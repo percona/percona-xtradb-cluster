@@ -327,7 +327,7 @@ static wsrep_status_t wsrep_set_options()
   return wsrep->options_set(wsrep, wsrep_options);
 }
 
-void wsrep_start_replication()
+bool wsrep_start_replication()
 {
   wsrep_status_t rcode;
   struct wsrep_init_args wsrep_args;
@@ -414,7 +414,8 @@ void wsrep_start_replication()
   else
   {
     /* start wsrep threads */
-    wsrep_create_appliers();
+    // Commented out, must be done now by caller
+    // wsrep_create_appliers();
     /*
      * check if provider supports incremental data collection
      * TODO: this should be implemented via capabilities interface
@@ -430,11 +431,10 @@ void wsrep_start_replication()
     }
   }
 
-  return;
+  return true;
 
 err:
-
-  unireg_abort(1);
+  return false;
 }
 
 bool

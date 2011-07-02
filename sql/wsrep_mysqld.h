@@ -96,11 +96,12 @@ extern int  wsrep_init();
 extern void wsrep_close_client_connections();
 extern void wsrep_close_appliers(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd); 
-extern void wsrep_create_appliers();
+extern void wsrep_create_appliers(long threads = wsrep_slave_threads);
+extern void wsrep_start_server_shutdown(THD *thd);
 
 /* new defines */
 extern void wsrep_stop_replication(THD *thd);
-extern void wsrep_start_replication();
+extern bool wsrep_start_replication();
 extern bool wsrep_causal_wait(THD* thd);
 // MySQL logging functions don't seem to understand long long length modifer.
 // This is a workaround. It also prefixes all messages with "WSREP"
@@ -120,7 +121,7 @@ extern bool wsrep_causal_wait(THD* thd);
 /*! Synchronizes applier thread start with init thread */
 extern void wsrep_sst_grab();
 /*! Init thread waits for SST completion */
-extern void wsrep_sst_wait();
+extern bool wsrep_sst_wait();
 /*! Signals wsrep that initialization is complete, writesets can be applied */
 extern void wsrep_sst_continue();
 

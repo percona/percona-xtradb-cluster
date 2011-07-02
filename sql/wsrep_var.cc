@@ -236,8 +236,10 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
     thd->variables.wsrep_on= false;
 
     wsrep_stop_replication(thd);
-    wsrep_start_replication();
-
+    if (wsrep_start_replication())
+    {
+      wsrep_create_appliers();
+    }
     thd->variables.wsrep_on= wsrep_on_saved;
   }
 
@@ -320,8 +322,10 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
   thd->variables.wsrep_on= false;
 
   wsrep_stop_replication(thd);
-  wsrep_start_replication();
-
+  if (wsrep_start_replication())
+  {
+    wsrep_create_appliers();
+  }
   thd->variables.wsrep_on= wsrep_on_saved;
 
   return 0;

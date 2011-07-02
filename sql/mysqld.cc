@@ -1438,6 +1438,18 @@ extern "C" void unireg_abort(int exit_code)
     usage();
   if (exit_code)
     sql_print_error("Aborting\n");
+
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&LOCK_thread_count);
+  while (wsrep_running_threads > 0)
+  {
+    sql_print_information("waiting for %lu wsrep threads to finish",
+                          wsrep_running_threads);
+    mysql_cond_wait(&COND_thread_count, &LOCK_thread_count);
+  }
+  mysql_mutex_unlock(&LOCK_thread_count);
+#endif // WITH_WSREP
+
   clean_up(!opt_help && (exit_code || !opt_bootstrap)); /* purecov: inspected */
   DBUG_PRINT("quit",("done with cleanup in unireg_abort"));
   mysqld_exit(exit_code);
@@ -2033,7 +2045,11 @@ static void network_init(void)
   @note
     For the connection that is doing shutdown, this is called twice
 */
+#ifdef WITH_WSREP
+void close_connection(THD *thd, uint sql_errno, bool lock)
+#else
 void close_connection(THD *thd, uint sql_errno)
+#endif
 {
   DBUG_ENTER("close_connection");
 
@@ -2049,6 +2065,10 @@ void close_connection(THD *thd, uint sql_errno)
     sleep(0); /* Workaround to avoid tailcall optimisation */
   }
   MYSQL_AUDIT_NOTIFY_CONNECTION_DISCONNECT(thd, sql_errno);
+#ifdef WITH_WSREP
+  if (lock)
+    mysql_mutex_unlock(&LOCK_thread_count);
+#endif
   DBUG_VOID_RETURN;
 }
 #endif /* EMBEDDED_LIBRARY */
@@ -3927,10 +3947,20 @@ will be ignored as the --log-bin option is not defined.");
       wsrep_init();
       wsrep_thr_lock_init(wsrep_thd_is_brute_force, wsrep_abort_thd,
 			  wsrep_debug, wsrep_convert_LOCK_to_trx);
-      wsrep_create_rollbacker();
       wsrep_sst_grab();
-      wsrep_start_replication();
-      wsrep_sst_wait();     // wait until SST is completed
+      if (!wsrep_start_replication())
+      {
+        unireg_abort(1);
+      }
+      wsrep_create_rollbacker();
+      wsrep_create_appliers(1);
+      if (!wsrep_sst_wait()) // wait until SST is completed
+      {
+        wsrep->disconnect(wsrep);
+        wsrep_close_appliers(NULL);
+        unireg_abort(1);
+      }
+      wsrep_create_appliers(wsrep_slave_threads - 1);
     }
   }
 #endif /* WITH_WSREP */
@@ -4297,7 +4327,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   thd->thr_create_utime= my_micro_time();
   if (MYSQL_CALLBACK_ELSE(thread_scheduler, init_new_connection_thread, (), 0))
   {
-    close_connection(thd, ER_OUT_OF_RESOURCES);
+    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     return 0;
@@ -4319,7 +4349,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   thd->thread_stack= (char*) &thd;
   if (thd->store_globals())
   {
-    close_connection(thd, ER_OUT_OF_RESOURCES);
+    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
     statistic_increment(aborted_connects,&LOCK_status);
     //thread_scheduler.end_thread(thd,0);
     delete thd;
@@ -4347,16 +4377,34 @@ pthread_handler_t start_wsrep_THD(void *arg)
   ++connection_count;
   mysql_mutex_unlock(&LOCK_connection_count);
 
-
+  mysql_mutex_lock(&LOCK_thread_count);
   wsrep_running_threads++;
+  mysql_cond_signal(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
 
   processor(thd);
 
-  wsrep_running_threads--;
+  close_connection(thd, 0, 1);
 
-  close_connection(thd, 0);
-  MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 1));
-  delete thd;
+  mysql_mutex_lock(&LOCK_thread_count);
+  wsrep_running_threads--;
+  mysql_cond_signal(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
+
+  // Note: We can't call THD destructor without crashing
+  // if plugins have not been initialized. However, in most of the
+  // cases this means that pre SE initialization SST failed and
+  // we are going to exit anyway.
+  if (plugins_are_initialized)
+  {
+    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 1));
+  }
+  else
+  {
+    // TODO: lightweight cleanup to get rid of:
+    // 'Error in my_thread_global_end(): 2 threads didn't exit'
+    // at server shutdown
+  }
   DBUG_RETURN(NULL);
 }
 
@@ -4371,11 +4419,11 @@ static void wsrep_create_rollbacker()
 
 }
 
-void wsrep_create_appliers()
+void wsrep_create_appliers(long threads)
 {
   long wsrep_threads=0;
   pthread_t hThread;
-  while (wsrep_threads++ < wsrep_slave_threads) {
+  while (wsrep_threads++ < threads) {
     if (pthread_create(
       &hThread, &connection_attrib,
       start_wsrep_THD, (void*)wsrep_replication_process))
@@ -4508,7 +4556,7 @@ void wsrep_close_client_connections()
     if (is_client_connection(tmp) && !abort_replicated(tmp))
     {
       sql_print_information("WSREP: SST kill local trx: %ld",tmp->thread_id);
-      close_connection(tmp,0);
+      close_connection(tmp,0,0);
     }
 #endif
   }
@@ -4563,7 +4611,7 @@ void wsrep_close_appliers(THD *thd)
   mysql_mutex_unlock(&LOCK_thread_count);
 }
 
-void wsrep_wait_appliers_close(THD *thd) 
+void wsrep_wait_appliers_close(THD *thd)
 {
   mysql_mutex_lock(&LOCK_thread_count); // For unlink from list
 
@@ -4577,7 +4625,16 @@ void wsrep_wait_appliers_close(THD *thd)
 
   /* All wsrep applier threads have now been aborted. However, if this thread
      is also applier, we are still running...
-   */
+  */
+}
+
+void wsrep_start_server_shutdown(THD *thd)
+{
+  if (mysqld_server_started && !shutdown_in_progress)
+  {
+    WSREP_INFO("starting shutdown");
+    kill_mysql();
+  }
 }
 #endif // WITH_WSREP
 
@@ -5059,9 +5116,12 @@ int mysqld_main(int argc, char **argv)
       wsrep_init();
       wsrep_thr_lock_init(wsrep_thd_is_brute_force, wsrep_abort_thd,
 			  wsrep_debug, wsrep_convert_LOCK_to_trx);
+      if (!wsrep_start_replication())
+      {
+        unireg_abort(1);
+      }
       wsrep_create_rollbacker();
-      // Appliers are created in start replication
-      wsrep_start_replication();
+      wsrep_create_appliers();
     }
   }
 #endif /* WITH_WSREP */
@@ -5498,7 +5558,11 @@ void create_thread_to_handle_connection(THD *thd)
       my_snprintf(error_message_buff, sizeof(error_message_buff),
                   ER_THD(thd, ER_CANT_CREATE_THREAD), error);
       net_send_error(thd, ER_CANT_CREATE_THREAD, error_message_buff, NULL);
+#ifdef WITH_WSREP
+      close_connection(thd,0,0);
+#else
       close_connection(thd);
+#endif
       mysql_mutex_lock(&LOCK_thread_count);
       delete thd;
       mysql_mutex_unlock(&LOCK_thread_count);
@@ -5540,7 +5604,11 @@ static void create_new_thread(THD *thd)
     mysql_mutex_unlock(&LOCK_connection_count);
 
     DBUG_PRINT("error",("Too many connections"));
+#ifdef WITH_WSREP
+    close_connection(thd, ER_CON_COUNT_ERROR, 1);
+#else
     close_connection(thd, ER_CON_COUNT_ERROR);
+#endif
     delete thd;
     DBUG_VOID_RETURN;
   }
@@ -5921,7 +5989,11 @@ pthread_handler_t handle_connections_namedpipes(void *arg)
     if (!(thd->net.vio= vio_new_win32pipe(hConnectedPipe)) ||
 	my_net_init(&thd->net, thd->net.vio))
     {
+#ifdef WITH_WSREP
+      close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+#else
       close_connection(thd, ER_OUT_OF_RESOURCES);
+#endif
       delete thd;
       continue;
     }
@@ -6116,7 +6188,11 @@ pthread_handler_t handle_connections_shared_memory(void *arg)
                                                    event_conn_closed)) ||
                         my_net_init(&thd->net, thd->net.vio))
     {
+#ifdef WITH_WSREP
+      close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+#else
       close_connection(thd, ER_OUT_OF_RESOURCES);
+#endif
       errmsg= 0;
       goto errorconn;
     }

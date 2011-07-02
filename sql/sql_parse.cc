@@ -651,7 +651,11 @@ void do_handle_bootstrap(THD *thd)
   if (my_thread_init() || thd->store_globals())
   {
 #ifndef EMBEDDED_LIBRARY
+#ifdef WITH_WSREP
+    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+#else
     close_connection(thd, ER_OUT_OF_RESOURCES);
+#endif
 #endif
     thd->fatal_error();
     goto end;
@@ -7774,9 +7778,11 @@ void wsrep_replication_process(THD *thd)
     break;
   case WSREP_NODE_FAIL:
     /* data inconsistency => SST is needed */
-    WSREP_WARN("node consistency compromised, restarting provider");
-    wsrep_stop_replication(thd);
-    wsrep_start_replication();
+    /* Note: we cannot just blindly restart replication here,
+     * SST might require server restart if storage engines must be
+     * initialized after SST */
+    WSREP_ERROR("node consistency compromised, aborting");
+    wsrep_start_server_shutdown(thd);
     break;
   case WSREP_WARNING:
   case WSREP_TRX_FAIL:
@@ -7786,15 +7792,15 @@ void wsrep_replication_process(THD *thd)
     /* fall through to node shutdown */
   case WSREP_FATAL:
   case WSREP_CONN_FAIL:
-    /* cluster connectivity is lost, node must abort 
-       however, if applier was killed on purpose (KILL_CONNECTION), we
-       avoid mysql shutdown. This is because the killer will then handle
-       shutdown processing (or replication restarting) 
-    */
-    if (!shutdown_in_progress && thd->killed != THD::KILL_CONNECTION) 
+    /* Cluster connectivity is lost.
+     *
+     * If applier was killed on purpose (KILL_CONNECTION), we
+     * avoid mysql shutdown. This is because the killer will then handle
+     * shutdown processing (or replication restarting)
+     */
+    if (thd->killed != THD::KILL_CONNECTION)
     {
-      WSREP_INFO("starting shutdown");
-      kill_mysql();
+      wsrep_start_server_shutdown(thd);
     }
     break;
   }

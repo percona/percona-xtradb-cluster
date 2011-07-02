@@ -50,7 +50,7 @@ void wsrep_sst_grab ()
 }
 
 // Wait for end of SST
-void wsrep_sst_wait ()
+bool wsrep_sst_wait ()
 {
   if (pthread_mutex_lock (&sst_lock)) abort();
   while (!sst_complete)
@@ -61,10 +61,7 @@ void wsrep_sst_wait ()
   WSREP_INFO("SST complete, status: %lld", (long long) local_seqno);
   pthread_mutex_unlock (&sst_lock);
 
-  if (local_seqno < 0)
-  {
-    unireg_abort(-local_seqno);
-  }
+  return (local_seqno >= 0);
 }
 
 // Signal end of SST
