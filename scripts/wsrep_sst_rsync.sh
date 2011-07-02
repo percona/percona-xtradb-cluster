@@ -71,8 +71,10 @@ then
     rsync -rlpgoDqI $WHOLE_FILE_OPT --inplace --delete \
           --exclude '*.err' --exclude '*.pid' --exclude '*.sock' --exclude '*.conf' \
           --exclude 'core' --exclude 'galera.*' --exclude 'grastate.txt' \
-          --exclude 'ib_logfile*' \
           "$DATA/" rsync://$ADDR
+
+# it looks like copying logfiles is mandatory at least for fresh nodes.
+#          --exclude 'ib_logfile*' \
 
     echo "$UUID:$SEQNO" > "$MAGIC_FILE"
     rsync -aqc "$MAGIC_FILE" rsync://$ADDR
