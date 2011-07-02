@@ -18,7 +18,6 @@
 # This is a reference script for mysqldump-based state snapshot tansfer
 
 trap "exit 32" SIGHUP SIGPIPE
-# trap "exit 32" SIGHUP SIGPIPE SIGCHLD
 trap kill_rsync EXIT
 
 

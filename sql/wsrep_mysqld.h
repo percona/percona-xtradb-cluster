@@ -97,7 +97,7 @@ extern void wsrep_close_client_connections();
 extern void wsrep_close_appliers(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd); 
 extern void wsrep_create_appliers(long threads = wsrep_slave_threads);
-extern void wsrep_start_server_shutdown(THD *thd);
+extern void wsrep_kill_mysql(THD *thd);
 
 /* new defines */
 extern void wsrep_stop_replication(THD *thd);

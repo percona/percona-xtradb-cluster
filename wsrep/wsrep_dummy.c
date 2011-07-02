@@ -53,6 +53,11 @@ static wsrep_status_t dummy_init (wsrep_t* w,
     return WSREP_OK;
 }
 
+static uint64_t dummy_capabilities (wsrep_t* w __attribute__((unused)))
+{
+    return 0;
+}
+
 static wsrep_status_t dummy_options_set(
     wsrep_t* w,
     const char* conf __attribute__((unused)))
@@ -278,6 +283,7 @@ void dummy_stats_free (
 static wsrep_t dummy_iface = {
     WSREP_INTERFACE_VERSION,
     &dummy_init,
+    &dummy_capabilities,
     &dummy_options_set,
     &dummy_options_get,
     &dummy_connect,

@@ -7782,7 +7782,7 @@ void wsrep_replication_process(THD *thd)
      * SST might require server restart if storage engines must be
      * initialized after SST */
     WSREP_ERROR("node consistency compromised, aborting");
-    wsrep_start_server_shutdown(thd);
+    wsrep_kill_mysql(thd);
     break;
   case WSREP_WARNING:
   case WSREP_TRX_FAIL:
@@ -7800,7 +7800,7 @@ void wsrep_replication_process(THD *thd)
      */
     if (thd->killed != THD::KILL_CONNECTION)
     {
-      wsrep_start_server_shutdown(thd);
+      wsrep_kill_mysql(thd);
     }
     break;
   }

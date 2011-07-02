@@ -413,22 +413,10 @@ bool wsrep_start_replication()
   }
   else
   {
-    /* start wsrep threads */
-    // Commented out, must be done now by caller
-    // wsrep_create_appliers();
-    /*
-     * check if provider supports incremental data collection
-     * TODO: this should be implemented via capabilities interface
-     */
-    wsrep_trx_handle_t dummy_trx= {-1, 0};
-    if (wsrep->append_data(wsrep, &dummy_trx, NULL, 0) == WSREP_NOT_IMPLEMENTED)
-    {
-      wsrep_incremental_data_collection= FALSE;
-    }
-    else
-    {
-      wsrep_incremental_data_collection= TRUE;
-    }
+    uint64_t caps = wsrep->capabilities (wsrep);
+
+    wsrep_incremental_data_collection =
+        (caps & WSREP_CAP_WRITE_SET_INCREMENTS);
   }
 
   return true;
