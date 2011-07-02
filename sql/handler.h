@@ -323,6 +323,7 @@ enum legacy_db_type
   DB_TYPE_MEMCACHE,
   DB_TYPE_FALCON,
   DB_TYPE_MARIA,
+  DB_TYPE_WSREP,
   /** Performance schema engine. */
   DB_TYPE_PERFORMANCE_SCHEMA,
   DB_TYPE_FIRST_DYNAMIC=42,
@@ -799,6 +800,8 @@ struct handlerton
                      const char *wild, bool dir, List<LEX_STRING> *files);
    int (*table_exists_in_engine)(handlerton *hton, THD* thd, const char *db,
                                  const char *name);
+   int (*wsrep_abort_transaction)(handlerton *hton, THD *bf_thd, 
+				  THD *victim_thd);
    uint32 license; /* Flag for Engine License */
    void *data; /* Location for engines to keep personal structures */
 };
@@ -2212,6 +2215,7 @@ int ha_enable_transaction(THD *thd, bool on);
 int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd);
 
 /* these are called by storage engines */
 void trans_register_ha(THD *thd, bool all, handlerton *ht);
@@ -2241,6 +2245,9 @@ int ha_binlog_end(THD *thd);
 #define ha_binlog_log_query(a,b,c,d,e,f,g) do {} while (0)
 #define ha_binlog_wait(a) do {} while (0)
 #define ha_binlog_end(a)  do {} while (0)
+#endif
+#ifdef WITH_WSREP
+void wsrep_brute_force_aborts();
 #endif
 
 const char *get_canonical_filename(handler *file, const char *path,

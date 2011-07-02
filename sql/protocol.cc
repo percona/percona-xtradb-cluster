@@ -489,6 +489,14 @@ static uchar *net_store_length_fast(uchar *packet, uint length)
 
 void Protocol::end_statement()
 {
+#ifdef WITH_WSREP
+  /*sanity check, can be removed before 1.0 release */
+  if (thd->wsrep_conflict_state== REPLAYING)
+    {
+      sql_print_warning("WSREP attempting net_end_statement while replaying");
+      return;
+    }
+#endif
   DBUG_ENTER("Protocol::end_statement");
   DBUG_ASSERT(! thd->stmt_da->is_sent);
   bool error= FALSE;

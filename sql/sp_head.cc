@@ -2976,7 +2976,11 @@ sp_lex_keeper::reset_lex_and_exec_core(THD *thd, uint *nextp,
     }
     thd_proc_info(thd, "closing tables");
     close_thread_tables(thd);
+#ifdef WITH_WSREP
+    /* if (thd->is_applier()) */ thd_proc_info(thd, "closed tables"); /*else*/
+#else /* WITH_WSREP */
     thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
 
     if (! thd->in_sub_stmt && ! thd->in_multi_stmt_transaction_mode())
       thd->mdl_context.release_transactional_locks();

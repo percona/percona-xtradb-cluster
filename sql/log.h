@@ -190,6 +190,12 @@ enum enum_log_state { LOG_OPENED, LOG_CLOSED, LOG_TO_BE_OPENED };
   (mmap+fsync is two times faster than write+fsync)
 */
 
+#ifdef WITH_WSREP
+extern my_bool wsrep_emulate_bin_log;
+Log_event* wsrep_read_log_event(
+  char **arg_buf, size_t *arg_buf_len,
+  const Format_description_log_event *description_event);
+#endif
 class MYSQL_LOG
 {
 public:
@@ -672,12 +678,29 @@ public:
 };
 
 enum enum_binlog_format {
+  /*
+    statement-based except for cases where only row-based can work (UUID()
+    etc):
+  */
+#ifdef WITH_WSREP
+  BINLOG_FORMAT_STMT= 0, // statement-based
+  BINLOG_FORMAT_ROW= 1, // row_based
+  BINLOG_FORMAT_UNSPEC= 2,
+  BINLOG_FORMAT_MIXED= 3 // mixed format is disabled
+#else
   BINLOG_FORMAT_MIXED= 0, ///< statement if safe, otherwise row - autodetected
   BINLOG_FORMAT_STMT=  1, ///< statement-based
   BINLOG_FORMAT_ROW=   2, ///< row-based
   BINLOG_FORMAT_UNSPEC=3  ///< thd_binlog_format() returns it when binlog is closed
+#endif
 };
 
+#ifdef WITH_WSREP
+IO_CACHE * get_trans_log(THD * thd);
+void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
+void thd_binlog_trx_reset(THD * thd);
+int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len);
+#endif
 int query_error_code(THD *thd, bool not_killed);
 uint purge_log_get_error_code(int res);
 

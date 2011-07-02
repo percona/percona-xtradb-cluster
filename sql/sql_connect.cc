@@ -54,6 +54,9 @@
 #else
 #define MIN_HANDSHAKE_SIZE      6
 #endif /* HAVE_OPENSSL && !EMBEDDED_LIBRARY */
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 
 /*
   Get structure for logging connection data for the current user
@@ -607,6 +610,13 @@ bool login_connection(THD *thd)
 void end_connection(THD *thd)
 {
   NET *net= &thd->net;
+#ifdef WITH_WSREP
+    wsrep_status_t rcode= wsrep->set_database(wsrep, thd->thread_id, NULL, -1);
+    if (rcode) {
+      sql_print_warning("wsrep failed to close connection: %lu, code: %d",
+                        thd->thread_id, rcode);
+    }
+#endif
   plugin_thdvar_cleanup(thd);
   if (thd->user_connect)
   {
@@ -773,6 +783,11 @@ void do_handle_one_connection(THD *thd_arg)
     }
     end_connection(thd);
    
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  thd->wsrep_query_state= QUERY_EXITING;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif
 end_thread:
     close_connection(thd);
     if (MYSQL_CALLBACK_ELSE(thread_scheduler, end_thread, (thd, 1), 0))

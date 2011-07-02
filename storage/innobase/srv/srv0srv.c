@@ -86,6 +86,10 @@ Created 10/8/1995 Heikki Tuuri
 #include "mysql/plugin.h"
 #include "mysql/service_thd_wait.h"
 
+#ifdef WITH_WSREP
+extern int wsrep_debug;
+extern int wsrep_trx_is_aborting(void *thd_ptr);
+#endif
 /* The following counter is incremented whenever there is some user activity
 in the server */
 UNIV_INTERN ulint	srv_activity_count	= 0;
@@ -366,6 +370,9 @@ struct srv_conc_slot_struct{
 							free to proceed; but
 							reserved may still be
 							TRUE at that point */
+#ifdef WITH_WSREP
+	void				*thd;		/*!< to see priority */
+#endif
 	UT_LIST_NODE_T(srv_conc_slot_t)	srv_conc_queue;	/*!< queue node */
 };
 
@@ -1073,6 +1080,9 @@ srv_init(void)
 		conc_slot->reserved = FALSE;
 		conc_slot->event = os_event_create(NULL);
 		ut_a(conc_slot->event);
+#ifdef WITH_WSREP
+		conc_slot->thd = NULL;
+#endif
 	}
 
 	/* Initialize some INFORMATION SCHEMA internal structures */
@@ -1160,6 +1170,16 @@ srv_conc_enter_innodb(
 		return;
 	}
 
+#ifdef WITH_WSREP
+	if (wsrep_thd_is_brute_force(trx->mysql_thd)) {
+		srv_conc_force_enter_innodb(trx);
+		return;
+	}
+	if (wsrep_trx_is_aborting(trx->mysql_thd)) {
+		srv_conc_force_enter_innodb(trx);
+		return;
+	}
+#endif
 	os_fast_mutex_lock(&srv_conc_mutex);
 retry:
 	if (trx->declared_to_be_inside_innodb) {
@@ -1252,6 +1272,9 @@ retry:
 	/* Add to the queue */
 	slot->reserved = TRUE;
 	slot->wait_ended = FALSE;
+#ifdef WITH_WSREP
+	slot->thd = trx->mysql_thd;
+#endif
 
 	UT_LIST_ADD_LAST(srv_conc_queue, srv_conc_queue, slot);
 
@@ -1284,6 +1307,9 @@ retry:
 	incremented the thread counter on behalf of this thread */
 
 	slot->reserved = FALSE;
+#ifdef WITH_WSREP
+	slot->thd = NULL;
+#endif
 
 	UT_LIST_REMOVE(srv_conc_queue, srv_conc_queue, slot);
 
@@ -1354,6 +1380,9 @@ srv_conc_force_exit_innodb(
 	trx->n_tickets_to_enter_innodb = 0;
 
 	if (srv_conc_n_threads < (lint)srv_thread_concurrency) {
+#ifdef WITH_WSREP
+		srv_conc_slot_t*  wsrep_slot;
+#endif
 		/* Look for a slot where a thread is waiting and no other
 		thread has yet released the thread */
 
@@ -1363,6 +1392,19 @@ srv_conc_force_exit_innodb(
 			slot = UT_LIST_GET_NEXT(srv_conc_queue, slot);
 		}
 
+#ifdef WITH_WSREP
+		/* look for aborting trx, they must be released asap */
+		wsrep_slot= slot;
+		while (wsrep_slot && (wsrep_slot->wait_ended == TRUE || 
+		    !wsrep_trx_is_aborting(wsrep_slot->thd))) {
+			wsrep_slot = UT_LIST_GET_NEXT(srv_conc_queue, wsrep_slot);
+		}
+		if (wsrep_slot) {
+			slot = wsrep_slot;
+			if (wsrep_debug)
+			    fprintf(stderr, "WSREP: releasing aborting thd\n");
+		}
+#endif
 		if (slot != NULL) {
 			slot->wait_ended = TRUE;
 
@@ -2320,8 +2362,18 @@ loop:
 				granted: in that case do nothing */
 
 				if (trx->wait_lock) {
+#ifdef WITH_WSREP
+					if (wsrep_thd_is_brute_force(
+					  (thr_get_trx(slot->thr))->mysql_thd)){
+					  if (wsrep_debug) fprintf(stderr, 
+						"WSREP: BF lock wait long\n");
+					} else {
+#endif
 					lock_cancel_waiting_and_release(
 						trx->wait_lock);
+#ifdef WITH_WSREP
+					}
+#endif
 				}
 			}
 		}

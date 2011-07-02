@@ -228,7 +228,7 @@ Distribution:   %{distro_description}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
 Source:         http://www.mysql.com/Downloads/MySQL-@MYSQL_BASE_VERSION@/%{src_dir}.tar.gz
 URL:            http://www.mysql.com/
-Packager:       MySQL Build Team <build@mysql.com>
+Packager:	Codership Oy
 Vendor:         %{mysql_vendor}
 Provides:       msqlormysql MySQL-server mysql
 BuildRequires:  %{distro_buildreq}
@@ -263,6 +263,9 @@ documentation and the manual for more information.
 %package -n MySQL-server%{product_suffix}
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
+%if %{WSREP_BUILD}
+Release:	wsrep_@WSREP_MAJOR@.@WSREP_MINOR@.@WSREP_REV@
+%endif
 Requires:       %{distro_requires}
 Provides:       msqlormysql mysql-server mysql MySQL MySQL-server
 Obsoletes:      MySQL mysql mysql-server MySQL-server MySQL-server-community
@@ -357,6 +360,15 @@ speed and more simple management for embedded applications.
 
 The API is identical for the embedded MySQL version and the
 client/server version.
+
+%{see_base}
+%endif
+
+%endif
+
+##############################################################################
+#
+##############################################################################
 
 For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 
@@ -501,6 +513,9 @@ ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 # Touch the place where the my.cnf config file might be located
 # Just to make sure it's in the file list and marked as a config file
 touch $RBR%{_sysconfdir}/my.cnf
+touch $RBR%{_sysconfdir}/mysqlmanager.passwd
+%if %{WSREP_BUILD}
+touch $RBR%{_sysconfdir}/wsrep.cnf
 
 # Install SELinux files in datadir
 install -m 600 $MBD/%{src_dir}/support-files/RHEL4-SElinux/mysql.{fc,te} \
@@ -946,6 +961,9 @@ echo "====="                                     >> $STATUS_HISTORY
 %if %{defined license_files_server}
 %doc %{license_files_server}
 %endif
+%if %{WSREP_BUILD}
+%doc mysql-release-%{mysql_version}/support-files/wsrep.cnf
+%endif
 %doc %{src_dir}/Docs/ChangeLog
 %doc %{src_dir}/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
@@ -982,6 +1000,9 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 
 %ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
+%if %{WSREP_BUILD}
+%ghost %config(noreplace,missingok) %{_sysconfdir}/wsrep.cnf
+%endif
 
 %attr(755, root, root) %{_bindir}/innochecksum
 %attr(755, root, root) %{_bindir}/my_print_defaults
@@ -1007,6 +1028,9 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/replace
 %attr(755, root, root) %{_bindir}/resolve_stack_dump
 %attr(755, root, root) %{_bindir}/resolveip
+%if %{WSREP_BUILD}
+%attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
+%endif
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1276,6 +1300,11 @@ echo "====="                                     >> $STATUS_HISTORY
 * Thu Aug 20 2009 Jonathan Perkin <jperkin@sun.com>
 
 - Update variable used for mysql-test suite location to match source.
+
+* Mon Jun 15 2009 Alex Yurchenko <alexey.yurchenko@codership.com>
+
+- Added option to build server RPM with wsrep support. That required
+  ifdefing out all embedded stuff. Use "rpmbuild --with wsrep" for it.
 
 * Fri Nov 07 2008 Joerg Bruehe <joerg@mysql.com>
 

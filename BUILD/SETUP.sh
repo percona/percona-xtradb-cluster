@@ -198,7 +198,7 @@ max_configs="$SSL_LIBRARY --with-plugins=max --with-embedded-server"
 alpha_cflags="$check_cpu_cflags -Wa,-m$cpu_flag"
 amd64_cflags="$check_cpu_cflags"
 amd64_cxxflags=""  # If dropping '--with-big-tables', add here  "-DBIG_TABLES"
-pentium_cflags="$check_cpu_cflags"
+pentium_cflags="$check_cpu_cflags -m32"
 pentium64_cflags="$check_cpu_cflags -m64"
 ppc_cflags="$check_cpu_cflags"
 sparc_cflags=""
@@ -233,6 +233,25 @@ then
   echo "$CC" | grep "ccache" > /dev/null || CC="ccache $CC"
   echo "$CXX" | grep "ccache" > /dev/null || CXX="ccache $CXX"
 fi
+
+################################################################################
+## WSREP SETUP                                                               ##
+################################################################################
+MYSQL_SOCKET_PATH=${MYSQL_SOCKET_PATH:-"/var/lib/mysql/mysql.sock"}
+wsrep_configs=""\
+"--with-wsrep "\
+"--with-comment=wsrep_dev "\
+"--without-archive-storage-engine "\
+"--without-blackhole-storage-engine "\
+"--without-example-storage-engine "\
+"--without-federated-storage-engine "\
+"--without-plugin-innobase "\
+"--with-plugin-innodb_plugin "\
+"--with-unix-socket-path=$MYSQL_SOCKET_PATH"
+
+wsrep_cflags="$wsrep_cflags -DWSREP_PROC_INFO -DWITH_WSREP"
+if test -n "$MYSQL_REV"; then wsrep_cflags="$wsrep_cflags -DMYSQL_REV=$MYSQL_REV"; fi
+if test -n "$WSREP_REV"; then wsrep_cflags="$wsrep_cflags -DWSREP_REV=$WSREP_REV"; fi
 
 # gcov
 

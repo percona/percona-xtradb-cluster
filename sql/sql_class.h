@@ -18,6 +18,31 @@
 #define SQL_CLASS_INCLUDED
 
 /* Classes in mysql */
+#ifdef WITH_WSREP
+#include "../wsrep/wsrep_api.h"
+  enum wsrep_exec_mode {
+    LOCAL_STATE,
+    REPL_RECV,
+    TOTAL_ORDER,
+    LOCAL_COMMIT,
+  };
+  enum wsrep_query_state {
+    QUERY_IDLE,
+    QUERY_EXEC,
+    QUERY_COMMITTING,
+    QUERY_EXITING,
+    QUERY_ROLLINGBACK,
+  };
+  enum wsrep_conflict_state {
+    NO_CONFLICT,
+    MUST_ABORT,
+    ABORTING,
+    ABORTED,
+    MUST_REPLAY,
+    REPLAYING,
+    RETRY_AUTOCOMMIT,
+  };
+#endif
 
 #ifdef USE_PRAGMA_INTERFACE
 #pragma interface			/* gcc class implementation */
@@ -506,6 +531,9 @@ typedef struct system_variables
 
   my_bool sysdate_is_now;
 
+#ifdef WITH_WSREP
+  my_bool wsrep_on;
+#endif
   double long_query_time_double;
 
 } SV;
@@ -867,6 +895,9 @@ struct st_savepoint {
   /** State of metadata locks before this savepoint was set. */
   MDL_savepoint        mdl_savepoint;
 };
+#ifdef WITH_WSREP
+void wsrep_cleanup_transaction(THD *thd); // THD.transactions.cleanup calls it
+#endif
 
 enum xa_states {XA_NOTR=0, XA_ACTIVE, XA_IDLE, XA_PREPARED, XA_ROLLBACK_ONLY};
 extern const char *xa_state_names[];
@@ -1696,7 +1727,11 @@ public:
     */
     CHANGED_TABLE_LIST* changed_tables;
     MEM_ROOT mem_root; // Transaction-life memory allocation pool
+#ifdef WITH_WSREP 
+    void cleanup(THD *thd)
+#else
     void cleanup()
+#endif
     {
       changed_tables= 0;
       savepoints= 0;
@@ -1709,6 +1744,10 @@ public:
       if (!xid_state.rm_error)
         xid_state.xid.null();
       free_root(&mem_root,MYF(MY_KEEP_PREALLOC));
+#ifdef WITH_WSREP // Todo: convert into a plugin method
+      // wsrep's post-commit. LOCAL_COMMIT designates wsrep's commit was ok
+      wsrep_cleanup_transaction(thd);
+#endif  /* WITH_WSREP */
     }
     my_bool is_active()
     {
@@ -2150,6 +2189,26 @@ public:
     query_id_t first_query_id;
   } binlog_evt_union;
 
+#ifdef WITH_WSREP
+  const bool                wsrep_applier; /* dedicated slave applier thread */
+  enum wsrep_exec_mode      wsrep_exec_mode;
+  query_id_t                wsrep_last_query_id;
+  enum wsrep_query_state    wsrep_query_state;
+  enum wsrep_conflict_state wsrep_conflict_state;
+  mysql_mutex_t             LOCK_wsrep_thd;
+  mysql_cond_t              COND_wsrep_thd;
+  wsrep_seqno_t             wsrep_trx_seqno;
+  uint32                    wsrep_rand;
+  uint64                    wsrep_trx_to_replay;
+  Relay_log_info*           wsrep_rli;
+  bool                      wsrep_converted_lock_session;
+  wsrep_trx_handle_t        wsrep_trx_handle;
+#ifdef WSREP_PROC_INFO
+  char                      wsrep_info[128]; /* string for dynamic proc info */
+#endif /* WSREP_PROC_INFO */
+  ulong                     wsrep_retry_autocommit; // max retry value
+  ulong                     wsrep_retry_counter; // of autocommit
+#endif /* WITH_WSREP */
   /**
     Internal parser state.
     Note that since the parser is not re-entrant, we keep only one parser
@@ -2181,7 +2240,11 @@ public:
   /* Debug Sync facility. See debug_sync.cc. */
   struct st_debug_sync_control *debug_sync_control;
 #endif /* defined(ENABLED_DEBUG_SYNC) */
+#ifdef WITH_WSREP
+  THD(bool is_applier = false);
+#else
   THD();
+#endif
   ~THD();
 
   void init(void);

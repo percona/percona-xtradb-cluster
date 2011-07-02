@@ -50,6 +50,9 @@
 #include "sql_plugin.h"
 #include "rpl_handler.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 /* max size of the log message */
 #define MAX_LOG_BUFFER_SIZE 1024
 #define MAX_TIME_SIZE 32
@@ -456,6 +459,9 @@ private:
 };
 
 handlerton *binlog_hton;
+#ifdef WITH_WSREP
+extern handlerton *wsrep_hton;
+#endif
 
 bool LOGGER::is_log_table_enabled(uint log_table_type)
 {
@@ -470,6 +476,103 @@ bool LOGGER::is_log_table_enabled(uint log_table_type)
   }
 }
 
+#ifdef WITH_WSREP
+IO_CACHE * get_trans_log(THD * thd)
+{
+  return ((binlog_cache_mngr*)
+           thd_get_ha_data(thd, binlog_hton))->get_binlog_cache_log(true);
+}
+
+void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end)
+{
+  thd->binlog_flush_pending_rows_event(stmt_end);
+}
+void thd_binlog_trx_reset(THD * thd)
+{
+  /*
+    todo: fix autocommit select to not call the caller
+  */
+  if (thd_get_ha_data(thd, binlog_hton) != NULL)
+  {
+    binlog_cache_mngr *const cache_mngr=
+      (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+    cache_mngr->reset_cache(&cache_mngr->trx_cache);
+  }
+  thd->clear_binlog_table_maps();
+}
+/*
+  Write the contents of a cache to memory buffer.
+
+  This function quite the same as MYSQL_BIN_LOG::write_cache(),
+  with the exception that here we write in buffer instead of log file.
+ */
+
+int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
+{
+
+  if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
+    return ER_ERROR_ON_WRITE;
+  uint length= my_b_bytes_in_cache(cache);
+  uint total_length = 0;
+  uchar *buf_ptr = NULL;
+  
+  do
+  {
+    /* bail out if buffer grows too large
+       This is a temporary fix to avoid flooding replication
+       TODO: remove this check for 0.7.4 release
+     */
+    if (total_length > wsrep_max_ws_size)
+    {
+      sql_print_warning("WSREP: transaction size exceeded: %d", total_length);
+      if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
+      {
+        sql_print_warning("WSREP: failed to initialize io-cache");
+      } 
+      if (buf_ptr) my_free(*buf);
+      *buf_len = 0;
+      return ER_ERROR_ON_WRITE;
+    }
+    if (total_length > 0)
+    {
+      *buf_len += length;
+      *buf = (uchar *)my_realloc(*buf, total_length+length, MYF(0));
+      if (!*buf)
+      {
+        sql_print_error("WSREP io cache write problem: %d %d",*buf_len,length);
+        return ER_ERROR_ON_WRITE;
+      }
+      buf_ptr = *buf+total_length;
+    }
+    else
+    {
+      if (buf_ptr != NULL)
+      {
+        sql_print_error("WSREP io cache alloc error: %d %d", *buf_len, length);
+        my_free(*buf);
+      }
+      if (length > 0) 
+      {
+        *buf = (uchar *) my_malloc(length, MYF(0));
+        buf_ptr = *buf;
+        *buf_len = length;
+      }
+    }
+    total_length += length;
+
+    memcpy(buf_ptr, cache->read_pos, length);
+    cache->read_pos=cache->read_end;
+  } while ((cache->file >= 0) && (length= my_b_fill(cache)));
+
+  if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
+  { 
+    if (buf_ptr) my_free(*buf);
+    *buf_len = 0;
+    return ER_ERROR_ON_WRITE;
+  }
+  return 0;
+}
+#endif
 
 /* Check if a given table is opened log table */
 int check_if_log_table(size_t db_len, const char *db, size_t table_name_len,
@@ -1518,7 +1621,11 @@ binlog_trans_log_savepos(THD *thd, my_off_t *pos)
     thd->binlog_setup_trx_data();
   binlog_cache_mngr *const cache_mngr=
     (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+#ifdef WITH_WSREP
+  DBUG_ASSERT(wsrep_emulate_bin_log || mysql_bin_log.is_open());
+#else
   DBUG_ASSERT(mysql_bin_log.is_open());
+#endif
   *pos= cache_mngr->trx_cache.get_byte_position();
   DBUG_PRINT("return", ("*pos: %lu", (ulong) *pos));
   DBUG_VOID_RETURN;
@@ -1566,7 +1673,11 @@ binlog_trans_log_truncate(THD *thd, my_off_t pos)
 int binlog_init(void *p)
 {
   binlog_hton= (handlerton *)p;
+#ifdef WITH_WSREP
+  binlog_hton->state= SHOW_OPTION_YES;
+#else
   binlog_hton->state=opt_bin_log ? SHOW_OPTION_YES : SHOW_OPTION_NO;
+#endif
   binlog_hton->db_type=DB_TYPE_BINLOG;
   binlog_hton->savepoint_offset= sizeof(my_off_t);
   binlog_hton->close_connection= binlog_close_connection;
@@ -4620,6 +4731,17 @@ THD::binlog_start_trans_and_stmt()
       cache_mngr->trx_cache.get_prev_position() == MY_OFF_T_UNDEF)
   {
     this->binlog_set_stmt_begin();
+#ifdef WITH_WSREP
+    if (in_multi_stmt_transaction_mode())
+    {
+      trans_register_ha(this, TRUE, wsrep_hton);
+      ha_data[wsrep_hton->slot].ha_info[1].set_trx_read_write();
+    }
+    trans_register_ha(this, FALSE, wsrep_hton);
+    ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
+    if (wsrep_emulate_bin_log)
+      DBUG_VOID_RETURN;
+#endif
     if (in_multi_stmt_transaction_mode())
       trans_register_ha(this, TRUE, binlog_hton);
     trans_register_ha(this, FALSE, binlog_hton);
@@ -4675,7 +4797,12 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional)
                        table->s->table_map_id));
 
   /* Pre-conditions */
+#ifdef WITH_WSREP
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+              (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+#else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
+#endif
   DBUG_ASSERT(table->s->table_map_id != ULONG_MAX);
 
   Table_map_log_event
@@ -4804,7 +4931,11 @@ MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
                                                 bool is_transactional)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::flush_and_set_pending_rows_event(event)");
+#ifdef WITH_WSREP
+  DBUG_ASSERT(wsrep_emulate_bin_log || mysql_bin_log.is_open());
+#else
   DBUG_ASSERT(mysql_bin_log.is_open());
+#endif
   DBUG_PRINT("enter", ("event: 0x%lx", (long) event));
 
   int error= 0;
@@ -4882,8 +5013,20 @@ bool MYSQL_BIN_LOG::write(Log_event *event_info)
      mostly called if is_open() *was* true a few instructions before, but it
      could have changed since.
   */
+#ifdef WITH_WSREP
+  if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+#else
   if (likely(is_open()))
+#endif
   {
+#ifdef WITH_WSREP
+    /* 
+       Note, non rbr events check is_open a bit earlier
+       and should not execute this method 
+    */
+    DBUG_ASSERT((int) thd->variables.binlog_format == BINLOG_FORMAT_ROW ||
+                 mysql_bin_log.is_open());
+#endif
 #ifdef HAVE_REPLICATION
     /*
       In the future we need to add to the following if tests like
@@ -5025,6 +5168,35 @@ unlock:
     }
   }
 
+#ifdef WITH_WSREP
+  if (wsrep_incremental_data_collection &&
+      (wsrep_emulate_bin_log || mysql_bin_log.is_open()))
+  {
+    DBUG_ASSERT(thd->wsrep_trx_handle.trx_id != (unsigned long)-1);
+    if (!error)
+    {
+      IO_CACHE* cache= get_trans_log(thd);
+      uchar* buf= NULL;
+      uint buf_len= 0;
+
+      if (wsrep_emulate_bin_log)
+        thd->binlog_flush_pending_rows_event(false);
+      error= wsrep_write_cache(cache, &buf, &buf_len);
+      if (!error && buf_len > 0)
+      {
+        wsrep_status_t rc= wsrep->append_data(wsrep,
+                                              &thd->wsrep_trx_handle,
+                                              buf, buf_len);
+        if (rc != WSREP_OK)
+        {
+          sql_print_warning("WSREP: append_data() returned %d", rc);
+          error= 1;
+        }
+      }
+      if (buf_len) my_free(buf);
+    }
+  }
+#endif /* WITH_WSREP */
   DBUG_RETURN(error);
 }
 
@@ -5113,6 +5285,14 @@ int MYSQL_BIN_LOG::rotate_and_purge(uint flags)
   DBUG_ENTER("MYSQL_BIN_LOG::rotate_and_purge");
 #ifdef HAVE_REPLICATION
   bool check_purge= false;
+#endif
+#ifdef WITH_WSREP
+  if (wsrep_to_isolation)
+    {
+      WSREP_DEBUG("avoiding binlog rotate due to TO isolation: %d", 
+		  wsrep_to_isolation);
+      DBUG_RETURN(0);
+    }
 #endif
   if (!(flags & RP_LOCK_LOG_IS_ALREADY_LOCKED))
     mysql_mutex_lock(&LOCK_log);
@@ -5997,8 +6177,13 @@ int TC_LOG_MMAP::open(const char *opt_name)
     mysql_mutex_init(key_PAGE_lock, &pg->lock, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_PAGE_cond, &pg->cond, 0);
     pg->start=(my_xid *)(data + i*tc_log_page_size);
+#ifndef WITH_WSREP
     pg->end=(my_xid *)(pg->start + tc_log_page_size);
+#endif /* WITH_WSREP */
     pg->size=pg->free=tc_log_page_size/sizeof(my_xid);
+#ifdef WITH_WSREP
+    pg->end=pg->start + pg->size;
+#endif /* WITH_WSREP */
   }
   pages[0].size=pages[0].free=
                 (tc_log_page_size-TC_LOG_HEADER_SIZE)/sizeof(my_xid);

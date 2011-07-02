@@ -1219,9 +1219,26 @@ int ha_commit_trans(THD *thd, bool all)
         */
         if ((err= ht->prepare(ht, thd, all)))
         {
+#ifdef WITH_WSREP
+          if (ht->db_type== DB_TYPE_WSREP)
+          {
+	    error= 1;
+	    /* avoid sending error, if we need to replay */
+            if (thd->wsrep_conflict_state!= MUST_REPLAY)
+            {
+              my_error(ER_LOCK_DEADLOCK, MYF(0), err);
+            }
+          }
+          else
+          {
+            /* not wsrep hton, bail to native mysql behavior */
+#endif
           my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
           error= 1;
-        }
+#ifdef WITH_WSREP
+          }
+#endif
+	}
         status_var_increment(thd->status_var.ha_prepare_count);
       }
       DBUG_EXECUTE_IF("crash_commit_after_prepare", DBUG_SUICIDE(););
@@ -1258,7 +1275,11 @@ end:
   }
   /* Free resources and perform other cleanup even for 'empty' transactions. */
   else if (is_real_trans)
+#ifdef WITH_WSREP
+    thd->transaction.cleanup(thd);
+#else
     thd->transaction.cleanup();
+#endif
   DBUG_RETURN(error);
 }
 
@@ -1293,6 +1314,17 @@ int ha_commit_one_phase(THD *thd, bool all)
   bool is_real_trans=all || thd->transaction.all.ha_list == 0;
   Ha_trx_info *ha_info= trans->ha_list, *ha_info_next;
   DBUG_ENTER("ha_commit_one_phase");
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64]= { 0, };
+  snprintf (info, sizeof(info) - 1, "ha_commit_one_phase(%lld)",
+            (long long)thd->wsrep_trx_seqno);
+#else
+  const char info[]="ha_commit_one_phase()";
+#endif /* WSREP_PROC_INFO */
+  const char* tmp_info= thd_proc_info(thd, info);
+#endif /* WITH_WSREP */
+#ifdef USING_TRANSACTIONS
 
   if (ha_info)
   {
@@ -1321,7 +1353,15 @@ int ha_commit_one_phase(THD *thd, bool all)
   }
   /* Free resources and perform other cleanup even for 'empty' transactions. */
   if (is_real_trans)
+#ifdef WITH_WSREP
+    thd->transaction.cleanup(thd);
+#else
     thd->transaction.cleanup();
+#endif /* WITH_WSREP */
+#endif /* USING_TRANSACTIONS */
+#ifdef WITH_WSREP
+  thd_proc_info(thd, tmp_info);
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(error);
 }
@@ -1396,7 +1436,11 @@ int ha_rollback_trans(THD *thd, bool all)
   }
   /* Always cleanup. Even if nht==0. There may be savepoints. */
   if (is_real_trans)
+#ifdef WITH_WSREP
+    thd->transaction.cleanup(thd);
+#else
     thd->transaction.cleanup();
+#endif /* WITH_WSREP */
   if (all)
     thd->transaction_rollback_request= FALSE;
 
@@ -1626,7 +1670,9 @@ int ha_recover(HASH *commit_list)
     for now, only InnoDB supports 2pc. It means we can always safely
     rollback all pending transactions, without risking inconsistent data
   */
+#ifndef WITH_WSREP
   DBUG_ASSERT(total_ha_2pc == (ulong) opt_bin_log+1); // only InnoDB and binlog
+#endif
   tc_heuristic_recover= TC_HEURISTIC_RECOVER_ROLLBACK; // forcing ROLLBACK
   info.dry_run=FALSE;
 #endif
@@ -4554,7 +4600,11 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
   return (thd->is_current_stmt_binlog_format_row() &&
           table->s->cached_row_logging_check &&
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
+#ifdef WITH_WSREP
+          (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+#else
           mysql_bin_log.is_open());
+#endif
 }
 
 
@@ -4862,6 +4912,37 @@ void signal_log_not_needed(struct handlerton, char *log_file)
 }
 
 
+#ifdef WITH_WSREP
+/**
+  @details
+  This function makes the storage engine to force te victim transaction
+  to abort. Currently, only innodb has this functionality, but any SE
+  implementing the wsrep API should be able to provide this service.
+
+  @param bf_thd       brute force THD asking for the abort
+  @param victim_thd   victim THD to be aborted
+
+  @return
+    always 0
+*/
+
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd)
+{
+  Ha_trx_info *info;
+
+  /*
+    Note that below we assume that only transactional storage engines
+    can provide this service
+  */
+  for (info= bf_thd->transaction.stmt.ha_list; info; info= info->next())
+  {
+    handlerton *hton= info->ht();
+    if (hton && hton->wsrep_abort_transaction)
+      hton->wsrep_abort_transaction(hton, bf_thd, victim_thd);
+  }
+  return 0;
+}
+#endif
 #ifdef TRANS_LOG_MGM_EXAMPLE_CODE
 /*
   Example of transaction log management functions based on assumption that logs

@@ -13,6 +13,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+IF(WITH_WSREP)
+ SET(WSREP_INCLUDES ${CMAKE_SOURCE_DIR}/wsrep)
+ENDIF()
+
 INCLUDE_DIRECTORIES(
 ${CMAKE_SOURCE_DIR}/include 
 ${CMAKE_SOURCE_DIR}/sql 
@@ -20,6 +24,7 @@ ${CMAKE_SOURCE_DIR}/regex
 ${ZLIB_INCLUDE_DIR}
 ${SSL_INCLUDE_DIRS}
 ${CMAKE_BINARY_DIR}/sql
+${WSREP_INCLUDES}
 )
 
 SET(GEN_SOURCES
@@ -36,6 +41,17 @@ IF(SSL_DEFINES)
  ADD_DEFINITIONS(${SSL_DEFINES})
 ENDIF()
 
+IF(WITH_WSREP)
+ SET(WSREP_SOURCES
+   wsrep_hton.cc
+   wsrep_mysqld.cc 
+   wsrep_notify.cc
+   wsrep_sst.cc
+   wsrep_utils.cc
+   wsrep_var.cc
+ )
+ SET(WSREP_LIB wsrep)
+ENDIF()
 
 SET (SQL_SOURCE
               ../sql-common/client.c derror.cc des_key_file.cc
@@ -76,6 +92,7 @@ SET (SQL_SOURCE
                sql_signal.cc rpl_handler.cc mdl.cc sql_admin.cc
                transaction.cc sys_vars.cc sql_truncate.cc datadict.cc
                sql_reload.cc
+	       ${WSREP_SOURCES}
                ${GEN_SOURCES}
                ${MYSYS_LIBWRAP_SOURCE})
 
@@ -88,6 +105,7 @@ DTRACE_INSTRUMENT(sql)
 TARGET_LINK_LIBRARIES(sql ${MYSQLD_STATIC_PLUGIN_LIBS} 
   mysys dbug strings vio regex   
   ${LIBWRAP} ${LIBCRYPT} ${LIBDL}
+  ${WSREP_LIB}
   ${SSL_LIBRARIES})
 
  

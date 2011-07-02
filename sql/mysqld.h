@@ -223,6 +223,10 @@ extern pthread_key(MEM_ROOT**,THR_MALLOC);
 extern PSI_mutex_key key_PAGE_lock, key_LOCK_sync, key_LOCK_active,
        key_LOCK_pool;
 #endif /* HAVE_MMAP */
+#ifdef WITH_WSREP
+extern PSI_mutex_key key_LOCK_wsrep_thd;
+extern PSI_cond_key  key_COND_wsrep_thd;
+#endif /* HAVE_MMAP */
 
 #ifdef HAVE_OPENSSL
 extern PSI_mutex_key key_LOCK_des_key_file;
@@ -400,6 +404,11 @@ enum options_mysqld
   OPT_WANT_CORE,
   OPT_ENGINE_CONDITION_PUSHDOWN,
   OPT_LOG_ERROR,
+#ifdef WITH_WSREP
+  OPT_WSREP_PROVIDER,
+  OPT_WSREP_CLUSTER_ADDRESS,
+  OPT_WSREP_START_POSITION,
+#endif
   OPT_MAX_LONG_DATA_SIZE
 };
 

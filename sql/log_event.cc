@@ -45,6 +45,9 @@
 #include "transaction.h"
 #include <my_dir.h>
 
+#if WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 #endif /* MYSQL_CLIENT */
 
 #include <base64.h>
@@ -3177,6 +3180,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   new_db.length= db_len;
   new_db.str= (char *) rpl_filter->get_rewrite_db(db, &new_db.length);
   thd->set_db(new_db.str, new_db.length);       /* allocates a copy of 'db' */
+  WSREP_SET_DATABASE(wsrep, thd, new_db.str)
 
   /*
     Setting the character set and collation of the current database thd->db.
@@ -4770,6 +4774,7 @@ int Load_log_event::do_apply_event(NET* net, Relay_log_info const *rli,
   new_db.length= db_len;
   new_db.str= (char *) rpl_filter->get_rewrite_db(db, &new_db.length);
   thd->set_db(new_db.str, new_db.length);
+  WSREP_SET_DATABASE(wsrep, thd, new_db.str)
   DBUG_ASSERT(thd->query() == 0);
   thd->reset_query_inner();                    // Should not be needed
   thd->is_slave_error= 0;
@@ -6496,7 +6501,11 @@ err:
     end_io_cache(&file);
   if (fd >= 0)
     mysql_file_close(fd, MYF(0));
+#ifdef WITH_WSREP
+  thd_proc_info(thd, "exit Create_file_log_event::do_apply_event()");
+#else /* WITH_WSREP */
   thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
   return error != 0;
 }
 #endif /* defined(HAVE_REPLICATION) && !defined(MYSQL_CLIENT) */
@@ -6667,7 +6676,11 @@ int Append_block_log_event::do_apply_event(Relay_log_info const *rli)
 err:
   if (fd >= 0)
     mysql_file_close(fd, MYF(0));
+#ifdef WITH_WSREP
+  thd_proc_info(thd, "exit Append_block_log_event::do_apply_event()");
+#else /* WITH_WSREP */
   thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
   DBUG_RETURN(error);
 }
 #endif
@@ -7605,7 +7618,17 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
 
     if (open_and_lock_tables(thd, rli->tables_to_lock, FALSE, 0))
     {
+#ifdef WITH_WSREP
+      uint actual_error= ER_SERVER_SHUTDOWN;
+      if (!thd->is_fatal_error)
+      {
+        sql_print_information("WSREP, BF applier interrupted in log_event.cc");
+      } 
+      else
+        actual_error= thd->stmt_da->sql_errno();
+#else
       uint actual_error= thd->stmt_da->sql_errno();
+#endif
       if (thd->is_slave_error || thd->is_fatal_error)
       {
         /*
@@ -8973,8 +8996,22 @@ int
 Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   DBUG_ASSERT(m_table != NULL);
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
+           (long long) thd->wsrep_trx_seqno);
+  const char* tmp = thd_proc_info(thd, info);
+#else
+  const char* tmp = thd_proc_info(thd,"Write_rows_log_event::write_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   int error= write_row(rli, slave_exec_mode == SLAVE_EXEC_MODE_IDEMPOTENT);
 
+#ifdef WITH_WSREP
+  thd_proc_info(thd, tmp);
+#endif /* WITH_WSREP */
   if (error && !thd->is_error())
   {
     DBUG_ASSERT(0);
@@ -9504,13 +9541,37 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   int error;
   DBUG_ASSERT(m_table != NULL);
 
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  snprintf(info, sizeof(info) - 1, "Delete_rows_log_event::find_row(%lld)",
+           (long long) thd->wsrep_trx_seqno);
+  const char* tmp = thd_proc_info(thd, info);
+#else
+  const char* tmp = thd_proc_info(thd,"Delete_rows_log_event::find_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   if (!(error= find_row(rli))) 
   { 
     /*
       Delete the record found, located in record[0]
     */
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+    snprintf(info, sizeof(info) - 1,
+             "Delete_rows_log_event::ha_delete_row(%lld)",
+             (long long) thd->wsrep_trx_seqno);
+    thd_proc_info(thd, info);
+#else
+    thd_proc_info(thd,"Delete_rows_log_event::ha_delete_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
     error= m_table->file->ha_delete_row(m_table->record[0]);
   }
+#ifdef WITH_WSREP
+  thd_proc_info(thd, tmp);
+#endif /* WITH_WSREP */
   return error;
 }
 
@@ -9627,6 +9688,17 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   DBUG_ASSERT(m_table != NULL);
 
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  snprintf(info, sizeof(info) - 1, "Update_rows_log_event::find_row(%lld)",
+           (long long) thd->wsrep_trx_seqno);
+  const char* tmp = thd_proc_info(thd, info);
+#else
+  const char* tmp = thd_proc_info(thd,"Update_rows_log_event::find_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   int error= find_row(rli); 
   if (error)
   {
@@ -9653,6 +9725,16 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   store_record(m_table,record[1]);
 
   m_curr_row= m_curr_row_end;
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  snprintf(info, sizeof(info) - 1,
+           "Update_rows_log_event::unpack_current_row(%lld)",
+           (long long) thd->wsrep_trx_seqno);
+  thd_proc_info(thd, info);
+#else
+  thd_proc_info(thd,"Update_rows_log_event::unpack_current_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   /* this also updates m_curr_row_end */
   if ((error= unpack_current_row(rli)))
     return error;
@@ -9671,10 +9753,23 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 #endif
 
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  snprintf(info, sizeof(info) - 1,
+           "Update_rows_log_event::ha_update_row(%lld)",
+           (long long) thd->wsrep_trx_seqno);
+  thd_proc_info(thd, info);
+#else
+  thd_proc_info(thd,"Update_rows_log_event::ha_update_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   error= m_table->file->ha_update_row(m_table->record[1], m_table->record[0]);
   if (error == HA_ERR_RECORD_IS_THE_SAME)
     error= 0;
 
+#ifdef WITH_WSREP
+  thd_proc_info(thd, tmp);
+#endif /* WITH_WSREP */
   return error;
 }
 
@@ -9832,6 +9927,50 @@ st_print_event_info::st_print_event_info()
   myf const flags = MYF(MY_WME | MY_NABP);
   open_cached_file(&head_cache, NULL, NULL, 0, flags);
   open_cached_file(&body_cache, NULL, NULL, 0, flags);
+}
+#endif
+#if WITH_WSREP && !defined(MYSQL_CLIENT)
+Format_description_log_event *wsrep_format_desc; // TODO: free them at the end
+/*
+  read the first event from (*buf). The size of the (*buf) is (*buf_len).
+  At the end (*buf) is shitfed to point to the following event or NULL and
+  (*buf_len) will be changed to account just being read bytes of the 1st event.
+*/
+Log_event* wsrep_read_log_event(
+  char **arg_buf, size_t *arg_buf_len,
+  const Format_description_log_event *description_event)
+{
+  DBUG_ENTER("wsrep_read_log_event");
+  char *head= (*arg_buf);
+
+  uint data_len = uint4korr(head + EVENT_LEN_OFFSET);
+  char *buf= (*arg_buf);
+  const char *error= 0;
+  Log_event *res=  0;
+#ifndef max_allowed_packet
+  THD *thd=current_thd;
+  uint max_allowed_packet= thd ? thd->variables.max_allowed_packet : ~(ulong)0;
+#endif
+
+  if (data_len > max_allowed_packet)
+  {
+    error = "Event too big";
+    goto err;
+  }
+
+  res= Log_event::read_log_event(buf, data_len, &error, description_event);
+
+err:
+  if (!res)
+  {
+    DBUG_ASSERT(error != 0);
+    sql_print_error("Error in Log_event::read_log_event(): "
+                    "'%s', data_len: %d, event_type: %d",
+		    error,data_len,head[EVENT_TYPE_OFFSET]);
+  }
+  (*arg_buf)+= data_len;
+  (*arg_buf_len)-= data_len;
+  DBUG_RETURN(res);
 }
 #endif
 

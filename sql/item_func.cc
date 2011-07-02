@@ -2418,7 +2418,18 @@ void Item_func_rand::seed_random(Item *arg)
     TODO: do not do reinit 'rand' for every execute of PS/SP if
     args[0] is a constant.
   */
+#ifdef WITH_WSREP
+  uint32 tmp;
+  if (current_thd->wsrep_exec_mode==REPL_RECV) {
+    tmp= current_thd->wsrep_rand;
+  } 
+  else
+  {
+    tmp= current_thd->wsrep_rand= (uint32) arg->val_int();
+  }
+#else
   uint32 tmp= (uint32) arg->val_int();
+#endif
   randominit(rand, (uint32) (tmp*0x10001L+55555555L),
              (uint32) (tmp*0x10000001L));
 }

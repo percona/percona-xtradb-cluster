@@ -309,6 +309,10 @@ MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, uint count, uint flags)
   /* Copy the lock data array. thr_multi_lock() reorders its contents. */
   memcpy(sql_lock->locks + sql_lock->lock_count, sql_lock->locks,
          sql_lock->lock_count * sizeof(*sql_lock->locks));
+#ifdef WITH_WSREP
+  //thd->main_lock_id.info->in_lock_tables= thd->in_lock_tables;
+    thd->lock_info.in_lock_tables= thd->in_lock_tables;
+#endif    /* Lock on the copied half of the lock data array. */
   /* Lock on the copied half of the lock data array. */
   rc= thr_lock_errno_to_mysql[(int) thr_multi_lock(sql_lock->locks +
                                                    sql_lock->lock_count,
@@ -323,7 +327,11 @@ MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, uint count, uint flags)
       my_error(rc, MYF(0));
   }
 end:
+#ifdef WITH_WSREP
+  thd_proc_info(thd, "mysql_lock_tables(): unlocking tables II");
+#else /* WITH_WSREP */
   thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
 
   if (thd->killed)
   {
@@ -336,6 +344,9 @@ end:
   }
 
   thd->set_time_after_lock();
+#ifdef WITH_WSREP
+  thd_proc_info(thd, "exit mysqld_lock_tables()");
+#endif /* WITH_WSREP */
   DBUG_RETURN(sql_lock);
 }
 

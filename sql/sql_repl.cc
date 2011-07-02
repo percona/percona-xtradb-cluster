@@ -1230,7 +1230,11 @@ int stop_slave(THD* thd, Master_info* mi, bool net_report )
                  ER(ER_SLAVE_WAS_NOT_RUNNING));
   }
   unlock_slave_threads(mi);
+#ifdef WITH_WSREP
+  thd_proc_info(thd, "exit stop_slave()");
+#else /* WITH_WSREP */
   thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
 
   if (slave_errno)
   {
@@ -1662,7 +1666,11 @@ bool change_master(THD* thd, Master_info* mi)
 
 err:
   unlock_slave_threads(mi);
+#ifdef WITH_WSREP
+  thd_proc_info(thd, "exit change_master()");
+#else /* WITH_WSREP */
   thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
   if (ret == FALSE)
     my_ok(thd);
   delete_dynamic(&lex_mi->repl_ignore_server_ids); //freeing of parser-time alloc
