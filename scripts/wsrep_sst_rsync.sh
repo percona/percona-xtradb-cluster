@@ -38,7 +38,7 @@ kill_rsync()
 check_pid()
 {
     local pid_file=$1
-    [ -r $pid_file ] && ps -p $(cat $pid_file) > /dev/null 2>&1
+    [ -r $pid_file ] && ps -p $(cat $pid_file) | grep rsync > /dev/null 2>&1
 }
 
 ROLE=$1

@@ -203,7 +203,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
       {
         wsrep_SE_init_grab();
         // Signal init thread to continue
-        wsrep_sst_complete (&cluster_uuid, view->first - 1);
+        wsrep_sst_complete (&cluster_uuid, view->first - 1, false);
         // and wait for SE initialization
         wsrep_SE_init_wait();
       }

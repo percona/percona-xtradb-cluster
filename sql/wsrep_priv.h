@@ -41,7 +41,7 @@ extern wsrep_uuid_t          local_uuid;
 extern wsrep_seqno_t         local_seqno;
 
 /*! SST thread signals init thread about sst completion */
-extern void wsrep_sst_complete(wsrep_uuid_t* uuid, wsrep_seqno_t seqno);
+extern void wsrep_sst_complete(wsrep_uuid_t* uuid, wsrep_seqno_t seqno, bool);
 
 extern void wsrep_notify_status (wsrep_member_status_t new_status,
                                  const wsrep_view_info_t* view = 0);

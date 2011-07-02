@@ -39,6 +39,7 @@ bool wsrep_init_first()
 static pthread_mutex_t sst_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  sst_cond = PTHREAD_COND_INITIALIZER;
 static bool            sst_complete = false;
+static bool            sst_needed   = false;
 
 void wsrep_sst_grab ()
 {
@@ -67,12 +68,15 @@ void wsrep_sst_wait ()
 }
 
 // Signal end of SST
-void wsrep_sst_complete (wsrep_uuid_t* sst_uuid, wsrep_seqno_t sst_seqno)
+void wsrep_sst_complete (wsrep_uuid_t* sst_uuid,
+                         wsrep_seqno_t sst_seqno,
+                         bool          needed)
 {
   if (pthread_mutex_lock (&sst_lock)) abort();
   if (!sst_complete)
   {
     sst_complete = true;
+    sst_needed   = needed;
     local_uuid   = *sst_uuid;
     local_seqno  = sst_seqno;
     pthread_cond_signal (&sst_cond);
@@ -87,8 +91,11 @@ void wsrep_sst_complete (wsrep_uuid_t* sst_uuid, wsrep_seqno_t sst_seqno)
 // Let applier threads to continue
 void wsrep_sst_continue ()
 {
-  WSREP_INFO("Signalling provider to continue.");
-  wsrep->sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
+  if (sst_needed)
+  {
+    WSREP_INFO("Signalling provider to continue.");
+    wsrep->sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
+  }
 }
 
 struct sst_thread_arg
@@ -224,7 +231,7 @@ static void* sst_joiner_thread (void* a)
     }
 
     // Tell initializer thread that SST is complete
-    wsrep_sst_complete (&ret_uuid, ret_seqno);
+    wsrep_sst_complete (&ret_uuid, ret_seqno, true);
   }
 
   return NULL;
@@ -257,7 +264,10 @@ static ssize_t sst_prepare_other (const char*  method,
   if (!arg.err)
     return strlen(*addr_out);
   else
-    return -arg.err;
+  {
+    assert (arg.err < 0);
+    return arg.err;
+  }
 }
 
 //extern ulong my_bind_addr;
@@ -347,7 +357,8 @@ ssize_t wsrep_sst_prepare (void** msg)
     addr_len = sst_prepare_other (wsrep_sst_method, addr_in, &addr_out);
     if (addr_len < 0)
     {
-      WSREP_ERROR("'%s' SST is not supported", wsrep_sst_method);
+//      WSREP_ERROR("failed to prepare for '%s' SST: %d (%s)",
+//                   wsrep_sst_method, -addr_len, strerror(-addr_len));
       return addr_len;
     }
   }

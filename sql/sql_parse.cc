@@ -7765,7 +7765,7 @@ void wsrep_replication_process(THD *thd)
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));
 
-  sql_print_information("wsrep recv thread exiting (code:%d)", rcode);
+  WSREP_INFO("recv thread exiting (code:%d)", rcode);
 
   switch (rcode) {
   case WSREP_OK:
@@ -7774,8 +7774,7 @@ void wsrep_replication_process(THD *thd)
     break;
   case WSREP_NODE_FAIL:
     /* data inconsistency => SST is needed */
-    sql_print_information(
-      "WSREP node consistency compromised, restarting provider");
+    WSREP_WARN("node consistency compromised, restarting provider");
     wsrep_stop_replication(thd);
     wsrep_start_replication();
     break;
@@ -7783,7 +7782,7 @@ void wsrep_replication_process(THD *thd)
   case WSREP_TRX_FAIL:
   case WSREP_TRX_MISSING:
     /* these suggests a bug in provider code */
-    sql_print_warning("WSREP: bad return from recv() call: %d", rcode);
+    WSREP_WARN("bad return from recv() call: %d", rcode);
     /* fall through to node shutdown */
   case WSREP_FATAL:
   case WSREP_CONN_FAIL:
@@ -7794,7 +7793,7 @@ void wsrep_replication_process(THD *thd)
     */
     if (!shutdown_in_progress && thd->killed != THD::KILL_CONNECTION) 
     {
-      sql_print_information("WSREP starting shutdown");
+      WSREP_INFO("starting shutdown");
       kill_mysql();
     }
     break;
