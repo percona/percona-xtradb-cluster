@@ -46,6 +46,7 @@ extern my_bool     wsrep_convert_LOCK_to_trx;
 extern ulong       wsrep_retry_autocommit;
 extern my_bool     wsrep_auto_increment_control;
 extern my_bool     wsrep_drupal_282555_workaround;
+extern my_bool     wsrep_consistent_reads;
 extern my_bool     wsrep_incremental_data_collection;
 extern const char* wsrep_sst_method;
 extern const char* wsrep_sst_receive_address;
@@ -69,6 +70,8 @@ extern int         wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
 // MySQL variables funcs
 extern int  wsrep_init_vars();
 extern bool wsrep_on_update (
+  sys_var *self, THD* thd, enum_var_type var_type);
+extern void wsrep_consistent_reads_update (
   sys_var *self, THD* thd, enum_var_type var_type);
 extern bool  wsrep_start_position_check   (
   sys_var *self, THD* thd, set_var* var);
@@ -98,7 +101,7 @@ extern void wsrep_create_appliers();
 /* new defines */
 extern void wsrep_stop_replication(THD *thd);
 extern void wsrep_start_replication();
-
+extern bool wsrep_causal_wait(THD* thd);
 // MySQL logging functions don't seem to understand long long length modifer.
 // This is a workaround. It also prefixes all messages with "WSREP"
 #define WSREP_LOG(fun, ...)                                       \

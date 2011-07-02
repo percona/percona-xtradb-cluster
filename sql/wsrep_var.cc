@@ -59,6 +59,15 @@ bool wsrep_on_update (sys_var *self, THD* thd, enum_var_type var_type)
   return true;
 }
 
+void wsrep_consistent_reads_update (THD* thd, enum_var_type var_type)
+{
+  if (var_type == OPT_GLOBAL) {
+    thd->variables.wsrep_consistent_reads = global_system_variables.wsrep_consistent_reads;
+  }
+  else {
+  }
+}
+
 static int wsrep_start_position_verify (const char* start_str)
 {
   size_t        start_len;

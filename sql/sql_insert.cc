@@ -3507,7 +3507,7 @@ bool select_insert::send_eof()
     ha_autocommit_or_rollback() is issued below.
   */
 #ifdef WITH_WSREP
-  if (wsrep_emulate_bin_log || mysql_bin_log.is_open() &&
+  if ((wsrep_emulate_bin_log || mysql_bin_log.is_open()) &&
       (!error || thd->transaction.stmt.modified_non_trans_table))
 #else
   if (mysql_bin_log.is_open() &&

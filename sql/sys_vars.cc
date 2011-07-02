@@ -3225,14 +3225,13 @@ static Sys_var_ulong Sys_wsrep_slave_threads(
        GLOBAL_VAR(wsrep_slave_threads), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(1, 32), DEFAULT(1), BLOCK_SIZE(1));
 
-// todo: consider converting to writeable class
 static Sys_var_charptr Sys_wsrep_dbug_option(
        "wsrep_dbug_option", "DBUG options to provider library",
        READ_ONLY GLOBAL_VAR(wsrep_dbug_option),CMD_LINE(REQUIRED_ARG),
        IN_FS_CHARSET, DEFAULT(NULL),
        NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
-static Sys_var_ulong Sys_local_cache_size(
+static Sys_var_ulong Sys_wsrep_local_cache_size(
        "wsrep_local_cache_size", "Memory size for processing local "
        "transactions",
        GLOBAL_VAR(wsrep_local_cache_size),CMD_LINE(REQUIRED_ARG),
@@ -3326,6 +3325,11 @@ static Sys_var_charptr Sys_wsrep_notify_cmd(
 static Sys_var_mybool Sys_wsrep_certify_nonPK(
        "wsrep_certify_nonPK", "To certify tables with no primary key",
        GLOBAL_VAR(wsrep_certify_nonPK), 
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+
+static Sys_var_mybool Sys_wsrep_consistent_reads(
+       "wsrep_consistent_reads", "Enable consistent (causal) reads",
+       GLOBAL_VAR(wsrep_consistent_reads), 
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 #endif // WITH_WSREP
 

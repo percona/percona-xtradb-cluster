@@ -470,8 +470,7 @@ char *thd_security_context(THD *thd, char *buffer, unsigned int length,
 #ifdef WITH_WSREP
 extern "C" bool wsrep_thd_is_wsrep_on(THD *thd)
 {
-  if (thd->variables.wsrep_on) return true;
-  return false;
+  return thd->variables.wsrep_on;
 }
 
 extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode)

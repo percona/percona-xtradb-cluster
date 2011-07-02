@@ -533,6 +533,7 @@ typedef struct system_variables
 
 #ifdef WITH_WSREP
   my_bool wsrep_on;
+  my_bool wsrep_consistent_reads;
 #endif
   double long_query_time_double;
 

@@ -45,9 +45,10 @@ my_bool wsrep_auto_increment_control   = 1; // control auto increment variables
 my_bool wsrep_drupal_282555_workaround = 1; // retry autoinc insert after dupkey
 my_bool wsrep_incremental_data_collection = 0; // incremental data collection
 long long wsrep_max_ws_size            = 1073741824LL; //max ws (RBR buffer) size
-long      wsrep_max_ws_rows            = 65536; // max number of rows in ws
-int       wsrep_to_isolation           = 0; // # of active TO isolation threads
+long    wsrep_max_ws_rows              = 65536; // max number of rows in ws
+int     wsrep_to_isolation             = 0; // # of active TO isolation threads
 my_bool wsrep_certify_nonPK            = 0; // certify, even when no primary key
+my_bool wsrep_consistent_reads         = 0; // consistent/causal reads flag
 
 /*
  * End configuration options
@@ -434,4 +435,52 @@ void wsrep_start_replication()
 err:
 
   unireg_abort(1);
+}
+
+bool
+wsrep_causal_wait (THD* thd)
+{
+  if (thd->variables.wsrep_consistent_reads && thd->variables.wsrep_on)
+  {
+    // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
+    // TODO: modify to check if thd has locked any rows.
+    if (unlikely(thd->in_active_multi_stmt_transaction()))
+    {
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0), "wsrep_consistent_reads=ON "
+               "inside transactions");
+      return true;
+    }
+
+    wsrep_seqno_t  seqno;
+    wsrep_status_t ret= wsrep->causal_read (wsrep, &seqno);
+
+    if (unlikely(WSREP_OK != ret))
+    {
+      const char* msg;
+      int err;
+
+      // Possibly relevant error codes:
+      // ER_CHECKREAD, ER_ERROR_ON_READ, ER_INVALID_DEFAULT, ER_EMPTY_QUERY,
+      // ER_FUNCTION_NOT_DEFINED, ER_NOT_ALLOWED_COMMAND, ER_NOT_SUPPORTED_YET,
+      // ER_FEATURE_DISABLED, ER_QUERY_INTERRUPTED
+
+      switch (ret)
+      {
+      case WSREP_NOT_IMPLEMENTED:
+        msg= "consistent reads by wsrep backend. "
+             "Please unset wsrep_consistent_reads variable.";
+        err= ER_NOT_SUPPORTED_YET;
+        break;
+      default:
+        msg= "Causal wait failed.";
+        err= ER_ERROR_ON_READ;
+      }
+
+      my_error(err, MYF(0), msg);
+
+      return true;
+    }
+  }
+
+  return false;
 }

@@ -70,7 +70,7 @@ wsrep_debug=0
 # convert locking sessions into transactions
 wsrep_convert_LOCK_to_trx=0
 
-# retry deadlocked autocommits
+# how many times to retry deadlocked autocommits
 wsrep_retry_autocommit=0
 
 # change auto_increment_increment and auto_increment_offset automatically

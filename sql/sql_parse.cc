@@ -2293,7 +2293,7 @@ mysql_execute_command(THD *thd)
     my_error(ER_UNKNOWN_COM_ERROR, MYF(0), "WSREP has not yet prepared node for application use");
     goto error;
   }
-#endif
+#endif /* WITH_WSREP */
   status_var_increment(thd->status_var.com_stat[lex->sql_command]);
 
   DBUG_ASSERT(thd->transaction.stmt.modified_non_trans_table == FALSE);
@@ -2329,6 +2329,9 @@ mysql_execute_command(THD *thd)
 #endif
   case SQLCOM_SHOW_STATUS_PROC:
   case SQLCOM_SHOW_STATUS_FUNC:
+#ifdef WITH_WSREP
+    if (wsrep_causal_wait(thd)) goto error;
+#endif /* WITH_WSREP */
     if ((res= check_table_access(thd, SELECT_ACL, all_tables, FALSE,
                                   UINT_MAX, FALSE)))
       goto error;
@@ -2338,6 +2341,9 @@ mysql_execute_command(THD *thd)
   {
     system_status_var old_status_var= thd->status_var;
     thd->initial_status_var= &old_status_var;
+#ifdef WITH_WSREP
+    if (wsrep_causal_wait(thd)) goto error;
+#endif /* WITH_WSREP */
     if (!(res= check_table_access(thd, SELECT_ACL, all_tables, FALSE,
                                   UINT_MAX, FALSE)))
       res= execute_sqlcom_select(thd, all_tables);
@@ -2363,12 +2369,22 @@ mysql_execute_command(THD *thd)
   case SQLCOM_SHOW_PLUGINS:
   case SQLCOM_SHOW_FIELDS:
   case SQLCOM_SHOW_KEYS:
+#ifndef WITH_WSREP
   case SQLCOM_SHOW_VARIABLES:
   case SQLCOM_SHOW_CHARSETS:
   case SQLCOM_SHOW_COLLATIONS:
   case SQLCOM_SHOW_STORAGE_ENGINES:
   case SQLCOM_SHOW_PROFILE:
+#endif /* WITH_WSREP */
   case SQLCOM_SELECT:
+#ifdef WITH_WSREP
+    if (wsrep_causal_wait(thd)) goto error;
+  case SQLCOM_SHOW_VARIABLES:
+  case SQLCOM_SHOW_CHARSETS:
+  case SQLCOM_SHOW_COLLATIONS:
+  case SQLCOM_SHOW_STORAGE_ENGINES:
+  case SQLCOM_SHOW_PROFILE:
+#endif /* WITH_WSREP */
   {
     thd->status_var.last_query_cost= 0.0;
 
