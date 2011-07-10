@@ -493,7 +493,7 @@ void Protocol::end_statement()
   /*sanity check, can be removed before 1.0 release */
   if (thd->wsrep_conflict_state== REPLAYING)
     {
-      sql_print_warning("WSREP attempting net_end_statement while replaying");
+      sql_print_error("WSREP: attempting net_end_statement while replaying");
       return;
     }
 #endif

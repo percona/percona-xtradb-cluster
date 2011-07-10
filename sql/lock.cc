@@ -83,6 +83,10 @@
 #include <hash.h>
 #include <assert.h>
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
+
 /**
   @defgroup Locking Locking
   @{
@@ -1022,7 +1026,11 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
   m_mdl_global_shared_lock= NULL;
   m_state= GRL_NONE;
-
+#ifdef WITH_WSREP
+  wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+  wsrep->resume(wsrep);
+#endif /* WITH_WSREP */
+ 
   DBUG_VOID_RETURN;
 }
 
@@ -1061,6 +1069,26 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
 
   m_mdl_blocks_commits_lock= mdl_request.ticket;
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
+#ifdef WITH_WSREP
+  int error = 0;
+  // allow wsrep appliers to continue committing so that we can lock provider
+  thd->global_read_lock.unlock_global_read_lock(thd);
+  long long ret = wsrep->pause(wsrep);
+  thd->global_read_lock.lock_global_read_lock(thd);
+  if (ret >= 0)
+  {
+    wsrep_locked_seqno= ret;
+  }
+  else if (ret != -ENOSYS) /* -ENOSYS - no provider */
+  {
+    WSREP_ERROR("Failed to pause provider: %lld (%s)", -ret, strerror(-ret));
+    error= 1;
+  }
+  if (error)
+  {
+    //global_read_lock_blocks_commit--;
+  }
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(FALSE);
 }

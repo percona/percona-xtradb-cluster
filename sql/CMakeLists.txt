@@ -43,6 +43,7 @@ ENDIF()
 
 IF(WITH_WSREP)
  SET(WSREP_SOURCES
+   wsrep_check_opts.cc
    wsrep_hton.cc
    wsrep_mysqld.cc 
    wsrep_notify.cc

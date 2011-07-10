@@ -507,10 +507,6 @@ extern "C" wsrep_trx_handle_t* wsrep_thd_trx_handle(THD *thd)
   return &thd->wsrep_trx_handle;
 }
 
-extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id)
-{
-  thd->wsrep_trx_to_replay= trx_id;
-}
 extern "C"void wsrep_thd_LOCK(THD *thd)
 {
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -551,11 +547,20 @@ extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id)
 {
   thd->wsrep_last_query_id= id;
 }
-extern "C" void wsrep_thd_awake(THD *thd)
+extern "C" void wsrep_thd_awake(THD *thd, my_bool signal)
 {
-  mysql_mutex_lock(&thd->LOCK_thd_data);
-  thd->awake(THD::KILL_QUERY);
-  mysql_mutex_unlock(&thd->LOCK_thd_data);
+  if (signal)
+  {
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->awake(THD::KILL_QUERY);
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+  }
+  else
+  {
+    mysql_mutex_lock(&LOCK_wsrep_replaying);
+    mysql_cond_broadcast(&COND_wsrep_replaying);
+    mysql_mutex_unlock(&LOCK_wsrep_replaying);
+  }
 }
 
 extern "C" int
@@ -1083,12 +1088,11 @@ void THD::init(void)
   reset_current_stmt_binlog_format_row();
   bzero((char *) &status_var, sizeof(status_var));
 #ifdef WITH_WSREP
-  wsrep_exec_mode= LOCAL_STATE;
+  wsrep_exec_mode= wsrep_applier ? REPL_RECV :  LOCAL_STATE;
   wsrep_conflict_state= NO_CONFLICT;
   wsrep_query_state= QUERY_IDLE;
   wsrep_last_query_id= 0;
   wsrep_trx_seqno= 0;
-  wsrep_trx_to_replay= 0;
   wsrep_converted_lock_session= false;
   //wsrep_retry_autocommit= ::wsrep_retry_autocommit;
   wsrep_retry_counter= 0;

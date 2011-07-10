@@ -208,7 +208,17 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         thd->global_read_lock.unlock_global_read_lock(thd);
         return 1;
       }
-    }
+#ifdef WITH_WSREP
+      /*
+        We need to do it second time after wsrep appliers were blocked in
+        make_global_read_lock_block_commit(thd) above since they could have
+        modified the tables too.
+      */
+      if (close_cached_tables(thd, tables, (options & REFRESH_FAST) ?
+                              FALSE : TRUE, TRUE))
+          result= 1;
+#endif /* WITH_WSREP */
+     }
     else
     {
       if (thd && thd->locked_tables_mode)

@@ -5943,12 +5943,18 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       error= 0;
       break;
     }
+#ifdef WITH_WSREP
+    bool do_log_write(true);
+#endif /* WITH_WSREP */
     if (error == HA_ERR_WRONG_COMMAND)
     {
       error= 0;
       push_warning_printf(thd, MYSQL_ERROR::WARN_LEVEL_NOTE,
                           ER_ILLEGAL_HA, ER(ER_ILLEGAL_HA),
                           table->alias);
+#ifdef WITH_WSREP
+      do_log_write= false;
+#endif /* WITH_WSREP */
     }
 
     if (!error && (new_name != table_name || new_db != db))
@@ -6000,11 +6006,20 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
       push_warning_printf(thd, MYSQL_ERROR::WARN_LEVEL_NOTE,
                           ER_ILLEGAL_HA, ER(ER_ILLEGAL_HA),
                           table->alias);
+#ifdef WITH_WSREP
+      do_log_write= false;
+#endif /* WITH_WSREP */
     }
 
     if (!error)
     {
+#ifdef WITH_WSREP
+      if (do_log_write) {
+#endif /* WITH_WSREP */
       error= write_bin_log(thd, TRUE, thd->query(), thd->query_length());
+#ifdef WITH_WSREP
+      }
+#endif /* !WITH_WSREP */
       if (!error)
         my_ok(thd);
     }

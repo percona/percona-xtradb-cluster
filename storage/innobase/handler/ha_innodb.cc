@@ -913,7 +913,8 @@ innobase_release_temporary_latches(
 
 #ifdef WITH_WSREP
 static int 
-wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd);
+wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd, 
+			my_bool signal);
 #endif
 /********************************************************************//**
 Increments innobase_active_counter and every INNOBASE_WAKE_INTERVALth
@@ -1353,6 +1354,9 @@ int
 innobase_mysql_tmpfile(void)
 /*========================*/
 {
+#ifdef WITH_INNODB_DISALLOW_WRITES
+	os_event_wait(srv_allow_writes_event);
+#endif /* WITH_INNODB_DISALLOW_WRITES */
 	int	fd2 = -1;
 	File	fd = mysql_tmpfile("ib");
 	if (fd >= 0) {
@@ -2248,9 +2252,7 @@ innobase_init(
 	innobase_hton->alter_table_flags = innobase_alter_table_flags;
 #ifdef WITH_WSREP
         innobase_hton->wsrep_abort_transaction=wsrep_abort_transaction;
-#else
-        innobase_hton->wsrep_abort_transaction=NULL;
-#endif
+#endif /* WITH_WSREP */
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
 
@@ -11278,23 +11280,26 @@ static struct st_mysql_storage_engine innobase_storage_engine=
 
 #ifdef WITH_WSREP
 int
-wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx)
+wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx, ibool signal)
 {
 	DBUG_ENTER("wsrep_innobase_kill_one_trx");
 	THD *thd          = (THD *) victim_trx->mysql_thd;
 	THD *bf_thd       = (bf_trx) ? (THD *)bf_trx->mysql_thd : NULL;
 	int64_t bf_seqno  = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
 
-	WSREP_DEBUG("BF kill, with seqno: %lld",
-		  (bf_thd) ? (long long) wsrep_thd_trx_seqno(bf_thd) : -1);
-	WSREP_DEBUG("Aborting query: %s", 
-		  (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
-
 	if (!thd) {
 		DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
 		WSREP_WARN("no THD for trx: %llu", victim_trx->id);
 		DBUG_RETURN(1);
 	}
+
+	WSREP_DEBUG("BF kill (%lu, seqno: %lld), victim: (%lu) trx: %llu", 
+ 		    signal, (long long)bf_seqno,
+ 		    wsrep_thd_thread_id(thd),
+		    victim_trx->id);
+
+	WSREP_DEBUG("Aborting query: %s", 
+		  (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
 
 	wsrep_thd_LOCK(thd);
 
@@ -11317,7 +11322,7 @@ wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx)
 		WSREP_DEBUG("victim %llu in MUST ABORT state", 
 			    victim_trx->id);
 		wsrep_thd_UNLOCK(thd);
-		wsrep_thd_awake(thd);
+		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
 		break;
 	case ABORTED:
@@ -11359,8 +11364,15 @@ wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx)
 			case WSREP_OK:
 				break;
 			default:
-				WSREP_WARN("cancel commit bad exit: %d %llu", 
-					 rcode, victim_trx->id);
+				WSREP_ERROR(
+					"cancel commit bad exit: %d %llu", 
+					rcode, 
+					victim_trx->id);
+				/* unable to interrupt, must abort */
+				/* note: kill_mysql() will block, if we cannot.
+				 * kill the lock holder first.
+				 */
+				abort();
 				break;
 			}
 		}
@@ -11382,14 +11394,14 @@ wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx)
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
-			wsrep_thd_awake(thd); 
+			wsrep_thd_awake(thd, signal); 
 		} else {
 			/* abort currently executing query */
 			DBUG_PRINT("wsrep",("sending KILL_QUERY to: %ld", 
                                             wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %ld",
 				wsrep_thd_thread_id(thd));
-			wsrep_thd_awake(thd); 
+			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */
 			if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
@@ -11464,7 +11476,8 @@ wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx)
 	DBUG_RETURN(0);
 }
 static int 
-wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd)
+wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd, 
+			my_bool signal)
 {
 	DBUG_ENTER("wsrep_innobase_abort_thd");
 	trx_t* victim_trx = thd_to_trx(victim_thd);
@@ -11472,11 +11485,15 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd)
 
 	if (victim_trx)
 	{
-		DBUG_RETURN(wsrep_innobase_kill_one_trx(bf_trx, victim_trx));
+		mutex_enter(&kernel_mutex);
+		int rcode = wsrep_innobase_kill_one_trx(bf_trx, victim_trx,
+							signal);
+		mutex_exit(&kernel_mutex);
+		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction: %llu", 
 			    victim_trx->id);
-		wsrep_thd_awake(victim_thd); 
+		wsrep_thd_awake(victim_thd, signal); 
 	}
 	DBUG_RETURN(-1);
 }
@@ -11802,6 +11819,41 @@ static MYSQL_SYSVAR_UINT(change_buffering_debug, ibuf_debug,
   NULL, NULL, 0, 0, 1, 0);
 #endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
+/*******************************************************
+ *    innobase_disallow_writes variable definition     *
+ *******************************************************/
+ 
+/* Must always init to FALSE. */
+static my_bool	innobase_disallow_writes	= FALSE;
+
+/**************************************************************************
+An "update" method for innobase_disallow_writes variable. */
+static
+void
+innobase_disallow_writes_update(
+/*============================*/
+	THD*			thd,		/* in: thread handle */
+	st_mysql_sys_var*	var,		/* in: pointer to system
+						variable */
+	void*			var_ptr,	/* out: pointer to dynamic
+						variable */
+	const void*		save)		/* in: temporary storage */
+{
+	*(my_bool*)var_ptr = *(my_bool*)save;
+	ut_a(srv_allow_writes_event);
+	if (*(ibool*)var_ptr)
+		os_event_reset(srv_allow_writes_event);
+	else
+		os_event_set(srv_allow_writes_event);
+}
+
+static MYSQL_SYSVAR_BOOL(disallow_writes, innobase_disallow_writes,
+  PLUGIN_VAR_NOCMDOPT,
+  "Tell InnoDB to stop any writes to disk",
+  NULL, innobase_disallow_writes_update, FALSE);
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 static MYSQL_SYSVAR_ULONG(read_ahead_threshold, srv_read_ahead_threshold,
   PLUGIN_VAR_RQCMDARG,
   "Number of pages that must be accessed sequentially for InnoDB to "
@@ -11869,6 +11921,9 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
 #if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG
   MYSQL_SYSVAR(change_buffering_debug),
 #endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
+#ifdef WITH_INNODB_DISALLOW_WRITES
+  MYSQL_SYSVAR(disallow_writes),
+#endif /* WITH_INNODB_DISALLOW_WRITES */
   MYSQL_SYSVAR(read_ahead_threshold),
   MYSQL_SYSVAR(io_capacity),
   MYSQL_SYSVAR(purge_threads),

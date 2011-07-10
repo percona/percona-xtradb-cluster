@@ -31,14 +31,19 @@ const  char* wsrep_start_position = start_position;
 static char  provider[256]  = { 0, };
 const  char* wsrep_provider = provider;
 
+static char provider_options[8192] = {0, };
+const char* wsrep_provider_options = provider_options;
+
 static char  cluster_address[256]  = { 0, };
 const  char* wsrep_cluster_address = cluster_address;
 
 int wsrep_init_vars()
 {
-  wsrep_start_position_default (NULL, OPT_DEFAULT);
-  wsrep_provider_default       (NULL, OPT_DEFAULT);
-  wsrep_cluster_address_default(NULL, OPT_DEFAULT);
+  wsrep_start_position_default  (NULL, OPT_DEFAULT);
+  wsrep_provider_default        (NULL, OPT_DEFAULT);
+  wsrep_provider_options_default(NULL, OPT_DEFAULT);
+  wsrep_cluster_address_default (NULL, OPT_DEFAULT);
+  wsrep_sst_auth_default        (NULL, OPT_DEFAULT);
 
   return 0;
 }
@@ -59,10 +64,10 @@ bool wsrep_on_update (sys_var *self, THD* thd, enum_var_type var_type)
   return true;
 }
 
-void wsrep_consistent_reads_update (THD* thd, enum_var_type var_type)
+void wsrep_causal_reads_update (sys_var *self, THD* thd, enum_var_type var_type)
 {
   if (var_type == OPT_GLOBAL) {
-    thd->variables.wsrep_consistent_reads = global_system_variables.wsrep_consistent_reads;
+    thd->variables.wsrep_causal_reads = global_system_variables.wsrep_causal_reads;
   }
   else {
   }
@@ -134,9 +139,9 @@ bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
 {
   // since this value passed wsrep_start_position_check, don't check anything
   // here
-  char *latin= "latin1";
+  const char *latin= "latin1";
   LEX_STRING charset; 
-  charset.str= latin;
+  charset.str= (char *)latin;
   charset.length= strlen(latin);
 
   const uchar* value = self->value_ptr(thd, type, &charset);
@@ -219,27 +224,36 @@ err:
 
 bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
 {
-  //const char* value = var->value->str_value.c_ptr();
-  char *latin= "latin1";
+  const char *latin= "latin1";
   LEX_STRING charset; 
-  charset.str= latin;
+  charset.str= (char *)latin;
   charset.length= strlen(latin);
   const char* value = (const char*)self->value_ptr(thd, type, &charset);
 
   if (strcmp(value, provider)) {
     /* provider has changed */
 
-    memset(provider, '\0', sizeof(provider));
-    strncpy (provider, value, sizeof(provider) - 1);
-
     bool wsrep_on_saved= thd->variables.wsrep_on;
     thd->variables.wsrep_on= false;
 
     wsrep_stop_replication(thd);
+    wsrep_deinit();
+
+    memset(provider, '\0', sizeof(provider));
+    strncpy (provider, value, sizeof(provider) - 1);
+
+    wsrep_init();
+    
+    // we sure don't want to use old address with new provider
+    cluster_address[0]='\0';
+
+#if 0 /* don't start replication until new address is set */
     if (wsrep_start_replication())
     {
+      wsrep_create_rollbacker();
       wsrep_create_appliers();
     }
+#endif
     thd->variables.wsrep_on= wsrep_on_saved;
   }
 
@@ -263,6 +277,65 @@ void wsrep_provider_init (const char* value)
 
   memset(provider, '\0', sizeof(provider));
   strncpy (provider, value, sizeof(provider) - 1);
+}
+
+bool wsrep_provider_options_check(sys_var *self, THD* thd, set_var* var)
+{
+  if (!(thd->security_ctx->master_access & SUPER_ACL)) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
+    return 1;
+  }
+  return 0;
+}
+
+bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
+{
+  const char *latin= "latin1";
+  LEX_STRING charset; 
+  charset.str= (char *)latin;
+  charset.length= strlen(latin);
+
+  const char* value = (const char*)self->value_ptr(thd, type, &charset);
+
+  wsrep_status_t ret= wsrep->options_set(wsrep, value);
+  if (ret != WSREP_OK)
+  {
+    sql_print_error("WSREP: Set options returned %d", ret);
+    return 1;
+  }
+  else
+  {
+    char* opts= wsrep->options_get(wsrep);
+    if (opts)
+    {
+      strncpy(provider_options, opts, sizeof(provider_options));
+      provider_options[sizeof(provider_options) - 1]= '\0';
+      free(opts);
+    }
+    else
+    {
+      sql_print_error("WSREP: Failed to get provider options");
+      return 1;
+    }
+  }
+  return 0;
+}
+
+void wsrep_provider_options_default(THD* thd, enum_var_type var_type)
+{
+  memset(provider_options, '\0', sizeof(provider_options));
+}
+
+void wsrep_provider_options_init(const char* value)
+{
+  if (NULL == value)
+  {
+    sql_print_error ("WSREP: Bad initial value for wsrep_provider_options: "
+                     "%s", (value ? value : ""));
+    return;
+  }
+  memset(provider_options, '\0', sizeof(provider_options));
+  strncpy(provider_options, value, sizeof(provider_options) - 1);
 }
 
 static int wsrep_cluster_address_verify (const char* cluster_address_str)
@@ -309,21 +382,23 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 
 bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
 {
-  char *latin= "latin1";
+  const char *latin= "latin1";
   LEX_STRING charset; 
-  charset.str= latin;
+  charset.str= (char *)latin;
   charset.length= strlen(latin);
   const uchar* value = self->value_ptr(thd, type, &charset);
-
-  memset(cluster_address, '\0', sizeof(cluster_address));
-  strncpy(cluster_address, (char *)value, sizeof(cluster_address) - 1);
 
   bool wsrep_on_saved= thd->variables.wsrep_on;
   thd->variables.wsrep_on= false;
 
   wsrep_stop_replication(thd);
+
+  memset(cluster_address, '\0', sizeof(cluster_address));
+  strncpy(cluster_address, (char *)value, sizeof(cluster_address) - 1);
+
   if (wsrep_start_replication())
   {
+    wsrep_create_rollbacker();
     wsrep_create_appliers();
   }
   thd->variables.wsrep_on= wsrep_on_saved;
@@ -405,17 +480,17 @@ static void export_wsrep_status_to_mysql()
     void* tmp = realloc (mysql_status_vars,
                          (wsrep_status_len + 1) * sizeof(SHOW_VAR));
     if (!tmp) {
-      
+
       sql_print_error ("Out of memory for wsrep status variables."
                        "Number of variables: %d", wsrep_status_len);
       return;
     }
-    
+
     mysql_status_len  = wsrep_status_len;
     mysql_status_vars = (SHOW_VAR*)tmp;
   }
   /* @TODO: fix this: */
-#lese
+#else
   if (mysql_status_len < wsrep_status_len) wsrep_status_len= mysql_status_len;
 #endif
 

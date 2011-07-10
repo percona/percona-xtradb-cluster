@@ -1512,7 +1512,7 @@ wsrep_kill_victim(trx_t *trx, lock_t *lock) {
 			/* cannot release lock, until our lock
 			is in the queue*/
 		} else if (lock->trx != trx) {
- 			wsrep_innobase_kill_one_trx(trx, lock->trx);
+			wsrep_innobase_kill_one_trx(trx, lock->trx, TRUE);
 		}
 	}
 }
@@ -4068,7 +4068,7 @@ lock_table_other_has_incompatible(
 				} else {
                                   if (bf_this && bf_other)
 					wsrep_innobase_kill_one_trx(
-						trx, lock->trx);
+						trx, lock->trx, TRUE);
 					return(lock);
 				}
 			} else {

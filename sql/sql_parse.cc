@@ -103,22 +103,49 @@
 
 extern Format_description_log_event *wsrep_format_desc;
 
+/*
+ * Construct Query_log_Event from thd query and serialize it
+ * into buffer.
+ *
+ * Return 0 in case of success, 1 in case of error.
+ */
+static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
+{
+  IO_CACHE tmp_io_cache;
+  if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
+                       65536, MYF(MY_WME)))
+    return 1;
+  Query_log_event ev(thd, thd->query(), thd->query_length(), FALSE, FALSE,
+                     FALSE, 0);
+  int ret(0);
+  if (ev.write(&tmp_io_cache)) ret= 1;
+  if (!ret && wsrep_write_cache(&tmp_io_cache, buf, buf_len)) ret= 1;
+  close_cached_file(&tmp_io_cache);
+  return ret;
+}
+
 #define WSREP_TO_ISOLATION_BEGIN                                            \
   if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)         \
   {                                                                         \
-    wsrep_status_t ret;                                                     \
-    if (WSREP_OK ==                                                         \
-        (ret = wsrep->to_execute_start(wsrep, thd->thread_id, thd->query(), \
-                                       thd->query_length(),                 \
+    wsrep_status_t ret(WSREP_WARNING);                                      \
+    uchar* buf(0);                                                          \
+    uint buf_len(0);                                                        \
+    WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno, thd->wsrep_exec_mode, thd->query() ) \
+    if (!wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==            \
+        (ret = wsrep->to_execute_start(wsrep, thd->thread_id, buf,          \
+                                       buf_len,                             \
                                        &thd->wsrep_trx_seqno))) {           \
       thd->wsrep_exec_mode= TOTAL_ORDER;                                    \
       wsrep_to_isolation++;                                                 \
+      if (buf) my_free(buf);                                                \
+      WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno, thd->wsrep_exec_mode); \
     }                                                                       \
     else {                                                                  \
       /* jump to error handler in mysql_execute_command() */                \
       sql_print_warning("WSREP: TO isolation failed for: %d, sql: %s",      \
                         ret, (thd->query()) ? thd->query() : "void");       \
       my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed");       \
+      if (buf) my_free(buf);                                                \
       goto error;                                                           \
     }                                                                       \
   }
@@ -128,11 +155,13 @@ extern Format_description_log_event *wsrep_format_desc;
   {                                                                         \
     wsrep_status_t ret;                                                     \
     wsrep_to_isolation--;                                                   \
+    WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno, thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void") \
     if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) { \
       thd->wsrep_exec_mode= LOCAL_STATE;                                    \
+      WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);         \
     }                                                                       \
     else {                                                                  \
-      sql_print_warning("WSREP: TO isolation end failed for: %d, sql: %s",  \
+      WSREP_WARN("TO isolation end failed for: %d, sql: %s",                \
                         ret, (thd->query()) ? thd->query() : "void");       \
     }                                                                       \
     thd->wsrep_trx_seqno= 0;                                                \
@@ -1573,7 +1602,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     ha_rollback_trans(thd, 0);
     thd->transaction.stmt.reset();
-    WSREP_DEBUG("WSREP abort in exec query state, avoiding autocommit");
+    WSREP_DEBUG("abort in exec query state, avoiding autocommit");
     goto wsrep_must_abort;
   }
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -1586,7 +1615,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     thd->wsrep_conflict_state= ABORTING;
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-    WSREP_DEBUG("WSREP in dispatch_command, aborting %s",
+    WSREP_DEBUG("in dispatch_command, aborting %s",
               (thd->query()) ? thd->query() : "void");
     trans_rollback(thd);
 
@@ -1604,18 +1633,18 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     if (thd->wsrep_conflict_state== MUST_REPLAY) {
       if (thd->wsrep_exec_mode!= REPL_RECV) {
         if (thd->stmt_da->is_sent) {
-          sql_print_error("WSREP replay issue, thd has reported status already");
+          WSREP_ERROR("replay issue, thd has reported status already");
         }
         thd->stmt_da->reset_diagnostics_area();
 
         thd->wsrep_conflict_state= REPLAYING;
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
         mysql_reset_thd_for_next_command(thd);
         close_thread_tables(thd);
 
-        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
         thd_proc_info(thd, "wsrep replaying trx");
-        WSREP_DEBUG("WSREP replay trx");
+        WSREP_DEBUG("replay trx");
         void *shadow= wsrep_prepare_bf_thd(thd);
         int rcode = wsrep->replay_trx(wsrep,
                                       &thd->wsrep_trx_handle,
@@ -1623,8 +1652,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 
         wsrep_return_from_bf_mode(shadow, thd);
         if (thd->wsrep_conflict_state!= REPLAYING)
-          sql_print_warning("WSREP lost replaying mode: %d",
-                            thd->wsrep_conflict_state );
+          WSREP_WARN("lost replaying mode: %d", thd->wsrep_conflict_state );
 
         mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 
@@ -1636,20 +1664,28 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
           break;
         case WSREP_TRX_FAIL:
           if (thd->stmt_da->is_sent) {
-            sql_print_error("WSREP replay failed, thd has reported status");
+            WSREP_ERROR("replay failed, thd has reported status");
           }
           else
           {
-            WSREP_DEBUG("WSREP replay failed, rolling back");
+            WSREP_DEBUG("replay failed, rolling back");
             my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
           }
           thd->wsrep_conflict_state= ABORTED;
           wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
           break;
         default:
-          sql_print_warning("WSREP trx_replay failed for: %d", rcode);
+          WSREP_ERROR("trx_replay failed for: %d", rcode);
+          /* we're now in inconsistent state, must abort */
+          unireg_abort(1);
           break;
         }
+	mysql_mutex_lock(&LOCK_wsrep_replaying);
+	wsrep_replaying--;
+	WSREP_DEBUG("replaying decreased: %d, thd: %lu", 
+		  wsrep_replaying, thd->thread_id);
+	mysql_cond_broadcast(&COND_wsrep_replaying);
+	mysql_mutex_unlock(&LOCK_wsrep_replaying);
       }
     }
     /* setting error code for BF aborted trxs */
@@ -3424,12 +3460,6 @@ end_with_restore_list:
       goto error;
     if (!(res= sql_set_variables(thd, lex_var_list)))
     {
-#ifdef WITH_WSREP
-      if (thd->wsrep_exec_mode == LOCAL_STATE) 
-      {
-        sql_set_wsrep_variables(thd, lex_var_list);
-      }
-#endif
       /*
         If the previous command was a SET ONE_SHOT, we don't want to forget
         about the ONE_SHOT property of that SET. So we use a |= instead of = .
@@ -7512,9 +7542,8 @@ static enum wsrep_status wsrep_bf_apply_sql(
     thd->wsrep_conflict_state= NO_CONFLICT;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  // Am I crazy or does dispatch_command() really modify sql argument?
   if ((error= dispatch_command(COM_QUERY, thd, (char*)sql, sql_len))) {
-    WSREP_WARN("BF SQL apply faled: %d, %lld",
+    WSREP_WARN("BF SQL apply failed: %d, %lld",
                thd->wsrep_conflict_state, (long long)thd->wsrep_trx_seqno);
     DBUG_RETURN(WSREP_FATAL);
   }
@@ -7566,6 +7595,26 @@ static wsrep_status_t wsrep_bf_apply_rbr(
     int exec_res;
     int error = 0;
     Log_event* ev=  wsrep_read_log_event(&buf, &buf_len, wsrep_format_desc);
+
+    switch (ev->get_type_code()) {
+    case WRITE_ROWS_EVENT:
+    case UPDATE_ROWS_EVENT:
+    case DELETE_ROWS_EVENT:
+      DBUG_ASSERT(buf_len != 0 ||
+                  ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F));
+      break;
+    case TABLE_MAP_EVENT:
+      break;
+    case QUERY_EVENT:
+      WSREP_DEBUG("query event: %s", ((Query_log_event*)ev)->query);
+      break;
+    default:
+      WSREP_WARN("Unknown event type code %d, discarding",
+                 ev->get_type_code());
+      goto cleanup;
+    }
+
+
     thd->server_id = ev->server_id; // use the original server id for logging
     thd->set_time();                // time the query
     thd->lex->current_select= 0;
@@ -7598,9 +7647,7 @@ static wsrep_status_t wsrep_bf_apply_rbr(
       DBUG_RETURN(WSREP_FATAL);
     }
 
-    DBUG_ASSERT(buf_len != 0 || 
-                ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F));
-
+  cleanup:
     if (ev->get_type_code() != TABLE_MAP_EVENT &&
         ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F))
     {
@@ -7693,7 +7740,8 @@ wsrep_status_t wsrep_bf_apply_cb(
 
   if (WSREP_OK == rcode)
   {
-    // TODO: mark snapshot with global_seqno
+    // TODO: mark snapshot with global_seqno. Remember that RBRs require
+    //       explicit commit.
   }
 //  thd->wsrep_trx_seqno= 0;
 
@@ -7716,9 +7764,10 @@ Relay_log_info* wsrep_relay_log_init(const char* log_fname)
 }
 
 struct wsrep_thd_shadow {
-  ulonglong          options;
+  ulonglong            options;
   enum wsrep_exec_mode wsrep_exec_mode;
-  Vio                *vio;
+  Vio                  *vio;
+  ulong                tx_isolation;
 };
 
 void *wsrep_prepare_bf_thd(THD *thd)
@@ -7730,27 +7779,32 @@ void *wsrep_prepare_bf_thd(THD *thd)
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->net.vio;
 
-  /*
-    rbr requires binlog but neither worker nor a client thread itself
-    writes to the binlog file.
-  */
-  thd->variables.option_bits&= ~(OPTION_BIN_LOG);
+  if (opt_log_slave_updates)
+    thd->variables.option_bits|= OPTION_BIN_LOG;
+  else
+    thd->variables.option_bits&= ~(OPTION_BIN_LOG);
 
   if (!thd->wsrep_rli) thd->wsrep_rli= wsrep_relay_log_init("wsrep_relay");
-  
+
   thd->wsrep_exec_mode= REPL_RECV;
   thd->net.vio= 0;
   thd->clear_error();
 
   thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
-  
+
+  shadow->tx_isolation        = thd->variables.tx_isolation;
+  thd->variables.tx_isolation = ISO_READ_COMMITTED;
+  thd->tx_isolation           = ISO_READ_COMMITTED;
+
   return (void *)shadow;
 }
 void wsrep_return_from_bf_mode(void *shadow, THD *thd)
 {
   thd->variables.option_bits= ((struct wsrep_thd_shadow *)shadow)->options;
   thd->wsrep_exec_mode = ((struct wsrep_thd_shadow *)shadow)->wsrep_exec_mode;
-  thd->net.vio       = ((struct wsrep_thd_shadow *)shadow)->vio;
+  thd->net.vio         = ((struct wsrep_thd_shadow *)shadow)->vio;
+  thd->variables.tx_isolation = 
+    ((struct wsrep_thd_shadow *)shadow)->tx_isolation;
 
   free(shadow);
 }
@@ -7760,8 +7814,6 @@ void wsrep_replication_process(THD *thd)
   int rcode;
   DBUG_ENTER("wsrep_replication_process");
 
-// REMOVE  thd->wsrep_applier= true;
-
   wsrep_prepare_bf_thd(thd);
 
   wsrep_format_desc= new Format_description_log_event(4);
@@ -7769,12 +7821,14 @@ void wsrep_replication_process(THD *thd)
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));
 
-  WSREP_INFO("recv thread exiting (code:%d)", rcode);
+  WSREP_INFO("applier thread exiting (code:%d)", rcode);
 
   switch (rcode) {
   case WSREP_OK:
   case WSREP_NOT_IMPLEMENTED:
-    /* provider does not support slave operations, just close applier thread */
+  case WSREP_CONN_FAIL:
+    /* provider does not support slave operations / disconnected from group,
+     * just close applier thread */
     break;
   case WSREP_NODE_FAIL:
     /* data inconsistency => SST is needed */
@@ -7791,7 +7845,6 @@ void wsrep_replication_process(THD *thd)
     WSREP_WARN("bad return from recv() call: %d", rcode);
     /* fall through to node shutdown */
   case WSREP_FATAL:
-  case WSREP_CONN_FAIL:
     /* Cluster connectivity is lost.
      *
      * If applier was killed on purpose (KILL_CONNECTION), we
@@ -7803,6 +7856,14 @@ void wsrep_replication_process(THD *thd)
       wsrep_kill_mysql(thd);
     }
     break;
+  }
+
+  if (thd->killed != THD::KILL_CONNECTION)
+  {
+    mysql_mutex_lock(&LOCK_thread_count);
+    wsrep_close_applier(thd);
+    mysql_cond_broadcast(&COND_thread_count);
+    mysql_mutex_unlock(&LOCK_thread_count);
   }
 
   DBUG_VOID_RETURN;
@@ -7901,16 +7962,17 @@ int wsrep_thd_is_brute_force(void *thd_ptr)
   return 0;
 }
 extern "C"
-int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr)
+int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr, my_bool signal)
 {
   THD *victim_thd = (THD *) victim_thd_ptr;
   THD *bf_thd     = (THD *) bf_thd_ptr;
   DBUG_ENTER("wsrep_abort_thd");
- 
+
   if (victim_thd)
   {
-    sql_print_warning("wsrep_abort_thd: %lu", victim_thd->real_id);
-    ha_wsrep_abort_transaction(bf_thd, victim_thd);
+    WSREP_DEBUG("wsrep_abort_thd, by: %lu, victim: %lu", 
+		   (bf_thd) ? bf_thd->real_id : 0, victim_thd->real_id);
+    ha_wsrep_abort_transaction(bf_thd, victim_thd, signal);
   }
      
   DBUG_RETURN(1);

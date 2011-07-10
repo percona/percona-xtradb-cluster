@@ -21,6 +21,9 @@ default-storage-engine=innodb
 # to avoid issues with 'bulk mode inserts' using autoinc
 innodb_autoinc_lock_mode=2
 
+# This is a must for paralell applying
+innodb_locks_unsafe_for_binlog=1
+
 # Synchronous replication allows for some optimizations (not required)
 innodb_flush_log_at_trx_commit=0
 innodb_doublewrite=0
@@ -58,11 +61,25 @@ wsrep_slave_threads=1
 # DBUG options for wsrep provider
 #wsrep_dbug_option
 
-# cache size (bytes) for processing write sets in local phase 
+# cache size (bytes) for processing write sets in local phase
 wsrep_local_cache_size=20M
 
 # write sets can be saved in binary files
 wsrep_ws_persistency=0
+
+# Generate fake primary keys for non-PK tables (required for multi-master
+# and parallel applying operation)
+wsrep_certify_nonPK=yes
+
+# Location of the directory with data files. Needed for non-mysqldump
+# state snapshot transfers. Defaults to mysql_real_data_home.
+#wsrep_data_home_dir=
+
+# Maximum number of rows in write set
+wsrep_max_ws_rows=65536
+
+# Maximum size of write set
+wsrep_max_ws_size=1073741824
 
 # to enable debug level logging, set this to 1
 wsrep_debug=0
@@ -71,13 +88,13 @@ wsrep_debug=0
 wsrep_convert_LOCK_to_trx=0
 
 # how many times to retry deadlocked autocommits
-wsrep_retry_autocommit=0
+wsrep_retry_autocommit=1
 
 # change auto_increment_increment and auto_increment_offset automatically
 wsrep_auto_increment_control=1
 
 # retry autoinc insert, which failed for duplicate key error
-wsrep_drupal_282555_workaround=0
+wsrep_drupal_282555_workaround=1
 
 # Command to call when node status or cluster membership changes.
 # Will be passed all or some of the following options:
@@ -105,3 +122,6 @@ wsrep_sst_auth=root:rootpass
 
 # Desired SST donor name.
 #wsrep_sst_donor=
+
+# Override thread_cache_size
+thread_cache_size=0

@@ -597,12 +597,12 @@ wsrep_break_lock(
     for (holder=lock_queue1->data; holder; holder=holder->next) 
     {
       wsrep_abort_thd(data->owner->mysql_thd, 
-                      holder->owner->mysql_thd);
+                      holder->owner->mysql_thd, FALSE);
     }
     for (holder=lock_queue2->data; holder; holder=holder->next) 
     {
       wsrep_abort_thd(data->owner->mysql_thd,
-                      holder->owner->mysql_thd);
+                      holder->owner->mysql_thd, FALSE);
     }
         
     /* Add our lock to the head of the wait queue */

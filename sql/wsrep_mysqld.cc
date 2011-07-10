@@ -27,7 +27,6 @@ my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
  * Begin configuration options and their default values
  */
 
-const char* wsrep_provider_options = "";
 const char* wsrep_data_home_dir = mysql_real_data_home;
 const char* wsrep_cluster_name  = "my_wsrep_cluster";
 const char* wsrep_node_name     = glob_hostname;
@@ -47,7 +46,7 @@ my_bool wsrep_incremental_data_collection = 0; // incremental data collection
 long long wsrep_max_ws_size            = 1073741824LL; //max ws (RBR buffer) size
 long    wsrep_max_ws_rows              = 65536; // max number of rows in ws
 int     wsrep_to_isolation             = 0; // # of active TO isolation threads
-my_bool wsrep_certify_nonPK            = 0; // certify, even when no primary key
+my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
 my_bool wsrep_consistent_reads         = 0; // consistent/causal reads flag
 
 /*
@@ -66,6 +65,7 @@ static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 /*
  * wsrep status variables
  */
+my_bool     wsrep_connected          = FALSE;
 my_bool     wsrep_ready              = FALSE; // node can accept queries
 const char* wsrep_cluster_state_uuid = cluster_uuid_str;
 long long   wsrep_cluster_conf_id    = WSREP_SEQNO_UNDEFINED;
@@ -268,22 +268,81 @@ static void wsrep_synced_cb(void* app_ctx)
   pthread_mutex_unlock (&ready_lock);
 }
 
-int wsrep_init()
+void wsrep_init()
 {
-  int rcode= 0;
+  int rcode= -1;
 
   wsrep_ready= FALSE;
   assert(wsrep_provider);
   assert(wsrep_cluster_address);
 
-  if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != 0) {
-    WSREP_ERROR("wsrep_load() failed: %s (%d)", strerror(rcode), rcode);
+  if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != WSREP_OK)
+  {
+    if (strcasecmp(wsrep_provider, WSREP_NONE))
+    {
+      WSREP_ERROR("wsrep_load(%s) failed: %s (%d). Reverting to no provider.",
+                  wsrep_provider, strerror(rcode), rcode);
+      strcpy((char*)wsrep_provider, WSREP_NONE); // damn it's an ugly hack
+      wsrep_init();
+    }
+    else
+    {
+      WSREP_ERROR("Could not revert to no provider: %s (%d). Need to abort.",
+                  strerror(rcode), rcode);
+      unireg_abort(1);
+    }
   }
 
-  if (WSREP_OK != rcode)
-    unireg_abort(1);
+  if (strlen(wsrep_provider)== 0 ||
+      !strcmp(wsrep_provider, WSREP_NONE))
+  {
+    // enable normal operation in case no provider is specified
+    wsrep_ready= TRUE;
+  }
 
-  return rcode;
+  struct wsrep_init_args wsrep_args;
+
+  if (!wsrep_node_incoming_address ||
+      !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO)) {
+    static char inc_addr[256];
+    size_t inc_addr_max = sizeof (inc_addr);
+    size_t ret = default_address (inc_addr, inc_addr_max);
+    if (ret > 0 && ret < inc_addr_max) {
+      wsrep_node_incoming_address = inc_addr;
+    }
+    else {
+      wsrep_node_incoming_address = NULL;
+    }
+  }
+
+  wsrep_args.data_dir        = mysql_real_data_home;
+  wsrep_args.node_name       = wsrep_node_name;
+  wsrep_args.node_incoming   = wsrep_node_incoming_address;
+  wsrep_args.options         = wsrep_provider_options;
+
+  wsrep_args.state_uuid      = &local_uuid;
+  wsrep_args.state_seqno     = local_seqno;
+
+  wsrep_args.logger_cb       = wsrep_log_cb;
+  wsrep_args.view_handler_cb = wsrep_view_handler_cb;
+  wsrep_args.synced_cb       = wsrep_synced_cb;
+  wsrep_args.bf_apply_cb     = wsrep_bf_apply_cb;
+  wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
+
+  rcode= wsrep->init(wsrep, &wsrep_args);
+
+  if (rcode)
+  {
+    DBUG_PRINT("wsrep",("wsrep::init() failed: %d", rcode));
+    WSREP_ERROR("wsrep::init() failed: %d", rcode);
+//    goto err;
+  }
+}
+
+void wsrep_deinit()
+{
+  wsrep_unload(wsrep);
+  wsrep= 0;
 }
 
 void wsrep_stop_replication(THD *thd)
@@ -299,103 +358,47 @@ void wsrep_stop_replication(THD *thd)
   WSREP_DEBUG("Provider disconnect");
   wsrep->disconnect(wsrep);
 
-  wsrep_close_client_connections();
+  wsrep_connected= FALSE;
 
-  /* signal all appliers to stop */
-  wsrep_close_appliers(thd);
+  wsrep_close_client_connections();
 
   /* wait until appliers have stopped */
   wsrep_wait_appliers_close(thd);
 
-  /* free provider resources */
-  wsrep->free(wsrep);
-
   return;
 }
 
-static wsrep_status_t wsrep_set_options()
-{
-  char wsrep_options[2048] = { 0, };
-
-  snprintf (wsrep_options, 2047,
-            "log_debug = %d; persistent_writesets = %d; "
-            "local_cache_size = %ld; dbug_spec = %s;",
-            (wsrep_debug != 0), (wsrep_ws_persistency != 0),
-            wsrep_local_cache_size,
-            wsrep_dbug_option ? wsrep_dbug_option : "");
-
-  return wsrep->options_set(wsrep, wsrep_options);
-}
 
 bool wsrep_start_replication()
 {
   wsrep_status_t rcode;
-  struct wsrep_init_args wsrep_args;
-
-  WSREP_INFO("Start replication");
-
-  if (!wsrep_node_incoming_address ||
-      !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO)) {
-    static char inc_addr[256];
-    size_t inc_addr_max = sizeof (inc_addr);
-    size_t ret = default_address (inc_addr, inc_addr_max);
-    if (ret > 0 && ret < inc_addr_max) {
-      wsrep_node_incoming_address = inc_addr;
-    }
-    else {
-      wsrep_node_incoming_address = NULL;
-    }
-  }
-
-  wsrep_args.data_dir        = wsrep_data_home_dir;
-  wsrep_args.node_name       = wsrep_node_name;
-  wsrep_args.node_incoming   = wsrep_node_incoming_address;
-  wsrep_args.options         = (wsrep_provider_options != NULL) ? wsrep_provider_options : "";
-
-  wsrep_args.state_uuid      = &local_uuid;
-  wsrep_args.state_seqno     = local_seqno;
-
-  wsrep_args.logger_cb       = wsrep_log_cb;
-  wsrep_args.view_handler_cb = wsrep_view_handler_cb;
-  wsrep_args.synced_cb       = wsrep_synced_cb;
-  wsrep_args.bf_apply_cb     = wsrep_bf_apply_cb;
-  wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
-
-  rcode = wsrep->init(wsrep, &wsrep_args);
-
-  if (rcode)
-  {
-    DBUG_PRINT("wsrep",("wsrep::init() failed: %d", rcode));
-    WSREP_ERROR("wsrep::init() failed: %d", rcode);
-    goto err;
-  }
-
-  rcode = wsrep_set_options();
-  if (WSREP_OK != rcode)
-  {
-    WSREP_ERROR("Failed to set options: %d", rcode);
-    goto err;
-  }
 
   /*
     if provider is trivial, don't even try to connect,
     but resume local node operation
   */
-  if (strlen(wsrep_provider)== 0           ||
+  if (strlen(wsrep_provider)== 0 ||
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
-    wsrep_ready = TRUE;
+    wsrep_ready= TRUE;
+    return true;
   }
-  else if (strlen(wsrep_cluster_address)== 0)
+
+  if (strlen(wsrep_cluster_address)== 0)
   {
     // if provider is non-trivial, but no address is specified, wait for address
-    wsrep_ready = FALSE;
+    wsrep_ready= FALSE;
+    return true;
   }
-  else if ((rcode = wsrep->connect(wsrep,
-                                   wsrep_cluster_name,
-                                   wsrep_cluster_address,
-                                   wsrep_sst_donor))) {
+
+  WSREP_INFO("Start replication");
+
+  if ((rcode = wsrep->connect(wsrep,
+                              wsrep_cluster_name,
+                              wsrep_cluster_address,
+                              wsrep_sst_donor)))
+  {
     if (-ESOCKTNOSUPPORT == rcode)
     {
       DBUG_PRINT("wsrep",("unrecognized cluster address: '%s', rcode: %d",
@@ -409,32 +412,42 @@ bool wsrep_start_replication()
       WSREP_ERROR("wsrep::connect() failed: %d", rcode);
     }
 
-    goto err;
+    return false;
   }
   else
   {
+    wsrep_connected= TRUE;
+
     uint64_t caps = wsrep->capabilities (wsrep);
 
     wsrep_incremental_data_collection =
         (caps & WSREP_CAP_WRITE_SET_INCREMENTS);
+
+    char* opts= wsrep->options_get(wsrep);
+    if (opts)
+    {
+      wsrep_provider_options_init(opts);
+      free(opts);
+    }
+    else
+    {
+      WSREP_WARN("Failed to get wsrep options");
+    }
   }
 
   return true;
-
-err:
-  return false;
 }
 
 bool
 wsrep_causal_wait (THD* thd)
 {
-  if (thd->variables.wsrep_consistent_reads && thd->variables.wsrep_on)
+  if (thd->variables.wsrep_causal_reads && thd->variables.wsrep_on)
   {
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
     if (unlikely(thd->in_active_multi_stmt_transaction()))
     {
-      my_error(ER_NOT_SUPPORTED_YET, MYF(0), "wsrep_consistent_reads=ON "
+      my_error(ER_NOT_SUPPORTED_YET, MYF(0), "wsrep_causal_reads=ON "
                "inside transactions");
       return true;
     }
@@ -456,7 +469,7 @@ wsrep_causal_wait (THD* thd)
       {
       case WSREP_NOT_IMPLEMENTED:
         msg= "consistent reads by wsrep backend. "
-             "Please unset wsrep_consistent_reads variable.";
+             "Please unset wsrep_causal_reads variable.";
         err= ER_NOT_SUPPORTED_YET;
         break;
       default:

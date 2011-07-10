@@ -1,4 +1,4 @@
-/* Copyright 2008 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2011 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,21 +15,82 @@
 
 #undef SAFE_MUTEX
 #include <mysqld.h>
+#include <sql_class.h>
+#include <set_var.h>
+#include <sql_acl.h>
 #include <sql_reload.h>
+#include <sql_parse.h>
 #include "wsrep_priv.h"
 #include <cstdio>
 #include <cstdlib>
 
 #define WSREP_SST_MYSQLDUMP "mysqldump"
 #define WSREP_SST_DEFAULT WSREP_SST_MYSQLDUMP
-
 const char* wsrep_sst_method          = WSREP_SST_DEFAULT;
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 const char* wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
-const char* wsrep_sst_auth            = NULL;
 const char* wsrep_sst_donor           = "";
 
-static wsrep_uuid_t cluster_uuid      = WSREP_UUID_UNDEFINED;
+static char  sst_auth[16] = { 0, };
+const  char* wsrep_sst_auth = sst_auth;
+
+// to show when wsrep_sst_auth is set
+static const char* const sst_auth_set = "********";
+// container for real auth string
+static const char* sst_auth_real = 0;
+
+bool wsrep_sst_auth_check (sys_var *self, THD* thd, set_var* var)
+{
+    if (!(thd->security_ctx->master_access & SUPER_ACL)) {
+        my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
+        return 1;
+    }
+    return 0;
+}
+
+static bool sst_auth_real_set (const char* value)
+{
+    const char* v = strdup (value);
+
+    if (v)
+    {
+        if (sst_auth_real) free (const_cast<char*>(sst_auth_real));
+        sst_auth_real = v;
+
+        memset (sst_auth, 0, sizeof(sst_auth));
+
+        if (strlen(sst_auth_real))
+            strncpy (sst_auth, sst_auth_set, sizeof(sst_auth) - 1);
+
+        return 0;
+    }
+
+    return 1;
+}
+
+bool wsrep_sst_auth_update (sys_var *self, THD* thd, enum_var_type type)
+{
+    const char *latin= "latin1";
+    LEX_STRING charset; 
+    charset.str= (char *)latin;
+    charset.length= strlen(latin);
+
+    const char* value = (const char*)self->value_ptr(thd, type, &charset);
+
+    return sst_auth_real_set (value);
+}
+
+void wsrep_sst_auth_default (THD* thd, enum_var_type var_type)
+{
+    sst_auth_real_set ("root:");
+}
+
+void wsrep_sst_auth_init (const char* value)
+{
+    if (value) sst_auth_real_set (value);
+}
+
+static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
 
 bool wsrep_init_first()
 {
@@ -240,10 +301,17 @@ static ssize_t sst_prepare_other (const char*  method,
 {
   ssize_t cmd_len= 1024;
   char    cmd_str[cmd_len];
+  const char* sst_dir;
+
+  if (wsrep_data_home_dir && strlen(wsrep_data_home_dir))
+    sst_dir= wsrep_data_home_dir;
+  else
+    sst_dir= mysql_real_data_home;
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s 'joiner' '%s' '%s' '%s'",
-                     method, addr_in, wsrep_sst_auth, mysql_real_data_home);
+                     method, addr_in, sst_auth_real, sst_dir);
+
   if (ret < 0 || ret >= cmd_len)
   {
     WSREP_ERROR("sst_prepare_other(): snprintf() failed: %d", ret);
@@ -442,7 +510,7 @@ static int sst_donate_mysqldump (const char*         addr,
   strncpy (host, addr, host_len - 1);
   host[host_len - 1] = '\0';
 
-  const char* auth = wsrep_sst_auth ? wsrep_sst_auth : "root:";
+  const char* auth = sst_auth_real;
   const char* pswd = strchr (auth, ':');
   size_t user_len;
 
@@ -482,53 +550,89 @@ static int sst_donate_mysqldump (const char*         addr,
   return ret;
 }
 
-// checks donor "done" string
-static int sst_donor_done (const char* str,
-                           wsrep_uuid_t* uuid, wsrep_seqno_t* seqno)
+wsrep_seqno_t wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+
+static int sst_flush_tables(THD* thd)
 {
-  const char magic[]= "done";
-  const size_t magic_len = sizeof(magic) - 1;
-  int ret= EINVAL;
+  WSREP_INFO("Flushing tables for SST...");
 
-  if (str && strlen(str) > (magic_len + 2) &&
-      !strncasecmp (str, magic, magic_len))
-  {
-    ret= sst_scan_uuid_seqno (str + magic_len + 1, uuid, seqno);
-  }
-
-  if (ret)
-  {
-    WSREP_ERROR("Failed to read 'done' string, read: '%s'", str);
-  }
-
-  return ret;
-}
-
-static int sst_flush_tables()
-{
-  int err= 1;
   int not_used;
   
-  WSREP_INFO("Flushing tables for SST...");
-  my_pthread_setspecific_ptr (THR_THD, 0);
-  err= reload_acl_and_cache((THD*) 0, REFRESH_TABLES | REFRESH_FAST,
-                            (TABLE_LIST*) 0, &not_used);
-  // Other flags: REFRESH_LOG, REFRESH_GRANT,
-  //              REFRESH_THREADS, REFRESH_HOSTS
-  WSREP_INFO("Tables flushed.");
-  if (!err)
+  int  err= reload_acl_and_cache(thd, REFRESH_TABLES | REFRESH_READ_LOCK,
+                                 (TABLE_LIST*) 0, &not_used);
+//  Other possible flags: REFRESH_LOG, REFRESH_THREADS, REFRESH_HOSTS,
+//                        REFRESH_FAST, REFRESH_STATUS, REFRESH_SLAVE,
+//                        REFRESH_MASTER, REFRESH_QUERY_CACHE_FREE,
+//                        REFRESH_DES_KEY_FILE
+
+  if (err)
   {
+    WSREP_ERROR("Failed to flush and lock tables: %d (%s)", err,strerror(err));
+  }
+  else
+  {
+    /* make sure logs are flushed after global read lock acquired */
+    err= reload_acl_and_cache(thd, REFRESH_LOG, (TABLE_LIST*) 0, &not_used);
+  }
+
+  if (err)
+  {
+    WSREP_ERROR("Failed to flush redo logs: %d (%s)", err, strerror(err));
+  }
+  else
+  {
+    WSREP_INFO("Tables flushed.");
     const char base_name[]= "tables_flushed";
-    ssize_t full_len= strlen(mysql_real_data_home) + strlen(base_name) + 2;
-    char full_name[full_len];
-    sprintf(full_name, "%s/%s", mysql_real_data_home, base_name);
-    if (0 == fopen(full_name, "w+"))
+    ssize_t const full_len= strlen(mysql_real_data_home) + strlen(base_name)+2;
+    char real_name[full_len];
+    sprintf(real_name, "%s/%s", mysql_real_data_home, base_name);
+    char tmp_name[full_len + 4];
+    sprintf(tmp_name, "%s.tmp", real_name);
+
+    FILE* file= fopen(tmp_name, "w+");
+    if (0 == file)
     {
       err= errno;
-      WSREP_ERROR("Failed to open '%s': %d (%s)", full_name, err,strerror(err));
+      WSREP_ERROR("Failed to open '%s': %d (%s)", tmp_name, err,strerror(err));
+    }
+    else
+    {
+      fprintf(file, "%s:%lld\n",
+              wsrep_cluster_state_uuid, (long long)wsrep_locked_seqno);
+      fsync(fileno(file));
+      fclose(file);
+      if (rename(tmp_name, real_name) == -1)
+      {
+        err= errno;
+        WSREP_ERROR("Failed to rename '%s' to '%s': %d (%s)",
+                     tmp_name, real_name, err,strerror(err));
+      }
     }
   }
+
   return err;
+}
+
+static void sst_disallow_writes (THD* thd, bool yes)
+{
+  char query_str[64] = { 0, };
+  ssize_t const query_max = sizeof(query_str) - 1;
+  snprintf (query_str, query_max, "SET GLOBAL innodb_disallow_writes=%d",
+            yes ? 1 : 0);
+
+  thd->set_query(query_str, strlen(query_str));
+
+  Parser_state ps;
+  mysql_parse(thd, thd->query(), thd->query_length(), &ps);
+  if (thd->is_error())
+  {
+    int const err= thd->stmt_da->sql_errno();
+    WSREP_WARN ("error executing '%s': %d (%s)%s",
+                query_str, err, thd->stmt_da->message(),
+                err == ER_UNKNOWN_SYSTEM_VARIABLE ? 
+                ". Was mysqld built with --with-innodb-disallow-writes ?" : "");
+    thd->clear_error();
+  }
 }
 
 static void* sst_donor_thread (void* a)
@@ -537,8 +641,8 @@ static void* sst_donor_thread (void* a)
 
   WSREP_INFO("Running: '%s'", arg->cmd);
 
-  int err= 1;
-  bool cont= false;
+  int  err= 1;
+  bool locked= false;
 
   const char*  out= NULL;
   const size_t out_len= 128;
@@ -547,9 +651,18 @@ static void* sst_donor_thread (void* a)
   wsrep_uuid_t  ret_uuid= WSREP_UUID_UNDEFINED;
   wsrep_seqno_t ret_seqno= WSREP_SEQNO_UNDEFINED; // seqno of complete SST
 
-  wsp::process proc (arg->cmd, "r");
+  wsp::thd thd;
+  wsp::process proc(arg->cmd, "r");
 
-  if (proc.pipe() && !proc.error())
+  err= proc.error();
+
+/* Inform server about SST script startup and release TO isolation */
+  pthread_mutex_lock   (&arg->lock);
+  arg->err = -err;
+  pthread_cond_signal  (&arg->cond);
+  pthread_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
+
+  if (proc.pipe() && !err)
   {
 wait_signal:
     out= my_fgets (out_buf, out_len, proc.pipe());
@@ -562,17 +675,26 @@ wait_signal:
 
       if (!strcasecmp (out, magic_flush))
       {
-        err= sst_flush_tables();
-        if (!err) goto wait_signal;
+        err= sst_flush_tables (thd.ptr);
+        if (!err)
+        {
+          sst_disallow_writes (thd.ptr, true);
+          locked= true;
+          goto wait_signal;
+        }
       }
       else if (!strcasecmp (out, magic_cont))
       {
-        cont= true;
+        sst_disallow_writes (thd.ptr, false);
+        thd.ptr->global_read_lock.unlock_global_read_lock (thd.ptr);
+        locked= false;
         err=  0;
+        goto wait_signal;
       }
       else if (!strncasecmp (out, magic_done, strlen(magic_done)))
       {
-        err= sst_donor_done (out, &ret_uuid, &ret_seqno);
+        err= sst_scan_uuid_seqno (out + strlen(magic_done) + 1,
+                                  &ret_uuid, &ret_seqno);
       }
       else
       {
@@ -587,21 +709,13 @@ wait_signal:
   }
   else
   {
-    err= proc.error();
     WSREP_ERROR("Failed to execute: %s : %d (%s)",arg->cmd, err, strerror(err));
   }
 
-  // signal to donor that it can continue applying
-  pthread_mutex_lock   (&arg->lock);
-  arg->err = -err;
-  pthread_cond_signal  (&arg->cond);
-  pthread_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
-
-  if (cont)
+  if (locked) // don't forget to unlock server before return
   {
-    // wait for 'done' string
-    out= my_fgets (out_buf, out_len, proc.pipe());
-    err= sst_donor_done (out, &ret_uuid, &ret_seqno);
+    sst_disallow_writes (thd.ptr, false);
+    thd.ptr->global_read_lock.unlock_global_read_lock (thd.ptr);
   }
 
   // signal to donor that SST is over
@@ -620,9 +734,9 @@ static int sst_donate_other (const char*   method,
   char    cmd_str[cmd_len];
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%lld' 2>sst.err",
-                     method, addr, wsrep_sst_auth, mysql_real_data_home, uuid,
-                     (long long) seqno);
+                     "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%lld' 2>sst.err"
+                     ,method, addr, sst_auth_real, mysql_real_data_home,
+                     uuid, (long long) seqno);
   if (ret < 0 || ret >= cmd_len)
   {
     WSREP_ERROR("sst_donate_other(): snprintf() failed: %d", ret);

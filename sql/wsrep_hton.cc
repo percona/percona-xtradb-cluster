@@ -145,6 +145,11 @@ wsrep_run_wsrep_commit(
   uchar *rbr_data   = NULL;
   IO_CACHE *cache;
 
+  if (thd->stmt_da->is_error()) {
+    WSREP_ERROR("commit issue, error: %d %s", 
+                thd->stmt_da->sql_errno(), thd->stmt_da->message());
+  }
+
   DBUG_ENTER("wsrep_run_wsrep_commit");
   if (thd->wsrep_exec_mode == REPL_RECV) {
 
@@ -180,14 +185,55 @@ wsrep_run_wsrep_commit(
     }
     DBUG_RETURN(WSREP_TRX_ROLLBACK);
   }
-  thd->wsrep_query_state = QUERY_COMMITTING;
+
+  mysql_mutex_lock(&LOCK_wsrep_replaying);
+
+  while (wsrep_replaying > 0 && thd->wsrep_conflict_state == NO_CONFLICT) {
+
+    mysql_mutex_unlock(&LOCK_wsrep_replaying);
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+    mysql_mutex_lock(&thd->mysys_var->mutex);
+    thd_proc_info(thd, "wsrep waiting on replaying");
+    thd->mysys_var->current_mutex= &LOCK_wsrep_replaying;
+    thd->mysys_var->current_cond=  &COND_wsrep_replaying;
+    mysql_mutex_unlock(&thd->mysys_var->mutex);
+
+    mysql_mutex_lock(&LOCK_wsrep_replaying);
+    // Using timedwait is a hack to avoid deadlock in case if BF victim
+    // misses the signal.
+    struct timespec wtime = {0, 1000000};
+    mysql_cond_timedwait(&COND_wsrep_replaying, &LOCK_wsrep_replaying,
+                           &wtime);
+    WSREP_DEBUG("commit waiting for replaying: %d, thd: (%lu) conflict: %d", 
+		wsrep_replaying, thd->thread_id, thd->wsrep_conflict_state);
+
+    mysql_mutex_unlock(&LOCK_wsrep_replaying);
+
+    mysql_mutex_lock(&thd->mysys_var->mutex);
+    thd->mysys_var->current_mutex= 0;
+    thd->mysys_var->current_cond=  0;
+    mysql_mutex_unlock(&thd->mysys_var->mutex);
+
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    mysql_mutex_lock(&LOCK_wsrep_replaying);
+  }
+  mysql_mutex_unlock(&LOCK_wsrep_replaying);
+
+  if (thd->wsrep_conflict_state == MUST_ABORT) {
+    DBUG_PRINT("wsrep", ("replicate commit fail"));
+    thd->wsrep_conflict_state = ABORTED;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    WSREP_DEBUG("innobase_commit abort after replaying wait %s",
+		(thd->query()) ? thd->query() : "void");
+    DBUG_RETURN(WSREP_TRX_ROLLBACK);
+  }  thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
   cache = get_trans_log(thd);
   rcode = 0;
   if (cache) {
-    if (wsrep_emulate_bin_log)
-      thd->binlog_flush_pending_rows_event(true);
+    thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(cache, &rbr_data, &data_len);
     if (rcode) {
       WSREP_ERROR("rbr write fail, data_len: %d, %d", 
@@ -218,7 +264,11 @@ wsrep_run_wsrep_commit(
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       thd->wsrep_conflict_state = MUST_REPLAY;
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      thd->wsrep_trx_to_replay = thd_to_trx_id(thd); //(trx_id_t)ut_conv_dulint_to_longlong(trx->id);
+      mysql_mutex_lock(&LOCK_wsrep_replaying);
+      wsrep_replaying++;
+      WSREP_DEBUG("replaying increased: %d, thd: %lu", 
+		  wsrep_replaying, thd->thread_id);
+      mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   } else {
     const char *errmsg = 

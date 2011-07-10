@@ -273,9 +273,20 @@ static struct wsrep_stats_var* dummy_stats_get (wsrep_t* w)
     return dummy_stats;
 }
 
-void dummy_stats_free (
+static void dummy_stats_free (
     wsrep_t* w,
     struct wsrep_stats_var* stats __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+}
+
+static wsrep_seqno_t dummy_pause (wsrep_t* w)
+{
+    WSREP_DBUG_ENTER(w);
+    return -ENOSYS;
+}
+
+static void dummy_resume (wsrep_t* w)
 {
     WSREP_DBUG_ENTER(w);
 }
@@ -308,6 +319,8 @@ static wsrep_t dummy_iface = {
     &dummy_snapshot,
     &dummy_stats_get,
     &dummy_stats_free,
+    &dummy_pause,
+    &dummy_resume,
     WSREP_NONE,
     WSREP_INTERFACE_VERSION,
     "Codership Oy <info@codership.com>",

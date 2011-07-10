@@ -3178,7 +3178,8 @@ static Sys_var_tz Sys_time_zone(
 static Sys_var_charptr Sys_wsrep_provider(
        "wsrep_provider", "Path to replication provider library",
        READ_ONLY GLOBAL_VAR(wsrep_provider), CMD_LINE(REQUIRED_ARG),
-       IN_FS_CHARSET, DEFAULT(NULL), 
+       IN_FS_CHARSET, DEFAULT("none"), 
+       //       IN_FS_CHARSET, DEFAULT(wsrep_provider_default), 
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
        ON_CHECK(wsrep_provider_check), ON_UPDATE(wsrep_provider_update));
 
@@ -3186,7 +3187,9 @@ static Sys_var_charptr Sys_wsrep_provider_options(
        "wsrep_provider_options", "provider specific options",
        READ_ONLY GLOBAL_VAR(wsrep_provider_options), CMD_LINE(REQUIRED_ARG),
        IN_FS_CHARSET, DEFAULT(NULL), 
-       NO_MUTEX_GUARD, NOT_IN_BINLOG);
+       NO_MUTEX_GUARD, NOT_IN_BINLOG,
+       ON_CHECK(wsrep_provider_options_check), 
+       ON_UPDATE(wsrep_provider_options_update));
 
 static Sys_var_charptr Sys_wsrep_data_home_dir(
        "wsrep_data_home_dir", "home directory for wsrep provider",
@@ -3223,7 +3226,7 @@ static Sys_var_charptr Sys_wsrep_node_incoming_address(
 static Sys_var_ulong Sys_wsrep_slave_threads(
        "wsrep_slave_threads", "Number of slave appliers to launch",
        GLOBAL_VAR(wsrep_slave_threads), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1, 32), DEFAULT(1), BLOCK_SIZE(1));
+       VALID_RANGE(1, 512), DEFAULT(1), BLOCK_SIZE(1));
 
 static Sys_var_charptr Sys_wsrep_dbug_option(
        "wsrep_dbug_option", "DBUG options to provider library",
@@ -3283,7 +3286,11 @@ static Sys_var_charptr Sys_wsrep_sst_receive_address(
 static Sys_var_charptr Sys_wsrep_sst_auth(
        "wsrep_sst_auth", "Authentication for SST connection",
        READ_ONLY GLOBAL_VAR(wsrep_sst_auth),CMD_LINE(REQUIRED_ARG),
-       IN_FS_CHARSET, DEFAULT(NULL), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+       IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, 
+       NOT_IN_BINLOG,
+       //       IN_FS_CHARSET, DEFAULT(wsrep_sst_auth_default), NO_MUTEX_GUARD, 
+       ON_CHECK(wsrep_sst_auth_check),
+       ON_UPDATE(wsrep_sst_auth_update)); 
 
 static Sys_var_charptr Sys_wsrep_sst_donor(
        "wsrep_sst_donor", "preferred donor node for the SST",
@@ -3315,7 +3322,7 @@ static Sys_var_ulonglong Sys_wsrep_max_ws_size (
 static Sys_var_ulong Sys_wsrep_max_ws_rows (
        "wsrep_max_ws_rows", "Max number of rows in write set",
        GLOBAL_VAR(wsrep_max_ws_rows), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1, 10000), DEFAULT(1024), BLOCK_SIZE(1));
+       VALID_RANGE(1, 131072), DEFAULT(131072), BLOCK_SIZE(1));
 
 static Sys_var_charptr Sys_wsrep_notify_cmd(
        "wsrep_notify_cmd", "",
@@ -3327,9 +3334,10 @@ static Sys_var_mybool Sys_wsrep_certify_nonPK(
        GLOBAL_VAR(wsrep_certify_nonPK), 
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
-static Sys_var_mybool Sys_wsrep_consistent_reads(
+static Sys_var_mybool Sys_wsrep_causal_reads(
        "wsrep_consistent_reads", "Enable consistent (causal) reads",
-       GLOBAL_VAR(wsrep_consistent_reads), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
-#endif // WITH_WSREP
+       SESSION_VAR(wsrep_causal_reads), 
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE)); 
+       //       ON_UPDATE(wsrep_causal_reads_update));
+#endif /* WITH_WSREP */
 

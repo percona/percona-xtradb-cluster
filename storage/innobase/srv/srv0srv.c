@@ -202,6 +202,10 @@ srv_printf_innodb_monitor() will request mutex acquisition
 with mutex_enter(), which will wait until it gets the mutex. */
 #define MUTEX_NOWAIT(mutex_skipped)	((mutex_skipped) < MAX_MUTEX_NOWAIT)
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
+UNIV_INTERN os_event_t	srv_allow_writes_event;
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 /** The sort order table of the MySQL latin1_swedish_ci character set
 collation */
 UNIV_INTERN const byte*	srv_latin1_ordering;
@@ -1082,8 +1086,17 @@ srv_init(void)
 		ut_a(conc_slot->event);
 #ifdef WITH_WSREP
 		conc_slot->thd = NULL;
-#endif
+#endif /* WITH_WSREP */
 	}
+
+#ifdef WITH_INNODB_DISALLOW_WRITES
+	/* Writes have to be enabled on init or else we hang. Thus, we
+	always set the event here regardless of innobase_disallow_writes.
+	That flag will always be 0 at this point because it isn't settable
+	via my.cnf or command line arg. */
+	srv_allow_writes_event = os_event_create(NULL);
+	os_event_set(srv_allow_writes_event);
+#endif /* WITH_INNODB_DISALLOW_WRITES */
 
 	/* Initialize some INFORMATION SCHEMA internal structures */
 	trx_i_s_cache_init(trx_i_s_cache);

@@ -194,6 +194,26 @@ private:
   critical& operator= (const critical&);
 };
 
+class thd
+{
+  class thd_init
+  {
+  public:
+    thd_init()  { my_thread_init(); }
+    ~thd_init() { my_thread_end();  }
+  }
+  init;
+
+  thd (const thd&);
+  thd& operator= (const thd&);
+
+public:
+
+  thd();
+  ~thd();
+  THD* const ptr;
+};
+
 } // namespace wsrep
 
 #endif /* WSREP_PRIV_H */

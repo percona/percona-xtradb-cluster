@@ -27,7 +27,7 @@ RSYNC_CONF=
 kill_rsync()
 {
 #set -x
-    local PID=$(cat "$RSYNC_PID" || echo 0)
+    local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
     [ "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -rf "$RSYNC_CONF"
     rm -rf "$MAGIC_FILE"
@@ -53,19 +53,22 @@ rm -rf "$FLUSHED"
 
 if [ "$ROLE" = "donor" ]
 then
-    UUID=$5
-    SEQNO=$6
-
     # Use deltaxfer only for WAN
     [ "$0" == "wsrep_sst_rsync_wan" ] && WHOLE_FILE_OPT="" \
                                       || WHOLE_FILE_OPT="--whole-file"
 
     echo "flush tables"
-    while [ ! -r "$FLUSHED" ] # wait for tables flushed from mysqld
+
+    # wait for tables flushed and state ID written to the file
+    while [ ! -r "$FLUSHED" ] && ! grep -q ':' "$FLUSHED" >/dev/null 2>&1
     do
         sleep 0.2
     done
+
+    STATE="$(cat $FLUSHED)"
     rm -rf "$FLUSHED"
+
+    sync
 
     rsync -rlpgoDqI $WHOLE_FILE_OPT --inplace --delete \
           --exclude '*.err' --exclude '*.pid' --exclude '*.sock' --exclude '*.conf' \
@@ -75,10 +78,10 @@ then
 # it looks like copying logfiles is mandatory at least for fresh nodes.
 #          --exclude 'ib_logfile*' \
 
-    echo "$UUID:$SEQNO" > "$MAGIC_FILE"
+    echo "$STATE" > "$MAGIC_FILE"
     rsync -aqc "$MAGIC_FILE" rsync://$ADDR
 
-    echo "done $UUID:$SEQNO"
+    echo "done $STATE"
 
 elif [ "$ROLE" = "joiner" ]
 then
@@ -122,10 +125,10 @@ then
         sleep 0.2
     done
 
-    echo "ready $ADDR/$MODULE"
-
     trap "exit 32" SIGHUP SIGPIPE SIGCHLD
     trap kill_rsync EXIT
+
+    echo "ready $ADDR/$MODULE"
 
     # wait for SST to complete by monitoring magic file
     while [ ! -r "$MAGIC_FILE" ] && check_pid "$RSYNC_PID"

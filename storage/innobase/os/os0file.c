@@ -89,6 +89,12 @@ UNIV_INTERN os_mutex_t	os_file_seek_mutexes[OS_FILE_N_SEEK_MUTEXES];
 /* In simulated aio, merge at most this many consecutive i/os */
 #define OS_AIO_MERGE_N_CONSECUTIVE	64
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
+#define WAIT_ALLOW_WRITES() os_event_wait(srv_allow_writes_event)
+#else
+#define WAIT_ALLOW_WRITES() do { } while (0)
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 /**********************************************************************
 
 InnoDB AIO Implementation:
@@ -723,6 +729,7 @@ FILE*
 os_file_create_tmpfile(void)
 /*========================*/
 {
+	WAIT_ALLOW_WRITES();
 	FILE*	file	= NULL;
 	int	fd	= innobase_mysql_tmpfile();
 
@@ -1027,6 +1034,7 @@ os_file_create_directory(
 	ibool		fail_if_exists)	/*!< in: if TRUE, pre-existing directory
 					is treated as an error. */
 {
+	WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	BOOL	rcode;
 
@@ -1080,6 +1088,8 @@ os_file_create_simple_func(
 				OS_FILE_READ_WRITE */
 	ibool*		success)/*!< out: TRUE if succeed, FALSE if error */
 {
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	os_file_t	file;
 	DWORD		create_flag;
@@ -1222,6 +1232,8 @@ os_file_create_simple_no_error_handling_func(
 				used by a backup program reading the file */
 	ibool*		success)/*!< out: TRUE if succeed, FALSE if error */
 {
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	os_file_t	file;
 	DWORD		create_flag;
@@ -1389,6 +1401,8 @@ os_file_create_func(
 	ulint		type,	/*!< in: OS_DATA_FILE or OS_LOG_FILE */
 	ibool*		success)/*!< out: TRUE if succeed, FALSE if error */
 {
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	os_file_t	file;
 	DWORD		share_mode	= FILE_SHARE_READ;
@@ -1625,6 +1639,7 @@ os_file_delete_if_exists(
 /*=====================*/
 	const char*	name)	/*!< in: file path as a null-terminated string */
 {
+	WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	BOOL	ret;
 	ulint	count	= 0;
@@ -1687,6 +1702,7 @@ os_file_delete(
 /*===========*/
 	const char*	name)	/*!< in: file path as a null-terminated string */
 {
+	WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	BOOL	ret;
 	ulint	count	= 0;
@@ -1754,6 +1770,7 @@ os_file_rename_func(
 				string */
 	const char*	newpath)/*!< in: new file path */
 {
+	WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	BOOL	ret;
 
@@ -2027,6 +2044,7 @@ os_file_set_eof(
 /*============*/
 	FILE*		file)	/*!< in: file to be truncated */
 {
+	WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	HANDLE h = (HANDLE) _get_osfhandle(fileno(file));
 	return(SetEndOfFile(h));
@@ -2048,6 +2066,7 @@ os_file_fsync(
 /*==========*/
 	os_file_t	file)	/*!< in: handle to a file */
 {
+	WAIT_ALLOW_WRITES();
 	int	ret;
 	int	failures;
 	ibool	retry;
@@ -2677,6 +2696,7 @@ os_file_write_func(
 				offset */
 	ulint		n)	/*!< in: number of bytes to write */
 {
+	WAIT_ALLOW_WRITES();
 #ifdef __WIN__
 	BOOL		ret;
 	DWORD		len;

@@ -801,7 +801,7 @@ struct handlerton
    int (*table_exists_in_engine)(handlerton *hton, THD* thd, const char *db,
                                  const char *name);
    int (*wsrep_abort_transaction)(handlerton *hton, THD *bf_thd, 
-				  THD *victim_thd);
+				  THD *victim_thd, my_bool signal);
    uint32 license; /* Flag for Engine License */
    void *data; /* Location for engines to keep personal structures */
 };
@@ -2215,7 +2215,9 @@ int ha_enable_transaction(THD *thd, bool on);
 int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
-int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd);
+#ifdef WITH_WSREP
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal);
+#endif /* WITH_WSREP */
 
 /* these are called by storage engines */
 void trans_register_ha(THD *thd, bool all, handlerton *ht);

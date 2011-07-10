@@ -141,6 +141,10 @@ extern ulint	srv_log_buffer_size;
 extern ulong	srv_flush_log_at_trx_commit;
 extern char	srv_adaptive_flushing;
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
+/* When this event is reset we do not allow any file writes to take place. */
+extern os_event_t	srv_allow_writes_event;
+#endif /* WITH_INNODB_DISALLOW_WRITES */
 
 /* The sort order table of the MySQL latin1_swedish_ci character set
 collation */

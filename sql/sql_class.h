@@ -533,7 +533,7 @@ typedef struct system_variables
 
 #ifdef WITH_WSREP
   my_bool wsrep_on;
-  my_bool wsrep_consistent_reads;
+  my_bool wsrep_causal_reads;
 #endif
   double long_query_time_double;
 
@@ -2200,7 +2200,6 @@ public:
   mysql_cond_t              COND_wsrep_thd;
   wsrep_seqno_t             wsrep_trx_seqno;
   uint32                    wsrep_rand;
-  uint64                    wsrep_trx_to_replay;
   Relay_log_info*           wsrep_rli;
   bool                      wsrep_converted_lock_session;
   wsrep_trx_handle_t        wsrep_trx_handle;

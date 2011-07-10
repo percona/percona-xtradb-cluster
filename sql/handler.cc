@@ -44,7 +44,9 @@
 #ifdef WITH_PARTITION_STORAGE_ENGINE
 #include "ha_partition.h"
 #endif
-
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 /*
   While we have legacy_db_type, we have this array to
   check for dups and to find handlerton from legacy_db_type.
@@ -4917,7 +4919,8 @@ void signal_log_not_needed(struct handlerton, char *log_file)
   @details
   This function makes the storage engine to force te victim transaction
   to abort. Currently, only innodb has this functionality, but any SE
-  implementing the wsrep API should be able to provide this service.
+  implementing the wsrep API should provide this service to support
+  multi-master operation.
 
   @param bf_thd       brute force THD asking for the abort
   @param victim_thd   victim THD to be aborted
@@ -4926,23 +4929,23 @@ void signal_log_not_needed(struct handlerton, char *log_file)
     always 0
 */
 
-int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd)
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
 {
-  Ha_trx_info *info;
+  DBUG_ENTER("ha_wsrep_abort_transaction");
 
-  /*
-    Note that below we assume that only transactional storage engines
-    can provide this service
-  */
-  for (info= bf_thd->transaction.stmt.ha_list; info; info= info->next())
+  handlerton *hton= installed_htons[DB_TYPE_INNODB];
+  if (hton && hton->wsrep_abort_transaction)
   {
-    handlerton *hton= info->ht();
-    if (hton && hton->wsrep_abort_transaction)
-      hton->wsrep_abort_transaction(hton, bf_thd, victim_thd);
+    hton->wsrep_abort_transaction(hton, bf_thd, victim_thd, signal);
+  } 
+  else 
+  {
+    WSREP_WARN("cannot abort InnoDB transaction");
   }
-  return 0;
+
+  DBUG_RETURN(0);
 }
-#endif
+#endif /* WITH_WSREP */
 #ifdef TRANS_LOG_MGM_EXAMPLE_CODE
 /*
   Example of transaction log management functions based on assumption that logs

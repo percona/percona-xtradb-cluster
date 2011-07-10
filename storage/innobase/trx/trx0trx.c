@@ -1064,6 +1064,11 @@ trx_commit_off_kernel(
 	ut_ad(UT_LIST_GET_LEN(trx->wait_thrs) == 0);
 	ut_ad(UT_LIST_GET_LEN(trx->trx_locks) == 0);
 
+#ifdef WITH_WSREP
+	if (trx->was_chosen_as_deadlock_victim) {
+		trx->was_chosen_as_deadlock_victim = FALSE;
+	}
+#endif
 	UT_LIST_REMOVE(trx_list, trx_sys->trx_list, trx);
 }
 

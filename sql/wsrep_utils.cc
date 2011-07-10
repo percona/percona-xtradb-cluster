@@ -22,6 +22,7 @@
 #include <netinet/in.h>
 
 #include <mysqld.h>
+#include <sql_class.h>
 #include "wsrep_priv.h"
 
 namespace wsp
@@ -83,6 +84,27 @@ process::wait ()
   }
 
   return err;
+}
+
+thd::thd () : init(), ptr(new THD)
+{
+  if (ptr)
+  {
+    ptr->thread_stack= (char*) &ptr;
+    ptr->store_globals();
+    ptr->variables.option_bits&= ~OPTION_BIN_LOG; // disable binlog
+    ptr->security_ctx->master_access= ~(ulong)0;
+    lex_start(ptr);
+  }
+}
+
+thd::~thd ()
+{
+  if (ptr)
+  {
+    delete ptr;
+    my_pthread_setspecific_ptr (THR_THD, 0);
+  }
 }
 
 } // namespace wsp
@@ -160,6 +182,5 @@ size_t default_address(char* buf, size_t buf_len)
 
   return addr_len;
 }
-
 
 

@@ -564,12 +564,6 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
     cache->read_pos=cache->read_end;
   } while ((cache->file >= 0) && (length= my_b_fill(cache)));
 
-  if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
-  { 
-    if (buf_ptr) my_free(*buf);
-    *buf_len = 0;
-    return ER_ERROR_ON_WRITE;
-  }
   return 0;
 }
 #endif

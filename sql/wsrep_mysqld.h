@@ -46,7 +46,6 @@ extern my_bool     wsrep_convert_LOCK_to_trx;
 extern ulong       wsrep_retry_autocommit;
 extern my_bool     wsrep_auto_increment_control;
 extern my_bool     wsrep_drupal_282555_workaround;
-extern my_bool     wsrep_consistent_reads;
 extern my_bool     wsrep_incremental_data_collection;
 extern const char* wsrep_sst_method;
 extern const char* wsrep_sst_receive_address;
@@ -59,6 +58,7 @@ extern const char* wsrep_notify_cmd;
 extern my_bool     wsrep_certify_nonPK;
 
 // MySQL status variables
+extern my_bool     wsrep_connected;
 extern my_bool     wsrep_ready;
 extern const char* wsrep_cluster_state_uuid;
 extern long long   wsrep_cluster_conf_id;
@@ -71,7 +71,7 @@ extern int         wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
 extern int  wsrep_init_vars();
 extern bool wsrep_on_update (
   sys_var *self, THD* thd, enum_var_type var_type);
-extern void wsrep_consistent_reads_update (
+extern void wsrep_causal_reads_update (
   sys_var *self, THD* thd, enum_var_type var_type);
 extern bool  wsrep_start_position_check   (
   sys_var *self, THD* thd, set_var* var);
@@ -80,29 +80,48 @@ extern bool wsrep_start_position_update  (
 extern void wsrep_start_position_default (THD* thd, enum_var_type var_type);
 extern void 
 wsrep_start_position_init    (const char* opt);
-extern bool  wsrep_provider_check          (sys_var *self, THD* thd, set_var* var);
+extern bool wsrep_provider_check          (sys_var *self, THD* thd, set_var* var);
 extern bool wsrep_provider_update         (sys_var *self, THD* thd, enum_var_type type);
 extern void wsrep_provider_default        (THD* thd, enum_var_type var_type);
 extern void wsrep_provider_init           (const char* opt);
-extern bool  wsrep_cluster_address_check   (sys_var *self, THD* thd, set_var* var);
+extern bool wsrep_provider_options_check (sys_var *self, THD* thd, 
+					   set_var* var);
+extern bool wsrep_provider_options_update (sys_var *self, THD* thd, 
+					   enum_var_type type);
+extern void wsrep_provider_options_default (THD* thd, enum_var_type var_type);
+extern void wsrep_provider_options_init    (const char* opt);
+extern bool wsrep_cluster_address_check   (sys_var *self, THD* thd, set_var* var);
 extern bool wsrep_cluster_address_update  (sys_var *self, THD* thd, enum_var_type type);
 extern void wsrep_cluster_address_default (THD* thd, enum_var_type var_type);
 extern void wsrep_cluster_address_init    (const char* opt);
+extern bool wsrep_sst_auth_check          (sys_var *self, THD* thd, 
+					   set_var* var);
+extern bool wsrep_sst_auth_update         (sys_var *self, THD* thd, 
+					   enum_var_type type);
+extern void wsrep_sst_auth_default        (THD* thd, enum_var_type var_type);
+extern void wsrep_sst_auth_init           (const char* opt);
 
 extern bool wsrep_init_first(); // initialize wsrep before storage
                                 // engines or after
-extern int  wsrep_init();
+extern void  wsrep_init();
+extern void  wsrep_deinit();
 
 extern void wsrep_close_client_connections();
-extern void wsrep_close_appliers(THD *thd);
+extern void wsrep_close_applier(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd); 
 extern void wsrep_create_appliers(long threads = wsrep_slave_threads);
+extern void wsrep_create_rollbacker();
 extern void wsrep_kill_mysql(THD *thd);
 
 /* new defines */
 extern void wsrep_stop_replication(THD *thd);
 extern bool wsrep_start_replication();
 extern bool wsrep_causal_wait(THD* thd);
+extern int  wsrep_check_opts (int argc, char* const* argv);
+
+/* Other global variables */
+extern wsrep_seqno_t wsrep_locked_seqno;
+
 // MySQL logging functions don't seem to understand long long length modifer.
 // This is a workaround. It also prefixes all messages with "WSREP"
 #define WSREP_LOG(fun, ...)                                       \
@@ -144,7 +163,8 @@ void wsrep_rollback_process(THD *thd);
 void wsrep_brute_force_killer(THD *thd);
 int  wsrep_hire_brute_force_killer(THD *thd, uint64_t trx_id);
 extern "C" int wsrep_thd_is_brute_force(void *thd_ptr);
-extern "C" int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr);
+extern "C" int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr, 
+                               my_bool signal);
 extern "C" int wsrep_thd_in_locking_session(void *thd_ptr);
 void *wsrep_prepare_bf_thd(THD *thd);
 void wsrep_return_from_bf_mode(void *shadow, THD *thd);
@@ -174,6 +194,9 @@ typedef struct wsrep_aborting_thd {
 
 extern mysql_mutex_t LOCK_wsrep_rollback;
 extern mysql_cond_t COND_wsrep_rollback;
+extern int wsrep_replaying;
+extern mysql_mutex_t LOCK_wsrep_replaying;
+extern mysql_cond_t COND_wsrep_replaying;
 extern wsrep_aborting_thd_t wsrep_aborting_thd;
 extern MYSQL_PLUGIN_IMPORT my_bool wsrep_debug;
 extern my_bool wsrep_convert_LOCK_to_trx;
@@ -188,5 +211,7 @@ extern my_bool wsrep_certify_nonPK;
 
 extern PSI_mutex_key key_LOCK_wsrep_rollback;
 extern PSI_cond_key key_COND_wsrep_rollback;
+extern PSI_mutex_key key_LOCK_wsrep_replaying;
+extern PSI_cond_key key_COND_wsrep_replaying;
 
 #endif /* WSREP_MYSQLD_H */
