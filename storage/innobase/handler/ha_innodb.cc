@@ -119,7 +119,8 @@ wsrep_trx_handle(THD* thd, const trx_t* trx) {
 				       (wsrep_trx_id_t)trx->id);
 }
 
-extern bool wsrep_prepare_key_for_innodb(const TABLE_SHARE* table_share,
+extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
+					 size_t cache_key_len,
                                          const uchar* row_id,
                                          size_t row_id_len,
                                          wsrep_key_t* key,
@@ -5548,8 +5549,9 @@ report_error:
 	if (!error_result && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
 	    wsrep_thd_is_wsrep_on(user_thd) && (sql_command != SQLCOM_LOAD ||
 	    thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW)) {
+
 		if (wsrep_append_keys(user_thd, WSREP_INSERT, record)) {
- 			DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+ 			DBUG_PRINT("wsrep", ("row key failed"));
  			error_result = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
 		}
@@ -5828,7 +5830,7 @@ ha_innobase::update_row(
 		DBUG_PRINT("wsrep", ("update row key"));
 
 		if (wsrep_append_keys(user_thd, WSREP_UPDATE, old_row)) {
-			DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+			DBUG_PRINT("wsrep", ("row key failed"));
 			error = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
 		}
@@ -5883,7 +5885,7 @@ ha_innobase::delete_row(
             wsrep_thd_is_wsrep_on(user_thd)) {
 
 		if (wsrep_append_keys(user_thd, WSREP_DELETE, record)) {
-			DBUG_PRINT("wsrep", ("delete fail: %d", rcode));
+			DBUG_PRINT("wsrep", ("delete fail"));
 			error = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
 		}
@@ -6662,22 +6664,19 @@ wsrep_append_foreign_key(
 {
 	ut_a(trx);
 	THD *thd = (THD*)trx->mysql_thd;
-	char name[256] = {'\0'};
+	char cache_key[512] = {'\0'};
 
-	strncpy(name, table_name, 256);
-	char *p = strchr(name, '/');
+	strncpy(cache_key, table_name, 512);
+	char *p = strchr(cache_key, '/');
 	if (p) {
 		*p = '\0';
 	} else {
 		WSREP_WARN("unexpected foreign key table %s", table_name);
 	}
 
-	TABLE_SHARE table_share;
-	table_share.set_table_cache_key(name, strlen(table_name));
-
 	wsrep_key_t wkey[3];
 	size_t wkey_len= 3;
-	if (!wsrep_prepare_key_for_innodb(&table_share,
+	if (!wsrep_prepare_key_for_innodb((const uchar*)cache_key, strlen(table_name) +  1,
 					  (const uchar*)key, key_len,
 					  wkey,
 					  &wkey_len)) {
@@ -6726,10 +6725,12 @@ wsrep_append_key(
 #endif
 	wsrep_key_t wkey[3];
 	size_t wkey_len= 3;
-	if (!wsrep_prepare_key_for_innodb(table_share,
-					  key, key_len,
-					  wkey,
-					  &wkey_len)) {
+	if (!wsrep_prepare_key_for_innodb(
+			(const uchar*)table_share->table_cache_key.str,
+			table_share->table_cache_key.length,
+			key, key_len,
+			wkey,
+			&wkey_len)) {
 		WSREP_WARN("key prepare failed for: %s", 
 			   (wsrep_thd_query(thd)) ? 
 			   wsrep_thd_query(thd) : "void");
@@ -6758,7 +6759,6 @@ ha_innobase::wsrep_append_keys(
 	wsrep_action_t 	action,
 	const uchar*	record)	/* in: row in MySQL format */
 {
-	uint i;
 	DBUG_ENTER("wsrep_append_keys");
 	trx_t *trx = thd_to_trx(thd);
 
@@ -6769,8 +6769,21 @@ ha_innobase::wsrep_append_keys(
 		int rcode = wsrep_append_key(thd, trx, table_share, table, 
 				 (const uchar*) digest, 16, action);
 		if (rcode) DBUG_RETURN(rcode);
+	} else if (wsrep_protocol_version == 0) {
+		uint	len;
+		uchar 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
+		uchar 	*key 		= &keyval[0];
+		KEY	*key_info	= table->key_info;
+
+		len = wsrep_store_key_val_for_row(
+			 table, 0, key, key_info->key_length, record);
+		int rcode = wsrep_append_key(
+			thd, trx, table_share, table, keyval, 
+			len, action);
+		if (rcode) DBUG_RETURN(rcode);
 	} else {
 		ut_a(table->s->keys <= 256);
+		uint i;
 		for (i=0; i<table->s->keys; ++i) {
 			uint	len;
 			uchar 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};

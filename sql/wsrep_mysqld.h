@@ -57,6 +57,7 @@ extern long        wsrep_max_ws_rows;
 extern const char* wsrep_notify_cmd;
 extern my_bool     wsrep_certify_nonPK;
 extern long        wsrep_max_protocol_version;
+extern long        wsrep_protocol_version;
 
 // MySQL status variables
 extern my_bool     wsrep_connected;
@@ -104,8 +105,12 @@ extern void wsrep_sst_auth_init           (const char* opt);
 
 extern bool wsrep_init_first(); // initialize wsrep before storage
                                 // engines or after
-extern void  wsrep_init();
+extern int   wsrep_init();
 extern void  wsrep_deinit();
+
+/* wsrep initialization sequence at startup
+ * @param first wsrep_init_first() value */
+extern void wsrep_init_startup(bool first);
 
 extern void wsrep_close_client_connections();
 extern void wsrep_close_applier(THD *thd);

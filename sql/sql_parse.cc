@@ -148,9 +148,11 @@ static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
     }                                                                       \
     else {                                                                  \
       /* jump to error handler in mysql_execute_command() */                \
-      sql_print_warning("WSREP: TO isolation failed for: %d, sql: %s",      \
-                        ret, (thd->query()) ? thd->query() : "void");       \
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed");       \
+      WSREP_WARN("TO isolation failed for: %d, sql: %s. Check wsrep "       \
+                 "connection state and retry the query.",                   \
+                 ret, (thd->query()) ? thd->query() : "void");              \
+      my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check " \
+               "your wsrep connection state and retry the query.");         \
       if (buf) my_free(buf);                                                \
       goto error;                                                           \
     }                                                                       \
@@ -1078,14 +1080,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   */
   thd->enable_slow_log= TRUE;
   thd->lex->sql_command= SQLCOM_END; /* to avoid confusing VIEW detectors */
-#ifdef WITH_WSREP
-  if (thd->wsrep_exec_mode != REPL_RECV) 
-  {
-    thd->set_time();
-  }
-#else
   thd->set_time();
-#endif
   if (!thd->is_valid_time())
   {
     /*

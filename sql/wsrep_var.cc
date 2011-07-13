@@ -229,6 +229,7 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   charset.str= (char *)latin;
   charset.length= strlen(latin);
   const char* value = (const char*)self->value_ptr(thd, type, &charset);
+  bool rcode;
 
   if (strcmp(value, provider)) {
     /* provider has changed */
@@ -242,8 +243,12 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
     memset(provider, '\0', sizeof(provider));
     strncpy (provider, value, sizeof(provider) - 1);
 
-    wsrep_init();
-    
+    if (wsrep_init())
+    {
+      my_error(ER_CANT_OPEN_LIBRARY, MYF(0), provider);
+      rcode = true;
+    }
+
     // we sure don't want to use old address with new provider
     cluster_address[0]='\0';
 
@@ -257,7 +262,7 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
     thd->variables.wsrep_on= wsrep_on_saved;
   }
 
-  return 0;
+  return rcode;
 }
 
 void wsrep_provider_default (THD* thd, enum_var_type var_type)
@@ -270,8 +275,8 @@ void wsrep_provider_init (const char* value)
 {
   if (NULL == value || wsrep_provider_verify (value))
   {
-    sql_print_error ("WSREP: Bad initial value for wsrep_provider: "
-                     "%s", (value ? value : ""));
+    WSREP_ERROR("Bad initial value for wsrep_provider: %s",
+                (value ? value : ""));
     return;
   }
 
@@ -340,18 +345,8 @@ void wsrep_provider_options_init(const char* value)
 
 static int wsrep_cluster_address_verify (const char* cluster_address_str)
 {
-  /* allow empty cluster address */
-  if (!cluster_address_str               || 
-      strlen(cluster_address_str) == 0   ||
-      !strcmp(cluster_address_str, "dummy://"))
-    return 0;
-
-  /* supported GCSs: gcomm, vsbes */
-  if (is_prefix(cluster_address_str, "gcomm") ||
-      is_prefix(cluster_address_str, "vsbes"))
-    return 0;
-
-  return 1;
+  /* There is no predefined address format, it depends on provider. */
+  return 0;
 }
 
 bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)

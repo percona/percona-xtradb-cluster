@@ -1,4 +1,5 @@
 #!/bin/bash -ue
+
 # Copyright (C) 2010 Codership Oy
 #
 # This program is free software; you can redistribute it and/or modify
@@ -17,27 +18,24 @@
 
 # This is a reference script for mysqldump-based state snapshot tansfer
 
-trap "exit 32" SIGHUP SIGPIPE
-trap kill_rsync EXIT
-
-
 RSYNC_PID=
 RSYNC_CONF=
 
-kill_rsync()
+cleanup_joiner()
 {
 #set -x
     local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
     [ "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -rf "$RSYNC_CONF"
     rm -rf "$MAGIC_FILE"
+    rm -rf "$RSYNC_PID"
 #set +x
 }
 
 check_pid()
 {
     local pid_file=$1
-    [ -r $pid_file ] && ps -p $(cat $pid_file) | grep rsync > /dev/null 2>&1
+    [ -r $pid_file ] && ps -p $(cat $pid_file) >/dev/null 2>&1
 }
 
 ROLE=$1
@@ -70,13 +68,11 @@ then
 
     sync
 
-    rsync -rlpgoDqI $WHOLE_FILE_OPT --inplace --delete \
-          --exclude '*.err' --exclude '*.pid' --exclude '*.sock' --exclude '*.conf' \
+    rsync -rlpgoDqI $WHOLE_FILE_OPT --inplace --delete --exclude '*.err' \
+          --exclude '*.pid' --exclude '*.sock' --exclude '*.conf' \
           --exclude 'core' --exclude 'galera.*' --exclude 'grastate.txt' \
+          --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index' \
           "$DATA/" rsync://$ADDR
-
-# it looks like copying logfiles is mandatory at least for fresh nodes.
-#          --exclude 'ib_logfile*' \
 
     echo "$STATE" > "$MAGIC_FILE"
     rsync -aqc "$MAGIC_FILE" rsync://$ADDR
@@ -85,6 +81,8 @@ then
 
 elif [ "$ROLE" = "joiner" ]
 then
+    MYSQLD_PID=$5
+
     MODULE="rsync_sst"
 
     RSYNC_PID="$DATA/$MODULE.pid"
@@ -102,6 +100,10 @@ then
         RSYNC_PORT=4444
         ADDR="$(echo $ADDR | awk -F ':' '{ print $1 }'):$RSYNC_PORT"
     fi
+
+    trap "exit 32" HUP PIPE
+    trap "exit 3"  INT TERM
+    trap cleanup_joiner EXIT
 
     MYUID=$(id -u)
     MYGID=$(id -g)
@@ -125,16 +127,20 @@ then
         sleep 0.2
     done
 
-    trap "exit 32" SIGHUP SIGPIPE SIGCHLD
-    trap kill_rsync EXIT
-
     echo "ready $ADDR/$MODULE"
 
     # wait for SST to complete by monitoring magic file
-    while [ ! -r "$MAGIC_FILE" ] && check_pid "$RSYNC_PID"
+    while [ ! -r "$MAGIC_FILE" ] && check_pid "$RSYNC_PID" && \
+          ps -p $MYSQLD_PID >/dev/null
     do
         sleep 1
     done
+
+    if ! ps -p $MYSQLD_PID >/dev/null
+    then
+        echo "Parent mysqld process (PID:$MYSQLD_PID) terminated unexpectedly." >&2
+        exit 32
+    fi
 
     if [ -r "$MAGIC_FILE" ]
     then
@@ -144,7 +150,7 @@ then
         echo "rsync process ended without creating '$MAGIC_FILE'"
     fi
 
-#    kill_rsync
+#    cleanup_joiner
 else
     echo "Unrecognized role: $ROLE"
     exit 22 # EINVAL

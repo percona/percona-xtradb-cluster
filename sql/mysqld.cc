@@ -659,6 +659,7 @@ wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
 mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t  COND_wsrep_replaying;
 int wsrep_replaying= 0;
+static void wsrep_close_threads(THD* thd);
 #endif
 int mysqld_server_started= 0;
 
@@ -1444,14 +1445,17 @@ extern "C" void unireg_abort(int exit_code)
     sql_print_error("Aborting\n");
 
 #ifdef WITH_WSREP
-  mysql_mutex_lock(&LOCK_thread_count);
-  while (wsrep_running_threads > 0)
+  if (wsrep)
   {
-    sql_print_information("waiting for %lu wsrep threads to finish",
-                          wsrep_running_threads);
-    mysql_cond_wait(&COND_thread_count, &LOCK_thread_count);
+    /* This is an abort situation, we cannot expect to gracefully close all
+     * wsrep threads here, we can only diconnect from service */
+    THD* thd(0);
+    wsrep->disconnect(wsrep);
+    WSREP_INFO("Service disconnected.");
+    wsrep_close_threads(thd); /* this won't close all threads */
+    sleep(1); /* so give some time to exit for those which can */
+    WSREP_INFO("Some threads may fail to exit.");
   }
-  mysql_mutex_unlock(&LOCK_thread_count);
 #endif // WITH_WSREP
 
   clean_up(!opt_help && (exit_code || !opt_bootstrap)); /* purecov: inspected */
@@ -3940,37 +3944,14 @@ will be ignored as the --log-bin option is not defined.");
 
 /* WSREP BEFORE */
 #ifdef WITH_WSREP
-  if (wsrep_init_first())
+  if (opt_bootstrap)
   {
-    /*
-       a workaround to avoid starting replication if running in bootstrap mode
-       TODO: remove this if, when wsrep_provider=NONE setting works reliably
-    */
-    if (opt_bootstrap)
-    {
-      wsrep_provider= WSREP_NONE;
-      wsrep_init();
-    }
-    else
-    {
-      wsrep_init();
-      wsrep_thr_lock_init(wsrep_thd_is_brute_force, wsrep_abort_thd,
-			  wsrep_debug, wsrep_convert_LOCK_to_trx);
-      wsrep_sst_grab();
-      if (!wsrep_start_replication())
-      {
-        unireg_abort(1);
-      }
-      wsrep_create_rollbacker();
-      wsrep_create_appliers(1);
-      if (!wsrep_sst_wait()) // wait until SST is completed
-      {
-        wsrep->disconnect(wsrep);
-        wsrep_wait_appliers_close(NULL);
-        unireg_abort(1);
-      }
-      wsrep_create_appliers(wsrep_slave_threads - 1);
-    }
+    strcpy((char*)wsrep_provider, WSREP_NONE);
+    if (wsrep_init()) unireg_abort(1);
+  }
+  else if (wsrep_init_first())
+  {
+    wsrep_init_startup(true);
   }
 #endif /* WITH_WSREP */
   if (opt_bin_log)
@@ -4327,7 +4308,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   {
     close_connection(thd, ER_OUT_OF_RESOURCES);
     statistic_increment(aborted_connects,&LOCK_status);
-    //thread_scheduler.end_thread(thd,0);
+    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     delete thd;
     return 0;
   }
@@ -4360,7 +4341,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   {
     close_connection(thd, ER_OUT_OF_RESOURCES, 1);
     statistic_increment(aborted_connects,&LOCK_status);
-    //thread_scheduler.end_thread(thd,0);
+    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     delete thd;
     return 0;
   }
@@ -4545,6 +4526,10 @@ void wsrep_close_client_connections()
   THD *tmp;
   mysql_mutex_lock(&LOCK_thread_count); // For unlink from list
 
+  bool kill_cached_threads_saved= kill_cached_threads;
+  kill_cached_threads= true; // prevent future threads caching
+  mysql_cond_broadcast(&COND_thread_cache); // tell cached threads to die
+
   I_List_iterator<THD> it(threads);
   while ((tmp=it++))
   {
@@ -4593,6 +4578,9 @@ void wsrep_close_client_connections()
     mysql_cond_wait(&COND_thread_count, &LOCK_thread_count);
     DBUG_PRINT("quit",("One thread died (count=%u)", thread_count));
   }
+
+  kill_cached_threads= kill_cached_threads_saved;
+
   mysql_mutex_unlock(&LOCK_thread_count);
 
   /* All client connection threads have now been aborted */
@@ -4606,7 +4594,7 @@ void wsrep_close_applier(THD *thd)
   wsrep_close_thread(thd);
 }
 
-static void wsrep_close_threads(THD *thd) 
+static void wsrep_close_threads(THD *thd)
 {
   THD *tmp;
   mysql_mutex_lock(&LOCK_thread_count); // For unlink from list
@@ -5121,8 +5109,10 @@ int mysqld_main(int argc, char **argv)
 /* WSREP AFTER */
 #ifdef WITH_WSREP
   if (opt_bootstrap)
-    wsrep_provider= WSREP_NONE;
-  if (wsrep_init_first())
+  {
+    /*! bootstrap wsrep init was taken care of above */
+  }
+  else if (wsrep_init_first())
   {
     /*! in case of no SST wsrep waits in view handler callback */
     wsrep_SE_init_grab();
@@ -5132,27 +5122,7 @@ int mysqld_main(int argc, char **argv)
   }
   else
   {
-    /*
-       a workaround to avoid starting replication if running in bootstrap mode
-       TODO: remove this if, when wsrep_provider=NONE setting works reliably
-    */
-    if (opt_bootstrap)
-    {
-      wsrep_provider= WSREP_NONE;
-      wsrep_init();
-    }
-    else
-    {
-      wsrep_init();
-      wsrep_thr_lock_init(wsrep_thd_is_brute_force, wsrep_abort_thd,
-			  wsrep_debug, wsrep_convert_LOCK_to_trx);
-      if (!wsrep_start_replication())
-      {
-        unireg_abort(1);
-      }
-      wsrep_create_rollbacker();
-      wsrep_create_appliers();
-    }
+    wsrep_init_startup (false);
   }
 #endif /* WITH_WSREP */
   if (opt_bootstrap)

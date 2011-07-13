@@ -243,14 +243,6 @@ wsrep_run_wsrep_commit(
       if (data_len) my_free(rbr_data);
       DBUG_RETURN(WSREP_TRX_ROLLBACK);
     }
-
-    if (thd_binlog_format(thd) != BINLOG_FORMAT_ROW) {
-      if (data_len > 0) {
-	data_len = 0;
-	my_free(rbr_data);
-	rbr_data = NULL;
-      }
-    }
   }
   if (!rcode) {
     rcode = wsrep->pre_commit(

@@ -119,7 +119,17 @@ bool wsrep_sst_wait ()
     WSREP_INFO("Waiting for SST to complete.");
     pthread_cond_wait (&sst_cond, &sst_lock);
   }
-  WSREP_INFO("SST complete, status: %lld", (long long) local_seqno);
+
+  if (local_seqno >= 0)
+  {
+    WSREP_INFO("SST complete, seqno: %lld", (long long) local_seqno);
+  }
+  else
+  {
+    WSREP_ERROR("SST failed: %d (%s)",
+                int(-local_seqno), strerror(-local_seqno));
+  }
+
   pthread_mutex_unlock (&sst_lock);
 
   return (local_seqno >= 0);
@@ -220,7 +230,7 @@ static void* sst_joiner_thread (void* a)
     const size_t out_len = 512;
     char out[out_len];
 
-    WSREP_DEBUG("Running: '%s'", arg->cmd);
+    WSREP_INFO("Running: '%s'", arg->cmd);
 
     wsp::process proc (arg->cmd, "r");
 
@@ -260,26 +270,27 @@ static void* sst_joiner_thread (void* a)
     pthread_cond_signal  (&arg->cond);
     pthread_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
 
+    if (err) return NULL; /* lp:808417 - return immediately, don't signal
+                           * initializer thread to ensure single thread of
+                           * shutdown. */
+
     wsrep_uuid_t  ret_uuid  = WSREP_UUID_UNDEFINED;
     wsrep_seqno_t ret_seqno = WSREP_SEQNO_UNDEFINED;
 
-    if (!err)
+    // in case of successfull receiver start, wait for SST completion/end
+    char* tmp = my_fgets (out, out_len, proc.pipe());
+
+    proc.wait();
+    err= EINVAL;
+
+    if (!tmp)
     {
-      // in case of successfull receiver start, wait for SST completion/end
-      char* tmp = my_fgets (out, out_len, proc.pipe());
-
-      proc.wait();
-      err= EINVAL;
-
-      if (!tmp)
-      {
-        WSREP_ERROR("Failed to read uuid:seqno from joiner script.");
-        if (proc.error()) err = proc.error();
-      }
-      else
-      {
-        err= sst_scan_uuid_seqno (out, &ret_uuid, &ret_seqno);
-      }
+      WSREP_ERROR("Failed to read uuid:seqno from joiner script.");
+      if (proc.error()) err = proc.error();
+    }
+    else
+    {
+      err= sst_scan_uuid_seqno (out, &ret_uuid, &ret_seqno);
     }
 
     if (err)
@@ -309,8 +320,8 @@ static ssize_t sst_prepare_other (const char*  method,
     sst_dir= mysql_real_data_home;
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'joiner' '%s' '%s' '%s'",
-                     method, addr_in, sst_auth_real, sst_dir);
+                     "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%d' 2>sst.err",
+                     method, addr_in, sst_auth_real, sst_dir, (int)getpid());
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -318,7 +329,7 @@ static ssize_t sst_prepare_other (const char*  method,
     return (ret < 0 ? ret : -EMSGSIZE);
   }
 
-  pthread_t      tmp;
+  pthread_t tmp;
   sst_thread_arg arg(cmd_str);
   pthread_mutex_lock (&arg.lock);
   pthread_create (&tmp, NULL, sst_joiner_thread, &arg);
@@ -327,12 +338,16 @@ static ssize_t sst_prepare_other (const char*  method,
   *addr_out= arg.ret_str;
 
   if (!arg.err)
-    return strlen(*addr_out);
+    ret = strlen(*addr_out);
   else
   {
     assert (arg.err < 0);
-    return arg.err;
+    ret = arg.err;
   }
+
+  pthread_detach (tmp);
+
+  return ret;
 }
 
 //extern ulong my_bind_addr;
@@ -396,10 +411,10 @@ ssize_t wsrep_sst_prepare (void** msg)
     }
     else
     {
-      sql_print_error ("WSREP: Could not prepare state transfer request: "
-                       "unable to determine address to accept state "
-                       "transfer at.");
-      return -EADDRNOTAVAIL;
+      WSREP_ERROR("Could not prepare state transfer request: "
+                  "unable to determine address to accept state transfer at.");
+//      return -EADDRNOTAVAIL;
+      unireg_abort(1);
     }
   }
 
@@ -407,7 +422,7 @@ ssize_t wsrep_sst_prepare (void** msg)
   if (!strcmp(wsrep_sst_method, WSREP_SST_MYSQLDUMP))
   {
     addr_len= sst_prepare_mysqldump (addr_in, &addr_out);
-    if (addr_len < 0) return addr_len;
+    if (addr_len < 0) unireg_abort(1); // return addr_len;
   }
   else
   {
@@ -416,15 +431,17 @@ ssize_t wsrep_sst_prepare (void** msg)
     {
       // we already did SST at initializaiton, now engines are running
       WSREP_ERROR("'%s' SST requires server restart", wsrep_sst_method);
-      return -ERESTART;
+//      return -ERESTART;
+      unireg_abort(1);
     }
 
     addr_len = sst_prepare_other (wsrep_sst_method, addr_in, &addr_out);
     if (addr_len < 0)
     {
-//      WSREP_ERROR("failed to prepare for '%s' SST: %d (%s)",
-//                   wsrep_sst_method, -addr_len, strerror(-addr_len));
-      return addr_len;
+      WSREP_ERROR("Failed to prepare for '%s' SST. Unrecoverable.",
+                   wsrep_sst_method);
+//      return addr_len;
+      unireg_abort(1);
     }
   }
 
@@ -443,6 +460,7 @@ ssize_t wsrep_sst_prepare (void** msg)
   }
   else {
     msg_len = -ENOMEM;
+    unireg_abort(1);
   }
 
   if (addr_out != addr_in) /* malloc'ed */ free ((char*)addr_out);

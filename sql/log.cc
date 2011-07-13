@@ -5013,14 +5013,6 @@ bool MYSQL_BIN_LOG::write(Log_event *event_info)
   if (likely(is_open()))
 #endif
   {
-#ifdef WITH_WSREP
-    /* 
-       Note, non rbr events check is_open a bit earlier
-       and should not execute this method 
-    */
-    DBUG_ASSERT((int) thd->variables.binlog_format == BINLOG_FORMAT_ROW ||
-                 mysql_bin_log.is_open());
-#endif
 #ifdef HAVE_REPLICATION
     /*
       In the future we need to add to the following if tests like

@@ -78,7 +78,7 @@ long        wsrep_local_index        = -1;
 wsrep_uuid_t     local_uuid   = WSREP_UUID_UNDEFINED;
 wsrep_seqno_t    local_seqno  = WSREP_SEQNO_UNDEFINED;
 wsp::node_status local_status;
-static long      wsrep_protocol_version = 1;
+long             wsrep_protocol_version = 1;
 
 // action execute callback
 extern wsrep_status_t wsrep_bf_apply_cb(void *ctx,
@@ -190,8 +190,8 @@ static void wsrep_view_handler_cb (void* app_ctx,
     goto out;
   }
 
-  if (view->state_gap) {
-
+  if (view->state_gap)
+  {
     WSREP_WARN("Gap in state sequence. Need state transfer.");
 
     /* After that wsrep will call wsrep_sst_prepare. */
@@ -293,7 +293,7 @@ static void wsrep_synced_cb(void* app_ctx)
   pthread_mutex_unlock (&ready_lock);
 }
 
-void wsrep_init()
+int wsrep_init()
 {
   int rcode= -1;
 
@@ -307,10 +307,11 @@ void wsrep_init()
     {
       WSREP_ERROR("wsrep_load(%s) failed: %s (%d). Reverting to no provider.",
                   wsrep_provider, strerror(rcode), rcode);
-      strcpy((char*)wsrep_provider, WSREP_NONE); // damn it's an ugly hack
-      wsrep_init();
+      strcpy((char*)wsrep_provider, WSREP_NONE); // damn it's a dirty hack
+      (void) wsrep_init();
+      return rcode;
     }
-    else
+    else /* this is for recursive call above */
     {
       WSREP_ERROR("Could not revert to no provider: %s (%d). Need to abort.",
                   strerror(rcode), rcode);
@@ -361,9 +362,31 @@ void wsrep_init()
   {
     DBUG_PRINT("wsrep",("wsrep::init() failed: %d", rcode));
     WSREP_ERROR("wsrep::init() failed: %d", rcode);
-//    goto err;
   }
+
+  return rcode;
 }
+
+
+void wsrep_init_startup (bool first)
+{
+  if (wsrep_init()) unireg_abort(1);
+
+  wsrep_thr_lock_init(wsrep_thd_is_brute_force, wsrep_abort_thd,
+                      wsrep_debug, wsrep_convert_LOCK_to_trx);
+
+  if (first) wsrep_sst_grab(); // do it so we can wait for SST below
+
+  if (!wsrep_start_replication()) unireg_abort(1);
+
+  wsrep_create_rollbacker();
+  wsrep_create_appliers(1);
+
+  if (first && !wsrep_sst_wait()) unireg_abort(1);// wait until SST is completed
+
+  wsrep_create_appliers(wsrep_slave_threads - 1);
+}
+
 
 void wsrep_deinit()
 {
@@ -552,8 +575,8 @@ bool wsrep_prepare_key_for_isolation(const char* db,
     return true;
 }
 
-
-bool wsrep_prepare_key_for_innodb(const TABLE_SHARE* table_share,
+bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
+				  size_t cache_key_len,
                                   const uchar* row_id,
                                   size_t row_id_len,
                                   wsrep_key_t* key,
@@ -565,17 +588,19 @@ bool wsrep_prepare_key_for_innodb(const TABLE_SHARE* table_share,
     switch (wsrep_protocol_version)
     {
     case 0:
-        key[*key_len].key=     table_share->table_cache_key.str;
-        key[*key_len].key_len= table_share->table_cache_key.length;
+    {
+        key[*key_len].key     = cache_key;
+        key[*key_len].key_len = cache_key_len;
         ++(*key_len);
         break;
+    }
     case 1:
     {
-        key[*key_len].key=     table_share->db.str;
-        key[*key_len].key_len= table_share->db.length;
+        key[*key_len].key     = cache_key;
+        key[*key_len].key_len = strlen( (char*)cache_key );
         ++(*key_len);
-        key[*key_len].key= table_share->table_name.str;
-        key[*key_len].key_len= table_share->table_name.length;
+        key[*key_len].key     = cache_key + strlen( (char*)cache_key ) + 1;
+        key[*key_len].key_len = strlen( (char*)(key[*key_len].key) );
         ++(*key_len);
         break;
     }
@@ -583,8 +608,8 @@ bool wsrep_prepare_key_for_innodb(const TABLE_SHARE* table_share,
         return false;
     }
 
-    key[*key_len].key= row_id;
-    key[*key_len].key_len= row_id_len;
+    key[*key_len].key     = row_id;
+    key[*key_len].key_len = row_id_len;
     ++(*key_len);
 
     return true;

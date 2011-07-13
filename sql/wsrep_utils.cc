@@ -34,7 +34,7 @@ process::process (const char* cmd, const char* type)
         err = errno;
         if (!err) err = ENOMEM; // errno is not set when out of memory
         WSREP_ERROR("Failed to execute: %s: %d (%s)",
-                         str, err, strerror (err));
+                    str, err, strerror (err));
     }
 }
 
@@ -74,6 +74,11 @@ process::wait ()
       }
 
       if (err) {
+        switch (err) /* Translate error codes to more meaningful */
+        {
+          case 126: err = EACCES; break; /* Permission denied */
+          case 127: err = ENOENT; break; /* No such file or directory */
+        }
         WSREP_ERROR("Process completed with error: %s: %d (%s)",
                     str, err, strerror(err));
       }
@@ -141,12 +146,12 @@ size_t default_ip (char* buf, size_t buf_len)
       if (proc.wait()) return 0;
 
       if (NULL == ret) {
-        WSREP_ERROR("Failed to read output of: %s", cmd);
+        WSREP_ERROR("Failed to read output of: '%s'", cmd);
         return 0;
       }
     }
     else {
-      WSREP_ERROR("Failed to execute: %s", cmd);
+      WSREP_ERROR("Failed to execute: '%s'", cmd);
       return 0;
     }
 
@@ -158,7 +163,7 @@ size_t default_ip (char* buf, size_t buf_len)
     }
 
     if (INADDR_NONE == inet_addr(buf)) {
-      WSREP_ERROR("Shell command returned invalid address: %s", buf);
+      WSREP_ERROR("Shell command returned invalid address: '%s'", buf);
       return 0;
     }
   }
