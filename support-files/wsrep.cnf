@@ -8,7 +8,7 @@
 # The rest of defaults should work out of the box.
 
 ##
-## mysqld options _required_ for correct opration of the cluster
+## mysqld options _MANDATORY_ for correct opration of the cluster
 ##
 [mysqld]
 
@@ -24,13 +24,18 @@ innodb_autoinc_lock_mode=2
 # This is a must for paralell applying
 innodb_locks_unsafe_for_binlog=1
 
-# Synchronous replication allows for some optimizations (not required)
-innodb_flush_log_at_trx_commit=0
-innodb_doublewrite=0
-
 # Query Cache is not supported with wsrep
 query_cache_size=0
 query_cache_type=0
+
+# Override bind-address
+# In some systems bind-address defaults to 127.0.0.1, and with mysqldump SST
+# it will have (most likely) disastrous consequences on donor node
+bind-address=0.0.0.0
+
+# Synchronous replication allows for some optimizations (this is not required):
+innodb_flush_log_at_trx_commit=0
+innodb_doublewrite=0
 
 ##
 ## WSREP options
@@ -76,7 +81,7 @@ wsrep_certify_nonPK=yes
 #wsrep_data_home_dir=
 
 # Maximum number of rows in write set
-wsrep_max_ws_rows=65536
+wsrep_max_ws_rows=131072
 
 # Maximum size of write set
 wsrep_max_ws_size=1073741824
@@ -123,5 +128,5 @@ wsrep_sst_auth=root:rootpass
 # Desired SST donor name.
 #wsrep_sst_donor=
 
-# Override thread_cache_size
-thread_cache_size=0
+# Protocol version to use
+# wsrep_protocol_version=

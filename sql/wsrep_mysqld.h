@@ -56,6 +56,7 @@ extern long long   wsrep_max_ws_size;
 extern long        wsrep_max_ws_rows;
 extern const char* wsrep_notify_cmd;
 extern my_bool     wsrep_certify_nonPK;
+extern long        wsrep_max_protocol_version;
 
 // MySQL status variables
 extern my_bool     wsrep_connected;
@@ -158,6 +159,20 @@ enum wsrep_trx_status
 wsrep_run_wsrep_commit(
     THD *thd, handlerton *hton, bool all);
 
+/*!
+ * @param db      Database string
+ * @param table   Table string
+ * @param key     Array of wsrep_key_t
+ * @param key_len In: number of elements in key array, Out: number of
+ *                elements populated
+ *
+ * @return true if preparation was successful, otherwise false.
+ */
+bool wsrep_prepare_key_for_isolation(const char* db,
+                                     const char* table,
+                                     wsrep_key_t* key,
+                                     size_t *key_len);
+
 void wsrep_replication_process(THD *thd);
 void wsrep_rollback_process(THD *thd);
 void wsrep_brute_force_killer(THD *thd);
@@ -168,23 +183,6 @@ extern "C" int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr,
 extern "C" int wsrep_thd_in_locking_session(void *thd_ptr);
 void *wsrep_prepare_bf_thd(THD *thd);
 void wsrep_return_from_bf_mode(void *shadow, THD *thd);
-
-#define WSREP_SET_DATABASE(wsrep, thd, db)                                \
-  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE &&     \
-      db && db[0])                                                        \
-  {                                                                       \
-    char query[85];                                                       \
-    int query_len;                                                        \
-    wsrep_status_t rcode;                                                 \
-    memset(query, 0, 85);                                                 \
-    query_len = snprintf(query, 84, "USE %s;", db);                       \
-    rcode = wsrep->set_database(wsrep, thd->thread_id, query, query_len); \
-    if (rcode != WSREP_OK) {                                              \
-      WSREP_WARN(                                                         \
-        "wsrep failed to set current db for connection: %lu, code: %d",   \
-        thd->thread_id, rcode);                                           \
-    }                                                                     \
-  }
 
 /* this is visible for client build so that innodb plugin gets this */
 typedef struct wsrep_aborting_thd {

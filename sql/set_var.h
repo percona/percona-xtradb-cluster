@@ -190,9 +190,6 @@ public:
   virtual int check(THD *thd)=0;           /* To check privileges etc. */
   virtual int update(THD *thd)=0;                  /* To set the value */
   virtual int light_check(THD *thd) { return check(thd); }   /* for PS */
-#ifdef WITH_WSREP
-  virtual int wsrep_store_variable(THD *thd) {return 0;}
-#endif
 };
 
 

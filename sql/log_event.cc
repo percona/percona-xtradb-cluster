@@ -3180,7 +3180,6 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   new_db.length= db_len;
   new_db.str= (char *) rpl_filter->get_rewrite_db(db, &new_db.length);
   thd->set_db(new_db.str, new_db.length);       /* allocates a copy of 'db' */
-  WSREP_SET_DATABASE(wsrep, thd, new_db.str)
 
   /*
     Setting the character set and collation of the current database thd->db.
@@ -4774,7 +4773,6 @@ int Load_log_event::do_apply_event(NET* net, Relay_log_info const *rli,
   new_db.length= db_len;
   new_db.str= (char *) rpl_filter->get_rewrite_db(db, &new_db.length);
   thd->set_db(new_db.str, new_db.length);
-  WSREP_SET_DATABASE(wsrep, thd, new_db.str)
   DBUG_ASSERT(thd->query() == 0);
   thd->reset_query_inner();                    // Should not be needed
   thd->is_slave_error= 0;

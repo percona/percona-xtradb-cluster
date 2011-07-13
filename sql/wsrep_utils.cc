@@ -182,5 +182,3 @@ size_t default_address(char* buf, size_t buf_len)
 
   return addr_len;
 }
-
-

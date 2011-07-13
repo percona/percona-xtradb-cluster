@@ -313,6 +313,9 @@ charset. In that charset, a character may take at most 3 bytes.  This
 constant MUST NOT BE CHANGED, or the compatibility of InnoDB data
 files would be at risk! */
 #define DICT_MAX_INDEX_COL_LEN		REC_MAX_INDEX_COL_LEN
+#ifdef WITH_WSREP
+#define WSREP_MAX_SUPPORTED_KEY_LENGTH 3500
+#endif /* WITH_WSREP */
 
 /** Data structure for a field in an index */
 struct dict_field_struct{

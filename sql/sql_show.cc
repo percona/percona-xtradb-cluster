@@ -57,7 +57,6 @@
 #if !defined(MYSQL_MAX_VARIABLE_VALUE_LEN)
 #define MYSQL_MAX_VARIABLE_VALUE_LEN 1024
 #endif // !defined(MYSQL_MAX_VARIABLE_VALUE_LEN)
-
 #define STR_OR_NIL(S) ((S) ? (S) : "<nil>")
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE

@@ -14,6 +14,7 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
 #include <mysqld.h>
+#include "sql_base.h"
 #include <sql_class.h>
 #include "wsrep_mysqld.h"
 #include "wsrep_priv.h"
@@ -35,6 +36,7 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool al
 */
 void wsrep_cleanup_transaction(THD *thd)
 {
+  if (thd->thread_id == 0) return;
   if (thd->wsrep_exec_mode == LOCAL_COMMIT)
   {
     if (thd->variables.wsrep_on &&

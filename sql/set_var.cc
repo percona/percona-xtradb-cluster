@@ -582,24 +582,6 @@ err:
   DBUG_RETURN(error);
 }
 
-#ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-int sql_set_wsrep_variables(THD *thd, List<set_var_base> *var_list)
-{
-  int error;
-  List_iterator_fast<set_var_base> it(*var_list);
-  DBUG_ENTER("sql_set_wsrep_variables");
-
-  set_var_base *var;
-  while ((var=it++))
-  {
-    if ((error= var->wsrep_store_variable(thd)))
-      DBUG_RETURN(error);
-  }
-
-  DBUG_RETURN(0);
-}
-#endif
 /*****************************************************************************
   Functions to handle SET mysql_internal_variable=const_expr
 *****************************************************************************/
@@ -691,113 +673,6 @@ int set_var::update(THD *thd)
   return value ? var->update(thd, this) : var->set_default(thd, type);
 }
 
-#ifdef WITH_WSREP
-static char *wsrep_add_str(char *pos, const char *str, size_t len)
-{
-    strncpy(pos, str, len);
-    return pos+len;
-}
-
-int set_var::wsrep_store_variable(THD *thd)
-{
-  char query[1024];
-  char *pos = query;
-  LEX_STRING null_lex_str;
-  enum enum_var_type value_type = thd->lex->option_type;
-  char *value = (char *)var->value_ptr(thd, value_type, &null_lex_str);
-
-  DBUG_ENTER("set_var::wsrep_store_variable");
-
-  memset(query, '\0', 1024);
-
-  pos = wsrep_add_str(pos, "SET ", 4);
-  pos = wsrep_add_str(pos, var->name.str, var->name.length);
-  pos = wsrep_add_str(pos, "=", 1);
-
-  switch (var->show_type()) {
-  case SHOW_DOUBLE_STATUS:
-  {
-    break;
-  }
-  case SHOW_LONG_STATUS:
-  case SHOW_LONG:
-    /* fall through */
-  case SHOW_LONG_NOFLUSH: // the difference lies in refresh_status()
-    pos= int10_to_str(*(long*) value, pos, 10);
-    break;
-  case SHOW_LONGLONG:
-    pos= longlong10_to_str(*(longlong*) value, pos, 10);
-    break;
-  case SHOW_HA_ROWS:
-    pos= longlong10_to_str((longlong) *(ha_rows*) value, pos, 10);
-    break;
-  case SHOW_BOOL:
-    pos= strmov(pos, *(bool*) value ? "ON" : "OFF");
-    break;
-  case SHOW_MY_BOOL:
-    pos= strmov(pos, *(my_bool*) value ? "ON" : "OFF");
-    break;
-  case SHOW_INT:
-    pos= int10_to_str((long) *(uint32*) value, pos, 10);
-    break;
-  case SHOW_HAVE:
-  {
-    const char *str;
-    SHOW_COMP_OPTION tmp= *(SHOW_COMP_OPTION*) value;
-    str = show_comp_option_name[(int) tmp];
-    pos = wsrep_add_str(pos, str, strlen(str));
-    break;
-  }
-  case SHOW_CHAR:
-  {
-    pos = wsrep_add_str(pos, "\'", 1);
-      if (value) {
-        pos = wsrep_add_str(pos, value, strlen(value));
-      }
-      else
-      {
-        pos = wsrep_add_str(pos, " ", 1);
-      }
-      pos = wsrep_add_str(pos, "\'", 1);
-      break;
-  }
-  case SHOW_CHAR_PTR:
-  {
-    char **v = (char **)value;
-    pos = wsrep_add_str(pos, "\'", 1);
-    if (*v) 
-    {
-      pos = wsrep_add_str(pos, *v, strlen(*v));
-    }
-    else
-    {
-      pos = wsrep_add_str(pos, " ", 1);
-    }
-    pos = wsrep_add_str(pos, "\'", 1);
-    break;
-  }
-  case SHOW_KEY_CACHE_LONG:
-    value= (char*) dflt_key_cache + (ulong)value;
-    pos= int10_to_str(*(long*) value, pos, 10);
-    break;
-  case SHOW_KEY_CACHE_LONGLONG:
-    value= (char*) dflt_key_cache + (ulong)value;
-    pos= longlong10_to_str(*(longlong*) value, pos, 10);
-    break;
-  case SHOW_UNDEF:
-    break;
-  case SHOW_SYS:
-  default:
-    DBUG_ASSERT(0);
-    break;
-  }
-  pos = wsrep_add_str(pos, ";", 1);
-
-  wsrep->set_variable(wsrep,
-    thd->thread_id, (char *)var->name.str, var->name.length, query, strlen(query));
-  DBUG_RETURN(0);
-}
-#endif
 
 /*****************************************************************************
   Functions to handle SET @user_variable=const_expr

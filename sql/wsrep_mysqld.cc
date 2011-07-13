@@ -47,7 +47,7 @@ long long wsrep_max_ws_size            = 1073741824LL; //max ws (RBR buffer) siz
 long    wsrep_max_ws_rows              = 65536; // max number of rows in ws
 int     wsrep_to_isolation             = 0; // # of active TO isolation threads
 my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
-my_bool wsrep_consistent_reads         = 0; // consistent/causal reads flag
+long    wsrep_max_protocol_version     = 1; // maximum protocol version to use
 
 /*
  * End configuration options
@@ -78,6 +78,7 @@ long        wsrep_local_index        = -1;
 wsrep_uuid_t     local_uuid   = WSREP_UUID_UNDEFINED;
 wsrep_seqno_t    local_seqno  = WSREP_SEQNO_UNDEFINED;
 wsp::node_status local_status;
+static long      wsrep_protocol_version = 1;
 
 // action execute callback
 extern wsrep_status_t wsrep_bf_apply_cb(void *ctx,
@@ -144,12 +145,36 @@ static void wsrep_view_handler_cb (void* app_ctx,
   wsrep_cluster_status= cluster_status_str[view->status];
   wsrep_cluster_size= view->memb_num;
   wsrep_local_index= view->my_idx;
+  switch (view->proto_ver)
+  {
+  case 0:
+  case 1:
+      // version change
+      if (view->proto_ver != wsrep_protocol_version)
+      {
+          my_bool wsrep_ready_saved= wsrep_ready;
+          wsrep_ready= FALSE;
+          WSREP_INFO("closing client connections for "
+                     "protocol change %ld -> %d",
+                     wsrep_protocol_version, view->proto_ver);
+          wsrep_close_client_connections();
+          wsrep_protocol_version= view->proto_ver;
+          wsrep_ready= wsrep_ready_saved;
+      }
+      break;
+  default:
+      WSREP_ERROR("Unsupported application protocol version: %d",
+                  view->proto_ver);
+      abort();
+  }
 
   WSREP_INFO("New cluster view: group UUID: %s, conf# %lld: %s, "
-             "number of nodes: %ld, my index: %ld, first seqno: %lld",
+             "number of nodes: %ld, my index: %ld, first seqno: %lld, "
+             "protocol version %d",
              wsrep_cluster_state_uuid, (long long)wsrep_cluster_conf_id,
              wsrep_cluster_status, wsrep_cluster_size,
-             wsrep_local_index, (long long)view->first);
+             wsrep_local_index, (long long)view->first,
+             view->proto_ver);
 
   /* Proceed further only if view is PRIMARY */
   if (WSREP_VIEW_PRIMARY != view->status) {
@@ -319,6 +344,7 @@ void wsrep_init()
   wsrep_args.node_name       = wsrep_node_name;
   wsrep_args.node_incoming   = wsrep_node_incoming_address;
   wsrep_args.options         = wsrep_provider_options;
+  wsrep_args.proto_ver       = wsrep_max_protocol_version;
 
   wsrep_args.state_uuid      = &local_uuid;
   wsrep_args.state_seqno     = local_seqno;
@@ -329,7 +355,7 @@ void wsrep_init()
   wsrep_args.bf_apply_cb     = wsrep_bf_apply_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
 
-  rcode= wsrep->init(wsrep, &wsrep_args);
+  rcode = wsrep->init(wsrep, &wsrep_args);
 
   if (rcode)
   {
@@ -381,14 +407,14 @@ bool wsrep_start_replication()
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
-    wsrep_ready= TRUE;
+    wsrep_ready = TRUE;
     return true;
   }
 
   if (strlen(wsrep_cluster_address)== 0)
   {
     // if provider is non-trivial, but no address is specified, wait for address
-    wsrep_ready= FALSE;
+    wsrep_ready = FALSE;
     return true;
   }
 
@@ -484,4 +510,82 @@ wsrep_causal_wait (THD* thd)
   }
 
   return false;
+}
+
+bool wsrep_prepare_key_for_isolation(const char* db,
+                                     const char* table,
+                                     wsrep_key_t* key,
+                                     size_t* key_len)
+{
+    if (*key_len < 2) return false;
+
+    switch (wsrep_protocol_version)
+    {
+    case 0:
+        *key_len= 0;
+        break;
+    case 1:
+    {
+        *key_len= 0;
+        if (db)
+        {
+            // sql_print_information("%s.%s", db, table);
+            if (db)
+            {
+                key[*key_len].key= db;
+                key[*key_len].key_len= strlen(db);
+                ++(*key_len);
+                if (table)
+                {
+                    key[*key_len].key=     table;
+                    key[*key_len].key_len= strlen(table);
+                    ++(*key_len);
+                }
+            }
+        }
+        break;
+    }
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+
+bool wsrep_prepare_key_for_innodb(const TABLE_SHARE* table_share,
+                                  const uchar* row_id,
+                                  size_t row_id_len,
+                                  wsrep_key_t* key,
+                                  size_t* key_len)
+{
+    if (*key_len < 3) return false;
+
+    *key_len= 0;
+    switch (wsrep_protocol_version)
+    {
+    case 0:
+        key[*key_len].key=     table_share->table_cache_key.str;
+        key[*key_len].key_len= table_share->table_cache_key.length;
+        ++(*key_len);
+        break;
+    case 1:
+    {
+        key[*key_len].key=     table_share->db.str;
+        key[*key_len].key_len= table_share->db.length;
+        ++(*key_len);
+        key[*key_len].key= table_share->table_name.str;
+        key[*key_len].key_len= table_share->table_name.length;
+        ++(*key_len);
+        break;
+    }
+    default:
+        return false;
+    }
+
+    key[*key_len].key= row_id;
+    key[*key_len].key_len= row_id_len;
+    ++(*key_len);
+
+    return true;
 }

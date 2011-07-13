@@ -124,21 +124,27 @@ static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
   return ret;
 }
 
-#define WSREP_TO_ISOLATION_BEGIN                                            \
+#define WSREP_TO_ISOLATION_BEGIN(db_, table_)                               \
   if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)         \
   {                                                                         \
     wsrep_status_t ret(WSREP_WARNING);                                      \
     uchar* buf(0);                                                          \
     uint buf_len(0);                                                        \
-    WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno, thd->wsrep_exec_mode, thd->query() ) \
-    if (!wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==            \
-        (ret = wsrep->to_execute_start(wsrep, thd->thread_id, buf,          \
-                                       buf_len,                             \
+    wsrep_key_t wkey[2];                                                    \
+    size_t wkey_len= 2;                                                     \
+    WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno, \
+                thd->wsrep_exec_mode, thd->query() );                       \
+    if (wsrep_prepare_key_for_isolation(db_, table_, wkey, &wkey_len) &&    \
+        !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==            \
+        (ret = wsrep->to_execute_start(wsrep, thd->thread_id,               \
+                                       wkey, wkey_len,                      \
+                                       buf, buf_len,                        \
                                        &thd->wsrep_trx_seqno))) {           \
       thd->wsrep_exec_mode= TOTAL_ORDER;                                    \
       wsrep_to_isolation++;                                                 \
       if (buf) my_free(buf);                                                \
-      WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno, thd->wsrep_exec_mode); \
+      WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,     \
+                  thd->wsrep_exec_mode);                                    \
     }                                                                       \
     else {                                                                  \
       /* jump to error handler in mysql_execute_command() */                \
@@ -155,20 +161,21 @@ static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
   {                                                                         \
     wsrep_status_t ret;                                                     \
     wsrep_to_isolation--;                                                   \
-    WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno, thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void") \
+    WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,   \
+                thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void") \
     if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) { \
       thd->wsrep_exec_mode= LOCAL_STATE;                                    \
       WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);         \
     }                                                                       \
     else {                                                                  \
       WSREP_WARN("TO isolation end failed for: %d, sql: %s",                \
-                        ret, (thd->query()) ? thd->query() : "void");       \
+                 ret, (thd->query()) ? thd->query() : "void");              \
     }                                                                       \
     thd->wsrep_trx_seqno= 0;                                                \
   }
 
 #else
-#define WSREP_TO_ISOLATION_BEGIN 
+#define WSREP_TO_ISOLATION_BEGIN(db_, table_)
 #define WSREP_TO_ISOLATION_END 
 #endif /* WITH_WSREP */
 /**
@@ -1115,20 +1122,6 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     {
       general_log_write(thd, command, thd->db, thd->db_length);
       my_ok(thd);
-#ifdef WITH_WSREP
-      if (thd->variables.wsrep_on && thd->wsrep_exec_mode == LOCAL_STATE) 
-      {
-        char query[85];
-        int query_len;
-        wsrep_status_t ret;
-        memset(query, 0, 85);
-        query_len = snprintf(query, 84, "USE %s;", tmp.str);
-        ret = wsrep->set_database(wsrep, thd->thread_id, query, query_len);
-        if (WSREP_OK != ret) {
-            /* todo: handle error */
-        }
-      }
-#endif
     }
     break;
   }
@@ -2824,7 +2817,7 @@ case SQLCOM_PREPARE:
       if (create_info.options & HA_LEX_CREATE_TMP_TABLE)
         thd->variables.option_bits|= OPTION_KEEP_LOG;
       /* regular create */
-      WSREP_TO_ISOLATION_BEGIN
+      WSREP_TO_ISOLATION_BEGIN(create_table->db, create_table->table_name)
       if (create_info.options & HA_LEX_CREATE_TABLE_LIKE)
       {
         /* CREATE TABLE ... LIKE ... */
@@ -2867,7 +2860,7 @@ end_with_restore_list:
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     if (check_one_table_access(thd, INDEX_ACL, all_tables))
       goto error; /* purecov: inspected */
-    WSREP_TO_ISOLATION_BEGIN  
+    WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name)
     /*
       Currently CREATE INDEX or DROP INDEX cause a full table rebuild
       and thus classify as slow administrative statements just like
@@ -2953,7 +2946,7 @@ end_with_restore_list:
         goto error;
     }
 
-    WSREP_TO_ISOLATION_BEGIN  
+    WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name)
     if (mysql_rename_tables(thd, first_table, 0))
     {
       WSREP_TO_ISOLATION_END
@@ -3361,7 +3354,7 @@ end_with_restore_list:
       /* So that DROP TEMPORARY TABLE gets to binlog at commit/rollback */
       thd->variables.option_bits|= OPTION_KEEP_LOG;
     }
-    WSREP_TO_ISOLATION_BEGIN  
+    WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name)
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->drop_if_exists,
 			lex->drop_temporary);
@@ -3405,23 +3398,7 @@ end_with_restore_list:
     LEX_STRING db_str= { (char *) select_lex->db, strlen(select_lex->db) };
 
     if (!mysql_change_db(thd, &db_str, FALSE))
-#ifdef WITH_WSREP
-    {
-      if (thd->variables.wsrep_on && thd->wsrep_exec_mode == LOCAL_STATE) 
-      {
-        wsrep_status_t ret;
-        ret = wsrep->set_database(
-            wsrep, thd->thread_id, thd->query(), thd->query_length());
-        if (WSREP_OK != ret) {
-            /* todo: handle error */
-        }
-      }
-#endif /* WITH_WSREP */
       my_ok(thd);
-#ifdef WITH_WSREP
-    }
-#endif /* WITH_WSREP */
-
     break;
   }
 
@@ -3584,7 +3561,7 @@ end_with_restore_list:
 #endif
     if (check_access(thd, CREATE_ACL, lex->name.str, NULL, NULL, 1, 0))
       break;
-    WSREP_TO_ISOLATION_BEGIN  
+    WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL)
     res= mysql_create_db(thd,(lower_case_table_names == 2 ? alias :
                               lex->name.str), &create_info, 0);
     WSREP_TO_ISOLATION_END
@@ -3615,7 +3592,7 @@ end_with_restore_list:
 #endif
     if (check_access(thd, DROP_ACL, lex->name.str, NULL, NULL, 1, 0))
       break;
-    WSREP_TO_ISOLATION_BEGIN  
+    WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL)
     res= mysql_rm_db(thd, lex->name.str, lex->drop_if_exists, 0);
     WSREP_TO_ISOLATION_END
     break;
@@ -3645,7 +3622,7 @@ end_with_restore_list:
       res= 1;
       break;
     }
-    WSREP_TO_ISOLATION_BEGIN  
+    WSREP_TO_ISOLATION_BEGIN(db->str, NULL)
     res= mysql_upgrade_db(thd, db);
     WSREP_TO_ISOLATION_END
     if (!res)
@@ -3679,7 +3656,7 @@ end_with_restore_list:
 #endif
     if (check_access(thd, ALTER_ACL, db->str, NULL, NULL, 1, 0))
       break;
-    WSREP_TO_ISOLATION_BEGIN  
+    WSREP_TO_ISOLATION_BEGIN(db->str, NULL)
     res= mysql_alter_db(thd, db->str, &create_info);
     WSREP_TO_ISOLATION_END
     break;
@@ -3713,7 +3690,7 @@ end_with_restore_list:
     if (res)
       break;
 
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     switch (lex->sql_command) {
     case SQLCOM_CREATE_EVENT:
     {
@@ -3749,7 +3726,7 @@ end_with_restore_list:
                                    lex->spname->m_name);
     break;
   case SQLCOM_DROP_EVENT:
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     if (!(res= Events::drop_event(thd,
                                   lex->spname->m_db, lex->spname->m_name,
                                   lex->drop_if_exists)))
@@ -3765,7 +3742,7 @@ end_with_restore_list:
     if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, 1, 0))
       break;
 #ifdef HAVE_DLOPEN
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     if (!(res = mysql_create_function(thd, &lex->udf)))
       my_ok(thd);
     WSREP_TO_ISOLATION_END
@@ -3781,7 +3758,7 @@ end_with_restore_list:
     if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, 1, 1) &&
         check_global_access(thd,CREATE_USER_ACL))
       break;
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     /* Conditionally writes to binlog */
     if (!(res= mysql_create_user(thd, lex->users_list)))
       my_ok(thd);
@@ -3794,7 +3771,7 @@ end_with_restore_list:
         check_global_access(thd,CREATE_USER_ACL))
       break;
     /* Conditionally writes to binlog */
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     if (!(res= mysql_drop_user(thd, lex->users_list)))
       my_ok(thd);
     WSREP_TO_ISOLATION_END
@@ -3806,7 +3783,7 @@ end_with_restore_list:
         check_global_access(thd,CREATE_USER_ACL))
       break;
     /* Conditionally writes to binlog */
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     if (!(res= mysql_rename_user(thd, lex->users_list)))
       my_ok(thd);
     WSREP_TO_ISOLATION_END
@@ -3822,7 +3799,7 @@ end_with_restore_list:
     thd->binlog_invoker();
 
     /* Conditionally writes to binlog */
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     if (!(res = mysql_revoke_all(thd, lex->users_list)))
       my_ok(thd);
     WSREP_TO_ISOLATION_END
@@ -3891,7 +3868,7 @@ end_with_restore_list:
                                 lex->type == TYPE_ENUM_PROCEDURE, 0))
 	  goto error;
         /* Conditionally writes to binlog */
-        WSREP_TO_ISOLATION_BEGIN
+        WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
         res= mysql_routine_grant(thd, all_tables,
                                  lex->type == TYPE_ENUM_PROCEDURE, 
                                  lex->users_list, grants,
@@ -3906,7 +3883,7 @@ end_with_restore_list:
                         all_tables, FALSE, UINT_MAX, FALSE))
 	  goto error;
         /* Conditionally writes to binlog */
-        WSREP_TO_ISOLATION_BEGIN
+        WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
         res= mysql_table_grant(thd, all_tables, lex->users_list,
 			       lex->columns, lex->grant,
 			       lex->sql_command == SQLCOM_REVOKE);
@@ -3923,7 +3900,7 @@ end_with_restore_list:
       }
       else
       {
-          WSREP_TO_ISOLATION_BEGIN
+          WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
         /* Conditionally writes to binlog */
         res = mysql_grant(thd, select_lex->db, lex->users_list, lex->grant,
                           lex->sql_command == SQLCOM_REVOKE,
@@ -4213,7 +4190,7 @@ end_with_restore_list:
     if (sp_process_definer(thd))
       goto create_sp_error;
 
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     res= (sp_result= sp_create_routine(thd, lex->sphead->m_type, lex->sphead));
     switch (sp_result) {
     case SP_OK: {
@@ -4425,7 +4402,7 @@ create_sp_error:
         already puts on CREATE FUNCTION.
       */
       /* Conditionally writes to binlog */
-      WSREP_TO_ISOLATION_BEGIN
+      WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
       sp_result= sp_update_routine(thd, type, lex->spname, &lex->sp_chistics);
       WSREP_TO_ISOLATION_END
       switch (sp_result)
@@ -4497,7 +4474,7 @@ create_sp_error:
       if (check_routine_access(thd, ALTER_PROC_ACL, db, name,
                                lex->sql_command == SQLCOM_DROP_PROCEDURE, 0))
         goto error;
-      WSREP_TO_ISOLATION_BEGIN
+      WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
 
       /* Conditionally writes to binlog */
       sp_result= sp_drop_routine(thd, type, lex->spname);
@@ -4616,7 +4593,7 @@ create_sp_error:
         Note: SQLCOM_CREATE_VIEW also handles 'ALTER VIEW' commands
         as specified through the thd->lex->create_view_mode flag.
       */
-      WSREP_TO_ISOLATION_BEGIN
+      WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
       res= mysql_create_view(thd, first_table, thd->lex->create_view_mode);
       WSREP_TO_ISOLATION_END
       break;
@@ -4626,7 +4603,7 @@ create_sp_error:
       if (check_table_access(thd, DROP_ACL, all_tables, FALSE, UINT_MAX, FALSE))
         goto error;
       /* Conditionally writes to binlog. */
-      WSREP_TO_ISOLATION_BEGIN
+      WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
       res= mysql_drop_view(thd, first_table, thd->lex->drop_mode);
       WSREP_TO_ISOLATION_END
       break;
@@ -4634,7 +4611,7 @@ create_sp_error:
   case SQLCOM_CREATE_TRIGGER:
   {
     /* Conditionally writes to binlog. */
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
     WSREP_TO_ISOLATION_END
 
@@ -4643,7 +4620,7 @@ create_sp_error:
   case SQLCOM_DROP_TRIGGER:
   {
     /* Conditionally writes to binlog. */
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     res= mysql_create_or_drop_trigger(thd, all_tables, 0);
     WSREP_TO_ISOLATION_END
     break;
@@ -4695,14 +4672,14 @@ create_sp_error:
       my_ok(thd);
     break;
   case SQLCOM_INSTALL_PLUGIN:
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     if (! (res= mysql_install_plugin(thd, &thd->lex->comment,
                                      &thd->lex->ident)))
       my_ok(thd);
     WSREP_TO_ISOLATION_END
     break;
   case SQLCOM_UNINSTALL_PLUGIN:
-    WSREP_TO_ISOLATION_BEGIN
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
     if (! (res= mysql_uninstall_plugin(thd, &thd->lex->comment)))
       my_ok(thd);
     WSREP_TO_ISOLATION_END
@@ -7856,6 +7833,14 @@ void wsrep_replication_process(THD *thd)
       wsrep_kill_mysql(thd);
     }
     break;
+  }
+
+  if (thd->killed != THD::KILL_CONNECTION)
+  {
+    mysql_mutex_lock(&LOCK_thread_count);
+    wsrep_close_applier(thd);
+    mysql_cond_broadcast(&COND_thread_count);
+    mysql_mutex_unlock(&LOCK_thread_count);
   }
 
   if (thd->killed != THD::KILL_CONNECTION)

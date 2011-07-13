@@ -238,18 +238,14 @@ fi
 ## WSREP SETUP                                                               ##
 ################################################################################
 MYSQL_SOCKET_PATH=${MYSQL_SOCKET_PATH:-"/var/lib/mysql/mysql.sock"}
-wsrep_configs=""\
+wsrep_configs="$wsrep_configs "\
 "--with-wsrep "\
-"--with-comment=wsrep_dev "\
-"--without-archive-storage-engine "\
-"--without-blackhole-storage-engine "\
-"--without-example-storage-engine "\
-"--without-federated-storage-engine "\
-"--without-plugin-innobase "\
-"--with-plugin-innodb_plugin "\
+"--with-comment=wsrep_0.8.0 "\
+"--with-plugins=innobase,innodb_plugin "\
+"--with-innodb-disallow-writes "\
 "--with-unix-socket-path=$MYSQL_SOCKET_PATH"
 
-wsrep_cflags="$wsrep_cflags -DWSREP_PROC_INFO -DWITH_WSREP"
+wsrep_cflags="$wsrep_cflags -DWSREP_PROC_INFO -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048 -DWITH_WSREP"
 if test -n "$MYSQL_REV"; then wsrep_cflags="$wsrep_cflags -DMYSQL_REV=$MYSQL_REV"; fi
 if test -n "$WSREP_REV"; then wsrep_cflags="$wsrep_cflags -DWSREP_REV=$WSREP_REV"; fi
 

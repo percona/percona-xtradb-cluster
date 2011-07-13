@@ -615,10 +615,10 @@ void end_connection(THD *thd)
 {
   NET *net= &thd->net;
 #ifdef WITH_WSREP
-    wsrep_status_t rcode= wsrep->set_database(wsrep, thd->thread_id, NULL, -1);
+    wsrep_status_t rcode= wsrep->free_connection(wsrep, thd->thread_id);
     if (rcode) {
-      sql_print_warning("wsrep failed to close connection: %lu, code: %d",
-                        thd->thread_id, rcode);
+      WSREP_WARN("wsrep failed to free connection context: %lu, "
+                        "code: %d", thd->thread_id, rcode);
     }
 #endif
   plugin_thdvar_cleanup(thd);

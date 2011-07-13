@@ -57,7 +57,9 @@
 #ifdef  __WIN__
 #include <io.h>
 #endif
-
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif // WITH_WSREP
 
 bool
 No_such_table_error_handler::handle_condition(THD *,
@@ -8768,7 +8770,19 @@ bool mysql_notify_thread_having_shared_lock(THD *thd, THD *in_use,
         (e.g. see partitioning code).
       */
       if (!thd_table->needs_reopen())
+#ifdef WITH_WSREP
+      {
+	signalled|= mysql_lock_abort_for_thread(thd, thd_table);
+	if (thd && wsrep_thd_is_brute_force((void *)thd)) 
+	{
+	  WSREP_DEBUG("remove_table_from_cache: %llu",
+		      (unsigned long long) thd->real_id);
+	  wsrep_abort_thd((void *)thd, (void *)in_use, FALSE);
+	}
+      }
+#else
         signalled|= mysql_lock_abort_for_thread(thd, thd_table);
+#endif
     }
     mysql_mutex_unlock(&in_use->LOCK_thd_data);
   }

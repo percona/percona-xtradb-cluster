@@ -179,6 +179,11 @@ trx_rollback_last_sql_stat_for_mysql(
 
 	trx->op_info = "";
 
+#ifdef WITH_WSREP
+	if (trx->was_chosen_as_deadlock_victim) {
+		trx->was_chosen_as_deadlock_victim = FALSE;
+	}
+#endif
 	return(err);
 }
 
@@ -1291,6 +1296,11 @@ trx_finish_rollback_off_kernel(
 
 		sig = next_sig;
 	}
+#ifdef WITH_WSREP
+	if (trx->was_chosen_as_deadlock_victim) {
+		trx->was_chosen_as_deadlock_victim = FALSE;
+	}
+#endif
 }
 
 /*********************************************************************//**

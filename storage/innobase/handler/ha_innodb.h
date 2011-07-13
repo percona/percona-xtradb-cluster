@@ -111,6 +111,10 @@ class ha_innobase: public handler
 	dict_index_t* innobase_get_index(uint keynr);
 	int info_low(uint flag, bool called_from_analyze);
 
+#ifdef WITH_WSREP
+	int wsrep_append_keys(THD *thd, wsrep_action_t action,
+			      const uchar* record);
+#endif
 	/* Init values for the class: */
  public:
 	ha_innobase(handlerton *hton, TABLE_SHARE *table_arg);

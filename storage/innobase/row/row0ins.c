@@ -1062,6 +1062,32 @@ row_ins_foreign_check_on_constraint(
 	err = row_update_cascade_for_mysql(thr, cascade,
 					   foreign->foreign_table);
 
+#ifdef WITH_WSREP
+	{
+		byte key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
+		uint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
+		key[0] = '\0';
+		int rcode = wsrep_rec_get_primary_key(
+			&key[1], &len, clust_rec, clust_index);
+
+		if (rcode == DB_SUCCESS) {
+#ifdef WSREP_DEBUG_PRINT
+			int i;
+			fprintf(stderr, "INNODB len: %u ", len+1);
+			for (i=0; (ulint)i<len+1; i++) {
+				fprintf(stderr, " %c ", key[i]);
+				fprintf(stderr, " (%X), ", key[i]);
+			}
+			fprintf(stderr, "\n");
+#endif
+			rcode = wsrep_append_foreign_key(
+				thr_get_trx(thr),
+				foreign->foreign_table->name,
+				(char *)key, 
+				len+1);
+		}
+	}
+#endif /* WITH_WSREP */
 	if (foreign->foreign_table->n_foreign_key_checks_running == 0) {
 		fprintf(stderr,
 			"InnoDB: error: table %s has the counter 0"

@@ -141,15 +141,6 @@ static wsrep_status_t dummy_abort_pre_commit(
     return WSREP_OK;
 }
 
-static wsrep_status_t dummy_abort_slave_trx(
-    wsrep_t* w,
-    const wsrep_seqno_t bf_seqno     __attribute__((unused)),
-    const wsrep_seqno_t victim_seqno __attribute__((unused)))
-{
-    WSREP_DBUG_ENTER(w);
-    return WSREP_OK;
-}
-
 static wsrep_status_t dummy_append_query(
     wsrep_t* w,
     wsrep_trx_handle_t* trx_handle __attribute__((unused)),
@@ -164,9 +155,7 @@ static wsrep_status_t dummy_append_query(
 static wsrep_status_t dummy_append_row_key(
     wsrep_t* w,
     wsrep_trx_handle_t*  trx_handle  __attribute__((unused)),
-    const char*          dbtable     __attribute__((unused)),
-    const size_t         dbtable_len __attribute__((unused)),
-    const char*          key         __attribute__((unused)),
+    const wsrep_key_t*   key         __attribute__((unused)),
     const size_t         key_len     __attribute__((unused)),
     const wsrep_action_t action      __attribute__((unused)))
 {
@@ -192,23 +181,9 @@ static wsrep_status_t dummy_causal_read(
     return WSREP_OK;
 }
 
-static wsrep_status_t dummy_set_variable(
+static wsrep_status_t dummy_free_connection(
     wsrep_t* w,
-    const wsrep_conn_id_t  conn_id   __attribute__((unused)),
-    const char            *key       __attribute__((unused)),
-    const size_t           key_len   __attribute__((unused)),
-    const char            *query     __attribute__((unused)),
-    const size_t           query_len __attribute__((unused)))
-{
-    WSREP_DBUG_ENTER(w);
-    return WSREP_OK;
-}
-
-static wsrep_status_t dummy_set_database(
-    wsrep_t* w,
-    const wsrep_conn_id_t  conn_id   __attribute__((unused)),
-    const char            *query     __attribute__((unused)),
-    const size_t           query_len __attribute__((unused)))
+    const wsrep_conn_id_t  conn_id   __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -217,6 +192,8 @@ static wsrep_status_t dummy_set_database(
 static wsrep_status_t dummy_to_execute_start(
     wsrep_t* w,
     const wsrep_conn_id_t  conn_id   __attribute__((unused)),
+    const wsrep_key_t*     key       __attribute__((unused)),
+    const size_t           key_len   __attribute__((unused)),
     const void*            query     __attribute__((unused)),
     const size_t           query_len __attribute__((unused)),
     wsrep_seqno_t*         seqno     __attribute__((unused)))
@@ -286,9 +263,22 @@ static wsrep_seqno_t dummy_pause (wsrep_t* w)
     return -ENOSYS;
 }
 
-static void dummy_resume (wsrep_t* w)
+static wsrep_status_t dummy_resume (wsrep_t* w)
 {
     WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_seqno_t dummy_desync (wsrep_t* w)
+{
+    WSREP_DBUG_ENTER(w);
+    return -ENOSYS;
+}
+
+static wsrep_status_t dummy_resync (wsrep_t* w)
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
 }
 
 static wsrep_t dummy_iface = {
@@ -305,13 +295,11 @@ static wsrep_t dummy_iface = {
     &dummy_post_rollback,
     &dummy_replay_trx,
     &dummy_abort_pre_commit,
-    &dummy_abort_slave_trx,
     &dummy_append_query,
     &dummy_append_row_key,
     &dummy_append_data,
     &dummy_causal_read,
-    &dummy_set_variable,
-    &dummy_set_database,
+    &dummy_free_connection,
     &dummy_to_execute_start,
     &dummy_to_execute_end,
     &dummy_sst_sent,
@@ -321,6 +309,8 @@ static wsrep_t dummy_iface = {
     &dummy_stats_free,
     &dummy_pause,
     &dummy_resume,
+    &dummy_desync,
+    &dummy_resync,
     WSREP_NONE,
     WSREP_INTERFACE_VERSION,
     "Codership Oy <info@codership.com>",
