@@ -2075,10 +2075,6 @@ void close_connection(THD *thd, uint sql_errno)
     sleep(0); /* Workaround to avoid tailcall optimisation */
   }
   MYSQL_AUDIT_NOTIFY_CONNECTION_DISCONNECT(thd, sql_errno);
-#ifdef WITH_WSREP
-  if (lock)
-    mysql_mutex_unlock(&LOCK_thread_count);
-#endif
   DBUG_VOID_RETURN;
 }
 #endif /* EMBEDDED_LIBRARY */
@@ -6629,6 +6625,14 @@ struct my_option my_long_options[]=
   {"table_cache", 0, "Deprecated; use --table-open-cache instead.",
    &table_cache_size, &table_cache_size, 0, GET_ULONG,
    REQUIRED_ARG, TABLE_OPEN_CACHE_DEFAULT, 1, 512*1024L, 0, 1, 0},
+#ifdef WITH_WSREP
+  {"wsrep_sst_auth", OPT_WSREP_SST_AUTH,
+   "Authentication required for SST. SST mode-dependent. "
+   "For mysqldump mode it is 'root:<root password>'. "
+   "Should be the same on all nodes",
+   (uchar**) &opt_wsrep_sst_auth,
+   (uchar**) &opt_wsrep_sst_auth, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+#endif
   {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
 
@@ -7733,6 +7737,9 @@ mysqld_get_one_option(int optid,
     break;
   case OPT_WSREP_START_POSITION:
     wsrep_start_position_init (opt_wsrep_start_pos);
+    break;
+  case OPT_WSREP_SST_AUTH:
+    wsrep_sst_auth_init (opt_wsrep_sst_auth);
     break;
 #endif
 #if defined(ENABLED_DEBUG_SYNC)

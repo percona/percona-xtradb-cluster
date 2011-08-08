@@ -61,7 +61,7 @@ bool wsrep_on_update (sys_var *self, THD* thd, enum_var_type var_type)
     thd->variables.option_bits |= (OPTION_BIN_LOG);
   else
     thd->variables.option_bits &= ~(OPTION_BIN_LOG);
-  return true;
+  return false;
 }
 
 void wsrep_causal_reads_update (sys_var *self, THD* thd, enum_var_type var_type)
@@ -139,14 +139,16 @@ bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
 {
   // since this value passed wsrep_start_position_check, don't check anything
   // here
+  /*
   const char *latin= "latin1";
   LEX_STRING charset; 
   charset.str= (char *)latin;
   charset.length= strlen(latin);
-
   const uchar* value = self->value_ptr(thd, type, &charset);
 
   wsrep_set_local_position ((const char*)value);
+  */
+  wsrep_set_local_position (wsrep_start_position);
 
   if (wsrep) {
     wsrep->sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);

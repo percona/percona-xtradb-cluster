@@ -1779,18 +1779,20 @@ rec_print(
 int
 wsrep_rec_get_primary_key(
 	byte 		*buf,     /* out: extracted key */
-	ulint 		*buf_len, /* in/out: length of buf */
-	rec_t*		rec,	  /* in: physical record */
+	uint 		*buf_len, /* in/out: length of buf */
+	const rec_t*	rec,	  /* in: physical record */
 	dict_index_t*	index)	  /* in: record descriptor */
 {
 	const byte*	data;
 	ulint		len;
 	ulint		key_len = 0;
 	ulint		i;
-	uint            key_parts = dict_index_get_n_unique_in_tree(index);
-	ut_ad(index);
+	uint            key_parts;
 	mem_heap_t*	heap	= NULL;
 	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
+
+	ut_ad(index);
+	key_parts = dict_index_get_n_unique_in_tree(index);
 	*offsets_ = (sizeof offsets_) / sizeof *offsets_;
 
 	rec_get_offsets(rec, index, offsets_, ULINT_UNDEFINED, &heap);

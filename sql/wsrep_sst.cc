@@ -38,16 +38,10 @@ const  char* wsrep_sst_auth = sst_auth;
 static const char* const sst_auth_set = "********";
 // container for real auth string
 static const char* sst_auth_real = 0;
-
 bool wsrep_sst_auth_check (sys_var *self, THD* thd, set_var* var)
 {
-    if (!(thd->security_ctx->master_access & SUPER_ACL)) {
-        my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-        return 1;
-    }
     return 0;
 }
-
 static bool sst_auth_real_set (const char* value)
 {
     const char* v = strdup (value);

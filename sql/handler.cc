@@ -1326,7 +1326,6 @@ int ha_commit_one_phase(THD *thd, bool all)
 #endif /* WSREP_PROC_INFO */
   const char* tmp_info= thd_proc_info(thd, info);
 #endif /* WITH_WSREP */
-#ifdef USING_TRANSACTIONS
 
   if (ha_info)
   {
@@ -1360,7 +1359,6 @@ int ha_commit_one_phase(THD *thd, bool all)
 #else
     thd->transaction.cleanup();
 #endif /* WITH_WSREP */
-#endif /* USING_TRANSACTIONS */
 #ifdef WITH_WSREP
   thd_proc_info(thd, tmp_info);
 #endif /* WITH_WSREP */

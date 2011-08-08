@@ -291,7 +291,11 @@ int
 wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx, ibool signal);
 int wsrep_thd_is_brute_force(void *thd_ptr);
 int wsrep_trx_order_before(void *thd1, void *thd2);
-#endif
+int wsrep_append_foreign_key(trx_t *trx,  const char *table_name,
+			      const char *key, uint key_len);
+void wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
+			       unsigned char* str, unsigned int str_length);
+#endif /* WITH_WSREP */
 /**********************************************************************//**
 Get the current setting of the lower_case_table_names global parameter from
 mysqld.cc. We do a dirty read because for one there is no synchronization

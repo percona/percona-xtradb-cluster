@@ -1066,8 +1066,10 @@ row_ins_foreign_check_on_constraint(
 	{
 		byte key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
 		uint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
+		int rcode;
+
 		key[0] = '\0';
-		int rcode = wsrep_rec_get_primary_key(
+		rcode = wsrep_rec_get_primary_key(
 			&key[1], &len, clust_rec, clust_index);
 
 		if (rcode == DB_SUCCESS) {

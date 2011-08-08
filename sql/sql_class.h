@@ -534,6 +534,7 @@ typedef struct system_variables
 #ifdef WITH_WSREP
   my_bool wsrep_on;
   my_bool wsrep_causal_reads;
+  char *wsrep_start_position;
 #endif
   double long_query_time_double;
 

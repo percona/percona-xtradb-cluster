@@ -6683,7 +6683,7 @@ wsrep_append_foreign_key(
 		WSREP_WARN("key prepare failed for cascaded FK: %s", 
 			   (wsrep_thd_query(thd)) ? 
 			   wsrep_thd_query(thd) : "void");
-		DBUG_RETURN(DB_ERROR);
+		return DB_ERROR;
 	}
 	int rcode = (int)wsrep->append_key(
 			       wsrep,
