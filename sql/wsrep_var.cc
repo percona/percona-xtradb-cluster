@@ -139,15 +139,6 @@ bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
 {
   // since this value passed wsrep_start_position_check, don't check anything
   // here
-  /*
-  const char *latin= "latin1";
-  LEX_STRING charset; 
-  charset.str= (char *)latin;
-  charset.length= strlen(latin);
-  const uchar* value = self->value_ptr(thd, type, &charset);
-
-  wsrep_set_local_position ((const char*)value);
-  */
   wsrep_set_local_position (wsrep_start_position);
 
   if (wsrep) {
@@ -226,43 +217,27 @@ err:
 
 bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
 {
-  const char *latin= "latin1";
-  LEX_STRING charset; 
-  charset.str= (char *)latin;
-  charset.length= strlen(latin);
-  const char* value = (const char*)self->value_ptr(thd, type, &charset);
-  bool rcode;
+  bool rcode= false;
 
-  if (strcmp(value, provider)) {
-    /* provider has changed */
+  bool wsrep_on_saved= thd->variables.wsrep_on;
+  thd->variables.wsrep_on= false;
 
-    bool wsrep_on_saved= thd->variables.wsrep_on;
-    thd->variables.wsrep_on= false;
+  wsrep_stop_replication(thd);
+  wsrep_deinit();
 
-    wsrep_stop_replication(thd);
-    wsrep_deinit();
+  //memset(provider, '\0', sizeof(provider));
+  //strncpy (provider, wsrep_provider, sizeof(provider) - 1);
 
-    memset(provider, '\0', sizeof(provider));
-    strncpy (provider, value, sizeof(provider) - 1);
-
-    if (wsrep_init())
-    {
-      my_error(ER_CANT_OPEN_LIBRARY, MYF(0), provider);
-      rcode = true;
-    }
-
-    // we sure don't want to use old address with new provider
-    cluster_address[0]='\0';
-
-#if 0 /* don't start replication until new address is set */
-    if (wsrep_start_replication())
-    {
-      wsrep_create_rollbacker();
-      wsrep_create_appliers();
-    }
-#endif
-    thd->variables.wsrep_on= wsrep_on_saved;
+  if (wsrep_init())
+  {
+    my_error(ER_CANT_OPEN_LIBRARY, MYF(0), provider);
+    rcode = true;
   }
+
+  // we sure don't want to use old address with new provider
+  cluster_address[0]='\0';
+
+  thd->variables.wsrep_on= wsrep_on_saved;
 
   return rcode;
 }
@@ -297,17 +272,10 @@ bool wsrep_provider_options_check(sys_var *self, THD* thd, set_var* var)
 
 bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
 {
-  const char *latin= "latin1";
-  LEX_STRING charset; 
-  charset.str= (char *)latin;
-  charset.length= strlen(latin);
-
-  const char* value = (const char*)self->value_ptr(thd, type, &charset);
-
-  wsrep_status_t ret= wsrep->options_set(wsrep, value);
+  wsrep_status_t ret= wsrep->options_set(wsrep, wsrep_provider_options);
   if (ret != WSREP_OK)
   {
-    sql_print_error("WSREP: Set options returned %d", ret);
+    WSREP_ERROR("Set options returned %d", ret);
     return 1;
   }
   else
@@ -321,11 +289,11 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
     }
     else
     {
-      sql_print_error("WSREP: Failed to get provider options");
-      return 1;
+      WSREP_ERROR("Failed to get provider options");
+      return true;
     }
   }
-  return 0;
+  return false;
 }
 
 void wsrep_provider_options_default(THD* thd, enum_var_type var_type)
@@ -379,19 +347,13 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 
 bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
 {
-  const char *latin= "latin1";
-  LEX_STRING charset; 
-  charset.str= (char *)latin;
-  charset.length= strlen(latin);
-  const uchar* value = self->value_ptr(thd, type, &charset);
-
   bool wsrep_on_saved= thd->variables.wsrep_on;
   thd->variables.wsrep_on= false;
 
   wsrep_stop_replication(thd);
 
-  memset(cluster_address, '\0', sizeof(cluster_address));
-  strncpy(cluster_address, (char *)value, sizeof(cluster_address) - 1);
+  //memset(cluster_address, '\0', sizeof(cluster_address));
+  //strncpy(cluster_address, (char *)wsrep_cluster_address, sizeof(cluster_address) - 1);
 
   if (wsrep_start_replication())
   {
@@ -400,7 +362,7 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
   }
   thd->variables.wsrep_on= wsrep_on_saved;
 
-  return 0;
+  return false;
 }
 
 void wsrep_cluster_address_default (THD* thd, enum_var_type var_type)

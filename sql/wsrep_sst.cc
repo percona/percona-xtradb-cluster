@@ -64,14 +64,7 @@ static bool sst_auth_real_set (const char* value)
 
 bool wsrep_sst_auth_update (sys_var *self, THD* thd, enum_var_type type)
 {
-    const char *latin= "latin1";
-    LEX_STRING charset; 
-    charset.str= (char *)latin;
-    charset.length= strlen(latin);
-
-    const char* value = (const char*)self->value_ptr(thd, type, &charset);
-
-    return sst_auth_real_set (value);
+    return sst_auth_real_set (wsrep_sst_auth);
 }
 
 void wsrep_sst_auth_default (THD* thd, enum_var_type var_type)

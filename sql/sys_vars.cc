@@ -3299,10 +3299,8 @@ static Sys_var_charptr Sys_wsrep_sst_donor(
 
 static Sys_var_mybool Sys_wsrep_on (
        "wsrep_on", "To enable wsrep replication ",
-       //       GLOBAL_VAR(SV::wsrep_on), 
-       //GLOBAL_VAR(global_system_variables.wsrep_on), 
        SESSION_VAR(wsrep_on), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE), 
+       CMD_LINE(OPT_ARG), DEFAULT(TRUE), 
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(wsrep_on_update));
 
