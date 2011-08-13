@@ -1065,7 +1065,7 @@ row_ins_foreign_check_on_constraint(
 #ifdef WITH_WSREP
 	{
 		byte key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
-		uint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
+		ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
 		int rcode;
 
 		key[0] = '\0';
@@ -1074,9 +1074,9 @@ row_ins_foreign_check_on_constraint(
 
 		if (rcode == DB_SUCCESS) {
 #ifdef WSREP_DEBUG_PRINT
-			int i;
-			fprintf(stderr, "INNODB len: %u ", len+1);
-			for (i=0; (ulint)i<len+1; i++) {
+			ulint i;
+			fprintf(stderr, "INNODB len: %lu ", len+1);
+			for (i=0; i<len+1; i++) {
 				fprintf(stderr, " %c ", key[i]);
 				fprintf(stderr, " (%X), ", key[i]);
 			}

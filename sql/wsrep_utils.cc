@@ -163,7 +163,9 @@ size_t default_ip (char* buf, size_t buf_len)
     }
 
     if (INADDR_NONE == inet_addr(buf)) {
-      WSREP_ERROR("Shell command returned invalid address: '%s'", buf);
+      if (strlen(buf) != 0) {
+        WSREP_WARN("Shell command returned invalid address: '%s'", buf);
+      }
       return 0;
     }
   }

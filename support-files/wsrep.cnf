@@ -33,10 +33,6 @@ query_cache_type=0
 # it will have (most likely) disastrous consequences on donor node
 bind-address=0.0.0.0
 
-# Synchronous replication allows for some optimizations (this is not required):
-innodb_flush_log_at_trx_commit=0
-innodb_doublewrite=0
-
 ##
 ## WSREP options
 ##
@@ -74,7 +70,7 @@ wsrep_ws_persistency=0
 
 # Generate fake primary keys for non-PK tables (required for multi-master
 # and parallel applying operation)
-wsrep_certify_nonPK=yes
+wsrep_certify_nonPK=1
 
 # Location of the directory with data files. Needed for non-mysqldump
 # state snapshot transfers. Defaults to mysql_real_data_home.

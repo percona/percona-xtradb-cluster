@@ -16,7 +16,7 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
-# This is a reference script for mysqldump-based state snapshot tansfer
+# This is a reference script for rsync-based state snapshot tansfer
 
 RSYNC_PID=
 RSYNC_CONF=

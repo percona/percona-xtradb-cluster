@@ -41,7 +41,7 @@ static struct opt opts[] =
     { "bind_address",      "0.0.0.0" }, // mysqld.cc
     { "wsrep_sst_method","mysqldump" }, // mysqld.cc
     { "wsrep_sst_receive_address","AUTO"}, // mysqld.cc
-    { "binlog_format",   "STATEMENT" }, // mysqld.cc
+    { "binlog_format",         "ROW" }, // mysqld.cc
     { "wsrep_provider",       "none" }, // mysqld.cc
     { "locks_unsafe_for_binlog", "0" }, // ha_innodb.cc
     { "autoinc_lock_mode",       "1" }, // ha_innodb.cc

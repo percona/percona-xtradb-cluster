@@ -4144,16 +4144,10 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   }
 
 #ifdef WITH_WSREP
-  if (wsrep_provider && strcmp(wsrep_provider, WSREP_NONE))
+  if (!opt_bin_log)
   {
-    if (global_system_variables.binlog_format== BINLOG_FORMAT_ROW)
-    {
-      if (!opt_bin_log)
-      {
-        opt_bin_log= 1;
-        wsrep_emulate_bin_log= 1;
-      }
-    }
+    opt_bin_log= 1;
+    wsrep_emulate_bin_log= 1;
   }
 #endif
 
@@ -7171,6 +7165,9 @@ SHOW_VAR status_vars[]= {
   {"wsrep_cluster_status",     (char*) &wsrep_cluster_status,    SHOW_CHAR_PTR},
   {"wsrep_cluster_size",       (char*) &wsrep_cluster_size,      SHOW_LONG},
   {"wsrep_local_index",        (char*) &wsrep_local_index,       SHOW_LONG},
+  {"wsrep_provider_name",      (char*) &wsrep_provider_name,     SHOW_CHAR_PTR},
+  {"wsrep_provider_version",   (char*) &wsrep_provider_version,  SHOW_CHAR_PTR},
+  {"wsrep_provider_vendor",    (char*) &wsrep_provider_vendor,   SHOW_CHAR_PTR},
   {"wsrep",                    (char*) &wsrep_show_status,       SHOW_FUNC},
 #endif
   {NullS, NullS, SHOW_LONG}

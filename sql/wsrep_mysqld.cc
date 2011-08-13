@@ -62,6 +62,10 @@ static const char*  cluster_status_str[WSREP_VIEW_MAX] =
     "Disconnected"
 };
 
+static char provider_name[256]= { 0, };
+static char provider_version[256]= { 0, };
+static char provider_vendor[256]= { 0, };
+
 /*
  * wsrep status variables
  */
@@ -72,6 +76,9 @@ long long   wsrep_cluster_conf_id    = WSREP_SEQNO_UNDEFINED;
 const char* wsrep_cluster_status = cluster_status_str[WSREP_VIEW_DISCONNECTED];
 long        wsrep_cluster_size       = 0;
 long        wsrep_local_index        = -1;
+const char* wsrep_provider_name      = provider_name;
+const char* wsrep_provider_version   = provider_version;
+const char* wsrep_provider_vendor    = provider_vendor;
 /* End wsrep status variables */
 
 
@@ -145,28 +152,6 @@ static void wsrep_view_handler_cb (void* app_ctx,
   wsrep_cluster_status= cluster_status_str[view->status];
   wsrep_cluster_size= view->memb_num;
   wsrep_local_index= view->my_idx;
-  switch (view->proto_ver)
-  {
-  case 0:
-  case 1:
-      // version change
-      if (view->proto_ver != wsrep_protocol_version)
-      {
-          my_bool wsrep_ready_saved= wsrep_ready;
-          wsrep_ready= FALSE;
-          WSREP_INFO("closing client connections for "
-                     "protocol change %ld -> %d",
-                     wsrep_protocol_version, view->proto_ver);
-          wsrep_close_client_connections();
-          wsrep_protocol_version= view->proto_ver;
-          wsrep_ready= wsrep_ready_saved;
-      }
-      break;
-  default:
-      WSREP_ERROR("Unsupported application protocol version: %d",
-                  view->proto_ver);
-      abort();
-  }
 
   WSREP_INFO("New cluster view: group UUID: %s, conf# %lld: %s, "
              "number of nodes: %ld, my index: %ld, first seqno: %lld, "
@@ -188,6 +173,29 @@ static void wsrep_view_handler_cb (void* app_ctx,
     // local_uuid= cluster_uuid;
     // local_seqno= view->first - 1;
     goto out;
+  }
+
+  switch (view->proto_ver)
+  {
+  case 0:
+  case 1:
+      // version change
+      if (view->proto_ver != wsrep_protocol_version)
+      {
+          my_bool wsrep_ready_saved= wsrep_ready;
+          wsrep_ready= FALSE;
+          WSREP_INFO("closing client connections for "
+                     "protocol change %ld -> %d",
+                     wsrep_protocol_version, view->proto_ver);
+          wsrep_close_client_connections();
+          wsrep_protocol_version= view->proto_ver;
+          wsrep_ready= wsrep_ready_saved;
+      }
+      break;
+  default:
+      WSREP_ERROR("Unsupported application protocol version: %d",
+                  view->proto_ver);
+      unireg_abort(1);
   }
 
   if (view->state_gap)
@@ -325,6 +333,12 @@ int wsrep_init()
     // enable normal operation in case no provider is specified
     wsrep_ready= TRUE;
   }
+  else
+  {
+    strncpy(provider_name,    wsrep->provider_name,    sizeof(provider_name) - 1);
+    strncpy(provider_version, wsrep->provider_version, sizeof(provider_version) - 1);
+    strncpy(provider_vendor,  wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
+  }
 
   struct wsrep_init_args wsrep_args;
 
@@ -392,6 +406,9 @@ void wsrep_deinit()
 {
   wsrep_unload(wsrep);
   wsrep= 0;
+  provider_name[0]=    '\0';
+  provider_version[0]= '\0';
+  provider_vendor[0]=  '\0';
 }
 
 void wsrep_stop_replication(THD *thd)

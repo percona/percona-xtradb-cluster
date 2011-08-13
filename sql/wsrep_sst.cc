@@ -399,7 +399,8 @@ ssize_t wsrep_sst_prepare (void** msg)
     else
     {
       WSREP_ERROR("Could not prepare state transfer request: "
-                  "unable to determine address to accept state transfer at.");
+                  "failed to guess address to accept state transfer at. "
+                  "wsrep_sst_receive_address must be set manually.");
 //      return -EADDRNOTAVAIL;
       unireg_abort(1);
     }

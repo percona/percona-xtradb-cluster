@@ -225,14 +225,13 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   wsrep_stop_replication(thd);
   wsrep_deinit();
 
-  //memset(provider, '\0', sizeof(provider));
-  //strncpy (provider, wsrep_provider, sizeof(provider) - 1);
-
+  char* tmp= strdup(provider); // wsrep_init() rewrites provider when fails
   if (wsrep_init())
   {
-    my_error(ER_CANT_OPEN_LIBRARY, MYF(0), provider);
+    my_error(ER_CANT_OPEN_LIBRARY, MYF(0), tmp);
     rcode = true;
   }
+  free(tmp);
 
   // we sure don't want to use old address with new provider
   cluster_address[0]='\0';

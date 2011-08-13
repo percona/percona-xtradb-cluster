@@ -58,6 +58,13 @@
 %undefine __perl_provides
 %undefine __perl_requires
 
+# ----------------------------------------------------------------------
+# use "rpmbuild --with wsrep" or "rpm --define '_with_wsrep 1'" (for RPM 3.x)
+# to build with wsrep support (off by default)
+# ----------------------------------------------------------------------
+%{?_with_wsrep:%define WSREP_BUILD 1}
+%{!?_with_wsrep:%define WSREP_BUILD 0}
+
 ##############################################################################
 # Command line handling
 ##############################################################################
@@ -364,8 +371,6 @@ client/server version.
 %{see_base}
 %endif
 
-%endif
-
 ##############################################################################
 #
 ##############################################################################
@@ -509,6 +514,10 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
 ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
+%if %{WSREP_BUILD}
+install -d $RBR%{_bindir}
+ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
+%endif
 
 # Touch the place where the my.cnf config file might be located
 # Just to make sure it's in the file list and marked as a config file
@@ -1030,6 +1039,8 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/resolveip
 %if %{WSREP_BUILD}
 %attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
 %endif
 
 %attr(755, root, root) %{_sbindir}/mysqld
