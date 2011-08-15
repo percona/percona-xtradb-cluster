@@ -925,6 +925,11 @@ lock_rec_has_to_wait(
 	if (trx != lock2->trx
 	    && !lock_mode_compatible(LOCK_MODE_MASK & type_mode,
 				     lock_get_mode(lock2))) {
+#ifdef WITH_WSREP
+		if ((type_mode & WSREP_BF) && (lock2->type_mode & WSREP_BF)) {
+			return FALSE;
+		}
+#endif /* WITH_WSREP */
 
 		/* We have somewhat complex rules when gap type record locks
 		cause waits */
@@ -1741,6 +1746,11 @@ lock_rec_create(
 	lock->trx = trx;
 
 	lock->type_mode = (type_mode & ~LOCK_TYPE_MASK) | LOCK_REC;
+#ifdef WITH_WSREP
+	if (wsrep_thd_is_brute_force(trx->mysql_thd)) {
+		lock->type_mode |= WSREP_BF;
+	}
+#endif /* WITH_WSREP */
 	lock->index = index;
 
 	lock->un_member.rec_lock.space = space;
@@ -1966,11 +1976,12 @@ lock_rec_add_to_queue(
 						      block, heap_no, trx);
 #ifdef WITH_WSREP
 		/* this can potentionally assert with wsrep */
-		if (other_lock) {
-			fprintf(stderr, "WSREP: assert should be ignored here");
+		if (wsrep_debug && other_lock) {
+			fprintf(stderr, "WSREP: InnoDB assert ignored\n");
 		}
-#endif
+#else
 		ut_a(!other_lock);
+#endif /* WITH_WSREP */
 	}
 #endif /* UNIV_DEBUG */
 
@@ -2077,6 +2088,10 @@ lock_rec_lock_fast(
 	      || (LOCK_MODE_MASK & mode) == LOCK_X);
 	ut_ad(mode - (LOCK_MODE_MASK & mode) == LOCK_GAP
 	      || mode - (LOCK_MODE_MASK & mode) == 0
+#ifdef WITH_WSREP
+	      || mode - (LOCK_MODE_MASK & mode) == WSREP_BF
+	      || mode - (LOCK_MODE_MASK & mode) - LOCK_REC_NOT_GAP == WSREP_BF
+#endif /* WITH_WSREP */
 	      || mode - (LOCK_MODE_MASK & mode) == LOCK_REC_NOT_GAP);
 
 	lock = lock_rec_get_first_on_page(block);
@@ -2158,6 +2173,10 @@ lock_rec_lock_slow(
 	      || (LOCK_MODE_MASK & mode) == LOCK_X);
 	ut_ad(mode - (LOCK_MODE_MASK & mode) == LOCK_GAP
 	      || mode - (LOCK_MODE_MASK & mode) == 0
+#ifdef WITH_WSREP
+	      || mode - (LOCK_MODE_MASK & mode) == WSREP_BF
+	      || mode - (LOCK_MODE_MASK & mode) - LOCK_REC_NOT_GAP == WSREP_BF
+#endif /* WITH_WSREP */
 	      || mode - (LOCK_MODE_MASK & mode) == LOCK_REC_NOT_GAP);
 
 	trx = thr_get_trx(thr);
@@ -2229,8 +2248,16 @@ lock_rec_lock(
 	      || (LOCK_MODE_MASK & mode) == LOCK_X);
 	ut_ad(mode - (LOCK_MODE_MASK & mode) == LOCK_GAP
 	      || mode - (LOCK_MODE_MASK & mode) == LOCK_REC_NOT_GAP
+#ifdef WITH_WSREP
+	      || mode - (LOCK_MODE_MASK & mode) == WSREP_BF
+	      || mode - (LOCK_MODE_MASK & mode) - LOCK_REC_NOT_GAP == WSREP_BF
+#endif /* WITH_WSREP */
 	      || mode - (LOCK_MODE_MASK & mode) == 0);
-
+#ifdef WITH_WSREP
+	if (wsrep_thd_is_brute_force(thr_get_trx(thr)->mysql_thd)) {
+		mode |= WSREP_BF;
+	}
+#endif
 	/* We try a simplified and faster subroutine for the most
 	common cases */
 	switch (lock_rec_lock_fast(impl, mode, block, heap_no, index, thr)) {
@@ -5077,8 +5104,10 @@ lock_rec_queue_validate(
 			} else {
 				mode = LOCK_S;
 			}
+#ifndef WITH_WSREP
 			ut_a(!lock_rec_other_has_expl_req(
 				     mode, 0, 0, block, heap_no, lock->trx));
+#endif /* WITH_WSREP */
 
 		} else if (lock_get_wait(lock) && !lock_rec_get_gap(lock)) {
 
@@ -5372,7 +5401,7 @@ lock_rec_insert_check_and_lock(
 
 #ifdef WITH_WSREP
 	if ((c_lock = lock_rec_other_has_conflicting(
-		    LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION,
+		    LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION | WSREP_BF,
 		    block, next_rec_heap_no, trx))) {
 #else
 	if (lock_rec_other_has_conflicting(
