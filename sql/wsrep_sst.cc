@@ -27,7 +27,6 @@
 #define WSREP_SST_MYSQLDUMP "mysqldump"
 #define WSREP_SST_DEFAULT WSREP_SST_MYSQLDUMP
 const char* wsrep_sst_method          = WSREP_SST_DEFAULT;
-#define WSREP_SST_ADDRESS_AUTO "AUTO"
 const char* wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char* wsrep_sst_donor           = "";
 

@@ -72,6 +72,7 @@ extern const char* wsrep_provider_version;
 extern const char* wsrep_provider_vendor;
 extern int         wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
 
+#define WSREP_SST_ADDRESS_AUTO "AUTO"
 // MySQL variables funcs
 extern int  wsrep_init_vars();
 extern bool wsrep_on_update (

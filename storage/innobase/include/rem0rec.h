@@ -823,7 +823,7 @@ two upmost bits in a two byte offset for special purposes */
 #ifdef WITH_WSREP
 int wsrep_rec_get_primary_key(
 	byte 		*buf,     /* out: extracted key */
-	uint 		*buf_len, /* in/out: length of buf */
+	ulint 		*buf_len, /* in/out: length of buf */
 	const rec_t*	rec,	  /* in: physical record */
 	dict_index_t*	index);	  /* in: record descriptor */
 #endif /* WITH_WSREP */

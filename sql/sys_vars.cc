@@ -3214,7 +3214,7 @@ static Sys_var_charptr Sys_wsrep_cluster_address (
 static Sys_var_charptr Sys_wsrep_node_name (
        "wsrep_node_name", "Node name",
        READ_ONLY GLOBAL_VAR(wsrep_node_name), CMD_LINE(REQUIRED_ARG),
-       IN_FS_CHARSET, DEFAULT(""), 
+       IN_FS_CHARSET, DEFAULT(glob_hostname), 
        NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 static Sys_var_charptr Sys_wsrep_node_incoming_address(
@@ -3280,8 +3280,9 @@ static Sys_var_charptr sys_wsrep_sst_method(
 static Sys_var_charptr Sys_wsrep_sst_receive_address( 
        "wsrep_sst_receive_address", "Address where node is waiting for "
        "SST contact", 
-       READ_ONLY GLOBAL_VAR(wsrep_sst_receive_address),CMD_LINE(REQUIRED_ARG),
-       IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+       GLOBAL_VAR(wsrep_sst_receive_address),CMD_LINE(REQUIRED_ARG),
+       IN_FS_CHARSET, DEFAULT(WSREP_SST_ADDRESS_AUTO), NO_MUTEX_GUARD, 
+       NOT_IN_BINLOG);
 
 static Sys_var_charptr Sys_wsrep_sst_auth(
        "wsrep_sst_auth", "Authentication for SST connection",
