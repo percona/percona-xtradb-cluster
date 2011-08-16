@@ -4759,11 +4759,13 @@ create_sp_error:
   case SQLCOM_TRUNCATE:
   case SQLCOM_ALTER_TABLE:
       DBUG_ASSERT(first_table == all_tables && first_table != 0);
+      WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name)
     /* fall through */
   case SQLCOM_SIGNAL:
   case SQLCOM_RESIGNAL:
     DBUG_ASSERT(lex->m_stmt != NULL);
     res= lex->m_stmt->execute(thd);
+    WSREP_TO_ISOLATION_END
     break;
   default:
 #ifndef EMBEDDED_LIBRARY
