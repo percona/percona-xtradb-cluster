@@ -16,11 +16,8 @@
 #ifndef WSREP_MYSQLD_H
 #define WSREP_MYSQLD_H
 
-//#include <my_global.h>
-//#include <mysql_priv.h>
 #include <mysql.h>
 #include <sql_priv.h>
-//#include <sql_base.h>
 #include "../wsrep/wsrep_api.h"
 
 class set_var;
@@ -220,5 +217,9 @@ extern PSI_mutex_key key_LOCK_wsrep_rollback;
 extern PSI_cond_key key_COND_wsrep_rollback;
 extern PSI_mutex_key key_LOCK_wsrep_replaying;
 extern PSI_cond_key key_COND_wsrep_replaying;
+
+int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_);
+void wsrep_to_isolation_end(THD *thd);
+
 
 #endif /* WSREP_MYSQLD_H */

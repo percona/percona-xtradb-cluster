@@ -124,57 +124,67 @@ static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
   return ret;
 }
 
-#define WSREP_TO_ISOLATION_BEGIN(db_, table_)                               \
-  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)         \
-  {                                                                         \
-    wsrep_status_t ret(WSREP_WARNING);                                      \
-    uchar* buf(0);                                                          \
-    uint buf_len(0);                                                        \
-    wsrep_key_t wkey[2];                                                    \
-    size_t wkey_len= 2;                                                     \
-    WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno, \
-                thd->wsrep_exec_mode, thd->query() );                       \
-    if (wsrep_prepare_key_for_isolation(db_, table_, wkey, &wkey_len) &&    \
-        !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==            \
-        (ret = wsrep->to_execute_start(wsrep, thd->thread_id,               \
-                                       wkey, wkey_len,                      \
-                                       buf, buf_len,                        \
-                                       &thd->wsrep_trx_seqno))) {           \
-      thd->wsrep_exec_mode= TOTAL_ORDER;                                    \
-      wsrep_to_isolation++;                                                 \
-      if (buf) my_free(buf);                                                \
-      WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,     \
-                  thd->wsrep_exec_mode);                                    \
-    }                                                                       \
-    else {                                                                  \
-      /* jump to error handler in mysql_execute_command() */                \
-      WSREP_WARN("TO isolation failed for: %d, sql: %s. Check wsrep "       \
-                 "connection state and retry the query.",                   \
-                 ret, (thd->query()) ? thd->query() : "void");              \
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check " \
-               "your wsrep connection state and retry the query.");         \
-      if (buf) my_free(buf);                                                \
-      goto error;                                                           \
-    }                                                                       \
+int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_) 
+{
+  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
+  {
+    wsrep_status_t ret(WSREP_WARNING);
+    uchar* buf(0);
+    uint buf_len(0);
+    wsrep_key_t wkey[2];
+    size_t wkey_len= 2;
+    WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+                thd->wsrep_exec_mode, thd->query() );
+    if (wsrep_prepare_key_for_isolation(db_, table_, wkey, &wkey_len) &&
+        !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==
+        (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
+                                       wkey, wkey_len,
+                                       buf, buf_len,
+                                       &thd->wsrep_trx_seqno))) {
+      thd->wsrep_exec_mode= TOTAL_ORDER;
+      wsrep_to_isolation++;
+      if (buf) my_free(buf);
+      WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,
+                  thd->wsrep_exec_mode);
+    }
+    else {
+      /* jump to error handler in mysql_execute_command() */
+      WSREP_WARN("TO isolation failed for: %d, sql: %s. Check wsrep "
+                 "connection state and retry the query.",
+                 ret, (thd->query()) ? thd->query() : "void");
+      my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
+               "your wsrep connection state and retry the query.");
+      if (buf) my_free(buf);
+      return -1;
+    }
   }
+  return 0;
+}
+
+void wsrep_to_isolation_end(THD *thd) {
+  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==TOTAL_ORDER)
+  {
+    wsrep_status_t ret;
+    wsrep_to_isolation--;
+    WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+                thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
+    if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
+      thd->wsrep_exec_mode= LOCAL_STATE;
+      WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);
+    }
+    else {
+      WSREP_WARN("TO isolation end failed for: %d, sql: %s",
+                 ret, (thd->query()) ? thd->query() : "void");
+    }
+    thd->wsrep_trx_seqno= 0;
+  }
+}
+
+#define WSREP_TO_ISOLATION_BEGIN(db_, table_)                               \
+  if (wsrep_to_isolation_begin(thd, db_, table_)) goto error;
 
 #define WSREP_TO_ISOLATION_END                                              \
-  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==TOTAL_ORDER)         \
-  {                                                                         \
-    wsrep_status_t ret;                                                     \
-    wsrep_to_isolation--;                                                   \
-    WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,   \
-                thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void") \
-    if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) { \
-      thd->wsrep_exec_mode= LOCAL_STATE;                                    \
-      WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);         \
-    }                                                                       \
-    else {                                                                  \
-      WSREP_WARN("TO isolation end failed for: %d, sql: %s",                \
-                 ret, (thd->query()) ? thd->query() : "void");              \
-    }                                                                       \
-    thd->wsrep_trx_seqno= 0;                                                \
-  }
+  wsrep_to_isolation_end(thd);
 
 #else
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_)
@@ -4759,13 +4769,11 @@ create_sp_error:
   case SQLCOM_TRUNCATE:
   case SQLCOM_ALTER_TABLE:
       DBUG_ASSERT(first_table == all_tables && first_table != 0);
-      WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name)
     /* fall through */
   case SQLCOM_SIGNAL:
   case SQLCOM_RESIGNAL:
     DBUG_ASSERT(lex->m_stmt != NULL);
     res= lex->m_stmt->execute(thd);
-    WSREP_TO_ISOLATION_END
     break;
   default:
 #ifndef EMBEDDED_LIBRARY

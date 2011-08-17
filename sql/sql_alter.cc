@@ -17,7 +17,9 @@
 #include "sql_table.h"                       // mysql_alter_table,
                                              // mysql_exchange_partition
 #include "sql_alter.h"
-
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 bool Alter_table_statement::execute(THD *thd)
 {
   LEX *lex= thd->lex;
@@ -97,6 +99,10 @@ bool Alter_table_statement::execute(THD *thd)
 
   thd->enable_slow_log= opt_log_slow_admin_statements;
 
+#ifdef WITH_WSREP
+  if (wsrep_to_isolation_begin(thd, first_table->db, first_table->table_name))
+    DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
   result= mysql_alter_table(thd, select_lex->db, lex->name.str,
                             &create_info,
                             first_table,
@@ -105,5 +111,8 @@ bool Alter_table_statement::execute(THD *thd)
                             select_lex->order_list.first,
                             lex->ignore);
 
+#ifdef WITH_WSREP
+  wsrep_to_isolation_end(thd);
+#endif /* WITH_WSREP */
   DBUG_RETURN(result);
 }

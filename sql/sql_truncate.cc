@@ -24,6 +24,9 @@
 #include "sql_acl.h"     // DROP_ACL
 #include "sql_parse.h"   // check_one_table_access()
 #include "sql_truncate.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 
 
 /**
@@ -515,8 +518,15 @@ bool Truncate_statement::execute(THD *thd)
   if (check_one_table_access(thd, DROP_ACL, first_table))
     DBUG_RETURN(res);
 
+#ifdef WITH_WSREP
+  if (wsrep_to_isolation_begin(thd, first_table->db, first_table->table_name))
+    DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
   if (! (res= truncate_table(thd, first_table)))
     my_ok(thd);
+#ifdef WITH_WSREP
+  wsrep_to_isolation_end(thd);
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(res);
 }
