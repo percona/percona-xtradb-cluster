@@ -1281,6 +1281,12 @@ MDL_object_lock::m_waiting_incompatible[MDL_TYPE_END] =
 };
 
 
+#ifdef WITH_WSREP
+extern bool
+wsrep_lock_grant_exception(enum_mdl_type type_arg,
+			   MDL_context *requestor_ctx,
+			   MDL_ticket *ticket);
+#endif /*  WITH_WSREP */
 /**
   Check if request for the metadata lock can be satisfied given its
   current state.
@@ -1323,7 +1329,12 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
       while ((ticket= it++))
       {
         if (ticket->get_ctx() != requestor_ctx &&
+#ifndef WITH_WSREP
             ticket->is_incompatible_when_granted(type_arg))
+#else
+            ticket->is_incompatible_when_granted(type_arg) &&
+	    !wsrep_lock_grant_exception(type_arg, requestor_ctx, ticket))
+#endif /* WITH_WSREP */
           break;
       }
       if (ticket == NULL)             /* Incompatible locks are our own. */

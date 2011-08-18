@@ -705,3 +705,18 @@ void wsrep_to_isolation_end(THD *thd) {
     thd->wsrep_trx_seqno= 0;
   }
 }
+
+bool
+wsrep_lock_grant_exception(enum_mdl_type type_arg,
+			   MDL_context *requestor_ctx,
+			   MDL_ticket *ticket) {
+  
+  if (type_arg == MDL_EXCLUSIVE                                &&
+      requestor_ctx->get_thd()->wsrep_exec_mode == TOTAL_ORDER &&
+      ticket->get_ctx()->get_thd()->wsrep_query_state == QUERY_COMMITTING) 
+  {
+    WSREP_DEBUG("mdl granted for TO isolation processor");
+    return TRUE;
+  }
+  return FALSE;
+}
