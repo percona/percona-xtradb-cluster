@@ -89,7 +89,7 @@ public:
     int   error() { return err; };
     int   wait ();
 };
-
+#ifdef REMOVED
 class lock
 {
   pthread_mutex_t* const mtx_;
@@ -193,6 +193,7 @@ private:
   critical (const critical&);
   critical& operator= (const critical&);
 };
+#endif
 
 class thd
 {
@@ -215,5 +216,4 @@ public:
 };
 
 } // namespace wsrep
-
 #endif /* WSREP_PRIV_H */

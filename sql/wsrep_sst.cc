@@ -13,7 +13,6 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
-#undef SAFE_MUTEX
 #include <mysqld.h>
 #include <sql_class.h>
 #include <set_var.h>
@@ -83,27 +82,25 @@ bool wsrep_init_first()
   return strcmp (wsrep_sst_method, WSREP_SST_MYSQLDUMP);
 }
 
-static pthread_mutex_t sst_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  sst_cond = PTHREAD_COND_INITIALIZER;
 static bool            sst_complete = false;
 static bool            sst_needed   = false;
 
 void wsrep_sst_grab ()
 {
-    WSREP_INFO("wsrep_sst_grab()");
-  if (pthread_mutex_lock (&sst_lock)) abort();
+  WSREP_INFO("wsrep_sst_grab()");
+  if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   sst_complete = false;
-  pthread_mutex_unlock (&sst_lock);
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
 }
 
 // Wait for end of SST
 bool wsrep_sst_wait ()
 {
-  if (pthread_mutex_lock (&sst_lock)) abort();
+  if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   while (!sst_complete)
   {
     WSREP_INFO("Waiting for SST to complete.");
-    pthread_cond_wait (&sst_cond, &sst_lock);
+    mysql_cond_wait (&COND_wsrep_sst, &LOCK_wsrep_sst);
   }
 
   if (local_seqno >= 0)
@@ -116,7 +113,7 @@ bool wsrep_sst_wait ()
                 int(-local_seqno), strerror(-local_seqno));
   }
 
-  pthread_mutex_unlock (&sst_lock);
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
 
   return (local_seqno >= 0);
 }
@@ -126,20 +123,20 @@ void wsrep_sst_complete (wsrep_uuid_t* sst_uuid,
                          wsrep_seqno_t sst_seqno,
                          bool          needed)
 {
-  if (pthread_mutex_lock (&sst_lock)) abort();
+  if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   if (!sst_complete)
   {
     sst_complete = true;
     sst_needed   = needed;
     local_uuid   = *sst_uuid;
     local_seqno  = sst_seqno;
-    pthread_cond_signal (&sst_cond);
+    mysql_cond_signal (&COND_wsrep_sst);
   }
   else
   {
     WSREP_WARN("Nobody is waiting for SST.");
   }
-  pthread_mutex_unlock (&sst_lock);
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
 }
 
 // Let applier threads to continue
@@ -157,20 +154,21 @@ struct sst_thread_arg
   const char*     cmd;
   int             err;
   char*           ret_str;
-  pthread_mutex_t lock;
-  pthread_cond_t  cond;
+  mysql_mutex_t   lock;
+  mysql_cond_t    cond;
 
   sst_thread_arg (const char* c) : cmd(c), err(-1), ret_str(0)
   {
-    pthread_mutex_init (&lock, NULL);
-    pthread_cond_init  (&cond, NULL);
+    mysql_mutex_init(key_LOCK_wsrep_sst_thread, 
+		   &lock, MY_MUTEX_INIT_FAST);
+    mysql_cond_init(key_COND_wsrep_sst_thread, &cond, NULL);
   }
 
   ~sst_thread_arg()
   {
-    pthread_cond_destroy  (&cond);
-    pthread_mutex_unlock  (&lock);
-    pthread_mutex_destroy (&lock);
+    mysql_cond_destroy  (&cond);
+    mysql_mutex_unlock  (&lock);
+    mysql_mutex_destroy (&lock);
   }
 };
 
@@ -246,15 +244,15 @@ static void* sst_joiner_thread (void* a)
 
     // signal sst_prepare thread with ret code,
     // it will go on sending SST request
-    pthread_mutex_lock   (&arg->lock);
+    mysql_mutex_lock   (&arg->lock);
     if (!err)
     {
       arg->ret_str = strdup (out + magic_len + 1);
       if (!arg->ret_str) err = ENOMEM;
     }
     arg->err = -err;
-    pthread_cond_signal  (&arg->cond);
-    pthread_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
+    mysql_cond_signal  (&arg->cond);
+    mysql_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
 
     if (err) return NULL; /* lp:808417 - return immediately, don't signal
                            * initializer thread to ensure single thread of
@@ -317,9 +315,9 @@ static ssize_t sst_prepare_other (const char*  method,
 
   pthread_t tmp;
   sst_thread_arg arg(cmd_str);
-  pthread_mutex_lock (&arg.lock);
+  mysql_mutex_lock (&arg.lock);
   pthread_create (&tmp, NULL, sst_joiner_thread, &arg);
-  pthread_cond_wait (&arg.cond, &arg.lock);
+  mysql_cond_wait (&arg.cond, &arg.lock);
 
   *addr_out= arg.ret_str;
 
@@ -662,10 +660,10 @@ static void* sst_donor_thread (void* a)
   err= proc.error();
 
 /* Inform server about SST script startup and release TO isolation */
-  pthread_mutex_lock   (&arg->lock);
+  mysql_mutex_lock   (&arg->lock);
   arg->err = -err;
-  pthread_cond_signal  (&arg->cond);
-  pthread_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
+  mysql_cond_signal  (&arg->cond);
+  mysql_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
 
   if (proc.pipe() && !err)
   {
@@ -750,9 +748,9 @@ static int sst_donate_other (const char*   method,
 
   pthread_t tmp;
   sst_thread_arg arg(cmd_str);
-  pthread_mutex_lock (&arg.lock);
+  mysql_mutex_lock (&arg.lock);
   pthread_create (&tmp, NULL, sst_donor_thread, &arg);
-  pthread_cond_wait (&arg.cond, &arg.lock);
+  mysql_cond_wait (&arg.cond, &arg.lock);
 
   WSREP_INFO("sst_donor_thread signaled with %d", arg.err);
   return arg.err;
@@ -789,22 +787,19 @@ int wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   return (ret > 0 ? 0 : ret);
 }
 
-static pthread_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  init_cond = PTHREAD_COND_INITIALIZER;
-
 void wsrep_SE_init_grab()
 {
-  if (pthread_mutex_lock (&init_lock)) abort();
+  if (mysql_mutex_lock (&LOCK_wsrep_sst_init)) abort();
 }
 
 void wsrep_SE_init_wait()
 {
-  pthread_cond_wait (&init_cond, &init_lock);
-  pthread_mutex_unlock (&init_lock);
+  mysql_cond_wait (&COND_wsrep_sst_init, &LOCK_wsrep_sst_init);
+  mysql_mutex_unlock (&LOCK_wsrep_sst_init);
 }
 
 void wsrep_SE_init_done()
 {
-  pthread_cond_signal (&init_cond);
-  pthread_mutex_unlock (&init_lock);
+  mysql_cond_signal (&COND_wsrep_sst_init);
+  mysql_mutex_unlock (&LOCK_wsrep_sst_init);
 }

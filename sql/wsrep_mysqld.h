@@ -196,6 +196,12 @@ typedef struct wsrep_aborting_thd {
   THD *aborting_thd;
 } *wsrep_aborting_thd_t;
 
+extern mysql_mutex_t LOCK_wsrep_ready;
+extern mysql_cond_t COND_wsrep_ready;
+extern mysql_mutex_t LOCK_wsrep_sst;
+extern mysql_cond_t COND_wsrep_sst;
+extern mysql_mutex_t LOCK_wsrep_sst_init;
+extern mysql_cond_t COND_wsrep_sst_init;
 extern mysql_mutex_t LOCK_wsrep_rollback;
 extern mysql_cond_t COND_wsrep_rollback;
 extern int wsrep_replaying;
@@ -213,10 +219,18 @@ extern long      wsrep_max_ws_rows;
 extern int       wsrep_to_isolation;
 extern my_bool wsrep_certify_nonPK;
 
+extern PSI_mutex_key key_LOCK_wsrep_ready;
+extern PSI_mutex_key key_COND_wsrep_ready;
+extern PSI_mutex_key key_LOCK_wsrep_sst;
+extern PSI_cond_key  key_COND_wsrep_sst;
+extern PSI_mutex_key key_LOCK_wsrep_sst_init;
+extern PSI_cond_key  key_COND_wsrep_sst_init;
+extern PSI_mutex_key key_LOCK_wsrep_sst_thread;
+extern PSI_cond_key  key_COND_wsrep_sst_thread;
 extern PSI_mutex_key key_LOCK_wsrep_rollback;
-extern PSI_cond_key key_COND_wsrep_rollback;
+extern PSI_cond_key  key_COND_wsrep_rollback;
 extern PSI_mutex_key key_LOCK_wsrep_replaying;
-extern PSI_cond_key key_COND_wsrep_replaying;
+extern PSI_cond_key  key_COND_wsrep_replaying;
 
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_);
 void wsrep_to_isolation_end(THD *thd);

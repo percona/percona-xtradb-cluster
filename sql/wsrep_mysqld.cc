@@ -13,7 +13,6 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
-#undef SAFE_MUTEX
 #include <mysqld.h>
 #include <sql_class.h>
 #include "wsrep_priv.h"
@@ -272,33 +271,30 @@ out:
   free(view);
 }
 
-static pthread_mutex_t ready_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  ready_cond = PTHREAD_COND_INITIALIZER;
-
 // Wait until wsrep has reached ready state
 void wsrep_ready_wait ()
 {
-  if (pthread_mutex_lock (&ready_lock)) abort();
+  if (mysql_mutex_lock (&LOCK_wsrep_ready)) abort();
   while (!wsrep_ready)
     {
       WSREP_INFO("Waiting to reach ready state");
-      pthread_cond_wait (&ready_cond, &ready_lock);
+      mysql_cond_wait (&COND_wsrep_ready, &LOCK_wsrep_ready);
     }
   WSREP_INFO("ready state reached");
-  pthread_mutex_unlock (&ready_lock);
+  mysql_mutex_unlock (&LOCK_wsrep_ready);
 }
 
 static void wsrep_synced_cb(void* app_ctx)
 {
   WSREP_INFO("Synchronized with group, ready for connections");
-  if (pthread_mutex_lock (&ready_lock)) abort();
+  if (mysql_mutex_lock (&LOCK_wsrep_ready)) abort();
   if (!wsrep_ready)
   {
     wsrep_ready= TRUE;
-    pthread_cond_signal (&ready_cond);
+    mysql_cond_signal (&COND_wsrep_ready);
   }
   local_status.set(WSREP_MEMBER_SYNCED);
-  pthread_mutex_unlock (&ready_lock);
+  mysql_mutex_unlock (&LOCK_wsrep_ready);
 }
 
 int wsrep_init()

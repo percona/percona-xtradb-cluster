@@ -653,6 +653,12 @@ mysql_mutex_t LOCK_server_started;
 mysql_cond_t COND_server_started;
 
 #ifdef WITH_WSREP
+mysql_mutex_t LOCK_wsrep_ready;
+mysql_cond_t  COND_wsrep_ready;
+mysql_mutex_t LOCK_wsrep_sst;
+mysql_cond_t  COND_wsrep_sst;
+mysql_mutex_t LOCK_wsrep_sst_init;
+mysql_cond_t  COND_wsrep_sst_init;
 mysql_mutex_t LOCK_wsrep_rollback;
 mysql_cond_t  COND_wsrep_rollback;
 wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
@@ -1653,6 +1659,12 @@ static void clean_up_mutexes()
   mysql_cond_destroy(&COND_flush_thread_cache);
   mysql_cond_destroy(&COND_manager);
 #ifdef WITH_WSREP
+  (void) mysql_mutex_destroy(&LOCK_wsrep_ready);
+  (void) mysql_cond_destroy(&COND_wsrep_ready);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_sst);
+  (void) mysql_cond_destroy(&COND_wsrep_sst);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_sst_init);
+  (void) mysql_cond_destroy(&COND_wsrep_sst_init);
   (void) mysql_mutex_destroy(&LOCK_wsrep_rollback);
   (void) mysql_cond_destroy(&COND_wsrep_rollback);
   (void) mysql_mutex_destroy(&LOCK_wsrep_replaying);
@@ -3696,6 +3708,15 @@ static int init_thread_environment()
     return 1;
   }
 #ifdef WITH_WSREP
+  mysql_mutex_init(key_LOCK_wsrep_ready, 
+		   &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_sst, 
+		   &LOCK_wsrep_sst, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_sst, &COND_wsrep_sst, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_sst_init, 
+		   &LOCK_wsrep_sst_init, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_sst_init, &COND_wsrep_sst_init, NULL);
   mysql_mutex_init(key_LOCK_wsrep_rollback, 
 		   &LOCK_wsrep_rollback, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_rollback, &COND_wsrep_rollback, NULL);
@@ -8354,7 +8375,8 @@ PSI_mutex_key key_BINLOG_LOCK_index, key_BINLOG_LOCK_prep_xids,
   key_PARTITION_LOCK_auto_inc;
 #ifdef WITH_WSREP
 PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
-  key_LOCK_wsrep_replaying;
+  key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
+  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init;
 #endif
 PSI_mutex_key key_RELAYLOG_LOCK_index;
 
@@ -8408,6 +8430,11 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOG_INFO_lock, "LOG_INFO::lock", 0},
   { &key_LOCK_thread_count, "LOCK_thread_count", PSI_FLAG_GLOBAL},
 #ifdef WITH_WSREP
+  { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_sst_thread, "wsrep_sst_thread", 0},
+  { &key_LOCK_wsrep_sst_init, "LOCK_wsrep_sst_init", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_rollback, "LOCK_wsrep_rollback", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
@@ -8448,7 +8475,9 @@ PSI_cond_key key_BINLOG_COND_prep_xids, key_BINLOG_update_cond,
   key_COND_thread_count, key_COND_thread_cache, key_COND_flush_thread_cache;
 #ifdef WITH_WSREP
 PSI_cond_key key_COND_wsrep_rollback, key_COND_wsrep_thd, 
-  key_COND_wsrep_replaying;
+  key_COND_wsrep_replaying, key_COND_wsrep_ready, key_COND_wsrep_sst,
+  key_COND_wsrep_sst_init, key_COND_wsrep_sst_thread;
+
 #endif /* WITH_WSREP */
 PSI_cond_key key_RELAYLOG_update_cond;
 
@@ -8484,6 +8513,10 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_thread_count, "COND_thread_count", PSI_FLAG_GLOBAL},
   { &key_COND_thread_cache, "COND_thread_cache", PSI_FLAG_GLOBAL},
 #ifdef WITH_WSREP
+  { &key_COND_wsrep_ready, "COND_wsrep_ready", PSI_FLAG_GLOBAL},
+  { &key_COND_wsrep_sst, "COND_wsrep_sst", PSI_FLAG_GLOBAL},
+  { &key_COND_wsrep_sst_init, "COND_wsrep_sst_init", PSI_FLAG_GLOBAL},
+  { &key_COND_wsrep_sst_thread, "wsrep_sst_thread", 0},
   { &key_COND_wsrep_rollback, "COND_wsrep_rollback", PSI_FLAG_GLOBAL},
   { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0},
   { &key_COND_wsrep_replaying, "COND_wsrep_replaying", PSI_FLAG_GLOBAL},
