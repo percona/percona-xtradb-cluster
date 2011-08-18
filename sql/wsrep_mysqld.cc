@@ -18,6 +18,7 @@
 #include "wsrep_priv.h"
 #include <cstdio>
 #include <cstdlib>
+#include "log_event.h"
 
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
@@ -626,4 +627,81 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
     ++(*key_len);
 
     return true;
+}
+
+/*
+ * Construct Query_log_Event from thd query and serialize it
+ * into buffer.
+ *
+ * Return 0 in case of success, 1 in case of error.
+ */
+static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
+{
+  IO_CACHE tmp_io_cache;
+  if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
+                       65536, MYF(MY_WME)))
+    return 1;
+  Query_log_event ev(thd, thd->query(), thd->query_length(), FALSE, FALSE,
+                     FALSE, 0);
+  int ret(0);
+  if (ev.write(&tmp_io_cache)) ret= 1;
+  if (!ret && wsrep_write_cache(&tmp_io_cache, buf, buf_len)) ret= 1;
+  close_cached_file(&tmp_io_cache);
+  return ret;
+}
+
+int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_) 
+{
+  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
+  {
+    wsrep_status_t ret(WSREP_WARNING);
+    uchar* buf(0);
+    uint buf_len(0);
+    wsrep_key_t wkey[2];
+    size_t wkey_len= 2;
+    WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+                thd->wsrep_exec_mode, thd->query() );
+    if (wsrep_prepare_key_for_isolation(db_, table_, wkey, &wkey_len) &&
+        !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==
+        (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
+                                       wkey, wkey_len,
+                                       buf, buf_len,
+                                       &thd->wsrep_trx_seqno))) {
+      thd->wsrep_exec_mode= TOTAL_ORDER;
+      wsrep_to_isolation++;
+      if (buf) my_free(buf);
+      WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,
+                  thd->wsrep_exec_mode);
+    }
+    else {
+      /* jump to error handler in mysql_execute_command() */
+      WSREP_WARN("TO isolation failed for: %d, sql: %s. Check wsrep "
+                 "connection state and retry the query.",
+                 ret, (thd->query()) ? thd->query() : "void");
+      my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
+               "your wsrep connection state and retry the query.");
+      if (buf) my_free(buf);
+      return -1;
+    }
+  }
+  return 0;
+}
+
+void wsrep_to_isolation_end(THD *thd) {
+  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==TOTAL_ORDER)
+  {
+    wsrep_status_t ret;
+    wsrep_to_isolation--;
+    WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+                thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
+    if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
+      thd->wsrep_exec_mode= LOCAL_STATE;
+      WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);
+    }
+    else {
+      WSREP_WARN("TO isolation end failed for: %d, sql: %s",
+                 ret, (thd->query()) ? thd->query() : "void");
+    }
+    thd->wsrep_trx_seqno= 0;
+  }
 }
