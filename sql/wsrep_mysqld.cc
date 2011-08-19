@@ -712,11 +712,20 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
 			   MDL_ticket *ticket) {
   
   if (type_arg == MDL_EXCLUSIVE                                &&
-      requestor_ctx->get_thd()->wsrep_exec_mode == TOTAL_ORDER &&
-      ticket->get_ctx()->get_thd()->wsrep_query_state == QUERY_COMMITTING) 
-  {
-    WSREP_DEBUG("mdl granted for TO isolation processor");
-    return TRUE;
+      requestor_ctx->get_thd()->wsrep_exec_mode == TOTAL_ORDER) {
+ 
+    THD *thd = ticket->get_ctx()->get_thd();
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    if (thd->wsrep_query_state == QUERY_COMMITTING) {
+      WSREP_DEBUG("mdl granted for TO isolation processor");
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      return TRUE;
+    } else {
+      WSREP_DEBUG("mdl conflict, set to MUST ABORT");
+      thd->wsrep_conflict_state = MUST_ABORT;
+    }
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
   }
   return FALSE;
 }
