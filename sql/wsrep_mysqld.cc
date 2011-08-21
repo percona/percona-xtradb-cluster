@@ -711,17 +711,24 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
 			   MDL_context *requestor_ctx,
 			   MDL_ticket *ticket) {
   
-  if (type_arg == MDL_EXCLUSIVE                                &&
-      requestor_ctx->get_thd()->wsrep_exec_mode == TOTAL_ORDER) {
- 
+  if (requestor_ctx->get_thd()->wsrep_exec_mode == TOTAL_ORDER ||
+      requestor_ctx->get_thd()->wsrep_exec_mode == REPL_RECV)
+  {
     THD *thd = ticket->get_ctx()->get_thd();
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if (thd->wsrep_query_state == QUERY_COMMITTING) {
-      WSREP_DEBUG("mdl granted for TO isolation processor");
+      WSREP_DEBUG(
+        "mdl granted for TO isolation, BF: (%lu %d %d) thd: (%lu %d)",
+	requestor_ctx->get_thd()->thread_id, type_arg,
+	requestor_ctx->get_thd()->wsrep_exec_mode, 
+	thd->thread_id, thd->wsrep_exec_mode);
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       return TRUE;
     } else {
-      WSREP_DEBUG("mdl conflict, set to MUST ABORT");
+      WSREP_DEBUG("mdl conflict, (%lu %d) set to MUST ABORT, BF:(%lu %d %d)",
+		  thd->thread_id, thd->wsrep_exec_mode,
+		  requestor_ctx->get_thd()->thread_id, type_arg,
+		  requestor_ctx->get_thd()->wsrep_exec_mode);
       thd->wsrep_conflict_state = MUST_ABORT;
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
