@@ -16,14 +16,15 @@
 
 //! @file declares symbols private to wsrep integration layer
 
+#include <mysqld.h>
+#include <sql_class.h>
+#include "wsrep_priv.h"
+
 //#include <linux/in.h>
 #include <linux/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include <mysqld.h>
-#include <sql_class.h>
-#include "wsrep_priv.h"
 
 namespace wsp
 {
