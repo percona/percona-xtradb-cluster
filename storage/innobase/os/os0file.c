@@ -1095,8 +1095,6 @@ os_file_create_simple_func(
 	DWORD		access;
 	DWORD		attributes	= 0;
 	ibool		retry;
-	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
-		WAIT_ALLOW_WRITES();
 
 try_again:
 	ut_a(name);
@@ -1155,6 +1153,8 @@ try_again:
 	os_file_t	file;
 	int		create_flag;
 	ibool		retry;
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
 
 try_again:
 	ut_a(name);
@@ -2070,7 +2070,6 @@ os_file_fsync(
 	int	ret;
 	int	failures;
 	ibool	retry;
-	WAIT_ALLOW_WRITES();
 
 	failures = 0;
 
@@ -2145,6 +2144,7 @@ os_file_flush_func(
 	return(FALSE);
 #else
 	int	ret;
+	WAIT_ALLOW_WRITES();
 
 #if defined(HAVE_DARWIN_THREADS)
 # ifndef F_FULLFSYNC
