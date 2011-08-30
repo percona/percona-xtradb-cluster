@@ -225,7 +225,8 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   wsrep_stop_replication(thd);
   wsrep_deinit();
 
-  char* tmp= strdup(provider); // wsrep_init() rewrites provider when fails
+  char* tmp= strdup(provider); // wsrep_init() rewrites provider 
+                                         //when fails
   if (wsrep_init())
   {
     my_error(ER_CANT_OPEN_LIBRARY, MYF(0), tmp);
