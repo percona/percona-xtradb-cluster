@@ -148,6 +148,7 @@ INCLUDE(plugin)
 INCLUDE(install_macros)
 INCLUDE(install_layout)
 INCLUDE(mysql_add_executable)
+INCLUDE(wsrep)
 
 # Handle options
 OPTION(DISABLE_SHARED 

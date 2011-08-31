@@ -240,8 +240,7 @@ fi
 MYSQL_SOCKET_PATH=${MYSQL_SOCKET_PATH:-"/var/lib/mysql/mysql.sock"}
 wsrep_configs="$wsrep_configs "\
 "--with-wsrep "\
-"--with-comment=wsrep_0.8.0 "\
-"--with-plugins=innobase,innodb_plugin "\
+"--with-comment=wsrep_1.0-beta "\
 "--with-innodb-disallow-writes "\
 "--with-unix-socket-path=$MYSQL_SOCKET_PATH"
 

@@ -68,6 +68,19 @@
 #
 
 # ----------------------------------------------------------------------------
+# wsrep builds
+# ----------------------------------------------------------------------------
+%if %{defined with_wsrep}
+%define wsrep_version @WSREP_VERSION@
+%define wsrep_comment wsrep patch: %{wsrep_version}
+%if %{undefined short_product_tag}
+%define short_product_tag wsrep
+%endif
+%else
+%define wsrep_comment %{nil}
+%endif
+
+# ----------------------------------------------------------------------------
 # Commercial builds
 # ----------------------------------------------------------------------------
 %if %{undefined commercial}
@@ -93,10 +106,10 @@
 # Server comment strings
 # ----------------------------------------------------------------------------
 %if %{undefined compilation_comment_debug}
-%define compilation_comment_debug       MySQL Community Server - Debug (GPL)
+%define compilation_comment_debug       MySQL Community Server - Debug (GPL) %{wsrep_comment}
 %endif
 %if %{undefined compilation_comment_release}
-%define compilation_comment_release     MySQL Community Server (GPL)
+%define compilation_comment_release     MySQL Community Server (GPL) %{wsrep_comment}
 %endif
 
 # ----------------------------------------------------------------------------
@@ -112,6 +125,13 @@
 
 %if %{undefined server_suffix}
 %define server_suffix   %{nil}
+%endif
+
+# ----------------------------------------------------------------------------
+# Packager
+# ----------------------------------------------------------------------------
+%if %{undefined mysql_packager}
+%define mysql_packager MySQL Build Team <build@mysql.com>
 %endif
 
 # ----------------------------------------------------------------------------
@@ -228,7 +248,7 @@ Distribution:   %{distro_description}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
 Source:         http://www.mysql.com/Downloads/MySQL-@MYSQL_BASE_VERSION@/%{src_dir}.tar.gz
 URL:            http://www.mysql.com/
-Packager:       MySQL Build Team <build@mysql.com>
+Packager:       %{mysql_packager}
 Vendor:         %{mysql_vendor}
 Provides:       msqlormysql MySQL-server mysql
 BuildRequires:  %{distro_buildreq}
@@ -261,6 +281,9 @@ documentation and the manual for more information.
 ##############################################################################
 
 %package -n MySQL-server%{product_suffix}
+%if %{defined with_wsrep}
+Release:        %{wsrep_version}.%{release}%{?distro_releasetag:.%{distro_releasetag}}
+%endif
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
 Requires:       %{distro_requires}
@@ -288,6 +311,9 @@ and the manual for more information.
 This package includes the MySQL server binary as well as related utilities
 to run and administer a MySQL server.
 
+%if %{defined with_wsrep}
+Built with wsrep patch %{wsrep_version}.
+%endif
 If you want to access and work with the database, you have to install
 package "MySQL-client%{product_suffix}" as well!
 
@@ -424,6 +450,12 @@ mkdir debug
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
+%if %{defined with_wsrep}
+           -DWITH_WSREP \
+           -DWSREP_PROC_INFO \
+           -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048 \
+           -DWITH_INNODB_DISALLOW_WRITES \
+%endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make ${MAKE_JFLAG} VERBOSE=1
@@ -439,6 +471,12 @@ mkdir release
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+%if %{defined with_wsrep}
+           -DWITH_WSREP \
+           -DWSREP_PROC_INFO \
+           -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048 \
+           -DWITH_INNODB_DISALLOW_WRITES \
+%endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG} VERBOSE=1
@@ -498,9 +536,18 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 # will appreciate that, as all services usually offer this.
 ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 
+%if %{defined with_wsrep}
+# Create a wsrep_sst_rsync_wan symlink.
+install -d $RBR%{_bindir}
+ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
+%endif
+
 # Touch the place where the my.cnf config file might be located
 # Just to make sure it's in the file list and marked as a config file
 touch $RBR%{_sysconfdir}/my.cnf
+%if %{defined with_wsrep}
+touch $RBR%{_sysconfdir}/wsrep.cnf
+%endif
 
 # Install SELinux files in datadir
 install -m 600 $MBD/%{src_dir}/support-files/RHEL4-SElinux/mysql.{fc,te} \
@@ -950,6 +997,9 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %{src_dir}/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
 %doc release/support-files/my-*.cnf
+%if %{defined with_wsrep}
+%doc release/support-files/wsrep.cnf
+%endif
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
 
@@ -982,6 +1032,9 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 
 %ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
+%if %{defined with_wsrep}
+%ghost %config(noreplace,missingok) %{_sysconfdir}/wsrep.cnf
+%endif
 
 %attr(755, root, root) %{_bindir}/innochecksum
 %attr(755, root, root) %{_bindir}/my_print_defaults
@@ -1007,6 +1060,11 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/replace
 %attr(755, root, root) %{_bindir}/resolve_stack_dump
 %attr(755, root, root) %{_bindir}/resolveip
+%if %{defined with_wsrep}
+%attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
+%endif
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1126,6 +1184,10 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Tue Aug 30 2011 Alexey Yurchenko <alexey.yurchenko@codership.com>
+
+- Added with_wsrep option for wsrep builds.
+
 * Thu Feb 09 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Fix bug#56581: If an installation deviates from the default file locations
