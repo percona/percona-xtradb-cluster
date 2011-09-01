@@ -20,8 +20,8 @@
 path=`dirname $0`
 . "$path/SETUP.sh"
 
-extra_flags="$pentium64_cflags $fast_cflags $wsrep_cflags -g"
-extra_configs="$pentium_configs $static_link $wsrep_configs"
+extra_flags="$pentium64_cflags $fast_cflags -g"
+extra_configs="$pentium_configs $static_link --with-wsrep"
 CC="$CC --pipe"
 strip=yes
 

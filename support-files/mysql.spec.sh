@@ -73,9 +73,6 @@
 %if %{defined with_wsrep}
 %define wsrep_version @WSREP_VERSION@
 %define wsrep_comment wsrep patch: %{wsrep_version}
-%if %{undefined short_product_tag}
-%define short_product_tag wsrep
-%endif
 %else
 %define wsrep_comment %{nil}
 %endif
@@ -282,7 +279,7 @@ documentation and the manual for more information.
 
 %package -n MySQL-server%{product_suffix}
 %if %{defined with_wsrep}
-Release:        %{wsrep_version}.%{release}%{?distro_releasetag:.%{distro_releasetag}}
+#Release:        %{wsrep_version}.%{release}
 %endif
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
@@ -368,6 +365,7 @@ This package contains the shared libraries (*.so*) which certain languages
 and applications need to dynamically load and use MySQL.
 
 # ----------------------------------------------------------------------------
+%if %{undefined with_wsrep}
 %package -n MySQL-embedded%{product_suffix}
 Summary:        MySQL - embedded library
 Group:          Applications/Databases
@@ -385,6 +383,7 @@ The API is identical for the embedded MySQL version and the
 client/server version.
 
 For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
+%endif
 
 ##############################################################################
 %prep
@@ -451,10 +450,7 @@ mkdir debug
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
 %if %{defined with_wsrep}
-           -DWITH_WSREP \
-           -DWSREP_PROC_INFO \
-           -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048 \
-           -DWITH_INNODB_DISALLOW_WRITES \
+           -DWITH_WSREP=1 \
 %endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
@@ -472,10 +468,7 @@ mkdir release
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
 %if %{defined with_wsrep}
-           -DWITH_WSREP \
-           -DWSREP_PROC_INFO \
-           -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048 \
-           -DWITH_INNODB_DISALLOW_WRITES \
+           -DWITH_WSREP=1 \
 %endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
@@ -1164,8 +1157,10 @@ echo "====="                                     >> $STATUS_HISTORY
 %defattr(-, root, root, 0755)
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
+%if %{undefined with_wsrep}
 %attr(755, root, root) %{_bindir}/mysql_client_test_embedded
 %attr(755, root, root) %{_bindir}/mysqltest_embedded
+%endif
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql-stress-test.pl.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql-test-run.pl.1*
@@ -1173,10 +1168,12 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysqltest_embedded.1*
 
 # ----------------------------------------------------------------------------
+%if %{undefined with_wsrep}
 %files -n MySQL-embedded%{product_suffix}
 %defattr(-, root, root, 0755)
 %attr(644, root, root) %{_libdir}/mysql/libmysqld.a
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
+%endif
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file

@@ -234,20 +234,6 @@ then
   echo "$CXX" | grep "ccache" > /dev/null || CXX="ccache $CXX"
 fi
 
-################################################################################
-## WSREP SETUP                                                               ##
-################################################################################
-MYSQL_SOCKET_PATH=${MYSQL_SOCKET_PATH:-"/var/lib/mysql/mysql.sock"}
-wsrep_configs="$wsrep_configs "\
-"--with-wsrep "\
-"--with-comment=wsrep_1.0-beta "\
-"--with-innodb-disallow-writes "\
-"--with-unix-socket-path=$MYSQL_SOCKET_PATH"
-
-wsrep_cflags="$wsrep_cflags -DWSREP_PROC_INFO -DMYSQL_MAX_VARIABLE_VALUE_LEN=2048 -DWITH_WSREP"
-if test -n "$MYSQL_REV"; then wsrep_cflags="$wsrep_cflags -DMYSQL_REV=$MYSQL_REV"; fi
-if test -n "$WSREP_REV"; then wsrep_cflags="$wsrep_cflags -DWSREP_REV=$WSREP_REV"; fi
-
 # gcov
 
 # The  -fprofile-arcs and -ftest-coverage options cause GCC to instrument the

@@ -3,7 +3,7 @@
 path=`dirname $0`
 . "$path/SETUP.sh"
 
-extra_flags="$amd64_cflags $fast_cflags $wsrep_cflags -g"
-extra_configs="$amd64_configs $wsrep_configs"
+extra_flags="$amd64_cflags $fast_cflags -g"
+extra_configs="$amd64_configs --with-wsrep"
 
 . "$path/FINISH.sh"
