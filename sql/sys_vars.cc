@@ -3259,19 +3259,19 @@ static Sys_var_ulong Sys_wsrep_retry_autocommit(
       "wsrep_retry_autocommit", "Max number of times to retry "
       "a failed autocommit statement",
        GLOBAL_VAR(wsrep_retry_autocommit), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(0, 10000), DEFAULT(0), BLOCK_SIZE(1));
+       VALID_RANGE(0, 10000), DEFAULT(1), BLOCK_SIZE(1));
 
 static Sys_var_mybool Sys_wsrep_auto_increment_control(
        "wsrep_auto_increment_control", "To automatically control the "
        "assignment of autoincrement variables",
        GLOBAL_VAR(wsrep_auto_increment_control), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       CMD_LINE(OPT_ARG), DEFAULT(TRUE));
 
 static Sys_var_mybool Sys_wsrep_drupal_282555_workaround(
        "wsrep_drupal_282555_workaround", "To use a workaround for"
        "bad autoincrement value", 
        GLOBAL_VAR(wsrep_drupal_282555_workaround), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       CMD_LINE(OPT_ARG), DEFAULT(TRUE));
 
 static Sys_var_charptr sys_wsrep_sst_method(
        "wsrep_sst_method", "Snapshot transfer method",

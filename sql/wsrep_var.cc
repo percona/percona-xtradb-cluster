@@ -327,7 +327,7 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 
   if (!(thd->security_ctx->master_access & SUPER_ACL)) {
     my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-    return false;
+    return 1    ;
   }
 
   if (!(res = var->value->val_str(&str))) goto err;
@@ -336,13 +336,13 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 
   if (!cluster_address_str) goto err;
 
-  if (!wsrep_cluster_address_verify(cluster_address_str)) return true;
+  if (!wsrep_cluster_address_verify(cluster_address_str)) return 0;
 
  err:
 
   my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
              cluster_address_str ? cluster_address_str : "NULL");
-  return false;
+  return 1    ;
 }
 
 bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
