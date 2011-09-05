@@ -3332,7 +3332,7 @@ static Sys_var_charptr Sys_wsrep_notify_cmd(
 static Sys_var_mybool Sys_wsrep_certify_nonPK(
        "wsrep_certify_nonPK", "To certify tables with no primary key",
        GLOBAL_VAR(wsrep_certify_nonPK), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       CMD_LINE(OPT_ARG), DEFAULT(TRUE));
 
 static Sys_var_mybool Sys_wsrep_causal_reads(
        "wsrep_consistent_reads", "Enable consistent (causal) reads",
