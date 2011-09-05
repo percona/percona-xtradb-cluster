@@ -68,11 +68,17 @@ then
 
     sync
 
-    rsync -rlpgoDqI $WHOLE_FILE_OPT --inplace --delete --exclude '*.err' \
-          --exclude '*.pid' --exclude '*.sock' --exclude '*.conf' \
-          --exclude 'core' --exclude 'galera.*' --exclude 'grastate.txt' \
-          --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index' \
-          "$DATA/" rsync://$ADDR
+    # Old filter - include everything except selected
+    # FILTER=(--exclude '*.err' --exclude '*.pid' --exclude '*.sock' \
+    #         --exclude '*.conf' --exclude core --exclude 'galera.*' \
+    #         --exclude grastate.txt --exclude '*.pem' \
+    #         --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index')
+
+    # New filter - exclude everything except dirs (schemas) and innodb files
+    FILTER=(-f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
+
+    rsync --archive --no-times --ignore-times --inplace --delete --quiet \
+          $WHOLE_FILE_OPT "${FILTER[@]}" "$DATA" rsync://$ADDR
 
     echo "$STATE" > "$MAGIC_FILE"
     rsync -aqc "$MAGIC_FILE" rsync://$ADDR
