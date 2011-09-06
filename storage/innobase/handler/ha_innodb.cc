@@ -5320,8 +5320,14 @@ ha_innobase::write_row(
 	if ((sql_command == SQLCOM_ALTER_TABLE
 	     || sql_command == SQLCOM_OPTIMIZE
 	     || sql_command == SQLCOM_CREATE_INDEX
+#ifdef WITH_WSREP
+	     || sql_command == SQLCOM_LOAD
+#endif /* WITH_WSREP */
 	     || sql_command == SQLCOM_DROP_INDEX)
 	    && num_write_row >= 10000) {
+#ifdef WITH_WSREP
+		WSREP_DEBUG("forced commit: %s", wsrep_thd_query(user_thd));
+#endif /* WITH_WSREP */
 		/* ALTER TABLE is COMMITted at every 10000 copied rows.
 		The IX table lock for the original table has to be re-issued.
 		As this method will be called on a temporary table where the
