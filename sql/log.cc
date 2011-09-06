@@ -513,7 +513,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
     return ER_ERROR_ON_WRITE;
   uint length= my_b_bytes_in_cache(cache);
-  uint total_length = 0;
+  long long total_length = 0;
   uchar *buf_ptr = NULL;
   
   do
@@ -524,7 +524,8 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
      */
     if (total_length > wsrep_max_ws_size)
     {
-      sql_print_warning("WSREP: transaction size exceeded: %d", total_length);
+      sql_print_warning("WSREP: transaction size limit (%lld) exceeded: %lld",
+                        wsrep_max_ws_size, total_length);
       if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
       {
         sql_print_warning("WSREP: failed to initialize io-cache");

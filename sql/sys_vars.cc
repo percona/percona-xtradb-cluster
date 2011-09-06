@@ -3317,12 +3317,12 @@ static Sys_var_charptr Sys_wsrep_start_position (
 static Sys_var_ulonglong Sys_wsrep_max_ws_size (
        "wsrep_max_ws_size", "Max write set size (bytes)",
        GLOBAL_VAR(wsrep_max_ws_size), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1024, 4293918720), DEFAULT(1073741824), BLOCK_SIZE(1));
+       VALID_RANGE(1024, 4000000000), DEFAULT(1073741824), BLOCK_SIZE(1));
 
 static Sys_var_ulong Sys_wsrep_max_ws_rows (
        "wsrep_max_ws_rows", "Max number of rows in write set",
        GLOBAL_VAR(wsrep_max_ws_rows), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1, 131072), DEFAULT(131072), BLOCK_SIZE(1));
+       VALID_RANGE(1, 1048576), DEFAULT(131072), BLOCK_SIZE(1));
 
 static Sys_var_charptr Sys_wsrep_notify_cmd(
        "wsrep_notify_cmd", "",
