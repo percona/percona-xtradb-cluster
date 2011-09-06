@@ -3330,12 +3330,12 @@ static Sys_var_charptr Sys_wsrep_notify_cmd(
        IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
 static Sys_var_mybool Sys_wsrep_certify_nonPK(
-       "wsrep_certify_nonPK", "To certify tables with no primary key",
+       "wsrep_certify_nonPK", "Certify tables with no primary key",
        GLOBAL_VAR(wsrep_certify_nonPK), 
        CMD_LINE(OPT_ARG), DEFAULT(TRUE));
 
 static Sys_var_mybool Sys_wsrep_causal_reads(
-       "wsrep_consistent_reads", "Enable consistent (causal) reads",
+       "wsrep_causal_reads", "Enable \"strictly synchronous\" semantics for read operations",
        SESSION_VAR(wsrep_causal_reads), 
        CMD_LINE(OPT_ARG), DEFAULT(FALSE)); 
        //       ON_UPDATE(wsrep_causal_reads_update));

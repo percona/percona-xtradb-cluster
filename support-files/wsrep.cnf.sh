@@ -97,6 +97,9 @@ wsrep_auto_increment_control=1
 # retry autoinc insert, which failed for duplicate key error
 wsrep_drupal_282555_workaround=1
 
+# enable "strictly synchronous" semantics for read operations
+wsrep_causal_reads=0
+
 # Command to call when node status or cluster membership changes.
 # Will be passed all or some of the following options:
 # --status  - new status of this node
