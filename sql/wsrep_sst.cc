@@ -626,6 +626,12 @@ static void sst_disallow_writes (THD* thd, bool yes)
   thd->set_query(query_str, strlen(query_str));
 
   Parser_state ps;
+  if (ps.init(thd, thd->query(), thd->query_length()))
+  {
+    WSREP_ERROR("SST disallow writes failed");
+    return;
+  }
+
   mysql_parse(thd, thd->query(), thd->query_length(), &ps);
   if (thd->is_error())
   {
