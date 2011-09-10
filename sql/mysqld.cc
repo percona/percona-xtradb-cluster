@@ -5748,6 +5748,9 @@ void handle_connections_sockets()
 
   DBUG_ENTER("handle_connections_sockets");
 
+  (void) ip_flags;
+  (void) socket_flags;
+
 #ifndef HAVE_POLL
   FD_ZERO(&clientFDs);
 #endif
@@ -8283,6 +8286,7 @@ static int fix_paths(void)
   {
     if (*opt_secure_file_priv == 0)
     {
+      my_free(opt_secure_file_priv);
       opt_secure_file_priv= 0;
     }
     else
