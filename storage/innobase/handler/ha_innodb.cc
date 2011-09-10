@@ -198,6 +198,7 @@ static my_bool	innobase_locks_unsafe_for_binlog	= FALSE;
 static my_bool	innobase_rollback_on_timeout		= FALSE;
 static my_bool	innobase_create_status_file		= FALSE;
 static my_bool	innobase_stats_on_metadata		= TRUE;
+static my_bool	innobase_large_prefix			= FALSE;
 
 
 static char*	internal_innobase_data_file_path	= NULL;
@@ -950,7 +951,7 @@ int
 convert_error_code_to_mysql(
 /*========================*/
 	int	error,	/*!< in: InnoDB error code */
-	ulint	flags,	/*!< in: InnoDB table flags, or 0 */
+	ulint	flags,  /*!< in: InnoDB table flags, or 0 */
 	THD*	thd)	/*!< in: user thread handle or NULL */
 {
 	switch (error) {
@@ -1053,6 +1054,11 @@ convert_error_code_to_mysql(
 			 page_get_free_space_of_empty(flags
 						      & DICT_TF_COMPACT) / 2);
 		return(HA_ERR_TO_BIG_ROW);
+
+	case DB_TOO_BIG_INDEX_COL:
+		my_error(ER_INDEX_COLUMN_TOO_LONG, MYF(0),
+			 DICT_MAX_FIELD_LEN_BY_FORMAT_FLAG(flags));
+		return(HA_ERR_INDEX_COL_TOO_LONG);
 
 	case DB_NO_SAVEPOINT:
 		return(HA_ERR_NO_SAVEPOINT);
@@ -2673,8 +2679,10 @@ innobase_alter_table_flags(
 	uint	flags)
 {
 	return(HA_INPLACE_ADD_INDEX_NO_READ_WRITE
+		| HA_INPLACE_ADD_INDEX_NO_WRITE
 		| HA_INPLACE_DROP_INDEX_NO_READ_WRITE
 		| HA_INPLACE_ADD_UNIQUE_INDEX_NO_READ_WRITE
+		| HA_INPLACE_ADD_UNIQUE_INDEX_NO_WRITE
 		| HA_INPLACE_DROP_UNIQUE_INDEX_NO_READ_WRITE
 		| HA_INPLACE_ADD_PK_INDEX_NO_READ_WRITE);
 }
@@ -4024,7 +4032,11 @@ UNIV_INTERN
 uint
 ha_innobase::max_supported_key_part_length() const
 {
-	return(DICT_MAX_INDEX_COL_LEN - 1);
+	/* A table format specific index column length check will be performed
+	at ha_innobase::add_index() and row_create_index_for_mysql() */
+	return(innobase_large_prefix
+		? REC_VERSION_56_MAX_INDEX_COL_LEN
+		: REC_ANTELOPE_MAX_INDEX_COL_LEN - 1);
 }
 
 /******************************************************************//**
@@ -4231,8 +4243,8 @@ wsrep_innobase_mysql_sort(
 	case MYSQL_TYPE_LONG_BLOB:
 	case MYSQL_TYPE_VARCHAR:
 	{
-		uchar tmp_str[DICT_MAX_INDEX_COL_LEN];
-		uint tmp_length = DICT_MAX_INDEX_COL_LEN;
+		uchar tmp_str[REC_VERSION_56_MAX_INDEX_COL_LEN];
+		uint tmp_length = REC_VERSION_56_MAX_INDEX_COL_LEN;
 
 		/* Use the charset number to pick the right charset struct for
 		the comparison. Since the MySQL function get_charset may be
@@ -4442,7 +4454,7 @@ wsrep_store_key_val_for_row(
 /*===============================*/
 	TABLE*		table,
 	uint		keynr,	/*!< in: key number */
-	uchar*		buff,	/*!< in/out: buffer for the key value (in MySQL
+	char*		buff,	/*!< in/out: buffer for the key value (in MySQL
 				format) */
 	uint		buff_len,/*!< in: buffer length */
 	const uchar*	record)/*!< in: row in MySQL format */
@@ -4450,7 +4462,7 @@ wsrep_store_key_val_for_row(
 	KEY*		key_info	= table->key_info + keynr;
 	KEY_PART_INFO*	key_part	= key_info->key_part;
 	KEY_PART_INFO*	end		= key_part + key_info->key_parts;
-	uchar*		buff_start	= buff;
+	char*		buff_start	= buff;
 	enum_field_types mysql_type;
 	Field*		field;
 	ibool		is_null;
@@ -4460,7 +4472,7 @@ wsrep_store_key_val_for_row(
 	bzero(buff, buff_len);
 
 	for (; key_part != end; key_part++) {
-		uchar sorted[DICT_MAX_INDEX_COL_LEN] = {'\0'};
+		uchar sorted[REC_VERSION_56_MAX_INDEX_COL_LEN] = {'\0'};
 		is_null = FALSE;
 
 		if (key_part->null_bit) {
@@ -4665,15 +4677,14 @@ wsrep_store_key_val_for_row(
 			}
 			buff += true_len;
 
-			/* Pad the unused space with spaces. Note that no
-			padding is ever needed for UCS-2 because in MySQL,
-			all UCS2 characters are 2 bytes, as MySQL does not
-			support surrogate pairs, which are needed to represent
-			characters in the range U+10000 to U+10FFFF. */
+			/* Pad the unused space with spaces. */
 
 			if (true_len < key_len) {
-				ulint pad_len = key_len - true_len;
-				memset(buff, ' ', pad_len);
+				ulint	pad_len = key_len - true_len;
+				ut_a(!(pad_len % cs->mbminlen));
+
+				cs->cset->fill(cs, buff, pad_len,
+					       0x20 /* space */);
 				buff += pad_len;
 			}
 		}
@@ -6715,7 +6726,7 @@ wsrep_append_key(
 	trx_t 		*trx,
 	TABLE_SHARE 	*table_share,
 	TABLE 		*table,
-	const uchar*	key,
+	const char*	key,
 	uint16_t        key_len,
 	wsrep_action_t 	action
 )
@@ -6734,7 +6745,7 @@ wsrep_append_key(
 	if (!wsrep_prepare_key_for_innodb(
 			(const uchar*)table_share->table_cache_key.str,
 			table_share->table_cache_key.length,
-			key, key_len,
+			(const uchar*)key, key_len,
 			wkey,
 			&wkey_len)) {
 		WSREP_WARN("key prepare failed for: %s", 
@@ -6773,12 +6784,12 @@ ha_innobase::wsrep_append_keys(
 		uchar digest[16];
 		MY_MD5_HASH(digest, (uchar *)record, table->s->reclength);
 		int rcode = wsrep_append_key(thd, trx, table_share, table, 
-				 (const uchar*) digest, 16, action);
+				 (const char*) digest, 16, action);
 		if (rcode) DBUG_RETURN(rcode);
 	} else if (wsrep_protocol_version == 0) {
 		uint	len;
-		uchar 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
-		uchar 	*key 		= &keyval[0];
+		char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
+		char 	*key 		= &keyval[0];
 		KEY	*key_info	= table->key_info;
 
 		len = wsrep_store_key_val_for_row(
@@ -6792,8 +6803,8 @@ ha_innobase::wsrep_append_keys(
 		uint i;
 		for (i=0; i<table->s->keys; ++i) {
 			uint	len;
-			uchar 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
-			uchar 	*key 		= &keyval[1];
+			char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
+			char 	*key 		= &keyval[1];
 			KEY	*key_info	= table->key_info + i;
 
 			keyval[0] = (char)i;
@@ -7651,8 +7662,8 @@ ha_innobase::create(
 
 		if (i != (uint) primary_key_no) {
 
-			if ((error = create_index(trx, form, flags, norm_name,
-						  i))) {
+			if ((error = create_index(trx, form, flags,
+						  norm_name, i))) {
 				goto cleanup;
 			}
 		}
@@ -11942,6 +11953,11 @@ static MYSQL_SYSVAR_STR(flush_method, innobase_file_flush_method,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "With which method to flush data.", NULL, NULL, NULL);
 
+static MYSQL_SYSVAR_BOOL(large_prefix, innobase_large_prefix,
+  PLUGIN_VAR_NOCMDARG,
+  "Support large index prefix length of REC_VERSION_56_MAX_INDEX_COL_LEN (3072) bytes.",
+  NULL, NULL, FALSE);
+
 static MYSQL_SYSVAR_BOOL(locks_unsafe_for_binlog, innobase_locks_unsafe_for_binlog,
   PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
   "Force InnoDB to not use next-key locking, to use only row-level locking.",
@@ -12230,6 +12246,7 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(flush_log_at_trx_commit),
   MYSQL_SYSVAR(flush_method),
   MYSQL_SYSVAR(force_recovery),
+  MYSQL_SYSVAR(large_prefix),
   MYSQL_SYSVAR(locks_unsafe_for_binlog),
   MYSQL_SYSVAR(lock_wait_timeout),
 #ifdef UNIV_LOG_ARCHIVE
