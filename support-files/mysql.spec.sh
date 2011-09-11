@@ -995,7 +995,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc release/Docs/INFO_BIN*
 %doc release/support-files/my-*.cnf
 %if %{defined with_wsrep}
-%doc release/Docs/README-wsrep
+%doc %{src_dir}/Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
 %endif
 
