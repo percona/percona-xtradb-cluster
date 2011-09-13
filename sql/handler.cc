@@ -1182,7 +1182,12 @@ int ha_commit_trans(THD *thd, bool all)
       mdl_request.init(MDL_key::COMMIT, "", "", MDL_INTENTION_EXCLUSIVE,
                        MDL_EXPLICIT);
 
+#ifdef WITH_WSREP
+      if (!thd->variables.wsrep_on && !thd->wsrep_applier && 
+	  thd->mdl_context.acquire_lock(&mdl_request,
+#else
       if (thd->mdl_context.acquire_lock(&mdl_request,
+#endif /* WITH_WSREP */
                                         thd->variables.lock_wait_timeout))
       {
         ha_rollback_trans(thd, all);

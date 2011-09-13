@@ -12205,7 +12205,7 @@ innobase_disallow_writes_update(
 {
 	*(my_bool*)var_ptr = *(my_bool*)save;
 	ut_a(srv_allow_writes_event);
-	if (*(ibool*)var_ptr)
+	if (*(my_bool*)var_ptr)
 		os_event_reset(srv_allow_writes_event);
 	else
 		os_event_set(srv_allow_writes_event);

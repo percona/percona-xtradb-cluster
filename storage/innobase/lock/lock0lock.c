@@ -4098,7 +4098,7 @@ lock_table_other_has_incompatible(
 				} else {
                                   if (bf_this && bf_other)
 					wsrep_innobase_kill_one_trx(
-						trx, lock->trx, TRUE);
+						(trx_t *)trx, lock->trx, TRUE);
 					return(lock);
 				}
 			} else {
@@ -4161,7 +4161,8 @@ lock_table(
 	other transactions have in the table lock queue. */
 
 #ifdef WITH_WSREP
-	if ((c_lock = lock_table_other_has_incompatible(trx, LOCK_WAIT, table, mode))) {
+	if ((c_lock = (lock_t *)lock_table_other_has_incompatible(
+					trx, LOCK_WAIT, table, mode))) {
 #else
 	if (lock_table_other_has_incompatible(trx, LOCK_WAIT, table, mode)) {
 #endif

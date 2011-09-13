@@ -709,30 +709,55 @@ void wsrep_to_isolation_end(THD *thd) {
 bool
 wsrep_lock_grant_exception(enum_mdl_type type_arg,
 			   MDL_context *requestor_ctx,
-			   MDL_ticket *ticket) {
-  
-  if (requestor_ctx->get_thd()->wsrep_exec_mode == TOTAL_ORDER ||
-      requestor_ctx->get_thd()->wsrep_exec_mode == REPL_RECV)
+			   MDL_ticket *ticket
+) {
+  THD *request_thd  =  requestor_ctx->get_thd();
+  THD *granted_thd  = ticket->get_ctx()->get_thd();
+  bool retval = FALSE;
+
+  if (request_thd->wsrep_exec_mode == TOTAL_ORDER ||
+      request_thd->wsrep_exec_mode == REPL_RECV)
   {
-    THD *thd = ticket->get_ctx()->get_thd();
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    if (thd->wsrep_query_state == QUERY_COMMITTING) {
+    mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
+    if (granted_thd->wsrep_query_state == QUERY_COMMITTING) {
       WSREP_DEBUG(
-        "mdl granted for TO isolation, BF: (%lu %d %d) thd: (%lu %d)",
-	requestor_ctx->get_thd()->thread_id, type_arg,
-	requestor_ctx->get_thd()->wsrep_exec_mode, 
-	thd->thread_id, thd->wsrep_exec_mode);
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      return TRUE;
+        "mdl granted over commiting thd, BF: (%lu %d %d %lu) thd: (%lu %d %lu)",
+	request_thd->thread_id, request_thd->wsrep_exec_mode,
+	request_thd->wsrep_query_state, request_thd->wsrep_trx_seqno, 
+	granted_thd->thread_id, granted_thd->wsrep_exec_mode,
+	granted_thd->wsrep_trx_seqno);
+      retval =  TRUE;
+
+    } else if (granted_thd->lex->sql_command == SQLCOM_FLUSH &&
+	       (granted_thd->wsrep_trx_seqno >= request_thd->wsrep_trx_seqno ||
+		granted_thd->wsrep_trx_seqno == 0)) {
+      WSREP_DEBUG(
+        "mdl granted over FLUSHing thd, BF: (%lu %d %d %lu) thd: (%lu %d %lu)",
+	request_thd->thread_id, request_thd->wsrep_exec_mode,
+	request_thd->wsrep_query_state, request_thd->wsrep_trx_seqno, 
+	granted_thd->thread_id, granted_thd->wsrep_exec_mode,
+	granted_thd->wsrep_trx_seqno);
+      retval = TRUE;
+
     } else {
-      WSREP_DEBUG("mdl conflict, (%lu %d) set to MUST ABORT, BF:(%lu %d %d)",
-		  thd->thread_id, thd->wsrep_exec_mode,
-		  requestor_ctx->get_thd()->thread_id, type_arg,
-		  requestor_ctx->get_thd()->wsrep_exec_mode);
-      thd->wsrep_conflict_state = MUST_ABORT;
+      WSREP_DEBUG("mdl conflict, (%lu %d %d) set to MUST ABORT, BF:(%lu %d %d)",
+		  granted_thd->thread_id, granted_thd->wsrep_exec_mode, 
+		  granted_thd->wsrep_query_state,
+		  request_thd->thread_id, type_arg,
+		  request_thd->wsrep_exec_mode);
+
+      WSREP_DEBUG(
+        "mdl conflict, BF: (%lu %d %d %lu) thd: (%lu %d %d %lu)",
+	request_thd->thread_id, request_thd->wsrep_exec_mode,
+	request_thd->wsrep_query_state, request_thd->wsrep_trx_seqno, 
+	granted_thd->thread_id, granted_thd->wsrep_exec_mode,
+	granted_thd->wsrep_query_state,  granted_thd->wsrep_trx_seqno);
+
+      granted_thd->wsrep_conflict_state = MUST_ABORT;
+      retval = FALSE;
     }
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
 
   }
-  return FALSE;
+  return retval;
 }

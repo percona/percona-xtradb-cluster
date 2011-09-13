@@ -1022,14 +1022,14 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
   {
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
     m_mdl_blocks_commits_lock= NULL;
+#ifdef WITH_WSREP
+    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    wsrep->resume(wsrep);
+#endif /* WITH_WSREP */
   }
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
   m_mdl_global_shared_lock= NULL;
   m_state= GRL_NONE;
-#ifdef WITH_WSREP
-  wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
-  wsrep->resume(wsrep);
-#endif /* WITH_WSREP */
  
   DBUG_VOID_RETURN;
 }
@@ -1058,9 +1058,38 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     If we didn't succeed lock_global_read_lock(), or if we already suceeded
     make_global_read_lock_block_commit(), do nothing.
   */
+
+#ifdef WITH_WSREP
+  if (m_mdl_blocks_commits_lock)
+  {
+    WSREP_DEBUG("GRL was in block commit mode when entering "
+		"make_global_read_lock_block_commit");
+    thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
+    m_mdl_blocks_commits_lock= NULL;
+    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    wsrep->resume(wsrep);
+    m_state= GRL_ACQUIRED;
+  }
+#endif /* WITH_WSREP */
+
   if (m_state != GRL_ACQUIRED)
     DBUG_RETURN(0);
 
+#ifdef WITH_WSREP
+  long long ret = wsrep->pause(wsrep);
+  if (ret >= 0)
+  {
+    wsrep_locked_seqno= ret;
+  }
+  else if (ret != -ENOSYS) /* -ENOSYS - no provider */
+  {
+    WSREP_ERROR("Failed to pause provider: %lld (%s)", -ret, strerror(-ret));
+    thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
+    m_mdl_blocks_commits_lock= NULL;
+    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
   mdl_request.init(MDL_key::COMMIT, "", "", MDL_SHARED, MDL_EXPLICIT);
 
   if (thd->mdl_context.acquire_lock(&mdl_request,
@@ -1069,26 +1098,6 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
 
   m_mdl_blocks_commits_lock= mdl_request.ticket;
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
-#ifdef WITH_WSREP
-  int error = 0;
-  // allow wsrep appliers to continue committing so that we can lock provider
-  thd->global_read_lock.unlock_global_read_lock(thd);
-  long long ret = wsrep->pause(wsrep);
-  thd->global_read_lock.lock_global_read_lock(thd);
-  if (ret >= 0)
-  {
-    wsrep_locked_seqno= ret;
-  }
-  else if (ret != -ENOSYS) /* -ENOSYS - no provider */
-  {
-    WSREP_ERROR("Failed to pause provider: %lld (%s)", -ret, strerror(-ret));
-    error= 1;
-  }
-  if (error)
-  {
-    //global_read_lock_blocks_commit--;
-  }
-#endif /* WITH_WSREP */
 
   DBUG_RETURN(FALSE);
 }
