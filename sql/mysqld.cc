@@ -359,10 +359,6 @@ static mysql_cond_t COND_thread_cache, COND_flush_thread_cache;
 
 #ifdef WITH_WSREP
 ulong my_bind_addr;
-char* opt_wsrep_provider;
-char* opt_wsrep_cluster_address;
-char* opt_wsrep_start_pos;
-char* opt_wsrep_sst_auth;
 #endif
 bool opt_bin_log, opt_ignore_builtin_innodb= 0;
 my_bool opt_log, opt_slow_log;
@@ -6702,13 +6698,25 @@ struct my_option my_long_options[]=
    &table_cache_size, &table_cache_size, 0, GET_ULONG,
    REQUIRED_ARG, TABLE_OPEN_CACHE_DEFAULT, 1, 512*1024L, 0, 1, 0},
 #ifdef WITH_WSREP
+  {"wsrep_provider", OPT_WSREP_PROVIDER,
+   "wsrep provider library to load.", 
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"wsrep_provider_options", OPT_WSREP_PROVIDER_OPTIONS,
+   "a string with options for specific wsrep provider.", 
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0,0,0,0},
+  {"wsrep_cluster_address", OPT_WSREP_CLUSTER_ADDRESS,
+   "The URL-like address at which connect to cluster. Example: 'gcomm://127.0.0.1:4567'. Depends on wsrep provider.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
   {"wsrep_sst_auth", OPT_WSREP_SST_AUTH,
    "Authentication required for SST. SST mode-dependent. "
    "For mysqldump mode it is 'root:<root password>'. "
    "Should be the same on all nodes",
-   (uchar**) &opt_wsrep_sst_auth,
-   (uchar**) &opt_wsrep_sst_auth, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-#endif
+   //   (uchar**) &opt_wsrep_sst_auth,
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"wsrep_start_position", OPT_WSREP_START_POSITION,
+   "Start at this replication position. Format: <history UUID(hex)>:<sequence number>. Unset option means no previous state on this node. Setting this option from client assumes that state with that position has just been installed on the node.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+#endif /* WITH_WSREP */
   {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
 
@@ -7809,16 +7817,19 @@ mysqld_get_one_option(int optid,
     break;
 #ifdef WITH_WSREP
   case OPT_WSREP_PROVIDER:
-    wsrep_provider_init (opt_wsrep_provider);
+    wsrep_provider_init (argument);
+    break;
+  case OPT_WSREP_PROVIDER_OPTIONS:
+    wsrep_provider_options_init (argument);
     break;
   case OPT_WSREP_CLUSTER_ADDRESS:
-    wsrep_cluster_address_init (opt_wsrep_cluster_address);
+    wsrep_cluster_address_init (argument);
     break;
   case OPT_WSREP_START_POSITION:
-    wsrep_start_position_init (opt_wsrep_start_pos);
+    wsrep_start_position_init (argument);
     break;
   case OPT_WSREP_SST_AUTH:
-    wsrep_sst_auth_init (opt_wsrep_sst_auth);
+    wsrep_sst_auth_init (argument);
     break;
 #endif
 #if defined(ENABLED_DEBUG_SYNC)

@@ -28,8 +28,6 @@ my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
  */
 
 const char* wsrep_data_home_dir = mysql_real_data_home;
-const char* wsrep_cluster_name  = "my_wsrep_cluster";
-const char* wsrep_node_name     = glob_hostname;
 #define WSREP_NODE_INCOMING_AUTO "AUTO"
 const char* wsrep_node_incoming_address = WSREP_NODE_INCOMING_AUTO;
 const char* wsrep_dbug_option   = "";
@@ -304,7 +302,6 @@ int wsrep_init()
 
   wsrep_ready= FALSE;
   assert(wsrep_provider);
-  assert(wsrep_cluster_address);
 
   if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != WSREP_OK)
   {
@@ -353,9 +350,10 @@ int wsrep_init()
   }
 
   wsrep_args.data_dir        = mysql_real_data_home;
-  wsrep_args.node_name       = wsrep_node_name;
+  wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : ""; 
   wsrep_args.node_incoming   = wsrep_node_incoming_address;
-  wsrep_args.options         = wsrep_provider_options;
+  wsrep_args.options         = (wsrep_provider_options) ? 
+                                 wsrep_provider_options : "";
   wsrep_args.proto_ver       = wsrep_max_protocol_version;
 
   wsrep_args.state_uuid      = &local_uuid;

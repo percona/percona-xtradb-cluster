@@ -24,27 +24,18 @@
 #include <cstdio>
 #include <cstdlib>
 
+#define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
+
 // trx history position to start with
-static char  start_position[128]   = { 0, };
-const  char* wsrep_start_position = start_position;
-
-static char  provider[256]  = { 0, };
-const  char* wsrep_provider = provider;
-
-static char provider_options[8192] = {0, };
-const char* wsrep_provider_options = provider_options;
-
-static char  cluster_address[256]  = { 0, };
-const  char* wsrep_cluster_address = cluster_address;
+const  char* wsrep_start_position   = WSREP_START_POSITION_ZERO;
+const  char* wsrep_provider         = WSREP_NONE;
+const  char* wsrep_provider_options = (const char*)my_memdup("", 1, MYF(MY_WME));
+const  char* wsrep_cluster_address  = NULL;
+const  char* wsrep_cluster_name     = "my_wsrep_cluster";
+const  char* wsrep_node_name        = glob_hostname;
 
 int wsrep_init_vars()
 {
-  wsrep_start_position_default  (NULL, OPT_DEFAULT);
-  wsrep_provider_default        (NULL, OPT_DEFAULT);
-  wsrep_provider_options_default(NULL, OPT_DEFAULT);
-  wsrep_cluster_address_default (NULL, OPT_DEFAULT);
-  wsrep_sst_auth_default        (NULL, OPT_DEFAULT);
-
   return 0;
 }
 
@@ -104,11 +95,6 @@ bool wsrep_start_position_check (sys_var *self, THD* thd, set_var* var)
   String str(buff, sizeof(buff), system_charset_info), *res;
   const char*   start_str = NULL;
 
-  if (!(thd->security_ctx->master_access & SUPER_ACL)) {
-    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-    return 1;
-  }
-
   if (!(res = var->value->val_str(&str))) goto err;
 
   start_str = res->c_ptr();
@@ -130,9 +116,8 @@ void wsrep_set_local_position (const char* value)
   size_t uuid_len   = wsrep_uuid_scan (value, value_len, &local_uuid);
 
   local_seqno = strtoll (value + uuid_len + 1, NULL, 10);
-  strncpy (start_position, value, sizeof(start_position) - 1);
-  sql_print_information ("WSREP: wsrep_start_position var submitted: '%s'",
-                         wsrep_start_position);
+
+  WSREP_INFO ("wsrep_start_position var submitted: '%s'", wsrep_start_position);
 }
 
 bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
@@ -148,20 +133,16 @@ bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
   return 0;
 }
 
-void wsrep_start_position_default (THD* thd, enum_var_type var_type)
-{
-  static const char zero[] = "00000000-0000-0000-0000-000000000000:-1";
-  strncpy (start_position, zero, sizeof(zero));
-}
-
 void wsrep_start_position_init (const char* val)
 {
   if (NULL == val || wsrep_start_position_verify (val))
   {
-    sql_print_error ("WSREP: Bad initial value for wsrep_start_position: "
-                     "%s", (val ? val : ""));
+    WSREP_ERROR("Bad initial value for wsrep_start_position: %s", 
+		(val ? val : ""));
     return;
   }
+
+  wsrep_start_position = strdup(val);
 
   wsrep_set_local_position (val);
 }
@@ -195,11 +176,6 @@ bool wsrep_provider_check (sys_var *self, THD* thd, set_var* var)
   String str(buff, sizeof(buff), system_charset_info), *res;
   const char*   provider_str = NULL;
 
-  if (!(thd->security_ctx->master_access & SUPER_ACL)) {
-    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-    return 1;
-  }
-
   if (!(res = var->value->val_str(&str))) goto err;
 
   provider_str = res->c_ptr();
@@ -225,8 +201,8 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   wsrep_stop_replication(thd);
   wsrep_deinit();
 
-  char* tmp= strdup(provider); // wsrep_init() rewrites provider 
-                                         //when fails
+  char* tmp= strdup(wsrep_provider); // wsrep_init() rewrites provider 
+                                     //when fails
   if (wsrep_init())
   {
     my_error(ER_CANT_OPEN_LIBRARY, MYF(0), tmp);
@@ -235,17 +211,12 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   free(tmp);
 
   // we sure don't want to use old address with new provider
-  cluster_address[0]='\0';
+  wsrep_cluster_address_init(NULL);
+  wsrep_provider_options_init(NULL);
 
   thd->variables.wsrep_on= wsrep_on_saved;
 
   return rcode;
-}
-
-void wsrep_provider_default (THD* thd, enum_var_type var_type)
-{
-  memset(provider, '\0', sizeof(provider));
-  strncpy (provider, WSREP_NONE, sizeof(provider) - 1);
 }
 
 void wsrep_provider_init (const char* value)
@@ -256,17 +227,11 @@ void wsrep_provider_init (const char* value)
                 (value ? value : ""));
     return;
   }
-
-  memset(provider, '\0', sizeof(provider));
-  strncpy (provider, value, sizeof(provider) - 1);
+  wsrep_provider = strdup(value);
 }
 
 bool wsrep_provider_options_check(sys_var *self, THD* thd, set_var* var)
 {
-  if (!(thd->security_ctx->master_access & SUPER_ACL)) {
-    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-    return 1;
-  }
   return 0;
 }
 
@@ -281,11 +246,12 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
   else
   {
     char* opts= wsrep->options_get(wsrep);
+
     if (opts)
     {
-      strncpy(provider_options, opts, sizeof(provider_options));
-      provider_options[sizeof(provider_options) - 1]= '\0';
-      free(opts);
+      if (wsrep_provider_options) my_free((void *)wsrep_provider_options);
+      wsrep_provider_options = (char*)my_memdup(opts, strlen(opts) + 1, 
+						MYF(MY_WME));
     }
     else
     {
@@ -296,21 +262,10 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
   return false;
 }
 
-void wsrep_provider_options_default(THD* thd, enum_var_type var_type)
-{
-  memset(provider_options, '\0', sizeof(provider_options));
-}
-
 void wsrep_provider_options_init(const char* value)
 {
-  if (NULL == value)
-  {
-    sql_print_error ("WSREP: Bad initial value for wsrep_provider_options: "
-                     "%s", (value ? value : ""));
-    return;
-  }
-  memset(provider_options, '\0', sizeof(provider_options));
-  strncpy(provider_options, value, sizeof(provider_options) - 1);
+  if (wsrep_provider_options) free((void *)wsrep_provider_options);
+  wsrep_provider_options = (value) ? strdup(value) : NULL;
 }
 
 static int wsrep_cluster_address_verify (const char* cluster_address_str)
@@ -324,11 +279,6 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
   char   buff[FN_REFLEN];
   String str(buff, sizeof(buff), system_charset_info), *res;
   const char*   cluster_address_str = NULL;
-
-  if (!(thd->security_ctx->master_access & SUPER_ACL)) {
-    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-    return 1    ;
-  }
 
   if (!(res = var->value->val_str(&str))) goto err;
 
@@ -352,9 +302,6 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
 
   wsrep_stop_replication(thd);
 
-  //memset(cluster_address, '\0', sizeof(cluster_address));
-  //strncpy(cluster_address, (char *)wsrep_cluster_address, sizeof(cluster_address) - 1);
-
   if (wsrep_start_replication())
   {
     wsrep_create_rollbacker();
@@ -365,24 +312,64 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
   return false;
 }
 
-void wsrep_cluster_address_default (THD* thd, enum_var_type var_type)
-{
-  memset(cluster_address, '\0', sizeof(cluster_address));
-}
-
 void wsrep_cluster_address_init (const char* value)
 {
-  if (NULL == value || wsrep_cluster_address_verify (value))
-  {
-    sql_print_error ("WSREP: Bad initial value for wsrep_cluster_address: "
-                     "%s", (value ? value : ""));
-    return;
-  }
+  if (wsrep_cluster_address) my_free ((void*)wsrep_cluster_address);
 
-  memset(cluster_address, '\0', sizeof(cluster_address));
-  strncpy (cluster_address, value, sizeof(cluster_address) - 1);
+  wsrep_cluster_address = (value) ? strdup(value) :  NULL;
 }
 
+bool wsrep_cluster_name_check (sys_var *self, THD* thd, set_var* var)
+{
+  char   buff[FN_REFLEN];
+  String str(buff, sizeof(buff), system_charset_info), *res;
+  const char* cluster_name_str = NULL;
+
+  if (!(res = var->value->val_str(&str))) goto err;
+
+  cluster_name_str = res->c_ptr();
+
+  if (!cluster_name_str) goto err;
+
+  return 0;
+
+ err:
+
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
+             cluster_name_str ? cluster_name_str : "NULL");
+  return 1;
+}
+
+bool wsrep_cluster_name_update (sys_var *self, THD* thd, enum_var_type type)
+{
+  return 0;
+}
+
+bool wsrep_node_name_check (sys_var *self, THD* thd, set_var* var)
+{
+  char   buff[FN_REFLEN];
+  String str(buff, sizeof(buff), system_charset_info), *res;
+  const char* node_name_str = NULL;
+
+  if (!(res = var->value->val_str(&str))) goto err;
+
+  node_name_str = res->c_ptr();
+
+  if (!node_name_str) goto err;
+
+  return 0;
+
+ err:
+
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
+             node_name_str ? node_name_str : "NULL");
+  return 1;
+}
+
+bool wsrep_node_name_update (sys_var *self, THD* thd, enum_var_type type)
+{
+  return 0;
+}
 
 /*
  * Status variables stuff below

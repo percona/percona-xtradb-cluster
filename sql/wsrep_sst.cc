@@ -23,19 +23,82 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define WSREP_SST_MYSQLDUMP "mysqldump"
-#define WSREP_SST_DEFAULT WSREP_SST_MYSQLDUMP
+#define WSREP_SST_MYSQLDUMP     "mysqldump"
+#define WSREP_SST_DEFAULT       WSREP_SST_MYSQLDUMP
+#define WSREP_SST_ADDRESS_AUTO "AUTO"
+#define WSREP_SST_AUTH_MASK     "********"
+
 const char* wsrep_sst_method          = WSREP_SST_DEFAULT;
 const char* wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char* wsrep_sst_donor           = "";
+//      char* wsrep_sst_auth            = (char *)"";
+      char* wsrep_sst_auth            = NULL;
 
-static char  sst_auth[16] = { 0, };
-const  char* wsrep_sst_auth = sst_auth;
-
-// to show when wsrep_sst_auth is set
-static const char* const sst_auth_set = "********";
 // container for real auth string
-static const char* sst_auth_real = 0;
+static const char* sst_auth_real      = NULL;
+
+static const char *sst_methods[] = {
+  "mysqldump",
+  "rsync",
+  "rsync_wan",
+  "xtrabackup",
+  NULL
+};
+
+bool  wsrep_sst_method_check (sys_var *self, THD* thd, set_var* var)
+{
+    char   buff[FN_REFLEN];
+    String str(buff, sizeof(buff), system_charset_info), *res;
+    const char* c_str = NULL;
+
+    if ((res = var->value->val_str(&str))) {
+      c_str = res->c_ptr();
+      int i = 0;
+
+      while (sst_methods[i] && strcasecmp(sst_methods[i], c_str)) i++;
+      if (!sst_methods[i]) {
+        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "wsrep_sst_method", c_str ? c_str : "NULL");
+	return 1;
+      }
+    }
+    return 0;
+}
+
+bool wsrep_sst_method_update (sys_var *self, THD* thd, enum_var_type type)
+{
+    return 0;
+}
+
+static bool sst_receive_address_check (const char* str)
+{
+    if (!strncasecmp(str, "127.0.0.1", strlen("127.0.0.1")) ||
+        !strncasecmp(str, "localhost", strlen("localhost")))
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+bool  wsrep_sst_receive_address_check (sys_var *self, THD* thd, set_var* var)
+{
+    const char* c_str = var->value->str_value.c_ptr();
+
+    if (sst_receive_address_check (c_str))
+    {
+        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "wsrep_sst_receive_address", c_str ? c_str : "NULL");
+        return 1;
+    }
+
+    return 0;
+}
+
+bool wsrep_sst_receive_address_update (sys_var *self, THD* thd, 
+				       enum_var_type type)
+{
+    return 0;
+}
+
 bool wsrep_sst_auth_check (sys_var *self, THD* thd, set_var* var)
 {
     return 0;
@@ -49,11 +112,20 @@ static bool sst_auth_real_set (const char* value)
         if (sst_auth_real) free (const_cast<char*>(sst_auth_real));
         sst_auth_real = v;
 
-        memset (sst_auth, 0, sizeof(sst_auth));
-
         if (strlen(sst_auth_real))
-            strncpy (sst_auth, sst_auth_set, sizeof(sst_auth) - 1);
-
+	{
+	  if (wsrep_sst_auth)
+	  {
+	    my_free ((void*)wsrep_sst_auth);
+	    wsrep_sst_auth = (char*)my_memdup(WSREP_SST_AUTH_MASK, 
+					      strlen(WSREP_SST_AUTH_MASK) + 1, 
+					      MYF(MY_WME));
+	    //strncpy (wsrep_sst_auth, WSREP_SST_AUTH_MASK, 
+	    //     sizeof(wsrep_sst_auth) - 1);
+	  }
+	  else
+	    wsrep_sst_auth = strdup (WSREP_SST_AUTH_MASK);
+	}
         return 0;
     }
 
@@ -65,14 +137,19 @@ bool wsrep_sst_auth_update (sys_var *self, THD* thd, enum_var_type type)
     return sst_auth_real_set (wsrep_sst_auth);
 }
 
-void wsrep_sst_auth_default (THD* thd, enum_var_type var_type)
-{
-    sst_auth_real_set ("root:");
-}
-
 void wsrep_sst_auth_init (const char* value)
 {
     if (value) sst_auth_real_set (value);
+}
+
+bool  wsrep_sst_donor_check (sys_var *self, THD* thd, set_var* var)
+{
+  return 0;
+}
+
+bool wsrep_sst_donor_update (sys_var *self, THD* thd, enum_var_type type)
+{
+    return 0;
 }
 
 static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
@@ -305,7 +382,8 @@ static ssize_t sst_prepare_other (const char*  method,
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%d' 2>sst.err",
-                     method, addr_in, sst_auth_real, sst_dir, (int)getpid());
+                     method, addr_in, (sst_auth_real) ? sst_auth_real : "", 
+		     sst_dir, (int)getpid());
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -398,7 +476,6 @@ ssize_t wsrep_sst_prepare (void** msg)
       WSREP_ERROR("Could not prepare state transfer request: "
                   "failed to guess address to accept state transfer at. "
                   "wsrep_sst_receive_address must be set manually.");
-//      return -EADDRNOTAVAIL;
       unireg_abort(1);
     }
   }
@@ -407,7 +484,7 @@ ssize_t wsrep_sst_prepare (void** msg)
   if (!strcmp(wsrep_sst_method, WSREP_SST_MYSQLDUMP))
   {
     addr_len= sst_prepare_mysqldump (addr_in, &addr_out);
-    if (addr_len < 0) unireg_abort(1); // return addr_len;
+    if (addr_len < 0) unireg_abort(1);
   }
   else
   {
@@ -416,7 +493,6 @@ ssize_t wsrep_sst_prepare (void** msg)
     {
       // we already did SST at initializaiton, now engines are running
       WSREP_ERROR("'%s' SST requires server restart", wsrep_sst_method);
-//      return -ERESTART;
       unireg_abort(1);
     }
 
@@ -425,7 +501,6 @@ ssize_t wsrep_sst_prepare (void** msg)
     {
       WSREP_ERROR("Failed to prepare for '%s' SST. Unrecoverable.",
                    wsrep_sst_method);
-//      return addr_len;
       unireg_abort(1);
     }
   }
@@ -440,8 +515,7 @@ ssize_t wsrep_sst_prepare (void** msg)
     msg_ptr += method_len + 1;
     strcpy (msg_ptr, addr_out);
 
-    sql_print_information ("[DEBUG] WSREP: Prepared SST request: %s|%s",
-                               (char*)*msg, msg_ptr);
+    WSREP_INFO ("Prepared SST request: %s|%s", (char*)*msg, msg_ptr);
   }
   else {
     msg_len = -ENOMEM;
@@ -514,7 +588,7 @@ static int sst_donate_mysqldump (const char*         addr,
   host[host_len - 1] = '\0';
 
   const char* auth = sst_auth_real;
-  const char* pswd = strchr (auth, ':');
+  const char* pswd = (auth) ? strchr (auth, ':') : NULL;
   size_t user_len;
 
   if (pswd)
@@ -525,12 +599,12 @@ static int sst_donate_mysqldump (const char*         addr,
   else
   {
     pswd = "";
-    user_len = strlen (auth) + 1;
+    user_len = (auth) ? strlen (auth) + 1 : 1;
   }
 
   char user[user_len];
 
-  strncpy (user, auth, user_len - 1);
+  strncpy (user, (auth) ? auth : "", user_len - 1);
   user[user_len - 1] = '\0';
 
   int ret = sst_mysqldump_check_addr (user, pswd, host, port);

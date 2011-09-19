@@ -46,7 +46,7 @@ extern my_bool     wsrep_drupal_282555_workaround;
 extern my_bool     wsrep_incremental_data_collection;
 extern const char* wsrep_sst_method;
 extern const char* wsrep_sst_receive_address;
-extern const char* wsrep_sst_auth;
+extern       char* wsrep_sst_auth;
 extern const char* wsrep_sst_donor;
 extern const char* wsrep_start_position;
 extern long long   wsrep_max_ws_size;
@@ -71,38 +71,52 @@ extern int         wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
 
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 // MySQL variables funcs
+
+#define CHECK_ARGS   (sys_var *self, THD* thd, set_var *var)
+#define UPDATE_ARGS  (sys_var *self, THD* thd, enum_var_type type)
+#define DEFAULT_ARGS (THD* thd, enum_var_type var_type)
+#define INIT_ARGS    (const char* opt)
+
 extern int  wsrep_init_vars();
-extern bool wsrep_on_update (
-  sys_var *self, THD* thd, enum_var_type var_type);
-extern void wsrep_causal_reads_update (
-  sys_var *self, THD* thd, enum_var_type var_type);
-extern bool  wsrep_start_position_check   (
-  sys_var *self, THD* thd, set_var* var);
-extern bool wsrep_start_position_update  (
-  sys_var *self, THD* thd, enum_var_type type);
-extern void wsrep_start_position_default (THD* thd, enum_var_type var_type);
-extern void 
-wsrep_start_position_init    (const char* opt);
-extern bool wsrep_provider_check          (sys_var *self, THD* thd, set_var* var);
-extern bool wsrep_provider_update         (sys_var *self, THD* thd, enum_var_type type);
-extern void wsrep_provider_default        (THD* thd, enum_var_type var_type);
-extern void wsrep_provider_init           (const char* opt);
-extern bool wsrep_provider_options_check (sys_var *self, THD* thd, 
-					   set_var* var);
-extern bool wsrep_provider_options_update (sys_var *self, THD* thd, 
-					   enum_var_type type);
-extern void wsrep_provider_options_default (THD* thd, enum_var_type var_type);
-extern void wsrep_provider_options_init    (const char* opt);
-extern bool wsrep_cluster_address_check   (sys_var *self, THD* thd, set_var* var);
-extern bool wsrep_cluster_address_update  (sys_var *self, THD* thd, enum_var_type type);
-extern void wsrep_cluster_address_default (THD* thd, enum_var_type var_type);
-extern void wsrep_cluster_address_init    (const char* opt);
-extern bool wsrep_sst_auth_check          (sys_var *self, THD* thd, 
-					   set_var* var);
-extern bool wsrep_sst_auth_update         (sys_var *self, THD* thd, 
-					   enum_var_type type);
-extern void wsrep_sst_auth_default        (THD* thd, enum_var_type var_type);
-extern void wsrep_sst_auth_init           (const char* opt);
+
+extern bool wsrep_on_update                  UPDATE_ARGS;
+extern void wsrep_causal_reads_update        UPDATE_ARGS;
+extern bool wsrep_start_position_check       CHECK_ARGS;
+extern bool wsrep_start_position_update      UPDATE_ARGS;
+extern void wsrep_start_position_init        INIT_ARGS;
+
+extern bool wsrep_provider_check             CHECK_ARGS;
+extern bool wsrep_provider_update            UPDATE_ARGS;
+extern void wsrep_provider_init              INIT_ARGS;
+
+extern bool wsrep_provider_options_check     CHECK_ARGS;
+extern bool wsrep_provider_options_update    UPDATE_ARGS;
+extern void wsrep_provider_options_init      INIT_ARGS;
+
+extern bool wsrep_cluster_address_check      CHECK_ARGS;
+extern bool wsrep_cluster_address_update     UPDATE_ARGS;
+extern void wsrep_cluster_address_init       INIT_ARGS;
+
+extern bool wsrep_cluster_name_check         CHECK_ARGS;
+extern bool wsrep_cluster_name_update        UPDATE_ARGS;
+
+extern bool wsrep_node_name_check            CHECK_ARGS;
+extern bool wsrep_node_name_update           UPDATE_ARGS;
+
+extern bool wsrep_sst_method_check           CHECK_ARGS;
+extern bool wsrep_sst_method_update          UPDATE_ARGS;
+extern void wsrep_sst_method_init            INIT_ARGS;
+
+extern bool wsrep_sst_receive_address_check  CHECK_ARGS;
+extern bool wsrep_sst_receive_address_update UPDATE_ARGS;
+
+extern bool wsrep_sst_auth_check             CHECK_ARGS;
+extern bool wsrep_sst_auth_update            UPDATE_ARGS;
+extern void wsrep_sst_auth_init              INIT_ARGS;
+
+extern bool wsrep_sst_donor_check            CHECK_ARGS;
+extern bool wsrep_sst_donor_update           UPDATE_ARGS;
+
 
 extern bool wsrep_init_first(); // initialize wsrep before storage
                                 // engines or after
