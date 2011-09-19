@@ -629,22 +629,41 @@ static int sst_donate_mysqldump (const char*         addr,
 
 wsrep_seqno_t wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
 
+static int run_sql_command(THD *thd, const char *query)
+{
+  thd->set_query((char *)query, strlen(query));
+
+  Parser_state ps;
+  if (ps.init(thd, thd->query(), thd->query_length()))
+  {
+    WSREP_ERROR("SST query: %s failed", query);
+    return -1;
+  }
+
+  mysql_parse(thd, thd->query(), thd->query_length(), &ps);
+  if (thd->is_error())
+  {
+    int const err= thd->stmt_da->sql_errno();
+    WSREP_WARN ("error executing '%s': %d (%s)%s",
+                query, err, thd->stmt_da->message(),
+                err == ER_UNKNOWN_SYSTEM_VARIABLE ? 
+                ". Was mysqld built with --with-innodb-disallow-writes ?" : "");
+    thd->clear_error();
+    return -1;
+  }
+  return 0;
+}
+
 static int sst_flush_tables(THD* thd)
 {
   WSREP_INFO("Flushing tables for SST...");
 
+  int err;
   int not_used;
-  
-  int  err= reload_acl_and_cache(thd, REFRESH_TABLES | REFRESH_READ_LOCK,
-                                 (TABLE_LIST*) 0, &not_used);
-//  Other possible flags: REFRESH_LOG, REFRESH_THREADS, REFRESH_HOSTS,
-//                        REFRESH_FAST, REFRESH_STATUS, REFRESH_SLAVE,
-//                        REFRESH_MASTER, REFRESH_QUERY_CACHE_FREE,
-//                        REFRESH_DES_KEY_FILE
-
-  if (err)
+  if (run_sql_command(thd, "FLUSH TABLES WITH READ LOCK"))
   {
-    WSREP_ERROR("Failed to flush and lock tables: %d (%s)", err,strerror(err));
+    WSREP_ERROR("Failed to flush and lock tables");
+    err = -1;
   }
   else
   {
@@ -697,24 +716,9 @@ static void sst_disallow_writes (THD* thd, bool yes)
   snprintf (query_str, query_max, "SET GLOBAL innodb_disallow_writes=%d",
             yes ? 1 : 0);
 
-  thd->set_query(query_str, strlen(query_str));
-
-  Parser_state ps;
-  if (ps.init(thd, thd->query(), thd->query_length()))
+  if (run_sql_command(thd, query_str))
   {
-    WSREP_ERROR("SST disallow writes failed");
-    return;
-  }
-
-  mysql_parse(thd, thd->query(), thd->query_length(), &ps);
-  if (thd->is_error())
-  {
-    int const err= thd->stmt_da->sql_errno();
-    WSREP_WARN ("error executing '%s': %d (%s)%s",
-                query_str, err, thd->stmt_da->message(),
-                err == ER_UNKNOWN_SYSTEM_VARIABLE ? 
-                ". Was mysqld built with --with-innodb-disallow-writes ?" : "");
-    thd->clear_error();
+    WSREP_ERROR("Failed to disallow InnoDB writes");
   }
 }
 
