@@ -214,7 +214,8 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         make_global_read_lock_block_commit(thd) above since they could have
         modified the tables too.
       */
-      if (close_cached_tables(thd, tables, (options & REFRESH_FAST) ?
+      if (WSREP(thd) && 
+	  close_cached_tables(thd, tables, (options & REFRESH_FAST) ?
                               FALSE : TRUE, TRUE))
           result= 1;
 #endif /* WITH_WSREP */

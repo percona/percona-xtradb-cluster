@@ -86,15 +86,17 @@ static wsrep_thd_is_brute_force_fun wsrep_thd_is_brute_force= NULL;
 static wsrep_abort_thd_fun wsrep_abort_thd= NULL;
 static my_bool wsrep_debug;
 static my_bool wsrep_convert_LOCK_to_trx;
+static wsrep_on_fun wsrep_on = NULL;
 
 void wsrep_thr_lock_init(
     wsrep_thd_is_brute_force_fun bf_fun, wsrep_abort_thd_fun abort_fun,
-    my_bool debug, my_bool convert_LOCK_to_trx
+    my_bool debug, my_bool convert_LOCK_to_trx, wsrep_on_fun on_fun
 ) {
-  wsrep_thd_is_brute_force= bf_fun;
-  wsrep_abort_thd= abort_fun;
-  wsrep_debug= debug;
-  wsrep_convert_LOCK_to_trx= convert_LOCK_to_trx;;
+  wsrep_thd_is_brute_force = bf_fun;
+  wsrep_abort_thd          = abort_fun;
+  wsrep_debug              = debug;
+  wsrep_convert_LOCK_to_trx= convert_LOCK_to_trx;
+  wsrep_on                 = on_fun;
 }
 #endif
 /* The following constants are only for debug output */
@@ -572,7 +574,8 @@ wsrep_break_lock(
     THR_LOCK_DATA *data, struct st_lock_list *lock_queue1, 
     struct st_lock_list *lock_queue2, struct st_lock_list *wait_queue)
 {
-  if (wsrep_thd_is_brute_force &&
+  if (wsrep_on(data->owner->mysql_thd) &&
+      wsrep_thd_is_brute_force          &&
       wsrep_thd_is_brute_force(data->owner->mysql_thd))
   {
     THR_LOCK_DATA *holder;
@@ -916,7 +919,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
   }
   /* Can't get lock yet;  Wait for it */
 #ifdef WITH_WSREP
-  if (wsrep_lock_inserted)
+  if (wsrep_on(data->owner->mysql_thd) && wsrep_lock_inserted)
     DBUG_RETURN(wait_for_lock(wait_queue, data, 1, lock_wait_timeout));
 #endif
   DBUG_RETURN(wait_for_lock(wait_queue, data, 0, lock_wait_timeout));

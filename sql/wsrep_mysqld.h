@@ -16,7 +16,9 @@
 #ifndef WSREP_MYSQLD_H
 #define WSREP_MYSQLD_H
 
-#include <mysql.h>
+//#include "mysqld.h"
+typedef struct st_mysql_show_var SHOW_VAR;
+//#include <mysql.h>
 #include <sql_priv.h>
 #include "../wsrep/wsrep_api.h"
 
@@ -142,6 +144,15 @@ extern int  wsrep_check_opts (int argc, char* const* argv);
 
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
+
+#define WSREP_ON \
+  (global_system_variables.wsrep_on)
+
+#define WSREP(thd) \
+  (WSREP_ON && (thd && thd->variables.wsrep_on))
+
+#define WSREP_EMULATE_BINLOG(thd) \
+  (WSREP(thd) && wsrep_emulate_bin_log)
 
 // MySQL logging functions don't seem to understand long long length modifer.
 // This is a workaround. It also prefixes all messages with "WSREP"

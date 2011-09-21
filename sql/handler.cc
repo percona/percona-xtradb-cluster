@@ -1183,7 +1183,7 @@ int ha_commit_trans(THD *thd, bool all)
                        MDL_EXPLICIT);
 
 #ifdef WITH_WSREP
-      if (!thd->variables.wsrep_on && !thd->wsrep_applier && 
+      if (!WSREP(thd) &&
 	  thd->mdl_context.acquire_lock(&mdl_request,
 #else
       if (thd->mdl_context.acquire_lock(&mdl_request,
@@ -1228,7 +1228,7 @@ int ha_commit_trans(THD *thd, bool all)
         if ((err= ht->prepare(ht, thd, all)))
         {
 #ifdef WITH_WSREP
-          if (ht->db_type== DB_TYPE_WSREP)
+          if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
           {
 	    error= 1;
 	    /* avoid sending error, if we need to replay */
@@ -1287,7 +1287,7 @@ end:
     thd->transaction.cleanup(thd);
 #else
     thd->transaction.cleanup();
-#endif
+#endif /* WITH_WSREP */
   DBUG_RETURN(error);
 }
 
@@ -1330,7 +1330,8 @@ int ha_commit_one_phase(THD *thd, bool all)
 #else
   const char info[]="ha_commit_one_phase()";
 #endif /* WSREP_PROC_INFO */
-  const char* tmp_info= thd_proc_info(thd, info);
+  char* tmp_info= NULL;
+  if (WSREP(thd)) tmp_info= (char *)thd_proc_info(thd, info);
 #endif /* WITH_WSREP */
 
   if (ha_info)
@@ -1361,12 +1362,12 @@ int ha_commit_one_phase(THD *thd, bool all)
   /* Free resources and perform other cleanup even for 'empty' transactions. */
   if (is_real_trans)
 #ifdef WITH_WSREP
-    thd->transaction.cleanup(thd);
+      thd->transaction.cleanup(thd);
 #else
-    thd->transaction.cleanup();
+      thd->transaction.cleanup();
 #endif /* WITH_WSREP */
 #ifdef WITH_WSREP
-  thd_proc_info(thd, tmp_info);
+  if (WSREP(thd)) thd_proc_info(thd, tmp_info);
 #endif /* WITH_WSREP */
 
   DBUG_RETURN(error);
@@ -1443,9 +1444,9 @@ int ha_rollback_trans(THD *thd, bool all)
   /* Always cleanup. Even if nht==0. There may be savepoints. */
   if (is_real_trans)
 #ifdef WITH_WSREP
-    thd->transaction.cleanup(thd);
+      thd->transaction.cleanup(thd);
 #else
-    thd->transaction.cleanup();
+      thd->transaction.cleanup();
 #endif /* WITH_WSREP */
   if (all)
     thd->transaction_rollback_request= FALSE;
@@ -4611,7 +4612,7 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
           table->s->cached_row_logging_check &&
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
 #ifdef WITH_WSREP
-          (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+          ((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()));
 #else
           mysql_bin_log.is_open());
 #endif
@@ -4925,7 +4926,7 @@ void signal_log_not_needed(struct handlerton, char *log_file)
 #ifdef WITH_WSREP
 /**
   @details
-  This function makes the storage engine to force te victim transaction
+  This function makes the storage engine to force the victim transaction
   to abort. Currently, only innodb has this functionality, but any SE
   implementing the wsrep API should provide this service to support
   multi-master operation.
@@ -4940,6 +4941,9 @@ void signal_log_not_needed(struct handlerton, char *log_file)
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
 {
   DBUG_ENTER("ha_wsrep_abort_transaction");
+  if (!WSREP(bf_thd)) {
+    DBUG_RETURN(0);
+  }
 
   handlerton *hton= installed_htons[DB_TYPE_INNODB];
   if (hton && hton->wsrep_abort_transaction)

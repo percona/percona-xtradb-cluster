@@ -2617,7 +2617,7 @@ void plugin_thdvar_init(THD *thd)
   thd->variables.dynamic_variables_ptr= 0;
 
 #ifdef WITH_WSREP
-  if (!thd->wsrep_applier) {
+  if (!WSREP(thd) || !thd->wsrep_applier) {
 #endif
   mysql_mutex_lock(&LOCK_plugin);
   thd->variables.table_plugin=

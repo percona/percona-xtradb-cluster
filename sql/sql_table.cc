@@ -6042,7 +6042,7 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
     if (!error)
     {
 #ifdef WITH_WSREP
-      if (do_log_write) {
+      if (!WSREP(thd) || do_log_write) {
 #endif /* WITH_WSREP */
       error= write_bin_log(thd, TRUE, thd->query(), thd->query_length());
 #ifdef WITH_WSREP

@@ -872,7 +872,7 @@ int mysql_update(THD *thd,
   if ((error < 0) || thd->transaction.stmt.modified_non_trans_table)
   {
 #ifdef WITH_WSREP
-    if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
     if (mysql_bin_log.is_open())
 #endif
@@ -1993,7 +1993,7 @@ void multi_update::abort_result_set()
       either from the query's list or via a stored routine: bug#13270,23333
     */
 #ifdef WITH_WSREP
-    if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
     if (mysql_bin_log.is_open())
 #endif
@@ -2228,7 +2228,7 @@ bool multi_update::send_eof()
   if (local_error == 0 || thd->transaction.stmt.modified_non_trans_table)
   {
 #ifdef WITH_WSREP
-    if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
     if (mysql_bin_log.is_open())
 #endif

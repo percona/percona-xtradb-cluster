@@ -379,7 +379,7 @@ cleanup:
   if ((error < 0) || thd->transaction.stmt.modified_non_trans_table)
   {
 #ifdef WITH_WSREP
-    if ((wsrep_emulate_bin_log || mysql_bin_log.is_open()))
+    if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()))
 #else
     if (mysql_bin_log.is_open())
 #endif
@@ -814,7 +814,7 @@ void multi_delete::abort_result_set()
        there is only side effects; to binlog with the error
     */
 #ifdef WITH_WSREP
-    if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
     if (mysql_bin_log.is_open())
 #endif
@@ -991,7 +991,7 @@ bool multi_delete::send_eof()
   if ((local_error == 0) || thd->transaction.stmt.modified_non_trans_table)
   {
 #ifdef WITH_WSREP
-    if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
     if (mysql_bin_log.is_open())
 #endif

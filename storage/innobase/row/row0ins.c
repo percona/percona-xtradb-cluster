@@ -1063,7 +1063,7 @@ row_ins_foreign_check_on_constraint(
 					   foreign->foreign_table);
 
 #ifdef WITH_WSREP
-	{
+	if (wsrep_on(thr_get_trx(thr)->mysql_thd)) {
 		byte key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
 		ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
 		int rcode;
@@ -1730,7 +1730,8 @@ row_ins_scan_sec_index_for_duplicate(
 #ifdef WITH_WSREP
 		/* slave applier must not get duplicate error */
 		if (allow_duplicates ||
-			wsrep_thd_is_brute_force(trx->mysql_thd)) {
+		    (wsrep_on(trx->mysql_thd) &&
+		     wsrep_thd_is_brute_force(trx->mysql_thd))) {
 #else
 		if (allow_duplicates) {
 #endif
@@ -1853,7 +1854,8 @@ row_ins_duplicate_error_in_clust(
 
 #ifdef WITH_WSREP
 			if (trx->duplicates & TRX_DUP_IGNORE ||
-				(wsrep_thd_is_brute_force(trx->mysql_thd))) {
+			    (wsrep_on(trx->mysql_thd) && 
+			     wsrep_thd_is_brute_force(trx->mysql_thd))) {
 #else
 			if (trx->duplicates & TRX_DUP_IGNORE) {
 #endif
@@ -1902,7 +1904,8 @@ row_ins_duplicate_error_in_clust(
 
 #ifdef WITH_WSREP
 			if (trx->duplicates & TRX_DUP_IGNORE ||
-				(wsrep_thd_is_brute_force(trx->mysql_thd))) {
+			    (wsrep_on(trx->mysql_thd) && 
+			     wsrep_thd_is_brute_force(trx->mysql_thd))) {
 #else
 			if (trx->duplicates & TRX_DUP_IGNORE) {
 #endif

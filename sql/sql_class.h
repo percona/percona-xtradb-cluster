@@ -20,6 +20,7 @@
 /* Classes in mysql */
 #ifdef WITH_WSREP
 #include "../wsrep/wsrep_api.h"
+//#include "wsrep_mysqld.h"
   enum wsrep_exec_mode {
     LOCAL_STATE,
     REPL_RECV,
@@ -66,6 +67,9 @@
                                      THR_LOCK_INFO */
 
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 class Reprepare_observer;
 class Relay_log_info;
 
@@ -1747,7 +1751,7 @@ public:
       free_root(&mem_root,MYF(MY_KEEP_PREALLOC));
 #ifdef WITH_WSREP // Todo: convert into a plugin method
       // wsrep's post-commit. LOCAL_COMMIT designates wsrep's commit was ok
-      wsrep_cleanup_transaction(thd);
+      if (WSREP(thd)) wsrep_cleanup_transaction(thd);
 #endif  /* WITH_WSREP */
     }
     my_bool is_active()

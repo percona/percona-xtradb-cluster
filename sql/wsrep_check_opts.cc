@@ -50,14 +50,14 @@ static struct opt opts[] =
 
 enum
 {
-    WSREP_SLAVE_THREADS,
-    BIND_ADDRESS,
-    WSREP_SST_METHOD,
-    WSREP_SST_RECEIVE_ADDRESS,
-    BINLOG_FORMAT,
-    WSREP_PROVIDER,
-    LOCKS_UNSAFE_FOR_BINLOG,
-    AUTOINC_LOCK_MODE
+    OPTION_WSREP_SLAVE_THREADS,
+    OPTION_BIND_ADDRESS,
+    OPTION_WSREP_SST_METHOD,
+    OPTION_WSREP_SST_RECEIVE_ADDRESS,
+    OPTION_BINLOG_FORMAT,
+    OPTION_WSREP_PROVIDER,
+    OPTION_LOCKS_UNSAFE_FOR_BINLOG,
+    OPTION_AUTOINC_LOCK_MODE
 };
 
 
@@ -254,7 +254,7 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
        what has been specified on the command line / my.cnf */
 
     long long slave_threads;
-    err = get_long_long (opts[WSREP_SLAVE_THREADS], &slave_threads, 10);
+    err = get_long_long (opts[OPTION_WSREP_SLAVE_THREADS], &slave_threads, 10);
     if (err) return err;
 
     int rcode = 0;
@@ -263,11 +263,13 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
         /* Need to check AUTOINC_LOCK_MODE and LOCKS_UNSAFE_FOR_BINLOG */
     {
         long long autoinc_lock_mode;
-        err = get_long_long (opts[AUTOINC_LOCK_MODE], &autoinc_lock_mode, 10);
+        err = get_long_long (opts[OPTION_AUTOINC_LOCK_MODE], 
+			     &autoinc_lock_mode, 10);
         if (err) return err;
 
         bool locks_unsafe_for_binlog;
-        err = get_bool (opts[LOCKS_UNSAFE_FOR_BINLOG],&locks_unsafe_for_binlog);
+        err = get_bool (opts[OPTION_LOCKS_UNSAFE_FOR_BINLOG],
+			&locks_unsafe_for_binlog);
         if (err) return err;
 
         if (autoinc_lock_mode != 2)

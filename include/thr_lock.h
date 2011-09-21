@@ -24,9 +24,10 @@ extern "C" {
 #include <my_sys.h>
   typedef int (* wsrep_thd_is_brute_force_fun)(void *);
   typedef int (* wsrep_abort_thd_fun)(void *, void *, my_bool);
+  typedef int (* wsrep_on_fun)(void *);
   void wsrep_thr_lock_init(
     wsrep_thd_is_brute_force_fun bf_fun, wsrep_abort_thd_fun abort_fun,
-    my_bool debug, my_bool convert_LOCK_to_trx);
+    my_bool debug, my_bool convert_LOCK_to_trx, wsrep_on_fun on_fun);
 #endif
 
 #include <my_pthread.h>

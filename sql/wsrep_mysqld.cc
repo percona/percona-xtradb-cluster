@@ -326,12 +326,17 @@ int wsrep_init()
   {
     // enable normal operation in case no provider is specified
     wsrep_ready= TRUE;
+    global_system_variables.wsrep_on = 0;
   }
   else
   {
-    strncpy(provider_name,    wsrep->provider_name,    sizeof(provider_name) - 1);
-    strncpy(provider_version, wsrep->provider_version, sizeof(provider_version) - 1);
-    strncpy(provider_vendor,  wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
+    global_system_variables.wsrep_on = 1;
+    strncpy(provider_name, 
+	    wsrep->provider_name,    sizeof(provider_name) - 1);
+    strncpy(provider_version, 
+	    wsrep->provider_version, sizeof(provider_version) - 1);
+    strncpy(provider_vendor, 
+	    wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
   }
 
   struct wsrep_init_args wsrep_args;
@@ -376,13 +381,14 @@ int wsrep_init()
   return rcode;
 }
 
+extern "C" int wsrep_on(void *);
 
 void wsrep_init_startup (bool first)
 {
   if (wsrep_init()) unireg_abort(1);
 
   wsrep_thr_lock_init(wsrep_thd_is_brute_force, wsrep_abort_thd,
-                      wsrep_debug, wsrep_convert_LOCK_to_trx);
+                      wsrep_debug, wsrep_convert_LOCK_to_trx, wsrep_on);
 
   if (first) wsrep_sst_grab(); // do it so we can wait for SST below
 
@@ -709,6 +715,8 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
 			   MDL_context *requestor_ctx,
 			   MDL_ticket *ticket
 ) {
+  if (!WSREP_ON) return FALSE;
+
   THD *request_thd  =  requestor_ctx->get_thd();
   THD *granted_thd  = ticket->get_ctx()->get_thd();
   bool retval = FALSE;

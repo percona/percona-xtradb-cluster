@@ -985,7 +985,7 @@ bool mysql_insert(THD *thd,TABLE_LIST *table_list,
         was_insert_delayed)
     {
 #ifdef WITH_WSREP
-      if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+      if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
       if (mysql_bin_log.is_open())
 #endif
@@ -3036,10 +3036,11 @@ bool Delayed_insert::handle_inserts(void)
     }
   }
 #ifdef WITH_WSREP
-  thd_proc_info(&thd, "insert done");
-#else /* WITH_WSREP */
-  thd_proc_info(&thd, 0);
+  if (WSREP((&thd)))
+    thd_proc_info(&thd, "insert done");
+  else
 #endif /* WITH_WSREP */
+  thd_proc_info(&thd, 0);
   mysql_mutex_unlock(&mutex);
 
   /*
@@ -3508,7 +3509,7 @@ bool select_insert::send_eof()
     ha_autocommit_or_rollback() is issued below.
   */
 #ifdef WITH_WSREP
-  if ((wsrep_emulate_bin_log || mysql_bin_log.is_open()) &&
+  if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
       (!error || thd->transaction.stmt.modified_non_trans_table))
 #else
   if (mysql_bin_log.is_open() &&
@@ -3597,7 +3598,7 @@ void select_insert::abort_result_set() {
           thd->transaction.all.modified_non_trans_table= TRUE;
 
 #ifdef WITH_WSREP
-        if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+        if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
         if (mysql_bin_log.is_open())
 #endif
@@ -3981,7 +3982,7 @@ select_create::binlog_show_create_table(TABLE **tables, uint count)
   DBUG_ASSERT(result == 0); /* store_create_info() always return 0 */
 
 #ifdef WITH_WSREP
-  if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+  if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
   if (mysql_bin_log.is_open())
 #endif

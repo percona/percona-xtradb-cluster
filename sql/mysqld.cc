@@ -359,7 +359,7 @@ static mysql_cond_t COND_thread_cache, COND_flush_thread_cache;
 
 #ifdef WITH_WSREP
 ulong my_bind_addr;
-#endif
+#endif /* WITH_WSREP */
 bool opt_bin_log, opt_ignore_builtin_innodb= 0;
 my_bool opt_log, opt_slow_log;
 ulonglong log_output_options;
@@ -1121,7 +1121,7 @@ static void close_connections(void)
 
 #ifdef WITH_WSREP
     /* skip wsrep system threads as well */
-    if (tmp->wsrep_exec_mode==REPL_RECV || tmp->wsrep_applier)
+    if (WSREP(tmp) && (tmp->wsrep_exec_mode==REPL_RECV || tmp->wsrep_applier))
       continue;
 #endif
     tmp->killed= THD::KILL_CONNECTION;
@@ -1184,7 +1184,7 @@ static void close_connections(void)
      *       The code here makes sure mysqld will not hang during shutdown
      *       even if wsrep provider has problems in shutting down.
      */
-    if (tmp->wsrep_exec_mode==REPL_RECV)
+    if (WSREP(tmp) && tmp->wsrep_exec_mode==REPL_RECV)
     {
       sql_print_information("closing wsrep system thread");
       tmp->killed= THD::KILL_CONNECTION;
@@ -1349,12 +1349,12 @@ static void __cdecl kill_server(int sig_ptr)
   }
 #endif  
 #ifdef WITH_WSREP
-  wsrep_stop_replication(NULL);
+  if (WSREP_ON) wsrep_stop_replication(NULL);
 #endif
   
   close_connections();
 #ifdef WITH_WSREP
-  wsrep_deinit();
+  if (WSREP_ON) wsrep_deinit();
 #endif
   if (sig != MYSQL_KILL_SIGNAL &&
       sig != 0)
@@ -3367,7 +3367,7 @@ static int init_common_variables()
 #endif
 #ifdef WITH_WSREP
   /* This is a protection against mutually incompatible option values. */
-  if (wsrep_check_opts (remaining_argc, remaining_argv))
+  if (WSREP_ON && wsrep_check_opts (remaining_argc, remaining_argv))
     return 1;
 #endif /* WITH_WSREP */
   if (get_options(&remaining_argc, &remaining_argv))
@@ -5228,7 +5228,7 @@ int mysqld_main(int argc, char **argv)
   sql_print_error("Before Lock_thread_count");
 #endif
 #ifdef WITH_WSREP
-  if (wsrep_debug) sql_print_information("Before Lock_thread_count");
+  WSREP_DEBUG("Before Lock_thread_count");
 #endif
   mysql_mutex_lock(&LOCK_thread_count);
   DBUG_PRINT("quit", ("Got thread_count mutex"));

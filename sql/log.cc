@@ -1617,7 +1617,7 @@ binlog_trans_log_savepos(THD *thd, my_off_t *pos)
   binlog_cache_mngr *const cache_mngr=
     (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
 #ifdef WITH_WSREP
-  DBUG_ASSERT(wsrep_emulate_bin_log || mysql_bin_log.is_open());
+  DBUG_ASSERT((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open());
 #else
   DBUG_ASSERT(mysql_bin_log.is_open());
 #endif
@@ -1669,7 +1669,7 @@ int binlog_init(void *p)
 {
   binlog_hton= (handlerton *)p;
 #ifdef WITH_WSREP
-  binlog_hton->state= SHOW_OPTION_YES;
+  if (WSREP_ON) binlog_hton->state= SHOW_OPTION_YES;
 #else
   binlog_hton->state=opt_bin_log ? SHOW_OPTION_YES : SHOW_OPTION_NO;
 #endif
@@ -4728,15 +4728,18 @@ THD::binlog_start_trans_and_stmt()
   {
     this->binlog_set_stmt_begin();
 #ifdef WITH_WSREP
-    if (in_multi_stmt_transaction_mode())
+    if (WSREP(this))
     {
-      trans_register_ha(this, TRUE, wsrep_hton);
-      ha_data[wsrep_hton->slot].ha_info[1].set_trx_read_write();
+      if (in_multi_stmt_transaction_mode())
+      {
+	trans_register_ha(this, TRUE, wsrep_hton);
+	ha_data[wsrep_hton->slot].ha_info[1].set_trx_read_write();
+      }
+      trans_register_ha(this, FALSE, wsrep_hton);
+      ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
+      if (wsrep_emulate_bin_log)
+	DBUG_VOID_RETURN;
     }
-    trans_register_ha(this, FALSE, wsrep_hton);
-    ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
-    if (wsrep_emulate_bin_log)
-      DBUG_VOID_RETURN;
 #endif
     if (in_multi_stmt_transaction_mode())
       trans_register_ha(this, TRUE, binlog_hton);
@@ -4795,7 +4798,7 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional)
   /* Pre-conditions */
 #ifdef WITH_WSREP
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
-              (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+	      (WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open()));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif
@@ -4928,7 +4931,7 @@ MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
 {
   DBUG_ENTER("MYSQL_BIN_LOG::flush_and_set_pending_rows_event(event)");
 #ifdef WITH_WSREP
-  DBUG_ASSERT(wsrep_emulate_bin_log || mysql_bin_log.is_open());
+  DBUG_ASSERT(WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
 #else
   DBUG_ASSERT(mysql_bin_log.is_open());
 #endif
@@ -5010,7 +5013,7 @@ bool MYSQL_BIN_LOG::write(Log_event *event_info)
      could have changed since.
   */
 #ifdef WITH_WSREP
-  if (wsrep_emulate_bin_log || mysql_bin_log.is_open())
+  if ((WSREP(thd) && wsrep_emulate_bin_log) || is_open())
 #else
   if (likely(is_open()))
 #endif
@@ -5157,7 +5160,7 @@ unlock:
   }
 
 #ifdef WITH_WSREP
-  if (wsrep_incremental_data_collection &&
+  if (WSREP(thd) && wsrep_incremental_data_collection &&
       (wsrep_emulate_bin_log || mysql_bin_log.is_open()))
   {
     DBUG_ASSERT(thd->wsrep_trx_handle.trx_id != (unsigned long)-1);
@@ -5275,7 +5278,7 @@ int MYSQL_BIN_LOG::rotate_and_purge(uint flags)
   bool check_purge= false;
 #endif
 #ifdef WITH_WSREP
-  if (wsrep_to_isolation)
+  if (WSREP_ON && wsrep_to_isolation)
     {
       WSREP_DEBUG("avoiding binlog rotate due to TO isolation: %d", 
 		  wsrep_to_isolation);
@@ -6165,12 +6168,13 @@ int TC_LOG_MMAP::open(const char *opt_name)
     mysql_mutex_init(key_PAGE_lock, &pg->lock, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_PAGE_cond, &pg->cond, 0);
     pg->start=(my_xid *)(data + i*tc_log_page_size);
-#ifndef WITH_WSREP
-    pg->end=(my_xid *)(pg->start + tc_log_page_size);
+#ifdef WITH_WSREP
+    if (!WSREP_ON) 
 #endif /* WITH_WSREP */
+    pg->end=(my_xid *)(pg->start + tc_log_page_size);
     pg->size=pg->free=tc_log_page_size/sizeof(my_xid);
 #ifdef WITH_WSREP
-    pg->end=pg->start + pg->size;
+    if (WSREP_ON) pg->end=pg->start + pg->size;
 #endif /* WITH_WSREP */
   }
   pages[0].size=pages[0].free=

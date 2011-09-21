@@ -295,6 +295,9 @@ int wsrep_append_foreign_key(trx_t *trx,  const char *table_name,
 			      const char *key, uint key_len);
 void wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
 			       unsigned char* str, unsigned int str_length);
+UNIV_INTERN
+int 
+wsrep_on(void *thd_ptr);
 #endif /* WITH_WSREP */
 /**********************************************************************//**
 Get the current setting of the lower_case_table_names global parameter from

@@ -1065,7 +1065,8 @@ trx_commit_off_kernel(
 	ut_ad(UT_LIST_GET_LEN(trx->trx_locks) == 0);
 
 #ifdef WITH_WSREP
-	if (trx->was_chosen_as_deadlock_victim) {
+	if (wsrep_on(trx->mysql_thd) &&
+	    trx->was_chosen_as_deadlock_victim) {
 		trx->was_chosen_as_deadlock_victim = FALSE;
 	}
 #endif

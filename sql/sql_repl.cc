@@ -1231,7 +1231,10 @@ int stop_slave(THD* thd, Master_info* mi, bool net_report )
   }
   unlock_slave_threads(mi);
 #ifdef WITH_WSREP
-  thd_proc_info(thd, "exit stop_slave()");
+  if (WSREP(thd))
+    thd_proc_info(thd, "exit stop_slave()");
+  else
+  thd_proc_info(thd, 0);
 #else /* WITH_WSREP */
   thd_proc_info(thd, 0);
 #endif /* WITH_WSREP */
@@ -1667,7 +1670,10 @@ bool change_master(THD* thd, Master_info* mi)
 err:
   unlock_slave_threads(mi);
 #ifdef WITH_WSREP
-  thd_proc_info(thd, "exit change_master()");
+  if (WSREP(thd))
+    thd_proc_info(thd, "exit change_master()");
+  else
+  thd_proc_info(thd, 0);
 #else /* WITH_WSREP */
   thd_proc_info(thd, 0);
 #endif /* WITH_WSREP */

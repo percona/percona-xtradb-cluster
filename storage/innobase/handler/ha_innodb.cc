@@ -2701,22 +2701,23 @@ innobase_commit_low(
 #ifdef WITH_WSREP
 	THD* thd = (THD*)trx->mysql_thd;
 	const char* tmp = 0;
-	if (thd) {
+	if (wsrep_on((void*)thd)) {
 #ifdef WSREP_PROC_INFO
-	char info[64];
-	info[sizeof(info) - 1] = '\0';
-	snprintf(info, sizeof(info) - 1,
-		 "innobase_commit_low():trx_commit_for_mysql(%lld)",
-		 (long long) wsrep_thd_trx_seqno(thd));
-	tmp = thd_proc_info(thd, info);
+		char info[64];
+		info[sizeof(info) - 1] = '\0';
+		snprintf(info, sizeof(info) - 1,
+			 "innobase_commit_low():trx_commit_for_mysql(%lld)",
+			 (long long) wsrep_thd_trx_seqno(thd));
+		tmp = thd_proc_info(thd, info);
+
 #else
-	tmp = thd_proc_info(thd, "innobase_commit_low()");
+		tmp = thd_proc_info(thd, "innobase_commit_low()");
 #endif /* WSREP_PROC_INFO */
 	}
 #endif /* WITH_WSREP */
 	trx_commit_for_mysql(trx);
 #ifdef WITH_WSREP
-	if (thd) { thd_proc_info(thd, tmp); }
+	if (wsrep_on((void*)thd)) { thd_proc_info(thd, tmp); }
 #endif /* WITH_WSREP */
 }
 
@@ -2860,11 +2861,15 @@ retry:
 			mysql_mutex_unlock(&commit_cond_m);
 		}
 
-#ifndef WITH_WSREP
+#ifdef WITH_WSREP
+		if(!wsrep_on((void*)thd)) {
+#endif
 		if (trx_has_prepare_commit_mutex(trx)) {
   
 			mysql_mutex_unlock(&prepare_commit_mutex);
   		}
+#ifdef WITH_WSREP
+		}
 #endif
   
 		trx_deregister_from_2pc(trx);
@@ -5331,7 +5336,7 @@ ha_innobase::write_row(
 	     || sql_command == SQLCOM_OPTIMIZE
 	     || sql_command == SQLCOM_CREATE_INDEX
 #ifdef WITH_WSREP
-	     || sql_command == SQLCOM_LOAD
+	     || (wsrep_on(user_thd) && sql_command == SQLCOM_LOAD)
 #endif /* WITH_WSREP */
 	     || sql_command == SQLCOM_DROP_INDEX)
 	    && num_write_row >= 10000) {
@@ -5495,10 +5500,12 @@ no_commit:
 #ifdef WITH_WSREP
 			/* workaround for LP bug #355000, retrying the insert */
 			case SQLCOM_INSERT:
-				if (auto_inc_inserted &&
+				if (wsrep_on(current_thd)          &&
+				    auto_inc_inserted              &&
 				    wsrep_drupal_282555_workaround &&
 				    !thd_test_options(current_thd, 
-				     OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) {
+						      OPTION_NOT_AUTOCOMMIT | 
+						      OPTION_BEGIN)) {
 					WSREP_DEBUG(
 					    "retrying insert: %s",
 					    (*wsrep_thd_query(current_thd)) ? 
@@ -5563,7 +5570,7 @@ report_error:
 						   user_thd);
 #ifdef WITH_WSREP
 	if (!error_result && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
-	    wsrep_thd_is_wsrep_on(user_thd) && (sql_command != SQLCOM_LOAD ||
+	    wsrep_on(user_thd) && (sql_command != SQLCOM_LOAD ||
 	    thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW)) {
 
 		if (wsrep_append_keys(user_thd, WSREP_INSERT, record)) {
@@ -5841,7 +5848,7 @@ ha_innobase::update_row(
 
 #ifdef WITH_WSREP
 	if (!error && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
-            wsrep_thd_is_wsrep_on(user_thd)) {
+            wsrep_on(user_thd)) {
 
 		DBUG_PRINT("wsrep", ("update row key"));
 
@@ -5898,7 +5905,7 @@ ha_innobase::delete_row(
 
 #ifdef WITH_WSREP
 	if (!error && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
-            wsrep_thd_is_wsrep_on(user_thd)) {
+            wsrep_on(user_thd)) {
 
 		if (wsrep_append_keys(user_thd, WSREP_DELETE, record)) {
 			DBUG_PRINT("wsrep", ("delete fail"));
@@ -10872,9 +10879,11 @@ innobase_xa_prepare(
 		In this case we cannot know how many minutes or hours
 		will be between XA PREPARE and XA COMMIT, and we don't want
 		to block for undefined period of time. */
-#ifndef WITH_WSREP
-		mysql_mutex_lock(&prepare_commit_mutex);
+#ifdef WITH_WSREP
+	    if (!wsrep_on(thd))
 #endif
+
+		mysql_mutex_lock(&prepare_commit_mutex);
 		trx_owns_prepare_commit_mutex_set(trx);
 	}
 

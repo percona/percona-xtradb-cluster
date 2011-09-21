@@ -717,6 +717,10 @@ char *thd_security_context(THD *thd, char *buffer, unsigned int length,
 }
 
 #ifdef WITH_WSREP
+extern "C" int wsrep_on(void *thd)
+{
+  return (int)(WSREP(((THD*)thd)));
+}
 extern "C" bool wsrep_thd_is_wsrep_on(THD *thd)
 {
   return thd->variables.wsrep_on;
@@ -3684,7 +3688,7 @@ extern "C" int thd_non_transactional_update(const MYSQL_THD thd)
 extern "C" int thd_binlog_format(const MYSQL_THD thd)
 {
 #ifdef WITH_WSREP
-  if ((wsrep_emulate_bin_log || mysql_bin_log.is_open()) &&
+  if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
       (thd->variables.option_bits & OPTION_BIN_LOG))
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
@@ -4769,7 +4773,9 @@ int THD::binlog_write_row(TABLE* table, bool is_trans,
                           uchar const *record) 
 { 
 #ifdef WITH_WSREP
-  DBUG_ASSERT(is_current_stmt_binlog_format_row() && (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      ((WSREP(this) && wsrep_emulate_bin_log) ||
+	       mysql_bin_log.is_open()));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif
@@ -4803,7 +4809,9 @@ int THD::binlog_update_row(TABLE* table, bool is_trans,
                            const uchar *after_record)
 { 
 #ifdef WITH_WSREP
-  DBUG_ASSERT(is_current_stmt_binlog_format_row() && (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      ((WSREP(this) && wsrep_emulate_bin_log)
+	       || mysql_bin_log.is_open()));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif
@@ -4852,7 +4860,9 @@ int THD::binlog_delete_row(TABLE* table, bool is_trans,
                            uchar const *record)
 { 
 #ifdef WITH_WSREP
-  DBUG_ASSERT(is_current_stmt_binlog_format_row() && (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      ((WSREP(this) && wsrep_emulate_bin_log)
+	       || mysql_bin_log.is_open()));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif
@@ -4887,7 +4897,7 @@ int THD::binlog_remove_pending_rows_event(bool clear_maps,
   DBUG_ENTER("THD::binlog_remove_pending_rows_event");
 
 #ifdef WITH_WSREP
-  if (!(wsrep_emulate_bin_log || mysql_bin_log.is_open()))
+  if (!(WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open()))
 #else
   if (!mysql_bin_log.is_open())
 #endif
@@ -4910,7 +4920,7 @@ int THD::binlog_flush_pending_rows_event(bool stmt_end, bool is_transactional)
     flushing anything (e.g., if we have explicitly locked tables).
    */
 #ifdef WITH_WSREP
-  if (!(wsrep_emulate_bin_log || mysql_bin_log.is_open()))
+  if (!(WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open()))
 #else
   if (!mysql_bin_log.is_open())
 #endif
@@ -5034,7 +5044,8 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, char const *query_arg,
   DBUG_PRINT("enter", ("qtype: %s  query: '%s'",
                        show_query_type(qtype), query_arg));
 #ifdef WITH_WSREP
-  DBUG_ASSERT(query_arg && (wsrep_emulate_bin_log || mysql_bin_log.is_open()));
+  DBUG_ASSERT(query_arg && (WSREP_EMULATE_BINLOG(this)
+			    || mysql_bin_log.is_open()));
 #else
   DBUG_ASSERT(query_arg && mysql_bin_log.is_open());
 #endif

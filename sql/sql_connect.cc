@@ -616,11 +616,14 @@ void end_connection(THD *thd)
 {
   NET *net= &thd->net;
 #ifdef WITH_WSREP
+  if (WSREP(thd))
+  {
     wsrep_status_t rcode= wsrep->free_connection(wsrep, thd->thread_id);
     if (rcode) {
       WSREP_WARN("wsrep failed to free connection context: %lu, "
                         "code: %d", thd->thread_id, rcode);
     }
+  }
 #endif
   plugin_thdvar_cleanup(thd);
   if (thd->user_connect)
@@ -810,9 +813,12 @@ void do_handle_one_connection(THD *thd_arg)
     end_connection(thd);
    
 #ifdef WITH_WSREP
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  thd->wsrep_query_state= QUERY_EXITING;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  if (WSREP(thd))
+  {
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    thd->wsrep_query_state= QUERY_EXITING;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
 #endif
 end_thread:
 #ifdef WITH_WSREP

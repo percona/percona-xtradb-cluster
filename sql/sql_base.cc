@@ -4949,7 +4949,10 @@ restart:
 
 err:
 #ifdef WITH_WSREP
-  thd_proc_info(thd, "exit open_tables()");
+  if (WSREP(thd)) 
+    thd_proc_info(thd, "exit open_tables()");
+  else
+    thd_proc_info(thd, 0);
 #else /* WITH_WSREP */
   thd_proc_info(thd, 0);
 #endif /* WITH_WSREP */
@@ -5395,7 +5398,10 @@ end:
     close_thread_tables(thd);
   }
 #ifdef WITH_WSREP
-  thd_proc_info(thd, "End opening table");
+  if (WSREP(thd))
+    thd_proc_info(thd, "End opening table");
+  else
+  thd_proc_info(thd, 0);
 #else /* WITH_WSREP */
   thd_proc_info(thd, 0);
 #endif /* WITH_WSREP */
@@ -8773,7 +8779,7 @@ bool mysql_notify_thread_having_shared_lock(THD *thd, THD *in_use,
 #ifdef WITH_WSREP
       {
 	signalled|= mysql_lock_abort_for_thread(thd, thd_table);
-	if (thd && wsrep_thd_is_brute_force((void *)thd)) 
+	if (thd && WSREP(thd) && wsrep_thd_is_brute_force((void *)thd)) 
 	{
 	  WSREP_DEBUG("remove_table_from_cache: %llu",
 		      (unsigned long long) thd->real_id);

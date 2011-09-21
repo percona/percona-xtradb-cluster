@@ -1184,11 +1184,13 @@ srv_conc_enter_innodb(
 	}
 
 #ifdef WITH_WSREP
-	if (wsrep_thd_is_brute_force(trx->mysql_thd)) {
+	if (wsrep_on(trx->mysql_thd) && 
+	    wsrep_thd_is_brute_force(trx->mysql_thd)) {
 		srv_conc_force_enter_innodb(trx);
 		return;
 	}
-	if (wsrep_trx_is_aborting(trx->mysql_thd)) {
+	if (wsrep_on(trx->mysql_thd) && 
+	    wsrep_trx_is_aborting(trx->mysql_thd)) {
 		srv_conc_force_enter_innodb(trx);
 		return;
 	}
@@ -2376,10 +2378,10 @@ loop:
 
 				if (trx->wait_lock) {
 #ifdef WITH_WSREP
-					if (wsrep_thd_is_brute_force(
-					  (thr_get_trx(slot->thr))->mysql_thd)){
-					  if (wsrep_debug) fprintf(stderr, 
-						"WSREP: BF lock wait long\n");
+					if (wsrep_on(thr_get_trx(slot->thr)->mysql_thd) &&
+					    wsrep_thd_is_brute_force((thr_get_trx(slot->thr))->mysql_thd)) {
+						if (wsrep_debug) fprintf(stderr, 
+							"WSREP: BF lock wait long\n");
 					} else {
 #endif
 					lock_cancel_waiting_and_release(

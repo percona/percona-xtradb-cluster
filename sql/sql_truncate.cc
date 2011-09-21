@@ -519,13 +519,15 @@ bool Truncate_statement::execute(THD *thd)
     DBUG_RETURN(res);
 
 #ifdef WITH_WSREP
-  if (wsrep_to_isolation_begin(thd, first_table->db, first_table->table_name))
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, 
+					     first_table->db, 
+					     first_table->table_name))
     DBUG_RETURN(TRUE);
 #endif /* WITH_WSREP */
   if (! (res= truncate_table(thd, first_table)))
     my_ok(thd);
 #ifdef WITH_WSREP
-  wsrep_to_isolation_end(thd);
+  if (WSREP(thd)) wsrep_to_isolation_end(thd);
 #endif /* WITH_WSREP */
 
   DBUG_RETURN(res);

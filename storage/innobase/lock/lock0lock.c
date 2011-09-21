@@ -1898,7 +1898,7 @@ lock_rec_enqueue_waiting(
 
 	/* Enqueue the lock request that will wait to be granted */
 #ifdef WITH_WSREP
-	if (trx->was_chosen_as_deadlock_victim) {
+	if (wsrep_on(trx->mysql_thd) && trx->was_chosen_as_deadlock_victim) {
 		return(DB_DEADLOCK);
         }
 	lock = lock_rec_create(c_lock, type_mode | LOCK_WAIT, 
@@ -1986,8 +1986,13 @@ lock_rec_add_to_queue(
 						      block, heap_no, trx);
 #ifdef WITH_WSREP
 		/* this can potentionally assert with wsrep */
-		if (wsrep_debug && other_lock) {
-			fprintf(stderr, "WSREP: InnoDB assert ignored\n");
+		if (wsrep_on(trx->mysql_thd)) {
+			if (wsrep_debug && other_lock) {
+				fprintf(stderr, 
+					"WSREP: InnoDB assert ignored\n");
+			}
+		} else {
+			ut_a(!other_lock);
 		}
 #else
 		ut_a(!other_lock);
