@@ -6501,7 +6501,10 @@ err:
   if (fd >= 0)
     mysql_file_close(fd, MYF(0));
 #ifdef WITH_WSREP
-  thd_proc_info(thd, "exit Create_file_log_event::do_apply_event()");
+  if (WSREP(thd))
+    thd_proc_info(thd, "exit Create_file_log_event::do_apply_event()");
+  else
+    thd_proc_info(thd, 0);
 #else /* WITH_WSREP */
   thd_proc_info(thd, 0);
 #endif /* WITH_WSREP */
@@ -6676,7 +6679,10 @@ err:
   if (fd >= 0)
     mysql_file_close(fd, MYF(0));
 #ifdef WITH_WSREP
-  thd_proc_info(thd, "exit Append_block_log_event::do_apply_event()");
+  if (WSREP(thd))
+    thd_proc_info(thd, "exit Append_block_log_event::do_apply_event()");
+  else
+    thd_proc_info(thd, 0);
 #else /* WITH_WSREP */
   thd_proc_info(thd, 0);
 #endif /* WITH_WSREP */
@@ -7619,7 +7625,7 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
     {
 #ifdef WITH_WSREP
       uint actual_error= ER_SERVER_SHUTDOWN;
-      if (!thd->is_fatal_error)
+      if (WSREP(thd) && !thd->is_fatal_error)
       {
         sql_print_information("WSREP, BF applier interrupted in log_event.cc");
       } 
@@ -9002,15 +9008,16 @@ Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   info[sizeof(info) - 1] = '\0';
   snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
            (long long) thd->wsrep_trx_seqno);
-  const char* tmp = thd_proc_info(thd, info);
+  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
 #else
-  const char* tmp = thd_proc_info(thd,"Write_rows_log_event::write_row()");
+  const char* tmp = (WSREP(thd)) ?
+    thd_proc_info(thd,"Write_rows_log_event::write_row()") :  NULL;
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
   int error= write_row(rli, slave_exec_mode == SLAVE_EXEC_MODE_IDEMPOTENT);
 
 #ifdef WITH_WSREP
-  thd_proc_info(thd, tmp);
+  if (WSREP(thd)) thd_proc_info(thd, tmp);
 #endif /* WITH_WSREP */
   if (error && !thd->is_error())
   {
@@ -9547,9 +9554,10 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   info[sizeof(info) - 1] = '\0';
   snprintf(info, sizeof(info) - 1, "Delete_rows_log_event::find_row(%lld)",
            (long long) thd->wsrep_trx_seqno);
-  const char* tmp = thd_proc_info(thd, info);
+  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
 #else
-  const char* tmp = thd_proc_info(thd,"Delete_rows_log_event::find_row()");
+  const char* tmp = (WSREP(thd)) ?
+    thd_proc_info(thd,"Delete_rows_log_event::find_row()") : NULL;
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
   if (!(error= find_row(rli))) 
@@ -9562,15 +9570,15 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
     snprintf(info, sizeof(info) - 1,
              "Delete_rows_log_event::ha_delete_row(%lld)",
              (long long) thd->wsrep_trx_seqno);
-    thd_proc_info(thd, info);
+    if (WSREP(thd)) thd_proc_info(thd, info);
 #else
-    thd_proc_info(thd,"Delete_rows_log_event::ha_delete_row()");
+    if (WSREP(thd)) thd_proc_info(thd,"Delete_rows_log_event::ha_delete_row()");
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
     error= m_table->file->ha_delete_row(m_table->record[0]);
   }
 #ifdef WITH_WSREP
-  thd_proc_info(thd, tmp);
+  if (WSREP(thd)) thd_proc_info(thd, tmp);
 #endif /* WITH_WSREP */
   return error;
 }
@@ -9694,9 +9702,10 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   info[sizeof(info) - 1] = '\0';
   snprintf(info, sizeof(info) - 1, "Update_rows_log_event::find_row(%lld)",
            (long long) thd->wsrep_trx_seqno);
-  const char* tmp = thd_proc_info(thd, info);
+  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
 #else
-  const char* tmp = thd_proc_info(thd,"Update_rows_log_event::find_row()");
+  const char* tmp = (WSREP(thd)) ? 
+    thd_proc_info(thd,"Update_rows_log_event::find_row()") : NULL;
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
   int error= find_row(rli); 
@@ -9730,9 +9739,10 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   snprintf(info, sizeof(info) - 1,
            "Update_rows_log_event::unpack_current_row(%lld)",
            (long long) thd->wsrep_trx_seqno);
-  thd_proc_info(thd, info);
+  if (WSREP(thd)) thd_proc_info(thd, info);
 #else
-  thd_proc_info(thd,"Update_rows_log_event::unpack_current_row()");
+  if (WSREP(thd)) 
+    thd_proc_info(thd,"Update_rows_log_event::unpack_current_row()");
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
   /* this also updates m_curr_row_end */
@@ -9758,9 +9768,9 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   snprintf(info, sizeof(info) - 1,
            "Update_rows_log_event::ha_update_row(%lld)",
            (long long) thd->wsrep_trx_seqno);
-  thd_proc_info(thd, info);
+  if (WSREP(thd)) thd_proc_info(thd, info);
 #else
-  thd_proc_info(thd,"Update_rows_log_event::ha_update_row()");
+  if (WSREP(thd)) thd_proc_info(thd,"Update_rows_log_event::ha_update_row()");
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
   error= m_table->file->ha_update_row(m_table->record[1], m_table->record[0]);
@@ -9768,7 +9778,7 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
     error= 0;
 
 #ifdef WITH_WSREP
-  thd_proc_info(thd, tmp);
+  if (WSREP(thd)) thd_proc_info(thd, tmp);
 #endif /* WITH_WSREP */
   return error;
 }
