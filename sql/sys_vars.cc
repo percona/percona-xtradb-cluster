@@ -3182,7 +3182,7 @@ static Sys_var_tz Sys_time_zone(
 
 static Sys_var_charptr Sys_wsrep_provider(
        "wsrep_provider", "Path to replication provider library",
-       GLOBAL_VAR(wsrep_provider), CMD_LINE(REQUIRED_ARG),
+       GLOBAL_VAR(wsrep_provider), CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER),
        IN_FS_CHARSET, DEFAULT(wsrep_provider), 
        //       IN_FS_CHARSET, DEFAULT(wsrep_provider_default), 
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
@@ -3190,7 +3190,8 @@ static Sys_var_charptr Sys_wsrep_provider(
 
 static Sys_var_charptr Sys_wsrep_provider_options(
        "wsrep_provider_options", "provider specific options",
-       GLOBAL_VAR(wsrep_provider_options), CMD_LINE(REQUIRED_ARG),
+       GLOBAL_VAR(wsrep_provider_options), 
+       CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER_OPTIONS),
        IN_FS_CHARSET, DEFAULT(wsrep_provider_options), 
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
        ON_CHECK(wsrep_provider_options_check), 
@@ -3299,7 +3300,7 @@ static Sys_var_charptr Sys_wsrep_sst_receive_address(
 
 static Sys_var_charptr Sys_wsrep_sst_auth(
        "wsrep_sst_auth", "Authentication for SST connection",
-       GLOBAL_VAR(wsrep_sst_auth),CMD_LINE(REQUIRED_ARG),
+       GLOBAL_VAR(wsrep_sst_auth), CMD_LINE(REQUIRED_ARG, OPT_WSREP_SST_AUTH),
        IN_FS_CHARSET, DEFAULT(wsrep_sst_auth), NO_MUTEX_GUARD, 
        NOT_IN_BINLOG,
        ON_CHECK(wsrep_sst_auth_check),
@@ -3321,7 +3322,8 @@ static Sys_var_mybool Sys_wsrep_on (
 
 static Sys_var_charptr Sys_wsrep_start_position (
        "wsrep_start_position", "global transaction position to start from ",
-       GLOBAL_VAR(wsrep_start_position), CMD_LINE(REQUIRED_ARG),
+       GLOBAL_VAR(wsrep_start_position), 
+       CMD_LINE(REQUIRED_ARG, OPT_WSREP_START_POSITION),
        IN_FS_CHARSET, DEFAULT(wsrep_start_position),
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
        ON_CHECK(wsrep_start_position_check), 

@@ -4009,7 +4009,7 @@ will be ignored as the --log-bin option is not defined.");
 #ifdef WITH_WSREP
   if (opt_bootstrap)
   {
-    strcpy((char*)wsrep_provider, WSREP_NONE);
+    wsrep_provider_init(WSREP_NONE);
     if (wsrep_init()) unireg_abort(1);
   }
   else if (wsrep_init_first())
@@ -6697,26 +6697,6 @@ struct my_option my_long_options[]=
   {"table_cache", 0, "Deprecated; use --table-open-cache instead.",
    &table_cache_size, &table_cache_size, 0, GET_ULONG,
    REQUIRED_ARG, TABLE_OPEN_CACHE_DEFAULT, 1, 512*1024L, 0, 1, 0},
-#ifdef WITH_WSREP
-  {"wsrep_provider", OPT_WSREP_PROVIDER,
-   "wsrep provider library to load.", 
-   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-  {"wsrep_provider_options", OPT_WSREP_PROVIDER_OPTIONS,
-   "a string with options for specific wsrep provider.", 
-   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0,0,0,0},
-  {"wsrep_cluster_address", OPT_WSREP_CLUSTER_ADDRESS,
-   "The URL-like address at which connect to cluster. Example: 'gcomm://127.0.0.1:4567'. Depends on wsrep provider.",
-   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-  {"wsrep_sst_auth", OPT_WSREP_SST_AUTH,
-   "Authentication required for SST. SST mode-dependent. "
-   "For mysqldump mode it is 'root:<root password>'. "
-   "Should be the same on all nodes",
-   //   (uchar**) &opt_wsrep_sst_auth,
-   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-  {"wsrep_start_position", OPT_WSREP_START_POSITION,
-   "Start at this replication position. Format: <history UUID(hex)>:<sequence number>. Unset option means no previous state on this node. Setting this option from client assumes that state with that position has just been installed on the node.",
-   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-#endif /* WITH_WSREP */
   {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
 
