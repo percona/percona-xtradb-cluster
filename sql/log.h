@@ -682,17 +682,10 @@ enum enum_binlog_format {
     statement-based except for cases where only row-based can work (UUID()
     etc):
   */
-#ifdef WITH_WSREP
-  BINLOG_FORMAT_STMT= 0, // statement-based
-  BINLOG_FORMAT_ROW= 1, // row_based
-  BINLOG_FORMAT_UNSPEC= 2,
-  BINLOG_FORMAT_MIXED= 3 // mixed format is disabled
-#else
   BINLOG_FORMAT_MIXED= 0, ///< statement if safe, otherwise row - autodetected
   BINLOG_FORMAT_STMT=  1, ///< statement-based
   BINLOG_FORMAT_ROW=   2, ///< row-based
   BINLOG_FORMAT_UNSPEC=3  ///< thd_binlog_format() returns it when binlog is closed
-#endif
 };
 
 #ifdef WITH_WSREP

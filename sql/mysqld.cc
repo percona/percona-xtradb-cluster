@@ -447,11 +447,7 @@ my_bool opt_noacl;
 my_bool sp_automatic_privileges= 1;
 
 ulong opt_binlog_rows_event_max_size;
-#ifdef WITH_WSREP
-const char *binlog_format_names[]= {"STATEMENT", "ROW", NullS};
-#else
 const char *binlog_format_names[]= {"MIXED", "STATEMENT", "ROW", NullS};
-#endif
 #ifdef HAVE_INITGROUPS
 static bool calling_initgroups= FALSE; /**< Used in SIGSEGV handler. */
 #endif

@@ -7602,7 +7602,7 @@ static wsrep_status_t wsrep_bf_apply_rbr(
     case TABLE_MAP_EVENT:
       break;
     case QUERY_EVENT:
-      WSREP_DEBUG("query event: %s", ((Query_log_event*)ev)->query);
+      //WSREP_DEBUG("query event: %s", ((Query_log_event*)ev)->query);
       break;
     default:
       WSREP_WARN("Unknown event type code %d, discarding",
