@@ -264,7 +264,8 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
 
 void wsrep_provider_options_init(const char* value)
 {
-  if (wsrep_provider_options) free((void *)wsrep_provider_options);
+  if (wsrep_provider_options && wsrep_provider_options != value) 
+    free((void *)wsrep_provider_options);
   wsrep_provider_options = (value) ? strdup(value) : NULL;
 }
 
@@ -314,7 +315,8 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
 
 void wsrep_cluster_address_init (const char* value)
 {
-  if (wsrep_cluster_address) my_free ((void*)wsrep_cluster_address);
+  if (wsrep_cluster_address && wsrep_cluster_address != value) 
+    my_free ((void*)wsrep_cluster_address);
 
   wsrep_cluster_address = (value) ? strdup(value) :  NULL;
 }
