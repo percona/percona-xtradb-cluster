@@ -117,14 +117,12 @@ static bool sst_auth_real_set (const char* value)
 	  if (wsrep_sst_auth)
 	  {
 	    my_free ((void*)wsrep_sst_auth);
-	    wsrep_sst_auth = (char*)my_memdup(WSREP_SST_AUTH_MASK, 
-					      strlen(WSREP_SST_AUTH_MASK) + 1, 
-					      MYF(MY_WME));
+	    wsrep_sst_auth = my_strdup(WSREP_SST_AUTH_MASK, MYF(0));
 	    //strncpy (wsrep_sst_auth, WSREP_SST_AUTH_MASK, 
 	    //     sizeof(wsrep_sst_auth) - 1);
 	  }
 	  else
-	    wsrep_sst_auth = strdup (WSREP_SST_AUTH_MASK);
+	    wsrep_sst_auth = my_strdup (WSREP_SST_AUTH_MASK, MYF(0));
 	}
         return 0;
     }

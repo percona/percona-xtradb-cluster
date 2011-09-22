@@ -142,7 +142,7 @@ void wsrep_start_position_init (const char* val)
     return;
   }
 
-  wsrep_start_position = strdup(val);
+  wsrep_start_position = my_strdup(val, MYF(0)); 
 
   wsrep_set_local_position (val);
 }
@@ -227,7 +227,7 @@ void wsrep_provider_init (const char* value)
                 (value ? value : ""));
     return;
   }
-  wsrep_provider = strdup(value);
+  wsrep_provider = my_strdup(value, MYF(0));
 }
 
 bool wsrep_provider_options_check(sys_var *self, THD* thd, set_var* var)
@@ -265,8 +265,8 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
 void wsrep_provider_options_init(const char* value)
 {
   if (wsrep_provider_options && wsrep_provider_options != value) 
-    free((void *)wsrep_provider_options);
-  wsrep_provider_options = (value) ? strdup(value) : NULL;
+    my_free((void *)wsrep_provider_options);
+  wsrep_provider_options = (value) ? my_strdup(value, MYF(0)) : NULL;
 }
 
 static int wsrep_cluster_address_verify (const char* cluster_address_str)
@@ -318,7 +318,7 @@ void wsrep_cluster_address_init (const char* value)
   if (wsrep_cluster_address && wsrep_cluster_address != value) 
     my_free ((void*)wsrep_cluster_address);
 
-  wsrep_cluster_address = (value) ? strdup(value) :  NULL;
+  wsrep_cluster_address = (value) ? my_strdup(value, MYF(0)) :  NULL;
 }
 
 bool wsrep_cluster_name_check (sys_var *self, THD* thd, set_var* var)

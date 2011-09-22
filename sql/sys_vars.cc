@@ -3213,7 +3213,8 @@ static Sys_var_charptr Sys_wsrep_cluster_name(
 
 static Sys_var_charptr Sys_wsrep_cluster_address (
        "wsrep_cluster_address", "Address to initially connect to cluster",
-       GLOBAL_VAR(wsrep_cluster_address), CMD_LINE(REQUIRED_ARG),
+       GLOBAL_VAR(wsrep_cluster_address), 
+       CMD_LINE(REQUIRED_ARG, OPT_WSREP_CLUSTER_ADDRESS),
        IN_FS_CHARSET, DEFAULT(wsrep_cluster_address),
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
        ON_CHECK(wsrep_cluster_address_check), 
