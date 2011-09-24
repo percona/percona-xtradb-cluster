@@ -1669,10 +1669,15 @@ int binlog_init(void *p)
 {
   binlog_hton= (handlerton *)p;
 #ifdef WITH_WSREP
-  if (WSREP_ON) binlog_hton->state= SHOW_OPTION_YES;
-#else
+  if (WSREP_ON) 
+    binlog_hton->state= SHOW_OPTION_YES;
+  else
+  {
+#endif /* WITH_WSREP */
   binlog_hton->state=opt_bin_log ? SHOW_OPTION_YES : SHOW_OPTION_NO;
-#endif
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
   binlog_hton->db_type=DB_TYPE_BINLOG;
   binlog_hton->savepoint_offset= sizeof(my_off_t);
   binlog_hton->close_connection= binlog_close_connection;

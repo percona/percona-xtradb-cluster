@@ -4209,29 +4209,26 @@ a file name for --log-bin-index option", opt_binlog_index_name);
 #ifdef WITH_WSREP
   if (!opt_bin_log)
   {
-    opt_bin_log= 1;
     wsrep_emulate_bin_log= 1;
   }
 #endif
 
-#ifdef WITH_WSREP
-  tc_log= (total_ha_2pc > 1 ? (opt_bin_log && !wsrep_emulate_bin_log ?
-                               (TC_LOG *) &mysql_bin_log :
-                               (TC_LOG *) &tc_log_dummy) :
-           (TC_LOG *) &tc_log_dummy);
-#else
   tc_log= (total_ha_2pc > 1 ? (opt_bin_log  ?
                                (TC_LOG *) &mysql_bin_log :
-                               (TC_LOG *) &tc_log_mmap) :
-           (TC_LOG *) &tc_log_dummy);
-#endif
 #ifdef WITH_WSREP
-  if (tc_log->open(opt_bin_log && !wsrep_emulate_bin_log ? 
-                   opt_bin_logname : opt_tc_log_file))
+                               (WSREP_ON ? 
+				(TC_LOG *) &tc_log_dummy : 
+				(TC_LOG *) &tc_log_mmap)) :
 #else
-  if (tc_log->open(opt_bin_log ? opt_bin_logname : opt_tc_log_file))
+	                       (TC_LOG *) &tc_log_mmap) :
 #endif
-
+    (TC_LOG *) &tc_log_dummy);
+  WSREP_DEBUG("Initial TC log open: %s", 
+	      (tc_log == &mysql_bin_log) ? "binlog" :
+	      (tc_log == &tc_log_mmap) ? "mmap" :
+	      (tc_log == &tc_log_dummy) ? "dummy" : "unknown"
+	      );
+  if (tc_log->open(opt_bin_log ? opt_bin_logname : opt_tc_log_file))
   {
     sql_print_error("Can't init tc log");
     unireg_abort(1);
@@ -4242,21 +4239,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
 
-#ifdef WITH_WSREP
-  if (opt_bin_log && !wsrep_emulate_bin_log &&
-       mysql_bin_log.open(opt_bin_logname, LOG_BIN, 0,
-#else
   if (opt_bin_log && mysql_bin_log.open(opt_bin_logname, LOG_BIN, 0,
-#endif
                                         WRITE_CACHE, 0, max_binlog_size, 0, TRUE))
     unireg_abort(1);
 
 #ifdef HAVE_REPLICATION
-#ifdef WITH_WSREP
-  if (opt_bin_log && !wsrep_emulate_bin_log && expire_logs_days)
-#else
   if (opt_bin_log && expire_logs_days)
-#endif
   {
     time_t purge_time= server_start_time - expire_logs_days*24*60*60;
     if (purge_time >= 0)
@@ -4294,8 +4282,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   init_update_queries();
   DBUG_RETURN(0);
 }
-
-
 #ifndef EMBEDDED_LIBRARY
 
 static void create_shutdown_thread()

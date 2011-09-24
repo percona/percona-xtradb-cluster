@@ -767,3 +767,4 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
   }
   return retval;
 }
+
