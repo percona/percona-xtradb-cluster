@@ -375,7 +375,9 @@ int wsrep_init()
   if (rcode)
   {
     DBUG_PRINT("wsrep",("wsrep::init() failed: %d", rcode));
-    WSREP_ERROR("wsrep::init() failed: %d", rcode);
+    WSREP_ERROR("wsrep::init() failed: %d, must shutdown", rcode);
+    free(wsrep);
+    wsrep = NULL;
   }
 
   return rcode;
