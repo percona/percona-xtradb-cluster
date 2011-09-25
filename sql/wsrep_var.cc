@@ -105,7 +105,7 @@ bool wsrep_start_position_check (sys_var *self, THD* thd, set_var* var)
 
 err:
 
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
            start_str ? start_str : "NULL");
   return 1;
 }
@@ -186,7 +186,7 @@ bool wsrep_provider_check (sys_var *self, THD* thd, set_var* var)
 
 err:
 
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
            provider_str ? provider_str : "NULL");
   return 1;
 }
@@ -291,7 +291,7 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 
  err:
 
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
              cluster_address_str ? cluster_address_str : "NULL");
   return 1    ;
 }
@@ -337,7 +337,7 @@ bool wsrep_cluster_name_check (sys_var *self, THD* thd, set_var* var)
 
  err:
 
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
              cluster_name_str ? cluster_name_str : "NULL");
   return 1;
 }
@@ -363,7 +363,7 @@ bool wsrep_node_name_check (sys_var *self, THD* thd, set_var* var)
 
  err:
 
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name, 
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
              node_name_str ? node_name_str : "NULL");
   return 1;
 }
