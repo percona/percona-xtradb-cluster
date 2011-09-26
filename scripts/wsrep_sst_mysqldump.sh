@@ -28,12 +28,23 @@ SEQNO=$7
 
 EINVAL=22
 
-if test -z "$USER";  then echo "USER cannot be nil"; exit $EINVAL; fi
-if test -z "$HOST";  then echo "HOST cannot be nil"; exit $EINVAL; fi
-if test -z "$PORT";  then echo "PORT cannot be nil"; exit $EINVAL; fi
-if test -z "$LOCAL_PORT"; then echo "LOCAL_PORT cannot be nil"; exit $EINVAL; fi
-if test -z "$UUID";  then echo "UUID cannot be nil"; exit $EINVAL; fi
-if test -z "$SEQNO"; then echo "SEQNO cannot be nil"; exit $EINVAL; fi
+err()
+{
+    echo "SST error: $*" >&2
+}
+
+if test -z "$USER";  then err "USER cannot be nil"; exit $EINVAL; fi
+if test -z "$HOST";  then err "HOST cannot be nil"; exit $EINVAL; fi
+if test -z "$PORT";  then err "PORT cannot be nil"; exit $EINVAL; fi
+if test -z "$LOCAL_PORT"; then err "LOCAL_PORT cannot be nil"; exit $EINVAL; fi
+if test -z "$UUID";  then err "UUID cannot be nil"; exit $EINVAL; fi
+if test -z "$SEQNO"; then err "SEQNO cannot be nil"; exit $EINVAL; fi
+
+if ip route get "$HOST" | grep local >/dev/null && [ "$PORT" = "$LOCAL_PORT" ]
+then
+    err "destination address '$HOST:$PORT' matches source address."
+    exit $EINVAL
+fi
 
 AUTH="-u$USER"
 if test -n "$PSWD"; then AUTH="$AUTH -p$PSWD"; fi
