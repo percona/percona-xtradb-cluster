@@ -58,7 +58,7 @@ bool  wsrep_sst_method_check (sys_var *self, THD* thd, set_var* var)
       while (sst_methods[i] && strcasecmp(sst_methods[i], c_str)) i++;
       if (!sst_methods[i]) {
         my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "wsrep_sst_method", c_str ? c_str : "NULL");
-	return 1;
+        return 1;
       }
     }
     return 0;
@@ -94,7 +94,7 @@ bool  wsrep_sst_receive_address_check (sys_var *self, THD* thd, set_var* var)
 }
 
 bool wsrep_sst_receive_address_update (sys_var *self, THD* thd, 
-				       enum_var_type type)
+                                       enum_var_type type)
 {
     return 0;
 }
@@ -382,7 +382,7 @@ static ssize_t sst_prepare_other (const char*  method,
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%d' 2>sst.err",
                      method, addr_in, (sst_auth_real) ? sst_auth_real : "", 
-		     sst_dir, (int)getpid());
+                     sst_dir, (int)getpid());
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -672,7 +672,7 @@ static int sst_flush_tables(THD* thd)
 
   if (err)
   {
-    WSREP_ERROR("Failed to flush redo logs: %d (%s)", err, strerror(err));
+    WSREP_ERROR("Failed to flush tables: %d (%s)", err, strerror(err));
   }
   else
   {
