@@ -1575,8 +1575,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     /* checking if BF trx must be replayed */
     if (thd->wsrep_conflict_state== MUST_REPLAY) {
       if (thd->wsrep_exec_mode!= REPL_RECV) {
-	if (thd->stmt_da->is_sent) {
-	  WSREP_ERROR("replay issue, thd has reported status already");
+        if (thd->stmt_da->is_sent) {
+          WSREP_ERROR("replay issue, thd has reported status already");
 	}
 	thd->stmt_da->reset_diagnostics_area();
 
@@ -1587,48 +1587,49 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 	close_thread_tables(thd);
 
 	thd_proc_info(thd, "wsrep replaying trx");
-	WSREP_DEBUG("replay trx");
+	WSREP_DEBUG("replay trx: %s", thd->query() ? thd->query() : "void");
 	void *shadow= wsrep_prepare_bf_thd(thd);
 	int rcode = wsrep->replay_trx(wsrep,
-				      &thd->wsrep_trx_handle,
-				      (void *)thd);
+                                      &thd->wsrep_trx_handle,
+                                      (void *)thd);
 
-	wsrep_return_from_bf_mode(shadow, thd);
-	if (thd->wsrep_conflict_state!= REPLAYING)
-	  WSREP_WARN("lost replaying mode: %d", thd->wsrep_conflict_state );
+        wsrep_return_from_bf_mode(shadow, thd);
+        if (thd->wsrep_conflict_state!= REPLAYING)
+          WSREP_WARN("lost replaying mode: %d", thd->wsrep_conflict_state );
 
-	mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+        mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 	  
-	switch (rcode) {
-	case WSREP_OK:
-	  thd->wsrep_conflict_state= NO_CONFLICT;
-	  wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
-	  WSREP_DEBUG("trx_replay successful for: %lu", thd->real_id);
-	  break;
-	case WSREP_TRX_FAIL:
-	  if (thd->stmt_da->is_sent) {
-	    WSREP_ERROR("replay failed, thd has reported status");
-	  }
-	  else
-	  {
-	    WSREP_DEBUG("replay failed, rolling back");
-	    my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-	  }
-	  thd->wsrep_conflict_state= ABORTED;
-	  wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
-	  break;
-	default:
-	  WSREP_ERROR("trx_replay failed for: %d", rcode);
-	  /* we're now in inconsistent state, must abort */
-	  unireg_abort(1);
-	  break;
-	}
-	mysql_mutex_lock(&LOCK_wsrep_replaying);
-	wsrep_replaying--;
-	WSREP_DEBUG("replaying decreased: %d, thd: %lu", 
-		    wsrep_replaying, thd->thread_id);
-	mysql_cond_broadcast(&COND_wsrep_replaying);
-	mysql_mutex_unlock(&LOCK_wsrep_replaying);
+        switch (rcode) {
+        case WSREP_OK:
+          thd->wsrep_conflict_state= NO_CONFLICT;
+          wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
+          WSREP_DEBUG("trx_replay successful for: %lu", thd->real_id);
+          break;
+        case WSREP_TRX_FAIL:
+          if (thd->stmt_da->is_sent) {
+            WSREP_ERROR("replay failed, thd has reported status");
+          }
+          else
+          {
+            WSREP_DEBUG("replay failed, rolling back");
+            my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+          }
+          thd->wsrep_conflict_state= ABORTED;
+          wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
+          break;
+        default:
+          WSREP_ERROR("trx_replay failed for: %d, query: %s", 
+		      rcode, thd->query() ? thd->query() : "void");
+          /* we're now in inconsistent state, must abort */
+          unireg_abort(1);
+          break;
+        }
+        mysql_mutex_lock(&LOCK_wsrep_replaying);
+        wsrep_replaying--;
+        WSREP_DEBUG("replaying decreased: %d, thd: %lu", 
+                    wsrep_replaying, thd->thread_id);
+        mysql_cond_broadcast(&COND_wsrep_replaying);
+        mysql_mutex_unlock(&LOCK_wsrep_replaying);
       }
     }
     /* setting error code for BF aborted trxs */
@@ -1639,17 +1640,17 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       if (is_autocommit &&
 	  (thd->wsrep_retry_counter < thd->wsrep_retry_autocommit))
       {
-	WSREP_DEBUG("wsrep retrying AC query: %s", 
-		    (thd->query()) ? thd->query() : "void");
-	thd->wsrep_conflict_state= RETRY_AUTOCOMMIT;
-	thd->wsrep_retry_counter++;            // grow
+        WSREP_DEBUG("wsrep retrying AC query: %s", 
+                    (thd->query()) ? thd->query() : "void");
+        thd->wsrep_conflict_state= RETRY_AUTOCOMMIT;
+        thd->wsrep_retry_counter++;            // grow
       }
       else
       {
-	my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-	thd->killed= THD::NOT_KILLED;
-	thd->wsrep_conflict_state= NO_CONFLICT;
-	thd->wsrep_retry_counter= 0;             //  reset
+        my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+        thd->killed= THD::NOT_KILLED;
+        thd->wsrep_conflict_state= NO_CONFLICT;
+        thd->wsrep_retry_counter= 0;             //  reset
       }
     }
     else
@@ -1658,7 +1659,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     }
       
     if ((thd->wsrep_conflict_state != REPLAYING) &&
-	(thd->wsrep_conflict_state != RETRY_AUTOCOMMIT)) {
+        (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT)) {
       thd->protocol->end_statement();
       query_cache_end_of_result(thd);
     }
