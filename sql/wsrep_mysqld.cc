@@ -748,21 +748,20 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
       retval = TRUE;
 
     } else {
-      WSREP_DEBUG("mdl conflict, (%lu %d %d) set to MUST ABORT, BF:(%lu %d %d)",
-		  granted_thd->thread_id, granted_thd->wsrep_exec_mode, 
-		  granted_thd->wsrep_query_state,
-		  request_thd->thread_id, type_arg,
-		  request_thd->wsrep_exec_mode);
-
-      WSREP_DEBUG(
+      WSREP_INFO(
         "mdl conflict, BF: (%lu %d %d %lu) thd: (%lu %d %d %lu)",
 	request_thd->thread_id, request_thd->wsrep_exec_mode,
 	request_thd->wsrep_query_state, request_thd->wsrep_trx_seqno, 
 	granted_thd->thread_id, granted_thd->wsrep_exec_mode,
 	granted_thd->wsrep_query_state,  granted_thd->wsrep_trx_seqno);
 
-      granted_thd->wsrep_conflict_state = MUST_ABORT;
-      retval = FALSE;
+      if (granted_thd->wsrep_exec_mode != TOTAL_ORDER &&
+	  granted_thd->wsrep_exec_mode != REPL_RECV)
+      {
+	mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+	wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
+	return TRUE;
+      }
     }
     mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
 
