@@ -543,7 +543,7 @@ static int sst_run_shell (const char* cmd_str, int max_tries)
     if ((ret = proc.error()))
     {
       WSREP_ERROR("Try %d/%d: '%s' failed: %d (%s)",
-                  tries, max_tries, proc.str, ret, strerror(ret));
+                  tries, max_tries, proc.str_, ret, strerror(ret));
       sleep (1);
     }
     else

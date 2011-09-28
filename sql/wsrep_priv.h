@@ -73,10 +73,11 @@ namespace wsp {
 class process
 {
 public:
-    const char* const str;
+    const char* const str_;
 private:
-    FILE*       io;
-    int         err;
+    FILE*       io_;
+    int         err_;
+    pid_t       pid_;
 
 public:
 /*! @arg type is a pointer to a null-terminated string which  must  contain
@@ -85,8 +86,8 @@ public:
     process  (const char* cmd, const char* type);
     ~process ();
 
-    FILE* pipe () { return io;  };
-    int   error() { return err; };
+    FILE* pipe () { return io_;  };
+    int   error() { return err_; };
     int   wait ();
 };
 #ifdef REMOVED

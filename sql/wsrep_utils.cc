@@ -16,80 +16,221 @@
 
 //! @file declares symbols private to wsrep integration layer
 
-#include <mysqld.h>
-#include <sql_class.h>
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE // POSIX_SPAWN_USEVFORK flag
+#endif
+
+#include <spawn.h>    // posix_spawn()
+#include <unistd.h>   // pipe()
+#include <errno.h>    // errno
+#include <string.h>   // strerror()
+#include <sys/wait.h> // waitpid()
+
+#include <sql_class.h>    // THD
 #include "wsrep_priv.h"
 
-//#include <linux/in.h>
-#include <linux/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
+extern char** environ; // environment variables
 
 namespace wsp
 {
+
+#define PIPE_READ  0
+#define PIPE_WRITE 1
+#define STDIN_FD   0
+#define STDOUT_FD  1
+
 process::process (const char* cmd, const char* type)
-    : str (strdup (cmd)), io (popen (str, type)), err(0)
+    : str_(strdup(cmd)), io_(NULL), err_(EINVAL), pid_(0)
 {
-    if (!io) {
-        err = errno;
-        if (!err) err = ENOMEM; // errno is not set when out of memory
-        WSREP_ERROR("Failed to execute: %s: %d (%s)",
-                    str, err, strerror (err));
+    if (0 == strlen(str_))
+    {
+        WSREP_ERROR ("Can't start a process: null or empty command line.");
+        return;
     }
+
+    if (NULL == type || (strcmp (type, "w") && strcmp(type, "r")))
+    {
+        WSREP_ERROR ("type argument should be either \"r\" or \"w\".");
+        return;
+    }
+
+    int pipe_fds[2] = { -1, };
+    if (::pipe(pipe_fds))
+    {
+        err_ = errno;
+        WSREP_ERROR ("pipe() failed: %d (%s)", err_, strerror(err_));
+        return;
+    }
+
+    // which end of pipe will be returned to parent
+    int const parent_end (strcmp(type,"w") ? PIPE_READ : PIPE_WRITE);
+    int const child_end  (parent_end == PIPE_READ ? PIPE_WRITE : PIPE_READ);
+    int const close_fd   (parent_end == PIPE_READ ? STDOUT_FD : STDIN_FD);
+
+    char* const pargv[4] = { strdup("sh"), strdup("-c"), strdup(str_), NULL };
+    if (!(pargv[0] && pargv[1] && pargv[2]))
+    {
+        err_ = ENOMEM;
+        WSREP_ERROR ("Failed to allocate pargv[] array.");
+        goto cleanup_pipe;
+    }
+
+    posix_spawnattr_t attr;
+    err_ = posix_spawnattr_init (&attr);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawnattr_init() failed: %d (%s)",
+                     err_, strerror(err_));
+        goto cleanup_pipe;
+    }
+
+    err_ = posix_spawnattr_setflags (&attr, POSIX_SPAWN_SETSIGDEF |
+                                            POSIX_SPAWN_USEVFORK);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawnattr_setflags() failed: %d (%s)",
+                     err_, strerror(err_));
+        goto cleanup_attr;
+    }
+
+    posix_spawn_file_actions_t fact;
+    err_ = posix_spawn_file_actions_init (&fact);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawn_file_actions_init() failed: %d (%s)",
+                     err_, strerror(err_));
+        goto cleanup_attr;
+    }
+
+    // close child's stdout|stdin depending on what we returning
+    err_ = posix_spawn_file_actions_addclose (&fact, close_fd);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)",
+                     err_, strerror(err_));
+        goto cleanup_fact;
+    }
+
+    // substitute our pipe descriptor in place of the closed one
+    err_ = posix_spawn_file_actions_adddup2 (&fact,
+                                             pipe_fds[child_end], close_fd);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawn_file_actions_addup2() failed: %d (%s)",
+                     err_, strerror(err_));
+        goto cleanup_fact;
+    }
+
+    err_ = posix_spawnp (&pid_, pargv[0], &fact, &attr, pargv, environ);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawnp(%s) failed: %d (%s)",
+                     pargv[2], err_, strerror(err_));
+        pid_ = 0; // just to make sure it was not messed up in the call
+        goto cleanup_fact;
+    }
+
+    io_ = fdopen (pipe_fds[parent_end], type);
+
+    if (io_)
+    {
+        pipe_fds[parent_end] = -1; // skip close on cleanup
+    }
+    else
+    {
+        err_ = errno;
+        WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+    }
+
+cleanup_fact:
+    int err; // to preserve err_ code
+    err = posix_spawn_file_actions_destroy (&fact);
+    if (err)
+    {
+        WSREP_ERROR ("posix_spawn_file_actions_destroy() failed: %d (%s)\n",
+                     err, strerror(err));
+    }
+
+cleanup_attr:
+    err = posix_spawnattr_destroy (&attr);
+    if (err)
+    {
+        WSREP_ERROR ("posix_spawnattr_destroy() failed: %d (%s)",
+                     err, strerror(err));
+    }
+
+cleanup_pipe:
+    if (pipe_fds[0] >= 0) close (pipe_fds[0]);
+    if (pipe_fds[1] >= 0) close (pipe_fds[1]);
+
+    free (pargv[0]);
+    free (pargv[1]);
+    free (pargv[2]);
 }
 
 process::~process ()
 {
-    if (str) free   (const_cast<char*>(str));
-    if (io)
+    if (io_)
     {
-        if (pclose (io) == -1)
+        assert (pid_);
+        assert (str_);
+
+        WSREP_WARN("Closing pipe to child process: %s, PID(%d) "
+                   "which might still be running.", str_, pid_);
+
+        if (fclose (io_) == -1)
         {
-            err = errno;
-            WSREP_ERROR("pclose() failed: %d (%s)", err, strerror(err));
+            err_ = errno;
+            WSREP_ERROR("fclose() failed: %d (%s)", err_, strerror(err_));
         }
     }
+
+    if (str_) free (const_cast<char*>(str_));
 }
 
 int
 process::wait ()
 {
-  if (io) {
-
-    err = pclose (io);
-    io  = NULL;
-
-    if (-1 == err) { // wait4() failed
-      err = errno; assert (err);
-      WSREP_ERROR("Waiting for process failed: %s: %d (%s)",
-                  str, err, strerror (err));
-    }
-    else {           // command completed, check exit status
-      if (WIFEXITED (err)) {
-        err = WEXITSTATUS (err);
+  if (pid_)
+  {
+      int status;
+      if (-1 == waitpid(pid_, &status, 0))
+      {
+          err_ = errno; assert (err_);
+          WSREP_ERROR("Waiting for process failed: %s, PID(%d): %d (%s)",
+                      str_, pid_, err_, strerror (err_));
       }
-      else {       // command didn't complete with exit()
-        WSREP_ERROR("Process was aborted.");
-        err = errno ? errno : ECHILD;
-      }
+      else
+      {                // command completed, check exit status
+          if (WIFEXITED (status)) {
+              err_ = WEXITSTATUS (status);
+          }
+          else {       // command didn't complete with exit()
+              WSREP_ERROR("Process was aborted.");
+              err_ = errno ? errno : ECHILD;
+          }
 
-      if (err) {
-        switch (err) /* Translate error codes to more meaningful */
-        {
-          case 126: err = EACCES; break; /* Permission denied */
-          case 127: err = ENOENT; break; /* No such file or directory */
-        }
-        WSREP_ERROR("Process completed with error: %s: %d (%s)",
-                    str, err, strerror(err));
+          if (err_) {
+              switch (err_) /* Translate error codes to more meaningful */
+              {
+              case 126: err_ = EACCES; break; /* Permission denied */
+              case 127: err_ = ENOENT; break; /* No such file or directory */
+              }
+              WSREP_ERROR("Process completed with error: %s: %d (%s)",
+                          str_, err_, strerror(err_));
+          }
+
+          pid_ = 0;
+          if (io_) fclose (io_);
+          io_ = NULL;
       }
-    }
   }
   else {
-    WSREP_ERROR("Command did not run: %s", str);
+      assert (NULL == io_);
+      WSREP_ERROR("Command did not run: %s", str_);
   }
 
-  return err;
+  return err_;
 }
 
 thd::thd () : init(), ptr(new THD)
@@ -190,3 +331,4 @@ size_t default_address(char* buf, size_t buf_len)
 
   return addr_len;
 }
+

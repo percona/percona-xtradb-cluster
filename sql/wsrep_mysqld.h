@@ -16,7 +16,7 @@
 #ifndef WSREP_MYSQLD_H
 #define WSREP_MYSQLD_H
 
-//#include "mysqld.h"
+#include "mysqld.h"
 typedef struct st_mysql_show_var SHOW_VAR;
 //#include <mysql.h>
 #include <sql_priv.h>
