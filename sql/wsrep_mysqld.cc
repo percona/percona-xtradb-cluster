@@ -454,7 +454,7 @@ bool wsrep_start_replication()
     return true;
   }
 
-  if (strlen(wsrep_cluster_address)== 0)
+  if (!wsrep_cluster_address || strlen(wsrep_cluster_address)== 0)
   {
     // if provider is non-trivial, but no address is specified, wait for address
     wsrep_ready = FALSE;
