@@ -126,9 +126,11 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
       WSREP_ERROR("settting rollback fail: %llu", thd_to_trx_id(thd));
     }
   }
-  thd_binlog_trx_reset(thd); // @TODO: move into wsrep engine rollback
+  int rcode = binlog_hton->rollback(binlog_hton, thd, all);
+  //thd_binlog_trx_reset(thd);
+
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  DBUG_RETURN(0);
+  DBUG_RETURN(rcode);
 }
 
 int wsrep_commit(handlerton *hton, THD *thd, bool all)

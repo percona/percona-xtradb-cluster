@@ -1983,8 +1983,12 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
     cache_mngr->reset_cache(&cache_mngr->trx_cache);
     DBUG_RETURN(error);
   }
-
+#ifdef WITH_WSREP
+  if (!wsrep_emulate_bin_log &&
+      mysql_bin_log.check_write_error(thd))
+#else
   if (mysql_bin_log.check_write_error(thd))
+#endif
   {
     /*
       "all == true" means that a "rollback statement" triggered the error and
@@ -2150,7 +2154,12 @@ static int binlog_savepoint_rollback(handlerton *hton, THD *thd, void *sv)
     non-transactional table. Otherwise, truncate the binlog cache starting
     from the SAVEPOINT command.
   */
+#ifdef WITH_WSREP
+  if (!wsrep_emulate_bin_log &&
+      unlikely(trans_has_updated_non_trans_table(thd) ||
+#else
   if (unlikely(trans_has_updated_non_trans_table(thd) ||
+#endif
                (thd->variables.option_bits & OPTION_KEEP_LOG)))
   {
     String log_query;
