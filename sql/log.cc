@@ -524,11 +524,11 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
      */
     if (total_length > wsrep_max_ws_size)
     {
-      sql_print_warning("WSREP: transaction size limit (%lld) exceeded: %lld",
-                        wsrep_max_ws_size, total_length);
+      WSREP_WARN("transaction size limit (%lld) exceeded: %lld",
+		 wsrep_max_ws_size, total_length);
       if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
       {
-        sql_print_warning("WSREP: failed to initialize io-cache");
+        WSREP_WARN("failed to initialize io-cache");
       } 
       if (buf_ptr) my_free(*buf);
       *buf_len = 0;
@@ -540,7 +540,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
       *buf = (uchar *)my_realloc(*buf, total_length+length, MYF(0));
       if (!*buf)
       {
-        sql_print_error("WSREP io cache write problem: %d %d",*buf_len,length);
+        WSREP_ERROR("io cache write problem: %d %d", *buf_len, length);
         return ER_ERROR_ON_WRITE;
       }
       buf_ptr = *buf+total_length;
@@ -549,7 +549,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
     {
       if (buf_ptr != NULL)
       {
-        sql_print_error("WSREP io cache alloc error: %d %d", *buf_len, length);
+        WSREP_ERROR("io cache alloc error: %d %d", *buf_len, length);
         my_free(*buf);
       }
       if (length > 0) 
@@ -2132,7 +2132,9 @@ static int binlog_savepoint_set(handlerton *hton, THD *thd, void *sv)
 
   binlog_trans_log_savepos(thd, (my_off_t*) sv);
   /* Write it to the binary log */
-
+#ifdef WITH_WSREP
+  if (wsrep_emulate_bin_log) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
   String log_query;
   if (log_query.append(STRING_WITH_LEN("SAVEPOINT ")) ||
       log_query.append("`") ||

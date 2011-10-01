@@ -106,11 +106,14 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
 
 static int wsrep_savepoint_set(handlerton *hton, THD *thd,  void *sv)
 {
-  return 0;
+  int rcode = binlog_hton->savepoint_set(binlog_hton, thd, sv);
+  return rcode;
 }
 static int wsrep_savepoint_rollback(handlerton *hton, THD *thd, void *sv)
 {
-  return 0;
+  if (!wsrep_emulate_bin_log) return 0;
+  int rcode = binlog_hton->savepoint_rollback(binlog_hton, thd, sv);
+  return rcode;
 }
 
 static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
@@ -126,7 +129,11 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
       WSREP_ERROR("settting rollback fail: %llu", thd_to_trx_id(thd));
     }
   }
-  int rcode = binlog_hton->rollback(binlog_hton, thd, all);
+  int rcode = 0;
+  if (!wsrep_emulate_bin_log) 
+    thd_binlog_trx_reset(thd);
+  else
+    rcode = binlog_hton->rollback(binlog_hton, thd, all);
   //thd_binlog_trx_reset(thd);
 
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -240,11 +247,15 @@ wsrep_run_wsrep_commit(
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(cache, &rbr_data, &data_len);
     if (rcode) {
-      WSREP_ERROR("rbr write fail, data_len: %d, %d", 
-		  data_len, rcode);
+      WSREP_ERROR("rbr write fail, data_len: %d, %d", data_len, rcode);
       if (data_len) my_free(rbr_data);
       DBUG_RETURN(WSREP_TRX_ROLLBACK);
     }
+  }
+  if (data_len == 0) 
+  {
+      WSREP_DEBUG("empty rbr buffer");
+      DBUG_RETURN(WSREP_TRX_ROLLBACK);
   }
   if (!rcode) {
     rcode = wsrep->pre_commit(
