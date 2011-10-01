@@ -21,6 +21,7 @@ typedef struct st_mysql_show_var SHOW_VAR;
 //#include <mysql.h>
 #include <sql_priv.h>
 #include "../wsrep/wsrep_api.h"
+//#include <sql_class.h>
 
 class set_var;
 class THD;
@@ -260,5 +261,6 @@ extern PSI_cond_key  key_COND_wsrep_replaying;
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_);
 void wsrep_to_isolation_end(THD *thd);
 
-
+void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow*);
+void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow*);
 #endif /* WSREP_MYSQLD_H */

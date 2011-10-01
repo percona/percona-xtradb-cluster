@@ -534,4 +534,5 @@ inline THD *_current_thd(void)
 #endif
 #define current_thd _current_thd()
 
+
 #endif /* MYSQLD_INCLUDED */

@@ -1577,23 +1577,24 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       if (thd->wsrep_exec_mode!= REPL_RECV) {
         if (thd->stmt_da->is_sent) {
           WSREP_ERROR("replay issue, thd has reported status already");
-	}
-	thd->stmt_da->reset_diagnostics_area();
+        }
+        thd->stmt_da->reset_diagnostics_area();
 
-	thd->wsrep_conflict_state= REPLAYING;
-	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+        thd->wsrep_conflict_state= REPLAYING;
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-	mysql_reset_thd_for_next_command(thd);
-	close_thread_tables(thd);
+        mysql_reset_thd_for_next_command(thd);
+        close_thread_tables(thd);
 
-	thd_proc_info(thd, "wsrep replaying trx");
-	WSREP_DEBUG("replay trx: %s", thd->query() ? thd->query() : "void");
-	void *shadow= wsrep_prepare_bf_thd(thd);
-	int rcode = wsrep->replay_trx(wsrep,
+        thd_proc_info(thd, "wsrep replaying trx");
+        WSREP_DEBUG("replay trx: %s", thd->query() ? thd->query() : "void");
+        struct wsrep_thd_shadow shadow;
+        wsrep_prepare_bf_thd(thd, &shadow);
+        int rcode = wsrep->replay_trx(wsrep,
                                       &thd->wsrep_trx_handle,
                                       (void *)thd);
 
-        wsrep_return_from_bf_mode(shadow, thd);
+        wsrep_return_from_bf_mode(thd, &shadow);
         if (thd->wsrep_conflict_state!= REPLAYING)
           WSREP_WARN("lost replaying mode: %d", thd->wsrep_conflict_state );
 
@@ -7627,6 +7628,7 @@ static wsrep_status_t wsrep_bf_apply_rbr(
                  event, exec_res, (long long) thd->wsrep_trx_seqno);
       rcode= exec_res;
       /* stop processing for the first error */
+      delete ev;
       goto error;
     }
     event++;
@@ -7760,18 +7762,8 @@ Relay_log_info* wsrep_relay_log_init(const char* log_fname)
   return rli;
 }
 
-struct wsrep_thd_shadow {
-  ulonglong            options;
-  enum wsrep_exec_mode wsrep_exec_mode;
-  Vio                  *vio;
-  ulong                tx_isolation;
-};
-
-void *wsrep_prepare_bf_thd(THD *thd)
+void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
 {
-  struct wsrep_thd_shadow *shadow = 
-    (struct wsrep_thd_shadow *)malloc(sizeof(struct wsrep_thd_shadow));
-
   shadow->options       = thd->variables.option_bits;
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->net.vio;
@@ -7792,16 +7784,14 @@ void *wsrep_prepare_bf_thd(THD *thd)
   shadow->tx_isolation        = thd->variables.tx_isolation;
   thd->variables.tx_isolation = ISO_READ_COMMITTED;
   thd->tx_isolation           = ISO_READ_COMMITTED;
-
-  return (void *)shadow;
 }
-void wsrep_return_from_bf_mode(void *shadow, THD *thd)
+
+void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
 {
-  thd->variables.option_bits= ((struct wsrep_thd_shadow *)shadow)->options;
-  thd->wsrep_exec_mode = ((struct wsrep_thd_shadow *)shadow)->wsrep_exec_mode;
-  thd->net.vio         = ((struct wsrep_thd_shadow *)shadow)->vio;
-  thd->variables.tx_isolation = 
-    ((struct wsrep_thd_shadow *)shadow)->tx_isolation;
+  thd->variables.option_bits  = shadow->options;
+  thd->wsrep_exec_mode        = shadow->wsrep_exec_mode;
+  thd->net.vio                = shadow->vio;
+  thd->variables.tx_isolation = shadow->tx_isolation;
 
   free(shadow);
 }
@@ -7811,7 +7801,8 @@ void wsrep_replication_process(THD *thd)
   int rcode;
   DBUG_ENTER("wsrep_replication_process");
 
-  wsrep_prepare_bf_thd(thd);
+  struct wsrep_thd_shadow shadow;
+  wsrep_prepare_bf_thd(thd, &shadow);
 
   wsrep_format_desc= new Format_description_log_event(4);
 
@@ -7870,7 +7861,7 @@ void wsrep_replication_process(THD *thd)
     mysql_cond_broadcast(&COND_thread_count);
     mysql_mutex_unlock(&LOCK_thread_count);
   }
-
+  wsrep_return_from_bf_mode(thd, &shadow);
   DBUG_VOID_RETURN;
 }
 

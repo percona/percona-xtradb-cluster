@@ -69,6 +69,12 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+struct wsrep_thd_shadow {
+  ulonglong            options;
+  enum wsrep_exec_mode wsrep_exec_mode;
+  Vio                  *vio;
+  ulong                tx_isolation;
+};
 #endif
 class Reprepare_observer;
 class Relay_log_info;

@@ -4426,6 +4426,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   // we are going to exit anyway.
   if (plugins_are_initialized)
   {
+    net_end(&thd->net);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 1));
   }
   else
