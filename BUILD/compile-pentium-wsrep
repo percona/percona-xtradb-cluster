@@ -3,8 +3,8 @@
 path=`dirname $0`
 . "$path/SETUP.sh"
 
-extra_flags="$pentium_cflags $fast_cflags"
-extra_configs="$pentium_configs --with-wsrep"
+extra_flags="$pentium_cflags $fast_cflags $wsrep_cflags"
+extra_configs="$pentium_configs $wsrep_configs --with-wsrep"
 
 #strip=yes
 
