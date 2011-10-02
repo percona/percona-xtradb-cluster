@@ -7792,8 +7792,6 @@ void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->wsrep_exec_mode        = shadow->wsrep_exec_mode;
   thd->net.vio                = shadow->vio;
   thd->variables.tx_isolation = shadow->tx_isolation;
-
-  free(shadow);
 }
 
 void wsrep_replication_process(THD *thd)
