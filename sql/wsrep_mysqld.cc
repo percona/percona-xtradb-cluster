@@ -331,18 +331,19 @@ int wsrep_init()
   else
   {
     global_system_variables.wsrep_on = 1;
-    strncpy(provider_name, 
-	    wsrep->provider_name,    sizeof(provider_name) - 1);
-    strncpy(provider_version, 
-	    wsrep->provider_version, sizeof(provider_version) - 1);
-    strncpy(provider_vendor, 
-	    wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
+    strncpy(provider_name,
+            wsrep->provider_name,    sizeof(provider_name) - 1);
+    strncpy(provider_version,
+            wsrep->provider_version, sizeof(provider_version) - 1);
+    strncpy(provider_vendor,
+            wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
   }
 
   struct wsrep_init_args wsrep_args;
 
-  if (!wsrep_node_incoming_address ||
-      !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO)) {
+  if (strcmp (wsrep_provider, WSREP_NONE) &&
+      (!wsrep_node_incoming_address ||
+       !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO))) {
     static char inc_addr[256];
     size_t inc_addr_max = sizeof (inc_addr);
     size_t ret = default_address (inc_addr, inc_addr_max);
@@ -355,10 +356,10 @@ int wsrep_init()
   }
 
   wsrep_args.data_dir        = mysql_real_data_home;
-  wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : ""; 
+  wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
   wsrep_args.node_incoming   = wsrep_node_incoming_address;
-  wsrep_args.options         = (wsrep_provider_options) ? 
-                                 wsrep_provider_options : "";
+  wsrep_args.options         = (wsrep_provider_options) ?
+                                wsrep_provider_options : "";
   wsrep_args.proto_ver       = wsrep_max_protocol_version;
 
   wsrep_args.state_uuid      = &local_uuid;
