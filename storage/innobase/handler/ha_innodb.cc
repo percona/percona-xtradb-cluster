@@ -6739,10 +6739,13 @@ wsrep_append_key(
 {
 	DBUG_ENTER("wsrep_append_key");
 #ifdef WSREP_DEBUG_PRINT
-	fprintf(stderr, "len: %d ", key_len);
+	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ", 
+		(action==WSREP_INSERT) ? "INSERT" : 
+		(action==WSREP_UPDATE) ? "UPDATE" : "DELETE",
+		wsrep_thd_thread_id(thd), trx->id, key_len, 
+		table_share->table_name);
 	for (int i=0; i<key_len; i++) {
-		fprintf(stderr, " %c ", key[i]);
-		fprintf(stderr, " (%X), ", key[i]);
+		fprintf(stderr, "%hhX, ", key[i]);
 	}
 	fprintf(stderr, "\n");
 #endif

@@ -129,12 +129,16 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
       WSREP_ERROR("settting rollback fail: %llu", thd_to_trx_id(thd));
     }
   }
+
   int rcode = 0;
   if (!wsrep_emulate_bin_log) 
-    thd_binlog_trx_reset(thd);
+  {
+    if (all) thd_binlog_trx_reset(thd);
+  }
   else
+  {
     rcode = binlog_hton->rollback(binlog_hton, thd, all);
-  //thd_binlog_trx_reset(thd);
+  }
 
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   DBUG_RETURN(rcode);
@@ -286,7 +290,7 @@ wsrep_run_wsrep_commit(
     DBUG_ASSERT(0); // failure like this can not normally happen
     DBUG_RETURN(WSREP_TRX_ERROR);
   }
-
+  
   if (data_len) {
     my_free(rbr_data);
   }
@@ -295,6 +299,7 @@ wsrep_run_wsrep_commit(
   case 0:
     thd->wsrep_exec_mode = LOCAL_COMMIT;
     DBUG_PRINT("wsrep", ("replicating commit success"));
+
     break;
   case WSREP_TRX_FAIL:
   case WSREP_BF_ABORT:

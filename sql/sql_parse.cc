@@ -1587,7 +1587,9 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
         close_thread_tables(thd);
 
         thd_proc_info(thd, "wsrep replaying trx");
-        WSREP_DEBUG("replay trx: %s", thd->query() ? thd->query() : "void");
+        WSREP_DEBUG("replay trx: %s %lld", 
+		    thd->query() ? thd->query() : "void", 
+		    (long long)thd->wsrep_trx_seqno);
         struct wsrep_thd_shadow shadow;
         wsrep_prepare_bf_thd(thd, &shadow);
         int rcode = wsrep->replay_trx(wsrep,
@@ -1604,7 +1606,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
         case WSREP_OK:
           thd->wsrep_conflict_state= NO_CONFLICT;
           wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
-          WSREP_DEBUG("trx_replay successful for: %lu", thd->real_id);
+          WSREP_DEBUG("trx_replay successful for: %ld %lu", 
+		      thd->thread_id, thd->real_id);
           break;
         case WSREP_TRX_FAIL:
           if (thd->stmt_da->is_sent) {
@@ -7624,8 +7627,8 @@ static wsrep_status_t wsrep_bf_apply_rbr(
 
     if (exec_res)
     {
-      WSREP_WARN("RBR event %d apply warning: %d, %lld",
-                 event, exec_res, (long long) thd->wsrep_trx_seqno);
+      WSREP_WARN("RBR event %d %s apply warning: %d, %lld",
+                 event, ev->get_type_str(), exec_res, (long long) thd->wsrep_trx_seqno);
       rcode= exec_res;
       /* stop processing for the first error */
       delete ev;
@@ -7742,8 +7745,6 @@ wsrep_status_t wsrep_bf_apply_cb(
     // TODO: mark snapshot with global_seqno. Remember that RBRs require
     //       explicit commit.
   }
-//  thd->wsrep_trx_seqno= 0;
-
   return rcode;
 }
 
