@@ -216,5 +216,15 @@ public:
   THD* const ptr;
 };
 
+class string
+{
+public:
+    string() : string_(0) {}
+    void set(char* str) { if (string_) free (string_); string_ = str; }
+    ~string() { set (0); }
+private:
+    char* string_;
+};
+
 } // namespace wsrep
 #endif /* WSREP_PRIV_H */

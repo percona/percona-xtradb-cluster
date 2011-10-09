@@ -31,6 +31,50 @@
 
 extern char** environ; // environment variables
 
+static wsp::string wsrep_PATH;
+
+void
+wsrep_append_PATH (const char* path)
+{
+    int count = 0;
+
+    while (environ[count])
+    {
+        if (strncmp (environ[count], "PATH=", 5))
+        {
+            count++;
+            continue;
+        }
+
+        char* const old_path (environ[count]);
+
+        if (strstr (old_path, path)) return; // path already there
+
+        size_t const new_path_len(strlen(old_path) + strlen(":") +
+                                  strlen(path) + 1);
+
+        char* const new_path (reinterpret_cast<char*>(malloc(new_path_len)));
+
+        if (new_path)
+        {
+            snprintf (new_path, new_path_len, "%s:%s", old_path, path);
+
+            wsrep_PATH.set (new_path);
+            environ[count] = new_path;
+        }
+        else
+        {
+            WSREP_ERROR ("Failed to allocate 'PATH' environment variable "
+                         "buffer of size %zu.", new_path_len);
+        }
+
+        return;
+    }
+
+    WSREP_ERROR ("Failed to find 'PATH' environment variable. "
+                 "State snapshot transfer may not be working.");
+}
+
 namespace wsp
 {
 

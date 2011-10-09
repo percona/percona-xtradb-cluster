@@ -142,6 +142,7 @@ extern void wsrep_stop_replication(THD *thd);
 extern bool wsrep_start_replication();
 extern bool wsrep_causal_wait(THD* thd);
 extern int  wsrep_check_opts (int argc, char* const* argv);
+extern void wsrep_append_PATH (const char* path);
 
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
@@ -182,14 +183,15 @@ extern void wsrep_SE_init_wait(); /*! wait for SE init to complete */
 extern void wsrep_SE_init_done(); /*! signal that SE init is complte */
 
 extern void wsrep_ready_wait();
+
 enum wsrep_trx_status {
     WSREP_TRX_OK,
     WSREP_TRX_ROLLBACK,
     WSREP_TRX_ERROR,
   };
-enum wsrep_trx_status
-wsrep_run_wsrep_commit(
-    THD *thd, handlerton *hton, bool all);
+
+extern enum wsrep_trx_status
+wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
 
 /*!
  * @param db      Database string

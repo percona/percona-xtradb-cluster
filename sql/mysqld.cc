@@ -4003,6 +4003,19 @@ will be ignored as the --log-bin option is not defined.");
 
 /* WSREP BEFORE */
 #ifdef WITH_WSREP
+  // add basedir/bin to PATH to resolve wsrep script names
+  char* const tmp_path((char*)alloca(strlen(mysql_home) + strlen("/bin") + 1));
+  if (tmp_path)
+  {
+    strcpy(tmp_path, mysql_home);
+    strcat(tmp_path, "/bin");
+    wsrep_append_PATH(tmp_path);
+  }
+  else
+  {
+    WSREP_ERROR("Could not append %s/bin to PATH", mysql_home);
+  }
+
   if (opt_bootstrap)
   {
     wsrep_provider_init(WSREP_NONE);
