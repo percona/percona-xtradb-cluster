@@ -4009,7 +4009,7 @@ will be ignored as the --log-bin option is not defined.");
   {
     strcpy(tmp_path, mysql_home);
     strcat(tmp_path, "/bin");
-    wsrep_append_PATH(tmp_path);
+    wsrep_prepend_PATH(tmp_path);
   }
   else
   {

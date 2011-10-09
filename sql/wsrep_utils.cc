@@ -34,7 +34,7 @@ extern char** environ; // environment variables
 static wsp::string wsrep_PATH;
 
 void
-wsrep_append_PATH (const char* path)
+wsrep_prepend_PATH (const char* path)
 {
     int count = 0;
 
@@ -57,7 +57,8 @@ wsrep_append_PATH (const char* path)
 
         if (new_path)
         {
-            snprintf (new_path, new_path_len, "%s:%s", old_path, path);
+            snprintf (new_path, new_path_len, "PATH=%s:%s", path,
+                      old_path + strlen("PATH="));
 
             wsrep_PATH.set (new_path);
             environ[count] = new_path;

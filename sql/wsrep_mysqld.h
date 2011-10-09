@@ -142,7 +142,7 @@ extern void wsrep_stop_replication(THD *thd);
 extern bool wsrep_start_replication();
 extern bool wsrep_causal_wait(THD* thd);
 extern int  wsrep_check_opts (int argc, char* const* argv);
-extern void wsrep_append_PATH (const char* path);
+extern void wsrep_prepend_PATH (const char* path);
 
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
