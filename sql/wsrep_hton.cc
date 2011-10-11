@@ -135,10 +135,6 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
   {
     if (all) thd_binlog_trx_reset(thd);
   }
-  else
-  {
-    rcode = binlog_hton->rollback(binlog_hton, thd, all);
-  }
 
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   DBUG_RETURN(rcode);

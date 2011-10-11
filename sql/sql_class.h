@@ -1632,6 +1632,9 @@ public:
 #ifndef MYSQL_CLIENT
   int binlog_setup_trx_data();
 
+#ifdef WITH_WSREP
+  void wsrep_start_trans_and_stmt();
+#endif
   /*
     Public interface to write RBR events to the binlog
   */

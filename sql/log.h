@@ -692,6 +692,7 @@ enum enum_binlog_format {
 IO_CACHE * get_trans_log(THD * thd);
 void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void thd_binlog_trx_reset(THD * thd);
+void thd_binlog_rollback_stmt(THD * thd);
 int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len);
 #endif
 int query_error_code(THD *thd, bool not_killed);

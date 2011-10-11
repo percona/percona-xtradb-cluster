@@ -983,6 +983,12 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht_arg)
   trans->no_2pc|=(ht_arg->prepare==0);
   if (thd->transaction.xid_state.xid.is_null())
     thd->transaction.xid_state.xid.set(thd->query_id);
+#ifdef WITH_WSREP
+  if (ht_arg->db_type == DB_TYPE_INNODB)
+  {
+    thd->wsrep_start_trans_and_stmt();
+  }
+#endif /* WITH_WSREP */
   DBUG_VOID_RETURN;
 }
 

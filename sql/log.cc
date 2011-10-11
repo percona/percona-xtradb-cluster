@@ -479,8 +479,17 @@ bool LOGGER::is_log_table_enabled(uint log_table_type)
 #ifdef WITH_WSREP
 IO_CACHE * get_trans_log(THD * thd)
 {
-  return ((binlog_cache_mngr*)
-           thd_get_ha_data(thd, binlog_hton))->get_binlog_cache_log(true);
+  binlog_cache_mngr *cache_mngr = (binlog_cache_mngr*)
+    thd_get_ha_data(thd, binlog_hton);
+  if (cache_mngr)
+  {
+    return cache_mngr->get_binlog_cache_log(true);
+  } 
+  else
+  {
+    WSREP_DEBUG("binlog cache not initialized, conn :%ld", thd->thread_id);
+    return NULL;
+  }
 }
 
 void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end)
@@ -496,9 +505,17 @@ void thd_binlog_trx_reset(THD * thd)
   {
     binlog_cache_mngr *const cache_mngr=
       (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
-    cache_mngr->reset_cache(&cache_mngr->trx_cache);
+    if (cache_mngr) cache_mngr->reset_cache(&cache_mngr->trx_cache);
   }
   thd->clear_binlog_table_maps();
+}
+
+void thd_binlog_rollback_stmt(THD * thd)
+{
+  WSREP_DEBUG("thd_binlog_rollback_stmt :%ld", thd->thread_id);
+  binlog_cache_mngr *const cache_mngr=
+    (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+  if (cache_mngr) cache_mngr->trx_cache.set_prev_position(MY_OFF_T_UNDEF);
 }
 /*
   Write the contents of a cache to memory buffer.
@@ -1899,6 +1916,9 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
   DBUG_ENTER("binlog_commit");
   binlog_cache_mngr *const cache_mngr=
     (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+#ifdef WITH_WSREP
+  if (!cache_mngr) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
 
   DBUG_PRINT("debug",
              ("all: %d, in_transaction: %s, all.modified_non_trans_table: %s, stmt.modified_non_trans_table: %s",
@@ -1955,6 +1975,9 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
   int error= 0;
   binlog_cache_mngr *const cache_mngr=
     (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+#ifdef WITH_WSREP
+  if (!cache_mngr) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
 
   DBUG_PRINT("debug", ("all: %s, all.modified_non_trans_table: %s, stmt.modified_non_trans_table: %s",
                        YESNO(all),
@@ -4702,6 +4725,22 @@ int THD::binlog_setup_trx_data()
   DBUG_RETURN(0);
 }
 
+#ifdef WITH_WSREP
+void
+THD::wsrep_start_trans_and_stmt()
+{
+  if (WSREP(this))
+  {
+    if (in_multi_stmt_transaction_mode())
+    {
+      trans_register_ha(this, TRUE, wsrep_hton);
+      ha_data[wsrep_hton->slot].ha_info[1].set_trx_read_write();
+    }
+    trans_register_ha(this, FALSE, wsrep_hton);
+    ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
+  }
+}
+#endif /* WITH_WSREP */
 /*
   Function to start a statement and optionally a transaction for the
   binary log.
@@ -4744,18 +4783,7 @@ THD::binlog_start_trans_and_stmt()
   {
     this->binlog_set_stmt_begin();
 #ifdef WITH_WSREP
-    if (WSREP(this))
-    {
-      if (in_multi_stmt_transaction_mode())
-      {
-	trans_register_ha(this, TRUE, wsrep_hton);
-	ha_data[wsrep_hton->slot].ha_info[1].set_trx_read_write();
-      }
-      trans_register_ha(this, FALSE, wsrep_hton);
-      ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
-      if (wsrep_emulate_bin_log)
-	DBUG_VOID_RETURN;
-    }
+    wsrep_start_trans_and_stmt();
 #endif
     if (in_multi_stmt_transaction_mode())
       trans_register_ha(this, TRUE, binlog_hton);
@@ -5574,6 +5602,9 @@ bool MYSQL_BIN_LOG::write(THD *thd, IO_CACHE *cache, Log_event *commit_event,
                           bool incident)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::write(THD *, IO_CACHE *, Log_event *)");
+#ifdef WITH_WSREP
+  if (wsrep_emulate_bin_log) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
   mysql_mutex_lock(&LOCK_log);
 
   DBUG_ASSERT(is_open());
