@@ -702,14 +702,12 @@ void wsrep_to_isolation_end(THD *thd) {
     WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
                 thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
     if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
-      thd->wsrep_exec_mode= LOCAL_STATE;
       WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);
     }
     else {
       WSREP_WARN("TO isolation end failed for: %d, sql: %s",
                  ret, (thd->query()) ? thd->query() : "void");
     }
-    thd->wsrep_trx_seqno= 0;
   }
 }
 

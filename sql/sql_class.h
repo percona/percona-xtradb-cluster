@@ -1761,6 +1761,11 @@ public:
 #ifdef WITH_WSREP // Todo: convert into a plugin method
       // wsrep's post-commit. LOCAL_COMMIT designates wsrep's commit was ok
       if (WSREP(thd)) wsrep_cleanup_transaction(thd);
+      if (TOTAL_ORDER == thd->wsrep_exec_mode)
+      {
+	thd->wsrep_exec_mode = LOCAL_STATE;
+      }
+      thd->wsrep_trx_seqno = 0;
 #endif  /* WITH_WSREP */
     }
     my_bool is_active()
