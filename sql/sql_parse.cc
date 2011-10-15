@@ -7562,6 +7562,17 @@ static enum wsrep_status wsrep_bf_apply_sql(
   DBUG_RETURN(ret_code);
 }
 
+void wsrep_write_rbr_buf(
+    THD *thd, const uchar *rbr_buf, size_t buf_len)
+{
+  char filename[64] = {0};
+  sprintf(filename, "%s/GRA_%ld_%lld.log", 
+	  wsrep_data_home_dir, thd->thread_id, (long long)thd->wsrep_trx_seqno);
+  FILE *of = fopen(filename, "wb");
+
+  fwrite (rbr_buf, buf_len, 1, of);
+  fclose(of);
+}
 static wsrep_status_t wsrep_bf_apply_rbr(
     THD *thd, const uchar *rbr_buf, size_t buf_len)
 {
@@ -7745,6 +7756,9 @@ wsrep_status_t wsrep_bf_apply_cb(
     // TODO: mark snapshot with global_seqno. Remember that RBRs require
     //       explicit commit.
   }
+  else
+    wsrep_write_rbr_buf(thd, data->u.app.buffer, data->u.app.len);
+
   return rcode;
 }
 
