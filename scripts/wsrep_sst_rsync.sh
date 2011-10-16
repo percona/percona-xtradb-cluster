@@ -52,8 +52,9 @@ rm -rf "$FLUSHED"
 if [ "$ROLE" = "donor" ]
 then
     # Use deltaxfer only for WAN
-    [ "$0" == "wsrep_sst_rsync_wan" ] && WHOLE_FILE_OPT="" \
-                                      || WHOLE_FILE_OPT="--whole-file"
+    inv=$(basename $0)
+    [ "$inv" = "wsrep_sst_rsync_wan" ] && WHOLE_FILE_OPT="" \
+                                       || WHOLE_FILE_OPT="--whole-file"
 
     echo "flush tables"
 
