@@ -1842,6 +1842,13 @@ void THD::cleanup_after_query()
   /* reset table map for multi-table update */
   table_map_for_update= 0;
   m_binlog_invoker= FALSE;
+#ifdef WITH_WSREP
+      if (TOTAL_ORDER == wsrep_exec_mode)
+      {
+	wsrep_exec_mode = LOCAL_STATE;
+      }
+      wsrep_trx_seqno = 0;
+#endif  /* WITH_WSREP */
 }
 
 
