@@ -393,6 +393,9 @@ void wsrep_init_startup (bool first)
   wsrep_thr_lock_init(wsrep_thd_is_brute_force, wsrep_abort_thd,
                       wsrep_debug, wsrep_convert_LOCK_to_trx, wsrep_on);
 
+  /* Skip replication start if no cluster address */
+  if (!wsrep_cluster_address || strlen(wsrep_cluster_address) == 0) return;
+
   if (first) wsrep_sst_grab(); // do it so we can wait for SST below
 
   if (!wsrep_start_replication()) unireg_abort(1);

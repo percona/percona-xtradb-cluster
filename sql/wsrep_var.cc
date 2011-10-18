@@ -306,8 +306,11 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
   if (wsrep_start_replication())
   {
     wsrep_create_rollbacker();
-    wsrep_create_appliers();
+    wsrep_create_appliers(1);
   }
+
+  wsrep_create_appliers(wsrep_slave_threads - 1);
+
   thd->variables.wsrep_on= wsrep_on_saved;
 
   return false;
