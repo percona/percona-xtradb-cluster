@@ -3245,16 +3245,6 @@ static Sys_var_charptr Sys_wsrep_dbug_option(
        IN_FS_CHARSET, DEFAULT(""),
        NO_MUTEX_GUARD, NOT_IN_BINLOG);
 
-static Sys_var_ulong Sys_wsrep_local_cache_size(
-       "wsrep_local_cache_size", "Memory size for processing local "
-       "transactions",
-       GLOBAL_VAR(wsrep_local_cache_size),CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(10000, 40000), DEFAULT(20000), BLOCK_SIZE(1));
-
-static Sys_var_mybool Sys_wsrep_ws_persistency(
-       "wsrep_ws_persistency", "",
-       GLOBAL_VAR(wsrep_ws_persistency), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
-
 static Sys_var_mybool Sys_wsrep_debug(
        "wsrep_debug", "To enable debug level logging",
        GLOBAL_VAR(wsrep_debug), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
@@ -3281,7 +3271,7 @@ static Sys_var_mybool Sys_wsrep_drupal_282555_workaround(
        "wsrep_drupal_282555_workaround", "To use a workaround for"
        "bad autoincrement value", 
        GLOBAL_VAR(wsrep_drupal_282555_workaround), 
-       CMD_LINE(OPT_ARG), DEFAULT(TRUE));
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_charptr sys_wsrep_sst_method(
        "wsrep_sst_method", "Snapshot transfer method",

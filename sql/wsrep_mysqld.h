@@ -39,8 +39,6 @@ extern const char* wsrep_node_incoming_address;
 extern const char* wsrep_data_home_dir;
 extern const char* wsrep_dbug_option;
 extern long        wsrep_slave_threads;
-extern long        wsrep_local_cache_size;
-extern my_bool     wsrep_ws_persistency;
 extern my_bool     wsrep_debug;
 extern my_bool     wsrep_convert_LOCK_to_trx;
 extern ulong       wsrep_retry_autocommit;

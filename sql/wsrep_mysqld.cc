@@ -33,8 +33,6 @@ const char* wsrep_node_incoming_address = WSREP_NODE_INCOMING_AUTO;
 const char* wsrep_dbug_option   = "";
 
 long    wsrep_slave_threads            = 1; // # of slave action appliers wanted
-long    wsrep_local_cache_size         = 20971520;// space allocd for local write sets
-my_bool wsrep_ws_persistency           = 0; // policy for certified WS storage
 my_bool wsrep_debug                    = 0; // enable debug level logging
 my_bool wsrep_convert_LOCK_to_trx      = 1; // convert locking sessions to trx
 ulong   wsrep_retry_autocommit         = 5; // retry aborted autocommit trx

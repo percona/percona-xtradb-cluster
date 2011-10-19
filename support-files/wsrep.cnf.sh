@@ -56,17 +56,10 @@ wsrep_cluster_name="my_wsrep_cluster"
 #wsrep_node_incoming_address=
 
 # How many threads will process writesets from other nodes
-# (more than one untested)
 wsrep_slave_threads=1
 
 # DBUG options for wsrep provider
 #wsrep_dbug_option
-
-# cache size (bytes) for processing write sets in local phase
-wsrep_local_cache_size=20M
-
-# write sets can be saved in binary files
-wsrep_ws_persistency=0
 
 # Generate fake primary keys for non-PK tables (required for multi-master
 # and parallel applying operation)
@@ -95,7 +88,7 @@ wsrep_retry_autocommit=1
 wsrep_auto_increment_control=1
 
 # retry autoinc insert, which failed for duplicate key error
-wsrep_drupal_282555_workaround=1
+wsrep_drupal_282555_workaround=0
 
 # enable "strictly synchronous" semantics for read operations
 wsrep_causal_reads=0
@@ -122,7 +115,7 @@ wsrep_sst_method=mysqldump
 
 # SST authentication string. This will be used to send SST to joining nodes.
 # Depends on SST method. For mysqldump method it is root:<root password>
-wsrep_sst_auth=root:rootpass
+wsrep_sst_auth=root:
 
 # Desired SST donor name.
 #wsrep_sst_donor=
