@@ -714,8 +714,8 @@ void wsrep_to_isolation_end(THD *thd) {
 
 bool
 wsrep_lock_grant_exception(enum_mdl_type type_arg,
-			   MDL_context *requestor_ctx,
-			   MDL_ticket *ticket
+                           MDL_context *requestor_ctx,
+                           MDL_ticket *ticket
 ) {
   if (!WSREP_ON) return FALSE;
 
@@ -729,38 +729,38 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
     mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
     if (granted_thd->wsrep_query_state == QUERY_COMMITTING) {
       WSREP_DEBUG(
-        "mdl granted over commiting thd, BF: (%lu %d %d %lu) thd: (%lu %d %lu)",
-	request_thd->thread_id, request_thd->wsrep_exec_mode,
-	request_thd->wsrep_query_state, request_thd->wsrep_trx_seqno, 
-	granted_thd->thread_id, granted_thd->wsrep_exec_mode,
-	granted_thd->wsrep_trx_seqno);
+        "mdl granted over commiting thd, BF: (%lu %d %d %lld) thd: (%lu %d %lld)",
+        request_thd->thread_id, request_thd->wsrep_exec_mode,
+        request_thd->wsrep_query_state, (long long)request_thd->wsrep_trx_seqno,
+        granted_thd->thread_id, granted_thd->wsrep_exec_mode,
+        (long long)granted_thd->wsrep_trx_seqno);
       retval =  TRUE;
 
     } else if (granted_thd->lex->sql_command == SQLCOM_FLUSH &&
-	       (granted_thd->wsrep_trx_seqno >= request_thd->wsrep_trx_seqno ||
-		granted_thd->wsrep_trx_seqno == 0)) {
+               (granted_thd->wsrep_trx_seqno >= request_thd->wsrep_trx_seqno ||
+                granted_thd->wsrep_trx_seqno == 0)) {
       WSREP_DEBUG(
-        "mdl granted over FLUSHing thd, BF: (%lu %d %d %lu) thd: (%lu %d %lu)",
-	request_thd->thread_id, request_thd->wsrep_exec_mode,
-	request_thd->wsrep_query_state, request_thd->wsrep_trx_seqno, 
-	granted_thd->thread_id, granted_thd->wsrep_exec_mode,
-	granted_thd->wsrep_trx_seqno);
+        "mdl granted over FLUSHing thd, BF: (%lu %d %d %lld) thd: (%lu %d %lld)",
+        request_thd->thread_id, request_thd->wsrep_exec_mode,
+        request_thd->wsrep_query_state, (long long)request_thd->wsrep_trx_seqno,
+        granted_thd->thread_id, granted_thd->wsrep_exec_mode,
+        (long long)granted_thd->wsrep_trx_seqno);
       retval = TRUE;
 
     } else {
       WSREP_INFO(
-        "mdl conflict, BF: (%lu %d %d %lu) thd: (%lu %d %d %lu)",
-	request_thd->thread_id, request_thd->wsrep_exec_mode,
-	request_thd->wsrep_query_state, request_thd->wsrep_trx_seqno, 
-	granted_thd->thread_id, granted_thd->wsrep_exec_mode,
-	granted_thd->wsrep_query_state,  granted_thd->wsrep_trx_seqno);
+        "mdl conflict, BF: (%lu %d %d %lld) thd: (%lu %d %d %lld)",
+        request_thd->thread_id, request_thd->wsrep_exec_mode,
+        request_thd->wsrep_query_state, (long long)request_thd->wsrep_trx_seqno, 
+        granted_thd->thread_id, granted_thd->wsrep_exec_mode,
+        granted_thd->wsrep_query_state,  (long long)granted_thd->wsrep_trx_seqno);
 
       if (granted_thd->wsrep_exec_mode != TOTAL_ORDER &&
-	  granted_thd->wsrep_exec_mode != REPL_RECV)
+          granted_thd->wsrep_exec_mode != REPL_RECV)
       {
-	mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-	wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
-	return TRUE;
+        mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
+        wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
+        return TRUE;
       }
     }
     mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
