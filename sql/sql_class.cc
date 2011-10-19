@@ -1847,7 +1847,7 @@ void THD::cleanup_after_query()
       {
 	wsrep_exec_mode = LOCAL_STATE;
       }
-      wsrep_trx_seqno = 0;
+      //wsrep_trx_seqno = 0;
 #endif  /* WITH_WSREP */
 }
 
