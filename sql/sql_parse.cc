@@ -855,9 +855,19 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow queries "SET" and "SHOW", they are trapped later in execute_command
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-	!wsrep_ready && command != COM_QUERY)
-    {
+    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready && 
+        command != COM_QUERY        &&
+        command != COM_PING         &&
+        command != COM_QUIT         &&
+        command != COM_PROCESS_INFO &&
+        command != COM_PROCESS_KILL &&
+        command != COM_SET_OPTION   &&
+        command != COM_SHUTDOWN     &&
+        command != COM_SLEEP        &&
+        command != COM_STATISTICS   &&
+        command != COM_TIME         &&
+        command != COM_END
+    ) {
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0), 
 	       "WSREP has not yet prepared node for application use");
       thd->protocol->end_statement();
