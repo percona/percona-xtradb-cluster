@@ -3976,7 +3976,12 @@ static int init_server_components()
     sql_print_warning("You need to use --log-bin to make "
                     "--log-slave-updates work.");
   }
+
+#ifdef WITH_WSREP
+  if (!WSREP_ON && !opt_bin_log && binlog_format_used)
+#else
   if (!opt_bin_log && binlog_format_used)
+#endif
     sql_print_warning("You need to use --log-bin to make "
                       "--binlog-format work.");
 
