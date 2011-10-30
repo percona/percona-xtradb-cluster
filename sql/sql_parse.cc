@@ -7625,17 +7625,9 @@ static wsrep_status_t wsrep_bf_apply_rbr(
       DBUG_ASSERT(buf_len != 0 ||
                   ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F));
       break;
-    case TABLE_MAP_EVENT:
-      break;
-    case QUERY_EVENT:
-      //WSREP_DEBUG("query event: %s", ((Query_log_event*)ev)->query);
-      break;
     default:
-      WSREP_WARN("Unknown event type code %d, discarding",
-                 ev->get_type_code());
-      goto cleanup;
+      break;
     }
-
 
     thd->server_id = ev->server_id; // use the original server id for logging
     thd->set_time();                // time the query
@@ -7670,7 +7662,6 @@ static wsrep_status_t wsrep_bf_apply_rbr(
       DBUG_RETURN(WSREP_FATAL);
     }
 
-  cleanup:
     if (ev->get_type_code() != TABLE_MAP_EVENT &&
         ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F))
     {
