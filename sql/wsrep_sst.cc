@@ -565,7 +565,8 @@ static int sst_mysqldump_check_addr (const char* user, const char* pswd,
 static int sst_donate_mysqldump (const char*         addr,
                                  const wsrep_uuid_t* uuid,
                                  const char*         uuid_str,
-                                 wsrep_seqno_t       seqno)
+                                 wsrep_seqno_t       seqno,
+                                 bool                bypass)
 {
   size_t host_len;
   const char* port = strchr (addr, ':');
@@ -613,8 +614,9 @@ static int sst_donate_mysqldump (const char*         addr,
     char   cmd_str[cmd_len];
 
     snprintf (cmd_str, cmd_len,
-              "wsrep_sst_mysqldump '%s' '%s' '%s' '%s' '%u' '%s' '%lld'",
-              user, pswd, host, port, mysqld_port, uuid_str, (long long)seqno);
+              "wsrep_sst_mysqldump '%s' '%s' '%s' '%s' '%u' '%s' '%lld' '%d'",
+              user, pswd, host, port, mysqld_port, uuid_str, (long long)seqno,
+              bypass);
 
     WSREP_DEBUG("Running: '%s'", cmd_str);
 
@@ -814,15 +816,18 @@ wait_signal:
 static int sst_donate_other (const char*   method,
                              const char*   addr,
                              const char*   uuid,
-                             wsrep_seqno_t seqno)
+                             wsrep_seqno_t seqno,
+                             bool          bypass)
 {
   ssize_t cmd_len = 1024;
   char    cmd_str[cmd_len];
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%lld' 2>sst.err"
+                     "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%lld' '%d' "
+                     "2>sst.err"
                      ,method, addr, sst_auth_real, mysql_real_data_home,
-                     uuid, (long long) seqno);
+                     uuid, (long long) seqno, bypass);
+
   if (ret < 0 || ret >= cmd_len)
   {
     WSREP_ERROR("sst_donate_other(): snprintf() failed: %d", ret);
@@ -843,7 +848,8 @@ int wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
                          const void* msg, size_t msg_len,
                          const wsrep_uuid_t*     current_uuid,
                          wsrep_seqno_t           current_seqno,
-                         const char* state, size_t state_len)
+                         const char* state, size_t state_len,
+                         bool bypass)
 {
   /* This will be reset when sync callback is called.
    * Should we set wsrep_ready to FALSE here too? */
@@ -860,11 +866,12 @@ int wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   int ret;
   if (!strcmp (WSREP_SST_MYSQLDUMP, method))
   {
-    ret = sst_donate_mysqldump (data, current_uuid, uuid_str, current_seqno);
+    ret = sst_donate_mysqldump (data, current_uuid, uuid_str, current_seqno,
+                                bypass);
   }
   else
   {
-    ret = sst_donate_other (method, data, uuid_str, current_seqno);
+    ret = sst_donate_other (method, data, uuid_str, current_seqno, bypass);
   }
 
   return (ret > 0 ? 0 : ret);

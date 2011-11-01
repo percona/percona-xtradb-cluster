@@ -84,9 +84,13 @@ wsp::node_status local_status;
 long             wsrep_protocol_version = 1;
 
 // action execute callback
-extern wsrep_status_t wsrep_bf_apply_cb(void *ctx,
-                                        wsrep_apply_data_t *data,
-                                        wsrep_seqno_t global_seqno);
+extern wsrep_status_t wsrep_apply_cb(void *ctx,
+                                     const void* buf, size_t buf_len,
+                                     wsrep_seqno_t global_seqno);
+
+extern wsrep_status_t wsrep_commit_cb  (void *ctx, wsrep_seqno_t global_seqno);
+extern wsrep_status_t wsrep_rollback_cb(void *ctx, wsrep_seqno_t global_seqno);
+
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
@@ -129,7 +133,7 @@ static void wsrep_log_states (wsrep_log_level_t level,
 
 static void wsrep_view_handler_cb (void* app_ctx,
                                    void* recv_ctx,
-                                   wsrep_view_info_t* view,
+                                   const wsrep_view_info_t* view,
                                    const char* state,
                                    size_t state_len,
                                    void** sst_req,
@@ -137,25 +141,23 @@ static void wsrep_view_handler_cb (void* app_ctx,
 {
   wsrep_member_status_t new_status= local_status.get();
 
-  if (memcmp(&cluster_uuid, &view->id, sizeof(wsrep_uuid_t)))
+  if (memcmp(&cluster_uuid, &view->uuid, sizeof(wsrep_uuid_t)))
   {
-    cluster_uuid= view->id;
+    cluster_uuid= view->uuid;
     wsrep_uuid_print (&cluster_uuid, cluster_uuid_str,
                       sizeof(cluster_uuid_str));
   }
 
-  wsrep_cluster_conf_id= view->conf;
+  wsrep_cluster_conf_id= view->view;
   wsrep_cluster_status= cluster_status_str[view->status];
   wsrep_cluster_size= view->memb_num;
   wsrep_local_index= view->my_idx;
 
-  WSREP_INFO("New cluster view: group UUID: %s, conf# %lld: %s, "
-             "number of nodes: %ld, my index: %ld, first seqno: %lld, "
-             "protocol version %d",
-             wsrep_cluster_state_uuid, (long long)wsrep_cluster_conf_id,
-             wsrep_cluster_status, wsrep_cluster_size,
-             wsrep_local_index, (long long)view->first,
-             view->proto_ver);
+  WSREP_INFO("New cluster view: global state: %s:%lld, view# %lld: %s, "
+             "number of nodes: %ld, my index: %ld, protocol version %d",
+             wsrep_cluster_state_uuid, (long long)view->seqno,
+             (long long)wsrep_cluster_conf_id, wsrep_cluster_status,
+             wsrep_cluster_size, wsrep_local_index, view->proto_ver);
 
   /* Proceed further only if view is PRIMARY */
   if (WSREP_VIEW_PRIMARY != view->status) {
@@ -232,14 +234,14 @@ static void wsrep_view_handler_cb (void* app_ctx,
       {
         wsrep_SE_init_grab();
         // Signal init thread to continue
-        wsrep_sst_complete (&cluster_uuid, view->first - 1, false);
+        wsrep_sst_complete (&cluster_uuid, view->seqno, false);
         // and wait for SE initialization
         wsrep_SE_init_wait();
       }
       else
       {
         local_uuid=  cluster_uuid;
-        local_seqno= view->first - 1;
+        local_seqno= view->seqno;
       }
 
       new_status= WSREP_MEMBER_JOINED;
@@ -249,7 +251,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
       if (memcmp (&local_uuid, &cluster_uuid, sizeof (wsrep_uuid_t)))
       {
         WSREP_ERROR("Undetected state gap. Can't continue.");
-        wsrep_log_states (WSREP_LOG_FATAL, &cluster_uuid, view->first,
+        wsrep_log_states (WSREP_LOG_FATAL, &cluster_uuid, view->seqno,
                           &local_uuid, -1);
         abort();
       }
@@ -265,7 +267,6 @@ static void wsrep_view_handler_cb (void* app_ctx,
 out:
 
   local_status.set(new_status, view);
-  free(view);
 }
 
 // Wait until wsrep has reached ready state
@@ -365,9 +366,11 @@ int wsrep_init()
 
   wsrep_args.logger_cb       = wsrep_log_cb;
   wsrep_args.view_handler_cb = wsrep_view_handler_cb;
-  wsrep_args.synced_cb       = wsrep_synced_cb;
-  wsrep_args.bf_apply_cb     = wsrep_bf_apply_cb;
+  wsrep_args.apply_cb        = wsrep_apply_cb;
+  wsrep_args.commit_cb       = wsrep_commit_cb;
+  wsrep_args.rollback_cb     = wsrep_rollback_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
+  wsrep_args.synced_cb       = wsrep_synced_cb;
 
   rcode = wsrep->init(wsrep, &wsrep_args);
 

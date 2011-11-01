@@ -46,40 +46,53 @@ DATA=$4
 MAGIC_FILE="$DATA/rsync_sst_complete"
 rm -rf "$MAGIC_FILE"
 
-FLUSHED="$DATA/tables_flushed"
-rm -rf "$FLUSHED"
-
 if [ "$ROLE" = "donor" ]
 then
-    # Use deltaxfer only for WAN
-    inv=$(basename $0)
-    [ "$inv" = "wsrep_sst_rsync_wan" ] && WHOLE_FILE_OPT="" \
-                                       || WHOLE_FILE_OPT="--whole-file"
+    UUID=$5
+    SEQNO=$6
+    BYPASS=$7
 
-    echo "flush tables"
+    if [ $BYPASS -eq 0 ]
+    then
 
-    # wait for tables flushed and state ID written to the file
-    while [ ! -r "$FLUSHED" ] && ! grep -q ':' "$FLUSHED" >/dev/null 2>&1
-    do
-        sleep 0.2
-    done
+        FLUSHED="$DATA/tables_flushed"
+        rm -rf "$FLUSHED"
 
-    STATE="$(cat $FLUSHED)"
-    rm -rf "$FLUSHED"
+        # Use deltaxfer only for WAN
+        inv=$(basename $0)
+        [ "$inv" = "wsrep_sst_rsync_wan" ] && WHOLE_FILE_OPT="" \
+                                           || WHOLE_FILE_OPT="--whole-file"
 
-    sync
+        echo "flush tables"
 
-    # Old filter - include everything except selected
-    # FILTER=(--exclude '*.err' --exclude '*.pid' --exclude '*.sock' \
-    #         --exclude '*.conf' --exclude core --exclude 'galera.*' \
-    #         --exclude grastate.txt --exclude '*.pem' \
-    #         --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index')
+        # wait for tables flushed and state ID written to the file
+        while [ ! -r "$FLUSHED" ] && ! grep -q ':' "$FLUSHED" >/dev/null 2>&1
+        do
+            sleep 0.2
+        done
 
-    # New filter - exclude everything except dirs (schemas) and innodb files
-    FILTER=(-f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
+        STATE="$(cat $FLUSHED)"
+        rm -rf "$FLUSHED"
 
-    rsync --archive --no-times --ignore-times --inplace --delete --quiet \
-          $WHOLE_FILE_OPT "${FILTER[@]}" "$DATA" rsync://$ADDR
+        sync
+
+        # Old filter - include everything except selected
+        # FILTER=(--exclude '*.err' --exclude '*.pid' --exclude '*.sock' \
+        #         --exclude '*.conf' --exclude core --exclude 'galera.*' \
+        #         --exclude grastate.txt --exclude '*.pem' \
+        #         --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index')
+
+        # New filter - exclude everything except dirs (schemas) and innodb files
+        FILTER=(-f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
+
+        rsync --archive --no-times --ignore-times --inplace --delete --quiet \
+              $WHOLE_FILE_OPT "${FILTER[@]}" "$DATA" rsync://$ADDR
+
+    else # BYPASS
+        STATE="$UUID:$SEQNO"
+    fi
+
+    echo "continue" # now server can resume updating data
 
     echo "$STATE" > "$MAGIC_FILE"
     rsync -aqc "$MAGIC_FILE" rsync://$ADDR

@@ -32,7 +32,8 @@ extern int     wsrep_sst_donate_cb (void* app_ctx,
                                     const void* msg, size_t msg_len,
                                     const wsrep_uuid_t* current_uuid,
                                     wsrep_seqno_t       current_seqno,
-                                    const char* state, size_t state_len);
+                                    const char* state, size_t state_len,
+                                    bool bypass);
 
 extern size_t default_ip (char* buf, size_t buf_len);
 extern size_t default_address(char* buf, size_t buf_len);

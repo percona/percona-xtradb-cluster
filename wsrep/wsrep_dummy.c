@@ -272,13 +272,39 @@ static wsrep_status_t dummy_resume (wsrep_t* w)
 static wsrep_seqno_t dummy_desync (wsrep_t* w)
 {
     WSREP_DBUG_ENTER(w);
-    return -ENOSYS;
+    return WSREP_NOT_IMPLEMENTED;
 }
 
 static wsrep_status_t dummy_resync (wsrep_t* w)
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
+}
+
+static wsrep_status_t dummy_lock (wsrep_t* w,
+                                  const char* s __attribute__((unused)),
+                                  int64_t     o __attribute__((unused)),
+                                  int64_t     t __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_NOT_IMPLEMENTED;
+}
+
+static wsrep_status_t dummy_unlock (wsrep_t* w,
+                                    const char* s __attribute__((unused)),
+                                    int64_t     o __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static bool dummy_is_locked (wsrep_t* w,
+                             const char*   s __attribute__((unused)),
+                             int64_t*      o __attribute__((unused)),
+                             wsrep_uuid_t* t __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return false;
 }
 
 static wsrep_t dummy_iface = {
@@ -311,6 +337,9 @@ static wsrep_t dummy_iface = {
     &dummy_resume,
     &dummy_desync,
     &dummy_resync,
+    &dummy_lock,
+    &dummy_unlock,
+    &dummy_is_locked,
     WSREP_NONE,
     WSREP_INTERFACE_VERSION,
     "Codership Oy <info@codership.com>",

@@ -64,12 +64,12 @@ void wsrep_notify_status (wsrep_member_status_t    status,
   {
     char uuid_str[40];
 
-    wsrep_uuid_print (&view->id, uuid_str, sizeof(uuid_str));
+    wsrep_uuid_print (&view->uuid, uuid_str, sizeof(uuid_str));
     cmd_off += snprintf (cmd_ptr + cmd_off, cmd_len - cmd_off,
                          " --uuid %s", uuid_str);
 
     cmd_off += snprintf (cmd_ptr + cmd_off, cmd_len - cmd_off,
-                         " --primary %s", view->conf >= 0 ? "yes" : "no");
+                         " --primary %s", view->view >= 0 ? "yes" : "no");
 
     cmd_off += snprintf (cmd_ptr + cmd_off, cmd_len - cmd_off,
                          " --index %d", view->my_idx);

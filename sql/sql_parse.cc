@@ -7530,7 +7530,7 @@ LEX_USER *create_definer(THD *thd, LEX_STRING *user_name, LEX_STRING *host_name)
 }
 
 #ifdef WITH_WSREP
-static enum wsrep_status wsrep_bf_apply_sql(
+static enum wsrep_status wsrep_apply_sql(
    THD *thd, const char *sql, size_t sql_len, time_t timeval, uint32 randseed) 
 {
   int error;
@@ -7573,24 +7573,25 @@ static enum wsrep_status wsrep_bf_apply_sql(
 }
 
 void wsrep_write_rbr_buf(
-    THD *thd, const uchar *rbr_buf, size_t buf_len)
+    THD *thd, const void* rbr_buf, size_t buf_len)
 {
   char filename[64] = {0};
   sprintf(filename, "%s/GRA_%ld_%lld.log", 
-	  wsrep_data_home_dir, thd->thread_id, (long long)thd->wsrep_trx_seqno);
+          wsrep_data_home_dir, thd->thread_id, (long long)thd->wsrep_trx_seqno);
   FILE *of = fopen(filename, "wb");
 
   fwrite (rbr_buf, buf_len, 1, of);
   fclose(of);
 }
-static wsrep_status_t wsrep_bf_apply_rbr(
+
+static inline wsrep_status_t wsrep_apply_rbr(
     THD *thd, const uchar *rbr_buf, size_t buf_len)
 {
   char *buf= (char *)rbr_buf;
   int rcode= 0;
   int event= 1;
 
-  DBUG_ENTER("wsrep_bf_apply_rbr");
+  DBUG_ENTER("wsrep_apply_rbr");
 
   if (thd->killed == THD::KILL_CONNECTION)
   {
@@ -7694,71 +7695,111 @@ static wsrep_status_t wsrep_bf_apply_rbr(
   DBUG_RETURN(WSREP_OK);
 }
 
-wsrep_status_t wsrep_bf_apply_cb(
-    void *ctx, wsrep_apply_data_t *data, wsrep_seqno_t global_seqno)
+wsrep_status_t wsrep_apply_cb(void* const ctx,
+                              const void* const buf, size_t const buf_len,
+                              wsrep_seqno_t const global_seqno)
 {
-  wsrep_status_t rcode;
-
-  THD *thd= (THD *)ctx;
+  THD* const thd((THD*)ctx);
 
   thd->wsrep_trx_seqno= global_seqno;
 
-  switch(data->type)
+#ifdef WSREP_PROC_INFO
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "applying write set %lld: %p, %zu",
+           (long long)thd->wsrep_trx_seqno, buf, buf_len);
+  thd_proc_info(thd, thd->wsrep_info);
+#else
+  thd_proc_info(thd, "applying write set");
+#endif /* WSREP_PROC_INFO */
+
+  wsrep_status_t const rcode(wsrep_apply_rbr(thd, (const uchar*)buf, buf_len));
+
+#ifdef WSREP_PROC_INFO
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "applied write set %lld", (long long)thd->wsrep_trx_seqno);
+  thd_proc_info(thd, thd->wsrep_info);
+#else
+  thd_proc_info(thd, "applied write set");
+#endif /* WSREP_PROC_INFO */
+
+  if (WSREP_OK != rcode) wsrep_write_rbr_buf(thd, buf, buf_len);
+
+  return rcode;
+}
+
+#if DELETE // this does not work in 5.5
+/* a common wrapper for end_trans() function - to put all necessary stuff */
+static inline wsrep_status_t
+wsrep_end_trans (THD* const thd, enum enum_mysql_completiontype const end)
+{
+  if (0 == end_trans(thd, end))
   {
-  case WSREP_APPLY_APP:
-#ifdef WSREP_PROC_INFO
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "applying RBR event (%lld): %p, %zu",
-             (long long)thd->wsrep_trx_seqno,
-             data->u.app.buffer, data->u.app.len);
-    thd_proc_info(thd, thd->wsrep_info);
-#else
-    thd_proc_info(thd, "applying RBR event");
-#endif /* WSREP_PROC_INFO */
-
-    rcode= wsrep_bf_apply_rbr(thd, data->u.app.buffer, data->u.app.len);
-
-#ifdef WSREP_PROC_INFO
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "post RBR applying (%lld)", (long long)thd->wsrep_trx_seqno);
-    thd_proc_info(thd, thd->wsrep_info);
-#else
-    thd_proc_info(thd, "post RBR applying");
-#endif /* WSREP_PROC_INFO */
-    break;
-  case WSREP_APPLY_SQL:
-#ifdef WSREP_PROC_INFO
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "applying SQL statement (%lld): %.*s",
-             (long long)thd->wsrep_trx_seqno, (int)data->u.sql.len,
-             data->u.sql.stm);
-    thd_proc_info(thd, thd->wsrep_info);
-#else
-    thd_proc_info(thd, "applying SQL statement");
-#endif /* WSREP_PROC_INFO */
-
-    rcode= wsrep_bf_apply_sql(thd, data->u.sql.stm, data->u.sql.len,
-                              data->u.sql.timeval, data->u.sql.randseed);
-#ifdef WSREP_PROC_INFO
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "post SQL applying (%lld)",(long long)thd->wsrep_trx_seqno);
-    thd_proc_info(thd, thd->wsrep_info);
-#else
-    thd_proc_info(thd, "post SQL applying");
-#endif /* WSREP_PROC_INFO */
-    break;
-  case WSREP_APPLY_ROW:
-  default: 
-    rcode= WSREP_NOT_IMPLEMENTED;
+      return WSREP_OK;
   }
+  else
+  {
+      return WSREP_FATAL;
+  }
+}
+#endif
+
+wsrep_status_t wsrep_commit_cb(void* ctx, wsrep_seqno_t const global_seqno)
+{
+  THD* const thd((THD*)ctx);
+
+  assert(global_seqno == thd->wsrep_trx_seqno);
+
+#ifdef WSREP_PROC_INFO
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "committing %lld", (long long)thd->wsrep_trx_seqno);
+  thd_proc_info(thd, thd->wsrep_info);
+#else
+  thd_proc_info(thd, "committing");
+#endif /* WSREP_PROC_INFO */
+
+  wsrep_status_t const rcode(wsrep_apply_sql(thd, "COMMIT", 6, 0, 0));
+//  wsrep_status_t const rcode(wsrep_end_trans (thd, COMMIT));
+
+#ifdef WSREP_PROC_INFO
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "committed %lld", (long long)thd->wsrep_trx_seqno);
+  thd_proc_info(thd, thd->wsrep_info);
+#else
+  thd_proc_info(thd, "committed");
+#endif /* WSREP_PROC_INFO */
 
   if (WSREP_OK == rcode)
   {
-    // TODO: mark snapshot with global_seqno. Remember that RBRs require
-    //       explicit commit.
+    // TODO: mark snapshot with global_seqno.
   }
-  else
-    wsrep_write_rbr_buf(thd, data->u.app.buffer, data->u.app.len);
+
+  return rcode;
+}
+
+wsrep_status_t wsrep_rollback_cb(void *ctx, wsrep_seqno_t global_seqno)
+{
+  THD* const thd((THD*)ctx);
+
+  assert(global_seqno == thd->wsrep_trx_seqno);
+
+#ifdef WSREP_PROC_INFO
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "rolling back %lld", (long long)thd->wsrep_trx_seqno);
+  thd_proc_info(thd, thd->wsrep_info);
+#else
+  thd_proc_info(thd, "rolling back");
+#endif /* WSREP_PROC_INFO */
+
+  wsrep_status_t const rcode(wsrep_apply_sql(thd, "ROLLBACK", 8, 0, 0));
+//  wsrep_status_t const rcode(wsrep_end_trans (thd, ROLLBACK));
+
+#ifdef WSREP_PROC_INFO
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "rolled back %lld", (long long)thd->wsrep_trx_seqno);
+  thd_proc_info(thd, thd->wsrep_info);
+#else
+  thd_proc_info(thd, "rolled back");
+#endif /* WSREP_PROC_INFO */
 
   return rcode;
 }

@@ -1,4 +1,4 @@
-/* Copyright (C) 2009 Codership Oy <info@codersihp.com>
+/* Copyright (C) 2009-2011 Codership Oy <info@codersihp.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -83,6 +83,9 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     VERIFY(wh->resume);
     VERIFY(wh->desync);
     VERIFY(wh->resync);
+    VERIFY(wh->lock);
+    VERIFY(wh->unlock);
+    VERIFY(wh->is_locked);
     VERIFY(wh->provider_name);
     VERIFY(wh->provider_version);
     VERIFY(wh->provider_vendor);
