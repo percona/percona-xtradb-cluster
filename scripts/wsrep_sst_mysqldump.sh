@@ -98,7 +98,8 @@ if [ $BYPASS -eq 0 ]
 then
     (echo $STOP_WSREP && $MYSQLDUMP && echo $CSV_TABLES_FIX \
     && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
-    && echo $SET_START_POSITION) | $MYSQL
+    && echo $SET_START_POSITION \
+    || echo "SST failed to complete;") | $MYSQL
 else
     echo "Bypassing state dump." >&2
     echo $SET_START_POSITION | $MYSQL
