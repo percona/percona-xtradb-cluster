@@ -269,7 +269,7 @@ static wsrep_status_t dummy_resume (wsrep_t* w)
     return WSREP_OK;
 }
 
-static wsrep_seqno_t dummy_desync (wsrep_t* w)
+static wsrep_status_t dummy_desync (wsrep_t* w)
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_NOT_IMPLEMENTED;
