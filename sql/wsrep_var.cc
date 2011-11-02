@@ -48,10 +48,12 @@ bool wsrep_on_update (sys_var *self, THD* thd, enum_var_type var_type)
   else {
   }
 
+#ifdef REMOVED
   if (thd->variables.wsrep_on)
     thd->variables.option_bits |= (OPTION_BIN_LOG);
   else
     thd->variables.option_bits &= ~(OPTION_BIN_LOG);
+#endif
   return false;
 }
 

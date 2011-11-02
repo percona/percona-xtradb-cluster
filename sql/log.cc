@@ -6718,6 +6718,13 @@ int TC_LOG_BINLOG::log_xid(THD *thd, my_xid xid)
   DBUG_ENTER("TC_LOG_BINLOG::log");
   binlog_cache_mngr *cache_mngr=
     (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+#ifdef WITH_WSREP
+  if (!cache_mngr)
+  {
+    WSREP_DEBUG("Skipping empty log_xid: %s", thd->query());
+    DBUG_RETURN(1);
+  }
+#endif /* WITH_WSREP */
   /*
     We always commit the entire transaction when writing an XID. Also
     note that the return value is inverted.

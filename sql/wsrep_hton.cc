@@ -147,6 +147,7 @@ int wsrep_commit(handlerton *hton, THD *thd, bool all)
   DBUG_RETURN(0);
 }
 
+extern my_bool opt_log_slave_updates;
 enum wsrep_trx_status
 wsrep_run_wsrep_commit(
     THD *thd, handlerton *hton, bool all)
@@ -162,6 +163,9 @@ wsrep_run_wsrep_commit(
   }
 
   DBUG_ENTER("wsrep_run_wsrep_commit");
+  if (thd->slave_thread && !opt_log_slave_updates) {
+    DBUG_RETURN(WSREP_TRX_OK);
+  }
   if (thd->wsrep_exec_mode == REPL_RECV) {
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);

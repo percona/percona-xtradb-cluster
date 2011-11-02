@@ -5981,7 +5981,10 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                           ER_ILLEGAL_HA, ER(ER_ILLEGAL_HA),
                           table->alias);
 #ifdef WITH_WSREP
-      do_log_write= false;
+
+      WSREP_DEBUG("ignoring DDL failure: %d %s", error, thd->query());
+      // WSREP_DEBUG("stmt da %s", thd->stmt_da->message());
+      //do_log_write= false;
 #endif /* WITH_WSREP */
     }
 
@@ -6035,7 +6038,9 @@ bool mysql_alter_table(THD *thd,char *new_db, char *new_name,
                           ER_ILLEGAL_HA, ER(ER_ILLEGAL_HA),
                           table->alias);
 #ifdef WITH_WSREP
-      do_log_write= false;
+      WSREP_DEBUG("ignoring DDL failure2: %d %s", error, thd->query());
+      //WSREP_DEBUG("stmt da %s", thd->stmt_da->message());
+      //do_log_write= false;
 #endif /* WITH_WSREP */
     }
 
