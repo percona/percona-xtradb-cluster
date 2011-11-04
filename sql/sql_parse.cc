@@ -7542,7 +7542,7 @@ static enum wsrep_status wsrep_apply_sql(
   thd->start_time= timeval;
   thd->wsrep_rand= randseed;
 
-  thd->variables.option_bits &= OPTION_NOT_AUTOCOMMIT;
+  thd->variables.option_bits |= OPTION_NOT_AUTOCOMMIT;
 
   DBUG_PRINT("wsrep", ("SQL: %s", sql));
 
