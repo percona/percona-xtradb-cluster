@@ -34,6 +34,23 @@ err()
     echo "SST error: $*" >&2
 }
 
+local_ip()
+{
+    export PATH=/usr/sbin:/usr/bin:/sbin:/bin:$PATH
+
+    [ "$1" = "127.0.0.1" ]      && return 0
+    [ "$1" = "localhost" ]      && return 0
+    [ "$1" = "$(hostname -s)" ] && return 0
+    [ "$1" = "$(hostname -f)" ] && return 0
+    [ "$1" = "$(hostname -d)" ] && return 0
+
+    # Now if ip program is not found in the path, we can't return 0 since
+    # it would block any address. Thankfully grep should fail in this case
+    ip route get "$1" | grep local >/dev/null && return 0
+
+    return 1
+}
+
 if test -z "$USER";  then err "USER cannot be nil"; exit $EINVAL; fi
 if test -z "$HOST";  then err "HOST cannot be nil"; exit $EINVAL; fi
 if test -z "$PORT";  then err "PORT cannot be nil"; exit $EINVAL; fi
@@ -41,7 +58,7 @@ if test -z "$LOCAL_PORT"; then err "LOCAL_PORT cannot be nil"; exit $EINVAL; fi
 if test -z "$UUID";  then err "UUID cannot be nil"; exit $EINVAL; fi
 if test -z "$SEQNO"; then err "SEQNO cannot be nil"; exit $EINVAL; fi
 
-if ip route get "$HOST" | grep local >/dev/null && [ "$PORT" = "$LOCAL_PORT" ]
+if local_ip $HOST && [ "$PORT" = "$LOCAL_PORT" ]
 then
     err "destination address '$HOST:$PORT' matches source address."
     exit $EINVAL
