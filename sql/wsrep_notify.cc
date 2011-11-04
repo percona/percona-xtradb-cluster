@@ -36,7 +36,7 @@ void wsrep_notify_status (wsrep_member_status_t    status,
 {
   if (!wsrep_notify_cmd || 0 == strlen(wsrep_notify_cmd))
   {
-    WSREP_WARN("wsrep_notify_cmd is not defined, skipping notification.");
+    WSREP_INFO("wsrep_notify_cmd is not defined, skipping notification.");
     return;
   }
 
