@@ -36,7 +36,7 @@ err()
 
 local_ip()
 {
-    export PATH=/usr/sbin:/usr/bin:/sbin:/bin:$PATH
+    PATH=$PATH:/usr/sbin:/usr/bin:/sbin:/bin
 
     [ "$1" = "127.0.0.1" ]      && return 0
     [ "$1" = "localhost" ]      && return 0
