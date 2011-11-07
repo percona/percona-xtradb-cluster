@@ -5184,6 +5184,7 @@ int mysqld_main(int argc, char **argv)
   {
     wsrep_init_startup (false);
   }
+  wsrep_create_appliers(wsrep_slave_threads - 1);
 #endif /* WITH_WSREP */
   if (opt_bootstrap)
   {

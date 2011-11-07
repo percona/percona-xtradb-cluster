@@ -491,8 +491,17 @@ ssize_t wsrep_sst_prepare (void** msg)
     if (sst_complete)
     {
       // we already did SST at initializaiton, now engines are running
-      WSREP_ERROR("'%s' SST requires server restart", wsrep_sst_method);
-      unireg_abort(1);
+      // sql_print_information() is here because the message is too long
+      // for WSREP_INFO.
+      sql_print_information ("WSREP: "
+                 "You have configured '%s' state snapshot transfer method "
+                 "which cannot be performed on a running server. "
+                 "Wsrep provider won't be able to fall back to it "
+                 "if other means of state transfer are unavailable. "
+                 "In that case you will need to restart the server.",
+                 wsrep_sst_method);
+      *msg = 0;
+      return 0;
     }
 
     addr_len = sst_prepare_other (wsrep_sst_method, addr_in, &addr_out);

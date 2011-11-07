@@ -405,8 +405,6 @@ void wsrep_init_startup (bool first)
   wsrep_create_appliers(1);
 
   if (first && !wsrep_sst_wait()) unireg_abort(1);// wait until SST is completed
-
-  wsrep_create_appliers(wsrep_slave_threads - 1);
 }
 
 

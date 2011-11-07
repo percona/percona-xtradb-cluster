@@ -137,7 +137,7 @@ then
     echo "	uid = $MYUID"    >> "$RSYNC_CONF"
     echo "	gid = $MYGID"    >> "$RSYNC_CONF"
 
-    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
+#    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
 
     # listen at all interfaces (for firewalled setups)
     rsync --daemon --port $RSYNC_PORT --config "$RSYNC_CONF"
