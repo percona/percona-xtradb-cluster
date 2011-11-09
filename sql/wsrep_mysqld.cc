@@ -659,56 +659,110 @@ static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
   return ret;
 }
 
-int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_) 
+static int wsrep_TOI_begin(THD *thd, char *db_, char *table_) 
 {
-  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
-  {
-    wsrep_status_t ret(WSREP_WARNING);
-    uchar* buf(0);
-    uint buf_len(0);
-    wsrep_key_t wkey[2];
-    size_t wkey_len= 2;
-    WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
-                thd->wsrep_exec_mode, thd->query() );
-    if (wsrep_prepare_key_for_isolation(db_, table_, wkey, &wkey_len) &&
-        !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==
-        (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
-                                       wkey, wkey_len,
-                                       buf, buf_len,
-                                       &thd->wsrep_trx_seqno))) {
-      thd->wsrep_exec_mode= TOTAL_ORDER;
-      wsrep_to_isolation++;
-      if (buf) my_free(buf);
-      WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,
-                  thd->wsrep_exec_mode);
-    }
-    else {
-      /* jump to error handler in mysql_execute_command() */
-      WSREP_WARN("TO isolation failed for: %d, sql: %s. Check wsrep "
-                 "connection state and retry the query.",
-                 ret, (thd->query()) ? thd->query() : "void");
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
-               "your wsrep connection state and retry the query.");
-      if (buf) my_free(buf);
-      return -1;
-    }
+  wsrep_status_t ret(WSREP_WARNING);
+  uchar* buf(0);
+  uint buf_len(0);
+  wsrep_key_t wkey[2];
+  size_t wkey_len= 2;
+  WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+	      thd->wsrep_exec_mode, thd->query() );
+  if (wsrep_prepare_key_for_isolation(db_, table_, wkey, &wkey_len) &&
+      !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==
+      (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
+				     wkey, wkey_len,
+				     buf, buf_len,
+				     &thd->wsrep_trx_seqno))) {
+    thd->wsrep_exec_mode= TOTAL_ORDER;
+    wsrep_to_isolation++;
+    if (buf) my_free(buf);
+    WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,
+		thd->wsrep_exec_mode);
+  }
+  else {
+    /* jump to error handler in mysql_execute_command() */
+    WSREP_WARN("TO isolation failed for: %d, sql: %s. Check wsrep "
+	       "connection state and retry the query.",
+	       ret, (thd->query()) ? thd->query() : "void");
+    my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
+	     "your wsrep connection state and retry the query.");
+    if (buf) my_free(buf);
+    return -1;
   }
   return 0;
 }
 
-void wsrep_to_isolation_end(THD *thd) {
-  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==TOTAL_ORDER)
-  {
-    wsrep_status_t ret;
-    wsrep_to_isolation--;
-    WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
-                thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
+static void wsrep_TOI_end(THD *thd) {
+  wsrep_status_t ret;
+  wsrep_to_isolation--;
+  WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+	      thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
     if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
       WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);
     }
     else {
       WSREP_WARN("TO isolation end failed for: %d, sql: %s",
                  ret, (thd->query()) ? thd->query() : "void");
+    }
+}
+
+static int wsrep_RSU_begin(THD *thd, char *db_, char *table_) 
+{
+  wsrep_status_t ret(WSREP_WARNING);
+  WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+	      thd->wsrep_exec_mode, thd->query() );
+
+  ret = wsrep->desync(wsrep);
+  if (ret != WSREP_OK)
+  {
+    WSREP_WARN("desync failed %d for %s", ret, thd->query());
+    return(ret);
+  }
+  thd->variables.wsrep_on = 0;
+  return 0;
+}
+
+static void wsrep_RSU_end(THD *thd)
+{
+  wsrep_status_t ret(WSREP_WARNING);
+  WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+	      thd->wsrep_exec_mode, thd->query() );
+
+  ret = wsrep->resync(wsrep);
+  if (ret != WSREP_OK)
+  {
+    WSREP_WARN("resync failed %d for %s", ret, thd->query());
+    return;
+  }
+  thd->variables.wsrep_on = 1;
+  return;
+}
+
+int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_) 
+{
+  int ret= 0;
+  if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
+  {
+    switch (wsrep_OSU_method_options) {
+    case WSREP_OSU_TOI: ret =  wsrep_TOI_begin(thd, db_, table_); break;
+    case WSREP_OSU_RSU: ret =  wsrep_RSU_begin(thd, db_, table_); break;
+    }
+    if (!ret)
+    {
+      thd->wsrep_exec_mode= TOTAL_ORDER;
+    }
+  }
+  return ret;
+}
+
+void wsrep_to_isolation_end(THD *thd) {
+  if (thd->wsrep_exec_mode==TOTAL_ORDER)
+  {
+    switch(wsrep_OSU_method_options)
+    {
+    case WSREP_OSU_TOI: return wsrep_TOI_end(thd);
+    case WSREP_OSU_RSU: return wsrep_RSU_end(thd);
     }
   }
 }

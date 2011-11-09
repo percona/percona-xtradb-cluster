@@ -3345,5 +3345,14 @@ static Sys_var_mybool Sys_wsrep_causal_reads(
        SESSION_VAR(wsrep_causal_reads), 
        CMD_LINE(OPT_ARG), DEFAULT(FALSE)); 
        //       ON_UPDATE(wsrep_causal_reads_update));
+
+static const char *wsrep_OSU_method_names[]= { "TOI", "RSU", NullS };
+static Sys_var_enum Sys_wsrep_OSU_method(
+       "wsrep_OSU_method", "Method for Online Schema Upgrade",
+       GLOBAL_VAR(wsrep_OSU_method_options), CMD_LINE(OPT_ARG),
+       wsrep_OSU_method_names, DEFAULT(WSREP_OSU_TOI),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(0));
+
 #endif /* WITH_WSREP */
 

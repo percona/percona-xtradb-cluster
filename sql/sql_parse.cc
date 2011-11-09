@@ -107,7 +107,8 @@ extern Format_description_log_event *wsrep_format_desc;
   if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_)) goto error;
 
 #define WSREP_TO_ISOLATION_END                                              \
-  if (WSREP(thd)) wsrep_to_isolation_end(thd);
+  if (WSREP(thd) || (thd && thd->wsrep_exec_mode==TOTAL_ORDER))             \
+    wsrep_to_isolation_end(thd);
 
 #else
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_)

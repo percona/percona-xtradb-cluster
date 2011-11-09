@@ -33,6 +33,7 @@ const  char* wsrep_provider_options = (const char*)my_memdup("", 1, MYF(MY_WME))
 const  char* wsrep_cluster_address  = NULL;
 const  char* wsrep_cluster_name     = "my_wsrep_cluster";
 const  char* wsrep_node_name        = glob_hostname;
+ulong   wsrep_OSU_method_options;
 
 int wsrep_init_vars()
 {
