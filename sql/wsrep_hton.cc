@@ -259,7 +259,7 @@ wsrep_run_wsrep_commit(
   if (data_len == 0) 
   {
       WSREP_DEBUG("empty rbr buffer");
-      DBUG_RETURN(WSREP_TRX_ROLLBACK);
+      DBUG_RETURN(WSREP_TRX_OK);
   }
   if (!rcode) {
     rcode = wsrep->pre_commit(
