@@ -144,13 +144,13 @@
       %define distro_description        Oracle Enterprise Linux 4
       %define distro_releasetag         oel4
       %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel
-      %define distro_requires           chkconfig coreutils grep procps shadow-utils
+      %define distro_requires           chkconfig coreutils grep procps shadow-utils net-tools
     %else
       %if "%oelver" == "5"
         %define distro_description      Oracle Enterprise Linux 5
         %define distro_releasetag       oel5
         %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel
-        %define distro_requires         chkconfig coreutils grep procps shadow-utils
+        %define distro_requires         chkconfig coreutils grep procps shadow-utils net-tools
       %else
         %{error:Oracle Enterprise Linux %{oelver} is unsupported}
       %endif
@@ -162,13 +162,13 @@
         %define distro_description      Red Hat Enterprise Linux 4
         %define distro_releasetag       rhel4
         %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel
-        %define distro_requires         chkconfig coreutils grep procps shadow-utils
+        %define distro_requires         chkconfig coreutils grep procps shadow-utils net-tools
       %else
         %if "%rhelver" == "5"
           %define distro_description    Red Hat Enterprise Linux 5
           %define distro_releasetag     rhel5
           %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel
-          %define distro_requires       chkconfig coreutils grep procps shadow-utils
+          %define distro_requires       chkconfig coreutils grep procps shadow-utils net-tools
         %else
           %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
         %endif
@@ -984,7 +984,7 @@ echo "====="                                     >> $STATUS_HISTORY
 #  Files section
 ##############################################################################
 
-%files -n MySQL-server%{product_suffix}
+%files -n MySQL-server%{product_suffix} -f release/support-files/plugins.files
 %defattr(-,root,root,0755)
 
 %if %{defined license_files_server}
@@ -1028,6 +1028,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/replace.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
 
 %ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
 %if %{defined with_wsrep}
@@ -1047,6 +1048,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/mysql_setpermission
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
 %attr(755, root, root) %{_bindir}/mysql_upgrade
+%attr(755, root, root) %{_bindir}/mysql_plugin
 %attr(755, root, root) %{_bindir}/mysql_zap
 %attr(755, root, root) %{_bindir}/mysqlbug
 %attr(755, root, root) %{_bindir}/mysqld_multi
@@ -1067,28 +1069,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
 %attr(755, root, root) %{_sbindir}/rcmysql
-%attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/libdaemon_example.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/mypluglib.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/semisync_master.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/semisync_slave.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth_socket.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/auth_test_plugin.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_client.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_interface.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_server.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/adt_null.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libdaemon_example.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/mypluglib.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_master.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_slave.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_socket.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_test_plugin.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_client.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_interface.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_server.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
@@ -1176,6 +1157,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %if %{undefined with_wsrep}
 %files -n MySQL-embedded%{product_suffix}
 %defattr(-, root, root, 0755)
+%attr(755, root, root) %{_bindir}/mysql_embedded
 %attr(644, root, root) %{_libdir}/mysql/libmysqld.a
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
 %endif
@@ -1186,6 +1168,22 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Sep 08 2011 Daniel Fischer <daniel.fischer@oracle.com>
+
+- Add mysql_plugin man page.
+
+* Fri Aug 12 2011 Daniel Fischer <daniel.fischer@oracle.com>
+
+- Source plugin library files list from cmake-generated file.
+
+* Mon Jul 25 2011 Chuck Bell <chuck.bell@oracle.com>
+
+- Added the mysql_plugin client - enables or disables plugins.
+
+* Thu Jul 21 2011 Sunanda Menon <sunanda.menon@oracle.com>
+
+- Fix bug#12561297: Added the MySQL embedded binary
+
 * Tue Aug 30 2011 Alexey Yurchenko <alexey.yurchenko@codership.com>
 - Added with_wsrep option for wsrep builds.
 
