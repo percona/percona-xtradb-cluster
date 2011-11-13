@@ -7580,9 +7580,15 @@ void wsrep_write_rbr_buf(
   sprintf(filename, "%s/GRA_%ld_%lld.log", 
           wsrep_data_home_dir, thd->thread_id, (long long)thd->wsrep_trx_seqno);
   FILE *of = fopen(filename, "wb");
-
-  fwrite (rbr_buf, buf_len, 1, of);
-  fclose(of);
+  if (of)
+  {
+    fwrite (rbr_buf, buf_len, 1, of);
+    fclose(of);
+  }
+  else
+  {
+    WSREP_ERROR("Failed to open file '%s': %d (%s)", filename, errno, strerror(errno));
+  }
 }
 
 static inline wsrep_status_t wsrep_apply_rbr(
