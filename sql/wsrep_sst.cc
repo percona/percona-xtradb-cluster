@@ -784,9 +784,12 @@ wait_signal:
       }
       else if (!strcasecmp (out, magic_cont))
       {
-        sst_disallow_writes (thd.ptr, false);
-        thd.ptr->global_read_lock.unlock_global_read_lock (thd.ptr);
-        locked= false;
+        if (locked)
+        {
+          sst_disallow_writes (thd.ptr, false);
+          thd.ptr->global_read_lock.unlock_global_read_lock (thd.ptr);
+          locked= false;
+        }
         err=  0;
         goto wait_signal;
       }
