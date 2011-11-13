@@ -155,7 +155,9 @@ static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
 
 bool wsrep_init_first()
 {
-  return strcmp (wsrep_sst_method, WSREP_SST_MYSQLDUMP);
+  return (wsrep_provider != NULL
+          && strcmp (wsrep_provider, WSREP_NONE)
+          && strcmp (wsrep_sst_method, WSREP_SST_MYSQLDUMP));
 }
 
 static bool            sst_complete = false;
