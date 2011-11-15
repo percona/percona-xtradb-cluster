@@ -515,20 +515,21 @@ ssize_t wsrep_sst_prepare (void** msg)
     }
   }
 
-  size_t method_len = strlen(wsrep_sst_method);
-  size_t msg_len    = method_len + addr_len + 2 /* + auth_len + 1*/;
+  size_t const method_len(strlen(wsrep_sst_method));
+  size_t const msg_len   (method_len + addr_len + 2 /* + auth_len + 1*/);
 
   *msg = malloc (msg_len);
   if (NULL != *msg) {
-    char* msg_ptr = (char*)*msg;
-    strcpy (msg_ptr, wsrep_sst_method);
-    msg_ptr += method_len + 1;
-    strcpy (msg_ptr, addr_out);
+    char* const method_ptr(reinterpret_cast<char*>(*msg));
+    strcpy (method_ptr, wsrep_sst_method);
+    char* const addr_ptr(method_ptr + method_len + 1);
+    strcpy (addr_ptr, addr_out);
 
-    WSREP_INFO ("Prepared SST request: %s|%s", (char*)*msg, msg_ptr);
+    WSREP_INFO ("Prepared SST request: %s|%s", method_ptr, addr_ptr);
   }
   else {
-    msg_len = -ENOMEM;
+    WSREP_ERROR("Failed to allocate SST request of size %zu. Can't continue.",
+                msg_len);
     unireg_abort(1);
   }
 

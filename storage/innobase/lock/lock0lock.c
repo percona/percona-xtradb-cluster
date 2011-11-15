@@ -5106,6 +5106,7 @@ lock_rec_queue_validate(
 
 		if (!lock_rec_get_gap(lock) && !lock_get_wait(lock)) {
 
+#ifndef WITH_WSREP
 			enum lock_mode	mode;
 
 			if (lock_get_mode(lock) == LOCK_S) {
@@ -5113,7 +5114,6 @@ lock_rec_queue_validate(
 			} else {
 				mode = LOCK_S;
 			}
-#ifndef WITH_WSREP
 			ut_a(!lock_rec_other_has_expl_req(
 				     mode, 0, 0, block, heap_no, lock->trx));
 #endif /* WITH_WSREP */

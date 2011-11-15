@@ -73,7 +73,6 @@ static int wsrep_start_position_verify (const char* start_str)
   char*         endptr;
   wsrep_uuid_t  uuid;
   ssize_t       uuid_len;
-  wsrep_seqno_t seqno;
 
   start_len = strlen (start_str);
   if (start_len < 34)
@@ -86,7 +85,7 @@ static int wsrep_start_position_verify (const char* start_str)
   if (start_str[uuid_len] != ':') // separator should follow UUID
     return 1;
 
-  seqno = strtoll (&start_str[uuid_len + 1], &endptr, 10);
+  strtoll (&start_str[uuid_len + 1], &endptr, 10);
   if (*endptr == '\0') return 0; // remaining string was seqno
 
   return 1;
