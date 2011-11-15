@@ -71,6 +71,7 @@
 # wsrep builds
 # ----------------------------------------------------------------------------
 %if %{defined with_wsrep}
+%define mysql_version @VERSION@-wsrep-@WSREP_API_VERSION@.@WSREP_PATCH_VERSION@
 %define wsrep_version @WSREP_VERSION@
 %define wsrep_comment wsrep patch: %{wsrep_version}
 %else
