@@ -4235,17 +4235,19 @@ a file name for --log-bin-index option", opt_binlog_index_name);
                                (TC_LOG *) &mysql_bin_log :
 #ifdef WITH_WSREP
                                (WSREP_ON ? 
-				(TC_LOG *) &tc_log_dummy : 
-				(TC_LOG *) &tc_log_mmap)) :
+                                (TC_LOG *) &tc_log_dummy : 
+                                (TC_LOG *) &tc_log_mmap)) :
 #else
-	                       (TC_LOG *) &tc_log_mmap) :
+                               (TC_LOG *) &tc_log_mmap) :
 #endif
     (TC_LOG *) &tc_log_dummy);
+#ifdef WITH_WSREP
   WSREP_DEBUG("Initial TC log open: %s", 
-	      (tc_log == &mysql_bin_log) ? "binlog" :
-	      (tc_log == &tc_log_mmap) ? "mmap" :
-	      (tc_log == &tc_log_dummy) ? "dummy" : "unknown"
-	      );
+              (tc_log == &mysql_bin_log) ? "binlog" :
+              (tc_log == &tc_log_mmap) ? "mmap" :
+              (tc_log == &tc_log_dummy) ? "dummy" : "unknown"
+              );
+#endif
   if (tc_log->open(opt_bin_log ? opt_bin_logname : opt_tc_log_file))
   {
     sql_print_error("Can't init tc log");

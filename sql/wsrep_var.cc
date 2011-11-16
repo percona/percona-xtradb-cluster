@@ -70,7 +70,6 @@ void wsrep_causal_reads_update (sys_var *self, THD* thd, enum_var_type var_type)
 static int wsrep_start_position_verify (const char* start_str)
 {
   size_t        start_len;
-  char*         endptr;
   wsrep_uuid_t  uuid;
   ssize_t       uuid_len;
 
@@ -85,7 +84,10 @@ static int wsrep_start_position_verify (const char* start_str)
   if (start_str[uuid_len] != ':') // separator should follow UUID
     return 1;
 
-  strtoll (&start_str[uuid_len + 1], &endptr, 10);
+  char* endptr;
+  wsrep_seqno_t const seqno __attribute__((unused)) // to avoid GCC warnings
+    (strtoll(&start_str[uuid_len + 1], &endptr, 10));
+
   if (*endptr == '\0') return 0; // remaining string was seqno
 
   return 1;
