@@ -31,7 +31,6 @@
 const char* wsrep_sst_method          = WSREP_SST_DEFAULT;
 const char* wsrep_sst_receive_address = WSREP_SST_ADDRESS_AUTO;
 const char* wsrep_sst_donor           = "";
-//      char* wsrep_sst_auth            = (char *)"";
       char* wsrep_sst_auth            = NULL;
 
 // container for real auth string
@@ -45,7 +44,7 @@ static const char *sst_methods[] = {
   NULL
 };
 
-bool  wsrep_sst_method_check (sys_var *self, THD* thd, set_var* var)
+bool wsrep_sst_method_check (sys_var *self, THD* thd, set_var* var)
 {
     char   buff[FN_REFLEN];
     String str(buff, sizeof(buff), system_charset_info), *res;
@@ -113,17 +112,17 @@ static bool sst_auth_real_set (const char* value)
         sst_auth_real = v;
 
         if (strlen(sst_auth_real))
-	{
-	  if (wsrep_sst_auth)
-	  {
-	    my_free ((void*)wsrep_sst_auth);
-	    wsrep_sst_auth = my_strdup(WSREP_SST_AUTH_MASK, MYF(0));
-	    //strncpy (wsrep_sst_auth, WSREP_SST_AUTH_MASK, 
-	    //     sizeof(wsrep_sst_auth) - 1);
-	  }
-	  else
-	    wsrep_sst_auth = my_strdup (WSREP_SST_AUTH_MASK, MYF(0));
-	}
+        {
+          if (wsrep_sst_auth)
+          {
+            my_free ((void*)wsrep_sst_auth);
+            wsrep_sst_auth = my_strdup(WSREP_SST_AUTH_MASK, MYF(0));
+            //strncpy (wsrep_sst_auth, WSREP_SST_AUTH_MASK, 
+            //     sizeof(wsrep_sst_auth) - 1);
+          }
+          else
+            wsrep_sst_auth = my_strdup (WSREP_SST_AUTH_MASK, MYF(0));
+        }
         return 0;
     }
 
