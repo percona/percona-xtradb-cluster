@@ -12,10 +12,11 @@
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
-#include <mysqld.h>
+
+//#include <mysqld.h>
 #include <sql_class.h>
-#include <sql_plugin.h>
-#include <set_var.h>
+//#include <sql_plugin.h>
+//#include <set_var.h>
 
 #include "wsrep_mysqld.h"
 
@@ -43,6 +44,8 @@ static struct opt opts[] =
     { "wsrep_sst_receive_address","AUTO"}, // mysqld.cc
     { "binlog_format",         "ROW" }, // mysqld.cc
     { "wsrep_provider",       "none" }, // mysqld.cc
+    { "query_cache_size",        "0" }, // mysqld.cc
+    { "locked_in_memory",        "0" }, // mysqld.cc
     { "locks_unsafe_for_binlog", "0" }, // ha_innodb.cc
     { "autoinc_lock_mode",       "1" }, // ha_innodb.cc
     { 0, 0 }
@@ -50,14 +53,16 @@ static struct opt opts[] =
 
 enum
 {
-    OPTION_WSREP_SLAVE_THREADS,
-    OPTION_BIND_ADDRESS,
-    OPTION_WSREP_SST_METHOD,
-    OPTION_WSREP_SST_RECEIVE_ADDRESS,
-    OPTION_BINLOG_FORMAT,
-    OPTION_WSREP_PROVIDER,
-    OPTION_LOCKS_UNSAFE_FOR_BINLOG,
-    OPTION_AUTOINC_LOCK_MODE
+    WSREP_SLAVE_THREADS,
+    BIND_ADDRESS,
+    WSREP_SST_METHOD,
+    WSREP_SST_RECEIVE_ADDRESS,
+    BINLOG_FORMAT,
+    WSREP_PROVIDER,
+    QUERY_CACHE_SIZE,
+    LOCKED_IN_MEMORY,
+    LOCKS_UNSAFE_FOR_BINLOG,
+    AUTOINC_LOCK_MODE
 };
 
 
@@ -254,7 +259,7 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
        what has been specified on the command line / my.cnf */
 
     long long slave_threads;
-    err = get_long_long (opts[OPTION_WSREP_SLAVE_THREADS], &slave_threads, 10);
+    err = get_long_long (opts[WSREP_SLAVE_THREADS], &slave_threads, 10);
     if (err) return err;
 
     int rcode = 0;
@@ -263,13 +268,11 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
         /* Need to check AUTOINC_LOCK_MODE and LOCKS_UNSAFE_FOR_BINLOG */
     {
         long long autoinc_lock_mode;
-        err = get_long_long (opts[OPTION_AUTOINC_LOCK_MODE], 
-			     &autoinc_lock_mode, 10);
+        err = get_long_long (opts[AUTOINC_LOCK_MODE], &autoinc_lock_mode, 10);
         if (err) return err;
 
         bool locks_unsafe_for_binlog;
-        err = get_bool (opts[OPTION_LOCKS_UNSAFE_FOR_BINLOG],
-			&locks_unsafe_for_binlog);
+        err = get_bool (opts[LOCKS_UNSAFE_FOR_BINLOG],&locks_unsafe_for_binlog);
         if (err) return err;
 
         if (autoinc_lock_mode != 2)
@@ -279,10 +282,75 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
             rcode = EINVAL;
         }
 
-        if (!locks_unsafe_for_binlog)
+/*        if (!locks_unsafe_for_binlog)
         {
             WSREP_ERROR ("Parallel applying (wsrep_slave_threads > 1) requires"
                          " innodb_locks_unsafe_for_binlog = 1.");
+            rcode = EINVAL;
+        } */
+    }
+
+    long long query_cache_size;
+    err = get_long_long (opts[QUERY_CACHE_SIZE], &query_cache_size, 10);
+    if (err) return err;
+    if (0 != query_cache_size)
+    {
+        WSREP_ERROR ("Query cache is not supported (query_cache_size=%lld)",
+                     query_cache_size);
+        rcode = EINVAL;
+    }
+
+    bool locked_in_memory;
+    err = get_bool (opts[LOCKED_IN_MEMORY], &locked_in_memory);
+    if (err) { WSREP_ERROR("get_bool error: %s", strerror(err)); return err; }
+    if (locked_in_memory)
+    {
+        WSREP_ERROR ("Memory locking is not supported (locked_in_memory=%s)",
+                     locked_in_memory ? "ON" : "OFF");
+        rcode = EINVAL;
+    }
+
+    if (!strcasecmp(opts[WSREP_SST_METHOD].value,"mysqldump"))
+    {
+        if (!strcasecmp(opts[BIND_ADDRESS].value, "127.0.0.1") ||
+            !strcasecmp(opts[BIND_ADDRESS].value, "localhost"))
+        {
+            WSREP_ERROR ("wsrep_sst_method is set to 'mysqldump' yet "
+                         "mysqld bind_address is set to '%s', which makes it "
+                         "impossible to receive state transfer from another "
+                         "node, since mysqld won't accept such connections. "
+                         "If you wish to use mysqldump state transfer method, "
+                         "set bind_address to allow mysql client connections "
+                         "from other cluster members (e.g. 0.0.0.0).",
+                         opts[BIND_ADDRESS].value);
+            rcode = EINVAL;
+        }
+    }
+
+    if (strcasecmp(opts[WSREP_SST_RECEIVE_ADDRESS].value, "AUTO"))
+    {
+        if (!strncasecmp(opts[WSREP_SST_RECEIVE_ADDRESS].value,
+                         "127.0.0.1", strlen("127.0.0.1"))       ||
+            !strncasecmp(opts[WSREP_SST_RECEIVE_ADDRESS].value,
+                         "localhost", strlen("localhost")))
+        {
+            WSREP_WARN  ("wsrep_sst_receive_address is set to '%s' which "
+                         "makes it impossible for another host to reach this "
+                         "one. Please set it to the address which this node "
+                         "can be connected at by other cluster members.",
+                         opts[WSREP_SST_RECEIVE_ADDRESS].value);
+//            rcode = EINVAL;
+        }
+    }
+
+    if (strcasecmp(opts[WSREP_PROVIDER].value, "none"))
+    {
+        if (strcasecmp(opts[BINLOG_FORMAT].value, "ROW"))
+        {
+            WSREP_ERROR ("Only binlog_format = 'ROW' is currently supported. "
+                         "Configured value: '%s'. Please adjust your "
+                         "configuration.", opts[BINLOG_FORMAT].value);
+
             rcode = EINVAL;
         }
     }
