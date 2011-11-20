@@ -43,12 +43,17 @@ void wsrep_cleanup_transaction(THD *thd)
         thd->wsrep_conflict_state != MUST_REPLAY &&
         thd_sql_command((const THD*) thd) != SQLCOM_SELECT)
     {
-      if (wsrep->post_commit(wsrep, &thd->wsrep_trx_handle))
+      //if (thd->wsrep_trx_handle != NULL)
       {
-        DBUG_PRINT("wsrep", ("set committed fail"));
-        WSREP_WARN("set committed fail: %lu %d", 
-		   thd->real_id, thd->stmt_da->status());
+	if (wsrep->post_commit(wsrep, &thd->wsrep_trx_handle))
+	{
+	  DBUG_PRINT("wsrep", ("set committed fail"));
+	  WSREP_WARN("set committed fail: %lu %d", 
+		     thd->real_id, thd->stmt_da->status());
+	}
       }
+      //else
+      //WSREP_DEBUG("no trx handle for %s", thd->query());
       thd_binlog_trx_reset(thd);
     }
     thd->wsrep_exec_mode= LOCAL_STATE;
@@ -258,8 +263,11 @@ wsrep_run_wsrep_commit(
   }
   if (data_len == 0) 
   {
-      WSREP_DEBUG("empty rbr buffer");
-      DBUG_RETURN(WSREP_TRX_OK);
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    thd->wsrep_exec_mode = LOCAL_COMMIT;
+    WSREP_DEBUG("empty rbr buffer, query: %s", thd->query());
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    DBUG_RETURN(WSREP_TRX_OK);
   }
   if (!rcode) {
     rcode = wsrep->pre_commit(
@@ -295,6 +303,7 @@ wsrep_run_wsrep_commit(
     my_free(rbr_data);
   }
 
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch(rcode) {
   case 0:
     thd->wsrep_exec_mode = LOCAL_COMMIT;
@@ -306,7 +315,6 @@ wsrep_run_wsrep_commit(
     WSREP_DEBUG("commit failed for reason: %d", rcode);
     DBUG_PRINT("wsrep", ("replicating commit fail"));
 
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     thd->wsrep_query_state= QUERY_EXEC;
 
     if (thd->wsrep_conflict_state == MUST_ABORT) {
@@ -323,7 +331,7 @@ wsrep_run_wsrep_commit(
     WSREP_ERROR("unknown connection failure");
     DBUG_RETURN(WSREP_TRX_ERROR);
   }
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
   thd->wsrep_query_state= QUERY_EXEC;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
