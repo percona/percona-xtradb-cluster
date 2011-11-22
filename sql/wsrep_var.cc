@@ -151,6 +151,23 @@ void wsrep_start_position_init (const char* val)
   wsrep_set_local_position (val);
 }
 
+static bool refresh_provider_options()
+{
+  char* opts= wsrep->options_get(wsrep);
+  if (opts)
+  {
+    if (wsrep_provider_options) my_free((void *)wsrep_provider_options);
+    wsrep_provider_options = (char*)my_memdup(opts, strlen(opts) + 1, 
+					      MYF(MY_WME));
+  }
+  else
+  {
+    WSREP_ERROR("Failed to get provider options");
+    return true;
+  }
+  return false;
+}
+
 static int wsrep_provider_verify (const char* provider_str)
 {
   MY_STAT   f_stat;
@@ -220,6 +237,8 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
 
   thd->variables.wsrep_on= wsrep_on_saved;
 
+  refresh_provider_options();
+
   return rcode;
 }
 
@@ -245,25 +264,9 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
   if (ret != WSREP_OK)
   {
     WSREP_ERROR("Set options returned %d", ret);
-    return 1;
+    return true;
   }
-  else
-  {
-    char* opts= wsrep->options_get(wsrep);
-
-    if (opts)
-    {
-      if (wsrep_provider_options) my_free((void *)wsrep_provider_options);
-      wsrep_provider_options = (char*)my_memdup(opts, strlen(opts) + 1, 
-						MYF(MY_WME));
-    }
-    else
-    {
-      WSREP_ERROR("Failed to get provider options");
-      return true;
-    }
-  }
-  return false;
+  return refresh_provider_options();
 }
 
 void wsrep_provider_options_init(const char* value)
