@@ -56,6 +56,7 @@ extern const char* wsrep_notify_cmd;
 extern my_bool     wsrep_certify_nonPK;
 extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
+extern ulong       wsrep_forced_binlog_format;
 extern ulong       wsrep_OSU_method_options;
 
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };

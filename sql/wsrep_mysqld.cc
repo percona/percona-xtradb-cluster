@@ -44,7 +44,7 @@ long    wsrep_max_ws_rows              = 65536; // max number of rows in ws
 int     wsrep_to_isolation             = 0; // # of active TO isolation threads
 my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
 long    wsrep_max_protocol_version     = 1; // maximum protocol version to use
-
+ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 /*
  * End configuration options
  */

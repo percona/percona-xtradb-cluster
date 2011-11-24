@@ -3699,7 +3699,7 @@ extern "C" int thd_binlog_format(const MYSQL_THD thd)
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
 #endif
-    return (int) thd->variables.binlog_format;
+    return (int) WSREP_FORMAT(thd->variables.binlog_format);
   else
     return BINLOG_FORMAT_UNSPEC;
 }
@@ -4265,7 +4265,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     binlog by filtering rules.
   */
   if (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG) &&
-      !(variables.binlog_format == BINLOG_FORMAT_STMT &&
+      !(WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT &&
         !binlog_filter->db_ok(db)))
   {
     /*
@@ -4429,7 +4429,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
         */
         my_error((error= ER_BINLOG_ROW_INJECTION_AND_STMT_ENGINE), MYF(0));
       }
-      else if (variables.binlog_format == BINLOG_FORMAT_ROW &&
+      else if (WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW &&
                sqlcom_can_generate_row_events(this))
       {
         /*
@@ -4458,7 +4458,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     else
     {
       /* binlog_format = STATEMENT */
-      if (variables.binlog_format == BINLOG_FORMAT_STMT)
+      if (WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT)
       {
         if (lex->is_stmt_row_injection())
         {
@@ -4523,7 +4523,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
                         "and binlog_filter->db_ok(db) = %d",
                         mysql_bin_log.is_open(),
                         (variables.option_bits & OPTION_BIN_LOG),
-                        variables.binlog_format,
+                        WSREP_FORMAT(variables.binlog_format),
                         binlog_filter->db_ok(db)));
 #endif
 

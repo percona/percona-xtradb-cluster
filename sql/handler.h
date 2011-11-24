@@ -2172,6 +2172,9 @@ private:
 extern const char *ha_row_type[];
 extern MYSQL_PLUGIN_IMPORT const char *tx_isolation_names[];
 extern MYSQL_PLUGIN_IMPORT const char *binlog_format_names[];
+#ifdef WITH_WSREP
+extern MYSQL_PLUGIN_IMPORT const char *wsrep_binlog_format_names[];
+#endif /* WITH_WSREP */
 extern TYPELIB tx_isolation_typelib;
 extern const char *myisam_stats_method_names[];
 extern ulong total_ha, total_ha_2pc;

@@ -2041,12 +2041,12 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
     if (ending_trans(thd, all) &&
         ((thd->variables.option_bits & OPTION_KEEP_LOG) ||
          (trans_has_updated_non_trans_table(thd) &&
-          thd->variables.binlog_format == BINLOG_FORMAT_STMT) ||
+          WSREP_FORMAT(thd->variables.binlog_format) == BINLOG_FORMAT_STMT) ||
          (cache_mngr->trx_cache.changes_to_non_trans_temp_table() &&
-          thd->variables.binlog_format == BINLOG_FORMAT_MIXED) ||
+          WSREP_FORMAT(thd->variables.binlog_format) == BINLOG_FORMAT_MIXED) ||
          (trans_has_updated_non_trans_table(thd) &&
           ending_single_stmt_trans(thd,all) &&
-          thd->variables.binlog_format == BINLOG_FORMAT_MIXED)))
+          WSREP_FORMAT(thd->variables.binlog_format) == BINLOG_FORMAT_MIXED)))
       error= binlog_rollback_flush_trx_cache(thd, cache_mngr);
     /*
       Truncate the cache if:
@@ -2060,9 +2060,9 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
     else if (ending_trans(thd, all) ||
              (!(thd->variables.option_bits & OPTION_KEEP_LOG) &&
               (!stmt_has_updated_non_trans_table(thd) ||
-               thd->variables.binlog_format != BINLOG_FORMAT_STMT) &&
+               WSREP_FORMAT(thd->variables.binlog_format) != BINLOG_FORMAT_STMT) &&
               (!cache_mngr->trx_cache.changes_to_non_trans_temp_table() ||
-               thd->variables.binlog_format != BINLOG_FORMAT_MIXED)))
+               WSREP_FORMAT(thd->variables.binlog_format) != BINLOG_FORMAT_MIXED)))
       error= binlog_truncate_trx_cache(thd, cache_mngr, all);
   }
 
