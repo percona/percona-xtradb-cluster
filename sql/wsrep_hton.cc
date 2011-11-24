@@ -276,6 +276,7 @@ wsrep_run_wsrep_commit(
 			      &thd->wsrep_trx_handle,
 			      rbr_data,
 			      data_len,
+			      (thd->wsrep_PA_safe) ? WSREP_FLAG_PA_SAFE : 0ULL,
 			      &thd->wsrep_trx_seqno);
     if (rcode == WSREP_TRX_MISSING) {
       rcode = WSREP_OK;

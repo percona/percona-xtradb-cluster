@@ -2473,7 +2473,9 @@ Query_log_event::Query_log_event(THD* thd_arg, const char* query_arg,
    master_data_written(0)
 {
   time_t end_time;
-
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= false;
+#endif /* WITH_WSREP */
   memset(&user, 0, sizeof(user));
   memset(&host, 0, sizeof(host));
 

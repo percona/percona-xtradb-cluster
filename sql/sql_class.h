@@ -2214,6 +2214,7 @@ public:
 #endif /* WSREP_PROC_INFO */
   ulong                     wsrep_retry_autocommit; // max retry value
   ulong                     wsrep_retry_counter; // of autocommit
+  bool                      wsrep_PA_safe;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

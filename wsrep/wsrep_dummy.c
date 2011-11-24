@@ -101,6 +101,7 @@ static wsrep_status_t dummy_pre_commit(
     wsrep_trx_handle_t*    trx_handle __attribute__((unused)),
     const void*            query      __attribute__((unused)),
     const size_t           query_len  __attribute__((unused)),
+    uint64_t               flags      __attribute__((unused)),
     wsrep_seqno_t*         seqno      __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);

@@ -174,6 +174,9 @@ bool trans_commit(THD *thd)
   int res;
   DBUG_ENTER("trans_commit");
 
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+#endif /* WITH_WSREP */
   if (trans_check(thd))
     DBUG_RETURN(TRUE);
 
@@ -211,6 +214,9 @@ bool trans_commit_implicit(THD *thd)
   bool res= FALSE;
   DBUG_ENTER("trans_commit_implicit");
 
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+#endif /* WITH_WSREP */
   if (trans_check(thd))
     DBUG_RETURN(TRUE);
 
@@ -251,9 +257,11 @@ bool trans_commit_implicit(THD *thd)
 bool trans_rollback(THD *thd)
 {
   int res;
-  DBUG_ENTER("trans_rollback");
-
-  if (trans_check(thd))
+  DBUG_ENTER("trans_rollback"); 
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+#endif /* WITH_WSREP */
+ if (trans_check(thd))
     DBUG_RETURN(TRUE);
 
   thd->server_status&= ~SERVER_STATUS_IN_TRANS;
