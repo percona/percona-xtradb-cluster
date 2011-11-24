@@ -997,6 +997,11 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   bool is_autocommit= false;
 
   if (WSREP(thd)) {
+    if (!thd->in_multi_stmt_transaction_mode())
+    {
+      thd->wsrep_PA_safe= true;
+    }
+
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     thd->wsrep_query_state= QUERY_EXEC;
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
