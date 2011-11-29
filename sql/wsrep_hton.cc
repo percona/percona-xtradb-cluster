@@ -77,7 +77,7 @@ wsrep_close_connection(handlerton*  hton, THD* thd)
 {
   DBUG_ENTER("wsrep_close_connection");
   if (thd_get_ha_data(thd, binlog_hton) != NULL)
-		binlog_hton->close_connection (binlog_hton, thd);
+    binlog_hton->close_connection (binlog_hton, thd);
   DBUG_RETURN(0);
 } 
 
@@ -148,7 +148,7 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
 int wsrep_commit(handlerton *hton, THD *thd, bool all)
 {
   DBUG_ENTER("wsrep_commit");
-  
+
   DBUG_RETURN(0);
 }
 
@@ -176,7 +176,7 @@ wsrep_run_wsrep_commit(
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if (thd->wsrep_conflict_state == MUST_ABORT) {
       if (wsrep_debug)
-	WSREP_INFO("WSREP: must abort for BF");
+        WSREP_INFO("WSREP: must abort for BF");
       DBUG_PRINT("wsrep", ("BF apply commit fail"));
       thd->wsrep_conflict_state = NO_CONFLICT;
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -201,7 +201,7 @@ wsrep_run_wsrep_commit(
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     if (wsrep_debug) {
       WSREP_INFO("innobase_commit, abort %s",
-		 (thd->query()) ? thd->query() : "void");
+                 (thd->query()) ? thd->query() : "void");
     }
     DBUG_RETURN(WSREP_TRX_ROLLBACK);
   }
@@ -226,7 +226,7 @@ wsrep_run_wsrep_commit(
     mysql_cond_timedwait(&COND_wsrep_replaying, &LOCK_wsrep_replaying,
                            &wtime);
     WSREP_DEBUG("commit waiting for replaying: %d, thd: (%lu) conflict: %d", 
-		wsrep_replaying, thd->thread_id, thd->wsrep_conflict_state);
+                wsrep_replaying, thd->thread_id, thd->wsrep_conflict_state);
 
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
@@ -245,7 +245,7 @@ wsrep_run_wsrep_commit(
     thd->wsrep_conflict_state = ABORTED;
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     WSREP_DEBUG("innobase_commit abort after replaying wait %s",
-		(thd->query()) ? thd->query() : "void");
+                (thd->query()) ? thd->query() : "void");
     DBUG_RETURN(WSREP_TRX_ROLLBACK);
   }  thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -271,13 +271,13 @@ wsrep_run_wsrep_commit(
   }
   if (!rcode) {
     rcode = wsrep->pre_commit(
-			      wsrep,
-			      (wsrep_conn_id_t)thd->thread_id,
-			      &thd->wsrep_trx_handle,
-			      rbr_data,
-			      data_len,
-			      (thd->wsrep_PA_safe) ? WSREP_FLAG_PA_SAFE : 0ULL,
-			      &thd->wsrep_trx_seqno);
+                              wsrep,
+                              (wsrep_conn_id_t)thd->thread_id,
+                              &thd->wsrep_trx_handle,
+                              rbr_data,
+                              data_len,
+                              (thd->wsrep_PA_safe) ? WSREP_FLAG_PA_SAFE : 0ULL,
+                              &thd->wsrep_trx_seqno);
     if (rcode == WSREP_TRX_MISSING) {
       rcode = WSREP_OK;
     } else if (rcode == WSREP_BF_ABORT) {
@@ -286,20 +286,18 @@ wsrep_run_wsrep_commit(
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       mysql_mutex_lock(&LOCK_wsrep_replaying);
       wsrep_replaying++;
-      WSREP_DEBUG("replaying increased: %d, thd: %lu", 
-		  wsrep_replaying, thd->thread_id);
+      WSREP_DEBUG("replaying increased: %d, thd: %lu",
+                  wsrep_replaying, thd->thread_id);
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   } else {
-    const char *errmsg = 
-      "I/O error reading from thd's binlog iocache";
-    WSREP_ERROR("%s, errno=%d, io cache code=%d", 
-		    errmsg, my_errno, cache->error);
+    WSREP_ERROR("I/O error reading from thd's binlog iocache: "
+                "errno=%d, io cache code=%d", my_errno, cache->error);
     if (data_len) my_free(rbr_data);
     DBUG_ASSERT(0); // failure like this can not normally happen
     DBUG_RETURN(WSREP_TRX_ERROR);
   }
-  
+
   if (data_len) {
     my_free(rbr_data);
   }
@@ -357,7 +355,6 @@ static int wsrep_hton_init(void *p)
   wsrep_hton->slot= 0;
   return 0;
 }
-
 
 
 struct st_mysql_storage_engine wsrep_storage_engine=
