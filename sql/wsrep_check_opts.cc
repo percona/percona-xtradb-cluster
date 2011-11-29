@@ -44,6 +44,7 @@ static struct opt opts[] =
     { "wsrep_sst_receive_address","AUTO"}, // mysqld.cc
     { "binlog_format",         "ROW" }, // mysqld.cc
     { "wsrep_provider",       "none" }, // mysqld.cc
+    { "query_cache_type",        "0" }, // mysqld.cc
     { "query_cache_size",        "0" }, // mysqld.cc
     { "locked_in_memory",        "0" }, // mysqld.cc
     { "locks_unsafe_for_binlog", "0" }, // ha_innodb.cc
@@ -59,6 +60,7 @@ enum
     WSREP_SST_RECEIVE_ADDRESS,
     BINLOG_FORMAT,
     WSREP_PROVIDER,
+    QUERY_CACHE_TYPE,
     QUERY_CACHE_SIZE,
     LOCKED_IN_MEMORY,
     LOCKS_UNSAFE_FOR_BINLOG,
@@ -183,6 +185,22 @@ int get_long_long (const struct opt& opt, long long* const val, int const base)
 
         *val = strtoll (str, &endptr, base);
 
+        if ('k' == *endptr || 'K' == *endptr) 
+        { 
+            *val *= 1024L;
+            endptr++;
+        } 
+        else if ('m' == *endptr || 'M' == *endptr) 
+        {
+            *val *= 1024L * 1024L;
+            endptr++;
+        }
+        else if ('g' == *endptr || 'G' == *endptr) 
+        {
+            *val *= 1024L * 1024L * 1024L;
+            endptr++;
+        }
+
         if ('\0' == *endptr) return 0; // the whole string was a valid integer
     }
 
@@ -281,22 +299,18 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
                          " innodb_autoinc_lock_mode = 2.");
             rcode = EINVAL;
         }
-
-/*        if (!locks_unsafe_for_binlog)
-        {
-            WSREP_ERROR ("Parallel applying (wsrep_slave_threads > 1) requires"
-                         " innodb_locks_unsafe_for_binlog = 1.");
-            rcode = EINVAL;
-        } */
     }
 
-    long long query_cache_size;
-    err = get_long_long (opts[QUERY_CACHE_SIZE], &query_cache_size, 10);
-    if (err) return err;
-    if (0 != query_cache_size)
+    long long query_cache_size, query_cache_type;
+    if ((err = get_long_long (opts[QUERY_CACHE_SIZE], &query_cache_size, 10)))
+        return err;
+    if ((err = get_long_long (opts[QUERY_CACHE_TYPE], &query_cache_type, 10)))
+        return err;
+
+    if (0 != query_cache_size && 0 != query_cache_type)
     {
-        WSREP_ERROR ("Query cache is not supported (query_cache_size=%lld)",
-                     query_cache_size);
+        WSREP_ERROR ("Query cache is not supported (size=%lld type=%lld)",
+                     query_cache_size, query_cache_type);
         rcode = EINVAL;
     }
 
