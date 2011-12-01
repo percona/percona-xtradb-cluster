@@ -4471,7 +4471,8 @@ wsrep_store_key_val_for_row(
 	char*		buff,	/*!< in/out: buffer for the key value (in MySQL
 				format) */
 	uint		buff_len,/*!< in: buffer length */
-	const uchar*	record)/*!< in: row in MySQL format */
+	const uchar*	record,
+	ibool*          key_is_null)/*!< out: full key was null */
 {
 	KEY*		key_info	= table->key_info + keynr;
 	KEY_PART_INFO*	key_part	= key_info->key_part;
@@ -4479,26 +4480,27 @@ wsrep_store_key_val_for_row(
 	char*		buff_start	= buff;
 	enum_field_types mysql_type;
 	Field*		field;
-	ibool		is_null;
-
+	
 	DBUG_ENTER("store_key_val_for_row");
 
 	bzero(buff, buff_len);
+	*key_is_null = TRUE;
 
 	for (; key_part != end; key_part++) {
 		uchar sorted[REC_VERSION_56_MAX_INDEX_COL_LEN] = {'\0'};
-		is_null = FALSE;
+		ibool part_is_null = FALSE;
 
 		if (key_part->null_bit) {
-			if (record[key_part->null_offset]
-						& key_part->null_bit) {
+			if (record[key_part->null_offset] & 
+			    key_part->null_bit) {
 				*buff = 1;
-				is_null = TRUE;
+				part_is_null = TRUE;
 			} else {
 				*buff = 0;
 			}
 			buff++;
 		}
+		if (!part_is_null)  *key_is_null = FALSE;
 
 		field = key_part->field;
 		mysql_type = field->type();
@@ -4515,7 +4517,7 @@ wsrep_store_key_val_for_row(
 
 			key_len = key_part->length;
 
-			if (is_null) {
+			if (part_is_null) {
 				buff += key_len + 2;
 
 				continue;
@@ -4582,7 +4584,7 @@ wsrep_store_key_val_for_row(
 
 			key_len = key_part->length;
 
-			if (is_null) {
+			if (part_is_null) {
 				buff += key_len + 2;
 
 				continue;
@@ -4646,7 +4648,7 @@ wsrep_store_key_val_for_row(
 
 			key_len = key_part->length;
 
-			if (is_null) {
+			if (part_is_null) {
 				 buff += key_len;
 
 				 continue;
@@ -6835,13 +6837,22 @@ ha_innobase::wsrep_append_keys(
 		char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
 		char 	*key 		= &keyval[0];
 		KEY	*key_info	= table->key_info;
+		ibool    is_null;
 
 		len = wsrep_store_key_val_for_row(
-			 table, 0, key, key_info->key_length, record);
-		int rcode = wsrep_append_key(
-			thd, trx, table_share, table, keyval, 
-			len, action);
-		if (rcode) DBUG_RETURN(rcode);
+			table, 0, key, key_info->key_length, record, &is_null);
+
+		if (!is_null) {
+			int rcode = wsrep_append_key(
+				thd, trx, table_share, table, keyval, 
+				len, action);
+			if (rcode) DBUG_RETURN(rcode);
+		}
+		else
+		{
+			WSREP_DEBUG("NULL key skipped (proto 0): %s", 
+				    wsrep_thd_query(thd));
+		}
 	} else {
 		ut_a(table->s->keys <= 256);
 		uint i;
@@ -6850,17 +6861,25 @@ ha_innobase::wsrep_append_keys(
 			char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
 			char 	*key 		= &keyval[1];
 			KEY	*key_info	= table->key_info + i;
+			ibool    is_null;
 
 			keyval[0] = (char)i;
 
 			if (key_info->flags & HA_NOSAME) {
 				len = wsrep_store_key_val_for_row(
 					table, i, key, key_info->key_length, 
-					record);
-				int rcode = wsrep_append_key(
-					thd, trx, table_share, table, keyval, 
-					len+1, action);
-				if (rcode) DBUG_RETURN(rcode);
+					record, &is_null);
+				if (!is_null) {
+					int rcode = wsrep_append_key(
+						thd, trx, table_share, table, 
+						keyval, len+1, action);
+					if (rcode) DBUG_RETURN(rcode);
+				}
+				else
+				{
+					WSREP_DEBUG("NULL key skipped: %s", 
+						    wsrep_thd_query(thd));
+				}
 			}
 		}
 	}
