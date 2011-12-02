@@ -7589,7 +7589,7 @@ void wsrep_write_rbr_buf(
 {
   char filename[64] = {0};
   sprintf(filename, "%s/GRA_%ld_%lld.log", 
-          wsrep_data_home_dir, thd->thread_id, (long long)thd->wsrep_trx_seqno);
+          mysql_real_data_home, thd->thread_id, (long long)thd->wsrep_trx_seqno);
   FILE *of = fopen(filename, "wb");
   if (of)
   {
