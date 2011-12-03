@@ -111,6 +111,7 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
 
 static int wsrep_savepoint_set(handlerton *hton, THD *thd,  void *sv)
 {
+  if (!wsrep_emulate_bin_log) return 0;
   int rcode = binlog_hton->savepoint_set(binlog_hton, thd, sv);
   return rcode;
 }
