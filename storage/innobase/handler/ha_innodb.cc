@@ -9693,11 +9693,18 @@ ha_innobase::external_lock(
 		/* used by test case */
 		DBUG_EXECUTE_IF("no_innodb_binlog_errors", skip = 1;);
 		if (!skip) {
+#ifdef WITH_WSREP
+		  if (!wsrep_on(thd) || wsrep_thd_exec_mode(thd) == LOCAL_STATE)
+			{
+#endif /* WITH_WSREP */
 			my_error(ER_BINLOG_STMT_MODE_AND_ROW_ENGINE, MYF(0),
 			         " InnoDB is limited to row-logging when "
 			         "transaction isolation level is "
 			         "READ COMMITTED or READ UNCOMMITTED.");
 			DBUG_RETURN(HA_ERR_LOGGING_IMPOSSIBLE);
+#ifdef WITH_WSREP
+			}
+#endif /* WITH_WSREP */
 		}
 	}
 

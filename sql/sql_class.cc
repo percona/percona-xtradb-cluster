@@ -4477,7 +4477,14 @@ int THD::decide_logging_format(TABLE_LIST *tables)
             5. Error: Cannot modify table that uses a storage engine
                limited to row-logging when binlog_format = STATEMENT
           */
+#ifdef WITH_WSREP
+	  if (!WSREP(this) || wsrep_exec_mode == LOCAL_STATE)
+	  {
+#endif /* WITH_WSREP */
           my_error((error= ER_BINLOG_STMT_MODE_AND_ROW_ENGINE), MYF(0), "");
+#ifdef WITH_WSREP
+	  }
+#endif /* WITH_WSREP */
         }
         else if (is_write && (unsafe_flags= lex->get_stmt_unsafe_flags()) != 0)
         {
