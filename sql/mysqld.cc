@@ -4336,7 +4336,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   if (my_thread_init()) 
   {
     WSREP_ERROR("Could not initialize thread");
-    return 0;
+    DBUG_RETURN(NULL);
   }
 
   if (!(thd= new THD(true)))
@@ -4383,7 +4383,8 @@ pthread_handler_t start_wsrep_THD(void *arg)
     close_connection(thd, ER_OUT_OF_RESOURCES, 1);
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
-    return 0;
+
+    DBUG_RETURN(NULL);
   }
 
 // </5.1.17>
@@ -4406,7 +4407,8 @@ pthread_handler_t start_wsrep_THD(void *arg)
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     delete thd;
-    return 0;
+ 
+    DBUG_RETURN(NULL);
   }
 
   /* from handle_bootstrap() */
