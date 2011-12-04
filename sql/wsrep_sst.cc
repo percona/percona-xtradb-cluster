@@ -373,12 +373,7 @@ static ssize_t sst_prepare_other (const char*  method,
 {
   ssize_t cmd_len= 1024;
   char    cmd_str[cmd_len];
-  const char* sst_dir;
-
-  if (wsrep_data_home_dir && strlen(wsrep_data_home_dir))
-    sst_dir= wsrep_data_home_dir;
-  else
-    sst_dir= mysql_real_data_home;
+  const char* sst_dir= mysql_real_data_home;
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%d' 2>sst.err",

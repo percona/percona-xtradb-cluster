@@ -27,7 +27,8 @@ my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
  * Begin configuration options and their default values
  */
 
-const char* wsrep_data_home_dir = mysql_real_data_home;
+const char* wsrep_data_home_dir = NULL;
+
 #define WSREP_NODE_INCOMING_AUTO "AUTO"
 const char* wsrep_node_incoming_address = WSREP_NODE_INCOMING_AUTO;
 const char* wsrep_dbug_option   = "";
@@ -340,6 +341,9 @@ int wsrep_init()
 
   struct wsrep_init_args wsrep_args;
 
+  if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)
+    wsrep_data_home_dir = mysql_real_data_home;
+
   if (strcmp (wsrep_provider, WSREP_NONE) &&
       (!wsrep_node_incoming_address ||
        !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO))) {
@@ -354,7 +358,7 @@ int wsrep_init()
     }
   }
 
-  wsrep_args.data_dir        = mysql_real_data_home;
+  wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
   wsrep_args.node_incoming   = wsrep_node_incoming_address;
   wsrep_args.options         = (wsrep_provider_options) ?

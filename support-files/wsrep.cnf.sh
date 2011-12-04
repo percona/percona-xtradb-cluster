@@ -65,10 +65,6 @@ wsrep_slave_threads=1
 # and parallel applying operation)
 wsrep_certify_nonPK=1
 
-# Location of the directory with data files. Needed for non-mysqldump
-# state snapshot transfers. Defaults to mysql_real_data_home.
-#wsrep_data_home_dir=
-
 # Maximum number of rows in write set
 wsrep_max_ws_rows=131072
 
