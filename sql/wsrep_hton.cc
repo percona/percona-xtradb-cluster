@@ -132,7 +132,8 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
     if (wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle))
     {
       DBUG_PRINT("wsrep", ("setting rollback fail"));
-      WSREP_ERROR("settting rollback fail: %llu", thd_to_trx_id(thd));
+      WSREP_ERROR("settting rollback fail: thd: %lu SQL: %s", 
+		  thd->real_id, thd->query());
     }
   }
 
