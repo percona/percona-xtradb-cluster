@@ -113,7 +113,7 @@ class ha_innobase: public handler
 
 #ifdef WITH_WSREP
 	int wsrep_append_keys(THD *thd, wsrep_action_t action,
-			      const uchar* record);
+			      const uchar* record0, const uchar* record1);
 #endif
 	/* Init values for the class: */
  public:

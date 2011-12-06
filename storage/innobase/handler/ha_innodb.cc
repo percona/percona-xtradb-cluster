@@ -5585,7 +5585,7 @@ report_error:
 	    wsrep_on(user_thd) && (sql_command != SQLCOM_LOAD ||
 	    thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW)) {
 
-		if (wsrep_append_keys(user_thd, WSREP_INSERT, record)) {
+		if (wsrep_append_keys(user_thd, WSREP_INSERT, record, NULL)) {
  			DBUG_PRINT("wsrep", ("row key failed"));
  			error_result = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -5864,7 +5864,7 @@ ha_innobase::update_row(
 
 		DBUG_PRINT("wsrep", ("update row key"));
 
-		if (wsrep_append_keys(user_thd, WSREP_UPDATE, old_row)) {
+		if (wsrep_append_keys(user_thd, WSREP_UPDATE, old_row, new_row)) {
 			DBUG_PRINT("wsrep", ("row key failed"));
 			error = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -5919,7 +5919,7 @@ ha_innobase::delete_row(
 	if (!error && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
             wsrep_on(user_thd)) {
 
-		if (wsrep_append_keys(user_thd, WSREP_DELETE, record)) {
+		if (wsrep_append_keys(user_thd, WSREP_DELETE, record, NULL)) {
 			DBUG_PRINT("wsrep", ("delete fail"));
 			error = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -6820,7 +6820,8 @@ ha_innobase::wsrep_append_keys(
 /*==================*/
 	THD 		*thd,
 	wsrep_action_t 	action,
-	const uchar*	record)	/* in: row in MySQL format */
+	const uchar*	record0,	/* in: row in MySQL format */
+	const uchar*	record1)	/* in: row in MySQL format */
 {
 	DBUG_ENTER("wsrep_append_keys");
 	trx_t *trx = thd_to_trx(thd);
@@ -6828,10 +6829,20 @@ ha_innobase::wsrep_append_keys(
 	/* if no PK, calculate hash of full row, to be the key value */
 	if (prebuilt->clust_index_was_generated && wsrep_certify_nonPK) {
 		uchar digest[16];
-		MY_MD5_HASH(digest, (uchar *)record, table->s->reclength);
-		int rcode = wsrep_append_key(thd, trx, table_share, table, 
-				 (const char*) digest, 16, action);
-		if (rcode) DBUG_RETURN(rcode);
+		int rcode;
+
+		MY_MD5_HASH(digest, (uchar *)record0, table->s->reclength);
+		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
+					      (const char*) digest, 16, action))) {
+			DBUG_RETURN(rcode);
+		}
+		if (record1) {
+			MY_MD5_HASH(digest, (uchar *)record1, table->s->reclength);
+			if ((rcode = wsrep_append_key(thd, trx, table_share, table,
+						      (const char*) digest, 16, action))) {
+				DBUG_RETURN(rcode);
+			}
+		}
 	} else if (wsrep_protocol_version == 0) {
 		uint	len;
 		char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
@@ -6840,7 +6851,7 @@ ha_innobase::wsrep_append_keys(
 		ibool    is_null;
 
 		len = wsrep_store_key_val_for_row(
-			table, 0, key, key_info->key_length, record, &is_null);
+			table, 0, key, key_info->key_length, record0, &is_null);
 
 		if (!is_null) {
 			int rcode = wsrep_append_key(
@@ -6868,7 +6879,7 @@ ha_innobase::wsrep_append_keys(
 			if (key_info->flags & HA_NOSAME) {
 				len = wsrep_store_key_val_for_row(
 					table, i, key, key_info->key_length, 
-					record, &is_null);
+					record0, &is_null);
 				if (!is_null) {
 					int rcode = wsrep_append_key(
 						thd, trx, table_share, table, 
