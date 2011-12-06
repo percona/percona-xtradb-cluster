@@ -6869,27 +6869,41 @@ ha_innobase::wsrep_append_keys(
 		uint i;
 		for (i=0; i<table->s->keys; ++i) {
 			uint	len;
-			char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
-			char 	*key 		= &keyval[1];
+			char 	keyval0[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
+			char 	keyval1[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
+			char 	*key0 		= &keyval0[1];
+			char 	*key1 		= &keyval1[1];
 			KEY	*key_info	= table->key_info + i;
 			ibool    is_null;
 
-			keyval[0] = (char)i;
+			keyval0[0] = (char)i;
+			keyval1[0] = (char)i;
 
 			if (key_info->flags & HA_NOSAME) {
 				len = wsrep_store_key_val_for_row(
-					table, i, key, key_info->key_length, 
+					table, i, key0, key_info->key_length, 
 					record0, &is_null);
 				if (!is_null) {
 					int rcode = wsrep_append_key(
 						thd, trx, table_share, table, 
-						keyval, len+1, action);
+						keyval0, len+1, action);
 					if (rcode) DBUG_RETURN(rcode);
 				}
 				else
 				{
 					WSREP_DEBUG("NULL key skipped: %s", 
 						    wsrep_thd_query(thd));
+				}
+				if (record1) {
+					len = wsrep_store_key_val_for_row(
+						table, i, key1, key_info->key_length, 
+						record1, &is_null);
+					if (!is_null && memcmp(key0, key1, len)) {
+						int rcode = wsrep_append_key(
+							thd, trx, table_share, table, 
+							keyval1, len+1, action);
+						if (rcode) DBUG_RETURN(rcode);
+					}
 				}
 			}
 		}
