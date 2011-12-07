@@ -71,7 +71,7 @@
 # wsrep builds
 # ----------------------------------------------------------------------------
 %if %{defined with_wsrep}
-%define mysql_version @VERSION@-wsrep-@WSREP_API_VERSION@.@WSREP_PATCH_VERSION@
+%define mysql_version @VERSION@_wsrep_@WSREP_API_VERSION@.@WSREP_PATCH_VERSION@
 %define wsrep_version @WSREP_VERSION@
 %define wsrep_comment wsrep patch: %{wsrep_version}
 %else
@@ -299,6 +299,7 @@ documentation and the manual for more information.
 
 %package -n MySQL-server%{product_suffix}
 %if %{defined with_wsrep}
+Version:        %{mysql_version}
 #Release:        %{wsrep_version}.%{release}
 %endif
 Summary:        MySQL: a very fast and reliable SQL database server
@@ -1186,6 +1187,10 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Wed Dec 07 2011 Alexey Yurchenko <alexey.yurchenko@codership.com>
+
+- wsrep-related cleanups.
+
 * Wed Sep 28 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Fix duplicate mentioning of "mysql_plugin" and its manual page,
@@ -1226,9 +1231,6 @@ echo "====="                                     >> $STATUS_HISTORY
 * Thu Jul 21 2011 Sunanda Menon <sunanda.menon@oracle.com>
 
 - Fix bug#12561297: Added the MySQL embedded binary
-
-* Tue Aug 30 2011 Alexey Yurchenko <alexey.yurchenko@codership.com>
-- Added with_wsrep option for wsrep builds.
 
 * Thu Jul 07 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 - Fix bug#45415: "rpm upgrade recreates test database"
