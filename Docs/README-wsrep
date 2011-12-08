@@ -32,7 +32,7 @@ administration of MySQL server per se. The reader is assumed to know how to
 install, configure, administer and use standard MySQL server version 5.1.xx.
 
 
-                        MYSQL-5.5.x/wsrep-21.x
+                        MYSQL-5.5.x/wsrep-22.x
 
 CONTENTS:
 =========
@@ -49,7 +49,10 @@ CONTENTS:
 5. CONFIGURATION OPTIONS
    5.1 MANDATORY MYSQL OPTIONS
    5.2 WSREP OPTIONS
-6. LIMITATIONS
+6. ONLINE SCHEMA UPGRADE
+   6.1 TOTAL ORDER ISOLATION (TOI)
+   6.2 ROLLING SCHEMA UPGRADE (RSU)
+7. LIMITATIONS
 
 
 1. WHAT IS WSREP PATCH FOR MYSQL/INNODB
@@ -337,10 +340,15 @@ wsrep_OSU_method=TOI
    Online Schema Upgrade (OSU) can be performed with two alternative  methods:
    Total Order Isolation (TOI) runs DDL statement in all cluster nodes in
    same total order sequence locking the affected table for the duration of the
-   operation. 
-   Rolling Schema Upgrade (RSU) performs the DDL statement locally in the 
-   cluster node. During the DDL processing, the node is not replicating or
-   accepting replication events.
+   operation. This may result in the whole cluster being blocked for the
+   duration of the operation.
+   Rolling Schema Upgrade (RSU) executes the DDL statement only locally, thus
+   blocking only one cluster node. During the DDL processing, the node
+   is not replicating and may be unable to process replication events (due to
+   table lock). Once DDL operation is complete, the node will catch up and sync
+   with the cluster to become fully operational again. The DDL statement or
+   its effects are not replicated, so it is user's responsibility to manually
+   perform this operation on each of the nodes.
 
 wsrep_forced_binlog_format=none
    Force every transaction to use given binlog format. When this variable is 
@@ -387,7 +395,8 @@ wsrep_sst_donor=
    wsrep_node_name.
 
 
-6. Online Schema Upgrade
+6. ONLINE SCHEMA UPGRADE
+
    Schema upgrades mean any data definition statements (DDL statemnents) run
    for the database. They change the database structure and are non-
    transactional.
@@ -398,23 +407,25 @@ wsrep_sst_donor=
    parameter: 'wsrep_OSU_method'.
 
 6.1 Total Order Isolation (TOI)
-   With earlier releases, DDL processing happened always by Total Order 
+
+   With earlier releases, DDL processing happened always by Total Order
    Isolation (TOI) method. With TOI, the DDL was scheduled to be processed in
-   same transaction seqeuncing 'slot' in each cluster node. 
-   The processing is secured by locking the affected table from any other use. 
+   same transaction seqeuncing 'slot' in each cluster node.
+   The processing is secured by locking the affected table from any other use.
    With TOI method, the whole cluster has part of the database locked for the
    duration of the DDL processing.
 
 6.2 Rolling Schema Upgrade (RSU)
+
    Rolling schema upgrade is new DDL processing method, where DDL will be
    processed locally for the node. The node is disconnected of the replication
    for the duration of the DDL processing, so that there is only DDL statement
-   processing in the node. When the DDL processing s complete, the node is 
-   connected  to the replication, and node has to do some catch up to apply 
-   all missed transactions.
-   The DDL can then be run for the cluster by running the same DDL statement
-   for each node in turn. When this rolling schema upgrade proceeds, part of 
-   the cluster will have old schema stucure and part of the cluster will have
+   processing in the node and it does not block the rest of the cluster. When
+   the DDL processing is complete, the node applies delayed replication events
+   and synchronizes back with the cluster.
+   The DDL can then be executed cluster-wide by running the same DDL statement
+   for each node in turn. When this rolling schema upgrade proceeds, part of
+   the cluster will have old schema structure and part of the cluster will have
    new schema structure.
 
 
