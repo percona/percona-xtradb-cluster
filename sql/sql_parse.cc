@@ -1717,9 +1717,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   if (WSREP(thd)) {
     thd_proc_info(thd, "sleeping");
   } else {
-#else /* WITH_WSREP */
-  thd_proc_info(thd, 0);
 #endif /* WITH_WSREP */
+  thd_proc_info(thd, 0);
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
