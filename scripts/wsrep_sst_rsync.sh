@@ -42,15 +42,16 @@ ROLE=$1
 ADDR=$2
 AUTH=$3
 DATA=$4
+CONF=$5
 
 MAGIC_FILE="$DATA/rsync_sst_complete"
 rm -rf "$MAGIC_FILE"
 
 if [ "$ROLE" = "donor" ]
 then
-    UUID=$5
-    SEQNO=$6
-    BYPASS=$7
+    UUID=$6
+    SEQNO=$7
+    BYPASS=$8
 
     if [ $BYPASS -eq 0 ]
     then
@@ -101,7 +102,7 @@ then
 
 elif [ "$ROLE" = "joiner" ]
 then
-    MYSQLD_PID=$5
+    MYSQLD_PID=$6
 
     MODULE="rsync_sst"
 
