@@ -23,6 +23,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+extern const char wsrep_defaults_file[];
+
 #define WSREP_SST_MYSQLDUMP     "mysqldump"
 #define WSREP_SST_DEFAULT       WSREP_SST_MYSQLDUMP
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
@@ -376,9 +378,9 @@ static ssize_t sst_prepare_other (const char*  method,
   const char* sst_dir= mysql_real_data_home;
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%d' 2>sst.err",
+                     "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%d' '%s' 2>sst.err",
                      method, addr_in, (sst_auth_real) ? sst_auth_real : "", 
-                     sst_dir, (int)getpid());
+                     sst_dir, (int)getpid(), wsrep_defaults_file);
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -832,10 +834,10 @@ static int sst_donate_other (const char*   method,
   char    cmd_str[cmd_len];
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%lld' '%d' "
-                     "2>sst.err"
+                     "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%lld' '%d' '%s'"
+                     " 2>sst.err"
                      ,method, addr, sst_auth_real, mysql_real_data_home,
-                     uuid, (long long) seqno, bypass);
+                     uuid, (long long) seqno, bypass, wsrep_defaults_file);
 
   if (ret < 0 || ret >= cmd_len)
   {
