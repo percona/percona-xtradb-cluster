@@ -41,7 +41,7 @@ void wsrep_cleanup_transaction(THD *thd)
   {
     if (thd->variables.wsrep_on &&
         thd->wsrep_conflict_state != MUST_REPLAY &&
-        thd_sql_command((const THD*) thd) != SQLCOM_SELECT)
+        thd->wsrep_seqno_changed)
     {
       //if (thd->wsrep_trx_handle != NULL)
       {
@@ -55,6 +55,7 @@ void wsrep_cleanup_transaction(THD *thd)
       //else
       //WSREP_DEBUG("no trx handle for %s", thd->query());
       thd_binlog_trx_reset(thd);
+      thd->wsrep_seqno_changed = false;
     }
     thd->wsrep_exec_mode= LOCAL_STATE;
   }
@@ -92,14 +93,19 @@ wsrep_close_connection(handlerton*  hton, THD* thd)
 */
 static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
 {
+#ifndef DBUG_OFF
+  wsrep_seqno_t old = thd->wsrep_trx_seqno;
+#endif
   DBUG_ENTER("wsrep_prepare");
   if ((all || 
       !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
-      (thd->variables.wsrep_on && thd_sql_command((const THD*) thd) != SQLCOM_SELECT))
+      (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)))
   {
     switch (wsrep_run_wsrep_commit(thd, hton, all))
     {
     case WSREP_TRX_OK:
+      thd->wsrep_seqno_changed = true; // flag is cleared in wsrep_cleanup_transaction
+      DBUG_ASSERT(thd->wsrep_trx_seqno > old);
       break;
     case WSREP_TRX_ROLLBACK:
     case WSREP_TRX_ERROR:

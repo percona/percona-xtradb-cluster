@@ -690,6 +690,7 @@ enum enum_binlog_format {
 
 #ifdef WITH_WSREP
 IO_CACHE * get_trans_log(THD * thd);
+bool wsrep_trans_cache_is_empty(THD *thd);
 void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void thd_binlog_trx_reset(THD * thd);
 void thd_binlog_rollback_stmt(THD * thd);

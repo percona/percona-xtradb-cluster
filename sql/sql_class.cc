@@ -989,6 +989,7 @@ THD::THD()
   //wsrep_retry_autocommit= ::wsrep_retry_autocommit;
   wsrep_retry_counter= 0;
   wsrep_PA_safe = true;
+  wsrep_seqno_changed= false;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state(this);
@@ -1351,6 +1352,7 @@ void THD::init(void)
   wsrep_retry_counter= 0;
   wsrep_rli= NULL;
   wsrep_PA_safe= true;
+  wsrep_seqno_changed= false;
 #endif
 
   if (variables.sql_log_bin)
