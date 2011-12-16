@@ -105,7 +105,7 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
     {
     case WSREP_TRX_OK:
       thd->wsrep_seqno_changed = true; // flag is cleared in wsrep_cleanup_transaction
-      DBUG_ASSERT(thd->wsrep_trx_seqno > old);
+      DBUG_ASSERT(thd->wsrep_trx_seqno > old || thd->wsrep_exec_mode == REPL_RECV);
       break;
     case WSREP_TRX_ROLLBACK:
     case WSREP_TRX_ERROR:
