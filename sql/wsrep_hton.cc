@@ -104,7 +104,6 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
     switch (wsrep_run_wsrep_commit(thd, hton, all))
     {
     case WSREP_TRX_OK:
-      thd->wsrep_seqno_changed = true; // flag is cleared in wsrep_cleanup_transaction
       DBUG_ASSERT(thd->wsrep_trx_seqno > old || thd->wsrep_exec_mode == REPL_RECV);
       break;
     case WSREP_TRX_ROLLBACK:
@@ -298,6 +297,7 @@ wsrep_run_wsrep_commit(
                   wsrep_replaying, thd->thread_id);
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
+    thd->wsrep_seqno_changed = true;
   } else {
     WSREP_ERROR("I/O error reading from thd's binlog iocache: "
                 "errno=%d, io cache code=%d", my_errno, cache->error);
