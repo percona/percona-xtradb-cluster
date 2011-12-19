@@ -599,13 +599,31 @@ wsrep_break_lock(
     /* aborting lock holder(s) here */
     for (holder=lock_queue1->data; holder; holder=holder->next) 
     {
-      wsrep_abort_thd(data->owner->mysql_thd, 
-                      holder->owner->mysql_thd, FALSE);
+      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd))
+      {
+        wsrep_abort_thd(data->owner->mysql_thd, 
+                        holder->owner->mysql_thd, FALSE);
+      }
+      else
+      {
+        if (wsrep_debug) 
+          fprintf(stderr,"WSREP wsrep_break_lock skipping BF lock conflict\n");
+         return FALSE;
+      }
     }
     for (holder=lock_queue2->data; holder; holder=holder->next) 
     {
-      wsrep_abort_thd(data->owner->mysql_thd,
-                      holder->owner->mysql_thd, FALSE);
+      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd))
+      {
+        wsrep_abort_thd(data->owner->mysql_thd,
+                        holder->owner->mysql_thd, FALSE);
+      }
+      else
+      {
+        if (wsrep_debug) 
+          fprintf(stderr,"WSREP wsrep_break_lock skipping BF lock conflict\n");
+         return FALSE;
+      }
     }
         
     /* Add our lock to the head of the wait queue */

@@ -12009,8 +12009,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 		mutex_exit(&kernel_mutex);
 		DBUG_RETURN(rcode);
 	} else {
-		WSREP_DEBUG("victim does not have transaction: %llu", 
-			    victim_trx->id);
+		WSREP_DEBUG("victim does not have transaction");
 		wsrep_thd_awake(victim_thd, signal); 
 	}
 	DBUG_RETURN(-1);
