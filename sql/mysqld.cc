@@ -5176,6 +5176,7 @@ int mysqld_main(int argc, char **argv)
 
 /* WSREP AFTER */
 #ifdef WITH_WSREP
+  wsrep_SE_initialized();
   if (opt_bootstrap)
   {
     /*! bootstrap wsrep init was taken care of above */

@@ -449,6 +449,8 @@ static ssize_t sst_prepare_mysqldump (const char*  addr_in,
   return ret;
 }
 
+static bool SE_initialized = false;
+
 ssize_t wsrep_sst_prepare (void** msg)
 {
   const ssize_t ip_max= 256;
@@ -486,7 +488,7 @@ ssize_t wsrep_sst_prepare (void** msg)
   else
   {
     /*! A heuristic workaround until we learn how to stop and start engines */
-    if (sst_complete)
+    if (SE_initialized)
     {
       // we already did SST at initializaiton, now engines are running
       // sql_print_information() is here because the message is too long
@@ -903,4 +905,9 @@ void wsrep_SE_init_done()
 {
   mysql_cond_signal (&COND_wsrep_sst_init);
   mysql_mutex_unlock (&LOCK_wsrep_sst_init);
+}
+
+void wsrep_SE_initialized()
+{
+  SE_initialized = true;
 }
