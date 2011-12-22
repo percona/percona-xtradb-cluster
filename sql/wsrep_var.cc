@@ -37,6 +37,7 @@ ulong   wsrep_OSU_method_options;
 
 int wsrep_init_vars()
 {
+  global_system_variables.binlog_format=BINLOG_FORMAT_ROW;
   return 0;
 }
 
