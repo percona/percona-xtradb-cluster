@@ -23,19 +23,31 @@ RSYNC_CONF=
 
 cleanup_joiner()
 {
-#set -x
+    echo "Joiner cleanup:" >&2
+set -x
     local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
-    [ "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
+    [ "0" != "$PID" ] && kill $PID && sleep 0.5 && kill -9 $PID || :
+set +x
     rm -rf "$RSYNC_CONF"
     rm -rf "$MAGIC_FILE"
     rm -rf "$RSYNC_PID"
-#set +x
 }
 
 check_pid()
 {
     local pid_file=$1
     [ -r $pid_file ] && ps -p $(cat $pid_file) >/dev/null 2>&1
+}
+
+check_pid_and_port()
+{
+    local pid_file=$1
+    local rsync_pid=$(cat $pid_file)
+    local rsync_port=$2
+
+    check_pid $pid_file && \
+    netstat -anpt 2>/dev/null | \
+    grep LISTEN | grep \:$rsync_port | grep $rsync_pid/rsync >/dev/null
 }
 
 ROLE=$1
@@ -129,21 +141,24 @@ then
     MYUID=$(id -u)
     MYGID=$(id -g)
     RSYNC_CONF="$DATA/$MODULE.conf"
-    echo "pid file = $RSYNC_PID" >  "$RSYNC_CONF"
-    echo "use chroot = no"       >> "$RSYNC_CONF"
-    echo "[${MODULE}]"           >> "$RSYNC_CONF"
-    echo "	path = $DATA"    >> "$RSYNC_CONF"
-    echo "	read only = no"  >> "$RSYNC_CONF"
-    echo "	timeout = 300"   >> "$RSYNC_CONF"
-    echo "	uid = $MYUID"    >> "$RSYNC_CONF"
-    echo "	gid = $MYGID"    >> "$RSYNC_CONF"
+
+cat << EOF > "$RSYNC_CONF"
+pid file = $RSYNC_PID
+use chroot = no
+[$MODULE]
+	path = $DATA
+	read only = no
+	timeout = 300
+	uid = $MYUID
+	gid = $MYGID
+EOF
 
 #    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
 
     # listen at all interfaces (for firewalled setups)
     rsync --daemon --port $RSYNC_PORT --config "$RSYNC_CONF"
 
-    until [ -r "$RSYNC_PID" ]
+    until check_pid_and_port $RSYNC_PID $RSYNC_PORT
     do
         sleep 0.2
     done
