@@ -3254,7 +3254,7 @@ static Sys_var_mybool Sys_wsrep_convert_LOCK_to_trx(
 static Sys_var_ulong Sys_wsrep_retry_autocommit(
       "wsrep_retry_autocommit", "Max number of times to retry "
       "a failed autocommit statement",
-       GLOBAL_VAR(wsrep_retry_autocommit), CMD_LINE(REQUIRED_ARG),
+       SESSION_VAR(wsrep_retry_autocommit), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(0, 10000), DEFAULT(1), BLOCK_SIZE(1));
 
 static Sys_var_mybool Sys_wsrep_auto_increment_control(

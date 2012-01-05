@@ -544,6 +544,7 @@ typedef struct system_variables
 #ifdef WITH_WSREP
   my_bool wsrep_on;
   my_bool wsrep_causal_reads;
+  ulong wsrep_retry_autocommit;
 #endif
   double long_query_time_double;
 
@@ -2213,7 +2214,6 @@ public:
 #ifdef WSREP_PROC_INFO
   char                      wsrep_info[128]; /* string for dynamic proc info */
 #endif /* WSREP_PROC_INFO */
-  ulong                     wsrep_retry_autocommit; // max retry value
   ulong                     wsrep_retry_counter; // of autocommit
   bool                      wsrep_PA_safe;
 #endif /* WITH_WSREP */

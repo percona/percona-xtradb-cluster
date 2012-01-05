@@ -1658,7 +1658,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       mysql_reset_thd_for_next_command(thd);
       thd->killed= THD::NOT_KILLED;
       if (is_autocommit &&
-	  (thd->wsrep_retry_counter < thd->wsrep_retry_autocommit))
+	  (thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit))
       {
         WSREP_DEBUG("wsrep retrying AC query: %s", 
                     (thd->query()) ? thd->query() : "void");
@@ -1667,6 +1667,9 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       }
       else
       {
+        WSREP_DEBUG("BF aborted, thd: %lu is_AC: %d, retry: %lu - %lu SQL: %s", 
+                    thd->thread_id, is_autocommit, thd->wsrep_retry_counter, 
+		    thd->variables.wsrep_retry_autocommit, thd->query());
         my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
         thd->killed= THD::NOT_KILLED;
         thd->wsrep_conflict_state= NO_CONFLICT;
