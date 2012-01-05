@@ -12000,6 +12000,9 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 	DBUG_ENTER("wsrep_innobase_abort_thd");
 	trx_t* victim_trx = thd_to_trx(victim_thd);
 	trx_t* bf_trx     = (bf_thd) ? thd_to_trx(bf_thd) : NULL;
+	WSREP_DEBUG("abort transaction: BF: %s victim: %s", 
+		    wsrep_thd_query(bf_thd),
+		    wsrep_thd_query(victim_thd));
 
 	if (victim_trx)
 	{
@@ -12010,6 +12013,9 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction");
+		wsrep_thd_LOCK(victim_thd);
+		wsrep_thd_set_conflict_state(victim_thd, MUST_ABORT);
+		wsrep_thd_UNLOCK(victim_thd);
 		wsrep_thd_awake(victim_thd, signal); 
 	}
 	DBUG_RETURN(-1);
