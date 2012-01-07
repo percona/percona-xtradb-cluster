@@ -7589,10 +7589,17 @@ static enum wsrep_status wsrep_apply_sql(
 void wsrep_write_rbr_buf(
     THD *thd, const void* rbr_buf, size_t buf_len)
 {
-  char filename[64] = {0};
-  sprintf(filename, "%s/GRA_%ld_%lld.log", 
-          wsrep_data_home_dir, thd->thread_id, (long long)thd->wsrep_trx_seqno);
-  FILE *of = fopen(filename, "wb");
+  char filename[PATH_MAX]= {0};
+  int len= snprintf(filename, PATH_MAX, "%s/GRA_%ld_%lld.log",
+                    wsrep_data_home_dir, thd->thread_id,
+                    (long long)thd->wsrep_trx_seqno);
+  if (len >= PATH_MAX)
+  {
+    WSREP_ERROR("RBR dump path too long: %d, skipping dump.", len);
+    return;
+  }
+
+  FILE *of= fopen(filename, "wb");
   if (of)
   {
     fwrite (rbr_buf, buf_len, 1, of);
@@ -7600,7 +7607,8 @@ void wsrep_write_rbr_buf(
   }
   else
   {
-    WSREP_ERROR("Failed to open file '%s': %d (%s)", filename, errno, strerror(errno));
+    WSREP_ERROR("Failed to open file '%s': %d (%s)",
+                filename, errno, strerror(errno));
   }
 }
 
