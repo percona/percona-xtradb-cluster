@@ -755,61 +755,6 @@ ulint wsrep_append_foreign_key(trx_t *trx,
 			       dict_foreign_t*	foreign,
 			       const rec_t*	clust_rec,
 			       dict_index_t*	clust_index);
-
-#ifdef OUT
-static int
-append_foreign_key_for_wsrep(
-/*===========================*/
-	que_thr_t*	thr,		/*!< in: query thread */
-	dict_foreign_t*	foreign,	/*!< in: foreign key constraint */
-	const rec_t*	clust_rec,	/*!<in: clustered index record */
-	dict_index_t*	clust_index)	/*!<in: clustered index */
-{
-	int rcode = DB_SUCCESS;
-	if (wsrep_on(thr_get_trx(thr)->mysql_thd)) {
-		byte key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
-		ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
-
-		if (!dict_index_is_clust(clust_index)) {
-			fprintf(stderr, 
-				"WSREP: clustered index not passed for FK append");
-			return 1;
-		}
-
-		key[0] = '\0';
-		rcode = wsrep_rec_get_primary_key(
-			&key[1], &len, clust_rec, clust_index);
-
-		if (rcode == DB_SUCCESS) {
-#define WSREP_DEBUG_PRINT 1
-
-#ifdef WSREP_DEBUG_PRINT
-			ulint i;
-			fprintf(stderr, "FK parent key, len: %lu ", len+1);
-			for (i=0; i<len+1; i++) {
-				fprintf(stderr, " (%X), ", key[i]);
-			}
-			fprintf(stderr, "\n");
-#endif
-			rcode = wsrep_append_foreign_key(
-				thr_get_trx(thr),
-				foreign->foreign_table->name,
-				(char *)key, 
-				len+1);
-			if (DB_SUCCESS != rcode) {
-				fprintf(stderr, 
-					"WSREP: FK key append failed: %d\n", 
-					rcode);
-			}
-		} else {
-			fprintf(stderr, "WSREP: FK key set failed: %d\n", 
-				rcode);
-		}
-
-	}
-	return rcode;
-}
-#endif
 #endif /* WITH_WSREP */
 
 /*********************************************************************//**
@@ -1127,11 +1072,13 @@ row_ins_foreign_check_on_constraint(
 					   foreign->foreign_table);
 
 #ifdef WITH_WSREP
-	err = wsrep_append_foreign_key(
-		thr_get_trx(thr),
-		foreign,
-		clust_rec, 
-		clust_index);
+	if (err == DB_SUCCESS) {
+		err = wsrep_append_foreign_key(
+			thr_get_trx(thr),
+			foreign,
+			clust_rec, 
+			clust_index);
+	}
 #endif /* WITH_WSREP */
 	if (foreign->foreign_table->n_foreign_key_checks_running == 0) {
 		fprintf(stderr,

@@ -6722,16 +6722,15 @@ wsrep_append_foreign_key(
 	const rec_t*	clust_rec,	/*!<in: clustered index record */
 	dict_index_t*	clust_index)	/*!<in: clustered index */
 {
-	THD *thd = (THD*)trx->mysql_thd;
+	THD*  thd = (THD*)trx->mysql_thd;
 	ulint rcode = DB_SUCCESS;
-	ulint i;
-	char cache_key[512] = {'\0'};
+	char  cache_key[512] = {'\0'};
 
 	if (!wsrep_on(trx->mysql_thd) || 
 	    wsrep_thd_exec_mode(thd) != LOCAL_STATE) 
 		return DB_SUCCESS;
 
-	byte key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
+	byte  key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
 	ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
 
 	if (!dict_index_is_clust(clust_index)) {
@@ -6747,6 +6746,7 @@ wsrep_append_foreign_key(
 		return rcode;
 	}
 #ifdef WSREP_DEBUG_PRINT
+	ulint i;
 	fprintf(stderr, "FK parent key, len: %lu ", len+1);
 	for (i=0; i<len+1; i++) {
 		fprintf(stderr, " (%X), ", key[i]);
