@@ -6746,8 +6746,6 @@ wsrep_append_foreign_key(
 		WSREP_ERROR("FK key set failed: %lu", rcode);
 		return rcode;
 	}
-#define WSREP_DEBUG_PRINT 1
-
 #ifdef WSREP_DEBUG_PRINT
 	fprintf(stderr, "FK parent key, len: %lu ", len+1);
 	for (i=0; i<len+1; i++) {
