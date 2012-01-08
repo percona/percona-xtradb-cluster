@@ -1809,8 +1809,11 @@ wsrep_rec_get_primary_key(
 		const dict_col_t* col = dict_field_get_col(field);
 
 		data = rec_get_nth_field(rec, offsets_, i, &len);
-		if (key_len + len > (col->prtype & DATA_NOT_NULL) ?   
-			*buf_len : *buf_len - 1) {
+		if (key_len + len > ((col->prtype & DATA_NOT_NULL) ?   
+				     *buf_len : *buf_len - 1)) {
+			fprintf (stderr, 
+				 "WSREP: FK key len exceeded %lu %lu %lu\n", 
+				 key_len, len, *buf_len);
 			goto err_out;
 		}
 

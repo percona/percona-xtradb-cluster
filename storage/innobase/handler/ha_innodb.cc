@@ -6714,50 +6714,83 @@ ha_innobase::rnd_pos(
 }
 #ifdef WITH_WSREP
 extern "C" {
-int
+ulint
 wsrep_append_foreign_key(
-			 		/* out: success code */
-	trx_t 		*trx, 		/* in: transaction */
-	const char 	*table_name, 	/* in: db + table name of foreign */
-	const char 	*key, 		/* in: PK key prefixed with '\0' */
-	uint   		key_len)	/* in: length of the key buffer */
+/*===========================*/
+	trx_t*		trx,		/*!< in: trx */
+	dict_foreign_t*	foreign,	/*!< in: foreign key constraint */
+	const rec_t*	clust_rec,	/*!<in: clustered index record */
+	dict_index_t*	clust_index)	/*!<in: clustered index */
 {
-	ut_a(trx);
 	THD *thd = (THD*)trx->mysql_thd;
+	ulint rcode = DB_SUCCESS;
+	ulint i;
 	char cache_key[512] = {'\0'};
 
-	strncpy(cache_key, table_name, 512);
+	if (!wsrep_on(trx->mysql_thd) || 
+	    wsrep_thd_exec_mode(thd) != LOCAL_STATE) 
+		return DB_SUCCESS;
+
+	byte key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
+	ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
+
+	if (!dict_index_is_clust(clust_index)) {
+		WSREP_ERROR("clustered index not passed for FK append");
+		return DB_ERROR;
+	}
+
+	key[0] = '\0';
+	rcode = wsrep_rec_get_primary_key(
+		&key[1], &len, clust_rec, clust_index);
+	if (rcode != DB_SUCCESS) {
+		WSREP_ERROR("FK key set failed: %lu", rcode);
+		return rcode;
+	}
+#define WSREP_DEBUG_PRINT 1
+
+#ifdef WSREP_DEBUG_PRINT
+	fprintf(stderr, "FK parent key, len: %lu ", len+1);
+	for (i=0; i<len+1; i++) {
+		fprintf(stderr, " (%X), ", key[i]);
+	}
+	fprintf(stderr, "\n");
+#endif
+	strncpy(cache_key, foreign->foreign_table->name, 512);
 	char *p = strchr(cache_key, '/');
 	if (p) {
 		*p = '\0';
 	} else {
-		WSREP_WARN("unexpected foreign key table %s", table_name);
+		WSREP_WARN("unexpected foreign key table %s", 
+			   foreign->foreign_table->name);
 	}
 
 	wsrep_key_t wkey[3];
 	size_t wkey_len= 3;
-	if (!wsrep_prepare_key_for_innodb((const uchar*)cache_key, strlen(table_name) +  1,
-					  (const uchar*)key, key_len,
-					  wkey,
-					  &wkey_len)) {
+	if (!wsrep_prepare_key_for_innodb(
+		(const uchar*)cache_key, 
+		strlen(foreign->foreign_table->name) +  1,
+		(const uchar*)key, len+1,
+		wkey,
+		&wkey_len)) {
 		WSREP_WARN("key prepare failed for cascaded FK: %s", 
 			   (wsrep_thd_query(thd)) ? 
 			   wsrep_thd_query(thd) : "void");
 		return DB_ERROR;
 	}
-	int rcode = (int)wsrep->append_key(
-			       wsrep,
-			       wsrep_trx_handle(thd, trx),
-			       wkey,
-			       wkey_len, 
-			       WSREP_DELETE);
+	rcode = (int)wsrep->append_key(
+		wsrep,
+		wsrep_trx_handle(thd, trx),
+		wkey,
+		wkey_len, 
+		WSREP_DELETE);
 	if (rcode) {
-		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
-		WSREP_ERROR("Appending cascaded fk row key failed: %s, %d", 
+		DBUG_PRINT("wsrep", ("row key failed: %lu", rcode));
+		WSREP_ERROR("Appending cascaded fk row key failed: %s, %lu", 
 			    (wsrep_thd_query(thd)) ? 
 			    wsrep_thd_query(thd) : "void", rcode);
 		return DB_ERROR;
 	}
+
 	return DB_SUCCESS;
 }
 }
@@ -6780,7 +6813,7 @@ wsrep_append_key(
 		(action==WSREP_INSERT) ? "INSERT" : 
 		(action==WSREP_UPDATE) ? "UPDATE" : "DELETE",
 		wsrep_thd_thread_id(thd), trx->id, key_len, 
-		table_share->table_name);
+		table_share->table_name.str);
 	for (int i=0; i<key_len; i++) {
 		fprintf(stderr, "%hhX, ", key[i]);
 	}
