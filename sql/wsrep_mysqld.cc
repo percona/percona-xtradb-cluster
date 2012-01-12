@@ -564,7 +564,7 @@ wsrep_causal_wait (THD* thd)
 
 bool wsrep_prepare_key_for_isolation(const char* db,
                                      const char* table,
-                                     wsrep_key_t* key,
+                                     wsrep_key_part_t* key,
                                      size_t* key_len)
 {
     if (*key_len < 2) return false;
@@ -582,13 +582,13 @@ bool wsrep_prepare_key_for_isolation(const char* db,
             // sql_print_information("%s.%s", db, table);
             if (db)
             {
-                key[*key_len].key= db;
-                key[*key_len].key_len= strlen(db);
+                key[*key_len].buf= db;
+                key[*key_len].buf_len= strlen(db);
                 ++(*key_len);
                 if (table)
                 {
-                    key[*key_len].key=     table;
-                    key[*key_len].key_len= strlen(table);
+                    key[*key_len].buf=     table;
+                    key[*key_len].buf_len= strlen(table);
                     ++(*key_len);
                 }
             }
@@ -606,7 +606,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
 				  size_t cache_key_len,
                                   const uchar* row_id,
                                   size_t row_id_len,
-                                  wsrep_key_t* key,
+                                  wsrep_key_part_t* key,
                                   size_t* key_len)
 {
     if (*key_len < 3) return false;
@@ -616,18 +616,18 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
     {
     case 0:
     {
-        key[*key_len].key     = cache_key;
-        key[*key_len].key_len = cache_key_len;
+        key[*key_len].buf     = cache_key;
+        key[*key_len].buf_len = cache_key_len;
         ++(*key_len);
         break;
     }
     case 1:
     {
-        key[*key_len].key     = cache_key;
-        key[*key_len].key_len = strlen( (char*)cache_key );
+        key[*key_len].buf     = cache_key;
+        key[*key_len].buf_len = strlen( (char*)cache_key );
         ++(*key_len);
-        key[*key_len].key     = cache_key + strlen( (char*)cache_key ) + 1;
-        key[*key_len].key_len = strlen( (char*)(key[*key_len].key) );
+        key[*key_len].buf     = cache_key + strlen( (char*)cache_key ) + 1;
+        key[*key_len].buf_len = strlen( (char*)(key[*key_len].buf) );
         ++(*key_len);
         break;
     }
@@ -635,8 +635,8 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
         return false;
     }
 
-    key[*key_len].key     = row_id;
-    key[*key_len].key_len = row_id_len;
+    key[*key_len].buf     = row_id;
+    key[*key_len].buf_len = row_id_len;
     ++(*key_len);
 
     return true;
@@ -668,14 +668,14 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_)
   wsrep_status_t ret(WSREP_WARNING);
   uchar* buf(0);
   uint buf_len(0);
-  wsrep_key_t wkey[2];
-  size_t wkey_len= 2;
+  wsrep_key_part_t wkey_part[2];
+  wsrep_key_t wkey = {wkey_part, 2};
   WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
 	      thd->wsrep_exec_mode, thd->query() );
-  if (wsrep_prepare_key_for_isolation(db_, table_, wkey, &wkey_len) &&
+  if (wsrep_prepare_key_for_isolation(db_, table_, wkey_part, &wkey.key_parts_len) &&
       !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==
       (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
-				     wkey, wkey_len,
+				     &wkey, 1,
 				     buf, buf_len,
 				     &thd->wsrep_trx_seqno))) {
     thd->wsrep_exec_mode= TOTAL_ORDER;

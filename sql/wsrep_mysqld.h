@@ -207,7 +207,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
  */
 bool wsrep_prepare_key_for_isolation(const char* db,
                                      const char* table,
-                                     wsrep_key_t* key,
+                                     wsrep_key_part_t* key,
                                      size_t *key_len);
 
 void wsrep_replication_process(THD *thd);

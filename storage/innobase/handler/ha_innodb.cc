@@ -123,7 +123,7 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
 					 size_t cache_key_len,
                                          const uchar* row_id,
                                          size_t row_id_len,
-                                         wsrep_key_t* key,
+                                         wsrep_key_part_t* key,
                                          size_t* key_len);
 
 #endif /* WITH_WSREP */
@@ -6762,14 +6762,14 @@ wsrep_append_foreign_key(
 			   foreign->foreign_table->name);
 	}
 
-	wsrep_key_t wkey[3];
-	size_t wkey_len= 3;
+	wsrep_key_part_t wkey_part[3];
+        wsrep_key_t wkey = {wkey_part, 3};
 	if (!wsrep_prepare_key_for_innodb(
 		(const uchar*)cache_key, 
 		strlen(foreign->foreign_table->name) +  1,
 		(const uchar*)key, len+1,
-		wkey,
-		&wkey_len)) {
+		wkey_part,
+		&wkey.key_parts_len)) {
 		WSREP_WARN("key prepare failed for cascaded FK: %s", 
 			   (wsrep_thd_query(thd)) ? 
 			   wsrep_thd_query(thd) : "void");
@@ -6778,8 +6778,8 @@ wsrep_append_foreign_key(
 	rcode = (int)wsrep->append_key(
 		wsrep,
 		wsrep_trx_handle(thd, trx),
-		wkey,
-		wkey_len, 
+		&wkey,
+		1, 
 		WSREP_DELETE);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %lu", rcode));
@@ -6817,14 +6817,14 @@ wsrep_append_key(
 	}
 	fprintf(stderr, "\n");
 #endif
-	wsrep_key_t wkey[3];
-	size_t wkey_len= 3;
+	wsrep_key_part_t wkey_part[3];
+        wsrep_key_t wkey = {wkey_part, 3};
 	if (!wsrep_prepare_key_for_innodb(
 			(const uchar*)table_share->table_cache_key.str,
 			table_share->table_cache_key.length,
 			(const uchar*)key, key_len,
-			wkey,
-			&wkey_len)) {
+			wkey_part,
+			&wkey.key_parts_len)) {
 		WSREP_WARN("key prepare failed for: %s", 
 			   (wsrep_thd_query(thd)) ? 
 			   wsrep_thd_query(thd) : "void");
@@ -6834,8 +6834,8 @@ wsrep_append_key(
 	int rcode = (int)wsrep->append_key(
 			       wsrep,
 			       wsrep_trx_handle(thd, trx),
-			       wkey,
-			       wkey_len,
+			       &wkey,
+			       1,
 			       action);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
