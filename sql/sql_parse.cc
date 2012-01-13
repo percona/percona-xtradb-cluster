@@ -2873,7 +2873,10 @@ case SQLCOM_PREPARE:
       if (create_info.options & HA_LEX_CREATE_TMP_TABLE)
         thd->variables.option_bits|= OPTION_KEEP_LOG;
       /* regular create */
-      WSREP_TO_ISOLATION_BEGIN(create_table->db, create_table->table_name)
+#ifdef WITH_WSREP
+      if (!(create_info.options & HA_LEX_CREATE_TMP_TABLE))
+	WSREP_TO_ISOLATION_BEGIN(create_table->db, create_table->table_name)
+#endif /* WITH_WSREP */
       if (create_info.options & HA_LEX_CREATE_TABLE_LIKE)
       {
         /* CREATE TABLE ... LIKE ... */
