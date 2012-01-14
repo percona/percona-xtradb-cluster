@@ -100,8 +100,15 @@ bool Alter_table_statement::execute(THD *thd)
   thd->enable_slow_log= opt_log_slow_admin_statements;
 
 #ifdef WITH_WSREP
-  if (wsrep_to_isolation_begin(thd, first_table->db, first_table->table_name))
+TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
+
+  if ((!thd->is_current_stmt_binlog_format_row() ||
+       !find_temporary_table(thd, first_table))  &&
+      wsrep_to_isolation_begin(thd, first_table->db, first_table->table_name))
+  {
+    WSREP_WARN("ALTER TABLE isolation failure");
     DBUG_RETURN(TRUE);
+  }
 #endif /* WITH_WSREP */
   result= mysql_alter_table(thd, select_lex->db, lex->name.str,
                             &create_info,

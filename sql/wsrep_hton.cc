@@ -94,7 +94,7 @@ wsrep_close_connection(handlerton*  hton, THD* thd)
 static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
 {
 #ifndef DBUG_OFF
-  wsrep_seqno_t old = thd->wsrep_trx_seqno;
+  //wsrep_seqno_t old = thd->wsrep_trx_seqno;
 #endif
   DBUG_ENTER("wsrep_prepare");
   if ((all || 
@@ -104,7 +104,9 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
     switch (wsrep_run_wsrep_commit(thd, hton, all))
     {
     case WSREP_TRX_OK:
-      DBUG_ASSERT(thd->wsrep_trx_seqno > old || thd->wsrep_exec_mode == REPL_RECV);
+      //  DBUG_ASSERT(thd->wsrep_trx_seqno > old       ||
+      //	  thd->wsrep_exec_mode == REPL_RECV    ||
+      //	  thd->wsrep_exec_mode == TOTAL_ORDER);
       break;
     case WSREP_TRX_ROLLBACK:
     case WSREP_TRX_ERROR:

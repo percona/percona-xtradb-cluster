@@ -2874,7 +2874,8 @@ case SQLCOM_PREPARE:
         thd->variables.option_bits|= OPTION_KEEP_LOG;
       /* regular create */
 #ifdef WITH_WSREP
-      if (!(create_info.options & HA_LEX_CREATE_TMP_TABLE))
+      if (!thd->is_current_stmt_binlog_format_row() ||
+	  !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
 	WSREP_TO_ISOLATION_BEGIN(create_table->db, create_table->table_name)
 #endif /* WITH_WSREP */
       if (create_info.options & HA_LEX_CREATE_TABLE_LIKE)
@@ -3413,7 +3414,17 @@ end_with_restore_list:
       /* So that DROP TEMPORARY TABLE gets to binlog at commit/rollback */
       thd->variables.option_bits|= OPTION_KEEP_LOG;
     }
-    WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name)
+#ifdef WITH_WSREP
+   for (TABLE_LIST *table= all_tables; table; table= table->next_global)
+   {
+     if (!thd->is_current_stmt_binlog_format_row() ||
+	 !find_temporary_table(thd, table))
+     {
+       WSREP_TO_ISOLATION_BEGIN(table->db, table->table_name);
+       break;
+     }
+   }
+#endif /* WITH_WSREP */
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->drop_if_exists,
 			lex->drop_temporary);
