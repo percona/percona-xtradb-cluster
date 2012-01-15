@@ -460,12 +460,29 @@ ssize_t wsrep_sst_prepare (void** msg)
 
   // Figure out SST address. Common for all SST methods
   if (wsrep_sst_receive_address &&
-    strcmp (wsrep_sst_receive_address, WSREP_SST_ADDRESS_AUTO)) {
+    strcmp (wsrep_sst_receive_address, WSREP_SST_ADDRESS_AUTO))
+  {
     addr_in= wsrep_sst_receive_address;
+  }
+  else if (wsrep_node_address && strlen(wsrep_node_address))
+  {
+    const char* const colon= strchr (wsrep_node_address, ':');
+    if (colon)
+    {
+      ptrdiff_t const len= colon - wsrep_node_address;
+      strncpy (ip_buf, wsrep_node_address, len);
+      ip_buf[len]= '\0';
+      addr_in= ip_buf;
+    }
+    else
+    {
+      addr_in= wsrep_node_address;
+    }
   }
   else
   {
     ssize_t ret= default_ip (ip_buf, ip_max);
+
     if (ret && ret < ip_max)
     {
       addr_in= ip_buf;

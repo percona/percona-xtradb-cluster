@@ -52,6 +52,11 @@ wsrep_cluster_name="my_wsrep_cluster"
 # Human-readable node name (non-unique). Hostname by default.
 #wsrep_node_name=
 
+# Base replication <address|hostname>[:port] of the node.
+# The values supplied will be used as defaults for state transfer receiving,
+# listening ports and so on. Default: address of the first network interface.
+#wsrep_node_address=
+
 # Address for incoming client connections. Autodetect by default.
 #wsrep_node_incoming_address=
 

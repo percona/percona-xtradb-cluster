@@ -360,6 +360,7 @@ int wsrep_init()
 
   wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
+  wsrep_args.node_address    = (wsrep_node_address) ? wsrep_node_address : "";
   wsrep_args.node_incoming   = wsrep_node_incoming_address;
   wsrep_args.options         = (wsrep_provider_options) ?
                                 wsrep_provider_options : "";

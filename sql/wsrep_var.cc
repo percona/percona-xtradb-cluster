@@ -18,7 +18,6 @@
 #include <sql_plugin.h>
 #include <set_var.h>
 #include <sql_acl.h>
-//#include <sys_vars.h>
 #include "wsrep_priv.h"
 #include <my_dir.h>
 #include <cstdio>
@@ -33,6 +32,8 @@ const  char* wsrep_provider_options = (const char*)my_memdup("", 1, MYF(MY_WME))
 const  char* wsrep_cluster_address  = NULL;
 const  char* wsrep_cluster_name     = "my_wsrep_cluster";
 const  char* wsrep_node_name        = glob_hostname;
+static char node_address[256] = { 0, };
+const  char* wsrep_node_address     = node_address;
 ulong   wsrep_OSU_method_options;
 
 int wsrep_init_vars()
@@ -293,7 +294,7 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 
   cluster_address_str = res->c_ptr();
 
-  if (!cluster_address_str) goto err;
+  if (!cluster_address_str || strlen(cluster_address_str) == 0) goto err;
 
   if (!wsrep_cluster_address_verify(cluster_address_str)) return 0;
 
@@ -327,7 +328,7 @@ void wsrep_cluster_address_init (const char* value)
   if (wsrep_cluster_address && wsrep_cluster_address != value) 
     my_free ((void*)wsrep_cluster_address);
 
-  wsrep_cluster_address = (value) ? my_strdup(value, MYF(0)) :  NULL;
+  wsrep_cluster_address = (value) ? my_strdup(value, MYF(0)) : NULL;
 }
 
 bool wsrep_cluster_name_check (sys_var *self, THD* thd, set_var* var)
@@ -340,7 +341,7 @@ bool wsrep_cluster_name_check (sys_var *self, THD* thd, set_var* var)
 
   cluster_name_str = res->c_ptr();
 
-  if (!cluster_name_str) goto err;
+  if (!cluster_name_str || strlen(cluster_name_str) == 0) goto err;
 
   return 0;
 
@@ -366,20 +367,55 @@ bool wsrep_node_name_check (sys_var *self, THD* thd, set_var* var)
 
   node_name_str = res->c_ptr();
 
-  if (!node_name_str) goto err;
+  if (!node_name_str || strlen(node_name_str) == 0) goto err;
 
   return 0;
 
  err:
 
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
-             node_name_str ? node_name_str : "NULL");
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+           node_name_str ? node_name_str : "NULL");
   return 1;
 }
 
 bool wsrep_node_name_update (sys_var *self, THD* thd, enum_var_type type)
 {
   return 0;
+}
+
+// TODO: do something more elaborate, like checking connectivity
+bool wsrep_node_address_check (sys_var *self, THD* thd, set_var* var)
+{
+  char   buff[FN_REFLEN];
+  String str(buff, sizeof(buff), system_charset_info), *res;
+  const char* node_address_str = NULL;
+
+  if (!(res = var->value->val_str(&str))) goto err;
+
+  node_address_str = res->c_ptr();
+
+  if (!node_address_str || strlen(node_address_str) == 0) goto err;
+
+  return 0;
+
+ err:
+
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+           node_address_str ? node_address_str : "NULL");
+  return 1;
+}
+
+bool wsrep_node_address_update (sys_var *self, THD* thd, enum_var_type type)
+{
+  return 0;
+}
+
+void wsrep_node_address_init (const char* value)
+{
+  if (wsrep_node_address && strcmp(wsrep_node_address, value))
+    my_free ((void*)wsrep_node_address);
+
+  wsrep_node_address = (value) ? my_strdup(value, MYF(0)) : NULL;
 }
 
 /*

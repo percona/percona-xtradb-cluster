@@ -35,6 +35,7 @@ extern const char* wsrep_provider_options;
 extern const char* wsrep_cluster_name;
 extern const char* wsrep_cluster_address;
 extern const char* wsrep_node_name;
+extern const char* wsrep_node_address;
 extern const char* wsrep_node_incoming_address;
 extern const char* wsrep_data_home_dir;
 extern const char* wsrep_dbug_option;
@@ -107,6 +108,10 @@ extern bool wsrep_cluster_name_update        UPDATE_ARGS;
 
 extern bool wsrep_node_name_check            CHECK_ARGS;
 extern bool wsrep_node_name_update           UPDATE_ARGS;
+
+extern bool wsrep_node_address_check         CHECK_ARGS;
+extern bool wsrep_node_address_update        UPDATE_ARGS;
+extern void wsrep_node_address_init          INIT_ARGS;
 
 extern bool wsrep_sst_method_check           CHECK_ARGS;
 extern bool wsrep_sst_method_update          UPDATE_ARGS;
