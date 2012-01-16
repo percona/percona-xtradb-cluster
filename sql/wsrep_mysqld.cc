@@ -89,9 +89,9 @@ extern wsrep_status_t wsrep_apply_cb(void *ctx,
                                      const void* buf, size_t buf_len,
                                      wsrep_seqno_t global_seqno);
 
-extern wsrep_status_t wsrep_commit_cb  (void *ctx, wsrep_seqno_t global_seqno);
-extern wsrep_status_t wsrep_rollback_cb(void *ctx, wsrep_seqno_t global_seqno);
-
+extern wsrep_status_t wsrep_commit_cb  (void *ctx,
+                                        wsrep_seqno_t global_seqno,
+                                        bool commit);
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
@@ -373,7 +373,6 @@ int wsrep_init()
   wsrep_args.view_handler_cb = wsrep_view_handler_cb;
   wsrep_args.apply_cb        = wsrep_apply_cb;
   wsrep_args.commit_cb       = wsrep_commit_cb;
-  wsrep_args.rollback_cb     = wsrep_rollback_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
 

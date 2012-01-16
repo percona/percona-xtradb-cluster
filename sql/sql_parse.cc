@@ -7786,12 +7786,8 @@ wsrep_end_trans (THD* const thd, enum enum_mysql_completiontype const end)
 }
 #endif
 
-wsrep_status_t wsrep_commit_cb(void* ctx, wsrep_seqno_t const global_seqno)
+wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
 {
-  THD* const thd((THD*)ctx);
-
-  assert(global_seqno == thd->wsrep_trx_seqno);
-
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
            "committing %lld", (long long)thd->wsrep_trx_seqno);
@@ -7819,12 +7815,8 @@ wsrep_status_t wsrep_commit_cb(void* ctx, wsrep_seqno_t const global_seqno)
   return rcode;
 }
 
-wsrep_status_t wsrep_rollback_cb(void *ctx, wsrep_seqno_t global_seqno)
+wsrep_status_t wsrep_rollback (THD* const thd, wsrep_seqno_t const global_seqno)
 {
-  THD* const thd((THD*)ctx);
-
-  assert(global_seqno == thd->wsrep_trx_seqno);
-
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
            "rolling back %lld", (long long)thd->wsrep_trx_seqno);
@@ -7845,6 +7837,20 @@ wsrep_status_t wsrep_rollback_cb(void *ctx, wsrep_seqno_t global_seqno)
 #endif /* WSREP_PROC_INFO */
 
   return rcode;
+}
+
+wsrep_status_t wsrep_commit_cb(void*         const ctx,
+                               wsrep_seqno_t const global_seqno,
+                               bool          const commit)
+{
+  THD* const thd((THD*)ctx);
+
+  assert(global_seqno == thd->wsrep_trx_seqno);
+
+  if (commit)
+    return wsrep_commit(thd, global_seqno);
+  else
+    return wsrep_rollback(thd, global_seqno);
 }
 
 Relay_log_info* wsrep_relay_log_init(const char* log_fname)
