@@ -2216,6 +2216,9 @@ public:
 #endif /* WSREP_PROC_INFO */
   ulong                     wsrep_retry_counter; // of autocommit
   bool                      wsrep_PA_safe;
+  char*                     wsrep_retry_query;
+  size_t                    wsrep_retry_query_len;
+  enum enum_server_command  wsrep_retry_command;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

@@ -887,9 +887,16 @@ bool do_command(THD *thd)
   if (WSREP(thd)) {
     while (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
-      return_value= dispatch_command(command, thd, packet+1, 
-				     (uint) (packet_length-1));
+      return_value= dispatch_command(command, thd, thd->wsrep_retry_query, 
+				     thd->wsrep_retry_query_len);
     }
+  }
+  if (thd->wsrep_retry_query)
+  {
+    my_free(thd->wsrep_retry_query);
+    thd->wsrep_retry_query      = NULL;
+    thd->wsrep_retry_query_len  = 0;
+    thd->wsrep_retry_command    = COM_CONNECT;
   }
 #endif
 out:
@@ -965,6 +972,34 @@ static my_bool deny_updates_if_read_only_option(THD *thd,
   DBUG_RETURN(FALSE);
 }
 
+#ifdef WITH_WSREP
+static my_bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables)
+{
+  int opt_readonly_saved = opt_readonly;
+  ulong flag_saved = (ulong)(thd->security_ctx->master_access & SUPER_ACL);
+
+  opt_readonly = 0;
+  thd->security_ctx->master_access &= ~SUPER_ACL;
+
+  my_bool ret = !deny_updates_if_read_only_option(thd, all_tables);
+
+  opt_readonly = opt_readonly_saved;
+  thd->security_ctx->master_access |= flag_saved;
+
+  return ret;
+}
+
+static void wsrep_copy_query(THD *thd)
+{
+  thd->wsrep_retry_command   = thd->command;
+  thd->wsrep_retry_query_len = thd->query_length();
+  thd->wsrep_retry_query     = (char *)my_malloc(
+                                 thd->wsrep_retry_query_len + 1, MYF(0));
+  thd->wsrep_retry_command   = thd->command;
+  strcpy(thd->wsrep_retry_query, thd->query());
+  thd->wsrep_retry_query[thd->wsrep_retry_query_len] = '\0';
+}
+#endif /* WITH_WSREP */
 /**
   Perform one connection-level (COM_XXXX) command.
 
@@ -1010,9 +1045,9 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       thd->wsrep_conflict_state= NO_CONFLICT;
     }
 
-    is_autocommit= !thd->in_multi_stmt_transaction_mode() &&
-      thd->wsrep_conflict_state == NO_CONFLICT            &&
-      !thd->wsrep_applier;
+    is_autocommit= thd->wsrep_conflict_state == NO_CONFLICT   &&
+      !thd->wsrep_applier                                     &&
+      wsrep_read_only_option(thd, thd->lex->query_tables);
 
     if (thd->wsrep_conflict_state== MUST_ABORT)
     {
@@ -1025,6 +1060,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     if (thd->wsrep_conflict_state== ABORTED) 
     {
       my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+      WSREP_DEBUG("Deadlock error for: %s", thd->query());
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
       thd->mysys_var->abort= 0;
@@ -1665,6 +1701,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
                     (thd->query()) ? thd->query() : "void");
         thd->wsrep_conflict_state= RETRY_AUTOCOMMIT;
         thd->wsrep_retry_counter++;            // grow
+        wsrep_copy_query(thd);
       }
       else
       {

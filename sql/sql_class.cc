@@ -990,6 +990,9 @@ THD::THD()
   wsrep_retry_counter= 0;
   wsrep_PA_safe = true;
   wsrep_seqno_changed= false;
+  wsrep_retry_query     = NULL;
+  wsrep_retry_query_len = 0;
+  wsrep_retry_command   = COM_CONNECT;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state(this);
@@ -2243,6 +2246,13 @@ bool sql_exchange::escaped_given(void)
 bool select_send::send_result_set_metadata(List<Item> &list, uint flags)
 {
   bool res;
+#ifdef WITH_WSREP
+  if (WSREP(thd) && thd->wsrep_retry_query)
+  {
+    WSREP_DEBUG("skipping select metadata");
+    return FALSE;
+  }
+#endif /* WITH_WSREP */
   if (!(res= thd->protocol->send_result_set_metadata(&list, flags)))
     is_result_set_started= 1;
   return res;
