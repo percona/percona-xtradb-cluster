@@ -1045,7 +1045,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       thd->wsrep_conflict_state= NO_CONFLICT;
     }
 
-    is_autocommit= thd->wsrep_conflict_state == NO_CONFLICT   &&
+    is_autocommit= !thd->in_multi_stmt_transaction_mode()     &&
+      thd->wsrep_conflict_state == NO_CONFLICT                &&
       !thd->wsrep_applier                                     &&
       wsrep_read_only_option(thd, thd->lex->query_tables);
 
