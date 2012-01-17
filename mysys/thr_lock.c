@@ -926,7 +926,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
 			 lock->read.data->owner->thread_id, data->type));
     }
 #ifdef WITH_WSREP
-    if (wsrep_break_lock(data, &lock->write, &lock->read, &lock->write_wait))
+    if (wsrep_break_lock(data, &lock->write, NULL, &lock->write_wait))
     {
       wsrep_lock_inserted= TRUE;
     }
