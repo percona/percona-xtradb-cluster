@@ -597,7 +597,9 @@ wsrep_break_lock(
       fprintf(stderr,"WSREP wsrep_break_lock aborting locks\n");
 
     /* aborting lock holder(s) here */
-    for (holder=lock_queue1->data; holder; holder=holder->next) 
+    for (holder=(lock_queue1) ? lock_queue1->data : NULL; 
+	 holder; 
+	 holder=holder->next) 
     {
       if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd))
       {
@@ -611,7 +613,9 @@ wsrep_break_lock(
          return FALSE;
       }
     }
-    for (holder=lock_queue2->data; holder; holder=holder->next) 
+    for (holder=(lock_queue2) ? lock_queue2->data :  NULL; 
+	 holder; 
+	 holder=holder->next) 
     {
       if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd))
       {
