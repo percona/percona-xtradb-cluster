@@ -85,7 +85,7 @@ namespace wsp
 #define STDOUT_FD  1
 
 process::process (const char* cmd, const char* type)
-    : str_(cmd ? strdup(cmd) : ""), io_(NULL), err_(EINVAL), pid_(0)
+    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), err_(EINVAL), pid_(0)
 {
     if (0 == str_)
     {
