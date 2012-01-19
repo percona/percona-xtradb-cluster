@@ -1679,7 +1679,7 @@ row_ins_scan_sec_index_for_duplicate(
 	ulint		n_fields_cmp;
 	btr_pcur_t	pcur;
 	ulint		err		= DB_SUCCESS;
-	unsigned	allow_duplicates;
+	ulint		allow_duplicates;
 	mtr_t		mtr;
 	mem_heap_t*	heap		= NULL;
 	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
@@ -1710,7 +1710,7 @@ row_ins_scan_sec_index_for_duplicate(
 
 	btr_pcur_open(index, entry, PAGE_CUR_GE, BTR_SEARCH_LEAF, &pcur, &mtr);
 
-	allow_duplicates = thr_get_trx(thr)->duplicates & TRX_DUP_IGNORE;
+	allow_duplicates = thr_get_trx(thr)->duplicates;
 
 	/* Scan index records and check if there is a duplicate */
 
@@ -1852,11 +1852,11 @@ row_ins_duplicate_error_in_clust(
 			errors as in original execution */
 
 #ifdef WITH_WSREP
-			if (trx->duplicates & TRX_DUP_IGNORE ||
+			if (trx->duplicates ||
 			    (wsrep_on(trx->mysql_thd) && 
 			     wsrep_thd_is_brute_force(trx->mysql_thd))) {
 #else
-			if (trx->duplicates & TRX_DUP_IGNORE) {
+			if (trx->duplicates) {
 #endif
 
 				/* If the SQL-query will update or replace
@@ -1902,11 +1902,11 @@ row_ins_duplicate_error_in_clust(
 						  ULINT_UNDEFINED, &heap);
 
 #ifdef WITH_WSREP
-			if (trx->duplicates & TRX_DUP_IGNORE ||
+			if (trx->duplicates ||
 			    (wsrep_on(trx->mysql_thd) && 
 			     wsrep_thd_is_brute_force(trx->mysql_thd))) {
 #else
-			if (trx->duplicates & TRX_DUP_IGNORE) {
+			if (trx->duplicates) {
 #endif
 
 				/* If the SQL-query will update or replace
