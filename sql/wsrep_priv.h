@@ -73,9 +73,8 @@ namespace wsp {
 /* A small class to run external programs. */
 class process
 {
-public:
-    const char* const str_;
 private:
+    const char* const str_;
     FILE*       io_;
     int         err_;
     pid_t       pid_;
@@ -87,9 +86,10 @@ public:
     process  (const char* cmd, const char* type);
     ~process ();
 
-    FILE* pipe () { return io_;  };
-    int   error() { return err_; };
+    FILE* pipe () { return io_;  }
+    int   error() { return err_; }
     int   wait ();
+    const char* cmd() { return str_; }
 };
 #ifdef REMOVED
 class lock

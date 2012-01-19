@@ -570,7 +570,7 @@ static int sst_run_shell (const char* cmd_str, int max_tries)
     if ((ret = proc.error()))
     {
       WSREP_ERROR("Try %d/%d: '%s' failed: %d (%s)",
-                  tries, max_tries, proc.str_, ret, strerror(ret));
+                  tries, max_tries, proc.cmd(), ret, strerror(ret));
       sleep (1);
     }
     else
@@ -821,13 +821,14 @@ wait_signal:
     }
     else
     {
-      WSREP_ERROR("Failed to read from: %s", arg->cmd);
+      WSREP_ERROR("Failed to read from: %s", proc.cmd());
     }
     if (err && proc.error()) err= proc.error();
   }
   else
   {
-    WSREP_ERROR("Failed to execute: %s : %d (%s)",arg->cmd, err, strerror(err));
+    WSREP_ERROR("Failed to execute: %s : %d (%s)",
+                proc.cmd(), err, strerror(err));
   }
 
   if (locked) // don't forget to unlock server before return
@@ -849,12 +850,12 @@ static int sst_donate_other (const char*   method,
                              wsrep_seqno_t seqno,
                              bool          bypass)
 {
-  ssize_t cmd_len = 1024;
+  ssize_t cmd_len = 4096;
   char    cmd_str[cmd_len];
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%s' '%lld' '%d'"
-                     " 2>sst.err",
+                     ,
                      method, addr, sst_auth_real, mysql_real_data_home,
                      wsrep_defaults_file, uuid, (long long) seqno, bypass);
 

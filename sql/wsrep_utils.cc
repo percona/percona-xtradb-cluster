@@ -26,7 +26,7 @@
 #include <string.h>   // strerror()
 #include <sys/wait.h> // waitpid()
 
-#include <sql_class.h>    // THD
+#include <sql_class.h>
 #include "wsrep_priv.h"
 
 extern char** environ; // environment variables
@@ -85,8 +85,15 @@ namespace wsp
 #define STDOUT_FD  1
 
 process::process (const char* cmd, const char* type)
-    : str_(strdup(cmd)), io_(NULL), err_(EINVAL), pid_(0)
+    : str_(cmd ? strdup(cmd) : ""), io_(NULL), err_(EINVAL), pid_(0)
 {
+    if (0 == str_)
+    {
+        WSREP_ERROR ("Can't allocate command line of size: %zu", strlen(cmd));
+        err_ = ENOMEM;
+        return;
+    }
+
     if (0 == strlen(str_))
     {
         WSREP_ERROR ("Can't start a process: null or empty command line.");

@@ -98,8 +98,27 @@ then
         # New filter - exclude everything except dirs (schemas) and innodb files
         FILTER=(-f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
 
+        RC=0
         rsync --archive --no-times --ignore-times --inplace --delete --quiet \
-              $WHOLE_FILE_OPT "${FILTER[@]}" "$DATA" rsync://$ADDR
+              $WHOLE_FILE_OPT "${FILTER[@]}" "$DATA" rsync://$ADDR || RC=$?
+
+        [ $RC -ne 0 ] && echo "rsync returned code $RC:" >> /dev/stderr
+
+        case $RC in
+        0)  RC=0   # Success
+            ;;
+        12) RC=71  # EPROTO
+            echo "rsync server on the other end has incompatible protocol. " \
+                 "Make sure you have the same version of rsync on all nodes."\
+                 >> /dev/stderr
+            ;;
+        22) RC=12  # ENOMEM
+            ;;
+        *)  RC=255 # unknown error
+            ;;
+        esac
+
+        [ $RC -ne 0 ] && exit $RC
 
     else # BYPASS
         STATE="$UUID:$SEQNO"
