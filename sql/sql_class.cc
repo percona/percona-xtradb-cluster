@@ -1855,6 +1855,11 @@ void THD::cleanup_after_query()
       }
       //wsrep_trx_seqno = 0;
 #endif  /* WITH_WSREP */
+  /* reset replication info structure */
+  if (lex && lex->mi.repl_ignore_server_ids.buffer) 
+  {
+    delete_dynamic(&lex->mi.repl_ignore_server_ids);
+  }
 }
 
 
