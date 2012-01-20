@@ -2968,7 +2968,6 @@ case SQLCOM_PREPARE:
         res= mysql_create_table(thd, create_table,
                                 &create_info, &alter_info);
       }
-      WSREP_TO_ISOLATION_END
       if (!res)
         my_ok(thd);
     }
@@ -3014,7 +3013,6 @@ end_with_restore_list:
     res= mysql_alter_table(thd, first_table->db, first_table->table_name,
                            &create_info, first_table, &alter_info,
                            0, (ORDER*) 0, 0);
-    WSREP_TO_ISOLATION_END
     break;
   }
 #ifdef HAVE_REPLICATION
@@ -3087,10 +3085,8 @@ end_with_restore_list:
     WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name)
     if (mysql_rename_tables(thd, first_table, 0))
     {
-      WSREP_TO_ISOLATION_END
       goto error;
     }
-    WSREP_TO_ISOLATION_END
     break;
   }
 #ifndef EMBEDDED_LIBRARY
@@ -3533,7 +3529,6 @@ end_with_restore_list:
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->drop_if_exists,
 			lex->drop_temporary);
-    WSREP_TO_ISOLATION_END
   }
   break;
   case SQLCOM_SHOW_PROCESSLIST:
@@ -3719,7 +3714,6 @@ end_with_restore_list:
     WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL)
     res= mysql_create_db(thd,(lower_case_table_names == 2 ? alias :
                               lex->name.str), &create_info, 0);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_DROP_DB:
@@ -3749,7 +3743,6 @@ end_with_restore_list:
       break;
     WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL)
     res= mysql_rm_db(thd, lex->name.str, lex->drop_if_exists, 0);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_ALTER_DB_UPGRADE:
@@ -3779,7 +3772,6 @@ end_with_restore_list:
     }
     WSREP_TO_ISOLATION_BEGIN(db->str, NULL)
     res= mysql_upgrade_db(thd, db);
-    WSREP_TO_ISOLATION_END
     if (!res)
       my_ok(thd);
     break;
@@ -3813,7 +3805,6 @@ end_with_restore_list:
       break;
     WSREP_TO_ISOLATION_BEGIN(db->str, NULL)
     res= mysql_alter_db(thd, db->str, &create_info);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_SHOW_CREATE_DB:
@@ -3862,7 +3853,6 @@ end_with_restore_list:
     default:
       DBUG_ASSERT(0);
     }
-    WSREP_TO_ISOLATION_END
     DBUG_PRINT("info",("DDL error code=%d", res));
     if (!res)
       my_ok(thd);
@@ -3886,7 +3876,6 @@ end_with_restore_list:
                                   lex->spname->m_db, lex->spname->m_name,
                                   lex->drop_if_exists)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
     break;
 #else
     my_error(ER_NOT_SUPPORTED_YET,MYF(0),"embedded server");
@@ -3900,7 +3889,6 @@ end_with_restore_list:
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
     if (!(res = mysql_create_function(thd, &lex->udf)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
 #else
     my_error(ER_CANT_OPEN_LIBRARY, MYF(0), lex->udf.dl, 0, "feature disabled");
     res= TRUE;
@@ -3917,7 +3905,6 @@ end_with_restore_list:
     /* Conditionally writes to binlog */
     if (!(res= mysql_create_user(thd, lex->users_list)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_DROP_USER:
@@ -3929,7 +3916,6 @@ end_with_restore_list:
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
     if (!(res= mysql_drop_user(thd, lex->users_list)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_RENAME_USER:
@@ -3941,7 +3927,6 @@ end_with_restore_list:
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
     if (!(res= mysql_rename_user(thd, lex->users_list)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_REVOKE_ALL:
@@ -3957,7 +3942,6 @@ end_with_restore_list:
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
     if (!(res = mysql_revoke_all(thd, lex->users_list)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_REVOKE:
@@ -4027,7 +4011,6 @@ end_with_restore_list:
                                  lex->type == TYPE_ENUM_PROCEDURE, 
                                  lex->users_list, grants,
                                  lex->sql_command == SQLCOM_REVOKE, TRUE);
-        WSREP_TO_ISOLATION_END
         if (!res)
           my_ok(thd);
       }
@@ -4041,7 +4024,6 @@ end_with_restore_list:
         res= mysql_table_grant(thd, all_tables, lex->users_list,
 			       lex->columns, lex->grant,
 			       lex->sql_command == SQLCOM_REVOKE);
-        WSREP_TO_ISOLATION_END
       }
     }
     else
@@ -4059,7 +4041,6 @@ end_with_restore_list:
         res = mysql_grant(thd, select_lex->db, lex->users_list, lex->grant,
                           lex->sql_command == SQLCOM_REVOKE,
                           lex->type == TYPE_ENUM_PROXY);
-          WSREP_TO_ISOLATION_END
       }
       if (!res)
       {
@@ -4442,7 +4423,6 @@ end_with_restore_list:
       my_error(ER_SP_STORE_FAILED, MYF(0), SP_TYPE_STRING(lex), name);
     break;
     } /* end switch */
-    WSREP_TO_ISOLATION_END
 
     /*
       Capture all errors within this CASE and
@@ -4570,7 +4550,6 @@ create_sp_error:
       /* Conditionally writes to binlog */
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
       sp_result= sp_update_routine(thd, type, lex->spname, &lex->sp_chistics);
-      WSREP_TO_ISOLATION_END
       switch (sp_result)
       {
       case SP_OK:
@@ -4644,7 +4623,6 @@ create_sp_error:
 
       /* Conditionally writes to binlog */
       sp_result= sp_drop_routine(thd, type, lex->spname);
-      WSREP_TO_ISOLATION_END
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
       /*
@@ -4761,7 +4739,6 @@ create_sp_error:
       */
       WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
       res= mysql_create_view(thd, first_table, thd->lex->create_view_mode);
-      WSREP_TO_ISOLATION_END
       break;
     }
   case SQLCOM_DROP_VIEW:
@@ -4771,7 +4748,6 @@ create_sp_error:
       /* Conditionally writes to binlog. */
       WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
       res= mysql_drop_view(thd, first_table, thd->lex->drop_mode);
-      WSREP_TO_ISOLATION_END
       break;
     }
   case SQLCOM_CREATE_TRIGGER:
@@ -4779,7 +4755,6 @@ create_sp_error:
     /* Conditionally writes to binlog. */
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
-    WSREP_TO_ISOLATION_END
 
     break;
   }
@@ -4788,7 +4763,6 @@ create_sp_error:
     /* Conditionally writes to binlog. */
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
     res= mysql_create_or_drop_trigger(thd, all_tables, 0);
-    WSREP_TO_ISOLATION_END
     break;
   }
   case SQLCOM_XA_START:
@@ -4842,13 +4816,11 @@ create_sp_error:
     if (! (res= mysql_install_plugin(thd, &thd->lex->comment,
                                      &thd->lex->ident)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
     break;
   case SQLCOM_UNINSTALL_PLUGIN:
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
     if (! (res= mysql_uninstall_plugin(thd, &thd->lex->comment)))
       my_ok(thd);
-    WSREP_TO_ISOLATION_END
     break;
   case SQLCOM_BINLOG_BASE64_EVENT:
   {
@@ -4997,6 +4969,7 @@ finish:
   /* Free tables */
   thd_proc_info(thd, "closing tables");
   close_thread_tables(thd);
+  WSREP_TO_ISOLATION_END
   thd_proc_info(thd, 0);
 
 #ifndef DBUG_OFF

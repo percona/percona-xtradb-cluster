@@ -119,7 +119,6 @@ TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
                             lex->ignore);
 
 #ifdef WITH_WSREP
-  wsrep_to_isolation_end(thd);
 #endif /* WITH_WSREP */
   DBUG_RETURN(result);
 }

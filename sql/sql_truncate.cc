@@ -526,10 +526,6 @@ bool Truncate_statement::execute(THD *thd)
 #endif /* WITH_WSREP */
   if (! (res= truncate_table(thd, first_table)))
     my_ok(thd);
-#ifdef WITH_WSREP
-  if (WSREP(thd)) wsrep_to_isolation_end(thd);
-#endif /* WITH_WSREP */
-
   DBUG_RETURN(res);
 }
 
