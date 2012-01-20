@@ -723,6 +723,13 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     WSREP_WARN("desync failed %d for %s", ret, thd->query());
     return(ret);
   }
+  wsrep_seqno_t seqno = wsrep->pause(wsrep);
+  if (seqno == WSREP_SEQNO_UNDEFINED)
+  {
+    WSREP_WARN("pause failed %lld for %s", (long long)seqno, thd->query());
+    return(1);
+  }
+  WSREP_DEBUG("paused at %lld", (long long)seqno);
   thd->variables.wsrep_on = 0;
   return 0;
 }
@@ -733,6 +740,11 @@ static void wsrep_RSU_end(THD *thd)
   WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
 	      thd->wsrep_exec_mode, thd->query() );
 
+  ret = wsrep->resume(wsrep);
+  if (ret != WSREP_OK)
+  {
+    WSREP_WARN("resume failed %d for %s", ret, thd->query());
+  }
   ret = wsrep->resync(wsrep);
   if (ret != WSREP_OK)
   {
