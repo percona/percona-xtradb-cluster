@@ -1033,6 +1033,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %if %{defined with_wsrep}
 %doc %{src_dir}/Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
+%doc release/support-files/wsrep_notify.sh
 %endif
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
