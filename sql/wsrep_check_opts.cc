@@ -47,6 +47,7 @@ static struct opt opts[] =
     { "query_cache_type",        "0" }, // mysqld.cc
     { "query_cache_size",        "0" }, // mysqld.cc
     { "locked_in_memory",        "0" }, // mysqld.cc
+    { "wsrep_cluster_address",   "0" }, // mysqld.cc
     { "locks_unsafe_for_binlog", "0" }, // ha_innodb.cc
     { "autoinc_lock_mode",       "1" }, // ha_innodb.cc
     { 0, 0 }
@@ -63,6 +64,7 @@ enum
     QUERY_CACHE_TYPE,
     QUERY_CACHE_SIZE,
     LOCKED_IN_MEMORY,
+    WSREP_CLUSTER_ADDRESS,
     LOCKS_UNSAFE_FOR_BINLOG,
     AUTOINC_LOCK_MODE
 };
@@ -337,6 +339,16 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
                          "set bind_address to allow mysql client connections "
                          "from other cluster members (e.g. 0.0.0.0).",
                          opts[BIND_ADDRESS].value);
+            rcode = EINVAL;
+        }
+    }
+    else
+    {
+        // non-mysqldump SST requires wsrep_cluster_address on startup
+        if (strlen(opts[WSREP_CLUSTER_ADDRESS].value) == 0)
+        {
+            WSREP_ERROR ("%s SST method requires wsrep_cluster_address to be "
+                         "configured on startup.",opts[WSREP_SST_METHOD].value);
             rcode = EINVAL;
         }
     }
