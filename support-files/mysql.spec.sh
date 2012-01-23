@@ -73,7 +73,7 @@
 %if %{defined with_wsrep}
 %define mysql_version @VERSION@_wsrep_@WSREP_API_VERSION@.@WSREP_PATCH_VERSION@
 %define wsrep_version @WSREP_VERSION@
-%define wsrep_comment wsrep patch: %{wsrep_version}
+%define wsrep_comment , wsrep_%{wsrep_version}
 %else
 %define wsrep_comment %{nil}
 %endif
@@ -104,10 +104,10 @@
 # Server comment strings
 # ----------------------------------------------------------------------------
 %if %{undefined compilation_comment_debug}
-%define compilation_comment_debug       MySQL Community Server - Debug (GPL) %{wsrep_comment}
+%define compilation_comment_debug       MySQL Community Server - Debug (GPL)%{wsrep_comment}
 %endif
 %if %{undefined compilation_comment_release}
-%define compilation_comment_release     MySQL Community Server (GPL) %{wsrep_comment}
+%define compilation_comment_release     MySQL Community Server (GPL)%{wsrep_comment}
 %endif
 
 # ----------------------------------------------------------------------------
