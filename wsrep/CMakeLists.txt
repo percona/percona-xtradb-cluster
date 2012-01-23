@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2012, Codership Oy. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,13 +13,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/include )
+INCLUDE_DIRECTORIES( "." )
 
-SET(WSREP_SOURCES  wsrep_uuid.c wsrep_loader.c wsrep_dummy.c)
+SET(WSREP_SOURCES wsrep_uuid.c wsrep_loader.c wsrep_dummy.c)
 
 ADD_CONVENIENCE_LIBRARY(wsrep ${WSREP_SOURCES})
-TARGET_LINK_LIBRARIES(wsrep ${LIBM})
 DTRACE_INSTRUMENT(wsrep)
 
-TARGET_LINK_LIBRARIES(wsrep)
-#SET_TARGET_PROPERTIES(thr_lock PROPERTIES COMPILE_FLAGS "-DMAIN")
+ADD_EXECUTABLE(listener wsrep_listener.c ${WSREP_SOURCES})
+TARGET_LINK_LIBRARIES(listener ${LIBDL})
