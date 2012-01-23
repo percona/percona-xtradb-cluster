@@ -64,6 +64,14 @@ then
     exit $EINVAL
 fi
 
+# Check client version
+if ! mysql --version | grep 'Distrib 5.5' >/dev/null
+then
+    mysql --version >&2
+    err "this procedure requires MySQL client version 5.5.x"
+    exit $EINVAL
+fi
+
 AUTH="-u$USER"
 if test -n "$PSWD"; then AUTH="$AUTH -p$PSWD"; fi
 
