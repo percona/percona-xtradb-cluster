@@ -696,7 +696,8 @@ static int sst_flush_tables(THD* thd)
   else
   {
     /* make sure logs are flushed after global read lock acquired */
-    err= reload_acl_and_cache(thd, REFRESH_LOG, (TABLE_LIST*) 0, &not_used);
+    err= reload_acl_and_cache(thd, REFRESH_ENGINE_LOG, 
+			      (TABLE_LIST*) 0, &not_used);
   }
 
   if (err)
