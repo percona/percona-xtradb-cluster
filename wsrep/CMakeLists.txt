@@ -20,5 +20,5 @@ SET(WSREP_SOURCES wsrep_uuid.c wsrep_loader.c wsrep_dummy.c)
 ADD_CONVENIENCE_LIBRARY(wsrep ${WSREP_SOURCES})
 DTRACE_INSTRUMENT(wsrep)
 
-ADD_EXECUTABLE(listener wsrep_listener.c ${WSREP_SOURCES})
-TARGET_LINK_LIBRARIES(listener ${LIBDL})
+#ADD_EXECUTABLE(listener wsrep_listener.c ${WSREP_SOURCES})
+#TARGET_LINK_LIBRARIES(listener ${LIBDL})
