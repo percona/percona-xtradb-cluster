@@ -563,12 +563,12 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
-ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
+ln -sf %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 
 %if %{defined with_wsrep}
 # Create a wsrep_sst_rsync_wan symlink.
 install -d $RBR%{_bindir}
-ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
+ln -sf wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 %endif
 
 # Touch the place where the my.cnf config file might be located
@@ -1033,7 +1033,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %if %{defined with_wsrep}
 %doc %{src_dir}/Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
-%doc release/support-files/wsrep_notify.sh
+%doc release/support-files/wsrep_notify
 %endif
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
