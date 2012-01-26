@@ -6854,6 +6854,7 @@ ha_innobase::wsrep_append_keys(
 {
 	DBUG_ENTER("wsrep_append_keys");
 	trx_t *trx = thd_to_trx(thd);
+	wsrep_mark_rw_trans(thd);
 
 	/* if no PK, calculate hash of full row, to be the key value */
 	if (prebuilt->clust_index_was_generated && wsrep_certify_nonPK) {

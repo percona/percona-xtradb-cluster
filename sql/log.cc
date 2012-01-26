@@ -4781,6 +4781,12 @@ int THD::binlog_setup_trx_data()
 }
 
 #ifdef WITH_WSREP
+extern "C" void 
+wsrep_mark_rw_trans(THD *thd)
+{
+  thd->ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
+}
+
 void
 THD::wsrep_start_trans_and_stmt()
 {
@@ -4792,7 +4798,6 @@ THD::wsrep_start_trans_and_stmt()
       ha_data[wsrep_hton->slot].ha_info[1].set_trx_read_write();
     }
     trans_register_ha(this, FALSE, wsrep_hton);
-    ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
   }
 }
 #endif /* WITH_WSREP */

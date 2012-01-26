@@ -328,6 +328,7 @@ extern "C" char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
+extern "C" void wsrep_mark_rw_trans(THD *thd);
 #endif
 typedef struct trx_struct trx_t;
 /********************************************************************//**
