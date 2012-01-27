@@ -112,7 +112,7 @@ class ha_innobase: public handler
 	int info_low(uint flag, bool called_from_analyze);
 
 #ifdef WITH_WSREP
-	int wsrep_append_keys(THD *thd, wsrep_action_t action,
+	int wsrep_append_keys(THD *thd, bool shared,
 			      const uchar* record0, const uchar* record1);
 #endif
 	/* Init values for the class: */

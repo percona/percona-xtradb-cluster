@@ -5583,7 +5583,7 @@ report_error:
 	    wsrep_on(user_thd) && (sql_command != SQLCOM_LOAD ||
 	    thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW)) {
 
-		if (wsrep_append_keys(user_thd, WSREP_INSERT, record, NULL)) {
+		if (wsrep_append_keys(user_thd, false, record, NULL)) {
  			DBUG_PRINT("wsrep", ("row key failed"));
  			error_result = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -5862,7 +5862,7 @@ ha_innobase::update_row(
 
 		DBUG_PRINT("wsrep", ("update row key"));
 
-		if (wsrep_append_keys(user_thd, WSREP_UPDATE, old_row, new_row)) {
+		if (wsrep_append_keys(user_thd, false, old_row, new_row)) {
 			DBUG_PRINT("wsrep", ("row key failed"));
 			error = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -5917,7 +5917,7 @@ ha_innobase::delete_row(
 	if (!error && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
             wsrep_on(user_thd)) {
 
-		if (wsrep_append_keys(user_thd, WSREP_DELETE, record, NULL)) {
+		if (wsrep_append_keys(user_thd, false, record, NULL)) {
 			DBUG_PRINT("wsrep", ("delete fail"));
 			error = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -6778,7 +6778,7 @@ wsrep_append_foreign_key(
 		wsrep_trx_handle(thd, trx),
 		&wkey,
 		1, 
-		WSREP_DELETE);
+		true);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %lu", rcode));
 		WSREP_ERROR("Appending cascaded fk row key failed: %s, %lu", 
@@ -6800,7 +6800,7 @@ wsrep_append_key(
 	TABLE 		*table,
 	const char*	key,
 	uint16_t        key_len,
-	wsrep_action_t 	action
+	bool            shared
 )
 {
 	DBUG_ENTER("wsrep_append_key");
@@ -6834,7 +6834,7 @@ wsrep_append_key(
 			       wsrep_trx_handle(thd, trx),
 			       &wkey,
 			       1,
-			       action);
+			       shared);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
 		WSREP_WARN("Appending row key failed: %s, %d", 
@@ -6848,7 +6848,7 @@ int
 ha_innobase::wsrep_append_keys(
 /*==================*/
 	THD 		*thd,
-	wsrep_action_t 	action,
+	bool		shared,
 	const uchar*	record0,	/* in: row in MySQL format */
 	const uchar*	record1)	/* in: row in MySQL format */
 {
@@ -6863,13 +6863,16 @@ ha_innobase::wsrep_append_keys(
 
 		MY_MD5_HASH(digest, (uchar *)record0, table->s->reclength);
 		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
-					      (const char*) digest, 16, action))) {
+					      (const char*) digest, 16, 
+					      shared))) {
 			DBUG_RETURN(rcode);
 		}
 		if (record1) {
 			MY_MD5_HASH(digest, (uchar *)record1, table->s->reclength);
-			if ((rcode = wsrep_append_key(thd, trx, table_share, table,
-						      (const char*) digest, 16, action))) {
+			if ((rcode = wsrep_append_key(thd, trx, table_share, 
+						      table,
+						      (const char*) digest, 
+						      16, shared))) {
 				DBUG_RETURN(rcode);
 			}
 		}
@@ -6886,7 +6889,7 @@ ha_innobase::wsrep_append_keys(
 		if (!is_null) {
 			int rcode = wsrep_append_key(
 				thd, trx, table_share, table, keyval, 
-				len, action);
+				len, shared);
 			if (rcode) DBUG_RETURN(rcode);
 		}
 		else
@@ -6916,7 +6919,7 @@ ha_innobase::wsrep_append_keys(
 				if (!is_null) {
 					int rcode = wsrep_append_key(
 						thd, trx, table_share, table, 
-						keyval0, len+1, action);
+						keyval0, len+1, shared);
 					if (rcode) DBUG_RETURN(rcode);
 				}
 				else
@@ -6930,8 +6933,9 @@ ha_innobase::wsrep_append_keys(
 						record1, &is_null);
 					if (!is_null && memcmp(key0, key1, len)) {
 						int rcode = wsrep_append_key(
-							thd, trx, table_share, table, 
-							keyval1, len+1, action);
+							thd, trx, table_share, 
+							table, 
+							keyval1, len+1, shared);
 						if (rcode) DBUG_RETURN(rcode);
 					}
 				}
