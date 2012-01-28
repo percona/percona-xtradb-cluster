@@ -4566,10 +4566,17 @@ void wsrep_wait_appliers_close(THD *thd)
 
 void wsrep_kill_mysql(THD *thd)
 {
-  if (mysqld_server_started && !shutdown_in_progress)
+  if (mysqld_server_started)
   {
-    WSREP_INFO("starting shutdown");
-    kill_mysql();
+    if (!shutdown_in_progress)
+    {
+      WSREP_INFO("starting shutdown");
+      kill_mysql();
+    }
+  }
+  else
+  {
+    unireg_abort(1);
   }
 }
 #endif /* WITH_WSREP */
