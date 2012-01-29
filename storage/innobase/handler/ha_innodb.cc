@@ -6806,8 +6806,7 @@ wsrep_append_key(
 	DBUG_ENTER("wsrep_append_key");
 #ifdef WSREP_DEBUG_PRINT
 	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ", 
-		(action==WSREP_INSERT) ? "INSERT" : 
-		(action==WSREP_UPDATE) ? "UPDATE" : "DELETE",
+		(shared) ? "Shared" : "Exclusive",
 		wsrep_thd_thread_id(thd), trx->id, key_len, 
 		table_share->table_name.str);
 	for (int i=0; i<key_len; i++) {
