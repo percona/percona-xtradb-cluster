@@ -15,6 +15,7 @@
 
 #include <mysqld.h>
 #include <sql_class.h>
+#include <sql_parse.h>
 #include "wsrep_priv.h"
 #include <cstdio>
 #include <cstdlib>
@@ -648,13 +649,14 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
  *
  * Return 0 in case of success, 1 in case of error.
  */
-static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
+int wsrep_to_buf_helper(
+    THD* thd, const char *query, uchar** buf, uint* buf_len)
 {
   IO_CACHE tmp_io_cache;
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                        65536, MYF(MY_WME)))
     return 1;
-  Query_log_event ev(thd, thd->query(), thd->query_length(), FALSE, FALSE,
+  Query_log_event ev(thd, query, thd->query_length(), FALSE, FALSE,
                      FALSE, 0);
   int ret(0);
   if (ev.write(&tmp_io_cache)) ret= 1;
@@ -663,21 +665,109 @@ static int wsrep_to_buf_helper(THD* thd, uchar** buf, uint* buf_len)
   return ret;
 }
 
+#include "sql_show.h"
+static int
+create_view_query(THD *thd, uchar** buf, uint* buf_len)
+{
+    LEX *lex= thd->lex;
+    SELECT_LEX *select_lex= &lex->select_lex;
+    TABLE_LIST *first_table= select_lex->table_list.first;
+    TABLE_LIST *views = first_table;
+
+    String buff;
+    const LEX_STRING command[3]=
+      {{ C_STRING_WITH_LEN("CREATE ") },
+       { C_STRING_WITH_LEN("ALTER ") },
+       { C_STRING_WITH_LEN("CREATE OR REPLACE ") }};
+
+    buff.append(command[thd->lex->create_view_mode].str,
+                command[thd->lex->create_view_mode].length);
+
+    if (!lex->definer)
+    {
+      /*
+	DEFINER-clause is missing; we have to create default definer in
+	persistent arena to be PS/SP friendly.
+	If this is an ALTER VIEW then the current user should be set as
+	the definer.
+      */
+
+      if (!(lex->definer= create_default_definer(thd)))
+      {
+	WSREP_WARN("view defualt definer issue");
+      }
+
+      views->algorithm    = lex->create_view_algorithm;
+      views->definer.user = lex->definer->user;
+      views->definer.host = lex->definer->host;
+      views->view_suid    = lex->create_view_suid;
+      views->with_check   = lex->create_view_check;
+    }
+
+    view_store_options(thd, views, &buff);
+    buff.append(STRING_WITH_LEN("VIEW "));
+    /* Test if user supplied a db (ie: we did not use thd->db) */
+    if (views->db && views->db[0] &&
+        (thd->db == NULL || strcmp(views->db, thd->db)))
+    {
+      append_identifier(thd, &buff, views->db,
+                        views->db_length);
+      buff.append('.');
+    }
+    append_identifier(thd, &buff, views->table_name,
+                      views->table_name_length);
+    if (lex->view_list.elements)
+    {
+      List_iterator_fast<LEX_STRING> names(lex->view_list);
+      LEX_STRING *name;
+      int i;
+      
+      for (i= 0; (name= names++); i++)
+      {
+        buff.append(i ? ", " : "(");
+        append_identifier(thd, &buff, name->str, name->length);
+      }
+      buff.append(')');
+    }
+    buff.append(STRING_WITH_LEN(" AS "));
+    //buff.append(views->source.str, views->source.length);
+    buff.append(thd->lex->create_view_select.str, 
+		thd->lex->create_view_select.length);
+    //int errcode= query_error_code(thd, TRUE);
+    //if (thd->binlog_query(THD::STMT_QUERY_TYPE,
+    //                      buff.ptr(), buff.length(), FALSE, FALSE, FALSE, errcod
+    return wsrep_to_buf_helper(thd, buff.ptr(), buf, buf_len);
+}
+
 static int wsrep_TOI_begin(THD *thd, char *db_, char *table_) 
 {
   wsrep_status_t ret(WSREP_WARNING);
   uchar* buf(0);
   uint buf_len(0);
+  int buf_err;
+
   wsrep_key_part_t wkey_part[2];
   wsrep_key_t wkey = {wkey_part, 2};
   WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
 	      thd->wsrep_exec_mode, thd->query() );
-  if (wsrep_prepare_key_for_isolation(db_, table_, wkey_part, &wkey.key_parts_len) &&
-      !wsrep_to_buf_helper(thd, &buf, &buf_len) && WSREP_OK ==
-      (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
-				     &wkey, 1,
-				     buf, buf_len,
-				     &thd->wsrep_trx_seqno))) {
+  switch (thd->lex->sql_command)
+  {
+  case SQLCOM_CREATE_VIEW:
+    buf_err= create_view_query(thd, &buf, &buf_len);
+    break;
+  default:
+    buf_err= wsrep_to_buf_helper(thd, thd->query(), &buf, &buf_len);
+    break;
+  }
+
+  if (!buf_err                                                    &&
+      wsrep_prepare_key_for_isolation(db_, table_, wkey_part, 
+				      &wkey.key_parts_len)        &&
+      WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
+						 &wkey, 1,
+						 buf, buf_len,
+						 &thd->wsrep_trx_seqno)))
+  {
     thd->wsrep_exec_mode= TOTAL_ORDER;
     wsrep_to_isolation++;
     if (buf) my_free(buf);

@@ -4737,7 +4737,7 @@ create_sp_error:
         Note: SQLCOM_CREATE_VIEW also handles 'ALTER VIEW' commands
         as specified through the thd->lex->create_view_mode flag.
       */
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL)
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL)
       res= mysql_create_view(thd, first_table, thd->lex->create_view_mode);
       break;
     }
