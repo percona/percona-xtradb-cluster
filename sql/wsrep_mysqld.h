@@ -277,4 +277,6 @@ int wsrep_to_buf_helper(
   THD* thd, const char *query, uint query_len, uchar** buf, uint* buf_len);
 int wsrep_create_sp(THD *thd, uchar** buf, uint* buf_len);
 int wsrep_create_trigger_query(THD *thd, uchar** buf, uint* buf_len);
+int wsrep_create_event_query(THD *thd, uchar** buf, uint* buf_len);
+
 #endif /* WSREP_MYSQLD_H */
