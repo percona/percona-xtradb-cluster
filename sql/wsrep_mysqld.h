@@ -276,4 +276,5 @@ void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow*);
 int wsrep_to_buf_helper(
   THD* thd, const char *query, uint query_len, uchar** buf, uint* buf_len);
 int wsrep_create_sp(THD *thd, uchar** buf, uint* buf_len);
+int wsrep_create_trigger_query(THD *thd, uchar** buf, uint* buf_len);
 #endif /* WSREP_MYSQLD_H */

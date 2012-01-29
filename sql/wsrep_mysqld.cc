@@ -758,6 +758,9 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_)
   case SQLCOM_CREATE_FUNCTION:
     buf_err= wsrep_create_sp(thd, &buf, &buf_len);
     break;
+  case SQLCOM_CREATE_TRIGGER:
+    buf_err= wsrep_create_trigger_query(thd, &buf, &buf_len);
+    break;
   default:
     buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(), &buf, 
                                  &buf_len);
