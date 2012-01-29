@@ -650,14 +650,13 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
  * Return 0 in case of success, 1 in case of error.
  */
 int wsrep_to_buf_helper(
-    THD* thd, const char *query, uchar** buf, uint* buf_len)
+    THD* thd, const char *query, uint query_len, uchar** buf, uint* buf_len)
 {
   IO_CACHE tmp_io_cache;
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                        65536, MYF(MY_WME)))
     return 1;
-  Query_log_event ev(thd, query, thd->query_length(), FALSE, FALSE,
-                     FALSE, 0);
+  Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
   int ret(0);
   if (ev.write(&tmp_io_cache)) ret= 1;
   if (!ret && wsrep_write_cache(&tmp_io_cache, buf, buf_len)) ret= 1;
@@ -736,7 +735,7 @@ create_view_query(THD *thd, uchar** buf, uint* buf_len)
     //int errcode= query_error_code(thd, TRUE);
     //if (thd->binlog_query(THD::STMT_QUERY_TYPE,
     //                      buff.ptr(), buff.length(), FALSE, FALSE, FALSE, errcod
-    return wsrep_to_buf_helper(thd, buff.ptr(), buf, buf_len);
+    return wsrep_to_buf_helper(thd, buff.ptr(), buff.length(), buf, buf_len);
 }
 
 static int wsrep_TOI_begin(THD *thd, char *db_, char *table_) 
@@ -756,17 +755,18 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_)
     buf_err= create_view_query(thd, &buf, &buf_len);
     break;
   default:
-    buf_err= wsrep_to_buf_helper(thd, thd->query(), &buf, &buf_len);
+    buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(), &buf, 
+                                 &buf_len);
     break;
   }
 
   if (!buf_err                                                    &&
       wsrep_prepare_key_for_isolation(db_, table_, wkey_part, 
-				      &wkey.key_parts_len)        &&
+                                      &wkey.key_parts_len)        &&
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
-						 &wkey, 1,
-						 buf, buf_len,
-						 &thd->wsrep_trx_seqno)))
+                                                 &wkey, 1,
+                                                 buf, buf_len,
+                                                 &thd->wsrep_trx_seqno)))
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
     wsrep_to_isolation++;
@@ -777,10 +777,10 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_)
   else {
     /* jump to error handler in mysql_execute_command() */
     WSREP_WARN("TO isolation failed for: %d, sql: %s. Check wsrep "
-	       "connection state and retry the query.",
-	       ret, (thd->query()) ? thd->query() : "void");
+               "connection state and retry the query.",
+               ret, (thd->query()) ? thd->query() : "void");
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
-	     "your wsrep connection state and retry the query.");
+            "your wsrep connection state and retry the query.");
     if (buf) my_free(buf);
     return -1;
   }
@@ -791,7 +791,7 @@ static void wsrep_TOI_end(THD *thd) {
   wsrep_status_t ret;
   wsrep_to_isolation--;
   WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
-	      thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
+              thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
     if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
       WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);
     }
@@ -805,7 +805,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
 {
   wsrep_status_t ret(WSREP_WARNING);
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
-	      thd->wsrep_exec_mode, thd->query() );
+               thd->wsrep_exec_mode, thd->query() );
 
   ret = wsrep->desync(wsrep);
   if (ret != WSREP_OK)
@@ -828,7 +828,7 @@ static void wsrep_RSU_end(THD *thd)
 {
   wsrep_status_t ret(WSREP_WARNING);
   WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
-	      thd->wsrep_exec_mode, thd->query() );
+               thd->wsrep_exec_mode, thd->query() );
 
   ret = wsrep->resume(wsrep);
   if (ret != WSREP_OK)
