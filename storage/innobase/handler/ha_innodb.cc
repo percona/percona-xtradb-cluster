@@ -6718,7 +6718,8 @@ wsrep_append_foreign_key(
 	trx_t*		trx,		/*!< in: trx */
 	dict_foreign_t*	foreign,	/*!< in: foreign key constraint */
 	const rec_t*	clust_rec,	/*!<in: clustered index record */
-	dict_index_t*	clust_index)	/*!<in: clustered index */
+	dict_index_t*	clust_index,	/*!<in: clustered index */
+	ibool		shared)		/*!<in: is shared access */
 {
 	THD*  thd = (THD*)trx->mysql_thd;
 	ulint rcode = DB_SUCCESS;
@@ -6778,7 +6779,7 @@ wsrep_append_foreign_key(
 		wsrep_trx_handle(thd, trx),
 		&wkey,
 		1, 
-		true);
+		shared);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %lu", rcode));
 		WSREP_ERROR("Appending cascaded fk row key failed: %s, %lu", 

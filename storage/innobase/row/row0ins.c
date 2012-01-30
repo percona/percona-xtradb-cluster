@@ -756,7 +756,8 @@ row_ins_invalidate_query_cache(
 ulint wsrep_append_foreign_key(trx_t *trx,  
 			       dict_foreign_t*	foreign,
 			       const rec_t*	clust_rec,
-			       dict_index_t*	clust_index);
+			       dict_index_t*	clust_index,
+			       ibool		shared);
 #endif /* WITH_WSREP */
 
 /*********************************************************************//**
@@ -1080,7 +1081,8 @@ row_ins_foreign_check_on_constraint(
 			thr_get_trx(thr),
 			foreign,
 			clust_rec, 
-			clust_index);
+			clust_index,
+			FALSE);
 	}
 #endif /* WITH_WSREP */
 	if (foreign->foreign_table->n_foreign_key_checks_running == 0) {
@@ -1417,7 +1419,8 @@ run_again:
 						thr_get_trx(thr),
 						foreign,
 						rec, 
-						check_index);
+						check_index, 
+						TRUE);
 #endif /* WITH_WSREP */
 					goto end_scan;
 				} else if (foreign->type != 0) {
