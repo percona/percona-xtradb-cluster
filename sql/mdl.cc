@@ -1491,6 +1491,9 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
   bool can_grant= FALSE;
   bitmap_t waiting_incompat_map= incompatible_waiting_types_bitmap()[type_arg];
   bitmap_t granted_incompat_map= incompatible_granted_types_bitmap()[type_arg];
+#ifdef WITH_WSREP
+  bool  wsrep_can_grant= TRUE;
+#endif /* WITH_WSREP */
   /*
     New lock request can be satisfied iff:
     - There are no incompatible types of satisfied requests
@@ -1511,15 +1514,20 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
       while ((ticket= it++))
       {
         if (ticket->get_ctx() != requestor_ctx &&
-#ifndef WITH_WSREP
             ticket->is_incompatible_when_granted(type_arg))
+#ifdef WITH_WSREP
+	  if (!wsrep_lock_grant_exception(type_arg, requestor_ctx, ticket))
+	    wsrep_can_grant= FALSE;
 #else
-            ticket->is_incompatible_when_granted(type_arg) &&
-	    !wsrep_lock_grant_exception(type_arg, requestor_ctx, ticket))
-#endif /* WITH_WSREP */
           break;
+#endif /* WITH_WSREP */
       }
+#ifdef WITH_WSREP
+      if ((ticket == NULL) && wsrep_can_grant)
+#else
       if (ticket == NULL)             /* Incompatible locks are our own. */
+#endif /* WITH_WSREP */
+
         can_grant= TRUE;
     }
   }
