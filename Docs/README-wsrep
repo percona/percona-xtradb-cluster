@@ -32,7 +32,7 @@ administration of MySQL server per se. The reader is assumed to know how to
 install, configure, administer and use standard MySQL server version 5.1.xx.
 
 
-                        MYSQL-5.5.x/wsrep-22.x
+                        MYSQL-5.5.x/wsrep-23.x
 
 CONTENTS:
 =========
@@ -79,7 +79,7 @@ In the examples below mysql authentication options are omitted for brevity.
 2.1 Download and install mysql-wsrep package.
 
 Download binary package for your Linux distribution from
-https://launchpad.net/codership-mysql/0.8
+https://launchpad.net/codership-mysql/
 
 2.1.1 On Debian and Debian-derived distributions.
 
