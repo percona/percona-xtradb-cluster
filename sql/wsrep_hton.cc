@@ -170,6 +170,7 @@ wsrep_run_wsrep_commit(
   uint data_len     = 0;
   uchar *rbr_data   = NULL;
   IO_CACHE *cache;
+  int replay_round= 0;
 
   if (thd->stmt_da->is_error()) {
     WSREP_ERROR("commit issue, error: %d %s", 
@@ -233,9 +234,10 @@ wsrep_run_wsrep_commit(
     // misses the signal.
     struct timespec wtime = {0, 1000000};
     mysql_cond_timedwait(&COND_wsrep_replaying, &LOCK_wsrep_replaying,
-                           &wtime);
-    WSREP_DEBUG("commit waiting for replaying: %d, thd: (%lu) conflict: %d", 
-                wsrep_replaying, thd->thread_id, thd->wsrep_conflict_state);
+			 &wtime);
+    if (replay_round++ % 100000 == 0)
+      WSREP_DEBUG("commit waiting for replaying: replayers %d, thd: (%lu) conflict: %d (round: %d)", 
+		  wsrep_replaying, thd->thread_id, thd->wsrep_conflict_state, replay_round);
 
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
 

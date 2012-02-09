@@ -1086,7 +1086,10 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     WSREP_ERROR("Failed to pause provider: %lld (%s)", -ret, strerror(-ret));
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
     m_mdl_blocks_commits_lock= NULL;
+
+    /* m_mdl_blocks_commits_lock is always NULL here */
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
     DBUG_RETURN(TRUE);
   }
 #endif /* WITH_WSREP */

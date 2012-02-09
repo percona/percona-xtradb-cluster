@@ -897,21 +897,22 @@ void wsrep_to_isolation_end(THD *thd) {
       gra->command, gra->lex->sql_command, gra->query());
 
 bool
-wsrep_lock_grant_exception(enum_mdl_type type_arg,
-                           MDL_context *requestor_ctx,
-                           MDL_ticket *ticket
+wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
+                          MDL_ticket *ticket
 ) {
   if (!WSREP_ON) return FALSE;
 
-  THD *request_thd  =  requestor_ctx->get_thd();
+  THD *request_thd  = requestor_ctx->get_thd();
   THD *granted_thd  = ticket->get_ctx()->get_thd();
 
+  mysql_mutex_lock(&request_thd->LOCK_wsrep_thd);
   if (request_thd->wsrep_exec_mode == TOTAL_ORDER ||
       request_thd->wsrep_exec_mode == REPL_RECV)
   {
-    mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
+    mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
     WSREP_MDL_LOG(DEBUG, "MDL conflict", request_thd, granted_thd);
 
+    mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
     if (granted_thd->wsrep_exec_mode == TOTAL_ORDER ||
         granted_thd->wsrep_exec_mode == REPL_RECV)
     {
@@ -934,9 +935,10 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
     } 
     else if (granted_thd->wsrep_query_state == QUERY_COMMITTING) 
     {
-      WSREP_DEBUG("mdl granted over commiting thd");
+      WSREP_DEBUG("mdl granted, but commiting thd abort scheduled");
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-      return  TRUE;
+      wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
+      return  FALSE;
     }  
     else 
     {
@@ -946,6 +948,9 @@ wsrep_lock_grant_exception(enum_mdl_type type_arg,
       return FALSE;
     }
   }
+  else
+  {
+    mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
+  }
   return FALSE;
 }
-
