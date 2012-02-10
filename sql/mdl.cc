@@ -1563,7 +1563,15 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
             ticket->is_incompatible_when_granted(type_arg))
 #ifdef WITH_WSREP
         {
-          if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
+          if (wsrep_thd_is_brute_force((void *)(requestor_ctx->get_thd())) &&
+              key.mdl_namespace() == MDL_key::GLOBAL)
+          {
+            WSREP_DEBUG("global lock granted for BF: %lu %s",
+                        wsrep_thd_thread_id(requestor_ctx->get_thd()), 
+                        wsrep_thd_query(requestor_ctx->get_thd()));
+            can_grant = true;
+          }
+          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
           {
             wsrep_can_grant= FALSE;
           }
@@ -1585,6 +1593,19 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         can_grant= TRUE;
     }
   }
+#ifdef WITH_WSREP
+  else
+  {
+    if (wsrep_thd_is_brute_force((void *)(requestor_ctx->get_thd())) &&
+	key.mdl_namespace() == MDL_key::GLOBAL)
+    {
+      WSREP_DEBUG("global lock granted for BF (waiting queue): %lu %s",
+		  wsrep_thd_thread_id(requestor_ctx->get_thd()), 
+		  wsrep_thd_query(requestor_ctx->get_thd()));
+      can_grant = true;
+    }
+  }
+#endif /* WITH_WSREP */
   return can_grant;
 }
 
