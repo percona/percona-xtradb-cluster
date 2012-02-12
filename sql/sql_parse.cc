@@ -1664,6 +1664,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
         mysql_reset_thd_for_next_command(thd);
+        thd->killed= THD::NOT_KILLED;
         close_thread_tables(thd);
 
         thd_proc_info(thd, "wsrep replaying trx");
