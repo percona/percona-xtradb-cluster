@@ -2508,7 +2508,20 @@ loop:
 
 	if (sync_array_print_long_waits(&waiter, &sema)
 	    && sema == old_sema && os_thread_eq(waiter, old_waiter)) {
+#ifdef WITH_WSREP
+	  if (srv_allow_writes_event->is_set) {
+#endif /* WITH_WSREP */
 		fatal_cnt++;
+#ifdef WITH_WSREP
+	  } else {
+		fprintf(stderr,
+			"WSREP: avoiding InnoDB self crash due to long "
+			"semaphore wait of  > %lu seconds\n"
+			"Server is processing SST donor operation, "
+			"fatal_cnt now: %lu",
+			(ulong) srv_fatal_semaphore_wait_threshold, fatal_cnt);
+	  }
+#endif /* WITH_WSREP */
 		if (fatal_cnt > 10) {
 
 			fprintf(stderr,
