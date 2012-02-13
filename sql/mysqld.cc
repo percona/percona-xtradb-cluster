@@ -1461,6 +1461,8 @@ extern "C" void unireg_abort(int exit_code)
   {
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only diconnect from service */
+    wsrep_close_client_connections(FALSE);
+    shutdown_in_progress= 1;
     THD* thd(0);
     wsrep->disconnect(wsrep);
     WSREP_INFO("Service disconnected.");
@@ -4435,7 +4437,7 @@ static void wsrep_close_thread(THD *thd)
   }
 }
 
-void wsrep_close_client_connections() 
+void wsrep_close_client_connections(my_bool wait_to_end) 
 {
   /*
     First signal all threads that it's time to die
@@ -4462,7 +4464,6 @@ void wsrep_close_client_connections()
       continue;
 
     WSREP_DEBUG("closing connection %ld", tmp->thread_id);
-
     wsrep_close_thread(tmp);
   }
   mysql_mutex_unlock(&LOCK_thread_count);
@@ -4491,7 +4492,7 @@ void wsrep_close_client_connections()
   if (wsrep_debug)
     WSREP_INFO("waiting for client connections to close: %u", thread_count);
 
-  while (have_client_connections())
+  while (wait_to_end && have_client_connections())
   {
     mysql_cond_wait(&COND_thread_count, &LOCK_thread_count);
     DBUG_PRINT("quit",("One thread died (count=%u)", thread_count));

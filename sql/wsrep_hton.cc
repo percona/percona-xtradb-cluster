@@ -218,7 +218,10 @@ wsrep_run_wsrep_commit(
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
 
-  while (wsrep_replaying > 0 && thd->wsrep_conflict_state == NO_CONFLICT) {
+  while (wsrep_replaying > 0                       && 
+         thd->wsrep_conflict_state == NO_CONFLICT  &&
+         thd->killed == THD::NOT_KILLED            &&
+         !shutdown_in_progress) {
 
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);

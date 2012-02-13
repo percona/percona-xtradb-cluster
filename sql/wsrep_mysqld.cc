@@ -187,7 +187,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
           WSREP_INFO("closing client connections for "
                      "protocol change %ld -> %d",
                      wsrep_protocol_version, view->proto_ver);
-          wsrep_close_client_connections();
+          wsrep_close_client_connections(TRUE);
           wsrep_protocol_version= view->proto_ver;
           wsrep_ready= wsrep_ready_saved;
       }
@@ -209,7 +209,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
     /* Close client connections to ensure that they don't interfere
      * with SST */
     WSREP_DEBUG("[debug]: closing client connections for PRIM");
-    wsrep_close_client_connections();
+    wsrep_close_client_connections(TRUE);
 
     *sst_req_len= wsrep_sst_prepare (sst_req);
 
@@ -437,7 +437,7 @@ void wsrep_stop_replication(THD *thd)
 
   wsrep_connected= FALSE;
 
-  wsrep_close_client_connections();
+  wsrep_close_client_connections(TRUE);
 
   /* wait until appliers have stopped */
   wsrep_wait_appliers_close(thd);

@@ -137,7 +137,7 @@ extern void  wsrep_deinit();
  * @param first wsrep_init_first() value */
 extern void wsrep_init_startup(bool first);
 
-extern void wsrep_close_client_connections();
+extern void wsrep_close_client_connections(my_bool wait_to_end);
 extern void wsrep_close_applier(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd); 
 extern void wsrep_create_appliers(long threads = wsrep_slave_threads);
