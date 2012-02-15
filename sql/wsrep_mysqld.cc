@@ -755,7 +755,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_)
     buf_err= create_view_query(thd, &buf, &buf_len);
     break;
   case SQLCOM_CREATE_PROCEDURE:
-  case SQLCOM_CREATE_FUNCTION:
+  case SQLCOM_CREATE_SPFUNCTION:
     buf_err= wsrep_create_sp(thd, &buf, &buf_len);
     break;
   case SQLCOM_CREATE_TRIGGER:
