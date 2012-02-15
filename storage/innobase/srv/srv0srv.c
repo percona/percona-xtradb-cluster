@@ -2508,11 +2508,11 @@ loop:
 
 	if (sync_array_print_long_waits(&waiter, &sema)
 	    && sema == old_sema && os_thread_eq(waiter, old_waiter)) {
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && defined(WITH_INNODB_DISALLOW_WRITES)
 	  if (srv_allow_writes_event->is_set) {
 #endif /* WITH_WSREP */
 		fatal_cnt++;
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && defined(WITH_INNODB_DISALLOW_WRITES)
 	  } else {
 		fprintf(stderr,
 			"WSREP: avoiding InnoDB self crash due to long "
