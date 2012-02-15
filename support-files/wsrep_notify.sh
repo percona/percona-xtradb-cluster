@@ -43,11 +43,11 @@ configuration_change()
 
     local idx=0
 
-    for NODE in $(echo $MEMBERS | sed s/\\//\ /g)
+    for NODE in $(echo $MEMBERS | sed s/,/\ /g)
     do
         echo "INSERT INTO $MEMB_TABLE VALUES ( $idx, "
         # Don't forget to properly quote string values
-        echo "'$NODE'" | sed s/,/\',\'/g
+        echo "'$NODE'" | sed  s/\\//\',\'/g
         echo ");"
         idx=$(( $idx + 1 ))
     done
