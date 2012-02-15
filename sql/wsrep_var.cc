@@ -294,8 +294,6 @@ bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 
   cluster_address_str = res->c_ptr();
 
-  if (!cluster_address_str || strlen(cluster_address_str) == 0) goto err;
-
   if (!wsrep_cluster_address_verify(cluster_address_str)) return 0;
 
  err:
