@@ -693,15 +693,15 @@ create_view_query(THD *thd, uchar** buf, uint* buf_len)
 
       if (!(lex->definer= create_default_definer(thd)))
       {
-	WSREP_WARN("view defualt definer issue");
+	WSREP_WARN("view default definer issue");
       }
-
-      views->algorithm    = lex->create_view_algorithm;
-      views->definer.user = lex->definer->user;
-      views->definer.host = lex->definer->host;
-      views->view_suid    = lex->create_view_suid;
-      views->with_check   = lex->create_view_check;
     }
+
+    views->algorithm    = lex->create_view_algorithm;
+    views->definer.user = lex->definer->user;
+    views->definer.host = lex->definer->host;
+    views->view_suid    = lex->create_view_suid;
+    views->with_check   = lex->create_view_check;
 
     view_store_options(thd, views, &buff);
     buff.append(STRING_WITH_LEN("VIEW "));
