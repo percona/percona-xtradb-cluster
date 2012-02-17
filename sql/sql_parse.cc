@@ -1746,9 +1746,10 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     {
       set_if_smaller(thd->wsrep_retry_counter, 0); // reset; eventually ok
     }
-      
     if ((thd->wsrep_conflict_state != REPLAYING) &&
         (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT)) {
+      
+      thd->update_server_status();
       thd->protocol->end_statement();
       query_cache_end_of_result(thd);
     }
