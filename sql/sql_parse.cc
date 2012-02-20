@@ -3130,6 +3130,10 @@ end_with_restore_list:
     goto error;
 #else
     {
+#ifdef WITH_WSREP
+      if (WSREP(thd) && wsrep_causal_wait(thd)) goto error;
+#endif /* WITH_WSREP */
+
      /*
         Access check:
         SHOW CREATE TABLE require any privileges on the table level (ie
@@ -3185,6 +3189,10 @@ end_with_restore_list:
   case SQLCOM_CHECKSUM:
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
+#ifdef WITH_WSREP
+    if (WSREP(thd) && wsrep_causal_wait(thd)) goto error;
+#endif /* WITH_WSREP */
+
     if (check_table_access(thd, SELECT_ACL, all_tables,
                            FALSE, UINT_MAX, FALSE))
       goto error; /* purecov: inspected */
