@@ -1794,7 +1794,20 @@ srv_suspend_mysql_thread(
 	if (lock_wait_timeout < 100000000
 	    && wait_time > (double) lock_wait_timeout) {
 
+#ifdef WITH_WSREP
+		if (wsrep_on(trx->mysql_thd) &&
+		    wsrep_thd_is_brute_force(trx->mysql_thd)) {
+			fprintf(stderr, 
+				"WSREP: BF long lock wait ended after %.f sec\n",
+				wait_time);
+			srv_print_innodb_monitor 	= FALSE;
+			srv_print_innodb_lock_monitor 	= FALSE;
+		} else {
+#endif
 		trx->error_state = DB_LOCK_WAIT_TIMEOUT;
+#ifdef WITH_WSREP
+		}
+#endif
 	}
 
 	if (trx_is_interrupted(trx)) {
@@ -2313,6 +2326,27 @@ exit_func:
 	OS_THREAD_DUMMY_RETURN;
 }
 
+#ifdef WITH_WSREP
+/*********************************************************************//**
+check if lock timeout was for priority thread, 
+as a side effect trigger lock monitor
+@return	false for regular lock timeout */
+static ibool
+wsrep_is_BF_lock_timeout(
+/*====================*/
+	 srv_slot_t*	slot) /* in: lock slot to check for lock priority */
+{
+	if (wsrep_on(thr_get_trx(slot->thr)->mysql_thd) &&
+	    wsrep_thd_is_brute_force((thr_get_trx(slot->thr))->mysql_thd)) {
+		fprintf(stderr, "WSREP: BF lock wait long\n");
+		srv_print_innodb_monitor 	= TRUE;
+		srv_print_innodb_lock_monitor 	= TURE;
+		os_event_set(srv_lock_timeout_thread_event);
+		return TRUE;
+	}
+	return FALSE;
+ }
+#endif /* WITH_WSREP */
 /*********************************************************************//**
 A thread which wakes up threads whose lock wait may have lasted too long.
 @return	a dummy parameter */
@@ -2382,11 +2416,7 @@ loop:
 
 				if (trx->wait_lock) {
 #ifdef WITH_WSREP
-					if (wsrep_on(thr_get_trx(slot->thr)->mysql_thd) &&
-					    wsrep_thd_is_brute_force((thr_get_trx(slot->thr))->mysql_thd)) {
-						if (wsrep_debug) fprintf(stderr, 
-							"WSREP: BF lock wait long\n");
-					} else {
+					if (!wsrep_is_BF_lock_timeout(slot)) {
 #endif
 					lock_cancel_waiting_and_release(
 						trx->wait_lock);
