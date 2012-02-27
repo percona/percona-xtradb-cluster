@@ -2340,7 +2340,7 @@ wsrep_is_BF_lock_timeout(
 	    wsrep_thd_is_brute_force((thr_get_trx(slot->thr))->mysql_thd)) {
 		fprintf(stderr, "WSREP: BF lock wait long\n");
 		srv_print_innodb_monitor 	= TRUE;
-		srv_print_innodb_lock_monitor 	= TURE;
+		srv_print_innodb_lock_monitor 	= TRUE;
 		os_event_set(srv_lock_timeout_thread_event);
 		return TRUE;
 	}
