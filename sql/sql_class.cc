@@ -726,6 +726,11 @@ extern "C" bool wsrep_thd_is_wsrep_on(THD *thd)
   return thd->variables.wsrep_on;
 }
 
+extern "C" bool wsrep_consistency_check(void *thd)
+{
+  return ((THD*)thd)->wsrep_consistency_check;
+}
+
 extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode)
 {
   thd->wsrep_exec_mode= mode;
@@ -993,6 +998,7 @@ THD::THD()
   wsrep_retry_query     = NULL;
   wsrep_retry_query_len = 0;
   wsrep_retry_command   = COM_CONNECT;
+  wsrep_consistency_check = false;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state(this);
@@ -1356,6 +1362,7 @@ void THD::init(void)
   wsrep_rli= NULL;
   wsrep_PA_safe= true;
   wsrep_seqno_changed= false;
+  wsrep_consistency_check = false;
 #endif
 
   if (variables.sql_log_bin)

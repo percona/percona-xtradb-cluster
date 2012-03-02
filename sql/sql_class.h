@@ -2217,6 +2217,7 @@ public:
   char*                     wsrep_retry_query;
   size_t                    wsrep_retry_query_len;
   enum enum_server_command  wsrep_retry_command;
+  bool                      wsrep_consistency_check;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

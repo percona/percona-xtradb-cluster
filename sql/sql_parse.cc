@@ -3382,6 +3382,14 @@ end_with_restore_list:
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     if ((res= insert_precheck(thd, all_tables)))
       break;
+#ifdef WITH_WSREP
+    if (lex->sql_command == SQLCOM_INSERT_SELECT &&
+	thd->wsrep_consistency_check)
+    {
+      WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name);
+    }
+
+#endif
     /*
       INSERT...SELECT...ON DUPLICATE KEY UPDATE/REPLACE SELECT/
       INSERT...IGNORE...SELECT can be unsafe, unless ORDER BY PRIMARY KEY
@@ -4995,7 +5003,10 @@ finish:
   /* Free tables */
   thd_proc_info(thd, "closing tables");
   close_thread_tables(thd);
+#ifdef WITH_WSREP
   WSREP_TO_ISOLATION_END
+  thd->wsrep_consistency_check= FALSE;
+#endif /* WITH_WSREP */
   thd_proc_info(thd, 0);
 
 #ifndef DBUG_OFF
