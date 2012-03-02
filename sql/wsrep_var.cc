@@ -123,6 +123,9 @@ void wsrep_set_local_position (const char* value)
 
   local_seqno = strtoll (value + uuid_len + 1, NULL, 10);
 
+  XID xid;
+  wsrep_xid_init(&xid, &local_uuid, local_seqno);
+  wsrep_set_SE_checkpoint(&xid);
   WSREP_INFO ("wsrep_start_position var submitted: '%s'", wsrep_start_position);
 }
 

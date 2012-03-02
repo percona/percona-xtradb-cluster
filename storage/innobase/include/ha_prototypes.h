@@ -296,6 +296,7 @@ void wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
 UNIV_INTERN
 int 
 wsrep_on(void *thd_ptr);
+int wsrep_is_wsrep_xid(const void*);
 #endif /* WITH_WSREP */
 /**********************************************************************//**
 Get the current setting of the lower_case_table_names global parameter from

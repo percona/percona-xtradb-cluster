@@ -3882,7 +3882,7 @@ will be ignored as the --log-bin option is not defined.");
     wsrep_provider_init(WSREP_NONE);
     if (wsrep_init()) unireg_abort(1);
   }
-  else if (wsrep_init_first())
+  else if (!wsrep_recovery && wsrep_init_first())
   {
     wsrep_init_startup(true);
   }
@@ -5049,6 +5049,12 @@ int mysqld_main(int argc, char **argv)
   if (opt_bootstrap)
   {
     /*! bootstrap wsrep init was taken care of above */
+  }
+  else if (wsrep_recovery)
+  {
+    select_thread_in_use= 0;
+    wsrep_recover();
+    unireg_abort(0);
   }
   else if (wsrep_init_first())
   {

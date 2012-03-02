@@ -59,6 +59,7 @@ extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;
 extern ulong       wsrep_OSU_method_options;
+extern my_bool     wsrep_recovery;
 
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
 
@@ -132,6 +133,7 @@ extern bool wsrep_init_first(); // initialize wsrep before storage
                                 // engines or after
 extern int   wsrep_init();
 extern void  wsrep_deinit();
+extern void  wsrep_recover();
 
 /* wsrep initialization sequence at startup
  * @param first wsrep_init_first() value */
@@ -200,6 +202,9 @@ enum wsrep_trx_status {
 
 extern enum wsrep_trx_status
 wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
+class Ha_trx_info;
+struct THD_TRANS;
+Ha_trx_info* wsrep_register_hton(THD* thd, bool all, THD_TRANS* trans);
 
 /*!
  * @param db      Database string
@@ -278,5 +283,14 @@ int wsrep_to_buf_helper(
 int wsrep_create_sp(THD *thd, uchar** buf, uint* buf_len);
 int wsrep_create_trigger_query(THD *thd, uchar** buf, uint* buf_len);
 int wsrep_create_event_query(THD *thd, uchar** buf, uint* buf_len);
+
+const wsrep_uuid_t* wsrep_cluster_uuid();
+struct xid_t;
+void wsrep_set_SE_checkpoint(xid_t*);
+
+void wsrep_xid_init(xid_t*, const wsrep_uuid_t*, wsrep_seqno_t);
+const wsrep_uuid_t* wsrep_xid_uuid(const xid_t*);
+wsrep_seqno_t wsrep_xid_seqno(const xid_t*);
+extern "C" int wsrep_is_wsrep_xid(const void* xid);
 
 #endif /* WSREP_MYSQLD_H */

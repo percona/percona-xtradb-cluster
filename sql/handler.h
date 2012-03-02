@@ -803,6 +803,8 @@ struct handlerton
                                  const char *name);
    int (*wsrep_abort_transaction)(handlerton *hton, THD *bf_thd, 
 				  THD *victim_thd, my_bool signal);
+   int (*wsrep_set_checkpoint)(handlerton *hton, const XID* xid);
+   int (*wsrep_get_checkpoint)(handlerton *hton, XID* xid);
    uint32 license; /* Flag for Engine License */
    void *data; /* Location for engines to keep personal structures */
 };

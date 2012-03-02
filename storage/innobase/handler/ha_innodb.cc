@@ -925,6 +925,8 @@ innobase_release_temporary_latches(
 static int 
 wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd, 
 			my_bool signal);
+static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid);
+static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid);
 #endif
 /********************************************************************//**
 Increments innobase_active_counter and every INNOBASE_WAKE_INTERVALth
@@ -2293,6 +2295,8 @@ innobase_init(
 	innobase_hton->alter_table_flags = innobase_alter_table_flags;
 #ifdef WITH_WSREP
         innobase_hton->wsrep_abort_transaction=wsrep_abort_transaction;
+        innobase_hton->wsrep_set_checkpoint=innobase_wsrep_set_checkpoint;
+        innobase_hton->wsrep_get_checkpoint=innobase_wsrep_get_checkpoint;
 #endif /* WITH_WSREP */
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
@@ -12064,6 +12068,28 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 	}
 	DBUG_RETURN(-1);
 }
+
+static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid)
+{
+	DBUG_ASSERT(hton == innodb_hton_ptr);
+        if (wsrep_is_wsrep_xid(xid)) {
+                mtr_t mtr;
+                mtr_start(&mtr);
+                trx_sys_update_wsrep_checkpoint(xid, &mtr);
+                mtr_commit(&mtr);
+                return 0;
+        } else {
+                return 1;
+        }
+}
+
+static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid)
+{
+	DBUG_ASSERT(hton == innodb_hton_ptr);
+        trx_sys_read_wsrep_checkpoint(xid);
+        return 0;
+}
+
 #endif /* WITH_WSREP */
 /* plugin options */
 static MYSQL_SYSVAR_BOOL(checksums, innobase_use_checksums,

@@ -47,11 +47,17 @@ int     wsrep_to_isolation             = 0; // # of active TO isolation threads
 my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
 long    wsrep_max_protocol_version     = 1; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
+my_bool wsrep_recovery                 = 0; // recovery
+
 /*
  * End configuration options
  */
 
 static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
+const wsrep_uuid_t* wsrep_cluster_uuid()
+{
+  return &cluster_uuid;
+}
 static char         cluster_uuid_str[40]= { 0, };
 static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 {
@@ -131,6 +137,49 @@ static void wsrep_log_states (wsrep_log_level_t level,
   snprintf (msg, 255, "WSREP: Local state: %s:%lld",
             uuid_str, (long long)node_seqno);
   wsrep_log_cb (level, msg);
+}
+
+static my_bool set_SE_checkpoint(THD* unused, plugin_ref plugin, void* arg)
+{
+  XID* xid= reinterpret_cast<XID*>(arg);
+  handlerton* hton= plugin_data(plugin, handlerton *);
+  if (hton->db_type == DB_TYPE_INNODB)
+  {
+    const wsrep_uuid_t* uuid(wsrep_xid_uuid(xid));
+    char uuid_str[40] = {0, };
+    wsrep_uuid_print(uuid, uuid_str, sizeof(uuid_str));
+    WSREP_DEBUG("Set WSREPXid for InnoDB:  %s:%lld",
+                uuid_str, (long long)wsrep_xid_seqno(xid));
+    hton->wsrep_set_checkpoint(hton, xid);
+  }
+  return FALSE;
+}
+
+void wsrep_set_SE_checkpoint(XID* xid)
+{
+  plugin_foreach(NULL, set_SE_checkpoint, MYSQL_STORAGE_ENGINE_PLUGIN, xid);
+}
+
+static my_bool get_SE_checkpoint(THD* unused, plugin_ref plugin, void* arg)
+{
+  XID* xid= reinterpret_cast<XID*>(arg);
+  handlerton* hton= plugin_data(plugin, handlerton *);
+  if (hton->db_type == DB_TYPE_INNODB)
+  {
+    hton->wsrep_get_checkpoint(hton, xid);
+    const wsrep_uuid_t* uuid(wsrep_xid_uuid(xid));
+    char uuid_str[40] = {0, };
+    wsrep_uuid_print(uuid, uuid_str, sizeof(uuid_str));
+    WSREP_DEBUG("Read WSREPXid from InnoDB:  %s:%lld",
+                uuid_str, (long long)wsrep_xid_seqno(xid));
+
+  }
+  return FALSE;
+}
+
+void wsrep_get_SE_checkpoint(XID* xid)
+{
+  plugin_foreach(NULL, get_SE_checkpoint, MYSQL_STORAGE_ENGINE_PLUGIN, xid);
 }
 
 static void wsrep_view_handler_cb (void* app_ctx,
@@ -245,7 +294,10 @@ static void wsrep_view_handler_cb (void* app_ctx,
         local_uuid=  cluster_uuid;
         local_seqno= view->seqno;
       }
-
+      /* Init storage engine XIDs from first view */
+      XID xid;
+      wsrep_xid_init(&xid, &local_uuid, local_seqno);
+      wsrep_set_SE_checkpoint(&xid);
       new_status= WSREP_MEMBER_JOINED;
     }
     else // just some sanity check
@@ -297,12 +349,57 @@ static void wsrep_synced_cb(void* app_ctx)
   mysql_mutex_unlock (&LOCK_wsrep_ready);
 }
 
+static void wsrep_init_position()
+{
+  /* read XIDs from storage engines */
+  XID xid;
+  memset(&xid, 0, sizeof(xid));
+  xid.formatID= -1;
+  wsrep_get_SE_checkpoint(&xid);
+
+  if (xid.formatID == -1)
+  {
+    WSREP_INFO("Read nil XID from storage engines, skipping position init");
+    return;
+  }
+  else if (!wsrep_is_wsrep_xid(&xid))
+  {
+    WSREP_WARN("Read non-wsrep XID from storage engines, skipping position init");
+    return;
+  }
+
+  const wsrep_uuid_t* uuid= wsrep_xid_uuid(&xid);
+  const wsrep_seqno_t seqno= wsrep_xid_seqno(&xid);
+
+  char uuid_str[40] = {0, };
+  wsrep_uuid_print(uuid, uuid_str, sizeof(uuid_str));
+  WSREP_INFO("Initial position: %s:%lld", uuid_str, (long long)seqno);
+
+
+  if (!memcmp(&local_uuid, &WSREP_UUID_UNDEFINED, sizeof(local_uuid)) &&
+      local_seqno == WSREP_SEQNO_UNDEFINED)
+  {
+    // Initial state
+    local_uuid= *uuid;
+    local_seqno= seqno;
+  }
+  else if (memcmp(&local_uuid, uuid, sizeof(local_uuid)) ||
+           local_seqno != seqno)
+  {
+    WSREP_WARN("Initial position was provided by configuration or SST, "
+               "avoiding override");
+  }
+}
+
+
 int wsrep_init()
 {
   int rcode= -1;
 
   wsrep_ready= FALSE;
   assert(wsrep_provider);
+
+  wsrep_init_position();
 
   if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != WSREP_OK)
   {
@@ -421,6 +518,19 @@ void wsrep_deinit()
   provider_version[0]= '\0';
   provider_vendor[0]=  '\0';
 }
+
+void wsrep_recover()
+{
+  XID xid;
+  memset(&xid, 0, sizeof(xid));
+  xid.formatID= -1;
+  wsrep_get_SE_checkpoint(&xid);
+  char uuid_str[40];
+  wsrep_uuid_print(wsrep_xid_uuid(&xid), uuid_str, sizeof(uuid_str));
+  WSREP_INFO("Recovered position: %s:%lld", uuid_str,
+             (long long)wsrep_xid_seqno(&xid));
+}
+
 
 void wsrep_stop_replication(THD *thd)
 {

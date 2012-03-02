@@ -384,3 +384,58 @@ size_t default_address(char* buf, size_t buf_len)
   return addr_len;
 }
 
+/*
+ * WSREPXid
+ */
+
+#define WSREP_XID_PREFIX "WSREPXid"
+#define WSREP_XID_PREFIX_LEN MYSQL_XID_PREFIX_LEN
+#define WSREP_XID_UUID_OFFSET 8
+#define WSREP_XID_SEQNO_OFFSET (WSREP_XID_UUID_OFFSET + sizeof(wsrep_uuid_t))
+#define WSREP_XID_GTRID_LEN (WSREP_XID_SEQNO_OFFSET + sizeof(wsrep_seqno_t))
+
+
+void wsrep_xid_init(XID* xid, const wsrep_uuid_t* uuid, wsrep_seqno_t seqno)
+{
+  xid->formatID= 1;
+  xid->gtrid_length= WSREP_XID_GTRID_LEN;
+  xid->bqual_length= 0;
+  memset(xid->data, 0, sizeof(xid->data));
+  memcpy(xid->data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
+  memcpy(xid->data + WSREP_XID_UUID_OFFSET, uuid, sizeof(wsrep_uuid_t));
+  memcpy(xid->data + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));
+}
+
+const wsrep_uuid_t* wsrep_xid_uuid(const XID* xid)
+{
+  if (wsrep_is_wsrep_xid(xid))
+    return reinterpret_cast<const wsrep_uuid_t*>(xid->data
+                                                 + WSREP_XID_UUID_OFFSET);
+  else
+    return &WSREP_UUID_UNDEFINED;
+}
+
+wsrep_seqno_t wsrep_xid_seqno(const XID* xid)
+{
+
+  if (wsrep_is_wsrep_xid(xid))
+  {
+    wsrep_seqno_t seqno;
+    memcpy(&seqno, xid->data + WSREP_XID_SEQNO_OFFSET, sizeof(wsrep_seqno_t));
+    return seqno;
+  }
+  else
+  {
+    return WSREP_SEQNO_UNDEFINED;
+  }
+}
+
+extern "C"
+int wsrep_is_wsrep_xid(const void* xid_ptr)
+{
+  const XID* xid= reinterpret_cast<const XID*>(xid_ptr);
+  return (xid->formatID      == 1                   &&
+          xid->gtrid_length  == WSREP_XID_GTRID_LEN &&
+          xid->bqual_length  == 0                   &&
+          !memcmp(xid->data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN));
+}

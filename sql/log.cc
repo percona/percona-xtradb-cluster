@@ -4786,21 +4786,8 @@ wsrep_mark_rw_trans(THD *thd)
 {
   thd->ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
 }
-
-void
-THD::wsrep_start_trans_and_stmt()
-{
-  if (WSREP(this))
-  {
-    if (in_multi_stmt_transaction_mode())
-    {
-      trans_register_ha(this, TRUE, wsrep_hton);
-      ha_data[wsrep_hton->slot].ha_info[1].set_trx_read_write();
-    }
-    trans_register_ha(this, FALSE, wsrep_hton);
-  }
-}
 #endif /* WITH_WSREP */
+
 /*
   Function to start a statement and optionally a transaction for the
   binary log.
@@ -4842,9 +4829,6 @@ THD::binlog_start_trans_and_stmt()
       cache_mngr->trx_cache.get_prev_position() == MY_OFF_T_UNDEF)
   {
     this->binlog_set_stmt_begin();
-#ifdef WITH_WSREP
-    wsrep_start_trans_and_stmt();
-#endif
     if (in_multi_stmt_transaction_mode())
       trans_register_ha(this, TRUE, binlog_hton);
     trans_register_ha(this, FALSE, binlog_hton);

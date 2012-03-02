@@ -7779,6 +7779,9 @@ static inline wsrep_status_t wsrep_apply_rbr(
 
     thd->server_id = ev->server_id; // use the original server id for logging
     thd->set_time();                // time the query
+    wsrep_xid_init(&thd->transaction.xid_state.xid,
+                   wsrep_cluster_uuid(),
+                   thd->wsrep_trx_seqno);
     thd->lex->current_select= 0;
     if (!ev->when)
       ev->when = time(NULL);
