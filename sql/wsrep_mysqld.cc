@@ -628,17 +628,11 @@ bool wsrep_start_replication()
 bool
 wsrep_causal_wait (THD* thd)
 {
-  if (thd->variables.wsrep_causal_reads && thd->variables.wsrep_on)
+  if (thd->variables.wsrep_causal_reads && thd->variables.wsrep_on &&
+      !thd->in_active_multi_stmt_transaction())
   {
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
-    if (unlikely(thd->in_active_multi_stmt_transaction()))
-    {
-      my_error(ER_NOT_SUPPORTED_YET, MYF(0), "wsrep_causal_reads=ON "
-               "inside transactions");
-      return true;
-    }
-
     wsrep_seqno_t  seqno;
     wsrep_status_t ret= wsrep->causal_read (wsrep, &seqno);
 

@@ -4366,8 +4366,9 @@ static bool abort_replicated(THD *thd)
   return ret_code;
 }
 /**/
-static bool is_client_connection(THD *thd)
+static inline bool is_client_connection(THD *thd)
 {
+#if REMOVE
 // REMOVE THIS LATER (lp:777201). Below we had to add an explicit check for
 // wsrep_applier since wsrep_exec_mode didn't seem to always work
 if (thd->wsrep_applier && thd->wsrep_exec_mode != REPL_RECV)
@@ -4382,6 +4383,9 @@ WSREP_WARN("applier has wsrep_exec_mode = %d", thd->wsrep_exec_mode);
     return false;
 
   return true;
+#else
+  return (thd->wsrep_client_thread && thd->variables.wsrep_on);
+#endif /* REMOVE */
 }
 
 static bool have_client_connections()

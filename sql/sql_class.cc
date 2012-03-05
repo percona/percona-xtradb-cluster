@@ -906,6 +906,7 @@ THD::THD()
    spcont(NULL),
 #ifdef WITH_WSREP
    wsrep_applier(is_applier),
+   wsrep_client_thread(0),
 #endif
    m_parser_state(NULL),
 #if defined(ENABLED_DEBUG_SYNC)

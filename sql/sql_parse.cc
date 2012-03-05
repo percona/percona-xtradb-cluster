@@ -7936,7 +7936,7 @@ wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
   return rcode;
 }
 
-wsrep_status_t wsrep_rollback (THD* const thd, wsrep_seqno_t const global_seqno)
+wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
 {
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,

@@ -123,9 +123,6 @@ bool trans_begin(THD *thd, uint flags)
   int res= FALSE;
   DBUG_ENTER("trans_begin");
 
-#ifdef WITH_WSREP
-  thd->wsrep_PA_safe= true;
-#endif /* WITH_WSREP */
   if (trans_check(thd))
     DBUG_RETURN(TRUE);
 
@@ -152,6 +149,12 @@ bool trans_begin(THD *thd, uint flags)
     transaction has been committed.
   */
   thd->mdl_context.release_transactional_locks();
+
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+  if (thd->wsrep_client_thread && wsrep_causal_wait(thd))
+    DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 
   thd->variables.option_bits|= OPTION_BEGIN;
   thd->server_status|= SERVER_STATUS_IN_TRANS;

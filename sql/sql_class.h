@@ -1631,9 +1631,6 @@ public:
 #ifndef MYSQL_CLIENT
   int binlog_setup_trx_data();
 
-#ifdef WITH_WSREP
-  void wsrep_start_trans_and_stmt();
-#endif
   /*
     Public interface to write RBR events to the binlog
   */
@@ -1757,7 +1754,8 @@ public:
       if (!xid_state.rm_error)
         xid_state.xid.null();
       free_root(&mem_root,MYF(MY_KEEP_PREALLOC));
-#ifdef WITH_WSREP // Todo: convert into a plugin method
+#ifdef WITH_WSREP
+      // Todo: convert into a plugin method
       // wsrep's post-commit. LOCAL_COMMIT designates wsrep's commit was ok
       if (WSREP(thd)) wsrep_cleanup_transaction(thd);
 #endif  /* WITH_WSREP */
@@ -2197,6 +2195,7 @@ public:
 
 #ifdef WITH_WSREP
   const bool                wsrep_applier; /* dedicated slave applier thread */
+  bool                      wsrep_client_thread; /* to identify client threads*/
   enum wsrep_exec_mode      wsrep_exec_mode;
   query_id_t                wsrep_last_query_id;
   enum wsrep_query_state    wsrep_query_state;

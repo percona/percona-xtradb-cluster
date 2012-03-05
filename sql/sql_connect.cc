@@ -110,6 +110,9 @@ int get_or_create_user_conn(THD *thd, const char *user,
   }
   thd->user_connect=uc;
   uc->connections++;
+#ifdef WITH_WSREP
+  thd->wsrep_client_thread= 1;
+#endif /* WITH_WSREP */
 end:
   mysql_mutex_unlock(&LOCK_user_conn);
   return return_val;
@@ -620,10 +623,11 @@ void end_connection(THD *thd)
   {
     wsrep_status_t rcode= wsrep->free_connection(wsrep, thd->thread_id);
     if (rcode) {
-      WSREP_WARN("wsrep failed to free connection context: %lu, "
-                        "code: %d", thd->thread_id, rcode);
+      WSREP_WARN("wsrep failed to free connection context: %lu, code: %d",
+                 thd->thread_id, rcode);
     }
   }
+  thd->wsrep_client_thread= 0;
 #endif
   plugin_thdvar_cleanup(thd);
   if (thd->user_connect)
