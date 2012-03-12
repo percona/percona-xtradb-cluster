@@ -204,7 +204,7 @@ extern enum wsrep_trx_status
 wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
 class Ha_trx_info;
 struct THD_TRANS;
-Ha_trx_info* wsrep_register_hton(THD* thd, bool all, THD_TRANS* trans);
+void wsrep_register_hton(THD* thd, bool all);
 
 /*!
  * @param db      Database string

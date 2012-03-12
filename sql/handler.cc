@@ -1120,11 +1120,7 @@ int ha_commit_trans(THD *thd, bool all)
     enclosing 'all' transaction is rolled back.
   */
   bool is_real_trans= all || thd->transaction.all.ha_list == 0;
-#ifdef WITH_WSREP
-  Ha_trx_info *ha_info= wsrep_register_hton(thd, all, trans);
-#else
   Ha_trx_info *ha_info= trans->ha_list;
-#endif /* WITH_WSREP */
   my_xid xid= thd->transaction.xid_state.xid.get_my_xid();
   DBUG_ENTER("ha_commit_trans");
 
@@ -1390,11 +1386,7 @@ int ha_rollback_trans(THD *thd, bool all)
 {
   int error=0;
   THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
-#ifdef WITH_WSREP
-  Ha_trx_info *ha_info= wsrep_register_hton(thd, all, trans), *ha_info_next;
-#else
   Ha_trx_info *ha_info= trans->ha_list, *ha_info_next;
-#endif /* WITH_WSREP */
   /*
     "real" is a nick name for a transaction for which a commit will
     make persistent changes. E.g. a 'stmt' transaction inside a 'all'

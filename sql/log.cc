@@ -4780,13 +4780,6 @@ int THD::binlog_setup_trx_data()
   DBUG_RETURN(0);
 }
 
-#ifdef WITH_WSREP
-extern "C" void 
-wsrep_mark_rw_trans(THD *thd)
-{
-  thd->ha_data[wsrep_hton->slot].ha_info[0].set_trx_read_write();
-}
-#endif /* WITH_WSREP */
 
 /*
   Function to start a statement and optionally a transaction for the
