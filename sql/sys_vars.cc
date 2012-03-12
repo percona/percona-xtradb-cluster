@@ -3447,8 +3447,8 @@ static Sys_var_enum Sys_wsrep_forced_binlog_format(
 
 static Sys_var_mybool Sys_wsrep_recover_datadir(
        "wsrep_recover", "Recover database state after crash and exit",
-       GLOBAL_VAR(wsrep_recovery),
-       CMD_LINE(NO_ARG), DEFAULT(FALSE));
+       READ_ONLY GLOBAL_VAR(wsrep_recovery),
+       CMD_LINE(OPT_ARG, OPT_WSREP_RECOVER), DEFAULT(FALSE));
 
 
 #endif /* WITH_WSREP */
