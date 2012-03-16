@@ -48,8 +48,8 @@ void wsrep_cleanup_transaction(THD *thd)
 	if (wsrep->post_commit(wsrep, &thd->wsrep_trx_handle))
 	{
 	  DBUG_PRINT("wsrep", ("set committed fail"));
-	  WSREP_WARN("set committed fail: %lu %d", 
-		     thd->real_id, thd->stmt_da->status());
+	  WSREP_WARN("set committed fail: %llu %d", 
+		     (long long)thd->real_id, thd->stmt_da->status());
 	}
       }
       //else
@@ -153,8 +153,8 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
     if (wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle))
     {
       DBUG_PRINT("wsrep", ("setting rollback fail"));
-      WSREP_ERROR("settting rollback fail: thd: %lu SQL: %s", 
-		  thd->real_id, thd->query());
+      WSREP_ERROR("settting rollback fail: thd: %llu SQL: %s", 
+		  (long long)thd->real_id, thd->query());
     }
   }
 

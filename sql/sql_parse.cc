@@ -1687,8 +1687,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
         case WSREP_OK:
           thd->wsrep_conflict_state= NO_CONFLICT;
           wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
-          WSREP_DEBUG("trx_replay successful for: %ld %lu", 
-		      thd->thread_id, thd->real_id);
+          WSREP_DEBUG("trx_replay successful for: %ld %llu", 
+		      thd->thread_id, (long long)thd->real_id);
           break;
         case WSREP_TRX_FAIL:
           if (thd->stmt_da->is_sent) {
@@ -8133,8 +8133,9 @@ void wsrep_rollback_process(THD *thd)
       mysql_mutex_lock(&aborting->LOCK_wsrep_thd);
       if (aborting->wsrep_conflict_state== ABORTED)
       {
-        WSREP_DEBUG("WSREP, thd already aborted: %lu state: %d", 
-                  aborting->real_id, aborting->wsrep_conflict_state);
+        WSREP_DEBUG("WSREP, thd already aborted: %llu state: %d", 
+                    (long long)aborting->real_id,
+                    aborting->wsrep_conflict_state);
 
         mysql_mutex_unlock(&aborting->LOCK_wsrep_thd);
         mysql_mutex_lock(&LOCK_wsrep_rollback);
@@ -8153,7 +8154,8 @@ void wsrep_rollback_process(THD *thd)
 
       mysql_mutex_lock(&aborting->LOCK_wsrep_thd);
       aborting->wsrep_conflict_state= ABORTED;
-      WSREP_DEBUG("WSREP rollbacker aborted thd: %lu", aborting->real_id);
+      WSREP_DEBUG("WSREP rollbacker aborted thd: %llu",
+                  (long long)aborting->real_id);
       mysql_mutex_unlock(&aborting->LOCK_wsrep_thd);
       mysql_mutex_lock(&LOCK_wsrep_rollback);
     }
@@ -8194,8 +8196,8 @@ int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr, my_bool signal)
 
   if (WSREP(bf_thd) && victim_thd)
   {
-    WSREP_DEBUG("wsrep_abort_thd, by: %lu, victim: %lu", 
-		   (bf_thd) ? bf_thd->real_id : 0, victim_thd->real_id);
+    WSREP_DEBUG("wsrep_abort_thd, by: %llu, victim: %llu", (bf_thd) ?
+                (long long)bf_thd->real_id : 0, (long long)victim_thd->real_id);
     ha_wsrep_abort_transaction(bf_thd, victim_thd, signal);
   }
      

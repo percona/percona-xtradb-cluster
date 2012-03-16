@@ -84,6 +84,10 @@ namespace wsp
 #define STDIN_FD   0
 #define STDOUT_FD  1
 
+#ifndef POSIX_SPAWN_USEVFORK
+# define POSIX_SPAWN_USEVFORK 0
+#endif
+
 process::process (const char* cmd, const char* type)
     : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), err_(EINVAL), pid_(0)
 {
@@ -227,8 +231,8 @@ process::~process ()
         assert (pid_);
         assert (str_);
 
-        WSREP_WARN("Closing pipe to child process: %s, PID(%d) "
-                   "which might still be running.", str_, pid_);
+        WSREP_WARN("Closing pipe to child process: %s, PID(%ld) "
+                   "which might still be running.", str_, (long)pid_);
 
         if (fclose (io_) == -1)
         {
@@ -249,8 +253,8 @@ process::wait ()
       if (-1 == waitpid(pid_, &status, 0))
       {
           err_ = errno; assert (err_);
-          WSREP_ERROR("Waiting for process failed: %s, PID(%d): %d (%s)",
-                      str_, pid_, err_, strerror (err_));
+          WSREP_ERROR("Waiting for process failed: %s, PID(%ld): %d (%s)",
+                      str_, (long)pid_, err_, strerror (err_));
       }
       else
       {                // command completed, check exit status
@@ -326,6 +330,9 @@ size_t default_ip (char* buf, size_t buf_len)
     const char cmd[] = "/sbin/ifconfig | "
         "grep -m1 -1 -E '^[a-z]?eth[0-9]' | tail -n 1 | "
         "awk '{ print $2 }' | awk -F : '{ print $2 }'";
+#elif defined(__sun__)
+    const char cmd[] = "/sbin/ifconfig -a | "
+        "grep -m1 -1 -E 'net[0-9]:' | tail -n 1 | awk '{ print $2 }'";
 #else
     char *cmd;
 #error "OS not supported"
@@ -393,7 +400,6 @@ size_t default_address(char* buf, size_t buf_len)
 #define WSREP_XID_UUID_OFFSET 8
 #define WSREP_XID_SEQNO_OFFSET (WSREP_XID_UUID_OFFSET + sizeof(wsrep_uuid_t))
 #define WSREP_XID_GTRID_LEN (WSREP_XID_SEQNO_OFFSET + sizeof(wsrep_seqno_t))
-
 
 void wsrep_xid_init(XID* xid, const wsrep_uuid_t* uuid, wsrep_seqno_t seqno)
 {
