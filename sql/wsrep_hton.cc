@@ -40,10 +40,9 @@ void wsrep_cleanup_transaction(THD *thd)
   if (thd->wsrep_exec_mode == LOCAL_COMMIT)
   {
     if (thd->variables.wsrep_on &&
-        thd->wsrep_conflict_state != MUST_REPLAY &&
-        thd->wsrep_seqno_changed)
+        thd->wsrep_conflict_state != MUST_REPLAY)
     {
-      //if (thd->wsrep_trx_handle != NULL)
+      if (thd->wsrep_seqno_changed)
       {
 	if (wsrep->post_commit(wsrep, &thd->wsrep_trx_handle))
 	{
