@@ -629,7 +629,8 @@ bool
 wsrep_causal_wait (THD* thd)
 {
   if (thd->variables.wsrep_causal_reads && thd->variables.wsrep_on &&
-      !thd->in_active_multi_stmt_transaction())
+      !thd->in_active_multi_stmt_transaction() &&
+      thd->wsrep_conflict_state != REPLAYING)
   {
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
