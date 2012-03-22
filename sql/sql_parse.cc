@@ -2496,7 +2496,7 @@ mysql_execute_command(THD *thd)
   case SQLCOM_SHOW_STATUS_PROC:
   case SQLCOM_SHOW_STATUS_FUNC:
 #ifdef WITH_WSREP
-    if (WSREP(thd) && wsrep_causal_wait(thd)) goto error;
+    if (WSREP_CLIENT(thd) && wsrep_causal_wait(thd)) goto error;
 #endif /* WITH_WSREP */
     if ((res= check_table_access(thd, SELECT_ACL, all_tables, FALSE,
                                   UINT_MAX, FALSE)))
@@ -2508,7 +2508,7 @@ mysql_execute_command(THD *thd)
     system_status_var old_status_var= thd->status_var;
     thd->initial_status_var= &old_status_var;
 #ifdef WITH_WSREP
-    if (WSREP(thd) && wsrep_causal_wait(thd)) goto error;
+    if (WSREP_CLIENT(thd) && wsrep_causal_wait(thd)) goto error;
 #endif /* WITH_WSREP */
     if (!(res= check_table_access(thd, SELECT_ACL, all_tables, FALSE,
                                   UINT_MAX, FALSE)))
@@ -2544,7 +2544,7 @@ mysql_execute_command(THD *thd)
 #endif /* WITH_WSREP */
   case SQLCOM_SELECT:
 #ifdef WITH_WSREP
-    if (WSREP(thd) && wsrep_causal_wait(thd)) goto error;
+    if (WSREP_CLIENT(thd) && wsrep_causal_wait(thd)) goto error;
   case SQLCOM_SHOW_VARIABLES:
   case SQLCOM_SHOW_CHARSETS:
   case SQLCOM_SHOW_COLLATIONS:
@@ -3131,7 +3131,7 @@ end_with_restore_list:
 #else
     {
 #ifdef WITH_WSREP
-      if (WSREP(thd) && wsrep_causal_wait(thd)) goto error;
+      if (WSREP_CLIENT(thd) && wsrep_causal_wait(thd)) goto error;
 #endif /* WITH_WSREP */
 
      /*
@@ -3190,7 +3190,7 @@ end_with_restore_list:
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
 #ifdef WITH_WSREP
-    if (WSREP(thd) && wsrep_causal_wait(thd)) goto error;
+    if (WSREP_CLIENT(thd) && wsrep_causal_wait(thd)) goto error;
 #endif /* WITH_WSREP */
 
     if (check_table_access(thd, SELECT_ACL, all_tables,

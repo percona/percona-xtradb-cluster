@@ -160,7 +160,10 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   (global_system_variables.wsrep_on)
 
 #define WSREP(thd) \
-  (WSREP_ON && (thd && thd->variables.wsrep_on && thd->wsrep_client_thread))
+  (WSREP_ON && (thd && thd->variables.wsrep_on))
+
+#define WSREP_CLIENT(thd) \
+    (WSREP(thd) && thd->wsrep_client_thread)
 
 #define WSREP_EMULATE_BINLOG(thd) \
   (WSREP(thd) && wsrep_emulate_bin_log)
