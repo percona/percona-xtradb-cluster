@@ -758,7 +758,7 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
         bzero((char*) &tmp_table,sizeof(tmp_table));
         tmp_table.table_name= (char*)db;
         tmp_table.db= (char*)table;
-        if (!find_temporary_table(thd, &tmp_table))
+        if (!table || !find_temporary_table(thd, &tmp_table))
         {
             if (!(ka->keys= (wsrep_key_t*)my_malloc(sizeof(wsrep_key_t), MYF(0))))
             {
