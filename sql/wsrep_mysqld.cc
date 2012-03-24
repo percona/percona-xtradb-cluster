@@ -668,10 +668,42 @@ wsrep_causal_wait (THD* thd)
   return false;
 }
 
-bool wsrep_prepare_key_for_isolation(const char* db,
-                                     const char* table,
-                                     wsrep_key_part_t* key,
-                                     size_t* key_len)
+/*
+ * Helpers to deal with TOI key arrays
+ */
+typedef struct wsrep_key_arr
+{
+    wsrep_key_t* keys;
+    size_t       keys_len;
+} wsrep_key_arr_t;
+
+
+static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
+{
+    for (size_t i= 0; i < key_arr->keys_len; ++i)
+    {
+        my_free((wsrep_key_part_t*)key_arr->keys[i].key_parts);
+    }
+    my_free(key_arr->keys);
+    key_arr->keys= 0;
+    key_arr->keys_len= 0;
+}
+
+
+/*!
+ * @param db      Database string
+ * @param table   Table string
+ * @param key     Array of wsrep_key_t
+ * @param key_len In: number of elements in key array, Out: number of
+ *                elements populated
+ *
+ * @return true if preparation was successful, otherwise false.
+ */
+
+static bool wsrep_prepare_key_for_isolation(const char* db,
+                                            const char* table,
+                                            wsrep_key_part_t* key,
+                                            size_t* key_len)
 {
     if (*key_len < 2) return false;
 
@@ -708,11 +740,12 @@ bool wsrep_prepare_key_for_isolation(const char* db,
     return true;
 }
 
-bool wsrep_prepare_keys_for_isolation(THD*              thd,
-                                      const char*       db,
-                                      const char*       table,
-                                      const TABLE_LIST* table_list,
-                                      wsrep_key_arr_t*  ka)
+/* Prepare key list from db/table and table_list */
+static bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                             const char*       db,
+                                             const char*       table,
+                                             const TABLE_LIST* table_list,
+                                             wsrep_key_arr_t*  ka)
 {
     ka->keys= 0;
     ka->keys_len= 0;
@@ -788,16 +821,6 @@ err:
     return false;
 }
 
-void wsrep_keys_free(wsrep_key_arr_t* key_arr)
-{
-    for (size_t i= 0; i < key_arr->keys_len; ++i)
-    {
-        my_free((wsrep_key_part_t*)key_arr->keys[i].key_parts);
-    }
-    my_free(key_arr->keys);
-    key_arr->keys= 0;
-    key_arr->keys_len= 0;
-}
 
 
 bool wsrep_prepare_key_for_innodb(const uchar* cache_key,

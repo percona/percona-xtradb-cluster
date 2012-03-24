@@ -209,31 +209,6 @@ class Ha_trx_info;
 struct THD_TRANS;
 void wsrep_register_hton(THD* thd, bool all);
 
-/*!
- * @param db      Database string
- * @param table   Table string
- * @param key     Array of wsrep_key_t
- * @param key_len In: number of elements in key array, Out: number of
- *                elements populated
- *
- * @return true if preparation was successful, otherwise false.
- */
-bool wsrep_prepare_key_for_isolation(const char* db,
-                                     const char* table,
-                                     wsrep_key_part_t* key,
-                                     size_t *key_len);
-typedef struct wsrep_key_arr
-{
-    wsrep_key_t* keys;
-    size_t       keys_len;
-} wsrep_key_arr_t;
-struct TABLE_LIST;
-/* Prepare key list from tables list */
-bool wsrep_prepare_keys_for_isolation(THD* thd,
-                                      const char* db, const char* table,
-                                      const TABLE_LIST* table_list,
-                                      wsrep_key_arr_t* key_arr);
-void wsrep_keys_free(wsrep_key_arr_t*);
 void wsrep_replication_process(THD *thd);
 void wsrep_rollback_process(THD *thd);
 void wsrep_brute_force_killer(THD *thd);
@@ -288,6 +263,7 @@ extern PSI_cond_key  key_COND_wsrep_rollback;
 extern PSI_mutex_key key_LOCK_wsrep_replaying;
 extern PSI_cond_key  key_COND_wsrep_replaying;
 
+struct TABLE_LIST;
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
                              const TABLE_LIST* table_list);
 void wsrep_to_isolation_end(THD *thd);
