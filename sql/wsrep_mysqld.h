@@ -222,7 +222,18 @@ bool wsrep_prepare_key_for_isolation(const char* db,
                                      const char* table,
                                      wsrep_key_part_t* key,
                                      size_t *key_len);
-
+typedef struct wsrep_key_arr
+{
+    wsrep_key_t* keys;
+    size_t       keys_len;
+} wsrep_key_arr_t;
+struct TABLE_LIST;
+/* Prepare key list from tables list */
+bool wsrep_prepare_keys_for_isolation(THD* thd,
+                                      const char* db, const char* table,
+                                      const TABLE_LIST* table_list,
+                                      wsrep_key_arr_t* key_arr);
+void wsrep_keys_free(wsrep_key_arr_t*);
 void wsrep_replication_process(THD *thd);
 void wsrep_rollback_process(THD *thd);
 void wsrep_brute_force_killer(THD *thd);
@@ -277,7 +288,8 @@ extern PSI_cond_key  key_COND_wsrep_rollback;
 extern PSI_mutex_key key_LOCK_wsrep_replaying;
 extern PSI_cond_key  key_COND_wsrep_replaying;
 
-int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_);
+int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
+                             const TABLE_LIST* table_list);
 void wsrep_to_isolation_end(THD *thd);
 
 void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow*);
