@@ -10143,6 +10143,8 @@ Format_description_log_event *wsrep_format_desc; // TODO: free them at the end
   At the end (*buf) is shitfed to point to the following event or NULL and
   (*buf_len) will be changed to account just being read bytes of the 1st event.
 */
+#define WSREP_MAX_ALLOWED_PACKET 1024*1024*1024 // current protocol max
+
 Log_event* wsrep_read_log_event(
   char **arg_buf, size_t *arg_buf_len,
   const Format_description_log_event *description_event)
@@ -10154,12 +10156,8 @@ Log_event* wsrep_read_log_event(
   char *buf= (*arg_buf);
   const char *error= 0;
   Log_event *res=  0;
-#ifndef max_allowed_packet
-  THD *thd=current_thd;
-  uint max_allowed_packet= thd ? thd->variables.max_allowed_packet : ~(ulong)0;
-#endif
 
-  if (data_len > max_allowed_packet)
+  if (data_len > WSREP_MAX_ALLOWED_PACKET)
   {
     error = "Event too big";
     goto err;

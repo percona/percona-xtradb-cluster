@@ -7780,6 +7780,13 @@ static inline wsrep_status_t wsrep_apply_rbr(
     int error = 0;
     Log_event* ev=  wsrep_read_log_event(&buf, &buf_len, wsrep_format_desc);
 
+    if (!ev)
+    {
+      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %ld",
+                  (long long)thd->wsrep_trx_seqno, buf_len);
+      rcode= 1;
+      goto error;
+    }
     switch (ev->get_type_code()) {
     case WRITE_ROWS_EVENT:
     case UPDATE_ROWS_EVENT:
