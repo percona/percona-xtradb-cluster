@@ -456,9 +456,25 @@ int wsrep_init()
     }
   }
 
+  char node_addr[256] = {0, };
+  if (!wsrep_node_address || !strcmp(wsrep_node_address, ""))
+  {
+    size_t node_addr_max= sizeof(node_addr);
+    size_t ret= default_ip(node_addr, node_addr_max);
+    if (!(ret > 0 && ret < node_addr_max))
+    {
+      WSREP_WARN("Failed to autoguess base node address");
+      node_addr[0]= 0;
+    }
+  }
+  else if (wsrep_node_address)
+  {
+    strncpy(node_addr, wsrep_node_address, sizeof(node_addr) - 1);
+  }
+
   wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
-  wsrep_args.node_address    = (wsrep_node_address) ? wsrep_node_address : "";
+  wsrep_args.node_address    = node_addr;
   wsrep_args.node_incoming   = wsrep_node_incoming_address;
   wsrep_args.options         = (wsrep_provider_options) ?
                                 wsrep_provider_options : "";
