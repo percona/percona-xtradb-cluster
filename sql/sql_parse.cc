@@ -100,6 +100,7 @@
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "rpl_rli.h"
+static void wsrep_client_rollback(THD *thd);
 
 extern Format_description_log_event *wsrep_format_desc;
 #define WSREP_MYSQL_DB (char *)"mysql"
@@ -712,15 +713,7 @@ bool do_command(THD *thd)
     thd->wsrep_query_state= QUERY_IDLE;
     if (thd->wsrep_conflict_state==MUST_ABORT) 
     {
-      thd->wsrep_conflict_state= ABORTING;
-
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      trans_rollback(thd);
-      thd->locked_tables_list.unlock_locked_tables(thd);
-      /* Release transactional metadata locks. */
-      thd->mdl_context.release_transactional_locks();
-      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-      thd->wsrep_conflict_state= ABORTED;
+      wsrep_client_rollback(thd);
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
@@ -801,16 +794,7 @@ bool do_command(THD *thd)
       if (thd->wsrep_conflict_state == MUST_ABORT)
       {
 	DBUG_PRINT("wsrep",("aborted for wsrep rollback: %lu", thd->real_id));
-	thd->wsrep_conflict_state= ABORTING;
-
-	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-	trans_rollback(thd);
-	thd->locked_tables_list.unlock_locked_tables(thd);
-	/* Release transactional metadata locks. */
-	thd->mdl_context.release_transactional_locks();
-
-	mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-	thd->wsrep_conflict_state= ABORTED;
+	wsrep_client_rollback(thd);
       }
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
@@ -1061,14 +1045,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 
     if (thd->wsrep_conflict_state== MUST_ABORT)
     {
-      thd->wsrep_conflict_state= ABORTING;
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      trans_rollback(thd);
-      thd->locked_tables_list.unlock_locked_tables(thd);
-      /* Release transactional metadata locks. */
-      thd->mdl_context.release_transactional_locks();
-      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-      thd->wsrep_conflict_state= ABORTED;
+      wsrep_client_rollback(thd);
     }
     if (thd->wsrep_conflict_state== ABORTED) 
     {
@@ -1615,43 +1592,11 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if (thd->wsrep_conflict_state == MUST_ABORT) {
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      ha_rollback_trans(thd, 0);
-      thd->locked_tables_list.unlock_locked_tables(thd);
-      /* Release transactional metadata locks. */
-      thd->mdl_context.release_transactional_locks();
-      thd->transaction.stmt.reset();
+      wsrep_client_rollback(thd);
+
       WSREP_DEBUG("abort in exec query state, avoiding autocommit");
-      goto wsrep_must_abort;
     }
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
-#endif /* WITH_WSREP */
 
-#ifdef WITH_WSREP
- wsrep_must_abort:
-  if (WSREP(thd)) {
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    if (thd->wsrep_conflict_state == MUST_ABORT) {
-      thd->wsrep_conflict_state= ABORTING;
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-      WSREP_DEBUG("in dispatch_command, aborting %s",
-		  (thd->query()) ? thd->query() : "void");
-      trans_rollback(thd);
-      thd->locked_tables_list.unlock_locked_tables(thd);
-      /* Release transactional metadata locks. */
-      thd->mdl_context.release_transactional_locks();
-
-      if (thd->get_binlog_table_maps()) {
-        thd->clear_binlog_table_maps();
-      }
-      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-      thd->wsrep_conflict_state= ABORTED;
-    }
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     /* checking if BF trx must be replayed */
     if (thd->wsrep_conflict_state== MUST_REPLAY) {
       if (thd->wsrep_exec_mode!= REPL_RECV) {
@@ -1666,11 +1611,18 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
         mysql_reset_thd_for_next_command(thd);
         thd->killed= THD::NOT_KILLED;
         close_thread_tables(thd);
+        if (thd->locked_tables_mode && thd->lock)
+        {
+	  WSREP_DEBUG("releasing table lock for replaying (%ld)", thd->thread_id);
+          thd->locked_tables_list.unlock_locked_tables(thd);
+	  thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
+        }
+	thd->mdl_context.release_transactional_locks();
 
         thd_proc_info(thd, "wsrep replaying trx");
         WSREP_DEBUG("replay trx: %s %lld", 
-		    thd->query() ? thd->query() : "void", 
-		    (long long)thd->wsrep_trx_seqno);
+                    thd->query() ? thd->query() : "void", 
+                    (long long)thd->wsrep_trx_seqno);
         struct wsrep_thd_shadow shadow;
         wsrep_prepare_bf_thd(thd, &shadow);
         int rcode = wsrep->replay_trx(wsrep,
@@ -7677,6 +7629,41 @@ LEX_USER *create_definer(THD *thd, LEX_STRING *user_name, LEX_STRING *host_name)
 }
 
 #ifdef WITH_WSREP
+/* must have (&thd->LOCK_wsrep_thd) */
+static void wsrep_client_rollback(THD *thd)
+{
+  WSREP_DEBUG("client rollback due to BF abort for (%ld), query: %s", 
+	      thd->thread_id, thd->query());
+
+  thd->wsrep_conflict_state= ABORTING;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  trans_rollback(thd);
+
+  if (thd->locked_tables_mode && thd->lock)
+  {
+    WSREP_DEBUG("unlocking tables for BF abort (%ld)", thd->thread_id);
+    thd->locked_tables_list.unlock_locked_tables(thd);
+    thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
+  }
+
+  if (thd->global_read_lock.is_acquired())
+  {
+    WSREP_DEBUG("unlocking GRL for BF abort (%ld)", thd->thread_id);
+    thd->global_read_lock.unlock_global_read_lock(thd);
+  }
+
+  /* Release transactional metadata locks. */
+  thd->mdl_context.release_transactional_locks();
+
+  if (thd->get_binlog_table_maps()) 
+  {
+    WSREP_DEBUG("clearing binlog table map for BF abort (%ld)", thd->thread_id);
+    thd->clear_binlog_table_maps();
+  }
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  thd->wsrep_conflict_state= ABORTED;
+}
+
 static enum wsrep_status wsrep_apply_sql(
    THD *thd, const char *sql, size_t sql_len, time_t timeval, uint32 randseed) 
 {
@@ -8157,16 +8144,12 @@ void wsrep_rollback_process(THD *thd)
 
       aborting->store_globals();
 
-      trans_rollback(aborting);
-      aborting->locked_tables_list.unlock_locked_tables(thd);
-      /* Release transactional metadata locks. */
-      aborting->mdl_context.release_transactional_locks();
-
       mysql_mutex_lock(&aborting->LOCK_wsrep_thd);
-      aborting->wsrep_conflict_state= ABORTED;
+      wsrep_client_rollback(aborting);
       WSREP_DEBUG("WSREP rollbacker aborted thd: %llu",
                   (long long)aborting->real_id);
       mysql_mutex_unlock(&aborting->LOCK_wsrep_thd);
+
       mysql_mutex_lock(&LOCK_wsrep_rollback);
     }
   }
