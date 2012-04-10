@@ -91,12 +91,12 @@ PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
     "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
     cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
-    "$SOURCEDIR/cmake/wsrep.cmake" | cut -d '"' -f2)"
+    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
 PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 
 # Build information
 REVISION="$(cd "$SOURCEDIR"; bzr revno)"
-GALERA_REVISION="$(cd percona-xtradb-cluster-galera; bzr revno)"
+GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; bzr revno)"
 PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.$REVISION.$(uname -s).$TARGET"
 COMMENT="Percona XtraDB Cluster (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
 COMMENT="$COMMENT, Revision $REVISION"
