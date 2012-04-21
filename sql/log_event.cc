@@ -7627,19 +7627,20 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
         thd->variables.option_bits&= ~OPTION_RELAXED_UNIQUE_CHECKS;
     /* A small test to verify that objects have consistent types */
     DBUG_ASSERT(sizeof(thd->variables.option_bits) == sizeof(OPTION_RELAXED_UNIQUE_CHECKS));
-
     if (open_and_lock_tables(thd, rli->tables_to_lock, FALSE, 0))
     {
-#ifdef WITH_WSREP
-      uint actual_error= ER_SERVER_SHUTDOWN;
-      if (WSREP(thd) && !thd->is_fatal_error)
-      {
-        sql_print_information("WSREP, BF applier interrupted in log_event.cc");
-      } 
-      else
-        actual_error= thd->stmt_da->sql_errno();
-#else
       uint actual_error= thd->stmt_da->sql_errno();
+#ifdef WITH_WSREP
+      if (WSREP(thd))
+      {
+        WSREP_WARN("BF applier failed to open_and_lock_tables: %u, fatal: %d "
+                   "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld)",
+                   thd->stmt_da->sql_errno(),
+                   thd->is_fatal_error,
+                   thd->wsrep_exec_mode,
+                   thd->wsrep_conflict_state,
+                   (long long)thd->wsrep_trx_seqno);
+      } 
 #endif
       if (thd->is_slave_error || thd->is_fatal_error)
       {
