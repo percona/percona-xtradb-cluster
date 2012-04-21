@@ -3037,9 +3037,11 @@ sql/share/slovak
 sql/share/spanish
 sql/share/swedish
 sql/share/ukrainian
+scripts/wsrep_sst_mysqldump
 libmysqld/examples/mysqltest.cc
 libmysqld/sql_signal.cc
 libmysqld/debug_sync.cc
+scripts/wsrep_sst_rsync
 dbug/tests
 libmysqld/mdl.cc
 client/transaction.h
