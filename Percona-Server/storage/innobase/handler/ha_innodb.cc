@@ -3538,7 +3538,6 @@ retry:
   
 			mysql_mutex_unlock(&prepare_commit_mutex);
   		}
-
 #ifdef WITH_WSREP
 		}
 #endif
