@@ -1161,7 +1161,11 @@ int ha_commit_trans(THD *thd, bool all)
   {
     /* Free resources and perform other cleanup even for 'empty' transactions. */
     if (is_real_trans)
-      thd->transaction.cleanup();
+#ifdef WITH_WSREP
+    	thd->transaction.cleanup(thd);
+#else
+    	thd->transaction.cleanup();
+#endif /* WITH_WSREP */
     DBUG_RETURN(0);
   }
   else
@@ -1328,12 +1332,7 @@ end:
     }
   }
   /* Free resources and perform other cleanup even for 'empty' transactions. */
-  else if (is_real_trans)
-#ifdef WITH_WSREP
-    thd->transaction.cleanup(thd);
-#else
-    thd->transaction.cleanup();
-#endif /* WITH_WSREP */
+  thd->diff_rollback_trans++;
   DBUG_RETURN(error);
 }
 
