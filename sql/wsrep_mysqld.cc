@@ -48,6 +48,7 @@ my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
 long    wsrep_max_protocol_version     = 1; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
+my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
 
 /*
  * End configuration options
