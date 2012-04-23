@@ -1182,7 +1182,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
     }  
     else 
     {
-      WSREP_MDL_LOG(INFO, "MDL conflict -> BF abort", request_thd, granted_thd);
+      WSREP_MDL_LOG(DEBUG, "MDL conflict-> BF abort", request_thd, granted_thd);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
       return FALSE;
