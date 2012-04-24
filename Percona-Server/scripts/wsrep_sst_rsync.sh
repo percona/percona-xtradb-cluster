@@ -96,7 +96,7 @@ then
         #         --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index')
 
         # New filter - exclude everything except dirs (schemas) and innodb files
-        FILTER=(-f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
+        FILTER=(-f '+ /ib_lru_dump' -f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
 
         RC=0
         rsync --archive --no-times --ignore-times --inplace --delete --quiet \
