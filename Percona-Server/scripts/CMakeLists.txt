@@ -314,7 +314,8 @@ IF(WIN32)
   ENDFOREACH()
 ELSE()
   IF(WITH_WSREP)
-    SET(WSREP_BINARIES wsrep_sst_mysqldump wsrep_sst_rsync wsrep_sst_xtrabackup)
+    SET(WSREP_BINARIES wsrep_sst_mysqldump wsrep_sst_rsync
+wsrep_sst_xtrabackup clustercheck)
   ENDIF()
   # On Unix, most of the files end up in the bin directory
   SET(mysql_config_COMPONENT COMPONENT Development)
@@ -356,6 +357,12 @@ ELSE()
       COMPONENT ${${file}_COMPONENT}
      )
   ENDFOREACH()
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysqlchk.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/mysqlchk ESCAPE_QUOTES @ONLY)
+  INSTALL(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/mysqlchk
+    DESTINATION ${INSTALL_XINETDDIR}
+    COMPONENT Server)
 ENDIF()
 
 # Install libgcc as  mylibgcc.a
