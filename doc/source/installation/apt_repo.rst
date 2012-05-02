@@ -40,6 +40,7 @@ Ubuntu
  * 11.04 natty
  * 11.10 oneiric
 
+
 Install XtraDB Cluster
 =======================
 
@@ -55,11 +56,6 @@ Percona offers fresh beta builds from the experimental repository. To enable it 
 
   deb http://repo.percona.com/apt VERSION main experimental
   deb-src http://repo.percona.com/apt VERSION main experimental
-=======
- * 10.04LTS (lucid)
- * 11.04 (natty)
- * 11.10 (oneiric)
-
 
 Release Candidate Repository
 ============================

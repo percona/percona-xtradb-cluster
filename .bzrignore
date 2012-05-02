@@ -104,6 +104,7 @@ CTestTestfile.cmake
 COPYING
 COPYING.LIB
 doc/build/*
+doc/build
 Docs/#manual.texi#
 Docs/INSTALL-BINARY
 Docs/Images/myaccess-odbc.txt
