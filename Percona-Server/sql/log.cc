@@ -7212,7 +7212,6 @@ int TC_LOG_BINLOG::log_and_order(THD *thd, my_xid xid, bool all,
   DBUG_ENTER("TC_LOG_BINLOG::log_and_order");
   binlog_cache_mngr *cache_mngr=
     (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
-
 #ifdef WITH_WSREP
   if (!cache_mngr)
   {

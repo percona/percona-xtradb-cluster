@@ -1338,7 +1338,6 @@ srv_conc_enter_innodb(
 		return;
 	}
 #endif
-
 	os_fast_mutex_lock(&srv_conc_mutex);
 retry:
 	if (trx->declared_to_be_inside_innodb) {
@@ -3336,7 +3335,6 @@ srv_master_thread(
 	mutex_exit(&(log_sys->mutex));
 
 	last_print_time = ut_time();
-
 loop:
 	/*****************************************************************/
 	/* ---- When there is database activity by users, we cycle in this
