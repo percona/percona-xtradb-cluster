@@ -278,9 +278,10 @@ static void wsrep_view_handler_cb (void* app_ctx,
   {
     /*
      *  NOTE: Initialize wsrep_group_uuid here only if it wasn't initialized
-     *  before.
+     *  before - OR - it was reinitilized on startup (lp:992840)
      */
-    if (!memcmp (&local_uuid, &WSREP_UUID_UNDEFINED, sizeof(wsrep_uuid_t)))
+    if (!memcmp (&local_uuid, &WSREP_UUID_UNDEFINED, sizeof(wsrep_uuid_t)) ||
+	0 == wsrep_cluster_conf_id)
     {
       if (wsrep_init_first())
       {
