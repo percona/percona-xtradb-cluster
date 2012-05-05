@@ -4730,6 +4730,8 @@ wsrep_store_key_val_for_row(
 			wsrep_innobase_mysql_sort(
 			       mysql_type, cs->number, sorted, true_len);
 
+			memcpy(buff, sorted, true_len);
+
 			/* Note that we always reserve the maximum possible
 			length of the true VARCHAR in the key value, though
 			only len first bytes after the 2 length bytes contain
