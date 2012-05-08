@@ -234,10 +234,7 @@ parse_arguments() {
       --skip-syslog) want_syslog=0 ;;
       --syslog-tag=*) syslog_tag="$val" ;;
       --timezone=*) TZ="$val"; export TZ; ;;
-      --wsrep[-_]urls=*)
-        url=`wsrep_pick_url $val` && test -n "$url" && \
-        append_arg_to_args "--wsrep_cluster_address=$url"
-        ;;
+      --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
 
       --help) usage ;;
 
@@ -785,9 +782,16 @@ while true
 do
   rm -f $safe_mysql_unix_port "$pid_file"	# Some extra safety
 
+  [ -n "$wsrep_urls" ] && url=`wsrep_pick_url $wsrep_urls` # check connect address
+
   start_time=`date +%M%S`
 
-  eval_log_error "$cmd"
+  if [ -z "$url" ]
+  then
+    eval_log_error "$cmd"
+  else
+    eval_log_error "$cmd --wsrep_cluster_address=$url"
+  fi
 
   end_time=`date +%M%S`
 
