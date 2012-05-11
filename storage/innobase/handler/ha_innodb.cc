@@ -4738,7 +4738,7 @@ wsrep_store_key_val_for_row(
 			actual data. The rest of the space was reset to zero
 			in the bzero() call above. */
 
-			buff += key_len;
+			buff += true_len;
 
 		} else if (mysql_type == MYSQL_TYPE_TINY_BLOB
 			|| mysql_type == MYSQL_TYPE_MEDIUM_BLOB
@@ -4807,7 +4807,7 @@ wsrep_store_key_val_for_row(
 			/* Note that we always reserve the maximum possible
 			length of the BLOB prefix in the key value. */
 
-			buff += key_len;
+			buff += true_len;
 		} else {
 			/* Here we handle all other data types except the
 			true VARCHAR, BLOB and TEXT. Note that the column
@@ -6934,13 +6934,14 @@ wsrep_append_foreign_key(
 	}
 #ifdef WSREP_DEBUG_PRINT
 	ulint i;
-	fprintf(stderr, "FK parent key, len: %lu ", len+1);
+	fprintf(stderr, "FK parent key, table: %s shared: %d len: %lu ", 
+		foreign->referenced_table_name, (int)shared, len+1);
 	for (i=0; i<len+1; i++) {
-		fprintf(stderr, " (%X), ", key[i]);
+		fprintf(stderr, " %hhX, ", key[i]);
 	}
 	fprintf(stderr, "\n");
 #endif
-	strncpy(cache_key, foreign->foreign_table->name, 512);
+	strncpy(cache_key, foreign->referenced_table->name, 512);
 	char *p = strchr(cache_key, '/');
 	if (p) {
 		*p = '\0';
