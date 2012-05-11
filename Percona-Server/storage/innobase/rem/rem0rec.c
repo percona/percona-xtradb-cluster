@@ -1824,11 +1824,42 @@ wsrep_rec_get_primary_key(
 				*buf++ = 0;
 				key_len++;
 			}
-			memcpy(buf, data, len);
-			wsrep_innobase_mysql_sort(
-				(int)(col->prtype & DATA_MYSQL_TYPE_MASK),
-				(uint)dtype_get_charset_coll(col->prtype),
-				buf, len);
+			switch (col->mtype) {
+			case DATA_INT: {
+				byte* ptr = buf+len;
+				for (;;) {
+					ptr--;
+					*ptr = *data;
+					if (ptr == buf) {
+						break;
+					}
+					data++;
+				}
+		
+				if (!(col->prtype & DATA_UNSIGNED)) {
+					buf[len-1] = (byte) (buf[len-1] ^ 128);
+				}
+
+				break;
+			}
+			case DATA_VARCHAR:
+			case DATA_VARMYSQL:
+			case DATA_BINARY:
+				/* Copy the actual data */
+				ut_memcpy(buf, data, len);
+				wsrep_innobase_mysql_sort(
+					(int)(col->prtype & DATA_MYSQL_TYPE_MASK),
+					(uint)dtype_get_charset_coll(col->prtype),
+					buf, len);
+				break;
+			case DATA_BLOB:
+			case DATA_MYSQL:
+				memcpy(buf, data, len);
+				break;
+			default: 
+				break;
+			}
+
 			key_len += len;
 			buf 	+= len;
 		}
