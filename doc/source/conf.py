@@ -23,12 +23,14 @@ import sys, os
 # If your documentation needs a minimal Sphinx version, state it here.
 #needs_sphinx = '1.0'
 
+sys.path.append(os.path.abspath('ext'))
+
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 
 extensions = ['sphinx.ext.intersphinx', 'sphinx.ext.todo', 
               'sphinx.ext.coverage', 'sphinx.ext.ifconfig', 
-              'sphinx.ext.extlinks']
+              'sphinx.ext.extlinks', 'psdom']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -51,7 +53,7 @@ copyright = u'2012, Percona Inc'
 # built documents.
 #
 # The short X.Y version.
-version = '5.5.20'
+version = '5.5.23'
 # The full version, including alpha/beta/rc tags.
 release = '5.5.23-23.4'
 
@@ -71,6 +73,8 @@ exclude_patterns = []
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
+
+primary_domain = 'psdom'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 #add_function_parentheses = True

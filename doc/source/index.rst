@@ -98,13 +98,14 @@ The full documentation and reference is available on
 `Galera Wiki <http://www.codership.com/wiki/doku.php>`_
 
 
-Misc
-====
+Reference
+=========
 
 .. toctree::
    :maxdepth: 1
    :glob:
 
+   release-notes/release-notes_index
    glossary
 
 Indices and tables
