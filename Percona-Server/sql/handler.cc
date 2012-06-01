@@ -1424,8 +1424,7 @@ int ha_commit_trans(THD *thd, bool all)
         xid= wsrep_xid_seqno(&thd->transaction.xid_state.xid);
       }
 #endif // WITH_WSREP
-      if (error || (is_real_trans && xid &&
-                    (error= !(cookie= tc_log->log_xid(thd, xid)))))
+      if (!is_real_trans)
       {
         error= commit_one_phase_low(thd, all, trans, is_real_trans);
         DBUG_EXECUTE_IF("crash_commit_after", DBUG_SUICIDE(););
