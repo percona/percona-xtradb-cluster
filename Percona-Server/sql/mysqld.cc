@@ -4229,7 +4229,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
 
 #ifdef WITH_WSREP
   if (!opt_bin_log)
+  {
     wsrep_emulate_bin_log= 1;
+  }
 #endif
   /*
     Validate any enforced storage engine
@@ -4570,6 +4572,17 @@ WSREP_WARN("applier has wsrep_exec_mode = %d", thd->wsrep_exec_mode);
 #endif /* REMOVE */
 }
 
+static inline bool is_replaying_connection(THD *thd)
+{
+  bool ret;
+
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  ret=  (thd->wsrep_conflict_state == REPLAYING) ? true : false;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+  return ret;
+}
+
 static bool have_client_connections()
 {
   THD *tmp;
@@ -4645,6 +4658,12 @@ void wsrep_close_client_connections(my_bool wait_to_end)
     if (!is_client_connection(tmp))
       continue;
 
+    if (is_replaying_connection(tmp))
+    {
+      tmp->killed= THD::KILL_CONNECTION;
+      continue;
+    }
+
     /* replicated transactions must be skipped */
     if (abort_replicated(tmp))
       continue;
@@ -4666,9 +4685,11 @@ void wsrep_close_client_connections(my_bool wait_to_end)
   while ((tmp=it2++))
   {
 #ifndef __bsdi__				// Bug in BSDI kernel
-    if (is_client_connection(tmp) && !abort_replicated(tmp))
+    if (is_client_connection(tmp) && 
+        !abort_replicated(tmp)    &&
+	!is_replaying_connection(tmp))
     {
-      WSREP_INFO("SST kill local trx: %ld",tmp->thread_id);
+      WSREP_INFO("killing local connection: %ld",tmp->thread_id);
       close_connection(tmp,0,0);
     }
 #endif

@@ -152,7 +152,7 @@ shell_quote_string() {
 }
 
 wsrep_pick_url() {
-  [ $# -eq 0 ] return 0
+  [ $# -eq 0 ] && return 0
 
   if ! which nc >/dev/null; then
     log_error "ERROR: nc tool not found in PATH! Make sure you have it installed."

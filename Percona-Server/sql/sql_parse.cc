@@ -1078,7 +1078,6 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
-
 #if defined(ENABLED_PROFILING)
   thd->profiling.start_new_query();
 #endif

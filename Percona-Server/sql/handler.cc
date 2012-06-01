@@ -48,6 +48,7 @@
 #include "wsrep_mysqld.h"
 #endif
 
+
 /*
   While we have legacy_db_type, we have this array to
   check for dups and to find handlerton from legacy_db_type.
@@ -173,6 +174,7 @@ struct st_sys_tbl_chk_params
     SUPPORTED_SYSTEM_TABLE
   }status;                                    // OUT param
 };
+
 
 static plugin_ref ha_default_plugin(THD *thd)
 {
@@ -1364,7 +1366,28 @@ int ha_commit_trans(THD *thd, bool all)
           Sic: we know that prepare() is not NULL since otherwise
           trans->no_2pc would have been set.
         */
-        err= ht->prepare(ht, thd, all);
+        if ((err= ht->prepare(ht, thd, all)))
+        {
+#ifdef WITH_WSREP
+          if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
+          {
+	    error= 1;
+	    /* avoid sending error, if we need to replay */
+            if (thd->wsrep_conflict_state!= MUST_REPLAY)
+            {
+              my_error(ER_LOCK_DEADLOCK, MYF(0), err);
+            }
+          }
+          else
+          {
+            /* not wsrep hton, bail to native mysql behavior */
+#endif
+          my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
+          error= 1;
+#ifdef WITH_WSREP
+          }
+#endif
+	}
         status_var_increment(thd->status_var.ha_prepare_count);
         if (err)
 	{
@@ -1394,7 +1417,15 @@ int ha_commit_trans(THD *thd, bool all)
         need_commit_ordered|= (ht->commit_ordered != NULL);
       }
       DBUG_EXECUTE_IF("crash_commit_after_prepare", DBUG_SUICIDE(););
-      if (!is_real_trans)
+#ifdef WITH_WSREP
+      if (!error && wsrep_is_wsrep_xid(&thd->transaction.xid_state.xid))
+      {
+        // xid was rewritten by wsrep
+        xid= wsrep_xid_seqno(&thd->transaction.xid_state.xid);
+      }
+#endif // WITH_WSREP
+      if (error || (is_real_trans && xid &&
+                    (error= !(cookie= tc_log->log_xid(thd, xid)))))
       {
         error= commit_one_phase_low(thd, all, trans, is_real_trans);
         DBUG_EXECUTE_IF("crash_commit_after", DBUG_SUICIDE(););
@@ -1435,6 +1466,7 @@ int ha_commit_trans(THD *thd, bool all)
 err:
     error= 1;                                  /* Transaction was rolled back */
     ha_rollback_trans(thd, all);
+    thd->diff_rollback_trans++;
 
 end:
     if (rw_trans && mdl_request.ticket)
@@ -1449,7 +1481,6 @@ end:
     }
   }
   /* Free resources and perform other cleanup even for 'empty' transactions. */
-  thd->diff_rollback_trans++;
   DBUG_RETURN(error);
 }
 
@@ -1491,8 +1522,6 @@ commit_one_phase_low(THD *thd, bool all, THD_TRANS *trans, bool is_real_trans)
   int error= 0;
   Ha_trx_info *ha_info= trans->ha_list, *ha_info_next;
   DBUG_ENTER("commit_one_phase_low");
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
   char info[64]= { 0, };
   snprintf (info, sizeof(info) - 1, "ha_commit_one_phase(%lld)",
             (long long)thd->wsrep_trx_seqno);
