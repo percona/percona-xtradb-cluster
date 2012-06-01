@@ -1522,6 +1522,8 @@ commit_one_phase_low(THD *thd, bool all, THD_TRANS *trans, bool is_real_trans)
   int error= 0;
   Ha_trx_info *ha_info= trans->ha_list, *ha_info_next;
   DBUG_ENTER("commit_one_phase_low");
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
   char info[64]= { 0, };
   snprintf (info, sizeof(info) - 1, "ha_commit_one_phase(%lld)",
             (long long)thd->wsrep_trx_seqno);
