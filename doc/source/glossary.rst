@@ -4,78 +4,106 @@
 
 .. glossary::
 
-   LSN
-     Each InnoDB page (usually 16kb in size) contains a log sequence number, or LSN. The LSN is the system version number for the entire database. Each page's LSN shows how recently it was changed.
+  ACID
+    Set of properties that guarantee database transactions are 
+    processed reliably. Stands for :term:`Atomicity`,
+    :term:`Consistency`, :term:`Isolation`, :term:`Durability`.
 
-   InnoDB
-      Storage engine which provides ACID-compliant transactions and foreign key support, among others improvements over :term:`MyISAM`. It is the default engine for |MySQL| as of the 5.5 series.
+  Atomicity
+    Atomicity means that database operations are applied following a
+    "all or nothing" rule. A transaction is either fully applied or not
+    at all.
 
-   MyISAM
-     Previous default storage engine for |MySQL| for versions prior to 5.5. It doesn't fully support transactions but in some scenarios may be faster than :term:`InnoDB`. Each table is stored on disk in 3 files: :term:`.frm`, :term:`.MYD`, :term:`.MYI`.
-	
-   IST
-     Incremental State Transfer. Functionallity which instead of whole state snapshot can catch up with te group by receiving the missing writesets, but only if the writeset is still in the donor's writeset cache.
+  Consistency
+    Consistency means that each transaction that modifies the database
+    takes it from one consistent state to another.
 
-   XtraBackup
-     *Percona XtraBackup* is an open-source hot backup utility for |MySQL| - based servers that doesn’t lock your database during the backup.
+  Drizzle
+    Drizzle: a database for the cloud.
 
-   XtraDB
-     *Percona XtraDB* is an enhanced version of the InnoDB storage engine, designed to better scale on modern hardware, and including a variety of other features useful in high performance environments. It is fully backwards compatible, and so can be used as a drop-in replacement for standard InnoDB. More information `here <http://www.percona.com/docs/wiki/Percona-XtraDB:start>`_ .
+    `Drizzle <http://www.drizzle.org/>`_ is a community-driven open source project that is forked
+    from the popular MySQL database. The Drizzle team has removed
+    non-essential code, re-factored the remaining code into a
+    plugin-based architecture and modernized the code base moving to
+    C++.
 
-   XtraDB Cluster
-     *Percona XtraDB Cluster* is a high availability solution for MySQL.
+  Drizzle Charter
+     * A database optimized for Cloud infrastructure and Web applications.
+     * Design for massive concurrency on modern multi-cpu architecture
+     * Optimize memory for increased performance and parallelism
+     * Open source, open community, open design Scope
+     * Re-designed modular architecture providing plugins with defined APIs
+     * Simple design for ease of use and administration
+     * Reliable, ACID transactional
 
-   Percona XtraDB Cluster
-     *Percona XtraDB Cluster* is a high availability solution for MySQL.
+  Durability
+    Once a transaction is committed, it will remain so.
 
-   my.cnf
-     This file refers to the database server's main configuration file. Most Linux distributions place it as :file:`/etc/mysql/my.cnf`, but the location and name depends on the particular installation. Note that this is not the only way of configuring the server, some systems does not have one even and rely on the command options to start the server and its defaults values.
+  Foreign Key
+    A referential constraint between two tables. Example: A purchase
+    order in the purchase_orders table must have been made by a customer
+    that exists in the customers table.
 
-   datadir
-    The directory in which the database server stores its databases. Most Linux distribution use :file:`/var/lib/mysql` by default.
+  Isolation
+    The Isolation requirement means that no transaction can interfere
+    with another.
 
-   ibdata
-     Default prefix for tablespace files, e.g. :file:`ibdata1` is a 10MB  autoextendable file that |MySQL| creates for the shared tablespace by default. 
+  InnoDB
+    A :term:`Storage Engine` for MySQL and derivatives (:term:`Percona
+    Server`, :term:`MariaDB`, :term:`Drizzle`) originally written by
+    Innobase Oy, since acquired by Oracle. It provides :term:`ACID`
+    compliant storage engine with :term:`foreign key` support. As of
+    :term:`MySQL` version 5.5, InnoDB became the default storage engine
+    on all platforms.
 
-   innodb_file_per_table
-     InnoDB option to use separate .ibd files for each table.
+  Jenkins
+    `Jenkins <http://www.jenkins-ci.org>`_ is a continuous integration
+    system that we use to help ensure the continued quality of the
+    software we produce. It helps us achieve the aims of:
 
-   split brain
-     Split brain occurs when two parts of a computer cluster are disconnected, each part believing that the other is no longer running. This problem can lead to data inconsistency.
+     * no failed tests in trunk on any platform,
+     * aid developers in ensuring merge requests build and test on all platforms,
+     * no known performance regressions (without a damn good explanation).
 
-   .frm
-     For each table, the server will create a file with the ``.frm`` extension containing the table definition (for all storage engines).
+  LSN
+    Log Serial Number. A term used in relation to the :term:`InnoDB` or
+    :term:`XtraDB` storage engines.
 
-   .ibd
-     On a multiple tablespace setup (:term:`innodb_file_per_table` enabled), |MySQL| will store each newly created table on a file with a ``.ibd`` extension.
+  MariaDB
+    A fork of :term:`MySQL` that is maintained primarily by Monty
+    Program AB. It aims to add features, fix bugs while maintaining 100%
+    backwards compatibility with MySQL.
 
-   .MYD
-     Each |MyISAM| table has ``.MYD`` (MYData) file which contains the data on it.
+  my.cnf
+    The file name of the default MySQL configuration file.
 
-   .MYI
-     Each |MyISAM| table has ``.MYI`` (MYIndex) file which contains the table's indexes.
+  MyISAM
+    A :term:`MySQL` :term:`Storage Engine` that was the default until
+    MySQL 5.5.
 
-   .MRG
-     Each table using the :program:`MERGE` storage engine, besides of a :term:`.frm` file, will have :term:`.MRG` file containing the names of the |MyISAM| tables associated with it.
+  MySQL
+    An open source database that has spawned several distributions and
+    forks. MySQL AB was the primary maintainer and distributor until
+    bought by Sun Microsystems, which was then acquired by Oracle. As
+    Oracle owns the MySQL trademark, the term MySQL is often used for
+    the Oracle distribution of MySQL as distinct from the drop-in
+    replacements such as :term:`MariaDB` and :term:`Percona Server`.
 
-   .TRG
-     File containing the triggers associated to a table, e.g. `:file:`mytable.TRG`. With the :term:`.TRN` file, they represent all the trigger definitions.
 
-   .TRN
-     File containing the triggers' Names associated to a table, e.g. `:file:`mytable.TRN`. With the :term:`.TRG` file, they represent all the trigger definitions.
+  Percona Server
+    Percona's branch of :term:`MySQL` with performance and management improvements.
 
-   .ARM
-     Each table with the :program:`Archive Storage Engine` has ``.ARM`` file which contains the metadata of it.
+  Storage Engine
+    A :term:`Storage Engine` is a piece of software that implements the
+    details of data storage and retrieval for a database system. This
+    term is primarily used within the :term:`MySQL` ecosystem due to it
+    being the first widely used relational database to have an
+    abstraction layer around storage. It is analogous to a Virtual File
+    System layer in an Operating System. A VFS layer allows an operating
+    system to read and write multiple file systems (e.g. FAT, NTFS, XFS,
+    ext3) and a Storage Engine layer allows a database server to access
+    tables stored in different engines (e.g. :term:`MyISAM`, InnoDB).
 
-   .ARZ
-     Each table with the :program:`Archive Storage Engine` has ``.ARZ`` file which contains the data of it.
-
-   .CSM
-     Each table with the :program:`CSV Storage Engine` has ``.CSM`` file which contains the metadata of it.
-
-   .CSV
-     Each table with the :program:`CSV Storage` engine has ``.CSV`` file which contains the data of it (which is a standard Comma Separated Value file).
-
-   .opt
-     |MySQL| stores options of a database (like charset) in a file with a :option:`.opt` extension in the database directory.
-
+  XtraDB
+    Percona's improved version of :term:`InnoDB` providing performance,
+    features and reliability above what is shipped by Oracle in InnoDB.

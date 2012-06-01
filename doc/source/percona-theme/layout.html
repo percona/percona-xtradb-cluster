@@ -50,7 +50,7 @@
       <div class="sphinxsidebar">
         <div class="sphinxsidebarwrapper">
 
-				<div class="side-column-block"><a href="http://www.percona.com/software/percona-xtradb-cluster/"><img alt="Percona XtraDB Cluster" src="http://s2.percona.com/logo_percona_xtradbcluster_new.png" /></a></div>
+				<div class="side-column-block"><a href="http://www.percona.com/software/percona-server/"><img alt="Percona Server" src="http://s2.percona.com/logo_percona_server_new.png" /></a></div>
 
 			<div class="side-column-block">
 				<div class="header">Call Us</div>
@@ -76,7 +76,7 @@
 
 			<div class="side-column-block">
 			    
-			    <div class="a-btn-container"><a title="Download PDF Manual for Percona XtraDB Cluster" href="http://form.percona.com/Percona_XtraDB_Cluster_1_0_Operation_Manual.html" class="a-btn-new"><span class="a-btn-text">Download Manual</span><span class="a-btn-fixed-slide-text">PDF for 5.5.20-23.4</span><span class="a-btn-icon-right"><span></span></span></a>
+			    <div class="a-btn-container"><a title="Download PDF Manual for Percona Server 5.5" href="http://form.percona.com/PerconaServer55OperationsManual.html" class="a-btn-new"><span class="a-btn-text">Download Manual</span><span class="a-btn-fixed-slide-text">PDF for 5.5</span><span class="a-btn-icon-right"><span></span></span></a>
 				</div>
 			</div>				
           {%- if sidebars != None %}
@@ -86,8 +86,15 @@
             {%- endfor %}
           {%- else %}
             {#- old style sidebars: using blocks -- should be deprecated #}
-            {%- block serverseries %}
-            {%- endblock %}
+			            {%- block serverseries %}
+		<div class="side-column-block">
+			<h3>Percona Server Series</h3>
+			     <ul>
+			       <li><a href="http://www.percona.com/doc/percona-server/5.5/">Percona Server 5.5</a></li>
+			       <li><a href="http://www.percona.com/doc/percona-server/5.1/">Percona Server 5.1</a></li>
+			     </ul>
+			</div>
+			            {%- endblock %}
             {%- block sidebartoc %}
             {%- include "localtoc.html" %}
             {%- endblock %}
@@ -288,8 +295,8 @@
 {%- block footer %}
 
     <div class="file-bugs">
-      	This documentation is developed in Launchpad as part of the <a href="https://code.launchpad.net/percona-xtradb-cluster">Percona XtraDB Cluster source code</a>.<br/>
-		If you spotted innacuracies, errors, don't understood it or you think something is missing or should be improved, please <a href="https://bugs.launchpad.net/percona-xtradb-cluster/+filebug?field.tags=doc&amp;field.comment=[In:Percona XtraDB Cluster Documentation]&amp;?field.tags=doc&amp;field.title=[DOC] ">file a bug</a>.
+      	This documentation is developed in Launchpad as part of the <a href="https://code.launchpad.net/percona-server">Percona Server source code</a>.<br/>
+		If you spotted innacuracies, errors, don't understood it or you think something is missing or should be improved, please <a href="https://bugs.launchpad.net/percona-server/+filebug?field.tags=doc&amp;field.comment=[In:Percona Server Documentation]&amp;?field.tags=doc&amp;field.title=[DOC] ">file a bug</a>.
 	
     </div>
 

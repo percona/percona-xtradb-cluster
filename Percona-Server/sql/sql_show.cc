@@ -2470,6 +2470,7 @@ int send_user_stats(THD* thd, HASH *all_user_stats, TABLE *table)
       table->field[18]->store((longlong)user_stats->lost_connections);
       table->field[19]->store((longlong)user_stats->access_denied_errors);
       table->field[20]->store((longlong)user_stats->empty_queries);
+      table->field[21]->store((longlong)user_stats->total_ssl_connections);
       if (schema_table_store_record(thd, table))
       {
 	      DBUG_PRINT("error", ("store record error"));
@@ -2507,6 +2508,7 @@ int send_thread_stats(THD* thd, HASH *all_thread_stats, TABLE *table)
       table->field[18]->store((longlong)user_stats->lost_connections);
       table->field[19]->store((longlong)user_stats->access_denied_errors);
       table->field[20]->store((longlong)user_stats->empty_queries);
+      table->field[21]->store((longlong)user_stats->total_ssl_connections);
       if (schema_table_store_record(thd, table))
       {
               DBUG_PRINT("error", ("store record error"));
@@ -8086,6 +8088,7 @@ ST_FIELD_INFO user_stats_fields_info[]=
   {"LOST_CONNECTIONS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Lost_connections", SKIP_OPEN_TABLE},
   {"ACCESS_DENIED", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Access_denied", SKIP_OPEN_TABLE},
   {"EMPTY_QUERIES", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Empty_queries", SKIP_OPEN_TABLE},
+  {"TOTAL_SSL_CONNECTIONS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Total_ssl_connections", SKIP_OPEN_TABLE},
   {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, 0}
 };
 
@@ -8111,7 +8114,8 @@ ST_FIELD_INFO client_stats_fields_info[]=
   {"DENIED_CONNECTIONS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Denied_connections", SKIP_OPEN_TABLE},
   {"LOST_CONNECTIONS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Lost_connections", SKIP_OPEN_TABLE},
   {"ACCESS_DENIED", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Access_denied", SKIP_OPEN_TABLE},
-  {"EMPTY_QUERIES", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Empty_queries", SKIP_OPEN_TABLE},
+  {"EMPTY_QUERIES", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Empty_queries", SKIP_OPEN_TABLE}, 
+  {"TOTAL_SSL_CONNECTIONS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Total_ssl_connections", SKIP_OPEN_TABLE},
   {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, 0}
 };
 
@@ -8138,6 +8142,7 @@ ST_FIELD_INFO thread_stats_fields_info[]=
   {"LOST_CONNECTIONS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Lost_connections", SKIP_OPEN_TABLE},
   {"ACCESS_DENIED", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Access_denied", SKIP_OPEN_TABLE},
   {"EMPTY_QUERIES", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Empty_queries", SKIP_OPEN_TABLE},
+  {"TOTAL_SSL_CONNECTIONS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONG, 0, 0, "Total_ssl_connections", SKIP_OPEN_TABLE},
   {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, 0}
 };
 

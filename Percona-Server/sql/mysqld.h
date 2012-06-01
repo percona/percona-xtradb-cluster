@@ -245,6 +245,8 @@ extern my_decimal decimal_zero;
 
 extern ulonglong opt_log_warnings_suppress;
 
+extern char* enforce_storage_engine;
+
 /*
   THR_MALLOC is a key which will be used to set/get MEM_ROOT** for a thread,
   using my_pthread_setspecific_ptr()/my_thread_getspecific_ptr().
@@ -456,7 +458,8 @@ enum options_mysqld
   OPT_WSREP_SST_AUTH,
   OPT_WSREP_RECOVER,
 #endif
-  OPT_MAX_LONG_DATA_SIZE
+  OPT_MAX_LONG_DATA_SIZE,
+  OPT_SECURE_FILE_PRIV
 };
 
 

@@ -3210,8 +3210,31 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
                                       const char *query_arg, uint32 q_len_arg)
 {
   LEX_STRING new_db;
+  char* query_buf;
+  int query_buf_len;
   int expected_error,actual_error= 0;
   HA_CREATE_INFO db_options;
+
+  /*
+    We must allocate some extra memory for query cache
+    The query buffer layout is:
+       buffer :==
+         <statement>   The input statement(s)
+         '\0'          Terminating null char  (1 byte)
+         <length>      Length of following current database name (size_t)
+         <db_name>     Name of current database
+         <flags>       Flags struct
+  */
+  query_buf_len = q_len_arg + 1 + sizeof(size_t) + thd->db_length
+                  + QUERY_CACHE_FLAGS_SIZE + 1;
+  if ((query_buf= (char *) thd->alloc(query_buf_len)))
+  {
+    memcpy(query_buf, query_arg, q_len_arg);
+    query_buf[q_len_arg]= 0;
+    memcpy(query_buf+q_len_arg+1, (char *) &thd->db_length, sizeof(size_t));
+  }
+  else
+    goto end;
 
   /*
     Colleagues: please never free(thd->catalog) in MySQL. This would
@@ -3293,8 +3316,10 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   if (is_trans_keyword() || rpl_filter->db_ok(thd->db))
   {
     thd->set_time((time_t)when);
-    thd->set_query_and_id((char*)query_arg, q_len_arg,
+
+    thd->set_query_and_id((char*) query_buf, q_len_arg,
                           thd->charset(), next_query_id());
+ 
     thd->variables.pseudo_thread_id= thread_id;		// for temp tables
     DBUG_PRINT("query",("%s", thd->query()));
 
@@ -3357,7 +3382,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
             result. This should be acceptable now. This is a reminder
             to fix this if any refactoring happens here sometime.
           */
-          thd->set_query((char*) query_arg, q_len_arg, thd->charset());
+          thd->set_query((char*) query_buf, q_len_arg, thd->charset());
         }
       }
       if (time_zone_len)
@@ -4892,12 +4917,25 @@ int Load_log_event::do_apply_event(NET* net, Relay_log_info const *rli,
       enum enum_duplicates handle_dup;
       bool ignore= 0;
       char *load_data_query;
+      int query_buf_len;
 
+      /*
+        We must allocate some extra memory for query cache
+        The query buffer layout is:
+           buffer :==
+             <statement>   The input statement(s)
+             '\0'          Terminating null char  (1 byte)
+             <length>      Length of following current database name (size_t)
+             <db_name>     Name of current database
+             <flags>       Flags struct
+      */
+      query_buf_len = get_query_buffer_length() + 1 + sizeof(size_t) + thd->db_length
+                  + QUERY_CACHE_FLAGS_SIZE + 1;
       /*
         Forge LOAD DATA INFILE query which will be used in SHOW PROCESS LIST
         and written to slave's binlog if binlogging is on.
       */
-      if (!(load_data_query= (char *)thd->alloc(get_query_buffer_length() + 1)))
+      if (!(load_data_query= (char *)thd->alloc(query_buf_len)))
       {
         /*
           This will set thd->fatal_error in case of OOM. So we surely will notice
@@ -4908,6 +4946,7 @@ int Load_log_event::do_apply_event(NET* net, Relay_log_info const *rli,
 
       print_query(FALSE, NULL, load_data_query, &end, NULL, NULL);
       *end= 0;
+      memcpy(end+1, (char *) &thd->db_length, sizeof(size_t));
       thd->set_query(load_data_query, (uint) (end - load_data_query));
 
       if (sql_ex.opt_flags & REPLACE_FLAG)
@@ -5617,6 +5656,11 @@ int Xid_log_event::do_apply_event(Relay_log_info const *rli)
                     "COMMIT /* implicit, from Xid_log_event */");
   res= trans_commit(thd); /* Automatically rolls back on error. */
   thd->mdl_context.release_transactional_locks();
+
+  /*
+    Increment the global status commit count variable
+  */
+  status_var_increment(thd->status_var.com_stat[SQLCOM_COMMIT]);
 
   return res;
 }
@@ -7707,9 +7751,24 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
     {
       DBUG_PRINT("debug", ("Checking compability of tables to lock - tables_to_lock: %p",
                            rli->tables_to_lock));
+
+      /**
+        When using RBR and MyISAM MERGE tables the base tables that make
+        up the MERGE table can be appended to the list of tables to lock.
+  
+        Thus, we just check compatibility for those that tables that have
+        a correspondent table map event (ie, those that are actually going
+        to be accessed while applying the event). That's why the loop stops
+        at rli->tables_to_lock_count .
+
+        NOTE: The base tables are added here are removed when 
+              close_thread_tables is called.
+       */
       RPL_TABLE_LIST *ptr= rli->tables_to_lock;
-      for ( ; ptr ; ptr= static_cast<RPL_TABLE_LIST*>(ptr->next_global))
+      for (uint i= 0 ; ptr && (i < rli->tables_to_lock_count);
+           ptr= static_cast<RPL_TABLE_LIST*>(ptr->next_global), i++)
       {
+        DBUG_ASSERT(ptr->m_tabledef_valid);
         TABLE *conv_table;
         if (!ptr->m_tabledef.compatible_with(thd, const_cast<Relay_log_info*>(rli),
                                              ptr->table, &conv_table))
@@ -7747,10 +7806,10 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       Rows_log_event, we can invalidate the query cache for the
       associated table.
      */
-    for (TABLE_LIST *ptr= rli->tables_to_lock ; ptr ; ptr= ptr->next_global)
-    {
+    TABLE_LIST *ptr= rli->tables_to_lock;
+    for (uint i=0 ;  ptr && (i < rli->tables_to_lock_count); ptr= ptr->next_global, i++)
       const_cast<Relay_log_info*>(rli)->m_table_map.set_table(ptr->table_id, ptr->table);
-    }
+
 #ifdef HAVE_QUERY_CACHE
     query_cache.invalidate_locked_for_write(rli->tables_to_lock);
 #endif
@@ -8536,9 +8595,9 @@ check_table_map(Relay_log_info const *rli, RPL_TABLE_LIST *table_list)
     res= FILTERED_OUT;
   else
   {
-    for(RPL_TABLE_LIST *ptr= static_cast<RPL_TABLE_LIST*>(rli->tables_to_lock);
-        ptr; 
-        ptr= static_cast<RPL_TABLE_LIST*>(ptr->next_local))
+    RPL_TABLE_LIST *ptr= static_cast<RPL_TABLE_LIST*>(rli->tables_to_lock);
+    for(uint i=0 ; ptr && (i< rli->tables_to_lock_count); 
+        ptr= static_cast<RPL_TABLE_LIST*>(ptr->next_local), i++)
     {
       if (ptr->table_id == table_list->table_id)
       {
@@ -8801,6 +8860,12 @@ int
 Write_rows_log_event::do_before_row_operations(const Slave_reporting_capability *const)
 {
   int error= 0;
+
+  /*
+    Increment the global status insert count variable
+  */
+  if (get_flags(STMT_END_F))
+    status_var_increment(thd->status_var.com_stat[SQLCOM_INSERT]);
 
   /**
      todo: to introduce a property for the event (handler?) which forces
@@ -9750,6 +9815,12 @@ Delete_rows_log_event::Delete_rows_log_event(const char *buf, uint event_len,
 int 
 Delete_rows_log_event::do_before_row_operations(const Slave_reporting_capability *const)
 {
+  /*
+    Increment the global status delete count variable
+   */
+  if (get_flags(STMT_END_F))
+    status_var_increment(thd->status_var.com_stat[SQLCOM_DELETE]);
+
   if ((m_table->file->ha_table_flags() & HA_PRIMARY_KEY_REQUIRED_FOR_POSITION) &&
       m_table->s->primary_key < MAX_KEY)
   {
@@ -9904,6 +9975,12 @@ Update_rows_log_event::Update_rows_log_event(const char *buf, uint event_len,
 int 
 Update_rows_log_event::do_before_row_operations(const Slave_reporting_capability *const)
 {
+  /*
+    Increment the global status update count variable
+  */
+  if (get_flags(STMT_END_F))
+    status_var_increment(thd->status_var.com_stat[SQLCOM_UPDATE]);
+
   if (m_table->s->keys > 0)
   {
     // Allocate buffer for key searches
