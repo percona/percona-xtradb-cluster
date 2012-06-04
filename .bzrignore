@@ -104,7 +104,9 @@ CTestTestfile.cmake
 COPYING
 COPYING.LIB
 doc/build/*
+doc-pxc/build/*
 doc/build
+doc-pxc/build
 Docs/#manual.texi#
 Docs/INSTALL-BINARY
 Docs/Images/myaccess-odbc.txt
@@ -3076,6 +3078,7 @@ source_downloads
 !kewpie/docs/Makefile
 !kewpie/randgen/Makefile
 !doc/Makefile
+!doc-pxc/Makefile
 Makefile
 scripts/clustercheck
 scripts/mysqlcheck
