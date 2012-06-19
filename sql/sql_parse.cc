@@ -2403,12 +2403,33 @@ mysql_execute_command(THD *thd)
      * allow SET and SHOW queries
      */
     if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
-	lex->sql_command != SQLCOM_SET_OPTION &&
-	!is_show_query(lex->sql_command))
+        lex->sql_command != SQLCOM_SET_OPTION &&
+        !is_show_query(lex->sql_command))
     {
+#if DIRTY_HACK
+      /* Dirty hack for lp:1002714 - trying to recognize mysqldump connection
+       * and allow it to continue. Actuall mysqldump_magic_str may be longer
+       * and is obviously version dependent and may be issued by any client
+       * connection after which connection becomes non-replicating. */
+      static char const mysqldump_magic_str[]=
+"SELECT LOGFILE_GROUP_NAME, FILE_NAME, TOTAL_EXTENTS, INITIAL_SIZE, ENGINE, EXTRA FROM INFORMATION_SCHEMA.FILES WHERE FILE_TYPE = 'UNDO LOG' AND FILE_NAME IS NOT NULL";
+      static const size_t mysqldump_magic_str_len= sizeof(mysqldump_magic_str) -1;
+      if (SQLCOM_SELECT != lex->sql_command ||
+          thd->query_length() < mysqldump_magic_str_len ||
+          strncmp(thd->query(), mysqldump_magic_str, mysqldump_magic_str_len))
+      {
+#endif /* DIRTY_HACK */
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0), 
 	       "WSREP has not yet prepared node for application use");
       goto error;
+#if DIRTY_HACK
+      }
+      else
+      {
+        /* mysqldump connection, allow all further queries to pass */
+        thd->variables.wsrep_on= FALSE;
+      }
+#endif /* DIRTY_HACK */
     }
   }
 #endif /* WITH_WSREP */

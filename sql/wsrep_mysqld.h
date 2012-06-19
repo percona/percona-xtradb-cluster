@@ -50,6 +50,7 @@ extern const char* wsrep_sst_method;
 extern const char* wsrep_sst_receive_address;
 extern       char* wsrep_sst_auth;
 extern const char* wsrep_sst_donor;
+extern my_bool     wsrep_sst_donor_rejects_queries;
 extern const char* wsrep_start_position;
 extern long long   wsrep_max_ws_size;
 extern long        wsrep_max_ws_rows;
@@ -142,7 +143,7 @@ extern void wsrep_init_startup(bool first);
 
 extern void wsrep_close_client_connections(my_bool wait_to_end);
 extern void wsrep_close_applier(THD *thd);
-extern void wsrep_wait_appliers_close(THD *thd); 
+extern void wsrep_wait_appliers_close(THD *thd);
 extern void wsrep_create_appliers(long threads = wsrep_slave_threads);
 extern void wsrep_create_rollbacker();
 extern void wsrep_kill_mysql(THD *thd);

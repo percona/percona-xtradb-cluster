@@ -326,15 +326,27 @@ out:
   local_status.set(new_status, view);
 }
 
+void wsrep_ready_set (my_bool x)
+{
+  WSREP_DEBUG("Setting wsrep_ready to %d", x);
+  if (mysql_mutex_lock (&LOCK_wsrep_ready)) abort();
+  if (wsrep_ready != x)
+  {
+    wsrep_ready= x;
+    mysql_cond_signal (&COND_wsrep_ready);
+  }
+  mysql_mutex_unlock (&LOCK_wsrep_ready);
+}
+
 // Wait until wsrep has reached ready state
 void wsrep_ready_wait ()
 {
   if (mysql_mutex_lock (&LOCK_wsrep_ready)) abort();
   while (!wsrep_ready)
-    {
-      WSREP_INFO("Waiting to reach ready state");
-      mysql_cond_wait (&COND_wsrep_ready, &LOCK_wsrep_ready);
-    }
+  {
+    WSREP_INFO("Waiting to reach ready state");
+    mysql_cond_wait (&COND_wsrep_ready, &LOCK_wsrep_ready);
+  }
   WSREP_INFO("ready state reached");
   mysql_mutex_unlock (&LOCK_wsrep_ready);
 }

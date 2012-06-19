@@ -3358,7 +3358,7 @@ static Sys_var_mybool Sys_wsrep_drupal_282555_workaround(
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_charptr sys_wsrep_sst_method(
-       "wsrep_sst_method", "Snapshot transfer method",
+       "wsrep_sst_method", "State snapshot transfer method",
        GLOBAL_VAR(wsrep_sst_method),CMD_LINE(REQUIRED_ARG),
        IN_FS_CHARSET, DEFAULT(wsrep_sst_method), NO_MUTEX_GUARD, NOT_IN_BINLOG,
        ON_CHECK(wsrep_sst_method_check),
@@ -3387,6 +3387,12 @@ static Sys_var_charptr Sys_wsrep_sst_donor(
        IN_FS_CHARSET, DEFAULT(""), NO_MUTEX_GUARD, NOT_IN_BINLOG,
        ON_CHECK(wsrep_sst_donor_check),
        ON_UPDATE(wsrep_sst_donor_update)); 
+
+static Sys_var_mybool Sys_wsrep_sst_donor_rejects_queries(
+       "wsrep_sst_donor_rejects_queries", "Reject client queries "
+       "when donating state snapshot transfer", 
+       GLOBAL_VAR(wsrep_sst_donor_rejects_queries), 
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_mybool Sys_wsrep_on (
        "wsrep_on", "To enable wsrep replication ",
