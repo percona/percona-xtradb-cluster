@@ -761,8 +761,8 @@ ulint wsrep_append_foreign_key(trx_t *trx,
 			       dict_foreign_t*	foreign,
 			       const rec_t*	clust_rec,
 			       dict_index_t*	clust_index,
-			       ibool		shared,
-			       ibool            referenced);
+			       ibool		referenced,
+			       ibool            shared);
 #endif /* WITH_WSREP */
 
 /*********************************************************************//**
@@ -1429,7 +1429,7 @@ run_again:
 							foreign,
 							rec, 
 							check_index, 
-							TRUE, TRUE);
+							check_ref, TRUE);
 					} else {
 					  fprintf(stderr, "WSREP: skipping FK key append\n");
 						err = wsrep_append_foreign_key(

@@ -170,6 +170,47 @@ func_exit:
 	return(is_referenced);
 }
 
+#ifdef WITH_WSREP
+ulint wsrep_append_foreign_key(trx_t *trx,  
+			       dict_foreign_t*	foreign,
+			       const rec_t*	clust_rec,
+			       dict_index_t*	clust_index,
+			       ibool		shared,
+			       ibool            referenced);
+
+static 
+void
+wsrep_append_fk_reference(
+/*=================================*/
+	upd_node_t*	node,	/*!< in: row update node */
+	dict_table_t*	table,	/*!< in: table in question */
+	dict_index_t*	index,	/*!< in: index of the cursor */
+	que_thr_t*	thr,	/*!< in: query thread */
+	const rec_t*	rec
+) {
+	dict_foreign_t *foreign = UT_LIST_GET_FIRST(table->foreign_list);
+
+	while (foreign) {
+		if (foreign->foreign_index == index
+		    && node->is_delete) 
+		{
+			fprintf(stderr, "WSREP: FK key append for delete\n");
+			if (DB_SUCCESS != wsrep_append_foreign_key(
+				thr_get_trx(thr),
+				foreign,
+				rec, 
+				index, 
+				TRUE, TRUE)
+			) {
+				fprintf(stderr, 
+					"WSREP: FK key append for failed\n");
+			}
+		}
+		foreign = UT_LIST_GET_NEXT(foreign_list, foreign);
+	}
+}
+#endif /* WITH_WSREP */
+
 /*********************************************************************//**
 Checks if possible foreign key constraints hold after a delete of the record
 under pcur.
@@ -283,7 +324,6 @@ row_upd_check_references_constraints(
 	}
 
 	err = DB_SUCCESS;
-
 func_exit:
 	if (got_s_lock) {
 		row_mysql_unfreeze_data_dictionary(trx);
@@ -1646,6 +1686,12 @@ row_upd_sec_index_entry(
 					node, &pcur, index->table,
 					index, offsets, thr, &mtr);
 			}
+#ifdef WITH_WSREP
+			if (err == DB_SUCCESS && !referenced) {
+				wsrep_append_fk_reference(node, index->table, 
+							  index, thr, rec);
+			}
+#endif /* WITH_WSREP */
 		}
 		break;
 	}
