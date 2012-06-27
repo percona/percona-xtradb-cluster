@@ -75,11 +75,11 @@ How-to
    :maxdepth: 1
    :glob:
   
-   singlebox
-   3nodesec2
-   haproxy
-   kewpietests
-   bugreport
+   howtos/singlebox
+   howtos/3nodesec2
+   howtos/haproxy
+   howtos/virt_sandbox
+   howtos/kewpietests
 
 Percona XtraDB Cluster limitations
 ==================================
@@ -106,6 +106,7 @@ Reference
    :glob:
 
    release-notes/release-notes_index
+   bugreport
    glossary
 
 Indices and tables
