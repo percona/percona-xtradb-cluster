@@ -102,11 +102,15 @@ rst_prolog = '''
 
 .. |IST|  replace:: :term:`IST`
 
+.. |SST|  replace:: :term:`SST`
+
 .. |XtraDB Cluster|  replace:: :term:`XtraDB Cluster`
 
 .. |Percona XtraDB Cluster|  replace:: :term:`Percona XtraDB Cluster`
 
 .. |InnoDB|  replace:: :term:`InnoDB`
+
+.. |HAProxy|  replace:: :term:`HAProxy`
 
 .. |MyISAM|  replace:: :term:`MyISAM`
 
@@ -123,6 +127,10 @@ rst_prolog = '''
 .. |Percona|  replace:: *Percona*
 
 .. |MySQL|  replace:: *MySQL*
+
+.. |sysbench|  replace:: *sysbench*
+
+.. |PXC|  replace:: *Percona XtraDB Cluster*
 
 .. |Drizzle|  replace:: *Drizzle*
 
