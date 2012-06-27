@@ -175,8 +175,8 @@ ulint wsrep_append_foreign_key(trx_t *trx,
 			       dict_foreign_t*	foreign,
 			       const rec_t*	clust_rec,
 			       dict_index_t*	clust_index,
-			       ibool		shared,
-			       ibool            referenced);
+			       ibool		referenced,
+			       ibool            shared);
 
 static 
 void
@@ -194,7 +194,6 @@ wsrep_append_fk_reference(
 		if (foreign->foreign_index == index
 		    && node->is_delete) 
 		{
-			fprintf(stderr, "WSREP: FK key append for delete\n");
 			if (DB_SUCCESS != wsrep_append_foreign_key(
 				thr_get_trx(thr),
 				foreign,
@@ -203,7 +202,7 @@ wsrep_append_fk_reference(
 				TRUE, TRUE)
 			) {
 				fprintf(stderr, 
-					"WSREP: FK key append for failed\n");
+					"WSREP: FK key append failed\n");
 			}
 		}
 		foreign = UT_LIST_GET_NEXT(foreign_list, foreign);
@@ -1933,6 +1932,12 @@ err_exit:
 				goto err_exit;
 			}
 		}
+#ifdef WITH_WSREP
+		if (!referenced) {
+			wsrep_append_fk_reference(node, index->table, 
+						  index, thr, rec);
+		}
+#endif /* WITH_WSREP */
 	}
 
 	mtr_commit(mtr);
@@ -2135,6 +2140,9 @@ row_upd_del_mark_clust_rec(
 	btr_pcur_t*	pcur;
 	btr_cur_t*	btr_cur;
 	ulint		err;
+#ifdef WITH_WSREP
+	rec_t*		rec;
+#endif /* WITH_WSREP */
 
 	ut_ad(node);
 	ut_ad(dict_index_is_clust(index));
@@ -2151,15 +2159,29 @@ row_upd_del_mark_clust_rec(
 	/* Mark the clustered index record deleted; we do not have to check
 	locks, because we assume that we have an x-lock on the record */
 
+#ifdef WITH_WSREP
+	rec = btr_cur_get_rec(btr_cur);
+#endif /* WITH_WSREP */
+
 	err = btr_cur_del_mark_set_clust_rec(
 		BTR_NO_LOCKING_FLAG, btr_cur_get_block(btr_cur),
+#ifdef WITH_WSREP
+		rec, index, offsets, TRUE, thr, mtr);
+#else
 		btr_cur_get_rec(btr_cur), index, offsets, TRUE, thr, mtr);
+#endif /* WITH_WSREP */
 	if (err == DB_SUCCESS && referenced) {
 		/* NOTE that the following call loses the position of pcur ! */
 
 		err = row_upd_check_references_constraints(
 			node, pcur, index->table, index, offsets, thr, mtr);
 	}
+#ifdef WITH_WSREP
+	if (err == DB_SUCCESS && !referenced) {
+		wsrep_append_fk_reference(node, index->table, 
+					  index, thr, rec);
+	}
+#endif /* WITH_WSREP */
 
 	mtr_commit(mtr);
 
