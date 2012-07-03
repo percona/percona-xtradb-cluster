@@ -67,6 +67,7 @@ typedef int64_t  wsrep_seqno_t;   //!< sequence number of a writeset, etc.
 /*! wsrep status codes */
 typedef enum wsrep_status {
     WSREP_OK        = 0,   //!< success
+    WSREP_APPLIER_CLOSING, //!< success, applier marked to terminate
     WSREP_WARNING,         //!< minor warning, error logged
     WSREP_TRX_MISSING,     //!< transaction is not known by wsrep
     WSREP_TRX_FAIL,        //!< transaction aborted, server can continue
