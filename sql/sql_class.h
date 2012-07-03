@@ -2197,6 +2197,7 @@ public:
 
 #ifdef WITH_WSREP
   const bool                wsrep_applier; /* dedicated slave applier thread */
+  bool                      wsrep_applier_closing; /* applier marked to close */
   bool                      wsrep_client_thread; /* to identify client threads*/
   enum wsrep_exec_mode      wsrep_exec_mode;
   query_id_t                wsrep_last_query_id;

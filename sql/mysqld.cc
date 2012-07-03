@@ -674,6 +674,7 @@ mysql_cond_t  COND_wsrep_rollback;
 wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
 mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t  COND_wsrep_replaying;
+mysql_mutex_t LOCK_wsrep_slave_threads;
 int wsrep_replaying= 0;
 static void wsrep_close_threads(THD* thd);
 #endif
@@ -1682,6 +1683,7 @@ static void clean_up_mutexes()
   (void) mysql_cond_destroy(&COND_wsrep_rollback);
   (void) mysql_mutex_destroy(&LOCK_wsrep_replaying);
   (void) mysql_cond_destroy(&COND_wsrep_replaying);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
 #endif
 }
 #endif /*EMBEDDED_LIBRARY*/
@@ -3701,6 +3703,8 @@ static int init_thread_environment()
   mysql_mutex_init(key_LOCK_wsrep_replaying, 
 		   &LOCK_wsrep_replaying, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_replaying, &COND_wsrep_replaying, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_slave_threads, 
+		   &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
 #endif
   return 0;
 }
@@ -4614,9 +4618,7 @@ void wsrep_close_client_connections(my_bool wait_to_end)
 
 void wsrep_close_applier(THD *thd)
 {
-  if (wsrep_debug)
-    WSREP_INFO("closing applier %ld", thd->thread_id);
-
+  WSREP_DEBUG("closing applier %ld", thd->thread_id);
   wsrep_close_thread(thd);
 }
 
@@ -4633,10 +4635,30 @@ static void wsrep_close_threads(THD *thd)
     /* We skip slave threads & scheduler on this first loop through. */
     if (tmp->wsrep_applier && tmp != thd)
     {
-      if (wsrep_debug)
-        WSREP_INFO("closing wsrep thread %ld", tmp->thread_id);
+      WSREP_DEBUG("closing wsrep thread %ld", tmp->thread_id);
       wsrep_close_thread (tmp);
+    }
+  }
 
+  mysql_mutex_unlock(&LOCK_thread_count);
+}
+
+void wsrep_close_applier_threads(int count)
+{
+  THD *tmp;
+  mysql_mutex_lock(&LOCK_thread_count); // For unlink from list
+
+  I_List_iterator<THD> it(threads);
+  while ((tmp=it++) && count)
+  {
+    DBUG_PRINT("quit",("Informing thread %ld that it's time to die",
+                       tmp->thread_id));
+    /* We skip slave threads & scheduler on this first loop through. */
+    if (tmp->wsrep_applier)
+    {
+      WSREP_DEBUG("closing wsrep applier thread %ld", tmp->thread_id);
+      tmp->wsrep_applier_closing= TRUE;
+      count--;
     }
   }
 
@@ -8429,7 +8451,8 @@ PSI_mutex_key key_BINLOG_LOCK_index, key_BINLOG_LOCK_prep_xids,
 #ifdef WITH_WSREP
 PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
   key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
-  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init;
+  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
+  key_LOCK_wsrep_slave_threads;
 #endif
 PSI_mutex_key key_RELAYLOG_LOCK_index;
 
@@ -8493,6 +8516,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_rollback, "LOCK_wsrep_rollback", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
 #endif
   { &key_PARTITION_LOCK_auto_inc, "HA_DATA_PARTITION::LOCK_auto_inc", 0}
 };

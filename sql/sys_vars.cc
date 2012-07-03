@@ -3287,12 +3287,13 @@ static Sys_var_charptr Sys_wsrep_cluster_name(
        ON_CHECK(wsrep_cluster_name_check),
        ON_UPDATE(wsrep_cluster_name_update));
 
+static PolyLock_mutex PLock_wsrep_slave_threads(&LOCK_wsrep_slave_threads);
 static Sys_var_charptr Sys_wsrep_cluster_address (
        "wsrep_cluster_address", "Address to initially connect to cluster",
        GLOBAL_VAR(wsrep_cluster_address), 
        CMD_LINE(REQUIRED_ARG, OPT_WSREP_CLUSTER_ADDRESS),
        IN_FS_CHARSET, DEFAULT(wsrep_cluster_address),
-       NO_MUTEX_GUARD, NOT_IN_BINLOG,
+       &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
        ON_CHECK(wsrep_cluster_address_check), 
        ON_UPDATE(wsrep_cluster_address_update));
 
@@ -3321,7 +3322,10 @@ static Sys_var_charptr Sys_wsrep_node_incoming_address(
 static Sys_var_ulong Sys_wsrep_slave_threads(
        "wsrep_slave_threads", "Number of slave appliers to launch",
        GLOBAL_VAR(wsrep_slave_threads), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1, 512), DEFAULT(1), BLOCK_SIZE(1));
+       VALID_RANGE(1, 512), DEFAULT(1), BLOCK_SIZE(1),
+       &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
+       ON_CHECK(wsrep_slave_threads_check), 
+       ON_UPDATE(wsrep_slave_threads_update));
 
 static Sys_var_charptr Sys_wsrep_dbug_option(
        "wsrep_dbug_option", "DBUG options to provider library",
