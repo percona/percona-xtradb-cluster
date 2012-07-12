@@ -43,6 +43,11 @@
     REPLAYING,
     RETRY_AUTOCOMMIT,
   };
+  enum wsrep_consistency_check_mode {
+    NO_CONSISTENCY_CHECK,
+    CONSISTENCY_CHECK_DECLARED,
+    CONSISTENCY_CHECK_RUNNING,
+  };
 #endif
 
 #ifdef USE_PRAGMA_INTERFACE
@@ -2219,7 +2224,8 @@ public:
   char*                     wsrep_retry_query;
   size_t                    wsrep_retry_query_len;
   enum enum_server_command  wsrep_retry_command;
-  bool                      wsrep_consistency_check;
+  enum wsrep_consistency_check_mode 
+                            wsrep_consistency_check;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

@@ -1457,7 +1457,7 @@ int lex_one_token(void *arg, void *yythd)
 	    if (version == 99997 && thd->wsrep_exec_mode == LOCAL_STATE)
 	    {
 	      WSREP_DEBUG("consistency check: %s", thd->query());
-	      thd->wsrep_consistency_check= TRUE;
+	      thd->wsrep_consistency_check= CONSISTENCY_CHECK_DECLARED;
 	      lip->yySkipn(5);
 	      lip->set_echo(TRUE);
 	      state=MY_LEX_START;

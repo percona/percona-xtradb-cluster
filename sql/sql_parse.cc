@@ -3363,8 +3363,9 @@ end_with_restore_list:
       break;
 #ifdef WITH_WSREP
     if (lex->sql_command == SQLCOM_INSERT_SELECT &&
-	thd->wsrep_consistency_check)
+	thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED)
     {
+      thd->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
       WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL);
     }
 
@@ -4984,7 +4985,7 @@ finish:
   close_thread_tables(thd);
 #ifdef WITH_WSREP
   WSREP_TO_ISOLATION_END
-  thd->wsrep_consistency_check= FALSE;
+  thd->wsrep_consistency_check= NO_CONSISTENCY_CHECK;
 #endif /* WITH_WSREP */
   thd_proc_info(thd, 0);
 
