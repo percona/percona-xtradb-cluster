@@ -3365,7 +3365,7 @@ end_with_restore_list:
     if (lex->sql_command == SQLCOM_INSERT_SELECT &&
 	thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED)
     {
-      thd->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
+      thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
       WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL);
     }
 
