@@ -33,7 +33,10 @@ For example for 4567 port (substitute 192.168.0.1 by your IP): ::
 
 5. Create /etc/my.cnf files.
 
-On the first node (assume IP 10.93.46.58): ::
+ On the first node (assume IP 10.93.46.58): ::
+
+  [mysqld_safe]
+  wsrep_urls=gcomm://10.93.46.58:4567,gcomm://10.93.46.59:4567,gcomm://10.93.46.60:4567,gcomm://  
 
   [mysqld]
   datadir=/mnt/data
@@ -42,8 +45,6 @@ On the first node (assume IP 10.93.46.58): ::
   binlog_format=ROW
 
   wsrep_provider=/usr/lib64/libgalera_smm.so
-
-  wsrep_cluster_address=gcomm://
 
   wsrep_slave_threads=2
   wsrep_cluster_name=trimethylxanthine
@@ -53,8 +54,10 @@ On the first node (assume IP 10.93.46.58): ::
   innodb_locks_unsafe_for_binlog=1
   innodb_autoinc_lock_mode=2
 
+ On the second node (assume IP 10.93.46.59): ::
 
-On the second node: ::
+  [mysqld_safe]
+  wsrep_urls=gcomm://10.93.46.58:4567,gcomm://10.93.46.59:4567,gcomm://10.93.46.60:4567,gcomm://
 
   [mysqld]
   datadir=/mnt/data
@@ -63,8 +66,6 @@ On the second node: ::
   binlog_format=ROW
 
   wsrep_provider=/usr/lib64/libgalera_smm.so
-
-  wsrep_cluster_address=gcomm://10.93.46.58
 
   wsrep_slave_threads=2
   wsrep_cluster_name=trimethylxanthine
@@ -78,12 +79,12 @@ On the third (and following nodes) config is similar, with the following change:
 
   wsrep_node_name=node3
 
-6. Start mysqld
+In this example variable :variable:`wsrep_urls` is being used instead of :variable:`wsrep_cluster_address`. With this configuration, node will first try to reach a cluster on `10.93.46.58:4567` if there is no cluster node, then it will try on `10.93.46.59:4567` and then `10.93.46.60:4567`. If no nodes are up, it will start a new cluster. Variable :variable:`wsrep_urls` goes into the [mysql_safe] section so it's important that the mysql server instance is started with the `/bin/mysql_safe` and not `bin/mysqld`.
+
+6. Start mysqld_safe
 
 On the first node: ::
 
-   /usr/sbin/mysqld
-   or
    mysqld_safe
 
 You should be able to see in console (or in error-log file): ::
@@ -95,8 +96,6 @@ You should be able to see in console (or in error-log file): ::
 
 On the second (and following nodes): ::
 
-   /usr/sbin/mysqld
-   or
    mysqld_safe
 
 You should be able to see in console (or in error-log file): ::
@@ -105,11 +104,11 @@ You should be able to see in console (or in error-log file): ::
   111216  0:21:39 [Note] WSREP: Shifting OPEN -> PRIMARY (TO: 0)
   111216  0:21:39 [Note] WSREP: New cluster view: global state: f912d2eb-27a2-11e1-0800-f34c520a3d4b:0, view# 2: Primary, number of nodes: 2, my index: 1, protocol version 1
   111216  0:21:39 [Warning] WSREP: Gap in state sequence. Need state transfer.
-  111216  0:21:41 [Note] WSREP: Running: 'wsrep_sst_rsync 'joiner' '10.93.62.178' '' '/mnt/data/' '/etc/my.cnf' '1694' 2>sst.err'
-  111216  0:21:41 [Note] WSREP: Prepared SST request: rsync|10.93.62.178:4444/rsync_sst
+  111216  0:21:41 [Note] WSREP: Running: 'wsrep_sst_rsync 'joiner' '10.93.46.60' '' '/mnt/data/' '/etc/my.cnf' '1694' 2>sst.err'
+  111216  0:21:41 [Note] WSREP: Prepared SST request: rsync|10.93.46.60:4444/rsync_sst
   111216  0:21:41 [Note] WSREP: wsrep_notify_cmd is not defined, skipping notification.
   111216  0:21:41 [Note] WSREP: Assign initial position for certification: 0, protocol version: 1
-  111216  0:21:41 [Note] WSREP: prepared IST receiver, listening in: tcp://10.93.62.178:4568
+  111216  0:21:41 [Note] WSREP: prepared IST receiver, listening in: tcp://10.93.46.60:4568
   111216  0:21:41 [Note] WSREP: Node 1 (node2) requested state transfer from '*any*'. Selected 0 (node1)(SYNCED) as donor.
   111216  0:21:41 [Note] WSREP: Shifting PRIMARY -> JOINER (TO: 0)
   111216  0:21:41 [Note] WSREP: Requesting state transfer: success, donor: 0
