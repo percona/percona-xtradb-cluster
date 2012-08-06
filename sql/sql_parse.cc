@@ -8207,11 +8207,16 @@ int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr, my_bool signal)
   THD *bf_thd     = (THD *) bf_thd_ptr;
   DBUG_ENTER("wsrep_abort_thd");
 
-  if (WSREP(bf_thd) && victim_thd)
+  if ( (WSREP(bf_thd) || 
+	(WSREP_ON && bf_thd->wsrep_exec_mode == TOTAL_ORDER)) && victim_thd)
   {
     WSREP_DEBUG("wsrep_abort_thd, by: %llu, victim: %llu", (bf_thd) ?
                 (long long)bf_thd->real_id : 0, (long long)victim_thd->real_id);
     ha_wsrep_abort_transaction(bf_thd, victim_thd, signal);
+  } 
+  else
+  {
+    WSREP_DEBUG("wsrep_abort_thd not effective: %p %p", bf_thd, victim_thd);
   }
      
   DBUG_RETURN(1);
