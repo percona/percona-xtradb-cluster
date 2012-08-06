@@ -7912,8 +7912,7 @@ wsrep_status_t wsrep_apply_cb(void* const ctx,
 
   if (WSREP_OK != rcode) wsrep_write_rbr_buf(thd, buf, buf_len);
 
-  return (WSREP_OK == rcode && thd->wsrep_applier_closing) ? 
-    WSREP_APPLIER_CLOSING : rcode;
+  return rcode;
 }
 
 #if DELETE // this does not work in 5.5
