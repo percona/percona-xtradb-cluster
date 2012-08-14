@@ -4768,7 +4768,6 @@ void wsrep_close_applier_threads(int count)
       WSREP_DEBUG("closing wsrep applier thread %ld", tmp->thread_id);
       tmp->wsrep_applier_closing= TRUE;
       count--;
->>>>>>> MERGE-SOURCE
     }
   }
 
@@ -8716,7 +8715,7 @@ PSI_mutex_key key_BINLOG_LOCK_index, key_BINLOG_LOCK_prep_xids,
 #ifdef WITH_WSREP
 PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
   key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
-  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init;
+  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init,
   key_LOCK_wsrep_slave_threads;
 #endif
 PSI_mutex_key key_RELAYLOG_LOCK_index;
