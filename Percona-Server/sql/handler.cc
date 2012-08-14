@@ -1430,14 +1430,6 @@ int ha_commit_trans(THD *thd, bool all)
         DBUG_EXECUTE_IF("crash_commit_after", DBUG_SUICIDE(););
         goto end;
       }
-#ifdef WITH_WSREP
-      if (!error && wsrep_is_wsrep_xid(&thd->transaction.xid_state.xid))
-      {
-        // xid was rewritten by wsrep
-        xid= wsrep_xid_seqno(&thd->transaction.xid_state.xid);
-      }
-#endif // WITH_WSREP
-
 
     cookie= tc_log->log_and_order(thd, xid, all, need_commit_ordered);
     if (!cookie)
@@ -1479,7 +1471,6 @@ end:
       thd->mdl_context.release_lock(mdl_request.ticket);
     }
   }
-  /* Free resources and perform other cleanup even for 'empty' transactions. */
   DBUG_RETURN(error);
 }
 

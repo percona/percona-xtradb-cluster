@@ -4927,6 +4927,10 @@ ha_innobase::clone(
 	new_handler = static_cast<ha_innobase*>(handler::clone(name,
 							       mem_root));
 	if (new_handler) {
+		DBUG_ASSERT(new_handler->prebuilt != NULL);
+		DBUG_ASSERT(new_handler->user_thd == user_thd);
+		DBUG_ASSERT(new_handler->prebuilt->trx == prebuilt->trx);
+
 		new_handler->prebuilt->select_lock_type
 			= prebuilt->select_lock_type;
 	}
@@ -7690,13 +7694,15 @@ wsrep_append_foreign_key(
 /*===========================*/
 	trx_t*		trx,		/*!< in: trx */
 	dict_foreign_t*	foreign,	/*!< in: foreign key constraint */
-	const rec_t*	clust_rec,	/*!<in: clustered index record */
-	dict_index_t*	clust_index,	/*!<in: clustered index */
+	const rec_t*	rec,		/*!<in: clustered index record */
+	dict_index_t*	index,		/*!<in: clustered index */
+	ibool		referenced,	/*!<in: is check for referenced table */
 	ibool		shared)		/*!<in: is shared access */
 {
 	THD*  thd = (THD*)trx->mysql_thd;
 	ulint rcode = DB_SUCCESS;
 	char  cache_key[512] = {'\0'};
+	int   cache_key_len;
 
 	if (!wsrep_on(trx->mysql_thd) || 
 	    wsrep_thd_exec_mode(thd) != LOCAL_STATE) 
@@ -7705,39 +7711,55 @@ wsrep_append_foreign_key(
 	byte  key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
 	ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
 
-	key[0] = '\0';
+	dict_index_t *idx_target = (referenced) ? 
+		foreign->referenced_index : foreign->foreign_index;
+	dict_index_t *idx = (referenced) ? 
+		UT_LIST_GET_FIRST(foreign->referenced_table->indexes) :
+		UT_LIST_GET_FIRST(foreign->foreign_table->indexes);
+	int i = 0;
+	while (idx != NULL && idx != idx_target) {
+		idx = UT_LIST_GET_NEXT(indexes, idx);
+		i++;
+	}
+	ut_a(idx);
+	key[0] = (char)i;
+
 	rcode = wsrep_rec_get_primary_key(
-		&key[1], &len, clust_rec, clust_index, 
+		&key[1], &len, rec, index, 
 		wsrep_protocol_version > 1);
 	if (rcode != DB_SUCCESS) {
 		WSREP_ERROR("FK key set failed: %lu", rcode);
 		return rcode;
 	}
+	strncpy(cache_key,
+		(wsrep_protocol_version > 1) ? 
+		((referenced) ? 
+			foreign->referenced_table->name : 
+			foreign->foreign_table->name) :
+		foreign->foreign_table->name, 512);
+	cache_key_len = strlen(cache_key);
 #ifdef WSREP_DEBUG_PRINT
-	ulint i;
-	fprintf(stderr, "FK parent key, table: %s shared: %d len: %lu ", 
-		foreign->referenced_table_name, (int)shared, len+1);
-	for (i=0; i<len+1; i++) {
-		fprintf(stderr, " %hhX, ", key[i]);
+	ulint j;
+	fprintf(stderr, "FK parent key, table: %s %s len: %lu ", 
+		cache_key, (shared) ? "shared" : "exclusive", len+1);
+	for (j=0; j<len+1; j++) {
+		fprintf(stderr, " %hhX, ", key[j]);
 	}
 	fprintf(stderr, "\n");
 #endif
-	strncpy(cache_key, (wsrep_protocol_version > 1) ? 
-		foreign->referenced_table->name :
-		foreign->foreign_table->name, 512);
 	char *p = strchr(cache_key, '/');
 	if (p) {
 		*p = '\0';
 	} else {
-		WSREP_WARN("unexpected foreign key table %s", 
-			   foreign->foreign_table->name);
+		WSREP_WARN("unexpected foreign key table %s %s", 
+			   foreign->referenced_table->name, foreign->foreign_table->name);
 	}
 
 	wsrep_key_part_t wkey_part[3];
         wsrep_key_t wkey = {wkey_part, 3};
 	if (!wsrep_prepare_key_for_innodb(
 		(const uchar*)cache_key, 
-		strlen(foreign->foreign_table->name) +  1,
+		cache_key_len +  1,
 		(const uchar*)key, len+1,
 		wkey_part,
 		&wkey.key_parts_len)) {
@@ -7816,6 +7838,23 @@ wsrep_append_key(
 	}
 	DBUG_RETURN(0);
 }
+
+ibool
+wsrep_is_cascding_foreign_key_parent(
+	dict_table_t*	table,	/*!< in: InnoDB table */
+	dict_index_t*	index	/*!< in: InnoDB index */
+) { 
+	// return referenced_by_foreign_key();
+	dict_foreign_t* fk = dict_table_get_referenced_constraint(table, index);
+	if (fk                                            && 
+	    (fk->type & DICT_FOREIGN_ON_UPDATE_CASCADE    ||
+	     fk->type & DICT_FOREIGN_ON_UPDATE_SET_NULL)
+	) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
 int
 ha_innobase::wsrep_append_keys(
 /*==================*/
@@ -7884,7 +7923,9 @@ ha_innobase::wsrep_append_keys(
 			keyval0[0] = (char)i;
 			keyval1[0] = (char)i;
 
-			if (key_info->flags & HA_NOSAME) {
+			if (key_info->flags & HA_NOSAME ||
+			    referenced_by_foreign_key()) {
+
 				len = wsrep_store_key_val_for_row(
 					table, i, key0, key_info->key_length, 
 					record0, &is_null);
