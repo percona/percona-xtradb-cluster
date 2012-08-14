@@ -15,6 +15,7 @@ set -ue
 # Examine parameters
 TARGET="$(uname -m)"
 TARGET_CFLAGS=''
+QUIET='VERBOSE=1'
 
 # Some programs that may be overriden
 TAR=${TAR:-tar}
@@ -22,7 +23,7 @@ TAR=${TAR:-tar}
 # Check if we have a functional getopt(1)
 if ! getopt --test
 then
-    go_out="$(getopt --options="i" --longoptions=i686 \
+    go_out="$(getopt --options="iq" --longoptions=i686,quiet \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -36,6 +37,10 @@ do
         shift
         TARGET="i686"
         TARGET_CFLAGS="-m32 -march=i686"
+        ;;
+    -q | --quiet )
+        shift
+        QUIET=''
         ;;
     esac
 done
@@ -149,7 +154,7 @@ INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
         -DWITH_WSREP=ON \
         -DCOMPILATION_COMMENT="$COMMENT"
 
-    make $MAKE_JFLAG VERBOSE=1
+    make $MAKE_JFLAG $QUIET
     make DESTDIR="$INSTALLDIR" install
 
     # Build HandlerSocket

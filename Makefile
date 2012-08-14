@@ -1,6 +1,6 @@
 FETCH_CMD=wget
 MASTER_SITE=http://s3.amazonaws.com/percona.com/downloads/community
-MYSQL_VERSION=5.5.24
+MYSQL_VERSION=5.5.27
 PERCONA_SERVER_VERSION=rel25.3
 PERCONA_XTRADB_CLUSTER ?=Percona-XtraDB-Cluster-$(MYSQL_VERSION)
 PERCONA_SERVER ?=Percona-Server
@@ -21,7 +21,7 @@ CONFIGURE=CFLAGS="-O2 -g -fmessage-length=0 -D_FORTIFY_SOURCE=2" CXXFLAGS="-O2 -
 REVS = $(shell bzr log | grep rev | head -1   )
 REV  = $(word 2, $(REVS) )
 
-all: main handlersocket maatkit-udf install-lic misc
+all: main handlersocket maatkit-udf install-lic
 	@echo ""
 	@echo "Percona Server source code is ready"
 	@echo "Now change directory to $(PERCONA_XTRADB_CLUSTER) define variables as show below"
