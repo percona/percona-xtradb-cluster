@@ -25,7 +25,7 @@
 %define mysql_vendor            Oracle and/or its affiliates
 %define percona_server_vendor	Percona, Inc
 
-%define mysql_version 5.5.24
+%define mysql_version 5.5.27
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
@@ -235,13 +235,14 @@ Source:         Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
-Provides:       mysql mysql-server
+Provides:       mysql-server
 BuildRequires:  %{distro_buildreq}
 
 # Think about what you use here since the first step is to
 # run a rm -rf
 BuildRoot:    %{_tmppath}/%{name}-%{version}-build
 
+# From the manual
 %description
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
@@ -388,7 +389,32 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 %build
 
 # Be strict about variables, bail at earliest opportunity, etc.
-set -u
+set -uex
+
+BuildHandlerSocket() {
+    cd storage/HandlerSocket-Plugin-for-MySQL
+    bash -x ./autogen.sh
+    echo "Configuring HandlerSocket"
+    CXX="${HS_CXX:-g++}" \
+        MYSQL_CFLAGS="-I $RPM_BUILD_DIR/%{src_dir}/release/include" \
+        ./configure --with-mysql-source=$RPM_BUILD_DIR/%{src_dir}/%{src_dir} \
+        --with-mysql-bindir=$RPM_BUILD_DIR/%{src_dir}/release/scripts \
+        --with-mysql-plugindir=%{_libdir}/mysql/plugin \
+        --libdir=%{_libdir} \
+        --prefix=%{_prefix}
+    make
+    cd -
+}
+
+BuildUDF() {
+    cd UDF
+    CXX="${UDF_CXX:-g++}"\
+        CXXFLAGS="$CXXFLAGS -I$RPM_BUILD_DIR/%{src_dir}/release/include" \
+        ./configure --includedir=$RPM_BUILD_DIR/%{src_dir}/%{src_dir}/include \
+        --libdir=%{_libdir}/mysql/plugin
+    make all
+    cd -
+}
 
 # Optional package files
 touch optional-files-devel
@@ -420,32 +446,73 @@ export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-${MAKE_JFLAG:-}}
 
+# Build debug mysqld and libmysqld.a
+mkdir debug
+(
+  cd debug
+  # Attempt to remove any optimisation flags from the debug build
+  CFLAGS=`echo " ${CFLAGS} " | \
+            sed -e 's/ -O[0-9]* / /' \
+                -e 's/ -unroll2 / /' \
+                -e 's/ -ip / /' \
+                -e 's/^ //' \
+                -e 's/ $//'`
+  CXXFLAGS=`echo " ${CXXFLAGS} " | \
+              sed -e 's/ -O[0-9]* / /' \
+                  -e 's/ -unroll2 / /' \
+                  -e 's/ -ip / /' \
+                  -e 's/^ //' \
+                  -e 's/ $//'`
+  # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
+  # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
+  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           -DCMAKE_BUILD_TYPE=Debug \
+           -DWITH_EMBEDDED_SERVER=OFF \
+           -DENABLE_DTRACE=OFF \
+           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
+           -DFEATURE_SET="%{feature_set}" \
+           -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
+           -DWITH_WSREP=1 \
+           -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+  echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
+  make ${MAKE_JFLAG}
+)
 # Build full release
-# XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
-# XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-${CMAKE} %{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DWITH_EMBEDDED_SERVER=OFF \
-        -DENABLE_DTRACE=OFF \
-        -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
-        -DFEATURE_SET="%{feature_set}" \
-        -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
-        -DWITH_WSREP=1 \
-	-DWITH_INNODB_DISALLOW_WRITES=ON \
-        -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
-echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
-make ${MAKE_JFLAG}
+mkdir release
+(
+  cd release
+  # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
+  # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
+  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+           -DWITH_EMBEDDED_SERVER=OFF \
+           -DENABLE_DTRACE=OFF \
+           -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
+           -DFEATURE_SET="%{feature_set}" \
+           -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+           -DWITH_WSREP=1 \
+           -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+  echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
+  make ${MAKE_JFLAG}
+  cd ../%{src_dir}
+  d="`pwd`"
+  BuildHandlerSocket
+  BuildUDF
+  cd "$d"
+)
 
 # For the debuginfo extraction stage, some source files are not located in the release
 # and debug dirs, but in the source dir. Make a link there to avoid errors in the
 # strip phase.
-#for f in lexyy.c pars0grm.c pars0grm.y pars0lex.l
-#do
-#    for d in debug release
-#    do
-#        ln -s "../../../%{src_dir}/storage/innobase/$f" "$d/storage/innobase/"
-#    done
-#done
+for f in lexyy.c pars0grm.c pars0grm.y pars0lex.l
+do
+    for d in debug release
+    do
+        ln -s "../../../%{src_dir}/storage/innobase/pars/$f" "$d/storage/innobase/"
+    done
+done
 
 # Use the build root for temporary storage of the shared libraries.
 RBR=$RPM_BUILD_ROOT
@@ -493,13 +560,20 @@ install -d $RBR%{_sbindir}
 install -d $RBR%{_libdir}/mysql/plugin
 
 (
-  cd $MBD
+  cd $MBD/release
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
+  d="`pwd`"
+  cd $MBD/%{src_dir}/storage/HandlerSocket-Plugin-for-MySQL
+  make DESTDIR=$RBR benchdir_root=%{_datadir} install
+  cd "$d"
+  cd $MBD/%{src_dir}/UDF
+  make DESTDIR=$RBR benchdir_root=%{_datadir} install
+  cd "$d"
 )
 
 # Install all binaries
 (
-  cd $MBD
+  cd $MBD/release
   make DESTDIR=$RBR install
 )
 
@@ -509,8 +583,8 @@ install -d $RBR%{_libdir}/mysql/plugin
 mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
 
 # Install logrotate and autostart
-install -m 644 $MBD/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
-install -m 755 $MBD/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
+install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
+install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
@@ -918,10 +992,10 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %{license_files_server}
 %endif
 #%doc %{src_dir}/Docs/INFO_SRC
-%doc Docs/INFO_BIN
-%doc support-files/my-*.cnf
+%doc release/Docs/INFO_BIN
+%doc release/support-files/my-*.cnf
 %doc %{src_dir}/Docs/README-wsrep
-%doc support-files/wsrep.cnf
+%doc release/support-files/wsrep.cnf
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
 
@@ -986,6 +1060,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
 
 %attr(755, root, root) %{_sbindir}/mysqld
+%attr(755, root, root) %{_sbindir}/mysqld-debug
 %attr(755, root, root) %{_sbindir}/rcmysql
 %attr(755, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
@@ -999,6 +1074,42 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_client.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_interface.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/qa_auth_server.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/auth_pam.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/auth_pam_compat.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/dialog.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/adt_null.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libdaemon_example.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/mypluglib.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_master.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/semisync_slave.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_socket.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_test_plugin.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_client.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_interface.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_server.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_pam.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_pam_compat.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/dialog.so
+# HandlerSocket files
+%attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.a
+%attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.la
+%attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.so.0
+%attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.so.0.0.0
+# UDF files
+%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv1a_udf.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv1a_udf.so.0
+%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv1a_udf.so.0.0.0
+%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv_udf.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv_udf.so.0
+%attr(755, root, root) %{_libdir}/mysql/plugin/libfnv_udf.so.0.0.0
+%attr(755, root, root) %{_libdir}/mysql/plugin/libmurmur_udf.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/libmurmur_udf.so.0
+%attr(755, root, root) %{_libdir}/mysql/plugin/libmurmur_udf.so.0.0.0
+
+
+
 
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
@@ -1028,6 +1139,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/mysqlimport
 %attr(755, root, root) %{_bindir}/mysqlshow
 %attr(755, root, root) %{_bindir}/mysqlslap
+%attr(755, root, root) %{_bindir}/hsclient
 
 %doc %attr(644, root, man) %{_mandir}/man1/msql2mysql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.1*
@@ -1051,16 +1163,26 @@ echo "====="                                     >> $STATUS_HISTORY
 %dir %attr(755, root, root) %{_includedir}/mysql
 %dir %attr(755, root, root) %{_libdir}/mysql
 %{_includedir}/mysql/*
+%{_includedir}/handlersocket
 %{_datadir}/aclocal/mysql.m4
 %{_libdir}/mysql/libmysqlclient.a
 %{_libdir}/mysql/libmysqlclient_r.a
 %{_libdir}/mysql/libmysqlservices.a
+%{_libdir}/mysql/libhsclient.a
+%{_libdir}/libhsclient.la
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysql*.so*
+# Maatkit UDF libs
+%{_libdir}/mysql/plugin/libfnv1a_udf.a
+%{_libdir}/mysql/plugin/libfnv1a_udf.la
+%{_libdir}/mysql/plugin/libfnv_udf.a
+%{_libdir}/mysql/plugin/libfnv_udf.la
+%{_libdir}/mysql/plugin/libmurmur_udf.a
+%{_libdir}/mysql/plugin/libmurmur_udf.la
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
