@@ -213,7 +213,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
   /* Proceed further only if view is PRIMARY */
   if (WSREP_VIEW_PRIMARY != view->status) {
-    wsrep_ready= FALSE;
+    wsrep_ready_set(FALSE);
     new_status= WSREP_MEMBER_UNDEFINED;
     /* Always record local_uuid and local_seqno in non-prim since this
      * may lead to re-initializing provider and start position is
@@ -234,13 +234,13 @@ static void wsrep_view_handler_cb (void* app_ctx,
       if (view->proto_ver != wsrep_protocol_version)
       {
           my_bool wsrep_ready_saved= wsrep_ready;
-          wsrep_ready= FALSE;
+          wsrep_ready_set(FALSE);
           WSREP_INFO("closing client connections for "
                      "protocol change %ld -> %d",
                      wsrep_protocol_version, view->proto_ver);
           wsrep_close_client_connections(TRUE);
           wsrep_protocol_version= view->proto_ver;
-          wsrep_ready= wsrep_ready_saved;
+          wsrep_ready_set(wsrep_ready_saved);
       }
       break;
   default:
@@ -255,7 +255,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
     /* After that wsrep will call wsrep_sst_prepare. */
     /* keep ready flag 0 until we receive the snapshot */
-    wsrep_ready= FALSE;
+    wsrep_ready_set(FALSE);
 
     /* Close client connections to ensure that they don't interfere
      * with SST */
@@ -411,7 +411,7 @@ int wsrep_init()
 {
   int rcode= -1;
 
-  wsrep_ready= FALSE;
+  wsrep_ready_set(FALSE);
   assert(wsrep_provider);
 
   wsrep_init_position();
@@ -438,7 +438,7 @@ int wsrep_init()
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
-    wsrep_ready= TRUE;
+    wsrep_ready_set(TRUE);
     global_system_variables.wsrep_on = 0;
   }
   else
@@ -599,14 +599,14 @@ bool wsrep_start_replication()
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
-    wsrep_ready = TRUE;
+    wsrep_ready_set(TRUE);
     return true;
   }
 
   if (!wsrep_cluster_address || strlen(wsrep_cluster_address)== 0)
   {
     // if provider is non-trivial, but no address is specified, wait for address
-    wsrep_ready = FALSE;
+    wsrep_ready_set(FALSE);
     return true;
   }
 
