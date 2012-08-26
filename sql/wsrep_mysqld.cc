@@ -54,7 +54,7 @@ my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
  * End configuration options
  */
 
-static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
+static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
 const wsrep_uuid_t* wsrep_cluster_uuid()
 {
   return &cluster_uuid;
@@ -120,11 +120,11 @@ static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   }
 }
 
-static void wsrep_log_states (wsrep_log_level_t level,
-                              wsrep_uuid_t* group_uuid,
-                              wsrep_seqno_t group_seqno,
-                              wsrep_uuid_t* node_uuid,
-                              wsrep_seqno_t node_seqno)
+static void wsrep_log_states (wsrep_log_level_t   const level,
+                              const wsrep_uuid_t* const group_uuid,
+                              wsrep_seqno_t       const group_seqno,
+                              const wsrep_uuid_t* const node_uuid,
+                              wsrep_seqno_t       const node_seqno)
 {
   char uuid_str[37];
   char msg[256];
@@ -195,7 +195,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
   if (memcmp(&cluster_uuid, &view->uuid, sizeof(wsrep_uuid_t)))
   {
-    cluster_uuid= view->uuid;
+    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->uuid, sizeof(cluster_uuid));
     wsrep_uuid_print (&cluster_uuid, cluster_uuid_str,
                       sizeof(cluster_uuid_str));
   }
@@ -453,8 +453,6 @@ int wsrep_init()
             wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
   }
 
-  struct wsrep_init_args wsrep_args;
-
   if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)
     wsrep_data_home_dir = mysql_real_data_home;
 
@@ -465,7 +463,8 @@ int wsrep_init()
     size_t const ret= guess_ip(node_addr, node_addr_max);
     if (!(ret > 0 && ret < node_addr_max))
     {
-      WSREP_WARN("Failed to autoguess base node address");
+      WSREP_WARN("Failed to guess base node address. Set it explicitly via "
+                 "wsrep_node_address.");
       node_addr[0]= '\0';
     }
   }
@@ -475,7 +474,6 @@ int wsrep_init()
   }
 
   static char inc_addr[512]= { 0, };
-//  if (strcmp (wsrep_provider, WSREP_NONE) &&
   if ((!wsrep_node_incoming_address ||
        !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO))) {
     size_t const node_addr_len= strlen(node_addr);
@@ -515,6 +513,8 @@ int wsrep_init()
                    "Try setting wsrep_node_incoming_address explicitly.");
     }
   }
+
+  struct wsrep_init_args wsrep_args;
 
   wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
