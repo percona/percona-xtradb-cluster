@@ -382,8 +382,8 @@ static ssize_t sst_prepare_other (const char*  method,
   const char* sst_dir= mysql_real_data_home;
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%s' '%d' 2>sst.err",
-                     method, addr_in, (sst_auth_real) ? sst_auth_real : "", 
+                     "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%s' '%d'",
+                     method, addr_in, (sst_auth_real) ? sst_auth_real : "",
                      sst_dir, wsrep_defaults_file, (int)getpid());
 
   if (ret < 0 || ret >= cmd_len)
