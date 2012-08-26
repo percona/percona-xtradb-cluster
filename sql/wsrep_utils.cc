@@ -316,7 +316,7 @@ thd::~thd ()
 extern ulong my_bind_addr;
 extern uint  mysqld_port;
 
-size_t default_ip (char* buf, size_t buf_len)
+size_t guess_ip (char* buf, size_t buf_len)
 {
   size_t ip_len = 0;
 
@@ -380,9 +380,9 @@ size_t default_ip (char* buf, size_t buf_len)
   return ip_len;
 }
 
-size_t default_address(char* buf, size_t buf_len)
+size_t guess_address(char* buf, size_t buf_len)
 {
-  size_t addr_len = default_ip (buf, buf_len);
+  size_t addr_len = guess_ip (buf, buf_len);
 
   if (addr_len && addr_len < buf_len) {
     addr_len += snprintf (buf + addr_len, buf_len - addr_len,

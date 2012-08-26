@@ -497,7 +497,7 @@ ssize_t wsrep_sst_prepare (void** msg)
   }
   else
   {
-    ssize_t ret= default_ip (ip_buf, ip_max);
+    ssize_t ret= guess_ip (ip_buf, ip_max);
 
     if (ret && ret < ip_max)
     {

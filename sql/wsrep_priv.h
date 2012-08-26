@@ -37,8 +37,8 @@ extern int     wsrep_sst_donate_cb (void* app_ctx,
                                     const char* state, size_t state_len,
                                     bool bypass);
 
-extern size_t default_ip (char* buf, size_t buf_len);
-extern size_t default_address(char* buf, size_t buf_len);
+extern size_t guess_ip (char* buf, size_t buf_len);
+extern size_t guess_address(char* buf, size_t buf_len);
 
 extern wsrep_uuid_t  local_uuid;
 extern wsrep_seqno_t local_seqno;
