@@ -19,7 +19,6 @@
 # This is a reference script for Percona XtraBackup-based state snapshot tansfer
 
 TMPDIR="/tmp"
-XTRABACKUP_PID="$TMPDIR/xtrabackup_pid"
 
 cleanup_joiner()
 {
@@ -44,6 +43,20 @@ kill_xtrabackup()
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -f "$XTRABACKUP_PID"
 #set +x
+}
+
+# waits ~10 seconds for nc to open the port and then reports ready
+# (regardless of timeout)
+wait_for_nc()
+{
+    local PORT=$1
+    for i in $(seq 1 50)
+    do
+        netstat -nptl 2>/dev/null | grep '/nc\s*$' | awk '{ print $4 }' | \
+        sed 's/.*://' | grep \^${PORT}\$ >/dev/null && break
+        sleep 0.2
+    done
+    echo "ready ${ADDR}/${MODULE}"
 }
 
 INNOBACKUPEX_BIN=innobackupex
@@ -82,18 +95,26 @@ then
 
     if [ $BYPASS -eq 0 ]
     then
-        sleep 3 # allow time to start nc
+
+        INNOBACKUPEX_ARGS="--galera-info --tmpdir=${TMPDIR} --stream=tar
+                           --defaults-file=${CONF}"
 
         if [ "${AUTH[0]}" != "(null)" ]; then
-           INNOBACKUPEX_ARGS="--user=${AUTH[0]} "
+           INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --user=${AUTH[0]}"
         fi
-        
+
         if [ ${#AUTH[*]} -eq 2 ]; then
            INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --password=${AUTH[1]}"
         fi
 
         set +e
-        ${INNOBACKUPEX_BIN} --galera-info --tmpdir=${TMPDIR} --stream=tar ${TMPDIR} ${INNOBACKUPEX_ARGS} 2> ${DATA}/innobackup.backup.log | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+
+        # This file and variable seems to have no effect and probably should be deleted
+        XTRABACKUP_PID=$(mktemp --tmpdir wsrep_sst_xtrabackupXXXX.pid)
+
+        ${INNOBACKUPEX_BIN} ${INNOBACKUPEX_ARGS} ${TMPDIR} \
+        2> ${DATA}/innobackup.backup.log | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+
         RC=( "${PIPESTATUS[@]}" )
         set -e
 
@@ -111,6 +132,9 @@ then
             kill_xtrabackup
             exit 22
         fi
+
+        rm -f ${XTRABACKUP_PID}
+
     else # BYPASS
         STATE="${UUID}:${SEQNO}"
         echo "continue" # now server can resume updating data
@@ -137,16 +161,19 @@ then
         ADDR="$(echo ${ADDR} | awk -F ':' '{ print $1 }'):${NC_PORT}"
     fi
 
-    echo "ready ${ADDR}/${MODULE}"
+#    echo "ready ${ADDR}/${MODULE}"
+    wait_for_nc ${NC_PORT} &
 
 #    trap "exit 32" HUP PIPE
 #    trap "exit 3"  INT TERM
     trap cleanup_joiner HUP PIPE INT TERM
-    
+
     set +e
     ${NC_BIN} -dl ${NC_PORT}  | tar xfi  - -C ${DATA}  1>&2
     RC=( "${PIPESTATUS[@]}" )
     set -e
+
+    wait %% # join wait_for_nc thread
 
     if [ ${RC[0]} -ne 0 -o ${RC[1]} -ne 0 ];
     then 
