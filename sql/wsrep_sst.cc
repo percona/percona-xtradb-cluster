@@ -382,7 +382,13 @@ static ssize_t sst_prepare_other (const char*  method,
   pthread_t tmp;
   sst_thread_arg arg(cmd_str);
   mysql_mutex_lock (&arg.lock);
-  pthread_create (&tmp, NULL, sst_joiner_thread, &arg);
+  ret = pthread_create (&tmp, NULL, sst_joiner_thread, &arg);
+  if (ret)
+  {
+    WSREP_ERROR("sst_prepare_other(): pthread_create() failed: %d (%s)",
+                ret, strerror(ret));
+    return ret;
+  }
   mysql_cond_wait (&arg.cond, &arg.lock);
 
   *addr_out= arg.ret_str;
@@ -884,7 +890,13 @@ static int sst_donate_other (const char*   method,
   pthread_t tmp;
   sst_thread_arg arg(cmd_str);
   mysql_mutex_lock (&arg.lock);
-  pthread_create (&tmp, NULL, sst_donor_thread, &arg);
+  ret = pthread_create (&tmp, NULL, sst_donor_thread, &arg);
+  if (ret)
+  {
+    WSREP_ERROR("sst_donate_other(): pthread_create() failed: %d (%s)",
+                ret, strerror(ret));
+    return ret;
+  }
   mysql_cond_wait (&arg.cond, &arg.lock);
 
   WSREP_INFO("sst_donor_thread signaled with %d", arg.err);
