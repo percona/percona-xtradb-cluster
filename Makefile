@@ -1,7 +1,7 @@
 FETCH_CMD=wget
 MASTER_SITE=http://s3.amazonaws.com/percona.com/downloads/community
 MYSQL_VERSION=5.5.27
-PERCONA_SERVER_VERSION=rel25.3
+PERCONA_SERVER_VERSION=rel28.1
 PERCONA_XTRADB_CLUSTER ?=Percona-XtraDB-Cluster-$(MYSQL_VERSION)
 PERCONA_SERVER ?=Percona-Server
 DEBUG_DIR ?= $(PERCONA_XTRADB_CLUSTER)-debug
