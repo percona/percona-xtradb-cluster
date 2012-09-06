@@ -30,3 +30,12 @@ Following command will install Cluster packages: ::
 
   $ yum install Percona-XtraDB-Cluster-server Percona-XtraDB-Cluster-client xtrabackup
 
+Percona `yum` Experimental repository
+=====================================
+
+Percona offers fresh beta builds from the experimental repository. To subscribe to the experimental repository, install the experimental *RPM*: ::
+
+  rpm -Uhv http://repo.percona.com/testing/centos/6/os/noarch/percona-testing-0.0-1.noarch.rpm
+
+.. note:: 
+ This repository works for both RHEL/CentOS 5 and RHEL/CentOS 6

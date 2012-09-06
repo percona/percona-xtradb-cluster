@@ -56,11 +56,3 @@ Percona offers fresh beta builds from the experimental repository. To enable it 
 
   deb http://repo.percona.com/apt VERSION main experimental
   deb-src http://repo.percona.com/apt VERSION main experimental
-
-Release Candidate Repository
-============================
-
-To subscribe to the release candidate repository, add two lines to the :file:`/etc/apt/sources.list` file, again replacing ``VERSION`` with your server's release version: ::
-
-  deb http://repo.percona.com/apt-rc VERSION main
-  deb-src http://repo.percona.com/apt-rc VERSION main
