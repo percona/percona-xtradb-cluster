@@ -581,6 +581,15 @@ void wsrep_deinit()
 
 void wsrep_recover()
 {
+  if (!memcmp(&local_uuid, &WSREP_UUID_UNDEFINED, sizeof(wsrep_uuid_t)) &&
+      local_seqno == -2)
+  {
+    char uuid_str[40];
+    wsrep_uuid_print(&local_uuid, uuid_str, sizeof(uuid_str));
+    WSREP_INFO("Position %s:%lld given at startup, skipping position recovery",
+               uuid_str, (long long)local_seqno);
+    return;
+  }
   XID xid;
   memset(&xid, 0, sizeof(xid));
   xid.formatID= -1;
