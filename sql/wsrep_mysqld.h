@@ -177,7 +177,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 // This is a workaround. It also prefixes all messages with "WSREP"
 #define WSREP_LOG(fun, ...)                                       \
     {                                                             \
-        char msg[256] = {'\0'};                                   \
+        char msg[1024] = {'\0'};                                  \
         snprintf(msg, sizeof(msg) - 1, ## __VA_ARGS__);           \
         fun("WSREP: %s", msg);                                    \
     }

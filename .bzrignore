@@ -3039,6 +3039,7 @@ sql/share/slovak
 sql/share/spanish
 sql/share/swedish
 sql/share/ukrainian
+scripts/wsrep_sst_common
 scripts/wsrep_sst_mysqldump
 scripts/wsrep_sst_rsync
 scripts/wsrep_sst_xtrabackup

@@ -25,6 +25,26 @@
 
 extern const char wsrep_defaults_file[];
 
+#define WSREP_SST_OPT_ROLE     "--role"
+#define WSREP_SST_OPT_ADDR     "--address"
+#define WSREP_SST_OPT_AUTH     "--auth"
+#define WSREP_SST_OPT_DATA     "--datadir"
+#define WSREP_SST_OPT_CONF     "--defaults-file"
+#define WSREP_SST_OPT_PARENT   "--parent"
+
+// mysqldump-specific options
+#define WSREP_SST_OPT_USER     "--user"
+#define WSREP_SST_OPT_PSWD     "--password"
+#define WSREP_SST_OPT_HOST     "--host"
+#define WSREP_SST_OPT_PORT     "--port"
+#define WSREP_SST_OPT_LPORT    "--local-port"
+
+// donor-specific
+#define WSREP_SST_OPT_SOCKET   "--socket"
+#define WSREP_SST_OPT_UUID     "--wsrep-uuid"
+#define WSREP_SST_OPT_SEQNO    "--wsrep-seqno"
+#define WSREP_SST_OPT_BYPASS   "--bypass"
+
 #define WSREP_SST_MYSQLDUMP    "mysqldump"
 #define WSREP_SST_SKIP         "skip"
 #define WSREP_SST_DEFAULT      WSREP_SST_MYSQLDUMP
@@ -369,7 +389,13 @@ static ssize_t sst_prepare_other (const char*  method,
   const char* sst_dir= mysql_real_data_home;
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'joiner' '%s' '%s' '%s' '%s' '%d'",
+                     "wsrep_sst_%s "
+                     WSREP_SST_OPT_ROLE" 'joiner' "
+                     WSREP_SST_OPT_ADDR" '%s' "
+                     WSREP_SST_OPT_AUTH" '%s' "
+                     WSREP_SST_OPT_DATA" '%s' "
+                     WSREP_SST_OPT_CONF" '%s' "
+                     WSREP_SST_OPT_PARENT" '%d'",
                      method, addr_in, (sst_auth_real) ? sst_auth_real : "",
                      sst_dir, wsrep_defaults_file, (int)getpid());
 
@@ -659,9 +685,18 @@ static int sst_donate_mysqldump (const char*         addr,
     if (!bypass && wsrep_sst_donor_rejects_queries) sst_reject_queries(TRUE);
 
     snprintf (cmd_str, cmd_len,
-              "wsrep_sst_mysqldump '%s' '%s' '%s' '%s' '%u' '%s' '%lld' '%d'",
-              user, pswd, host, port, mysqld_port, uuid_str, (long long)seqno,
-              bypass);
+              "wsrep_sst_mysqldump "
+              WSREP_SST_OPT_USER" '%s' "
+              WSREP_SST_OPT_PSWD" '%s' "
+              WSREP_SST_OPT_HOST" '%s' "
+              WSREP_SST_OPT_PORT" '%s' "
+              WSREP_SST_OPT_LPORT" '%u' "
+              WSREP_SST_OPT_SOCKET" '%s' "
+              WSREP_SST_OPT_UUID" '%s' "
+              WSREP_SST_OPT_SEQNO" '%lld'"
+              "%s",
+              user, pswd, host, port, mysqld_port, mysqld_unix_port, uuid_str,
+              (long long)seqno, bypass ? " "WSREP_SST_OPT_BYPASS : "");
 
     WSREP_DEBUG("Running: '%s'", cmd_str);
 
@@ -874,10 +909,20 @@ static int sst_donate_other (const char*   method,
   char    cmd_str[cmd_len];
 
   int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s 'donor' '%s' '%s' '%s' '%s' '%s' '%lld' '%d'"
-                     ,
-                     method, addr, sst_auth_real, mysql_real_data_home,
-                     wsrep_defaults_file, uuid, (long long) seqno, bypass);
+                     "wsrep_sst_%s "
+                     WSREP_SST_OPT_ROLE" 'donor' "
+                     WSREP_SST_OPT_ADDR" '%s' "
+                     WSREP_SST_OPT_AUTH" '%s' "
+                     WSREP_SST_OPT_SOCKET" '%s' "
+                     WSREP_SST_OPT_DATA" '%s' "
+                     WSREP_SST_OPT_CONF" '%s' "
+                     WSREP_SST_OPT_UUID" '%s' "
+                     WSREP_SST_OPT_SEQNO" %lld"
+                     "%s",
+                     method, addr, sst_auth_real, mysqld_unix_port,
+                     mysql_real_data_home, wsrep_defaults_file,
+                     uuid, (long long) seqno,
+                     bypass ? " "WSREP_SST_OPT_BYPASS : "");
 
   if (ret < 0 || ret >= cmd_len)
   {
