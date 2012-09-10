@@ -60,6 +60,7 @@ extern ulong       wsrep_forced_binlog_format;
 extern ulong       wsrep_OSU_method_options;
 extern my_bool     wsrep_recovery;
 extern my_bool     wsrep_replicate_myisam;
+extern ulong       wsrep_mysql_replication_bundle;
 
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
 
