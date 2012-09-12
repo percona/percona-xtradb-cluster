@@ -115,8 +115,9 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
       !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
       (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)))
   {
+#ifdef REMOVED
     if (thd->system_thread== SYSTEM_THREAD_SLAVE_SQL &&
-        ++thd->wsrep_mysql_replicated < wsrep_mysql_replication_bundle)
+        ++thd->wsrep_mysql_replicated < (int)wsrep_mysql_replication_bundle)
     {
       WSREP_DEBUG("skipping wsrep commit %d", thd->wsrep_mysql_replicated);
     }
@@ -124,6 +125,7 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
     {
       if (thd->system_thread== SYSTEM_THREAD_SLAVE_SQL)
         thd->wsrep_mysql_replicated = 0;
+#endif
     switch (wsrep_run_wsrep_commit(thd, hton, all))
     {
     case WSREP_TRX_OK:
@@ -135,7 +137,9 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
     case WSREP_TRX_ERROR:
       DBUG_RETURN(1);
     }
+#ifdef REMOVED
     }
+#endif
   }
   DBUG_RETURN(0);
 }
