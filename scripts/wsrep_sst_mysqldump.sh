@@ -43,8 +43,7 @@ if test -z "$WSREP_SST_OPT_HOST";  then err "HOST cannot be nil";  exit $EINVAL;
 if test -z "$WSREP_SST_OPT_PORT";  then err "PORT cannot be nil";  exit $EINVAL; fi
 if test -z "$WSREP_SST_OPT_LPORT"; then err "LPORT cannot be nil"; exit $EINVAL; fi
 if test -z "$WSREP_SST_OPT_SOCKET";then err "SOCKET cannot be nil";exit $EINVAL; fi
-if test -z "$WSREP_SST_OPT_UUID";  then err "UUID cannot be nil";  exit $EINVAL; fi
-if test -z "$WSREP_SST_OPT_SEQNO"; then err "SEQNO cannot be nil"; exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_GTID";  then err "GTID cannot be nil";  exit $EINVAL; fi
 
 if local_ip $WSREP_SST_OPT_HOST && \
    [ "$WSREP_SST_OPT_PORT" = "$WSREP_SST_OPT_LPORT" ]
@@ -91,7 +90,7 @@ PREPARE stmt FROM @str;
 EXECUTE stmt;
 DROP PREPARE stmt;"
 
-SET_START_POSITION="SET GLOBAL wsrep_start_position='$WSREP_SST_OPT_UUID:$WSREP_SST_OPT_SEQNO';"
+SET_START_POSITION="SET GLOBAL wsrep_start_position='$WSREP_SST_OPT_GTID';"
 
 MYSQL="mysql $AUTH -h$WSREP_SST_OPT_HOST -P$WSREP_SST_OPT_PORT "\
 "--disable-reconnect --connect_timeout=10"

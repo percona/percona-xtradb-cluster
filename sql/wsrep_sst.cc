@@ -41,8 +41,7 @@ extern const char wsrep_defaults_file[];
 
 // donor-specific
 #define WSREP_SST_OPT_SOCKET   "--socket"
-#define WSREP_SST_OPT_UUID     "--wsrep-uuid"
-#define WSREP_SST_OPT_SEQNO    "--wsrep-seqno"
+#define WSREP_SST_OPT_GTID     "--gtid"
 #define WSREP_SST_OPT_BYPASS   "--bypass"
 
 #define WSREP_SST_MYSQLDUMP    "mysqldump"
@@ -692,8 +691,7 @@ static int sst_donate_mysqldump (const char*         addr,
               WSREP_SST_OPT_PORT" '%s' "
               WSREP_SST_OPT_LPORT" '%u' "
               WSREP_SST_OPT_SOCKET" '%s' "
-              WSREP_SST_OPT_UUID" '%s' "
-              WSREP_SST_OPT_SEQNO" '%lld'"
+              WSREP_SST_OPT_GTID" '%s:%lld'"
               "%s",
               user, pswd, host, port, mysqld_port, mysqld_unix_port, uuid_str,
               (long long)seqno, bypass ? " "WSREP_SST_OPT_BYPASS : "");
@@ -916,8 +914,7 @@ static int sst_donate_other (const char*   method,
                      WSREP_SST_OPT_SOCKET" '%s' "
                      WSREP_SST_OPT_DATA" '%s' "
                      WSREP_SST_OPT_CONF" '%s' "
-                     WSREP_SST_OPT_UUID" '%s' "
-                     WSREP_SST_OPT_SEQNO" %lld"
+                     WSREP_SST_OPT_GTID" '%s:%lld'"
                      "%s",
                      method, addr, sst_auth_real, mysqld_unix_port,
                      mysql_real_data_home, wsrep_defaults_file,

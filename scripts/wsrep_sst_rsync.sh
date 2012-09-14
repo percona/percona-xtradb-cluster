@@ -116,7 +116,7 @@ then
 
     else # BYPASS
         wsrep_log_info "Bypassing state dump."
-        STATE="$WSREP_SST_OPT_UUID:$WSREP_SST_OPT_SEQNO"
+        STATE="$WSREP_SST_OPT_GTID"
     fi
 
     echo "continue" # now server can resume updating data

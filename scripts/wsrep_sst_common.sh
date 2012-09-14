@@ -73,12 +73,8 @@ case "$1" in
         readonly WSREP_SST_OPT_USER="$2"
         shift
         ;;
-    '--wsrep-seqno')
-        readonly WSREP_SST_OPT_SEQNO="$2"
-        shift
-        ;;
-    '--wsrep-uuid')
-        readonly WSREP_SST_OPT_UUID="$2"
+    '--gtid')
+        readonly WSREP_SST_OPT_GTID="$2"
         shift
         ;;
     *) # must be command

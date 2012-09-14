@@ -143,7 +143,7 @@ then
         rm -f ${XTRABACKUP_PID}
 
     else # BYPASS
-        STATE="${WSREP_SST_OPT_UUID}:${WSREP_SST_OPT_SEQNO}"
+        STATE="${WSREP_SST_OPT_GTID}"
         echo "continue" # now server can resume updating data
         echo "${STATE}" > "${MAGIC_FILE}"
         echo "1" > "${DATA}/${IST_FILE}"
@@ -151,7 +151,7 @@ then
         rm -f ${DATA}/${IST_FILE}
     fi
 
-    echo "done ${WSREP_SST_OPT_UUID}:${WSREP_SST_OPT_SEQNO}"
+    echo "done ${WSREP_SST_OPT_GTID}"
 
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
