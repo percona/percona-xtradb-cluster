@@ -105,21 +105,8 @@ static void wsrep_client_rollback(THD *thd);
 extern Format_description_log_event *wsrep_format_desc;
 #define WSREP_MYSQL_DB (char *)"mysql"
 
-#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto error;
-
-#define WSREP_TO_ISOLATION_END                                              \
-  if (WSREP(thd) || (thd && thd->wsrep_exec_mode==TOTAL_ORDER))             \
-    wsrep_to_isolation_end(thd);
-
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
 			      Parser_state *parser_state);
-
-#else
-
-#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
-#define WSREP_TO_ISOLATION_END 
-
 #endif /* WITH_WSREP */
 /**
   @defgroup Runtime_Environment Runtime Environment
