@@ -4273,16 +4273,15 @@ pthread_handler_t start_wsrep_THD(void *arg)
   THD *thd;
   wsrep_thd_processor_fun processor= (wsrep_thd_processor_fun)arg;
 
-  DBUG_ENTER("start_wsrep_THD");
   if (my_thread_init()) 
   {
     WSREP_ERROR("Could not initialize thread");
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
 
   if (!(thd= new THD(true)))
   {
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
   mysql_mutex_lock(&LOCK_thread_count);
   thd->thread_id=thread_id++;
@@ -4325,7 +4324,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
 
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
 
 // </5.1.17>
@@ -4349,7 +4348,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     delete thd;
  
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
 
   /* from handle_bootstrap() */
@@ -4402,7 +4401,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     // 'Error in my_thread_global_end(): 2 threads didn't exit'
     // at server shutdown
   }
-  DBUG_RETURN(NULL);
+  return(NULL);
 }
 
 void wsrep_create_rollbacker()
