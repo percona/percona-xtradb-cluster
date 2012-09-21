@@ -725,7 +725,8 @@ wsrep_causal_wait (THD* thd)
         break;
       default:
         msg= "Causal wait failed.";
-        err= ER_ERROR_ON_READ;
+        err= ER_LOCK_WAIT_TIMEOUT; // NOTE: the above msg won't be displayed
+                                   //       with ER_LOCK_WAIT_TIMEOUT
       }
 
       my_error(err, MYF(0), msg);
