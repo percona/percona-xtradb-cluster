@@ -42,6 +42,7 @@
     MUST_REPLAY,
     REPLAYING,
     RETRY_AUTOCOMMIT,
+    CERT_FAILURE,
   };
   enum wsrep_consistency_check_mode {
     NO_CONSISTENCY_CHECK,
