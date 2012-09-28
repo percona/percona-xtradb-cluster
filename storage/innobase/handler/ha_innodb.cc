@@ -6982,7 +6982,12 @@ wsrep_append_foreign_key(
 		&key[1], &len, rec, index, 
 		wsrep_protocol_version > 1);
 	if (rcode != DB_SUCCESS) {
-		WSREP_ERROR("FK key set failed: %lu", rcode);
+		WSREP_ERROR(
+			"FK key set failed: %lu (%lu %lu), index: %s %s, %s", 
+			rcode, referenced, shared, 
+			(index->name) ? index->name : "void index", 
+			(index->table_name) ? index->table_name : "void table", 
+			wsrep_thd_query(thd));
 		return rcode;
 	}
 	strncpy(cache_key,
