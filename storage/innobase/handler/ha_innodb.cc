@@ -12131,18 +12131,27 @@ wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno)
 	abort();
 }
 int
-wsrep_innobase_kill_one_trx(trx_t *bf_trx, trx_t *victim_trx, ibool signal)
+wsrep_innobase_kill_one_trx(void *bf_thd_ptr, trx_t *bf_trx, trx_t *victim_trx, ibool signal)
 {
 	DBUG_ENTER("wsrep_innobase_kill_one_trx");
+	THD *bf_thd 	  = (THD *)bf_thd_ptr;
 	THD *thd          = (THD *) victim_trx->mysql_thd;
-	THD *bf_thd       = (bf_trx) ? (THD *)bf_trx->mysql_thd : NULL;
 	int64_t bf_seqno  = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
+
+	if (!bf_thd) bf_thd = (bf_trx) ? (THD *)bf_trx->mysql_thd : NULL;
 
 	if (!thd) {
 		DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
 		WSREP_WARN("no THD for trx: %llu", victim_trx->id);
 		DBUG_RETURN(1);
 	}
+	if (!bf_thd) {
+		DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
+		WSREP_WARN("no BF THD for trx: %llu", (bf_trx) ? bf_trx->id : 0);
+		DBUG_RETURN(1);
+	}
+
+	WSREP_LOG_CONFLICT(bf_thd, thd, TRUE);
 
 	WSREP_DEBUG("BF kill (%lu, seqno: %lld), victim: (%lu) trx: %llu", 
  		    signal, (long long)bf_seqno,
@@ -12331,8 +12340,8 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 	if (victim_trx)
 	{
 		mutex_enter(&kernel_mutex);
-		int rcode = wsrep_innobase_kill_one_trx(bf_trx, victim_trx,
-							signal);
+		int rcode = wsrep_innobase_kill_one_trx(
+			bf_thd, bf_trx, victim_trx, signal);
 		mutex_exit(&kernel_mutex);
 		DBUG_RETURN(rcode);
 	} else {

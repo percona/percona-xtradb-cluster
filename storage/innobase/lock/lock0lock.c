@@ -42,6 +42,7 @@ Created 5/7/1996 Heikki Tuuri
 
 #ifdef WITH_WSREP
 extern my_bool wsrep_debug;
+extern my_bool wsrep_log_conflicts;
 #endif
 /* Restricts the length of search we will do in the waits-for
 graph of transactions */
@@ -1528,7 +1529,21 @@ wsrep_kill_victim(trx_t *trx, lock_t *lock) {
 			/* cannot release lock, until our lock
 			is in the queue*/
 		} else if (lock->trx != trx) {
-			wsrep_innobase_kill_one_trx(trx, lock->trx, TRUE);
+			if (wsrep_log_conflicts) {
+				fputs("\n*** TRANSACTION:\n", stderr);
+				trx_print(stderr, trx, 3000);
+
+				fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n",
+				      stderr);
+
+				if (lock_get_type(lock) == LOCK_REC) {
+					lock_rec_print(stderr, lock);
+				} else {
+					lock_table_print(stderr, lock);
+				}
+			}
+			wsrep_innobase_kill_one_trx(
+				trx->mysql_thd, trx, lock->trx, TRUE);
 		}
 	}
 }
@@ -4109,7 +4124,7 @@ lock_table_other_has_incompatible(
 				} else {
                                   if (bf_this && bf_other)
 					wsrep_innobase_kill_one_trx(
-						(trx_t *)trx, lock->trx, TRUE);
+						trx->mysql_thd, (trx_t *)trx, lock->trx, TRUE);
 					return(lock);
 				}
 			} else {
