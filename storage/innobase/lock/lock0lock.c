@@ -4119,33 +4119,12 @@ lock_table_other_has_incompatible(
 		if ((lock->trx != trx)
 		    && (!lock_mode_compatible(lock_get_mode(lock), mode))
 		    && (wait || !(lock_get_wait(lock)))) {
-
 #ifdef WITH_WSREP
-			int bf_this  = wsrep_thd_is_brute_force(trx->mysql_thd);
-			int bf_other = wsrep_thd_is_brute_force(
-			    lock->trx->mysql_thd);
-			if ((bf_this && !bf_other) ||
-			    (bf_this && bf_other &&
-			     wsrep_trx_order_before(
-				trx->mysql_thd,	lock->trx->mysql_thd)
-			    )
-			) {
-				if (lock->trx->que_state == TRX_QUE_LOCK_WAIT) {
-					if (wsrep_debug) fprintf(stderr, 
-						"WSREP: BF victim  waiting");
-					return(lock);
-				} else {
-                                  if (bf_this && bf_other)
-					wsrep_innobase_kill_one_trx(
-						trx->mysql_thd, (trx_t *)trx, lock->trx, TRUE);
-					return(lock);
-				}
-			} else {
-				return(lock);
-			}
-#else
-			return(lock);
+			if (wsrep_debug) 
+				fprintf(stderr, "WSREP: table lock abort");
+			wsrep_kill_victim(trx, lock);
 #endif
+			return(lock);
 		}
 
 		lock = UT_LIST_GET_PREV(un_member.tab_lock.locks, lock);
