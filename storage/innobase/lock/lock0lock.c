@@ -4122,7 +4122,7 @@ lock_table_other_has_incompatible(
 #ifdef WITH_WSREP
 			if (wsrep_debug) 
 				fprintf(stderr, "WSREP: table lock abort");
-			wsrep_kill_victim(trx, lock);
+			wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
 #endif
 			return(lock);
 		}
