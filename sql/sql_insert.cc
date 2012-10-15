@@ -3478,8 +3478,14 @@ bool select_insert::send_eof()
   DBUG_PRINT("enter", ("trans_table=%d, table_type='%s'",
                        trans_table, table->file->table_type()));
 
+#ifdef WITH_WSREP
+  error= (thd->wsrep_conflict_state == MUST_ABORT) ? -1 :
+    (thd->locked_tables_mode <= LTM_LOCK_TABLES ?
+          table->file->ha_end_bulk_insert() : 0);
+#else
   error= (thd->locked_tables_mode <= LTM_LOCK_TABLES ?
           table->file->ha_end_bulk_insert() : 0);
+#endif /* WITH_WSREP */
   if (!error && thd->is_error())
     error= thd->stmt_da->sql_errno();
 
@@ -4008,6 +4014,7 @@ select_create::binlog_show_create_table(TABLE **tables, uint count)
 
     thd->query_string     = query_save;
     thd->wsrep_exec_mode  = LOCAL_STATE;
+    return result;
   }
   else
   {
@@ -4017,7 +4024,7 @@ select_create::binlog_show_create_table(TABLE **tables, uint count)
   }
  error:
   WSREP_WARN("TO isolation failed: %s", thd->query());
-  return 0;
+  return -1;
 #endif
 }
 
