@@ -103,7 +103,6 @@
 static void wsrep_client_rollback(THD *thd);
 
 extern Format_description_log_event *wsrep_format_desc;
-#define WSREP_MYSQL_DB (char *)"mysql"
 
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
 			      Parser_state *parser_state);
