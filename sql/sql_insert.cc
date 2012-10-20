@@ -4002,30 +4002,9 @@ select_create::binlog_show_create_table(TABLE **tables, uint count)
                               errcode);
   }
 #ifdef WITH_WSREP
-  if (WSREP(thd))
-  {
-    const CSET_STRING query_save = thd->query_string;
-    thd->set_query_inner((char*)query.ptr(), query.length(), system_charset_info);
-
-    WSREP_TO_ISOLATION_BEGIN((*tables)->s->db.str, (*tables)->s->table_name.str, NULL);
-    WSREP_TO_ISOLATION_END;
-    extern handlerton *binlog_hton;
-    binlog_hton->commit(binlog_hton, thd, TRUE);
-
-    thd->query_string     = query_save;
-    thd->wsrep_exec_mode  = LOCAL_STATE;
-    return result;
-  }
-  else
-  {
-#endif /* WITH_WSREP */
-  return result;
-#ifdef WITH_WSREP
-  }
- error:
-  WSREP_WARN("TO isolation failed: %s", thd->query());
-  return -1;
+  ha_wsrep_fake_trx_id(thd);
 #endif
+  return result;
 }
 
 void select_create::store_values(List<Item> &values)

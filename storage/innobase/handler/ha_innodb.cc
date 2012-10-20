@@ -926,6 +926,8 @@ innobase_release_temporary_latches(
 static int 
 wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd, 
 			my_bool signal);
+static void
+wsrep_fake_trx_id(handlerton* hton, THD *thd);
 static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid);
 static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid);
 #endif
@@ -2318,6 +2320,7 @@ innobase_init(
         innobase_hton->wsrep_abort_transaction=wsrep_abort_transaction;
         innobase_hton->wsrep_set_checkpoint=innobase_wsrep_set_checkpoint;
         innobase_hton->wsrep_get_checkpoint=innobase_wsrep_get_checkpoint;
+        innobase_hton->wsrep_fake_trx_id=wsrep_fake_trx_id;
 #endif /* WITH_WSREP */
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
@@ -12373,6 +12376,19 @@ static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid)
 	DBUG_ASSERT(hton == innodb_hton_ptr);
         trx_sys_read_wsrep_checkpoint(xid);
         return 0;
+}
+
+static void
+wsrep_fake_trx_id(
+/*==================*/
+	handlerton	*hton,
+	THD		*thd)	/*!< in: user thread handle */
+{
+	mutex_enter(&kernel_mutex);
+	trx_id_t trx_id = trx_sys_get_new_trx_id();
+	mutex_exit(&kernel_mutex);
+
+	(void *)wsrep_trx_handle_for_id(wsrep_thd_trx_handle(thd), trx_id);
 }
 
 #endif /* WITH_WSREP */
