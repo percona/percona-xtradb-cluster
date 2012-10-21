@@ -1828,6 +1828,9 @@ bool change_password(THD *thd, const char *host, const char *user,
   bool save_binlog_row_based;
   uint new_password_len= (uint) strlen(new_password);
   bool result= 1;
+#ifdef WITH_WSREP
+  const CSET_STRING query_save = thd->query_string;
+#endif /* WITH_WSREP */
   DBUG_ENTER("change_password");
   DBUG_PRINT("enter",("host: '%s'  user: '%s'  new_password: '%s'",
 		      host,user,new_password));
@@ -1835,6 +1838,18 @@ bool change_password(THD *thd, const char *host, const char *user,
 
   if (check_change_password(thd, host, user, new_password, new_password_len))
     DBUG_RETURN(1);
+#ifdef WITH_WSREP
+  if (WSREP(thd) && !thd->wsrep_applier)
+  {
+      query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
+			    user ? user : "",
+			    host ? host : "",
+			    new_password);
+    thd->set_query_inner(buff, query_length, system_charset_info);
+
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, (char*)"user", NULL);
+  }
+#endif /* WITH_WSREP */
 
   tables.init_one_table("mysql", 5, "user", 4, "user", TL_WRITE);
 
@@ -1899,19 +1914,12 @@ bool change_password(THD *thd, const char *host, const char *user,
   acl_cache->clear(1);				// Clear locked hostname cache
   mysql_mutex_unlock(&acl_cache->lock);
   result= 0;
-#ifdef WITH_WSREP
-#else
   if (mysql_bin_log.is_open())
   {
-#endif /* WITH_WSREP */
     query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
                           acl_user->user ? acl_user->user : "",
                           acl_user->host.hostname ? acl_user->host.hostname : "",
                           new_password);
-#ifdef WITH_WSREP
-  if (mysql_bin_log.is_open())
-  {
-#endif /* WITH_WSREP */
     thd->clear_error();
     result= thd->binlog_query(THD::STMT_QUERY_TYPE, buff, query_length,
                               FALSE, FALSE, FALSE, 0);
@@ -1921,10 +1929,6 @@ end:
 #ifdef WITH_WSREP
   if (WSREP(thd) && !thd->wsrep_applier)
   {
-    const CSET_STRING query_save = thd->query_string;
-    thd->set_query_inner(buff, query_length, system_charset_info);
-
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, (char*)"user", NULL);
     WSREP_TO_ISOLATION_END;
 
     thd->query_string     = query_save;
