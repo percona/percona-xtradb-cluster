@@ -50,6 +50,7 @@ ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
 my_bool wsrep_log_conflicts            = 0; // 
+ulong  wsrep_mysql_replication_bundle  = 0;
 
 /*
  * End configuration options

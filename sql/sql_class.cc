@@ -1026,17 +1026,19 @@ THD::THD()
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_thd, &LOCK_wsrep_thd, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd, NULL);
-  wsrep_trx_handle.trx_id= -1;
-  wsrep_trx_handle.opaque= NULL;
+  wsrep_trx_handle.trx_id = -1;
+  wsrep_trx_handle.opaque = NULL;
   //wsrep_retry_autocommit= ::wsrep_retry_autocommit;
-  wsrep_retry_counter= 0;
-  wsrep_PA_safe = true;
-  wsrep_seqno_changed= false;
-  wsrep_retry_query     = NULL;
-  wsrep_retry_query_len = 0;
-  wsrep_retry_command   = COM_CONNECT;
+  wsrep_retry_counter     = 0;
+  wsrep_PA_safe           = true;
+  wsrep_seqno_changed     = false;
+  wsrep_retry_query       = NULL;
+  wsrep_retry_query_len   = 0;
+  wsrep_retry_command     = COM_CONNECT;
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
-  wsrep_status_vars     = 0;
+  wsrep_status_vars       = 0;
+  wsrep_mysql_replicated  = 0;
+
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state(this);
@@ -1401,6 +1403,7 @@ void THD::init(void)
   wsrep_PA_safe= true;
   wsrep_seqno_changed= false;
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
+  wsrep_mysql_replicated  = 0;
 #endif
 
   if (variables.sql_log_bin)

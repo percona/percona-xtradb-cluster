@@ -2215,6 +2215,7 @@ public:
   enum wsrep_consistency_check_mode 
                             wsrep_consistency_check;
   wsrep_stats_var*          wsrep_status_vars;
+  int                       wsrep_mysql_replicated;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
