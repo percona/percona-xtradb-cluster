@@ -4982,8 +4982,6 @@ restart:
     */
     if (thd->locked_tables_mode <= LTM_LOCK_TABLES)
     {
-      bool need_prelocking= FALSE;
-      TABLE_LIST **save_query_tables_last= thd->lex->query_tables_last;
       /*
         Process elements of the prelocking set which are present there
         since parsing stage or were added to it by invocations of
@@ -4996,9 +4994,18 @@ restart:
       for (Sroutine_hash_entry *rt= *sroutine_to_open; rt;
            sroutine_to_open= &rt->next, rt= rt->next)
       {
+        bool need_prelocking= false;
+        TABLE_LIST **save_query_tables_last= thd->lex->query_tables_last;
+
         error= open_and_process_routine(thd, thd->lex, rt, prelocking_strategy,
                                         has_prelocking_list, &ot_ctx,
                                         &need_prelocking);
+
+        if (need_prelocking && ! thd->lex->requires_prelocking())
+          thd->lex->mark_as_requiring_prelocking(save_query_tables_last);
+
+        if (need_prelocking && ! *start)
+          *start= thd->lex->query_tables;
 
         if (error)
         {
@@ -5020,12 +5027,6 @@ restart:
           goto err;
         }
       }
-
-      if (need_prelocking && ! thd->lex->requires_prelocking())
-        thd->lex->mark_as_requiring_prelocking(save_query_tables_last);
-
-      if (need_prelocking && ! *start)
-        *start= thd->lex->query_tables;
     }
   }
 
@@ -5052,9 +5053,6 @@ restart:
     }
   }
 #ifdef WITH_WSREP
-#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto err;
-
   if ((thd->lex->sql_command== SQLCOM_INSERT         ||
        thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
        thd->lex->sql_command== SQLCOM_REPLACE        ||
@@ -5068,6 +5066,7 @@ restart:
     {
       WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
     }
+ error:
 #endif
 
 err:
@@ -5322,6 +5321,12 @@ static bool check_lock_and_start_stmt(THD *thd,
   int error;
   thr_lock_type lock_type;
   DBUG_ENTER("check_lock_and_start_stmt");
+
+  /*
+    Prelocking placeholder is not set for TABLE_LIST that
+    are directly used by TOP level statement.
+  */
+  DBUG_ASSERT(table_list->prelocking_placeholder == false);
 
   /*
     TL_WRITE_DEFAULT and TL_READ_DEFAULT are supposed to be parser only

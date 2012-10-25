@@ -314,7 +314,7 @@ IF(WIN32)
   ENDFOREACH()
 ELSE()
   IF(WITH_WSREP)
-    SET(WSREP_BINARIES wsrep_sst_mysqldump wsrep_sst_rsync
+    SET(WSREP_BINARIES wsrep_sst_common wsrep_sst_mysqldump wsrep_sst_rsync
 wsrep_sst_xtrabackup clustercheck)
   ENDIF()
   # On Unix, most of the files end up in the bin directory

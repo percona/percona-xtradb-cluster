@@ -290,7 +290,7 @@ public:
       before_stmt_pos= MY_OFF_T_UNDEF;
   }
 
-  void set_binlog_cache_info(ulong param_max_binlog_cache_size,
+  void set_binlog_cache_info(my_off_t param_max_binlog_cache_size,
                              ulong *param_ptr_binlog_cache_use,
                              ulong *param_ptr_binlog_cache_disk_use)
   {
@@ -367,7 +367,7 @@ private:
     is configured. This corresponds to either
       . max_binlog_cache_size or max_binlog_stmt_cache_size.
   */
-  ulong saved_max_binlog_cache_size;
+  my_off_t saved_max_binlog_cache_size;
 
   /*
     Stores a pointer to the status variable that keeps track of the in-memory 
@@ -419,8 +419,8 @@ public:
 
 class binlog_cache_mngr {
 public:
-  binlog_cache_mngr(ulong param_max_binlog_stmt_cache_size,
-                    ulong param_max_binlog_cache_size,
+  binlog_cache_mngr(my_off_t param_max_binlog_stmt_cache_size,
+                    my_off_t param_max_binlog_cache_size,
                     ulong *param_ptr_binlog_stmt_cache_use,
                     ulong *param_ptr_binlog_stmt_cache_disk_use,
                     ulong *param_ptr_binlog_cache_use,
@@ -1831,6 +1831,13 @@ binlog_commit_flush_stmt_cache(THD *thd,
 static inline int
 binlog_commit_flush_trx_cache(THD *thd, binlog_cache_mngr *cache_mngr, bool all)
 {
+#ifdef WITH_WSREP
+  if (thd->wsrep_mysql_replicated > 0)
+  {
+    WSREP_DEBUG("avoiding binlog_commit_flush_trx_cache: %d", thd->wsrep_mysql_replicated);
+    return 0;
+  }
+#endif
   Query_log_event end_evt(thd, STRING_WITH_LEN("COMMIT"),
                           TRUE, FALSE, TRUE, 0);
   return (binlog_flush_cache(thd, &cache_mngr->trx_cache, &end_evt,

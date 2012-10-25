@@ -1427,22 +1427,12 @@ run_again:
 				if (check_ref) {
 					err = DB_SUCCESS;
 #ifdef WITH_WSREP
-					if (thr->fk_cascade_depth == 0) {
-						err = wsrep_append_foreign_key(
-							thr_get_trx(thr),
-							foreign,
-							rec, 
-							check_index, 
-							check_ref, TRUE);
-					} else {
-					  fprintf(stderr, "WSREP: skipping FK key append\n");
-						err = wsrep_append_foreign_key(
-							thr_get_trx(thr),
-							foreign,
-							rec, 
-							check_index, 
-							TRUE, TRUE);
-					}
+					err = wsrep_append_foreign_key(
+						thr_get_trx(thr),
+						foreign,
+						rec, 
+						check_index, 
+						check_ref, TRUE);
 #endif /* WITH_WSREP */
 					goto end_scan;
 				} else if (foreign->type != 0) {
@@ -2246,9 +2236,16 @@ row_ins_index_entry_low(
 
 				goto function_exit;
 			}
-			err = btr_cur_pessimistic_insert(
+
+			err = btr_cur_optimistic_insert(
 				0, &cursor, entry, &insert_rec, &big_rec,
 				n_ext, thr, &mtr);
+
+			if (err == DB_FAIL) {
+				err = btr_cur_pessimistic_insert(
+					0, &cursor, entry, &insert_rec,
+					&big_rec, n_ext, thr, &mtr);
+			}
 		}
 	}
 

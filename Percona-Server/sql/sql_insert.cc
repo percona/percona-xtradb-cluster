@@ -3523,8 +3523,14 @@ bool select_insert::send_eof()
   DBUG_PRINT("enter", ("trans_table=%d, table_type='%s'",
                        trans_table, table->file->table_type()));
 
+#ifdef WITH_WSREP
+  error= (thd->wsrep_conflict_state == MUST_ABORT) ? -1 :
+    (thd->locked_tables_mode <= LTM_LOCK_TABLES ?
+          table->file->ha_end_bulk_insert() : 0);
+#else
   error= (thd->locked_tables_mode <= LTM_LOCK_TABLES ?
           table->file->ha_end_bulk_insert() : 0);
+#endif /* WITH_WSREP */
   if (!error && thd->is_error())
     error= thd->stmt_da->sql_errno();
 
@@ -4031,7 +4037,7 @@ select_create::binlog_show_create_table(TABLE **tables, uint count)
   if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
   if (mysql_bin_log.is_open())
-#endif
+#endif /* WITH_WSREP */
   {
     int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
     result= thd->binlog_query(THD::STMT_QUERY_TYPE,
@@ -4041,6 +4047,9 @@ select_create::binlog_show_create_table(TABLE **tables, uint count)
                               /* suppress_use */ FALSE,
                               errcode);
   }
+#ifdef WITH_WSREP
+  ha_wsrep_fake_trx_id(thd);
+#endif
   return result;
 }
 

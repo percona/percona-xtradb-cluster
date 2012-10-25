@@ -4960,7 +4960,7 @@ buf_stats_aggregate_pool_info(
 Collect buffer pool stats information for a buffer pool. Also
 record aggregated stats if there are more than one buffer pool
 in the server */
-static
+UNIV_INTERN
 void
 buf_stats_get_pool_info(
 /*====================*/

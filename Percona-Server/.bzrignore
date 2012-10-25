@@ -2891,6 +2891,8 @@ support-files/mysql.server
 support-files/mysql.spec
 support-files/mysqld_multi.server
 support-files/ndb-config-2-node.ini
+support-files/wsrep.cnf
+support-files/wsrep_notify
 tags
 test/ndbapi/bank/bankCreator
 test/ndbapi/bank/bankMakeGL
@@ -3037,11 +3039,13 @@ sql/share/slovak
 sql/share/spanish
 sql/share/swedish
 sql/share/ukrainian
+scripts/wsrep_sst_common
 scripts/wsrep_sst_mysqldump
+scripts/wsrep_sst_rsync
+scripts/wsrep_sst_xtrabackup
 libmysqld/examples/mysqltest.cc
 libmysqld/sql_signal.cc
 libmysqld/debug_sync.cc
-scripts/wsrep_sst_rsync
 dbug/tests
 libmysqld/mdl.cc
 client/transaction.h

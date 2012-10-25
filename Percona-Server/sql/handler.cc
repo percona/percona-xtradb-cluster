@@ -4955,7 +4955,19 @@ int handler::read_range_first(const key_range *start_key,
 		? HA_ERR_END_OF_FILE
 		: result);
 
-  DBUG_RETURN (compare_key(end_range) <= 0 ? 0 : HA_ERR_END_OF_FILE);
+  if (compare_key(end_range) <= 0)
+  {
+    DBUG_RETURN(0);
+  }
+  else
+  {
+    /*
+      The last read row does not fall in the range. So request
+      storage engine to release row lock if possible.
+    */
+    unlock_row();
+    DBUG_RETURN(HA_ERR_END_OF_FILE);
+  }
 }
 
 
@@ -4987,7 +4999,20 @@ int handler::read_range_next()
   result= index_next(table->record[0]);
   if (result)
     DBUG_RETURN(result);
-  DBUG_RETURN(compare_key(end_range) <= 0 ? 0 : HA_ERR_END_OF_FILE);
+
+  if (compare_key(end_range) <= 0)
+  {
+    DBUG_RETURN(0);
+  }
+  else
+  {
+    /*
+      The last read row does not fall in the range. So request
+      storage engine to release row lock if possible.
+    */
+    unlock_row();
+    DBUG_RETURN(HA_ERR_END_OF_FILE);
+  }
 }
 
 
@@ -5527,7 +5552,9 @@ void signal_log_not_needed(struct handlerton, char *log_file)
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
 {
   DBUG_ENTER("ha_wsrep_abort_transaction");
-  if (!WSREP(bf_thd)) {
+  if (!WSREP(bf_thd) &&  
+      !(wsrep_OSU_method_options == WSREP_OSU_RSU &&
+        bf_thd->wsrep_exec_mode == TOTAL_ORDER)) {
     DBUG_RETURN(0);
   }
 
@@ -5542,6 +5569,27 @@ int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
   }
 
   DBUG_RETURN(0);
+}
+
+void ha_wsrep_fake_trx_id(THD *thd)
+{
+  DBUG_ENTER("ha_wsrep_fake_trx_id");
+  if (!WSREP(thd)) 
+  {
+    DBUG_VOID_RETURN;
+  }
+
+  handlerton *hton= installed_htons[DB_TYPE_INNODB];
+  if (hton && hton->wsrep_fake_trx_id)
+  {
+    hton->wsrep_fake_trx_id(hton, thd);
+  } 
+  else 
+  {
+    WSREP_WARN("cannot get get fake InnoDB transaction ID");
+  }
+
+  DBUG_VOID_RETURN;
 }
 #endif /* WITH_WSREP */
 #ifdef TRANS_LOG_MGM_EXAMPLE_CODE

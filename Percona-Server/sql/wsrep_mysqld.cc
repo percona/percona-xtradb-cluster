@@ -49,12 +49,14 @@ long    wsrep_max_protocol_version     = 2; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
+my_bool wsrep_log_conflicts            = 0; // 
+ulong  wsrep_mysql_replication_bundle  = 0;
 
 /*
  * End configuration options
  */
 
-static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
+static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
 const wsrep_uuid_t* wsrep_cluster_uuid()
 {
   return &cluster_uuid;
@@ -120,11 +122,11 @@ static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   }
 }
 
-static void wsrep_log_states (wsrep_log_level_t level,
-                              wsrep_uuid_t* group_uuid,
-                              wsrep_seqno_t group_seqno,
-                              wsrep_uuid_t* node_uuid,
-                              wsrep_seqno_t node_seqno)
+static void wsrep_log_states (wsrep_log_level_t   const level,
+                              const wsrep_uuid_t* const group_uuid,
+                              wsrep_seqno_t       const group_seqno,
+                              const wsrep_uuid_t* const node_uuid,
+                              wsrep_seqno_t       const node_seqno)
 {
   char uuid_str[37];
   char msg[256];
@@ -195,7 +197,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
   if (memcmp(&cluster_uuid, &view->uuid, sizeof(wsrep_uuid_t)))
   {
-    cluster_uuid= view->uuid;
+    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->uuid, sizeof(cluster_uuid));
     wsrep_uuid_print (&cluster_uuid, cluster_uuid_str,
                       sizeof(cluster_uuid_str));
   }
@@ -213,7 +215,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
   /* Proceed further only if view is PRIMARY */
   if (WSREP_VIEW_PRIMARY != view->status) {
-    wsrep_ready= FALSE;
+    wsrep_ready_set(FALSE);
     new_status= WSREP_MEMBER_UNDEFINED;
     /* Always record local_uuid and local_seqno in non-prim since this
      * may lead to re-initializing provider and start position is
@@ -234,13 +236,13 @@ static void wsrep_view_handler_cb (void* app_ctx,
       if (view->proto_ver != wsrep_protocol_version)
       {
           my_bool wsrep_ready_saved= wsrep_ready;
-          wsrep_ready= FALSE;
+          wsrep_ready_set(FALSE);
           WSREP_INFO("closing client connections for "
                      "protocol change %ld -> %d",
                      wsrep_protocol_version, view->proto_ver);
           wsrep_close_client_connections(TRUE);
           wsrep_protocol_version= view->proto_ver;
-          wsrep_ready= wsrep_ready_saved;
+          wsrep_ready_set(wsrep_ready_saved);
       }
       break;
   default:
@@ -255,7 +257,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
     /* After that wsrep will call wsrep_sst_prepare. */
     /* keep ready flag 0 until we receive the snapshot */
-    wsrep_ready= FALSE;
+    wsrep_ready_set(FALSE);
 
     /* Close client connections to ensure that they don't interfere
      * with SST */
@@ -411,7 +413,7 @@ int wsrep_init()
 {
   int rcode= -1;
 
-  wsrep_ready= FALSE;
+  wsrep_ready_set(FALSE);
   assert(wsrep_provider);
 
   wsrep_init_position();
@@ -438,8 +440,9 @@ int wsrep_init()
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
-    wsrep_ready= TRUE;
+    wsrep_ready_set(TRUE);
     global_system_variables.wsrep_on = 0;
+    return 0;
   }
   else
   {
@@ -452,40 +455,68 @@ int wsrep_init()
             wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
   }
 
-  struct wsrep_init_args wsrep_args;
-
   if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)
     wsrep_data_home_dir = mysql_real_data_home;
 
-  if (strcmp (wsrep_provider, WSREP_NONE) &&
-      (!wsrep_node_incoming_address ||
-       !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO))) {
-    static char inc_addr[256];
-    size_t inc_addr_max = sizeof (inc_addr);
-    size_t ret = default_address (inc_addr, inc_addr_max);
-    if (ret > 0 && ret < inc_addr_max) {
-      wsrep_node_incoming_address = inc_addr;
-    }
-    else {
-      wsrep_node_incoming_address = NULL;
-    }
-  }
-
-  char node_addr[256] = {0, };
+  char node_addr[512]= { 0, };
   if (!wsrep_node_address || !strcmp(wsrep_node_address, ""))
   {
-    size_t node_addr_max= sizeof(node_addr);
-    size_t ret= default_ip(node_addr, node_addr_max);
+    size_t const node_addr_max= sizeof(node_addr);
+    size_t const ret= guess_ip(node_addr, node_addr_max);
     if (!(ret > 0 && ret < node_addr_max))
     {
-      WSREP_WARN("Failed to autoguess base node address");
-      node_addr[0]= 0;
+      WSREP_WARN("Failed to guess base node address. Set it explicitly via "
+                 "wsrep_node_address.");
+      node_addr[0]= '\0';
     }
   }
-  else if (wsrep_node_address)
+  else
   {
     strncpy(node_addr, wsrep_node_address, sizeof(node_addr) - 1);
   }
+
+  static char inc_addr[512]= { 0, };
+  if ((!wsrep_node_incoming_address ||
+       !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO))) {
+    size_t const node_addr_len= strlen(node_addr);
+    if (node_addr_len > 0)
+    {
+      const char* const colon= strrchr(node_addr, ':');
+      if (strchr(node_addr, ':') == colon) // 1 or 0 ':'
+      {
+        size_t const inc_addr_max= sizeof (inc_addr);
+        size_t const ip_len= colon ? colon - node_addr : node_addr_len;
+        if (ip_len + 7 /* :55555\0 */ < inc_addr_max)
+        {
+          memcpy (inc_addr, node_addr, ip_len);
+          snprintf(inc_addr + ip_len, inc_addr_max - ip_len, ":%u",mysqld_port);
+        }
+        else
+        {
+          WSREP_WARN("Guessing address for incoming client connections: "
+                     "address too long.");
+          inc_addr[0]= '\0';
+        }
+      }
+      else
+      {
+        WSREP_WARN("Guessing address for incoming client connections: "
+                   "too many colons :) .");
+        inc_addr[0]= '\0';
+      }
+    }
+
+    // this is to display detected address on SHOW VARIABLES...
+    wsrep_node_incoming_address = inc_addr;
+
+    if (!strlen(wsrep_node_incoming_address))
+    {
+        WSREP_WARN("Guessing address for incoming client connections failed. "
+                   "Try setting wsrep_node_incoming_address explicitly.");
+    }
+  }
+
+  struct wsrep_init_args wsrep_args;
 
   wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
@@ -552,6 +583,15 @@ void wsrep_deinit()
 
 void wsrep_recover()
 {
+  if (!memcmp(&local_uuid, &WSREP_UUID_UNDEFINED, sizeof(wsrep_uuid_t)) &&
+      local_seqno == -2)
+  {
+    char uuid_str[40];
+    wsrep_uuid_print(&local_uuid, uuid_str, sizeof(uuid_str));
+    WSREP_INFO("Position %s:%lld given at startup, skipping position recovery",
+               uuid_str, (long long)local_seqno);
+    return;
+  }
   XID xid;
   memset(&xid, 0, sizeof(xid));
   xid.formatID= -1;
@@ -599,14 +639,14 @@ bool wsrep_start_replication()
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
-    wsrep_ready = TRUE;
+    wsrep_ready_set(TRUE);
     return true;
   }
 
   if (!wsrep_cluster_address || strlen(wsrep_cluster_address)== 0)
   {
     // if provider is non-trivial, but no address is specified, wait for address
-    wsrep_ready = FALSE;
+    wsrep_ready_set(FALSE);
     return true;
   }
 
@@ -687,7 +727,8 @@ wsrep_causal_wait (THD* thd)
         break;
       default:
         msg= "Causal wait failed.";
-        err= ER_ERROR_ON_READ;
+        err= ER_LOCK_WAIT_TIMEOUT; // NOTE: the above msg won't be displayed
+                                   //       with ER_LOCK_WAIT_TIMEOUT
       }
 
       my_error(err, MYF(0), msg);
@@ -1074,9 +1115,31 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   ret = wsrep->desync(wsrep);
   if (ret != WSREP_OK)
   {
-    WSREP_WARN("desync failed %d for %s", ret, thd->query());
+    WSREP_WARN("RSU desync failed %d for %s", ret, thd->query());
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(ret);
   }
+  mysql_mutex_lock(&LOCK_wsrep_replaying);
+  wsrep_replaying++;
+  mysql_mutex_unlock(&LOCK_wsrep_replaying);
+
+  if (wsrep_wait_committing_connections_close(5000))
+  {
+    /* no can do, bail out from DDL */
+    WSREP_WARN("RSU failed due to pending transactions, %s", thd->query());
+    mysql_mutex_lock(&LOCK_wsrep_replaying);
+    wsrep_replaying--;
+    mysql_mutex_unlock(&LOCK_wsrep_replaying);
+
+    ret = wsrep->resync(wsrep);
+    if (ret != WSREP_OK)
+    {
+      WSREP_WARN("resync failed %d for %s", ret, thd->query());
+    }
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
+    return(1);
+  }
+
   wsrep_seqno_t seqno = wsrep->pause(wsrep);
   if (seqno == WSREP_SEQNO_UNDEFINED)
   {
@@ -1093,6 +1156,11 @@ static void wsrep_RSU_end(THD *thd)
   wsrep_status_t ret(WSREP_WARNING);
   WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
                thd->wsrep_exec_mode, thd->query() );
+
+
+  mysql_mutex_lock(&LOCK_wsrep_replaying);
+  wsrep_replaying--;
+  mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
   ret = wsrep->resume(wsrep);
   if (ret != WSREP_OK)
@@ -1160,6 +1228,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
 
   THD *request_thd  = requestor_ctx->get_thd();
   THD *granted_thd  = ticket->get_ctx()->get_thd();
+  bool ret          = FALSE;
 
   mysql_mutex_lock(&request_thd->LOCK_wsrep_thd);
   if (request_thd->wsrep_exec_mode == TOTAL_ORDER ||
@@ -1174,39 +1243,39 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
     {
       WSREP_MDL_LOG(INFO, "MDL BF-BF conflict", request_thd, granted_thd);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-      return TRUE;
+      ret = TRUE;
     }
     else if (granted_thd->lex->sql_command == SQLCOM_FLUSH)
     {
       WSREP_DEBUG("mdl granted over FLUSH BF");
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
-      return TRUE;
-    } 
+      ret = TRUE;
+    }
     else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE) 
     {
       WSREP_DEBUG("DROP caused BF abort");
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
-      return FALSE;
-    } 
+      ret = FALSE;
+    }
     else if (granted_thd->wsrep_query_state == QUERY_COMMITTING) 
     {
       WSREP_DEBUG("mdl granted, but commiting thd abort scheduled");
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
-      return  FALSE;
+      ret = FALSE;
     }
     else 
     {
       WSREP_MDL_LOG(DEBUG, "MDL conflict-> BF abort", request_thd, granted_thd);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
-      return FALSE;
+      ret = FALSE;
     }
   }
   else
   {
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
   }
-  return FALSE;
+  return ret;
 }
