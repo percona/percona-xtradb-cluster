@@ -677,14 +677,6 @@ char* utility_user= NULL;
 char* utility_user_password= NULL;
 char* utility_user_schema_access= NULL;
 
-ulonglong opt_log_warnings_suppress= 0;
-
-char* enforce_storage_engine= NULL;
-
-char* utility_user= NULL;
-char* utility_user_password= NULL;
-char* utility_user_schema_access= NULL;
-
 /* Thread specific variables */
 
 pthread_key(MEM_ROOT**,THR_MALLOC);
