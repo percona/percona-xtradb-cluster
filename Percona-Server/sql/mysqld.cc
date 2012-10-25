@@ -667,6 +667,15 @@ SHOW_COMP_OPTION have_ssl, have_symlink, have_dlopen, have_query_cache, have_res
 SHOW_COMP_OPTION have_geometry, have_rtree_keys;
 SHOW_COMP_OPTION have_crypt, have_compress;
 SHOW_COMP_OPTION have_profiling;
+SHOW_COMP_OPTION have_flashcache;
+
+ulonglong opt_log_warnings_suppress= 0;
+
+char* enforce_storage_engine= NULL;
+
+char* utility_user= NULL;
+char* utility_user_password= NULL;
+char* utility_user_schema_access= NULL;
 
 ulonglong opt_log_warnings_suppress= 0;
 
@@ -4335,6 +4344,10 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     if (purge_time >= 0)
       mysql_bin_log.purge_logs_before_date(purge_time);
   }
+  if (opt_bin_log && max_binlog_files)
+  {
+    mysql_bin_log.purge_logs_maximum_number(max_binlog_files);
+  }
 #endif
 
   if (opt_myisam_log)
@@ -4974,20 +4987,20 @@ static void init_cachedev(void)
 
   if (!mysql_data_home)
   {
-    error_message= "mysql_data_home not set";
+    error_message= "Flashcache setup error (mysql_data_home not set)";
     goto epilogue;
   }
 
   if (statfs(mysql_data_home, &stfs_data_home_dir) < 0)
   {
-    error_message= "statfs failed";
+    error_message= "Flashcache setup error (statfs)";
     goto epilogue;
   }
 
   mounts = setmntent("/etc/mtab", "r");
   if (mounts == NULL)
   {
-    error_message= "setmntent failed";
+    error_message= "Flashcache setup error (setmntent)";
     goto epilogue;
   }
 
@@ -5002,14 +5015,14 @@ static void init_cachedev(void)
 
   if (ent == NULL)
   {
-    error_message= "getmntent loop failed";
+    error_message= "Flashcache setup error (getmntent loop)";
     goto epilogue;
   }
 
   cachedev_fd = open(ent->mnt_fsname, O_RDONLY);
   if (cachedev_fd < 0)
   {
-    error_message= "open flash device failed";
+    error_message= "Flashcache setup error (open flash device)";
     goto epilogue;
   }
 
@@ -5018,18 +5031,17 @@ static void init_cachedev(void)
   {
     close(cachedev_fd);
     cachedev_fd = -1;
-    error_message= "ioctl failed";
+    error_message= "Flashcache setup error (ioctl)";
   } else {
     ioctl(cachedev_fd, FLASHCACHEADDWHITELIST, &pid);
   }
 
 epilogue:
-  sql_print_information("Flashcache bypass: %s",
-      (cachedev_fd > 0) ? "enabled" : "disabled");
-  if (error_message)
-    sql_print_information("Flashcache setup error is : %s\n", error_message);
-  else
-    cachedev_enabled= TRUE;
+  if (error_message) {
+    sql_perror(error_message);
+    unireg_abort(1);
+  }
+  sql_print_information("Flashcache bypass support initialized successfully");
 
 }
 
@@ -5306,7 +5318,11 @@ int mysqld_main(int argc, char **argv)
 #endif
 
 #if defined(__linux__)
-  init_cachedev();
+  have_flashcache= SHOW_OPTION_YES;
+  if (cachedev_enabled)
+    init_cachedev();
+#else
+  have_flashcache= SHOW_OPTION_NO;
 #endif//__linux__
 
   /*
@@ -7013,6 +7029,12 @@ struct my_option my_long_options[]=
   {"table_cache", 0, "Deprecated; use --table-open-cache instead.",
    &table_cache_size, &table_cache_size, 0, GET_ULONG,
    REQUIRED_ARG, TABLE_OPEN_CACHE_DEFAULT, 1, 512*1024L, 0, 1, 0},
+  {"flashcache",
+   0,
+   "Enable flashcache detection.",
+   &cachedev_enabled,
+   &cachedev_enabled,
+   0, GET_BOOL, OPT_ARG, 0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
 

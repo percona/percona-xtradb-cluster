@@ -8,10 +8,10 @@ CMAKE=cmake
 TMP=$(CURDIR)/debian/tmp/
 
 feature_set="community"
-major_version=28
-minor_version=1
-compilation_comment_release="Percona XtraDB Cluster (GPL)"
-server_suffix="-55"
+major_version=29
+minor_version=0
+compilation_comment_release="Percona Server (GPL), Release $(major_version).$(minor_version)"
+server_suffix="-$(major_version).$(minor_version)"
 prefix="/usr"
 
 clean: clean-patched unpatch
@@ -26,8 +26,6 @@ build: patch
 	   -DINSTALL_LAYOUT=DEB \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DWITH_EMBEDDED_SERVER=OFF \
-           -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DWITH_WSREP=ON \
            -DMYSQL_UNIX_ADDR="/var/run/mysqld/mysqld.sock" \
            -DFEATURE_SET=$(feature_set) \
            -DCOMPILATION_COMMENT=$(compilation_comment_release) \

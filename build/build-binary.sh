@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Execute this tool to setup the environment and build binary releases
-# for Percona XtraDB Cluster starting from a fresh tree.
+# for Percona-Server starting from a fresh tree.
 #
 # Usage: build-binary.sh [target dir]
 # The default target directory is the current directory. If it is not
@@ -80,30 +80,18 @@ WORKDIR_ABS="$(cd "$WORKDIR"; pwd)"
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
 test -e "$SOURCEDIR/Makefile" || exit 2
 
-# Test for the galera sources
-if ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
-then
-    echo >&2 "Subdir percona-xtradb-cluster-galera not found"
-    exit 1
-fi
-
 # Extract version from the Makefile
 MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
-RELEASE_TAG=''
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
     "$SOURCEDIR/Makefile" | cut -d = -f 2)"
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
-    "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
-    cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
-    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
-PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
+PRODUCT="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
 
 # Build information
-REVISION="$(cd "$SOURCEDIR"; bzr revno)"
-GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; bzr revno)"
-PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.$REVISION.$(uname -s).$TARGET"
-COMMENT="Percona XtraDB Cluster (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
+REVISION="$(cd "$SOURCEDIR"; bzr log -r-1 | grep ^revno: | cut -d ' ' -f 2)"
+PRODUCT_FULL="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+PRODUCT_FULL="$PRODUCT_FULL-$REVISION.$(uname -s).$TARGET"
+COMMENT="Percona Server with XtraDB (GPL), Release $PERCONA_SERVER_VERSION"
 COMMENT="$COMMENT, Revision $REVISION"
 
 # Compilation flags
@@ -121,37 +109,17 @@ INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
 (
     cd "$SOURCEDIR"
  
-    # Build galera
-    (
-        export CC=${GALERA_CC:-gcc}
-        export CXX=${GALERA_CXX:-g++}
-
-        cd "percona-xtradb-cluster-galera"
-        scons --config=force revno="$GALERA_REVISION" garb/garbd libgalera_smm.so
-        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-        cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
-        cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-
-    ) || exit 1
-
-    # Export and cd to a new dir
-    bzr export "$INSTALLDIR/src"
-
-    cd "$INSTALLDIR/src"
-
+    # Execute clean and download mysql, apply patches
     make clean all
-    cd Percona-Server
 
+    cd "$PRODUCT"
     cmake . -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DWITH_EMBEDDED_SERVER=OFF \
         -DFEATURE_SET=community \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
         -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-        -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
-        -DWITH_INNODB_DISALLOW_WRITES=ON \
-        -DWITH_WSREP=ON \
+        -DMYSQL_SERVER_SUFFIX="-$PERCONA_SERVER_VERSION" \
         -DCOMPILATION_COMMENT="$COMMENT"
 
     make $MAKE_JFLAG $QUIET
@@ -161,8 +129,8 @@ INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
     (
         cd "storage/HandlerSocket-Plugin-for-MySQL"
         ./autogen.sh
-        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$INSTALLDIR/src/Percona-Server" \
-            --with-mysql-bindir="$INSTALLDIR/src/Percona-Server/scripts" \
+        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$SOURCEDIR/$PRODUCT" \
+            --with-mysql-bindir="$SOURCEDIR/$PRODUCT/scripts" \
             --with-mysql-plugindir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --prefix="/usr/local/$PRODUCT_FULL"
@@ -174,7 +142,7 @@ INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
     # Build UDF
     (
         cd "UDF"
-        CXX=${UDF_CXX:-g++} ./configure --includedir="$INSTALLDIR/src/Percona-Server/include" \
+        CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/$PRODUCT/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make
         make DESTDIR="$INSTALLDIR" install

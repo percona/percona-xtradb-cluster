@@ -51,6 +51,7 @@ extern struct st_mysql_plugin	i_s_innodb_admin_command;
 extern struct st_mysql_plugin	i_s_innodb_buffer_pool_pages;
 extern struct st_mysql_plugin	i_s_innodb_buffer_pool_pages_index;
 extern struct st_mysql_plugin	i_s_innodb_buffer_pool_pages_blob;
+extern struct st_mysql_plugin	i_s_innodb_changed_pages;
 extern struct st_mysql_plugin	i_s_innodb_buffer_page;
 extern struct st_mysql_plugin	i_s_innodb_buffer_page_lru;
 extern struct st_mysql_plugin	i_s_innodb_buffer_stats;;

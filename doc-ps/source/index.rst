@@ -75,6 +75,7 @@ Performance Improvements
    performance/remove_fcntl_excessive_calls
    performance/innodb_opt_lru_count
    performance/innodb_thread_concurrency_timer_based
+   performance/innodb_numa_support
    performance/handlersocket
 
 Flexibility Improvements
@@ -90,6 +91,7 @@ Flexibility Improvements
    flexibility/buff_read_ahead_area
    flexibility/innodb_fast_shutdown
    flexibility/improved_memory_engine
+   flexibility/max_binlog_files
 
 Reliability Improvements
 ========================
@@ -125,6 +127,7 @@ Management Improvements
    management/utility_user
    management/secure_file_priv_extended
    management/expanded_program_option_modifiers
+   management/changed_page_tracking
 
 Diagnostics Improvements
 ========================

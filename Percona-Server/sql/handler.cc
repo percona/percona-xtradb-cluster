@@ -175,7 +175,6 @@ struct st_sys_tbl_chk_params
   }status;                                    // OUT param
 };
 
-
 static plugin_ref ha_default_plugin(THD *thd)
 {
   if (thd->variables.table_plugin)
@@ -1639,7 +1638,6 @@ int ha_rollback_trans(THD *thd, bool all)
       thd->transaction.cleanup();
 #endif /* WITH_WSREP */
   thd->diff_rollback_trans++;
-
   if (all)
     thd->transaction_rollback_request= FALSE;
 

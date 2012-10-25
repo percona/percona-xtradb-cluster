@@ -36,15 +36,7 @@ Created 11/5/1995 Heikki Tuuri
 #include "buf0lru.h"
 #include "buf0rea.h"
 #include "srv0srv.h"
-
-/** A chunk of buffers. The buffer pool is allocated in chunks. */
-struct buf_chunk_struct{
-	ulint		mem_size;	/*!< allocated size of the chunk */
-	ulint		size;		/*!< size of frames[] and blocks[] */
-	void*		mem;		/*!< pointer to the memory area which
-					was allocated for the frames */
-	buf_block_t*	blocks;		/*!< array of buffer control blocks */
-};
+#include "buf0types.h"
 
 /*********************************************************************//**
 Gets the current size of buffer buf_pool in bytes.
@@ -1363,6 +1355,7 @@ buf_pool_page_hash_x_unlock_all(void)
 		buf_pool = buf_pool_from_array(i);
 		rw_lock_x_unlock(&buf_pool->page_hash_latch);
 	}
+}
 /*********************************************************************//**
 Get the nth chunk's buffer block in the specified buffer pool.
 @return the nth chunk's buffer block. */

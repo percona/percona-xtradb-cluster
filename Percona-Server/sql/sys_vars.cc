@@ -799,6 +799,14 @@ static Sys_var_ulong Sys_expire_logs_days(
        GLOBAL_VAR(expire_logs_days),
        CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 99), DEFAULT(0), BLOCK_SIZE(1));
 
+static Sys_var_ulong Sys_max_binlog_files(
+       "max_binlog_files",
+       "Maximum number of binlog files. Used with --max-binlog-size this can "
+       "be used to limit the total amount of disk space used for the binlog. "
+       "Default is 0, don't limit.",
+       GLOBAL_VAR(max_binlog_files),
+       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 102400), DEFAULT(0), BLOCK_SIZE(1));
+
 static Sys_var_mybool Sys_flush(
        "flush", "Flush MyISAM tables to disk between SQL commands",
        GLOBAL_VAR(myisam_flush),
@@ -3054,6 +3062,10 @@ static Sys_var_have Sys_have_ssl(
 static Sys_var_have Sys_have_symlink(
        "have_symlink", "have_symlink",
        READ_ONLY GLOBAL_VAR(have_symlink), NO_CMD_LINE);
+
+static Sys_var_have Sys_have_flashcache(
+       "have_flashcache", "have_flashcache",
+       READ_ONLY GLOBAL_VAR(have_flashcache), NO_CMD_LINE);
 
 static bool fix_log_state(sys_var *self, THD *thd, enum_var_type type);
 static Sys_var_mybool Sys_general_log(
