@@ -8095,8 +8095,6 @@ void wsrep_replication_process(THD *thd)
   struct wsrep_thd_shadow shadow;
   wsrep_prepare_bf_thd(thd, &shadow);
 
-  wsrep_format_desc= new Format_description_log_event(4);
-
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));
 

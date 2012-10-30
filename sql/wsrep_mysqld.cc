@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include "log_event.h"
 
+extern Format_description_log_event *wsrep_format_desc;
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
 
@@ -415,7 +416,7 @@ int wsrep_init()
 
   wsrep_ready_set(FALSE);
   assert(wsrep_provider);
-
+  wsrep_format_desc= new Format_description_log_event(4);
   wsrep_init_position();
 
   if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != WSREP_OK)
@@ -579,6 +580,9 @@ void wsrep_deinit()
   provider_name[0]=    '\0';
   provider_version[0]= '\0';
   provider_vendor[0]=  '\0';
+
+  delete wsrep_format_desc;
+  wsrep_format_desc= NULL;
 }
 
 void wsrep_recover()

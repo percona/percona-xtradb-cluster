@@ -27,8 +27,10 @@
 
 // trx history position to start with
 const  char* wsrep_start_position   = WSREP_START_POSITION_ZERO;
-const  char* wsrep_provider         = WSREP_NONE;
-const  char* wsrep_provider_options = (const char*)my_memdup("", 1, MYF(MY_WME));
+const  char* wsrep_provider         = (const char*)my_memdup(
+                                        WSREP_NONE, 1, MYF(MY_WME));
+const  char* wsrep_provider_options = (const char*)my_memdup(
+                                        "", 1, MYF(MY_WME));
 const  char* wsrep_cluster_address  = NULL;
 const  char* wsrep_cluster_name     = "my_wsrep_cluster";
 const  char* wsrep_node_name        = glob_hostname;
@@ -152,13 +154,13 @@ void wsrep_start_position_init (const char* val)
     return;
   }
 
-  wsrep_start_position = my_strdup(val, MYF(0)); 
-
   wsrep_set_local_position (val);
 }
 
 static bool refresh_provider_options()
 {
+  WSREP_DEBUG("refresh_provider_options: %s", 
+              (wsrep_provider_options) ? wsrep_provider_options : "null");
   char* opts= wsrep->options_get(wsrep);
   if (opts)
   {
@@ -225,6 +227,8 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   bool wsrep_on_saved= thd->variables.wsrep_on;
   thd->variables.wsrep_on= false;
 
+  WSREP_DEBUG("wsrep_provider_update: %s", wsrep_provider);
+
   wsrep_stop_replication(thd);
   wsrep_deinit();
 
@@ -250,12 +254,17 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
 
 void wsrep_provider_init (const char* value)
 {
+  WSREP_DEBUG("wsrep_provider_init: %s -> %s", 
+              (wsrep_provider) ? wsrep_provider : "null", 
+              (value) ? value : "null");
   if (NULL == value || wsrep_provider_verify (value))
   {
     WSREP_ERROR("Bad initial value for wsrep_provider: %s",
                 (value ? value : ""));
     return;
   }
+
+  if (wsrep_provider) my_free((void *)wsrep_provider);
   wsrep_provider = my_strdup(value, MYF(0));
 }
 
@@ -327,9 +336,11 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
 
 void wsrep_cluster_address_init (const char* value)
 {
-  if (wsrep_cluster_address && wsrep_cluster_address != value) 
-    my_free ((void*)wsrep_cluster_address);
+  WSREP_DEBUG("wsrep_cluster_address_init: %s -> %s", 
+              (wsrep_cluster_address) ? wsrep_cluster_address : "null", 
+              (value) ? value : "null");
 
+  if (wsrep_cluster_address) my_free ((void*)wsrep_cluster_address);
   wsrep_cluster_address = (value) ? my_strdup(value, MYF(0)) : NULL;
 }
 
