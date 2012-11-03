@@ -477,8 +477,10 @@ int wsrep_init()
   }
 
   static char inc_addr[512]= { 0, };
+
   if ((!wsrep_node_incoming_address ||
-       !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO))) {
+       !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO)))
+  {
     size_t const node_addr_len= strlen(node_addr);
     if (node_addr_len > 0)
     {
