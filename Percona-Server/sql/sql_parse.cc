@@ -5024,7 +5024,6 @@ finish:
   thd_proc_info(thd, "closing tables");
   close_thread_tables(thd);
 #ifdef WITH_WSREP
-  WSREP_TO_ISOLATION_END
   thd->wsrep_consistency_check= NO_CONSISTENCY_CHECK;
 #endif /* WITH_WSREP */
   thd_proc_info(thd, 0);
@@ -5063,6 +5062,7 @@ finish:
   {
     thd->mdl_context.release_statement_locks();
   }
+  WSREP_TO_ISOLATION_END
 
   DBUG_RETURN(res || thd->is_error());
 }
@@ -8324,8 +8324,6 @@ void wsrep_replication_process(THD *thd)
 
   struct wsrep_thd_shadow shadow;
   wsrep_prepare_bf_thd(thd, &shadow);
-
-  wsrep_format_desc= new Format_description_log_event(4);
 
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));

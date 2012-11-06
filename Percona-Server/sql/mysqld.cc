@@ -8112,15 +8112,6 @@ mysqld_get_one_option(int optid,
     lower_case_table_names_used= 1;
     break;
 #ifdef WITH_WSREP
-  case OPT_WSREP_PROVIDER:
-    wsrep_provider_init (argument);
-    break;
-  case OPT_WSREP_PROVIDER_OPTIONS:
-    wsrep_provider_options_init (argument);
-    break;
-  case OPT_WSREP_CLUSTER_ADDRESS:
-    wsrep_cluster_address_init (argument);
-    break;
   case OPT_WSREP_START_POSITION:
     wsrep_start_position_init (argument);
     break;
