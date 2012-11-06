@@ -1191,6 +1191,21 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
                              const TABLE_LIST* table_list)
 {
   int ret= 0;
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  if (thd->wsrep_conflict_state == MUST_ABORT) 
+  {
+    WSREP_INFO("thread: %lu, %s has been aborted due to multi-master conflict", 
+               thd->thread_id, thd->query());
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    return WSREP_TRX_FAIL;
+  }
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+  if (wsrep_debug && thd->mdl_context.has_locks())
+  {
+    WSREP_DEBUG("thread holds MDL locks at TI begin: %s %lu", 
+                thd->query(), thd->thread_id);
+  }
   if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
   {
     switch (wsrep_OSU_method_options) {
@@ -1246,24 +1261,28 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
   {
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
     WSREP_MDL_LOG(DEBUG, "MDL conflict ", request_thd, granted_thd);
+    ticket->wsrep_report(wsrep_debug);
 
     mysql_mutex_lock(&granted_thd->LOCK_wsrep_thd);
     if (granted_thd->wsrep_exec_mode == TOTAL_ORDER ||
         granted_thd->wsrep_exec_mode == REPL_RECV)
     {
       WSREP_MDL_LOG(INFO, "MDL BF-BF conflict", request_thd, granted_thd);
+      ticket->wsrep_report(true);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = TRUE;
     }
     else if (granted_thd->lex->sql_command == SQLCOM_FLUSH)
     {
       WSREP_DEBUG("mdl granted over FLUSH BF");
+      ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = TRUE;
     }
     else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE) 
     {
       WSREP_DEBUG("DROP caused BF abort");
+      ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
       ret = FALSE;
@@ -1271,6 +1290,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
     else if (granted_thd->wsrep_query_state == QUERY_COMMITTING) 
     {
       WSREP_DEBUG("mdl granted, but commiting thd abort scheduled");
+      ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
       ret = FALSE;
@@ -1278,6 +1298,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
     else 
     {
       WSREP_MDL_LOG(DEBUG, "MDL conflict-> BF abort", request_thd, granted_thd);
+      ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
       ret = FALSE;
