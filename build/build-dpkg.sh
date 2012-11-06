@@ -12,7 +12,7 @@
 set -ue
 
 # Examine parameters
-go_out="$(getopt --options "kK:b" --longoptions key:,nosign,binary \
+go_out="$(getopt --options "kK:bB" --longoptions key:,nosign,binary,binarydep \
     --name "$(basename "$0")" -- "$@")"
 test $? -eq 0 || exit 1
 eval set -- $go_out
@@ -27,6 +27,7 @@ do
     -k | --key ) shift; BUILDPKG_KEY="-pgpg -k$1"; shift;;
     -K | --nosign ) shift; BUILDPKG_KEY="-uc -us";;
     -b | --binary ) shift; BINARY='-b';;
+    -B | --binarydep ) shift; BINARY='-B';;
     esac
 done
 
@@ -66,13 +67,15 @@ test -e "$SOURCEDIR/Makefile" || exit 2
 # Extract version from the Makefile
 MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
+    cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
+    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= "$SOURCEDIR/Makefile" | cut -d = -f 2)"
-PRODUCT="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 DEBIAN_VERSION="$(lsb_release -sc)"
 
-
 # Build information
-export BB_PERCONA_REVISION="$(cd "$SOURCEDIR"; bzr log -r-1 | grep ^revno: | cut -d ' ' -f 2)"
+export WSREP_REV="$(cd "$SOURCEDIR"; bzr revno)"
 export DEB_BUILD_OPTIONS='nostrip debug nocheck'
 
 # Compilation flags
@@ -103,7 +106,7 @@ export MAKE_JFLAG=-j4
         chmod +x debian/rules
 
         # Update distribution name
-        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$PERCONA_SERVER_VERSION-$BB_PERCONA_REVISION.$DEBIAN_VERSION" 'Update distribution'
+        dch -m -v "$MYSQL_VERSION-$WSREP_VERSION-$WSREP_REV.$DEBIAN_VERSION" 'Update distribution'
 
         DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS" \
                 dpkg-buildpackage $BINARY -rfakeroot $BUILDPKG_KEY
