@@ -95,6 +95,11 @@ wsrep_seqno_t    local_seqno  = WSREP_SEQNO_UNDEFINED;
 wsp::node_status local_status;
 long             wsrep_protocol_version = 2;
 
+// Boolean denoting if server is in initial startup phase. This is needed
+// to make sure that main thread waiting in wsrep_sst_wait() is signaled
+// if there was no state gap on receiving first view event.
+static my_bool   wsrep_initial_state = TRUE;
+
 // action execute callback
 extern wsrep_status_t wsrep_apply_cb(void *ctx,
                                      const void* buf, size_t buf_len,
@@ -284,8 +289,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
      *  NOTE: Initialize wsrep_group_uuid here only if it wasn't initialized
      *  before - OR - it was reinitilized on startup (lp:992840)
      */
-    if (!memcmp (&local_uuid, &WSREP_UUID_UNDEFINED, sizeof(wsrep_uuid_t)) ||
-	0 == wsrep_cluster_conf_id)
+    if (wsrep_initial_state)
     {
       if (wsrep_init_first())
       {
@@ -325,7 +329,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
   }
 
 out:
-
+  wsrep_initial_state= FALSE;
   local_status.set(new_status, view);
 }
 
