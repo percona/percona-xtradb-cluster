@@ -98,7 +98,7 @@ long             wsrep_protocol_version = 2;
 // Boolean denoting if server is in initial startup phase. This is needed
 // to make sure that main thread waiting in wsrep_sst_wait() is signaled
 // if there was no state gap on receiving first view event.
-static my_bool   wsrep_initial_state = TRUE;
+static my_bool   wsrep_startup = TRUE;
 
 // action execute callback
 extern wsrep_status_t wsrep_apply_cb(void *ctx,
@@ -289,12 +289,12 @@ static void wsrep_view_handler_cb (void* app_ctx,
      *  NOTE: Initialize wsrep_group_uuid here only if it wasn't initialized
      *  before - OR - it was reinitilized on startup (lp:992840)
      */
-    if (wsrep_initial_state)
+    if (wsrep_startup)
     {
-      if (wsrep_init_first())
+      if (wsrep_before_SE())
       {
         wsrep_SE_init_grab();
-        // Signal init thread to continue
+        // Signal mysqld init thread to continue
         wsrep_sst_complete (&cluster_uuid, view->seqno, false);
         // and wait for SE initialization
         wsrep_SE_init_wait();
@@ -310,15 +310,14 @@ static void wsrep_view_handler_cb (void* app_ctx,
       wsrep_set_SE_checkpoint(&xid);
       new_status= WSREP_MEMBER_JOINED;
     }
-    else // just some sanity check
+
+    // just some sanity check
+    if (memcmp (&local_uuid, &cluster_uuid, sizeof (wsrep_uuid_t)))
     {
-      if (memcmp (&local_uuid, &cluster_uuid, sizeof (wsrep_uuid_t)))
-      {
-        WSREP_ERROR("Undetected state gap. Can't continue.");
-        wsrep_log_states (WSREP_LOG_FATAL, &cluster_uuid, view->seqno,
-                          &local_uuid, -1);
-        abort();
-      }
+      WSREP_ERROR("Undetected state gap. Can't continue.");
+      wsrep_log_states(WSREP_LOG_FATAL, &cluster_uuid, view->seqno,
+                       &local_uuid, -1);
+      unireg_abort(1);
     }
   }
 
@@ -329,7 +328,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
   }
 
 out:
-  wsrep_initial_state= FALSE;
+  wsrep_startup= FALSE;
   local_status.set(new_status, view);
 }
 
