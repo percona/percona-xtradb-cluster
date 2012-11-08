@@ -6078,7 +6078,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
   if (thd->wsrep_retry_query)
   {
     WSREP_DEBUG("releasing retry_query: %s", thd->wsrep_retry_query);
-    my_free(thd->wsrep_retry_query);
+     my_free(thd->wsrep_retry_query);
     thd->wsrep_retry_query      = NULL;
     thd->wsrep_retry_query_len  = 0;
     thd->wsrep_retry_command    = COM_CONNECT;
