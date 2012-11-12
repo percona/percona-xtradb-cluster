@@ -62,7 +62,6 @@ Usage: $0 [OPTIONS]
   --syslog                   Log messages to syslog with 'logger'
   --skip-syslog              Log messages to error log (default)
   --syslog-tag=TAG           Pass -t "mysqld-TAG" to 'logger'
-  --wsrep-urls=WSREP_URLS    Comma-separated list of wsrep URLs
   --flush-caches             Flush and purge buffers/caches before
                              starting the server
   --numa-interleave          Run mysqld with its memory interleaved
@@ -159,6 +158,8 @@ shell_quote_string() {
 
 wsrep_pick_url() {
   [ $# -eq 0 ] && return 0
+
+  log_error "WSREP: 'wsrep_urls' is DEPRECATED! Use wsrep_cluster_address to specify multiple addresses instead."
 
   if ! which nc >/dev/null; then
     log_error "ERROR: nc tool not found in PATH! Make sure you have it installed."
@@ -270,7 +271,12 @@ parse_arguments() {
       --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
       --flush-caches) flush_caches=1 ;;
       --numa-interleave) numa_interleave=1 ;;
-
+      --wsrep[-_]provider=*)
+        if test -n "$val" && test "$val" != "none"
+        then
+    	  wsrep_restart=1
+    	fi
+	;;
       --help) usage ;;
 
       *)
@@ -874,6 +880,9 @@ max_fast_restarts=5
 # flag whether a usable sleep command exists
 have_sleep=1
 
+# maximum number of wsrep restarts
+max_wsrep_restarts=0
+
 while true
 do
   rm -f $safe_mysql_unix_port "$pid_file"	# Some extra safety
@@ -953,8 +962,20 @@ do
       I=`expr $I + 1`
     done
   fi
-  log_notice "WSREP: sleeping 15 seconds before restart"
-  sleep 15
+
+  if [ -n "$wsrep_restart" ]
+  then
+    if [ $wsrep_restart -le $max_wsrep_restarts ]
+    then
+      wsrep_restart=`expr $wsrep_restart + 1`
+      log_notice "WSREP: sleeping 15 seconds before restart"
+      sleep 15
+    else
+      log_notice "WSREP: not restarting wsrep node automatically"
+      break
+    fi
+  fi
+
   log_notice "mysqld restarted"
 done
 

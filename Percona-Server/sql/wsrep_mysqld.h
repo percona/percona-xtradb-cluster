@@ -258,11 +258,11 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_LOG_CONFLICT_THD(thd, role)                                      \
     WSREP_LOG(sql_print_information, 	                                       \
       "%s: \n "       	                                                       \
-      "  THD: %lu, mode: %s, state: %s, conflict: %s, seqno: %ld\n "	       \
+      "  THD: %lu, mode: %s, state: %s, conflict: %s, seqno: %lld\n "          \
       "  SQL: %s",							       \
       role, wsrep_thd_thread_id(thd), wsrep_thd_exec_mode_str(thd),            \
       wsrep_thd_query_state_str(thd),                                          \
-      wsrep_thd_conflict_state_str(thd), wsrep_thd_trx_seqno(thd),             \
+      wsrep_thd_conflict_state_str(thd), (long long)wsrep_thd_trx_seqno(thd),  \
       wsrep_thd_query(thd)                                                     \
     );
 

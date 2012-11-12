@@ -24,23 +24,28 @@
 #include <cstdlib>
 
 #define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
+#define WSREP_CLUSTER_NAME "my_wsrep_cluster"
 
-// trx history position to start with
-const  char* wsrep_start_position   = WSREP_START_POSITION_ZERO;
-const  char* wsrep_provider         = (const char*)my_memdup(
-                                        WSREP_NONE, 1, MYF(MY_WME));
-const  char* wsrep_provider_options = (const char*)my_memdup(
-                                        "", 1, MYF(MY_WME));
-const  char* wsrep_cluster_address  = NULL;
-const  char* wsrep_cluster_name     = "my_wsrep_cluster";
-const  char* wsrep_node_name        = glob_hostname;
-static char node_address[256] = { 0, };
-const  char* wsrep_node_address     = node_address;
+const  char* wsrep_provider         = 0;
+const  char* wsrep_provider_options = 0;
+const  char* wsrep_cluster_address  = 0;
+const  char* wsrep_cluster_name     = 0;
+const  char* wsrep_node_name        = 0;
+static char  node_address[256] = { 0, };
+const  char* wsrep_node_address     = node_address; // ???
+const  char* wsrep_start_position   = 0;
 ulong   wsrep_OSU_method_options;
 static int   wsrep_thread_change    = 0;
 
 int wsrep_init_vars()
 {
+  wsrep_provider        = my_strdup(WSREP_NONE, MYF(MY_WME));
+  wsrep_provider_options= my_strdup("", MYF(MY_WME));
+  wsrep_cluster_address = my_strdup("", MYF(MY_WME));
+  wsrep_cluster_name    = my_strdup(WSREP_CLUSTER_NAME, MYF(MY_WME));
+  wsrep_node_name       = my_strdup(glob_hostname, MYF(MY_WME));
+  wsrep_start_position  = my_strdup(WSREP_START_POSITION_ZERO, MYF(MY_WME));
+
   global_system_variables.binlog_format=BINLOG_FORMAT_ROW;
   return 0;
 }
