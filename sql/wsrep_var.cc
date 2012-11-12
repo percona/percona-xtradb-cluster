@@ -27,10 +27,8 @@
 
 // trx history position to start with
 const  char* wsrep_start_position   = WSREP_START_POSITION_ZERO;
-const  char* wsrep_provider         = (const char*)my_memdup(
-                                        WSREP_NONE, 1, MYF(MY_WME));
-const  char* wsrep_provider_options = (const char*)my_memdup(
-                                        "", 1, MYF(MY_WME));
+const  char* wsrep_provider         = my_strdup(WSREP_NONE, MYF(MY_WME));
+const  char* wsrep_provider_options = NULL;
 const  char* wsrep_cluster_address  = NULL;
 const  char* wsrep_cluster_name     = "my_wsrep_cluster";
 const  char* wsrep_node_name        = glob_hostname;
