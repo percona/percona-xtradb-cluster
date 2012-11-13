@@ -75,7 +75,8 @@ PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 DEBIAN_VERSION="$(lsb_release -sc)"
 
 # Build information
-export WSREP_REV="$(cd "$SOURCEDIR"; bzr revno)"
+export REVISION="$(cd "$SOURCEDIR"; bzr revno)"
+export WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
 export DEB_BUILD_OPTIONS='nostrip debug nocheck'
 
 # Compilation flags
@@ -106,7 +107,7 @@ export MAKE_JFLAG=-j4
         chmod +x debian/rules
 
         # Update distribution name
-        dch -m -v "$MYSQL_VERSION-$WSREP_VERSION-$WSREP_REV.$DEBIAN_VERSION" 'Update distribution'
+        dch -m -v "$MYSQL_VERSION-$WSREP_VERSION-$REVISION.$DEBIAN_VERSION" 'Update distribution'
 
         DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS" \
                 dpkg-buildpackage $BINARY -rfakeroot $BUILDPKG_KEY

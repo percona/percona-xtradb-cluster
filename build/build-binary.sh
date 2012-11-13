@@ -101,7 +101,7 @@ PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 
 # Build information
 REVISION="$(cd "$SOURCEDIR"; bzr revno)"
-GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; bzr revno)"
+GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION || bzr revno)"
 PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.$REVISION.$(uname -s).$TARGET"
 COMMENT="Percona XtraDB Cluster (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
 COMMENT="$COMMENT, Revision $REVISION"

@@ -122,7 +122,7 @@ export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURC
 export MAKE_JFLAG=-j4
 
 # For the wsrep version
-export WSREP_REV="$REVISION"
+export WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
 export WSREP_VERSION="$WSREP_VERSION"
 
 # Create directories for rpmbuild if these don't exist
