@@ -37,8 +37,8 @@ Ubuntu
 ------
 
  * 10.04LTS lucid
- * 11.04 natty
- * 11.10 oneiric
+ * 12.04LTS precise
+ * 12.10 quantal
 
 
 Install XtraDB Cluster
