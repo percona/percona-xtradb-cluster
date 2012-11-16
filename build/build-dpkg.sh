@@ -107,7 +107,7 @@ export MAKE_JFLAG=-j4
         chmod +x debian/rules
 
         # Update distribution name
-        dch -m -v "$MYSQL_VERSION-$WSREP_VERSION-$REVISION.$DEBIAN_VERSION" 'Update distribution'
+        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$REVISION.$DEBIAN_VERSION" 'Update distribution'
 
         DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS" \
                 dpkg-buildpackage $BINARY -rfakeroot $BUILDPKG_KEY
