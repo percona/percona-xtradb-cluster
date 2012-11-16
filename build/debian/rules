@@ -38,7 +38,7 @@ build: patch
 	echo "Configuring HandlerSocket"
 	cd storage/HandlerSocket-Plugin-for-MySQL && \
 	bash -x autogen.sh && \
-	CXX=g++ CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/include" \
+	CXX="$${HS_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/include" \
 		./configure --with-mysql-source=$(CURDIR) \
 			--with-mysql-bindir=$(CURDIR)/scripts \
 			--with-mysql-plugindir=$(prefix)/lib/mysql/plugin \
@@ -48,7 +48,7 @@ build: patch
 	
 	# Build UDF
 	cd UDF && \
-	CXX=g++ CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/include" \
+	CXX="$${UDF_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/include" \
 		./configure --includedir=$(CURDIR)/include \
 			--libdir=$(prefix)/lib/mysql/plugin && \
 	make $(MAKE_JFLAG)
