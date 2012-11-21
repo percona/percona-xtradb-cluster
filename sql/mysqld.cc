@@ -3260,6 +3260,13 @@ static int init_common_variables()
     strmake(default_logfile_name, glob_hostname, 
 	    sizeof(default_logfile_name)-5);
 
+#ifdef WITH_WSREP
+  if (0 == wsrep_node_name || 0 == wsrep_node_name[0])
+  {
+    my_free((void *)wsrep_node_name);
+    wsrep_node_name= my_strdup(glob_hostname, MYF(MY_WME));
+  }
+#endif /* WITH_WSREP */
   strmake(pidfile_name, default_logfile_name, sizeof(pidfile_name)-5);
   strmov(fn_ext(pidfile_name),".pid");		// Add proper extension
 
