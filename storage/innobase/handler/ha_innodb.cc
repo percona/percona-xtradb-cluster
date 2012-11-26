@@ -12202,6 +12202,9 @@ wsrep_innobase_kill_one_trx(void *bf_thd_ptr, trx_t *bf_trx, trx_t *victim_trx, 
 	case QUERY_COMMITTING:
 		enum wsrep_status rcode;
 
+		WSREP_DEBUG("kill query for: %ld",
+			    wsrep_thd_thread_id(thd));
+		wsrep_thd_awake(thd, signal); 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    victim_trx->id);
 
