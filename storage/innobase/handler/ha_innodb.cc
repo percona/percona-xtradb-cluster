@@ -6956,15 +6956,27 @@ wsrep_append_foreign_key(
 	ibool		referenced,	/*!<in: is check for referenced table */
 	ibool		shared)		/*!<in: is shared access */
 {
+	ut_a(trx);
 	THD*  thd = (THD*)trx->mysql_thd;
 	ulint rcode = DB_SUCCESS;
-	char  cache_key[512] = {'\0'};
+	char  cache_key[513] = {'\0'};
 	int   cache_key_len;
 
 	if (!wsrep_on(trx->mysql_thd) || 
 	    wsrep_thd_exec_mode(thd) != LOCAL_STATE) 
 		return DB_SUCCESS;
-
+	if (!thd || !foreign || 
+	    !foreign->referenced_table || !foreign->foreign_table) 
+	{
+		WSREP_INFO("FK: %s missing in: %s", 
+			(!thd)      ?  "thread"     : 
+			((!foreign) ?  "constraint" : 
+			((!foreign->referenced_table) ? 
+			     "referenced table" : "foreign table")), 
+			   (thd && wsrep_thd_query(thd)) ? 
+			   wsrep_thd_query(thd) : "void");
+		return DB_ERROR;
+	}
 	byte  key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
 	ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
 
@@ -6988,8 +7000,10 @@ wsrep_append_foreign_key(
 		WSREP_ERROR(
 			"FK key set failed: %lu (%lu %lu), index: %s %s, %s", 
 			rcode, referenced, shared, 
-			(index->name) ? index->name : "void index", 
-			(index->table_name) ? index->table_name : "void table", 
+			(index && index->name)       ? index->name :
+				"void index", 
+			(index && index->table_name) ? index->table_name : 
+				"void table", 
 			wsrep_thd_query(thd));
 		return rcode;
 	}
@@ -6998,7 +7012,7 @@ wsrep_append_foreign_key(
 		((referenced) ? 
 			foreign->referenced_table->name : 
 			foreign->foreign_table->name) :
-		foreign->foreign_table->name, 512);
+		foreign->foreign_table->name, sizeof(cache_key) - 1);
 	cache_key_len = strlen(cache_key);
 #ifdef WSREP_DEBUG_PRINT
 	ulint j;
@@ -7014,7 +7028,8 @@ wsrep_append_foreign_key(
 		*p = '\0';
 	} else {
 		WSREP_WARN("unexpected foreign key table %s %s", 
-			   foreign->referenced_table->name, foreign->foreign_table->name);
+			   foreign->referenced_table->name, 
+			   foreign->foreign_table->name);
 	}
 
 	wsrep_key_part_t wkey_part[3];
