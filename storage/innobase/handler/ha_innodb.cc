@@ -6946,6 +6946,15 @@ ha_innobase::rnd_pos(
 }
 #ifdef WITH_WSREP
 extern "C" {
+dict_index_t*
+wsrep_dict_foreign_find_index(
+	dict_table_t*	table,
+	const char**	columns,
+	ulint		n_cols,
+	dict_index_t*	types_idx, 
+	ibool		check_charsets,
+	ulint		check_null);
+
 ulint
 wsrep_append_foreign_key(
 /*===========================*/
@@ -6965,8 +6974,9 @@ wsrep_append_foreign_key(
 	if (!wsrep_on(trx->mysql_thd) || 
 	    wsrep_thd_exec_mode(thd) != LOCAL_STATE) 
 		return DB_SUCCESS;
-	if (!thd || !foreign || 
-	    !foreign->referenced_table || !foreign->foreign_table) 
+
+	if (!thd || !foreign ||
+	    (!foreign->referenced_table && !foreign->foreign_table))
 	{
 		WSREP_INFO("FK: %s missing in: %s", 
 			(!thd)      ?  "thread"     : 
@@ -6974,6 +6984,53 @@ wsrep_append_foreign_key(
 			((!foreign->referenced_table) ? 
 			     "referenced table" : "foreign table")), 
 			   (thd && wsrep_thd_query(thd)) ? 
+			   wsrep_thd_query(thd) : "void");
+		return DB_ERROR;
+	}
+
+	if ( !((referenced) ? 
+		foreign->referenced_table : foreign->foreign_table))
+	{
+		WSREP_DEBUG("pulling %s table into cache", 
+			    (referenced) ? "referenced" : "foreign");
+		mutex_enter(&(dict_sys->mutex));
+		if (referenced)
+		{
+			foreign->referenced_table = 
+				dict_table_check_if_in_cache_low(
+					foreign->referenced_table_name_lookup);
+			foreign->referenced_index = 
+				wsrep_dict_foreign_find_index(
+					foreign->referenced_table,
+					foreign->referenced_col_names,
+					foreign->n_fields, 
+					foreign->foreign_index,
+					TRUE, FALSE);
+		}
+		else
+		{
+	  		foreign->foreign_table = 
+				dict_table_check_if_in_cache_low(
+					foreign->foreign_table_name_lookup);
+			foreign->foreign_index = 
+				wsrep_dict_foreign_find_index(
+					foreign->foreign_table,
+					foreign->foreign_col_names,
+					foreign->n_fields,
+					foreign->referenced_index, 
+					TRUE, FALSE);
+
+		}
+		mutex_exit(&(dict_sys->mutex));
+	}
+
+	if ( !((referenced) ? 
+		foreign->referenced_table : foreign->foreign_table))
+	{
+		WSREP_WARN("FK: %s missing in query: %s", 
+			   (!foreign->referenced_table) ? 
+			   "referenced table" : "foreign table", 
+			   (wsrep_thd_query(thd)) ? 
 			   wsrep_thd_query(thd) : "void");
 		return DB_ERROR;
 	}
