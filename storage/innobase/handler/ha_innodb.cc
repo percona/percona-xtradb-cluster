@@ -11359,6 +11359,9 @@ innobase_xa_prepare(
 	to the session variable take effect only in the next transaction */
 	if (!trx->support_xa) {
 
+#ifdef WITH_WSREP
+                thd_get_xid(thd, (MYSQL_XID*) &trx->xid);
+#endif // WITH_WSREP
 		return(0);
 	}
 
