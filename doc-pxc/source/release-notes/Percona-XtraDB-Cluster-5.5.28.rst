@@ -4,7 +4,7 @@
  |Percona XtraDB Cluster| 5.5.28-23.7
 ======================================
 
-Percona is glad to announce the release of |Percona XtraDB Cluster| on November 5th, 2012. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.5.28-23.7/>`_ or from our `software repositories <http://www.percona.com/doc/percona-xtradb-cluster/installation.html#using-percona-software-repositories>`_.
+Percona is glad to announce the release of |Percona XtraDB Cluster| on November 15th, 2012. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.5.28-23.7/>`_ or from our `software repositories <http://www.percona.com/doc/percona-xtradb-cluster/installation.html#using-percona-software-repositories>`_.
 
 This is an General Availability release. We did our best to eliminate bugs and problems during the testing release, but this is a software, so bugs are expected. If you encounter them, please report them to our `bug tracking system <https://bugs.launchpad.net/percona-xtradb-cluster/+filebug>`_.
 
