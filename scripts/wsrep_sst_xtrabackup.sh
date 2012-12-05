@@ -114,9 +114,6 @@ then
 
         set +e
 
-        # This file and variable seems to have no effect and probably should be deleted
-        XTRABACKUP_PID=$(mktemp --tmpdir wsrep_sst_xtrabackupXXXX.pid)
-
         ${INNOBACKUPEX_BIN} ${INNOBACKUPEX_ARGS} ${TMPDIR} \
         2> ${DATA}/innobackup.backup.log | \
         ${NC_BIN} ${REMOTEIP} ${NC_PORT}
@@ -132,6 +129,9 @@ then
           wsrep_log_error "${NC_BIN} finished with error: ${RC[1]}"
           exit 22
         fi
+
+        # innobackupex implicitly writes PID to fixed location in ${TMPDIR}
+        XTRABACKUP_PID="${TMPDIR}/xtrabackup_pid"
 
         if check_pid "${XTRABACKUP_PID}"
         then
