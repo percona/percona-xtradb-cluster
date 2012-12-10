@@ -6996,30 +6996,35 @@ wsrep_append_foreign_key(
 		mutex_enter(&(dict_sys->mutex));
 		if (referenced)
 		{
-			foreign->referenced_table = 
-				dict_table_check_if_in_cache_low(
+			foreign->referenced_table =
+				dict_table_get_low(
 					foreign->referenced_table_name_lookup);
-			foreign->referenced_index = 
-				wsrep_dict_foreign_find_index(
-					foreign->referenced_table,
-					foreign->referenced_col_names,
-					foreign->n_fields, 
-					foreign->foreign_index,
-					TRUE, FALSE);
+			if (foreign->referenced_table)
+			{
+				foreign->referenced_index =
+					wsrep_dict_foreign_find_index(
+						foreign->referenced_table,
+						foreign->referenced_col_names,
+						foreign->n_fields, 
+						foreign->foreign_index,
+						TRUE, FALSE);
+			}
 		}
 		else
 		{
-	  		foreign->foreign_table = 
-				dict_table_check_if_in_cache_low(
+	  		foreign->foreign_table =
+				dict_table_get_low(
 					foreign->foreign_table_name_lookup);
-			foreign->foreign_index = 
-				wsrep_dict_foreign_find_index(
-					foreign->foreign_table,
-					foreign->foreign_col_names,
-					foreign->n_fields,
-					foreign->referenced_index, 
-					TRUE, FALSE);
-
+			if (foreign->foreign_table)
+			{
+				foreign->foreign_index =
+					wsrep_dict_foreign_find_index(
+						foreign->foreign_table,
+						foreign->foreign_col_names,
+						foreign->n_fields,
+						foreign->referenced_index, 
+						TRUE, FALSE);
+			}
 		}
 		mutex_exit(&(dict_sys->mutex));
 	}
