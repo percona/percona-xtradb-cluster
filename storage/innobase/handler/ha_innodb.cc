@@ -7056,7 +7056,7 @@ wsrep_append_foreign_key(
 	key[0] = (char)i;
 
 	rcode = wsrep_rec_get_primary_key(
-		&key[1], &len, rec, index, 
+		&key[1], &len, rec, idx, 
 		wsrep_protocol_version > 1);
 	if (rcode != DB_SUCCESS) {
 		WSREP_ERROR(
