@@ -7043,7 +7043,7 @@ wsrep_append_foreign_key(
 	ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
 
 	dict_index_t *idx_target = (referenced) ? 
-		foreign->referenced_index : foreign->foreign_index;
+		foreign->referenced_index : index;
 	dict_index_t *idx = (referenced) ? 
 		UT_LIST_GET_FIRST(foreign->referenced_table->indexes) :
 		UT_LIST_GET_FIRST(foreign->foreign_table->indexes);
