@@ -189,7 +189,7 @@ wsrep_append_fk_reference(
 	const rec_t*	rec
 ) {
 	dict_foreign_t *foreign = UT_LIST_GET_FIRST(table->foreign_list);
-	if (thr->fk_cascade_depth > 0) return;
+	if (thr->fk_cascade_depth > 0 || node->cascade_node) return;
 
 	while (foreign) {
 		if (foreign->foreign_index == index
