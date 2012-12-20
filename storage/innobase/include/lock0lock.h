@@ -846,6 +846,7 @@ lock_table_get_n_locks(
 				remains set when the waiting lock is granted,
 				or if the lock is inherited to a neighboring
 				record */
+#define WSREP_BF		4096
 #if (LOCK_WAIT|LOCK_GAP|LOCK_REC_NOT_GAP|LOCK_INSERT_INTENTION)&LOCK_MODE_MASK
 # error
 #endif
@@ -925,6 +926,16 @@ extern	ib_int64_t	srv_n_lock_wait_time;
 extern	ulint		srv_n_lock_max_wait_time;
 extern	os_event_t	srv_lock_timeout_thread_event;
 
+#ifdef WITH_WSREP
+/*********************************************************************//**
+Cancels a waiting lock request and releases possible other transactions
+waiting behind it. */
+UNIV_INTERN
+void
+lock_cancel_waiting_and_release(
+/*============================*/
+	lock_t*	lock);	/*!< in/out: waiting lock request */
+#endif /* WITH_WSREP */
 #ifndef UNIV_NONINL
 #include "lock0lock.ic"
 #endif

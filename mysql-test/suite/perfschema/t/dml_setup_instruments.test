@@ -36,7 +36,8 @@ select * from performance_schema.setup_instruments
   and name not in (
     'wait/synch/cond/sql/COND_handler_count',
     'wait/synch/cond/sql/DEBUG_SYNC::cond')
-  order by name limit 10;
+  and name not like 'wait/synch/cond/sql/COND_wsrep_%'
+order by name limit 10;
 
 --disable_result_log
 select * from performance_schema.setup_instruments

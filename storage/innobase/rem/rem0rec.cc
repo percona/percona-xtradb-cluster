@@ -32,6 +32,9 @@ Created 5/30/1994 Heikki Tuuri
 #include "mtr0mtr.h"
 #include "mtr0log.h"
 #include "fts0fts.h"
+#ifdef WITH_WSREP
+#include <ha_prototypes.h>
+#endif /* WITH_WSREP */
 
 /*			PHYSICAL RECORD (OLD STYLE)
 			===========================
@@ -1793,3 +1796,78 @@ rec_print(
 	}
 }
 #endif /* !UNIV_HOTBACKUP */
+#ifdef WITH_WSREP
+dberr_t
+wsrep_rec_get_primary_key(
+	byte 		*buf,     /* out: extracted key */
+	ulint 		*buf_len, /* in/out: length of buf */
+	const rec_t*	rec,	  /* in: physical record */
+	dict_index_t*	index)	  /* in: record descriptor */
+{
+	const byte*	data;
+	ulint		len;
+	ulint		key_len = 0;
+	ulint		i;
+	uint            key_parts;
+	mem_heap_t*	heap	= NULL;
+	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
+        const ulint*    offsets;
+
+	ut_ad(index);
+
+        rec_offs_init(offsets_);
+	offsets = rec_get_offsets(rec, index, offsets_, ULINT_UNDEFINED, &heap);
+
+	ut_ad(rec_offs_validate(rec, NULL, offsets));
+
+	ut_ad(rec);
+
+	key_parts = dict_index_get_n_unique_in_tree(index);
+	for (i = 0; i < key_parts; i++) {
+                dict_field_t*	  field = dict_index_get_nth_field(index, i);
+		const dict_col_t* col = dict_field_get_col(field);
+
+		data = rec_get_nth_field(rec, offsets, i, &len);
+		if (key_len + len > ((col->prtype & DATA_NOT_NULL) ?   
+				     *buf_len : *buf_len - 1)) {
+			fprintf (stderr, 
+				 "WSREP: FK key len exceeded %lu %lu %lu\n", 
+				 key_len, len, *buf_len);
+			goto err_out;
+		}
+
+		if (len == UNIV_SQL_NULL) {
+			ut_a(!(col->prtype & DATA_NOT_NULL));
+			*buf++ = 1;
+			key_len++;
+		} else {
+			if (!(col->prtype & DATA_NOT_NULL)) {
+				*buf++ = 0;
+				key_len++;
+			}
+			memcpy(buf, data, len);
+			wsrep_innobase_mysql_sort(
+				(int)(col->prtype & DATA_MYSQL_TYPE_MASK),
+				(uint)dtype_get_charset_coll(col->prtype),
+				buf, len);
+			key_len += len;
+			buf 	+= len;
+		}
+	}
+
+	rec_validate(rec, offsets);
+
+	if (UNIV_LIKELY_NULL(heap)) {
+		mem_heap_free(heap);
+	}
+
+	*buf_len = key_len;
+	return DB_SUCCESS;
+
+ err_out:
+	if (UNIV_LIKELY_NULL(heap)) {
+		mem_heap_free(heap);
+	}
+	return DB_ERROR;
+}
+#endif // WITH_WSREP

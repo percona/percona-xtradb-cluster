@@ -17,6 +17,32 @@
 #define SQL_CLASS_INCLUDED
 
 /* Classes in mysql */
+#ifdef WITH_WSREP
+#include "../wsrep/wsrep_api.h"
+//#include "wsrep_mysqld.h"
+  enum wsrep_exec_mode {
+    LOCAL_STATE,
+    REPL_RECV,
+    TOTAL_ORDER,
+    LOCAL_COMMIT,
+  };
+  enum wsrep_query_state {
+    QUERY_IDLE,
+    QUERY_EXEC,
+    QUERY_COMMITTING,
+    QUERY_EXITING,
+    QUERY_ROLLINGBACK,
+  };
+  enum wsrep_conflict_state {
+    NO_CONFLICT,
+    MUST_ABORT,
+    ABORTING,
+    ABORTED,
+    MUST_REPLAY,
+    REPLAYING,
+    RETRY_AUTOCOMMIT,
+  };
+#endif
 
 #include "my_global.h"                          /* NO_EMBEDDED_ACCESS_CHECKS */
 #ifdef MYSQL_SERVER
@@ -66,6 +92,15 @@ void set_thd_stage_info(void *thd,
 #define THD_STAGE_INFO(thd, stage) \
   (thd)->enter_stage(& stage, NULL, __func__, __FILE__, __LINE__)
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+struct wsrep_thd_shadow {
+  ulonglong            options;
+  enum wsrep_exec_mode wsrep_exec_mode;
+  Vio                  *vio;
+  ulong                tx_isolation;
+};
+#endif
 class Reprepare_observer;
 class Relay_log_info;
 
@@ -826,6 +861,11 @@ typedef struct system_variables
   my_bool sysdate_is_now;
   my_bool binlog_rows_query_log_events;
 
+#ifdef WITH_WSREP
+  my_bool wsrep_on;
+  my_bool wsrep_causal_reads;
+  ulong wsrep_retry_autocommit;
+#endif
   double long_query_time_double;
 
   Gtid_specification gtid_next;
@@ -1437,6 +1477,9 @@ struct st_savepoint {
   /** State of metadata locks before this savepoint was set. */
   MDL_savepoint        mdl_savepoint;
 };
+#ifdef WITH_WSREP
+void wsrep_cleanup_transaction(THD *thd); // THD.transactions.cleanup calls it
+#endif
 
 enum xa_states {XA_NOTR=0, XA_ACTIVE, XA_IDLE, XA_PREPARED, XA_ROLLBACK_ONLY};
 extern const char *xa_state_names[];
@@ -2402,7 +2445,7 @@ public:
   int is_current_stmt_binlog_format_row() const {
     DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
                 current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-    return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
+    return (WSREP_FORMAT((ulong)current_stmt_binlog_format) == BINLOG_FORMAT_ROW);
   }
   /** Tells whether the given optimizer_switch flag is on */
   inline bool optimizer_switch_flag(ulonglong flag) const
@@ -2487,7 +2530,11 @@ public:
     */
     CHANGED_TABLE_LIST* changed_tables;
     MEM_ROOT mem_root; // Transaction-life memory allocation pool
+#ifdef WITH_WSREP 
+    void cleanup(THD *thd)
+#else
     void cleanup()
+#endif
     {
       changed_tables= 0;
       savepoints= 0;
@@ -2500,6 +2547,11 @@ public:
       if (!xid_state.rm_error)
         xid_state.xid.null();
       free_root(&mem_root,MYF(MY_KEEP_PREALLOC));
+#ifdef WITH_WSREP
+      // Todo: convert into a plugin method
+      // wsrep's post-commit. LOCAL_COMMIT designates wsrep's commit was ok
+      if (WSREP(thd)) wsrep_cleanup_transaction(thd);
+#endif  /* WITH_WSREP */
     }
     my_bool is_active()
     {
@@ -3011,6 +3063,31 @@ public:
     query_id_t first_query_id;
   } binlog_evt_union;
 
+#ifdef WITH_WSREP
+  const bool                wsrep_applier; /* dedicated slave applier thread */
+  bool                      wsrep_client_thread; /* to identify client threads*/
+  enum wsrep_exec_mode      wsrep_exec_mode;
+  query_id_t                wsrep_last_query_id;
+  enum wsrep_query_state    wsrep_query_state;
+  enum wsrep_conflict_state wsrep_conflict_state;
+  mysql_mutex_t             LOCK_wsrep_thd;
+  mysql_cond_t              COND_wsrep_thd;
+  wsrep_seqno_t             wsrep_trx_seqno;
+  uint32                    wsrep_rand;
+  Relay_log_info*           wsrep_rli;
+  bool                      wsrep_converted_lock_session;
+  wsrep_trx_handle_t        wsrep_trx_handle;
+  bool                      wsrep_seqno_changed;
+#ifdef WSREP_PROC_INFO
+  char                      wsrep_info[128]; /* string for dynamic proc info */
+#endif /* WSREP_PROC_INFO */
+  ulong                     wsrep_retry_counter; // of autocommit
+  bool                      wsrep_PA_safe;
+  char*                     wsrep_retry_query;
+  size_t                    wsrep_retry_query_len;
+  enum enum_server_command  wsrep_retry_command;
+  bool                      wsrep_consistency_check;
+#endif /* WITH_WSREP */
   /**
     Internal parser state.
     Note that since the parser is not re-entrant, we keep only one parser
@@ -3046,7 +3123,11 @@ public:
   // We don't want to load/unload plugins for unit tests.
   bool m_enable_plugins;
 
+#ifdef WITH_WSREP
+  THD(bool enable_plugins= true, bool is_applier = false);
+#else
   THD(bool enable_plugins= true);
+#endif
   ~THD();
 
   void init(void);
@@ -3533,7 +3614,7 @@ public:
       tests fail and so force them to propagate the
       lex->binlog_row_based_if_mixed upwards to the caller.
     */
-    if ((variables.binlog_format == BINLOG_FORMAT_MIXED) &&
+    if ((WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED) &&
         (in_sub_stmt == 0))
       set_current_stmt_binlog_format_row();
 
@@ -3575,7 +3656,7 @@ public:
                 show_system_thread(system_thread)));
     if (in_sub_stmt == 0)
     {
-      if (variables.binlog_format == BINLOG_FORMAT_ROW)
+      if (WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW)
         set_current_stmt_binlog_format_row();
       else if (temporary_tables == NULL)
         clear_current_stmt_binlog_format_row();

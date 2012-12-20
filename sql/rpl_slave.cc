@@ -55,6 +55,9 @@
 #include "rpl_rli_pdb.h"
 #include "global_threads.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 #ifdef HAVE_REPLICATION
 
 #include "rpl_tblmap.h"
@@ -5282,6 +5285,11 @@ pthread_handler_t handle_slave_sql(void *arg)
   }
 #endif
 
+#ifdef WITH_WSREP
+  thd->wsrep_exec_mode= LOCAL_STATE;
+  /* synchronize with wsrep replication */
+  wsrep_ready_wait ();
+#endif
   DBUG_PRINT("master_info",("log_file_name: %s  position: %s",
                             rli->get_group_master_log_name(),
                             llstr(rli->get_group_master_log_pos(),llbuff)));

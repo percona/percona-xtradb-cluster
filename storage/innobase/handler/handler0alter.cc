@@ -39,6 +39,10 @@ Smart ALTER TABLE
 #include "srv0mon.h"
 #include "fts0priv.h"
 
+#ifdef WITH_WSREP
+//#include "wsrep_api.h"
+#include <sql_acl.h>	// PROCESS_ACL
+#endif
 #include "ha_innodb.h"
 
 /** Operations for creating an index in place */

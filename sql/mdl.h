@@ -900,6 +900,9 @@ private:
                              MDL_ticket **out_ticket);
 
 public:
+#ifdef WITH_WSREP
+  THD *wsrep_get_thd() const { return get_thd(); }
+#endif /* WITH_WSREP */
   void find_deadlock();
 
   bool visit_subgraph(MDL_wait_for_graph_visitor *dvisitor);

@@ -392,7 +392,11 @@ int gtid_empty_group_log_and_cleanup(THD *thd);
 
 extern const char *log_bin_index;
 extern const char *log_bin_basename;
-
+#ifdef WITH_WSREP
+int wsrep_binlog_close_connection(THD* thd);
+int wsrep_binlog_savepoint_set(THD *thd,  void *sv);
+int wsrep_binlog_savepoint_rollback(THD *thd, void *sv);
+#endif /* WITH_WSREP */
 /**
   Turns a relative log binary log path into a full path, based on the
   opt_bin_logname or opt_relay_logname.

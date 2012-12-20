@@ -57,7 +57,10 @@
 #ifdef  __WIN__
 #include <io.h>
 #endif
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
 
+#endif // WITH_WSREP
 
 bool
 No_such_table_error_handler::handle_condition(THD *,
@@ -4230,7 +4233,7 @@ thr_lock_type read_lock_type_for_table(THD *thd,
   */
   bool log_on= mysql_bin_log.is_open() && thd->variables.sql_log_bin;
   ulong binlog_format= thd->variables.binlog_format;
-  if ((log_on == FALSE) || (binlog_format == BINLOG_FORMAT_ROW) ||
+  if ((log_on == FALSE) || (WSREP_FORMAT(binlog_format) == BINLOG_FORMAT_ROW) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_RPL_INFO) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE) ||
@@ -5224,8 +5227,34 @@ restart:
     goto err;
   }
 #endif
+#ifdef WITH_WSREP
+#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto err;
+
+  if ((thd->lex->sql_command== SQLCOM_INSERT         ||
+       thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
+       thd->lex->sql_command== SQLCOM_REPLACE        ||
+       thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
+       thd->lex->sql_command== SQLCOM_UPDATE         ||
+       thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
+       thd->lex->sql_command== SQLCOM_LOAD           ||
+       thd->lex->sql_command== SQLCOM_DELETE)        &&
+      wsrep_replicate_myisam                         &&
+      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM)
+    {
+      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
+    }
+#endif
 
 err:
+#ifdef WITH_WSREP
+  if (WSREP(thd)) 
+    thd_proc_info(thd, "exit open_tables()");
+  else
+    thd_proc_info(thd, 0);
+#else /* WITH_WSREP */
+  thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
   free_root(&new_frm_mem, MYF(0));              // Free pre-alloced block
 
   if (error && *table_to_open)
@@ -5917,7 +5946,7 @@ bool lock_tables(THD *thd, TABLE_LIST *tables, uint count,
         We can solve these problems in mixed mode by switching to binlogging 
         if at least one updated table is used by sub-statement
       */
-      if (thd->variables.binlog_format != BINLOG_FORMAT_ROW && tables && 
+      if (WSREP_FORMAT(thd->variables.binlog_format) != BINLOG_FORMAT_ROW && tables && 
           has_write_table_with_auto_increment(thd->lex->first_not_own_table()))
         thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_AUTOINC_COLUMNS);
     }
