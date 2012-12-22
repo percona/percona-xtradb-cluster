@@ -28,7 +28,7 @@
 %define mysql_version 5.5.28
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define majorversion 29
-%define minorversion 1
+%define minorversion 2
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
 
@@ -997,7 +997,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
 
 %doc %attr(644, root, man) %{_mandir}/man1/innochecksum.1*
-%doc %attr(644, root, man) %{_mandir}/man1/my_print_defaults.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisam_ftdump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisamchk.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisamlog.1*
@@ -1027,7 +1026,6 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
-%attr(755, root, root) %{_bindir}/my_print_defaults
 %attr(755, root, root) %{_bindir}/myisam_ftdump
 %attr(755, root, root) %{_bindir}/myisamchk
 %attr(755, root, root) %{_bindir}/myisamlog
@@ -1125,6 +1123,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %defattr(-, root, root, 0755)
 %attr(755, root, root) %{_bindir}/msql2mysql
 %attr(755, root, root) %{_bindir}/mysql
+%attr(755, root, root) %{_bindir}/my_print_defaults
 %attr(755, root, root) %{_bindir}/mysql_find_rows
 %attr(755, root, root) %{_bindir}/mysql_waitpid
 %attr(755, root, root) %{_bindir}/mysqlaccess
@@ -1141,6 +1140,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %doc %attr(644, root, man) %{_mandir}/man1/msql2mysql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.1*
+%doc %attr(644, root, man) %{_mandir}/man1/my_print_defaults.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_find_rows.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_waitpid.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlaccess.1*

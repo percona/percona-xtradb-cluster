@@ -100,7 +100,7 @@ Reliability Improvements
    :maxdepth: 1
    :glob:
 
-   reliability/innodb_recovery_update_relay_log
+   reliability/crash_resistant_replication
    reliability/log_connection_error
    reliability/error_pad
    reliability/innodb_corrupt_table_action
@@ -136,7 +136,6 @@ Diagnostics Improvements
    :maxdepth: 1
    :glob:
 
-   diagnostics/index_info_schema_tables
    diagnostics/innodb_stats
    diagnostics/user_stats
    diagnostics/slow_extended_55
@@ -168,6 +167,8 @@ Reference
 
    development
    trademark-policy
+   upstream-bug-fixes
+   index_info_schema_tables
    faq
    compatibility
    release-notes/release-notes_index

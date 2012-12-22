@@ -54,6 +54,8 @@
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 #include "debug_sync.h"
+#include "sql_show.h"
+
 /* max size of the log message */
 #define MAX_LOG_BUFFER_SIZE 1024
 #define MAX_TIME_SIZE 32
@@ -398,6 +400,11 @@ private:
       delete pending();
       set_pending(0);
     }
+    /*
+      Truncate the temporary file to reclaim disk space occupied by cached
+      transactions on COMMIT/ROLLBACK.
+    */
+    truncate_cached_file(&cache_log, pos);
     reinit_io_cache(&cache_log, WRITE_CACHE, pos, 0, 0);
     cache_log.end_of_file= saved_max_binlog_cache_size;
   }
@@ -2210,9 +2217,8 @@ static int binlog_savepoint_set(handlerton *hton, THD *thd, void *sv)
 #endif /* WITH_WSREP */
   String log_query;
   if (log_query.append(STRING_WITH_LEN("SAVEPOINT ")) ||
-      log_query.append("`") ||
-      log_query.append(thd->lex->ident.str, thd->lex->ident.length) ||
-      log_query.append("`"))
+      append_identifier(thd, &log_query,
+                        thd->lex->ident.str, thd->lex->ident.length))
     DBUG_RETURN(1);
   int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
   Query_log_event qinfo(thd, log_query.c_ptr_safe(), log_query.length(),
@@ -2239,9 +2245,8 @@ static int binlog_savepoint_rollback(handlerton *hton, THD *thd, void *sv)
   {
     String log_query;
     if (log_query.append(STRING_WITH_LEN("ROLLBACK TO ")) ||
-        log_query.append("`") ||
-        log_query.append(thd->lex->ident.str, thd->lex->ident.length) ||
-        log_query.append("`"))
+        append_identifier(thd, &log_query,
+                          thd->lex->ident.str, thd->lex->ident.length))
       DBUG_RETURN(1);
     int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
     Query_log_event qinfo(thd, log_query.c_ptr_safe(), log_query.length(),
@@ -2928,7 +2933,7 @@ bool MYSQL_QUERY_LOG::write(THD *thd, ulonglong current_utime,
                     (ulong) thd->sent_row_count,
                     (ulong) thd->examined_row_count,
                     ((long) thd->get_row_count_func() > 0 ) ? (ulong) thd->get_row_count_func() : 0,
-                    (ulong) thd->sent_row_count,
+                    (ulong) thd->examined_row_count,
                     (ulong) (thd->status_var.bytes_sent - thd->bytes_sent_old),
                     (ulong) thd->tmp_tables_used,
                     (ulong) thd->tmp_tables_disk_used,
