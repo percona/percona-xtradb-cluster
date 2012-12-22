@@ -50,7 +50,7 @@ long    wsrep_max_protocol_version     = 2; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
-my_bool wsrep_log_conflicts            = 0; // 
+my_bool wsrep_log_conflicts            = 0;
 ulong  wsrep_mysql_replication_bundle  = 0;
 
 /*
@@ -105,9 +105,25 @@ extern wsrep_status_t wsrep_apply_cb(void *ctx,
                                      const void* buf, size_t buf_len,
                                      wsrep_seqno_t global_seqno);
 
-extern wsrep_status_t wsrep_commit_cb  (void *ctx,
-                                        wsrep_seqno_t global_seqno,
-                                        bool commit);
+extern wsrep_status_t wsrep_commit_cb(void *ctx,
+                                      wsrep_seqno_t global_seqno,
+                                      bool commit);
+
+static wsrep_status_t wsrep_unordered_cb(void*       ctx,
+                                         const void* data,
+                                         size_t      size)
+{
+    return WSREP_OK;
+}
+
+static wsrep_status_t wsrep_expand_cb(void*               ctx,
+                                      const void*         data,
+                                      size_t              size,
+                                      wsrep_stream_t      type,
+                                      const wsrep_uuid_t* producer)
+{
+    return WSREP_OK;
+}
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
@@ -539,6 +555,8 @@ int wsrep_init()
   wsrep_args.view_handler_cb = wsrep_view_handler_cb;
   wsrep_args.apply_cb        = wsrep_apply_cb;
   wsrep_args.commit_cb       = wsrep_commit_cb;
+  wsrep_args.unordered_cb    = wsrep_unordered_cb;
+  wsrep_args.expand_cb       = wsrep_expand_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
 
@@ -763,7 +781,7 @@ static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 {
     for (size_t i= 0; i < key_arr->keys_len; ++i)
     {
-        my_free((wsrep_key_part_t*)key_arr->keys[i].key_parts);
+        my_free((void*)key_arr->keys[i].key_parts);
     }
     my_free(key_arr->keys);
     key_arr->keys= 0;
@@ -783,8 +801,8 @@ static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 
 static bool wsrep_prepare_key_for_isolation(const char* db,
                                             const char* table,
-                                            wsrep_key_part_t* key,
-                                            size_t* key_len)
+                                            wsrep_buf_t* key,
+                                            long* key_len)
 {
     if (*key_len < 2) return false;
 
@@ -802,13 +820,13 @@ static bool wsrep_prepare_key_for_isolation(const char* db,
             // sql_print_information("%s.%s", db, table);
             if (db)
             {
-                key[*key_len].buf= db;
-                key[*key_len].buf_len= strlen(db);
+                key[*key_len].ptr= db;
+                key[*key_len].len= strlen(db);
                 ++(*key_len);
                 if (table)
                 {
-                    key[*key_len].buf=     table;
-                    key[*key_len].buf_len= strlen(table);
+                    key[*key_len].ptr= table;
+                    key[*key_len].len= strlen(table);
                     ++(*key_len);
                 }
             }
@@ -844,23 +862,23 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
         {
             if (!(ka->keys= (wsrep_key_t*)my_malloc(sizeof(wsrep_key_t), MYF(0))))
             {
-                sql_print_error("Can't allocate memory for key_array");
+                WSREP_ERROR("Can't allocate memory for key_array");
                 goto err;
             }
             ka->keys_len= 1;
-            if (!(ka->keys[0].key_parts= (wsrep_key_part_t*)
-                  my_malloc(sizeof(wsrep_key_part_t)*2, MYF(0))))
+            if (!(ka->keys[0].key_parts= (wsrep_buf_t*)
+                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
             {
-                sql_print_error("Can't allocate memory for key_parts");
+                WSREP_ERROR("Can't allocate memory for key_parts");
                 goto err;
             }
-            ka->keys[0].key_parts_len= 2;
+            ka->keys[0].key_parts_num= 2;
             if (!wsrep_prepare_key_for_isolation(
                     db, table,
-                    (wsrep_key_part_t*)ka->keys[0].key_parts,
-                    &ka->keys[0].key_parts_len))
+                    (wsrep_buf_t*)ka->keys[0].key_parts,
+                    &ka->keys[0].key_parts_num))
             {
-                sql_print_error("Preparing keys for isolation failed");
+                WSREP_ERROR("Preparing keys for isolation failed");
                 goto err;
             }
         }
@@ -875,24 +893,24 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
                 ka->keys, (ka->keys_len + 1) * sizeof(wsrep_key_t), MYF(0));
             if (!tmp)
             {
-                sql_print_error("Can't allocate memory for key_array");
+                WSREP_ERROR("Can't allocate memory for key_array");
                 goto err;
             }
             ka->keys= tmp;
-            if (!(ka->keys[ka->keys_len].key_parts= (wsrep_key_part_t*)
-                  my_malloc(sizeof(wsrep_key_part_t)*2, MYF(0))))
+            if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*)
+                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
             {
-                sql_print_error("Can't allocate memory for key_parts");
+                WSREP_ERROR("Can't allocate memory for key_parts");
                 goto err;
             }
-            ka->keys[ka->keys_len].key_parts_len= 2;
+            ka->keys[ka->keys_len].key_parts_num= 2;
             ++ka->keys_len;
             if (!wsrep_prepare_key_for_isolation(
                     table->db, table->table_name,
-                    (wsrep_key_part_t*)ka->keys[ka->keys_len - 1].key_parts,
-                    &ka->keys[ka->keys_len - 1].key_parts_len))
+                    (wsrep_buf_t*)ka->keys[ka->keys_len - 1].key_parts,
+                    &ka->keys[ka->keys_len - 1].key_parts_num))
             {
-                sql_print_error("Preparing keys for isolation failed");
+                WSREP_ERROR("Preparing keys for isolation failed");
                 goto err;
             }
         }
@@ -909,8 +927,8 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
 				  size_t cache_key_len,
                                   const uchar* row_id,
                                   size_t row_id_len,
-                                  wsrep_key_part_t* key,
-                                  size_t* key_len)
+                                  wsrep_buf_t* key,
+                                  long* key_len)
 {
     if (*key_len < 3) return false;
 
@@ -919,28 +937,30 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
     {
     case 0:
     {
-        key[*key_len].buf     = cache_key;
-        key[*key_len].buf_len = cache_key_len;
-        ++(*key_len);
+        key[0].ptr = cache_key;
+        key[0].len = cache_key_len;
+
+        *key_len = 1;
         break;
     }
     case 1:
     case 2:
     {
-        key[*key_len].buf     = cache_key;
-        key[*key_len].buf_len = strlen( (char*)cache_key );
-        ++(*key_len);
-        key[*key_len].buf     = cache_key + strlen( (char*)cache_key ) + 1;
-        key[*key_len].buf_len = strlen( (char*)(key[*key_len].buf) );
-        ++(*key_len);
+        key[0].ptr = cache_key;
+        key[0].len = strlen( (char*)cache_key );
+
+        key[1].ptr = cache_key + strlen( (char*)cache_key ) + 1;
+        key[1].len = strlen( (char*)(key[1].ptr) );
+
+        *key_len = 2;
         break;
     }
     default:
         return false;
     }
 
-    key[*key_len].buf     = row_id;
-    key[*key_len].buf_len = row_id_len;
+    key[*key_len].ptr = row_id;
+    key[*key_len].len = row_id_len;
     ++(*key_len);
 
     return true;

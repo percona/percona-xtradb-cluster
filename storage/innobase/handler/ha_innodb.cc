@@ -124,8 +124,8 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
 					 size_t cache_key_len,
                                          const uchar* row_id,
                                          size_t row_id_len,
-                                         wsrep_key_part_t* key,
-                                         size_t* key_len);
+                                         wsrep_buf_t* key,
+                                         long* key_len);
 
 #endif /* WITH_WSREP */
 /** to protect innobase_open_files */
@@ -6951,7 +6951,7 @@ wsrep_dict_foreign_find_index(
 	dict_table_t*	table,
 	const char**	columns,
 	ulint		n_cols,
-	dict_index_t*	types_idx, 
+	dict_index_t*	types_idx,
 	ibool		check_charsets,
 	ulint		check_null);
 
@@ -6970,28 +6970,29 @@ wsrep_append_foreign_key(
 	ulint rcode = DB_SUCCESS;
 	char  cache_key[513] = {'\0'};
 	int   cache_key_len;
+        bool const nocopy = false;
 
-	if (!wsrep_on(trx->mysql_thd) || 
-	    wsrep_thd_exec_mode(thd) != LOCAL_STATE) 
+	if (!wsrep_on(trx->mysql_thd) ||
+	    wsrep_thd_exec_mode(thd) != LOCAL_STATE)
 		return DB_SUCCESS;
 
 	if (!thd || !foreign ||
 	    (!foreign->referenced_table && !foreign->foreign_table))
 	{
-		WSREP_INFO("FK: %s missing in: %s", 
-			(!thd)      ?  "thread"     : 
-			((!foreign) ?  "constraint" : 
-			((!foreign->referenced_table) ? 
-			     "referenced table" : "foreign table")), 
-			   (thd && wsrep_thd_query(thd)) ? 
+		WSREP_INFO("FK: %s missing in: %s",
+			(!thd)      ?  "thread"     :
+			((!foreign) ?  "constraint" :
+			((!foreign->referenced_table) ?
+			     "referenced table" : "foreign table")),
+			   (thd && wsrep_thd_query(thd)) ?
 			   wsrep_thd_query(thd) : "void");
 		return DB_ERROR;
 	}
 
-	if ( !((referenced) ? 
+	if ( !((referenced) ?
 		foreign->referenced_table : foreign->foreign_table))
 	{
-		WSREP_DEBUG("pulling %s table into cache", 
+		WSREP_DEBUG("pulling %s table into cache",
 			    (referenced) ? "referenced" : "foreign");
 		mutex_enter(&(dict_sys->mutex));
 		if (referenced)
@@ -7029,22 +7030,22 @@ wsrep_append_foreign_key(
 		mutex_exit(&(dict_sys->mutex));
 	}
 
-	if ( !((referenced) ? 
+	if ( !((referenced) ?
 		foreign->referenced_table : foreign->foreign_table))
 	{
-		WSREP_WARN("FK: %s missing in query: %s", 
-			   (!foreign->referenced_table) ? 
-			   "referenced table" : "foreign table", 
-			   (wsrep_thd_query(thd)) ? 
+		WSREP_WARN("FK: %s missing in query: %s",
+			   (!foreign->referenced_table) ?
+			   "referenced table" : "foreign table",
+			   (wsrep_thd_query(thd)) ?
 			   wsrep_thd_query(thd) : "void");
 		return DB_ERROR;
 	}
 	byte  key[WSREP_MAX_SUPPORTED_KEY_LENGTH+1];
 	ulint len = WSREP_MAX_SUPPORTED_KEY_LENGTH;
 
-	dict_index_t *idx_target = (referenced) ? 
+	dict_index_t *idx_target = (referenced) ?
 		foreign->referenced_index : index;
-	dict_index_t *idx = (referenced) ? 
+	dict_index_t *idx = (referenced) ?
 		UT_LIST_GET_FIRST(foreign->referenced_table->indexes) :
 		UT_LIST_GET_FIRST(foreign->foreign_table->indexes);
 	int i = 0;
@@ -7056,29 +7057,29 @@ wsrep_append_foreign_key(
 	key[0] = (char)i;
 
 	rcode = wsrep_rec_get_foreign_key(
-		&key[1], &len, rec, index, idx, 
+		&key[1], &len, rec, index, idx,
 		wsrep_protocol_version > 1);
 	if (rcode != DB_SUCCESS) {
 		WSREP_ERROR(
-			"FK key set failed: %lu (%lu %lu), index: %s %s, %s", 
-			rcode, referenced, shared, 
+			"FK key set failed: %lu (%lu %lu), index: %s %s, %s",
+			rcode, referenced, shared,
 			(index && index->name)       ? index->name :
-				"void index", 
-			(index && index->table_name) ? index->table_name : 
-				"void table", 
+				"void index",
+			(index && index->table_name) ? index->table_name :
+				"void table",
 			wsrep_thd_query(thd));
 		return rcode;
 	}
 	strncpy(cache_key,
-		(wsrep_protocol_version > 1) ? 
-		((referenced) ? 
-			foreign->referenced_table->name : 
+		(wsrep_protocol_version > 1) ?
+		((referenced) ?
+			foreign->referenced_table->name :
 			foreign->foreign_table->name) :
 		foreign->foreign_table->name, sizeof(cache_key) - 1);
 	cache_key_len = strlen(cache_key);
 #ifdef WSREP_DEBUG_PRINT
 	ulint j;
-	fprintf(stderr, "FK parent key, table: %s %s len: %lu ", 
+	fprintf(stderr, "FK parent key, table: %s %s len: %lu ",
 		cache_key, (shared) ? "shared" : "exclusive", len+1);
 	for (j=0; j<len+1; j++) {
 		fprintf(stderr, " %hhX, ", key[j]);
@@ -7089,21 +7090,21 @@ wsrep_append_foreign_key(
 	if (p) {
 		*p = '\0';
 	} else {
-		WSREP_WARN("unexpected foreign key table %s %s", 
-			   foreign->referenced_table->name, 
+		WSREP_WARN("unexpected foreign key table %s %s",
+			   foreign->referenced_table->name,
 			   foreign->foreign_table->name);
 	}
 
-	wsrep_key_part_t wkey_part[3];
+	wsrep_buf_t wkey_part[3];
         wsrep_key_t wkey = {wkey_part, 3};
 	if (!wsrep_prepare_key_for_innodb(
-		(const uchar*)cache_key, 
+		(const uchar*)cache_key,
 		cache_key_len +  1,
 		(const uchar*)key, len+1,
 		wkey_part,
-		&wkey.key_parts_len)) {
-		WSREP_WARN("key prepare failed for cascaded FK: %s", 
-			   (wsrep_thd_query(thd)) ? 
+		&wkey.key_parts_num)) {
+		WSREP_WARN("key prepare failed for cascaded FK: %s",
+			   (wsrep_thd_query(thd)) ?
 			   wsrep_thd_query(thd) : "void");
 		return DB_ERROR;
 	}
@@ -7111,12 +7112,13 @@ wsrep_append_foreign_key(
 		wsrep,
 		wsrep_trx_handle(thd, trx),
 		&wkey,
-		1, 
+		1,
+                nocopy,
 		shared);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %lu", rcode));
-		WSREP_ERROR("Appending cascaded fk row key failed: %s, %lu", 
-			    (wsrep_thd_query(thd)) ? 
+		WSREP_ERROR("Appending cascaded fk row key failed: %s, %lu",
+			    (wsrep_thd_query(thd)) ?
 			    wsrep_thd_query(thd) : "void", rcode);
 		return DB_ERROR;
 	}
@@ -7138,26 +7140,27 @@ wsrep_append_key(
 )
 {
 	DBUG_ENTER("wsrep_append_key");
+	bool const nocopy = false;
 #ifdef WSREP_DEBUG_PRINT
-	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ", 
+	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ",
 		(shared) ? "Shared" : "Exclusive",
-		wsrep_thd_thread_id(thd), trx->id, key_len, 
+		wsrep_thd_thread_id(thd), trx->id, key_len,
 		table_share->table_name.str);
 	for (int i=0; i<key_len; i++) {
 		fprintf(stderr, "%hhX, ", key[i]);
 	}
 	fprintf(stderr, "\n");
 #endif
-	wsrep_key_part_t wkey_part[3];
+	wsrep_buf_t wkey_part[3];
         wsrep_key_t wkey = {wkey_part, 3};
 	if (!wsrep_prepare_key_for_innodb(
 			(const uchar*)table_share->table_cache_key.str,
 			table_share->table_cache_key.length,
 			(const uchar*)key, key_len,
 			wkey_part,
-			&wkey.key_parts_len)) {
-		WSREP_WARN("key prepare failed for: %s", 
-			   (wsrep_thd_query(thd)) ? 
+			&wkey.key_parts_num)) {
+		WSREP_WARN("key prepare failed for: %s",
+			   (wsrep_thd_query(thd)) ?
 			   wsrep_thd_query(thd) : "void");
 		DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
 	}
@@ -7167,11 +7170,12 @@ wsrep_append_key(
 			       wsrep_trx_handle(thd, trx),
 			       &wkey,
 			       1,
+                               nocopy,
 			       shared);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
-		WSREP_WARN("Appending row key failed: %s, %d", 
-			   (wsrep_thd_query(thd)) ? 
+		WSREP_WARN("Appending row key failed: %s, %d",
+			   (wsrep_thd_query(thd)) ?
 			   wsrep_thd_query(thd) : "void", rcode);
 		DBUG_RETURN(rcode);
 	}
@@ -7182,10 +7186,10 @@ ibool
 wsrep_is_cascding_foreign_key_parent(
 	dict_table_t*	table,	/*!< in: InnoDB table */
 	dict_index_t*	index	/*!< in: InnoDB index */
-) { 
+) {
 	// return referenced_by_foreign_key();
 	dict_foreign_t* fk = dict_table_get_referenced_constraint(table, index);
-	if (fk                                            && 
+	if (fk                                            &&
 	    (fk->type & DICT_FOREIGN_ON_UPDATE_CASCADE    ||
 	     fk->type & DICT_FOREIGN_ON_UPDATE_SET_NULL)
 	) {

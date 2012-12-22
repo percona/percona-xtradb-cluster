@@ -70,11 +70,12 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     VERIFY(wh->post_rollback);
     VERIFY(wh->replay_trx);
     VERIFY(wh->abort_pre_commit);
-    VERIFY(wh->append_query);
     VERIFY(wh->append_key);
+    VERIFY(wh->append_data);
     VERIFY(wh->free_connection);
     VERIFY(wh->to_execute_start);
     VERIFY(wh->to_execute_end);
+    VERIFY(wh->encapsulate);
     VERIFY(wh->sst_sent);
     VERIFY(wh->sst_received);
     VERIFY(wh->stats_get);
@@ -89,6 +90,7 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     VERIFY(wh->provider_name);
     VERIFY(wh->provider_version);
     VERIFY(wh->provider_vendor);
+    VERIFY(wh->provider_type);
     VERIFY(wh->free);
     return 0;
 }
@@ -175,7 +177,7 @@ out:
         *hptr = NULL;
     } else {
         snprintf (msg, msg_len,
-                  "wsrep_load(): %s %s by %s loaded succesfully.",
+                  "wsrep_load(): %s %s by %s loaded successfully.",
                   (*hptr)->provider_name, (*hptr)->provider_version,
                   (*hptr)->provider_vendor);
         logger (WSREP_LOG_INFO, msg);
