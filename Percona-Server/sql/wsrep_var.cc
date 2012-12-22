@@ -43,7 +43,7 @@ int wsrep_init_vars()
   wsrep_provider_options= my_strdup("", MYF(MY_WME));
   wsrep_cluster_address = my_strdup("", MYF(MY_WME));
   wsrep_cluster_name    = my_strdup(WSREP_CLUSTER_NAME, MYF(MY_WME));
-  wsrep_node_name       = my_strdup(glob_hostname, MYF(MY_WME));
+  wsrep_node_name       = my_strdup("", MYF(MY_WME));
   wsrep_start_position  = my_strdup(WSREP_START_POSITION_ZERO, MYF(MY_WME));
 
   global_system_variables.binlog_format=BINLOG_FORMAT_ROW;
