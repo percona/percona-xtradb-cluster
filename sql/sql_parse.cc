@@ -7743,6 +7743,7 @@ static void wsrep_client_rollback(THD *thd)
   thd->wsrep_conflict_state= ABORTED;
 }
 
+#if REMOVE /* lp:884560 */
 static enum wsrep_status wsrep_apply_sql(
    THD *thd, const char *sql, size_t sql_len, time_t timeval, uint32 randseed) 
 {
@@ -7784,6 +7785,7 @@ static enum wsrep_status wsrep_apply_sql(
   assert(thd->wsrep_exec_mode== REPL_RECV);
   DBUG_RETURN(ret_code);
 }
+#endif /* REMOVE lp:884560 */
 
 void wsrep_write_rbr_buf(
     THD *thd, const void* rbr_buf, size_t buf_len)
@@ -7967,22 +7969,6 @@ wsrep_status_t wsrep_apply_cb(void* const ctx,
   return rcode;
 }
 
-#if DELETE // this does not work in 5.5
-/* a common wrapper for end_trans() function - to put all necessary stuff */
-static inline wsrep_status_t
-wsrep_end_trans (THD* const thd, enum enum_mysql_completiontype const end)
-{
-  if (0 == end_trans(thd, end))
-  {
-      return WSREP_OK;
-  }
-  else
-  {
-      return WSREP_FATAL;
-  }
-}
-#endif
-
 wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
 {
 #ifdef WSREP_PROC_INFO
@@ -7993,8 +7979,8 @@ wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
   thd_proc_info(thd, "committing");
 #endif /* WSREP_PROC_INFO */
 
-  wsrep_status_t const rcode(wsrep_apply_sql(thd, "COMMIT", 6, 0, 0));
-//  wsrep_status_t const rcode(wsrep_end_trans (thd, COMMIT));
+//REMOVE lp:884560  wsrep_status_t const rcode(wsrep_apply_sql(thd, "COMMIT", 6, 0, 0));
+  wsrep_status_t const rcode(trans_commit(thd) ? WSREP_FATAL : WSREP_OK);
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -8022,8 +8008,8 @@ wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
   thd_proc_info(thd, "rolling back");
 #endif /* WSREP_PROC_INFO */
 
-  wsrep_status_t const rcode(wsrep_apply_sql(thd, "ROLLBACK", 8, 0, 0));
-//  wsrep_status_t const rcode(wsrep_end_trans (thd, ROLLBACK));
+//REMOVE lp:884560  wsrep_status_t const rcode(wsrep_apply_sql(thd, "ROLLBACK", 8, 0, 0));
+  wsrep_status_t const rcode(trans_rollback(thd) ? WSREP_FATAL : WSREP_OK);
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
