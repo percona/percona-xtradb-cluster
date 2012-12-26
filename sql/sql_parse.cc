@@ -8526,6 +8526,8 @@ Relay_log_info* wsrep_relay_log_init(const char* log_fname)
   uint rli_option = 0;
   Relay_log_info *rli= NULL;
   rli = Rpl_info_factory::create_rli(rli_option, false);
+  rli->relay_log.description_event_for_exec = wsrep_format_desc;
+
   return (rli);
 
 #ifdef REMOVED
@@ -8555,11 +8557,11 @@ Relay_log_info* wsrep_relay_log_init(const char* log_fname)
   key_info_idx[0]= server_id;
   rli->set_idx_info(key_info_idx, NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR);
 
-  //  if(Rpl_info_factory::init_rli_repositories(rli, rli_option, &handler_src, &handler_dest, &msg))
-  //    goto err;
+  if(Rpl_info_factory::init_rli_repositories(rli, rli_option, &handler_src, &handler_dest, &msg))
+    goto err;
 
-  //  if (Rpl_info_factory::decide_repository(rli, rli_option, &handler_src, &handler_dest, &msg))
-  //    goto err;
+  if (Rpl_info_factory::decide_repository(rli, rli_option, &handler_src, &handler_dest, &msg))
+    goto err;
 
   DBUG_RETURN(rli);
 err:
@@ -8621,9 +8623,8 @@ void wsrep_replication_process(THD *thd)
   DBUG_ENTER("wsrep_replication_process");
 
   struct wsrep_thd_shadow shadow;
-  wsrep_prepare_bf_thd(thd, &shadow);
 
-  wsrep_format_desc= new Format_description_log_event(4);
+  wsrep_prepare_bf_thd(thd, &shadow);
 
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));
