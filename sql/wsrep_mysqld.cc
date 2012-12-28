@@ -425,7 +425,6 @@ static void wsrep_init_position()
   }
 }
 
-
 int wsrep_init()
 {
   int rcode= -1;
@@ -669,6 +668,8 @@ void wsrep_stop_replication(THD *thd)
 }
 
 
+extern my_bool wsrep_new_cluster;
+
 bool wsrep_start_replication()
 {
   wsrep_status_t rcode;
@@ -692,11 +693,16 @@ bool wsrep_start_replication()
     return true;
   }
 
+  /**/
+  const char* cluster_address =
+    wsrep_new_cluster ? WSREP_BOOTSTRAP_CODE : wsrep_cluster_address;
+  wsrep_new_cluster= FALSE;
+
   WSREP_INFO("Start replication");
 
   if ((rcode = wsrep->connect(wsrep,
                               wsrep_cluster_name,
-                              wsrep_cluster_address,
+                              cluster_address,
                               wsrep_sst_donor)))
   {
     if (-ESOCKTNOSUPPORT == rcode)
