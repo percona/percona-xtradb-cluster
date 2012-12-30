@@ -693,17 +693,16 @@ bool wsrep_start_replication()
     return true;
   }
 
-  /**/
-  const char* cluster_address =
-    wsrep_new_cluster ? WSREP_BOOTSTRAP_CODE : wsrep_cluster_address;
+  bool const bootstrap(TRUE == wsrep_new_cluster);
   wsrep_new_cluster= FALSE;
 
   WSREP_INFO("Start replication");
 
   if ((rcode = wsrep->connect(wsrep,
                               wsrep_cluster_name,
-                              cluster_address,
-                              wsrep_sst_donor)))
+                              wsrep_cluster_address,
+                              wsrep_sst_donor,
+                              bootstrap)))
   {
     if (-ESOCKTNOSUPPORT == rcode)
     {
