@@ -28,15 +28,18 @@ Created 5/11/2006 Osku Salerma
 #define HA_INNODB_PROTOTYPES_H
 
 #include "my_dbug.h"
+#include "mysqld_error.h"
 #include "my_compare.h"
 #include "my_sys.h"
 #include "m_string.h"
+#include "debug_sync.h"
 
 #include "trx0types.h"
 #include "m_ctype.h" /* CHARSET_INFO */
 
-// Forward declaration
-typedef struct fts_string_struct fts_string_t;
+// Forward declarations
+class Field;
+struct fts_string_t;
 
 /*********************************************************************//**
 Wrapper around MySQL's copy_and_convert function.
@@ -121,6 +124,18 @@ ibool
 thd_is_replication_slave_thread(
 /*============================*/
 	THD*	thd);	/*!< in: thread handle */
+
+/******************************************************************//**
+Gets information on the durability property requested by thread.
+Used when writing either a prepare or commit record to the log
+buffer.
+@return the durability property. */
+UNIV_INTERN
+enum durability_properties
+thd_requested_durability(
+/*=====================*/
+	const THD* thd)	/*!< in: thread handle */
+	__attribute__((nonnull, warn_unused_result));
 
 /******************************************************************//**
 Returns true if the transaction this thread is processing has edited
@@ -436,4 +451,138 @@ ibool
 thd_trx_is_auto_commit(
 /*===================*/
 	THD*	thd);	/*!< in: thread handle, or NULL */
+
+/*****************************************************************//**
+A wrapper function of innobase_convert_name(), convert a table or
+index name to the MySQL system_charset_info (UTF-8) and quote it if needed.
+@return	pointer to the end of buf */
+UNIV_INTERN
+void
+innobase_format_name(
+/*==================*/
+	char*		buf,		/*!< out: buffer for converted
+					identifier */
+	ulint		buflen,		/*!< in: length of buf, in bytes */
+	const char*	name,		/*!< in: index or table name
+					to format */
+	ibool		is_index_name)	/*!< in: index name */
+	__attribute__((nonnull));
+
+/** Corresponds to Sql_condition:enum_warning_level. */
+enum ib_log_level_t {
+	IB_LOG_LEVEL_INFO,
+	IB_LOG_LEVEL_WARN,
+	IB_LOG_LEVEL_ERROR,
+	IB_LOG_LEVEL_FATAL
+};
+
+/******************************************************************//**
+Use this when the args are first converted to a formatted string and then
+passed to the format string from errmsg-utf8.txt. The error message format
+must be: "Some string ... %s".
+
+Push a warning message to the client, it is a wrapper around:
+
+void push_warning_printf(
+	THD *thd, Sql_condition::enum_warning_level level,
+	uint code, const char *format, ...);
+*/
+UNIV_INTERN
+void
+ib_errf(
+/*====*/
+	THD*		thd,		/*!< in/out: session */
+	ib_log_level_t	level,		/*!< in: warning level */
+	ib_uint32_t	code,		/*!< MySQL error code */
+	const char*	format,		/*!< printf format */
+	...)				/*!< Args */
+	__attribute__((format(printf, 4, 5)));
+
+/******************************************************************//**
+Use this when the args are passed to the format string from
+errmsg-utf8.txt directly as is.
+
+Push a warning message to the client, it is a wrapper around:
+
+void push_warning_printf(
+	THD *thd, Sql_condition::enum_warning_level level,
+	uint code, const char *format, ...);
+*/
+UNIV_INTERN
+void
+ib_senderrf(
+/*========*/
+	THD*		thd,		/*!< in/out: session */
+	ib_log_level_t	level,		/*!< in: warning level */
+	ib_uint32_t	code,		/*!< MySQL error code */
+	...);				/*!< Args */
+
+/******************************************************************//**
+Write a message to the MySQL log, prefixed with "InnoDB: ".
+Wrapper around sql_print_information() */
+UNIV_INTERN
+void
+ib_logf(
+/*====*/
+	ib_log_level_t	level,		/*!< in: warning level */
+	const char*	format,		/*!< printf format */
+	...)				/*!< Args */
+	__attribute__((format(printf, 2, 3)));
+
+/******************************************************************//**
+Returns the NUL terminated value of glob_hostname.
+@return	pointer to glob_hostname. */
+UNIV_INTERN
+const char*
+server_get_hostname();
+/*=================*/
+
+/******************************************************************//**
+Get the error message format string.
+@return the format string or 0 if not found. */
+UNIV_INTERN
+const char*
+innobase_get_err_msg(
+/*=================*/
+	int	error_code);	/*!< in: MySQL error code */
+
+/*********************************************************************//**
+Compute the next autoinc value.
+
+For MySQL replication the autoincrement values can be partitioned among
+the nodes. The offset is the start or origin of the autoincrement value
+for a particular node. For n nodes the increment will be n and the offset
+will be in the interval [1, n]. The formula tries to allocate the next
+value for a particular node.
+
+Note: This function is also called with increment set to the number of
+values we want to reserve for multi-value inserts e.g.,
+
+	INSERT INTO T VALUES(), (), ();
+
+innobase_next_autoinc() will be called with increment set to 3 where
+autoinc_lock_mode != TRADITIONAL because we want to reserve 3 values for
+the multi-value INSERT above.
+@return	the next value */
+UNIV_INTERN
+ulonglong
+innobase_next_autoinc(
+/*==================*/
+	ulonglong	current,	/*!< in: Current value */
+	ulonglong	need,		/*!< in: count of values needed */
+	ulonglong	step,		/*!< in: AUTOINC increment step */
+	ulonglong	offset,		/*!< in: AUTOINC offset */
+	ulonglong	max_value)	/*!< in: max value for type */
+	__attribute__((pure, warn_unused_result));
+
+/********************************************************************//**
+Get the upper limit of the MySQL integral and floating-point type.
+@return maximum allowed value for the field */
+UNIV_INTERN
+ulonglong
+innobase_get_int_col_max_value(
+/*===========================*/
+	const Field*	field)	/*!< in: MySQL field */
+	__attribute__((nonnull, pure, warn_unused_result));
+
 #endif /* HA_INNODB_PROTOTYPES_H */

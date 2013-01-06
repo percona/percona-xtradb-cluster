@@ -95,7 +95,6 @@ void HexEncoder::Encode()
 void HexDecoder::Decode()
 {
     word32 bytes = coded_.size();
-    assert((bytes % 2) == 0);
     decoded_.New(bytes / 2);
 
     word32 i(0);
@@ -105,14 +104,18 @@ void HexDecoder::Decode()
         byte b2 = coded_.next() - 0x30;
 
         // sanity checks
-        assert( b  < sizeof(hexDecode)/sizeof(hexDecode[0]) );
-        assert( b2 < sizeof(hexDecode)/sizeof(hexDecode[0]) );
+        if (b >= sizeof(hexDecode)/sizeof(hexDecode[0])) {
+            coded_.SetError(PEM_E);
+            return;
+        }
+        if (b2 >= sizeof(hexDecode)/sizeof(hexDecode[0])) {
+            coded_.SetError(PEM_E);
+            return;
+        }
 
         b  = hexDecode[b];
         b2 = hexDecode[b2];
-        
-        assert( b != bad && b2 != bad );
-        
+
         decoded_[i++] = (b << 4) | b2;
         bytes -= 2;
     }
@@ -174,9 +177,9 @@ void Base64Encoder::Encode()
     } 
 
     encoded_[i++] = '\n';
-    assert(i == outSz);
-
-    plain_.reset(encoded_);
+    
+    if (i == outSz)
+        plain_.reset(encoded_);
 }
 
 
@@ -185,6 +188,7 @@ void Base64Decoder::Decode()
 {
     word32 bytes = coded_.size();
     word32 plainSz = bytes - ((bytes + (pemLineSz - 1)) / pemLineSz); 
+    const  byte maxIdx = (byte)sizeof(base64Decode) + 0x2B - 1;
     plainSz = ((plainSz * 3) / 4) + 3;
     decoded_.New(plainSz);
 
@@ -197,7 +201,6 @@ void Base64Decoder::Decode()
         byte e3 = coded_.next();
         byte e4 = coded_.next();
 
-        // do asserts first
         if (e1 == 0)            // end file 0's
             break;
 
@@ -207,6 +210,16 @@ void Base64Decoder::Decode()
             pad3 = true;
         if (e4 == pad)
             pad4 = true;
+
+        if (e1 < 0x2B || e2 < 0x2B || e3 < 0x2B || e4 < 0x2B) {
+            coded_.SetError(PEM_E);
+            return;
+        }
+
+        if (e1 > maxIdx || e2 > maxIdx || e3 > maxIdx || e4 > maxIdx) {
+            coded_.SetError(PEM_E);
+            return;
+        }
 
         e1 = base64Decode[e1 - 0x2B];
         e2 = base64Decode[e2 - 0x2B];

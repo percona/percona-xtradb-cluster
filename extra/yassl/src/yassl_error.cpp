@@ -55,12 +55,13 @@ Library Error::get_lib() const
 */
 
 
-void SetErrorString(unsigned long error, char* buffer)
+void SetErrorString(YasslError error, char* buffer)
 {
     using namespace TaoCrypt;
     const int max = MAX_ERROR_SZ;  // shorthand
+    int localError = error;        // errors from a few enums 
 
-    switch (error) {
+    switch (localError) {
 
         // yaSSL proper errors
     case range_error :
@@ -121,7 +122,7 @@ void SetErrorString(unsigned long error, char* buffer)
 
     case certificate_error :
         strncpy(buffer, "unable to proccess cerificate", max);
-        break; 
+        break;
 
     case privateKey_error :
         strncpy(buffer, "unable to proccess private key, bad format", max);
@@ -130,7 +131,7 @@ void SetErrorString(unsigned long error, char* buffer)
     case badVersion_error :
         strncpy(buffer, "protocol version mismatch", max);
         break;
-        
+
     case compress_error :
         strncpy(buffer, "compression error", max);
         break;
@@ -146,6 +147,10 @@ void SetErrorString(unsigned long error, char* buffer)
         // openssl errors
     case SSL_ERROR_WANT_READ :
         strncpy(buffer, "the read operation would block", max);
+        break;
+
+    case SSL_ERROR_WANT_WRITE :
+        strncpy(buffer, "the write operation would block", max);
         break;
 
     case CERTFICATE_ERROR :

@@ -38,6 +38,7 @@
 #include <m_ctype.h>
 #include "log.h"
 #include "binlog.h"                             // mysql_bin_log
+#include "log_event.h"
 #ifdef __WIN__
 #include <direct.h>
 #endif
@@ -619,12 +620,17 @@ not_silent:
   {
     char *query;
     uint query_length;
+    char db_name_quoted[2 * FN_REFLEN + sizeof("create database ") + 2];
+    int id_len= 0;
 
     if (!thd->query())                          // Only in replication
     {
-      query= 	     tmp_query;
-      query_length= (uint) (strxmov(tmp_query,"create database `",
-                                    db, "`", NullS) - tmp_query);
+      id_len= my_strmov_quoted_identifier(thd, (char *) db_name_quoted, db,
+                                          0);
+      db_name_quoted[id_len]= '\0';
+      query= tmp_query;
+      query_length= (uint) (strxmov(tmp_query,"create database ",
+                                    db_name_quoted, NullS) - tmp_query);
     }
     else
     {
@@ -761,7 +767,7 @@ bool mysql_rm_db(THD *thd,char *db,bool if_exists, bool silent)
 {
   ulong deleted_tables= 0;
   bool error= true;
-  char	path[FN_REFLEN+16];
+  char	path[2 * FN_REFLEN + 16];
   MY_DIR *dirp;
   uint length;
   bool found_other_files= false;
@@ -882,11 +888,16 @@ update_binlog:
   {
     const char *query;
     ulong query_length;
+    // quoted db name + wraping quote
+    char buffer_temp [2 * FN_REFLEN + 2];
+    int id_len= 0;
     if (!thd->query())
     {
       /* The client used the old obsolete mysql_drop_db() call */
       query= path;
-      query_length= (uint) (strxmov(path, "drop database `", db, "`",
+      id_len= my_strmov_quoted_identifier(thd, buffer_temp, db, strlen(db));
+      buffer_temp[id_len] ='\0';
+      query_length= (uint) (strxmov(path, "DROP DATABASE ", buffer_temp, "",
                                      NullS) - path);
     }
     else
@@ -924,8 +935,9 @@ update_binlog:
   else if (mysql_bin_log.is_open() && !silent)
   {
     char *query, *query_pos, *query_end, *query_data_start;
+    char temp_identifier[ 2 * FN_REFLEN + 2];
     TABLE_LIST *tbl;
-    uint db_len;
+    uint db_len, id_length=0;
 
     if (!(query= (char*) thd->alloc(MAX_DROP_TABLE_Q_LEN)))
       goto exit; /* not much else we can do */
@@ -962,10 +974,10 @@ update_binlog:
         }
         query_pos= query_data_start;
       }
-
-      *query_pos++ = '`';
-      query_pos= strmov(query_pos,tbl->table_name);
-      *query_pos++ = '`';
+      id_length= my_strmov_quoted_identifier(thd, (char *)temp_identifier,
+                                      tbl->table_name, 0);
+      temp_identifier[id_length]= '\0';
+      query_pos= strmov(query_pos,(char *)&temp_identifier);
       *query_pos++ = ',';
     }
 
@@ -1008,6 +1020,7 @@ static bool find_db_tables_and_rm_known_files(THD *thd, MY_DIR *dirp,
   TABLE_LIST *tot_list=0, **tot_list_next_local, **tot_list_next_global;
   DBUG_ENTER("find_db_tables_and_rm_known_files");
   DBUG_PRINT("enter",("path: %s", path));
+  TYPELIB *known_extensions= ha_known_exts();
 
   tot_list_next_local= tot_list_next_global= &tot_list;
 
@@ -1049,8 +1062,8 @@ static bool find_db_tables_and_rm_known_files(THD *thd, MY_DIR *dirp,
       extension= strend(file->name);
     if (find_type(extension, &deletable_extentions, FIND_TYPE_NO_PREFIX) <= 0)
     {
-      if (find_type(extension, ha_known_exts(), FIND_TYPE_NO_PREFIX) <= 0)
-	*found_other_files= true;
+      if (find_type(extension, known_extensions, FIND_TYPE_NO_PREFIX) <= 0)
+        *found_other_files= true;
       continue;
     }
     /* just for safety we use files_charset_info */
@@ -1502,14 +1515,12 @@ bool mysql_change_db(THD *thd, const LEX_STRING *new_db_name, bool force_switch)
     in this case to be sure.
   */
 
-  if (check_and_convert_db_name(&new_db_file_name, FALSE))
+  if (check_and_convert_db_name(&new_db_file_name, FALSE) != IDENT_NAME_OK)
   {
-    my_error(ER_WRONG_DB_NAME, MYF(0), new_db_file_name.str);
     my_free(new_db_file_name.str);
 
     if (force_switch)
       mysql_change_db_impl(thd, NULL, 0, thd->variables.collation_server);
-
     DBUG_RETURN(TRUE);
   }
 

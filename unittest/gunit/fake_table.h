@@ -26,12 +26,16 @@ class Fake_TABLE_SHARE : public TABLE_SHARE
 public:
   Fake_TABLE_SHARE(uint number_of_columns)
   {
+    static const char *fakepath= "fakepath";
     fields= number_of_columns;
     // fix if you plan to test with >32 columns.
     column_bitmap_size= sizeof(int);
     tmp_table= NO_TMP_TABLE;
     db_low_byte_first= true;
+    path.str= const_cast<char*>(fakepath);
+    path.length= strlen(path.str);
   }
+  ~Fake_TABLE_SHARE() {}
 };
 
 /*
@@ -42,17 +46,20 @@ class Fake_TABLE: public TABLE
 {
   Fake_TABLE_SHARE table_share;
   MY_BITMAP write_set_struct;
+  uint32 write_set_buf;
+  Field *field_array[32];
 
   void inititalize()
   {
     s= &table_share;
+    file= NULL;
     in_use= current_thd;
     null_row= '\0';
     write_set= &write_set_struct;
     read_set= NULL;
+    next_number_field= NULL; // No autoinc column
 
-    EXPECT_EQ(0, bitmap_init(write_set, NULL, s->fields, false))
-      << "Out of memory";
+    EXPECT_EQ(0, bitmap_init(write_set, &write_set_buf, s->fields, false));
 
     static const char *table_name= "Fake";
     for (uint i= 0; i < s->fields; ++i)
@@ -68,16 +75,14 @@ class Fake_TABLE: public TABLE
 public:
   Fake_TABLE(Field *column1) : table_share(1)
   {
-    field= new Field*[1];
-    EXPECT_FALSE(field == NULL) << "Out of memory";
+    field= field_array;
     field[0]= column1;
     inititalize();
   }
 
   Fake_TABLE(Field *column1, Field *column2) : table_share(2)
   {
-    field= new Field*[2];
-    EXPECT_FALSE(field == NULL) << "Out of memory";
+    field= field_array;
     field[0]= column1;
     field[1]= column2;
     inititalize();
@@ -85,9 +90,14 @@ public:
 
   ~Fake_TABLE()
   {
-    bitmap_free(write_set);
-    delete[] field;
+    /*
+      This DTOR should be empty, since we inherit from TABLE,
+      which cannot have virtual member functions.
+    */ 
   }
+
+  void set_handler(handler *h) { file= h; }
+  TABLE_SHARE *get_share() { return &table_share; }
 };
 
 #endif // FAKE_TABLE_H

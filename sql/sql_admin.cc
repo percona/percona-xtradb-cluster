@@ -166,7 +166,7 @@ static int prepare_for_repair(THD *thd, TABLE_LIST *table_list,
     */
     if (wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
       goto end;
-    close_all_tables_for_name(thd, table_list->table->s, FALSE);
+    close_all_tables_for_name(thd, table_list->table->s, false, NULL);
     table_list->table= 0;
   }
   /*
@@ -207,7 +207,7 @@ static int prepare_for_repair(THD *thd, TABLE_LIST *table_list,
     Now we should be able to open the partially repaired table
     to finish the repair in the handler later on.
   */
-  if (open_table(thd, table_list, thd->mem_root, &ot_ctx))
+  if (open_table(thd, table_list, &ot_ctx))
   {
     error= send_check_errmsg(thd, table_list, "repair",
                              "Failed to open partially repaired table");
@@ -732,6 +732,11 @@ send_result_message:
 
     case HA_ADMIN_TRY_ALTER:
     {
+      uint save_flags;
+      Alter_info *alter_info= &lex->alter_info;
+
+      /* Store the original value of alter_info->flags */
+      save_flags= alter_info->flags;
       /*
         This is currently used only by InnoDB. ha_innobase::optimize() answers
         "try with alter", so here we close the table, do an ALTER TABLE,
@@ -753,9 +758,18 @@ send_result_message:
 
       DEBUG_SYNC(thd, "ha_admin_try_alter");
       protocol->store(STRING_WITH_LEN("note"), system_charset_info);
-      protocol->store(STRING_WITH_LEN(
-          "Table does not support optimize, doing recreate + analyze instead"),
-                      system_charset_info);
+      if(alter_info->flags & Alter_info::ALTER_ADMIN_PARTITION)
+      {
+        protocol->store(STRING_WITH_LEN(
+        "Table does not support optimize on partitions. All partitions "
+        "will be rebuilt and analyzed."),system_charset_info);
+      }
+      else
+      {
+        protocol->store(STRING_WITH_LEN(
+        "Table does not support optimize, doing recreate + analyze instead"),
+        system_charset_info);
+      }
       if (protocol->write())
         goto err;
       DBUG_PRINT("info", ("HA_ADMIN_TRY_ALTER, trying analyze..."));
@@ -789,11 +803,17 @@ send_result_message:
         if (!open_temporary_tables(thd, table) &&
             (table->table= open_n_lock_single_table(thd, table, lock_type, 0)))
         {
+          /*
+           Reset the ALTER_ADMIN_PARTITION bit in alter_info->flags
+           to force analyze on all partitions.
+          */
+          alter_info->flags &= ~(Alter_info::ALTER_ADMIN_PARTITION);
           result_code= table->table->file->ha_analyze(thd, check_opt);
           if (result_code == HA_ADMIN_ALREADY_DONE)
             result_code= HA_ADMIN_OK;
           else if (result_code)  // analyze failed
             table->table->file->print_error(result_code, MYF(0));
+          alter_info->flags= save_flags;
         }
         else
           result_code= -1; // open failed
@@ -897,8 +917,8 @@ send_result_message:
       }
     }
     /* Error path, a admin command failed. */
-    trans_commit_stmt(thd);
-    trans_commit_implicit(thd);
+    if (trans_commit_stmt(thd) || trans_commit_implicit(thd))
+      goto err;
     close_thread_tables(thd);
     thd->mdl_context.release_transactional_locks();
 
@@ -1069,7 +1089,7 @@ bool Sql_cmd_optimize_table::execute(THD *thd)
                          FALSE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
   thd->enable_slow_log= opt_log_slow_admin_statements;
-  res= (specialflag & (SPECIAL_SAFE_MODE | SPECIAL_NO_NEW_FUNC)) ?
+  res= (specialflag & SPECIAL_NO_NEW_FUNC) ?
     mysql_recreate_table(thd, first_table) :
     mysql_admin_table(thd, first_table, &thd->lex->check_opt,
                       "optimize", TL_WRITE, 1, 0, 0, 0,

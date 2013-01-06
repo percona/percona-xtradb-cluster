@@ -1,6 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 2010, 2012, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2012, Facebook Inc.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -214,11 +215,6 @@ static monitor_info_t	innodb_counter_info[] =
 	 MONITOR_EXISTING | MONITOR_DEFAULT_ON),
 	 MONITOR_DEFAULT_START, MONITOR_OVLD_BUF_POOL_WRITE_REQUEST},
 
-	{"buffer_pool_pages_in_flush", "buffer",
-	 "Number of pages in flush list",
-	 MONITOR_NONE,
-	 MONITOR_DEFAULT_START, MONITOR_PAGE_INFLUSH},
-
 	{"buffer_pool_wait_free", "buffer",
 	 "Number of times waited for free buffer"
 	 " (innodb_buffer_pool_wait_free)",
@@ -349,25 +345,40 @@ static monitor_info_t	innodb_counter_info[] =
 	 MONITOR_SET_MEMBER, MONITOR_FLUSH_NEIGHBOR_TOTAL_PAGE,
 	 MONITOR_FLUSH_NEIGHBOR_PAGES},
 
-	/* Cumulative counter for flush batches because of max_dirty */
-	{"buffer_flush_max_dirty_total_pages", "buffer",
-	 "Total pages flushed as part of max_dirty batches",
-	 MONITOR_SET_OWNER, MONITOR_FLUSH_MAX_DIRTY_COUNT,
-	 MONITOR_FLUSH_MAX_DIRTY_TOTAL_PAGE},
+	{"buffer_flush_n_to_flush_requested", "buffer",
+	 "Number of pages requested for flushing.",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_FLUSH_N_TO_FLUSH_REQUESTED},
 
-	{"buffer_flush_max_dirty", "buffer",
-	 "Number of max_dirty batches",
-	 MONITOR_SET_MEMBER, MONITOR_FLUSH_MAX_DIRTY_TOTAL_PAGE,
-	 MONITOR_FLUSH_MAX_DIRTY_COUNT},
+	{"buffer_flush_avg_page_rate", "buffer",
+	 "Average number of pages at which flushing is happening",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_FLUSH_AVG_PAGE_RATE},
 
-	{"buffer_flush_max_dirty_pages", "buffer",
-	 "Pages queued as a max_dirty batch",
-	 MONITOR_SET_MEMBER, MONITOR_FLUSH_MAX_DIRTY_TOTAL_PAGE,
-	 MONITOR_FLUSH_MAX_DIRTY_PAGES},
+	{"buffer_flush_lsn_avg_rate", "buffer",
+	 "Average redo generation rate",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_FLUSH_LSN_AVG_RATE},
 
-	/* Cumulative counter for flush batches because of adaptive */
+	{"buffer_flush_pct_for_dirty", "buffer",
+	 "Percent of IO capacity used to avoid max dirty page limit",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_FLUSH_PCT_FOR_DIRTY},
+
+	{"buffer_flush_pct_for_lsn", "buffer",
+	 "Percent of IO capacity used to avoid reusable redo space limit",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_FLUSH_PCT_FOR_LSN},
+
+	{"buffer_flush_sync_waits", "buffer",
+	 "Number of times a wait happens due to sync flushing",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_FLUSH_SYNC_WAITS},
+
+
+	/* Cumulative counter for flush batches for adaptive flushing  */
 	{"buffer_flush_adaptive_total_pages", "buffer",
-	 "Total pages flushed as part of adaptive batches",
+	 "Total pages flushed as part of adaptive flushing",
 	 MONITOR_SET_OWNER, MONITOR_FLUSH_ADAPTIVE_COUNT,
 	 MONITOR_FLUSH_ADAPTIVE_TOTAL_PAGE},
 
@@ -380,22 +391,6 @@ static monitor_info_t	innodb_counter_info[] =
 	 "Pages queued as an adaptive batch",
 	 MONITOR_SET_MEMBER, MONITOR_FLUSH_ADAPTIVE_TOTAL_PAGE,
 	 MONITOR_FLUSH_ADAPTIVE_PAGES},
-
-	/* Cumulative counter for flush batches because of async */
-	{"buffer_flush_async_total_pages", "buffer",
-	 "Total pages flushed as part of async batches",
-	 MONITOR_SET_OWNER, MONITOR_FLUSH_ASYNC_COUNT,
-	 MONITOR_FLUSH_ASYNC_TOTAL_PAGE},
-
-	{"buffer_flush_async", "buffer",
-	 "Number of async batches",
-	 MONITOR_SET_MEMBER, MONITOR_FLUSH_ASYNC_TOTAL_PAGE,
-	 MONITOR_FLUSH_ASYNC_COUNT},
-
-	{"buffer_flush_async_pages", "buffer",
-	 "Pages queued as an async batch",
-	 MONITOR_SET_MEMBER, MONITOR_FLUSH_ASYNC_TOTAL_PAGE,
-	 MONITOR_FLUSH_ASYNC_PAGES},
 
 	/* Cumulative counter for flush batches because of sync */
 	{"buffer_flush_sync_total_pages", "buffer",
@@ -858,6 +853,16 @@ static monitor_info_t	innodb_counter_info[] =
 	 MONITOR_NONE,
 	 MONITOR_DEFAULT_START, MONITOR_PAGE_DECOMPRESS},
 
+	{"compression_pad_increments", "compression",
+	 "Number of times padding is incremented to avoid compression failures",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_PAD_INCREMENTS},
+
+	{"compression_pad_decrements", "compression",
+	 "Number of times padding is decremented due to good compressibility",
+	 MONITOR_NONE,
+	 MONITOR_DEFAULT_START, MONITOR_PAD_DECREMENTS},
+
 	/* ========== Counters for Index ========== */
 	{"module_index", "index", "Index Manager",
 	 MONITOR_MODULE,
@@ -1188,7 +1193,7 @@ UNIV_INTERN ulint		monitor_set_tbl[(NUM_MONITOR + NUM_BITS_ULINT
 #ifndef HAVE_ATOMIC_BUILTINS_64
 /** Mutex protecting atomic operations on platforms that lack
 built-in operations for atomic memory access */
-mutex_t	monitor_mutex;
+ib_mutex_t	monitor_mutex;
 
 /** Key to register monitor_mutex with performance schema */
 UNIV_INTERN mysql_pfs_key_t	monitor_mutex_key;
@@ -1423,7 +1428,7 @@ srv_mon_process_existing_counter(
 	/* export_vars.innodb_buffer_pool_reads. Num Reads from
 	disk (page not in buffer) */
 	case MONITOR_OVLD_BUF_POOL_READS:
-		value = srv_buf_pool_reads;
+		value = srv_stats.buf_pool_reads;
 		break;
 
 	/* innodb_buffer_pool_read_requests, the number of logical
@@ -1436,12 +1441,12 @@ srv_mon_process_existing_counter(
 	/* innodb_buffer_pool_write_requests, the number of
 	write request */
 	case MONITOR_OVLD_BUF_POOL_WRITE_REQUEST:
-		value = srv_buf_pool_write_requests;
+		value = srv_stats.buf_pool_write_requests;
 		break;
 
 	/* innodb_buffer_pool_wait_free */
 	case MONITOR_OVLD_BUF_POOL_WAIT_FREE:
-		value = srv_buf_pool_wait_free;
+		value = srv_stats.buf_pool_wait_free;
 		break;
 
 	/* innodb_buffer_pool_read_ahead */
@@ -1505,12 +1510,12 @@ srv_mon_process_existing_counter(
 
 	/* innodb_data_reads, the total number of data reads */
 	case MONITOR_OVLD_BYTE_READ:
-		value = srv_data_read;
+		value = srv_stats.data_read;
 		break;
 
 	/* innodb_data_writes, the total number of data writes. */
 	case MONITOR_OVLD_BYTE_WRITTEN:
-		value = srv_data_written;
+		value = srv_stats.data_written;
 		break;
 
 	/* innodb_data_reads, the total number of data reads. */
@@ -1530,7 +1535,7 @@ srv_mon_process_existing_counter(
 
 	/* innodb_os_log_written */
 	case MONITOR_OVLD_OS_LOG_WRITTEN:
-		value = (mon_type_t) srv_os_log_written;
+		value = (mon_type_t) srv_stats.os_log_written;
 		break;
 
 	/* innodb_os_log_fsyncs */
@@ -1546,33 +1551,33 @@ srv_mon_process_existing_counter(
 
 	/* innodb_os_log_pending_writes */
 	case MONITOR_OVLD_OS_LOG_PENDING_WRITES:
-		value = srv_os_log_pending_writes;
+		value = srv_stats.os_log_pending_writes;
 		update_min = TRUE;
 		break;
 
 	/* innodb_log_waits */
 	case MONITOR_OVLD_LOG_WAITS:
-		value = srv_log_waits;
+		value = srv_stats.log_waits;
 		break;
 
 	/* innodb_log_write_requests */
 	case MONITOR_OVLD_LOG_WRITE_REQUEST:
-		value = srv_log_write_requests;
+		value = srv_stats.log_write_requests;
 		break;
 
 	/* innodb_log_writes */
 	case MONITOR_OVLD_LOG_WRITES:
-		value = srv_log_writes;
+		value = srv_stats.log_writes;
 		break;
 
 	/* innodb_dblwr_writes */
 	case MONITOR_OVLD_SRV_DBLWR_WRITES:
-		value = srv_dblwr_writes;
+		value = srv_stats.dblwr_writes;
 		break;
 
 	/* innodb_dblwr_pages_written */
 	case MONITOR_OVLD_SRV_DBLWR_PAGES_WRITTEN:
-		value = srv_dblwr_pages_written;
+		value = srv_stats.dblwr_pages_written;
 		break;
 
 	/* innodb_page_size */
@@ -1581,27 +1586,27 @@ srv_mon_process_existing_counter(
 		break;
 
 	case MONITOR_OVLD_RWLOCK_S_SPIN_WAITS:
-		value = rw_s_spin_wait_count;
+		value = rw_lock_stats.rw_s_spin_wait_count;
 		break;
 
 	case MONITOR_OVLD_RWLOCK_X_SPIN_WAITS:
-		value = rw_x_os_wait_count;
+		value = rw_lock_stats.rw_x_os_wait_count;
 		break;
 
 	case MONITOR_OVLD_RWLOCK_S_SPIN_ROUNDS:
-		value = rw_s_spin_round_count;
+		value = rw_lock_stats.rw_s_spin_round_count;
 		break;
 
 	case MONITOR_OVLD_RWLOCK_X_SPIN_ROUNDS:
-		value = rw_x_spin_round_count;
+		value = rw_lock_stats.rw_x_spin_round_count;
 		break;
 
 	case MONITOR_OVLD_RWLOCK_S_OS_WAITS:
-		value = rw_s_os_wait_count;
+		value = rw_lock_stats.rw_s_os_wait_count;
 		break;
 
 	case MONITOR_OVLD_RWLOCK_X_OS_WAITS:
-		value = rw_x_os_wait_count;
+		value = rw_lock_stats.rw_x_os_wait_count;
 		break;
 
 	case MONITOR_OVLD_BUFFER_POOL_SIZE:
@@ -1610,44 +1615,44 @@ srv_mon_process_existing_counter(
 
 	/* innodb_rows_read */
 	case MONITOR_OLVD_ROW_READ:
-		value = srv_n_rows_read;
+		value = srv_stats.n_rows_read;
 		break;
 
 	/* innodb_rows_inserted */
 	case MONITOR_OLVD_ROW_INSERTED:
-		value = srv_n_rows_inserted;
+		value = srv_stats.n_rows_inserted;
 		break;
 
 	/* innodb_rows_deleted */
 	case MONITOR_OLVD_ROW_DELETED:
-		value = srv_n_rows_deleted;
+		value = srv_stats.n_rows_deleted;
 		break;
 
 	/* innodb_rows_updated */
 	case MONITOR_OLVD_ROW_UPDTATED:
-		value = srv_n_rows_updated;
+		value = srv_stats.n_rows_updated;
 		break;
 
 	/* innodb_row_lock_current_waits */
 	case MONITOR_OVLD_ROW_LOCK_CURRENT_WAIT:
-		value = srv_n_lock_wait_current_count;
+		value = srv_stats.n_lock_wait_current_count;
 		break;
 
 	/* innodb_row_lock_time */
 	case MONITOR_OVLD_LOCK_WAIT_TIME:
-		value = srv_n_lock_wait_time / 1000;
+		value = srv_stats.n_lock_wait_time / 1000;
 		break;
 
 	/* innodb_row_lock_time_max */
 	case MONITOR_OVLD_LOCK_MAX_WAIT_TIME:
-		value = srv_n_lock_max_wait_time / 1000;
+		value = lock_sys->n_lock_max_wait_time / 1000;
 		break;
 
 	/* innodb_row_lock_time_avg */
 	case MONITOR_OVLD_LOCK_AVG_WAIT_TIME:
-		if (srv_n_lock_wait_count > 0) {
-			value = srv_n_lock_wait_time / 1000
-				/ srv_n_lock_wait_count;
+		if (srv_stats.n_lock_wait_count > 0) {
+			value = srv_stats.n_lock_wait_time / 1000
+				/ srv_stats.n_lock_wait_count;
 		} else {
 			value = 0;
 		}
@@ -1655,7 +1660,7 @@ srv_mon_process_existing_counter(
 
 	/* innodb_row_lock_waits */
 	case MONITOR_OVLD_ROW_LOCK_WAIT:
-		value = srv_n_lock_wait_count;
+		value = srv_stats.n_lock_wait_count;
 		break;
 
 	case MONITOR_RSEG_HISTORY_LEN:

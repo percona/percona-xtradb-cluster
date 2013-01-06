@@ -1,7 +1,7 @@
 #ifndef SQL_ARRAY_INCLUDED
 #define SQL_ARRAY_INCLUDED
 
-/* Copyright (c) 2005, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -83,6 +83,15 @@ public:
   }
 
   Element_type *array() const { return m_array; }
+
+  bool operator==(const Bounds_checked_array<Element_type>&rhs) const
+  {
+    return m_array == rhs.m_array && m_size == rhs.m_size;
+  }
+  bool operator!=(const Bounds_checked_array<Element_type>&rhs) const
+  {
+    return m_array != rhs.m_array || m_size != rhs.m_size;
+  }
 
 private:
   Element_type *m_array;
@@ -174,9 +183,20 @@ public:
     return array.elements;
   }
 
+  void elements(uint num_elements)
+  {
+    DBUG_ASSERT(num_elements <= array.max_element);
+    array.elements= num_elements;
+  }
+
   void clear()
   {
-    array.elements= 0;
+    elements(0);
+  }
+
+  void set(uint idx, const Elem &el)
+  {
+    set_dynamic(&array, &el, idx);
   }
 
   ~Dynamic_array()

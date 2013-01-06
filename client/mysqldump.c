@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -49,11 +49,10 @@
 #include <stdarg.h>
 
 #include "client_priv.h"
+#include "my_default.h"
 #include "mysql.h"
 #include "mysql_version.h"
 #include "mysqld_error.h"
-
-#include <welcome_copyright_notice.h> /* ORACLE_WELCOME_COPYRIGHT_NOTICE */
 
 #include <welcome_copyright_notice.h> /* ORACLE_WELCOME_COPYRIGHT_NOTICE */
 
@@ -84,6 +83,15 @@
 #define IGNORE_NONE 0x00 /* no ignore */
 #define IGNORE_DATA 0x01 /* don't dump data for this table */
 #define IGNORE_INSERT_DELAYED 0x02 /* table doesn't support INSERT DELAYED */
+
+/* general_log or slow_log tables under mysql database */
+static inline my_bool general_log_or_slow_log_tables(const char *db, 
+                                                     const char *table)
+{
+  return (strcmp(db, "mysql") == 0) &&
+         ((strcmp(table, "general_log") == 0) ||
+          (strcmp(table, "slow_log") == 0));
+}
 
 static void add_load_option(DYNAMIC_STRING *str, const char *option,
                              const char *option_value);
@@ -140,6 +148,17 @@ static DYNAMIC_STRING extended_row;
 #include <sslopt-vars.h>
 FILE *md_result_file= 0;
 FILE *stderror_file=0;
+
+const char *set_gtid_purged_mode_names[]=
+{"OFF", "AUTO", "ON", NullS};
+static TYPELIB set_gtid_purged_mode_typelib=
+               {array_elements(set_gtid_purged_mode_names) -1, "",
+                set_gtid_purged_mode_names, NULL};
+static enum enum_set_gtid_purged_mode {
+  SET_GTID_PURGED_OFF= 0,
+  SET_GTID_PURGED_AUTO =1,
+  SET_GTID_PURGED_ON=2
+} opt_set_gtid_purged_mode= SET_GTID_PURGED_AUTO;
 
 #ifdef HAVE_SMEM
 static char *shared_memory_base_name=0;
@@ -456,6 +475,15 @@ static struct my_option my_long_options[] =
    "Add 'SET NAMES default_character_set' to the output.",
    &opt_set_charset, &opt_set_charset, 0, GET_BOOL, NO_ARG, 1,
    0, 0, 0, 0, 0},
+  {"set-gtid-purged", OPT_SET_GTID_PURGED,
+    "Add 'SET @@GLOBAL.GTID_PURGED' to the output. Possible values for "
+    "this option are ON, OFF and AUTO. If ON is used and GTIDs "
+    "are not enabled on the server, an error is generated. If OFF is "
+    "used, this option does nothing. If AUTO is used and GTIDs are enabled "
+    "on the server, 'SET @@GLOBAL.GTID_PURGED' is added to the output. "
+    "If GTIDs are disabled, AUTO does nothing. Default is AUTO.",
+    0, 0, 0, GET_STR, OPT_ARG,
+    0, 0, 0, 0, 0, 0},
 #ifdef HAVE_SMEM
   {"shared-memory-base-name", OPT_SHARED_MEMORY_BASE_NAME,
    "Base name of shared memory.", &shared_memory_base_name, &shared_memory_base_name,
@@ -612,7 +640,7 @@ static void short_usage_sub(void)
 static void usage(void)
 {
   print_version();
-  puts(ORACLE_WELCOME_COPYRIGHT_NOTICE("2000, 2012"));
+  puts(ORACLE_WELCOME_COPYRIGHT_NOTICE("2000"));
   puts("Dumping structure and contents of MySQL databases and tables.");
   short_usage_sub();
   print_defaults("my",load_default_groups);
@@ -895,6 +923,13 @@ get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
     opt_protocol= find_type_or_exit(argument, &sql_protocol_typelib,
                                     opt->name);
     break;
+  case (int) OPT_SET_GTID_PURGED:
+    {
+      opt_set_gtid_purged_mode= find_type_or_exit(argument,
+                                                  &set_gtid_purged_mode_typelib,
+                                                  opt->name)-1;
+      break;
+    }
   }
   return 0;
 }
@@ -1502,6 +1537,9 @@ static int connect_to_db(char *host, char *user,char *passwd)
   if (opt_default_auth && *opt_default_auth)
     mysql_options(&mysql_connection, MYSQL_DEFAULT_AUTH, opt_default_auth);
 
+  mysql_options(&mysql_connection, MYSQL_OPT_CONNECT_ATTR_RESET, 0);
+  mysql_options4(&mysql_connection, MYSQL_OPT_CONNECT_ATTR_ADD,
+                 "program_name", "mysqldump");
   if (!(mysql= mysql_real_connect(&mysql_connection,host,user,passwd,
                                   NULL,opt_mysql_port,opt_mysql_unix_port,
                                   0)))
@@ -2467,6 +2505,7 @@ static uint get_table_structure(char *table, char *db, char *table_type,
                                 "TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'";
   FILE       *sql_file= md_result_file;
   int        len;
+  my_bool    is_log_table;
   MYSQL_RES  *result;
   MYSQL_ROW  row;
   DBUG_ENTER("get_table_structure");
@@ -2551,9 +2590,12 @@ static uint get_table_structure(char *table, char *db, char *table_type,
       /*
         Even if the "table" is a view, we do a DROP TABLE here.  The
         view-specific code below fills in the DROP VIEW.
+        We will skip the DROP TABLE for general_log and slow_log, since
+        those stmts will fail, in case we apply dump by enabling logging.
        */
-        fprintf(sql_file, "DROP TABLE IF EXISTS %s;\n",
-                opt_quoted_table);
+        if (!general_log_or_slow_log_tables(db, table))
+          fprintf(sql_file, "DROP TABLE IF EXISTS %s;\n",
+                  opt_quoted_table);
         check_io(sql_file);
       }
 
@@ -2561,6 +2603,7 @@ static uint get_table_structure(char *table, char *db, char *table_type,
       if (strcmp(field->name, "View") == 0)
       {
         char *scv_buff= NULL;
+        my_ulonglong n_cols;
 
         verbose_msg("-- It's a view, create dummy table for view\n");
 
@@ -2575,8 +2618,8 @@ static uint get_table_structure(char *table, char *db, char *table_type,
           the same name in order to satisfy views that depend on this view.
           The table will be removed when the actual view is created.
 
-          The properties of each column, aside from the data type, are not
-          preserved in this temporary table, because they are not necessary.
+          The properties of each column, are not preserved in this temporary
+          table, because they are not necessary.
 
           This will not be necessary once we can determine dependencies
           between views and can simply dump them in the appropriate order.
@@ -2603,8 +2646,23 @@ static uint get_table_structure(char *table, char *db, char *table_type,
         else
           my_free(scv_buff);
 
-        if (mysql_num_rows(result))
+        n_cols= mysql_num_rows(result);
+        if (0 != n_cols)
         {
+
+          /*
+            The actual formula is based on the column names and how the .FRM
+            files are stored and is too volatile to be repeated here.
+            Thus we simply warn the user if the columns exceed a limit we
+            know works most of the time.
+          */
+          if (n_cols >= 1000)
+            fprintf(stderr,
+                    "-- Warning: Creating a stand-in table for view %s may"
+                    " fail when replaying the dump file produced because "
+                    "of the number of columns exceeding 1000. Exercise "
+                    "caution when replaying the produced dump file.\n", 
+                    table);
           if (opt_drop)
           {
             /*
@@ -2631,14 +2689,19 @@ static uint get_table_structure(char *table, char *db, char *table_type,
 
           row= mysql_fetch_row(result);
 
-          fprintf(sql_file, "  %s %s", quote_name(row[0], name_buff, 0),
-                  row[1]);
+          /*
+            The actual column type doesn't matter anyway, since the table will
+            be dropped at run time.
+            We do tinyint to avoid hitting the row size limit.
+          */
+          fprintf(sql_file, "  %s tinyint NOT NULL",
+                  quote_name(row[0], name_buff, 0));
 
           while((row= mysql_fetch_row(result)))
           {
             /* col name, col type */
-            fprintf(sql_file, ",\n  %s %s",
-                    quote_name(row[0], name_buff, 0), row[1]);
+            fprintf(sql_file, ",\n  %s tinyint NOT NULL",
+                    quote_name(row[0], name_buff, 0));
           }
 
           /*
@@ -2665,12 +2728,25 @@ static uint get_table_structure(char *table, char *db, char *table_type,
 
       row= mysql_fetch_row(result);
 
-      fprintf(sql_file, (opt_compatible_mode & 3) ? "%s;\n" :
-              "/*!40101 SET @saved_cs_client     = @@character_set_client */;\n"
-              "/*!40101 SET character_set_client = utf8 */;\n"
-              "%s;\n"
-              "/*!40101 SET character_set_client = @saved_cs_client */;\n",
-              row[1]);
+      is_log_table= general_log_or_slow_log_tables(db, table);
+      if (is_log_table)
+        row[1]+= 13; /* strlen("CREATE TABLE ")= 13 */
+      if (opt_compatible_mode & 3)
+      {
+        fprintf(sql_file,
+                is_log_table ? "CREATE TABLE IF NOT EXISTS %s;\n" : "%s;\n",
+                row[1]);
+      }
+      else
+      {
+        fprintf(sql_file,
+                "/*!40101 SET @saved_cs_client     = @@character_set_client */;\n"
+                "/*!40101 SET character_set_client = utf8 */;\n"
+                "%s%s;\n"
+                "/*!40101 SET character_set_client = @saved_cs_client */;\n",
+                is_log_table ? "CREATE TABLE IF NOT EXISTS " : "",
+                row[1]);
+      }
 
       check_io(sql_file);
       mysql_free_result(result);
@@ -3372,18 +3448,6 @@ static void dump_table(char *table, char *db)
   {
     verbose_msg("-- Skipping dump data for table '%s', it has no fields\n",
                 table);
-    DBUG_VOID_RETURN;
-  }
-
-  /*
-     Check --skip-events flag: it is not enough to skip creation of events
-     discarding SHOW CREATE EVENT statements generation. The myslq.event
-     table data should be skipped too.
-  */
-  if (!opt_events && !my_strcasecmp(&my_charset_latin1, db, "mysql") &&
-      !my_strcasecmp(&my_charset_latin1, table, "event"))
-  {
-    verbose_msg("-- Skipping data table mysql.event, --skip-events was used\n");
     DBUG_VOID_RETURN;
   }
 
@@ -4339,6 +4403,22 @@ static int dump_all_tables_in_db(char *database)
   if (opt_xml)
     print_xml_tag(md_result_file, "", "\n", "database", "name=", database, NullS);
 
+  if (strcmp(database, "mysql") == 0)
+  {
+    char table_type[NAME_LEN];
+    char ignore_flag;
+    uint num_fields;
+    num_fields= get_table_structure((char *) "general_log", 
+                                    database, table_type, &ignore_flag);
+    if (num_fields == 0)
+      verbose_msg("-- Warning: get_table_structure() failed with some internal "
+                  "error for 'general_log' table\n");
+    num_fields= get_table_structure((char *) "slow_log", 
+                                    database, table_type, &ignore_flag);
+    if (num_fields == 0)
+      verbose_msg("-- Warning: get_table_structure() failed with some internal "
+                  "error for 'slow_log' table\n");
+  }
   if (lock_tables)
   {
     DYNAMIC_STRING query;
@@ -4743,7 +4823,7 @@ static int add_slave_statements(void)
 
 static int do_show_slave_status(MYSQL *mysql_con)
 {
-  MYSQL_RES *slave;
+  MYSQL_RES *slave= NULL;
   const char *comment_prefix=
     (opt_slave_data == MYSQL_OPT_SLAVE_DATA_COMMENTED_SQL) ? "-- " : "";
   if (mysql_query_with_error_report(mysql_con, &slave, "SHOW SLAVE STATUS"))
@@ -5195,6 +5275,153 @@ static int replace(DYNAMIC_STRING *ds_str,
 }
 
 
+/**
+  This function sets the session binlog in the dump file.
+  When --set-gtid-purged is used, this function is called to
+  disable the session binlog and at the end of the dump, to restore
+  the session binlog.
+
+  @note: md_result_file should have been opened, before
+         this function is called.
+
+  @param[in]      flag          If FALSE, disable binlog.
+                                If TRUE and binlog disabled previously,
+                                restore the session binlog.
+*/
+
+static void set_session_binlog(my_bool flag)
+{
+  static my_bool is_binlog_disabled= FALSE;
+
+  if (!flag && !is_binlog_disabled)
+  {
+    fprintf(md_result_file,
+            "SET @MYSQLDUMP_TEMP_LOG_BIN = @@SESSION.SQL_LOG_BIN;\n");
+    fprintf(md_result_file, "SET @@SESSION.SQL_LOG_BIN= 0;\n");
+    is_binlog_disabled= 1;
+  }
+  else if (flag && is_binlog_disabled)
+  {
+    fprintf(md_result_file,
+            "SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;\n");
+    is_binlog_disabled= 0;
+  }
+}
+
+
+/**
+  This function gets the GTID_EXECUTED sets from the
+  server and assigns those sets to GTID_PURGED in the
+  dump file.
+
+  @param[in]  mysql_con     connection to the server
+
+  @retval     FALSE         succesfully printed GTID_PURGED sets
+                             in the dump file.
+  @retval     TRUE          failed.
+
+*/
+
+static my_bool add_set_gtid_purged(MYSQL *mysql_con)
+{
+  MYSQL_RES  *gtid_purged_res;
+  MYSQL_ROW  gtid_set;
+  ulong     num_sets, idx;
+
+  /* query to get the GTID_EXECUTED */
+  if (mysql_query_with_error_report(mysql_con, &gtid_purged_res,
+                  "SELECT @@GLOBAL.GTID_EXECUTED"))
+    return TRUE;
+
+  /* Proceed only if gtid_purged_res is non empty */
+  if ((num_sets= mysql_num_rows(gtid_purged_res)) > 0)
+  {
+    if (opt_comments)
+      fprintf(md_result_file,
+          "\n--\n--GTID state at the beginning of the backup \n--\n\n");
+
+    fprintf(md_result_file,"SET @@GLOBAL.GTID_PURGED='");
+
+    /* formatting is not required, even for multiple gtid sets */
+    for (idx= 0; idx< num_sets-1; idx++)
+    {
+      gtid_set= mysql_fetch_row(gtid_purged_res);
+      fprintf(md_result_file,"%s,", (char*)gtid_set[0]);
+    }
+    /* for the last set */
+    gtid_set= mysql_fetch_row(gtid_purged_res);
+    /* close the SET expression */
+    fprintf(md_result_file,"%s';\n", (char*)gtid_set[0]);
+  }
+
+  return FALSE;  /*success */
+}
+
+
+/**
+  This function processes the opt_set_gtid_purged option.
+  This function also calls set_session_binlog() function before
+  setting the SET @@GLOBAL.GTID_PURGED in the output.
+
+  @param[in]          mysql_con     the connection to the server
+
+  @retval             FALSE         successful according to the value
+                                    of opt_set_gtid_purged.
+  @retval             TRUE          fail.
+*/
+
+static my_bool process_set_gtid_purged(MYSQL* mysql_con)
+{
+  MYSQL_RES  *gtid_mode_res;
+  MYSQL_ROW  gtid_mode_row;
+  char       *gtid_mode_val= 0;
+
+  if (opt_set_gtid_purged_mode == SET_GTID_PURGED_OFF)
+    return FALSE;  /* nothing to be done */
+
+
+  /* check if gtid_mode is ON or OFF */
+  if (mysql_query_with_error_report(mysql_con, &gtid_mode_res,
+                                    "SELECT @@GTID_MODE"))
+    return TRUE;
+
+  gtid_mode_row = mysql_fetch_row(gtid_mode_res);
+  gtid_mode_val = (char*)gtid_mode_row[0];
+
+  if (gtid_mode_val && strcmp(gtid_mode_val, "OFF"))
+  {
+    /*
+       For any gtid_mode !=OFF and irrespective of --set-gtid-purged
+       being AUTO or ON,  add GTID_PURGED in the output.
+    */
+    if (opt_databases || !opt_alldbs || !opt_dump_triggers
+        || !opt_routines || !opt_events)
+    {
+      fprintf(stderr,"Warning: A partial dump from a server that has GTIDs will "
+                     "by default include the GTIDs of all transactions, even "
+                     "those that changed suppressed parts of the database. If "
+                     "you don't want to restore GTIDs, pass "
+                     "--set-gtid-purged=OFF. To make a complete dump, pass "
+                     "--all-databases --triggers --routines --events. \n");
+    }
+
+    set_session_binlog(FALSE);
+    if (add_set_gtid_purged(mysql_con))
+      return TRUE;
+  }
+  else /* gtid_mode is off */
+  {
+    if (opt_set_gtid_purged_mode == SET_GTID_PURGED_ON)
+    {
+      fprintf(stderr, "Error: Server has GTIDs disabled.\n");
+      return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
+
 /*
   Getting VIEW structure
 
@@ -5524,6 +5751,13 @@ int main(int argc, char **argv)
   /* Add 'STOP SLAVE to beginning of dump */
   if (opt_slave_apply && add_stop_slave())
     goto err;
+
+
+  /* Process opt_set_gtid_purged and add SET @@GLOBAL.GTID_PURGED if required. */
+  if (process_set_gtid_purged(mysql))
+    goto err;
+
+
   if (opt_master_data && do_show_master_status(mysql))
     goto err;
   if (opt_slave_data && do_show_slave_status(mysql))
@@ -5558,6 +5792,12 @@ int main(int argc, char **argv)
   /* if --dump-slave , start the slave sql thread */
   if (opt_slave_data && do_start_slave_sql(mysql))
     goto err;
+
+  /*
+    if --set-gtid-purged, restore binlog at the end of the session
+    if required.
+  */
+  set_session_binlog(TRUE);
 
   /* add 'START SLAVE' to end of dump */
   if (opt_slave_apply && add_slave_statements())

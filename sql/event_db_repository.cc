@@ -406,7 +406,6 @@ Event_db_repository::index_read_for_db_for_i_s(THD *thd, TABLE *schema_table,
                                                TABLE *event_table,
                                                const char *db)
 {
-  int ret=0;
   CHARSET_INFO *scs= system_charset_info;
   KEY *key_info;
   uint key_len;
@@ -416,10 +415,17 @@ Event_db_repository::index_read_for_db_for_i_s(THD *thd, TABLE *schema_table,
   DBUG_ENTER("Event_db_repository::index_read_for_db_for_i_s");
 
   DBUG_PRINT("info", ("Using prefix scanning on PK"));
-  event_table->file->ha_index_init(0, 1);
+
+  int ret= event_table->file->ha_index_init(0, 1);
+  if (ret)
+  {
+    event_table->file->print_error(ret, MYF(0));
+    DBUG_RETURN(true);
+  }
+
   key_info= event_table->key_info;
 
-  if (key_info->key_parts == 0 ||
+  if (key_info->user_defined_key_parts == 0 ||
       key_info->key_part[0].field != event_table->field[ET_FIELD_DB])
   {
     /* Corrupted table: no index or index on a wrong column */
@@ -1187,8 +1193,7 @@ Event_db_repository::check_system_tables(THD *thd)
   {
     if (table_intact.check(tables.table, &mysql_db_table_def))
       ret= 1;
-
-    close_mysql_tables(thd);
+    close_acl_tables(thd);
   }
   /* Check mysql.user */
   tables.init_one_table("mysql", 5, "user", 4, "user", TL_READ);
@@ -1208,7 +1213,7 @@ Event_db_repository::check_system_tables(THD *thd)
                       event_priv_column_position);
       ret= 1;
     }
-    close_mysql_tables(thd);
+    close_acl_tables(thd);
   }
   /* Check mysql.event */
   tables.init_one_table("mysql", 5, "event", 5, "event", TL_READ);

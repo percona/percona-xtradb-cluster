@@ -79,7 +79,7 @@ protected:
   ptrdiff_t offset;     ///< offset to the value from global_system_variables
   on_check_function on_check;
   on_update_function on_update;
-  const char *deprecation_substitute;
+  const char *const deprecation_substitute;
   bool is_os_charset; ///< true if the value is in character_set_filesystem
 
 public:
@@ -105,6 +105,8 @@ public:
   bool check(THD *thd, set_var *var);
   uchar *value_ptr(THD *thd, enum_var_type type, LEX_STRING *base);
   bool set_default(THD *thd, enum_var_type type);
+  virtual void update_default(longlong new_def_value)
+  { option.def_value= new_def_value; }
   bool update(THD *thd, set_var *var);
 
   SHOW_TYPE show_type() { return show_val_type; }
@@ -135,6 +137,7 @@ public:
     return (option.id != -1) && (m_parse_flag & parse_flags) &&
       (array->push_back(option), false);
   }
+  void do_deprecated_warning(THD *thd);
 
 private:
   virtual bool do_check(THD *thd, set_var *var) = 0;
@@ -148,7 +151,6 @@ private:
   virtual void global_save_default(THD *thd, set_var *var) = 0;
   virtual bool session_update(THD *thd, set_var *var) = 0;
   virtual bool global_update(THD *thd, set_var *var) = 0;
-  void do_deprecated_warning(THD *thd);
 protected:
   /**
     A pointer to a value of the variable for SHOW.
@@ -335,6 +337,7 @@ bool sql_mode_string_representation(THD *thd, sql_mode_t sql_mode, LEX_STRING *l
 extern sys_var *Sys_autocommit_ptr;
 extern sys_var *Sys_gtid_next_ptr;
 extern sys_var *Sys_gtid_next_list_ptr;
+extern sys_var *Sys_gtid_purged_ptr;
 
 const CHARSET_INFO *get_old_charset_by_name(const char *old_name);
 

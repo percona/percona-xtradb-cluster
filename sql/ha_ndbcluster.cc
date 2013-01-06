@@ -1,4 +1,4 @@
-/* Copyright (c) 2004, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2004, 2012, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -1943,7 +1943,7 @@ ha_ndbcluster::set_blob_values(const NdbOperation *ndb_op,
     NdbBlob *ndb_blob= ndb_op->getBlobHandle(field_no);
     if (ndb_blob == NULL)
       ERR_RETURN(ndb_op->getNdbError());
-    if (field->is_null_in_record_with_offset(row_offset))
+    if (field->is_real_null(row_offset))
     {
       DBUG_PRINT("info", ("Setting Blob %d to NULL", field_no));
       if (ndb_blob->setNull() != 0)
@@ -2173,13 +2173,10 @@ int ha_ndbcluster::check_default_values(const NDBTAB* ndbtab)
     {
       Field* field= table->field[f]; // Use Field struct from MySQLD table rep
       const NdbDictionary::Column* ndbCol= ndbtab->getColumn(field->field_index); 
-      bool isTimeStampWithAutoValue = ((field->type() == MYSQL_TYPE_TIMESTAMP) &&
-                                       (field->table->get_timestamp_field() == field));
 
       if ((! (field->flags & (PRI_KEY_FLAG |
                               NO_DEFAULT_VALUE_FLAG))) &&
-          (type_supports_default_value(field->real_type())) &&
-          !isTimeStampWithAutoValue)
+          type_supports_default_value(field->real_type()))
       {
         /* We expect Ndb to have a native default for this
          * column
@@ -6117,7 +6114,7 @@ void ha_ndbcluster::unpack_record(uchar *dst_row, const uchar *src_row)
       if (field->type() == MYSQL_TYPE_BIT)
       {
         Field_bit *field_bit= static_cast<Field_bit*>(field);
-        if (!field->is_null_in_record_with_offset(src_offset))
+        if (!field->is_real_null(src_offset))
         {
           field->move_field_offset(src_offset);
           longlong value= field_bit->val_int();
@@ -6208,7 +6205,7 @@ static void get_default_value(void *def_val, Field *field)
       if (field->type() == MYSQL_TYPE_BIT)
       {
         Field_bit *field_bit= static_cast<Field_bit*>(field);
-        if (!field->is_null_in_record_with_offset(src_offset))
+        if (!field->is_real_null(src_offset))
         {
           field->move_field_offset(src_offset);
           longlong value= field_bit->val_int();
@@ -7138,10 +7135,10 @@ int ha_ndbcluster::extra(enum ha_extra_function operation)
 }
 
 
-bool ha_ndbcluster::read_before_write_removal_possible()
+bool ha_ndbcluster::start_read_removal()
 {
   THD *thd= table->in_use;
-  DBUG_ENTER("read_before_write_removal_possible");
+  DBUG_ENTER("start_read_removal");
 
   if (uses_blob_value(table->write_set))
   {
@@ -7188,9 +7185,10 @@ bool ha_ndbcluster::read_before_write_removal_possible()
 }
 
 
-ha_rows ha_ndbcluster::read_before_write_removal_rows_written(void) const
+ha_rows ha_ndbcluster::end_read_removal(void)
 {
-  DBUG_ENTER("read_before_write_removal_rows_written");
+  DBUG_ENTER("end_read_removal");
+  DBUG_ASSERT(m_read_before_write_removal_possible);
   DBUG_PRINT("info", ("updated: %llu, deleted: %llu",
                       m_rows_updated, m_rows_deleted));
   DBUG_RETURN(m_rows_updated + m_rows_deleted);
@@ -7529,7 +7527,7 @@ static void transaction_checks(THD *thd, Thd_ndb *thd_ndb)
 {
   if (thd->lex->sql_command == SQLCOM_LOAD)
     thd_ndb->trans_options|= TNTO_TRANSACTIONS_OFF;
-  else if (!thd->transaction.on)
+  else if (!thd->transaction.flags.enabled)
     thd_ndb->trans_options|= TNTO_TRANSACTIONS_OFF;
   else if (!THDVAR(thd, use_transactions))
     thd_ndb->trans_options|= TNTO_TRANSACTIONS_OFF;
@@ -8575,19 +8573,14 @@ static int create_ndb_column(THD *thd,
 
     if (likely( nativeDefaults ))
     {
-      /* Ndb does not support auto-set Timestamp default values natively */
-      bool isTimeStampWithAutoValue = ((mysql_type == MYSQL_TYPE_TIMESTAMP) &&
-                                       (field->table->get_timestamp_field() == field));
-
       if ((!(field->flags & PRI_KEY_FLAG) ) &&
-          type_supports_default_value(mysql_type) &&
-          !isTimeStampWithAutoValue)
+          type_supports_default_value(mysql_type))
       {
         if (!(field->flags & NO_DEFAULT_VALUE_FLAG))
         {
           my_ptrdiff_t src_offset= field->table->s->default_values 
             - field->table->record[0];
-          if ((! field->is_null_in_record_with_offset(src_offset)) ||
+          if ((! field->is_real_null(src_offset)) ||
               ((field->flags & NOT_NULL_FLAG)))
           {
             /* Set a non-null native default */
@@ -12344,6 +12337,14 @@ ulonglong ha_ndbcluster::table_flags(void) const
   */
   if (thd->variables.binlog_format == BINLOG_FORMAT_STMT)
     f= (f | HA_BINLOG_STMT_CAPABLE) & ~HA_HAS_OWN_BINLOGGING;
+
+  /**
+   * To maximize join pushability we want const-table 
+   * optimization blocked if 'ndb_join_pushdown= on'
+   */
+  if (THDVAR(thd, join_pushdown))
+    f= f | HA_BLOCK_CONST_TABLE;
+
   return f;
 }
 
@@ -12399,24 +12400,33 @@ uint8 ha_ndbcluster::table_cache_type()
   DBUG_RETURN(HA_CACHE_TBL_ASKTRANSACT);
 }
 
+/**
+   Retrieve the commit count for the table object.
 
-uint ndb_get_commitcount(THD *thd, char *dbname, char *tabname,
+   @param thd              Thread context.
+   @param norm_name        Normalized path to the table.
+   @param[out] commit_count Commit count for the table.
+
+   @return 0 on success.
+   @return 1 if an error occured.
+*/
+
+uint ndb_get_commitcount(THD *thd, char *norm_name,
                          Uint64 *commit_count)
 {
-  char name[FN_REFLEN + 1];
+  char dbname[NAME_LEN + 1];
   NDB_SHARE *share;
   DBUG_ENTER("ndb_get_commitcount");
 
-  build_table_filename(name, sizeof(name) - 1,
-                       dbname, tabname, "", 0);
-  DBUG_PRINT("enter", ("name: %s", name));
+  DBUG_PRINT("enter", ("name: %s", norm_name));
   pthread_mutex_lock(&ndbcluster_mutex);
   if (!(share=(NDB_SHARE*) my_hash_search(&ndbcluster_open_tables,
-                                          (const uchar*) name,
-                                          strlen(name))))
+                                          (const uchar*) norm_name,
+                                          strlen(norm_name))))
   {
     pthread_mutex_unlock(&ndbcluster_mutex);
-    DBUG_PRINT("info", ("Table %s not found in ndbcluster_open_tables", name));
+    DBUG_PRINT("info", ("Table %s not found in ndbcluster_open_tables",
+                         norm_name));
     DBUG_RETURN(1);
   }
   /* ndb_share reference temporary, free below */
@@ -12448,6 +12458,8 @@ uint ndb_get_commitcount(THD *thd, char *dbname, char *tabname,
   Ndb *ndb;
   if (!(ndb= check_ndb_in_thd(thd)))
     DBUG_RETURN(1);
+
+  ha_ndbcluster::set_dbname(norm_name, dbname);
   if (ndb->setDatabaseName(dbname))
   {
     ERR_RETURN(ndb->getNdbError());
@@ -12457,7 +12469,9 @@ uint ndb_get_commitcount(THD *thd, char *dbname, char *tabname,
 
   struct Ndb_statistics stat;
   {
-    Ndb_table_guard ndbtab_g(ndb->getDictionary(), tabname);
+    char tblname[NAME_LEN + 1];
+    ha_ndbcluster::set_tabname(norm_name, tblname);
+    Ndb_table_guard ndbtab_g(ndb->getDictionary(), tblname);
     if (ndbtab_g.get_table() == 0
         || ndb_get_table_statistics(thd, NULL, 
                                     FALSE, 
@@ -12511,10 +12525,9 @@ uint ndb_get_commitcount(THD *thd, char *dbname, char *tabname,
 
 
   @param thd            thread handle
-  @param full_name      concatenation of database name,
-                        the null character '\\0', and the table name
-  @param full_name_len  length of the full name,
-                        i.e. len(dbname) + len(tablename) + 1
+  @param full_name      normalized path to the table in the canonical
+                        format.
+  @param full_name_len  length of the normalized path to the table.
   @param engine_data    parameter retrieved when query was first inserted into
                         the cache. If the value of engine_data is changed,
                         all queries for this table should be invalidated.
@@ -12533,11 +12546,15 @@ ndbcluster_cache_retrieval_allowed(THD *thd,
                                    ulonglong *engine_data)
 {
   Uint64 commit_count;
-  char *dbname= full_name;
-  char *tabname= dbname+strlen(dbname)+1;
+  char dbname[NAME_LEN + 1];
+  char tabname[NAME_LEN + 1];
 #ifndef DBUG_OFF
   char buff[22], buff2[22];
 #endif
+
+  ha_ndbcluster::set_dbname(full_name, dbname);
+  ha_ndbcluster::set_tabname(full_name, tabname);
+
   DBUG_ENTER("ndbcluster_cache_retrieval_allowed");
   DBUG_PRINT("enter", ("dbname: %s, tabname: %s",
                        dbname, tabname));
@@ -12565,7 +12582,7 @@ ndbcluster_cache_retrieval_allowed(THD *thd,
     }
   }
 
-  if (ndb_get_commitcount(thd, dbname, tabname, &commit_count))
+  if (ndb_get_commitcount(thd, full_name, &commit_count))
   {
     *engine_data= 0; /* invalidate */
     DBUG_PRINT("exit", ("No, could not retrieve commit_count"));
@@ -12600,10 +12617,9 @@ ndbcluster_cache_retrieval_allowed(THD *thd,
   the cached query is reused.
 
   @param thd            thread handle
-  @param full_name      concatenation of database name,
-                        the null character '\\0', and the table name
-  @param full_name_len  length of the full name,
-                        i.e. len(dbname) + len(tablename) + 1
+  @param full_name      normalized path to the table in the 
+                        canonical format.
+  @param full_name_len  length of the normalized path to the table.
   @param engine_callback  function to be called before using cache on
                           this table
   @param[out] engine_data    commit_count for this table
@@ -12649,7 +12665,7 @@ ha_ndbcluster::register_query_cache_table(THD *thd,
     }
   }
 
-  if (ndb_get_commitcount(thd, m_dbname, m_tabname, &commit_count))
+  if (ndb_get_commitcount(thd, full_name, &commit_count))
   {
     *engine_data= 0;
     DBUG_PRINT("exit", ("Error, could not get commitcount"));
@@ -14502,97 +14518,6 @@ ha_ndbcluster::parent_of_pushed_join() const
   }
   return NULL;
 }
-
-bool
-ha_ndbcluster::test_push_flag(enum ha_push_flag flag) const
-{
-  DBUG_ENTER("test_push_flag");
-  switch (flag) {
-  case HA_PUSH_BLOCK_CONST_TABLE:
-  {
-    /**
-     * We don't support join push down if...
-     *   - not LM_CommittedRead
-     *   - uses blobs
-     */
-    THD *thd= current_thd;
-    if (unlikely(!THDVAR(thd, join_pushdown)))
-      DBUG_RETURN(false);
-
-    if (table->read_set != NULL && uses_blob_value(table->read_set))
-    {
-      DBUG_RETURN(false);
-    }
-
-    NdbOperation::LockMode lm= get_ndb_lock_mode(m_lock.type);
-
-    if (lm != NdbOperation::LM_CommittedRead)
-    {
-      DBUG_RETURN(false);
-    }
-
-    DBUG_RETURN(true);
-  }
-  case HA_PUSH_MULTIPLE_DEPENDENCY:
-    /**
-     * If any child operation within this pushed join refer 
-     * column values (paramValues), the pushed join has dependencies
-     * in addition to the root operation itself.
-     */
-    if (m_pushed_join_operation==PUSHED_ROOT &&
-        m_pushed_join_member->get_field_referrences_count() > 0)  // Childs has field refs
-    {
-      DBUG_RETURN(true);
-    }
-    DBUG_RETURN(false);
-
-  case HA_PUSH_NO_ORDERED_INDEX:
-  {
-    if (m_pushed_join_operation != PUSHED_ROOT)
-    {
-      DBUG_RETURN(true);
-    }
-    const NdbQueryDef& query_def = m_pushed_join_member->get_query_def();
-    const NdbQueryOperationDef::Type root_type=
-      query_def.getQueryOperation((uint)PUSHED_ROOT)->getType();
-
-    /**
-     * Primary key/ unique key lookup is always 'ordered' wrt. itself.
-     */
-    if (root_type == NdbQueryOperationDef::PrimaryKeyAccess  ||
-        root_type == NdbQueryOperationDef::UniqueIndexAccess)
-    {
-      DBUG_RETURN(false);
-    }
-
-    /**
-     * Ordered index scan can be provided as an ordered resultset iff
-     * it has no child scans.
-     */
-    if (root_type == NdbQueryOperationDef::OrderedIndexScan)
-    {
-      for (uint i= 1; i < query_def.getNoOfOperations(); i++)
-      {
-        const NdbQueryOperationDef::Type child_type=
-          query_def.getQueryOperation(i)->getType();
-        if (child_type == NdbQueryOperationDef::TableScan ||
-            child_type == NdbQueryOperationDef::OrderedIndexScan)
-        {
-          DBUG_RETURN(true);
-        }
-      }
-      DBUG_RETURN(false);
-    }
-    DBUG_RETURN(true);
-  }
-
-  default:
-    DBUG_ASSERT(0);
-    DBUG_RETURN(false);
-  }
-  DBUG_RETURN(false);
-}
-
 
 /**
   @param[in] comment  table comment defined by user

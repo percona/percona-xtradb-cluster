@@ -17,7 +17,7 @@
 #include "my_config.h"
 #include <gtest/gtest.h>
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && __GNUC__ > 3
 #include <tr1/unordered_map>
 #elif defined(__WIN__)
 #include <hash_map>
@@ -31,7 +31,7 @@
 template<typename K, typename T>
 struct MyHashMap
 {
-#if defined(__GNUC__)
+#if defined(__GNUC__) && __GNUC__ > 3
   typedef std::tr1::unordered_map<K, T> Type;
 #elif defined(__WIN__)
   typedef stdext::hash_map<K, T> Type;
@@ -53,52 +53,3 @@ TEST(STDfeatures, HashMap)
   EXPECT_TRUE(0 == intmap.count(42));
   EXPECT_TRUE(intmap.end() == intmap.find(42));
 }
-
-#if defined(TARGET_OS_LINUX)
-
-#include <malloc.h>
-
-namespace {
-
-void *nop_malloc_hook(size_t size, const void *caller)
-{
-  return NULL;
-}
-
-TEST(StdCxxNoThrow, NoThrow)
-{
-  typeof(__malloc_hook) old_malloc_hook= __malloc_hook;
-
-  __malloc_hook= nop_malloc_hook;
-
-  const int *pnull= NULL;
-  int *ptr= new (std::nothrow) int;
-  __malloc_hook= old_malloc_hook;
-
-  EXPECT_EQ(pnull, ptr);
-}
-
-TEST(StdCxxExceptionInNew, NewThrowsException)
-{
-  typeof(__malloc_hook) old_malloc_hook= __malloc_hook;
-
-  __malloc_hook= nop_malloc_hook;
-
-  bool thrown= false;
-  try
-  {
-    int *ptr= new int;
-    *ptr= 0;
-  }
-  catch (std::bad_alloc &e)
-  {
-    thrown= true;
-  }
-  __malloc_hook= old_malloc_hook;
-
-  EXPECT_TRUE(thrown);
-}
-
-}
-
-#endif // TARGET_OS_LINUX

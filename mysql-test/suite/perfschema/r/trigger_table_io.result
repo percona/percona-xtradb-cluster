@@ -145,8 +145,6 @@ wait/io/table/sql/handler	handler.cc:	TABLE	test	t2	insert	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	marker	insert	NULL
-wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
-wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	marker	insert	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t2	fetch	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t2	fetch	NULL
@@ -162,9 +160,6 @@ wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	delete	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t2	insert	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	marker	insert	NULL
-wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
-wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
-wait/io/table/sql/handler	handler.cc:	TABLE	test	t1	fetch	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	marker	insert	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t2	fetch	NULL
 wait/io/table/sql/handler	handler.cc:	TABLE	test	t2	fetch	NULL
@@ -184,6 +179,7 @@ Performance_schema_mutex_classes_lost	0
 Performance_schema_mutex_instances_lost	0
 Performance_schema_rwlock_classes_lost	0
 Performance_schema_rwlock_instances_lost	0
+Performance_schema_session_connect_attrs_lost	0
 Performance_schema_socket_classes_lost	0
 Performance_schema_socket_instances_lost	0
 Performance_schema_stage_classes_lost	0

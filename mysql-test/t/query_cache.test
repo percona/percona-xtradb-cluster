@@ -1,3 +1,5 @@
+#Want to skip this test from daily Valgrind execution
+--source include/no_valgrind_without_big.inc
 -- source include/have_query_cache.inc
 
 #
@@ -1236,7 +1238,7 @@ show status like 'Qcache_free_blocks';
  drop database db2;
  drop database db3;
 
-set GLOBAL query_cache_type=default;
+set GLOBAL query_cache_type=1;
 set GLOBAL query_cache_limit=default;
 set GLOBAL query_cache_min_res_unit=default;
 set GLOBAL query_cache_size=default;

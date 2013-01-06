@@ -1,7 +1,7 @@
 #ifndef ITEM_STRFUNC_INCLUDED
 #define ITEM_STRFUNC_INCLUDED
 
-/* Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 
 /* This file defines all string functions */
+#include "crypt_genhash_impl.h"
 
 class MY_LOCALE;
 
@@ -67,10 +68,14 @@ class Item_str_ascii_func :public Item_str_func
 {
   String ascii_buf;
 public:
-  Item_str_ascii_func() :Item_str_func() {}
-  Item_str_ascii_func(Item *a) :Item_str_func(a) {}
-  Item_str_ascii_func(Item *a,Item *b) :Item_str_func(a,b) {}
-  Item_str_ascii_func(Item *a,Item *b,Item *c) :Item_str_func(a,b,c) {}
+  Item_str_ascii_func() :Item_str_func()
+  { collation.set_repertoire(MY_REPERTOIRE_ASCII); }
+  Item_str_ascii_func(Item *a) :Item_str_func(a)
+  { collation.set_repertoire(MY_REPERTOIRE_ASCII); }
+  Item_str_ascii_func(Item *a,Item *b) :Item_str_func(a,b)
+  { collation.set_repertoire(MY_REPERTOIRE_ASCII); }
+  Item_str_ascii_func(Item *a,Item *b,Item *c) :Item_str_func(a,b,c)
+  { collation.set_repertoire(MY_REPERTOIRE_ASCII); }
   String *val_str(String *str)
   {
     return val_str_from_val_str_ascii(str, &ascii_buf);
@@ -327,16 +332,20 @@ public:
 
 class Item_func_password :public Item_str_ascii_func
 {
-  char tmp_value[SCRAMBLED_PASSWORD_CHAR_LENGTH+1]; 
+  char m_hashed_password_buffer[CRYPT_MAX_PASSWORD_SIZE + 1];
+  unsigned int m_hashed_password_buffer_len;
+  bool m_recalculate_password;
 public:
-  Item_func_password(Item *a) :Item_str_ascii_func(a) {}
-  String *val_str_ascii(String *str);
-  void fix_length_and_dec()
+  Item_func_password(Item *a) : Item_str_ascii_func(a)
   {
-    fix_length_and_charset(SCRAMBLED_PASSWORD_CHAR_LENGTH, default_charset());
+    m_hashed_password_buffer_len= 0;
+    m_recalculate_password= false;
   }
+  String *val_str_ascii(String *str);
+  void fix_length_and_dec();
   const char *func_name() const { return "password"; }
-  static char *alloc(THD *thd, const char *password, size_t pass_len);
+  static char *create_password_hash_buffer(THD *thd, const char *password,
+                                           size_t pass_len);
 };
 
 
@@ -464,7 +473,7 @@ public:
     safe_charset_converter, return string representation of this function
     call
   */
-  virtual const NameString fully_qualified_func_name() const = 0;
+  virtual const Name_string fully_qualified_func_name() const = 0;
 };
 
 
@@ -479,7 +488,7 @@ public:
     maybe_null=1;
   }
   const char *func_name() const { return "database"; }
-  const NameString fully_qualified_func_name() const
+  const Name_string fully_qualified_func_name() const
   { return NAME_STRING("database()"); }
 };
 
@@ -506,9 +515,9 @@ public:
                  (HOSTNAME_LENGTH + 1) * SYSTEM_CHARSET_MBMAXLEN);
   }
   const char *func_name() const { return "user"; }
-  const NameString fully_qualified_func_name() const
+  const Name_string fully_qualified_func_name() const
   { return NAME_STRING("user()"); }
-  int save_in_field(Field *field, bool no_conversions)
+  type_conversion_status save_in_field(Field *field, bool no_conversions)
   {
     return save_str_value_in_field(field, &str_value);
   }
@@ -524,7 +533,7 @@ public:
     : context(context_arg) {}
   bool fix_fields(THD *thd, Item **ref);
   const char *func_name() const { return "current_user"; }
-  const NameString fully_qualified_func_name() const
+  const Name_string fully_qualified_func_name() const
   { return NAME_STRING("current_user()"); }
 };
 
@@ -892,10 +901,10 @@ public:
   const char *func_name() const { return "collate"; }
   enum Functype functype() const { return COLLATE_FUNC; }
   virtual void print(String *str, enum_query_type query_type);
-  Item_field *filed_for_view_update()
+  Item_field *field_for_view_update()
   {
     /* this function is transparent for view updating */
-    return args[0]->filed_for_view_update();
+    return args[0]->field_for_view_update();
   }
 };
 

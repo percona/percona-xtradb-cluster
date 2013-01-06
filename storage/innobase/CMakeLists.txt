@@ -54,6 +54,8 @@ SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DUNIV_DEBUG -DUNIV_SYNC_DEB
 #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wconversion")
 #ENDIF()
 
+CHECK_FUNCTION_EXISTS(sched_getcpu  HAVE_SCHED_GETCPU)
+
 IF(NOT MSVC)
 # either define HAVE_IB_GCC_ATOMIC_BUILTINS or not
 IF(NOT CMAKE_CROSSCOMPILING)
@@ -152,6 +154,9 @@ IF(HAVE_IB_ATOMIC_PTHREAD_T_GCC)
 ENDIF()
 
 ENDIF(NOT MSVC)
+
+CHECK_FUNCTION_EXISTS(asprintf  HAVE_ASPRINTF)
+CHECK_FUNCTION_EXISTS(vasprintf  HAVE_VASPRINTF)
 
 # Solaris atomics
 IF(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
@@ -271,6 +276,7 @@ SET(INNOBASE_SOURCES
 	dict/dict0load.cc
 	dict/dict0mem.cc
 	dict/dict0stats.cc
+	dict/dict0stats_bg.cc
 	dyn/dyn0dyn.cc
 	eval/eval0eval.cc
 	eval/eval0proc.cc
@@ -322,6 +328,7 @@ SET(INNOBASE_SOURCES
 	rem/rem0rec.cc
 	row/row0ext.cc
 	row/row0ftsort.cc
+	row/row0import.cc
 	row/row0ins.cc
 	row/row0merge.cc
 	row/row0mysql.cc
@@ -333,6 +340,7 @@ SET(INNOBASE_SOURCES
 	row/row0umod.cc
 	row/row0undo.cc
 	row/row0upd.cc
+	row/row0quiesce.cc
 	row/row0vers.cc
 	srv/srv0conc.cc
 	srv/srv0mon.cc

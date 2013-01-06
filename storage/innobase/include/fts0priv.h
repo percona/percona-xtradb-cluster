@@ -535,14 +535,7 @@ fts_wait_for_background_thread_to_start(
 	ulint		max_wait);	/*!< in: time in microseconds, if set
 					to 0 then it disables timeout
 					checking */
-/*********************************************************************//**
-Get the total number of documents in the FTS.
-@return estimated number of rows in the table */
-UNIV_INTERN
-ib_int64_t
-fts_get_total_document_count(
-/*=========================*/
-	dict_table_t*	table);		/*!< in: table instance */
+#ifdef FTS_DOC_STATS_DEBUG
 /******************************************************************//**
 Get the total number of words in the FTS for a particular FTS index.
 @return DB_SUCCESS or error code */
@@ -554,6 +547,7 @@ fts_get_total_word_count(
 	dict_index_t*	index,		/*!< in: for this index */
 	ulint*		total)		/*!< out: total words */
 	__attribute__((nonnull, warn_unused_result));
+#endif
 /******************************************************************//**
 Search the index specific cache for a particular FTS index.
 @return the index specific cache else NULL */

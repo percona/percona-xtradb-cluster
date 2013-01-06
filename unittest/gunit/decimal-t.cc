@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ typedef decimal_digit_t dec1;
 
 int full= 0;
 decimal_t a, b, c;
-decimal_digit_t buf1[25], buf2[25], buf3[25];
+decimal_digit_t buf1[50], buf2[50], buf3[50];
 
 void dump_decimal(decimal_t *d)
 {
@@ -420,8 +420,10 @@ void do_test_pr(const char *s1, int prec, int dec, char filler,
   int slen= sizeof(s2);
   int res;
 
-  sprintf(s, filler ? "'%s', %d, %d, '%c'" : "'%s', %d, %d, '\\0'",
-          s1, prec, dec, filler);
+  if (filler)
+    sprintf(s, "'%s', %d, %d, '%c'", s1, prec, dec, filler);
+  else
+    sprintf(s, "'%s', %d, %d, '\\0'", s1, prec, dec);
   end= strend(s1);
   string2decimal(s1, &a, &end);
   res= decimal2string(&a, s2, &slen, prec, dec, filler);

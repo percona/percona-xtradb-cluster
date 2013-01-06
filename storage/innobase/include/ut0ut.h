@@ -345,7 +345,7 @@ ut_print_filename(
 
 #ifndef UNIV_HOTBACKUP
 /* Forward declaration of transaction handle */
-struct trx_struct;
+struct trx_t;
 
 /**********************************************************************//**
 Outputs a fixed-length string, quoted as an SQL identifier.
@@ -357,7 +357,7 @@ void
 ut_print_name(
 /*==========*/
 	FILE*		f,	/*!< in: output stream */
-	struct trx_struct*trx,	/*!< in: transaction */
+	const trx_t*	trx,	/*!< in: transaction */
 	ibool		table_id,/*!< in: TRUE=print a table name,
 				FALSE=print other identifier */
 	const char*	name);	/*!< in: name to print */
@@ -372,11 +372,29 @@ void
 ut_print_namel(
 /*===========*/
 	FILE*		f,	/*!< in: output stream */
-	struct trx_struct*trx,	/*!< in: transaction (NULL=no quotes) */
+	const trx_t*	trx,	/*!< in: transaction (NULL=no quotes) */
 	ibool		table_id,/*!< in: TRUE=print a table name,
 				FALSE=print other identifier */
 	const char*	name,	/*!< in: name to print */
 	ulint		namelen);/*!< in: length of name */
+
+/**********************************************************************//**
+Formats a table or index name, quoted as an SQL identifier. If the name
+contains a slash '/', the result will contain two identifiers separated by
+a period (.), as in SQL database_name.identifier.
+@return pointer to 'formatted' */
+UNIV_INTERN
+char*
+ut_format_name(
+/*===========*/
+	const char*	name,		/*!< in: table or index name, must be
+					'\0'-terminated */
+	ibool		is_table,	/*!< in: if TRUE then 'name' is a table
+					name */
+	char*		formatted,	/*!< out: formatted result, will be
+					'\0'-terminated */
+	ulint		formatted_size);/*!< out: no more than this number of
+					bytes will be written to 'formatted' */
 
 /**********************************************************************//**
 Catenate files. */

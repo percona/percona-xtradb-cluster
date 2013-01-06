@@ -259,7 +259,7 @@ int init_io_cache(IO_CACHE *info, File file, size_t cachesize,
   else
   {
     /* Clear mutex so that safe_mutex will notice that it's not initialized */
-    memset(&info->append_buffer_lock, 0, sizeof(info));
+    memset(&info->append_buffer_lock, 0, sizeof(info->append_buffer_lock));
   }
 #endif
 
@@ -1535,8 +1535,13 @@ int _my_b_get(IO_CACHE *info)
 int _my_b_write(register IO_CACHE *info, const uchar *Buffer, size_t Count)
 {
   size_t rest_length,length;
+  my_off_t pos_in_file= info->pos_in_file;
 
-  if (info->pos_in_file+info->buffer_length > info->end_of_file)
+  DBUG_EXECUTE_IF("simulate_huge_load_data_file",
+                  {
+                    pos_in_file=(my_off_t)(5000000000ULL);
+                  });
+  if (pos_in_file+info->buffer_length > info->end_of_file)
   {
     my_errno=errno=EFBIG;
     return info->error = -1;

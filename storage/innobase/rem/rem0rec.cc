@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2011, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2012, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -29,6 +29,7 @@ Created 5/30/1994 Heikki Tuuri
 #include "rem0rec.ic"
 #endif
 
+#include "page0page.h"
 #include "mtr0mtr.h"
 #include "mtr0log.h"
 #include "fts0fts.h"
@@ -165,9 +166,9 @@ UNIV_INTERN
 ulint
 rec_get_n_extern_new(
 /*=================*/
-	const rec_t*	rec,	/*!< in: compact physical record */
-	dict_index_t*	index,	/*!< in: record descriptor */
-	ulint		n)	/*!< in: number of columns to scan */
+	const rec_t*		rec,	/*!< in: compact physical record */
+	const dict_index_t*	index,	/*!< in: record descriptor */
+	ulint			n)	/*!< in: number of columns to scan */
 {
 	const byte*	nulls;
 	const byte*	lens;
@@ -254,14 +255,13 @@ rec_init_offsets_comp_ordinary(
 					the data payload
 					(usually REC_N_NEW_EXTRA_BYTES) */
 	const dict_index_t*	index,	/*!< in: record descriptor */
-	ulint			n_null,	/*!< in: number of fields that
-					can be NULL */
 	ulint*			offsets)/*!< in/out: array of offsets;
 					in: n=rec_offs_n_fields(offsets) */
 {
 	ulint		i		= 0;
 	ulint		offs		= 0;
 	ulint		any_ext		= 0;
+	ulint		n_null		= index->n_nullable;
 	const byte*	nulls		= rec - (extra + 1);
 	const byte*	lens		= nulls - UT_BITS_IN_BYTES(n_null);
 	dict_field_t*	field;
@@ -274,7 +274,6 @@ rec_init_offsets_comp_ordinary(
 	offsets[2] = (ulint) rec;
 	offsets[3] = (ulint) index;
 #endif /* UNIV_DEBUG */
-	ut_ad(n_null >= index->n_nullable);
 
 	/* read the lengths of fields 0..n */
 	do {
@@ -284,6 +283,7 @@ rec_init_offsets_comp_ordinary(
 		if (!(dict_field_get_col(field)->prtype
 		      & DATA_NOT_NULL)) {
 			/* nullable field => read the null flag */
+			ut_ad(n_null--);
 
 			if (UNIV_UNLIKELY(!(byte) null_mask)) {
 				nulls--;
@@ -400,8 +400,7 @@ rec_init_offsets(
 			break;
 		case REC_STATUS_ORDINARY:
 			rec_init_offsets_comp_ordinary(
-				rec, REC_N_NEW_EXTRA_BYTES,
-				index, index->n_nullable, offsets);
+				rec, REC_N_NEW_EXTRA_BYTES, index, offsets);
 			return;
 		}
 
@@ -789,18 +788,14 @@ rec_get_converted_size_comp_prefix(
 					it does not */
 	const dfield_t*		fields,	/*!< in: array of data fields */
 	ulint			n_fields,/*!< in: number of data fields */
-	ulint			n_null,	/*!< in: number of fields that
-					can be NULL */
 	ulint*			extra)	/*!< out: extra size */
 {
 	ulint	extra_size;
 	ulint	data_size;
 	ulint	i;
-	ut_ad(index);
-	ut_ad(fields);
+	ulint	n_null	= index->n_nullable;
 	ut_ad(n_fields > 0);
 	ut_ad(n_fields <= dict_index_get_n_fields(index));
-	ut_ad(n_null >= index->n_nullable);
 
 	extra_size = REC_N_NEW_EXTRA_BYTES + UT_BITS_IN_BYTES(n_null);
 	data_size = 0;
@@ -817,6 +812,8 @@ rec_get_converted_size_comp_prefix(
 
 		ut_ad(dict_col_type_assert_equal(col,
 						 dfield_get_type(&fields[i])));
+		/* All NULLable fields must be included in the n_null count. */
+		ut_ad((col->prtype & DATA_NOT_NULL) || n_null--);
 
 		if (dfield_is_null(&fields[i])) {
 			/* No length is stored for NULL fields. */
@@ -876,15 +873,10 @@ rec_get_converted_size_comp(
 	ulint			status,	/*!< in: status bits of the record */
 	const dfield_t*		fields,	/*!< in: array of data fields */
 	ulint			n_fields,/*!< in: number of data fields */
-	ulint			n_null,	/*!< in: number of fields that
-					can be NULL */
 	ulint*			extra)	/*!< out: extra size */
 {
 	ulint	size;
-	ut_ad(index);
-	ut_ad(fields);
 	ut_ad(n_fields > 0);
-	ut_ad(n_null >= index->n_nullable);
 
 	switch (UNIV_EXPECT(status, REC_STATUS_ORDINARY)) {
 	case REC_STATUS_ORDINARY:
@@ -910,7 +902,7 @@ rec_get_converted_size_comp(
 	}
 
 	return(size + rec_get_converted_size_comp_prefix(
-		       index, fields, n_fields, n_null, extra));
+		       index, fields, n_fields, extra));
 }
 
 /***********************************************************//**
@@ -1099,9 +1091,7 @@ rec_convert_dtuple_to_rec_comp(
 	const dict_index_t*	index,	/*!< in: record descriptor */
 	ulint			status,	/*!< in: status bits of the record */
 	const dfield_t*		fields,	/*!< in: array of data fields */
-	ulint			n_fields,/*!< in: number of data fields */
-	ulint			n_null)	/*!< in: number of fields that
-					can be NULL */
+	ulint			n_fields)/*!< in: number of data fields */
 {
 	const dfield_t*	field;
 	const dtype_t*	type;
@@ -1113,10 +1103,11 @@ rec_convert_dtuple_to_rec_comp(
 	ulint		n_node_ptr_field;
 	ulint		fixed_len;
 	ulint		null_mask	= 1;
+	ulint		n_null;
+
 	ut_ad(extra == 0 || dict_table_is_comp(index->table));
 	ut_ad(extra == 0 || extra == REC_N_NEW_EXTRA_BYTES);
 	ut_ad(n_fields > 0);
-	ut_ad(n_null >= index->n_nullable);
 
 	switch (UNIV_EXPECT(status, REC_STATUS_ORDINARY)) {
 	case REC_STATUS_ORDINARY:
@@ -1139,6 +1130,7 @@ rec_convert_dtuple_to_rec_comp(
 
 	end = rec;
 	nulls = rec - (extra + 1);
+	n_null = index->n_nullable;
 	lens = nulls - UT_BITS_IN_BYTES(n_null);
 	/* clear the SQL-null flags */
 	memset(lens + 1, 0, nulls - lens);
@@ -1161,7 +1153,7 @@ rec_convert_dtuple_to_rec_comp(
 
 		if (!(dtype_get_prtype(type) & DATA_NOT_NULL)) {
 			/* nullable field */
-			ut_ad(index->n_nullable > 0);
+			ut_ad(n_null--);
 
 			if (UNIV_UNLIKELY(!(byte) null_mask)) {
 				nulls--;
@@ -1240,14 +1232,13 @@ rec_convert_dtuple_to_rec_new(
 	rec_t*	rec;
 
 	status = dtuple_get_info_bits(dtuple) & REC_NEW_STATUS_MASK;
-	rec_get_converted_size_comp(index, status,
-				    dtuple->fields, dtuple->n_fields,
-				    index->n_nullable, &extra_size);
+	rec_get_converted_size_comp(
+		index, status, dtuple->fields, dtuple->n_fields, &extra_size);
 	rec = buf + extra_size;
 
 	rec_convert_dtuple_to_rec_comp(
 		rec, REC_N_NEW_EXTRA_BYTES, index, status,
-		dtuple->fields, dtuple->n_fields, index->n_nullable);
+		dtuple->fields, dtuple->n_fields);
 
 	/* Set the info bits of the record */
 	rec_set_info_and_status_bits(rec, dtuple_get_info_bits(dtuple));
@@ -1795,6 +1786,49 @@ rec_print(
 		}
 	}
 }
+
+# ifdef UNIV_DEBUG
+/************************************************************//**
+Reads the DB_TRX_ID of a clustered index record.
+@return	the value of DB_TRX_ID */
+UNIV_INTERN
+trx_id_t
+rec_get_trx_id(
+/*===========*/
+	const rec_t*		rec,	/*!< in: record */
+	const dict_index_t*	index)	/*!< in: clustered index */
+{
+	const page_t*	page
+		= page_align(rec);
+	ulint		trx_id_col
+		= dict_index_get_sys_col_pos(index, DATA_TRX_ID);
+	const byte*	trx_id;
+	ulint		len;
+	mem_heap_t*	heap		= NULL;
+	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
+	ulint*		offsets		= offsets_;
+	rec_offs_init(offsets_);
+
+	ut_ad(fil_page_get_type(page) == FIL_PAGE_INDEX);
+	ut_ad(mach_read_from_8(page + PAGE_HEADER + PAGE_INDEX_ID)
+	      == index->id);
+	ut_ad(dict_index_is_clust(index));
+	ut_ad(trx_id_col > 0);
+	ut_ad(trx_id_col != ULINT_UNDEFINED);
+
+	offsets = rec_get_offsets(rec, index, offsets, trx_id_col + 1, &heap);
+
+	trx_id = rec_get_nth_field(rec, offsets, trx_id_col, &len);
+
+	ut_ad(len == DATA_TRX_ID_LEN);
+
+	if (heap) {
+		mem_heap_free(heap);
+	}
+
+	return(trx_read_trx_id(trx_id));
+}
+# endif /* UNIV_DEBUG */
 #endif /* !UNIV_HOTBACKUP */
 #ifdef WITH_WSREP
 dberr_t

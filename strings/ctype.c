@@ -51,6 +51,8 @@
 #define my_snprintf "We cannot use my_snprintf in this file"
 
 
+int (*my_string_stack_guard)(int)= NULL;
+
 static char *mstr(char *str,const char *src,size_t l1,size_t l2)
 {
   l1= l1<l2 ? l1 : l2;
@@ -579,8 +581,9 @@ static int cs_value(MY_XML_PARSER *st,const char *attr, size_t len)
 {
   struct my_cs_file_info *i= (struct my_cs_file_info *)st->user_data;
   struct my_cs_file_section_st *s;
-  int    state= (int)((s=cs_file_sec(st->attr, strlen(st->attr))) ? s->state :
-                      0);
+  int    state= (int)((s= cs_file_sec(st->attr.start,
+                                      st->attr.end - st->attr.start)) ?
+                      s->state : 0);
   int rc= MY_XML_OK;
 
   switch (state) {

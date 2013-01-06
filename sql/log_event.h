@@ -43,6 +43,8 @@
 #include "rpl_record.h"
 #include "rpl_reporting.h"
 #include "sql_class.h"                          /* THD */
+#include "rpl_utility.h"                        /* Hash_slave_rows */
+#include "rpl_filter.h"
 #endif
 
 /* Forward declarations */
@@ -63,8 +65,6 @@ typedef struct st_db_worker_hash_entry db_worker_hash_entry;
                        characters)
 */
 #define TEMP_FILE_MAX_LEN UUID_LENGTH+38 
-
-#define LONG_FIND_ROW_THRESHOLD 60 /* seconds */
 
 /**
    Either assert or return an error.
@@ -262,14 +262,14 @@ struct sql_ex_info
 #define FORMAT_DESCRIPTION_HEADER_LEN (START_V3_HEADER_LEN+1+LOG_EVENT_TYPES)
 #define XID_HEADER_LEN         0
 #define BEGIN_LOAD_QUERY_HEADER_LEN APPEND_BLOCK_HEADER_LEN
-#define ROWS_HEADER_LEN        8
+#define ROWS_HEADER_LEN_V1     8
 #define TABLE_MAP_HEADER_LEN   8
 #define EXECUTE_LOAD_QUERY_EXTRA_HEADER_LEN (4 + 4 + 4 + 1)
 #define EXECUTE_LOAD_QUERY_HEADER_LEN  (QUERY_HEADER_LEN + EXECUTE_LOAD_QUERY_EXTRA_HEADER_LEN)
 #define INCIDENT_HEADER_LEN    2
 #define HEARTBEAT_HEADER_LEN   0
 #define IGNORABLE_HEADER_LEN   0
-#define RESERVED_HEADER_LEN    0
+#define ROWS_HEADER_LEN_V2     10
 
 /*
    The maximum number of updated databases that a status of
@@ -310,6 +310,13 @@ struct sql_ex_info
   EXECUTE_LOAD_QUERY_EXTRA_HEADER_LEN + /*write_post_header_for_derived */ \
   MAX_SIZE_LOG_EVENT_STATUS + /* status */ \
   NAME_LEN + 1)
+
+/*
+  The new option is added to handle large packets that are sent from the master 
+  to the slave. It is used to increase the thd(max_allowed) for both the
+  DUMP thread on the master and the SQL/IO thread on the slave. 
+*/
+#define MAX_MAX_ALLOWED_PACKET 1024*1024*1024
 
 /* 
    Event header offsets; 
@@ -437,6 +444,9 @@ struct sql_ex_info
 /* RW = "RoWs" */
 #define RW_MAPID_OFFSET    0
 #define RW_FLAGS_OFFSET    6
+#define RW_VHLEN_OFFSET    8
+#define RW_V_TAG_LEN       1
+#define RW_V_EXTRAINFO_TAG 0
 
 /* ELQ = "Execute Load Query" */
 #define ELQ_FILE_ID_OFFSET QUERY_HEADER_LEN
@@ -666,11 +676,11 @@ enum Log_event_type
   PRE_GA_DELETE_ROWS_EVENT = 22,
 
   /*
-    These event numbers are used from 5.1.16 and forward
+    These event numbers are used from 5.1.16 until mysql-trunk-xx
    */
-  WRITE_ROWS_EVENT = 23,
-  UPDATE_ROWS_EVENT = 24,
-  DELETE_ROWS_EVENT = 25,
+  WRITE_ROWS_EVENT_V1 = 23,
+  UPDATE_ROWS_EVENT_V1 = 24,
+  DELETE_ROWS_EVENT_V1 = 25,
 
   /*
     Something out of the ordinary happened on the master
@@ -692,10 +702,10 @@ enum Log_event_type
   IGNORABLE_LOG_EVENT= 28,
   ROWS_QUERY_LOG_EVENT= 29,
 
-  /* Following event numbers reserved for WL#5917 */
-  RESERVED_EVENT_NUM_1 = 30,
-  RESERVED_EVENT_NUM_2 = 31,
-  RESERVED_EVENT_NUM_3 = 32,
+  /* Version 2 of the Row events */
+  WRITE_ROWS_EVENT = 30,
+  UPDATE_ROWS_EVENT = 31,
+  DELETE_ROWS_EVENT = 32,
 
   GTID_LOG_EVENT= 33,
   ANONYMOUS_GTID_LOG_EVENT= 34,
@@ -2073,7 +2083,21 @@ public:
     else
     {
       for (uchar i= 0; i < mts_accessed_dbs; i++)
-        res->push_back(mts_accessed_db_names[i]);
+      {
+        char *db_name= mts_accessed_db_names[i];
+
+        // Only default database is rewritten.
+        if (!rpl_filter->is_rewrite_empty() && !strcmp(get_db(), db_name))
+        {
+          size_t dummy_len;
+          const char *db_filtered= rpl_filter->get_rewrite_db(db_name, &dummy_len);
+          // db_name != db_filtered means that db_name is rewritten.
+          if (strcmp(db_name, db_filtered))
+            db_name= (char*)db_filtered;
+        }
+
+        res->push_back(db_name);
+      }
     }
     return res;
   }
@@ -2858,7 +2882,7 @@ public:
     UNDEF_F= 0,
     UNSIGNED_F= 1
   };
-  char *name;
+  const char *name;
   uint name_len;
   char *val;
   ulong val_len;
@@ -2867,14 +2891,15 @@ public:
   bool is_null;
   uchar flags;
 #ifdef MYSQL_SERVER
-  User_var_log_event(THD* thd_arg, char *name_arg, uint name_len_arg,
+  bool deferred;
+  User_var_log_event(THD* thd_arg, const char *name_arg, uint name_len_arg,
                      char *val_arg, ulong val_len_arg, Item_result type_arg,
 		     uint charset_number_arg, uchar flags_arg,
                      enum_event_cache_type cache_type_arg,
                      enum_event_logging_type logging_type_arg)
     :Log_event(thd_arg, 0, cache_type_arg, logging_type_arg), name(name_arg),
      name_len(name_len_arg), val(val_arg), val_len(val_len_arg), type(type_arg),
-     charset_number(charset_number_arg), flags(flags_arg)
+     charset_number(charset_number_arg), flags(flags_arg), deferred(false)
     { 
       is_null= !val;
     }
@@ -2883,14 +2908,21 @@ public:
   void print(FILE* file, PRINT_EVENT_INFO* print_event_info);
 #endif
 
-  User_var_log_event(const char* buf,
+  User_var_log_event(const char* buf, uint event_len,
                      const Format_description_log_event *description_event);
   ~User_var_log_event() {}
   Log_event_type get_type_code() { return USER_VAR_EVENT;}
 #ifdef MYSQL_SERVER
   bool write(IO_CACHE* file);
+  /* 
+     Getter and setter for deferred User-event. 
+     Returns true if the event is not applied directly 
+     and which case the applier adjusts execution path.
+  */
+  bool is_deferred() { return deferred; }
+  void set_deferred() { deferred= true; }
 #endif
-  bool is_valid() const { return 1; }
+  bool is_valid() const { return name != 0; }
 
 private:
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
@@ -3736,7 +3768,8 @@ public:
   enum 
   {
     TM_NO_FLAGS = 0U,
-    TM_BIT_LEN_EXACT_F = (1U << 0)
+    TM_BIT_LEN_EXACT_F = (1U << 0),
+    TM_REFERRED_FK_DB_F = (1U << 1)
   };
 
   flag_set get_flags(flag_set flag) const { return m_flags & flag; }
@@ -3771,6 +3804,29 @@ public:
   virtual bool write_data_header(IO_CACHE *file);
   virtual bool write_data_body(IO_CACHE *file);
   virtual const char *get_db() { return m_dbnam; }
+  virtual uint8 mts_number_dbs()
+  { 
+    return get_flags(TM_REFERRED_FK_DB_F) ? OVER_MAX_DBS_IN_EVENT_MTS : 1;
+  }
+  virtual List<char>* get_mts_dbs(MEM_ROOT *mem_root)
+  {
+    List<char> *res= new List<char>;
+    const char *db_name= get_db();
+
+    if (!rpl_filter->is_rewrite_empty() && !get_flags(TM_REFERRED_FK_DB_F))
+    {
+      size_t dummy_len;
+      const char *db_filtered= rpl_filter->get_rewrite_db(db_name, &dummy_len);
+      // db_name != db_filtered means that db_name is rewritten.
+      if (strcmp(db_name, db_filtered))
+        db_name= db_filtered;
+    }
+
+    res->push_back(strdup_root(mem_root,
+                               get_flags(TM_REFERRED_FK_DB_F) ? "" : db_name));
+    return res;
+  }
+
 #endif
 
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
@@ -3833,6 +3889,14 @@ private:
 class Rows_log_event : public Log_event
 {
 public:
+  enum row_lookup_mode {
+       ROW_LOOKUP_UNDEFINED= 0,
+       ROW_LOOKUP_NOT_NEEDED= 1,
+       ROW_LOOKUP_INDEX_SCAN= 2,
+       ROW_LOOKUP_TABLE_SCAN= 3,
+       ROW_LOOKUP_HASH_SCAN= 4
+  };
+
   /**
      Enumeration of the errors that can be returned.
    */
@@ -3885,6 +3949,9 @@ public:
   void clear_flags(flag_set flags_arg) { m_flags &= ~flags_arg; }
   flag_set get_flags(flag_set flags_arg) const { return m_flags & flags_arg; }
 
+  Log_event_type get_type_code() { return m_type; } /* Specific type (_V1 etc) */
+  virtual Log_event_type get_general_type_code() = 0; /* General rows op type, no version */
+
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
   virtual int pack_info(Protocol *protocol);
 #endif
@@ -3926,7 +3993,7 @@ public:
     Note that this member function should only be called for the
     following events:
     - Delete_rows_log_event
-    - Wrirte_rows_log_event
+    - Write_rows_log_event
     - Update_rows_log_event
 
     @param[IN] table The table to compare this events bitmaps 
@@ -3940,7 +4007,7 @@ public:
   {
     bool res= FALSE;
 
-    switch (get_type_code())
+    switch (get_general_type_code())
     {
       case DELETE_ROWS_EVENT:
         res= bitmap_cmp(get_cols(), table->read_set);
@@ -3981,6 +4048,8 @@ public:
 
   uint     m_row_count;         /* The number of rows added to the event */
 
+  const uchar* get_extra_row_data() const   { return m_extra_row_data; }
+
 protected:
   /* 
      The constructors are protected since you're supposed to inherit
@@ -3988,10 +4057,11 @@ protected:
   */
 #ifdef MYSQL_SERVER
   Rows_log_event(THD*, TABLE*, ulong table_id, 
-		 MY_BITMAP const *cols, bool is_transactional);
+		 MY_BITMAP const *cols, bool is_transactional,
+                 Log_event_type event_type,
+                 const uchar* extra_row_info);
 #endif
   Rows_log_event(const char *row_data, uint event_len, 
-		 Log_event_type event_type,
 		 const Format_description_log_event *description_event);
 
 #ifdef MYSQL_CLIENT
@@ -4008,6 +4078,19 @@ protected:
   ulong       m_table_id;	/* Table ID */
   MY_BITMAP   m_cols;		/* Bitmap denoting columns available */
   ulong       m_width;          /* The width of the columns bitmap */
+#ifndef MYSQL_CLIENT
+  /**
+     Hash table that will hold the entries for while using HASH_SCAN
+     algorithm to search and update/delete rows.
+   */
+  Hash_slave_rows m_hash;
+
+  /**
+     The algorithm to use while searching for rows using the before
+     image.
+  */
+  uint            m_rows_lookup_algorithm;  
+#endif
   /*
     Bitmap for columns available in the after image, if present. These
     fields are only available for Update_rows events. Observe that the
@@ -4029,15 +4112,21 @@ protected:
 
   flag_set m_flags;		/* Flags for row-level events */
 
+  Log_event_type m_type;        /* Actual event type */
+
+  uchar    *m_extra_row_data;   /* Pointer to extra row data if any */
+                                /* If non null, first byte is length */
+
   /* helper functions */
 
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
   const uchar *m_curr_row;     /* Start of the row being processed */
   const uchar *m_curr_row_end; /* One-after the end of the current row */
   uchar    *m_key;      /* Buffer to keep key value during searches */
-
-  int find_row(const Relay_log_info *const);
-  int write_row(const Relay_log_info *const, const bool);
+  uchar    *last_hashed_key;
+  uint     m_key_index;
+  List<uchar> m_distinct_key_list;
+  List_iterator_fast<uchar> m_itr;
 
   // Unpack the current row into m_table->record[0]
   int unpack_current_row(const Relay_log_info *const rli,
@@ -4053,6 +4142,28 @@ protected:
     ASSERT_OR_RETURN_ERROR(m_curr_row_end <= m_rows_end, HA_ERR_CORRUPT_EVENT);
     return result;
   }
+
+  /*
+    This member function is called when deciding the algorithm to be used to
+    find the rows to be updated on the slave during row based replication.
+    This this functions sets the m_rows_lookup_algorithm and also the
+    m_key_index with the key index to be used if the algorithm is dependent on
+    an index.
+   */
+  void decide_row_lookup_algorithm_and_key();
+
+  /*
+    Encapsulates the  operations to be done before applying
+    row event for update and delete.
+   */
+  int row_operations_scan_and_key_setup();
+
+  /*
+   Encapsulates the  operations to be done after applying
+   row event for update and delete.
+  */
+  int row_operations_scan_and_key_teardown(int error);
+
 #endif
 
 private:
@@ -4112,6 +4223,92 @@ private:
       
   */
   virtual int do_exec_row(const Relay_log_info *const rli) = 0;
+
+  /**
+    Private member function called while handling idempotent errors.
+
+    @param err[IN/OUT] the error to handle. If it is listed as
+                       idempotent/ignored related error, then it is cleared.
+    @returns true if the slave should stop executing rows.
+   */
+  int handle_idempotent_and_ignored_errors(Relay_log_info const *rli, int *err);
+
+  /**
+     Private member function called after updating/deleting a row. It
+     performs some assertions and more importantly, it updates
+     m_curr_row so that the next row is processed during the row
+     execution main loop (@c Rows_log_event::do_apply_event()).
+
+     @param err[IN] the current error code.
+   */
+  void do_post_row_operations(Relay_log_info const *rli, int err);
+
+  /**
+     Commodity wrapper around do_exec_row(), that deals with resetting
+     the thd reference in the table.
+   */
+  int do_apply_row(Relay_log_info const *rli);
+
+  /**
+     Implementation of the index scan and update algorithm. It uses
+     PK, UK or regular Key to search for the record to update. When
+     found it updates it.
+   */
+  int do_index_scan_and_update(Relay_log_info const *rli);
+  
+  /**
+     Implementation of the hash_scan and update algorithm. It collects
+     rows positions in a hashtable until the last row is
+     unpacked. Then it scans the table to update and when a record in
+     the table matches the one in the hashtable, the update/delete is
+     performed.
+   */
+  int do_hash_scan_and_update(Relay_log_info const *rli);
+
+  /**
+     Implementation of the legacy table_scan and update algorithm. For
+     each unpacked row it scans the storage engine table for a
+     match. When a match is found, the update/delete operations are
+     performed.
+   */
+  int do_table_scan_and_update(Relay_log_info const *rli);
+
+/**
+  Initializes scanning of rows. Opens an index and initailizes an iterator
+  over a list of distinct keys (m_distinct_key_list) if it is a HASH_SCAN
+  over an index or the table if its a HASH_SCAN over the table.
+*/
+  int open_record_scan();
+
+/**
+   Does the cleanup
+     -  deallocates all the elements in m_distinct_key_list if any
+     -  closes the index if opened by open_record_scan
+     -  closes the table if opened for scanning.
+*/
+  int close_record_scan();
+
+/**
+  Fetches next row. If it is a HASH_SCAN over an index, it populates
+  table->record[0] with the next row corresponding to the index. If
+  the indexes are in non-contigous ranges it fetches record corresponding
+  to the key value in the next range.
+
+  @parms: bool first_read : signifying if this is the first time we are reading a row
+          over an index.
+  @return_value: -  error code when there are no more reeords to be fetched or some other
+                    error occured,
+                 -  0 otherwise.
+*/
+  int next_record_scan(bool first_read);
+
+/**
+  Populates the m_distinct_key_list with unique keys to be modified
+  during HASH_SCAN over keys.
+  @return_value -0 success
+                -Err_code
+*/
+  int add_key_to_distinct_keyset();
 #endif /* defined(MYSQL_SERVER) && defined(HAVE_REPLICATION) */
 
   friend class Old_rows_log_event;
@@ -4137,7 +4334,8 @@ public:
 
 #if defined(MYSQL_SERVER)
   Write_rows_log_event(THD*, TABLE*, ulong table_id, 
-		       bool is_transactional);
+		       bool is_transactional,
+                       const uchar* extra_row_info);
 #endif
 #ifdef HAVE_REPLICATION
   Write_rows_log_event(const char *buf, uint event_len, 
@@ -4151,12 +4349,15 @@ public:
                                           const uchar *after_record)
   {
     return thd->binlog_write_row(table, is_transactional,
-                                 after_record);
+                                 after_record, NULL);
   }
 #endif
 
+protected:
+  int write_row(const Relay_log_info *const, const bool);
+
 private:
-  virtual Log_event_type get_type_code() { return (Log_event_type)TYPE_CODE; }
+  virtual Log_event_type get_general_type_code() { return (Log_event_type)TYPE_CODE; }
 
 #ifdef MYSQL_CLIENT
   void print(FILE *file, PRINT_EVENT_INFO *print_event_info);
@@ -4195,10 +4396,12 @@ public:
   Update_rows_log_event(THD*, TABLE*, ulong table_id,
 			MY_BITMAP const *cols_bi,
 			MY_BITMAP const *cols_ai,
-                        bool is_transactional);
+                        bool is_transactional,
+                        const uchar* extra_row_info);
 
   Update_rows_log_event(THD*, TABLE*, ulong table_id,
-                        bool is_transactional);
+                        bool is_transactional,
+                        const uchar* extra_row_info);
 
   void init(MY_BITMAP const *cols);
 #endif
@@ -4217,7 +4420,7 @@ public:
                                           const uchar *after_record)
   {
     return thd->binlog_update_row(table, is_transactional,
-                                  before_record, after_record);
+                                  before_record, after_record, NULL);
   }
 #endif
 
@@ -4227,7 +4430,7 @@ public:
   }
 
 protected:
-  virtual Log_event_type get_type_code() { return (Log_event_type)TYPE_CODE; }
+  virtual Log_event_type get_general_type_code() { return (Log_event_type)TYPE_CODE; }
 
 #ifdef MYSQL_CLIENT
   void print(FILE *file, PRINT_EVENT_INFO *print_event_info);
@@ -4271,7 +4474,7 @@ public:
 
 #ifdef MYSQL_SERVER
   Delete_rows_log_event(THD*, TABLE*, ulong, 
-			bool is_transactional);
+			bool is_transactional, const uchar* extra_row_info);
 #endif
 #ifdef HAVE_REPLICATION
   Delete_rows_log_event(const char *buf, uint event_len, 
@@ -4285,12 +4488,12 @@ public:
                                           __attribute__((unused)))
   {
     return thd->binlog_delete_row(table, is_transactional,
-                                  before_record);
+                                  before_record, NULL);
   }
 #endif
   
 protected:
-  virtual Log_event_type get_type_code() { return (Log_event_type)TYPE_CODE; }
+  virtual Log_event_type get_general_type_code() { return (Log_event_type)TYPE_CODE; }
 
 #ifdef MYSQL_CLIENT
   void print(FILE *file, PRINT_EVENT_INFO *print_event_info);
@@ -4553,6 +4756,14 @@ private:
   const char* log_ident;
   uint ident_len;
 };
+
+/**
+   The function is called by slave applier in case there are
+   active table filtering rules to force gathering events associated
+   with Query-log-event into an array to execute
+   them once the fate of the Query is determined for execution.
+*/
+bool slave_execute_deferred_events(THD *thd);
 #endif
 
 int append_query_string(THD *thd, const CHARSET_INFO *csinfo,
@@ -4642,12 +4853,12 @@ public:
     if (spec.gtid.sidno < 0)
     {
       if (need_lock)
-        global_sid_lock.rdlock();
+        global_sid_lock->rdlock();
       else
-        global_sid_lock.assert_some_lock();
-      spec.gtid.sidno= global_sid_map.add_sid(sid);
+        global_sid_lock->assert_some_lock();
+      spec.gtid.sidno= global_sid_map->add_sid(sid);
       if (need_lock)
-        global_sid_lock.unlock();
+        global_sid_lock->unlock();
     }
     return spec.gtid.sidno;
   }
@@ -4779,6 +4990,43 @@ inline bool is_gtid_event(Log_event* evt)
   return (evt->get_type_code() == GTID_LOG_EVENT ||
           evt->get_type_code() == ANONYMOUS_GTID_LOG_EVENT);
 }
+
+inline ulong version_product(const uchar* version_split)
+{
+  return ((version_split[0] * 256 + version_split[1]) * 256
+          + version_split[2]);
+}
+
+inline void do_server_version_split(char* version, uchar split_versions[3])
+{
+  char *p= version, *r;
+  ulong number;
+  for (uint i= 0; i<=2; i++)
+  {
+    number= strtoul(p, &r, 10);
+    split_versions[i]= (uchar) number;
+    DBUG_ASSERT(number < 256); // fit in uchar
+    p= r;
+    DBUG_ASSERT(!((i == 0) && (*r != '.'))); // should be true in practice
+    if (*r == '.')
+      p++; // skip the dot
+  }
+}
+
+#ifdef MYSQL_SERVER
+/*
+  This is an utility function that adds a quoted identifier into the a buffer.
+  This also escapes any existance of the quote string inside the identifier.
+ */
+size_t my_strmov_quoted_identifier(THD *thd, char *buffer,
+                                   const char* identifier,
+                                   uint length);
+#else
+size_t my_strmov_quoted_identifier(char *buffer, const char* identifier);
+#endif
+size_t my_strmov_quoted_identifier_helper(int q, char *buffer,
+                                          const char* identifier,
+                                          uint length);
 
 /**
   @} (end of group Replication)

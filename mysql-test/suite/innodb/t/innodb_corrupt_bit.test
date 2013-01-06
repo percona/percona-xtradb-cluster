@@ -12,6 +12,7 @@
 --source include/have_debug.inc
 
 -- disable_query_log
+call mtr.add_suppression("Flagged corruption of idx.*in CHECK TABLE");
 # This test setup is extracted from bug56680.test:
 # The flag innodb_change_buffering_debug is only available in debug builds.
 # It instructs InnoDB to try to evict pages from the buffer pool when
@@ -80,10 +81,10 @@ CREATE INDEX idx4 ON corrupt_bit_test_ā(b, z);
 check table corrupt_bit_test_ā;
 
 # This selection intend to use the corrupted index. Expect to fail
--- error ER_NOT_KEYFILE
+-- error ER_INDEX_CORRUPT
 select c from corrupt_bit_test_ā;
 
--- error ER_NOT_KEYFILE
+-- error ER_INDEX_CORRUPT
 select z from corrupt_bit_test_ā;
 
 show warnings;
@@ -109,7 +110,7 @@ check table corrupt_bit_test_ā;
 
 set names utf8;
 
--- error ER_NOT_KEYFILE
+-- error ER_INDEX_CORRUPT
 select z from corrupt_bit_test_ā;
 
 # Drop the corrupted index

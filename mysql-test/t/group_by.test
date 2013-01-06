@@ -870,10 +870,10 @@ SELECT t1.a FROM t1 GROUP BY t1.a
 
 SELECT t1.a FROM t1 GROUP BY t1.a
   HAVING t1.a IN (SELECT t2.a FROM t2 ORDER BY SUM(t1.b));
-# No error since ORDER BY is optimized away in IN/ALL/ANY subqueries
+--error 1140
 SELECT t1.a FROM t1 GROUP BY t1.a
   HAVING t1.a IN (SELECT t2.a FROM t2 ORDER BY t2.a, SUM(t2.b));
-# No error since ORDER BY is optimized away in IN/ALL/ANY subqueries
+--error 1140
 SELECT t1.a FROM t1 GROUP BY t1.a
   HAVING t1.a > ANY (SELECT t2.a FROM t2 ORDER BY t2.a, SUM(t2.b));
 
@@ -1549,7 +1549,8 @@ CREATE TABLE t1(
  UNIQUE INDEX idx (col1)
 );
 
-INSERT INTO t1 VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+INSERT INTO t1 VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),
+   (11),(12),(13),(14),(15),(16),(17),(18),(19),(20);
 
 let $query=SELECT SQL_BIG_RESULT col1 AS field1, col1 AS field2
            FROM t1 GROUP BY field1, field2;
@@ -1977,7 +1978,7 @@ CREATE TABLE t1 (
   KEY (b,a)
 );
 
-INSERT INTO t1 VALUES (1,NULL),(0,'a');
+INSERT INTO t1 VALUES (1,NULL),(0,'a'),(1,NULL),(0,'a');
 
 let $query=
   SELECT SQL_BUFFER_RESULT MIN(a), b FROM t1 WHERE t1.b = 'a' GROUP BY b;
@@ -1994,4 +1995,13 @@ let $query= SELECT MIN(a), b FROM t1 WHERE t1.b = 'a' GROUP BY b;
 --eval $query
 
 --echo
+DROP TABLE t1;
+
+--echo #
+--echo # Bug #12888306 MISSING ROWS FOR SELECT >ALL (SUBQUERY WITHOUT ROWS)
+--echo #
+
+CREATE TABLE t1(a INT);
+INSERT INTO t1 VALUES (0);
+SELECT 1 FROM t1 WHERE 1 > ALL(SELECT 1 FROM t1 WHERE a);
 DROP TABLE t1;

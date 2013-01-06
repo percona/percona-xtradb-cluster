@@ -37,8 +37,8 @@ enum_return_status Gtid_state::acquire_ownership(THD *thd, const Gtid &gtid)
 {
   DBUG_ENTER("Gtid_state::acquire_ownership");
   // caller must take lock on the SIDNO.
-  global_sid_lock.assert_some_lock();
-  gtid_state.assert_sidno_lock_owner(gtid.sidno);
+  global_sid_lock->assert_some_lock();
+  gtid_state->assert_sidno_lock_owner(gtid.sidno);
   DBUG_ASSERT(!logged_gtids.contains_gtid(gtid));
   DBUG_PRINT("info", ("group=%d:%lld", gtid.sidno, gtid.gno));
   DBUG_ASSERT(thd->owned_gtid.sidno == 0);
@@ -126,10 +126,68 @@ void Gtid_state::broadcast_owned_sidnos(const THD *thd)
 }
 
 
-enum_return_status Gtid_state::update(THD *thd, bool commit)
+enum_return_status Gtid_state::update_on_flush(THD *thd)
 {
-  DBUG_ENTER("Gtid_state::update");
+  DBUG_ENTER("Gtid_state::update_on_flush");
   enum_return_status ret= RETURN_STATUS_OK;
+
+  // Caller must take lock on the SIDNO.
+  global_sid_lock->assert_some_lock();
+
+  if (thd->owned_gtid.sidno == -1)
+  {
+#ifdef HAVE_NDB_BINLOG
+    rpl_sidno prev_sidno= 0;
+    Gtid_set::Gtid_iterator git(&thd->owned_gtid_set);
+    Gtid g= git.get();
+    while (g.sidno != 0)
+    {
+      if (g.sidno != prev_sidno)
+        sid_locks.lock(g.sidno);
+      if (ret == RETURN_STATUS_OK)
+        ret= logged_gtids._add_gtid(g);
+      git.next();
+      g= git.get();
+    }
+#else
+    DBUG_ASSERT(0);
+#endif
+  }
+  else if (thd->owned_gtid.sidno > 0)
+  {
+    lock_sidno(thd->owned_gtid.sidno);
+    ret= logged_gtids._add_gtid(thd->owned_gtid);
+  }
+
+  broadcast_owned_sidnos(thd);
+  unlock_owned_sidnos(thd);
+
+  DBUG_RETURN(ret);
+}
+
+
+void Gtid_state::update_on_commit(THD *thd)
+{
+  DBUG_ENTER("Gtid_state::update_on_commit");
+  update_owned_gtids_impl(thd, true);
+  DBUG_VOID_RETURN;
+}
+
+
+void Gtid_state::update_on_rollback(THD *thd)
+{
+  DBUG_ENTER("Gtid_state::update_on_rollback");
+  update_owned_gtids_impl(thd, false);
+  DBUG_VOID_RETURN;
+}
+
+
+void Gtid_state::update_owned_gtids_impl(THD *thd, bool is_commit)
+{
+  DBUG_ENTER("Gtid_state::update_owned_gtids_impl");
+
+  // Caller must take lock on the SIDNO.
+  global_sid_lock->assert_some_lock();
 
   if (thd->owned_gtid.sidno == -1)
   {
@@ -142,8 +200,6 @@ enum_return_status Gtid_state::update(THD *thd, bool commit)
       if (g.sidno != prev_sidno)
         sid_locks.lock(g.sidno);
       owned_gtids.remove_gtid(g);
-      if (commit && ret == RETURN_STATUS_OK)
-        ret= logged_gtids._add_gtid(g);
       git.next();
       g= git.get();
     }
@@ -155,16 +211,15 @@ enum_return_status Gtid_state::update(THD *thd, bool commit)
   {
     lock_sidno(thd->owned_gtid.sidno);
     owned_gtids.remove_gtid(thd->owned_gtid);
-    if (commit)
-      ret= logged_gtids._add_gtid(thd->owned_gtid);
   }
 
-  broadcast_owned_sidnos(thd);
+  if (!is_commit)
+    broadcast_owned_sidnos(thd);
   unlock_owned_sidnos(thd);
 
   thd->clear_owned_gtids();
 
-  DBUG_RETURN(ret);
+  DBUG_VOID_RETURN;
 }
 
 
@@ -271,11 +326,41 @@ enum_return_status Gtid_state::ensure_sidno()
 }
 
 
+enum_return_status Gtid_state::add_lost_gtids(const char *text)
+{
+  DBUG_ENTER("Gtid_state::add_lost_gtids()");
+  sid_lock->assert_some_wrlock();
+
+  DBUG_PRINT("info", ("add_lost_gtids '%s'", text));
+
+  if (!logged_gtids.is_empty())
+  {
+    BINLOG_ERROR((ER(ER_CANT_SET_GTID_PURGED_WHEN_GTID_EXECUTED_IS_NOT_EMPTY)),
+                 (ER_CANT_SET_GTID_PURGED_WHEN_GTID_EXECUTED_IS_NOT_EMPTY,
+                 MYF(0)));
+    RETURN_REPORTED_ERROR;
+  }
+  if (!owned_gtids.is_empty())
+  {
+    BINLOG_ERROR((ER(ER_CANT_SET_GTID_PURGED_WHEN_OWNED_GTIDS_IS_NOT_EMPTY)),
+                 (ER_CANT_SET_GTID_PURGED_WHEN_OWNED_GTIDS_IS_NOT_EMPTY,
+                 MYF(0)));
+    RETURN_REPORTED_ERROR;
+  }
+  DBUG_ASSERT(lost_gtids.is_empty());
+
+  PROPAGATE_REPORTED_ERROR(lost_gtids.add_gtid_text(text));
+  PROPAGATE_REPORTED_ERROR(logged_gtids.add_gtid_text(text));
+
+  DBUG_RETURN(RETURN_STATUS_OK);
+}
+
+
 int Gtid_state::init()
 {
   DBUG_ENTER("Gtid_state::init()");
 
-  global_sid_lock.assert_some_lock();
+  global_sid_lock->assert_some_lock();
 
   rpl_sid server_sid;
   if (server_sid.parse(server_uuid) != RETURN_STATUS_OK)

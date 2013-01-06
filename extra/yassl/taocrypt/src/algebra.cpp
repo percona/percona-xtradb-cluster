@@ -244,7 +244,6 @@ void AbstractGroup::SimultaneousMultiply(Integer *results, const Integer &base,
 
     for (i=0; i<expCount; i++)
     {
-        assert(expBegin->NotNegative());
         exponents.push_back(WindowSlider(*expBegin++, InversionIsFast(), 0));
         exponents[i].FindNextWindow();
         buckets[i].resize(1<<(exponents[i].windowSize-1), Identity());
@@ -285,7 +284,7 @@ void AbstractGroup::SimultaneousMultiply(Integer *results, const Integer &base,
         r = buckets[i][buckets[i].size()-1];
         if (buckets[i].size() > 1)
         {
-            for (int j= (unsigned int) (buckets[i].size()) - 2; j >= 1; j--)
+            for (size_t j = buckets[i].size()-2; j >= 1; j--)
             {
                 Accumulate(buckets[i][j], buckets[i][j+1]);
                 Accumulate(r, buckets[i][j]);
@@ -323,3 +322,14 @@ void AbstractRing::SimultaneousExponentiate(Integer *results,
 
 
 } // namespace
+
+
+#ifdef HAVE_EXPLICIT_TEMPLATE_INSTANTIATION
+namespace mySTL {
+template TaoCrypt::WindowSlider* uninit_copy<TaoCrypt::WindowSlider*, TaoCrypt::WindowSlider*>(TaoCrypt::WindowSlider*, TaoCrypt::WindowSlider*, TaoCrypt::WindowSlider*);
+template void destroy<TaoCrypt::WindowSlider*>(TaoCrypt::WindowSlider*, TaoCrypt::WindowSlider*);
+template TaoCrypt::WindowSlider* GetArrayMemory<TaoCrypt::WindowSlider>(size_t);
+template void FreeArrayMemory<TaoCrypt::WindowSlider>(TaoCrypt::WindowSlider*);
+}
+#endif
+

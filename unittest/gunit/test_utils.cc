@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -31,28 +31,39 @@ extern "C" void test_error_handler_hook(uint err, const char *str, myf MyFlags)
   EXPECT_EQ(expected_error, err) << str;
 }
 
-void Server_initializer::set_expected_error(uint val)
-{
-  expected_error= val;
-}
-
-void Server_initializer::SetUpTestCase()
+void setup_server_for_unit_tests()
 {
   static char *my_name= strdup(my_progname);
   char *argv[] = { my_name, 0 };
   set_remaining_args(1, argv);
+  mysql_mutex_init(key_LOCK_error_log, &LOCK_error_log, MY_MUTEX_INIT_FAST);
+  system_charset_info= &my_charset_utf8_general_ci;
+  sys_var_init();
   init_common_variables();
   my_init_signals();
   randominit(&sql_rand, 0, 0);
   xid_cache_init();
   delegates_init();
+  gtid_server_init();
   error_handler_hook= test_error_handler_hook;
+  // Initialize logger last, to avoid spurious warnings to stderr.
+  logger.init_base();
 }
 
-void Server_initializer::TearDownTestCase()
+void teardown_server_for_unit_tests()
 {
+  sys_var_end();
   delegates_destroy();
   xid_cache_free();
+  gtid_server_cleanup();
+  mysql_mutex_destroy(&LOCK_error_log);
+  logger.cleanup_base();
+  logger.cleanup_end();
+}
+
+void Server_initializer::set_expected_error(uint val)
+{
+  expected_error= val;
 }
 
 void Server_initializer::SetUp()
@@ -85,7 +96,14 @@ Mock_error_handler::~Mock_error_handler()
   // Strange Visual Studio bug: have to store 'this' in local variable.
   Internal_error_handler *me= this;
   EXPECT_EQ(me, m_thd->pop_internal_handler());
-  EXPECT_GE(m_handle_called, 0);
+  if (m_expected_error == 0)
+  {
+    EXPECT_EQ(0, m_handle_called);
+  }
+  else
+  {
+    EXPECT_GT(m_handle_called, 0);
+  }
 }
 
 bool Mock_error_handler::handle_condition(THD *thd,

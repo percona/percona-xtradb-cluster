@@ -244,7 +244,7 @@ the read requests for the whole area.
 
 #ifndef UNIV_HOTBACKUP
 /** Value in microseconds */
-static const int WAIT_FOR_READ	= 5000;
+static const int WAIT_FOR_READ	= 100;
 /** Number of attemtps made to read in a page in the buffer pool */
 static const ulint BUF_PAGE_READ_MAX_RETRIES = 100;
 
@@ -455,6 +455,8 @@ UNIV_INTERN
 ibool
 buf_page_is_corrupted(
 /*==================*/
+	bool		check_lsn,	/*!< in: true if we need to check
+					and complain about the LSN */
 	const byte*	read_buf,	/*!< in: a database page */
 	ulint		zip_size)	/*!< in: size of compressed page;
 					0 for uncompressed pages */
@@ -479,14 +481,17 @@ buf_page_is_corrupted(
 	if (recv_lsn_checks_on) {
 		lsn_t	current_lsn;
 
-		if (log_peek_lsn(&current_lsn)
-		    && UNIV_UNLIKELY
-		    (current_lsn
-		     < mach_read_from_8(read_buf + FIL_PAGE_LSN))) {
+		/* Since we are going to reset the page LSN during the import
+		phase it makes no sense to spam the log with error messages. */
+
+		if (check_lsn
+		    && log_peek_lsn(&current_lsn)
+		    && current_lsn
+		    < mach_read_from_8(read_buf + FIL_PAGE_LSN)) {
 			ut_print_timestamp(stderr);
 
 			fprintf(stderr,
-				"  InnoDB: Error: page %lu log sequence number"
+				" InnoDB: Error: page %lu log sequence number"
 				" " LSN_PF "\n"
 				"InnoDB: is in the future! Current system "
 				"log sequence number " LSN_PF ".\n"
@@ -671,6 +676,8 @@ buf_page_is_corrupted(
 	/* no default so the compiler will emit a warning if new enum
 	is added and not handled here */
 	}
+
+	DBUG_EXECUTE_IF("buf_page_is_corrupt_failure", return(TRUE); );
 
 	return(FALSE);
 }
@@ -884,7 +891,7 @@ pfs_register_buffer_block(
 				 PFS_MAX_BUFFER_MUTEX_LOCK_REGISTER);
 
 	for (i = 0; i < num_to_register; i++) {
-		mutex_t*	mutex;
+		ib_mutex_t*	mutex;
 		rw_lock_t*	rwlock;
 
 #  ifdef UNIV_PFS_MUTEX
@@ -1730,7 +1737,7 @@ buf_pool_watch_unset(
 	ut_a(bpage);
 
 	if (UNIV_UNLIKELY(!buf_pool_watch_is_sentinel(buf_pool, bpage))) {
-		mutex_t* mutex = buf_page_get_mutex(bpage);
+		ib_mutex_t* mutex = buf_page_get_mutex(bpage);
 
 		mutex_enter(mutex);
 		ut_a(bpage->buf_fix_count > 0);
@@ -1879,7 +1886,7 @@ buf_page_set_file_page_was_freed(
 					   &hash_lock);
 
 	if (bpage) {
-		mutex_t*	block_mutex = buf_page_get_mutex(bpage);
+		ib_mutex_t*	block_mutex = buf_page_get_mutex(bpage);
 		ut_ad(!buf_pool_watch_is_sentinel(buf_pool, bpage));
 		mutex_enter(block_mutex);
 		rw_lock_s_unlock(hash_lock);
@@ -1912,7 +1919,7 @@ buf_page_reset_file_page_was_freed(
 	bpage = buf_page_hash_get_s_locked(buf_pool, space, offset,
 					   &hash_lock);
 	if (bpage) {
-		mutex_t*	block_mutex = buf_page_get_mutex(bpage);
+		ib_mutex_t*	block_mutex = buf_page_get_mutex(bpage);
 		ut_ad(!buf_pool_watch_is_sentinel(buf_pool, bpage));
 		mutex_enter(block_mutex);
 		rw_lock_s_unlock(hash_lock);
@@ -1973,7 +1980,7 @@ buf_page_get_zip(
 	ulint		offset)	/*!< in: page number */
 {
 	buf_page_t*	bpage;
-	mutex_t*	block_mutex;
+	ib_mutex_t*	block_mutex;
 	rw_lock_t*	hash_lock;
 	ibool		discard_attempted = FALSE;
 	ibool		must_read;
@@ -2371,6 +2378,28 @@ buf_block_is_uncompressed(
 	return(buf_pointer_is_block_field_instance(buf_pool, (void*) block));
 }
 
+#if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG
+/********************************************************************//**
+Return true if probe is enabled.
+@return true if probe enabled. */
+static
+bool
+buf_debug_execute_is_force_flush()
+/*==============================*/
+{
+	DBUG_EXECUTE_IF("ib_buf_force_flush", return(true); );
+
+	/* This is used during queisce testing, we want to ensure maximum
+	buffering by the change buffer. */
+
+	if (srv_ibuf_disable_background_merge) {
+		return(true);
+	}
+
+	return(false);
+}
+#endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
+
 /********************************************************************//**
 This is the general function used to get access to a database page.
 @return	pointer to the block or NULL */
@@ -2397,7 +2426,7 @@ buf_page_get_gen(
 	ulint		fix_type;
 	ibool		must_read;
 	rw_lock_t*	hash_lock;
-	mutex_t*	block_mutex;
+	ib_mutex_t*	block_mutex;
 	buf_page_t*	hash_bpage;
 	ulint		retries = 0;
 	buf_pool_t*	buf_pool = buf_pool_get(space, offset);
@@ -2681,7 +2710,10 @@ wait_until_unfixed:
 		/* Decompress the page and apply buffered operations
 		while not holding buf_pool->mutex or block->mutex. */
 
-		ut_a(buf_zip_decompress(block, TRUE));
+		/* Page checksum verification is already done when
+		the page is read from disk. Hence page checksum
+		verification is not necesary when decompressing the page. */
+		ut_a(buf_zip_decompress(block, FALSE));
 
 		if (UNIV_LIKELY(!recv_no_ibuf_operations)) {
 			ibuf_merge_or_delete_for_page(block, space, offset,
@@ -2722,8 +2754,9 @@ wait_until_unfixed:
 	UNIV_MEM_ASSERT_RW(&block->page, sizeof block->page);
 #endif
 #if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG
+
 	if ((mode == BUF_GET_IF_IN_POOL || mode == BUF_GET_IF_IN_POOL_OR_WATCH)
-	    && ibuf_debug) {
+	    && (ibuf_debug || buf_debug_execute_is_force_flush())) {
 		/* Try to evict the block from the buffer pool, to use the
 		insert buffer (change buffer) as much as possible. */
 
@@ -2758,19 +2791,18 @@ wait_until_unfixed:
 					buf_pool, space, offset, fold);
 			}
 
-			if (UNIV_LIKELY_NULL(block)) {
-				block_mutex = buf_page_get_mutex(
-					&block->page);
-				/* The page entered the buffer
-				pool for some reason. Try to
-				evict it again. */
-				mutex_enter(block_mutex);
-				rw_lock_x_unlock(hash_lock);
+			rw_lock_x_unlock(hash_lock);
 
-				goto got_block;
+			if (UNIV_LIKELY_NULL(block)) {
+				/* Either the page has been read in or
+				a watch was set on that in the window
+				where we released the buf_pool::mutex
+				and before we acquire the hash_lock
+				above. Try again. */
+				guess = block;
+				goto loop;
 			}
 
-			rw_lock_x_unlock(hash_lock);
 			fprintf(stderr,
 				"innodb_change_buffering_debug evict %u %u\n",
 				(unsigned) space, (unsigned) offset);
@@ -2828,8 +2860,9 @@ wait_until_unfixed:
 				mutex_exit(&block->mutex);
 
 				if (io_fix == BUF_IO_READ) {
-
-					os_thread_sleep(WAIT_FOR_READ);
+					/* wait by temporaly s-latch */
+					rw_lock_s_lock(&(block->lock));
+					rw_lock_s_unlock(&(block->lock));
 				} else {
 					break;
 				}
@@ -3847,6 +3880,8 @@ buf_mark_space_corrupt(
 			BUF_IO_READ);
 	}
 
+	mutex_exit(buf_page_get_mutex(bpage));
+
 	/* Find the table with specified space id, and mark it corrupted */
 	if (dict_set_corrupted_by_space(space)) {
 		buf_LRU_free_one_page(bpage);
@@ -3857,7 +3892,6 @@ buf_mark_space_corrupt(
 	ut_ad(buf_pool->n_pend_reads > 0);
 	buf_pool->n_pend_reads--;
 
-	mutex_exit(buf_page_get_mutex(bpage));
 	buf_pool_mutex_exit(buf_pool);
 
 	return(ret);
@@ -3865,9 +3899,10 @@ buf_mark_space_corrupt(
 
 /********************************************************************//**
 Completes an asynchronous read or write request of a file page to or from
-the buffer pool. */
+the buffer pool.
+@return true if successful */
 UNIV_INTERN
-void
+bool
 buf_page_io_complete(
 /*=================*/
 	buf_page_t*	bpage)	/*!< in: pointer to the block in question */
@@ -3949,8 +3984,20 @@ buf_page_io_complete(
 		/* From version 3.23.38 up we store the page checksum
 		to the 4 first bytes of the page end lsn field */
 
-		if (buf_page_is_corrupted(frame,
+		if (buf_page_is_corrupted(true, frame,
 					  buf_page_get_zip_size(bpage))) {
+
+			/* Not a real corruption if it was triggered by
+			error injection */
+			DBUG_EXECUTE_IF("buf_page_is_corrupt_failure",
+				if (bpage->space > TRX_SYS_SPACE
+				    && buf_mark_space_corrupt(bpage)) {
+					ib_logf(IB_LOG_LEVEL_INFO,
+						"Simulated page corruption");
+					return(true);
+				}
+				goto page_not_corrupt;
+				;);
 corrupt:
 			fprintf(stderr,
 				"InnoDB: Database page corruption on disk"
@@ -3994,7 +4041,7 @@ corrupt:
 				table as corrupted instead of crashing server */
 				if (bpage->space > TRX_SYS_SPACE
 				    && buf_mark_space_corrupt(bpage)) {
-					return;
+					return(false);
 				} else {
 					fputs("InnoDB: Ending processing"
 					      " because of"
@@ -4004,6 +4051,9 @@ corrupt:
 				}
 			}
 		}
+
+		DBUG_EXECUTE_IF("buf_page_is_corrupt_failure",
+				page_not_corrupt:  bpage = bpage; );
 
 		if (recv_recovery_is_on()) {
 			/* Pages must be uncompressed for crash recovery. */
@@ -4086,6 +4136,8 @@ corrupt:
 
 	mutex_exit(buf_page_get_mutex(bpage));
 	buf_pool_mutex_exit(buf_pool);
+
+	return(true);
 }
 
 /*********************************************************************//**
@@ -5113,9 +5165,7 @@ void
 buf_refresh_io_stats_all(void)
 /*==========================*/
 {
-	ulint		i;
-
-	for (i = 0; i < srv_buf_pool_instances; i++) {
+	for (ulint i = 0; i < srv_buf_pool_instances; i++) {
 		buf_pool_t*	buf_pool;
 
 		buf_pool = buf_pool_from_array(i);
@@ -5132,9 +5182,7 @@ ibool
 buf_all_freed(void)
 /*===============*/
 {
-	ulint	i;
-
-	for (i = 0; i < srv_buf_pool_instances; i++) {
+	for (ulint i = 0; i < srv_buf_pool_instances; i++) {
 		buf_pool_t*	buf_pool;
 
 		buf_pool = buf_pool_from_array(i);

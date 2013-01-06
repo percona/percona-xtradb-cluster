@@ -59,7 +59,7 @@ ibuf_mtr_commit(
 }
 
 /** Insert buffer struct */
-struct ibuf_struct{
+struct ibuf_t{
 	ulint		size;		/*!< current size of the ibuf index
 					tree, in pages */
 	ulint		max_size;	/*!< recommended maximum size of the
@@ -127,6 +127,7 @@ ibuf_should_try(
 	return(ibuf_use != IBUF_USE_NONE
 	       && ibuf->max_size != 0
 	       && !dict_index_is_clust(index)
+	       && index->table->quiesce == QUIESCE_NONE
 	       && (ignore_sec_unique || !dict_index_is_unique(index)));
 }
 

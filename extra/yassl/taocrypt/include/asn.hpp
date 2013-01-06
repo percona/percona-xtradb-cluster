@@ -23,6 +23,7 @@
 #ifndef TAO_CRYPT_ASN_HPP
 #define TAO_CRYPT_ASN_HPP
 
+
 #include <time.h>
 #include "misc.hpp"
 #include "block.hpp"
@@ -166,6 +167,7 @@ public:
     void Decode(RSA_PublicKey&);
 private:
     void ReadHeader();
+    void ReadHeaderOpenSSL();
 };
 
 
@@ -371,7 +373,7 @@ int GetCert(Source&);
 // Get Cert in PEM format from pkcs12 file
 int GetPKCS_Cert(const char* password, Source&);
 
-void ASN1_TIME_extract(const unsigned char* date, unsigned char format,
+bool ASN1_TIME_extract(const unsigned char* date, unsigned char format,
                        tm *parsed_time);
 
 } // namespace

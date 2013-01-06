@@ -98,10 +98,30 @@ enum Extra_tag
   ET_CONST_ROW_NOT_FOUND,
   ET_UNIQUE_ROW_NOT_FOUND,
   ET_IMPOSSIBLE_ON_CONDITION,
+  ET_PUSHED_JOIN,
   //------------------------------------
   ET_total
 };
 
+
+/**
+  Emulate lazy computation
+*/
+class Lazy: public Sql_alloc
+{
+public:
+  virtual ~Lazy() {}
+
+  /**
+    Deferred evaluation of encapsulated expression
+
+    @param [out] ret    Return string value
+
+    @retval false       Success
+    @retval true        Failure (OOM)
+  */
+  virtual bool eval(String *ret)= 0;
+};
 
 /**
   Base class for all EXPLAIN context descriptor classes
@@ -173,20 +193,38 @@ public:
     in the most cases, those input strings must have the same lifetime as
     Item_string objects, i.e. lifetime of MEM_ROOT.
     This class allocates input parameters for Item_string objects in MEM_ROOT.
+
+    @note Call to is_empty() is necessary before the access to "str" and
+          "length" fields, since is_empty() may trigger an evaluation of
+          an associated expression that updates these fields.
   */
   struct mem_root_str
   {
     const char *str;
     size_t length;
+    Lazy *deferred; //< encapsulated expression to evaluate it later (on demand)
     
     mem_root_str() { cleanup(); }
     void cleanup()
     {
       str= NULL;
       length= 0;
+      deferred= NULL;
     }
-    bool is_empty() const { return str == NULL; }
-
+    bool is_empty()
+    {
+      if (deferred)
+      {
+        StringBuffer<128> buff(system_charset_info);
+        if (deferred->eval(&buff) || set(buff))
+        {
+          DBUG_ASSERT(!"OOM!");
+          return true; // ignore OOM
+        }
+        deferred= NULL; // prevent double evaluation, if any
+      }
+      return str == NULL;
+    }
     bool set(const char *str_arg)
     {
       return set(str_arg, strlen(str_arg));
@@ -205,10 +243,22 @@ public:
     */
     bool set(const char *str_arg, size_t length_arg)
     {
+      deferred= NULL;
       if (!(str= strndup_root(current_thd->mem_root, str_arg, length_arg)))
         return true; /* purecov: inspected */
       length= length_arg;
       return false;
+    }
+    /**
+      Save expression for further evaluation
+
+      @param x  Expression
+    */
+    void set(Lazy *x)
+    {
+      deferred= x;
+      str= NULL;
+      length= 0;
     }
     /**
       Make a copy of string constant
@@ -222,6 +272,7 @@ public:
     }
     void set_const(const char *str_arg, size_t length_arg)
     {
+      deferred= NULL;
       str= str_arg;
       length= length_arg;
     }
@@ -289,25 +340,28 @@ public:
   mem_root_str col_attached_condition; ///< former "Using where"
 
   /* For structured EXPLAIN in CTX_JOIN_TAB context: */
-  uint derived_select_number; ///< "derived" subquery id
+  uint query_block_id; ///< query block id for materialized subqueries
 
   /**
-    Pointer to "derived" subquery tree
+    List of "derived" subquery trees
   */
-  opt_explain_json_namespace::context *derived_from;
+  List<opt_explain_json_namespace::context> derived_from;
+
+  List<const char> col_key_parts; ///< used parts of the key
 
   bool is_dependent;
   bool is_cacheable;
   bool using_temporary;
+  bool is_materialized_from_subquery;
   bool is_update; //< UPDATE modified this table
   bool is_delete; //< DELETE modified this table
 
   qep_row() :
-    derived_select_number(0),
-    derived_from(NULL),
+    query_block_id(0),
     is_dependent(false),
     is_cacheable(true),
     using_temporary(false),
+    is_materialized_from_subquery(false),
     is_update(false),
     is_delete(false)
   {}
@@ -329,16 +383,18 @@ public:
     col_extra.empty();
     col_message.cleanup();
     col_attached_condition.cleanup();
+    col_key_parts.empty();
 
     /*
       Not needed (we call cleanup() for structured EXPLAIN only,
       just for the consistency).
     */
-    derived_select_number= 0;
-    derived_from= NULL;
+    query_block_id= 0;
+    derived_from.empty();
     is_dependent= false;
     is_cacheable= true;
     using_temporary= false;
+    is_materialized_from_subquery= false;
     is_update= false;
     is_delete= false;
   }

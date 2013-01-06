@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -730,6 +730,8 @@ bool Protocol::send_result_set_metadata(List<Item> *list, uint flags)
       /* Store fixed length fields */
       pos= (char*) local_packet->ptr()+local_packet->length();
       *pos++= 12;				// Length of packed fields
+      /* inject a NULL to test the client */
+      DBUG_EXECUTE_IF("poison_rs_fields", pos[-1]= 0xfb;);
       if (item->charset_for_protocol() == &my_charset_bin || thd_charset == NULL)
       {
         /* No conversion */
@@ -1203,7 +1205,7 @@ bool Protocol_text::send_out_parameters(List<Item_param> *sp_params)
       continue; // It's an IN-parameter.
 
     Item_func_set_user_var *suv=
-      new Item_func_set_user_var(*user_var_name, item_param);
+      new Item_func_set_user_var(*user_var_name, item_param, false);
     /*
       Item_func_set_user_var is not fixed after construction, call
       fix_fields().

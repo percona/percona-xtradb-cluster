@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Oracle and/or its affiliates. All rights reserved. 
+/* Copyright (c) 2011, 2012, Oracle and/or its affiliates. All rights reserved. 
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -33,25 +33,8 @@ using my_testing::Mock_error_handler;
 class ItemTest : public ::testing::Test
 {
 protected:
-  static void SetUpTestCase()
-  {
-    Server_initializer::SetUpTestCase();
-  }
-
-  static void TearDownTestCase()
-  {
-    Server_initializer::TearDownTestCase();
-  }
-
-  virtual void SetUp()
-  {
-    initializer.SetUp();
-  }
-
-  virtual void TearDown()
-  {
-    initializer.TearDown();
-  }
+  virtual void SetUp() { initializer.SetUp(); }
+  virtual void TearDown() { initializer.TearDown(); }
 
   THD *thd() { return initializer.thd(); }
 
@@ -92,12 +75,12 @@ public:
     This is the only member function we need to override.
     We expect it to be called with specific arguments.
    */
-  virtual int store(longlong nr, bool unsigned_val)
+  virtual type_conversion_status store(longlong nr, bool unsigned_val)
   {
     EXPECT_EQ(m_expected_value, nr);
     EXPECT_FALSE(unsigned_val);
     ++m_store_called;
-    return 0;
+    return TYPE_OK;
   }
 
 private:
@@ -310,6 +293,18 @@ TEST_F(ItemTest, ItemFuncIntDivUnderflow)
 }
 
 
+TEST_F(ItemTest, ItemFuncNegLongLongMin)
+{
+  // Bug#14314156 MAIN.FUNC_MATH TEST FAILS ON MYSQL-TRUNK ON PB2
+  const longlong longlong_min= LONGLONG_MIN;
+  Item_func_neg *item_neg= new Item_func_neg(new Item_int(longlong_min));
+
+  EXPECT_FALSE(item_neg->fix_fields(thd(), NULL));
+  initializer.set_expected_error(ER_DATA_OUT_OF_RANGE);
+  EXPECT_EQ(0, item_neg->int_op());
+}
+
+
 /*
   This is not an exhaustive test. It simply demonstrates that more of the
   initializations in mysqld.cc are needed for testing Item_xxx classes.
@@ -322,7 +317,7 @@ TEST_F(ItemTest, ItemFuncSetUserVar)
 
   LEX_STRING var_name= { C_STRING_WITH_LEN("a") };
   Item_func_set_user_var *user_var=
-    new Item_func_set_user_var(var_name, item_str);
+    new Item_func_set_user_var(var_name, item_str, false);
   EXPECT_FALSE(user_var->set_entry(thd(), true));
   EXPECT_FALSE(user_var->fix_fields(thd(), NULL));
   EXPECT_EQ(val1, user_var->val_int());

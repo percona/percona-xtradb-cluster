@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -43,9 +43,6 @@ setup_without_group(THD *thd, Ref_ptr_array ref_pointer_array,
                     ORDER *order,
                     ORDER *group, bool *hidden_group_fields);
 static bool resolve_subquery(THD *thd, JOIN *join);
-static bool
-setup_new_fields(THD *thd, List<Item> &fields,
-		 List<Item> &all_fields, ORDER *new_field);
 static int
 setup_group(THD *thd, Ref_ptr_array ref_pointer_array, TABLE_LIST *tables,
             List<Item> &fields, List<Item> &all_fields, ORDER *order);
@@ -74,7 +71,7 @@ JOIN::prepare(TABLE_LIST *tables_init,
 	      uint wild_num, Item *conds_init, uint og_num,
 	      ORDER *order_init, ORDER *group_init,
 	      Item *having_init,
-	      ORDER *proc_param_init, SELECT_LEX *select_lex_arg,
+	      SELECT_LEX *select_lex_arg,
 	      SELECT_LEX_UNIT *unit_arg)
 {
   DBUG_ENTER("JOIN::prepare");
@@ -93,8 +90,7 @@ JOIN::prepare(TABLE_LIST *tables_init,
   conds= conds_init;
   order= ORDER_with_src(order_init, ESC_ORDER_BY);
   group_list= ORDER_with_src(group_init, ESC_GROUP_BY);
-  having= having_init;
-  proc_param= proc_param_init;
+  having= having_for_explain= having_init;
   tables_list= tables_init;
   select_lex= select_lex_arg;
   select_lex->join= this;
@@ -115,22 +111,6 @@ JOIN::prepare(TABLE_LIST *tables_init,
   trace_prepare.add_select_number(select_lex->select_number);
   Opt_trace_array trace_steps(trace, "steps");
 
-  /*
-    Permanently remove redundant parts from the query if
-      1) This is a subquery
-      2) This is the first time this query is optimized (since the
-         transformation is permanent
-      3) Not normalizing a view. Removal should take place when a
-         query involving a view is optimized, not when the view
-         is created
-  */
-  if (select_lex->master_unit()->item &&                               // 1)
-      select_lex->first_cond_optimization &&                           // 2)
-      !(thd->lex->context_analysis_only & CONTEXT_ANALYSIS_ONLY_VIEW)) // 3)
-  {
-    remove_redundant_subquery_clauses(select_lex);
-  }
-
   /* Check that all tables, fields, conds and order are ok */
 
   if (!(select_options & OPTION_SETUP_TABLES_DONE) &&
@@ -143,7 +123,9 @@ JOIN::prepare(TABLE_LIST *tables_init,
   for (table_ptr= select_lex->leaf_tables;
        table_ptr;
        table_ptr= table_ptr->next_leaf)
-    tables++;
+    primary_tables++;           // Count the primary input tables of the query
+
+  tables= primary_tables;       // This is currently the total number of tables
 
   /*
     Item and Item_field CTORs will both increment some counters
@@ -170,10 +152,24 @@ JOIN::prepare(TABLE_LIST *tables_init,
 			  &hidden_group_fields))
     DBUG_RETURN(-1);
 
+  /*
+    Permanently remove redundant parts from the query if
+      1) This is a subquery
+      2) This is the first time this query is optimized (since the
+         transformation is permanent)
+      3) Not normalizing a view. Removal should take place when a
+         query involving a view is optimized, not when the view
+         is created
+  */
+  if (select_lex->master_unit()->item &&                               // 1)
+      select_lex->first_cond_optimization &&                           // 2)
+      !(thd->lex->context_analysis_only & CONTEXT_ANALYSIS_ONLY_VIEW)) // 3)
+  {
+    remove_redundant_subquery_clauses(select_lex);
+  }
+
   if (having)
   {
-    Query_arena backup, *arena;
-    arena= thd->activate_stmt_arena_if_needed(&backup);
     nesting_map save_allow_sum_func= thd->lex->allow_sum_func;
     thd->where="having clause";
     thd->lex->allow_sum_func|= 1 << select_lex_arg->nest_level;
@@ -183,8 +179,7 @@ JOIN::prepare(TABLE_LIST *tables_init,
 			 (having->fix_fields(thd, &having) ||
 			  having->check_cols(1)));
     select_lex->having_fix_field= 0;
-    if (arena)
-      thd->restore_active_arena(arena, &backup);
+    select_lex->having= having;
 
     select_lex->resolve_place= st_select_lex::RESOLVE_NONE;
     if (having_fix_rc || thd->is_error())
@@ -207,6 +202,12 @@ JOIN::prepare(TABLE_LIST *tables_init,
     opt_trace_print_expanded_query(thd, select_lex, &trace_wrapper);
   }
 
+  /*
+    When normalizing a view (like when writing a view's body to the FRM),
+    subquery transformations don't apply (if they did, IN->EXISTS could not be
+    undone in favour of materialization, when optimizing a later statement
+    using the view)
+  */
   if (select_lex->master_unit()->item &&    // This is a subquery
                                             // Not normalizing a view
       !(thd->lex->context_analysis_only & CONTEXT_ANALYSIS_ONLY_VIEW) &&
@@ -315,45 +316,9 @@ JOIN::prepare(TABLE_LIST *tables_init,
     for (ORDER *group_tmp= group_list ; group_tmp ; group_tmp= group_tmp->next)
       send_group_parts++;
   }
-  
-  procedure= setup_procedure(thd, proc_param, result, fields_list, &error);
-  if (error)
-    goto err;					/* purecov: inspected */
-  if (procedure)
-  {
-    if (setup_new_fields(thd, fields_list, all_fields,
-			 procedure->param_fields))
-	goto err;				/* purecov: inspected */
-    if (procedure->group)
-    {
-      if (!test_if_subpart(procedure->group,group_list))
-      {						/* purecov: inspected */
-	my_message(ER_DIFF_GROUPS_PROC, ER(ER_DIFF_GROUPS_PROC),
-                   MYF(0));                     /* purecov: inspected */
-	goto err;				/* purecov: inspected */
-      }
-    }
-    if (order && (procedure->flags & PROC_NO_SORT))
-    {						/* purecov: inspected */
-      my_message(ER_ORDER_WITH_PROC, ER(ER_ORDER_WITH_PROC),
-                 MYF(0));                       /* purecov: inspected */
-      goto err;					/* purecov: inspected */
-    }
-    if (thd->lex->derived_tables)
-    {
-      my_error(ER_WRONG_USAGE, MYF(0), "PROCEDURE", 
-               thd->lex->derived_tables & DERIVED_VIEW ?
-               "view" : "subquery"); 
-      goto err;
-    }
-    if (thd->lex->sql_command != SQLCOM_SELECT)
-    {
-      my_error(ER_WRONG_USAGE, MYF(0), "PROCEDURE", "non-SELECT");
-      goto err;
-    }
-  }
 
-  if (!procedure && result && result->prepare(fields_list, unit_arg))
+
+  if (result && result->prepare(fields_list, unit_arg))
     goto err;					/* purecov: inspected */
 
   /* Init join struct */
@@ -380,11 +345,25 @@ JOIN::prepare(TABLE_LIST *tables_init,
   if (alloc_func_list())
     goto err;
 
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+  {
+    TABLE_LIST *tbl;
+    for (tbl= select_lex->leaf_tables; tbl; tbl= tbl->next_leaf)
+    {
+      /* 
+        This will only prune constant conditions, which will be used for
+        lock pruning.
+      */
+      Item *prune_cond= tbl->join_cond() ? tbl->join_cond() : conds;
+      if (prune_partitions(thd, tbl->table, prune_cond))
+        goto err;
+    }
+  }
+#endif
+
   DBUG_RETURN(0); // All OK
 
 err:
-  delete procedure;				/* purecov: inspected */
-  procedure= 0;
   DBUG_RETURN(-1);				/* purecov: inspected */
 }
 
@@ -400,7 +379,6 @@ err:
   @return TRUE if subquery allows materialization, FALSE otherwise.
 */
 
-static
 bool subquery_allows_materialization(Item_in_subselect *predicate,
                                      THD *thd,
                                      SELECT_LEX *select_lex,
@@ -417,7 +395,12 @@ bool subquery_allows_materialization(Item_in_subselect *predicate,
                       "IN (SELECT)", "materialization");
 
   const char *cause= NULL;
-  if (select_lex->is_part_of_union())
+  if (predicate->substype() != Item_subselect::IN_SUBS)
+  {
+    // Subq-mat cannot handle 'outer_expr > {ANY|ALL}(subq)'...
+    cause= "not an IN predicate";
+  }
+  else if (select_lex->is_part_of_union())
   {
     // Subquery must be a single query specification clause (not a UNION)
     cause= "in UNION";
@@ -437,17 +420,16 @@ bool subquery_allows_materialization(Item_in_subselect *predicate,
   }
   else if (!outer->leaf_tables)
   {
-    /*
-      The upper query is SELECT ... FROM DUAL. We can't do materialization for
-      SELECT .. FROM DUAL because it does not call
-      setup_subquery_materialization(). We could fix it but it's not worth it.
-    */
+    // The upper query is SELECT ... FROM DUAL. No gain in materializing.
     cause= "no tables in outer query";
   }
-  else if (predicate->is_correlated)
+  else if (predicate->originally_dependent())
   {
     /*
-      Subquery should not be correlated.
+      Subquery should not be correlated; the correlation due to predicates
+      injected by IN->EXISTS does not count as we will remove them if we
+      choose materialization.
+
       TODO:
       This is an overly restrictive condition. It can be extended to:
          (Subquery is non-correlated ||
@@ -457,12 +439,6 @@ bool subquery_allows_materialization(Item_in_subselect *predicate,
            aggregate functions}) && subquery predicate is not under "NOT IN"))
     */
     cause= "correlated";
-  }
-  else if (predicate->exec_method !=
-           Item_exists_subselect::EXEC_UNSPECIFIED)
-  {
-    // An execution method was already chosen (by a prepared statement).
-    cause= "already have strategy";
   }
   else
   {
@@ -512,13 +488,13 @@ bool subquery_allows_materialization(Item_in_subselect *predicate,
         cause= "cannot_handle_partial_matches";
       else
       {
-        trace_mat.add("chosen", true);
+        trace_mat.add("possible", true);
         DBUG_RETURN(TRUE);
       }
     }
   }
   DBUG_ASSERT(cause != NULL);
-  trace_mat.add("chosen", false).add_alnum("cause", cause);
+  trace_mat.add("possible", false).add_alnum("cause", cause);
   DBUG_RETURN(false);
 }
 
@@ -562,8 +538,6 @@ static bool resolve_subquery(THD *thd, JOIN *join)
   */
   Item_subselect *subq_predicate= select_lex->master_unit()->item;
   DBUG_ASSERT(subq_predicate);
-  const Item_subselect::subs_type subq_predicate_substype=
-    subq_predicate->substype();
   /**
     @note
     In this case: IN (SELECT ... UNION SELECT ...), JOIN::prepare() is
@@ -571,16 +545,12 @@ static bool resolve_subquery(THD *thd, JOIN *join)
     subq_predicate is the same, not sure this is desired (double work?).
   */
 
-  /* in_exists_predicate is non-NULL for IN, =ANY and EXISTS predicates */
-  Item_exists_subselect *in_exists_predicate= 
-    (subq_predicate_substype == Item_subselect::IN_SUBS ||
-     subq_predicate_substype == Item_subselect::EXISTS_SUBS) ?
-        (Item_exists_subselect*)subq_predicate :
-        NULL;
+  Item_in_subselect * const in_predicate=
+    (subq_predicate->substype() == Item_subselect::IN_SUBS) ?
+    static_cast<Item_in_subselect *>(subq_predicate) : NULL;
 
-  if (subq_predicate_substype == Item_subselect::IN_SUBS)
+  if (in_predicate)
   {
-    Item_in_subselect *in_predicate= (Item_in_subselect *)subq_predicate;
     /*
       Check if the left and right expressions have the same # of
       columns, i.e. we don't have a case like 
@@ -625,14 +595,9 @@ static bool resolve_subquery(THD *thd, JOIN *join)
       8. No execution method was already chosen (by a prepared statement)
       9. Parent select is not a confluent table-less select
       10. Neither parent nor child select have STRAIGHT_JOIN option.
-
-      Please note that subq_predicate and in_exists_predicate points to the
-      same object here, but in_exists_predicate is NULL if the predicate
-      is not IN or EXISTS. Therefore both pointers are needed in the same
-      statement.
   */
   if (thd->optimizer_switch_flag(OPTIMIZER_SWITCH_SEMIJOIN) &&
-      subq_predicate_substype == Item_subselect::IN_SUBS &&             // 1
+      in_predicate &&                                                   // 1
       !select_lex->is_part_of_union() &&                                // 2
       !select_lex->group_list.elements &&                               // 3
       !join->having && !select_lex->with_sum_func &&                    // 4
@@ -640,7 +605,7 @@ static bool resolve_subquery(THD *thd, JOIN *join)
        outer->resolve_place == st_select_lex::RESOLVE_JOIN_NEST) &&     // 5
       outer->join &&                                                    // 6
       select_lex->master_unit()->first_select()->leaf_tables &&         // 7
-      in_exists_predicate->exec_method == 
+      in_predicate->exec_method ==
                            Item_exists_subselect::EXEC_UNSPECIFIED &&   // 8
       outer->leaf_tables &&                                             // 9
       !((join->select_options | outer->join->select_options)
@@ -649,38 +614,19 @@ static bool resolve_subquery(THD *thd, JOIN *join)
     DBUG_PRINT("info", ("Subquery is semi-join conversion candidate"));
 
     /* Notify in the subquery predicate where it belongs in the query graph */
-    in_exists_predicate->embedding_join_nest= outer->resolve_nest;
+    in_predicate->embedding_join_nest= outer->resolve_nest;
 
     /* Register the subquery for further processing in flatten_subqueries() */
-    outer->join->sj_subselects.push_back(in_exists_predicate);
+    outer->join->sj_subselects.push_back(in_predicate);
     chose_semijoin= true;
   }
 
-  if (subq_predicate_substype == Item_subselect::IN_SUBS)
+  if (in_predicate)
   {
     Opt_trace_context * const trace= &join->thd->opt_trace;
     OPT_TRACE_TRANSFORM(trace, oto0, oto1,
                         select_lex->select_number, "IN (SELECT)", "semijoin");
     oto1.add("chosen", chose_semijoin);
-  }
-
-  if (!chose_semijoin &&
-      thd->optimizer_switch_flag(OPTIMIZER_SWITCH_MATERIALIZATION) &&
-      (subq_predicate_substype == Item_subselect::IN_SUBS))
-  {
-    /*
-      Check if the subquery predicate can be executed via materialization.
-
-      We have to determine whether we will perform subquery materialization
-      before calling the IN=>EXISTS transformation, so that we know whether to
-      perform the whole transformation or only that part of it which wraps
-      Item_in_subselect in an Item_in_optimizer.
-    */
-    Item_in_subselect *in_predicate= static_cast<Item_in_subselect *>
-      (subq_predicate);
-    if (subquery_allows_materialization(in_predicate, thd, select_lex, outer))
-      in_predicate->exec_method=
-        Item_exists_subselect::EXEC_MATERIALIZATION;
   }
 
   if (!chose_semijoin &&
@@ -876,11 +822,22 @@ void remove_redundant_subquery_clauses(st_select_lex *subq_select_lex)
 
   uint changelog= 0;
 
+  bool order_with_sum_func= false;
+  for (ORDER *o= subq_select_lex->join->order; o != NULL; o= o->next)
+    order_with_sum_func|= (*o->item)->with_sum_func;
   if (subq_select_lex->order_list.elements)
   {
     changelog|= REMOVE_ORDER;
     subq_select_lex->join->order= NULL;
-    subq_select_lex->order_list.empty();
+    /*
+      If the ORDER BY clause contains aggregate functions, we cannot
+      remove it from subq_select_lex->order_list since the aggregate
+      function still appears in the inner_sum_func_list for some
+      SELECT_LEX. Clearing subq_select_lex->join->order has made sure
+      it won't be executed.
+     */
+    if (!order_with_sum_func)
+      subq_select_lex->order_list.empty();
   }
 
   if (subq_select_lex->options & SELECT_DISTINCT)
@@ -1405,41 +1362,6 @@ setup_group(THD *thd, Ref_ptr_array ref_pointer_array, TABLE_LIST *tables,
 }
 
 
-/**
-  Add fields with aren't used at start of field list.
-
-  @return
-    FALSE if ok
-*/
-
-static bool
-setup_new_fields(THD *thd, List<Item> &fields,
-		 List<Item> &all_fields, ORDER *new_field)
-{
-  Item	  **item;
-  uint counter;
-  enum_resolution_type not_used;
-  DBUG_ENTER("setup_new_fields");
-
-  thd->mark_used_columns= MARK_COLUMNS_READ;       // Not really needed, but...
-  for (; new_field ; new_field= new_field->next)
-  {
-    if ((item= find_item_in_list(*new_field->item, fields, &counter,
-				 IGNORE_ERRORS, &not_used)))
-      new_field->item=item;			/* Change to shared Item */
-    else
-    {
-      thd->where="procedure list";
-      if ((*new_field->item)->fix_fields(thd, new_field->item))
-	DBUG_RETURN(1); /* purecov: inspected */
-      all_fields.push_front(*new_field->item);
-      new_field->item=all_fields.head_ref();
-    }
-  }
-  DBUG_RETURN(0);
-}
-
-
 /****************************************************************************
   ROLLUP handling
 ****************************************************************************/
@@ -1535,6 +1457,7 @@ bool JOIN::rollup_init()
 {
   uint i,j;
   Item **ref_array;
+  ORDER *group_tmp;
 
   tmp_table_param.quick_group= 0;	// Can't create groups in tmp table
   rollup.state= ROLLUP::STATE_INITED;
@@ -1565,13 +1488,17 @@ bool JOIN::rollup_init()
     Prepare space for field list for the different levels
     These will be filled up in rollup_make_fields()
   */
+  group_tmp= group_list;
   for (i= 0 ; i < send_group_parts ; i++)
   {
-    rollup.null_items[i]= new (thd->mem_root) Item_null_result();
+    rollup.null_items[i]=
+      new (thd->mem_root) Item_null_result((*group_tmp->item)->field_type(),
+                                           (*group_tmp->item)->result_type());
     List<Item> *rollup_fields= &rollup.fields[i];
     rollup_fields->empty();
     rollup.ref_pointer_arrays[i]= Ref_ptr_array(ref_array, all_fields.elements);
     ref_array+= all_fields.elements;
+    group_tmp= group_tmp->next;
   }
   for (i= 0 ; i < send_group_parts; i++)
   {
@@ -1582,7 +1509,6 @@ bool JOIN::rollup_init()
   Item *item;
   while ((item= it++))
   {
-    ORDER *group_tmp;
     bool found_in_group= 0;
 
     for (group_tmp= group_list; group_tmp; group_tmp= group_tmp->next)

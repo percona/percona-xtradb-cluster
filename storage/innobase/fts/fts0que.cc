@@ -24,6 +24,7 @@ Created 2007/03/27 Sunny Bains
 Completed 2011/7/10 Sunny and Jimmy Yang
 *******************************************************/
 
+#include "dict0dict.h" /* dict_table_get_n_rows() */
 #include "ut0rbt.h"
 #include "row0sel.h"
 #include "fts0fts.h"
@@ -57,15 +58,10 @@ static const double FTS_NORMALIZE_COEFF = 0.0115F;
 /* For parsing the search phrase */
 static const char* FTS_PHRASE_DELIMITER = "\t ";
 
-typedef struct fts_match_struct fts_match_t;
-typedef	struct fts_query_struct fts_query_t;
-typedef struct fts_phrase_struct fts_phrase_t;
-typedef struct fts_select_struct fts_select_t;
-typedef struct fts_doc_freq_struct fts_doc_freq_t;
-typedef struct fts_word_freq_struct fts_word_freq_t;
+struct fts_word_freq_t;
 
 /** State of an FTS query. */
-struct fts_query_struct {
+struct fts_query_t {
 	mem_heap_t*	heap;		/*!< Heap to use for allocations */
 
 	trx_t*		trx;		/*!< The query transaction */
@@ -126,7 +122,7 @@ struct fts_query_struct {
 					position info for each matched word
 					in the word list */
 
-	ib_int64_t	total_docs;	/*!< The total number of documents */
+	ib_uint64_t	total_docs;	/*!< The total number of documents */
 
 	ulint		total_words;	/*!< The total number of words */
 
@@ -144,7 +140,7 @@ struct fts_query_struct {
 
 /** For phrase matching, first we collect the documents and the positions
 then we match. */
-struct fts_match_struct {
+struct fts_match_t {
 	doc_id_t	doc_id;		/*!< Document id */
 
 	ulint		start;		/*!< Start the phrase match from
@@ -158,7 +154,7 @@ struct fts_match_struct {
 /** For matching tokens in a phrase search. We use this data structure in
 the callback that determines whether a document should be accepted or
 rejected for a phrase search. */
-struct fts_select_struct {
+struct fts_select_t {
 	doc_id_t	doc_id;		/*!< The document id to match */
 
 	ulint		min_pos;	/*!< For found to be TRUE at least
@@ -174,7 +170,7 @@ struct fts_select_struct {
 };
 
 /** The match positions and tokesn to match */
-struct fts_phrase_struct {
+struct fts_phrase_t {
 	ibool		found;		/*!< Match result */
 
 	const fts_match_t*
@@ -191,20 +187,20 @@ struct fts_phrase_struct {
 };
 
 /** For storing the frequncy of a word/term in a document */
-struct fts_doc_freq_struct {
+struct fts_doc_freq_t {
 	doc_id_t	doc_id;		/*!< Document id */
 	ulint		freq;		/*!< Frequency of a word in a document */
 };
 
 /** To determine the word frequency per document. */
-struct fts_word_freq_struct {
+struct fts_word_freq_t {
 	byte*		word;		/*!< Word for which we need the freq,
 					it's allocated on the query heap */
 
 	ib_rbt_t*	doc_freqs;	/*!< RB Tree for storing per document
 					word frequencies. The elements are
 					of type fts_doc_freq_t */
-	ulint		doc_count;	/*!< Total number of documents that
+	ib_uint64_t	doc_count;	/*!< Total number of documents that
 					contain this word */
 	double		idf;		/*!< Inverse document frequency */
 };
@@ -994,15 +990,21 @@ fts_query_difference(
 		ut_a(index_cache != NULL);
 
 		/* Search the cache for a matching word first. */
-		nodes = fts_cache_find_word(index_cache, token);
+		if (query->cur_node->term.wildcard
+		    && query->flags != FTS_PROXIMITY
+		    && query->flags != FTS_PHRASE) {
+			fts_cache_find_wildcard(query, index_cache, token);
+		} else {
+			nodes = fts_cache_find_word(index_cache, token);
 
-		for (i = 0; nodes && i < ib_vector_size(nodes); ++i) {
-			const fts_node_t*	node;
+			for (i = 0; nodes && i < ib_vector_size(nodes); ++i) {
+				const fts_node_t*	node;
 
-			node = static_cast<const fts_node_t*>(
-				ib_vector_get_const(nodes, i));
+				node = static_cast<const fts_node_t*>(
+					ib_vector_get_const(nodes, i));
 
-			fts_query_check_node(query, token, node);
+				fts_query_check_node(query, token, node);
+			}
 		}
 
 		rw_lock_x_unlock(&cache->lock);
@@ -2485,6 +2487,7 @@ fts_ast_visit_sub_exp(
 	ib_rbt_t*		subexpr_doc_ids;
 	dberr_t			error = DB_SUCCESS;
 	ibool			inited = query->inited;
+	bool			will_be_ignored = false;
 
 	ut_a(node->type == FTS_AST_SUBEXP_LIST);
 
@@ -2512,7 +2515,8 @@ fts_ast_visit_sub_exp(
 
 	/* Process nodes in current sub-expression and store its
 	result set in query->doc_ids we created above. */
-	error = fts_ast_visit(FTS_NONE, node->next, visitor, arg);
+	error = fts_ast_visit(FTS_NONE, node->next, visitor,
+			      arg, &will_be_ignored);
 
 	/* Reinstate parent node state and prepare for merge. */
 	query->inited = inited;
@@ -2748,6 +2752,8 @@ fts_query_read_node(
 	ut_a(query->cur_node->type == FTS_AST_TERM ||
 	     query->cur_node->type == FTS_AST_TEXT);
 
+	memset(&node, 0, sizeof(node));
+
 	/* Need to consider the wildcard search case, the word frequency
 	is created on the search string not the actual word. So we need
 	to assign the frequency on search string behalf. */
@@ -2870,8 +2876,8 @@ fts_query_calculate_idf(
 /*====================*/
 	fts_query_t*	query)	/*!< in: Query state */
 {
-	const ib_rbt_node_t* node;
-	double		total_docs = query->total_docs;
+	const ib_rbt_node_t*	node;
+	ib_uint64_t		total_docs = query->total_docs;
 
 	/* We need to free any instances of fts_doc_freq_t that we
 	may have allocated. */
@@ -2884,7 +2890,7 @@ fts_query_calculate_idf(
 		word_freq = rbt_value(fts_word_freq_t, node);
 
 		if (word_freq->doc_count > 0) {
-			if (total_docs == (double) word_freq->doc_count) {
+			if (total_docs == word_freq->doc_count) {
 				/* QP assume ranking > 0 if we find
 				a match. Since Log10(1) = 0, we cannot
 				make IDF a zero value if do find a
@@ -2898,10 +2904,13 @@ fts_query_calculate_idf(
 			}
 		}
 
-		fprintf(stderr,"'%s' -> " INT64PF "/%lu %6.5lf\n",
-		       word_freq->word,
-		       query->total_docs, word_freq->doc_count,
-		       word_freq->idf);
+		if (fts_enable_diag_print) {
+			fprintf(stderr,"'%s' -> " UINT64PF "/" UINT64PF
+				" %6.5lf\n",
+			        word_freq->word,
+			        query->total_docs, word_freq->doc_count,
+			        word_freq->idf);
+		}
 	}
 }
 
@@ -3008,7 +3017,7 @@ fts_retrieve_ranking(
 
 		ranking = rbt_value(fts_ranking_t, parent.last);
 
-		return (ranking->rank);
+		return(ranking->rank);
 	}
 
 	return(0);
@@ -3187,7 +3196,7 @@ fts_query(
 	fts_result_t**	result)		/*!< in/out: result doc ids */
 {
 	fts_query_t	query;
-	dberr_t		error;
+	dberr_t		error = DB_SUCCESS;
 	byte*		lc_query_str;
 	ulint		lc_query_str_len;
 	ulint		result_len;
@@ -3195,6 +3204,7 @@ fts_query(
 	trx_t*		query_trx;
 	CHARSET_INFO*	charset;
 	ulint		start_time_ms;
+	bool		will_be_ignored = false;
 
 	boolean_mode = flags & FTS_BOOL;
 
@@ -3230,18 +3240,21 @@ fts_query(
 	query.word_freqs = rbt_create_arg_cmp(
 		sizeof(fts_word_freq_t), innobase_fts_string_cmp, charset);
 
-	query.total_docs = fts_get_total_document_count(index->table);
+	query.total_docs = dict_table_get_n_rows(index->table);
 
-	error = fts_get_total_word_count(trx, query.index, &query.total_words);
+#ifdef FTS_DOC_STATS_DEBUG
+	if (ft_enable_diag_print) {
+		error = fts_get_total_word_count(
+			trx, query.index, &query.total_words);
 
-	if (error != DB_SUCCESS) {
-		goto func_exit;
+		if (error != DB_SUCCESS) {
+			goto func_exit;
+		}
+
+		fprintf(stderr, "Total docs: " UINT64PF " Total words: %lu\n",
+			query.total_docs, query.total_words);
 	}
-
-#ifdef	FTS_INTERNAL_DIAG_PRINT
-	fprintf(stderr, "Total docs: " INT64PF " Total words: %lu\n",
-		query.total_docs, query.total_words);
-#endif
+#endif /* FTS_DOC_STATS_DEBUG */
 
 	query.fts_common_table.suffix = "DELETED";
 
@@ -3290,13 +3303,14 @@ fts_query(
 		sizeof(fts_ranking_t), fts_ranking_doc_id_cmp);
 
 	/* Parse the input query string. */
-	if (fts_query_parse(&query, lc_query_str, query_len)) {
+	if (fts_query_parse(&query, lc_query_str, result_len)) {
 		fts_ast_node_t*	ast = query.root;
 
 		/* Traverse the Abstract Syntax Tree (AST) and execute
 		the query. */
 		query.error = fts_ast_visit(
-			FTS_NONE, ast, fts_query_visitor, &query);
+			FTS_NONE, ast, fts_query_visitor,
+			&query, &will_be_ignored);
 
 		/* If query expansion is requested, extend the search
 		with first search pass result */

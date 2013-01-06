@@ -49,6 +49,7 @@ Group_cache::add_logged_group(const THD *thd, my_off_t binlog_offset)
 {
   DBUG_ENTER("Group_cache::add_logged_group(THD *, my_off_t)");
   const Gtid_specification &spec= thd->variables.gtid_next;
+  DBUG_ASSERT(spec.type != UNDEFINED_GROUP);
   // merge with previous group if possible
   Cached_group *prev= get_last_group();
   if (prev != NULL && prev->spec.equals(spec))
@@ -146,17 +147,17 @@ enum_return_status Group_cache::generate_automatic_gno(THD *thd)
         else
         {
           automatic_type= GTID_GROUP;
-          automatic_gtid.sidno= gtid_state.get_server_sidno();
-          gtid_state.lock_sidno(automatic_gtid.sidno);
+          automatic_gtid.sidno= gtid_state->get_server_sidno();
+          gtid_state->lock_sidno(automatic_gtid.sidno);
           automatic_gtid.gno=
-            gtid_state.get_automatic_gno(automatic_gtid.sidno);
+            gtid_state->get_automatic_gno(automatic_gtid.sidno);
           if (automatic_gtid.gno == -1)
           {
-            gtid_state.unlock_sidno(automatic_gtid.sidno);
+            gtid_state->unlock_sidno(automatic_gtid.sidno);
             RETURN_REPORTED_ERROR;
           }
-          gtid_state.acquire_ownership(thd, automatic_gtid);
-          gtid_state.unlock_sidno(automatic_gtid.sidno);
+          gtid_state->acquire_ownership(thd, automatic_gtid);
+          gtid_state->unlock_sidno(automatic_gtid.sidno);
         }
       }
       group->spec.type= automatic_type;
@@ -175,7 +176,12 @@ enum_return_status Group_cache::get_gtids(Gtid_set *gs) const
   for (int i= 0; i < n_groups; i++)
   {
     Cached_group *group= get_unsafe_pointer(i);
-    PROPAGATE_REPORTED_ERROR(gs->_add_gtid(group->spec.gtid));
+    /*
+      Cached groups only have GTIDs if SET @@SESSION.GTID_NEXT statement
+      was executed before group.
+    */
+    if (group->spec.type == GTID_GROUP)
+      PROPAGATE_REPORTED_ERROR(gs->_add_gtid(group->spec.gtid));
   }
   RETURN_OK;
 }

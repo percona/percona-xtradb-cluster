@@ -38,16 +38,18 @@ struct PFS_thread;
 /**
   Structure to store a MD5 hash value (digest) for a statement.
 */
-struct PFS_digest_hash
+struct PFS_digest_key
 {
   unsigned char m_md5[PFS_MD5_SIZE];
+  char m_schema_name[NAME_LEN];
+  uint m_schema_name_length;
 };
 
 /** A statement digest stat record. */
-struct PFS_statements_digest_stat
+struct PFS_ALIGNED PFS_statements_digest_stat
 {
-  /** Digest MD5 Hash. */
-  PFS_digest_hash m_digest_hash;
+  /** Digest Schema + MD5 Hash. */
+  PFS_digest_key m_digest_key;
 
   /** Digest Storage. */
   PSI_digest_storage m_digest_storage;
@@ -71,7 +73,9 @@ void cleanup_digest();
 int init_digest_hash(void);
 void cleanup_digest_hash(void);
 PFS_statement_stat* find_or_create_digest(PFS_thread *thread,
-                                          PSI_digest_storage *digest_storage);
+                                          PSI_digest_storage *digest_storage,
+                                          const char *schema_name,
+                                          uint schema_name_length);
 
 void get_digest_text(char *digest_text, PSI_digest_storage *digest_storage);
 
@@ -91,7 +95,7 @@ static inline void digest_reset(PSI_digest_storage *digest)
 {
   digest->m_full= false;
   digest->m_byte_count= 0;
-  digest->m_charset= NULL;
+  digest->m_charset_number= 0;
 }
 
 static inline void digest_copy(PSI_digest_storage *to, const PSI_digest_storage *from)
@@ -100,7 +104,7 @@ static inline void digest_copy(PSI_digest_storage *to, const PSI_digest_storage 
   {
     to->m_full= from->m_full;
     to->m_byte_count= from->m_byte_count;
-    to->m_charset= from->m_charset;
+    to->m_charset_number= from->m_charset_number;
     DBUG_ASSERT(to->m_byte_count <= PSI_MAX_DIGEST_STORAGE_SIZE);
     memcpy(to->m_token_array, from->m_token_array, to->m_byte_count);
   }
@@ -110,7 +114,7 @@ static inline void digest_copy(PSI_digest_storage *to, const PSI_digest_storage 
     DBUG_ASSERT(from->m_byte_count == 0);
     to->m_full= false;
     to->m_byte_count= 0;
-    to->m_charset= NULL;
+    to->m_charset_number= 0;
   }
 }
 
@@ -210,5 +214,7 @@ inline void store_token_identifier(PSI_digest_storage* digest_storage,
     digest_storage->m_full= true;
   }
 }
+
+extern LF_HASH digest_hash;
 
 #endif

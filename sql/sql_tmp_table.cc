@@ -21,6 +21,7 @@
 #include "sql_base.h"
 #include "opt_trace.h"
 #include "debug_sync.h"
+#include "filesort.h"   // filesort_free_buffers
 
 #include <algorithm>
 using std::max;
@@ -43,8 +44,6 @@ using std::min;
                       the record in the original table.
                       If item == NULL then fill_record() will update
                       the temporary table
-  @param convert_blob_length   If >0 create a varstring(convert_blob_length)
-                               field instead of blob.
 
   @retval
     NULL		on error
@@ -54,23 +53,12 @@ using std::min;
 
 Field *create_tmp_field_from_field(THD *thd, Field *org_field,
                                    const char *name, TABLE *table,
-                                   Item_field *item, uint convert_blob_length)
+                                   Item_field *item)
 {
   Field *new_field;
 
-  /* 
-    Make sure that the blob fits into a Field_varstring which has 
-    2-byte lenght. 
-  */
-  if (convert_blob_length && convert_blob_length <= Field_varstring::MAX_SIZE &&
-      (org_field->flags & BLOB_FLAG))
-    new_field= new Field_varstring(convert_blob_length,
-                                   org_field->maybe_null(),
-                                   org_field->field_name, table->s,
-                                   org_field->charset());
-  else
-    new_field= org_field->new_field(thd->mem_root, table,
-                                    table == org_field->table);
+  new_field= org_field->new_field(thd->mem_root, table,
+                                  table == org_field->table);
   if (new_field)
   {
     new_field->init(table);
@@ -106,8 +94,6 @@ Field *create_tmp_field_from_field(THD *thd, Field *org_field,
                                update the record in the original table.
                                If modify_item is 0 then fill_record() will
                                update the temporary table
-  @param convert_blob_length   If >0 create a varstring(convert_blob_length)
-                               field instead of blob.
 
   @retval
     0  on error
@@ -116,8 +102,7 @@ Field *create_tmp_field_from_field(THD *thd, Field *org_field,
 */
 
 static Field *create_tmp_field_from_item(THD *thd, Item *item, TABLE *table,
-                                         Item ***copy_func, bool modify_item,
-                                         uint convert_blob_length)
+                                         Item ***copy_func, bool modify_item)
 {
   bool maybe_null= item->maybe_null;
   Field *new_field;
@@ -151,16 +136,6 @@ static Field *create_tmp_field_from_item(THD *thd, Item *item, TABLE *table,
     */
     if (item->is_temporal() || item->field_type() == MYSQL_TYPE_GEOMETRY)
       new_field= item->tmp_table_field_from_field_type(table, 1);
-    /* 
-      Make sure that the blob fits into a Field_varstring which has 
-      2-byte lenght. 
-    */
-    else if (item->max_length/item->collation.collation->mbmaxlen > 255 &&
-             convert_blob_length <= Field_varstring::MAX_SIZE && 
-             convert_blob_length)
-      new_field= new Field_varstring(convert_blob_length, maybe_null,
-                                     item->item_name.ptr(), table->s,
-                                     item->collation.collation);
     else
       new_field= item->make_string_field(table);
     new_field->set_derivation(item->collation.derivation);
@@ -177,8 +152,17 @@ static Field *create_tmp_field_from_item(THD *thd, Item *item, TABLE *table,
   }
   if (new_field)
     new_field->init(table);
-    
-  if (copy_func && item->is_result_field())
+
+  /*
+    If the item is a function, a pointer to the item is stored in
+    copy_func. We separate fields from functions by checking if the
+    item is a result field item. The real_item() must be checked to
+    avoid falsely identifying Item_ref and its subclasses as functions
+    when they refer to field-like items, such as Item_copy and
+    subclasses. References to true fields have already been untangled
+    in the beginning of create_tmp_field().
+   */
+  if (copy_func && item->real_item()->is_result_field())
     *((*copy_func)++) = item;			// Save for copy_funcs
   if (modify_item)
     item->set_result_field(new_field);
@@ -244,8 +228,6 @@ static Field *create_tmp_field_for_schema(THD *thd, Item *item, TABLE *table)
                        the record in the original table.
                        If modify_item is 0 then fill_record() will update
                        the temporary table
-  @param convert_blob_length If >0 create a varstring(convert_blob_length)
-                             field instead of blob.
 
   @retval
     0			on error
@@ -258,8 +240,7 @@ Field *create_tmp_field(THD *thd, TABLE *table,Item *item, Item::Type type,
                         Field **default_field,
                         bool group, bool modify_item,
                         bool table_cant_handle_bit_fields,
-                        bool make_copy_field,
-                        uint convert_blob_length)
+                        bool make_copy_field)
 {
   Field *result;
   Item::Type orig_type= type;
@@ -277,7 +258,7 @@ Field *create_tmp_field(THD *thd, TABLE *table,Item *item, Item::Type type,
   case Item::SUM_FUNC_ITEM:
   {
     Item_sum *item_sum=(Item_sum*) item;
-    result= item_sum->create_tmp_field(group, table, convert_blob_length);
+    result= item_sum->create_tmp_field(group, table);
     if (!result)
       my_error(ER_OUT_OF_RESOURCES, MYF(ME_FATALERROR));
     return result;
@@ -296,7 +277,7 @@ Field *create_tmp_field(THD *thd, TABLE *table,Item *item, Item::Type type,
     if (field->maybe_null && !field->field->maybe_null())
     {
       result= create_tmp_field_from_item(thd, item, table, NULL,
-                                         modify_item, convert_blob_length);
+                                         modify_item);
       *from_field= field->field;
       if (result && modify_item)
         field->result_field= result;
@@ -306,7 +287,7 @@ Field *create_tmp_field(THD *thd, TABLE *table,Item *item, Item::Type type,
     {
       *from_field= field->field;
       result= create_tmp_field_from_item(thd, item, table, copy_func,
-                                        modify_item, convert_blob_length);
+                                         modify_item);
       if (result && modify_item)
         field->result_field= result;
     }
@@ -316,8 +297,7 @@ Field *create_tmp_field(THD *thd, TABLE *table,Item *item, Item::Type type,
                                           item->item_name.ptr(),
                                           table,
                                           modify_item ? field :
-                                          NULL,
-                                          convert_blob_length);
+                                          NULL);
     if (orig_type == Item::REF_ITEM && orig_modify)
       ((Item_ref*)orig_item)->set_result_field(result);
     /*
@@ -351,8 +331,7 @@ Field *create_tmp_field(THD *thd, TABLE *table,Item *item, Item::Type type,
                                     sp_result_field,
                                     item_func_sp->item_name.ptr(),
                                     table,
-                                    NULL,
-                                    convert_blob_length);
+                                    NULL);
 
       if (modify_item)
         item->set_result_field(result_field);
@@ -381,7 +360,7 @@ Field *create_tmp_field(THD *thd, TABLE *table,Item *item, Item::Type type,
     }
     return create_tmp_field_from_item(thd, item, table,
                                       (make_copy_field ? 0 : copy_func),
-                                       modify_item, convert_blob_length);
+                                       modify_item);
   case Item::TYPE_HOLDER:  
     result= ((Item_type_holder *)item)->make_field_by_type(table);
     result->set_derivation(item->collation.derivation);
@@ -668,8 +647,7 @@ create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
             create_tmp_field(thd, table, arg, arg->type(), &copy_func,
                              tmp_from_field, &default_field[fieldnr],
                              group != 0,not_all_columns,
-                             distinct, 0,
-                             param->convert_blob_length);
+                             distinct, false);
 	  if (!new_field)
 	    goto err;					// Should be OOM
 	  tmp_from_field++;
@@ -731,8 +709,7 @@ create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
                            usable in this case too.
                          */
                          item->marker == 4 || param->bit_fields_as_long,
-                         force_copy_fields,
-                         param->convert_blob_length);
+                         force_copy_fields);
 
       if (!new_field)
       {
@@ -1006,6 +983,7 @@ create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
   param->end_write_records= rows_limit;
 
   keyinfo= param->keyinfo;
+  keyinfo->table= table;
 
   if (group)
   {
@@ -1017,7 +995,9 @@ create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
     table->key_info= share->key_info= keyinfo;
     keyinfo->key_part= key_part_info;
     keyinfo->flags=HA_NOSAME;
-    keyinfo->usable_key_parts=keyinfo->key_parts= param->group_parts;
+    keyinfo->usable_key_parts=keyinfo->user_defined_key_parts=
+      param->group_parts;
+    keyinfo->actual_key_parts= keyinfo->user_defined_key_parts;
     keyinfo->key_length=0;
     keyinfo->rec_per_key=0;
     keyinfo->algorithm= HA_KEY_ALG_UNDEF;
@@ -1032,12 +1012,12 @@ create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
       if (!using_unique_constraint)
       {
 	cur_group->buff=(char*) group_buff;
-	if (!(cur_group->field= field->new_key_field(thd->mem_root,table,
-                                                     group_buff +
-                                                     test(maybe_null),
-                                                     field->null_ptr,
-                                                     field->null_bit)))
+	cur_group->field= field->new_key_field(thd->mem_root, table,
+                                               group_buff + test(maybe_null));
+
+	if (!cur_group->field)
 	  goto err; /* purecov: inspected */
+
 	if (maybe_null)
 	{
 	  /*
@@ -1056,6 +1036,7 @@ create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
       }
       keyinfo->key_length+=  key_part_info->store_length;
     }
+    keyinfo->actual_flags= keyinfo->flags;
   }
 
   if (distinct && field_count != param->hidden_field_count)
@@ -1078,20 +1059,23 @@ create_tmp_table(THD *thd,TMP_TABLE_PARAM *param,List<Item> &fields,
       share->uniques= 1;
     }
     null_pack_length-=hidden_null_pack_length;
-    keyinfo->key_parts= ((field_count-param->hidden_field_count)+
-			 (share->uniques ? test(null_pack_length) : 0));
+    keyinfo->user_defined_key_parts= 
+      ((field_count-param->hidden_field_count) +
+       (share->uniques ? test(null_pack_length) : 0));
+    keyinfo->actual_key_parts= keyinfo->user_defined_key_parts;
     table->distinct= 1;
     share->keys= 1;
     if (!(key_part_info= (KEY_PART_INFO*)
           alloc_root(&table->mem_root,
-                     keyinfo->key_parts * sizeof(KEY_PART_INFO))))
+                     keyinfo->user_defined_key_parts * sizeof(KEY_PART_INFO))))
       goto err;
-    memset(key_part_info, 0, keyinfo->key_parts * sizeof(KEY_PART_INFO));
+    memset(key_part_info, 0, keyinfo->user_defined_key_parts *
+           sizeof(KEY_PART_INFO));
     table->key_info= share->key_info= keyinfo;
     keyinfo->key_part= key_part_info;
-    keyinfo->flags= HA_NOSAME | HA_NULL_ARE_EQUAL;
+    keyinfo->actual_flags= keyinfo->flags= HA_NOSAME | HA_NULL_ARE_EQUAL;
     keyinfo->key_length= 0;  // Will compute the sum of the parts below.
-    keyinfo->name= (char*) "distinct_key";
+    keyinfo->name= (char*) "<auto_key>";
     keyinfo->algorithm= HA_KEY_ALG_UNDEF;
     keyinfo->rec_per_key= 0;
 
@@ -1319,7 +1303,6 @@ TABLE *create_duplicate_weedout_tmp_table(THD *thd,
     share->db_plugin= ha_lock_engine(0, myisam_hton);
     table->file= get_new_handler(share, &table->mem_root,
                                  share->db_type());
-    DBUG_ASSERT(uniq_tuple_length_arg <= table->file->max_key_length());
   }
   else
   {
@@ -1404,8 +1387,9 @@ TABLE *create_duplicate_weedout_tmp_table(THD *thd,
     share->uniques= test(using_unique_constraint);
     table->key_info= table->s->key_info= keyinfo;
     keyinfo->key_part=key_part_info;
-    keyinfo->flags=HA_NOSAME;
-    keyinfo->usable_key_parts= keyinfo->key_parts= 1;
+    keyinfo->actual_flags= keyinfo->flags= HA_NOSAME;
+    keyinfo->usable_key_parts= keyinfo->user_defined_key_parts= 1;
+    keyinfo->actual_key_parts= keyinfo->user_defined_key_parts;
     keyinfo->key_length=0;
     keyinfo->rec_per_key=0;
     keyinfo->algorithm= HA_KEY_ALG_UNDEF;
@@ -1419,10 +1403,8 @@ TABLE *create_duplicate_weedout_tmp_table(THD *thd,
       key_part_info->key_type = FIELDFLAG_BINARY;
       if (!using_unique_constraint)
       {
-	if (!(key_field= field->new_key_field(thd->mem_root, table,
-                                              group_buff,
-                                              field->null_ptr,
-                                              field->null_bit)))
+        key_field= field->new_key_field(thd->mem_root, table, group_buff);
+        if (!key_field)
 	  goto err;
         key_part_info->key_part_flag|= HA_END_SPACE_ARE_EQUAL; //todo need this?
       }
@@ -1661,13 +1643,14 @@ bool create_myisam_tmp_table(TABLE *table, KEY *keyinfo,
       share->keys= 1;
     }
     HA_KEYSEG *seg= (HA_KEYSEG*) alloc_root(&table->mem_root,
-                                            sizeof(*seg) * keyinfo->key_parts);
+                                            sizeof(*seg) *
+                                            keyinfo->user_defined_key_parts);
     if (!seg)
       goto err;
 
-    memset(seg, 0, sizeof(*seg) * keyinfo->key_parts);
+    memset(seg, 0, sizeof(*seg) * keyinfo->user_defined_key_parts);
     if (keyinfo->key_length >= table->file->max_key_length() ||
-	keyinfo->key_parts > table->file->max_key_parts() ||
+	keyinfo->user_defined_key_parts > table->file->max_key_parts() ||
 	share->uniques)
     {
       /* Can't create a key; Make a unique constraint instead of a key */
@@ -1675,7 +1658,7 @@ bool create_myisam_tmp_table(TABLE *table, KEY *keyinfo,
       share->uniques= 1;
       using_unique_constraint=1;
       memset(&uniquedef, 0, sizeof(uniquedef));
-      uniquedef.keysegs=keyinfo->key_parts;
+      uniquedef.keysegs=keyinfo->user_defined_key_parts;
       uniquedef.seg=seg;
       uniquedef.null_are_equal=1;
 
@@ -1691,10 +1674,10 @@ bool create_myisam_tmp_table(TABLE *table, KEY *keyinfo,
       /* Create an unique key */
       memset(&keydef, 0, sizeof(keydef));
       keydef.flag= keyinfo->flags;
-      keydef.keysegs=  keyinfo->key_parts;
+      keydef.keysegs=  keyinfo->user_defined_key_parts;
       keydef.seg= seg;
     }
-    for (uint i=0; i < keyinfo->key_parts ; i++,seg++)
+    for (uint i=0; i < keyinfo->user_defined_key_parts ; i++,seg++)
     {
       Field *field=keyinfo->key_part[i].field;
       seg->flag=     0;
@@ -1722,7 +1705,7 @@ bool create_myisam_tmp_table(TABLE *table, KEY *keyinfo,
       if (!(field->flags & NOT_NULL_FLAG))
       {
 	seg->null_bit= field->null_bit;
-	seg->null_pos= (uint) (field->null_ptr - (uchar*) table->record[0]);
+	seg->null_pos= field->null_offset();
 	/*
 	  We are using a GROUP BY on something that contains NULL
 	  In this case we have to tell MyISAM that two NULL should
@@ -1744,7 +1727,7 @@ bool create_myisam_tmp_table(TABLE *table, KEY *keyinfo,
                        start_recinfo,
                        share->uniques, &uniquedef,
                        &create_info,
-                       HA_CREATE_TMP_TABLE | 
+                       HA_CREATE_TMP_TABLE | HA_CREATE_INTERNAL_TABLE |
                        ((share->db_create_options & HA_OPTION_PACK_RECORD) ?
                         HA_PACK_RECORD : 0)
                        )))
@@ -1849,6 +1832,8 @@ free_tmp_table(THD *thd, TABLE *entry)
 
   // Release latches since this can take a long time
   ha_release_temporary_latches(thd);
+
+  filesort_free_buffers(entry, true);
 
   if (entry->file && entry->created)
   {
@@ -1974,7 +1959,12 @@ bool create_myisam_from_heap(THD *thd, TABLE *table,
   if (table->file->indexes_are_disabled())
     new_table.file->ha_disable_indexes(HA_KEY_SWITCH_ALL);
   table->file->ha_index_or_rnd_end();
-  table->file->ha_rnd_init(1);
+  if ((write_err= table->file->ha_rnd_init(1)))
+  {
+    table->file->print_error(write_err, MYF(ME_FATALERROR));
+    write_err= 0;
+    goto err;
+  }
   if (table->no_rows)
   {
     new_table.file->extra(HA_EXTRA_NO_ROWS);
@@ -2053,9 +2043,13 @@ bool create_myisam_from_heap(THD *thd, TABLE *table,
   DBUG_RETURN(0);
 
  err:
-  DBUG_PRINT("error",("Got error: %d",write_err));
-  table->file->print_error(write_err, MYF(0));
-  (void) table->file->ha_rnd_end();
+  if (write_err)
+  {
+    DBUG_PRINT("error",("Got error: %d",write_err));
+    new_table.file->print_error(write_err, MYF(0));
+  }
+  if (table->file->inited)
+    (void) table->file->ha_rnd_end();
   (void) new_table.file->ha_close();
  err1:
   new_table.file->ha_delete_table(new_table.s->table_name.str);

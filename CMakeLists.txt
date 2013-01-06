@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2011, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2012, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@ if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}" GREATER 2.6)
  CMAKE_POLICY(VERSION 2.8)
 endif()
 
+MESSAGE(STATUS "Running cmake version ${CMAKE_VERSION}")
 
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
@@ -58,7 +59,12 @@ ENDIF()
 SET(BUILDTYPE_DOCSTRING
  "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or
  CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel")
- 
+
+# Possibly temporary fix: Clang on 32 bit causes non-debug server to crash
+IF(CMAKE_OSX_ARCHITECTURES MATCHES "i386")
+  SET(CMAKE_CXX_COMPILER g++)
+ENDIF()
+
 IF(WITH_DEBUG)
   SET(CMAKE_BUILD_TYPE "Debug" CACHE STRING ${BUILDTYPE_DOCSTRING} FORCE)
   SET(MYSQL_MAINTAINER_MODE ON CACHE BOOL
@@ -103,7 +109,7 @@ IF(BUILD_CONFIG)
   ${CMAKE_SOURCE_DIR}/cmake/build_configurations/${BUILD_CONFIG}.cmake)
 ENDIF()
 
-#cmake on 64 bit windows doesn't set CMAKE_SYSTEM_PROCESSOR correctly
+#cmake on 64bit windows/mac/solaris doesn't set CMAKE_SYSTEM_PROCESSOR correctly
 SET(MYSQL_MACHINE_TYPE ${CMAKE_SYSTEM_PROCESSOR})
 
 
@@ -179,6 +185,7 @@ ENDIF()
 
 # Add macros
 INCLUDE(character_sets)
+INCLUDE(cpu_info)
 INCLUDE(zlib)
 INCLUDE(libevent)
 INCLUDE(ssl)
@@ -219,9 +226,9 @@ ENDIF()
 OPTION(ENABLE_GCOV "Enable gcov (debug, Linux builds only)" OFF)
 IF (ENABLE_GCOV AND NOT WIN32 AND NOT APPLE)
   SET(CMAKE_CXX_FLAGS_DEBUG
-    "${CMAKE_CXX_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage")
+    "${CMAKE_CXX_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage -DHAVE_GCOV")
   SET(CMAKE_C_FLAGS_DEBUG
-    "${CMAKE_C_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage")
+    "${CMAKE_C_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage -DHAVE_GCOV")
   SET(CMAKE_EXE_LINKER_FLAGS_DEBUG
     "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage -lgcov")
 ENDIF()
@@ -319,7 +326,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/include)
 
 # Add bundled or system zlib.
 MYSQL_CHECK_ZLIB_WITH_COMPRESS()
-# Optionally add bundled yassl/taocrypt or system openssl.
+# Add bundled yassl/taocrypt or system openssl.
 MYSQL_CHECK_SSL()
 # Add readline or libedit.
 MYSQL_CHECK_READLINE()
@@ -366,6 +373,7 @@ ADD_SUBDIRECTORY(strings)
 ADD_SUBDIRECTORY(vio)
 ADD_SUBDIRECTORY(regex)
 ADD_SUBDIRECTORY(mysys)
+ADD_SUBDIRECTORY(mysys_ssl)
 ADD_SUBDIRECTORY(libmysql)
 IF(WITH_WSREP)
 ADD_SUBDIRECTORY(wsrep)
@@ -401,6 +409,10 @@ IF(NOT WITHOUT_SERVER)
   IF(UNIX)
     ADD_SUBDIRECTORY(man)
   ENDIF()
+  IF(EXISTS ${CMAKE_SOURCE_DIR}/internal/CMakeLists.txt)
+    ADD_SUBDIRECTORY(internal)
+  ENDIF()
+  ADD_SUBDIRECTORY(packaging/rpm-uln)
 ENDIF()
 
 INCLUDE(cmake/abi_check.cmake)
@@ -438,6 +450,7 @@ ELSE()
   SET(CPACK_GENERATOR "TGZ")
 ENDIF() 
 ADD_SUBDIRECTORY(packaging/WiX)
+ADD_SUBDIRECTORY(packaging/solaris)
 
 # Create a single package with "make package"
 # (see http://public.kitware.com/Bug/view.php?id=11452)

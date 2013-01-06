@@ -88,7 +88,7 @@ SET @@collation_connection = @collation_connection_saved||
 INSERT INTO global_suppressions VALUES
  (".SELECT UNIX_TIMESTAMP... failed on master"),
  ("Aborted connection"),
- ("Client requested master to start replication from impossible position"),
+ ("Client requested master to start replication from position"),
  ("Could not find first log file name in binary log"),
  ("Enabling keys got errno"),
  ("Error reading master configuration"),
@@ -173,6 +173,8 @@ INSERT INTO global_suppressions VALUES
 
  /*It will print a warning if a new UUID of server is generated.*/
  ("No existing UUID has been found, so we assume that this is the first time that this server has been started.*"),
+ /*It will print a warning if server is run without --explicit_defaults_for_timestamp.*/
+ ("TIMESTAMP with implicit DEFAULT value is deprecated. Please use --explicit_defaults_for_timestamp server option (see documentation for more details)*"),
 
  /* Added 2009-08-XX after fixing Bug #42408 */
 
@@ -237,6 +239,9 @@ INSERT INTO global_suppressions VALUES
   of events, this warning is emitted.
   */
  ("Slave SQL: Coordinator thread of multi-threaded slave is being stopped in the middle of assigning a group of events.*"),
+ 
+ ("Changed limits: max_open_files: *  max_connections: *  table_cache: *"),
+ ("Could not increase number of max_open_files to more than *"),
 
  ("THE_LAST_SUPPRESSION")||
 

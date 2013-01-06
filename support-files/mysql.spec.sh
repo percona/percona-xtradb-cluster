@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2012, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -194,7 +194,7 @@
         %endif
       %else
         %if %(test -f /etc/SuSE-release && echo 1 || echo 0)
-          %define susever %(rpm -qf --qf '%%{version}\\n' /etc/SuSE-release)
+          %define susever %(rpm -qf --qf '%%{version}\\n' /etc/SuSE-release | cut -d. -f1)
           %if "%susever" == "10"
             %define distro_description    SUSE Linux Enterprise Server 10
             %define distro_releasetag     sles10
@@ -217,9 +217,9 @@
     %endif
   %endif
 %else
-  %define generic_kernel %(uname -r | cut -d. -f1-2)
-  %define distro_description            Generic Linux (kernel %{generic_kernel})
-  %define distro_releasetag             linux%{generic_kernel}
+  %define glibc_version %(/lib/libc.so.6 | grep stable | cut -d, -f1 | cut -c38-)
+  %define distro_description            Generic Linux (glibc %{glibc_version})
+  %define distro_releasetag             linux_glibc%{glibc_version}
   %define distro_buildreq               gcc-c++ gperf ncurses-devel perl  time zlib-devel
   %define distro_requires               coreutils grep procps /sbin/chkconfig /usr/sbin/useradd /usr/sbin/groupadd
 %endif
@@ -270,6 +270,9 @@ Vendor:         %{mysql_vendor}
 Provides:       msqlormysql MySQL-server mysql
 BuildRequires:  %{distro_buildreq}
 
+# Regression tests may take a long time, override the default to skip them 
+%{!?runselftest:%global runselftest 1}
+
 # Think about what you use here since the first step is to
 # run a rm -rf
 BuildRoot:    %{_tmppath}/%{name}-%{version}-build
@@ -305,8 +308,8 @@ Version:        %{mysql_version}
 Summary:	MySQL: a very fast and reliable SQL database server
 Group:		Applications/Databases
 Requires:	%{distro_requires}
-Provides:	msqlormysql mysql MySQL mysql-server MySQL-server
-Obsoletes:	mysql MySQL mysql-server MySQL-server
+Provides:	msqlormysql MySQL MySQL-server
+Conflicts:	mysql mysql-server mysql-advanced mysql-server-advanced
 Obsoletes:	MySQL-server-community MySQL-server-advanced
 
 %description -n MySQL-server%{product_suffix}
@@ -340,8 +343,8 @@ package "MySQL-client%{product_suffix}" as well!
 %package -n MySQL-client%{product_suffix}
 Summary:	MySQL - Client
 Group:		Applications/Databases
-Provides:	mysql-client MySQL-client
-Obsoletes:	mysql-client MySQL-client
+Provides:	MySQL-client
+Conflicts:	mysql mysql-advanced
 Obsoletes:	MySQL-client-community MySQL-client-advanced
 
 %description -n MySQL-client%{product_suffix}
@@ -354,8 +357,8 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 Summary:	MySQL - Test suite
 Group:		Applications/Databases
 Requires:	MySQL-client perl
-Provides:	mysql-test MySQL-test
-Obsoletes:	mysql-test MySQL-test
+Provides:	MySQL-test
+Conflicts:	mysql-test mysql-test-advanced
 Obsoletes:	MySQL-test-community MySQL-test-advanced
 AutoReqProv:	no
 
@@ -368,8 +371,8 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 %package -n MySQL-devel%{product_suffix}
 Summary:	MySQL - Development header files and libraries
 Group:		Applications/Databases
-Provides:	mysql-devel MySQL-devel
-Obsoletes:	mysql-devel MySQL-devel
+Provides:	MySQL-devel
+Conflicts:	mysql-devel mysql-embedded-devel mysql-devel-advanced mysql-embedded-devel-advanced
 Obsoletes:	MySQL-devel-community MySQL-devel-advanced
 
 %description -n MySQL-devel%{product_suffix}
@@ -382,8 +385,8 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 %package -n MySQL-shared%{product_suffix}
 Summary:	MySQL - Shared libraries
 Group:		Applications/Databases
-Provides:	mysql-shared MySQL-shared
-Obsoletes:	mysql-shared MySQL-shared
+Provides:	MySQL-shared
+Conflicts:	mysql-libs mysql-libs-advanced
 Obsoletes:	MySQL-shared-community MySQL-shared-advanced
 
 %description -n MySQL-shared%{product_suffix}
@@ -396,8 +399,8 @@ and applications need to dynamically load and use MySQL.
 Summary:	MySQL - Embedded library
 Group:		Applications/Databases
 Requires:	MySQL-devel
-Provides:	mysql-embedded MySQL-embedded
-Obsoletes:	mysql-embedded MySQL-embedded
+Provides:	MySQL-embedded
+Conflicts:	mysql-embedded mysql-embedded-advanced
 Obsoletes:	MySQL-embedded-community MySQL-embedded-advanced
 
 %description -n MySQL-embedded%{product_suffix}
@@ -419,6 +422,16 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 
 ##############################################################################
 %build
+
+# Fail quickly and obviously if user tries to build as root
+%if %runselftest
+    if [ x"`id -u`" = x0 ]; then
+        echo "The MySQL regression tests may fail if run as root."
+        echo "If you really need to build the RPM as root, use"
+        echo "--define='runselftest 0' to skip the regression tests."
+        exit 1
+    fi
+%endif
 
 # Be strict about variables, bail at earliest opportunity, etc.
 set -eu
@@ -448,6 +461,15 @@ export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-}
 
+# By default, a build will include the bundeled "yaSSL" library for SSL.
+# However, there may be a need to override.
+# Protect against undefined variables if there is no override option.
+%if %{undefined with_ssl}
+%define ssl_option   %{nil}
+%else
+%define ssl_option   -DWITH_SSL=%{with_ssl}
+%endif
+
 # Build debug mysqld and libmysqld.a
 mkdir debug
 (
@@ -471,6 +493,7 @@ mkdir debug
            -DCMAKE_BUILD_TYPE=Debug \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
+           %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
 %if %{defined with_wsrep}
            -DWITH_WSREP=1 \
@@ -489,6 +512,7 @@ mkdir release
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
+           %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
 %if %{defined with_wsrep}
            -DWITH_WSREP=1 \
@@ -497,6 +521,13 @@ mkdir release
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG} VERBOSE=1
 )
+
+%if %runselftest
+  MTR_BUILD_THREAD=auto
+  export MTR_BUILD_THREAD
+
+  (cd release && make test-bt-fast || true)
+%endif
 
 ##############################################################################
 %install
@@ -591,8 +622,13 @@ fi
 # Check if we can safely upgrade.  An upgrade is only safe if it's from one
 # of our RPMs in the same version family.
 
+# Handle both ways of spelling the capability.
 installed=`rpm -q --whatprovides mysql-server 2> /dev/null`
+if [ $? -ne 0 -o -z "$installed" ]; then
+  installed=`rpm -q --whatprovides MySQL-server 2> /dev/null`
+fi
 if [ $? -eq 0 -a -n "$installed" ]; then
+  installed=`echo $installed | sed 's/\([^ ]*\) .*/\1/'` # Tests have shown duplicated package names
   vendor=`rpm -q --queryformat='%{VENDOR}' "$installed" 2>&1`
   version=`rpm -q --queryformat='%{VERSION}' "$installed" 2>&1`
   myoldvendor='%{mysql_old_vendor}'
@@ -695,7 +731,9 @@ NEW_VERSION=%{mysql_version}-%{release}
 
 # The "pre" section code is also run on a first installation,
 # when there  is no data directory yet. Protect against error messages.
-if [ -d $mysql_datadir ] ; then
+# Check for the existence of subdirectory "mysql/", the database of system
+# tables like "mysql.user".
+if [ -d $mysql_datadir/mysql ] ; then
 	echo "MySQL RPM upgrade to version $NEW_VERSION"  > $STATUS_FILE
 	echo "'pre' step running at `date`"          >> $STATUS_FILE
 	echo                                         >> $STATUS_FILE
@@ -809,7 +847,13 @@ if ! grep '^MySQL RPM upgrade' $STATUS_FILE >/dev/null 2>&1 ; then
 	# Fix bug#45415: no "mysql_install_db" on an upgrade
 	# Do this as a negative to err towards more "install" runs
 	# rather than to miss one.
-	%{_bindir}/mysql_install_db --rpm --user=%{mysqld_user}
+	%{_bindir}/mysql_install_db --rpm --user=%{mysqld_user} --random-passwords
+
+	# Attention: Now 'root' is the only database user,
+	# its password is a random value found in ~/.mysql_secret,
+	# and the "password expired" flag is set:
+	# Any client needs that password, and the first command
+	# executed must be a new "set password"!
 fi
 
 # ----------------------------------------------------------------------
@@ -997,7 +1041,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %{src_dir}/Docs/ChangeLog
 %doc %{src_dir}/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
-%doc release/support-files/my-*.cnf
+%doc release/support-files/my-default.cnf
 %if %{defined with_wsrep}
 %doc %{src_dir}/Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
@@ -1075,7 +1119,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_sbindir}/mysqld-debug
 %attr(755, root, root) %{_sbindir}/rcmysql
 %attr(755, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
-%attr(755, root, root) %{_bindir}/innodb_memcached_config.sql
 
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
@@ -1104,6 +1147,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/mysqlimport
 %attr(755, root, root) %{_bindir}/mysqlshow
 %attr(755, root, root) %{_bindir}/mysqlslap
+%attr(755, root, root) %{_bindir}/mysql_config_editor
 
 %doc %attr(644, root, man) %{_mandir}/man1/msql2mysql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.1*
@@ -1117,6 +1161,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlimport.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlshow.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlslap.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysql_config_editor.1*
 
 # ----------------------------------------------------------------------------
 %files -n MySQL-devel%{product_suffix} -f optional-files-devel
@@ -1174,6 +1219,38 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Mon Nov 05 2012 Joerg Bruehe <joerg.bruehe@oracle.com>
+
+- Allow to override the default to use the bundled yaSSL by an option like
+      --define="with_ssl /path/to/ssl"
+
+* Wed Oct 10 2012 Bjorn Munch <bjorn.munch@oracle.com>
+
+- Replace old my-*.cnf config file examples with template my-default.cnf
+
+* Fri Oct 05 2012 Joerg Bruehe <joerg.bruehe@oracle.com>
+
+- Let the installation use the new option "--random-passwords" of "mysql_install_db".
+  (Bug# 12794345 Ensure root password)
+- Fix an inconsistency: "new install" vs "upgrade" are told from the (non)existence
+  of "$mysql_datadir/mysql" (holding table "mysql.user" and other system stuff).
+
+* Tue Jul 24 2012 Joerg Bruehe <joerg.bruehe@oracle.com>
+
+- Add a macro "runselftest":
+  if set to 1 (default), the test suite will be run during the RPM build;
+  this can be oveeridden via the command line by adding
+      --define "runselftest 0"
+  Failures of the test suite will NOT make the RPM build fail!
+
+* Mon Jul 16 2012 Joerg Bruehe <joerg.bruehe@oracle.com>
+
+- Add the man page for the "mysql_config_editor".
+
+* Mon Jun 11 2012 Joerg Bruehe <joerg.bruehe@oracle.com>
+
+- Make sure newly added "SPECIFIC-ULN/" directory does not disturb packaging.
+
 * Wed Feb 29 2012 Brajmohan Saxena <brajmohan.saxena@oracle.com>
 
 - Removal all traces of the readline library from mysql (BUG 13738013)

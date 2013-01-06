@@ -159,6 +159,22 @@ extern void *my_memdup(const void *from,size_t length,myf MyFlags);
 extern char *my_strdup(const char *from,myf MyFlags);
 extern char *my_strndup(const char *from, size_t length,
 				   myf MyFlags);
+
+/*
+  Switch to my_malloc() if the memory block to be allocated is bigger than
+  max_alloca_sz.
+*/
+#ifndef HAVE_ALLOCA
+#define my_safe_alloca(size, max_alloca_sz) my_alloca(size)
+#define my_safe_afree(ptr, size, max_alloca_sz) my_afree(ptr)
+#else
+#define my_safe_alloca(size, max_alloca_sz) ((size <= max_alloca_sz) ? \
+                                             my_alloca(size) : \
+                                             my_malloc(size, MYF(0)))
+#define my_safe_afree(ptr, size, max_alloca_sz) if (size > max_alloca_sz) \
+                                               my_free(ptr)
+#endif                                          /* #ifndef HAVE_ALLOCA */
+
 #if !defined(DBUG_OFF) || defined(HAVE_VALGRIND)
 /**
   Put bad content in memory to be sure it will segfault if dereferenced.
@@ -251,7 +267,6 @@ extern CHARSET_INFO compiled_charsets[];
 /* statistics */
 extern ulong	my_file_opened,my_stream_opened, my_tmp_file_created;
 extern ulong    my_file_total_opened;
-extern uint	mysys_usage_id;
 extern my_bool	my_init_done;
 
 					/* Point to current my_message() */
@@ -272,10 +287,6 @@ extern my_bool  my_disable_locking, my_disable_async_io,
                 my_disable_flush_key_blocks, my_disable_symlinks;
 extern char	wild_many,wild_one,wild_prefix;
 extern const char *charsets_dir;
-/* from default.c */
-extern const char *my_defaults_extra_file;
-extern const char *my_defaults_group_suffix;
-extern const char *my_defaults_file;
 
 extern my_bool timed_mutexes;
 
@@ -560,10 +571,6 @@ my_off_t my_b_safe_tell(IO_CACHE* info); /* picks the correct tell() */
 
 typedef uint32 ha_checksum;
 
-/* Define the type of function to be passed to process_default_option_files */
-typedef int (*Process_option_func)(void *ctx, const char *group_name,
-                                   const char *option);
-
 #include <my_alloc.h>
 
 
@@ -653,6 +660,7 @@ extern int my_sync(File fd, myf my_flags);
 extern int my_sync_dir(const char *dir_name, myf my_flags);
 extern int my_sync_dir_by_file(const char *file_name, myf my_flags);
 extern char *my_strerror(char *buf, size_t len, int errnum);
+extern const char *my_get_err_msg(int nr);
 extern void my_error(int nr,myf MyFlags, ...);
 extern void my_printf_error(uint my_err, const char *format,
                             myf MyFlags, ...)
@@ -695,7 +703,7 @@ extern char * fn_format(char * to,const char *name,const char *dir,
 extern size_t strlength(const char *str);
 extern void pack_dirname(char * to,const char *from);
 extern size_t normalize_dirname(char * to, const char *from);
-extern size_t unpack_dirname(char * to,const char *from);
+extern size_t unpack_dirname(char * to,const char *from, my_bool *is_symdir);
 extern size_t cleanup_dirname(char * to,const char *from);
 extern size_t system_filename(char * to,const char *from);
 extern size_t unpack_filename(char * to,const char *from);
@@ -838,22 +846,6 @@ static inline char *safe_strdup_root(MEM_ROOT *root, const char *str)
 }
 extern char *strmake_root(MEM_ROOT *root,const char *str,size_t len);
 extern void *memdup_root(MEM_ROOT *root,const void *str, size_t len);
-extern int get_defaults_options(int argc, char **argv,
-                                char **defaults, char **extra_defaults,
-                                char **group_suffix);
-extern my_bool my_getopt_use_args_separator;
-extern my_bool my_getopt_is_args_separator(const char* arg);
-extern int my_load_defaults(const char *conf_file, const char **groups,
-                            int *argc, char ***argv, const char ***);
-extern int load_defaults(const char *conf_file, const char **groups,
-                         int *argc, char ***argv);
-extern int my_search_option_files(const char *conf_file, int *argc,
-                                  char ***argv, uint *args_used,
-                                  Process_option_func func, void *func_ctx,
-                                  const char **default_directories);
-extern void free_defaults(char **argv);
-extern void my_print_default_files(const char *conf_file);
-extern void print_defaults(const char *conf_file, const char **groups);
 extern my_bool my_compress(uchar *, size_t *, size_t *);
 extern my_bool my_uncompress(uchar *, size_t , size_t *);
 extern uchar *my_compress_alloc(const uchar *packet, size_t *len,
@@ -990,6 +982,18 @@ void my_init_mysys_psi_keys(void);
 
 struct st_mysql_file;
 extern struct st_mysql_file *mysql_stdin;
+
+enum durability_properties
+{
+  /*
+    Preserves the durability properties defined by the engine */
+  HA_REGULAR_DURABILITY= 0,
+  /* 
+     Ignore the durability properties defined by the engine and
+     write only in-memory entries.
+  */
+  HA_IGNORE_DURABILITY= 1
+};
 
 C_MODE_END
 #endif /* _my_sys_h */

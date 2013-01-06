@@ -479,7 +479,7 @@ EXPLAIN
       "access_type": "ALL",
       "rows": 3,
       "filtered": 100,
-      "attached_condition": "<in_optimizer>(1,<exists>(select 1 from `test`.`t2` where ((`test`.`t2`.`b` < 3) and (<cache>(1) = 1))))",
+      "attached_condition": "<in_optimizer>(1,<exists>(select 1 from `test`.`t2` where (`test`.`t2`.`b` < 3)))",
       "attached_subqueries": [
         {
           "dependent": true,
@@ -1397,6 +1397,9 @@ EXPLAIN
         "b"
       ] /* possible_keys */,
       "key": "a",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "5",
       "rows": 1,
       "filtered": 100,
@@ -1426,6 +1429,9 @@ EXPLAIN
         "a"
       ] /* possible_keys */,
       "key": "a",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "5",
       "ref": [
         "const"
@@ -1477,6 +1483,9 @@ EXPLAIN
         "b"
       ] /* possible_keys */,
       "key": "a",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "5",
       "rows": 1,
       "filtered": 100,
@@ -1505,6 +1514,9 @@ EXPLAIN
         "a"
       ] /* possible_keys */,
       "key": "a",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "5",
       "rows": 1,
       "filtered": 100,
@@ -1554,6 +1566,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 1,
         "filtered": 100,
@@ -1585,6 +1600,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 1,
         "filtered": 100,
@@ -1634,6 +1652,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 3,
         "filtered": 100,
@@ -1665,6 +1686,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 3,
         "filtered": 100,
@@ -1720,6 +1744,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 4,
         "filtered": 100,
@@ -1748,6 +1775,9 @@ EXPLAIN
         "table_name": "t1",
         "access_type": "index",
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 1,
         "filtered": 400,
@@ -1904,6 +1934,9 @@ EXPLAIN
             "PRIMARY"
           ] /* possible_keys */,
           "key": "PRIMARY",
+          "used_key_parts": [
+            "a2"
+          ] /* used_key_parts */,
           "key_length": "4",
           "ref": [
             "test.t1.a1"
@@ -1921,6 +1954,10 @@ EXPLAIN
             "PRIMARY"
           ] /* possible_keys */,
           "key": "PRIMARY",
+          "used_key_parts": [
+            "a3",
+            "b3"
+          ] /* used_key_parts */,
           "key_length": "8",
           "ref": [
             "test.t2.b2",
@@ -1966,6 +2003,9 @@ EXPLAIN
             "PRIMARY"
           ] /* possible_keys */,
           "key": "PRIMARY",
+          "used_key_parts": [
+            "a2"
+          ] /* used_key_parts */,
           "key_length": "4",
           "ref": [
             "test.t1.a1"
@@ -1983,6 +2023,10 @@ EXPLAIN
             "PRIMARY"
           ] /* possible_keys */,
           "key": "PRIMARY",
+          "used_key_parts": [
+            "a3",
+            "b3"
+          ] /* used_key_parts */,
           "key_length": "8",
           "ref": [
             "test.t2.b2",
@@ -2499,6 +2543,11 @@ EXPLAIN
           "a"
         ] /* possible_keys */,
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b",
+          "c"
+        ] /* used_key_parts */,
         "key_length": "15",
         "rows": "X",
         "filtered": "X",
@@ -2527,6 +2576,11 @@ EXPLAIN
         "table_name": "t2",
         "access_type": "index",
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b",
+          "c"
+        ] /* used_key_parts */,
         "key_length": "15",
         "rows": "X",
         "filtered": "X",
@@ -2782,6 +2836,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 8,
         "filtered": 100,
@@ -2813,6 +2870,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 8,
         "filtered": 100,
@@ -2852,8 +2912,8 @@ EXPLAIN EXTENDED DELETE   FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	ALL	i	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON DELETE   FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
@@ -2878,18 +2938,18 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	ALL	i	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`i` AS `i` from `test`.`t1` where ((`test`.`t1`.`i` > 10) and (`test`.`t1`.`i` <= 18)) order by `test`.`t1`.`i` limit 5
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
@@ -2914,10 +2974,10 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`i` AS `i` from `test`.`t1` where ((`test`.`t1`.`i` > 10) and (`test`.`t1`.`i` <= 18)) order by `test`.`t1`.`i` limit 5
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
@@ -3062,6 +3122,11 @@ EXPLAIN
           "a"
         ] /* possible_keys */,
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b",
+          "c"
+        ] /* used_key_parts */,
         "key_length": "15",
         "rows": "X",
         "filtered": "X",
@@ -3090,6 +3155,11 @@ EXPLAIN
         "table_name": "t2",
         "access_type": "index",
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b",
+          "c"
+        ] /* used_key_parts */,
         "key_length": "15",
         "rows": "X",
         "filtered": "X",
@@ -3133,7 +3203,7 @@ EXPLAIN EXTENDED DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t2	ALL	a	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
@@ -3158,7 +3228,7 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -3226,7 +3296,7 @@ EXPLAIN EXTENDED DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t2	ALL	a	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;;
@@ -3251,7 +3321,7 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -3299,7 +3369,8 @@ DROP TABLE t1, t2;
 CREATE TABLE t1 (i INT);
 INSERT INTO t1 (i) VALUES (10),(11),(12),(13),(14),(15),(16),(17),(18),(19),
 (20),(21),(22),(23),(24),(25),(26),(27),(28),(29),
-(30),(31),(32),(33),(34),(35);
+(30),(31),(32),(33),(34),(35),(36),(37),(38),(39),
+(40),(41),(42);
 CREATE TABLE t2 (i INT, key1 INT, key2 INT, INDEX (key1), INDEX (key2));
 INSERT INTO t2 (key1, key2) SELECT i, i FROM t1;
 #
@@ -3308,12 +3379,12 @@ INSERT INTO t2 (key1, key2) SELECT i, i FROM t1;
 #
 EXPLAIN DELETE   FROM t2 WHERE key1 < 13 or key2 < 14 ORDER BY key1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	key1,key2	NULL	NULL	NULL	26	Using where; Using filesort
+1	SIMPLE	t2	index_merge	key1,key2	key1,key2	5,5	NULL	5	Using sort_union(key1,key2); Using where; Using filesort
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED DELETE   FROM t2 WHERE key1 < 13 or key2 < 14 ORDER BY key1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t2	ALL	key1,key2	NULL	NULL	NULL	26	100.00	Using where; Using filesort
+1	SIMPLE	t2	index_merge	key1,key2	key1,key2	5,5	NULL	5	100.00	Using sort_union(key1,key2); Using where; Using filesort
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON DELETE   FROM t2 WHERE key1 < 13 or key2 < 14 ORDER BY key1;;
@@ -3326,12 +3397,14 @@ EXPLAIN
       "table": {
         "delete": true,
         "table_name": "t2",
-        "access_type": "ALL",
+        "access_type": "index_merge",
         "possible_keys": [
           "key1",
           "key2"
         ] /* possible_keys */,
-        "rows": 26,
+        "key": "sort_union(key1,key2)",
+        "key_length": "5,5",
+        "rows": 5,
         "filtered": 100,
         "attached_condition": "((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14))"
       } /* table */
@@ -3342,7 +3415,7 @@ FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2 WHERE key1 < 13 or key2 < 14 ORDER BY key1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t2	ALL	key1,key2	NULL	NULL	NULL	26	100.00	Using where; Using filesort
+1	SIMPLE	t2	index_merge	key1,key2	key1,key2	5,5	NULL	5	100.00	Using sort_union(key1,key2); Using where; Using filesort
 Warnings:
 Note	1003	/* select#1 */ select `test`.`t2`.`i` AS `i`,`test`.`t2`.`key1` AS `key1`,`test`.`t2`.`key2` AS `key2` from `test`.`t2` where ((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14)) order by `test`.`t2`.`key1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
@@ -3356,12 +3429,14 @@ EXPLAIN
       "using_filesort": true,
       "table": {
         "table_name": "t2",
-        "access_type": "ALL",
+        "access_type": "index_merge",
         "possible_keys": [
           "key1",
           "key2"
         ] /* possible_keys */,
-        "rows": 26,
+        "key": "sort_union(key1,key2)",
+        "key_length": "5,5",
+        "rows": 5,
         "filtered": 100,
         "attached_condition": "((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14))"
       } /* table */
@@ -3372,20 +3447,19 @@ Warnings:
 Note	1003	/* select#1 */ select `test`.`t2`.`i` AS `i`,`test`.`t2`.`key1` AS `key1`,`test`.`t2`.`key2` AS `key2` from `test`.`t2` where ((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14)) order by `test`.`t2`.`key1`
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_first	1
-Handler_read_key	1
-Handler_read_rnd_next	27
+Handler_read_key	6
+Handler_read_next	7
+Handler_read_rnd	4
+Sort_range	1
 Sort_rows	4
-Sort_scan	1
 # Status of testing query execution:
 Variable_name	Value
 Handler_delete	4
-Handler_read_first	1
-Handler_read_key	5
-Handler_read_rnd	4
-Handler_read_rnd_next	27
+Handler_read_key	10
+Handler_read_next	7
+Handler_read_rnd	8
+Sort_range	1
 Sort_rows	4
-Sort_scan	1
 
 DROP TABLE t1, t2;
 #36
@@ -3424,6 +3498,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 8,
         "filtered": 100,
@@ -3455,6 +3532,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 8,
         "filtered": 100,
@@ -3599,6 +3679,10 @@ EXPLAIN
           "a"
         ] /* possible_keys */,
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b"
+        ] /* used_key_parts */,
         "key_length": "6",
         "rows": "X",
         "filtered": "X"
@@ -3626,6 +3710,10 @@ EXPLAIN
         "table_name": "t2",
         "access_type": "index",
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b"
+        ] /* used_key_parts */,
         "key_length": "6",
         "rows": "X",
         "filtered": "X"
@@ -3685,6 +3773,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": "X",
         "filtered": "X",
@@ -3716,6 +3807,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": "X",
         "filtered": "X",
@@ -3758,8 +3852,8 @@ EXPLAIN EXTENDED UPDATE t2 SET a = 10 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t2	ALL	i	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON UPDATE t2 SET a = 10 WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;;
@@ -3784,18 +3878,18 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE i > 10 AND i <= 18 ORDER BY i LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t2	ALL	i	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 Note	1003	/* select#1 */ select `test`.`t2`.`a` AS `a`,`test`.`t2`.`i` AS `i` from `test`.`t2` where ((`test`.`t2`.`i` > 10) and (`test`.`t2`.`i` <= 18)) order by `test`.`t2`.`i` limit 5
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
 Variable_name	Value
@@ -3820,10 +3914,10 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
-Warning	1738	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
+Warning	1739	Cannot use range access on index 'i' due to type or collation conversion on field 'i'
 Note	1003	/* select#1 */ select `test`.`t2`.`a` AS `a`,`test`.`t2`.`i` AS `i` from `test`.`t2` where ((`test`.`t2`.`i` > 10) and (`test`.`t2`.`i` <= 18)) order by `test`.`t2`.`i` limit 5
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
@@ -3969,6 +4063,11 @@ EXPLAIN
           "a"
         ] /* possible_keys */,
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b",
+          "c"
+        ] /* used_key_parts */,
         "key_length": "15",
         "rows": "X",
         "filtered": "X",
@@ -3997,6 +4096,11 @@ EXPLAIN
         "table_name": "t2",
         "access_type": "index",
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b",
+          "c"
+        ] /* used_key_parts */,
         "key_length": "15",
         "rows": "X",
         "filtered": "X",
@@ -4041,7 +4145,7 @@ EXPLAIN EXTENDED UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t2	ALL	a	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;;
@@ -4066,7 +4170,7 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -4134,7 +4238,7 @@ EXPLAIN EXTENDED UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t2	ALL	a	NULL	NULL	NULL	26	100.00	Using where; Using filesort
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON UPDATE t2 SET d = 10 WHERE b = 10 ORDER BY a, c LIMIT 5;;
@@ -4159,7 +4263,7 @@ EXPLAIN
   } /* query_block */
 }
 Warnings:
-Warning	1738	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
+Warning	1739	Cannot use range access on index 'a' due to type or collation conversion on field 'b'
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2     WHERE b = 10 ORDER BY a, c LIMIT 5;
@@ -4206,7 +4310,8 @@ DROP TABLE t1, t2;
 CREATE TABLE t1 (i INT);
 INSERT INTO t1 VALUES (10),(11),(12),(13),(14),(15),(16),(17),(18),(19),
 (20),(21),(22),(23),(24),(25),(26),(27),(28),(29),
-(30),(31),(32),(33),(34),(35);
+(30),(31),(32),(33),(34),(35),(36),(37),(38),(39),
+(40),(41),(42);
 CREATE TABLE t2 (i INT, key1 INT, key2 INT, INDEX (key1), INDEX (key2));
 INSERT INTO t2 (key1, key2) SELECT i, i FROM t1;
 #
@@ -4215,12 +4320,12 @@ INSERT INTO t2 (key1, key2) SELECT i, i FROM t1;
 #
 EXPLAIN UPDATE t2 SET i = 123 WHERE key1 < 13 or key2 < 14 ORDER BY key1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	key1,key2	NULL	NULL	NULL	26	Using where; Using filesort
+1	SIMPLE	t2	index_merge	key1,key2	key1,key2	5,5	NULL	5	Using sort_union(key1,key2); Using where; Using filesort
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED UPDATE t2 SET i = 123 WHERE key1 < 13 or key2 < 14 ORDER BY key1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t2	ALL	key1,key2	NULL	NULL	NULL	26	100.00	Using where; Using filesort
+1	SIMPLE	t2	index_merge	key1,key2	key1,key2	5,5	NULL	5	100.00	Using sort_union(key1,key2); Using where; Using filesort
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
 EXPLAIN FORMAT=JSON UPDATE t2 SET i = 123 WHERE key1 < 13 or key2 < 14 ORDER BY key1;;
@@ -4233,12 +4338,14 @@ EXPLAIN
       "table": {
         "update": true,
         "table_name": "t2",
-        "access_type": "ALL",
+        "access_type": "index_merge",
         "possible_keys": [
           "key1",
           "key2"
         ] /* possible_keys */,
-        "rows": 26,
+        "key": "sort_union(key1,key2)",
+        "key_length": "5,5",
+        "rows": 5,
         "filtered": 100,
         "attached_condition": "((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14))"
       } /* table */
@@ -4249,7 +4356,7 @@ FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t2      WHERE key1 < 13 or key2 < 14 ORDER BY key1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t2	ALL	key1,key2	NULL	NULL	NULL	26	100.00	Using where; Using filesort
+1	SIMPLE	t2	index_merge	key1,key2	key1,key2	5,5	NULL	5	100.00	Using sort_union(key1,key2); Using where; Using filesort
 Warnings:
 Note	1003	/* select#1 */ select `test`.`t2`.`i` AS `i`,`test`.`t2`.`key1` AS `key1`,`test`.`t2`.`key2` AS `key2` from `test`.`t2` where ((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14)) order by `test`.`t2`.`key1`
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
@@ -4263,12 +4370,14 @@ EXPLAIN
       "using_filesort": true,
       "table": {
         "table_name": "t2",
-        "access_type": "ALL",
+        "access_type": "index_merge",
         "possible_keys": [
           "key1",
           "key2"
         ] /* possible_keys */,
-        "rows": 26,
+        "key": "sort_union(key1,key2)",
+        "key_length": "5,5",
+        "rows": 5,
         "filtered": 100,
         "attached_condition": "((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14))"
       } /* table */
@@ -4279,20 +4388,19 @@ Warnings:
 Note	1003	/* select#1 */ select `test`.`t2`.`i` AS `i`,`test`.`t2`.`key1` AS `key1`,`test`.`t2`.`key2` AS `key2` from `test`.`t2` where ((`test`.`t2`.`key1` < 13) or (`test`.`t2`.`key2` < 14)) order by `test`.`t2`.`key1`
 # Status of "equivalent" SELECT query execution:
 Variable_name	Value
-Handler_read_first	1
-Handler_read_key	1
-Handler_read_rnd_next	27
+Handler_read_key	6
+Handler_read_next	7
+Handler_read_rnd	4
+Sort_range	1
 Sort_rows	4
-Sort_scan	1
 # Status of testing query execution:
 Variable_name	Value
-Handler_read_first	1
-Handler_read_key	5
-Handler_read_rnd	4
-Handler_read_rnd_next	27
+Handler_read_key	10
+Handler_read_next	7
+Handler_read_rnd	8
 Handler_update	4
+Sort_range	1
 Sort_rows	4
-Sort_scan	1
 
 DROP TABLE t1, t2;
 #46
@@ -4332,6 +4440,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 8,
         "filtered": 100,
@@ -4363,6 +4474,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "i"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 8,
         "filtered": 100,
@@ -4509,6 +4623,10 @@ EXPLAIN
           "a"
         ] /* possible_keys */,
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b"
+        ] /* used_key_parts */,
         "key_length": "6",
         "rows": "X",
         "filtered": "X"
@@ -4536,6 +4654,10 @@ EXPLAIN
         "table_name": "t2",
         "access_type": "index",
         "key": "a",
+        "used_key_parts": [
+          "a",
+          "b"
+        ] /* used_key_parts */,
         "key_length": "6",
         "rows": "X",
         "filtered": "X"
@@ -4599,6 +4721,9 @@ EXPLAIN
           "c1_idx"
         ] /* possible_keys */,
         "key": "c1_idx",
+        "used_key_parts": [
+          "c1_idx"
+        ] /* used_key_parts */,
         "key_length": "2",
         "rows": 2,
         "filtered": 100,
@@ -4611,7 +4736,7 @@ FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1     WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using index condition; Using where
+1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using where
 Warnings:
 Note	1003	/* select#1 */ select `test`.`t1`.`pk` AS `pk`,`test`.`t1`.`c1_idx` AS `c1_idx`,`test`.`t1`.`c2` AS `c2` from `test`.`t1` where (`test`.`t1`.`c1_idx` = 'y') order by `test`.`t1`.`pk` desc limit 2
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
@@ -4630,14 +4755,16 @@ EXPLAIN
           "c1_idx"
         ] /* possible_keys */,
         "key": "c1_idx",
+        "used_key_parts": [
+          "c1_idx"
+        ] /* used_key_parts */,
         "key_length": "2",
         "ref": [
           "const"
         ] /* ref */,
         "rows": 2,
         "filtered": 100,
-        "index_condition": "(`test`.`t1`.`c1_idx` = 'y')",
-        "attached_condition": "((`test`.`t1`.`c1_idx` <=> 'y'))"
+        "attached_condition": "((`test`.`t1`.`c1_idx` <=> 'y') and (`test`.`t1`.`c1_idx` = 'y'))"
       } /* table */
     } /* ordering_operation */
   } /* query_block */
@@ -4685,6 +4812,9 @@ EXPLAIN
           "c1_idx"
         ] /* possible_keys */,
         "key": "c1_idx",
+        "used_key_parts": [
+          "c1_idx"
+        ] /* used_key_parts */,
         "key_length": "2",
         "rows": 2,
         "filtered": 100,
@@ -4697,7 +4827,7 @@ FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1 WHERE c1_idx = 'y' ORDER BY pk DESC LIMIT 2;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using index condition; Using where
+1	SIMPLE	t1	ref	c1_idx	c1_idx	2	const	2	100.00	Using where
 Warnings:
 Note	1003	/* select#1 */ select `test`.`t1`.`pk` AS `pk`,`test`.`t1`.`c1_idx` AS `c1_idx`,`test`.`t1`.`c2` AS `c2` from `test`.`t1` where (`test`.`t1`.`c1_idx` = 'y') order by `test`.`t1`.`pk` desc limit 2
 # Status of EXPLAIN EXTENDED "equivalent" SELECT query execution
@@ -4716,14 +4846,16 @@ EXPLAIN
           "c1_idx"
         ] /* possible_keys */,
         "key": "c1_idx",
+        "used_key_parts": [
+          "c1_idx"
+        ] /* used_key_parts */,
         "key_length": "2",
         "ref": [
           "const"
         ] /* ref */,
         "rows": 2,
         "filtered": 100,
-        "index_condition": "(`test`.`t1`.`c1_idx` = 'y')",
-        "attached_condition": "((`test`.`t1`.`c1_idx` <=> 'y'))"
+        "attached_condition": "((`test`.`t1`.`c1_idx` <=> 'y') and (`test`.`t1`.`c1_idx` = 'y'))"
       } /* table */
     } /* ordering_operation */
   } /* query_block */
@@ -4771,6 +4903,9 @@ EXPLAIN
         "PRIMARY"
       ] /* possible_keys */,
       "key": "PRIMARY",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "4",
       "rows": 2,
       "filtered": 100,
@@ -4800,6 +4935,9 @@ EXPLAIN
         "PRIMARY"
       ] /* possible_keys */,
       "key": "PRIMARY",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "4",
       "rows": 2,
       "filtered": 100,
@@ -4864,7 +5002,7 @@ EXPLAIN
           "rows": 1,
           "filtered": 100,
           "using_join_buffer": "Block Nested Loop",
-          "attached_condition": "trigcond_if(is_not_null_compl(t2), (`test`.`t1`.`c1` = `test`.`t2`.`c1`), true)"
+          "attached_condition": "<if>(is_not_null_compl(t2), (`test`.`t1`.`c1` = `test`.`t2`.`c1`), true)"
         } /* table */
       }
     ] /* nested_loop */
@@ -4901,7 +5039,7 @@ EXPLAIN
           "rows": 1,
           "filtered": 100,
           "using_join_buffer": "Block Nested Loop",
-          "attached_condition": "trigcond_if(is_not_null_compl(t2), (`test`.`t1`.`c1` = `test`.`t2`.`c1`), true)"
+          "attached_condition": "<if>(is_not_null_compl(t2), (`test`.`t1`.`c1` = `test`.`t2`.`c1`), true)"
         } /* table */
       }
     ] /* nested_loop */
@@ -4959,7 +5097,7 @@ EXPLAIN
           "rows": 1,
           "filtered": 100,
           "using_join_buffer": "Block Nested Loop",
-          "attached_condition": "trigcond_if(is_not_null_compl(t2), (`test`.`t2`.`c1` = `test`.`t1`.`c1`), true)"
+          "attached_condition": "<if>(is_not_null_compl(t2), (`test`.`t2`.`c1` = `test`.`t1`.`c1`), true)"
         } /* table */
       }
     ] /* nested_loop */
@@ -4997,7 +5135,7 @@ EXPLAIN
           "rows": 1,
           "filtered": 100,
           "using_join_buffer": "Block Nested Loop",
-          "attached_condition": "trigcond_if(is_not_null_compl(t2), (`test`.`t2`.`c1` = `test`.`t1`.`c1`), true)"
+          "attached_condition": "<if>(is_not_null_compl(t2), (`test`.`t2`.`c1` = `test`.`t1`.`c1`), true)"
         } /* table */
       }
     ] /* nested_loop */
@@ -5066,6 +5204,9 @@ EXPLAIN
               "IDX"
             ] /* possible_keys */,
             "key": "IDX",
+            "used_key_parts": [
+              "f3"
+            ] /* used_key_parts */,
             "key_length": "5",
             "ref": [
               "test.t1.f1"
@@ -5115,6 +5256,9 @@ EXPLAIN
               "IDX"
             ] /* possible_keys */,
             "key": "IDX",
+            "used_key_parts": [
+              "f3"
+            ] /* used_key_parts */,
             "key_length": "5",
             "ref": [
               "test.t1.f1"
@@ -5431,6 +5575,9 @@ EXPLAIN
         "PRIMARY"
       ] /* possible_keys */,
       "key": "PRIMARY",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "4",
       "rows": 3,
       "filtered": 100,
@@ -5459,6 +5606,9 @@ EXPLAIN
         "PRIMARY"
       ] /* possible_keys */,
       "key": "PRIMARY",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "4",
       "rows": 3,
       "filtered": 100,
@@ -5529,6 +5679,9 @@ EXPLAIN
             "PRIMARY"
           ] /* possible_keys */,
           "key": "PRIMARY",
+          "used_key_parts": [
+            "a"
+          ] /* used_key_parts */,
           "key_length": "4",
           "ref": [
             "test.t2.x"
@@ -5643,6 +5796,9 @@ EXPLAIN
             "PRIMARY"
           ] /* possible_keys */,
           "key": "PRIMARY",
+          "used_key_parts": [
+            "a"
+          ] /* used_key_parts */,
           "key_length": "4",
           "ref": [
             "test.t2.x"
@@ -5841,6 +5997,8 @@ CREATE TABLE t1 (i INT);
 EXPLAIN INSERT DELAYED INTO t1 VALUES (1);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	NULL	NULL	NULL	NULL	NULL	NULL	NULL	No tables used
+Warnings:
+Warning	1287	'INSERT DELAYED' is deprecated and will be removed in a future release. Please use INSERT instead
 DROP TABLE t1;
 #69
 CREATE TABLE t1 (a INT);
@@ -5854,14 +6012,14 @@ INSERT INTO t2 VALUES (1), (2), (3);
 EXPLAIN UPDATE        t1 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	Using where
-2	DEPENDENT SUBQUERY	<derived3>	ALL	NULL	NULL	NULL	NULL	3	Using where
+2	DEPENDENT SUBQUERY	<derived3>	index_subquery	<auto_key0>	<auto_key0>	5	func	2	Using index
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	Using filesort
 FLUSH STATUS;
 FLUSH TABLES;
 EXPLAIN EXTENDED UPDATE        t1 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
-2	DEPENDENT SUBQUERY	<derived3>	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
+2	DEPENDENT SUBQUERY	<derived3>	index_subquery	<auto_key0>	<auto_key0>	5	func	2	100.00	Using index
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 # Status of EXPLAIN EXTENDED query
 Variable_name	Value
@@ -5876,7 +6034,7 @@ EXPLAIN
       "access_type": "ALL",
       "rows": 3,
       "filtered": 100,
-      "attached_condition": "<in_optimizer>(`test`.`t1`.`a`,<exists>(select 1 from (select `test`.`t2`.`b` AS `b` from `test`.`t2` order by `test`.`t2`.`b` limit 2,2) `x` where (<cache>(`test`.`t1`.`a`) = `x`.`b`)))",
+      "attached_condition": "<in_optimizer>(`test`.`t1`.`a`,<exists>(<index_lookup>(<cache>(`test`.`t1`.`a`) in x on <auto_key0>)))",
       "attached_subqueries": [
         {
           "dependent": true,
@@ -5885,10 +6043,21 @@ EXPLAIN
             "select_id": 2,
             "table": {
               "table_name": "x",
-              "access_type": "ALL",
-              "rows": 3,
+              "access_type": "index_subquery",
+              "possible_keys": [
+                "<auto_key0>"
+              ] /* possible_keys */,
+              "key": "<auto_key0>",
+              "used_key_parts": [
+                "b"
+              ] /* used_key_parts */,
+              "key_length": "5",
+              "ref": [
+                "func"
+              ] /* ref */,
+              "rows": 2,
               "filtered": 100,
-              "attached_condition": "(<cache>(`test`.`t1`.`a`) = `x`.`b`)",
+              "using_index": true,
               "materialized_from_subquery": {
                 "using_temporary_table": true,
                 "dependent": false,
@@ -5918,7 +6087,7 @@ FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
-1	PRIMARY	<derived3>	ref	auto_key0	auto_key0	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
+1	PRIMARY	<derived3>	ref	<auto_key0>	<auto_key0>	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 Warnings:
 Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` semi join ((/* select#3 */ select `test`.`t2`.`b` AS `b` from `test`.`t2` order by `test`.`t2`.`b` limit 2,2) `x`) where (`x`.`b` = `test`.`t1`.`a`)
@@ -5944,9 +6113,12 @@ EXPLAIN
           "table_name": "x",
           "access_type": "ref",
           "possible_keys": [
-            "auto_key0"
+            "<auto_key0>"
           ] /* possible_keys */,
-          "key": "auto_key0",
+          "key": "<auto_key0>",
+          "used_key_parts": [
+            "b"
+          ] /* used_key_parts */,
           "key_length": "5",
           "ref": [
             "test.t1.a"
@@ -5990,8 +6162,8 @@ Sort_scan	1
 # Status of testing query execution:
 Variable_name	Value
 Handler_read_first	2
-Handler_read_key	2
-Handler_read_rnd_next	13
+Handler_read_key	5
+Handler_read_rnd_next	8
 Handler_update	1
 Handler_write	1
 Sort_rows	3
@@ -6004,7 +6176,7 @@ Sort_scan	1
 EXPLAIN UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	Using where
-1	PRIMARY	<derived3>	ref	auto_key0	auto_key0	5	test.t1.a	2	Using index; FirstMatch(t1)
+1	PRIMARY	<derived3>	ref	<auto_key0>	<auto_key0>	5	test.t1.a	2	Using index; FirstMatch(t1)
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	Using join buffer (Block Nested Loop)
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	Using filesort
 FLUSH STATUS;
@@ -6012,7 +6184,7 @@ FLUSH TABLES;
 EXPLAIN EXTENDED UPDATE        t1, t2 SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
-1	PRIMARY	<derived3>	ref	auto_key0	auto_key0	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
+1	PRIMARY	<derived3>	ref	<auto_key0>	<auto_key0>	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (Block Nested Loop)
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 # Status of EXPLAIN EXTENDED query
@@ -6038,9 +6210,12 @@ EXPLAIN
           "table_name": "x",
           "access_type": "ref",
           "possible_keys": [
-            "auto_key0"
+            "<auto_key0>"
           ] /* possible_keys */,
-          "key": "auto_key0",
+          "key": "<auto_key0>",
+          "used_key_parts": [
+            "b"
+          ] /* used_key_parts */,
           "key_length": "5",
           "ref": [
             "test.t1.a"
@@ -6085,7 +6260,7 @@ FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1, t2            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
-1	PRIMARY	<derived3>	ref	auto_key0	auto_key0	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
+1	PRIMARY	<derived3>	ref	<auto_key0>	<auto_key0>	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
 1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (Block Nested Loop)
 3	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 Warnings:
@@ -6112,9 +6287,12 @@ EXPLAIN
           "table_name": "x",
           "access_type": "ref",
           "possible_keys": [
-            "auto_key0"
+            "<auto_key0>"
           ] /* possible_keys */,
-          "key": "auto_key0",
+          "key": "<auto_key0>",
+          "used_key_parts": [
+            "b"
+          ] /* used_key_parts */,
           "key_length": "5",
           "ref": [
             "test.t1.a"
@@ -6180,7 +6358,7 @@ Sort_scan	1
 EXPLAIN UPDATE        t1, (SELECT * FROM t2) y SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	Using where
-1	PRIMARY	<derived4>	ref	auto_key0	auto_key0	5	test.t1.a	2	Using index; FirstMatch(t1)
+1	PRIMARY	<derived4>	ref	<auto_key0>	<auto_key0>	5	test.t1.a	2	Using index; FirstMatch(t1)
 1	PRIMARY	<derived2>	ALL	NULL	NULL	NULL	NULL	3	Using join buffer (Block Nested Loop)
 4	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	Using filesort
 2	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	NULL
@@ -6189,7 +6367,7 @@ FLUSH TABLES;
 EXPLAIN EXTENDED UPDATE        t1, (SELECT * FROM t2) y SET a = 10 WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
-1	PRIMARY	<derived4>	ref	auto_key0	auto_key0	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
+1	PRIMARY	<derived4>	ref	<auto_key0>	<auto_key0>	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
 1	PRIMARY	<derived2>	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (Block Nested Loop)
 4	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 2	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	NULL
@@ -6216,9 +6394,12 @@ EXPLAIN
           "table_name": "x",
           "access_type": "ref",
           "possible_keys": [
-            "auto_key0"
+            "<auto_key0>"
           ] /* possible_keys */,
-          "key": "auto_key0",
+          "key": "<auto_key0>",
+          "used_key_parts": [
+            "b"
+          ] /* used_key_parts */,
           "key_length": "5",
           "ref": [
             "test.t1.a"
@@ -6277,7 +6458,7 @@ FLUSH TABLES;
 EXPLAIN EXTENDED SELECT * FROM t1, (SELECT * FROM t2) y            WHERE a IN (SELECT * FROM (SELECT b FROM t2 ORDER BY b LIMIT 2,2) x);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	3	100.00	Using where
-1	PRIMARY	<derived4>	ref	auto_key0	auto_key0	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
+1	PRIMARY	<derived4>	ref	<auto_key0>	<auto_key0>	5	test.t1.a	2	100.00	Using index; FirstMatch(t1)
 1	PRIMARY	<derived2>	ALL	NULL	NULL	NULL	NULL	3	100.00	Using join buffer (Block Nested Loop)
 4	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	Using filesort
 2	DERIVED	t2	ALL	NULL	NULL	NULL	NULL	3	100.00	NULL
@@ -6305,9 +6486,12 @@ EXPLAIN
           "table_name": "x",
           "access_type": "ref",
           "possible_keys": [
-            "auto_key0"
+            "<auto_key0>"
           ] /* possible_keys */,
-          "key": "auto_key0",
+          "key": "<auto_key0>",
+          "used_key_parts": [
+            "b"
+          ] /* used_key_parts */,
           "key_length": "5",
           "ref": [
             "test.t1.a"
@@ -6450,6 +6634,9 @@ EXPLAIN
         "PRIMARY"
       ] /* possible_keys */,
       "key": "PRIMARY",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "4",
       "rows": 1,
       "filtered": 100,
@@ -6479,6 +6666,9 @@ EXPLAIN
         "PRIMARY"
       ] /* possible_keys */,
       "key": "PRIMARY",
+      "used_key_parts": [
+        "a"
+      ] /* used_key_parts */,
       "key_length": "4",
       "rows": 1,
       "filtered": 100,
@@ -6526,6 +6716,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 1,
         "filtered": 100,
@@ -6557,6 +6750,9 @@ EXPLAIN
           "PRIMARY"
         ] /* possible_keys */,
         "key": "PRIMARY",
+        "used_key_parts": [
+          "a"
+        ] /* used_key_parts */,
         "key_length": "4",
         "rows": 1,
         "filtered": 100,

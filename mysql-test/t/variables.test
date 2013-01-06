@@ -30,6 +30,7 @@ set @my_net_write_timeout         =@@global.net_write_timeout;
 set @my_net_read_timeout          =@@global.net_read_timeout;
 set @my_query_cache_limit         =@@global.query_cache_limit;
 set @my_query_cache_type          =@@global.query_cache_type;
+set @my_query_cache_size          =@@global.query_cache_size;
 set @my_server_id                 =@@global.server_id;
 set @my_slow_launch_time          =@@global.slow_launch_time;
 set @my_storage_engine            =@@global.default_storage_engine;
@@ -358,6 +359,8 @@ set tx_isolation="READ-COMMITTED";
 set wait_timeout=100;
 set global log_warnings=1;
 
+#restore the variable, since it introduces a degree of unpredictability
+set global max_allowed_packet        =@my_max_allowed_packet;
 #
 # Bugs: #20392: INSERT_ID session variable has weird value
 #
@@ -819,6 +822,7 @@ set global net_write_timeout         =@my_net_write_timeout;
 set global net_read_timeout          =@my_net_read_timeout;
 set global query_cache_limit         =@my_query_cache_limit;
 set global query_cache_type          =@my_query_cache_type;
+set global query_cache_size          =@my_query_cache_size;
 set global server_id                 =@my_server_id;
 set global slow_launch_time          =@my_slow_launch_time;
 set global default_storage_engine            =@my_storage_engine;

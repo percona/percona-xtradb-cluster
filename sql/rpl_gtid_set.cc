@@ -407,7 +407,6 @@ int format_gno(char *s, rpl_gno gno)
 
 enum_return_status Gtid_set::add_gtid_text(const char *text, bool *anonymous)
 {
-#define SKIP_WHITESPACE() while (isspace(*s)) s++
   DBUG_ENTER("Gtid_set::add_gtid_text(const char *, bool *)");
   DBUG_ASSERT(sid_map != NULL);
   if (sid_lock != NULL)
@@ -558,7 +557,6 @@ bool Gtid_set::is_valid(const char *text)
 {
   DBUG_ENTER("Gtid_set::is_valid(const char*)");
 
-#ifdef HAVE_NDB_BINLOG
   const char *s= text;
 
   SKIP_WHITESPACE();
@@ -602,9 +600,7 @@ bool Gtid_set::is_valid(const char *text)
   } while (*s == ',');
   if (*s != 0)
     DBUG_RETURN(false);
-#else
-  DBUG_ASSERT(0); /*NOTREACHED*/
-#endif
+
   DBUG_RETURN(true);
 }
 

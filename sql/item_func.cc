@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2012, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -54,10 +54,6 @@
 
 using std::min;
 using std::max;
-
-#ifdef NO_EMBEDDED_ACCESS_CHECKS
-#define sp_restore_security_context(A,B) while (0) {}
-#endif
 
 bool check_reserved_words(LEX_STRING *name)
 {
@@ -174,15 +170,16 @@ bool
 Item_func::fix_fields(THD *thd, Item **ref)
 {
   DBUG_ASSERT(fixed == 0 || basic_const_item());
+
   Item **arg,**arg_end;
   uchar buff[STACK_BUFF_ALLOC];			// Max argument in function
-  st_select_lex::Resolve_place save_resolve= st_select_lex::RESOLVE_NONE;
-  if (thd->lex->current_select != NULL)
-  {
-    save_resolve= thd->lex->current_select->resolve_place;
-    thd->lex->current_select->resolve_place= st_select_lex::RESOLVE_NONE;
-  }
-  used_tables_cache= not_null_tables_cache= 0;
+
+  Switch_resolve_place SRP(thd->lex->current_select ?
+                           &thd->lex->current_select->resolve_place : NULL,
+                           st_select_lex::RESOLVE_NONE,
+                           thd->lex->current_select);
+  used_tables_cache= get_initial_pseudo_tables();
+  not_null_tables_cache= 0;
   const_item_cache=1;
 
   /*
@@ -228,33 +225,32 @@ Item_func::fix_fields(THD *thd, Item **ref)
       not_null_tables_cache|= item->not_null_tables();
       const_item_cache&=      item->const_item();
       with_subselect|=        item->has_subquery();
+      with_stored_program|=   item->has_stored_program();
     }
   }
   fix_length_and_dec();
   if (thd->is_error()) // An error inside fix_length_and_dec occured
     return TRUE;
   fixed= 1;
-  if (thd->lex->current_select != NULL)
-    thd->lex->current_select->resolve_place= save_resolve;
   return FALSE;
 }
 
 
 void Item_func::fix_after_pullout(st_select_lex *parent_select,
-                                  st_select_lex *removed_select,
-                                  Item **ref)
+                                  st_select_lex *removed_select)
 {
   Item **arg,**arg_end;
 
-  used_tables_cache= not_null_tables_cache= 0;
+  used_tables_cache= get_initial_pseudo_tables();
+  not_null_tables_cache= 0;
   const_item_cache=1;
 
   if (arg_count)
   {
     for (arg=args, arg_end=args+arg_count; arg != arg_end ; arg++)
     {
-      (*arg)->fix_after_pullout(parent_select, removed_select, arg);
-      Item *item= *arg;
+      Item *const item= *arg;
+      item->fix_after_pullout(parent_select, removed_select);
 
       used_tables_cache|=     item->used_tables();
       not_null_tables_cache|= item->not_null_tables();
@@ -416,15 +412,17 @@ void Item_func::split_sum_func(THD *thd, Ref_ptr_array ref_pointer_array,
 
 void Item_func::update_used_tables()
 {
-  used_tables_cache=0;
+  used_tables_cache= get_initial_pseudo_tables();
   const_item_cache=1;
   with_subselect= false;
+  with_stored_program= false;
   for (uint i=0 ; i < arg_count ; i++)
   {
     args[i]->update_used_tables();
     used_tables_cache|=args[i]->used_tables();
     const_item_cache&=args[i]->const_item();
     with_subselect|= args[i]->has_subquery();
+    with_stored_program|= args[i]->has_stored_program();
   }
 }
 
@@ -765,7 +763,7 @@ String *Item_int_func::val_str(String *str)
 void Item_func_connection_id::fix_length_and_dec()
 {
   Item_int_func::fix_length_and_dec();
-  max_length= 10;
+  unsigned_flag= 1;
 }
 
 
@@ -1937,7 +1935,13 @@ longlong Item_func_neg::int_op()
   if ((null_value= args[0]->null_value))
     return 0;
   if (args[0]->unsigned_flag &&
-      (ulonglong) value > (ulonglong) LONGLONG_MAX + 1)
+      (ulonglong) value > (ulonglong) LONGLONG_MAX + 1ULL)
+    return raise_integer_overflow();
+  // For some platforms we need special handling of LONGLONG_MIN to
+  // guarantee overflow.
+  if (value == LONGLONG_MIN &&
+      !args[0]->unsigned_flag &&
+      !unsigned_flag)
     return raise_integer_overflow();
   return check_integer_overflow(-value, !args[0]->unsigned_flag && value < 0);
 }
@@ -2634,7 +2638,7 @@ bool Item_func_rand::fix_fields(THD *thd,Item **ref)
 {
   if (Item_real_func::fix_fields(thd, ref))
     return TRUE;
-  used_tables_cache|= RAND_TABLE_BIT;
+
   if (arg_count)
   {					// Only use argument once in query
     /*
@@ -2665,12 +2669,6 @@ bool Item_func_rand::fix_fields(THD *thd,Item **ref)
     rand= &thd->rand;
   }
   return FALSE;
-}
-
-void Item_func_rand::update_used_tables()
-{
-  Item_real_func::update_used_tables();
-  used_tables_cache|= RAND_TABLE_BIT;
 }
 
 
@@ -3236,6 +3234,15 @@ void Item_func_locate::print(String *str, enum_query_type query_type)
     args[2]->print(str, query_type);
   }
   str->append(')');
+}
+
+
+longlong Item_func_validate_password_strength::val_int()
+{
+  String *field= args[0]->val_str(&value);
+  if ((null_value= args[0]->null_value))
+    return 0;
+  return (check_password_strength(field));
 }
 
 
@@ -4080,7 +4087,7 @@ longlong Item_master_gtid_set_wait::val_int()
   int event_count= 0;
 
   null_value=0;
-  if (thd->slave_thread || !gtid)
+  if (thd->slave_thread || !gtid || 0 == gtid_mode)
   {
     null_value = 1;
     return event_count;
@@ -4088,11 +4095,20 @@ longlong Item_master_gtid_set_wait::val_int()
 
 #if defined(HAVE_REPLICATION)
   longlong timeout = (arg_count== 2) ? args[1]->val_int() : 0;
-  if ((event_count = active_mi->rli->wait_for_gtid_set(thd, gtid, timeout)) == -2)
+  if (active_mi && active_mi->rli)
   {
-    null_value = 1;
-    event_count=0;
+    if ((event_count = active_mi->rli->wait_for_gtid_set(thd, gtid, timeout))
+         == -2)
+    {
+      null_value = 1;
+      event_count=0;
+    }
   }
+  else
+    /*
+      Replication has not been set up, we should return NULL;
+     */
+    null_value = 1;
 #endif
 
   return event_count;
@@ -4423,7 +4439,8 @@ longlong Item_func_last_insert_id::val_int()
     thd->first_successful_insert_id_in_prev_stmt= value;
     return value;
   }
-  return thd->read_first_successful_insert_id_in_prev_stmt();
+  return
+    static_cast<longlong>(thd->read_first_successful_insert_id_in_prev_stmt());
 }
 
 
@@ -4556,9 +4573,7 @@ longlong Item_func_sleep::val_int()
 }
 
 
-#define extra_size sizeof(double)
-
-static user_var_entry *get_variable(HASH *hash, NameString &name,
+static user_var_entry *get_variable(HASH *hash, const Name_string &name,
 				    bool create_if_not_exists)
 {
   user_var_entry *entry;
@@ -4567,32 +4582,10 @@ static user_var_entry *get_variable(HASH *hash, NameString &name,
                                                  name.length())) &&
       create_if_not_exists)
   {
-    uint size=ALIGN_SIZE(sizeof(user_var_entry))+name.length()+1+extra_size;
     if (!my_hash_inited(hash))
       return 0;
-    if (!(entry = (user_var_entry*) my_malloc(size,MYF(MY_WME | ME_FATALERROR))))
+    if (!(entry= user_var_entry::create(name)))
       return 0;
-    entry->name.str=(char*) entry+ ALIGN_SIZE(sizeof(user_var_entry))+
-      extra_size;
-    entry->name.length= name.length();
-    entry->value=0;
-    entry->length=0;
-    entry->update_query_id=0;
-    entry->collation.set(NULL, DERIVATION_IMPLICIT, 0);
-    entry->unsigned_flag= 0;
-    /*
-      If we are here, we were called from a SET or a query which sets a
-      variable. Imagine it is this:
-      INSERT INTO t SELECT @a:=10, @a:=@a+1.
-      Then when we have a Item_func_get_user_var (because of the @a+1) so we
-      think we have to write the value of @a to the binlog. But before that,
-      we have a Item_func_set_user_var to create @a (@a:=10), in this we mark
-      the variable as "already logged" (line below) so that it won't be logged
-      by Item_func_get_user_var (because that's not necessary).
-    */
-    entry->used_query_id=current_thd->query_id;
-    entry->type=STRING_RESULT;
-    name.strcpy(entry->name.str);
     if (my_hash_insert(hash,(uchar*) entry))
     {
       my_free(entry);
@@ -4620,13 +4613,17 @@ bool Item_func_set_user_var::set_entry(THD *thd, bool create_if_not_exists)
     return TRUE;
   }
   entry_thread_id= thd->thread_id;
-  /* 
-     Remember the last query which updated it, this way a query can later know
-     if this variable is a constant item in the query (it is if update_query_id
-     is different from query_id).
-  */
 end:
-  entry->update_query_id= thd->query_id;
+  /* 
+    Remember the last query which updated it, this way a query can later know
+    if this variable is a constant item in the query (it is if update_query_id
+    is different from query_id).
+
+    If this object has delayed setting of non-constness, we delay this
+    until Item_func_set-user_var::save_item_result().
+  */
+  if (!delayed_non_constness)
+    entry->update_query_id= thd->query_id;
   return FALSE;
 }
 
@@ -4705,11 +4702,60 @@ bool Item_func_set_user_var::register_field_in_read_map(uchar *arg)
 }
 
 
+bool user_var_entry::realloc(uint length)
+{
+  if (length <= extra_size)
+  {
+    /* Enough space to store value in value struct */
+    free_value();
+    m_ptr= internal_buffer_ptr();
+  }
+  else
+  {
+    /* Allocate an external buffer */
+    if (m_length != length)
+    {
+      if (m_ptr == internal_buffer_ptr())
+        m_ptr= 0;
+      if (!(m_ptr= (char*) my_realloc(m_ptr, length,
+                                      MYF(MY_ALLOW_ZERO_PTR | MY_WME |
+                                      ME_FATALERROR))))
+        return true;
+    }
+  }
+  return false;
+}
+
+
+/**
+  Set value to user variable.
+  @param ptr            pointer to buffer with new value
+  @param length         length of new value
+  @param type           type of new value
+
+  @retval  false   on success
+  @retval  true    on allocation error
+
+*/
+bool user_var_entry::store(void *from, uint length, Item_result type)
+{
+  // Store strings with end \0
+  if (realloc(length + test(type == STRING_RESULT)))
+    return true;
+  if (type == STRING_RESULT)
+    m_ptr[length]= 0;     // Store end \0
+  memmove(m_ptr, from, length);
+  if (type == DECIMAL_RESULT)
+    ((my_decimal*) m_ptr)->fix_buffer_pointer();
+  m_length= length;
+  m_type= type;
+  return false;
+}
+
+
 /**
   Set value to user variable.
 
-  @param entry          pointer to structure representing variable
-  @param set_null       should we set NULL value ?
   @param ptr            pointer to buffer with new value
   @param length         length of new value
   @param type           type of new value
@@ -4725,63 +4771,15 @@ bool Item_func_set_user_var::register_field_in_read_map(uchar *arg)
     true    failure
 */
 
-static bool
-update_hash(user_var_entry *entry, bool set_null, void *ptr, uint length,
-            Item_result type, const CHARSET_INFO *cs, Derivation dv,
-            bool unsigned_arg)
+bool user_var_entry::store(void *ptr, uint length, Item_result type,
+                           const CHARSET_INFO *cs, Derivation dv,
+                           bool unsigned_arg)
 {
-  if (set_null)
-  {
-    char *pos= (char*) entry+ ALIGN_SIZE(sizeof(user_var_entry));
-    if (entry->value && entry->value != pos)
-      my_free(entry->value);
-    entry->value= 0;
-    entry->length= 0;
-  }
-  else
-  {
-    if (type == STRING_RESULT)
-      length++;					// Store strings with end \0
-    if (length <= extra_size)
-    {
-      /* Save value in value struct */
-      char *pos= (char*) entry+ ALIGN_SIZE(sizeof(user_var_entry));
-      if (entry->value != pos)
-      {
-	if (entry->value)
-	  my_free(entry->value);
-	entry->value=pos;
-      }
-    }
-    else
-    {
-      /* Allocate variable */
-      if (entry->length != length)
-      {
-	char *pos= (char*) entry+ ALIGN_SIZE(sizeof(user_var_entry));
-	if (entry->value == pos)
-	  entry->value=0;
-        entry->value= (char*) my_realloc(entry->value, length,
-                                         MYF(MY_ALLOW_ZERO_PTR | MY_WME |
-                                             ME_FATALERROR));
-        if (!entry->value)
-	  return 1;
-      }
-    }
-    if (type == STRING_RESULT)
-    {
-      length--;					// Fix length change above
-      entry->value[length]= 0;			// Store end \0
-    }
-    memmove(entry->value, ptr, length);
-    if (type == DECIMAL_RESULT)
-      ((my_decimal*)entry->value)->fix_buffer_pointer();
-    entry->length= length;
-    entry->collation.set(cs, dv);
-    entry->unsigned_flag= unsigned_arg;
-  }
-  entry->type=type;
-  return 0;
+  if (store(ptr, length, type))
+    return true;
+  collation.set(cs, dv);
+  unsigned_flag= unsigned_arg;
+  return false;
 }
 
 
@@ -4795,10 +4793,16 @@ Item_func_set_user_var::update_hash(void *ptr, uint length,
     If we set a variable explicitely to NULL then keep the old
     result type of the variable
   */
-  if ((null_value= args[0]->null_value) && null_item)
-    res_type= entry->type;                      // Don't change type of item
-  if (::update_hash(entry, (null_value= args[0]->null_value),
-                    ptr, length, res_type, cs, dv, unsigned_arg))
+  // args[0]->null_value could be outdated
+  if (args[0]->type() == Item::FIELD_ITEM)
+    null_value= ((Item_field*)args[0])->field->is_null();
+  else
+    null_value= args[0]->null_value;
+  if (null_value && null_item)
+    res_type= entry->type();                    // Don't change type of item
+  if (null_value)
+    entry->set_null_value(res_type);
+  else if (entry->store(ptr, length, res_type, cs, dv, unsigned_arg))
   {
     null_value= 1;
     return 1;
@@ -4811,22 +4815,22 @@ Item_func_set_user_var::update_hash(void *ptr, uint length,
 
 double user_var_entry::val_real(my_bool *null_value)
 {
-  if ((*null_value= (value == 0)))
+  if ((*null_value= (m_ptr == 0)))
     return 0.0;
 
-  switch (type) {
+  switch (m_type) {
   case REAL_RESULT:
-    return *(double*) value;
+    return *(double*) m_ptr;
   case INT_RESULT:
-    return (double) *(longlong*) value;
+    return (double) *(longlong*) m_ptr;
   case DECIMAL_RESULT:
   {
     double result;
-    my_decimal2double(E_DEC_FATAL_ERROR, (my_decimal *)value, &result);
+    my_decimal2double(E_DEC_FATAL_ERROR, (my_decimal *) m_ptr, &result);
     return result;
   }
   case STRING_RESULT:
-    return my_atof(value);                      // This is null terminated
+    return my_atof(m_ptr);                    // This is null terminated
   case ROW_RESULT:
     DBUG_ASSERT(1);				// Impossible
     break;
@@ -4839,24 +4843,24 @@ double user_var_entry::val_real(my_bool *null_value)
 
 longlong user_var_entry::val_int(my_bool *null_value) const
 {
-  if ((*null_value= (value == 0)))
+  if ((*null_value= (m_ptr == 0)))
     return LL(0);
 
-  switch (type) {
+  switch (m_type) {
   case REAL_RESULT:
-    return (longlong) *(double*) value;
+    return (longlong) *(double*) m_ptr;
   case INT_RESULT:
-    return *(longlong*) value;
+    return *(longlong*) m_ptr;
   case DECIMAL_RESULT:
   {
     longlong result;
-    my_decimal2int(E_DEC_FATAL_ERROR, (my_decimal *)value, 0, &result);
+    my_decimal2int(E_DEC_FATAL_ERROR, (my_decimal *) m_ptr, 0, &result);
     return result;
   }
   case STRING_RESULT:
   {
     int error;
-    return my_strtoll10(value, (char**) 0, &error);// String is null terminated
+    return my_strtoll10(m_ptr, (char**) 0, &error);// String is null terminated
   }
   case ROW_RESULT:
     DBUG_ASSERT(1);				// Impossible
@@ -4871,24 +4875,24 @@ longlong user_var_entry::val_int(my_bool *null_value) const
 String *user_var_entry::val_str(my_bool *null_value, String *str,
 				uint decimals)
 {
-  if ((*null_value= (value == 0)))
+  if ((*null_value= (m_ptr == 0)))
     return (String*) 0;
 
-  switch (type) {
+  switch (m_type) {
   case REAL_RESULT:
-    str->set_real(*(double*) value, decimals, collation.collation);
+    str->set_real(*(double*) m_ptr, decimals, collation.collation);
     break;
   case INT_RESULT:
     if (!unsigned_flag)
-      str->set(*(longlong*) value, collation.collation);
+      str->set(*(longlong*) m_ptr, collation.collation);
     else
-      str->set(*(ulonglong*) value, collation.collation);
+      str->set(*(ulonglong*) m_ptr, collation.collation);
     break;
   case DECIMAL_RESULT:
-    str_set_decimal((my_decimal *) value, str, collation.collation);
+    str_set_decimal((my_decimal *) m_ptr, str, collation.collation);
     break;
   case STRING_RESULT:
-    if (str->copy(value, length, collation.collation))
+    if (str->copy(m_ptr, m_length, collation.collation))
       str= 0;					// EOM error
   case ROW_RESULT:
     DBUG_ASSERT(1);				// Impossible
@@ -4901,21 +4905,22 @@ String *user_var_entry::val_str(my_bool *null_value, String *str,
 
 my_decimal *user_var_entry::val_decimal(my_bool *null_value, my_decimal *val)
 {
-  if ((*null_value= (value == 0)))
+  if ((*null_value= (m_ptr == 0)))
     return 0;
 
-  switch (type) {
+  switch (m_type) {
   case REAL_RESULT:
-    double2my_decimal(E_DEC_FATAL_ERROR, *(double*) value, val);
+    double2my_decimal(E_DEC_FATAL_ERROR, *(double*) m_ptr, val);
     break;
   case INT_RESULT:
-    int2my_decimal(E_DEC_FATAL_ERROR, *(longlong*) value, 0, val);
+    int2my_decimal(E_DEC_FATAL_ERROR, *(longlong*) m_ptr, 0, val);
     break;
   case DECIMAL_RESULT:
-    my_decimal2decimal((my_decimal *) value, val);
+    my_decimal2decimal((my_decimal *) m_ptr, val);
     break;
   case STRING_RESULT:
-    str2my_decimal(E_DEC_FATAL_ERROR, value, length, collation.collation, val);
+    str2my_decimal(E_DEC_FATAL_ERROR, m_ptr, m_length,
+                   collation.collation, val);
     break;
   case ROW_RESULT:
     DBUG_ASSERT(1);				// Impossible
@@ -5014,6 +5019,13 @@ void Item_func_set_user_var::save_item_result(Item *item)
     DBUG_ASSERT(0);
     break;
   }
+  /*
+    Set the ID of the query that last updated this variable. This is
+    usually set by Item_func_set_user_var::set_entry(), but if this
+    item has delayed setting of non-constness, we must do it now.
+   */
+  if (delayed_non_constness)
+    entry->update_query_id= current_thd->query_id;
   DBUG_VOID_RETURN;
 }
 
@@ -5251,12 +5263,13 @@ void Item_func_set_user_var::make_field(Send_field *tmp_field)
     TRUE        Error
 */
 
-int Item_func_set_user_var::save_in_field(Field *field, bool no_conversions,
-                                          bool can_use_result_field)
+type_conversion_status
+Item_func_set_user_var::save_in_field(Field *field, bool no_conversions,
+                                      bool can_use_result_field)
 {
   bool use_result_field= (!can_use_result_field ? 0 :
                           (result_field && result_field != field));
-  int error;
+  type_conversion_status error;
 
   /* Update the value of the user variable */
   check(use_result_field);
@@ -5374,7 +5387,7 @@ longlong Item_func_get_user_var::val_int()
 
 static int
 get_var_with_binlog(THD *thd, enum_sql_command sql_command,
-                    NameString &name, user_var_entry **out_entry)
+                    Name_string &name, user_var_entry **out_entry)
 {
   BINLOG_USER_VAR_EVENT *user_var_event;
   user_var_entry *var_entry;
@@ -5417,7 +5430,8 @@ get_var_with_binlog(THD *thd, enum_sql_command sql_command,
     thd->lex= &lex_tmp;
     lex_start(thd);
     tmp_var_list.push_back(new set_var_user(new Item_func_set_user_var(name,
-                                                                       new Item_null())));
+                                                                       new Item_null(),
+                                                                       false)));
     /* Create the variable */
     if (sql_set_variables(thd, &tmp_var_list))
     {
@@ -5453,7 +5467,7 @@ get_var_with_binlog(THD *thd, enum_sql_command sql_command,
     may need to be valid after current [SP] statement execution pool is
     destroyed.
   */
-  size= ALIGN_SIZE(sizeof(BINLOG_USER_VAR_EVENT)) + var_entry->length;
+  size= ALIGN_SIZE(sizeof(BINLOG_USER_VAR_EVENT)) + var_entry->length();
   if (!(user_var_event= (BINLOG_USER_VAR_EVENT *)
         alloc_root(thd->user_var_events_alloc, size)))
     goto err;
@@ -5461,10 +5475,10 @@ get_var_with_binlog(THD *thd, enum_sql_command sql_command,
   user_var_event->value= (char*) user_var_event +
     ALIGN_SIZE(sizeof(BINLOG_USER_VAR_EVENT));
   user_var_event->user_var_event= var_entry;
-  user_var_event->type= var_entry->type;
+  user_var_event->type= var_entry->type();
   user_var_event->charset_number= var_entry->collation.collation->number;
   user_var_event->unsigned_flag= var_entry->unsigned_flag;
-  if (!var_entry->value)
+  if (!var_entry->ptr())
   {
     /* NULL value*/
     user_var_event->length= 0;
@@ -5472,9 +5486,9 @@ get_var_with_binlog(THD *thd, enum_sql_command sql_command,
   }
   else
   {
-    user_var_event->length= var_entry->length;
-    memcpy(user_var_event->value, var_entry->value,
-           var_entry->length);
+    user_var_event->length= var_entry->length();
+    memcpy(user_var_event->value, var_entry->ptr(),
+           var_entry->length());
   }
   /* Mark that this variable has been used by this query */
   var_entry->used_query_id= thd->query_id;
@@ -5506,9 +5520,9 @@ void Item_func_get_user_var::fix_length_and_dec()
   */
   if (!error && var_entry)
   {
-    m_cached_result_type= var_entry->type;
+    m_cached_result_type= var_entry->type();
     unsigned_flag= var_entry->unsigned_flag;
-    max_length= var_entry->length;
+    max_length= var_entry->length();
 
     collation.set(var_entry->collation);
     switch(m_cached_result_type) {
@@ -5579,7 +5593,7 @@ bool Item_func_get_user_var::eq(const Item *item, bool binary_cmp) const
 bool Item_func_get_user_var::set_value(THD *thd,
                                        sp_rcontext * /*ctx*/, Item **it)
 {
-  Item_func_set_user_var *suv= new Item_func_set_user_var(name, *it);
+  Item_func_set_user_var *suv= new Item_func_set_user_var(name, *it, false);
   /*
     Item_func_set_user_var is not fixed after construction, call
     fix_fields().
@@ -5595,7 +5609,7 @@ bool Item_user_var_as_out_param::fix_fields(THD *thd, Item **ref)
   if (Item::fix_fields(thd, ref) ||
       !(entry= get_variable(&thd->user_vars, name, 1)))
     return TRUE;
-  entry->type= STRING_RESULT;
+  entry->set_type(STRING_RESULT);
   /*
     Let us set the same collation which is used for loading
     of fields in LOAD DATA INFILE.
@@ -5611,16 +5625,15 @@ bool Item_user_var_as_out_param::fix_fields(THD *thd, Item **ref)
 
 void Item_user_var_as_out_param::set_null_value(const CHARSET_INFO* cs)
 {
-  ::update_hash(entry, TRUE, 0, 0, STRING_RESULT, cs,
-                DERIVATION_IMPLICIT, 0 /* unsigned_arg */);
+  entry->set_null_value(STRING_RESULT);
 }
 
 
 void Item_user_var_as_out_param::set_value(const char *str, uint length,
                                            const CHARSET_INFO* cs)
 {
-  ::update_hash(entry, FALSE, (void*)str, length, STRING_RESULT, cs,
-                DERIVATION_IMPLICIT, 0 /* unsigned_arg */);
+  entry->store((void*) str, length, STRING_RESULT, cs,
+               DERIVATION_IMPLICIT, 0 /* unsigned_arg */);
 }
 
 
@@ -6281,7 +6294,7 @@ bool Item_func_match::fix_index()
     for (keynr=0 ; keynr < fts ; keynr++)
     {
       KEY *ft_key=&table->key_info[ft_to_key[keynr]];
-      uint key_parts=ft_key->key_parts;
+      uint key_parts=ft_key->user_defined_key_parts;
 
       for (uint part=0 ; part < key_parts ; part++)
       {
@@ -6313,7 +6326,7 @@ bool Item_func_match::fix_index()
   {
     // partial keys doesn't work
     if (max_cnt < arg_count-1 ||
-        max_cnt < table->key_info[ft_to_key[keynr]].key_parts)
+        max_cnt < table->key_info[ft_to_key[keynr]].user_defined_key_parts)
       continue;
 
     key=ft_to_key[keynr];
@@ -6335,9 +6348,11 @@ err:
 
 bool Item_func_match::eq(const Item *item, bool binary_cmp) const
 {
+  /* We ignore FT_SORTED flag when checking for equality since result is
+     equvialent regardless of sorting */
   if (item->type() != FUNC_ITEM ||
       ((Item_func*)item)->functype() != FT_FUNC ||
-      flags != ((Item_func_match*)item)->flags)
+      (flags | FT_SORTED) != (((Item_func_match*)item)->flags | FT_SORTED))
     return 0;
 
   Item_func_match *ifm=(Item_func_match*) item;
@@ -6454,6 +6469,8 @@ Item *get_system_var(THD *thd, enum_var_type var_type, LEX_STRING name,
   thd->lex->uncacheable(UNCACHEABLE_SIDEEFFECT);
 
   set_if_smaller(component_name->length, MAX_SYS_VAR_LENGTH);
+  
+  var->do_deprecated_warning(thd);
 
   return new Item_func_get_system_var(var, var_type, component_name,
                                       NULL, 0);
@@ -6533,6 +6550,7 @@ Item_func_sp::Item_func_sp(Name_resolution_context *context_arg, sp_name *name)
   m_name->init_qname(current_thd);
   dummy_table= (TABLE*) sql_calloc(sizeof(TABLE)+ sizeof(TABLE_SHARE));
   dummy_table->s= (TABLE_SHARE*) (dummy_table+1);
+  with_stored_program= true;
 }
 
 
@@ -6544,6 +6562,7 @@ Item_func_sp::Item_func_sp(Name_resolution_context *context_arg,
   m_name->init_qname(current_thd);
   dummy_table= (TABLE*) sql_calloc(sizeof(TABLE)+ sizeof(TABLE_SHARE));
   dummy_table->s= (TABLE_SHARE*) (dummy_table+1);
+  with_stored_program= true;
 }
 
 
@@ -6558,6 +6577,8 @@ Item_func_sp::cleanup()
   m_sp= NULL;
   dummy_table->alias= NULL;
   Item_func::cleanup();
+  tables_locked_cache= false;
+  with_stored_program= true;
 }
 
 const char *
@@ -6583,6 +6604,12 @@ Item_func_sp::func_name() const
   }
   append_identifier(thd, &qname, m_name->m_name.str, m_name->m_name.length);
   return qname.ptr();
+}
+
+
+table_map Item_func_sp::get_initial_pseudo_tables() const
+{
+  return m_sp->m_chistics->detistic ? 0 : RAND_TABLE_BIT;
 }
 
 
@@ -6623,7 +6650,7 @@ Item_func_sp::init_result_field(THD *thd)
   DBUG_ASSERT(m_sp == NULL);
   DBUG_ASSERT(sp_result_field == NULL);
 
-  if (!(m_sp= sp_find_routine(thd, TYPE_ENUM_FUNCTION, m_name,
+  if (!(m_sp= sp_find_routine(thd, SP_TYPE_FUNCTION, m_name,
                                &thd->sp_func_cache, TRUE)))
   {
     my_missing_function_error (m_name->m_name, m_name->m_qname.str);
@@ -6661,8 +6688,7 @@ Item_func_sp::init_result_field(THD *thd)
   else
     sp_result_field->move_field(result_buf);
   
-  sp_result_field->null_ptr= (uchar *) &null_value;
-  sp_result_field->null_bit= 1;
+  sp_result_field->set_null_ptr((uchar *) &null_value, 1);
   DBUG_RETURN(FALSE);
 }
 
@@ -6934,6 +6960,11 @@ Item_func_sp::fix_fields(THD *thd, Item **ref)
 
   res= Item_func::fix_fields(thd, ref);
 
+  /* These is reset/set by Item_func::fix_fields. */
+  with_stored_program= true;
+  if (!m_sp->m_chistics->detistic || !tables_locked_cache)
+    const_item_cache= false;
+
   if (res)
     DBUG_RETURN(res);
 
@@ -6955,17 +6986,11 @@ Item_func_sp::fix_fields(THD *thd, Item **ref)
       Try to set and restore the security context to see whether it's valid
     */
     Security_context *save_secutiry_ctx;
-    res= set_routine_security_ctx(thd, m_sp, false, &save_secutiry_ctx);
+    res= m_sp->set_security_ctx(thd, &save_secutiry_ctx);
     if (!res)
       m_sp->m_security_ctx.restore_security_context(thd, save_secutiry_ctx);
     
 #endif /* ! NO_EMBEDDED_ACCESS_CHECKS */
-  }
-
-  if (!m_sp->m_chistics->detistic)
-  {
-    used_tables_cache |= RAND_TABLE_BIT;
-    const_item_cache= FALSE;
   }
 
   DBUG_RETURN(res);
@@ -6977,10 +7002,10 @@ void Item_func_sp::update_used_tables()
   Item_func::update_used_tables();
 
   if (!m_sp->m_chistics->detistic)
-  {
-    used_tables_cache |= RAND_TABLE_BIT;
-    const_item_cache= FALSE;
-  }
+    const_item_cache= false;
+
+  /* This is reset by Item_func::update_used_tables(). */
+  with_stored_program= true;
 }
 
 

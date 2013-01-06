@@ -1241,11 +1241,14 @@ UNLOCK TABLES;
 --echo # Insert delayed
 --echo #
 # See also Bug#26464 - insert delayed + update + merge = corruption
-# Succeeds in embedded server - is converted to normal insert
+# Succeeds with deprecation warning in embedded server - is converted to normal
+# insert
 # Fails in normal server, ps-protocol - not supported by engine
 # Fails in normal server, normal protocol - not a base table
+--disable_warnings
 --error 0, ER_DELAYED_NOT_SUPPORTED, ER_WRONG_OBJECT
 INSERT DELAYED INTO t4 VALUES(44);
+--enable_warnings
 # Get rid of row in embedded server
 DELETE FROM t4 WHERE c1 = 44;
 INSERT DELAYED INTO t3 VALUES(33);
@@ -1824,6 +1827,8 @@ DROP TABLE m1, t1;
 drop table if exists t_parent;
 --enable_warnings
 set @save_table_definition_cache=@@global.table_definition_cache;
+set @save_table_open_cache=@@global.table_open_cache;
+set @@global.table_open_cache=400;
 --echo #
 --echo # Set @@global.table_definition_cache to minimum
 --echo #
@@ -1873,6 +1878,7 @@ while ($1)
 --enable_query_log
 drop table t_parent;
 set @@global.table_definition_cache=@save_table_definition_cache;
+set @@global.table_open_cache=@save_table_open_cache;
 
 #
 # WL#4144 - Lock MERGE engine children

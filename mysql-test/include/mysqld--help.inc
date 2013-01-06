@@ -18,11 +18,12 @@ perl;
   # their paths may vary:
   @skipvars=qw/basedir open-files-limit general-log-file log plugin-dir
                log-slow-queries pid-file slow-query-log-file
-			   datadir slave-load-tmpdir tmpdir socket/;
+			   datadir slave-load-tmpdir tmpdir socket table-definition-cache table-open-cache/;
 
   # Plugins which may or may not be there:
   @plugins=qw/innodb ndb ndbinfo archive blackhole federated partition ndbcluster debug temp-pool ssl des-key-file
-              thread-concurrency super-large-pages mutex-deadlock-detector null-audit/;
+              thread-concurrency super-large-pages mutex-deadlock-detector null-audit
+              sha256-password-private-key-path sha256-password-public-key-path/;
 
   # And substitute the content some environment variables with their
   # names:

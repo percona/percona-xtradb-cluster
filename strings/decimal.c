@@ -1167,6 +1167,17 @@ int double2lldiv_t(double nr, lldiv_t *lld)
   lld->quot= (longlong) (nr > 0 ? floor(nr) : ceil(nr));
   /* Multiply reminder to 10^9 and store into "rem" */
   lld->rem= (longlong) rint((nr - (double) lld->quot) * 1000000000);
+  /*
+    Sometimes the expression "(double) 0.999999999xxx * (double) 10e9"
+    gives 1,000,000,000 instead of 999,999,999 due to lack of double precision.
+    The callers do not expect lld->rem to be greater than 999,999,999.
+    Let's catch this corner case and put the "nanounit" (e.g. nanosecond)
+    value in ldd->rem back into the valid range.
+  */
+  if (lld->rem > 999999999LL)
+    lld->rem= 999999999LL;
+  else if (lld->rem < -999999999LL)
+    lld->rem= -999999999LL;
   return E_DEC_OK;
 }
 
@@ -1706,10 +1717,18 @@ decimal_round(const decimal_t *from, decimal_t *to, int scale,
       }
       for (buf1=to->buf + intg0 + MY_MAX(frac0, 0); buf1 > to->buf; buf1--)
       {
-        buf1[0]=buf1[-1];
+        /* Avoid out-of-bounds write. */
+        if (buf1 < to->buf + len)
+          buf1[0]=buf1[-1];
+        else
+          error= E_DEC_OVERFLOW;
       }
       *buf1=1;
-      to->intg++;
+      /* We cannot have more than 9 * 9 = 81 digits. */
+      if (to->intg < len * DIG_PER_DEC1)
+        to->intg++;
+      else
+        error= E_DEC_OVERFLOW;
     }
   }
   else
@@ -1741,6 +1760,7 @@ decimal_round(const decimal_t *from, decimal_t *to, int scale,
     scale=0;
 
 done:
+  DBUG_ASSERT(to->intg <= (len * DIG_PER_DEC1));
   to->frac=scale;
   return error;
 }

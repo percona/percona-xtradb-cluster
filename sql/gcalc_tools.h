@@ -41,6 +41,8 @@
 class Gcalc_function
 {
 private:
+  static const uint32 function_buffer_item_size= 4;
+  static const uint32 shape_buffer_item_size= 4;
   String shapes_buffer;
   String function_buffer;
   const char *cur_func;
@@ -49,6 +51,16 @@ private:
   uint n_shapes;
   int count_internal();
 public:
+#ifndef DBUG_OFF
+  /**
+    Convert operation code to its readable name.
+  */
+  static const char *op_name(int code);
+  /**
+    Convert shape code to its readable name.
+  */
+  static const char *shape_name(int code);
+#endif
   enum op_type
   {
     op_shape= 0,
@@ -77,7 +89,14 @@ public:
   void add_operation(op_type operation, uint32 n_operands);
   void add_not_operation(op_type operation, uint32 n_operands);
   uint32 get_next_operation_pos() { return function_buffer.length(); }
+  /**
+    Read operand number from the given position and add more operands.
+  */
   void add_operands_to_op(uint32 operation_pos, uint32 n_operands);
+  /**
+    Set operand number at the given position (replace the old operand number).
+  */
+  void set_operands_to_op(uint32 operation_pos, uint32 n_operands);
   void set_cur_obj(uint32 cur_obj) { cur_object_id= cur_obj; }
   int reserve_shape_buffer(uint n_shapes);
   int reserve_op_buffer(uint n_ops);
@@ -100,6 +119,16 @@ public:
   void reset();
 
   int find_function(Gcalc_scan_iterator &scan_it);
+
+#ifndef DBUG_OFF
+  /**
+    Print function buffer created after shape transformation
+    into mysqld log and into client side warnings.
+    Printing to mysqld log is useful when server crashed during an operation.
+    Printing to client side warnings is useful for mtr purposes.
+  */
+  void debug_print_function_buffer();
+#endif
 };
 
 
@@ -119,15 +148,18 @@ public:
   Gcalc_operation_transporter(Gcalc_function *fn, Gcalc_heap *heap) :
     Gcalc_shape_transporter(heap), m_fn(fn) {}
 
-  int single_point(double x, double y);
-  int start_line();
-  int complete_line();
-  int start_poly();
-  int complete_poly();
-  int start_ring();
-  int complete_ring();
-  int add_point(double x, double y);
-  int start_collection(int n_objects);
+  int single_point(Gcalc_shape_status *st, double x, double y);
+  int start_line(Gcalc_shape_status *st);
+  int complete_line(Gcalc_shape_status *st);
+  int start_poly(Gcalc_shape_status *st);
+  int complete_poly(Gcalc_shape_status *st);
+  int start_ring(Gcalc_shape_status *st);
+  int complete_ring(Gcalc_shape_status *st);
+  int add_point(Gcalc_shape_status *st, double x, double y);
+  int start_collection(Gcalc_shape_status *st, int nshapes);
+  int complete_collection(Gcalc_shape_status *st);
+  int collection_add_item(Gcalc_shape_status *st_collection,
+                          Gcalc_shape_status *st_item);
 };
 
 
@@ -154,6 +186,20 @@ class Gcalc_result_receiver
   double first_x, first_y, prev_x, prev_y;
   double shape_area;
 public:
+
+  class chunk_info
+  {
+  public:
+    void *first_point;
+    uint32 order;
+    uint32 position;
+    uint32 length;
+    bool is_poly_hole;
+#ifndef DBUG_OFF
+    inline void dbug_print() const;
+#endif
+  };
+
   Gcalc_result_receiver() : collection_result(FALSE), n_shapes(0), n_holes(0)
     {}
   int start_shape(Gcalc_function::shape_type shape);
@@ -169,8 +215,7 @@ public:
   int get_nholes() { return n_holes; }
   int get_result_typeid();
   uint32 position() { return buffer.length(); }
-  int move_hole(uint32 dest_position, uint32 source_position,
-                uint32 *new_dest_position);
+  int reorder_chunks(chunk_info *chunks, int nchunks);
 };
 
 
@@ -204,6 +249,7 @@ public:
 
   class res_point : public Gcalc_dyn_list::Item
   {
+    res_point *m_outer_poly;
   public:
     bool intersection_point;
     double x,y;
@@ -212,16 +258,19 @@ public:
     res_point *glue;
     union
     {
-      const Gcalc_heap::Info *pi;
-      res_point *first_poly_node;
-    };
-    union
-    {
-      res_point *outer_poly;
-      uint32 poly_position;
+      const Gcalc_heap::Info *pi; // is valid before get_result_thread()
+      res_point *first_poly_node; // is valid after get_result_thread()
     };
     Gcalc_dyn_list::Item **prev_hook;
     res_point *get_next() { return (res_point *)next; }
+    void set_outer_poly(res_point *p)
+    {
+      m_outer_poly= p;
+      DBUG_PRINT("info", ("setting outer_poly of #%u to #%u",
+                          item_id(),
+                          m_outer_poly ? m_outer_poly->item_id() : 0));
+    }
+    res_point *get_outer_poly() { return m_outer_poly; }
   };
 
   class active_thread : public Gcalc_dyn_list::Item
@@ -230,6 +279,11 @@ public:
     res_point *rp;
     int result_range;
     res_point *thread_start;
+    void init()
+    {
+      rp= thread_start= NULL;
+      result_range= 0;
+    }
     active_thread *get_next() { return (active_thread *)next; }
   };
 
@@ -242,18 +296,62 @@ protected:
   res_point *result_heap;
   active_thread *m_first_active_thread;
 
-  res_point *add_res_point()
+  res_point *add_res_point(const Gcalc_heap::Info *pi)
   {
-    res_point *result= (res_point *)new_item();
+    res_point *rp= new_res_point(pi, false);
+    if (!rp)
+      return NULL;
+    DBUG_PRINT("info", ("add_res_point #%u: pi=(%g,%g,#%u)",
+                        rp->item_id(), pi->x, pi->y, pi->shape));
+    return rp;
+  }
+
+  res_point *add_res_i_point(const Gcalc_heap::Info *pi, double x, double y)
+  {
+    res_point *rp= new_res_point(pi, true);
+    if (!rp)
+      return NULL;
+    DBUG_PRINT("info", ("add_res_i_point #%u: pi=(%g,%g,#%u) xy=(%g,%g)",
+                        rp->item_id(), pi->x, pi->y, pi->shape, x, y));
+    rp->x= x;
+    rp->y= y;
+    return rp;
+  }
+
+  res_point *add_res_single_point(const Gcalc_heap::Info *pi)
+  {
+    res_point *rp= new_res_point(pi, false);
+    if (!rp)
+      return NULL;
+    DBUG_PRINT("info", ("add_res_single_point #%u: pi=(%g,%g,#%u)",
+                        rp->item_id(), pi->x, pi->y, pi->shape));
+    rp->x= pi->x;
+    rp->y= pi->y;
+    return rp;
+  }
+
+  active_thread *new_active_thread()
+  {
+    active_thread *tmp= (active_thread *) new_item();
+    if (tmp)
+      tmp->init();
+    return tmp;
+  }
+
+private:
+
+  res_point *new_res_point(const Gcalc_heap::Info *pi,
+                           bool intersection_point)
+  {
+    res_point *result= (res_point *) new_item();
     *m_res_hook= result;
     result->prev_hook= m_res_hook;
     m_res_hook= &result->next;
+    result->pi= pi;
+    result->intersection_point= intersection_point;
     return result;
   }
 
-  active_thread *new_active_thread() { return (active_thread *)new_item(); }
-
-private:
   int continue_range(active_thread *t, const Gcalc_heap::Info *p);
   int continue_i_range(active_thread *t, const Gcalc_heap::Info *p,
 		       double x, double y);

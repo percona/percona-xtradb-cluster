@@ -17,15 +17,18 @@
  * draft along with type conversion functions.
  */
 
+// First include (the generated) my_config.h, to get correct platform defines.
+#include "my_config.h"
+#ifdef __WIN__
+#include<Windows.h>
+#else
+#include <pthread.h>
+#endif
+
 #include "runtime.hpp"
 #include "yassl_int.hpp"
 #include "handshake.hpp"
 #include "timer.hpp"
-
-#ifdef _POSIX_THREADS
-    #include "pthread.h"
-#endif
-
 
 #ifdef HAVE_LIBZ
     #include "zlib.h"
@@ -719,6 +722,58 @@ void SSL::set_pending(Cipher suite)
     }
 }
 
+#ifdef __WIN__
+typedef volatile LONG yassl_pthread_once_t;
+#define YASSL_PTHREAD_ONCE_INIT  0
+#define YASSL_PTHREAD_ONCE_INPROGRESS 1
+#define YASSL_PTHREAD_ONCE_DONE 2
+
+int yassl_pthread_once(yassl_pthread_once_t *once_control,
+    void (*init_routine)(void))
+{
+  LONG state;
+
+  /*
+    Do "dirty" read to find out if initialization is already done, to
+    save an interlocked operation in common case. Memory barriers are ensured by 
+    Visual C++ volatile implementation.
+  */
+  if (*once_control == YASSL_PTHREAD_ONCE_DONE)
+    return 0;
+
+  state= InterlockedCompareExchange(once_control, YASSL_PTHREAD_ONCE_INPROGRESS,
+                                        YASSL_PTHREAD_ONCE_INIT);
+
+  switch(state)
+  {
+  case YASSL_PTHREAD_ONCE_INIT:
+    /* This is initializer thread */
+    (*init_routine)();
+    *once_control= YASSL_PTHREAD_ONCE_DONE;
+    break;
+
+  case YASSL_PTHREAD_ONCE_INPROGRESS:
+    /* init_routine in progress. Wait for its completion */
+    while(*once_control == YASSL_PTHREAD_ONCE_INPROGRESS)
+    {
+      Sleep(1);
+    }
+    break;
+  case YASSL_PTHREAD_ONCE_DONE:
+    /* Nothing to do */
+    break;
+  }
+  return 0;
+}
+#else
+#define yassl_pthread_once_t pthread_once_t
+#if defined(PTHREAD_ONCE_INITIALIZER)
+#define YASSL_PTHREAD_ONCE_INIT PTHREAD_ONCE_INITIALIZER
+#else
+#define YASSL_PTHREAD_ONCE_INIT PTHREAD_ONCE_INIT
+#endif
+#define yassl_pthread_once(C,F) pthread_once(C,F)
+#endif // __WIN__
 
 // store peer's random
 void SSL::set_random(const opaque* random, ConnectionEnd sender)
@@ -1126,8 +1181,28 @@ void SSL::flushBuffer()
 
 void SSL::Send(const byte* buffer, uint sz)
 {
-    if (socket_.send(buffer, sz) != sz)
-        SetError(send_error);
+    unsigned int sent = 0;
+
+    if (socket_.send(buffer, sz, sent) != sz) {
+        if (socket_.WouldBlock()) {
+            buffers_.SetOutput(NEW_YS output_buffer(sz - sent, buffer + sent,
+                                                    sz - sent));
+            SetError(YasslError(SSL_ERROR_WANT_WRITE));
+        }
+        else
+            SetError(send_error);
+    }
+}
+
+
+void SSL::SendWriteBuffered()
+{
+    output_buffer* out = buffers_.TakeOutput();
+
+    if (out) {
+        mySTL::auto_ptr<output_buffer> tmp(out);
+        Send(out->get_buffer(), out->get_size());
+    }
 }
 
 
@@ -1289,7 +1364,6 @@ void SSL::matchSuite(const opaque* peer, uint length)
             if (secure_.use_parms().suites_[i] == peer[j]) {
                 secure_.use_parms().suite_[0] = 0x00;
                 secure_.use_parms().suite_[1] = peer[j];
-
                 return;
             }
 
@@ -1433,7 +1507,6 @@ void SSL::addBuffer(output_buffer* b)
 
 void SSL_SESSION::CopyX509(X509* x)
 {
-    assert(peerX509_ == 0);
     if (x == 0) return;
 
     X509_NAME* issuer   = x->GetIssuer();
@@ -1548,11 +1621,22 @@ SSL_SESSION::~SSL_SESSION()
 
 
 static Sessions* sessionsInstance = 0;
+static yassl_pthread_once_t session_created= YASSL_PTHREAD_ONCE_INIT;
+
+void Session_initialize()
+{
+    sessionsInstance = NEW_YS Sessions;
+}
+
+extern "C"
+{
+  static void c_session_initialize() { Session_initialize(); }
+}
+
 
 Sessions& GetSessions()
 {
-    if (!sessionsInstance)
-        sessionsInstance = NEW_YS Sessions;
+    yassl_pthread_once(&session_created, c_session_initialize);
     return *sessionsInstance;
 }
 
@@ -1808,6 +1892,8 @@ extern "C" char *yassl_mysql_strdup(const char *from, int)
 }
 
 
+extern "C"
+{
 static int
 default_password_callback(char * buffer, int size_arg, int rwflag,
                           void * /* unused: callback_data */)
@@ -1836,7 +1922,7 @@ default_password_callback(char * buffer, int size_arg, int rwflag,
   free(passwd);
   return passwd_len;
 }
-
+}
 
 SSL_CTX::SSL_CTX(SSL_METHOD* meth) 
     : method_(meth), certificate_(0), privateKey_(0), 
@@ -1869,7 +1955,7 @@ SSL_CTX::GetCA_List() const
 }
 
 
-VerifyCallback SSL_CTX::getVerifyCallback() const
+const VerifyCallback SSL_CTX::getVerifyCallback() const
 {
     return verifyCallback_;
 }
@@ -2268,7 +2354,7 @@ Hashes& sslHashes::use_certVerify()
 }
 
 
-Buffers::Buffers() : rawInput_(0)
+Buffers::Buffers() : prevSent(0), plainSz(0), rawInput_(0), output_(0)
 {}
 
 
@@ -2279,12 +2365,18 @@ Buffers::~Buffers()
     STL::for_each(dataList_.begin(), dataList_.end(),
                   del_ptr_zero()) ;
     ysDelete(rawInput_);
+    ysDelete(output_);
+}
+
+
+void Buffers::SetOutput(output_buffer* ob)
+{
+    output_ = ob;
 }
 
 
 void Buffers::SetRawInput(input_buffer* ib)
 {
-    assert(rawInput_ == 0);
     rawInput_ = ib;
 }
 
@@ -2293,6 +2385,15 @@ input_buffer* Buffers::TakeRawInput()
 {
     input_buffer* ret = rawInput_;
     rawInput_ = 0;
+
+    return ret;
+}
+
+
+output_buffer* Buffers::TakeOutput()
+{
+    output_buffer* ret = output_;
+    output_ = 0;
 
     return ret;
 }
@@ -2573,14 +2674,12 @@ ASN1_STRING* StringHolder::GetString()
     // these versions should never get called
     int Compress(const byte* in, int sz, input_buffer& buffer)
     {
-        assert(0);  
         return -1;
     } 
 
 
     int DeCompress(input_buffer& in, int sz, input_buffer& out)
     {
-        assert(0);  
         return -1;
     } 
 
@@ -2604,3 +2703,14 @@ extern "C" void yaSSL_CleanUp()
     yaSSL::sessionsInstance = 0;
     yaSSL::errorsInstance = 0;
 }
+
+
+#ifdef HAVE_EXPLICIT_TEMPLATE_INSTANTIATION
+namespace mySTL {
+template yaSSL::yassl_int_cpp_local1::SumData for_each<mySTL::list<yaSSL::input_buffer*>::iterator, yaSSL::yassl_int_cpp_local1::SumData>(mySTL::list<yaSSL::input_buffer*>::iterator, mySTL::list<yaSSL::input_buffer*>::iterator, yaSSL::yassl_int_cpp_local1::SumData);
+template yaSSL::yassl_int_cpp_local1::SumBuffer for_each<mySTL::list<yaSSL::output_buffer*>::iterator, yaSSL::yassl_int_cpp_local1::SumBuffer>(mySTL::list<yaSSL::output_buffer*>::iterator, mySTL::list<yaSSL::output_buffer*>::iterator, yaSSL::yassl_int_cpp_local1::SumBuffer);
+template mySTL::list<yaSSL::SSL_SESSION*>::iterator find_if<mySTL::list<yaSSL::SSL_SESSION*>::iterator, yaSSL::yassl_int_cpp_local2::sess_match>(mySTL::list<yaSSL::SSL_SESSION*>::iterator, mySTL::list<yaSSL::SSL_SESSION*>::iterator, yaSSL::yassl_int_cpp_local2::sess_match);
+template mySTL::list<yaSSL::ThreadError>::iterator find_if<mySTL::list<yaSSL::ThreadError>::iterator, yaSSL::yassl_int_cpp_local2::thr_match>(mySTL::list<yaSSL::ThreadError>::iterator, mySTL::list<yaSSL::ThreadError>::iterator, yaSSL::yassl_int_cpp_local2::thr_match);
+}
+#endif
+

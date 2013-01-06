@@ -23,6 +23,7 @@ Create Full Text Index with (parallel) merge sort
 Created 10/13/2010 Jimmy Yang
 *******************************************************/
 
+#include "dict0dict.h" /* dict_table_stats_lock() */
 #include "row0merge.h"
 #include "pars0pars.h"
 #include "row0ftsort.h"
@@ -35,7 +36,7 @@ Created 10/13/2010 Jimmy Yang
 #define ROW_MERGE_READ_GET_NEXT(N)					\
 	do {								\
 		b[N] = row_merge_read_rec(				\
-			block[N], buf[N], b[N], index, n_null,		\
+			block[N], buf[N], b[N], index,			\
 			fd[N], &foffs[N], &mrec[N], offsets[N]);	\
 		if (UNIV_UNLIKELY(!b[N])) {				\
 			if (mrec[N]) {					\
@@ -121,7 +122,7 @@ row_merge_create_fts_sort_index(
 	if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_FTS_ADD_DOC_ID)) {
 		/* If Doc ID column is being added by this create
 		index, then just check the number of rows in the table */
-		if (table->stat_n_rows < MAX_DOC_ID_OPT_VAL) {
+		if (dict_table_get_n_rows(table) < MAX_DOC_ID_OPT_VAL) {
 			*opt_doc_id_size = TRUE;
 		}
 	} else {
@@ -170,10 +171,10 @@ ibool
 row_fts_psort_info_init(
 /*====================*/
 	trx_t*			trx,	/*!< in: transaction */
-	struct TABLE*		table,	/*!< in: MySQL table object */
+	row_merge_dup_t*	dup,	/*!< in,own: descriptor of
+					FTS index being created */
 	const dict_table_t*	new_table,/*!< in: table on which indexes are
 					created */
-	dict_index_t*		index,	/*!< in: FTS index to be created */
 	ibool			opt_doc_id_size,
 					/*!< in: whether to use 4 bytes
 					instead of 8 bytes integer to
@@ -189,7 +190,6 @@ row_fts_psort_info_init(
 	fts_psort_t*		psort_info = NULL;
 	fts_psort_t*		merge_info = NULL;
 	ulint			block_size;
-	os_event_t		sort_event;
 	ibool			ret = TRUE;
 
 	block_size = 3 * srv_sort_buf_size;
@@ -198,27 +198,27 @@ row_fts_psort_info_init(
 		 fts_sort_pll_degree * sizeof *psort_info));
 
 	if (!psort_info) {
-		return FALSE;
+		ut_free(dup);
+		return(FALSE);
 	}
-
-	sort_event = os_event_create(NULL);
 
 	/* Common Info for all sort threads */
 	common_info = static_cast<fts_psort_common_t*>(
 		mem_alloc(sizeof *common_info));
 
-	common_info->table = table;
+	if (!common_info) {
+		ut_free(dup);
+		mem_free(psort_info);
+		return(FALSE);
+	}
+
+	common_info->dup = dup;
 	common_info->new_table = (dict_table_t*) new_table;
 	common_info->trx = trx;
-	common_info->sort_index = index;
 	common_info->all_info = psort_info;
-	common_info->sort_event = sort_event;
+	common_info->sort_event = os_event_create(NULL);
+	common_info->merge_event = os_event_create(NULL);
 	common_info->opt_doc_id_size = opt_doc_id_size;
-
-	if (!common_info) {
-		mem_free(psort_info);
-		return FALSE;
-	}
 
 	/* There will be FTS_NUM_AUX_INDEX number of "sort buckets" for
 	each parallel sort thread. Each "sort bucket" holds records for
@@ -239,7 +239,7 @@ row_fts_psort_info_init(
 			}
 
 			psort_info[j].merge_buf[i] = row_merge_buf_create(
-				index);
+				dup->index);
 
 			row_merge_file_create(psort_info[j].merge_file[i]);
 
@@ -311,6 +311,9 @@ row_fts_psort_info_destroy(
 			}
 		}
 
+		os_event_free(merge_info[0].psort_common->sort_event);
+		os_event_free(merge_info[0].psort_common->merge_event);
+		ut_free(merge_info[0].psort_common->dup);
 		mem_free(merge_info[0].psort_common);
 		mem_free(psort_info);
 	}
@@ -432,7 +435,6 @@ row_merge_fts_doc_tokenize(
 
 		mtuple_t* mtuple = &buf->tuples[buf->n_tuples + n_tuple[idx]];
 
-		mtuple->del_mark = false;
 		field = mtuple->fields = static_cast<dfield_t*>(
 			mem_heap_alloc(buf->heap,
 				       FTS_NUM_FIELDS_SORT * sizeof *field));
@@ -582,10 +584,10 @@ fts_parallel_tokenization(
 	memset(mycount, 0, FTS_NUM_AUX_INDEX * sizeof(int));
 
 	doc.charset = fts_index_get_charset(
-		psort_info->psort_common->sort_index);
+		psort_info->psort_common->dup->index);
 
 	idx_field = dict_index_get_nth_field(
-		psort_info->psort_common->sort_index, 0);
+		psort_info->psort_common->dup->index, 0);
 	word_dtype.prtype = idx_field->col->prtype;
 	word_dtype.mbminmaxlen = idx_field->col->mbminmaxlen;
 	word_dtype.mtype = (strcmp(doc.charset->name, "latin1_swedish_ci") == 0)
@@ -752,16 +754,51 @@ loop:
 	goto loop;
 
 exit:
+	/* Do a final sort of the last (or latest) batch of records
+	in block memory. Flush them to temp file if records cannot
+	be hold in one block memory */
 	for (i = 0; i < FTS_NUM_AUX_INDEX; i++) {
 		if (t_ctx.rows_added[i]) {
 			row_merge_buf_sort(buf[i], NULL);
 			row_merge_buf_write(
-				buf[i], (const merge_file_t*) merge_file[i],
-				block[i]);
-			row_merge_write(merge_file[i]->fd,
-					merge_file[i]->offset++, block[i]);
+				buf[i], merge_file[i], block[i]);
 
-			UNIV_MEM_INVALID(block[i][0], srv_sort_buf_size);
+			/* Write to temp file, only if records have
+			been flushed to temp file before (offset > 0):
+			The pseudo code for sort is following:
+
+				while (there are rows) {
+					tokenize rows, put result in block[]
+					if (block[] runs out) {
+						sort rows;
+						write to temp file with
+						row_merge_write();
+						offset++;
+					}
+				}
+
+				# write out the last batch
+				if (offset > 0) {
+					row_merge_write();
+					offset++;
+				} else {
+					# no need to write anything
+					offset stay as 0
+				}
+
+			so if merge_file[i]->offset is 0 when we come to
+			here as the last batch, this means rows have
+			never flush to temp file, it can be held all in
+			memory */
+			if (merge_file[i]->offset != 0) {
+				row_merge_write(merge_file[i]->fd,
+						merge_file[i]->offset++,
+						block[i]);
+
+				UNIV_MEM_INVALID(block[i][0],
+						 srv_sort_buf_size);
+			}
+
 			buf[i] = row_merge_buf_empty(buf[i]);
 			t_ctx.rows_added[i] = 0;
 		}
@@ -779,10 +816,8 @@ exit:
 
 		tmpfd[i] = innobase_mysql_tmpfile();
 		row_merge_sort(psort_info->psort_common->trx,
-				       psort_info->psort_common->sort_index,
-				       merge_file[i],
-				       (row_merge_block_t*) block[i], &tmpfd[i],
-				       psort_info->psort_common->table);
+			       psort_info->psort_common->dup,
+			       merge_file[i], block[i], &tmpfd[i]);
 		total_rec += merge_file[i]->n_rec;
 		close(tmpfd[i]);
 	}
@@ -795,8 +830,14 @@ exit:
 
 	psort_info->child_status = FTS_CHILD_COMPLETE;
 	os_event_set(psort_info->psort_common->sort_event);
+	psort_info->child_status = FTS_CHILD_EXITING;
+
+#ifdef __WIN__
+	CloseHandle(psort_info->thread_hdl);
+#endif /*__WIN__ */
 
 	os_thread_exit(NULL);
+
 	OS_THREAD_DUMMY_RETURN;
 }
 
@@ -813,8 +854,9 @@ row_fts_start_psort(
 
 	for (i = 0; i < fts_sort_pll_degree; i++) {
 		psort_info[i].psort_id = i;
-		os_thread_create(fts_parallel_tokenization,
-				 (void*) &psort_info[i], &thd_id);
+		psort_info[i].thread_hdl = os_thread_create(
+			fts_parallel_tokenization,
+			(void*) &psort_info[i], &thd_id);
 	}
 }
 
@@ -834,14 +876,20 @@ fts_parallel_merge(
 
 	id = psort_info->psort_id;
 
-	row_fts_merge_insert(psort_info->psort_common->sort_index,
+	row_fts_merge_insert(psort_info->psort_common->dup->index,
 			     psort_info->psort_common->new_table,
 			     psort_info->psort_common->all_info, id);
 
 	psort_info->child_status = FTS_CHILD_COMPLETE;
-	os_event_set(psort_info->psort_common->sort_event);
+	os_event_set(psort_info->psort_common->merge_event);
+	psort_info->child_status = FTS_CHILD_EXITING;
+
+#ifdef __WIN__
+	CloseHandle(psort_info->thread_hdl);
+#endif /*__WIN__ */
 
 	os_thread_exit(NULL);
+
 	OS_THREAD_DUMMY_RETURN;
 }
 
@@ -861,8 +909,8 @@ row_fts_start_parallel_merge(
 		merge_info[i].psort_id = i;
 		merge_info[i].child_status = 0;
 
-		os_thread_create(fts_parallel_merge,
-				 (void*) &merge_info[i], &thd_id);
+		merge_info[i].thread_hdl = os_thread_create(
+			fts_parallel_merge, (void*) &merge_info[i], &thd_id);
 	}
 }
 
@@ -1313,7 +1361,7 @@ row_fts_merge_insert(
 		count_diag += (int) psort_info[i].merge_file[id]->n_rec;
 	}
 
-	if (fts_enable_diag_print) { 
+	if (fts_enable_diag_print) {
 		ut_print_timestamp(stderr);
 		fprintf(stderr, "  InnoDB_FTS: to inserted %lu records\n",
 			(ulong) count_diag);
@@ -1340,15 +1388,18 @@ row_fts_merge_insert(
 	ins_ctx.fts_table.parent = index->table->name;
 	ins_ctx.fts_table.table = NULL;
 
-	const ulint	n_null = index->n_nullable;
-
 	for (i = 0; i < fts_sort_pll_degree; i++) {
 		if (psort_info[i].merge_file[id]->n_rec == 0) {
 			/* No Rows to read */
 			mrec[i] = b[i] = NULL;
 		} else {
-			if (!row_merge_read(fd[i], foffs[i],
-			    (row_merge_block_t*) block[i])) {
+			/* Read from temp file only if it has been
+			written to. Otherwise, block memory holds
+			all the sorted records */
+			if (psort_info[i].merge_file[id]->offset > 0
+			    && (!row_merge_read(
+					fd[i], foffs[i],
+					(row_merge_block_t*) block[i]))) {
 				error = DB_CORRUPTION;
 				goto exit;
 			}

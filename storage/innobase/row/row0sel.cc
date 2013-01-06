@@ -706,10 +706,9 @@ row_sel_build_prev_vers(
 
 /*********************************************************************//**
 Builds the last committed version of a clustered index record for a
-semi-consistent read.
-@return	DB_SUCCESS or error code */
-static __attribute__((nonnull, warn_unused_result))
-dberr_t
+semi-consistent read. */
+static __attribute__((nonnull))
+void
 row_sel_build_committed_vers_for_mysql(
 /*===================================*/
 	dict_index_t*	clust_index,	/*!< in: clustered index */
@@ -725,18 +724,16 @@ row_sel_build_committed_vers_for_mysql(
 					afterwards */
 	mtr_t*		mtr)		/*!< in: mtr */
 {
-	dberr_t	err;
-
 	if (prebuilt->old_vers_heap) {
 		mem_heap_empty(prebuilt->old_vers_heap);
 	} else {
-		prebuilt->old_vers_heap = mem_heap_create(200);
+		prebuilt->old_vers_heap = mem_heap_create(
+			rec_offs_size(*offsets));
 	}
 
-	err = row_vers_build_for_semi_consistent_read(
+	row_vers_build_for_semi_consistent_read(
 		rec, mtr, clust_index, offsets, offset_heap,
 		prebuilt->old_vers_heap, old_vers);
-	return(err);
 }
 
 /*********************************************************************//**
@@ -1083,7 +1080,7 @@ row_sel_open_pcur(
 		(FALSE: no init) */
 
 		btr_pcur_open_at_index_side(plan->asc, index, BTR_SEARCH_LEAF,
-					    &(plan->pcur), FALSE, mtr);
+					    &(plan->pcur), false, 0, mtr);
 	}
 
 	ut_ad(plan->n_rows_prefetched == 0);
@@ -2533,12 +2530,16 @@ row_sel_convert_mysql_key_to_innobase(
 				dfield_set_len(dfield, len
 					       - (ulint) (key_ptr - key_end));
 			}
+                        ut_ad(0);
 		}
 
 		n_fields++;
 		field++;
 		dfield++;
 	}
+
+	DBUG_EXECUTE_IF("innodb_srch_key_buffer_full",
+		ut_a(buf == (original_buf + buf_len)););
 
 	ut_a(buf <= original_buf + buf_len);
 
@@ -3691,48 +3692,41 @@ row_search_for_mysql(
 	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
 	ulint*		offsets				= offsets_;
 	ibool		table_lock_waited		= FALSE;
+	byte*		next_buf			= 0;
 
 	rec_offs_init(offsets_);
 
 	ut_ad(index && pcur && search_tuple);
 
-	if (UNIV_UNLIKELY(prebuilt->table->ibd_file_missing)) {
-		ut_print_timestamp(stderr);
-		fprintf(stderr, "  InnoDB: Error:\n"
-			"InnoDB: MySQL is trying to use a table handle"
-			" but the .ibd file for\n"
-			"InnoDB: table %s does not exist.\n"
-			"InnoDB: Have you deleted the .ibd file"
-			" from the database directory under\n"
-			"InnoDB: the MySQL datadir, or have you used"
-			" DISCARD TABLESPACE?\n"
-			"InnoDB: Look from\n"
-			"InnoDB: " REFMAN "innodb-troubleshooting.html\n"
-			"InnoDB: how you can resolve the problem.\n",
-			prebuilt->table->name);
-
-#ifdef UNIV_SYNC_DEBUG
-		ut_ad(!sync_thread_levels_nonempty_trx(trx->has_search_latch));
-#endif /* UNIV_SYNC_DEBUG */
-		return(DB_ERROR);
+	/* We don't support FTS queries from the HANDLER interfaces, because
+	we implemented FTS as reversed inverted index with auxiliary tables.
+	So anything related to traditional index query would not apply to
+	it. */
+	if (index->type & DICT_FTS) {
+		return(DB_END_OF_INDEX);
 	}
 
-	if (UNIV_UNLIKELY(!prebuilt->index_usable)) {
-
 #ifdef UNIV_SYNC_DEBUG
-		ut_ad(!sync_thread_levels_nonempty_trx(trx->has_search_latch));
+	ut_ad(!sync_thread_levels_nonempty_trx(trx->has_search_latch));
 #endif /* UNIV_SYNC_DEBUG */
+
+	if (dict_table_is_discarded(prebuilt->table)) {
+
+		return(DB_TABLESPACE_DELETED);
+
+	} else if (prebuilt->table->ibd_file_missing) {
+
+		return(DB_TABLESPACE_NOT_FOUND);
+
+	} else if (!prebuilt->index_usable) {
+
 		return(DB_MISSING_HISTORY);
-	}
 
-	if (dict_index_is_corrupted(index)) {
-#ifdef UNIV_SYNC_DEBUG
-		ut_ad(!sync_thread_levels_nonempty_trx(trx->has_search_latch));
-#endif /* UNIV_SYNC_DEBUG */
+	} else if (dict_index_is_corrupted(index)) {
+
 		return(DB_CORRUPTION);
-	}
 
-	if (prebuilt->magic_n != ROW_PREBUILT_ALLOCATED) {
+	} else if (prebuilt->magic_n != ROW_PREBUILT_ALLOCATED) {
 		fprintf(stderr,
 			"InnoDB: Error: trying to free a corrupt\n"
 			"InnoDB: table handle. Magic n %lu, table name ",
@@ -3836,7 +3830,6 @@ row_search_for_mysql(
 
 			prebuilt->n_rows_fetched++;
 
-			srv_n_rows_read++;
 			err = DB_SUCCESS;
 			goto func_exit;
 		}
@@ -3993,8 +3986,6 @@ row_search_for_mysql(
 
 				/* ut_print_name(stderr, index->name);
 				fputs(" shortcut\n", stderr); */
-
-				srv_n_rows_read++;
 
 				err = DB_SUCCESS;
 				goto release_search_latch_if_needed;
@@ -4168,12 +4159,12 @@ wait_table_again:
 
 			/* Try to place a gap lock on the next index record
 			to prevent phantoms in ORDER BY ... DESC queries */
-			const rec_t*	next = page_rec_get_next_const(rec);
+			const rec_t*	next_rec = page_rec_get_next_const(rec);
 
-			offsets = rec_get_offsets(next, index, offsets,
+			offsets = rec_get_offsets(next_rec, index, offsets,
 						  ULINT_UNDEFINED, &heap);
 			err = sel_set_rec_lock(btr_pcur_get_block(pcur),
-					       next, index, offsets,
+					       next_rec, index, offsets,
 					       prebuilt->select_lock_type,
 					       LOCK_GAP, thr);
 
@@ -4186,19 +4177,18 @@ wait_table_again:
 				goto lock_wait_or_error;
 			}
 		}
-	} else {
-		if (mode == PAGE_CUR_G) {
-			btr_pcur_open_at_index_side(
-				TRUE, index, BTR_SEARCH_LEAF, pcur, FALSE,
-				&mtr);
-		} else if (mode == PAGE_CUR_L) {
-			btr_pcur_open_at_index_side(
-				FALSE, index, BTR_SEARCH_LEAF, pcur, FALSE,
-				&mtr);
-		}
+	} else if (mode == PAGE_CUR_G || mode == PAGE_CUR_L) {
+		btr_pcur_open_at_index_side(
+			mode == PAGE_CUR_G, index, BTR_SEARCH_LEAF,
+			pcur, false, 0, &mtr);
 	}
 
 rec_loop:
+	if (trx_is_interrupted(trx)) {
+		err = DB_INTERRUPTED;
+		goto normal_return;
+	}
+
 	/*-------------------------------------------------------------*/
 	/* PHASE 4: Look for matching records in a loop */
 
@@ -4331,6 +4321,9 @@ wrong_offs:
 	/*-------------------------------------------------------------*/
 
 	/* Calculate the 'offsets' associated with 'rec' */
+
+	ut_ad(fil_page_get_type(btr_pcur_get_page(pcur)) == FIL_PAGE_INDEX);
+	ut_ad(btr_page_get_index_id(btr_pcur_get_page(pcur)) == index->id);
 
 	offsets = rec_get_offsets(rec, index, offsets, ULINT_UNDEFINED, &heap);
 
@@ -4523,14 +4516,9 @@ no_gap_lock:
 
 			/* The following call returns 'offsets'
 			associated with 'old_vers' */
-			err = row_sel_build_committed_vers_for_mysql(
+			row_sel_build_committed_vers_for_mysql(
 				clust_index, prebuilt, rec,
 				&offsets, &heap, &old_vers, &mtr);
-
-			if (err != DB_SUCCESS) {
-
-				goto lock_wait_or_error;
-			}
 
 			/* Check whether it was a deadlock or not, if not
 			a deadlock and the transaction had to wait then
@@ -4672,11 +4660,15 @@ locks_ok:
 		delete marked record and the record following it.
 
 		For now this is applicable only to clustered indexes while
-		doing a unique search. There is scope for further optimization
+		doing a unique search except for HANDLER queries because
+		HANDLER allows NEXT and PREV even in unique search on
+		clustered index. There is scope for further optimization
 		applicable to unique secondary indexes. Current behaviour is
 		to widen the scope of a lock on an already delete marked record
 		if the same record is deleted twice by the same transaction */
-		if (index == clust_index && unique_search) {
+		if (index == clust_index && unique_search
+		    && !prebuilt->used_in_HANDLER) {
+
 			err = DB_RECORD_NOT_FOUND;
 
 			goto normal_return;
@@ -4813,7 +4805,7 @@ requires_clust_rec:
 	    && !prebuilt->innodb_api
 	    && prebuilt->template_type
 	    != ROW_MYSQL_DUMMY_TEMPLATE
-	    && !prebuilt->result) {
+	    && !prebuilt->in_fts_query) {
 
 		/* Inside an update, for example, we do not cache rows,
 		since we may use the cursor position to do the actual
@@ -4829,29 +4821,58 @@ requires_clust_rec:
 		/* We only convert from InnoDB row format to MySQL row
 		format when ICP is disabled. */
 
-		if (!prebuilt->idx_cond
-		    && !row_sel_store_mysql_rec(
-			    row_sel_fetch_last_buf(prebuilt),
-			    prebuilt, result_rec,
-			    result_rec != rec,
-			    result_rec != rec ? clust_index : index,
-			    offsets)) {
+		if (!prebuilt->idx_cond) {
 
-			/* Only fresh inserts may contain incomplete
-			externally stored columns. Pretend that such
-			records do not exist. Such records may only be
-			accessed at the READ UNCOMMITTED isolation
-			level or when rolling back a recovered
-			transaction. Rollback happens at a lower
-			level, not here. */
-			goto next_rec;
+			/* We use next_buf to track the allocation of buffers
+			where we store and enqueue the buffers for our
+			pre-fetch optimisation.
+
+			If next_buf == 0 then we store the converted record
+			directly into the MySQL record buffer (buf). If it is
+			!= 0 then we allocate a pre-fetch buffer and store the
+			converted record there.
+
+			If the conversion fails and the MySQL record buffer
+			was not written to then we reset next_buf so that
+			we can re-use the MySQL record buffer in the next
+			iteration. */
+
+			next_buf = next_buf
+				 ? row_sel_fetch_last_buf(prebuilt) : buf;
+
+			if (!row_sel_store_mysql_rec(
+				next_buf, prebuilt, result_rec,
+				result_rec != rec,
+				result_rec != rec ? clust_index : index,
+				offsets)) {
+
+				if (next_buf == buf) {
+					ut_a(prebuilt->n_fetch_cached == 0);
+					next_buf = 0;
+				}
+
+				/* Only fresh inserts may contain incomplete
+				externally stored columns. Pretend that such
+				records do not exist. Such records may only be
+				accessed at the READ UNCOMMITTED isolation
+				level or when rolling back a recovered
+				transaction. Rollback happens at a lower
+				level, not here. */
+				goto next_rec;
+			}
+
+			if (next_buf != buf) {
+				row_sel_enqueue_cache_row_for_mysql(
+					next_buf, prebuilt);
+			}
+		} else {
+			row_sel_enqueue_cache_row_for_mysql(buf, prebuilt);
 		}
-
-		row_sel_enqueue_cache_row_for_mysql(buf, prebuilt);
 
 		if (prebuilt->n_fetch_cached < MYSQL_FETCH_CACHE_SIZE) {
 			goto next_rec;
 		}
+
 	} else {
 		if (UNIV_UNLIKELY
 		    (prebuilt->template_type == ROW_MYSQL_DUMMY_TEMPLATE)) {
@@ -5086,8 +5107,23 @@ normal_return:
 
 	mtr_commit(&mtr);
 
-	if (prebuilt->n_fetch_cached > 0) {
-		row_sel_dequeue_cached_row_for_mysql(buf, prebuilt);
+	if (prebuilt->idx_cond != 0) {
+
+		/* When ICP is active we don't write to the MySQL buffer
+		directly, only to buffers that are enqueued in the pre-fetch
+		queue. We need to dequeue the first buffer and copy the contents
+		to the record buffer that was passed in by MySQL. */
+
+		if (prebuilt->n_fetch_cached > 0) {
+			row_sel_dequeue_cached_row_for_mysql(buf, prebuilt);
+			err = DB_SUCCESS;
+		}
+
+	} else if (next_buf != 0) {
+
+		/* We may or may not have enqueued some buffers to the
+		pre-fetch queue, but we definitely wrote to the record
+		buffer passed to use by MySQL. */
 
 		err = DB_SUCCESS;
 	}
@@ -5097,9 +5133,6 @@ normal_return:
 	dict_index_name_print(stderr, index);
 	fprintf(stderr, " cnt %lu ret value %lu err\n", cnt, err); */
 #endif /* UNIV_SEARCH_DEBUG */
-	if (err == DB_SUCCESS) {
-		srv_n_rows_read++;
-	}
 
 func_exit:
 	trx->op_info = "";
@@ -5124,6 +5157,9 @@ func_exit:
 #ifdef UNIV_SYNC_DEBUG
 	ut_ad(!sync_thread_levels_nonempty_trx(trx->has_search_latch));
 #endif /* UNIV_SYNC_DEBUG */
+
+	DEBUG_SYNC_C("innodb_row_search_for_mysql_exit");
+
 	return(err);
 }
 
@@ -5142,7 +5178,22 @@ row_search_check_if_query_cache_permitted(
 	dict_table_t*	table;
 	ibool		ret	= FALSE;
 
-	table = dict_table_open_on_name(norm_name, FALSE, FALSE);
+	/* Disable query cache altogether for all tables if recovered XA
+	transactions in prepared state exist. This is because we do not
+	restore the table locks for those transactions and we may wrongly
+	set ret=TRUE above if "lock_table_get_n_locks(table) == 0". See
+	"Bug#14658648 XA ROLLBACK (DISTRIBUTED DATABASE) NOT WORKING WITH
+	QUERY CACHE ENABLED".
+	Read trx_sys->n_prepared_recovered_trx without mutex protection,
+	not possible to end up with a torn read since n_prepared_recovered_trx
+	is word size. */
+	if (trx_sys->n_prepared_recovered_trx > 0) {
+
+		return(FALSE);
+	}
+
+	table = dict_table_open_on_name(norm_name, FALSE, FALSE,
+					DICT_ERR_IGNORE_NONE);
 
 	if (table == NULL) {
 
@@ -5204,11 +5255,15 @@ row_search_autoinc_read_column(
 
 	rec_offs_init(offsets_);
 
-	offsets = rec_get_offsets(rec, index, offsets, ULINT_UNDEFINED, &heap);
+	offsets = rec_get_offsets(rec, index, offsets, col_no + 1, &heap);
+
+	if (rec_offs_nth_sql_null(offsets, col_no)) {
+		/* There is no non-NULL value in the auto-increment column. */
+		value = 0;
+		goto func_exit;
+	}
 
 	data = rec_get_nth_field(rec, offsets, col_no, &len);
-
-	ut_a(len != UNIV_SQL_NULL);
 
 	switch (mtype) {
 	case DATA_INT:
@@ -5230,12 +5285,13 @@ row_search_autoinc_read_column(
 		ut_error;
 	}
 
-	if (UNIV_LIKELY_NULL(heap)) {
-		mem_heap_free(heap);
-	}
-
 	if (!unsigned_type && (ib_int64_t) value < 0) {
 		value = 0;
+	}
+
+func_exit:
+	if (UNIV_LIKELY_NULL(heap)) {
+		mem_heap_free(heap);
 	}
 
 	return(value);
@@ -5299,10 +5355,9 @@ row_search_max_autoinc(
 
 		mtr_start(&mtr);
 
-		/* Open at the high/right end (FALSE), and INIT
-		cursor (TRUE) */
+		/* Open at the high/right end (false), and init cursor */
 		btr_pcur_open_at_index_side(
-			FALSE, index, BTR_SEARCH_LEAF, &pcur, TRUE, &mtr);
+			false, index, BTR_SEARCH_LEAF, &pcur, true, 0, &mtr);
 
 		if (page_get_n_recs(btr_pcur_get_page(&pcur)) > 0) {
 			const rec_t*	rec;
