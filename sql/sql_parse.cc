@@ -1926,7 +1926,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
         wsrep_return_from_bf_mode(thd, &shadow);
         if (thd->wsrep_conflict_state!= REPLAYING)
           WSREP_WARN("lost replaying mode: %d", thd->wsrep_conflict_state );
-
+	thd->wsrep_exec_mode = LOCAL_COMMIT;
         mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 	  
         switch (rcode) {

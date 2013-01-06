@@ -972,7 +972,9 @@ lock_rec_has_to_wait(
 				     lock_get_mode(lock2))) {
 #ifdef WITH_WSREP
 		if ((type_mode & WSREP_BF) && (lock2->type_mode & WSREP_BF)) {
-			return FALSE;
+			if (wsrep_debug)
+				fprintf(stderr, "BF locks in conflict: " TRX_ID_FMT " " TRX_ID_FMT "\n", 
+					trx->id, lock2->trx->id);
 		}
 #endif /* WITH_WSREP */
 
