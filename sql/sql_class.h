@@ -42,6 +42,11 @@
     REPLAYING,
     RETRY_AUTOCOMMIT,
   };
+  enum wsrep_consistency_check_mode {
+    NO_CONSISTENCY_CHECK,
+    CONSISTENCY_CHECK_DECLARED,
+    CONSISTENCY_CHECK_RUNNING,
+  };
 #endif
 
 #include "my_global.h"                          /* NO_EMBEDDED_ACCESS_CHECKS */
@@ -3009,6 +3014,7 @@ public:
 
 #ifdef WITH_WSREP
   const bool                wsrep_applier; /* dedicated slave applier thread */
+  bool                      wsrep_applier_closing; /* applier marked to close */
   bool                      wsrep_client_thread; /* to identify client threads*/
   enum wsrep_exec_mode      wsrep_exec_mode;
   query_id_t                wsrep_last_query_id;
@@ -3030,7 +3036,8 @@ public:
   char*                     wsrep_retry_query;
   size_t                    wsrep_retry_query_len;
   enum enum_server_command  wsrep_retry_command;
-  bool                      wsrep_consistency_check;
+  enum wsrep_consistency_check_mode 
+                            wsrep_consistency_check;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

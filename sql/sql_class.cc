@@ -834,7 +834,7 @@ extern "C" bool wsrep_thd_is_wsrep_on(THD *thd)
 
 extern "C" bool wsrep_consistency_check(void *thd)
 {
-  return ((THD*)thd)->wsrep_consistency_check;
+  return ((THD*)thd)->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING;
 }
 
 extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode)
@@ -1056,6 +1056,7 @@ THD::THD(bool enable_plugins)
 #endif /* defined(ENABLED_DEBUG_SYNC) */
 #ifdef WITH_WSREP
    wsrep_applier(is_applier),
+   wsrep_applier_closing(FALSE),
    wsrep_client_thread(0),
 #endif
    m_enable_plugins(enable_plugins),
@@ -1155,7 +1156,7 @@ THD::THD(bool enable_plugins)
   wsrep_retry_query     = NULL;
   wsrep_retry_query_len = 0;
   wsrep_retry_command   = COM_CONNECT;
-  wsrep_consistency_check = false;
+  wsrep_consistency_check = NO_CONSISTENCY_CHECK;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1549,7 +1550,7 @@ void THD::init(void)
   wsrep_rli= NULL;
   wsrep_PA_safe= true;
   wsrep_seqno_changed= false;
-  wsrep_consistency_check = false;
+  wsrep_consistency_check = NO_CONSISTENCY_CHECK;
 #endif
   binlog_row_event_extra_data= 0;
 

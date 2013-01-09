@@ -2223,8 +2223,9 @@ lock_rec_lock_fast(
 	ut_ad(mode - (LOCK_MODE_MASK & mode) == LOCK_GAP
 	      || mode - (LOCK_MODE_MASK & mode) == 0
 #ifdef WITH_WSREP
-	      || mode - (LOCK_MODE_MASK & mode) == WSREP_BF
-	      || mode - (LOCK_MODE_MASK & mode) - LOCK_REC_NOT_GAP == WSREP_BF
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == 0
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == LOCK_GAP
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == LOCK_REC_NOT_GAP
 #endif /* WITH_WSREP */
 	      || mode - (LOCK_MODE_MASK & mode) == LOCK_REC_NOT_GAP);
 	ut_ad(dict_index_is_clust(index) || !dict_index_is_online_ddl(index));
@@ -2310,8 +2311,9 @@ lock_rec_lock_slow(
 	ut_ad(mode - (LOCK_MODE_MASK & mode) == LOCK_GAP
 	      || mode - (LOCK_MODE_MASK & mode) == 0
 #ifdef WITH_WSREP
-	      || mode - (LOCK_MODE_MASK & mode) == WSREP_BF
-	      || mode - (LOCK_MODE_MASK & mode) - LOCK_REC_NOT_GAP == WSREP_BF
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == 0
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == LOCK_GAP
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == LOCK_REC_NOT_GAP
 #endif /* WITH_WSREP */
 	      || mode - (LOCK_MODE_MASK & mode) == LOCK_REC_NOT_GAP);
 	ut_ad(dict_index_is_clust(index) || !dict_index_is_online_ddl(index));
@@ -2396,8 +2398,9 @@ lock_rec_lock(
 	ut_ad(mode - (LOCK_MODE_MASK & mode) == LOCK_GAP
 	      || mode - (LOCK_MODE_MASK & mode) == LOCK_REC_NOT_GAP
 #ifdef WITH_WSREP
-	      || mode - (LOCK_MODE_MASK & mode) == WSREP_BF
-	      || mode - (LOCK_MODE_MASK & mode) - LOCK_REC_NOT_GAP == WSREP_BF
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == 0
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == LOCK_GAP
+	      || mode - (LOCK_MODE_MASK & mode) - WSREP_BF == LOCK_REC_NOT_GAP
 #endif /* WITH_WSREP */
 	      || mode - (LOCK_MODE_MASK & mode) == 0);
 	ut_ad(dict_index_is_clust(index) || !dict_index_is_online_ddl(index));

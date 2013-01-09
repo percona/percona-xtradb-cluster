@@ -2732,6 +2732,14 @@ mysql_execute_command(THD *thd)
 #ifdef HAVE_REPLICATION
   } /* endif unlikely slave */
 #endif
+  status_var_increment(thd->status_var.com_stat[lex->sql_command]);
+
+  Opt_trace_start ots(thd, all_tables, lex->sql_command, &lex->var_list,
+                      thd->query(), thd->query_length(), NULL,
+                      thd->variables.character_set_client);
+
+  Opt_trace_object trace_command(&thd->opt_trace);
+  Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     /*
@@ -2762,23 +2770,15 @@ mysql_execute_command(THD *thd)
      * allow SET and SHOW queries
      */
     if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
-	lex->sql_command != SQLCOM_SET_OPTION &&
-	!is_show_query(lex->sql_command))
+        lex->sql_command != SQLCOM_SET_OPTION &&
+        !is_show_query(lex->sql_command))
     {
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0), 
 	       "WSREP has not yet prepared node for application use");
-      // goto error;
+      goto error;
     }
   }
 #endif /* WITH_WSREP */
-  status_var_increment(thd->status_var.com_stat[lex->sql_command]);
-
-  Opt_trace_start ots(thd, all_tables, lex->sql_command, &lex->var_list,
-                      thd->query(), thd->query_length(), NULL,
-                      thd->variables.character_set_client);
-
-  Opt_trace_object trace_command(&thd->opt_trace);
-  Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
 
   DBUG_ASSERT(thd->transaction.stmt.cannot_safely_rollback() == FALSE);
 
@@ -3762,8 +3762,9 @@ end_with_restore_list:
       break;
 #ifdef WITH_WSREP
     if (lex->sql_command == SQLCOM_INSERT_SELECT &&
-	thd->wsrep_consistency_check)
+	thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED)
     {
+      thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
       WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL);
     }
 
@@ -5356,7 +5357,7 @@ finish:
   close_thread_tables(thd);
 #ifdef WITH_WSREP
   WSREP_TO_ISOLATION_END
-  thd->wsrep_consistency_check= FALSE;
+  thd->wsrep_consistency_check= NO_CONSISTENCY_CHECK;
 #endif /* WITH_WSREP */
 
 #ifndef DBUG_OFF
@@ -8871,11 +8872,16 @@ int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr, my_bool signal)
   THD *bf_thd     = (THD *) bf_thd_ptr;
   DBUG_ENTER("wsrep_abort_thd");
 
-  if (WSREP(bf_thd) && victim_thd)
+  if ( (WSREP(bf_thd) || 
+	(WSREP_ON && bf_thd->wsrep_exec_mode == TOTAL_ORDER)) && victim_thd)
   {
     WSREP_DEBUG("wsrep_abort_thd, by: %llu, victim: %llu", (bf_thd) ?
                 (long long)bf_thd->real_id : 0, (long long)victim_thd->real_id);
     ha_wsrep_abort_transaction(bf_thd, victim_thd, signal);
+  } 
+  else
+  {
+    WSREP_DEBUG("wsrep_abort_thd not effective: %p %p", bf_thd, victim_thd);
   }
      
   DBUG_RETURN(1);
