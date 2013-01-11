@@ -55,10 +55,6 @@ ulong  wsrep_mysql_replication_bundle  = 0;
  */
 
 static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
-const wsrep_uuid_t* wsrep_cluster_uuid()
-{
-  return &cluster_uuid;
-}
 static char         cluster_uuid_str[40]= { 0, };
 static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 {
@@ -100,10 +96,10 @@ static my_bool   wsrep_startup = TRUE;
 // action execute callback
 extern wsrep_status_t wsrep_apply_cb(void *ctx,
                                      const void* buf, size_t buf_len,
-                                     wsrep_seqno_t global_seqno);
+                                     const wsrep_trx_meta_t* meta);
 
 extern wsrep_status_t wsrep_commit_cb(void *ctx,
-                                      wsrep_seqno_t global_seqno,
+                                      const wsrep_trx_meta_t* meta,
                                       bool commit);
 
 static wsrep_status_t wsrep_unordered_cb(void*       ctx,
@@ -752,8 +748,8 @@ wsrep_causal_wait (THD* thd)
   {
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
-    wsrep_seqno_t  seqno;
-    wsrep_status_t ret= wsrep->causal_read (wsrep, &seqno);
+    wsrep_gtid_t  gtid;
+    wsrep_status_t ret= wsrep->causal_read (wsrep, &gtid);
 
     if (unlikely(WSREP_OK != ret))
     {
@@ -1089,7 +1085,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   uint buf_len(0);
   int buf_err;
 
-  WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
 	      thd->wsrep_exec_mode, thd->query() );
   switch (thd->lex->sql_command)
   {
@@ -1118,13 +1114,13 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
                                                  key_arr.keys, key_arr.keys_len,
                                                  buf, buf_len,
-                                                 &thd->wsrep_trx_seqno)))
+                                                 &thd->wsrep_trx_meta)))
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
     wsrep_to_isolation++;
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
-    WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,
+    WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
 		thd->wsrep_exec_mode);
   }
   else {
@@ -1144,10 +1140,10 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
 static void wsrep_TOI_end(THD *thd) {
   wsrep_status_t ret;
   wsrep_to_isolation--;
-  WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("TO END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
     if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
-      WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);
+      WSREP_DEBUG("TO END: %lld", (long long)wsrep_thd_trx_seqno(thd));
     }
     else {
       WSREP_WARN("TO isolation end failed for: %d, sql: %s",
@@ -1158,7 +1154,7 @@ static void wsrep_TOI_end(THD *thd) {
 static int wsrep_RSU_begin(THD *thd, char *db_, char *table_) 
 {
   wsrep_status_t ret(WSREP_WARNING);
-  WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, thd->query() );
 
   ret = wsrep->desync(wsrep);
@@ -1203,7 +1199,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
 static void wsrep_RSU_end(THD *thd)
 {
   wsrep_status_t ret(WSREP_WARNING);
-  WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, thd->query() );
 
 
@@ -1277,10 +1273,10 @@ void wsrep_to_isolation_end(THD *thd) {
       "request: (%lu \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)\n"      \
       "granted: (%lu \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)",       \
       msg,                                                                     \
-      req->thread_id, (long long)req->wsrep_trx_seqno,                         \
+      req->thread_id, (long long)wsrep_thd_trx_seqno(req),                     \
       req->wsrep_exec_mode, req->wsrep_query_state, req->wsrep_conflict_state, \
       req->command, req->lex->sql_command, req->query(),                       \
-      gra->thread_id, (long long)gra->wsrep_trx_seqno,                         \
+      gra->thread_id, (long long)wsrep_thd_trx_seqno(gra),                     \
       gra->wsrep_exec_mode, gra->wsrep_query_state, gra->wsrep_conflict_state, \
       gra->command, gra->lex->sql_command, gra->query());
 

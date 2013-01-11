@@ -104,7 +104,7 @@ static wsrep_status_t dummy_pre_commit(
     const void*            query      __attribute__((unused)),
     const size_t           query_len  __attribute__((unused)),
     uint64_t               flags      __attribute__((unused)),
-    wsrep_seqno_t*         seqno      __attribute__((unused)))
+    wsrep_trx_meta_t*      meta       __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -170,7 +170,7 @@ static wsrep_status_t dummy_append_data(
 
 static wsrep_status_t dummy_causal_read(
     wsrep_t* w,
-    wsrep_seqno_t* seqno __attribute__((unused)))
+    wsrep_gtid_t* gtid __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -191,7 +191,7 @@ static wsrep_status_t dummy_to_execute_start(
     const long             key_num    __attribute__((unused)),
     const void*            action     __attribute__((unused)),
     const size_t           action_len __attribute__((unused)),
-    wsrep_seqno_t*         seqno      __attribute__((unused)))
+    wsrep_trx_meta_t*      meta       __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
