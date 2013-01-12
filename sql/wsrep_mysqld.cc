@@ -421,6 +421,8 @@ static void wsrep_init_position()
   }
 }
 
+extern const char* my_bind_addr_str;
+
 int wsrep_init()
 {
   int rcode= -1;
@@ -474,7 +476,7 @@ int wsrep_init()
   size_t const node_addr_max= sizeof(node_addr) - 1;
   if (!wsrep_node_address || !strcmp(wsrep_node_address, ""))
   {
-    size_t const ret= guess_ip(node_addr, node_addr_max);
+    size_t const ret= wsrep_guess_ip(node_addr, node_addr_max);
     if (!(ret > 0 && ret < node_addr_max))
     {
       WSREP_WARN("Failed to guess base node address. Set it explicitly via "
@@ -492,37 +494,56 @@ int wsrep_init()
   if ((!wsrep_node_incoming_address ||
        !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO)))
   {
-    size_t const node_addr_len= strlen(node_addr);
-    if (node_addr_len > 0)
+    unsigned int my_bind_ip= INADDR_ANY; // default if not set
+    if (my_bind_addr_str && strlen(my_bind_addr_str))
     {
-      const char* const colon= strrchr(node_addr, ':');
-      if (strchr(node_addr, ':') == colon) // 1 or 0 ':'
+      my_bind_ip= wsrep_check_ip(my_bind_addr_str);
+    }
+
+    if (INADDR_ANY != my_bind_ip)
+    {
+      if (INADDR_NONE != my_bind_ip && INADDR_LOOPBACK != my_bind_ip)
       {
-        size_t const ip_len= colon ? colon - node_addr : node_addr_len;
-        if (ip_len + 7 /* :55555\0 */ < inc_addr_max)
+        snprintf(inc_addr, inc_addr_max, "%s:%u",
+                 my_bind_addr_str, (int)mysqld_port);
+      } // else leave inc_addr an empty string - mysqld is not listening for
+        // client connections on network interfaces.
+    }
+    else // mysqld binds to 0.0.0.0, take IP from wsrep_node_address if possible
+    {
+      size_t const node_addr_len= strlen(node_addr);
+      if (node_addr_len > 0)
+      {
+        const char* const colon= strrchr(node_addr, ':');
+        if (strchr(node_addr, ':') == colon) // 1 or 0 ':'
         {
-          memcpy (inc_addr, node_addr, ip_len);
-          snprintf(inc_addr + ip_len, inc_addr_max - ip_len, ":%u",mysqld_port);
+          size_t const ip_len= colon ? colon - node_addr : node_addr_len;
+          if (ip_len + 7 /* :55555\0 */ < inc_addr_max)
+          {
+            memcpy (inc_addr, node_addr, ip_len);
+            snprintf(inc_addr + ip_len, inc_addr_max - ip_len, ":%u",
+                     (int)mysqld_port);
+          }
+          else
+          {
+            WSREP_WARN("Guessing address for incoming client connections: "
+                       "address too long.");
+            inc_addr[0]= '\0';
+          }
         }
         else
         {
           WSREP_WARN("Guessing address for incoming client connections: "
-                     "address too long.");
+                     "too many colons :) .");
           inc_addr[0]= '\0';
         }
       }
-      else
-      {
-        WSREP_WARN("Guessing address for incoming client connections: "
-                   "too many colons :) .");
-        inc_addr[0]= '\0';
-      }
-    }
 
-    if (!strlen(inc_addr))
-    {
-        WSREP_WARN("Guessing address for incoming client connections failed. "
-                   "Try setting wsrep_node_incoming_address explicitly.");
+      if (!strlen(inc_addr))
+      {
+          WSREP_WARN("Guessing address for incoming client connections failed. "
+                     "Try setting wsrep_node_incoming_address explicitly.");
+      }
     }
   }
   else if (!strchr(wsrep_node_incoming_address, ':')) // no port included

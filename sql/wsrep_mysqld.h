@@ -28,7 +28,6 @@ class THD;
 
 #ifdef WITH_WSREP
 #include "../wsrep/wsrep_api.h"
-//#include "wsrep_mysqld.h"
   enum wsrep_exec_mode {
     LOCAL_STATE,
     REPL_RECV,

@@ -345,7 +345,11 @@ static char *default_character_set_name;
 static char *character_set_filesystem_name;
 static char *lc_messages;
 static char *lc_time_names_name;
+#ifndef WITH_WSREP
 static char *my_bind_addr_str;
+#else
+char *my_bind_addr_str;
+#endif /* WITH_WSREP */
 static char *default_collation_name;
 char *default_storage_engine;
 static char compiled_default_collation_name[]= MYSQL_DEFAULT_COLLATION_NAME;
@@ -358,9 +362,6 @@ static mysql_cond_t COND_thread_cache, COND_flush_thread_cache;
 
 /* Global variables */
 
-#ifdef WITH_WSREP
-ulong my_bind_addr;
-#endif /* WITH_WSREP */
 bool opt_bin_log, opt_ignore_builtin_innodb= 0;
 my_bool opt_log, opt_slow_log;
 ulonglong log_output_options;
@@ -2068,7 +2069,7 @@ static void network_init(void)
 		      socket_errno);
       unireg_abort(1);
     }
-#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
     (void) fcntl(ip_sock, F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */
   }
@@ -2161,7 +2162,7 @@ static void network_init(void)
     if (listen(unix_sock,(int) back_log) < 0)
       sql_print_warning("listen() on Unix socket failed with error %d",
 		      socket_errno);
-#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
     (void) fcntl(unix_sock, F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */
   }
@@ -5983,7 +5984,7 @@ void handle_connections_sockets()
 	sleep(1);				// Give other threads some time
       continue;
     }
-#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
     (void) fcntl(new_sock, F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */
 

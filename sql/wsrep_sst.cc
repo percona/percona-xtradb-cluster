@@ -431,7 +431,6 @@ static ssize_t sst_prepare_other (const char*  method,
   return ret;
 }
 
-//extern ulong my_bind_addr;
 extern uint  mysqld_port;
 
 /*! Just tells donor where to send mysqldump */
@@ -515,7 +514,7 @@ ssize_t wsrep_sst_prepare (void** msg)
   }
   else
   {
-    ssize_t ret= guess_ip (ip_buf, ip_max);
+    ssize_t ret= wsrep_guess_ip (ip_buf, ip_max);
 
     if (ret && ret < ip_max)
     {
