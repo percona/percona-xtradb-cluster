@@ -3765,6 +3765,13 @@ int init_common_variables()
     strmake(default_logfile_name, glob_hostname,
       sizeof(default_logfile_name)-5);
 
+#ifdef WITH_WSREP
+  if (0 == wsrep_node_name || 0 == wsrep_node_name[0])
+  {
+    my_free((void *)wsrep_node_name);
+    wsrep_node_name= my_strdup(glob_hostname, MYF(MY_WME));
+  }
+#endif /* WITH_WSREP */
   strmake(pidfile_name, default_logfile_name, sizeof(pidfile_name)-5);
   strmov(fn_ext(pidfile_name),".pid");    // Add proper extension
 
@@ -4768,41 +4775,37 @@ will be ignored as the --log-bin option is not defined.");
   }
 #endif
 
-#define MOVED_UPWARDS
-#ifdef MOVED_HERE
-  if (plugin_init(&remaining_argc, remaining_argv,
-                  (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
-                  (opt_help ? PLUGIN_INIT_SKIP_INITIALIZATION : 0)))
+#ifdef WITH_WSREP /* WSREP BEFORE SE */
+  if (!wsrep_recovery)
   {
-    sql_print_error("Failed to initialize plugins.");
-    unireg_abort(1);
-  }
-  plugins_are_initialized= TRUE;  /* Don't separate from init function */
-#endif
+    if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
+    {
+      wsrep_provider_init(WSREP_NONE);
+      if (wsrep_init()) unireg_abort(1);
+    }
+    else // full wsrep initialization
+    {
+      // add basedir/bin to PATH to resolve wsrep script names
+      char* const tmp_path((char*)alloca(strlen(mysql_home) +
+                                           strlen("/bin") + 1));
+      if (tmp_path)
+      {
+        strcpy(tmp_path, mysql_home);
+        strcat(tmp_path, "/bin");
+        wsrep_prepend_PATH(tmp_path);
+      }
+      else
+      {
+        WSREP_ERROR("Could not append %s/bin to PATH", mysql_home);
+      }
 
-/* WSREP BEFORE */
-#ifdef WITH_WSREP
-  // add basedir/bin to PATH to resolve wsrep script names
-  char* const tmp_path((char*)alloca(strlen(mysql_home) + strlen("/bin") + 1));
-  if (tmp_path)
-  {
-    strcpy(tmp_path, mysql_home);
-    strcat(tmp_path, "/bin");
-    wsrep_prepend_PATH(tmp_path);
-  }
-  else
-  {
-    WSREP_ERROR("Could not append %s/bin to PATH", mysql_home);
-  }
-
-  if (opt_bootstrap)
-  {
-    wsrep_provider_init(WSREP_NONE);
-    if (wsrep_init()) unireg_abort(1);
-  }
-  else if (!wsrep_recovery && wsrep_init_first())
-  {
-    wsrep_init_startup(true);
+      if (wsrep_before_SE())
+      {
+        set_ports(); // this is also called in network_init() later but we need
+                     // to know mysqld_port now - lp:1071882
+        wsrep_init_startup(true);
+      }
+    }
   }
 #endif /* WITH_WSREP */
   if (opt_bin_log)
@@ -4912,7 +4915,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
 
-#ifdef MOVED_UPWARDS
+#ifdef WITH_WSREP
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? PLUGIN_INIT_SKIP_INITIALIZATION : 0)))
@@ -4921,7 +4924,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
-#endif
+#endif /* WITH_WSREP */
   /* we do want to exit if there are any other unknown options */
   if (remaining_argc > 1)
   {
@@ -6140,32 +6143,37 @@ int mysqld_main(int argc, char **argv)
   if (Events::init(opt_noacl || opt_bootstrap))
     unireg_abort(1);
 
-/* WSREP AFTER */
-#ifdef WITH_WSREP
-  wsrep_SE_initialized();
-  if (opt_bootstrap)
-  {
-    /*! bootstrap wsrep init was taken care of above */
-  }
-  else if (wsrep_recovery)
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
   {
     select_thread_in_use= 0;
     wsrep_recover();
     unireg_abort(0);
   }
-  else if (wsrep_init_first())
+
+  if (opt_bootstrap)
   {
-    /*! in case of no SST wsrep waits in view handler callback */
-    wsrep_SE_init_grab();
-    wsrep_SE_init_done();
-    /*! in case of SST wsrep waits for wsrep->sst_received */
-    wsrep_sst_continue();
+    /*! bootstrap wsrep init was taken care of above */
   }
   else
   {
-    wsrep_init_startup (false);
+    wsrep_SE_initialized();
+
+    if (wsrep_before_SE())
+    {
+      /*! in case of no SST wsrep waits in view handler callback */
+      wsrep_SE_init_grab();
+      wsrep_SE_init_done();
+      /*! in case of SST wsrep waits for wsrep->sst_received */
+      wsrep_sst_continue();
+    }
+    else
+    {
+      wsrep_init_startup (false);
+    }
+
+    wsrep_create_appliers(wsrep_slave_threads - 1);
   }
-  wsrep_create_appliers(wsrep_slave_threads - 1);
 #endif /* WITH_WSREP */
   if (opt_bootstrap)
   {
@@ -9041,15 +9049,6 @@ mysqld_get_one_option(int optid,
     lower_case_table_names_used= 1;
     break;
 #ifdef WITH_WSREP
-  case OPT_WSREP_PROVIDER:
-    wsrep_provider_init (argument);
-    break;
-  case OPT_WSREP_PROVIDER_OPTIONS:
-    wsrep_provider_options_init (argument);
-    break;
-  case OPT_WSREP_CLUSTER_ADDRESS:
-    wsrep_cluster_address_init (argument);
-    break;
   case OPT_WSREP_START_POSITION:
     wsrep_start_position_init (argument);
     break;

@@ -1075,6 +1075,15 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   if (m_state != GRL_ACQUIRED)
     DBUG_RETURN(0);
 
+  mdl_request.init(MDL_key::COMMIT, "", "", MDL_SHARED, MDL_EXPLICIT);
+
+  if (thd->mdl_context.acquire_lock(&mdl_request,
+                                    thd->variables.lock_wait_timeout))
+    DBUG_RETURN(TRUE);
+
+  m_mdl_blocks_commits_lock= mdl_request.ticket;
+  m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
+
 #ifdef WITH_WSREP
   long long ret = wsrep->pause(wsrep);
   if (ret >= 0)
@@ -1091,15 +1100,6 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     DBUG_RETURN(TRUE);
   }
 #endif /* WITH_WSREP */
-  mdl_request.init(MDL_key::COMMIT, "", "", MDL_SHARED, MDL_EXPLICIT);
-
-  if (thd->mdl_context.acquire_lock(&mdl_request,
-                                    thd->variables.lock_wait_timeout))
-    DBUG_RETURN(TRUE);
-
-  m_mdl_blocks_commits_lock= mdl_request.ticket;
-  m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
-
   DBUG_RETURN(FALSE);
 }
 
