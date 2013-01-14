@@ -4309,6 +4309,15 @@ static Sys_var_mybool Sys_wsrep_replicate_myisam(
        "wsrep_replicate_myisam", "To enable myisam replication",
        GLOBAL_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
+static Sys_var_mybool Sys_wsrep_log_conflicts(
+       "wsrep_log_conflicts", "To log multi-master conflicts",
+       GLOBAL_VAR(wsrep_log_conflicts), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+
+static Sys_var_ulong Sys_wsrep_mysql_replication_bundle(
+      "wsrep_mysql_replication_bundle", "mysql replication group commit ",
+       GLOBAL_VAR(wsrep_mysql_replication_bundle), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(0, 1000), DEFAULT(0), BLOCK_SIZE(1));
+
 #endif /* WITH_WSREP */
 
 static bool fix_host_cache_size(sys_var *, THD *, enum_var_type)

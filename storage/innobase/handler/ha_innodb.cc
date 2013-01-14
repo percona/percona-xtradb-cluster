@@ -1351,6 +1351,8 @@ innobase_release_temporary_latches(
 static int 
 wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd, 
 			my_bool signal);
+static void
+wsrep_fake_trx_id(handlerton* hton, THD *thd);
 static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid);
 static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid);
 #endif
@@ -2892,6 +2894,7 @@ innobase_init(
         innobase_hton->wsrep_abort_transaction=wsrep_abort_transaction;
         innobase_hton->wsrep_set_checkpoint=innobase_wsrep_set_checkpoint;
         innobase_hton->wsrep_get_checkpoint=innobase_wsrep_get_checkpoint;
+        innobase_hton->wsrep_fake_trx_id=wsrep_fake_trx_id;
 #endif /* WITH_WSREP */
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
@@ -6912,7 +6915,10 @@ ha_innobase::write_row(
 	     || sql_command == SQLCOM_DROP_INDEX)
 	    && num_write_row >= 10000) {
 #ifdef WITH_WSREP
-		WSREP_DEBUG("forced commit: %s", wsrep_thd_query(user_thd));
+		if (wsrep_on(user_thd) && sql_command == SQLCOM_LOAD) {
+			WSREP_DEBUG("forced trx split for LOAD: %s", 
+				    wsrep_thd_query(user_thd));
+		}
 #endif /* WITH_WSREP */
 		/* ALTER TABLE is COMMITted at every 10000 copied rows.
 		The IX table lock for the original table has to be re-issued.
@@ -8795,7 +8801,12 @@ wsrep_append_foreign_key(
 		&key[1], &len, rec, index, 
 		wsrep_protocol_version > 1);
 	if (rcode != DB_SUCCESS) {
-		WSREP_ERROR("FK key set failed: %d", err);
+		WSREP_ERROR(
+			"FK key set failed: %lu (%lu %lu), index: %s %s, %s", 
+			rcode, referenced, shared, 
+			(index->name) ? index->name : "void index", 
+			(index->table_name) ? index->table_name : "void table", 
+			wsrep_thd_query(thd));
 		return DB_ERROR;
 	}
 	strncpy(cache_key,
@@ -16127,15 +16138,24 @@ int
 wsrep_innobase_kill_one_trx(const trx_t *bf_trx, trx_t *victim_trx, ibool signal)
 {
 	DBUG_ENTER("wsrep_innobase_kill_one_trx");
+	THD *bf_thd 	  = (THD *)(bf_trx) ? bf_trx->mysql_thd : NULL;
 	THD *thd          = (THD *) victim_trx->mysql_thd;
-	THD *bf_thd       = (bf_trx) ? (THD *)bf_trx->mysql_thd : NULL;
 	int64_t bf_seqno  = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
+
+	if (!bf_thd) bf_thd = (bf_trx) ? (THD *)bf_trx->mysql_thd : NULL;
 
 	if (!thd) {
 		DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
 		WSREP_WARN("no THD for trx: %lu", victim_trx->id);
 		DBUG_RETURN(1);
 	}
+	if (!bf_thd) {
+		DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
+		WSREP_WARN("no BF THD for trx: %llu", (bf_trx) ? bf_trx->id : 0);
+		DBUG_RETURN(1);
+	}
+
+	WSREP_LOG_CONFLICT(bf_thd, thd, TRUE);
 
 	WSREP_DEBUG("BF kill (%lu, seqno: %lld), victim: (%lu) trx: %lu",
  		    signal, (long long)bf_seqno,
@@ -16355,6 +16375,17 @@ static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid)
 	DBUG_ASSERT(hton == innodb_hton_ptr);
         trx_sys_read_wsrep_checkpoint(xid);
         return 0;
+}
+
+static void
+wsrep_fake_trx_id(
+/*==================*/
+	handlerton	*hton,
+	THD		*thd)	/*!< in: user thread handle */
+{
+	trx_id_t trx_id = trx_sys_get_new_trx_id();
+
+	(void *)wsrep_trx_handle_for_id(wsrep_thd_trx_handle(thd), trx_id);
 }
 
 #endif /* WITH_WSREP */

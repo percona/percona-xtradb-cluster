@@ -5156,16 +5156,15 @@ pthread_handler_t start_wsrep_THD(void *arg)
   THD *thd;
   wsrep_thd_processor_fun processor= (wsrep_thd_processor_fun)arg;
 
-  DBUG_ENTER("start_wsrep_THD");
   if (my_thread_init()) 
   {
     WSREP_ERROR("Could not initialize thread");
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
 
   if (!(thd= new THD(true, true)))
   {
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
   mysql_mutex_lock(&LOCK_thread_count);
   thd->thread_id=thread_id++;
@@ -5196,7 +5195,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
 
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
 
   /* now that we've called my_thread_init(), it is safe to call DBUG_* */
@@ -5209,7 +5208,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     delete thd;
  
-    DBUG_RETURN(NULL);
+    return(NULL);
   }
 
   /* from handle_bootstrap() */
@@ -5257,7 +5256,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     // 'Error in my_thread_global_end(): 2 threads didn't exit'
     // at server shutdown
   }
-  DBUG_RETURN(NULL);
+  return(NULL);
 }
 
 void wsrep_create_rollbacker()
@@ -5343,6 +5342,17 @@ static inline bool is_replaying_connection(THD *thd)
   return ret;
 }
 
+static inline bool is_committing_connection(THD *thd)
+{
+  bool ret;
+
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  ret=  (thd->wsrep_query_state == QUERY_COMMITTING) ? true : false;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+  return ret;
+}
+
 static bool have_client_connections()
 {
   Thread_iterator it= global_thread_list->begin();
@@ -5393,6 +5403,42 @@ static void wsrep_close_thread(THD *thd)
     }
     mysql_mutex_unlock(&thd->mysys_var->mutex);
   }
+}
+
+static my_bool have_committing_connections()
+{
+  Thread_iterator it= global_thread_list->begin();
+  for (; it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+
+    if (!is_client_connection(tmp))
+      continue;
+
+    if (is_committing_connection(tmp))
+    {
+      mysql_mutex_unlock(&LOCK_thread_count);
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+int wsrep_wait_committing_connections_close(int wait_time)
+{
+  int sleep_time= 100;
+
+  while (have_committing_connections() && wait_time > 0)
+  {
+    WSREP_DEBUG("wait for committing transaction to close: %d", wait_time);
+    my_sleep(sleep_time);
+    wait_time -= sleep_time;
+  }
+  if (have_committing_connections())
+  {
+    return 1;
+  }
+  return 0;
 }
 
 void wsrep_close_client_connections(my_bool wait_to_end) 
@@ -5537,7 +5583,7 @@ void wsrep_wait_appliers_close(THD *thd)
   /* and wait for them to die */
   mysql_mutex_lock(&LOCK_thread_count);
   while (have_wsrep_appliers(thd) > 0)
-   {
+  {
     mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
     DBUG_PRINT("quit",("One thread died (count=%u)", get_thread_count()));
   }

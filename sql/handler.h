@@ -922,6 +922,7 @@ struct handlerton
 				  THD *victim_thd, my_bool signal);
    int (*wsrep_set_checkpoint)(handlerton *hton, const XID* xid);
    int (*wsrep_get_checkpoint)(handlerton *hton, XID* xid);
+   void (*wsrep_fake_trx_id)(handlerton *hton, THD *thd);
    int (*make_pushed_join)(handlerton *hton, THD* thd, 
                            const AQP::Join_plan* plan);
 
@@ -3369,6 +3370,7 @@ int ha_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
 #ifdef WITH_WSREP
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal);
+void ha_wsrep_fake_trx_id(THD *thd);
 #endif /* WITH_WSREP */
 
 /* Build pushed joins in handlers implementing this feature */
