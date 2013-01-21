@@ -5694,6 +5694,7 @@ wsrep_store_key_val_for_row(
 
 			/* Pad the unused space with spaces. */
 
+#ifdef REMOVED
 			if (true_len < key_len) {
 				ulint	pad_len = key_len - true_len;
 				ut_a(!(pad_len % cs->mbminlen));
@@ -5702,6 +5703,7 @@ wsrep_store_key_val_for_row(
 					       0x20 /* space */);
 				buff += pad_len;
 			}
+#endif /* REMOVED */
 		}
 	}
 
