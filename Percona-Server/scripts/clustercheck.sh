@@ -26,11 +26,13 @@ then
     /bin/echo -en "\r\n" 
     /bin/echo -en "Percona XtraDB Cluster Node is synced.\r\n" 
     /bin/echo -en "\r\n" 
+    exit 0
 else 
     # Percona XtraDB Cluster node local state is not 'Synced' => return HTTP 503
     /bin/echo -en "HTTP/1.1 503 Service Unavailable\r\n" 
     /bin/echo -en "Content-Type: text/plain\r\n" 
     /bin/echo -en "\r\n" 
     /bin/echo -en "Percona XtraDB Cluster Node is not synced.\r\n" 
-    /bin/echo -en "\r\n" 
+    /bin/echo -en "\r\n"
+    exit 1 
 fi 
