@@ -46,7 +46,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Percona XtraDB Cluster'
-copyright = u'2012, Percona Inc'
+copyright = u'Percona Ireland Ltd. 2012-2013'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -242,7 +242,7 @@ htmlhelp_basename = 'PerconaXtraDBClusterDoc'
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'PerconaXtraDBCluster.tex', u'Percona XtraDB Cluster Documentation',
-   u'Percona Inc', 'manual'),
+   u'Percona Ireland Ltd. 2012-2013', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -275,5 +275,5 @@ latex_logo = 'percona-logo.jpg'
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'perconaxtradbcluster', u'Percona XtraDB Cluster Documentation',
-     [u'Percona Inc'], 1)
+     [u'Percona Ireland Ltd. 2012-2013'], 1)
 ]
