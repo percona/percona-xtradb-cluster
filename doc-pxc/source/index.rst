@@ -106,6 +106,7 @@ Reference
    :glob:
 
    release-notes/release-notes_index
+   wsrep-status-index
    bugreport
    glossary
 
