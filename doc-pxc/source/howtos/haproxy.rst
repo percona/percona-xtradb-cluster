@@ -45,8 +45,8 @@ To check the current status of a node we need a more complex checks. This idea w
 
 To implement this setup you will need two scripts: 
 
-  *  **clustercheck** (place to /usr/local/bin) and a config for xined and 
-  *  **mysqlchk** (place to /etc/xined.d) on each node. 
+  *  **clustercheck** (place to /usr/local/bin) and a config for xinetd and 
+  *  **mysqlchk** (place to /etc/xinetd.d) on each node. 
 
 Both scripts are available in binaries and source distributions of |Percona XtraDB Cluster|.
 
