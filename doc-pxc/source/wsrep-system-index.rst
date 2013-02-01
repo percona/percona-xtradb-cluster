@@ -1,11 +1,8 @@
-.. _wsrep_index:
+.. _wsrep_system_index:
 
 =====================================
-Index of wsrep variables
+ Index of wsrep system variables
 =====================================
-
-System variables
------------------
 
 .. variable:: wsrep_OSU_method
 
