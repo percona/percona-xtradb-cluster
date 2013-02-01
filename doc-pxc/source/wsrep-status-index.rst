@@ -118,7 +118,7 @@ Description of the :variable:`wsrep_local_state` variable.
 
 .. variable:: wsrep_cert_index_size
   
-.. variable:: wsrep_causal_reads
+.. variable:: wsrep_causal_reads_
 
 Shows the number of writesets processed while the variable :variable:`wsrep_causal_reads` was set to ``ON``.
 

@@ -98,7 +98,7 @@ rst_prolog = '''
 
 .. |innobackupex|  replace:: :program:`innobackupex`
 
-.. |XtraDB|  replace:: :term:`XtraDB`
+.. |XtraDB|  replace:: *XtraDB*
 
 .. |IST|  replace:: :term:`IST`
 
@@ -108,7 +108,7 @@ rst_prolog = '''
 
 .. |Percona XtraDB Cluster|  replace:: *Percona XtraDB Cluster*
 
-.. |InnoDB|  replace:: :term:`InnoDB`
+.. |InnoDB|  replace:: *InnoDB*
 
 .. |HAProxy|  replace:: :term:`HAProxy`
 

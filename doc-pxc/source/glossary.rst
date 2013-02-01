@@ -13,6 +13,9 @@
    MyISAM
      Previous default storage engine for |MySQL| for versions prior to 5.5. It doesn't fully support transactions but in some scenarios may be faster than :term:`InnoDB`. Each table is stored on disk in 3 files: :term:`.frm`, :term:`.MYD`, :term:`.MYI`.
 
+   GTID
+     Global Transaction ID, in *Percona XtraDB Cluster* it consists of :term:`UUID` and an ordinal sequence number which denotes the position of the change in the sequence.
+   
    HAProxy
      `HAProxy <http://haproxy.1wt.eu/>`_ is a free, very fast and reliable solution offering high availability, load balancing, and proxying for TCP and HTTP-based applications. It is particularly suited for web sites crawling under very high loads while needing persistence or Layer7 processing. Supporting tens of thousands of connections is clearly realistic with todays hardware. Its mode of operation makes its integration into existing architectures very easy and riskless, while still offering the possibility not to expose fragile web servers to the net.
 	
@@ -23,7 +26,7 @@
      State Snapshot Transfer is the full copy of data from one node to another. It's used when a new node joins the cluster, it has to transfer data from existing node. There are three methods of SST available in Percona XtraDB Cluster: :program:`mysqldump`, :program:`rsync` and :program:`xtrabackup` (Percona |XtraBackup| with support of XtraDB Cluster will be released soon, currently you need to use our `source code repository <http://www.percona.com/doc/percona-xtrabackup/installation/compiling_xtrabackup.html>`_). The downside of `mysqldump` and `rsync` is that your cluster becomes *READ-ONLY* while data is being copied from one node to another (SST applies :command:`FLUSH TABLES WITH READ LOCK` command). Xtrabackup SST does not require :command:`READ LOCK` for the entire syncing process, only for syncing |.FRM| files (the same as with regular backup).
 
    UUID 
-      universally unique identifier which uniquely identifies the state and the sequence of changes node undergoes.
+      Universally Unique IDentifier which uniquely identifies the state and the sequence of changes node undergoes.
 
    XtraBackup
      *Percona XtraBackup* is an open-source hot backup utility for |MySQL| - based servers that doesn’t lock your database during the backup.
