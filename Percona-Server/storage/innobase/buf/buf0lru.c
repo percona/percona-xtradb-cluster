@@ -1853,7 +1853,7 @@ alloc:
 	    || !buf_page_can_relocate(bpage)) {
 not_freed:
 		if (b) {
-			buf_buddy_free(buf_pool, b, sizeof *b, TRUE);
+			buf_page_free_descriptor(b);
 		}
 		if (!have_LRU_mutex)
 			mutex_exit(&buf_pool->LRU_list_mutex);
@@ -2196,7 +2196,9 @@ buf_LRU_block_remove_hashed_page(
 				break;
 			case FIL_PAGE_INDEX:
 #ifdef UNIV_ZIP_DEBUG
-				ut_a(page_zip_validate(&bpage->zip, page));
+				ut_a(page_zip_validate(
+					     &bpage->zip, page,
+					     ((buf_block_t*) bpage)->index));
 #endif /* UNIV_ZIP_DEBUG */
 				break;
 			default:

@@ -12,14 +12,13 @@
 set -ue
 
 # Examine parameters
-go_out="$(getopt --options "kK:bD" --longoptions key:,nosign,binary,nodebug \
+go_out="$(getopt --options "kK:bB" --longoptions key:,nosign,binary,binarydep \
     --name "$(basename "$0")" -- "$@")"
 test $? -eq 0 || exit 1
 eval set -- $go_out
 
 BUILDPKG_KEY=''
 BINARY=''
-DEBUG='yes'
 
 for arg
 do
@@ -28,7 +27,7 @@ do
     -k | --key ) shift; BUILDPKG_KEY="-pgpg -k$1"; shift;;
     -K | --nosign ) shift; BUILDPKG_KEY="-uc -us";;
     -b | --binary ) shift; BINARY='-b';;
-    -D | --nodebug ) shift; DEBUG='';;
+    -B | --binarydep ) shift; BINARY='-B';;
     esac
 done
 
@@ -68,14 +67,17 @@ test -e "$SOURCEDIR/Makefile" || exit 2
 # Extract version from the Makefile
 MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
+    cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
+    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= "$SOURCEDIR/Makefile" | cut -d = -f 2)"
-PRODUCT="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 DEBIAN_VERSION="$(lsb_release -sc)"
 
-
 # Build information
-export BB_PERCONA_REVISION="$(cd "$SOURCEDIR"; bzr revno)"
-export DEB_BUILD_OPTIONS='debug nocheck'
+export REVISION="$(cd "$SOURCEDIR"; bzr revno)"
+export WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
+export DEB_BUILD_OPTIONS='nostrip debug nocheck'
 
 # Compilation flags
 export CC=${CC:-gcc}
@@ -104,17 +106,10 @@ export MAKE_JFLAG=-j4
         cp -R "$SOURCEDIR/build/debian" .
         chmod +x debian/rules
 
-        # If debug is not set, do not ship mysql-debug
-        if test "x$DEBUG" = "x"
-        then
-            sed -i '/mysqld-debug/d' debian/percona-server-server-5.5.install
-        fi
-
         # Update distribution name
-        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$PERCONA_SERVER_VERSION-$BB_PERCONA_REVISION.$DEBIAN_VERSION" 'Update distribution'
+        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$REVISION.$DEBIAN_VERSION" 'Update distribution'
 
         DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS" \
-                BUILD_DEBUG_BINARY="$DEBUG" \
                 dpkg-buildpackage $BINARY -rfakeroot $BUILDPKG_KEY
 
     )
