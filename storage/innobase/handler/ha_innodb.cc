@@ -11460,10 +11460,10 @@ innobase_xa_prepare(
 		In this case we cannot know how many minutes or hours
 		will be between XA PREPARE and XA COMMIT, and we don't want
 		to block for undefined period of time. */
+
 #ifdef WITH_WSREP
 	    if (!wsrep_on(thd))
 #endif
-
 		mysql_mutex_lock(&prepare_commit_mutex);
 		trx_owns_prepare_commit_mutex_set(trx);
 	}
