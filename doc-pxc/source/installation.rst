@@ -1,3 +1,5 @@
+.. _installation:
+
 ===================================================
  Installing Percona XtraDB Cluster from Binaries
 ===================================================
@@ -32,6 +34,7 @@ Initial configuration
 
 In order to start using XtraDB Cluster, you need to configure my.cnf file. Following options are needed: ::
 
+  [mysqld]
   wsrep_provider — a path to Galera library.
   wsrep_cluster_address — cluster connection URL.
   binlog_format=ROW
@@ -56,6 +59,8 @@ Example: ::
   default_storage_engine=InnoDB
   innodb_autoinc_lock_mode=2
   innodb_locks_unsafe_for_binlog=1
+
+Detailed list of variables can be found in :ref:`wsrep_system_index` and :ref:`wsrep_status_index`.
 
 Install XtraBackup SST method
 ==============================

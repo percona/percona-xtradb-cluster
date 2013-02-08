@@ -1,3 +1,5 @@
+.. _faq:
+
 ============================
  Frequently Asked Questions
 ============================
@@ -55,8 +57,8 @@ Q: Is it possible to set up cluster without state transfer
 ==========================================================
 A: It is possible in two ways:
 
-1. by default Galera reads starting position from a text file <datadir>/grastate.dat. Just make this file identical on all nodes, and there will be no state transfer upon start.
-2. wsrep_start_position variable - start the nodes with the same *UUID:seqno* value and there you are.
+1. By default Galera reads starting position from a text file <datadir>/grastate.dat. Just make this file identical on all nodes, and there will be no state transfer upon start.
+2. With :variable:`wsrep_start_position` variable - start the nodes with the same *UUID:seqno* value and there you are.
 
 Q: I have a two nodes setup. When node1 fails, node2 does not accept commands, why?
 ====================================================================================

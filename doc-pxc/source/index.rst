@@ -37,6 +37,7 @@ Introduction
 
    intro
    resources
+   limitation
 
 Installation
 ============
@@ -58,18 +59,20 @@ Features
    features/highavailability
    features/multimaster-replication
 
-FAQ
-===
+User's Manual
+=============
 
 .. toctree::
    :maxdepth: 1
    :glob:
 
-   faq
+   manual/bootstrap
+   manual/restarting_nodes
+   manual/failover
+   manual/monitoring
 
-
-How-to
-======
+How-tos
+=======
 
 .. toctree::
    :maxdepth: 1
@@ -80,23 +83,7 @@ How-to
    howtos/haproxy
    howtos/virt_sandbox
    howtos/kewpietests
-
-Percona XtraDB Cluster limitations
-==================================
-
-.. toctree::
-   :maxdepth: 1
-   :glob:
-
-   limitation
-
-
-Galera documentation
-=====================
-
-The full documentation and reference is available on
-`Galera Wiki <http://www.codership.com/wiki/doku.php>`_
-
+   howtos/bugreport
 
 Reference
 =========
@@ -106,13 +93,11 @@ Reference
    :glob:
 
    release-notes/release-notes_index
-   bugreport
+   wsrep-status-index
+   wsrep-system-index
+   faq
    glossary
 
-Indices and tables
-==================
-
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 

@@ -1,3 +1,5 @@
+.. _bugreports:
+
 How to Report Bugs
 ==================
 
