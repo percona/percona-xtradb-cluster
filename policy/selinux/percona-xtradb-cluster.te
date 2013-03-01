@@ -19,7 +19,7 @@ require {
 	type anon_inodefs_t;
 	type fixed_disk_device_t;
 	class lnk_file read;
-        class process getattr;
+        class process { getattr signull };
 	class unix_stream_socket connectto;
 	class capability { sys_resource sys_nice };
 	class tcp_socket { name_bind name_connect };
@@ -31,6 +31,7 @@ require {
 
 
 #============= mysqld_safe_t ==============
+allow mysqld_safe_t mysqld_t:process signull;
 allow mysqld_safe_t self:capability { sys_resource sys_nice };
 allow mysqld_safe_t tmp_t:file { create read write open getattr unlink ioctl setattr };
 allow mysqld_safe_t tmp_t:dir { write remove_name add_name };
@@ -64,7 +65,7 @@ allow mysqld_t hostname_exec_t:file { read getattr execute open execute_no_trans
 allow mysqld_t user_tmp_t:dir { write add_name };
 allow mysqld_t user_tmp_t:file create;
 allow mysqld_t bin_t:lnk_file read;
-allow mysqld_t tmp_t:file { append open };
+allow mysqld_t tmp_t:file { append create read write open getattr unlink setattr };
 
 # Allows too much leeway - the xtrabackup/wsrep rules in fc should fix it, but
 # keep for the moment.
