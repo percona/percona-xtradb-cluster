@@ -362,7 +362,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared mysql-libs Percona-Server-shared
-Conflicts:	Percona-Server-shared-55 Percona-Server-shared-51
+Conflicts:	Percona-Server-shared-55
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -1168,12 +1168,13 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/libmysqlservices.a
 %{_libdir}/mysql/libhsclient.a
 %{_libdir}/libhsclient.la
+%{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libmysql*.so*
+%{_libdir}/libmysql*.so.*
 # Maatkit UDF libs
 %{_libdir}/mysql/plugin/libfnv1a_udf.a
 %{_libdir}/mysql/plugin/libfnv1a_udf.la
