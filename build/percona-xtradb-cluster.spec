@@ -263,7 +263,7 @@ be eligible for hot fixes, and boost your team's productivity.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} mysql-libs Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar nc rsync
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar nc rsync
 Provides:       mysql-server MySQL-server Percona-Server-server
 Conflicts:	Percona-Server-server-55 Percona-Server-server-51
 
@@ -288,7 +288,7 @@ package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
 %package -n Percona-XtraDB-Cluster-client%{product_suffix}
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
-Requires:       mysql-libs
+Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
 Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
 Conflicts:	Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
 
