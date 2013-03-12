@@ -36,7 +36,6 @@ Introduction
    :glob:
 
    intro
-   resources
    limitation
 
 Installation
@@ -67,6 +66,7 @@ User's Manual
    :glob:
 
    manual/bootstrap
+   manual/state_snapshot_transfer
    manual/restarting_nodes
    manual/failover
    manual/monitoring
@@ -78,6 +78,7 @@ How-tos
    :maxdepth: 1
    :glob:
   
+   howtos/cenots_howto
    howtos/singlebox
    howtos/3nodesec2
    howtos/haproxy
@@ -95,6 +96,7 @@ Reference
    release-notes/release-notes_index
    wsrep-status-index
    wsrep-system-index
+   wsrep-files-index
    faq
    glossary
 

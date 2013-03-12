@@ -30,9 +30,13 @@ Once the first node is configured, then each other node should be started, one a
 
 In case cluster that's being bootstrapped has already been set up before, and to avoid editing the :file:`my.cnf` twice to change the :variable:`wsrep_cluster_address` to ``gcomm://`` and then to change it back to other node addresses, first node can be started with: :: 
  
-  /etc/init.d/myslq start --wsrep-cluster-address="gcomm://"
+  /etc/init.d/mysql start --wsrep-cluster-address="gcomm://"
 
 This way values in :file:`my.cnf` would remain unchanged. Next time node is restarted it won't require updating the configuration file. This can be useful in case cluster has been previously set up and for some reason all nodes went down and the cluster needs to be bootstrapped again. 
+
+.. note:: 
+
+ Starting the cluster using the ``/etc/init.d/mysql start --wsrep-cluster-address="gcomm://"`` will only work on RedHat based distributions (like CentOS). This method won't work on Debian/Ubuntu due to difference in the init script.
 
 Other Reading
 =============

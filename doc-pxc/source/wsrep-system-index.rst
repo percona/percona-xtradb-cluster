@@ -290,8 +290,9 @@ This variable controls the number of threads that can apply replication transact
    :conf: Yes
    :scope: Global
    :dyn: Yes
+   :format: <username>:<password>
 
-This variable should contain the authentication information needed for State Snapshot Transfer. Required information depends on the method selected in the :variable:`wsrep_sst_method`. More information about required authentication can be found in :ref:`resources`. This variable will appear masked in the logs and in the ``SHOW VARIABLES`` query.
+This variable should contain the authentication information needed for State Snapshot Transfer. Required information depends on the method selected in the :variable:`wsrep_sst_method`. More information about required authentication can be found in the :ref:`state_snapshot_transfer` documentation. This variable will appear masked in the logs and in the ``SHOW VARIABLES`` query.
 
 .. variable:: wsrep_sst_donor
 
