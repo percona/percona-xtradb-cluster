@@ -57,6 +57,10 @@ i_s_trx_row_t::trx_foreign_key_error */
 i_s_trx_row_t::trx_isolation_level */
 #define TRX_I_S_TRX_ISOLATION_LEVEL_MAX_LEN	16
 
+/** The maximum length of a string that can be stored in 
+ * i_s_trx_row_t::trx_query_state and other i_s_trx_row_t::trx* wsrep variables */
+#define TRX_I_S_TRX_WSREP_MAX_LEN	35
+
 /** Safely copy strings in to the INNODB_TRX table's
 string based columns */
 #define TRX_I_S_STRING_COPY(data, field, constraint, tcache)	\
@@ -173,6 +177,18 @@ struct i_s_trx_row_struct {
 	ulint		trx_search_latch_timeout;
 					/*!< search_latch_timeout in
 					trx_struct */
+#ifdef WITH_WSREP
+	const char*     trx_query_state;
+					/*!< Transaction query state*/
+	const char*     trx_conflict_state;
+	                                /*!< Transaction conflict state*/
+	const char*     trx_exec_mode;
+	                                /*!< Transaction exec mode*/
+	const char*	trx_consistency_check;
+					/*!< Transaction consistency check */
+	ulint		trx_wsrep_seqno;
+					/*!< Transaction wsrep sequence no */
+#endif
 };
 
 /** This structure represents INFORMATION_SCHEMA.innodb_lock_waits row */
