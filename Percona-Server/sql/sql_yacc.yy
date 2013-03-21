@@ -858,6 +858,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  CHAIN_SYM                     /* SQL-2003-N */
 %token  CHANGE
 %token  CHANGED
+%token  CHANGED_PAGE_BITMAPS_SYM      /* MYSQL      */
 %token  CHARSET
 %token  CHAR_SYM                      /* SQL-2003-R */
 %token  CHECKSUM_SYM
@@ -8992,7 +8993,7 @@ variable_aux:
           ident_or_text SET_VAR expr
           {
             Item_func_set_user_var *item;
-            $$= item= new (YYTHD->mem_root) Item_func_set_user_var($1, $3);
+            $$= item= new (YYTHD->mem_root) Item_func_set_user_var($1, $3, false);
             if ($$ == NULL)
               MYSQL_YYABORT;
             LEX *lex= Lex;
@@ -11457,6 +11458,8 @@ flush_option:
           { Lex->type|= REFRESH_DES_KEY_FILE; }
         | RESOURCES
           { Lex->type|= REFRESH_USER_RESOURCES; }
+        | CHANGED_PAGE_BITMAPS_SYM
+          { Lex->type|= REFRESH_FLUSH_PAGE_BITMAPS; }
         ;
 
 opt_table_list:
@@ -11484,6 +11487,8 @@ reset_option:
           slave_reset_options { }
         | MASTER_SYM          { Lex->type|= REFRESH_MASTER; }
         | QUERY_SYM CACHE_SYM { Lex->type|= REFRESH_QUERY_CACHE;}
+        | CHANGED_PAGE_BITMAPS_SYM
+          { Lex->type |= REFRESH_RESET_PAGE_BITMAPS; }
         ;
 
 slave_reset_options:
@@ -11504,6 +11509,13 @@ purge:
 
 purge_options:
           master_or_binary LOGS_SYM purge_option
+        | CHANGED_PAGE_BITMAPS_SYM BEFORE_SYM real_ulonglong_num
+          {
+            LEX *lex= Lex;
+            lex->value_list.empty();
+            lex->value_list.push_front(new Item_uint($3));
+            lex->type= PURGE_BITMAPS_TO_LSN;
+          }
         ;
 
 purge_option:
@@ -12594,6 +12606,7 @@ keyword_sp:
         | CATALOG_NAME_SYM         {}
         | CHAIN_SYM                {}
         | CHANGED                  {}
+        | CHANGED_PAGE_BITMAPS_SYM {}
         | CIPHER_SYM               {}
         | CLIENT_STATS_SYM         {}
         | CLIENT_SYM               {}
@@ -13062,7 +13075,7 @@ option_value:
           '@' ident_or_text equal expr
           {
             Item_func_set_user_var *item;
-            item= new (YYTHD->mem_root) Item_func_set_user_var($2, $4);
+            item= new (YYTHD->mem_root) Item_func_set_user_var($2, $4, false);
             if (item == NULL)
               MYSQL_YYABORT;
             set_var_user *var= new set_var_user(item);

@@ -25,10 +25,10 @@
 %define mysql_vendor            Oracle and/or its affiliates
 %define percona_server_vendor	Percona, Inc
 
-%define mysql_version   5.5.29
+%define mysql_version   5.5.30
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define majorversion 29
-%define minorversion 4
+%define majorversion 30
+%define minorversion 1
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
 
@@ -238,7 +238,7 @@ URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
 Provides:       mysql-server
-BuildRequires:  %{distro_buildreq}
+BuildRequires:  %{distro_buildreq} pam-devel
 
 # Think about what you use here since the first step is to
 # run a rm -rf
@@ -471,7 +471,8 @@ mkdir debug
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+	   -DWITH_PAM=ON
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make ${MAKE_JFLAG}
 )
@@ -490,7 +491,8 @@ mkdir release
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG}
   cd ../%{src_dir}
@@ -1168,12 +1170,13 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/libmysqlservices.a
 %{_libdir}/mysql/libhsclient.a
 %{_libdir}/libhsclient.la
+%{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libmysql*.so*
+%{_libdir}/libmysql*.so.*
 # Maatkit UDF libs
 %{_libdir}/mysql/plugin/libfnv1a_udf.a
 %{_libdir}/mysql/plugin/libfnv1a_udf.la

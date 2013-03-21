@@ -8,10 +8,10 @@ CMAKE=cmake
 TMP=$(CURDIR)/debian/tmp/
 
 feature_set="community"
-major_version=29
+major_version=30
 minor_version=1
-compilation_comment_release="Percona XtraDB Cluster (GPL)"
-server_suffix="-55"
+compilation_comment_release="Percona Server (GPL), Release $(major_version).$(minor_version)"
+server_suffix="-$(major_version).$(minor_version)"
 prefix="/usr"
 
 clean: clean-patched unpatch
@@ -20,9 +20,26 @@ clean-patched:
 	dh clean
 	rm -rf CMakeFiles
 
-build: patch
-	dh_testdir
-	$(CMAKE) . -DBUILD_CONFIG=mysql_release \
+override_dh_auto_configure: patch
+ifneq ($(BUILD_DEBUG_BINARY),)
+	# Make a debug binary
+	mkdir debug
+	cd debug && \
+	$(CMAKE) ../ -DBUILD_CONFIG=mysql_release \
+	   -DINSTALL_LAYOUT=DEB \
+	   -DCMAKE_BUILD_TYPE=Debug \
+	   -DWITH_EMBEDDED_SERVER=OFF \
+           -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DWITH_WSREP=ON \
+	   -DMYSQL_UNIX_ADDR="/var/run/mysqld/mysqld.sock" \
+	   -DFEATURE_SET=$(feature_set) \
+	   -DCOMPILATION_COMMENT=$(compilation_comment_debug) \
+	   -DMYSQL_SERVER_SUFFIX=$(server_suffix) \
+	   -DWITH_PAM=ON
+endif
+
+	mkdir release
+	cd release && $(CMAKE) ../ -DBUILD_CONFIG=mysql_release \
 	   -DINSTALL_LAYOUT=DEB \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DWITH_EMBEDDED_SERVER=OFF \
@@ -31,8 +48,16 @@ build: patch
            -DMYSQL_UNIX_ADDR="/var/run/mysqld/mysqld.sock" \
            -DFEATURE_SET=$(feature_set) \
            -DCOMPILATION_COMMENT=$(compilation_comment_release) \
-           -DMYSQL_SERVER_SUFFIX=$(server_suffix)
+           -DMYSQL_SERVER_SUFFIX=$(server_suffix) \
+	   -DWITH_PAM=ON
 	make $(MAKE_JFLAG)
+
+override_dh_auto_build:
+ifneq ($(BUILD_DEBUG_BINARY),)
+	cd debug && make $(MAKE_JFLAG)
+endif
+
+	cd release && make $(MAKE_JFLAG)
 	
 	# Build HandlerSocket
 	echo "Configuring HandlerSocket"

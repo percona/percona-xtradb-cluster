@@ -16,6 +16,8 @@ set -ue
 TARGET="$(uname -m)"
 TARGET_CFLAGS=''
 QUIET='VERBOSE=1'
+CMAKE_BUILD_TYPE='RelWithDebInfo'
+DEBUG_COMMENT=''
 
 # Some programs that may be overriden
 TAR=${TAR:-tar}
@@ -23,7 +25,7 @@ TAR=${TAR:-tar}
 # Check if we have a functional getopt(1)
 if ! getopt --test
 then
-    go_out="$(getopt --options="iq" --longoptions=i686,quiet \
+    go_out="$(getopt --options="iqdv" --longoptions=i686,quiet,debug,valgrind \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -37,6 +39,16 @@ do
         shift
         TARGET="i686"
         TARGET_CFLAGS="-m32 -march=i686"
+        ;;
+    -d | --debug )
+        shift
+        CMAKE_BUILD_TYPE='Debug'
+        BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
+        ;;
+    -v | --valgrind )
+        shift
+        CMAKE_OPTS="${CMAKE_OPTS:-} -DWITH_VALGRIND=ON"
+        BUILD_COMMENT="${BUILD_COMMENT:-}-valgrind"
         ;;
     -q | --quiet )
         shift
@@ -146,8 +158,9 @@ INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
     make clean all
     cd Percona-Server
 
-    cmake . -DBUILD_CONFIG=mysql_release \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    cd "$PRODUCT"
+    cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+        -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DWITH_EMBEDDED_SERVER=OFF \
         -DFEATURE_SET=community \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
@@ -155,7 +168,8 @@ INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
         -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
         -DWITH_INNODB_DISALLOW_WRITES=ON \
         -DWITH_WSREP=ON \
-        -DCOMPILATION_COMMENT="$COMMENT"
+        -DCOMPILATION_COMMENT="$COMMENT" \
+	-DWITH_PAM=ON
 
     make $MAKE_JFLAG $QUIET
     make DESTDIR="$INSTALLDIR" install

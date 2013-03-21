@@ -4003,7 +4003,7 @@ void handler::update_global_table_stats()
   table_stats->rows_changed+=           rows_changed;
   table_stats->rows_changed_x_indexes+=
     rows_changed * (table->s->keys ? table->s->keys : 1);
-  current_thd->diff_total_read_rows+=   rows_read;
+  ha_thd()->diff_total_read_rows+=   rows_read;
   rows_read= rows_changed=              0;
 end:
   mysql_mutex_unlock(&LOCK_global_table_stats);
@@ -5216,6 +5216,42 @@ bool ha_show_status(THD *thd, handlerton *db_type, enum ha_stat_type stat)
   if (!result)
     my_eof(thd);
   return result;
+}
+
+static my_bool flush_changed_page_bitmaps_handlerton(THD *unused1,
+                                                     plugin_ref plugin,
+                                                     void *unused2)
+{
+  handlerton *hton= plugin_data(plugin, handlerton *);
+
+  if (hton->flush_changed_page_bitmaps == NULL)
+    return FALSE;
+
+  return hton->flush_changed_page_bitmaps();
+}
+
+bool ha_flush_changed_page_bitmaps()
+{
+  return plugin_foreach(NULL, flush_changed_page_bitmaps_handlerton,
+                        MYSQL_STORAGE_ENGINE_PLUGIN, NULL);
+}
+
+static my_bool purge_changed_page_bitmaps_handlerton(THD *unused1,
+                                                     plugin_ref plugin,
+                                                     void *lsn)
+{
+  handlerton *hton= plugin_data(plugin, handlerton *);
+
+  if (hton->purge_changed_page_bitmaps == NULL)
+    return FALSE;
+
+  return hton->purge_changed_page_bitmaps(*(ulonglong *)lsn);
+}
+
+bool ha_purge_changed_page_bitmaps(ulonglong lsn)
+{
+  return plugin_foreach(NULL, purge_changed_page_bitmaps_handlerton,
+                        MYSQL_STORAGE_ENGINE_PLUGIN, &lsn);
 }
 
 /*

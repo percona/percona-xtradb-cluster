@@ -730,7 +730,8 @@ bool do_command(THD *thd)
     the client, the connection is closed or "net_wait_timeout"
     number of seconds has passed.
   */
-  my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+  if(!thd->skip_wait_timeout)
+    my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
 
   /*
     XXX: this code is here only to clear possible errors of init_connect. 
@@ -1751,7 +1752,7 @@ void log_slow_statement(THD *thd)
   /* Follow the slow log filter configuration. */
   if (thd->variables.log_slow_filter != 0 &&
       (!(thd->variables.log_slow_filter & thd->query_plan_flags) ||
-       ((thd->variables.log_slow_filter & SLOG_F_QC_NO) &&
+       ((thd->variables.log_slow_filter & (1UL << SLOG_F_QC_NO)) &&
         (thd->query_plan_flags & QPLAN_QC))))
     DBUG_VOID_RETURN;
 
@@ -1783,10 +1784,20 @@ void log_slow_statement(THD *thd)
   copy_global_to_session(thd, SLOG_UG_MIN_EXAMINED_ROW_LIMIT,
                          &g.min_examined_row_limit);
 
-  /* Do not log this thread's queries due to rate limiting. */
-  if (!thd->write_to_slow_log && (thd->variables.long_query_time >= 1000000
-                                  || (ulong) query_exec_time < 1000000))
+  if (opt_slow_query_log_rate_type == SLOG_RT_QUERY
+      && thd->variables.log_slow_rate_limit
+      && thd->query_id % thd->variables.log_slow_rate_limit
+      && (thd->variables.long_query_time >= 1000000
+          || (ulong) query_exec_time < 1000000)) {
     DBUG_VOID_RETURN;
+  }
+  if (opt_slow_query_log_rate_type == SLOG_RT_SESSION
+      && thd->variables.log_slow_rate_limit
+      && thd->thread_id % thd->variables.log_slow_rate_limit
+      && (thd->variables.long_query_time >= 1000000
+          || (ulong) query_exec_time < 1000000)) {
+    DBUG_VOID_RETURN;
+  }
 
 
   /*
@@ -2376,9 +2387,14 @@ mysql_execute_command(THD *thd)
     }
     /* 
        Execute deferred events first
+       Bug lp1068210 or upstream 67504: Test first to see if we are executing
+       within a sub statement. If so, DO NOT execute any deferred events, they
+       have already been executed by the parent statement and have no bearing
+       on the sub statement and can cause faulty behavior.
     */
-    if (slave_execute_deferred_events(thd))
-      DBUG_RETURN(-1);
+    if (thd->in_sub_stmt == 0)
+      if (slave_execute_deferred_events(thd))
+          DBUG_RETURN(-1);
   }
   else
   {
@@ -2614,9 +2630,35 @@ case SQLCOM_PREPARE:
   {
     if (check_global_access(thd, SUPER_ACL))
       goto error;
-    /* PURGE MASTER LOGS TO 'file' */
-    res = purge_master_logs(thd, lex->to_log);
-    break;
+    if (lex->type == 0)
+    {
+      /* PURGE MASTER LOGS TO 'file' */
+      res = purge_master_logs(thd, lex->to_log);
+      break;
+    }
+    if (lex->type == PURGE_BITMAPS_TO_LSN)
+    {
+      /* PURGE CHANGED_PAGE_BITMAPS BEFORE lsn */
+      ulonglong lsn= 0;
+      Item *it= (Item *)lex->value_list.head();
+      if ((!it->fixed && it->fix_fields(lex->thd, &it)) || it->check_cols(1)
+          || it->null_value)
+      {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0),
+                 "PURGE CHANGED_PAGE_BITMAPS BEFORE");
+        goto error;
+      }
+      lsn= it->val_uint();
+      res= ha_purge_changed_page_bitmaps(lsn);
+      if (res)
+      {
+        my_error(ER_LOG_PURGE_UNKNOWN_ERR, MYF(0),
+                 "PURGE CHANGED_PAGE_BITMAPS BEFORE");
+        goto error;
+      }
+      my_ok(thd);
+      break;
+    }
   }
   case SQLCOM_PURGE_BEFORE:
   {
@@ -4127,7 +4169,14 @@ end_with_restore_list:
   case SQLCOM_FLUSH:
   {
     int write_to_binlog;
-    if (check_global_access(thd,RELOAD_ACL))
+
+    if (lex->type & REFRESH_FLUSH_PAGE_BITMAPS
+        || lex->type & REFRESH_RESET_PAGE_BITMAPS)
+    {
+      if (check_global_access(thd, SUPER_ACL))
+          goto error;
+    }
+    else if (check_global_access(thd, RELOAD_ACL))
       goto error;
 
     if (first_table && lex->type & REFRESH_READ_LOCK)
@@ -7269,8 +7318,14 @@ uint kill_one_thread(THD *thd, ulong id, bool only_kill_query)
     if ((thd->security_ctx->master_access & SUPER_ACL) ||
         thd->security_ctx->user_matches(tmp->security_ctx))
     {
-      tmp->awake(only_kill_query ? THD::KILL_QUERY : THD::KILL_CONNECTION);
-      error=0;
+      /* process the kill only if thread is not already undergoing any kill
+         connection.
+      */
+      if (tmp->killed != THD::KILL_CONNECTION)
+      {
+        tmp->awake(only_kill_query ? THD::KILL_QUERY : THD::KILL_CONNECTION);
+      }
+      error= 0;
     }
     else
       error=ER_KILL_DENIED_ERROR;

@@ -640,7 +640,7 @@ then
   log_notice "Logging to '$err_log'."
   logging=file
 
-  if [ ! -e "$err_log" ]; then                  # if error log already exists,
+  if [ ! -f "$err_log" ]; then                  # if error log already exists,
     touch "$err_log"                            # we just append. otherwise,
     chmod "$fmode" "$err_log"                   # fix the permissions here!
   fi
@@ -929,7 +929,7 @@ do
     eval_log_error "$cmd $wsrep_start_position_opt --wsrep_cluster_address=$url $nohup_redir"
   fi
 
-  if [ $want_syslog -eq 0 -a ! -e "$err_log" ]; then
+  if [ $want_syslog -eq 0 -a ! -f "$err_log" ]; then
     touch "$err_log"                    # hypothetical: log was renamed but not
     chown $user "$err_log"              # flushed yet. we'd recreate it with
     chmod "$fmode" "$err_log"           # wrong owner next time we log, so set

@@ -77,6 +77,7 @@ Performance Improvements
    performance/innodb_thread_concurrency_timer_based
    performance/innodb_numa_support
    performance/handlersocket
+   performance/threadpool
 
 Flexibility Improvements
 ========================
@@ -92,6 +93,7 @@ Flexibility Improvements
    flexibility/innodb_fast_shutdown
    flexibility/improved_memory_engine
    flexibility/max_binlog_files
+   flexibility/mysqldump_ignore_create_error
 
 Reliability Improvements
 ========================
@@ -128,6 +130,7 @@ Management Improvements
    management/secure_file_priv_extended
    management/expanded_program_option_modifiers
    management/changed_page_tracking
+   management/pam_plugin
 
 Diagnostics Improvements
 ========================
