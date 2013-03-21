@@ -798,10 +798,10 @@ lock_rec_get_page_no(
 				remains set when the waiting lock is granted,
 				or if the lock is inherited to a neighboring
 				record */
-#define WSREP_BF		4096
+#define WSREP_BF		8192
 #define LOCK_CONV_BY_OTHER 4096 /*!< this bit is set when the lock is created
 				by other transaction */
-#if (LOCK_WAIT|LOCK_GAP|LOCK_REC_NOT_GAP|LOCK_INSERT_INTENTION|LOCK_CONV_BY_OTHER)&LOCK_MODE_MASK
+#if (LOCK_WAIT|LOCK_GAP|LOCK_REC_NOT_GAP|LOCK_INSERT_INTENTION|LOCK_CONV_BY_OTHER)&LOCK_TYPE_MASK
 # error
 #endif
 /* @} */

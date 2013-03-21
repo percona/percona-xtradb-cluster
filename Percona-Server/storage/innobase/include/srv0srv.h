@@ -325,6 +325,10 @@ extern lint	srv_kill_idle_transaction;
 extern my_bool	srv_purge_view_update_only_debug;
 #endif /* UNIV_DEBUG */
 
+#ifdef UNIV_DEBUG
+extern my_bool	srv_purge_view_update_only_debug;
+#endif /* UNIV_DEBUG */
+
 extern mutex_t*	kernel_mutex_temp;/* mutex protecting the server, trx structs,
 				query threads, and lock table: we allocate
 				it from dynamic memory to get it to the
@@ -639,6 +643,14 @@ srv_conc_enter_innodb(
 /*==================*/
 	trx_t*	trx);	/*!< in: transaction object associated with the
 			thread */
+#ifdef WITH_WSREP
+UNIV_INTERN
+void
+wsrep_srv_conc_cancel_wait(
+/*==================*/
+	trx_t*	trx);	/*!< in: transaction object associated with the
+			thread */
+#endif /* WITH_WSREP */
 /*********************************************************************//**
 This lets a thread enter InnoDB regardless of the number of threads inside
 InnoDB. This must be called when a thread ends a lock wait. */

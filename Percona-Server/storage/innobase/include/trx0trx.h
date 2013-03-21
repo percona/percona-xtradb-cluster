@@ -758,6 +758,9 @@ struct trx_struct{
 #define	DPAH_SIZE	8192
 	byte*		distinct_page_access_hash;
 	ibool		take_stats;
+#ifdef WITH_WSREP
+	os_event_t	wsrep_event;	/* event waited for in srv_conc_slot */
+#endif /* WITH_WSREP */
 };
 
 #define TRX_MAX_N_THREADS	32	/* maximum number of

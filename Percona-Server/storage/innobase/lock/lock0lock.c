@@ -1832,22 +1832,30 @@ lock_rec_create(
 		 */
 		if (c_lock && c_lock->trx->que_state == TRX_QUE_LOCK_WAIT) {
 			c_lock->trx->was_chosen_as_deadlock_victim = TRUE;
+
+			if (wsrep_debug && c_lock->trx->wait_lock != c_lock) {
+				fprintf(stderr, "WSREP: c_lock != wait lock\n");
+				lock_rec_print(stderr, c_lock);
+				lock_rec_print(stderr, c_lock->trx->wait_lock);
+			}
+
 			trx->que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
 
 			lock_cancel_waiting_and_release(c_lock->trx->wait_lock);
 
-			/* trx might not wait for c_lock, but some other lock */
-			if (wsrep_debug && c_lock->trx->wait_lock != c_lock) {
-				fprintf(stderr, "WSREP: c_lock != wait lock\n");
-			}
+			/* trx might not wait for c_lock, but some other lock
+			   does not matter if wait_lock was released above
+			 */
 			if (c_lock->trx->wait_lock == c_lock) {
 				lock_reset_lock_and_trx_wait(lock);
 			}
 
-			if (wsrep_debug)
-				fprintf(stderr, "WSREP: c_lock canceled %llu\n", 
+			if (wsrep_debug) fprintf(
+				stderr, 
+				"WSREP: c_lock canceled %llu\n", 
 				(ulonglong) c_lock->trx->id);
+
 			/* have to bail out here to avoid lock_set_lock... */
 			return(lock);
 		}
@@ -1942,12 +1950,12 @@ lock_rec_enqueue_waiting(
 		}
 		/* Enqueue the lock request that will wait to be granted */
 		lock = lock_rec_create(c_lock, type_mode | LOCK_WAIT, 
-				block, heap_no, index, trx);
+				       block, heap_no, index, trx);
 #else
 		/* Enqueue the lock request that will wait to be granted */
 		lock = lock_rec_create(type_mode | LOCK_WAIT,
 				       block, heap_no, index, trx);
-#endif
+#endif /*WITH_WSREP */
 	} else {
 		ut_ad(lock->type_mode & LOCK_WAIT);
 		ut_ad(lock->type_mode & LOCK_CONV_BY_OTHER);
@@ -2287,7 +2295,6 @@ lock_rec_lock_slow(
 		enough already granted on the record, we have to wait. */
 
 		ut_ad(lock == NULL);
-
 enqueue_waiting:
 #ifdef WITH_WSREP
 		return(lock_rec_enqueue_waiting(c_lock,mode, block, heap_no,
@@ -3788,7 +3795,7 @@ lock_deadlock_recursive(
 #endif /* UNIV_DEBUG */
 #ifdef WITH_WSREP
 				if (wsrep_debug)
-					fputs("WSREP: Deadlock detected\n", ef);
+					fputs("WSREP: Deadlock detected\n", stderr);
 				if (wsrep_thd_is_brute_force(start->mysql_thd) &&
 				    wsrep_thd_is_brute_force(
 				        wait_lock->trx->mysql_thd) &&
@@ -3806,14 +3813,6 @@ lock_deadlock_recursive(
 					}
                                 }
 #endif
-				if (too_far) {
-
-					fputs("TOO DEEP OR LONG SEARCH"
-					      " IN THE LOCK TABLE"
-					      " WAITS-FOR GRAPH\n", ef);
-
-					return(LOCK_VICTIM_IS_START);
-				}
 
 				if (trx_weight_ge(wait_lock->trx, start)) {
 					/* Our recursion starting point
@@ -5615,7 +5614,7 @@ lock_rec_insert_check_and_lock(
 					       | LOCK_INSERT_INTENTION,
 					       block, next_rec_heap_no,
 					       NULL, index, thr);
-#endif
+#endif /* WITH_WSREP */
 	} else {
 		err = DB_SUCCESS;
 	}
