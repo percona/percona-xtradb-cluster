@@ -9,7 +9,7 @@ service mysqlchk
         port            = 9200 
         wait            = no 
         user            = nobody 
-        server          = /usr/local/bin/clustercheck
+        server          = /usr/bin/clustercheck
         log_on_failure  += USERID 
         only_from       = 0.0.0.0/0 
         # recommended to put the IPs that need 
