@@ -35,7 +35,9 @@
 %define mysqld_user     mysql
 %define mysqld_group    mysql
 %define mysqldatadir    /var/lib/mysql
-
+#
+%{!?wsrep_version:%global wsrep_version @@WSREP_VERSION@@}
+#
 %if %{undefined revision}
 %define revision	1
 %endif
