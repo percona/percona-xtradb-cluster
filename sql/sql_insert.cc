@@ -3479,7 +3479,8 @@ bool select_insert::send_eof()
                        trans_table, table->file->table_type()));
 
 #ifdef WITH_WSREP
-  error= (thd->wsrep_conflict_state == MUST_ABORT) ? -1 :
+  error= (thd->wsrep_conflict_state == MUST_ABORT ||
+          thd->wsrep_conflict_state == CERT_FAILURE) ? -1 :
     (thd->locked_tables_mode <= LTM_LOCK_TABLES ?
           table->file->ha_end_bulk_insert() : 0);
 #else
