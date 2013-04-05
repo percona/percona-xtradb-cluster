@@ -152,7 +152,7 @@ export WSREP_VERSION="$WSREP_VERSION"
     "$SOURCEDIR/build/percona-xtradb-cluster.spec" > \
     "${WORKDIR_ABS}/SPECS/percona-xtradb-cluster.spec"
     # Issue RPM command
-    rpmbuild -ba --clean --with yassl $TARGET $SIGN $QUIET \
+    rpmbuild -ba --clean $TARGET $SIGN $QUIET \
         "${WORKDIR_ABS}/SPECS/percona-xtradb-cluster.spec" \
         --define "_topdir $WORKDIR_ABS" \
         --define "revision $REVISION" 

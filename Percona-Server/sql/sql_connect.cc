@@ -565,9 +565,6 @@ static int increment_connection_count(THD* thd, bool use_lock)
   const char* client_string= get_client_host(thd);
   int return_value=          0;
 
-  if (!opt_userstat)
-    return return_value;
-
   if (acl_is_utility_user(thd->security_ctx->user, thd->security_ctx->host,
       thd->security_ctx->ip))
     return return_value;
@@ -1270,8 +1267,9 @@ bool login_connection(THD *thd)
   my_net_set_write_timeout(net, thd->variables.net_write_timeout);
 
   thd->reset_stats();
+
   // Updates global user connection stats.
-  if (increment_connection_count(thd, true))
+  if (opt_userstat && increment_connection_count(thd, true))
     DBUG_RETURN(1);
 
   DBUG_RETURN(0);
@@ -1517,12 +1515,12 @@ void do_handle_one_connection(THD *thd_arg)
     end_connection(thd);
    
 #ifdef WITH_WSREP
-  if (WSREP(thd))
-  {
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXITING;
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
+    if (WSREP(thd))
+    {
+        mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+        thd->wsrep_query_state= QUERY_EXITING;
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    }
 #endif
 end_thread:
 #ifdef WITH_WSREP
@@ -1530,8 +1528,12 @@ end_thread:
 #else
     close_connection(thd);
 #endif
-    thd->update_stats(false);
-    update_global_user_stats(thd, create_user, time(NULL));
+
+    if (unlikely(opt_userstat))
+    {
+      thd->update_stats(false);
+      update_global_user_stats(thd, create_user, time(NULL));
+    }
 
     if (MYSQL_CALLBACK_ELSE(thd->scheduler, end_thread, (thd, 1), 0))
       return;                                 // Probably no-threads
