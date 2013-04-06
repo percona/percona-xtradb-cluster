@@ -176,7 +176,6 @@ fi
     cd "$INSTALLDIR/src"
 
     make clean all
-    cd Percona-Server
 
     cd "$PRODUCT"
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
