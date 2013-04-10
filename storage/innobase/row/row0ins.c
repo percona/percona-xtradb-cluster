@@ -1457,14 +1457,6 @@ run_again:
 						goto end_scan;
 					}
 
-#ifdef WITH_WSREP_REMOVED
-					err = wsrep_append_foreign_key(
-						thr_get_trx(thr),
-						foreign,
-						rec, 
-						check_index, 
-						FALSE);
-#endif /* WITH_WSREP */
 					/* row_ins_foreign_check_on_constraint
 					may have repositioned pcur on a
 					different block */
@@ -2309,7 +2301,10 @@ row_ins_index_entry(
 	err = row_ins_index_entry_low(BTR_MODIFY_LEAF, index, entry,
 				      n_ext, thr);
 	if (err != DB_FAIL) {
-
+		if (index == dict_table_get_first_index(index->table)
+		    && thr_get_trx(thr)->mysql_thd != 0) {
+			DEBUG_SYNC_C("row_ins_clust_index_entry_leaf_after");
+		}
 		return(err);
 	}
 

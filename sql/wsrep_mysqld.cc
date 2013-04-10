@@ -55,6 +55,10 @@ ulong  wsrep_mysql_replication_bundle  = 0;
  */
 
 static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
+const wsrep_uuid_t* wsrep_cluster_uuid()
+{
+  return &cluster_uuid;
+}
 static char         cluster_uuid_str[40]= { 0, };
 static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 {

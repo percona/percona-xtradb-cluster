@@ -431,6 +431,7 @@ static ssize_t sst_prepare_other (const char*  method,
   return ret;
 }
 
+//extern ulong my_bind_addr;
 extern uint  mysqld_port;
 
 /*! Just tells donor where to send mysqldump */
@@ -936,7 +937,7 @@ static int sst_donate_other (const char*   method,
   {
     WSREP_ERROR("sst_donate_other(): pthread_create() failed: %d (%s)",
                 ret, strerror(ret));
-    return ret;
+    return -ret;
   }
   mysql_cond_wait (&arg.cond, &arg.lock);
 

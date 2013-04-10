@@ -633,8 +633,12 @@ innobase_commit_low(
 static SHOW_VAR innodb_status_variables[]= {
   {"buffer_pool_pages_data",
   (char*) &export_vars.innodb_buffer_pool_pages_data,	  SHOW_LONG},
+  {"buffer_pool_bytes_data",
+  (char*) &export_vars.innodb_buffer_pool_bytes_data,	  SHOW_LONG},
   {"buffer_pool_pages_dirty",
   (char*) &export_vars.innodb_buffer_pool_pages_dirty,	  SHOW_LONG},
+  {"buffer_pool_bytes_dirty",
+  (char*) &export_vars.innodb_buffer_pool_bytes_dirty,	  SHOW_LONG},
   {"buffer_pool_pages_flushed",
   (char*) &export_vars.innodb_buffer_pool_pages_flushed,  SHOW_LONG},
   {"buffer_pool_pages_free",
@@ -725,6 +729,12 @@ static SHOW_VAR innodb_status_variables[]= {
   (char*) &export_vars.innodb_rows_updated,		  SHOW_LONG},
   {"truncated_status_writes",
   (char*) &export_vars.innodb_truncated_status_writes,	SHOW_LONG},
+#ifdef UNIV_DEBUG
+  {"purge_trx_id_age",
+  (char*) &export_vars.innodb_purge_trx_id_age,		  SHOW_LONG},
+  {"purge_view_trx_id_age",
+  (char*) &export_vars.innodb_purge_view_trx_id_age,	  SHOW_LONG},
+#endif /* UNIV_DEBUG */
   {NullS, NullS, SHOW_LONG}
 };
 
@@ -1113,6 +1123,8 @@ convert_error_code_to_mysql(
 		return(HA_ERR_INDEX_CORRUPT);
 	case DB_UNDO_RECORD_TOO_BIG:
 		return(HA_ERR_UNDO_REC_TOO_BIG);
+	case DB_OUT_OF_MEMORY:
+		return(HA_ERR_OUT_OF_MEM);
 	}
 }
 
@@ -1290,100 +1302,6 @@ innobase_get_lower_case_table_names(void)
 	return(lower_case_table_names);
 }
 
-#if defined (__WIN__) && defined (MYSQL_DYNAMIC_PLUGIN)
-extern MYSQL_PLUGIN_IMPORT MY_TMPDIR mysql_tmpdir_list;
-/*******************************************************************//**
-Map an OS error to an errno value. The OS error number is stored in
-_doserrno and the mapped value is stored in errno) */
-extern "C"
-void __cdecl
-_dosmaperr(
-	unsigned long);	/*!< in: OS error value */
-
-/*********************************************************************//**
-Creates a temporary file.
-@return	temporary file descriptor, or < 0 on error */
-extern "C" UNIV_INTERN
-int
-innobase_mysql_tmpfile(void)
-/*========================*/
-{
-	int	fd;				/* handle of opened file */
-	HANDLE	osfh;				/* OS handle of opened file */
-	char*	tmpdir;				/* point to the directory
-						where to create file */
-	TCHAR	path_buf[MAX_PATH - 14];	/* buffer for tmp file path.
-						The length cannot be longer
-						than MAX_PATH - 14, or
-						GetTempFileName will fail. */
-	char	filename[MAX_PATH];		/* name of the tmpfile */
-	DWORD	fileaccess = GENERIC_READ	/* OS file access */
-			     | GENERIC_WRITE
-			     | DELETE;
-	DWORD	fileshare = FILE_SHARE_READ	/* OS file sharing mode */
-			    | FILE_SHARE_WRITE
-			    | FILE_SHARE_DELETE;
-	DWORD	filecreate = CREATE_ALWAYS;	/* OS method of open/create */
-	DWORD	fileattrib =			/* OS file attribute flags */
-			     FILE_ATTRIBUTE_NORMAL
-			     | FILE_FLAG_DELETE_ON_CLOSE
-			     | FILE_ATTRIBUTE_TEMPORARY
-			     | FILE_FLAG_SEQUENTIAL_SCAN;
-
-	DBUG_ENTER("innobase_mysql_tmpfile");
-
-	tmpdir = my_tmpdir(&mysql_tmpdir_list);
-
-	/* The tmpdir parameter can not be NULL for GetTempFileName. */
-	if (!tmpdir) {
-		uint	ret;
-
-		/* Use GetTempPath to determine path for temporary files. */
-		ret = GetTempPath(sizeof(path_buf), path_buf);
-		if (ret > sizeof(path_buf) || (ret == 0)) {
-
-			_dosmaperr(GetLastError());	/* map error */
-			DBUG_RETURN(-1);
-		}
-
-		tmpdir = path_buf;
-	}
-
-	/* Use GetTempFileName to generate a unique filename. */
-	if (!GetTempFileName(tmpdir, "ib", 0, filename)) {
-
-		_dosmaperr(GetLastError());	/* map error */
-		DBUG_RETURN(-1);
-	}
-
-	DBUG_PRINT("info", ("filename: %s", filename));
-
-	/* Open/Create the file. */
-	osfh = CreateFile(filename, fileaccess, fileshare, NULL,
-			  filecreate, fileattrib, NULL);
-	if (osfh == INVALID_HANDLE_VALUE) {
-
-		/* open/create file failed! */
-		_dosmaperr(GetLastError());	/* map error */
-		DBUG_RETURN(-1);
-	}
-
-	do {
-		/* Associates a CRT file descriptor with the OS file handle. */
-		fd = _open_osfhandle((intptr_t) osfh, 0);
-	} while (fd == -1 && errno == EINTR);
-
-	if (fd == -1) {
-		/* Open failed, close the file handle. */
-
-		_dosmaperr(GetLastError());	/* map error */
-		CloseHandle(osfh);		/* no need to check if
-						CloseHandle fails */
-	}
-
-	DBUG_RETURN(fd);
-}
-#else
 /*********************************************************************//**
 Creates a temporary file.
 @return	temporary file descriptor, or < 0 on error */
@@ -1396,7 +1314,15 @@ innobase_mysql_tmpfile(void)
 	os_event_wait(srv_allow_writes_event);
 #endif /* WITH_INNODB_DISALLOW_WRITES */
 	int	fd2 = -1;
-	File	fd = mysql_tmpfile("ib");
+	File	fd;
+
+	DBUG_EXECUTE_IF(
+		"innobase_tmpfile_creation_failure",
+		return(-1);
+	);
+
+	fd = mysql_tmpfile("ib");
+
 	if (fd >= 0) {
 		/* Copy the file descriptor, so that the additional resources
 		allocated by create_temp_file() can be freed by invoking
@@ -1440,7 +1366,6 @@ innobase_mysql_tmpfile(void)
 	}
 	return(fd2);
 }
-#endif /* defined (__WIN__) && defined (MYSQL_DYNAMIC_PLUGIN) */
 
 /*********************************************************************//**
 Wrapper around MySQL's copy_and_convert function.
@@ -4918,14 +4843,6 @@ wsrep_store_key_val_for_row(
 
 			/* Pad the unused space with spaces. */
 
-			if (true_len < key_len) {
-				ulint	pad_len = key_len - true_len;
-				ut_a(!(pad_len % cs->mbminlen));
-
-				cs->cset->fill(cs, buff, pad_len,
-					       0x20 /* space */);
-				buff += pad_len;
-			}
 		}
 	}
 
@@ -5975,7 +5892,84 @@ calc_row_difference(
 
 	return(0);
 }
+#ifdef WITH_WSREP
+static
+int
+wsrep_calc_row_hash(
+/*================*/
+	byte*		digest,		/*!< in/out: md5 sum */
+	const uchar*	row,		/*!< in: row in MySQL format */
+	TABLE*		table,		/*!< in: table in MySQL data
+					dictionary */
+	row_prebuilt_t*	prebuilt,	/*!< in: InnoDB prebuilt struct */
+	THD*		thd)		/*!< in: user thread */
+{
+	Field*		field;
+	enum_field_types field_mysql_type;
+	uint		n_fields;
+	ulint		len;
+	const byte*	ptr;
+	ulint		col_type;
+	uint		i;
 
+	my_MD5Context ctx;
+	my_MD5Init (&ctx);
+
+	n_fields = table->s->fields;
+
+	for (i = 0; i < n_fields; i++) {
+		byte null_byte=0;
+		byte true_byte=1;
+
+		field = table->field[i];
+
+		ptr = (const byte*) row + get_field_offset(table, field);
+		len = field->pack_length();
+
+		field_mysql_type = field->type();
+
+		col_type = prebuilt->table->cols[i].mtype;
+
+		switch (col_type) {
+
+		case DATA_BLOB:
+			ptr = row_mysql_read_blob_ref(&len, ptr, len);
+
+			break;
+
+		case DATA_VARCHAR:
+		case DATA_BINARY:
+		case DATA_VARMYSQL:
+			if (field_mysql_type == MYSQL_TYPE_VARCHAR) {
+				/* This is a >= 5.0.3 type true VARCHAR where
+				the real payload data length is stored in
+				1 or 2 bytes */
+
+				ptr = row_mysql_read_true_varchar(
+					&len, ptr,
+					(ulint)
+					(((Field_varstring*)field)->length_bytes));
+
+			}
+
+			break;
+		default:
+			;
+		}
+
+		if (field->null_ptr &&
+		    field_in_record_is_null(table, field, (char*) row)) {
+			my_MD5Update (&ctx, &null_byte, 1);
+		} else {
+			my_MD5Update (&ctx, &true_byte, 1);
+			my_MD5Update (&ctx, ptr, len);
+		}
+	}
+	my_MD5Final (digest, &ctx);
+
+	return(0);
+}
+#endif /* WITH_WSREP */
 /**********************************************************************//**
 Updates a row given as a parameter to a new value. Note that we are given
 whole rows, not just the fields which are updated: this incurs some
@@ -7219,6 +7213,8 @@ ha_innobase::wsrep_append_keys(
 	const uchar*	record1)	/* in: row in MySQL format */
 {
 	DBUG_ENTER("wsrep_append_keys");
+
+  	bool key_appended = false;
 	trx_t *trx = thd_to_trx(thd);
 
 	if (table_share && table_share->tmp_table  != NO_TMP_TABLE) {
@@ -7230,27 +7226,6 @@ ha_innobase::wsrep_append_keys(
 		DBUG_RETURN(0);
 	}
 
-	/* if no PK, calculate hash of full row, to be the key value */
-	if (prebuilt->clust_index_was_generated && wsrep_certify_nonPK) {
-		uchar digest[16];
-		int rcode;
-
-		MY_MD5_HASH(digest, (uchar *)record0, table->s->reclength);
-		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
-					      (const char*) digest, 16, 
-					      shared))) {
-			DBUG_RETURN(rcode);
-		}
-		if (record1) {
-			MY_MD5_HASH(digest, (uchar *)record1, table->s->reclength);
-			if ((rcode = wsrep_append_key(thd, trx, table_share, 
-						      table,
-						      (const char*) digest, 
-						      16, shared))) {
-				DBUG_RETURN(rcode);
-			}
-		}
-	}
 	if (wsrep_protocol_version == 0) {
 		uint	len;
 		char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
@@ -7289,6 +7264,8 @@ ha_innobase::wsrep_append_keys(
 
 			if (key_info->flags & HA_NOSAME ||
 			    referenced_by_foreign_key()) {
+				if (key_info->flags & HA_NOSAME || shared)
+			  		key_appended = true;
 
 				len = wsrep_store_key_val_for_row(
 					table, i, key0, key_info->key_length, 
@@ -7319,6 +7296,32 @@ ha_innobase::wsrep_append_keys(
 			}
 		}
 	}
+
+	/* if no PK, calculate hash of full row, to be the key value */
+	if (!key_appended && wsrep_certify_nonPK) {
+		uchar digest[16];
+		int rcode;
+
+		wsrep_calc_row_hash(digest, record0, table, prebuilt, thd);
+		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
+					      (const char*) digest, 16, 
+					      shared))) {
+			DBUG_RETURN(rcode);
+		}
+
+		if (record1) {
+			wsrep_calc_row_hash(
+				digest, record1, table, prebuilt, thd);
+			if ((rcode = wsrep_append_key(thd, trx, table_share, 
+						      table,
+						      (const char*) digest, 
+						      16, shared))) {
+				DBUG_RETURN(rcode);
+			}
+		}
+		DBUG_RETURN(0);
+	}
+
 	DBUG_RETURN(0);
 }
 #endif
@@ -11465,7 +11468,6 @@ innobase_xa_prepare(
 #ifdef WITH_WSREP
 	    if (!wsrep_on(thd))
 #endif
-
 		mysql_mutex_lock(&prepare_commit_mutex);
 		trx_owns_prepare_commit_mutex_set(trx);
 	}
@@ -12454,6 +12456,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 		int rcode = wsrep_innobase_kill_one_trx(
 			bf_thd, bf_trx, victim_trx, signal);
 		mutex_exit(&kernel_mutex);
+		wsrep_srv_conc_cancel_wait(victim_trx);
 		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction");
@@ -12881,7 +12884,24 @@ static MYSQL_SYSVAR_UINT(trx_rseg_n_slots_debug, trx_rseg_n_slots_debug,
   PLUGIN_VAR_RQCMDARG,
   "Debug flags for InnoDB to limit TRX_RSEG_N_SLOTS for trx_rsegf_undo_find_free()",
   NULL, NULL, 0, 0, 1024, 0);
+
+static MYSQL_SYSVAR_UINT(limit_optimistic_insert_debug,
+  btr_cur_limit_optimistic_insert_debug, PLUGIN_VAR_RQCMDARG,
+  "Artificially limit the number of records per B-tree page (0=unlimited).",
+  NULL, NULL, 0, 0, UINT_MAX32, 0);
+
+static MYSQL_SYSVAR_BOOL(trx_purge_view_update_only_debug,
+  srv_purge_view_update_only_debug, PLUGIN_VAR_NOCMDARG,
+  "Pause actual purging any delete-marked records, but merely update the purge view. "
+  "It is to create artificially the situation the purge view have been updated "
+  "but the each purges were not done yet.",
+  NULL, NULL, FALSE);
 #endif /* UNIV_DEBUG */
+
+static MYSQL_SYSVAR_BOOL(print_all_deadlocks, srv_print_all_deadlocks,
+  PLUGIN_VAR_OPCMDARG,
+  "Print all deadlocks to MySQL error log (off by default)",
+  NULL, NULL, FALSE);
 
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(additional_mem_pool_size),
@@ -12957,7 +12977,10 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(rollback_segments),
 #ifdef UNIV_DEBUG
   MYSQL_SYSVAR(trx_rseg_n_slots_debug),
+  MYSQL_SYSVAR(limit_optimistic_insert_debug),
+  MYSQL_SYSVAR(trx_purge_view_update_only_debug),
 #endif /* UNIV_DEBUG */
+  MYSQL_SYSVAR(print_all_deadlocks),
   NULL
 };
 

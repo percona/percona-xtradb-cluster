@@ -374,6 +374,7 @@ int wsrep_create_sp(THD *thd, uchar** buf, uint* buf_len);
 int wsrep_create_trigger_query(THD *thd, uchar** buf, uint* buf_len);
 int wsrep_create_event_query(THD *thd, uchar** buf, uint* buf_len);
 
+const wsrep_uuid_t* wsrep_cluster_uuid();
 struct xid_t;
 void wsrep_set_SE_checkpoint(xid_t*);
 
