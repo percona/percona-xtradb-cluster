@@ -1656,14 +1656,6 @@ run_again:
 						goto end_scan;
 					}
 
-#ifdef WITH_WSREP_REMOVED
-					err = wsrep_append_foreign_key(
-						thr_get_trx(thr),
-						foreign,
-						rec, 
-						check_index, 
-						FALSE);
-#endif /* WITH_WSREP */
 					/* row_ins_foreign_check_on_constraint
 					may have repositioned pcur on a
 					different block */

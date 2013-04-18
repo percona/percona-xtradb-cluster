@@ -2046,7 +2046,8 @@ wsrep_rec_get_foreign_key(
 			}
 			case DATA_VARCHAR:
 			case DATA_VARMYSQL:
-			case DATA_BINARY:
+			case DATA_CHAR:
+			case DATA_MYSQL:
 				/* Copy the actual data */
 				ut_memcpy(buf, data, len);
 				wsrep_innobase_mysql_sort(
@@ -2057,7 +2058,7 @@ wsrep_rec_get_foreign_key(
 					buf, len);
 				break;
 			case DATA_BLOB:
-			case DATA_MYSQL:
+			case DATA_BINARY:
 				memcpy(buf, data, len);
 				break;
 			default: 

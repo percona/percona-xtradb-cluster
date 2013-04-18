@@ -2469,6 +2469,9 @@ static void network_init(void)
           socket_errno);
       unireg_abort(1);
     }
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+    (void) fcntl(mysql_socket_getfd(ip_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
   }
 
 #ifdef _WIN32
@@ -2565,6 +2568,9 @@ static void network_init(void)
     if (mysql_socket_listen(unix_sock, (int)back_log) < 0)
       sql_print_warning("listen() on Unix socket failed with error %d",
           socket_errno);
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+    (void) fcntl(mysql_socket_getfd(unix_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
   }
 #endif
   DBUG_PRINT("info",("server started"));
@@ -5877,6 +5883,14 @@ int mysqld_main(int argc, char **argv)
   /* Initialize audit interface globals. Audit plugins are inited later. */
   mysql_audit_initialize();
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    select_thread_in_use= 0;
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
   /*
     Perform basic logger initialization logger. Should be called after
     MY_INIT, as it initializes mutexes. Log tables are inited later.
@@ -6171,13 +6185,6 @@ int mysqld_main(int argc, char **argv)
     unireg_abort(1);
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (wsrep_recovery)
-  {
-    select_thread_in_use= 0;
-    wsrep_recover();
-    unireg_abort(0);
-  }
-
   if (opt_bootstrap)
   {
     /*! bootstrap wsrep init was taken care of above */
@@ -6947,6 +6954,9 @@ void handle_connections_sockets()
         sleep(1);       // Give other threads some time
       continue;
     }
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+    (void) fcntl(mysql_socket_getfd(new_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_LIBWRAP
     {
