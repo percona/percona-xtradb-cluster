@@ -4,7 +4,7 @@
  |Percona XtraDB Cluster| 5.5.30-23.7.4
 ========================================
 
-Percona is glad to announce the release of |Percona XtraDB Cluster| on April 16th, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.5.30-23.7.4/>`_ or from our :doc:`software repositories </installation>`.
+Percona is glad to announce the release of |Percona XtraDB Cluster| on April 17th, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.5.30-23.7.4/>`_ or from our :doc:`software repositories </installation>`.
 
 This is an General Availability release. We did our best to eliminate bugs and problems during the testing release, but this is a software, so bugs are expected. If you encounter them, please report them to our `bug tracking system <https://bugs.launchpad.net/percona-xtradb-cluster/+filebug>`_.
 
@@ -13,7 +13,7 @@ New Features
 
  |Percona XtraDB Cluster| has implemented initial implementation of weighted quorum. Weight for node can be assigned via :variable:`pc.weight` option in the :variable:`wsrep_provider_options` variable. Accepted values are in the range [0, 255] (inclusive). Quorum is computed using weighted sum over group members.
 
- |Percona XtraDB Cluster| will now be shipped with the ``libjemalloc`` library. Benchmark showing the impact of memory allocators on |MySQL| performance can be found in this `blogpost <http://www.mysqlperformanceblog.com/2012/07/05/impact-of-memory-allocators-on-mysql-performance/>`_.
+ |Percona XtraDB Cluster| binary will now be shipped with the ``libjemalloc`` library. For ``rpm/deb`` packages, this library will be available for download from our repositories. Benchmark showing the impact of memory allocators on |MySQL| performance can be found in this `blogpost <http://www.mysqlperformanceblog.com/2012/07/05/impact-of-memory-allocators-on-mysql-performance/>`_.
 
  This release of |Percona XtraDB Cluster| has fixed number of foreign key and packaging bugs.
 
