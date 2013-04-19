@@ -115,6 +115,40 @@ static my_bool defaults_already_read= FALSE;
 /* The only purpose of this global array is to hold full name of my.cnf
  * which seems to be otherwise unavailable */
 char wsrep_defaults_file[FN_REFLEN + 10]={0,};
+/* Command-line only option to start a new wsrep service instance */
+#define WSREP_NEW_CLUSTER1 "--wsrep-new-cluster"
+#define WSREP_NEW_CLUSTER2 "--wsrep_new_cluster"
+/* This one is set to true when --wsrep-new-cluster is found in the command
+ * line arguments */
+my_bool wsrep_new_cluster= FALSE;
+/* Finds and removes --wsrep-new-cluster from the arguments list.
+ * Returns true if found. */
+static my_bool find_wsrep_new_cluster (int* argc, char* argv[])
+{
+  my_bool ret= FALSE;
+  int i;
+
+  for (i= *argc - 1; i > 0; i--)
+  {
+    if (!strcmp(argv[i], WSREP_NEW_CLUSTER1) ||
+        !strcmp(argv[i], WSREP_NEW_CLUSTER2))
+    {
+      ret= TRUE;
+      *argc -= 1;
+      if (*argc == i)
+      { // last argument, just zero it up
+        argv[i]= NULL;
+      }
+      else
+      { // not the last argument, copy the last one over and zero that up.
+        argv[i]= argv[*argc];
+        argv[*argc]= NULL;
+      }
+    }
+  }
+
+  return ret;
+}
 #endif /* WITH_WREP */
 /* Set to TRUE, if --no-defaults is found. */
 static my_bool found_no_defaults= FALSE;

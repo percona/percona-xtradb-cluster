@@ -30,9 +30,6 @@ my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
  */
 
 const char* wsrep_data_home_dir = NULL;
-
-#define WSREP_NODE_INCOMING_AUTO "AUTO"
-const char* wsrep_node_incoming_address = WSREP_NODE_INCOMING_AUTO;
 const char* wsrep_dbug_option   = "";
 
 long    wsrep_slave_threads            = 1; // # of slave action appliers wanted
@@ -50,7 +47,7 @@ long    wsrep_max_protocol_version     = 2; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
-my_bool wsrep_log_conflicts            = 0; // 
+my_bool wsrep_log_conflicts            = 0;
 ulong  wsrep_mysql_replication_bundle  = 0;
 
 /*
@@ -58,10 +55,6 @@ ulong  wsrep_mysql_replication_bundle  = 0;
  */
 
 static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
-const wsrep_uuid_t* wsrep_cluster_uuid()
-{
-  return &cluster_uuid;
-}
 static char         cluster_uuid_str[40]= { 0, };
 static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 {
@@ -103,11 +96,27 @@ static my_bool   wsrep_startup = TRUE;
 // action execute callback
 extern wsrep_status_t wsrep_apply_cb(void *ctx,
                                      const void* buf, size_t buf_len,
-                                     wsrep_seqno_t global_seqno);
+                                     const wsrep_trx_meta_t* meta);
 
-extern wsrep_status_t wsrep_commit_cb  (void *ctx,
-                                        wsrep_seqno_t global_seqno,
-                                        bool commit);
+extern wsrep_status_t wsrep_commit_cb(void *ctx,
+                                      const wsrep_trx_meta_t* meta,
+                                      bool commit);
+
+static wsrep_status_t wsrep_unordered_cb(void*       ctx,
+                                         const void* data,
+                                         size_t      size)
+{
+    return WSREP_OK;
+}
+
+static wsrep_status_t wsrep_expand_cb(void*               ctx,
+                                      const void*         data,
+                                      size_t              size,
+                                      wsrep_stream_t      type,
+                                      const wsrep_uuid_t* producer)
+{
+    return WSREP_OK;
+}
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
@@ -412,6 +421,7 @@ static void wsrep_init_position()
   }
 }
 
+extern char* my_bind_addr_str;
 
 int wsrep_init()
 {
@@ -463,10 +473,10 @@ int wsrep_init()
     wsrep_data_home_dir = mysql_real_data_home;
 
   char node_addr[512]= { 0, };
+  size_t const node_addr_max= sizeof(node_addr) - 1;
   if (!wsrep_node_address || !strcmp(wsrep_node_address, ""))
   {
-    size_t const node_addr_max= sizeof(node_addr);
-    size_t const ret= guess_ip(node_addr, node_addr_max);
+    size_t const ret= wsrep_guess_ip(node_addr, node_addr_max);
     if (!(ret > 0 && ret < node_addr_max))
     {
       WSREP_WARN("Failed to guess base node address. Set it explicitly via "
@@ -476,49 +486,86 @@ int wsrep_init()
   }
   else
   {
-    strncpy(node_addr, wsrep_node_address, sizeof(node_addr) - 1);
+    strncpy(node_addr, wsrep_node_address, node_addr_max);
   }
 
-  static char inc_addr[512]= { 0, };
-
+  char inc_addr[512]= { 0, };
+  size_t const inc_addr_max= sizeof (inc_addr);
   if ((!wsrep_node_incoming_address ||
        !strcmp (wsrep_node_incoming_address, WSREP_NODE_INCOMING_AUTO)))
   {
-    size_t const node_addr_len= strlen(node_addr);
-    if (node_addr_len > 0)
+    unsigned int my_bind_ip= INADDR_ANY; // default if not set
+    if (my_bind_addr_str && strlen(my_bind_addr_str))
     {
-      const char* const colon= strrchr(node_addr, ':');
-      if (strchr(node_addr, ':') == colon) // 1 or 0 ':'
+      my_bind_ip= wsrep_check_ip(my_bind_addr_str);
+    }
+
+    if (INADDR_ANY != my_bind_ip)
+    {
+      if (INADDR_NONE != my_bind_ip && INADDR_LOOPBACK != my_bind_ip)
       {
-        size_t const inc_addr_max= sizeof (inc_addr);
-        size_t const ip_len= colon ? colon - node_addr : node_addr_len;
-        if (ip_len + 7 /* :55555\0 */ < inc_addr_max)
+        snprintf(inc_addr, inc_addr_max, "%s:%u",
+                 my_bind_addr_str, (int)mysqld_port);
+      } // else leave inc_addr an empty string - mysqld is not listening for
+        // client connections on network interfaces.
+    }
+    else // mysqld binds to 0.0.0.0, take IP from wsrep_node_address if possible
+    {
+      size_t const node_addr_len= strlen(node_addr);
+      if (node_addr_len > 0)
+      {
+        const char* const colon= strrchr(node_addr, ':');
+        if (strchr(node_addr, ':') == colon) // 1 or 0 ':'
         {
-          memcpy (inc_addr, node_addr, ip_len);
-          snprintf(inc_addr + ip_len, inc_addr_max - ip_len, ":%u",mysqld_port);
+          size_t const ip_len= colon ? colon - node_addr : node_addr_len;
+          if (ip_len + 7 /* :55555\0 */ < inc_addr_max)
+          {
+            memcpy (inc_addr, node_addr, ip_len);
+            snprintf(inc_addr + ip_len, inc_addr_max - ip_len, ":%u",
+                     (int)mysqld_port);
+          }
+          else
+          {
+            WSREP_WARN("Guessing address for incoming client connections: "
+                       "address too long.");
+            inc_addr[0]= '\0';
+          }
         }
         else
         {
           WSREP_WARN("Guessing address for incoming client connections: "
-                     "address too long.");
+                     "too many colons :) .");
           inc_addr[0]= '\0';
         }
       }
-      else
+
+      if (!strlen(inc_addr))
       {
-        WSREP_WARN("Guessing address for incoming client connections: "
-                   "too many colons :) .");
-        inc_addr[0]= '\0';
+          WSREP_WARN("Guessing address for incoming client connections failed. "
+                     "Try setting wsrep_node_incoming_address explicitly.");
       }
     }
-
-    // this is to display detected address on SHOW VARIABLES...
-    wsrep_node_incoming_address = inc_addr;
-
-    if (!strlen(wsrep_node_incoming_address))
+  }
+  else if (!strchr(wsrep_node_incoming_address, ':')) // no port included
+  {
+    if ((int)inc_addr_max <=
+        snprintf(inc_addr, inc_addr_max, "%s:%u",
+                 wsrep_node_incoming_address,(int)mysqld_port))
     {
-        WSREP_WARN("Guessing address for incoming client connections failed. "
-                   "Try setting wsrep_node_incoming_address explicitly.");
+      WSREP_WARN("Guessing address for incoming client connections: "
+                 "address too long.");
+      inc_addr[0]= '\0';
+    }
+  }
+  else
+  {
+    size_t const need = strlen (wsrep_node_incoming_address);
+    if (need >= inc_addr_max) {
+      WSREP_WARN("wsrep_node_incoming_address too long: %zu", need);
+      inc_addr[0]= '\0';
+    }
+    else {
+      memcpy (inc_addr, wsrep_node_incoming_address, need);
     }
   }
 
@@ -527,7 +574,7 @@ int wsrep_init()
   wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
   wsrep_args.node_address    = node_addr;
-  wsrep_args.node_incoming   = wsrep_node_incoming_address;
+  wsrep_args.node_incoming   = inc_addr;
   wsrep_args.options         = (wsrep_provider_options) ?
                                 wsrep_provider_options : "";
   wsrep_args.proto_ver       = wsrep_max_protocol_version;
@@ -539,6 +586,8 @@ int wsrep_init()
   wsrep_args.view_handler_cb = wsrep_view_handler_cb;
   wsrep_args.apply_cb        = wsrep_apply_cb;
   wsrep_args.commit_cb       = wsrep_commit_cb;
+  wsrep_args.unordered_cb    = wsrep_unordered_cb;
+  wsrep_args.expand_cb       = wsrep_expand_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
 
@@ -636,6 +685,8 @@ void wsrep_stop_replication(THD *thd)
 }
 
 
+extern my_bool wsrep_new_cluster;
+
 bool wsrep_start_replication()
 {
   wsrep_status_t rcode;
@@ -659,12 +710,16 @@ bool wsrep_start_replication()
     return true;
   }
 
+  bool const bootstrap(TRUE == wsrep_new_cluster);
+  wsrep_new_cluster= FALSE;
+
   WSREP_INFO("Start replication");
 
   if ((rcode = wsrep->connect(wsrep,
                               wsrep_cluster_name,
                               wsrep_cluster_address,
-                              wsrep_sst_donor)))
+                              wsrep_sst_donor,
+                              bootstrap)))
   {
     if (-ESOCKTNOSUPPORT == rcode)
     {
@@ -714,8 +769,8 @@ wsrep_causal_wait (THD* thd)
   {
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
-    wsrep_seqno_t  seqno;
-    wsrep_status_t ret= wsrep->causal_read (wsrep, &seqno);
+    wsrep_gtid_t  gtid;
+    wsrep_status_t ret= wsrep->causal_read (wsrep, &gtid);
 
     if (unlikely(WSREP_OK != ret))
     {
@@ -763,7 +818,7 @@ static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 {
     for (size_t i= 0; i < key_arr->keys_len; ++i)
     {
-        my_free((wsrep_key_part_t*)key_arr->keys[i].key_parts);
+        my_free((void*)key_arr->keys[i].key_parts);
     }
     my_free(key_arr->keys);
     key_arr->keys= 0;
@@ -783,8 +838,8 @@ static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 
 static bool wsrep_prepare_key_for_isolation(const char* db,
                                             const char* table,
-                                            wsrep_key_part_t* key,
-                                            size_t* key_len)
+                                            wsrep_buf_t* key,
+                                            long* key_len)
 {
     if (*key_len < 2) return false;
 
@@ -802,13 +857,13 @@ static bool wsrep_prepare_key_for_isolation(const char* db,
             // sql_print_information("%s.%s", db, table);
             if (db)
             {
-                key[*key_len].buf= db;
-                key[*key_len].buf_len= strlen(db);
+                key[*key_len].ptr= db;
+                key[*key_len].len= strlen(db);
                 ++(*key_len);
                 if (table)
                 {
-                    key[*key_len].buf=     table;
-                    key[*key_len].buf_len= strlen(table);
+                    key[*key_len].ptr= table;
+                    key[*key_len].len= strlen(table);
                     ++(*key_len);
                 }
             }
@@ -850,23 +905,23 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
         {
             if (!(ka->keys= (wsrep_key_t*)my_malloc(sizeof(wsrep_key_t), MYF(0))))
             {
-                sql_print_error("Can't allocate memory for key_array");
+                WSREP_ERROR("Can't allocate memory for key_array");
                 goto err;
             }
             ka->keys_len= 1;
-            if (!(ka->keys[0].key_parts= (wsrep_key_part_t*)
-                  my_malloc(sizeof(wsrep_key_part_t)*2, MYF(0))))
+            if (!(ka->keys[0].key_parts= (wsrep_buf_t*)
+                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
             {
-                sql_print_error("Can't allocate memory for key_parts");
+                WSREP_ERROR("Can't allocate memory for key_parts");
                 goto err;
             }
-            ka->keys[0].key_parts_len= 2;
+            ka->keys[0].key_parts_num= 2;
             if (!wsrep_prepare_key_for_isolation(
                     db, table,
-                    (wsrep_key_part_t*)ka->keys[0].key_parts,
-                    &ka->keys[0].key_parts_len))
+                    (wsrep_buf_t*)ka->keys[0].key_parts,
+                    &ka->keys[0].key_parts_num))
             {
-                sql_print_error("Preparing keys for isolation failed");
+                WSREP_ERROR("Preparing keys for isolation failed");
                 goto err;
             }
         }
@@ -881,24 +936,24 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
                 ka->keys, (ka->keys_len + 1) * sizeof(wsrep_key_t), MYF(0));
             if (!tmp)
             {
-                sql_print_error("Can't allocate memory for key_array");
+                WSREP_ERROR("Can't allocate memory for key_array");
                 goto err;
             }
             ka->keys= tmp;
-            if (!(ka->keys[ka->keys_len].key_parts= (wsrep_key_part_t*)
-                  my_malloc(sizeof(wsrep_key_part_t)*2, MYF(0))))
+            if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*)
+                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
             {
-                sql_print_error("Can't allocate memory for key_parts");
+                WSREP_ERROR("Can't allocate memory for key_parts");
                 goto err;
             }
-            ka->keys[ka->keys_len].key_parts_len= 2;
+            ka->keys[ka->keys_len].key_parts_num= 2;
             ++ka->keys_len;
             if (!wsrep_prepare_key_for_isolation(
                     table->db, table->table_name,
-                    (wsrep_key_part_t*)ka->keys[ka->keys_len - 1].key_parts,
-                    &ka->keys[ka->keys_len - 1].key_parts_len))
+                    (wsrep_buf_t*)ka->keys[ka->keys_len - 1].key_parts,
+                    &ka->keys[ka->keys_len - 1].key_parts_num))
             {
-                sql_print_error("Preparing keys for isolation failed");
+                WSREP_ERROR("Preparing keys for isolation failed");
                 goto err;
             }
         }
@@ -915,8 +970,8 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
 				  size_t cache_key_len,
                                   const uchar* row_id,
                                   size_t row_id_len,
-                                  wsrep_key_part_t* key,
-                                  size_t* key_len)
+                                  wsrep_buf_t* key,
+                                  long* key_len)
 {
     if (*key_len < 3) return false;
 
@@ -925,28 +980,30 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
     {
     case 0:
     {
-        key[*key_len].buf     = cache_key;
-        key[*key_len].buf_len = cache_key_len;
-        ++(*key_len);
+        key[0].ptr = cache_key;
+        key[0].len = cache_key_len;
+
+        *key_len = 1;
         break;
     }
     case 1:
     case 2:
     {
-        key[*key_len].buf     = cache_key;
-        key[*key_len].buf_len = strlen( (char*)cache_key );
-        ++(*key_len);
-        key[*key_len].buf     = cache_key + strlen( (char*)cache_key ) + 1;
-        key[*key_len].buf_len = strlen( (char*)(key[*key_len].buf) );
-        ++(*key_len);
+        key[0].ptr = cache_key;
+        key[0].len = strlen( (char*)cache_key );
+
+        key[1].ptr = cache_key + strlen( (char*)cache_key ) + 1;
+        key[1].len = strlen( (char*)(key[1].ptr) );
+
+        *key_len = 2;
         break;
     }
     default:
         return false;
     }
 
-    key[*key_len].buf     = row_id;
-    key[*key_len].buf_len = row_id_len;
+    key[*key_len].ptr = row_id;
+    key[*key_len].len = row_id_len;
     ++(*key_len);
 
     return true;
@@ -1055,7 +1112,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   uint buf_len(0);
   int buf_err;
 
-  WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
 	      thd->wsrep_exec_mode, thd->query() );
   switch (thd->lex->sql_command)
   {
@@ -1084,13 +1141,13 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
                                                  key_arr.keys, key_arr.keys_len,
                                                  buf, buf_len,
-                                                 &thd->wsrep_trx_seqno)))
+                                                 &thd->wsrep_trx_meta)))
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
     wsrep_to_isolation++;
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
-    WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)thd->wsrep_trx_seqno,
+    WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
 		thd->wsrep_exec_mode);
   }
   else {
@@ -1110,10 +1167,10 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
 static void wsrep_TOI_end(THD *thd) {
   wsrep_status_t ret;
   wsrep_to_isolation--;
-  WSREP_DEBUG("TO END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("TO END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void")
     if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
-      WSREP_DEBUG("TO END: %lld", (long long)thd->wsrep_trx_seqno);
+      WSREP_DEBUG("TO END: %lld", (long long)wsrep_thd_trx_seqno(thd));
     }
     else {
       WSREP_WARN("TO isolation end failed for: %d, sql: %s",
@@ -1124,7 +1181,7 @@ static void wsrep_TOI_end(THD *thd) {
 static int wsrep_RSU_begin(THD *thd, char *db_, char *table_) 
 {
   wsrep_status_t ret(WSREP_WARNING);
-  WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, thd->query() );
 
   ret = wsrep->desync(wsrep);
@@ -1169,7 +1226,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
 static void wsrep_RSU_end(THD *thd)
 {
   wsrep_status_t ret(WSREP_WARNING);
-  WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)thd->wsrep_trx_seqno,
+  WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, thd->query() );
 
 
@@ -1243,10 +1300,10 @@ void wsrep_to_isolation_end(THD *thd) {
       "request: (%lu \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)\n"      \
       "granted: (%lu \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)",       \
       msg,                                                                     \
-      req->thread_id, (long long)req->wsrep_trx_seqno,                         \
+      req->thread_id, (long long)wsrep_thd_trx_seqno(req),                     \
       req->wsrep_exec_mode, req->wsrep_query_state, req->wsrep_conflict_state, \
-      req->get_command(), req->lex->sql_command, req->query(),		\
-      gra->thread_id, (long long)gra->wsrep_trx_seqno,                         \
+      req->get_command(), req->lex->sql_command, req->query(),		       \
+      gra->thread_id, (long long)wsrep_thd_trx_seqno(gra),                     \
       gra->wsrep_exec_mode, gra->wsrep_query_state, gra->wsrep_conflict_state, \
       gra->get_command(), gra->lex->sql_command, gra->query());
 

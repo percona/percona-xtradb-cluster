@@ -380,9 +380,6 @@ static mysql_cond_t COND_thread_cache, COND_flush_thread_cache;
 
 /* Global variables */
 
-#ifdef WITH_WSREP
-ulong my_bind_addr;
-#endif /* WITH_WSREP */
 bool opt_bin_log, opt_ignore_builtin_innodb= 0;
 my_bool opt_log, opt_slow_log, opt_log_raw;
 ulonglong log_output_options;
@@ -2469,6 +2466,9 @@ static void network_init(void)
           socket_errno);
       unireg_abort(1);
     }
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    (void) fcntl(mysql_socket_getfd(ip_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
   }
 
 #ifdef _WIN32
@@ -2565,7 +2565,10 @@ static void network_init(void)
     if (mysql_socket_listen(unix_sock, (int)back_log) < 0)
       sql_print_warning("listen() on Unix socket failed with error %d",
           socket_errno);
-  }
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    (void) fcntl(mysql_socket_getfd(unix_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
+   }
 #endif
   DBUG_PRINT("info",("server started"));
   DBUG_VOID_RETURN;
@@ -6947,6 +6950,9 @@ void handle_connections_sockets()
         sleep(1);       // Give other threads some time
       continue;
     }
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    (void) fcntl(mysql_socket_getfd(new_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_LIBWRAP
     {

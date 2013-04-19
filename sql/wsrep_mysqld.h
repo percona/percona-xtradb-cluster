@@ -28,7 +28,6 @@ class THD;
 
 #ifdef WITH_WSREP
 #include "../wsrep/wsrep_api.h"
-//#include "wsrep_mysqld.h"
   enum wsrep_exec_mode {
     LOCAL_STATE,
     REPL_RECV,
@@ -114,7 +113,9 @@ extern const char* wsrep_provider_vendor;
 extern int         wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
 extern void        wsrep_free_status(THD *thd);
 
-#define WSREP_SST_ADDRESS_AUTO "AUTO"
+#define WSREP_SST_ADDRESS_AUTO   "AUTO"
+#define WSREP_NODE_INCOMING_AUTO "AUTO"
+
 // MySQL variables funcs
 
 #define CHECK_ARGS   (sys_var *self, THD* thd, set_var *var)
@@ -373,7 +374,6 @@ int wsrep_create_sp(THD *thd, uchar** buf, uint* buf_len);
 int wsrep_create_trigger_query(THD *thd, uchar** buf, uint* buf_len);
 int wsrep_create_event_query(THD *thd, uchar** buf, uint* buf_len);
 
-const wsrep_uuid_t* wsrep_cluster_uuid();
 struct xid_t;
 void wsrep_set_SE_checkpoint(xid_t*);
 

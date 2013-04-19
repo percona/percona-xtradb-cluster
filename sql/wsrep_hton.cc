@@ -335,7 +335,7 @@ wsrep_run_wsrep_commit(
                               rbr_data,
                               data_len,
                               (thd->wsrep_PA_safe) ? WSREP_FLAG_PA_SAFE : 0ULL,
-                              &thd->wsrep_trx_seqno);
+                              &thd->wsrep_trx_meta);
     if (rcode == WSREP_TRX_MISSING) {
       rcode = WSREP_OK;
     } else if (rcode == WSREP_BF_ABORT) {
@@ -369,8 +369,8 @@ wsrep_run_wsrep_commit(
     if (thd->transaction.xid_state.xid.get_my_xid())
     {
       wsrep_xid_init(&thd->transaction.xid_state.xid,
-                     wsrep_cluster_uuid(),
-                     thd->wsrep_trx_seqno);
+                     &thd->wsrep_trx_meta.gtid.uuid,
+                     thd->wsrep_trx_meta.gtid.seqno);
     }
     DBUG_PRINT("wsrep", ("replicating commit success"));
 

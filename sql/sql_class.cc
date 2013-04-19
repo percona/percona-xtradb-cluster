@@ -928,7 +928,7 @@ extern "C" my_thread_id wsrep_thd_thread_id(THD *thd)
 }
 extern "C" wsrep_seqno_t wsrep_thd_trx_seqno(THD *thd) 
 {
-  return (thd) ? thd->wsrep_trx_seqno : -1;
+  return (thd) ? thd->wsrep_trx_meta.gtid.seqno : -1;
 }
 extern "C" query_id_t wsrep_thd_query_id(THD *thd) 
 {
@@ -965,16 +965,16 @@ extern "C" void wsrep_thd_awake(THD *thd, my_bool signal)
 extern int
 wsrep_trx_order_before(void *thd1, void *thd2)
 {
-	if (((THD*)thd1)->wsrep_trx_seqno < ((THD*)thd2)->wsrep_trx_seqno) {
-	  WSREP_DEBUG("BF conflict, order: %lld %lld\n",
-		      (long long)((THD*)thd1)->wsrep_trx_seqno,
-		      (long long)((THD*)thd2)->wsrep_trx_seqno);
-	  return 1;
-	}
-	WSREP_DEBUG("waiting for BF, trx order: %lld %lld\n",
-		    (long long)((THD*)thd1)->wsrep_trx_seqno,
-		    (long long)((THD*)thd2)->wsrep_trx_seqno);
-	return 0;
+    if (wsrep_thd_trx_seqno((THD*)thd1) < wsrep_thd_trx_seqno((THD*)thd2)) {
+        WSREP_DEBUG("BF conflict, order: %lld %lld\n",
+                    (long long)wsrep_thd_trx_seqno((THD*)thd1),
+                    (long long)wsrep_thd_trx_seqno((THD*)thd2));
+        return 1;
+    }
+    WSREP_DEBUG("waiting for BF, trx order: %lld %lld\n",
+                (long long)wsrep_thd_trx_seqno((THD*)thd1),
+                (long long)wsrep_thd_trx_seqno((THD*)thd2));
+    return 0;
 }
 extern "C" int
 wsrep_trx_is_aborting(void *thd_ptr)
@@ -1582,7 +1582,8 @@ void THD::init(void)
   wsrep_conflict_state= NO_CONFLICT;
   wsrep_query_state= QUERY_IDLE;
   wsrep_last_query_id= 0;
-  wsrep_trx_seqno= 0;
+  wsrep_trx_meta.gtid= WSREP_GTID_UNDEFINED;
+  wsrep_trx_meta.depends_on= WSREP_SEQNO_UNDEFINED;
   wsrep_converted_lock_session= false;
   wsrep_retry_counter= 0;
   wsrep_rli= NULL;
