@@ -2568,7 +2568,7 @@ static void network_init(void)
 #if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
     (void) fcntl(mysql_socket_getfd(unix_sock), F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */
-   }
+  }
 #endif
   DBUG_PRINT("info",("server started"));
   DBUG_VOID_RETURN;
@@ -5880,6 +5880,14 @@ int mysqld_main(int argc, char **argv)
   /* Initialize audit interface globals. Audit plugins are inited later. */
   mysql_audit_initialize();
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    select_thread_in_use= 0;
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
   /*
     Perform basic logger initialization logger. Should be called after
     MY_INIT, as it initializes mutexes. Log tables are inited later.
@@ -6174,13 +6182,6 @@ int mysqld_main(int argc, char **argv)
     unireg_abort(1);
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (wsrep_recovery)
-  {
-    select_thread_in_use= 0;
-    wsrep_recover();
-    unireg_abort(0);
-  }
-
   if (opt_bootstrap)
   {
     /*! bootstrap wsrep init was taken care of above */
