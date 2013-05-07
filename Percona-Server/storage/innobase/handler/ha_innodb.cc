@@ -85,6 +85,7 @@ extern "C" {
 #include "row0sel.h"
 #include "row0upd.h"
 #include "log0log.h"
+#include "log0online.h"
 #include "lock0lock.h"
 #include "dict0crea.h"
 #include "btr0cur.h"
@@ -233,6 +234,7 @@ static ulong    innobase_sys_stats_root_page		= 0;
 #endif
 static my_bool	innobase_buffer_pool_shm_checksum	= TRUE;
 static uint	innobase_buffer_pool_shm_key		= 0;
+static ulong	srv_lazy_drop_table			= 0;
 
 
 static char*	internal_innobase_data_file_path	= NULL;
@@ -329,6 +331,7 @@ static PSI_mutex_info all_innodb_mutexes[] = {
 	{&ibuf_pessimistic_insert_mutex_key,
 		 "ibuf_pessimistic_insert_mutex", 0},
 	{&kernel_mutex_key, "kernel_mutex", 0},
+	{&log_bmp_sys_mutex_key, "log_bmp_sys_mutex", 0},
 	{&log_sys_mutex_key, "log_sys_mutex", 0},
 #  ifdef UNIV_MEM_DEBUG
 	{&mem_hash_mutex_key, "mem_hash_mutex", 0},
@@ -470,6 +473,25 @@ uint
 innobase_alter_table_flags(
 /*=======================*/
 	uint	flags);
+/************************************************************//**
+Synchronously read and parse the redo log up to the last
+checkpoint to write the changed page bitmap.
+@return 0 to indicate success.  Current implementation cannot fail. */
+static
+my_bool
+innobase_flush_changed_page_bitmaps();
+/*==================================*/
+/************************************************************//**
+Delete all the bitmap files for data less than the specified LSN.
+If called with lsn == 0 (i.e. set by RESET request) or
+IB_ULONGLONG_MAX, restart the bitmap file sequence, otherwise
+continue it.
+@return 0 to indicate success, 1 for failure. */
+static
+my_bool
+innobase_purge_changed_page_bitmaps(
+/*================================*/
+	ulonglong lsn);	/*!< in: LSN to purge files up to */
 
 static const char innobase_hton_name[]= "InnoDB";
 
@@ -703,8 +725,12 @@ static SHOW_VAR innodb_status_variables[]= {
   (char*) &export_vars.innodb_background_log_sync,	  SHOW_LONG},
   {"buffer_pool_pages_data",
   (char*) &export_vars.innodb_buffer_pool_pages_data,	  SHOW_LONG},
+  {"buffer_pool_bytes_data",
+  (char*) &export_vars.innodb_buffer_pool_bytes_data,	  SHOW_LONG},
   {"buffer_pool_pages_dirty",
   (char*) &export_vars.innodb_buffer_pool_pages_dirty,	  SHOW_LONG},
+  {"buffer_pool_bytes_dirty",
+  (char*) &export_vars.innodb_buffer_pool_bytes_dirty,	  SHOW_LONG},
   {"buffer_pool_pages_flushed",
   (char*) &export_vars.innodb_buffer_pool_pages_flushed,  SHOW_LONG},
   {"buffer_pool_pages_LRU_flushed",
@@ -885,6 +911,12 @@ static SHOW_VAR innodb_status_variables[]= {
   (char*) &export_vars.innodb_x_lock_spin_rounds,	  SHOW_LONGLONG},
   {"x_lock_spin_waits",
   (char*) &export_vars.innodb_x_lock_spin_waits,	  SHOW_LONGLONG},
+#ifdef UNIV_DEBUG
+  {"purge_trx_id_age",
+  (char*) &export_vars.innodb_purge_trx_id_age,		  SHOW_LONG},
+  {"purge_view_trx_id_age",
+  (char*) &export_vars.innodb_purge_view_trx_id_age,	  SHOW_LONG},
+#endif /* UNIV_DEBUG */
   {NullS, NullS, SHOW_LONG}
 };
 
@@ -1318,6 +1350,8 @@ convert_error_code_to_mysql(
 		return(HA_ERR_INDEX_CORRUPT);
 	case DB_UNDO_RECORD_TOO_BIG:
 		return(HA_ERR_UNDO_REC_TOO_BIG);
+	case DB_OUT_OF_MEMORY:
+		return(HA_ERR_OUT_OF_MEM);
 	}
 }
 
@@ -1495,100 +1529,6 @@ innobase_get_lower_case_table_names(void)
 	return(lower_case_table_names);
 }
 
-#if defined (__WIN__) && defined (MYSQL_DYNAMIC_PLUGIN)
-extern MYSQL_PLUGIN_IMPORT MY_TMPDIR mysql_tmpdir_list;
-/*******************************************************************//**
-Map an OS error to an errno value. The OS error number is stored in
-_doserrno and the mapped value is stored in errno) */
-extern "C"
-void __cdecl
-_dosmaperr(
-	unsigned long);	/*!< in: OS error value */
-
-/*********************************************************************//**
-Creates a temporary file.
-@return	temporary file descriptor, or < 0 on error */
-extern "C" UNIV_INTERN
-int
-innobase_mysql_tmpfile(void)
-/*========================*/
-{
-	int	fd;				/* handle of opened file */
-	HANDLE	osfh;				/* OS handle of opened file */
-	char*	tmpdir;				/* point to the directory
-						where to create file */
-	TCHAR	path_buf[MAX_PATH - 14];	/* buffer for tmp file path.
-						The length cannot be longer
-						than MAX_PATH - 14, or
-						GetTempFileName will fail. */
-	char	filename[MAX_PATH];		/* name of the tmpfile */
-	DWORD	fileaccess = GENERIC_READ	/* OS file access */
-			     | GENERIC_WRITE
-			     | DELETE;
-	DWORD	fileshare = FILE_SHARE_READ	/* OS file sharing mode */
-			    | FILE_SHARE_WRITE
-			    | FILE_SHARE_DELETE;
-	DWORD	filecreate = CREATE_ALWAYS;	/* OS method of open/create */
-	DWORD	fileattrib =			/* OS file attribute flags */
-			     FILE_ATTRIBUTE_NORMAL
-			     | FILE_FLAG_DELETE_ON_CLOSE
-			     | FILE_ATTRIBUTE_TEMPORARY
-			     | FILE_FLAG_SEQUENTIAL_SCAN;
-
-	DBUG_ENTER("innobase_mysql_tmpfile");
-
-	tmpdir = my_tmpdir(&mysql_tmpdir_list);
-
-	/* The tmpdir parameter can not be NULL for GetTempFileName. */
-	if (!tmpdir) {
-		uint	ret;
-
-		/* Use GetTempPath to determine path for temporary files. */
-		ret = GetTempPath(sizeof(path_buf), path_buf);
-		if (ret > sizeof(path_buf) || (ret == 0)) {
-
-			_dosmaperr(GetLastError());	/* map error */
-			DBUG_RETURN(-1);
-		}
-
-		tmpdir = path_buf;
-	}
-
-	/* Use GetTempFileName to generate a unique filename. */
-	if (!GetTempFileName(tmpdir, "ib", 0, filename)) {
-
-		_dosmaperr(GetLastError());	/* map error */
-		DBUG_RETURN(-1);
-	}
-
-	DBUG_PRINT("info", ("filename: %s", filename));
-
-	/* Open/Create the file. */
-	osfh = CreateFile(filename, fileaccess, fileshare, NULL,
-			  filecreate, fileattrib, NULL);
-	if (osfh == INVALID_HANDLE_VALUE) {
-
-		/* open/create file failed! */
-		_dosmaperr(GetLastError());	/* map error */
-		DBUG_RETURN(-1);
-	}
-
-	do {
-		/* Associates a CRT file descriptor with the OS file handle. */
-		fd = _open_osfhandle((intptr_t) osfh, 0);
-	} while (fd == -1 && errno == EINTR);
-
-	if (fd == -1) {
-		/* Open failed, close the file handle. */
-
-		_dosmaperr(GetLastError());	/* map error */
-		CloseHandle(osfh);		/* no need to check if
-						CloseHandle fails */
-	}
-
-	DBUG_RETURN(fd);
-}
-#else
 /*********************************************************************//**
 Creates a temporary file.
 @return	temporary file descriptor, or < 0 on error */
@@ -1601,7 +1541,15 @@ innobase_mysql_tmpfile(void)
 	os_event_wait(srv_allow_writes_event);
 #endif /* WITH_INNODB_DISALLOW_WRITES */
 	int	fd2 = -1;
-	File	fd = mysql_tmpfile("ib");
+	File	fd;
+
+	DBUG_EXECUTE_IF(
+		"innobase_tmpfile_creation_failure",
+		return(-1);
+	);
+
+	fd = mysql_tmpfile("ib");
+
 	if (fd >= 0) {
 		/* Copy the file descriptor, so that the additional resources
 		allocated by create_temp_file() can be freed by invoking
@@ -1645,7 +1593,6 @@ innobase_mysql_tmpfile(void)
 	}
 	return(fd2);
 }
-#endif /* defined (__WIN__) && defined (MYSQL_DYNAMIC_PLUGIN) */
 
 /*********************************************************************//**
 Wrapper around MySQL's copy_and_convert function.
@@ -1832,7 +1779,7 @@ innobase_trx_init(
 	trx->fake_changes = THDVAR(thd, fake_changes);
 
 #ifdef EXTENDED_SLOWLOG
-	if (thd_log_slow_verbosity(thd) & SLOG_V_INNODB) {
+	if (thd_log_slow_verbosity(thd) & (1ULL << SLOG_V_INNODB)) {
 		trx->take_stats = TRUE;
 	} else {
 		trx->take_stats = FALSE;
@@ -2017,7 +1964,7 @@ trx_is_started(
 /*===========*/
 	trx_t*	trx)	/* in: transaction */
 {
-	return(trx->conc_state != TRX_NOT_STARTED);
+	return(trx->state != TRX_NOT_STARTED);
 }
 
 /*********************************************************************//**
@@ -2722,6 +2669,10 @@ innobase_init(
         innobase_hton->wsrep_get_checkpoint=innobase_wsrep_get_checkpoint;
         innobase_hton->wsrep_fake_trx_id=wsrep_fake_trx_id;
 #endif /* WITH_WSREP */
+	innobase_hton->flush_changed_page_bitmaps
+		= innobase_flush_changed_page_bitmaps;
+	innobase_hton->purge_changed_page_bitmaps
+		= innobase_purge_changed_page_bitmaps;
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
 
@@ -2792,6 +2743,7 @@ innobase_init(
 	} else {
 		srv_log_block_size = 512;
 	}
+	ut_ad (srv_log_block_size >= OS_MIN_LOG_BLOCK_SIZE);
 
 	if (!srv_log_block_size) {
 		fprintf(stderr,
@@ -3117,6 +3069,12 @@ innobase_change_buffering_inited_ok:
 			"InnoDB:          innodb_buffer_pool_shm_key was ignored.\n");
 	}
 
+	if (srv_lazy_drop_table) {
+		fprintf(stderr,
+			"InnoDB: Warning: "
+			"innodb_lazy_drop_table is deprecated and ignored.\n");
+	}
+
 	srv_mem_pool_size = (ulint) innobase_additional_mem_pool_size;
 
 	srv_n_file_io_threads = (ulint) innobase_file_io_threads;
@@ -3341,6 +3299,36 @@ innobase_alter_table_flags(
 		| HA_INPLACE_ADD_PK_INDEX_NO_READ_WRITE);
 }
 
+/************************************************************//**
+Synchronously read and parse the redo log up to the last
+checkpoint to write the changed page bitmap.
+@return 0 to indicate success.  Current implementation cannot fail. */
+static
+my_bool
+innobase_flush_changed_page_bitmaps()
+/*=================================*/
+{
+	if (srv_track_changed_pages) {
+		os_event_reset(srv_checkpoint_completed_event);
+		log_online_follow_redo_log();
+	}
+	return FALSE;
+}
+
+/************************************************************//**
+Delete all the bitmap files for data less than the specified LSN.
+If called with lsn == IB_ULONGLONG_MAX (i.e. set by RESET request),
+restart the bitmap file sequence, otherwise continue it.
+@return 0 to indicate success, 1 for failure. */
+static
+my_bool
+innobase_purge_changed_page_bitmaps(
+/*================================*/
+	ulonglong lsn)	/*!< in: LSN to purge files up to */
+{
+	return (my_bool)log_online_purge_changed_page_bitmaps(lsn);
+}
+
 /****************************************************************//**
 Copy the current replication position from MySQL to a transaction. */
 static
@@ -3381,7 +3369,7 @@ innobase_commit_low(
 		header for undo purposes, see the comment at corresponding call
 		at innobase_xa_prepare(). */
 
-		innobase_copy_repl_coords_to_trx(current_thd, trx);
+		innobase_copy_repl_coords_to_trx((THD *) trx->mysql_thd, trx);
 
 		trx_commit_for_mysql(trx);
 	}
@@ -4709,7 +4697,8 @@ ha_innobase::open(
 		DBUG_RETURN(1);
 	}
 
-	if (srv_pass_corrupt_table <= 1 && share->ib_table && share->ib_table->is_corrupt) {
+	if (UNIV_UNLIKELY(share->ib_table && share->ib_table->is_corrupt &&
+			  srv_pass_corrupt_table <= 1)) {
 		free_share(share);
 
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
@@ -4734,7 +4723,8 @@ retry:
 	/* Get pointer to a table object in InnoDB dictionary cache */
 	ib_table = dict_table_get(norm_name, TRUE);
 
-	if (srv_pass_corrupt_table <= 1 && ib_table && ib_table->is_corrupt) {
+	if (UNIV_UNLIKELY(ib_table && ib_table->is_corrupt &&
+			  srv_pass_corrupt_table <= 1)) {
 		free_share(share);
 		my_free(upd_buf);
 		upd_buf = NULL;
@@ -6768,7 +6758,84 @@ calc_row_difference(
 
 	return(0);
 }
+#ifdef WITH_WSREP
+static
+int
+wsrep_calc_row_hash(
+/*================*/
+	byte*		digest,		/*!< in/out: md5 sum */
+	const uchar*	row,		/*!< in: row in MySQL format */
+	TABLE*		table,		/*!< in: table in MySQL data
+					dictionary */
+	row_prebuilt_t*	prebuilt,	/*!< in: InnoDB prebuilt struct */
+	THD*		thd)		/*!< in: user thread */
+{
+	Field*		field;
+	enum_field_types field_mysql_type;
+	uint		n_fields;
+	ulint		len;
+	const byte*	ptr;
+	ulint		col_type;
+	uint		i;
 
+	my_MD5Context ctx;
+	my_MD5Init (&ctx);
+
+	n_fields = table->s->fields;
+
+	for (i = 0; i < n_fields; i++) {
+		byte null_byte=0;
+		byte true_byte=1;
+
+		field = table->field[i];
+
+		ptr = (const byte*) row + get_field_offset(table, field);
+		len = field->pack_length();
+
+		field_mysql_type = field->type();
+
+		col_type = prebuilt->table->cols[i].mtype;
+
+		switch (col_type) {
+
+		case DATA_BLOB:
+			ptr = row_mysql_read_blob_ref(&len, ptr, len);
+
+			break;
+
+		case DATA_VARCHAR:
+		case DATA_BINARY:
+		case DATA_VARMYSQL:
+			if (field_mysql_type == MYSQL_TYPE_VARCHAR) {
+				/* This is a >= 5.0.3 type true VARCHAR where
+				the real payload data length is stored in
+				1 or 2 bytes */
+
+				ptr = row_mysql_read_true_varchar(
+					&len, ptr,
+					(ulint)
+					(((Field_varstring*)field)->length_bytes));
+
+			}
+
+			break;
+		default:
+			;
+		}
+
+		if (field->null_ptr &&
+		    field_in_record_is_null(table, field, (char*) row)) {
+			my_MD5Update (&ctx, &null_byte, 1);
+		} else {
+			my_MD5Update (&ctx, &true_byte, 1);
+			my_MD5Update (&ctx, ptr, len);
+		}
+	}
+	my_MD5Final (digest, &ctx);
+
+	return(0);
+}
+#endif /* WITH_WSREP */
 /**********************************************************************//**
 Updates a row given as a parameter to a new value. Note that we are given
 whole rows, not just the fields which are updated: this incurs some
@@ -7234,7 +7301,8 @@ ha_innobase::index_read(
 
 	ha_statistic_increment(&SSV::ha_read_key_count);
 
-	if (srv_pass_corrupt_table <= 1 && share->ib_table->is_corrupt) {
+	if (UNIV_UNLIKELY(share->ib_table->is_corrupt &&
+			  srv_pass_corrupt_table <= 1)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
 
@@ -7305,7 +7373,8 @@ ha_innobase::index_read(
 		ret = DB_UNSUPPORTED;
 	}
 
-	if (srv_pass_corrupt_table <= 1 && share->ib_table->is_corrupt) {
+	if (UNIV_UNLIKELY(share->ib_table->is_corrupt &&
+			  srv_pass_corrupt_table <= 1)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
 
@@ -7423,7 +7492,8 @@ ha_innobase::change_active_index(
 {
 	DBUG_ENTER("change_active_index");
 
-	if (srv_pass_corrupt_table <= 1 && share->ib_table->is_corrupt) {
+	if (UNIV_UNLIKELY(share->ib_table->is_corrupt &&
+			  srv_pass_corrupt_table <= 1)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
 
@@ -7540,7 +7610,8 @@ ha_innobase::general_fetch(
 
 	DBUG_ENTER("general_fetch");
 
-	if (srv_pass_corrupt_table <= 1 && share->ib_table->is_corrupt) {
+	if (UNIV_UNLIKELY(share->ib_table->is_corrupt &&
+			  srv_pass_corrupt_table <= 1)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
 
@@ -7553,7 +7624,8 @@ ha_innobase::general_fetch(
 
 	innodb_srv_conc_exit_innodb(prebuilt->trx);
 
-	if (srv_pass_corrupt_table <= 1 && share->ib_table->is_corrupt) {
+	if (UNIV_UNLIKELY(share->ib_table->is_corrupt &&
+			  srv_pass_corrupt_table <= 1)) {
 		DBUG_RETURN(HA_ERR_CRASHED);
 	}
 
@@ -8068,6 +8140,8 @@ ha_innobase::wsrep_append_keys(
 	const uchar*	record1)	/* in: row in MySQL format */
 {
 	DBUG_ENTER("wsrep_append_keys");
+
+  	bool key_appended = false;
 	trx_t *trx = thd_to_trx(thd);
 
 	if (table_share && table_share->tmp_table  != NO_TMP_TABLE) {
@@ -8079,27 +8153,6 @@ ha_innobase::wsrep_append_keys(
 		DBUG_RETURN(0);
 	}
 
-	/* if no PK, calculate hash of full row, to be the key value */
-	if (prebuilt->clust_index_was_generated && wsrep_certify_nonPK) {
-		uchar digest[16];
-		int rcode;
-
-		MY_MD5_HASH(digest, (uchar *)record0, table->s->reclength);
-		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
-					      (const char*) digest, 16, 
-					      shared))) {
-			DBUG_RETURN(rcode);
-		}
-		if (record1) {
-			MY_MD5_HASH(digest, (uchar *)record1, table->s->reclength);
-			if ((rcode = wsrep_append_key(thd, trx, table_share, 
-						      table,
-						      (const char*) digest, 
-						      16, shared))) {
-				DBUG_RETURN(rcode);
-			}
-		}
-	}
 	if (wsrep_protocol_version == 0) {
 		uint	len;
 		char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
@@ -8138,6 +8191,8 @@ ha_innobase::wsrep_append_keys(
 
 			if (key_info->flags & HA_NOSAME ||
 			    referenced_by_foreign_key()) {
+				if (key_info->flags & HA_NOSAME || shared)
+			  		key_appended = true;
 
 				len = wsrep_store_key_val_for_row(
 					table, i, key0, key_info->key_length, 
@@ -8168,6 +8223,32 @@ ha_innobase::wsrep_append_keys(
 			}
 		}
 	}
+
+	/* if no PK, calculate hash of full row, to be the key value */
+	if (!key_appended && wsrep_certify_nonPK) {
+		uchar digest[16];
+		int rcode;
+
+		wsrep_calc_row_hash(digest, record0, table, prebuilt, thd);
+		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
+					      (const char*) digest, 16, 
+					      shared))) {
+			DBUG_RETURN(rcode);
+		}
+
+		if (record1) {
+			wsrep_calc_row_hash(
+				digest, record1, table, prebuilt, thd);
+			if ((rcode = wsrep_append_key(thd, trx, table_share, 
+						      table,
+						      (const char*) digest, 
+						      16, shared))) {
+				DBUG_RETURN(rcode);
+			}
+		}
+		DBUG_RETURN(0);
+	}
+
 	DBUG_RETURN(0);
 }
 #endif
@@ -9942,7 +10023,7 @@ ha_innobase::info_low(
 
 				prebuilt->trx->op_info = "confirming rows of SYS_STATS to store statistics";
 
-				ut_a(prebuilt->trx->conc_state == TRX_NOT_STARTED);
+				ut_a(!trx_is_started(prebuilt->trx));
 
 				for (index = dict_table_get_first_index(ib_table);
 				     index != NULL;
@@ -9955,7 +10036,7 @@ ha_innobase::info_low(
 					innobase_commit_low(prebuilt->trx);
 				}
 
-				ut_a(prebuilt->trx->conc_state == TRX_NOT_STARTED);
+				ut_a(!trx_is_started(prebuilt->trx));
 			}
 
 			prebuilt->trx->op_info = "updating table statistics";
@@ -11194,23 +11275,26 @@ ha_innobase::external_lock(
 
 	if (trx->n_mysql_tables_in_use == 0) {
 #ifdef EXTENDED_SLOWLOG
-		increment_thd_innodb_stats(thd,
-					(unsigned long long) trx->id,
-					trx->io_reads,
-					trx->io_read,
-					trx->io_reads_wait_timer,
-					trx->lock_que_wait_timer,
-					trx->innodb_que_wait_timer,
-					trx->distinct_page_access);
+		if (UNIV_UNLIKELY(trx->take_stats)) {
+			increment_thd_innodb_stats(thd,
+						   (unsigned long long) trx->id,
+						   trx->io_reads,
+						   trx->io_read,
+						   trx->io_reads_wait_timer,
+						   trx->lock_que_wait_timer,
+						   trx->innodb_que_wait_timer,
+						   trx->distinct_page_access);
 
-		trx->io_reads = 0;
-		trx->io_read = 0;
-		trx->io_reads_wait_timer = 0;
-		trx->lock_que_wait_timer = 0;
-		trx->innodb_que_wait_timer = 0;
-		trx->distinct_page_access = 0;
-		if (trx->distinct_page_access_hash)
-			memset(trx->distinct_page_access_hash, 0, DPAH_SIZE);
+			trx->io_reads = 0;
+			trx->io_read = 0;
+			trx->io_reads_wait_timer = 0;
+			trx->lock_que_wait_timer = 0;
+			trx->innodb_que_wait_timer = 0;
+			trx->distinct_page_access = 0;
+			if (trx->distinct_page_access_hash)
+				memset(trx->distinct_page_access_hash, 0,
+				       DPAH_SIZE);
+		}
 #endif
 
 		trx->mysql_n_tables_locked = 0;
@@ -13502,6 +13586,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 		int rcode = wsrep_innobase_kill_one_trx(
 			bf_thd, bf_trx, victim_trx, signal);
 		mutex_exit(&kernel_mutex);
+		wsrep_srv_conc_cancel_wait(victim_trx);
 		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction");
@@ -13574,7 +13659,8 @@ static MYSQL_SYSVAR_ULONG(page_size, innobase_page_size,
 static MYSQL_SYSVAR_ULONG(log_block_size, innobase_log_block_size,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "###EXPERIMENTAL###: The log block size of the transaction log file. Changing for created log file is not supported. Use on your own risk!",
-  NULL, NULL, (1 << 9)/*512*/, (1 << 9)/*512*/, (1 << UNIV_PAGE_SIZE_SHIFT_MAX), 0);
+  NULL, NULL, (1 << 9)/*512*/, OS_MIN_LOG_BLOCK_SIZE,
+  (1 << UNIV_PAGE_SIZE_SHIFT_MAX), 0);
 
 static MYSQL_SYSVAR_STR(data_home_dir, innobase_data_home_dir,
   PLUGIN_VAR_READONLY,
@@ -13998,7 +14084,7 @@ static MYSQL_SYSVAR_ULONGLONG(max_bitmap_file_size, srv_max_bitmap_file_size,
     "The maximum size of changed page bitmap files",
     NULL, NULL, 100*1024*1024ULL, 4096ULL, ULONGLONG_MAX, 0);
 
-static MYSQL_SYSVAR_ULONGLONG(changed_pages_limit, srv_changed_pages_limit,
+static MYSQL_SYSVAR_ULONGLONG(max_changed_pages, srv_max_changed_pages,
   PLUGIN_VAR_RQCMDARG,
   "The maximum number of rows for "
   "INFORMATION_SCHEMA.INNODB_CHANGED_PAGES table, "
@@ -14062,6 +14148,18 @@ static MYSQL_SYSVAR_UINT(trx_rseg_n_slots_debug, trx_rseg_n_slots_debug,
   PLUGIN_VAR_RQCMDARG,
   "Debug flags for InnoDB to limit TRX_RSEG_N_SLOTS for trx_rsegf_undo_find_free()",
   NULL, NULL, 0, 0, 1024, 0);
+
+static MYSQL_SYSVAR_UINT(limit_optimistic_insert_debug,
+  btr_cur_limit_optimistic_insert_debug, PLUGIN_VAR_RQCMDARG,
+  "Artificially limit the number of records per B-tree page (0=unlimited).",
+  NULL, NULL, 0, 0, UINT_MAX32, 0);
+
+static MYSQL_SYSVAR_BOOL(trx_purge_view_update_only_debug,
+  srv_purge_view_update_only_debug, PLUGIN_VAR_NOCMDARG,
+  "Pause actual purging any delete-marked records, but merely update the purge view. "
+  "It is to create artificially the situation the purge view have been updated "
+  "but the each purges were not done yet.",
+  NULL, NULL, FALSE);
 #endif /* UNIV_DEBUG */
 
 static MYSQL_SYSVAR_LONGLONG(ibuf_max_size, srv_ibuf_max_size,
@@ -14230,8 +14328,7 @@ static	MYSQL_SYSVAR_ENUM(corrupt_table_action, srv_pass_corrupt_table,
 
 static MYSQL_SYSVAR_ULONG(lazy_drop_table, srv_lazy_drop_table,
   PLUGIN_VAR_RQCMDARG,
-  "At deleting tablespace, only miminum needed processes at the time are done. "
-  "e.g. for http://bugs.mysql.com/51325",
+  "[Deprecated option] no effect",
   NULL, NULL, 0, 0, 1, 0);
 
 static MYSQL_SYSVAR_BOOL(locking_fake_changes, srv_fake_changes_locks,
@@ -14240,6 +14337,11 @@ static MYSQL_SYSVAR_BOOL(locking_fake_changes, srv_fake_changes_locks,
   "of X locks for fake changes.  If disabled, fake change transactions will "
   "not take any locks at all.",
   NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_BOOL(print_all_deadlocks, srv_print_all_deadlocks,
+  PLUGIN_VAR_OPCMDARG,
+  "Print all deadlocks to MySQL error log (off by default)",
+  NULL, NULL, FALSE);
 
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(page_size),
@@ -14333,7 +14435,7 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(change_buffering),
   MYSQL_SYSVAR(track_changed_pages),
   MYSQL_SYSVAR(max_bitmap_file_size),
-  MYSQL_SYSVAR(changed_pages_limit),
+  MYSQL_SYSVAR(max_changed_pages),
 #if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG
   MYSQL_SYSVAR(change_buffering_debug),
 #endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
@@ -14350,12 +14452,15 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(rollback_segments),
 #ifdef UNIV_DEBUG
   MYSQL_SYSVAR(trx_rseg_n_slots_debug),
+  MYSQL_SYSVAR(limit_optimistic_insert_debug),
+  MYSQL_SYSVAR(trx_purge_view_update_only_debug),
 #endif /* UNIV_DEBUG */
   MYSQL_SYSVAR(corrupt_table_action),
   MYSQL_SYSVAR(lazy_drop_table),
   MYSQL_SYSVAR(fake_changes),
   MYSQL_SYSVAR(locking_fake_changes),
   MYSQL_SYSVAR(merge_sort_block_size),
+  MYSQL_SYSVAR(print_all_deadlocks),
   NULL
 };
 

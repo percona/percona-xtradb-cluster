@@ -25,17 +25,19 @@
 %define mysql_vendor            Oracle and/or its affiliates
 %define percona_server_vendor	Percona, Inc
 
-%define mysql_version   5.5.29
+%define mysql_version   5.5.30
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define majorversion 29
-%define minorversion 4
+%define majorversion 30
+%define minorversion 2
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
 
 %define mysqld_user     mysql
 %define mysqld_group    mysql
 %define mysqldatadir    /var/lib/mysql
-
+#
+%{!?wsrep_version:%global wsrep_version @@WSREP_VERSION@@}
+#
 %if %{undefined revision}
 %define revision	1
 %endif
@@ -238,7 +240,7 @@ URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
 Provides:       mysql-server
-BuildRequires:  %{distro_buildreq}
+BuildRequires:  %{distro_buildreq} pam-devel
 
 # Think about what you use here since the first step is to
 # run a rm -rf
@@ -263,9 +265,9 @@ be eligible for hot fixes, and boost your team's productivity.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} mysql-libs Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar nc rsync
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar nc rsync
 Provides:       mysql-server MySQL-server Percona-Server-server
-Conflicts:	Percona-Server-server-55 Percona-Server-server-51 mysql-server
+Conflicts:	Percona-Server-server-55 Percona-Server-server-51
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -288,9 +290,9 @@ package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
 %package -n Percona-XtraDB-Cluster-client%{product_suffix}
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
-Requires:       mysql-libs
+Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
 Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
-Conflicts:	Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50 mysql
+Conflicts:	Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
 
 %description -n Percona-XtraDB-Cluster-client%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -314,7 +316,7 @@ Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test Percona-Server-test
-Conflicts:	Percona-Server-test-55 Percona-Server-test-51 mysql-test
+Conflicts:	Percona-Server-test-55 Percona-Server-test-51
 AutoReqProv:    no
 
 %description -n Percona-XtraDB-Cluster-test%{product_suffix}
@@ -338,7 +340,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel Percona-Server-devel
-Conflicts:	Percona-Server-devel-55 Percona-Server-devel-51 mysql-devel
+Conflicts:	Percona-Server-devel-55 Percona-Server-devel-51
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -362,7 +364,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared mysql-libs Percona-Server-shared
-Conflicts:	Percona-Server-shared-55 Percona-Server-shared-51 mysql-libs
+Conflicts:	Percona-Server-shared-55
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -466,12 +468,14 @@ mkdir debug
            -DCMAKE_BUILD_TYPE=Debug \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
+           -DWITH_SSL=system \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+	   -DWITH_PAM=ON
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make ${MAKE_JFLAG}
 )
@@ -485,12 +489,14 @@ mkdir release
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
+           -DWITH_SSL=system \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG}
   cd ../%{src_dir}
@@ -767,21 +773,37 @@ fi
 
 %post -n Percona-XtraDB-Cluster-server%{product_suffix}
 
+if [ X${PERCONA_DEBUG} == X1 ]; then
+        set -x
+fi
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
 mysql_datadir=%{mysqldatadir}
 NEW_VERSION=%{mysql_version}-%{release}
 STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 
-# ----------------------------------------------------------------------
-# Create data directory if needed, check whether upgrade or install
-# ----------------------------------------------------------------------
-if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir; fi
 if [ -f $STATUS_FILE ] ; then
 	SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
 else
 	SERVER_TO_START=''
 fi
+
+if [ $1 -eq 1 ]; then
+# ----------------------------------------------------------------------
+# Create a MySQL user and group. Do not report any problems if it already
+# exists.
+# ----------------------------------------------------------------------
+groupadd -r %{mysqld_group} 2> /dev/null || true
+useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
+  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+# The user may already exist, make sure it has the proper group nevertheless
+# (BUG#12823)
+usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+
+# ----------------------------------------------------------------------
+# Create data directory if needed, check whether upgrade or install
+# ----------------------------------------------------------------------
+if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir; fi
 # echo "Analyzed: SERVER_TO_START=$SERVER_TO_START"
 if [ ! -d $mysql_datadir/mysql ] ; then
 	mkdir $mysql_datadir/mysql;
@@ -790,8 +812,11 @@ else
 	# If the directory exists, we may assume it is an upgrade.
 	echo "MySQL RPM upgrade to version $NEW_VERSION" >> $STATUS_FILE
 fi
-if [ ! -d $mysql_datadir/test ] ; then mkdir $mysql_datadir/test; fi
-
+if [ ! -d $mysql_datadir/test ]; then 
+        mkdir $mysql_datadir/test; 
+fi
+%{_bindir}/mysql_install_db --rpm --user=%{mysqld_user}
+fi 
 # ----------------------------------------------------------------------
 # Make MySQL start/shutdown automatically when the machine does it.
 # ----------------------------------------------------------------------
@@ -806,33 +831,15 @@ elif [ -x /sbin/insserv ] ; then
 fi
 
 # ----------------------------------------------------------------------
-# Create a MySQL user and group. Do not report any problems if it already
-# exists.
-# ----------------------------------------------------------------------
-groupadd -r %{mysqld_group} 2> /dev/null || true
-useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
-  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-# The user may already exist, make sure it has the proper group nevertheless
-# (BUG#12823)
-usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-
-# ----------------------------------------------------------------------
-# Change permissions so that the user that will run the MySQL daemon
-# owns all database files.
-# ----------------------------------------------------------------------
-chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
-
-# ----------------------------------------------------------------------
 # Initiate databases if needed
 # ----------------------------------------------------------------------
-%{_bindir}/mysql_install_db --rpm --user=%{mysqld_user}
-
 # ----------------------------------------------------------------------
 # Upgrade databases if needed would go here - but it cannot be automated yet
 # ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
-# Change permissions again to fix any new files.
+# Change permissions so that the user that will run the MySQL daemon
+# owns all database files.
 # ----------------------------------------------------------------------
 chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
 
@@ -1168,12 +1175,13 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/libmysqlservices.a
 %{_libdir}/mysql/libhsclient.a
 %{_libdir}/libhsclient.la
+%{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libmysql*.so*
+%{_libdir}/libmysql*.so.*
 # Maatkit UDF libs
 %{_libdir}/mysql/plugin/libfnv1a_udf.a
 %{_libdir}/mysql/plugin/libfnv1a_udf.la

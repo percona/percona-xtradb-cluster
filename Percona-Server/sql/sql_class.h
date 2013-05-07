@@ -89,14 +89,14 @@ enum enum_slow_query_log_rate_type {
   SLOG_RT_SESSION, SLOG_RT_QUERY
 };
 #define QPLAN_NONE            0
-#define QPLAN_QC              1 << 0
-#define QPLAN_QC_NO           1 << 1
-#define QPLAN_FULL_SCAN       1 << 2
-#define QPLAN_FULL_JOIN       1 << 3
-#define QPLAN_TMP_TABLE       1 << 4
-#define QPLAN_TMP_DISK        1 << 5
-#define QPLAN_FILESORT        1 << 6
-#define QPLAN_FILESORT_DISK   1 << 7
+#define QPLAN_QC_NO           (1 << 0)
+#define QPLAN_FULL_SCAN       (1 << 1)
+#define QPLAN_FULL_JOIN       (1 << 2)
+#define QPLAN_TMP_TABLE       (1 << 3)
+#define QPLAN_TMP_DISK        (1 << 4)
+#define QPLAN_FILESORT        (1 << 5)
+#define QPLAN_FILESORT_DISK   (1 << 6)
+#define QPLAN_QC              (1 << 7)
 enum enum_log_slow_filter {
   SLOG_F_QC_NO, SLOG_F_FULL_SCAN, SLOG_F_FULL_JOIN,
   SLOG_F_TMP_TABLE, SLOG_F_TMP_DISK, SLOG_F_FILESORT,
@@ -575,6 +575,8 @@ typedef struct system_variables
   double long_query_time_double;
 
   my_bool expand_fast_index_creation;
+  my_bool pseudo_slave_mode;
+
 } SV;
 
 
@@ -1584,6 +1586,7 @@ public:
   Query_cache_tls query_cache_tls;
 #endif
   NET	  net;				// client connection descriptor
+  scheduler_functions *scheduler;       // Scheduler for this connection
   Protocol *protocol;			// Current protocol
   Protocol_text   protocol_text;	// Normal protocol
   Protocol_binary protocol_binary;	// Binary protocol
@@ -1689,18 +1692,6 @@ public:
 
   /*** Following variables used in slow_extended.patch ***/
   /*
-    Variable write_to_slow_log:
-     1) initialized in
-       * sql_connect.cc (log_slow_rate_limit support)
-       * slave.cc       (log_slow_slave_statements support)
-     2) The variable is initialized on the thread startup and remains
-        constant afterwards.  This will change when 
-        LP #712396 ("log_slow_slave_statements not work on replication 
-        threads without RESTART") is implemented.
-     3) An implementation of LP #688646 ("Make query sampling possible by query") should use it.
-  */
-  bool       write_to_slow_log;
-  /*
     Variable bytes_send_old saves value of thd->status_var.bytes_sent
     before query execution.
   */
@@ -1754,6 +1745,9 @@ public:
 
   /* <> 0 if we are inside of trigger or stored function. */
   uint in_sub_stmt;
+
+  /* Do not set socket timeouts for wait_timeout (used with threadpool) */
+  bool skip_wait_timeout;
 
   /* container for handler's private per-connection data */
   Ha_data ha_data[MAX_HA];
@@ -2239,6 +2233,8 @@ public:
   char	     scramble[SCRAMBLE_LENGTH+1];
 
   bool       slave_thread, one_shot_set;
+  bool       extra_port;                        /* If extra connection */
+
   bool	     no_errors;
   uchar      password;
   /**
@@ -2480,6 +2476,7 @@ public:
   {
     mysql_mutex_lock(&LOCK_thd_data);
     active_vio = vio;
+    vio_set_thread_id(vio, pthread_self());
     mysql_mutex_unlock(&LOCK_thd_data);
   }
   inline void clear_active_vio()
@@ -2950,7 +2947,7 @@ public:
     *p_db_length= db_length;
     return FALSE;
   }
-  thd_scheduler scheduler;
+  thd_scheduler event_scheduler;
 
   /* Returns string as 'IP:port' for the client-side
      of the connnection represented
@@ -3859,7 +3856,6 @@ public:
 
 class select_dumpvar :public select_result_interceptor {
   ha_rows row_count;
-  Item_func_set_user_var **set_var_items;
 public:
   List<my_var> var_list;
   select_dumpvar()  { var_list.empty(); row_count= 0;}
@@ -3983,6 +3979,8 @@ inline bool add_group_to_list(THD *thd, Item *item, bool asc)
 {
   return thd->lex->current_select->add_group_to_list(thd, item, asc);
 }
+
+extern pthread_attr_t *get_connection_attrib(void);
 
 #endif /* MYSQL_SERVER */
 

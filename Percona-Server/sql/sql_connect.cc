@@ -565,9 +565,6 @@ static int increment_connection_count(THD* thd, bool use_lock)
   const char* client_string= get_client_host(thd);
   int return_value=          0;
 
-  if (!opt_userstat)
-    return return_value;
-
   if (acl_is_utility_user(thd->security_ctx->user, thd->security_ctx->host,
       thd->security_ctx->ip))
     return return_value;
@@ -1217,7 +1214,7 @@ bool setup_connection_thread_globals(THD *thd)
     close_connection(thd, ER_OUT_OF_RESOURCES);
 #endif
     statistic_increment(aborted_connects,&LOCK_status);
-    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
+    MYSQL_CALLBACK(thd->scheduler, end_thread, (thd, 0));
     return 1;                                   // Error
   }
   return 0;
@@ -1270,8 +1267,9 @@ bool login_connection(THD *thd)
   my_net_set_write_timeout(net, thd->variables.net_write_timeout);
 
   thd->reset_stats();
+
   // Updates global user connection stats.
-  if (increment_connection_count(thd, true))
+  if (opt_userstat && increment_connection_count(thd, true))
     DBUG_RETURN(1);
 
   DBUG_RETURN(0);
@@ -1435,14 +1433,6 @@ bool thd_prepare_connection(THD *thd)
   MYSQL_CONNECTION_START(thd->thread_id, &thd->security_ctx->priv_user[0],
                          (char *) thd->security_ctx->host_or_ip);
 
-  /*
-    If rate limiting of slow log writes is enabled, decide whether to log this 
-    new thread's queries or not. Uses extremely simple algorithm. :)
-  */
-  const ulong& limit= thd->variables.log_slow_rate_limit;
-  thd->write_to_slow_log= opt_slow_query_log_rate_type == SLOG_RT_SESSION &&
-                          (limit == 0 || (thd->thread_id % limit) == 0);
-
   prepare_new_connection_state(thd);
 #ifdef WITH_WSREP
   thd->wsrep_client_thread= 1;
@@ -1466,7 +1456,7 @@ void do_handle_one_connection(THD *thd_arg)
 
   thd->thr_create_utime= my_micro_time();
 
-  if (MYSQL_CALLBACK_ELSE(thread_scheduler, init_new_connection_thread, (), 0))
+  if (MYSQL_CALLBACK_ELSE(thd->scheduler, init_new_connection_thread, (), 0))
   {
 #ifdef WITH_WSREP
     close_connection(thd, ER_OUT_OF_RESOURCES, 1);
@@ -1474,7 +1464,7 @@ void do_handle_one_connection(THD *thd_arg)
     close_connection(thd, ER_OUT_OF_RESOURCES);
 #endif
     statistic_increment(aborted_connects,&LOCK_status);
-    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
+    MYSQL_CALLBACK(thd->scheduler, end_thread, (thd, 0));
     return;
   }
 
@@ -1525,12 +1515,12 @@ void do_handle_one_connection(THD *thd_arg)
     end_connection(thd);
    
 #ifdef WITH_WSREP
-  if (WSREP(thd))
-  {
-    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    thd->wsrep_query_state= QUERY_EXITING;
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  }
+    if (WSREP(thd))
+    {
+        mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+        thd->wsrep_query_state= QUERY_EXITING;
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    }
 #endif
 end_thread:
 #ifdef WITH_WSREP
@@ -1538,10 +1528,14 @@ end_thread:
 #else
     close_connection(thd);
 #endif
-    thd->update_stats(false);
-    update_global_user_stats(thd, create_user, time(NULL));
 
-    if (MYSQL_CALLBACK_ELSE(thread_scheduler, end_thread, (thd, 1), 0))
+    if (unlikely(opt_userstat))
+    {
+      thd->update_stats(false);
+      update_global_user_stats(thd, create_user, time(NULL));
+    }
+
+    if (MYSQL_CALLBACK_ELSE(thd->scheduler, end_thread, (thd, 1), 0))
       return;                                 // Probably no-threads
 
     /*

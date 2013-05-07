@@ -231,7 +231,7 @@ bool foreign_key_prefix(Key *a, Key *b)
 */
 void *thd_get_scheduler_data(THD *thd)
 {
-  return thd->scheduler.data;
+  return thd->event_scheduler.data;
 }
 
 /**
@@ -242,7 +242,7 @@ void *thd_get_scheduler_data(THD *thd)
 */
 void thd_set_scheduler_data(THD *thd, void *data)
 {
-  thd->scheduler.data= data;
+  thd->event_scheduler.data= data;
 }
 
 /**
@@ -254,7 +254,7 @@ void thd_set_scheduler_data(THD *thd, void *data)
 */
 PSI_thread *thd_get_psi(THD *thd)
 {
-  return thd->scheduler.m_psi;
+  return thd->event_scheduler.m_psi;
 }
 
 /**
@@ -277,7 +277,7 @@ ulong thd_get_net_wait_timeout(THD* thd)
 */
 void thd_set_psi(THD *thd, PSI_thread *psi)
 {
-  thd->scheduler.m_psi= psi;
+  thd->event_scheduler.m_psi= psi;
 }
 
 /**
@@ -469,6 +469,18 @@ void thd_set_mysys_var(THD *thd, st_my_thread_var *mysys_var)
 my_socket thd_get_fd(THD *thd)
 {
   return thd->net.vio->sd;
+}
+
+/**
+  Set thread specific environment required for thd cleanup in thread pool.
+
+  @param thd            THD object
+
+  @retval               1 if thread-specific enviroment could be set else 0
+*/
+int thd_store_globals(THD* thd)
+{
+  return thd->store_globals();
 }
 
 /**
@@ -1052,6 +1064,11 @@ THD::THD()
   init_sql_alloc(&main_mem_root, ALLOC_ROOT_MIN_BLOCK_SIZE, 0);
   stmt_arena= this;
   thread_stack= 0;
+  scheduler= thread_scheduler;                 // Will be fixed later
+  event_scheduler.data= 0;
+  event_scheduler.m_psi= 0;
+  skip_wait_timeout= false;
+  extra_port= 0;
   catalog= (char*)"std"; // the only catalog we have for now
   main_security_ctx.init();
   security_ctx= &main_security_ctx;
@@ -1099,8 +1116,8 @@ THD::THD()
 #endif
 #ifndef EMBEDDED_LIBRARY
   mysql_audit_init_thd(this);
-  net.vio=0;
 #endif
+  net.vio=0;
   client_capabilities= 0;                       // minimalistic client
   ull=0;
   system_thread= NON_SYSTEM_THREAD;
@@ -1557,8 +1574,6 @@ void THD::reset_diff_stats(void)
 // Updates 'diff' stats of a THD.
 void THD::update_stats(bool ran_command)
 {
-  if (opt_userstat)
-  {
   diff_total_busy_time+=            busy_time;
   diff_total_cpu_time+=             cpu_time;
   diff_total_bytes_received+=       bytes_received;
@@ -1603,7 +1618,7 @@ void THD::update_stats(bool ran_command)
   /* reset counters to zero to avoid double-counting since values
      are already store in diff_total_*.
   */
-  }
+
   busy_time=            0;
   cpu_time=             0;
   bytes_received=       0;
@@ -1872,33 +1887,8 @@ void THD::awake(THD::killed_state state_to_set)
 #ifdef SIGNAL_WITH_VIO_CLOSE
     if (this != current_thd)
     {
-      /*
-        Before sending a signal, let's close the socket of the thread
-        that is being killed ("this", which is not the current thread).
-        This is to make sure it does not block if the signal is lost.
-        This needs to be done only on platforms where signals are not
-        a reliable interruption mechanism.
-
-        Note that the downside of this mechanism is that we could close
-        the connection while "this" target thread is in the middle of
-        sending a result to the application, thus violating the client-
-        server protocol.
-
-        On the other hand, without closing the socket we have a race
-        condition. If "this" target thread passes the check of
-        thd->killed, and then the current thread runs through
-        THD::awake(), sets the 'killed' flag and completes the
-        signaling, and then the target thread runs into read(), it will
-        block on the socket. As a result of the discussions around
-        Bug#37780, it has been decided that we accept the race
-        condition. A second KILL awakes the target from read().
-
-        If we are killing ourselves, we know that we are not blocked.
-        We also know that we will check thd->killed before we go for
-        reading the next statement.
-      */
-
-      close_active_vio();
+      if(active_vio)
+        vio_shutdown(active_vio, SHUT_RDWR);
     }
 #endif
 
@@ -1907,7 +1897,7 @@ void THD::awake(THD::killed_state state_to_set)
 
     /* Send an event to the scheduler that a thread should be killed. */
     if (!slave_thread)
-      MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (this));
+      MYSQL_CALLBACK(scheduler, post_kill_notification, (this));
   }
 
   /* Broadcast a condition to kick the target if it is waiting on it. */
@@ -2017,7 +2007,7 @@ bool THD::store_globals()
   */
   mysys_var->id= thread_id;
   real_id= pthread_self();                      // For debugging
-
+  vio_set_thread_id(net.vio, real_id);
   /*
     We have to call thr_lock_info_init() again here as THD may have been
     created in another thread
@@ -2080,6 +2070,19 @@ void THD::cleanup_after_query()
     stmt_depends_on_first_successful_insert_id_in_prev_stmt= 0;
     auto_inc_intervals_in_cur_stmt_for_binlog.empty();
     rand_used= 0;
+#ifndef EMBEDDED_LIBRARY
+    /*
+      Clean possible unused INSERT_ID events by current statement.
+      is_update_query() is needed to ignore SET statements:
+        Statements that don't update anything directly and don't
+        used stored functions. This is mostly necessary to ignore
+        statements in binlog between SET INSERT_ID and DML statement
+        which is intended to consume its event (there can be other
+        SET statements between them).
+    */
+    if ((rli_slave || rli_fake) && is_update_query(lex->sql_command))
+      auto_inc_intervals_forced.empty();
+#endif
   }
   if (first_successful_insert_id_in_cur_stmt > 0)
   {
@@ -3326,40 +3329,12 @@ bool select_exists_subselect::send_data(List<Item> &items)
 int select_dumpvar::prepare(List<Item> &list, SELECT_LEX_UNIT *u)
 {
   unit= u;
-  List_iterator_fast<my_var> var_li(var_list);
-  List_iterator_fast<Item> it(list);
-  Item *item;
-  my_var *mv;
-  Item_func_set_user_var **suv;
-  
+
   if (var_list.elements != list.elements)
   {
     my_message(ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT,
                ER(ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT), MYF(0));
     return 1;
-  }
-
-  /*
-    Iterate over the destination variables and mark them as being
-    updated in this query.
-    We need to do this at JOIN::prepare time to ensure proper
-    const detection of Item_func_get_user_var that is determined
-    by the presence of Item_func_set_user_vars
-  */
-
-  suv= set_var_items= (Item_func_set_user_var **) 
-    sql_alloc(sizeof(Item_func_set_user_var *) * list.elements);
-
-  while ((mv= var_li++) && (item= it++))
-  {
-    if (!mv->local)
-    {
-      *suv= new Item_func_set_user_var(mv->s, item);
-      (*suv)->fix_fields(thd, 0);
-    }
-    else
-      *suv= NULL;
-    suv++;
   }
 
   return 0;
@@ -3678,33 +3653,41 @@ bool select_dumpvar::send_data(List<Item> &items)
   List_iterator<Item> it(items);
   Item *item;
   my_var *mv;
-  Item_func_set_user_var **suv;
   DBUG_ENTER("select_dumpvar::send_data");
 
   if (unit->offset_limit_cnt)
   {						// using limit offset,count
     unit->offset_limit_cnt--;
-    DBUG_RETURN(0);
+    DBUG_RETURN(false);
   }
   if (row_count++) 
   {
     my_message(ER_TOO_MANY_ROWS, ER(ER_TOO_MANY_ROWS), MYF(0));
-    DBUG_RETURN(1);
+    DBUG_RETURN(true);
   }
-  for (suv= set_var_items; ((mv= var_li++) && (item= it++)); suv++)
+  while ((mv= var_li++) && (item= it++))
   {
     if (mv->local)
     {
-      DBUG_ASSERT(!*suv);
       if (thd->spcont->set_variable(thd, mv->offset, &item))
-	    DBUG_RETURN(1);
+	    DBUG_RETURN(true);
     }
     else
     {
-      DBUG_ASSERT(*suv);
-      (*suv)->save_item_result(item);
-      if ((*suv)->update())
-        DBUG_RETURN (1);
+      /*
+        Create Item_func_set_user_vars with delayed non-constness. We
+        do this so that Item_get_user_var::const_item() will return
+        the same result during
+        Item_func_set_user_var::save_item_result() as they did during
+        optimization and execution.
+       */
+      Item_func_set_user_var *suv=
+        new Item_func_set_user_var(mv->s, item, true);
+      if (suv->fix_fields(thd, 0))
+        DBUG_RETURN(true);
+      suv->save_item_result(item);
+      if (suv->update())
+        DBUG_RETURN(true);
     }
   }
   DBUG_RETURN(thd->is_error());
@@ -3756,8 +3739,10 @@ void thd_increment_bytes_sent(ulong length)
 
 void thd_increment_bytes_received(ulong length)
 {
-  current_thd->status_var.bytes_received+= length;
-  current_thd->bytes_received+= length;
+  THD * const thd = current_thd;
+
+  thd->status_var.bytes_received+= length;
+  thd->bytes_received+= length;
 }
 
 
@@ -4062,6 +4047,7 @@ extern "C" void thd_pool_wait_end(MYSQL_THD thd);
   SYNOPSIS
   thd_wait_begin()
   thd                     Thread object
+                          Can be NULL, in this case current THD is used.
   wait_type               Type of wait
                           1 -- short wait (e.g. for mutex)
                           2 -- medium wait (e.g. for disk io)
@@ -4078,7 +4064,13 @@ extern "C" void thd_pool_wait_end(MYSQL_THD thd);
 */
 extern "C" void thd_wait_begin(MYSQL_THD thd, int wait_type)
 {
-  MYSQL_CALLBACK(thread_scheduler, thd_wait_begin, (thd, wait_type));
+  if (!thd)
+  {
+    thd= current_thd;
+    if (unlikely(!thd))
+      return;
+  }
+  MYSQL_CALLBACK(thd->scheduler, thd_wait_begin, (thd, wait_type));
 }
 
 /**
@@ -4086,10 +4078,17 @@ extern "C" void thd_wait_begin(MYSQL_THD thd, int wait_type)
   when they waking up from a sleep/stall.
 
   @param  thd   Thread handle
+  Can be NULL, in this case current THD is used.
 */
 extern "C" void thd_wait_end(MYSQL_THD thd)
 {
-  MYSQL_CALLBACK(thread_scheduler, thd_wait_end, (thd));
+  if (!thd)
+  {
+    thd= current_thd;
+    if (unlikely(!thd))
+      return;
+  }
+  MYSQL_CALLBACK(thd->scheduler, thd_wait_end, (thd));
 }
 #else
 extern "C" void thd_wait_begin(MYSQL_THD thd, int wait_type)
@@ -4356,11 +4355,6 @@ void THD::do_set_query_id(query_id_t new_query_id)
   }
 #endif /* DBUG_OFF */
   query_id= new_query_id;
-  if (opt_slow_query_log_rate_type == SLOG_RT_QUERY)
-  {
-    const ulong& limit= variables.log_slow_rate_limit;
-    write_to_slow_log= limit == 0 || (query_id % limit) == 0;
-  }
 }
 
 /** Assign a new value to thd->mysys_var.  */
@@ -4543,9 +4537,14 @@ bool xid_cache_insert(XID *xid, enum xa_states xa_state)
 bool xid_cache_insert(XID_STATE *xid_state)
 {
   mysql_mutex_lock(&LOCK_xid_cache);
-  DBUG_ASSERT(my_hash_search(&xid_cache, xid_state->xid.key(),
-                             xid_state->xid.key_length())==0);
-  my_bool res=my_hash_insert(&xid_cache, (uchar*)xid_state);
+  if (my_hash_search(&xid_cache, xid_state->xid.key(),
+      xid_state->xid.key_length()))
+  {
+    mysql_mutex_unlock(&LOCK_xid_cache);
+    my_error(ER_XAER_DUPID, MYF(0));
+    return true;
+  }
+  bool res= my_hash_insert(&xid_cache, (uchar*)xid_state);
   mysql_mutex_unlock(&LOCK_xid_cache);
   return res;
 }

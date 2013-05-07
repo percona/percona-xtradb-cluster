@@ -77,6 +77,8 @@ Performance Improvements
    performance/innodb_thread_concurrency_timer_based
    performance/innodb_numa_support
    performance/handlersocket
+   performance/threadpool
+   performance/binary_group_commit
 
 Flexibility Improvements
 ========================
@@ -92,6 +94,7 @@ Flexibility Improvements
    flexibility/innodb_fast_shutdown
    flexibility/improved_memory_engine
    flexibility/max_binlog_files
+   flexibility/mysqldump_ignore_create_error
 
 Reliability Improvements
 ========================
@@ -120,7 +123,7 @@ Management Improvements
    management/innodb_fast_index_creation
    management/innodb_expanded_fast_index_creation
    management/sql_no_fcache
-   management/udf_maatkit
+   management/udf_percona_toolkit
    management/innodb_fake_changes
    management/innodb_kill_idle_trx
    management/enforce_engine
@@ -128,6 +131,7 @@ Management Improvements
    management/secure_file_priv_extended
    management/expanded_program_option_modifiers
    management/changed_page_tracking
+   management/pam_plugin
 
 Diagnostics Improvements
 ========================
@@ -156,7 +160,6 @@ Obsolete and Removed Features
    :glob:
 
    management/innodb_buffer_pool_shm
-   performance/innodb_purge_thread
 
 Reference
 =========

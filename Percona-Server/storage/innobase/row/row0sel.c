@@ -3520,13 +3520,13 @@ row_search_for_mysql(
 	should_release = 0;
 	for (i = 0; i < btr_search_index_num; i++) {
 		/* we should check all latches (fix Bug#791030) */
-		if (rw_lock_get_writer(btr_search_latch_part[i])
-		    != RW_LOCK_NOT_LOCKED) {
+		if (UNIV_UNLIKELY(rw_lock_get_writer(btr_search_latch_part[i])
+				  != RW_LOCK_NOT_LOCKED)) {
 			should_release |= ((ulint)1 << i);
 		}
 	}
 
-	if (should_release) {
+	if (UNIV_UNLIKELY(should_release)) {
 
 		/* There is an x-latch request on the adaptive hash index:
 		release the s-latch to reduce starvation and wait for
@@ -3813,9 +3813,9 @@ release_search_latch_if_needed:
 		trx->has_search_latch = FALSE;
 	}
 
-	ut_ad(prebuilt->sql_stat_start || trx->conc_state == TRX_ACTIVE);
-	ut_ad(trx->conc_state == TRX_NOT_STARTED
-	      || trx->conc_state == TRX_ACTIVE);
+	ut_ad(prebuilt->sql_stat_start || trx->state == TRX_ACTIVE);
+	ut_ad(trx->state == TRX_NOT_STARTED
+	      || trx->state == TRX_ACTIVE);
 	ut_ad(prebuilt->sql_stat_start
 	      || prebuilt->select_lock_type != LOCK_NONE
 	      || trx->read_view);
@@ -3997,11 +3997,11 @@ rec_loop:
 
 	rec = btr_pcur_get_rec(pcur);
 
-	if (srv_pass_corrupt_table && !rec) {
+	SRV_CORRUPT_TABLE_CHECK(rec,
+	{
 		err = DB_CORRUPTION;
 		goto lock_wait_or_error;
-	}
-	ut_a(rec);
+	});
 
 	ut_ad(!!page_rec_is_comp(rec) == comp);
 #ifdef UNIV_SEARCH_DEBUG
@@ -4138,8 +4138,9 @@ wrong_offs:
 
 	offsets = rec_get_offsets(rec, index, offsets, ULINT_UNDEFINED, &heap);
 
-	if (UNIV_UNLIKELY(srv_force_recovery > 0)
-	    || (srv_pass_corrupt_table == 2 && index->table->is_corrupt)) {
+	if (UNIV_UNLIKELY(srv_force_recovery > 0
+			  || (index->table->is_corrupt &&
+			      srv_pass_corrupt_table == 2))) {
 		if (!rec_validate(rec, offsets)
 		    || !btr_index_rec_validate(rec, index, FALSE)) {
 			fprintf(stderr,
@@ -4896,8 +4897,10 @@ row_search_check_if_query_cache_permitted(
 		if (trx->isolation_level >= TRX_ISO_REPEATABLE_READ
 		    && !trx->read_view) {
 
-			trx->read_view = read_view_open_now(
-				trx->id, trx->global_read_view_heap);
+			trx->read_view =
+				read_view_open_now(trx->id,
+						   NULL, TRUE);
+
 			trx->global_read_view = trx->read_view;
 		}
 	}

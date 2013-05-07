@@ -730,7 +730,8 @@ bool do_command(THD *thd)
     the client, the connection is closed or "net_wait_timeout"
     number of seconds has passed.
   */
-  my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+  if(!thd->skip_wait_timeout)
+    my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
 
   /*
     XXX: this code is here only to clear possible errors of init_connect. 
@@ -1751,7 +1752,7 @@ void log_slow_statement(THD *thd)
   /* Follow the slow log filter configuration. */
   if (thd->variables.log_slow_filter != 0 &&
       (!(thd->variables.log_slow_filter & thd->query_plan_flags) ||
-       ((thd->variables.log_slow_filter & SLOG_F_QC_NO) &&
+       ((thd->variables.log_slow_filter & (1UL << SLOG_F_QC_NO)) &&
         (thd->query_plan_flags & QPLAN_QC))))
     DBUG_VOID_RETURN;
 
@@ -1783,10 +1784,20 @@ void log_slow_statement(THD *thd)
   copy_global_to_session(thd, SLOG_UG_MIN_EXAMINED_ROW_LIMIT,
                          &g.min_examined_row_limit);
 
-  /* Do not log this thread's queries due to rate limiting. */
-  if (!thd->write_to_slow_log && (thd->variables.long_query_time >= 1000000
-                                  || (ulong) query_exec_time < 1000000))
+  if (opt_slow_query_log_rate_type == SLOG_RT_QUERY
+      && thd->variables.log_slow_rate_limit
+      && thd->query_id % thd->variables.log_slow_rate_limit
+      && (thd->variables.long_query_time >= 1000000
+          || (ulong) query_exec_time < 1000000)) {
     DBUG_VOID_RETURN;
+  }
+  if (opt_slow_query_log_rate_type == SLOG_RT_SESSION
+      && thd->variables.log_slow_rate_limit
+      && thd->thread_id % thd->variables.log_slow_rate_limit
+      && (thd->variables.long_query_time >= 1000000
+          || (ulong) query_exec_time < 1000000)) {
+    DBUG_VOID_RETURN;
+  }
 
 
   /*
@@ -2376,9 +2387,14 @@ mysql_execute_command(THD *thd)
     }
     /* 
        Execute deferred events first
+       Bug lp1068210 or upstream 67504: Test first to see if we are executing
+       within a sub statement. If so, DO NOT execute any deferred events, they
+       have already been executed by the parent statement and have no bearing
+       on the sub statement and can cause faulty behavior.
     */
-    if (slave_execute_deferred_events(thd))
-      DBUG_RETURN(-1);
+    if (thd->in_sub_stmt == 0)
+      if (slave_execute_deferred_events(thd))
+          DBUG_RETURN(-1);
   }
   else
   {
@@ -2614,9 +2630,35 @@ case SQLCOM_PREPARE:
   {
     if (check_global_access(thd, SUPER_ACL))
       goto error;
-    /* PURGE MASTER LOGS TO 'file' */
-    res = purge_master_logs(thd, lex->to_log);
-    break;
+    if (lex->type == 0)
+    {
+      /* PURGE MASTER LOGS TO 'file' */
+      res = purge_master_logs(thd, lex->to_log);
+      break;
+    }
+    if (lex->type == PURGE_BITMAPS_TO_LSN)
+    {
+      /* PURGE CHANGED_PAGE_BITMAPS BEFORE lsn */
+      ulonglong lsn= 0;
+      Item *it= (Item *)lex->value_list.head();
+      if ((!it->fixed && it->fix_fields(lex->thd, &it)) || it->check_cols(1)
+          || it->null_value)
+      {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0),
+                 "PURGE CHANGED_PAGE_BITMAPS BEFORE");
+        goto error;
+      }
+      lsn= it->val_uint();
+      res= ha_purge_changed_page_bitmaps(lsn);
+      if (res)
+      {
+        my_error(ER_LOG_PURGE_UNKNOWN_ERR, MYF(0),
+                 "PURGE CHANGED_PAGE_BITMAPS BEFORE");
+        goto error;
+      }
+      my_ok(thd);
+      break;
+    }
   }
   case SQLCOM_PURGE_BEFORE:
   {
@@ -2929,7 +2971,14 @@ case SQLCOM_PREPARE:
         goto end_with_restore_list;
       }
 
-      if (!(res= open_and_lock_tables(thd, lex->query_tables, TRUE, 0)))
+      res= open_and_lock_tables(thd, lex->query_tables, TRUE, 0);
+      if (res)
+      {
+        /* Got error or warning. Set res to 1 if error */
+        if (!(res= thd->is_error()))
+          my_ok(thd);                           // CREATE ... IF NOT EXISTS
+      }
+      else
       {
         /* The table already exists */
         if (create_table->table)
@@ -3576,8 +3625,9 @@ end_with_restore_list:
 #ifdef WITH_WSREP
    for (TABLE_LIST *table= all_tables; table; table= table->next_global)
    {
-     if (!thd->is_current_stmt_binlog_format_row() ||
-        !find_temporary_table(thd, table))
+     if (!lex->drop_temporary                       && 
+	 (!thd->is_current_stmt_binlog_format_row() ||
+	  !find_temporary_table(thd, table)))
      {
        WSREP_TO_ISOLATION_BEGIN(NULL, NULL, all_tables);
        break;
@@ -4127,7 +4177,14 @@ end_with_restore_list:
   case SQLCOM_FLUSH:
   {
     int write_to_binlog;
-    if (check_global_access(thd,RELOAD_ACL))
+
+    if (lex->type & REFRESH_FLUSH_PAGE_BITMAPS
+        || lex->type & REFRESH_RESET_PAGE_BITMAPS)
+    {
+      if (check_global_access(thd, SUPER_ACL))
+          goto error;
+    }
+    else if (check_global_access(thd, RELOAD_ACL))
       goto error;
 
     if (first_table && lex->type & REFRESH_READ_LOCK)
@@ -6095,6 +6152,86 @@ void mysql_init_multi_delete(LEX *lex)
 }
 
 #ifdef WITH_WSREP
+void wsrep_replay_transaction(THD *thd)
+{
+  /* checking if BF trx must be replayed */
+  if (thd->wsrep_conflict_state== MUST_REPLAY) {
+    if (thd->wsrep_exec_mode!= REPL_RECV) {
+      if (thd->stmt_da->is_sent) 
+      {
+	WSREP_ERROR("replay issue, thd has reported status already");
+      }
+      thd->stmt_da->reset_diagnostics_area();
+
+      thd->wsrep_conflict_state= REPLAYING;
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+      mysql_reset_thd_for_next_command(thd);
+      thd->killed= THD::NOT_KILLED;
+      close_thread_tables(thd);
+      if (thd->locked_tables_mode && thd->lock)
+      {
+	WSREP_DEBUG("releasing table lock for replaying (%ld)", 
+		    thd->thread_id);
+	thd->locked_tables_list.unlock_locked_tables(thd);
+	thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
+      }
+      thd->mdl_context.release_transactional_locks();
+
+      thd_proc_info(thd, "wsrep replaying trx");
+      WSREP_DEBUG("replay trx: %s %lld", 
+		  thd->query() ? thd->query() : "void", 
+		  (long long)thd->wsrep_trx_seqno);
+      struct wsrep_thd_shadow shadow;
+      wsrep_prepare_bf_thd(thd, &shadow);
+      int rcode = wsrep->replay_trx(wsrep,
+				    &thd->wsrep_trx_handle,
+				    (void *)thd);
+
+      wsrep_return_from_bf_mode(thd, &shadow);
+      if (thd->wsrep_conflict_state!= REPLAYING)
+	WSREP_WARN("lost replaying mode: %d", thd->wsrep_conflict_state );
+
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+      switch (rcode)
+      {
+      case WSREP_OK:
+	thd->wsrep_conflict_state= NO_CONFLICT;
+	wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
+	WSREP_DEBUG("trx_replay successful for: %ld %llu", 
+		    thd->thread_id, (long long)thd->real_id);
+	break;
+      case WSREP_TRX_FAIL:
+	if (thd->stmt_da->is_sent) 
+	{
+	  WSREP_ERROR("replay failed, thd has reported status");
+	}
+	else
+	{
+	  WSREP_DEBUG("replay failed, rolling back");
+	  my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+	}
+	thd->wsrep_conflict_state= ABORTED;
+	wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
+	break;
+      default:
+	WSREP_ERROR("trx_replay failed for: %d, query: %s", 
+		    rcode, thd->query() ? thd->query() : "void");
+	/* we're now in inconsistent state, must abort */
+	unireg_abort(1);
+	break;
+      }
+      mysql_mutex_lock(&LOCK_wsrep_replaying);
+      wsrep_replaying--;
+      WSREP_DEBUG("replaying decreased: %d, thd: %lu", 
+		  wsrep_replaying, thd->thread_id);
+      mysql_cond_broadcast(&COND_wsrep_replaying);
+      mysql_mutex_unlock(&LOCK_wsrep_replaying);
+    }
+  }
+}
+
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                  Parser_state *parser_state)
 {
@@ -6122,77 +6259,9 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
       }
 
       /* checking if BF trx must be replayed */
-      if (thd->wsrep_conflict_state== MUST_REPLAY) {
-        if (thd->wsrep_exec_mode!= REPL_RECV) {
-          if (thd->stmt_da->is_sent) {
-            WSREP_ERROR("replay issue, thd has reported status already");
-          }
-          thd->stmt_da->reset_diagnostics_area();
-
-          thd->wsrep_conflict_state= REPLAYING;
-          mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-          mysql_reset_thd_for_next_command(thd);
-          thd->killed= THD::NOT_KILLED;
-          close_thread_tables(thd);
-          if (thd->locked_tables_mode && thd->lock)
-          {
-            WSREP_DEBUG("releasing table lock for replaying (%ld)", 
-                        thd->thread_id);
-            thd->locked_tables_list.unlock_locked_tables(thd);
-            thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
-          }
-          thd->mdl_context.release_transactional_locks();
-
-          thd_proc_info(thd, "wsrep replaying trx");
-          WSREP_DEBUG("replay trx: %s %lld", 
-                      thd->query() ? thd->query() : "void", 
-                      (long long)thd->wsrep_trx_seqno);
-          struct wsrep_thd_shadow shadow;
-          wsrep_prepare_bf_thd(thd, &shadow);
-          int rcode = wsrep->replay_trx(wsrep,
-                                        &thd->wsrep_trx_handle,
-                                        (void *)thd);
-
-          wsrep_return_from_bf_mode(thd, &shadow);
-          if (thd->wsrep_conflict_state!= REPLAYING)
-            WSREP_WARN("lost replaying mode: %d", thd->wsrep_conflict_state );
-
-          mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-
-          switch (rcode) {
-          case WSREP_OK:
-            thd->wsrep_conflict_state= NO_CONFLICT;
-            wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
-            WSREP_DEBUG("trx_replay successful for: %ld %llu", 
-                        thd->thread_id, (long long)thd->real_id);
-            break;
-          case WSREP_TRX_FAIL:
-            if (thd->stmt_da->is_sent) {
-              WSREP_ERROR("replay failed, thd has reported status");
-            }
-            else
-            {
-              WSREP_DEBUG("replay failed, rolling back");
-              my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-            }
-            thd->wsrep_conflict_state= ABORTED;
-            wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
-            break;
-          default:
-            WSREP_ERROR("trx_replay failed for: %d, query: %s", 
-                        rcode, thd->query() ? thd->query() : "void");
-            /* we're now in inconsistent state, must abort */
-            unireg_abort(1);
-            break;
-          }
-          mysql_mutex_lock(&LOCK_wsrep_replaying);
-          wsrep_replaying--;
-          WSREP_DEBUG("replaying decreased: %d, thd: %lu", 
-                      wsrep_replaying, thd->thread_id);
-          mysql_cond_broadcast(&COND_wsrep_replaying);
-          mysql_mutex_unlock(&LOCK_wsrep_replaying);
-        }
+      if (thd->wsrep_conflict_state== MUST_REPLAY) 
+      {
+	wsrep_replay_transaction(thd);
       }
 
       /* setting error code for BF aborted trxs */
@@ -6434,9 +6503,13 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
     else
       thd->cpu_time = 0;
   }
+
   // Updates THD stats and the global user stats.
-  thd->update_stats(true);
-  update_global_user_stats(thd, true, time(NULL));
+  if (unlikely(opt_userstat))
+  {
+    thd->update_stats(true);
+    update_global_user_stats(thd, true, time(NULL));
+  }
 
   DBUG_VOID_RETURN;
 }
@@ -7269,8 +7342,14 @@ uint kill_one_thread(THD *thd, ulong id, bool only_kill_query)
     if ((thd->security_ctx->master_access & SUPER_ACL) ||
         thd->security_ctx->user_matches(tmp->security_ctx))
     {
-      tmp->awake(only_kill_query ? THD::KILL_QUERY : THD::KILL_CONNECTION);
-      error=0;
+      /* process the kill only if thread is not already undergoing any kill
+         connection.
+      */
+      if (tmp->killed != THD::KILL_CONNECTION)
+      {
+        tmp->awake(only_kill_query ? THD::KILL_QUERY : THD::KILL_CONNECTION);
+      }
+      error= 0;
     }
     else
       error=ER_KILL_DENIED_ERROR;

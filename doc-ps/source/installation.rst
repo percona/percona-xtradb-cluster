@@ -25,7 +25,7 @@ Using Percona Software Repositories
    installation/apt_repo
    installation/yum_repo
 
-|Percona| provides repositories for :program:`yum` (``RPM`` packages for *Red Hat*, *CentOS* and *Amazon Linux AMI*) and :program:`apt` (:file:`.deb` packages for *Ubuntu* and *Debian*) for software such as |Percona Server|, |XtraDB|, |XtraBackup|, and *Maatkit*. This makes it easy to install and update your software and its dependencies through your operating system's package manager.
+|Percona| provides repositories for :program:`yum` (``RPM`` packages for *Red Hat*, *CentOS* and *Amazon Linux AMI*) and :program:`apt` (:file:`.deb` packages for *Ubuntu* and *Debian*) for software such as |Percona Server|, |XtraDB|, |XtraBackup|, and *Percona Toolkit*. This makes it easy to install and update your software and its dependencies through your operating system's package manager.
 
 This is the recommend way of installing where possible.
 
@@ -134,8 +134,8 @@ The ``percona-server-dfsg`` package contains....
 The ``libmysqlclient-dev`` package contains header files needed to
 compile software to use the client library.
 
-The ``libmysqlclient16`` package contains the client shared
-library. The ``16`` is a reference to the version of the shared
+The ``libmysqlclient18`` package contains the client shared
+library. The ``18`` is a reference to the version of the shared
 library. The version is incremented when there is a ABI change that
 requires software using the client library to be recompiled or their
 source code modified.
@@ -201,3 +201,7 @@ build. ::
   $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_CONFIG=mysql_release -DFEATURE_SET=community -DWITH_EMBEDDED_SERVER=OFF
   $ make
   $ make install
+
+.. note::
+
+  :ref:`pam_plugin` has been merged into |Percona Server| in :rn:`5.5.24-26.0` but it is not built with the server by default. In order to build the Percona Server with PAM plugin, additional option :option:`-DWITH_PAM=ON` should be used.

@@ -178,6 +178,7 @@ int wsrep_commit(handlerton *hton, THD *thd, bool all)
 
 extern Rpl_filter* binlog_filter;
 extern my_bool opt_log_slave_updates;
+extern void wsrep_write_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len);
 enum wsrep_trx_status
 wsrep_run_wsrep_commit(
     THD *thd, handlerton *hton, bool all)
@@ -320,6 +321,7 @@ wsrep_run_wsrep_commit(
     {
       WSREP_DEBUG("empty rbr buffer, query: %s", thd->query());
     }
+    thd->wsrep_query_state= QUERY_EXEC;
     DBUG_RETURN(WSREP_TRX_OK);
   }
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_trx_handle.trx_id)
@@ -337,6 +339,10 @@ wsrep_run_wsrep_commit(
                               (thd->wsrep_PA_safe) ? WSREP_FLAG_PA_SAFE : 0ULL,
                               &thd->wsrep_trx_seqno);
     if (rcode == WSREP_TRX_MISSING) {
+      WSREP_WARN("Transaction missing in provider, thd: %ld, SQL: %s",
+                 thd->thread_id, thd->query());
+      wsrep_write_rbr_buf(thd, rbr_data, data_len);
+
       rcode = WSREP_OK;
     } else if (rcode == WSREP_BF_ABORT) {
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);

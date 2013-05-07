@@ -97,17 +97,9 @@ then
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
+        TMPDIR="/tmp"
 
-        TMPDIR=${TMPDIR:-""}
-        if [ -z "${TMPDIR}" ]; then
-            # try to get it from my.cnf
-            TMPDIR=$(grep -E '^\s*tmpdir' $WSREP_SST_OPT_CONF | \
-                     awk -F = '{ print $2 }' | sed 's/^\s//g' | sed 's/\s.*//g' )
-            # if failed default to /tmp
-            [ -z "${TMPDIR}" ] && TMPDIR="/tmp"
-        fi
-
-        INNOBACKUPEX_ARGS="--galera-info --tmpdir=${TMPDIR} --stream=tar
+        INNOBACKUPEX_ARGS="--galera-info --stream=tar
                            --defaults-file=${WSREP_SST_OPT_CONF}
                            --socket=${WSREP_SST_OPT_SOCKET}"
 

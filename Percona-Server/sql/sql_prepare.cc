@@ -2195,7 +2195,7 @@ void mysqld_stmt_prepare(THD *thd, const char *packet, uint packet_length)
   double start_cpu_nsecs= 0;
   double end_cpu_nsecs=   0;
 
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
 #ifdef HAVE_CLOCK_GETTIME
     /* get start cputime */
@@ -2237,7 +2237,7 @@ void mysqld_stmt_prepare(THD *thd, const char *packet, uint packet_length)
 
   /* check_prepared_statemnt sends the metadata packet in case of success */
 end:
-  if (opt_userstat)
+  if (unlikely(opt_userstat))
   {
     // Gets the end time.
     if (!(end_time_error= gettimeofday(&end_time, NULL)))
@@ -2279,9 +2279,13 @@ end:
     else
       thd->cpu_time = 0;
   }
+
   // Updates THD stats and the global user stats.
-  thd->update_stats(true);
-  update_global_user_stats(thd, true, time(NULL));
+  if (unlikely(opt_userstat))
+  {
+    thd->update_stats(true);
+    update_global_user_stats(thd, true, time(NULL));
+  }
 
   DBUG_VOID_RETURN;
 }
@@ -2730,9 +2734,13 @@ end:
     else
       thd->cpu_time = 0;
   }
+
   // Updates THD stats and the global user stats.
-  thd->update_stats(true);
-  update_global_user_stats(thd, true, time(NULL));
+  if (unlikely(opt_userstat))
+  {
+    thd->update_stats(true);
+    update_global_user_stats(thd, true, time(NULL));
+  }
 
   DBUG_VOID_RETURN;
 }
@@ -2905,9 +2913,13 @@ end:
     } else
       thd->cpu_time= 0;
   }
+
   // Updates THD stats and the global user stats.
-  thd->update_stats(true);
-  update_global_user_stats(thd, true, time(NULL));
+  if (unlikely(opt_userstat))
+  {
+    thd->update_stats(true);
+    update_global_user_stats(thd, true, time(NULL));
+  }
 
   DBUG_VOID_RETURN;
 }
@@ -3031,9 +3043,13 @@ end:
     else
       thd->cpu_time= 0;
   }
+
   // Updates THD stats and the global user stats.
-  thd->update_stats(true);
-  update_global_user_stats(thd, true, time(NULL));
+  if (unlikely(opt_userstat))
+  {
+    thd->update_stats(true);
+    update_global_user_stats(thd, true, time(NULL));
+  }
 
   DBUG_VOID_RETURN;
 }
@@ -3682,7 +3698,9 @@ Prepared_statement::set_parameters(String *expanded_query,
   return res;
 }
 
-
+#ifdef WITH_WSREP
+void wsrep_replay_transaction(THD *thd);
+#endif /* WITH_WSREP */
 /**
   Execute a prepared statement. Re-prepare it a limited number
   of times if necessary.
@@ -3753,6 +3771,22 @@ reexecute:
   error= execute(expanded_query, open_cursor) || thd->is_error();
 
   thd->m_reprepare_observer= NULL;
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  switch (thd->wsrep_conflict_state)
+  {
+  case CERT_FAILURE:
+    WSREP_DEBUG("PS execute fail for CERT_FAILURE: thd: %ld err: %d",
+                thd->thread_id, thd->stmt_da->sql_errno() );
+    thd->wsrep_conflict_state = NO_CONFLICT;
+    break;
+
+  case MUST_REPLAY:
+    (void)wsrep_replay_transaction(thd);
+  default: break;
+  }
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
 
   if (error && !thd->is_fatal_error && !thd->killed &&
       reprepare_observer.is_invalidated() &&

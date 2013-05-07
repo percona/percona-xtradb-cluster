@@ -1479,7 +1479,7 @@ fil_space_get_size(
 
 	ut_ad(fil_system);
 
-	fil_mutex_enter_and_prepare_for_io(id);
+	mutex_enter(&fil_system->mutex);
 
 	space = fil_space_get_by_id(id);
 
@@ -1493,6 +1493,23 @@ fil_space_get_size(
 		ut_a(id != 0);
 
 		ut_a(1 == UT_LIST_GET_LEN(space->chain));
+
+		mutex_exit(&fil_system->mutex);
+
+		/* It is possible that the space gets evicted at this point
+		before the fil_mutex_enter_and_prepare_for_io() acquires
+		the fil_system->mutex. Check for this after completing the
+		call to fil_mutex_enter_and_prepare_for_io(). */
+		fil_mutex_enter_and_prepare_for_io(id);
+
+		/* We are still holding the fil_system->mutex. Check if
+		the space is still in memory cache. */
+		space = fil_space_get_by_id(id);
+
+		if (space == NULL) {
+			mutex_exit(&fil_system->mutex);
+			return(0);
+		}
 
 		node = UT_LIST_GET_FIRST(space->chain);
 
@@ -1531,7 +1548,7 @@ fil_space_get_flags(
 		return(0);
 	}
 
-	fil_mutex_enter_and_prepare_for_io(id);
+	mutex_enter(&fil_system->mutex);
 
 	space = fil_space_get_by_id(id);
 
@@ -1545,6 +1562,23 @@ fil_space_get_flags(
 		ut_a(id != 0);
 
 		ut_a(1 == UT_LIST_GET_LEN(space->chain));
+
+		mutex_exit(&fil_system->mutex);
+
+		/* It is possible that the space gets evicted at this point
+		before the fil_mutex_enter_and_prepare_for_io() acquires
+		the fil_system->mutex. Check for this after completing the
+		call to fil_mutex_enter_and_prepare_for_io(). */
+		fil_mutex_enter_and_prepare_for_io(id);
+
+		/* We are still holding the fil_system->mutex. Check if
+		the space is still in memory cache. */
+		space = fil_space_get_by_id(id);
+
+		if (space == NULL) {
+			mutex_exit(&fil_system->mutex);
+			return(0);
+		}
 
 		node = UT_LIST_GET_FIRST(space->chain);
 
@@ -2392,15 +2426,11 @@ try_again:
 	To deal with potential read requests by checking the
 	::stop_new_ops flag in fil_io() */
 
-	if (srv_lazy_drop_table) {
-		buf_LRU_mark_space_was_deleted(id);
-	} else {
 	buf_LRU_flush_or_remove_pages(
 		id, evict_all
 		? BUF_REMOVE_ALL_NO_WRITE
 		: BUF_REMOVE_FLUSH_NO_WRITE);
 
-	}
 #endif
 	/* printf("Deleting tablespace %s id %lu\n", space->name, id); */
 
@@ -2732,7 +2762,7 @@ retry:
 	mutex_exit(&fil_system->mutex);
 
 #ifndef UNIV_HOTBACKUP
-	if (success) {
+	if (success && !recv_recovery_on) {
 		mtr_t		mtr;
 
 		mtr_start(&mtr);
@@ -5270,22 +5300,6 @@ _fil_io(
 		srv_data_written+= len;
 	}
 
-	/* if the table space was already deleted, space might not exist already. */
-	if (message
-	    && space_id < SRV_LOG_SPACE_FIRST_ID
-	    && ((buf_page_t*)message)->space_was_being_deleted) {
-
-		if (mode == OS_AIO_NORMAL) {
-			buf_page_io_complete(message);
-			return(DB_SUCCESS); /*fake*/
-		}
-		if (type == OS_FILE_READ) {
-			return(DB_TABLESPACE_DELETED);
-		} else {
-			return(DB_SUCCESS); /*fake*/
-		}
-	}
-
 	/* Reserve the fil_system mutex and make sure that we can open at
 	least one file while holding it, if the file is not already open */
 
@@ -5386,38 +5400,41 @@ _fil_io(
 
 	/* Do aio */
 
-	ut_a(byte_offset % OS_FILE_LOG_BLOCK_SIZE == 0);
-	ut_a((len % OS_FILE_LOG_BLOCK_SIZE) == 0);
+	ut_a(byte_offset % OS_MIN_LOG_BLOCK_SIZE == 0);
+	ut_a((len % OS_MIN_LOG_BLOCK_SIZE) == 0);
 
-	if (srv_pass_corrupt_table == 1 && space->is_corrupt) {
+#ifndef UNIV_HOTBACKUP
+	if (UNIV_UNLIKELY(space->is_corrupt && srv_pass_corrupt_table)) {
+
 		/* should ignore i/o for the crashed space */
-		mutex_enter(&fil_system->mutex);
-		fil_node_complete_io(node, fil_system, type);
-		mutex_exit(&fil_system->mutex);
-		if (mode == OS_AIO_NORMAL) {
-			ut_a(space->purpose == FIL_TABLESPACE);
-			buf_page_io_complete(message);
-		}
-		if (type == OS_FILE_READ) {
-			return(DB_TABLESPACE_DELETED);
-		} else {
-			return(DB_SUCCESS);
-		}
-	} else {
-		if (srv_pass_corrupt_table > 1 && space->is_corrupt) {
-			/* should ignore write i/o for the crashed space */
-			if (type == OS_FILE_WRITE) {
-				mutex_enter(&fil_system->mutex);
-				fil_node_complete_io(node, fil_system, type);
-				mutex_exit(&fil_system->mutex);
-				if (mode == OS_AIO_NORMAL) {
-					ut_a(space->purpose == FIL_TABLESPACE);
-					buf_page_io_complete(message);
-				}
-				return(DB_SUCCESS);
+		if (srv_pass_corrupt_table == 1 ||
+		    type == OS_FILE_WRITE) {
+
+			mutex_enter(&fil_system->mutex);
+			fil_node_complete_io(node, fil_system, type);
+			mutex_exit(&fil_system->mutex);
+			if (mode == OS_AIO_NORMAL) {
+				ut_a(space->purpose == FIL_TABLESPACE);
+				buf_page_io_complete(message);
 			}
 		}
-#ifdef UNIV_HOTBACKUP
+
+		if (srv_pass_corrupt_table == 1 && type == OS_FILE_READ) {
+
+			return(DB_TABLESPACE_DELETED);
+
+		} else if (type == OS_FILE_WRITE) {
+
+			return(DB_SUCCESS);
+		}
+	} /**/
+
+	/* Queue the aio request */
+	ret = os_aio(type, mode | wake_later, node->name, node->handle, buf,
+		offset_low, offset_high, len, node, message, space_id,
+		trx);
+
+#else
 	/* In ibbackup do normal i/o, not aio */
 	if (type == OS_FILE_READ) {
 		ret = os_file_read(node->handle, buf, offset_low, offset_high,
@@ -5426,26 +5443,7 @@ _fil_io(
 		ret = os_file_write(node->name, node->handle, buf,
 				    offset_low, offset_high, len);
 	}
-#else
-	/* Queue the aio request */
-	ret = os_aio(type, mode | wake_later, node->name, node->handle, buf,
-		     offset_low, offset_high, len, node, message, space_id, trx);
 #endif
-	} /**/
-
-	/* if the table space was already deleted, space might not exist already. */
-	if (message
-	    && space_id < SRV_LOG_SPACE_FIRST_ID
-	    && ((buf_page_t*)message)->space_was_being_deleted) {
-
-		if (mode == OS_AIO_SYNC) {
-			if (type == OS_FILE_READ) {
-				return(DB_TABLESPACE_DELETED);
-			} else {
-				return(DB_SUCCESS); /*fake*/
-			}
-		}
-	}
 
 	ut_a(ret);
 
@@ -5567,21 +5565,6 @@ fil_aio_wait(
 
 		ret = os_aio_simulated_handle(segment, &fil_node,
 					      &message, &type, &space_id);
-	}
-
-	/* if the table space was already deleted, fil_node might not exist already. */
-	if (message
-	    && space_id < SRV_LOG_SPACE_FIRST_ID
-	    && ((buf_page_t*)message)->space_was_being_deleted) {
-
-		/* intended not to be uncompress read page */
-		ut_a(buf_page_get_io_fix(message) == BUF_IO_WRITE
-		     || !buf_page_get_zip_size(message)
-		     || buf_page_get_state(message) != BUF_BLOCK_FILE_PAGE);
-
-		srv_set_io_thread_op_info(segment, "complete io for buf page");
-		buf_page_io_complete(message);
-		return;
 	}
 
 	ut_a(ret);
@@ -6006,3 +5989,26 @@ fil_space_set_corrupt(
 	mutex_exit(&fil_system->mutex);
 }
 
+/****************************************************************//**
+Generate redo logs for swapping two .ibd files */
+UNIV_INTERN
+void
+fil_mtr_rename_log(
+/*===============*/
+	ulint		old_space_id,	/*!< in: tablespace id of the old
+					table. */
+	const char*	old_name,	/*!< in: old table name */
+	ulint		new_space_id,	/*!< in: tablespace id of the new
+					table */
+	const char*	new_name,	/*!< in: new table name */
+	const char*	tmp_name)	/*!< in: temp table name used while
+					swapping */
+{
+	mtr_t           mtr;
+	mtr_start(&mtr);
+	fil_op_write_log(MLOG_FILE_RENAME, old_space_id,
+			 0, 0, old_name, tmp_name, &mtr);
+	fil_op_write_log(MLOG_FILE_RENAME, new_space_id,
+			 0, 0, new_name, old_name, &mtr);
+	mtr_commit(&mtr);
+}

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Execute this tool to setup and build RPMs for Percona XtraDB Cluster
 # from a fresh tree
@@ -148,13 +148,13 @@ export WSREP_VERSION="$WSREP_VERSION"
 # Issue rpmbuild command
 (
     cd "$WORKDIR"
-
+    sed -e "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" \
+    "$SOURCEDIR/build/percona-xtradb-cluster.spec" > \
+    "${WORKDIR_ABS}/SPECS/percona-xtradb-cluster.spec"
     # Issue RPM command
-    rpmbuild -ba --clean --with yassl $TARGET $SIGN $QUIET \
-        "$SOURCEDIR/build/percona-xtradb-cluster.spec" \
+    rpmbuild -ba --clean $TARGET $SIGN $QUIET \
+        "${WORKDIR_ABS}/SPECS/percona-xtradb-cluster.spec" \
         --define "_topdir $WORKDIR_ABS" \
-        --define "revision $REVISION" \
-        --define "wsrep_version $WSREP_VERSION"
-
+        --define "revision $REVISION" 
 )
 

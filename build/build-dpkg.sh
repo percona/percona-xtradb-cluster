@@ -77,7 +77,7 @@ DEBIAN_VERSION="$(lsb_release -sc)"
 # Build information
 export REVISION="$(cd "$SOURCEDIR"; bzr revno)"
 export WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
-export DEB_BUILD_OPTIONS='nostrip debug nocheck'
+export DEB_BUILD_OPTIONS='debug nocheck'
 
 # Compilation flags
 export CC=${CC:-gcc}
