@@ -373,10 +373,16 @@ case "$mode" in
       fi
     fi
     ;;
+    'boostrap-pxc')
+      # Bootstrap the Percona XtraDB Cluster, start the first node
+      # that initiate the cluster
+      echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
+      $0 start $other_args --wsrep-new-cluster
+      ;;
     *)
       # usage
       basename=`basename "$0"`
-      echo "Usage: $basename  {start|stop|restart|reload|force-reload|status}  [ MySQL (Percona XtraDB Cluster) options ]"
+      echo "Usage: $basename {start|stop|restart|reload|force-reload|status|bootstrap-pxc}  [ MySQL (Percona XtraDB Cluster) options ]"
       exit 1
     ;;
 esac
