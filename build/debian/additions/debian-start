@@ -23,6 +23,13 @@ MYCHECK_RCPT="root"
 # "check_for_crashed_tables" out.  
 # (There may be no output to stdout inside the background process!)
 echo "Checking for corrupt, not cleanly closed and upgrade needing tables."
+
+# Ported
+# https://bazaar.launchpad.net/~knielsen/ourdelta/bug_484127_484120_2/revision/68
+# for lp:1104720
+# Need to ignore SIGHUP, as otherwise a SIGHUP can sometimes abort the upgrade
+# process in the middle.
+trap "" SIGHUP
 (
   upgrade_system_tables_if_necessary;
   check_root_accounts;
