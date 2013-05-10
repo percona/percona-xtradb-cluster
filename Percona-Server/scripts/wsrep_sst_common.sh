@@ -86,6 +86,9 @@ shift
 done
 readonly WSREP_SST_OPT_BYPASS
 
+SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
+touch $SST_PROGRESS_FILE
+
 wsrep_log()
 {
     # echo everything to stderr so that it gets into common error log
@@ -102,5 +105,10 @@ wsrep_log_error()
 wsrep_log_info()
 {
     wsrep_log "[INFO] $*"
+}
+
+wsrep_cleanup_progress_file()
+{
+    rm -f $SST_PROGRESS_FILE 2>/dev/null
 }
 
