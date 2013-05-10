@@ -3716,6 +3716,25 @@ Query_log_event::do_shall_skip(Relay_log_info *rli)
       DBUG_RETURN(Log_event::EVENT_SKIP_COUNT);
     }
   }
+#ifdef WITH_WSREP
+  else if (WSREP_ON && thd->wsrep_mysql_replicated > 0 &&
+       (!strncasecmp(query , "BEGIN", 5) || !strncasecmp(query , "COMMIT", 6)))
+  {
+    if (strcmp("COMMIT", query) == 0 || strcmp("ROLLBACK", query) == 0)
+    {
+      thd->variables.option_bits&= ~OPTION_BEGIN;
+    }
+    if (++thd->wsrep_mysql_replicated < (int)wsrep_mysql_replication_bundle)
+    {
+      WSREP_DEBUG("skipping wsrep commit %d", thd->wsrep_mysql_replicated);
+      DBUG_RETURN(Log_event::EVENT_SKIP_IGNORE);
+    }
+    else
+    {
+      thd->wsrep_mysql_replicated = 0;
+    }
+  }
+#endif
   DBUG_RETURN(Log_event::do_shall_skip(rli));
 }
 
@@ -5752,6 +5771,20 @@ Xid_log_event::do_shall_skip(Relay_log_info *rli)
     thd->variables.option_bits&= ~OPTION_BEGIN;
     DBUG_RETURN(Log_event::EVENT_SKIP_COUNT);
   }
+#ifdef WITH_WSREP
+  else if (WSREP_ON)
+  {
+    if (++thd->wsrep_mysql_replicated < (int)wsrep_mysql_replication_bundle)
+    {
+      WSREP_DEBUG("skipping wsrep commit %d", thd->wsrep_mysql_replicated);
+      DBUG_RETURN(Log_event::EVENT_SKIP_IGNORE);
+    }
+    else
+    {
+      thd->wsrep_mysql_replicated = 0;
+    }
+  }
+#endif
   DBUG_RETURN(Log_event::do_shall_skip(rli));
 }
 #endif /* !MYSQL_CLIENT */
