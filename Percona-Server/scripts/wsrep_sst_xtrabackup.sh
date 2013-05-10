@@ -168,9 +168,9 @@ then
 
     wait_for_nc ${NC_PORT} ${ADDR} ${MODULE} &
 
-#    trap "exit 32" HUP PIPE
-#    trap "exit 3"  INT TERM
-    trap cleanup_joiner HUP PIPE INT TERM
+    trap "exit 32" HUP PIPE
+    trap "exit 3"  INT TERM
+    trap cleanup_joiner EXIT
 
     set +e
     ${NC_BIN} -dl ${NC_PORT}  | tar xfi  - -C ${DATA}  1>&2
