@@ -2533,6 +2533,9 @@ main(int argc, char **argv)
     return 1;
   }
 
+  # Replicate MyISAM DDL for this session, cf. lp:1161432
+  printf("SET SESSION wsrep_replicate_myisam=ON;\n");
+
   if (argc == 2)
   {
     root_name_end= strmake(fullname, argv[1], FN_REFLEN);

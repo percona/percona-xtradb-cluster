@@ -27,6 +27,7 @@ cleanup_joiner()
     wsrep_log_info "Killing nc pid $PID"
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -f "$MAGIC_FILE"
+    wsrep_cleanup_progress_file
 #set +x
 }
 
@@ -252,6 +253,7 @@ then
     fi
 
     cat "${MAGIC_FILE}" # output UUID:seqno
+    wsrep_cleanup_progress_file
 
 else
     wsrep_log_error "Unrecognized role: ${WSREP_SST_OPT_ROLE}"

@@ -32,7 +32,8 @@ cleanup_joiner()
     rm -rf "$RSYNC_CONF"
     rm -rf "$MAGIC_FILE"
     rm -rf "$RSYNC_PID"
-    echo " done." >&2
+    wsrep_log_info "Joiner cleanup done."
+    wsrep_cleanup_progress_file
 }
 
 check_pid()
@@ -201,7 +202,7 @@ EOF
         # this message should cause joiner to abort
         echo "rsync process ended without creating '$MAGIC_FILE'"
     fi
-
+    wsrep_cleanup_progress_file
 #    cleanup_joiner
 else
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
