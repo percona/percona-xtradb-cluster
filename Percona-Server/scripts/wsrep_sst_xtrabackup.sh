@@ -195,18 +195,58 @@ then
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} >/dev/null
     then
-        wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly." >&2
+        wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly." 
         exit 32
     fi
 
     if [ ! -r "${IST_FILE}" ]
     then
         rm -f ${DATA}/ib_logfile*
-        ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log \
-        --ibbackup=xtrabackup ${DATA} 1>&2 2> ${DATA}/innobackup.prepare.log
+        rebuild=""
+
+        # Rebuild indexes for compact backups
+        grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints && rebuild="--rebuild-indexes"
+
+        ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+        ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+        ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+
+        # Decrypt the files if any
+        find ${DATA} -type f -name '*.xbcrypt' -printf '%p\n'  |  while read line;do 
+            if [[ -z $ealgo -o (-z $ekey -a -z $ekeyfile) ]];then
+                wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
+                exit 3
+            fi
+            input=$line
+            output=${input%.xbcrypt}
+
+            if [[ -n $ekey ]];then
+                xbcrypt -d --encrypt=$ealgo --encrypt-key=$ekey -i $input > $output
+            else 
+                if [[ ! -r $ekeyfile ]];then
+                    wsrep_log_error "FATAL: Key file not readable"
+                    exit 3
+                fi
+                xbcrypt -d --encrypt=$ealgo --encrypt-key-file=$ekeyfile -i $input > $output
+            fi
+        done
+
+        if [[ $? = 0 ]];then
+            find ${DATA} -type f -name '*.xbcrypt' -delete
+        fi
+
+        # Decompress the qpress files if any
+        find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d
+
+        if [[ $? = 0 ]];then
+            find ${DATA} -type f -name '*.qp' -delete
+        fi
+
+        ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild \
+        ${DATA} 1>&2 2> ${DATA}/innobackup.prepare.log
         if [ $? -ne 0 ];
         then
-            wsrep_log_error "${INNOBACKUPEX_BIN} finished with errors. Check ${DATA}/innobackup.prepare.log" >&2
+            wsrep_log_error "${INNOBACKUPEX_BIN} finished with errors. Check ${DATA}/innobackup.prepare.log" 
             exit 22
         fi
     fi
