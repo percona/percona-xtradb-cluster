@@ -289,6 +289,9 @@ case "$mode" in
       # may be overwritten at next upgrade.
       $bindir/mysqld_safe --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null 2>&1 &
       wait_for_pid created "$!" "$mysqld_pid_file_path"; return_value=$?
+      if [[ $return_value != 0 ]];then 
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
+      fi
 
       # Make lock for RedHat / SuSE
       if test -w "$lockdir"
@@ -305,17 +308,19 @@ case "$mode" in
   'stop')
     # Stop daemon. We use a signal here to avoid having to know the
     # root password.
-
+    echo $echo_n "Shutting down MySQL (Percona XtraDB Cluster)"
     if test -s "$mysqld_pid_file_path"
     then
       mysqld_pid=`cat "$mysqld_pid_file_path"`
 
       if (kill -0 $mysqld_pid 2>/dev/null)
       then
-        echo $echo_n "Shutting down MySQL (Percona XtraDB Cluster)"
         kill $mysqld_pid
         # mysqld should remove the pid file when it exits, so wait for it.
         wait_for_pid removed "$mysqld_pid" "$mysqld_pid_file_path"; return_value=$?
+        if [[ $return_value != 0 ]];then 
+            log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
+        fi
       else
         log_failure_msg "MySQL (Percona XtraDB Cluster) server process #$mysqld_pid is not running!"
         rm "$mysqld_pid_file_path"
