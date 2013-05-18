@@ -100,7 +100,7 @@ then
     then
         TMPDIR="/tmp"
 
-        INNOBACKUPEX_ARGS="--galera-info --stream=tar
+        INNOBACKUPEX_ARGS="--galera-info --stream=xbstream
                            --defaults-file=${WSREP_SST_OPT_CONF}
                            --socket=${WSREP_SST_OPT_SOCKET}"
 
@@ -174,7 +174,7 @@ then
     trap cleanup_joiner EXIT
 
     set +e
-    ${NC_BIN} -dl ${NC_PORT}  | tar xfi  - -C ${DATA}  1>&2
+    ${NC_BIN} -dl ${NC_PORT}  | xbstream -x -C ${DATA}  1>&2
     RC=( "${PIPESTATUS[@]}" )
     set -e
 
