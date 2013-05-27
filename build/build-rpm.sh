@@ -127,7 +127,7 @@ export WSREP_VERSION="$WSREP_VERSION"
 
 # Create directories for rpmbuild if these don't exist
 (cd "$WORKDIR" && mkdir -p BUILD RPMS SOURCES SPECS SRPMS)
-
+cp -f $(readlink -f $(dirname $0))/rpm/*.patch ${WORKDIR}/SOURCES/
 (
     cd "$SOURCEDIR"
  
@@ -139,7 +139,6 @@ export WSREP_VERSION="$WSREP_VERSION"
     then
         sed -i 's/lib64/lib/' "Percona-Server/cmake/install_layout.cmake"
     fi
-
     # Create tarball for build
     tar czf "$WORKDIR_ABS/SOURCES/$PRODUCT.tar.gz" "$PRODUCT/"*
 

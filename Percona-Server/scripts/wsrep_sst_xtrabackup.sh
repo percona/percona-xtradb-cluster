@@ -110,7 +110,10 @@ then
 
         if [ ${#AUTH[*]} -eq 2 ]; then
            INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --password=${AUTH[1]}"
-        fi
+       else
+           # Empty password, used for testing, debugging etc.
+           INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --password=''"
+       fi
 
         set +e
 

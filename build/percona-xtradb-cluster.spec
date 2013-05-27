@@ -216,10 +216,10 @@
 ##############################################################################
 
 %if %{commercial}
-%define license_files_server    %{src_dir}/LICENSE.mysql
+%define license_files_server    LICENSE.mysql
 %define license_type            Commercial
 %else
-%define license_files_server    %{src_dir}/COPYING %{src_dir}/README
+%define license_files_server    COPYING README
 %define license_type            GPL
 %endif
 
@@ -235,7 +235,8 @@ Release:        %{release}
 Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
-Source:         Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
+Source:         http://www.percona.com/downloads/Percona-XtraDB-Cluster/%{mysql_version}-%{majorversion}.%{minorversion}/source/Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
+Patch1:         mysql-dubious-exports.patch
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -267,7 +268,7 @@ Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar nc rsync
 Provides:       mysql-server MySQL-server Percona-Server-server
-Conflicts:	Percona-Server-server-55 Percona-Server-server-51
+Conflicts:	Percona-Server-server-55 Percona-Server-server-51 Percona-SQL-server-50
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -316,7 +317,7 @@ Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test Percona-Server-test
-Conflicts:	Percona-Server-test-55 Percona-Server-test-51
+Conflicts:	Percona-Server-test-55 Percona-Server-test-51 Percona-SQL-test-50
 AutoReqProv:    no
 
 %description -n Percona-XtraDB-Cluster-test%{product_suffix}
@@ -340,7 +341,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel Percona-Server-devel
-Conflicts:	Percona-Server-devel-55 Percona-Server-devel-51
+Conflicts:	Percona-SQL-devel-50 Percona-Server-devel-55 Percona-Server-devel-51
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -382,8 +383,10 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 
 ##############################################################################
 %prep
-%setup -T -a 0 -c -n %{src_dir}
-
+%setup -n %{src_dir}
+#
+%patch1 -p1 
+#
 ##############################################################################
 %build
 
@@ -396,7 +399,7 @@ BuildHandlerSocket() {
     echo "Configuring HandlerSocket"
     CXX="${HS_CXX:-g++}" \
         MYSQL_CFLAGS="-I $RPM_BUILD_DIR/%{src_dir}/release/include" \
-        ./configure --with-mysql-source=$RPM_BUILD_DIR/%{src_dir}/%{src_dir} \
+        ./configure --with-mysql-source=$RPM_BUILD_DIR/%{src_dir} \
         --with-mysql-bindir=$RPM_BUILD_DIR/%{src_dir}/release/scripts \
         --with-mysql-plugindir=%{_libdir}/mysql/plugin \
         --libdir=%{_libdir} \
@@ -409,7 +412,7 @@ BuildUDF() {
     cd UDF
     CXX="${UDF_CXX:-g++}"\
         CXXFLAGS="$CXXFLAGS -I$RPM_BUILD_DIR/%{src_dir}/release/include" \
-        ./configure --includedir=$RPM_BUILD_DIR/%{src_dir}/%{src_dir}/include \
+        ./configure --includedir=$RPM_BUILD_DIR/%{src_dir}/include \
         --libdir=%{_libdir}/mysql/plugin
     make all
     cd -
@@ -464,7 +467,7 @@ mkdir debug
                   -e 's/ $//'`
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DCMAKE_BUILD_TYPE=Debug \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
@@ -485,7 +488,7 @@ mkdir release
   cd release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
@@ -499,7 +502,7 @@ mkdir release
            -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG}
-  cd ../%{src_dir}
+  cd ../
   d="`pwd`"
   BuildHandlerSocket
   BuildUDF
@@ -566,10 +569,10 @@ install -d $RBR%{_libdir}/mysql/plugin
   cd $MBD/release
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   d="`pwd`"
-  cd $MBD/%{src_dir}/storage/HandlerSocket-Plugin-for-MySQL
+  cd $MBD/storage/HandlerSocket-Plugin-for-MySQL
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   cd "$d"
-  cd $MBD/%{src_dir}/UDF
+  cd $MBD/UDF
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   cd "$d"
 )
@@ -598,7 +601,7 @@ install -d $RBR%{_bindir}
 ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 # Install SELinux files in datadir
-install -m 600 $MBD/%{src_dir}/support-files/RHEL4-SElinux/mysql.{fc,te} \
+install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
   $RBR%{_datadir}/mysql/SELinux/RHEL4
 
 %if %{WITH_TCMALLOC}
@@ -790,17 +793,6 @@ fi
 
 if [ $1 -eq 1 ]; then
 # ----------------------------------------------------------------------
-# Create a MySQL user and group. Do not report any problems if it already
-# exists.
-# ----------------------------------------------------------------------
-groupadd -r %{mysqld_group} 2> /dev/null || true
-useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
-  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-# The user may already exist, make sure it has the proper group nevertheless
-# (BUG#12823)
-usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-
-# ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
 if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir; fi
@@ -815,8 +807,24 @@ fi
 if [ ! -d $mysql_datadir/test ]; then 
         mkdir $mysql_datadir/test; 
 fi
+
+# ----------------------------------------------------------------------
+# Create a MySQL user and group. Do not report any problems if it already
+# exists.
+# ----------------------------------------------------------------------
+groupadd -r %{mysqld_group} 2> /dev/null || true
+useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
+  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+# The user may already exist, make sure it has the proper group nevertheless
+# (BUG#12823)
+usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+
+# ----------------------------------------------------------------------
+# Initiate databases if needed
+# ----------------------------------------------------------------------
 %{_bindir}/mysql_install_db --rpm --user=%{mysqld_user}
 fi 
+
 # ----------------------------------------------------------------------
 # Make MySQL start/shutdown automatically when the machine does it.
 # ----------------------------------------------------------------------
@@ -830,9 +838,6 @@ elif [ -x /sbin/insserv ] ; then
         /sbin/insserv %{_sysconfdir}/init.d/mysql
 fi
 
-# ----------------------------------------------------------------------
-# Initiate databases if needed
-# ----------------------------------------------------------------------
 # ----------------------------------------------------------------------
 # Upgrade databases if needed would go here - but it cannot be automated yet
 # ----------------------------------------------------------------------
