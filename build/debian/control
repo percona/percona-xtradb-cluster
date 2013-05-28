@@ -40,9 +40,9 @@ Package: percona-xtradb-cluster-common-5.5
 Section: database
 Architecture: all
 Depends: ${misc:Depends}
-Conflicts: mysql-common-4.1, mysql-common-5.0, mysql-common-5.1, mysql-common
+Conflicts: mysql-common-4.1, mysql-common-5.0, mysql-common-5.1, mysql-common, percona-server-common-5.1, percona-server-common-5.5
 Provides: mysql-common
-Replaces: mysql-common-4.1, mysql-common-5.0, mysql-common-5.1, mysql-common
+Replaces: mysql-common-4.1, mysql-common-5.0, mysql-common-5.1, mysql-common, percona-server-common-5.1, percona-server-common-5.5
 Description: Percona Server database common files (e.g. /etc/mysql/my.cnf)
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -71,9 +71,9 @@ Description: Percona Server database test suite
 Package: percona-xtradb-cluster-client-5.5
 Architecture: any
 Depends: debianutils (>=1.6), libdbi-perl, percona-xtradb-cluster-common-5.5 (>= ${source:Version}), libmysqlclient18 (>= ${source:Version}), ${shlib:Depends}, ${misc:Depends}
-Provides: mysql-client, virtual-mysql-client
-Conflicts: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, percona-xtradb-client-5.0, percona-xtradb-cluster-client-5.1
-Replaces: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, percona-xtradb-client-5.0, percona-xtradb-cluster-client-5.1
+Provides: mysql-client, mysql-client-core, mysql-client-5.5, mysql-client-core-5.5, virtual-mysql-client
+Conflicts: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, mysql-client-5.5, mysql-client-core-5.5, percona-xtradb-client-5.0, percona-server-client-5.1, percona-server-client-5.5
+Replaces: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, mysql-client-5.5, mysql-client-core-5.5, percona-xtradb-client-5.0, percona-server-client-5.1, percona-server-client-5.5
 Description: Percona Server database client binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -88,9 +88,9 @@ Package: percona-xtradb-cluster-server-5.5
 Architecture: any
 Suggests: tinyca
 Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}), libdbi-perl, perl (>= 5.6), ${shlibs:Depends}, ${misc:Depends}, psmisc, passwd, lsb-base (>= 3.0-10), percona-xtradb-cluster-common-5.5 (>= ${source:Version}), percona-xtradb-cluster-galera, adduser (>= 3.40), debconf, percona-xtrabackup (>= 1.9.0), tar, netcat-openbsd, rsync
-Conflicts: mysql-server (<< ${source:Version}), mysql-server-4.1, mysql-server-core-5.1, percona-xtradb-server-5.0, percona-xtradb-cluster-server-5.1
-Provides: mysql-server
-Replaces: mysql-server (<< ${source:Version}), mysql-server-5.0, mysql-server-core-5.1, percona-xtradb-server-5.0, percona-xtradb-cluster-server-5.1
+Conflicts: mysql-server (<< ${source:Version}), mysql-server-4.1, mysql-server-5.5, mysql-server-core-5.1, mysql-server-core-5.5, percona-xtradb-server-5.0, percona-server-server-5.1, percona-server-server-5.5
+Provides: mysql-server, mysql-server-core, mysql-server-5.5, mysql-server-core-5.5
+Replaces: mysql-server (<< ${source:Version}), mysql-server-5.0, mysql-server-core-5.1, mysql-server-core-5.5, percona-xtradb-server-5.0, percona-server-server-5.1, percona-server-server-5.5
 Description: Percona Server database server binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
