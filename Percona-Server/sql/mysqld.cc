@@ -8927,7 +8927,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
 #endif
-  { &key_PARTITION_LOCK_auto_inc, "HA_DATA_PARTITION::LOCK_auto_inc", 0}
+  { &key_PARTITION_LOCK_auto_inc, "HA_DATA_PARTITION::LOCK_auto_inc", 0},
   { &key_LOCK_thread_created, "LOCK_thread_created", PSI_FLAG_GLOBAL }
 };
 

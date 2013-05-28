@@ -2617,6 +2617,7 @@ null_exit:
 			  srv_pass_corrupt_table <= 1)) {
 
 		mutex_exit(block_mutex);
+
 		return(NULL);
 	}
 
