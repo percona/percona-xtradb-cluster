@@ -289,6 +289,9 @@ then
 
         if [[ $? = 0 ]];then
             find ${DATA} -type f -name '*.qp' -delete
+        else 
+            wsrep_log_error "Decompression failed.  Make sure qpress is installed and is in PATH"
+            exit 22
         fi
 
         ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild \
