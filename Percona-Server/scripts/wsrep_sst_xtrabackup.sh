@@ -158,8 +158,8 @@ then
 
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
-    s_encrypted=1
-    encrypt=1
+    sencrypted=1
+    encrypt=0
     ekey=""
     ealgo=""
     ekeyfile=""
@@ -189,13 +189,13 @@ then
     my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt && encrypt=1
 
     set +e
-    if [[ $encrypt -eq 1 -a $s_encrypted -eq 1 ]];then
+    if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
 
         ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
         ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
         ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
-        if [[ -z $ealgo -o (-z $ekey -a -z $ekeyfile) ]];then
+        if [[ -z $ealgo || (-z $ekey && -z $ekeyfile) ]];then
             wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
             exit 3
         fi
@@ -251,14 +251,14 @@ then
         # Till https://blueprints.launchpad.net/percona-xtrabackup/+spec/add-support-for-rsync-url 
         # is implemented
 
-        if [[ $encrypt -eq 1 -a $s_encrypted -eq 0 ]];then
+        if [[ $encrypt -eq 1 && $sencrypted -eq 0 ]];then
             ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
             ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
             ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
             # Decrypt the files if any
             find ${DATA} -type f -name '*.xbcrypt' -printf '%p\n'  |  while read line;do 
-                if [[ -z $ealgo -o (-z $ekey -a -z $ekeyfile) ]];then
+                if [[ -z $ealgo || (-z $ekey && -z $ekeyfile) ]];then
                     wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
                     exit 3
                 fi
@@ -284,12 +284,14 @@ then
         # Rebuild indexes for compact backups
         grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints && rebuild="--rebuild-indexes"
 
+        set +e
         # Decompress the qpress files if any
-        find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d
+        find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d 2>/dev/null
+        set -e
 
-        if [[ $? = 0 ]];then
-            find ${DATA} -type f -name '*.qp' -delete
-        else 
+        if [[ $? -eq 0 ]];then
+            find ${DATA} -type f -name '*.qp' -delete 2>/dev/null
+        elif [[ $? -ne 124 ]];then
             wsrep_log_error "Decompression failed.  Make sure qpress is installed and is in PATH"
             exit 22
         fi
