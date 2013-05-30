@@ -3980,11 +3980,13 @@ static int init_server_components()
 
 #ifdef WITH_WSREP
   if (!WSREP_ON && !opt_bin_log && binlog_format_used)
+    sql_print_warning("You need to use --log-bin or have --wsrep-on to make"
+                      "--binlog-format work.");
 #else
   if (!opt_bin_log && binlog_format_used)
-#endif
     sql_print_warning("You need to use --log-bin to make "
                       "--binlog-format work.");
+#endif
 
   /* Check that we have not let the format to unspecified at this point */
   DBUG_ASSERT((uint)global_system_variables.binlog_format <=
