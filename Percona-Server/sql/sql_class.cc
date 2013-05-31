@@ -898,6 +898,16 @@ extern "C" const char *wsrep_thd_conflict_state_str(THD *thd)
     (thd->wsrep_conflict_state == CERT_FAILURE)     ? "cert failure" : "void";
 }
 
+extern "C" const char *wsrep_consistency_check_str(THD *thd)
+{
+  return 
+    (!thd) ? "void" :
+    (thd->wsrep_consistency_check == CONSISTENCY_CHECK_RUNNING) \
+                                    ? "Consistency check running"  :
+    (thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED) \
+                                    ? "Consistency check declared" : "None";
+}
+
 extern "C" wsrep_trx_handle_t* wsrep_thd_trx_handle(THD *thd)
 {
   return &thd->wsrep_trx_handle;
