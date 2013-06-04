@@ -3434,16 +3434,6 @@ innobase_commit_low(
 /*================*/
 	trx_t*	trx)	/*!< in: transaction handle */
 {
-	if (trx_is_started(trx)) {
-
-		/* Save the current replication position for write to trx sys
-		header for undo purposes, see the comment at corresponding call
-		at innobase_xa_prepare(). */
-
-		innobase_copy_repl_coords_to_trx((THD *) trx->mysql_thd, trx);
-
-		trx_commit_for_mysql(trx);
-	}
 #ifdef WITH_WSREP
 	THD* thd = (THD*)trx->mysql_thd;
 	const char* tmp = 0;
@@ -3461,7 +3451,16 @@ innobase_commit_low(
 #endif /* WSREP_PROC_INFO */
 	}
 #endif /* WITH_WSREP */
-	trx_commit_for_mysql(trx);
+	if (trx_is_started(trx)) {
+
+		/* Save the current replication position for write to trx sys
+		header for undo purposes, see the comment at corresponding call
+		at innobase_xa_prepare(). */
+
+		innobase_copy_repl_coords_to_trx((THD *) trx->mysql_thd, trx);
+
+		trx_commit_for_mysql(trx);
+	}
 #ifdef WITH_WSREP
 	if (wsrep_on((void*)thd)) { thd_proc_info(thd, tmp); }
 #endif /* WITH_WSREP */
