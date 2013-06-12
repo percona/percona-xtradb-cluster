@@ -22,13 +22,11 @@
 
 cleanup_joiner()
 {
-#set -x
     local PID=$(ps -aef |grep nc| grep $NC_PORT  | awk '{ print $2 }')
     wsrep_log_info "Killing nc pid $PID"
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -f "$MAGIC_FILE"
     wsrep_cleanup_progress_file
-#set +x
 }
 
 check_pid()
@@ -88,6 +86,7 @@ rm -f "${MAGIC_FILE}"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
+    encrypt=0
 
 #    UUID=$6
 #    SEQNO=$7
@@ -116,6 +115,32 @@ then
        fi
 
         set +e
+
+        if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
+            wsrep_log_info "Encryption enabled"
+            encrypt=1
+        fi
+        if [[ $encrypt -eq 1 ]];then
+
+            ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+            ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+            ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+
+            if [[ -z $ealgo || (-z $ekey && -z $ekeyfile) ]];then
+                wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
+                exit 3
+            fi
+            
+            if [[ -n $ekey ]];then
+                INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --encrypt=$ealgo --encrypt-key=$ekey"
+            else 
+                if [[ ! -r $ekeyfile ]];then
+                    wsrep_log_error "FATAL: Key file not readable"
+                    exit 3
+                fi
+                INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --encrypt=$ealgo --encrypt-key-file=$ekeyfile"
+            fi
+        fi
 
         ${INNOBACKUPEX_BIN} ${INNOBACKUPEX_ARGS} ${TMPDIR} \
         2> ${DATA}/innobackup.backup.log | \
@@ -186,7 +211,10 @@ then
     # There is no metadata in the stream to indicate that it is encrypted
     # So, if the cnf file on joiner contains 'encrypt' under [xtrabackup] section then 
     # it means encryption is being used
-    my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt && encrypt=1
+    if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
+        wsrep_log_info "Encryption enabled in my.cnf, decrypting the stream/backup"
+        encrypt=1
+    fi
 
     set +e
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
@@ -201,14 +229,14 @@ then
         fi
 
         if [[ -n $ekey ]];then
-            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA}  1>&2
+            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA}  1>&2
             RC=( "${PIPESTATUS[@]}" )
         else 
             if [[ ! -r $ekeyfile ]];then
                 wsrep_log_error "FATAL: Key file not readable"
                 exit 3
             fi
-            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}  1>&2
+            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}  1>&2
             RC=( "${PIPESTATUS[@]}" )
         fi
     else 
@@ -266,13 +294,13 @@ then
                 output=${input%.xbcrypt}
 
                 if [[ -n $ekey ]];then
-                    xbcrypt -d --encrypt=$ealgo --encrypt-key=$ekey -i $input > $output
+                    xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey -i $input > $output
                 else 
                     if [[ ! -r $ekeyfile ]];then
                         wsrep_log_error "FATAL: Key file not readable"
                         exit 3
                     fi
-                    xbcrypt -d --encrypt=$ealgo --encrypt-key-file=$ekeyfile -i $input > $output
+                    xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile -i $input > $output
                 fi
             done
 
@@ -282,17 +310,31 @@ then
         fi
 
         # Rebuild indexes for compact backups
-        grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints && rebuild="--rebuild-indexes"
+        if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
+            wsrep_log_info "Index compaction detected"
+            rebuild="--rebuild-indexes"
+        fi
 
         set +e
         # Decompress the qpress files if any
         find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d 2>/dev/null
+        extcode=$?
         set -e
 
-        if [[ $? -eq 0 ]];then
+        # 124 is the exit code if there no qpress files found
+        # 127 is the exit code if qpress is not found
+        if [[ $extcode -eq 0 ]];then
+            wsrep_log_info "Removing qpress files after decompression"
             find ${DATA} -type f -name '*.qp' -delete 2>/dev/null
-        elif [[ $? -ne 124 ]];then
-            wsrep_log_error "Decompression failed.  Make sure qpress is installed and is in PATH"
+            if [[ $? -ne 0 ]];then 
+                wsrep_log_error "Something went wrong with deletion of qpress files. Investigate"
+            fi
+        elif [[ $extcode -ne 124 ]];then
+            if [[ $extcode -eq 127 ]];then
+                wsrep_log_error "Decompression failed.  Make sure qpress is installed and is in PATH"
+            else
+                wsrep_log_error "Decompression failed. Unknown error: $extcode"
+            fi
             exit 22
         fi
 
@@ -306,7 +348,9 @@ then
     fi
 
     cat "${MAGIC_FILE}" # output UUID:seqno
-    wsrep_cleanup_progress_file
+
+    #Cleanup not required here since EXIT trap should be called
+    #wsrep_cleanup_progress_file
 
 else
     wsrep_log_error "Unrecognized role: ${WSREP_SST_OPT_ROLE}"
