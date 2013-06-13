@@ -26,7 +26,9 @@ cleanup_joiner()
     wsrep_log_info "Killing nc pid $PID"
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -f "$MAGIC_FILE"
-    wsrep_cleanup_progress_file
+    if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
+        wsrep_cleanup_progress_file
+    fi
 }
 
 check_pid()
@@ -122,9 +124,9 @@ then
         fi
         if [[ $encrypt -eq 1 ]];then
 
-            ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
-            ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
-            ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+            ealgo=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+            ekey=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+            ekeyfile=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
             if [[ -z $ealgo || (-z $ekey && -z $ekeyfile) ]];then
                 wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
@@ -183,6 +185,8 @@ then
 
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
+    touch $SST_PROGRESS_FILE
+
     sencrypted=1
     encrypt=0
     ekey=""
@@ -219,9 +223,10 @@ then
     set +e
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
 
-        ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
-        ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
-        ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+
+        ealgo=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+        ekey=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+        ekeyfile=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
         if [[ -z $ealgo || (-z $ekey && -z $ekeyfile) ]];then
             wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
@@ -280,9 +285,9 @@ then
         # is implemented
 
         if [[ $encrypt -eq 1 && $sencrypted -eq 0 ]];then
-            ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
-            ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
-            ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+            ealgo=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+            ekey=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+            ekeyfile=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
             # Decrypt the files if any
             find ${DATA} -type f -name '*.xbcrypt' -printf '%p\n'  |  while read line;do 

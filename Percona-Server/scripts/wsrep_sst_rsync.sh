@@ -33,7 +33,9 @@ cleanup_joiner()
     rm -rf "$MAGIC_FILE"
     rm -rf "$RSYNC_PID"
     wsrep_log_info "Joiner cleanup done."
-    wsrep_cleanup_progress_file
+    if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
+        wsrep_cleanup_progress_file
+    fi
 }
 
 check_pid()
@@ -155,6 +157,7 @@ then
 
 elif [ "$WSREP_SST_OPT_ROLE" = "joiner" ]
 then
+    touch $SST_PROGRESS_FILE
     MYSQLD_PID=$WSREP_SST_OPT_PARENT
 
     MODULE="rsync_sst"
