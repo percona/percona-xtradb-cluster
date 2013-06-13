@@ -1032,7 +1032,7 @@ echo "====="                                     >> $STATUS_HISTORY
 #%doc %{src_dir}/Docs/INFO_SRC
 %doc release/Docs/INFO_BIN
 %doc release/support-files/my-*.cnf
-%doc %{src_dir}/Docs/README-wsrep
+%doc Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
