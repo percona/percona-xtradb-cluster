@@ -27,8 +27,8 @@
 
 %define mysql_version   5.5.31
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define majorversion 24
-%define minorversion 8
+%define majorversion 30
+%define minorversion 3
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
 
@@ -235,7 +235,7 @@ Release:        %{release}
 Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
-Source:         http://www.percona.com/downloads/Percona-XtraDB-Cluster/%{mysql_version}-%{majorversion}.%{minorversion}/source/Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
+Source:         Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
 Patch1:         mysql-dubious-exports.patch
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
@@ -268,7 +268,7 @@ Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar nc rsync
 Provides:       mysql-server MySQL-server Percona-Server-server
-Conflicts:	Percona-Server-server-55 Percona-Server-server-51 Percona-SQL-server-50
+Conflicts:	Percona-Server-server-56 Percona-Server-server-55 Percona-Server-server-51 Percona-SQL-server-50
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -293,7 +293,7 @@ Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
 Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
 Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
-Conflicts:	Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
+Conflicts:	Percona-Server-client-56 Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
 
 %description -n Percona-XtraDB-Cluster-client%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -317,7 +317,7 @@ Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test Percona-Server-test
-Conflicts:	Percona-Server-test-55 Percona-Server-test-51 Percona-SQL-test-50
+Conflicts:	Percona-Server-test-56 Percona-Server-test-55 Percona-Server-test-51
 AutoReqProv:    no
 
 %description -n Percona-XtraDB-Cluster-test%{product_suffix}
@@ -341,7 +341,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel Percona-Server-devel
-Conflicts:	Percona-SQL-devel-50 Percona-Server-devel-55 Percona-Server-devel-51
+Conflicts:	Percona-Server-devel-56 Percona-Server-devel-55 Percona-Server-devel-51 Percona-SQL-devel-50
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
