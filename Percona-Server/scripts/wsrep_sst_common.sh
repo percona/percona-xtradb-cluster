@@ -87,7 +87,6 @@ done
 readonly WSREP_SST_OPT_BYPASS
 
 SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
-touch $SST_PROGRESS_FILE
 
 wsrep_log()
 {

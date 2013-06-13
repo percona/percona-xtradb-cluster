@@ -26,7 +26,9 @@ cleanup_joiner()
     wsrep_log_info "Killing nc pid $PID"
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -f "$MAGIC_FILE"
-    wsrep_cleanup_progress_file
+    if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
+        wsrep_cleanup_progress_file
+    fi
 }
 
 check_pid()
@@ -117,14 +119,14 @@ then
         set +e
 
         if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
-            wsrep_log_info "Encryption enabled"
-            encrypt=1
+            wsrep_log_info "Encryption enabled in my.cnf -  NOT SUPPORTED - look at lp:1190343"
+            #encrypt=1
         fi
         if [[ $encrypt -eq 1 ]];then
 
-            ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
-            ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
-            ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+            ealgo=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+            ekey=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+            ekeyfile=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
             if [[ -z $ealgo || (-z $ekey && -z $ekeyfile) ]];then
                 wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
@@ -183,6 +185,8 @@ then
 
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
+    touch $SST_PROGRESS_FILE
+
     sencrypted=1
     encrypt=0
     ekey=""
@@ -212,16 +216,18 @@ then
     # So, if the cnf file on joiner contains 'encrypt' under [xtrabackup] section then 
     # it means encryption is being used
     if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
-        wsrep_log_info "Encryption enabled in my.cnf, decrypting the stream/backup"
-        encrypt=1
+        #wsrep_log_info "Encryption enabled in my.cnf, decrypting the stream/backup"
+        wsrep_log_error "Encryption enabled in my.cnf -  NOT SUPPORTED - look at lp:1190343"
+        #encrypt=1
     fi
 
     set +e
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
 
-        ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
-        ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
-        ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+
+        ealgo=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+        ekey=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+        ekeyfile=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
         if [[ -z $ealgo || (-z $ekey && -z $ekeyfile) ]];then
             wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
@@ -270,6 +276,7 @@ then
 
     if [ ! -r "${IST_FILE}" ]
     then
+        wsrep_log_info "Removing existing ib_logfile files"
         rm -f ${DATA}/ib_logfile*
         rebuild=""
 
@@ -280,9 +287,9 @@ then
         # is implemented
 
         if [[ $encrypt -eq 1 && $sencrypted -eq 0 ]];then
-            ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
-            ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
-            ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+            ealgo=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+            ekey=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+            ekeyfile=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
 
             # Decrypt the files if any
             find ${DATA} -type f -name '*.xbcrypt' -printf '%p\n'  |  while read line;do 
@@ -315,27 +322,37 @@ then
             rebuild="--rebuild-indexes"
         fi
 
-        set +e
-        # Decompress the qpress files if any
-        find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d 2>/dev/null
-        extcode=$?
-        set -e
+        if test -n "$(find ${DATA} -maxdepth 1 -name '*.qp' -print -quit)";then
 
-        # 124 is the exit code if there no qpress files found
-        # 127 is the exit code if qpress is not found
-        if [[ $extcode -eq 0 ]];then
-            wsrep_log_info "Removing qpress files after decompression"
-            find ${DATA} -type f -name '*.qp' -delete 2>/dev/null
-            if [[ $? -ne 0 ]];then 
-                wsrep_log_error "Something went wrong with deletion of qpress files. Investigate"
+            wsrep_log_info "Compressed qpress files found"
+
+            if [[ ! -x `which qpress` ]];then 
+                wsrep_log_error "qpress not found in PATH"
+                exit 22
             fi
-        elif [[ $extcode -ne 124 ]];then
-            if [[ $extcode -eq 127 ]];then
-                wsrep_log_error "Decompression failed.  Make sure qpress is installed and is in PATH"
+
+
+            set +e
+
+            wsrep_log_info "Removing existing ibdata1 file"
+            rm -f ${DATA}/ibdata1
+
+            # Decompress the qpress files 
+            find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d 
+            extcode=$?
+
+            set -e
+
+            if [[ $extcode -eq 0 ]];then
+                wsrep_log_info "Removing qpress files after decompression"
+                find ${DATA} -type f -name '*.qp' -delete 
+                if [[ $? -ne 0 ]];then 
+                    wsrep_log_error "Something went wrong with deletion of qpress files. Investigate"
+                fi
             else
-                wsrep_log_error "Decompression failed. Unknown error: $extcode"
+                wsrep_log_error "Decompression failed. Exit code: $extcode"
+                exit 22
             fi
-            exit 22
         fi
 
         ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild \

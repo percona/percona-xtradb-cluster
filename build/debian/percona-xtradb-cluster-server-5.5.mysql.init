@@ -253,7 +253,9 @@ case "${1:-''}" in
 	   log_progress_msg "already running"
 	   log_end_msg 0
 	else
-  	    "${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-new-cluster > /dev/null 2>&1 &
+	     # Not enabled in code - will be in 5.5-24
+             #"${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-new-cluster > /dev/null 2>&1 &
+  	    "${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-cluster-address="gcomm://" > /dev/null 2>&1 &
 	    # 6s was reported in #352070 to be too few when using ndbcluster
 	    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do
                 sleep 1
