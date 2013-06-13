@@ -1,3 +1,5 @@
+.. _limitations:
+
 ====================================
  Percona XtraDB Cluster Limitations
 ====================================
@@ -5,8 +7,6 @@
 There are some limitations which you should be aware of. Some of them will be eliminated later as product is improved and some are design limitations.
 
  - Currently replication works only with |InnoDB| storage engine. Any writes to tables of other types, including system (mysql.*) tables, are not replicated. However, DDL statements are replicated in statement level, and changes to mysql.* tables will get replicated that way. So, you can safely issue: CREATE USER..., but issuing: INSERT INTO mysql.user..., will not be replicated.
-
- - DELETE operation is unsupported on tables without primary key. Also rows in tables without primary key may appear in different order on different nodes. As a result SELECT...LIMIT... may return slightly different sets.
 
  - Unsupported queries:
     * LOCK/UNLOCK TABLES cannot be supported in multi-master setups.
@@ -21,10 +21,7 @@ There are some limitations which you should be aware of. Some of them will be el
 
  - XA transactions can not be supported due to possible rollback on commit.
 
- - The write throughput of the whole cluster is limited by weakest node. If one node becomes slow, whole cluster is slow. If you have requirements for stable high performance, then it should be supported by corresponding hardware (10Gb network, SSD).
+ - The write throughput of the whole cluster is limited by weakest node. If one node becomes slow, whole cluster is slow. If you have requirements for stable high performance, then it should be supported by corresponding hardware.
 
  - The minimal recommended size of cluster is 3 nodes.
-
- - DDL statements are problematic and may stall cluster. Later, the support of DDL will be improved, but will always require special treatment. 
-
 
