@@ -275,6 +275,7 @@ then
 
     if [ ! -r "${IST_FILE}" ]
     then
+        wsrep_log_info "Removing existing ib_logfile files"
         rm -f ${DATA}/ib_logfile*
         rebuild=""
 
@@ -320,27 +321,37 @@ then
             rebuild="--rebuild-indexes"
         fi
 
-        set +e
-        # Decompress the qpress files if any
-        find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d 2>/dev/null
-        extcode=$?
-        set -e
+        if test -n "$(find ${DATA} -maxdepth 1 -name '*.qp' -print -quit)";then
 
-        # 124 is the exit code if there no qpress files found
-        # 127 is the exit code if qpress is not found
-        if [[ $extcode -eq 0 ]];then
-            wsrep_log_info "Removing qpress files after decompression"
-            find ${DATA} -type f -name '*.qp' -delete 2>/dev/null
-            if [[ $? -ne 0 ]];then 
-                wsrep_log_error "Something went wrong with deletion of qpress files. Investigate"
+            wsrep_log_info "Compressed qpress files found"
+
+            if [[ ! -x `which qpress` ]];then 
+                wsrep_log_error "qpress not found in PATH"
+                exit 22
             fi
-        elif [[ $extcode -ne 124 ]];then
-            if [[ $extcode -eq 127 ]];then
-                wsrep_log_error "Decompression failed.  Make sure qpress is installed and is in PATH"
+
+
+            set +e
+
+            wsrep_log_info "Removing existing ibdata1 file"
+            rm -f ${DATA}/ibdata1
+
+            # Decompress the qpress files 
+            find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d 
+            extcode=$?
+
+            set -e
+
+            if [[ $extcode -eq 0 ]];then
+                wsrep_log_info "Removing qpress files after decompression"
+                find ${DATA} -type f -name '*.qp' -delete 
+                if [[ $? -ne 0 ]];then 
+                    wsrep_log_error "Something went wrong with deletion of qpress files. Investigate"
+                fi
             else
-                wsrep_log_error "Decompression failed. Unknown error: $extcode"
+                wsrep_log_error "Decompression failed. Exit code: $extcode"
+                exit 22
             fi
-            exit 22
         fi
 
         ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild \
