@@ -119,8 +119,8 @@ then
         set +e
 
         if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
-            wsrep_log_info "Encryption enabled"
-            encrypt=1
+            wsrep_log_info "Encryption enabled in my.cnf -  NOT SUPPORTED - look at lp:1190343"
+            #encrypt=1
         fi
         if [[ $encrypt -eq 1 ]];then
 
@@ -216,8 +216,9 @@ then
     # So, if the cnf file on joiner contains 'encrypt' under [xtrabackup] section then 
     # it means encryption is being used
     if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
-        wsrep_log_info "Encryption enabled in my.cnf, decrypting the stream/backup"
-        encrypt=1
+        #wsrep_log_info "Encryption enabled in my.cnf, decrypting the stream/backup"
+        wsrep_log_error "Encryption enabled in my.cnf -  NOT SUPPORTED - look at lp:1190343"
+        #encrypt=1
     fi
 
     set +e
