@@ -213,9 +213,11 @@ wsrep_recover_position() {
   [ "$euid" = "0" ] && chown $user $wr_logfile
   chmod 600 $wr_logfile
 
-  log_notice "WSREP: Running position recovery with --log_error=$wr_logfile"
+  log_notice "WSREP: Running position recovery with --log_error=$wr_logfile \
+                                --pid-file="$DATADIR/`@HOSTNAME@`-recover.pid""
 
-  eval_log_error $mysqld_cmd --log_error=$wr_logfile --wsrep-recover
+  eval_log_error "$mysqld_cmd --log_error=$wr_logfile --wsrep-recover \
+                            --pid-file="$DATADIR/`@HOSTNAME@`-recover.pid""
 
   local rp="$(grep 'WSREP: Recovered position:' $wr_logfile)"
   if [ -z "$rp" ]; then
