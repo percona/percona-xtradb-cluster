@@ -156,6 +156,13 @@ then
 
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
+    s_encrypted=1
+    encrypt=1
+    ekey=""
+    ealgo=""
+    ekeyfile=""
+    ecode=0
+
     MODULE="xtrabackup_sst"
 
     rm -f ${DATA}/xtrabackup_*
@@ -174,19 +181,49 @@ then
 #    trap "exit 3"  INT TERM
     trap cleanup_joiner HUP PIPE INT TERM
 
+    # There is no metadata in the stream to indicate that it is encrypted
+    # So, if the cnf file on joiner contains 'encrypt' under [xtrabackup] section then 
+    # it means encryption is being used
+    my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt && encrypt=1
+
     set +e
-    ${NC_BIN} -dl ${NC_PORT}  | xbstream -x -C ${DATA}  1>&2
-    RC=( "${PIPESTATUS[@]}" )
+    if [[ $encrypt -eq 1 -a $s_encrypted -eq 1 ]];then
+
+        ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+        ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+        ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+
+        if [[ -z $ealgo -o (-z $ekey -a -z $ekeyfile) ]];then
+            wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
+            exit 3
+        fi
+
+        if [[ -n $ekey ]];then
+            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA}  1>&2
+            RC=( "${PIPESTATUS[@]}" )
+        else 
+            if [[ ! -r $ekeyfile ]];then
+                wsrep_log_error "FATAL: Key file not readable"
+                exit 3
+            fi
+            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}  1>&2
+            RC=( "${PIPESTATUS[@]}" )
+        fi
+    else 
+        ${NC_BIN} -dl ${NC_PORT}  | xbstream -x -C ${DATA}  1>&2
+        RC=( "${PIPESTATUS[@]}" )
+    fi
     set -e
 
     wait %% # join wait_for_nc thread
 
-    if [ ${RC[0]} -ne 0 -o ${RC[1]} -ne 0 ];
-    then
-        wsrep_log_error "Error while getting st data from donor node: " \
-                        "${RC[0]}, ${RC[1]}"
-        exit 32
-    fi
+    for ecode in "${RC[@]}";do 
+        if [[ $ecode -ne 0 ]];then 
+            wsrep_log_error "Error while getting st data from donor node: " \
+                            "exit codes: ${RC[@]}"
+            exit 32
+        fi
+    done
 
     if [ ! -r "${MAGIC_FILE}" ]
     then
@@ -204,9 +241,45 @@ then
     if [ ! -r "${IST_FILE}" ]
     then
         rm -f ${DATA}/ib_logfile*
-        ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log \
-        --ibbackup=xtrabackup ${DATA} 1>&2 2> ${DATA}/innobackup.prepare.log
-        if [ $? -ne 0 ];
+
+        # Decrypt only if not encrypted in stream.
+        # NOT USED NOW.  
+        # Till https://blueprints.launchpad.net/percona-xtrabackup/+spec/add-support-for-rsync-url 
+        # is implemented
+
+        if [[ $encrypt -eq 1 -a $s_encrypted -eq 0 ]];then
+            ealgo=$(my_print_defaults xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
+            ekey=$(my_print_defaults xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
+            ekeyfile=$(my_print_defaults xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+
+            # Decrypt the files if any
+            find ${DATA} -type f -name '*.xbcrypt' -printf '%p\n'  |  while read line;do 
+                if [[ -z $ealgo -o (-z $ekey -a -z $ekeyfile) ]];then
+                    wsrep_log_error "FATAL: Encryption parameters empty from my.cnf, bailing out"
+                    exit 3
+                fi
+                input=$line
+                output=${input%.xbcrypt}
+
+                if [[ -n $ekey ]];then
+                    xbcrypt -d --encrypt=$ealgo --encrypt-key=$ekey -i $input > $output
+                else 
+                    if [[ ! -r $ekeyfile ]];then
+                        wsrep_log_error "FATAL: Key file not readable"
+                        exit 3
+                    fi
+                    xbcrypt -d --encrypt=$ealgo --encrypt-key-file=$ekeyfile -i $input > $output
+                fi
+            done
+
+            if [[ $? = 0 ]];then
+                find ${DATA} -type f -name '*.xbcrypt' -delete
+            fi
+        fi
+
+        ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild \
+        ${DATA} 1>&2 2> ${DATA}/innobackup.prepare.log
+         if [ $? -ne 0 ];
         then
             wsrep_log_error "${INNOBACKUPEX_BIN} finished with errors. Check ${DATA}/innobackup.prepare.log" >&2
             exit 22
