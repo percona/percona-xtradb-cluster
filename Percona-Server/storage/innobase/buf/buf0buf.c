@@ -2774,10 +2774,6 @@ wait_until_unfixed:
 		buf_pool->n_pend_unzip++;
 		buf_pool_mutex_exit(buf_pool);
 
-		access_time = buf_page_is_accessed(&block->page);
-		mutex_exit(&block->mutex);
-		mutex_exit(&buf_pool->zip_mutex);
-
 		buf_page_free_descriptor(bpage);
 
 		/* Decompress the page while not holding
