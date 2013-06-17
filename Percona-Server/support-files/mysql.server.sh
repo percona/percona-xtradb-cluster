@@ -390,8 +390,8 @@ case "$mode" in
       # that initiate the cluster
       echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
       # Not enabled in code - will be in 5.5-24
-      #$0 start $other_args --wsrep-new-cluster
-      $0 start $other_args --wsrep-cluster-address="gcomm://"
+      $0 start $other_args --wsrep-new-cluster
+      #$0 start $other_args --wsrep-cluster-address="gcomm://"
       ;;
     *)
       # usage
