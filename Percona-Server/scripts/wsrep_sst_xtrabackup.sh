@@ -16,7 +16,13 @@
 # MA  02110-1301  USA.
 
 # This is a reference script for Percona XtraBackup-based state snapshot tansfer
-
+# Dependencies:  (depending on configuration)
+# xbcrypt for encryption/decryption.
+# qpress for decompression. Download from http://www.quicklz.com/qpress-11-linux-x64.tar till 
+# https://blueprints.launchpad.net/percona-xtrabackup/+spec/package-qpress is fixed.
+# my_print_defaults to extract values from my.cnf.
+# netcat for transfer.
+# xbstream for streaming.
 
 . $(dirname $0)/wsrep_sst_common
 
