@@ -252,14 +252,19 @@ then
     RC=( "${PIPESTATUS[@]}" )
     set -e
 
+    if [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]];then 
+        wsrep_log_error "Xbstream failed"
+        wsrep_log_error "Data directory ${DATA} needs to be empty for SST:" \
+                        "Manual intervention required in that case"
+        exit 32
+    fi
+
     wait %% # join wait_for_nc thread
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
             wsrep_log_error "Error while getting data from donor node: " \
                             "exit codes: ${RC[@]}"
-            wsrep_log_error "Data directory ${DATA} needs to be empty for SST:" \
-                            "Manual intervention required in that case"
             exit 32
         fi
     done
@@ -279,6 +284,7 @@ then
 
     if [ ! -r "${IST_FILE}" ]
     then
+        wsrep_log_info "Proceeding with SST"
         rebuild=""
         wsrep_log_info "Removing existing ib_logfile files"
         rm -f ${DATA}/ib_logfile*
@@ -354,7 +360,7 @@ then
             exit 22
         fi
     else 
-        wsrep_log_info "Running IST"
+        wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi
 
     cat "${MAGIC_FILE}" # output UUID:seqno
