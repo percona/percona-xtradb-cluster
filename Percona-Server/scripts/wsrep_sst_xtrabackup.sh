@@ -31,6 +31,9 @@ ekey=""
 ekeyfile=""
 encrypt=0
 nproc=1
+ecode=0
+
+declare -a RC
 
 get_keys()
 {
@@ -171,6 +174,8 @@ then
             fi
         fi
 
+        wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${NC_PORT}"
+
         set +e
         ${INNOBACKUPEX_BIN} ${INNOBACKUPEX_ARGS} ${TMPDIR} \
         2> ${DATA}/innobackup.backup.log | \
@@ -201,20 +206,34 @@ then
         rm -f "${XTRABACKUP_PID}"
 
     else # BYPASS
+        wsrep_log_info "Bypassing the SST for IST"
         STATE="${WSREP_SST_OPT_GTID}"
         echo "continue" # now server can resume updating data
         echo "${STATE}" > "${MAGIC_FILE}"
         echo "1" > "${DATA}/${IST_FILE}"
         get_keys
+        pushd ${DATA} 1>/dev/null
+        set +e
         if [[ $encrypt -eq 1 ]];then
             if [[ -n $ekey ]];then
-                (cd ${DATA}; xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey) | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
             else 
-                (cd ${DATA}; xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile) | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
             fi
         else 
-            (cd ${DATA}; xbstream -c ${INFO_FILE} ${IST_FILE}) | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+             xbstream -c ${INFO_FILE} ${IST_FILE} | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
         fi
+        RC=( "${PIPESTATUS[@]}" )
+        set -e
+        popd 1>/dev/null
+
+        for ecode in "${RC[@]}";do 
+            if [[ $ecode -ne 0 ]];then 
+                wsrep_log_error "Error while streaming data to joiner node: " \
+                                "exit codes: ${RC[@]}"
+                exit 32
+            fi
+        done
         rm -f ${DATA}/${IST_FILE}
     fi
 
@@ -226,8 +245,6 @@ then
     touch $SST_PROGRESS_FILE
 
     sencrypted=1
-    ecode=0
-    declare -a RC
 
     MODULE="xtrabackup_sst"
 
