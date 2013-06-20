@@ -30,6 +30,7 @@ ealgo=""
 ekey=""
 ekeyfile=""
 encrypt=0
+nproc=1
 
 get_keys()
 {
@@ -54,6 +55,14 @@ get_keys()
         exit 3
     fi
     encrypt=1
+}
+
+get_proc()
+{
+    set +e
+    nproc=$(grep -c processor /proc/cpuinfo)
+    [[ -z $nproc || $nproc -eq 0 ]] && nproc=1
+    set -e
 }
 
 cleanup_joiner()
@@ -312,10 +321,13 @@ then
             fi
         fi
 
+        get_proc
+
         # Rebuild indexes for compact backups
         if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
             wsrep_log_info "Index compaction detected"
-            rebuild="--rebuild-indexes"
+            wsrep_log_info "Rebuilding with $nproc threads"
+            rebuild="--rebuild-indexes --rebuild-threads=$nproc"
         fi
 
         if test -n "$(find ${DATA} -maxdepth 1 -name '*.qp' -print -quit)";then
@@ -333,7 +345,8 @@ then
             rm -f ${DATA}/ibdata1
 
             # Decompress the qpress files 
-            find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $(grep -c processor /proc/cpuinfo) -n 2 qpress -d 
+            wsrep_log_info "Decompression with $nproc threads"
+            find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $nproc -n 2 qpress -d 
             extcode=$?
 
             set -e
