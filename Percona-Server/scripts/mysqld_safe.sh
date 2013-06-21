@@ -932,9 +932,20 @@ do
   rm -f $safe_mysql_unix_port "$pid_file"	# Some extra safety
 
   start_time=`date +%M%S`
+  
+  # This file is checked for empty directory because 
+  # a) Not having this file means the wsrep-start-position is useless - lp:1112724
+  # b) Otherwise I have to check if directory is empty sans a few files like 
+  # error log and others, #a is simpler.
+  if [[ -e ${DATADIR}/grastate.dat ]];then
+    # this sets wsrep_start_position_opt
+    wsrep_recover_position "$cmd"
+  else 
+    log_notice "Skipping wsrep-recover for empty datadir: ${DATADIR}"
+    log_notice "Assigning 00000000-0000-0000-0000-000000000000:-1 to wsrep_start_position"
+    wsrep_start_position_opt="--wsrep_start_position='00000000-0000-0000-0000-000000000000:-1'"
+  fi
 
-  # this sets wsrep_start_position_opt
-  wsrep_recover_position "$cmd"
 
   [ $? -ne 0 ] && exit 1 #
 

@@ -385,7 +385,7 @@ case "$mode" in
       fi
     fi
     ;;
-    'boostrap-pxc')
+    'bootstrap-pxc')
       # Bootstrap the Percona XtraDB Cluster, start the first node
       # that initiate the cluster
       echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
