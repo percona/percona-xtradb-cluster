@@ -12,8 +12,8 @@
 set -ue
 
 # Examine parameters
-go_out="$(getopt --options "k:Ke:bDS" \
-    --longoptions key:,nosign,epoch:,binary,nodebug,source \
+go_out="$(getopt --options "k:Ke:bBDS" \
+    --longoptions key:,nosign,epoch:,binary,binarydep,nodebug,source \
     --name "$(basename "$0")" -- "$@")"
 test $? -eq 0 || exit 1
 eval set -- $go_out
@@ -31,6 +31,7 @@ do
     -K | --nosign ) shift; BUILDPKG_KEY="-uc -us";;
     -e | --epoch ) shift; EPOCH="$1:"; shift;;
     -b | --binary ) shift; DPKG_BINSRC='-b';;
+    -B | --binarydep ) shift; DPKG_BINSRC='-B';;
     -D | --nodebug ) shift; SKIPDEBUG='yes';;
     -S | --source ) shift; DPKG_BINSRC='-S';;
     esac
