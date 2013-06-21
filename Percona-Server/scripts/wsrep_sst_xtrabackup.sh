@@ -413,8 +413,7 @@ then
         # Rebuild indexes for compact backups
         if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
             wsrep_log_info "Index compaction detected"
-            wsrep_log_info "Rebuilding with $nproc threads"
-            rebuild="--rebuild-indexes --rebuild-threads=$nproc"
+            rebuild="--rebuild-indexes"
         fi
 
         if test -n "$(find ${DATA} -maxdepth 1 -name '*.qp' -print -quit)";then
