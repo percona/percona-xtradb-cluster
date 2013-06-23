@@ -312,6 +312,7 @@ then
     touch $SST_PROGRESS_FILE
 
     sencrypted=1
+    nthreads=1
 
     MODULE="xtrabackup_sst"
 
@@ -413,7 +414,9 @@ then
         # Rebuild indexes for compact backups
         if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
             wsrep_log_info "Index compaction detected"
-            rebuild="--rebuild-indexes"
+            nthreads=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--rebuild-threads' | cut -d= -f2)
+            [[ -z $nthreads ]] && nthreads=$nproc
+            rebuild="--rebuild-indexes --rebuild-threads=$nthreads"
         fi
 
         if test -n "$(find ${DATA} -maxdepth 1 -name '*.qp' -print -quit)";then
