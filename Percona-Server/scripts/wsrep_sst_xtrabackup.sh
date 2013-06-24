@@ -416,6 +416,7 @@ then
             wsrep_log_info "Index compaction detected"
             nthreads=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--rebuild-threads' | cut -d= -f2)
             [[ -z $nthreads ]] && nthreads=$nproc
+            wsrep_log_info "Rebuilding with $nthreads threads"
             rebuild="--rebuild-indexes --rebuild-threads=$nthreads"
         fi
 
