@@ -22,6 +22,17 @@ More information about the required credentials can be found in the |XtraBackup|
  
 Script used for this method can be found in :file:`/usr/bin/wsrep_sst_xtrabackup` and it's provided with the |PXC| binary packages.
 
+After :rn:`5.5.31-23.7.5` this method introduced the new :file:`my.cnf` option which can be used to set |XtraBackup| streaming option: :: 
+
+  [sst]
+  streamfmt=xbstream 
+
+Currently supported formats are tar (default, used in previous releases) and `xbstream <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_. Some of the benefits of choosing the xbstream over tar is that it supports more advanced features like `encrypted <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/encrypted_backups_innobackupex.html>`_, `compact <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_ and `compressed <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/streaming_backups_innobackupex.html#examples-using-xbstream>`_ backups.
+
+.. note::
+
+  Currently there is a limitations when using the ``xbstream`` option that the :term:`datadir` needs to be empty before starting the SST or otherwise the process will fail and the node will not be able to join the cluster.
+
 Using ``mysqldump``
 ===================
 
