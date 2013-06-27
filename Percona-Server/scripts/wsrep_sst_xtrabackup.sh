@@ -22,18 +22,41 @@
 #     qpress for decompression. Download from http://www.quicklz.com/qpress-11-linux-x64.tar till           #
 #     https://blueprints.launchpad.net/percona-xtrabackup/+spec/package-qpress is fixed.                    #
 #     my_print_defaults to extract values from my.cnf.                                                      #
-#     netcat for transfer.                                                                                  #
+#     netcat or socat for transfer.                                                                         #
 #     xbstream/tar for streaming. (and xtrabackup ofc)                                                      #
-#                                                                                                           #                                                                                           
-#     Currently only option in cnf is read specifically for SST                                             #
-#     [sst]                                                                                                 #
-#     streamfmt=tar|xbstream                                                                                #
-#                                                                                                           #
-#     Default is tar till lp:1193240 is fixed                                                               #
-#     You need to use xbstream for encryption, compression etc., however,                                   #
-#     lp:1193240 requires you to manually cleanup the directory prior to SST                                #
+#     ss from iproute package                                                                               #
 #                                                                                                           #
 #############################################################################################################
+
+###############################################################################################################
+# Following SST specific options (under [sst]) are allowed in my.cnf:                                         #
+#                                                                                                             #
+# a) streamfmt=xbstream|tar : default is tar (till lp:1193240 is fixed).                                      #
+#      You need to use xbstream for encryption, compression etc., however,                                    #
+#      lp:1193240 requires you to manually cleanup the directory prior to SST                                 #
+#                                                                                                             #
+# b) transferfmt=socat|nc : default is nc, however, socat is recommended.                                     #
+#                                                                                                             #
+# c) tca = PEM for openssl based encryption with socat.                                                       #
+#                                                                                                             #
+# d) tcert = CRT for openssl based encryption with socat.                                                     #
+#                                                                                                             #
+# e) encrypt = 0|1|2 : decides whether encryption is to be done or not, if                                    #
+#    this is zero, no encryption is done.                                                                     #
+#    1 - Xtrabackup based encryption                                                                          #
+#    2 - OpenSSL based encryption                                                                             #   
+#                                                                                                             #
+# f) sockopt = comma separated key/value pairs of socket options. Must                                        #
+# begin with a comma. Refer to socat manual for details.                                                      #
+#                                                                                                             #
+# For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
+#                                                                                                             #
+# Values of a), b) and e) must match on donor and joiner.                                                     #
+# socat based openssl encryption is recommended for now.                                                      #
+#                                                                                                             #
+# socat must be built with openSSL for encryption: socat -V | grep OPENSSL                                    #
+#                                                                                                             #
+###############################################################################################################
 
 . $(dirname $0)/wsrep_sst_common
 
@@ -44,28 +67,42 @@ encrypt=0
 nproc=1
 ecode=0
 XTRABACKUP_PID=""
+SST_PORT=""
+REMOTEIP=""
+tcert=""
+tpem=""
+sockopt=""
 
 sfmt="tar"
 strmcmd=""
+tfmt=""
+tcmd=""
+rebuild=""
 declare -a RC
+
+INNOBACKUPEX_BIN=innobackupex
+readonly AUTH=(${WSREP_SST_OPT_AUTH//:/ })
+readonly DATA="${WSREP_SST_OPT_DATA}"
+INFO_FILE="xtrabackup_galera_info"
+IST_FILE="xtrabackup_ist"
+MAGIC_FILE="${DATA}/${INFO_FILE}"
 
 get_keys()
 {
-    # There is no metadata in the stream to indicate that it is encrypted
-    # So, if the cnf file on joiner contains 'encrypt' under [xtrabackup] section then 
-    # it means encryption is being used
-    if ! my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
-        return
+    if [[ $encrypt -eq 0 ]];then 
+        return 
     fi
+
     if [[ $sfmt == 'tar' ]];then
         wsrep_log_info "NOTE: Encryption cannot be enabled with tar format"
+        encrypt=0
         return
     fi
 
     wsrep_log_info "Encryption enabled in my.cnf - not supported at the moment - Bug in Xtrabackup - lp:1190343"
-    ealgo=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt=' | cut -d= -f2)
-    ekey=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key=' | cut -d= -f2)
-    ekeyfile=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--encrypt-key-file=' | cut -d= -f2)
+    ealgo=$(parse_cnf xtrabackup encrypt)
+    ekey=$(parse_cnf xtrabackup encrypt-key)
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file)
 
     if [[ -z $ealgo ]];then
         wsrep_log_error "FATAL: Encryption algorithm empty from my.cnf, bailing out"
@@ -76,22 +113,84 @@ get_keys()
         wsrep_log_error "FATAL: Either key or keyfile must be readable"
         exit 3
     fi
-    encrypt=1
+}
+
+get_transfer()
+{
+    if [[ $tfmt == 'socat' ]];then 
+        wsrep_log_info "Using socat as streamer"
+        if [[ ! -x `which socat` ]];then 
+            wsrep_log_error "socat not found in path: $PATH"
+            exit 2
+        fi
+
+        if ! socat -V | grep -q OPENSSL && [[ $encrypt -eq 2 ]];then 
+            wsrep_log_info "socat is not openssl enabled, falling back to plain transfer"
+            encrypt=0
+        fi
+
+        if [[ $encrypt -eq 2 ]];then 
+            wsrep_log_info "Using openssl based encryption with socat"
+            if [[ -z $tpem || -z $tcert ]];then 
+                wsrep_log_error "Both PEM and CRT files required"
+                exit 22
+            fi
+            if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+                tcmd="socat openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
+            else
+                tcmd="socat stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
+            fi
+        else 
+            wsrep_log_info "Using socat as streamer"
+            if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+                tcmd="socat TCP-LISTEN:${SST_PORT},reuseaddr${sockopt} stdio"
+            else
+                tcmd="socat stdio TCP:${REMOTEIP}:${SST_PORT}${sockopt}"
+            fi
+        fi
+    else
+        tfmt='nc'
+        if [[ ! -x `which nc` ]];then 
+            wsrep_log_error "nc(netcat) not found in path: $PATH"
+            exit 2
+        fi
+        wsrep_log_info "Using netcat as streamer"
+        if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+            tcmd="nc -dl ${SST_PORT}"
+        else
+            tcmd="nc ${REMOTEIP} ${SST_PORT}"
+        fi
+    fi
+
+}
+
+parse_cnf()
+{
+    local group=$1
+    local var=$2
+    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | grep -- "--$var" | cut -d= -f2)
+    echo $reval
 }
 
 read_cnf()
 {
-    sfmt=$(my_print_defaults -c $WSREP_SST_OPT_CONF sst | grep -- '--streamfmt' | cut -d= -f2)
+    sfmt=$(parse_cnf sst streamfmt)
+    tfmt=$(parse_cnf sst transferfmt)
+    tcert=$(parse_cnf sst tcert)
+    tpem=$(parse_cnf sst tca)
+    encrypt=$(parse_cnf sst encrypt)
+    sockopt=$(parse_cnf sst sockopt)
+}
+
+get_stream()
+{
     if [[ $sfmt == 'xbstream' ]];then 
         wsrep_log_info "Streaming with xbstream"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             wsrep_log_info "xbstream requires manual cleanup of data directory before SST - lp:1193240"
             strmcmd="xbstream -x -C ${DATA}"
-        elif [[ "$WSREP_SST_OPT_ROLE"  == "donor" ]];then 
-            strmcmd="xbstream -c ${INFO_FILE} ${IST_FILE}"
         else
-            wsrep_log_error "Invalid role: $WSREP_SST_OPT_ROLE"
-            exit 22
+            strmcmd="xbstream -c ${INFO_FILE} ${IST_FILE}"
         fi
     else
         sfmt="tar"
@@ -99,12 +198,9 @@ read_cnf()
         wsrep_log_info "Note: Advanced xtrabackup features - encryption,compression etc. not available with tar."
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             wsrep_log_info "However, xbstream requires manual cleanup of data directory before SST - lp:1193240."
-            strmcmd="tar xfi  - -C ${DATA}"
-        elif [[ "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
+            strmcmd="tar xfi - -C ${DATA}"
+        else
             strmcmd="tar cf - ${INFO_FILE} ${IST_FILE}"
-        else 
-            wsrep_log_error "Invalid role: $WSREP_SST_OPT_ROLE"
-            exit 22
         fi
 
     fi
@@ -125,7 +221,7 @@ cleanup_joiner()
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
-    local PID=$(ps -aef |grep nc| grep $NC_PORT  | awk '{ print $2 }')
+    local PID=$(ps -aef | grep nc | grep $SST_PORT  | awk '{ print $2 }')
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Killing nc pid $PID"
     else 
@@ -165,97 +261,87 @@ cleanup_donor()
 
 kill_xtrabackup()
 {
-#set -x
     local PID=$(cat $XTRABACKUP_PID)
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
     rm -f "$XTRABACKUP_PID"
-#set +x
+}
+
+setup_ports()
+{
+    if [[ "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
+        SST_PORT=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $2 }')
+        REMOTEIP=$(echo $WSREP_SST_OPT_ADDR | awk -F ':' '{ print $1 }')
+    else
+        SST_PORT=$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $2 }')
+    fi
 }
 
 # waits ~10 seconds for nc to open the port and then reports ready
 # (regardless of timeout)
-wait_for_nc()
+wait_for_listen()
 {
     local PORT=$1
     local ADDR=$2
     local MODULE=$3
-    for i in $(seq 1 50)
+    for i in {1..50}
     do
-        netstat -nptl 2>/dev/null | grep '/nc\s*$' | awk '{ print $4 }' | \
-        sed 's/.*://' | grep \^${PORT}\$ >/dev/null && break
+        ss -p state listening "( sport = :$PORT )" | grep -qE 'socat|nc' && break
         sleep 0.2
     done
     echo "ready ${ADDR}/${MODULE}"
 }
 
-INNOBACKUPEX_BIN=innobackupex
-INNOBACKUPEX_ARGS=""
-NC_BIN=nc
+if [[ ! -x `which innobackupex` ]];then 
+    wsrep_log_error "innobackupex not in path: $PATH"
+    exit 2
+fi
 
-for TOOL_BIN in INNOBACKUPEX_BIN NC_BIN ; do
-  if ! which ${!TOOL_BIN} > /dev/null 2>&1
-  then 
-     echo "Can't find ${!TOOL_BIN} in the path"
-     exit 22 # EINVAL
-  fi
-done
-
-#ROLE=$1
-#ADDR=$2
-readonly AUTH=(${WSREP_SST_OPT_AUTH//:/ })
-readonly DATA="${WSREP_SST_OPT_DATA}"
-#CONF=$5
-
-INFO_FILE="xtrabackup_galera_info"
-IST_FILE="xtrabackup_ist"
-
-MAGIC_FILE="${DATA}/${INFO_FILE}"
 rm -f "${MAGIC_FILE}"
 
+if [[ ! ${WSREP_SST_OPT_ROLE} == 'joiner' && ! ${WSREP_SST_OPT_ROLE} == 'donor' ]];then 
+    wsrep_log_error "Invalid role ${WSREP_SST_OPT_ROLE}"
+    exit 22
+fi
+
 read_cnf
+setup_ports
+get_stream
+get_transfer
+
+INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild ${DATA}"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=$sfmt"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
     trap cleanup_donor EXIT
 
-    NC_PORT=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $2 }')
-    REMOTEIP=$(echo $WSREP_SST_OPT_ADDR | awk -F ':' '{ print $1 }')
-
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
         TMPDIR="/tmp"
 
-        INNOBACKUPEX_ARGS="--galera-info --stream=$sfmt
-                           --defaults-file=${WSREP_SST_OPT_CONF}
-                           --socket=${WSREP_SST_OPT_SOCKET}"
-
         if [ "${AUTH[0]}" != "(null)" ]; then
-           INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --user=${AUTH[0]}"
+           INNOBACKUP+=" --user=${AUTH[0]}"
         fi
 
         if [ ${#AUTH[*]} -eq 2 ]; then
-           INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --password=${AUTH[1]}"
+           INNOBACKUP+=" --password=${AUTH[1]}"
        else
            # Empty password, used for testing, debugging etc.
-           INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --password="
+           INNOBACKUP+=" --password="
        fi
 
         get_keys
         if [[ $encrypt -eq 1 ]];then
             if [[ -n $ekey ]];then
-                INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --encrypt=$ealgo --encrypt-key=$ekey"
+                INNOBACKUP+=" --encrypt=$ealgo --encrypt-key=$ekey"
             else 
-                INNOBACKUPEX_ARGS="${INNOBACKUPEX_ARGS} --encrypt=$ealgo --encrypt-key-file=$ekeyfile"
+                INNOBACKUP+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile"
             fi
         fi
-
-        wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${NC_PORT}"
+        wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
 
         set +e
-        ${INNOBACKUPEX_BIN} ${INNOBACKUPEX_ARGS} ${TMPDIR} \
-        2> ${DATA}/innobackup.backup.log | \
-        ${NC_BIN} ${REMOTEIP} ${NC_PORT}
-
+        $INNOBACKUP ${TMPDIR} 2>${DATA}/innobackup.backup.log | $tcmd
         RC=( "${PIPESTATUS[@]}" )
         set -e
 
@@ -264,7 +350,7 @@ then
                           "Check ${DATA}/innobackup.backup.log"
           exit 22
         elif [  ${RC[1]} -ne 0 ]; then
-          wsrep_log_error "${NC_BIN} finished with error: ${RC[1]}"
+          wsrep_log_error "$tcmd finished with error: ${RC[1]}"
           exit 22
         fi
 
@@ -272,7 +358,8 @@ then
         XTRABACKUP_PID="${TMPDIR}/xtrabackup_pid"
 
 
-    else # BYPASS
+    else # BYPASS FOR IST
+
         wsrep_log_info "Bypassing the SST for IST"
         STATE="${WSREP_SST_OPT_GTID}"
         echo "continue" # now server can resume updating data
@@ -283,12 +370,12 @@ then
         set +e
         if [[ $encrypt -eq 1 ]];then
             if [[ -n $ekey ]];then
-                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey | $tcmd
             else 
-                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | $tcmd
             fi
         else
-            $strmcmd | ${NC_BIN} ${REMOTEIP} ${NC_PORT}
+            $strmcmd | $tcmd
         fi
         RC=( "${PIPESTATUS[@]}" )
         set -e
@@ -301,7 +388,6 @@ then
                 exit 1
             fi
         done
-        #rm -f ${DATA}/${IST_FILE}
     fi
 
     echo "done ${WSREP_SST_OPT_GTID}"
@@ -319,14 +405,13 @@ then
     rm -f ${DATA}/xtrabackup_*
 
     ADDR=${WSREP_SST_OPT_ADDR}
-    NC_PORT=$(echo ${ADDR} | awk -F ':' '{ print $2 }')
-    if [ -z "${NC_PORT}" ]
+    if [ -z "${SST_PORT}" ]
     then
-        NC_PORT=4444
-        ADDR="$(echo ${ADDR} | awk -F ':' '{ print $1 }'):${NC_PORT}"
+        SST_PORT=4444
+        ADDR="$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $1 }'):${SST_PORT}"
     fi
 
-    wait_for_nc ${NC_PORT} ${ADDR} ${MODULE} &
+    wait_for_listen ${SST_PORT} ${ADDR} ${MODULE} &
 
     trap "exit 32" HUP PIPE
     trap "exit 3"  INT TERM
@@ -336,12 +421,12 @@ then
     set +e
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         if [[ -n $ekey ]];then
-            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA} 
+            $tcmd  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA} 
         else 
-            ${NC_BIN} -dl ${NC_PORT}  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}
+            $tcmd  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}
         fi
     else 
-        ${NC_BIN} -dl ${NC_PORT}  | $strmcmd
+        $tcmd | $strmcmd
     fi
     RC=( "${PIPESTATUS[@]}" )
     set -e
@@ -356,7 +441,7 @@ then
         fi
     fi
 
-    wait %% # join wait_for_nc thread
+    wait %% # join for wait_for_listen thread
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
@@ -373,7 +458,7 @@ then
         exit 32
     fi
 
-    if ! ps -p ${WSREP_SST_OPT_PARENT} >/dev/null
+    if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
         wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly." 
         exit 32
@@ -382,7 +467,6 @@ then
     if [ ! -r "${IST_FILE}" ]
     then
         wsrep_log_info "Proceeding with SST"
-        rebuild=""
         wsrep_log_info "Removing existing ib_logfile files"
         rm -f ${DATA}/ib_logfile*
 
@@ -414,7 +498,7 @@ then
         # Rebuild indexes for compact backups
         if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
             wsrep_log_info "Index compaction detected"
-            nthreads=$(my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -- '--rebuild-threads' | cut -d= -f2)
+            nthreads=$(parse_cnf xtrabackup rebuild-threads)
             [[ -z $nthreads ]] && nthreads=$nproc
             wsrep_log_info "Rebuilding with $nthreads threads"
             rebuild="--rebuild-indexes --rebuild-threads=$nthreads"
@@ -454,9 +538,8 @@ then
         fi
 
         wsrep_log_info "Preparing the backup at ${DATA}"
+        $INNOAPPLY &>${DATA}/innobackup.prepare.log
 
-        ${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild \
-        ${DATA} 1>&2 2> ${DATA}/innobackup.prepare.log
         if [ $? -ne 0 ];
         then
             wsrep_log_error "${INNOBACKUPEX_BIN} finished with errors. Check ${DATA}/innobackup.prepare.log" 
@@ -467,13 +550,6 @@ then
     fi
 
     cat "${MAGIC_FILE}" # output UUID:seqno
-
-    #Cleanup not required here since EXIT trap should be called
-    #wsrep_cleanup_progress_file
-
-else
-    wsrep_log_error "Unrecognized role: ${WSREP_SST_OPT_ROLE}"
-    exit 22 # EINVAL
 fi
 
 exit 0
