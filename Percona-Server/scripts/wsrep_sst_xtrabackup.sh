@@ -37,9 +37,9 @@
 #                                                                                                             #
 # b) transferfmt=socat|nc : default is nc, however, socat is recommended.                                     #
 #                                                                                                             #
-# c) tca = PEM for openssl based encryption with socat.                                                       #
+# c) tca = CA file for openssl based encryption with socat.                                                   #
 #                                                                                                             #
-# d) tcert = CRT for openssl based encryption with socat.                                                     #
+# d) tcert = PEM for openssl based encryption with socat.                                                     #
 #                                                                                                             #
 # e) encrypt = 0|1|2 : decides whether encryption is to be done or not, if                                    #
 #    this is zero, no encryption is done.                                                                     #
@@ -52,7 +52,8 @@
 # For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
 #                                                                                                             #
 # Values of a), b) and e) must match on donor and joiner.                                                     #
-# socat based openssl encryption is recommended for now.                                                      #
+#                                                                                                             #
+# socat based openssl encryption: encrypt=2 is recommended for now.                                           #
 #                                                                                                             #
 # socat must be built with openSSL for encryption: socat -V | grep OPENSSL                                    #
 #                                                                                                             #
@@ -176,8 +177,8 @@ read_cnf()
 {
     sfmt=$(parse_cnf sst streamfmt)
     tfmt=$(parse_cnf sst transferfmt)
-    tcert=$(parse_cnf sst tcert)
-    tpem=$(parse_cnf sst tca)
+    tcert=$(parse_cnf sst tca)
+    tpem=$(parse_cnf sst tcert)
     encrypt=$(parse_cnf sst encrypt)
     sockopt=$(parse_cnf sst sockopt)
 }
