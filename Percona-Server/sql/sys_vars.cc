@@ -3839,6 +3839,14 @@ static Sys_var_enum Sys_wsrep_OSU_method(
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(0));
 
+static const char *wsrep_reject_queries_names[]= { "NONE", "ALL", "ALL_KILL", NullS };
+static Sys_var_enum Sys_wsrep_reject_queries(
+       "wsrep_reject_queries", "Variable to set to reject queries",
+       GLOBAL_VAR(wsrep_reject_queries_options), CMD_LINE(OPT_ARG),
+       wsrep_reject_queries_names, DEFAULT(WSREP_REJ_NONE),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(wsrep_reject_queries_update));
+
 static Sys_var_enum Sys_wsrep_forced_binlog_format(
        "wsrep_forced_binlog_format", "binlog format to take effect over user's choice",
        GLOBAL_VAR(wsrep_forced_binlog_format), 

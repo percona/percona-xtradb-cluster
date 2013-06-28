@@ -93,12 +93,14 @@ extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;
 extern ulong       wsrep_OSU_method_options;
+extern ulong       wsrep_reject_queries_options;
 extern my_bool     wsrep_recovery;
 extern my_bool     wsrep_replicate_myisam;
 extern my_bool     wsrep_log_conflicts;
 extern ulong       wsrep_mysql_replication_bundle;
 
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
+enum enum_wsrep_reject_types { WSREP_REJ_NONE, WSREP_REJ_ALL, WSREP_REJ_ALL_KILL };
 
 // MySQL status variables
 extern my_bool     wsrep_connected;
@@ -139,6 +141,8 @@ extern void wsrep_provider_init              INIT_ARGS;
 extern bool wsrep_provider_options_check     CHECK_ARGS;
 extern bool wsrep_provider_options_update    UPDATE_ARGS;
 extern void wsrep_provider_options_init      INIT_ARGS;
+
+extern bool wsrep_reject_queries_update    UPDATE_ARGS;
 
 extern bool wsrep_cluster_address_check      CHECK_ARGS;
 extern bool wsrep_cluster_address_update     UPDATE_ARGS;
