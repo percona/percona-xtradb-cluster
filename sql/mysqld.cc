@@ -5883,14 +5883,6 @@ int mysqld_main(int argc, char **argv)
   /* Initialize audit interface globals. Audit plugins are inited later. */
   mysql_audit_initialize();
 
-#ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (wsrep_recovery)
-  {
-    select_thread_in_use= 0;
-    wsrep_recover();
-    unireg_abort(0);
-  }
-#endif /* WITH_WSREP */
   /*
     Perform basic logger initialization logger. Should be called after
     MY_INIT, as it initializes mutexes. Log tables are inited later.
@@ -6107,6 +6099,14 @@ int mysqld_main(int argc, char **argv)
   my_str_free= &my_str_free_mysqld;
   my_str_realloc= &my_str_realloc_mysqld;
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    select_thread_in_use= 0;
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
   /*
     init signals & alarm
     After this we can't quit by a simple unireg_abort
