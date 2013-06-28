@@ -27,6 +27,8 @@ syslog_tag=
 user='@MYSQLD_USER@'
 pid_file=
 err_log=
+wsrep_data_home_dir=""
+grastate_loc=""
 
 syslog_tag_mysqld=mysqld
 syslog_tag_mysqld_safe=mysqld_safe
@@ -212,9 +214,25 @@ wsrep_pick_url() {
 wsrep_start_position_opt=""
 wsrep_recover_position() {
   local mysqld_cmd="$@"
+  local ret=0
+  local uuid=""
+  local seqno=0
+
+  uuid=$(grep 'uuid:' $grastate_loc | cut -d: -f2 | tr -d ' ')
+  seqno=$(grep 'seqno:' $grastate_loc | cut -d: -f2 | tr -d ' ')
+
+  # If sequence number is not equal to -1, wsrep-recover co-ordinates aren't used.
+  # lp:1112724
+  # So, directly pass whatever is obtained from grastate.dat
+  if [ $seqno -ne -1 ];then 
+    log_notice "Skipping wsrep-recover for $uuid:$seqno pair"
+    log_notice "Assigning $uuid:$seqno to wsrep_start_position"
+    wsrep_start_position_opt="--wsrep_start_position=$uuid:$seqno"
+    return $ret
+  fi
+
   local wr_logfile=$(mktemp)
   local euid=$(id -u)
-  local ret=0
 
   [ "$euid" = "0" ] && chown $user $wr_logfile
   chmod 600 $wr_logfile
@@ -302,6 +320,7 @@ parse_arguments() {
       --syslog-tag=*) syslog_tag="$val" ;;
       --timezone=*) TZ="$val"; export TZ; ;;
       --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
+      --wsrep-data-home-dir=*) wsrep_data_home_dir="$val"; ;;
       --flush-caches) flush_caches=1 ;;
       --numa-interleave) numa_interleave=1 ;;
       --wsrep[-_]provider=*)
@@ -927,6 +946,12 @@ max_wsrep_restarts=0
 # maximum number of wsrep restarts
 max_wsrep_restarts=0
 
+if [ $wsrep_data_home_dir ];then 
+    grastate_loc="$wsrep_data_home_dir/grastate.dat"
+else 
+    grastate_loc="${DATADIR}/grastate.dat"
+fi
+
 while true
 do
   rm -f $safe_mysql_unix_port "$pid_file"	# Some extra safety
@@ -937,7 +962,7 @@ do
   # a) Not having this file means the wsrep-start-position is useless - lp:1112724
   # b) Otherwise I have to check if directory is empty sans a few files like 
   # error log and others, #a is simpler.
-  if [[ -e ${DATADIR}/grastate.dat ]];then
+  if [ -e $grastate_loc ];then
     # this sets wsrep_start_position_opt
     wsrep_recover_position "$cmd"
   else 

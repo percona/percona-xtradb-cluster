@@ -89,7 +89,7 @@ MAGIC_FILE="${DATA}/${INFO_FILE}"
 
 get_keys()
 {
-    if [[ $encrypt -eq 0 ]];then 
+    if [[ $encrypt -eq 0 || $encrypt -eq 2 ]];then 
         return 
     fi
 
