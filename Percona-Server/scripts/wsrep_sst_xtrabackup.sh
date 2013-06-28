@@ -100,7 +100,8 @@ get_keys()
         return
     fi
 
-    wsrep_log_info "Encryption enabled in my.cnf - not supported at the moment - Bug in Xtrabackup - lp:1190343"
+    wsrep_log_info "Xtrabackup based encryption enabled in my.cnf - not supported at the moment - lp:1190343"
+    wsrep_log_info "Use socat-based openSSL encryption with encrypt=2 under [sst]"
     ealgo=$(parse_cnf xtrabackup encrypt)
     ekey=$(parse_cnf xtrabackup encrypt-key)
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file)
@@ -126,7 +127,7 @@ get_transfer()
         fi
 
         if ! socat -V | grep -q OPENSSL && [[ $encrypt -eq 2 ]];then 
-            wsrep_log_info "socat is not openssl enabled, falling back to plain transfer"
+            wsrep_log_info "NOTE: socat is not openssl enabled, falling back to plain transfer"
             encrypt=0
         fi
 
