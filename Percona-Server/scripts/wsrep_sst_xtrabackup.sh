@@ -35,7 +35,7 @@
 #      You need to use xbstream for encryption, compression etc., however,                                    #
 #      lp:1193240 requires you to manually cleanup the directory prior to SST                                 #
 #                                                                                                             #
-# b) transferfmt=socat|nc : default is nc, however, socat is recommended.                                     #
+# b) transferfmt=socat|nc : default is socat and recommended.                                                 #
 #                                                                                                             #
 # c) tca = CA file for openssl based encryption with socat.                                                   #
 #                                                                                                             #
@@ -119,7 +119,19 @@ get_keys()
 
 get_transfer()
 {
-    if [[ $tfmt == 'socat' ]];then 
+    if [[ $tfmt == 'nc' ]];then
+        if [[ ! -x `which nc` ]];then 
+            wsrep_log_error "nc(netcat) not found in path: $PATH"
+            exit 2
+        fi
+        wsrep_log_info "Using netcat as streamer"
+        if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+            tcmd="nc -dl ${SST_PORT}"
+        else
+            tcmd="nc ${REMOTEIP} ${SST_PORT}"
+        fi
+    else
+        tfmt='socat'
         wsrep_log_info "Using socat as streamer"
         if [[ ! -x `which socat` ]];then 
             wsrep_log_error "socat not found in path: $PATH"
@@ -150,20 +162,7 @@ get_transfer()
                 tcmd="socat stdio TCP:${REMOTEIP}:${SST_PORT}${sockopt}"
             fi
         fi
-    else
-        tfmt='nc'
-        if [[ ! -x `which nc` ]];then 
-            wsrep_log_error "nc(netcat) not found in path: $PATH"
-            exit 2
-        fi
-        wsrep_log_info "Using netcat as streamer"
-        if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-            tcmd="nc -dl ${SST_PORT}"
-        else
-            tcmd="nc ${REMOTEIP} ${SST_PORT}"
-        fi
     fi
-
 }
 
 parse_cnf()
