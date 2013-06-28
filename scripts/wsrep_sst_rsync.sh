@@ -180,7 +180,7 @@ then
     fi
 
     trap "exit 32" HUP PIPE
-    trap "exit 3"  INT TERM
+    trap "exit 3"  INT TERM ABRT
     trap cleanup_joiner EXIT
 
     MYUID=$(id -u)
