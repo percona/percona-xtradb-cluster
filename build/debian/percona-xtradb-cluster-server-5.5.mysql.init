@@ -74,7 +74,16 @@ mysql_data_dir=$(mysqld_get_param datadir)
 [ ! $mysql_data_dir ] && mysql_data_dir="/var/lib/mysql"
 
 pid_file=$(mysqld_get_param pid-file)
-[ ! $pid_file ] && pid_file="$mysql_data_dir/$(hostname).pid"
+
+if test -z "$pid_file"
+then
+    pid_file="$mysql_data_dir/$(hostname).pid"
+else
+  case "$pid_file" in
+    /* ) ;;
+    * )  pid_file="$mysql_data_dir/$pid_file" ;;
+  esac
+fi
 
 sst_progress_file=$mysql_data_dir/sst_in_progress
 ## Checks if there is a server running and if so if it is accessible.
