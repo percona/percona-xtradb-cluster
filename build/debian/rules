@@ -9,9 +9,9 @@ TMP=$(CURDIR)/debian/tmp/
 
 feature_set="community"
 major_version=30
-minor_version=2
-compilation_comment_release="Percona Server (GPL), Release $(major_version).$(minor_version)"
-server_suffix="-$(major_version).$(minor_version)"
+minor_version=3
+compilation_comment_release="Percona XtraDB Cluster (GPL)"
+server_suffix="-55"
 prefix="/usr"
 
 clean: clean-patched unpatch
@@ -21,7 +21,7 @@ clean-patched:
 	rm -rf CMakeFiles
 
 override_dh_auto_configure: patch
-ifneq ($(BUILD_DEBUG_BINARY),)
+ifeq ($(SKIP_DEBUG_BINARY),)
 	# Make a debug binary
 	mkdir debug
 	cd debug && \
@@ -54,7 +54,7 @@ endif
 	   -DWITH_PAM=ON
 
 override_dh_auto_build:
-ifneq ($(BUILD_DEBUG_BINARY),)
+ifeq ($(SKIP_DEBUG_BINARY),)
 	cd debug && make $(MAKE_JFLAG)
 endif
 

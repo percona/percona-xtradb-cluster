@@ -684,6 +684,7 @@ char* utility_user_schema_access= NULL;
 
 pthread_key(MEM_ROOT**,THR_MALLOC);
 pthread_key(THD*, THR_THD);
+mysql_mutex_t LOCK_thread_created;
 mysql_mutex_t LOCK_thread_count;
 mysql_mutex_t
   LOCK_status, LOCK_error_log, LOCK_uuid_generator,
@@ -1704,6 +1705,7 @@ static void clean_up_mutexes()
 {
   mysql_rwlock_destroy(&LOCK_grant);
   mysql_mutex_destroy(&LOCK_thread_count);
+  mysql_mutex_destroy(&LOCK_thread_created);
   mysql_mutex_destroy(&LOCK_status);
   mysql_mutex_destroy(&LOCK_delayed_insert);
   mysql_mutex_destroy(&LOCK_delayed_status);
@@ -2987,14 +2989,25 @@ sizeof(load_default_groups)/sizeof(load_default_groups[0]);
 
 
 #ifndef EMBEDDED_LIBRARY
-static
-int
-check_enough_stack_size()
+/**
+  This function is used to check for stack overrun for pathological
+  cases of  regular expressions and 'like' expressions.
+  The call to current_thd is  quite expensive, so we try to avoid it
+  for the normal cases.
+  The size of  each stack frame for the wildcmp() routines is ~128 bytes,
+  so checking  *every* recursive call is not necessary.
+ */
+extern "C" int
+check_enough_stack_size(int recurse_level)
 {
   uchar stack_top;
+  if (recurse_level % 16 != 0)
+    return 0;
 
-  return check_stack_overrun(current_thd, STACK_MIN_SIZE,
-                             &stack_top);
+  THD *my_thd= current_thd;
+  if (my_thd != NULL)
+    return check_stack_overrun(my_thd, STACK_MIN_SIZE * 2, &stack_top);
+  return 0;
 }
 #endif
 
@@ -3493,6 +3506,7 @@ static int init_common_variables()
   item_init();
 #ifndef EMBEDDED_LIBRARY
   my_regex_init(&my_charset_latin1, check_enough_stack_size);
+  my_string_stack_guard= check_enough_stack_size;
 #else
   my_regex_init(&my_charset_latin1, NULL);
 #endif
@@ -3656,6 +3670,7 @@ You should consider changing lower_case_table_names to 1 or 2",
 
 static int init_thread_environment()
 {
+  mysql_mutex_init(key_LOCK_thread_created, &LOCK_thread_created, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_thread_count, &LOCK_thread_count, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_status, &LOCK_status, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_delayed_insert,
@@ -3965,11 +3980,13 @@ static int init_server_components()
 
 #ifdef WITH_WSREP
   if (!WSREP_ON && !opt_bin_log && binlog_format_used)
+    sql_print_warning("You need to use --log-bin or have --wsrep-on to make"
+                      "--binlog-format work.");
 #else
   if (!opt_bin_log && binlog_format_used)
-#endif
     sql_print_warning("You need to use --log-bin to make "
                       "--binlog-format work.");
+#endif
 
   /* Check that we have not let the format to unspecified at this point */
   DBUG_ASSERT((uint)global_system_variables.binlog_format <=
@@ -4503,6 +4520,14 @@ pthread_handler_t start_wsrep_THD(void *arg)
     // 'Error in my_thread_global_end(): 2 threads didn't exit'
     // at server shutdown
   }
+
+  if (thread_handling > SCHEDULER_ONE_THREAD_PER_CONNECTION)
+  {
+    mysql_mutex_lock(&LOCK_thread_count);
+    delete thd;
+    thread_count--;
+    mysql_mutex_unlock(&LOCK_thread_count);
+  }
   return(NULL);
 }
 
@@ -4825,7 +4850,14 @@ void wsrep_wait_appliers_close(THD *thd)
   // This gotta be fixed in a more elegant manner if we gonna have arbitrary
   // number of non-applier wsrep threads.
   {
-    mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
+    if (thread_handling > SCHEDULER_ONE_THREAD_PER_CONNECTION)
+    {
+      mysql_mutex_unlock(&LOCK_thread_count);
+      my_sleep(100);
+      mysql_mutex_lock(&LOCK_thread_count);
+    }
+    else
+      mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
     DBUG_PRINT("quit",("One applier died (count=%u)",thread_count));
   }
   mysql_mutex_unlock(&LOCK_thread_count);
@@ -4835,7 +4867,14 @@ void wsrep_wait_appliers_close(THD *thd)
   mysql_mutex_lock(&LOCK_thread_count);
   while (have_wsrep_appliers(thd) > 0)
   {
-    mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
+   if (thread_handling > SCHEDULER_ONE_THREAD_PER_CONNECTION)
+    {
+      mysql_mutex_unlock(&LOCK_thread_count);
+      my_sleep(100);
+      mysql_mutex_lock(&LOCK_thread_count);
+    }
+    else
+      mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
     DBUG_PRINT("quit",("One thread died (count=%u)",thread_count));
   }
   mysql_mutex_unlock(&LOCK_thread_count);
@@ -5828,7 +5867,9 @@ static bool read_init_file(char *file_name)
 */
 void inc_thread_created(void)
 {
+  mysql_mutex_lock(&LOCK_thread_created);
   thread_created++;
+  mysql_mutex_unlock(&LOCK_thread_created);
 }
 
 #ifndef EMBEDDED_LIBRARY
@@ -8834,6 +8875,7 @@ PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd,
 #endif
 PSI_mutex_key key_RELAYLOG_LOCK_index;
 PSI_mutex_key key_LOCK_wakeup_ready, key_LOCK_group_commit_queue, key_LOCK_commit_ordered;
+PSI_mutex_key key_LOCK_thread_created;
 
 static PSI_mutex_info all_server_mutexes[]=
 {
@@ -8908,7 +8950,8 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
 #endif
-  { &key_PARTITION_LOCK_auto_inc, "HA_DATA_PARTITION::LOCK_auto_inc", 0}
+  { &key_PARTITION_LOCK_auto_inc, "HA_DATA_PARTITION::LOCK_auto_inc", 0},
+  { &key_LOCK_thread_created, "LOCK_thread_created", PSI_FLAG_GLOBAL }
 };
 
 PSI_rwlock_key key_rwlock_LOCK_grant, key_rwlock_LOCK_logger,

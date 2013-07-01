@@ -184,6 +184,7 @@ extern "C" enum wsrep_conflict_state wsrep_thd_conflict_state(THD *thd);
 extern "C" enum wsrep_query_state wsrep_thd_query_state(THD *thd);
 extern "C" const char * wsrep_thd_exec_mode_str(THD *thd);
 extern "C" const char * wsrep_thd_conflict_state_str(THD *thd);
+extern "C" const char * wsrep_thd_consistency_check_str(THD *thd);
 extern "C" const char * wsrep_thd_query_state_str(THD *thd);
 extern "C" wsrep_trx_handle_t* wsrep_thd_trx_handle(THD *thd);
 

@@ -330,6 +330,8 @@ wsrep_run_wsrep_commit(
   } 
   else if (!rcode) 
   {
+    if (WSREP(thd))
+        thd_proc_info(thd, "wsrep in pre-commit stage");
     rcode = wsrep->pre_commit(
                               wsrep,
                               (wsrep_conn_id_t)thd->thread_id,

@@ -52,6 +52,7 @@ datadir=
 # 0 means don't wait at all
 # Negative numbers mean to wait indefinitely
 service_startup_timeout=900
+startup_sleep=1
 
 # Lock directory for RedHat / SuSE.
 lockdir='/var/lock/subsys'
@@ -146,6 +147,7 @@ wait_for_pid () {
   pid="$2"            # process ID of the program operating on the pid-file
   pid_file_path="$3" # path to the PID file.
 
+  sst_progress_file=$datadir/sst_in_progress
   i=0
   avoid_race_condition="by checking again"
 
@@ -183,9 +185,14 @@ wait_for_pid () {
       fi
     fi
 
+    if test -e $sst_progress_file && [ $startup_sleep -ne 100 ];then
+        echo $echo_n "SST in progress, setting sleep higher"
+        startup_sleep=100
+    fi
+
     echo $echo_n ".$echo_c"
     i=`expr $i + 1`
-    sleep 1
+    sleep $startup_sleep
 
   done
 
@@ -282,6 +289,9 @@ case "$mode" in
       # may be overwritten at next upgrade.
       $bindir/mysqld_safe --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null 2>&1 &
       wait_for_pid created "$!" "$mysqld_pid_file_path"; return_value=$?
+      if [[ $return_value != 0 ]];then 
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
+      fi
 
       # Make lock for RedHat / SuSE
       if test -w "$lockdir"
@@ -298,17 +308,19 @@ case "$mode" in
   'stop')
     # Stop daemon. We use a signal here to avoid having to know the
     # root password.
-
+    echo $echo_n "Shutting down MySQL (Percona XtraDB Cluster)"
     if test -s "$mysqld_pid_file_path"
     then
       mysqld_pid=`cat "$mysqld_pid_file_path"`
 
       if (kill -0 $mysqld_pid 2>/dev/null)
       then
-        echo $echo_n "Shutting down MySQL (Percona XtraDB Cluster)"
         kill $mysqld_pid
         # mysqld should remove the pid file when it exits, so wait for it.
         wait_for_pid removed "$mysqld_pid" "$mysqld_pid_file_path"; return_value=$?
+        if [[ $return_value != 0 ]];then 
+            log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
+        fi
       else
         log_failure_msg "MySQL (Percona XtraDB Cluster) server process #$mysqld_pid is not running!"
         rm "$mysqld_pid_file_path"
@@ -373,10 +385,18 @@ case "$mode" in
       fi
     fi
     ;;
+    'bootstrap-pxc')
+      # Bootstrap the Percona XtraDB Cluster, start the first node
+      # that initiate the cluster
+      echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
+      # Not enabled in code - will be in 5.5-24
+      $0 start $other_args --wsrep-new-cluster
+      #$0 start $other_args --wsrep-cluster-address="gcomm://"
+      ;;
     *)
       # usage
       basename=`basename "$0"`
-      echo "Usage: $basename  {start|stop|restart|reload|force-reload|status}  [ MySQL (Percona XtraDB Cluster) options ]"
+      echo "Usage: $basename {start|stop|restart|reload|force-reload|status|bootstrap-pxc}  [ MySQL (Percona XtraDB Cluster) options ]"
       exit 1
     ;;
 esac

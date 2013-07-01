@@ -518,6 +518,53 @@ static ST_FIELD_INFO	innodb_trx_fields_info[] =
 	 STRUCT_FLD(old_name,		""),
 	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
 
+#ifdef WITH_WSREP
+
+#define IDX_TRX_WSREP_SEQNO	22
+	{STRUCT_FLD(field_name,		"trx_wsrep_seqno"),
+	 STRUCT_FLD(field_length,	MY_INT64_NUM_DECIMAL_DIGITS),
+	 STRUCT_FLD(field_type,		MYSQL_TYPE_LONGLONG),
+	 STRUCT_FLD(value,		0),
+	 STRUCT_FLD(field_flags,	0),
+	 STRUCT_FLD(old_name,		""),
+	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
+
+#define IDX_TRX_QUERY_STATE	23
+	{STRUCT_FLD(field_name,		"trx_query_state"),
+	 STRUCT_FLD(field_length,	TRX_I_S_TRX_WSREP_MAX_LEN),
+	 STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	 STRUCT_FLD(value,		0),
+	 STRUCT_FLD(field_flags,	0),
+	 STRUCT_FLD(old_name,		""),
+	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
+
+#define IDX_TRX_CONFLICT_STATE	24
+	{STRUCT_FLD(field_name,		"trx_conflict_state"),
+	 STRUCT_FLD(field_length,	TRX_I_S_TRX_WSREP_MAX_LEN),
+	 STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	 STRUCT_FLD(value,		0),
+	 STRUCT_FLD(field_flags,	0),
+	 STRUCT_FLD(old_name,		""),
+	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
+
+#define IDX_TRX_EXEC_MODE	25
+	{STRUCT_FLD(field_name,		"trx_exec_mode"),
+	 STRUCT_FLD(field_length,	TRX_I_S_TRX_WSREP_MAX_LEN),
+	 STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	 STRUCT_FLD(value,		0),
+	 STRUCT_FLD(field_flags,	0),
+	 STRUCT_FLD(old_name,		""),
+	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
+
+#define IDX_TRX_CONSISTENCY_CHECK	26
+	{STRUCT_FLD(field_name,		"trx_consistency_check"),
+	 STRUCT_FLD(field_length,	TRX_I_S_TRX_WSREP_MAX_LEN),
+	 STRUCT_FLD(field_type,		MYSQL_TYPE_STRING),
+	 STRUCT_FLD(value,		0),
+	 STRUCT_FLD(field_flags,	0),
+	 STRUCT_FLD(old_name,		""),
+	 STRUCT_FLD(open_method,	SKIP_OPEN_TABLE)},
+#endif
 	END_OF_ST_FIELD_INFO
 };
 
@@ -663,6 +710,27 @@ fill_innodb_trx_from_cache(
 		/* trx_adaptive_hash_timeout */
 		OK(fields[IDX_TRX_ADAPTIVE_HASH_TIMEOUT]->store(
 			   (longlong) row->trx_search_latch_timeout, true));
+#ifdef WITH_WSREP
+		/* trx_wsrep_seqno */
+		OK(fields[IDX_TRX_WSREP_SEQNO]->store(
+			   (longlong) row->trx_wsrep_seqno, true));
+
+		/* trx_query_state */
+		OK(field_store_string(fields[IDX_TRX_QUERY_STATE],
+				      row->trx_query_state));
+
+		/* trx_conflict_state */
+		OK(field_store_string(fields[IDX_TRX_CONFLICT_STATE],
+				      row->trx_conflict_state));
+
+		/* trx_exec_mode */
+		OK(field_store_string(fields[IDX_TRX_EXEC_MODE],
+				      row->trx_exec_mode));
+
+		/* trx_consistency_check */
+		OK(field_store_string(fields[IDX_TRX_CONSISTENCY_CHECK],
+				      row->trx_consistency_check));
+#endif
 
 		OK(schema_table_store_record(thd, table));
 	}
@@ -2314,6 +2382,7 @@ i_s_innodb_buffer_stats_fill_table(
 	buf_pool_info_t*	pool_info;
 
 	DBUG_ENTER("i_s_innodb_buffer_fill_general");
+	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
 
 	/* Only allow the PROCESS privilege holder to access the stats */
 	if (check_global_access(thd, PROCESS_ACL)) {
@@ -2930,6 +2999,7 @@ i_s_innodb_fill_buffer_pool(
 	mem_heap_t*		heap;
 
 	DBUG_ENTER("i_s_innodb_fill_buffer_pool");
+	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
 
 	heap = mem_heap_create(10000);
 
@@ -3496,7 +3566,6 @@ i_s_innodb_fill_buffer_lru(
 	mutex_t*		block_mutex;
 
 	DBUG_ENTER("i_s_innodb_fill_buffer_lru");
-
 	RETURN_IF_INNODB_NOT_STARTED(tables->schema_table_name);
 
 	/* Obtain buf_pool mutex before allocate info_buffer, since

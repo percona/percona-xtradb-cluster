@@ -106,6 +106,14 @@ then
     exit 1
 fi
 
+# The number of processors is a good default for -j
+if test -e "/proc/cpuinfo"
+then
+    PROCESSORS="$(grep -c ^processor /proc/cpuinfo)"
+else
+    PROCESSORS=4
+fi
+
 # Extract version from the Makefile
 MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
@@ -131,7 +139,7 @@ export CC=${CC:-gcc}
 export CXX=${CXX:-gcc}
 export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -fno-omit-frame-pointer -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fno-exceptions -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CXXFLAGS:-}"
-export MAKE_JFLAG=-j4
+export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 export WSREP_REV="$WSREP_REV"
 
@@ -162,7 +170,8 @@ fi
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        scons --config=force revno="$GALERA_REVISION" garb/garbd libgalera_smm.so
+        scons --config=force revno="$GALERA_REVISION" $MAKE_JFLAG \
+              garb/garbd libgalera_smm.so
         mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
              "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
         cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
@@ -203,7 +212,7 @@ fi
             --with-mysql-plugindir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --prefix="/usr/local/$PRODUCT_FULL"
-        make
+        make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install
 
     )
@@ -213,7 +222,7 @@ fi
         cd "UDF"
         CXX=${UDF_CXX:-g++} ./configure --includedir="$INSTALLDIR/src/Percona-Server/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
-        make
+        make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install
 
     )
@@ -226,7 +235,7 @@ fi
 
         ./configure --prefix="/usr/local/$PRODUCT_FULL/" \
                 --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
-        make
+        make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install_lib_shared
 
         # Copy COPYING file

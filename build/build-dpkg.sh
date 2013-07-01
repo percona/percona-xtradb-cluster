@@ -12,13 +12,16 @@
 set -ue
 
 # Examine parameters
-go_out="$(getopt --options "kK:bB" --longoptions key:,nosign,binary,binarydep \
+go_out="$(getopt --options "k:Ke:bBDS" \
+    --longoptions key:,nosign,epoch:,binary,binarydep,nodebug,source \
     --name "$(basename "$0")" -- "$@")"
 test $? -eq 0 || exit 1
 eval set -- $go_out
 
 BUILDPKG_KEY=''
-BINARY=''
+EPOCH=''
+DPKG_BINSRC=''
+SKIPDEBUG=''
 
 for arg
 do
@@ -26,8 +29,11 @@ do
     -- ) shift; break;;
     -k | --key ) shift; BUILDPKG_KEY="-pgpg -k$1"; shift;;
     -K | --nosign ) shift; BUILDPKG_KEY="-uc -us";;
-    -b | --binary ) shift; BINARY='-b';;
-    -B | --binarydep ) shift; BINARY='-B';;
+    -e | --epoch ) shift; EPOCH="$1:"; shift;;
+    -b | --binary ) shift; DPKG_BINSRC='-b';;
+    -B | --binarydep ) shift; DPKG_BINSRC='-B';;
+    -D | --nodebug ) shift; SKIPDEBUG='yes';;
+    -S | --source ) shift; DPKG_BINSRC='-S';;
     esac
 done
 
@@ -64,6 +70,14 @@ fi
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
 test -e "$SOURCEDIR/Makefile" || exit 2
 
+# The number of processors is a good default for -j
+if test -e "/proc/cpuinfo"
+then
+    PROCESSORS="$(grep -c ^processor /proc/cpuinfo)"
+else
+    PROCESSORS=4
+fi
+
 # Extract version from the Makefile
 MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
@@ -78,13 +92,16 @@ DEBIAN_VERSION="$(lsb_release -sc)"
 export REVISION="$(cd "$SOURCEDIR"; bzr revno)"
 export WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
 export DEB_BUILD_OPTIONS='debug nocheck'
+export BB_PERCONA_REVISION="$(cd "$SOURCEDIR"; bzr revno)"
 
 # Compilation flags
-export CC=${CC:-gcc}
-export CXX=${CXX:-gcc}
+export CC="${CC:-gcc}"
+export CXX="${CXX:-gcc}"
+export HS_CXX=${HS_CXX:-g++}
+export UDF_CXX=${UDF_CXX:-g++}
 export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -fno-omit-frame-pointer -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION ${CFLAGS:-}"
 export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fno-exceptions -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION ${CXXFLAGS:-}"
-export MAKE_JFLAG=-j4
+export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 # Prepare sources
 (
@@ -106,11 +123,18 @@ export MAKE_JFLAG=-j4
         cp -R "$SOURCEDIR/build/debian" .
         chmod +x debian/rules
 
+        # If nodebug is set, do not ship mysql-debug
+        if test "x$SKIPDEBUG" = "xyes"
+        then
+            sed -i '/mysqld-debug/d' debian/percona-server-server-5.5.install
+        fi
+
         # Update distribution name
-        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$MYSQL_VERSION-$WSREP_VERSION-$REVISION.$DEBIAN_VERSION" 'Update distribution'
+        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$EPOCH$MYSQL_VERSION-$WSREP_VERSION-$BB_PERCONA_REVISION.$DEBIAN_VERSION" 'Update distribution'
 
         DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS" \
-                dpkg-buildpackage $BINARY -rfakeroot $BUILDPKG_KEY
+                SKIP_DEBUG_BINARY="$SKIPDEBUG" \
+                dpkg-buildpackage $DPKG_BINSRC -rfakeroot $BUILDPKG_KEY
 
     )
 

@@ -25,10 +25,10 @@
 %define mysql_vendor            Oracle and/or its affiliates
 %define percona_server_vendor	Percona, Inc
 
-%define mysql_version   5.5.30
+%define mysql_version   5.5.31
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define majorversion 30
-%define minorversion 2
+%define minorversion 3
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
 
@@ -216,10 +216,10 @@
 ##############################################################################
 
 %if %{commercial}
-%define license_files_server    %{src_dir}/LICENSE.mysql
+%define license_files_server    LICENSE.mysql
 %define license_type            Commercial
 %else
-%define license_files_server    %{src_dir}/COPYING %{src_dir}/README
+%define license_files_server    COPYING README
 %define license_type            GPL
 %endif
 
@@ -236,6 +236,7 @@ Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
 Source:         Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
+Patch1:         mysql-dubious-exports.patch
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -267,7 +268,7 @@ Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar nc rsync
 Provides:       mysql-server MySQL-server Percona-Server-server
-Conflicts:	Percona-Server-server-55 Percona-Server-server-51
+Conflicts:	Percona-Server-server-56 Percona-Server-server-55 Percona-Server-server-51 Percona-SQL-server-50
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -292,7 +293,7 @@ Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
 Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
 Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
-Conflicts:	Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
+Conflicts:	Percona-Server-client-56 Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
 
 %description -n Percona-XtraDB-Cluster-client%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -316,7 +317,7 @@ Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test Percona-Server-test
-Conflicts:	Percona-Server-test-55 Percona-Server-test-51
+Conflicts:	Percona-Server-test-56 Percona-Server-test-55 Percona-Server-test-51
 AutoReqProv:    no
 
 %description -n Percona-XtraDB-Cluster-test%{product_suffix}
@@ -340,7 +341,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel Percona-Server-devel
-Conflicts:	Percona-Server-devel-55 Percona-Server-devel-51
+Conflicts:	Percona-Server-devel-56 Percona-Server-devel-55 Percona-Server-devel-51 Percona-SQL-devel-50
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -365,6 +366,7 @@ Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared mysql-libs Percona-Server-shared
 Conflicts:	Percona-Server-shared-55
+Obsoletes:	mysql-libs
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -382,8 +384,10 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 
 ##############################################################################
 %prep
-%setup -T -a 0 -c -n %{src_dir}
-
+%setup -n %{src_dir}
+#
+%patch1 -p1 
+#
 ##############################################################################
 %build
 
@@ -396,12 +400,12 @@ BuildHandlerSocket() {
     echo "Configuring HandlerSocket"
     CXX="${HS_CXX:-g++}" \
         MYSQL_CFLAGS="-I $RPM_BUILD_DIR/%{src_dir}/release/include" \
-        ./configure --with-mysql-source=$RPM_BUILD_DIR/%{src_dir}/%{src_dir} \
+        ./configure --with-mysql-source=$RPM_BUILD_DIR/%{src_dir} \
         --with-mysql-bindir=$RPM_BUILD_DIR/%{src_dir}/release/scripts \
         --with-mysql-plugindir=%{_libdir}/mysql/plugin \
         --libdir=%{_libdir} \
         --prefix=%{_prefix}
-    make
+    make ${MAKE_JFLAG}
     cd -
 }
 
@@ -409,9 +413,9 @@ BuildUDF() {
     cd UDF
     CXX="${UDF_CXX:-g++}"\
         CXXFLAGS="$CXXFLAGS -I$RPM_BUILD_DIR/%{src_dir}/release/include" \
-        ./configure --includedir=$RPM_BUILD_DIR/%{src_dir}/%{src_dir}/include \
+        ./configure --includedir=$RPM_BUILD_DIR/%{src_dir}/include \
         --libdir=%{_libdir}/mysql/plugin
-    make all
+    make ${MAKE_JFLAG} all
     cd -
 }
 
@@ -464,7 +468,7 @@ mkdir debug
                   -e 's/ $//'`
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DCMAKE_BUILD_TYPE=Debug \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
@@ -485,7 +489,7 @@ mkdir release
   cd release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
@@ -499,7 +503,7 @@ mkdir release
            -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG}
-  cd ../%{src_dir}
+  cd ../
   d="`pwd`"
   BuildHandlerSocket
   BuildUDF
@@ -566,10 +570,10 @@ install -d $RBR%{_libdir}/mysql/plugin
   cd $MBD/release
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   d="`pwd`"
-  cd $MBD/%{src_dir}/storage/HandlerSocket-Plugin-for-MySQL
+  cd $MBD/storage/HandlerSocket-Plugin-for-MySQL
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   cd "$d"
-  cd $MBD/%{src_dir}/UDF
+  cd $MBD/UDF
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   cd "$d"
 )
@@ -598,7 +602,7 @@ install -d $RBR%{_bindir}
 ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 # Install SELinux files in datadir
-install -m 600 $MBD/%{src_dir}/support-files/RHEL4-SElinux/mysql.{fc,te} \
+install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
   $RBR%{_datadir}/mysql/SELinux/RHEL4
 
 %if %{WITH_TCMALLOC}
@@ -621,7 +625,16 @@ rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
-mysql_datadir=%{mysqldatadir}
+# There are users who deviate from the default file system layout.
+# Check local settings to support them.
+if [ -x %{_bindir}/my_print_defaults ]
+then
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+fi
+if [ -z "$mysql_datadir" ]
+then
+  mysql_datadir=%{mysqldatadir}
+fi
 # Check if we can safely upgrade.  An upgrade is only safe if it's from one
 # of our RPMs in the same version family.
 
@@ -778,7 +791,16 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
 fi
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
-mysql_datadir=%{mysqldatadir}
+# There are users who deviate from the default file system layout.
+# Check local settings to support them.
+if [ -x %{_bindir}/my_print_defaults ]
+then
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+fi
+if [ -z "$mysql_datadir" ]
+then
+  mysql_datadir=%{mysqldatadir}
+fi
 NEW_VERSION=%{mysql_version}-%{release}
 STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 
@@ -789,17 +811,6 @@ else
 fi
 
 if [ $1 -eq 1 ]; then
-# ----------------------------------------------------------------------
-# Create a MySQL user and group. Do not report any problems if it already
-# exists.
-# ----------------------------------------------------------------------
-groupadd -r %{mysqld_group} 2> /dev/null || true
-useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
-  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-# The user may already exist, make sure it has the proper group nevertheless
-# (BUG#12823)
-usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
@@ -815,8 +826,25 @@ fi
 if [ ! -d $mysql_datadir/test ]; then 
         mkdir $mysql_datadir/test; 
 fi
-%{_bindir}/mysql_install_db --rpm --user=%{mysqld_user}
+
+# ----------------------------------------------------------------------
+# Create a MySQL user and group. Do not report any problems if it already
+# exists.
+# ----------------------------------------------------------------------
+groupadd -r %{mysqld_group} 2> /dev/null || true
+useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
+  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+# The user may already exist, make sure it has the proper group nevertheless
+# (BUG#12823)
+usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+
+# ----------------------------------------------------------------------
+# Initiate databases if needed
+# ----------------------------------------------------------------------
+%{_bindir}/mysql_install_db --rpm --user=%{mysqld_user} \
+    --datadir=$mysql_datadir
 fi 
+
 # ----------------------------------------------------------------------
 # Make MySQL start/shutdown automatically when the machine does it.
 # ----------------------------------------------------------------------
@@ -830,9 +858,6 @@ elif [ -x /sbin/insserv ] ; then
         /sbin/insserv %{_sysconfdir}/init.d/mysql
 fi
 
-# ----------------------------------------------------------------------
-# Initiate databases if needed
-# ----------------------------------------------------------------------
 # ----------------------------------------------------------------------
 # Upgrade databases if needed would go here - but it cannot be automated yet
 # ----------------------------------------------------------------------
@@ -943,7 +968,16 @@ fi
 #   http://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch10s02.html
 # For all details of this code, see the "pre" and "post" sections.
 
-mysql_datadir=%{mysqldatadir}
+# There are users who deviate from the default file system layout.
+# Check local settings to support them.
+if [ -x %{_bindir}/my_print_defaults ]
+then
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+fi
+if [ -z "$mysql_datadir" ]
+then
+  mysql_datadir=%{mysqldatadir}
+fi
 NEW_VERSION=%{mysql_version}-%{release}
 STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER-LAST  # Note the difference!
 STATUS_HISTORY=$mysql_datadir/RPM_UPGRADE_HISTORY
@@ -998,7 +1032,7 @@ echo "====="                                     >> $STATUS_HISTORY
 #%doc %{src_dir}/Docs/INFO_SRC
 %doc release/Docs/INFO_BIN
 %doc release/support-files/my-*.cnf
-%doc %{src_dir}/Docs/README-wsrep
+%doc Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
@@ -1032,6 +1066,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
 
 %attr(755, root, root) %{_bindir}/clustercheck
+%attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
 %attr(755, root, root) %{_bindir}/myisam_ftdump
 %attr(755, root, root) %{_bindir}/myisamchk

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2013, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -286,7 +286,8 @@ static bool mysql_admin_table(THD* thd, TABLE_LIST* tables,
   item->maybe_null = 1;
   field_list.push_back(item = new Item_empty_string("Msg_type", 10));
   item->maybe_null = 1;
-  field_list.push_back(item = new Item_empty_string("Msg_text", 255));
+  field_list.push_back(item = new Item_empty_string("Msg_text",
+                                                    SQL_ADMIN_MSG_TEXT_SIZE));
   item->maybe_null = 1;
   if (protocol->send_result_set_metadata(&field_list,
                             Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
@@ -1032,6 +1033,8 @@ bool Optimize_table_statement::execute(THD *thd)
                          FALSE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
   thd->enable_slow_log= opt_log_slow_admin_statements;
+
+  WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL)
   res= (specialflag & (SPECIAL_SAFE_MODE | SPECIAL_NO_NEW_FUNC)) ?
     mysql_recreate_table(thd, first_table) :
     mysql_admin_table(thd, first_table, &m_lex->check_opt,
@@ -1063,6 +1066,7 @@ bool Repair_table_statement::execute(THD *thd)
                          FALSE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
   thd->enable_slow_log= opt_log_slow_admin_statements;
+  WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL)
   res= mysql_admin_table(thd, first_table, &m_lex->check_opt, "repair",
                          TL_WRITE, 1,
                          test(m_lex->check_opt.sql_flags & TT_USEFRM),

@@ -507,6 +507,21 @@ fill_trx_row(
 	row->trx_mysql_thread_id = thd_get_thread_id(trx->mysql_thd);
 	stmt = innobase_get_stmt(trx->mysql_thd, &stmt_len);
 
+
+#ifdef WITH_WSREP
+
+	row->trx_consistency_check = wsrep_consistency_check_str(trx->mysql_thd);
+
+	row->trx_query_state       = wsrep_thd_query_state_str(trx->mysql_thd);
+
+	row->trx_conflict_state    = wsrep_thd_conflict_state_str(trx->mysql_thd);
+
+	row->trx_exec_mode         = wsrep_thd_exec_mode_str(trx->mysql_thd);
+
+	row->trx_wsrep_seqno	   = wsrep_thd_trx_seqno(trx->mysql_thd);
+
+#endif
+
 	if (stmt != NULL) {
 		char	query[TRX_I_S_TRX_QUERY_MAX_LEN + 1];
 

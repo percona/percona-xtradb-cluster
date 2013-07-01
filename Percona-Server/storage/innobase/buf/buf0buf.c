@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2012, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2013, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, Google Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
@@ -2565,6 +2565,10 @@ loop2:
 			retries = 0;
 		} else if (retries < BUF_PAGE_READ_MAX_RETRIES) {
 			++retries;
+			DBUG_EXECUTE_IF(
+				"innodb_page_corruption_retries",
+				retries = BUF_PAGE_READ_MAX_RETRIES;
+			);
 		} else {
 			fprintf(stderr, "InnoDB: Error: Unable"
 				" to read tablespace %lu page no"
@@ -2602,6 +2606,7 @@ got_block:
 		/* The page is being read to buffer pool,
 		but we cannot wait around for the read to
 		complete. */
+null_exit:
 		//buf_pool_mutex_exit(buf_pool);
 		mutex_exit(block_mutex);
 
@@ -2631,6 +2636,14 @@ got_block:
 	case BUF_BLOCK_ZIP_PAGE:
 	case BUF_BLOCK_ZIP_DIRTY:
 		ut_ad(block_mutex == &buf_pool->zip_mutex);
+		if (mode == BUF_PEEK_IF_IN_POOL) {
+			/* This mode is only used for dropping an
+			adaptive hash index.  There cannot be an
+			adaptive hash index for a compressed-only
+			page, so do not bother decompressing the page. */
+			goto null_exit;
+		}
+
 		bpage = &block->page;
 		/* Protect bpage->buf_fix_count. */
 		//mutex_enter(&buf_pool->zip_mutex);
@@ -2760,10 +2773,6 @@ wait_until_unfixed:
 		buf_pool_mutex_enter(buf_pool);
 		buf_pool->n_pend_unzip++;
 		buf_pool_mutex_exit(buf_pool);
-
-		access_time = buf_page_is_accessed(&block->page);
-		mutex_exit(&block->mutex);
-		mutex_exit(&buf_pool->zip_mutex);
 
 		buf_page_free_descriptor(bpage);
 

@@ -77,7 +77,13 @@ public:
   int log_and_order(THD *thd, my_xid xid, bool all,
                     bool need_commit_ordered)
   {
+    /* 
+     * To avoid the assertion when binlogging is turned off with wsrep 
+     * and UNIV_DEBUG is on 
+     */
+#ifndef WITH_WSREP
     DBUG_ASSERT(0 /* Internal error - TC_LOG_DUMMY::log_and_order() called */);
+#endif
     return 1;
   }
   int unlog(ulong cookie, my_xid xid)  { return 0; }

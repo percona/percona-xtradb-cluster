@@ -13,8 +13,8 @@ if [[ $1 == '-h' || $1 == '--help' ]];then
     exit
 fi
 
-MYSQL_USERNAME="${1:-clustercheckuser}" 
-MYSQL_PASSWORD="${2:-clustercheckpassword!}" 
+MYSQL_USERNAME="${1-clustercheckuser}" 
+MYSQL_PASSWORD="${2-clustercheckpassword!}" 
 AVAILABLE_WHEN_DONOR=${3:-0}
 ERR_FILE="${4:-/dev/null}" 
 #Timeout exists for instances where mysqld may be hung
