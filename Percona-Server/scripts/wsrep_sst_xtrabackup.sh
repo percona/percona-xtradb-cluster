@@ -25,6 +25,7 @@
 #     netcat or socat for transfer.                                                                         #
 #     xbstream/tar for streaming. (and xtrabackup ofc)                                                      #
 #     ss from iproute package                                                                               #
+#     pv if progress is enabled                                                                             #
 #                                                                                                           #
 #############################################################################################################
 
@@ -36,6 +37,7 @@
 #      lp:1193240 requires you to manually cleanup the directory prior to SST                                 #
 #                                                                                                             #
 # b) transferfmt=socat|nc : default is socat and recommended.                                                 #
+#                           Recommended because it allows for socket options like transfer buffer sizes       #
 #                                                                                                             #
 # c) tca = CA file for openssl based encryption with socat.                                                   #
 #                                                                                                             #
@@ -48,6 +50,15 @@
 #                                                                                                             #
 # f) sockopt = comma separated key/value pairs of socket options. Must                                        #
 # begin with a comma. Refer to socat manual for details.                                                      #
+#                                                                                                             #
+# g) progress = 1|path-to-file:                                                                               # 
+#     If 1 it writes to mysql stderr                                                                          # 
+#        path-to-file writes to that file                                                                     # 
+#     Note: Value of 0 is not valid                                                                           # 
+#                                                                                                             #
+# h) rebuild = 1|0 - 1 implies rebuild indexes. Note this is independent of compaction, though compaction     # 
+# enables it.                                                                                                 #
+#    Rebuild of indexes may be used as an optimization.                                                       #
 #                                                                                                             #
 # For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
 #                                                                                                             #
@@ -73,12 +84,17 @@ REMOTEIP=""
 tcert=""
 tpem=""
 sockopt=""
+progress=""
 
 sfmt="tar"
 strmcmd=""
 tfmt=""
 tcmd=""
-rebuild=""
+rebuild=0
+rebuildcmd=""
+payload=0
+pvopts="-f -i 10 -N $WSREP_SST_OPT_ROLE -F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p'"
+pcmd="pv $pvopts"
 declare -a RC
 
 INNOBACKUPEX_BIN=innobackupex
@@ -102,9 +118,9 @@ get_keys()
 
     wsrep_log_info "Xtrabackup based encryption enabled in my.cnf - not supported at the moment - lp:1190343"
     wsrep_log_info "Use socat-based openSSL encryption with encrypt=2 under [sst]"
-    ealgo=$(parse_cnf xtrabackup encrypt)
-    ekey=$(parse_cnf xtrabackup encrypt-key)
-    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file)
+    ealgo=$(parse_cnf xtrabackup encrypt "")
+    ekey=$(parse_cnf xtrabackup encrypt-key "")
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
 
     if [[ -z $ealgo ]];then
         wsrep_log_error "FATAL: Encryption algorithm empty from my.cnf, bailing out"
@@ -155,7 +171,6 @@ get_transfer()
                 tcmd="socat stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
             fi
         else 
-            wsrep_log_info "Using socat as streamer"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
                 tcmd="socat TCP-LISTEN:${SST_PORT},reuseaddr${sockopt} stdio"
             else
@@ -170,17 +185,46 @@ parse_cnf()
     local group=$1
     local var=$2
     reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | grep -- "--$var" | cut -d= -f2)
+    if [[ -z $reval ]];then 
+        [[ -n $3 ]] && reval=$3
+    fi
     echo $reval
+}
+
+get_footprint()
+{
+    pushd $WSREP_SST_OPT_DATA 1>/dev/null
+    payload=$(du --block-size=1 -c  **/*.ibd **/*.MYI **/*.MYI ibdata1  | awk 'END { print $1 }')
+    if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress";then 
+        # QuickLZ has around 50% compression ratio
+        payload=$(( payload*1/2 ))
+    fi
+    popd 1>/dev/null
+    pcmd+=" -s $payload"
+    adjust_progress
+}
+
+adjust_progress()
+{
+    if [[ -n $progress && $progress -ne 1 ]];then 
+        if [[ -e $progress ]];then 
+            pcmd+=" 2>>$progress"
+        else 
+            pcmd+=" 2>$progress"
+        fi
+    fi
 }
 
 read_cnf()
 {
-    sfmt=$(parse_cnf sst streamfmt)
-    tfmt=$(parse_cnf sst transferfmt)
-    tcert=$(parse_cnf sst tca)
-    tpem=$(parse_cnf sst tcert)
-    encrypt=$(parse_cnf sst encrypt)
-    sockopt=$(parse_cnf sst sockopt)
+    sfmt=$(parse_cnf sst streamfmt "tar")
+    tfmt=$(parse_cnf sst transferfmt "socat")
+    tcert=$(parse_cnf sst tca "")
+    tpem=$(parse_cnf sst tcert "")
+    encrypt=$(parse_cnf sst encrypt 0)
+    sockopt=$(parse_cnf sst sockopt "")
+    progress=$(parse_cnf sst progress "")
+    rebuild=$(parse_cnf sst rebuild 0)
 }
 
 get_stream()
@@ -309,7 +353,7 @@ setup_ports
 get_stream
 get_transfer
 
-INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuild ${DATA}"
+INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuildcmd ${DATA}"
 INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=$sfmt"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
@@ -341,16 +385,20 @@ then
         fi
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
 
+        if [[ -n $progress ]];then 
+            get_footprint
+            tcmd="$pcmd | $tcmd"
+        fi
+
         set +e
-        $INNOBACKUP ${TMPDIR} 2>${DATA}/innobackup.backup.log | $tcmd
-        RC=( "${PIPESTATUS[@]}" )
+        eval "$INNOBACKUP ${TMPDIR} 2>${DATA}/innobackup.backup.log | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
         set -e
 
         if [ ${RC[0]} -ne 0 ]; then
           wsrep_log_error "${INNOBACKUPEX_BIN} finished with error: ${RC[0]}. " \
                           "Check ${DATA}/innobackup.backup.log"
           exit 22
-        elif [  ${RC[1]} -ne 0 ]; then
+        elif [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]];then 
           wsrep_log_error "$tcmd finished with error: ${RC[1]}"
           exit 22
         fi
@@ -418,18 +466,22 @@ then
     trap "exit 3"  INT TERM
     trap cleanup_joiner EXIT
 
+    if [[ -n $progress ]];then 
+        adjust_progress
+        tcmd+=" | $pcmd"
+    fi
+
     get_keys
     set +e
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         if [[ -n $ekey ]];then
-            $tcmd  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA} 
+            eval "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
         else 
-            $tcmd  |  xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}
+            eval "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
         fi
     else 
-        $tcmd | $strmcmd
+        eval "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
-    RC=( "${PIPESTATUS[@]}" )
     set -e
 
     if [[ $sfmt == 'xbstream' ]];then 
@@ -499,13 +551,16 @@ then
         # Rebuild indexes for compact backups
         if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
             wsrep_log_info "Index compaction detected"
-            nthreads=$(parse_cnf xtrabackup rebuild-threads)
-            [[ -z $nthreads ]] && nthreads=$nproc
-            wsrep_log_info "Rebuilding with $nthreads threads"
-            rebuild="--rebuild-indexes --rebuild-threads=$nthreads"
+            rebuild=1
         fi
 
-        if test -n "$(find ${DATA} -maxdepth 1 -name '*.qp' -print -quit)";then
+        if [[ $rebuild -eq 1 ]];then 
+            nthreads=$(parse_cnf xtrabackup rebuild-threads $nproc)
+            wsrep_log_info "Rebuilding during prepare with $nthreads threads"
+            rebuildcmd="--rebuild-indexes --rebuild-threads=$nthreads"
+        fi
+
+        if test -n "$(find ${DATA} -maxdepth 1 -type f -name '*.qp' -print -quit)";then
 
             wsrep_log_info "Compressed qpress files found"
 
@@ -514,17 +569,24 @@ then
                 exit 22
             fi
 
-            set +e
+            if [[ -n $progress ]];then
+                count=$(find ${DATA} -type f -name '*.qp' | wc -l)
+                count=$(( count*2 ))
+                pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
+                pcmd="pv $pvopts"
+                adjust_progress
+                dcmd="$pcmd | xargs -n 2 qpress -T${nproc}d"
+            else 
+                dcmd="xargs -n 2 qpress -T${nproc}d"
+            fi
 
             wsrep_log_info "Removing existing ibdata1 file"
             rm -f ${DATA}/ibdata1
 
             # Decompress the qpress files 
             wsrep_log_info "Decompression with $nproc threads"
-            find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' |  xargs -P $nproc -n 2 qpress -d 
+            eval "find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' | $dcmd"
             extcode=$?
-
-            set -e
 
             if [[ $extcode -eq 0 ]];then
                 wsrep_log_info "Removing qpress files after decompression"
