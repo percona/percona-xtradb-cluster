@@ -59,6 +59,7 @@
 # h) rebuild = 1|0 - 1 implies rebuild indexes. Note this is independent of compaction, though compaction     # 
 # enables it.                                                                                                 #
 #    Rebuild of indexes may be used as an optimization.                                                       #
+# i) time = 0|1  - enabling it instruments key stages of backup/restore in SST                                #
 #                                                                                                             #
 # For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
 #                                                                                                             #
@@ -85,6 +86,8 @@ tcert=""
 tpem=""
 sockopt=""
 progress=""
+ttime=0
+totime=0
 
 sfmt="tar"
 strmcmd=""
@@ -103,6 +106,27 @@ readonly DATA="${WSREP_SST_OPT_DATA}"
 INFO_FILE="xtrabackup_galera_info"
 IST_FILE="xtrabackup_ist"
 MAGIC_FILE="${DATA}/${INFO_FILE}"
+
+timeit(){
+    local stage=$1
+    shift
+    local cmd="$@"
+    local x1 x2 took extcode
+
+    if [[ $ttime -eq 1 ]];then 
+        x1=$(date +%s)
+        eval "$cmd"
+        extcode=$?
+        x2=$(date +%s)
+        took=$(( x2-x1 ))
+        wsrep_log_info "NOTE: $stage took $took seconds"
+        totime=$(( totime+took ))
+    else 
+        eval "$cmd"
+        extcode=$?
+    fi
+    return $extcode
+}
 
 get_keys()
 {
@@ -225,6 +249,7 @@ read_cnf()
     sockopt=$(parse_cnf sst sockopt "")
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
+    ttime=$(parse_cnf sst time 0)
 }
 
 get_stream()
@@ -391,7 +416,7 @@ then
         fi
 
         set +e
-        eval "$INNOBACKUP ${TMPDIR} 2>${DATA}/innobackup.backup.log | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+        timeit "Donor-Transfer" "$INNOBACKUP ${TMPDIR} 2>${DATA}/innobackup.backup.log | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
         set -e
 
         if [ ${RC[0]} -ne 0 ]; then
@@ -440,6 +465,7 @@ then
     fi
 
     echo "done ${WSREP_SST_OPT_GTID}"
+    wsrep_log_info "Total time on donor: $totime seconds"
 
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
@@ -475,12 +501,12 @@ then
     set +e
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         if [[ -n $ekey ]];then
-            eval "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
+            timeit "Joiner-Recv-Encrypted-key" "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
         else 
-            eval "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
+            timeit "Joiner-Recv-Encrypted-keyfile" "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
         fi
     else 
-        eval "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+        timeit "Joiner-Recv-Unencrypted" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
     set -e
 
@@ -585,7 +611,7 @@ then
 
             # Decompress the qpress files 
             wsrep_log_info "Decompression with $nproc threads"
-            eval "find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' | $dcmd"
+            timeit "Decompression" "find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' | $dcmd"
             extcode=$?
 
             if [[ $extcode -eq 0 ]];then
@@ -601,7 +627,7 @@ then
         fi
 
         wsrep_log_info "Preparing the backup at ${DATA}"
-        $INNOAPPLY &>${DATA}/innobackup.prepare.log
+        timeit "Xtrabackup prepare stage" "$INNOAPPLY &>${DATA}/innobackup.prepare.log"
 
         if [ $? -ne 0 ];
         then
@@ -613,6 +639,7 @@ then
     fi
 
     cat "${MAGIC_FILE}" # output UUID:seqno
+    wsrep_log_info "Total time on joiner: $totime seconds"
 fi
 
 exit 0
