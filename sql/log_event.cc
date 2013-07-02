@@ -11810,8 +11810,9 @@ check_table_map(Relay_log_info const *rli, RPL_TABLE_LIST *table_list)
 
 #ifdef WITH_WSREP
   if ((rli->info_thd->slave_thread /* filtering is for slave only */  ||
-       (WSREP(rli->info_thd) && rli->info_thd->wsrep_applier))         &&
+       (WSREP(rli->info_thd) && rli->info_thd->wsrep_applier))        &&
 #else
+  if (rli->info_thd->slave_thread /* filtering is for slave only */ &&
 #endif /* WITH_WSREP */
       (!rpl_filter->db_ok(table_list->db) ||
        (rpl_filter->is_on() && !rpl_filter->tables_ok("", table_list))))
