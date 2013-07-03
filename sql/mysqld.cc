@@ -5020,7 +5020,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     else
 #ifdef WITH_WSREP
       if (WSREP_ON)
-	tc_log=  &tc_log_dummy;
+        tc_log=  &tc_log_dummy;
       else
 #endif /* WITH_WSREP */
       tc_log= &tc_log_mmap;
