@@ -59,7 +59,11 @@
 # h) rebuild = 1|0 - 1 implies rebuild indexes. Note this is independent of compaction, though compaction     # 
 # enables it.                                                                                                 #
 #    Rebuild of indexes may be used as an optimization.                                                       #
+#                                                                                                             #
 # i) time = 0|1  - enabling it instruments key stages of backup/restore in SST                                #
+#                                                                                                             #
+# j) incremental=0|1  -  To be set on joiner only, supersedes IST if set. Read documentation before setting   #
+#                         this.                                                                               #
 #                                                                                                             #
 # For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
 #                                                                                                             #
@@ -88,6 +92,9 @@ sockopt=""
 progress=""
 ttime=0
 totime=0
+lsn=""
+incremental=0
+ecmd=""
 
 sfmt="tar"
 strmcmd=""
@@ -102,7 +109,7 @@ declare -a RC
 
 INNOBACKUPEX_BIN=innobackupex
 readonly AUTH=(${WSREP_SST_OPT_AUTH//:/ })
-readonly DATA="${WSREP_SST_OPT_DATA}"
+DATA="${WSREP_SST_OPT_DATA}"
 INFO_FILE="xtrabackup_galera_info"
 IST_FILE="xtrabackup_ist"
 MAGIC_FILE="${DATA}/${INFO_FILE}"
@@ -142,9 +149,6 @@ get_keys()
 
     wsrep_log_info "Xtrabackup based encryption enabled in my.cnf - not supported at the moment - lp:1190343"
     wsrep_log_info "Use socat-based openSSL encryption with encrypt=2 under [sst]"
-    ealgo=$(parse_cnf xtrabackup encrypt "")
-    ekey=$(parse_cnf xtrabackup encrypt-key "")
-    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
 
     if [[ -z $ealgo ]];then
         wsrep_log_error "FATAL: Encryption algorithm empty from my.cnf, bailing out"
@@ -154,6 +158,16 @@ get_keys()
     if [[ -z $ekey && ! -r $ekeyfile ]];then
         wsrep_log_error "FATAL: Either key or keyfile must be readable"
         exit 3
+    fi
+
+    if [[ -z $ekey ]];then
+        ecmd="xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile"
+    else
+        ecmd="xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey"
+    fi
+
+    if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]];then
+        ecmd+=" -d"
     fi
 }
 
@@ -250,6 +264,10 @@ read_cnf()
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
+    incremental=$(parse_cnf sst incremental 0)
+    ealgo=$(parse_cnf xtrabackup encrypt "")
+    ekey=$(parse_cnf xtrabackup encrypt-key "")
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
 }
 
 get_stream()
@@ -258,9 +276,9 @@ get_stream()
         wsrep_log_info "Streaming with xbstream"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             wsrep_log_info "xbstream requires manual cleanup of data directory before SST - lp:1193240"
-            strmcmd="xbstream -x -C ${DATA}"
+            strmcmd="xbstream -x -C \${DATA}"
         else
-            strmcmd="xbstream -c ${INFO_FILE} ${IST_FILE}"
+            strmcmd="xbstream -c \${INFO_FILE} \${IST_FILE}"
         fi
     else
         sfmt="tar"
@@ -268,9 +286,9 @@ get_stream()
         wsrep_log_info "Note: Advanced xtrabackup features - encryption,compression etc. not available with tar."
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             wsrep_log_info "However, xbstream requires manual cleanup of data directory before SST - lp:1193240."
-            strmcmd="tar xfi - -C ${DATA}"
+            strmcmd="tar xfi - -C \${DATA}"
         else
-            strmcmd="tar cf - ${INFO_FILE} ${IST_FILE}"
+            strmcmd="tar cf - \${INFO_FILE} \${IST_FILE}"
         fi
 
     fi
@@ -341,6 +359,7 @@ setup_ports()
     if [[ "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
         SST_PORT=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $2 }')
         REMOTEIP=$(echo $WSREP_SST_OPT_ADDR | awk -F ':' '{ print $1 }')
+        lsn=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $4 }')
     else
         SST_PORT=$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $2 }')
     fi
@@ -358,7 +377,11 @@ wait_for_listen()
         ss -p state listening "( sport = :$PORT )" | grep -qE 'socat|nc' && break
         sleep 0.2
     done
+    if [[ $incremental -eq 1 ]];then 
+        echo "ready ${ADDR}/${MODULE}/$lsn"
+    else 
     echo "ready ${ADDR}/${MODULE}"
+    fi
 }
 
 if [[ ! -x `which innobackupex` ]];then 
@@ -378,8 +401,8 @@ setup_ports
 get_stream
 get_transfer
 
-INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --apply-log $rebuildcmd ${DATA}"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=$sfmt"
+INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log $rebuildcmd ${DATA} &>${DATA}/innobackup.prepare.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=$sfmt \${TMPDIR} 2>${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -408,6 +431,11 @@ then
                 INNOBACKUP+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile"
             fi
         fi
+
+        if [[ -n $lsn ]];then 
+                INNOBACKUP+=" --incremental --incremental-lsn=$lsn"
+        fi
+
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
 
         if [[ -n $progress ]];then 
@@ -416,7 +444,7 @@ then
         fi
 
         set +e
-        timeit "Donor-Transfer" "$INNOBACKUP ${TMPDIR} 2>${DATA}/innobackup.backup.log | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
+        timeit "Donor-Transfer" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
         set -e
 
         if [ ${RC[0]} -ne 0 ]; then
@@ -443,15 +471,9 @@ then
         pushd ${DATA} 1>/dev/null
         set +e
         if [[ $encrypt -eq 1 ]];then
-            if [[ -n $ekey ]];then
-                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey | $tcmd
-            else 
-                 xbstream -c ${INFO_FILE} ${IST_FILE} | xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | $tcmd
-            fi
-        else
-            $strmcmd | $tcmd
+            tcmd=" $ecmd | $tcmd"
         fi
-        RC=( "${PIPESTATUS[@]}" )
+        timeit "Donor-IST-Unencrypted-transfer" "$strmcmd | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
         set -e
         popd 1>/dev/null
 
@@ -472,12 +494,23 @@ then
     [[ -e $SST_PROGRESS_FILE ]] && wsrep_log_info "Stale sst_in_progress file: $SST_PROGRESS_FILE"
     touch $SST_PROGRESS_FILE
 
+    if [[ ! -e ${DATA}/ibdata1 ]];then 
+        incremental=0
+    fi
+
+    if [[ $incremental -eq 1 ]];then 
+        wsrep_log_info "Incremental SST enabled"
+        #lsn=$(/pxc/bin/mysqld --defaults-file=$WSREP_SST_OPT_CONF  --basedir=/pxc  --wsrep-recover 2>&1 | grep -o 'log sequence number .*' | cut -d " " -f 4 | head -1)
+        lsn=$(grep to_lsn xtrabackup_checkpoints | cut -d= -f2 | tr -d ' ')
+        wsrep_log_info "Recovered LSN: $lsn"
+    fi
+
     sencrypted=1
     nthreads=1
 
     MODULE="xtrabackup_sst"
 
-    rm -f ${DATA}/xtrabackup_*
+    rm -f ${DATA}/xtrabackup_binary ${DATA}/xtrabackup_galera_info  ${DATA}/xtrabackup_logfile
 
     ADDR=${WSREP_SST_OPT_ADDR}
     if [ -z "${SST_PORT}" ]
@@ -497,17 +530,18 @@ then
         tcmd+=" | $pcmd"
     fi
 
+    if [[ $incremental -eq 1 ]];then 
+        BDATA=$DATA
+        DATA=$(mktemp -d)
+        MAGIC_FILE="${DATA}/${INFO_FILE}"
+    fi
+
     get_keys
     set +e
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
-        if [[ -n $ekey ]];then
-            timeit "Joiner-Recv-Encrypted-key" "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
-        else 
-            timeit "Joiner-Recv-Encrypted-keyfile" "$tcmd  | xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile | xbstream -x -C ${DATA}; RC=( "\${PIPESTATUS[@]}" )"
-        fi
-    else 
-        timeit "Joiner-Recv-Unencrypted" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+        strmcmd=" $ecmd | $strmcmd"
     fi
+    timeit "Joiner-Recv-Unencrypted" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     set -e
 
     if [[ $sfmt == 'xbstream' ]];then 
@@ -543,33 +577,14 @@ then
         exit 32
     fi
 
-    if [ ! -r "${IST_FILE}" ]
+    if [ ! -r "${DATA}/${IST_FILE}" ]
     then
         wsrep_log_info "Proceeding with SST"
         wsrep_log_info "Removing existing ib_logfile files"
-        rm -f ${DATA}/ib_logfile*
-
-        # Decrypt only if not encrypted in stream.
-        # NOT USED NOW.  
-        # Till https://blueprints.launchpad.net/percona-xtrabackup/+spec/add-support-for-rsync-url 
-        # is implemented
-        #get_keys
-        if [[ $encrypt -eq 1 && $sencrypted -eq 0 ]];then
-            # Decrypt the files if any
-            find ${DATA} -type f -name '*.xbcrypt' -printf '%p\n'  |  while read line;do 
-                input=$line
-                output=${input%.xbcrypt}
-
-                if [[ -n $ekey ]];then
-                    xbcrypt -d --encrypt-algo=$ealgo --encrypt-key=$ekey -i $input > $output
-                else 
-                    xbcrypt -d --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile -i $input > $output
-                fi
-            done
-
-            if [[ $? = 0 ]];then
-                find ${DATA} -type f -name '*.xbcrypt' -delete
-            fi
+        if [[ $incremental -ne 1 ]];then 
+            rm -f ${DATA}/ib_logfile*
+        else
+            rm -f ${BDATA}/ib_logfile*
         fi
 
         get_proc
@@ -591,7 +606,7 @@ then
             wsrep_log_info "Compressed qpress files found"
 
             if [[ ! -x `which qpress` ]];then 
-                wsrep_log_error "qpress not found in PATH"
+                wsrep_log_error "qpress not found in path: $PATH"
                 exit 22
             fi
 
@@ -626,8 +641,19 @@ then
             fi
         fi
 
+        if [[ $incremental -eq 1 ]];then 
+            INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \
+                --ibbackup=xtrabackup_55 --apply-log $rebuildcmd --redo-only $BDATA --incremental-dir=${DATA} &>>${BDATA}/innobackup.prepare.log"
+        fi
+
         wsrep_log_info "Preparing the backup at ${DATA}"
-        timeit "Xtrabackup prepare stage" "$INNOAPPLY &>${DATA}/innobackup.prepare.log"
+        timeit "Xtrabackup prepare stage" "$INNOAPPLY"
+
+        if [[ $incremental -eq 1 ]];then 
+            wsrep_log_info "Cleaning up ${DATA} after incremental SST"
+            [[ -d ${DATA} ]] && rm -rf ${DATA}
+            DATA=$BDATA
+        fi
 
         if [ $? -ne 0 ];
         then
