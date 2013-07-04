@@ -1083,15 +1083,15 @@ THD::THD(bool enable_plugins)
    bootstrap(0),
    derived_tables_processing(FALSE),
    sp_runtime_ctx(NULL),
-   m_parser_state(NULL),
-#if defined(ENABLED_DEBUG_SYNC)
-   debug_sync_control(0),
-#endif /* defined(ENABLED_DEBUG_SYNC) */
 #ifdef WITH_WSREP
    wsrep_applier(is_applier),
    wsrep_applier_closing(FALSE),
    wsrep_client_thread(0),
 #endif
+   m_parser_state(NULL),
+#if defined(ENABLED_DEBUG_SYNC)
+   debug_sync_control(0),
+#endif /* defined(ENABLED_DEBUG_SYNC) */
    m_enable_plugins(enable_plugins),
    owned_gtid_set(global_sid_map),
    main_da(0, false),
