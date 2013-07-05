@@ -46,17 +46,19 @@
 # e) encrypt = 0|1|2 : decides whether encryption is to be done or not, if                                    #
 #    this is zero, no encryption is done.                                                                     #
 #    1 - Xtrabackup based encryption                                                                          #
-#    2 - OpenSSL based encryption                                                                             #   
+#    2 - OpenSSL based encryption                                                                             # 
 #                                                                                                             #
 # f) sockopt = comma separated key/value pairs of socket options. Must                                        #
 # begin with a comma. Refer to socat manual for details.                                                      #
 #                                                                                                             #
-# g) progress = 1|path-to-file:                                                                               # 
-#     If 1 it writes to mysql stderr                                                                          # 
-#        path-to-file writes to that file                                                                     # 
-#     Note: Value of 0 is not valid                                                                           # 
+# g) progress = 1|path-to-file|path-to-fifo:                                                                  #
+#     If 1 it writes to mysql stderr                                                                          #
+#        path-to-file writes to that file                                                                     #
+#    If path is to a fifo (full path), it will be created and cleaned up at exit. This is the preferred way.  #
+#        You need to cat the fifo file to monitor the progress, not tailf it.                                 #
+#     Note: Value of 0 is not valid                                                                           #
 #                                                                                                             #
-# h) rebuild = 1|0 - 1 implies rebuild indexes. Note this is independent of compaction, though compaction     # 
+# h) rebuild = 1|0 - 1 implies rebuild indexes. Note this is independent of compaction, though compaction     #
 # enables it.                                                                                                 #
 #    Rebuild of indexes may be used as an optimization.                                                       #
 #                                                                                                             #
@@ -245,6 +247,11 @@ get_footprint()
 adjust_progress()
 {
     if [[ -n $progress && $progress -ne 1 ]];then 
+        if [[ $progress == /*.fif ]];then 
+            wsrep_log_info "Creating fifo file $progress for tracking progress"
+            mkfifo $progress
+        fi
+        
         if [[ -e $progress ]];then 
             pcmd+=" 2>>$progress"
         else 
@@ -321,6 +328,10 @@ cleanup_joiner()
         wsrep_log_info "Removing the sst_in_progress file"
         wsrep_cleanup_progress_file
     fi
+    if [[ -p $progress ]];then 
+        wsrep_log_info "Cleaning up fifo file"
+        rm $progress
+    fi
 }
 
 check_pid()
@@ -345,6 +356,11 @@ cleanup_donor()
 
     rm -f "$pid"
     rm -f ${DATA}/${IST_FILE}
+
+    if [[ -p $progress ]];then 
+        wsrep_log_info "Cleaning up fifo file $progress"
+        rm $progress
+    fi
 }
 
 kill_xtrabackup()
