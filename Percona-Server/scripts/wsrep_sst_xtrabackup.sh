@@ -47,9 +47,12 @@
 #    this is zero, no encryption is done.                                                                     #
 #    1 - Xtrabackup based encryption                                                                          #
 #    2 - OpenSSL based encryption                                                                             # 
+#   Note: You can also enable SSL based compression with sockopt mentioned in f)  below                       #
 #                                                                                                             #
 # f) sockopt = comma separated key/value pairs of socket options. Must                                        #
-# begin with a comma. Refer to socat manual for details.                                                      #
+# begin with a comma.                                                                                         #
+#    You can use tcpwrap option here to blacklist/whitelist the clients.                                      #
+#                     Refer to socat manual for further details.                                              #
 #                                                                                                             #
 # g) progress = 1|path-to-file|path-to-fifo:                                                                  #
 #     If 1 it writes to mysql stderr                                                                          #
@@ -66,6 +69,7 @@
 #                                                                                                             #
 # j) incremental=0|1  -  To be set on joiner only, supersedes IST if set. Read documentation before setting   #
 #                         this.                                                                               #
+# k) rlimit=x(k|m|g|t) - ratelimit to x kilobytes, megabytes etc. Refer to pv manual for details              #
 #                                                                                                             #
 # For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
 #                                                                                                             #
@@ -97,6 +101,7 @@ totime=0
 lsn=""
 incremental=0
 ecmd=""
+rlimit=""
 
 sfmt="tar"
 strmcmd=""
@@ -106,7 +111,7 @@ rebuild=0
 rebuildcmd=""
 payload=0
 pvopts="-f -i 10 -N $WSREP_SST_OPT_ROLE -F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p'"
-pcmd="pv $pvopts"
+pcmd="pv \$pvopts"
 declare -a RC
 
 INNOBACKUPEX_BIN=innobackupex
@@ -218,6 +223,10 @@ get_transfer()
             fi
         fi
     fi
+
+    if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+        pvopts+=" -L \$rlimit"
+    fi
 }
 
 parse_cnf()
@@ -237,6 +246,7 @@ get_footprint()
     payload=$(du --block-size=1 -c  **/*.ibd **/*.MYI **/*.MYI ibdata1  | awk 'END { print $1 }')
     if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress";then 
         # QuickLZ has around 50% compression ratio
+        # When compression/compaction used, the progress is only an approximate.
         payload=$(( payload*1/2 ))
     fi
     popd 1>/dev/null
@@ -247,7 +257,7 @@ get_footprint()
 adjust_progress()
 {
     if [[ -n $progress && $progress -ne 1 ]];then 
-        if [[ $progress == /*.fif ]];then 
+        if [[ $progress == /*.fif && ! -e $progress ]];then 
             wsrep_log_info "Creating fifo file $progress for tracking progress"
             mkfifo $progress
         fi
@@ -275,6 +285,7 @@ read_cnf()
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
+    rlimit=$(parse_cnf sst rlimit "")
 }
 
 get_stream()
