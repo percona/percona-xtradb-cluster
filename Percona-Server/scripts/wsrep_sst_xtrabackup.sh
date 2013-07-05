@@ -224,7 +224,7 @@ get_transfer()
         fi
     fi
 
-    if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+    if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
         pvopts+=" -L \$rlimit"
     fi
 }
