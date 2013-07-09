@@ -9,8 +9,10 @@
       
 .. note:: 
     In following options, non-integer options which have no default are
-    disabled if not set. ":Match: Yes" implies that options should match on
-    donor and joiner (in their cnf). ":Recommended: Yes" implies the value which is recommended.
+    disabled if not set. ":Match: Yes" implies that options should match
+    on donor and joiner (in their cnf). ":Recommended: Yes" implies the
+    value which is recommended. Also, in following options, path always
+    means full path.
 
 .. option:: streamfmt
 
@@ -28,7 +30,7 @@ directory prior to SST.
      :Default: socat
      :Match: Yes
      
-socat is recommended because it allows for socket options like transfer buffer sizes       
+socat is recommended because it allows for socket options like transfer buffer sizes.
                                                                                                              
 .. option:: tca 
 
@@ -51,13 +53,12 @@ socat is recommended because it allows for socket options like transfer buffer s
     :Recommended: 2
 
 Decides whether encryption is to be done or not, if this is zero, no    
-encryption is done.                                                    
-  * Xtrabackup based encryption                                                                          
-  * OpenSSL based encryption - socat must be built with openSSL for encryption: ```socat -V | grep OPENSSL```. 
+encryption is done.
+   * Xtrabackup based encryption.
+   * OpenSSL based encryption - socat must be built with openSSL for encryption: ``socat -V | grep OPENSSL``.
 
 .. note::
-
- You can also enable SSL based compression with sockopt mentioned in f)  below                       
+   You can also enable SSL based compression with :option:`sockopt` mentioned below.
             
 .. option:: sockopt
 
@@ -67,13 +68,15 @@ clients. Refer to socat manual for further details.
 
 .. option progress::
 
-    :Values: 1,path-to-file,path-to-fifo
+    :Values: 1,path/to/file,path/to/fifo
 
 If equal to:
     * 1 it writes to mysql stderr 
-    * path to file writes to that file 
-    * path to a fifo, it will be created and cleaned up at exit.This is the preferred way. You need to cat the fifo file to monitor the progress, not tail it. 
-Note: Value of 0 is not valid.
+    * path/to/file writes to that file 
+    * path/to/fifo, it will be created and cleaned up at exit.This is the preferred way. You need to cat the fifo file to monitor the progress, not tail it. 
+
+.. note::
+    Note: Value of 0 is not valid.
            
 .. option:: rebuild
 
