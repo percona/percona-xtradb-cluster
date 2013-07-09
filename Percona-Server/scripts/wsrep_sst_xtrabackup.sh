@@ -15,71 +15,24 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
-#############################################################################################################
-#     This is a reference script for Percona XtraBackup-based state snapshot transfer                       #
-#     Dependencies:  (depending on configuration)                                                           #
-#     xbcrypt for encryption/decryption.                                                                    #
-#     qpress for decompression. Download from http://www.quicklz.com/qpress-11-linux-x64.tar till           #
-#     https://blueprints.launchpad.net/percona-xtrabackup/+spec/package-qpress is fixed.                    #
-#     my_print_defaults to extract values from my.cnf.                                                      #
-#     netcat or socat for transfer.                                                                         #
-#     xbstream/tar for streaming. (and xtrabackup ofc)                                                      #
-#     ss from iproute package                                                                               #
-#     pv if progress is enabled                                                                             #
-#                                                                                                           #
-#############################################################################################################
+#####################################################################################################################
+#     This is a reference script for Percona XtraBackup-based state snapshot transfer                               #
+#     Dependencies:  (depending on configuration)                                                                   #
+#     xbcrypt for encryption/decryption.                                                                            #
+#     qpress for decompression. Download from http://www.quicklz.com/qpress-11-linux-x64.tar till                   #
+#     https://blueprints.launchpad.net/percona-xtrabackup/+spec/package-qpress is fixed.                            #
+#     my_print_defaults to extract values from my.cnf.                                                              #
+#     netcat or socat for transfer.                                                                                 #
+#     xbstream/tar for streaming. (and xtrabackup ofc)                                                              #
+#     ss from iproute package                                                                                       #
+#     pv if progress is enabled                                                                                     #
+#                                                                                                                   #
+# For further documentation refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html   #
+#                                                                                                                   #
+#####################################################################################################################
 
-###############################################################################################################
-# Following SST specific options (under [sst]) are allowed in my.cnf:                                         #
-#                                                                                                             #
-# a) streamfmt=xbstream|tar : default is tar (till lp:1193240 is fixed).                                      #
-#      You need to use xbstream for encryption, compression etc., however,                                    #
-#      lp:1193240 requires you to manually cleanup the directory prior to SST                                 #
-#                                                                                                             #
-# b) transferfmt=socat|nc : default is socat and recommended.                                                 #
-#                           Recommended because it allows for socket options like transfer buffer sizes       #
-#                                                                                                             #
-# c) tca = CA file for openssl based encryption with socat.                                                   #
-#                                                                                                             #
-# d) tcert = PEM for openssl based encryption with socat.                                                     #
-#                                                                                                             #
-# e) encrypt = 0|1|2 : decides whether encryption is to be done or not, if                                    #
-#    this is zero, no encryption is done.                                                                     #
-#    1 - Xtrabackup based encryption                                                                          #
-#    2 - OpenSSL based encryption                                                                             # 
-#   Note: You can also enable SSL based compression with sockopt mentioned in f)  below                       #
-#                                                                                                             #
-# f) sockopt = comma separated key/value pairs of socket options. Must                                        #
-# begin with a comma.                                                                                         #
-#    You can use tcpwrap option here to blacklist/whitelist the clients.                                      #
-#                     Refer to socat manual for further details.                                              #
-#                                                                                                             #
-# g) progress = 1|path-to-file|path-to-fifo:                                                                  #
-#     If 1 it writes to mysql stderr                                                                          #
-#        path-to-file writes to that file                                                                     #
-#    If path is to a fifo (full path), it will be created and cleaned up at exit. This is the preferred way.  #
-#        You need to cat the fifo file to monitor the progress, not tailf it.                                 #
-#     Note: Value of 0 is not valid                                                                           #
-#                                                                                                             #
-# h) rebuild = 1|0 - 1 implies rebuild indexes. Note this is independent of compaction, though compaction     #
-# enables it.                                                                                                 #
-#    Rebuild of indexes may be used as an optimization.                                                       #
-#                                                                                                             #
-# i) time = 0|1  - enabling it instruments key stages of backup/restore in SST                                #
-#                                                                                                             #
-# j) incremental=0|1  -  To be set on joiner only, supersedes IST if set. Currently requires manual setup.    #
-#                                            Hence, not supported currently.                                  #
-# k) rlimit=x(k|m|g|t) - ratelimit to x kilobytes, megabytes etc. Refer to pv manual for details              #
-#                                                                                                             #
-# For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
-#                                                                                                             #
-# Values of a), b) and e) must match on donor and joiner.                                                     #
-#                                                                                                             #
-# socat based openssl encryption: encrypt=2 is recommended for now.                                           #
-#                                                                                                             #
-# socat must be built with openSSL for encryption: socat -V | grep OPENSSL                                    #
-#                                                                                                             #
-###############################################################################################################
+
+
 
 . $(dirname $0)/wsrep_sst_common
 
