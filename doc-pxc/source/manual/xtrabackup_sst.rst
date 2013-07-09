@@ -26,9 +26,7 @@ Following SST specific options are allowed in my.cnf under [sst]:
      :Default: tar             
      :Match: Yes
 
-You need to use xbstream for encryption, compression etc.,        
-however, bug :bug:`1193240` requires you to manually cleanup the          
-directory prior to SST.
+Refer to :ref:`Xbstream v/s Tar<tar_ag_xbstream>` for details and caveats of using tar v/s xbstream for SST.
              
 .. option:: transferfmt
 
@@ -114,3 +112,12 @@ Ratelimit to x kilobytes, megabytes etc. Refer to pv manual for details.
 
 To be set on joiner only, supersedes IST if set. Currently requires
 manual setup. Hence, not supported currently.
+
+.. _tar_ag_xbstream:
+
+===============================
+ Tar against xbstream
+===============================
+
+  * Features - encryption, compression, parallel streaming, streaming incremental backups, compaction - won't work with tar. Refer to `xbstream docs <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_ for more. 
+  * Bug :bug:`1193240` requires you to manually cleanup the directory (empty data directory) prior to SST. After that is fixed (and xtrabackup is released), SST will work without any modifications to wsrep_sst_xtrabackup.
