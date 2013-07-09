@@ -67,8 +67,8 @@
 #                                                                                                             #
 # i) time = 0|1  - enabling it instruments key stages of backup/restore in SST                                #
 #                                                                                                             #
-# j) incremental=0|1  -  To be set on joiner only, supersedes IST if set. Read documentation before setting   #
-#                         this.                                                                               #
+# j) incremental=0|1  -  To be set on joiner only, supersedes IST if set. Currently requires manual setup.    #
+#                                            Hence, not supported currently.                                  #
 # k) rlimit=x(k|m|g|t) - ratelimit to x kilobytes, megabytes etc. Refer to pv manual for details              #
 #                                                                                                             #
 # For c) and d), refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      #
