@@ -1,10 +1,11 @@
 .. _xtrabackup_sst:
 
-=========================
+===============================
  Xtrabackup SST Configuration
-=========================
+===============================
 
 * Following SST specific options are allowed in my.cnf under [sst]:                                     
+==========================
       
 .. note:: 
     In following options, non-integer options which have no default are
@@ -13,7 +14,7 @@
 
 .. option:: streamfmt
 
-     :Possible values: xbstream, tar  
+     :Values: xbstream, tar  
      :Default: tar             
      :Match: Yes
 
@@ -23,7 +24,7 @@ directory prior to SST.
              
 .. option:: transferfmt
 
-     :Possible values: socat, nc
+     :Values: socat, nc
      :Default: socat
      :Match: Yes
      
@@ -44,7 +45,7 @@ socat is recommended because it allows for socket options like transfer buffer s
                                                                                                              
 .. option:: encrypt
 
-    :Possible values: 0,1,2  
+    :Values: 0,1,2  
     :Default: 0
     :Match: Yes
     :Recommended: 2
@@ -66,7 +67,7 @@ clients. Refer to socat manual for further details.
 
 .. option progress::
 
-    :Possible values: 1,path-to-file,path-to-fifo
+    :Values: 1,path-to-file,path-to-fifo
 
 If equal to:
     * 1 it writes to mysql stderr 
@@ -76,7 +77,7 @@ Note: Value of 0 is not valid.
            
 .. option:: rebuild
 
-    :Possible values: 0,1 
+    :Values: 0,1 
     :Default: 0
     
 Used only on joiner. 1 implies rebuild indexes. Note that this is       
@@ -85,23 +86,21 @@ indexes may be used as an optimization.
                              
 .. option:: time
 
-    :Possible values: 0,1  
+    :Values: 0,1  
     :Default: 0   
 
 Enabling it instruments key stages of backup/restore in SST.
                
 .. option:: rlimit 
 
-    :Possible values: x(k|m|g|t) 
+    :Values: x(k|m|g|t) 
     
 Ratelimit to x kilobytes, megabytes etc. Refer to pv manual for details.
 
 .. option:: incremental
 
-    :Possible values: 0,1
+    :Values: 0,1
     :Default: 0
 
-To be set on joiner only, supersedes IST if set. Currently requires     
+To be set on joiner only, supersedes IST if set. Currently requires
 manual setup. Hence, not supported currently.
-
-
