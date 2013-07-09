@@ -21,7 +21,7 @@ Public License for more details.
 
 You should have received a copy of the GNU General Public License along
 with this program; if not, write to the Free Software Foundation, Inc.,
-59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
 ***********************************************************************/
 
@@ -1394,8 +1394,11 @@ static __attribute__((warn_unused_result))
 ibool
 os_file_set_atomic_writes(
 /*======================*/
-	const char*	name,	/*!< in: name of the file */
-	os_file_t	file)	/*!< in: handle to the file */
+	const char*	name	/*!< in: name of the file */
+	__attribute__((unused)),
+	os_file_t	file	/*!< in: handle to the file */
+	__attribute__((unused)))
+
 {
 #ifdef DFS_IOCTL_ATOMIC_WRITE_SET
 	int	atomic_option	= 1;
@@ -1908,7 +1911,6 @@ os_file_close_func(
 #endif
 }
 
-#ifdef UNIV_HOTBACKUP
 /***********************************************************************//**
 Closes a file handle.
 @return	TRUE if success */
@@ -1943,7 +1945,6 @@ os_file_close_no_error_handling(
 	return(TRUE);
 #endif
 }
-#endif /* UNIV_HOTBACKUP */
 
 /***********************************************************************//**
 Gets a file size.

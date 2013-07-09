@@ -198,7 +198,7 @@ fi
         -DWITH_INNODB_DISALLOW_WRITES=ON \
         -DWITH_WSREP=ON \
         -DCOMPILATION_COMMENT="$COMMENT" \
-	-DWITH_PAM=ON
+        -DWITH_PAM=ON
 
     make $MAKE_JFLAG $QUIET
     make DESTDIR="$INSTALLDIR" install
