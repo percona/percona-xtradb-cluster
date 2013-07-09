@@ -4,9 +4,9 @@
 ## DP: Fixed prefix to /usr
 
 @DPATCH@
-diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' '--exclude=.hg' '--exclude=_darcs' '--exclude=.bzr' TMPLOLOLOL~/cmake/install_layout.cmake TMPLOLOLOL/cmake/install_layout.cmake
---- TMPLOLOLOL~/cmake/install_layout.cmake	2012-08-19 21:13:17.000000000 -0400
-+++ TMPLOLOLOL/cmake/install_layout.cmake	2012-08-20 14:16:14.000000000 -0400
+diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' '--exclude=.hg' '--exclude=_darcs' '--exclude=.bzr' Percona-Server~/cmake/install_layout.cmake Percona-Server/cmake/install_layout.cmake
+--- Percona-Server~/cmake/install_layout.cmake	2011-07-13 15:09:02.000000000 -0400
++++ Percona-Server/cmake/install_layout.cmake	2011-08-31 12:18:45.000000000 -0400
 @@ -74,7 +74,7 @@
    IF(INSTALL_LAYOUT MATCHES "RPM")
      SET(default_prefix "/usr")
@@ -16,7 +16,7 @@ diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' 
      # This is required to avoid "cpack -GDEB" default of prefix=/usr
      SET(CPACK_SET_DESTDIR ON)
    ELSEIF(INSTALL_LAYOUT MATCHES "SVR4")
-@@ -170,8 +170,8 @@
+@@ -166,8 +166,8 @@
  # DEB layout
  #
  SET(INSTALL_BINDIR_DEB                  "bin")
@@ -26,8 +26,8 @@ diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' 
 +SET(INSTALL_SCRIPTDIR_DEB               "bin")
  #
  SET(INSTALL_LIBDIR_DEB                  "lib")
- SET(INSTALL_PLUGINDIR_DEB               "lib/mysql/plugin")
-@@ -180,16 +180,17 @@
+ SET(INSTALL_PLUGINDIR_DEB               "lib/plugin")
+@@ -176,16 +176,16 @@
  #
  SET(INSTALL_DOCDIR_DEB                  "docs")
  SET(INSTALL_DOCREADMEDIR_DEB            ".")
@@ -45,53 +45,9 @@ diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' 
 +SET(INSTALL_MYSQLTESTDIR_DEB            "share/mysql-test")
 +SET(INSTALL_SQLBENCHDIR_DEB             "share/sql-bench")
 +SET(INSTALL_SUPPORTFILESDIR_DEB         "share/mysql")
-+
  #
 -SET(INSTALL_MYSQLDATADIR_DEB            "data")
 +SET(INSTALL_MYSQLDATADIR_DEB            "/var/lib/mysql")
  SET(INSTALL_PLUGINTESTDIR_DEB           ${plugin_tests})
  
- SET(INSTALL_XINETDDIR_DEB               "/etc/xinetd.d")
-diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' '--exclude=.hg' '--exclude=_darcs' '--exclude=.bzr' TMPLOLOLOL~/cmake/install_layout.cmake.rej TMPLOLOLOL/cmake/install_layout.cmake.rej
---- TMPLOLOLOL~/cmake/install_layout.cmake.rej	1969-12-31 19:00:00.000000000 -0500
-+++ TMPLOLOLOL/cmake/install_layout.cmake.rej	2012-08-20 01:46:42.000000000 -0400
-@@ -0,0 +1,39 @@
-+--- cmake/install_layout.cmake	2011-12-08 14:06:08.000000000 -0500
-++++ cmake/install_layout.cmake	2011-12-08 15:04:50.000000000 -0500
-+@@ -166,26 +166,26 @@
-+ # DEB layout
-+ #
-+ SET(INSTALL_BINDIR_DEB                  "bin")
-+-SET(INSTALL_SBINDIR_DEB                 "bin")
-+-SET(INSTALL_SCRIPTDIR_DEB               "scripts")
-++SET(INSTALL_SBINDIR_DEB                 "sbin")
-++SET(INSTALL_SCRIPTDIR_DEB               "bin")
-+ #
-+ SET(INSTALL_LIBDIR_DEB                  "lib")
-+-SET(INSTALL_PLUGINDIR_DEB               "lib/plugin")
-++SET(INSTALL_PLUGINDIR_DEB               "lib/mysql/plugin")
-+ #
-+ SET(INSTALL_INCLUDEDIR_DEB              "include")
-+ #
-+ SET(INSTALL_DOCDIR_DEB                  "docs")
-+ SET(INSTALL_DOCREADMEDIR_DEB            ".")
-+-SET(INSTALL_MANDIR_DEB                  "man")
-+-SET(INSTALL_INFODIR_DEB                 "docs")
-++SET(INSTALL_MANDIR_DEB                  "share/man")
-++SET(INSTALL_INFODIR_DEB                 "share/info")
-+ #
-+ SET(INSTALL_SHAREDIR_DEB                "share")
-+-SET(INSTALL_MYSQLSHAREDIR_DEB           "share")
-+-SET(INSTALL_MYSQLTESTDIR_DEB            "mysql-test")
-+-SET(INSTALL_SQLBENCHDIR_DEB             ".")
-+-SET(INSTALL_SUPPORTFILESDIR_DEB         "support-files")
-++SET(INSTALL_MYSQLSHAREDIR_DEB           "share/mysql")
-++SET(INSTALL_MYSQLTESTDIR_DEB            "share/mysql-test")
-++SET(INSTALL_SQLBENCHDIR_DEB             "share/sql-bench")
-++SET(INSTALL_SUPPORTFILESDIR_DEB         "share/mysql")
-+ #
-+-SET(INSTALL_MYSQLDATADIR_DEB            "data")
-++SET(INSTALL_MYSQLDATADIR_DEB            "/var/lib/mysql")
-+ SET(INSTALL_PLUGINTESTDIR_DEB           ${plugin_tests})
-+ 
-+ #
+ #

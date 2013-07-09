@@ -118,7 +118,7 @@ PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 # Build information
 REDHAT_RELEASE="$(grep -o 'release [0-9][0-9]*' /etc/redhat-release | \
     cut -d ' ' -f 2)"
-REVISION="$(cd "$SOURCEDIR"; bzr log -r-1 | grep ^revno: | cut -d ' ' -f 2)"
+REVISION="$(cd "$SOURCEDIR"; bzr revno)"
 
 # Compilation flags
 export CC=${CC:-gcc}
