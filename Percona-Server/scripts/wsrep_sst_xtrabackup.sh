@@ -320,6 +320,12 @@ get_proc()
     set -e
 }
 
+sig_joiner_cleanup()
+{
+    wsrep_log_error "Removing $MAGIC_FILE file due to signal"
+    rm -f "$MAGIC_FILE"
+}
+
 cleanup_joiner()
 {
     # Since this is invoked just after exit NNN
@@ -327,14 +333,6 @@ cleanup_joiner()
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
-    local PID=$(ps -aef | grep nc | grep $SST_PORT  | awk '{ print $2 }')
-    if [[ $estatus -ne 0 ]];then 
-        wsrep_log_error "Killing nc pid $PID"
-    else 
-        wsrep_log_info "Killing nc pid $PID"
-    fi
-    [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
-    rm -f "$MAGIC_FILE"
     if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_log_info "Removing the sst_in_progress file"
         wsrep_cleanup_progress_file
@@ -358,14 +356,13 @@ cleanup_donor()
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
-    local pid=$XTRABACKUP_PID
-    if check_pid "$pid"
+    if check_pid $XTRABACKUP_PID
     then
         wsrep_log_error "xtrabackup process is still running. Killing... "
         kill_xtrabackup
     fi
 
-    rm -f "$pid"
+    rm -f $XTRABACKUP_PID 
     rm -f ${DATA}/${IST_FILE}
 
     if [[ -p $progress ]];then 
@@ -548,8 +545,7 @@ then
 
     wait_for_listen ${SST_PORT} ${ADDR} ${MODULE} &
 
-    trap "exit 32" HUP PIPE
-    trap "exit 3"  INT TERM
+    trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT
 
     if [[ -n $progress ]];then 
