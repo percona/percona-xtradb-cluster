@@ -66,7 +66,7 @@ Comma separated key/value pairs of socket options. Must begin with
 a comma. You can use tcpwrap option here to blacklist/whitelist the     
 clients. Refer to socat manual for further details.                     
 
-.. option progress::
+.. option:: progress
 
     :Values: 1,path/to/file,path/to/fifo
 
