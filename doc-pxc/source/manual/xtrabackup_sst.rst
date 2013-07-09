@@ -4,8 +4,8 @@
  Xtrabackup SST Configuration
 ===============================
 
-* Following SST specific options are allowed in my.cnf under [sst]:                                     
-==========================
+Following SST specific options are allowed in my.cnf under [sst]:                                     
+==================================================================
       
 .. note:: 
     In following options, non-integer options which have no default are
@@ -21,7 +21,7 @@
      :Match: Yes
 
 You need to use xbstream for encryption, compression etc.,        
-however, lp:1193240 requires you to manually cleanup the          
+however, bug :bug:`1193240` requires you to manually cleanup the          
 directory prior to SST.
              
 .. option:: transferfmt
@@ -53,30 +53,31 @@ socat is recommended because it allows for socket options like transfer buffer s
     :Recommended: 2
 
 Decides whether encryption is to be done or not, if this is zero, no    
-encryption is done.
-   * Xtrabackup based encryption.
-   * OpenSSL based encryption - socat must be built with openSSL for encryption: ``socat -V | grep OPENSSL``.
+encryption is done.                                                    
+
+  * Xtrabackup based encryption                                                                          
+
+  * OpenSSL based encryption - socat must be built with openSSL for encryption: ```socat -V | grep OPENSSL```. 
 
 .. note::
    You can also enable SSL based compression with :option:`sockopt` mentioned below.
             
 .. option:: sockopt
 
-Comma separated key/value pairs of socket options. Must begin with      
-a comma. You can use tcpwrap option here to blacklist/whitelist the     
-clients. Refer to socat manual for further details.                     
+Comma separated key/value pairs of socket options. Must begin with a comma. You can use tcpwrap option here to blacklist/whitelist the clients. Refer to socat manual for further details.                     
 
 .. option:: progress
 
     :Values: 1,path/to/file,path/to/fifo
 
 If equal to:
+
     * 1 it writes to mysql stderr 
-    * path/to/file writes to that file 
-    * path/to/fifo, it will be created and cleaned up at exit.This is the preferred way. You need to cat the fifo file to monitor the progress, not tail it. 
+    * path/to/file writes to that file. 
+    * path/to/fifo, it will be created and cleaned up at exit.This is the preferred way. You need to cat the fifo file to monitor the progress, not tail it.
 
 .. note::
-    Note: Value of 0 is not valid.
+    Value of 0 is not valid.
            
 .. option:: rebuild
 
