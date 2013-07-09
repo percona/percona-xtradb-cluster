@@ -79,6 +79,7 @@ How-tos
    :glob:
   
    howtos/cenots_howto
+   howtos/ubuntu_howto
    howtos/singlebox
    howtos/3nodesec2
    howtos/haproxy

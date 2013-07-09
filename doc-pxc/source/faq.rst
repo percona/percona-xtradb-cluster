@@ -47,7 +47,7 @@ the nodes will need to copy data from working cluster.
 
 Q: How would it handle split brain? 
 ====================================
-A: It would not handle it. The |split brain| is hard stop, |XtraDB Cluster| can't resolve it.
+A: It would not handle it. The |split brain| is hard stop, XtraDB Cluster can't resolve it.
 That's why the minimal recommendation is to have 3 nodes. 
 However there is possibility to allow a node to handle the traffic, option is: ::
   
@@ -58,11 +58,12 @@ Q: Is it possible to set up cluster without state transfer
 A: It is possible in two ways:
 
 1. By default Galera reads starting position from a text file <datadir>/grastate.dat. Just make this file identical on all nodes, and there will be no state transfer upon start.
+
 2. With :variable:`wsrep_start_position` variable - start the nodes with the same *UUID:seqno* value and there you are.
 
 Q: I have a two nodes setup. When node1 fails, node2 does not accept commands, why?
 ====================================================================================
-A: This is expected behaviour, to prevent |split brain|. See previous question.
+A: This is expected behavior, to prevent |split brain|. See previous question.
 
 Q: What tcp ports are used by Percona XtraDB Cluster?
 ======================================================

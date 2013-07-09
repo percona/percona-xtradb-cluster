@@ -1,52 +1,52 @@
-.. _centos_howto:
+.. _ubuntu_howto:
 
-Installing Percona XtraDB Cluster on *CentOS*
+Installing Percona XtraDB Cluster on *Ubuntu*
 =============================================
 
-This tutorial will show how to install the |Percona XtraDB Cluster| on three CentOS 6.3 servers, using the packages from Percona repositories.
+This tutorial will show how to install the |Percona XtraDB Cluster| on three *Ubuntu* 12.04.2 LTS servers, using the packages from Percona repositories.
 
 This cluster will be assembled of three servers/nodes: ::
  
   node #1
-  hostname: percona1
-  IP: 192.168.70.71
+  hostname: pxc1
+  IP: 192.168.70.61
 
   node #2
-  hostname: percona2
-  IP: 192.168.70.72
+  hostname: pxc2
+  IP: 192.168.70.62
 
   node #3
-  hostname: percona3
-  IP: 192.168.70.73
+  hostname: pxc3
+  IP: 192.168.70.63
 
 Prerequisites 
 -------------
 
- * All three nodes have a CentOS 6.3 installation. 
+ * All three nodes have a *Ubuntu* 12.04.2 LTS installation. 
  
  * Firewall has been set up to allow connecting to ports 3306, 4444, 4567 and 4568
 
- * SELinux is disabled
+ * AppArmor profile for |MySQL| is `disabled <http://www.mysqlperformanceblog.com/2012/12/20/percona-xtradb-cluster-selinux-is-not-always-the-culprit/>`_ 
 
 Installation
 ------------
 
-Percona repository should be set up as described in the :ref:`yum-repo` guide. To enable the repository following command should be used: :: 
+Percona repository should be set up as described in the :ref:`apt-repo` guide. Following command will install |Percona XtraDB Cluster| packages: :: 
 
-  $ rpm -Uhv http://www.percona.com/downloads/percona-release/percona-release-0.0-1.x86_64.rpm
-
-Following command will install |Percona XtraDB Cluster| packages: :: 
-
-  $ yum install Percona-XtraDB-Cluster-server Percona-XtraDB-Cluster-client
+  $ apt-get install percona-xtradb-cluster-server-5.5 percona-xtradb-cluster-client-5.5
 
 When these two commands have been executed successfully on all three nodes |Percona XtraDB Cluster| is installed.
+
+.. note:: 
+
+ Debian/Ubuntu installation prompts for root password, this was set to: ``Passw0rd``. After the packages have been installed, ``mysqld`` will be started automatically. In this example mysqld is stopped on all three nodes after successful installation with: ``/etc/init.d/mysql stop``.
 
 Configuring the nodes
 ---------------------
 
 Individual nodes should be configured to be able to bootstrap the cluster. More details about bootstrapping the cluster can be found in the :ref:`bootstrap` guide.
 
-Configuration file :file:`/etc/my.cnf` for the first node should look like: ::
+Configuration file :file:`/etc/mysql/my.cnf` for the first node should look like: ::
 
   [mysqld]
 
@@ -54,10 +54,13 @@ Configuration file :file:`/etc/my.cnf` for the first node should look like: ::
   user=mysql
 
   # Path to Galera library
-  wsrep_provider=/usr/lib64/libgalera_smm.so
+  wsrep_provider=/usr/lib/libgalera_smm.so
+
+  # Empty gcomm address is being used when cluster is getting bootstrapped
+  wsrep_cluster_address=gcomm://
 
   # Cluster connection URL contains the IPs of node#1, node#2 and node#3
-  wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
+  #wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
   # In order for Galera to work correctly binlog format should be ROW
   binlog_format=ROW
@@ -72,23 +75,24 @@ Configuration file :file:`/etc/my.cnf` for the first node should look like: ::
   innodb_autoinc_lock_mode=2
 
   # Node #1 address
-  wsrep_node_address=192.168.70.71
+  wsrep_node_address=192.168.70.61
 
   # SST method
   wsrep_sst_method=xtrabackup
 
   # Cluster name
-  wsrep_cluster_name=my_centos_cluster
+  wsrep_cluster_name=my_ubuntu_cluster
 
   # Authentication for SST method
-  wsrep_sst_auth="sstuser:s3cret"
+  wsrep_sst_auth="sstuser:s3cretPass"
 
+.. note:: For the first member of the cluster variable :variable:`wsrep_cluster_address` should contain empty ``gcomm://`` when the cluster is being bootstrapped. But as soon as we have bootstrapped the cluster and have at least one more node joined that line can be removed from the :file:`my.cnf` configuration file and the one where :variable:`wsrep_cluster_address` contains all three node addresses. In case the node gets restarted and without making this change it will make bootstrap new cluster instead of joining the existing one.
 
 After this, first node can be started with the following command: ::
 
-  [root@percona1 ~]# /etc/init.d/mysql start --wsrep-cluster-address="gcomm://"
+  [root@pxc1 ~]# /etc/init.d/mysql start
  
-This command will start the cluster with initial :variable:`wsrep_cluster_address` set to ``gcomm://``. This way the cluster will be bootstrapped and in case the node or |MySQL| have to be restarted later, there would be no need to change the configuration file.
+This command will start the first node and bootstrap the cluster (more information about bootstrapping cluster can be found in :ref:`bootstrap` manual).
 
 After the first node has been started, cluster status can be checked by: 
 
@@ -98,7 +102,7 @@ After the first node has been started, cluster status can be checked by:
   +----------------------------+--------------------------------------+
   | Variable_name              | Value                                |
   +----------------------------+--------------------------------------+
-  | wsrep_local_state_uuid     | c2883338-834d-11e2-0800-03c9c68e41ec |
+  | wsrep_local_state_uuid     | b598af3e-ace3-11e2-0800-3e90eb9cd5d3 |
   ...
   | wsrep_local_state          | 4                                    |
   | wsrep_local_state_comment  | Synced                               |
@@ -113,27 +117,20 @@ After the first node has been started, cluster status can be checked by:
 
 This output shows that the cluster has been successfully bootstrapped. 
 
-It's recommended not to leave the empty password for the root account. Password can be changed with: 
-
-.. code-block:: mysql 
-
-  mysql@percona1> UPDATE mysql.user SET password=PASSWORD("Passw0rd") where user='root';
-  mysql@percona1> FLUSH PRIVILEGES;
-
 In order to perform successful :ref:`state_snapshot_transfer` using |XtraBackup| new user needs to be set up with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_: 
 
 .. code-block:: mysql
 
-  mysql@percona1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 's3cret';
-  mysql@percona1> GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
-  mysql@percona1> FLUSH PRIVILEGES;
+  mysql@pxc1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 's3cretPass';
+  mysql@pxc1> GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
+  mysql@pxc1> FLUSH PRIVILEGES;
 
 
 .. note:: 
 
- MySQL root account can also be used for setting up the SST with Percona XtraBackup, but it's recommended to use a different (non-root) user for this.
+ MySQL root account can also be used for setting up the :ref:`state_snapshot_transfer` with Percona XtraBackup, but it's recommended to use a different (non-root) user for this.
 
-Configuration file :file:`/etc/my.cnf` on the second node (``percona2``) should look like this: ::
+Configuration file :file:`/etc/mysql/my.cnf` on the second node (``pxc2``) should look like this: ::
 
   [mysqld]
 
@@ -141,10 +138,10 @@ Configuration file :file:`/etc/my.cnf` on the second node (``percona2``) should 
   user=mysql
 
   # Path to Galera library
-  wsrep_provider=/usr/lib64/libgalera_smm.so
+  wsrep_provider=/usr/lib/libgalera_smm.so
 
   # Cluster connection URL contains IPs of node#1, node#2 and node#3
-  wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
+  wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
   # In order for Galera to work correctly binlog format should be ROW
   binlog_format=ROW
@@ -159,22 +156,22 @@ Configuration file :file:`/etc/my.cnf` on the second node (``percona2``) should 
   innodb_autoinc_lock_mode=2
 
   # Node #2 address
-  wsrep_node_address=192.168.70.72
+  wsrep_node_address=192.168.70.62
 
   # Cluster name
-  wsrep_cluster_name=my_centos_cluster
+  wsrep_cluster_name=my_ubuntu_cluster
 
   # SST method
   wsrep_sst_method=xtrabackup
 
   #Authentication for SST method
-  wsrep_sst_auth="sstuser:s3cret"
+  wsrep_sst_auth="sstuser:s3cretPass"
  
 Second node can be started with the following command: ::
 
-  [root@percona2 ~]# /etc/init.d/mysql start
+  [root@pxc2 ~]# /etc/init.d/mysql start
 
-After the server has been started it should receive the state snapshot transfer automatically. This means that the second node won't have the empty root password anymore. In order to connect to the cluster and check the status changed root password from the first node should be used. Cluster status can now be checked on both nodes. This is the example from the second node (``percona2``): 
+After the server has been started it should receive the state snapshot transfer automatically. Cluster status can now be checked on both nodes. This is the example from the second node (``pxc2``): 
 
 .. code-block:: mysql 
 
@@ -182,7 +179,7 @@ After the server has been started it should receive the state snapshot transfer 
   +----------------------------+--------------------------------------+
   | Variable_name              | Value                                |
   +----------------------------+--------------------------------------+
-  | wsrep_local_state_uuid     | c2883338-834d-11e2-0800-03c9c68e41ec |
+  | wsrep_local_state_uuid     | b598af3e-ace3-11e2-0800-3e90eb9cd5d3 |
   ...
   | wsrep_local_state          | 4                                    |
   | wsrep_local_state_comment  | Synced                               |
@@ -197,7 +194,7 @@ After the server has been started it should receive the state snapshot transfer 
 
 This output shows that the new node has been successfully added to the cluster. 
 
-MySQL configuration file :file:`/etc/my.cnf` on the third node (``percona3``) should look like this: ::
+MySQL configuration file :file:`/etc/mysql/my.cnf` on the third node (``pxc3``) should look like this: ::
 
   [mysqld]
 
@@ -205,10 +202,10 @@ MySQL configuration file :file:`/etc/my.cnf` on the third node (``percona3``) sh
   user=mysql
 
   # Path to Galera library
-  wsrep_provider=/usr/lib64/libgalera_smm.so
+  wsrep_provider=/usr/lib/libgalera_smm.so
 
   # Cluster connection URL contains IPs of node#1, node#2 and node#3
-  wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
+  wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
   # In order for Galera to work correctly binlog format should be ROW
   binlog_format=ROW
@@ -223,22 +220,22 @@ MySQL configuration file :file:`/etc/my.cnf` on the third node (``percona3``) sh
   innodb_autoinc_lock_mode=2
 
   # Node #3 address
-  wsrep_node_address=192.168.70.73
+  wsrep_node_address=192.168.70.63
 
   # Cluster name
-  wsrep_cluster_name=my_centos_cluster
+  wsrep_cluster_name=my_ubuntu_cluster
 
   # SST method
   wsrep_sst_method=xtrabackup
 
   #Authentication for SST method
-  wsrep_sst_auth="sstuser:s3cret"
+  wsrep_sst_auth="sstuser:s3cretPass"
 
 Third node can now be started with the following command: :: 
 
-  [root@percona3 ~]# /etc/init.d/mysql start
+  [root@pxc3 ~]# /etc/init.d/mysql start
 
-After the server has been started it should receive the SST same as the second node. Cluster status can now be checked on both nodes. This is the example from the third node (``percona3``): 
+After the server has been started it should receive the SST same as the second node. Cluster status can now be checked on both nodes. This is the example from the third node (``pxc3``): 
 
 .. code-block:: mysql 
 
@@ -246,7 +243,7 @@ After the server has been started it should receive the SST same as the second n
   +----------------------------+--------------------------------------+
   | Variable_name              | Value                                |
   +----------------------------+--------------------------------------+
-  | wsrep_local_state_uuid     | c2883338-834d-11e2-0800-03c9c68e41ec |
+  | wsrep_local_state_uuid     | b598af3e-ace3-11e2-0800-3e90eb9cd5d3 |
   ...
   | wsrep_local_state          | 4                                    |
   | wsrep_local_state_comment  | Synced                               |
@@ -270,31 +267,31 @@ Creating the new database on the second node:
 
 .. code-block:: mysql 
 
-  mysql@percona2> CREATE DATABASE percona;
+  mysql@pxc2> CREATE DATABASE percona;
   Query OK, 1 row affected (0.01 sec)
 
 Creating the ``example`` table on the third node: 
   
 .. code-block:: mysql 
 
-  mysql@percona3> USE percona;
+  mysql@pxc3> USE percona;
   Database changed
 
-  mysql@percona3> CREATE TABLE example (node_id INT PRIMARY KEY, node_name VARCHAR(30));
+  mysql@pxc3> CREATE TABLE example (node_id INT PRIMARY KEY, node_name VARCHAR(30));
   Query OK, 0 rows affected (0.05 sec)
 
 Inserting records on the first node: 
 
 .. code-block:: mysql 
 
-  mysql@percona1> INSERT INTO percona.example VALUES (1, 'percona1');
+  mysql@pxc1> INSERT INTO percona.example VALUES (1, 'percona1');
   Query OK, 1 row affected (0.02 sec)
 
 Retrieving all the rows from that table on the second node: 
 
 .. code-block:: mysql 
 
-  mysql@percona2> SELECT * FROM percona.example;
+  mysql@pxc2> SELECT * FROM percona.example;
   +---------+-----------+
   | node_id | node_name |
   +---------+-----------+
