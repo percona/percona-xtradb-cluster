@@ -8,11 +8,17 @@ Following SST specific options are allowed in my.cnf under [sst]:
 ==================================================================
       
 .. note:: 
-    In following options, non-integer options which have no default are
-    disabled if not set. ":Match: Yes" implies that options should match
-    on donor and joiner (in their cnf). ":Recommended: Yes" implies the
-    value which is recommended. Also, in following options, path always
-    means full path.
+    In following options:
+    
+        * Non-integer options which have no default are disabled if not set.
+    
+        * ":Match: Yes" implies that options should match on donor and joiner (in their cnf). 
+    
+        * ":Recommended: Yes" implies the value which is recommended. 
+          
+        * In following options, path always means full path.
+
+        * Following options are only applicable for **PXC 5.5.32** and above. For 5.5.31 PXC refer to documentation in wsrep_sst_xtrabackup.
 
 .. option:: streamfmt
 
@@ -57,7 +63,7 @@ encryption is done.
 
   * Xtrabackup based encryption                                                                          
 
-  * OpenSSL based encryption - socat must be built with openSSL for encryption: ```socat -V | grep OPENSSL```. 
+  * OpenSSL based encryption - socat must be built with openSSL for encryption: ``socat -V | grep OPENSSL``. 
 
 .. note::
    You can also enable SSL based compression with :option:`sockopt` mentioned below.

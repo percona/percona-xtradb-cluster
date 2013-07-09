@@ -51,3 +51,4 @@ Other Reading
 =============
 
 * `SST Methods for MySQL <http://www.codership.com/wiki/doku.php?id=sst_mysql>`_
+* :ref:`Xtrabackup SST configuration<xtrabackup_sst>`
