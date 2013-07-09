@@ -16,7 +16,6 @@
 # MA  02110-1301  USA.
 
 #####################################################################################################################
-#     This is a reference script for Percona XtraBackup-based state snapshot transfer                               #
 #     Dependencies:  (depending on configuration)                                                                   #
 #     xbcrypt for encryption/decryption.                                                                            #
 #     qpress for decompression. Download from http://www.quicklz.com/qpress-11-linux-x64.tar till                   #
@@ -246,7 +245,6 @@ get_stream()
     if [[ $sfmt == 'xbstream' ]];then 
         wsrep_log_info "Streaming with xbstream"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-            wsrep_log_info "xbstream requires manual cleanup of data directory before SST - lp:1193240"
             strmcmd="xbstream -x -C \${DATA}"
         else
             strmcmd="xbstream -c \${INFO_FILE} \${IST_FILE}"
@@ -254,9 +252,7 @@ get_stream()
     else
         sfmt="tar"
         wsrep_log_info "Streaming with tar"
-        wsrep_log_info "Note: Advanced xtrabackup features - encryption,compression etc. not available with tar."
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-            wsrep_log_info "However, xbstream requires manual cleanup of data directory before SST - lp:1193240."
             strmcmd="tar xfi - -C \${DATA}"
         else
             strmcmd="tar cf - \${INFO_FILE} \${IST_FILE}"
@@ -378,8 +374,8 @@ setup_ports
 get_stream
 get_transfer
 
-INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log $rebuildcmd ${DATA} &>${DATA}/innobackup.prepare.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=$sfmt \${TMPDIR} 2>${DATA}/innobackup.backup.log"
+INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -524,7 +520,7 @@ then
         # Special handling till lp:1193240 is fixed"
         if [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]];then 
             wsrep_log_error "Xbstream failed"
-            wsrep_log_error "Data directory ${DATA} needs to be empty for SST: lp:1193240" \
+            wsrep_log_error "Data directory ${DATA} may not be empty: lp:1193240" \
                             "Manual intervention required in that case"
             exit 32
         fi
