@@ -16,7 +16,6 @@
 # MA  02110-1301  USA.
 
 #####################################################################################################################
-#     This is a reference script for Percona XtraBackup-based state snapshot transfer                               #
 #     Dependencies:  (depending on configuration)                                                                   #
 #     xbcrypt for encryption/decryption.                                                                            #
 #     qpress for decompression. Download from http://www.quicklz.com/qpress-11-linux-x64.tar till                   #
@@ -375,8 +374,8 @@ setup_ports
 get_stream
 get_transfer
 
-INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log $rebuildcmd ${DATA} &>${DATA}/innobackup.prepare.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=$sfmt \${TMPDIR} 2>${DATA}/innobackup.backup.log"
+INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log \$rebuildcmd ${DATA} &>${DATA}/innobackup.prepare.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=\$sfmt \${TMPDIR} 2>${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
