@@ -67,6 +67,7 @@ User's Manual
 
    manual/bootstrap
    manual/state_snapshot_transfer
+   manual/xtrabackup_sst
    manual/restarting_nodes
    manual/failover
    manual/monitoring
