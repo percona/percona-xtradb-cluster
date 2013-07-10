@@ -14,21 +14,7 @@
 # along with this program; see the file COPYING. If not, write to the
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
-
-#####################################################################################################################
-#     Dependencies:  (depending on configuration)                                                                   #
-#     xbcrypt for encryption/decryption.                                                                            #
-#     qpress for decompression. Download from http://www.quicklz.com/qpress-11-linux-x64.tar till                   #
-#     https://blueprints.launchpad.net/percona-xtrabackup/+spec/package-qpress is fixed.                            #
-#     my_print_defaults to extract values from my.cnf.                                                              #
-#     netcat or socat for transfer.                                                                                 #
-#     xbstream/tar for streaming. (and xtrabackup ofc)                                                              #
-#     ss from iproute package                                                                                       #
-#     pv if progress is enabled                                                                                     #
-#                                                                                                                   #
-# For further documentation refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html   #
-#                                                                                                                   #
-#####################################################################################################################
+# Optional dependencies and options documented here: http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
 
 
 

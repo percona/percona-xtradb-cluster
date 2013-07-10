@@ -121,3 +121,17 @@ manual setup. Hence, not supported currently.
 
   * Features - encryption, compression, parallel streaming, streaming incremental backups, compaction - won't work with tar. Refer to `xbstream docs <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_ for more. 
   * Bug :bug:`1193240` requires you to manually cleanup the directory (empty data directory) prior to SST. After that is fixed (and xtrabackup is released), SST will work without any modifications to wsrep_sst_xtrabackup.
+
+===============================
+ Xtrabackup SST Dependencies
+===============================
+
+Following are optional dependencies of PXC introduced by wsrep_sst_xtrabackup: (obvious and direct dependencies are not provided here)
+
+    * qpress for decompression. Download  `here <http://www.quicklz.com/qpress-11-linux-x64.tar>`_ till `this <https://blueprints.launchpad.net/percona-xtrabackup/+spec/package-qpress>`_ is fixed.
+    * my_print_defaults to extract values from my.cnf. Provided by the server package.
+    * openbsd-netcat or socat for transfer. socat is a direct dependency of PXC and is the default.
+    * xbstream/tar for streaming. tar is default.
+    * pv. Required for :option:`progress` and :option:`rlimit`. Provided by pv.
+    * mkfifo. Required for :option:`progress`. Provided by coreutils.
+    * mktemp. Required for :option:`incremental`. Provided by coreutils.
