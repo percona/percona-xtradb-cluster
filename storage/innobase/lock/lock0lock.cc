@@ -1881,9 +1881,8 @@ lock_rec_create(
 
 #ifdef WITH_WSREP
 	if (c_lock && wsrep_thd_is_brute_force(trx->mysql_thd)) {
-	  //hash_node_t *hash 	= c_lock->hash;
-	  lock_t *hash 	= (lock_t *)c_lock->hash;
-		lock_t *prev 		= NULL;
+		lock_t *hash 	= (lock_t *)c_lock->hash;
+		lock_t *prev	= NULL;
 
 		while (hash 						&&
 		       wsrep_thd_is_brute_force(
@@ -1904,7 +1903,7 @@ lock_rec_create(
 		 * delayed conflict resolution '...kill_one_trx' was not called,
 		 * if victim was waiting for some other lock
 		 */
-		if (c_lock && c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT){
+		if (c_lock && c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
 			if (wsrep_debug && 
@@ -1930,6 +1929,8 @@ lock_rec_create(
 				stderr, 
 				"WSREP: c_lock canceled %llu\n", 
 				(ulonglong) c_lock->trx->id);
+
+			UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
 
 			/* have to bail out here to avoid lock_set_lock... */
 			return(lock);
@@ -7015,7 +7016,9 @@ lock_cancel_waiting_and_release(
 	que_thr_t*	thr;
 
 	ut_ad(lock_mutex_own());
+#ifndef WITH_WSREP
 	ut_ad(trx_mutex_own(lock->trx));
+#endif
 	ut_ad(!(lock->type_mode & LOCK_CONV_BY_OTHER));
 
 	lock->trx->lock.cancel = TRUE;

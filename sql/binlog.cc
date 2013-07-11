@@ -827,10 +827,23 @@ static int binlog_init(void *p)
   return 0;
 }
 
+#ifdef WITH_WSREP
+void wsrep_write_rbr_buf(
+   THD *thd, const void* rbr_buf, size_t buf_len);
+#endif /* WITH_WSREP */
 static int binlog_close_connection(handlerton *hton, THD *thd)
 {
   DBUG_ENTER("binlog_close_connection");
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+  if (!cache_mngr->is_binlog_empty()) {
+    IO_CACHE* cache= get_trans_log(thd);
+    uchar *buf;
+    uint len=0;
+    WSREP_WARN("binlog cache not empty at connection close %lu", 
+               thd->thread_id);
+    wsrep_write_cache(cache, &buf, &len);
+    wsrep_write_rbr_buf(thd, buf, len);
+  }
   DBUG_ASSERT(cache_mngr->is_binlog_empty());
   DBUG_ASSERT(cache_mngr->trx_cache.is_group_cache_empty() &&
               cache_mngr->stmt_cache.is_group_cache_empty());

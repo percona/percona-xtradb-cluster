@@ -58,6 +58,13 @@ void wsrep_cleanup_transaction(THD *thd)
     }
     thd->wsrep_exec_mode= LOCAL_STATE;
   }
+  else
+  {
+    /* when configured with no log_bin, appliers use TC_LOG_DUMMY, 
+       which does not clean transaction cache after commit. Have to do it here. 
+     */
+    thd_binlog_trx_reset(thd);
+  }
   thd->wsrep_trx_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
 }
 

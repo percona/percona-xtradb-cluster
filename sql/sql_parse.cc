@@ -6489,7 +6489,7 @@ void wsrep_replay_transaction(THD *thd)
 	else
 	{
 	  WSREP_DEBUG("replay failed, rolling back");
-	  my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+	  //my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
 	}
 	thd->wsrep_conflict_state= ABORTED;
 	wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
@@ -6541,6 +6541,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
       if (thd->wsrep_conflict_state== MUST_REPLAY) 
       {
         wsrep_replay_transaction(thd);
+	my_ok(thd);
       }
 
       /* setting error code for BF aborted trxs */
