@@ -1802,6 +1802,7 @@ lock_rec_create(
 /*============*/
 #ifdef WITH_WSREP
 	lock_t*			c_lock,   /* conflicting lock */
+	que_thr_t*		thr,
 #endif
 	ulint			type_mode,/*!< in: lock mode and wait
 					flag, type is ignored and
@@ -1915,8 +1916,20 @@ lock_rec_create(
 
 			trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
+			//lock->type_mode |= LOCK_CONV_BY_OTHER;
+			UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
 
+			ut_ad(thr != NULL);
+			trx->lock.wait_thr = thr;
+			thr->state = QUE_THR_LOCK_WAIT;
+
+			if (caller_owns_trx_mutex) {
+				trx_mutex_exit(trx);
+			}
 			lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock);
+			if (caller_owns_trx_mutex) {
+				trx_mutex_enter(trx);
+			}
 
 			/* trx might not wait for c_lock, but some other lock
 			   does not matter if wait_lock was released above
@@ -1930,7 +1943,7 @@ lock_rec_create(
 				"WSREP: c_lock canceled %llu\n", 
 				(ulonglong) c_lock->trx->id);
 
-			UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
+			//UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
 
 			/* have to bail out here to avoid lock_set_lock... */
 			return(lock);
@@ -2044,7 +2057,7 @@ lock_rec_enqueue_waiting(
 			return(DB_DEADLOCK);
 		}
 		lock = lock_rec_create(
-			c_lock,
+			c_lock, thr,
 			type_mode | LOCK_WAIT, block, heap_no,
 			index, trx, TRUE);
 #else
@@ -2222,7 +2235,7 @@ lock_rec_add_to_queue(
 
 somebody_waits:
 #ifdef WITH_WSREP
-	return(lock_rec_create(NULL,
+	return(lock_rec_create(NULL, NULL,
 			type_mode, block, heap_no, index, trx,
 			caller_owns_trx_mutex));
 #else
@@ -2298,7 +2311,7 @@ lock_rec_lock_fast(
 		if (!impl) {
 			/* Note that we don't own the trx mutex. */
 #ifdef WITH_WSREP
-			lock = lock_rec_create(NULL,
+			lock = lock_rec_create(NULL, thr,
 				mode, block, heap_no, index, trx, FALSE);
 #else
 			lock = lock_rec_create(
