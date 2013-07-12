@@ -14,7 +14,9 @@
 # along with this program; see the file COPYING. If not, write to the
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
+
 # Optional dependencies and options documented here: http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
+# Make sure to read that before proceeding!
 
 
 
@@ -82,18 +84,24 @@ timeit(){
 
 get_keys()
 {
-    if [[ $encrypt -eq 0 || $encrypt -eq 2 ]];then 
+    if [[ $encrypt -eq 2 ]];then 
         return 
     fi
 
+    if [[ $encrypt -eq 0 ]];then 
+        if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt;then
+            wsrep_log_error "Unexpected option combination. SST may fail. Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html "
+        fi
+        return
+    fi
+
     if [[ $sfmt == 'tar' ]];then
-        wsrep_log_info "NOTE: Encryption cannot be enabled with tar format"
+        wsrep_log_info "NOTE: Xtrabackup-based encryption - encrypt=1 - cannot be enabled with tar format"
         encrypt=0
         return
     fi
 
-    wsrep_log_info "Xtrabackup based encryption enabled in my.cnf - not supported at the moment - lp:1190343"
-    wsrep_log_info "Use socat-based openSSL encryption with encrypt=2 under [sst]"
+    wsrep_log_info "Xtrabackup based encryption enabled in my.cnf - Supported only from Xtrabackup 2.1.4"
 
     if [[ -z $ealgo ]];then
         wsrep_log_error "FATAL: Encryption algorithm empty from my.cnf, bailing out"
@@ -137,7 +145,7 @@ get_transfer()
             exit 2
         fi
 
-        if ! socat -V | grep -q OPENSSL && [[ $encrypt -eq 2 ]];then 
+        if [[ $encrypt -eq 2 ]] && ! socat -V | grep -q OPENSSL;then 
             wsrep_log_info "NOTE: socat is not openssl enabled, falling back to plain transfer"
             encrypt=0
         fi
@@ -223,6 +231,13 @@ read_cnf()
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
+
+    # Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
+    if [[ -z $ealgo ]];then
+        ealgo=$(parse_cnf sst encrypt-algo "")
+        ekey=$(parse_cnf sst encrypt-key "")
+        ekeyfile=$(parse_cnf sst encrypt-key-file "")
+    fi
     rlimit=$(parse_cnf sst rlimit "")
 }
 
@@ -469,6 +484,7 @@ then
 
     MODULE="xtrabackup_sst"
 
+    # May need xtrabackup_checkpoints later on
     rm -f ${DATA}/xtrabackup_binary ${DATA}/xtrabackup_galera_info  ${DATA}/xtrabackup_logfile
 
     ADDR=${WSREP_SST_OPT_ADDR}
@@ -600,6 +616,7 @@ then
         fi
 
         if [[ $incremental -eq 1 ]];then 
+            # Added --ibbackup=xtrabackup_55 because it fails otherwise citing connection issues.
             INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \
                 --ibbackup=xtrabackup_55 --apply-log $rebuildcmd --redo-only $BDATA --incremental-dir=${DATA} &>>${BDATA}/innobackup.prepare.log"
         fi
