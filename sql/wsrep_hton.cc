@@ -153,6 +153,16 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
 {
   DBUG_ENTER("wsrep_rollback");
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  switch (thd->wsrep_exec_mode)
+  {
+  case TOTAL_ORDER:
+  case REPL_RECV: 
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      WSREP_DEBUG("Avoiding wsrep rollback for failed DDL: %s", thd->query());
+      DBUG_RETURN(0);
+  default: break;
+  }
+
   thd->wsrep_exec_mode = LOCAL_COMMIT;
 
   if ((all || !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
