@@ -50,8 +50,8 @@ tcmd=""
 rebuild=0
 rebuildcmd=""
 payload=0
-pvopts="-f -i 10 -N $WSREP_SST_OPT_ROLE -F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p'"
-pcmd="pv \$pvopts"
+pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE -F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p'"
+pcmd="pv $pvopts"
 declare -a RC
 
 INNOBACKUPEX_BIN=innobackupex
@@ -170,9 +170,6 @@ get_transfer()
         fi
     fi
 
-    if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
-        pvopts+=" -L \$rlimit"
-    fi
 }
 
 parse_cnf()
@@ -213,6 +210,14 @@ adjust_progress()
         else 
             pcmd+=" 2>$progress"
         fi
+    elif [[ -z $progress && -n $rlimit  ]];then 
+            # When rlimit is non-zero
+            pcmd="pv -q"
+    fi 
+
+    if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
+        wsrep_log_info "Rate-limiting SST to $rlimit"
+        pcmd+=" -L \$rlimit"
     fi
 }
 
@@ -392,10 +397,10 @@ then
 
         if [ ${#AUTH[*]} -eq 2 ]; then
            INNOBACKUP+=" --password=${AUTH[1]}"
-       else
+        elif [ "${AUTH[0]}" != "(null)" ]; then
            # Empty password, used for testing, debugging etc.
            INNOBACKUP+=" --password="
-       fi
+        fi
 
         get_keys
         if [[ $encrypt -eq 1 ]];then
@@ -414,6 +419,9 @@ then
 
         if [[ -n $progress ]];then 
             get_footprint
+            tcmd="$pcmd | $tcmd"
+        elif [[ -n $rlimit ]];then 
+            adjust_progress
             tcmd="$pcmd | $tcmd"
         fi
 
