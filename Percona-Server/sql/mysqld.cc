@@ -2517,6 +2517,7 @@ static void network_init(void)
       base_ip_sock= activate_tcp_port(mysqld_port);
     if (mysqld_extra_port)
       extra_ip_sock= activate_tcp_port(mysqld_extra_port);
+  }
 
 #ifdef _WIN32
   /* create named pipe */
