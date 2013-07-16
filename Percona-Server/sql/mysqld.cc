@@ -71,6 +71,10 @@
 #include "probes_mysql.h"
 #include "scheduler.h"
 #include "debug_sync.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+ulong  wsrep_running_threads = 0; // # of currently running wsrep threads
+#endif
 #include "sql_callback.h"
 #include "opt_trace_context.h"
 
@@ -485,6 +489,10 @@ ulong binlog_checksum_options;
 my_bool opt_master_verify_checksum= 0;
 my_bool opt_slave_sql_verify_checksum= 1;
 const char *binlog_format_names[]= {"MIXED", "STATEMENT", "ROW", NullS};
+#ifdef WITH_WSREP
+const char *wsrep_binlog_format_names[]= 
+                                   {"MIXED", "STATEMENT", "ROW", "NONE", NullS};
+#endif /*WITH_WSREP */
 my_bool enforce_gtid_consistency;
 ulong gtid_mode;
 const char *gtid_mode_names[]=
@@ -754,6 +762,22 @@ pthread_attr_t connection_attrib;
 mysql_mutex_t LOCK_server_started;
 mysql_cond_t COND_server_started;
 
+#ifdef WITH_WSREP
+mysql_mutex_t LOCK_wsrep_ready;
+mysql_cond_t  COND_wsrep_ready;
+mysql_mutex_t LOCK_wsrep_sst;
+mysql_cond_t  COND_wsrep_sst;
+mysql_mutex_t LOCK_wsrep_sst_init;
+mysql_cond_t  COND_wsrep_sst_init;
+mysql_mutex_t LOCK_wsrep_rollback;
+mysql_cond_t  COND_wsrep_rollback;
+wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
+mysql_mutex_t LOCK_wsrep_replaying;
+mysql_cond_t  COND_wsrep_replaying;
+mysql_mutex_t LOCK_wsrep_slave_threads;
+int wsrep_replaying= 0;
+static void wsrep_close_threads(THD* thd);
+#endif
 int mysqld_server_started= 0;
 
 File_parser_dummy_hook file_parser_dummy_hook;
@@ -1416,6 +1440,11 @@ static void close_connections(void)
     if (tmp->slave_thread)
       continue;
 
+#ifdef WITH_WSREP
+    /* skip wsrep system threads as well */
+    if (WSREP(tmp) && (tmp->wsrep_exec_mode==REPL_RECV || tmp->wsrep_applier))
+      continue;
+#endif
     tmp->killed= THD::KILL_CONNECTION;
     MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (tmp));
     mysql_mutex_lock(&tmp->LOCK_thd_data);
@@ -1467,6 +1496,33 @@ static void close_connections(void)
                            tmp->main_security_ctx.user : ""));
       close_connection(tmp);
     }
+#ifdef WITH_WSREP
+    /*
+     * TODO: this code block may turn out redundant. wsrep->disconnect()
+     *       should terminate slave threads gracefully, and we don't need
+     *       to signal them here. 
+     *       The code here makes sure mysqld will not hang during shutdown
+     *       even if wsrep provider has problems in shutting down.
+     */
+    if (WSREP(tmp) && tmp->wsrep_exec_mode==REPL_RECV)
+    {
+      sql_print_information("closing wsrep system thread");
+      tmp->killed= THD::KILL_CONNECTION;
+      MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (tmp));
+      if (tmp->mysys_var)
+      {
+	tmp->mysys_var->abort=1;
+	mysql_mutex_lock(&tmp->mysys_var->mutex);
+	if (tmp->mysys_var->current_cond)
+        {
+	  mysql_mutex_lock(tmp->mysys_var->current_mutex);
+	  mysql_cond_broadcast(tmp->mysys_var->current_cond);
+	  mysql_mutex_unlock(tmp->mysys_var->current_mutex);
+	}
+	mysql_mutex_unlock(&tmp->mysys_var->mutex);
+      }
+    }
+#endif
   }
   DBUG_PRINT("quit",("Unlocking LOCK_thread_count"));
   mysql_mutex_unlock(&LOCK_thread_count);
@@ -1610,8 +1666,14 @@ static void __cdecl kill_server(int sig_ptr)
     }
   }
 #endif
+#ifdef WITH_WSREP
+  if (WSREP_ON) wsrep_stop_replication(NULL);
+#endif
 
   close_connections();
+#ifdef WITH_WSREP
+  if (WSREP_ON) wsrep_deinit();
+#endif
   if (sig != MYSQL_KILL_SIGNAL &&
       sig != 0)
     unireg_abort(1);        /* purecov: inspected */
@@ -1706,6 +1768,23 @@ extern "C" void unireg_abort(int exit_code)
     usage();
   if (exit_code)
     sql_print_error("Aborting\n");
+
+#ifdef WITH_WSREP
+  if (wsrep)
+  {
+    /* This is an abort situation, we cannot expect to gracefully close all
+     * wsrep threads here, we can only diconnect from service */
+    wsrep_close_client_connections(FALSE);
+    shutdown_in_progress= 1;
+    THD* thd(0);
+    wsrep->disconnect(wsrep);
+    WSREP_INFO("Service disconnected.");
+    wsrep_close_threads(thd); /* this won't close all threads */
+    sleep(1); /* so give some time to exit for those which can */
+    WSREP_INFO("Some threads may fail to exit.");
+  }
+#endif // WITH_WSREP
+
   clean_up(!opt_help && (exit_code || !opt_bootstrap)); /* purecov: inspected */
   DBUG_PRINT("quit",("done with cleanup in unireg_abort"));
   mysqld_exit(exit_code);
@@ -1963,6 +2042,19 @@ static void clean_up_mutexes()
   mysql_mutex_destroy(&LOCK_global_user_client_stats);
   mysql_mutex_destroy(&LOCK_global_table_stats);
   mysql_mutex_destroy(&LOCK_global_index_stats);
+#ifdef WITH_WSREP
+  (void) mysql_mutex_destroy(&LOCK_wsrep_ready);
+  (void) mysql_cond_destroy(&COND_wsrep_ready);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_sst);
+  (void) mysql_cond_destroy(&COND_wsrep_sst);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_sst_init);
+  (void) mysql_cond_destroy(&COND_wsrep_sst_init);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_rollback);
+  (void) mysql_cond_destroy(&COND_wsrep_rollback);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_replaying);
+  (void) mysql_cond_destroy(&COND_wsrep_replaying);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
+#endif
 }
 #endif /*EMBEDDED_LIBRARY*/
 
@@ -2425,7 +2517,6 @@ static void network_init(void)
       base_ip_sock= activate_tcp_port(mysqld_port);
     if (mysqld_extra_port)
       extra_ip_sock= activate_tcp_port(mysqld_extra_port);
-  }
 
 #ifdef _WIN32
   /* create named pipe */
@@ -2521,6 +2612,9 @@ static void network_init(void)
     if (mysql_socket_listen(unix_sock, (int)back_log) < 0)
       sql_print_warning("listen() on Unix socket failed with error %d",
           socket_errno);
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    (void) fcntl(mysql_socket_getfd(unix_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
   }
 #endif
   DBUG_PRINT("info",("server started"));
@@ -2540,7 +2634,11 @@ static void network_init(void)
   @note
     For the connection that is doing shutdown, this is called twice
 */
+#ifdef WITH_WSREP
+void close_connection(THD *thd, uint sql_errno, bool lock)
+#else
 void close_connection(THD *thd, uint sql_errno)
+#endif
 {
   DBUG_ENTER("close_connection");
 
@@ -3755,6 +3853,13 @@ int init_common_variables()
     strmake(default_logfile_name, glob_hostname,
       sizeof(default_logfile_name)-5);
 
+#ifdef WITH_WSREP
+  if (0 == wsrep_node_name || 0 == wsrep_node_name[0])
+  {
+    my_free((void *)wsrep_node_name);
+    wsrep_node_name= my_strdup(glob_hostname, MYF(MY_WME));
+  }
+#endif /* WITH_WSREP */
   strmake(pidfile_name, default_logfile_name, sizeof(pidfile_name)-5);
   strmov(fn_ext(pidfile_name),".pid");    // Add proper extension
 
@@ -3814,7 +3919,11 @@ int init_common_variables()
   compile_time_assert(sizeof(com_status_vars)/sizeof(com_status_vars[0]) - 1 ==
                      SQLCOM_END + 8);
 #endif
-
+#ifdef WITH_WSREP
+  /* This is a protection against mutually incompatible option values. */
+  if (WSREP_ON && wsrep_check_opts (remaining_argc, remaining_argv))
+    return 1;
+#endif /* WITH_WSREP */
   if (get_options(&remaining_argc, &remaining_argv))
     return 1;
   set_server_version();
@@ -4228,6 +4337,25 @@ static int init_thread_environment()
     sql_print_error("Can't create thread-keys");
     return 1;
   }
+#ifdef WITH_WSREP
+  mysql_mutex_init(key_LOCK_wsrep_ready, 
+		   &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_sst, 
+		   &LOCK_wsrep_sst, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_sst, &COND_wsrep_sst, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_sst_init, 
+		   &LOCK_wsrep_sst_init, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_sst_init, &COND_wsrep_sst_init, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_rollback, 
+		   &LOCK_wsrep_rollback, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_rollback, &COND_wsrep_rollback, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_replaying, 
+		   &LOCK_wsrep_replaying, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(key_COND_wsrep_replaying, &COND_wsrep_replaying, NULL);
+  mysql_mutex_init(key_LOCK_wsrep_slave_threads, 
+		   &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
+#endif
   return 0;
 }
 
@@ -4559,7 +4687,6 @@ initialize_storage_engine(char *se_name, const char *se_kind,
   return false;
 }
 
-
 static int init_server_components()
 {
   DBUG_ENTER("init_server_components");
@@ -4657,7 +4784,11 @@ static int init_server_components()
     sql_print_warning("You need to use --log-bin to make "
                     "--log-slave-updates work.");
   }
+#ifdef WITH_WSREP
+  if (!WSREP_ON && binlog_format_used && !opt_bin_log)
+#else
   if (binlog_format_used && !opt_bin_log)
+#endif
     sql_print_warning("You need to use --log-bin to make "
                       "--binlog-format work.");
 
@@ -4694,6 +4825,39 @@ will be ignored as the --log-bin option is not defined.");
   }
 #endif
 
+#ifdef WITH_WSREP /* WSREP BEFORE SE */
+  if (!wsrep_recovery)
+  {
+    if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
+    {
+      wsrep_provider_init(WSREP_NONE);
+      if (wsrep_init()) unireg_abort(1);
+    }
+    else // full wsrep initialization
+    {
+      // add basedir/bin to PATH to resolve wsrep script names
+      char* const tmp_path((char*)alloca(strlen(mysql_home) +
+                                           strlen("/bin") + 1));
+      if (tmp_path)
+      {
+        strcpy(tmp_path, mysql_home);
+        strcat(tmp_path, "/bin");
+        wsrep_prepend_PATH(tmp_path);
+      }
+      else
+      {
+        WSREP_ERROR("Could not append %s/bin to PATH", mysql_home);
+      }
+
+      if (wsrep_before_SE())
+      {
+        set_ports(); // this is also called in network_init() later but we need
+                     // to know mysqld_port now - lp:1071882
+        wsrep_init_startup(true);
+      }
+    }
+  }
+#endif /* WITH_WSREP */
   if (opt_bin_log)
   {
     /* Reports an error and aborts, if the --log-bin's path
@@ -4801,6 +4965,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
 
+#ifdef WITH_WSREP
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? PLUGIN_INIT_SKIP_INITIALIZATION : 0)))
@@ -4809,7 +4974,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
-
+#endif /* WITH_WSREP */
   /* we do want to exit if there are any other unknown options */
   if (remaining_argc > 1)
   {
@@ -4944,17 +5109,34 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       unireg_abort(1);
     }
   }
-
+#ifdef WITH_WSREP
+  if (!opt_bin_log)
+  {
+    wsrep_emulate_bin_log= 1;
+  }
+#endif
   if (total_ha_2pc > 1 || (1 == total_ha_2pc && opt_bin_log))
   {
     if (opt_bin_log)
       tc_log= &mysql_bin_log;
     else
+#ifdef WITH_WSREP
+      if (WSREP_ON)
+        tc_log=  &tc_log_dummy;
+      else
+#endif /* WITH_WSREP */
       tc_log= &tc_log_mmap;
   }
   else
     tc_log= &tc_log_dummy;
 
+#ifdef WITH_WSREP
+  WSREP_DEBUG("Initial TC log open: %s", 
+              (tc_log == &mysql_bin_log) ? "binlog" :
+              (tc_log == &tc_log_mmap) ? "mmap" :
+              (tc_log == &tc_log_dummy) ? "dummy" : "unknown"
+              );
+#endif
   if (tc_log->open(opt_bin_log ? opt_bin_logname : opt_tc_log_file))
   {
     sql_print_error("Can't init tc log");
@@ -5054,8 +5236,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
 #endif
   DBUG_RETURN(0);
 }
-
-
 #ifndef EMBEDDED_LIBRARY
 
 static void create_shutdown_thread()
@@ -5074,6 +5254,468 @@ static void create_shutdown_thread()
 
 #endif /* EMBEDDED_LIBRARY */
 
+#ifdef WITH_WSREP
+typedef void (*wsrep_thd_processor_fun)(THD *);
+
+pthread_handler_t start_wsrep_THD(void *arg)
+{
+  THD *thd;
+  wsrep_thd_processor_fun processor= (wsrep_thd_processor_fun)arg;
+
+  if (my_thread_init()) 
+  {
+    WSREP_ERROR("Could not initialize thread");
+    return(NULL);
+  }
+
+  if (!(thd= new THD(true, true)))
+  {
+    return(NULL);
+  }
+  mysql_mutex_lock(&LOCK_thread_count);
+  thd->thread_id=thread_id++;
+
+  thd->real_id=pthread_self(); // Keep purify happy
+  add_global_thread(thd);
+  thread_created++;
+
+  my_net_init(&thd->net,(st_vio*) 0);
+
+  DBUG_PRINT("wsrep",(("creating thread %lld"), (long long)thd->thread_id));
+  thd->prior_thr_create_utime= thd->start_utime= my_micro_time();
+  (void) mysql_mutex_unlock(&LOCK_thread_count);
+
+  /* from bootstrap()... */
+  thd->bootstrap=1;
+  thd->max_client_packet_length= thd->net.max_packet;
+  thd->security_ctx->master_access= ~(ulong)0;
+
+  /* from handle_one_connection... */
+  pthread_detach_this_thread();
+
+  mysql_thread_set_psi_id(thd->thread_id);
+  thd->thr_create_utime= my_micro_time();
+  if (MYSQL_CALLBACK_ELSE(thread_scheduler, init_new_connection_thread, (), 0))
+  {
+    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+    statistic_increment(aborted_connects,&LOCK_status);
+    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
+
+    return(NULL);
+  }
+
+  /* now that we've called my_thread_init(), it is safe to call DBUG_* */
+
+  thd->thread_stack= (char*) &thd;
+  if (thd->store_globals())
+  {
+    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+    statistic_increment(aborted_connects,&LOCK_status);
+    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
+    delete thd;
+ 
+    return(NULL);
+  }
+
+  /* from handle_bootstrap() */
+
+  thd->system_thread= SYSTEM_THREAD_SLAVE_SQL;
+  thd->security_ctx->skip_grants();
+
+  /* handle_one_connection() again... */
+  //thd->version= refresh_version;
+  thd->proc_info= 0;
+  thd->set_command(COM_SLEEP);
+  thd->set_time();
+  thd->init_for_queries();
+
+  mysql_mutex_lock(&LOCK_connection_count);
+  ++connection_count;
+  mysql_mutex_unlock(&LOCK_connection_count);
+
+  mysql_mutex_lock(&LOCK_thread_count);
+  wsrep_running_threads++;
+  mysql_cond_signal(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
+
+  processor(thd);
+
+  close_connection(thd, 0, 1);
+
+  mysql_mutex_lock(&LOCK_thread_count);
+  wsrep_running_threads--;
+  mysql_cond_signal(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
+
+  // Note: We can't call THD destructor without crashing
+  // if plugins have not been initialized. However, in most of the
+  // cases this means that pre SE initialization SST failed and
+  // we are going to exit anyway.
+  if (plugins_are_initialized)
+  {
+    net_end(&thd->net);
+    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 1));
+  }
+  else
+  {
+    // TODO: lightweight cleanup to get rid of:
+    // 'Error in my_thread_global_end(): 2 threads didn't exit'
+    // at server shutdown
+  }
+  return(NULL);
+}
+
+void wsrep_create_rollbacker()
+{
+  if (wsrep_provider && strcasecmp(wsrep_provider, "none"))
+  {
+    pthread_t hThread;
+    /* create rollbacker */
+    if (pthread_create( &hThread, &connection_attrib,
+			start_wsrep_THD, (void*)wsrep_rollback_process))
+      WSREP_WARN("Can't create thread to manage wsrep rollback");
+  }
+}
+
+void wsrep_create_appliers(long threads)
+{
+  if (!wsrep_connected)
+  {
+    /* see wsrep_replication_start() for the logic */
+    if (wsrep_cluster_address && strlen(wsrep_cluster_address) &&
+        wsrep_provider && strcasecmp(wsrep_provider, "none"))
+    {
+      WSREP_ERROR("Trying to launch slave threads before creating "
+                  "connection at '%s'", wsrep_cluster_address);
+      assert(0);
+    }
+    return;
+  }
+
+  long wsrep_threads=0;
+  pthread_t hThread;
+  while (wsrep_threads++ < threads) {
+    if (pthread_create(
+      &hThread, &connection_attrib,
+      start_wsrep_THD, (void*)wsrep_replication_process))
+      WSREP_WARN("Can't create thread to manage wsrep replication");
+  }
+}
+/**/
+static bool abort_replicated(THD *thd)
+{
+  bool ret_code= false;
+  if (thd->wsrep_query_state== QUERY_COMMITTING)
+  {
+    if (wsrep_debug) WSREP_INFO("aborting replicated trx: %lu", thd->real_id);
+
+    (void)wsrep_abort_thd(thd, thd, TRUE);
+    ret_code= true;
+  }
+  return ret_code;
+}
+/**/
+static inline bool is_client_connection(THD *thd)
+{
+#if REMOVE
+// REMOVE THIS LATER (lp:777201). Below we had to add an explicit check for
+// wsrep_applier since wsrep_exec_mode didn't seem to always work
+if (thd->wsrep_applier && thd->wsrep_exec_mode != REPL_RECV)
+WSREP_WARN("applier has wsrep_exec_mode = %d", thd->wsrep_exec_mode);
+
+  if ( thd->slave_thread               || /* declared as mysql slave  */
+       thd->system_thread              || /* declared as system thread */
+      !thd->vio_ok()                   || /* server internal thread */ 
+       thd->wsrep_exec_mode==REPL_RECV || /* applier or replaying thread */
+       thd->wsrep_applier              || /* wsrep slave applier */
+      !thd->variables.wsrep_on)           /* client, but fenced outside wsrep */
+    return false;
+
+  return true;
+#else
+  return (thd->wsrep_client_thread && thd->variables.wsrep_on);
+#endif /* REMOVE */
+}
+
+static inline bool is_replaying_connection(THD *thd)
+{
+  bool ret;
+
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  ret=  (thd->wsrep_conflict_state == REPLAYING) ? true : false;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+  return ret;
+}
+
+static inline bool is_committing_connection(THD *thd)
+{
+  bool ret;
+
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  ret=  (thd->wsrep_query_state == QUERY_COMMITTING) ? true : false;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+  return ret;
+}
+
+static bool have_client_connections()
+{
+  Thread_iterator it= global_thread_list->begin();
+  for (; it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+    DBUG_PRINT("quit",("Informing thread %ld that it's time to die",
+                        tmp->thread_id));
+    if (is_client_connection(tmp) && tmp->killed == THD::KILL_CONNECTION)
+    {
+      (void)abort_replicated(tmp);
+      return true;
+    }
+  }
+  return false;
+}
+
+/*
+   returns the number of wsrep appliers running.
+   However, the caller (thd parameter) is not taken in account
+ */
+static int have_wsrep_appliers(THD *thd)
+{
+  int ret= 0;
+
+  Thread_iterator it= global_thread_list->begin();
+  for (; it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+    ret+= (tmp != thd && tmp->wsrep_applier);
+  }
+  return ret;
+}
+
+static void wsrep_close_thread(THD *thd)
+{
+  thd->killed= THD::KILL_CONNECTION;
+  MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (thd));
+  if (thd->mysys_var)
+  {
+    thd->mysys_var->abort=1;
+    mysql_mutex_lock(&thd->mysys_var->mutex);
+    if (thd->mysys_var->current_cond)
+    {
+      mysql_mutex_lock(thd->mysys_var->current_mutex);
+      mysql_cond_broadcast(thd->mysys_var->current_cond);
+      mysql_mutex_unlock(thd->mysys_var->current_mutex);
+    }
+    mysql_mutex_unlock(&thd->mysys_var->mutex);
+  }
+}
+
+static my_bool have_committing_connections()
+{
+  Thread_iterator it= global_thread_list->begin();
+  for (; it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+
+    if (!is_client_connection(tmp))
+      continue;
+
+    if (is_committing_connection(tmp))
+    {
+      mysql_mutex_unlock(&LOCK_thread_count);
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+int wsrep_wait_committing_connections_close(int wait_time)
+{
+  int sleep_time= 100;
+
+  while (have_committing_connections() && wait_time > 0)
+  {
+    WSREP_DEBUG("wait for committing transaction to close: %d", wait_time);
+    my_sleep(sleep_time);
+    wait_time -= sleep_time;
+  }
+  if (have_committing_connections())
+  {
+    return 1;
+  }
+  return 0;
+}
+
+void wsrep_close_client_connections(my_bool wait_to_end) 
+{
+  /*
+    First signal all threads that it's time to die
+  */
+
+  /* Kill blocked pthreads */
+  kill_blocked_pthreads_flag++;
+  kill_blocked_pthreads();
+
+  mysql_mutex_lock(&LOCK_thread_count); // For unlink from list
+
+  Thread_iterator it= global_thread_list->begin();
+  for (; it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+    DBUG_PRINT("quit",("Informing thread %ld that it's time to die",
+                        tmp->thread_id));
+    /* We skip slave threads & scheduler on this first loop through. */
+    if (!is_client_connection(tmp))
+      continue;
+
+    if (is_replaying_connection(tmp))
+    {
+      tmp->killed= THD::KILL_CONNECTION;
+      continue;
+    }
+
+    /* replicated transactions must be skipped */
+    if (abort_replicated(tmp))
+      continue;
+
+    WSREP_DEBUG("closing connection %ld", tmp->thread_id);
+    wsrep_close_thread(tmp);
+  }
+  mysql_mutex_unlock(&LOCK_thread_count);
+
+  if (get_thread_count() > 0)
+    sleep(2);                               // Give threads time to die
+
+  mysql_mutex_lock(&LOCK_thread_count);
+  /*
+    Force remaining threads to die by closing the connection to the client
+  */
+
+  for (it= global_thread_list->begin(); it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+#ifndef __bsdi__				// Bug in BSDI kernel
+    if (is_client_connection(tmp) && 
+        !abort_replicated(tmp)    &&
+	!is_replaying_connection(tmp))
+    {
+      WSREP_INFO("killing local connection: %ld",tmp->thread_id);
+      close_connection(tmp,0,0);
+    }
+#endif
+  }
+
+  DBUG_PRINT("quit",("Waiting for threads to die (count=%u)", get_thread_count()));
+  if (wsrep_debug)
+    WSREP_INFO("waiting for client connections to close: %u", 
+               get_thread_count());
+
+  while (wait_to_end && have_client_connections())
+  {
+    mysql_cond_wait(&COND_thread_count, &LOCK_thread_count);
+    DBUG_PRINT("quit",("One thread died (count=%u)", get_thread_count()));
+  }
+
+  mysql_mutex_unlock(&LOCK_thread_count);
+
+  /* All client connection threads have now been aborted */
+}
+
+void wsrep_close_applier(THD *thd)
+{
+  WSREP_DEBUG("closing applier %ld", thd->thread_id);
+  wsrep_close_thread(thd);
+}
+
+static void wsrep_close_threads(THD *thd)
+{
+  mysql_mutex_lock(&LOCK_thread_count); // For unlink from list
+
+  Thread_iterator it= global_thread_list->begin();
+  for (; it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+    DBUG_PRINT("quit",("Informing thread %ld that it's time to die",
+                       tmp->thread_id));
+    /* We skip slave threads & scheduler on this first loop through. */
+    if (tmp->wsrep_applier && tmp != thd)
+    {
+      WSREP_DEBUG("closing wsrep thread %ld", tmp->thread_id);
+      wsrep_close_thread (tmp);
+    }
+  }
+
+  mysql_mutex_unlock(&LOCK_thread_count);
+}
+
+void wsrep_close_applier_threads(int count)
+{
+  mysql_mutex_lock(&LOCK_thread_count); // For unlink from list
+
+  Thread_iterator it= global_thread_list->begin();
+  for (; it != global_thread_list->end(); ++it)
+  {
+    THD *tmp= *it;
+    DBUG_PRINT("quit",("Informing thread %ld that it's time to die",
+                       tmp->thread_id));
+    /* We skip slave threads & scheduler on this first loop through. */
+    if (tmp->wsrep_applier)
+    {
+      WSREP_DEBUG("closing wsrep applier thread %ld", tmp->thread_id);
+      tmp->wsrep_applier_closing= TRUE;
+      count--;
+    }
+  }
+
+  mysql_mutex_unlock(&LOCK_thread_count);
+}
+
+void wsrep_wait_appliers_close(THD *thd)
+{
+  /* Wait for wsrep appliers to gracefully exit */
+  mysql_mutex_lock(&LOCK_thread_count);
+  while (have_wsrep_appliers(thd) > 1)
+  // 1 is for rollbacker thread which needs to be killed explicitly.
+  // This gotta be fixed in a more elegant manner if we gonna have arbitrary
+  // number of non-applier wsrep threads.
+  {
+    mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
+    DBUG_PRINT("quit",("One applier died (count=%u)", get_thread_count()));
+  }
+  mysql_mutex_unlock(&LOCK_thread_count);
+  /* Now kill remaining wsrep threads: rollbacker */
+  wsrep_close_threads (thd);
+  /* and wait for them to die */
+  mysql_mutex_lock(&LOCK_thread_count);
+  while (have_wsrep_appliers(thd) > 0)
+  {
+    mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
+    DBUG_PRINT("quit",("One thread died (count=%u)", get_thread_count()));
+  }
+  mysql_mutex_unlock(&LOCK_thread_count);
+
+  /* All wsrep applier threads have now been aborted. However, if this thread
+     is also applier, we are still running...
+  */
+}
+
+void wsrep_kill_mysql(THD *thd)
+{
+  if (mysqld_server_started)
+  {
+    if (!shutdown_in_progress)
+    {
+      WSREP_INFO("starting shutdown");
+      kill_mysql();
+    }
+  }
+  else
+  {
+    unireg_abort(1);
+  }
+}
+#endif /* WITH_WSREP */
 
 #if (defined(_WIN32) || defined(HAVE_SMEM)) && !defined(EMBEDDED_LIBRARY)
 static void handle_connections_methods()
@@ -5527,6 +6169,14 @@ int mysqld_main(int argc, char **argv)
   my_str_free= &my_str_free_mysqld;
   my_str_realloc= &my_str_realloc_mysqld;
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    select_thread_in_use= 0;
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
   /*
     init signals & alarm
     After this we can't quit by a simple unireg_abort
@@ -5605,6 +6255,31 @@ int mysqld_main(int argc, char **argv)
   if (Events::init(opt_noacl || opt_bootstrap))
     unireg_abort(1);
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (opt_bootstrap)
+  {
+    /*! bootstrap wsrep init was taken care of above */
+  }
+  else
+  {
+    wsrep_SE_initialized();
+
+    if (wsrep_before_SE())
+    {
+      /*! in case of no SST wsrep waits in view handler callback */
+      wsrep_SE_init_grab();
+      wsrep_SE_init_done();
+      /*! in case of SST wsrep waits for wsrep->sst_received */
+      wsrep_sst_continue();
+    }
+    else
+    {
+      wsrep_init_startup (false);
+    }
+
+    wsrep_create_appliers(wsrep_slave_threads - 1);
+  }
+#endif /* WITH_WSREP */
   if (opt_bootstrap)
   {
     select_thread_in_use= 0;                    // Allow 'kill' to work
@@ -5665,6 +6340,9 @@ int mysqld_main(int argc, char **argv)
 #ifndef __WIN__
 #ifdef EXTRA_DEBUG2
   sql_print_error("Before Lock_thread_count");
+#endif
+#ifdef WITH_WSREP
+  WSREP_DEBUG("Before Lock_thread_count");
 #endif
   mysql_mutex_lock(&LOCK_thread_count);
   DBUG_PRINT("quit", ("Got thread_count mutex"));
@@ -5931,6 +6609,9 @@ static void bootstrap(MYSQL_FILE *file)
   DBUG_ENTER("bootstrap");
 
   THD *thd= new THD;
+#ifdef WITH_WSREP
+  thd->variables.wsrep_on= 0;
+#endif
   thd->bootstrap=1;
   my_net_init(&thd->net,(st_vio*) 0);
   thd->max_client_packet_length= thd->net.max_packet;
@@ -6064,7 +6745,11 @@ void create_thread_to_handle_connection(THD *thd)
       my_snprintf(error_message_buff, sizeof(error_message_buff),
                   ER_THD(thd, ER_CANT_CREATE_THREAD), error);
       net_send_error(thd, ER_CANT_CREATE_THREAD, error_message_buff, NULL);
+#ifdef WITH_WSREP
+      close_connection(thd,0,0);
+#else
       close_connection(thd);
+#endif
       delete thd;
       return;
       /* purecov: end */
@@ -6117,7 +6802,11 @@ static void create_new_thread(THD *thd)
       with no sqlstate.
       A client expecting a SQLSTATE will not find any, and assume 'HY000'.
     */
+#ifdef WITH_WSREP
+    close_connection(thd, ER_CON_COUNT_ERROR, 1);
+#else
     close_connection(thd, ER_CON_COUNT_ERROR);
+#endif
     if (log_warnings)
     {
       sql_print_warning("%s", ER_DEFAULT(ER_CON_COUNT_ERROR));
@@ -6351,6 +7040,9 @@ void handle_connections_sockets()
         sleep(1);       // Give other threads some time
       continue;
     }
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    (void) fcntl(mysql_socket_getfd(new_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_LIBWRAP
     {
@@ -6540,7 +7232,11 @@ pthread_handler_t handle_connections_namedpipes(void *arg)
       {
         sql_print_warning("%s", ER_DEFAULT(ER_OUT_OF_RESOURCES));
       }
+#ifdef WITH_WSREP
+      close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+#else
       close_connection(thd, ER_OUT_OF_RESOURCES);
+#endif
       delete thd;
       continue;
     }
@@ -6739,7 +7435,11 @@ pthread_handler_t handle_connections_shared_memory(void *arg)
       {
         sql_print_warning("%s", ER_DEFAULT(ER_OUT_OF_RESOURCES));
       }
+#ifdef WITH_WSREP
+      close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+#else
       close_connection(thd, ER_OUT_OF_RESOURCES);
+#endif
       errmsg= 0;
       goto errorconn;
     }
@@ -8099,6 +8799,19 @@ SHOW_VAR status_vars[]= {
 #ifdef ENABLED_PROFILING
   {"Uptime_since_flush_status",(char*) &show_flushstatustime,   SHOW_FUNC},
 #endif
+#ifdef WITH_WSREP
+  {"wsrep_connected",          (char*) &wsrep_connected,         SHOW_BOOL},
+  {"wsrep_ready",              (char*) &wsrep_ready,             SHOW_BOOL},
+  {"wsrep_cluster_state_uuid", (char*) &wsrep_cluster_state_uuid,SHOW_CHAR_PTR},
+  {"wsrep_cluster_conf_id",    (char*) &wsrep_cluster_conf_id,   SHOW_LONGLONG},
+  {"wsrep_cluster_status",     (char*) &wsrep_cluster_status,    SHOW_CHAR_PTR},
+  {"wsrep_cluster_size",       (char*) &wsrep_cluster_size,      SHOW_LONG},
+  {"wsrep_local_index",        (char*) &wsrep_local_index,       SHOW_LONG},
+  {"wsrep_provider_name",      (char*) &wsrep_provider_name,     SHOW_CHAR_PTR},
+  {"wsrep_provider_version",   (char*) &wsrep_provider_version,  SHOW_CHAR_PTR},
+  {"wsrep_provider_vendor",    (char*) &wsrep_provider_vendor,   SHOW_CHAR_PTR},
+  {"wsrep",                    (char*) &wsrep_show_status,       SHOW_FUNC},
+#endif
   {NullS, NullS, SHOW_LONG}
 };
 
@@ -8426,6 +9139,10 @@ static int mysql_init_variables(void)
     tmpenv = DEFAULT_MYSQL_HOME;
   (void) strmake(mysql_home, tmpenv, sizeof(mysql_home)-1);
 #endif
+#ifdef WITH_WSREP
+  if (WSREP_ON && wsrep_init_vars())
+    return 1;
+#endif
   return 0;
 }
 
@@ -8626,6 +9343,14 @@ mysqld_get_one_option(int optid,
   case OPT_LOWER_CASE_TABLE_NAMES:
     lower_case_table_names_used= 1;
     break;
+#ifdef WITH_WSREP
+  case OPT_WSREP_START_POSITION:
+    wsrep_start_position_init (argument);
+    break;
+  case OPT_WSREP_SST_AUTH:
+    wsrep_sst_auth_init (argument);
+    break;
+#endif
 #if defined(ENABLED_DEBUG_SYNC)
   case OPT_DEBUG_SYNC_TIMEOUT:
     /*
@@ -9450,6 +10175,12 @@ PSI_mutex_key
   key_structure_guard_mutex, key_TABLE_SHARE_LOCK_ha_data,
   key_LOCK_error_messages, key_LOG_INFO_lock, key_LOCK_thread_count,
   key_LOCK_log_throttle_qni;
+#ifdef WITH_WSREP
+PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
+  key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
+  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
+  key_LOCK_wsrep_slave_threads;
+#endif
 PSI_mutex_key key_RELAYLOG_LOCK_commit;
 PSI_mutex_key key_RELAYLOG_LOCK_commit_queue;
 PSI_mutex_key key_RELAYLOG_LOCK_done;
@@ -9542,6 +10273,17 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_error_messages, "LOCK_error_messages", PSI_FLAG_GLOBAL},
   { &key_LOG_INFO_lock, "LOG_INFO::lock", 0},
   { &key_LOCK_thread_count, "LOCK_thread_count", PSI_FLAG_GLOBAL},
+#ifdef WITH_WSREP
+  { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_sst_thread, "wsrep_sst_thread", 0},
+  { &key_LOCK_wsrep_sst_init, "LOCK_wsrep_sst_init", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_rollback, "LOCK_wsrep_rollback", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
+  { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
+#endif
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},
   { &key_LOCK_thread_created, "LOCK_thread_created", PSI_FLAG_GLOBAL }
@@ -9583,6 +10325,12 @@ PSI_cond_key key_BINLOG_update_cond,
   key_cond_slave_parallel_worker,
   key_TABLE_SHARE_cond, key_user_level_lock_cond,
   key_COND_thread_count, key_COND_thread_cache, key_COND_flush_thread_cache;
+#ifdef WITH_WSREP
+PSI_cond_key key_COND_wsrep_rollback, key_COND_wsrep_thd, 
+  key_COND_wsrep_replaying, key_COND_wsrep_ready, key_COND_wsrep_sst,
+  key_COND_wsrep_sst_init, key_COND_wsrep_sst_thread;
+
+#endif /* WITH_WSREP */
 PSI_cond_key key_RELAYLOG_update_cond;
 PSI_cond_key key_BINLOG_COND_done;
 PSI_cond_key key_RELAYLOG_COND_done;
@@ -9627,6 +10375,15 @@ static PSI_cond_info all_server_conds[]=
   { &key_user_level_lock_cond, "User_level_lock::cond", 0},
   { &key_COND_thread_count, "COND_thread_count", PSI_FLAG_GLOBAL},
   { &key_COND_thread_cache, "COND_thread_cache", PSI_FLAG_GLOBAL},
+#ifdef WITH_WSREP
+  { &key_COND_wsrep_ready, "COND_wsrep_ready", PSI_FLAG_GLOBAL},
+  { &key_COND_wsrep_sst, "COND_wsrep_sst", PSI_FLAG_GLOBAL},
+  { &key_COND_wsrep_sst_init, "COND_wsrep_sst_init", PSI_FLAG_GLOBAL},
+  { &key_COND_wsrep_sst_thread, "wsrep_sst_thread", 0},
+  { &key_COND_wsrep_rollback, "COND_wsrep_rollback", PSI_FLAG_GLOBAL},
+  { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0},
+  { &key_COND_wsrep_replaying, "COND_wsrep_replaying", PSI_FLAG_GLOBAL},
+#endif
   { &key_COND_flush_thread_cache, "COND_flush_thread_cache", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_cond, "Gtid_state", PSI_FLAG_GLOBAL}
 };

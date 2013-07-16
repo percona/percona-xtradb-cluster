@@ -577,6 +577,9 @@ public:
   MDL_ticket *next_in_lock;
   MDL_ticket **prev_in_lock;
 public:
+#ifdef WITH_WSREP
+  void wsrep_report(bool debug);
+#endif /* WITH_WSREP */
   bool has_pending_conflicting_lock() const;
 
   MDL_context *get_ctx() const { return m_ctx; }
@@ -908,6 +911,9 @@ private:
                              MDL_ticket **out_ticket);
 
 public:
+#ifdef WITH_WSREP
+  THD *wsrep_get_thd() const { return get_thd(); }
+#endif /* WITH_WSREP */
   void find_deadlock();
 
   bool visit_subgraph(MDL_wait_for_graph_visitor *dvisitor);

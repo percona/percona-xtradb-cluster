@@ -5143,4 +5143,9 @@ size_t my_strmov_quoted_identifier_helper(int q, char *buffer,
   @} (end of group Replication)
 */
 
+#ifdef WITH_WSREP
+Log_event* wsrep_read_log_event(
+  char **arg_buf, size_t *arg_buf_len,
+  const Format_description_log_event *description_event);
+#endif
 #endif /* _log_event_h */

@@ -40,6 +40,9 @@
 #include <my_dir.h>
 #include <stdarg.h>
 #include <m_ctype.h>				// For test_if_number
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 
 #ifdef _WIN32
 #include "message.h"
@@ -307,7 +310,6 @@ bool LOGGER::is_log_table_enabled(uint log_table_type)
     return FALSE;                             /* make compiler happy */
   }
 }
-
 
 /* Check if a given table is opened log table */
 int check_if_log_table(size_t db_len, const char *db, size_t table_name_len,
@@ -2524,6 +2526,7 @@ int my_plugin_log_message(MYSQL_PLUGIN *plugin_ptr, plugin_log_level level,
 
 /********* transaction coordinator log for 2pc - mmap() based solution *******/
 
+
 /*
   the log consists of a file, mmapped to a memory.
   file is divided on pages of tc_log_page_size size.
@@ -2636,8 +2639,14 @@ int TC_LOG_MMAP::open(const char *opt_name)
     mysql_mutex_init(key_PAGE_lock, &pg->lock, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_PAGE_cond, &pg->cond, 0);
     pg->start=(my_xid *)(data + i*tc_log_page_size);
+#ifdef WITH_WSREP
+    if (!WSREP_ON) 
+#endif /* WITH_WSREP */
     pg->end=(my_xid *)(pg->start + tc_log_page_size);
     pg->size=pg->free=tc_log_page_size/sizeof(my_xid);
+#ifdef WITH_WSREP
+    if (WSREP_ON) pg->end=pg->start + pg->size;
+#endif /* WITH_WSREP */
   }
   pages[0].size=pages[0].free=
                 (tc_log_page_size-TC_LOG_HEADER_SIZE)/sizeof(my_xid);

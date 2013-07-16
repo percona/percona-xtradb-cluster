@@ -398,7 +398,9 @@ lock_wait_release_thread_if_suspended(
 				user OS thread	 */
 {
 	ut_ad(lock_mutex_own());
+#ifndef WITH_WSREP
 	ut_ad(trx_mutex_own(thr_get_trx(thr)));
+#endif /* WITH_WSREP */
 
 	/* We own both the lock mutex and the trx_t::mutex but not the
 	lock wait mutex. This is OK because other threads will see the state

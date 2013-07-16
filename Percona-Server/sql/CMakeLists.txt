@@ -13,6 +13,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+IF(WITH_WSREP)
+ SET(WSREP_INCLUDES ${CMAKE_SOURCE_DIR}/wsrep)
+ENDIF()
+
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/include 
   ${CMAKE_SOURCE_DIR}/sql 
@@ -20,6 +24,7 @@ INCLUDE_DIRECTORIES(
   ${ZLIB_INCLUDE_DIR}
   ${SSL_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}/sql
+  ${WSREP_INCLUDES}
 )
 
 SET(GEN_SOURCES
@@ -34,6 +39,19 @@ SET_SOURCE_FILES_PROPERTIES(${GEN_SOURCES} PROPERTIES GENERATED 1)
 ADD_DEFINITIONS(-DMYSQL_SERVER -DHAVE_EVENT_SCHEDULER -DHAVE_POOL_OF_THREADS)
 IF(SSL_DEFINES)
  ADD_DEFINITIONS(${SSL_DEFINES})
+ENDIF()
+
+IF(WITH_WSREP)
+ SET(WSREP_SOURCES
+   wsrep_check_opts.cc
+   wsrep_hton.cc
+   wsrep_mysqld.cc 
+   wsrep_notify.cc
+   wsrep_sst.cc
+   wsrep_utils.cc
+   wsrep_var.cc
+ )
+ SET(WSREP_LIB wsrep)
 ENDIF()
 
 SET(SQL_SHARED_SOURCES
@@ -179,6 +197,7 @@ ENDIF()
 SET(SQL_EXPORTED_SOURCES ${SQL_SHARED_SOURCES} PARENT_SCOPE)
 
 SET(SQL_SOURCE
+  ${WSREP_SOURCES}
   ${GEN_SOURCES}
   ${MYSYS_LIBWRAP_SOURCE}
   ${SQL_SHARED_SOURCES}
@@ -215,6 +234,7 @@ DTRACE_INSTRUMENT(sql)
 TARGET_LINK_LIBRARIES(sql ${MYSQLD_STATIC_PLUGIN_LIBS} 
   mysys mysys_ssl dbug strings vio regex   
   ${LIBWRAP} ${LIBCRYPT} ${LIBDL}
+  ${WSREP_LIB}
   ${SSL_LIBRARIES})
 
 #
@@ -253,6 +273,18 @@ ADD_LIBRARY(sqlgunitlib
   )
 ADD_DEPENDENCIES(sqlgunitlib GenError)
 
+IF(WITH_WSREP)
+ SET(WSREP_SOURCES
+   wsrep_check_opts.cc
+   wsrep_hton.cc
+   wsrep_mysqld.cc 
+   wsrep_notify.cc
+   wsrep_sst.cc
+   wsrep_utils.cc
+   wsrep_var.cc
+ )
+ SET(WSREP_LIB wsrep)
+ENDIF()
 
 IF(WIN32)
   SET(MYSQLD_SOURCE main.cc nt_servc.cc nt_servc.h message.rc)
