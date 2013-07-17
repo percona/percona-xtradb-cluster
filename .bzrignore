@@ -323,7 +323,7 @@ bkpush.log
 bkpush.log*
 build.log
 build_debug
-build_release
+build_install
 build_tags.sh
 client/#mysql.cc#
 client/*.ds?
