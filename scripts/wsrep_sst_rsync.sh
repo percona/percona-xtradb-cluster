@@ -1,7 +1,4 @@
 #!/bin/bash -ue
-echo --- env --- >&2
-env | sort >&2
-echo ----------- >&2
 
 # Copyright (C) 2010 Codership Oy
 #
