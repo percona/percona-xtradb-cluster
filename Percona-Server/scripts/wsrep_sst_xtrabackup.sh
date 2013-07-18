@@ -61,6 +61,9 @@ INFO_FILE="xtrabackup_galera_info"
 IST_FILE="xtrabackup_ist"
 MAGIC_FILE="${DATA}/${INFO_FILE}"
 
+# Setting the path for ss and ip
+export PATH="/usr/sbin:/sbin:$PATH"
+
 timeit(){
     local stage=$1
     shift
@@ -292,8 +295,8 @@ cleanup_joiner()
         wsrep_log_info "Removing the sst_in_progress file"
         wsrep_cleanup_progress_file
     fi
-    if [[ -p $progress ]];then 
-        wsrep_log_info "Cleaning up fifo file"
+    if [[ -n $progress && -p $progress ]];then 
+        wsrep_log_info "Cleaning up fifo file $progress"
         rm $progress
     fi
 }
@@ -320,7 +323,7 @@ cleanup_donor()
     rm -f $XTRABACKUP_PID 
     rm -f ${DATA}/${IST_FILE}
 
-    if [[ -p $progress ]];then 
+    if [[ -n $progress && -p $progress ]];then 
         wsrep_log_info "Cleaning up fifo file $progress"
         rm $progress
     fi
