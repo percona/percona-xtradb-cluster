@@ -5367,8 +5367,8 @@ pthread_handler_t start_wsrep_THD(void *arg)
   if (thread_handling > SCHEDULER_ONE_THREAD_PER_CONNECTION)
   {
     mysql_mutex_lock(&LOCK_thread_count);
+    remove_global_thread(thd);
     delete thd;
-    thread_count--;
     mysql_mutex_unlock(&LOCK_thread_count);
   }
   return(NULL);
