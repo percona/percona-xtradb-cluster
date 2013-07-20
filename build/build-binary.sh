@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Execute this tool to setup the environment and build binary releases
-# for Percona-Server starting from a fresh tree.
+# for Percona XtraDB Cluster starting from a fresh tree.
 #
 # Usage: build-binary.sh [target dir]
 # The default target directory is the current directory. If it is not
@@ -16,6 +16,8 @@ set -ue
 TARGET="$(uname -m)"
 TARGET_CFLAGS=''
 QUIET='VERBOSE=1'
+CMAKE_BUILD_TYPE='RelWithDebInfo'
+DEBUG_COMMENT=''
 WITH_JEMALLOC=''
 DEBUG_EXTNAME=''
 
@@ -99,6 +101,13 @@ WORKDIR_ABS="$(cd "$WORKDIR"; pwd)"
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
 test -e "$SOURCEDIR/Makefile" || exit 2
 
+# Test for the galera sources
+if ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
+then
+    echo >&2 "Subdir percona-xtradb-cluster-galera not found"
+    exit 1
+fi
+
 # The number of processors is a good default for -j
 if test -e "/proc/cpuinfo"
 then
@@ -110,16 +119,22 @@ fi
 # Extract version from the Makefile
 MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
+RELEASE_TAG=''
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
     "$SOURCEDIR/Makefile" | cut -d = -f 2)"
-PRODUCT="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
+    "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
+    cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
+    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
+PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 
 # Build information
 REVISION="$(cd "$SOURCEDIR"; bzr revno)"
-PRODUCT_FULL="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
-PRODUCT_FULL="$PRODUCT_FULL-$REVISION${BUILD_COMMENT:-}.$(uname -s).$TARGET"
-COMMENT="Percona Server with XtraDB (GPL), Release $PERCONA_SERVER_VERSION"
-COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
+WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
+GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION || bzr revno)"
+PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.$REVISION.$(uname -s).$TARGET"
+COMMENT="Percona XtraDB Cluster (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
+COMMENT="$COMMENT, Revision $REVISION"
 
 # Compilation flags
 export CC=${CC:-gcc}
@@ -127,6 +142,8 @@ export CXX=${CXX:-g++}
 export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -fno-omit-frame-pointer -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
+
+export WSREP_REV="$WSREP_REV"
 
 # Create a temporary working directory
 INSTALLDIR="$(cd "$WORKDIR" && TMPDIR="$WORKDIR_ABS" mktemp -d percona-build.XXXXXX)"
@@ -149,7 +166,26 @@ fi
 (
     cd "$SOURCEDIR"
  
-    # Execute clean and download mysql, apply patches
+    # Build galera
+    (
+        export CC=${GALERA_CC:-gcc}
+        export CXX=${GALERA_CXX:-g++}
+
+        cd "percona-xtradb-cluster-galera"
+        scons --config=force revno="$GALERA_REVISION" $MAKE_JFLAG \
+              garb/garbd libgalera_smm.so
+        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
+        cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+
+    ) || exit 1
+
+    # Export and cd to a new dir
+    bzr export "$INSTALLDIR/src"
+
+    cd "$INSTALLDIR/src"
+
     make clean all
 
     cd "$PRODUCT"
@@ -162,7 +198,9 @@ fi
         -DWITH_SSL=system \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
         -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-        -DMYSQL_SERVER_SUFFIX="-$PERCONA_SERVER_VERSION" \
+        -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
+        -DWITH_INNODB_DISALLOW_WRITES=ON \
+        -DWITH_WSREP=ON \
         -DCOMPILATION_COMMENT="$COMMENT" \
         -DWITH_PAM=ON
 
