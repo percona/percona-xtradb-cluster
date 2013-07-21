@@ -1,0 +1,54 @@
+.. _state_snapshot_transfer:
+
+=========================
+ State Snapshot Transfer
+=========================
+
+State Snapshot Transfer is a full data copy from one node (donor) to the joining node (joiner). It's used when a new node joins the cluster. In order to be synchronized with the cluster, new node has to transfer data from the node that is already part of the cluster.  
+There are three methods of SST available in Percona XtraDB Cluster: :program:`mysqldump`, :program:`rsync` and :program:`xtrabackup`. The downside of `mysqldump` and `rsync` is that the donor node becomes *READ-ONLY* while data is being copied from one node to another (SST applies :command:`FLUSH TABLES WITH READ LOCK` command). Xtrabackup SST does not require :command:`READ LOCK` for the entire syncing process, only for syncing the |MySQL| system tables and writing the information about the binlog, galera and slave information (same as the regular XtraBackup backup). State snapshot transfer method can be configured with the :variable:`wsrep_sst_method` variable.
+
+.. note:: 
+
+ If the variable :variable:`gcs.sync_donor` is set to ``Yes`` (default ``No``), whole cluster will get blocked if the donor is blocked by the State Snapshot Transfer and not just the donor node.
+
+Using *Percona Xtrabackup*
+==========================
+
+This is the least blocking method as it locks the tables only to copy the |MyISAM| system tables. |XtraBackup| is run locally on the donor node, so it's important that the correct user credentials are set up on the donor node. In order for PXC to perform the SST using the |XtraBackup|, credentials for connecting to the donor node need to be set up in the variable :variable:`wsrep_sst_auth`. Beside the credentials, one more important thing is that the :term:`datadir` needs to be specified in the server configuration file :file:`my.cnf`, otherwise the transfer process will fail.
+
+More information about the required credentials can be found in the |XtraBackup| `manual <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_. Easy way to test if the credentials will work is to run the |innobackupex| on the donor node with the username and password specified in the variable :variable:`wsrep_sst_auth`. For example, if the value of the :variable:`wsrep_sst_auth` is ``root:Passw0rd`` |innobackupex| command should look like: :: 
+
+  innobackupex --user=root --password=Passw0rd /tmp/
+ 
+Script used for this method can be found in :file:`/usr/bin/wsrep_sst_xtrabackup` and it's provided with the |PXC| binary packages.
+
+After :rn:`5.5.31-23.7.5` this method introduced the new :file:`my.cnf` option which can be used to set |XtraBackup| streaming option: :: 
+
+  [sst]
+  streamfmt=xbstream 
+
+Currently supported formats are tar (default, used in previous releases) and `xbstream <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_. Some of the benefits of choosing the xbstream over tar is that it supports more advanced features like `encrypted <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/encrypted_backups_innobackupex.html>`_, `compact <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_ and `compressed <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/streaming_backups_innobackupex.html#examples-using-xbstream>`_ backups.
+
+.. note::
+
+  Currently there is a limitations when using the ``xbstream`` option that the :term:`datadir` needs to be empty before starting the SST or otherwise the process will fail and the node will not be able to join the cluster.
+
+Using ``mysqldump``
+===================
+
+This method uses the standard :program:`mysqldump` to dump all the databases from the donor node and import them to the joining node. For this method to work :variable:`wsrep_sst_auth` needs to be set up with the root credentials. This method is the slowest one and it also performs the global lock while doing the |SST| which will block writes to the donor node.
+
+Script used for this method can be found in :file:`/usr/bin/wsrep_sst_mysqldump` and it's provided with the |PXC| binary packages.
+
+Using ``rsync``
+===============
+
+This method uses :program:`rsync` to copy files from donor to the joining node. In some cases this can be faster than using the |XtraBackup| but requires the global data lock which will block writes to the donor node. This method doesn't require username/password credentials to be set up in the variable :variable:`wsrep_sst_auth`.
+
+Script used for this method can be found in :file:`/usr/bin/wsrep_sst_rsync` and it's provided with the |PXC| binary packages.
+
+Other Reading
+=============
+
+* `SST Methods for MySQL <http://www.codership.com/wiki/doku.php?id=sst_mysql>`_
+* :ref:`Xtrabackup SST configuration<xtrabackup_sst>`

@@ -1,13 +1,17 @@
-==================================
-|Percona Server| 5.6 Release notes
-==================================
+======================================
+|Percona XtraDB Cluster| Release notes
+======================================
 
 .. toctree::
    :maxdepth: 1
    :glob:
 
-   Percona-Server-5.6.12-60.4
-   Percona-Server-5.6.11-60.3
-   Percona-Server-5.6.10-60.2
-   Percona-Server-5.6.6-60.1
-   Percona-Server-5.6.5-60.0
+   Percona-XtraDB-Cluster-5.5.31-23.7.5
+   Percona-XtraDB-Cluster-5.5.30-23.7.4
+   Percona-XtraDB-Cluster-5.5.29-23.7.2
+   Percona-XtraDB-Cluster-5.5.29
+   Percona-XtraDB-Cluster-5.5.28
+   Percona-XtraDB-Cluster-5.5.27
+   Percona-XtraDB-Cluster-5.5.24
+   Percona-XtraDB-Cluster-5.5.23
+
