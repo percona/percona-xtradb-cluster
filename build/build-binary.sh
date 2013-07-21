@@ -210,7 +210,7 @@ fi
     # Build UDF
     (
         cd "UDF"
-        CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/$PRODUCT/include" \
+        CXX=${UDF_CXX:-g++} ./configure --includedir="$INSTALLDIR/src/Percona-Server/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install

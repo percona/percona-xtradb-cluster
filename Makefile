@@ -18,8 +18,7 @@ CMAKE=CC=gcc CXX=gcc cmake $(ADDITIONAL)
 ADDITIONAL ?=
 CONFIGURE=CFLAGS="-O2 -g -fmessage-length=0 -D_FORTIFY_SOURCE=2" CXXFLAGS="-O2 -g -fmessage-length=0 -D_FORTIFY_SOURCE=2"  LIBS=-lrt ./configure --prefix=/usr/local/$(PERCONA_XTRADB_CLUSTER) --with-plugin-innobase --with-plugin-partition
 
-REVS = $(shell bzr log | grep rev | head -1   )
-REV  = $(word 2, $(REVS) )
+REV  = $(shell bzr revno)
 
 all: main maatkit-udf install-lic
 	@echo ""
