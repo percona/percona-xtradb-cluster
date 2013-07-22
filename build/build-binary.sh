@@ -227,6 +227,10 @@ fi
 
     )
 
+    (
+       cp -R tests $INSTALLDIR/usr/local/share/percona-xtradb-cluster-tests
+    )
+
     # Build jemalloc
     if test "x$WITH_JEMALLOC" != x
     then
