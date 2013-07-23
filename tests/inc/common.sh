@@ -283,10 +283,7 @@ basedir=${MYSQL_BASEDIR}
 datadir=${MYSQLD_DATADIR}
 tmpdir=${MYSQLD_TMPDIR}
 log-error=${MYSQLD_ERRFILE}
-log-bin=mysql-bin
-relay-log=mysql-relay-bin
 pid-file=${MYSQLD_PIDFILE}
-replicate-ignore-db=mysql
 ${MYSQLD_EXTRA_MY_CNF_OPTS:-}
 
 [client]
