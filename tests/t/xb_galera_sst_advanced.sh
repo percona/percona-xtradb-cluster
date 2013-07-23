@@ -29,7 +29,6 @@ if [[ -n ${EXTRAFILE:-} ]];then
     dextra1="--defaults-extra-file=$EXTRAFILE1"
     dextra2="--defaults-extra-file=$EXTRAFILE2"
 fi
-
 debug=""
 pdebug=""
 if [[ -n ${WSREP_DEBUG:-} ]];then 
@@ -43,7 +42,8 @@ listen_addr1="${ADDR}:$(get_free_port 4)"
 listen_addr2="${ADDR}:$(get_free_port 5)"
 
 vlog "Starting server $node1"
-start_server_with_id $node1 $dextra1 --innodb_file_per_table  --binlog-format=ROW --wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so --wsrep_cluster_address=gcomm:// --wsrep_sst_receive_address=$recv_addr1 --wsrep_node_incoming_address=$ADDR --wsrep_provider_options="gmcast.listen_addr=tcp://$listen_addr1${pdebug}" --wsrep_sst_method=xtrabackup --wsrep_sst_auth=$SUSER:$SSTPASS  --wsrep_node_address=$ADDR $debug 
+MYSQLD_EXTRA_MY_CNF_OPTS="!include $dextra1"
+start_server_with_id $node1  --innodb_file_per_table  --binlog-format=ROW --wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so --wsrep_cluster_address=gcomm:// --wsrep_sst_receive_address=$recv_addr1 --wsrep_node_incoming_address=$ADDR --wsrep_provider_options="gmcast.listen_addr=tcp://$listen_addr1${pdebug}" --wsrep_sst_method=xtrabackup --wsrep_sst_auth=$SUSER:$SSTPASS  --wsrep_node_address=$ADDR $debug 
 
 load_sakila
 
@@ -53,7 +53,8 @@ run_cmd ${MYSQL} ${MYSQL_ARGS} <<EOF
 EOF
 
 vlog "Starting server $node2"
-start_server_with_id $node2 $dextra2 --innodb_file_per_table --binlog-format=ROW --wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so --wsrep_cluster_address=gcomm://$listen_addr1 --wsrep_sst_receive_address=$recv_addr2 --wsrep_node_incoming_address=$ADDR --wsrep_provider_options="gmcast.listen_addr=tcp://$listen_addr2${pdebug}" --wsrep_sst_method=xtrabackup --wsrep_sst_auth=$SUSER:$SSTPASS  --wsrep_node_address=$ADDR $debug
+MYSQLD_EXTRA_MY_CNF_OPTS="!include $dextra2"
+start_server_with_id $node2  --innodb_file_per_table --binlog-format=ROW --wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so --wsrep_cluster_address=gcomm://$listen_addr1 --wsrep_sst_receive_address=$recv_addr2 --wsrep_node_incoming_address=$ADDR --wsrep_provider_options="gmcast.listen_addr=tcp://$listen_addr2${pdebug}" --wsrep_sst_method=xtrabackup --wsrep_sst_auth=$SUSER:$SSTPASS  --wsrep_node_address=$ADDR $debug
 switch_server $node2
 
 # The password propagates through SST
