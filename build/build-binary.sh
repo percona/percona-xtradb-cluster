@@ -228,8 +228,9 @@ fi
     )
 
     (
-       mkdir -p $INSTALLDIR/usr/local/share/percona-xtradb-cluster-tests
-       cp -R tests $INSTALLDIR/usr/local/share/percona-xtradb-cluster-tests
+       echo "Packaging the test files"
+       mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL/percona-xtradb-cluster-tests
+       cp -R tests $INSTALLDIR/usr/local/$PRODUCT_FULL/percona-xtradb-cluster-tests
     )
 
     # Build jemalloc
