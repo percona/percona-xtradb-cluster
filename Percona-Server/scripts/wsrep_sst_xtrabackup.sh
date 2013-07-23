@@ -166,9 +166,9 @@ get_transfer()
             fi
         else 
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-                tcmd="socat TCP-LISTEN:${SST_PORT},reuseaddr${sockopt} stdio"
+                tcmd="socat -u TCP-LISTEN:${SST_PORT},reuseaddr${sockopt} stdio"
             else
-                tcmd="socat stdio TCP:${REMOTEIP}:${SST_PORT}${sockopt}"
+                tcmd="socat -u stdio TCP:${REMOTEIP}:${SST_PORT}${sockopt}"
             fi
         fi
     fi
