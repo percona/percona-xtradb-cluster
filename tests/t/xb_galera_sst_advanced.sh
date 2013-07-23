@@ -24,8 +24,8 @@ fi
 set -e
 
 if [[ -n ${EXTRAFILE:-} ]];then 
-    EXTRAFILE1="${EXTRAFILE}.cnf-node1"
-    EXTRAFILE2="${EXTRAFILE}.cnf-node2"
+    EXTRAFILE1="$XB_TESTDIR/conf/${EXTRAFILE}.cnf-node1"
+    EXTRAFILE2="$XB_TESTDIR/conf/${EXTRAFILE}.cnf-node2"
     dextra1="--defaults-extra-file=$EXTRAFILE1"
     dextra2="--defaults-extra-file=$EXTRAFILE2"
 fi
