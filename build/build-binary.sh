@@ -228,6 +228,7 @@ fi
     )
 
     (
+       mkdir -p $INSTALLDIR/usr/local/share/percona-xtradb-cluster-tests
        cp -R tests $INSTALLDIR/usr/local/share/percona-xtradb-cluster-tests
     )
 
