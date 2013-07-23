@@ -53,7 +53,7 @@ check_pid_and_port()
     local rsync_port=$2
 
     if [ "$OS" == "Darwin" -o "$OS" == "FreeBSD" ]; then
-	# no netstat --program(-p) option in Darwin and FreeBSD
+        # no netstat --program(-p) option in Darwin and FreeBSD
         check_pid $pid_file && \
         lsof -i -Pn 2>/dev/null | \
         grep "(LISTEN)" | grep ":$rsync_port" | grep -w "^rsync\\s\\+$rsync_pid" >/dev/null
@@ -66,6 +66,17 @@ check_pid_and_port()
 
 MAGIC_FILE="$WSREP_SST_OPT_DATA/rsync_sst_complete"
 rm -rf "$MAGIC_FILE"
+
+# Old filter - include everything except selected
+# FILTER=(--exclude '*.err' --exclude '*.pid' --exclude '*.sock' \
+#         --exclude '*.conf' --exclude core --exclude 'galera.*' \
+#         --exclude grastate.txt --exclude '*.pem' \
+#         --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index')
+
+# New filter - exclude everything except dirs (schemas) and innodb files
+FILTER=(-f '- lost+found' -f '+ /ib_lru_dump' -f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
+# Old versions of rsync have a bug transferring filter rules to daemon, so specify filter rules directly to daemon
+FILTER_DAEMON="- lost+found  + /ib_lru_dump  + /ibdata*  + ib_logfile*  + */  -! */*"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -93,15 +104,6 @@ then
         rm -rf "$FLUSHED"
 
         sync
-
-        # Old filter - include everything except selected
-        # FILTER=(--exclude '*.err' --exclude '*.pid' --exclude '*.sock' \
-        #         --exclude '*.conf' --exclude core --exclude 'galera.*' \
-        #         --exclude grastate.txt --exclude '*.pem' \
-        #         --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index')
-
-        # New filter - exclude everything except dirs (schemas) and innodb files
-        FILTER=(-f '- lost+found' -f '+ /ib_lru_dump' -f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
 
         # first, the normal directories, so that we can detect incompatible protocol
         RC=0
@@ -202,11 +204,12 @@ cat << EOF > "$RSYNC_CONF"
 pid file = $RSYNC_PID
 use chroot = no
 [$MODULE]
-	path = $WSREP_SST_OPT_DATA
-	read only = no
-	timeout = 300
-	uid = $MYUID
-	gid = $MYGID
+    path = $WSREP_SST_OPT_DATA
+    read only = no
+    timeout = 300
+    uid = $MYUID
+    gid = $MYGID
+    filter = $FILTER_DAEMON
 EOF
 
 #    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
