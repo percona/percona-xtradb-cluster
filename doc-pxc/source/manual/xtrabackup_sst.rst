@@ -78,13 +78,12 @@ Comma separated key/value pairs of socket options. Must begin with a comma. You 
 
 .. option:: progress
 
-    :Values: 1,path/to/file,path/to/fifo
+    :Values: 1,path/to/file
 
 If equal to:
 
     * 1 it writes to mysql stderr 
-    * path/to/file writes to that file. 
-    * path/to/fifo, it will be created and cleaned up at exit.This is the preferred way. You need to cat the fifo file to monitor the progress, not tail it.
+    * path/to/file writes to that file. If this is a fifo, it needs to exist and be open on reader end before itself, otherwise wsrep_sst_xtrabackup will block indefinitely.
 
 .. note::
     Value of 0 is not valid.
