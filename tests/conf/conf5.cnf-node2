@@ -3,5 +3,5 @@ compress
 
 [sst]
 encrypt=2
-tca=$TMPDIR/certs/node1.crt
-tcert=$TMPDIR/certs/node2.pem
+tca=/tmp/certs/node1.crt
+tcert=/tmp/certs/node2.pem
