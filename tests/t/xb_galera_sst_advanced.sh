@@ -26,8 +26,9 @@ set -e
 if [[ -n ${EXTRAFILE:-} ]];then 
     EXTRAFILE1="$XB_TESTDIR/conf/${EXTRAFILE}.cnf-node1"
     EXTRAFILE2="$XB_TESTDIR/conf/${EXTRAFILE}.cnf-node2"
-    dextra1="--defaults-extra-file=$EXTRAFILE1"
-    dextra2="--defaults-extra-file=$EXTRAFILE2"
+    dextra1="$EXTRAFILE1"
+    dextra2="$EXTRAFILE2"
+    vlog "Including $EXTRAFILE1 and $EXTRAFILE2 for $CONF"
 fi
 debug=""
 pdebug=""
