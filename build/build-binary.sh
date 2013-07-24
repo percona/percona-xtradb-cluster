@@ -229,8 +229,8 @@ fi
 
     (
        echo "Packaging the test files"
-       mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL/percona-xtradb-cluster-tests
-       cp -R percona-xtradb-cluster-tests $INSTALLDIR/usr/local/$PRODUCT_FULL/percona-xtradb-cluster-tests/
+       # mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL
+       cp -R percona-xtradb-cluster-tests $INSTALLDIR/usr/local/$PRODUCT_FULL/
     )
 
     # Build jemalloc
