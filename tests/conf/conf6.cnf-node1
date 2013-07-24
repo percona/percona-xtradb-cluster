@@ -4,4 +4,4 @@ compact
 
 [sst]
 time=1
-progress=/tmp/test1.fif
+progress=$ROOT_FS/progress1.log
