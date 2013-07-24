@@ -165,8 +165,10 @@ get_transfer()
                 exit 22
             fi
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+                wsrep_log_info "Decrypting with PEM $tpem, CA: $tcert"
                 tcmd="socat openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
             else
+                wsrep_log_info "Encrypting with PEM $tpem, CA: $tcert"
                 tcmd="socat stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
             fi
         else 
