@@ -50,7 +50,12 @@ tcmd=""
 rebuild=0
 rebuildcmd=""
 payload=0
-pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE -F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p'"
+pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
+pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
+
+if pv --help | grep -q FORMAT;then 
+    pvopts+=$pvformat
+fi
 pcmd="pv $pvopts"
 declare -a RC
 
@@ -593,7 +598,11 @@ then
             if [[ -n $progress ]];then
                 count=$(find ${DATA} -type f -name '*.qp' | wc -l)
                 count=$(( count*2 ))
-                pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
+                if pv --help | grep -q FORMAT;then 
+                    pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
+                else 
+                    pvopts="-f -s $count -l -N Decompression"
+                fi
                 pcmd="pv $pvopts"
                 adjust_progress
                 dcmd="$pcmd | xargs -n 2 qpress -T${nproc}d"
