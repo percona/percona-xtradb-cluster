@@ -388,8 +388,9 @@ setup_ports
 get_stream
 get_transfer
 
+INNOEXTRA=""
 INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -400,27 +401,27 @@ then
         TMPDIR="${TMPDIR:-/tmp}"
 
         if [ "${AUTH[0]}" != "(null)" ]; then
-           INNOBACKUP+=" --user=${AUTH[0]}"
+           INNOEXTRA+=" --user=${AUTH[0]}"
        fi
 
         if [ ${#AUTH[*]} -eq 2 ]; then
-           INNOBACKUP+=" --password=${AUTH[1]}"
+           INNOEXTRA+=" --password=${AUTH[1]}"
         elif [ "${AUTH[0]}" != "(null)" ]; then
            # Empty password, used for testing, debugging etc.
-           INNOBACKUP+=" --password="
+           INNOEXTRA+=" --password="
         fi
 
         get_keys
         if [[ $encrypt -eq 1 ]];then
             if [[ -n $ekey ]];then
-                INNOBACKUP+=" --encrypt=$ealgo --encrypt-key=$ekey"
+                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key=$ekey "
             else 
-                INNOBACKUP+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile"
+                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile "
             fi
         fi
 
         if [[ -n $lsn ]];then 
-                INNOBACKUP+=" --incremental --incremental-lsn=$lsn"
+                INNOEXTRA+=" --incremental --incremental-lsn=$lsn "
         fi
 
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
