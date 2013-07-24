@@ -5,3 +5,4 @@ compress
 
 [sst]
 encrypt=1
+streamfmt=xbstream

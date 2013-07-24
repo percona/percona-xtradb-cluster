@@ -804,8 +804,11 @@ fi
 
 export OUTFILE="$PWD/results/setup"
 
-rm -rf results
-mkdir results
+#rm -rf results
+if [ ! -d results ]
+then
+    mkdir results
+fi
 
 cleanup_all_workers >>$OUTFILE 2>&1
 
