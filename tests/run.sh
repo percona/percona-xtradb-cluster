@@ -560,7 +560,7 @@ function reap_worker()
         rc="1"
     fi
 
-    printf "%-40s w%d\t" $tname $worker
+    printf "%-40s w%d\t" $tname${CONF:-} $worker
 
     ((TOTAL_TIME+=test_time))
 
@@ -884,8 +884,8 @@ do
    name=`basename $t .sh`
    worker_names[$worker]=$t
    worker_outfiles[$worker]="$PWD/results/$name${CONF:-}"
-   worker_skip_files[$worker]="$PWD/results/$name.skipped"
-   worker_status_files[$worker]="$PWD/results/$name.status"
+   worker_skip_files[$worker]="$PWD/results/$name${CONF:-}.skipped"
+   worker_status_files[$worker]="$PWD/results/$name${CONF:-}.status"
    # Create a unique TMPDIR for each worker so that it can be removed as a part
    # of the cleanup procedure. Server socket files will also be created there.
    worker_tmpdirs[$worker]="`mktemp -d -t xbtemp.XXXXXX`"
