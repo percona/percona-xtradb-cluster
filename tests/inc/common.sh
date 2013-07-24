@@ -329,6 +329,14 @@ EOF
                 cat ${errfile} >&2 || true
                 vlog "----------------"
             done 
+
+            for id in "${!SRV_MYSQLD_DATADIR[@]}"; do
+                vlog "----------------"
+                vlog "Innobackupex log for server with id: $id"
+                errdir=${SRV_MYSQLD_DATADIR[$id]}
+                cat ${errdir}/innobackup*.log >&2 || true
+                vlog "----------------"
+            done 
             exit -1
         else
             break

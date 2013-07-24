@@ -166,10 +166,10 @@ get_transfer()
             fi
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
                 wsrep_log_info "Decrypting with PEM $tpem, CA: $tcert"
-                tcmd="socat openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
+                tcmd="socat -u openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
             else
                 wsrep_log_info "Encrypting with PEM $tpem, CA: $tcert"
-                tcmd="socat stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
+                tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
             fi
         else 
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
@@ -316,13 +316,16 @@ cleanup_donor()
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
-    if check_pid $XTRABACKUP_PID
-    then
-        wsrep_log_error "xtrabackup process is still running. Killing... "
-        kill_xtrabackup
-    fi
 
-    rm -f $XTRABACKUP_PID 
+    if [[ -n $XTRABACKUP_PID ]];then 
+        if check_pid $XTRABACKUP_PID
+        then
+            wsrep_log_error "xtrabackup process is still running. Killing... "
+            kill_xtrabackup
+        fi
+
+        rm -f $XTRABACKUP_PID 
+    fi
     rm -f ${DATA}/${IST_FILE}
 
     if [[ -n $progress && -p $progress ]];then 
