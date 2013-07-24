@@ -203,7 +203,6 @@ get_footprint()
 adjust_progress()
 {
     if [[ -n $progress && $progress != '1' ]];then 
-        
         if [[ -e $progress ]];then 
             pcmd+=" 2>>$progress"
         else 
@@ -388,11 +387,11 @@ then
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
-        TMPDIR="/tmp"
+        TMPDIR="${TMPDIR:-/tmp}"
 
         if [ "${AUTH[0]}" != "(null)" ]; then
            INNOBACKUP+=" --user=${AUTH[0]}"
-        fi
+       fi
 
         if [ ${#AUTH[*]} -eq 2 ]; then
            INNOBACKUP+=" --password=${AUTH[1]}"
