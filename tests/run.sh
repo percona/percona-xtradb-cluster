@@ -880,7 +880,7 @@ do
 
    name=`basename $t .sh`
    worker_names[$worker]=$t
-   worker_outfiles[$worker]="$PWD/results/$name"
+   worker_outfiles[$worker]="$PWD/results/$name${CONF:-}"
    worker_skip_files[$worker]="$PWD/results/$name.skipped"
    worker_status_files[$worker]="$PWD/results/$name.status"
    # Create a unique TMPDIR for each worker so that it can be removed as a part

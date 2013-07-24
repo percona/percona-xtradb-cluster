@@ -202,7 +202,7 @@ get_footprint()
 
 adjust_progress()
 {
-    if [[ -n $progress && $progress -ne 1 ]];then 
+    if [[ -n $progress && $progress != '1' ]];then 
         if [[ $progress == /*.fif && ! -e $progress ]];then 
             wsrep_log_info "Creating fifo file $progress for tracking progress"
             mkfifo $progress
