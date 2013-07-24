@@ -4,4 +4,4 @@ compact
 
 [sst]
 time=1
-progress=$TMPDIR/progress1.log
+progress=/tmp/progress1.log
