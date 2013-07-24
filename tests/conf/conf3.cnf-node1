@@ -1,0 +1,4 @@
+[sst]
+rlimit=512k
+time=1
+progress=1

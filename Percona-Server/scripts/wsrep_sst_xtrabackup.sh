@@ -50,7 +50,12 @@ tcmd=""
 rebuild=0
 rebuildcmd=""
 payload=0
-pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE -F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p'"
+pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
+pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
+
+if pv --help | grep -q FORMAT;then 
+    pvopts+=$pvformat
+fi
 pcmd="pv $pvopts"
 declare -a RC
 
@@ -160,9 +165,11 @@ get_transfer()
                 exit 22
             fi
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-                tcmd="socat openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
+                wsrep_log_info "Decrypting with PEM $tpem, CA: $tcert"
+                tcmd="socat -u openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
             else
-                tcmd="socat stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
+                wsrep_log_info "Encrypting with PEM $tpem, CA: $tcert"
+                tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
             fi
         else 
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
@@ -202,12 +209,7 @@ get_footprint()
 
 adjust_progress()
 {
-    if [[ -n $progress && $progress -ne 1 ]];then 
-        if [[ $progress == /*.fif && ! -e $progress ]];then 
-            wsrep_log_info "Creating fifo file $progress for tracking progress"
-            mkfifo $progress
-        fi
-        
+    if [[ -n $progress && $progress != '1' ]];then 
         if [[ -e $progress ]];then 
             pcmd+=" 2>>$progress"
         else 
@@ -314,13 +316,16 @@ cleanup_donor()
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
-    if check_pid $XTRABACKUP_PID
-    then
-        wsrep_log_error "xtrabackup process is still running. Killing... "
-        kill_xtrabackup
-    fi
 
-    rm -f $XTRABACKUP_PID 
+    if [[ -n $XTRABACKUP_PID ]];then 
+        if check_pid $XTRABACKUP_PID
+        then
+            wsrep_log_error "xtrabackup process is still running. Killing... "
+            kill_xtrabackup
+        fi
+
+        rm -f $XTRABACKUP_PID 
+    fi
     rm -f ${DATA}/${IST_FILE}
 
     if [[ -n $progress && -p $progress ]];then 
@@ -392,11 +397,11 @@ then
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
-        TMPDIR="/tmp"
+        TMPDIR="${TMPDIR:-/tmp}"
 
         if [ "${AUTH[0]}" != "(null)" ]; then
            INNOBACKUP+=" --user=${AUTH[0]}"
-        fi
+       fi
 
         if [ ${#AUTH[*]} -eq 2 ]; then
            INNOBACKUP+=" --password=${AUTH[1]}"
@@ -598,7 +603,11 @@ then
             if [[ -n $progress ]];then
                 count=$(find ${DATA} -type f -name '*.qp' | wc -l)
                 count=$(( count*2 ))
-                pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
+                if pv --help | grep -q FORMAT;then 
+                    pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
+                else 
+                    pvopts="-f -s $count -l -N Decompression"
+                fi
                 pcmd="pv $pvopts"
                 adjust_progress
                 dcmd="$pcmd | xargs -n 2 qpress -T${nproc}d"

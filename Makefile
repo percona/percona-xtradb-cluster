@@ -21,7 +21,7 @@ CONFIGURE=CFLAGS="-O2 -g -fmessage-length=0 -D_FORTIFY_SOURCE=2" CXXFLAGS="-O2 -
 REVS = $(shell bzr log | grep rev | head -1   )
 REV  = $(word 2, $(REVS) )
 
-all: main handlersocket maatkit-udf install-lic
+all: main handlersocket maatkit-udf pxc-tests install-lic
 	@echo ""
 	@echo "Percona Server source code is ready"
 	@echo "Now change directory to $(PERCONA_XTRADB_CLUSTER) define variables as show below"
@@ -40,6 +40,10 @@ handlersocket:
 maatkit-udf:
 	cp -R UDF "$(PERCONA_XTRADB_CLUSTER)"
 	cd "$(PERCONA_XTRADB_CLUSTER)"/UDF && autoreconf --install
+
+pxc-tests:
+	-rm -rf "$(PERCONA_XTRADB_CLUSTER)"/percona-xtradb-cluster-tests
+	cp -R tests "$(PERCONA_XTRADB_CLUSTER)"/percona-xtradb-cluster-tests
 
 configure: all
 	(cd $(PERCONA_XTRADB_CLUSTER); bash BUILD/autorun.sh; $(CONFIGURE))

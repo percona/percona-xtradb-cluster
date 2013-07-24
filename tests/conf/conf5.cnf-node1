@@ -1,0 +1,7 @@
+[xtrabackup]
+compress
+
+[sst]
+encrypt=2
+tca=$TMPDIR/certs/node2.crt
+tcert=$TMPDIR/certs/node1.pem

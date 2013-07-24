@@ -1,0 +1,8 @@
+[xtrabackup]
+compress
+compact
+compress-threads=4
+
+[sst]
+streamfmt=xbstream
+transferfmt=socat

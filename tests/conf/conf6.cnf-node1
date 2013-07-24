@@ -1,0 +1,7 @@
+[xtrabackup]
+parallel=4
+compact
+
+[sst]
+time=1
+progress=$TMPDIR/progress1.log
