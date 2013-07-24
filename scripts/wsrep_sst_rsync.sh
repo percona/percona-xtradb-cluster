@@ -110,7 +110,7 @@ then
         rsync --archive --no-times --ignore-times --inplace --delete --quiet \
               --no-recursive --dirs \
               $WHOLE_FILE_OPT "${FILTER[@]}" "$WSREP_SST_OPT_DATA/" \
-              rsync://$WSREP_SST_OPT_ADDR || RC=$?
+              rsync://$WSREP_SST_OPT_ADDR-with_filter || RC=$?
 
         [ $RC -ne 0 ] && wsrep_log_error "rsync returned code $RC:"
 
@@ -164,7 +164,7 @@ then
     echo "continue" # now server can resume updating data
 
     echo "$STATE" > "$MAGIC_FILE"
-    rsync -aqc "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
+    rsync --archive --quiet --checksum "$MAGIC_FILE" rsync://$WSREP_SST_OPT_ADDR
 
     echo "done $STATE"
 
@@ -203,13 +203,19 @@ then
 cat << EOF > "$RSYNC_CONF"
 pid file = $RSYNC_PID
 use chroot = no
-[$MODULE]
+[$MODULE-with_filter]
     path = $WSREP_SST_OPT_DATA
     read only = no
     timeout = 300
     uid = $MYUID
     gid = $MYGID
     filter = $FILTER_DAEMON
+[$MODULE]
+    path = $WSREP_SST_OPT_DATA
+    read only = no
+    timeout = 300
+    uid = $MYUID
+    gid = $MYGID
 EOF
 
 #    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
