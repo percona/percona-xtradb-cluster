@@ -337,6 +337,14 @@ EOF
                 cat ${errdir}/innobackup*.log >&2 || true
                 vlog "----------------"
             done 
+
+            for id in "${!SRV_MYSQLD_VARDIR[@]}"; do
+                vlog "----------------"
+                vlog "Configuration for server with id: $id"
+                vardir=${SRV_MYSQLD_VARDIR[$id]}
+                cat ${vardir}/my.cnf >&2 || true
+                vlog "----------------"
+            done 
             exit -1
         else
             break

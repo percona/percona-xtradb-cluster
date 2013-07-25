@@ -77,6 +77,7 @@ timeit(){
 
     if [[ $ttime -eq 1 ]];then 
         x1=$(date +%s)
+        wsrep_log_info "Evaluating $cmd"
         eval "$cmd"
         extcode=$?
         x2=$(date +%s)
@@ -84,6 +85,7 @@ timeit(){
         wsrep_log_info "NOTE: $stage took $took seconds"
         totime=$(( totime+took ))
     else 
+        wsrep_log_info "Evaluating $cmd"
         eval "$cmd"
         extcode=$?
     fi
