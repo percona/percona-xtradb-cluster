@@ -21,7 +21,7 @@
 RSYNC_PID=
 RSYNC_CONF=
 OS=$(uname)
-[ "$OS" == "Darwin" ] && unset LD_LIBRARY_PATH
+[ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
 
 . $(dirname $0)/wsrep_sst_common
 
@@ -56,10 +56,10 @@ check_pid_and_port()
         # no netstat --program(-p) option in Darwin and FreeBSD
         check_pid $pid_file && \
         lsof -i -Pn 2>/dev/null | \
-        grep "(LISTEN)" | grep ":$rsync_port" | grep -w "^rsync\\s\\+$rsync_pid" >/dev/null
+        grep "(LISTEN)" | grep ":$rsync_port" | grep -w '^rsync[[:space:]]\+'"$rsync_pid" >/dev/null
     else
         check_pid $pid_file && \
-        netstat -anpt 2>/dev/null | \
+        netstat -lnpt 2>/dev/null | \
         grep LISTEN | grep \:$rsync_port | grep $rsync_pid/rsync >/dev/null
     fi
 }
