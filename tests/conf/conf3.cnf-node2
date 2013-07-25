@@ -1,3 +1,4 @@
+# rlimit+time+progress
 [sst]
 rlimit=2m
 time=1

@@ -1,3 +1,4 @@
+# encrypt2
 [sst]
 encrypt=2
 tca=/tmp/certs/node2.crt

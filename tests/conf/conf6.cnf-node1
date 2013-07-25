@@ -1,3 +1,4 @@
+# parallel+compact+progressfile+time
 [xtrabackup]
 parallel=4
 compact
