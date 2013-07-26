@@ -20,6 +20,7 @@ QUIET='VERBOSE=1'
 CMAKE_BUILD_TYPE='RelWithDebInfo'
 DEBUG_COMMENT=''
 WITH_JEMALLOC=''
+SKIPGALERA=0
 
 # Some programs that may be overriden
 TAR=${TAR:-tar}
@@ -27,8 +28,8 @@ TAR=${TAR:-tar}
 # Check if we have a functional getopt(1)
 if ! getopt --test
 then
-    go_out="$(getopt --options=iqdvj: \
-        --longoptions=i686,quiet,debug,valgrind,with-jemalloc: \
+    go_out="$(getopt --options=iqGdvj: \
+        --longoptions=i686,quiet,skipgalera,debug,valgrind,with-jemalloc: \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -47,6 +48,10 @@ do
         shift
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
+        ;;
+    -G | --skipgalera)
+        shift
+        SKIPGALERA=1
         ;;
     -v | --valgrind )
         shift
@@ -172,6 +177,7 @@ fi
  
     # Build galera
     (
+    if [[ $SKIPGALERA -eq 0 ]];then 
         export CC=${GALERA_CC:-gcc}
         export CXX=${GALERA_CXX:-g++}
 
@@ -182,6 +188,7 @@ fi
              "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
         cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
         cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+    fi
 
     ) || exit 1
 
