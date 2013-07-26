@@ -212,11 +212,42 @@ EOF
     exit 1
 }
 
+function print_log()
+{
+
+    vlog "Can't start the server. Server log (if exists):"
+    for id in "${!SRV_MYSQLD_ERRFILE[@]}"; do
+        vlog "----------------"
+        vlog "Error log for server with id: $id"
+        errfile=${SRV_MYSQLD_ERRFILE[$id]}
+        cat ${errfile} >&2 || true
+        vlog "----------------"
+    done 
+
+    for id in "${!SRV_MYSQLD_DATADIR[@]}"; do
+        vlog "----------------"
+        vlog "Innobackupex log for server with id: $id"
+        errdir=${SRV_MYSQLD_DATADIR[$id]}
+        cat ${errdir}/innobackup*.log >&2 || true
+        vlog "----------------"
+    done 
+
+    for id in "${!SRV_MYSQLD_VARDIR[@]}"; do
+        vlog "----------------"
+        vlog "Configuration for server with id: $id"
+        vardir=${SRV_MYSQLD_VARDIR[$id]}
+        cat ${vardir}/my.cnf >&2 || true
+        vlog "----------------"
+    done 
+}
+
 ########################################################################
 # Cleanup procedure invoked on process exit
 ########################################################################
 function cleanup_on_exit()
 {
+    print_log 
+
     kill_servers $TEST_VAR_ROOT
 
     remove_var_dirs
