@@ -346,10 +346,6 @@ extern lint	srv_kill_idle_transaction;
 extern my_bool	srv_purge_view_update_only_debug;
 #endif /* UNIV_DEBUG */
 
-#ifdef UNIV_DEBUG
-extern my_bool	srv_purge_view_update_only_debug;
-#endif /* UNIV_DEBUG */
-
 extern mutex_t*	kernel_mutex_temp;/* mutex protecting the server, trx structs,
 				query threads, and lock table: we allocate
 				it from dynamic memory to get it to the
@@ -429,9 +425,6 @@ extern ibool srv_blocking_lru_restore;
 /** When TRUE, fake change transcations take S rather than X row locks.
 When FALSE, row locks are not taken at all. */
 extern my_bool srv_fake_changes_locks;
-
-/** print all user-level transactions deadlocks to mysqld stderr */
-extern my_bool srv_print_all_deadlocks;
 
 /** Status variables to be passed to MySQL */
 typedef struct export_var_struct export_struc;

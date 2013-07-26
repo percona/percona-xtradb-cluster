@@ -2090,8 +2090,6 @@ got_block:
 
 	//buf_pool_mutex_exit(buf_pool);
 
-	buf_page_set_accessed(bpage);
-
 	mutex_exit(block_mutex);
 
 	buf_page_make_young_if_needed(bpage);

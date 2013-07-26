@@ -14475,11 +14475,6 @@ static MYSQL_SYSVAR_BOOL(locking_fake_changes, srv_fake_changes_locks,
   "not take any locks at all.",
   NULL, NULL, TRUE);
 
-static MYSQL_SYSVAR_BOOL(print_all_deadlocks, srv_print_all_deadlocks,
-  PLUGIN_VAR_OPCMDARG,
-  "Print all deadlocks to MySQL error log (off by default)",
-  NULL, NULL, FALSE);
-
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(page_size),
   MYSQL_SYSVAR(log_block_size),

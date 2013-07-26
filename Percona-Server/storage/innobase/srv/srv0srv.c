@@ -2649,35 +2649,6 @@ srv_export_innodb_status(void)
 	export_vars.innodb_read_views_memory = srv_read_views_memory;
 	export_vars.innodb_descriptors_memory = srv_descriptors_memory;
 
-#ifdef UNIV_DEBUG
-	{
-		trx_id_t	done_trx_no;
-		trx_id_t	up_limit_id;
-
-		rw_lock_s_lock(&purge_sys->latch);
-		done_trx_no	= purge_sys->done_trx_no;
-		up_limit_id	= purge_sys->view
-			? purge_sys->view->up_limit_id
-			: 0;
-		rw_lock_s_unlock(&purge_sys->latch);
-
-		if (trx_sys->max_trx_id < done_trx_no) {
-			export_vars.innodb_purge_trx_id_age = 0;
-		} else {
-			export_vars.innodb_purge_trx_id_age =
-				trx_sys->max_trx_id - done_trx_no;
-		}
-
-		if (!up_limit_id
-		    || trx_sys->max_trx_id < up_limit_id) {
-			export_vars.innodb_purge_view_trx_id_age = 0;
-		} else {
-			export_vars.innodb_purge_view_trx_id_age =
-				trx_sys->max_trx_id - up_limit_id;
-		}
-	}
-#endif /* UNIV_DEBUG */
-
 	mutex_exit(&srv_innodb_monitor_mutex);
 }
 
