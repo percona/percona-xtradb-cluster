@@ -106,7 +106,7 @@ SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
 test -e "$SOURCEDIR/Makefile" || exit 2
 
 # Test for the galera sources
-if ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
+if [[ $COPYGALERA -eq 0 ]] && ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
 then
     echo >&2 "Subdir percona-xtradb-cluster-galera not found"
     exit 1
