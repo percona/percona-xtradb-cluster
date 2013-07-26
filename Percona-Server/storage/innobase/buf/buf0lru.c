@@ -1572,9 +1572,6 @@ buf_LRU_remove_block(
 	zip_size = page_zip_get_size(&bpage->zip);
 	buf_pool->stat.LRU_bytes -= zip_size ? zip_size : UNIV_PAGE_SIZE;
 
-	zip_size = page_zip_get_size(&bpage->zip);
-	buf_pool->stat.LRU_bytes -= zip_size ? zip_size : UNIV_PAGE_SIZE;
-
 	buf_unzip_LRU_remove_block_if_needed(bpage);
 
 	/* If the LRU list is so short that LRU_old is not defined,
@@ -1661,8 +1658,6 @@ buf_LRU_add_block_to_end_low(
 
 	incr_LRU_size_in_bytes(bpage, buf_pool);
 
-	incr_LRU_size_in_bytes(bpage, buf_pool);
-
 	if (UT_LIST_GET_LEN(buf_pool->LRU) > BUF_LRU_OLD_MIN_LEN) {
 
 		ut_ad(buf_pool->LRU_old);
@@ -1736,8 +1731,6 @@ buf_LRU_add_block_low(
 	}
 
 	bpage->in_LRU_list = TRUE;
-
-	incr_LRU_size_in_bytes(bpage, buf_pool);
 
 	incr_LRU_size_in_bytes(bpage, buf_pool);
 
