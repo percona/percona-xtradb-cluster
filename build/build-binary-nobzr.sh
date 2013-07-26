@@ -222,8 +222,8 @@ fi
     (
         cd "storage/HandlerSocket-Plugin-for-MySQL"
         ./autogen.sh
-        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$INSTALLDIR/Percona-Server" \
-            --with-mysql-bindir="$INSTALLDIR/Percona-Server/scripts" \
+        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$SOURCEDIR/Percona-Server" \
+            --with-mysql-bindir="$SOURCEDIR/Percona-Server/scripts" \
             --with-mysql-plugindir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --prefix="/usr/local/$PRODUCT_FULL"
