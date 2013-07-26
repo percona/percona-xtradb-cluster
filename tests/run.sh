@@ -214,6 +214,11 @@ EOF
 
 function print_log()
 {
+    if [[ $? -eq 0 ]];then 
+        return 
+    fi
+
+    source inc/common.sh 
 
     vlog "Can't start the server. Server log (if exists):"
     for id in "${!SRV_MYSQLD_ERRFILE[@]}"; do
