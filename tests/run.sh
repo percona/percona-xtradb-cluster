@@ -251,7 +251,7 @@ function print_log()
 ########################################################################
 function cleanup_on_exit()
 {
-    print_log 
+    #print_log 
 
     kill_servers $TEST_VAR_ROOT
 
