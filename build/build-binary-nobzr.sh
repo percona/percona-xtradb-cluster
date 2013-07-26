@@ -20,7 +20,7 @@ QUIET='VERBOSE=1'
 CMAKE_BUILD_TYPE='RelWithDebInfo'
 DEBUG_COMMENT=''
 WITH_JEMALLOC=''
-SKIPGALERA=0
+COPYGALERA=0
 
 # Some programs that may be overriden
 TAR=${TAR:-tar}
@@ -29,7 +29,7 @@ TAR=${TAR:-tar}
 if ! getopt --test
 then
     go_out="$(getopt --options=iqGdvj: \
-        --longoptions=i686,quiet,skipgalera,debug,valgrind,with-jemalloc: \
+        --longoptions=i686,quiet,copygalera,debug,valgrind,with-jemalloc: \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -49,9 +49,9 @@ do
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
         ;;
-    -G | --skipgalera)
+    -G | --copygalera)
         shift
-        SKIPGALERA=1
+        COPYGALERA=1
         ;;
     -v | --valgrind )
         shift
@@ -155,8 +155,7 @@ export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 export WSREP_REV="$WSREP_REV"
 
 # Create a temporary working directory
-INSTALLDIR="$(cd "$WORKDIR" && TMPDIR="$WORKDIR_ABS" mktemp -d percona-build.XXXXXX)"
-INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
+INSTALLDIR="$WORKDIR_ABS/percona-build"   # Make it absolute
 
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
@@ -177,7 +176,7 @@ fi
  
     # Build galera
     (
-    if [[ $SKIPGALERA -eq 0 ]];then 
+    if [[ $COPYGALERA -eq 0 ]];then 
         export CC=${GALERA_CC:-gcc}
         export CXX=${GALERA_CXX:-g++}
 
@@ -188,6 +187,11 @@ fi
              "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
         cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
         cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+    else 
+        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        cp $WORKDIR_ABS/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
+        cp $WORKDIR_ABS/libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
     fi
 
     ) || exit 1
