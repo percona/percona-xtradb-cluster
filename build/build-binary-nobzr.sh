@@ -209,8 +209,8 @@ fi
     (
         cd "storage/HandlerSocket-Plugin-for-MySQL"
         ./autogen.sh
-        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$INSTALLDIR/src/Percona-Server" \
-            --with-mysql-bindir="$INSTALLDIR/src/Percona-Server/scripts" \
+        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$INSTALLDIR/Percona-Server" \
+            --with-mysql-bindir="$INSTALLDIR/Percona-Server/scripts" \
             --with-mysql-plugindir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --prefix="/usr/local/$PRODUCT_FULL"
@@ -222,7 +222,7 @@ fi
     # Build UDF
     (
         cd "UDF"
-        CXX=${UDF_CXX:-g++} ./configure --includedir="$INSTALLDIR/src/Percona-Server/include" \
+        CXX=${UDF_CXX:-g++} ./configure --includedir="$INSTALLDIR/Percona-Server/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install
