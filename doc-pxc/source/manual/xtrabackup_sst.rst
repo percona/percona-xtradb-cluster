@@ -118,6 +118,13 @@ Ratelimit to ``x`` kilobytes, megabytes etc. Refer to `pv(1) <http://linux.die.n
 To be set on joiner only, supersedes IST if set. Currently requires
 manual setup. Hence, not supported currently.
 
+.. option:: use_extra
+
+    :Values: 0,1
+    :Default: 0
+
+If set to 1, SST will use the thread pool's `extra_port <http://www.percona.com/doc/percona-server/5.6/performance/threadpool.html#extra_port>`_. Make sure that thread pool is enabled and extra_port option is set in my.cnf before you turn on this option.
+
 .. _tar_ag_xbstream:
 
 Tar against xbstream

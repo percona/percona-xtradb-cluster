@@ -52,6 +52,7 @@ rebuildcmd=""
 payload=0
 pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
 pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
+uextra=0
 
 if pv --help | grep -q FORMAT;then 
     pvopts+=$pvformat
@@ -251,6 +252,7 @@ read_cnf()
         ekeyfile=$(parse_cnf sst encrypt-key-file "")
     fi
     rlimit=$(parse_cnf sst rlimit "")
+    uextra=$(parse_cnf sst use_extra 0)
 }
 
 get_stream()
@@ -373,6 +375,26 @@ wait_for_listen()
     fi
 }
 
+check_extra()
+{
+    if [[ $uextra -eq 1 ]];then 
+        if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | grep -- "--thread_handling=" | grep -q 'pool-of-threads';then 
+            local eport=$(my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | grep -- "--extra_port=" | cut -d= -f2)
+            if [[ -n $eport ]];then 
+                # Xtrabackup works only locally.
+                # Hence, setting host to 127.0.0.1 unconditionally. 
+                wsrep_log_info "SST through extra_port $eport"
+                INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
+            else 
+                wsrep_log_error "Extra port $eport null, failing"
+                exit 1
+            fi
+        else 
+            wsrep_log_info "Thread pool not set, ignore the option use_extra"
+        fi
+    fi
+}
+
 if [[ ! -x `which innobackupex` ]];then 
     wsrep_log_error "innobackupex not in path: $PATH"
     exit 2
@@ -425,6 +447,8 @@ then
         if [[ -n $lsn ]];then 
                 INNOEXTRA+=" --incremental --incremental-lsn=$lsn "
         fi
+
+        check_extra
 
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
 
