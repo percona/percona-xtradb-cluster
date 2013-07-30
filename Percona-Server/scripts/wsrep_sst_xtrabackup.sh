@@ -561,6 +561,8 @@ then
     then
         # this message should cause joiner to abort
         wsrep_log_error "xtrabackup process ended without creating '${MAGIC_FILE}'"
+        wsrep_log_info "Contents of datadir" 
+        wsrep_log_info "$(ls -l ${DATA}/**/*)"
         exit 32
     fi
 
