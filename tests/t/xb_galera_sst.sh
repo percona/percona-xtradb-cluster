@@ -68,6 +68,8 @@ mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sakila.actor;' | md5sum | cut -
 if [[ $mdsum != $SMDSUM ]];then 
     vlog "Integrity verification failed: found: $mdsum expected: $SMDSUM"
     exit 1
+else 
+    vlog "Integrity verification successful"
 fi
 
 stop_server_with_id $node2
