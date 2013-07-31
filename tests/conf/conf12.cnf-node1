@@ -1,7 +1,7 @@
 # compress+compact+xbstream+nc+encrypt1+threads + thread pool
 [mysqld]
 thread_handling=pool-of-threads
-extra_port=50000
+extra_port=51000
 extra_max_connections=2
 
 [xtrabackup]
