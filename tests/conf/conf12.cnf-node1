@@ -1,0 +1,23 @@
+# compress+compact+xbstream+nc+encrypt1+threads + thread pool
+[mysqld]
+thread_handling=pool-of-threads
+extra_port=50000
+extra_max_connections=2
+
+[xtrabackup]
+compress
+parallel=4
+encrypt-chunk-size=1073741824
+compress-threads=4
+encrypt-threads=4
+encrypt=AES256
+encrypt-key=6F3AD9F428143F133FD7D50D77D91EA4
+compact
+
+
+[sst]
+streamfmt=xbstream
+transferfmt=nc
+encrypt=1
+use_extra=1
+
