@@ -1,4 +1,8 @@
-# xbstream+nc+progress+time+encrypt2+threads
+# xbstream+nc+progress+time+encrypt2+threads + thread pool
+[mysqld]
+thread_handling=pool-of-threads
+extra_port=50002
+
 [xtrabackup]
 compress
 compact
@@ -13,3 +17,4 @@ progress=1
 encrypt=2
 tca=/tmp/certs/node1.crt
 tcert=/tmp/certs/node2.pem
+use_extra=1
