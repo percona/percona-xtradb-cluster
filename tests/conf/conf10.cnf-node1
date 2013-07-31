@@ -11,7 +11,6 @@ compress-threads=4
 
 [sst]
 streamfmt=xbstream
-transferfmt=nc
 time=1
 progress=1
 encrypt=2

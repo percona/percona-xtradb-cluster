@@ -12,6 +12,5 @@ compact
 
 [sst]
 streamfmt=xbstream
-transferfmt=nc
 encrypt=1
 
