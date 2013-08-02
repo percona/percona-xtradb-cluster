@@ -909,7 +909,7 @@ echo "Run the following commands to create these functions:"
 echo "mysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmurmur_udf.so'\""
-echo "See http://code.google.com/p/maatkit/source/browse/trunk/udf for more details"
+echo "See  http://www.percona.com/doc/percona-server/5.5/management/udf_percona_toolkit.html for more details"
 
 # Collect an upgrade history ...
 echo "Upgrade/install finished at `date`"        >> $STATUS_FILE
