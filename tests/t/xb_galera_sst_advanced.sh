@@ -10,8 +10,7 @@ node2=901
 ADDR=127.0.0.1
 SSTPASS="password"
 SUSER="root"
-#SMDSUM="9f6f3edb78f9a5957ecaf8f99953b5af"
-SMDSUM="6037e6114f597021c9d0414db1a34e64"
+SMDSUM="d35d212fdfe9452e711704e3dc3e93cf"
 EXTRAFILE=${CONF:-}
 
 
@@ -74,7 +73,7 @@ else
 fi
 
 # Lightweight verification till lp:1199656 is fixed
-mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sbtest.sbtest1 LIMIT 10000;' | md5sum | cut -d" " -f1)
+mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sbtest.sbtest1;' | md5sum | cut -d" " -f1)
 
 if [[ $mdsum != $SMDSUM ]];then 
     vlog "Integrity verification failed: found: $mdsum expected: $SMDSUM"
