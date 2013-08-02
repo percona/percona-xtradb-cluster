@@ -1,4 +1,4 @@
-# xbstream+nc+progress+time+encrypt2+threads + thread pool
+# xbstream+nc+compress+progress+time+encrypt2+threads + thread pool
 [mysqld]
 thread_handling=pool-of-threads
 extra_port=50002

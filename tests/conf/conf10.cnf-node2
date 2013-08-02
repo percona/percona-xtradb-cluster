@@ -1,4 +1,4 @@
-# xbstream+nc+progress+time+encrypt2+threads
+# xbstream+nc+compress+progress+time+encrypt2+threads
 [xtrabackup]
 compress
 compact
