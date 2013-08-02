@@ -86,7 +86,7 @@ shift
 done
 readonly WSREP_SST_OPT_BYPASS
 
-SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
+[ -n $WSREP_SST_OPT_DATA ] && SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
 
 wsrep_log()
 {
