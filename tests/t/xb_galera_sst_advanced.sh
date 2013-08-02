@@ -10,7 +10,8 @@ node2=901
 ADDR=127.0.0.1
 SSTPASS="password"
 SUSER="root"
-SMDSUM="9f6f3edb78f9a5957ecaf8f99953b5af"
+#SMDSUM="9f6f3edb78f9a5957ecaf8f99953b5af"
+SMDSUM="65f686b9459812e9af0cdc011a5ec9c4"
 EXTRAFILE=${CONF:-}
 
 
@@ -47,7 +48,8 @@ vlog "Starting server $node1"
 MYSQLD_EXTRA_MY_CNF_OPTS="!include $EXTRAFILE1"
 start_server_with_id $node1  --innodb_file_per_table  --binlog-format=ROW --wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so --wsrep_cluster_address=gcomm:// --wsrep_sst_receive_address=$recv_addr1 --wsrep_node_incoming_address=$ADDR --wsrep_provider_options="gmcast.listen_addr=tcp://$listen_addr1${pdebug}" --wsrep_sst_method=xtrabackup --wsrep_sst_auth=$SUSER:$SSTPASS  --wsrep_node_address=$ADDR $debug 
 
-load_sakila
+load_dbase_schema sbtest
+load_dbase_data sbtest
 
 vlog "Setting password to 'password'"
 run_cmd ${MYSQL} ${MYSQL_ARGS} <<EOF
@@ -72,7 +74,7 @@ else
 fi
 
 # Lightweight verification till lp:1199656 is fixed
-mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sakila.actor;' | md5sum | cut -d" " -f1)
+mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sbtest.sbtest1;' | md5sum | cut -d" " -f1)
 
 if [[ $mdsum != $SMDSUM ]];then 
     vlog "Integrity verification failed: found: $mdsum expected: $SMDSUM"
