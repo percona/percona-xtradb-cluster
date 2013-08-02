@@ -629,7 +629,7 @@ then
                 exit 22
             fi
 
-            if [[ -n $progress ]];then
+            if [[ -n $progress ]] && pv --help | grep -q 'line-mode';then
                 count=$(find ${DATA} -type f -name '*.qp' | wc -l)
                 count=$(( count*2 ))
                 if pv --help | grep -q FORMAT;then 
