@@ -11,7 +11,8 @@ ADDR=127.0.0.1
 SSTPASS="password"
 SUSER="root"
 #SMDSUM="9f6f3edb78f9a5957ecaf8f99953b5af"
-SMDSUM="65f686b9459812e9af0cdc011a5ec9c4"
+#SMDSUM="65f686b9459812e9af0cdc011a5ec9c4"
+SMDSUM="6037e6114f597021c9d0414db1a34e64"
 
 set +e
 ${MYSQLD} --basedir=$MYSQL_BASEDIR  --help --verbose --wsrep-sst-method=rsync| grep -q wsrep
@@ -65,7 +66,7 @@ else
 fi
 
 # Lightweight verification till lp:1199656 is fixed
-mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sbtest.sbtest1;' | md5sum | cut -d" " -f1)
+mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sbtest.sbtest1 LIMIT 10000;' | md5sum | cut -d" " -f1)
 
 if [[ $mdsum != $SMDSUM ]];then 
     vlog "Integrity verification failed: found: $mdsum expected: $SMDSUM"
