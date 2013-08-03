@@ -775,8 +775,6 @@ row_merge_write(
 
 	DBUG_EXECUTE_IF("row_merge_write_failure", return(FALSE););
 
-	DBUG_EXECUTE_IF("row_merge_write_failure", return(FALSE););
-
 #ifdef UNIV_DEBUG
 	if (row_merge_print_block_write) {
 		fprintf(stderr, "row_merge_write fd=%d ofs=%lu\n",
