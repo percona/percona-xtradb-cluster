@@ -189,7 +189,7 @@ parse_cnf()
 {
     local group=$1
     local var=$2
-    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | grep -- "--$var=" | cut -d= -f2)
+    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | grep -- "--$var=" | cut -d= -f2-)
     if [[ -z $reval ]];then 
         [[ -n $3 ]] && reval=$3
     fi
