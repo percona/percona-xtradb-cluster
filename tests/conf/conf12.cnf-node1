@@ -5,4 +5,4 @@ parallel=8
 [sst]
 streamfmt=xbstream
 transferfmt=socat
-sockopt=,nodelay,cork,sndbuf=1048576
+sockopt=,nodelay,sndbuf=1048576
