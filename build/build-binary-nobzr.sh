@@ -11,7 +11,6 @@
 
 # Bail out on errors, be strict
 set -ue
-REVNO=500 
 
 # Examine parameters
 TARGET="$(uname -m)"
@@ -134,9 +133,10 @@ PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 
 # Build information
 if [[ -z ${REVNO:-} ]];then 
-    REVISION="$(cd "$SOURCEDIR"; bzr revno)"
+    REVISION=500 
 else 
     REVISION=$REVNO
+    echo "Building with revision $REVISION"
 fi 
 
 WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
