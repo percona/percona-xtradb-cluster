@@ -189,7 +189,7 @@ parse_cnf()
 {
     local group=$1
     local var=$2
-    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | grep -- "--$var=" | cut -d= -f2-)
+    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | tr '_' '-' | grep -- "--$var=" | cut -d= -f2-)
     if [[ -z $reval ]];then 
         [[ -n $3 ]] && reval=$3
     fi
@@ -200,7 +200,7 @@ get_footprint()
 {
     pushd $WSREP_SST_OPT_DATA 1>/dev/null
     payload=$(du --block-size=1 -c  **/*.ibd **/*.MYI **/*.MYI ibdata1  | awk 'END { print $1 }')
-    if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress";then 
+    if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress=";then 
         # QuickLZ has around 50% compression ratio
         # When compression/compaction used, the progress is only an approximate.
         payload=$(( payload*1/2 ))
@@ -378,8 +378,8 @@ wait_for_listen()
 check_extra()
 {
     if [[ $uextra -eq 1 ]];then 
-        if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | grep -- "--thread_handling=" | grep -q 'pool-of-threads';then 
-            local eport=$(my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | grep -- "--extra_port=" | cut -d= -f2)
+        if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads';then 
+            local eport=$(my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
             if [[ -n $eport ]];then 
                 # Xtrabackup works only locally.
                 # Hence, setting host to 127.0.0.1 unconditionally. 

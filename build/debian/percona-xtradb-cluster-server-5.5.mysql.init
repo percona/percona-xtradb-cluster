@@ -45,8 +45,8 @@ export HOME=/etc/mysql/
 # Usage: void mysqld_get_param option
 mysqld_get_param() {
 	"${PERCONA_PREFIX}"/sbin/mysqld --print-defaults \
-		| tr " " "\n" \
-		| grep -- "--$1" \
+		| tr " " "\n" | tr '_' '-' \
+		| grep -- "--$1=" \
 		| tail -n 1 \
 		| cut -d= -f2
 }
