@@ -282,6 +282,10 @@ case "$mode" in
   'start')
     # Start daemon
 
+    if test -e $datadir/sst_in_progress;then 
+        echo $echo_n "Stale sst_in_progress file in datadir"
+    fi
+
     # Safeguard (relative paths, core dumps..)
     cd $basedir
 

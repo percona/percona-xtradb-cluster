@@ -68,6 +68,10 @@ sanity_checks() {
     echo                "ERROR: The partition with $datadir is too full!" | $ERR_LOGGER
     exit 1
   fi
+
+  if test -e $sst_progress_file;then 
+	log_daemon_msg "Stale sst_in_progress file in datadir" "mysqld"
+  fi
 }
 
 # Get the pid file
@@ -129,7 +133,7 @@ mysqld_status () {
 
 log_startup_failure() {
     local msg="$@"
-    if [ -e $sst_progress_file ];then 
+    if test -e $sst_progress_file;then 
         msg+=" However, SST is still in progress. Please check if mysqld is running."
     fi
     log_failure_msg "$msg"
