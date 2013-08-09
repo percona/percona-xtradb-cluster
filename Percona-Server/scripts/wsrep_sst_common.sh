@@ -93,7 +93,7 @@ if my_print_defaults -c $WSREP_SST_OPT_CONF sst | grep -q "wsrep_sst_auth";then
     fi
 fi
 
-[ -n $WSREP_SST_OPT_DATA ] && \
+[ -n ${WSREP_SST_OPT_DATA:-} ] && \
     SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
 
 wsrep_log()
