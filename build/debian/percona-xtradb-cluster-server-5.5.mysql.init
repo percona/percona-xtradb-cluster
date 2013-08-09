@@ -51,6 +51,7 @@ mysqld_get_param() {
 		| cut -d= -f2
 }
 
+
 ## Do some sanity checks before even trying to start mysqld.
 sanity_checks() {
   # check for config file
@@ -126,6 +127,13 @@ mysqld_status () {
     fi
 }
 
+log_startup_failure() {
+    local msg="$@"
+    if [ -e $sst_progress_file ];then 
+        msg+=" However, SST is still in progress. Please check if mysqld is running."
+    fi
+    log_failure_msg "$msg"
+}
 #
 # main()
 #
@@ -148,7 +156,7 @@ case "${1:-''}" in
 
                 if test -e $sst_progress_file && [ $startup_sleep -ne 100 ];then
                     log_daemon_msg "SST in progress, setting sleep higher" "mysqld"
-                    startup_sleep=100
+                    startup_sleep=10
                 fi
                 # if server isn't running, then pid-file will never be updated
                 if test -n "$safe_pid"; then
@@ -179,8 +187,8 @@ case "${1:-''}" in
                     [ "$output" ] && log_action_msg "$output"
                 fi
             else
+                log_startup_failure "Please take a look at the syslog."
                 log_end_msg 1
-                log_failure_msg "Please take a look at the syslog"
             fi
 	fi
 	;;

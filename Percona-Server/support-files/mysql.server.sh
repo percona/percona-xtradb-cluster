@@ -187,7 +187,7 @@ wait_for_pid () {
 
     if test -e $sst_progress_file && [ $startup_sleep -ne 100 ];then
         echo $echo_n "SST in progress, setting sleep higher"
-        startup_sleep=100
+        startup_sleep=10
     fi
 
     echo $echo_n ".$echo_c"
@@ -199,6 +199,9 @@ wait_for_pid () {
   if test -z "$i" ; then
     log_success_msg
     return 0
+  elif test -e $sst_progress_file; then 
+    log_failure_msg
+    return 2
   else
     log_failure_msg
     return 1
@@ -289,8 +292,10 @@ case "$mode" in
       # may be overwritten at next upgrade.
       $bindir/mysqld_safe --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null 2>&1 &
       wait_for_pid created "$!" "$mysqld_pid_file_path"; return_value=$?
-      if [[ $return_value != 0 ]];then 
+      if [ $return_value == 1 ];then 
           log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
+      elif [ $return_value == 2 ];then
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed! SST still in progress"
       fi
 
       # Make lock for RedHat / SuSE
@@ -318,7 +323,7 @@ case "$mode" in
         kill $mysqld_pid
         # mysqld should remove the pid file when it exits, so wait for it.
         wait_for_pid removed "$mysqld_pid" "$mysqld_pid_file_path"; return_value=$?
-        if [[ $return_value != 0 ]];then 
+        if [ $return_value != 0 ];then 
             log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
         fi
       else
