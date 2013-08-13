@@ -47,6 +47,9 @@ vlog "Starting server $node1"
 MYSQLD_EXTRA_MY_CNF_OPTS="!include $EXTRAFILE1"
 start_server_with_id $node1 --innodb_flush_method=O_DIRECT  --innodb_file_per_table  --binlog-format=ROW --wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so --wsrep_cluster_address=gcomm:// --wsrep_sst_receive_address=$recv_addr1 --wsrep_node_incoming_address=$ADDR --wsrep_provider_options="gmcast.listen_addr=tcp://$listen_addr1${pdebug}" --wsrep_sst_method=xtrabackup --wsrep_sst_auth=$SUSER:$SSTPASS  --wsrep_node_address=$ADDR $debug 
 
+
+sleep 2 
+
 load_dbase_schema sbtest
 load_dbase_data sbtest
 
