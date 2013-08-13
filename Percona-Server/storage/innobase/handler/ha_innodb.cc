@@ -8017,7 +8017,7 @@ wsrep_append_foreign_key(
 		{
 			foreign->referenced_table =
 				dict_table_get_low(
-					foreign->referenced_table_name_lookup);
+					foreign->referenced_table_name_lookup, DICT_ERR_IGNORE_NONE);
 			if (foreign->referenced_table)
 			{
 				foreign->referenced_index =
@@ -8033,7 +8033,7 @@ wsrep_append_foreign_key(
 		{
 	  		foreign->foreign_table =
 				dict_table_get_low(
-					foreign->foreign_table_name_lookup);
+					foreign->foreign_table_name_lookup, DICT_ERR_IGNORE_NONE);
 			if (foreign->foreign_table)
 			{
 				foreign->foreign_index =

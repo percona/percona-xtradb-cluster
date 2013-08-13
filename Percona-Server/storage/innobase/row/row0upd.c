@@ -408,7 +408,7 @@ wsrep_row_upd_check_foreign_constraints(
 
 			if (foreign->referenced_table == NULL) {
 				dict_table_get(foreign->referenced_table_name_lookup,
-					       FALSE);
+					       FALSE, DICT_ERR_IGNORE_NONE);
 			}
 
 			if (foreign->referenced_table) {
