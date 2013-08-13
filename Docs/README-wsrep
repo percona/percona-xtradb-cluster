@@ -377,7 +377,7 @@ the other cluster members by transferring state snapshot from one of them.
 The options below govern how this happens and should be set up before attempting
 to join or start a cluster.
 
-wsrep_sst_method=mysqldump
+wsrep_sst_method=rsync
    What method to use to copy database state to a newly joined node. Supported
    methods:
    - mysqldump:  slow (except for small datasets) but most tested.
