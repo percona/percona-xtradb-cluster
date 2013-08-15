@@ -45,8 +45,9 @@ extern const char wsrep_defaults_file[];
 #define WSREP_SST_OPT_BYPASS   "--bypass"
 
 #define WSREP_SST_MYSQLDUMP    "mysqldump"
+#define WSREP_SST_RSYNC        "rsync"
 #define WSREP_SST_SKIP         "skip"
-#define WSREP_SST_DEFAULT      WSREP_SST_MYSQLDUMP
+#define WSREP_SST_DEFAULT      WSREP_SST_RSYNC
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 #define WSREP_SST_AUTH_MASK    "********"
 
