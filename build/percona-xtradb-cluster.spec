@@ -629,7 +629,7 @@ rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 # Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
-  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
 fi
 if [ -z "$mysql_datadir" ]
 then
@@ -795,7 +795,7 @@ fi
 # Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
-  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
 fi
 if [ -z "$mysql_datadir" ]
 then
@@ -974,7 +974,7 @@ fi
 # Check local settings to support them.
 if [ -x %{_bindir}/my_print_defaults ]
 then
-  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p'`
+  mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
 fi
 if [ -z "$mysql_datadir" ]
 then
