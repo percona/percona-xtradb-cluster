@@ -26,6 +26,9 @@ class opts:
     c_timeout              = 10
 
 class clustercheck(BaseHTTPServer.BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.do_GET()
+
     def do_GET(self):
         ctime = time.time()
         if ((ctime - opts.last_query_time) > opts.cache_time) and opts.being_updated == False:
