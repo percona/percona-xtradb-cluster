@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2012, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2013, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -52,6 +52,7 @@ Created 12/27/1996 Heikki Tuuri
 #include "eval0eval.h"
 #include "buf0lru.h"
 #ifdef WITH_WSREP
+#include "ha_prototypes.h"
 extern my_bool wsrep_debug;
 #endif
 
@@ -288,7 +289,8 @@ row_upd_check_references_constraints(
 
 			if (foreign->foreign_table == NULL) {
 				dict_table_get(foreign->foreign_table_name_lookup,
-					       FALSE);
+					       FALSE,
+					       DICT_ERR_IGNORE_NONE);
 			}
 
 			if (foreign->foreign_table) {
@@ -407,7 +409,7 @@ wsrep_row_upd_check_foreign_constraints(
 
 			if (foreign->referenced_table == NULL) {
 				dict_table_get(foreign->referenced_table_name_lookup,
-					       FALSE);
+					       FALSE, DICT_ERR_IGNORE_NONE);
 			}
 
 			if (foreign->referenced_table) {

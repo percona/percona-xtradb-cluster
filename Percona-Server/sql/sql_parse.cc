@@ -8487,13 +8487,11 @@ void wsrep_replication_process(THD *thd)
     break;
   }
 
-  if (thd->killed != THD::KILL_CONNECTION)
-  {
-    mysql_mutex_lock(&LOCK_thread_count);
-    wsrep_close_applier(thd);
-    mysql_cond_broadcast(&COND_thread_count);
-    mysql_mutex_unlock(&LOCK_thread_count);
-  }
+  mysql_mutex_lock(&LOCK_thread_count);
+  wsrep_close_applier(thd);
+  mysql_cond_broadcast(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
+
   wsrep_return_from_bf_mode(thd, &shadow);
   DBUG_VOID_RETURN;
 }
