@@ -75,6 +75,7 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     VERIFY(wh->free_connection);
     VERIFY(wh->to_execute_start);
     VERIFY(wh->to_execute_end);
+    VERIFY(wh->preordered);
     VERIFY(wh->sst_sent);
     VERIFY(wh->sst_received);
     VERIFY(wh->stats_get);
