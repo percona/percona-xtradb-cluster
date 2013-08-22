@@ -5158,11 +5158,12 @@ err:
       error= wsrep_write_cache(cache, &buf, &buf_len);
       if (!error && buf_len > 0)
       {
-        const bool nocopy(false);
+        const struct wsrep_buf buff = { buf, buf_len };
+        const bool copy(true);
         const bool unordered(false);
         wsrep_status_t rc= wsrep->append_data(wsrep,
                                               &thd->wsrep_trx_handle,
-                                              buf, buf_len, nocopy, unordered);
+                                              &buff, 1, copy, unordered);
         if (rc != WSREP_OK)
         {
           sql_print_warning("WSREP: append_data() returned %d", rc);

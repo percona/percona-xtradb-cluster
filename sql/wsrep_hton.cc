@@ -346,12 +346,16 @@ wsrep_run_wsrep_commit(
   } 
   else if (!rcode) 
   {
+    const struct wsrep_buf data = { rbr_data, data_len };
+    rcode = wsrep->append_data(wsrep, &thd->wsrep_trx_handle,
+                               &data, 1, false, false);
+    if (WSREP_OK == rcode)
     rcode = wsrep->pre_commit(
                               wsrep,
                               (wsrep_conn_id_t)thd->thread_id,
                               &thd->wsrep_trx_handle,
-                              rbr_data,
-                              data_len,
+//                              rbr_data,
+//                              data_len,
                               (thd->wsrep_PA_safe) ? WSREP_FLAG_PA_SAFE : 0ULL,
                               &thd->wsrep_trx_meta);
     if (rcode == WSREP_TRX_MISSING) {

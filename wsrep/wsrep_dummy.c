@@ -99,12 +99,12 @@ static wsrep_status_t dummy_recv(wsrep_t* w,
 
 static wsrep_status_t dummy_pre_commit(
     wsrep_t* w,
-    const wsrep_conn_id_t  conn_id    __attribute__((unused)),
-    wsrep_trx_handle_t*    trx_handle __attribute__((unused)),
-    const void*            query      __attribute__((unused)),
-    const size_t           query_len  __attribute__((unused)),
-    uint64_t               flags      __attribute__((unused)),
-    wsrep_trx_meta_t*      meta       __attribute__((unused)))
+    const wsrep_conn_id_t   conn_id    __attribute__((unused)),
+    wsrep_trx_handle_t*     trx_handle __attribute__((unused)),
+//    const struct wsrep_buf* data       __attribute__((unused)),
+//    const long              count      __attribute__((unused)),
+    uint64_t                flags      __attribute__((unused)),
+    wsrep_trx_meta_t*       meta       __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -149,7 +149,7 @@ static wsrep_status_t dummy_append_key(
     wsrep_trx_handle_t* trx_handle  __attribute__((unused)),
     const wsrep_key_t*  key         __attribute__((unused)),
     const long          key_num     __attribute__((unused)),
-    const bool          nocopy      __attribute__((unused)),
+    const bool          copy        __attribute__((unused)),
     const bool          shared      __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
@@ -158,11 +158,11 @@ static wsrep_status_t dummy_append_key(
 
 static wsrep_status_t dummy_append_data(
     wsrep_t* w,
-    wsrep_trx_handle_t* trx_handle __attribute__((unused)),
-    const void*         data       __attribute__((unused)),
-    const size_t        data_len   __attribute__((unused)),
-    const bool          nocopy     __attribute__((unused)),
-    const bool          unordered  __attribute__((unused)))
+    wsrep_trx_handle_t*     trx_handle __attribute__((unused)),
+    const struct wsrep_buf* data       __attribute__((unused)),
+    const long              count      __attribute__((unused)),
+    const bool              copy       __attribute__((unused)),
+    const bool              unordered  __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -186,12 +186,12 @@ static wsrep_status_t dummy_free_connection(
 
 static wsrep_status_t dummy_to_execute_start(
     wsrep_t* w,
-    const wsrep_conn_id_t  conn_id    __attribute__((unused)),
-    const wsrep_key_t*     key        __attribute__((unused)),
-    const long             key_num    __attribute__((unused)),
-    const void*            action     __attribute__((unused)),
-    const size_t           action_len __attribute__((unused)),
-    wsrep_trx_meta_t*      meta       __attribute__((unused)))
+    const wsrep_conn_id_t   conn_id    __attribute__((unused)),
+    const wsrep_key_t*      key        __attribute__((unused)),
+    const long              key_num    __attribute__((unused)),
+    const struct wsrep_buf* data       __attribute__((unused)),
+    const long              count      __attribute__((unused)),
+    wsrep_trx_meta_t*       meta       __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -200,17 +200,6 @@ static wsrep_status_t dummy_to_execute_start(
 static wsrep_status_t dummy_to_execute_end(
     wsrep_t* w,
     const wsrep_conn_id_t  conn_id   __attribute__((unused)))
-{
-    WSREP_DBUG_ENTER(w);
-    return WSREP_OK;
-}
-
-static wsrep_status_t dummy_encapsulate(
-    wsrep_t* w,
-    const wsrep_buf_t*     events     __attribute__((unused)),
-    long                   events_num __attribute__((unused)),
-    wsrep_stream_t         type       __attribute__((unused)),
-    const wsrep_uuid_t*    producer   __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -334,7 +323,6 @@ static wsrep_t dummy_iface = {
     &dummy_free_connection,
     &dummy_to_execute_start,
     &dummy_to_execute_end,
-    &dummy_encapsulate,
     &dummy_sst_sent,
     &dummy_sst_received,
     &dummy_snapshot,

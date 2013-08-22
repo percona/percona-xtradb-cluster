@@ -109,15 +109,6 @@ static wsrep_status_t wsrep_unordered_cb(void*       ctx,
     return WSREP_OK;
 }
 
-static wsrep_status_t wsrep_expand_cb(void*               ctx,
-                                      const void*         data,
-                                      size_t              size,
-                                      wsrep_stream_t      type,
-                                      const wsrep_uuid_t* producer)
-{
-    return WSREP_OK;
-}
-
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
   case WSREP_LOG_INFO:
@@ -587,7 +578,6 @@ int wsrep_init()
   wsrep_args.apply_cb        = wsrep_apply_cb;
   wsrep_args.commit_cb       = wsrep_commit_cb;
   wsrep_args.unordered_cb    = wsrep_unordered_cb;
-  wsrep_args.expand_cb       = wsrep_expand_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
 
@@ -1136,11 +1126,12 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   }
 
   wsrep_key_arr_t key_arr= {0, 0};
+  struct wsrep_buf buff = { buf, buf_len };
   if (!buf_err                                                    &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
                                                  key_arr.keys, key_arr.keys_len,
-                                                 buf, buf_len,
+                                                 &buff, 1,
                                                  &thd->wsrep_trx_meta)))
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
