@@ -1,4 +1,4 @@
-# Copyright (C) 2010 Codership Oy
+# Copyright (C) 2012 Codership Oy
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 set -u
 
 WSREP_SST_OPT_BYPASS=0
+WSREP_SST_OPT_DATA=""
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -93,8 +94,13 @@ if my_print_defaults -c $WSREP_SST_OPT_CONF sst | grep -q "wsrep_sst_auth";then
     fi
 fi
 
-[ -n ${WSREP_SST_OPT_DATA:-} ] && \
+if [ -n "${WSREP_SST_OPT_DATA:-}" ]
+then
     SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
+else
+    SST_PROGRESS_FILE=""
+fi
+
 
 wsrep_log()
 {
@@ -116,6 +122,6 @@ wsrep_log_info()
 
 wsrep_cleanup_progress_file()
 {
-    rm -f $SST_PROGRESS_FILE 2>/dev/null
+    [ -n "$SST_PROGRESS_FILE" ] && rm -f "$SST_PROGRESS_FILE" 2>/dev/null
 }
 

@@ -300,13 +300,20 @@ documentation and the manual for more information.
 %package -n MySQL-server%{product_suffix}
 %if %{defined with_wsrep}
 Version:        %{mysql_version}
-#Release:        %{wsrep_version}.%{release}
 %endif
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
+%if %{defined with_wsrep}
+Requires:       %{distro_requires} rsync
+%else
 Requires:       %{distro_requires}
-%if 0%{?commercial}
-Obsoletes:      MySQL-server
+%endif
+%if %{defined susever}
+Provides:       msqlormysql MySQL MySQL-server
+Conflicts:      mysql mysql-server mysql-advanced mysql-server-advanced
+Obsoletes:      MySQL MySQL-server
+Obsoletes:      MySQL-server-classic MySQL-server-community MySQL-server-enterprise
+Obsoletes:      MySQL-server-advanced MySQL-server-advanced-gpl MySQL-server-enterprise-gpl
 %else
 Obsoletes:      MySQL-server-advanced
 %endif

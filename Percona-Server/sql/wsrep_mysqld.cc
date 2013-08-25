@@ -48,7 +48,8 @@ ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
 my_bool wsrep_log_conflicts            = 0; // 
-ulong  wsrep_mysql_replication_bundle  = 0;
+ulong   wsrep_mysql_replication_bundle = 0;
+my_bool wsrep_load_data_splitting      = 1; // commit load data every 10K intervals
 
 /*
  * End configuration options
@@ -983,10 +984,23 @@ int wsrep_to_buf_helper(
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                        65536, MYF(MY_WME)))
     return 1;
-  Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
+
   int ret(0);
+  /* if there is prepare query, add event for it */
+  if (thd->wsrep_TOI_pre_query)
+  {
+    Query_log_event ev(thd, thd->wsrep_TOI_pre_query, 
+		       thd->wsrep_TOI_pre_query_len, 
+		       FALSE, FALSE, FALSE, 0);
+    if (ev.write(&tmp_io_cache)) ret= 1;
+  }
+
+  /* append the actual query */
+  Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
   if (ev.write(&tmp_io_cache)) ret= 1;
+
   if (!ret && wsrep_write_cache(&tmp_io_cache, buf, buf_len)) ret= 1;
+
   close_cached_file(&tmp_io_cache);
   return ret;
 }
