@@ -544,7 +544,7 @@ void thd_binlog_rollback_stmt(THD * thd)
   with the exception that here we write in buffer instead of log file.
  */
 
-int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
+int wsrep_write_cache(IO_CACHE *cache, uchar **buf, int *buf_len)
 {
 
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
@@ -552,7 +552,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
   uint length= my_b_bytes_in_cache(cache);
   long long total_length = 0;
   uchar *buf_ptr = NULL;
-  
+
   do
   {
     /* bail out if buffer grows too large
@@ -562,7 +562,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
     if (total_length > wsrep_max_ws_size)
     {
       WSREP_WARN("transaction size limit (%lld) exceeded: %lld",
-		 wsrep_max_ws_size, total_length);
+                 wsrep_max_ws_size, total_length);
       if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
       {
         WSREP_WARN("failed to initialize io-cache");
@@ -5282,12 +5282,12 @@ err:
   if (WSREP(thd) && wsrep_incremental_data_collection &&
       (wsrep_emulate_bin_log || mysql_bin_log.is_open()))
   {
-    DBUG_ASSERT(thd->wsrep_trx_handle.trx_id != (unsigned long)-1);
+    DBUG_ASSERT(thd->wsrep_ws_handle.trx_id != (unsigned long)-1);
     if (!error)
     {
       IO_CACHE* cache= get_trans_log(thd);
       uchar* buf= NULL;
-      uint buf_len= 0;
+      int buf_len= 0;
 
       if (wsrep_emulate_bin_log)
         thd->binlog_flush_pending_rows_event(false);
@@ -5295,11 +5295,10 @@ err:
       if (!error && buf_len > 0)
       {
         const struct wsrep_buf buff = { buf, buf_len };
-        const bool copy(true);
-        const bool unordered(false);
         wsrep_status_t rc= wsrep->append_data(wsrep,
-                                              &thd->wsrep_trx_handle,
-                                              &buff, 1, copy, unordered);
+                                              &thd->wsrep_ws_handle,
+                                              &buff, 1, WSREP_DATA_ORDERED,
+                                              true);
         if (rc != WSREP_OK)
         {
           sql_print_warning("WSREP: append_data() returned %d", rc);
