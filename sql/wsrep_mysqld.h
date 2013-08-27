@@ -184,13 +184,13 @@ extern "C" enum wsrep_query_state wsrep_thd_query_state(THD *thd);
 extern "C" const char * wsrep_thd_exec_mode_str(THD *thd);
 extern "C" const char * wsrep_thd_conflict_state_str(THD *thd);
 extern "C" const char * wsrep_thd_query_state_str(THD *thd);
-extern "C" wsrep_trx_handle_t* wsrep_thd_trx_handle(THD *thd);
+extern "C" wsrep_ws_handle_t* wsrep_thd_ws_handle(THD *thd);
 
 extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode);
 extern "C" void wsrep_thd_set_query_state(
-	THD *thd, enum wsrep_query_state state);
+        THD *thd, enum wsrep_query_state state);
 extern "C" void wsrep_thd_set_conflict_state(
-	THD *thd, enum wsrep_conflict_state state);
+        THD *thd, enum wsrep_conflict_state state);
 
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 
@@ -369,10 +369,10 @@ void wsrep_to_isolation_end(THD *thd);
 void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow*);
 void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow*);
 int wsrep_to_buf_helper(
-  THD* thd, const char *query, uint query_len, uchar** buf, uint* buf_len);
-int wsrep_create_sp(THD *thd, uchar** buf, uint* buf_len);
-int wsrep_create_trigger_query(THD *thd, uchar** buf, uint* buf_len);
-int wsrep_create_event_query(THD *thd, uchar** buf, uint* buf_len);
+  THD* thd, const char *query, uint query_len, uchar** buf, int* buf_len);
+int wsrep_create_sp(THD *thd, uchar** buf, int* buf_len);
+int wsrep_create_trigger_query(THD *thd, uchar** buf, int* buf_len);
+int wsrep_create_event_query(THD *thd, uchar** buf, int* buf_len);
 
 struct xid_t;
 void wsrep_set_SE_checkpoint(xid_t*);

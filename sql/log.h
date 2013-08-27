@@ -564,7 +564,7 @@ bool wsrep_trans_cache_is_empty(THD *thd);
 void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void thd_binlog_trx_reset(THD * thd);
 void thd_binlog_rollback_stmt(THD * thd);
-int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len);
+int wsrep_write_cache(IO_CACHE *cache, uchar **buf, int *buf_len);
 
 #define WSREP_FORMAT(my_format)                           \
   ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ?	\

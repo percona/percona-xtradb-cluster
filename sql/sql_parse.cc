@@ -6481,7 +6481,7 @@ void wsrep_replay_transaction(THD *thd)
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
       int rcode = wsrep->replay_trx(wsrep,
-				    &thd->wsrep_trx_handle,
+				    &thd->wsrep_ws_handle,
 				    (void *)thd);
 
       wsrep_return_from_bf_mode(thd, &shadow);
@@ -6494,7 +6494,7 @@ void wsrep_replay_transaction(THD *thd)
       {
       case WSREP_OK:
 	thd->wsrep_conflict_state= NO_CONFLICT;
-	wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
+	wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
 	WSREP_DEBUG("trx_replay successful for: %ld %llu", 
 		    thd->thread_id, (long long)thd->real_id);
 	break;
@@ -6509,7 +6509,7 @@ void wsrep_replay_transaction(THD *thd)
 	  //my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
 	}
 	thd->wsrep_conflict_state= ABORTED;
-	wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
+	wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
 	break;
       default:
 	WSREP_ERROR("trx_replay failed for: %d, query: %s", 

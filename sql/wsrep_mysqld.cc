@@ -197,7 +197,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
                                    const char* state,
                                    size_t state_len,
                                    void** sst_req,
-                                   ssize_t* sst_req_len)
+                                   int*   sst_req_len)
 {
   wsrep_member_status_t new_status= local_status.get();
 
@@ -829,7 +829,7 @@ static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 static bool wsrep_prepare_key_for_isolation(const char* db,
                                             const char* table,
                                             wsrep_buf_t* key,
-                                            long* key_len)
+                                            int* key_len)
 {
     if (*key_len < 2) return false;
 
@@ -961,7 +961,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
                                   const uchar* row_id,
                                   size_t row_id_len,
                                   wsrep_buf_t* key,
-                                  long* key_len)
+                                  int* key_len)
 {
     if (*key_len < 3) return false;
 
@@ -1006,7 +1006,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
  * Return 0 in case of success, 1 in case of error.
  */
 int wsrep_to_buf_helper(
-    THD* thd, const char *query, uint query_len, uchar** buf, uint* buf_len)
+    THD* thd, const char *query, uint query_len, uchar** buf, int* buf_len)
 {
   IO_CACHE tmp_io_cache;
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
@@ -1022,7 +1022,7 @@ int wsrep_to_buf_helper(
 
 #include "sql_show.h"
 static int
-create_view_query(THD *thd, uchar** buf, uint* buf_len)
+create_view_query(THD *thd, uchar** buf, int* buf_len)
 {
     LEX *lex= thd->lex;
     SELECT_LEX *select_lex= &lex->select_lex;
@@ -1041,15 +1041,15 @@ create_view_query(THD *thd, uchar** buf, uint* buf_len)
     if (!lex->definer)
     {
       /*
-	DEFINER-clause is missing; we have to create default definer in
-	persistent arena to be PS/SP friendly.
-	If this is an ALTER VIEW then the current user should be set as
-	the definer.
+        DEFINER-clause is missing; we have to create default definer in
+        persistent arena to be PS/SP friendly.
+        If this is an ALTER VIEW then the current user should be set as
+        the definer.
       */
 
       if (!(lex->definer= create_default_definer(thd)))
       {
-	WSREP_WARN("view default definer issue");
+        WSREP_WARN("view default definer issue");
       }
     }
 
@@ -1076,7 +1076,7 @@ create_view_query(THD *thd, uchar** buf, uint* buf_len)
       List_iterator_fast<LEX_STRING> names(lex->view_list);
       LEX_STRING *name;
       int i;
-      
+
       for (i= 0; (name= names++); i++)
       {
         buff.append(i ? ", " : "(");
@@ -1099,11 +1099,11 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
 {
   wsrep_status_t ret(WSREP_WARNING);
   uchar* buf(0);
-  uint buf_len(0);
+  int buf_len(0);
   int buf_err;
 
   WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
-	      thd->wsrep_exec_mode, thd->query() );
+              thd->wsrep_exec_mode, thd->query() );
   switch (thd->lex->sql_command)
   {
   case SQLCOM_CREATE_VIEW:
@@ -1139,7 +1139,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
-		thd->wsrep_exec_mode);
+                thd->wsrep_exec_mode);
   }
   else {
     /* jump to error handler in mysql_execute_command() */

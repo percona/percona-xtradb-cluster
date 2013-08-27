@@ -898,9 +898,9 @@ extern "C" const char *wsrep_thd_conflict_state_str(THD *thd)
     (thd->wsrep_conflict_state == CERT_FAILURE)     ? "cert failure" : "void";
 }
 
-extern "C" wsrep_trx_handle_t* wsrep_thd_trx_handle(THD *thd)
+extern "C" wsrep_ws_handle_t* wsrep_thd_ws_handle(THD *thd)
 {
-  return &thd->wsrep_trx_handle;
+  return &thd->wsrep_ws_handle;
 }
 
 extern "C"void wsrep_thd_LOCK(THD *thd)
@@ -1180,8 +1180,8 @@ THD::THD(bool enable_plugins)
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_thd, &LOCK_wsrep_thd, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd, NULL);
-  wsrep_trx_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
-  wsrep_trx_handle.opaque = NULL;
+  wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
+  wsrep_ws_handle.opaque = NULL;
   //wsrep_retry_autocommit= ::wsrep_retry_autocommit;
   wsrep_retry_counter     = 0;
   wsrep_PA_safe           = true;

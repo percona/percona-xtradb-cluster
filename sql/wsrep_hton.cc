@@ -44,7 +44,7 @@ void wsrep_cleanup_transaction(THD *thd)
     {
       if (thd->wsrep_seqno_changed)
       {
-	if (wsrep->post_commit(wsrep, &thd->wsrep_trx_handle))
+	if (wsrep->post_commit(wsrep, &thd->wsrep_ws_handle))
 	{
 	  DBUG_PRINT("wsrep", ("set committed fail"));
 	  WSREP_WARN("set committed fail: %llu %d", 
@@ -65,7 +65,7 @@ void wsrep_cleanup_transaction(THD *thd)
      */
     thd_binlog_trx_reset(thd);
   }
-  thd->wsrep_trx_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
+  thd->wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
 }
 
 /*
@@ -168,7 +168,7 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
   if ((all || !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
       (thd->variables.wsrep_on && thd->wsrep_conflict_state != MUST_REPLAY))
   {
-    if (wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle))
+    if (wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle))
     {
       DBUG_PRINT("wsrep", ("setting rollback fail"));
       WSREP_ERROR("settting rollback fail: thd: %llu SQL: %s", 
@@ -201,7 +201,7 @@ wsrep_run_wsrep_commit(
     THD *thd, handlerton *hton, bool all)
 {
   int rcode         = -1;
-  uint data_len     = 0;
+  int data_len      = 0;
   uchar *rbr_data   = NULL;
   IO_CACHE *cache;
   int replay_round= 0;
@@ -340,24 +340,26 @@ wsrep_run_wsrep_commit(
     }
     DBUG_RETURN(WSREP_TRX_OK);
   }
-  if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_trx_handle.trx_id)
+  if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
   {
     WSREP_WARN("SQL statement was ineffective: %s\n => Skipping replication", thd->query());
   } 
   else if (!rcode) 
   {
     const struct wsrep_buf data = { rbr_data, data_len };
-    rcode = wsrep->append_data(wsrep, &thd->wsrep_trx_handle,
-                               &data, 1, false, false);
+    rcode = wsrep->append_data(wsrep, &thd->wsrep_ws_handle,
+                               &data, 1, WSREP_DATA_ORDERED, false);
+
     if (WSREP_OK == rcode)
-    rcode = wsrep->pre_commit(
-                              wsrep,
+    rcode = wsrep->pre_commit(wsrep,
                               (wsrep_conn_id_t)thd->thread_id,
-                              &thd->wsrep_trx_handle,
+                              &thd->wsrep_ws_handle,
 //                              rbr_data,
 //                              data_len,
-                              (thd->wsrep_PA_safe) ? WSREP_FLAG_PA_SAFE : 0ULL,
+                              WSREP_FLAG_COMMIT |
+                              ((thd->wsrep_PA_safe) ? 0ULL : WSREP_FLAG_PA_UNSAFE),
                               &thd->wsrep_trx_meta);
+
     if (rcode == WSREP_TRX_MISSING) {
       WSREP_WARN("Transaction missing in provider, thd: %ld, SQL: %s",
                  thd->thread_id, thd->query());
