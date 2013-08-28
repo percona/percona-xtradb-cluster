@@ -94,19 +94,19 @@ long             wsrep_protocol_version = 2;
 static my_bool   wsrep_startup = TRUE;
 
 // action execute callback
-extern wsrep_status_t wsrep_apply_cb(void *ctx,
-                                     const void* buf, size_t buf_len,
-                                     const wsrep_trx_meta_t* meta);
+extern wsrep_cb_status_t wsrep_apply_cb(void *ctx,
+                                        const void* buf, size_t buf_len,
+                                        const wsrep_trx_meta_t* meta);
 
-extern wsrep_status_t wsrep_commit_cb(void *ctx,
-                                      const wsrep_trx_meta_t* meta,
-                                      bool commit);
+extern wsrep_cb_status_t wsrep_commit_cb(void *ctx,
+                                         const wsrep_trx_meta_t* meta,
+                                         bool commit);
 
-static wsrep_status_t wsrep_unordered_cb(void*       ctx,
-                                         const void* data,
-                                         size_t      size)
+static wsrep_cb_status_t wsrep_unordered_cb(void*       ctx,
+                                            const void* data,
+                                            size_t      size)
 {
-    return WSREP_OK;
+    return WSREP_CB_SUCCESS;
 }
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
@@ -191,19 +191,22 @@ void wsrep_get_SE_checkpoint(XID* xid)
   plugin_foreach(NULL, get_SE_checkpoint, MYSQL_STORAGE_ENGINE_PLUGIN, xid);
 }
 
-static void wsrep_view_handler_cb (void* app_ctx,
-                                   void* recv_ctx,
-                                   const wsrep_view_info_t* view,
-                                   const char* state,
-                                   size_t state_len,
-                                   void** sst_req,
-                                   int*   sst_req_len)
+static wsrep_cb_status_t
+wsrep_view_handler_cb (void* app_ctx,
+                       void* recv_ctx,
+                       const wsrep_view_info_t* view,
+                       const char* state,
+                       size_t state_len,
+                       void** sst_req,
+                       int*   sst_req_len)
 {
   wsrep_member_status_t new_status= local_status.get();
 
-  if (memcmp(&cluster_uuid, &view->uuid, sizeof(wsrep_uuid_t)))
+  if (memcmp(&cluster_uuid, &view->state_id.uuid, sizeof(wsrep_uuid_t)))
   {
-    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->uuid, sizeof(cluster_uuid));
+    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->state_id.uuid,
+           sizeof(cluster_uuid));
+
     wsrep_uuid_print (&cluster_uuid, cluster_uuid_str,
                       sizeof(cluster_uuid_str));
   }
@@ -215,7 +218,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
   WSREP_INFO("New cluster view: global state: %s:%lld, view# %lld: %s, "
              "number of nodes: %ld, my index: %ld, protocol version %d",
-             wsrep_cluster_state_uuid, (long long)view->seqno,
+             wsrep_cluster_state_uuid, (long long)view->state_id.seqno,
              (long long)wsrep_cluster_conf_id, wsrep_cluster_status,
              wsrep_cluster_size, wsrep_local_index, view->proto_ver);
 
@@ -295,14 +298,14 @@ static void wsrep_view_handler_cb (void* app_ctx,
       {
         wsrep_SE_init_grab();
         // Signal mysqld init thread to continue
-        wsrep_sst_complete (&cluster_uuid, view->seqno, false);
+        wsrep_sst_complete (&cluster_uuid, view->state_id.seqno, false);
         // and wait for SE initialization
         wsrep_SE_init_wait();
       }
       else
       {
         local_uuid=  cluster_uuid;
-        local_seqno= view->seqno;
+        local_seqno= view->state_id.seqno;
       }
       /* Init storage engine XIDs from first view */
       XID xid;
@@ -315,7 +318,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
     if (memcmp (&local_uuid, &cluster_uuid, sizeof (wsrep_uuid_t)))
     {
       WSREP_ERROR("Undetected state gap. Can't continue.");
-      wsrep_log_states(WSREP_LOG_FATAL, &cluster_uuid, view->seqno,
+      wsrep_log_states(WSREP_LOG_FATAL, &cluster_uuid, view->state_id.seqno,
                        &local_uuid, -1);
       unireg_abort(1);
     }
@@ -330,6 +333,8 @@ static void wsrep_view_handler_cb (void* app_ctx,
 out:
   wsrep_startup= FALSE;
   local_status.set(new_status, view);
+
+  return WSREP_CB_SUCCESS;
 }
 
 void wsrep_ready_set (my_bool x)
@@ -562,6 +567,8 @@ int wsrep_init()
 
   struct wsrep_init_args wsrep_args;
 
+  struct wsrep_gtid const state_id = { local_uuid, local_seqno };
+
   wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
   wsrep_args.node_address    = node_addr;
@@ -570,8 +577,7 @@ int wsrep_init()
                                 wsrep_provider_options : "";
   wsrep_args.proto_ver       = wsrep_max_protocol_version;
 
-  wsrep_args.state_uuid      = &local_uuid;
-  wsrep_args.state_seqno     = local_seqno;
+  wsrep_args.state_id        = &state_id;
 
   wsrep_args.logger_cb       = wsrep_log_cb;
   wsrep_args.view_handler_cb = wsrep_view_handler_cb;

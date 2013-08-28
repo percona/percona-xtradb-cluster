@@ -146,7 +146,7 @@ bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
   wsrep_set_local_position (wsrep_start_position);
 
   if (wsrep) {
-    wsrep->sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
+    wsrep_sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
   }
 
   return 0;
