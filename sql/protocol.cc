@@ -523,7 +523,9 @@ void Protocol::end_statement()
     break;
   case Diagnostics_area::DA_EMPTY:
   default:
+#ifndef WITH_WSREP
     DBUG_ASSERT(0);
+#endif
     error= send_ok(thd->server_status, 0, 0, 0, NULL);
     break;
   }

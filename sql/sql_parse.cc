@@ -2349,7 +2349,10 @@ mysql_execute_command(THD *thd)
     thd->is_error() ? trans_rollback_stmt(thd) : trans_commit_stmt(thd);
     /* Commit the normal transaction if one is active. */
     if (trans_commit_implicit(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
       goto error;
+    }
     /* Release metadata locks acquired in this transaction. */
     thd->mdl_context.release_transactional_locks();
   }
@@ -4112,7 +4115,10 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_commit(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
