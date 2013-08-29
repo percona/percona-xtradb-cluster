@@ -523,7 +523,7 @@ void Protocol::end_statement()
     break;
   case Diagnostics_area::DA_EMPTY:
   default:
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && !defined(DBUG_OFF)
     WSREP_WARN("Should not be here:\nDA status %d,\nwsrep_applier %d,\n"
                "wsrep_exec_mode %d,\nwsrep_query_state %d,\n"
                "wsrep_conflict_state %d",
