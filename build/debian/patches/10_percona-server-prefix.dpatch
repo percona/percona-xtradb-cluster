@@ -26,8 +26,8 @@ diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' 
 +SET(INSTALL_SCRIPTDIR_DEB               "bin")
  #
  SET(INSTALL_LIBDIR_DEB                  "lib")
- SET(INSTALL_PLUGINDIR_DEB               "lib/plugin")
-@@ -176,16 +176,16 @@
+ SET(INSTALL_PLUGINDIR_DEB               "lib/mysql/plugin")
+@@ -176,16 +176,17 @@
  #
  SET(INSTALL_DOCDIR_DEB                  "docs")
  SET(INSTALL_DOCREADMEDIR_DEB            ".")
@@ -45,9 +45,10 @@ diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' 
 +SET(INSTALL_MYSQLTESTDIR_DEB            "share/mysql-test")
 +SET(INSTALL_SQLBENCHDIR_DEB             "share/sql-bench")
 +SET(INSTALL_SUPPORTFILESDIR_DEB         "share/mysql")
++
  #
 -SET(INSTALL_MYSQLDATADIR_DEB            "data")
 +SET(INSTALL_MYSQLDATADIR_DEB            "/var/lib/mysql")
  SET(INSTALL_PLUGINTESTDIR_DEB           ${plugin_tests})
  
- #
+ SET(INSTALL_XINETDDIR_DEB               "/etc/xinetd.d")
