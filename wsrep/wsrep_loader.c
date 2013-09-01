@@ -91,7 +91,6 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     VERIFY(wh->provider_name);
     VERIFY(wh->provider_version);
     VERIFY(wh->provider_vendor);
-    VERIFY(wh->provider_type);
     VERIFY(wh->free);
     return 0;
 }
