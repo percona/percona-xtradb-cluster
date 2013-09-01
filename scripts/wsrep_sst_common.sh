@@ -19,6 +19,7 @@
 set -u
 
 WSREP_SST_OPT_BYPASS=0
+WSREP_SST_OPT_DATA=""
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -86,12 +87,19 @@ shift
 done
 readonly WSREP_SST_OPT_BYPASS
 
+if [ -n "$WSREP_SST_OPT_DATA" ]
+then
+    SST_PROGRESS_FILE="$WSREP_SST_OPT_DATA/sst_in_progress"
+else
+    SST_PROGRESS_FILE=""
+fi
+
 wsrep_log()
 {
     # echo everything to stderr so that it gets into common error log
     # deliberately made to look different from the rest of the log
     local readonly tst="$(date +%Y%m%d\ %H:%M:%S.%N | cut -b -21)"
-    echo "WSREP_SST: $* ($tst)" >>/dev/stderr
+    echo "WSREP_SST: $* ($tst)" >&2
 }
 
 wsrep_log_error()
@@ -102,5 +110,10 @@ wsrep_log_error()
 wsrep_log_info()
 {
     wsrep_log "[INFO] $*"
+}
+
+wsrep_cleanup_progress_file()
+{
+    [ -n "$SST_PROGRESS_FILE" ] && rm -f "$SST_PROGRESS_FILE" 2>/dev/null
 }
 
