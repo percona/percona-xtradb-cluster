@@ -49,6 +49,7 @@ my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
 my_bool wsrep_log_conflicts            = 0;
 ulong  wsrep_mysql_replication_bundle  = 0;
+my_bool wsrep_desync                   = 0; // desynchronize the node from the cluster
 
 /*
  * End configuration options
