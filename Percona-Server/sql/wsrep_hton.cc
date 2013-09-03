@@ -331,9 +331,17 @@ wsrep_run_wsrep_commit(
   }
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_trx_handle.trx_id)
   {
-    WSREP_WARN("SQL statement was ineffective: %s\n => Skipping replication", thd->query());
-  } 
-  else if (!rcode) 
+    WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %d\n"
+	       "QUERY: %s\n"
+	       " => Skipping replication", 
+	       thd->thread_id, data_len, thd->query());
+    if (wsrep_debug)
+    {
+      wsrep_write_rbr_buf(thd, rbr_data, data_len);
+    }
+    rcode = WSREP_TRX_FAIL;
+  }
+  else if (!rcode)
   {
     if (WSREP(thd))
         thd_proc_info(thd, "wsrep in pre-commit stage");
