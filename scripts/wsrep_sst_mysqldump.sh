@@ -38,12 +38,12 @@ local_ip()
     return 1
 }
 
-if test -z "$WSREP_SST_OPT_USER";  then err "USER cannot be nil";  exit $EINVAL; fi
-if test -z "$WSREP_SST_OPT_HOST";  then err "HOST cannot be nil";  exit $EINVAL; fi
-if test -z "$WSREP_SST_OPT_PORT";  then err "PORT cannot be nil";  exit $EINVAL; fi
-if test -z "$WSREP_SST_OPT_LPORT"; then err "LPORT cannot be nil"; exit $EINVAL; fi
-if test -z "$WSREP_SST_OPT_SOCKET";then err "SOCKET cannot be nil";exit $EINVAL; fi
-if test -z "$WSREP_SST_OPT_GTID";  then err "GTID cannot be nil";  exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_USER";  then wsrep_log_error "USER cannot be nil";  exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_HOST";  then wsrep_log_error "HOST cannot be nil";  exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_PORT";  then wsrep_log_error "PORT cannot be nil";  exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_LPORT"; then wsrep_log_error "LPORT cannot be nil"; exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_SOCKET";then wsrep_log_error "SOCKET cannot be nil";exit $EINVAL; fi
+if test -z "$WSREP_SST_OPT_GTID";  then wsrep_log_error "GTID cannot be nil";  exit $EINVAL; fi
 
 if local_ip $WSREP_SST_OPT_HOST && \
    [ "$WSREP_SST_OPT_PORT" = "$WSREP_SST_OPT_LPORT" ]
@@ -54,10 +54,10 @@ then
 fi
 
 # Check client version
-if ! mysql --version | grep 'Distrib 5.5' >/dev/null
+if ! mysql --version | grep 'Distrib 5.6' >/dev/null
 then
     mysql --version >&2
-    err "this operation requires MySQL client version 5.5.x"
+    wsrep_log_error "this operation requires MySQL client version 5.6.x"
     exit $EINVAL
 fi
 
@@ -107,9 +107,14 @@ $MYSQL -e"$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
 RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
 RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
 
+# reset master for 5.6 to clear GTID_EXECUTED
+RESET_MASTER="RESET MASTER;"
+
+
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
-    (echo $STOP_WSREP && $MYSQLDUMP && echo $CSV_TABLES_FIX \
+# commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
+    (echo $STOP_WSREP && echo $RESET_MASTER && $MYSQLDUMP \
     && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
     && echo $SET_START_POSITION \
     || echo "SST failed to complete;") | $MYSQL

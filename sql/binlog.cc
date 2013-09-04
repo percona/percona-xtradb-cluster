@@ -6133,7 +6133,13 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   DBUG_ENTER("MYSQL_BIN_LOG::commit");
 
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(thd);
+#ifdef WITH_WSREP
+  my_xid xid= (wsrep_is_wsrep_xid(&thd->transaction.xid_state.xid) ?
+               wsrep_xid_seqno(&thd->transaction.xid_state.xid) :
+               thd->transaction.xid_state.xid.get_my_xid());
+#else
   my_xid xid= thd->transaction.xid_state.xid.get_my_xid();
+#endif /* WITH_WSREP */
   int error= RESULT_SUCCESS;
   bool stuff_logged= false;
 
@@ -6918,6 +6924,24 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
   */
   bool in_transaction= FALSE;
 
+#ifdef WITH_WSREP
+  /*
+    Read current wsrep position from storage engines to have consistent
+    end position for binlog scan.
+  */
+  XID xid;
+  memset(&xid, 0, sizeof(xid));
+  xid.formatID= -1;
+  wsrep_get_SE_checkpoint(&xid);
+  char uuid_str[40];
+  wsrep_uuid_print(wsrep_xid_uuid(&xid), uuid_str, sizeof(uuid_str));
+  WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
+             (long long)wsrep_xid_seqno(&xid));
+  const wsrep_seqno_t last_xid_seqno= wsrep_xid_seqno(&xid);
+  wsrep_seqno_t cur_xid_seqno=WSREP_SEQNO_UNDEFINED;
+#endif /* WITH_WSREP */
+
+
   if (! fdle->is_valid() ||
       my_hash_init(&xids, &my_charset_bin, TC_LOG_PAGE_SIZE/3, 0,
                    sizeof(my_xid), 0, 0, MYF(0)))
@@ -6926,7 +6950,12 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
   init_alloc_root(&mem_root, TC_LOG_PAGE_SIZE, TC_LOG_PAGE_SIZE);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-         && ev->is_valid())
+         && ev->is_valid()
+#ifdef WITH_WSREP
+         && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
+             last_xid_seqno != cur_xid_seqno)
+#endif
+      )
   {
     if (ev->get_type_code() == QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))
@@ -6947,6 +6976,9 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                                       sizeof(xev->xid));
       if (!x || my_hash_insert(&xids, x))
         goto err2;
+#ifdef WITH_WSREP
+      cur_xid_seqno= xev->xid;
+#endif /* WITH_WSREP */
     }
 
     /*
@@ -6990,6 +7022,11 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
 
     delete ev;
   }
+
+#ifdef WITH_WSREP
+  WSREP_INFO("Binlog recovery scan stopped at Xid event %lld",
+             (long long)cur_xid_seqno);
+#endif /* WITH_WSREP */
 
   if (ha_recover(&xids))
     goto err2;
@@ -8891,7 +8928,7 @@ void thd_binlog_rollback_stmt(THD * thd)
 
 int wsrep_write_cache(IO_CACHE *cache, uchar **buf, int *buf_len)
 {
-
+  my_off_t saved_pos= my_b_tell(cache);
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
     return ER_ERROR_ON_WRITE;
   uint length= my_b_bytes_in_cache(cache);
@@ -8908,7 +8945,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, int *buf_len)
     {
       WSREP_WARN("transaction size limit (%lld) exceeded: %lld",
                  wsrep_max_ws_size, total_length);
-      if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
+      if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
       {
         WSREP_WARN("failed to initialize io-cache");
       } 
@@ -8946,6 +8983,14 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, int *buf_len)
     memcpy(buf_ptr, cache->read_pos, length);
     cache->read_pos=cache->read_end;
   } while ((cache->file >= 0) && (length= my_b_fill(cache)));
+
+  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
+  {
+    WSREP_WARN("failed to initialize io-cache");
+    my_free(*buf);
+    *buf_len= 0;
+    return ER_ERROR_ON_WRITE;
+  }
 
   return 0;
 }

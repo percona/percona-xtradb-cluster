@@ -67,6 +67,16 @@ check_pid_and_port()
 MAGIC_FILE="$WSREP_SST_OPT_DATA/rsync_sst_complete"
 rm -rf "$MAGIC_FILE"
 
+BINLOG_TAR_FILE="$WSREP_SST_OPT_DATA/wsrep_sst_binlog.tar"
+BINLOG_N_FILES=1
+rm -f "$BINLOG_TAR_FILE" || :
+
+if ! [ -z $WSREP_SST_OPT_BINLOG ]
+then
+    BINLOG_DIRNAME=$(dirname $WSREP_SST_OPT_BINLOG)
+    BINLOG_FILENAME=$(basename $WSREP_SST_OPT_BINLOG)
+fi
+
 # Old filter - include everything except selected
 # FILTER=(--exclude '*.err' --exclude '*.pid' --exclude '*.sock' \
 #         --exclude '*.conf' --exclude core --exclude 'galera.*' \
@@ -74,9 +84,9 @@ rm -rf "$MAGIC_FILE"
 #         --exclude '*.[0-9][0-9][0-9][0-9][0-9][0-9]' --exclude '*.index')
 
 # New filter - exclude everything except dirs (schemas) and innodb files
-FILTER=(-f '- lost+found' -f '+ /ib_lru_dump' -f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
+FILTER=(-f '- lost+found' -f '+ /wsrep_sst_binlog.tar' -f '+ /ib_lru_dump' -f '+ /ibdata*' -f '+ /ib_logfile*' -f '+ */' -f '-! */*')
 # Old versions of rsync have a bug transferring filter rules to daemon, so specify filter rules directly to daemon
-FILTER_DAEMON="- lost+found  + /ib_lru_dump  + /ibdata*  + ib_logfile*  + */  -! */*"
+FILTER_DAEMON="- lost+found  + /wsrep_sst_binlog.tar  + /ib_lru_dump  + /ibdata*  + ib_logfile*  + */  -! */*"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -104,6 +114,24 @@ then
         rm -rf "$FLUSHED"
 
         sync
+
+        if ! [ -z $WSREP_SST_OPT_BINLOG ]
+        then
+            # Prepare binlog files
+            pushd $BINLOG_DIRNAME &> /dev/null
+            binlog_files_full=$(tail -n $BINLOG_N_FILES ${BINLOG_FILENAME}.index)
+            binlog_files=""
+            for ii in $binlog_files_full
+            do
+                binlog_files="$binlog_files $(basename $ii)"
+            done
+            if ! [ -z "$binlog_files" ]
+            then
+                wsrep_log_info "Preparing binlog files for transfer:"
+                tar -cvf $BINLOG_TAR_FILE $binlog_files &>> /dev/stderr
+            fi
+            popd &> /dev/null
+        fi
 
         # first, the normal directories, so that we can detect incompatible protocol
         RC=0
@@ -244,6 +272,23 @@ EOF
         exit 32
     fi
 
+    if ! [ -z $WSREP_SST_OPT_BINLOG ]
+    then
+
+        pushd $BINLOG_DIRNAME &> /dev/null
+        if [ -f $BINLOG_TAR_FILE ]
+        then
+            # Clean up old binlog files first
+            rm -f ${BINLOG_FILENAME}.*
+            wsrep_log_info "Extracting binlog files:"
+            tar -xvf $BINLOG_TAR_FILE &>> /dev/stderr
+            for ii in $(ls -1 ${BINLOG_FILENAME}.*)
+            do
+                echo ${BINLOG_DIRNAME}/${ii} >> ${BINLOG_FILENAME}.index
+            done
+        fi
+        popd &> /dev/null
+    fi
     if [ -r "$MAGIC_FILE" ]
     then
         cat "$MAGIC_FILE" # output UUID:seqno
@@ -257,5 +302,7 @@ else
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
     exit 22 # EINVAL
 fi
+
+rm -f $BINLOG_TAR_FILE || :
 
 exit 0

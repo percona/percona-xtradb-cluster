@@ -24,6 +24,8 @@
 extern Format_description_log_event *wsrep_format_desc;
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
+/* Sidno in global_sid_map corresponding to group uuid */
+rpl_sidno wsrep_sidno= -1;
 
 /*
  * Begin configuration options and their default values
@@ -192,6 +194,23 @@ void wsrep_get_SE_checkpoint(XID* xid)
   plugin_foreach(NULL, get_SE_checkpoint, MYSQL_STORAGE_ENGINE_PLUGIN, xid);
 }
 
+void wsrep_init_sidno(const wsrep_uuid_t& uuid)
+{
+  /* generate new Sid map entry from inverted uuid */
+  rpl_sid sid;
+  wsrep_uuid_t ltid_uuid;
+  for (size_t i= 0; i < sizeof(ltid_uuid.data); ++i)
+  {
+      ltid_uuid.data[i] = ~local_uuid.data[i];
+  }
+  sid.copy_from(ltid_uuid.data);
+  global_sid_lock->wrlock();
+  wsrep_sidno= global_sid_map->add_sid(sid);
+  WSREP_INFO("inited wsrep sidno %d", wsrep_sidno);
+  global_sid_lock->unlock();
+}
+
+
 static wsrep_cb_status_t
 wsrep_view_handler_cb (void* app_ctx,
                        void* recv_ctx,
@@ -313,6 +332,7 @@ wsrep_view_handler_cb (void* app_ctx,
       wsrep_xid_init(&xid, &local_uuid, local_seqno);
       wsrep_set_SE_checkpoint(&xid);
       new_status= WSREP_MEMBER_JOINED;
+      wsrep_init_sidno(local_uuid);
     }
 
     // just some sanity check

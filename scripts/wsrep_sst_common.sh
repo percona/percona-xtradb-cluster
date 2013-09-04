@@ -19,6 +19,7 @@
 set -u
 
 WSREP_SST_OPT_BYPASS=0
+WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_DATA=""
 
 while [ $# -gt 0 ]; do
@@ -78,6 +79,10 @@ case "$1" in
         readonly WSREP_SST_OPT_GTID="$2"
         shift
         ;;
+    '--binlog')
+        WSREP_SST_OPT_BINLOG="$2"
+        shift
+        ;;
     *) # must be command
        # usage
        # exit 1
@@ -86,6 +91,7 @@ esac
 shift
 done
 readonly WSREP_SST_OPT_BYPASS
+readonly WSREP_SST_OPT_BINLOG
 
 if [ -n "$WSREP_SST_OPT_DATA" ]
 then

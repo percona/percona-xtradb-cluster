@@ -19,6 +19,7 @@
 #include "mysqld.h"
 typedef struct st_mysql_show_var SHOW_VAR;
 #include <sql_priv.h>
+#include "rpl_gtid.h"
 #include "../wsrep/wsrep_api.h"
 
 #define WSREP_UNDEFINED_TRX_ID ULONGLONG_MAX
@@ -350,6 +351,7 @@ extern long      wsrep_max_ws_rows;
 extern int       wsrep_to_isolation;
 extern my_bool wsrep_certify_nonPK;
 extern mysql_mutex_t LOCK_wsrep_slave_threads;
+extern rpl_sidno wsrep_sidno;
 extern mysql_mutex_t LOCK_wsrep_desync;
 
 extern PSI_mutex_key key_LOCK_wsrep_ready;
@@ -381,8 +383,9 @@ int wsrep_create_trigger_query(THD *thd, uchar** buf, int* buf_len);
 int wsrep_create_event_query(THD *thd, uchar** buf, int* buf_len);
 
 struct xid_t;
+void wsrep_get_SE_checkpoint(xid_t*);
 void wsrep_set_SE_checkpoint(xid_t*);
-
+void wsrep_init_sidno(const wsrep_uuid_t&);
 void wsrep_xid_init(xid_t*, const wsrep_uuid_t*, wsrep_seqno_t);
 const wsrep_uuid_t* wsrep_xid_uuid(const xid_t*);
 wsrep_seqno_t wsrep_xid_seqno(const xid_t*);

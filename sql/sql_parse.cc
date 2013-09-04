@@ -8587,7 +8587,6 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
   while(buf_len)
   {
     int exec_res;
-    int error = 0;
     Log_event* ev=  wsrep_read_log_event(&buf, &buf_len, wsrep_format_desc);
 
     if (!ev)
@@ -8604,6 +8603,16 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
       DBUG_ASSERT(buf_len != 0 ||
                   ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F));
       break;
+    case GTID_LOG_EVENT:
+    {
+      Gtid_log_event* gev= (Gtid_log_event*)ev;
+      if (gev->get_gno() == 0)
+      {
+        /* Skip GTID log event to make binlog to generate LTID on commit */
+        delete ev;
+        continue;
+      }
+    }
     default:
       break;
     }
@@ -8647,21 +8656,6 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
       DBUG_RETURN(WSREP_CB_FAILURE);
     }
 
-    if (ev->get_type_code() != TABLE_MAP_EVENT &&
-        ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F))
-    {
-      // TODO: combine with commit on higher level common for the query ws
-
-      thd->wsrep_rli->cleanup_context(thd, 0);
-
-      if (error == 0)
-      {
-        thd->clear_error();
-      }
-      else
-        WSREP_ERROR("Error in %s event: commit of row events failed: %lld",
-                    ev->get_type_str(), (long long)wsrep_thd_trx_seqno(thd));
-    }
     delete ev;
   }
 
@@ -8736,6 +8730,8 @@ wsrep_cb_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
 
   if (WSREP_CB_SUCCESS == rcode)
   {
+    thd->wsrep_rli->cleanup_context(thd, 0);
+    thd->variables.gtid_next.set_automatic();
     // TODO: mark snapshot with global_seqno.
   }
 
@@ -8763,6 +8759,8 @@ wsrep_cb_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqn
 #else
   thd_proc_info(thd, "rolled back");
 #endif /* WSREP_PROC_INFO */
+  thd->wsrep_rli->cleanup_context(thd, 0);
+  thd->variables.gtid_next.set_automatic();
 
   return rcode;
 }
