@@ -50,6 +50,7 @@ my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
 my_bool wsrep_log_conflicts            = 0; // 
 ulong   wsrep_mysql_replication_bundle = 0;
 my_bool wsrep_load_data_splitting      = 1; // commit load data every 10K intervals
+my_bool wsrep_desync                   = 0; // desynchronize the node from the cluster
 
 /*
  * End configuration options
@@ -1111,6 +1112,8 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   }
 
   wsrep_key_arr_t key_arr= {0, 0};
+  if (WSREP(thd))
+      thd_proc_info(thd, "Preparing for TO isolation");
   if (!buf_err                                                    &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
