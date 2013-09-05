@@ -136,8 +136,8 @@ parse_server_arguments() {
       --datadir=*)  datadir=`echo "$arg" | sed -e 's/^[^=]*=//'`
 		    datadir_set=1
 	;;
-      --pid-file=*) mysqld_pid_file_path=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
-      --service-startup-timeout=*) service_startup_timeout=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
+      --pid-file=*|--pid_file=*) mysqld_pid_file_path=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
+      --service-startup-timeout=*|--service_startup_timeout=*) service_startup_timeout=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
     esac
   done
 }
@@ -187,7 +187,7 @@ wait_for_pid () {
 
     if test -e $sst_progress_file && [ $startup_sleep -ne 100 ];then
         echo $echo_n "SST in progress, setting sleep higher"
-        startup_sleep=100
+        startup_sleep=10
     fi
 
     echo $echo_n ".$echo_c"
@@ -199,6 +199,9 @@ wait_for_pid () {
   if test -z "$i" ; then
     log_success_msg
     return 0
+  elif test -e $sst_progress_file; then 
+    log_failure_msg
+    return 2
   else
     log_failure_msg
     return 1
@@ -275,9 +278,56 @@ else
   esac
 fi
 
+check_running() {
+
+    local show_msg=$1
+
+    # First, check to see if pid file exists
+    if test -s "$mysqld_pid_file_path" ; then 
+        read mysqld_pid < "$mysqld_pid_file_path"
+        if kill -0 $mysqld_pid 2>/dev/null ; then 
+            log_success_msg "MySQL (Percona XtraDB Cluster) running ($mysqld_pid)"
+            return 0
+        else
+            log_failure_msg "MySQL (Percona XtraDB Cluster) is not running, but PID file exists"
+            return 1
+        fi
+    else
+        # Try to find appropriate mysqld process
+        mysqld_pid=`pidof $libexecdir/mysqld`
+
+        # test if multiple pids exist
+        pid_count=`echo $mysqld_pid | wc -w`
+        if test $pid_count -gt 1 ; then
+            log_failure_msg "Multiple MySQL running but PID file could not be found ($mysqld_pid)"
+            return 5
+        elif test -z $mysqld_pid ; then 
+            if test -f "$lock_file_path" ; then 
+                log_failure_msg "MySQL (Percona XtraDB Cluster) is not running, but lock file ($lock_file_path) exists"
+                return 2
+            fi 
+            test $show_msg -eq 1 && log_failure_msg "MySQL (Percona XtraDB Cluster) is not running"
+            return 3
+        else
+            log_failure_msg "MySQL (Percona XtraDB Cluster) is running but PID file could not be found"
+            return 4
+        fi
+    fi
+}
+
 case "$mode" in
   'start')
+
+    check_running 0
+    ext_status=$?
+    if test $ext_status -ne 3;then 
+        exit $ext_status
+    fi
+
     # Start daemon
+    if test -e $datadir/sst_in_progress;then 
+        echo $echo_n "Stale sst_in_progress file in datadir"
+    fi
 
     # Safeguard (relative paths, core dumps..)
     cd $basedir
@@ -289,8 +339,10 @@ case "$mode" in
       # may be overwritten at next upgrade.
       $bindir/mysqld_safe --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null 2>&1 &
       wait_for_pid created "$!" "$mysqld_pid_file_path"; return_value=$?
-      if [[ $return_value != 0 ]];then 
+      if [ $return_value == 1 ];then 
           log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
+      elif [ $return_value == 2 ];then
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed! SST still in progress"
       fi
 
       # Make lock for RedHat / SuSE
@@ -318,7 +370,7 @@ case "$mode" in
         kill $mysqld_pid
         # mysqld should remove the pid file when it exits, so wait for it.
         wait_for_pid removed "$mysqld_pid" "$mysqld_pid_file_path"; return_value=$?
-        if [[ $return_value != 0 ]];then 
+        if [ $return_value != 0 ];then 
             log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
         fi
       else
@@ -359,43 +411,12 @@ case "$mode" in
     fi
     ;;
   'status')
-    # First, check to see if pid file exists
-    if test -s "$mysqld_pid_file_path" ; then 
-      read mysqld_pid < "$mysqld_pid_file_path"
-      if kill -0 $mysqld_pid 2>/dev/null ; then 
-        log_success_msg "MySQL (Percona XtraDB Cluster) running ($mysqld_pid)"
-        exit 0
-      else
-        log_failure_msg "MySQL (Percona XtraDB Cluster) is not running, but PID file exists"
-        exit 1
-      fi
-    else
-      # Try to find appropriate mysqld process
-      mysqld_pid=`pidof $libexecdir/mysqld`
-
-      # test if multiple pids exist
-      pid_count=`echo $mysqld_pid | wc -w`
-      if test $pid_count -gt 1 ; then
-        log_failure_msg "Multiple MySQL running but PID file could not be found ($mysqld_pid)"
-        exit 5
-      elif test -z $mysqld_pid ; then 
-        if test -f "$lock_file_path" ; then 
-          log_failure_msg "MySQL (Percona XtraDB Cluster) is not running, but lock file ($lock_file_path) exists"
-          exit 2
-        fi 
-        log_failure_msg "MySQL (Percona XtraDB Cluster) is not running"
-        exit 3
-      else
-        log_failure_msg "MySQL (Percona XtraDB Cluster) is running but PID file could not be found"
-        exit 4
-      fi
-    fi
+      check_running 1
     ;;
     'bootstrap-pxc')
       # Bootstrap the Percona XtraDB Cluster, start the first node
       # that initiate the cluster
       echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
-      # Not enabled in code - will be in 5.5-24
       $0 start $other_args --wsrep-new-cluster
       #$0 start $other_args --wsrep-cluster-address="gcomm://"
       ;;
