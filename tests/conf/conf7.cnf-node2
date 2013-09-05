@@ -1,0 +1,5 @@
+# encrypt2
+[sst]
+encrypt=2
+tca=/tmp/certs/node1.crt
+tcert=/tmp/certs/node2.pem

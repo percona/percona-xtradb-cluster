@@ -1,0 +1,8 @@
+# compact+progressfile+time
+[xtrabackup]
+compact
+
+[sst]
+time=1
+streamfmt=xbstream
+progress=/tmp/progress2-conf8.log

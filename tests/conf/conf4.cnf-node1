@@ -1,0 +1,9 @@
+# encrypt1+compress
+[xtrabackup]
+encrypt=AES256
+encrypt-key=6F3AD9F428143F133FD7D50D77D91EA4
+compress
+
+[sst]
+encrypt=1
+streamfmt=xbstream
