@@ -260,7 +260,7 @@ get_stream()
     if [[ $sfmt == 'xbstream' ]];then 
         wsrep_log_info "Streaming with xbstream"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-            strmcmd="xbstream -x -C \${DATA}"
+            strmcmd="xbstream -x"
         else
             strmcmd="xbstream -c \${INFO_FILE} \${IST_FILE}"
         fi
@@ -268,7 +268,7 @@ get_stream()
         sfmt="tar"
         wsrep_log_info "Streaming with tar"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-            strmcmd="tar xfi - -C \${DATA}"
+            strmcmd="tar xfi - --recursive-unlink -h"
         else
             strmcmd="tar cf - \${INFO_FILE} \${IST_FILE}"
         fi
@@ -558,7 +558,11 @@ then
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         strmcmd=" $ecmd | $strmcmd"
     fi
+
+    pushd ${DATA} 1>/dev/null
     timeit "Joiner-Recv-Unencrypted" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+    popd 1>/dev/null 
+
     set -e
 
     if [[ $sfmt == 'xbstream' ]];then 
