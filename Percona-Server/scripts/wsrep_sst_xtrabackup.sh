@@ -50,7 +50,13 @@ tcmd=""
 rebuild=0
 rebuildcmd=""
 payload=0
-pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE -F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p'"
+pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
+pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
+uextra=0
+
+if pv --help | grep -q FORMAT;then 
+    pvopts+=$pvformat
+fi
 pcmd="pv $pvopts"
 declare -a RC
 
@@ -61,6 +67,9 @@ INFO_FILE="xtrabackup_galera_info"
 IST_FILE="xtrabackup_ist"
 MAGIC_FILE="${DATA}/${INFO_FILE}"
 
+# Setting the path for ss and ip
+export PATH="/usr/sbin:/sbin:$PATH"
+
 timeit(){
     local stage=$1
     shift
@@ -69,6 +78,7 @@ timeit(){
 
     if [[ $ttime -eq 1 ]];then 
         x1=$(date +%s)
+        wsrep_log_info "Evaluating $cmd"
         eval "$cmd"
         extcode=$?
         x2=$(date +%s)
@@ -76,6 +86,7 @@ timeit(){
         wsrep_log_info "NOTE: $stage took $took seconds"
         totime=$(( totime+took ))
     else 
+        wsrep_log_info "Evaluating $cmd"
         eval "$cmd"
         extcode=$?
     fi
@@ -157,15 +168,17 @@ get_transfer()
                 exit 22
             fi
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-                tcmd="socat openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
+                wsrep_log_info "Decrypting with PEM $tpem, CA: $tcert"
+                tcmd="socat -u openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
             else
-                tcmd="socat stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
+                wsrep_log_info "Encrypting with PEM $tpem, CA: $tcert"
+                tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
             fi
         else 
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-                tcmd="socat TCP-LISTEN:${SST_PORT},reuseaddr${sockopt} stdio"
+                tcmd="socat -u TCP-LISTEN:${SST_PORT},reuseaddr${sockopt} stdio"
             else
-                tcmd="socat stdio TCP:${REMOTEIP}:${SST_PORT}${sockopt}"
+                tcmd="socat -u stdio TCP:${REMOTEIP}:${SST_PORT}${sockopt}"
             fi
         fi
     fi
@@ -176,7 +189,7 @@ parse_cnf()
 {
     local group=$1
     local var=$2
-    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | grep -- "--$var" | cut -d= -f2)
+    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | tr '_' '-' | grep -- "--$var=" | cut -d= -f2-)
     if [[ -z $reval ]];then 
         [[ -n $3 ]] && reval=$3
     fi
@@ -187,7 +200,7 @@ get_footprint()
 {
     pushd $WSREP_SST_OPT_DATA 1>/dev/null
     payload=$(du --block-size=1 -c  **/*.ibd **/*.MYI **/*.MYI ibdata1  | awk 'END { print $1 }')
-    if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress";then 
+    if my_print_defaults -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress=";then 
         # QuickLZ has around 50% compression ratio
         # When compression/compaction used, the progress is only an approximate.
         payload=$(( payload*1/2 ))
@@ -199,12 +212,7 @@ get_footprint()
 
 adjust_progress()
 {
-    if [[ -n $progress && $progress -ne 1 ]];then 
-        if [[ $progress == /*.fif && ! -e $progress ]];then 
-            wsrep_log_info "Creating fifo file $progress for tracking progress"
-            mkfifo $progress
-        fi
-        
+    if [[ -n $progress && $progress != '1' ]];then 
         if [[ -e $progress ]];then 
             pcmd+=" 2>>$progress"
         else 
@@ -244,6 +252,7 @@ read_cnf()
         ekeyfile=$(parse_cnf sst encrypt-key-file "")
     fi
     rlimit=$(parse_cnf sst rlimit "")
+    uextra=$(parse_cnf sst use_extra 0)
 }
 
 get_stream()
@@ -311,13 +320,16 @@ cleanup_donor()
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
-    if check_pid $XTRABACKUP_PID
-    then
-        wsrep_log_error "xtrabackup process is still running. Killing... "
-        kill_xtrabackup
-    fi
 
-    rm -f $XTRABACKUP_PID 
+    if [[ -n $XTRABACKUP_PID ]];then 
+        if check_pid $XTRABACKUP_PID
+        then
+            wsrep_log_error "xtrabackup process is still running. Killing... "
+            kill_xtrabackup
+        fi
+
+        rm -f $XTRABACKUP_PID 
+    fi
     rm -f ${DATA}/${IST_FILE}
 
     if [[ -n $progress && -p $progress ]];then 
@@ -363,6 +375,26 @@ wait_for_listen()
     fi
 }
 
+check_extra()
+{
+    if [[ $uextra -eq 1 ]];then 
+        if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads';then 
+            local eport=$(my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
+            if [[ -n $eport ]];then 
+                # Xtrabackup works only locally.
+                # Hence, setting host to 127.0.0.1 unconditionally. 
+                wsrep_log_info "SST through extra_port $eport"
+                INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
+            else 
+                wsrep_log_error "Extra port $eport null, failing"
+                exit 1
+            fi
+        else 
+            wsrep_log_info "Thread pool not set, ignore the option use_extra"
+        fi
+    fi
+}
+
 if [[ ! -x `which innobackupex` ]];then 
     wsrep_log_error "innobackupex not in path: $PATH"
     exit 2
@@ -380,8 +412,9 @@ setup_ports
 get_stream
 get_transfer
 
+INNOEXTRA=""
 INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -389,31 +422,33 @@ then
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
-        TMPDIR="/tmp"
+        TMPDIR="${TMPDIR:-/tmp}"
 
         if [ "${AUTH[0]}" != "(null)" ]; then
-           INNOBACKUP+=" --user=${AUTH[0]}"
-        fi
+           INNOEXTRA+=" --user=${AUTH[0]}"
+       fi
 
         if [ ${#AUTH[*]} -eq 2 ]; then
-           INNOBACKUP+=" --password=${AUTH[1]}"
+           INNOEXTRA+=" --password=${AUTH[1]}"
         elif [ "${AUTH[0]}" != "(null)" ]; then
            # Empty password, used for testing, debugging etc.
-           INNOBACKUP+=" --password="
+           INNOEXTRA+=" --password="
         fi
 
         get_keys
         if [[ $encrypt -eq 1 ]];then
             if [[ -n $ekey ]];then
-                INNOBACKUP+=" --encrypt=$ealgo --encrypt-key=$ekey"
+                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key=$ekey "
             else 
-                INNOBACKUP+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile"
+                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile "
             fi
         fi
 
         if [[ -n $lsn ]];then 
-                INNOBACKUP+=" --incremental --incremental-lsn=$lsn"
+                INNOEXTRA+=" --incremental --incremental-lsn=$lsn "
         fi
+
+        check_extra
 
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
 
@@ -550,6 +585,8 @@ then
     then
         # this message should cause joiner to abort
         wsrep_log_error "xtrabackup process ended without creating '${MAGIC_FILE}'"
+        wsrep_log_info "Contents of datadir" 
+        wsrep_log_info "$(ls -l ${DATA}/**/*)"
         exit 32
     fi
 
@@ -592,10 +629,14 @@ then
                 exit 22
             fi
 
-            if [[ -n $progress ]];then
+            if [[ -n $progress ]] && pv --help | grep -q 'line-mode';then
                 count=$(find ${DATA} -type f -name '*.qp' | wc -l)
                 count=$(( count*2 ))
-                pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
+                if pv --help | grep -q FORMAT;then 
+                    pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
+                else 
+                    pvopts="-f -s $count -l -N Decompression"
+                fi
                 pcmd="pv $pvopts"
                 adjust_progress
                 dcmd="$pcmd | xargs -n 2 qpress -T${nproc}d"
