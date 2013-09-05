@@ -26,6 +26,9 @@ class opts:
     c_timeout              = 10
 
 class clustercheck(BaseHTTPServer.BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.do_GET()
+
     def do_GET(self):
         ctime = time.time()
         if ((ctime - opts.last_query_time) > opts.cache_time) and opts.being_updated == False:
@@ -56,7 +59,7 @@ class clustercheck(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write("Percona XtraDB Cluster Node state could not be retrieved.")
 
-            elif res[0]['Value'] == '4' or (opts.available_when_donor == 1 and res[0]['Value'] == '2'):
+            elif res[0]['Value'] == '4' or (int(opts.available_when_donor) == 1 and res[0]['Value'] == '2'):
                 opts.last_query_result = res[0]['Value']
                 self.send_response(200)
                 self.send_header("Content-type", "text/html")
