@@ -24,6 +24,8 @@
 extern Format_description_log_event *wsrep_format_desc;
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
+/* Sidno in global_sid_map corresponding to group uuid */
+rpl_sidno wsrep_sidno= -1;
 
 /*
  * Begin configuration options and their default values
@@ -49,6 +51,7 @@ my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
 my_bool wsrep_log_conflicts            = 0;
 ulong  wsrep_mysql_replication_bundle  = 0;
+my_bool wsrep_desync                   = 0; // desynchronize the node from the cluster
 
 /*
  * End configuration options
@@ -94,28 +97,19 @@ long             wsrep_protocol_version = 2;
 static my_bool   wsrep_startup = TRUE;
 
 // action execute callback
-extern wsrep_status_t wsrep_apply_cb(void *ctx,
-                                     const void* buf, size_t buf_len,
-                                     const wsrep_trx_meta_t* meta);
+extern wsrep_cb_status_t wsrep_apply_cb(void *ctx,
+                                        const void* buf, size_t buf_len,
+                                        const wsrep_trx_meta_t* meta);
 
-extern wsrep_status_t wsrep_commit_cb(void *ctx,
-                                      const wsrep_trx_meta_t* meta,
-                                      bool commit);
+extern wsrep_cb_status_t wsrep_commit_cb(void *ctx,
+                                         const wsrep_trx_meta_t* meta,
+                                         bool commit);
 
-static wsrep_status_t wsrep_unordered_cb(void*       ctx,
-                                         const void* data,
-                                         size_t      size)
+static wsrep_cb_status_t wsrep_unordered_cb(void*       ctx,
+                                            const void* data,
+                                            size_t      size)
 {
-    return WSREP_OK;
-}
-
-static wsrep_status_t wsrep_expand_cb(void*               ctx,
-                                      const void*         data,
-                                      size_t              size,
-                                      wsrep_stream_t      type,
-                                      const wsrep_uuid_t* producer)
-{
-    return WSREP_OK;
+    return WSREP_CB_SUCCESS;
 }
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
@@ -200,19 +194,39 @@ void wsrep_get_SE_checkpoint(XID* xid)
   plugin_foreach(NULL, get_SE_checkpoint, MYSQL_STORAGE_ENGINE_PLUGIN, xid);
 }
 
-static void wsrep_view_handler_cb (void* app_ctx,
-                                   void* recv_ctx,
-                                   const wsrep_view_info_t* view,
-                                   const char* state,
-                                   size_t state_len,
-                                   void** sst_req,
-                                   ssize_t* sst_req_len)
+void wsrep_init_sidno(const wsrep_uuid_t& uuid)
+{
+  /* generate new Sid map entry from inverted uuid */
+  rpl_sid sid;
+  wsrep_uuid_t ltid_uuid;
+  for (size_t i= 0; i < sizeof(ltid_uuid.data); ++i)
+  {
+      ltid_uuid.data[i] = ~local_uuid.data[i];
+  }
+  sid.copy_from(ltid_uuid.data);
+  global_sid_lock->wrlock();
+  wsrep_sidno= global_sid_map->add_sid(sid);
+  WSREP_INFO("inited wsrep sidno %d", wsrep_sidno);
+  global_sid_lock->unlock();
+}
+
+
+static wsrep_cb_status_t
+wsrep_view_handler_cb (void* app_ctx,
+                       void* recv_ctx,
+                       const wsrep_view_info_t* view,
+                       const char* state,
+                       size_t state_len,
+                       void** sst_req,
+                       int*   sst_req_len)
 {
   wsrep_member_status_t new_status= local_status.get();
 
-  if (memcmp(&cluster_uuid, &view->uuid, sizeof(wsrep_uuid_t)))
+  if (memcmp(&cluster_uuid, &view->state_id.uuid, sizeof(wsrep_uuid_t)))
   {
-    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->uuid, sizeof(cluster_uuid));
+    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->state_id.uuid,
+           sizeof(cluster_uuid));
+
     wsrep_uuid_print (&cluster_uuid, cluster_uuid_str,
                       sizeof(cluster_uuid_str));
   }
@@ -224,7 +238,7 @@ static void wsrep_view_handler_cb (void* app_ctx,
 
   WSREP_INFO("New cluster view: global state: %s:%lld, view# %lld: %s, "
              "number of nodes: %ld, my index: %ld, protocol version %d",
-             wsrep_cluster_state_uuid, (long long)view->seqno,
+             wsrep_cluster_state_uuid, (long long)view->state_id.seqno,
              (long long)wsrep_cluster_conf_id, wsrep_cluster_status,
              wsrep_cluster_size, wsrep_local_index, view->proto_ver);
 
@@ -304,27 +318,28 @@ static void wsrep_view_handler_cb (void* app_ctx,
       {
         wsrep_SE_init_grab();
         // Signal mysqld init thread to continue
-        wsrep_sst_complete (&cluster_uuid, view->seqno, false);
+        wsrep_sst_complete (&cluster_uuid, view->state_id.seqno, false);
         // and wait for SE initialization
         wsrep_SE_init_wait();
       }
       else
       {
         local_uuid=  cluster_uuid;
-        local_seqno= view->seqno;
+        local_seqno= view->state_id.seqno;
       }
       /* Init storage engine XIDs from first view */
       XID xid;
       wsrep_xid_init(&xid, &local_uuid, local_seqno);
       wsrep_set_SE_checkpoint(&xid);
       new_status= WSREP_MEMBER_JOINED;
+      wsrep_init_sidno(local_uuid);
     }
 
     // just some sanity check
     if (memcmp (&local_uuid, &cluster_uuid, sizeof (wsrep_uuid_t)))
     {
       WSREP_ERROR("Undetected state gap. Can't continue.");
-      wsrep_log_states(WSREP_LOG_FATAL, &cluster_uuid, view->seqno,
+      wsrep_log_states(WSREP_LOG_FATAL, &cluster_uuid, view->state_id.seqno,
                        &local_uuid, -1);
       unireg_abort(1);
     }
@@ -339,6 +354,8 @@ static void wsrep_view_handler_cb (void* app_ctx,
 out:
   wsrep_startup= FALSE;
   local_status.set(new_status, view);
+
+  return WSREP_CB_SUCCESS;
 }
 
 void wsrep_ready_set (my_bool x)
@@ -571,6 +588,8 @@ int wsrep_init()
 
   struct wsrep_init_args wsrep_args;
 
+  struct wsrep_gtid const state_id = { local_uuid, local_seqno };
+
   wsrep_args.data_dir        = wsrep_data_home_dir;
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
   wsrep_args.node_address    = node_addr;
@@ -579,15 +598,13 @@ int wsrep_init()
                                 wsrep_provider_options : "";
   wsrep_args.proto_ver       = wsrep_max_protocol_version;
 
-  wsrep_args.state_uuid      = &local_uuid;
-  wsrep_args.state_seqno     = local_seqno;
+  wsrep_args.state_id        = &state_id;
 
   wsrep_args.logger_cb       = wsrep_log_cb;
   wsrep_args.view_handler_cb = wsrep_view_handler_cb;
   wsrep_args.apply_cb        = wsrep_apply_cb;
   wsrep_args.commit_cb       = wsrep_commit_cb;
   wsrep_args.unordered_cb    = wsrep_unordered_cb;
-  wsrep_args.expand_cb       = wsrep_expand_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
 
@@ -839,7 +856,7 @@ static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 static bool wsrep_prepare_key_for_isolation(const char* db,
                                             const char* table,
                                             wsrep_buf_t* key,
-                                            long* key_len)
+                                            int* key_len)
 {
     if (*key_len < 2) return false;
 
@@ -971,7 +988,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
                                   const uchar* row_id,
                                   size_t row_id_len,
                                   wsrep_buf_t* key,
-                                  long* key_len)
+                                  int* key_len)
 {
     if (*key_len < 3) return false;
 
@@ -1016,7 +1033,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
  * Return 0 in case of success, 1 in case of error.
  */
 int wsrep_to_buf_helper(
-    THD* thd, const char *query, uint query_len, uchar** buf, uint* buf_len)
+    THD* thd, const char *query, uint query_len, uchar** buf, int* buf_len)
 {
   IO_CACHE tmp_io_cache;
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
@@ -1032,7 +1049,7 @@ int wsrep_to_buf_helper(
 
 #include "sql_show.h"
 static int
-create_view_query(THD *thd, uchar** buf, uint* buf_len)
+create_view_query(THD *thd, uchar** buf, int* buf_len)
 {
     LEX *lex= thd->lex;
     SELECT_LEX *select_lex= &lex->select_lex;
@@ -1051,15 +1068,15 @@ create_view_query(THD *thd, uchar** buf, uint* buf_len)
     if (!lex->definer)
     {
       /*
-	DEFINER-clause is missing; we have to create default definer in
-	persistent arena to be PS/SP friendly.
-	If this is an ALTER VIEW then the current user should be set as
-	the definer.
+        DEFINER-clause is missing; we have to create default definer in
+        persistent arena to be PS/SP friendly.
+        If this is an ALTER VIEW then the current user should be set as
+        the definer.
       */
 
       if (!(lex->definer= create_default_definer(thd)))
       {
-	WSREP_WARN("view default definer issue");
+        WSREP_WARN("view default definer issue");
       }
     }
 
@@ -1086,7 +1103,7 @@ create_view_query(THD *thd, uchar** buf, uint* buf_len)
       List_iterator_fast<LEX_STRING> names(lex->view_list);
       LEX_STRING *name;
       int i;
-      
+
       for (i= 0; (name= names++); i++)
       {
         buff.append(i ? ", " : "(");
@@ -1109,11 +1126,11 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
 {
   wsrep_status_t ret(WSREP_WARNING);
   uchar* buf(0);
-  uint buf_len(0);
+  int buf_len(0);
   int buf_err;
 
   WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
-	      thd->wsrep_exec_mode, thd->query() );
+              thd->wsrep_exec_mode, thd->query() );
   switch (thd->lex->sql_command)
   {
   case SQLCOM_CREATE_VIEW:
@@ -1136,11 +1153,12 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   }
 
   wsrep_key_arr_t key_arr= {0, 0};
+  struct wsrep_buf buff = { buf, buf_len };
   if (!buf_err                                                    &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
                                                  key_arr.keys, key_arr.keys_len,
-                                                 buf, buf_len,
+                                                 &buff, 1,
                                                  &thd->wsrep_trx_meta)))
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
@@ -1148,7 +1166,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
-		thd->wsrep_exec_mode);
+                thd->wsrep_exec_mode);
   }
   else {
     /* jump to error handler in mysql_execute_command() */

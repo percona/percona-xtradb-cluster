@@ -2728,7 +2728,7 @@ String *sp_get_item_value(THD *thd, Item *item, String *str)
   }
 }
 #ifdef WITH_WSREP
-int wsrep_create_sp(THD *thd, uchar** buf, uint* buf_len)
+int wsrep_create_sp(THD *thd, uchar** buf, int* buf_len)
 {
   String log_query;
   sp_head *sp = thd->lex->sphead;

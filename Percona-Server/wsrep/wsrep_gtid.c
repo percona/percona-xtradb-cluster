@@ -27,10 +27,10 @@
  * Read GTID from string
  * @return length of GTID string representation or -EINVAL in case of error
  */
-ssize_t
+int
 wsrep_gtid_scan(const char* str, size_t str_len, wsrep_gtid_t* gtid)
 {
-    size_t offset;
+    unsigned int offset;
     char* endptr;
 
     if ((offset = wsrep_uuid_scan(str, str_len, &gtid->uuid)) > 0 &&
@@ -56,10 +56,10 @@ wsrep_gtid_scan(const char* str, size_t str_len, wsrep_gtid_t* gtid)
  * @return length of GTID stirng representation of -EMSGSIZE if string is too
  *         short
  */
-ssize_t
+int
 wsrep_gtid_print(const wsrep_gtid_t* gtid, char* str, size_t str_len)
 {
-    size_t offset, ret;
+    unsigned int offset, ret;
     if ((offset = wsrep_uuid_print(&gtid->uuid, str, str_len)) > 0)
     {
         ret = snprintf(str + offset, str_len - offset,

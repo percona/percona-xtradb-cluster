@@ -969,9 +969,9 @@ extern "C" const char *wsrep_thd_conflict_state_str(THD *thd)
     (thd->wsrep_conflict_state == CERT_FAILURE)     ? "cert failure" : "void";
 }
 
-extern "C" wsrep_trx_handle_t* wsrep_thd_trx_handle(THD *thd)
+extern "C" wsrep_ws_handle_t* wsrep_thd_ws_handle(THD *thd)
 {
-  return &thd->wsrep_trx_handle;
+  return &thd->wsrep_ws_handle;
 }
 
 extern "C"void wsrep_thd_LOCK(THD *thd)
@@ -1141,7 +1141,6 @@ THD::THD(bool enable_plugins)
    first_successful_insert_id_in_prev_stmt_for_binlog(0),
    first_successful_insert_id_in_cur_stmt(0),
    stmt_depends_on_first_successful_insert_id_in_prev_stmt(FALSE),
-   failed_com_change_user(0),
    m_examined_row_count(0),
    m_statement_psi(NULL),
    m_idle_psi(NULL),
@@ -1267,8 +1266,8 @@ THD::THD(bool enable_plugins)
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_thd, &LOCK_wsrep_thd, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd, NULL);
-  wsrep_trx_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
-  wsrep_trx_handle.opaque = NULL;
+  wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
+  wsrep_ws_handle.opaque = NULL;
   //wsrep_retry_autocommit= ::wsrep_retry_autocommit;
   wsrep_retry_counter     = 0;
   wsrep_PA_safe           = true;
@@ -2383,6 +2382,9 @@ void THD::cleanup_after_query()
     rand_used= 0;
     binlog_accessed_db_names= NULL;
     m_trans_fixed_log_file= NULL;
+
+    if (gtid_mode > 0)
+      gtid_post_statement_checks(this);
 #ifndef EMBEDDED_LIBRARY
     /*
       Clean possible unused INSERT_ID events by current statement.

@@ -184,7 +184,7 @@ UNIV_INTERN char**	srv_data_file_names = NULL;
 /* size in database pages */
 UNIV_INTERN ulint*	srv_data_file_sizes = NULL;
 
-UNIV_INTERN my_bool	srv_track_changed_pages = TRUE;
+UNIV_INTERN my_bool	srv_track_changed_pages = FALSE;
 
 UNIV_INTERN ulonglong	srv_max_bitmap_file_size = 100 * 1024 * 1024;
 
@@ -1324,17 +1324,20 @@ srv_printf_innodb_monitor(
 		os_atomic_increment_lint(&srv_read_views_memory, 0));
 
 	/* Calculate reserved memories */
-	if (btr_search_sys && btr_search_sys->hash_index->heap) {
+	if (btr_search_sys && btr_search_sys->hash_index[0]->heap) {
 		btr_search_sys_subtotal
-			= mem_heap_get_size(btr_search_sys->hash_index->heap);
+			= mem_heap_get_size(btr_search_sys->hash_index[0]
+					    ->heap);
 	} else {
 		btr_search_sys_subtotal = 0;
-		for (i=0; i < btr_search_sys->hash_index->n_sync_obj; i++) {
+		for (i=0; i < btr_search_sys->hash_index[0]->n_sync_obj; i++) {
 			btr_search_sys_subtotal
 				+= mem_heap_get_size(
-					btr_search_sys->hash_index->heaps[i]);
+					btr_search_sys->hash_index[0]
+					->heaps[i]);
 		}
 	}
+	btr_search_sys_subtotal *= btr_search_index_num;
 
 	lock_sys_subtotal = 0;
 	if (trx_sys) {
@@ -1363,13 +1366,15 @@ srv_printf_innodb_monitor(
 			"    Recovery system     %lu \t(%lu + " ULINTPF ")\n",
 
 			(ulong) (btr_search_sys
-				? (btr_search_sys->hash_index->n_cells
-				   * sizeof(hash_cell_t))
+				? (btr_search_sys->hash_index[0]->n_cells
+				   * sizeof(hash_cell_t)
+				   * btr_search_index_num)
 				 : 0)
 			+ btr_search_sys_subtotal,
 			(ulong) (btr_search_sys
-				? (btr_search_sys->hash_index->n_cells
-				   * sizeof(hash_cell_t))
+				? (btr_search_sys->hash_index[0]->n_cells
+				   * sizeof(hash_cell_t)
+				   * btr_search_index_num)
 				 : 0),
 			btr_search_sys_subtotal,
 
@@ -1520,21 +1525,23 @@ srv_export_innodb_status(void)
 	buf_get_total_list_len(&LRU_len, &free_len, &flush_list_len);
 	buf_get_total_list_size_in_bytes(&buf_pools_list_size);
 
-	if (btr_search_sys && btr_search_sys->hash_index->heap) {
+	if (btr_search_sys && btr_search_sys->hash_index[0]->heap) {
 		mem_adaptive_hash
-			= mem_heap_get_size(btr_search_sys->hash_index->heap);
+			= mem_heap_get_size(btr_search_sys
+					    ->hash_index[0]->heap);
 	} else {
 		mem_adaptive_hash = 0;
-		for (i=0; i < btr_search_sys->hash_index->n_sync_obj; i++) {
+		for (i=0; i < btr_search_sys->hash_index[0]->n_sync_obj; i++) {
 			mem_adaptive_hash
 				+= mem_heap_get_size
-				(btr_search_sys->hash_index->heaps[i]);
+				(btr_search_sys->hash_index[0]->heaps[i]);
 		}
 	}
 	if (btr_search_sys) {
-		mem_adaptive_hash += (btr_search_sys->hash_index->n_cells
+		mem_adaptive_hash += (btr_search_sys->hash_index[0]->n_cells
 				      * sizeof(hash_cell_t));
 	}
+	mem_adaptive_hash *= btr_search_index_num;
 
 	mem_dictionary = (dict_sys ? ((dict_sys->table_hash->n_cells
 					+ dict_sys->table_id_hash->n_cells
@@ -1771,19 +1778,23 @@ srv_export_innodb_status(void)
 		: 0;
 	rw_lock_s_unlock(&purge_sys->latch);
 
-	if (!done_trx_no || trx_sys->rw_max_trx_id < done_trx_no - 1) {
+	mutex_enter(&trx_sys->mutex);
+	trx_id_t	max_trx_id	= trx_sys->rw_max_trx_id;
+	mutex_exit(&trx_sys->mutex);
+
+	if (!done_trx_no || max_trx_id < done_trx_no - 1) {
 		export_vars.innodb_purge_trx_id_age = 0;
 	} else {
 		export_vars.innodb_purge_trx_id_age =
-			(ulint) (trx_sys->rw_max_trx_id - done_trx_no + 1);
+			(ulint) (max_trx_id - done_trx_no + 1);
 	}
 
 	if (!up_limit_id
-	    || trx_sys->rw_max_trx_id < up_limit_id) {
+	    || max_trx_id < up_limit_id) {
 		export_vars.innodb_purge_view_trx_id_age = 0;
 	} else {
 		export_vars.innodb_purge_view_trx_id_age =
-			(ulint) (trx_sys->rw_max_trx_id - up_limit_id);
+			(ulint) (max_trx_id - up_limit_id);
 	}
 #endif /* UNIV_DEBUG */
 

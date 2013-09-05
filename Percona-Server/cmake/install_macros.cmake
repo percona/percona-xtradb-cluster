@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2011, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2013, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,8 +13,31 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA 
 
+if(APPLE)
+ LIST(APPEND CMAKE_CXX_LINK_EXECUTABLE "dsymutil <TARGET>")
+ LIST(APPEND CMAKE_C_LINK_EXECUTABLE "dsymutil <TARGET>")
+ LIST(APPEND CMAKE_CXX_CREATE_SHARED_LIBRARY "dsymutil <TARGET>")
+ LIST(APPEND CMAKE_C_CREATE_SHARED_LIBRARY "dsymutil <TARGET>")
+ LIST(APPEND CMAKE_CXX_CREATE_SHARED_MODULE "dsymutil <TARGET>")
+ LIST(APPEND CMAKE_C_CREATE_SHARED_MODULE "dsymutil <TARGET>")
+ENDIF()
+
 GET_FILENAME_COMPONENT(MYSQL_CMAKE_SCRIPT_DIR ${CMAKE_CURRENT_LIST_FILE} PATH)
 INCLUDE(${MYSQL_CMAKE_SCRIPT_DIR}/cmake_parse_arguments.cmake)
+MACRO (INSTALL_DSYM_DIRECTORIES targets)
+  IF(APPLE)
+    FOREACH(target ${targets})
+      GET_TARGET_PROPERTY(location ${target} LOCATION)
+      GET_TARGET_PROPERTY(type ${target} TYPE)
+      # It's a dirty hack, but cmake too stupid and mysql cmake files too buggy */
+      STRING(REPLACE "liblibmysql.dylib" "libmysqlclient.${SHARED_LIB_MAJOR_VERSION}.dylib" location ${location})
+      IF(type MATCHES "EXECUTABLE" OR type MATCHES "MODULE" OR type MATCHES "SHARED_LIBRARY")
+        INSTALL(DIRECTORY "${location}.dSYM" DESTINATION ${INSTALL_LOCATION} COMPONENT Debuginfo)
+      ENDIF()
+    ENDFOREACH()
+  ENDIF()
+ENDMACRO()
+
 MACRO (INSTALL_DEBUG_SYMBOLS targets)
   IF(MSVC)
   FOREACH(target ${targets})
@@ -111,28 +134,28 @@ FUNCTION(INSTALL_SCRIPT)
 ENDFUNCTION()
 
 # Install symbolic link to CMake target. 
-# the link is created in the same directory as target
-# and extension will be the same as for target file.
-MACRO(INSTALL_SYMLINK linkname target destination component)
+# We do 'cd path; ln -s target_name link_name'
+# We also add an INSTALL target for "${path}/${link_name}"
+MACRO(INSTALL_SYMLINK target target_name link_name destination component)
 IF(UNIX)
   GET_TARGET_PROPERTY(location ${target} LOCATION)
   GET_FILENAME_COMPONENT(path ${location} PATH)
-  GET_FILENAME_COMPONENT(name ${location} NAME)
-  SET(output ${path}/${linkname})
+
+  SET(output ${path}/${link_name})
   ADD_CUSTOM_COMMAND(
     OUTPUT ${output}
     COMMAND ${CMAKE_COMMAND} ARGS -E remove -f ${output}
     COMMAND ${CMAKE_COMMAND} ARGS -E create_symlink 
-      ${name} 
-      ${linkname}
+      ${target_name} 
+      ${link_name}
     WORKING_DIRECTORY ${path}
     DEPENDS ${target}
     )
   
-  ADD_CUSTOM_TARGET(symlink_${linkname}
+  ADD_CUSTOM_TARGET(symlink_${link_name}
     ALL
     DEPENDS ${output})
-  SET_TARGET_PROPERTIES(symlink_${linkname} PROPERTIES CLEAN_DIRECT_OUTPUT 1)
+  SET_TARGET_PROPERTIES(symlink_${link_name} PROPERTIES CLEAN_DIRECT_OUTPUT 1)
   IF(CMAKE_GENERATOR MATCHES "Xcode")
     # For Xcode, replace project config with install config
     STRING(REPLACE "${CMAKE_CFG_INTDIR}" 
@@ -232,6 +255,7 @@ FUNCTION(MYSQL_INSTALL_TARGETS)
   INSTALL(TARGETS ${TARGETS} DESTINATION ${ARG_DESTINATION} ${COMP})
   SET(INSTALL_LOCATION ${ARG_DESTINATION} )
   INSTALL_DEBUG_SYMBOLS("${TARGETS}")
+  INSTALL_DSYM_DIRECTORIES("${TARGETS}")
   SET(INSTALL_LOCATION)
 ENDFUNCTION()
 

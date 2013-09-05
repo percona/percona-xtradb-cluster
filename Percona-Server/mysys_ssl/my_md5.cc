@@ -90,10 +90,10 @@ void wsrep_compute_md5_hash(char *digest, void *ctx)
 {
 #if defined(HAVE_YASSL)
   ((TaoCrypt::MD5*)ctx)->Final((TaoCrypt::byte *) digest);
-  free((TaoCrypt::MD5*)ctx);
+  delete (TaoCrypt::MD5*)ctx;
 #elif defined(HAVE_OPENSSL)
   MD5_Final ((unsigned char*)digest, (MD5_CTX*)ctx);
-  free((MD5_CTX*)ctx);
+  delete (MD5_CTX*)ctx;
 #endif /* HAVE_YASSL */
 }
 #endif

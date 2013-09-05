@@ -1700,6 +1700,8 @@ struct buf_block_t{
 					complete, though: there may
 					have been hash collisions,
 					record deletions, etc. */
+	rw_lock_t*	btr_search_latch;/*!< Adaptive hash index latch for the
+					 index this block belongs to or NULL */
 	/* @} */
 # ifdef UNIV_SYNC_DEBUG
 	/** @name Debug fields */
@@ -1820,6 +1822,9 @@ struct buf_pool_t{
 	ulint		n_chunks;	/*!< number of buffer pool chunks */
 	buf_chunk_t*	chunks;		/*!< buffer pool chunks */
 	ulint		curr_size;	/*!< current pool size in pages */
+	ulint		read_ahead_area;/*!< size in pages of the area which
+					the read-ahead algorithms read if
+					invoked */
 	hash_table_t*	page_hash;	/*!< hash table of buf_page_t or
 					buf_block_t file pages,
 					buf_page_in_file() == TRUE,

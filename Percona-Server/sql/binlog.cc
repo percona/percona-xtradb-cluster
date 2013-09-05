@@ -844,7 +844,7 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
   if (!cache_mngr->is_binlog_empty()) {
     IO_CACHE* cache= get_trans_log(thd);
     uchar *buf;
-    uint len=0;
+    int len=0;
     WSREP_WARN("binlog cache not empty at connection close %lu", 
                thd->thread_id);
     wsrep_write_cache(cache, &buf, &len);
@@ -1495,15 +1495,15 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
     rollback.
    */
   if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT)
-    if (int error= ha_rollback_low(thd, all))
-      DBUG_RETURN(error);
+    if ((error= ha_rollback_low(thd, all)))
+      goto end;
 
   /*
     If there is no cache manager, or if there is nothing in the
     caches, there are no caches to roll back, so we're trivially done.
    */
   if (cache_mngr == NULL || cache_mngr->is_binlog_empty())
-    DBUG_RETURN(0);
+    goto end;
 
   DBUG_PRINT("debug",
              ("all.cannot_safely_rollback(): %s, trx_cache_empty: %s",
@@ -1525,8 +1525,8 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
   }
   else if (!cache_mngr->stmt_cache.is_binlog_empty())
   {
-    if (int error= cache_mngr->stmt_cache.finalize(thd))
-      DBUG_RETURN(error);
+    if ((error= cache_mngr->stmt_cache.finalize(thd)))
+      goto end;
     stuff_logged= true;
   }
 
@@ -1620,8 +1620,15 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
       a cache and need to be rolled back.
     */
     error |= cache_mngr->trx_cache.truncate(thd, all);
-    DBUG_RETURN(error);
   }
+
+end:
+  /*
+    When a statement errors out on auto-commit mode it is rollback
+    implicitly, so the same should happen to its GTID.
+  */
+  if (!thd->in_active_multi_stmt_transaction())
+    gtid_rollback(thd);
 
   DBUG_PRINT("return", ("error: %d", error));
   DBUG_RETURN(error);
@@ -5222,23 +5229,24 @@ err:
   if (WSREP(thd) && wsrep_incremental_data_collection &&
       (wsrep_emulate_bin_log || mysql_bin_log.is_open()))
   {
-    DBUG_ASSERT(thd->wsrep_trx_handle.trx_id != (unsigned long)-1);
+    DBUG_ASSERT(thd->wsrep_ws_handle.trx_id != (unsigned long)-1);
     if (!error)
     {
       IO_CACHE* cache= get_trans_log(thd);
       uchar* buf= NULL;
-      uint buf_len= 0;
+      int buf_len= 0;
 
       if (wsrep_emulate_bin_log)
         thd->binlog_flush_pending_rows_event(false);
       error= wsrep_write_cache(cache, &buf, &buf_len);
       if (!error && buf_len > 0)
       {
-        const bool nocopy(false);
-        const bool unordered(false);
+        const struct wsrep_buf buff = { buf, buf_len };
+        const bool copy(true);
         wsrep_status_t rc= wsrep->append_data(wsrep,
-                                              &thd->wsrep_trx_handle,
-                                              buf, buf_len, nocopy, unordered);
+                                              &thd->wsrep_ws_handle,
+                                              &buff, 1, WSREP_DATA_ORDERED,
+                                              copy);
         if (rc != WSREP_OK)
         {
           sql_print_warning("WSREP: append_data() returned %d", rc);
@@ -5816,7 +5824,6 @@ bool MYSQL_BIN_LOG::write_cache(THD *thd, binlog_cache_data *cache_data)
         goto err;
       }
 
-      thd->variables.gtid_next.set_undefined();
       global_sid_lock->rdlock();
       if (gtid_state->update_on_flush(thd) != RETURN_STATUS_OK)
       {
@@ -6221,7 +6228,13 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   DBUG_ENTER("MYSQL_BIN_LOG::commit");
 
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(thd);
+#ifdef WITH_WSREP
+  my_xid xid= (wsrep_is_wsrep_xid(&thd->transaction.xid_state.xid) ?
+               wsrep_xid_seqno(&thd->transaction.xid_state.xid) :
+               thd->transaction.xid_state.xid.get_my_xid());
+#else
   my_xid xid= thd->transaction.xid_state.xid.get_my_xid();
+#endif /* WITH_WSREP */
   int error= RESULT_SUCCESS;
   bool stuff_logged= false;
 
@@ -6740,7 +6753,6 @@ MYSQL_BIN_LOG::finish_commit(THD *thd)
   else if (thd->transaction.flags.xid_written)
     dec_prep_xids(thd);
 
-  thd->variables.gtid_next.set_undefined();
   /*
     Remove committed GTID from owned_gtids, it was already logged on
     MYSQL_BIN_LOG::write_cache().
@@ -6973,10 +6985,10 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
     int error= rotate(false, &check_purge);
     mysql_mutex_unlock(&LOCK_log);
 
-    if (!error && check_purge)
-      purge();
-    else
+    if (error)
       thd->commit_error= THD::CE_COMMIT_ERROR;
+    else if (check_purge)
+      purge();
   }
   DBUG_RETURN(thd->commit_error);
 }
@@ -7007,6 +7019,24 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
   */
   bool in_transaction= FALSE;
 
+#ifdef WITH_WSREP
+  /*
+    Read current wsrep position from storage engines to have consistent
+    end position for binlog scan.
+  */
+  XID xid;
+  memset(&xid, 0, sizeof(xid));
+  xid.formatID= -1;
+  wsrep_get_SE_checkpoint(&xid);
+  char uuid_str[40];
+  wsrep_uuid_print(wsrep_xid_uuid(&xid), uuid_str, sizeof(uuid_str));
+  WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
+             (long long)wsrep_xid_seqno(&xid));
+  const wsrep_seqno_t last_xid_seqno= wsrep_xid_seqno(&xid);
+  wsrep_seqno_t cur_xid_seqno=WSREP_SEQNO_UNDEFINED;
+#endif /* WITH_WSREP */
+
+
   if (! fdle->is_valid() ||
       my_hash_init(&xids, &my_charset_bin, TC_LOG_PAGE_SIZE/3, 0,
                    sizeof(my_xid), 0, 0, MYF(0)))
@@ -7015,7 +7045,12 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
   init_alloc_root(&mem_root, TC_LOG_PAGE_SIZE, TC_LOG_PAGE_SIZE);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-         && ev->is_valid())
+         && ev->is_valid()
+#ifdef WITH_WSREP
+         && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
+             last_xid_seqno != cur_xid_seqno)
+#endif
+      )
   {
     if (ev->get_type_code() == QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))
@@ -7036,6 +7071,9 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                                       sizeof(xev->xid));
       if (!x || my_hash_insert(&xids, x))
         goto err2;
+#ifdef WITH_WSREP
+      cur_xid_seqno= xev->xid;
+#endif /* WITH_WSREP */
     }
 
     /*
@@ -7079,6 +7117,11 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
 
     delete ev;
   }
+
+#ifdef WITH_WSREP
+  WSREP_INFO("Binlog recovery scan stopped at Xid event %lld",
+             (long long)cur_xid_seqno);
+#endif /* WITH_WSREP */
 
   if (ha_recover(&xids))
     goto err2;
@@ -9006,15 +9049,15 @@ void thd_binlog_rollback_stmt(THD * thd)
   with the exception that here we write in buffer instead of log file.
  */
 
-int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
+int wsrep_write_cache(IO_CACHE *cache, uchar **buf, int *buf_len)
 {
-
+  my_off_t saved_pos= my_b_tell(cache);
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
     return ER_ERROR_ON_WRITE;
   uint length= my_b_bytes_in_cache(cache);
   long long total_length = 0;
   uchar *buf_ptr = NULL;
-  
+
   do
   {
     /* bail out if buffer grows too large
@@ -9024,8 +9067,8 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
     if (total_length > wsrep_max_ws_size)
     {
       WSREP_WARN("transaction size limit (%lld) exceeded: %lld",
-		 wsrep_max_ws_size, total_length);
-      if (reinit_io_cache(cache, WRITE_CACHE, 0, 0, 0))
+                 wsrep_max_ws_size, total_length);
+      if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
       {
         WSREP_WARN("failed to initialize io-cache");
       } 
@@ -9063,6 +9106,14 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, uint *buf_len)
     memcpy(buf_ptr, cache->read_pos, length);
     cache->read_pos=cache->read_end;
   } while ((cache->file >= 0) && (length= my_b_fill(cache)));
+
+  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
+  {
+    WSREP_WARN("failed to initialize io-cache");
+    my_free(*buf);
+    *buf_len= 0;
+    return ER_ERROR_ON_WRITE;
+  }
 
   return 0;
 }

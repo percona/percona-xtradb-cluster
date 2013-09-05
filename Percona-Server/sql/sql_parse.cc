@@ -1433,47 +1433,27 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     /* acl_authenticate() takes the data from net->read_pos */
     net->read_pos= (uchar*)packet;
 
-    uint save_db_length= thd->db_length;
-    char *save_db= thd->db;
     USER_CONN *save_user_connect=
       const_cast<USER_CONN*>(thd->get_user_connect());
+    char *save_db= thd->db;
+    uint save_db_length= thd->db_length;
     Security_context save_security_ctx= *thd->security_ctx;
-    const CHARSET_INFO *save_character_set_client=
-      thd->variables.character_set_client;
-    const CHARSET_INFO *save_collation_connection=
-      thd->variables.collation_connection;
-    const CHARSET_INFO *save_character_set_results=
-      thd->variables.character_set_results;
 
-    /* Ensure we don't free security_ctx->user in case we have to revert */
-    thd->security_ctx->user= 0;
-    thd->set_user_connect(0);
-
-    /*
-      to limit COM_CHANGE_USER ability to brute-force passwords,
-      we only allow three unsuccessful COM_CHANGE_USER per connection.
-    */
-    if (thd->failed_com_change_user >= 3)
-    {
-      my_message(ER_UNKNOWN_COM_ERROR, ER(ER_UNKNOWN_COM_ERROR), MYF(0));
-      auth_rc= 1;
-    }
-    else
-      auth_rc= acl_authenticate(thd, packet_length);
-
+    auth_rc= acl_authenticate(thd, packet_length);
     MYSQL_AUDIT_NOTIFY_CONNECTION_CHANGE_USER(thd);
     if (auth_rc)
     {
       my_free(thd->security_ctx->user);
       *thd->security_ctx= save_security_ctx;
       thd->set_user_connect(save_user_connect);
-      thd->reset_db (save_db, save_db_length);
-      thd->variables.character_set_client= save_character_set_client;
-      thd->variables.collation_connection= save_collation_connection;
-      thd->variables.character_set_results= save_character_set_results;
-      thd->update_charset();
-      thd->failed_com_change_user++;
-      my_sleep(1000000);
+      thd->reset_db(save_db, save_db_length);
+
+      my_error(ER_ACCESS_DENIED_CHANGE_USER_ERROR, MYF(0),
+               thd->security_ctx->user,
+               thd->security_ctx->host_or_ip,
+               (thd->password ? ER(ER_YES) : ER(ER_NO)));
+      thd->killed= THD::KILL_CONNECTION;
+      error=true;
     }
     else
     {
@@ -1484,6 +1464,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 #endif /* NO_EMBEDDED_ACCESS_CHECKS */
       my_free(save_db);
       my_free(save_security_ctx.user);
+
     }
     break;
   }
@@ -1509,12 +1490,12 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   }
   case COM_STMT_CLOSE:
   {
-    mysqld_stmt_close(thd, packet);
+    mysqld_stmt_close(thd, packet, packet_length);
     break;
   }
   case COM_STMT_RESET:
   {
-    mysqld_stmt_reset(thd, packet);
+    mysqld_stmt_reset(thd, packet, packet_length);
     break;
   }
   case COM_QUERY:
@@ -1793,6 +1774,12 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   {
     int not_used;
 
+    if (packet_length < 1)
+    {
+      my_error(ER_MALFORMED_PACKET, MYF(0));
+      break;
+    }
+
     /*
       Initialize thd->lex since it's used in many base functions, such as
       open_tables(). Otherwise, it remains unitialized and may cause crash
@@ -1841,6 +1828,11 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 #ifndef EMBEDDED_LIBRARY
   case COM_SHUTDOWN:
   {
+    if (packet_length < 1)
+    {
+      my_error(ER_MALFORMED_PACKET, MYF(0));
+      break;
+    }
     status_var_increment(thd->status_var.com_other);
     if (check_global_access(thd,SHUTDOWN_ACL))
       break; /* purecov: inspected */
@@ -1927,6 +1919,8 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   {
     if (thread_id & (~0xfffffffful))
       my_error(ER_DATA_OUT_OF_RANGE, MYF(0), "thread_id", "mysql_kill()");
+    else if (packet_length < 4)
+      my_error(ER_MALFORMED_PACKET, MYF(0));
     else
     {
       status_var_increment(thd->status_var.com_stat[SQLCOM_KILL]);
@@ -1937,6 +1931,12 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   }
   case COM_SET_OPTION:
   {
+
+    if (packet_length < 2)
+    {
+      my_error(ER_MALFORMED_PACKET, MYF(0));
+      break;
+    }
     status_var_increment(thd->status_var.com_stat[SQLCOM_SET_OPTION]);
     uint opt_command= uint2korr(packet);
 
@@ -6728,7 +6728,7 @@ void wsrep_replay_transaction(THD *thd)
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
       int rcode = wsrep->replay_trx(wsrep,
-				    &thd->wsrep_trx_handle,
+				    &thd->wsrep_ws_handle,
 				    (void *)thd);
 
       wsrep_return_from_bf_mode(thd, &shadow);
@@ -6741,7 +6741,7 @@ void wsrep_replay_transaction(THD *thd)
       {
       case WSREP_OK:
 	thd->wsrep_conflict_state= NO_CONFLICT;
-	wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
+	wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
 	WSREP_DEBUG("trx_replay successful for: %ld %llu", 
 		    thd->thread_id, (long long)thd->real_id);
 	break;
@@ -6756,7 +6756,7 @@ void wsrep_replay_transaction(THD *thd)
 	  //my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
 	}
 	thd->wsrep_conflict_state= ABORTED;
-	wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
+	wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
 	break;
       default:
 	WSREP_ERROR("trx_replay failed for: %d, query: %s", 
@@ -8880,7 +8880,7 @@ void wsrep_write_rbr_buf(
   }
 }
 
-static inline wsrep_status_t wsrep_apply_rbr(
+static inline wsrep_cb_status_t wsrep_apply_rbr(
     THD *thd, const uchar *rbr_buf, size_t buf_len)
 {
   char *buf= (char *)rbr_buf;
@@ -8893,7 +8893,7 @@ static inline wsrep_status_t wsrep_apply_rbr(
   {
     WSREP_INFO("applier has been aborted, skipping apply_rbr: %lld",
                (long long) wsrep_thd_trx_seqno(thd));
-    DBUG_RETURN(WSREP_FATAL);
+    DBUG_RETURN(WSREP_CB_FAILURE);
   }
 
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -8912,7 +8912,6 @@ static inline wsrep_status_t wsrep_apply_rbr(
   while(buf_len)
   {
     int exec_res;
-    int error = 0;
     Log_event* ev=  wsrep_read_log_event(&buf, &buf_len, wsrep_format_desc);
 
     if (!ev)
@@ -8929,6 +8928,16 @@ static inline wsrep_status_t wsrep_apply_rbr(
       DBUG_ASSERT(buf_len != 0 ||
                   ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F));
       break;
+    case GTID_LOG_EVENT:
+    {
+      Gtid_log_event* gev= (Gtid_log_event*)ev;
+      if (gev->get_gno() == 0)
+      {
+        /* Skip GTID log event to make binlog to generate LTID on commit */
+        delete ev;
+        continue;
+      }
+    }
     default:
       break;
     }
@@ -8969,24 +8978,9 @@ static inline wsrep_status_t wsrep_apply_rbr(
       /* Release transactional metadata locks. */
       thd->mdl_context.release_transactional_locks();
       thd->wsrep_conflict_state= NO_CONFLICT;
-      DBUG_RETURN(WSREP_FATAL);
+      DBUG_RETURN(WSREP_CB_FAILURE);
     }
 
-    if (ev->get_type_code() != TABLE_MAP_EVENT &&
-        ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F))
-    {
-      // TODO: combine with commit on higher level common for the query ws
-
-      thd->wsrep_rli->cleanup_context(thd, 0);
-
-      if (error == 0)
-      {
-        thd->clear_error();
-      }
-      else
-        WSREP_ERROR("Error in %s event: commit of row events failed: %lld",
-                    ev->get_type_str(), (long long)wsrep_thd_trx_seqno(thd));
-    }
     delete ev;
   }
 
@@ -9000,13 +8994,13 @@ static inline wsrep_status_t wsrep_apply_rbr(
   if (thd->killed == THD::KILL_CONNECTION)
     WSREP_INFO("applier aborted: %lld", (long long)wsrep_thd_trx_seqno(thd));
 
-  if (rcode) DBUG_RETURN(WSREP_FATAL);
-  DBUG_RETURN(WSREP_OK);
+  if (rcode) DBUG_RETURN(WSREP_CB_FAILURE);
+  DBUG_RETURN(WSREP_CB_SUCCESS);
 }
 
-wsrep_status_t wsrep_apply_cb(void* const ctx,
-                              const void* const buf, size_t const buf_len,
-                              const wsrep_trx_meta_t* meta)
+wsrep_cb_status_t wsrep_apply_cb(void* const ctx,
+                                 const void* const buf, size_t const buf_len,
+                                 const wsrep_trx_meta_t* meta)
 {
   THD* const thd((THD*)ctx);
 
@@ -9021,7 +9015,8 @@ wsrep_status_t wsrep_apply_cb(void* const ctx,
   thd_proc_info(thd, "applying write set");
 #endif /* WSREP_PROC_INFO */
 
-  wsrep_status_t const rcode(wsrep_apply_rbr(thd, (const uchar*)buf, buf_len));
+  wsrep_cb_status_t const rcode(wsrep_apply_rbr(thd, (const uchar*)buf,
+                                                buf_len));
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9031,12 +9026,12 @@ wsrep_status_t wsrep_apply_cb(void* const ctx,
   thd_proc_info(thd, "applied write set");
 #endif /* WSREP_PROC_INFO */
 
-  if (WSREP_OK != rcode) wsrep_write_rbr_buf(thd, buf, buf_len);
+  if (WSREP_CB_SUCCESS != rcode) wsrep_write_rbr_buf(thd, buf, buf_len);
 
   return rcode;
 }
 
-wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
+wsrep_cb_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
 {
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9047,7 +9042,8 @@ wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
 #endif /* WSREP_PROC_INFO */
 
 //REMOVE lp:884560  wsrep_status_t const rcode(wsrep_apply_sql(thd, "COMMIT", 6, 0, 0));
-  wsrep_status_t const rcode(trans_commit(thd) ? WSREP_FATAL : WSREP_OK);
+  wsrep_cb_status_t const rcode(trans_commit(thd) ?
+                                WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9057,15 +9053,17 @@ wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
   thd_proc_info(thd, "committed");
 #endif /* WSREP_PROC_INFO */
 
-  if (WSREP_OK == rcode)
+  if (WSREP_CB_SUCCESS == rcode)
   {
+    thd->wsrep_rli->cleanup_context(thd, 0);
+    thd->variables.gtid_next.set_automatic();
     // TODO: mark snapshot with global_seqno.
   }
 
   return rcode;
 }
 
-wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
+wsrep_cb_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
 {
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9076,7 +9074,8 @@ wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
 #endif /* WSREP_PROC_INFO */
 
 //REMOVE lp:884560  wsrep_status_t const rcode(wsrep_apply_sql(thd, "ROLLBACK", 8, 0, 0));
-  wsrep_status_t const rcode(trans_rollback(thd) ? WSREP_FATAL : WSREP_OK);
+  wsrep_cb_status_t const rcode(trans_rollback(thd) ?
+                                WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9085,13 +9084,15 @@ wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
 #else
   thd_proc_info(thd, "rolled back");
 #endif /* WSREP_PROC_INFO */
+  thd->wsrep_rli->cleanup_context(thd, 0);
+  thd->variables.gtid_next.set_automatic();
 
   return rcode;
 }
 
-wsrep_status_t wsrep_commit_cb(void*         const     ctx,
-                               const wsrep_trx_meta_t* meta,
-                               bool          const     commit)
+wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
+                                  const wsrep_trx_meta_t* meta,
+                                  bool          const     commit)
 {
   THD* const thd((THD*)ctx);
 

@@ -1013,6 +1013,7 @@ buf_block_init(
 
 	block->check_index_page_at_flush = FALSE;
 	block->index = NULL;
+	block->btr_search_latch = NULL;
 
 #ifdef UNIV_DEBUG
 	block->page.in_page_hash = FALSE;
@@ -1324,6 +1325,8 @@ buf_pool_init_instance(
 		buf_pool->instance_no = instance_no;
 		buf_pool->old_pool_size = buf_pool_size;
 		buf_pool->curr_size = chunk->size;
+		buf_pool->read_ahead_area
+			= ut_min(64, ut_2_power_up(buf_pool->curr_size / 32));
 		buf_pool->curr_pool_size = buf_pool->curr_size * UNIV_PAGE_SIZE;
 
 		/* Number of locks protecting page_hash must be a
@@ -1482,7 +1485,7 @@ buf_pool_clear_hash_index(void)
 	ulint	p;
 
 #ifdef UNIV_SYNC_DEBUG
-	ut_ad(rw_lock_own(&btr_search_latch, RW_LOCK_EX));
+	ut_ad(btr_search_own_all(RW_LOCK_EX));
 #endif /* UNIV_SYNC_DEBUG */
 	ut_ad(!btr_search_enabled);
 
@@ -2206,6 +2209,7 @@ buf_block_init_low(
 {
 	block->check_index_page_at_flush = FALSE;
 	block->index		= NULL;
+	block->btr_search_latch = NULL;
 
 	block->n_hash_helps	= 0;
 	block->n_fields		= 1;
@@ -2752,35 +2756,25 @@ wait_until_unfixed:
 						   offset, fold);
 
 		mutex_enter(&block->mutex);
-		if (UNIV_UNLIKELY(bpage != hash_bpage)) {
-			/* The buf_pool->page_hash was modified
-			while buf_pool->mutex was released.
-			Free the block that was allocated. */
-
+		if (bpage != hash_bpage
+		    || bpage->buf_fix_count
+		    || buf_page_get_io_fix(bpage) != BUF_IO_NONE) {
 			buf_LRU_block_free_non_file_page(block);
 			buf_pool_mutex_exit(buf_pool);
-			mutex_exit(&block->mutex);
 			rw_lock_x_unlock(hash_lock);
-
-			block = NULL;
-			goto loop;
-		}
-
-		if (UNIV_UNLIKELY
-		    (bpage->buf_fix_count
-		     || buf_page_get_io_fix(bpage) != BUF_IO_NONE)) {
-
-			rw_lock_x_unlock(hash_lock);
-			/* The block was buffer-fixed or I/O-fixed
-			while buf_pool->mutex was not held by this thread.
-			Free the block that was allocated and try again.
-			This should be extremely unlikely. */
-
-			buf_LRU_block_free_non_file_page(block);
-			buf_pool_mutex_exit(buf_pool);
 			mutex_exit(&block->mutex);
 
-			goto wait_until_unfixed;
+			if (bpage != hash_bpage) {
+				/* The buf_pool->page_hash was modified
+				while buf_pool->mutex was not held
+				by this thread. */
+				goto loop;
+			} else {
+				/* The block was buffer-fixed or
+				I/O-fixed while buf_pool->mutex was
+				not held by this thread. */
+				goto wait_until_unfixed;
+			}
 		}
 
 		/* Move the compressed page from bpage to block,

@@ -54,10 +54,10 @@ then
 fi
 
 # Check client version
-if ! mysql --version | grep 'Distrib 5.5' >/dev/null
+if ! mysql --version | grep 'Distrib 5.6' >/dev/null
 then
     mysql --version >&2
-    wsrep_log_error "this operation requires MySQL client version 5.5.x"
+    wsrep_log_error "this operation requires MySQL client version 5.6.x"
     exit $EINVAL
 fi
 
@@ -107,9 +107,14 @@ $MYSQL -e"$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
 RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
 RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
 
+# reset master for 5.6 to clear GTID_EXECUTED
+RESET_MASTER="RESET MASTER;"
+
+
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
-    (echo $STOP_WSREP && $MYSQLDUMP && echo $CSV_TABLES_FIX \
+# commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
+    (echo $STOP_WSREP && echo $RESET_MASTER && $MYSQLDUMP \
     && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
     && echo $SET_START_POSITION \
     || echo "SST failed to complete;") | $MYSQL
