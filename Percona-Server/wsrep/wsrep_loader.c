@@ -75,11 +75,12 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     VERIFY(wh->free_connection);
     VERIFY(wh->to_execute_start);
     VERIFY(wh->to_execute_end);
-    VERIFY(wh->encapsulate);
+    VERIFY(wh->preordered);
     VERIFY(wh->sst_sent);
     VERIFY(wh->sst_received);
     VERIFY(wh->stats_get);
     VERIFY(wh->stats_free);
+    VERIFY(wh->stats_reset);
     VERIFY(wh->pause);
     VERIFY(wh->resume);
     VERIFY(wh->desync);
@@ -90,7 +91,6 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     VERIFY(wh->provider_name);
     VERIFY(wh->provider_version);
     VERIFY(wh->provider_vendor);
-    VERIFY(wh->provider_type);
     VERIFY(wh->free);
     return 0;
 }

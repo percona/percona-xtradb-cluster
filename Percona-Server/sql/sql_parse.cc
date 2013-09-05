@@ -6728,7 +6728,7 @@ void wsrep_replay_transaction(THD *thd)
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
       int rcode = wsrep->replay_trx(wsrep,
-				    &thd->wsrep_trx_handle,
+				    &thd->wsrep_ws_handle,
 				    (void *)thd);
 
       wsrep_return_from_bf_mode(thd, &shadow);
@@ -6741,7 +6741,7 @@ void wsrep_replay_transaction(THD *thd)
       {
       case WSREP_OK:
 	thd->wsrep_conflict_state= NO_CONFLICT;
-	wsrep->post_commit(wsrep, &thd->wsrep_trx_handle);
+	wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
 	WSREP_DEBUG("trx_replay successful for: %ld %llu", 
 		    thd->thread_id, (long long)thd->real_id);
 	break;
@@ -6756,7 +6756,7 @@ void wsrep_replay_transaction(THD *thd)
 	  //my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
 	}
 	thd->wsrep_conflict_state= ABORTED;
-	wsrep->post_rollback(wsrep, &thd->wsrep_trx_handle);
+	wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
 	break;
       default:
 	WSREP_ERROR("trx_replay failed for: %d, query: %s", 
@@ -8880,7 +8880,7 @@ void wsrep_write_rbr_buf(
   }
 }
 
-static inline wsrep_status_t wsrep_apply_rbr(
+static inline wsrep_cb_status_t wsrep_apply_rbr(
     THD *thd, const uchar *rbr_buf, size_t buf_len)
 {
   char *buf= (char *)rbr_buf;
@@ -8893,7 +8893,7 @@ static inline wsrep_status_t wsrep_apply_rbr(
   {
     WSREP_INFO("applier has been aborted, skipping apply_rbr: %lld",
                (long long) wsrep_thd_trx_seqno(thd));
-    DBUG_RETURN(WSREP_FATAL);
+    DBUG_RETURN(WSREP_CB_FAILURE);
   }
 
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -8912,7 +8912,6 @@ static inline wsrep_status_t wsrep_apply_rbr(
   while(buf_len)
   {
     int exec_res;
-    int error = 0;
     Log_event* ev=  wsrep_read_log_event(&buf, &buf_len, wsrep_format_desc);
 
     if (!ev)
@@ -8929,6 +8928,16 @@ static inline wsrep_status_t wsrep_apply_rbr(
       DBUG_ASSERT(buf_len != 0 ||
                   ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F));
       break;
+    case GTID_LOG_EVENT:
+    {
+      Gtid_log_event* gev= (Gtid_log_event*)ev;
+      if (gev->get_gno() == 0)
+      {
+        /* Skip GTID log event to make binlog to generate LTID on commit */
+        delete ev;
+        continue;
+      }
+    }
     default:
       break;
     }
@@ -8969,24 +8978,9 @@ static inline wsrep_status_t wsrep_apply_rbr(
       /* Release transactional metadata locks. */
       thd->mdl_context.release_transactional_locks();
       thd->wsrep_conflict_state= NO_CONFLICT;
-      DBUG_RETURN(WSREP_FATAL);
+      DBUG_RETURN(WSREP_CB_FAILURE);
     }
 
-    if (ev->get_type_code() != TABLE_MAP_EVENT &&
-        ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F))
-    {
-      // TODO: combine with commit on higher level common for the query ws
-
-      thd->wsrep_rli->cleanup_context(thd, 0);
-
-      if (error == 0)
-      {
-        thd->clear_error();
-      }
-      else
-        WSREP_ERROR("Error in %s event: commit of row events failed: %lld",
-                    ev->get_type_str(), (long long)wsrep_thd_trx_seqno(thd));
-    }
     delete ev;
   }
 
@@ -9000,13 +8994,13 @@ static inline wsrep_status_t wsrep_apply_rbr(
   if (thd->killed == THD::KILL_CONNECTION)
     WSREP_INFO("applier aborted: %lld", (long long)wsrep_thd_trx_seqno(thd));
 
-  if (rcode) DBUG_RETURN(WSREP_FATAL);
-  DBUG_RETURN(WSREP_OK);
+  if (rcode) DBUG_RETURN(WSREP_CB_FAILURE);
+  DBUG_RETURN(WSREP_CB_SUCCESS);
 }
 
-wsrep_status_t wsrep_apply_cb(void* const ctx,
-                              const void* const buf, size_t const buf_len,
-                              const wsrep_trx_meta_t* meta)
+wsrep_cb_status_t wsrep_apply_cb(void* const ctx,
+                                 const void* const buf, size_t const buf_len,
+                                 const wsrep_trx_meta_t* meta)
 {
   THD* const thd((THD*)ctx);
 
@@ -9021,7 +9015,8 @@ wsrep_status_t wsrep_apply_cb(void* const ctx,
   thd_proc_info(thd, "applying write set");
 #endif /* WSREP_PROC_INFO */
 
-  wsrep_status_t const rcode(wsrep_apply_rbr(thd, (const uchar*)buf, buf_len));
+  wsrep_cb_status_t const rcode(wsrep_apply_rbr(thd, (const uchar*)buf,
+                                                buf_len));
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9031,12 +9026,12 @@ wsrep_status_t wsrep_apply_cb(void* const ctx,
   thd_proc_info(thd, "applied write set");
 #endif /* WSREP_PROC_INFO */
 
-  if (WSREP_OK != rcode) wsrep_write_rbr_buf(thd, buf, buf_len);
+  if (WSREP_CB_SUCCESS != rcode) wsrep_write_rbr_buf(thd, buf, buf_len);
 
   return rcode;
 }
 
-wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
+wsrep_cb_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
 {
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9047,7 +9042,8 @@ wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
 #endif /* WSREP_PROC_INFO */
 
 //REMOVE lp:884560  wsrep_status_t const rcode(wsrep_apply_sql(thd, "COMMIT", 6, 0, 0));
-  wsrep_status_t const rcode(trans_commit(thd) ? WSREP_FATAL : WSREP_OK);
+  wsrep_cb_status_t const rcode(trans_commit(thd) ?
+                                WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9057,15 +9053,17 @@ wsrep_status_t wsrep_commit(THD* const thd, wsrep_seqno_t const global_seqno)
   thd_proc_info(thd, "committed");
 #endif /* WSREP_PROC_INFO */
 
-  if (WSREP_OK == rcode)
+  if (WSREP_CB_SUCCESS == rcode)
   {
+    thd->wsrep_rli->cleanup_context(thd, 0);
+    thd->variables.gtid_next.set_automatic();
     // TODO: mark snapshot with global_seqno.
   }
 
   return rcode;
 }
 
-wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
+wsrep_cb_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
 {
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9076,7 +9074,8 @@ wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
 #endif /* WSREP_PROC_INFO */
 
 //REMOVE lp:884560  wsrep_status_t const rcode(wsrep_apply_sql(thd, "ROLLBACK", 8, 0, 0));
-  wsrep_status_t const rcode(trans_rollback(thd) ? WSREP_FATAL : WSREP_OK);
+  wsrep_cb_status_t const rcode(trans_rollback(thd) ?
+                                WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9085,13 +9084,15 @@ wsrep_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqno)
 #else
   thd_proc_info(thd, "rolled back");
 #endif /* WSREP_PROC_INFO */
+  thd->wsrep_rli->cleanup_context(thd, 0);
+  thd->variables.gtid_next.set_automatic();
 
   return rcode;
 }
 
-wsrep_status_t wsrep_commit_cb(void*         const     ctx,
-                               const wsrep_trx_meta_t* meta,
-                               bool          const     commit)
+wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
+                                  const wsrep_trx_meta_t* meta,
+                                  bool          const     commit)
 {
   THD* const thd((THD*)ctx);
 

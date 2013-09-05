@@ -120,9 +120,9 @@ extern MYSQL_PLUGIN_IMPORT mysql_mutex_t LOCK_wsrep_rollback;
 extern MYSQL_PLUGIN_IMPORT mysql_cond_t COND_wsrep_rollback;
 extern MYSQL_PLUGIN_IMPORT wsrep_aborting_thd_t wsrep_aborting_thd;
 
-static inline wsrep_trx_handle_t*
-wsrep_trx_handle(THD* thd, const trx_t* trx) {
-	return wsrep_trx_handle_for_id(wsrep_thd_trx_handle(thd),
+static inline wsrep_ws_handle_t*
+wsrep_ws_handle(THD* thd, const trx_t* trx) {
+	return wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd),
 				       (wsrep_trx_id_t)trx->id);
 }
 
@@ -131,7 +131,7 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
                                          const uchar* row_id,
                                          size_t row_id_len,
                                          wsrep_buf_t* key,
-                                         long* key_len);
+                                         int* key_len);
 
 #endif /* WITH_WSREP */
 
@@ -9346,7 +9346,7 @@ wsrep_append_foreign_key(
 	int rcode 		= 0;
 	char    cache_key[513] 	= {'\0'};
 	int   cache_key_len;
-        bool const nocopy = false;
+	bool const copy = true;
 	ut_a(trx);
 
 	if (!wsrep_on(trx->mysql_thd) ||
@@ -9482,21 +9482,21 @@ wsrep_append_foreign_key(
 		&wkey.key_parts_num)) {
 		WSREP_WARN("key prepare failed for cascaded FK: %s",
 			   (wsrep_thd_query(thd)) ?
-			   wsrep_thd_query(thd) : "void");
+			    wsrep_thd_query(thd) : "void");
 		return DB_ERROR;
 	}
 	rcode = wsrep->append_key(
 		wsrep,
-		wsrep_trx_handle(thd, trx),
+		wsrep_ws_handle(thd, trx),
 		&wkey,
 		1,
-		nocopy,
-		shared);
+		shared ? WSREP_KEY_SHARED : WSREP_KEY_EXCLUSIVE,
+		copy);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
 		WSREP_ERROR("Appending cascaded fk row key failed: %s, %d",
 			    (wsrep_thd_query(thd)) ?
-			    wsrep_thd_query(thd) : "void", rcode);
+			     wsrep_thd_query(thd) : "void", rcode);
 		return DB_ERROR;
 	}
 
@@ -9516,7 +9516,7 @@ wsrep_append_key(
 )
 {
 	DBUG_ENTER("wsrep_append_key");
-	bool const nocopy = false;
+	bool const copy = true;
 #ifdef WSREP_DEBUG_PRINT
 	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ",
 		(shared) ? "Shared" : "Exclusive",
@@ -9528,7 +9528,7 @@ wsrep_append_key(
 	fprintf(stderr, "\n");
 #endif
 	wsrep_buf_t wkey_part[3];
-        wsrep_key_t wkey = {wkey_part, 3};
+	wsrep_key_t wkey = {wkey_part, 3};
 	if (!wsrep_prepare_key_for_innodb(
 			(const uchar*)table_share->table_cache_key.str,
 			table_share->table_cache_key.length,
@@ -9542,12 +9542,12 @@ wsrep_append_key(
 	}
 
 	int rcode = wsrep->append_key(
-				      wsrep,
-				      wsrep_trx_handle(thd, trx),
-				      &wkey,
-				      1,
-				      nocopy,
-				      shared);
+				wsrep,
+				wsrep_ws_handle(thd, trx),
+				&wkey,
+				1,
+				shared ? WSREP_KEY_SHARED : WSREP_KEY_EXCLUSIVE,
+				copy);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
 		WSREP_WARN("Appending row key failed: %s, %d",
@@ -17321,7 +17321,7 @@ wsrep_fake_trx_id(
 {
 	trx_id_t trx_id = trx_sys_get_new_trx_id();
 
-	(void *)wsrep_trx_handle_for_id(wsrep_thd_trx_handle(thd), trx_id);
+	(void *)wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd), trx_id);
 }
 
 #endif /* WITH_WSREP */

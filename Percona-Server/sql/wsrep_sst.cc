@@ -31,6 +31,7 @@ extern const char wsrep_defaults_file[];
 #define WSREP_SST_OPT_DATA     "--datadir"
 #define WSREP_SST_OPT_CONF     "--defaults-file"
 #define WSREP_SST_OPT_PARENT   "--parent"
+#define WSREP_SST_OPT_BINLOG   "--binlog"
 
 // mysqldump-specific options
 #define WSREP_SST_OPT_USER     "--user"
@@ -45,8 +46,9 @@ extern const char wsrep_defaults_file[];
 #define WSREP_SST_OPT_BYPASS   "--bypass"
 
 #define WSREP_SST_MYSQLDUMP    "mysqldump"
+#define WSREP_SST_RSYNC        "rsync"
 #define WSREP_SST_SKIP         "skip"
-#define WSREP_SST_DEFAULT      WSREP_SST_MYSQLDUMP
+#define WSREP_SST_DEFAULT      WSREP_SST_RSYNC
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 #define WSREP_SST_AUTH_MASK    "********"
 
@@ -210,8 +212,8 @@ bool wsrep_sst_wait ()
 
 // Signal end of SST
 void wsrep_sst_complete (const wsrep_uuid_t* sst_uuid,
-                         wsrep_seqno_t sst_seqno,
-                         bool          needed)
+                         wsrep_seqno_t       sst_seqno,
+                         bool                needed)
 {
   if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   if (!sst_complete)
@@ -229,13 +231,27 @@ void wsrep_sst_complete (const wsrep_uuid_t* sst_uuid,
   mysql_mutex_unlock (&LOCK_wsrep_sst);
 }
 
+void wsrep_sst_received (wsrep_t*            const wsrep,
+                         const wsrep_uuid_t* const uuid,
+                         wsrep_seqno_t       const seqno,
+                         const void*         const state,
+                         size_t              const state_len)
+{
+    int const rcode(seqno < 0 ? seqno : 0);
+    wsrep_gtid_t const state_id = {
+        *uuid, (rcode ? WSREP_SEQNO_UNDEFINED : seqno)
+    };
+    wsrep_init_sidno(state_id.uuid);
+    wsrep->sst_received(wsrep, &state_id, state, state_len, rcode);
+}
+
 // Let applier threads to continue
 void wsrep_sst_continue ()
 {
   if (sst_needed)
   {
     WSREP_INFO("Signalling provider to continue.");
-    wsrep->sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
+    wsrep_sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
   }
 }
 
@@ -386,6 +402,8 @@ static ssize_t sst_prepare_other (const char*  method,
   ssize_t cmd_len= 1024;
   char    cmd_str[cmd_len];
   const char* sst_dir= mysql_real_data_home;
+  const char* binlog_opt= (opt_bin_logname ? "--binlog" : "");
+  const char* binlog_opt_val= (opt_bin_logname ? opt_bin_logname : "");
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s "
@@ -394,9 +412,11 @@ static ssize_t sst_prepare_other (const char*  method,
                      WSREP_SST_OPT_AUTH" '%s' "
                      WSREP_SST_OPT_DATA" '%s' "
                      WSREP_SST_OPT_CONF" '%s' "
-                     WSREP_SST_OPT_PARENT" '%d'",
+                     WSREP_SST_OPT_PARENT" '%d'"
+                     " %s '%s' ",
                      method, addr_in, (sst_auth_real) ? sst_auth_real : "",
-                     sst_dir, wsrep_defaults_file, (int)getpid());
+                     sst_dir, wsrep_defaults_file, (int)getpid(),
+                     binlog_opt, binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -700,7 +720,9 @@ static int sst_donate_mysqldump (const char*         addr,
     ret= sst_run_shell (cmd_str, 3);
   }
 
-  wsrep->sst_sent (wsrep, uuid, ret ? ret : seqno);
+  wsrep_gtid_t const state_id = { *uuid, (ret ? WSREP_SEQNO_UNDEFINED : seqno)};
+
+  wsrep->sst_sent (wsrep, &state_id, ret);
 
   return ret;
 }
@@ -746,7 +768,7 @@ static int sst_flush_tables(THD* thd)
   else
   {
     /* make sure logs are flushed after global read lock acquired */
-    err= reload_acl_and_cache(thd, REFRESH_ENGINE_LOG, 
+    err= reload_acl_and_cache(thd, REFRESH_ENGINE_LOG | REFRESH_BINARY_LOG,
 			      (TABLE_LIST*) 0, &not_used);
   }
 
@@ -890,7 +912,10 @@ wait_signal:
   }
 
   // signal to donor that SST is over
-  wsrep->sst_sent (wsrep, &ret_uuid, err ? -err : ret_seqno);
+  struct wsrep_gtid const state_id = {
+      ret_uuid, err ? WSREP_SEQNO_UNDEFINED : ret_seqno
+  };
+  wsrep->sst_sent (wsrep, &state_id, -err);
   proc.wait();
 
   return NULL;
@@ -904,6 +929,8 @@ static int sst_donate_other (const char*   method,
 {
   ssize_t cmd_len = 4096;
   char    cmd_str[cmd_len];
+  const char* binlog_opt= (opt_bin_logname ? "--binlog" : "");
+  const char* binlog_opt_val= (opt_bin_logname ? opt_bin_logname : "");
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s "
@@ -913,10 +940,12 @@ static int sst_donate_other (const char*   method,
                      WSREP_SST_OPT_SOCKET" '%s' "
                      WSREP_SST_OPT_DATA" '%s' "
                      WSREP_SST_OPT_CONF" '%s' "
+                     " %s '%s' "
                      WSREP_SST_OPT_GTID" '%s:%lld'"
                      "%s",
                      method, addr, sst_auth_real, mysqld_unix_port,
                      mysql_real_data_home, wsrep_defaults_file,
+                     binlog_opt, binlog_opt_val,
                      uuid, (long long) seqno,
                      bypass ? " "WSREP_SST_OPT_BYPASS : "");
 
@@ -946,8 +975,7 @@ static int sst_donate_other (const char*   method,
 
 int wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
                          const void* msg, size_t msg_len,
-                         const wsrep_uuid_t*     current_uuid,
-                         wsrep_seqno_t           current_seqno,
+                         const wsrep_gtid_t*     current_gtid,
                          const char* state, size_t state_len,
                          bool bypass)
 {
@@ -961,17 +989,17 @@ int wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
   const char* data   = method + method_len + 1;
 
   char uuid_str[37];
-  wsrep_uuid_print (current_uuid, uuid_str, sizeof(uuid_str));
+  wsrep_uuid_print (&current_gtid->uuid, uuid_str, sizeof(uuid_str));
 
   int ret;
   if (!strcmp (WSREP_SST_MYSQLDUMP, method))
   {
-    ret = sst_donate_mysqldump (data, current_uuid, uuid_str, current_seqno,
-                                bypass);
+    ret = sst_donate_mysqldump(data, &current_gtid->uuid, uuid_str,
+                               current_gtid->seqno, bypass);
   }
   else
   {
-    ret = sst_donate_other (method, data, uuid_str, current_seqno, bypass);
+    ret = sst_donate_other(method, data, uuid_str, current_gtid->seqno,bypass);
   }
 
   return (ret > 0 ? 0 : ret);

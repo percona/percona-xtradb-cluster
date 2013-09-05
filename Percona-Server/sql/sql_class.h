@@ -3233,7 +3233,7 @@ public:
   uint32                    wsrep_rand;
   Relay_log_info*           wsrep_rli;
   bool                      wsrep_converted_lock_session;
-  wsrep_trx_handle_t        wsrep_trx_handle;
+  wsrep_ws_handle_t         wsrep_ws_handle;
   bool                      wsrep_seqno_changed;
 #ifdef WSREP_PROC_INFO
   char                      wsrep_info[128]; /* string for dynamic proc info */
