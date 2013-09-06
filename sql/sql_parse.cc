@@ -2351,6 +2351,7 @@ mysql_execute_command(THD *thd)
     if (trans_commit_implicit(thd))
     {
       thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("implicit commit failed, MDL released: %lu", thd->thread_id);
       goto error;
     }
     /* Release metadata locks acquired in this transaction. */
@@ -4101,7 +4102,11 @@ end_with_restore_list:
 
   case SQLCOM_BEGIN:
     if (trans_begin(thd, lex->start_transaction_opt))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("BEGIN failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     my_ok(thd);
     break;
   case SQLCOM_COMMIT:
@@ -4117,6 +4122,7 @@ end_with_restore_list:
     if (trans_commit(thd))
     {
       thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("COMMIT failed, MDL released: %lu", thd->thread_id);
       goto error;
     }
     thd->mdl_context.release_transactional_locks();
@@ -4161,7 +4167,11 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_rollback(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("rollback failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -4701,7 +4711,11 @@ create_sp_error:
     break;
   case SQLCOM_XA_COMMIT:
     if (trans_xa_commit(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("XA commit failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a commit, reset transaction
@@ -4712,7 +4726,11 @@ create_sp_error:
     break;
   case SQLCOM_XA_ROLLBACK:
     if (trans_xa_rollback(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("XA rollback failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a rollback, reset transaction
