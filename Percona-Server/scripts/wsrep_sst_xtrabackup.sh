@@ -645,7 +645,7 @@ then
 
         if [[ $incremental -ne 1 ]];then 
             wsrep_log_info "Cleaning the existing datadir"
-            find $DATA -mindepth 1  -regex  '.*galera.cache$\|.*sst_in_progress$\|.*grastate.dat$'  -prune  -o -exec rm -rfv {} 1>&2 \+
+            find $DATA -mindepth 1  -regex  '.*galera.cache$\|.*sst_in_progress$\|.*grastate.dat$\|.*err$'  -prune  -o -exec rm -rfv {} 1>&2 \+
         else
             wsrep_log_info "Removing existing ib_logfile files"
             rm -f ${BDATA}/ib_logfile*
