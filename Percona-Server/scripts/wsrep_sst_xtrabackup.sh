@@ -407,7 +407,6 @@ recv_joiner()
 {
     local dir=$1
     local msg=$2 
-    local wait=$3
 
     pushd ${dir} 1>/dev/null
     set +e
@@ -415,9 +414,6 @@ recv_joiner()
     set -e
     popd 1>/dev/null 
 
-    if [[ $wait -eq 1 ]];then 
-        wait %% # join for wait_for_listen thread
-    fi
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
@@ -477,7 +473,7 @@ get_stream
 get_transfer
 
 INNOEXTRA=""
-INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --redo-only --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
 INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
@@ -696,8 +692,6 @@ then
                 dcmd="xargs -n 2 qpress -T${nproc}d"
             fi
 
-            wsrep_log_info "Removing existing ibdata1 file"
-            rm -f ${DATA}/ibdata1
 
             # Decompress the qpress files 
             wsrep_log_info "Decompression with $nproc threads"
