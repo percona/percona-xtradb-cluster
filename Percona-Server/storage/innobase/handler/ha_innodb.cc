@@ -8130,7 +8130,9 @@ wsrep_append_foreign_key(
 	int i = 0;
 	while (idx != NULL && idx != idx_target) {
 		idx = UT_LIST_GET_NEXT(indexes, idx);
-		i++;
+		if (innobase_strcasecmp (idx->name, innobase_index_reserve_name) != 0) {
+			i++;
+		}
 	}
 	ut_a(idx);
 	key[0] = (char)i;
