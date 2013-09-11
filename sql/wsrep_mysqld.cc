@@ -35,6 +35,7 @@ const char* wsrep_data_home_dir = NULL;
 const char* wsrep_dbug_option   = "";
 
 long    wsrep_slave_threads            = 1; // # of slave action appliers wanted
+int     wsrep_slave_count_change       = 0; // # of appliers to stop or start
 my_bool wsrep_debug                    = 0; // enable debug level logging
 my_bool wsrep_convert_LOCK_to_trx      = 1; // convert locking sessions to trx
 ulong   wsrep_retry_autocommit         = 5; // retry aborted autocommit trx
