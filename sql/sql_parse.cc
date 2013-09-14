@@ -7999,17 +7999,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const ctx,
   thd_proc_info(thd, "applied write set");
 #endif /* WSREP_PROC_INFO */
 
-  if (WSREP_CB_SUCCESS == rcode) 
-  {
-    mysql_mutex_lock(&LOCK_wsrep_slave_threads);
-    if (wsrep_slave_count_change < 0)
-    {
-      wsrep_slave_count_change++;
-      rcode= WSREP_CB_RETURN;
-    }
-    mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
-  }
-  else
+  if (WSREP_CB_SUCCESS != rcode)
   {
     wsrep_write_rbr_buf(thd, buf, buf_len);
   }
@@ -8090,10 +8080,25 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
 
   assert(meta->gtid.seqno == wsrep_thd_trx_seqno(thd));
 
+  wsrep_cb_status_t rcode;
+
   if (commit)
-    return wsrep_commit(thd, meta->gtid.seqno);
+    rcode = wsrep_commit(thd, meta->gtid.seqno);
   else
-    return wsrep_rollback(thd, meta->gtid.seqno);
+    rcode = wsrep_rollback(thd, meta->gtid.seqno);
+
+  if (wsrep_slave_count_change < 0 && WSREP_CB_SUCCESS == rcode) 
+  {
+    mysql_mutex_lock(&LOCK_wsrep_slave_threads);
+    if (wsrep_slave_count_change < 0)
+    {
+      wsrep_slave_count_change++;
+      rcode= WSREP_CB_RETURN;
+    }
+    mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
+  }
+
+  return rcode;
 }
 
 Relay_log_info* wsrep_relay_log_init(const char* log_fname)
