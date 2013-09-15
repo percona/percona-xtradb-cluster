@@ -158,7 +158,7 @@ case "${1:-''}" in
 	    for i in `seq 1 $startup_timeout`; do
                 test -s $pid_file && break
 
-                if test -e $sst_progress_file && [ $startup_sleep -ne 100 ];then
+                if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
                     log_daemon_msg "SST in progress, setting sleep higher" "mysqld"
                     startup_sleep=10
                 fi
