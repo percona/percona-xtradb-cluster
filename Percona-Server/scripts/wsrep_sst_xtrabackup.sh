@@ -56,7 +56,7 @@ pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
 pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
 uextra=0
 
-if pv --help | grep -q FORMAT;then 
+if which pv &>/dev/null && pv --help | grep -q FORMAT;then 
     pvopts+=$pvformat
 fi
 pcmd="pv $pvopts"
@@ -141,6 +141,12 @@ get_keys()
 
 get_transfer()
 {
+    if [[ -z $SST_PORT ]];then 
+        TSST_PORT=4444
+    else 
+        TSST_PORT=$SST_PORT
+    fi
+
     if [[ $tfmt == 'nc' ]];then
         if [[ ! -x `which nc` ]];then 
             wsrep_log_error "nc(netcat) not found in path: $PATH"
@@ -148,9 +154,9 @@ get_transfer()
         fi
         wsrep_log_info "Using netcat as streamer"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-            tcmd="nc -dl ${SST_PORT}"
+            tcmd="nc -dl ${TSST_PORT}"
         else
-            tcmd="nc ${REMOTEIP} ${SST_PORT}"
+            tcmd="nc ${REMOTEIP} ${TSST_PORT}"
         fi
     else
         tfmt='socat'
@@ -174,16 +180,16 @@ get_transfer()
             stagemsg+="-OpenSSL-Encrypted"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
                 wsrep_log_info "Decrypting with PEM $tpem, CA: $tcert"
-                tcmd="socat -u openssl-listen:${SST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
+                tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
             else
                 wsrep_log_info "Encrypting with PEM $tpem, CA: $tcert"
-                tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${SST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
+                tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
             fi
         else 
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-                tcmd="socat -u TCP-LISTEN:${SST_PORT},reuseaddr${sockopt} stdio"
+                tcmd="socat -u TCP-LISTEN:${TSST_PORT},reuseaddr${sockopt} stdio"
             else
-                tcmd="socat -u stdio TCP:${REMOTEIP}:${SST_PORT}${sockopt}"
+                tcmd="socat -u stdio TCP:${REMOTEIP}:${TSST_PORT}${sockopt}"
             fi
         fi
     fi
