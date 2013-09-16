@@ -253,6 +253,16 @@ This variable contains settings currently used by Galera library.
 
 When server is started with this variable it will parse Global Transaction ID from log, and if the GTID is found, assign it as initial position for actual server start. This option is used to recover GTID.
 
+.. variable:: wsrep_reject_queries
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: NONE
+
+This variable can be used to reject queries for that node. This can be useful if someone wants to manually run maintenance on the node like mysqldump without need to change the settings on the load balancer. Following values are supported: a) ``NONE`` - default - nothing is rejected. b) ``ALL`` - all queries are rejected with 'Error 1047: Unknown command'. c) ``ALL_KILL`` - all queries are rejected and existing ones are also aborted without waiting. 
+   
 .. variable:: wsrep_replicate_myisam
 
    :cli: Yes
@@ -318,7 +328,7 @@ When this variable is enabled SST donor node will not accept incoming queries, i
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: mysqldump
+   :default: rsync
 
 This variable sets up the method for taking the State Snapshot Transfer (SST). Available options are:
  * xtrabackup - uses Percona XtraBackup to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password> which |XtraBackup| will use on donor. Privileges and permissions needed for running |XtraBackup| can be found `here <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_.
