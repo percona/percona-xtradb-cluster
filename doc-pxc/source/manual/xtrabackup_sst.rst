@@ -4,6 +4,11 @@
  Xtrabackup SST Configuration
 ===============================
 
+XtraBackup SST works in two stages:
+
+ * Stage I on joiner checks if it is |SST| or |IST| based on presence of :file:`xtrabackup_ist` file. 
+ * In Stage II it starts the data transfer, if it's |SST|, it empties the data directory sans few files (galera.cache, sst_in_progress, grastate.dat) and then proceed with the SST or if it's IST, proceeds as before.
+
 Following SST specific options are allowed in my.cnf under [sst]                                     
 -----------------------------------------------------------------
       
@@ -18,7 +23,7 @@ Following SST specific options are allowed in my.cnf under [sst]
           
         * In following options, path always means full path.
 
-        * Following options are only applicable for **PXC 5.5.32** and above. For 5.5.31 PXC refer to documentation in wsrep_sst_xtrabackup.
+        * Following options are only applicable for :rn:`5.5.33-23.7.6` and above. For :rn:`5.5.31-23.7.5` refer to documentation in wsrep_sst_xtrabackup.
 
 .. option:: streamfmt
 
@@ -26,7 +31,7 @@ Following SST specific options are allowed in my.cnf under [sst]
      :Default: tar             
      :Match: Yes
 
-Xbstream is highly recommended. Refer to :ref:`Xbstream v/s Tar<tar_ag_xbstream>` for details and caveats of using tar v/s xbstream for SST.
+Xbstream is highly recommended. Refer to :ref:`Xbstream v/s Tar <tar_ag_xbstream>` for details and caveats of using tar v/s xbstream for SST.
              
 .. option:: transferfmt
 
@@ -123,6 +128,7 @@ manual setup. Hence, not supported currently.
     :Values: 0,1
     :Default: 0
 
+
 If set to 1, SST will use the thread pool's `extra_port <http://www.percona.com/doc/percona-server/5.6/performance/threadpool.html#extra_port>`_. Make sure that thread pool is enabled and extra_port option is set in my.cnf before you turn on this option.
 
 .. _tar_ag_xbstream:
@@ -137,23 +143,20 @@ Xtrabackup SST Dependencies
 
 Following are optional dependencies of PXC introduced by wsrep_sst_xtrabackup: (obvious and direct dependencies are not provided here)
 
-    * qpress for decompression. It is a dependency of Xtrabackup 2.1.4 and is available in our repos.
+    * qpress for decompression. It is an optional dependency of |Percona XtraBackup| 2.1.4 and it is available in our software repositories.
     * my_print_defaults to extract values from my.cnf. Provided by the server package.
-    * openbsd-netcat or socat for transfer. socat is a direct dependency of PXC and is the default.
+    * openbsd-netcat or socat for transfer. socat is a direct dependency of |Percona XtraDB Cluster| and it is the default.
     * xbstream/tar for streaming. tar is default.
     * pv. Required for :option:`progress` and :option:`rlimit`. Provided by pv.
     * mkfifo. Required for :option:`progress`. Provided by coreutils.
     * mktemp. Required for :option:`incremental`. Provided by coreutils.
-
-.. _tip::
-    For qpress download `from <http://www.quicklz.com/qpress-11-linux-x64.tar>`_ till it is available. You can also build it from `source <http://www.quicklz.com/qpress-11-source.zip>`_.
 
 .. _xtrabackup_sst_encryption:
 
 Xtrabackup-based encryption
 ----------------------------
 
-This is enabled when :option:`encrypt` is set to 1 under [sst]. However, due to lp:1190335, it will also be enabled when you specify any of the following options under [xtrabackup] in my.cnf:
+This is enabled when :option:`encrypt` is set to 1 under [sst]. However, due to bug :bug:`1190335`, it will also be enabled when you specify any of the following options under [xtrabackup] in my.cnf:
 
 .. _xtrabackup_encrypt_options:
 
@@ -163,11 +166,11 @@ This is enabled when :option:`encrypt` is set to 1 under [sst]. However, due to 
 
 There is no way to disallow encryption from innobackupex if the above are in my.cnf under [xtrabackup]. For that reason, do the following:
 
-    #. If you want to use xtrabackup based encryption for SST but not otherwise, use ``encrypt=1`` under [sst] and provide xtrabackup_encrypt_options_ under [sst]. Details of those options can be found `here <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/encrypted_backups_innobackupex.html>`_.
+    #. If you want to use xtrabackup based encryption for SST but not otherwise, use ``encrypt=1`` under [sst] and provide xtrabackup_encrypt_options under [sst]. Details of those options can be found `here <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/encrypted_backups_innobackupex.html>`_.
 
-    #. If you want to use xtrabackup based encryption always, use ``encrypt=1`` under [sst] and have those xtrabackup_encrypt_options_ either under [sst] or [xtrabackup].
+    #. If you want to use xtrabackup based encryption always, use ``encrypt=1`` under [sst] and have those xtrabackup_encrypt_options either under [sst] or [xtrabackup].
 
-    #. If you don't want xtrabackup based encryption for SST but want it otherwise, use ``encrypt=0`` or ``encrypt=2`` and do **NOT** provide xtrabackup_encrypt_options_ under [xtrabackup]. You can still have them under [sst] though. You will need to provide those options on innobackupex commandline then.
+    #. If you don't want xtrabackup based encryption for SST but want it otherwise, use ``encrypt=0`` or ``encrypt=2`` and do **NOT** provide xtrabackup_encrypt_options under [xtrabackup]. You can still have them under [sst] though. You will need to provide those options on innobackupex commandline then.
 
     #. If you don't want to use xtrabackup based encryption at all (or only the openssl-based for SST with ``encrypt=2``), then you don't need worry about these options! (just don't provide them in my.cnf)
 
@@ -177,4 +180,4 @@ There is no way to disallow encryption from innobackupex if the above are in my.
     The :option:`encrypt` under [sst] is different from under [xtrabackup]. The former is for disabling/changing encryption mode, latter is to provide encryption algorithm. To disambiguate, if you need to provide latter under [sst] (which you need to, for points #1 and #2 above) then it should be specified as :option:`encrypt-algo`.
 
 .. warning:: 
-    An implication of the above is that if you specify xtrabackup_encrypt_options_ but ``encrypt=0`` under [sst], it will **STILL** be encrypted and SST will fail. Look at point#3 above for resolution.
+    An implication of the above is that if you specify xtrabackup_encrypt_options but ``encrypt=0`` under [sst], it will **STILL** be encrypted and SST will fail. Look at point#3 above for resolution.

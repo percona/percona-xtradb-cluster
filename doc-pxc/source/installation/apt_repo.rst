@@ -8,7 +8,7 @@
 
   $ apt-key adv --keyserver keys.gnupg.net --recv-keys 1C4CBDCDCD2EFD2A
 
-Add this to :file:`/etc/apt/sources.list`, replacing ``VERSION`` with the name of your distribution: ::
+Add this to :file:`/etc/apt/sources.list` (or create a dedicated Percona repository file :file:`/etc/apt/sources.list.d/percona.list`), and replace ``VERSION`` with the name of your distribution: ::
 
   deb http://repo.percona.com/apt VERSION main 
   deb-src http://repo.percona.com/apt VERSION main
