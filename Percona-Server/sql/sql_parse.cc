@@ -9019,8 +9019,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const ctx,
   thd_proc_info(thd, "applying write set");
 #endif /* WSREP_PROC_INFO */
 
-  wsrep_cb_status_t const rcode(wsrep_apply_rbr(thd, (const uchar*)buf,
-                                                buf_len));
+  wsrep_cb_status_t rcode(wsrep_apply_rbr(thd, (const uchar*)buf, buf_len));
 
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -9030,7 +9029,10 @@ wsrep_cb_status_t wsrep_apply_cb(void* const ctx,
   thd_proc_info(thd, "applied write set");
 #endif /* WSREP_PROC_INFO */
 
-  if (WSREP_CB_SUCCESS != rcode) wsrep_write_rbr_buf(thd, buf, buf_len);
+  if (WSREP_CB_SUCCESS != rcode)
+  {
+    wsrep_write_rbr_buf(thd, buf, buf_len);
+  }
 
   return rcode;
 }
@@ -9102,10 +9104,25 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
 
   assert(meta->gtid.seqno == wsrep_thd_trx_seqno(thd));
 
+  wsrep_cb_status_t rcode;
+
   if (commit)
-    return wsrep_commit(thd, meta->gtid.seqno);
+    rcode = wsrep_commit(thd, meta->gtid.seqno);
   else
-    return wsrep_rollback(thd, meta->gtid.seqno);
+    rcode = wsrep_rollback(thd, meta->gtid.seqno);
+
+  if (wsrep_slave_count_change < 0 && WSREP_CB_SUCCESS == rcode) 
+  {
+    mysql_mutex_lock(&LOCK_wsrep_slave_threads);
+    if (wsrep_slave_count_change < 0)
+    {
+      wsrep_slave_count_change++;
+      rcode= WSREP_CB_RETURN;
+    }
+    mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
+  }
+
+  return rcode;
 }
 
 #define NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR 1
@@ -9257,13 +9274,11 @@ void wsrep_replication_process(THD *thd)
     break;
   }
 
-  if (thd->killed != THD::KILL_CONNECTION)
-  {
-    mysql_mutex_lock(&LOCK_thread_count);
-    wsrep_close_applier(thd);
-    mysql_cond_broadcast(&COND_thread_count);
-    mysql_mutex_unlock(&LOCK_thread_count);
-  }
+  mysql_mutex_lock(&LOCK_thread_count);
+  wsrep_close_applier(thd);
+  mysql_cond_broadcast(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
+  
   wsrep_return_from_bf_mode(thd, &shadow);
   DBUG_VOID_RETURN;
 }

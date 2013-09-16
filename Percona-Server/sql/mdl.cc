@@ -3157,7 +3157,7 @@ void MDL_ticket::wsrep_report(bool debug)
 {
   if (debug) 
     {
-      WSREP_DEBUG("MDL ticket: type: %s space: %s db: %s name: %s (%s)",
+      WSREP_DEBUG("MDL ticket: type: %s space: %s db: %s name: %s",
        	 (get_type()  == MDL_INTENTION_EXCLUSIVE)  ? "intention exclusive"  :
        	 ((get_type() == MDL_SHARED)               ? "shared"               :
        	 ((get_type() == MDL_SHARED_HIGH_PRIO      ? "shared high prio"     :
@@ -3177,8 +3177,7 @@ void MDL_ticket::wsrep_report(bool debug)
          ((m_lock->key.mdl_namespace() == MDL_key::COMMIT) ? "COMMIT"       :
          (char *)"UNKNOWN"))))))),
          m_lock->key.db_name(),
-       	 m_lock->key.name(),
-         m_lock->key.get_wait_state_name());
+         m_lock->key.name());
     }
 }
 #endif /* WITH_WSREP */
