@@ -541,7 +541,7 @@ then
         wsrep_log_info "Sleeping before data transfer for SST"
         sleep 10
 
-        wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
+        wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT:-4444}"
 
         set +e
         timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
