@@ -28,7 +28,7 @@ Following SST specific options are allowed in my.cnf under [sst]
 .. option:: streamfmt
 
      :Values: xbstream, tar  
-     :Default: tar             
+     :Default: xbstream
      :Match: Yes
 
 Xbstream is highly recommended. Refer to :ref:`Xbstream v/s Tar <tar_ag_xbstream>` for details and caveats of using tar v/s xbstream for SST.

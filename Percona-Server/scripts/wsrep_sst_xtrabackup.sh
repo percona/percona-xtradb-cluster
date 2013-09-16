@@ -242,7 +242,7 @@ adjust_progress()
 
 read_cnf()
 {
-    sfmt=$(parse_cnf sst streamfmt "tar")
+    sfmt=$(parse_cnf sst streamfmt "xbstream")
     tfmt=$(parse_cnf sst transferfmt "socat")
     tcert=$(parse_cnf sst tca "")
     tpem=$(parse_cnf sst tcert "")
@@ -541,7 +541,7 @@ then
         wsrep_log_info "Sleeping before data transfer for SST"
         sleep 10
 
-        wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT}"
+        wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT:-4444}"
 
         set +e
         timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
