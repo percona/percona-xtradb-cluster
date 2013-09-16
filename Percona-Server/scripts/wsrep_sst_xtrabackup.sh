@@ -582,7 +582,7 @@ then
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
     [[ -e $SST_PROGRESS_FILE ]] && wsrep_log_info "Stale sst_in_progress file: $SST_PROGRESS_FILE"
-    touch $SST_PROGRESS_FILE
+    [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     stagemsg="Joiner-Recv"
 

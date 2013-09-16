@@ -170,7 +170,7 @@ then
 
 elif [ "$WSREP_SST_OPT_ROLE" = "joiner" ]
 then
-    touch $SST_PROGRESS_FILE
+    [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
     MYSQLD_PID=$WSREP_SST_OPT_PARENT
 
     MODULE="rsync_sst"
