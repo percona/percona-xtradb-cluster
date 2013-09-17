@@ -1,7 +1,7 @@
 .. _Errata:
 
 ====================================
- Percona XtraDB Cluster Known Issues
+ Percona XtraDB Cluster Errata
 ====================================
 
 Following are issues which may impact you while running PXC:
