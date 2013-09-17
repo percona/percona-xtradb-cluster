@@ -5273,7 +5273,7 @@ void wsrep_create_rollbacker()
     pthread_t hThread;
     /* create rollbacker */
     if (pthread_create( &hThread, &connection_attrib,
-			start_wsrep_THD, (void*)wsrep_rollback_process))
+                        start_wsrep_THD, (void*)wsrep_rollback_process))
       WSREP_WARN("Can't create thread to manage wsrep rollback");
   }
 }

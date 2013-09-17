@@ -1183,7 +1183,7 @@ end:
   DBUG_RETURN(ret);
 }
 #ifdef WITH_WSREP
-int wsrep_create_event_query(THD *thd, uchar** buf, int* buf_len)
+int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len)
 {
   String log_query;
 

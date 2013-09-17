@@ -8769,6 +8769,7 @@ wsrep_cb_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqn
 
 wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
                                   const wsrep_trx_meta_t* meta,
+                                  wsrep_bool_t* const     exit,
                                   bool          const     commit)
 {
   THD* const thd((THD*)ctx);
@@ -8782,13 +8783,13 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
   else
     rcode = wsrep_rollback(thd, meta->gtid.seqno);
 
-  if (wsrep_slave_count_change < 0 && WSREP_CB_SUCCESS == rcode) 
+  if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode) 
   {
     mysql_mutex_lock(&LOCK_wsrep_slave_threads);
     if (wsrep_slave_count_change < 0)
     {
       wsrep_slave_count_change++;
-      rcode= WSREP_CB_RETURN;
+      *exit = true;
     }
     mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
   }

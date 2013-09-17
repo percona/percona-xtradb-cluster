@@ -29,12 +29,12 @@
 extern void    wsrep_ready_set (my_bool x);
 
 extern ssize_t wsrep_sst_prepare   (void** msg);
-extern int     wsrep_sst_donate_cb (void* app_ctx,
-                                    void* recv_ctx,
-                                    const void* msg, size_t msg_len,
-                                    const wsrep_gtid_t* state_id,
-                                    const char* state, size_t state_len,
-                                    bool bypass);
+extern wsrep_cb_status wsrep_sst_donate_cb (void* app_ctx,
+                                            void* recv_ctx,
+                                            const void* msg, size_t msg_len,
+                                            const wsrep_gtid_t* state_id,
+                                            const char* state, size_t state_len,
+                                            bool bypass);
 
 extern unsigned int wsrep_check_ip (const char* addr);
 extern size_t wsrep_guess_ip (char* buf, size_t buf_len);

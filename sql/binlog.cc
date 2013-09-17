@@ -835,15 +835,17 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
 {
   DBUG_ENTER("binlog_close_connection");
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+#ifdef WITH_WSREP
   if (!cache_mngr->is_binlog_empty()) {
     IO_CACHE* cache= get_trans_log(thd);
     uchar *buf;
-    int len=0;
+    size_t len=0;
     WSREP_WARN("binlog cache not empty at connection close %lu", 
                thd->thread_id);
     wsrep_write_cache(cache, &buf, &len);
     wsrep_write_rbr_buf(thd, buf, len);
   }
+#endif /* WITH_WSREP */
   DBUG_ASSERT(cache_mngr->is_binlog_empty());
   DBUG_ASSERT(cache_mngr->trx_cache.is_group_cache_empty() &&
               cache_mngr->stmt_cache.is_group_cache_empty());
@@ -5151,7 +5153,7 @@ err:
     {
       IO_CACHE* cache= get_trans_log(thd);
       uchar* buf= NULL;
-      int buf_len= 0;
+      size_t buf_len= 0;
 
       if (wsrep_emulate_bin_log)
         thd->binlog_flush_pending_rows_event(false);
@@ -8926,7 +8928,7 @@ void thd_binlog_rollback_stmt(THD * thd)
   with the exception that here we write in buffer instead of log file.
  */
 
-int wsrep_write_cache(IO_CACHE *cache, uchar **buf, int *buf_len)
+int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len)
 {
   my_off_t saved_pos= my_b_tell(cache);
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))

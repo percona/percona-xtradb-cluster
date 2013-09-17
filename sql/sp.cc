@@ -2728,7 +2728,7 @@ String *sp_get_item_value(THD *thd, Item *item, String *str)
   }
 }
 #ifdef WITH_WSREP
-int wsrep_create_sp(THD *thd, uchar** buf, int* buf_len)
+int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len)
 {
   String log_query;
   sp_head *sp = thd->lex->sphead;
@@ -2754,10 +2754,10 @@ int wsrep_create_sp(THD *thd, uchar** buf, int* buf_len)
                      sp->m_chistics, &(thd->lex->definer->user),
                      &(thd->lex->definer->host),
                      saved_mode))
-    {
-      WSREP_WARN("SP create string failed: %s", thd->query());
-      return 1;
-    }
+  {
+    WSREP_WARN("SP create string failed: %s", thd->query());
+    return 1;
+  }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);
 }
 #endif /* WITH_WSREP */

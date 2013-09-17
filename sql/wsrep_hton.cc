@@ -201,7 +201,7 @@ wsrep_run_wsrep_commit(
     THD *thd, handlerton *hton, bool all)
 {
   int rcode         = -1;
-  int data_len      = 0;
+  size_t data_len   = 0;
   uchar *rbr_data   = NULL;
   IO_CACHE *cache;
   int replay_round= 0;
@@ -310,7 +310,7 @@ wsrep_run_wsrep_commit(
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(cache, &rbr_data, &data_len);
     if (rcode) {
-      WSREP_ERROR("rbr write fail, data_len: %d, %d", data_len, rcode);
+      WSREP_ERROR("rbr write fail, data_len: %zu, %d", data_len, rcode);
       if (data_len) my_free(rbr_data);
       DBUG_RETURN(WSREP_TRX_ROLLBACK);
     }
@@ -328,11 +328,11 @@ wsrep_run_wsrep_commit(
                  "affected rows: %llu, " 
                  "changed tables: %d, " 
                  "sql_log_bin: %d, "
-		 "wsrep status (%d %d %d)",
-		  thd->query(), thd->get_stmt_da()->affected_rows(),
+                 "wsrep status (%d %d %d)",
+                 thd->query(), thd->get_stmt_da()->affected_rows(),
                  stmt_has_updated_trans_table(thd), thd->variables.sql_log_bin,
-		 thd->wsrep_exec_mode, thd->wsrep_query_state, 
-		 thd->wsrep_conflict_state);
+                 thd->wsrep_exec_mode, thd->wsrep_query_state, 
+                 thd->wsrep_conflict_state);
     }
     else
     {

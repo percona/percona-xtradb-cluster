@@ -104,6 +104,7 @@ extern wsrep_cb_status_t wsrep_apply_cb(void *ctx,
 
 extern wsrep_cb_status_t wsrep_commit_cb(void *ctx,
                                          const wsrep_trx_meta_t* meta,
+                                         wsrep_bool_t* exit,
                                          bool commit);
 
 static wsrep_cb_status_t wsrep_unordered_cb(void*       ctx,
@@ -213,14 +214,17 @@ void wsrep_init_sidno(const wsrep_uuid_t& uuid)
 
 
 static wsrep_cb_status_t
-wsrep_view_handler_cb (void* app_ctx,
-                       void* recv_ctx,
+wsrep_view_handler_cb (void*                    app_ctx,
+                       void*                    recv_ctx,
                        const wsrep_view_info_t* view,
-                       const char* state,
-                       size_t state_len,
-                       void** sst_req,
-                       int*   sst_req_len)
+                       const char*              state,
+                       size_t                   state_len,
+                       void**                   sst_req,
+                       size_t*                  sst_req_len)
 {
+  *sst_req     = NULL;
+  *sst_req_len = 0;
+
   wsrep_member_status_t new_status= local_status.get();
 
   if (memcmp(&cluster_uuid, &view->state_id.uuid, sizeof(wsrep_uuid_t)))
@@ -294,16 +298,18 @@ wsrep_view_handler_cb (void* app_ctx,
     WSREP_DEBUG("[debug]: closing client connections for PRIM");
     wsrep_close_client_connections(TRUE);
 
-    *sst_req_len= wsrep_sst_prepare (sst_req);
+    ssize_t const req_len= wsrep_sst_prepare (sst_req);
 
-    if (*sst_req_len < 0)
+    if (req_len < 0)
     {
-      int err = *sst_req_len;
-      WSREP_ERROR("SST preparation failed: %d (%s)", -err, strerror(-err));
+      WSREP_ERROR("SST preparation failed: %zd (%s)", -req_len,
+                  strerror(-req_len));
       new_status= WSREP_MEMBER_UNDEFINED;
     }
     else
     {
+      assert(sst_req != NULL);
+      *sst_req_len= req_len;
       new_status= WSREP_MEMBER_JOINER;
     }
   }
@@ -857,7 +863,7 @@ static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 static bool wsrep_prepare_key_for_isolation(const char* db,
                                             const char* table,
                                             wsrep_buf_t* key,
-                                            int* key_len)
+                                            size_t* key_len)
 {
     if (*key_len < 2) return false;
 
@@ -985,11 +991,11 @@ err:
 
 
 bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
-				  size_t cache_key_len,
+                                  size_t cache_key_len,
                                   const uchar* row_id,
                                   size_t row_id_len,
                                   wsrep_buf_t* key,
-                                  int* key_len)
+                                  size_t* key_len)
 {
     if (*key_len < 3) return false;
 
@@ -1034,7 +1040,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
  * Return 0 in case of success, 1 in case of error.
  */
 int wsrep_to_buf_helper(
-    THD* thd, const char *query, uint query_len, uchar** buf, int* buf_len)
+    THD* thd, const char *query, uint query_len, uchar** buf, size_t* buf_len)
 {
   IO_CACHE tmp_io_cache;
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
@@ -1050,7 +1056,7 @@ int wsrep_to_buf_helper(
 
 #include "sql_show.h"
 static int
-create_view_query(THD *thd, uchar** buf, int* buf_len)
+create_view_query(THD *thd, uchar** buf, size_t* buf_len)
 {
     LEX *lex= thd->lex;
     SELECT_LEX *select_lex= &lex->select_lex;
@@ -1115,7 +1121,7 @@ create_view_query(THD *thd, uchar** buf, int* buf_len)
     buff.append(STRING_WITH_LEN(" AS "));
     //buff.append(views->source.str, views->source.length);
     buff.append(thd->lex->create_view_select.str, 
-		thd->lex->create_view_select.length);
+                thd->lex->create_view_select.length);
     //int errcode= query_error_code(thd, TRUE);
     //if (thd->binlog_query(THD::STMT_QUERY_TYPE,
     //                      buff.ptr(), buff.length(), FALSE, FALSE, FALSE, errcod
@@ -1127,7 +1133,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
 {
   wsrep_status_t ret(WSREP_WARNING);
   uchar* buf(0);
-  int buf_len(0);
+  size_t buf_len(0);
   int buf_err;
 
   WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
