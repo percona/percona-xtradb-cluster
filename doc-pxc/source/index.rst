@@ -37,6 +37,7 @@ Introduction
 
    intro
    limitation
+   errata
 
 Installation
 ============
