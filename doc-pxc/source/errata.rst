@@ -11,4 +11,4 @@ Following are issues which may impact you while running PXC:
  - https://bugs.launchpad.net/percona-xtradb-cluster/+bug/1098566: innodb_data_home_dir is not supported. Depends on https://bugs.launchpad.net/percona-xtrabackup/+bug/1164945 for the fix.
  - https://bugs.launchpad.net/percona-xtradb-cluster/+bug/1112363: After debian upgrade, certain DDL will be replicated across nodes from the node where the upgrade took place and not work. This is fairly benign and shouldn't disrupt the service. The workaround is to 'touch /etc/mysql/NO-DEBIAN-START'. This also circumvents other debian-specific startup 'tasks' which can disrupt startup.
 
-Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases.
+Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (ie. releases after the upcoming/recent release).
