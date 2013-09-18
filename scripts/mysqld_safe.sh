@@ -207,16 +207,21 @@ wsrep_pick_url() {
 wsrep_start_position_opt=""
 wsrep_recover_position() {
   local mysqld_cmd="$@"
-  local wr_logfile=$(mktemp)
   local euid=$(id -u)
   local ret=0
+
+  local wr_logfile=$(mktemp $DATADIR/wsrep_recovery.XXXXXX)
 
   [ "$euid" = "0" ] && chown $user $wr_logfile
   chmod 600 $wr_logfile
 
-  log_notice "WSREP: Running position recovery with --log_error=$wr_logfile"
+  local wr_pidfile="$DATADIR/"`@HOSTNAME@`"-recover.pid"
 
-  $mysqld_cmd --log_error=$wr_logfile --wsrep-recover
+  local wr_options="--log_error='$wr_logfile' --pid-file='$wr_pidfile'"
+
+  log_notice "WSREP: Running position recovery with $wr_options"
+
+  eval_log_error "$mysqld_cmd --wsrep_recover $wr_options"
 
   local rp="$(grep 'WSREP: Recovered position:' $wr_logfile)"
   if [ -z "$rp" ]; then
