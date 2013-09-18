@@ -7873,10 +7873,6 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
   if (!buf_len) WSREP_DEBUG("empty rbr buffer to apply: %lld",
                             (long long) wsrep_thd_trx_seqno(thd));
 
-  if ((rcode= trans_begin(thd)))
-    WSREP_WARN("begin for rbr apply failed: %lld, code: %d",
-               (long long) wsrep_thd_trx_seqno(thd), rcode);
-
   while(buf_len)
   {
     int exec_res;
@@ -8087,6 +8083,9 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     rcode = wsrep_commit(thd, meta->gtid.seqno);
   else
     rcode = wsrep_rollback(thd, meta->gtid.seqno);
+
+  /* reset autocommit option in case it was changed during event processing */
+  thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
 
   if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode) 
   {
