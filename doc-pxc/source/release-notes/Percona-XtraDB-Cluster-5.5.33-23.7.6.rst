@@ -4,7 +4,7 @@
  |Percona XtraDB Cluster| 5.5.33-23.7.6
 ========================================
 
-Percona is glad to announce the release of |Percona XtraDB Cluster| on September 17th, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.5.33-23.7.6/>`_ or from our :doc:`software repositories </installation>`.
+Percona is glad to announce the release of |Percona XtraDB Cluster| on September 18th, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.5.33-23.7.6/>`_ or from our :doc:`software repositories </installation>`.
 
 This is an General Availability release. We did our best to eliminate bugs and problems during the testing release, but this is a software, so bugs are expected. If you encounter them, please report them to our `bug tracking system <https://bugs.launchpad.net/percona-xtradb-cluster/+filebug>`_.
 
@@ -78,6 +78,11 @@ Bugs fixed
  ``GU_AVPHYS_SIZE`` would report more available memory than could be addressed on 32-bit systems. Bug fixed :bug:`1204241`.
 
 Other bug fixes: bug fixed :bug:`1210638`, bug fixed :bug:`1222777`, bug fixed :bug:`1216904`, bug fixed :bug:`1205467`, bug fixed :bug:`1196898`, bug fixed :bug:`1195355`, bug fixed :bug:`1049599`, bug fixed :bug:`1191395`, bug fixed :bug:`1017526`, bug fixed :bug:`1213073`, bug fixed :bug:`1171759`, bug fixed :bug:`1210618`, bug fixed :bug:`1190756`.
+
+Known Issues
+============
+
+For Debian/Ubuntu users: |Percona XtraDB Cluster| 5.5.33-23.7.6 includes a new dependency, the ``socat`` package. If the ``socat`` is not previously installed, ``percona-xtradb-cluster-server-5.5`` may be held back. In order to upgrade, you need to either install ``socat`` before running the ``apt-get upgrade`` or by writing the following command: ``apt-get install percona-xtradb-cluster-server-5.5``. For *Ubuntu* users the ``socat`` package is in the universe repository, so the repository will have to be enabled in order to install the package.
 
 Based on `Percona Server 5.5.33-31.1 <http://www.percona.com/doc/percona-server/5.5/release-notes/Percona-Server-5.5.33-31.1.html>`_ including all the bug fixes in it, `Galera Replicator <https://launchpad.net/galera/+milestone/23.2.7>`_ and on `Codership wsrep API 5.5.33-23.7.6 <https://launchpad.net/codership-mysql/+milestone/5.5.33-23.7.6>`_, |Percona XtraDB Cluster| `5.5.33-23.7.6 <https://launchpad.net/percona-xtradb-cluster/+milestone/5.5.33-23.7.6>`_ is now the current stable release. All of |Percona|'s software is open-source and free. 
 
