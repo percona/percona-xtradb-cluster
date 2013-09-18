@@ -353,6 +353,7 @@ extern int       wsrep_to_isolation;
 extern my_bool wsrep_certify_nonPK;
 extern mysql_mutex_t LOCK_wsrep_slave_threads;
 extern rpl_sidno wsrep_sidno;
+extern my_bool wsrep_preordered_opt;
 extern mysql_mutex_t LOCK_wsrep_desync;
 
 extern PSI_mutex_key key_LOCK_wsrep_ready;
@@ -378,10 +379,10 @@ void wsrep_to_isolation_end(THD *thd);
 void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow*);
 void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow*);
 int wsrep_to_buf_helper(
-  THD* thd, const char *query, uint query_len, uchar** buf, int* buf_len);
-int wsrep_create_sp(THD *thd, uchar** buf, int* buf_len);
-int wsrep_create_trigger_query(THD *thd, uchar** buf, int* buf_len);
-int wsrep_create_event_query(THD *thd, uchar** buf, int* buf_len);
+  THD* thd, const char *query, uint query_len, uchar** buf, size_t* buf_len);
+int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len);
+int wsrep_create_trigger_query(THD *thd, uchar** buf, size_t* buf_len);
+int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len);
 
 struct xid_t;
 void wsrep_get_SE_checkpoint(xid_t*);

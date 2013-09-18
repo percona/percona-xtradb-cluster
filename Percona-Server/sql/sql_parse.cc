@@ -111,9 +111,6 @@ using std::min;
 #include "wsrep_mysqld.h"
 #include "rpl_rli.h"
 static void wsrep_client_rollback(THD *thd);
-
-extern Format_description_log_event *wsrep_format_desc;
-
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
 			      Parser_state *parser_state);
 #endif /* WITH_WSREP */
@@ -8884,6 +8881,24 @@ void wsrep_write_rbr_buf(
   }
 }
 
+static inline void
+wsrep_set_apply_format(THD* thd, Format_description_log_event* ev)
+{
+  if (thd->wsrep_apply_format)
+  {
+      delete (Format_description_log_event*)thd->wsrep_apply_format;
+  }
+  thd->wsrep_apply_format= ev;
+}
+
+static inline Format_description_log_event*
+wsrep_get_apply_format(THD* thd)
+{
+  if (thd->wsrep_apply_format)
+      return (Format_description_log_event*) thd->wsrep_apply_format;
+  return thd->wsrep_rli->get_rli_description_event();
+}
+
 static inline wsrep_cb_status_t wsrep_apply_rbr(
     THD *thd, const uchar *rbr_buf, size_t buf_len)
 {
@@ -8909,14 +8924,11 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
   if (!buf_len) WSREP_DEBUG("empty rbr buffer to apply: %lld",
                             (long long) wsrep_thd_trx_seqno(thd));
 
-  if ((rcode= trans_begin(thd)))
-    WSREP_WARN("begin for rbr apply failed: %lld, code: %d",
-               (long long) wsrep_thd_trx_seqno(thd), rcode);
-
   while(buf_len)
   {
     int exec_res;
-    Log_event* ev=  wsrep_read_log_event(&buf, &buf_len, wsrep_format_desc);
+    Log_event* ev= wsrep_read_log_event(&buf, &buf_len,
+                                        wsrep_get_apply_format(thd));
 
     if (!ev)
     {
@@ -8925,13 +8937,11 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
       rcode= 1;
       goto error;
     }
+
     switch (ev->get_type_code()) {
-    case WRITE_ROWS_EVENT:
-    case UPDATE_ROWS_EVENT:
-    case DELETE_ROWS_EVENT:
-      DBUG_ASSERT(buf_len != 0 ||
-                  ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F));
-      break;
+    case FORMAT_DESCRIPTION_EVENT:
+      wsrep_set_apply_format(thd, (Format_description_log_event*)ev);
+      continue;
     case GTID_LOG_EVENT:
     {
       Gtid_log_event* gev= (Gtid_log_event*)ev;
@@ -9098,6 +9108,7 @@ wsrep_cb_status_t wsrep_rollback(THD* const thd, wsrep_seqno_t const global_seqn
 
 wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
                                   const wsrep_trx_meta_t* meta,
+                                  wsrep_bool_t* const     exit,
                                   bool          const     commit)
 {
   THD* const thd((THD*)ctx);
@@ -9111,13 +9122,17 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
   else
     rcode = wsrep_rollback(thd, meta->gtid.seqno);
 
-  if (wsrep_slave_count_change < 0 && WSREP_CB_SUCCESS == rcode) 
+  /* reset autocommit option in case it was changed during event processing */
+  thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
+  wsrep_set_apply_format(thd, NULL);
+
+  if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode) 
   {
     mysql_mutex_lock(&LOCK_wsrep_slave_threads);
     if (wsrep_slave_count_change < 0)
     {
       wsrep_slave_count_change++;
-      rcode= WSREP_CB_RETURN;
+      *exit = true;
     }
     mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
   }
@@ -9134,7 +9149,8 @@ Relay_log_info* wsrep_relay_log_init(const char* log_fname)
   uint rli_option = INFO_REPOSITORY_DUMMY;
   Relay_log_info *rli= NULL;
   rli = Rpl_info_factory::create_rli(rli_option, false);
-  rli->set_rli_description_event(new Format_description_log_event(3));
+  rli->set_rli_description_event(
+      new Format_description_log_event(BINLOG_VERSION));
 
   return (rli);
 

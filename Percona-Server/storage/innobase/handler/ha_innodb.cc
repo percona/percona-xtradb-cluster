@@ -131,7 +131,7 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
                                          const uchar* row_id,
                                          size_t row_id_len,
                                          wsrep_buf_t* key,
-                                         int* key_len);
+                                         size_t* key_len);
 
 #endif /* WITH_WSREP */
 

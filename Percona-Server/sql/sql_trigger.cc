@@ -2496,7 +2496,7 @@ bool load_table_name_for_trigger(THD *thd,
   DBUG_RETURN(FALSE);
 }
 #ifdef WITH_WSREP
-int wsrep_create_trigger_query(THD *thd, uchar** buf, int* buf_len)
+int wsrep_create_trigger_query(THD *thd, uchar** buf, size_t* buf_len)
 {
   LEX *lex= thd->lex;
   String stmt_query;

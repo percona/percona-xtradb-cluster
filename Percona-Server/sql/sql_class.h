@@ -3247,6 +3247,11 @@ public:
                             wsrep_consistency_check;
   wsrep_stats_var*          wsrep_status_vars;
   int                       wsrep_mysql_replicated;
+  wsrep_po_handle_t         wsrep_po_handle;
+  size_t                    wsrep_po_cnt;
+  my_bool                   wsrep_po_in_trans;
+  rpl_sid                   wsrep_po_sid;
+  void*                     wsrep_apply_format;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

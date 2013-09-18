@@ -1159,6 +1159,10 @@ THD::THD(bool enable_plugins)
    wsrep_applier(is_applier),
    wsrep_applier_closing(FALSE),
    wsrep_client_thread(0),
+   wsrep_po_handle(WSREP_PO_INITIALIZER),
+   wsrep_po_cnt(0),
+   wsrep_po_in_trans(FALSE),
+   wsrep_apply_format(0),
 #endif
    m_parser_state(NULL),
 #if defined(ENABLED_DEBUG_SYNC)
@@ -1278,7 +1282,6 @@ THD::THD(bool enable_plugins)
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_status_vars       = 0;
   wsrep_mysql_replicated  = 0;
-
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
