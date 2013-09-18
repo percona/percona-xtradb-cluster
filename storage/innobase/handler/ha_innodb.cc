@@ -3286,6 +3286,13 @@ innobase_change_buffering_inited_ok:
 	/* Adjust the innodb_undo_logs config object */
 	innobase_undo_logs_init_default_max();
 
+#ifdef WITH_WSREP
+	/* pass the location and count of log_group_home_dirs to wsrep_sst_rsync script */
+	setenv("WSREP_LOG_DIR", srv_log_group_home_dirs[0], 1);
+	char n_log_str[32];
+	snprintf(n_log_str, sizeof(n_log_str), "%lu", srv_n_log_files);
+	setenv("WSREP_N_LOG", n_log_str, 1);
+#endif
 	innobase_old_blocks_pct = buf_LRU_old_ratio_update(
 		innobase_old_blocks_pct, TRUE);
 
