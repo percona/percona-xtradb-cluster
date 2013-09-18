@@ -96,6 +96,7 @@ static int verify(const wsrep_t *wh, const char *iface_ver)
     return 0;
 }
 
+typedef int (*wsrep_loader_fun)(wsrep_t*);
 
 static wsrep_loader_fun wsrep_dlf(void *dlh, const char *sym)
 {
