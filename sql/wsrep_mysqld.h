@@ -353,6 +353,7 @@ extern int       wsrep_to_isolation;
 extern my_bool wsrep_certify_nonPK;
 extern mysql_mutex_t LOCK_wsrep_slave_threads;
 extern rpl_sidno wsrep_sidno;
+extern my_bool wsrep_preordered_opt;
 extern mysql_mutex_t LOCK_wsrep_desync;
 
 extern PSI_mutex_key key_LOCK_wsrep_ready;

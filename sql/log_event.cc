@@ -13466,7 +13466,6 @@ st_print_event_info::st_print_event_info()
 }
 #endif
 #if WITH_WSREP && !defined(MYSQL_CLIENT)
-Format_description_log_event *wsrep_format_desc; // TODO: free them at the end
 /*
   read the first event from (*buf). The size of the (*buf) is (*buf_len).
   At the end (*buf) is shitfed to point to the following event or NULL and

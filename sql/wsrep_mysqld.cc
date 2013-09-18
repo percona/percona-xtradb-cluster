@@ -21,11 +21,11 @@
 #include <cstdlib>
 #include "log_event.h"
 
-extern Format_description_log_event *wsrep_format_desc;
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
 /* Sidno in global_sid_map corresponding to group uuid */
 rpl_sidno wsrep_sidno= -1;
+my_bool wsrep_preordered_opt= FALSE;
 
 /*
  * Begin configuration options and their default values
@@ -453,7 +453,7 @@ int wsrep_init()
 
   wsrep_ready_set(FALSE);
   assert(wsrep_provider);
-  wsrep_format_desc= new Format_description_log_event(4);
+
   wsrep_init_position();
 
   if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != WSREP_OK)
@@ -658,9 +658,6 @@ void wsrep_deinit()
   provider_name[0]=    '\0';
   provider_version[0]= '\0';
   provider_vendor[0]=  '\0';
-
-  delete wsrep_format_desc;
-  wsrep_format_desc= NULL;
 }
 
 void wsrep_recover()
@@ -1046,9 +1043,15 @@ int wsrep_to_buf_helper(
   if (open_cached_file(&tmp_io_cache, mysql_tmpdir, TEMP_PREFIX,
                        65536, MYF(MY_WME)))
     return 1;
-  Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
   int ret(0);
-  if (ev.write(&tmp_io_cache)) ret= 1;
+  if (thd->variables.gtid_next.type == GTID_GROUP)
+  {
+      Gtid_log_event gtid_ev(thd, FALSE, &thd->variables.gtid_next);
+      if (!gtid_ev.is_valid()) ret= 0;
+      if (!ret && gtid_ev.write(&tmp_io_cache)) ret= 1;
+  }
+  Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
+  if (!ret && ev.write(&tmp_io_cache)) ret= 1;
   if (!ret && wsrep_write_cache(&tmp_io_cache, buf, buf_len)) ret= 1;
   close_cached_file(&tmp_io_cache);
   return ret;

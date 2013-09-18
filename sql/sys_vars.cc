@@ -4396,6 +4396,9 @@ static Sys_var_ulong Sys_wsrep_mysql_replication_bundle(
        GLOBAL_VAR(wsrep_mysql_replication_bundle), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(0, 1000), DEFAULT(0), BLOCK_SIZE(1));
 
+static Sys_var_mybool Sys_wsrep_preordered(
+       "wsrep_preordered", "To enable preordered write set processing",
+       GLOBAL_VAR(wsrep_preordered_opt), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 #endif /* WITH_WSREP */
 
 static bool fix_host_cache_size(sys_var *, THD *, enum_var_type)
