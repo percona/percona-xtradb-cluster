@@ -5992,6 +5992,14 @@ void wsrep_replay_transaction(THD *thd)
 	wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
 	WSREP_DEBUG("trx_replay successful for: %ld %llu", 
 		    thd->thread_id, (long long)thd->real_id);
+        if (thd->stmt_da->is_sent)
+        {
+          WSREP_WARN("replay ok, thd has reported status");
+        }
+        else
+        {
+          my_ok(thd);
+        }
 	break;
       case WSREP_TRX_FAIL:
 	if (thd->stmt_da->is_sent) 
