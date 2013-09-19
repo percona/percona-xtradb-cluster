@@ -8603,7 +8603,7 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
 
     if (!ev)
     {
-      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %ld",
+      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %zd",
                   (long long)wsrep_thd_trx_seqno(thd), buf_len);
       rcode= 1;
       goto error;
