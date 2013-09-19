@@ -673,6 +673,9 @@ int my_load_defaults(const char *conf_file, const char **groups,
   init_alloc_root(&alloc,512,0);
   if ((dirs= init_default_directories(&alloc)) == NULL)
     goto err;
+#ifdef WITH_WSREP
+  wsrep_new_cluster= find_wsrep_new_cluster(argc, argv[0]);
+#endif /* WITH_WSREP */
   /*
     Check if the user doesn't want any default option processing
     --no-defaults is always the first option
