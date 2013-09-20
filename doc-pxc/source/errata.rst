@@ -15,3 +15,11 @@ Following are issues which may impact you while running PXC:
 
 
 Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (ie. releases after the upcoming/recent release).
+
+====================================
+ New Behavior
+====================================
+
+These may seem like bugs but they are not:
+
+ - A startup after unclean stop will result in startup failing with '... lock file ...' exists. This is due to a stale lock file in /var/lock/subsys created by earlier startup (which failed). To 'fix' this just remove the lock file and start. This is due to a side-effect of the fix of bug :bug:`1211505`. This is intended to be the ideal behaviour since earlier the startup (even for PS/MySQL) didn't care for the stale lock file but instead just retouched it, giving the illusion of a clean stop earlier.
