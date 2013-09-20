@@ -5,7 +5,8 @@
 ====================================
 
 Following are issues which may impact you while running PXC:
-
+ - bug :bug:`1227521`: On Debian/Ubuntu, if my.cnf options' pid-file/datadir values have underscore in them, the service startup/stop will fail. The workaround is to either change the value (for pid-file) or to symlink the datadir appropriately (ie. symlink data_dir to data-dir).
+ - bug :bug:`1226185`: percona-xtrabackup-20 may get installed as a dependency instead of latest percona-xtrabackup during a fresh install due to certain yum issues. Workaround is documented here - https://bugs.launchpad.net/percona-xtradb-cluster/+bug/1226185/comments/2.
  - bug :bug:`1192834`: Joiner may crash after SST from donor with compaction enabled. Workaround is to disable the index compaction (compact under [xtrabackup]), if enabled. This crash requires specific configuration, hence you may not be affected.
  - bug :bug:`1217426`: When empty test directory is present on donor, it is not created on joiner, so when tables are created after SST on donor, the joiner later on will fail with inconsistency. Workaround is to either drop the test database or populate it with a table before SST.
  - :bug:`1098566`: :variable:`innodb_data_home_dir` is not supported. Depends on bug :bug:`1164945` for the fix.
