@@ -135,15 +135,9 @@ static my_bool find_wsrep_new_cluster (int* argc, char* argv[])
     {
       ret= TRUE;
       *argc -= 1;
-      if (*argc == i)
-      { // last argument, just zero it up
-        argv[i]= NULL;
-      }
-      else
-      { // not the last argument, copy the last one over and zero that up.
-        argv[i]= argv[*argc];
-        argv[*argc]= NULL;
-      }
+      /* preserve the order of remaining arguments */
+      memmove(&argv[i], &argv[i + 1], (*argc - i)*sizeof(argv[i]));
+      argv[*argc]= NULL;
     }
   }
 
@@ -673,6 +667,9 @@ int my_load_defaults(const char *conf_file, const char **groups,
   init_alloc_root(&alloc,512,0);
   if ((dirs= init_default_directories(&alloc)) == NULL)
     goto err;
+#ifdef WITH_WSREP
+  wsrep_new_cluster= find_wsrep_new_cluster(argc, argv[0]);
+#endif /* WITH_WSREP */
   /*
     Check if the user doesn't want any default option processing
     --no-defaults is always the first option

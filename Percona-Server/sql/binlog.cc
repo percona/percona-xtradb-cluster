@@ -9084,7 +9084,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len)
       *buf = (uchar *)my_realloc(*buf, total_length+length, MYF(0));
       if (!*buf)
       {
-        WSREP_ERROR("io cache write problem: %d %d", *buf_len, length);
+        WSREP_ERROR("io cache write problem: %zd %d", *buf_len, length);
         return ER_ERROR_ON_WRITE;
       }
       buf_ptr = *buf+total_length;
@@ -9093,7 +9093,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len)
     {
       if (buf_ptr != NULL)
       {
-        WSREP_ERROR("io cache alloc error: %d %d", *buf_len, length);
+        WSREP_ERROR("io cache alloc error: %zd %d", *buf_len, length);
         my_free(*buf);
       }
       if (length > 0) 

@@ -6743,6 +6743,14 @@ void wsrep_replay_transaction(THD *thd)
 	wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
 	WSREP_DEBUG("trx_replay successful for: %ld %llu", 
 		    thd->thread_id, (long long)thd->real_id);
+        if (thd->get_stmt_da()->is_sent())
+        {
+          WSREP_WARN("replay ok, thd has reported status");
+        }
+        else
+        {
+          my_ok(thd);
+        }
 	break;
       case WSREP_TRX_FAIL:
 	if (thd->get_stmt_da()->is_sent()) 
@@ -6804,7 +6812,6 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
       if (thd->wsrep_conflict_state== MUST_REPLAY) 
       {
         wsrep_replay_transaction(thd);
-	my_ok(thd);
       }
 
       /* setting error code for BF aborted trxs */
@@ -8932,7 +8939,7 @@ static inline wsrep_cb_status_t wsrep_apply_rbr(
 
     if (!ev)
     {
-      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %ld",
+      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %zd",
                   (long long)wsrep_thd_trx_seqno(thd), buf_len);
       rcode= 1;
       goto error;
