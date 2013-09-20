@@ -16,9 +16,8 @@ Following are issues which may impact you while running PXC:
 
 Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (ie. releases after the upcoming/recent release).
 
-====================================
  New Behavior
-====================================
+----------------------------
 
 These may seem like bugs but they are not:
 
