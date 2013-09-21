@@ -31,6 +31,6 @@ Incompatibilities
 Following are incompatibilities between PXC 5.5.33 and older versions:
  - Due to bug :bug:`1222122` Xtrabackup SST works differently, hence won't be compatible with older Xtrabackup SST found in older PXC versions. Hence it is strongly recommended to upgrade the donor/joiner if other node is upgraded already before SST.
    Following workarounds can be used:
-    - Copy the newer wsrep_sst_xtrabackup/wsrep_sst_common (from newer package) to the donor node (when joiner is upgraded to 5.5.33) and vice versa (when donor is upgrade, copy to joiner).
+    - Copy the newer wsrep_sst_xtrabackup/wsrep_sst_common (from newer package) to the donor node (when joiner is upgraded to 5.5.33) and vice versa (when donor is upgrade, copy to joiner). Take care of the dependencies required - socat and xbstream being the default one. Refer to this `document <http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html>`_ for more details.
     - Use the rsync SST method and use Xtrabackup SST after upgrades are done, if the need arises later on.
     - Upgrade after the SST is done.
