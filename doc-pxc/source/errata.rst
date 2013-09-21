@@ -32,3 +32,4 @@ Following are incompatibilities between PXC 5.5.33 and older versions:
    Following workarounds can be used:
     - Copy the newer wsrep_sst_xtrabackup/wsrep_sst_common (from newer package) to the donor node (when joiner is upgraded to 5.5.33) and vice versa (when donor is upgrade, copy to joiner).
     - Use the rsync SST method and use Xtrabackup SST after upgrades are done, if the need arises later on.
+    - Upgrade after the SST is done.
