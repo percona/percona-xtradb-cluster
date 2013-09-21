@@ -9,7 +9,7 @@ XtraBackup SST works in two stages:
  * Stage I on joiner checks if it is |SST| or |IST| based on presence of :file:`xtrabackup_ist` file. 
  * In Stage II it starts the data transfer, if it's |SST|, it empties the data directory sans few files (galera.cache, sst_in_progress, grastate.dat) and then proceed with the SST or if it's IST, proceeds as before.
 
-This change has introduced incompatibilities with older versions, refer to `Incompatibilities <http://www.percona.com/doc/percona-xtradb-cluster/errata.html#incompatibilities>`_ for more details.
+This change has introduced **incompatibilities** with older versions, refer to `Incompatibilities <http://www.percona.com/doc/percona-xtradb-cluster/errata.html#incompatibilities>`_ for more details.
 
 Latest Xtrabackup 2.1.x is strongly recommended for Xtrabackup SST.
 
