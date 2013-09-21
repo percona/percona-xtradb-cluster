@@ -24,10 +24,11 @@ These may seem like bugs but they are not:
 
  - A startup after unclean stop will result in startup failing with '... lock file ...' exists. This is due to a stale lock file in /var/lock/subsys created by earlier startup (which failed). To 'fix' this just remove the lock file and start. This is due to a side-effect of the fix of bug :bug:`1211505`. This is intended to be the ideal behaviour since earlier the startup (even for PS/MySQL) didn't care for the stale lock file but instead just retouched it, giving the illusion of a clean stop earlier.
 
+
 Incompatibilities
 -------------------
-Following are incompatibilities between PXC 5.5.33 and older versions:
 
+Following are incompatibilities between PXC 5.5.33 and older versions:
  - Due to bug :bug:`1222122` Xtrabackup SST works differently, hence won't be compatible with older Xtrabackup SST found in older PXC versions. Hence it is strongly recommended to upgrade the donor/joiner if other node is upgraded already before SST.
    Following workarounds can be used:
     - Copy the newer wsrep_sst_xtrabackup/wsrep_sst_common (from newer package) to the donor node (when joiner is upgraded to 5.5.33) and vice versa (when donor is upgrade, copy to joiner).
