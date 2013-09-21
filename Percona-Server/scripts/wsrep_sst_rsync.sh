@@ -136,7 +136,7 @@ then
             if ! [ -z "$binlog_files" ]
             then
                 wsrep_log_info "Preparing binlog files for transfer:"
-                tar -cvf $BINLOG_TAR_FILE $binlog_files &>> /dev/stderr
+                tar -cvf $BINLOG_TAR_FILE $binlog_files >&2
             fi
             popd &> /dev/null
         fi
@@ -288,7 +288,7 @@ EOF
             # Clean up old binlog files first
             rm -f ${BINLOG_FILENAME}.*
             wsrep_log_info "Extracting binlog files:"
-            tar -xvf $BINLOG_TAR_FILE &>> /dev/stderr
+            tar -xvf $BINLOG_TAR_FILE >&2
             for ii in $(ls -1 ${BINLOG_FILENAME}.*)
             do
                 echo ${BINLOG_DIRNAME}/${ii} >> ${BINLOG_FILENAME}.index
