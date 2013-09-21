@@ -4,6 +4,9 @@
  Percona XtraDB Cluster Errata
 ====================================
 
+Known Issues
+-------------
+
 Following are issues which may impact you while running PXC:
  - bug :bug:`1227521`: On Debian/Ubuntu, if my.cnf options' pid-file/datadir values have underscore in them, the service startup/stop will fail. The workaround is to either change the value (for pid-file, if defined in my.cnf) or to symlink the datadir appropriately (ie. symlink data_dir to data-dir).
  - bug :bug:`1226185`: percona-xtrabackup-20 may get installed as a dependency instead of latest percona-xtrabackup during a fresh install due to certain yum issues. Workaround is documented here - https://bugs.launchpad.net/percona-xtradb-cluster/+bug/1226185/comments/2.
