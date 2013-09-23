@@ -402,8 +402,8 @@ static ssize_t sst_prepare_other (const char*  method,
   ssize_t cmd_len= 1024;
   char    cmd_str[cmd_len];
   const char* sst_dir= mysql_real_data_home;
-  const char* binlog_opt= (strcmp(opt_bin_logname, "0") ? WSREP_SST_OPT_BINLOG : "");
-  const char* binlog_opt_val= (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "");
+  const char* binlog_opt= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? WSREP_SST_OPT_BINLOG : "") : "");
+  const char* binlog_opt_val= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "") : "");
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s "
@@ -929,8 +929,8 @@ static int sst_donate_other (const char*   method,
 {
   ssize_t cmd_len = 4096;
   char    cmd_str[cmd_len];
-  const char* binlog_opt= (strcmp(opt_bin_logname, "0") ? WSREP_SST_OPT_BINLOG : "");
-  const char* binlog_opt_val= (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "");
+  const char* binlog_opt= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? WSREP_SST_OPT_BINLOG : "") : "");
+  const char* binlog_opt_val= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "") : "");
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s "
