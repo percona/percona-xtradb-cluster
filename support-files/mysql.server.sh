@@ -386,10 +386,10 @@ case "$mode" in
       fi
     fi
     ;;
-    'boostrap')
+    'bootstrap')
       # Bootstrap the cluster, start the first node
       # that initiate the cluster
-      echo $echo_n "Bootstrapping cluster)"
+      echo $echo_n "Bootstrapping the cluster"
       $0 start $other_args --wsrep-new-cluster
       ;;
     *)
