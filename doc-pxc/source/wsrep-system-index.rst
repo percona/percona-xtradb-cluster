@@ -117,7 +117,7 @@ When this variable is set to ``ON``, debug messages will also be logged to the e
    :dyn: Yes
    :default: OFF
 
-When this variable is set to ``ON``, the node is desynced from the cluster. Toggling this back will require a IST or a SST depending on how long it was desynced. This is similar to desync which occurs during RSU TOI. This can also be done with  /*! WSREP_DESYNC */ query comment.
+When this variable is set to ``ON``, the node is desynced from the cluster. Toggling this back will require a IST or a SST depending on how long it was desynced. This is similar to desync which occurs during RSU TOI. This can also be done with  ``/*! WSREP_DESYNC */`` query comment.
 
 .. variable:: wsrep_drupal_282555_workaround
 
@@ -271,7 +271,13 @@ When server is started with this variable it will parse Global Transaction ID fr
    :dyn: Yes
    :default: NONE
 
-This variable can be used to reject queries for that node. This can be useful if someone wants to manually run maintenance on the node like mysqldump without need to change the settings on the load balancer. Following values are supported: a) ``NONE`` - default - nothing is rejected. b) ``ALL`` - all queries are rejected with 'Error 1047: Unknown command'. c) ``ALL_KILL`` - all queries are rejected and existing client connections are also killed without waiting. Note, that this doesn't affect galera replication in any way, only the applications which connect to database are affected. If you are looking for desyncing a node then :variable:`wsrep_desync` is the right option for that.
+This variable can be used to reject queries for that node. This can be useful if someone wants to manually run maintenance on the node like mysqldump without need to change the settings on the load balancer. Following values are supported: 
+
+ - ``NONE`` - default - nothing is rejected. 
+ - ``ALL`` - all queries are rejected with 'Error 1047: Unknown command'. 
+ - ``ALL_KILL`` - all queries are rejected and existing client connections are also killed without waiting. 
+   
+Note, that this doesn't affect galera replication in any way, only the applications which connect to database are affected. If you are looking for desyncing a node then :variable:`wsrep_desync` is the right option for that.
    
 .. variable:: wsrep_replicate_myisam
 
