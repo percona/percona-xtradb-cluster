@@ -32,6 +32,7 @@ Incompatibilities
 -------------------
 
 Following are incompatibilities between PXC 5.5.33 and older versions:
+ - wsrep_sst_donor now supports comma separated list of nodes as a consequence of bug :bug:`1129512`. This is not compatible with nodes running older PXC. Only workaround is to upgrade Galera package. Upgrading the full PXC is strongly recommended, however, just upgrading PXC galera package will do for this.
  - Due to bug :bug:`1222122` Xtrabackup SST works differently, hence won't be compatible with older Xtrabackup SST found in older PXC versions. Hence it is strongly recommended to upgrade the donor/joiner if other node is upgraded already before SST.
 
   Any of the following workarounds can be used:
