@@ -23,71 +23,72 @@
  */
 int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len)
 {
+  *buf= NULL;
+  *buf_len= 0;
+
   my_off_t saved_pos= my_b_tell(cache);
+
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
+  {
+    WSREP_ERROR("failed to initialize io-cache");
     return ER_ERROR_ON_WRITE;
+  }
+
   uint length= my_b_bytes_in_cache(cache);
-  long long total_length = 0;
-  uchar *buf_ptr = NULL;
+  long long total_length= 0;
 
   do
   {
+    total_length += length;
     /* bail out if buffer grows too large
-       This is a temporary fix to avoid flooding replication
-       TODO: remove this check for 0.7.4 release
+       This is a temporary fix to avoid allocating indefinitely large buffer,
+       not a real limit on a writeset size which includes other things like
+       header and keys.
      */
     if (total_length > wsrep_max_ws_size)
     {
       WSREP_WARN("transaction size limit (%lld) exceeded: %lld",
                  wsrep_max_ws_size, total_length);
-      if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
-      {
-        WSREP_WARN("failed to initialize io-cache");
-      }
-      if (buf_ptr) my_free(*buf);
-      *buf_len = 0;
-      return ER_ERROR_ON_WRITE;
+      goto error;
     }
-    if (total_length > 0)
-    {
-      *buf_len += length;
-      *buf = (uchar *)my_realloc(*buf, total_length+length, MYF(0));
-      if (!*buf)
-      {
-        WSREP_ERROR("io cache write problem: %zd %d", *buf_len, length);
-        return ER_ERROR_ON_WRITE;
-      }
-      buf_ptr = *buf+total_length;
-    }
-    else
-    {
-      if (buf_ptr != NULL)
-      {
-        WSREP_ERROR("io cache alloc error: %zd %d", *buf_len, length);
-        my_free(*buf);
-      }
-      if (length > 0)
-      {
-        *buf = (uchar *) my_malloc(length, MYF(0));
-        buf_ptr = *buf;
-        *buf_len = length;
-      }
-    }
-    total_length += length;
 
-    memcpy(buf_ptr, cache->read_pos, length);
-    cache->read_pos=cache->read_end;
+#ifndef DBUG_OFF /* my_realloc() asserts on zero length */
+    if (total_length) {
+#endif
+    uchar* tmp= (uchar *)my_realloc(*buf, total_length, MYF(0));
+    if (!tmp)
+    {
+      WSREP_ERROR("could not (re)allocate buffer: %zu + %u", *buf_len, length);
+      goto error;
+    }
+    *buf= tmp;
+#ifndef DBUG_OFF
+    }
+#endif
+
+    memcpy(*buf + *buf_len, cache->read_pos, length);
+    *buf_len= total_length;
+    cache->read_pos= cache->read_end;
   } while ((cache->file >= 0) && (length= my_b_fill(cache)));
 
   if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
   {
-    WSREP_WARN("failed to initialize io-cache");
-    my_free(*buf);
-    *buf_len= 0;
-    return ER_ERROR_ON_WRITE;
+    WSREP_ERROR("failed to initialize io-cache");
+    goto cleanup;
   }
 
   return 0;
+
+error:
+  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
+  {
+    WSREP_WARN("failed to initialize io-cache");
+  }
+cleanup:
+  my_free(*buf);
+  *buf= NULL;
+  *buf_len= 0;
+  return ER_ERROR_ON_WRITE;
 }
 
 extern handlerton *binlog_hton;
