@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Execute this tool to setup and build RPMs for Percona-Server starting
+# Execute this tool to setup and build RPMs for Percona XtraDB Cluster
 # from a fresh tree
 #
 # Usage: build-rpm.sh [target dir]
@@ -111,7 +111,11 @@ MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
     "$SOURCEDIR/Makefile" | cut -d = -f 2)"
-PRODUCT="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
+    "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
+    cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
+    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
+PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 
 # Build information
 REDHAT_RELEASE="$(grep -o 'release [0-9][0-9]*' /etc/redhat-release | \
@@ -127,6 +131,10 @@ export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -fno-omit-frame-pointer -DPERCO
 export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
+# For the wsrep version
+export WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
+export WSREP_VERSION="$WSREP_VERSION"
+
 # Create directories for rpmbuild if these don't exist
 (cd "$WORKDIR" && mkdir -p BUILD RPMS SOURCES SPECS SRPMS)
 cp -f $(readlink -f $(dirname $0))/rpm/*.patch ${WORKDIR}/SOURCES/
@@ -139,7 +147,7 @@ cp -f $(readlink -f $(dirname $0))/rpm/*.patch ${WORKDIR}/SOURCES/
     # "Fix" cmake destdirs, since we cannot alter SYSTEM_PROCESSOR
     if test "x$TARGET" != "x"
     then
-        sed -i 's/lib64/lib/' "$PRODUCT/cmake/install_layout.cmake"
+        sed -i 's/lib64/lib/' "Percona-Server/cmake/install_layout.cmake"
     fi
     # Create tarball for build
     tar czf "$WORKDIR_ABS/SOURCES/$PRODUCT.tar.gz" "$PRODUCT/"*
@@ -149,10 +157,12 @@ cp -f $(readlink -f $(dirname $0))/rpm/*.patch ${WORKDIR}/SOURCES/
 # Issue rpmbuild command
 (
     cd "$WORKDIR"
-
+    sed -e "s:@@WSREP_VERSION@@:${WSREP_VERSION}:g" \
+    "$SOURCEDIR/build/percona-xtradb-cluster.spec" > \
+    "${WORKDIR_ABS}/SPECS/percona-xtradb-cluster.spec"
     # Issue RPM command
     rpmbuild -ba --clean $TARGET $SIGN $QUIET \
-        "$SOURCEDIR/build/percona-server.spec" \
+        "${WORKDIR_ABS}/SPECS/percona-xtradb-cluster.spec" \
         --define "_topdir $WORKDIR_ABS" \
         --define "redhat_version $REDHAT_RELEASE" \
         --define "gotrevision $REVISION"

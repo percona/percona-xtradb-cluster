@@ -30,13 +30,20 @@
 %define majorversion 60
 %define minorversion 5
 %define distribution  rhel%{redhatversion}
-%define percona_server_version	rc%{majorversion}.%{minorversion}
+%define percona_server_version	%{wsrep_version}
 
 %define mysqld_user     mysql
 %define mysqld_group    mysql
 %define mysqldatadir    /var/lib/mysql
+#
+%{!?wsrep_version:%global wsrep_version @@WSREP_VERSION@@}
+#
+%if %{undefined revision}
+%define revision	1
+%endif
 
-%define release         rc%{majorversion}.%{minorversion}.%{gotrevision}.%{distribution}
+%define release_tag	%{nil}
+%define release         %{release_tag}%{wsrep_version}.%{revision}.%{distribution}
 
 #
 # Macros we use which are not available in all supported versions of RPM
@@ -84,7 +91,7 @@
 # Source name
 # ----------------------------------------------------------------------------
 %if %{undefined src_base}
-%define src_base Percona-Server
+%define src_base Percona-XtraDB-Cluster
 %endif
 %define src_dir %{src_base}-%{mysql_version}-%{percona_server_version}
 
@@ -99,10 +106,10 @@
 # Server comment strings
 # ----------------------------------------------------------------------------
 %if %{undefined compilation_comment_debug}
-%define compilation_comment_debug       Percona Server - Debug (GPL), Release %{percona_server_version}, Revision %{gotrevision}
+%define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release %{percona_server_version}, Revision %{gotrevision}
 %endif
 %if %{undefined compilation_comment_release}
-%define compilation_comment_release     Percona Server (GPL), Release %{percona_server_version}, Revision %{gotrevision}
+%define compilation_comment_release     Percona XtraDB Cluster (GPL), Release %{percona_server_version}, Revision %{gotrevision}
 %endif
 
 
@@ -221,14 +228,15 @@
 # Main spec file section
 ##############################################################################
 
-Name:           Percona-Server%{product_suffix}
-Summary:        Percona-Server: a very fast and reliable SQL database server
+Name:           Percona-XtraDB-Cluster%{product_suffix}
+Summary:        A High Availability solution based in Percona Server
 Group:          Applications/Databases
 Version:        %{mysql_version}
 Release:        %{release}
+Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
-Source:         http://www.percona.com/downloads/Percona-Server-5.5/Percona-Server-%{mysql_version}-%{majorversion}.%{minorversion}/source/%{src_dir}.tar.gz
+Source:         http://www.percona.com/downloads/Percona-XtraDB-Cluster-5.6/LATEST/source/Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
 #TODO
 Patch1:         mysql-dubious-exports.patch
 #TODO
@@ -244,91 +252,137 @@ BuildRoot:    %{_tmppath}/%{name}-%{version}-build
 
 # From the manual
 %description
-The Percona Server software delivers a very fast, multi-threaded, multi-user,
-and robust SQL (Structured Query Language) database server. Percona Server
-is intended for mission-critical, heavy-load production systems.
+Percona XtraDB Cluster is based on the Percona Server database server and
+provides a High Availability solution.
+Percona XtraDB Cluster provides synchronous replication, supports
+multi-master replication, parallel applying on slaves, automatic node
+provisioning with primary focus on data consistency.
 
 Percona recommends that all production deployments be protected with a support
-contract (http://www.percona.com/mysql-suppport/) to ensure the highest uptime,
+contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
 ##############################################################################
 # Sub package definition
 ##############################################################################
 
-%package -n Percona-Server-server%{product_suffix}
-Summary:        Percona Server: a very fast and reliable SQL database server
+%package -n Percona-XtraDB-Cluster-server%{product_suffix}
+Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-Server-shared%{product_suffix} Percona-Server-client%{product_suffix}
-Provides:       mysql-server MySQL-server
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar socat rsync iproute
+Provides:       mysql-server MySQL-server Percona-Server-server
 Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55
 
-%description -n Percona-Server-server%{product_suffix}
-The Percona Server software delivers a very fast, multi-threaded, multi-user,
-and robust SQL (Structured Query Language) database server. Percona Server
-is intended for mission-critical, heavy-load production systems.
+%description -n Percona-XtraDB-Cluster-server%{product_suffix}
+Percona XtraDB Cluster is based on the Percona Server database server and
+provides a High Availability solution.
+Percona XtraDB Cluster provides synchronous replication, supports
+multi-master replication, parallel applying on slaves, automatic node
+provisioning with primary focus on data consistency.
 
 Percona recommends that all production deployments be protected with a support
 contract (http://www.percona.com/mysql-suppport/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
-This package includes the Percona Server with XtraDB binary 
-as well as related utilities to run and administer Percona Server.
+This package includes the Percona XtraDB Cluster binary 
+as well as related utilities to run and administer Percona XtraDB Cluster.
 
 If you want to access and work with the database, you have to install
-package "Percona-Server-client%{product_suffix}" as well!
+package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
 
 # ----------------------------------------------------------------------------
-%package -n Percona-Server-client%{product_suffix}
-Summary:        Percona Server - Client
+%package -n Percona-XtraDB-Cluster-client%{product_suffix}
+Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
-Requires:      Percona-Server-shared%{product_suffix}
-Provides:       mysql-client MySQL-client mysql MySQL
+Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
+Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55
+%description -n Percona-XtraDB-Cluster-client%{product_suffix}
+Percona XtraDB Cluster is based on the Percona Server database server and
+provides a High Availability solution.
+Percona XtraDB Cluster provides synchronous replication, supports
+multi-master replication, parallel applying on slaves, automatic node
+provisioning with primary focus on data consistency.
 
-%description -n Percona-Server-client%{product_suffix}
-This package contains the standard Percona Server client and administration tools.
+Percona recommends that all production deployments be protected with a support
+contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
+be eligible for hot fixes, and boost your team's productivity.
 
-For a description of Percona Server see http://www.percona.com/software/percona-server/
+This package contains the standard Percona XtraDB Cluster client and administration tools.
+
+For a description of Percona XtraDB Cluster see
+http://www.percona.com/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
-%package -n Percona-Server-test%{product_suffix}
-Requires:       Percona-Server-client%{product_suffix} perl
-Summary:        Percona Server - Test suite
+%package -n Percona-XtraDB-Cluster-test%{product_suffix}
+Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
+Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
-Provides:       mysql-test
+Provides:       mysql-test Percona-Server-test
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55
 AutoReqProv:    no
 
-%description -n Percona-Server-test%{product_suffix}
-This package contains the Percona Server regression test suite.
+%description -n Percona-XtraDB-Cluster-test%{product_suffix}
+Percona XtraDB Cluster is based on the Percona Server database server and
+provides a High Availability solution.
+Percona XtraDB Cluster provides synchronous replication, supports
+multi-master replication, parallel applying on slaves, automatic node
+provisioning with primary focus on data consistency.
 
-For a description of Percona Server see http://www.percona.com/software/percona-server/
+Percona recommends that all production deployments be protected with a support
+contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
+be eligible for hot fixes, and boost your team's productivity.
+
+This package contains the Percona XtraDB Cluster regression test suite.
+
+For a description of Percona XtraDB Cluster see
+http://www.percona.com/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
-%package -n Percona-Server-devel%{product_suffix}
-Summary:        Percona Server - Development header files and libraries
+%package -n Percona-XtraDB-Cluster-devel%{product_suffix}
+Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
-Provides:       mysql-devel
+Provides:       mysql-devel Percona-Server-devel
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55
+%description -n Percona-XtraDB-Cluster-devel%{product_suffix}
+Percona XtraDB Cluster is based on the Percona Server database server and
+provides a High Availability solution.
+Percona XtraDB Cluster provides synchronous replication, supports
+multi-master replication, parallel applying on slaves, automatic node
+provisioning with primary focus on data consistency.
+
+Percona recommends that all production deployments be protected with a support
+contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
+be eligible for hot fixes, and boost your team's productivity.
 
 %description -n Percona-Server-devel%{product_suffix}
 This package contains the development header files and libraries necessary
-to develop Percona Server client applications.
+to develop Percona XtraDB Cluster client applications.
 
-For a description of Percona Server see http://www.percona.com/software/percona-server/
+For a description of Percona XtraDB Cluster see
+http://www.percona.com/software/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
-%package -n Percona-Server-shared%{product_suffix}
-Summary:        Percona Server - Shared libraries
+%package -n Percona-XtraDB-Cluster-shared%{product_suffix}
+Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
-Provides:       mysql-shared mysql-libs
+Provides:       mysql-shared mysql-libs Percona-Server-shared
 Conflicts:	Percona-Server-shared-55
 Obsoletes:	mysql-libs
 
-%description -n Percona-Server-shared%{product_suffix}
+%description -n Percona-XtraDB-Cluster-shared%{product_suffix}
+Percona XtraDB Cluster is based on the Percona Server database server and
+provides a High Availability solution.
+Percona XtraDB Cluster provides synchronous replication, supports
+multi-master replication, parallel applying on slaves, automatic node
+provisioning with primary focus on data consistency.
+
+Percona recommends that all production deployments be protected with a support
+contract (http://www.percona.com/mysql-suppport/) to ensure the highest uptime,
+be eligible for hot fixes, and boost your team's productivity.
+
 This package contains the shared libraries (*.so*) which certain languages
-and applications need to dynamically load and use Percona Server.
+and applications need to dynamically load and use Percona XtraDB Cluster.
 
 ##############################################################################
 %prep
@@ -410,7 +464,10 @@ mkdir debug
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DWITH_WSREP=1 \
+           -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+	   -DWITH_PAM=ON
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make ${MAKE_JFLAG}
 )
@@ -429,7 +486,10 @@ mkdir release
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DWITH_WSREP=1 \
+           -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG}
   cd ../
@@ -533,6 +593,10 @@ ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 # Just to make sure it's in the file list and marked as a config file
 touch $RBR%{_sysconfdir}/my.cnf
 
+# Create a wsrep_sst_rsync_wan symlink.
+install -d $RBR%{_bindir}
+ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
+
 # Install SELinux files in datadir
 install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
   $RBR%{_datadir}/mysql/SELinux/RHEL4
@@ -553,7 +617,7 @@ rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 #  Post processing actions, i.e. when installed
 ##############################################################################
 
-%pre -n Percona-Server-server%{product_suffix}
+%pre -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
@@ -716,8 +780,11 @@ if [ -x %{_sysconfdir}/init.d/mysql ] ; then
         sleep 5
 fi
 
-%post -n Percona-Server-server%{product_suffix}
+%post -n Percona-XtraDB-Cluster-server%{product_suffix}
 
+if [ X${PERCONA_DEBUG} == X1 ]; then
+        set -x
+fi
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
 # There are users who deviate from the default file system layout.
@@ -733,6 +800,13 @@ fi
 NEW_VERSION=%{mysql_version}-%{release}
 STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 
+if [ -f $STATUS_FILE ] ; then
+	SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
+else
+	SERVER_TO_START=''
+fi
+
+if [ $1 -eq 1 ]; then
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
@@ -746,19 +820,6 @@ else
 fi
 
 # ----------------------------------------------------------------------
-# Make MySQL start/shutdown automatically when the machine does it.
-# ----------------------------------------------------------------------
-# NOTE: This still needs to be debated. Should we check whether these links
-# for the other run levels exist(ed) before the upgrade?
-# use chkconfig on Enterprise Linux and newer SuSE releases
-if [ -x /sbin/chkconfig ] ; then
-        /sbin/chkconfig --add mysql
-# use insserv for older SuSE Linux versions
-elif [ -x /sbin/insserv ] ; then
-        /sbin/insserv %{_sysconfdir}/init.d/mysql
-fi
-
-# ----------------------------------------------------------------------
 # Create a MySQL user and group. Do not report any problems if it already
 # exists.
 # ----------------------------------------------------------------------
@@ -768,12 +829,6 @@ useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
 # The user may already exist, make sure it has the proper group nevertheless
 # (BUG#12823)
 usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-
-# ----------------------------------------------------------------------
-# Change permissions so that the user that will run the MySQL daemon
-# owns all database files.
-# ----------------------------------------------------------------------
-chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
 
 # ----------------------------------------------------------------------
 # Initiate databases if needed
@@ -849,12 +904,12 @@ if [ "$SERVER_TO_START" = "true" ] ; then
 	fi
 fi
 
-echo "Percona Server is distributed with several useful UDF (User Defined Function) from Maatkit."
+echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
 echo "Run the following commands to create these functions:"
 echo "mysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmurmur_udf.so'\""
-echo "See http://code.google.com/p/maatkit/source/browse/trunk/udf for more details"
+echo "See  http://www.percona.com/doc/percona-server/5.5/management/udf_percona_toolkit.html for more details"
 
 # Collect an upgrade history ...
 echo "Upgrade/install finished at `date`"        >> $STATUS_FILE
@@ -871,7 +926,7 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
 #scheduled service packs and more.  Visit www.mysql.com/enterprise for more
 #information."
 
-%preun -n Percona-Server-server%{product_suffix}
+%preun -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 # Which '$1' does this refer to?  Fedora docs have info:
 # " ... a count of the number of versions of the package that are installed.
@@ -900,7 +955,7 @@ fi
 # We do not remove the mysql user since it may still own a lot of
 # database files.
 
-%triggerpostun -n Percona-Server-server%{product_suffix} --MySQL-server-community
+%triggerpostun -n Percona-XtraDB-Cluster-server%{product_suffix} --MySQL-server-community
 
 # Setup: We renamed this package, so any existing "server-community"
 #   package will be removed when this "server" is installed.
@@ -970,7 +1025,7 @@ echo "====="                                     >> $STATUS_HISTORY
 #  Files section
 ##############################################################################
 
-%files -n Percona-Server-server%{product_suffix}
+%files -n Percona-XtraDB-Cluster-server%{product_suffix}
 %defattr(-,root,root,0755)
 
 %if %{defined license_files_server}
@@ -979,6 +1034,8 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc release/Docs/INFO_SRC
 %doc release/Docs/INFO_BIN
 %doc release/support-files/my-*.cnf
+%doc Docs/README-wsrep
+%doc release/support-files/wsrep.cnf
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
 
@@ -1013,6 +1070,8 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
 
+%attr(755, root, root) %{_bindir}/clustercheck
+%attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
 %attr(755, root, root) %{_bindir}/my_print_defaults
 %attr(755, root, root) %{_bindir}/myisam_ftdump
@@ -1038,6 +1097,11 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/replace
 %attr(755, root, root) %{_bindir}/resolve_stack_dump
 %attr(755, root, root) %{_bindir}/resolveip
+%attr(755, root, root) %{_bindir}/wsrep_sst_common
+%attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
+%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1051,12 +1115,13 @@ echo "====="                                     >> $STATUS_HISTORY
 %endif
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
+%attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 
 %attr(755, root, root) %{_datadir}/mysql/
 
 # ----------------------------------------------------------------------------
-%files -n Percona-Server-client%{product_suffix}
+%files -n Percona-XtraDB-Cluster-client%{product_suffix}
 
 %defattr(-, root, root, 0755)
 %attr(755, root, root) %{_bindir}/msql2mysql
@@ -1090,7 +1155,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config_editor.1*
 
 # ----------------------------------------------------------------------------
-%files -n Percona-Server-devel%{product_suffix} -f optional-files-devel
+%files -n Percona-XtraDB-Cluster-devel%{product_suffix} -f optional-files-devel
 %defattr(-, root, root, 0755)
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
@@ -1104,10 +1169,10 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/libmysqlservices.a
 
 # ----------------------------------------------------------------------------
-%files -n Percona-Server-shared%{product_suffix}
+%files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libmysql*.so*
+%{_libdir}/libmysql*.so.*
 # Maatkit UDF libs
 %{_libdir}/mysql/plugin/libfnv1a_udf.a
 %{_libdir}/mysql/plugin/libfnv1a_udf.la
@@ -1116,14 +1181,14 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/plugin/libmurmur_udf.a
 %{_libdir}/mysql/plugin/libmurmur_udf.la
 
-%post -n Percona-Server-shared%{product_suffix}
+%post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
 
-%postun -n Percona-Server-shared%{product_suffix}
+%postun -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
 
 # ----------------------------------------------------------------------------
-%files -n Percona-Server-test%{product_suffix}
+%files -n Percona-XtraDB-Cluster-test%{product_suffix}
 %defattr(-, root, root, 0755)
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
