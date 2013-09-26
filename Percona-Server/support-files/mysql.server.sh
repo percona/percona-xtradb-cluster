@@ -413,12 +413,11 @@ case "$mode" in
   'status')
       check_running 1
     ;;
-    'bootstrap-pxc')
+  'bootstrap-pxc')
       # Bootstrap the Percona XtraDB Cluster, start the first node
       # that initiate the cluster
       echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
       $0 start $other_args --wsrep-new-cluster
-      #$0 start $other_args --wsrep-cluster-address="gcomm://"
       ;;
     *)
       # usage

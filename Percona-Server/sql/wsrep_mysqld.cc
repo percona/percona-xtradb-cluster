@@ -764,7 +764,7 @@ bool wsrep_start_replication()
     uint64_t caps = wsrep->capabilities (wsrep);
 
     wsrep_incremental_data_collection =
-        (caps & WSREP_CAP_WRITE_SET_INCREMENTS);
+        (caps & WSREP_CAP_INCREMENTAL_WRITESET);
 
     char* opts= wsrep->options_get(wsrep);
     if (opts)
