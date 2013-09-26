@@ -26,7 +26,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len)
   *buf= NULL;
   *buf_len= 0;
 
-  my_off_t saved_pos= my_b_tell(cache);
+  my_off_t const saved_pos(my_b_tell(cache));
 
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
   {
@@ -34,42 +34,46 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len)
     return ER_ERROR_ON_WRITE;
   }
 
-  uint length= my_b_bytes_in_cache(cache);
-  long long total_length= 0;
+  uint length = my_b_bytes_in_cache(cache);
+  if (unlikely(0 == length)) length = my_b_fill(cache);
 
-  do
+  long long total_length = 0;
+
+  if (likely(length > 0)) do
   {
-    total_length += length;
-    /* bail out if buffer grows too large
-       This is a temporary fix to avoid allocating indefinitely large buffer,
-       not a real limit on a writeset size which includes other things like
-       header and keys.
-     */
-    if (total_length > wsrep_max_ws_size)
-    {
-      WSREP_WARN("transaction size limit (%lld) exceeded: %lld",
-                 wsrep_max_ws_size, total_length);
-      goto error;
-    }
+      total_length += length;
+      /*
+        Bail out if buffer grows too large.
+        A temporary fix to avoid allocating indefinitely large buffer,
+        not a real limit on a writeset size which includes other things
+        like header and keys.
+      */
+      if (total_length > wsrep_max_ws_size)
+      {
+          WSREP_WARN("transaction size limit (%lld) exceeded: %lld",
+                     wsrep_max_ws_size, total_length);
+          goto error;
+      }
 
-#ifndef DBUG_OFF /* my_realloc() asserts on zero length */
-    if (total_length) {
-#endif
-    uchar* tmp= (uchar *)my_realloc(*buf, total_length, MYF(0));
-    if (!tmp)
-    {
-      WSREP_ERROR("could not (re)allocate buffer: %zu + %u", *buf_len, length);
-      goto error;
-    }
-    *buf= tmp;
-#ifndef DBUG_OFF
-    }
-#endif
+      uchar* tmp = (uchar *)my_realloc(*buf, total_length, MYF(0));
+      if (!tmp)
+      {
+          WSREP_ERROR("could not (re)allocate buffer: %zu + %u",
+                      *buf_len, length);
+          goto error;
+      }
+      *buf = tmp;
 
-    memcpy(*buf + *buf_len, cache->read_pos, length);
-    *buf_len= total_length;
-    cache->read_pos= cache->read_end;
-  } while ((cache->file >= 0) && (length= my_b_fill(cache)));
+      memcpy(*buf + *buf_len, cache->read_pos, length);
+      *buf_len = total_length;
+      cache->read_pos = cache->read_end;
+  } while ((cache->file >= 0) && (length = my_b_fill(cache)));
+
+  if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
+  {
+    WSREP_ERROR("failed to initialize io-cache");
+    goto cleanup;
+  }
 
   if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
   {
