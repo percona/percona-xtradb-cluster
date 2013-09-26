@@ -1,4 +1,4 @@
-/* Copyright 2008-2012 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2013 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,12 +29,14 @@ class THD;
 
 #ifdef WITH_WSREP
 #include "../wsrep/wsrep_api.h"
+
   enum wsrep_exec_mode {
     LOCAL_STATE,
     REPL_RECV,
     TOTAL_ORDER,
     LOCAL_COMMIT,
   };
+
   enum wsrep_query_state {
     QUERY_IDLE,
     QUERY_EXEC,
@@ -42,6 +44,7 @@ class THD;
     QUERY_EXITING,
     QUERY_ROLLINGBACK,
   };
+
   enum wsrep_conflict_state {
     NO_CONFLICT,
     MUST_ABORT,
@@ -52,6 +55,7 @@ class THD;
     RETRY_AUTOCOMMIT,
     CERT_FAILURE,
   };
+
   enum wsrep_consistency_check_mode {
     NO_CONSISTENCY_CHECK,
     CONSISTENCY_CHECK_DECLARED,
@@ -183,7 +187,6 @@ extern void  wsrep_deinit();
 extern void  wsrep_recover();
 
 
-
 extern "C" enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd);
 extern "C" enum wsrep_conflict_state wsrep_thd_conflict_state(THD *thd);
 extern "C" enum wsrep_query_state wsrep_thd_query_state(THD *thd);
@@ -200,8 +203,8 @@ extern "C" void wsrep_thd_set_conflict_state(
 
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 
-extern "C"void wsrep_thd_LOCK(THD *thd);
-extern "C"void wsrep_thd_UNLOCK(THD *thd);
+extern "C" void wsrep_thd_LOCK(THD *thd);
+extern "C" void wsrep_thd_UNLOCK(THD *thd);
 extern "C" uint32 wsrep_thd_wsrep_rand(THD *thd);
 extern "C" time_t wsrep_thd_query_start(THD *thd);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
@@ -211,7 +214,6 @@ extern "C" char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
-
 
 
 /* wsrep initialization sequence at startup
@@ -292,9 +294,9 @@ extern bool wsrep_sst_wait();
 /*! Signals wsrep that initialization is complete, writesets can be applied */
 extern void wsrep_sst_continue();
 
-extern void wsrep_SE_init_grab(); /*! grab init critical section */
-extern void wsrep_SE_init_wait(); /*! wait for SE init to complete */
-extern void wsrep_SE_init_done(); /*! signal that SE init is complte */
+extern void wsrep_SE_init_grab();   /*! grab init critical section */
+extern void wsrep_SE_init_wait();   /*! wait for SE init to complete */
+extern void wsrep_SE_init_done();   /*! signal that SE init is complte */
 extern void wsrep_SE_initialized(); /*! mark SE initialization complete */
 
 extern void wsrep_ready_wait();
@@ -303,7 +305,7 @@ enum wsrep_trx_status {
     WSREP_TRX_OK,
     WSREP_TRX_ROLLBACK,
     WSREP_TRX_ERROR,
-  };
+};
 
 extern enum wsrep_trx_status
 wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
@@ -330,16 +332,16 @@ typedef struct wsrep_aborting_thd {
 } *wsrep_aborting_thd_t;
 
 extern mysql_mutex_t LOCK_wsrep_ready;
-extern mysql_cond_t COND_wsrep_ready;
+extern mysql_cond_t  COND_wsrep_ready;
 extern mysql_mutex_t LOCK_wsrep_sst;
-extern mysql_cond_t COND_wsrep_sst;
+extern mysql_cond_t  COND_wsrep_sst;
 extern mysql_mutex_t LOCK_wsrep_sst_init;
-extern mysql_cond_t COND_wsrep_sst_init;
+extern mysql_cond_t  COND_wsrep_sst_init;
 extern mysql_mutex_t LOCK_wsrep_rollback;
-extern mysql_cond_t COND_wsrep_rollback;
+extern mysql_cond_t  COND_wsrep_rollback;
 extern int wsrep_replaying;
 extern mysql_mutex_t LOCK_wsrep_replaying;
-extern mysql_cond_t COND_wsrep_replaying;
+extern mysql_cond_t  COND_wsrep_replaying;
 extern wsrep_aborting_thd_t wsrep_aborting_thd;
 extern MYSQL_PLUGIN_IMPORT my_bool wsrep_debug;
 extern my_bool wsrep_convert_LOCK_to_trx;
@@ -350,7 +352,7 @@ extern my_bool wsrep_drupal_282555_workaround;
 extern long long wsrep_max_ws_size;
 extern long      wsrep_max_ws_rows;
 extern int       wsrep_to_isolation;
-extern my_bool wsrep_certify_nonPK;
+extern my_bool   wsrep_certify_nonPK;
 extern mysql_mutex_t LOCK_wsrep_slave_threads;
 extern rpl_sidno wsrep_sidno;
 extern my_bool wsrep_preordered_opt;

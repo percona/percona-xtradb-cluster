@@ -4358,7 +4358,7 @@ extern "C" int thd_binlog_format(const MYSQL_THD thd)
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
 #endif
-    return (int) WSREP_FORMAT(thd->variables.binlog_format);
+    return (int) WSREP_BINLOG_FORMAT(thd->variables.binlog_format);
   else
     return BINLOG_FORMAT_UNSPEC;
 }

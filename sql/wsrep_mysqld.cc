@@ -1,4 +1,4 @@
-/* Copyright 2008 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2013 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -986,7 +986,6 @@ err:
 }
 
 
-
 bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
                                   size_t cache_key_len,
                                   const uchar* row_id,
@@ -1029,6 +1028,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
 
     return true;
 }
+
 
 /*
  * Construct Query_log_Event from thd query and serialize it

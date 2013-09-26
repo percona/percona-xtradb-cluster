@@ -559,19 +559,18 @@ enum enum_binlog_format {
 };
 
 #ifdef WITH_WSREP
-IO_CACHE * get_trans_log(THD * thd);
+IO_CACHE* get_trans_log(THD * thd);
 bool wsrep_trans_cache_is_empty(THD *thd);
 void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void thd_binlog_trx_reset(THD * thd);
 void thd_binlog_rollback_stmt(THD * thd);
-int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len);
 
-#define WSREP_FORMAT(my_format)                           \
-  ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ? \
+#define WSREP_BINLOG_FORMAT(my_format)                         \
+   ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ?     \
    wsrep_forced_binlog_format : my_format)
 #else
-#define WSREP_FORMAT(my_format) my_format
-#endif
+#define WSREP_BINLOG_FORMAT(my_format) my_format
+#endif /* WITH_WSREP */
 int query_error_code(THD *thd, bool not_killed);
 uint purge_log_get_error_code(int res);
 

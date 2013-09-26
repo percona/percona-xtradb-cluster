@@ -50,6 +50,7 @@ IF(WITH_WSREP)
    wsrep_sst.cc
    wsrep_utils.cc
    wsrep_var.cc
+   wsrep_binlog.cc
  )
  SET(WSREP_LIB wsrep)
 ENDIF()
@@ -275,6 +276,7 @@ IF(WITH_WSREP)
    wsrep_sst.cc
    wsrep_utils.cc
    wsrep_var.cc
+   wsrep_binlog.cc
  )
  SET(WSREP_LIB wsrep)
 ENDIF()

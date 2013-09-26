@@ -52,6 +52,13 @@ extern void wsrep_sst_complete(const wsrep_uuid_t*, wsrep_seqno_t, bool);
 extern void wsrep_notify_status (wsrep_member_status_t new_status,
                                  const wsrep_view_info_t* view = 0);
 
+/* binlog-related stuff */
+int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len);
+int wsrep_binlog_close_connection(THD* thd);
+int wsrep_binlog_savepoint_set(THD *thd,  void *sv);
+int wsrep_binlog_savepoint_rollback(THD *thd, void *sv);
+
+
 namespace wsp {
 class node_status
 {
@@ -96,6 +103,7 @@ public:
     int   wait ();
     const char* cmd() { return str_; }
 };
+
 #ifdef REMOVED
 class lock
 {
