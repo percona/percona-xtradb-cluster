@@ -185,8 +185,8 @@ wait_for_pid () {
       fi
     fi
 
-    if test -e $sst_progress_file && [ $startup_sleep -ne 100 ];then
-        echo $echo_n "SST in progress, setting sleep higher"
+    if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
+        echo "SST in progress, setting sleep higher"
         startup_sleep=10
     fi
 
@@ -326,7 +326,7 @@ case "$mode" in
 
     # Start daemon
     if test -e $datadir/sst_in_progress;then 
-        echo $echo_n "Stale sst_in_progress file in datadir"
+        echo "Stale sst_in_progress file in datadir"
     fi
 
     # Safeguard (relative paths, core dumps..)
