@@ -51,6 +51,7 @@ IF(WITH_WSREP)
    wsrep_utils.cc
    wsrep_var.cc
    wsrep_binlog.cc
+   wsrep_applier.cc
  )
  SET(WSREP_LIB wsrep)
 ENDIF()
@@ -95,7 +96,7 @@ SET (SQL_SOURCE
                sql_signal.cc rpl_handler.cc mdl.cc sql_admin.cc
                transaction.cc sys_vars.cc sql_truncate.cc datadict.cc
                sql_reload.cc
-	       ${WSREP_SOURCES}
+               ${WSREP_SOURCES}
                ${GEN_SOURCES}
                ${MYSYS_LIBWRAP_SOURCE})
 

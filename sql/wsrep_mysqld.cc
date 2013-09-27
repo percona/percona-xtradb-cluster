@@ -21,7 +21,7 @@
 #include <cstdlib>
 #include "log_event.h"
 
-extern Format_description_log_event *wsrep_format_desc;
+Format_description_log_event *wsrep_format_desc = NULL;
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
 

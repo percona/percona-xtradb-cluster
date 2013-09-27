@@ -26,25 +26,22 @@ typedef struct st_mysql_show_var SHOW_VAR;
 class set_var;
 class THD;
 
-#ifdef WITH_WSREP
-#include "../wsrep/wsrep_api.h"
-
-  enum wsrep_exec_mode {
+enum wsrep_exec_mode {
     LOCAL_STATE,
     REPL_RECV,
     TOTAL_ORDER,
     LOCAL_COMMIT,
-  };
+};
 
-  enum wsrep_query_state {
+enum wsrep_query_state {
     QUERY_IDLE,
     QUERY_EXEC,
     QUERY_COMMITTING,
     QUERY_EXITING,
     QUERY_ROLLINGBACK,
-  };
+};
 
-  enum wsrep_conflict_state {
+enum wsrep_conflict_state {
     NO_CONFLICT,
     MUST_ABORT,
     ABORTING,
@@ -53,14 +50,14 @@ class THD;
     REPLAYING,
     RETRY_AUTOCOMMIT,
     CERT_FAILURE,
-  };
+};
 
-  enum wsrep_consistency_check_mode {
+enum wsrep_consistency_check_mode {
     NO_CONSISTENCY_CHECK,
     CONSISTENCY_CHECK_DECLARED,
     CONSISTENCY_CHECK_RUNNING,
-  };
-#endif
+};
+
 
 // Global wsrep parameters
 extern wsrep_t*    wsrep;
@@ -317,10 +314,10 @@ void wsrep_rollback_process(THD *thd);
 void wsrep_brute_force_killer(THD *thd);
 int  wsrep_hire_brute_force_killer(THD *thd, uint64_t trx_id);
 extern "C" bool wsrep_consistency_check(void *thd_ptr);
-extern "C" int wsrep_thd_is_brute_force(void *thd_ptr);
-extern "C" int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr,
-                               my_bool signal);
-extern "C" int wsrep_thd_in_locking_session(void *thd_ptr);
+extern "C" int  wsrep_thd_is_brute_force(void *thd_ptr);
+extern "C" int  wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr,
+                                my_bool signal);
+extern "C" int  wsrep_thd_in_locking_session(void *thd_ptr);
 void *wsrep_prepare_bf_thd(THD *thd);
 void wsrep_return_from_bf_mode(void *shadow, THD *thd);
 
@@ -343,15 +340,15 @@ extern mysql_mutex_t LOCK_wsrep_replaying;
 extern mysql_cond_t  COND_wsrep_replaying;
 extern wsrep_aborting_thd_t wsrep_aborting_thd;
 extern MYSQL_PLUGIN_IMPORT my_bool wsrep_debug;
-extern my_bool wsrep_convert_LOCK_to_trx;
-extern ulong   wsrep_retry_autocommit;
-extern my_bool wsrep_emulate_bin_log;
-extern my_bool wsrep_auto_increment_control;
-extern my_bool wsrep_drupal_282555_workaround;
-extern long long wsrep_max_ws_size;
-extern long      wsrep_max_ws_rows;
-extern int       wsrep_to_isolation;
-extern my_bool   wsrep_certify_nonPK;
+extern my_bool       wsrep_convert_LOCK_to_trx;
+extern ulong         wsrep_retry_autocommit;
+extern my_bool       wsrep_emulate_bin_log;
+extern my_bool       wsrep_auto_increment_control;
+extern my_bool       wsrep_drupal_282555_workaround;
+extern long long     wsrep_max_ws_size;
+extern long          wsrep_max_ws_rows;
+extern int           wsrep_to_isolation;
+extern my_bool       wsrep_certify_nonPK;
 extern mysql_mutex_t LOCK_wsrep_slave_threads;
 extern mysql_mutex_t LOCK_wsrep_desync;
 
