@@ -50,4 +50,5 @@ diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' 
 +SET(INSTALL_MYSQLDATADIR_DEB            "/var/lib/mysql")
  SET(INSTALL_PLUGINTESTDIR_DEB           ${plugin_tests})
  
+ SET(INSTALL_XINETDDIR_DEB               "/etc/xinetd.d")
  #
