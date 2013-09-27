@@ -2376,7 +2376,8 @@ public:
   int is_current_stmt_binlog_format_row() const {
     DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
                 current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-    return (WSREP_FORMAT((ulong)current_stmt_binlog_format) == BINLOG_FORMAT_ROW);
+    return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
+            BINLOG_FORMAT_ROW);
   }
   /** Tells whether the given optimizer_switch flag is on */
   inline bool optimizer_switch_flag(ulonglong flag) const
@@ -3829,7 +3830,7 @@ public:
       tests fail and so force them to propagate the
       lex->binlog_row_based_if_mixed upwards to the caller.
     */
-    if ((WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED) &&
+    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED)&&
         (in_sub_stmt == 0))
       set_current_stmt_binlog_format_row();
 
@@ -3871,7 +3872,7 @@ public:
                 show_system_thread(system_thread)));
     if (in_sub_stmt == 0)
     {
-      if (WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW)
+      if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW)
         set_current_stmt_binlog_format_row();
       else if (temporary_tables == NULL)
         clear_current_stmt_binlog_format_row();

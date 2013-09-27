@@ -41,19 +41,6 @@ IF(SSL_DEFINES)
  ADD_DEFINITIONS(${SSL_DEFINES})
 ENDIF()
 
-IF(WITH_WSREP)
- SET(WSREP_SOURCES
-   wsrep_check_opts.cc
-   wsrep_hton.cc
-   wsrep_mysqld.cc 
-   wsrep_notify.cc
-   wsrep_sst.cc
-   wsrep_utils.cc
-   wsrep_var.cc
- )
- SET(WSREP_LIB wsrep)
-ENDIF()
-
 SET(SQL_SHARED_SOURCES
   abstract_query_plan.cc
   datadict.cc
@@ -196,6 +183,21 @@ ENDIF()
 
 SET(SQL_EXPORTED_SOURCES ${SQL_SHARED_SOURCES} PARENT_SCOPE)
 
+IF(WITH_WSREP)
+ SET(WSREP_SOURCES
+   wsrep_check_opts.cc
+   wsrep_hton.cc
+   wsrep_mysqld.cc 
+   wsrep_notify.cc
+   wsrep_sst.cc
+   wsrep_utils.cc
+   wsrep_var.cc
+   wsrep_binlog.cc
+   wsrep_applier.cc
+ )
+ SET(WSREP_LIB wsrep)
+ENDIF()
+
 SET(SQL_SOURCE
   ${WSREP_SOURCES}
   ${GEN_SOURCES}
@@ -277,18 +279,20 @@ ADD_LIBRARY(sqlgunitlib
   )
 ADD_DEPENDENCIES(sqlgunitlib GenError)
 
-IF(WITH_WSREP)
- SET(WSREP_SOURCES
-   wsrep_check_opts.cc
-   wsrep_hton.cc
-   wsrep_mysqld.cc 
-   wsrep_notify.cc
-   wsrep_sst.cc
-   wsrep_utils.cc
-   wsrep_var.cc
- )
- SET(WSREP_LIB wsrep)
-ENDIF()
+#IF(WITH_WSREP)
+# SET(WSREP_SOURCES
+#   wsrep_check_opts.cc
+#   wsrep_hton.cc
+#   wsrep_mysqld.cc 
+#   wsrep_notify.cc
+#   wsrep_sst.cc
+#   wsrep_utils.cc
+#   wsrep_var.cc
+#   wsrep_binlog.cc
+#   wsrep_applier.cc
+# )
+# SET(WSREP_LIB wsrep)
+#ENDIF()
 
 IF(WIN32)
   SET(MYSQLD_SOURCE main.cc nt_servc.cc nt_servc.h message.rc)
