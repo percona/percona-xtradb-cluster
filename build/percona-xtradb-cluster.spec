@@ -93,7 +93,7 @@
 %if %{undefined src_base}
 %define src_base Percona-XtraDB-Cluster
 %endif
-%define src_dir %{src_base}-%{mysql_version}-%{percona_server_version}
+%define src_dir %{src_base}-%{mysql_version}
 
 # ----------------------------------------------------------------------------
 # Feature set (storage engines, options).  Default to community (everything)
