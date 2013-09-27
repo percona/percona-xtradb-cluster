@@ -1167,6 +1167,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/libmysqlclient.a
 %{_libdir}/mysql/libmysqlclient_r.a
 %{_libdir}/mysql/libmysqlservices.a
+%{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
