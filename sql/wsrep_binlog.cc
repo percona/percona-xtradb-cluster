@@ -1,4 +1,4 @@
-/* Copyright 2013 Codership Oy <http://www.codership.com>
+/* Copyright (C) 2013 Codership Oy <info@codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -9,14 +9,14 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
+   You should have received a copy of the GNU General Public License along
+   with this program; if not, write to the Free Software Foundation, Inc.,
+   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. */
 
 #include "wsrep_priv.h"
 
 /*
-  Write the contents of a cache to memory buffer.
+  Write the contents of a cache to a memory buffer.
 
   This function quite the same as MYSQL_BIN_LOG::write_cache(),
   with the exception that here we write in buffer instead of log file.
@@ -71,7 +71,7 @@ int wsrep_write_cache(IO_CACHE *cache, uchar **buf, size_t *buf_len)
 
   if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
   {
-    WSREP_ERROR("failed to initialize io-cache");
+    WSREP_WARN("failed to initialize io-cache");
     goto cleanup;
   }
 

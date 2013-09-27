@@ -13465,47 +13465,6 @@ st_print_event_info::st_print_event_info()
   open_cached_file(&body_cache, NULL, NULL, 0, flags);
 }
 #endif
-#if WITH_WSREP && !defined(MYSQL_CLIENT)
-/*
-  read the first event from (*buf). The size of the (*buf) is (*buf_len).
-  At the end (*buf) is shitfed to point to the following event or NULL and
-  (*buf_len) will be changed to account just being read bytes of the 1st event.
-*/
-#define WSREP_MAX_ALLOWED_PACKET 1024*1024*1024 // current protocol max
-
-Log_event* wsrep_read_log_event(
-  char **arg_buf, size_t *arg_buf_len,
-  const Format_description_log_event *description_event)
-{
-  DBUG_ENTER("wsrep_read_log_event");
-  char *head= (*arg_buf);
-
-  uint data_len = uint4korr(head + EVENT_LEN_OFFSET);
-  char *buf= (*arg_buf);
-  const char *error= 0;
-  Log_event *res=  0;
-
-  if (data_len > WSREP_MAX_ALLOWED_PACKET)
-  {
-    error = "Event too big";
-    goto err;
-  }
-
-  res= Log_event::read_log_event(buf, data_len, &error, description_event, 0);
-
-err:
-  if (!res)
-  {
-    DBUG_ASSERT(error != 0);
-    sql_print_error("Error in Log_event::read_log_event(): "
-                    "'%s', data_len: %d, event_type: %d",
-		    error,data_len,head[EVENT_TYPE_OFFSET]);
-  }
-  (*arg_buf)+= data_len;
-  (*arg_buf_len)-= data_len;
-  DBUG_RETURN(res);
-}
-#endif
 
 
 #if defined(HAVE_REPLICATION) && !defined(MYSQL_CLIENT)

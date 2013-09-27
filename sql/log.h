@@ -258,12 +258,6 @@ enum enum_log_state { LOG_OPENED, LOG_CLOSED, LOG_TO_BE_OPENED };
   (mmap+fsync is two times faster than write+fsync)
 */
 
-#ifdef WITH_WSREP
-extern my_bool wsrep_emulate_bin_log;
-//Log_event* wsrep_read_log_event(
-//  char **arg_buf, size_t *arg_buf_len,
-//  const Format_description_log_event *description_event);
-#endif
 class MYSQL_LOG
 {
 public:
