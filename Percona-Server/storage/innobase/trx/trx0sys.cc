@@ -309,14 +309,13 @@ trx_sys_print_mysql_binlog_offset(void)
 void
 trx_sys_update_wsrep_checkpoint(
         const XID*      xid,  /*!< in: transaction XID */
-        mtr_t*          mtr)  /*!< in: mtr */
+        mtr_t*          mtr,  /*!< in: mtr */
+        trx_sysf_t* sys_header) /*!< in: sys_header */  
 {
-        trx_sysf_t*     sys_header;
 
         ut_ad(xid && mtr);
         ut_a(xid->formatID == -1 || wsrep_is_wsrep_xid(xid));
 
-        sys_header = trx_sysf_get(mtr);
         if (mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
                              + TRX_SYS_WSREP_XID_MAGIC_N_FLD)
             != TRX_SYS_WSREP_XID_MAGIC_N) {
@@ -358,13 +357,12 @@ trx_sys_read_wsrep_checkpoint(XID* xid)
 	mtr_start(&mtr);
 
 	sys_header = trx_sysf_get(&mtr);
+        magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_MAGIC_N_FLD);
 
-        if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-                                      + TRX_SYS_WSREP_XID_MAGIC_N_FLD))
-            != TRX_SYS_WSREP_XID_MAGIC_N) {
+        if (magic != TRX_SYS_WSREP_XID_MAGIC_N) {
                 memset(xid, 0, sizeof(*xid));
                 xid->formatID = -1;
-                trx_sys_update_wsrep_checkpoint(xid, &mtr);
+                trx_sys_update_wsrep_checkpoint(xid, &mtr, sys_header);
                 mtr_commit(&mtr);
                 return;
         }

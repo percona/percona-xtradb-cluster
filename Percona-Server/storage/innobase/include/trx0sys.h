@@ -330,7 +330,8 @@ trx_sys_print_mysql_binlog_offset(void);
 void
 trx_sys_update_wsrep_checkpoint(
         const XID*      xid,  /*!< in: WSREP XID */
-        mtr_t*          mtr); /*!< in: mtr       */
+        mtr_t*          mtr, /*!< in: mtr       */
+        trx_sysf_t*     sys_header); /*!< in: sys_header */
 void
 /** Read WSREP checkpoint XID from sys header. */
 trx_sys_read_wsrep_checkpoint(

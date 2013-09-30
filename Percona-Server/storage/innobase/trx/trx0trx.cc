@@ -1189,7 +1189,7 @@ trx_write_serialisation_history(
         /* Update latest MySQL wsrep XID in trx sys header. */
         if (wsrep_is_wsrep_xid(&trx->xid))
         {
-            trx_sys_update_wsrep_checkpoint(&trx->xid, mtr);
+            trx_sys_update_wsrep_checkpoint(&trx->xid, mtr, trx_sysf_get(mtr));
         }
 #endif /* WITH_WSREP */
 
