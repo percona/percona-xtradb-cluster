@@ -304,7 +304,7 @@ check_running() {
         elif test -z $mysqld_pid ; then 
             if test -f "$lock_file_path" ; then 
                 log_failure_msg "MySQL (Percona XtraDB Cluster) is not running, but lock file ($lock_file_path) exists"
-                return 2
+                return 3
             fi 
             test $show_msg -eq 1 && log_failure_msg "MySQL (Percona XtraDB Cluster) is not running"
             return 3
