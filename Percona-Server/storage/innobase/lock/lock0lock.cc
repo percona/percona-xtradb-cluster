@@ -1662,9 +1662,11 @@ lock_rec_other_has_conflicting(
 
 		if (lock_rec_has_to_wait(trx, mode, lock, is_supremum)) {
 #ifdef WITH_WSREP
+			trx_mutex_exit(((trx_t *)trx));
                         lock_mutex_exit();
 			wsrep_kill_victim(trx, lock);
                         lock_mutex_enter();
+			trx_mutex_enter(((trx_t *)trx));
 #endif
 			return(lock);
 		}
@@ -4654,7 +4656,9 @@ lock_table_other_has_incompatible(
 #ifdef WITH_WSREP
 			if (wsrep_debug) 
 				fprintf(stderr, "WSREP: table lock abort");
+                        lock_mutex_exit();
 			wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
+                        lock_mutex_enter();
 #endif
 			return(lock);
 		}
