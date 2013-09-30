@@ -185,8 +185,8 @@ case "${1:-''}" in
             if mysqld_status check_alive warn; then
                 log_end_msg 0
                 # Now start mysqlcheck or whatever the admin wants.
-                # only if the file /etc/mysql/NO-DEBIAN-START is absent.
-                if ! test -e /etc/mysql/NO-DEBIAN-START;then
+                # only if the file /etc/mysql/DEBIAN-START is present.
+                if test -e /etc/mysql/DEBIAN-START;then
                     output=$(/etc/mysql/debian-start)
                     [ "$output" ] && log_action_msg "$output"
                 fi
