@@ -44,6 +44,7 @@ ecmd=""
 rlimit=""
 # Initially
 stagemsg="${WSREP_SST_OPT_ROLE}"
+cpat=""
 
 sfmt="tar"
 strmcmd=""
@@ -200,7 +201,7 @@ parse_cnf()
 {
     local group=$1
     local var=$2
-    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | tr '_' '-' | grep -- "--$var=" | cut -d= -f2-)
+    reval=$(my_print_defaults -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
     if [[ -z $reval ]];then 
         [[ -n $3 ]] && reval=$3
     fi
@@ -251,6 +252,7 @@ read_cnf()
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
+    cpat=$(parse_cnf sst cpat '.*galera\.cache$\|.*sst_in_progress$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
     incremental=$(parse_cnf sst incremental 0)
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
@@ -651,7 +653,7 @@ then
 
         if [[ $incremental -ne 1 ]];then 
             wsrep_log_info "Cleaning the existing datadir"
-            find $DATA -mindepth 1  -regex  '.*galera.cache$\|.*sst_in_progress$\|.*grastate.dat$\|.*err$'  -prune  -o -exec rm -rfv {} 1>&2 \+
+            find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
         else
             wsrep_log_info "Removing existing ib_logfile files"
             rm -f ${BDATA}/ib_logfile*
