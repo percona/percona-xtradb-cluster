@@ -2381,7 +2381,7 @@ lock_rec_lock_slow(
 {
 	trx_t*			trx;
 #ifdef WITH_WSREP
-	lock_t 			*c_lock;
+	lock_t 			*c_lock = NULL;
 #endif
 	lock_t*			lock;
 	dberr_t			err = DB_SUCCESS;
