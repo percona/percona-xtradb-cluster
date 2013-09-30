@@ -4301,6 +4301,7 @@ innobase_kill_connection(
         handlerton*	hton,	/*!< in:  innobase handlerton */
 	THD*	thd)	/*!< in: handle to the MySQL thread being killed */
 {
+        ut_ad(!lock_mutex_own());
 	trx_t*	trx;
 
 	DBUG_ENTER("innobase_kill_connection");

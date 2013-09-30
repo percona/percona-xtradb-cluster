@@ -1662,7 +1662,9 @@ lock_rec_other_has_conflicting(
 
 		if (lock_rec_has_to_wait(trx, mode, lock, is_supremum)) {
 #ifdef WITH_WSREP
+                        lock_mutex_exit();
 			wsrep_kill_victim(trx, lock);
+                        lock_mutex_enter();
 #endif
 			return(lock);
 		}
