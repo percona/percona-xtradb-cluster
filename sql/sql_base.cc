@@ -9194,9 +9194,13 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
   else
     table_cache_manager.assert_owner_all_and_tdc();
 
+#ifdef WITH_WSREP
+  /* if thd was BF aborted, exclusive locks were canceled */
+#else
   DBUG_ASSERT(remove_type == TDC_RT_REMOVE_UNUSED ||
               thd->mdl_context.is_lock_owner(MDL_key::TABLE, db, table_name,
                                              MDL_EXCLUSIVE));
+#endif /* WITH_WSREP */
 
   key_length= create_table_def_key(thd, key, db, table_name, false);
 
