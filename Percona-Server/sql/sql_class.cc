@@ -1018,7 +1018,7 @@ extern "C" void wsrep_thd_awake(THD *thd, my_bool signal)
   if (signal)
   {
     mysql_mutex_lock(&thd->LOCK_thd_data);
-    thd->awake(THD::KILL_QUERY);
+    thd->awake();
     mysql_mutex_unlock(&thd->LOCK_thd_data);
   }
   else
@@ -2214,6 +2214,67 @@ void THD::awake(THD::killed_state state_to_set)
   DBUG_VOID_RETURN;
 }
 
+#ifdef WITH_WSREP
+/**
+  Awake a thread.
+
+  This is a overloaded version of THD::awake called from wsrep_thd_awake only.
+
+  @note Do always call this while holding LOCK_thd_data.
+*/
+
+void THD::awake()
+{
+  DBUG_ENTER("THD::awake");
+  DBUG_PRINT("enter", ("this: %p current_thd: %p", this, current_thd));
+  THD_CHECK_SENTRY(this);
+  mysql_mutex_assert_owner(&LOCK_thd_data);
+
+  /* Set the 'killed' flag of 'this', which is the target THD object. */
+  killed= THD::KILL_QUERY;
+
+  /* Broadcast a condition to kick the target if it is waiting on it. */
+  if (mysys_var)
+  {
+    mysql_mutex_lock(&mysys_var->mutex);
+    if (!system_thread)		// Don't abort locks
+      mysys_var->abort=1;
+    /*
+      This broadcast could be up in the air if the victim thread
+      exits the cond in the time between read and broadcast, but that is
+      ok since all we want to do is to make the victim thread get out
+      of waiting on current_cond.
+      If we see a non-zero current_cond: it cannot be an old value (because
+      then exit_cond() should have run and it can't because we have mutex); so
+      it is the true value but maybe current_mutex is not yet non-zero (we're
+      in the middle of enter_cond() and there is a "memory order
+      inversion"). So we test the mutex too to not lock 0.
+
+      Note that there is a small chance we fail to kill. If victim has locked
+      current_mutex, but hasn't yet entered enter_cond() (which means that
+      current_cond and current_mutex are 0), then the victim will not get
+      a signal and it may wait "forever" on the cond (until
+      we issue a second KILL or the status it's waiting for happens).
+      It's true that we have set its thd->killed but it may not
+      see it immediately and so may have time to reach the cond_wait().
+
+      However, where possible, we test for killed once again after
+      enter_cond(). This should make the signaling as safe as possible.
+      However, there is still a small chance of failure on platforms with
+      instruction or memory write reordering.
+    */
+    if (mysys_var->current_cond && mysys_var->current_mutex)
+    {
+      mysql_mutex_lock(mysys_var->current_mutex);
+      mysql_cond_broadcast(mysys_var->current_cond);
+      mysql_mutex_unlock(mysys_var->current_mutex);
+    }
+    mysql_mutex_unlock(&mysys_var->mutex);
+  }
+  DBUG_VOID_RETURN;
+}
+
+#endif
 
 /**
   Close the Vio associated this session.

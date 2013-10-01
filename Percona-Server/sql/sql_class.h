@@ -3369,6 +3369,7 @@ public:
   void shutdown_active_vio();
 #endif
   void awake(THD::killed_state state_to_set);
+  void awake(void);
 
   /** Disconnect the associated communication endpoint. */
   void disconnect();
