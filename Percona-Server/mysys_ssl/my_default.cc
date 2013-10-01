@@ -668,7 +668,15 @@ int my_load_defaults(const char *conf_file, const char **groups,
   if ((dirs= init_default_directories(&alloc)) == NULL)
     goto err;
 #ifdef WITH_WSREP
-  wsrep_new_cluster= find_wsrep_new_cluster(argc, argv[0]);
+  /*
+    Just run find_wsrep_new_cluster() to remove option from args if
+    wsrep_new_cluster is already set
+  */
+
+  if (wsrep_new_cluster)
+    (void)find_wsrep_new_cluster(argc, argv[0]);
+  else
+    wsrep_new_cluster= find_wsrep_new_cluster(argc, argv[0]);
 #endif /* WITH_WSREP */
   /*
     Check if the user doesn't want any default option processing
