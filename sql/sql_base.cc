@@ -59,7 +59,7 @@
 #include "table_cache.h" // Table_cache_manager, Table_cache
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-#endif // WITH_WSREP
+#endif /* WITH_WSREP */
 
 
 bool

@@ -1420,7 +1420,7 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
       DBUG_PRINT("debug", ("Acquire MDL commit lock"));
 #ifdef WITH_WSREP
       if (!WSREP(thd) &&
-	  thd->mdl_context.acquire_lock(&mdl_request,
+          thd->mdl_context.acquire_lock(&mdl_request,
 #else
       if (thd->mdl_context.acquire_lock(&mdl_request,
 #endif /* WITH_WSREP */
