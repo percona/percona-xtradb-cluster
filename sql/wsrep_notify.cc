@@ -15,6 +15,7 @@
 
 #include <mysqld.h>
 #include "wsrep_priv.h"
+#include "wsrep_utils.h"
 
 const char* wsrep_notify_cmd="";
 

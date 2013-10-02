@@ -178,8 +178,8 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
     }
 
     if ((ev->get_type_code() == WRITE_ROWS_EVENT  ||
-	 ev->get_type_code() == UPDATE_ROWS_EVENT ||
-	 ev->get_type_code() == DELETE_ROWS_EVENT) &&
+         ev->get_type_code() == UPDATE_ROWS_EVENT ||
+         ev->get_type_code() == DELETE_ROWS_EVENT) &&
         ((Rows_log_event *) ev)->get_flags(Rows_log_event::STMT_END_F))
      {
        thd->wsrep_rli->cleanup_context(thd, 0);

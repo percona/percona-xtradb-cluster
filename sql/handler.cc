@@ -1274,7 +1274,7 @@ int ha_commit_trans(THD *thd, bool all)
 
 #ifdef WITH_WSREP
       if (!WSREP(thd) &&
-	  thd->mdl_context.acquire_lock(&mdl_request,
+          thd->mdl_context.acquire_lock(&mdl_request,
 #else
       if (thd->mdl_context.acquire_lock(&mdl_request,
 #endif /* WITH_WSREP */
@@ -1320,8 +1320,8 @@ int ha_commit_trans(THD *thd, bool all)
 #ifdef WITH_WSREP
           if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
           {
-	    error= 1;
-	    /* avoid sending error, if we need to replay */
+            error= 1;
+            /* avoid sending error, if we need to replay */
             if (thd->wsrep_conflict_state!= MUST_REPLAY)
             {
               my_error(ER_LOCK_DEADLOCK, MYF(0), err);
@@ -1330,13 +1330,13 @@ int ha_commit_trans(THD *thd, bool all)
           else
           {
             /* not wsrep hton, bail to native mysql behavior */
-#endif
+#endif /* WITH_WSREP */
           my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
           error= 1;
 #ifdef WITH_WSREP
           }
-#endif
-	}
+#endif /* WITH_WSREP */
+        }
         status_var_increment(thd->status_var.ha_prepare_count);
       }
       DBUG_EXECUTE_IF("crash_commit_after_prepare", DBUG_SUICIDE(););
@@ -1346,7 +1346,7 @@ int ha_commit_trans(THD *thd, bool all)
         // xid was rewritten by wsrep
         xid= wsrep_xid_seqno(&thd->transaction.xid_state.xid);
       }
-#endif // WITH_WSREP
+#endif /* WITH_WSREP */
       if (error || (is_real_trans && xid &&
                     (error= !(cookie= tc_log->log_xid(thd, xid)))))
       {
