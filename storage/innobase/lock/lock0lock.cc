@@ -1904,7 +1904,9 @@ lock_rec_create(
 		 * delayed conflict resolution '...kill_one_trx' was not called,
 		 * if victim was waiting for some other lock
 		 */
-		if (c_lock && c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
+		if (c_lock) trx_mutex_enter(c_lock->trx);
+		if (c_lock && c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT){
+
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
 			if (wsrep_debug && 
@@ -1916,20 +1918,20 @@ lock_rec_create(
 
 			trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
-			//lock->type_mode |= LOCK_CONV_BY_OTHER;
 			UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
 
 			ut_ad(thr != NULL);
 			trx->lock.wait_thr = thr;
 			thr->state = QUE_THR_LOCK_WAIT;
 
-			if (caller_owns_trx_mutex) {
-				trx_mutex_exit(trx);
-			}
-			lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock);
-			if (caller_owns_trx_mutex) {
-				trx_mutex_enter(trx);
-			}
+			/* have to release trx mutex for the duration of
+			   victim lock release. This will eventually call
+			   lock_grant, which wants to grant trx mutex again
+			*/
+			if (caller_owns_trx_mutex) trx_mutex_exit(trx);
+			lock_cancel_waiting_and_release(
+				c_lock->trx->lock.wait_lock);
+			if (caller_owns_trx_mutex) trx_mutex_enter(trx);
 
 			/* trx might not wait for c_lock, but some other lock
 			   does not matter if wait_lock was released above
@@ -1937,17 +1939,17 @@ lock_rec_create(
 			if (c_lock->trx->lock.wait_lock == c_lock) {
 				lock_reset_lock_and_trx_wait(lock);
 			}
+			trx_mutex_exit(c_lock->trx);
 
 			if (wsrep_debug) fprintf(
 				stderr, 
 				"WSREP: c_lock canceled %llu\n", 
 				(ulonglong) c_lock->trx->id);
 
-			//UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
-
 			/* have to bail out here to avoid lock_set_lock... */
 			return(lock);
 		}
+		if (c_lock) trx_mutex_exit(c_lock->trx);
 	} else {
 		HASH_INSERT(lock_t, hash, lock_sys->rec_hash,
 			    lock_rec_fold(space, page_no), lock);
@@ -4335,6 +4337,7 @@ lock_table_create(
         	UT_LIST_ADD_LAST(un_member.tab_lock.locks, table->locks, lock);
         }
 
+	if (c_lock) trx_mutex_enter(c_lock->trx);
 	if (c_lock && c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
 		if (wsrep_debug)
 			fprintf(stderr, "WSREP: table c_lock in wait: %llu\n", 
@@ -4342,6 +4345,7 @@ lock_table_create(
 		c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 		lock_cancel_waiting_and_release(c_lock);
 	}
+	if (c_lock) trx_mutex_exit(c_lock->trx);
 #else
 	UT_LIST_ADD_LAST(un_member.tab_lock.locks, table->locks, lock);
 #endif /* WITH_WSREP */
@@ -7029,9 +7033,7 @@ lock_cancel_waiting_and_release(
 	que_thr_t*	thr;
 
 	ut_ad(lock_mutex_own());
-#ifndef WITH_WSREP
 	ut_ad(trx_mutex_own(lock->trx));
-#endif
 	ut_ad(!(lock->type_mode & LOCK_CONV_BY_OTHER));
 
 	lock->trx->lock.cancel = TRUE;
