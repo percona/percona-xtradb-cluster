@@ -17,6 +17,10 @@
 #include <sql_class.h>
 #include <sql_parse.h>
 #include "wsrep_priv.h"
+#include "wsrep_thd.h"
+#include "wsrep_sst.h"
+#include "wsrep_utils.h"
+#include "wsrep_var.h"
 #include <cstdio>
 #include <cstdlib>
 #include "log_event.h"
@@ -86,7 +90,6 @@ const char* wsrep_provider_version   = provider_version;
 const char* wsrep_provider_vendor    = provider_vendor;
 /* End wsrep status variables */
 
-
 wsrep_uuid_t     local_uuid   = WSREP_UUID_UNDEFINED;
 wsrep_seqno_t    local_seqno  = WSREP_SEQNO_UNDEFINED;
 wsp::node_status local_status;
@@ -97,7 +100,7 @@ long             wsrep_protocol_version = 2;
 // if there was no state gap on receiving first view event.
 static my_bool   wsrep_startup = TRUE;
 
-// action execute callback
+/* wsrep callbacks */
 extern wsrep_cb_status_t wsrep_apply_cb(void *ctx,
                                         const void* buf, size_t buf_len,
                                         const wsrep_trx_meta_t* meta);

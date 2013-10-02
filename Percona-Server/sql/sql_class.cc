@@ -59,6 +59,7 @@
 #include "sql_callback.h"
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_thd.h"
 #endif
 #include "lock.h"
 #include "global_threads.h"
