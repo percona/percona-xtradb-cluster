@@ -17553,7 +17553,9 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 							signal);
                 trx_mutex_exit(victim_trx);
                 lock_mutex_exit();
+#ifndef HAVE_ATOMIC_BUILTINS
 		wsrep_srv_conc_cancel_wait(victim_trx);
+#endif
  		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction");

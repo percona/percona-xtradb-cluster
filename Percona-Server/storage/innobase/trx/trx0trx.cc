@@ -288,7 +288,7 @@ trx_create(void)
 	trx->lock.table_locks = ib_vector_create(
 		heap_alloc, sizeof(void**), 32);
 
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && not defined(HAVE_ATOMIC_BUILTINS)
 	trx->wsrep_event = NULL;
 #endif /* WITH_WSREP */
  	return(trx);

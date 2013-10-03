@@ -1039,7 +1039,7 @@ struct trx_t{
 #define	DPAH_SIZE	8192
 	byte*		distinct_page_access_hash;
 	ibool		take_stats;
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && not defined(HAVE_ATOMIC_BUILTINS)
 	os_event_t	wsrep_event;	/* event waited for in srv_conc_slot */
 #endif /* WITH_WSREP */
 };

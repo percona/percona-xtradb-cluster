@@ -690,7 +690,7 @@ srv_conc_get_active_threads(void)
 	return(srv_conc.n_active);
 }
 
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && not defined(HAVE_ATOMIC_BUILTINS)
 UNIV_INTERN
 void
 wsrep_srv_conc_cancel_wait(
@@ -698,16 +698,12 @@ wsrep_srv_conc_cancel_wait(
 	trx_t*	trx)	/*!< in: transaction object associated with the
 			thread */
 {
-#ifdef HAVE_ATOMIC_BUILTINS
-	fprintf(stderr, "WSREP: conc slot cancel not supported\n");
-#else
-	os_fast_mutex_lock(&srv_conc_mutex);
-	if (trx->wsrep_event) {
-		if (wsrep_debug) 
-			fprintf(stderr, "WSREP: conc slot cancel\n");
-		os_event_set(trx->wsrep_event);
-	}
-	os_fast_mutex_unlock(&srv_conc_mutex);
-#endif
+    os_fast_mutex_lock(&srv_conc_mutex);
+    if (trx->wsrep_event) {
+            if (wsrep_debug) 
+                    fprintf(stderr, "WSREP: conc slot cancel\n");
+            os_event_set(trx->wsrep_event);
+    }
+    os_fast_mutex_unlock(&srv_conc_mutex);
 }
-#endif /* WITH_WSREP */
+#endif /* WITH_WSREP && HAVE_ATOMIC_BUILTINS */
