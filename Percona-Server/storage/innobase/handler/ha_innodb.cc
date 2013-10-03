@@ -264,6 +264,21 @@ static TYPELIB innodb_checksum_algorithm_typelib = {
 	NULL
 };
 
+/** Possible values for system variable "innodb_cleaner_lsn_age_factor".  */
+static const char* innodb_cleaner_lsn_age_factor_names[] = {
+	"legacy",
+	"high_checkpoint",
+	NullS
+};
+
+/** Enumeration for innodb_cleaner_lsn_age_factor.  */
+static TYPELIB innodb_cleaner_lsn_age_factor_typelib = {
+	array_elements(innodb_cleaner_lsn_age_factor_names) - 1,
+	"innodb_cleaner_lsn_age_factor_typelib",
+	innodb_cleaner_lsn_age_factor_names,
+	NULL
+};
+
 /* The following counter is used to convey information to InnoDB
 about server activity: in selects it is not sensible to call
 srv_active_wake_master_thread after each fetch or search, we only do
@@ -16695,6 +16710,172 @@ innodb_enable_monitor_at_startup(
 	}
 }
 
+#ifdef UNIV_LINUX
+
+/****************************************************************//**
+Update the innodb_sched_priority_cleaner variable and set the thread
+priority accordingly.  */
+static
+void
+innodb_sched_priority_cleaner_update(
+/*=================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to
+						system variable */
+	void*				var_ptr,/*!< out: where the
+						formal string goes */
+	const void*			save)	/*!< in: immediate result
+						from check function */
+{
+	ulint	priority = *static_cast<const ulint *>(save);
+	ulint	actual_priority;
+
+	if (srv_read_only_mode) {
+
+		return;
+	}
+
+	ut_ad(buf_page_cleaner_is_active);
+	actual_priority = os_thread_set_priority(srv_cleaner_tid, priority);
+	if (UNIV_UNLIKELY(actual_priority != priority)) {
+
+		push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+				    ER_WRONG_ARGUMENTS,
+				    "Failed to set the page cleaner thread "
+				    "priority to %lu,  "
+				    "the current priority is %lu", priority,
+				    actual_priority);
+	} else {
+
+		srv_sched_priority_cleaner = priority;
+	}
+}
+
+#if defined(UNIV_DEBUG) || (UNIV_PERF_DEBUG)
+
+/****************************************************************//**
+Update the innodb_sched_priority_purge variable and set the thread
+priorities accordingly.  */
+static
+void
+innodb_sched_priority_purge_update(
+/*===============================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to
+						system variable */
+	void*				var_ptr,/*!< out: where the
+						formal string goes */
+	const void*			save)	/*!< in: immediate result
+						from check function */
+{
+	ulint	priority = *static_cast<const ulint *>(save);
+
+	if (srv_read_only_mode) {
+		return;
+	}
+
+	ut_ad(purge_sys->state == PURGE_STATE_RUN);
+	for (ulint i = 0; i < srv_n_purge_threads; i++) {
+
+		ulint actual_priority
+			= os_thread_set_priority(srv_purge_tids[i], priority);
+		if (UNIV_UNLIKELY(actual_priority != priority)) {
+
+			push_warning_printf(thd,
+					    Sql_condition::WARN_LEVEL_WARN,
+					    ER_WRONG_ARGUMENTS,
+					    "Failed to set the purge "
+					    "thread priority to %lu, the "
+					    "current priority is %lu, "
+					    "aborting priority update",
+					    priority, actual_priority);
+			return;
+		}
+	}
+
+	srv_sched_priority_purge = priority;
+}
+
+/****************************************************************//**
+Update the innodb_sched_priority_io variable and set the thread
+priorities accordingly.  */
+static
+void
+innodb_sched_priority_io_update(
+/*============================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to
+					        system variable */
+	void*				var_ptr,/*!< out: where the
+						formal string goes */
+	const void*			save)	/*!< in: immediate result
+						from check function */
+{
+	ulint	priority = *static_cast<const ulint *>(save);
+
+	for (ulint i = 0; i < srv_n_file_io_threads; i++) {
+
+		ulint actual_priority = os_thread_set_priority(srv_io_tids[i],
+							       priority);
+
+		if (UNIV_UNLIKELY(actual_priority != priority)) {
+
+			push_warning_printf(thd,
+					    Sql_condition::WARN_LEVEL_WARN,
+					    ER_WRONG_ARGUMENTS,
+					    "Failed to set the I/O "
+					    "thread priority to %lu, the "
+					    "current priority is %lu, "
+					    "aborting priority update",
+					    priority, actual_priority);
+			return;
+		}
+	}
+
+	srv_sched_priority_io = priority;
+}
+
+/****************************************************************//**
+Update the innodb_sched_priority_master variable and set the thread
+priorities accordingly.  */
+static
+void
+innodb_sched_priority_master_update(
+/*================================*/
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to
+						system variable */
+	void*				var_ptr,/*!< out: where the
+						formal string goes */
+	const void*			save)	/*!< in: immediate result
+						from check function */
+{
+	ulint	priority = *static_cast<const lint *>(save);
+	ulint	actual_priority;
+
+	if (srv_read_only_mode) {
+		return;
+	}
+
+	actual_priority = os_thread_set_priority(srv_master_tid, priority);
+	if (UNIV_UNLIKELY(actual_priority != priority)) {
+
+		push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+				    ER_WRONG_ARGUMENTS,
+				    "Failed to set the master thread "
+				    "priority to %lu,  "
+				    "the current priority is %lu", priority,
+				    actual_priority);
+	} else {
+
+		srv_sched_priority_master = priority;
+	}
+}
+
+#endif /* defined(UNIV_DEBUG) || (UNIV_PERF_DEBUG) */
+
+#endif /* UNIV_LINUX */
+
 /****************************************************************//**
 Callback function for accessing the InnoDB variables from MySQL:
 SHOW VARIABLES. */
@@ -17528,7 +17709,7 @@ static MYSQL_SYSVAR_ULONG(purge_threads, srv_n_purge_threads,
   NULL, NULL,
   1,			/* Default setting */
   1,			/* Minimum value */
-  32, 0);		/* Maximum value */
+  SRV_MAX_N_PURGE_THREADS, 0);		/* Maximum value */
 
 static MYSQL_SYSVAR_ULONG(sync_array_size, srv_sync_array_size,
   PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
@@ -17801,6 +17982,15 @@ static MYSQL_SYSVAR_BOOL(buffer_pool_populate, srv_buf_pool_populate,
   "established by the buffer pool memory region. Disabled by default.",
   NULL, NULL, FALSE);
 
+#ifdef UNIV_LINUX
+
+static MYSQL_SYSVAR_ULONG(sched_priority_cleaner, srv_sched_priority_cleaner,
+  PLUGIN_VAR_RQCMDARG,
+  "Nice value for the cleaner thread scheduling",
+  NULL, innodb_sched_priority_cleaner_update, 20, 0, 39, 0);
+
+#endif /* UNIV_LINUX */
+
 #if defined UNIV_DEBUG || defined UNIV_PERF_DEBUG
 static MYSQL_SYSVAR_ULONG(page_hash_locks, srv_n_page_hash_locks,
   PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
@@ -17813,6 +18003,21 @@ static MYSQL_SYSVAR_ULONG(doublewrite_batch_size, srv_doublewrite_batch_size,
   NULL, NULL, 120, 1, 127, 0);
 
 #ifdef UNIV_LINUX
+
+static MYSQL_SYSVAR_ULONG(sched_priority_purge, srv_sched_priority_purge,
+  PLUGIN_VAR_RQCMDARG,
+  "Nice value for the purge thread scheduling",
+  NULL, innodb_sched_priority_purge_update, 20, 0, 39, 0);
+
+static MYSQL_SYSVAR_ULONG(sched_priority_io, srv_sched_priority_io,
+  PLUGIN_VAR_RQCMDARG,
+  "Nice value for the I/O handler thread scheduling",
+  NULL, innodb_sched_priority_io_update, 20, 0, 39, 0);
+
+static MYSQL_SYSVAR_ULONG(sched_priority_master, srv_sched_priority_master,
+  PLUGIN_VAR_RQCMDARG,
+  "Nice value for the master thread scheduling",
+  NULL, innodb_sched_priority_master_update, 20, 0, 39, 0);
 
 static MYSQL_SYSVAR_BOOL(priority_purge, srv_purge_thread_priority,
   PLUGIN_VAR_OPCMDARG,
@@ -17873,6 +18078,15 @@ static MYSQL_SYSVAR_BOOL(cleaner_eviction_factor, srv_cleaner_eviction_factor,
   NULL, NULL, FALSE);
 
 #endif /* defined UNIV_DEBUG || defined UNIV_PERF_DEBUG */
+
+static MYSQL_SYSVAR_ENUM(cleaner_lsn_age_factor,
+  srv_cleaner_lsn_age_factor,
+  PLUGIN_VAR_OPCMDARG,
+  "The formula for LSN age factor for page cleaner adaptive flushing. "
+  "LEGACY: Original Oracle MySQL 5.6 formula. "
+  "HIGH_CHECKPOINT: (the default) Percona Server 5.6 formula.",
+  NULL, NULL, SRV_CLEANER_LSN_AGE_FACTOR_HIGH_CHECKPOINT,
+  &innodb_cleaner_lsn_age_factor_typelib);
 
 static MYSQL_SYSVAR_LONG(buffer_pool_instances, innobase_buffer_pool_instances,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
@@ -18567,10 +18781,16 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(log_checkpoint_now),
   MYSQL_SYSVAR(track_redo_log_now),
 #endif /* UNIV_DEBUG */
+#ifdef UNIV_LINUX
+  MYSQL_SYSVAR(sched_priority_cleaner),
+#endif
 #if defined UNIV_DEBUG || defined UNIV_PERF_DEBUG
   MYSQL_SYSVAR(page_hash_locks),
   MYSQL_SYSVAR(doublewrite_batch_size),
 #ifdef UNIV_LINUX
+  MYSQL_SYSVAR(sched_priority_purge),
+  MYSQL_SYSVAR(sched_priority_io),
+  MYSQL_SYSVAR(sched_priority_master),
   MYSQL_SYSVAR(priority_purge),
   MYSQL_SYSVAR(priority_io),
   MYSQL_SYSVAR(priority_cleaner),
@@ -18583,6 +18803,7 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(cleaner_free_list_lwm),
   MYSQL_SYSVAR(cleaner_eviction_factor),
 #endif /* defined UNIV_DEBUG || defined UNIV_PERF_DEBUG */
+  MYSQL_SYSVAR(cleaner_lsn_age_factor),
   MYSQL_SYSVAR(print_all_deadlocks),
   MYSQL_SYSVAR(cmp_per_index_enabled),
   MYSQL_SYSVAR(undo_logs),

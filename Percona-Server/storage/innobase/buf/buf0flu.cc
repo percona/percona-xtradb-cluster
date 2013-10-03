@@ -2247,25 +2247,22 @@ buf_flush_LRU_tail(void)
 					buffer pool instance. */
 					buf_flush_wait_batch_end(
 						buf_pool, BUF_FLUSH_LRU);
-				} else {
-
-					total_flushed += n.flushed;
-
-					/* When we evict less pages than we did
-					on a previous try we relax the LRU scan
-					limit in order to attempt to evict
-					more */
-					limited_scan[i]
-						= (previous_evicted[i]
-						   > n.evicted);
-					previous_evicted[i] = n.evicted;
-
-					requested_pages[i] += lru_chunk_size;
 				}
 
+				total_flushed += n.flushed;
+
+				/* When we evict less pages than we did	on a
+				previous try we relax the LRU scan limit in
+				order to attempt to evict more */
+				limited_scan[i]
+					= (previous_evicted[i] > n.evicted);
+				previous_evicted[i] = n.evicted;
+
+				requested_pages[i] += lru_chunk_size;
+
 				if (requested_pages[i] >= scan_depth[i]
-				    || (srv_cleaner_eviction_factor
-					? n.evicted : n.flushed)) {
+				    || !(srv_cleaner_eviction_factor
+					 ? n.evicted : n.flushed)) {
 
 					active_instance[i] = false;
 					remaining_instances--;
@@ -2401,10 +2398,22 @@ af_get_pct_for_lsn(
 	lsn_age_factor = (age * 100) / max_async_age;
 
 	ut_ad(srv_max_io_capacity >= srv_io_capacity);
-	return(static_cast<ulint>(
-		((srv_max_io_capacity / srv_io_capacity)
-		* (lsn_age_factor * sqrt((double)lsn_age_factor)))
-		/ 7.5));
+	switch ((srv_cleaner_lsn_age_factor_t)srv_cleaner_lsn_age_factor) {
+	case SRV_CLEANER_LSN_AGE_FACTOR_LEGACY:
+		return(static_cast<ulint>(
+			       ((srv_max_io_capacity / srv_io_capacity)
+				* (lsn_age_factor
+				   * sqrt((double)lsn_age_factor)))
+			       / 7.5));
+	case SRV_CLEANER_LSN_AGE_FACTOR_HIGH_CHECKPOINT:
+		return(static_cast<ulint>(
+			       ((srv_max_io_capacity / srv_io_capacity)
+				* (lsn_age_factor * lsn_age_factor
+				   * sqrt((double)lsn_age_factor)))
+			       / 700.5));
+	default:
+		ut_error;
+	}
 }
 
 /*********************************************************************//**
@@ -2635,6 +2644,10 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 #ifdef UNIV_PFS_THREAD
 	pfs_register_thread(buf_page_cleaner_thread_key);
 #endif /* UNIV_PFS_THREAD */
+
+	srv_cleaner_tid = os_thread_get_tid();
+
+	os_thread_set_priority(srv_cleaner_tid, srv_sched_priority_cleaner);
 
 #ifdef UNIV_DEBUG_THREAD_CREATION
 	fprintf(stderr, "InnoDB: page_cleaner thread running, id %lu\n",
