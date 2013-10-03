@@ -1585,7 +1585,9 @@ lock_rec_other_has_expl_req(
 
 #ifdef WITH_WSREP
 static void 
-wsrep_kill_victim(const trx_t *trx, const lock_t *lock) {
+wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
+        ut_ad(lock_mutex_own());
+        ut_ad(trx_mutex_own(lock->trx));
 	int bf_this  = wsrep_thd_is_brute_force(trx->mysql_thd);
 	int bf_other = 
 		wsrep_thd_is_brute_force(lock->trx->mysql_thd);
@@ -1661,7 +1663,9 @@ lock_rec_other_has_conflicting(
 
 		if (lock_rec_has_to_wait(trx, mode, lock, is_supremum)) {
 #ifdef WITH_WSREP
+                        trx_mutex_enter(lock->trx);
 			wsrep_kill_victim(trx, lock);
+                        trx_mutex_exit(lock->trx);
 #endif
 			return(lock);
 		}
@@ -1801,7 +1805,7 @@ lock_t*
 lock_rec_create(
 /*============*/
 #ifdef WITH_WSREP
-	lock_t*			c_lock,   /* conflicting lock */
+	lock_t*		  const c_lock,   /* conflicting lock */
 	que_thr_t*		thr,
 #endif
 	ulint			type_mode,/*!< in: lock mode and wait

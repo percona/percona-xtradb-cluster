@@ -16430,8 +16430,9 @@ wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno)
 	abort();
 }
 int
-wsrep_innobase_kill_one_trx(const trx_t *bf_trx, trx_t *victim_trx, ibool signal)
+wsrep_innobase_kill_one_trx(const trx_t * const bf_trx, trx_t *victim_trx, ibool signal)
 {
+        ut_ad(trx_mutex_own(victim_trx));
 	DBUG_ENTER("wsrep_innobase_kill_one_trx");
 	THD *bf_thd 	  = (THD *)(bf_trx) ? bf_trx->mysql_thd : NULL;
 	THD *thd          = (THD *) victim_trx->mysql_thd;
