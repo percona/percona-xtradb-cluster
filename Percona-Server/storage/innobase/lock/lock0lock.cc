@@ -1905,8 +1905,8 @@ lock_rec_create(
 		 * delayed conflict resolution '...kill_one_trx' was not called,
 		 * if victim was waiting for some other lock
 		 */
-		if (c_lock) trx_mutex_enter(c_lock->trx);
-		if (c_lock && c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT){
+		trx_mutex_enter(c_lock->trx);
+		if (c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
 
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
@@ -1950,7 +1950,7 @@ lock_rec_create(
 			/* have to bail out here to avoid lock_set_lock... */
 			return(lock);
 		}
-		if (c_lock) trx_mutex_exit(c_lock->trx);
+		trx_mutex_exit(c_lock->trx);
 	} else {
 		HASH_INSERT(lock_t, hash, lock_sys->rec_hash,
 			    lock_rec_fold(space, page_no), lock);
