@@ -17348,7 +17348,7 @@ wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno)
 	abort();
 }
 int
-wsrep_innobase_kill_one_trx(const trx_t *bf_trx, trx_t *victim_trx, ibool signal)
+wsrep_innobase_kill_one_trx(const trx_t * const bf_trx, trx_t *victim_trx, ibool signal)
 {
         ut_ad(lock_mutex_own());
 	DBUG_ENTER("wsrep_innobase_kill_one_trx");
