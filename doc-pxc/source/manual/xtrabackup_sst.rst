@@ -48,15 +48,15 @@ socat is recommended because it allows for socket options like transfer buffer s
 .. option:: tca 
 
      :Description: CA file for openssl based encryption with socat.                                                   
-     :Type: Full path to CA file.
+     :Type: Full path to CRT file (.crt).
                           
 .. option:: tcert
     
     :Description: PEM for openssl based encryption with socat.                                                     
-    :Type:  Full path to PEM.
+    :Type:  Full path to PEM (.pem).
 
 .. note::
-    For tca and tcert, refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example. The ``tca`` is essentially the self-signed certificate in that example, and ``tcert`` is the PEM file generated after concatenation of the key and the certificate generated earlier. The names of options were chosen so as to be compatible with socat's parameter' names as well as with MySQL's SSL authentication. For testing you can also download certificates from `launchpad <https://bazaar.launchpad.net/~percona-core/percona-xtradb-cluster/5.5/files/head:/tests/certs/>`_.
+    For tca and tcert, refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example. The ``tca`` is essentially the self-signed certificate in that example, and ``tcert`` is the PEM file generated after concatenation of the key and the certificate generated earlier. The names of options were chosen so as to be compatible with socat's parameter' names as well as with MySQL's SSL authentication. For testing you can also download certificates from `launchpad <https://bazaar.launchpad.net/~percona-core/percona-xtradb-cluster/5.5/files/head:/tests/certs/>`_. **Note** that irrespective of what is shown in the example, you can use same crt and pem files on all nodes and it will work, since there is no server-client paradigm here but a cluster with homogeneous nodes.
                                                                                                              
 .. option:: encrypt
 
