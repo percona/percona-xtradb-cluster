@@ -56,17 +56,18 @@ socat is recommended because it allows for socket options like transfer buffer s
     :Type:  Full path to PEM.
 
 .. note::
-    For tca and tcert, refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example.      
+    For tca and tcert, refer to http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html for an example. The ``tca`` is essentially the self-signed certificate in that example, and ``tcert`` is the PEM file generated after concatenation of the key and the certificate generated earlier. The names of options were chosen so as to be compatible with socat's parameter' names as well as with MySQL's SSL authentication. For testing you can also download certificates from `launchpad <https://bazaar.launchpad.net/~percona-core/percona-xtradb-cluster/5.5/files/head:/tests/certs/>`_.
                                                                                                              
 .. option:: encrypt
 
     :Values: 0,1,2  
     :Default: 0
     :Match: Yes
-    :Recommended: 2
 
 Decides whether encryption is to be done or not, if this is zero, no    
-encryption is done.                                                    
+encryption is done. ``encrypt=2`` is recommended if your nodes are      
+over WAN and security constraints are higher, while ``encrypt=1``       
+(Xtrabackup-based symmetric encryption) is easier to setup.             
 
   * Xtrabackup based encryption  with ``encrypt=1``.
 
