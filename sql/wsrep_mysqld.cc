@@ -21,6 +21,7 @@
 #include "wsrep_sst.h"
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
+#include "wsrep_binlog.h"
 #include <cstdio>
 #include <cstdlib>
 #include "log_event.h"
@@ -46,8 +47,8 @@ ulong   wsrep_retry_autocommit         = 5; // retry aborted autocommit trx
 my_bool wsrep_auto_increment_control   = 1; // control auto increment variables
 my_bool wsrep_drupal_282555_workaround = 1; // retry autoinc insert after dupkey
 my_bool wsrep_incremental_data_collection = 0; // incremental data collection
-long long wsrep_max_ws_size            = 1073741824LL; //max ws (RBR buffer) size
-long    wsrep_max_ws_rows              = 65536; // max number of rows in ws
+ulong   wsrep_max_ws_size              = 1073741824UL;//max ws (RBR buffer) size
+ulong   wsrep_max_ws_rows              = 65536; // max number of rows in ws
 int     wsrep_to_isolation             = 0; // # of active TO isolation threads
 my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
 long    wsrep_max_protocol_version     = 2; // maximum protocol version to use
@@ -55,8 +56,9 @@ ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
 my_bool wsrep_log_conflicts            = 0;
-ulong  wsrep_mysql_replication_bundle  = 0;
-my_bool wsrep_desync                   = 0; // desynchronize the node from the cluster
+ulong   wsrep_mysql_replication_bundle = 0;
+my_bool wsrep_desync                   = 0; // desynchronize the node from the
+                                            // cluster
 
 /*
  * End configuration options
@@ -359,6 +361,18 @@ wsrep_view_handler_cb (void*                    app_ctx,
   {
     global_system_variables.auto_increment_offset= view->my_idx + 1;
     global_system_variables.auto_increment_increment= view->memb_num;
+  }
+
+  { /* capabilities may be updated on new configuration */
+    uint64_t const caps(wsrep->capabilities (wsrep));
+
+    my_bool const idc((caps & WSREP_CAP_INCREMENTAL_WRITESET) != 0);
+    if (TRUE == wsrep_incremental_data_collection && FALSE == idc)
+    {
+      WSREP_WARN("Unsupported protocol downgrade: "
+                 "incremental data collection disabled. Expect abort.");
+    }
+    wsrep_incremental_data_collection = idc;
   }
 
 out:
@@ -764,11 +778,6 @@ bool wsrep_start_replication()
   {
     wsrep_connected= TRUE;
 
-    uint64_t caps = wsrep->capabilities (wsrep);
-
-    wsrep_incremental_data_collection =
-        !!(caps & WSREP_CAP_INCREMENTAL_WRITESET);
-
     char* opts= wsrep->options_get(wsrep);
     if (opts)
     {
@@ -1055,7 +1064,7 @@ int wsrep_to_buf_helper(
   }
   Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
   if (!ret && ev.write(&tmp_io_cache)) ret= 1;
-  if (!ret && wsrep_write_cache(&tmp_io_cache, buf, buf_len)) ret= 1;
+  if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret= 1;
   close_cached_file(&tmp_io_cache);
   return ret;
 }

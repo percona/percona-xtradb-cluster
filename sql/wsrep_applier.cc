@@ -14,6 +14,7 @@
    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. */
 
 #include "wsrep_priv.h"
+#include "wsrep_binlog.h" // wsrep_dump_rbr_buf()
 
 #include "log_event.h" // class THD, EVENT_LEN_OFFSET, etc.
 /*
@@ -53,31 +54,6 @@ err:
   (*arg_buf)+= data_len;
   (*arg_buf_len)-= data_len;
   DBUG_RETURN(res);
-}
-
-void wsrep_write_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len)
-{
-  char filename[PATH_MAX]= {0};
-  int len= snprintf(filename, PATH_MAX, "%s/GRA_%ld_%lld.log",
-                    wsrep_data_home_dir, thd->thread_id,
-                    (long long)wsrep_thd_trx_seqno(thd));
-  if (len >= PATH_MAX)
-  {
-    WSREP_ERROR("RBR dump path too long: %d, skipping dump.", len);
-    return;
-  }
-
-  FILE *of= fopen(filename, "wb");
-  if (of)
-  {
-    fwrite (rbr_buf, buf_len, 1, of);
-    fclose(of);
-  }
-  else
-  {
-    WSREP_ERROR("Failed to open file '%s': %d (%s)",
-                filename, errno, strerror(errno));
-  }
 }
 
 #include "transaction.h" // trans_commit(), trans_rollback()
@@ -247,7 +223,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   if (WSREP_CB_SUCCESS != rcode)
   {
-    wsrep_write_rbr_buf(thd, buf, buf_len);
+    wsrep_dump_rbr_buf(thd, buf, buf_len);
   }
 
   return rcode;
