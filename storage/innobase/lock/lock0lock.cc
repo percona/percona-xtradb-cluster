@@ -1805,7 +1805,7 @@ lock_t*
 lock_rec_create(
 /*============*/
 #ifdef WITH_WSREP
-	lock_t*		  const c_lock,   /* conflicting lock */
+	lock_t*		  const c_lock,	/* conflicting lock */
 	que_thr_t*		thr,
 #endif
 	ulint			type_mode,/*!< in: lock mode and wait
@@ -1886,7 +1886,7 @@ lock_rec_create(
 
 #ifdef WITH_WSREP
 	if (c_lock && wsrep_thd_is_brute_force(trx->mysql_thd)) {
-		lock_t *hash 	= (lock_t *)c_lock->hash;
+		lock_t *hash	= (lock_t *)c_lock->hash;
 		lock_t *prev	= NULL;
 
 		while (hash 						&&
@@ -1913,7 +1913,7 @@ lock_rec_create(
 
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
-			if (wsrep_debug && 
+			if (wsrep_debug &&
 			    c_lock->trx->lock.wait_lock != c_lock) {
 				fprintf(stderr, "WSREP: c_lock != wait lock\n");
 				lock_rec_print(stderr, c_lock);
@@ -1946,8 +1946,8 @@ lock_rec_create(
 			trx_mutex_exit(c_lock->trx);
 
 			if (wsrep_debug) fprintf(
-				stderr, 
-				"WSREP: c_lock canceled %llu\n", 
+				stderr,
+				"WSREP: c_lock canceled %llu\n",
 				(ulonglong) c_lock->trx->id);
 
 			/* have to bail out here to avoid lock_set_lock... */
@@ -1961,7 +1961,7 @@ lock_rec_create(
 #else
 	HASH_INSERT(lock_t, hash, lock_sys->rec_hash,
 		    lock_rec_fold(space, page_no), lock);
-#endif
+#endif /* WITH_WSREP */
 	if (!caller_owns_trx_mutex) {
 		trx_mutex_enter(trx);
 	}
@@ -1996,7 +1996,7 @@ dberr_t
 lock_rec_enqueue_waiting(
 /*=====================*/
 #ifdef WITH_WSREP
-	lock_t*			c_lock,   /* conflicting lock */
+	lock_t*			c_lock,	/* conflicting lock */
 #endif
 	ulint			type_mode,/*!< in: lock mode this
 					transaction is requesting:
@@ -2376,7 +2376,7 @@ lock_rec_lock_slow(
 {
 	trx_t*			trx;
 #ifdef WITH_WSREP
-	lock_t 			*c_lock;
+	lock_t*			c_lock(NULL);
 #endif
 	lock_t*			lock;
 	dberr_t			err = DB_SUCCESS;
@@ -2435,7 +2435,7 @@ lock_rec_lock_slow(
 	} else if (lock_rec_other_has_conflicting(
 			static_cast<enum lock_mode>(mode),
 			block, heap_no, trx)) {
-#endif
+#endif /* WITH_WSREP */
 		/* If another transaction has a non-gap conflicting
 		request in the queue, as this transaction does not
 		have a lock strong enough already granted on the
@@ -2444,6 +2444,9 @@ lock_rec_lock_slow(
 		ut_ad(lock == NULL);
 enqueue_waiting:
 #ifdef WITH_WSREP
+		/* c_lock is NULL here if jump to enqueue_waiting happened
+		but it's ok because lock is not NULL in that case and c_lock
+		is not used. */
 		err = lock_rec_enqueue_waiting(c_lock,
 			mode, block, heap_no, lock, index, thr);
 #else
