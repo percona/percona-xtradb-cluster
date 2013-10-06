@@ -835,8 +835,7 @@ static int binlog_init(void *p)
 }
 
 #ifdef WITH_WSREP
-void wsrep_write_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len);
-int  wsrep_write_cache  (IO_CACHE *cache, uchar **buf, size_t *buf_len);
+#include "wsrep_binlog.h"
 #endif /* WITH_WSREP */
 static int binlog_close_connection(handlerton *hton, THD *thd)
 {
@@ -849,8 +848,8 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     size_t len=0;
     WSREP_WARN("binlog cache not empty at connection close %lu",
                thd->thread_id);
-    wsrep_write_cache(cache, &buf, &len);
-    wsrep_write_rbr_buf(thd, buf, len);
+    wsrep_write_cache_buf(cache, &buf, &len);
+    wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
   DBUG_ASSERT(cache_mngr->is_binlog_empty());
