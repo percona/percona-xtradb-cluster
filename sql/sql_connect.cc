@@ -189,7 +189,7 @@ end:
   mysql_mutex_unlock(&LOCK_user_conn);
   if (error)
   {
-    inc_host_errors(thd->main_security_ctx.ip, &errors);
+    inc_host_errors(thd->main_security_ctx.get_ip()->ptr(), &errors);
   }
   DBUG_RETURN(error);
 }
@@ -516,7 +516,7 @@ static int check_connection(THD *thd)
   thd->set_active_vio(net->vio);
 #endif
 
-  if (!thd->main_security_ctx.host)         // If TCP/IP connection
+  if (!thd->main_security_ctx.get_host()->length())     // If TCP/IP connection
   {
     my_bool peer_rc;
     char ip[NI_MAXHOST];
@@ -596,7 +596,8 @@ static int check_connection(THD *thd)
       my_error(ER_BAD_HOST_ERROR, MYF(0));
       return 1;
     }
-    if (!(thd->main_security_ctx.ip= my_strdup(ip,MYF(MY_WME))))
+    thd->main_security_ctx.set_ip(my_strdup(ip, MYF(MY_WME)));
+    if (!(thd->main_security_ctx.get_ip()->length()))
     {
       /*
         No error accounting per IP in host_cache,
@@ -606,23 +607,26 @@ static int check_connection(THD *thd)
       statistic_increment(connection_errors_internal, &LOCK_status);
       return 1; /* The error is set by my_strdup(). */
     }
-    thd->main_security_ctx.host_or_ip= thd->main_security_ctx.ip;
+    thd->main_security_ctx.host_or_ip= thd->main_security_ctx.get_ip()->ptr();
     if (!(specialflag & SPECIAL_NO_RESOLVE))
     {
       int rc;
+      char *host= (char *) thd->main_security_ctx.get_host()->ptr();
 
       rc= ip_to_hostname(&net->vio->remote,
-                         thd->main_security_ctx.ip,
-                         &thd->main_security_ctx.host,
-                         &connect_errors);
+                         thd->main_security_ctx.get_ip()->ptr(),
+                         &host, &connect_errors);
 
+      thd->main_security_ctx.set_host(host);
       /* Cut very long hostnames to avoid possible overflows */
-      if (thd->main_security_ctx.host)
+      if (thd->main_security_ctx.get_host()->length())
       {
-        if (thd->main_security_ctx.host != my_localhost)
-          thd->main_security_ctx.host[min<size_t>(strlen(thd->main_security_ctx.host),
-                                                  HOSTNAME_LENGTH)]= 0;
-        thd->main_security_ctx.host_or_ip= thd->main_security_ctx.host;
+        if (thd->main_security_ctx.get_host()->ptr() != my_localhost)
+          thd->main_security_ctx.set_host(thd->main_security_ctx.get_host()->ptr(),
+                               min<size_t>(thd->main_security_ctx.get_host()->length(),
+                               HOSTNAME_LENGTH));
+        thd->main_security_ctx.host_or_ip=
+                        thd->main_security_ctx.get_host()->ptr();
       }
 
       if (rc == RC_BLOCKED_HOST)
@@ -633,11 +637,12 @@ static int check_connection(THD *thd)
       }
     }
     DBUG_PRINT("info",("Host: %s  ip: %s",
-           (thd->main_security_ctx.host ?
-                        thd->main_security_ctx.host : "unknown host"),
-           (thd->main_security_ctx.ip ?
-                        thd->main_security_ctx.ip : "unknown ip")));
-    if (acl_check_host(thd->main_security_ctx.host, thd->main_security_ctx.ip))
+           (thd->main_security_ctx.get_host()->length() ?
+                 thd->main_security_ctx.get_host()->ptr() : "unknown host"),
+           (thd->main_security_ctx.get_ip()->length() ?
+                 thd->main_security_ctx.get_ip()->ptr() : "unknown ip")));
+    if (acl_check_host(thd->main_security_ctx.get_host()->ptr(),
+                       thd->main_security_ctx.get_ip()->ptr()))
     {
       /* HOST_CACHE stats updated by acl_check_host(). */
       my_error(ER_HOST_NOT_PRIVILEGED, MYF(0),
@@ -647,9 +652,9 @@ static int check_connection(THD *thd)
   }
   else /* Hostname given means that the connection was on a socket */
   {
-    DBUG_PRINT("info",("Host: %s", thd->main_security_ctx.host));
-    thd->main_security_ctx.host_or_ip= thd->main_security_ctx.host;
-    thd->main_security_ctx.ip= 0;
+    DBUG_PRINT("info",("Host: %s", thd->main_security_ctx.get_host()->ptr()));
+    thd->main_security_ctx.host_or_ip= thd->main_security_ctx.get_host()->ptr();
+    thd->main_security_ctx.set_ip("");
     /* Reset sin_addr */
     memset(&net->vio->remote, 0, sizeof(net->vio->remote));
   }
@@ -680,7 +685,7 @@ static int check_connection(THD *thd)
       after some previous failures.
       Reset the connection error counter.
     */
-    reset_host_connect_errors(thd->main_security_ctx.ip);
+    reset_host_connect_errors(thd->main_security_ctx.get_ip()->ptr());
   }
 
   return auth_rc;
@@ -874,7 +879,7 @@ void prepare_new_connection_state(THD* thd)
       thd->protocol->end_statement();
       thd->killed = THD::KILL_CONNECTION;
       errors.m_init_connect= 1;
-      inc_host_errors(thd->main_security_ctx.ip, &errors);
+      inc_host_errors(thd->main_security_ctx.get_ip()->ptr(), &errors);
       return;
     }
 
