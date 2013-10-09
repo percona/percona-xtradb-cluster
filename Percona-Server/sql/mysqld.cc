@@ -1997,6 +1997,8 @@ void clean_up(bool print_message)
   if (THR_MALLOC)
     (void) pthread_key_delete(THR_MALLOC);
 
+  my_handle_options_end();
+
   /*
     The following lines may never be executed as the main thread may have
     killed us
@@ -5117,7 +5119,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   /*
     Validate any enforced storage engine
   */
-  if (enforce_storage_engine)
+  if (enforce_storage_engine && !opt_bootstrap && !opt_noacl)
   {
     LEX_STRING name= { enforce_storage_engine,
       strlen(enforce_storage_engine) };
@@ -5140,6 +5142,8 @@ a file name for --log-bin-index option", opt_binlog_index_name);
             enforce_storage_engine);
         }
       }
+      plugin_unlock(0, defplugin);
+      plugin_unlock(0, plugin);
     }
     else
     {
