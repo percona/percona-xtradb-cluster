@@ -1608,9 +1608,7 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 				else
 					fputs("\n*** Victim TRANSACTION:\n", 
 					      stderr);
-                                mutex_enter(&trx_sys->mutex);
 				trx_print_latched(stderr, trx, 3000);
-                                mutex_exit(&trx_sys->mutex);
 
 				if (bf_other)
 					fputs("\n*** Priority TRANSACTION:\n", 
@@ -1618,9 +1616,7 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 				else
 					fputs("\n*** Victim TRANSACTION:\n", 
 					      stderr);
-                                mutex_enter(&trx_sys->mutex);
 				trx_print_latched(stderr, lock->trx, 3000);
-                                mutex_exit(&trx_sys->mutex);
 
 				fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n",
 				      stderr);
@@ -2414,6 +2410,8 @@ lock_rec_lock_slow(
 
 	DBUG_EXECUTE_IF("innodb_report_deadlock", return(DB_DEADLOCK););
 
+        if (wsrep_log_conflicts)
+                mutex_enter(&trx_sys->mutex);
 	trx = thr_get_trx(thr);
 	trx_mutex_enter(trx);
 
@@ -2458,11 +2456,14 @@ lock_rec_lock_slow(
 		ut_ad(lock == NULL);
 enqueue_waiting:
 #ifdef WITH_WSREP
+                if (wsrep_log_conflicts)
+                        mutex_exit(&trx_sys->mutex);
 		/* c_lock is NULL here if jump to enqueue_waiting happened
 		but it's ok because lock is not NULL in that case and c_lock
 		is not used. */
 		err = lock_rec_enqueue_waiting(c_lock,
 			mode, block, heap_no, lock, index, thr);
+		goto released;
 #else
 		err = lock_rec_enqueue_waiting(
 			mode, block, heap_no, lock, index, thr);
@@ -2477,7 +2478,10 @@ enqueue_waiting:
 		err = DB_SUCCESS_LOCKED_REC;
 	}
 
-	trx_mutex_exit(trx);
+        if (wsrep_log_conflicts)
+                mutex_exit(&trx_sys->mutex);
+released:
+        trx_mutex_exit(trx);
 
 	return(err);
 }
