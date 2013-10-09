@@ -231,17 +231,20 @@ wsrep_recover_position() {
     return $ret
   fi
 
-  local wr_logfile=$(mktemp)
   local euid=$(id -u)
+
+  local wr_logfile=$(mktemp $DATADIR/wsrep_recovery.XXXXXX)
 
   [ "$euid" = "0" ] && chown $user $wr_logfile
   chmod 600 $wr_logfile
 
-  log_notice "WSREP: Running position recovery with --log_error=$wr_logfile \
-                                --pid-file="$DATADIR/`@HOSTNAME@`-recover.pid""
+  local wr_pidfile="$DATADIR/"`@HOSTNAME@`"-recover.pid"
 
-  eval_log_error "$mysqld_cmd --log_error=$wr_logfile --wsrep-recover \
-                            --pid-file="$DATADIR/`@HOSTNAME@`-recover.pid""
+  local wr_options="--log_error='$wr_logfile' --pid-file='$wr_pidfile'"
+
+  log_notice "WSREP: Running position recovery with $wr_options"
+
+  eval_log_error "$mysqld_cmd --wsrep_recover $wr_options"
 
   local rp="$(grep 'WSREP: Recovered position:' $wr_logfile)"
   if [ -z "$rp" ]; then
@@ -941,8 +944,6 @@ max_fast_restarts=5
 # flag whether a usable sleep command exists
 have_sleep=1
 
-# maximum number of wsrep restarts
-max_wsrep_restarts=0
 
 # maximum number of wsrep restarts
 max_wsrep_restarts=0
