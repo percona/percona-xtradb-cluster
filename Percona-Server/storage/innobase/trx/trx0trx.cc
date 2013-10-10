@@ -1508,15 +1508,9 @@ trx_commit_in_memory(
 	ut_ad(!trx->in_rw_trx_list);
 
 #ifdef WITH_WSREP
-	/* this asignment inherits from version 5.1 patch and
-	   turns out obsolote by now
-	*/
-#ifdef REMOVED
-	if (wsrep_on(trx->mysql_thd) &&
-	    trx->lock.was_chosen_as_deadlock_victim) {
+	if (wsrep_on(trx->mysql_thd)) {
 		trx->lock.was_chosen_as_deadlock_victim = FALSE;
 	}
-#endif
 #endif
 	trx->dict_operation = TRX_DICT_OP_NONE;
 
