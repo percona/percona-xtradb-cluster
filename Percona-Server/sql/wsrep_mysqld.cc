@@ -1176,6 +1176,8 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
 
   wsrep_key_arr_t key_arr= {0, 0};
   struct wsrep_buf buff = { buf, buf_len };
+  if (WSREP(thd))
+      thd_proc_info(thd, "Preparing for TO isolation");
   if (!buf_err                                                    &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,

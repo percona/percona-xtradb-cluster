@@ -359,7 +359,9 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   }
   else if (!rcode)
   {
-    if (WSREP_OK == rcode)
+    if (WSREP_OK == rcode) {
+      if (WSREP(thd))
+        thd_proc_info(thd, "wsrep in pre-commit stage");
       rcode = wsrep->pre_commit(wsrep,
                                 (wsrep_conn_id_t)thd->thread_id,
                                 &thd->wsrep_ws_handle,
@@ -367,6 +369,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                                 ((thd->wsrep_PA_safe) ?
                                  0ULL : WSREP_FLAG_PA_UNSAFE),
                                 &thd->wsrep_trx_meta);
+    }
 
     if (rcode == WSREP_TRX_MISSING) {
       WSREP_WARN("Transaction missing in provider, thd: %ld, SQL: %s",
