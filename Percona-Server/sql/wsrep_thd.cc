@@ -239,6 +239,7 @@ void wsrep_replay_transaction(THD *thd)
         WSREP_ERROR("trx_replay failed for: %d, query: %s",
                     rcode, thd->query() ? thd->query() : "void");
         /* we're now in inconsistent state, must abort */
+	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         unireg_abort(1);
         break;
       }

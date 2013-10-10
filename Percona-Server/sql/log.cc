@@ -1073,9 +1073,11 @@ bool LOGGER::slow_log_print(THD *thd, const char *query, uint query_length)
     user_host_len= (strxnmov(user_host_buff, MAX_USER_HOST_SIZE,
                              sctx->priv_user ? sctx->priv_user : "", "[",
                              sctx->user ? sctx->user : (thd->slave_thread ? "SQL_SLAVE" : ""), "] @ ",
-                             sctx->host ? sctx->host : "", " [",
-                             sctx->ip ? sctx->ip : "", "]", NullS) -
-                    user_host_buff);
+                             sctx->get_host()->length() ?
+                             sctx->get_host()->ptr() : "", " [",
+                             sctx->get_ip()->length() ? sctx->get_ip()->ptr() :
+                             "", "]", NullS) - user_host_buff);
+
 
     current_utime= thd->current_utime();
     if (thd->start_utime)
@@ -2592,7 +2594,10 @@ int TC_LOG_MMAP::open(const char *opt_name)
   DBUG_ASSERT(opt_name && opt_name[0]);
 
   tc_log_page_size= my_getpagesize();
-  DBUG_ASSERT(TC_LOG_PAGE_SIZE % tc_log_page_size == 0);
+  if (TC_LOG_PAGE_SIZE > tc_log_page_size)
+  {
+    DBUG_ASSERT(TC_LOG_PAGE_SIZE % tc_log_page_size == 0);
+  }
 
   fn_format(logname,opt_name,mysql_data_home,"",MY_UNPACK_FILENAME);
   if ((fd= mysql_file_open(key_file_tclog, logname, O_RDWR, MYF(0))) < 0)

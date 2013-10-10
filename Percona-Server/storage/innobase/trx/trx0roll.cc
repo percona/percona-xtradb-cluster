@@ -386,10 +386,15 @@ trx_rollback_to_savepoint_for_mysql_low(
 	trx->op_info = "";
 
 #ifdef WITH_WSREP
+	/* this asignment inherits from version 5.1 patch and
+	   turns out obsolote by now
+	*/
+#ifdef REMOVED
 	if (wsrep_on(trx->mysql_thd) && 
 	    trx->lock.was_chosen_as_deadlock_victim) {
 		trx->lock.was_chosen_as_deadlock_victim = FALSE;
 	}
+#endif
 #endif
 	return(err);
 }
@@ -1030,10 +1035,15 @@ trx_roll_try_truncate(
 		trx_undo_truncate_end(trx, trx->update_undo, limit);
 	}
 #ifdef WITH_WSREP
+	/* this asignment inherits from version 5.1 patch and
+	   turns out obsolote by now
+	*/
+#ifdef REMOVED
 	if (wsrep_on(trx->mysql_thd) &&
 	    trx->lock.was_chosen_as_deadlock_victim) {
 		trx->lock.was_chosen_as_deadlock_victim = FALSE;
 	}
+#endif
 #endif
 }
 
@@ -1342,10 +1352,15 @@ trx_rollback_finish(
 
 	trx->lock.que_state = TRX_QUE_RUNNING;
 #ifdef WITH_WSREP
+	/* this asignment inherits from version 5.1 patch and
+	   turns out obsolote by now
+	*/
+#ifdef REMOVED
 	if (wsrep_on(trx->mysql_thd) &&
 	    trx->lock.was_chosen_as_deadlock_victim) {
 		trx->lock.was_chosen_as_deadlock_victim = FALSE;
 	}
+#endif
 #endif
 }
 
