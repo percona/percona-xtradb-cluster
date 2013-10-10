@@ -2507,7 +2507,7 @@ buf_page_get_gen(
 	ibool		must_read;
 	prio_rw_lock_t*	hash_lock;
 	ib_mutex_t*	block_mutex;
-	buf_page_t*	hash_bpage;
+	buf_page_t*	hash_bpage = NULL;
 	ulint		retries = 0;
 	trx_t*		trx = NULL;
 	ulint		sec;
