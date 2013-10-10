@@ -27,7 +27,7 @@
 
 %define mysql_version   5.6.13
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define majorversion 60
+%define majorversion 61
 %define minorversion 6
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
@@ -43,7 +43,7 @@
 %endif
 
 %define release_tag	%{nil}
-%define release         %{release_tag}%{wsrep_version}.%{revision}.%{distribution}
+%define release         rel%{release_tag}%{wsrep_version}.%{revision}.%{distribution}
 
 #
 # Macros we use which are not available in all supported versions of RPM
@@ -367,7 +367,6 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared mysql-libs Percona-Server-shared
-Conflicts:	Percona-Server-shared-55
 Obsoletes:	mysql-libs
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
@@ -594,6 +593,10 @@ mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
+
+# Delete the symlinks to the libraries from the libdir. These are created by
+# ldconfig(8) afterwards.
+rm -f $RBR%{_libdir}/libmysqlclient*.so.18
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
@@ -1179,11 +1182,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/libmysqlservices.a
 %{_libdir}/*.so
 
-# ----------------------------------------------------------------------------
-%files -n Percona-XtraDB-Cluster-shared%{product_suffix}
-%defattr(-, root, root, 0755)
-# Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libmysql*.so.*
 # Maatkit UDF libs
 %{_libdir}/mysql/plugin/libfnv1a_udf.a
 %{_libdir}/mysql/plugin/libfnv1a_udf.la
@@ -1191,6 +1189,12 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/mysql/plugin/libfnv_udf.la
 %{_libdir}/mysql/plugin/libmurmur_udf.a
 %{_libdir}/mysql/plugin/libmurmur_udf.la
+
+# ----------------------------------------------------------------------------
+%files -n Percona-XtraDB-Cluster-shared%{product_suffix}
+%defattr(-, root, root, 0755)
+# Shared libraries (omit for architectures that don't support them)
+%{_libdir}/libmysql*.so.*
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
