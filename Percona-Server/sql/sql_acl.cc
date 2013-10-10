@@ -3261,7 +3261,6 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
              table->s->table_name.str);
     goto end;
   }
-
   table->use_all_columns();
   DBUG_ASSERT(combo->host.str != '\0');
   table->field[MYSQL_USER_FIELD_HOST]->store(combo->host.str,combo->host.length,
