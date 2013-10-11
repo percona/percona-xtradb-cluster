@@ -1394,6 +1394,10 @@ innobase_srv_conc_enter_innodb(
 /*===========================*/
 	trx_t*	trx)	/*!< in: transaction handle */
 {
+#ifdef WITH_WSREP
+	if (wsrep_on(trx->mysql_thd) && 
+	    wsrep_thd_is_brute_force(trx->mysql_thd)) return;
+#endif /* WITH_WSREP */
 	if (srv_thread_concurrency) {
 		if (trx->n_tickets_to_enter_innodb > 0) {
 
@@ -1428,6 +1432,10 @@ innobase_srv_conc_exit_innodb(
 #ifdef UNIV_SYNC_DEBUG
 	ut_ad(!sync_thread_levels_nonempty_trx(trx->has_search_latch));
 #endif /* UNIV_SYNC_DEBUG */
+#ifdef WITH_WSREP
+	if (wsrep_on(trx->mysql_thd) && 
+	    wsrep_thd_is_brute_force(trx->mysql_thd)) return;
+#endif /* WITH_WSREP */
 
 	/* This is to avoid making an unnecessary function call. */
 	if (trx->declared_to_be_inside_innodb

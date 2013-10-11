@@ -213,6 +213,16 @@ srv_conc_enter_innodb_with_atomics(
 
 	for (;;) {
 		ulint	sleep_in_us;
+#ifdef WITH_WSREP
+		if (wsrep_on(trx->mysql_thd) && 
+		    wsrep_trx_is_aborting(trx->mysql_thd)) {
+			if (wsrep_debug)
+		  		fprintf(stderr,	
+					"srv_conc_enter due to MUST_ABORT");
+			srv_conc_force_enter_innodb(trx);
+			return;
+		}
+#endif /* WITH_WSREP */
 
 		if (srv_conc.n_active < (lint) srv_thread_concurrency) {
 			ulint	n_active;
@@ -254,21 +264,6 @@ srv_conc_enter_innodb_with_atomics(
 			(void) os_atomic_decrement_lint(
 				&srv_conc.n_active, 1);
 		}
-#ifdef WITH_WSREP
-		if (wsrep_on(trx->mysql_thd) && 
-		  	wsrep_thd_is_brute_force(trx->mysql_thd)) {
-			srv_conc_force_enter_innodb(trx);
-			return;
-		}
-		if (wsrep_on(trx->mysql_thd) && 
-		    wsrep_trx_is_aborting(trx->mysql_thd)) {
-			if (wsrep_debug)
-			  	fprintf(stderr, 
-					"srv_conc_enter due to MUST_ABORT");
-			srv_conc_force_enter_innodb(trx);
-			return;
-		}
-#endif
 
 		if (!notified_mysql) {
 			(void) os_atomic_increment_lint(
@@ -432,11 +427,6 @@ retry:
 		return;
 	}
 #ifdef WITH_WSREP
-	if (wsrep_on(trx->mysql_thd) && 
-	    wsrep_thd_is_brute_force(trx->mysql_thd)) {
-		srv_conc_force_enter_innodb(trx);
-		return;
-	}
 	if (wsrep_on(trx->mysql_thd) && 
 	    wsrep_trx_is_aborting(trx->mysql_thd)) {
 		srv_conc_force_enter_innodb(trx);
