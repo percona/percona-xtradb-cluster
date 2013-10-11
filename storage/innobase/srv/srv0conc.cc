@@ -212,6 +212,16 @@ srv_conc_enter_innodb_with_atomics(
 
 	for (;;) {
 		ulint	sleep_in_us;
+#ifdef WITH_WSREP
+		if (wsrep_on(trx->mysql_thd) && 
+		    wsrep_trx_is_aborting(trx->mysql_thd)) {
+			if (wsrep_debug)
+		  		fprintf(stderr,	
+					"srv_conc_enter due to MUST_ABORT");
+			srv_conc_force_enter_innodb(trx);
+			return;
+		}
+#endif /* WITH_WSREP */
 
 		if (srv_conc.n_active < (lint) srv_thread_concurrency) {
 			ulint	n_active;
@@ -253,21 +263,6 @@ srv_conc_enter_innodb_with_atomics(
 			(void) os_atomic_decrement_lint(
 				&srv_conc.n_active, 1);
 		}
-#ifdef WITH_WSREP
-		if (wsrep_on(trx->mysql_thd) && 
-		  	wsrep_thd_is_brute_force(trx->mysql_thd)) {
-			srv_conc_force_enter_innodb(trx);
-			return;
-		}
-		if (wsrep_on(trx->mysql_thd) && 
-		    wsrep_trx_is_aborting(trx->mysql_thd)) {
-			if (wsrep_debug)
-			  	fprintf(stderr, 
-					"srv_conc_enter due to MUST_ABORT");
-			srv_conc_force_enter_innodb(trx);
-			return;
-		}
-#endif
 
 		if (!notified_mysql) {
 			(void) os_atomic_increment_lint(
@@ -426,11 +421,6 @@ retry:
 		return;
 	}
 #ifdef WITH_WSREP
-	if (wsrep_on(trx->mysql_thd) && 
-	    wsrep_thd_is_brute_force(trx->mysql_thd)) {
-		srv_conc_force_enter_innodb(trx);
-		return;
-	}
 	if (wsrep_on(trx->mysql_thd) && 
 	    wsrep_trx_is_aborting(trx->mysql_thd)) {
 		srv_conc_force_enter_innodb(trx);
@@ -678,7 +668,12 @@ wsrep_srv_conc_cancel_wait(
 			thread */
 {
 #ifdef HAVE_ATOMIC_BUILTINS
-	fprintf(stderr, "WSREP: conc slot cancel not supported\n");
+	/* aborting transactions will enter innodb by force in 
+	   srv_conc_enter_innodb_with_atomics(). No need to cancel here,
+	   thr will wake up after os_sleep and let to enter innodb
+	*/
+	if (wsrep_debug)
+		fprintf(stderr, "WSREP: conc slot cancel, no atomics\n");
 #else
 	os_fast_mutex_lock(&srv_conc_mutex);
 	if (trx->wsrep_event) {
@@ -690,3 +685,4 @@ wsrep_srv_conc_cancel_wait(
 #endif
 }
 #endif /* WITH_WSREP */
+
