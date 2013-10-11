@@ -4945,8 +4945,7 @@ end_with_restore_list:
 #ifdef WITH_WSREP
     if (WSREP(thd)) {
 
-      if (thd->wsrep_conflict_state == NO_CONFLICT ||
-	  thd->wsrep_conflict_state == REPLAYING)
+      if (thd->wsrep_conflict_state == NO_CONFLICT)
       {
 	my_ok(thd);
       }
