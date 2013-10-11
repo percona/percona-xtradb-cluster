@@ -109,24 +109,22 @@ extern long        wsrep_local_index;
 extern const char* wsrep_provider_name;
 extern const char* wsrep_provider_version;
 extern const char* wsrep_provider_vendor;
-extern int         wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
-extern void        wsrep_free_status(THD *thd);
 
+int  wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
+void wsrep_free_status(THD *thd);
 
-extern int   wsrep_init_vars();
-extern void  wsrep_provider_init       (const char* provider);
-extern void  wsrep_start_position_init (const char* position);
-extern void  wsrep_sst_auth_init       (const char* auth);
+/* Filters out --wsrep-new-cluster oprtion from argv[]
+ * should be called in the very beginning of main() */
+void wsrep_filter_new_cluster (int* argc, char* argv[]);
 
-extern int   wsrep_init();
-extern void  wsrep_deinit();
-extern void  wsrep_recover();
-extern bool  wsrep_before_SE(); // initialize wsrep before storage
-                                // engines (true) or after (false)
+int  wsrep_init();
+void wsrep_deinit();
+void wsrep_recover();
+bool wsrep_before_SE(); // initialize wsrep before storage
+                        // engines (true) or after (false)
 /* wsrep initialization sequence at startup
  * @param before wsrep_before_SE() value */
-extern void wsrep_init_startup(bool before);
-
+void wsrep_init_startup(bool before);
 
 
 extern "C" enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd);
