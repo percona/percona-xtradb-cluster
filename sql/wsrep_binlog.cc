@@ -108,7 +108,7 @@ heap_size(size_t length)
 }
 
 /* append data to writeset */
-static wsrep_status_t
+static inline wsrep_status_t
 wsrep_append_data(wsrep_t*           const wsrep,
                   wsrep_ws_handle_t* const ws,
                   const void*        const data,
@@ -244,17 +244,9 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
     int err(WSREP_OK);
 
     size_t total_length(0);
-    uchar  stack_buf[STACK_SIZE]; /* to avoid dynamic allocations for few data*/
-    uchar* heap_buf(NULL);
-    uchar* buf(stack_buf);
-    size_t allocated(sizeof(stack_buf));
-    size_t used(0);
 
     uint length(my_b_bytes_in_cache(cache));
     if (unlikely(0 == length)) length = my_b_fill(cache);
-
-//  WSREP_INFO("wsrep_write_cache_inc(): starting with %u bytes", length);
-//int allocs=0;
 
     if (likely(length > 0)) do
     {
@@ -271,42 +263,12 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
             goto cleanup;
         }
 
-        if (length > allocated - used)
-        {
-            /* flush already accumulated data to wsrep provider */
-            if (used > 0 &&
-                WSREP_OK != (err=wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
-                                                   buf, used)))
+        if(WSREP_OK != (err=wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
+                                              cache->read_pos, length)))
                 goto cleanup;
 
-            used = 0;
-
-            if (length > allocated) /* need to allocate a bigger buffer */
-            {
-                size_t const new_size(heap_size(length));
-                uchar* tmp = (uchar *)my_realloc(heap_buf, new_size, MYF(0));
-                if (!tmp)
-                {
-                    WSREP_ERROR("could not (re)allocate buffer: %zu + %zu",
-                                allocated, new_size - allocated);
-                    err = WSREP_NODE_FAIL;
-                    goto cleanup;
-                }
-                heap_buf = tmp;
-                buf = heap_buf;
-                allocated = new_size;
-//allocs++;
-            }
-        }
-
-        memcpy(buf + used, cache->read_pos, length);
-        used += length;
-
-        cache->read_pos= cache->read_end;
-    } while ((cache->file >= 0) && (length= my_b_fill(cache)));
-
-    if (used > 0)
-        err = wsrep_append_data(wsrep, &thd->wsrep_ws_handle, buf, used);
+        cache->read_pos = cache->read_end;
+    } while ((cache->file >= 0) && (length = my_b_fill(cache)));
 
     if (WSREP_OK == err) *len = total_length;
 
@@ -316,10 +278,6 @@ cleanup:
         WSREP_ERROR("failed to reinitialize io-cache");
     }
 
-    if (unlikely(WSREP_OK != err)) wsrep_dump_rbr_buf(thd, buf, used);
-
-    my_free(heap_buf);
-//WSREP_INFO("%d (re)allocs, total_length %zu", allocs, total_length);
     return err;
 }
 
