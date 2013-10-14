@@ -16471,17 +16471,19 @@ wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno)
 	abort();
 }
 int
-wsrep_innobase_kill_one_trx(const trx_t * const bf_trx, trx_t *victim_trx, ibool signal)
+wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
+                            const trx_t * const bf_trx,
+                            trx_t *victim_trx, ibool signal)
 {
         ut_ad(lock_mutex_own());
         ut_ad(trx_mutex_own(victim_trx));
+        ut_ad(bf_thd_ptr);
+        ut_ad(victim_trx);
 
 	DBUG_ENTER("wsrep_innobase_kill_one_trx");
-	THD *bf_thd 	  = (THD *)(bf_trx) ? bf_trx->mysql_thd : NULL;
+        THD *bf_thd       = bf_thd_ptr ? (THD*) bf_thd_ptr : NULL;
 	THD *thd          = (THD *) victim_trx->mysql_thd;
 	int64_t bf_seqno  = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
-
-	if (!bf_thd) bf_thd = (bf_trx) ? (THD *)bf_trx->mysql_thd : NULL;
 
 	if (!thd) {
 		DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
@@ -16688,8 +16690,8 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 	{
                 lock_mutex_enter();
                 trx_mutex_enter(victim_trx);
-		int rcode = wsrep_innobase_kill_one_trx(bf_trx, victim_trx,
-							signal);
+		int rcode = wsrep_innobase_kill_one_trx(bf_thd, bf_trx,
+                                                        victim_trx, signal);
                 trx_mutex_exit(victim_trx);
                 lock_mutex_exit();
 		wsrep_srv_conc_cancel_wait(victim_trx);

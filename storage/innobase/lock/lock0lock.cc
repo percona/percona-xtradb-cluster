@@ -1627,7 +1627,7 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 					lock_table_print(stderr, lock);
 				}
 			}
-			wsrep_innobase_kill_one_trx(
+			wsrep_innobase_kill_one_trx(trx->mysql_thd,
 				(const trx_t*) trx, lock->trx, TRUE);
 		}
 	}
