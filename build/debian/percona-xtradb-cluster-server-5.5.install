@@ -27,6 +27,7 @@ usr/bin/resolveip
 usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_mysqldump
 usr/bin/wsrep_sst_xtrabackup
+usr/bin/wsrep_sst_xtrabackup-v1
 usr/bin/wsrep_sst_rsync
 usr/sbin/mysqld
 usr/share/man/man1/msql2mysql.1
