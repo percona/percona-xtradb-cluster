@@ -4655,7 +4655,7 @@ create_sp_error:
       if (check_table_access(thd, DROP_ACL, all_tables, FALSE, UINT_MAX, FALSE))
         goto error;
       /* Conditionally writes to binlog. */
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, NULL)
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
       res= mysql_drop_view(thd, first_table, thd->lex->drop_mode);
       break;
     }
