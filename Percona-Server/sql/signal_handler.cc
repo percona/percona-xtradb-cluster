@@ -101,8 +101,8 @@ extern "C" sig_handler handle_fatal_signal(int sig)
     "We will try our best to scrape up some info that will hopefully help\n"
     "diagnose the problem, but since we have already crashed, \n"
     "something is definitely wrong and this may fail.\n"
-    "Please help us make Percona Server better by reporting any\n"
-    "bugs at http://bugs.percona.com/\n\n");
+    "Please help us make Percona XtraDB Cluster better by reporting any\n"
+    "bugs at https://bugs.launchpad.net/percona-xtradb-cluster\n\n");
 
   my_safe_printf_stderr("key_buffer_size=%lu\n",
                         (ulong) dflt_key_cache->key_cache_mem_size);
@@ -199,8 +199,8 @@ extern "C" sig_handler handle_fatal_signal(int sig)
     my_safe_printf_stderr("Status: %s\n\n", kreason);
   }
   my_safe_printf_stderr("%s",
-    "You may download the Percona Server operations manual by visiting\n"
-    "http://www.percona.com/software/percona-server/. You may find information\n"
+    "You may download the Percona XtraDB Cluster operations manual by visiting\n"
+    "http://www.percona.com/software/percona-xtradb-cluster/. You may find information\n"
     "in the manual which will help you identify the cause of the crash.\n");
 
 #endif /* HAVE_STACKTRACE */
