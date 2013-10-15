@@ -3035,7 +3035,11 @@ mysql_execute_command(THD *thd)
 
     /* Commit the normal transaction if one is active. */
     if (trans_commit_implicit(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("implicit commit failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     /* Release metadata locks acquired in this transaction. */
     thd->mdl_context.release_transactional_locks();
   }
@@ -4911,7 +4915,11 @@ end_with_restore_list:
 #endif
   case SQLCOM_BEGIN:
     if (trans_begin(thd, lex->start_transaction_opt))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("BEGIN failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     my_ok(thd);
     break;
   case SQLCOM_COMMIT:
@@ -4925,7 +4933,11 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_commit(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("COMMIT failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -4968,7 +4980,11 @@ end_with_restore_list:
                       (thd->variables.completion_type == 2 &&
                        lex->tx_release != TVL_NO));
     if (trans_rollback(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("rollback failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /* Begin transaction with the same isolation level. */
     if (tx_chain)
@@ -5480,7 +5496,7 @@ create_sp_error:
       if (check_table_access(thd, DROP_ACL, all_tables, FALSE, UINT_MAX, FALSE))
         goto error;
       /* Conditionally writes to binlog. */
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, NULL)
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
       res= mysql_drop_view(thd, first_table, thd->lex->drop_mode);
       break;
     }
@@ -5516,7 +5532,11 @@ create_sp_error:
     break;
   case SQLCOM_XA_COMMIT:
     if (trans_xa_commit(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("XA commit failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a commit, reset transaction
@@ -5528,7 +5548,11 @@ create_sp_error:
     break;
   case SQLCOM_XA_ROLLBACK:
     if (trans_xa_rollback(thd))
+    {
+      thd->mdl_context.release_transactional_locks();
+      WSREP_DEBUG("XA rollback failed, MDL released: %lu", thd->thread_id);
       goto error;
+    }
     thd->mdl_context.release_transactional_locks();
     /*
       We've just done a rollback, reset transaction
