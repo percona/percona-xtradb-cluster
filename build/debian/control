@@ -3,6 +3,7 @@ Section: database
 Priority: extra
 Maintainer: Percona Server Development Team <mysql-dev@percona.com>
 Uploaders: Ignacio Nin <ignacio.nin@percona.com>
+Build-Depends: debhelper (>= 7.0.50), cmake, libtool, autoconf, libncurses5-dev, perl, bison, fakeroot, devscripts, libaio-dev, libpam-dev, dpatch, automake, libssl-dev
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Build-Depends: debhelper (>= 7.0.50), cmake, libtool, autoconf, libncurses5-dev, perl, bison, fakeroot, devscripts, libaio-dev, libpam-dev, dpatch, automake, libssl-dev
@@ -22,12 +23,13 @@ Description: Percona XtraDB Cluster database client library
  .
  This package includes the client library.
 
-Package: libmysqlclient-dev
+Package: libmysqlclient18-dev
 Architecture: any
 Section: libdevel
 Depends: libmysqlclient18 (= ${binary:Version}), zlib1g-dev, ${misc:Depends}
 Conflicts: libmysqlclient14-dev, libmysqlclient12-dev, libmysqlclient10-dev, libmysqlclient15-dev, libmysqlclient16-dev
 Replaces: libmysqlclient14-dev, libmysqlclient12-dev, libmysqlclient10-dev, libmysqlclient15-dev, libmysqlclient16-dev, libpercona-xtradb-client-dev
+Provides: libmysqlclient-dev
 Description: Percona Server database development files
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.

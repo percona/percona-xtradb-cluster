@@ -3646,9 +3646,8 @@ innobase_commit_ordered(
 	/* Since we will reserve the kernel mutex, we have to release
 	the search system latch first to obey the latching order. */
 
-	if (trx->has_search_latch) {
-		trx_search_latch_release_if_reserved(trx);
-	}
+	/* No-op in XtraDB */
+	trx_search_latch_release_if_reserved(trx);
 
 	if (!trx_is_registered_for_2pc(trx) && trx_is_started(trx)) {
 		/* We cannot throw error here; instead we will catch this error
@@ -3694,9 +3693,8 @@ innobase_commit(
 	/* Since we will reserve the kernel mutex, we have to release
 	the search system latch first to obey the latching order. */
 
-	if (trx->has_search_latch) {
-		trx_search_latch_release_if_reserved(trx);
-	}
+	/* No-op in XtraDB */
+	trx_search_latch_release_if_reserved(trx);
 
 	if (trx->fake_changes && (all || (!thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)))) {
 		innobase_rollback(hton, thd, all); /* rollback implicitly */
@@ -13572,6 +13570,63 @@ innobase_thd_get_thread_id(
 	return(thd_get_thread_id((const THD*) thd));
 }
 
+#ifdef UNIV_DEBUG
+static my_bool	innodb_log_checkpoint_now = TRUE;
+
+/****************************************************************//**
+Force innodb to checkpoint. */
+static
+void
+checkpoint_now_set(
+/*===============*/
+	THD*				thd	/*!< in: thread handle */
+	__attribute__((unused)),
+	struct st_mysql_sys_var*	var	/*!< in: pointer to system
+						variable */
+	__attribute__((unused)),
+	void*				var_ptr	/*!< out: where the formal
+						string goes */
+	__attribute__((unused)),
+	const void*			save)	/*!< in: immediate result from
+						check function */
+{
+	if (*(my_bool*) save) {
+		while (log_sys->last_checkpoint_lsn < log_sys->lsn) {
+			log_make_checkpoint_at(IB_ULONGLONG_MAX, TRUE);
+			fil_flush_file_spaces(FIL_LOG);
+		}
+		fil_write_flushed_lsn_to_data_files(log_sys->lsn, 0);
+		fil_flush_file_spaces(FIL_TABLESPACE);
+	}
+}
+
+static my_bool	innodb_track_redo_log_now = TRUE;
+
+/****************************************************************//**
+Force log tracker to track the log synchronously.  */
+static
+void
+track_redo_log_now_set(
+/*===================*/
+	THD*				thd	/*!< in: thread handle */
+	__attribute__((unused)),
+	struct st_mysql_sys_var*	var	/*!< in: pointer to system
+						variable */
+	__attribute__((unused)),
+	void*				var_ptr	/*!< out: where the formal
+						string goes */
+	__attribute__((unused)),
+	const void*			save)	/*!< in: immediate result from
+						check function */
+{
+	if (*(my_bool*) save && srv_track_changed_pages) {
+
+		log_online_follow_redo_log();
+	}
+}
+
+
+#endif /* UNIV_DEBUG */
 
 static SHOW_VAR innodb_status_variables_export[]= {
   {"Innodb",                   (char*) &show_innodb_vars, SHOW_FUNC},
@@ -14108,6 +14163,8 @@ static MYSQL_SYSVAR_BOOL(adaptive_hash_index, btr_search_enabled,
   "Disable with --skip-innodb-adaptive-hash-index.",
   NULL, innodb_adaptive_hash_index_update, TRUE);
 
+/* btr_search_index_num is constrained to machine word size for historical
+reasons. This limitation can be easily removed later. */
 static MYSQL_SYSVAR_ULONG(adaptive_hash_index_partitions, btr_search_index_num,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "Number of InnoDB adaptive hash index partitions (default 1: disable partitioning)",
@@ -14315,9 +14372,15 @@ static MYSQL_SYSVAR_ENUM(stats_method, srv_innodb_stats_method,
    NULL, NULL, SRV_STATS_NULLS_EQUAL, &innodb_stats_method_typelib);
 
 static MYSQL_SYSVAR_BOOL(track_changed_pages, srv_track_changed_pages,
-    PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
-    "Track the redo log for changed pages and output a changed page bitmap",
-    NULL, NULL, FALSE);
+  PLUGIN_VAR_NOCMDARG
+#ifndef UNIV_DEBUG
+  /* Make this variable dynamic for debug builds to
+  provide a testcase sync facility */
+  | PLUGIN_VAR_READONLY
+#endif
+  ,
+  "Track the redo log for changed pages and output a changed page bitmap",
+  NULL, NULL, FALSE);
 
 static MYSQL_SYSVAR_ULONGLONG(max_bitmap_file_size, srv_max_bitmap_file_size,
     PLUGIN_VAR_RQCMDARG,
@@ -14571,6 +14634,21 @@ static MYSQL_SYSVAR_ULONG(lazy_drop_table, srv_lazy_drop_table,
   "[Deprecated option] no effect",
   NULL, NULL, 0, 0, 1, 0);
 
+#ifdef UNIV_DEBUG
+
+static MYSQL_SYSVAR_BOOL(log_checkpoint_now, innodb_log_checkpoint_now,
+  PLUGIN_VAR_OPCMDARG,
+  "Force checkpoint now",
+  NULL, checkpoint_now_set, FALSE);
+
+static MYSQL_SYSVAR_BOOL(track_redo_log_now,
+  innodb_track_redo_log_now,
+  PLUGIN_VAR_OPCMDARG,
+  "Force log tracker to catch up with checkpoint now",
+  NULL, track_redo_log_now_set, FALSE);
+
+#endif /* UNIV_DEBUG */
+
 static MYSQL_SYSVAR_BOOL(locking_fake_changes, srv_fake_changes_locks,
   PLUGIN_VAR_NOCMDARG,
   "###EXPERIMENTAL### if enabled, transactions will get S row locks instead "
@@ -14705,6 +14783,10 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(locking_fake_changes),
   MYSQL_SYSVAR(merge_sort_block_size),
   MYSQL_SYSVAR(print_all_deadlocks),
+#ifdef UNIV_DEBUG
+  MYSQL_SYSVAR(log_checkpoint_now),
+  MYSQL_SYSVAR(track_redo_log_now),
+#endif /* UNIV_DEBUG */
   NULL
 };
 
