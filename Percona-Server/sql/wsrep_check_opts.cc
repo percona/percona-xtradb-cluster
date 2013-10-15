@@ -291,10 +291,6 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
         err = get_long_long (opts[AUTOINC_LOCK_MODE], &autoinc_lock_mode, 10);
         if (err) return err;
 
-        bool locks_unsafe_for_binlog;
-        err = get_bool (opts[LOCKS_UNSAFE_FOR_BINLOG],&locks_unsafe_for_binlog);
-        if (err) return err;
-
         if (autoinc_lock_mode != 2)
         {
             WSREP_ERROR ("Parallel applying (wsrep_slave_threads > 1) requires"
