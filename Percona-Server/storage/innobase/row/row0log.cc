@@ -2247,6 +2247,7 @@ row_log_table_apply_ops(
 	const ulint	new_trx_id_col	= dict_col_get_clust_pos(
 		dict_table_get_sys_col(new_table, DATA_TRX_ID), new_index);
 	trx_t*		trx		= thr_get_trx(thr);
+        int unused __attribute__((unused));
 
 	ut_ad(dict_index_is_clust(index));
 	ut_ad(dict_index_is_online_ddl(index));
@@ -2309,7 +2310,7 @@ corruption:
 		if (index->online_log->head.blocks) {
 #ifdef HAVE_FTRUNCATE
 			/* Truncate the file in order to save space. */
-			ftruncate(index->online_log->fd, 0);
+			unused = ftruncate(index->online_log->fd, 0);
 #endif /* HAVE_FTRUNCATE */
 			index->online_log->head.blocks
 				= index->online_log->tail.blocks = 0;
@@ -3054,6 +3055,7 @@ row_log_apply_ops(
 	bool		has_index_lock;
 	const ulint	i	= 1 + REC_OFFS_HEADER_SIZE
 		+ dict_index_get_n_fields(index);
+        int unused __attribute__((unused));
 
 	ut_ad(dict_index_is_online_ddl(index));
 	ut_ad(*index->name == TEMP_INDEX_PREFIX);
@@ -3102,7 +3104,7 @@ corruption:
 		if (index->online_log->head.blocks) {
 #ifdef HAVE_FTRUNCATE
 			/* Truncate the file in order to save space. */
-			ftruncate(index->online_log->fd, 0);
+			unused = ftruncate(index->online_log->fd, 0);
 #endif /* HAVE_FTRUNCATE */
 			index->online_log->head.blocks
 				= index->online_log->tail.blocks = 0;
