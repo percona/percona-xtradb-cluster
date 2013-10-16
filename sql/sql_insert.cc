@@ -3778,7 +3778,8 @@ bool select_insert::send_eof()
                        trans_table, table->file->table_type()));
 
 #ifdef WITH_WSREP
-  error= (thd->wsrep_conflict_state == MUST_ABORT) ? -1 :
+  error= (thd->wsrep_conflict_state == MUST_ABORT ||
+          thd->wsrep_conflict_state == CERT_FAILURE) ? -1 :
     (bulk_insert_started ?
 #else
   error= (bulk_insert_started ?
