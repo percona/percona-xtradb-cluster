@@ -572,6 +572,7 @@ bool host_cache_size_specified= false;
 bool table_definition_cache_specified= false;
 
 ulonglong denied_connections= 0;
+
 Error_log_throttle err_log_throttle(Log_throttle::LOG_THROTTLE_WINDOW_SIZE,
                                     sql_print_error,
                                     "Error log throttle: %10lu 'Can't create"
@@ -1478,12 +1479,12 @@ static void close_connections(void)
       continue;
     }
     tmp->killed= THD::KILL_CONNECTION;
-    mysql_mutex_lock(&tmp->LOCK_thd_data);
     DBUG_EXECUTE_IF("Check_dump_thread_is_alive",
                     {
                       DBUG_ASSERT(tmp->get_command() != COM_BINLOG_DUMP &&
                                   tmp->get_command() != COM_BINLOG_DUMP_GTID);
                     };);
+    mysql_mutex_lock(&tmp->LOCK_thd_data);
     MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (tmp));
     if (tmp->mysys_var)
     {

@@ -480,7 +480,8 @@ static int increment_count_by_name(const char *name, const char *role_name,
                                                    (uchar*) name,
                                                    strlen(name))))
   {
-    if (acl_is_utility_user(thd->security_ctx->user, thd->security_ctx->get_host()->ptr(),
+    if (acl_is_utility_user(thd->security_ctx->user,
+                            thd->security_ctx->get_host()->ptr(),
                             thd->security_ctx->get_ip()->ptr()))
       return 0;
 
@@ -524,8 +525,9 @@ static int increment_count_by_id(my_thread_id id,
                                                        (uchar*) &id,
                                                        sizeof(my_thread_id))))
   {
-    if (acl_is_utility_user(thd->security_ctx->user, thd->security_ctx->get_host()->ptr(),
-        thd->security_ctx->get_ip()->ptr()))
+    if (acl_is_utility_user(thd->security_ctx->user,
+                            thd->security_ctx->get_host()->ptr(),
+                            thd->security_ctx->get_ip()->ptr()))
       return 0;
 
     // First connection for this user or client
@@ -569,8 +571,9 @@ static int increment_connection_count(THD* thd, bool use_lock)
   const char* client_string= get_client_host(thd);
   int return_value=          0;
 
-  if (acl_is_utility_user(thd->security_ctx->user, thd->security_ctx->get_host()->ptr(),
-      thd->security_ctx->get_ip()->ptr()))
+  if (acl_is_utility_user(thd->security_ctx->user,
+                          thd->security_ctx->get_host()->ptr(),
+                          thd->security_ctx->get_ip()->ptr()))
     return return_value;
 
   if (use_lock)
@@ -666,8 +669,9 @@ void update_global_user_stats(THD* thd, bool create_user, time_t now)
     USER_STATS* user_stats;
     THREAD_STATS* thread_stats;
 
-    if (acl_is_utility_user(thd->security_ctx->user, thd->security_ctx->get_host()->ptr(),
-        thd->security_ctx->get_ip()->ptr()))
+    if (acl_is_utility_user(thd->security_ctx->user,
+                            thd->security_ctx->get_host()->ptr(),
+                            thd->security_ctx->get_ip()->ptr()))
       return;
 
     mysql_mutex_lock(&LOCK_global_user_client_stats);
@@ -1668,7 +1672,7 @@ end_thread:
       update_global_user_stats(thd, create_user, time(NULL));
     }
 
-    if (MYSQL_CALLBACK_ELSE(thread_scheduler, end_thread, (thd, 1), 0))
+    if (MYSQL_CALLBACK_ELSE(thd->scheduler, end_thread, (thd, 1), 0))
       return;                                 // Probably no-threads
 
     /*

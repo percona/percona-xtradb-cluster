@@ -2054,7 +2054,8 @@ void mysqld_list_processes(THD *thd,const char *user, bool verbose)
       struct st_my_thread_var *mysys_var;
       if ((tmp->vio_ok() || tmp->system_thread) &&
           (!user || (tmp_sctx->user && !strcmp(tmp_sctx->user, user)))
-          && !acl_is_utility_user(tmp_sctx->user, tmp_sctx->get_host()->ptr(), tmp_sctx->get_ip()->ptr()))
+          && !acl_is_utility_user(tmp_sctx->user, tmp_sctx->get_host()->ptr(),
+                                  tmp_sctx->get_ip()->ptr()))
       {
         thread_info *thd_info= new thread_info;
 
@@ -2162,7 +2163,8 @@ int fill_schema_processlist(THD* thd, TABLE_LIST* tables, Item* cond)
 
       if ((!tmp->vio_ok() && !tmp->system_thread) ||
           (user && (!tmp_sctx->user || strcmp(tmp_sctx->user, user)))
-          || acl_is_utility_user(tmp_sctx->user, tmp_sctx->get_host()->ptr(), tmp_sctx->get_ip()->ptr()))
+          || acl_is_utility_user(tmp_sctx->user, tmp_sctx->get_host()->ptr(),
+                                 tmp_sctx->get_ip()->ptr()))
         continue;
 
       restore_record(table, s->default_values);
@@ -4033,7 +4035,9 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
       if (test_all_bits(sctx->master_access, DB_ACLS))
         db_access=DB_ACLS;
       else
-        db_access= (acl_get(sctx->get_host()->ptr(), sctx->get_ip()->ptr(), sctx->priv_user, tmp->s->db.str, 0) | sctx->master_access);
+        db_access= (acl_get(sctx->get_host()->ptr(), sctx->get_ip()->ptr(),
+                            sctx->priv_user, tmp->s->db.str, 0)
+                    | sctx->master_access);
 
       if (!(db_access & DB_ACLS) && check_grant_db(thd,tmp->s->db.str)) {
         //no access for temp tables within this db for user

@@ -1597,6 +1597,7 @@ ha_innobase::is_fake_change_enabled(THD* thd)
 	return(trx && trx->fake_changes);
 }
 
+
 /********************************************************************//**
 In XtraDB it is impossible for a transaction to own a search latch outside of
 InnoDB code, so there is nothing to release on demand.  We keep this function to
@@ -5587,6 +5588,7 @@ ha_innobase::clone(
 	new_handler = static_cast<ha_innobase*>(handler::clone(name,
 							       mem_root));
 	if (new_handler) {
+		DBUG_ASSERT(new_handler->prebuilt != NULL);
 
 		new_handler->prebuilt->select_lock_type
 			= prebuilt->select_lock_type;
@@ -15086,6 +15088,18 @@ innobase_xa_prepare(
 #ifdef WITH_WSREP
                 thd_get_xid(thd, (MYSQL_XID*) &trx->xid);
 #endif // WITH_WSREP
+		return(0);
+	}
+
+	if (UNIV_UNLIKELY(trx->fake_changes)) {
+
+		if (prepare_trx
+		    || (!thd_test_options(thd, OPTION_NOT_AUTOCOMMIT
+					  | OPTION_BEGIN))) {
+
+			thd->get_stmt_da()->reset_diagnostics_area();
+			return(HA_ERR_WRONG_COMMAND);
+		}
 		return(0);
 	}
 
