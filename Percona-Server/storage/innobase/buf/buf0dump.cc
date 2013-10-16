@@ -57,6 +57,9 @@ static ibool	buf_load_should_start = FALSE;
 
 static ibool	buf_load_abort_flag = FALSE;
 
+#ifdef WITH_WSREP
+extern my_bool wsrep_recovery;
+#endif /* WITH_WSREP */
 /* Used to temporary store dump info in order to avoid IO while holding
 buffer pool LRU list mutex during dump and also to sort the contents of the
 dump before reading the pages from disk during load.
@@ -585,7 +588,7 @@ DECLARE_THREAD(buf_dump_thread)(
 	buf_dump_status(STATUS_INFO, "not started");
 	buf_load_status(STATUS_INFO, "not started");
 
-	if (srv_buffer_pool_load_at_startup) {
+	if (srv_buffer_pool_load_at_startup && !wsrep_recovery) {
 		buf_load();
 	}
 
@@ -598,7 +601,7 @@ DECLARE_THREAD(buf_dump_thread)(
 			buf_dump(TRUE /* quit on shutdown */);
 		}
 
-		if (buf_load_should_start) {
+		if (buf_load_should_start && !wsrep_recovery) {
 			buf_load_should_start = FALSE;
 			buf_load();
 		}
