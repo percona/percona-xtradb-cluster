@@ -32,7 +32,7 @@ Incompatibilities
 -------------------
 
 Following are incompatibilities between PXC 5.5.33 and older versions:
- - wsrep_sst_donor now supports comma separated list of nodes as a consequence of bug :bug:`1129512`. This is not compatible with nodes running older PXC. Minimal workaround is to upgrade Galera package. However, upgrading the full PXC is strongly recommended, however, just upgrading PXC galera package will do for this.
+ - wsrep_sst_donor now supports comma separated list of nodes as a consequence of bug :bug:`1129512`. This only affects if you use this option as a list. This is not compatible with nodes running older PXC, hence **entire** cluster will be affected as far as SST is concerned, since donor nodes won't recognise the request from joiner nodes if former are not upgraded. Minimal workaround is to upgrade Galera package or to not use this new feature (wsrep_sst_donor with single node can still be used). However, upgrading the full PXC is strongly recommended, however, just upgrading PXC galera package will do for this.
  - Due to bug :bug:`1222122` Xtrabackup SST works differently, hence won't be compatible with older Xtrabackup SST found in older PXC versions. Hence it is strongly recommended to upgrade the donor/joiner if other node is upgraded already before SST. Workarounds:
 
   * Copy the newer wsrep_sst_xtrabackup and wsrep_sst_common (from newer package) to the donor node (when joiner is upgraded to 5.5.33) and vice versa (when donor is upgrade, copy to joiner). Take care of the dependencies required - socat and xbstream being the default one. Refer to this `document <http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html>`_ for more details.
