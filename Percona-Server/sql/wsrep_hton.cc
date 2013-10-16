@@ -76,6 +76,7 @@ handlerton *wsrep_hton;
 
 void wsrep_register_hton(THD* thd, bool all)
 {
+  DBUG_ASSERT(thd->wsrep_exec_mode != LOCAL_COMMIT);
   if (thd->wsrep_exec_mode == LOCAL_STATE)
   {
     THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
@@ -172,7 +173,13 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
   default: break;
   }
 
-  thd->wsrep_exec_mode = LOCAL_COMMIT;
+  /* wsrep_transaction_cleanup() does not get called after rollback
+     for autocommit queries, so set exec mode to LOCAL_STATE here
+  */
+  if (all)
+    thd->wsrep_exec_mode= LOCAL_COMMIT;
+  else
+    thd->wsrep_exec_mode= LOCAL_STATE;
 
   if ((all || !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
       (thd->variables.wsrep_on && thd->wsrep_conflict_state != MUST_REPLAY))
