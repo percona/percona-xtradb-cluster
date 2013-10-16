@@ -2572,6 +2572,9 @@ static MYSQL_SOCKET activate_tcp_port(uint port)
         socket_errno);
     unireg_abort(1);
   }
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+  (void) fcntl(mysql_socket_getfd(ip_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
   DBUG_RETURN(ip_sock);
 }
 
