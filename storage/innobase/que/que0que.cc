@@ -206,9 +206,8 @@ que_thr_end_lock_wait(
 	ibool		was_active;
 
 	ut_ad(lock_mutex_own());
-#ifndef WITH_WSREP
 	ut_ad(trx_mutex_own(trx));
-#endif /* WITH_WSREP */
+
 	thr = trx->lock.wait_thr;
 
 	ut_ad(thr != NULL);
