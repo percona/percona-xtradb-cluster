@@ -168,6 +168,7 @@ void wsrep_replay_transaction(THD *thd)
 {
   /* checking if BF trx must be replayed */
   if (thd->wsrep_conflict_state== MUST_REPLAY) {
+    DBUG_ASSERT(wsrep_thd_trx_seqno(thd) > 0 && thd->wsrep_seqno_changed);
     if (thd->wsrep_exec_mode!= REPL_RECV) {
       if (thd->get_stmt_da()->is_sent())
       {
@@ -189,7 +190,13 @@ void wsrep_replay_transaction(THD *thd)
         thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
       }
       thd->mdl_context.release_transactional_locks();
-
+      /*
+        Replaying will call MYSQL_START_STATEMENT when handling
+        BEGIN Query_log_event so end statement must be called before
+        replaying.
+      */
+      MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+      thd->m_statement_psi= NULL;
       thd_proc_info(thd, "wsrep replaying trx");
       WSREP_DEBUG("replay trx: %s %lld",
                   thd->query() ? thd->query() : "void",

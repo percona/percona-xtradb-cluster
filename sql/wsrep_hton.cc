@@ -382,6 +382,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     } else if (rcode == WSREP_BF_ABORT) {
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       thd->wsrep_conflict_state = MUST_REPLAY;
+      DBUG_ASSERT(wsrep_thd_trx_seqno(thd) > 0);
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       mysql_mutex_lock(&LOCK_wsrep_replaying);
       wsrep_replaying++;
