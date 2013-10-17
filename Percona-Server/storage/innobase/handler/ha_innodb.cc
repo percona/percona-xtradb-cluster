@@ -9598,6 +9598,7 @@ wsrep_append_foreign_key(
 			foreign->foreign_table->name) :
 		foreign->foreign_table->name, sizeof(cache_key) - 1);
 	cache_key_len = strlen(cache_key);
+#define WSREP_DEBUG_PRINT
 #ifdef WSREP_DEBUG_PRINT
 	ulint j;
 	fprintf(stderr, "FK parent key, table: %s %s len: %lu ",
@@ -9664,7 +9665,7 @@ wsrep_append_key(
 #ifdef WSREP_DEBUG_PRINT
 	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ",
 		(shared) ? "Shared" : "Exclusive",
-		wsrep_thd_thread_id(thd), trx->id, key_len,
+		wsrep_thd_thread_id(thd), (long long)trx->id, key_len,
 		table_share->table_name.str);
 	for (int i=0; i<key_len; i++) {
 		fprintf(stderr, "%hhX, ", key[i]);

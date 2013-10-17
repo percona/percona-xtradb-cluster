@@ -6432,6 +6432,11 @@ lock_rec_convert_impl_to_expl(
 			implicit lock. Because cannot lock at this moment.*/
 
 			if (rec_get_deleted_flag(rec, rec_offs_comp(offsets))
+#ifdef WITH_WSREP
+			    && !wsrep_thd_is_brute_force(impl_trx->mysql_thd)
+			    /* BF-BF conflict is possible if advancing into
+			       lock_rec_other_has_conflicting*/
+#endif /* WITH_WSREP */
 			    && lock_rec_other_has_conflicting(
 					static_cast<enum lock_mode>
 					(LOCK_X | LOCK_REC_NOT_GAP), block,
