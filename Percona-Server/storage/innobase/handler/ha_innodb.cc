@@ -9665,14 +9665,16 @@ wsrep_append_key(
 	DBUG_ENTER("wsrep_append_key");
 	bool const copy = true;
 #ifdef WSREP_DEBUG_PRINT
-	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ",
-		(shared) ? "Shared" : "Exclusive",
-		wsrep_thd_thread_id(thd), (long long)trx->id, key_len,
-		table_share->table_name.str);
-	for (int i=0; i<key_len; i++) {
-		fprintf(stderr, "%hhX, ", key[i]);
-	}
-	fprintf(stderr, "\n");
+        if (wsrep_debug) {
+            fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s ",
+                    (shared) ? "Shared" : "Exclusive",
+                    wsrep_thd_thread_id(thd), (long long)trx->id, key_len,
+                    table_share->table_name.str);
+            for (int i=0; i<key_len; i++) {
+                    fprintf(stderr, "%hhX, ", key[i]);
+            }
+            fprintf(stderr, "\n");
+        }
 #endif
 	wsrep_buf_t wkey_part[3];
 	wsrep_key_t wkey = {wkey_part, 3};
