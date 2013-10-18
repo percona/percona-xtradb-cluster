@@ -1331,7 +1331,7 @@ int ha_commit_trans(THD *thd, bool all)
 
 #ifdef WITH_WSREP
       if (!WSREP(thd) &&
-	  thd->mdl_context.acquire_lock(&mdl_request,
+          thd->mdl_context.acquire_lock(&mdl_request,
 #else
       if (thd->mdl_context.acquire_lock(&mdl_request,
 #endif /* WITH_WSREP */
@@ -1390,8 +1390,8 @@ int ha_commit_trans(THD *thd, bool all)
 #ifdef WITH_WSREP
           if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
           {
-	    error= 1;
-	    /* avoid sending error, if we need to replay */
+            error= 1;
+            /* avoid sending error, if we need to replay */
             if (thd->wsrep_conflict_state!= MUST_REPLAY)
             {
               my_error(ER_LOCK_DEADLOCK, MYF(0), err);
@@ -1400,13 +1400,13 @@ int ha_commit_trans(THD *thd, bool all)
           else
           {
             /* not wsrep hton, bail to native mysql behavior */
-#endif
+#endif /* WITH_WSREP */
           my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
           error= 1;
 #ifdef WITH_WSREP
           }
-#endif
-	}
+#endif /* WITH_WSREP */
+        }
         status_var_increment(thd->status_var.ha_prepare_count);
         if (err)
 	{
@@ -1442,17 +1442,14 @@ int ha_commit_trans(THD *thd, bool all)
         // xid was rewritten by wsrep
         xid= wsrep_xid_seqno(&thd->transaction.xid_state.xid);
       }
-#endif // WITH_WSREP
-      if (!is_real_trans)
+#endif /* WITH_WSREP */
+      if (error || (is_real_trans && xid &&
+                    (error= !(cookie= tc_log->log_and_order(thd, xid, all, need_commit_ordered)))))
       {
         error= commit_one_phase_low(thd, all, trans, is_real_trans);
         DBUG_EXECUTE_IF("crash_commit_after", DBUG_SUICIDE(););
         goto end;
       }
-
-    cookie= tc_log->log_and_order(thd, xid, all, need_commit_ordered);
-    if (!cookie)
-      goto err;
 
     DBUG_EXECUTE_IF("crash_commit_after_log", DBUG_SUICIDE(););
 
@@ -1535,7 +1532,7 @@ commit_one_phase_low(THD *thd, bool all, THD_TRANS *trans, bool is_real_trans)
 #ifdef WSREP_PROC_INFO
   char info[64]= { 0, };
   snprintf (info, sizeof(info) - 1, "ha_commit_one_phase(%lld)",
-            (long long)thd->wsrep_trx_seqno);
+            (long long)wsrep_thd_trx_seqno(thd));
 #else
   const char info[]="ha_commit_one_phase()";
 #endif /* WSREP_PROC_INFO */

@@ -69,6 +69,9 @@
 #include "debug_sync.h"
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_var.h"
+#include "wsrep_thd.h"
+#include "wsrep_sst.h"
 ulong  wsrep_running_threads = 0; // # of currently running wsrep threads
 #endif
 #include "sql_callback.h"
@@ -353,7 +356,11 @@ static char *default_character_set_name;
 static char *character_set_filesystem_name;
 static char *lc_messages;
 static char *lc_time_names_name;
+#ifndef WITH_WSREP
 static char *my_bind_addr_str;
+#else
+char *my_bind_addr_str;
+#endif /* WITH_WSREP */
 static char *default_collation_name;
 char *default_storage_engine;
 static char compiled_default_collation_name[]= MYSQL_DEFAULT_COLLATION_NAME;
@@ -735,7 +742,7 @@ mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 int wsrep_replaying= 0;
 static void wsrep_close_threads(THD* thd);
-#endif
+#endif /* WITH_WSREP */
 int mysqld_server_started= 0;
 
 File_parser_dummy_hook file_parser_dummy_hook;
@@ -2192,7 +2199,7 @@ static void network_init(void)
     if (listen(unix_sock,(int) back_log) < 0)
       sql_print_warning("listen() on Unix socket failed with error %d",
 		      socket_errno);
-#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
     (void) fcntl(unix_sock, F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */
   }
@@ -3778,25 +3785,25 @@ static int init_thread_environment()
     return 1;
   }
 #ifdef WITH_WSREP
-  mysql_mutex_init(key_LOCK_wsrep_ready, 
-		   &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_ready,
+                   &LOCK_wsrep_ready, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_ready, &COND_wsrep_ready, NULL);
-  mysql_mutex_init(key_LOCK_wsrep_sst, 
-		   &LOCK_wsrep_sst, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_sst,
+                   &LOCK_wsrep_sst, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_sst, &COND_wsrep_sst, NULL);
-  mysql_mutex_init(key_LOCK_wsrep_sst_init, 
-		   &LOCK_wsrep_sst_init, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_sst_init,
+                   &LOCK_wsrep_sst_init, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_sst_init, &COND_wsrep_sst_init, NULL);
-  mysql_mutex_init(key_LOCK_wsrep_rollback, 
-		   &LOCK_wsrep_rollback, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_rollback,
+                   &LOCK_wsrep_rollback, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_rollback, &COND_wsrep_rollback, NULL);
-  mysql_mutex_init(key_LOCK_wsrep_replaying, 
-		   &LOCK_wsrep_replaying, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_replaying,
+                   &LOCK_wsrep_replaying, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_wsrep_replaying, &COND_wsrep_replaying, NULL);
-  mysql_mutex_init(key_LOCK_wsrep_slave_threads, 
-		   &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
-  mysql_mutex_init(key_LOCK_wsrep_desync, 
-		   &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_slave_threads,
+                   &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_desync,
+                   &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
 #endif
   return 0;
 }
@@ -4425,7 +4432,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   THD *thd;
   wsrep_thd_processor_fun processor= (wsrep_thd_processor_fun)arg;
 
-  if (my_thread_init()) 
+  if (my_thread_init())
   {
     WSREP_ERROR("Could not initialize thread");
     return(NULL);
@@ -4499,7 +4506,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     delete thd;
- 
+
     return(NULL);
   }
 
@@ -4564,42 +4571,6 @@ pthread_handler_t start_wsrep_THD(void *arg)
   return(NULL);
 }
 
-void wsrep_create_rollbacker()
-{
-  if (wsrep_provider && strcasecmp(wsrep_provider, "none"))
-  {
-    pthread_t hThread;
-    /* create rollbacker */
-    if (pthread_create( &hThread, &connection_attrib,
-			start_wsrep_THD, (void*)wsrep_rollback_process))
-      WSREP_WARN("Can't create thread to manage wsrep rollback");
-  }
-}
-
-void wsrep_create_appliers(long threads)
-{
-  if (!wsrep_connected)
-  {
-    /* see wsrep_replication_start() for the logic */
-    if (wsrep_cluster_address && strlen(wsrep_cluster_address) &&
-        wsrep_provider && strcasecmp(wsrep_provider, "none"))
-    {
-      WSREP_ERROR("Trying to launch slave threads before creating "
-                  "connection at '%s'", wsrep_cluster_address);
-      assert(0);
-    }
-    return;
-  }
-
-  long wsrep_threads=0;
-  pthread_t hThread;
-  while (wsrep_threads++ < threads) {
-    if (pthread_create(
-      &hThread, &connection_attrib,
-      start_wsrep_THD, (void*)wsrep_replication_process))
-      WSREP_WARN("Can't create thread to manage wsrep replication");
-  }
-}
 /**/
 static bool abort_replicated(THD *thd)
 {
@@ -4624,7 +4595,7 @@ WSREP_WARN("applier has wsrep_exec_mode = %d", thd->wsrep_exec_mode);
 
   if ( thd->slave_thread               || /* declared as mysql slave  */
        thd->system_thread              || /* declared as system thread */
-      !thd->vio_ok()                   || /* server internal thread */ 
+      !thd->vio_ok()                   || /* server internal thread */
        thd->wsrep_exec_mode==REPL_RECV || /* applier or replaying thread */
        thd->wsrep_applier              || /* wsrep slave applier */
       !thd->variables.wsrep_on)           /* client, but fenced outside wsrep */
@@ -5155,6 +5126,9 @@ int mysqld_main(int argc, char **argv)
     return 1;
   }
 #endif
+#ifdef WITH_WSREP
+  wsrep_filter_new_cluster (&argc, argv);
+#endif /* WITH_WSREP */
 
   orig_argc= argc;
   orig_argv= argv;
@@ -5501,6 +5475,13 @@ int mysqld_main(int argc, char **argv)
     unireg_abort(1);
 
 #ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    select_thread_in_use= 0;
+    wsrep_recover();
+    unireg_abort(0);
+  }
+
   if (opt_bootstrap)
   {
     /*! bootstrap wsrep init was taken care of above */
@@ -6224,7 +6205,7 @@ void handle_connections_sockets()
 	sleep(1);				// Give other threads some time
       continue;
     }
-#if defined(WITH_WSREP) && defined(HAVE_FCNTL)
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
     (void) fcntl(new_sock, F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */
 

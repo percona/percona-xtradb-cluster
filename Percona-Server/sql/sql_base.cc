@@ -59,7 +59,7 @@
 #endif
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-
+#include "wsrep_thd.h"
 #endif // WITH_WSREP
 
 bool
@@ -4217,7 +4217,7 @@ thr_lock_type read_lock_type_for_table(THD *thd,
   */
   bool log_on= mysql_bin_log.is_open() && thd->variables.sql_log_bin;
   ulong binlog_format= thd->variables.binlog_format;
-  if ((log_on == FALSE) || (WSREP_FORMAT(binlog_format) == BINLOG_FORMAT_ROW) ||
+  if ((log_on == FALSE) || (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE) ||
       !(is_update_query(prelocking_ctx->sql_command) ||
@@ -5885,7 +5885,7 @@ bool lock_tables(THD *thd, TABLE_LIST *tables, uint count,
         We can solve these problems in mixed mode by switching to binlogging 
         if at least one updated table is used by sub-statement
       */
-      if (WSREP_FORMAT(thd->variables.binlog_format) != BINLOG_FORMAT_ROW && tables && 
+      if (WSREP_BINLOG_FORMAT(thd->variables.binlog_format) != BINLOG_FORMAT_ROW && tables && 
           has_write_table_with_auto_increment(thd->lex->first_not_own_table()))
         thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_AUTOINC_COLUMNS);
     }

@@ -1806,7 +1806,8 @@ public:
   int is_current_stmt_binlog_format_row() const {
     DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
                 current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-    return (WSREP_FORMAT((ulong)current_stmt_binlog_format) == BINLOG_FORMAT_ROW);
+    return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
+            BINLOG_FORMAT_ROW);
   }
 
 private:
@@ -2396,11 +2397,13 @@ public:
   enum wsrep_conflict_state wsrep_conflict_state;
   mysql_mutex_t             LOCK_wsrep_thd;
   mysql_cond_t              COND_wsrep_thd;
-  wsrep_seqno_t             wsrep_trx_seqno;
+  // changed from wsrep_seqno_t to wsrep_trx_meta_t in wsrep API rev 75
+  // wsrep_seqno_t             wsrep_trx_seqno;
+  wsrep_trx_meta_t          wsrep_trx_meta;
   uint32                    wsrep_rand;
   Relay_log_info*           wsrep_rli;
   bool                      wsrep_converted_lock_session;
-  wsrep_trx_handle_t        wsrep_trx_handle;
+  wsrep_ws_handle_t         wsrep_ws_handle;
   bool                      wsrep_seqno_changed;
 #ifdef WSREP_PROC_INFO
   char                      wsrep_info[128]; /* string for dynamic proc info */
@@ -2414,8 +2417,8 @@ public:
                             wsrep_consistency_check;
   wsrep_stats_var*          wsrep_status_vars;
   int                       wsrep_mysql_replicated;
-  const char*               wsrep_TOI_pre_query; /* a query to apply before 
-						    the actual TOI query */
+  const char*               wsrep_TOI_pre_query; /* a query to apply before
+                                                    the actual TOI query */
   size_t                    wsrep_TOI_pre_query_len;
 #endif /* WITH_WSREP */
   /**
@@ -2833,7 +2836,7 @@ public:
       tests fail and so force them to propagate the
       lex->binlog_row_based_if_mixed upwards to the caller.
     */
-    if ((WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED) &&
+    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED)&&
         (in_sub_stmt == 0))
       set_current_stmt_binlog_format_row();
 
@@ -2875,7 +2878,7 @@ public:
                 show_system_thread(system_thread)));
     if (in_sub_stmt == 0)
     {
-      if (WSREP_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW)
+      if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW)
         set_current_stmt_binlog_format_row();
       else if (temporary_tables == NULL)
         clear_current_stmt_binlog_format_row();
