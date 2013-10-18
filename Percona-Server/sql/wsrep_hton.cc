@@ -76,7 +76,14 @@ handlerton *wsrep_hton;
 
 void wsrep_register_hton(THD* thd, bool all)
 {
-  //DBUG_ASSERT(thd->wsrep_exec_mode != LOCAL_COMMIT);
+  /*
+    For unknown reason, ROLLBACK TO SAVEPOINT sometimes leads to situation
+    when wsrep_rollback() is called so that thd->wsrep_exec_mode remains
+    in LOCAL_COMMIT even if transaction is still alive. Switch the state
+    here to get thd out of BF mode.
+   */
+  if (thd->wsrep_exec_mode == LOCAL_COMMIT)
+    thd->wsrep_exec_mode= LOCAL_STATE;
   if (thd->wsrep_exec_mode == LOCAL_STATE)
   {
     THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
