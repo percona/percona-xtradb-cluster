@@ -76,7 +76,7 @@ handlerton *wsrep_hton;
 
 void wsrep_register_hton(THD* thd, bool all)
 {
-  DBUG_ASSERT(thd->wsrep_exec_mode != LOCAL_COMMIT);
+  //DBUG_ASSERT(thd->wsrep_exec_mode != LOCAL_COMMIT);
   if (thd->wsrep_exec_mode == LOCAL_STATE)
   {
     THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
