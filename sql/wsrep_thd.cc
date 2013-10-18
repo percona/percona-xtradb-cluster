@@ -224,6 +224,14 @@ void wsrep_replay_transaction(THD *thd)
         {
           WSREP_WARN("replay ok, thd has reported status");
         }
+        else if (thd->get_stmt_da()->is_set())
+        {
+          if (thd->get_stmt_da()->status() != Diagnostics_area::DA_OK)
+          {
+            WSREP_WARN("replay ok, thd has error status %d",
+                       thd->get_stmt_da()->status());
+          }
+        }
         else
         {
           my_ok(thd);
