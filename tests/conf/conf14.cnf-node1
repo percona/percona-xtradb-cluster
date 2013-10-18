@@ -1,4 +1,5 @@
 # compress+encrypt3+threads+samecrt
+# v2only
 [xtrabackup]
 compress
 parallel=4
