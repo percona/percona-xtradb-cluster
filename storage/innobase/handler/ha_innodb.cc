@@ -9039,7 +9039,7 @@ wsrep_append_foreign_key(
 			foreign->foreign_table->name) :
 		foreign->foreign_table->name, sizeof(cache_key) - 1);
 	cache_key_len = strlen(cache_key);
-#define WSREP_DEBUG_PRINT
+// #define WSREP_DEBUG_PRINT
 #ifdef WSREP_DEBUG_PRINT
 	ulint j;
 	fprintf(stderr, "FK parent key, table: %s %s len: %lu ",
