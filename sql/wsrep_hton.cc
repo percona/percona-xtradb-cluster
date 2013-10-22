@@ -76,30 +76,19 @@ handlerton *wsrep_hton;
 
 void wsrep_register_hton(THD* thd, bool all)
 {
-  /*
-    For unknown reason, ROLLBACK TO SAVEPOINT sometimes leads to situation
-    when wsrep_rollback() is called so that thd->wsrep_exec_mode remains
-    in LOCAL_COMMIT even if transaction is still alive. Switch the state
-    here to get thd out of BF mode.
-   */
-  if (thd->wsrep_exec_mode == LOCAL_COMMIT)
-    thd->wsrep_exec_mode= LOCAL_STATE;
-  if (thd->wsrep_exec_mode == LOCAL_STATE)
+  THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
+  for (Ha_trx_info *i= trans->ha_list; WSREP(thd) && i; i = i->next())
   {
-    THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
-    for (Ha_trx_info *i= trans->ha_list; WSREP(thd) && i; i = i->next())
+    if (i->ht()->db_type == DB_TYPE_INNODB)
     {
-      if (i->ht()->db_type == DB_TYPE_INNODB)
-      {
-        trans_register_ha(thd, all, wsrep_hton);
+      trans_register_ha(thd, all, wsrep_hton);
 
-        /* follow innodb read/write settting */
-        if (i->is_trx_read_write())
-        {
-          thd->ha_data[wsrep_hton->slot].ha_info[all].set_trx_read_write();
-        }
-        break;
+      /* follow innodb read/write settting */
+      if (i->is_trx_read_write())
+      {
+	thd->ha_data[wsrep_hton->slot].ha_info[all].set_trx_read_write();
       }
+      break;
     }
   }
 }
