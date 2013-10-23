@@ -30,7 +30,7 @@ enum wsrep_exec_mode {
     LOCAL_STATE,
     REPL_RECV,
     TOTAL_ORDER,
-    LOCAL_COMMIT,
+    LOCAL_COMMIT
 };
 
 enum wsrep_query_state {
@@ -233,6 +233,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
 class Ha_trx_info;
 struct THD_TRANS;
 void wsrep_register_hton(THD* thd, bool all);
+void wsrep_post_commit(THD* thd, bool all);
 void wsrep_brute_force_killer(THD *thd);
 int  wsrep_hire_brute_force_killer(THD *thd, uint64_t trx_id);
 
@@ -280,7 +281,7 @@ struct TABLE_LIST;
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
                              const TABLE_LIST* table_list);
 void wsrep_to_isolation_end(THD *thd);
-
+void wsrep_cleanup_transaction(THD *thd);
 int wsrep_to_buf_helper(
   THD* thd, const char *query, uint query_len, uchar** buf, size_t* buf_len);
 int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len);
