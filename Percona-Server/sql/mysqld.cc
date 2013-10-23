@@ -5437,11 +5437,11 @@ pthread_handler_t start_wsrep_THD(void *arg)
 
   mysql_thread_set_psi_id(thd->thread_id);
   thd->thr_create_utime= my_micro_time();
-  if (MYSQL_CALLBACK_ELSE(thread_scheduler, init_new_connection_thread, (), 0))
+  if (MYSQL_CALLBACK_ELSE(thd->scheduler, init_new_connection_thread, (), 0))
   {
     close_connection(thd, ER_OUT_OF_RESOURCES, 1);
     statistic_increment(aborted_connects,&LOCK_status);
-    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
+    MYSQL_CALLBACK(thd->scheduler, end_thread, (thd, 0));
 
     return(NULL);
   }
@@ -5453,7 +5453,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   {
     close_connection(thd, ER_OUT_OF_RESOURCES, 1);
     statistic_increment(aborted_connects,&LOCK_status);
-    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
+    MYSQL_CALLBACK(thd->scheduler, end_thread, (thd, 0));
     delete thd;
 
     return(NULL);
@@ -5496,7 +5496,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
   if (plugins_are_initialized)
   {
     net_end(&thd->net);
-    MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 1));
+    MYSQL_CALLBACK(thd->scheduler, end_thread, (thd, 1));
   }
   else
   {
@@ -5610,7 +5610,7 @@ static int have_wsrep_appliers(THD *thd)
 static void wsrep_close_thread(THD *thd)
 {
   thd->killed= THD::KILL_CONNECTION;
-  MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (thd));
+  MYSQL_CALLBACK(thd->scheduler, post_kill_notification, (thd));
   if (thd->mysys_var)
   {
     thd->mysys_var->abort=1;
