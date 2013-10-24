@@ -309,7 +309,7 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
     if ((err = get_long_long (opts[QUERY_CACHE_TYPE], &query_cache_type, 10)))
         return err;
 
-    if (0 != query_cache_size && 0 != query_cache_type)
+    if (0 != query_cache_size || 0 != query_cache_type)
     {
         WSREP_ERROR ("Query cache is not supported (size=%lld type=%lld)",
                      query_cache_size, query_cache_type);
