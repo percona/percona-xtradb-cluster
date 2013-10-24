@@ -1243,6 +1243,7 @@ echo "====="                                     >> $STATUS_HISTORY
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysql*.so.*
 
+%post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
 
 %postun -n Percona-XtraDB-Cluster-shared%{product_suffix}
