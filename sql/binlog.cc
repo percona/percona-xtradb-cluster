@@ -8924,19 +8924,9 @@ IO_CACHE * get_trans_log(THD * thd)
 
 bool wsrep_trans_cache_is_empty(THD *thd)
 {
-  bool res= TRUE;
-
-  if (thd_sql_command((const THD*) thd) != SQLCOM_SELECT)
-    res= FALSE;
-  else
-  {
-    binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
-    if (cache_mngr)
-    {
-      res= cache_mngr->trx_cache.is_binlog_empty();
-    }
-  }
-  return res;
+  binlog_cache_mngr *const cache_mngr=
+      (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+  return (!cache_mngr || cache_mngr->trx_cache.is_binlog_empty());
 }
 
 void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end)
