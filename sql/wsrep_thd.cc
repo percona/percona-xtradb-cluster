@@ -149,8 +149,6 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->net.vio= 0;
   thd->clear_error();
 
-  thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
-
   shadow->tx_isolation        = thd->variables.tx_isolation;
   thd->variables.tx_isolation = ISO_READ_COMMITTED;
   thd->tx_isolation           = ISO_READ_COMMITTED;
@@ -203,6 +201,11 @@ void wsrep_replay_transaction(THD *thd)
                   (long long)wsrep_thd_trx_seqno(thd));
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
+
+      /* From trans_begin() */
+      thd->variables.option_bits|= OPTION_BEGIN;
+      thd->server_status|= SERVER_STATUS_IN_TRANS;
+
       int rcode = wsrep->replay_trx(wsrep,
                                     &thd->wsrep_ws_handle,
                                     (void *)thd);
@@ -279,6 +282,10 @@ static void wsrep_replication_process(THD *thd)
   struct wsrep_thd_shadow shadow;
 
   wsrep_prepare_bf_thd(thd, &shadow);
+
+  /* From trans_begin() */
+  thd->variables.option_bits|= OPTION_BEGIN;
+  thd->server_status|= SERVER_STATUS_IN_TRANS;
 
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));

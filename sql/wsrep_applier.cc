@@ -304,8 +304,6 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
   else
     rcode = wsrep_rollback(thd, meta->gtid.seqno);
 
-  /* reset autocommit option in case it was changed during event processing */
-  thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
   wsrep_set_apply_format(thd, NULL);
 
   if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode)
@@ -317,6 +315,13 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
       *exit = true;
     }
     mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
+  }
+
+  if (*exit == false && thd->wsrep_applier)
+  {
+    /* From trans_begin() */
+    thd->variables.option_bits|= OPTION_BEGIN;
+    thd->server_status|= SERVER_STATUS_IN_TRANS;
   }
 
   return rcode;
