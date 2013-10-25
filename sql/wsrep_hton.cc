@@ -172,9 +172,9 @@ static int wsrep_savepoint_set(handlerton *hton, THD *thd,  void *sv)
     DBUG_RETURN(0);
   }
 
-  if (!wsrep_emulate_bin_log) return 0;
+  if (!wsrep_emulate_bin_log) DBUG_RETURN(0);
   int rcode = wsrep_binlog_savepoint_set(thd, sv);
-  return rcode;
+  DBUG_RETURN(rcode);
 }
 
 static int wsrep_savepoint_rollback(handlerton *hton, THD *thd, void *sv)
@@ -186,9 +186,9 @@ static int wsrep_savepoint_rollback(handlerton *hton, THD *thd, void *sv)
     DBUG_RETURN(0);
   }
 
-  if (!wsrep_emulate_bin_log) return 0;
+  if (!wsrep_emulate_bin_log) DBUG_RETURN(0);
   int rcode = wsrep_binlog_savepoint_rollback(thd, sv);
-  return rcode;
+  DBUG_RETURN(rcode);
 }
 
 static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
@@ -210,14 +210,6 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
       DBUG_RETURN(0);
   default: break;
   }
-
-  /* wsrep_transaction_cleanup() does not get called after rollback
-     for autocommit queries, so set exec mode to LOCAL_STATE here
-  */
-  if (all)
-    thd->wsrep_exec_mode= LOCAL_COMMIT;
-  else
-    thd->wsrep_exec_mode= LOCAL_STATE;
 
   if ((all || !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
       (thd->variables.wsrep_on && thd->wsrep_conflict_state != MUST_REPLAY))
@@ -420,13 +412,17 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     {
       WSREP_DEBUG("empty rbr buffer, query: %s", thd->query());
     }
+    thd->wsrep_query_state= QUERY_EXEC;
     DBUG_RETURN(WSREP_TRX_OK);
   }
 
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
   {
-    WSREP_WARN("SQL statement was ineffective: %s\n => Skipping replication",
-               thd->query());
+    WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %d\n"
+	       "QUERY: %s\n"
+	       " => Skipping replication", 
+	       thd->thread_id, data_len, thd->query());
+    rcode = WSREP_TRX_FAIL;
   }
   else if (!rcode)
   {
