@@ -525,9 +525,6 @@ bool trans_rollback_stmt(THD *thd)
 #ifdef WITH_WSREP
     wsrep_register_hton(thd, FALSE);
 #endif /* WITH_WSREP */
-#ifdef WITH_WSREP
-    wsrep_register_hton(thd, TRUE);
-#endif /* WITH_WSREP */
     ha_rollback_trans(thd, FALSE);
     if (! thd->in_active_multi_stmt_transaction())
     {
