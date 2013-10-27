@@ -48,6 +48,7 @@
 #include "wsrep_mysqld.h"
 struct wsrep_thd_shadow {
   ulonglong            options;
+  uint                 server_status;
   enum wsrep_exec_mode wsrep_exec_mode;
   Vio                  *vio;
   ulong                tx_isolation;
@@ -940,9 +941,6 @@ struct st_savepoint {
   /** State of metadata locks before this savepoint was set. */
   MDL_savepoint        mdl_savepoint;
 };
-#ifdef WITH_WSREP
-void wsrep_cleanup_transaction(THD *thd); // THD.transactions.cleanup calls it
-#endif
 
 enum xa_states {XA_NOTR=0, XA_ACTIVE, XA_IDLE, XA_PREPARED, XA_ROLLBACK_ONLY};
 extern const char *xa_state_names[];
@@ -1884,11 +1882,7 @@ public:
     */
     CHANGED_TABLE_LIST* changed_tables;
     MEM_ROOT mem_root; // Transaction-life memory allocation pool
-#ifdef WITH_WSREP 
-    void cleanup(THD *thd)
-#else
     void cleanup()
-#endif
     {
       changed_tables= 0;
       savepoints= 0;
@@ -1901,11 +1895,6 @@ public:
       if (!xid_state.rm_error)
         xid_state.xid.null();
       free_root(&mem_root,MYF(MY_KEEP_PREALLOC));
-#ifdef WITH_WSREP
-      // Todo: convert into a plugin method
-      // wsrep's post-commit. LOCAL_COMMIT designates wsrep's commit was ok
-      if (WSREP(thd)) wsrep_cleanup_transaction(thd);
-#endif  /* WITH_WSREP */
     }
     my_bool is_active()
     {
@@ -2424,7 +2413,6 @@ public:
   Relay_log_info*           wsrep_rli;
   bool                      wsrep_converted_lock_session;
   wsrep_ws_handle_t         wsrep_ws_handle;
-  bool                      wsrep_seqno_changed;
 #ifdef WSREP_PROC_INFO
   char                      wsrep_info[128]; /* string for dynamic proc info */
 #endif /* WSREP_PROC_INFO */

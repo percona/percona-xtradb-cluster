@@ -1567,11 +1567,7 @@ commit_one_phase_low(THD *thd, bool all, THD_TRANS *trans, bool is_real_trans)
   }
   /* Free resources and perform other cleanup even for 'empty' transactions. */
   if (is_real_trans)
-#ifdef WITH_WSREP
-      thd->transaction.cleanup(thd);
-#else
       thd->transaction.cleanup();
-#endif /* WITH_WSREP */
 #ifdef WITH_WSREP
   if (WSREP(thd)) thd_proc_info(thd, tmp_info);
 #endif /* WITH_WSREP */
@@ -1655,11 +1651,8 @@ int ha_rollback_trans(THD *thd, bool all)
 
   /* Always cleanup. Even if nht==0. There may be savepoints. */
   if (is_real_trans)
-#ifdef WITH_WSREP
-      thd->transaction.cleanup(thd);
-#else
       thd->transaction.cleanup();
-#endif /* WITH_WSREP */
+
   thd->diff_rollback_trans++;
   if (all)
     thd->transaction_rollback_request= FALSE;
