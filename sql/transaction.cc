@@ -327,6 +327,9 @@ bool trans_rollback_implicit(THD *thd)
   */
   DBUG_ASSERT(thd->transaction.stmt.is_empty() && !thd->in_sub_stmt);
 
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, true);
+#endif /* WITH_WSREP */
   thd->server_status&= ~SERVER_STATUS_IN_TRANS;
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
   res= ha_rollback_trans(thd, true);
