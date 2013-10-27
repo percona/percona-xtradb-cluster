@@ -433,15 +433,6 @@ bool trans_rollback_stmt(THD *thd)
     wsrep_register_hton(thd, FALSE);
 #endif /* WITH_WSREP */
     ha_rollback_trans(thd, FALSE);
-    if (thd->transaction_rollback_request && !thd->in_sub_stmt)
-#ifdef WITH_WSREP
-    {
-      wsrep_register_hton(thd, TRUE);
-#endif /* WITH_WSREP */
-      ha_rollback_trans(thd, TRUE);
-#ifdef WITH_WSREP
-    }
-#endif /* WITH_WSREP */
     if (! thd->in_active_multi_stmt_transaction())
       thd->tx_isolation= (enum_tx_isolation) thd->variables.tx_isolation;
   }

@@ -1404,27 +1404,6 @@ int ha_commit_trans(THD *thd, bool all)
 #endif /* WITH_WSREP */
         }
         status_var_increment(thd->status_var.ha_prepare_count);
-        if (err)
-	{
-#ifdef WITH_WSREP
-          if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
-          {
-	    error= 1;
-	    /* avoid sending error, if we need to replay */
-            if (thd->wsrep_conflict_state!= MUST_REPLAY)
-            {
-              my_error(ER_LOCK_DEADLOCK, MYF(0), err);
-            }
-          }
-          else
-          {
-            /* not wsrep hton, bail to native mysql behavior */
-#endif
-          my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
-#ifdef WITH_WSREP
-          }
-#endif
-	}
 
         if (err)
           goto err;
