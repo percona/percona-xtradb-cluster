@@ -134,6 +134,7 @@ err:
 static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
 {
   shadow->options       = thd->variables.option_bits;
+  shadow->server_status = thd->server_status;
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->net.vio;
 
@@ -149,8 +150,6 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->net.vio= 0;
   thd->clear_error();
 
-  thd->variables.option_bits|= OPTION_NOT_AUTOCOMMIT;
-
   shadow->tx_isolation        = thd->variables.tx_isolation;
   thd->variables.tx_isolation = ISO_READ_COMMITTED;
   thd->tx_isolation           = ISO_READ_COMMITTED;
@@ -159,6 +158,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
 {
   thd->variables.option_bits  = shadow->options;
+  thd->server_status          = shadow->server_status;
   thd->wsrep_exec_mode        = shadow->wsrep_exec_mode;
   thd->net.vio                = shadow->vio;
   thd->variables.tx_isolation = shadow->tx_isolation;
@@ -168,7 +168,7 @@ void wsrep_replay_transaction(THD *thd)
 {
   /* checking if BF trx must be replayed */
   if (thd->wsrep_conflict_state== MUST_REPLAY) {
-    DBUG_ASSERT(wsrep_thd_trx_seqno(thd) > 0 && thd->wsrep_seqno_changed);
+    DBUG_ASSERT(wsrep_thd_trx_seqno(thd));
     if (thd->wsrep_exec_mode!= REPL_RECV) {
       if (thd->get_stmt_da()->is_sent())
       {
@@ -203,6 +203,11 @@ void wsrep_replay_transaction(THD *thd)
                   (long long)wsrep_thd_trx_seqno(thd));
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
+
+      /* From trans_begin() */
+      thd->variables.option_bits|= OPTION_BEGIN;
+      thd->server_status|= SERVER_STATUS_IN_TRANS;
+
       int rcode = wsrep->replay_trx(wsrep,
                                     &thd->wsrep_ws_handle,
                                     (void *)thd);
@@ -258,6 +263,9 @@ void wsrep_replay_transaction(THD *thd)
         unireg_abort(1);
         break;
       }
+
+      wsrep_cleanup_transaction(thd);
+
       mysql_mutex_lock(&LOCK_wsrep_replaying);
       wsrep_replaying--;
       WSREP_DEBUG("replaying decreased: %d, thd: %lu",
@@ -276,6 +284,10 @@ static void wsrep_replication_process(THD *thd)
   struct wsrep_thd_shadow shadow;
 
   wsrep_prepare_bf_thd(thd, &shadow);
+
+  /* From trans_begin() */
+  thd->variables.option_bits|= OPTION_BEGIN;
+  thd->server_status|= SERVER_STATUS_IN_TRANS;
 
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));
@@ -439,20 +451,23 @@ void wsrep_create_rollbacker()
 
 int wsrep_thd_is_brute_force(void *thd_ptr)
 {
+  /*
+    Brute force:
+    Appliers and replaying are running in REPL_RECV mode. TOI statements
+    in TOTAL_ORDER mode. Locally committing transaction that has got
+    past wsrep->pre_commit() without error is running in LOCAL_COMMIT mode.
+
+    Everything else is running in LOCAL_STATE and should not be considered
+    brute force.
+   */
   if (thd_ptr) {
     switch (((THD *)thd_ptr)->wsrep_exec_mode) {
-    case LOCAL_STATE:
-    {
-      if (((THD *)thd_ptr)->wsrep_conflict_state== REPLAYING)
-      {
-        return 1;
-      }
-      return 0;
-    }
+    case LOCAL_STATE:  return 0;
     case REPL_RECV:    return 1;
     case TOTAL_ORDER:  return 2;
     case LOCAL_COMMIT: return 3;
     }
+    DBUG_ASSERT(0);
   }
   return 0;
 }
