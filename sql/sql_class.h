@@ -73,6 +73,7 @@ void set_thd_stage_info(void *thd,
 #include "wsrep_mysqld.h"
 struct wsrep_thd_shadow {
   ulonglong            options;
+  uint                 server_status;
   enum wsrep_exec_mode wsrep_exec_mode;
   Vio                  *vio;
   ulong                tx_isolation;
