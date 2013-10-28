@@ -97,6 +97,10 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->tx_isolation        = thd->variables.tx_isolation;
   thd->variables.tx_isolation = ISO_READ_COMMITTED;
   thd->tx_isolation           = ISO_READ_COMMITTED;
+
+  shadow->db            = thd->db;
+  shadow->db_length     = thd->db_length;
+  thd->reset_db(NULL, 0);
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -106,6 +110,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->wsrep_exec_mode        = shadow->wsrep_exec_mode;
   thd->net.vio                = shadow->vio;
   thd->variables.tx_isolation = shadow->tx_isolation;
+  thd->reset_db(shadow->db, shadow->db_length);
 }
 
 void wsrep_replay_transaction(THD *thd)
