@@ -339,6 +339,14 @@ static void wsrep_replication_process(THD *thd)
   mysql_cond_broadcast(&COND_thread_count);
   mysql_mutex_unlock(&LOCK_thread_count);
 
+  TABLE *tmp;
+  while ((tmp = thd->temporary_tables))
+  {
+    WSREP_WARN("Applier %lu, has temporary tables at exit: %s.%s",
+                  thd->thread_id, 
+                  (tmp->s) ? tmp->s->db.str : "void",
+                  (tmp->s) ? tmp->s->table_name.str : "void");
+  }
   wsrep_return_from_bf_mode(thd, &shadow);
   DBUG_VOID_RETURN;
 }

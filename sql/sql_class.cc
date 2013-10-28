@@ -1196,6 +1196,8 @@ THD::THD(bool enable_plugins)
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_status_vars       = 0;
   wsrep_mysql_replicated  = 0;
+  wsrep_TOI_pre_query     = NULL;
+  wsrep_TOI_pre_query_len = 0;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1595,6 +1597,8 @@ void THD::init(void)
   wsrep_PA_safe= true;
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_mysql_replicated  = 0;
+  wsrep_TOI_pre_query     = NULL;
+  wsrep_TOI_pre_query_len = 0;
 #endif
   binlog_row_event_extra_data= 0;
 
