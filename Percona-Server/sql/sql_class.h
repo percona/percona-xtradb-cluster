@@ -81,6 +81,8 @@ struct wsrep_thd_shadow {
   enum wsrep_exec_mode wsrep_exec_mode;
   Vio                  *vio;
   ulong                tx_isolation;
+  char                 *db;
+  size_t               db_length;
 };
 #endif
 class Reprepare_observer;
@@ -3360,6 +3362,9 @@ public:
                             wsrep_consistency_check;
   wsrep_stats_var*          wsrep_status_vars;
   int                       wsrep_mysql_replicated;
+  const char*               wsrep_TOI_pre_query; /* a query to apply before 
+                                                    the actual TOI query */
+  size_t                    wsrep_TOI_pre_query_len;
   wsrep_po_handle_t         wsrep_po_handle;
   size_t                    wsrep_po_cnt;
   my_bool                   wsrep_po_in_trans;

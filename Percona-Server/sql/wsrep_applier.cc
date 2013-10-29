@@ -226,6 +226,16 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
     wsrep_dump_rbr_buf(thd, buf, buf_len);
   }
 
+  TABLE *tmp;
+  while ((tmp = thd->temporary_tables))
+  {
+    WSREP_DEBUG("Applier %lu, has temporary tables: %s.%s",
+                  thd->thread_id, 
+                  (tmp->s) ? tmp->s->db.str : "void",
+                  (tmp->s) ? tmp->s->table_name.str : "void");
+      close_temporary_table(thd, tmp, 1, 1);    
+  }
+
   return rcode;
 }
 
@@ -305,6 +315,8 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     rcode = wsrep_rollback(thd, meta->gtid.seqno);
 
   wsrep_set_apply_format(thd, NULL);
+  thd->mdl_context.release_transactional_locks();
+  thd->tx_isolation= (enum_tx_isolation) thd->variables.tx_isolation;
 
   if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode)
   {

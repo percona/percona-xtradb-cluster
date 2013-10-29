@@ -59,6 +59,7 @@ my_bool wsrep_log_conflicts            = 0;
 ulong   wsrep_mysql_replication_bundle = 0;
 my_bool wsrep_desync                   = 0; // desynchronize the node from the
                                             // cluster
+my_bool wsrep_load_data_splitting      = 1; // commit load data every 10K intervals
 
 /*
  * End configuration options
@@ -1084,12 +1085,24 @@ int wsrep_to_buf_helper(
                        65536, MYF(MY_WME)))
     return 1;
   int ret(0);
+
   if (thd->variables.gtid_next.type == GTID_GROUP)
   {
       Gtid_log_event gtid_ev(thd, FALSE, &thd->variables.gtid_next);
       if (!gtid_ev.is_valid()) ret= 0;
       if (!ret && gtid_ev.write(&tmp_io_cache)) ret= 1;
   }
+
+  /* if there is prepare query, add event for it */
+  if (!ret && thd->wsrep_TOI_pre_query)
+  {
+    Query_log_event ev(thd, thd->wsrep_TOI_pre_query, 
+		       thd->wsrep_TOI_pre_query_len, 
+		       FALSE, FALSE, FALSE, 0);
+    if (ev.write(&tmp_io_cache)) ret= 1;
+  }
+
+  /* continue to append the actual query */
   Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
   if (!ret && ev.write(&tmp_io_cache)) ret= 1;
   if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret= 1;
