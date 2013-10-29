@@ -104,6 +104,14 @@ class TC_LOG
   virtual int prepare(THD *thd, bool all) = 0;
 };
 
+#ifdef WITH_WSREP
+/*
+  Wrappers to MYSQL_BIN_LOG commit()/rollback() when wsrep_emulate_bin_log
+  is on.
+ */
+TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all);
+int wsrep_thd_binlog_rollback(THD * thd, bool all);
+#endif /* WITH_WSREP */
 
 class TC_LOG_DUMMY: public TC_LOG // use it to disable the logging
 {
@@ -112,10 +120,18 @@ public:
   int open(const char *opt_name)        { return 0; }
   void close()                          { }
   enum_result commit(THD *thd, bool all) {
+#ifdef WITH_WSREP
+    return wsrep_thd_binlog_commit(thd, all);
+#else
     return ha_commit_low(thd, all) ? RESULT_ABORTED : RESULT_SUCCESS;
+#endif /* WITH_WSREP */
   }
   int rollback(THD *thd, bool all) {
+#ifdef WITH_WSREP
+    return wsrep_thd_binlog_rollback(thd, all);
+#else
     return ha_rollback_low(thd, all);
+#endif /* WITH_WSREP */
   }
   int prepare(THD *thd, bool all) {
     return ha_prepare_low(thd, all);
@@ -557,7 +573,6 @@ IO_CACHE* get_trans_log(THD * thd);
 bool wsrep_trans_cache_is_empty(THD *thd);
 void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void thd_binlog_trx_reset(THD * thd);
-void thd_binlog_rollback_stmt(THD * thd);
 
 #define WSREP_BINLOG_FORMAT(my_format)                         \
    ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ?     \

@@ -6774,6 +6774,16 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
   my_off_t total_bytes= 0;
   bool do_rotate= false;
 
+#ifdef WITH_WSREP
+  if (WSREP_EMULATE_BINLOG(thd))
+  {
+    /*
+      Skip group commit, just do storage engine commit.
+    */
+    DBUG_RETURN(ha_commit_low(thd, all));
+  }
+#endif /* WITH_WSREP */
+
   /*
     These values are used while flushing a transaction, so clear
     everything.
@@ -8946,11 +8956,21 @@ void thd_binlog_trx_reset(THD * thd)
   thd->clear_binlog_table_maps();
 }
 
-void thd_binlog_rollback_stmt(THD * thd)
+TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
 {
-  WSREP_DEBUG("thd_binlog_rollback_stmt :%ld", thd->thread_id);
-  binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
-  if (cache_mngr) cache_mngr->trx_cache.set_prev_position(MY_OFF_T_UNDEF);
+  if (WSREP_EMULATE_BINLOG(thd))
+    return mysql_bin_log.commit(thd, all);
+  else
+    return (ha_commit_low(thd, all) ?
+            TC_LOG::RESULT_ABORTED : TC_LOG::RESULT_SUCCESS);
+}
+
+int wsrep_thd_binlog_rollback(THD* thd, bool all)
+{
+  if (WSREP_EMULATE_BINLOG(thd))
+    return mysql_bin_log.rollback(thd, all);
+  else
+    return ha_rollback_low(thd, all);
 }
 #endif /* WITH_WSREP */
 
