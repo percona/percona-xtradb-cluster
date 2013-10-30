@@ -3678,8 +3678,11 @@ case SQLCOM_PREPARE:
       else
       {
 #ifdef WITH_WSREP
+        /* in STATEMENT format, we probably have to replicate also temporary
+           tables, like mysql replication does
+        */
       if (!thd->is_current_stmt_binlog_format_row() ||
-	  !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
+          !(create_info.options & HA_LEX_CREATE_TMP_TABLE))
        WSREP_TO_ISOLATION_BEGIN(create_table->db, create_table->table_name,
                                  NULL)
 #endif /* WITH_WSREP */
