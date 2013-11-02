@@ -22,6 +22,7 @@
 #include "wsrep_utils.h"
 #include "wsrep_var.h"
 #include "wsrep_binlog.h"
+#include "wsrep_applier.h"
 #include <cstdio>
 #include <cstdlib>
 #include "log_event.h"
@@ -103,22 +104,6 @@ long             wsrep_protocol_version = 2;
 // if there was no state gap on receiving first view event.
 static my_bool   wsrep_startup = TRUE;
 
-/* wsrep callbacks */
-extern wsrep_cb_status_t wsrep_apply_cb(void *ctx,
-                                        const void* buf, size_t buf_len,
-                                        const wsrep_trx_meta_t* meta);
-
-extern wsrep_cb_status_t wsrep_commit_cb(void *ctx,
-                                         const wsrep_trx_meta_t* meta,
-                                         wsrep_bool_t* exit,
-                                         bool commit);
-
-static wsrep_cb_status_t wsrep_unordered_cb(void*       ctx,
-                                            const void* data,
-                                            size_t      size)
-{
-    return WSREP_CB_SUCCESS;
-}
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {

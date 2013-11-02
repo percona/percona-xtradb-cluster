@@ -17,6 +17,8 @@
 #include "wsrep_binlog.h" // wsrep_dump_rbr_buf()
 
 #include "log_event.h" // class THD, EVENT_LEN_OFFSET, etc.
+#include "wsrep_applier.h"
+
 /*
   read the first event from (*buf). The size of the (*buf) is (*buf_len).
   At the end (*buf) is shitfed to point to the following event or NULL and
@@ -196,6 +198,7 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
 wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
                                  const void* const       buf,
                                  size_t const            buf_len,
+                                 uint32_t const          flags,
                                  const wsrep_trx_meta_t* meta)
 {
   THD* const thd((THD*)ctx);
@@ -299,6 +302,7 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd,
 }
 
 wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
+                                  uint32_t      const     flags,
                                   const wsrep_trx_meta_t* meta,
                                   wsrep_bool_t* const     exit,
                                   bool          const     commit)
@@ -337,4 +341,12 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
   }
 
   return rcode;
+}
+
+
+wsrep_cb_status_t wsrep_unordered_cb(void*       const ctx,
+                                     const void* const data,
+                                     size_t      const size)
+{
+    return WSREP_CB_SUCCESS;
 }
