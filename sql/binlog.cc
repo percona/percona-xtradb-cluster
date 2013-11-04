@@ -866,7 +866,7 @@ binlog_trans_log_savepos(THD *thd, my_off_t *pos)
   DBUG_ASSERT(pos != NULL);
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
 #ifdef WITH_WSREP
-  DBUG_ASSERT((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open());
+  DBUG_ASSERT((WSREP_EMULATE_BINLOG(thd)) || mysql_bin_log.is_open());
 #else
   DBUG_ASSERT(mysql_bin_log.is_open());
 #endif
@@ -1676,8 +1676,7 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
     error= ordered_commit(thd, all, /* skip_commit */ true);
 
 #ifdef WITH_WSREP
-  if (!wsrep_emulate_bin_log &&
-      check_write_error(thd))
+  if (!WSREP_EMULATE_BINLOG(thd) && check_write_error(thd))
 #else
   if (check_write_error(thd))
 #endif
@@ -5097,7 +5096,9 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
      could have changed since.
   */
 #ifdef WITH_WSREP
-  if ((WSREP(thd) && wsrep_emulate_bin_log) || is_open())
+  /* applier and replayer can skip writing binlog events */
+  if ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) || 
+      is_open())
 #else
   if (likely(is_open()))
 #endif
@@ -5735,7 +5736,7 @@ bool MYSQL_BIN_LOG::write_cache(THD *thd, binlog_cache_data *cache_data)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::write_cache(THD *, binlog_cache_data *, bool)");
 #ifdef WITH_WSREP
-  if (wsrep_emulate_bin_log) DBUG_RETURN(0);
+  if (WSREP_EMULATE_BINLOG(thd)) DBUG_RETURN(0);
 #endif /* WITH_WSREP */
 
   IO_CACHE *cache= &cache_data->cache_log;
@@ -8958,7 +8959,8 @@ void thd_binlog_trx_reset(THD * thd)
 
 TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
 {
-  if (WSREP_EMULATE_BINLOG(thd))
+  /* applier and replayer can skip binlog commit */
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV))
     return mysql_bin_log.commit(thd, all);
   else
     return (ha_commit_low(thd, all) ?
@@ -8967,7 +8969,8 @@ TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
 
 int wsrep_thd_binlog_rollback(THD* thd, bool all)
 {
-  if (WSREP_EMULATE_BINLOG(thd))
+  /* applier and replayer can skip binlog rollback */
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV))
     return mysql_bin_log.rollback(thd, all);
   else
     return ha_rollback_low(thd, all);
