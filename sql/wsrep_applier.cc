@@ -322,6 +322,11 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
   thd->mdl_context.release_transactional_locks();
   thd->tx_isolation= (enum_tx_isolation) thd->variables.tx_isolation;
 
+  /* IO cache cleanup for applier only, 
+     replaying trx will do this this in wsrep_cleanup_transaction() 
+  */
+  if (wsrep_emulate_bin_log) thd_binlog_trx_reset(thd);
+
   if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode)
   {
     mysql_mutex_lock(&LOCK_wsrep_slave_threads);
