@@ -5444,7 +5444,22 @@ finish:
   {
     thd->mdl_context.release_statement_locks();
   }
-  WSREP_TO_ISOLATION_END
+  WSREP_TO_ISOLATION_END;
+
+#ifdef WITH_WSREP
+  /*
+    Force release of transactional locks if not in active MST and wsrep is on.
+  */
+  if (WSREP(thd) &&
+      ! thd->in_sub_stmt &&
+      ! thd->in_active_multi_stmt_transaction() &&
+      thd->mdl_context.has_transactional_locks())
+  {
+    WSREP_DEBUG("Forcing release of transactional locks for thd %lu",
+               thd->thread_id);
+    thd->mdl_context.release_transactional_locks();
+  }
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(res || thd->is_error());
 }
