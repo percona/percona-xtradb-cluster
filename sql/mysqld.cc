@@ -8559,6 +8559,9 @@ void refresh_status(THD *thd)
 
   /* Reset some global variables */
   reset_status_vars();
+#ifdef WITH_WSREP
+  wsrep->stats_reset(wsrep);
+#endif /* WITH_WSREP */
 
   /* Reset the counters of all key caches (default and named). */
   process_key_caches(reset_key_cache_counters);
