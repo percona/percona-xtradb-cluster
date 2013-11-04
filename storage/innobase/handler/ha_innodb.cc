@@ -4081,7 +4081,6 @@ ha_innobase::max_supported_key_length() const
 		return(1536);
 	default:
 #ifdef WITH_WSREP
-	return(3500);
 		return(3500);
 #else
 		return(3500);
