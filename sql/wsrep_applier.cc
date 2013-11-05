@@ -209,6 +209,11 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   if (flags & WSREP_FLAG_ISOLATION)
   {
     thd->wsrep_apply_toi= true;
+    /*
+      Don't run in transaction mode with TOI actions.
+     */
+    thd->variables.option_bits&= ~OPTION_BEGIN;
+    thd->server_status&= ~SERVER_STATUS_IN_TRANS;
   }
   wsrep_cb_status_t rcode(wsrep_apply_events(thd, buf, buf_len));
 
