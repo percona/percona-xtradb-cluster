@@ -214,6 +214,10 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   thd_proc_info(thd, "applying write set");
 #endif /* WSREP_PROC_INFO */
 
+  if (flags & WSREP_FLAG_ISOLATION)
+  {
+    thd->wsrep_apply_toi= true;
+  }
   wsrep_cb_status_t rcode(wsrep_apply_events(thd, buf, buf_len));
 
 #ifdef WSREP_PROC_INFO
@@ -338,6 +342,7 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     /* From trans_begin() */
     thd->variables.option_bits|= OPTION_BEGIN;
     thd->server_status|= SERVER_STATUS_IN_TRANS;
+    thd->wsrep_apply_toi= false;
   }
 
   return rcode;
