@@ -89,6 +89,7 @@ long long   wsrep_cluster_conf_id    = WSREP_SEQNO_UNDEFINED;
 const char* wsrep_cluster_status = cluster_status_str[WSREP_VIEW_DISCONNECTED];
 long        wsrep_cluster_size       = 0;
 long        wsrep_local_index        = -1;
+long long   wsrep_local_bf_aborts    = 0;
 const char* wsrep_provider_name      = provider_name;
 const char* wsrep_provider_version   = provider_version;
 const char* wsrep_provider_vendor    = provider_vendor;
