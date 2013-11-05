@@ -106,6 +106,7 @@ extern long long   wsrep_cluster_conf_id;
 extern const char* wsrep_cluster_status;
 extern long        wsrep_cluster_size;
 extern long        wsrep_local_index;
+extern long long   wsrep_local_bf_aborts;
 extern const char* wsrep_provider_name;
 extern const char* wsrep_provider_version;
 extern const char* wsrep_provider_vendor;

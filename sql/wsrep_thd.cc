@@ -23,11 +23,22 @@
 #include "sql_base.h" // close_thread_tables()
 #include "mysqld.h"   // start_wsrep_THD();
 
+static long long wsrep_bf_aborts_counter = 0;
+
+int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
+{
+    wsrep_local_bf_aborts = my_atomic_load64(&wsrep_bf_aborts_counter);
+    var->type = SHOW_LONGLONG;
+    var->value = (char*)&wsrep_local_bf_aborts;
+}
+
 /* must have (&thd->LOCK_wsrep_thd) */
 void wsrep_client_rollback(THD *thd)
 {
   WSREP_DEBUG("client rollback due to BF abort for (%ld), query: %s",
               thd->thread_id, thd->query());
+
+  my_atomic_add64(&wsrep_bf_aborts_counter, 1);
 
   thd->wsrep_conflict_state= ABORTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
