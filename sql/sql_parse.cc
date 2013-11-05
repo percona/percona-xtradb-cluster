@@ -5802,7 +5802,12 @@ void THD::reset_for_next_command()
   thd->stmt_depends_on_first_successful_insert_id_in_prev_stmt= 0;
 
 #ifdef WITH_WSREP
-  if (WSREP(thd)) {
+  /*
+    Autoinc variables should be adjusted only for locally executed
+    transactions. Appliers and replayers are either processing ROW
+    events or get autoinc variable values from Query_log_event.
+  */
+  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE) {
     if (wsrep_auto_increment_control)
     {
       if (thd->variables.auto_increment_offset !=

@@ -1321,6 +1321,20 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
     WSREP_DEBUG("thread holds MDL locks at TI begin: %s %lu", 
                 thd->query(), thd->thread_id);
   }
+
+  /*
+    It makes sense to set auto_increment_* to defaults in TOI operations.
+    Must be done before wsrep_TOI_begin() since Query_log_event encapsulating
+    TOI statement and auto inc variables for wsrep replication is constructed
+    there. Variables are reset back in THD::reset_for_next_command() before
+    processing of next command.
+   */
+  if (wsrep_auto_increment_control)
+  {
+    thd->variables.auto_increment_offset = 1;
+    thd->variables.auto_increment_increment = 1;
+  }
+
   if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
   {
     switch (wsrep_OSU_method_options) {
@@ -1331,12 +1345,6 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
     if (!ret)
     {
       thd->wsrep_exec_mode= TOTAL_ORDER;
-      /* It makes sense to set auto_increment_* to defaults in TOI operations */
-      if (wsrep_auto_increment_control)
-      {
-        thd->variables.auto_increment_offset = 1;
-        thd->variables.auto_increment_increment = 1;
-      }
     }
   }
   return ret;
