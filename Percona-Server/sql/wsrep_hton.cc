@@ -67,7 +67,7 @@ handlerton *wsrep_hton;
 */
 void wsrep_register_hton(THD* thd, bool all)
 {
-  if (thd->wsrep_exec_mode != TOTAL_ORDER)
+  if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
     THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
     for (Ha_trx_info *i= trans->ha_list; WSREP(thd) && i; i = i->next())
@@ -76,8 +76,13 @@ void wsrep_register_hton(THD* thd, bool all)
       {
         trans_register_ha(thd, all, wsrep_hton);
 
-        /* follow innodb read/write settting */
-        if (i->is_trx_read_write())
+        /* follow innodb read/write settting
+         * but, as an exception: CTAS with empty result set will not be 
+         * replicated unless we declare wsrep hton as read/write here
+	 */
+        if (i->is_trx_read_write() || 
+            (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+             thd->wsrep_exec_mode == LOCAL_STATE))
         {
           thd->ha_data[wsrep_hton->slot].ha_info[all].set_trx_read_write();
         }
@@ -420,7 +425,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   {
     WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %d\n"
 	       "QUERY: %s\n"
-	       " => Skipping replication", 
+	       " => Skipping replication",
 	       thd->thread_id, data_len, thd->query());
     rcode = WSREP_TRX_FAIL;
   }

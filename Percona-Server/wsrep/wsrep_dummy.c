@@ -101,7 +101,7 @@ static wsrep_status_t dummy_pre_commit(
     wsrep_t* w,
     const wsrep_conn_id_t   conn_id    __attribute__((unused)),
     wsrep_ws_handle_t*      ws_handle  __attribute__((unused)),
-    uint64_t                flags      __attribute__((unused)),
+    uint32_t                flags      __attribute__((unused)),
     wsrep_trx_meta_t*       meta       __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
@@ -218,7 +218,7 @@ static wsrep_status_t dummy_preordered_commit(
     wsrep_t*                 w,
     wsrep_po_handle_t*       handle    __attribute__((unused)),
     const wsrep_uuid_t*      source_id __attribute__((unused)),
-    uint64_t                 flags     __attribute__((unused)),
+    uint32_t                 flags     __attribute__((unused)),
     int                      pa_range  __attribute__((unused)),
     wsrep_bool_t             commit    __attribute__((unused)))
 {

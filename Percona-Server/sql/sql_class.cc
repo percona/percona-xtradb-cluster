@@ -1164,6 +1164,7 @@ THD::THD(bool enable_plugins)
    wsrep_po_cnt(0),
    wsrep_po_in_trans(FALSE),
    wsrep_apply_format(0),
+   wsrep_apply_toi(false),
 #endif
    m_parser_state(NULL),
 #if defined(ENABLED_DEBUG_SYNC)

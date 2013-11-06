@@ -3422,7 +3422,7 @@ int handler::update_auto_increment()
     auto_inc_intervals_count++;
     /* Row-based replication does not need to store intervals in binlog */
 #ifdef WITH_WSREP
-    if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
+    if (((WSREP_EMULATE_BINLOG(thd)) || mysql_bin_log.is_open()) &&
 	!thd->is_current_stmt_binlog_format_row())
 #else
     if (mysql_bin_log.is_open() && !thd->is_current_stmt_binlog_format_row())
@@ -7285,7 +7285,9 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
           table->s->cached_row_logging_check &&
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
 #ifdef WITH_WSREP
-          ((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()));
+	  /* applier and replayer should not binlog */
+          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) || 
+           mysql_bin_log.is_open()));
 #else
           mysql_bin_log.is_open());
 #endif
