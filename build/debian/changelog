@@ -2,7 +2,7 @@ percona-xtradb-cluster-5.6 (5.6.14-rel62.0) unstable; urgency=low
 
   * Ported to PXC 5.6.
 
- -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Web,  06 Nov 2013 17:00:00 -0300
+ -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Wed,  06 Nov 2013 17:00:00 -0300
 
 percona-server-5.6 (5.6.13-rel61.0) unstable; urgency=low
 
