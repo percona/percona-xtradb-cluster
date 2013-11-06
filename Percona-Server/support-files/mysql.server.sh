@@ -412,6 +412,7 @@ case "$mode" in
     ;;
   'status')
       check_running 1
+      exit $?
     ;;
   'bootstrap-pxc')
       # Bootstrap the Percona XtraDB Cluster, start the first node
