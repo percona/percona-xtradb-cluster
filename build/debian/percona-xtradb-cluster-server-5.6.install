@@ -1,4 +1,6 @@
 usr/lib/mysql/plugin
+usr/bin/clustercheck
+usr/bin/pyclustercheck
 usr/bin/innochecksum
 usr/bin/msql2mysql
 usr/bin/my_print_defaults
@@ -22,6 +24,11 @@ usr/bin/perror
 usr/bin/replace
 usr/bin/resolve_stack_dump
 usr/bin/resolveip
+usr/bin/wsrep_sst_common
+usr/bin/wsrep_sst_mysqldump
+usr/bin/wsrep_sst_xtrabackup
+usr/bin/wsrep_sst_xtrabackup-v2
+usr/bin/wsrep_sst_rsync
 usr/sbin/mysqld
 usr/sbin/mysqld-debug
 usr/share/man/man1/msql2mysql.1
@@ -52,5 +59,6 @@ usr/share/man/man1/comp_err.1
 usr/share/man/man1/mysqlman.1
 usr/share/man/man8/mysqld.8
 usr/share/mysql/
+etc/xinetd.d/mysqlchk
 debian/additions/debian-start etc/mysql/
 debian/additions/debian-start.inc.sh usr/share/mysql

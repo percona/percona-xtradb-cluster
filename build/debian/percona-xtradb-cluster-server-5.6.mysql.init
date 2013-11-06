@@ -1,0 +1,304 @@
+#!/bin/bash
+#
+### BEGIN INIT INFO
+# Provides:          mysql
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Should-Start:      $network $named $time
+# Should-Stop:       $network $named $time
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start and stop the mysql (Percona XtraDB Cluster) daemon
+# Description:       Controls the main MySQL (Percona XtraDB Cluster) daemon "mysqld"
+#                    and its wrapper script "mysqld_safe".
+### END INIT INFO
+#
+set -e
+set -u
+${DEBIAN_SCRIPT_DEBUG:+ set -v -x}
+PERCONA_PREFIX=/usr
+startup_timeout=900
+stop_timeout=300
+startup_sleep=1
+
+test -x "${PERCONA_PREFIX}"/sbin/mysqld || exit 0
+
+. /lib/lsb/init-functions
+
+SELF=$(cd $(dirname $0); pwd -P)/$(basename $0)
+CONF=/etc/mysql/my.cnf
+
+# priority can be overriden and "-s" adds output to stderr
+ERR_LOGGER="logger -p daemon.err -t /etc/init.d/mysql -i"
+
+# Safeguard (relative paths, core dumps..)
+cd /
+umask 077
+
+# mysqladmin likes to read /root/.my.cnf. This is usually not what I want
+# as many admins e.g. only store a password without a username there and
+# so break my scripts.
+export HOME=/etc/mysql/
+
+## Fetch a particular option from mysql's invocation.
+#
+# Usage: void mysqld_get_param option
+mysqld_get_param() {
+	"${PERCONA_PREFIX}"/sbin/mysqld --print-defaults \
+                | tr " " "\n" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' \
+		| grep -- "--$1=" \
+		| tail -n 1 \
+		| cut -d= -f2
+}
+
+## Do some sanity checks before even trying to start mysqld.
+sanity_checks() {
+  # check for config file
+  # DISABLED: We do not install my.cnf
+  #if [ ! -r /etc/mysql/my.cnf ]; then
+  #  log_warning_msg "$0: WARNING: /etc/mysql/my.cnf cannot be read. See README.Debian.gz"
+  #  echo                "WARNING: /etc/mysql/my.cnf cannot be read. See README.Debian.gz" | $ERR_LOGGER
+  #fi
+
+  # check for diskspace shortage
+  datadir=`mysqld_get_param datadir`
+  if LC_ALL=C BLOCKSIZE= df --portability $datadir/. | tail -n 1 | awk '{ exit ($4>4096) }'; then
+    log_failure_msg "$0: ERROR: The partition with $datadir is too full!"
+    echo                "ERROR: The partition with $datadir is too full!" | $ERR_LOGGER
+    exit 1
+  fi
+
+  if test -e $sst_progress_file;then 
+	log_daemon_msg "Stale sst_in_progress file in datadir" "mysqld"
+  fi
+}
+
+# Get the pid file
+mysql_data_dir=$(mysqld_get_param datadir)
+[ ! $mysql_data_dir ] && mysql_data_dir="/var/lib/mysql"
+
+pid_file=$(mysqld_get_param pid-file)
+
+if test -z "$pid_file"
+then
+    pid_file="$mysql_data_dir/$(hostname).pid"
+else
+  case "$pid_file" in
+    /* ) ;;
+    * )  pid_file="$mysql_data_dir/$pid_file" ;;
+  esac
+fi
+
+sst_progress_file=$mysql_data_dir/sst_in_progress
+## Checks if there is a server running and if so if it is accessible.
+#
+# check_alive insists on a pingable server
+# check_dead also fails if there is a lost mysqld in the process list
+#
+# Usage: boolean mysqld_status [check_alive|check_dead] [warn|nowarn]
+mysqld_status () {
+    mysqld_pid=$(cat $pid_file 2>/dev/null)
+
+    if [ ! $mysqld_pid ];then 
+        echo "MySQL PID not found, pid_file detected/guessed: $pid_file" | $ERR_LOGGER
+        if [ "$1" = "check_dead" ]; then
+            return 0
+        fi
+        return 1
+    fi
+
+    ping_alive=1
+    ps_alive=0
+    
+    soutput=$(mysql -u root -pabcd -e 'select 1;' 2>&1 | grep 'ERROR 2002')
+    [ "$soutput" ] && ping_alive=0
+    
+    /bin/kill -0 $mysqld_pid &>/dev/null && ps_alive=1
+    
+    if [ "$1" = "check_alive"  -a  $ping_alive = 1 ] ||
+       [ "$1" = "check_dead"   -a  $ping_alive = 0  -a  $ps_alive = 0 ]; then
+	return 0 # EXIT_SUCCESS
+    else
+  	if [ "$2" = "warn" ]; then
+  	    warn_msg=
+  	    [ $ping_alive = 0 ] && warn_msg+="mysql ping failed with $soutput"
+  	    [ $ps_alive = 0 ] && \
+  	        warn_msg+=" and/or mysqld with pid $mysqld_pid is not alive"
+  	    echo -e "$warn_msg" | $ERR_LOGGER -p daemon.debug
+	fi
+  	return 1 # EXIT_FAILURE
+    fi
+}
+
+log_startup_failure() {
+    local msg="$@"
+    if test -e $sst_progress_file;then 
+        msg+=" However, SST is still in progress. Please check if mysqld is running."
+    fi
+    log_failure_msg "$msg"
+}
+#
+# main()
+#
+
+case "${1:-''}" in
+  'start')
+	sanity_checks;
+	# Start daemon
+	log_daemon_msg "Starting MySQL (Percona XtraDB Cluster) database server" "mysqld"
+	if mysqld_status check_alive nowarn; then
+	   log_progress_msg "already running"
+	   log_end_msg 0
+	else
+  	    "${PERCONA_PREFIX}"/bin/mysqld_safe > /dev/null 2>&1 &
+  	    safe_pid=$!
+            avoid_race_condition="by checking again"
+
+	    for i in `seq 1 $startup_timeout`; do
+                test -s $pid_file && break
+
+                if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
+                    log_daemon_msg "SST in progress, setting sleep higher" "mysqld"
+                    startup_sleep=10
+                fi
+                # if server isn't running, then pid-file will never be updated
+                if test -n "$safe_pid"; then
+                    if kill -0 "$safe_pid" 2>/dev/null; then
+                        :  # the server still runs
+                    else
+                        # The server may have exited between the last pid-file check and now.  
+                        if test -n "$avoid_race_condition"; then
+                            avoid_race_condition=""
+                            continue  # Check again.
+                        fi
+
+                        log_failure_msg "The server quit without updating PID file ($pid_file)."
+                        log_end_msg 1
+                        exit 1  # not waiting any more.
+                    fi
+                fi
+                sleep $startup_sleep
+		log_progress_msg "."
+	    done
+	    sleep 1
+	    if mysqld_status check_alive warn; then
+                log_end_msg 0
+	        # Now start mysqlcheck or whatever the admin wants.
+                # only if the file /etc/mysql/DEBIAN-START is present.
+                if test -e /etc/mysql/DEBIAN-START;then
+	        output=$(/etc/mysql/debian-start)
+                    [ "$output" ] && log_action_msg "$output"
+                fi
+                log_startup_failure "Please take a look at the syslog."
+                log_end_msg 1
+		log_failure_msg "Please take a look at the syslog"
+	    fi
+	fi
+	;;
+
+  'stop')
+	# * As a passwordless mysqladmin (e.g. via ~/.my.cnf) must be possible
+	# at least for cron, we can rely on it here, too. (although we have 
+	# to specify it explicit as e.g. sudo environments points to the normal
+	# users home and not /root)
+	log_daemon_msg "Stopping MySQL (Percona XtraDB Cluster)" "mysqld"
+	if ! mysqld_status check_dead nowarn; then
+	  set +e
+	  shutdown_out=`kill $mysqld_pid 2>&1`; r=$?
+	  set -e
+	  if [ "$r" -ne 0 ]; then
+	    log_end_msg 1
+	    log_daemon_msg "MySQLd already dead" "mysqld"
+	  else
+            server_down=
+	    for i in `seq 1 $stop_timeout`; do
+              sleep 1
+              if mysqld_status check_dead nowarn; then server_down=1; break; fi
+            done
+            #Better to not kill in cases of large buffer pools
+            #if test -z "$server_down"; then 
+                #kill -9 $mysqld_pid 
+            #fi
+	  fi
+        fi
+
+        if ! mysqld_status check_dead warn; then
+	  log_end_msg 1
+	  log_failure_msg "Please stop MySQL (Percona XtraDB Cluster) manually and \
+	      read /usr/share/doc/percona-xtradb-cluster-server-5.5/README.Debian.gz!"
+	  exit -1
+	else
+	  log_end_msg 0
+        fi
+	;;
+
+  'restart')
+	set +e; $SELF stop; set -e
+	$SELF start 
+	;;
+
+  'reload'|'force-reload')
+  	log_daemon_msg "Reloading MySQL (Percona XtraDB Cluster)" "mysqld"
+        mysqld_pid=$(cat $pid_file 2>/dev/null)
+
+        if [ ! $mysqld_pid ];then 
+            log_failure_msg "MySQL PID not found, pid_file detected/guessed: $pid_file"
+            log_end_msg 1
+            exit 4
+        fi
+
+  	if kill -HUP $mysqld_pid 2>/dev/null;then 
+  	    log_daemon_msg "Percona XtraDB Cluster reload complete" "mysqld"
+	log_end_msg 0
+  	else
+            log_failure_msg "Percona XtraDB Cluster with PID $mysqld_pid \
+                            is not running or unknown error"
+            log_end_msg 1
+        fi
+	;;
+
+  'status')
+	if mysqld_status check_alive nowarn; then
+	  log_action_msg "Percona XtraDB Cluster up and running"
+	else
+	  log_action_msg "MySQL (Percona XtraDB Cluster) is stopped. Check log"
+	  exit 3
+	fi
+  	;;
+  'bootstrap-pxc')
+	sanity_checks;
+	# Start daemon
+	log_daemon_msg "Bootstrapping MySQL (Percona XtraDB Cluster) database server" "mysqld"
+	if mysqld_status check_alive nowarn; then
+	   log_progress_msg "already running"
+	   log_end_msg 0
+	else
+	     # Not enabled in code - will be in 5.5-24
+             "${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-new-cluster > /dev/null 2>&1 &
+              #"${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-cluster-address="gcomm://" > /dev/null 2>&1 &
+	    # 6s was reported in #352070 to be too few when using ndbcluster
+	    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do
+                sleep 1
+	        if mysqld_status check_alive nowarn ; then break; fi
+		log_progress_msg "."
+	    done
+            if mysqld_status check_alive warn; then
+                log_end_msg 0
+                # Now start mysqlcheck or whatever the admin wants.
+                # only if the file /etc/mysql/NO-DEBIAN-START is absent.
+                if ! test -e /etc/mysql/NO-DEBIAN-START;then
+                    output=$(/etc/mysql/debian-start)
+                    [ -n "$output" ] && log_action_msg "$output"
+                fi
+            else
+                log_end_msg 1
+                log_failure_msg "Please take a look at the syslog"
+            fi
+	fi
+	;;
+  *)
+	echo "Usage: $SELF start|stop|restart|reload|force-reload|status|bootstrap-pxc"
+	exit 1
+	;;
+esac
+

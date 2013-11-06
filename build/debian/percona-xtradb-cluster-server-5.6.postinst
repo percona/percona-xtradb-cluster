@@ -139,7 +139,7 @@ EOF
     # Debian: beware of the bashisms... 
     # Debian: can safely run on upgrades with existing databases 
     set +e
-    ${PERCONA_PREFIX}/bin/mysql_install_db --user=mysql --rpm 2>&1 |
+    /bin/bash ${PERCONA_PREFIX}/bin/mysql_install_db --user=mysql --rpm 2>&1 |
         $ERR_LOGGER
     if [ "$?" != "0" ]; then
       echo "ATTENTION: An error has occured. More info is in the syslog!"
@@ -255,7 +255,7 @@ if [ "$1" = "configure" ]; then
 fi
 #Some postinstall info about UDF
 #
-echo -e "\n\n * Percona Server is distributed with several useful UDF (User Defined Function) from Percona Toolkit."
+echo -e "\n\n * Percona XtraDB Cluster is distributed with several useful UDF (User Defined Function) from Percona Toolkit."
 echo -e " * Run the following commands to create these functions:\n"
 echo -e "\tmysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo -e "\tmysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
