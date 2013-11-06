@@ -8,9 +8,9 @@ CMAKE=cmake
 TMP=$(CURDIR)/debian/tmp/
 
 feature_set="community"
-major_version=61
+major_version=62
 minor_version=0
-compilation_comment_release="Percona Server (GPL), Release $(major_version).$(minor_version)"
+compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(major_version).$(minor_version)"
 server_suffix="-$(major_version).$(minor_version)"
 prefix="/usr"
 
@@ -31,6 +31,8 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 	   -DWITH_SSL=system \
 	   -DWITH_EMBEDDED_SERVER=OFF \
 	   -DWITH_INNODB_MEMCACHED=ON \
+	   -DWITH_INNODB_DISALLOW_WRITES=ON \
+	   -DWITH_WSREP=ON \
 	   -DMYSQL_UNIX_ADDR="/var/run/mysqld/mysqld.sock" \
 	   -DFEATURE_SET=$(feature_set) \
 	   -DCOMPILATION_COMMENT=$(compilation_comment_debug) \
@@ -45,6 +47,8 @@ endif
 	   -DWITH_SSL=system \
 	   -DWITH_EMBEDDED_SERVER=OFF \
 	   -DWITH_INNODB_MEMCACHED=ON \
+	   -DWITH_INNODB_DISALLOW_WRITES=ON \
+	   -DWITH_WSREP=ON \
 	   -DMYSQL_UNIX_ADDR="/var/run/mysqld/mysqld.sock" \
 	   -DFEATURE_SET=$(feature_set) \
 	   -DCOMPILATION_COMMENT=$(compilation_comment_release) \
@@ -88,5 +92,5 @@ override_dh_installinit:
 	dh_installinit --name=mysql --error-handler=:
 
 override_dh_strip:
-	dh_strip --dbg-package=percona-server-5.6-dbg
+	dh_strip --dbg-package=percona-server-5.5-dbg
 
