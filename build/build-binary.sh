@@ -249,6 +249,12 @@ fi
 
     )
 
+    (
+       echo "Packaging the test files"
+       # mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL
+       cp -R percona-xtradb-cluster-tests $INSTALLDIR/usr/local/$PRODUCT_FULL/
+    )
+
     # Build jemalloc
     if test "x$WITH_JEMALLOC" != x
     then
