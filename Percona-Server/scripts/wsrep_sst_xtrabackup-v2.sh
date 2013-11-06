@@ -56,6 +56,7 @@ rebuildcmd=""
 payload=0
 pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
 pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
+STATDIR=""
 uextra=0
 
 if which pv &>/dev/null && pv --help | grep -q FORMAT;then 
@@ -335,9 +336,9 @@ cleanup_joiner()
         wsrep_log_info "Cleaning up fifo file $progress"
         rm $progress
     fi
-    #if [[ -n ${STATDIR:-} ]];then 
-       #[[ -d $STATDIR ]] && rm -rf $STATDIR
-    #fi
+    if [[ -n ${STATDIR:-} ]];then 
+       [[ -d $STATDIR ]] && rm -rf $STATDIR
+    fi
 }
 
 check_pid()
