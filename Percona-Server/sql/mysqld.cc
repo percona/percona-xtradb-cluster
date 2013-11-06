@@ -4845,6 +4845,11 @@ static int init_server_components()
   init_slave_list();
 #endif
 
+#ifndef EMBEDDED_LIBRARY
+  init_global_table_stats();
+  init_global_index_stats();
+#endif
+
   /* Setup logs */
 
   /*
@@ -5149,11 +5154,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   /* if the errmsg.sys is not loaded, terminate to maintain behaviour */
   if (!DEFAULT_ERRMSGS[0][0])
     unireg_abort(1);
-
-#ifndef EMBEDDED_LIBRARY
-  init_global_table_stats();
-  init_global_index_stats();
-#endif
 
   /* We have to initialize the storage engines before CSV logging */
 
