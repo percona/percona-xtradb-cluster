@@ -12,8 +12,8 @@
 set -ue
 
 # Examine parameters
-go_out="$(getopt --options "k:Ke:bDS" \
-    --longoptions key:,nosign,epoch:,binary,nodebug,source \
+go_out="$(getopt --options "k:Ke:bBDS" \
+    --longoptions key:,nosign,epoch:,binary,binarydep,nodebug,source \
     --name "$(basename "$0")" -- "$@")"
 test $? -eq 0 || exit 1
 eval set -- $go_out
@@ -31,6 +31,7 @@ do
     -K | --nosign ) shift; BUILDPKG_KEY="-uc -us";;
     -e | --epoch ) shift; EPOCH="$1:"; shift;;
     -b | --binary ) shift; DPKG_BINSRC='-b';;
+    -B | --binarydep ) shift; DPKG_BINSRC='-B';;
     -D | --nodebug ) shift; SKIPDEBUG='yes';;
     -S | --source ) shift; DPKG_BINSRC='-S';;
     esac
@@ -80,12 +81,18 @@ fi
 # Extract version from the Makefile
 MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
     | cut -d = -f 2)"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
+    cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
+    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= "$SOURCEDIR/Makefile" | cut -d = -f 2)"
-PRODUCT="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 DEBIAN_VERSION="$(lsb_release -sc)"
 
 
 # Build information
+export REVISION="$(cd "$SOURCEDIR"; bzr revno)"
+export WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
+export DEB_BUILD_OPTIONS='debug nocheck'
 export BB_PERCONA_REVISION="$(cd "$SOURCEDIR"; bzr revno)"
 export DEB_BUILD_OPTIONS='debug'
 
@@ -121,11 +128,11 @@ export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
         # If nodebug is set, do not ship mysql-debug
         if test "x$SKIPDEBUG" = "xyes"
         then
-            sed -i '/mysqld-debug/d' debian/percona-server-server-5.6.install
+            sed -i '/mysqld-debug/d' debian/percona-server-server-5.5.install
         fi
 
         # Update distribution name
-        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$EPOCH$MYSQL_VERSION-$PERCONA_SERVER_VERSION-$BB_PERCONA_REVISION.$DEBIAN_VERSION" 'Update distribution'
+        dch -m -D "$DEBIAN_VERSION" --force-distribution -v "$EPOCH$MYSQL_VERSION-$WSREP_VERSION-$BB_PERCONA_REVISION.$DEBIAN_VERSION" 'Update distribution'
 
         DEB_CFLAGS_APPEND="$CFLAGS" DEB_CXXFLAGS_APPEND="$CXXFLAGS" \
                 SKIP_DEBUG_BINARY="$SKIPDEBUG" \
