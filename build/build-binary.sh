@@ -202,7 +202,7 @@ fi
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        scons --config=force boost_pool=0 revno="$GALERA_REVISION" $MAKE_JFLAG \
+        scons --config=force strict_build_flags=0 revno="$GALERA_REVISION" $MAKE_JFLAG \
               garb/garbd libgalera_smm.so
         mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
              "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
