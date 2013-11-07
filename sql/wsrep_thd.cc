@@ -30,6 +30,7 @@ int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
     wsrep_local_bf_aborts = my_atomic_load64(&wsrep_bf_aborts_counter);
     var->type = SHOW_LONGLONG;
     var->value = (char*)&wsrep_local_bf_aborts;
+    return 0;
 }
 
 /* must have (&thd->LOCK_wsrep_thd) */
