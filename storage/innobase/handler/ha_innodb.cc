@@ -12646,7 +12646,8 @@ static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid)
         if (wsrep_is_wsrep_xid(xid)) {
                 mtr_t mtr;
                 mtr_start(&mtr);
-                trx_sys_update_wsrep_checkpoint(xid, &mtr);
+                trx_sysf_t* sys_header = trx_sysf_get(&mtr);
+                trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
                 mtr_commit(&mtr);
                 return 0;
         } else {
