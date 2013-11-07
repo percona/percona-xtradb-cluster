@@ -411,7 +411,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
   {
-    WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %uz\n"
+    WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %zu\n"
                "QUERY: %s\n"
                " => Skipping replication", 
                thd->thread_id, data_len, thd->query());
