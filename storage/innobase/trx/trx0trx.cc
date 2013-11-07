@@ -942,6 +942,9 @@ trx_write_serialisation_history(
 	trx_t*		trx,	/*!< in/out: transaction */
 	mtr_t*		mtr)	/*!< in/out: mini-transaction */
 {
+#ifdef WITH_WSREP
+        trx_sysf_t* sys_header;
+#endif /* WITH_WSREP */
 	trx_rseg_t*	rseg;
 
 	rseg = trx->rseg;
@@ -989,10 +992,11 @@ trx_write_serialisation_history(
 	MONITOR_INC(MONITOR_TRX_COMMIT_UNDO);
 
 #ifdef WITH_WSREP
+        sys_header = trx_sysf_get(mtr);
         /* Update latest MySQL wsrep XID in trx sys header. */
         if (wsrep_is_wsrep_xid(&trx->xid))
         {
-            trx_sys_update_wsrep_checkpoint(&trx->xid, mtr);
+            trx_sys_update_wsrep_checkpoint(&trx->xid, sys_header, mtr);
         }
 #endif /* WITH_WSREP */
 
@@ -1006,7 +1010,11 @@ trx_write_serialisation_history(
 		trx_sys_update_mysql_binlog_offset(
 			trx->mysql_log_file_name,
 			trx->mysql_log_offset,
-			TRX_SYS_MYSQL_LOG_INFO, mtr);
+			TRX_SYS_MYSQL_LOG_INFO,
+#ifdef WITH_WSREP
+                        sys_header,
+#endif /* WITH_WSREP */
+                        mtr);
 
 		trx->mysql_log_file_name = NULL;
 	}
