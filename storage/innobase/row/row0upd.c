@@ -1731,12 +1731,15 @@ row_upd_sec_index_entry(
 	trx_t*			trx	= thr_get_trx(thr);
 	ulint			mode	= BTR_MODIFY_LEAF;
 	enum row_search_result	search_result;
+#ifdef WITH_WSREP
+	ibool foreign;
+#endif /* WITH_WSREP */
 
 	index = node->index;
 
 	referenced = row_upd_index_is_referenced(index, trx);
 #ifdef WITH_WSREP
-	ibool foreign = wsrep_row_upd_index_is_foreign(index, trx);
+	foreign = wsrep_row_upd_index_is_foreign(index, trx);
 #endif /* WITH_WSREP */
 
 	heap = mem_heap_create(1024);
@@ -2423,14 +2426,16 @@ row_upd_clust_step(
 	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
 	ulint*		offsets;
 	ibool		referenced;
+#ifdef WITH_WSREP
+	ibool foreign;
+#endif /* WITH_WSREP */
 	rec_offs_init(offsets_);
 
 	index = dict_table_get_first_index(node->table);
 
 	referenced = row_upd_index_is_referenced(index, thr_get_trx(thr));
 #ifdef WITH_WSREP
-	ibool foreign = wsrep_row_upd_index_is_foreign(
-		index, thr_get_trx(thr));
+	foreign = wsrep_row_upd_index_is_foreign(index, thr_get_trx(thr));
 #endif /* WITH_WSREP */
 
 	pcur = node->pcur;
