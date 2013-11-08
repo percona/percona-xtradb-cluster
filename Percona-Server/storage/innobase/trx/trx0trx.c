@@ -999,9 +999,6 @@ trx_write_serialisation_history(
 /*============================*/
 	trx_t*		trx)	/*!< in: transaction */
 {
-#ifdef WITH_WSREP
-        trx_sysf_t* sys_header;
-#endif /* WITH_WSREP */
 	mtr_t		mtr;
 	trx_rseg_t*	rseg;
 	trx_sysf_t*	sys_header = NULL;
@@ -1076,9 +1073,6 @@ trx_write_serialisation_history(
 			trx->mysql_log_file_name,
 			trx->mysql_log_offset,
 			TRX_SYS_MYSQL_LOG_INFO,
-#ifdef WITH_WSREP
-                        sys_header,
-#endif /* WITH_WSREP */
                         &mtr);
 
 		trx->mysql_log_file_name = NULL;

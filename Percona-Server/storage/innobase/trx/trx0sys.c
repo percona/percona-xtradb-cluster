@@ -865,9 +865,6 @@ trx_sys_update_mysql_binlog_offset(
 	ib_int64_t	offset,	/*!< in: position in that log file */
 	ulint		field,	/*!< in: offset of the MySQL log info field in
 				the trx sys header */
-#ifdef WITH_WSREP
-        trx_sysf_t*     sys_header, /*!< in: trx sys header */
-#endif /* WITH_WSREP */
 	mtr_t*		mtr)	/*!< in: mtr */
 {
 #ifndef WITH_WSREP
