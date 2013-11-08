@@ -17,7 +17,10 @@
 ##############################################################################
 # Some common macro definitions
 ##############################################################################
-
+#
+Prefix: %{_prefix}
+Prefix: %{_sysconfdir}
+#
 # NOTE: "vendor" is used in upgrade/downgrade check, so you can't
 # change these, has to be exactly as is.
 %define mysql_old_vendor        MySQL AB
@@ -479,7 +482,7 @@ mkdir debug
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
-           -DCMAKE_BUILD_TYPE=Debug \
+           -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
@@ -500,7 +503,7 @@ mkdir release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
-           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+           -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
@@ -603,6 +606,8 @@ mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 
+install -d $RBR%{_sysconfdir}/ld.so.conf.d
+echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Delete the symlinks to the libraries from the libdir. These are created by
 # ldconfig(8) afterwards.
 rm -f $RBR%{_libdir}/libmysqlclient*.so.18
@@ -1163,9 +1168,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_libdir}/mysql/plugin/libmurmur_udf.so.0
 %attr(755, root, root) %{_libdir}/mysql/plugin/libmurmur_udf.so.0.0.0
 
-
-
-
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
 %endif
@@ -1240,6 +1242,7 @@ echo "====="                                     >> $STATUS_HISTORY
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
+%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysql*.so.*
 
