@@ -285,14 +285,10 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
     int rcode = 0;
 
     if (slave_threads > 1)
-        /* Need to check AUTOINC_LOCK_MODE and LOCKS_UNSAFE_FOR_BINLOG */
+        /* Need to check AUTOINC_LOCK_MODE */
     {
         long long autoinc_lock_mode;
         err = get_long_long (opts[AUTOINC_LOCK_MODE], &autoinc_lock_mode, 10);
-        if (err) return err;
-
-        bool locks_unsafe_for_binlog;
-        err = get_bool (opts[LOCKS_UNSAFE_FOR_BINLOG],&locks_unsafe_for_binlog);
         if (err) return err;
 
         if (autoinc_lock_mode != 2)
