@@ -68,7 +68,7 @@ handlerton *wsrep_hton;
 */
 void wsrep_register_hton(THD* thd, bool all)
 {
-  if (thd->wsrep_exec_mode != TOTAL_ORDER)
+  if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
     THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
     for (Ha_trx_info *i= trans->ha_list; WSREP(thd) && i; i = i->next())
@@ -411,7 +411,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
   {
-    WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %d\n"
+    WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %zu\n"
                "QUERY: %s\n"
                " => Skipping replication", 
                thd->thread_id, data_len, thd->query());

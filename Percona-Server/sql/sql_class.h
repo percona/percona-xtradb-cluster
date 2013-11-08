@@ -52,6 +52,8 @@ struct wsrep_thd_shadow {
   enum wsrep_exec_mode wsrep_exec_mode;
   Vio                  *vio;
   ulong                tx_isolation;
+  char                 *db;
+  size_t               db_length;
 };
 #endif
 class Reprepare_observer;
@@ -2428,6 +2430,7 @@ public:
   const char*               wsrep_TOI_pre_query; /* a query to apply before
                                                     the actual TOI query */
   size_t                    wsrep_TOI_pre_query_len;
+  bool                      wsrep_apply_toi; /* applier processing in TOI */
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
