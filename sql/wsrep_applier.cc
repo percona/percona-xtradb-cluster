@@ -316,6 +316,7 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     rcode = wsrep_rollback(thd, meta->gtid.seqno);
 
   thd->mdl_context.release_transactional_locks();
+  free_root(thd->mem_root,MYF(MY_KEEP_PREALLOC));
   thd->tx_isolation= (enum_tx_isolation) thd->variables.tx_isolation;
 
   if (wsrep_slave_count_change < 0 && commit && WSREP_CB_SUCCESS == rcode)
