@@ -1599,13 +1599,16 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if ((thd->wsrep_conflict_state != REPLAYING) &&
         (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT)) {
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
       thd->update_server_status();
       thd->protocol->end_statement();
       query_cache_end_of_result(thd);
+    } 
+    else
+    {
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
   } else { /* if (WSREP(thd))... */
 #endif /* WITH_WSREP */
   DBUG_ASSERT(thd->derived_tables == NULL &&
