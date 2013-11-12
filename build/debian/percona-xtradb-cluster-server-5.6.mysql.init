@@ -186,12 +186,12 @@ case "${1:-''}" in
 	        # Now start mysqlcheck or whatever the admin wants.
                 # only if the file /etc/mysql/DEBIAN-START is present.
                 if test -e /etc/mysql/DEBIAN-START;then
-	        output=$(/etc/mysql/debian-start)
+	            output=$(/etc/mysql/debian-start)
                     [ "$output" ] && log_action_msg "$output"
                 fi
+            else
                 log_startup_failure "Please take a look at the syslog."
                 log_end_msg 1
-		log_failure_msg "Please take a look at the syslog"
 	    fi
 	fi
 	;;
@@ -225,7 +225,7 @@ case "${1:-''}" in
         if ! mysqld_status check_dead warn; then
 	  log_end_msg 1
 	  log_failure_msg "Please stop MySQL (Percona XtraDB Cluster) manually and \
-	      read /usr/share/doc/percona-xtradb-cluster-server-5.5/README.Debian.gz!"
+	      read /usr/share/doc/percona-xtradb-cluster-server-5.6/README.Debian.gz!"
 	  exit -1
 	else
 	  log_end_msg 0
@@ -266,33 +266,56 @@ case "${1:-''}" in
 	fi
   	;;
   'bootstrap-pxc')
+        startup_sleep=10
 	sanity_checks;
 	# Start daemon
-	log_daemon_msg "Bootstrapping MySQL (Percona XtraDB Cluster) database server" "mysqld"
+	log_daemon_msg "Bootstrapping Percona XtraDB Cluster database server" "mysqld"
 	if mysqld_status check_alive nowarn; then
 	   log_progress_msg "already running"
 	   log_end_msg 0
 	else
-	     # Not enabled in code - will be in 5.5-24
              "${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-new-cluster > /dev/null 2>&1 &
-              #"${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-cluster-address="gcomm://" > /dev/null 2>&1 &
-	    # 6s was reported in #352070 to be too few when using ndbcluster
-	    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14; do
-                sleep 1
-	        if mysqld_status check_alive nowarn ; then break; fi
+  	    safe_pid=$!
+            avoid_race_condition="by checking again"
+
+	    for i in `seq 1 $startup_timeout`; do
+                test -s $pid_file && break
+
+                if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
+                    log_daemon_msg "SST in progress, setting sleep higher" "mysqld"
+                    startup_sleep=10
+                fi
+                # if server isn't running, then pid-file will never be updated
+                if test -n "$safe_pid"; then
+                    if kill -0 "$safe_pid" 2>/dev/null; then
+                        :  # the server still runs
+                    else
+                        # The server may have exited between the last pid-file check and now.  
+                        if test -n "$avoid_race_condition"; then
+                            avoid_race_condition=""
+                            continue  # Check again.
+                        fi
+
+                        log_failure_msg "The server quit without updating PID file ($pid_file)."
+                        log_end_msg 1
+                        exit 1  # not waiting any more.
+                    fi
+                fi
+                sleep $startup_sleep
 		log_progress_msg "."
 	    done
+	    sleep 1
             if mysqld_status check_alive warn; then
                 log_end_msg 0
                 # Now start mysqlcheck or whatever the admin wants.
-                # only if the file /etc/mysql/NO-DEBIAN-START is absent.
-                if ! test -e /etc/mysql/NO-DEBIAN-START;then
+                # only if the file /etc/mysql/DEBIAN-START is present.
+                if test -e /etc/mysql/DEBIAN-START;then
                     output=$(/etc/mysql/debian-start)
-                    [ -n "$output" ] && log_action_msg "$output"
+                    [ "$output" ] && log_action_msg "$output"
                 fi
             else
+                log_startup_failure "Please take a look at the syslog."
                 log_end_msg 1
-                log_failure_msg "Please take a look at the syslog"
             fi
 	fi
 	;;
