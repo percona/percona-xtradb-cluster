@@ -9814,7 +9814,8 @@ ha_innobase::wsrep_append_keys(
 	bool key_appended = false;
 	trx_t *trx = thd_to_trx(thd);
 
-	if (table_share && table_share->tmp_table  != NO_TMP_TABLE) {
+	if (table_share && table_share->tmp_table  != NO_TMP_TABLE &&
+	        thd->lex->sql_command != SQLCOM_CREATE_TABLE) {
 		WSREP_DEBUG("skipping tmp table DML: THD: %lu tmp: %d SQL: %s", 
 			    wsrep_thd_thread_id(thd),
 			    table_share->tmp_table,
