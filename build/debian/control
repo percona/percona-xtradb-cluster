@@ -6,7 +6,6 @@ Uploaders: Ignacio Nin <ignacio.nin@percona.com>
 Build-Depends: debhelper (>= 7.0.50), cmake, libtool, autoconf, libncurses5-dev, perl, bison, fakeroot, devscripts, libaio-dev, libpam-dev, dpatch, automake, libssl-dev
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
-Build-Depends: debhelper (>= 7.0.50), cmake, libtool, autoconf, libncurses5-dev, perl, bison, fakeroot, devscripts, libaio-dev, libpam-dev, dpatch, automake, libssl-dev
 Vcs-Bzr: lp:percona-xtradb-cluster
 
 Package: libmysqlclient18
