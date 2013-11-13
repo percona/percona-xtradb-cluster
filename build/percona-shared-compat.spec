@@ -48,9 +48,9 @@ Version:      %{version55}
 Release:      %{release}.%{gotrevision}.rhel%{redhatversion}
 BuildRoot:    %{_tmppath}/%{name}-%{version}-build
 %if "%{redhatversion}" == "5"
-Obsoletes:    MySQL-shared mysql
+Obsoletes:    MySQL-shared
 %else
-Obsoletes:    MySQL-shared mysql-libs
+Obsoletes:    MySQL-shared
 %endif
 Provides:     MySQL-shared mysql-libs
 Summary:      MySQL shared client libraries for MySQL %{version}, %{version50}, %{version41} and %{version40}
