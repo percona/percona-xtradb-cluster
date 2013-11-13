@@ -46,6 +46,7 @@ rlimit=""
 # Initially
 stagemsg="${WSREP_SST_OPT_ROLE}"
 cpat=""
+speciald=0
 
 sfmt="tar"
 strmcmd=""
@@ -284,6 +285,7 @@ read_cnf()
     fi
     rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use_extra 0)
+    speciald=$(parse_cnf sst sst-special-dirs 0)
 }
 
 get_stream()
@@ -499,7 +501,8 @@ get_stream
 get_transfer
 
 INNOEXTRA=""
-INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+INNOAPPLY="${INNOBACKUPEX_BIN} --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --move-back \${DATA} &>\${DATA}/innobackup.move.log"
 INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
@@ -604,6 +607,10 @@ then
     [[ -e $SST_PROGRESS_FILE ]] && wsrep_log_info "Stale sst_in_progress file: $SST_PROGRESS_FILE"
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
+    if [[ $speciald -eq 1 ]];then 
+        wsrep_log_info "WARNING: This requires updated Percona Xtrabackup with lp:1164945 fixed"
+    fi
+
     stagemsg="Joiner-Recv"
 
     if [[ ! -e ${DATA}/ibdata1 ]];then 
@@ -611,8 +618,7 @@ then
     fi
 
     if [[ $incremental -eq 1 ]];then 
-        wsrep_log_info "Incremental SST enabled"
-        #lsn=$(/pxc/bin/mysqld --defaults-file=$WSREP_SST_OPT_CONF  --basedir=/pxc  --wsrep-recover 2>&1 | grep -o 'log sequence number .*' | cut -d " " -f 4 | head -1)
+        wsrep_log_info "Incremental SST enabled: NOT SUPPORTED yet"
         lsn=$(grep to_lsn xtrabackup_checkpoints | cut -d= -f2 | tr -d ' ')
         wsrep_log_info "Recovered LSN: $lsn"
     fi
@@ -669,6 +675,10 @@ then
     then
         wsrep_log_info "Proceeding with SST"
 
+        if [[ $speciald -eq 1 && -d ${DATA}/.sst ]];then 
+            wsrep_log_error "Stale temporary SST directory: ${DATA}/.sst, SST may fail"
+        fi
+
         if [[ $incremental -ne 1 ]];then 
             wsrep_log_info "Cleaning the existing datadir"
             find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
@@ -676,6 +686,14 @@ then
             wsrep_log_info "Removing existing ib_logfile files"
             rm -f ${BDATA}/ib_logfile*
         fi
+
+
+        if [[ $speciald -eq 1 ]];then 
+            mkdir -p ${DATA}/.sst
+            TDATA=${DATA}
+            DATA="${DATA}/.sst"
+        fi
+
 
         MAGIC_FILE="${DATA}/${INFO_FILE}"
         recv_joiner $DATA "${stagemsg}-SST" 0 
@@ -745,17 +763,36 @@ then
         wsrep_log_info "Preparing the backup at ${DATA}"
         timeit "Xtrabackup prepare stage" "$INNOAPPLY"
 
+        if [ $? -ne 0 ];
+        then
+            wsrep_log_error "${INNOBACKUPEX_BIN} apply finished with errors. Check ${DATA}/innobackup.prepare.log" 
+            exit 22
+        fi
+
+        if [[ $speciald -eq 1 ]];then 
+            MAGIC_FILE="${TDATA}/${INFO_FILE}"
+            wsrep_log_info "Moving the backup to ${TDATA}"
+            timeit "Xtrabackup move stage" "$INNOMOVE"
+            if [[ $? -eq 0 ]];then 
+                wsrep_log_info "Move successful, removing ${DATA}"
+                set +e
+                mv $DATA/innobackup.prepare.log $TDATA/
+                mv $DATA/innobackup.move.log $TDATA/
+                set -e
+                rm -rf $DATA
+                DATA=${TDATA}
+            else 
+                wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis"
+                wsrep_log_error "Check ${DATA}/innobackup.move.log for details"
+            fi
+        fi
+
         if [[ $incremental -eq 1 ]];then 
             wsrep_log_info "Cleaning up ${DATA} after incremental SST"
             [[ -d ${DATA} ]] && rm -rf ${DATA}
             DATA=$BDATA
         fi
 
-        if [ $? -ne 0 ];
-        then
-            wsrep_log_error "${INNOBACKUPEX_BIN} finished with errors. Check ${DATA}/innobackup.prepare.log" 
-            exit 22
-        fi
     else 
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi
