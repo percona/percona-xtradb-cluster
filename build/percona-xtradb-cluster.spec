@@ -17,7 +17,6 @@
 ##############################################################################
 # Some common macro definitions
 ##############################################################################
-#
 Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 #
@@ -297,7 +296,6 @@ Group:          Applications/Databases
 Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
 Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
 Conflicts:	Percona-Server-client-56 Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
-
 %description -n Percona-XtraDB-Cluster-client%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
@@ -357,6 +355,7 @@ Percona recommends that all production deployments be protected with a support
 contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
+%description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 This package contains the development header files and libraries necessary
 to develop Percona XtraDB Cluster client applications.
 
