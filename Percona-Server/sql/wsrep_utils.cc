@@ -329,34 +329,32 @@ unsigned int wsrep_check_ip (const char* const addr)
   hints.ai_socktype= SOCK_STREAM;
   hints.ai_family= AF_UNSPEC;
 
-  int gai_ret = getaddrinfo(addr, NULL, &hints, &res);
-  if (0 == gai_ret)
+  if (strcasecmp(my_bind_addr_str, MY_BIND_ALL_ADDRESSES) != 0)
   {
-    if (AF_INET == res->ai_family) /* IPv4 */
+    int gai_ret = getaddrinfo(addr, NULL, &hints, &res);
+    if (0 == gai_ret)
     {
-      struct sockaddr_in* a= (struct sockaddr_in*)res->ai_addr;
-      ret= htonl(a->sin_addr.s_addr);
+        if (AF_INET == res->ai_family) /* IPv4 */
+        {
+            struct sockaddr_in* a= (struct sockaddr_in*)res->ai_addr;
+            ret= htonl(a->sin_addr.s_addr);
+        }
+        else /* IPv6 */
+        {
+            struct sockaddr_in6* a= (struct sockaddr_in6*)res->ai_addr;
+            if (IN6_IS_ADDR_UNSPECIFIED(&a->sin6_addr))
+                ret= INADDR_ANY;
+            else if (IN6_IS_ADDR_LOOPBACK(&a->sin6_addr))
+                ret= INADDR_LOOPBACK;
+            else
+                ret= 0xdeadbeef;
+        }
+        freeaddrinfo (res);
+    } else {
+        WSREP_ERROR ("getaddrinfo() failed on '%s': %d (%s)",
+                    addr, gai_ret, gai_strerror(gai_ret));
     }
-    else /* IPv6 */
-    {
-      struct sockaddr_in6* a= (struct sockaddr_in6*)res->ai_addr;
-      if (IN6_IS_ADDR_UNSPECIFIED(&a->sin6_addr))
-        ret= INADDR_ANY;
-      else if (IN6_IS_ADDR_LOOPBACK(&a->sin6_addr))
-        ret= INADDR_LOOPBACK;
-      else
-        ret= 0xdeadbeef;
-    }
-    freeaddrinfo (res);
   }
-  else {
-    WSREP_ERROR ("getaddrinfo() failed on '%s': %d (%s)",
-                 addr, gai_ret, gai_strerror(gai_ret));
-  }
-
-  // uint8_t* b= (uint8_t*)&ret;
-  // fprintf (stderr, "########## wsrep_check_ip returning: %hhu.%hhu.%hhu.%hhu\n",
-  //          b[0], b[1], b[2], b[3]);
 
   return ret;
 }
@@ -377,7 +375,7 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
       return 0;
     }
 
-    if (INADDR_ANY != ip_type) {;
+    if (INADDR_ANY != ip_type) {
       strncpy (buf, my_bind_addr_str, buf_len);
       return strlen(buf);
     }
