@@ -139,7 +139,7 @@ EOF
     # Debian: beware of the bashisms... 
     # Debian: can safely run on upgrades with existing databases 
     set +e
-    /bin/bash ${PERCONA_PREFIX}/bin/mysql_install_db --user=mysql --rpm 2>&1 |
+    ${PERCONA_PREFIX}/bin/mysql_install_db --user=mysql --rpm 2>&1 |
         $ERR_LOGGER
     if [ "$?" != "0" ]; then
       echo "ATTENTION: An error has occured. More info is in the syslog!"
