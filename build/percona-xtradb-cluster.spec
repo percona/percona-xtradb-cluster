@@ -17,7 +17,6 @@
 ##############################################################################
 # Some common macro definitions
 ##############################################################################
-
 Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 # NOTE: "vendor" is used in upgrade/downgrade check, so you can't
@@ -30,7 +29,7 @@ Prefix: %{_sysconfdir}
 %define mysql_version   5.6.14
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define majorversion 61
-%define minorversion 0
+%define minorversion 1
 %define distribution  rhel%{redhatversion}
 %define percona_server_version	%{wsrep_version}
 
@@ -45,7 +44,7 @@ Prefix: %{_sysconfdir}
 %endif
 
 %define release_tag	%{nil}
-%define release         rel%{release_tag}%{wsrep_version}.%{revision}.%{distribution}
+%define release         %{release_tag}%{wsrep_version}.%{gotrevision}.%{distribution}
 
 #
 # Macros we use which are not available in all supported versions of RPM
@@ -273,7 +272,7 @@ Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera%{product_suffix} xtrabackup >= 1.9.0 tar socat rsync iproute
 Provides:       mysql-server MySQL-server Percona-Server-server
-Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55
+Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -283,7 +282,7 @@ multi-master replication, parallel applying on slaves, automatic node
 provisioning with primary focus on data consistency.
 
 Percona recommends that all production deployments be protected with a support
-contract (http://www.percona.com/mysql-suppport/) to ensure the highest uptime,
+contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
 This package includes the Percona XtraDB Cluster binary 
@@ -470,6 +469,7 @@ mkdir debug
            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
+           -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
@@ -491,6 +491,7 @@ mkdir release
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
+           -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \

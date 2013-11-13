@@ -1,4 +1,4 @@
-percona-xtradb-cluster-5.6 (5.6.14-rel62.0) unstable; urgency=low
+percona-xtradb-cluster-5.6 (5.6.14-rel61.1) unstable; urgency=low
 
   * Ported to PXC 5.6.
 
