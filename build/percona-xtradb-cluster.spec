@@ -369,7 +369,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared mysql-libs Percona-Server-shared
-Obsoletes:	mysql-libs
+Conflicts:      Percona-Server-shared-56
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
