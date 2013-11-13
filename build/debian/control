@@ -80,7 +80,7 @@ Description: Percona Server database client binaries
 
 Package: percona-xtradb-cluster-server-5.6
 Architecture: any
-Suggests: tinyca
+Suggests: tinyca, netcat-openbsd, pv, qpress
 Depends: percona-xtradb-cluster-client-5.6 (>= ${source:Version}), libdbi-perl, libdbd-mysql-perl, perl (>= 5.6), ${shlibs:Depends}, ${misc:Depends}, psmisc, passwd, lsb-base (>= 3.0-10), percona-xtradb-cluster-common-5.6 (>= ${source:Version}), percona-xtradb-cluster-galera, adduser (>= 3.40), debconf, percona-xtrabackup (>= 1.9.0) | percona-xtrabackup-20, tar, socat, rsync, iproute
 Conflicts: mysql-server (<< ${source:Version}), mysql-server-4.1, mysql-server-5.6, mysql-server-core-5.1, mysql-server-core-5.6, percona-xtradb-server-5.0, percona-server-server-5.1, percona-server-server-5.5, percona-server-server-5.6
 Provides: mysql-server, mysql-server-core, mysql-server-5.6, mysql-server-core-5.6
