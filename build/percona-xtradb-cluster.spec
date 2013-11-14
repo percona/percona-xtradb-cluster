@@ -857,6 +857,7 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
         %{_bindir}/mysql_install_db --rpm --user=%{mysqld_user} \
             --datadir=$mysql_datadir
     fi
+fi
 
 # ----------------------------------------------------------------------
 # Upgrade databases if needed would go here - but it cannot be automated yet
