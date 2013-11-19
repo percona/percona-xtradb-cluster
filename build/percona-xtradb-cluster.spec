@@ -355,7 +355,6 @@ Percona recommends that all production deployments be protected with a support
 contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
-%description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 This package contains the development header files and libraries necessary
 to develop Percona XtraDB Cluster client applications.
 
