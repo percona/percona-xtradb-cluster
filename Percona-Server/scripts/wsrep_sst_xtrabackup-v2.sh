@@ -609,6 +609,8 @@ then
 
     if [[ $speciald -eq 1 ]];then 
         wsrep_log_info "WARNING: This requires updated Percona Xtrabackup with lp:1164945 fixed"
+        wsrep_log_info "WARNING: Not enabled in this release yet"
+        exit 22
     fi
 
     stagemsg="Joiner-Recv"
