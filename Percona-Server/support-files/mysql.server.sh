@@ -185,7 +185,7 @@ wait_for_pid () {
       fi
     fi
 
-    if (test -e $sst_progress_file || $mode == 'bootstrap-pxc') && [ $startup_sleep -ne 10 ];then
+    if (test -e $sst_progress_file || [ $mode = 'bootstrap-pxc' ]) && [ $startup_sleep -ne 10 ];then
         echo "SST in progress, setting sleep higher"
         startup_sleep=10
     fi
