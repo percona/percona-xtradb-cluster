@@ -373,11 +373,8 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
     unsigned int const ip_type= wsrep_check_ip(my_bind_addr_str);
 
     if (INADDR_NONE == ip_type) {
-      WSREP_ERROR("Networking not configured, cannot receive state transfer.");
-      return 0;
-    }
-
-    if (INADDR_ANY != ip_type) {;
+      WSREP_ERROR("Node IP address not obtained from bind_address, trying alternate methods");
+    } else if (INADDR_ANY != ip_type) {
       strncpy (buf, my_bind_addr_str, buf_len);
       return strlen(buf);
     }
