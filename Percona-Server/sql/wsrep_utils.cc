@@ -404,8 +404,8 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
 
   // try to find the address of the first one
 #if (TARGET_OS_LINUX == 1)
-  const char cmd[] = "ip addr show | grep -E '^\\s*inet' | grep -m1 global |"
-                     " awk '{ print $2 }' | sed 's/\\/.*//'";
+  const char cmd[] = "ip addr show | grep -E '^[ ]*inet' | grep -m1 global | "
+                     "awk '{ print $2 }' | sed -e 's/\\/.*//'";
 #elif defined(__sun__)
   const char cmd[] = "/sbin/ifconfig -a | "
       "/usr/gnu/bin/grep -m1 -1 -E 'net[0-9]:' | tail -n 1 | awk '{ print $2 }'";
