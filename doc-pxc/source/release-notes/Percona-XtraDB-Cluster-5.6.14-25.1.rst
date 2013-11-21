@@ -4,7 +4,7 @@
  |Percona XtraDB Cluster| 5.6.14-25.1
 ======================================
 
-Percona is glad to announce the first Beta release of |Percona XtraDB Cluster| 5.6 on November 21st, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/5.6.14-25.1/>`_ or from our :doc:`software repositories </installation>`.
+Percona is glad to announce the first Beta release of |Percona XtraDB Cluster| 5.6 on November 21st, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/release-5.6.14-25.1/>`_ or from our :doc:`software repositories </installation>`.
 
 Based on `Percona Server 5.6.14-62.0 <http://www.percona.com/doc/percona-server/5.6/release-notes/Percona-Server-5.6.14-62.0.html>`_ including all the bug fixes in it, `Galera Replicator 3.1 <https://launchpad.net/galera/3.x/25.3.1>`_ and on `Codership wsrep API 5.6.14-25.1 <https://launchpad.net/codership-mysql/5.6/5.6.14-25.1>`_ is now the first **BETA** release. All of |Percona|'s software is open-source and free, all the details of the release can be found in the `5.6.14-25.1 milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/5.6.14-25.1>`_ at Launchpad.
 
