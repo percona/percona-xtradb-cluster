@@ -49,14 +49,14 @@ That is MySQL replication does not guarantee Consistency of your data, while Per
 Components
 ==========
 
-*Percona XtraDB Cluster* is based on `Percona Server with XtraDB <http://www.percona.com/software/percona-server/>`_
+|Percona XtraDB Cluster| is based on `Percona Server with XtraDB <http://www.percona.com/software/percona-server/>`_
 and includes `Write Set Replication patches <https://launchpad.net/codership-mysql>`_.
-It uses  the  `Galera library <https://launchpad.net/galera>`_, version 2.x, 
+It uses  the  `Galera library <https://launchpad.net/galera>`_, version 3.x, 
 a generic Synchronous Multi-Master replication plugin for transactional applications. 
 
 Galera library is developed by `Codership Oy <http://www.codership.com/>`_.
 
-Galera 2.x supports such new features as:
+Galera 3.x supports such new features as:
  * Incremental State Transfer (|IST|), especially useful for WAN deployments,
  * RSU, Rolling Schema Update. Schema change does not block operations against table.
 

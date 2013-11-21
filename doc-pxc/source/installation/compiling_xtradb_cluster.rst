@@ -4,7 +4,7 @@
 
 The source code is available from the *Launchpad* project `here <https://launchpad.net/percona-xtradb-cluster>`_. The easiest way to get the code is with :command:`bzr branch` of the desired release, such as the following: ::
 
-  bzr branch lp:percona-xtradb-cluster
+  bzr branch lp:percona-xtradb-cluster/5.6
 
 You should then have a directory named after the release you branched, such as ``percona-xtradb-cluster``.
 
