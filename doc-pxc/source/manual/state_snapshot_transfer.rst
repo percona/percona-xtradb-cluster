@@ -20,32 +20,21 @@ More information about the required credentials can be found in the |XtraBackup|
 
   innobackupex --user=root --password=Passw0rd /tmp/
  
-Script used for this method can be found in :file:`/usr/bin/wsrep_sst_xtrabackup` and it's provided with the |PXC| binary packages.
-
-After :rn:`5.5.31-23.7.5` this method introduced the new :file:`my.cnf` option which can be used to set |XtraBackup| streaming option: :: 
-
-  [sst]
-  streamfmt=xbstream 
-
-Currently supported formats are tar (default, used in previous releases) and `xbstream <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_. Some of the benefits of choosing the xbstream over tar is that it supports more advanced features like `encrypted <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/encrypted_backups_innobackupex.html>`_, `compact <http://www.percona.com/doc/percona-xtrabackup/2.1/xbstream/xbstream.html>`_ and `compressed <http://www.percona.com/doc/percona-xtrabackup/2.1/innobackupex/streaming_backups_innobackupex.html#examples-using-xbstream>`_ backups.
-
-.. note::
-
-  Currently there is a limitations when using the ``xbstream`` option that the :term:`datadir` needs to be empty before starting the SST or otherwise the process will fail and the node will not be able to join the cluster.
+Script used for this method can be found in :file:`/usr/bin/wsrep_sst_xtrabackup` and it's provided with the |Percona XtraDB Cluster| binary packages. Detailed information on this method are provided in :ref:`xtrabackup_sst` documentation.
 
 Using ``mysqldump``
 ===================
 
 This method uses the standard :program:`mysqldump` to dump all the databases from the donor node and import them to the joining node. For this method to work :variable:`wsrep_sst_auth` needs to be set up with the root credentials. This method is the slowest one and it also performs the global lock while doing the |SST| which will block writes to the donor node.
 
-Script used for this method can be found in :file:`/usr/bin/wsrep_sst_mysqldump` and it's provided with the |PXC| binary packages.
+Script used for this method can be found in :file:`/usr/bin/wsrep_sst_mysqldump` and it's provided with the |Percona XtraDB Cluster| binary packages.
 
 Using ``rsync``
 ===============
 
 This method uses :program:`rsync` to copy files from donor to the joining node. In some cases this can be faster than using the |XtraBackup| but requires the global data lock which will block writes to the donor node. This method doesn't require username/password credentials to be set up in the variable :variable:`wsrep_sst_auth`.
 
-Script used for this method can be found in :file:`/usr/bin/wsrep_sst_rsync` and it's provided with the |PXC| binary packages.
+Script used for this method can be found in :file:`/usr/bin/wsrep_sst_rsync` and it's provided with the |Percona XtraDB Cluster| binary packages.
 
 Other Reading
 =============

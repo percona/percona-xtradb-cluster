@@ -34,11 +34,6 @@ In case cluster that's being bootstrapped has already been set up before, and to
 
 This way values in :file:`my.cnf` would remain unchanged. Next time node is restarted it won't require updating the configuration file. This can be useful in case cluster has been previously set up and for some reason all nodes went down and the cluster needs to be bootstrapped again. 
 
-Version Specific Information
-============================
-
- * :rn:`5.5.31-23.7.5` - New bootstrap init script option ``bootstrap-pxc`` introduced.
-
 Other Reading
 =============
 
