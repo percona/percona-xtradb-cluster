@@ -4,7 +4,7 @@
  |Percona XtraDB Cluster| 5.6.14-25.1
 ======================================
 
-Percona is glad to announce the first Beta release of |Percona XtraDB Cluster| 5.6 on November 21st, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.6.14-25.1/>`_ or from our :doc:`software repositories </installation>`.
+Percona is glad to announce the first Beta release of |Percona XtraDB Cluster| 5.6 on November 21st, 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/5.6.14-25.1/>`_ or from our :doc:`software repositories </installation>`.
 
 Based on `Percona Server 5.6.14-62.0 <http://www.percona.com/doc/percona-server/5.6/release-notes/Percona-Server-5.6.14-62.0.html>`_ including all the bug fixes in it, `Galera Replicator 3.1 <https://launchpad.net/galera/3.x/25.3.1>`_ and on `Codership wsrep API 5.6.14-25.1 <https://launchpad.net/codership-mysql/5.6/5.6.14-25.1>`_ is now the first **BETA** release. All of |Percona|'s software is open-source and free, all the details of the release can be found in the `5.6.14-25.1 milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/5.6.14-25.1>`_ at Launchpad.
 
@@ -13,7 +13,7 @@ This release contains all of the features and bug fixes in `Percona XtraDB Clust
 New Features
 ============
 
- |Percona XtraDB Cluster| is now using `Galera Replicator 3.1 <https://launchpad.net/galera/3.x/25.3.1>`_ and `Codership wsrep API 5.6.14-25.1 <https://launchpad.net/codership-mysql/5.6/5.6.14-25.1>`_.
+ |Percona XtraDB Cluster| is now using `Galera Replicator 3.1 <https://launchpad.net/galera/3.x/25.3.1>`_ and `wsrep API 5.6.14-25.1 <https://launchpad.net/codership-mysql/5.6/5.6.14-25.1>`_.
 
  |Percona XtraDB Cluster| has implemented a number of `XtraDB performance improvements <http://www.percona.com/doc/percona-server/5.6/performance/xtradb_performance_improvements_for_io-bound_highly-concurrent_workloads.html>`_ for I/O-bound high-concurrency workloads. 
 
@@ -52,7 +52,7 @@ Bugs fixed
 
  Server could freeze with mixed DML/DDL load because TOI brute force aborts were not properly propagated. Bug fixed :bug:`1239571`.
 
- ``CREATE TABLE AS SELECT`` would fail with explicit temporary tables, when was binlogging enabled and :variable:`autocommit` was set to ``0``. Bug fixed :bug:`1240098`.
+ ``CREATE TABLE AS SELECT`` would fail with explicit temporary tables, when binlogging was enabled and :variable:`autocommit` was set to ``0``. Bug fixed :bug:`1240098`.
 
  Transaction cleanup function did not get called for autocommit statements after rollback, it would stay in ``LOCAL_COMMIT`` even after rollback finished which caused problems when the next transaction started. Bug fixed :bug:`1240567`.
 
