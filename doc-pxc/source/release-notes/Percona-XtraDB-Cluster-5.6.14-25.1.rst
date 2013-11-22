@@ -74,5 +74,10 @@ Bugs fixed
 
 Other bugs fixed: bug fixed :bug:`1020457`, bug fixed :bug:`1250865`, bug fixed :bug:`1249753`, bug fixed :bug:`1248396`, bug fixed :bug:`1247980`, bug fixed :bug:`1238278`, bug fixed :bug:`1234421`, bug fixed :bug:`1228341`, bug fixed :bug:`1228333`, bug fixed :bug:`1225236`, bug fixed :bug:`1221354`, bug fixed :bug:`1217138`, bug fixed :bug:`1206648`, bug fixed :bug:`1200647`, bug fixed :bug:`1180792`, bug fixed :bug:`1163283`, bug fixed :bug:`1234229`, bugs fixed :bug:`1250805`, bug fixed :bug:`1233301`, and bug fixed :bug:`1210509`.
 
+Note
+=======  
+
+ Since this release introduces galera-3 packages to the repo (in addition to existing galera-2.x packages), you will need to explicitly specify galera package required (2.x for 5.5, 3.x for 5.6) during installation.
+
 We did our best to eliminate bugs and problems during the testing release, but this is a software, so bugs are expected. If you encounter them, please report them to our `bug tracking system <https://bugs.launchpad.net/percona-xtradb-cluster/+filebug>`_.
 
