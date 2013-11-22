@@ -91,7 +91,7 @@ Assuming we are going to upgrade node A, (and other nodes B and C are on 5.5)
 
 **Step #4** Install the new packages: ::
 
-    # apt-get install percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6 percona-xtrabackup
+    # apt-get install percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6 percona-xtrabackup percona-xtradb-cluster-galera-3.x
 
 **Step #5** After node has been started you'll need to run ``mysql_upgrade``: ::
 
