@@ -5303,8 +5303,17 @@ void TABLE::mark_columns_needed_for_delete()
         in mark_columns_per_binlog_row_image, if not, then use
         the hidden primary key
       */
+#ifdef WITH_WSREP
+      /* this does not affect wsrep patch as long as we use RBR only,
+	 but this condition is just preparing for possible future STATEMENT 
+	 format support
+      */
+      if (!((WSREP_EMULATE_BINLOG(current_thd) || mysql_bin_log.is_open()) && 
+          in_use && in_use->is_current_stmt_binlog_format_row()))
+#else
       if (!(mysql_bin_log.is_open() && in_use &&
           in_use->is_current_stmt_binlog_format_row()))
+#endif /* WITH_WSREP */
         file->use_hidden_primary_key();
     }
     else
@@ -5370,8 +5379,17 @@ void TABLE::mark_columns_needed_for_update()
         in mark_columns_per_binlog_row_image, if not, then use
         the hidden primary key
       */
+#ifdef WITH_WSREP
+      /* this does not affect wsrep patch as long as we use RBR only,
+	 but this condition is just preparing for possible future STATEMENT 
+	 format support
+      */
+      if (!((WSREP_EMULATE_BINLOG(current_thd) || mysql_bin_log.is_open()) && 
+          in_use && in_use->is_current_stmt_binlog_format_row()))
+#else
       if (!(mysql_bin_log.is_open() && in_use &&
           in_use->is_current_stmt_binlog_format_row()))
+#endif /* WITH_WSREP */
         file->use_hidden_primary_key();
     }
     else

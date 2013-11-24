@@ -690,7 +690,12 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
     replication as it allows other connections to drop these tables before
     rollback to savepoint is written to the binlog.
   */
+#ifdef WITH_WSREP
+  bool binlog_on= (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) && 
+    thd->variables.sql_log_bin;
+#else
   bool binlog_on= mysql_bin_log.is_open() && thd->variables.sql_log_bin;
+#endif /* WITH_WSREP */
   if (!res && !binlog_on)
     thd->mdl_context.rollback_to_savepoint(sv->mdl_savepoint);
 
