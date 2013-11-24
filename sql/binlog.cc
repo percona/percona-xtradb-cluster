@@ -7547,10 +7547,16 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     binlogging is off, or if the statement is filtered out from the
     binlog by filtering rules.
   */
+#ifdef WITH_WSREP
+  if ((WSREP_EMULATE_BINLOG(this) || 
+       (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG))) &&
+      !(WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT    &&
+	!binlog_filter->db_ok(db)))
+#else
   if (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG) &&
       !(variables.binlog_format == BINLOG_FORMAT_STMT &&
-      !(WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT &&
-        !binlog_filter->db_ok(db))))
+        !binlog_filter->db_ok(db)))
+#endif /* WITH_WSREP */
   {
     /*
       Compute one bit field with the union of all the engine

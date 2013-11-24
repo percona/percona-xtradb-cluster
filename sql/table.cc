@@ -5423,9 +5423,15 @@ void TABLE::mark_columns_per_binlog_row_image()
     If in RBR we may need to mark some extra columns,
     depending on the binlog-row-image command line argument.
    */
+#ifdef WITH_WSREP
+  if (((WSREP_EMULATE_BINLOG(current_thd) || mysql_bin_log.is_open()) && 
+       in_use && in_use->is_current_stmt_binlog_format_row()          &&
+       !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT)))
+#else
   if ((mysql_bin_log.is_open() && in_use &&
        in_use->is_current_stmt_binlog_format_row() &&
        !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT)))
+#endif /* WITH_WSREP */
   {
 
     THD *thd= current_thd;
