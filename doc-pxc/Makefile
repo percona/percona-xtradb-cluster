@@ -40,7 +40,7 @@ clean:
 
 source/percona-theme/built:
 	@echo "Downloading percona-theme ..."
-	@wget -O percona-theme.tar.gz http://percona.com/docs/theme/percona-xtradb-cluster
+	@wget -O percona-theme.tar.gz http://percona.com/docs/theme/percona-xtradb-cluster/5.6/
 	@echo "Extracting theme."
 	@tar -zxf percona-theme.tar.gz
 	@rm -rf source/percona-theme
