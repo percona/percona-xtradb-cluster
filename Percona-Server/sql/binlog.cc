@@ -875,7 +875,7 @@ binlog_trans_log_savepos(THD *thd, my_off_t *pos)
   DBUG_ASSERT((WSREP_EMULATE_BINLOG(thd)) || mysql_bin_log.is_open());
 #else
   DBUG_ASSERT(mysql_bin_log.is_open());
-#endif
+#endif /* WITH_WSREP */
   *pos= cache_mngr->trx_cache.get_byte_position();
   DBUG_PRINT("return", ("position: %lu", (ulong) *pos));
   DBUG_VOID_RETURN;
@@ -5093,7 +5093,7 @@ MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
   DBUG_ASSERT(WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
 #else
   DBUG_ASSERT(mysql_bin_log.is_open());
-#endif
+#endif /* WITH_WSREP */
   DBUG_PRINT("enter", ("event: 0x%lx", (long) event));
 
   int error= 0;
@@ -7403,7 +7403,7 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional,
 	      (WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open()));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
-#endif
+#endif /* WITH_WSREP */
   DBUG_ASSERT(table->s->table_map_id.is_valid());
 
   Table_map_log_event
@@ -7642,10 +7642,16 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     binlogging is off, or if the statement is filtered out from the
     binlog by filtering rules.
   */
+#ifdef WITH_WSREP
+  if ((WSREP_EMULATE_BINLOG(this) || 
+       (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG))) &&
+      !(WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT    &&
+	!binlog_filter->db_ok(db)))
+#else
   if (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG) &&
       !(variables.binlog_format == BINLOG_FORMAT_STMT &&
-      !(WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT &&
-        !binlog_filter->db_ok(db))))
+        !binlog_filter->db_ok(db)))
+#endif /* WITH_WSREP */
   {
     /*
       Compute one bit field with the union of all the engine
@@ -8400,11 +8406,10 @@ int THD::binlog_write_row(TABLE* table, bool is_trans,
 { 
 #ifdef WITH_WSREP
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
-	      ((WSREP(this) && wsrep_emulate_bin_log) ||
-	       mysql_bin_log.is_open()));
+	      ((WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open())));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
-#endif
+#endif /* WITH_WSREP */
 
   /*
     Pack records into format for transfer. We are allocating more
@@ -8436,11 +8441,10 @@ int THD::binlog_update_row(TABLE* table, bool is_trans,
 { 
 #ifdef WITH_WSREP
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
-	      ((WSREP(this) && wsrep_emulate_bin_log)
-	       || mysql_bin_log.is_open()));
+	      ((WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open())));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
-#endif
+#endif /* WITH_WSREP */
 
   int error= 0;
 
@@ -8509,11 +8513,10 @@ int THD::binlog_delete_row(TABLE* table, bool is_trans,
 { 
 #ifdef WITH_WSREP
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
-	      ((WSREP(this) && wsrep_emulate_bin_log)
-	       || mysql_bin_log.is_open()));
+	      ((WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open())));
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
-#endif
+#endif /* WITH_WSREP */
 
   int error= 0;
 
@@ -8636,7 +8639,7 @@ int THD::binlog_flush_pending_rows_event(bool stmt_end, bool is_transactional)
   if (!(WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open()))
 #else
  if (!mysql_bin_log.is_open())
-#endif
+#endif /* WITH_WSREP */
     DBUG_RETURN(0);
 
   /*
@@ -8935,7 +8938,7 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, char const *query_arg,
 			    || mysql_bin_log.is_open()));
 #else
   DBUG_ASSERT(query_arg && mysql_bin_log.is_open());
-#endif
+#endif /* WITH_WSREP */
 
   if (get_binlog_local_stmt_filter() == BINLOG_FILTER_SET)
   {
