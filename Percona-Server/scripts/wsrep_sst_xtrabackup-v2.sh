@@ -47,6 +47,8 @@ rlimit=""
 stagemsg="${WSREP_SST_OPT_ROLE}"
 cpat=""
 speciald=0
+ib_home_dir=""
+ib_log_dir=""
 
 sfmt="tar"
 strmcmd=""
@@ -502,7 +504,7 @@ get_transfer
 
 INNOEXTRA=""
 INNOAPPLY="${INNOBACKUPEX_BIN} --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --move-back \${DATA} &>\${DATA}/innobackup.move.log"
+INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
 INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
@@ -613,6 +615,11 @@ then
         exit 22
     fi
 
+    if [[ $speciald -eq 1 ]];then 
+        ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
+        ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
+    fi
+
     stagemsg="Joiner-Recv"
 
     if [[ ! -e ${DATA}/ibdata1 ]];then 
@@ -682,8 +689,13 @@ then
         fi
 
         if [[ $incremental -ne 1 ]];then 
-            wsrep_log_info "Cleaning the existing datadir"
-            find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+            if [[ $speciald -eq 1 ]];then 
+                wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
+                find $ib_home_dir $ib_log_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+            else 
+                wsrep_log_info "Cleaning the existing datadir"
+                find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+            fi
         else
             wsrep_log_info "Removing existing ib_logfile files"
             rm -f ${BDATA}/ib_logfile*
@@ -773,14 +785,13 @@ then
 
         if [[ $speciald -eq 1 ]];then 
             MAGIC_FILE="${TDATA}/${INFO_FILE}"
+            set +e
+            rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
+            set -e
             wsrep_log_info "Moving the backup to ${TDATA}"
             timeit "Xtrabackup move stage" "$INNOMOVE"
             if [[ $? -eq 0 ]];then 
                 wsrep_log_info "Move successful, removing ${DATA}"
-                set +e
-                mv $DATA/innobackup.prepare.log $TDATA/
-                mv $DATA/innobackup.move.log $TDATA/
-                set -e
                 rm -rf $DATA
                 DATA=${TDATA}
             else 
