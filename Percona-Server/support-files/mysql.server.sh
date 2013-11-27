@@ -378,6 +378,12 @@ case "$mode" in
         rm "$mysqld_pid_file_path"
       fi
 
+      # To avoid the race condition involved in restarts with PID file.
+      if (kill -0 $mysqld_pid 2>/dev/null)
+      then
+          sleep 2
+      fi
+
       # Delete lock for RedHat / SuSE
       if test -f "$lock_file_path"
       then
