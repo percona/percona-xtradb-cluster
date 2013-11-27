@@ -117,7 +117,7 @@ Prefix: %{_sysconfdir}
 # ----------------------------------------------------------------------------
 # Product and server suffixes
 # ----------------------------------------------------------------------------
-%define product_suffix %{nil}
+%define product_suffix -55
 %if %{undefined product_suffix}
   %if %{defined short_product_tag}
     %define product_suffix      -%{short_product_tag}
