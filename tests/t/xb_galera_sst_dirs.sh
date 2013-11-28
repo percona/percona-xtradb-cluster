@@ -37,6 +37,9 @@ log1="/tmp/var-test/log1"
 data2="/tmp/var-test/data2"
 log2="/tmp/var-test/log2"
 
+vlog "Initial cleanup"
+rm -rf $data1 $log1 $data2 $log2
+
 mkdir -p $data1 $log1 $data2 $log2
 
 vlog "Starting server $node1"
