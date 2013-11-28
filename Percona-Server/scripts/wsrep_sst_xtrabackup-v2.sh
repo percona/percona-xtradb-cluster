@@ -610,9 +610,7 @@ then
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     if [[ $speciald -eq 1 ]];then 
-        wsrep_log_info "WARNING: This requires updated Percona Xtrabackup with lp:1164945 fixed"
-        wsrep_log_info "WARNING: Not enabled in this release yet"
-        exit 22
+        wsrep_log_info "WARNING: This feature requires PXC 2.1.6 or latter."
     fi
 
     if [[ $speciald -eq 1 ]];then 
