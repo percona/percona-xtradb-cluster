@@ -23,6 +23,7 @@ WITH_SSL='/usr'
 OPENSSL_INCLUDE=''
 OPENSSL_LIBRARY=''
 CRYPTO_LIBRARY=''
+GALERA_SSL=''
 TAG=''
 
 # Some programs that may be overriden
@@ -76,11 +77,13 @@ do
             OPENSSL_INCLUDE="-DOPENSSL_INCLUDE_DIR=$WITH_SSL/include"
             OPENSSL_LIBRARY="-DOPENSSL_LIBRARIES=$WITH_SSL/lib/libssl.a"
             CRYPTO_LIBRARY="-DCRYPTO_LIBRARY=$WITH_SSL/lib/libcrypto.a"
+            GALERA_SSL="$WITH_SSL/lib"
         elif test -e "$WITH_SSL/lib64/libssl.a"
         then
             OPENSSL_INCLUDE="-DOPENSSL_INCLUDE_DIR=$WITH_SSL/include"
             OPENSSL_LIBRARY="-DOPENSSL_LIBRARIES=$WITH_SSL/lib64/libssl.a"
             CRYPTO_LIBRARY="-DCRYPTO_LIBRARY=$WITH_SSL/lib64/libcrypto.a"
+            GALERA_SSL="$WITH_SSL/lib64"
         else
             echo >&2 "Cannot find libssl.a in $WITH_SSL"
             exit 3
@@ -200,8 +203,13 @@ fi
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        scons --config=force revno="$GALERA_REVISION" boost_pool=0 $MAKE_JFLAG \
-              garb/garbd libgalera_smm.so
+        if grep static <<< "$TAG";then 
+            scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
+            revno="$GALERA_REVISION" boost_pool=0 garb/garbd libgalera_smm.so
+        else 
+            scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" \
+              boost_pool=0  garb/garbd libgalera_smm.so
+        fi
         mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
              "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
         cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
