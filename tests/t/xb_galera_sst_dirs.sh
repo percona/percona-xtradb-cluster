@@ -13,17 +13,6 @@ SUSER="root"
 SMDSUM="d35d212fdfe9452e711704e3dc3e93cf"
 
 
-set +e
-${MYSQLD} --basedir=$MYSQL_BASEDIR  --help --verbose --wsrep-sst-method=rsync| grep -q wsrep
-probe_result=$?
-if [[ "$probe_result" == "0" ]]
-    then
-        vlog "Server supports wsrep"
-    else
-        echo "Requires WSREP enabled" > $SKIPPED_REASON
-        exit $SKIPPED_EXIT_CODE
-fi
-set -e
 
 vlog "Running test for innodb_data_home_dir/innodb_log_group_home_dir"
 
