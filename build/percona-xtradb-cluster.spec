@@ -271,6 +271,7 @@ Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera-25 xtrabackup >= 2.1.4 tar socat rsync iproute
 Provides:       mysql-server MySQL-server Percona-Server-server
 Conflicts:	Percona-Server-server-56 Percona-Server-server-55 Percona-Server-server-51 Percona-SQL-server-50
+Obsoletes:      Percona-XtraDB-Cluster-server
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -294,8 +295,10 @@ package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
 Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
-Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
+Provides:       mysql-client MySQL-client mysql MySQL
 Conflicts:	Percona-Server-client-56 Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50
+Obsoletes:      Percona-XtraDB-Cluster-client
+
 %description -n Percona-XtraDB-Cluster-client%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
 provides a High Availability solution.
@@ -319,6 +322,7 @@ Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
 Provides:       mysql-test Percona-Server-test
 Conflicts:	Percona-Server-test-56 Percona-Server-test-55 Percona-Server-test-51
+Obsoletes:      Percona-XtraDB-Cluster-test
 AutoReqProv:    no
 
 %description -n Percona-XtraDB-Cluster-test%{product_suffix}
@@ -343,6 +347,7 @@ Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel Percona-Server-devel
 Conflicts:	Percona-Server-devel-56 Percona-Server-devel-55 Percona-Server-devel-51 Percona-SQL-devel-50
+Obsoletes:      Percona-XtraDB-Cluster-devel
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -367,6 +372,7 @@ Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared mysql-libs Percona-Server-shared
 Conflicts:	Percona-Server-shared-55
+Obsoletes:      Percona-XtraDB-Cluster-shared
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
