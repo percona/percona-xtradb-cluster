@@ -1,4 +1,9 @@
 # compress+compact+xbstream+nc+encrypt1+threads
+
+[mysqld]
+innodb_data_home_dir=/tmp/var-test/data1
+innodb_log_group_home_dir=/tmp/var-test/log1
+
 [xtrabackup]
 compress
 parallel=4
