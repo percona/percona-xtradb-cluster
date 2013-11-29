@@ -207,7 +207,7 @@ fi
         cd "percona-xtradb-cluster-galera"
         if grep static <<< "$TAG";then 
             # Disable SSL in galera for now
-            scons $MAKE_JFLAG --config=force ssl=0 \
+            scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
             revno="$GALERA_REVISION" boost_pool=0 garb/garbd libgalera_smm.so
         else 
             scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" \
