@@ -82,7 +82,7 @@ vlog "Testing replication"
 load_dbase_schema sakila
 load_dbase_data sakila
 
-SMDSUM="7263d83daaba1ae8a8e780ab90ad7114"
+SMDSUM="8bb66e725374a56a9b5d570703e34d99"
 # Lightweight verification till lp:1199656 is fixed
 mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sakila.customer;' | md5sum | cut -d" " -f1)
 
