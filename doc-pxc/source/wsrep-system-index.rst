@@ -325,6 +325,7 @@ This variable sets up the method for taking the State Snapshot Transfer (SST). A
  * rsync - uses ``rsync`` to perform the SST, this method doesn't use the :variable:`wsrep_sst_auth`
  * mysqldump - uses ``mysqldump`` to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password>, where user has root privileges on the server.
  * custom_script_name - Galera supports `Scriptable State Snapshot Transfer <http://www.codership.com/wiki/doku.php?id=scriptable_state_snapshot_transfer>`_. This enables users to create their own custom script for performing an SST.
+ * skip - this option can be used to skip the SST, it can be used when initially starting the cluster and manually restore the same data to all nodes. It shouldn't be used as permanent setting because it could lead to data inconsistency across the nodes.
 
 .. variable:: wsrep_sst_receive_address
 
