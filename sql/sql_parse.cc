@@ -2813,7 +2813,9 @@ mysql_execute_command(THD *thd)
     if (trans_commit_implicit(thd))
     {
       thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
       WSREP_DEBUG("implicit commit failed, MDL released: %lu", thd->thread_id);
+#endif /* WITH_WSREP */
       goto error;
     }
     /* Release metadata locks acquired in this transaction. */
@@ -4595,7 +4597,9 @@ end_with_restore_list:
     if (trans_begin(thd, lex->start_transaction_opt))
     {
       thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
       WSREP_DEBUG("BEGIN failed, MDL released: %lu", thd->thread_id);
+#endif /* WITH_WSREP */
       goto error;
     }
     my_ok(thd);
@@ -4613,7 +4617,9 @@ end_with_restore_list:
     if (trans_commit(thd))
     {
       thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
       WSREP_DEBUG("COMMIT failed, MDL released: %lu", thd->thread_id);
+#endif /* WITH_WSREP */
       goto error;
     }
     thd->mdl_context.release_transactional_locks();
@@ -4636,9 +4642,9 @@ end_with_restore_list:
     if (WSREP(thd)) {
 
       if (thd->wsrep_conflict_state == NO_CONFLICT ||
-	  thd->wsrep_conflict_state == REPLAYING)
+          thd->wsrep_conflict_state == REPLAYING)
       {
-	my_ok(thd);
+        my_ok(thd);
       }
     } else {
 #endif /* WITH_WSREP */
@@ -4661,7 +4667,9 @@ end_with_restore_list:
     if (trans_rollback(thd))
     {
       thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
       WSREP_DEBUG("rollback failed, MDL released: %lu", thd->thread_id);
+#endif /* WITH_WSREP */
       goto error;
     }
     thd->mdl_context.release_transactional_locks();
@@ -4683,7 +4691,7 @@ end_with_restore_list:
 #ifdef WITH_WSREP
     if (WSREP(thd)) {
       if (thd->wsrep_conflict_state == NO_CONFLICT) {
-	my_ok(thd);
+        my_ok(thd);
       }
     } else {
 #endif /* WITH_WSREP */
@@ -5213,7 +5221,9 @@ create_sp_error:
     if (trans_xa_commit(thd))
     {
       thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
       WSREP_DEBUG("XA commit failed, MDL released: %lu", thd->thread_id);
+#endif /* WITH_WSREP */
       goto error;
     }
     thd->mdl_context.release_transactional_locks();
@@ -5229,7 +5239,9 @@ create_sp_error:
     if (trans_xa_rollback(thd))
     {
       thd->mdl_context.release_transactional_locks();
+#ifdef WITH_WSREP
       WSREP_DEBUG("XA rollback failed, MDL released: %lu", thd->thread_id);
+#endif /* WITH_WSREP */
       goto error;
     }
     thd->mdl_context.release_transactional_locks();
