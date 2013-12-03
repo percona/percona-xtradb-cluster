@@ -244,6 +244,7 @@ Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel
+Obsoletes:      Percona-XtraDB-Cluster
 
 # Think about what you use here since the first step is to
 # run a rm -rf
