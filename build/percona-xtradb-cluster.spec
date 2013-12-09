@@ -295,7 +295,6 @@ package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
 %package -n Percona-XtraDB-Cluster-client%{product_suffix}
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
-Requires:       Percona-XtraDB-Cluster-shared%{product_suffix}
 Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55 Percona-XtraDB-Cluster-client-55
 
