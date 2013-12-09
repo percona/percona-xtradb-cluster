@@ -3963,9 +3963,6 @@ lock_table_create(
         }
 
 	if (c_lock && c_lock->trx->que_state == TRX_QUE_LOCK_WAIT) {
-		if (wsrep_debug)
-			fprintf(stderr, "WSREP: table c_lock in wait: %llu\n", 
-			(ulonglong) lock->trx->id);
 		if (wsrep_debug) {
 			fprintf(stderr, 
 				"WSREP: table c_lock in wait: %llu new loc: %llu\n",
