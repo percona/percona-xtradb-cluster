@@ -368,7 +368,15 @@ void Table_cache_manager::free_table(THD *thd,
         Table_cache_element::TABLE_list::Iterator it2(cache_el[i]->used_tables);
         while ((table= it2++))
         {
+#ifdef WITH_WSREP
+          /* if thd was BF aborted, exclusive locks were canceled,
+          thus others can use table */
+
+          if (table->in_use != thd &&
+               table->in_use->wsrep_conflict_state != MUST_ABORT)
+#else
           if (table->in_use != thd)
+#endif
             DBUG_ASSERT(0);
         }
       }
