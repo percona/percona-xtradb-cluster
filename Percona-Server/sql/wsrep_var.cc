@@ -38,6 +38,7 @@ const  char* wsrep_node_address     = 0;
 const  char* wsrep_node_incoming_address = 0;
 const  char* wsrep_start_position   = 0;
 ulong  wsrep_OSU_method_options;
+ulong   wsrep_reject_queries_options;
 
 int wsrep_init_vars()
 {
@@ -281,6 +282,29 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
     return true;
   }
   return refresh_provider_options();
+}
+
+bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
+{
+    switch (wsrep_reject_queries_options) {
+        case WSREP_REJ_NONE:
+            wsrep_ready_set(TRUE); 
+            WSREP_INFO("Allowing client queries due to manual setting");
+            break;
+        case WSREP_REJ_ALL:
+            wsrep_ready_set(FALSE);
+            WSREP_INFO("Rejecting client queries due to manual setting");
+            break;
+        case WSREP_REJ_ALL_KILL:
+            wsrep_ready_set(FALSE);
+            wsrep_close_client_connections(FALSE);
+            WSREP_INFO("Rejecting client queries and killing connections due to manual setting");
+            break;
+        default:
+            WSREP_INFO("Unknown value");
+            return true;
+    }
+    return false;
 }
 
 void wsrep_provider_options_init(const char* value)
