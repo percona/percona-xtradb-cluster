@@ -82,8 +82,12 @@ vlog "Testing replication"
 load_dbase_schema sakila
 load_dbase_data sakila
 
-SMDSUM="8bb66e725374a56a9b5d570703e34d99"
-# Lightweight verification till lp:1199656 is fixed
+SMDSUM=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sakila.customer;' | md5sum | cut -d" " -f1)
+echo "md5sum on node:$node2 = $SMDSUM"
+
+switch_server $node1
+MYSQL_ARGS="${MYSQL_ARGS} -ppassword"
+
 mdsum=$(${MYSQL} ${MYSQL_ARGS} -e 'select * from sakila.customer;' | md5sum | cut -d" " -f1)
 
 if [[ $mdsum != $SMDSUM ]];then 
