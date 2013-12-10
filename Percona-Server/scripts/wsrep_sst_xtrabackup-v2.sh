@@ -62,6 +62,9 @@ pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
 STATDIR=""
 uextra=0
 
+scomp=""
+sdecomp=""
+
 if which pv &>/dev/null && pv --help | grep -q FORMAT;then 
     pvopts+=$pvformat
 fi
@@ -278,6 +281,9 @@ read_cnf()
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
+    scomp=$(parse_cnf sst compressor "")
+    sdecomp=$(parse_cnf sst decompressor "")
+
 
     # Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
     if [[ -z $ealgo ]];then
@@ -552,6 +558,10 @@ then
             tcmd="$ecmd | $tcmd"
         fi
 
+        if [[ -n $scomp ]];then 
+            tcmd="$scomp | $tcmd"
+        fi
+
         send_donor $DATA "${stagemsg}-gtid"
 
         tcmd="$ttcmd"
@@ -567,6 +577,10 @@ then
         sleep 10
 
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT:-4444}"
+
+        if [[ -n $scomp ]];then 
+            tcmd="$scomp | $tcmd"
+        fi
 
         set +e
         timeit "${stagemsg}-SST" "$INNOBACKUP | $tcmd; RC=( "\${PIPESTATUS[@]}" )"
@@ -594,6 +608,9 @@ then
         get_keys
         if [[ $encrypt -eq 1 ]];then
             tcmd=" $ecmd | $tcmd"
+        fi
+        if [[ -n $scomp ]];then 
+            tcmd="$scomp | $tcmd"
         fi
         strmcmd+=" \${IST_FILE}"
 
@@ -665,7 +682,14 @@ then
 
     get_keys
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
-        strmcmd=" $ecmd | $strmcmd"
+        if [[ -n $sdecomp ]];then 
+            strmcmd=" $ecmd | $sdecomp | $strmcmd"
+        else 
+            strmcmd=" $ecmd | $strmcmd"
+        fi
+    elif [[ -n $sdecomp ]];then 
+            strmcmd=" $sdecomp | $strmcmd"
+        fi
     fi
 
     STATDIR=$(mktemp -d)
