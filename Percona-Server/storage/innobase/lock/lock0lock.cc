@@ -1665,9 +1665,9 @@ lock_rec_other_has_conflicting(
 
 		if (lock_rec_has_to_wait(trx, mode, lock, is_supremum)) {
 #ifdef WITH_WSREP
-                        trx_mutex_enter(lock->trx);
+			trx_mutex_enter(lock->trx);
 			wsrep_kill_victim(trx, lock);
-                        trx_mutex_exit(lock->trx);
+			trx_mutex_exit(lock->trx);
 #endif
 			return(lock);
 		}
@@ -1797,6 +1797,27 @@ lock_number_of_rows_locked(
 }
 
 /*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
+#ifdef WITH_WSREP
+static
+void
+wsrep_print_wait_locks(
+/*============*/
+	lock_t*		c_lock) /* conflicting lock to print */
+{
+	if (wsrep_debug &&  c_lock->trx->lock.wait_lock != c_lock) {
+		fprintf(stderr, "WSREP: c_lock != wait lock\n");
+		if (lock_get_type_low(c_lock) & LOCK_TABLE)
+			lock_table_print(stderr, c_lock);
+		else
+			lock_rec_print(stderr, c_lock);
+
+		if (lock_get_type_low(c_lock->trx->lock.wait_lock) & LOCK_TABLE)
+			lock_table_print(stderr, c_lock->trx->lock.wait_lock);
+		else
+			lock_rec_print(stderr, c_lock->trx->lock.wait_lock);
+	}
+}
+#endif /* WITH_WSREP */
 
 /*********************************************************************//**
 Creates a new record lock and inserts it to the lock queue. Does NOT check
@@ -1915,12 +1936,7 @@ lock_rec_create(
 
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
-			if (wsrep_debug &&
-			    c_lock->trx->lock.wait_lock != c_lock) {
-				fprintf(stderr, "WSREP: c_lock != wait lock\n");
-				lock_rec_print(stderr, c_lock);
-				lock_rec_print(stderr, c_lock->trx->lock.wait_lock);
-			}
+			if (wsrep_debug) wsrep_print_wait_locks(c_lock);
 
 			trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
@@ -4370,12 +4386,19 @@ lock_table_create(
 
 	if (c_lock) trx_mutex_enter(c_lock->trx);
 	if (c_lock && c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
-		if (wsrep_debug) {
-			fprintf(stderr, "WSREP: table c_lock in wait: %llu new loc: %lu\n",
-				(ulonglong) c_lock->trx->id, lock->trx->id);
-		}
-		c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
+
+ 		c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
+
+		if (wsrep_debug) wsrep_print_wait_locks(c_lock);
+
+		/* have to release trx mutex for the duration of
+		   victim lock release. This will eventually call
+		   lock_grant, which wants to grant trx mutex again
+		*/
+		/* caller has trx_mutex, have to release for lock cancel */
+		trx_mutex_exit(trx);
 		lock_cancel_waiting_and_release(c_lock->trx->lock.wait_lock);
+		trx_mutex_enter(trx);
 
 		/* trx might not wait for c_lock, but some other lock
 		does not matter if wait_lock was released above
@@ -4685,7 +4708,9 @@ lock_table_other_has_incompatible(
 #ifdef WITH_WSREP
 			if (wsrep_debug) 
 				fprintf(stderr, "WSREP: table lock abort");
+			trx_mutex_enter(lock->trx);
 			wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
+			trx_mutex_exit(lock->trx);
 #endif
 			return(lock);
 		}
