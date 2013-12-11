@@ -297,6 +297,7 @@ Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
 Provides:       mysql-client MySQL-client mysql MySQL Percona-XtraDB-Cluster-client
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55 Percona-XtraDB-Cluster-client-55
+Requires:       perl-DBI
 
 %description -n Percona-XtraDB-Cluster-client%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
