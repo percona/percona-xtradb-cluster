@@ -17735,7 +17735,6 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 
 static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid)
 {
-        trx_sysf_t*     sys_header;
 	DBUG_ASSERT(hton == innodb_hton_ptr);
         if (wsrep_is_wsrep_xid(xid)) {
                 mtr_t mtr;

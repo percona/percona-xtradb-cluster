@@ -1286,7 +1286,7 @@ row_ins_foreign_check_on_constraint(
 				       FALSE, FALSE);
 	if (err != DB_SUCCESS) {
 		fprintf(stderr, 
-			"WSREP: foreign key append failed: %lu\n", err);
+			"WSREP: foreign key append failed: %d\n", err);
 	} else
 #endif
 	err = row_update_cascade_for_mysql(thr, cascade,
