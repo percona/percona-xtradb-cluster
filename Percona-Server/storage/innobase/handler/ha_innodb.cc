@@ -3172,8 +3172,8 @@ innobase_change_buffering_inited_ok:
 	if (innobase_fast_checksum) {
 		fprintf(stderr,
 			"InnoDB: Warning: innodb_fast_checksum is DEPRECATED "
-			"and *WILL* be removed in Percona Server 5.6. Please "
-			"consult the Percona Server 5.6 documentation for "
+			"and *WILL* be removed in Percona XtraDB Cluster 5.6. Please "
+			"consult the Percona XtraDB Cluster 5.6 documentation for "
 			"help in upgrading.\n");
 	}
 
