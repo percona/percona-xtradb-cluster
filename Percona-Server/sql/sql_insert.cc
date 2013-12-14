@@ -4411,8 +4411,14 @@ bool select_create::send_eof()
     */
     if (!table->s->tmp_table)
     {
+#ifndef DBUG_OFF
+      thd->get_stmt_da()->set_overwrite_status(true);
+#endif
       trans_commit_stmt(thd);
       trans_commit_implicit(thd);
+#ifndef DBUG_OFF
+      thd->get_stmt_da()->set_overwrite_status(false);
+#endif
 #ifdef WITH_WSREP
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state != NO_CONFLICT)
