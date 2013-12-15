@@ -2,7 +2,6 @@
 [xtrabackup]
 compress
 parallel=4
-encrypt-chunk-size=1073741824
 compress-threads=4
 encrypt-threads=4
 encrypt=AES256

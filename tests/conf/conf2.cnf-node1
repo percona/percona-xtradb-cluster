@@ -1,9 +1,12 @@
-# compress+compact
+# compress+compact + stream-compress
+# v2only
 [xtrabackup]
 compress
 compact
 compress-threads=4
+rebuild-threads=4
 
 [sst]
+compressor="gzip"
 streamfmt=xbstream
 transferfmt=socat

@@ -3,7 +3,9 @@
 compress
 compact
 compress-threads=4
+rebuild-threads=4
 
 [sst]
+decompressor="gzip -dc"
 streamfmt=xbstream
 transferfmt=socat
