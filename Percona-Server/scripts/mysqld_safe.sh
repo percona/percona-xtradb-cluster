@@ -332,6 +332,7 @@ parse_arguments() {
         then
           wsrep_restart=1
         fi
+        append_arg_to_args "$arg"
         ;;
       --help) usage ;;
 
