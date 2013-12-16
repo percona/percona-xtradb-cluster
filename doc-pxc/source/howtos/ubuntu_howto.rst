@@ -31,6 +31,7 @@ Prerequisites
 Installation
 ------------
 
+Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 Percona repository should be set up as described in the :ref:`apt-repo` guide. Following command will install |Percona XtraDB Cluster| packages: :: 
 
   $ apt-get install percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6 percona-xtradb-cluster-galera-3.x

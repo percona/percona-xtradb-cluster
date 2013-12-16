@@ -27,6 +27,7 @@ Using Percona Software Repositories
 |Percona| provides repositories for :program:`yum` (``RPM`` packages for *Red Hat*, *CentOS* and *Amazon Linux AMI*) and :program:`apt` (:file:`.deb` packages for *Ubuntu* and *Debian*) for software such as |Percona Server|, |XtraDB|, |XtraBackup|, and *Percona Toolkit*. This makes it easy to install and update your software and its dependencies through your operating system's package manager.
 
 This is the recommend way of installing where possible.
+Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 
 ``YUM``-Based Systems
 ---------------------

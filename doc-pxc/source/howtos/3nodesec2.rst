@@ -4,6 +4,7 @@ How to setup 3 node cluster in EC2 enviroment
 This is how to setup 3-node cluster in EC2 enviroment.
 
 Assume you are running *m1.xlarge* instances with OS *Red Hat Enterprise Linux 6.1 64-bit*.
+Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 
 Install XtraDB Cluster from RPM:
 
