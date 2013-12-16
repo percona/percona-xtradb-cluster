@@ -561,12 +561,15 @@ then
         ttcmd="$tcmd"
 
         if [[ $encrypt -eq 1 ]];then
-            tcmd="$ecmd | $tcmd"
+            if [[ -n $scomp ]];then 
+                tcmd=" $ecmd | $scomp | $tcmd "
+            else 
+                tcmd=" $ecmd | $tcmd "
+            fi
+        elif [[ -n $scomp ]];then 
+            tcmd=" $scomp | $tcmd "
         fi
 
-        if [[ -n $scomp ]];then 
-            tcmd="$scomp | $tcmd"
-        fi
 
         send_donor $DATA "${stagemsg}-gtid"
 
@@ -613,10 +616,13 @@ then
         echo "1" > "${DATA}/${IST_FILE}"
         get_keys
         if [[ $encrypt -eq 1 ]];then
-            tcmd=" $ecmd | $tcmd"
-        fi
-        if [[ -n $scomp ]];then 
-            tcmd="$scomp | $tcmd"
+            if [[ -n $scomp ]];then 
+                tcmd=" $ecmd | $scomp | $tcmd "
+            else
+                tcmd=" $ecmd | $tcmd "
+            fi
+        elif [[ -n $scomp ]];then 
+            tcmd=" $scomp | $tcmd "
         fi
         strmcmd+=" \${IST_FILE}"
 
@@ -689,7 +695,7 @@ then
     get_keys
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         if [[ -n $sdecomp ]];then 
-            strmcmd=" $ecmd | $sdecomp | $strmcmd"
+            strmcmd=" $sdecomp | $ecmd | $strmcmd"
         else 
             strmcmd=" $ecmd | $strmcmd"
         fi
