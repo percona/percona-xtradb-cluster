@@ -4,6 +4,12 @@
  Percona XtraDB Cluster In-Place Upgrading Guide: From 5.5 to 5.6
 ==================================================================
 
+.. warning::
+
+   * This upgrade guide ensures that a replication from 5.6 nodes to 5.5 ones is avoided by making them read-only. This is due to an existing bug :bug:`1251137`.
+   * Also, some variables (possibly deprecated) in PS 5.5 may have been removed in PS 5.6 (hence in PXC 5.6), please check that the variable is still valid before upgrade.
+   * Also, make sure to avoid SST during upgrade since a SST between nodes with 5.5 and 5.6 may not work (especially, if 5.5 is donor and 5.6 is joiner, mysql_upgrade will be required on joiner; vice-versa, package upgrade will be required on joiner).
+
 Upgrading cluster involves two major stages:
 
 I) Upgrade a single node
