@@ -8,7 +8,7 @@
 
    * This upgrade guide ensures that a replication from 5.6 nodes to 5.5 ones is avoided by making them read-only. This is due to an existing bug :bug:`1251137`.
    * Also, some variables (possibly deprecated) in PS 5.5 may have been removed in PS 5.6 (hence in PXC 5.6), please check that the variable is still valid before upgrade.
-   * Also, make sure to avoid SST during upgrade since a SST between nodes with 5.5 and 5.6 may not work (especially, if 5.5 is donor and 5.6 is joiner, mysql_upgrade will be required on joiner; vice-versa, package upgrade will be required on joiner).
+   * Also, make sure to avoid SST during upgrade since a SST between nodes with 5.5 and 5.6 may not work (especially, if 5.5 is donor and 5.6 is joiner, mysql_upgrade will be required on joiner; vice-versa, package upgrade will be required on joiner). You can also avoid automatic SST for the duration of upgrade by setting ```wsrep-sst-method``` to 'skip'. (Note that ```wsrep-sst-method``` is a dynamic variable.)
    * Finally, note that 5.6 PXC is not supported for production yet (till the GA release). You are welcome to test it on staging/testing environments and provide feedback.
 
 Upgrading cluster involves two major stages:
@@ -16,6 +16,9 @@ Upgrading cluster involves two major stages:
 I) Upgrade a single node
 II) Upgrade the whole cluster while not breaking replication
  
+.. note::
+    Following upgrade process is for a **rolling** upgrade, ie. an upgrade without downtime for the cluster. If you intend to allow for downtime - bring down all nodes, upgrade them, bootstrap and start nodes - then you can just follow Stage I sans the compatibility variables part. Make sure to bootstrap the first node in the cluster after upgrade.
+
 Following is the upgrade process on CentOS 6.4
 ==============================================
  
@@ -56,7 +59,9 @@ This is to ensure that other hosts are not affected by this upgrade.
 **Step #7** Step #5 must complete successfully, upon which, process started in Step 5) can be stopped/killed.
  
  
-**Step #8** Step #5) should not fail (if it fails check for any bad variables in the configuration file), otherwise :file:`grastate.dat` can potentially get zeroed and the node will try to perform State Snapshot Transfer from a 5.5 node. ('Potentially' since with --wsrep-provider='none' it shouldn't). Also backing up :file:`grastate.dat` is recommended prior to Step #5 for the same purpose.
+**Step #8** Step #5) should not fail (if it fails check for any bad variables in the configuration file), otherwise :file:`grastate.dat` can potentially get zeroed and the node will try to perform State Snapshot Transfer (SST) from a 5.5 node. ('Potentially' since with --wsrep-provider='none' it shouldn't). Also backing up :file:`grastate.dat` is recommended prior to Step #5 for the same purpose.
+
+    * As mentioned before, you can also avoid automatic SST for the duration of upgrade by setting ```wsrep-sst-method``` to 'skip'. You can toggle it later since it is a dynamic variable.
 
 **Step #9** If all the steps above have completed successfully node can be started with: ::
   
