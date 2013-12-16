@@ -12,3 +12,4 @@ compressor="gzip"
 rlimit=2m
 time=1
 progress=1
+encrypt=1
