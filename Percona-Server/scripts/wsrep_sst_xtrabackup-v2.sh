@@ -510,14 +510,14 @@ get_stream
 get_transfer
 
 if ${INNOBACKUPEX_BIN} /tmp --help  | grep -q -- '--version-check'; then 
-    disver="--no-version-check'
+    disver="--no-version-check"
 fi
 
 
 INNOEXTRA=""
 INNOAPPLY="${INNOBACKUPEX_BIN} $disver --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOMOVE="${INNOBACKUPEX_BIN} $disver --defaults-file=${WSREP_SST_OPT_CONF}  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} $disver --defaults-file=${WSREP_SST_OPT_CONF} \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
+INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
