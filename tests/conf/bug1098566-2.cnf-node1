@@ -1,4 +1,4 @@
-# compress+parallel+compress-stream+sst-special-dirs+encrypt2+samecrt
+# compress+parallel+compress-stream+sst-special-dirs+encrypt3
 
 [mysqld]
 innodb_data_home_dir=/tmp/var-test/data1
@@ -8,12 +8,13 @@ innodb_log_group_home_dir=/tmp/var-test/log1
 compress
 parallel=4
 compress-threads=4
+compact
 
 
 [sst]
 compressor="gzip"
 streamfmt=xbstream
 sst-special-dirs=1
-encrypt=2
-tca=/tmp/certs/node1.crt
+encrypt=3
+tkey=/tmp/certs/node1.key
 tcert=/tmp/certs/node1.pem
