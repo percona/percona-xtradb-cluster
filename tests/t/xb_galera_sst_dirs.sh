@@ -16,9 +16,15 @@ SMDSUM="d35d212fdfe9452e711704e3dc3e93cf"
 
 vlog "Running test for innodb_data_home_dir/innodb_log_group_home_dir"
 
-EXTRAFILE1="$XB_TESTDIR/conf/bug1098566.cnf-node1"
-EXTRAFILE2="$XB_TESTDIR/conf/bug1098566.cnf-node2"
-vlog "Including $EXTRAFILE1 and $EXTRAFILE2"
+if [[ -n ${EXTRAFILE:-} ]];then 
+    EXTRAFILE1="$XB_TESTDIR/conf/${EXTRAFILE}.cnf-node1"
+    EXTRAFILE2="$XB_TESTDIR/conf/${EXTRAFILE}.cnf-node2"
+    vlog "Including $EXTRAFILE1 and $EXTRAFILE2 for $CONF"
+else 
+    EXTRAFILE1="$XB_TESTDIR/conf/bug1098566.cnf-node1"
+    EXTRAFILE2="$XB_TESTDIR/conf/bug1098566.cnf-node2"
+    vlog "Including $EXTRAFILE1 and $EXTRAFILE2 for $CONF"
+fi
 
 debug=""
 pdebug=""

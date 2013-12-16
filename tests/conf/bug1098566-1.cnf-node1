@@ -1,4 +1,4 @@
-# compress+compact+xbstream+nc+encrypt1+threads
+# compress+parallel+compress-stream+sst-special-dirs+encrypt2
 
 [mysqld]
 innodb_data_home_dir=/tmp/var-test/data1
@@ -7,16 +7,13 @@ innodb_log_group_home_dir=/tmp/var-test/log1
 [xtrabackup]
 compress
 parallel=4
-encrypt-chunk-size=1073741824
 compress-threads=4
-encrypt-threads=4
-encrypt=AES256
-encrypt-key=6F3AD9F428143F133FD7D50D77D91EA4
 
 
 [sst]
 compressor="gzip"
 streamfmt=xbstream
-encrypt=1
 sst-special-dirs=1
-
+encrypt=2
+tca=/tmp/certs/node1.crt
+tcert=/tmp/certs/node1.pem
