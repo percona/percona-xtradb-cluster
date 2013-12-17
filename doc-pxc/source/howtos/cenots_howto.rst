@@ -37,7 +37,7 @@ Percona repository should be set up as described in the :ref:`yum-repo` guide. T
 
 Following command will install |Percona XtraDB Cluster| packages: :: 
 
-  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 percona-server
+  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 percona-xtrabackup
 
 When these two commands have been executed successfully on all three nodes |Percona XtraDB Cluster| is installed.
 
