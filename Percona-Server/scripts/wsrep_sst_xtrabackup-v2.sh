@@ -639,7 +639,7 @@ then
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     if [[ $speciald -eq 1 ]];then 
-        wsrep_log_info "WARNING: This feature requires PXC 2.1.6 or latter."
+        wsrep_log_info "WARNING: sst-special-dirs feature requires PXC 2.1.6 or latter."
     fi
 
     if [[ $speciald -eq 1 ]];then 
