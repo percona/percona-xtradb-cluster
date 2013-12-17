@@ -7,9 +7,9 @@
  Percona XtraDB Cluster 5.6 Documentation
 ==========================================
 
-.. warning::
+.. note::
 
-   Please note: |Percona XtraDB Cluster| 5.6 is BETA quality software. It should *NOT* be used in production environments. Refer to :ref:`upgrading_guide` for upgrade guide.
+   Please note: |Percona XtraDB Cluster| 5.6 is RELEASE CANDIDATE quality software. It should *NOT* be used in production environments. Refer to :ref:`upgrading_guide` for upgrade guide.
 
 |Percona XtraDB Cluster| is High Availability and Scalability solution for MySQL Users.
 

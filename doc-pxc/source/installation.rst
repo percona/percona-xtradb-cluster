@@ -34,7 +34,7 @@ Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 
 Once the repository is set up, use the following commands: ::
 
-  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 percona-xtrabackup
+  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 Percona-XtraDB-Cluster-galera-3
 
 More detailed example of the |Percona XtraDB Cluster| installation and configuration can be seen in :ref:`centos_howto` tutorial.
 
@@ -43,7 +43,7 @@ More detailed example of the |Percona XtraDB Cluster| installation and configura
 
 Once the repository is set up, use the following commands: ::
 
-  $ sudo apt-get install percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6 percona-xtrabackup percona-xtradb-cluster-galera-3.x
+  $ sudo apt-get install percona-xtradb-cluster-galera-3.x percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6
 
 More detailed example of the |Percona XtraDB Cluster| installation and configuration can be seen in :ref:`ubuntu_howto` tutorial.
 
