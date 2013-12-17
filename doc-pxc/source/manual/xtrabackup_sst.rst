@@ -149,6 +149,23 @@ During the SST, the :term:`datadir` is cleaned up so that state of other node ca
 
 **NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2.
 
+.. option:: sst_special_dirs
+   
+     :Values: 0,1
+     :Default: 0
+ 
+In order for XtraBackup SST to support :variable:`innodb_data_home_dir` and :variable:`innodb_log_home_dir` variables in the configuration file this option was introduced in |Percona XtraDB Cluster| :rn:`5.6.15-25.2`. This requires sst-special-dirs to be set under [sst] in the configuration file to either 0 or 1. Also, :variable:`innodb-data-home-dir` and/or :variable:`innodb-log-group-home-dir` need to be defined in :file:`my.cnf` under [mysqld]. |Percona Xtrabackup| 2.1.6 or higher is required in order for this to work.
+ 
+**NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2.
+ 
+.. option:: compressor/decompressor
+ 
+    :Values: command-lines to compressor/decompressor
+    :Default: Not set, hence not enabled.
+    :Example: compressor='gzip', decompressor='gzip -dc'
+ 
+This option introduces stream-based compression/decompression. When these options are set, compression/decompression are done on stream, in contrast to earlier PXB-based one where decompression was done after streaming to disk, involving additional I/O; hence I/O is saved here (almost halved on joiner). You can use any compression utility which works on stream - gzip, pigz (which is multi-threaded and hence, recommended) etc. Also, note that, compressor has to be set on donor and decompressor on joiner (though you can have decompressor set on donor and vice-versa for config homogeneity, it won't affect that particular SST). To use Xtrabackup-based compression as before use ``compress`` under ``[xtrabackup]`` as before, also having both enabled won't cause any failure (though you will be wasting CPU cycles with this).
+
 .. _tar_ag_xbstream:
 
 Tar against xbstream

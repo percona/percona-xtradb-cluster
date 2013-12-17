@@ -4,6 +4,10 @@
  Index of wsrep status variables
 =================================
 
+.. variable:: wsrep_local_cached_downto
+
+This variable shows the lowest sequence number in gcache. This information can be helpful with determining IST and/or SST. 
+
 .. variable:: wsrep_local_state_uuid
   
 This variable contains :term:`UUID` state stored on the node.
@@ -78,7 +82,7 @@ Number of ``FC_PAUSE`` events sent and received since the last status query.
 
 .. variable:: wsrep_cert_deps_distance
   
-Average distance between highest and lowest sequence numbet that can be possibly applied in parallel.
+Average distance between highest and lowest sequence number that can be possibly applied in parallel.
 
 .. variable:: wsrep_apply_oooe
   

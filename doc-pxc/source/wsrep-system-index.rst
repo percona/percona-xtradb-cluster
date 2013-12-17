@@ -109,6 +109,16 @@ This variable is used to send the ``DBUG`` option to the wsrep provider.
 
 When this variable is set to ``ON``, debug messages will also be logged to the error_log. This can be used when trying to diagnose the problem or when submitting a bug.
 
+.. variable:: wsrep_desync
+ 
+   :cli: No
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: OFF
+ 
+When this variable is set to ``ON``, the node is desynced from the cluster. Toggling this back will require a IST or a SST depending on how long it was desynced. This is similar to desync which occurs during RSU TOI. This can also be done with  ``/*! WSREP_DESYNC */`` query comment.
+
 .. variable:: wsrep_drupal_282555_workaround
 
    :cli: Yes
@@ -215,8 +225,8 @@ This variable is used to set the notification `command <http://www.codership.com
 
 .. variable:: wsrep_on
 
-   :cli: Yes
-   :conf: Yes
+   :cli: No
+   :conf: No
    :scope: Local, Global
    :dyn: Yes
    :default: ON
@@ -252,6 +262,22 @@ This variable contains settings currently used by Galera library.
    :location: mysqld_safe
 
 When server is started with this variable it will parse Global Transaction ID from log, and if the GTID is found, assign it as initial position for actual server start. This option is used to recover GTID.
+
+.. variable:: wsrep_reject_queries
+ 
+   :cli: No
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: NONE
+ 
+This variable can be used to reject queries for that node. This can be useful if someone wants to manually run maintenance on the node like mysqldump without need to change the settings on the load balancer. Following values are supported: 
+ 
+ - ``NONE`` - default - nothing is rejected. 
+ - ``ALL`` - all queries are rejected with 'Error 1047: Unknown command'. 
+ - ``ALL_KILL`` - all queries are rejected and existing client connections are also killed without waiting. 
+ 
+Note, that this doesn't affect galera replication in any way, only the applications which connect to database are affected. If you are looking for desyncing a node then :variable:`wsrep_desync` is the right option for that.
 
 .. variable:: wsrep_replicate_myisam
 
@@ -318,14 +344,22 @@ When this variable is enabled SST donor node will not accept incoming queries, i
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: mysqldump
+   :default: rsync
+   :recommended: xtrabackup-v2
 
 This variable sets up the method for taking the State Snapshot Transfer (SST). Available options are:
  * xtrabackup - uses Percona XtraBackup to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password> which |XtraBackup| will use on donor. Privileges and permissions needed for running |XtraBackup| can be found `here <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_.
+ * xtrabackup-v2 - This is same as xtrabackup SST except that it uses newer protocol, hence is not compatible. This is the **recommended** option for PXC 5.5.34 and above. For more details, please check :ref:`xtrabackup_sst` and :ref:`errata`.
  * rsync - uses ``rsync`` to perform the SST, this method doesn't use the :variable:`wsrep_sst_auth`
  * mysqldump - uses ``mysqldump`` to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password>, where user has root privileges on the server.
  * custom_script_name - Galera supports `Scriptable State Snapshot Transfer <http://www.codership.com/wiki/doku.php?id=scriptable_state_snapshot_transfer>`_. This enables users to create their own custom script for performing an SST.
  * skip - this option can be used to skip the SST, it can be used when initially starting the cluster and manually restore the same data to all nodes. It shouldn't be used as permanent setting because it could lead to data inconsistency across the nodes.
+
+.. note:: 
+
+    Note the following:
+        * mysqldump SST is not recommended unless it is required for specific reasons. Also, it is not compatible with ``bind_address = 127.0.0.1 or localhost`` and will cause startup to fail if set so.
+        * Xtrabackup-v2 SST is currently recommended if you have innodb-log-group_home-dir/innodb-data-home-dir in your cnf. Refer to :option:`sst-special-dirs` for more.
 
 .. variable:: wsrep_sst_receive_address
 
