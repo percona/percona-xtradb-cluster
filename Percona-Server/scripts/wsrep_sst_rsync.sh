@@ -236,8 +236,6 @@ then
     trap "exit 3"  INT TERM ABRT
     trap cleanup_joiner EXIT
 
-    MYUID=$(id -u)
-    MYGID=$(id -g)
     RSYNC_CONF="$WSREP_SST_OPT_DATA/$MODULE.conf"
 
 cat << EOF > "$RSYNC_CONF"
@@ -245,8 +243,6 @@ pid file = $RSYNC_PID
 use chroot = no
 read only = no
 timeout = 300
-uid = $MYUID
-gid = $MYGID
 [$MODULE]
     path = $WSREP_SST_OPT_DATA
 [$MODULE-log_dir]
