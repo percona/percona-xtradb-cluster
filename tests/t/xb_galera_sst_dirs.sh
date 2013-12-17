@@ -23,7 +23,7 @@ if [[ -n ${EXTRAFILE:-} ]];then
 else 
     EXTRAFILE1="$XB_TESTDIR/conf/bug1098566.cnf-node1"
     EXTRAFILE2="$XB_TESTDIR/conf/bug1098566.cnf-node2"
-    vlog "Including $EXTRAFILE1 and $EXTRAFILE2 for $CONF"
+    vlog "Including $EXTRAFILE1 and $EXTRAFILE2"
 fi
 
 debug=""
