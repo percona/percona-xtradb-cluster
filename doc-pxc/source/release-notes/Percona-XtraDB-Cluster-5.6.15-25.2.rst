@@ -6,7 +6,7 @@
 
 Percona is glad to announce the first Release Candidate release of |Percona XtraDB Cluster| 5.6 on December 18th 2013. Binaries are available from `downloads area <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/release-5.6.15-25.2/>`_ or from our :doc:`software repositories </installation>`.
 
-Based on `Percona Server 5.6.15-63.0 <http://www.percona.com/doc/percona-server/5.6/release-notes/Percona-Server-5.6.15-63.0.html>`_ including all the bug fixes in it, `Galera Replicator 3.2 <https://launchpad.net/galera/3.x/25.3.2>`_ and on `Codership wsrep API 5.6.15-25.2 <https://launchpad.net/codership-mysql/5.6/5.6.15-25.2>`_ is now the first **RELEASE CANDIDATE** release. All of |Percona|'s software is open-source and free, all the details of the release can be found in the `5.6.15-25.2 milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/5.6.12-25.2>`_ at Launchpad.
+Based on `Percona Server 5.6.15-63.0 <http://www.percona.com/doc/percona-server/5.6/release-notes/Percona-Server-5.6.15-63.0.html>`_ including all the bug fixes in it, `Galera Replicator 3.2 <https://launchpad.net/galera/3.x/25.3.2>`_ and on `Codership wsrep API 5.6.15-25.2 <https://launchpad.net/codership-mysql/+milestone/5.6.15-25.2>`_ is now the first **RELEASE CANDIDATE** release. All of |Percona|'s software is open-source and free, all the details of the release can be found in the `5.6.15-25.2 milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/5.6.15-25.2>`_ at Launchpad.
 
 This release contains all of the features and bug fixes in `Percona XtraDB Cluster 5.5.34-25.9 <http://www.percona.com/doc/percona-xtradb-cluster/release-notes/Percona-XtraDB-Cluster-5.5.34-25.9.html>`_, plus the following:
 
@@ -51,6 +51,10 @@ Bugs fixed
  Fixed rsync SST for compatibility with ``rsync`` version 3.1.0. Bug fixed :bug:`1261673`.
 
 Other bugs fixed: :bug:`1261138`, :bug:`1254633`.
+
+.. note::
+
+   On *CentOS* 5/6, those who may have installed ``percona-xtrabackup-20`` with |Percona XtraDB Cluster| 5.6 due to bug :bug:`1226185`, the upgrade may fail, the dependency issue has been fixed since then, hence replace ``percona-xtrabackup-20`` with ``percona-xtrabackup`` before upgrade.
 
 We did our best to eliminate bugs and problems during the testing release, but this is a software, so bugs are expected. If you encounter them, please report them to our `bug tracking system <https://bugs.launchpad.net/percona-xtradb-cluster/+filebug>`_.
 
