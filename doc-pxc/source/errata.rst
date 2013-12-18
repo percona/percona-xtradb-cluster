@@ -8,7 +8,6 @@ Known Issues
 -------------
 
 Following are issues which may impact you while running PXC:
- - Create Table As Select (CTAS) can cause deadlocks and server hang when used with explicit TEMPORARY tables.
  - bug :bug:`1192834`: Joiner may crash after SST from donor with compaction enabled. Workaround is to disable the index compaction (compact under [xtrabackup]), if enabled. This crash requires specific configuration, hence you may not be affected. Also, this doesn't require any fix from PXC, but Xtrabackup with the fix included should do.
 
 Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (i.e. releases after the upcoming/recent release).
