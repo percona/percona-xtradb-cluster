@@ -6,7 +6,7 @@
 
 .. variable:: wsrep_local_cached_downto
 
-This variable shows the lowest sequence number in gcache. This information can be helpful with determining IST and/or SST. 
+This variable shows the lowest sequence number in gcache. This information can be helpful with determining IST and/or SST. If the value is 18446744073709551615, then it means there are no writesets in cached in gcache (usual for a single node).
 
 .. variable:: wsrep_local_state_uuid
   
