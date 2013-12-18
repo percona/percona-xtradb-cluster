@@ -9,6 +9,7 @@ Known Issues
 
 Following are issues which may impact you while running PXC:
  - bug :bug:`1192834`: Joiner may crash after SST from donor with compaction enabled. Workaround is to disable the index compaction (compact under [xtrabackup]), if enabled. This crash requires specific configuration, hence you may not be affected. Also, this doesn't require any fix from PXC, but Xtrabackup with the fix included should do.
+ - For fresh installs, if you skip the galera package on yum install command-line, yum may end up installing either of Percona-XtraDB-Cluster-galera-2 or 3. Hence, it is imperative to provide Percona-XtraDB-Cluster-galera-3 for PXC56 and Percona-XtraDB-Cluster-galera-2 for PXC55 on yum install command-line. Upgrades are not affected. This is not a bug but a situation due to existence of multiple providers.
 
 Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (i.e. releases after the upcoming/recent release).
 
