@@ -9,9 +9,7 @@ Known Issues
 
 Following are issues which may impact you while running PXC:
  - Create Table As Select (CTAS) can cause deadlocks and server hang when used with explicit TEMPORARY tables.
- - bug :bug:`1226185`: percona-xtrabackup-20 may get installed as a dependency instead of latest percona-xtrabackup during a fresh install due to certain yum issues. This can be avoided by specifying ``percona-xtrabackup`` explicitly in the install command line.
  - bug :bug:`1192834`: Joiner may crash after SST from donor with compaction enabled. Workaround is to disable the index compaction (compact under [xtrabackup]), if enabled. This crash requires specific configuration, hence you may not be affected. Also, this doesn't require any fix from PXC, but Xtrabackup with the fix included should do.
- - bug :bug:`1098566`: :variable:`innodb_data_home_dir`/:variable:`innodb_log_group_home_dir` is not supported. Depends on bug :bug:`1164945` for the fix.
 
 Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (i.e. releases after the upcoming/recent release).
 
