@@ -35,7 +35,7 @@ Assuming we are going to upgrade node A, (and other nodes B and C are on 5.5)
  
 **Step #3** Install the new packages: ::
 
-    # yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 percona-xtrabackup
+    # yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 percona-xtrabackup Percona-XtraDB-Cluster-galera-3
  
 **Step #4** Fix the variables in the |MySQL| configuration file :file:`my.cnf` which are not compatible with |Percona Server| 5.6. Detailed list can be checked in `Changed in Percona Server 5.6 <http://www.percona.com/doc/percona-server/5.6/changed_in_56.html>`_ documentation. Add the following to :file:`my.cnf` for compatibility with 5.5 replication for the duration of upgrade, add 'socket.checksum=1' to the :variable:`wsrep_provider_options` variable, and set the following options: ::
 
