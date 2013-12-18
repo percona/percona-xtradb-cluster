@@ -13,7 +13,7 @@ Automatic Installation
 
 Execute the following command as a ``root`` user, replacing ``x86_64`` with ``i386`` if you are not running a 64-bit operating system: ::
 
-  $ rpm -Uhv http://www.percona.com/downloads/percona-release/percona-release-0.0-1.x86_64.rpm
+  $ yum install http://www.percona.com/downloads/percona-release/percona-release-0.0-1.x86_64.rpm
 
 The RPMs for the automatic installation are available at http://www.percona.com/downloads/percona-release/ and include source code.
 
@@ -32,7 +32,7 @@ Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 
 Following command will install Cluster packages: ::
 
-  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 percona-xtrabackup
+  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 Percona-XtraDB-Cluster-galera-3
 
 .. warning:: 
 
@@ -43,7 +43,7 @@ Percona `yum` Experimental repository
 
 Percona offers fresh beta builds from the experimental repository. To subscribe to the experimental repository, install the experimental *RPM*: ::
 
-  rpm -Uhv http://repo.percona.com/testing/centos/6/os/noarch/percona-testing-0.0-1.noarch.rpm
+  yum install http://repo.percona.com/testing/centos/6/os/noarch/percona-testing-0.0-1.noarch.rpm
 
 .. note:: 
  This repository works for both RHEL/CentOS 5 and RHEL/CentOS 6

@@ -49,7 +49,11 @@ Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 
 Following command will install Cluster packages: :: 
 
-  $ sudo apt-get install percona-xtradb-cluster-client-5.6 percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-galera-3.x
+  $ sudo apt-get install percona-xtradb-cluster-galera-3.x percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6
+
+.. note:: 
+    
+   Garbd is packaged separately as part of debian split packaging. The garbd debian package is ``percona-xtradb-cluster-garbd-3.x``. The package contains, garbd, daemon init script and related config files.
 
 Percona `apt` Experimental repository
 =====================================
