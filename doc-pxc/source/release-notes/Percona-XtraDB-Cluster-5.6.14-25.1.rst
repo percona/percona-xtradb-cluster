@@ -33,6 +33,17 @@ New Features
 
  ``RPM`` packages are now made `relocatable <http://rpm5.org/docs/api/relocatable.html>`_ which means they now support installation to custom prefixes.
 
+Features from Galera
+---------------------
+
+Following are salient features of Galera 3:
+
+ * new writeset format optimized for performance and reduced memory usage.
+ * 128-bit writeset checksums, checked every time before writeset is applied, so that corruption cannot sneak in neither on disk, nor in transfer.
+ * hardware accelerated CRC32-C algorithm for network packets (and ability to turn it off completely). Parameter: socket.checksum.
+ * improved handling of preordered (read: master-slave replication) events, that preserves original event ID and offers better throughput.
+ * ability to divide cluster into segments with minimized communication between them to minimize network traffic over WAN. Parameter: gmcast.segment.
+
 Bugs fixed 
 ==========
 
