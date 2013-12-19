@@ -17,7 +17,7 @@ New Features
 
  New :variable:`wsrep_reject_queries` has been implemented that can be used to reject queries for that node. This can be useful if someone wants to manually run maintenance on the node like ``mysqldump`` without need to change the settings on the load balancer. 
 
- XtraBackup SST now supports :variable:`innodb_data_home_dir` and :variable:`innodb_log_home_dir` in the configuration file with :option:`sst_special_dirs` option.
+ XtraBackup SST now supports :variable:`innodb_data_home_dir` and :variable:`innodb_log_group_home_dir` in the configuration file with :option:`sst_special_dirs` option.
 
  New :variable:`wsrep_local_cached_downto` status variable has been introduced. This variable shows the lowest sequence number in ``gcache``. This information can be helpful with determining IST and/or SST.
 
