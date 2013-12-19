@@ -12430,6 +12430,7 @@ wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno)
 		(long long)bf_seqno, (long long)victim_seqno);
 	abort();
 }
+
 int
 wsrep_innobase_kill_one_trx(void *bf_thd_ptr, trx_t *bf_trx, trx_t *victim_trx, ibool signal)
 {
