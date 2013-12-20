@@ -22,6 +22,8 @@
 #include <mysql/plugin.h>
 #include <mysql/service_thd_wait.h>
 #include <mysql/psi/mysql_stage.h>
+#include <my_murmur3.h>
+
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
@@ -29,12 +31,10 @@ extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 extern "C" char *wsrep_thd_query(THD *thd);
 void sql_print_information(const char *format, ...)
   ATTRIBUTE_FORMAT(printf, 1, 2);
-#include <my_murmur3.h>
-
 extern bool
 wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
                           MDL_ticket *ticket);
-#endif
+#endif /* WITH_WSREP */
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_MDL_map_mutex;
 static PSI_mutex_key key_MDL_wait_LOCK_wait_status;
