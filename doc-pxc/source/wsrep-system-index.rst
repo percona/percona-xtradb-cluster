@@ -225,8 +225,8 @@ This variable is used to set the notification `command <http://www.codership.com
 
 .. variable:: wsrep_on
 
-   :cli: Yes
-   :conf: Yes
+   :cli: No
+   :conf: No
    :scope: Local, Global
    :dyn: Yes
    :default: ON
@@ -254,14 +254,13 @@ This variable contains settings currently used by Galera library.
 
 .. variable:: wsrep_recover
 
-   :cli: No
-   :conf: Yes
+   :cli: Yes
+   :conf: No
    :scope: Global
    :dyn: No
    :default: OFF
-   :location: mysqld_safe
 
-When server is started with this variable it will parse Global Transaction ID from log, and if the GTID is found, assign it as initial position for actual server start. This option is used to recover GTID.
+When server is started with this variable (as ``--wsrep-recover``) it will parse Global Transaction ID from log, and if the GTID is found, output to stderr (which usually goes into the log). This option is used to recover GTID, mysqld is called with this automatically in mysqld_safe, hence running this manually is not required, also no need to set it in my.cnf.
 
 .. variable:: wsrep_reject_queries
 
@@ -345,12 +344,20 @@ When this variable is enabled SST donor node will not accept incoming queries, i
    :scope: Global
    :dyn: Yes
    :default: rsync
+   :recommended: xtrabackup-v2
 
 This variable sets up the method for taking the State Snapshot Transfer (SST). Available options are:
  * xtrabackup - uses Percona XtraBackup to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password> which |XtraBackup| will use on donor. Privileges and permissions needed for running |XtraBackup| can be found `here <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_.
+ * xtrabackup-v2 - This is same as xtrabackup SST except that it uses newer protocol, hence is not compatible. This is the **recommended** option for PXC 5.5.34 and above. For more details, please check :ref:`xtrabackup_sst` and :ref:`errata`.
  * rsync - uses ``rsync`` to perform the SST, this method doesn't use the :variable:`wsrep_sst_auth`
  * mysqldump - uses ``mysqldump`` to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password>, where user has root privileges on the server.
  * custom_script_name - Galera supports `Scriptable State Snapshot Transfer <http://www.codership.com/wiki/doku.php?id=scriptable_state_snapshot_transfer>`_. This enables users to create their own custom script for performing an SST.
+ * skip - this option can be used to skip the SST, it can be used when initially starting the cluster and manually restore the same data to all nodes. It shouldn't be used as permanent setting because it could lead to data inconsistency across the nodes.
+
+.. note:: 
+    Note the following:
+        * mysqldump SST is not recommended unless it is required for specific reasons. Also, it is not compatible with ``bind_address = 127.0.0.1 or localhost`` and will cause startup to fail if set so.
+        * Xtrabackup-v2 SST is currently recommended if you have innodb-log-group_home-dir/innodb-data-home-dir in your cnf. Refer to :option:`sst-special-dirs` for more.
 
 .. variable:: wsrep_sst_receive_address
 

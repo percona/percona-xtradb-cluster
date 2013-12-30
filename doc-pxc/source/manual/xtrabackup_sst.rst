@@ -9,9 +9,11 @@ XtraBackup SST works in two stages:
  * Stage I on joiner checks if it is |SST| or |IST| based on presence of :file:`xtrabackup_ist` file. 
  * In Stage II it starts the data transfer, if it's |SST|, it empties the data directory sans few files (galera.cache, sst_in_progress, grastate.dat) and then proceed with the SST or if it's IST, proceeds as before.
 
-This change has introduced **incompatibilities** with older versions, refer to `Incompatibilities <http://www.percona.com/doc/percona-xtradb-cluster/errata.html#incompatibilities>`_ for more details.
+.. warning::
 
-Latest Xtrabackup 2.1.x is strongly recommended for Xtrabackup SST.
+   :ref:`xtrabackup_sst` implementation added in |Percona XtraDB Cluster| :rn:`5.5.33-23.7.6` has been renamed to ``xtrabackup-v2``, so :variable:`wsrep_sst_method` =xtrabackup will use xtrabackup implementation before :rn:`5.5.33-23.7.6` and will be compatible with older |Percona XtraDB Cluster| versions. In order to use the new version :variable:`wsrep_sst_method` should be set to ``xtrabackup-v2``.
+
+Latest |Percona Xtrabackup| 2.1.x is strongly recommended for Xtrabackup SST. Refer to `Incompatibilities <http://www.percona.com/doc/percona-xtradb-cluster/errata.html#incompatibilities>`_ for possible caveats.
 
 Following SST specific options are allowed in my.cnf under [sst]                                     
 -----------------------------------------------------------------
@@ -60,7 +62,7 @@ socat is recommended because it allows for socket options like transfer buffer s
                                                                                                              
 .. option:: encrypt
 
-    :Values: 0,1,2  
+    :Values: 0,1,2,3
     :Default: 0
     :Match: Yes
 
@@ -72,6 +74,8 @@ over WAN and security constraints are higher, while ``encrypt=1``
   * Xtrabackup based encryption  with ``encrypt=1``.
 
   * OpenSSL based encryption with ``encrypt=2``. Socat must be built with openSSL for encryption: ``socat -V | grep OPENSSL``.
+
+  * Support for SSL encryption for just the key and crt files as implemented in `Galera <http://www.codership.com/wiki/doku.php?id=ssl_support>`_ can be enabled with ``encrypt=3`` option. Information on this option can be found :ref:`here <galera_sst_encryption>`.
 
 Refer to this :ref:`document <xtrabackup_sst_encryption>` when enabling with ``encrypt=1``.
 
@@ -105,7 +109,9 @@ If equal to:
     
 Used only on joiner. 1 implies rebuild indexes. Note that this is       
 independent of compaction, though compaction enables it. Rebuild of     
-indexes may be used as an optimization.                                 
+indexes may be used as an optimization. Note that :bug:`1192834`        
+affects this, hence use of ``compact`` and ``rebuild`` are recommended  
+after that is fixed in Percona Xtrabackup and released.                 
                              
 .. option:: time
 
@@ -136,6 +142,24 @@ manual setup. Hence, not supported currently.
 
 If set to 1, SST will use the thread pool's `extra_port <http://www.percona.com/doc/percona-server/5.6/performance/threadpool.html#extra_port>`_. Make sure that thread pool is enabled and extra_port option is set in my.cnf before you turn on this option.
 
+.. option:: cpat
+
+During the SST, the :term:`datadir` is cleaned up so that state of other node can be restored cleanly. This option provides the ability to define the files that need to be deleted before the SST. It can be set like: :: 
+
+  [sst]
+  cpat='.*galera\.cache$\|.*sst_in_progress$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*\.xyz$'
+
+**NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2.
+
+.. option:: sst_special_dirs
+   
+     :Values: 0,1
+     :Default: 0
+
+In order for XtraBackup SST to support :variable:`innodb_data_home_dir` and :variable:`innodb_log_home_dir` variables in the configuration file this option was introduced in |Percona XtraDB Cluster| :rn:`5.5.34-25.9`. This requires sst-special-dirs to be set under [sst] in the configuration file to either 0 or 1. Also, :variable:`innodb-data-home-dir` and/or :variable:`innodb-log-group-home-dir` need to be defined in :file:`my.cnf` under [mysqld]. |Percona Xtrabackup| 2.1.6 or higher is required in order for this to work.
+
+**NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2.
+
 .. _tar_ag_xbstream:
 
 Tar against xbstream
@@ -155,6 +179,20 @@ Following are optional dependencies of PXC introduced by wsrep_sst_xtrabackup: (
     * pv. Required for :option:`progress` and :option:`rlimit`. Provided by pv.
     * mkfifo. Required for :option:`progress`. Provided by coreutils.
     * mktemp. Required for :option:`incremental`. Provided by coreutils.
+
+.. _galera_sst_encryption:
+
+Galera compatible encryption
+----------------------------
+
+Support for SSL encryption for just the key and crt files as implemented in `Galera <http://www.codership.com/wiki/doku.php?id=ssl_support>`_ can be enabled with ``encrypt=3`` option. This has been implemented in :rn:`5.5.34-23.7.6` for compatibility with Galera. **NOTE**: This option does not provide certificate validation. In order to work correctly paths to the key and cert files need to be specified as well, like: ::
+
+   [sst] 
+   encrypt=3
+   tkey=/etc/mysql/key.pem
+   tcert=/etc/mysql/cert.pem
+
+**NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2.
 
 .. _xtrabackup_sst_encryption:
 

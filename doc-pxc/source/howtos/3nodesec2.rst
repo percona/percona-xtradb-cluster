@@ -14,7 +14,7 @@ Install XtraDB Cluster from RPM:
 
 2. Install Percona XtraDB Cluster packages: ::
 
-        yum install Percona-XtraDB-Cluster-server Percona-XtraDB-Cluster-client
+        yum install Percona-XtraDB-Cluster-server-55 Percona-XtraDB-Cluster-client-55 Percona-XtraDB-Cluster-galera-2
 
 3. Create data directories: ::
 

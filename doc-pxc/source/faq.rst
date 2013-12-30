@@ -49,9 +49,14 @@ Q: How would it handle split brain?
 ====================================
 A: It would not handle it. The |split brain| is hard stop, XtraDB Cluster can't resolve it.
 That's why the minimal recommendation is to have 3 nodes. 
-However there is possibility to allow a node to handle the traffic, option is: ::
+If there is a loss of quorum and no primary component, you can make a node PRIMARY by: ::
+
+  SET GLOBAL wsrep_provider_options="pc.bootstrap=1";
+
+However it is also possible to make a node immune to quorum issues with: ::
   
-  wsrep_provider_options="pc.ignore_sb = yes"
+  SET GLOBAL wsrep_provider_options="pc.ignore_sb = yes"
+
 
 Q: Is it possible to set up cluster without state transfer
 ==========================================================

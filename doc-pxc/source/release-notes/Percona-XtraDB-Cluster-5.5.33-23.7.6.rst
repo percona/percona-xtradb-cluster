@@ -22,6 +22,9 @@ New Features
 Improvements to :ref:`XtraBackup SST <xtrabackup_sst>`
 ------------------------------------------------------
 
+.. note::
+    There are several changes to Xtrabackup SST from 5.5.33 onwards. Make sure to check :ref:`XtraBackup SST <xtrabackup_sst>` for details, and also `incompatibilities <http://www.percona.com/doc/percona-xtradb-cluster/errata.html#incompatibilities>`_ for any issues.
+
  |Percona XtraDB Cluster| has implemented progress indicator for :ref:`XtraBackup SST <xtrabackup_sst>`.
 
  |Percona XtraDB Cluster| has implemented new rate limiting, :option:`rlimit`, option for :ref:`XtraBackup SST <xtrabackup_sst>` that can be used to avoid saturating the donor node.

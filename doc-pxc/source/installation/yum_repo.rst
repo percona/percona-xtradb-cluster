@@ -30,7 +30,7 @@ Install XtraDB Cluster
 
 Following command will install Cluster packages: ::
 
-  $ yum install Percona-XtraDB-Cluster-server Percona-XtraDB-Cluster-client xtrabackup
+  $ yum install Percona-XtraDB-Cluster-server-55 Percona-XtraDB-Cluster-client-55 Percona-XtraDB-Cluster-galera-2
 
 Percona `yum` Experimental repository
 =====================================

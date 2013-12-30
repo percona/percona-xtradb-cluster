@@ -25,3 +25,4 @@ There are some limitations which you should be aware of. Some of them will be el
 
  - The minimal recommended size of cluster is 3 nodes.
 
+ - Currently using the query cache isn't supported as it was showing some issues during the cache invalidation with certain multi-master use cases.
