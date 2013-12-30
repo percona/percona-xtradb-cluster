@@ -867,9 +867,6 @@ trx_sys_update_mysql_binlog_offset(
 				the trx sys header */
 	mtr_t*		mtr)	/*!< in: mtr */
 {
-#ifndef WITH_WSREP
-	trx_sysf_t*	sys_header;
-#endif /* !WITH_WSREP */
 	const char*	file_name;
 
 	if (ut_strlen(file_name_in) >= TRX_SYS_MYSQL_MASTER_LOG_NAME_LEN) {
@@ -881,10 +878,6 @@ trx_sys_update_mysql_binlog_offset(
 	} else {
 		file_name = file_name_in;
 	}
-
-#ifndef WITH_WSREP
-	sys_header = trx_sysf_get(mtr);
-#endif /* !WITH_WSREP */
 
 	if (mach_read_from_4(sys_header + field
 			     + TRX_SYS_MYSQL_LOG_MAGIC_N_FLD)
