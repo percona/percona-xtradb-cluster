@@ -59,8 +59,12 @@ need to protect it by a mutex. It is only ever read by the thread
 doing the shutdown */
 UNIV_INTERN ibool buf_page_cleaner_is_active = FALSE;
 
+/** Flag indicating if the lru_manager is in active state. */
+UNIV_INTERN bool buf_lru_manager_is_active = false;
+
 #ifdef UNIV_PFS_THREAD
 UNIV_INTERN mysql_pfs_key_t buf_page_cleaner_thread_key;
+UNIV_INTERN mysql_pfs_key_t buf_lru_manager_thread_key;
 #endif /* UNIV_PFS_THREAD */
 
 /** If LRU list of a buf_pool is less than this size then LRU eviction
@@ -550,6 +554,8 @@ buf_flush_ready_for_flush(
 
 	switch (flush_type) {
 	case BUF_FLUSH_LIST:
+		return(true);
+
 	case BUF_FLUSH_LRU:
 	case BUF_FLUSH_SINGLE_PAGE:
 		/* Because any thread may call single page flush, even
@@ -2626,7 +2632,7 @@ page_cleaner_adapt_flush_sleep_time(void)
 
 /******************************************************************//**
 page_cleaner thread tasked with flushing dirty pages from the buffer
-pools. As of now we'll have only one instance of this thread.
+pool flush lists. As of now we'll have only one instance of this thread.
 @return a dummy parameter */
 extern "C" UNIV_INTERN
 os_thread_ret_t
@@ -2639,7 +2645,7 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 	ulint	next_loop_time = ut_time_ms() + 1000;
 	ulint	n_flushed = 0;
 	ulint	last_activity = srv_get_activity_count();
-	ulint	lru_sleep_time = srv_cleaner_max_lru_time;
+	ulint	last_activity_time = ut_time_ms();
 
 	ut_ad(!srv_read_only_mode);
 
@@ -2660,8 +2666,8 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 
 	while (srv_shutdown_state == SRV_SHUTDOWN_NONE) {
 
-		ulint	flush_sleep_time;
 		ulint	page_cleaner_sleep_time;
+		ibool	server_active;
 
 		srv_current_thread_priority = srv_cleaner_thread_priority;
 
@@ -2674,20 +2680,20 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 			page_cleaner_sleep_if_needed(next_loop_time);
 		}
 
-		page_cleaner_adapt_lru_sleep_time(&lru_sleep_time);
-
-		flush_sleep_time = page_cleaner_adapt_flush_sleep_time();
-
-		page_cleaner_sleep_time = ut_min(lru_sleep_time,
-						 flush_sleep_time);
+		page_cleaner_sleep_time
+			= page_cleaner_adapt_flush_sleep_time();
 
 		next_loop_time = ut_time_ms() + page_cleaner_sleep_time;
 
-		/* Flush pages from end of LRU if required */
-		n_flushed = buf_flush_LRU_tail();
+		server_active = srv_check_activity(last_activity);
+		if (server_active
+		    || ut_time_ms() - last_activity_time < 1000) {
 
-		if (srv_check_activity(last_activity)) {
-			last_activity = srv_get_activity_count();
+			if (server_active) {
+
+				last_activity = srv_get_activity_count();
+				last_activity_time = ut_time_ms();
+			}
 
 			/* Flush pages from flush_list if required */
 			n_flushed += page_cleaner_flush_pages_if_needed();
@@ -2770,6 +2776,74 @@ DECLARE_THREAD(buf_flush_page_cleaner_thread)(
 
 thread_exit:
 	buf_page_cleaner_is_active = FALSE;
+
+	/* We count the number of threads in os_thread_exit(). A created
+	thread should always use that to exit and not use return() to exit. */
+	os_thread_exit(NULL);
+
+	OS_THREAD_DUMMY_RETURN;
+}
+
+/******************************************************************//**
+lru_manager thread tasked with performing LRU flushes and evictions to refill
+the buffer pool free lists.  As of now we'll have only one instance of this
+thread.
+@return a dummy parameter */
+extern "C" UNIV_INTERN
+os_thread_ret_t
+DECLARE_THREAD(buf_flush_lru_manager_thread)(
+/*==========================================*/
+	void*	arg __attribute__((unused)))
+			/*!< in: a dummy parameter required by
+			os_thread_create */
+{
+	ulint	next_loop_time = ut_time_ms() + 1000;
+	ulint	lru_sleep_time = srv_cleaner_max_lru_time;
+
+#ifdef UNIV_PFS_THREAD
+	pfs_register_thread(buf_lru_manager_thread_key);
+#endif /* UNIV_PFS_THREAD */
+
+	srv_lru_manager_tid = os_thread_get_tid();
+
+	os_thread_set_priority(srv_lru_manager_tid,
+			       srv_sched_priority_cleaner);
+
+#ifdef UNIV_DEBUG_THREAD_CREATION
+	fprintf(stderr, "InnoDB: lru_manager thread running, id %lu\n",
+		os_thread_pf(os_thread_get_curr_id()));
+#endif /* UNIV_DEBUG_THREAD_CREATION */
+
+	buf_lru_manager_is_active = true;
+
+	/* On server shutdown, the LRU manager thread runs through cleanup
+	phase to provide free pages for the master and purge threads.  */
+	while (srv_shutdown_state == SRV_SHUTDOWN_NONE
+	       || srv_shutdown_state == SRV_SHUTDOWN_CLEANUP) {
+
+		ulint n_flushed_lru;
+
+		srv_current_thread_priority = srv_cleaner_thread_priority;
+
+		page_cleaner_sleep_if_needed(next_loop_time);
+
+		page_cleaner_adapt_lru_sleep_time(&lru_sleep_time);
+
+		next_loop_time = ut_time_ms() + lru_sleep_time;
+
+		n_flushed_lru = buf_flush_LRU_tail();
+
+		if (n_flushed_lru) {
+
+			MONITOR_INC_VALUE_CUMULATIVE(
+				MONITOR_FLUSH_BACKGROUND_TOTAL_PAGE,
+				MONITOR_FLUSH_BACKGROUND_COUNT,
+				MONITOR_FLUSH_BACKGROUND_PAGES,
+				n_flushed_lru);
+		}
+	}
+
+	buf_lru_manager_is_active = false;
 
 	/* We count the number of threads in os_thread_exit(). A created
 	thread should always use that to exit and not use return() to exit. */

@@ -165,7 +165,7 @@ class TC_LOG_MMAP: public TC_LOG
   my_off_t file_length;
   uint npages, inited;
   uchar *data;
-  struct st_page *pages, *syncing, *active, *pool, *pool_last;
+  struct st_page *pages, *syncing, *active, *pool, **pool_last_ptr;
   /*
     note that, e.g. LOCK_active is only used to protect
     'active' pointer, to protect the content of the active page
@@ -183,6 +183,7 @@ class TC_LOG_MMAP: public TC_LOG
   int rollback(THD *thd, bool all)      { return ha_rollback_low(thd, all); }
   int prepare(THD *thd, bool all)       { return ha_prepare_low(thd, all); }
   int recover();
+  uint size() const;
 
 private:
   int log_xid(THD *thd, my_xid xid);
@@ -190,6 +191,8 @@ private:
   void get_active_from_pool();
   int sync();
   int overflow();
+
+  friend class TCLogMMapTest;
 };
 #else
 #define TC_LOG_MMAP TC_LOG_DUMMY
