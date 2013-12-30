@@ -580,7 +580,7 @@ wsrep_break_lock(
 {
   if (wsrep_on(data->owner->mysql_thd) &&
       wsrep_thd_is_brute_force          &&
-      wsrep_thd_is_brute_force(data->owner->mysql_thd))
+      wsrep_thd_is_brute_force(data->owner->mysql_thd, TRUE))
   {
     THR_LOCK_DATA *holder;
 
@@ -605,7 +605,7 @@ wsrep_break_lock(
 	 holder; 
 	 holder=holder->next) 
     {
-      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd))
+      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd, TRUE))
       {
         wsrep_abort_thd(data->owner->mysql_thd, 
                         holder->owner->mysql_thd, FALSE);
@@ -621,7 +621,7 @@ wsrep_break_lock(
 	 holder; 
 	 holder=holder->next) 
     {
-      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd))
+      if (!wsrep_thd_is_brute_force(holder->owner->mysql_thd, TRUE))
       {
         wsrep_abort_thd(data->owner->mysql_thd,
                         holder->owner->mysql_thd, FALSE);
