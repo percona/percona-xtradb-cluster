@@ -588,7 +588,11 @@ DECLARE_THREAD(buf_dump_thread)(
 	buf_dump_status(STATUS_INFO, "not started");
 	buf_load_status(STATUS_INFO, "not started");
 
+#ifdef WITH_WSREP
 	if (srv_buffer_pool_load_at_startup && !wsrep_recovery) {
+#else
+	if (srv_buffer_pool_load_at_startup) {
+#endif
 		buf_load();
 	}
 
@@ -601,7 +605,11 @@ DECLARE_THREAD(buf_dump_thread)(
 			buf_dump(TRUE /* quit on shutdown */);
 		}
 
+#ifdef WITH_WSREP
 		if (buf_load_should_start && !wsrep_recovery) {
+#else
+		if (buf_load_should_start) {
+#endif
 			buf_load_should_start = FALSE;
 			buf_load();
 		}

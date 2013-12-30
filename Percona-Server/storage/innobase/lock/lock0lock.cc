@@ -2428,8 +2428,10 @@ lock_rec_lock_slow(
 
 	DBUG_EXECUTE_IF("innodb_report_deadlock", return(DB_DEADLOCK););
 
+#ifdef WITH_WSREP
         if (wsrep_log_conflicts)
                 mutex_enter(&trx_sys->mutex);
+#endif /* WITH_WSREP */
 	trx = thr_get_trx(thr);
 	trx_mutex_enter(trx);
 
@@ -2496,8 +2498,10 @@ enqueue_waiting:
 		err = DB_SUCCESS_LOCKED_REC;
 	}
 
+#ifdef WITH_WSREP
         if (wsrep_log_conflicts)
                 mutex_exit(&trx_sys->mutex);
+#endif /* WITH_WSREP */
 released:
         trx_mutex_exit(trx);
 
