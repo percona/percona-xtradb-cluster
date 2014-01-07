@@ -4591,28 +4591,6 @@ static bool have_client_connections()
   return false;
 }
 
-/*
-   returns the number of wsrep appliers running.
-   However, the caller (thd parameter) is not taken in account
- */
-static int have_wsrep_appliers(THD *thd)
-{
-  int ret= 0;
-  THD *tmp;
-
-  I_List_iterator<THD> it(threads);
-  while ((tmp=it++))
-  {
-    ret+= (tmp != thd && tmp->wsrep_applier);
-  }
-  if (ret && wsrep_running_threads == 0)
-    {
-      WSREP_DEBUG("applier mismatch: %d - %d", ret, (int)wsrep_running_threads);
-      return wsrep_running_threads;
-    }
-  return ret;
-}
-
 static void wsrep_close_thread(THD *thd)
 {
   thd->killed= THD::KILL_CONNECTION;
@@ -4798,7 +4776,7 @@ void wsrep_wait_appliers_close(THD *thd)
 {
   /* Wait for wsrep appliers to gracefully exit */
   mysql_mutex_lock(&LOCK_thread_count);
-  while (have_wsrep_appliers(thd) > 1)
+  while (wsrep_running_threads > 1)
   // 1 is for rollbacker thread which needs to be killed explicitly.
   // This gotta be fixed in a more elegant manner if we gonna have arbitrary
   // number of non-applier wsrep threads.
@@ -4811,7 +4789,7 @@ void wsrep_wait_appliers_close(THD *thd)
   wsrep_close_threads (thd);
   /* and wait for them to die */
   mysql_mutex_lock(&LOCK_thread_count);
-  while (have_wsrep_appliers(thd) > 0)
+  while (wsrep_running_threads > 0)
   {
     mysql_cond_wait(&COND_thread_count,&LOCK_thread_count);
     DBUG_PRINT("quit",("One thread died (count=%u)",thread_count));
