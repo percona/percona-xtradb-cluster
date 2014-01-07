@@ -2408,7 +2408,11 @@ bool one_thread_per_connection_end(THD *thd, bool put_in_cache)
 {
   DBUG_ENTER("one_thread_per_connection_end");
   unlink_thd(thd);
+#ifdef WITH_WSREP
+  if (put_in_cache && !thd->wsrep_applier)
+#else
   if (put_in_cache)
+#endif /* WITH_WSREP */
     put_in_cache= cache_thread();
   mysql_mutex_unlock(&LOCK_thread_count);
   if (put_in_cache)
@@ -4489,6 +4493,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
 
   mysql_mutex_lock(&LOCK_thread_count);
   wsrep_running_threads--;
+  WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
   mysql_cond_signal(&COND_thread_count);
   mysql_mutex_unlock(&LOCK_thread_count);
 
@@ -4600,6 +4605,11 @@ static int have_wsrep_appliers(THD *thd)
   {
     ret+= (tmp != thd && tmp->wsrep_applier);
   }
+  if (ret && wsrep_running_threads == 0)
+    {
+      WSREP_DEBUG("applier mismatch: %d - %d", ret, (int)wsrep_running_threads);
+      return wsrep_running_threads;
+    }
   return ret;
 }
 
