@@ -1049,7 +1049,11 @@ lock_has_to_wait(
 			/* If this lock request is for a supremum record
 			then the second bit on the lock bitmap is set */
 
+#ifdef WITH_WSREP
 			return(lock_rec_has_to_wait(FALSE, lock1->trx,
+#else
+			return(lock_rec_has_to_wait(lock1->trx,
+#endif /* WITH_WSREP */
 						    lock1->type_mode, lock2,
 						    lock_rec_get_nth_bit(
 							    lock1, 1)));
@@ -1627,7 +1631,11 @@ lock_rec_other_has_conflicting(
 		if (UNIV_UNLIKELY(heap_no == PAGE_HEAP_NO_SUPREMUM)) {
 
 			do {
+#ifdef WITH_WSREP
 			  if (lock_rec_has_to_wait(TRUE, trx, mode, lock,
+#else
+			  if (lock_rec_has_to_wait(trx, mode, lock,
+#endif /* WITH_WSREP */
 							 TRUE)) {
 #ifdef WITH_WSREP
 					wsrep_kill_victim(trx, lock);
@@ -1640,7 +1648,11 @@ lock_rec_other_has_conflicting(
 		} else {
 
 			do {
+#ifdef WITH_WSREP
 			  if (lock_rec_has_to_wait(TRUE, trx, mode, lock,
+#else
+			  if (lock_rec_has_to_wait(trx, mode, lock,
+#endif /* WITH_WSREP */
 							 FALSE)) {
 #ifdef WITH_WSREP
 					wsrep_kill_victim(trx, lock);
