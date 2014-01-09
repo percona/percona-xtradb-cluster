@@ -4446,13 +4446,6 @@ pthread_handler_t start_wsrep_THD(void *arg)
     return(NULL);
   }
 
-  /* from handle_bootstrap() */
-#ifdef REMOVED
-  thd->security_ctx->priv_user=
-    thd->security_ctx->user= (char*) my_strdup("boot", MYF(MY_WME));
-  thd->security_ctx->priv_host[0]=0;
-#endif
-
   thd->system_thread= SYSTEM_THREAD_SLAVE_SQL;
   thd->security_ctx->skip_grants();
 
@@ -4497,6 +4490,7 @@ pthread_handler_t start_wsrep_THD(void *arg)
     // 'Error in my_thread_global_end(): 2 threads didn't exit'
     // at server shutdown
   }
+  my_thread_end();
   return(NULL);
 }
 
