@@ -228,7 +228,17 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
 
   WSREP_DEBUG("wsrep_provider_update: %s", wsrep_provider);
 
+  /* stop replication is heavy operation, and includes closing all client 
+     connections. Closing clients may need to get LOCK_global_system_variables
+     at least in MariaDB.
+
+     Note: releasing LOCK_global_system_variables may cause race condition, if 
+     there can be several concurrent clients changing wsrep_provider
+  */
+  mysql_mutex_unlock(&LOCK_global_system_variables);
   wsrep_stop_replication(thd);
+  mysql_mutex_lock(&LOCK_global_system_variables);
+
   wsrep_deinit();
 
   char* tmp= strdup(wsrep_provider); // wsrep_init() rewrites provider 
@@ -344,7 +354,16 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
   bool wsrep_on_saved= thd->variables.wsrep_on;
   thd->variables.wsrep_on= false;
 
+  /* stop replication is heavy operation, and includes closing all client 
+     connections. Closing clients may need to get LOCK_global_system_variables
+     at least in MariaDB.
+
+     Note: releasing LOCK_global_system_variables may cause race condition, if 
+     there can be several concurrent clients changing wsrep_provider
+  */
+  mysql_mutex_unlock(&LOCK_global_system_variables);
   wsrep_stop_replication(thd);
+  mysql_mutex_lock(&LOCK_global_system_variables);
 
   if (wsrep_start_replication())
   {

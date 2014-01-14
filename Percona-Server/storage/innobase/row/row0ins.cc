@@ -1938,9 +1938,6 @@ row_ins_scan_sec_index_for_duplicate(
 	mem_heap_t*	offsets_heap)
 				/*!< in/out: memory heap that can be emptied */
 {
-#ifdef WITH_WSREP
-	trx_t*		trx = thr_get_trx(thr);
-#endif
 	ulint		n_unique;
 	int		cmp;
 	ulint		n_fields_cmp;
@@ -2009,14 +2006,7 @@ row_ins_scan_sec_index_for_duplicate(
 		if (flags & BTR_NO_LOCKING_FLAG) {
 			/* Set no locks when applying log
 			in online table rebuild. */
-#ifdef WITH_WSREP
-		/* slave applier must not get duplicate error */
-		} else if (allow_duplicates ||
-		    (wsrep_on(trx->mysql_thd) &&
-		     wsrep_thd_is_brute_force(trx->mysql_thd))) {
-#else
 		} else if (allow_duplicates) {
-#endif
 
 			/* If the SQL-query will update or replace
 			duplicate key we will take X-lock for
@@ -2222,13 +2212,7 @@ row_ins_duplicate_error_in_clust(
 			sure that in roll-forward we get the same duplicate
 			errors as in original execution */
 
-#ifdef WITH_WSREP
-			if (trx->duplicates ||
-			    (wsrep_on(trx->mysql_thd) && 
-			     wsrep_thd_is_brute_force(trx->mysql_thd))) {
-#else
 			if (trx->duplicates) {
-#endif
 
 				/* If the SQL-query will update or replace
 				duplicate key we will take X-lock for
@@ -2273,13 +2257,7 @@ duplicate:
 			offsets = rec_get_offsets(rec, cursor->index, offsets,
 						  ULINT_UNDEFINED, &heap);
 
-#ifdef WITH_WSREP
-			if (trx->duplicates ||
-			    (wsrep_on(trx->mysql_thd) && 
-			     wsrep_thd_is_brute_force(trx->mysql_thd))) {
-#else
 			if (trx->duplicates) {
-#endif
 
 				/* If the SQL-query will update or replace
 				duplicate key we will take X-lock for
