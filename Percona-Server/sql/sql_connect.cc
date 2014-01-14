@@ -1130,11 +1130,7 @@ bool setup_connection_thread_globals(THD *thd)
 {
   if (thd->store_globals())
   {
-#ifdef WITH_WSREP
-    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
-#else
     close_connection(thd, ER_OUT_OF_RESOURCES);
-#endif
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thd->scheduler, end_thread, (thd, 0));
     return 1;                                   // Error
@@ -1380,11 +1376,7 @@ void do_handle_one_connection(THD *thd_arg)
 
   if (MYSQL_CALLBACK_ELSE(thd->scheduler, init_new_connection_thread, (), 0))
   {
-#ifdef WITH_WSREP
-    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
-#else
     close_connection(thd, ER_OUT_OF_RESOURCES);
-#endif
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thd->scheduler, end_thread, (thd, 0));
     return;
@@ -1445,11 +1437,7 @@ void do_handle_one_connection(THD *thd_arg)
     }
 #endif
 end_thread:
-#ifdef WITH_WSREP
-    close_connection(thd, 0, 1);
-#else
     close_connection(thd);
-#endif
 
     if (unlikely(opt_userstat))
     {
