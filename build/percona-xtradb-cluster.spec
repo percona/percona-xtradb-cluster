@@ -1044,6 +1044,9 @@ echo "====="                                     >> $STATUS_HISTORY
 #  Files section
 ##############################################################################
 
+# Empty section for metapackage
+%files 
+
 %files -n Percona-XtraDB-Cluster-server%{product_suffix}
 %defattr(-,root,root,0755)
 
