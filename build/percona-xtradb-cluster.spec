@@ -244,6 +244,7 @@ Patch1:         mysql-dubious-exports.patch
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
+Requires:       Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel
 
