@@ -48,10 +48,12 @@ extern const char wsrep_defaults_file[];
 #define WSREP_SST_OPT_GTID     "--gtid"
 #define WSREP_SST_OPT_BYPASS   "--bypass"
 
-#define WSREP_SST_MYSQLDUMP    "mysqldump"
-#define WSREP_SST_RSYNC        "rsync"
-#define WSREP_SST_SKIP         "skip"
-#define WSREP_SST_DEFAULT      WSREP_SST_RSYNC
+#define WSREP_SST_MYSQLDUMP       "mysqldump"
+#define WSREP_SST_RSYNC           "rsync"
+#define WSREP_SST_SKIP            "skip"
+#define WSREP_SST_XTRABACKUP      "xtrabackup"
+#define WSREP_SST_XTRABACKUP_V2   "xtrabackup-v2"
+#define WSREP_SST_DEFAULT      WSREP_SST_XTRABACKUP_V2
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 #define WSREP_SST_AUTH_MASK    "********"
 
