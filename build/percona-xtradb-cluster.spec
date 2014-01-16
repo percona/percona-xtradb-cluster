@@ -244,7 +244,7 @@ Patch1:         mysql-dubious-exports.patch
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
-Requires:       Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel
 
@@ -264,15 +264,27 @@ Percona recommends that all production deployments be protected with a support
 contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
+This is a meta-package which installs server, client and galera-3.
+
 ##############################################################################
 # Sub package definition
 ##############################################################################
+%package -n Percona-XtraDB-Cluster-full%{product_suffix}
+Summary:        Percona XtraDB Cluster - full package
+Group:          Applications/Databases
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
+Conflicts:    Percona-XtraDB-Cluster-full-55 Percona-XtraDB-Cluster-55
+
+%description -n Percona-XtraDB-Cluster-full%{product_suffix}
+This is a meta-package which provides the full suite of Percona XtraDB
+Cluster 56 packages including the debuginfo. Recommended.
+# ----------------------------------------------------------------------------
 
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.4 socat rsync iproute perl perl-DBI perl-DBD-MySQL
-Provides:       mysql-server MySQL-server Percona-Server-server Percona-XtraDB-Cluster-server-55
+Provides:       mysql-server MySQL-server Percona-Server-server
 Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
@@ -369,7 +381,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 %package -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
-Provides:       mysql-shared mysql-libs Percona-Server-shared Percona-XtraDB-Cluster-shared-55
+Provides:       mysql-shared mysql-libs Percona-Server-shared 
 Conflicts:      Percona-Server-shared-56
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
@@ -1046,6 +1058,9 @@ echo "====="                                     >> $STATUS_HISTORY
 
 # Empty section for metapackage
 %files 
+
+# Empty section for metapackage
+%files -n Percona-XtraDB-Cluster-full%{product_suffix}
 
 %files -n Percona-XtraDB-Cluster-server%{product_suffix}
 %defattr(-,root,root,0755)
