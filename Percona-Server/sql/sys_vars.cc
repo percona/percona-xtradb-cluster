@@ -752,6 +752,9 @@ static bool fix_binlog_format_after_update(sys_var *self, THD *thd,
 static Sys_var_test_flag Sys_core_file(
        "core_file", "write a core-file on crashes", TEST_CORE_ON_SIGNAL);
 
+/*
+  Bug#1243228 Changed from BINLOG_FORMAT_STMT to BINLOG_FORMAT_ROW here.
+*/
 static Sys_var_enum Sys_binlog_format(
        "binlog_format", "What form of binary logging the master will "
        "use: either ROW for row-based binary logging, STATEMENT "
@@ -763,7 +766,7 @@ static Sys_var_enum Sys_binlog_format(
        "MIXED, the format switches to row-based and back implicitly per each "
        "query accessing an NDBCLUSTER table",
        SESSION_VAR(binlog_format), CMD_LINE(REQUIRED_ARG, OPT_BINLOG_FORMAT),
-       binlog_format_names, DEFAULT(BINLOG_FORMAT_STMT),
+       binlog_format_names, DEFAULT(BINLOG_FORMAT_ROW),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(binlog_format_check),
        ON_UPDATE(fix_binlog_format_after_update));
 
