@@ -801,6 +801,20 @@ then
             fi
         fi
 
+
+        if  [[ ! -z $WSREP_SST_OPT_BINLOG ]];then
+
+            BINLOG_DIRNAME=$(dirname $WSREP_SST_OPT_BINLOG)
+            BINLOG_FILENAME=$(basename $WSREP_SST_OPT_BINLOG)
+
+            pushd $BINLOG_DIRNAME &>/dev/null
+            for bfiles in $(ls -1 ${BINLOG_FILENAME}.*);do
+                echo ${BINLOG_DIRNAME}/${bfiles} >> ${BINLOG_FILENAME}.index
+            done
+            popd &> /dev/null
+
+        fi
+
         if [[ $incremental -eq 1 ]];then 
             # Added --ibbackup=xtrabackup_55 because it fails otherwise citing connection issues.
             INNOAPPLY="${INNOBACKUPEX_BIN} $disver --defaults-file=${WSREP_SST_OPT_CONF} \
