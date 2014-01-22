@@ -412,8 +412,21 @@ static ssize_t sst_prepare_other (const char*  method,
   ssize_t cmd_len= 1024;
   char    cmd_str[cmd_len];
   const char* sst_dir= mysql_real_data_home;
-  const char* binlog_opt= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? WSREP_SST_OPT_BINLOG : "") : "");
-  const char* binlog_opt_val= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "") : "");
+  const char* binlog_opt;
+  const char* binlog_opt_val;
+
+  if (opt_bin_log && gtid_mode > 0) {
+    binlog_opt= WSREP_SST_OPT_BINLOG;
+    if (opt_bin_logname) {
+        binlog_opt_val= (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "");
+    }
+    else {
+        char buf[FN_REFLEN];
+        strmake(buf, pidfile_name, FN_REFLEN - strlen("-bin") - 1);
+        binlog_opt_val = (const char *)
+        fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
+    }
+  }
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s "
@@ -457,6 +470,9 @@ static ssize_t sst_prepare_other (const char*  method,
   }
 
   pthread_detach (tmp);
+  free(binlog_opt);
+  free(binlog_opt_val);
+  free(sst_dir);
 
   return ret;
 }
@@ -939,8 +955,21 @@ static int sst_donate_other (const char*   method,
 {
   ssize_t cmd_len = 4096;
   char    cmd_str[cmd_len];
-  const char* binlog_opt= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? WSREP_SST_OPT_BINLOG : "") : "");
-  const char* binlog_opt_val= (opt_bin_logname ? (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "") : "");
+  const char* binlog_opt;
+  const char* binlog_opt_val;
+
+  if (opt_bin_log && gtid_mode > 0) {
+    binlog_opt= WSREP_SST_OPT_BINLOG;
+    if (opt_bin_logname) {
+        binlog_opt_val= (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "");
+    }
+    else {
+        char buf[FN_REFLEN];
+        strmake(buf, pidfile_name, FN_REFLEN - strlen("-bin") - 1);
+        binlog_opt_val = (const char *)
+        fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
+    }
+  }
 
   int ret= snprintf (cmd_str, cmd_len,
                      "wsrep_sst_%s "
