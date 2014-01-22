@@ -807,6 +807,9 @@ then
             BINLOG_DIRNAME=$(dirname $WSREP_SST_OPT_BINLOG)
             BINLOG_FILENAME=$(basename $WSREP_SST_OPT_BINLOG)
 
+            # To avoid comparing data directory and BINLOG_DIRNAME 
+            mv $DATA/${BINLOG_FILENAME}.* $BINLOG_DIRNAME/ 2>/dev/null || true
+
             pushd $BINLOG_DIRNAME &>/dev/null
             for bfiles in $(ls -1 ${BINLOG_FILENAME}.*);do
                 echo ${BINLOG_DIRNAME}/${bfiles} >> ${BINLOG_FILENAME}.index
