@@ -470,9 +470,7 @@ static ssize_t sst_prepare_other (const char*  method,
   }
 
   pthread_detach (tmp);
-  free(binlog_opt);
-  free(binlog_opt_val);
-  free(sst_dir);
+  free((void *)binlog_opt_val);
 
   return ret;
 }
@@ -1009,6 +1007,7 @@ static int sst_donate_other (const char*   method,
   mysql_cond_wait (&arg.cond, &arg.lock);
 
   WSREP_INFO("sst_donor_thread signaled with %d", arg.err);
+  free((void *)binlog_opt_val);
   return arg.err;
 }
 
