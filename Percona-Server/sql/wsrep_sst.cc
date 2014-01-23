@@ -413,7 +413,7 @@ static ssize_t sst_prepare_other (const char*  method,
   char    cmd_str[cmd_len];
   const char* sst_dir= mysql_real_data_home;
   const char* binlog_opt;
-  const char* binlog_opt_val;
+  const char* binlog_opt_val = NULL;
 
   if (opt_bin_log && gtid_mode > 0) {
     binlog_opt= WSREP_SST_OPT_BINLOG;
@@ -423,8 +423,8 @@ static ssize_t sst_prepare_other (const char*  method,
     else {
         char buf[FN_REFLEN];
         strmake(buf, pidfile_name, FN_REFLEN - strlen("-bin") - 1);
-        binlog_opt_val = (const char *)
         fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
+        binlog_opt_val=strdup(buf);
     }
   }
 
@@ -440,6 +440,10 @@ static ssize_t sst_prepare_other (const char*  method,
                      method, addr_in, (sst_auth_real) ? sst_auth_real : "",
                      sst_dir, wsrep_defaults_file, (int)getpid(),
                      binlog_opt, binlog_opt_val);
+
+  if (binlog_opt_val) {
+    free((void *)binlog_opt_val);
+  }
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -470,7 +474,6 @@ static ssize_t sst_prepare_other (const char*  method,
   }
 
   pthread_detach (tmp);
-  free((void *)binlog_opt_val);
 
   return ret;
 }
@@ -954,7 +957,7 @@ static int sst_donate_other (const char*   method,
   ssize_t cmd_len = 4096;
   char    cmd_str[cmd_len];
   const char* binlog_opt;
-  const char* binlog_opt_val;
+  const char* binlog_opt_val = NULL;
 
   if (opt_bin_log && gtid_mode > 0) {
     binlog_opt= WSREP_SST_OPT_BINLOG;
@@ -964,8 +967,8 @@ static int sst_donate_other (const char*   method,
     else {
         char buf[FN_REFLEN];
         strmake(buf, pidfile_name, FN_REFLEN - strlen("-bin") - 1);
-        binlog_opt_val = (const char *)
         fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
+        binlog_opt_val=strdup(buf);
     }
   }
 
@@ -985,6 +988,10 @@ static int sst_donate_other (const char*   method,
                      binlog_opt, binlog_opt_val,
                      uuid, (long long) seqno,
                      bypass ? " "WSREP_SST_OPT_BYPASS : "");
+
+  if (binlog_opt_val) {
+    free((void *)binlog_opt_val);
+  }
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -1007,7 +1014,6 @@ static int sst_donate_other (const char*   method,
   mysql_cond_wait (&arg.cond, &arg.lock);
 
   WSREP_INFO("sst_donor_thread signaled with %d", arg.err);
-  free((void *)binlog_opt_val);
   return arg.err;
 }
 
