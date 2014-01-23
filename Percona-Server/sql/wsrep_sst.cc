@@ -412,7 +412,7 @@ static ssize_t sst_prepare_other (const char*  method,
   ssize_t cmd_len= 1024;
   char    cmd_str[cmd_len];
   const char* sst_dir= mysql_real_data_home;
-  const char* binlog_opt;
+  const char* binlog_opt = "";
   const char* binlog_opt_val = NULL;
 
   if (opt_bin_log && gtid_mode > 0) {
@@ -426,6 +426,8 @@ static ssize_t sst_prepare_other (const char*  method,
         fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
         binlog_opt_val=strdup(buf);
     }
+  } else {
+      binlog_opt_val = "";
   }
 
   int ret= snprintf (cmd_str, cmd_len,
@@ -441,7 +443,7 @@ static ssize_t sst_prepare_other (const char*  method,
                      sst_dir, wsrep_defaults_file, (int)getpid(),
                      binlog_opt, binlog_opt_val);
 
-  if (binlog_opt_val) {
+  if (binlog_opt_val == NULL) {
     free((void *)binlog_opt_val);
   }
 
@@ -956,7 +958,7 @@ static int sst_donate_other (const char*   method,
 {
   ssize_t cmd_len = 4096;
   char    cmd_str[cmd_len];
-  const char* binlog_opt;
+  const char* binlog_opt = "";
   const char* binlog_opt_val = NULL;
 
   if (opt_bin_log && gtid_mode > 0) {
@@ -970,6 +972,8 @@ static int sst_donate_other (const char*   method,
         fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
         binlog_opt_val=strdup(buf);
     }
+  } else {
+      binlog_opt_val = "";
   }
 
   int ret= snprintf (cmd_str, cmd_len,
@@ -989,7 +993,7 @@ static int sst_donate_other (const char*   method,
                      uuid, (long long) seqno,
                      bypass ? " "WSREP_SST_OPT_BYPASS : "");
 
-  if (binlog_opt_val) {
+  if (binlog_opt_val == NULL) {
     free((void *)binlog_opt_val);
   }
 
