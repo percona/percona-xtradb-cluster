@@ -11,7 +11,7 @@ ADDR=127.0.0.1
 SSTPASS="password"
 SUSER="root"
 SMDSUM="d35d212fdfe9452e711704e3dc3e93cf"
-
+EXTRAFILE=${CONF:-}
 
 
 vlog "Running test for innodb_data_home_dir/innodb_log_group_home_dir"
