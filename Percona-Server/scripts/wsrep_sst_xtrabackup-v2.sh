@@ -107,7 +107,8 @@ timeit(){
 
 get_keys()
 {
-    if [[ $encrypt -ge 2 ]];then 
+    # $encrypt -eq 1 is for internal purposes only
+    if [[ $encrypt -ge 2 || $encrypt -eq -1 ]];then 
         return 
     fi
 
@@ -120,7 +121,7 @@ get_keys()
 
     if [[ $sfmt == 'tar' ]];then
         wsrep_log_info "NOTE: Xtrabackup-based encryption - encrypt=1 - cannot be enabled with tar format"
-        encrypt=0
+        encrypt=-1
         return
     fi
 
@@ -178,7 +179,7 @@ get_transfer()
 
         if [[ $encrypt -eq 2 || $encrypt -eq 3 ]] && ! socat -V | grep -q WITH_OPENSSL;then 
             wsrep_log_info "NOTE: socat is not openssl enabled, falling back to plain transfer"
-            encrypt=0
+            encrypt=-1
         fi
 
         if [[ $encrypt -eq 2 ]];then 
