@@ -959,6 +959,10 @@ extern "C" void wsrep_thd_awake(THD *thd, my_bool signal)
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
   }
 }
+extern "C" int wsrep_thd_retry_counter(THD *thd) 
+{
+  return(thd->wsrep_retry_counter);
+}
 
 extern int
 wsrep_trx_order_before(void *thd1, void *thd2)

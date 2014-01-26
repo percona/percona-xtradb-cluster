@@ -7111,9 +7111,10 @@ no_commit:
 #ifdef WITH_WSREP
 			/* workaround for LP bug #355000, retrying the insert */
 			case SQLCOM_INSERT:
-				if (wsrep_on(current_thd)          &&
-				    auto_inc_inserted              &&
-				    wsrep_drupal_282555_workaround &&
+				if (wsrep_on(current_thd)                     &&
+				    auto_inc_inserted                         &&
+				    wsrep_drupal_282555_workaround            &&
+				    wsrep_thd_retry_counter(current_thd) == 0 &&
 				    !thd_test_options(current_thd, 
 						      OPTION_NOT_AUTOCOMMIT | 
 						      OPTION_BEGIN)) {
