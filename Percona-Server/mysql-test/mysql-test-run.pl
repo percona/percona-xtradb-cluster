@@ -4907,9 +4907,12 @@ sub mysqld_arguments ($$$) {
     {
       $found_skip_core= 1;
     }
-    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
+#    elsif ($skip_binlog and mtr_match_prefix($arg, "--binlog-format"))
+#    {
+#      ; # Dont add --binlog-format when running without binlog
+#    }
+    elsif ($arg eq "--loose-skip-log-bin")
     {
-      ; # Dont add --binlog-format when running without binlog
     }
     elsif ($arg eq "--loose-skip-log-bin" and
            $mysqld->option("log-slave-updates"))
