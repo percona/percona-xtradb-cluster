@@ -5783,7 +5783,7 @@ wsrep_innobase_mysql_sort(
 
 		tmp_length = charset->coll->strnxfrm(charset, str, str_length,
 						     str_length, tmp_str, tmp_length, 0);
-		DBUG_ASSERT(tmp_length == str_length);
+		DBUG_ASSERT(tmp_length <= str_length);
  
 		break;
 	}
@@ -7665,9 +7665,10 @@ no_commit:
 #ifdef WITH_WSREP
 			/* workaround for LP bug #355000, retrying the insert */
 			case SQLCOM_INSERT:
-				if (wsrep_on(current_thd)          &&
-				    auto_inc_inserted              &&
-				    wsrep_drupal_282555_workaround &&
+				if (wsrep_on(current_thd)                     &&
+				    auto_inc_inserted                         &&
+				    wsrep_drupal_282555_workaround            &&
+				    wsrep_thd_retry_counter(current_thd) == 0 &&
 				    !thd_test_options(current_thd, 
 						      OPTION_NOT_AUTOCOMMIT | 
 						      OPTION_BEGIN)) {
