@@ -5239,7 +5239,7 @@ wsrep_innobase_mysql_sort(
 
 		tmp_length = charset->coll->strnxfrm(charset, str, str_length,
 						     str_length, tmp_str, tmp_length, 0);
-		DBUG_ASSERT(tmp_length == str_length);
+		DBUG_ASSERT(tmp_length <= str_length);
  
 		break;
 	}
