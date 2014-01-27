@@ -270,8 +270,8 @@ fi
     (
         cd "$JEMALLOCDIR"
 
-        ./configure --prefix="/usr/local/$PRODUCT_FULL/" \
-                --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
+        CFLAGS="$CFLAGS -std=gnu11" ./autogen.sh --prefix="/usr/local/$PRODUCT_FULL/" \
+            --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install_lib_shared
 
