@@ -270,11 +270,11 @@ fi
     (
         cd "$JEMALLOCDIR"
 
-        CFLAGS="-O2 -std=gnu11" ./autogen.sh --prefix="/usr/local/$PRODUCT_FULL/" \
+        ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL/" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install_lib_shared
-
+        strip lib/libjemalloc* || true
         # Copy COPYING file
         cp COPYING "$INSTALLDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
