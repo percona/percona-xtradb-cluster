@@ -730,6 +730,15 @@ then
                 wsrep_log_info "Cleaning the existing datadir"
                 find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
             fi
+            tempdir=$(parse_cnf mysqld log-bin "")
+            if [[ -n ${tempdir:-} ]];then 
+                binlog_dir=$(dirname $tempdir)
+                if [[ $binlog_dir != '.' && $binlog_dir != $DATA ]];then 
+                    wsrep_log_info "Cleaning the binlog directory as well"
+                    find $binlog_dir -maxdepth 1 -type f -exec rm -rfv {} 1>&2 \+
+                fi
+            fi
+
         else
             wsrep_log_info "Removing existing ib_logfile files"
             rm -f ${BDATA}/ib_logfile*
