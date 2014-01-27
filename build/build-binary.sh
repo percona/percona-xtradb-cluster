@@ -270,7 +270,7 @@ fi
     (
         cd "$JEMALLOCDIR"
 
-        ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL/" \
+        CFLAGS= ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL/" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install_lib_shared
