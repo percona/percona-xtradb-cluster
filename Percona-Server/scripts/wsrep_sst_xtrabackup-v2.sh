@@ -734,7 +734,7 @@ then
             if [[ -n ${tempdir:-} ]];then 
                 binlog_dir=$(dirname $tempdir)
                 if [[ $binlog_dir != '.' && $binlog_dir != $DATA ]];then 
-                    wsrep_log_info "Cleaning the binlog directory as well"
+                    wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
                     find $binlog_dir -maxdepth 1 -type f -exec rm -fv {} 1>&2 \+
                 fi
             fi
