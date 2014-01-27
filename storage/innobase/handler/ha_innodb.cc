@@ -3352,6 +3352,9 @@ ha_innobase::max_supported_key_length() const
 	is 16 kB; but currently MySQL does not work with keys whose
 	size is > MAX_KEY_LENGTH */
 #ifdef WITH_WSREP
+	/* this may look like obsolete code, but this ifdef is here
+	   just to make sure we will see bzr merge conflict, if Oracle 
+	   changes max key length */
 	return(3500);
 #else
 	return(3500);
