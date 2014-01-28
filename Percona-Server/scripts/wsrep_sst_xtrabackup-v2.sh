@@ -731,11 +731,14 @@ then
                 find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
             fi
             tempdir=$(parse_cnf mysqld log-bin "")
-            if [[ -n ${tempdir:-} ]];then 
+            if [[ -n ${tempdir:-} ]];then
                 binlog_dir=$(dirname $tempdir)
-                if [[ $binlog_dir != '.' && $binlog_dir != $DATA ]];then 
+                binlog_file=$(basename $tempdir)
+                if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
+                    pattern="$binlog_dir/$binlog_file\.[0-9]+$"
                     wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
-                    find $binlog_dir -maxdepth 1 -type f -exec rm -fv {} 1>&2 \+
+                    find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+
+                    rm $binlog_dir/*.index || true
                 fi
             fi
 
