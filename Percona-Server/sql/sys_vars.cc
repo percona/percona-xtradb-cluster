@@ -766,7 +766,11 @@ static Sys_var_enum Sys_binlog_format(
        "MIXED, the format switches to row-based and back implicitly per each "
        "query accessing an NDBCLUSTER table",
        SESSION_VAR(binlog_format), CMD_LINE(REQUIRED_ARG, OPT_BINLOG_FORMAT),
+#ifdef WITH_WSREP
        binlog_format_names, DEFAULT(BINLOG_FORMAT_ROW),
+#else 
+       binlog_format_names, DEFAULT(BINLOG_FORMAT_STMT),
+#endif
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(binlog_format_check),
        ON_UPDATE(fix_binlog_format_after_update));
 
