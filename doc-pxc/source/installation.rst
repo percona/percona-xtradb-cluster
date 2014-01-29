@@ -7,7 +7,7 @@
 .. toctree::
    :hidden:
 
-Ready-to-use binaries are available from the *Percona XtraDB Cluster* `download page <http://www.percona.com/downloads/Percona-XtraDB-Cluster/>`_, including:
+Ready-to-use binaries are available from the *Percona XtraDB Cluster* `download page <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/>`_, including:
 
  * ``RPM`` packages for *RHEL* 5 and *RHEL* 6
 
@@ -34,7 +34,7 @@ Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 
 Once the repository is set up, use the following commands: ::
 
-  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56  Percona-XtraDB-Cluster-galera-3
+  $ yum install Percona-XtraDB-Cluster-56
 
 More detailed example of the |Percona XtraDB Cluster| installation and configuration can be seen in :ref:`centos_howto` tutorial.
 
@@ -43,7 +43,7 @@ More detailed example of the |Percona XtraDB Cluster| installation and configura
 
 Once the repository is set up, use the following commands: ::
 
-  $ sudo apt-get install percona-xtradb-cluster-galera-3.x percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6
+  $ sudo apt-get install percona-xtradb-cluster-56
 
 More detailed example of the |Percona XtraDB Cluster| installation and configuration can be seen in :ref:`ubuntu_howto` tutorial.
 
@@ -65,7 +65,6 @@ In order to start using the |Percona XtraDB Cluster|, following options are need
   
   binlog_format=ROW - In order for Galera to work correctly binlog format should be ROW
   default_storage_engine=InnoDB - MyISAM storage engine has only experimental support
-  innodb_locks_unsafe_for_binlog=1 - This is a recommended tuning variable for performance
   innodb_autoinc_lock_mode=2 - This changes how InnoDB autoincrement locks are managed
 
 Additional parameters to specify: ::
@@ -82,7 +81,6 @@ Example: ::
   wsrep_sst_method=rsync
   binlog_format=ROW
   default_storage_engine=InnoDB
-  innodb_locks_unsafe_for_binlog=1
   innodb_autoinc_lock_mode=2
 
 Detailed list of variables can be found in :ref:`wsrep_system_index` and :ref:`wsrep_status_index`.

@@ -31,12 +31,7 @@ Prerequisites
 Installation
 ------------
 
-Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
-Percona repository should be set up as described in the :ref:`apt-repo` guide. Following command will install |Percona XtraDB Cluster| packages: :: 
-
-  $ apt-get install percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6 percona-xtradb-cluster-galera-3.x
-
-When these two commands have been executed successfully on all three nodes |Percona XtraDB Cluster| is installed.
+Installation information can be found in the :ref:`installation` guide
 
 .. note:: 
 
@@ -57,20 +52,14 @@ Configuration file :file:`/etc/mysql/my.cnf` for the first node should look like
   # Path to Galera library
   wsrep_provider=/usr/lib/libgalera_smm.so
 
-  # Empty gcomm address is being used when cluster is getting bootstrapped
-  wsrep_cluster_address=gcomm://
-
   # Cluster connection URL contains the IPs of node#1, node#2 and node#3
-  #wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
+  wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
   # In order for Galera to work correctly binlog format should be ROW
   binlog_format=ROW
 
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
-
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
 
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
@@ -79,7 +68,7 @@ Configuration file :file:`/etc/mysql/my.cnf` for the first node should look like
   wsrep_node_address=192.168.70.61
 
   # SST method
-  wsrep_sst_method=xtrabackup
+  wsrep_sst_method=xtrabackup-v2
 
   # Cluster name
   wsrep_cluster_name=my_ubuntu_cluster
@@ -87,11 +76,10 @@ Configuration file :file:`/etc/mysql/my.cnf` for the first node should look like
   # Authentication for SST method
   wsrep_sst_auth="sstuser:s3cretPass"
 
-.. note:: For the first member of the cluster variable :variable:`wsrep_cluster_address` should contain empty ``gcomm://`` when the cluster is being bootstrapped. But as soon as we have bootstrapped the cluster and have at least one more node joined that line can be removed from the :file:`my.cnf` configuration file and the one where :variable:`wsrep_cluster_address` contains all three node addresses. In case the node gets restarted and without making this change it will make bootstrap new cluster instead of joining the existing one.
 
 After this, first node can be started with the following command: ::
 
-  [root@pxc1 ~]# /etc/init.d/mysql start
+  [root@pxc1 ~]# /etc/init.d/mysql bootstrap-pxc
  
 This command will start the first node and bootstrap the cluster (more information about bootstrapping cluster can be found in :ref:`bootstrap` manual).
 
@@ -118,7 +106,7 @@ After the first node has been started, cluster status can be checked by:
 
 This output shows that the cluster has been successfully bootstrapped. 
 
-In order to perform successful :ref:`state_snapshot_transfer` using |XtraBackup| new user needs to be set up with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_: 
+In order to perform successful :ref:`state_snapshot_transfer` using |Percona XtraBackup| new user needs to be set up with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_: 
 
 .. code-block:: mysql
 
@@ -129,7 +117,7 @@ In order to perform successful :ref:`state_snapshot_transfer` using |XtraBackup|
 
 .. note:: 
 
- MySQL root account can also be used for setting up the :ref:`state_snapshot_transfer` with Percona XtraBackup, but it's recommended to use a different (non-root) user for this.
+ MySQL root account can also be used for setting up the :ref:`state_snapshot_transfer` with |Percona XtraBackup|, but it's recommended to use a different (non-root) user for this.
 
 Configuration file :file:`/etc/mysql/my.cnf` on the second node (``pxc2``) should look like this: ::
 
@@ -150,9 +138,6 @@ Configuration file :file:`/etc/mysql/my.cnf` on the second node (``pxc2``) shoul
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
 
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
-
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
 
@@ -163,7 +148,7 @@ Configuration file :file:`/etc/mysql/my.cnf` on the second node (``pxc2``) shoul
   wsrep_cluster_name=my_ubuntu_cluster
 
   # SST method
-  wsrep_sst_method=xtrabackup
+  wsrep_sst_method=xtrabackup-v2
 
   #Authentication for SST method
   wsrep_sst_auth="sstuser:s3cretPass"
@@ -214,9 +199,6 @@ MySQL configuration file :file:`/etc/mysql/my.cnf` on the third node (``pxc3``) 
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
 
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
-
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
 
@@ -227,7 +209,7 @@ MySQL configuration file :file:`/etc/mysql/my.cnf` on the third node (``pxc3``) 
   wsrep_cluster_name=my_ubuntu_cluster
 
   # SST method
-  wsrep_sst_method=xtrabackup
+  wsrep_sst_method=xtrabackup-v2
 
   #Authentication for SST method
   wsrep_sst_auth="sstuser:s3cretPass"
