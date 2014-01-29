@@ -143,6 +143,16 @@ This variable defines a binlog format that will be always be effective regardles
   * MIXED
   * NONE - This option resets the forced state of the binlog format
 
+.. variable:: wsrep_load_data_splitting
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ON 
+
+This variable controls whether ``LOAD DATA`` transaction splitting is wanted or not.
+
 .. variable:: wsrep_log_conflicts
 
    :cli: Yes
@@ -233,6 +243,16 @@ This variable is used to set the notification `command <http://www.codership.com
 
 This variable is used to enable/disable wsrep replication. When set to ``OFF`` server will stop replication and behave like standalone |MySQL| server. 
 
+.. variable:: wsrep_preordered
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: OFF
+
+When enabled this option will use new, transparent handling of preordered replication events (like replication from traditional master).
+
 .. variable:: wsrep_provider
 
    :cli: Yes
@@ -285,7 +305,7 @@ Note, that this doesn't affect galera replication in any way, only the applicati
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: Off
+   :default: OFF
 
 This variable controls if *MyISAM* will be replicated or not. *MyISAM* replication is still experimental and that is one of the reasons why this variable is set to ``OFF`` by default. 
 

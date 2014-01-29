@@ -31,15 +31,7 @@ Prerequisites
 Installation
 ------------
 
-Percona repository should be set up as described in the :ref:`yum-repo` guide. To enable the repository following command should be used: :: 
-
-  $ rpm -Uhv http://www.percona.com/downloads/percona-release/percona-release-0.0-1.x86_64.rpm
-
-Following command will install |Percona XtraDB Cluster| packages: :: 
-
-  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 Percona-XtraDB-Cluster-galera-3
-
-When these two commands have been executed successfully on all three nodes |Percona XtraDB Cluster| is installed.
+Installation information can be found in the :ref:`installation` guide. 
 
 Configuring the nodes
 ---------------------
@@ -65,9 +57,6 @@ Configuration file :file:`/etc/my.cnf` for the first node should look like: ::
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
 
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
-
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
 
@@ -75,7 +64,7 @@ Configuration file :file:`/etc/my.cnf` for the first node should look like: ::
   wsrep_node_address=192.168.70.71
 
   # SST method
-  wsrep_sst_method=xtrabackup
+  wsrep_sst_method=xtrabackup-v2
 
   # Cluster name
   wsrep_cluster_name=my_centos_cluster
@@ -86,7 +75,7 @@ Configuration file :file:`/etc/my.cnf` for the first node should look like: ::
 
 After this, first node can be started with the following command: ::
 
-  [root@percona1 ~]# /etc/init.d/mysql start --wsrep-cluster-address="gcomm://"
+  [root@percona1 ~]# /etc/init.d/mysql bootstrap-pxc
  
 This command will start the cluster with initial :variable:`wsrep_cluster_address` set to ``gcomm://``. This way the cluster will be bootstrapped and in case the node or |MySQL| have to be restarted later, there would be no need to change the configuration file.
 
@@ -152,9 +141,6 @@ Configuration file :file:`/etc/my.cnf` on the second node (``percona2``) should 
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
 
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
-
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
 
@@ -165,7 +151,7 @@ Configuration file :file:`/etc/my.cnf` on the second node (``percona2``) should 
   wsrep_cluster_name=my_centos_cluster
 
   # SST method
-  wsrep_sst_method=xtrabackup
+  wsrep_sst_method=xtrabackup-v2
 
   #Authentication for SST method
   wsrep_sst_auth="sstuser:s3cret"
@@ -216,9 +202,6 @@ MySQL configuration file :file:`/etc/my.cnf` on the third node (``percona3``) sh
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
 
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
-
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
 
@@ -229,7 +212,7 @@ MySQL configuration file :file:`/etc/my.cnf` on the third node (``percona3``) sh
   wsrep_cluster_name=my_centos_cluster
 
   # SST method
-  wsrep_sst_method=xtrabackup
+  wsrep_sst_method=xtrabackup-v2
 
   #Authentication for SST method
   wsrep_sst_auth="sstuser:s3cret"

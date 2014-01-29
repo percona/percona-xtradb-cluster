@@ -4,10 +4,6 @@
  Index of wsrep status variables
 =================================
 
-.. variable:: wsrep_local_cached_downto
-
-This variable shows the lowest sequence number in gcache. This information can be helpful with determining IST and/or SST. If the value is 18446744073709551615, then it means there are no writesets in cached in gcache (usual for a single node).
-
 .. variable:: wsrep_local_state_uuid
   
 This variable contains :term:`UUID` state stored on the node.
@@ -28,6 +24,14 @@ Total number of writesets sent to other nodes.
   
 Total size (in bytes) of writesets sent to other nodes.
 
+.. variable:: wsrep_repl_keys
+
+.. variable:: wsrep_repl_keys_bytes
+
+.. variable:: wsrep_repl_data_bytes
+
+.. variable:: wsrep_repl_other_bytes
+
 .. variable:: wsrep_received
   
 Total number of writesets received from other nodes. 
@@ -43,10 +47,6 @@ Number of writesets commited on the node.
 .. variable:: wsrep_local_cert_failures
   
 Number of writesets that failed the certification test.
-
-.. variable:: wsrep_local_bf_aborts
-  
-Number of local transactions that were aborted by slave transactions while being executed.
 
 .. variable:: wsrep_local_replays
   
@@ -67,6 +67,12 @@ Current length of the receive queue. Show the number of writesets waiting to be 
 .. variable:: wsrep_local_recv_queue_avg
   
 Average length of the receive queue since the last status query. When this number is bigger than ``0`` this means node can't apply writesets as fast as they're received. This could be sign that node is overloaded and it will cause the replication throttling. 
+
+.. variable:: wsrep_local_cached_downto
+
+This variable shows the lowest sequence number in gcache. This information can be helpful with determining IST and/or SST. If the value is 18446744073709551615, then it means there are no writesets in cached in gcache (usual for a single node).
+
+.. variable:: wsrep_flow_control_paused_ns
 
 .. variable:: wsrep_flow_control_paused
   
@@ -151,6 +157,10 @@ Status of the cluster component. Possible values are:
   
 .. variable:: wsrep_connected
   
+.. variable:: wsrep_local_bf_aborts
+  
+Number of local transactions that were aborted by slave transactions while being executed.
+
 .. variable:: wsrep_local_index
   
 Node index in the cluster 

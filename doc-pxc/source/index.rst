@@ -91,7 +91,6 @@ How-tos
    howtos/3nodesec2
    howtos/haproxy
    howtos/virt_sandbox
-   howtos/kewpietests
    howtos/bugreport
 
 Reference
