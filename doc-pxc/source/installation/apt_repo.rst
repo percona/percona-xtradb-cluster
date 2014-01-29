@@ -45,15 +45,17 @@ Ubuntu
 Install XtraDB Cluster
 =======================
 
-Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
+Make sure to remove existing |Percona XtraDB Cluster| 5.5 and |Percona Server| 5.5/5.6 packages before proceeding.
 
-Following command will install Cluster packages: :: 
+Following command will install |Percona XtraDB Cluster| packages: :: 
 
-  $ sudo apt-get install percona-xtradb-cluster-galera-3.x percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6
+  $ sudo apt-get install percona-xtradb-cluster-56
+
+Instead of ``percona-xtradb-cluster-56`` you can install ``percona-xtradb-cluster-full-56`` meta-package which will install ``percona-xtradb-cluster-test-5.6``, ``percona-xtradb-cluster-5.6-dbg``, ``percona-xtradb-cluster-garbd-3.x``, ``percona-xtradb-cluster-galera-3.x-dbg``, ``percona-xtradb-cluster-garbd-3.x-dbg`` and ``libmysqlclient18`` packages in addition.
 
 .. note:: 
     
-   Garbd is packaged separately as part of debian split packaging. The garbd debian package is ``percona-xtradb-cluster-garbd-3.x``. The package contains, garbd, daemon init script and related config files.
+   Garbd is packaged separately as part of debian split packaging. The garbd debian package is ``percona-xtradb-cluster-garbd-3.x``. The package contains, garbd, daemon init script and related config files. This package will be installed if you install the ``percona-xtradb-cluster-56-full`` meta package.
 
 Percona `apt` Experimental repository
 =====================================

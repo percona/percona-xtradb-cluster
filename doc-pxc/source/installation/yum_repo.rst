@@ -32,11 +32,14 @@ Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
 
 Following command will install Cluster packages: ::
 
-  $ yum install Percona-XtraDB-Cluster-server-56 Percona-XtraDB-Cluster-client-56 Percona-XtraDB-Cluster-galera-3
+  $ yum install Percona-XtraDB-Cluster-56
+
+Instead of ``Percona-XtraDB-Cluster-56`` you can install ``Percona-XtraDB-Cluster-full-56`` meta-package which will install ``Percona-XtraDB-Cluster-devel-56``, ``Percona-XtraDB-Cluster-test-56``, ``Percona-XtraDB-Cluster-debuginfo-56``, ``Percona-XtraDB-Cluster-galera-3-debuginfo``, and ``Percona-XtraDB-Cluster-shared-56`` packages in addition.
 
 .. warning:: 
 
    In order to sucessfully install |Percona XtraDB Cluster| ``socat`` package will need to be installed first.
+
 
 Percona `yum` Experimental repository
 =====================================
