@@ -14,13 +14,13 @@ There are three methods of SST available in Percona XtraDB Cluster: :program:`my
 Using *Percona Xtrabackup*
 ==========================
 
-This is the least blocking method as it locks the tables only to copy the |MyISAM| system tables. |XtraBackup| is run locally on the donor node, so it's important that the correct user credentials are set up on the donor node. In order for PXC to perform the SST using the |XtraBackup|, credentials for connecting to the donor node need to be set up in the variable :variable:`wsrep_sst_auth`. Beside the credentials, one more important thing is that the :term:`datadir` needs to be specified in the server configuration file :file:`my.cnf`, otherwise the transfer process will fail.
+This is the default SST method (version 2 of it: xtrabackup-v2). This is the least blocking method as it locks the tables only to copy the |MyISAM| system tables. |XtraBackup| is run locally on the donor node, so it's important that the correct user credentials are set up on the donor node. In order for PXC to perform the SST using the |XtraBackup|, credentials for connecting to the donor node need to be set up in the variable :variable:`wsrep_sst_auth`. Beside the credentials, one more important thing is that the :term:`datadir` needs to be specified in the server configuration file :file:`my.cnf`, otherwise the transfer process will fail.
 
 More information about the required credentials can be found in the |XtraBackup| `manual <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_. Easy way to test if the credentials will work is to run the |innobackupex| on the donor node with the username and password specified in the variable :variable:`wsrep_sst_auth`. For example, if the value of the :variable:`wsrep_sst_auth` is ``root:Passw0rd`` |innobackupex| command should look like: :: 
 
   innobackupex --user=root --password=Passw0rd /tmp/
  
-Script used for this method can be found in :file:`/usr/bin/wsrep_sst_xtrabackup` and it's provided with the |Percona XtraDB Cluster| binary packages. Detailed information on this method are provided in :ref:`xtrabackup_sst` documentation.
+Detailed information on this method are provided in :ref:`xtrabackup_sst` documentation.
 
 Using ``mysqldump``
 ===================

@@ -364,12 +364,12 @@ When this variable is enabled SST donor node will not accept incoming queries, i
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: rsync
+   :default: xtrabackup-v2
    :recommended: xtrabackup-v2
 
 This variable sets up the method for taking the State Snapshot Transfer (SST). Available options are:
  * xtrabackup - uses Percona XtraBackup to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password> which |XtraBackup| will use on donor. Privileges and permissions needed for running |XtraBackup| can be found `here <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_.
- * xtrabackup-v2 - This is same as xtrabackup SST except that it uses newer protocol, hence is not compatible. This is the **recommended** option for PXC 5.5.34 and above. For more details, please check :ref:`xtrabackup_sst` and :ref:`errata`.
+ * xtrabackup-v2 - This is same as xtrabackup SST except that it uses newer protocol, hence is not compatible. This is the **recommended** option for PXC 5.5.34 and above. For more details, please check :ref:`xtrabackup_sst` and :ref:`errata`. This is also the default SST method. For SST with older nodes (< 5.5.34), use xtrabackup as the SST method.
  * rsync - uses ``rsync`` to perform the SST, this method doesn't use the :variable:`wsrep_sst_auth`
  * mysqldump - uses ``mysqldump`` to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password>, where user has root privileges on the server.
  * custom_script_name - Galera supports `Scriptable State Snapshot Transfer <http://www.codership.com/wiki/doku.php?id=scriptable_state_snapshot_transfer>`_. This enables users to create their own custom script for performing an SST.
@@ -380,6 +380,7 @@ This variable sets up the method for taking the State Snapshot Transfer (SST). A
     Note the following:
         * mysqldump SST is not recommended unless it is required for specific reasons. Also, it is not compatible with ``bind_address = 127.0.0.1 or localhost`` and will cause startup to fail if set so.
         * Xtrabackup-v2 SST is currently recommended if you have innodb-log-group_home-dir/innodb-data-home-dir in your cnf. Refer to :option:`sst-special-dirs` for more.
+        * Only xtrabackup-v2 and rsync provide gtid_mode async-slave support during SST.
 
 .. variable:: wsrep_sst_receive_address
 

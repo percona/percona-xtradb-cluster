@@ -11,7 +11,7 @@ XtraBackup SST works in two stages:
 
 .. note::
 
-   To maintain compatibility with |Percona XtraDB Cluster| older than 5.5.33-23.7.6, use xtrabackup as SST method, else xtrabackup-v2 is recommended
+   To maintain compatibility with |Percona XtraDB Cluster| older than 5.5.33-23.7.6, use xtrabackup as SST method, else xtrabackup-v2 is recommended. xtrabackup-v2 is also the default SST method now.
 
 Latest |Percona Xtrabackup| 2.1.x is strongly recommended for Xtrabackup SST. Refer to `Incompatibilities <http://www.percona.com/doc/percona-xtradb-cluster/errata.html#incompatibilities>`_ for possible caveats.
 
