@@ -56,7 +56,7 @@ If there are any invalid variables, it will print it there without affect galera
     # Required under certain conditions
     read_only=ON
 
-**Step #5.1** "read_only=ON" is required only when the tables you have contain timestamp/datetime/time data types as those data types are incompatible across replication from higher version to lower. This is currently a limitation of mysql itself. Also, refer to `Replication compatibility guide https://dev.mysql.com/doc/refman/5.6/en/replication-compatibility.html>`_. Any DDLs during migration are not recommended for the same reason.
+**Step #5.1** "read_only=ON" is required only when the tables you have contain timestamp/datetime/time data types as those data types are incompatible across replication from higher version to lower. This is currently a limitation of mysql itself. Also, refer to `Replication compatibility guide <https://dev.mysql.com/doc/refman/5.6/en/replication-compatibility.html>`_. Any DDLs during migration are not recommended for the same reason.
 
 **Step #5.2** To ensure 5.6 read-only nodes are not written to during migration, clustercheck (usually used with xinetd and HAProxy) distributed with PXC has been modified to return 503 when the node is read-only so that HAProxy doesn't send writes to it. Refer to clustercheck script for more details. Instead, you can also opt for read-write splitting at load-balancer/proxy level or at application level.
 
@@ -134,16 +134,33 @@ Assuming we are going to upgrade node A, (and other nodes B and C are on 5.5)
 
 **Step #3** Fix the variables in the |MySQL| configuration file :file:`my.cnf` which are not compatible with |Percona Server| 5.6. Detailed list can be checked in `Changed in Percona Server 5.6 <http://www.percona.com/doc/percona-server/5.6/changed_in_56.html>`_ documentation. Add the following to :file:`my.cnf` for compatibility with 5.5 replication for the duration of upgrade, add 'socket.checksum=1' to the :variable:`wsrep_provider_options` variable and set :variable:`wsrep_provider` set to ``none`` ::
 
+    # Required for compatibility with galera-2
+    # Append socket.checksum=1 to other options if others are in wsrep_provider_options. Eg.: "gmcast.listen_addr=tcp://127.0.0.1:15010; socket.checksum=1"
     wsrep_provider_options="socket.checksum=1"
-    wsrep_provider=none
+    # Required for replication compatibility
     log_bin_use_v1_row_events=1
     gtid_mode=0
     binlog_checksum=NONE
-    wsrep-slave-threads=1
+    # Required under certain conditions
+    read_only=ON
+
+**Step #3.1** "read_only=ON" is required only when the tables you have contain timestamp/datetime/time data types as those data types are incompatible across 
+replication from higher version to lower. This is currently a limitation of mysql itself. Also, refer to `Replication compatibility guide <https://dev.mysql.c
+om/doc/refman/5.6/en/replication-compatibility.html>`_. Any DDLs during migration are not recommended for the same reason.
+
+**Step #3.2** To ensure 5.6 read-only nodes are not written to during migration, clustercheck (usually used with xinetd and HAProxy) distributed with PXC has 
+been modified to return 503 when the node is read-only so that HAProxy doesn't send writes to it. Refer to clustercheck script for more details. Instead, you 
+can also opt for read-write splitting at load-balancer/proxy level or at application level.
+
+.. note::
+    On the last 5.5 node to upgrade to 5.6, the compatibility options of Step #3 are not required since all other nodes will already be upgrade and their configuration options are compatible with a 5.6 node without them.
 
 **Step #4** Install the new packages: ::
 
-    # apt-get install percona-xtradb-cluster-server-5.6 percona-xtradb-cluster-client-5.6 percona-xtrabackup percona-xtradb-cluster-galera-3.x
+    # apt-get install percona-xtradb-cluster-56
+
+.. note::
+    For more details on installation, refer to :ref:`installation` guide. You may also want to install percona-xtradb-cluster-full-56 which installs other ancillary packages like '-shared-56', '-test-56', debuginfos and so on.
 
 **Step #5** After node has been started you'll need to run ``mysql_upgrade``: ::
 
@@ -163,9 +180,31 @@ Stage II
 
 **Step #9**   After this has been set up all 5.5 nodes can be upgraded, one-by-one, as described in the Stage I. 
 
-  a) After all nodes in the cluster are upgraded to 5.6, option :variable:`read_only` should be set to ``OFF``. 
+  a) If :variable:`read_only` was turned on in Step #3.1, then after all nodes in the cluster are upgraded to 5.6 or equivalently, after the last 5.5 has been take down for upgrade, option :variable:`read_only` can be set to ``OFF`` (since this is a dynamic variable, it can done without restart).
 
-  b) Nodes should be restarted with compatibility options added earlier removed/updated for optimal performance (though cluster will continue run with those options).
+  b) If read-write splitting was done in applications and/or in load-balancer then in previous step, instead of ``read_only``, writes need to be directed to 5.6 nodes.
 
+Stage III [Optional]
+--------------------
 
- 
+**Step #10** This step is required to turn off the options added in #Step 3. Note, that this step is not required immediately after upgrade and can be done at a latter stage. The aim here is to turn off the compatibility options for performance reasons (only socket.checksum=1 fits this). This requires restart of each node. Hence, following can be removed/commented-out::
+
+    # Remove socket.checksum=1 from other options if others are in wsrep_provider_options. Eg.: "gmcast.listen_addr=tcp://127.0.0.1:15010"
+    # Removing this makes socket.checksum=2 which uses hardware accelerated CRC32 checksumming.
+    wsrep_provider_options="socket.checksum=1"
+
+    # Required for replication compatibility, being removed here.
+    # You can keep some of these if you wish.
+    log_bin_use_v1_row_events=1
+
+    # You will need this if you need to add async-slaves
+    gtid_mode=0
+
+    # Galera already has full writeset checksumming, so 
+    # this is required only if async-slaves are there or 
+    # binlogging is turned on.
+    binlog_checksum=NONE
+
+    # Remove it from cnf even though it was turned off at runtime in Step #11.
+    read_only=ON
+
