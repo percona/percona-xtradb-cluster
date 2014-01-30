@@ -102,8 +102,8 @@ export CXX=${CXX:-g++}
 export HS_CXX=${HS_CXX:-g++}
 export UDF_CXX=${UDF_CXX:-g++}
 COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
-export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
-export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
+export CFLAGS=" $COMMON_FLAGS -static-libgcc ${CFLAGS:-}"
+export CXXFLAGS=" $COMMON_FLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 # Prepare sources
