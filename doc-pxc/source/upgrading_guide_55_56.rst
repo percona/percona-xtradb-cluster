@@ -105,16 +105,17 @@ Stage III [Optional]
     # Removing this makes socket.checksum=2 which uses hardware accelerated CRC32 checksumming.
     wsrep_provider_options="socket.checksum=1"
 
-    # Required for replication compatibility, being removed here.
+    # Options added for replication compatibility, being removed here.
     # You can keep some of these if you wish.
+
     log_bin_use_v1_row_events=1
 
-    # You will need this if you need to add async-slaves
+    # You can keep if you are not adding async-slaves.
     gtid_mode=0
 
     # Galera already has full writeset checksumming, so 
-    # this is required only if async-slaves are there or 
-    # binlogging is turned on.
+    # you can keep this if async-slaves are not there or 
+    # binlogging is not turned on.
     binlog_checksum=NONE
 
     # Remove it from cnf even though it was turned off at runtime in Step #11.
@@ -196,18 +197,18 @@ Stage III [Optional]
     # Removing this makes socket.checksum=2 which uses hardware accelerated CRC32 checksumming.
     wsrep_provider_options="socket.checksum=1"
 
-    # Required for replication compatibility, being removed here.
+    # Options added for replication compatibility, being removed here.
     # You can keep some of these if you wish.
+
     log_bin_use_v1_row_events=1
 
-    # You will need this if you need to add async-slaves
+    # You can keep if you are not adding async-slaves.
     gtid_mode=0
 
     # Galera already has full writeset checksumming, so 
-    # this is required only if async-slaves are there or 
-    # binlogging is turned on.
+    # you can keep this if async-slaves are not there or 
+    # binlogging is not turned on.
     binlog_checksum=NONE
 
     # Remove it from cnf even though it was turned off at runtime in Step #11.
     read_only=ON
-
