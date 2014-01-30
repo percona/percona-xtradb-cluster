@@ -58,6 +58,9 @@ If there are any invalid variables, it will print it there without affect galera
 
 **Step #5.1** "read_only=ON" is required only when the tables you have contain timestamp/datetime/time data types as those data types are incompatible across replication from higher version to lower. This is currently a limitation of mysql itself. Also, refer to `Replication compatibility guide <https://dev.mysql.com/doc/refman/5.6/en/replication-compatibility.html>`_. Any DDLs during migration are not recommended for the same reason.
 
+.. note::
+    ``read_only`` does not apply to root connections (as per mysql specifications).
+
 **Step #5.2** To ensure 5.6 read-only nodes are not written to during migration, clustercheck (usually used with xinetd and HAProxy) distributed with PXC has been modified to return 503 when the node is read-only so that HAProxy doesn't send writes to it. Refer to clustercheck script for more details. Instead, you can also opt for read-write splitting at load-balancer/proxy level or at application level.
 
 .. note::
