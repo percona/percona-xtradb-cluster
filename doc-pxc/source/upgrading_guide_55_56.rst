@@ -45,7 +45,7 @@ Assuming we are going to upgrade node A, (and other nodes B and C are on 5.5)
 If there are any invalid variables, it will print it there without affect galera grastate or any other things.
 
 .. note::
-    It may also be worthwhile to backup the grastate.dat to use it if it gets zeroed (or sequence number to -1) accidentally (or due to network issues).
+    It may also be worthwhile to backup the grastate.dat to use it if it gets zeroed (or sequence number to -1) accidentally (or due to network issues) since this can avoid SST.
 
 **Step #5** Add the following to :file:`my.cnf` for compatibility with 5.5 replication for the duration of upgrade, and set the following options: ::
 
