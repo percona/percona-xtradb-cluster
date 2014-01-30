@@ -490,7 +490,7 @@ mkdir debug
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DMYSQL_SERVER_SUFFIX="-%{server_suffix}" \
 	   -DWITH_PAM=ON
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make ${MAKE_JFLAG}
@@ -512,7 +512,7 @@ mkdir release
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DMYSQL_SERVER_SUFFIX="-%{server_suffix}" \
            -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG}
