@@ -44,6 +44,9 @@ Assuming we are going to upgrade node A, (and other nodes B and C are on 5.5)
 
 If there are any invalid variables, it will print it there without affect galera grastate or any other things.
 
+.. note::
+    It may also be worthwhile to backup the grastate.dat to use it if it gets zeroed (or sequence number to -1) accidentally (or due to network issues).
+
 **Step #5** Add the following to :file:`my.cnf` for compatibility with 5.5 replication for the duration of upgrade, and set the following options: ::
 
     # Required for compatibility with galera-2
@@ -152,9 +155,15 @@ Assuming we are going to upgrade node A, (and other nodes B and C are on 5.5)
 replication from higher version to lower. This is currently a limitation of mysql itself. Also, refer to `Replication compatibility guide <https://dev.mysql.c
 om/doc/refman/5.6/en/replication-compatibility.html>`_. Any DDLs during migration are not recommended for the same reason.
 
+.. note::
+    ``read_only`` does not apply to root connections (as per mysql specifications).
+
 **Step #3.2** To ensure 5.6 read-only nodes are not written to during migration, clustercheck (usually used with xinetd and HAProxy) distributed with PXC has 
 been modified to return 503 when the node is read-only so that HAProxy doesn't send writes to it. Refer to clustercheck script for more details. Instead, you 
 can also opt for read-write splitting at load-balancer/proxy level or at application level.
+
+.. note::
+    It may also be worthwhile to backup the grastate.dat to use it if it gets zeroed (or sequence number to -1) accidentally (or due to network issues).
 
 .. note::
     On the last 5.5 node to upgrade to 5.6, the compatibility options of Step #3 are not required since all other nodes will already be upgrade and their configuration options are compatible with a 5.6 node without them.
