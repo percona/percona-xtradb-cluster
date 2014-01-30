@@ -129,7 +129,7 @@ export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
         # If nodebug is set, do not ship mysql-debug
         if test "x$SKIPDEBUG" = "xyes"
         then
-            sed -i '/mysqld-debug/d' debian/percona-server-server-5.5.install
+            sed -i '/mysqld-debug/d' debian/percona-xtradb-cluster-server-5.6.install
         fi
 
         # Update distribution name
