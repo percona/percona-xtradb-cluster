@@ -22,7 +22,9 @@ Bugs fixed
 
  Node would get stuck and required restart if ``DDL`` was performed after ``FLUSH TABLES WITH READ LOCK``. Bug fixed :bug:`1265656`.
 
- Default value for :variable:`binlog_format` is now ``ROW`` and for :variable:`innodb_autoinc_lock_mode` is ``2``. This is done so that |Percona XtraDB Cluster| is not started with wrong defaults leading to non-deterministic outcomes like crash. Bug fixed :bug:`1243228`.
+ Galera provider pause has been fixed to avoid potential deadlock with replicating threads.
+
+ Default value for :variable:`binlog_format` is now ``ROW``. This is done so that |Percona XtraDB Cluster| is not started with wrong defaults leading to non-deterministic outcomes like crash. Bug fixed :bug:`1243228`.
 
  During the installation of ``percona-xtradb-cluster-garbd-3.x`` package, *Debian* tries to start it, but as the configuration is not set, it would fail to start and leave the installation in ``iF`` state. Bug fixed :bug:`1262171`.
 
@@ -39,8 +41,16 @@ Bugs fixed
  Binary log directory is now being cleanup as part of the :ref:`XtraBackup SST <xtrabackup_sst>`. Bug fixed :bug:`1273368`.
 
  First connection would hang after changing the :variable:`wsrep_cluster_address` variable. Bug fixed :bug:`1022250`.
+ 
+ When :variable:`gmcast.listen_addr` was set manually it did not allow nodes own address in gcomm address list. Bug fixed :bug:`1099478`.
 
- Fixed multiple build bugs: :bug:`1262716`, :bug:`1269063`, :bug:`1269351`, :bug:`1272723`,  :bug:`1272732`.
+ GCache file allocation could fail if file size was a multiple of page size. Bug fixed :bug:`1259952`.
+
+ Group remerge after partitioning event has been fixed. Bug fixed :bug:`1232747`.
+
+ Fixed the OpenSSL linking exceptions. Bug fixed :bug:`1259063`.
+
+ Fixed multiple build bugs: :bug:`1262716`, :bug:`1269063`, :bug:`1269351`, :bug:`1272723`, :bug:`1272732`, and :bug:`1261996`.
 
 Other bugs fixed: :bug:`1273101`, :bug:`1272961`, :bug:`1271264`, and :bug:`1253055`.
 
