@@ -8,9 +8,11 @@ CMAKE=cmake
 TMP=$(CURDIR)/debian/tmp/
 
 feature_set="community"
-major_version=62
+major_version=63
 minor_version=0
-compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(major_version).$(minor_version)"
+wsrep_version="25.3"
+compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(wsrep_version)"
+compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release $(wsrep_version)"
 server_suffix="-$(major_version).$(minor_version)"
 prefix="/usr"
 
