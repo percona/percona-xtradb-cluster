@@ -117,10 +117,11 @@ Stage III [Optional]
     log_bin_use_v1_row_events=1
 
     # You can keep if you are not adding async-slaves.
+    # Apropos, you may need to enable this if you are adding async-slaves, refer to MySQL 5.6 gtid_mode documentation for more details on this variable.
     gtid_mode=0
 
     # Galera already has full writeset checksumming, so 
-    # you can keep this if async-slaves are not there or 
+    # you can keep this if async-slaves are not there and
     # binlogging is not turned on.
     binlog_checksum=NONE
 
@@ -218,10 +219,11 @@ Stage III [Optional]
     log_bin_use_v1_row_events=1
 
     # You can keep if you are not adding async-slaves.
+    # Apropos, you may need to enable this if you are adding async-slaves, refer to MySQL 5.6 gtid_mode documentation for more details on this variable.
     gtid_mode=0
 
     # Galera already has full writeset checksumming, so 
-    # you can keep this if async-slaves are not there or 
+    # you can keep this if async-slaves are not there and
     # binlogging is not turned on.
     binlog_checksum=NONE
 
