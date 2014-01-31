@@ -87,6 +87,9 @@ This is to ensure that other hosts are not affected by this upgrade (hence provi
 **Step #9** If all the steps above have completed successfully node can be started with: ::
   
     # service mysql start 
+
+.. note::
+    If this is the first node of cluster, then replace start with ``bootstrap-pxc``. This shouldn't apply to rolling upgrade in general (since other nodes are up during this) but only for downtime-based upgrades (where you bring up nodes one by one).
  
 **Step #10** At this point, other nodes (B, C) should acknowledge that this node is up and synced! 
 
@@ -150,6 +153,7 @@ Assuming we are going to upgrade node A, (and other nodes B and C are on 5.5)
     binlog_checksum=NONE
     # Required under certain conditions
     read_only=ON
+    wsrep_provider=none
 
 **Step #3.1** "read_only=ON" is required only when the tables you have contain timestamp/datetime/time data types as those data types are incompatible across 
 replication from higher version to lower. This is currently a limitation of mysql itself. Also, refer to `Replication compatibility guide <https://dev.mysql.c
@@ -179,19 +183,21 @@ can also opt for read-write splitting at load-balancer/proxy level or at applica
 
     # mysql_upgrade
 
-**Step #6** Step #5) should not fail (if it fails check for any bad variables in the configuration file), otherwise :file:`grastate.dat` can potentially get zeroed and the node will try to perform State Snapshot Transfer from a 5.5 node. ('Potentially' since with --wsrep-provider='none' it shouldn't). Also backing up :file:`grastate.dat` is recommended prior to Step #5 for the same purpose.
+    Other options like socket, user, pass may need to provided here if not defined in my.cnf.
 
-
-**Step #7** If all the steps above have completed successfully,  set the :variable:`wsrep_provider` to the location of the Galera library, and node can be started with: ::
+**Step #6** If all the steps above have completed successfully, shutdown the server,  set the :variable:`wsrep_provider` to the location of the Galera library (from 'none' to something like /usr/lib/libgalera_smm.so) in my.cnf, and node can be started with: ::
   
     # service mysql start 
 
-**Step #8** At this point, other nodes (B, C) should acknowledge that this node is up and synced!
+.. note::
+    If this is the first node of cluster, then replace start with ``bootstrap-pxc``. This shouldn't apply to rolling upgrade in general (since other nodes are up during this) but only for downtime-based upgrades (where you bring up nodes one by one).
+
+**Step #7** At this point, other nodes (B, C) should acknowledge that this node is up and synced!
 
 Stage II
 ---------
 
-**Step #9**   After this has been set up all 5.5 nodes can be upgraded, one-by-one, as described in the Stage I. 
+**Step #8**   After this has been set up all 5.5 nodes can be upgraded, one-by-one, as described in the Stage I. 
 
   a) If :variable:`read_only` was turned on in Step #3.1, then after all nodes in the cluster are upgraded to 5.6 or equivalently, after the last 5.5 has been take down for upgrade, option :variable:`read_only` can be set to ``OFF`` (since this is a dynamic variable, it can done without restart).
 
@@ -200,7 +206,7 @@ Stage II
 Stage III [Optional]
 --------------------
 
-**Step #10** This step is required to turn off the options added in #Step 3. Note, that this step is not required immediately after upgrade and can be done at a latter stage. The aim here is to turn off the compatibility options for performance reasons (only socket.checksum=1 fits this). This requires restart of each node. Hence, following can be removed/commented-out::
+**Step #9** This step is required to turn off the options added in #Step 3. Note, that this step is not required immediately after upgrade and can be done at a latter stage. The aim here is to turn off the compatibility options for performance reasons (only socket.checksum=1 fits this). This requires restart of each node. Hence, following can be removed/commented-out::
 
     # Remove socket.checksum=1 from other options if others are in wsrep_provider_options. Eg.: "gmcast.listen_addr=tcp://127.0.0.1:15010"
     # Removing this makes socket.checksum=2 which uses hardware accelerated CRC32 checksumming.
@@ -219,5 +225,5 @@ Stage III [Optional]
     # binlogging is not turned on.
     binlog_checksum=NONE
 
-    # Remove it from cnf even though it was turned off at runtime in Step #11.
+    # Remove it from cnf even though it was turned off at runtime in Step #8.
     read_only=ON
