@@ -222,7 +222,7 @@ fi
 
     cd "$INSTALLDIR/src"
 
-    make clean all
+    make all
 
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \

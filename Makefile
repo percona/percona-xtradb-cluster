@@ -19,7 +19,7 @@ CONFIGURE=CFLAGS="-O2 -g -fmessage-length=0 -D_FORTIFY_SOURCE=2" CXXFLAGS="-O2 -
 REVS = $(shell bzr log | grep rev | head -1   )
 REV  = $(word 2, $(REVS) )
 
-all: maatkit-udf pxc-tests install-lic
+all: maatkit-udf
 	@echo ""
 	@echo "Percona Server source code is ready"
 	@echo "Now change directory to $(PERCONA_XTRADB_CLUSTER) define variables as show below"
@@ -33,10 +33,6 @@ all: maatkit-udf pxc-tests install-lic
 
 maatkit-udf:
 	cd UDF && autoreconf --install
-
-pxc-tests:
-	-rm -rf "$(PERCONA_XTRADB_CLUSTER)"/percona-xtradb-cluster-tests
-	cp -R sst-tests "$(PERCONA_XTRADB_CLUSTER)"/percona-xtradb-cluster-tests
 
 configure: all
 	(bash BUILD/autorun.sh; $(CONFIGURE))
@@ -52,17 +48,10 @@ cmake_debug:
 	(mkdir -p $(DEBUG_DIR); cd $(DEBUG_DIR); CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" $(CMAKE) -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DWITH_DEBUG=ON -DMYSQL_MAINTAINER_MODE=OFF ../$(PERCONA_XTRADB_CLUSTER))
 
 binary:
-	CFLAGS="$(CFLAGS_RELEASE)" CXXFLAGS="$(CXXFLAGS_RELEASE)" ${CMAKE} . -DBUILD_CONFIG=mysql_release  \
+	(CFLAGS="$(CFLAGS_RELEASE)" CXXFLAGS="$(CXXFLAGS_RELEASE)" ${CMAKE} . -DBUILD_CONFIG=mysql_release  \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	   -DCMAKE_INSTALL_PREFIX="/usr/local/$(PERCONA_XTRADB_CLUSTER)-$(REV)" \
            -DFEATURE_SET="community" \
 	   -DWITH_EMBEDDED_SERVER=OFF \
            -DCOMPILATION_COMMENT="Percona-XtraDB-Cluster" \
            -DMYSQL_SERVER_SUFFIX="-$(REV)" )
-
-install-lic: 
-	@echo "Installing license files"
-	install -m 644 COPYING.* $(PERCONA_XTRADB_CLUSTER)
-
-clean:
-	rm -rf mysql-$(MYSQL_VERSION) $(PERCONA_XTRADB_CLUSTER) $(RELEASE_DIR) $(DEBUG_DIR)

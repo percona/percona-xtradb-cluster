@@ -106,7 +106,7 @@ export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 # Prepare sources
 (
     cd "$SOURCEDIR"
-    make clean all
+    make all
 )
 
 # Build

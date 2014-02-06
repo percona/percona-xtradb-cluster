@@ -199,7 +199,7 @@ fi
     ) || exit 1
 
 
-    make clean all
+    make all
 
     cd "$PRODUCT"
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \

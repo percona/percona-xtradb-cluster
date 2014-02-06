@@ -140,7 +140,7 @@ cp -f $(readlink -f $(dirname $0))/rpm/*.patch ${WORKDIR}/SOURCES/
     cd "$SOURCEDIR"
  
     # Execute clean and download mysql, apply patches
-    make clean all
+    make all
 
     # Create tarball for build
     tar czf "$WORKDIR_ABS/SOURCES/$PRODUCT.tar.gz" "$PRODUCT/"*
