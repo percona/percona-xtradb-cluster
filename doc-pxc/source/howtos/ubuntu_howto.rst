@@ -68,9 +68,6 @@ Configuration file :file:`/etc/mysql/my.cnf` for the first node should look like
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
 
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
-
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
 
@@ -149,9 +146,6 @@ Configuration file :file:`/etc/mysql/my.cnf` on the second node (``pxc2``) shoul
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
 
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
-
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2
 
@@ -212,9 +206,6 @@ MySQL configuration file :file:`/etc/mysql/my.cnf` on the third node (``pxc3``) 
 
   # MyISAM storage engine has only experimental support
   default_storage_engine=InnoDB
-
-  # This is a recommended tuning variable for performance
-  innodb_locks_unsafe_for_binlog=1
 
   # This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
   innodb_autoinc_lock_mode=2

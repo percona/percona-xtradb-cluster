@@ -64,7 +64,6 @@ In order to start using the |Percona XtraDB Cluster|, following options are need
   
   binlog_format=ROW - In order for Galera to work correctly binlog format should be ROW
   default_storage_engine=InnoDB - MyISAM storage engine has only experimental support
-  innodb_locks_unsafe_for_binlog=1 - This is a recommended tuning variable for performance
   innodb_autoinc_lock_mode=2 - This changes how InnoDB autoincrement locks are managed
 
 Additional parameters to specify: ::
@@ -81,7 +80,6 @@ Example: ::
   wsrep_sst_method=rsync
   binlog_format=ROW
   default_storage_engine=InnoDB
-  innodb_locks_unsafe_for_binlog=1
   innodb_autoinc_lock_mode=2
 
 Detailed list of variables can be found in :ref:`wsrep_system_index` and :ref:`wsrep_status_index`.
