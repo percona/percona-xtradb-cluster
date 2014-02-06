@@ -95,7 +95,7 @@ IF(NOT CPACK_PACKAGE_FILE_NAME)
 ENDIF()
 
 IF(NOT CPACK_SOURCE_PACKAGE_FILE_NAME)
-    SET(CPACK_SOURCE_PACKAGE_FILE_NAME "Percona-Xtradb-Cluster-${VERSION}")
+    SET(CPACK_SOURCE_PACKAGE_FILE_NAME "Percona-XtraDB-Cluster-${VERSION}")
   IF("${VERSION}" MATCHES "-ndb-")
     STRING(REGEX REPLACE "^.*-ndb-" "" NDBVERSION "${VERSION}")
     SET(CPACK_SOURCE_PACKAGE_FILE_NAME "mysql-cluster-gpl-${NDBVERSION}")
@@ -107,7 +107,7 @@ SET(CPACK_SOURCE_GENERATOR "TGZ")
 INCLUDE(cpack_source_ignore_files)
 
 # Defintions for windows version resources
-SET(PRODUCTNAME "Percona Server")
+SET(PRODUCTNAME "Percona XtraDB Cluster")
 SET(COMPANYNAME ${CPACK_PACKAGE_VENDOR})
 
 # Windows 'date' command has unpredictable output, so cannot rely on it to
