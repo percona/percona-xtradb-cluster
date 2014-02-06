@@ -4,9 +4,9 @@
 ## DP: 30_scripts__mysqld_safe.sh__signals.patch by  <ch@debian.org>
 
 @DPATCH@
-diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' '--exclude=.hg' '--exclude=_darcs' '--exclude=.bzr' Percona-Server~/scripts/mysqld_safe.sh Percona-Server/scripts/mysqld_safe.sh
---- Percona-Server~/scripts/mysqld_safe.sh	2013-01-22 11:14:28.000000000 -0500
-+++ Percona-Server/scripts/mysqld_safe.sh	2013-01-22 11:14:39.000000000 -0500
+diff -urNad '--exclude=CVS' '--exclude=.svn' '--exclude=.git' '--exclude=.arch' '--exclude=.hg' '--exclude=_darcs' '--exclude=.bzr' ~scripts/mysqld_safe.sh scripts/mysqld_safe.sh
+--- ~scripts/mysqld_safe.sh	2013-01-22 11:14:28.000000000 -0500
++++ scripts/mysqld_safe.sh	2013-01-22 11:14:39.000000000 -0500
 @@ -31,8 +31,6 @@
  syslog_tag_mysqld=mysqld
  syslog_tag_mysqld_safe=mysqld_safe
