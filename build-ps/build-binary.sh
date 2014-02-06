@@ -130,7 +130,7 @@ fi
 WORKDIR_ABS="$(cd "$WORKDIR"; pwd)"
 
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
-test -e "$SOURCEDIR/Makefile" || exit 2
+test -e "$SOURCEDIR/Makefile-pxc" || exit 2
 
 # Test for the galera sources
 if ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
@@ -147,12 +147,12 @@ else
     PROCESSORS=4
 fi
 
-# Extract version from the Makefile
-MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
+# Extract version from the Makefile-pxc
+MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile-pxc" \
     | cut -d = -f 2)"
 RELEASE_TAG=''
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
-    "$SOURCEDIR/Makefile" | cut -d = -f 2)"
+    "$SOURCEDIR/Makefile-pxc" | cut -d = -f 2)"
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
     "$SOURCEDIR/wsrep/wsrep_api.h" |
     cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
@@ -222,7 +222,7 @@ fi
 
     cd "$INSTALLDIR/src"
 
-    make all
+    make -f Makefile-pxc all
 
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
