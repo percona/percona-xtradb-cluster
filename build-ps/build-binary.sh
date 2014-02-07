@@ -147,38 +147,35 @@ else
     PROCESSORS=4
 fi
 
+
+# Build information
+if [[ -z ${REVISION:-} ]];then 
+    REVISION=500 
+else 
+    REVISION=$REVISION
+    echo "Building with revision $REVISION"
+fi 
+
 # Extract version from the Makefile-pxc
-MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile-pxc" \
-    | cut -d = -f 2)"
 RELEASE_TAG=''
-PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
-    "$SOURCEDIR/Makefile-pxc" | cut -d = -f 2)"
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
-    "$SOURCEDIR/wsrep/wsrep_api.h" |
-    cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
-    "$SOURCEDIR/cmake/wsrep.cmake" | cut -d '"' -f2)"
 PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 
 # Build information
-REVISION="$(cd "$SOURCEDIR"; bzr revno)"
-WSREP_REV="$(cd "$SOURCEDIR";test -r WSREP-REVISION && cat WSREP-REVISION || echo "$REVISION")"
 GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION || bzr revno)"
 PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.$REVISION${BUILD_COMMENT:-}$TAG.$(uname -s).$TARGET"
-COMMENT="Percona XtraDB Cluster (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 
 # Compilation flags
 export CC=${CC:-gcc}
-export CXX=${CXX:-gcc}
-export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -fno-omit-frame-pointer -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CFLAGS:-}"
-export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fno-exceptions -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CXXFLAGS:-}"
+export CXX=${CXX:-g++}
+COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
+export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
+export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
-export WSREP_REV="$WSREP_REV"
 
-# Create a temporary working directory
-INSTALLDIR="$(cd "$WORKDIR" && TMPDIR="$WORKDIR_ABS" mktemp -d percona-build.XXXXXX)"
-INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
+INSTALLDIR="$WORKDIR_ABS"   # Make it absolute
 
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
@@ -217,11 +214,6 @@ fi
 
     ) || exit 1
 
-    # Export and cd to a new dir
-    bzr export "$INSTALLDIR/src"
-
-    cd "$INSTALLDIR/src"
-
     make -f Makefile-pxc all
 
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
@@ -245,8 +237,8 @@ fi
     (
         cd "storage/HandlerSocket-Plugin-for-MySQL"
         ./autogen.sh
-        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$INSTALLDIR/src/" \
-            --with-mysql-bindir="$INSTALLDIR/src/scripts" \
+        CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$SOURCEDIR" \
+            --with-mysql-bindir="$SOURCEDIR/scripts" \
             --with-mysql-plugindir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --prefix="/usr/local/$PRODUCT_FULL"
@@ -258,7 +250,7 @@ fi
     # Build UDF
     (
         cd "UDF"
-        CXX=${UDF_CXX:-g++} ./configure --includedir="$INSTALLDIR/src/include" \
+        CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make $MAKE_JFLAG
         make DESTDIR="$INSTALLDIR" install
