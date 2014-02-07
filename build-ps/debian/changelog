@@ -1,3 +1,9 @@
+percona-xtradb-cluster-5.5 (5.5.32-rel33.0) unstable; urgency=low
+
+  * Update packaging for Percona XtraDB Cluster
+
+ -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Wed, 7 Feb 2013 16:12:23 -0500
+
 percona-xtradb-cluster-5.5 (5.5.17-rel22.1) unstable; urgency=low
 
   * Update packaging for Percona XtraDB Cluster
