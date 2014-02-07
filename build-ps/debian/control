@@ -126,6 +126,7 @@ Description: Debugging package for Percona XtraDB Cluster
  This package contains the debugging symbols for the Percona XtraDB Cluster binaries.
 
 Package: percona-xtradb-cluster-source-5.5
+Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Percona Server 5.5 source
  This package includes the source code to Percona Server as configured before
