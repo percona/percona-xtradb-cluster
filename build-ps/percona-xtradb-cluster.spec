@@ -240,6 +240,7 @@ Patch1:         mysql-dubious-exports.patch
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-2
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel
 Obsoletes:      Percona-XtraDB-Cluster
@@ -260,9 +261,21 @@ Percona recommends that all production deployments be protected with a support
 contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
+This is a meta-package which installs server, client and galera-2.
+
 ##############################################################################
 # Sub package definition
 ##############################################################################
+
+%package -n Percona-XtraDB-Cluster-full%{product_suffix}
+Summary:        Percona XtraDB Cluster - full package
+Group:          Applications/Databases
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-2-debuginfo
+
+%description -n Percona-XtraDB-Cluster-full%{product_suffix}
+This is a meta-package which provides the full suite of Percona XtraDB
+Cluster 55 packages including the debuginfo. Recommended.
+# ----------------------------------------------------------------------------
 
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
@@ -1048,6 +1061,12 @@ echo "====="                                     >> $STATUS_HISTORY
 ##############################################################################
 #  Files section
 ##############################################################################
+
+# Empty section for metapackage
+%files 
+
+# Empty section for metapackage
+%files -n Percona-XtraDB-Cluster-full%{product_suffix}
 
 %files -n Percona-XtraDB-Cluster-server%{product_suffix}
 %defattr(-,root,root,0755)
