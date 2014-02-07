@@ -61,6 +61,7 @@ pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
 pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
 STATDIR=""
 uextra=0
+disver=""
 
 scomp=""
 sdecomp=""
@@ -106,7 +107,8 @@ timeit(){
 
 get_keys()
 {
-    if [[ $encrypt -ge 2 ]];then 
+    # $encrypt -eq 1 is for internal purposes only
+    if [[ $encrypt -ge 2 || $encrypt -eq -1 ]];then 
         return 
     fi
 
@@ -119,7 +121,7 @@ get_keys()
 
     if [[ $sfmt == 'tar' ]];then
         wsrep_log_info "NOTE: Xtrabackup-based encryption - encrypt=1 - cannot be enabled with tar format"
-        encrypt=0
+        encrypt=-1
         return
     fi
 
@@ -177,7 +179,7 @@ get_transfer()
 
         if [[ $encrypt -eq 2 || $encrypt -eq 3 ]] && ! socat -V | grep -q WITH_OPENSSL;then 
             wsrep_log_info "NOTE: socat is not openssl enabled, falling back to plain transfer"
-            encrypt=0
+            encrypt=-1
         fi
 
         if [[ $encrypt -eq 2 ]];then 
@@ -508,10 +510,15 @@ setup_ports
 get_stream
 get_transfer
 
+if ${INNOBACKUPEX_BIN} /tmp --help  | grep -q -- '--version-check'; then 
+    disver="--no-version-check"
+fi
+
+
 INNOEXTRA=""
-INNOAPPLY="${INNOBACKUPEX_BIN} --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
+INNOAPPLY="${INNOBACKUPEX_BIN} $disver --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -555,12 +562,15 @@ then
         ttcmd="$tcmd"
 
         if [[ $encrypt -eq 1 ]];then
-            tcmd="$ecmd | $tcmd"
+            if [[ -n $scomp ]];then 
+                tcmd=" $ecmd | $scomp | $tcmd "
+            else 
+                tcmd=" $ecmd | $tcmd "
+            fi
+        elif [[ -n $scomp ]];then 
+            tcmd=" $scomp | $tcmd "
         fi
 
-        if [[ -n $scomp ]];then 
-            tcmd="$scomp | $tcmd"
-        fi
 
         send_donor $DATA "${stagemsg}-gtid"
 
@@ -607,10 +617,13 @@ then
         echo "1" > "${DATA}/${IST_FILE}"
         get_keys
         if [[ $encrypt -eq 1 ]];then
-            tcmd=" $ecmd | $tcmd"
-        fi
-        if [[ -n $scomp ]];then 
-            tcmd="$scomp | $tcmd"
+            if [[ -n $scomp ]];then 
+                tcmd=" $ecmd | $scomp | $tcmd "
+            else
+                tcmd=" $ecmd | $tcmd "
+            fi
+        elif [[ -n $scomp ]];then 
+            tcmd=" $scomp | $tcmd "
         fi
         strmcmd+=" \${IST_FILE}"
 
@@ -627,7 +640,7 @@ then
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     if [[ $speciald -eq 1 ]];then 
-        wsrep_log_info "WARNING: This feature requires PXC 2.1.6 or latter."
+        wsrep_log_info "WARNING: sst-special-dirs feature requires PXC 2.1.6 or latter."
     fi
 
     if [[ $speciald -eq 1 ]];then 
@@ -683,13 +696,12 @@ then
     get_keys
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         if [[ -n $sdecomp ]];then 
-            strmcmd=" $ecmd | $sdecomp | $strmcmd"
+            strmcmd=" $sdecomp | $ecmd | $strmcmd"
         else 
             strmcmd=" $ecmd | $strmcmd"
         fi
     elif [[ -n $sdecomp ]];then 
             strmcmd=" $sdecomp | $strmcmd"
-        fi
     fi
 
     STATDIR=$(mktemp -d)
@@ -707,7 +719,7 @@ then
         wsrep_log_info "Proceeding with SST"
 
         if [[ $speciald -eq 1 && -d ${DATA}/.sst ]];then 
-            wsrep_log_error "Stale temporary SST directory: ${DATA}/.sst, SST may fail"
+            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous SST"
         fi
 
         if [[ $incremental -ne 1 ]];then 
@@ -718,6 +730,18 @@ then
                 wsrep_log_info "Cleaning the existing datadir"
                 find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
             fi
+            tempdir=$(parse_cnf mysqld log-bin "")
+            if [[ -n ${tempdir:-} ]];then
+                binlog_dir=$(dirname $tempdir)
+                binlog_file=$(basename $tempdir)
+                if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
+                    pattern="$binlog_dir/$binlog_file\.[0-9]+$"
+                    wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
+                    find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+
+                    rm $binlog_dir/*.index || true
+                fi
+            fi
+
         else
             wsrep_log_info "Removing existing ib_logfile files"
             rm -f ${BDATA}/ib_logfile*
