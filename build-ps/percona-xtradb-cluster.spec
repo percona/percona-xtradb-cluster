@@ -27,12 +27,10 @@ Prefix: %{_sysconfdir}
 %define mysql_vendor            Oracle and/or its affiliates
 %define percona_server_vendor	Percona, Inc
 
-%define mysql_version 5.5.36
+%define mysql_version @@MYSQL_VERSION@@
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define majorversion 33
-%define minorversion 0
+%define percona_server_version @@PERCONA_VERSION@@
 %define distribution  rhel%{redhatversion}
-%define percona_server_version	%{wsrep_version}
 
 %define mysqld_user     mysql
 %define mysqld_group    mysql
@@ -95,7 +93,7 @@ Prefix: %{_sysconfdir}
 %if %{undefined src_base}
 %define src_base Percona-XtraDB-Cluster
 %endif
-%define src_dir %{src_base}-%{mysql_version}-%{majorversion}.%{minorversion}
+%define src_dir %{src_base}-%{mysql_version}-%{percona_server_version}
 
 # ----------------------------------------------------------------------------
 # Feature set (storage engines, options).  Default to community (everything)

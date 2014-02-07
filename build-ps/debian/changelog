@@ -1,4 +1,4 @@
-percona-xtradb-cluster-5.5 (5.5.36-rel33.0) unstable; urgency=low
+percona-xtradb-cluster-5.5 (@@MYSQL_VERSION@@-rel@@PERCONA_VERSION@@) unstable; urgency=low
 
   * Update packaging for Percona XtraDB Cluster
 
