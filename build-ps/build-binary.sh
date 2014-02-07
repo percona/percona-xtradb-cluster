@@ -127,7 +127,8 @@ else
 
 fi
 
-WORKDIR_ABS="$(cd "$WORKDIR"; pwd)"
+# Workdir path should be absolute
+WORKDIR="$(cd "$WORKDIR"; pwd)"
 
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
 test -e "$SOURCEDIR/Makefile-pxc" || exit 2
@@ -169,13 +170,12 @@ COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 # Compilation flags
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
-COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
+COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 
-INSTALLDIR="$WORKDIR_ABS"   # Make it absolute
 
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
@@ -207,10 +207,10 @@ fi
             scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" \
               boost_pool=0  garb/garbd libgalera_smm.so
         fi
-        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-        cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
-        cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
+        cp garb/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
+        cp libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
 
     ) || exit 1
 
@@ -231,7 +231,7 @@ fi
         $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
     make $MAKE_JFLAG $QUIET
-    make DESTDIR="$INSTALLDIR" install
+    make DESTDIR="$WORKDIR" install
 
     # Build HandlerSocket
     (
@@ -243,7 +243,7 @@ fi
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --prefix="/usr/local/$PRODUCT_FULL"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install
+        make DESTDIR="$WORKDIR" install
 
     )
 
@@ -253,14 +253,14 @@ fi
         CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install
+        make DESTDIR="$WORKDIR" install
 
     )
 
     (
        echo "Packaging the test files"
-       # mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL
-       cp -R percona-xtradb-cluster-tests $INSTALLDIR/usr/local/$PRODUCT_FULL/
+       # mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL
+       cp -R percona-xtradb-cluster-tests $WORKDIR/usr/local/$PRODUCT_FULL/
     )
 
     # Build jemalloc
@@ -272,10 +272,10 @@ fi
         ./configure --prefix="/usr/local/$PRODUCT_FULL/" \
                 --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install_lib_shared
+        make DESTDIR="$WORKDIR" install_lib_shared
 
         # Copy COPYING file
-        cp COPYING "$INSTALLDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
+        cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
     )
     fi
@@ -284,7 +284,7 @@ fi
 
 # Package the archive
 (
-    cd "$INSTALLDIR/usr/local/"
+    cd "$WORKDIR/usr/local/"
 
     $TAR czf "$WORKDIR_ABS/$PRODUCT_FULL.tar.gz" \
         --owner=0 --group=0 "$PRODUCT_FULL/"
@@ -292,5 +292,5 @@ fi
 )
 
 # Clean up
-rm -rf "$INSTALLDIR"
+rm -rf "$WORKDIR"
 
