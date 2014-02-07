@@ -8367,9 +8367,6 @@ ha_innobase::wsrep_append_keys(
 			      dict_table_get_referenced_constraint(tab, idx)) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
-				if (key_info->flags & HA_NOSAME || shared)
-			  		key_appended = true;
-
 				len = wsrep_store_key_val_for_row(
 					table, i, key0, key_info->key_length, 
 					record0, &is_null);
@@ -8378,6 +8375,9 @@ ha_innobase::wsrep_append_keys(
 						thd, trx, table_share, table, 
 						keyval0, len+1, shared);
 					if (rcode) DBUG_RETURN(rcode);
+
+					if (key_info->flags & HA_NOSAME || shared)
+						key_appended = true;
 				}
 				else
 				{
@@ -9676,16 +9676,6 @@ innobase_rename_table(
 
 	error = row_rename_table_for_mysql(
 		norm_from, norm_to, trx, lock_and_commit);
-
-	if (error != DB_SUCCESS) {
-		FILE* ef = dict_foreign_err_file;
-
-		fputs("InnoDB: Renaming table ", ef);
-		ut_print_name(ef, trx, TRUE, norm_from);
-		fputs(" to ", ef);
-		ut_print_name(ef, trx, TRUE, norm_to);
-		fputs(" failed!\n", ef);
-	}
 
 	if (lock_and_commit) {
 		row_mysql_unlock_data_dictionary(trx);
