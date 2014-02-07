@@ -286,11 +286,9 @@ fi
 (
     cd "$WORKDIR/usr/local/"
 
-    $TAR czf "$WORKDIR_ABS/$PRODUCT_FULL.tar.gz" \
+    $TAR czf "$WORKDIR/$PRODUCT_FULL.tar.gz" \
         --owner=0 --group=0 "$PRODUCT_FULL/"
     
 )
 
-# Clean up
-rm -rf "$WORKDIR"
 
