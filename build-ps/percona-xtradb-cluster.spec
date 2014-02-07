@@ -566,7 +566,7 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 %install
 
 RBR=$RPM_BUILD_ROOT
-MBD=$RPM_BUILD_DIR/percona-server-%{mysql_version}%{server_suffix}
+MBD=$RPM_BUILD_DIR/percona-xtradb-cluster-%{mysql_version}%{server_suffix}
 
 # Move back the libdir from BUILD dir to BUILDROOT
 mkdir -p "$(dirname $RBR%{_libdir})"
