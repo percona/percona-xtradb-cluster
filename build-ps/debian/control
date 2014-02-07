@@ -1,7 +1,7 @@
 Source: percona-xtradb-cluster-5.5
 Section: database
 Priority: extra
-Maintainer: Percona Server Development Team <mysql-dev@percona.com>
+Maintainer: Percona XtraDB Cluster Development Team <mysql-dev@percona.com>
 Uploaders: Stewart Smith <stewart.smith@percona.com>, Alexey Bychko <alexey.bychko@percona.com>
 Build-Depends: libtool (>= 1.4.2-7), procps | hurd,  debhelper (>= 7.0.50), file (>= 3.28), libncurses5-dev (>= 5.0-6), perl (>= 5.6.0), libwrap0-dev (>= 7.6-8.3), zlib1g-dev (>= 1:1.1.3-5), libreadline-dev, psmisc, po-debconf, chrpath, ghostscript,  gawk, bison, lsb-release, hardening-wrapper, cmake, gcc, g++, libaio-dev, libpam-dev, libssl-dev, fakeroot 
 Standards-Version: 3.9.4
@@ -27,7 +27,7 @@ Package: libperconaserverclient18-dev
 Architecture: any
 Section: libdevel
 Depends: libperconaserverclient-dev (= ${binary:Version}), ${misc:Depends}
-Description: Percona Server database development files - empty transitional 
+Description: Percona XtraDB Cluster database development files - empty transitional 
  package. This is an empty package that depends on libperconaserverclient-dev
  to ease the transition for packages with versioned build-deps on
  libperconaserverclient18-dev.
@@ -39,7 +39,7 @@ Depends: libperconaserverclient18 (= ${binary:Version}), zlib1g-dev, ${misc:Depe
 Conflicts: libperconaserverclient14-dev, libperconaserverclient12-dev, libperconaserverclient10-dev, libperconaserverclient15-dev, libperconaserverclient16-dev, libmysqlclient-dev
 Replaces: libperconaserverclient14-dev, libperconaserverclient12-dev, libperconaserverclient10-dev, libperconaserverclient15-dev, libperconaserverclient16-dev, libpercona-xtradb-client-dev
 Provides: libmysqlclient-dev
-Description: Percona Server database development files
+Description: Percona XtraDB Cluster database development files
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
  Percona XtraDB Cluster provides synchronous replication, supports
@@ -54,7 +54,7 @@ Architecture: all
 Depends: ${misc:Depends}
 Provides: mysql-common
 Replaces: mysql-common-4.1, mysql-common-5.0, mysql-common-5.1, mysql-common, percona-server-common-5.1, percona-server-common-5.5
-Description: Percona Server database common files (e.g. /etc/mysql/my.cnf)
+Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
  Percona XtraDB Cluster provides synchronous replication, supports
@@ -68,15 +68,15 @@ Package: percona-xtradb-cluster-test-5.5
 Architecture: all
 Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}), percona-xtradb-cluster-server-5.5 (>= ${source:Version})
 Provides: mysql-test
-Description: Percona Server database test suite
+Description: Percona XtraDB Cluster database test suite
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
  Percona XtraDB Cluster provides synchronous replication, supports
  multi-master replication, parallel applying on slaves, automatic
  node provisioning with primary focus on data consistency.
  .
- This package includes the Percona Server test framework that provides 
- a means for verifying that Percona Server and its client programs 
+ This package includes the Percona XtraDB Cluster test framework that provides 
+ a means for verifying that Percona XtraDB Cluster and its client programs 
  operate according to expectations
 
 Package: percona-xtradb-cluster-client-5.5
@@ -85,7 +85,7 @@ Depends: debianutils (>=1.6), libdbi-perl, percona-xtradb-cluster-common-5.5 (>=
 Provides: mysql-client, mysql-client-core, mysql-client-5.5, mysql-client-core-5.5, virtual-mysql-client
 Conflicts: mysql-client, mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, mysql-client-5.5, mysql-client-core-5.5, percona-xtradb-client-5.0, percona-server-client-5.1
 Replaces: mysql-client, mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, mysql-client-5.5, mysql-client-core-5.5, percona-xtradb-client-5.0, percona-server-client-5.1
-Description: Percona Server database client binaries
+Description: Percona XtraDB Cluster database client binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
  Percona XtraDB Cluster provides synchronous replication, supports
@@ -103,7 +103,7 @@ Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}), libdbi-perl, 
 Conflicts: mysql-server, mysql-server-4.1, mysql-server-5.1, mysql-server-5.5, mysql-server-core-5.1, mysql-server-core-5.5, percona-server-server-5.1, percona-server-server-5.5
 Provides: mysql-server, mysql-server-core, mysql-server-5.5, mysql-server-core-5.5
 Replaces: mysql-server, mysql-server-5.0, mysql-server-core-5.1, mysql-server-core-5.5, mysql-server-5.5, percona-xtradb-server-5.0, percona-server-server-5.1, , percona-server-server-5.5
-Description: Percona Server database server binaries
+Description: Percona XtraDB Cluster database server binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
  Percona XtraDB Cluster provides synchronous replication, supports
@@ -128,6 +128,6 @@ Description: Debugging package for Percona XtraDB Cluster
 Package: percona-xtradb-cluster-source-5.5
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: Percona Server 5.5 source
- This package includes the source code to Percona Server as configured before
+Description: Percona XtraDB Cluster 5.5 source
+ This package includes the source code to Percona XtraDB Cluster as configured before
  building.

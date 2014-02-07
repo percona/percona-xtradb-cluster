@@ -4,7 +4,7 @@ export DH_VERBOSE=1
 export DEB_BUILD_HARDENING=1
 
 PACKAGE=percona-xtradb-cluster-5.5
-PS_VERSION_EXTRA = $(shell echo "Percona Server (GPL), $(DEBVERSION)")
+PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 TMP=$(CURDIR)/debian/tmp/
 
@@ -29,7 +29,7 @@ DEB_UPSTREAM_VERSION ?= $(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/-[^-]*$$//'
 DEB_UPSTREAM_VERSION_MAJOR_MINOR := $(shell echo $(DEB_UPSTREAM_VERSION) | sed -r -n 's/^([0-9]+\.[0-9]+).*/\1/p')
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.5.tar.gz
+EXPORTED_SOURCE_TARBALL = debian/Percona-XtraDB-Cluster-source-5.5.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -sc)
