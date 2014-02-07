@@ -1058,6 +1058,8 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     If we didn't succeed lock_global_read_lock(), or if we already suceeded
     make_global_read_lock_block_commit(), do nothing.
   */
+  if (m_state != GRL_ACQUIRED)
+    DBUG_RETURN(0);
 
 #ifdef WITH_WSREP
   if (m_mdl_blocks_commits_lock)
@@ -1071,9 +1073,6 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     m_state= GRL_ACQUIRED;
   }
 #endif /* WITH_WSREP */
-
-  if (m_state != GRL_ACQUIRED)
-    DBUG_RETURN(0);
 
   mdl_request.init(MDL_key::COMMIT, "", "", MDL_SHARED, MDL_EXPLICIT);
 
