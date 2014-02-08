@@ -501,6 +501,7 @@ mkdir debug
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
+           -DWITH_ZLIB=system \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
@@ -522,6 +523,7 @@ mkdir release
            -DWITH_EMBEDDED_SERVER=OFF \
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
+           -DWITH_ZLIB=system \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \

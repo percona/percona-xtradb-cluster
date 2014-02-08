@@ -221,6 +221,7 @@ fi
         -DWITH_EMBEDDED_SERVER=OFF \
         -DFEATURE_SET=community \
         -DWITH_SSL=system \
+        -DWITH_ZLIB=system \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
         -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
         -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
