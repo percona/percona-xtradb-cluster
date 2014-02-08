@@ -120,11 +120,11 @@ else
 fi
 
 # Extract version from the Makefile
-MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
+MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile-pxc" \
     | cut -d = -f 2)"
 RELEASE_TAG=''
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
-    "$SOURCEDIR/Makefile" | cut -d = -f 2)"
+    "$SOURCEDIR/Makefile-pxc" | cut -d = -f 2)"
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
     "$SOURCEDIR/wsrep/wsrep_api.h" |
     cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \

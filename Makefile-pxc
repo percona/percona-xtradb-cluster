@@ -22,7 +22,7 @@ REV = $(shell bzr revno)
 all: maatkit-udf
 	@echo ""
 	@echo "Percona XtraDB Cluster source code is ready"
-	@echo "Now change directory to $(PERCONA_XTRADB_CLUSTER) define variables as show below"
+	@echo "Now define variables as show below"
 	@echo ""
 	export CFLAGS="-O2 -g -fmessage-length=0 -D_FORTIFY_SOURCE=2"
 	export CXXFLAGS="-O2 -g -fmessage-length=0 -D_FORTIFY_SOURCE=2"
