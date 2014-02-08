@@ -229,16 +229,6 @@ fi
 
     )
 
-    # Build UDF
-    (
-        cd "UDF"
-        CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/include" \
-            --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
-        make $MAKE_JFLAG
-        make DESTDIR="$WORKDIR" install
-
-    )
-
     (
        echo "Packaging the test files"
        # mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL
