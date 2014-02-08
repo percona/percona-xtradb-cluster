@@ -350,6 +350,26 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
   if (check_has_super(self, thd, var))
     return true;
 
+#ifdef WITH_WSREP
+  /* Galera does not support STATEMENT or MIXED binlog
+  format currently */
+  if (WSREP(thd) &&
+     (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
+      var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED))
+  {
+    WSREP_DEBUG("PXC does not support binlog format : %s",
+                var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
+                "STATEMENT" : "MIXED");
+    /* Push also warning, because error message is general */
+     push_warning_printf(thd, MYSQL_ERROR::WARN_LEVEL_WARN,
+                        ER_UNKNOWN_ERROR,
+                        "PXC does not support binlog format: %s",
+                        var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
+                        "STATEMENT" : "MIXED");
+    return true;
+  }
+#endif
+
   if (var->type == OPT_GLOBAL)
     return false;
 
@@ -389,26 +409,6 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     my_error(ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_BINLOG_FORMAT, MYF(0));
     return true;
   }
-
-#ifdef WITH_WSREP
-  /* Galera does not support STATEMENT or MIXED binlog
-  format currently */
-  if (WSREP(thd) &&
-     (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
-      var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED))
-  {
-    WSREP_DEBUG("PXC does not support binlog format : %s",
-                var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
-                "STATEMENT" : "MIXED");
-    /* Push also warning, because error message is general */
-     push_warning_printf(thd, MYSQL_ERROR::WARN_LEVEL_WARN,
-                        ER_UNKNOWN_ERROR,
-                        "PXC does not support binlog format: %s",
-                        var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
-                        "STATEMENT" : "MIXED");
-    return true;
-  }
-#endif
 
   return false;
 }
