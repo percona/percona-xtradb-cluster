@@ -112,7 +112,6 @@ Description: Percona XtraDB Cluster database server binaries
  .
  This package includes the server binaries.
 
-<<<<<<< TREE
 Package: percona-xtradb-cluster-55
 Section: database
 Architecture: any
