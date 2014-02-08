@@ -1,0 +1,16 @@
+# compress+compact+xbstream + log_bin
+# v2only 56only
+[mysqld]
+log_bin 
+gtid_mode=ON
+log_slave_updates
+enforce-gtid-consistency
+
+[xtrabackup]
+compress
+compact
+compress-threads=4
+
+[sst]
+streamfmt=xbstream
+transferfmt=socat

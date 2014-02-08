@@ -1,0 +1,19 @@
+# compress+compact+xbstream + external-log-bin +cpat
+# v2only 56only
+[mysqld]
+log_bin=/tmp/blog1/mysql-bin
+gtid_mode=ON
+log_slave_updates
+enforce-gtid-consistency
+
+[xtrabackup]
+compress
+compact
+compress-threads=4
+encrypt-threads=4
+encrypt=AES256
+encrypt-key=6F3AD9F428143F133FD7D50D77D91EA4
+
+[sst]
+cpat='.*galera\.cache$\|.*sst_in_progress$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*\.borr$\|.*\.brn$'
+encrypt=1

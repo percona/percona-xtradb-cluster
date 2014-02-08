@@ -1,0 +1,16 @@
+# xbstream+compress+parallel+compress-threads+compact+compress-stream+encrypt2+rlimit+time+progress
+[xtrabackup]
+compress
+parallel=4
+compress-threads=4
+compact
+
+[sst]
+streamfmt=xbstream
+decompressor="gzip -dc"
+encrypt=2
+rlimit=2m
+time=1
+progress=1
+tca=/tmp/certs/node2.crt
+tcert=/tmp/certs/node1.pem
