@@ -14383,7 +14383,11 @@ static MYSQL_SYSVAR_LONG(autoinc_lock_mode, innobase_autoinc_lock_mode,
   "1 => New style AUTOINC locking                            "
   "2 => No AUTOINC locking (unsafe for SBR)",
   NULL, NULL,
-  AUTOINC_NEW_STYLE_LOCKING,	/* Default setting */
+#ifdef WITH_WSREP
+  AUTOINC_NO_LOCKING,           /* Default setting: changed for galera Bug#1243228 */
+#else 
+  AUTOINC_NEW_STYLE_LOCKING,   /*  Default setting */
+#endif
   AUTOINC_OLD_STYLE_LOCKING,	/* Minimum value */
   AUTOINC_NO_LOCKING, 0);	/* Maximum value */
 
