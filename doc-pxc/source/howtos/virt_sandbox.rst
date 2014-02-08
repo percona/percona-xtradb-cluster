@@ -34,7 +34,6 @@ After installing everything, we'll configure |PXC| first. On the first node, :fi
 
   log_slave_updates
 
-  innodb_locks_unsafe_for_binlog=1
   innodb_autoinc_lock_mode=2
   innodb_buffer_pool_size=400M
   innodb_log_file_size=64M
