@@ -99,10 +99,10 @@ else
 
 fi
 
-WORKDIR_ABS="$(cd "$WORKDIR"; pwd)"
+WORKDIR="$(cd "$WORKDIR"; pwd)"
 
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
-test -e "$SOURCEDIR/Makefile" || exit 2
+test -e "$SOURCEDIR/Makefile-pxc" || exit 2
 
 # Test for the galera sources
 if [[ $COPYGALERA -eq 0 ]] && ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
@@ -149,15 +149,13 @@ COMMENT="$COMMENT, Revision $REVISION"
 
 # Compilation flags
 export CC=${CC:-gcc}
-export CXX=${CXX:-gcc}
-export CFLAGS="-fPIC -Wall -O3 -g -static-libgcc -fno-omit-frame-pointer -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CFLAGS:-}"
-export CXXFLAGS="-O2 -fno-omit-frame-pointer -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fno-exceptions -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION $TARGET_CFLAGS ${CXXFLAGS:-}"
+export CXX=${CXX:-g++}
+COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
+export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
+export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 export WSREP_REV="$WSREP_REV"
-
-# Create a temporary working directory
-INSTALLDIR="$WORKDIR_ABS/percona-build"   # Make it absolute
 
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
@@ -185,23 +183,22 @@ fi
         cd "percona-xtradb-cluster-galera"
         scons --config=force revno="$GALERA_REVISION" $MAKE_JFLAG \
               garb/garbd libgalera_smm.so
-        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-        cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
-        cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
+        cp garb/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
+        cp libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
     else 
-        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-        cp $WORKDIR_ABS/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
-        cp $WORKDIR_ABS/libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
+        cp $WORKDIR/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
+        cp $WORKDIR/libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
     fi
 
     ) || exit 1
 
 
-    make all
+    make -f Makefile-pxc all
 
-    cd "$PRODUCT"
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DWITH_EMBEDDED_SERVER=OFF \
@@ -216,7 +213,7 @@ fi
         -DWITH_PAM=ON
 
     make $MAKE_JFLAG $QUIET
-    make DESTDIR="$INSTALLDIR" install
+    make DESTDIR="$WORKDIR" install
 
     # Build HandlerSocket
     (
@@ -228,7 +225,7 @@ fi
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/plugin" \
             --prefix="/usr/local/$PRODUCT_FULL"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install
+        make DESTDIR="$WORKDIR" install
 
     )
 
@@ -238,14 +235,14 @@ fi
         CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install
+        make DESTDIR="$WORKDIR" install
 
     )
 
     (
        echo "Packaging the test files"
-       # mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL
-       cp -R percona-xtradb-cluster-tests $INSTALLDIR/usr/local/$PRODUCT_FULL/
+       # mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL
+       cp -R percona-xtradb-cluster-tests $WORKDIR/usr/local/$PRODUCT_FULL/
     )
 
     # Build jemalloc
@@ -257,10 +254,10 @@ fi
         ./configure --prefix="/usr/local/$PRODUCT_FULL/" \
                 --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install_lib_shared
+        make DESTDIR="$WORKDIR" install_lib_shared
 
         # Copy COPYING file
-        cp COPYING "$INSTALLDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
+        cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
     )
     fi
@@ -269,13 +266,9 @@ fi
 
 # Package the archive
 (
-    cd "$INSTALLDIR/usr/local/"
+    cd "$WORKDIR/usr/local/"
 
-    $TAR czf "$WORKDIR_ABS/$PRODUCT_FULL.tar.gz" \
+    $TAR czf "$WORKDIR/$PRODUCT_FULL.tar.gz" \
         --owner=0 --group=0 "$PRODUCT_FULL/"
     
 )
-
-# Clean up
-rm -rf "$INSTALLDIR"
-
