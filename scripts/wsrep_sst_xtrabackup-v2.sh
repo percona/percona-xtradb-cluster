@@ -295,7 +295,7 @@ read_cnf()
     fi
     rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use_extra 0)
-    speciald=$(parse_cnf sst sst-special-dirs 0)
+    speciald=$(parse_cnf sst sst-special-dirs 1)
 }
 
 get_stream()
@@ -646,6 +646,9 @@ then
     if [[ $speciald -eq 1 ]];then 
         ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
         ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
+        if [[ -n $ib_home_dir && -n $ib_log_dir ]];then 
+            speciald=0
+        fi
     fi
 
     stagemsg="Joiner-Recv"

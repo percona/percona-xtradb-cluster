@@ -280,7 +280,7 @@ Cluster 55 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.4 socat rsync iproute perl-DBI perl-DBD-MySQL
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.6 socat rsync iproute perl-DBI perl-DBD-MySQL
 Provides:       mysql-server MySQL-server Percona-Server-server
 Conflicts:	Percona-Server-server-56 Percona-Server-server-55 Percona-Server-server-51 Percona-SQL-server-50 Percona-XtraDB-Cluster-server-56
 Obsoletes:      Percona-XtraDB-Cluster-server
