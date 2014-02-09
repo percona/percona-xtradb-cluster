@@ -646,7 +646,7 @@ then
     if [[ $speciald -eq 1 ]];then 
         ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
         ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
-        if [[ -n $ib_home_dir && -n $ib_log_dir ]];then 
+        if [[ -z $ib_home_dir && -z $ib_log_dir ]];then 
             speciald=0
         fi
     fi
