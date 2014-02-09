@@ -81,7 +81,7 @@ Description: Percona XtraDB Cluster database test suite
 
 Package: percona-xtradb-cluster-client-5.5
 Architecture: any
-Depends: debianutils (>=1.6), libdbi-perl, percona-xtradb-cluster-common-5.5 (>= ${source:Version}), libperconaserverclient18 (>= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: debianutils (>=1.6), libdbi-perl, percona-xtradb-cluster-common-5.5 (>= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
 Provides: mysql-client, mysql-client-core, mysql-client-5.5, mysql-client-core-5.5, virtual-mysql-client
 Conflicts: mysql-client, mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, mysql-client-5.5, mysql-client-core-5.5, percona-xtradb-client-5.0, percona-server-client-5.1
 Replaces: mysql-client, mysql-client-5.0, mysql-client-5.1, mysql-client-core-5.1, mysql-client-5.5, mysql-client-core-5.5, percona-xtradb-client-5.0, percona-server-client-5.1
