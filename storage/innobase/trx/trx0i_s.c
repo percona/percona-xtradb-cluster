@@ -38,6 +38,15 @@ Created July 17, 2007 Vasil Dimov
 
 #include <mysql/plugin.h>
 
+#ifdef WITH_WSREP
+#include "../wsrep/wsrep_api.h"
+extern const char *wsrep_consistency_check_str(void *thd);
+extern const char *wsrep_thd_query_state_str(void *thd);
+extern const char *wsrep_thd_conflict_state_str(void *thd);
+extern const char *wsrep_thd_exec_mode_str(void *thd);
+extern wsrep_seqno_t wsrep_thd_trx_seqno(void *thd);
+#endif
+
 #include "buf0buf.h"
 #include "dict0dict.h"
 #include "ha0storage.h"
