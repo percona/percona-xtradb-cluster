@@ -9881,9 +9881,6 @@ ha_innobase::wsrep_append_keys(
 			      dict_table_get_referenced_constraint(tab, idx)) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
-				if (key_info->flags & HA_NOSAME || shared)
-			  		key_appended = true;
-
 				len = wsrep_store_key_val_for_row(
 					table, i, key0, key_info->key_length, 
 					record0, &is_null);
@@ -9892,6 +9889,9 @@ ha_innobase::wsrep_append_keys(
 						thd, trx, table_share, table, 
 						keyval0, len+1, shared);
 					if (rcode) DBUG_RETURN(rcode);
+
+					if (key_info->flags & HA_NOSAME || shared)
+						key_appended = true;
 				}
 				else
 				{
