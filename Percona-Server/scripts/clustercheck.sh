@@ -25,8 +25,12 @@ DEFAULTS_EXTRA_FILE=${6:-/etc/my.cnf}
 #Timeout exists for instances where mysqld may be hung
 TIMEOUT=10
 
-MYSQL_CMDLINE="mysql --defaults-extra-file=$DEFAULTS_EXTRA_FILE -nNE --connect-timeout=$TIMEOUT \
-                --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD}"
+if [[ -r $DEFAULTS_EXTRA_FILE ]];then 
+    MYSQL_CMDLINE="mysql --defaults-extra-file=$DEFAULTS_EXTRA_FILE -nNE --connect-timeout=$TIMEOUT \
+                    --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD}"
+else 
+    MYSQL_CMDLINE="mysql -nNE --connect-timeout=$TIMEOUT --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD}"
+fi
 #
 # Perform the query to check the wsrep_local_state
 #
