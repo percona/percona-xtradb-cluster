@@ -141,13 +141,13 @@ Prefix: %{_sysconfdir}
     %if "%oelver" == "4"
       %define distro_description        Oracle Enterprise Linux 4
       %define distro_releasetag         oel4
-      %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
+      %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake redhat-lsb
       %define distro_requires           chkconfig coreutils grep procps shadow-utils
     %else
       %if "%oelver" == "5"
         %define distro_description      Oracle Enterprise Linux 5
         %define distro_releasetag       oel5
-        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
+        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake redhat-lsb
         %define distro_requires         chkconfig coreutils grep procps shadow-utils
       %else
         %{error:Oracle Enterprise Linux %{oelver} is unsupported}
@@ -159,13 +159,13 @@ Prefix: %{_sysconfdir}
       %if "%rhelver" == "4"
         %define distro_description      Red Hat Enterprise Linux 4
         %define distro_releasetag       rhel4
-        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
+        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake redhat-lsb
         %define distro_requires         chkconfig coreutils grep procps shadow-utils
       %else
         %if "%rhelver" == "5"
           %define distro_description    Red Hat Enterprise Linux 5
           %define distro_releasetag     rhel5
-          %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
+          %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake redhat-lsb
           %define distro_requires       chkconfig coreutils grep procps shadow-utils
         %else
           %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
@@ -177,13 +177,13 @@ Prefix: %{_sysconfdir}
         %if "%susever" == "10"
           %define distro_description    SUSE Linux Enterprise Server 10
           %define distro_releasetag     sles10
-          %define distro_buildreq       gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client readline-devel zlib-devel libaio-devel bison cmake redhat-lsb
+          %define distro_buildreq       gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client readline-devel zlib-devel libaio-devel bison < 3 cmake redhat-lsb
           %define distro_requires       aaa_base coreutils grep procps pwdutils
         %else
           %if "%susever" == "11"
             %define distro_description  SUSE Linux Enterprise Server 11
             %define distro_releasetag   sles11
-            %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils readline-devel zlib-devel libaio-devel bison cmake redhat-lsb
+            %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils readline-devel zlib-devel libaio-devel bison < 3 cmake redhat-lsb
             %define distro_requires     aaa_base coreutils grep procps pwdutils
           %else
             %{error:SuSE %{susever} is unsupported}
@@ -198,7 +198,7 @@ Prefix: %{_sysconfdir}
   %define generic_kernel %(uname -r | cut -d. -f1-2)
   %define distro_description            Generic Linux (kernel %{generic_kernel})
   %define distro_releasetag             linux%{generic_kernel}
-  %define distro_buildreq               gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
+  %define distro_buildreq               gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake redhat-lsb
   %define distro_requires               coreutils grep procps /sbin/chkconfig /usr/sbin/useradd /usr/sbin/groupadd
 %endif
 
