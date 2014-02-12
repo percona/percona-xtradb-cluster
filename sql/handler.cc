@@ -7037,7 +7037,7 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
 #ifdef WITH_WSREP
 	  /* applier and replayer should not binlog */
-          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) || 
+          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) ||
            mysql_bin_log.is_open()));
 #else
           mysql_bin_log.is_open());
@@ -7142,6 +7142,17 @@ int binlog_log_row(TABLE* table,
   bool error= 0;
   THD *const thd= table->in_use;
 
+#ifdef WITH_WSREP
+  /* only InnoDB tables will be replicated through binlog emulation */
+  if (WSREP_EMULATE_BINLOG(thd) && table->file->ht->db_type != DB_TYPE_INNODB)
+  {
+    WSREP_DEBUG("skipping repication for: %s.%s", 
+                table->s->db.str,
+                table->s->table_name.str
+                );
+    return 0;
+  } 
+#endif /* WITH_WSREP */
   if (check_table_binlog_row_based(thd, table))
   {
     DBUG_DUMP("read_set 10", (uchar*) table->read_set->bitmap,
