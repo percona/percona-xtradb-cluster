@@ -207,10 +207,11 @@ fi
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        if grep noopenssl <<< "$TAG";then 
+        if grep builtin <<< "$STAG";then 
+            # No builtin SSL in galera yet.
             scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" boost_pool=0 \
                 garb/garbd libgalera_smm.so
-        elif grep static <<< "$TAG";then 
+        elif grep static <<< "$STAG";then 
             # Disable SSL in galera for now
             scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
             revno="$GALERA_REVISION" boost_pool=0 garb/garbd libgalera_smm.so
@@ -232,7 +233,7 @@ fi
 
     make clean all
 
-    if grep noopenssl <<< "$TAG";then 
+    if grep builtin <<< "$STAG";then 
         # builtin
         SSL_OPT='-DWITH_SSL=bundled -DWITH_ZLIB=bundled'
     else 
