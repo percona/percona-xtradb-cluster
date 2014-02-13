@@ -101,9 +101,17 @@ export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
 export HS_CXX=${HS_CXX:-g++}
 export UDF_CXX=${UDF_CXX:-g++}
-COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
-export CFLAGS=" $COMMON_FLAGS -static-libgcc ${CFLAGS:-}"
-export CXXFLAGS=" $COMMON_FLAGS ${CXXFLAGS:-}"
+
+arch=$(uname -m)
+if [[ "x$DEBIAN_VERSION" == "xlucid" && $arch != 'x86_64' ]];then
+    COMMON_FLAGS="-Wall  -march=i686  -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
+    export CFLAGS=" $COMMON_FLAGS -static-libgcc ${CFLAGS:-}"
+    export CXXFLAGS=" $COMMON_FLAGS ${CXXFLAGS:-}"
+else 
+    COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
+    export CFLAGS=" $COMMON_FLAGS -static-libgcc ${CFLAGS:-}"
+    export CXXFLAGS=" $COMMON_FLAGS ${CXXFLAGS:-}"
+fi
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 # Prepare sources
