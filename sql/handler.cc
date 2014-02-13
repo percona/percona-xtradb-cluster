@@ -7146,10 +7146,6 @@ int binlog_log_row(TABLE* table,
   /* only InnoDB tables will be replicated through binlog emulation */
   if (WSREP_EMULATE_BINLOG(thd) && table->file->ht->db_type != DB_TYPE_INNODB)
   {
-    WSREP_DEBUG("skipping repication for: %s.%s", 
-                table->s->db.str,
-                table->s->table_name.str
-                );
     return 0;
   } 
 #endif /* WITH_WSREP */
