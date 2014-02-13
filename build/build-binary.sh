@@ -25,6 +25,7 @@ OPENSSL_INCLUDE=''
 OPENSSL_LIBRARY=''
 CRYPTO_LIBRARY=''
 GALERA_SSL=''
+SSL_OPT=''
 TAG=''
 
 # Some programs that may be overriden
@@ -206,7 +207,10 @@ fi
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        if grep static <<< "$TAG";then 
+        if grep noopenssl <<< "$TAG";then 
+            scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" boost_pool=0 \
+                garb/garbd libgalera_smm.so
+        elif grep static <<< "$TAG";then 
             # Disable SSL in galera for now
             scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
             revno="$GALERA_REVISION" boost_pool=0 garb/garbd libgalera_smm.so
@@ -228,6 +232,13 @@ fi
 
     make clean all
 
+    if grep noopenssl <<< "$TAG";then 
+        # builtin
+        SSL_OPT='-DWITH_SSL=bundled -DWITH_ZLIB=bundled'
+    else 
+        SSL_OPT='-DWITH_SSL=system -DWITH_ZLIB=system'
+    fi
+
     cd "$PRODUCT"
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
@@ -235,8 +246,7 @@ fi
         -DWITH_EMBEDDED_SERVER=OFF \
         -DFEATURE_SET=community \
         -DENABLE_DTRACE=OFF \
-        -DWITH_SSL=system \
-        -DWITH_ZLIB=system \
+         $SSL_OPT \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
         -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
         -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$PERCONA_SERVER_VERSION" \
