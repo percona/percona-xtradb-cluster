@@ -5375,6 +5375,13 @@ static int binlog_log_row(TABLE* table,
   bool error= 0;
   THD *const thd= table->in_use;
 
+#ifdef WITH_WSREP
+  /* only InnoDB tables will be replicated through binlog emulation */
+  if (WSREP_EMULATE_BINLOG(thd) && table->file->ht->db_type != DB_TYPE_INNODB)
+  {
+    return 0;
+  } 
+#endif /* WITH_WSREP */
   if (check_table_binlog_row_based(thd, table))
   {
     MY_BITMAP cols;
