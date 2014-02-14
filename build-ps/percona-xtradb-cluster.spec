@@ -502,6 +502,8 @@ mkdir debug
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
@@ -524,6 +526,8 @@ mkdir release
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
