@@ -1149,7 +1149,13 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_sbindir}/mysqld-debug
 %attr(755, root, root) %{_sbindir}/rcmysql
 
-%attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
+%if "%rhel" == "5"
+    %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
+%endif
+
+%if "%rhel" == "6"
+    %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
+%endif 
 
 %attr(755, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
