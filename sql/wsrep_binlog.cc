@@ -172,6 +172,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
         {
             WSREP_WARN("transaction size limit (%lu) exceeded: %zu",
                        wsrep_max_ws_size, total_length);
+	    err = WSREP_SIZE_EXCEEDED;
             goto cleanup;
         }
 
