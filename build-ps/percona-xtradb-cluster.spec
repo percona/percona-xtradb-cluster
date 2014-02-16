@@ -1215,8 +1215,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 
-%attr(755, root, root) %{_datadir}/mysql/
-
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}
 
