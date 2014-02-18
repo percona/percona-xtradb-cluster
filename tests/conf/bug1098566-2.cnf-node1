@@ -14,7 +14,7 @@ compact
 [sst]
 compressor="gzip"
 streamfmt=xbstream
-sst-special-dirs=1
+#sst-special-dirs=1
 encrypt=3
 tkey=/tmp/certs/node1.key
 tcert=/tmp/certs/node1.pem
