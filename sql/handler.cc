@@ -1321,12 +1321,21 @@ int ha_commit_trans(THD *thd, bool all)
           if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
           {
             error= 1;
-            /* avoid sending error, if we need to replay */
-            if (thd->wsrep_conflict_state!= MUST_REPLAY)
-            {
-              my_error(ER_LOCK_DEADLOCK, MYF(0), err);
-            }
-          }
+	    switch (err)
+	    {
+	    case WSREP_TRX_SIZE_EXCEEDED:
+	      /* give user size exeeded erro from wsrep_api.h */
+	      my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED);
+	      break;
+	    case WSREP_TRX_CERT_FAIL:
+	    case WSREP_TRX_ERROR:
+	      /* avoid sending error, if we need to replay */
+	      if (thd->wsrep_conflict_state!= MUST_REPLAY)
+	      {
+		my_error(ER_LOCK_DEADLOCK, MYF(0), err);
+	      }
+	    }
+	  }
           else
           {
             /* not wsrep hton, bail to native mysql behavior */
