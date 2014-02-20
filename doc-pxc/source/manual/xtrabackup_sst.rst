@@ -152,7 +152,7 @@ During the SST, the :term:`datadir` is cleaned up so that state of other node ca
 .. option:: sst_special_dirs
    
      :Values: 0,1
-     :Default: 0
+     :Default: 1
  
 In order for XtraBackup SST to support :variable:`innodb_data_home_dir` and :variable:`innodb_log_home_dir` variables in the configuration file this option was introduced in |Percona XtraDB Cluster| :rn:`5.6.15-25.2`. This requires sst-special-dirs to be set under [sst] in the configuration file to either 0 or 1. Also, :variable:`innodb-data-home-dir` and/or :variable:`innodb-log-group-home-dir` need to be defined in :file:`my.cnf` under [mysqld]. |Percona Xtrabackup| 2.1.6 or higher is required in order for this to work.
  

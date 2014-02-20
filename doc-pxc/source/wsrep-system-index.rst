@@ -149,9 +149,9 @@ This variable defines a binlog format that will be always be effective regardles
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: ON 
+   :default: OFF
 
-This variable controls whether ``LOAD DATA`` transaction splitting is wanted or not.
+This variable controls whether ``LOAD DATA`` transaction splitting is wanted or not. This variable doesn't work as expected with autocommit=0 when turned ON.
 
 .. variable:: wsrep_log_conflicts
 
