@@ -43,7 +43,11 @@ Prefix: %{_sysconfdir}
 %endif
 
 %define release_tag	%{nil}
-%define release         %{release_tag}%{wsrep_version}.%{revision}.%{distribution}
+%if %{undefined dist}
+    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{redhatversion}
+%else
+    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{dist}
+%endif
 
 #
 # Macros we use which are not available in all supported versions of RPM
