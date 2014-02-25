@@ -229,8 +229,9 @@ extern void wsrep_ready_wait();
 
 enum wsrep_trx_status {
     WSREP_TRX_OK,
-    WSREP_TRX_ROLLBACK,
-    WSREP_TRX_ERROR,
+    WSREP_TRX_CERT_FAIL,      /* certification failure, must abort */
+    WSREP_TRX_SIZE_EXCEEDED,  /* trx size exceeded */
+    WSREP_TRX_ERROR,          /* native mysql error */
 };
 
 extern enum wsrep_trx_status
