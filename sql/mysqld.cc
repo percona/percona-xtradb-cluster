@@ -76,7 +76,6 @@
 #include "wsrep_var.h"
 #include "wsrep_thd.h"
 #include "wsrep_sst.h"
-ulong  wsrep_running_threads = 0; // # of currently running wsrep threads
 #endif
 #include "sql_callback.h"
 #include "opt_trace_context.h"
@@ -5322,19 +5321,9 @@ pthread_handler_t start_wsrep_THD(void *arg)
   ++connection_count;
   mysql_mutex_unlock(&LOCK_connection_count);
 
-  mysql_mutex_lock(&LOCK_thread_count);
-  wsrep_running_threads++;
-  mysql_cond_signal(&COND_thread_count);
-  mysql_mutex_unlock(&LOCK_thread_count);
-
   processor(thd);
 
   close_connection(thd, 0, 1);
-
-  mysql_mutex_lock(&LOCK_thread_count);
-  wsrep_running_threads--;
-  mysql_cond_signal(&COND_thread_count);
-  mysql_mutex_unlock(&LOCK_thread_count);
 
   // Note: We can't call THD destructor without crashing
   // if plugins have not been initialized. However, in most of the
