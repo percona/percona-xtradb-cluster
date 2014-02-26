@@ -6479,7 +6479,9 @@ ha_innobase::write_row(
 	     || sql_command == SQLCOM_CREATE_INDEX
 #ifdef WITH_WSREP
 	     || (wsrep_on(user_thd) && wsrep_load_data_splitting &&
-		 sql_command == SQLCOM_LOAD)
+		 sql_command == SQLCOM_LOAD                      &&
+		 !thd_test_options(
+			user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 #endif /* WITH_WSREP */
 	     || sql_command == SQLCOM_DROP_INDEX)
 	    && num_write_row >= 10000) {
