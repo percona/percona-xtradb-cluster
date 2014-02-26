@@ -1156,6 +1156,9 @@ public:
     -------------------------------------------------------------------------
     virtual void append_create_info(String *packet)
   */
+#ifdef WITH_WSREP
+    virtual int wsrep_db_type() const;
+#endif /* WITH_WSREP */
 };
 
 #endif /* HA_PARTITION_INCLUDED */
