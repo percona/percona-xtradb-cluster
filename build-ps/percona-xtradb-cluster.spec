@@ -44,7 +44,7 @@ Prefix: %{_sysconfdir}
 
 %define release_tag	%{nil}
 %if %{undefined dist}
-    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{redhatversion}
+    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{distribution}
 %else
     %define release         %{release_tag}%{wsrep_version}.%{revision}.%{dist}
 %endif
@@ -240,7 +240,6 @@ Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
 Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz 
-Patch1:         mysql-dubious-exports.patch
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -405,10 +404,10 @@ This package contains the shared libraries (*.so*) which certain languages
 and applications need to dynamically load and use Percona XtraDB Cluster.
 
 ##############################################################################
-%prep
-%setup -n %{src_dir}
 #
-%patch1 -p1 
+%prep
+#
+%setup -n %{src_dir}
 #
 ##############################################################################
 %build
@@ -447,12 +446,6 @@ touch optional-files-devel
 # Set environment in order of preference, MYSQL_BUILD_* first, then variable
 # name, finally a default.  RPM_OPT_FLAGS is assumed to be a part of the
 # default RPM build environment.
-#
-# We set CXX=gcc by default to support so-called 'generic' binaries, where we
-# do not have a dependancy on libgcc/libstdc++.  This only works while we do
-# not require C++ features such as exceptions, and may need to be removed at
-# a later date.
-#
 
 # This is a hack, $RPM_OPT_FLAGS on ia64 hosts contains flags which break
 # the compile in cmd-line-utils/readline - needs investigation, but for now
@@ -565,33 +558,11 @@ RBR=$RPM_BUILD_ROOT
 # Clean up the BuildRoot first
 [ "$RBR" != "/" ] && [ -d "$RBR" ] && rm -rf "$RBR";
 
-# For gcc builds, include libgcc.a in the devel subpackage (BUG 4921).  This
-# needs to be during build phase as $CC is not set during install.
-if "$CC" -v 2>&1 | grep '^gcc.version' >/dev/null 2>&1
-then
-  libgcc=`$CC $CFLAGS --print-libgcc-file`
-  if [ -f $libgcc ]
-  then
-    mkdir -p $RBR%{_libdir}/mysql
-    install -m 644 $libgcc $RBR%{_libdir}/mysql/libmygcc.a
-    echo "%{_libdir}/mysql/libmygcc.a" >>optional-files-devel
-  fi
-fi
-
-# Move temporarily the saved files to the BUILD directory since the BUILDROOT
-# dir will be cleaned at the start of the install phase
-mkdir -p "$(dirname $RPM_BUILD_DIR/%{_libdir})"
-mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
-
 ##############################################################################
 %install
 
 RBR=$RPM_BUILD_ROOT
 MBD=$RPM_BUILD_DIR/%{src_dir}
-
-# Move back the libdir from BUILD dir to BUILDROOT
-mkdir -p "$(dirname $RBR%{_libdir})"
-mv $RPM_BUILD_DIR/%{_libdir} $RBR%{_libdir}
 
 # Ensure that needed directories exists
 install -d $RBR%{_sysconfdir}/{logrotate.d,init.d}
@@ -1218,6 +1189,8 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
+
+%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}

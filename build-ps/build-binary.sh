@@ -145,7 +145,7 @@ if test -e "/proc/cpuinfo"
 then
     PROCESSORS="$(grep -c ^processor /proc/cpuinfo)"
 else
-    PROCESSORS=4
+    PROCESSORS=2
 fi
 
 
