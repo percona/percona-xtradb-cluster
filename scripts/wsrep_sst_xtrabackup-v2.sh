@@ -296,6 +296,9 @@ read_cnf()
     rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use_extra 0)
     speciald=$(parse_cnf sst sst-special-dirs 1)
+    iopts=$(parse_cnf sst inno-backup-opts "")
+    iapts=$(parse_cnf sst inno-apply-opts "")
+    impts=$(parse_cnf sst inno-move-opts "")
 }
 
 get_stream()
@@ -516,9 +519,9 @@ fi
 
 
 INNOEXTRA=""
-INNOAPPLY="${INNOBACKUPEX_BIN} $disver --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
+INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
