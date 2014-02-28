@@ -123,7 +123,6 @@ Architecture: any
 Depends: debianutils (>=1.6),
          libdbi-perl,
          percona-xtradb-cluster-common-5.5 (>= ${source:Version}),
-         libperconaserverclient18 (>= ${source:Version}),
          ${shlibs:Depends},
          ${misc:Depends}
 Provides: virtual-mysql-client
