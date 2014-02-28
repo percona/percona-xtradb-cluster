@@ -4971,10 +4971,6 @@ dict_update_statistics(
 
 		dict_table_stats_unlock(table, RW_X_LATCH);
 	}
-#ifdef UNIV_DEBUG
-	fprintf(stderr, "InnoDB: DEBUG: update_statistics for %s.\n",
-			table->name);
-#endif
 	sum_of_index_sizes = 0;
 
 	/* Find out the sizes of the indexes and how many different values
