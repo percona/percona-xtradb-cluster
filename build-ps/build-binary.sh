@@ -200,7 +200,12 @@ fi
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        if grep static <<< "$TAG";then 
+        if grep builtin <<< "$STAG";then 
+            # No builtin SSL in galera yet.
+            scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" boost_pool=0 \
+                garb/garbd libgalera_smm.so
+        elif grep static <<< "$STAG";then 
+            # Disable SSL in galera for now
             scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
             revno="$GALERA_REVISION" boost_pool=0 garb/garbd libgalera_smm.so
         else 
@@ -216,12 +221,18 @@ fi
 
     make -f Makefile-pxc all
 
+    if grep builtin <<< "$STAG";then 
+        # builtin
+        SSL_OPT='-DWITH_SSL=bundled -DWITH_ZLIB=bundled'
+    else 
+        SSL_OPT='-DWITH_SSL=system -DWITH_ZLIB=system'
+    fi
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
         -DWITH_EMBEDDED_SERVER=OFF \
         -DFEATURE_SET=community \
-        -DWITH_SSL=system \
-        -DWITH_ZLIB=system \
+        -DENABLE_DTRACE=OFF \
+         $SSL_OPT \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
         -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
         -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
@@ -270,11 +281,11 @@ fi
     (
         cd "$JEMALLOCDIR"
 
-        ./configure --prefix="/usr/local/$PRODUCT_FULL/" \
+        CFLAGS= ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL/" \
                 --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
         make DESTDIR="$WORKDIR" install_lib_shared
-
+        strip lib/libjemalloc* || true
         # Copy COPYING file
         cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
