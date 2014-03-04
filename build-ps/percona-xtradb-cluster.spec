@@ -273,7 +273,7 @@ This is a meta-package which installs server, client and galera-2.
 %package -n Percona-XtraDB-Cluster-full%{product_suffix}
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-2-debuginfo
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-2-debuginfo
 
 %description -n Percona-XtraDB-Cluster-full%{product_suffix}
 This is a meta-package which provides the full suite of Percona XtraDB
@@ -385,7 +385,6 @@ http://www.percona.com/software/percona-xtradb-cluster/
 %package -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
-Provides:       Percona-Server-shared
 Conflicts:	Percona-Server-shared-55 Percona-XtraDB-Cluster-shared-56
 Obsoletes:      Percona-XtraDB-Cluster-shared
 
