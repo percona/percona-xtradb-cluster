@@ -595,7 +595,7 @@ install -d $RBR%{_libdir}/mysql/plugin
 # FIXME: at some point we should stop doing this and just install everything
 # FIXME: directly into %{_libdir}/mysql - perhaps at the same time as renaming
 # FIXME: the shared libraries to use libmysql*-$major.$minor.so syntax
-mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
+#mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
 
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
@@ -1188,8 +1188,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
-
-%attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}
