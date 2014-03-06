@@ -18,5 +18,5 @@ encrypt-chunk-size=16777216
 decompressor="gzip -dc"
 streamfmt=xbstream
 encrypt=1
-inno-apply-opts="  --lock-wait-threshold=5  --throttle=30 --use-memory=500M --tmpdir=/dev/shm "
+inno-apply-opts="  --lock-wait-threshold=5  --throttle=30 --use-memory=500M --tmpdir=/tmp "
 inno-move-opts=" --kill-long-query-type=select  --throttle=30  "
