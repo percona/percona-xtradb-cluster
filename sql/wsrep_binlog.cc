@@ -172,7 +172,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
         {
             WSREP_WARN("transaction size limit (%lu) exceeded: %zu",
                        wsrep_max_ws_size, total_length);
-	    err = WSREP_SIZE_EXCEEDED;
+	    err = WSREP_TRX_SIZE_EXCEEDED;
             goto cleanup;
         }
 
@@ -184,7 +184,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
             {
                 WSREP_ERROR("could not (re)allocate buffer: %zu + %u",
                             allocated, length);
-                err = WSREP_SIZE_EXCEEDED;
+                err = WSREP_TRX_SIZE_EXCEEDED;
                 goto cleanup;
             }
 
@@ -239,7 +239,7 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
     if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
     {
       WSREP_ERROR("failed to initialize io-cache");
-      return WSREP_TRX_ROLLBACK;
+      return WSREP_TRX_ERROR;
     }
 
     int err(WSREP_OK);
@@ -260,7 +260,7 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
         {
             WSREP_WARN("transaction size limit (%lu) exceeded: %zu",
                        wsrep_max_ws_size, total_length);
-            err = WSREP_SIZE_EXCEEDED;
+            err = WSREP_TRX_SIZE_EXCEEDED;
             goto cleanup;
         }
 
