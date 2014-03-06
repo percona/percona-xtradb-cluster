@@ -605,7 +605,7 @@ install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Delete the symlinks to the libraries from the libdir. These are created by
 # ldconfig(8) afterwards.
-rm -f $RBR%{_libdir}/libmysqlclient*.so.18
+#rm -f $RBR%{_libdir}/libmysqlclient*.so.18
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
@@ -1237,10 +1237,10 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_includedir}/mysql/*
 %{_includedir}/handlersocket
 %{_datadir}/aclocal/mysql.m4
-%{_libdir}/mysql/libperconaserverclient.a
-%{_libdir}/mysql/libperconaserverclient_r.a
-%{_libdir}/mysql/libmysqlservices.a
-%{_libdir}/mysql/libhsclient.a
+%{_libdir}/libperconaserverclient.a
+%{_libdir}/libperconaserverclient_r.a
+%{_libdir}/libmysqlservices.a
+%{_libdir}/libhsclient.a
 %{_libdir}/libhsclient.la
 
 # Maatkit UDF libs
