@@ -1,4 +1,4 @@
-#!/bin/bash mysqle
+#!/bin/bash -e
 #
 # summary of how this script can be called:
 #        * <new-preinst> install
