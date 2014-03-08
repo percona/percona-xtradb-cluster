@@ -648,10 +648,6 @@ then
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     if [[ $speciald -eq 1 ]];then 
-        wsrep_log_info "WARNING: sst-special-dirs feature requires PXC 2.1.6 or latter."
-    fi
-
-    if [[ $speciald -eq 1 ]];then 
         ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
         ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
         if [[ -z $ib_home_dir && -z $ib_log_dir ]];then 
