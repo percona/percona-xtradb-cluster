@@ -288,12 +288,12 @@ binary-arch: build install
 	dh_installdocs -a
 	dh_installexamples -a
 	dh_installmenu -a
-	dh_installlogrotate -a --name mysql-server
+	dh_installlogrotate -a --name percona-xtradb-cluster
 	if [ "$(DISTRIBUTION)" = "Ubuntu" ]; then if [ "$(DISTRELEASE)"  != "lucid"]; then dh_apparmor -pmysql-server-5.5 --profile-name=usr.sbin.mysqld; fi; fi	
 	# Start mysql in runlevel 19 before 20 where apache, proftpd etc gets
 	# started which might depend on a running database server.
 	dh_installinit -a --name=mysql -- defaults 19 21
-	dh_installcron -a --name mysql-server
+	dh_installcron -a --name percona-xtradb-cluster
 	dh_installman -a
 	dh_installinfo -a
 	dh_installlogcheck -a
