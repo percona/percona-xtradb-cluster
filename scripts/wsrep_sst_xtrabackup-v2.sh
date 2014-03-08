@@ -426,6 +426,7 @@ wait_for_listen()
 
 check_extra()
 {
+    local use_socket=1
     if [[ $uextra -eq 1 ]];then 
         if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads';then 
             local eport=$(my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
@@ -434,6 +435,7 @@ check_extra()
                 # Hence, setting host to 127.0.0.1 unconditionally. 
                 wsrep_log_info "SST through extra_port $eport"
                 INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
+                use_socket=0
             else 
                 wsrep_log_error "Extra port $eport null, failing"
                 exit 1
@@ -441,6 +443,9 @@ check_extra()
         else 
             wsrep_log_info "Thread pool not set, ignore the option use_extra"
         fi
+    fi
+    if [[ $use_socket -eq 1 ]] && [[ -n "${WSREP_SST_OPT_SOCKET}" ]];then
+        INNOEXTRA+=" --socket=${WSREP_SST_OPT_SOCKET}"
     fi
 }
 
