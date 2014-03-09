@@ -12,6 +12,7 @@ Following are issues which may impact you while running PXC:
  - bug :bug:`1192834`: Joiner may crash after SST from donor with compaction enabled. Workaround is to disable the index compaction (compact under [xtrabackup]), if enabled. This crash requires specific configuration, hence you may not be affected. Also, this doesn't require any fix from PXC, but Xtrabackup with the fix included should do.
  - For Debian/Ubuntu users: |Percona XtraDB Cluster| :rn:`5.5.33-23.7.6` onwards has a new dependency, the ``socat`` package. If the ``socat`` is not previously installed, ``percona-xtradb-cluster-server-5.5`` may be held back. In order to upgrade, you need to either install ``socat`` before running the ``apt-get upgrade`` or with the following command: ``apt-get install percona-xtradb-cluster-server-5.5``. For *Ubuntu* users the ``socat`` package is in the universe repository, so the repository will have to be enabled in order to install the package.
  - For fresh installs, if you skip the galera package on yum install command-line, yum may end up installing either of Percona-XtraDB-Cluster-galera-2 or 3. Hence, it is imperative to provide Percona-XtraDB-Cluster-galera-3 for PXC56 and Percona-XtraDB-Cluster-galera-2 for PXC55 on yum install command-line. Similarly for apt-get. Upgrades are not affected. This is not a bug but a situation due to existence of multiple providers. Please refer to installation guides of yum and apt for more details.
+ - Partition tables are not replicated unless debugging is turned on.
  
 
 
