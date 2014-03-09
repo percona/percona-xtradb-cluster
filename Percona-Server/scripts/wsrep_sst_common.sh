@@ -93,7 +93,6 @@ done
 readonly WSREP_SST_OPT_BYPASS
 readonly WSREP_SST_OPT_BINLOG
 
-
 # For Bug:1200727
 if my_print_defaults -c $WSREP_SST_OPT_CONF sst | grep -q "wsrep_sst_auth";then 
     if [ -z $WSREP_SST_OPT_AUTH -o $WSREP_SST_OPT_AUTH = "(null)" ];then 

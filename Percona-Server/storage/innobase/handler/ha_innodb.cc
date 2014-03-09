@@ -7516,7 +7516,8 @@ no_commit:
 			{
 			case WSREP_TRX_OK:
 				break;
-			case WSREP_TRX_ROLLBACK:
+			case WSREP_TRX_SIZE_EXCEEDED:
+			case WSREP_TRX_CERT_FAIL:
 			case WSREP_TRX_ERROR:
 				DBUG_RETURN(1);
 			}
@@ -7540,7 +7541,8 @@ no_commit:
 			{
 			case WSREP_TRX_OK:
 				break;
-			case WSREP_TRX_ROLLBACK:
+			case WSREP_TRX_SIZE_EXCEEDED:
+			case WSREP_TRX_CERT_FAIL:
 			case WSREP_TRX_ERROR:
 				DBUG_RETURN(1);
 			}
