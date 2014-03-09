@@ -294,7 +294,7 @@ read_cnf()
         ekeyfile=$(parse_cnf sst encrypt-key-file "")
     fi
     rlimit=$(parse_cnf sst rlimit "")
-    uextra=$(parse_cnf sst use_extra 0)
+    uextra=$(parse_cnf sst use-extra 0)
     speciald=$(parse_cnf sst sst-special-dirs 1)
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
@@ -648,10 +648,6 @@ then
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     if [[ $speciald -eq 1 ]];then 
-        wsrep_log_info "WARNING: sst-special-dirs feature requires PXC 2.1.6 or latter."
-    fi
-
-    if [[ $speciald -eq 1 ]];then 
         ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
         ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
         if [[ -z $ib_home_dir && -z $ib_log_dir ]];then 
@@ -825,10 +821,27 @@ then
             fi
         fi
 
+
+        if  [[ ! -z $WSREP_SST_OPT_BINLOG ]];then
+
+            BINLOG_DIRNAME=$(dirname $WSREP_SST_OPT_BINLOG)
+            BINLOG_FILENAME=$(basename $WSREP_SST_OPT_BINLOG)
+
+            # To avoid comparing data directory and BINLOG_DIRNAME 
+            mv $DATA/${BINLOG_FILENAME}.* $BINLOG_DIRNAME/ 2>/dev/null || true
+
+            pushd $BINLOG_DIRNAME &>/dev/null
+            for bfiles in $(ls -1 ${BINLOG_FILENAME}.*);do
+                echo ${BINLOG_DIRNAME}/${bfiles} >> ${BINLOG_FILENAME}.index
+            done
+            popd &> /dev/null
+
+        fi
+
         if [[ $incremental -eq 1 ]];then 
             # Added --ibbackup=xtrabackup_55 because it fails otherwise citing connection issues.
-            INNOAPPLY="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} \
-                --ibbackup=xtrabackup_55 --apply-log $rebuildcmd --redo-only $BDATA --incremental-dir=${DATA} &>>${BDATA}/innobackup.prepare.log"
+            INNOAPPLY="${INNOBACKUPEX_BIN} $disver --defaults-file=${WSREP_SST_OPT_CONF} \
+                --ibbackup=xtrabackup_56 --apply-log $rebuildcmd --redo-only $BDATA --incremental-dir=${DATA} &>>${BDATA}/innobackup.prepare.log"
         fi
 
         wsrep_log_info "Preparing the backup at ${DATA}"
@@ -867,6 +880,10 @@ then
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi
 
+    if [[ ! -r ${MAGIC_FILE} ]];then 
+        wsrep_log_error "SST magic file ${MAGIC_FILE} not found/readable"
+        exit 2
+    fi
     cat "${MAGIC_FILE}" # output UUID:seqno
     wsrep_log_info "Total time on joiner: $totime seconds"
 fi
