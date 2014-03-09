@@ -15,6 +15,7 @@ Following are issues which may impact you while running PXC:
  - Partition tables are not replicated unless debugging is turned on.
  - garbd from galera3 crashes when listen address is not specified.
  - wsrep-load-data-splitting=ON doesn't work (default is OFF now).
+ - socket.ssl = yes is required to turn on SSL.
 
 Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (i.e. releases after the upcoming/recent release).
 
