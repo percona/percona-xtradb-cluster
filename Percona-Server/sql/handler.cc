@@ -7413,7 +7413,11 @@ int binlog_log_row(TABLE* table,
 
 #ifdef WITH_WSREP
   /* only InnoDB tables will be replicated through binlog emulation */
-  if (WSREP_EMULATE_BINLOG(thd) && table->file->ht->db_type != DB_TYPE_INNODB)
+  if (WSREP_EMULATE_BINLOG(thd)                          && 
+      table->file->ht->db_type != DB_TYPE_INNODB         &&
+      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB && 
+	(((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
+	//	!strcmp(table->file->table_type(), "InnoDB"))
   {
     return 0;
   } 
