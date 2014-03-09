@@ -15,6 +15,5 @@ compact
 decompressor="gzip -dc"
 streamfmt=xbstream
 encrypt=3
-#sst-special-dirs=1
 tkey=/tmp/certs/node1.key
 tcert=/tmp/certs/node1.pem
