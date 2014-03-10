@@ -309,7 +309,7 @@ package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
 %package -n Percona-XtraDB-Cluster-client%{product_suffix}
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
-Provides:       mysql-client MySQL-client mysql MySQL
+Provides:       mysql-client MySQL-client MySQL
 Conflicts:	Percona-Server-client-56 Percona-Server-client-55 Percona-Server-client-51 Percona-SQL-client-50 Percona-XtraDB-Cluster-client-56
 Obsoletes:      Percona-XtraDB-Cluster-client
 Requires:       perl-DBI
@@ -361,7 +361,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel Percona-Server-devel
-Conflicts:	Percona-Server-devel-56 Percona-Server-devel-55 Percona-Server-devel-51 Percona-SQL-devel-50 Percona-XtraDB-Cluster-devel-56 mysql-libs
+Conflicts:	Percona-Server-devel-56 Percona-Server-devel-55 Percona-Server-devel-51 Percona-SQL-devel-50 Percona-XtraDB-Cluster-devel-56 mysql
 Obsoletes:      Percona-XtraDB-Cluster-devel Percona-Server-shared-compat
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
