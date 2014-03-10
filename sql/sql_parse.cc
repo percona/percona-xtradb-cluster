@@ -687,7 +687,7 @@ bool do_command(THD *thd)
 {
   bool return_value;
   char *packet= 0;
-  ulong packet_length;
+  ulong packet_length = 0UL;
   NET *net= &thd->net;
   enum enum_server_command command;
   DBUG_ENTER("do_command");
