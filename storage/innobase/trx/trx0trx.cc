@@ -564,6 +564,13 @@ trx_resurrect_insert(
 		trx->no = TRX_ID_MAX;
 	}
 
+	/* trx_start_low() is not called with resurrect, so need to initialize
+	start time here.*/
+	if (trx->state == TRX_STATE_ACTIVE
+	    || trx->state == TRX_STATE_PREPARED) {
+		trx->start_time = ut_time();
+	}
+
 	if (undo->dict_operation) {
 		trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
 		trx->table_id = undo->table_id;
@@ -649,6 +656,13 @@ trx_resurrect_update(
 		TRX_ID_MAX */
 
 		trx->no = TRX_ID_MAX;
+	}
+
+	/* trx_start_low() is not called with resurrect, so need to initialize
+	start time here.*/
+	if (trx->state == TRX_STATE_ACTIVE
+	    || trx->state == TRX_STATE_PREPARED) {
+		trx->start_time = ut_time();
 	}
 
 	if (undo->dict_operation) {
