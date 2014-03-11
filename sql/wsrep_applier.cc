@@ -325,6 +325,7 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     if (wsrep_slave_count_change < 0)
     {
       wsrep_slave_count_change++;
+      WSREP_DEBUG("Closing applier thread, to close %d", abs(wsrep_slave_count_change));
       *exit = true;
     }
     mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
