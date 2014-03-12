@@ -863,10 +863,11 @@ then
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi
 
-    if [[ ! -r ${MAGIC_FILE} ]];then 
+    if [[ ! -r ${MAGIC_FILE} ]];then
         wsrep_log_error "SST magic file ${MAGIC_FILE} not found/readable"
         exit 2
     fi
+
     cat "${MAGIC_FILE}" # output UUID:seqno
     wsrep_log_info "Total time on joiner: $totime seconds"
 fi
