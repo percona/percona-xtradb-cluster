@@ -299,6 +299,7 @@ read_cnf()
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
+    stimeout=$(parse_cnf sst sst-initial-timeout 100)
 }
 
 get_stream()
@@ -453,9 +454,19 @@ recv_joiner()
 {
     local dir=$1
     local msg=$2 
+    local tmt=$3
 
     pushd ${dir} 1>/dev/null
     set +e
+
+    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
+        if timeout --help | grep -q -- '-k';then 
+            tcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
+        else 
+            tcmd="timeout $tmt $tcmd"
+        fi
+    fi
+
     timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     set -e
     popd 1>/dev/null 
@@ -713,7 +724,7 @@ then
 
     STATDIR=$(mktemp -d)
     MAGIC_FILE="${STATDIR}/${INFO_FILE}"
-    recv_joiner $STATDIR  "${stagemsg}-gtid" 1 
+    recv_joiner $STATDIR  "${stagemsg}-gtid" 1 $stimeout
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
@@ -763,7 +774,7 @@ then
 
 
         MAGIC_FILE="${DATA}/${INFO_FILE}"
-        recv_joiner $DATA "${stagemsg}-SST" 0 
+        recv_joiner $DATA "${stagemsg}-SST" 0 0
 
         get_proc
 
