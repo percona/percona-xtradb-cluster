@@ -34,7 +34,6 @@ Vcs-Bzr: lp:percona-xtradb-cluster
 Package: libperconaserverclient18
 Section: libs
 Architecture: any
-Pre-Depends: multiarch-support
 Depends: percona-xtradb-cluster-common-5.5 ${misc:Depends}, ${shlibs:Depends}
 Replaces: libpercona-server-client16
 Description: Percona XtraDB Cluster database client library

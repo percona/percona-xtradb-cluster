@@ -110,16 +110,15 @@ Prefix: %{_sysconfdir}
 # Server comment strings
 # ----------------------------------------------------------------------------
 %if %{undefined compilation_comment_debug}
-%define compilation_comment_debug       Percona Server - Debug (GPL), Release rel%{percona_server_version}, Revision %{gotrevision}
+%define compilation_comment_debug       Percona Server - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}
 %endif
 %if %{undefined compilation_comment_release}
-%define compilation_comment_release     Percona Server (GPL), Release rel%{percona_server_version}, Revision %{gotrevision}
+%define compilation_comment_release     Percona Server (GPL), Release rel%{percona_server_version}, Revision %{revision}
 %endif
 
 # ----------------------------------------------------------------------------
 # Product and server suffixes
 # ----------------------------------------------------------------------------
-%define product_suffix -55
 %if %{undefined product_suffix}
   %if %{defined short_product_tag}
     %define product_suffix      -%{short_product_tag}
