@@ -284,7 +284,6 @@ Cluster 56 packages including the debuginfo. Recommended.
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.6 socat rsync iproute perl perl-DBI perl-DBD-MySQL
-Provides:       mysql-server MySQL-server Percona-Server-server
 Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
@@ -333,7 +332,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
-Provides:       mysql-test Percona-Server-test
+Provides:       mysql-test
 Conflicts:      Percona-SQL-test-50 Percona-Server-test-51 Percona-Server-test-55 Percona-XtraDB-Cluster-test-55
 AutoReqProv:    no
 
@@ -357,7 +356,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 %package -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
-Provides:       mysql-devel Percona-Server-devel
+Provides:       mysql-devel
 Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
@@ -381,7 +380,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 %package -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
-Provides:       mysql-shared mysql-libs Percona-Server-shared 
+Provides:       mysql-shared mysql-libs=5.6.15
 Conflicts:      Percona-Server-shared-56
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
