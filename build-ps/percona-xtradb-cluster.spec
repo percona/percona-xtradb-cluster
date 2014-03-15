@@ -110,15 +110,16 @@ Prefix: %{_sysconfdir}
 # Server comment strings
 # ----------------------------------------------------------------------------
 %if %{undefined compilation_comment_debug}
-%define compilation_comment_debug       Percona Server - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}
+    %define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 %if %{undefined compilation_comment_release}
-%define compilation_comment_release     Percona Server (GPL), Release rel%{percona_server_version}, Revision %{revision}
+    %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 
 # ----------------------------------------------------------------------------
 # Product and server suffixes
 # ----------------------------------------------------------------------------
+%define product_suffix -55
 %if %{undefined product_suffix}
   %if %{defined short_product_tag}
     %define product_suffix      -%{short_product_tag}
@@ -231,7 +232,7 @@ Prefix: %{_sysconfdir}
 ##############################################################################
 
 Name:           Percona-XtraDB-Cluster%{product_suffix}
-Summary:        A High Availability solution based in Percona Server
+Summary:        A High Availability solution based on Percona Server and Galera
 Group:          Applications/Databases
 Version:        %{mysql_version}
 Release:        %{release}
@@ -333,7 +334,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Requires:       Percona-XtraDB-Cluster-client%{product_suffix} perl
 Summary:        Percona XtraDB Cluster - Test suite
 Group:          Applications/Databases
-Provides:       mysql-test Percona-Server-test
+Provides:       mysql-test
 Conflicts:	Percona-Server-test-56 Percona-Server-test-55 Percona-Server-test-51 Percona-XtraDB-Cluster-test-56
 Obsoletes:      Percona-XtraDB-Cluster-test
 AutoReqProv:    no
@@ -358,7 +359,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 %package -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
-Provides:       mysql-devel Percona-Server-devel
+Provides:       mysql-devel
 Conflicts:	Percona-Server-devel-56 Percona-Server-devel-55 Percona-Server-devel-51 Percona-SQL-devel-50 Percona-XtraDB-Cluster-devel-56 mysql
 Obsoletes:      Percona-XtraDB-Cluster-devel 
 
