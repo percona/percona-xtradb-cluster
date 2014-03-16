@@ -512,7 +512,7 @@ send_donor()
 
 }
 
-if [[ ! -x `which innobackupex` ]];then 
+if [[ ! -x `which $INNOBACKUPEX_BIN` ]];then 
     wsrep_log_error "innobackupex not in path: $PATH"
     exit 2
 fi
@@ -724,7 +724,7 @@ then
 
     STATDIR=$(mktemp -d)
     MAGIC_FILE="${STATDIR}/${INFO_FILE}"
-    recv_joiner $STATDIR  "${stagemsg}-gtid" 1 $stimeout
+    recv_joiner $STATDIR  "${stagemsg}-gtid" $stimeout
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
@@ -774,7 +774,7 @@ then
 
 
         MAGIC_FILE="${DATA}/${INFO_FILE}"
-        recv_joiner $DATA "${stagemsg}-SST" 0 0
+        recv_joiner $DATA "${stagemsg}-SST" 0
 
         get_proc
 
