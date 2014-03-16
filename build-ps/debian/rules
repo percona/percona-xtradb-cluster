@@ -29,6 +29,13 @@ EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.5.tar.gz
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -sc)
 
+major_version=34
+minor_version=0
+wsrep_version="25.10"
+compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(wsrep_version)"
+compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release $(wsrep_version)"
+server_suffix="-$(major_version).$(minor_version)"
+
 MYSQL_SRC = $(shell pwd)
 
 #MAKE_TEST_TARGET=test-mtr
@@ -78,8 +85,8 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		$(USE_LINUX_NATIVE_AIO) \
 		-DWITH_SSL=system \
 		-DWITH_ZLIB=system \
-		-DCOMPILATION_COMMENT="($(DISTRIBUTION))" \
-		-DMYSQL_SERVER_SUFFIX="-$(DEBVERSION)" \
+		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
+		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DINSTALL_LAYOUT=RPM \
 		-DWITH_INNODB_DISALLOW_WRITES=ON \
@@ -107,8 +114,8 @@ endif
 		-DWITH_LIBWRAP=ON \
 		-DWITH_SSL=system \
 		-DWITH_ZLIB=system \
-		-DCOMPILATION_COMMENT="($(DISTRIBUTION))" \
-		-DMYSQL_SERVER_SUFFIX="-$(DEBVERSION)" \
+		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
+		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DINSTALL_LAYOUT=RPM \
 		-DWITH_INNODB_DISALLOW_WRITES=ON \
