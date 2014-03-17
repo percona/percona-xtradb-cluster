@@ -455,22 +455,29 @@ recv_joiner()
     local dir=$1
     local msg=$2 
     local tmt=$3
+    local ltcmd
 
     pushd ${dir} 1>/dev/null
     set +e
 
     if [[ $tmt -gt 0 && -x `which timeout` ]];then 
         if timeout --help | grep -q -- '-k';then 
-            tcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
+            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
         else 
-            tcmd="timeout $tmt $tcmd"
+            ltcmd="timeout $tmt $tcmd"
         fi
+        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+    else 
+        timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     fi
 
-    timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     set -e
     popd 1>/dev/null 
 
+    if [[ ${RC[0]} -eq 124 ]];then 
+        wsrep_log_error "Possible timeout in receving first data from donor in gtid stage"
+        exit 32
+    fi
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
