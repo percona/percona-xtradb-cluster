@@ -607,10 +607,13 @@ echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-
 rm -f $RBR%{_libdir}/libperconaserverclient*.so.18
 
 # Added for compatibility
-ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient.so.18.0.0 
-ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient.so.18
-ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient_r.so.18.0.0
-ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient_r.so.18
+pushd $RBR%{_libdir}
+ln -s libperconaserverclient.so.18.0.0  libmysqlclient.so.18.0.0 
+ln -s libperconaserverclient.so.18.0.0  libmysqlclient.so.18
+ln -s libperconaserverclient.so.18.0.0  libmysqlclient_r.so.18.0.0
+ln -s libperconaserverclient.so.18.0.0  libmysqlclient_r.so.18
+popd
+
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
@@ -1260,6 +1263,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libperconaserver*.so*
+%{_libdir}/libmysqlclient*.so*
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
