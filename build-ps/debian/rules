@@ -149,6 +149,26 @@ endif
 
 	cd $(builddir) && $(MAKE) $(MAKE_JFLAG) VERBOSE=1
 
+
+	# Build HandlerSocket
+	echo "Configuring HandlerSocket"
+	cd storage/HandlerSocket-Plugin-for-MySQL && \
+	bash -x autogen.sh && \
+	CXX="$${HS_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/release/include" \
+		./configure --with-mysql-source=$(CURDIR) \
+			--with-mysql-bindir=$(CURDIR)/release/scripts \
+			--with-mysql-plugindir=$(prefix)/lib/mysql/plugin \
+			--libdir=$(prefix)/lib \
+			--prefix=$(prefix) && \
+	make $(MAKE_JFLAG)
+	
+	# Build UDF
+	cd UDF && \
+	CXX="$${UDF_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/release/include" \
+		./configure --includedir=$(CURDIR)/include \
+			--libdir=$(prefix)/lib/mysql/plugin && \
+	make $(MAKE_JFLAG)
+
 ifeq ($(findstring nocheck,$(DEB_BUILD_OPTIONS)),)
 	# Don't know why the following is necessary...
 	cp unittest/unit.pl $(builddir)/unittest/
@@ -192,6 +212,8 @@ install: build
 
 	# make install (trailing slash needed for innobase)
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
+	(cd storage/HandlerSocket-Plugin-for-MySQL && make DESTDIR=$(TMP) install)
+	(cd UDF && make DESTDIR=$(TMP) install)
 		
 	# After installing, remove rpath to make lintian happy.
 	set +e; \
