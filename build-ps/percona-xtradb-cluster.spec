@@ -660,7 +660,7 @@ fi
 # Check if we can safely upgrade.  An upgrade is only safe if it's from one
 # of our RPMs in the same version family.
 
-installed=`rpm -q --whatprovides mysql-server 2> /dev/null`
+installed=`rpm -qf $(which mysqld) 2> /dev/null`
 if [ $? -eq 0 -a -n "$installed" ]; then
   vendor=`rpm -q --queryformat='%{VENDOR}' "$installed" 2>&1`
   version=`rpm -q --queryformat='%{VERSION}' "$installed" 2>&1`
