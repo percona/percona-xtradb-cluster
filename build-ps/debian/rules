@@ -35,6 +35,7 @@ wsrep_version="25.10"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(wsrep_version)"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release $(wsrep_version)"
 server_suffix="-$(major_version).$(minor_version)"
+prefix=/usr
 
 MYSQL_SRC = $(shell pwd)
 
@@ -154,9 +155,9 @@ endif
 	echo "Configuring HandlerSocket"
 	cd storage/HandlerSocket-Plugin-for-MySQL && \
 	bash -x autogen.sh && \
-	CXX="$${HS_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/release/include" \
+	CXX="$${HS_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/builddir/include" \
 		./configure --with-mysql-source=$(CURDIR) \
-			--with-mysql-bindir=$(CURDIR)/release/scripts \
+			--with-mysql-bindir=$(CURDIR)/builddir/scripts \
 			--with-mysql-plugindir=$(prefix)/lib/mysql/plugin \
 			--libdir=$(prefix)/lib \
 			--prefix=$(prefix) && \
@@ -164,7 +165,7 @@ endif
 	
 	# Build UDF
 	cd UDF && \
-	CXX="$${UDF_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/release/include" \
+	CXX="$${UDF_CXX:-g++}" CXXFLAGS="$(CXXFLAGS) -I$(CURDIR)/builddir/include" \
 		./configure --includedir=$(CURDIR)/include \
 			--libdir=$(prefix)/lib/mysql/plugin && \
 	make $(MAKE_JFLAG)
