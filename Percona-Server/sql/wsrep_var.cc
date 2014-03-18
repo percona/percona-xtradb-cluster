@@ -475,17 +475,26 @@ void wsrep_node_address_init (const char* value)
 
 bool wsrep_slave_threads_check (sys_var *self, THD* thd, set_var* var)
 {
+  if (wsrep_slave_count_change != 0) {
+      WSREP_ERROR("Still closing existing threads - %d", abs(wsrep_slave_count_change));
+     push_warning_printf(thd, MYSQL_ERROR::WARN_LEVEL_WARN,
+                        ER_UNKNOWN_ERROR,
+                        "Still closing existing threads - %d",
+                        abs(wsrep_slave_count_change));
+      return true;
+  }
   mysql_mutex_lock(&LOCK_wsrep_slave_threads);
   wsrep_slave_count_change = var->value->val_int() - wsrep_slave_threads;
   mysql_mutex_unlock(&LOCK_wsrep_slave_threads);
 
-  return 0;
+  return false;
 }
 
 bool wsrep_slave_threads_update (sys_var *self, THD* thd, enum_var_type type)
 {
   if (wsrep_slave_count_change > 0)
   {
+    WSREP_DEBUG("Creating %d applier threads, total %ld", wsrep_slave_count_change, wsrep_slave_threads);
     wsrep_create_appliers(wsrep_slave_count_change);
     wsrep_slave_count_change = 0;
   }
