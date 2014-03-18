@@ -6364,6 +6364,8 @@ lock_rec_insert_check_and_lock(
 	on the successor, which produced an unnecessary deadlock. */
 
 #ifdef WITH_WSREP
+        if (wsrep_log_conflicts)
+                mutex_enter(&trx_sys->mutex);
 	if ((c_lock = (lock_t *)lock_rec_other_has_conflicting(
 		    static_cast<enum lock_mode>(
 			    LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION),
@@ -6374,6 +6376,8 @@ lock_rec_insert_check_and_lock(
 			    LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION),
 		    block, next_rec_heap_no, trx)) {
 #endif /* WITH_WSREP */
+                if (wsrep_log_conflicts)
+                        mutex_exit(&trx_sys->mutex);
 		/* Note that we may get DB_SUCCESS also here! */
 		trx_mutex_enter(trx);
 
@@ -6389,6 +6393,8 @@ lock_rec_insert_check_and_lock(
 
 		trx_mutex_exit(trx);
 	} else {
+                if (wsrep_log_conflicts)
+                        mutex_exit(&trx_sys->mutex);
 		err = DB_SUCCESS;
 	}
 
