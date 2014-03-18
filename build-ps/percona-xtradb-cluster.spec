@@ -604,7 +604,13 @@ install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Delete the symlinks to the libraries from the libdir. These are created by
 # ldconfig(8) afterwards.
-#rm -f $RBR%{_libdir}/libmysqlclient*.so.18
+rm -f $RBR%{_libdir}/libperconaserverclient*.so.18
+
+# Added for compatibility
+ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient.so.18.0.0 
+ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient.so.18
+ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient_r.so.18.0.0
+ln -s libperconaserverclient.so.18.0.0  {_libdir}/libmysqlclient_r.so.18
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
