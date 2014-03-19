@@ -573,11 +573,7 @@ then
             wsrep_log_info "Using $xtmpdir as xtrabackup temporary directory"
         fi
 
-        if [[ -z ${TMPDIR:-} ]];then 
-            itmpdir=$(mktemp -d)
-        else 
-            itmpdir=$TMPDIR
-        fi
+        itmpdir=$(mktemp -d)
         wsrep_log_info "Using $itmpdir as innobackupex temporary directory"
 
         if [ "${AUTH[0]}" != "(null)" ]; then
