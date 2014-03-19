@@ -375,14 +375,13 @@ cleanup_donor()
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
 
-    if [[ -n $XTRABACKUP_PID ]];then 
+    if [[ -n ${XTRABACKUP_PID:-} ]];then 
         if check_pid $XTRABACKUP_PID
         then
             wsrep_log_error "xtrabackup process is still running. Killing... "
             kill_xtrabackup
         fi
 
-        rm -f $XTRABACKUP_PID 
     fi
     rm -f ${DATA}/${IST_FILE} || true
 
@@ -391,7 +390,7 @@ cleanup_donor()
         rm -f $progress || true
     fi
 
-    wsrep_log_info "Cleaning up left over temporary directories"
+    wsrep_log_info "Cleaning up temporary directories"
 
     if [[ -n $xtmpdir ]];then 
        [[ -d $xtmpdir ]] &&  rm -rf $xtmpdir || true
@@ -406,7 +405,8 @@ kill_xtrabackup()
 {
     local PID=$(cat $XTRABACKUP_PID)
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
-    rm -f "$XTRABACKUP_PID"
+    wsrep_log_info "Removing xtrabackup pid file $XTRABACKUP_PID"
+    rm -f "$XTRABACKUP_PID" || true
 }
 
 setup_ports()
@@ -656,8 +656,8 @@ then
           exit 22
         fi
 
-        # innobackupex implicitly writes PID to fixed location in ${TMPDIR}
-        XTRABACKUP_PID="${TMPDIR}/xtrabackup_pid"
+        # innobackupex implicitly writes PID to fixed location in $xtmpdir
+        XTRABACKUP_PID="$xtmpdir/xtrabackup_pid"
 
 
     else # BYPASS FOR IST
