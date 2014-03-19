@@ -506,13 +506,13 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
   bool new_wsrep_desync = var->save_result.ulonglong_value; 
   if (wsrep_desync == new_wsrep_desync) {
     if (new_wsrep_desync) {
-      WSREP_DEBUG("wsrep_desync is already ON.");  
+      WSREP_ERROR("wsrep_desync is already ON.");  
       push_warning (thd, Sql_condition::WARN_LEVEL_WARN,
                    ER_WRONG_VALUE_FOR_VAR,
                    "'wsrep_desync' is already ON.");
       return true;
     } else {
-      WSREP_DEBUG("wsrep_desync is already OFF.");  
+      WSREP_ERROR("wsrep_desync is already OFF.");  
       push_warning (thd, Sql_condition::WARN_LEVEL_WARN,
                    ER_WRONG_VALUE_FOR_VAR,
                    "'wsrep_desync' is already OFF.");
