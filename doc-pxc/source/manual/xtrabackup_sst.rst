@@ -166,6 +166,13 @@ In order for XtraBackup SST to support :variable:`innodb_data_home_dir` and :var
  
 This option introduces stream-based compression/decompression. When these options are set, compression/decompression are done on stream, in contrast to earlier PXB-based one where decompression was done after streaming to disk, involving additional I/O; hence I/O is saved here (almost halved on joiner). You can use any compression utility which works on stream - gzip, pigz (which is multi-threaded and hence, recommended) etc. Also, note that, compressor has to be set on donor and decompressor on joiner (though you can have decompressor set on donor and vice-versa for config homogeneity, it won't affect that particular SST). To use Xtrabackup-based compression as before use ``compress`` under ``[xtrabackup]`` as before, also having both enabled won't cause any failure (though you will be wasting CPU cycles with this).
 
+.. option:: sst-initial-timeout
+   
+   :Values: 0 (Disabled)
+   :Default: 100
+
+This option is use to configure initial timeout to receive a first packet via SST. This has been implemented, so that if donor dies somewhere in between, joiner doesn't hang.
+
 .. _tar_ag_xbstream:
 
 Tar against xbstream

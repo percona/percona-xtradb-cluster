@@ -6,7 +6,7 @@
 
 There are some limitations which you should be aware of. Some of them will be eliminated later as product is improved and some are design limitations.
 
- - Currently replication works only with |InnoDB| storage engine. Any writes to tables of other types, including system (mysql.*) tables, are not replicated. However, DDL statements are replicated in statement level, and changes to mysql.* tables will get replicated that way. So, you can safely issue: CREATE USER..., but issuing: INSERT INTO mysql.user..., will not be replicated.
+ - Currently replication works only with |InnoDB| storage engine. Any writes to tables of other types, including system (mysql.*) tables, are not replicated. However, ``DDL`` statements are replicated in statement level, and changes to mysql.* tables will get replicated that way. So, you can safely issue: ``CREATE USER...``, but issuing: ``INSERT INTO mysql.user...``, will not be replicated. You can enable experimental |MyISAM| replication support with :variable:`wsrep_replicate_myisam`.
 
  - Unsupported queries:
 
