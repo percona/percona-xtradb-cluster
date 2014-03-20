@@ -346,7 +346,7 @@ This variable should contain the authentication information needed for State Sna
    :scope: Global
    :dyn: Yes
 
-This variable contains the name (:variable:`wsrep_node_name`) of the preferred donor for the SST. If no node is selected as a preferred donor it will be chosen from one of the available nodes automatically.
+This variable contains the name (:variable:`wsrep_node_name`) of the preferred donor for the SST. If no node is selected as a preferred donor it will be chosen from one of the available nodes automatically **if and only if** there is a terminating comma at the end (like 'node1,node2,'). Otherwise, if there is no terminating comma, the list of nodes in wsrep_sst_donor is considered absolute, and thus it won't fall back even if other nodes are available. Please check the note for :option:`sst-initial-timeout` if you are using it without terminating comma and/or want joiner to wait more than default 100 seconds. 
 
 .. variable:: wsrep_sst_donor_rejects_queries
 

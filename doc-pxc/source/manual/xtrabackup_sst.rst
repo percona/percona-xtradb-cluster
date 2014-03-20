@@ -29,6 +29,12 @@ Following SST specific options are allowed in my.cnf under [sst]
           
         * In following options, path always means full path.
 
+        * Also, these variables are cnf only (thus not mysqld runtime variables), and can be modified in config till the SST script runs on either donor or joiner (ie. config is read by SST script during SST time and not during mysqld startup).
+
+        * Only the main mysqld my.cnf is used. (so providing in ~/.my.cnf etc. won't work).
+
+        * All the following options are to be provided under [sst] in cnf unless indicated otherwise.
+
 .. option:: streamfmt
 
      :Values: xbstream, tar  
@@ -170,8 +176,12 @@ This option introduces stream-based compression/decompression. When these option
    
    :Values: 0 (Disabled)
    :Default: 100
+   :Unit: seconds
 
-This option is use to configure initial timeout to receive a first packet via SST. This has been implemented, so that if donor dies somewhere in between, joiner doesn't hang.
+This option is use to configure initial timeout (in seconds) to receive a first packet via SST. This has been implemented, so that if donor dies somewhere in between, joiner doesn't hang and wait forever. Thus joiner won't wait for more than 100 seconds to get a donor. The default should be sufficient, however, it is configurable, so you can set it appropriately for your cluster.
+
+.. note::
+    If you are using :variable:`wsrep_sst_donor`, and you want joiner to strictly wait for donors listed in the variable and not fallback (ie. without a terminating comma at the end), **and** there is a possibility of **all** nodes in that variable to be unavailable,  set this variable to 0 to disable it or set it to a higher value (maximum threshold that you want joiner to wait). You can also disable (or set higher) this if you believe all other nodes in the cluster can be potentially unavailable at any point in time (mostly in small clusters) or there is a high network latency / network disturbance (which can cause donor selection to take longer than 100 seconds).
 
 .. _tar_ag_xbstream:
 
@@ -205,7 +215,7 @@ Support for SSL encryption for just the key and crt files as implemented in `Gal
    tkey=/etc/mysql/key.pem
    tcert=/etc/mysql/cert.pem
 
-**NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2.
+**NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2 (which is default now).
 
 .. _xtrabackup_sst_encryption:
 
