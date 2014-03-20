@@ -1,5 +1,5 @@
 # compress+compact+xbstream + log_bin
-# v2only
+# v2only 56only
 [mysqld]
 log_bin 
 gtid_mode=ON

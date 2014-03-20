@@ -294,8 +294,12 @@ read_cnf()
         ekeyfile=$(parse_cnf sst encrypt-key-file "")
     fi
     rlimit=$(parse_cnf sst rlimit "")
-    uextra=$(parse_cnf sst use_extra 0)
-    speciald=$(parse_cnf sst sst-special-dirs 0)
+    uextra=$(parse_cnf sst use-extra 0)
+    speciald=$(parse_cnf sst sst-special-dirs 1)
+    iopts=$(parse_cnf sst inno-backup-opts "")
+    iapts=$(parse_cnf sst inno-apply-opts "")
+    impts=$(parse_cnf sst inno-move-opts "")
+    stimeout=$(parse_cnf sst sst-initial-timeout 100)
 }
 
 get_stream()
@@ -423,6 +427,7 @@ wait_for_listen()
 
 check_extra()
 {
+    local use_socket=1
     if [[ $uextra -eq 1 ]];then 
         if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads';then 
             local eport=$(my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
@@ -431,6 +436,7 @@ check_extra()
                 # Hence, setting host to 127.0.0.1 unconditionally. 
                 wsrep_log_info "SST through extra_port $eport"
                 INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
+                use_socket=0
             else 
                 wsrep_log_error "Extra port $eport null, failing"
                 exit 1
@@ -439,19 +445,39 @@ check_extra()
             wsrep_log_info "Thread pool not set, ignore the option use_extra"
         fi
     fi
+    if [[ $use_socket -eq 1 ]] && [[ -n "${WSREP_SST_OPT_SOCKET}" ]];then
+        INNOEXTRA+=" --socket=${WSREP_SST_OPT_SOCKET}"
+    fi
 }
 
 recv_joiner()
 {
     local dir=$1
     local msg=$2 
+    local tmt=$3
+    local ltcmd
 
     pushd ${dir} 1>/dev/null
     set +e
-    timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+
+    if [[ $tmt -gt 0 && -x `which timeout` ]];then 
+        if timeout --help | grep -q -- '-k';then 
+            ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
+        else 
+            ltcmd="timeout $tmt $tcmd"
+        fi
+        timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+    else 
+        timeit "$msg" "$tcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
+    fi
+
     set -e
     popd 1>/dev/null 
 
+    if [[ ${RC[0]} -eq 124 ]];then 
+        wsrep_log_error "Possible timeout in receving first data from donor in gtid stage"
+        exit 32
+    fi
 
     for ecode in "${RC[@]}";do 
         if [[ $ecode -ne 0 ]];then 
@@ -493,7 +519,7 @@ send_donor()
 
 }
 
-if [[ ! -x `which innobackupex` ]];then 
+if [[ ! -x `which $INNOBACKUPEX_BIN` ]];then 
     wsrep_log_error "innobackupex not in path: $PATH"
     exit 2
 fi
@@ -516,9 +542,9 @@ fi
 
 
 INNOEXTRA=""
-INNOAPPLY="${INNOBACKUPEX_BIN} $disver --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
+INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -640,12 +666,11 @@ then
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     if [[ $speciald -eq 1 ]];then 
-        wsrep_log_info "WARNING: sst-special-dirs feature requires PXC 2.1.6 or latter."
-    fi
-
-    if [[ $speciald -eq 1 ]];then 
         ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
         ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
+        if [[ -z $ib_home_dir && -z $ib_log_dir ]];then 
+            speciald=0
+        fi
     fi
 
     stagemsg="Joiner-Recv"
@@ -706,7 +731,7 @@ then
 
     STATDIR=$(mktemp -d)
     MAGIC_FILE="${STATDIR}/${INFO_FILE}"
-    recv_joiner $STATDIR  "${stagemsg}-gtid" 1 
+    recv_joiner $STATDIR  "${stagemsg}-gtid" $stimeout
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
@@ -756,7 +781,7 @@ then
 
 
         MAGIC_FILE="${DATA}/${INFO_FILE}"
-        recv_joiner $DATA "${stagemsg}-SST" 0 
+        recv_joiner $DATA "${stagemsg}-SST" 0
 
         get_proc
 
@@ -873,6 +898,10 @@ then
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi
 
+    if [[ ! -r ${MAGIC_FILE} ]];then 
+        wsrep_log_error "SST magic file ${MAGIC_FILE} not found/readable"
+        exit 2
+    fi
     cat "${MAGIC_FILE}" # output UUID:seqno
     wsrep_log_info "Total time on joiner: $totime seconds"
 fi

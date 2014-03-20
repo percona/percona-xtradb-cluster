@@ -149,9 +149,9 @@ This variable defines a binlog format that will be always be effective regardles
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: ON 
+   :default: OFF
 
-This variable controls whether ``LOAD DATA`` transaction splitting is wanted or not.
+This variable controls whether ``LOAD DATA`` transaction splitting is wanted or not. This variable doesn't work as expected with autocommit=0 when turned ON.
 
 .. variable:: wsrep_log_conflicts
 
@@ -324,10 +324,10 @@ This variable sets the number of times autocommitted transactions will be tried 
    :cli: Yes
    :conf: Yes
    :scope: Global
-   :dyn: No
+   :dyn: Yes
    :default: 1
 
-This variable controls the number of threads that can apply replication transactions in parallel. Galera supports true parallel replication, replication that applies transactions in parallel only when it is safe to do so. The default value can be increased for better throughput. If any replication consistency problems are encountered, it's recommended to set this back to ``1`` to see if that resolves the issue.
+This variable controls the number of threads that can apply replication transactions in parallel. Galera supports true parallel replication, replication that applies transactions in parallel only when it is safe to do so. The variable is dynamic, you can increase/decrease it anytime, note that, when you decrease it, it won't kill the threads immediately but stop them after they are done applying current transaction (the effect with increase is immediate though).  If any replication consistency problems are encountered, it's recommended to set this back to ``1`` to see if that resolves the issue. The default value can be increased for better throughput. You may want to increase it many a time as suggested `in Codership documentation <http://www.codership.com/wiki/doku.php?id=flow_control>`_, in JOINED state for instance to speed up the catchup process to SYNCED. You can also estimate the optimal value for this from :variable:`wsrep_cert_deps_distance` as suggested `on this page <http://www.codership.com/wiki/doku.php?id=monitoring#checking_replication_health>`_. You can also refer to `this <http://www.codership.com/wiki/doku.php?id=configuration_tips#parallel_applying_wsrep_slave_threads>`_ for more configuration tips.
 
 .. variable:: wsrep_sst_auth
 

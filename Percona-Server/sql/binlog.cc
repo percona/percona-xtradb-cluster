@@ -925,9 +925,9 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     IO_CACHE* cache= get_trans_log(thd);
     uchar *buf;
     size_t len=0;
-    WSREP_WARN("binlog cache not empty at connection close %lu",
-               thd->thread_id);
     wsrep_write_cache_buf(cache, &buf, &len);
+    WSREP_WARN("binlog cache not empty (%lu bytes) at connection close %lu",
+               len, thd->thread_id);
     wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */

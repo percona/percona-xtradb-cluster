@@ -10,7 +10,7 @@ TMP=$(CURDIR)/debian/tmp/
 feature_set="community"
 major_version=63
 minor_version=0
-wsrep_version="25.3"
+wsrep_version="25.5"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(wsrep_version)"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release $(wsrep_version)"
 server_suffix="-$(major_version).$(minor_version)"
@@ -31,6 +31,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 	   -DINSTALL_LAYOUT=DEB \
 	   -DCMAKE_BUILD_TYPE=Debug \
 	   -DWITH_SSL=system \
+           -DWITH_ZLIB=system \
 	   -DWITH_EMBEDDED_SERVER=OFF \
 	   -DWITH_INNODB_MEMCACHED=ON \
 	   -DWITH_INNODB_DISALLOW_WRITES=ON \
@@ -47,6 +48,7 @@ endif
 	   -DINSTALL_LAYOUT=DEB \
 	   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	   -DWITH_SSL=system \
+           -DWITH_ZLIB=system \
 	   -DWITH_EMBEDDED_SERVER=OFF \
 	   -DWITH_INNODB_MEMCACHED=ON \
 	   -DWITH_INNODB_DISALLOW_WRITES=ON \

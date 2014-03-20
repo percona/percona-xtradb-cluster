@@ -318,6 +318,33 @@ static char* my_fgets (char* buf, size_t buf_len, FILE* stream)
    return ret;
 }
 
+/*
+  Generate opt_binlog_opt_val for sst_donate_other(), sst_prepare_other().
+
+  Returns zero on success, negative error code otherwise.
+
+  String containing binlog name is stored in param ret if binlog is enabled
+  and GTID mode is on, otherwise empty string. Returned string should be
+  freed with my_free().
+ */
+static int generate_binlog_opt_val(char** ret)
+{
+  DBUG_ASSERT(ret);
+  *ret= NULL;
+  if (opt_bin_log && gtid_mode > 0)
+  {
+    assert(opt_bin_logname);
+    *ret= strcmp(opt_bin_logname, "0") ?
+        my_strdup(opt_bin_logname, MYF(0)) : my_strdup("", MYF(0));
+  }
+  else
+  {
+    *ret= my_strdup("", MYF(0));
+  }
+  if (!*ret) return -ENOMEM;
+  return 0;
+}
+
 static void* sst_joiner_thread (void* a)
 {
   sst_thread_arg* arg= (sst_thread_arg*) a;
@@ -412,40 +439,32 @@ static ssize_t sst_prepare_other (const char*  method,
   ssize_t cmd_len= 1024;
   char    cmd_str[cmd_len];
   const char* sst_dir= mysql_real_data_home;
-  const char* binlog_opt = "";
-  const char* binlog_opt_val = NULL;
+  const char* binlog_opt= "";
+  char* binlog_opt_val= NULL;
 
-  if (opt_bin_log && gtid_mode > 0) {
-    binlog_opt= WSREP_SST_OPT_BINLOG;
-    if (opt_bin_logname) {
-        binlog_opt_val= (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "");
-    }
-    else {
-        char buf[FN_REFLEN];
-        strmake(buf, pidfile_name, FN_REFLEN - strlen("-bin") - 1);
-        fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
-        binlog_opt_val=strdup(buf);
-    }
-  } else {
-      binlog_opt_val = "";
+  int ret;
+  if ((ret= generate_binlog_opt_val(&binlog_opt_val)))
+  {
+    WSREP_ERROR("sst_prepare_other(): generate_binlog_opt_val() failed: %d",
+                ret);
+    return ret;
   }
+  if (strlen(binlog_opt_val)) binlog_opt= WSREP_SST_OPT_BINLOG;
 
-  int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s "
-                     WSREP_SST_OPT_ROLE" 'joiner' "
-                     WSREP_SST_OPT_ADDR" '%s' "
-                     WSREP_SST_OPT_AUTH" '%s' "
-                     WSREP_SST_OPT_DATA" '%s' "
-                     WSREP_SST_OPT_CONF" '%s' "
-                     WSREP_SST_OPT_PARENT" '%d'"
-                     " %s '%s' ",
-                     method, addr_in, (sst_auth_real) ? sst_auth_real : "",
-                     sst_dir, wsrep_defaults_file, (int)getpid(),
-                     binlog_opt, binlog_opt_val);
 
-  if (binlog_opt_val == NULL) {
-    free((void *)binlog_opt_val);
-  }
+  ret= snprintf (cmd_str, cmd_len,
+                 "wsrep_sst_%s "
+                 WSREP_SST_OPT_ROLE" 'joiner' "
+                 WSREP_SST_OPT_ADDR" '%s' "
+                 WSREP_SST_OPT_AUTH" '%s' "
+                 WSREP_SST_OPT_DATA" '%s' "
+                 WSREP_SST_OPT_CONF" '%s' "
+                 WSREP_SST_OPT_PARENT" '%d'"
+                 " %s '%s' ",
+                 method, addr_in, (sst_auth_real) ? sst_auth_real : "",
+                 sst_dir, wsrep_defaults_file, (int)getpid(),
+                 binlog_opt, binlog_opt_val);
+  my_free(binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -925,8 +944,9 @@ wait_signal:
     else
     {
       WSREP_ERROR("Failed to read from: %s", proc.cmd());
+      proc.wait();
     }
-    if (err && proc.error()) err= proc.error();
+    if (!err && proc.error()) err= proc.error();
   }
   else
   {
@@ -950,6 +970,8 @@ wait_signal:
   return NULL;
 }
 
+
+
 static int sst_donate_other (const char*   method,
                              const char*   addr,
                              const char*   uuid,
@@ -958,44 +980,34 @@ static int sst_donate_other (const char*   method,
 {
   ssize_t cmd_len = 4096;
   char    cmd_str[cmd_len];
-  const char* binlog_opt = "";
-  const char* binlog_opt_val = NULL;
+  const char* binlog_opt= "";
+  char* binlog_opt_val= NULL;
 
-  if (opt_bin_log && gtid_mode > 0) {
-    binlog_opt= WSREP_SST_OPT_BINLOG;
-    if (opt_bin_logname) {
-        binlog_opt_val= (strcmp(opt_bin_logname, "0") ? opt_bin_logname : "");
-    }
-    else {
-        char buf[FN_REFLEN];
-        strmake(buf, pidfile_name, FN_REFLEN - strlen("-bin") - 1);
-        fn_format(buf, buf, "", "-bin", MYF(MY_REPLACE_EXT|MY_REPLACE_DIR));
-        binlog_opt_val=strdup(buf);
-    }
-  } else {
-      binlog_opt_val = "";
+  int ret;
+  if ((ret= generate_binlog_opt_val(&binlog_opt_val)))
+  {
+    WSREP_ERROR("sst_donate_other(): generate_binlog_opt_val() failed: %d",ret);
+    return ret;
   }
+  if (strlen(binlog_opt_val)) binlog_opt= WSREP_SST_OPT_BINLOG;
 
-  int ret= snprintf (cmd_str, cmd_len,
-                     "wsrep_sst_%s "
-                     WSREP_SST_OPT_ROLE" 'donor' "
-                     WSREP_SST_OPT_ADDR" '%s' "
-                     WSREP_SST_OPT_AUTH" '%s' "
-                     WSREP_SST_OPT_SOCKET" '%s' "
-                     WSREP_SST_OPT_DATA" '%s' "
-                     WSREP_SST_OPT_CONF" '%s' "
-                     " %s '%s' "
-                     WSREP_SST_OPT_GTID" '%s:%lld'"
-                     "%s",
-                     method, addr, sst_auth_real, mysqld_unix_port,
-                     mysql_real_data_home, wsrep_defaults_file,
-                     binlog_opt, binlog_opt_val,
-                     uuid, (long long) seqno,
-                     bypass ? " "WSREP_SST_OPT_BYPASS : "");
-
-  if (binlog_opt_val == NULL) {
-    free((void *)binlog_opt_val);
-  }
+  ret= snprintf (cmd_str, cmd_len,
+                 "wsrep_sst_%s "
+                 WSREP_SST_OPT_ROLE" 'donor' "
+                 WSREP_SST_OPT_ADDR" '%s' "
+                 WSREP_SST_OPT_AUTH" '%s' "
+                 WSREP_SST_OPT_SOCKET" '%s' "
+                 WSREP_SST_OPT_DATA" '%s' "
+                 WSREP_SST_OPT_CONF" '%s' "
+                 " %s '%s' "
+                 WSREP_SST_OPT_GTID" '%s:%lld'"
+                 "%s",
+                 method, addr, sst_auth_real, mysqld_unix_port,
+                 mysql_real_data_home, wsrep_defaults_file,
+                 binlog_opt, binlog_opt_val,
+                 uuid, (long long) seqno,
+                 bypass ? " "WSREP_SST_OPT_BYPASS : "");
+  my_free(binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len)
   {

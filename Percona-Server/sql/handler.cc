@@ -2181,23 +2181,33 @@ int ha_prepare_low(THD *thd, bool all)
       if ((err= ht->prepare(ht, thd, all)))
       {
 #ifdef WITH_WSREP
-          if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
+	if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
+        {
+	  error= 1;
+	  switch (err)
           {
-	    error= 1;
+	  case WSREP_TRX_SIZE_EXCEEDED:
+	    /* give user size exeeded erro from wsrep_api.h */
+	    my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED);
+	    break;
+	  case WSREP_TRX_CERT_FAIL:
+	  case WSREP_TRX_ERROR:
 	    /* avoid sending error, if we need to replay */
-            if (thd->wsrep_conflict_state!= MUST_REPLAY)
+	    if (thd->wsrep_conflict_state!= MUST_REPLAY)
             {
-              my_error(ER_LOCK_DEADLOCK, MYF(0), err);
-            }
-          }
-          else
-          {
-            /* not wsrep hton, bail to native mysql behavior */
+	      my_error(ER_LOCK_DEADLOCK, MYF(0), err);
+	    }
+	  }
+	}
+
+        else
+        {
+          /* not wsrep hton, bail to native mysql behavior */
 #endif
         my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
         error= 1;
 #ifdef WITH_WSREP
-          }
+        }
 #endif
       }
       status_var_increment(thd->status_var.ha_prepare_count);
@@ -7306,7 +7316,7 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
 #ifdef WITH_WSREP
 	  /* applier and replayer should not binlog */
-          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) || 
+          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) ||
            mysql_bin_log.is_open()));
 #else
           mysql_bin_log.is_open());
@@ -7411,6 +7421,17 @@ int binlog_log_row(TABLE* table,
   bool error= 0;
   THD *const thd= table->in_use;
 
+#ifdef WITH_WSREP
+  /* only InnoDB tables will be replicated through binlog emulation */
+  if (WSREP_EMULATE_BINLOG(thd)                          && 
+      table->file->ht->db_type != DB_TYPE_INNODB         &&
+      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB && 
+	(((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
+	//	!strcmp(table->file->table_type(), "InnoDB"))
+  {
+    return 0;
+  } 
+#endif /* WITH_WSREP */
   if (check_table_binlog_row_based(thd, table))
   {
     DBUG_DUMP("read_set 10", (uchar*) table->read_set->bitmap,

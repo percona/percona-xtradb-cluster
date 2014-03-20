@@ -44,7 +44,7 @@ CAP theorem says that each Distributed system can have only two out of these thr
 
 |Percona XtraDB Cluster| has: Consistency and Availability.
 
-That is |MySQL| replication does not guarantee Consistency of your data, while |Percona XtraDB Cluster| provides data Consistency (but it looses Partitioning tolerance property).
+That is |MySQL| replication does not guarantee Consistency of your data, while |Percona XtraDB Cluster| provides data Consistency (but it loses Partitioning tolerance property).
 
 Components
 ==========

@@ -1042,29 +1042,26 @@ lock_rec_has_to_wait(
 
 			if (wsrep_trx_order_before(trx->mysql_thd, 
 						   lock2->trx->mysql_thd) &&
-			    (type_mode & LOCK_MODE_MASK) == LOCK_X &&
+			    (type_mode & LOCK_MODE_MASK) == LOCK_X        &&
 			    (lock2->type_mode & LOCK_MODE_MASK) == LOCK_X)
 			{
 				/* exclusive lock conflicts are not accepted */
 				fprintf(stderr, "BF-BF X lock conflict\n");
 				lock_rec_print(stderr, lock2);
-
 				abort();
 			} else {
-				if (wsrep_debug) {
-					fprintf(stderr, 
-						"BF conflict, modes: %lu %lu\n",
-						type_mode,
-						lock2->type_mode);
-#ifdef OUT
-					fprintf(stderr,
-						"seqnos %llu %llu\n",
-						(long long)wsrep_thd_trx_seqno(
-							trx->mysql_thd),
-						(long long)wsrep_thd_trx_seqno(
-							lock2->trx->mysql_thd));
-#endif
-				}
+				/* if lock2->index->n_uniq <= 
+				   lock2->index->n_user_defined_cols
+				   operation is on uniq index
+				*/
+				if (wsrep_debug) fprintf(stderr,
+					"BF conflict, modes: %lu %lu, "
+					"idx: %s-%s n_uniq %u n_user %u\n",
+					type_mode, lock2->type_mode,
+					lock2->index->name, 
+					lock2->index->table_name,
+					lock2->index->n_uniq, 
+					lock2->index->n_user_defined_cols);
 				return FALSE;
 			}
 		}
@@ -1642,7 +1639,6 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 			is in the queue*/
 		} else if (lock->trx != trx) {
 			if (wsrep_log_conflicts) {
-				mutex_enter(&trx_sys->mutex);
 				if (bf_this)
 					fputs("\n*** Priority TRANSACTION:\n", 
 					      stderr);
@@ -1659,7 +1655,6 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 					      stderr);
 				trx_print_latched(stderr, lock->trx, 3000);
 
-				mutex_exit(&trx_sys->mutex);
 				fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n",
 				      stderr);
 
