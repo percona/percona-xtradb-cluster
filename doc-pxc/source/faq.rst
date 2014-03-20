@@ -22,12 +22,50 @@ A:  Your check should be simply:
 
 .. code-block:: mysql
 
-    SELECT * FROM someinnodbtable WHERE id=1;
+   SELECT 1 FROM dual;
 
 3 different results are possible:
    * You get the row with id=1 (node is healthy)
    * Unknown error (node is online but Galera is not connected/synced with the cluster)
    * Connection error (node is not online)
+
+You can also check the node health with the ``clustercheck`` script. You need to set up ``clustercheck`` user:
+
+.. code-block:: mysql
+
+   GRANT USAGE ON *.* TO 'clustercheck'@'localhost' IDENTIFIED BY PASSWORD '*2470C0C06DEE42FD1618BB99005ADCA2EC9D1E19';
+
+You can then check the node health by running the ``clustercheck`` script: 
+
+.. code-block:: bash
+
+   /usr/bin/clustercheck clustercheck password 0
+
+If the node is running correctly you should get the following status: :: 
+
+  HTTP/1.1 200 OK
+  Content-Type: text/plain
+  Connection: close
+  Content-Length: 40
+
+  Percona XtraDB Cluster Node is synced.
+
+In case node isn't sync or if it is off-line status will look like: :: 
+
+  HTTP/1.1 503 Service Unavailable
+  Content-Type: text/plain
+  Connection: close
+  Content-Length: 44
+
+  Percona XtraDB Cluster Node is not synced. 
+
+.. note::
+
+   clustercheck syntax: 
+
+   <user> <pass> <available_when_donor=0|1> <log_file> <available_when_readonly=0|1> <defaults_extra_file>"
+   Recommended: server_args = user pass 1 /var/log/log-file 0 /etc/my.cnf.local"
+   Compatibility: server_args = user pass 1 /var/log/log-file 1 /etc/my.cnf.local"
 
 Q: How does XtraDB Cluster handle big transaction?
 ==================================================

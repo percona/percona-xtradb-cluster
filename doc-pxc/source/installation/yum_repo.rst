@@ -38,7 +38,7 @@ Instead of ``Percona-XtraDB-Cluster-56`` you can install ``Percona-XtraDB-Cluste
 
 .. warning:: 
 
-   In order to sucessfully install |Percona XtraDB Cluster| ``socat`` package will need to be installed first.
+   In order to sucessfully install |Percona XtraDB Cluster| ``socat`` package will need to be installed first. ``socat`` package can be installed from the `EPEL <https://fedoraproject.org/wiki/EPEL>`_ repositories.
 
 
 Percona `yum` Experimental repository
@@ -50,3 +50,8 @@ Percona offers fresh beta builds from the experimental repository. To subscribe 
 
 .. note:: 
  This repository works for both RHEL/CentOS 5 and RHEL/CentOS 6
+
+Resolving package conflicts
+===========================
+
+In CentOS ``mysql-libs`` conflicts with ``Percona-XtraDB-Cluster-server-56.x86_64`` package. To avoid this you need to remove the ``mysql-libs`` package before installing |Percona XtraDB Cluster|. Package ``Percona-Server-shared-51.x86_64`` provides that dependency during installation if required.
