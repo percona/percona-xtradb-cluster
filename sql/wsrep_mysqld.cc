@@ -480,7 +480,18 @@ int wsrep_init()
     // enable normal operation in case no provider is specified
     wsrep_ready_set(TRUE);
     global_system_variables.wsrep_on = 0;
-    return 0;
+    wsrep_init_args args;
+    args.options = (wsrep_provider_options) ?
+            wsrep_provider_options : "";
+    rcode = wsrep->init(wsrep, &args);
+    if (rcode)
+    {
+      DBUG_PRINT("wsrep",("wsrep::init() failed: %d", rcode));
+      WSREP_ERROR("wsrep::init() failed: %d, must shutdown", rcode);
+      free(wsrep);
+      wsrep = NULL;
+    }
+    return rcode;
   }
   else
   {
