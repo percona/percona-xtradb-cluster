@@ -76,9 +76,10 @@ static wsrep_status_t dummy_options_set(
     wsrep_t* w,
     const char* conf)
 {
+    char* options = NULL;
     WSREP_DBUG_ENTER(w);
     // concatenate config string with ';'
-    char* options = WSREP_DUMMY(w)->options;
+    options = WSREP_DUMMY(w)->options;
     if (options == NULL)
     {
       options = malloc(strlen(conf) + 1);
