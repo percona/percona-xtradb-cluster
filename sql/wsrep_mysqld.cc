@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include "log_event.h"
+#include <rpl_slave.h>
 
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
@@ -61,7 +62,10 @@ ulong   wsrep_mysql_replication_bundle = 0;
 my_bool wsrep_desync                   = 0; // desynchronize the node from the
                                             // cluster
 my_bool wsrep_load_data_splitting      = 1; // commit load data every 10K intervals
-
+my_bool wsrep_restart_slave            = 0; // should mysql slave thread be 
+                                            // restarted, if node joins back
+my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave 
+                                            // restart will be needed 
 /*
  * End configuration options
  */
@@ -416,6 +420,12 @@ static void wsrep_synced_cb(void* app_ctx)
       wsrep_sst_complete (&local_uuid, local_seqno, false);
       // and wait for SE initialization
       wsrep_SE_init_wait();
+  }
+  if (wsrep_restart_slave_activated)
+  {
+    WSREP_INFO("MySQL slave restart");
+    wsrep_restart_slave_activated= FALSE;
+    init_slave();
   }
 }
 
