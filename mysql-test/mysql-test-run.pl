@@ -103,6 +103,7 @@ use My::CoreDump;
 use mtr_cases;
 use mtr_cases_from_list;
 use mtr_report;
+use mtr_report_junit;
 use mtr_match;
 use mtr_unique;
 use mtr_results;
@@ -353,6 +354,8 @@ my $opt_include_ndbcluster= 0;
 my $opt_skip_ndbcluster= 0;
 
 my $opt_skip_sys_schema= 0;
+our $opt_junit_output= undef;
+our $opt_junit_package= undef;
 
 my $exe_ndbd;
 my $exe_ndbmtd;
@@ -594,7 +597,7 @@ sub main {
     # Not all tests completed, failure
     mtr_report();
     mtr_report("Only ", int(@$completed), " of $num_tests completed.");
-    mtr_error("Not all tests completed");
+    report_stats("Not all tests completed", $completed);
   }
 
   mark_time_used('init');
@@ -640,11 +643,22 @@ sub main {
 
   print_total_times($opt_parallel) if $opt_report_times;
 
-  mtr_report_stats("Completed", $completed);
+  report_stats("Completed", $completed);
 
   remove_vardir_subs() if $opt_clean_vardir;
 
   exit(0);
+}
+
+
+sub report_stats($$;$) {
+  my ($prefix, $tests, $skip_error) = @_;
+
+  if ($opt_junit_output) {
+    mtr_report_stats_junit($tests, $opt_junit_output, $opt_junit_package);
+  }
+
+  mtr_report_stats($prefix, $tests, $skip_error);
 }
 
 
@@ -777,7 +791,7 @@ sub run_test_server ($$$) {
 	    elsif ($opt_max_test_fail > 0 and
 		   $num_failed_test >= $opt_max_test_fail) {
 	      push(@$completed, $result);
-	      mtr_report_stats("Too many failed", $completed, 1);
+	      report_stats("Too many failed", $completed, 1);
 	      mtr_report("Too many tests($num_failed_test) failed!",
 			 "Terminating...");
 	      return undef;
@@ -943,7 +957,7 @@ sub run_test_server ($$$) {
     # ----------------------------------------------------
     if ( has_expired($suite_timeout) )
     {
-      mtr_report_stats("Timeout", $completed, 1);
+      report_stats("Timeout", $completed, 1);
       mtr_report("Test suite timeout! Terminating...");
       return undef;
     }
@@ -1293,8 +1307,9 @@ sub command_line_setup {
 	     'unit-tests!'              => \$opt_ctest,
 	     'unit-tests-report!'	=> \$opt_ctest_report,
 	     'stress=s'                 => \$opt_stress,
-             'suite-opt=s'              => \$opt_suite_opt,
-
+         'suite-opt=s'              => \$opt_suite_opt,
+	     'junit-output=s'           => \$opt_junit_output,
+	     'junit-package=s'          => \$opt_junit_package,
              'help|h'                   => \$opt_usage,
 	     # list-options is internal, not listed in help
 	     'list-options'             => \$opt_list_options,
@@ -1308,6 +1323,12 @@ sub command_line_setup {
 
   usage("") if $opt_usage;
   list_options(\%options) if $opt_list_options;
+
+  # Make sure that XML::Simple support exists for JUnit output
+  if ($opt_junit_output and !mtr_junit_supported()) {
+    mtr_error("JUnit XML reporting is not supported.  The XML::Simple package",
+              "could not be loaded.");
+  }
 
   # --------------------------------------------------------------------------
   # Setup verbosity
@@ -7653,6 +7674,8 @@ Misc options
   sanitize              Scan server log files for warnings from various
                         sanitizers. Assumes that you have built with
                         -DWITH_ASAN.
+  junit-output=FILE     Output JUnit test summary XML to FILE.
+  junit-package=NAME    Set the JUnit package name to NAME for this test run.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.
