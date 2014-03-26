@@ -407,9 +407,22 @@ static void wsrep_synced_cb(void* app_ctx)
   }
   if (wsrep_restart_slave_activated)
   {
+    int rcode;
     WSREP_INFO("MySQL slave restart");
     wsrep_restart_slave_activated= FALSE;
-    init_slave();
+
+    mysql_mutex_lock(&LOCK_active_mi);
+    if ((rcode = start_slave_threads(1 /* need mutex */,
+                            0 /* no wait for start*/,
+                            active_mi,
+                            master_info_file,
+                            relay_log_info_file,
+                       	    SLAVE_SQL)))
+    {
+      WSREP_WARN("Failed to create slave threads: %d", rcode);
+    }
+    mysql_mutex_unlock(&LOCK_active_mi);
+
   }
 }
 

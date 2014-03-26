@@ -3205,6 +3205,9 @@ pthread_handler_t handle_slave_sql(void *arg)
   my_off_t UNINIT_VAR(saved_log_pos);
   my_off_t UNINIT_VAR(saved_master_log_pos);
   my_off_t saved_skip= 0;
+#ifdef WITH_WSREP
+  my_bool wsrep_node_dropped= FALSE;
+#endif /* WITH_WSREP */
 
   Relay_log_info* rli = &((Master_info*)arg)->rli;
   const char *errmsg;
@@ -3212,6 +3215,9 @@ pthread_handler_t handle_slave_sql(void *arg)
   // needs to call my_thread_init(), otherwise we get a coredump in DBUG_ stuff
   my_thread_init();
   DBUG_ENTER("handle_slave_sql");
+#ifdef WITH_WSREP
+ wsrep_restart_point:
+#endif /* WITH_WSREP */
 
   DBUG_ASSERT(rli->inited);
   mysql_mutex_lock(&rli->run_lock);
@@ -3468,6 +3474,12 @@ log '%s' at position %s, relay log '%s' position: %s", RPL_LOG_NAME,
 Error running query, slave SQL thread aborted. Fix the problem, and restart \
 the slave SQL thread with \"SLAVE START\". We stopped at log \
 '%s' position %s", RPL_LOG_NAME, llstr(rli->group_master_log_pos, llbuff));
+#ifdef WITH_WSREP
+        if (WSREP_ON && last_errno == ER_UNKNOWN_COM_ERROR)
+        {
+	  wsrep_node_dropped= TRUE;
+	}
+#endif /* WITH_WSREP */
       }
       goto err;
     }
@@ -3530,6 +3542,27 @@ the slave SQL thread with \"SLAVE START\". We stopped at log \
   THD_CHECK_SENTRY(thd);
   delete thd;
   mysql_mutex_unlock(&LOCK_thread_count);
+#ifdef WITH_WSREP
+  /* if slave stopped due to node going non primary, we set global flag to
+     trigger automatic restart of slave when node joins back to cluster
+  */
+   if (wsrep_node_dropped && wsrep_restart_slave)
+   {
+     if (wsrep_ready)
+     {
+       WSREP_INFO("Slave error due to node temporarily non-primary"
+		  "SQL slave will continue");
+       wsrep_node_dropped= FALSE;
+       mysql_mutex_unlock(&rli->run_lock);
+       goto wsrep_restart_point;
+     } else {
+       WSREP_INFO("Slave error due to node going non-primary");
+       WSREP_INFO("wsrep_restart_slave was set and therefore slave will be "
+		  "automatically restarted when node joins back to cluster");
+       wsrep_restart_slave_activated= TRUE;
+     }
+   }
+#endif /* WITH_WSREP */
  /*
   Note: the order of the broadcast and unlock calls below (first broadcast, then unlock)
   is important. Otherwise a killer_thread can execute between the calls and
@@ -3539,21 +3572,6 @@ the slave SQL thread with \"SLAVE START\". We stopped at log \
   DBUG_EXECUTE_IF("simulate_slave_delay_at_terminate_bug38694", sleep(5););
   mysql_mutex_unlock(&rli->run_lock);  // tell the world we are done
 
-#ifdef WITH_WSREP
-  /* if slave stopped due to node going non primary, we set global flag to
-     trigger automatic restart of slave when node joins back to cluster
-  */
-  if (WSREP_ON && !wsrep_ready)
-  {
-    WSREP_INFO("Slave thread stopped because node dropped from cluster");
-    if (wsrep_restart_slave)
-    {
-      WSREP_INFO("wsrep_restart_slave was set and therefore slave will be "
-		 "automatically restarted when node joins back to cluster");
-      wsrep_restart_slave_activated= TRUE;
-    }
-  }
-#endif /* WITH_WSREP */
   DBUG_LEAVE;                                   // Must match DBUG_ENTER()
   my_thread_end();
   pthread_exit(0);
