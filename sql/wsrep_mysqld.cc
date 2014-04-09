@@ -62,10 +62,10 @@ ulong   wsrep_mysql_replication_bundle = 0;
 my_bool wsrep_desync                   = 0; // desynchronize the node from the
                                             // cluster
 my_bool wsrep_load_data_splitting      = 1; // commit load data every 10K intervals
-my_bool wsrep_restart_slave            = 0; // should mysql slave thread be 
+my_bool wsrep_restart_slave            = 0; // should mysql slave thread be
                                             // restarted, if node joins back
-my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave 
-                                            // restart will be needed 
+my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
+                                            // restart will be needed
 /*
  * End configuration options
  */
@@ -656,6 +656,7 @@ int wsrep_init()
   {
     DBUG_PRINT("wsrep",("wsrep::init() failed: %d", rcode));
     WSREP_ERROR("wsrep::init() failed: %d, must shutdown", rcode);
+    wsrep->free(wsrep);
     free(wsrep);
     wsrep = NULL;
   }
@@ -976,8 +977,8 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
         memset(&tmp_table, 0, sizeof(tmp_table));
         tmp_table.table_name= (char*)table;
         tmp_table.db= (char*)db;
-	tmp_table.mdl_request.init(MDL_key::GLOBAL, (db) ? db :  "", 
-				   (table) ? table : "", 
+	tmp_table.mdl_request.init(MDL_key::GLOBAL, (db) ? db :  "",
+				   (table) ? table : "",
 				   MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
 
         if (!table || !find_temporary_table(thd, &tmp_table))
@@ -1113,8 +1114,8 @@ int wsrep_to_buf_helper(
   /* if there is prepare query, add event for it */
   if (!ret && thd->wsrep_TOI_pre_query)
   {
-    Query_log_event ev(thd, thd->wsrep_TOI_pre_query, 
-		       thd->wsrep_TOI_pre_query_len, 
+    Query_log_event ev(thd, thd->wsrep_TOI_pre_query,
+		       thd->wsrep_TOI_pre_query_len,
 		       FALSE, FALSE, FALSE, 0);
     if (ev.write(&tmp_io_cache)) ret= 1;
   }
@@ -1193,7 +1194,7 @@ create_view_query(THD *thd, uchar** buf, size_t* buf_len)
     }
     buff.append(STRING_WITH_LEN(" AS "));
     //buff.append(views->source.str, views->source.length);
-    buff.append(thd->lex->create_view_select.str, 
+    buff.append(thd->lex->create_view_select.str,
                 thd->lex->create_view_select.length);
     //int errcode= query_error_code(thd, TRUE);
     //if (thd->binlog_query(THD::STMT_QUERY_TYPE,
@@ -1202,7 +1203,7 @@ create_view_query(THD *thd, uchar** buf, size_t* buf_len)
 }
 
 static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
-                           const TABLE_LIST* table_list) 
+                           const TABLE_LIST* table_list)
 {
   wsrep_status_t ret(WSREP_WARNING);
   uchar* buf(0);
@@ -1227,7 +1228,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     buf_err= wsrep_create_event_query(thd, &buf, &buf_len);
     break;
   default:
-    buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(), &buf, 
+    buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(), &buf,
                                  &buf_len);
     break;
   }
@@ -1277,7 +1278,7 @@ static void wsrep_TOI_end(THD *thd) {
   }
 }
 
-static int wsrep_RSU_begin(THD *thd, char *db_, char *table_) 
+static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
 {
   wsrep_status_t ret(WSREP_WARNING);
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
@@ -1359,9 +1360,9 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
   int ret= 0;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 
-  if (thd->wsrep_conflict_state == MUST_ABORT) 
+  if (thd->wsrep_conflict_state == MUST_ABORT)
   {
-    WSREP_INFO("thread: %lu, %s has been aborted due to multi-master conflict", 
+    WSREP_INFO("thread: %lu, %s has been aborted due to multi-master conflict",
                thd->thread_id, thd->query());
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     return WSREP_TRX_FAIL;
@@ -1380,7 +1381,7 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
 
   if (wsrep_debug && thd->mdl_context.has_locks())
   {
-    WSREP_DEBUG("thread holds MDL locks at TI begin: %s %lu", 
+    WSREP_DEBUG("thread holds MDL locks at TI begin: %s %lu",
                 thd->query(), thd->thread_id);
   }
 
@@ -1472,7 +1473,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = TRUE;
     }
-    else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE) 
+    else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE)
     {
       WSREP_DEBUG("DROP caused BF abort");
       ticket->wsrep_report(wsrep_debug);
@@ -1480,7 +1481,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
       ret = FALSE;
     }
-    else if (granted_thd->wsrep_query_state == QUERY_COMMITTING) 
+    else if (granted_thd->wsrep_query_state == QUERY_COMMITTING)
     {
       WSREP_DEBUG("mdl granted, but commiting thd abort scheduled");
       ticket->wsrep_report(wsrep_debug);
@@ -1488,7 +1489,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
       ret = FALSE;
     }
-    else 
+    else
     {
       WSREP_MDL_LOG(DEBUG, "MDL conflict-> BF abort", request_thd, granted_thd);
       ticket->wsrep_report(wsrep_debug);
