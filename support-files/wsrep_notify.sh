@@ -85,10 +85,8 @@ do
         shift
         ;;
     --members)
-        if [ $INDEX -ge 0 ]
-        then
-            MEMBERS=$2
-            shift
+        MEMBERS=$2
+        shift
         fi
         ;;
     esac
