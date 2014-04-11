@@ -54,13 +54,25 @@ check_pid_and_port()
 
     if [ "$OS" == "Darwin" -o "$OS" == "FreeBSD" ]; then
         # no netstat --program(-p) option in Darwin and FreeBSD
+        port_info=$(lsfo -i -Pn 2>/dev/null | grep "(LISTEN)" | \
+            grep ":$rsync_port")
+        if [ -n "$port_info" -a -z "$rsync_pid" ]; then
+            wsrep_log_error "rsync daemon port '$rsync_port' has been taken"
+            exit 16 # EBUSY
+        fi
         check_pid $pid_file && \
-        lsof -i -Pn 2>/dev/null | \
-        grep "(LISTEN)" | grep ":$rsync_port" | grep -w '^rsync[[:space:]]\+'"$rsync_pid" >/dev/null
+            [ -n "$port_info" ] && echo "$port_info" | \
+            grep -w '^rsync[[:space:]]\+'"$rsync_pid" >/dev/null
     else
+        port_info=$(netstat -lntp 2>/dev/null | grep "LISTEN" | \
+            grep ":$rsync_port")
+        if [ -n "$port_info" -a -z "$rsync_pid" ]; then
+            wsrep_log_error "rsync daemon port '$rsync_port' has been taken"
+            exit 16 # EBUSY
+        fi
         check_pid $pid_file && \
-        netstat -lnpt 2>/dev/null | \
-        grep LISTEN | grep \:$rsync_port | grep $rsync_pid/rsync >/dev/null
+            [ -n "$port_info" ] && echo "$port_info" | \
+            grep $rsync_pid/rsync >/dev/null
     fi
 }
 
