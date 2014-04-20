@@ -192,7 +192,13 @@ IF(UNIX)
       SET(${OUTNAME} ${LIBNAME}${EXTENSION}${DOT_VERSION})
     ENDIF() 
   ENDMACRO()
-  INSTALL_SYMLINK(${CMAKE_STATIC_LIBRARY_PREFIX}mysqlclient_r.a mysqlclient ${INSTALL_LIBDIR} Development)
+ENDIF()
+
+IF(UNIX)
+  GET_TARGET_NAME(mysqlclient lib_name)
+  INSTALL_SYMLINK(mysqlclient
+    ${lib_name} ${CMAKE_STATIC_LIBRARY_PREFIX}mysqlclient_r.a
+    ${INSTALL_LIBDIR} Development)
 ENDIF()
 
 IF(NOT DISABLE_SHARED)
