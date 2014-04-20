@@ -325,8 +325,8 @@ parse_arguments() {
       --timezone=*) TZ="$val"; export TZ; ;;
       --wsrep[-_]urls=*) wsrep_urls="$val"; ;;
       --wsrep-data-home-dir=*) wsrep_data_home_dir="$val"; ;;
-      --flush-caches) flush_caches=1 ;;
-      --numa-interleave) numa_interleave=1 ;;
+      --flush-caches=*) flush_caches="$val" ;;
+      --numa-interleave=*) numa_interleave="$val" ;;
       --wsrep[-_]provider=*)
         if test -n "$val" && test "$val" != "none"
         then

@@ -1355,6 +1355,8 @@ bool LOGGER::general_log_write(THD *thd, enum enum_server_command command,
 
   DBUG_ASSERT(thd);
 
+  mysql_audit_general_log(thd, command, query, query_length);
+
   lock_shared();
   if (!opt_log)
   {
@@ -1365,12 +1367,6 @@ bool LOGGER::general_log_write(THD *thd, enum enum_server_command command,
 
   current_time= my_time(0);
 
-  mysql_audit_general_log(thd, current_time,
-                          user_host_buff, user_host_len,
-                          command_name[(uint) command].str,
-                          command_name[(uint) command].length,
-                          query, query_length);
-                        
   while (*current_handler)
     error|= (*current_handler++)->
       log_general(thd, current_time, user_host_buff,
@@ -1396,6 +1392,12 @@ bool LOGGER::general_log_print(THD *thd, enum enum_server_command command,
                                    format, args);
   else
     message_buff[0]= '\0';
+
+  mysql_audit_general_log(thd, command, message_buff, message_buff_len);
+
+  /* Print the message to the buffer if we want to log this kind of commands */
+  if (! logger.log_command(thd, command))
+    return FALSE;
 
   return general_log_write(thd, command, message_buff, message_buff_len);
 }
@@ -5125,9 +5127,9 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional)
 {
   int error;
   DBUG_ENTER("THD::binlog_write_table_map");
-  DBUG_PRINT("enter", ("table: 0x%lx  (%s: #%lu)",
+  DBUG_PRINT("enter", ("table: 0x%lx  (%s: #%llu)",
                        (long) table, table->s->table_name.str,
-                       table->s->table_map_id));
+                       table->s->table_map_id.id()));
 
   /* Pre-conditions */
 #ifdef WITH_WSREP
@@ -5136,7 +5138,7 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional)
 #else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
 #endif
-  DBUG_ASSERT(table->s->table_map_id != ULONG_MAX);
+  DBUG_ASSERT(table->s->table_map_id.is_valid());
 
   Table_map_log_event
     the_event(this, table, table->s->table_map_id, is_transactional);
@@ -5576,10 +5578,6 @@ bool general_log_print(THD *thd, enum enum_server_command command,
 {
   va_list args;
   uint error= 0;
-
-  /* Print the message to the buffer if we want to log this king of commands */
-  if (! logger.log_command(thd, command))
-    return FALSE;
 
   va_start(args, format);
   error= logger.general_log_print(thd, command, format, args);

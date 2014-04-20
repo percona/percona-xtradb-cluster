@@ -1249,7 +1249,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/libhsclient.a
 %{_libdir}/libhsclient.la
 
-# Maatkit UDF libs
+# Percona Toolkit UDF libs
 %{_libdir}/mysql/plugin/libfnv1a_udf.a
 %{_libdir}/mysql/plugin/libfnv1a_udf.la
 %{_libdir}/mysql/plugin/libfnv_udf.a

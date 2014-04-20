@@ -131,7 +131,7 @@ fi
 WORKDIR="$(cd "$WORKDIR"; pwd)"
 
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
-test -e "$SOURCEDIR/Makefile-pxc" || exit 2
+test -e "$SOURCEDIR/VERSION" || exit 2
 
 # Test for the galera sources
 if ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
@@ -157,11 +157,17 @@ else
     echo "Building with revision $REVISION"
 fi 
 
+# Extract version from the VERSION file
+source "$SOURCEDIR/VERSION"
+MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
 # Extract version from the Makefile-pxc
+PERCONA_XTRADB_CLUSTER_VERSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
 RELEASE_TAG=''
-PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
+PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_XTRADB_CLUSTER_VERSION""
 
 # Build information
+REVISION="$(cd "$SOURCEDIR"; grep '^revno: ' Docs/INFO_SRC |sed -e 's/revno: //')"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
 GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION || bzr revno)"
 PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.$REVISION${BUILD_COMMENT:-}$TAG.$(uname -s).$TARGET"
 COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
@@ -170,12 +176,18 @@ COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 # Compilation flags
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
-COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
+if [ -n "$(which rpm)" ]; then
+  export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
+else
+  COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
+fi
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
-
-
+#
+# Create a temporary working directory
+INSTALLDIR="$(cd "$WORKDIR" && TMPDIR="$WORKDIR_ABS" mktemp -d percona-build.XXXXXX)"
+INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
 
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
@@ -262,6 +274,7 @@ fi
     # Build UDF
     (
         cd "UDF"
+	autoreconf --install
         CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make $MAKE_JFLAG
