@@ -718,7 +718,7 @@ A manual upgrade is required.
   rpm -qa | grep -i '^mysql-'
 
   You may choose to use 'rpm --nodeps -ev <package-name>' to remove
-  the package which contains the perconaserverclient shared library.  The
+  the package which contains the mysqlclient shared library.  The
   library will be reinstalled by the MySQL-shared-compat package.
 - Install the new MySQL packages supplied by $myvendor
 - Ensure that the MySQL server is started
@@ -1243,8 +1243,8 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_includedir}/mysql/*
 %{_includedir}/handlersocket
 %{_datadir}/aclocal/mysql.m4
-%{_libdir}/libperconaserverclient.a
-%{_libdir}/libperconaserverclient_r.a
+%{_libdir}/libmysqlclient.a
+%{_libdir}/libmysqlclient_r.a
 %{_libdir}/libmysqlservices.a
 %{_libdir}/libhsclient.a
 %{_libdir}/libhsclient.la
