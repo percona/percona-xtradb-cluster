@@ -28,45 +28,45 @@ INCLUDE_DIRECTORIES(
 ADD_DEFINITIONS(${READLINE_DEFINES})
 ADD_DEFINITIONS(${SSL_DEFINES})
 MYSQL_ADD_EXECUTABLE(mysql completion_hash.cc mysql.cc readline.cc sql_string.cc)
-TARGET_LINK_LIBRARIES(mysql perconaserverclient)
+TARGET_LINK_LIBRARIES(mysql mysqlclient)
 IF(UNIX)
   TARGET_LINK_LIBRARIES(mysql ${READLINE_LIBRARY})
 ENDIF(UNIX)
 
 MYSQL_ADD_EXECUTABLE(mysqltest mysqltest.cc COMPONENT Test)
 SET_SOURCE_FILES_PROPERTIES(mysqltest.cc PROPERTIES COMPILE_FLAGS "-DTHREADS")
-TARGET_LINK_LIBRARIES(mysqltest perconaserverclient regex)
+TARGET_LINK_LIBRARIES(mysqltest mysqlclient regex)
 
 
 MYSQL_ADD_EXECUTABLE(mysqlcheck mysqlcheck.c)
-TARGET_LINK_LIBRARIES(mysqlcheck perconaserverclient)
+TARGET_LINK_LIBRARIES(mysqlcheck mysqlclient)
 
 MYSQL_ADD_EXECUTABLE(mysqldump mysqldump.c ../sql-common/my_user.c)
-TARGET_LINK_LIBRARIES(mysqldump perconaserverclient)
+TARGET_LINK_LIBRARIES(mysqldump mysqlclient)
 
 MYSQL_ADD_EXECUTABLE(mysqlimport mysqlimport.c)
-TARGET_LINK_LIBRARIES(mysqlimport perconaserverclient)
+TARGET_LINK_LIBRARIES(mysqlimport mysqlclient)
 
 MYSQL_ADD_EXECUTABLE(mysql_upgrade mysql_upgrade.c)
-TARGET_LINK_LIBRARIES(mysql_upgrade perconaserverclient)
+TARGET_LINK_LIBRARIES(mysql_upgrade mysqlclient)
 ADD_DEPENDENCIES(mysql_upgrade GenFixPrivs)
 
 MYSQL_ADD_EXECUTABLE(mysqlshow mysqlshow.c)
-TARGET_LINK_LIBRARIES(mysqlshow perconaserverclient)
+TARGET_LINK_LIBRARIES(mysqlshow mysqlclient)
 
 MYSQL_ADD_EXECUTABLE(mysql_plugin mysql_plugin.c)
-TARGET_LINK_LIBRARIES(mysql_plugin perconaserverclient)
+TARGET_LINK_LIBRARIES(mysql_plugin mysqlclient)
 
 MYSQL_ADD_EXECUTABLE(mysqlbinlog mysqlbinlog.cc sql_string.cc
                      ../sql/rpl_filter.cc ../sql/sql_list.cc)
-TARGET_LINK_LIBRARIES(mysqlbinlog perconaserverclient)
+TARGET_LINK_LIBRARIES(mysqlbinlog mysqlclient)
 
 MYSQL_ADD_EXECUTABLE(mysqladmin mysqladmin.cc)
-TARGET_LINK_LIBRARIES(mysqladmin perconaserverclient)
+TARGET_LINK_LIBRARIES(mysqladmin mysqlclient)
 
 MYSQL_ADD_EXECUTABLE(mysqlslap mysqlslap.c)
 SET_SOURCE_FILES_PROPERTIES(mysqlslap.c PROPERTIES COMPILE_FLAGS "-DTHREADS")
-TARGET_LINK_LIBRARIES(mysqlslap perconaserverclient)
+TARGET_LINK_LIBRARIES(mysqlslap mysqlclient)
 
 # "WIN32" also covers 64 bit. "echo" is used in some files below "mysql-test/".
 IF(WIN32)

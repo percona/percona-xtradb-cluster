@@ -202,12 +202,12 @@ install: build
 		| xargs --no-run-if-empty chrpath -d; \
 	set -e
 
-	# libperconaserverclient: move shared libraries (but not the rest like libheap.a & co)
+	# libmysqlclient: move shared libraries (but not the rest like libheap.a & co)
 	# libmysqlclient_r is now a symlink to libmysqlclient. But it is
 	# created wrong by the cmake build system and points at
 	# libmysqlclient.so instead of the corresponding versioned lib.
-	for i in `ls $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/libperconaserverclient.so*` ; do \
-		rlib=`basename $$i | sed -e 's/libperconaserverclient\./libperconaserverclient_r./'` ;\
+	for i in `ls $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/libmysqlclient.so*` ; do \
+		rlib=`basename $$i | sed -e 's/libmysqlclient\./libmysqlclient_r./'` ;\
 		ln -sf `basename $$i` $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/$$rlib ;\
 	done
 
