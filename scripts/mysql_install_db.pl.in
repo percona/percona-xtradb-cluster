@@ -365,7 +365,7 @@ my $hostname = hostname();
 my $resolved;
 if ( !$opt->{'cross-bootstrap'} and !$opt->{rpm} and !$opt->{force} )
 {
-  my $resolveip;
+  my $resolveip = "$extra_bindir/resolveip";
 
   $resolved = `$resolveip $hostname 2>&1`;
   if ( $? != 0 )
@@ -375,14 +375,14 @@ if ( !$opt->{'cross-bootstrap'} and !$opt->{rpm} and !$opt->{force} )
     {
       error($opt,
             "Neither host '$hostname' nor 'localhost' could be looked up with",
-            "$bindir/resolveip",
+            "$resolveip",
             "Please configure the 'hostname' command to return a correct",
             "hostname.",
             "If you want to solve this at a later stage, restart this script",
             "with the --force option");
     }
     warning($opt,
-            "The host '$hostname' could not be looked up with resolveip.",
+            "The host '$hostname' could not be looked up with $resolveip.",
             "This probably means that your libc libraries are not 100 % compatible",
             "with this binary MySQL version. The MySQL daemon, mysqld, should work",
             "normally with the exception that host name resolving will not work.",
@@ -537,13 +537,14 @@ if ( open(PIPE, "| $mysqld_install_cmd_line") )
              "  cd mysql-test ; perl mysql-test-run.pl");
     }
     report($opt,
-           "Please report any problems at http://bugs.mysql.com/",
+           "Please report any problems at",
+           "  https://bugs.launchpad.net/percona-server/+filebug",
            "",
-           "The latest information about MySQL is available on the web at",
+           "The latest information about Percona Server is available on the web at",
+           "  http://www.percona.com/software/percona-server",
            "",
-           "  http://www.mysql.com",
-           "",
-           "Support MySQL by buying support/licenses at http://shop.mysql.com");
+           "Support Percona by buying support at",
+           "  http://www.percona.com/products/mysql-support");
   }
   exit 0
 }
@@ -565,14 +566,15 @@ else
         "Try 'mysqld --help' if you have problems with paths. Using --log",
         "gives you a log in $opt->{ldata} that may be helpful.",
         "",
-        "The latest information about MySQL is available on the web at",
-        "http://www.mysql.com",
+        "The latest information about Percona Server is available on the web @",
+        "  http://www.percona.com/software/percona-server",
+	"",
         "Please consult the MySQL manual section: 'Problems running mysql_install_db',",
         "and the manual section that describes problems on your OS.",
         "Another information source is the MySQL email archive.",
         "",
-        "Please check all of the above before submitting a bug report",
-        "at http://bugs.mysql.com/")
+        "Please check all of the above before submitting a bug report at",
+        "  https://bugs.launchpad.net/percona-server/+filebug")
 }
 
 ##############################################################################

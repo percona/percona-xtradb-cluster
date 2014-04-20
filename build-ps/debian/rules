@@ -7,6 +7,7 @@ PACKAGE=percona-xtradb-cluster-5.5
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 TMP=$(CURDIR)/debian/tmp/
+prefix=/usr
 
 ARCH = $(shell dpkg-architecture -qDEB_BUILD_ARCH)
 ARCH_OS = $(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)
@@ -213,9 +214,23 @@ install: build
 
 	# make install (trailing slash needed for innobase)
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
-	#(cd storage/HandlerSocket-Plugin-for-MySQL && make DESTDIR=$(TMP) install)
-	(cd UDF && make DESTDIR=$(TMP) install)
-		
+	
+	# build HandlerSocket
+	(cd storage/HandlerSocket-Plugin-for-MySQL && \
+	MYSQL_CFLAGS="-I$(CURDIR)/$(builddir)/include" \
+	./configure --with-mysql-source=$(CURDIR) \
+	--with-mysql-bindir=$(CURDIR)/$(builddir)/scripts \
+	--with-mysql-plugindir=$(prefix)/lib/mysql/plugin \
+	--libdir=$(prefix)/lib --prefix=$(prefix) && \
+	make && make DESTDIR=$(TMP) install)
+
+	# Build UDFs
+	(cd UDF && \
+	CXXFLAGS="-I $(CURDIR)/$(builddir)/include" \
+	./configure --includedir=$(CURDIR)/include \
+	--libdir=$(prefix)/lib/mysql/plugin && \
+	make && make DESTDIR=$(TMP) install)
+
 	# After installing, remove rpath to make lintian happy.
 	set +e; \
 	find ./debian/tmp/ -type f -print0 \
@@ -225,12 +240,12 @@ install: build
 		| xargs --no-run-if-empty chrpath -d; \
 	set -e
 
-	# libperconaserverclient: move shared libraries (but not the rest like libheap.a & co)
+	# libmysqlclient: move shared libraries (but not the rest like libheap.a & co)
 	# libmysqlclient_r is now a symlink to libmysqlclient. But it is
 	# created wrong by the cmake build system and points at
 	# libmysqlclient.so instead of the corresponding versioned lib.
-	for i in `ls $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/libperconaserverclient.so*` ; do \
-		rlib=`basename $$i | sed -e 's/libperconaserverclient\./libperconaserverclient_r./'` ;\
+	for i in `ls $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/libmysqlclient.so*` ; do \
+		rlib=`basename $$i | sed -e 's/libmysqlclient\./libmysqlclient_r./'` ;\
 		ln -sf `basename $$i` $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/$$rlib ;\
 	done
 
@@ -279,7 +294,6 @@ install: build
 	chmod -x $(TMP)/usr/share/mysql/config.medium.ini
 	chmod -x $(TMP)/usr/share/mysql/ndb-config-2-node.ini
 	chmod -x $(TMP)/usr/share/mysql/config.huge.ini
-	chmod -x $(TMP)/usr/share/mysql/mysql-log-rotate
 	chmod -x $(TMP)/usr/share/mysql/config.small.ini
 
 	dh_movefiles
@@ -328,7 +342,6 @@ binary-arch: build install
 	dh_installinfo -a
 	dh_installlogcheck -a
 	dh_installchangelogs -a
-	dh_strip -a
 	dh_lintian
 	dh_link -a	# .so muss nach .so.1.2.3 installier werden!
 	dh_compress -a
@@ -348,8 +361,6 @@ binary:	binary-indep binary-arch
 
 override_dh_auto_install:
 	dh_auto_install
-	cd storage/HandlerSocket-Plugin-for-MySQL && make DESTDIR=$(TMP) install
-	cd UDF && make DESTDIR=$(TMP) install
 
 .PHONY: clean clean-patched configure build binary binary-indep binary-arch install patch
 
@@ -358,4 +369,3 @@ override_dh_installinit:
 
 override_dh_strip:
 	dh_strip --dbg-package=percona-xtradb-cluster-5.5-dbg
-

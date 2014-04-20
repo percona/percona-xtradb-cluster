@@ -604,16 +604,7 @@ install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Delete the symlinks to the libraries from the libdir. These are created by
 # ldconfig(8) afterwards.
-rm -f $RBR%{_libdir}/libperconaserverclient*.so.18
-
-# Added for compatibility
-pushd $RBR%{_libdir}
-ln -s libperconaserverclient.so.18.0.0  libmysqlclient.so.18.0.0 
-ln -s libperconaserverclient.so.18.0.0  libmysqlclient.so.18
-ln -s libperconaserverclient.so.18.0.0  libmysqlclient_r.so.18.0.0
-ln -s libperconaserverclient.so.18.0.0  libmysqlclient_r.so.18
-popd
-
+rm -f $RBR%{_libdir}/libmysqlclient*.so.18
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
@@ -718,7 +709,7 @@ A manual upgrade is required.
   rpm -qa | grep -i '^mysql-'
 
   You may choose to use 'rpm --nodeps -ev <package-name>' to remove
-  the package which contains the perconaserverclient shared library.  The
+  the package which contains the mysqlclient shared library.  The
   library will be reinstalled by the MySQL-shared-compat package.
 - Install the new MySQL packages supplied by $myvendor
 - Ensure that the MySQL server is started
@@ -1243,13 +1234,13 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_includedir}/mysql/*
 %{_includedir}/handlersocket
 %{_datadir}/aclocal/mysql.m4
-%{_libdir}/libperconaserverclient.a
-%{_libdir}/libperconaserverclient_r.a
+%{_libdir}/libmysqlclient.a
+%{_libdir}/libmysqlclient_r.a
 %{_libdir}/libmysqlservices.a
 %{_libdir}/libhsclient.a
 %{_libdir}/libhsclient.la
 
-# Maatkit UDF libs
+# Percona Toolkit UDF libs
 %{_libdir}/mysql/plugin/libfnv1a_udf.a
 %{_libdir}/mysql/plugin/libfnv1a_udf.la
 %{_libdir}/mysql/plugin/libfnv_udf.a
@@ -1262,7 +1253,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %defattr(-, root, root, 0755)
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libperconaserver*.so*
 %{_libdir}/libmysqlclient*.so*
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}

@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2013, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2014, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -228,6 +228,11 @@ SET(pkglibdir ${prefix}/${INSTALL_LIBDIR})
 SET(pkgplugindir ${prefix}/${INSTALL_PLUGINDIR})
 SET(localstatedir ${MYSQL_DATADIR})
 
+SET(RPATH_OPTION "")
+IF(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
+  SET(RPATH_OPTION "-R$pkglibdir")
+ENDIF()
+
 # some scripts use  @TARGET_LINUX@
 IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
   SET(TARGET_LINUX "true")
@@ -236,7 +241,7 @@ ELSE()
 ENDIF()
 
 # Use cmake variables to inspect dependencies for 
-# perconaserverclient library (add -l stuff)
+# mysqlclient library (add -l stuff)
 SET(CLIENT_LIBS "")
 SET(LIBS "")
 
@@ -276,7 +281,7 @@ MACRO(EXTRACT_LINK_LIBRARIES target var)
   ENDIF()
 ENDMACRO()
 
-EXTRACT_LINK_LIBRARIES(perconaserverclient CLIENT_LIBS)
+EXTRACT_LINK_LIBRARIES(mysqlclient CLIENT_LIBS)
 EXTRACT_LINK_LIBRARIES(mysqlserver LIBS)
 
 # mysql_config evaluates ${LIBDL}, we want to avoid it
@@ -316,6 +321,9 @@ ELSE()
     SET(WSREP_BINARIES wsrep_sst_common wsrep_sst_mysqldump wsrep_sst_rsync
 wsrep_sst_xtrabackup wsrep_sst_xtrabackup-v2 clustercheck pyclustercheck)
   ENDIF()
+  # Configure this one, for testing, but do not install it.
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql_config.pl.in
+    ${CMAKE_CURRENT_BINARY_DIR}/mysql_config.pl ESCAPE_QUOTES @ONLY)
   # On Unix, most of the files end up in the bin directory
   SET(mysql_config_COMPONENT COMPONENT Development)
   SET(BIN_SCRIPTS
