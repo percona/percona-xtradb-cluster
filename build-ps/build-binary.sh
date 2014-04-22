@@ -185,10 +185,6 @@ export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 #
-# Create a temporary working directory
-INSTALLDIR="$(cd "$WORKDIR" && TMPDIR="$WORKDIR_ABS" mktemp -d percona-build.XXXXXX)"
-INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
-
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
 then
