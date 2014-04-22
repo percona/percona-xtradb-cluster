@@ -34,7 +34,7 @@ Vcs-Bzr: lp:percona-xtradb-cluster
 Package: libperconaserverclient18
 Section: libs
 Architecture: any
-Depends: percona-xtradb-cluster-common-5.5 ${misc:Depends}, ${shlibs:Depends}
+Depends: percona-xtradb-cluster-common-5.5, ${misc:Depends}, ${shlibs:Depends}
 Conflicts: libmysqlclient18
 Replaces: libpercona-server-client16
 Description: Percona XtraDB Cluster database client library
@@ -205,14 +205,14 @@ Description: Percona XtraDB Cluster database server binaries
 Package: percona-xtradb-cluster-55
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-server-5.5, percona-xtradb-cluster-client-5.5, galera2, ${misc:Depends}
+Depends: percona-xtradb-cluster-server-5.5 (>= ${source:Version}), percona-xtradb-cluster-client-5.5 (>= ${source:Version}), percona-xtradb-cluster-galera-2, ${misc:Depends}
 Description: Percona XtraDB Cluster with Galera
  This is a meta-package providing PXC56 server, client and galera-2.
 
 Package: percona-xtradb-cluster-full-55
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-server-5.5, percona-xtradb-cluster-client-5.5, galera2, percona-xtradb-cluster-test-5.5, percona-xtradb-cluster-5.5-dbg, garbd2, percona-xtradb-cluster-galera-2.x-dbg, percona-xtradb-cluster-garbd-2.x-dbg, ${misc:Depends}
+Depends: percona-xtradb-cluster-server-5.5 (>= ${source:Version}), percona-xtradb-cluster-client-5.5 (>= ${source:Version}), percona-xtradb-cluster-galera-2, percona-xtradb-cluster-test-5.5 (>= ${source:Version}), percona-xtradb-cluster-5.5-dbg (>= ${source:Version}), percona-xtradb-cluster-garbd-2, percona-xtradb-cluster-galera2-dbg, ${misc:Depends}
 Description: Percona XtraDB Cluster with Galera
  This is a meta-package providing PXC56 server, client, galera-2, test and debug packages.
 
