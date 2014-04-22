@@ -63,6 +63,10 @@ STATDIR=""
 uextra=0
 disver=""
 
+tmpopts=""
+itmpdir=""
+xtmpdir=""
+
 scomp=""
 sdecomp=""
 
@@ -371,20 +375,29 @@ cleanup_donor()
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
 
-    if [[ -n $XTRABACKUP_PID ]];then 
+    if [[ -n ${XTRABACKUP_PID:-} ]];then 
         if check_pid $XTRABACKUP_PID
         then
             wsrep_log_error "xtrabackup process is still running. Killing... "
             kill_xtrabackup
         fi
 
-        rm -f $XTRABACKUP_PID 
     fi
-    rm -f ${DATA}/${IST_FILE}
+    rm -f ${DATA}/${IST_FILE} || true
 
     if [[ -n $progress && -p $progress ]];then 
         wsrep_log_info "Cleaning up fifo file $progress"
-        rm $progress
+        rm -f $progress || true
+    fi
+
+    wsrep_log_info "Cleaning up temporary directories"
+
+    if [[ -n $xtmpdir ]];then 
+       [[ -d $xtmpdir ]] &&  rm -rf $xtmpdir || true
+    fi
+
+    if [[ -n $itmpdir ]];then 
+       [[ -d $itmpdir ]] &&  rm -rf $itmpdir || true
     fi
 }
 
@@ -392,7 +405,8 @@ kill_xtrabackup()
 {
     local PID=$(cat $XTRABACKUP_PID)
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
-    rm -f "$XTRABACKUP_PID"
+    wsrep_log_info "Removing xtrabackup pid file $XTRABACKUP_PID"
+    rm -f "$XTRABACKUP_PID" || true
 }
 
 setup_ports()
@@ -544,7 +558,7 @@ fi
 INNOEXTRA=""
 INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
 INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$INNOEXTRA --galera-info --stream=\$sfmt \${TMPDIR} 2>\${DATA}/innobackup.backup.log"
+INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2>\${DATA}/innobackup.backup.log"
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -553,7 +567,14 @@ then
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
 
-        TMPDIR="${TMPDIR:-/tmp}"
+        if [[ -z $(parse_cnf mysqld tmpdir "") && -z $(parse_cnf xtrabackup tmpdir "") ]];then 
+            xtmpdir=$(mktemp -d)
+            tmpopts=" --tmpdir=$xtmpdir "
+            wsrep_log_info "Using $xtmpdir as xtrabackup temporary directory"
+        fi
+
+        itmpdir=$(mktemp -d)
+        wsrep_log_info "Using $itmpdir as innobackupex temporary directory"
 
         if [ "${AUTH[0]}" != "(null)" ]; then
            INNOEXTRA+=" --user=${AUTH[0]}"
@@ -631,8 +652,8 @@ then
           exit 22
         fi
 
-        # innobackupex implicitly writes PID to fixed location in ${TMPDIR}
-        XTRABACKUP_PID="${TMPDIR}/xtrabackup_pid"
+        # innobackupex implicitly writes PID to fixed location in $xtmpdir
+        XTRABACKUP_PID="$xtmpdir/xtrabackup_pid"
 
 
     else # BYPASS FOR IST
