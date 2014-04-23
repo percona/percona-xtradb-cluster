@@ -538,10 +538,10 @@ if ( open(PIPE, "| $mysqld_install_cmd_line") )
     }
     report($opt,
            "Please report any problems at",
-           "  https://bugs.launchpad.net/percona-server/+filebug",
+           "  https://bugs.launchpad.net/percona-xtradb-cluster/+filebug",
            "",
-           "The latest information about Percona Server is available on the web at",
-           "  http://www.percona.com/software/percona-server",
+           "The latest information about Percona XtraDB Cluster is available on the web at",
+           "  http://www.percona.com/software/percona-xtradb-cluster",
            "",
            "Support Percona by buying support at",
            "  http://www.percona.com/products/mysql-support");

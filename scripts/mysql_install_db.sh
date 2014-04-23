@@ -479,7 +479,7 @@ then
 
   echo
   echo "Please report any problems at"
-  echo "  https://bugs.launchpad.net/percona-server/+filebug"
+  echo "  https://bugs.launchpad.net/percona-xtradb-cluster/+filebug"
   echo
   echo "Percona recommends that all production deployments be protected with a support"
   echo "contract (http://www.percona.com/mysql-suppport/) to ensure the highest uptime,"
