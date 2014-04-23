@@ -427,7 +427,7 @@ else
   echo "MySQL email archives available at http://lists.mysql.com/."
   echo
   echo "Please check all of the above before submitting a bug report at"
-  echo "  https://bugs.launchpad.net/percona-server/+filebug"
+  echo "  https://bugs.launchpad.net/percona-xtradb-cluster/+filebug"
   echo
   exit 1
 fi
