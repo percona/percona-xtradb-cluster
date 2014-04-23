@@ -22,7 +22,7 @@
 # Default-Start:  2 3 4 5
 # Default-Stop: 0 1 6
 # Short-Description: start and stop MySQL (Percona XtraDB Cluster)
-# Description: Percona-Server is a SQL database engine with focus on high performance.
+# Description: Percona-XtraDB-Cluster is a cluster based on Galera.
 ### END INIT INFO
  
 # If you install MySQL on some other places than @prefix@, then you
