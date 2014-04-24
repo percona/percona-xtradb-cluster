@@ -25,7 +25,7 @@ OS=$(uname)
 
 . $(dirname $0)/wsrep_sst_common
 
-# Setting the path for lsof
+# Setting the path for lsof on CentOS
 export PATH="/usr/sbin:/sbin:$PATH"
 
 cleanup_joiner()
