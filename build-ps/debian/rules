@@ -35,7 +35,7 @@ minor_version=0
 wsrep_version="25.10"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(wsrep_version)"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release $(wsrep_version)"
-server_suffix="-$(major_version).$(minor_version)"
+server_suffix="-55"
 prefix=/usr
 
 MYSQL_SRC = $(shell pwd)
