@@ -1151,6 +1151,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_pam_compat.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/dialog.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/scalability_metrics.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/audit_log.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/adt_null.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/libdaemon_example.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/mypluglib.so
@@ -1166,6 +1167,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/auth_pam_compat.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/dialog.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/scalability_metrics.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/audit_log.so
 # HandlerSocket files
 %attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.a
 %attr(755, root, root) %{_libdir}/mysql/plugin/handlersocket.la
