@@ -188,10 +188,10 @@ fi
         cp garb/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
         cp libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
     else 
-        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
-        cp $WORKDIR/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
-        cp $WORKDIR/libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
+        mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL/lib/{galera2,galera3}
+        #cp $WORKDIR/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
+        cp $WORKDIR/galera2/libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib/galera2/"
+        cp $WORKDIR/galera3/libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib/galera3/"
     fi
 
     ) || exit 1
