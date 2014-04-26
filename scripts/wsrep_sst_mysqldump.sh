@@ -119,11 +119,10 @@ RESET_MASTER="RESET MASTER;"
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
 # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
-    # ignore error because if gtid and binlog is not used 'RESET MASTER' gets error
+    # error is ignored because joiner binlog might be disabled.
+    # and if joiner binlog is disabled, 'RESET MASTER' returns error
     # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER
-    set +e
-    (echo $STOP_WSREP && echo $RESET_MASTER) | $MYSQL
-    set -e
+    (echo $STOP_WSREP && echo $RESET_MASTER) | $MYSQL || true
     (echo $STOP_WSREP && $MYSQLDUMP \
         && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
         && echo $SET_START_POSITION \
