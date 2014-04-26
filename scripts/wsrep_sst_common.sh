@@ -21,6 +21,7 @@ set -u
 WSREP_SST_OPT_BYPASS=0
 WSREP_SST_OPT_BINLOG=""
 WSREP_SST_OPT_DATA=""
+WSREP_SST_OPT_AUTH=""
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -56,7 +57,7 @@ case "$1" in
         shift
         ;;
     '--password')
-        readonly WSREP_SST_OPT_PSWD="$2"
+        WSREP_SST_OPT_PSWD="$2"
         shift
         ;;
     '--port')
@@ -72,7 +73,7 @@ case "$1" in
         shift
         ;;
     '--user')
-        readonly WSREP_SST_OPT_USER="$2"
+        WSREP_SST_OPT_USER="$2"
         shift
         ;;
     '--gtid')
@@ -94,8 +95,8 @@ readonly WSREP_SST_OPT_BYPASS
 readonly WSREP_SST_OPT_BINLOG
 
 # For Bug:1200727
-if my_print_defaults -c $WSREP_SST_OPT_CONF sst | grep -q "wsrep_sst_auth";then 
-    if [ -z $WSREP_SST_OPT_AUTH -o $WSREP_SST_OPT_AUTH = "(null)" ];then 
+if my_print_defaults -c $WSREP_SST_OPT_CONF sst | grep -q "wsrep_sst_auth";then
+    if [ -z "$WSREP_SST_OPT_AUTH" -o "$WSREP_SST_OPT_AUTH" = "(null)" ];then
             WSREP_SST_OPT_AUTH=$(my_print_defaults -c $WSREP_SST_OPT_CONF sst | grep -- "--wsrep_sst_auth" | cut -d= -f2)
     fi
 fi
@@ -130,4 +131,3 @@ wsrep_cleanup_progress_file()
 {
     [ -n "$SST_PROGRESS_FILE" ] && rm -f "$SST_PROGRESS_FILE" 2>/dev/null
 }
-
