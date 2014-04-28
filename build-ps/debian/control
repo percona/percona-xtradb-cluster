@@ -177,6 +177,7 @@ Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}),
         percona-xtradb-cluster-galera-25,
         percona-xtrabackup (>= 2.1.6),
         socat,
+        lsof,
         rsync,
         iproute
 Provides: mysql-server, mysql-server-5.5

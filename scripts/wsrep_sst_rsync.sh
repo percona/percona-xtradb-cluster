@@ -55,6 +55,11 @@ check_pid_and_port()
     local rsync_pid=$2
     local rsync_port=$3
 
+    if [[ ! -x `which lsof` ]];then 
+        wsrep_log_error "lsof not found in path: $PATH"
+        exit 2 
+    fi
+
     local port_info=$(lsof -i :$rsync_port -Pn 2>/dev/null | \
         grep "(LISTEN)")
     local is_rsync=$(echo $port_info | \
