@@ -167,7 +167,6 @@ Suggests: tinyca, netcat-openbsd, pv, qpress
 Pre-Depends: percona-xtradb-cluster-common-5.5 (>= ${source:Version}),
              adduser (>= 3.4.0),
              debconf
-<<<<<<< TREE
 Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}),
         libdbi-perl,
         libdbd-mysql-perl,
