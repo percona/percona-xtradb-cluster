@@ -125,11 +125,9 @@ Depends: debianutils (>=1.6),
          percona-xtradb-cluster-common-5.5 (>= ${source:Version}),
          ${shlibs:Depends},
          ${misc:Depends}
-Provides: mysql-client, 
-          mysql-client-core, 
-          mysql-client-5.5, 
-          mysql-client-core-5.5, 
-          virtual-mysql-client
+Provides: mysql-client,
+          virtual-mysql-client,
+          virtual-mysql-client-core
 Breaks: mysql-client-5.0,
         mysql-client-core-5.1,
         mysql-client-5.1,
@@ -138,7 +136,9 @@ Breaks: mysql-client-5.0,
         percona-server-client-5.1,
         mariadb-client,
         mariadb-client-core-5.5,
-        mariadb-client-5.5
+        mariadb-client-5.5,
+        virtual-mysql-client,
+        virtual-mysql-client-core
 Replaces: mysql-client-5.0,
           mysql-client-core-5.1,
           mysql-client-5.1,
@@ -148,7 +148,9 @@ Replaces: mysql-client-5.0,
           percona-server-client-5.5,
           mariadb-client,
           mariadb-client-core-5.5,
-          mariadb-client-5.5
+          mariadb-client-5.5,
+          virtual-mysql-client,
+          virtual-mysql-client-core
 Description: Percona XtraDB Cluster database client binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
@@ -165,6 +167,7 @@ Suggests: tinyca, netcat-openbsd, pv, qpress
 Pre-Depends: percona-xtradb-cluster-common-5.5 (>= ${source:Version}),
              adduser (>= 3.4.0),
              debconf
+<<<<<<< TREE
 Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}),
         libdbi-perl,
         libdbd-mysql-perl,
@@ -180,7 +183,9 @@ Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}),
         lsof,
         rsync,
         iproute
-Provides: mysql-server, mysql-server-5.5
+Provides: mysql-server,
+          virtual-mysql-server,
+          virtual-mysql-server-core
 Breaks: mysql-server-5.0,
         mysql-server-5.1,
         mysql-server-5.5,
@@ -189,7 +194,9 @@ Breaks: mysql-server-5.0,
         percona-server-server-5.1,
         mariadb-server,
         mariadb-server-core-5.5,
-        mariadb-server-5.5
+        mariadb-server-5.5,
+        virtual-mysql-server,
+        virtual-mysql-server-core
 Replaces: mysql-server-5.0,
           mysql-server-5.1,
           mysql-server-5.5,
@@ -199,7 +206,9 @@ Replaces: mysql-server-5.0,
           percona-server-server-5.5,
           mariadb-server,
           mariadb-server-core-5.5,
-          mariadb-server-5.5
+          mariadb-server-5.5,
+          virtual-mysql-server,
+          virtual-mysql-server-core
 Description: Percona XtraDB Cluster database server binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
