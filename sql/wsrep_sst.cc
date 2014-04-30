@@ -52,7 +52,7 @@ extern const char wsrep_defaults_file[];
 #define WSREP_SST_SKIP         "skip"
 #define WSREP_SST_XTRABACKUP      "xtrabackup"
 #define WSREP_SST_XTRABACKUP_V2   "xtrabackup-v2"
-#define WSREP_SST_DEFAULT      WSREP_SST_RSYNC
+#define WSREP_SST_DEFAULT      WSREP_SST_XTRABACKUP_V2
 #define WSREP_SST_ADDRESS_AUTO "AUTO"
 #define WSREP_SST_AUTH_MASK    "********"
 
@@ -134,7 +134,7 @@ static bool sst_auth_real_set (const char* value)
           {
             my_free ((void*)wsrep_sst_auth);
             wsrep_sst_auth = my_strdup(WSREP_SST_AUTH_MASK, MYF(0));
-            //strncpy (wsrep_sst_auth, WSREP_SST_AUTH_MASK, 
+            //strncpy (wsrep_sst_auth, WSREP_SST_AUTH_MASK,
             //     sizeof(wsrep_sst_auth) - 1);
           }
           else
@@ -716,10 +716,11 @@ static int sst_donate_mysqldump (const char*         addr,
               WSREP_SST_OPT_LPORT" '%u' "
               WSREP_SST_OPT_SOCKET" '%s' "
               WSREP_SST_OPT_DATA" '%s' "
+              WSREP_SST_OPT_CONF" '%s' "
               WSREP_SST_OPT_GTID" '%s:%lld'"
               "%s",
               user, pswd, host, port, mysqld_port, mysqld_unix_port,
-              mysql_real_data_home, uuid_str,
+              mysql_real_data_home, wsrep_defaults_file, uuid_str,
               (long long)seqno, bypass ? " "WSREP_SST_OPT_BYPASS : "");
 
     WSREP_DEBUG("Running: '%s'", cmd_str);
