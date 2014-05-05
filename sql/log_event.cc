@@ -7336,6 +7336,11 @@ int Xid_log_event::do_apply_event(Relay_log_info const *rli)
   lex_start(thd);
   mysql_reset_thd_for_next_command(thd);
   Relay_log_info *rli_ptr= const_cast<Relay_log_info *>(rli);
+#ifdef WITH_WSREP
+  ulonglong wsrep_log_pos_save= 0;
+  ulonglong wsrep_relay_log_pos_save= 0;
+  char wsrep_relay_log_name_save[FN_REFLEN]= {0};
+#endif /* WITH_WSREP */
 
   /* For a slave Xid_log_event is COMMIT */
   general_log_print(thd, COM_QUERY,
@@ -7359,13 +7364,30 @@ int Xid_log_event::do_apply_event(Relay_log_info const *rli)
     We need to update the positions in here to make it transactional.  
   */
   rli_ptr->inc_event_relay_log_pos();
+#ifdef WITH_WSREP
+  {
+    wsrep_relay_log_pos_save=  rli_ptr->get_group_relay_log_pos();
+    strncpy(wsrep_relay_log_name_save, rli_ptr->get_group_relay_log_name(), 
+            strlen(rli_ptr->get_group_relay_log_name()));
+#endif /* WITH_WSREP */
   rli_ptr->set_group_relay_log_pos(rli_ptr->get_event_relay_log_pos());
   rli_ptr->set_group_relay_log_name(rli_ptr->get_event_relay_log_name());
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 
   rli_ptr->notify_group_relay_log_name_update();
 
   if (log_pos) // 3.23 binlogs don't have log_posx
+#ifdef WITH_WSREP
+  {
+    wsrep_log_pos_save= rli_ptr->get_group_master_log_pos();
+#endif /* WITH_WSREP */
     rli_ptr->set_group_master_log_pos(log_pos);
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
+
   
   if ((error= rli_ptr->flush_info(rli_ptr->is_transactional())))
     goto err;
@@ -7394,9 +7416,19 @@ int Xid_log_event::do_apply_event(Relay_log_info const *rli)
                   });
   error= do_commit(thd);
   if(error)
+#ifdef WITH_WSREP
+  {
+    /* rollback to saved relay log positions */
+    rli_ptr->set_group_master_log_pos(wsrep_log_pos_save);
+    rli_ptr->set_group_relay_log_pos(wsrep_relay_log_pos_save);
+    rli_ptr->set_group_relay_log_name(wsrep_relay_log_name_save);
+#endif /* WITH_WSREP */
     rli->report(ERROR_LEVEL, thd->get_stmt_da()->sql_errno(),
                 "Error in Xid_log_event: Commit could not be completed, '%s'",
                 thd->get_stmt_da()->message());
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 err:
   mysql_cond_broadcast(&rli_ptr->data_cond);
   mysql_mutex_unlock(&rli_ptr->data_lock);
