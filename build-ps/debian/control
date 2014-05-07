@@ -83,7 +83,7 @@ Package: percona-xtradb-cluster-common-5.5
 Section: database
 Architecture: all
 Depends: ${misc:Depends}
-Provides: mysql-common, percona-server-common-5.5
+Provides: mysql-common
 Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
