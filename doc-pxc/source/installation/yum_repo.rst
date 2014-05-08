@@ -30,7 +30,14 @@ Install XtraDB Cluster
 
 Following command will install Cluster packages: ::
 
-  $ yum install Percona-XtraDB-Cluster-server-55 Percona-XtraDB-Cluster-client-55 Percona-XtraDB-Cluster-galera-2
+  $ yum install Percona-XtraDB-Cluster-55
+
+Instead of ``Percona-XtraDB-Cluster-55`` you can install ``Percona-XtraDB-Cluster-full-55`` meta-package which will install ``Percona-XtraDB-Cluster-devel-55``, ``Percona-XtraDB-Cluster-test-55``, ``Percona-XtraDB-Cluster-debuginfo-55``, ``Percona-XtraDB-Cluster-galera-2-debuginfo``, and ``Percona-XtraDB-Cluster-shared-55`` packages in addition.
+
+.. warning:: 
+
+   In order to sucessfully install |Percona XtraDB Cluster| ``socat`` package will need to be installed first. ``socat`` package can be installed from the `EPEL <https://fedoraproject.org/wiki/EPEL>`_ repositories.
+
 
 Percona `yum` Experimental repository
 =====================================
