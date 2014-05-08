@@ -111,3 +111,16 @@ Q: I'm getting "nc: invalid option -- 'd'" in the sst.err log file
 A: This is Debian/Ubuntu specific error, Percona-XtraDB-Cluster uses netcat-openbsd package. This dependency has been fixed in recent releases. Future releases of PXC will be compatible with any netcat (bug :bug:`959970`).
 
 
+Q: How do I use Galera-3 with PXC 5.5?
+========================================================
+A: For ubuntu/debian, you can just do:
+
+.. code-block:: mysql
+
+    apt-get install percona-xtradb-cluster-galera-3.x
+
+For centos, you will need to install yum replace `plugin<https://iuscommunity.org/pages/IUSClientUsageGuide.html>`_.  After this, doing  following will work:
+
+.. code-block:: shell
+
+    yum replace Percona-XtraDB-Cluster-galera-3 --replace-with Percona-XtraDB-Cluster-galera-2
