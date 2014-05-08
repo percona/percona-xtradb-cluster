@@ -37,9 +37,9 @@ Ubuntu
 
  * 10.04LTS lucid
  * 12.04LTS precise
- * 12.10 quantal
  * 13.04 raring
  * 13.10 saucy
+ * 14.04LTS trusty
 
 
 Install XtraDB Cluster
@@ -47,14 +47,13 @@ Install XtraDB Cluster
 
 Following command will install Cluster packages: :: 
 
-  $ sudo apt-get install percona-xtradb-cluster-client-5.5 \
-  percona-xtradb-cluster-server-5.5 percona-xtradb-cluster-galera-2.x
+$ sudo apt-get install percona-xtradb-cluster-55
+
+Instead of ``percona-xtradb-cluster-55`` you can install ``percona-xtradb-cluster-full-55`` meta-package which will install ``percona-xtradb-cluster-test-5.5``, ``percona-xtradb-cluster-5.5-dbg``, ``percona-xtradb-cluster-garbd-2.x``, ``percona-xtradb-cluster-galera-2x-dbg``, ``percona-xtradb-cluster-garbd-2.x-dbg`` and ``libmysqlclient18`` packages in addition.
 
 .. note:: 
-
-   When doing the package upgrade on debian, you may need to specify the all the packages on apt-get command-line or do the ``dist-upgrade``, otherwise some packages will be held back during the upgrade: ::
- 
-   $ apt-get install percona-xtradb-cluster-galera-2.x percona-xtradb-cluster-server-5.5 percona-xtradb-cluster-client-5.5  
+    
+   Garbd is packaged separately as part of debian split packaging. The garbd debian package is ``percona-xtradb-cluster-garbd-2.x``. The package contains, garbd, daemon init script and related config files. This package will be installed if you install the ``percona-xtradb-cluster-55-full`` meta package.
 
 Percona `apt` Experimental repository
 =====================================

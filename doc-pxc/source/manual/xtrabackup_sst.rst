@@ -160,6 +160,29 @@ In order for XtraBackup SST to support :variable:`innodb_data_home_dir` and :var
 
 **NOTE:** This option can only be used when :variable:`wsrep_sst_method` is set to xtrabackup-v2.
 
+.. option:: compressor/decompressor
+ 
+    :Values: command-lines to compressor/decompressor
+    :Default: Not set, hence not enabled.
+    :Example: compressor='gzip', decompressor='gzip -dc'
+ 
+This option introduces stream-based compression/decompression. When these options are set, compression/decompression are done on stream, in contrast to earlier PXB-based one where decompression was done after streaming to disk, involving additional I/O; hence I/O is saved here (almost halved on joiner). You can use any compression utility which works on stream - gzip, pigz (which is multi-threaded and hence, recommended) etc. Also, note that, compressor has to be set on donor and decompressor on joiner (though you can have decompressor set on donor and vice-versa for config homogeneity, it won't affect that particular SST). To use Xtrabackup-based compression as before use ``compress`` under ``[xtrabackup]`` as before, also having both enabled won't cause any failure (though you will be wasting CPU cycles with this).
+
+.. option:: inno-backup-opts, inno-apply-opts, inno-move-opts
+
+   :Default: Empty
+   :Type: Quoted String
+
+These group of options can be used to pass options to backup, apply, move stages of innobackupex. Note, this option is to be used to pass only those options which are innobackupex-only and thus cannot be provided in :file:`my.cnf`. Otherwise, it is strongly recommended to pass xtrabackup options through my.cnf (under [xtrabackup]).
+
+.. option:: sst-initial-timeout
+   
+   :Values: 0 (Disabled)
+   :Default: 100
+   :Unit: seconds
+
+This option is use to configure initial timeout (in seconds) to receive a first packet via SST. This has been implemented, so that if donor dies somewhere in between, joiner doesn't hang and wait forever. Thus joiner won't wait for more than 100 seconds to get a donor. The default should be sufficient, however, it is configurable, so you can set it appropriately for your cluster.
+
 .. _tar_ag_xbstream:
 
 Tar against xbstream
