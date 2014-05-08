@@ -357,7 +357,7 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
      (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
       var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED))
   {
-    WSREP_DEBUG("PXC does not support binlog format : %s",
+     WSREP_ERROR("PXC does not support binlog format : %s",
                 var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
                 "STATEMENT" : "MIXED");
     /* Push also warning, because error message is general */
@@ -366,7 +366,8 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
                         "PXC does not support binlog format: %s",
                         var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
                         "STATEMENT" : "MIXED");
-    return true;
+    if (var->type == OPT_GLOBAL)
+        return true;
   }
 #endif
 
