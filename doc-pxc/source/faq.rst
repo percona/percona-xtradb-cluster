@@ -119,8 +119,8 @@ A: For ubuntu/debian, you can just do:
 
     apt-get install percona-xtradb-cluster-galera-3.x
 
-For centos, you will need to install yum replace `plugin<https://iuscommunity.org/pages/IUSClientUsageGuide.html>`_.  After this, doing  following will work:
+For centos, you will need to install yum replace `plugin <https://iuscommunity.org/pages/IUSClientUsageGuide.html>`_.  After this, doing  following will work:
 
-.. code-block:: shell
+.. code-block:: bash
 
     yum replace Percona-XtraDB-Cluster-galera-3 --replace-with Percona-XtraDB-Cluster-galera-2
