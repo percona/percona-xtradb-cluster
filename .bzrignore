@@ -12,6 +12,7 @@
 *.dir
 *.dll
 *.dylib
+*.diff
 *.exe
 *.exp
 *.gcda
