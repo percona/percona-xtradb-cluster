@@ -130,7 +130,8 @@ else
 
 fi
 
-WORKDIR_ABS="$(cd "$WORKDIR"; pwd)"
+# Workdir path should be absolute
+WORKDIR="$(cd "$WORKDIR"; pwd)"
 
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
 test -e "$SOURCEDIR/VERSION" || exit 2
@@ -150,39 +151,43 @@ else
     PROCESSORS=4
 fi
 
+
+# Build information
+if [[ -z ${REVISION:-} ]];then 
+    REVISION=500 
+else 
+    REVISION=$REVISION
+    echo "Building with revision $REVISION"
+fi
+
 # Extract version from the VERSION file
 source "$SOURCEDIR/VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
-PERCONA_SERVER_VERSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
-PRODUCT="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
+# Extract version from the Makefile-pxc
+PERCONA_XTRADB_CLUSTER_VERSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
+RELEASE_TAG=''
+PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_XTRADB_CLUSTER_VERSION"
 
 # Build information
 REVISION="$(cd "$SOURCEDIR"; grep '^revno: ' Docs/INFO_SRC |sed -e 's/revno: //')"
-PRODUCT_FULL="Percona-Server-$MYSQL_VERSION-$PERCONA_SERVER_VERSION"
-PRODUCT_FULL="$PRODUCT_FULL-$REVISION${BUILD_COMMENT:-}$TAG.$(uname -s).$TARGET"
-COMMENT="Percona Server with XtraDB (GPL), Release $PERCONA_SERVER_VERSION"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
+GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION || bzr revno)"
+PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.$REVISION${BUILD_COMMENT:-}$TAG.$(uname -s).$TARGET"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 
 # Compilation flags
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
-
-#
 if [ -n "$(which rpm)" ]; then
   export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
+else
+  COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
 fi
-#
-export CFLAGS="${COMMON_FLAGS} -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION"
-export CXXFLAGS="${COMMON_FLAGS} -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION"
-#
+export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
+export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
-
-export WSREP_REV="$WSREP_REV"
-
-# Create a temporary working directory
-INSTALLDIR="$(cd "$WORKDIR" && TMPDIR="$WORKDIR_ABS" mktemp -d percona-build.XXXXXX)"
-INSTALLDIR="$WORKDIR_ABS/$INSTALLDIR"   # Make it absolute
-
+#
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
 then
@@ -218,19 +223,14 @@ fi
             scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" \
                 garb/garbd libgalera_smm.so
         fi
-        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-        cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
-        cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
+        cp garb/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
+        cp libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
 
     ) || exit 1
 
-    # Export and cd to a new dir
-    bzr export "$INSTALLDIR/src"
-
-    cd "$INSTALLDIR/src"
-
-    make clean all
+    make -f Makefile-pxc all
 
     if grep builtin <<< "$STAG";then 
         # builtin
@@ -238,8 +238,6 @@ fi
     else 
         SSL_OPT='-DWITH_SSL=system -DWITH_ZLIB=system'
     fi
-
-    cd "$PRODUCT"
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
         $DEBUG_EXTNAME \
@@ -249,7 +247,7 @@ fi
          $SSL_OPT \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
         -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-        -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$PERCONA_SERVER_VERSION" \
+        -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
         -DWITH_INNODB_DISALLOW_WRITES=ON \
         -DWITH_WSREP=ON \
         -DCOMPILATION_COMMENT="$COMMENT" \
@@ -258,7 +256,7 @@ fi
         $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
     make $MAKE_JFLAG $QUIET
-    make DESTDIR="$INSTALLDIR" install
+    make DESTDIR="$WORKDIR" install
 
     # Build UDF
     (
@@ -267,14 +265,14 @@ fi
         CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/include" \
             --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install
+        make DESTDIR="$WORKDIR" install
 
     )
 
     (
        echo "Packaging the test files"
-       # mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL
-       cp -R percona-xtradb-cluster-tests $INSTALLDIR/usr/local/$PRODUCT_FULL/
+       # mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL
+       cp -R percona-xtradb-cluster-tests $WORKDIR/usr/local/$PRODUCT_FULL/
     )
 
     # Build jemalloc
@@ -286,10 +284,10 @@ fi
         CFLAGS= ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL/" \
             --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install_lib_shared
+        make DESTDIR="$WORKDIR" install_lib_shared
         strip lib/libjemalloc* || true
         # Copy COPYING file
-        cp COPYING "$INSTALLDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
+        cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
     )
     fi
@@ -298,13 +296,10 @@ fi
 
 # Package the archive
 (
-    cd "$INSTALLDIR/usr/local/"
+    cd "$WORKDIR/usr/local/"
 
-    $TAR czf "$WORKDIR_ABS/$PRODUCT_FULL.tar.gz" \
+    $TAR czf "$WORKDIR/$PRODUCT_FULL.tar.gz" \
         --owner=0 --group=0 "$PRODUCT_FULL/"
     
 )
-
-# Clean up
-rm -rf "$INSTALLDIR"
 

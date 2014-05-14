@@ -26,12 +26,10 @@ Prefix: %{_sysconfdir}
 %define mysql_vendor            Oracle and/or its affiliates
 %define percona_server_vendor	Percona, Inc
 
-%define mysql_version   5.6.15
+%define mysql_version @@MYSQL_VERSION@@
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
-%define majorversion 63
-%define minorversion 0
+%define percona_server_version @@PERCONA_VERSION@@
 %define distribution  rhel%{redhatversion}
-%define percona_server_version	%{wsrep_version}
 
 %define mysqld_user     mysql
 %define mysqld_group    mysql
@@ -44,7 +42,11 @@ Prefix: %{_sysconfdir}
 %endif
 
 %define release_tag	%{nil}
-%define release         %{release_tag}%{wsrep_version}.%{gotrevision}.%{distribution}
+%if %{undefined dist}
+    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{distribution}
+%else
+    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{dist}
+%endif
 
 #
 # Macros we use which are not available in all supported versions of RPM
@@ -94,7 +96,7 @@ Prefix: %{_sysconfdir}
 %if %{undefined src_base}
 %define src_base Percona-XtraDB-Cluster
 %endif
-%define src_dir %{src_base}-%{mysql_version}
+%define src_dir %{src_base}-%{mysql_version}-%{percona_server_version}
 
 # ----------------------------------------------------------------------------
 # Feature set (storage engines, options).  Default to community (everything)
@@ -107,10 +109,10 @@ Prefix: %{_sysconfdir}
 # Server comment strings
 # ----------------------------------------------------------------------------
 %if %{undefined compilation_comment_debug}
-%define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release %{percona_server_version}, Revision %{gotrevision}
+    %define compilation_comment_debug       Percona XtraDB Cluster - Debug (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 %if %{undefined compilation_comment_release}
-%define compilation_comment_release     Percona XtraDB Cluster (GPL), Release %{percona_server_version}, Revision %{gotrevision}
+    %define compilation_comment_release     Percona XtraDB Cluster (GPL), Release rel%{percona_server_version}, Revision %{revision}, WSREP version %{wsrep_version}
 %endif
 
 
@@ -143,13 +145,13 @@ Prefix: %{_sysconfdir}
     %if "%oelver" == "4"
       %define distro_description        Oracle Enterprise Linux 4
       %define distro_releasetag         oel4
-      %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake
+      %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
       %define distro_requires           chkconfig coreutils grep procps shadow-utils
     %else
       %if "%oelver" == "5"
         %define distro_description      Oracle Enterprise Linux 5
         %define distro_releasetag       oel5
-        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake
+        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
         %define distro_requires         chkconfig coreutils grep procps shadow-utils
       %else
         %{error:Oracle Enterprise Linux %{oelver} is unsupported}
@@ -161,13 +163,13 @@ Prefix: %{_sysconfdir}
       %if "%rhelver" == "4"
         %define distro_description      Red Hat Enterprise Linux 4
         %define distro_releasetag       rhel4
-        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake
+        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
         %define distro_requires         chkconfig coreutils grep procps shadow-utils
       %else
         %if "%rhelver" == "5"
           %define distro_description    Red Hat Enterprise Linux 5
           %define distro_releasetag     rhel5
-          %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake
+          %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
           %define distro_requires       chkconfig coreutils grep procps shadow-utils
         %else
           %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
@@ -179,13 +181,13 @@ Prefix: %{_sysconfdir}
         %if "%susever" == "10"
           %define distro_description    SUSE Linux Enterprise Server 10
           %define distro_releasetag     sles10
-          %define distro_buildreq       gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client readline-devel zlib-devel libaio-devel bison < 3 cmake
+          %define distro_buildreq       gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client readline-devel zlib-devel libaio-devel bison cmake redhat-lsb
           %define distro_requires       aaa_base coreutils grep procps pwdutils
         %else
           %if "%susever" == "11"
             %define distro_description  SUSE Linux Enterprise Server 11
             %define distro_releasetag   sles11
-            %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils readline-devel zlib-devel libaio-devel bison < 3 cmake
+            %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils readline-devel zlib-devel libaio-devel bison cmake redhat-lsb
             %define distro_requires     aaa_base coreutils grep procps pwdutils
           %else
             %{error:SuSE %{susever} is unsupported}
@@ -200,7 +202,7 @@ Prefix: %{_sysconfdir}
   %define generic_kernel %(uname -r | cut -d. -f1-2)
   %define distro_description            Generic Linux (kernel %{generic_kernel})
   %define distro_releasetag             linux%{generic_kernel}
-  %define distro_buildreq               gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison < 3 cmake
+  %define distro_buildreq               gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake redhat-lsb
   %define distro_requires               coreutils grep procps /sbin/chkconfig /usr/sbin/useradd /usr/sbin/groupadd
 %endif
 
@@ -230,17 +232,14 @@ Prefix: %{_sysconfdir}
 ##############################################################################
 
 Name:           Percona-XtraDB-Cluster%{product_suffix}
-Summary:        A High Availability solution based in Percona Server
+Summary:        A High Availability solution based on Percona Server and Galera
 Group:          Applications/Databases
 Version:        %{mysql_version}
 Release:        %{release}
 Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
-Source:         http://www.percona.com/downloads/Percona-XtraDB-Cluster-5.6/LATEST/source/Percona-XtraDB-Cluster-%{mysql_version}.tar.gz
-#TODO
-Patch1:         mysql-dubious-exports.patch
-#TODO
+Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz 
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -272,8 +271,7 @@ This is a meta-package which installs server, client and galera-3.
 %package -n Percona-XtraDB-Cluster-full%{product_suffix}
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
-Conflicts:    Percona-XtraDB-Cluster-full-55 Percona-XtraDB-Cluster-55
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-garbd-3 Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
 
 %description -n Percona-XtraDB-Cluster-full%{product_suffix}
 This is a meta-package which provides the full suite of Percona XtraDB
@@ -283,7 +281,7 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.6 socat rsync iproute perl perl-DBI perl-DBD-MySQL
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.6 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
@@ -380,7 +378,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 %package -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
-Provides:       mysql-shared
+Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
@@ -409,13 +407,14 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 # Be strict about variables, bail at earliest opportunity, etc.
 set -uex
 
+
 BuildUDF() {
     cd UDF
     CXX="${UDF_CXX:-g++}"\
         CXXFLAGS="$CXXFLAGS -I$RPM_BUILD_DIR/%{src_dir}/release/include" \
         ./configure --includedir=$RPM_BUILD_DIR/%{src_dir}/include \
         --libdir=%{_libdir}/mysql/plugin
-    make ${MAKE_JFLAG} all
+    make %{?_smp_mflags} all
     cd -
 }
 
@@ -485,6 +484,8 @@ mkdir debug
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
@@ -493,7 +494,7 @@ mkdir debug
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
 	   -DWITH_PAM=ON
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
-  make ${MAKE_JFLAG}
+  make %{?_smp_mflags}
 )
 # Build full release
 mkdir release
@@ -508,6 +509,8 @@ mkdir release
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
+           -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
@@ -516,7 +519,7 @@ mkdir release
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
-  make ${MAKE_JFLAG}
+  make %{?_smp_mflags}
   cd ../
   d="`pwd`"
   BuildUDF
@@ -579,7 +582,7 @@ mv $RPM_BUILD_DIR/%{_libdir} $RBR%{_libdir}
 install -d $RBR%{_sysconfdir}/{logrotate.d,init.d}
 install -d $RBR%{mysqldatadir}/mysql
 install -d $RBR%{_datadir}/mysql-test
-install -d $RBR%{_datadir}/mysql/SELinux/RHEL4
+install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 install -d $RBR%{_includedir}
 install -d $RBR%{_libdir}
 install -d $RBR%{_mandir}
@@ -590,6 +593,9 @@ install -d $RBR%{_libdir}/mysql/plugin
   cd $MBD/release
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   d="`pwd`"
+  cd $MBD/storage/HandlerSocket-Plugin-for-MySQL
+  make DESTDIR=$RBR benchdir_root=%{_datadir} install
+  cd "$d"
   cd $MBD/UDF
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   cd "$d"
@@ -604,7 +610,7 @@ install -d $RBR%{_libdir}/mysql/plugin
 # FIXME: at some point we should stop doing this and just install everything
 # FIXME: directly into %{_libdir}/mysql - perhaps at the same time as renaming
 # FIXME: the shared libraries to use libmysql*-$major.$minor.so syntax
-mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
+#mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
 
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
@@ -630,7 +636,7 @@ ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 # Install SELinux files in datadir
 install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
-  $RBR%{_datadir}/mysql/SELinux/RHEL4
+  $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 
 %if %{WITH_TCMALLOC}
 # Even though this is a shared library, put it under /usr/lib*/mysql, so it
@@ -665,7 +671,7 @@ fi
 # Check if we can safely upgrade.  An upgrade is only safe if it's from one
 # of our RPMs in the same version family.
 
-installed=`rpm -qf $(which mysqld) 2> /dev/null`
+installed=`rpm -qf $(which mysqld 2>/dev/null) 2> /dev/null`
 if [ $? -eq 0 -a -n "$installed" ]; then
   vendor=`rpm -q --queryformat='%{VENDOR}' "$installed" 2>&1`
   version=`rpm -q --queryformat='%{VERSION}' "$installed" 2>&1`
@@ -873,6 +879,19 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
         %{_bindir}/mysql_install_db --rpm --user=%{mysqld_user} \
             --datadir=$mysql_datadir
     fi
+fi
+
+# ----------------------------------------------------------------------
+# Make MySQL start/shutdown automatically when the machine does it.
+# ----------------------------------------------------------------------
+# NOTE: This still needs to be debated. Should we check whether these links
+# for the other run levels exist(ed) before the upgrade?
+# use chkconfig on Enterprise Linux and newer SuSE releases
+if [ -x /sbin/chkconfig ] ; then
+        /sbin/chkconfig --add mysql
+# use insserv for older SuSE Linux versions
+elif [ -x /sbin/insserv ] ; then
+        /sbin/insserv %{_sysconfdir}/init.d/mysql
 fi
 
 # ----------------------------------------------------------------------
@@ -1149,6 +1168,14 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_libdir}/mysql/plugin/*.so*
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
 
+%if "%rhel" == "5"
+    %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
+%endif
+
+%if "%rhel" == "6"
+    %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
+%endif 
+
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
 %endif
@@ -1203,9 +1230,9 @@ echo "====="                                     >> $STATUS_HISTORY
 %dir %attr(755, root, root) %{_libdir}/mysql
 %{_includedir}/mysql/*
 %{_datadir}/aclocal/mysql.m4
-%{_libdir}/mysql/libmysqlclient.a
-%{_libdir}/mysql/libmysqlclient_r.a
-%{_libdir}/mysql/libmysqlservices.a
+%{_libdir}/libmysqlclient.a
+%{_libdir}/libmysqlclient_r.a
+%{_libdir}/libmysqlservices.a
 %{_libdir}/*.so
 
 # Maatkit UDF libs
@@ -1248,6 +1275,10 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Fri Apr 25 2014 Tomislav Plavcic <tomislav.plavcic@percona.com>
+
+- Added Audit Log and Scalability Metrics plugin binaries
+
 * Thu Feb 10 2011 Ignacio Nin <ignacio.nin@percona.com>
 
 - Removed lines which prevented -debuginfo packages from being built.

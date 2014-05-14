@@ -47,7 +47,7 @@ case "$1" in
 esac
 
 #
-# - Do NOT purge logs or data if another percona-server-server* package is installed (#307473)
+# - Do NOT purge logs or data if another percona-xtradb-cluster-server* package is installed (#307473)
 # - Remove the mysql user only after all his owned files are purged.
 #   
 if [ "$1" = "purge" -a ! \( -x /usr/sbin/mysqld -o -L /usr/sbin/mysqld \) ]; then
@@ -55,9 +55,9 @@ if [ "$1" = "purge" -a ! \( -x /usr/sbin/mysqld -o -L /usr/sbin/mysqld \) ]; the
   rm -f /var/log/mysql.{log,err}{,.0,.[1234567].gz}
   rm -rf /var/log/mysql
 
-  db_input high percona-server-server-5.6/postrm_remove_databases || true
+  db_input high percona-xtradb-cluster-server-5.6/postrm_remove_databases || true
   db_go || true
-  db_get percona-server-server-5.6/postrm_remove_databases || true
+  db_get percona-xtradb-cluster-server-5.6/postrm_remove_databases || true
   if [ "$RET" = "true" ]; then
     # never remove the debian.cnf when the databases are still existing
     # else we ran into big trouble on the next install!
