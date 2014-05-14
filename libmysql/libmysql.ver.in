@@ -1,1 +1,1 @@
-libperconaserverclient_@SHARED_LIB_MAJOR_VERSION@ { global: *; };
+libmysqlclient_@SHARED_LIB_MAJOR_VERSION@ { global: *; };

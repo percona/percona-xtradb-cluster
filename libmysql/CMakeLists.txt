@@ -179,13 +179,13 @@ IF(WIN32)
   LIST(APPEND LIBS auth_win_client)
 ENDIF()
 
-# Merge several convenience libraries into one big perconaserverclient
-MERGE_LIBRARIES(perconaserverclient STATIC ${LIBS} COMPONENT Development)
+# Merge several convenience libraries into one big mysqlclient
+MERGE_LIBRARIES(mysqlclient STATIC ${LIBS} COMPONENT Development)
 
 # Visual Studio users need debug  static library for debug projects
 INSTALL_DEBUG_SYMBOLS(clientlib)
 IF(MSVC)
- INSTALL_DEBUG_TARGET(perconaserverclient DESTINATION ${INSTALL_LIBDIR}/debug)
+ INSTALL_DEBUG_TARGET(mysqlclient DESTINATION ${INSTALL_LIBDIR}/debug)
  INSTALL_DEBUG_TARGET(clientlib DESTINATION ${INSTALL_LIBDIR}/debug)
 ENDIF()
 
@@ -210,14 +210,14 @@ IF(UNIX)
 ENDIF()
 
 IF(UNIX)
-  GET_TARGET_NAME(perconaserverclient lib_name)
-  INSTALL_SYMLINK(perconaserverclient
-    ${lib_name} ${CMAKE_STATIC_LIBRARY_PREFIX}perconaserverclient_r.a
+  GET_TARGET_NAME(mysqlclient lib_name)
+  INSTALL_SYMLINK(mysqlclient
+    ${lib_name} ${CMAKE_STATIC_LIBRARY_PREFIX}mysqlclient_r.a
     ${INSTALL_LIBDIR} Development)
 ENDIF()
 
 IF(NOT DISABLE_SHARED)
-  # Merge several convenience libraries into one big perconaserverclient
+  # Merge several convenience libraries into one big mysqlclient
   # and link them together into shared library.
   MERGE_LIBRARIES(libmysql SHARED ${LIBS}
     EXPORTS ${CLIENT_API_FUNCTIONS}
@@ -230,9 +230,9 @@ IF(NOT DISABLE_SHARED)
       SET(OS_SHARED_LIB_VERSION
         "${SHARED_LIB_MAJOR_VERSION}.${SHARED_LIB_MINOR_VERSION}.0")
     ENDIF()
-    # Name of shared library is perconaserverclient on Unix
+    # Name of shared library is mysqlclient on Unix
     SET_TARGET_PROPERTIES(libmysql PROPERTIES 
-      OUTPUT_NAME perconaserverclient 
+      OUTPUT_NAME mysqlclient 
       VERSION "${OS_SHARED_LIB_VERSION}" 
       SOVERSION "${SHARED_LIB_MAJOR_VERSION}")
     CONFIGURE_FILE(libmysql.ver.in ${CMAKE_CURRENT_BINARY_DIR}/libmysql.ver)
@@ -249,13 +249,13 @@ IF(NOT DISABLE_SHARED)
         PROPERTIES LINK_FLAGS "${libmysql_link_flags}")
     ENDIF() 
     # clean direct output needs to be set several targets have the same name
-    #(perconaserverclient in this case)
-    SET_TARGET_PROPERTIES(perconaserverclient PROPERTIES CLEAN_DIRECT_OUTPUT 1)
+    #(mysqlclient in this case)
+    SET_TARGET_PROPERTIES(mysqlclient PROPERTIES CLEAN_DIRECT_OUTPUT 1)
     SET_TARGET_PROPERTIES(libmysql PROPERTIES CLEAN_DIRECT_OUTPUT 1)
 
-    # Install links to libperconaserverclient.so (client_r)
+    # Install links to libmysqlclient.so (client_r)
     GET_VERSIONED_LIBNAME(
-      "${CMAKE_SHARED_LIBRARY_PREFIX}perconaserverclient_r"
+      "${CMAKE_SHARED_LIBRARY_PREFIX}mysqlclient_r"
       "${CMAKE_SHARED_LIBRARY_SUFFIX}"
       ""
       linkname)
@@ -269,7 +269,7 @@ IF(NOT DISABLE_SHARED)
     LIST(REMOVE_DUPLICATES OS_SHARED_LIB_SYMLINKS)
     FOREACH(ver ${OS_SHARED_LIB_SYMLINKS})
       GET_VERSIONED_LIBNAME(
-        "${CMAKE_SHARED_LIBRARY_PREFIX}perconaserverclient_r"
+        "${CMAKE_SHARED_LIBRARY_PREFIX}mysqlclient_r"
         "${CMAKE_SHARED_LIBRARY_SUFFIX}"
         "${ver}"
         linkname)
