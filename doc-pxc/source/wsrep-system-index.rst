@@ -143,6 +143,16 @@ This variable defines a binlog format that will be always be effective regardles
   * MIXED
   * NONE - This option resets the forced state of the binlog format
 
+.. variable:: wsrep_load_data_splitting
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ON 
+
+This variable controls whether ``LOAD DATA`` transaction splitting is wanted or not.
+
 .. variable:: wsrep_log_conflicts
 
    :cli: Yes
