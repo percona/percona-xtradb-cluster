@@ -60,5 +60,5 @@ usr/share/man/man1/mysqlman.1
 usr/share/man/man8/mysqld.8
 usr/share/mysql
 etc/xinetd.d/mysqlchk
-debian/additions/debian-start etc/mysql/
-debian/additions/debian-start.inc.sh usr/share/mysql
+etc/mysql/debian-start
+usr/share/mysql/debian-start.inc.sh
