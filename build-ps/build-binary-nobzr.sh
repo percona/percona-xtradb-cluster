@@ -101,10 +101,10 @@ else
 
 fi
 
-WORKDIR_ABS="$(cd "$WORKDIR"; pwd)"
+WORKDIR="$(cd "$WORKDIR"; pwd)"
 
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
-test -e "$SOURCEDIR/Makefile" || exit 2
+test -e "$SOURCEDIR/Makefile-pxc" || exit 2
 
 # Test for the galera sources
 if [[ $COPYGALERA -eq 0 ]] && ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
@@ -122,15 +122,15 @@ else
 fi
 
 # Extract version from the Makefile
-MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile" \
+MYSQL_VERSION="$(grep ^MYSQL_VERSION= "$SOURCEDIR/Makefile-pxc" \
     | cut -d = -f 2)"
 RELEASE_TAG=''
 PERCONA_SERVER_VERSION="$(grep ^PERCONA_SERVER_VERSION= \
-    "$SOURCEDIR/Makefile" | cut -d = -f 2)"
+    "$SOURCEDIR/Makefile-pxc" | cut -d = -f 2)"
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION \
-    "$SOURCEDIR/Percona-Server/wsrep/wsrep_api.h" |
+    "$SOURCEDIR/wsrep/wsrep_api.h" |
     cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION' \
-    "$SOURCEDIR/Percona-Server/cmake/wsrep.cmake" | cut -d '"' -f2)"
+    "$SOURCEDIR/cmake/wsrep.cmake" | cut -d '"' -f2)"
 PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION"
 
 # Build information
@@ -159,9 +159,6 @@ export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 export WSREP_REV="$WSREP_REV"
 
-# Create a temporary working directory
-INSTALLDIR="$WORKDIR_ABS/percona-build"   # Make it absolute
-
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
 then
@@ -188,23 +185,22 @@ fi
         cd "percona-xtradb-cluster-galera"
         scons --config=force boost_pool=0 revno="$GALERA_REVISION" $MAKE_JFLAG \
               garb/garbd libgalera_smm.so
-        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-        cp garb/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
-        cp libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
+        cp garb/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
+        cp libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
     else 
-        mkdir -p "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
-        cp $WORKDIR_ABS/garbd "$INSTALLDIR/usr/local/$PRODUCT_FULL/bin"
-        cp $WORKDIR_ABS/libgalera_smm.so "$INSTALLDIR/usr/local/$PRODUCT_FULL/lib"
+        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
+             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
+        cp $WORKDIR/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
+        cp $WORKDIR/libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
     fi
 
     ) || exit 1
 
 
-    make clean all
+    #make -f Makefile-pxc all
 
-    cd "$PRODUCT"
     cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
         $DEBUG_EXTNAME \
@@ -222,22 +218,13 @@ fi
         -DWITH_PAM=ON
 
     make $MAKE_JFLAG $QUIET
-    make DESTDIR="$INSTALLDIR" install
+    make DESTDIR="$WORKDIR" install
 
-    # Build UDF
-    (
-        cd "UDF"
-        CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/Percona-Server/include" \
-            --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
-        make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install
-
-    )
 
     (
        echo "Packaging the test files"
-       # mkdir -p $INSTALLDIR/usr/local/$PRODUCT_FULL
-       cp -R percona-xtradb-cluster-tests $INSTALLDIR/usr/local/$PRODUCT_FULL/
+       # mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL
+       cp -R percona-xtradb-cluster-tests $WORKDIR/usr/local/$PRODUCT_FULL/
     )
 
     # Build jemalloc
@@ -249,10 +236,10 @@ fi
         ./configure --prefix="/usr/local/$PRODUCT_FULL/" \
                 --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
-        make DESTDIR="$INSTALLDIR" install_lib_shared
+        make DESTDIR="$WORKDIR" install_lib_shared
 
         # Copy COPYING file
-        cp COPYING "$INSTALLDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
+        cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
     )
     fi
@@ -261,13 +248,9 @@ fi
 
 # Package the archive
 (
-    cd "$INSTALLDIR/usr/local/"
+    cd "$WORKDIR/usr/local/"
 
-    $TAR czf "$WORKDIR_ABS/$PRODUCT_FULL.tar.gz" \
+    $TAR czf "$WORKDIR/$PRODUCT_FULL.tar.gz" \
         --owner=0 --group=0 "$PRODUCT_FULL/"
     
 )
-
-# Clean up
-rm -rf "$INSTALLDIR"
-
