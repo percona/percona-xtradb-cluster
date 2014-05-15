@@ -26,17 +26,17 @@ DEB_UPSTREAM_VERSION ?= $(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/-[^-]*$$//'
 DEB_UPSTREAM_VERSION_MAJOR_MINOR := $(shell echo $(DEB_UPSTREAM_VERSION) | sed -r -n 's/^([0-9]+\.[0-9]+).*/\1/p')
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.5.tar.gz
+EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.6.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -sc)
 
-major_version=35
+major_version=65
 minor_version=0
-wsrep_version="25.10"
+wsrep_version="25.5"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(wsrep_version)"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release $(wsrep_version)"
-server_suffix="-55"
+server_suffix="-56"
 prefix=/usr
 
 MYSQL_SRC = $(shell pwd)
@@ -68,6 +68,8 @@ configure-stamp:
 ifneq ($(ARCH_OS),hurd)
 	if [ ! -d /proc/self ]; then echo "/proc IS NEEDED" 1>&2; exit 1; fi 
 endif
+
+	[ ! -d python-for-subunit2junitxml ] || rm -rf python-for-subunit2junitxml
 
 ifeq ($(SKIP_DEBUG_BINARY),)
 	( test -d $(builddebug) || mkdir $(builddebug) ) && cd $(builddebug) && \
@@ -245,7 +247,6 @@ install: build
 	#FIXME install -m 0755 debian/additions/innotop/innotop $(TMP)/usr/bin/
 	#FIXME install -m 0644 debian/additions/innotop/innotop.1 $(TMP)/usr/share/man/man1/
 
-	# mysql-5.5-testsuite
 	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 	cp -rp $(TMP)/usr/share/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 
@@ -264,7 +265,7 @@ install: build
 	# install AppArmor profile
 	# FIXME install -D -m 644 debian/apparmor-profile $(TMP)/etc/apparmor.d/usr.sbin.mysqld
 	# install Apport hook
-	# FIXME install -D -m 644 debian/mysql-server-5.5.py $(TMP)/usr/share/apport/package-hooks/source_mysql-5.6.py
+	# FIXME install -D -m 644 debian/mysql-server-5.6.py $(TMP)/usr/share/apport/package-hooks/source_mysql-5.6.py
 
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
@@ -318,12 +319,10 @@ binary-arch: build install
 	dh_link -a	# .so muss nach .so.1.2.3 installier werden!
 	dh_compress -a
 	dh_fixperms -a
-	#dh_makeshlibs -a
-	dh_makeshlibs -plibmysqlclient18 -V'libmysqlclient18 (>= 5.5.13-1)'
+	dh_makeshlibs -a
 	dh_installdeb -a
 	dh_perl -a
 	#dh_shlibdeps -a -l debian/libmysqlclient16/usr/lib -L libmysqlclient16
-	dh_makeshlibs -a
 	dh_shlibdeps -a
 	dh_gencontrol -a
 	dh_md5sums -a
