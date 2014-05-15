@@ -398,9 +398,6 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 ##############################################################################
 %prep
 %setup -n %{src_dir}
-#TODO
-%patch1 -p1 
-#TODO
 ##############################################################################
 %build
 
