@@ -35,6 +35,7 @@ Package: libperconaserverclient18.1
 Section: libs
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
+Provides: libmysqlclient18.1
 Replaces: libpercona-server-client16, libperconaserverclient18
 Description: Percona XtraDB Cluster database client library
  Percona XtraDB Cluster is based on the Percona Server database
@@ -111,6 +112,7 @@ Breaks: mysql-client-5.0,
         percona-xtradb-client-5.0,
         percona-server-client-5.1,
         percona-server-client-5.5,
+        percona-xtradb-cluster-client-5.5,
         mariadb-client,
         mariadb-client-core-5.5,
         mariadb-client-5.5,
@@ -125,6 +127,7 @@ Replaces: mysql-client-5.0,
            percona-xtradb-client-5.0,
            percona-server-client-5.1,
            percona-server-client-5.5,
+           percona-xtradb-cluster-client-5.5,
            mariadb-client,
            mariadb-client-core-5.5,
            mariadb-client-5.5,
@@ -172,6 +175,7 @@ Breaks: mysql-server-5.0,
         percona-xtradb-server-5.0,
         percona-server-server-5.1,
         percona-server-server-5.5,
+        percona-xtradb-cluster-server-5.5,
         mariadb-server,
         mariadb-server-core-5.5,
         mariadb-server-5.5,
@@ -185,6 +189,7 @@ Replaces: mysql-server-5.0,
           percona-xtradb-server-5.0,
           percona-server-server-5.1,
           percona-server-server-5.5,
+          percona-xtradb-cluster-server-5.5,
           mariadb-server,
           mariadb-server-core-5.5,
           mariadb-server-5.5,
