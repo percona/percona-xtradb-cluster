@@ -577,7 +577,7 @@ elsif ( $opt->{basedir} )
                     find_in_basedir($opt,"file","mysqld-nt",
                                   "bin");  # ,"sql"
   $pkgdatadir     = find_in_basedir($opt,"dir","fill_help_tables.sql",
-                                    "share","share/percona-server","share/mysql");  # ,"scripts"
+                                    "share","share/percona-xtradb-cluster","share/mysql");  # ,"scripts"
   $scriptdir      = "$opt->{basedir}/scripts";
 }
 else
@@ -936,15 +936,15 @@ else
         "Try 'mysqld --help' if you have problems with paths. Using --log",
         "gives you a log in $opt->{ldata} that may be helpful.",
         "",
-        "The latest information about Percona Server is available on the web at",
-        "  http://www.percona.com/software/percona-server",
+        "The latest information about Percona XtraDB Cluster is available on the web at",
+        "  http://www.percona.com/software/percona-xtradb-cluster",
 	"",
         "Please consult the MySQL manual section: 'Problems running mysql_install_db',",
         "and the manual section that describes problems on your OS.",
         "Another information source is the MySQL email archive.",
         "",
         "Please check all of the above before submitting a bug report at",
-        "  https://bugs.launchpad.net/percona-server/+filebug")
+        "  https://bugs.launchpad.net/percona-xtradb-cluster/+filebug")
 }
 
 ##############################################################################

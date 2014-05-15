@@ -269,16 +269,16 @@ then
     cannot_find_file mysqld $basedir/libexec $basedir/sbin $basedir/bin
     exit 1
   fi
-  langdir=`find_in_basedir --dir errmsg.sys share/english share/percona-server/english share/mysql/english`
+  langdir=`find_in_basedir --dir errmsg.sys share/english share/percona-xtradb-cluster/english share/mysql/english`
   if test -z "$langdir"
   then
-    cannot_find_file errmsg.sys $basedir/share/english $basedir/share/percona-server/english $basedir/share/mysql/english
+    cannot_find_file errmsg.sys $basedir/share/english $basedir/share/percona-xtradb-cluster/english $basedir/share/mysql/english
     exit 1
   fi
-  pkgdatadir=`find_in_basedir --dir fill_help_tables.sql share share/percona-server share/mysql`
+  pkgdatadir=`find_in_basedir --dir fill_help_tables.sql share share/percona-xtradb-cluster share/mysql`
   if test -z "$pkgdatadir"
   then
-    cannot_find_file fill_help_tables.sql $basedir/share $basedir/share/percona-server $basedir/share/mysql
+    cannot_find_file fill_help_tables.sql $basedir/share $basedir/share/percona-xtradb-cluster $basedir/share/mysql
     exit 1
   fi
   scriptdir="$basedir/scripts"
@@ -427,7 +427,7 @@ else
   echo "MySQL email archives available at http://lists.mysql.com/."
   echo
   echo "Please check all of the above before submitting a bug report at"
-  echo "  https://bugs.launchpad.net/percona-server/+filebug"
+  echo "  https://bugs.launchpad.net/percona-xtradb-cluster/+filebug"
   echo
   exit 1
 fi
@@ -479,7 +479,7 @@ then
 
   echo
   echo "Please report any problems at"
-  echo "  https://bugs.launchpad.net/percona-server/+filebug"
+  echo "  https://bugs.launchpad.net/percona-xtradb-cluster/+filebug"
   echo
   echo "Percona recommends that all production deployments be protected with a support"
   echo "contract (http://www.percona.com/mysql-suppport/) to ensure the highest uptime,"
