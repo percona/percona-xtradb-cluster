@@ -435,7 +435,9 @@ touch optional-files-devel
 %if "%{_arch}" == "ia64"
 RPM_OPT_FLAGS=
 %endif
-
+#
+RPM_OPT_FLAGS=$(echo ${RPM_OPT_FLAGS} | sed -e 's|-march=i386|-march=i686|g')
+#
 export PATH=${MYSQL_BUILD_PATH:-$PATH}
 export CC=${MYSQL_BUILD_CC:-${CC:-gcc}}
 export CXX=${MYSQL_BUILD_CXX:-${CXX:-g++}}
@@ -526,19 +528,12 @@ mkdir release
 # For the debuginfo extraction stage, some source files are not located in the release
 # and debug dirs, but in the source dir. Make a link there to avoid errors in the
 # strip phase.
-for d in debug release
+for f in lexyy.c pars0grm.c pars0grm.y pars0lex.l
 do
-    for f in pars/lexyy.cc pars/pars0grm.cc pars/pars0grm.y pars/pars0lex.l \
-        fts/fts0pars.cc fts/fts0pars.y fts/fts0blex.l fts/fts0blex.cc \
-        include/fts0pars.h fts/fts0tlex.cc fts/fts0tlex.l
+    for d in debug release
     do
-        ln -s "../../../%{src_dir}/storage/innobase/$f" "$d/storage/innobase/"
+        ln -s "../../../%{src_dir}/storage/innobase/pars/$f" "$d/storage/innobase/"
     done
-    mkdir -p "$d/storage/include/"
-    ln -s "../../../%{src_dir}/storage/innobase/include/fts0tlex.h" \
-            "$d/storage/include/"
-    ln -s "../../../%{src_dir}/storage/innobase/include/fts0blex.h" \
-            "$d/storage/include/"
 done
 
 # Use the build root for temporary storage of the shared libraries.
@@ -1177,8 +1172,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
-
-%attr(755, root, root) %{_datadir}/mysql/
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}
