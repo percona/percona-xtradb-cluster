@@ -2165,12 +2165,15 @@ lock_rec_enqueue_waiting(
 	/* Enqueue the lock request that will wait to be granted */
 
 #ifdef WITH_WSREP
-	if (trx->lock.was_chosen_as_deadlock_victim) {
+	if (wsrep_on(trx->mysql_thd) &&
+	        trx->lock.was_chosen_as_deadlock_victim) {
 		return(DB_DEADLOCK);
 	}
-	lock = lock_table_create(c_lock, table, mode | LOCK_WAIT, trx);
+        lock = lock_rec_create(c_lock, thr,
+                type_mode | LOCK_WAIT, block, heap_no, index, trx, TRUE);
 #else
-	lock = lock_table_create(table, mode | LOCK_WAIT, trx);
+	lock = lock_rec_create(
+		type_mode | LOCK_WAIT, block, heap_no, index, trx, TRUE);
 #endif
 
 	/* Release the mutex to obey the latching order.
@@ -2514,8 +2517,16 @@ lock_rec_lock_slow(
 		have a lock strong enough already granted on the
 		record, we have to wait. */
 
+#ifdef WITH_WSREP
+		/* c_lock is NULL here if jump to enqueue_waiting happened
+		but it's ok because lock is not NULL in that case and c_lock
+		is not used. */
+		err = lock_rec_enqueue_waiting(c_lock,
+			mode, block, heap_no, index, thr);
+#else
 		err = lock_rec_enqueue_waiting(
 			mode, block, heap_no, index, thr);
+#endif /* WITH_WSREP */
 	} else if (!impl) {
 		/* Set the requested lock on the record, note that
 		we already own the transaction mutex. */
@@ -6391,7 +6402,7 @@ lock_rec_insert_check_and_lock(
 #ifdef WITH_WSREP
 		err = lock_rec_enqueue_waiting(c_lock,
 			LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION,
-			block, next_rec_heap_no, NULL, index, thr);
+			block, next_rec_heap_no, index, thr);
 #else
 		err = lock_rec_enqueue_waiting(
 			LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION,
