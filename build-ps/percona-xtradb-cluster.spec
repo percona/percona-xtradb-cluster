@@ -590,9 +590,6 @@ install -d $RBR%{_libdir}/mysql/plugin
   cd $MBD/release
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   d="`pwd`"
-  cd $MBD/storage/HandlerSocket-Plugin-for-MySQL
-  make DESTDIR=$RBR benchdir_root=%{_datadir} install
-  cd "$d"
   cd $MBD/UDF
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
   cd "$d"
