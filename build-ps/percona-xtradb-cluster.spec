@@ -355,7 +355,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Development header files and libraries
 Group:          Applications/Databases
 Provides:       mysql-devel
-Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55
+Conflicts:      Percona-SQL-devel-50 Percona-Server-devel-51 Percona-Server-devel-55 Percona-XtraDB-Cluster-devel-55 mysql
 
 %description -n Percona-XtraDB-Cluster-devel%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
