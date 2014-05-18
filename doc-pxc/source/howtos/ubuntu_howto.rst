@@ -31,11 +31,7 @@ Prerequisites
 Installation
 ------------
 
-Percona repository should be set up as described in the :ref:`apt-repo` guide. Following command will install |Percona XtraDB Cluster| packages: :: 
-
-  $ apt-get install percona-xtradb-cluster-server-5.5 percona-xtradb-cluster-client-5.5 percona-xtradb-cluster-galera-2.x
-
-When these two commands have been executed successfully on all three nodes |Percona XtraDB Cluster| is installed.
+Installation information can be found in the :ref:`installation` guide.
 
 .. note:: 
 
@@ -83,11 +79,10 @@ Configuration file :file:`/etc/mysql/my.cnf` for the first node should look like
   # Authentication for SST method
   wsrep_sst_auth="sstuser:s3cretPass"
 
-.. note:: For the first member of the cluster variable :variable:`wsrep_cluster_address` should contain empty ``gcomm://`` when the cluster is being bootstrapped. But as soon as we have bootstrapped the cluster and have at least one more node joined that line can be removed from the :file:`my.cnf` configuration file and the one where :variable:`wsrep_cluster_address` contains all three node addresses. In case the node gets restarted and without making this change it will make bootstrap new cluster instead of joining the existing one.
 
 After this, first node can be started with the following command: ::
 
-  [root@pxc1 ~]# /etc/init.d/mysql start
+  [root@pxc1 ~]# /etc/init.d/mysql bootstrap-pxc
  
 This command will start the first node and bootstrap the cluster (more information about bootstrapping cluster can be found in :ref:`bootstrap` manual).
 

@@ -44,7 +44,7 @@ MySQL replication has: Availability and Partitioning tolerance.
 
 Percona XtraDB Cluster has: Consistency and Availability.
 
-That is MySQL replication does not guarantee Consistency of your data, while Percona XtraDB Cluster provides data Consistency. (And yes, Percona XtraDB Cluster looses Partitioning tolerance property).
+That is |MySQL| replication does not guarantee Consistency of your data, while |Percona XtraDB Cluster| provides data Consistency (but it loses Partitioning tolerance property).
 
 Components
 ==========

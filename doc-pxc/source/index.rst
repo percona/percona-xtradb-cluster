@@ -98,6 +98,7 @@ Reference
    release-notes/release-notes_index
    wsrep-status-index
    wsrep-system-index
+   wsrep-provider-index
    wsrep-files-index
    faq
    glossary
