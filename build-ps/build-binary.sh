@@ -258,16 +258,6 @@ fi
     make $MAKE_JFLAG $QUIET
     make DESTDIR="$WORKDIR" install
 
-    # Build UDF
-    (
-        cd "UDF"
-	autoreconf --install
-        CXX=${UDF_CXX:-g++} ./configure --includedir="$SOURCEDIR/include" \
-            --libdir="/usr/local/$PRODUCT_FULL/mysql/plugin"
-        make $MAKE_JFLAG
-        make DESTDIR="$WORKDIR" install
-
-    )
 
     (
        echo "Packaging the test files"

@@ -401,19 +401,6 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 ##############################################################################
 %build
 
-# Be strict about variables, bail at earliest opportunity, etc.
-set -uex
-
-
-BuildUDF() {
-    cd UDF
-    CXX="${UDF_CXX:-g++}"\
-        CXXFLAGS="$CXXFLAGS -I$RPM_BUILD_DIR/%{src_dir}/release/include" \
-        ./configure --includedir=$RPM_BUILD_DIR/%{src_dir}/include \
-        --libdir=%{_libdir}/mysql/plugin
-    make %{?_smp_mflags} all
-    cd -
-}
 
 # Optional package files
 touch optional-files-devel
@@ -519,10 +506,6 @@ mkdir release
            -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
-  cd ../
-  d="`pwd`"
-  BuildUDF
-  cd "$d"
 )
 
 # For the debuginfo extraction stage, some source files are not located in the release
@@ -584,10 +567,6 @@ install -d $RBR%{_libdir}/mysql/plugin
 (
   cd $MBD/release
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
-  d="`pwd`"
-  cd $MBD/UDF
-  make DESTDIR=$RBR benchdir_root=%{_datadir} install
-  cd "$d"
 )
 
 # Install all binaries
@@ -1221,14 +1200,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/libmysqlclient_r.a
 %{_libdir}/libmysqlservices.a
 %{_libdir}/*.so
-
-# Maatkit UDF libs
-%{_libdir}/mysql/plugin/libfnv1a_udf.a
-%{_libdir}/mysql/plugin/libfnv1a_udf.la
-%{_libdir}/mysql/plugin/libfnv_udf.a
-%{_libdir}/mysql/plugin/libfnv_udf.la
-%{_libdir}/mysql/plugin/libmurmur_udf.a
-%{_libdir}/mysql/plugin/libmurmur_udf.la
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
