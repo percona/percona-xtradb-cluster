@@ -2174,7 +2174,7 @@ lock_rec_enqueue_waiting(
 #else
 	lock = lock_rec_create(
 		type_mode | LOCK_WAIT, block, heap_no, index, trx, TRUE);
-#endif
+#endif /* WITH_WSREP */
 
 	/* Release the mutex to obey the latching order.
 	This is safe, because lock_deadlock_check_and_resolve()

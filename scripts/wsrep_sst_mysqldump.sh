@@ -1,15 +1,15 @@
-#!/bin/sh -e
+#!/bin/bash -e
 # Copyright (C) 2009 Codership Oy
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; version 2 of the License.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; see the file COPYING. If not, write to the
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
@@ -61,6 +61,11 @@ then
     exit $EINVAL
 fi
 
+# For Bug:1293798
+if [ -z "$WSREP_SST_OPT_PSWD" -a -n "$WSREP_SST_OPT_AUTH" ]; then
+    WSREP_SST_OPT_USER=$(echo $WSREP_SST_OPT_AUTH | cut -d: -f1)
+    WSREP_SST_OPT_PSWD=$(echo $WSREP_SST_OPT_AUTH | cut -d: -f2)
+fi
 AUTH="-u$WSREP_SST_OPT_USER"
 if test -n "$WSREP_SST_OPT_PSWD"; then AUTH="$AUTH -p$WSREP_SST_OPT_PSWD"; fi
 
@@ -114,10 +119,14 @@ RESET_MASTER="RESET MASTER;"
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
 # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
-    (echo $STOP_WSREP && echo $RESET_MASTER && $MYSQLDUMP \
-    && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
-    && echo $SET_START_POSITION \
-    || echo "SST failed to complete;") | $MYSQL
+    # error is ignored because joiner binlog might be disabled.
+    # and if joiner binlog is disabled, 'RESET MASTER' returns error
+    # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER
+    (echo $STOP_WSREP && echo $RESET_MASTER) | $MYSQL || true
+    (echo $STOP_WSREP && $MYSQLDUMP \
+        && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
+        && echo $SET_START_POSITION \
+        || echo "SST failed to complete;") | $MYSQL
 else
     wsrep_log_info "Bypassing state dump."
     echo $SET_START_POSITION | $MYSQL

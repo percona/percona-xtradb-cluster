@@ -186,6 +186,9 @@ struct fsp_open_info {
 	lsn_t		lsn;		/*!< Flushed LSN from header page */
 	ulint		id;		/*!< Space ID */
 	ulint		flags;		/*!< Tablespace flags */
+#ifdef UNIV_LOG_ARCHIVE
+	ulint		arch_log_no;	/*!< latest archived log file number */
+#endif /* UNIV_LOG_ARCHIVE */
 };
 
 #ifndef UNIV_HOTBACKUP

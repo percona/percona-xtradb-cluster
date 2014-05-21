@@ -3180,7 +3180,9 @@ mysql_execute_command(THD *thd)
   {
     system_status_var old_status_var= thd->status_var;
     thd->initial_status_var= &old_status_var;
-
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd) && wsrep_causal_wait(thd)) goto error;
+#endif /* WITH_WSREP */
     if (!(res= select_precheck(thd, lex, all_tables, first_table)))
       res= execute_sqlcom_select(thd, all_tables);
 

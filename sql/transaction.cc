@@ -699,9 +699,16 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
     For backward-compatibility reasons we always release MDL if binary
     logging is off.
   */
+#ifdef WITH_WSREP
+  bool mdl_can_safely_rollback_to_savepoint=
+                (!((WSREP_EMULATE_BINLOG(thd) ||  mysql_bin_log.is_open()) 
+		   && thd->variables.sql_log_bin) ||
+                 ha_rollback_to_savepoint_can_release_mdl(thd));
+#else
   bool mdl_can_safely_rollback_to_savepoint=
                 (!(mysql_bin_log.is_open() && thd->variables.sql_log_bin) ||
                  ha_rollback_to_savepoint_can_release_mdl(thd));
+#endif /* WITH_WSREP */
 
   if (ha_rollback_to_savepoint(thd, sv))
     res= TRUE;
@@ -710,6 +717,12 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
 
   thd->transaction.savepoints= sv;
 
+  /*
+    Release metadata locks that were acquired during this savepoint unit
+    unless binlogging is on. Releasing locks with binlogging on can break
+    replication as it allows other connections to drop these tables before
+    rollback to savepoint is written to the binlog.
+  */
   if (!res && mdl_can_safely_rollback_to_savepoint)
     thd->mdl_context.rollback_to_savepoint(sv->mdl_savepoint);
 
