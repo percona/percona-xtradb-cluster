@@ -1097,6 +1097,20 @@ Events::load_events_from_db(THD *thd)
       delete et;
       goto end;
     }
+#ifdef WITH_WSREP
+    // when SST from master node who initials event, the event status is ENABLED
+    // this is problematic because there are two nodes with same events and both enabled.
+    if (et->originator != thd->server_id)
+    {
+        store_record(table, record[1]);
+        table->field[ET_FIELD_STATUS]->
+                store((longlong) Event_parse_data::SLAVESIDE_DISABLED,
+                      TRUE);
+        (void) table->file->ha_update_row(table->record[1], table->record[0]);
+        delete et;
+        continue;
+    }
+#endif
     drop_on_completion= (et->on_completion ==
                          Event_parse_data::ON_COMPLETION_DROP);
 
