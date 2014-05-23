@@ -6359,6 +6359,9 @@ alter:
             Lex->event_parse_data->identifier= $4;
 
             Lex->sql_command= SQLCOM_ALTER_EVENT;
+#ifdef WITH_WSREP
+            Lex->stmt_definition_begin= (char*)YYLIP->get_cpp_tok_start();
+#endif
           }
           ev_alter_on_schedule_completion
           opt_ev_rename_to
