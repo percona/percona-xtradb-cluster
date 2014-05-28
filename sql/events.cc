@@ -1167,18 +1167,11 @@ int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len)
 static int
 wsrep_alter_query_string(THD *thd, String *buf)
 {
-  /* Append the "UPDATE" part of the query */
+  /* Append the "ALTER" part of the query */
   if (buf->append(STRING_WITH_LEN("ALTER ")))
     return 1;
   /* Append definer */
   append_definer(thd, buf, &(thd->lex->definer->user), &(thd->lex->definer->host));
-  /* Append EVENT and spname */
-  sp_name* spname = thd->lex->event_parse_data->identifier;
-  if (buf->append(STRING_WITH_LEN("EVENT ")) ||
-      buf->append(spname->m_qname.str,
-                  spname->m_qname.length) ||
-      buf->append(" ",1))
-      return 1;
   /* Append the left part of thd->query after event name part */
   if (buf->append(thd->lex->stmt_definition_begin,
                   thd->lex->stmt_definition_end -
