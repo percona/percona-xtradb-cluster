@@ -6356,11 +6356,11 @@ alter:
 
             if (!(Lex->event_parse_data= Event_parse_data::new_instance(YYTHD)))
               MYSQL_YYABORT;
+            Lex->event_parse_data->identifier= $5;
 
             Lex->sql_command= SQLCOM_ALTER_EVENT;
-            Lex->stmt_definition_begin= $3;
 #ifdef WITH_WSREP
-            Lex->event_parse_data->identifier= $5;
+            Lex->stmt_definition_begin= $3;
 #endif
           }
           ev_alter_on_schedule_completion
