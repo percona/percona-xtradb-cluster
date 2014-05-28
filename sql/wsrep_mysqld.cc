@@ -1240,6 +1240,9 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   case SQLCOM_CREATE_EVENT:
     buf_err= wsrep_create_event_query(thd, &buf, &buf_len);
     break;
+  case SQLCOM_ALTER_EVENT:
+    buf_err= wsrep_alter_event_query(thd, &buf, &buf_len);
+    break;
   default:
     buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(), &buf,
                                  &buf_len);

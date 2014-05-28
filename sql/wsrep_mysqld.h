@@ -296,6 +296,7 @@ int wsrep_to_buf_helper(
 int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len);
 int wsrep_create_trigger_query(THD *thd, uchar** buf, size_t* buf_len);
 int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len);
+int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len);
 
 struct xid_t;
 void wsrep_get_SE_checkpoint(xid_t*);
