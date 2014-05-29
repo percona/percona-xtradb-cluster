@@ -160,6 +160,9 @@ UNIV_INTERN mysql_pfs_key_t	srv_purge_thread_key;
 UNIV_INTERN mysql_pfs_key_t	srv_log_tracking_thread_key;
 #endif /* UNIV_PFS_THREAD */
 
+#ifdef WITH_WSREP
+extern my_bool wsrep_recovery;
+#endif /* WITH_WSREP */
 /*********************************************************************//**
 Convert a numeric string that optionally ends in G or M or K, to a number
 containing megabytes.
@@ -2894,8 +2897,21 @@ files_checked:
 	}
 
 	if (!srv_read_only_mode) {
-		/* Create the buffer pool dump/load thread */
-		os_thread_create(buf_dump_thread, NULL, NULL);
+#ifdef WITH_WSREP
+	        /* Create the dump/load thread only when not running with
+	        --wsrep-recover */
+                if (!wsrep_recovery) {
+#endif
+                    /* Create the buffer pool dump/load thread */
+                    os_thread_create(buf_dump_thread, NULL, NULL);
+#ifdef WITH_WSREP
+                } else { 
+                    ut_print_timestamp(stderr);
+                    fprintf(stderr,
+                            " Skipping buffer pool dump/restore"
+                            " during wsrep recovery. \n");
+                }
+#endif
 
 		/* Create the dict stats gathering thread */
 		os_thread_create(dict_stats_thread, NULL, NULL);
