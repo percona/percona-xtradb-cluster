@@ -2906,9 +2906,8 @@ files_checked:
                     os_thread_create(buf_dump_thread, NULL, NULL);
 #ifdef WITH_WSREP
                 } else { 
-                    ib_logf(IB_LOG_LEVEL_WARN,
-                            " Skipping buffer pool dump/restore "
-                            " during wsrep recovery.");
+                    ib_logf(IB_LOG_LEVEL_WARN,"Skipping buffer pool dump/restore "
+                            "during wsrep recovery.");
                 }
 #endif
 
