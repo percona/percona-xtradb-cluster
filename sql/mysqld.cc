@@ -2807,9 +2807,19 @@ void thd_release_resources(THD *thd)
 
 void dec_connection_count(THD *thd)
 {
-  mysql_mutex_lock(&LOCK_connection_count);
-  (*thd->scheduler->connection_count)--;
-  mysql_mutex_unlock(&LOCK_connection_count);
+#ifdef WITH_WSREP
+  /*
+    Do not decrement when its wsrep system thread. wsrep_applier is set for
+    applier as well as rollbacker threads.
+  */
+  if (!thd->wsrep_applier)
+#endif /* WITH_WSREP */
+  {
+    DBUG_ASSERT(*thd->scheduler->connection_count > 0);
+    mysql_mutex_lock(&LOCK_connection_count);
+    (*thd->scheduler->connection_count)--;
+    mysql_mutex_unlock(&LOCK_connection_count);
+  }
 }
 
 
@@ -5506,10 +5516,6 @@ pthread_handler_t start_wsrep_THD(void *arg)
   thd->set_command(COM_SLEEP);
   thd->set_time();
   thd->init_for_queries();
-
-  mysql_mutex_lock(&LOCK_connection_count);
-  ++connection_count;
-  mysql_mutex_unlock(&LOCK_connection_count);
 
   processor(thd);
 
