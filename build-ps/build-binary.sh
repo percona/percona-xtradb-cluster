@@ -27,7 +27,9 @@ CRYPTO_LIBRARY=''
 GALERA_SSL=''
 SSL_OPT=''
 TAG=''
-
+#
+COMMON_FLAGS=''
+#
 # Some programs that may be overriden
 TAR=${TAR:-tar}
 
@@ -169,6 +171,15 @@ RELEASE_TAG=''
 PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_XTRADB_CLUSTER_VERSION"
 
 # Build information
+if test -e "$SOURCEDIR/Docs/INFO_SRC"
+then
+    REVISION="$(cd "$SOURCEDIR"; grep '^revno: ' Docs/INFO_SRC |sed -e 's/revno: //')"
+elif test -e "$SOURCEDIR/.bzr/branch/last-revision"
+then
+    REVISION="$(cd "$SOURCEDIR"; cat .bzr/branch/last-revision | awk -F ' ' '{print $1}')"
+else
+    REVISION=""
+fi
 REVISION="$(cd "$SOURCEDIR"; grep '^revno: ' Docs/INFO_SRC |sed -e 's/revno: //')"
 WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
 GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
