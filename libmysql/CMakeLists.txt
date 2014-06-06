@@ -210,9 +210,9 @@ IF(UNIX)
 ENDIF()
 
 IF(UNIX)
-  GET_TARGET_NAME(perconaserverclient lib_name)
-  INSTALL_SYMLINK(perconaserverclient
-    ${lib_name} ${CMAKE_STATIC_LIBRARY_PREFIX}perconaserverclient_r.a
+  GET_TARGET_NAME(mysqlclient lib_name)
+  INSTALL_SYMLINK(mysqlclient
+    ${lib_name} ${CMAKE_STATIC_LIBRARY_PREFIX}mysqlclient_r.a
     ${INSTALL_LIBDIR} Development)
 ENDIF()
 
