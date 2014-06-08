@@ -1962,7 +1962,12 @@ lock_rec_create(
 	automatically of the gap type */
 
 	if (UNIV_UNLIKELY(heap_no == PAGE_HEAP_NO_SUPREMUM)) {
+#ifdef WITH_WSREP
+		ut_ad(!(type_mode & LOCK_REC_NOT_GAP) || 
+		      wsrep_thd_is_BF(trx->mysql_thd, FALSE));
+#else
 		ut_ad(!(type_mode & LOCK_REC_NOT_GAP));
+#endif /* WITH_WSREP */
 
 		type_mode = type_mode & ~(LOCK_GAP | LOCK_REC_NOT_GAP);
 	}
@@ -6491,8 +6496,10 @@ lock_rec_convert_impl_to_expl(
 		trx_is_active(trx_id, NULL) check below, because we are not
 		holding lock_mutex. */
 
+#ifndef WITH_WSREP
 		ut_ad(!lock_rec_other_trx_holds_expl(LOCK_S | LOCK_REC_NOT_GAP,
 						     trx_id, rec, block));
+#endif /* WITH_WSREP */
 	}
 
 	if (trx_id != 0) {
