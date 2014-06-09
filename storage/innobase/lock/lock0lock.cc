@@ -2308,7 +2308,12 @@ lock_rec_add_to_queue(
 	struct for a gap type lock */
 
 	if (UNIV_UNLIKELY(heap_no == PAGE_HEAP_NO_SUPREMUM)) {
+#ifdef WITH_WSREP
+		ut_ad(!(type_mode & LOCK_REC_NOT_GAP) || 
+		      wsrep_thd_is_BF(trx->mysql_thd, FALSE));
+#else
 		ut_ad(!(type_mode & LOCK_REC_NOT_GAP));
+#endif /* WITH_WSREP */
 
 		/* There should never be LOCK_REC_NOT_GAP on a supremum
 		record, but let us play safe */
