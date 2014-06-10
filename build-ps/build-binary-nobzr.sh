@@ -172,6 +172,12 @@ then
 
 fi
 
+if [[ -n $LDFLAGS ]];then 
+   MLDFLAGS="-DWITH_MYSQLD_LDFLAGS='$LDFLAGS'" 
+else 
+   MLDFLAGS=""
+fi
+
 # Build
 (
     cd "$SOURCEDIR"
@@ -201,7 +207,7 @@ fi
 
     #make -f Makefile-pxc all
 
-    cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+    cmake . ${CMAKE_OPTS:-} $MLDFLAGS -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
         $DEBUG_EXTNAME \
         -DWITH_EMBEDDED_SERVER=OFF \
