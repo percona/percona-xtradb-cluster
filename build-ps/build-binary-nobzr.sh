@@ -174,8 +174,10 @@ fi
 
 if [[ -n ${LDFLAGS:-} ]];then 
    MLDFLAGS=-DWITH_MYSQLD_LDFLAGS=$LDFLAGS 
+   WITHASAN=ON
 else 
    MLDFLAGS=""
+   WITHASAN=OFF
 fi
 
 # Build
@@ -210,6 +212,7 @@ fi
     cmake . ${CMAKE_OPTS:-} $MLDFLAGS -DBUILD_CONFIG=mysql_release \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
         $DEBUG_EXTNAME \
+        -DWITH_ASAN=$WITHASAN \
         -DWITH_EMBEDDED_SERVER=OFF \
         -DFEATURE_SET=community \
         -DENABLE_DTRACE=OFF \
