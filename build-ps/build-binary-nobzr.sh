@@ -173,7 +173,7 @@ then
 fi
 
 if [[ -n ${LDFLAGS:-} ]];then 
-   MLDFLAGS="-DWITH_MYSQLD_LDFLAGS='$LDFLAGS'" 
+   MLDFLAGS=-DWITH_MYSQLD_LDFLAGS=$LDFLAGS 
 else 
    MLDFLAGS=""
 fi
