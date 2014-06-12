@@ -228,7 +228,7 @@ public:
                      void * arg, traverse_order order);
   inline double fix_result(double value)
   {
-    if (isfinite(value))
+    if (my_isfinite(value))
       return value;
     null_value=1;
     return 0.0;
@@ -262,7 +262,7 @@ public:
   */
   inline double check_float_overflow(double value)
   {
-    return isfinite(value) ? value : raise_float_overflow();
+    return my_isfinite(value) ? value : raise_float_overflow();
   }
   /**
     Throw an error if the input BIGINT value represented by the
@@ -1263,6 +1263,9 @@ public:
 };
 
 
+void item_func_sleep_init(void);
+void item_func_sleep_free(void);
+
 class Item_func_sleep :public Item_int_func
 {
 public:
@@ -1543,14 +1546,8 @@ public:
 
 #endif /* HAVE_DLOPEN */
 
-/*
-** User level locks
-*/
-
-class User_level_lock;
-void item_user_lock_init(void);
-void item_user_lock_release(User_level_lock *ull);
-void item_user_lock_free(void);
+void mysql_ull_cleanup(THD *thd);
+void mysql_ull_set_explicit_lock_duration(THD *thd);
 
 class Item_func_get_lock :public Item_int_func
 {
