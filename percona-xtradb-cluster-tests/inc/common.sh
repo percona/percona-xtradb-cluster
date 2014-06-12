@@ -33,10 +33,20 @@ function die()
 function call_mysql_install_db()
 {
 	vlog "Calling mysql_install_db"
+
 	cd $MYSQL_BASEDIR
-	$MYSQL_INSTALL_DB --defaults-file=${MYSQLD_VARDIR}/my.cnf \
+
+        if ! $MYSQL_INSTALL_DB --defaults-file=${MYSQLD_VARDIR}/my.cnf \
                     --basedir=${MYSQL_BASEDIR} \
                     ${MYSQLD_EXTRA_ARGS}
+        then
+            vlog "mysql_install_db failed. Server log (if exists):"
+            vlog "----------------"
+            cat ${MYSQLD_ERRFILE} >&2 || true
+            vlog "----------------"
+            exit -1
+        fi
+
 	cd - >/dev/null 2>&1
 }
 
@@ -229,7 +239,8 @@ function switch_server()
 	MYSQLD_ARGS="$MYSQLD_ARGS --user=root"
     fi
 
-    IB_ARGS="--defaults-file=$MYSQLD_VARDIR/my.cnf --ibbackup=$XB_BIN"
+    IB_ARGS="--defaults-file=$MYSQLD_VARDIR/my.cnf --ibbackup=$XB_BIN \
+--no-version-check"
     XB_ARGS="--defaults-file=$MYSQLD_VARDIR/my.cnf"
 
     # Some aliases for compatibility, as tests use the following names
@@ -627,6 +638,150 @@ function resume_suspended_xb()
     local file=$1
     echo "Removing $file"
     rm -f $file
+}
+
+########################################################################
+# Skip the current test with a given comment
+########################################################################
+function skip_test()
+{
+    echo $1 > $SKIPPED_REASON
+    exit $SKIPPED_EXIT_CODE
+}
+
+########################################################################
+# Get version string in the XXYYZZ version
+########################################################################
+function get_version_str()
+{
+    printf %02d%02d%02d $1 $2 $3
+}
+
+#########################################################################
+# Return 0 if the server version is higher than the first argument
+#########################################################################
+function is_server_version_higher_than()
+{
+    [[ $1 =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || \
+        die "Cannot parse server version: '$1'"
+
+    local major=${BASH_REMATCH[1]}
+    local minor=${BASH_REMATCH[2]}
+    local patch=${BASH_REMATCH[3]}
+
+    local server_str=`get_version_str $MYSQL_VERSION_MAJOR \
+$MYSQL_VERSION_MINOR $MYSQL_VERSION_PATCH`
+    local version_str=`get_version_str $major $minor $patch`
+
+    [[ $server_str > $version_str ]]
+}
+
+#########################################################################
+# Require a server version higher than the first argument
+########################################################################
+function require_server_version_higher_than()
+{
+    is_server_version_higher_than $1 || \
+        skip_test "Requires server version higher than $1"
+}
+
+########################################################################
+# Return 0 if the server version is lower than the first argument
+#########################################################################
+function is_server_version_lower_than()
+{
+    [[ $1 =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || \
+        die "Cannot parse server version: '$1'"
+
+    local major=${BASH_REMATCH[1]}
+    local minor=${BASH_REMATCH[2]}
+    local patch=${BASH_REMATCH[3]}
+
+    local server_str=`get_version_str $MYSQL_VERSION_MAJOR \
+$MYSQL_VERSION_MINOR $MYSQL_VERSION_PATCH`
+    local version_str=`get_version_str $major $minor $patch`
+
+    [[ $server_str < $version_str ]]
+}
+
+#########################################################################
+# Require a server version lower than the first argument
+########################################################################
+function require_server_version_lower_than()
+{
+    is_server_version_lower_than $1 || \
+        skip_test "Requires server version lower than $1"
+}
+
+########################################################################
+# Return 0 if the server is XtraDB-based
+########################################################################
+function is_xtradb()
+{
+    [ -n "$XTRADB_VERSION" ]
+}
+
+#########################################################################
+# Skip the test if not running against XtraDB
+########################################################################
+function require_xtradb()
+{
+    is_xtradb || skip_test "Requires XtraDB"
+}
+
+########################################################################
+# Return 0 if the server has Galera support
+########################################################################
+function is_galera()
+{
+    [ -n "$WSREP_READY" ]
+}
+
+########################################################################
+# Skip the test if not running against a Galera-enabled server
+########################################################################
+function require_galera()
+{
+    is_galera || skip_test "Requires Galera support"
+}
+
+########################################################################
+# Skip the test if qpress binary is not available
+########################################################################
+function require_qpress()
+{
+    if ! which qpress > /dev/null 2>&1 ; then
+        skip_test "Requires qpress to be installed"
+    fi
+}
+
+##############################################################################
+# Execute a multi-row INSERT into a specified table.
+#
+# Arguments:
+#
+#   $1 -- table specification
+#
+#   all subsequent arguments represent tuples to insert in the form:
+#   (value1, ..., valueN)
+#
+# Notes:
+#
+#   1. Bash special characters in the arguments must be quoted to screen them
+#      from interpreting by Bash, i.e. \(1,...,\'a'\)
+#
+#   2. you can use Bash brace expansion to generate multiple tuples, e.g.:
+#      \({1..1000},\'a'\) will generate 1000 tuples (1,'a'), ..., (1000, 'a')
+##############################################################################
+function multi_row_insert()
+{
+    local table=$1
+    shift
+
+    vlog "Inserting $# rows into $table..."
+    (IFS=,; echo "INSERT INTO $table VALUES $*") | \
+        $MYSQL $MYSQL_ARGS
+    vlog "Done."
 }
 
 # To avoid unbound variable error when no server have been started

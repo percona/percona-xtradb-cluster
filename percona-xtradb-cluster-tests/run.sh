@@ -46,9 +46,6 @@ Usage: $0 [-f] [-g] [-h] [-s suite] [-t test_name] [-d mysql_basedir] [-c build_
 -h          Print this help message
 -s suite    Select a test suite to run. Possible values: experimental, t. 
             Default is 't'.
--c conf     XtraBackup build configuration as specified to build.sh.
-            Default is 'autodetect', i.e. xtrabackup binary is determined based
-            on the MySQL version.
 -j N        Run tests in N parallel processes.
 -T seconds  Test timeout (default is $TEST_TIMEOUT seconds).
 EOF
@@ -74,12 +71,14 @@ function autocalc_nworkers()
         exit -1
     fi
 
-    if [ "$NWORKERS" -gt 16 ]
+    XB_TEST_MAX_WORKERS=${XB_TEST_MAX_WORKERS:-16}
+    if [ "$NWORKERS" -gt $XB_TEST_MAX_WORKERS ]
     then
-        echo "Autodetected number of cores: $NWORKERS"
-        echo "Limiting to 16 to avoid excessive resource consumption"
-
-        NWORKERS=16
+        cat <<EOF
+Autodetected number of cores: $NWORKERS
+Limiting to $XB_TEST_MAX_WORKERS to avoid excessive resource consumption
+EOF
+        NWORKERS=$XB_TEST_MAX_WORKERS
     fi
 }
 
@@ -304,15 +303,27 @@ function set_vars()
     find_program MYSQL_INSTALL_DB mysql_install_db $MYSQL_BASEDIR/bin \
 	$MYSQL_BASEDIR/scripts
     find_program MYSQLD mysqld $MYSQL_BASEDIR/bin/ $MYSQL_BASEDIR/libexec
+    # Use the global mysql client binary, if available. This is a workaround for
+    # PS packageing bug LP 1153950
+    if which mysql >/dev/null 2>&1
+    then
+        MYSQL=`which mysql`
+    else
     find_program MYSQL mysql $MYSQL_BASEDIR/bin
+    fi
     find_program MYSQLADMIN mysqladmin $MYSQL_BASEDIR/bin
     find_program MYSQLDUMP mysqldump $MYSQL_BASEDIR/bin
 
     # Check if we are running from a source tree and, if so, set PATH 
     # appropriately
-    if test "`basename $PWD`" = "test"
+    if test -d $PWD/../src
     then
 	PATH="$PWD/..:$PWD/../src:$PATH"
+    fi
+
+    if test -d $PWD/../bin
+    then
+        PATH="$PWD/../bin:$PATH"
     fi
 
     PATH="${MYSQL_BASEDIR}/bin:$PATH"
@@ -326,6 +337,9 @@ function set_vars()
 
     export TAR MYSQL_BASEDIR MYSQL MYSQLD MYSQLADMIN \
 MYSQL_INSTALL_DB PATH LD_LIBRARY_PATH DYLD_LIBRARY_PATH MYSQLDUMP
+
+    # Use stage-v.percona.com as a VersionCheck server
+    export PERCONA_VERSION_CHECK_URL=https://stage-v.percona.com
 }
 
 
@@ -350,36 +364,7 @@ function get_version_info()
     XB_BIN=""
     IB_ARGS="--user=root --ibbackup=$XB_BIN"
     XB_ARGS="--no-defaults"
-
-    if [ "$XB_BUILD" != "autodetect" ]
-    then
-	case "$XB_BUILD" in
-	    "innodb50" )
-		XB_BIN="xtrabackup_51";;
-	    "innodb51_builtin" )
-		XB_BIN="xtrabackup_51";;
-	    "innodb51" )
-		XB_BIN="xtrabackup_plugin"
-		MYSQLD_EXTRA_ARGS="--ignore-builtin-innodb --plugin-load=innodb=ha_innodb_plugin.so"
-	        fix_selinux
-		;;
-	    "innodb55" )
-		XB_BIN="xtrabackup_innodb55";;
-            "innodb56" | "xtradb56" | "mariadb100")
-                XB_BIN="xtrabackup_56" ;;
-	    "xtradb51" | "mariadb51" | "mariadb52" | "mariadb53")
-		XB_BIN="xtrabackup";;
-	    "xtradb55" | "mariadb55")
-		XB_BIN="xtrabackup_55";;
-	    "galera55" )
-		XB_BIN="xtrabackup_55";;
-	esac
-	if [ -z "$XB_BIN" ]
-	then
-	    vlog "Unknown configuration: '$XB_BUILD'"
-	    exit -1
-	fi
-    fi
+    XB_BIN="xtrabackup"
 
     MYSQL_VERSION=""
     INNODB_VERSION=""
@@ -391,9 +376,40 @@ function get_version_info()
     MYSQL_VERSION=${MYSQL_VERSION#"version	"}
     MYSQL_VERSION_COMMENT=`$MYSQL ${MYSQL_ARGS} -Nsf -e "SHOW VARIABLES LIKE 'version_comment'"`
     MYSQL_VERSION_COMMENT=${MYSQL_VERSION_COMMENT#"version_comment	"}
+
+    # Split version info into components for easier compatibility checks
+    [[ $MYSQL_VERSION =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]] || \
+        die "Cannot parse server version: '$MYSQL_VERSION'"
+    MYSQL_VERSION_MAJOR=${BASH_REMATCH[1]}
+    MYSQL_VERSION_MINOR=${BASH_REMATCH[2]}
+    MYSQL_VERSION_PATCH=${BASH_REMATCH[3]}
+
     INNODB_VERSION=`$MYSQL ${MYSQL_ARGS} -Nsf -e "SHOW VARIABLES LIKE 'innodb_version'"`
     INNODB_VERSION=${INNODB_VERSION#"innodb_version	"}
     XTRADB_VERSION="`echo $INNODB_VERSION  | sed 's/[0-9]\.[0-9]\.[0-9][0-9]*\(-[0-9][0-9]*\.[0-9][0-9]*\)*$/\1/'`"
+
+    WSREP_ENABLED=`$MYSQL ${MYSQL_ARGS} -Nsf -e "SHOW VARIABLES" | grep -i wsrep`
+
+    WSREP_READY=`$MYSQL ${MYSQL_ARGS} -Nsf -e "SHOW STATUS LIKE 'wsrep_ready'"`
+    WSREP_READY=${WSREP_READY#"wsrep_ready	"}
+
+    if [ -n "$WSREP_ENABLED" -a -z "$WSREP_READY" ]
+    then
+        die "Galera initialization failed!"
+    fi
+
+    if [ -n "$WSREP_READY" ]
+    then
+       if [ -f ${MYSQL_BASEDIR}/lib/libgalera_smm.so ]
+       then
+           LIBGALERA_PATH=${MYSQL_BASEDIR}/lib/libgalera_smm.so
+       elif [ -f ${MYSQL_BASEDIR}/lib/galera3/libgalera_smm.so ]
+       then
+           LIBGALERA_PATH=${MYSQL_BASEDIR}/lib/galera3/libgalera_smm.so
+       else
+           die "Cannot find libgalera_smm.so"
+       fi
+    fi
 
     # Version-specific defaults
     DEFAULT_IBDATA_SIZE="10M"
@@ -417,37 +433,29 @@ function get_version_info()
 	INNODB_FLAVOR="InnoDB"
     fi
 
-    if [ "$XB_BUILD" = "autodetect" ]
-    then
-        # Determine xtrabackup build automatically
-	if [ "${MYSQL_VERSION:0:3}" = "5.1" ]
-	then
+    # Setup version-specific mysqld arguments
+    case "$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR" in
+        5.1 )
 	    if [ -z "$INNODB_VERSION" ]
 	    then
-		XB_BIN="xtrabackup_51" # InnoDB 5.1 builtin
-	    else
-		XB_BIN="xtrabackup"    # InnoDB 5.1 plugin or Percona Server 5.1
+                MYSQLD_EXTRA_ARGS="--ignore-builtin-innodb \
+--plugin-load=innodb=ha_innodb_plugin.so"
+                fix_selinux
+                INNODB_VERSION="$MYSQL_VERSION"
 	    fi
-	elif [ "${MYSQL_VERSION:0:3}" = "5.2" -o "${MYSQL_VERSION:0:3}" = "5.3" ]
-	then
-	    XB_BIN="xtrabackup"
-	elif [ "${MYSQL_VERSION:0:3}" = "5.5" ]
-	then
-	    if [ -n "$XTRADB_VERSION" ]
-	    then
-		XB_BIN="xtrabackup_55"
-	    else
-		XB_BIN="xtrabackup_innodb55"
-	    fi
-        elif [ "${MYSQL_VERSION:0:3}" = "5.6" -o "${MYSQL_VERSION:0:4}" = "10.0" ]
-        then
-            XB_BIN="xtrabackup_56"
+            ;;
+        5.2 | 5.3 )
+            ;;
+        5.5 )
+            ;;
+        5.6 | 10.0 )
             DEFAULT_IBDATA_SIZE="12M"
-	else
+            ;;
+        *)
 	    vlog "Unknown MySQL/InnoDB version: $MYSQL_VERSION/$INNODB_VERSION"
 	    exit -1
-	fi
-    fi
+            ;;
+    esac
 
     XB_PATH="`which $XB_BIN`"
     if [ -z "$XB_PATH" ]
@@ -470,7 +478,7 @@ function get_version_info()
     export MYSQL_VERSION MYSQL_VERSION_COMMENT MYSQL_FLAVOR \
 	INNODB_VERSION XTRADB_VERSION INNODB_FLAVOR \
 	XB_BIN IB_BIN IB_ARGS XB_ARGS MYSQLD_EXTRA_ARGS \
-        DEFAULT_IBDATA_SIZE XB_BUILD
+        DEFAULT_IBDATA_SIZE WSREP_READY LIBGALERA_PATH
 }
 
 ###########################################################################
@@ -781,7 +789,6 @@ TEST_START_TIME=`now`
 
 tname=""
 XTRACE_OPTION=""
-XB_BUILD="autodetect"
 force=""
 SUBUNIT_OUT=test_results.subunit
 NWORKERS=
@@ -804,7 +811,8 @@ while getopts "fgh?:t:s:d:c:j:T:" options; do
             h ) usage; exit;;
             s ) tname="$OPTARG/*.sh";;
             d ) export MYSQL_BASEDIR="$OPTARG";;
-            c ) XB_BUILD="$OPTARG";;
+            c ) echo "Warning: -c does not have any effect and is only \
+recognized for compatibility";;
             j )
 
                 if [[ ! $OPTARG =~ ^[0-9]+$ || $OPTARG < 1 ]]
@@ -945,7 +953,10 @@ do
 
        mkdir $TEST_VAR_ROOT
 
-       . $t
+       # Execute the test in a subshell. This is required to catch syntax
+       # errors, as otherwise $? would be 0 in cleanup_on_test_exit resulting in
+       # passed test
+       (. $t) || exit $?
    ) > ${worker_outfiles[$worker]} 2>&1 &
 
    worker_pids[$worker]=$!
