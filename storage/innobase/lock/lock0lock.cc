@@ -1040,9 +1040,13 @@ lock_rec_has_to_wait(
 			    (lock2->type_mode & LOCK_MODE_MASK) == LOCK_X)
 			{
 				/* exclusive lock conflicts are not accepted */
-				fprintf(stderr, "BF-BF X lock conflict\n");
+				fprintf(stderr, "BF-BF X lock conflict," 
+					"type_mode: %lu supremum: %lu\n", 
+					type_mode, lock_is_on_supremum);
+				fprintf(stderr, "conflicts states: my %d locked %d\n", 
+					wsrep_thd_conflict_state(trx->mysql_thd, FALSE), 
+					wsrep_thd_conflict_state(lock2->trx->mysql_thd, FALSE) );
 				lock_rec_print(stderr, lock2);
-				abort();
 			} else {
 				/* if lock2->index->n_uniq <= 
 				   lock2->index->n_user_defined_cols
@@ -1623,6 +1627,7 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
         ut_ad(trx_mutex_own(lock->trx));
 	my_bool bf_this  = wsrep_thd_is_BF(trx->mysql_thd, FALSE);
 	my_bool bf_other = wsrep_thd_is_BF(lock->trx->mysql_thd, TRUE);
+
 	if ((bf_this && !bf_other) ||
 		(bf_this && bf_other && wsrep_trx_order_before(
 			trx->mysql_thd, lock->trx->mysql_thd))) {
@@ -1663,6 +1668,30 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 			}
 			wsrep_innobase_kill_one_trx(trx->mysql_thd,
 				(const trx_t*) trx, lock->trx, TRUE);
+		}
+	} else if (bf_this && bf_other && wsrep_log_conflicts) {
+		mutex_enter(&trx_sys->mutex);
+		if (bf_this)
+			fputs("\n*** Priority TRANSACTION:\n", 
+			      stderr);
+		else
+			fputs("\n*** Victim TRANSACTION:\n", stderr);
+		trx_print_latched(stderr, trx, 3000);
+
+		if (bf_other)
+			fputs("\n*** Priority TRANSACTION:\n", 
+			      stderr);
+		else
+			fputs("\n*** Victim TRANSACTION:\n", stderr);
+		trx_print_latched(stderr, lock->trx, 3000);
+
+		mutex_exit(&trx_sys->mutex);
+		fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n", stderr);
+
+		if (lock_get_type(lock) == LOCK_REC) {
+			lock_rec_print(stderr, lock);
+		} else {
+			lock_table_print(stderr, lock);
 		}
 	}
 }
@@ -2290,8 +2319,13 @@ lock_rec_add_to_queue(
 	struct for a gap type lock */
 
 	if (UNIV_UNLIKELY(heap_no == PAGE_HEAP_NO_SUPREMUM)) {
+#ifdef WITH_WSREP
+		ut_ad(!(type_mode & LOCK_REC_NOT_GAP) ||
+			wsrep_thd_is_BF(trx->mysql_thd, FALSE));
+#else
 		ut_ad(!(type_mode & LOCK_REC_NOT_GAP));
 
+#endif /* WITH_WSREP */
 		/* There should never be LOCK_REC_NOT_GAP on a supremum
 		record, but let us play safe */
 
