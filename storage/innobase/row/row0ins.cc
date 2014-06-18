@@ -1286,7 +1286,7 @@ row_ins_foreign_check_on_constraint(
 				       FALSE, FALSE);
 	if (err != DB_SUCCESS) {
 		fprintf(stderr, 
-			"WSREP: foreign key append failed: %lu\n", err);
+			"WSREP: foreign key append failed: %d\n", err);
 	} else
 #endif
 	err = row_update_cascade_for_mysql(thr, cascade,
@@ -2005,13 +2005,6 @@ row_ins_scan_sec_index_for_duplicate(
 				lock_type, block, rec, index, offsets, thr);
 		} else {
 
-#ifdef WITH_WSREP
-			if (wsrep_thd_is_BF(thr_get_trx(thr)->mysql_thd, 0)) {
-				if (!(lock_type & LOCK_REC_NOT_GAP)) {
-					lock_type |= LOCK_REC_NOT_GAP;
-				}
-			}
-#endif /* WITH_WSREP */
 			err = row_ins_set_shared_rec_lock(
 				lock_type, block, rec, index, offsets, thr);
 		}

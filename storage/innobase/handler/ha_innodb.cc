@@ -9276,9 +9276,14 @@ ha_innobase::wsrep_append_keys(
 		uint i;
 		bool hasPK= false;
 
-		for (i=0; i<table->s->keys && !hasPK; ++i) {
+		for (i=0; i<table->s->keys; ++i) {
 			KEY*  key_info	= table->key_info + i;
-			if (key_info->flags & HA_NOSAME) hasPK = true;
+			if (key_info->flags & HA_NOSAME) {
+				hasPK = true;
+				if (i != table->s->primary_key) {
+					wsrep_thd_set_PA_safe(thd, FALSE);
+				}
+			}
 		}
 
 		for (i=0; i<table->s->keys; ++i) {
@@ -9301,6 +9306,7 @@ ha_innobase::wsrep_append_keys(
 					   table->s->table_name.str, 
 					   key_info->name);
 			}
+			/* !hasPK == table with no PK, must append all non-unique keys */
 			if (!hasPK || key_info->flags & HA_NOSAME ||
 			    ((tab &&
 			      dict_table_get_referenced_constraint(tab, idx)) ||

@@ -474,6 +474,15 @@ void wsrep_create_rollbacker()
   }
 }
 
+void wsrep_thd_set_PA_safe(void *thd_ptr, my_bool safe)
+{ 
+  if (thd_ptr) 
+  {
+    THD* thd = (THD*)thd_ptr;
+    thd->wsrep_PA_safe = safe;
+  }
+}
+
 int wsrep_thd_conflict_state(void *thd_ptr, my_bool sync)
 { 
   int state = -1;
@@ -497,8 +506,7 @@ my_bool wsrep_thd_is_BF(void *thd_ptr, my_bool sync)
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
-	      (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
-	      (thd->wsrep_conflict_state == MUST_REPLAY));
+	      (thd->wsrep_exec_mode == TOTAL_ORDER));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   return status;
