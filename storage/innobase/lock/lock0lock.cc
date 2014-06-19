@@ -2310,7 +2310,6 @@ lock_rec_add_to_queue(
 
 	if (UNIV_UNLIKELY(heap_no == PAGE_HEAP_NO_SUPREMUM)) {
 		ut_ad(!(type_mode & LOCK_REC_NOT_GAP));
-#endif /* WITH_WSREP */
 
 		/* There should never be LOCK_REC_NOT_GAP on a supremum
 		record, but let us play safe */
