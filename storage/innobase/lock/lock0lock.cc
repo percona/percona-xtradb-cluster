@@ -1048,6 +1048,7 @@ lock_rec_has_to_wait(
 					wsrep_thd_conflict_state(trx->mysql_thd, FALSE), 
 					wsrep_thd_conflict_state(lock2->trx->mysql_thd, FALSE) );
 				lock_rec_print(stderr, lock2);
+				abort();
 			} else {
 				/* if lock2->index->n_uniq <= 
 				   lock2->index->n_user_defined_cols
@@ -1665,30 +1666,6 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 			wsrep_innobase_kill_one_trx(trx->mysql_thd,
 				(const trx_t*) trx, lock->trx, TRUE);
 		}
-	} else if (bf_this && bf_other && wsrep_log_conflicts) {
-		mutex_enter(&trx_sys->mutex);
-		if (bf_this)
-			fputs("\n*** Priority TRANSACTION:\n", 
-			      stderr);
-		else
-			fputs("\n*** Victim TRANSACTION:\n", stderr);
-		trx_print_latched(stderr, trx, 3000);
-
-		if (bf_other)
-			fputs("\n*** Priority TRANSACTION:\n", 
-			      stderr);
-		else
-			fputs("\n*** Victim TRANSACTION:\n", stderr);
-		trx_print_latched(stderr, lock->trx, 3000);
-
-		mutex_exit(&trx_sys->mutex);
-		fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n", stderr);
-
-		if (lock_get_type(lock) == LOCK_REC) {
-			lock_rec_print(stderr, lock);
-		} else {
-			lock_table_print(stderr, lock);
-		}
 	}
 }
 #endif
@@ -1991,12 +1968,7 @@ lock_rec_create(
 	automatically of the gap type */
 
 	if (UNIV_UNLIKELY(heap_no == PAGE_HEAP_NO_SUPREMUM)) {
-#ifdef WITH_WSREP
-		ut_ad(!(type_mode & LOCK_REC_NOT_GAP) || 
-		      wsrep_thd_is_BF(trx->mysql_thd, FALSE));
-#else
 		ut_ad(!(type_mode & LOCK_REC_NOT_GAP));
-#endif /* WITH_WSREP */
 
 		type_mode = type_mode & ~(LOCK_GAP | LOCK_REC_NOT_GAP);
 	}
@@ -2337,10 +2309,6 @@ lock_rec_add_to_queue(
 	struct for a gap type lock */
 
 	if (UNIV_UNLIKELY(heap_no == PAGE_HEAP_NO_SUPREMUM)) {
-#ifdef WITH_WSREP
-		ut_ad(!(type_mode & LOCK_REC_NOT_GAP) ||
-			wsrep_thd_is_BF(trx->mysql_thd, FALSE));
-#else
 		ut_ad(!(type_mode & LOCK_REC_NOT_GAP));
 #endif /* WITH_WSREP */
 
@@ -4361,8 +4329,9 @@ lock_deadlock_check_and_resolve(
 				lock_deadlock_joining_trx_print(trx, lock);
 			}
 #ifdef WITH_WSREP
-			} else
+			} else {
 			  /* BF processor */;
+			}
 #endif /* WITH_WSREP */
 
 			MONITOR_INC(MONITOR_DEADLOCK);
@@ -6530,10 +6499,8 @@ lock_rec_convert_impl_to_expl(
 		trx_is_active(trx_id, NULL) check below, because we are not
 		holding lock_mutex. */
 
-#ifndef WITH_WSREP
 		ut_ad(!lock_rec_other_trx_holds_expl(LOCK_S | LOCK_REC_NOT_GAP,
 						     trx_id, rec, block));
-#endif /* WITH_WSREP */
 	}
 
 	if (trx_id != 0) {
