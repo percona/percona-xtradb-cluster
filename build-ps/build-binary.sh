@@ -241,7 +241,7 @@ fi
 
     ) || exit 1
 
-    make -f Makefile-pxc all
+    #make -f Makefile-pxc all
 
     if grep builtin <<< "$STAG";then 
         # builtin
