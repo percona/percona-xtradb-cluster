@@ -269,6 +269,30 @@ fi
     make $MAKE_JFLAG $QUIET
     make DESTDIR="$WORKDIR" install
 
+    if [[ $CMAKE_BUILD_TYPE != 'Debug' ]];then
+        make clean
+        cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+            -DCMAKE_BUILD_TYPE=Debug \
+            $DEBUG_EXTNAME \
+            -DWITH_EMBEDDED_SERVER=OFF \
+            -DFEATURE_SET=community \
+            -DENABLE_DTRACE=OFF \
+            $SSL_OPT \
+            -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
+            -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
+            -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
+            -DWITH_INNODB_DISALLOW_WRITES=ON \
+            -DWITH_WSREP=ON \
+            -DCOMPILATION_COMMENT="$COMMENT" \
+            -DWITH_PAM=ON \
+            -DWITH_INNODB_MEMCACHED=ON \
+            $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+        make $MAKE_JFLAG $QUIET
+
+        echo "Copying mysqld-debug"
+        cp -v sql/mysqld-debug $WORKDIR/usr/local/$PRODUCT_FULL/bin/
+    fi
+
 
     (
        echo "Packaging the test files"
