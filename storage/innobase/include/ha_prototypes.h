@@ -298,6 +298,7 @@ UNIV_INTERN
 int 
 wsrep_on(void *thd_ptr);
 int wsrep_is_wsrep_xid(const void*);
+my_bool wsrep_thd_set_PA_safe(void *thd_ptr, my_bool safe);
 #endif /* WITH_WSREP */
 /**********************************************************************//**
 Get the current setting of the lower_case_table_names global parameter from
