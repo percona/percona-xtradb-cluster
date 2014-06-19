@@ -153,6 +153,10 @@ else
     PROCESSORS=4
 fi
 
+if [[ -z ${STAG:-} ]];then 
+    STAG=""
+fi
+
 
 # Build information
 if [[ -z ${REVISION:-} ]];then 
