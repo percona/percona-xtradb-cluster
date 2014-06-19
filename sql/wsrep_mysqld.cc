@@ -1290,6 +1290,14 @@ static void wsrep_TOI_end(THD *thd) {
 
   WSREP_DEBUG("TO END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, (thd->query()) ? thd->query() : "void");
+  
+  XID xid;
+  wsrep_xid_init(&xid, &thd->wsrep_trx_meta.gtid.uuid,
+                 thd->wsrep_trx_meta.gtid.seqno);
+  wsrep_set_SE_checkpoint(&xid);
+  WSREP_DEBUG("TO END: %lld, update seqno",
+              (long long)wsrep_thd_trx_seqno(thd));
+  
   if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
     WSREP_DEBUG("TO END: %lld", (long long)wsrep_thd_trx_seqno(thd));
   }
