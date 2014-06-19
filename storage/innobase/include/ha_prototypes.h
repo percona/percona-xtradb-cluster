@@ -292,8 +292,9 @@ wsrep_innobase_kill_one_trx(void *bf_thd, trx_t *bf_trx, trx_t *victim_trx, iboo
 my_bool wsrep_thd_is_BF(void *thd_ptr, my_bool sync);
 //int64_t wsrep_thd_trx_seqno(THD *thd);
 int wsrep_trx_order_before(void *thd1, void *thd2);
-void wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
-			       unsigned char* str, unsigned int str_length);
+int wsrep_innobase_mysql_sort(int mysql_type, uint charset_number,
+			      unsigned char* str, unsigned int str_length,
+			      unsigned int buf_length);
 UNIV_INTERN
 int 
 wsrep_on(void *thd_ptr);

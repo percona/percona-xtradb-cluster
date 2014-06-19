@@ -51,7 +51,7 @@ ulong   wsrep_max_ws_size              = 1073741824UL;//max ws (RBR buffer) size
 ulong   wsrep_max_ws_rows              = 65536; // max number of rows in ws
 int     wsrep_to_isolation             = 0; // # of active TO isolation threads
 my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
-long    wsrep_max_protocol_version     = 2; // maximum protocol version to use
+long    wsrep_max_protocol_version     = 3; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_replicate_myisam         = 0; // enable myisam replication
@@ -106,7 +106,7 @@ const char* wsrep_provider_vendor    = provider_vendor;
 wsrep_uuid_t     local_uuid   = WSREP_UUID_UNDEFINED;
 wsrep_seqno_t    local_seqno  = WSREP_SEQNO_UNDEFINED;
 wsp::node_status local_status;
-long             wsrep_protocol_version = 2;
+long             wsrep_protocol_version = 3;
 
 // Boolean denoting if server is in initial startup phase. This is needed
 // to make sure that main thread waiting in wsrep_sst_wait() is signaled
@@ -249,6 +249,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
   case 0:
   case 1:
   case 2:
+  case 3:
       // version change
       if (view->proto_ver != wsrep_protocol_version)
       {
@@ -936,6 +937,7 @@ static bool wsrep_prepare_key_for_isolation(const char* db,
         break;
     case 1:
     case 2:
+    case 3:
     {
         *key_len= 0;
         if (db)
@@ -1067,6 +1069,7 @@ bool wsrep_prepare_key_for_innodb(const uchar* cache_key,
     }
     case 1:
     case 2:
+    case 3:
     {
         key[0].ptr = cache_key;
         key[0].len = strlen( (char*)cache_key );
