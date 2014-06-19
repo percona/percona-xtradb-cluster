@@ -64,6 +64,8 @@ my_bool wsrep_restart_slave            = 0; // should mysql slave thread be
                                             // restarted, if node joins back
 my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
                                             // restart will be needed
+my_bool wsrep_slave_UK_checks          = 0; // slave thread does UK checks
+my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
 /*
  * End configuration options
  */
