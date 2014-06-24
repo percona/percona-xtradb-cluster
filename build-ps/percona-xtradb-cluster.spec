@@ -31,6 +31,20 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define distribution  rhel%{redhatversion}
 
+#
+%bcond_with tokudb
+#
+%if %{with tokudb}
+  %define TOKUDB_FLAGS -DWITH_VALGRIND=OFF -DUSE_VALGRIND=OFF -DDEBUG_EXTNAME=OFF -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF
+  %define TOKUDB_DEBUG_ON -DTOKU_DEBUG_PARANOID=ON
+  %define TOKUDB_DEBUG_OFF -DTOKU_DEBUG_PARANOID=OFF
+%else
+  %define TOKUDB_FLAGS %{nil}
+  %define TOKUDB_DEBUG_ON %{nil}
+  %define TOKUDB_DEBUG_OFF %{nil}
+%endif
+#
+
 %define mysqld_user     mysql
 %define mysqld_group    mysql
 %define mysqldatadir    /var/lib/mysql
@@ -240,6 +254,9 @@ Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
 Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz 
+%if %{with tokudb}
+Source1:        http://www.percona.com/downloads/Percona-Server-5.6/Percona-Server-%{mysql_version}-%{percona_server_version}/source/%{src_dir}.tokudb.tar.gz
+%endif
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -300,6 +317,21 @@ as well as related utilities to run and administer Percona XtraDB Cluster.
 
 If you want to access and work with the database, you have to install
 package "Percona-XtraDB-Cluster-client%{product_suffix}" as well!
+
+%if %{with tokudb}
+# ----------------------------------------------------------------------------
+%package -n Percona-Server-tokudb%{product_suffix}
+Summary:        Percona Server - TokuDB
+Group:          Applications/Databases
+Requires:       Percona-Server-server%{product_suffix} = %{version}-%{release}
+Requires:       Percona-Server-shared%{product_suffix} = %{version}-%{release}
+Requires:       Percona-Server-client%{product_suffix} = %{version}-%{release}
+Requires:       jemalloc >= 3.3.0
+Provides:       tokudb-plugin = %{version}-%{release}
+
+%description -n Percona-Server-tokudb%{product_suffix}
+This package contains the TokuDB plugin for Percona Server %{version}-%{release}
+%endif
 
 # ----------------------------------------------------------------------------
 %package -n Percona-XtraDB-Cluster-client%{product_suffix}
@@ -398,6 +430,9 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 ##############################################################################
 %prep
 %setup -n %{src_dir}
+%if %{with tokudb}
+%setup -n %{src_dir} -T -D -b 1
+%endif
 ##############################################################################
 %build
 
@@ -423,7 +458,11 @@ touch optional-files-devel
 RPM_OPT_FLAGS=
 %endif
 #
+%if %{with tokudb}
+RPM_OPT_FLAGS= 
+%else
 RPM_OPT_FLAGS=$(echo ${RPM_OPT_FLAGS} | sed -e 's|-march=i386|-march=i686|g')
+%endif
 #
 export PATH=${MYSQL_BUILD_PATH:-$PATH}
 export CC=${MYSQL_BUILD_CC:-${CC:-gcc}}
@@ -478,7 +517,7 @@ mkdir debug
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
-	   -DWITH_PAM=ON
+	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
 )
@@ -503,7 +542,7 @@ mkdir release
            -DWITH_WSREP=1 \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
-           -DWITH_PAM=ON
+           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF}
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
 )
@@ -583,6 +622,10 @@ install -d $RBR%{_libdir}/mysql/plugin
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
+
+#
+%{__rm} -f $RBR/%{_prefix}/README*
+#
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
@@ -1032,6 +1075,30 @@ echo "Trigger 'postun --community' finished at `date`"        >> $STATUS_HISTORY
 echo                                             >> $STATUS_HISTORY
 echo "====="                                     >> $STATUS_HISTORY
 
+%if %{with tokudb}
+# ----------------------------------------------------------------------------
+%post -n Percona-Server-tokudb%{product_suffix}
+
+if [ $1 -eq 1 ] ; then
+	echo ""
+	echo "* This release of Percona Server is distributed with TokuDB storage engine."
+	echo "* Run the following commands to enable the TokuDB storage engine in Percona Server:"
+	echo ""
+	echo "mysql -e \"INSTALL PLUGIN tokudb SONAME 'ha_tokudb.so';\""
+	echo "mysql -e \"INSTALL PLUGIN tokudb_file_map SONAME 'ha_tokudb.so';\""
+	echo "mysql -e \"INSTALL PLUGIN tokudb_fractal_tree_info SONAME 'ha_tokudb.so';\""
+	echo "mysql -e \"INSTALL PLUGIN tokudb_fractal_tree_block_map SONAME 'ha_tokudb.so';\""
+	echo "mysql -e \"INSTALL PLUGIN tokudb_trx SONAME 'ha_tokudb.so';\""
+	echo "mysql -e \"INSTALL PLUGIN tokudb_locks SONAME 'ha_tokudb.so';\""
+	echo "mysql -e \"INSTALL PLUGIN tokudb_lock_waits SONAME 'ha_tokudb.so';\""
+	echo ""
+	echo "* See http://www.percona.com/doc/percona-server/5.6/tokudb/tokudb_intro.html for more details"
+	echo ""
+fi
+%endif
+# ----------------------------------------------------------------------------
+
+
 
 # ----------------------------------------------------------------------
 # Clean up the BuildRoot after build is done
@@ -1202,6 +1269,16 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
+%if %{with tokudb}
+%files -n Percona-Server-tokudb%{product_suffix}
+%attr(-, root, root) 
+%{_bindir}/tokuftdump
+%{_includedir}/tdb-internal.h
+%{_libdir}/mysql/plugin/ha_tokudb.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/ha_tokudb.so
+%endif
+
+# ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
@@ -1233,6 +1310,10 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Mon May 26 2014 Tomislav Plavcic <tomislav.plavcic@percona.com>
+
+- Added packaging changes regarding TokuDB
+
 * Fri Apr 25 2014 Tomislav Plavcic <tomislav.plavcic@percona.com>
 
 - Added Audit Log and Scalability Metrics plugin binaries

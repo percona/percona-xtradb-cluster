@@ -1,5 +1,11 @@
 percona-xtradb-cluster-5.6 (@@MYSQL_VERSION@@-rel@@PERCONA_VERSION@@) unstable; urgency=low
 
+  * Merge TokuDB packaging changes.
+
+ -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Mon, 26 May 2014 08:28:27 +0200
+
+percona-xtradb-cluster-5.6 (5.6.17-rel66.0) unstable; urgency=low
+
   * Packaging updates for PXC 5.6.
 
  -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Wed, 14 May 2014 16:12:23 -0500
