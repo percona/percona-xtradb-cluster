@@ -5652,7 +5652,8 @@ static int have_wsrep_appliers(THD *thd)
 static void wsrep_close_thread(THD *thd)
 {
   thd->killed= THD::KILL_CONNECTION;
-  MYSQL_CALLBACK(thd->scheduler, post_kill_notification, (thd));
+  if (!thd->wsrep_applier)
+    MYSQL_CALLBACK(thd->scheduler, post_kill_notification, (thd));
   if (thd->mysys_var)
   {
     thd->mysys_var->abort=1;
