@@ -13,7 +13,6 @@ ARCH = $(shell dpkg-architecture -qDEB_BUILD_ARCH)
 ARCH_OS = $(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)
 DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-DEBVERSION = $(shell dpkg-parsechangelog | awk '/^Version: / { print $$2 }' | sed 's/^.*-//' )
 
 export MYSQL_BUILD_CC=$(DEB_HOST_GNU_TYPE)-gcc$(USE_THIS_GCC_VERSION)
 export MYSQL_BUILD_CXX=$(DEB_HOST_GNU_TYPE)-g++$(USE_THIS_GCC_VERSION)
@@ -216,19 +215,12 @@ install: build
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
 	
 	# build HandlerSocket
-	(cd storage/HandlerSocket-Plugin-for-MySQL && \
+	(cd plugin/HandlerSocket-Plugin-for-MySQL && ./autogen.sh; \
 	MYSQL_CFLAGS="-I$(CURDIR)/$(builddir)/include" \
 	./configure --with-mysql-source=$(CURDIR) \
 	--with-mysql-bindir=$(CURDIR)/$(builddir)/scripts \
 	--with-mysql-plugindir=$(prefix)/lib/mysql/plugin \
 	--libdir=$(prefix)/lib --prefix=$(prefix) && \
-	make && make DESTDIR=$(TMP) install)
-
-	# Build UDFs
-	(cd UDF && \
-	CXXFLAGS="-I $(CURDIR)/$(builddir)/include" \
-	./configure --includedir=$(CURDIR)/include \
-	--libdir=$(prefix)/lib/mysql/plugin && \
 	make && make DESTDIR=$(TMP) install)
 
 	# After installing, remove rpath to make lintian happy.
