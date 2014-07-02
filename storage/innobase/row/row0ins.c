@@ -1708,10 +1708,6 @@ row_ins_scan_sec_index_for_duplicate(
 	mem_heap_t*	heap		= NULL;
 	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
 	ulint*		offsets		= offsets_;
-#ifdef WITH_WSREP
-	/* appliers don't need dupkey checks */
-	if (wsrep_thd_is_BF(thr_get_trx(thr)->mysql_thd, 0)) return(DB_SUCCESS);
-#endif /* WITH_WSREP */
 	rec_offs_init(offsets_);
 
 	n_unique = dict_index_get_n_unique(index);

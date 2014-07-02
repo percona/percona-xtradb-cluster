@@ -2432,11 +2432,12 @@ static bool cache_thread()
 bool one_thread_per_connection_end(THD *thd, bool put_in_cache)
 {
   DBUG_ENTER("one_thread_per_connection_end");
-  const bool not_applier = !thd->wsrep_applier;
-  unlink_thd(thd);
 #ifdef WITH_WSREP
-  if (put_in_cache && not_applier)
+  const bool wsrep_applier(thd->wsrep_applier);
+  unlink_thd(thd);
+  if (put_in_cache && !wsrep_applier)
 #else
+  unlink_thd(thd);
   if (put_in_cache)
 #endif /* WITH_WSREP */
     put_in_cache= cache_thread();

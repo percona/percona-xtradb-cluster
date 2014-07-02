@@ -99,7 +99,7 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
 
     if (!ev)
     {
-      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %ld",
+      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %zu",
                   (long long)wsrep_thd_trx_seqno(thd), buf_len);
       rcode= 1;
       goto error;
@@ -205,6 +205,17 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 #else
   thd_proc_info(thd, "applying write set");
 #endif /* WSREP_PROC_INFO */
+
+  /* tune FK and UK checking policy */
+  if (wsrep_slave_UK_checks == FALSE) 
+    thd->variables.option_bits|= OPTION_RELAXED_UNIQUE_CHECKS;
+  else
+    thd->variables.option_bits&= ~OPTION_RELAXED_UNIQUE_CHECKS;
+
+  if (wsrep_slave_FK_checks == FALSE) 
+    thd->variables.option_bits|= OPTION_NO_FOREIGN_KEY_CHECKS;
+  else
+    thd->variables.option_bits&= ~OPTION_NO_FOREIGN_KEY_CHECKS;
 
   if (flags & WSREP_FLAG_ISOLATION)
   {

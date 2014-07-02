@@ -98,6 +98,8 @@ extern ulong       wsrep_mysql_replication_bundle;
 extern my_bool     wsrep_load_data_splitting;
 extern my_bool     wsrep_restart_slave;
 extern my_bool     wsrep_restart_slave_activated;
+extern my_bool     wsrep_slave_FK_checks;
+extern my_bool     wsrep_slave_UK_checks;
 
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
 enum enum_wsrep_reject_types { WSREP_REJ_NONE, WSREP_REJ_ALL, WSREP_REJ_ALL_KILL };
@@ -296,6 +298,7 @@ int wsrep_to_buf_helper(
 int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len);
 int wsrep_create_trigger_query(THD *thd, uchar** buf, size_t* buf_len);
 int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len);
+int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len);
 
 const wsrep_uuid_t* wsrep_cluster_uuid();
 struct xid_t;

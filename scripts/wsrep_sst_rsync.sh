@@ -1,6 +1,6 @@
 #!/bin/bash -ue
 
-# Copyright (C) 2010 Codership Oy
+# Copyright (C) 2010-2014 Codership Oy
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,10 +23,12 @@ RSYNC_CONF=
 OS=$(uname)
 [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
 
-. $(dirname $0)/wsrep_sst_common
-
 # Setting the path for lsof on CentOS
 export PATH="/usr/sbin:/sbin:$PATH"
+
+. $(dirname $0)/wsrep_sst_common
+
+wsrep_check_programs rsync
 
 cleanup_joiner()
 {
@@ -203,6 +205,8 @@ then
 elif [ "$WSREP_SST_OPT_ROLE" = "joiner" ]
 then
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
+    wsrep_check_programs lsof
+
     MYSQLD_PID=$WSREP_SST_OPT_PARENT
 
     MODULE="rsync_sst"
