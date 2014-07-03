@@ -4747,7 +4747,6 @@ wsrep_store_key_val_for_row(
 			ulint		key_len;
 			ulint		true_len;
 			CHARSET_INFO*	cs;
-			ulint		sort_len;
 			int		error=0;
 
 			key_len = key_part->length;
@@ -4789,12 +4788,12 @@ wsrep_store_key_val_for_row(
 			}
 
 			memcpy(sorted, data, true_len);
-			sort_len = wsrep_innobase_mysql_sort(
+			true_len = wsrep_innobase_mysql_sort(
 				mysql_type, cs->number, sorted, true_len, 
 				REC_VERSION_56_MAX_INDEX_COL_LEN);
 
 			if (wsrep_protocol_version > 1) {
-				memcpy(buff, sorted, sort_len);
+				memcpy(buff, sorted, true_len);
                         /* Note that we always reserve the maximum possible
 			length of the true VARCHAR in the key value, though
 			only len first bytes after the 2 length bytes contain
@@ -4815,7 +4814,6 @@ wsrep_store_key_val_for_row(
 			CHARSET_INFO*	cs;
 			ulint		key_len;
 			ulint		true_len;
-			ulint		sort_len;
 			int		error=0;
 			ulint		blob_len;
 			const byte*	blob_data;
@@ -4864,11 +4862,11 @@ wsrep_store_key_val_for_row(
 			}
 
 			memcpy(sorted, blob_data, true_len);
-			sort_len = wsrep_innobase_mysql_sort(
+			true_len = wsrep_innobase_mysql_sort(
 				mysql_type, cs->number, sorted, true_len,
 				REC_VERSION_56_MAX_INDEX_COL_LEN);
 
-			memcpy(buff, sorted, sort_len);
+			memcpy(buff, sorted, true_len);
 
 			/* Note that we always reserve the maximum possible
 			length of the BLOB prefix in the key value. */
@@ -4885,7 +4883,6 @@ wsrep_store_key_val_for_row(
 
 			CHARSET_INFO*		cs;
 			ulint			true_len;
-			ulint			sort_len;
 			ulint			key_len;
 			const uchar*		src_start;
 			int			error=0;
@@ -4930,11 +4927,11 @@ wsrep_store_key_val_for_row(
 							&error);
 				}
 				memcpy(sorted, src_start, true_len);
-				sort_len = wsrep_innobase_mysql_sort(
+				true_len = wsrep_innobase_mysql_sort(
 					mysql_type, cs->number, sorted, true_len,
 					REC_VERSION_56_MAX_INDEX_COL_LEN);
 
-				memcpy(buff, sorted, sort_len);
+				memcpy(buff, sorted, true_len);
 			} else {
 				memcpy(buff, src_start, true_len);
 			}
