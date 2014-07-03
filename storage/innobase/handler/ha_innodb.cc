@@ -10045,9 +10045,6 @@ ha_innobase::wsrep_append_keys(
 			KEY*  key_info	= table->key_info + i;
 			if (key_info->flags & HA_NOSAME) {
 				hasPK = true;
-				if (i != table->s->primary_key) {
-					wsrep_thd_set_PA_safe(thd, FALSE);
-				}
 			}
 		}
 
