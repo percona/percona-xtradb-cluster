@@ -4515,9 +4515,16 @@ wsrep_innobase_mysql_sort(
 			   protocols < 3 truncated the sorted sring
 			   protocols > 3 gets full sorted sring
 			*/
+		  	/* 5.5 strnxfrm pads the tail with spaces and
+			   always returns the full destination buffer lenght
+			   we cannot know how many characters were converted
+			   using 2 * str length here as best guess
+			*/
+			uint dst_length = (str_length * 2 < tmp_length) ? 
+				(str_length * 2) : tmp_length; 
 			tmp_length = charset->coll->strnxfrm(
-				charset, str, buf_length,
-				tmp_str, tmp_length);
+				charset, str, dst_length,
+				tmp_str, str_length);
 			DBUG_ASSERT(tmp_length <= buf_length);
 			ret_length = tmp_length;
 		}
