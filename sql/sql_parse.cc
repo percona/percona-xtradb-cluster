@@ -3102,6 +3102,11 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_UPDATE:
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) &&
+          !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
+          wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+#endif /* WITH_WSREP */      
   {
     ha_rows found= 0, updated= 0;
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
@@ -3141,6 +3146,11 @@ end_with_restore_list:
     /* if we switched from normal update, rights are checked */
     if (up_result != 2)
     {
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) &&
+          !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
+          wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+#endif /* WITH_WSREP */
       if ((res= multi_update_precheck(thd, all_tables)))
         break;
     }
@@ -3371,6 +3381,11 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_DELETE:
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd) && 
+        !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
+        wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+#endif /* WITH_WSREP */
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     if ((res= delete_precheck(thd, all_tables)))
@@ -3386,6 +3401,11 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_DELETE_MULTI:
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd) && 
+        !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
+        wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+#endif /* WITH_WSREP */
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     TABLE_LIST *aux_tables= thd->lex->auxiliary_table_list.first;
