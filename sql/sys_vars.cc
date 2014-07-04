@@ -3467,7 +3467,19 @@ static Sys_var_mybool Sys_wsrep_certify_nonPK(
 static Sys_var_mybool Sys_wsrep_causal_reads(
        "wsrep_causal_reads", "Enable \"strictly synchronous\" semantics for read operations",
        SESSION_VAR(wsrep_causal_reads), 
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(wsrep_causal_reads_update));
+
+static Sys_var_ulong Sys_wsrep_causal_mask(
+    "wsrep_causal_mask", "Specify \"strictly synchronous\" semantics on which operation type",
+    SESSION_VAR(wsrep_causal_mask),
+    CMD_LINE(OPT_ARG),
+    VALID_RANGE(WSREP_CAUSAL_NONE, WSREP_CAUSAL_MAX_VALUE),
+    DEFAULT(WSREP_CAUSAL_NONE),
+    BLOCK_SIZE(1),
+    NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+    ON_UPDATE(wsrep_causal_mask_update));
 
 static const char *wsrep_OSU_method_names[]= { "TOI", "RSU", NullS };
 static Sys_var_enum Sys_wsrep_OSU_method(

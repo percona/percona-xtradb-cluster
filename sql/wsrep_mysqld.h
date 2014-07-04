@@ -101,6 +101,13 @@ extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
 
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
+enum enum_wsrep_causal_mask {
+    WSREP_CAUSAL_NONE = 0x0,
+    WSREP_CAUSAL_ON_READ_AND_TRAN = 0x1, // SELECT, SHOW, BEGIN
+    WSREP_CAUSAL_ON_UPDATE_DELETE = 0x2, // UPDATE/DELEET
+    WSREP_CAUSAL_ON_INSERT = 0x4, // INSERT
+    WSREP_CAUSAL_MAX_VALUE = 0x7
+};
 
 // MySQL status variables
 extern my_bool     wsrep_connected;
@@ -172,6 +179,7 @@ extern void wsrep_kill_mysql(THD *thd);
 extern void wsrep_stop_replication(THD *thd);
 extern bool wsrep_start_replication();
 extern bool wsrep_causal_wait(THD* thd);
+extern bool wsrep_causal_wait_by_mask(THD* thd, int mask);
 extern int  wsrep_check_opts (int argc, char* const* argv);
 extern void wsrep_prepend_PATH (const char* path);
 

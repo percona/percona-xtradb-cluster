@@ -850,7 +850,14 @@ bool wsrep_start_replication()
 bool
 wsrep_causal_wait (THD* thd)
 {
-  if (thd->variables.wsrep_causal_reads && thd->variables.wsrep_on &&
+    return wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_READ_AND_TRAN);
+}
+
+bool
+wsrep_causal_wait_by_mask (THD* thd, int mask)
+{
+  if ((thd->variables.wsrep_causal_mask & mask) &&
+      thd->variables.wsrep_on &&
       !thd->in_active_multi_stmt_transaction() &&
       thd->wsrep_conflict_state != REPLAYING)
   {

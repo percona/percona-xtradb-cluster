@@ -63,11 +63,29 @@ bool wsrep_on_update (sys_var *self, THD* thd, enum_var_type var_type)
   return false;
 }
 
-void wsrep_causal_reads_update (sys_var *self, THD* thd, enum_var_type var_type)
+bool wsrep_causal_reads_update (sys_var *self, THD* thd, enum_var_type var_type)
 {
-  if (var_type == OPT_GLOBAL) {
-    thd->variables.wsrep_causal_reads = global_system_variables.wsrep_causal_reads;
+  // global setting should not affect session setting.
+  // if (var_type == OPT_GLOBAL) {
+  //   thd->variables.wsrep_causal_reads = global_system_variables.wsrep_causal_reads;
+  // }
+  if (thd->variables.wsrep_causal_reads) {
+    thd->variables.wsrep_causal_mask |= WSREP_CAUSAL_ON_READ_AND_TRAN;
+  } else {
+    thd->variables.wsrep_causal_mask &= ~WSREP_CAUSAL_ON_READ_AND_TRAN;
   }
+  return false;
+}
+
+bool wsrep_causal_mask_update (sys_var* self, THD* thd, enum_var_type var_type)
+{
+  // global setting should not affect session setting.
+  // if (var_type == OPT_GLOBAL) {
+  //   thd->variables.wsrep_causal_mask = global_system_variables.wsrep_causal_mask;
+  // }
+  thd->variables.wsrep_causal_reads = thd->variables.wsrep_causal_mask &
+          WSREP_CAUSAL_ON_READ_AND_TRAN;
+  return false;
 }
 
 static int wsrep_start_position_verify (const char* start_str)
