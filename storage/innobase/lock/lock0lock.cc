@@ -2357,9 +2357,11 @@ lock_rec_add_to_queue(
 
 somebody_waits:
 #ifdef WITH_WSREP
+#if 0
 	if (wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
 	  fprintf(stderr, "BF thread to go for lock create: %lu\n", trx->id);
 	}
+#endif
 	return(lock_rec_create(NULL, NULL,
 			type_mode, block, heap_no, index, trx,
 			caller_owns_trx_mutex));
