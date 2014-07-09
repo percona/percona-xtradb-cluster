@@ -186,7 +186,7 @@ wait_for_pid () {
     fi
 
     if (test -e $sst_progress_file || [ $mode = 'bootstrap-pxc' ]) && [ $startup_sleep -ne 10 ];then
-        echo "SST in progress, setting sleep higher"
+        echo "State transfer in progress, setting sleep higher"
         startup_sleep=10
     fi
 
@@ -342,7 +342,7 @@ case "$mode" in
       if [ $return_value == 1 ];then 
           log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
       elif [ $return_value == 2 ];then
-          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed! SST still in progress"
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
       fi
 
       # Make lock for RedHat / SuSE
