@@ -218,7 +218,7 @@ fi
 
     # Build HandlerSocket
     (
-        cd "storage/HandlerSocket-Plugin-for-MySQL"
+        cd "plugin/HandlerSocket-Plugin-for-MySQL"
         ./autogen.sh
         CXX=${HS_CXX:-g++} ./configure --with-mysql-source="$SOURCEDIR/" \
             --with-mysql-bindir="$SOURCEDIR/scripts" \
@@ -242,11 +242,11 @@ fi
     (
         cd "$JEMALLOCDIR"
 
-        ./configure --prefix="/usr/local/$PRODUCT_FULL/" \
+        CFLAGS= ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL/" \
                 --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
         make $MAKE_JFLAG
         make DESTDIR="$WORKDIR" install_lib_shared
-
+        strip lib/libjemalloc* || true
         # Copy COPYING file
         cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
