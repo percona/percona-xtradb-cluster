@@ -1131,7 +1131,7 @@ echo "====="                                     >> $STATUS_HISTORY
     %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
 %endif
 
-%if "%rhel" == "6"
+%if "%rhel" >= "6"
     %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
 %endif 
 
