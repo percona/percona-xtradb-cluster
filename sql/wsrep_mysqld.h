@@ -101,12 +101,13 @@ extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
 
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
-enum enum_wsrep_causal_mask {
-    WSREP_CAUSAL_NONE = 0x0,
-    WSREP_CAUSAL_ON_READ_AND_TRAN = 0x1, // SELECT, SHOW, BEGIN
-    WSREP_CAUSAL_ON_UPDATE_DELETE = 0x2, // UPDATE/DELEET
-    WSREP_CAUSAL_ON_INSERT = 0x4, // INSERT
-    WSREP_CAUSAL_MAX_VALUE = 0x7
+enum enum_wsrep_sync_wait {
+    WSREP_SYNC_WAIT_NONE = 0x0,
+    // show, select, begin
+    WSREP_SYNC_WAIT_BEFORE_READ = 0x1,
+    WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE = 0x2,
+    WSREP_SYNC_WAIT_BEFORE_INSERT = 0x4,
+    WSREP_SYNC_WAIT_MAX = 0x7,
 };
 
 // MySQL status variables
