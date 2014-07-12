@@ -5267,7 +5267,7 @@ wsrep_innobase_mysql_sort(
 	case MYSQL_TYPE_LONG_BLOB:
 	case MYSQL_TYPE_VARCHAR:
 	{
-		uchar tmp_str[REC_VERSION_56_MAX_INDEX_COL_LEN];
+		uchar tmp_str[REC_VERSION_56_MAX_INDEX_COL_LEN] = {'\0'};
 		uint tmp_length = REC_VERSION_56_MAX_INDEX_COL_LEN;
 
 		/* Use the charset number to pick the right charset struct for
