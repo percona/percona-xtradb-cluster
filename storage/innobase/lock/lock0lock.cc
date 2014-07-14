@@ -2311,9 +2311,13 @@ lock_rec_add_to_queue(
 		if (lock_get_wait(lock)
 		    && lock_rec_get_nth_bit(lock, heap_no)) {
 #ifdef WITH_WSREP
-		  if (wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
-		    fprintf(stderr, "BF thread skipping somebody_waits: %lu\n", trx->id);
-		    lock_rec_print(stderr, lock);
+			if (wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
+				if (wsrep_debug) {
+					fprintf(stderr, 
+						"BF skipping wait: %lu\n", 
+						trx->id);
+					lock_rec_print(stderr, lock);
+				}
 		  } else
 #endif
 			goto somebody_waits;
@@ -2339,9 +2343,6 @@ lock_rec_add_to_queue(
 
 somebody_waits:
 #ifdef WITH_WSREP
-	if (wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
-	  fprintf(stderr, "BF thread to go for lock create: %lu\n", trx->id);
-	}
 	return(lock_rec_create(NULL, NULL,
 			type_mode, block, heap_no, index, trx,
 			caller_owns_trx_mutex));
