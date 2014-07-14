@@ -3471,13 +3471,11 @@ static Sys_var_mybool Sys_wsrep_causal_reads(
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(wsrep_causal_reads_update));
 
-static Sys_var_ulong Sys_wsrep_sync_wait(
+static Sys_var_mybool Sys_wsrep_sync_wait(
        "wsrep_sync_wait", "Ensure \"synchronous\" read view before executing an operation of the type specified by bitmask: 1 - SELECT, SHOW and BEGIN/START TRANSACTION; 2 - UPDATE and DELETE; 3 - INSERT",
        SESSION_VAR(wsrep_sync_wait),
        CMD_LINE(OPT_ARG),
-       VALID_RANGE(WSREP_SYNC_WAIT_NONE, WSREP_SYNC_WAIT_MAX),
        DEFAULT(WSREP_SYNC_WAIT_NONE),
-       BLOCK_SIZE(1),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(wsrep_sync_wait_update));
 

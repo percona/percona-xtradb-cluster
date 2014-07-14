@@ -106,8 +106,7 @@ enum enum_wsrep_sync_wait {
     // show, select, begin
     WSREP_SYNC_WAIT_BEFORE_READ = 0x1,
     WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE = 0x2,
-    WSREP_SYNC_WAIT_BEFORE_INSERT = 0x4,
-    WSREP_SYNC_WAIT_MAX = 0x7,
+    WSREP_SYNC_WAIT_BEFORE_INSERT = 0x4
 };
 
 // MySQL status variables
