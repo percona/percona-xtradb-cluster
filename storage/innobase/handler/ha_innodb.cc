@@ -7355,11 +7355,11 @@ ha_innobase::wsrep_append_keys(
 		uint	len;
 		char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
 		char 	*key 		= &keyval[0];
-		KEY	*key_info	= table->key_info;
 		ibool    is_null;
 
 		len = wsrep_store_key_val_for_row(
-			table, 0, key, key_info->key_length, record0, &is_null);
+			table, 0, key, WSREP_MAX_SUPPORTED_KEY_LENGTH, 
+			record0, &is_null);
 
 		if (!is_null) {
 			int rcode = wsrep_append_key(
@@ -7414,7 +7414,8 @@ ha_innobase::wsrep_append_keys(
 			     (!tab && referenced_by_foreign_key()))) {
 
 				len = wsrep_store_key_val_for_row(
-					table, i, key0, key_info->key_length, 
+					table, i, key0, 
+					WSREP_MAX_SUPPORTED_KEY_LENGTH,
 					record0, &is_null);
 				if (!is_null) {
 					int rcode = wsrep_append_key(
@@ -7432,7 +7433,8 @@ ha_innobase::wsrep_append_keys(
 				}
 				if (record1) {
 					len = wsrep_store_key_val_for_row(
-						table, i, key1, key_info->key_length, 
+						table, i, key1, 
+						WSREP_MAX_SUPPORTED_KEY_LENGTH, 
 						record1, &is_null);
 					if (!is_null && memcmp(key0, key1, len)) {
 						int rcode = wsrep_append_key(
