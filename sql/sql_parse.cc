@@ -3105,7 +3105,7 @@ end_with_restore_list:
 #ifdef WITH_WSREP
       if (WSREP_CLIENT(thd) &&
           !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
-          wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+          wsrep_causal_wait_by_mask(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
 #endif /* WITH_WSREP */      
   {
     ha_rows found= 0, updated= 0;
@@ -3149,7 +3149,7 @@ end_with_restore_list:
 #ifdef WITH_WSREP
       if (WSREP_CLIENT(thd) &&
           !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
-          wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+          wsrep_causal_wait_by_mask(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
 #endif /* WITH_WSREP */
       if ((res= multi_update_precheck(thd, all_tables)))
         break;
@@ -3384,7 +3384,7 @@ end_with_restore_list:
 #ifdef WITH_WSREP
     if (WSREP_CLIENT(thd) && 
         !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
-        wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+        wsrep_causal_wait_by_mask(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
 #endif /* WITH_WSREP */
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
@@ -3404,7 +3404,7 @@ end_with_restore_list:
 #ifdef WITH_WSREP
     if (WSREP_CLIENT(thd) && 
         !thd->in_multi_stmt_transaction_mode() && // auto_commit = 1
-        wsrep_causal_wait_by_mask(thd, WSREP_CAUSAL_ON_UPDATE_DELETE)) goto error;
+        wsrep_causal_wait_by_mask(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
 #endif /* WITH_WSREP */
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);

@@ -70,21 +70,21 @@ bool wsrep_causal_reads_update (sys_var *self, THD* thd, enum_var_type var_type)
   //   thd->variables.wsrep_causal_reads = global_system_variables.wsrep_causal_reads;
   // }
   if (thd->variables.wsrep_causal_reads) {
-    thd->variables.wsrep_causal_mask |= WSREP_CAUSAL_ON_READ_AND_TRAN;
+    thd->variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;
   } else {
-    thd->variables.wsrep_causal_mask &= ~WSREP_CAUSAL_ON_READ_AND_TRAN;
+    thd->variables.wsrep_sync_wait &= ~WSREP_SYNC_WAIT_BEFORE_READ;
   }
   return false;
 }
 
-bool wsrep_causal_mask_update (sys_var* self, THD* thd, enum_var_type var_type)
+bool wsrep_sync_wait_update (sys_var* self, THD* thd, enum_var_type var_type)
 {
   // global setting should not affect session setting.
   // if (var_type == OPT_GLOBAL) {
-  //   thd->variables.wsrep_causal_mask = global_system_variables.wsrep_causal_mask;
+  //   thd->variables.wsrep_sync_wait = global_system_variables.wsrep_sync_wait;
   // }
-  thd->variables.wsrep_causal_reads = thd->variables.wsrep_causal_mask &
-          WSREP_CAUSAL_ON_READ_AND_TRAN;
+  thd->variables.wsrep_causal_reads = thd->variables.wsrep_sync_wait &
+          WSREP_SYNC_WAIT_BEFORE_READ;
   return false;
 }
 
