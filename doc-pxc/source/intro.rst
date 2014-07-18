@@ -54,7 +54,7 @@ and includes `Write Set Replication patches <https://launchpad.net/codership-mys
 It uses  the  `Galera library <https://launchpad.net/galera>`_, version 3.x, 
 a generic Synchronous Multi-Master replication plugin for transactional applications. 
 
-Galera library is developed by `Codership Oy <http://www.codership.com/>`_.
+Galera library is developed by `Codership Oy <http://www.galeracluster.com/>`_.
 
 Galera 3.x supports such new features as:
  * Incremental State Transfer (|IST|), especially useful for WAN deployments,
