@@ -37,13 +37,12 @@ Ubuntu
 
  * 10.04LTS lucid
  * 12.04LTS precise
- * 12.10 quantal
- * 13.04 raring
  * 13.10 saucy
+ * 14.04LTS trusty
 
 
-Install XtraDB Cluster
-=======================
+Install Percona XtraDB Cluster
+==============================
 
 Make sure to remove existing |Percona XtraDB Cluster| 5.5 and |Percona Server| 5.5/5.6 packages before proceeding.
 
@@ -64,3 +63,15 @@ Percona offers fresh beta builds from the experimental repository. To enable it 
 
   deb http://repo.percona.com/apt VERSION main experimental
   deb-src http://repo.percona.com/apt VERSION main experimental
+
+Apt-Pinning the packages
+========================
+
+In some cases you might need to "pin" the selected packages to avoid the upgrades from the distribution repositories. You'll need to make a new file :file:`/etc/apt/preferences.d/00percona.pref` and add the following lines in it: :: 
+
+  Package: *
+  Pin: release o=Percona Development Team
+  Pin-Priority: 1001
+
+For more information about the pinning you can check the official `debian wiki <http://wiki.debian.org/AptPreferences>`_.
+

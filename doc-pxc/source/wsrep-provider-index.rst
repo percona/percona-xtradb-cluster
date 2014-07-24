@@ -485,6 +485,16 @@ This variable specifies the period which PC protocol waits for EVS termination.
 
 When this variable is set to ``TRUE`` more recent primary component overrides older ones in case of conflicting prims.
 
+.. variable::  pc.recovery
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+   :default: true
+
+When this variable is set to ``true`` the node stores the Primary Component state to disk. The Primary Component can then recover automatically when all nodes that were part of the last saved state re-establish communications with each other. This feature allows automatic recovery from full cluster crashes, such as in the case of a data center power outage and graceful full cluster restarts without the need for explicitly bootstrapping a new Primary Component.
+
 .. variable::  pc.version
 
    :cli: Yes

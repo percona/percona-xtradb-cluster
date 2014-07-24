@@ -135,6 +135,10 @@ Shows the number of writesets processed while the variable :variable:`wsrep_caus
 .. variable:: wsrep_incoming_addresses
 
 Shows the comma-separated list of incoming node addresses in the cluster.
+
+.. variable:: wsrep_evs_repl_latency
+
+This status variable provides the information regarding the group communication replication latency. This latency is measured from the time point when a message is sent out to the time point when a message is received.
   
 .. variable:: wsrep_cluster_conf_id
 
