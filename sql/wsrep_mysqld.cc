@@ -848,20 +848,20 @@ bool wsrep_start_replication()
 }
 
 bool
-wsrep_causal_wait (THD* thd)
+wsrep_sync_wait (THD* thd)
 {
-    return wsrep_causal_wait_by_mask(thd, WSREP_SYNC_WAIT_BEFORE_READ);
+    return wsrep_sync_wait_by_mask(thd, WSREP_SYNC_WAIT_BEFORE_READ);
 }
 
 bool
-wsrep_causal_wait_by_mask (THD* thd, int mask)
+wsrep_sync_wait_by_mask (THD* thd, int mask)
 {
   if ((thd->variables.wsrep_sync_wait & mask) &&
       thd->variables.wsrep_on &&
       !thd->in_active_multi_stmt_transaction() &&
       thd->wsrep_conflict_state != REPLAYING)
   {
-    WSREP_INFO("executing causal read");
+    WSREP_DEBUG("wsrep_sync_wait_by_mask %d", mask);
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
     wsrep_gtid_t  gtid;
@@ -881,11 +881,11 @@ wsrep_causal_wait_by_mask (THD* thd, int mask)
       {
       case WSREP_NOT_IMPLEMENTED:
         msg= "consistent reads by wsrep backend. "
-             "Please unset wsrep_causal_reads variable.";
+             "Please unset wsrep_sync_wait variable.";
         err= ER_NOT_SUPPORTED_YET;
         break;
       default:
-        msg= "Causal wait failed.";
+        msg= "Synchronous wait failed.";
         err= ER_LOCK_WAIT_TIMEOUT; // NOTE: the above msg won't be displayed
                                    //       with ER_LOCK_WAIT_TIMEOUT
       }

@@ -106,7 +106,7 @@ enum enum_wsrep_sync_wait {
     // show, select, begin
     WSREP_SYNC_WAIT_BEFORE_READ = 0x1,
     WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE = 0x2,
-    WSREP_SYNC_WAIT_BEFORE_INSERT = 0x4,
+    WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE = 0x4,
     WSREP_SYNC_WAIT_MAX = 0x7
 };
 
@@ -179,8 +179,8 @@ extern void wsrep_kill_mysql(THD *thd);
 /* new defines */
 extern void wsrep_stop_replication(THD *thd);
 extern bool wsrep_start_replication();
-extern bool wsrep_causal_wait(THD* thd);
-extern bool wsrep_causal_wait_by_mask(THD* thd, int mask);
+extern bool wsrep_sync_wait(THD* thd);
+extern bool wsrep_sync_wait_by_mask(THD* thd, int mask);
 extern int  wsrep_check_opts (int argc, char* const* argv);
 extern void wsrep_prepend_PATH (const char* path);
 
