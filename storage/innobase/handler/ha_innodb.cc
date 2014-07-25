@@ -5297,16 +5297,16 @@ wsrep_innobase_mysql_sort(
 		if (wsrep_protocol_version < 3) {
 			tmp_length = charset->coll->strnxfrm(
 				charset, str, str_length,
-				str_length, tmp_str, tmp_length, 0);
+				str_length, tmp_str, str_length, 0);
 			DBUG_ASSERT(tmp_length <= str_length);
 		} else {
 			/* strnxfrm will expand the destination string,
 			   protocols < 3 truncated the sorted sring
-			   protocols > 3 gets full sorted sring
+			   protocols >= 3 gets full sorted sring
 			*/
 			tmp_length = charset->coll->strnxfrm(
 				charset, str, buf_length,
-				str_length, tmp_str, tmp_length, 0);
+				str_length, tmp_str, str_length, 0);
 			DBUG_ASSERT(tmp_length <= buf_length);
 			ret_length = tmp_length;
 		}
