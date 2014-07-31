@@ -848,13 +848,7 @@ bool wsrep_start_replication()
 }
 
 bool
-wsrep_sync_wait (THD* thd)
-{
-    return wsrep_sync_wait_by_mask(thd, WSREP_SYNC_WAIT_BEFORE_READ);
-}
-
-bool
-wsrep_sync_wait_by_mask (THD* thd, int mask)
+wsrep_sync_wait (THD* thd, uint mask)
 {
   if ((thd->variables.wsrep_sync_wait & mask) &&
       thd->variables.wsrep_on &&
