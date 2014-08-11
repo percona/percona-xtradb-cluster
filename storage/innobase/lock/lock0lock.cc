@@ -6449,8 +6449,10 @@ lock_rec_convert_impl_to_expl(
 		trx_is_active(trx_id, NULL) check below, because we are not
 		holding lock_mutex. */
 
+#ifndef WITH_WSREP
 		ut_ad(!lock_rec_other_trx_holds_expl(LOCK_S | LOCK_REC_NOT_GAP,
 						     trx_id, rec, block));
+#endif /* WITH_WSREP */
 	}
 
 	if (trx_id != 0) {

@@ -189,7 +189,7 @@ wsrep_row_upd_index_is_foreign(
 	dict_foreign_set::iterator	it
 		= std::find_if(table->foreign_set.begin(),
 			       table->foreign_set.end(),
-			       dict_foreign_with_index(index));
+			       dict_foreign_with_foreign_index(index));
 
 	is_referenced = (it != table->foreign_set.end());
 
