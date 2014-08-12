@@ -1,4 +1,5 @@
 usr/lib/mysql/plugin
+usr/lib/mysql/plugin/debug
 usr/bin/clustercheck
 usr/bin/pyclustercheck
 usr/bin/innochecksum
