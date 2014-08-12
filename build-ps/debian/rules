@@ -309,7 +309,7 @@ binary-arch: build install
 	dh_installlogcheck -a
 	dh_installchangelogs -a
 	dh_strip -a --dbg-package=percona-xtradb-cluster-5.6-dbg
-	dh_strip -a --dbg-package=percona-xtradb-cluster-debug-5.6-dbg
+	dh_strip -a --dbg-package=percona-xtradb-cluster-server-debug-5.6-dbg
 	dh_lintian
 	dh_link -a	# .so muss nach .so.1.2.3 installier werden!
 	dh_compress -a
