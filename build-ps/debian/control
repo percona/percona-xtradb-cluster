@@ -204,6 +204,68 @@ Description: Percona XtraDB Cluster database server binaries
  .
  This package includes the server binaries.
 
+
+Package: percona-xtradb-cluster-server-debug-5.6
+Architecture: any
+Suggests: tinyca, netcat-openbsd, pv, qpress
+Pre-Depends: percona-xtradb-cluster-common-5.6 (>= ${source:Version}),
+             adduser (>= 3.4.0),
+             debconf
+Depends: percona-xtradb-cluster-client-5.6 (>= ${source:Version}),
+         libdbi-perl,
+         libdbd-mysql-perl,
+         perl (>= 5.6),
+         ${shlibs:Depends},
+         ${misc:Depends},
+         psmisc,
+         passwd,
+         lsb-base (>= 3.0-10),
+         percona-xtradb-cluster-galera-25,
+         percona-xtrabackup (>= 2.1.6),
+         socat,
+        lsof,
+         rsync,
+         iproute
+Provides: mysql-server,
+          virtual-mysql-server,
+          virtual-mysql-server-core
+Breaks: mysql-server-5.0,
+        mysql-server-5.1,
+        mysql-server-5.5,
+        mysql-server-5.6,
+        mysql-server-core-5.1,
+        percona-xtradb-server-5.0,
+        percona-server-server-5.1,
+        percona-server-server-5.5,
+        percona-xtradb-cluster-server-5.5,
+        mariadb-server,
+        mariadb-server-core-5.5,
+        mariadb-server-5.5,
+        virtual-mysql-server,
+        virtual-mysql-server-core
+Replaces: mysql-server-5.0,
+          mysql-server-5.1,
+          mysql-server-5.5,
+          mysql-server-5.6,
+          mysql-server-core-5.1,
+          percona-xtradb-server-5.0,
+          percona-server-server-5.1,
+          percona-server-server-5.5,
+          percona-xtradb-cluster-server-5.5,
+          mariadb-server,
+          mariadb-server-core-5.5,
+          mariadb-server-5.5,
+          virtual-mysql-server,
+          virtual-mysql-server-core
+Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
+ .
+ This package includes the server binaries.
+
 Package: percona-xtradb-cluster-56
 Section: database
 Architecture: any
