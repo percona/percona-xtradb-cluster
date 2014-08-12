@@ -23,10 +23,6 @@
 #include "rpl_handler.h"
 #include "debug_sync.h"         // DEBUG_SYNC
 
-#ifdef WITH_WSREP
-#include "wsrep_mysqld_inl.h"
-#endif /* WITH_WSREP */
-
 /* Conditions under which the transaction state must not change. */
 static bool trans_check(THD *thd)
 {

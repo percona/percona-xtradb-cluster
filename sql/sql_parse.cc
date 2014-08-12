@@ -102,7 +102,6 @@
 #include "wsrep_thd.h"
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                               Parser_state *parser_state);
-#include "wsrep_mysqld_inl.h"
 #endif /* WITH_WSREP */
 /**
   @defgroup Runtime_Environment Runtime Environment
