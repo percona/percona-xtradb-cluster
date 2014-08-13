@@ -203,8 +203,8 @@ install: build
 	dh_installdirs
 
 	# make install (trailing slash needed for innobase)
-	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
 	(cd $(builddebug) && $(MAKE) install DESTDIR=$(TMPD)/)
+	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
 
 	# After installing, remove rpath to make lintian happy.
 	set +e; \
@@ -310,7 +310,7 @@ binary-arch: build install
 	dh_installinfo -a
 	dh_installlogcheck -a
 	dh_installchangelogs -a
-	dh_strip -a --dbg-package=percona-xtradb-cluster-5.6-dbg --dbg-package=percona-xtradb-cluster-server-debug-5.6-dbg
+	dh_strip -a --dbg-package=percona-xtradb-cluster-5.6-dbg 
 	dh_lintian
 	dh_link -a	# .so muss nach .so.1.2.3 installier werden!
 	dh_compress -a
