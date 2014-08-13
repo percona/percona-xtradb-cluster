@@ -188,6 +188,7 @@ clean-patched:
 	[ ! -d mysql-test/var ] || rm -rf mysql-test/var
 	
 	rm -rf $(builddir)
+	rm -rf $(builddebug)
 
 	debconf-updatepo
 	# rm -f $(EXPORTED_SOURCE_TARBALL)
@@ -264,7 +265,6 @@ install: build
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 	dh_movefiles
-	dh_movefiles --sourcedir=debian/tmp-debug
 
 # Build architecture-independent files here.
 binary-indep: build install
