@@ -1,2 +1,2 @@
-usr/lib/mysql/plugin/debug
+usr/lib/mysql/plugin/debug/*.so
 usr/sbin/mysqld-debug

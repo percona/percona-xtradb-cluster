@@ -7,6 +7,7 @@ PACKAGE=percona-xtradb-cluster-5.6
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 TMP=$(CURDIR)/debian/tmp/
+TMPD=$(CURDIR)/debian/tmp-debug/
 prefix=/usr
 
 ARCH = $(shell dpkg-architecture -qDEB_BUILD_ARCH)
@@ -202,7 +203,7 @@ install: build
 
 	# make install (trailing slash needed for innobase)
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
-	(cd $(builddebug) && $(MAKE) install DESTDIR=$(TMP)/)
+	(cd $(builddebug) && $(MAKE) install DESTDIR=$(TMPD)/)
 
 	# After installing, remove rpath to make lintian happy.
 	set +e; \
@@ -263,6 +264,7 @@ install: build
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 	dh_movefiles
+	dh_movefiles --sourcedir=debian/tmp-debug
 
 # Build architecture-independent files here.
 binary-indep: build install
