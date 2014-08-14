@@ -1121,17 +1121,49 @@ static const char *require_quotes(const char *name, uint name_length)
   packet                target string
   name                  the identifier to be appended
   name_length           length of the appending identifier
-
-  RETURN VALUES
-    true                Error
-    false               Ok
 */
 
-bool
+void
 append_identifier(THD *thd, String *packet, const char *name, uint length)
 {
-  int q= get_quote_char_for_identifier(thd, name, length);
-  return packet->append_identifier(name, length, system_charset_info, q);
+  const char *name_end;
+  char quote_char;
+  int q;
+  q= thd ? get_quote_char_for_identifier(thd, name, length) : '`';
+
+  if (q == EOF)
+  {
+    packet->append(name, length, packet->charset());
+    return;
+  }
+
+  /*
+    The identifier must be quoted as it includes a quote character or
+   it's a keyword
+  */
+
+  (void) packet->reserve(length*2 + 2);
+  quote_char= (char) q;
+  packet->append(&quote_char, 1, system_charset_info);
+
+  for (name_end= name+length ; name < name_end ; name+= length)
+  {
+    uchar chr= (uchar) *name;
+    length= my_mbcharlen(system_charset_info, chr);
+    /*
+      my_mbcharlen can return 0 on a wrong multibyte
+      sequence. It is possible when upgrading from 4.0,
+      and identifier contains some accented characters.
+      The manual says it does not work. So we'll just
+      change length to 1 not to hang in the endless loop.
+    */
+    if (!length)
+      length= 1;
+    if (length == 1 && chr == (uchar) quote_char)
+      packet->append(&quote_char, 1, system_charset_info);
+    packet->append(name, length, system_charset_info);
+  }
+  packet->append(&quote_char, 1, system_charset_info);
 }
 
 
@@ -1198,8 +1230,6 @@ static void append_directory(THD *thd, String *packet, const char *dir_type,
   }
 }
 
-
-#define LIST_PROCESS_HOST_LEN 64
 
 /**
   Print "ON UPDATE" clause of a field into a string.
@@ -6481,15 +6511,13 @@ int get_cs_converted_part_value_from_string(THD *thd,
 static void store_schema_partitions_record(THD *thd, TABLE *schema_table,
                                            TABLE *showing_table,
                                            partition_element *part_elem,
-                                           handler *file, uint part_id,
-                                           ha_rows *records)
+                                           handler *file, uint part_id)
 {
   TABLE* table= schema_table;
   CHARSET_INFO *cs= system_charset_info;
   PARTITION_STATS stat_info;
   MYSQL_TIME time;
   file->get_dynamic_partition_info(&stat_info, part_id);
-  *records= stat_info.records;
   table->field[0]->store(STRING_WITH_LEN("def"), cs);
   table->field[12]->store((longlong) stat_info.records, TRUE);
   table->field[13]->store((longlong) stat_info.mean_rec_length, TRUE);
@@ -6612,12 +6640,8 @@ static int get_schema_partitions_record(THD *thd, TABLE_LIST *tables,
   String tmp_str;
   TABLE *show_table= tables->table;
   handler *file;
-  ha_rows records;
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   partition_info *part_info;
-  uint handler_part_id= 0;
-  ha_rows max_records= 0;
-  PARTITION_STATS stat_info;
 #endif
   DBUG_ENTER("get_schema_partitions_record");
 
@@ -6745,8 +6769,6 @@ static int get_schema_partitions_record(THD *thd, TABLE_LIST *tables,
                                                list_value,
                                                tmp_str))
           {
-            file->info(HA_STATUS_CONST | HA_STATUS_TIME | HA_STATUS_VARIABLE |
-                       HA_STATUS_VARIABLE_EXTRA | HA_STATUS_NO_LOCK);
             DBUG_RETURN(1);
           }
           table->field[11]->store(tmp_str.ptr(), tmp_str.length(), cs);
@@ -6785,8 +6807,6 @@ static int get_schema_partitions_record(THD *thd, TABLE_LIST *tables,
                                                  list_value,
                                                  tmp_str))
             {
-              file->info(HA_STATUS_CONST | HA_STATUS_TIME | HA_STATUS_VARIABLE |
-                         HA_STATUS_VARIABLE_EXTRA | HA_STATUS_NO_LOCK);
               DBUG_RETURN(1);
             }
             if (part_info->part_field_list.elements > 1U)
@@ -6823,39 +6843,27 @@ static int get_schema_partitions_record(THD *thd, TABLE_LIST *tables,
           table->field[6]->set_notnull();
           
           store_schema_partitions_record(thd, table, show_table, subpart_elem,
-                                         file, part_id, &records);
-          handler_part_id= (records > max_records) ? part_id : handler_part_id;
+                                         file, part_id);
           part_id++;
           if(schema_table_store_record(thd, table))
-          {
-            file->info(HA_STATUS_CONST | HA_STATUS_TIME | HA_STATUS_VARIABLE |
-                       HA_STATUS_VARIABLE_EXTRA | HA_STATUS_NO_LOCK);
             DBUG_RETURN(1);
-          }
         }
       }
       else
       {
         store_schema_partitions_record(thd, table, show_table, part_elem,
-                                       file, part_id, &records);
-        handler_part_id= (records > max_records) ? part_id : handler_part_id;
+                                       file, part_id);
         part_id++;
         if(schema_table_store_record(thd, table))
-        {
-          file->info(HA_STATUS_CONST | HA_STATUS_TIME | HA_STATUS_VARIABLE |
-                     HA_STATUS_VARIABLE_EXTRA | HA_STATUS_NO_LOCK);
           DBUG_RETURN(1);
-        }
       }
     }
-    file->get_dynamic_partition_info(&stat_info, handler_part_id);
     DBUG_RETURN(0);
   }
   else
 #endif
   {
-    store_schema_partitions_record(thd, table, show_table, 0, file, 0,
-                                   &records);
+    store_schema_partitions_record(thd, table, show_table, 0, file, 0);
     if(schema_table_store_record(thd, table))
       DBUG_RETURN(1);
   }

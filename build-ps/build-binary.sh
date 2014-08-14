@@ -21,6 +21,7 @@ DEBUG_COMMENT=''
 WITH_JEMALLOC=''
 DEBUG_EXTNAME=''
 WITH_SSL='/usr'
+WITH_SSL_TYPE='system'
 OPENSSL_INCLUDE=''
 OPENSSL_LIBRARY=''
 CRYPTO_LIBRARY=''
@@ -38,7 +39,7 @@ TAR=${TAR:-tar}
 if ! getopt --test
 then
     go_out="$(getopt --options=iqdvjt: \
-        --longoptions=i686,quiet,debug,valgrind,with-jemalloc:,with-ssl:,tag: \
+        --longoptions=i686,quiet,debug,valgrind,with-jemalloc:,with-yassl,with-ssl:,tag: \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -72,6 +73,10 @@ do
         shift
         WITH_JEMALLOC="$1"
         shift
+        ;;
+    --with-yassl )
+        shift
+        WITH_SSL_TYPE="bundled"
         ;;
     --with-ssl )
         shift
@@ -268,7 +273,7 @@ fi
 
     #make -f Makefile-pxc all
 
-    if grep builtin <<< "$STAG";then 
+    if grep -q builtin <<< "$STAG" || [[ $WITH_SSL_TYPE == 'bundled' ]];then 
         # builtin
         SSL_OPT='-DWITH_SSL=bundled -DWITH_ZLIB=bundled'
     else 
@@ -348,14 +353,14 @@ fi
 (
     cd "$WORKDIR/usr/local/"
 
-    find $PRODUCT_FULL ! -type d  ! -iname "*tdb*.h" -a ! -iname "*toku*" | sort > $WORKDIR/tokudb_server.list
+    find $PRODUCT_FULL ! -type d  ! \( -iname '*toku*' -o -iwholename '*/tokudb*/*' -o -iname '*tdb*.h' \) | sort > $WORKDIR/tokudb_server.list
     $TAR --owner=0 --group=0 -czf "$WORKDIR/$PRODUCT_FULL.tar.gz" -T $WORKDIR/tokudb_server.list
     rm -f $WORKDIR/tokudb_server.list
 
     if test -e "$PRODUCT_FULL/lib/mysql/plugin/ha_tokudb.so"
     then
         TARGETTOKU=$(echo $PRODUCT_FULL | sed 's/.Linux/.TokuDB.Linux/')
-        find $PRODUCT_FULL ! -type d  -iname "*toku*" -o -iname "*tdb*.h" > $WORKDIR/tokudb_plugin.list
+	find $PRODUCT_FULL ! -type d \( -iname '*toku*' -o -iwholename '*/tokudb*/*' -o -iname '*tdb*.h' \) > $WORKDIR/tokudb_plugin.list
         $TAR --owner=0 --group=0 -czf "$WORKDIR/$TARGETTOKU.tar.gz" -T $WORKDIR/tokudb_plugin.list
         rm -f $WORKDIR/tokudb_plugin.list
     fi
