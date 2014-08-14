@@ -1382,6 +1382,11 @@ static int binlog_start_consistent_snapshot(handlerton *hton, THD *thd)
   LOG_INFO li;
   DBUG_ENTER("binlog_start_consistent_snapshot");
 
+#ifdef WSREP
+  if (wsrep_emulate_bin_log)
+    DBUG_RETURN(0);
+#endif
+
   if ((err= thd->binlog_setup_trx_data()))
     DBUG_RETURN(err);
 
@@ -1405,6 +1410,11 @@ static int binlog_clone_consistent_snapshot(handlerton *hton, THD *thd,
   my_off_t pos;
 
   DBUG_ENTER("binlog_start_consistent_snapshot");
+
+#ifdef WSREP
+  if (wsrep_emulate_bin_log)
+    DBUG_RETURN(0);
+#endif
 
   from_cache_mngr= opt_bin_log ?
     (binlog_cache_mngr *) thd_get_cache_mngr(from_thd) : NULL;
