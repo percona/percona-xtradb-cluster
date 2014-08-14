@@ -3083,7 +3083,9 @@ btr_cur_del_mark_set_clust_rec(
 #endif /* UNIV_DEBUG */
 
 	ut_ad(dict_index_is_clust(index));
+#ifndef WITH_WSREP
 	ut_ad(!rec_get_deleted_flag(rec, rec_offs_comp(offsets)));
+#endif
 
 	if (UNIV_UNLIKELY(thr_get_trx(thr)->fake_changes)) {
 		/* skip LOCK, UNDO, CHANGE, LOG */

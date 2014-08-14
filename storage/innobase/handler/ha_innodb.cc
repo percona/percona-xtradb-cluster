@@ -5965,7 +5965,7 @@ wsrep_innobase_mysql_sort(
 			*/
 			tmp_length = charset->coll->strnxfrm(
 				charset, str, buf_length,
-				str_length, tmp_str, tmp_length, 0);
+				str_length, tmp_str, str_length, 0);
 			DBUG_ASSERT(tmp_length <= buf_length);
 			ret_length = tmp_length;
 		}
