@@ -18,12 +18,10 @@ update mysql.user set plugin='auth_socket';
 flush privileges;
 
 --replace_result $MASTER_MYSOCK MASTER_SOCKET $MASTER_MYPORT MASTER_PORT $USER USER
---error ER_PLUGIN_IS_NOT_LOADED
+--error ER_ACCESS_DENIED_ERROR
 connect (fail,localhost,$USER);
 
-connection con1;
-
---error ER_PLUGIN_IS_NOT_LOADED
+--error ER_ACCESS_DENIED_ERROR
 change_user $USER;
 
 connection default;
@@ -36,7 +34,8 @@ connect (fail,localhost,$USER);
 
 connection con2;
 
---error ER_ACCESS_DENIED_ERROR, ER_ACCESS_DENIED_NO_PASSWORD_ERROR
+# CR_SERVER_LOST
+--error 2006
 change_user $USER;
 
 connection default;
