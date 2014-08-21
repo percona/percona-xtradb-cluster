@@ -651,6 +651,7 @@ install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/lo
 %if 0%{?systemd}
 install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd-start $RBR%{_bindir}/mysql-systemd-start
 install -D -m 0644 $MBD/build-ps/rpm/mysqld.service $RBR%{_unitdir}/mysqld.service
+install -D -m 0644 $MBD/build-ps/rpm/mysql.config $RBR%{_sysconfdir}/sysconfig/mysql
 %else
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif

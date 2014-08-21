@@ -15,32 +15,34 @@
 #
 
 [Unit]
-Description=MySQL Percona Server
-After=network.target
-After=syslog.target
+Description=Percona XtraDB Cluster
+After=network.target syslog.target
 
 [Install]
 WantedBy=multi-user.target
 Alias=mysql.service
 
 [Service]
-User=mysql
-Group=mysql
-
-# Execute pre and post scripts as root
-PermissionsStartOnly=true
-
 # Needed to create system tables etc.
-ExecStartPre=/usr/bin/mysql-systemd-start pre
+ExecStartPre=/usr/bin/mysql-systemd-start start-pre
 
+EnvironmentFile=/etc/sysconfig/mysql
 # Start main service
-ExecStart=/usr/bin/mysqld_safe
+ExecStart=/usr/bin/mysqld_safe ${EXTRA_ARGS}
 
 # Don't signal startup success before a ping works
-ExecStartPost=/usr/bin/mysql-systemd-start post
+ExecStartPost=/usr/bin/mysql-systemd-start start-post
 
-# Give up if ping don't get an answer
-TimeoutSec=600
+ExecStopPost=/usr/bin/mysql-systemd-start stop-post
+
+
+# Timeout is handled elsewhere
+# service-startup-timeout in my.cnf 
+# Default is 900 seconds
+TimeoutStartSec=0
+
+# Maximum time to stop
+TimeoutStopSec=900
 
 Restart=always
 PrivateTmp=false
