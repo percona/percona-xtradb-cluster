@@ -169,7 +169,11 @@ get_transfer()
         fi
         wsrep_log_info "Using netcat as streamer"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
+            if nc -h | grep -q ncat;then 
+                tcmd="nc -l ${TSST_PORT}"
+            else 
             tcmd="nc -dl ${TSST_PORT}"
+            fi
         else
             tcmd="nc ${REMOTEIP} ${TSST_PORT}"
         fi
@@ -783,7 +787,7 @@ then
                 if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
                     pattern="$binlog_dir/$binlog_file\.[0-9]+$"
                     wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
-                    find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+
+                    find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
                     rm $binlog_dir/*.index || true
                 fi
             fi
