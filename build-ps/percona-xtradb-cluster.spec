@@ -674,7 +674,7 @@ ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 
 # Touch the place where the my.cnf config file might be located
 # Just to make sure it's in the file list and marked as a config file
-touch $RBR%{_sysconfdir}/my.cnf
+# touch $RBR%{_sysconfdir}/my.cnf
 
 # Create a wsrep_sst_rsync_wan symlink.
 install -d $RBR%{_bindir}
@@ -1249,7 +1249,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
 
-%ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
+#%ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
 
 %if 0%{?systemd}
 %attr(755, root, root) %{_bindir}/mysql-systemd-start
@@ -1313,6 +1313,7 @@ fi
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %if 0%{?systemd}
 %attr(644, root, root) %{_unitdir}/mysqld.service
+%attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
