@@ -1,0 +1,193 @@
+#! /bin/bash -ue
+#
+# Scripts to run by MySQL systemd service
+# 
+# Needed argument: pre | post
+# 
+# pre mode  :  try to run mysql_install_db and fix perms and SELinux contexts
+# post mode :  ping server until answer is received
+# 
+
+parse_cnf()
+{
+    local var=$1
+    shift
+    local groups=$*
+    reval=$(my_print_defaults $groups | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
+    if [[ -z ${reval:-} ]];then 
+        reval=""
+    fi
+    echo $reval
+}
+
+install_db () {    
+    # Note: something different than datadir=/var/lib/mysql requires SELinux policy changes (in enforcing mode)
+    datadir=$(parse_cnf datadir server mysqld)
+    log=$(parse_cnf log-error server mysqld)
+
+
+    # Check that pid-file directory exists and has valid permissions
+    pidfiledir=$(dirname pid_path)
+    if [ ! -z $pidfiledir ]; then
+        [ -d "$pidfiledir" ] || install -d -m 0755 -omysql -gmysql "$pidfiledir" || exit 1
+    fi
+    
+    # Restore log, dir, perms and SELinux contexts
+    [ -d "$datadir" ] || install -d -m 0755 -omysql -gmysql "$datadir" || exit 1
+    if [ -x /usr/sbin/restorecon ]; then
+        /usr/sbin/restorecon "$datadir"
+        if [ ! -z $pidfiledir ]; then
+            /usr/sbin/restorecon "$pidfiledir"
+        fi
+    fi
+
+    # If log file is not specified it's put into datadir by default
+    if [ ! -z $log ]; then
+        [ -e $log ] || touch $log
+        chmod 0640 $log
+        chown mysql:mysql $log || exit 1
+        if [ -x /usr/sbin/restorecon ]; then
+            /usr/sbin/restorecon $log
+        fi
+    fi
+
+    # If special mysql dir is in place, skip db install 
+    [ -d "$datadir/mysql" ] && exit 0
+
+    # Create initial db
+    /usr/bin/mysql_install_db --rpm --datadir="$datadir" --user=mysql
+    exit 0
+}
+
+log_success_msg() {
+    echo " SUCCESS! $@"
+}
+
+log_failure_msg() {
+    echo " ERROR! $@"
+}
+
+wait_for_pid () {
+  local verb=$1          
+  local pid_file_path="$2" 
+  local mpid
+
+  if [[ $verb = 'removed' ]];then 
+    if [[ ! -s $pid_file_path ]];then 
+        log_success_msg
+        return 0
+    fi
+    mpid=$(cat $pid_file_path)
+  fi
+
+  local sst_progress_file=$datadir/sst_in_progress
+  i=0
+
+  while [[ $i -lt $service_startup_timeout ]]; do
+
+    case "$verb" in
+      'created')
+            if [[ -s "$pid_file_path" ]]; then 
+                mpid=$(cat $pid_file_path)
+                if kill -0 $mpid;then
+                    i='' 
+                    break
+                fi
+            fi
+        ;;
+      'removed')
+            if [[ ! -s "$pid_file_path" ]] && ! kill -0 $mpid;then 
+                i=''
+                break
+            fi
+        ;;
+      *)
+        echo "wait_for_pid () usage: wait_for_pid created|removed pid pid_file_path"
+        exit 1
+        ;;
+    esac
+
+
+    if ([[ -e $sst_progress_file ]] || grep -q -- '--wsrep-new-cluster' $env_file ) \
+        && [[ $startup_sleep -ne 10 ]];then
+        echo "State transfer in progress, setting sleep higher"
+        startup_sleep=10
+    fi
+
+    i=$(( i+1 ))
+    sleep $startup_sleep
+
+  done
+
+  if [[ -z "$i" ]]; then
+    log_success_msg
+    return 0
+  elif [[ -e $sst_progress_file ]]; then 
+    log_failure_msg
+    return 2
+  else
+    log_failure_msg
+    return 1
+  fi
+}
+
+
+
+service_startup_timeout=900
+startup_sleep=1
+basedir=/usr
+bindir="$basedir/bin"
+sbindir="$basedir/sbin"
+libexecdir="$basedir/libexec"
+
+
+PATH="/sbin:/usr/sbin:/bin:/usr/bin:$basedir/bin"
+export PATH
+
+pid_path=$(parse_cnf pid-file server mysqld)
+datadir=$(parse_cnf datadir server mysqld)
+service_startup_timeout=$(parse_cnf service-startup-timeout server mysqld)
+env_file="/etc/sysconfig/mysql"
+
+if [[ -z ${datadir:-} ]];then
+    datadir="/var/lib/mysql"
+    if [[ ! -d $datadir ]];then 
+        echo "FATAL: datadir not found in cnf or is /var/lib/mysql"
+        exit 2
+    fi
+fi
+
+
+
+if [[ -z "${pid_path:-}" ]];then
+  pid_path=$datadir/`hostname`.pid
+else
+  case "$pid_path" in
+    /* ) ;;
+    * )  pid_path="$datadir/$pid_path" ;;
+  esac
+fi
+
+
+case $1 in
+    "start-pre") install_db ;;
+    "start-post") 
+      wait_for_pid created  "$pid_path"; return_value=$?
+      if [ $return_value == 1 ];then 
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
+      elif [ $return_value == 2 ];then
+          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
+      fi
+      exit $return_value
+    ;;
+    "stop-post") 
+      wait_for_pid removed  "$pid_path"; return_value=$?
+      if [ $return_value != 0 ];then 
+        log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
+      fi
+      exit $return_value
+    ;;
+esac
+
+exit 0
+
