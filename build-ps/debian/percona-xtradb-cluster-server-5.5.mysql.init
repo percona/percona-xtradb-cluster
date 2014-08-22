@@ -134,7 +134,7 @@ mysqld_status () {
 log_startup_failure() {
     local msg="$@"
     if test -e $sst_progress_file;then 
-        msg+=" However, SST is still in progress. Please check if mysqld is running."
+        msg+=" However, State transfer is still in progress. Please check if mysqld is running."
     fi
     log_failure_msg "$msg"
 }
@@ -159,7 +159,7 @@ case "${1:-''}" in
                 test -s $pid_file && break
 
                 if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
-                    log_daemon_msg "SST in progress, setting sleep higher" "mysqld"
+                    log_daemon_msg "State transfer in progress, setting sleep higher" "mysqld"
                     startup_sleep=10
                 fi
                 # if server isn't running, then pid-file will never be updated
@@ -288,7 +288,7 @@ case "${1:-''}" in
                 test -s $pid_file && break
 
                 if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
-                    log_daemon_msg "SST in progress, setting sleep higher" "mysqld"
+                    log_daemon_msg "State transfer in progress, setting sleep higher" "mysqld"
                     startup_sleep=10
                 fi
                 # if server isn't running, then pid-file will never be updated
