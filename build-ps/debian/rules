@@ -7,6 +7,7 @@ PACKAGE=percona-xtradb-cluster-5.5
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 TMP=$(CURDIR)/debian/tmp/
+TMPD=$(CURDIR)/debian/tmp-debug/
 prefix=/usr
 
 ARCH = $(shell dpkg-architecture -qDEB_BUILD_ARCH)
@@ -93,7 +94,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_INNODB_DISALLOW_WRITES=ON \
 		-DWITH_WSREP=ON \
 		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
-		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
+		-DINSTALL_PLUGINDIR=lib/mysql/plugin/debug \
 		-DWITH_EMBEDDED_SERVER=OFF \
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
@@ -181,6 +182,7 @@ clean-patched:
 	[ ! -d mysql-test/var ] || rm -rf mysql-test/var
 	
 	rm -rf $(builddir)
+	rm -rf $(builddebug)
 
 	debconf-updatepo
 	rm -f $(EXPORTED_SOURCE_TARBALL)
@@ -194,6 +196,7 @@ install: build
 	dh_installdirs
 
 	# make install (trailing slash needed for innobase)
+	(cd $(builddebug) && $(MAKE) install DESTDIR=$(TMPD)/)
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
 	
 	# build HandlerSocket
@@ -316,6 +319,7 @@ binary-arch: build install
 	dh_installinfo -a
 	dh_installlogcheck -a
 	dh_installchangelogs -a
+	dh_strip -a --dbg-package=percona-xtradb-cluster-5.6-dbg 
 	dh_lintian
 	dh_link -a	# .so muss nach .so.1.2.3 installier werden!
 	dh_compress -a
@@ -340,6 +344,3 @@ override_dh_auto_install:
 
 override_dh_installinit:
 	dh_installinit --name=mysql --error-handler=:
-
-override_dh_strip:
-	dh_strip --dbg-package=percona-xtradb-cluster-5.5-dbg
