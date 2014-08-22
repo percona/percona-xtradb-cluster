@@ -29,9 +29,9 @@ EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.5.tar.gz
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -sc)
 
-major_version=35
+major_version=36
 minor_version=0
-wsrep_version="25.10"
+wsrep_version="25.11"
 compilation_comment_release="Percona XtraDB Cluster (GPL), Release $(wsrep_version)"
 compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release $(wsrep_version)"
 server_suffix="-55"
