@@ -2453,6 +2453,7 @@ bool one_thread_per_connection_end(THD *thd, bool put_in_cache)
 #ifdef WITH_WSREP
   const bool wsrep_applier(thd->wsrep_applier);
   unlink_thd(thd);
+  mysql_mutex_unlock(&LOCK_thd_remove);
   if (put_in_cache && !wsrep_applier)
 #else
   unlink_thd(thd);
