@@ -688,13 +688,15 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     WSREP_DEBUG("PXC does not support binlog format : %s",
                 var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
                 "STATEMENT" : "MIXED");
+    WSREP_DEBUG("This is meant only for simple tasks/tools like checksumming");
     /* Push also warning, because error message is general */
      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
                         ER_UNKNOWN_ERROR,
                         "PXC does not support binlog format: %s",
                         var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
                         "STATEMENT" : "MIXED");
-    return true;
+    if (var->type == OPT_GLOBAL)
+        return true;
   }
 #endif
 
