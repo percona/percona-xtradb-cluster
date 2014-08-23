@@ -256,14 +256,14 @@ Description: Percona XtraDB Cluster with Galera
 Package: percona-xtradb-cluster-full-55
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-server-5.5 (>= ${source:Version}), percona-xtradb-cluster-client-5.5 (>= ${source:Version}), percona-xtradb-cluster-galera-2, percona-xtradb-cluster-test-5.5 (>= ${source:Version}), percona-xtradb-cluster-5.5-dbg (>= ${source:Version}), percona-xtradb-cluster-garbd-2, percona-xtradb-cluster-galera2-dbg, ${misc:Depends}
+Depends: percona-xtradb-cluster-server-5.5 (>= ${source:Version}), percona-xtradb-cluster-client-5.5 (>= ${source:Version}), percona-xtradb-cluster-galera-2, percona-xtradb-cluster-test-5.5 (>= ${source:Version}), percona-xtradb-cluster-5.5-dbg (>= ${source:Version}), percona-xtradb-cluster-garbd-2, percona-xtradb-cluster-galera2-dbg, percona-xtradb-cluster-server-debug-5.5, ${misc:Depends}
 Description: Percona XtraDB Cluster with Galera
  This is a meta-package providing PXC56 server, client, galera-2, test and debug packages.
 
 Package: percona-xtradb-cluster-full-55-g3
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-server-5.5 (>= ${source:Version}), percona-xtradb-cluster-client-5.5 (>= ${source:Version}), percona-xtradb-cluster-galera-3, percona-xtradb-cluster-test-5.5 (>= ${source:Version}), percona-xtradb-cluster-5.5-dbg (>= ${source:Version}), percona-xtradb-cluster-garbd-3, percona-xtradb-cluster-galera3-dbg, ${misc:Depends}
+Depends: percona-xtradb-cluster-server-5.5 (>= ${source:Version}), percona-xtradb-cluster-client-5.5 (>= ${source:Version}), percona-xtradb-cluster-galera-3, percona-xtradb-cluster-test-5.5 (>= ${source:Version}), percona-xtradb-cluster-5.5-dbg (>= ${source:Version}), percona-xtradb-cluster-garbd-3, percona-xtradb-cluster-galera3-dbg, percona-xtradb-cluster-server-debug-5.5, ${misc:Depends}
 Description: Percona XtraDB Cluster with Galera
  This is a meta-package providing PXC56 server, client, galera-3, test and debug packages.
 
