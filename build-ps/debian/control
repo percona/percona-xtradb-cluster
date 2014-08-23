@@ -29,7 +29,7 @@ Build-Depends: libtool (>= 1.4.2-7),
                libssl-dev 
 Standards-Version: 3.9.4
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
-Vcs-Bzr: lp:percona-xtradb-cluster
+Vcs-Bzr: lp:percona-xtradb-cluster/5.5
 
 Package: libperconaserverclient18
 Section: libs
@@ -200,6 +200,37 @@ Replaces: mysql-server-5.0,
           virtual-mysql-server,
           virtual-mysql-server-core
 Description: Percona XtraDB Cluster database server binaries
+ Percona XtraDB Cluster is based on the Percona Server database
+ server and provides a High Availability solution.
+ Percona XtraDB Cluster provides synchronous replication, supports
+ multi-master replication, parallel applying on slaves, automatic
+ node provisioning with primary focus on data consistency.
+ .
+ This package includes the server binaries.
+
+Package: percona-xtradb-cluster-server-debug-5.5
+Architecture: any
+Suggests: tinyca, netcat-openbsd, pv, qpress
+Pre-Depends: percona-xtradb-cluster-common-5.5 (>= ${source:Version}),
+             adduser (>= 3.4.0),
+             debconf
+Depends: percona-xtradb-cluster-client-5.5 (>= ${source:Version}),
+        libdbi-perl,
+        libdbd-mysql-perl,
+        perl (>= 5.6),
+        ${shlibs:Depends},
+        ${misc:Depends},
+        psmisc,
+        passwd,
+        lsb-base (>= 3.0-10),
+        percona-xtradb-cluster-galera-25,
+        percona-xtrabackup (>= 2.1.6),
+        socat,
+        lsof,
+        rsync,
+        iproute
+Provides: mysql-server-debug
+Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
  Percona XtraDB Cluster provides synchronous replication, supports
