@@ -309,7 +309,7 @@ Summary:        Percona XtraDB Cluster - full package with Galera 3
 Group:          Applications/Databases
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-garbd-3 Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
 
-%description -n Percona-XtraDB-Cluster-full%{product_suffix}
+%description -n Percona-XtraDB-Cluster-full%{product_suffix}-g3
 This is a meta-package which provides the full suite of Percona XtraDB
 Cluster 55 packages including the debuginfo and Galera3. Recommended.
 
