@@ -27,7 +27,7 @@ install_db () {
 
 
     # Check that pid-file directory exists and has valid permissions
-    pidfiledir=$(dirname pid_path)
+    pidfiledir=$(dirname $pid_path)
     if [ ! -z $pidfiledir ]; then
         [ -d "$pidfiledir" ] || install -d -m 0755 -omysql -gmysql "$pidfiledir" || exit 1
     fi
