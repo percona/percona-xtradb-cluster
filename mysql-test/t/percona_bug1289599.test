@@ -34,8 +34,8 @@ connect (fail,localhost,$USER);
 
 connection con2;
 
-# CR_SERVER_LOST
---error 2006
+# CR_SERVER_LOST, CR_SERVER_GONE_ERROR
+--error 2006,2013
 change_user $USER;
 
 connection default;
