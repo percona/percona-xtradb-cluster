@@ -11,7 +11,12 @@ parse_cnf()
     local groups=$*
     reval=$(my_print_defaults $groups | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
     if [[ -z ${reval:-} ]];then 
-        reval="$def"
+        val=$(tar ' ' '\n' <<< "$env_args" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
+        if [[ -n ${val:-} ]];then
+            reval=$val
+        else 
+            reval=$def
+        fi
     fi
     echo $reval
 }
@@ -114,7 +119,7 @@ wait_for_pid () {
 
 
     if [[ $verb = 'created' ]];then 
-        if ([[ -e $sst_progress_file ]] || grep -q -- '--wsrep-new-cluster' <<< $env_args ) \
+        if ([[ -e $sst_progress_file ]] || grep -q -- '--wsrep-new-cluster' <<< "$env_args" ) \
             && [[ $startup_sleep -ne 10 ]];then
             echo "State transfer in progress, setting sleep higher"
             startup_sleep=10
@@ -139,7 +144,7 @@ wait_for_pid () {
 }
 
 
-
+action=$1
 service_startup_timeout=900
 startup_sleep=1
 basedir=/usr
@@ -150,7 +155,7 @@ libexecdir="$basedir/libexec"
 env_args="${EXTRA_ARGS:-}"
 
 
-PATH="/sbin:/usr/sbin:/bin:/usr/bin:$basedir/bin"
+PATH="/sbin:/usr/sbin:/bin:/usr/bin:$bindir:$sbindir"
 export PATH
 
 pid_path=$(parse_cnf pid-file "" server mysqld)
@@ -183,7 +188,7 @@ if [[ -z ${mysql_pid:-} ]];then
 fi
 ret=0
 
-case $1 in
+case $action in
     "start-pre") install_db ;;
     "start-post") 
       wait_for_pid created  "$pid_path"; ret=$?
