@@ -1,0 +1,7 @@
+# Arguments to pass to mysqld_safe in systemctl
+# For Bootstrapping
+# You can append any extra options in to the same variable.
+EXTRA_ARGS=" --wsrep-new-cluster "
+
+# Other environment variables if any
+# ABC=123 for example.

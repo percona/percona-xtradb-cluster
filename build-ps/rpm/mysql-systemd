@@ -2,27 +2,27 @@
 #
 # Scripts to run by MySQL systemd service
 # 
-# Needed argument: pre | post
-# 
-# pre mode  :  try to run mysql_install_db and fix perms and SELinux contexts
-# post mode :  ping server until answer is received
-# 
 
 parse_cnf()
 {
     local var=$1
+    local def=$2
     shift
     local groups=$*
     reval=$(my_print_defaults $groups | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
     if [[ -z ${reval:-} ]];then 
-        reval=""
+        val=$(tar ' ' '\n' <<< "$env_args" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
+        if [[ -n ${val:-} ]];then
+            reval=$val
+        else 
+            reval=$def
+        fi
     fi
     echo $reval
 }
 
 install_db () {    
     # Note: something different than datadir=/var/lib/mysql requires SELinux policy changes (in enforcing mode)
-    datadir=$(parse_cnf datadir server mysqld)
     log=$(parse_cnf log-error server mysqld)
 
 
@@ -67,6 +67,14 @@ log_failure_msg() {
     echo " ERROR! $@"
 }
 
+log_info_msg() {
+    echo " INFO: $@"
+}
+
+log_warning_msg() {
+    echo " WARNING: $@"
+}
+
 wait_for_pid () {
   local verb=$1          
   local pid_file_path="$2" 
@@ -85,6 +93,7 @@ wait_for_pid () {
 
   while [[ $i -lt $service_startup_timeout ]]; do
 
+    set +e
     case "$verb" in
       'created')
             if [[ -s "$pid_file_path" ]]; then 
@@ -106,12 +115,15 @@ wait_for_pid () {
         exit 1
         ;;
     esac
+    set -e
 
 
-    if ([[ -e $sst_progress_file ]] || grep -q -- '--wsrep-new-cluster' $env_file ) \
-        && [[ $startup_sleep -ne 10 ]];then
-        echo "State transfer in progress, setting sleep higher"
-        startup_sleep=10
+    if [[ $verb = 'created' ]];then 
+        if ([[ -e $sst_progress_file ]] || grep -q -- '--wsrep-new-cluster' <<< "$env_args" ) \
+            && [[ $startup_sleep -ne 10 ]];then
+            echo "State transfer in progress, setting sleep higher"
+            startup_sleep=10
+        fi
     fi
 
     i=$(( i+1 ))
@@ -123,7 +135,7 @@ wait_for_pid () {
     log_success_msg
     return 0
   elif [[ -e $sst_progress_file ]]; then 
-    log_failure_msg
+    log_info_msg
     return 2
   else
     log_failure_msg
@@ -132,7 +144,7 @@ wait_for_pid () {
 }
 
 
-
+action=$1
 service_startup_timeout=900
 startup_sleep=1
 basedir=/usr
@@ -140,14 +152,15 @@ bindir="$basedir/bin"
 sbindir="$basedir/sbin"
 libexecdir="$basedir/libexec"
 
+env_args="${EXTRA_ARGS:-}"
 
-PATH="/sbin:/usr/sbin:/bin:/usr/bin:$basedir/bin"
+
+PATH="/sbin:/usr/sbin:/bin:/usr/bin:$bindir:$sbindir"
 export PATH
 
-pid_path=$(parse_cnf pid-file server mysqld)
-datadir=$(parse_cnf datadir server mysqld)
-service_startup_timeout=$(parse_cnf service-startup-timeout server mysqld)
-env_file="/etc/sysconfig/mysql"
+pid_path=$(parse_cnf pid-file "" server mysqld)
+datadir=$(parse_cnf datadir "" server mysqld)
+service_startup_timeout=$(parse_cnf service-startup-timeout $service_startup_timeout server mysqld)
 
 if [[ -z ${datadir:-} ]];then
     datadir="/var/lib/mysql"
@@ -168,25 +181,49 @@ else
   esac
 fi
 
+mysql_pid=$(cat $pid_path)
+if [[ -z ${mysql_pid:-} ]];then 
+    log_warning_msg "mysqld pid not detected, systemctl may fail"
+    log_warning_msg "Please set pid file in my.cnf if different from default"
+fi
+ret=0
 
-case $1 in
+case $action in
     "start-pre") install_db ;;
     "start-post") 
-      wait_for_pid created  "$pid_path"; return_value=$?
-      if [ $return_value == 1 ];then 
+      wait_for_pid created  "$pid_path"; ret=$?
+      if [[ $ret -eq 1 ]];then 
           log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
-      elif [ $return_value == 2 ];then
-          log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
+      elif [[ $ret -eq 2 ]];then
+          log_info_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
       fi
-      exit $return_value
+      exit $ret
     ;;
     "stop-post") 
-      wait_for_pid removed  "$pid_path"; return_value=$?
-      if [ $return_value != 0 ];then 
+      wait_for_pid removed  "$pid_path"; ret=$?
+      if [[ $ret -ne 0 ]];then 
         log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
       fi
-      exit $return_value
+      exit $ret
     ;;
+    reload)
+        kill -HUP $mysql_pid || ret=$?
+        if [[ $ret -ne 0 ]]; then 
+            log_failure_msg "Failed to reload the server with PID: $mysql_pid with $ret status"
+            exit $ret
+        else 
+            log_success_msg "Reloaded the server"
+        fi
+        ;;
+    stop)
+        kill -TERM $mysql_pid || ret=$?
+        if [[ $ret -ne 0 ]]; then 
+            log_failure_msg "Failed to stop the server with PID: $mysql_pid with $ret status"
+            exit $ret
+        else 
+            log_success_msg "Stopping Percona XtraDB Cluster......"
+        fi
+        ;;
 esac
 
 exit 0
