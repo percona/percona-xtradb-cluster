@@ -1,0 +1,56 @@
+# Systemd service file for Percona XtraDB Cluster
+
+
+# This service file allows for instance specifier %i
+# to pass an Environment file
+# Example: systemctl start mysql@bootstrap.service
+# will check for EnvironmentFile named /etc/sysconfig/mysql.bootstrap
+
+# The environment file can  have any key=value 
+# variables separated by newlines.
+
+# But, EXTRA_ARGS must be there - empty/set
+# EXTRA_ARGS=" --wsrep-new-cluster" for bootstrapping
+# /etc/sysconfig/mysql.bootstrap is provided for convenience 
+# and as a template.
+
+
+# Note, this is NOT a replacement for my.cnf
+# This file is just to pass environment variables and/or 
+# EXTRA_ARGS to mysqld_safe.
+
+
+[Unit]
+Description=Percona XtraDB Cluster with config /etc/sysconfig/mysql.%i
+After=network.target syslog.target
+
+[Install]
+WantedBy=multi-user.target
+Alias=mysql-%i.service
+
+[Service]
+# Needed to create system tables etc.
+ExecStartPre=/usr/bin/mysql-systemd-start start-pre
+
+EnvironmentFile=/etc/sysconfig/mysql.%i
+# Start main service
+ExecStart=/usr/bin/mysqld_safe ${EXTRA_ARGS}
+
+# Don't signal startup success before a ping works
+ExecStartPost=/usr/bin/mysql-systemd-start start-post
+
+ExecStopPost=/usr/bin/mysql-systemd-start stop-post
+
+
+# Timeout is handled elsewhere
+# service-startup-timeout in my.cnf 
+# Default is 900 seconds
+TimeoutStartSec=0
+
+# Maximum time to stop
+TimeoutStopSec=900
+
+Restart=always
+PrivateTmp=false
+
+
