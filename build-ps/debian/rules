@@ -145,7 +145,7 @@ build-stamp: configure
 	--transform="s,^\./,percona-xtradb-cluster-5.6/,"
 
 ifeq ($(SKIP_DEBUG_BINARY),)
-	cd $(builddebug) && $(MAKE) -j$(NCPU)
+	cd $(builddebug) && $(MAKE) -j$(NCPU)  VERBOSE=1
 endif
 
 	cd $(builddir) && $(MAKE) -j$(NCPU) VERBOSE=1
