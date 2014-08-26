@@ -18,6 +18,17 @@
 # Note, this is NOT a replacement for my.cnf
 # This file is just to pass environment variables and/or 
 # EXTRA_ARGS to mysqld_safe.
+#
+# For bootstrapping, you may not want to enable mysql@bootstrap 
+# but start it directly since you don't want 
+# a bootstrapped mysqld coming up on reboot.
+#
+# But, if you want to pass CUSTOM flags, create a file called 
+# /etc/sysconfig/mysql.custom and then 
+# add EXTRA_ARGS=" --wsrep-debug " etc. to it along 
+# with any environment variables you may want to pass.
+# After that you can either enable it or start it as 
+# systemctl start mysql@custom.service.
 
 
 [Unit]
