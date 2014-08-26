@@ -649,7 +649,7 @@ install -d $RBR%{_libdir}/mysql/plugin
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 %if 0%{?systemd}
-install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd-start $RBR%{_bindir}/mysql-systemd-start
+install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
 install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
@@ -1253,7 +1253,7 @@ fi
 #%ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
 
 %if 0%{?systemd}
-%attr(755, root, root) %{_bindir}/mysql-systemd-start
+%attr(755, root, root) %{_bindir}/mysql-systemd
 %endif
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
