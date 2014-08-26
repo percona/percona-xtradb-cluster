@@ -650,7 +650,7 @@ install -d $RBR%{_libdir}/mysql/plugin
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 %if 0%{?systemd}
 install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd-start $RBR%{_bindir}/mysql-systemd-start
-install -D -m 0644 $MBD/build-ps/rpm/mysqld.service $RBR%{_unitdir}/mysqld.service
+install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.config $RBR%{_sysconfdir}/sysconfig/mysql
 %else
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
@@ -1312,7 +1312,7 @@ fi
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
 %if 0%{?systemd}
-%attr(644, root, root) %{_unitdir}/mysqld.service
+%attr(644, root, root) %{_unitdir}/mysql.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
