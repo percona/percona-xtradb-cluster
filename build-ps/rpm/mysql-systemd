@@ -2,11 +2,6 @@
 #
 # Scripts to run by MySQL systemd service
 # 
-# Needed argument: pre | post
-# 
-# pre mode  :  try to run mysql_install_db and fix perms and SELinux contexts
-# post mode :  ping server until answer is received
-# 
 
 parse_cnf()
 {
@@ -69,6 +64,10 @@ log_failure_msg() {
 
 log_info_msg() {
     echo " INFO: $@"
+}
+
+log_warning_msg() {
+    echo " WARNING: $@"
 }
 
 wait_for_pid () {
@@ -177,25 +176,49 @@ else
   esac
 fi
 
+mysql_pid=$(cat $pid_path)
+if [[ -z ${mysql_pid:-} ]];then 
+    log_warning_msg "mysqld pid not detected, systemctl may fail"
+    log_warning_msg "Please set pid file in my.cnf if different from default"
+fi
+ret=0
 
 case $1 in
     "start-pre") install_db ;;
     "start-post") 
-      wait_for_pid created  "$pid_path"; return_value=$?
-      if [ $return_value == 1 ];then 
+      wait_for_pid created  "$pid_path"; ret=$?
+      if [[ $ret -eq 1 ]];then 
           log_failure_msg "MySQL (Percona XtraDB Cluster) server startup failed!"
-      elif [ $return_value == 2 ];then
+      elif [[ $ret -eq 2 ]];then
           log_info_msg "MySQL (Percona XtraDB Cluster) server startup failed! State transfer still in progress"
       fi
-      exit $return_value
+      exit $ret
     ;;
     "stop-post") 
-      wait_for_pid removed  "$pid_path"; return_value=$?
-      if [ $return_value != 0 ];then 
+      wait_for_pid removed  "$pid_path"; ret=$?
+      if [[ $ret -ne 0 ]];then 
         log_failure_msg "MySQL (Percona XtraDB Cluster) server stop failed!"
       fi
-      exit $return_value
+      exit $ret
     ;;
+    reload)
+        kill -HUP $mysql_pid || ret=$?
+        if [[ $ret -ne 0 ]]; then 
+            log_failure_msg "Failed to reload the server with PID: $mysql_pid with $ret status"
+            exit $ret
+        else 
+            log_success_msg "Reloaded the server"
+        fi
+        ;;
+    stop)
+        kill -TERM $mysql_pid || ret=$?
+        if [[ $ret -ne 0 ]]; then 
+            log_failure_msg "Failed to stop the server with PID: $mysql_pid with $ret status"
+            exit $ret
+        else 
+            log_success_msg "Stopping Percona XtraDB Cluster......"
+        fi
+        ;;
 esac
 
 exit 0

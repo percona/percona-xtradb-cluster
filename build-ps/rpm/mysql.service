@@ -19,12 +19,16 @@ Alias=mysql.service
 ExecStartPre=/usr/bin/mysql-systemd-start start-pre
 
 # Start main service
-ExecStart=/usr/bin/mysqld_safe 
+ExecStart=/usr/bin/mysqld_safe --basedir=/usr
 
 # Don't signal startup success before a ping works
-ExecStartPost=/usr/bin/mysql-systemd-start start-post
+ExecStartPost=/usr/bin/mysql-systemd start-post
 
-ExecStopPost=/usr/bin/mysql-systemd-start stop-post
+ExecStop=/usr/bin/mysql-systemd stop
+
+ExecStopPost=/usr/bin/mysql-systemd stop-post
+
+ExecReload=/usr/bin/mysql-systemd reload
 
 # Timeout is handled elsewhere
 # service-startup-timeout in my.cnf 
