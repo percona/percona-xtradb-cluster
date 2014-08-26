@@ -22,7 +22,7 @@ ExecStartPre=/usr/bin/mysql-systemd-start start-pre
 ExecStart=/usr/bin/mysqld_safe --basedir=/usr
 
 # Don't signal startup success before a ping works
-ExecStartPost=/usr/bin/mysql-systemd start-post
+ExecStartPost=/usr/bin/mysql-systemd start-post $MAINPID
 
 ExecStop=/usr/bin/mysql-systemd stop
 

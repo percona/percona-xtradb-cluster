@@ -48,11 +48,11 @@ EnvironmentFile=/etc/sysconfig/mysql.%i
 ExecStart=/usr/bin/mysqld_safe --basedir=/usr ${EXTRA_ARGS}
 
 # Don't signal startup success before a ping works
-ExecStartPost=/usr/bin/mysql-systemd start-post
+ExecStartPost=/usr/bin/mysql-systemd start-post $MAINPID
 
 ExecStop=/usr/bin/mysql-systemd stop
 
-ExecStopPost=/usr/bin/mysql-systemd stop-post
+ExecStopPost=/usr/bin/mysql-systemd stop-post $MAINPID
 
 ExecReload=/usr/bin/mysql-systemd reload
 

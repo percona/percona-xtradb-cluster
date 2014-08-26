@@ -78,7 +78,7 @@ log_warning_msg() {
 wait_for_pid () {
   local verb=$1          
   local pid_file_path="$2" 
-  local mpid
+  local mpid=0
 
   if [[ $verb = 'removed' ]];then 
     if [[ ! -s $pid_file_path ]];then 
@@ -145,6 +145,7 @@ wait_for_pid () {
 
 
 action=$1
+manager=${2:-0}
 service_startup_timeout=900
 startup_sleep=1
 basedir=/usr
@@ -181,11 +182,30 @@ else
   esac
 fi
 
-mysql_pid=$(cat $pid_path)
-if [[ -z ${mysql_pid:-} ]];then 
-    log_warning_msg "mysqld pid not detected, systemctl may fail"
-    log_warning_msg "Please set pid file in my.cnf if different from default"
+if [[ $action == 'reload' || $action == 'stop' ]];then
+    if [[ ! -s $pid_path ]];then 
+        log_error_msg "mysql pid file $pid_path empty or not readable"
+        [[ $action == 'stop' ]] && log_warning_msg "mysql may be already dead"
+        exit 2
+    fi
+    mysql_pid=$(cat $pid_path)
 fi
+
+if [[ $action == 'start-post' ]];then 
+    if ! kill -0 $manager;then 
+        log_error_msg "mysqld_safe with PID $manager has already exited"
+        exit 1
+    fi
+fi
+
+if [[ $action == 'stop-post' ]];then 
+    if  kill -0 $manager;then 
+        log_success_msg "mysqld_safe with PID $manager has already exited"
+        exit 0
+    fi
+fi
+
+
 ret=0
 
 case $action in
@@ -206,7 +226,7 @@ case $action in
       fi
       exit $ret
     ;;
-    reload)
+    'reload')
         kill -HUP $mysql_pid || ret=$?
         if [[ $ret -ne 0 ]]; then 
             log_failure_msg "Failed to reload the server with PID: $mysql_pid with $ret status"
@@ -215,7 +235,7 @@ case $action in
             log_success_msg "Reloaded the server"
         fi
         ;;
-    stop)
+    'stop')
         kill -TERM $mysql_pid || ret=$?
         if [[ $ret -ne 0 ]]; then 
             log_failure_msg "Failed to stop the server with PID: $mysql_pid with $ret status"
