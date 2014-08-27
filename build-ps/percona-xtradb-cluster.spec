@@ -653,6 +653,7 @@ install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
 install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
+install -D -m 0644 $MBD/build-ps/rpm/mysql.conf $RBR%{_tmpfilesdir}/mysql.conf
 %else
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
@@ -706,14 +707,14 @@ rm -rf $RBR%{_sysconfdir}/init.d/mysql
 
 %pre -n Percona-XtraDB-Cluster-server%{product_suffix}
 
-# On rhel7 change default MariaDB options if they exists (only on initial installation)
-%if "%rhel" > "6"
-if [ $1 -eq 1 -a -f /etc/my.cnf ]; then
-  sed -i 's/log-error=\/var\/log\/mariadb\/mariadb.log/log-error=\/var\/log\/mysqld.log/g' /etc/my.cnf;
-  sed -i 's/pid-file=\/var\/run\/mariadb\/mariadb.pid/pid-file=\/var\/run\/mysqld\/mysqld.pid/g' /etc/my.cnf;
-  sed -i 's/\!includedir \/etc\/my.cnf.d/\#\!includedir \/etc\/my.cnf.d/g' /etc/my.cnf;
-fi
-%endif
+## On rhel7 change default MariaDB options if they exists (only on initial installation)
+#%if "%rhel" > "6"
+#if [ $1 -eq 1 -a -f /etc/my.cnf ]; then
+  #sed -i 's/log-error=\/var\/log\/mariadb\/mariadb.log/log-error=\/var\/log\/mysqld.log/g' /etc/my.cnf;
+  #sed -i 's/pid-file=\/var\/run\/mariadb\/mariadb.pid/pid-file=\/var\/run\/mysqld\/mysqld.pid/g' /etc/my.cnf;
+  #sed -i 's/\!includedir \/etc\/my.cnf.d/\#\!includedir \/etc\/my.cnf.d/g' /etc/my.cnf;
+#fi
+#%endif
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
@@ -1252,9 +1253,6 @@ fi
 
 #%ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
 
-%if 0%{?systemd}
-%attr(755, root, root) %{_bindir}/mysql-systemd
-%endif
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
@@ -1316,6 +1314,8 @@ fi
 %attr(644, root, root) %{_unitdir}/mysql.service
 %attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql.bootstrap
+%attr(644, root, root) %{_tmpfilesdir}/mysql.conf
+%attr(755, root, root) %{_bindir}/mysql-systemd
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
