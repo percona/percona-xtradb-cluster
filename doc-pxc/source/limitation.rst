@@ -25,4 +25,4 @@ There are some limitations which you should be aware of. Some of them will be el
 
  - The minimal recommended size of cluster is 3 nodes.
 
- - Currently using the query cache isn't supported as it was showing some issues during the cache invalidation with certain multi-master use cases.
+ - To enable Query Cache, node should be started with :variable:`query_cache_type` set to ``1`` and :variable:`query_cache_size` set to ``0``. After the node has been successfully started :variable:`query_cache_size` can be changed to desired value during the runtime.
