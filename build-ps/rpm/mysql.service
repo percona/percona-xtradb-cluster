@@ -16,13 +16,13 @@ Alias=mysql.service
 
 [Service]
 # Needed to create system tables etc.
-ExecStartPre=/usr/bin/mysql-systemd-start start-pre
+ExecStartPre=/usr/bin/mysql-systemd start-pre
 
 # Start main service
 ExecStart=/usr/bin/mysqld_safe --basedir=/usr
 
 # Don't signal startup success before a ping works
-ExecStartPost=/usr/bin/mysql-systemd start-post
+ExecStartPost=/usr/bin/mysql-systemd start-post $MAINPID
 
 ExecStop=/usr/bin/mysql-systemd stop
 
