@@ -41,7 +41,7 @@ Alias=mysql-%i.service
 
 [Service]
 # Needed to create system tables etc.
-ExecStartPre=/usr/bin/mysql-systemd-start start-pre
+ExecStartPre=/usr/bin/mysql-systemd start-pre
 
 EnvironmentFile=/etc/sysconfig/mysql.%i
 # Start main service
