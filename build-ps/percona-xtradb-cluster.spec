@@ -871,26 +871,22 @@ fi
 # Note we *could* make that depend on $SERVER_TO_START, but we rather don't,
 # so a "stop" is attempted even if there is no PID file.
 # (Maybe the "stop" doesn't work then, but we might fix that in itself.)
-%if 0%{?systemd}
-SYSD_ACTIVE=$(systemctl is-active mysql)
-if [ $SYSD_ACTIVE == "active" ] ; then
-	%{_bindir}/systemctl stop mysql >/dev/null 2>&1
-	echo "Giving mysqld 5 seconds to exit nicely"
-	sleep 5
-fi
-%else
+
 if [ -x %{_sysconfdir}/init.d/mysql ] ; then
         %{_sysconfdir}/init.d/mysql stop > /dev/null 2>&1
         echo "Giving mysqld 5 seconds to exit nicely"
         sleep 5
 fi
-%endif
 
 %post -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
+
+%if 0%{?systemd}
+  %systemd_post mysql
+%endif
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
@@ -916,7 +912,7 @@ fi
 if [ $1 -eq 1 ]; then
 
 %if 0%{?systemd}
-   systemd-tmpfiles --create %{_tmpfilesdir}/mysql.conf 
+  %tmpfiles_create mysql.conf
 %endif
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
@@ -962,9 +958,9 @@ fi
 # for the other run levels exist(ed) before the upgrade?
 # use chkconfig on Enterprise Linux and newer SuSE releases
 %if 0%{?systemd}
-if [ -x %{_bindir}/systemctl ] ; then
-	%{_bindir}/systemctl enable mysql >/dev/null 2>&1
-fi
+
+# Do NOTHING for PXC
+
 %else
 if [ -x /sbin/chkconfig ] ; then
         /sbin/chkconfig --add mysql
@@ -1028,9 +1024,9 @@ fi
 # Was the server running before the upgrade? If so, restart the new one.
 if [ "$SERVER_TO_START" = "true" ] ; then
 %if 0%{?systemd}
-if [ -x %{_bindir}/systemctl ] ; then
-	%{_bindir}/systemctl start mysql
-fi
+
+# Check %postun
+
 %else
 # Restart in the same way that mysqld will be started normally.
 if [ -x %{_sysconfdir}/init.d/mysql ] ; then
@@ -1076,10 +1072,7 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
  
 if [ $1 = 0 ] ; then
 %if 0%{?systemd}
-	if [ -x %{_bindir}/systemctl ] ; then
-		%{_bindir}/systemctl stop mysql > /dev/null
-		%{_bindir}/systemctl disable mysql > /dev/null
-	fi
+    %systemd_preun mysql
 %else
         # Stop MySQL before uninstalling it
         if [ -x %{_sysconfdir}/init.d/mysql ] ; then
@@ -1402,6 +1395,12 @@ done
 
 %postun -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
+
+%postun -n Percona-XtraDB-Cluster-server%{product_suffix}
+
+%if 0%{?systemd}
+%systemd_postun_with_restart mysql
+%endif
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-test%{product_suffix}
