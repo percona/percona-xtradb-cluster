@@ -198,13 +198,6 @@ if [[ $action == 'start-post' ]];then
     fi
 fi
 
-if [[ $action == 'stop-post' ]];then 
-    if  ! kill -0 $manager;then 
-        log_success_msg "mysqld_safe with PID $manager has already exited"
-        exit 0
-    fi
-fi
-
 
 ret=0
 
