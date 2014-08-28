@@ -892,10 +892,6 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 
-%if 0%{?systemd}
-   systemd-tmpfiles --create %{_tmpfilesdir}/mysql.conf 
-%endif
-
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
 # There are users who deviate from the default file system layout.
@@ -918,6 +914,10 @@ else
 fi
 
 if [ $1 -eq 1 ]; then
+
+%if 0%{?systemd}
+   systemd-tmpfiles --create %{_tmpfilesdir}/mysql.conf 
+%endif
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
