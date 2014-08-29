@@ -657,6 +657,7 @@ install -D -m 0644 $MBD/build-ps/rpm/mysql.conf $RBR%{_tmpfilesdir}/mysql.conf
 %else
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
+install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
 
 #
 %{__rm} -f $RBR/%{_prefix}/README*
@@ -1249,7 +1250,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
 
-#%ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
+%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
 
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
