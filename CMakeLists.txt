@@ -163,6 +163,7 @@ IF(MYSQL_MAINTAINER_MODE)
 ENDIF()
 
 # Add macros
+INCLUDE(wsrep)
 INCLUDE(character_sets)
 INCLUDE(zlib)
 INCLUDE(ssl)
@@ -174,7 +175,6 @@ INCLUDE(plugin)
 INCLUDE(install_macros)
 INCLUDE(install_layout)
 INCLUDE(mysql_add_executable)
-INCLUDE(wsrep)
 
 # Handle options
 OPTION(DISABLE_SHARED 
