@@ -37,7 +37,7 @@ After=network.target syslog.target
 
 [Install]
 WantedBy=multi-user.target
-Alias=mysql-%i.service
+Alias=mysql.service
 
 [Service]
 # Needed to create system tables etc.
@@ -52,7 +52,7 @@ ExecStartPost=/usr/bin/mysql-systemd start-post $MAINPID
 
 ExecStop=/usr/bin/mysql-systemd stop
 
-ExecStopPost=/usr/bin/mysql-systemd stop-post $MAINPID
+ExecStopPost=/usr/bin/mysql-systemd stop-post
 
 ExecReload=/usr/bin/mysql-systemd reload
 

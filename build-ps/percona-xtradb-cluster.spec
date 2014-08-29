@@ -318,7 +318,7 @@ Cluster 55 packages including the debuginfo and Galera3. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.6 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.1.6 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -433,6 +433,10 @@ Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:	Percona-Server-shared-55 Percona-XtraDB-Cluster-shared-56
 Obsoletes:      Percona-XtraDB-Cluster-shared
+%if "%rhel" > "6"
+obsoletes:      mariadb-libs >= 5.5.37
+%endif
+
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -637,9 +641,11 @@ install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
 install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
+install -D -m 0644 $MBD/build-ps/rpm/mysql.conf $RBR%{_tmpfilesdir}/mysql.conf
 %else
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
+install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
@@ -682,14 +688,6 @@ rm -rf $RBR%{_sysconfdir}/init.d/mysql
 
 %pre -n Percona-XtraDB-Cluster-server%{product_suffix}
 
-# On rhel7 change default MariaDB options if they exists (only on initial installation)
-%if "%rhel" > "6"
-if [ $1 -eq 1 -a -f /etc/my.cnf ]; then
-  sed -i 's/log-error=\/var\/log\/mariadb\/mariadb.log/log-error=\/var\/log\/mysqld.log/g' /etc/my.cnf;
-  sed -i 's/pid-file=\/var\/run\/mariadb\/mariadb.pid/pid-file=\/var\/run\/mysqld\/mysqld.pid/g' /etc/my.cnf;
-  sed -i 's/\!includedir \/etc\/my.cnf.d/\#\!includedir \/etc\/my.cnf.d/g' /etc/my.cnf;
-fi
-%endif
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
@@ -846,26 +844,23 @@ fi
 # Note we *could* make that depend on $SERVER_TO_START, but we rather don't,
 # so a "stop" is attempted even if there is no PID file.
 # (Maybe the "stop" doesn't work then, but we might fix that in itself.)
-%if 0%{?systemd}
-SYSD_ACTIVE=$(systemctl is-active mysqld)
-if [ $SYSD_ACTIVE == "active" ] ; then
-	%{_bindir}/systemctl stop mysqld >/dev/null 2>&1
-	echo "Giving mysqld 5 seconds to exit nicely"
-	sleep 5
-fi
-%else
+
 if [ -x %{_sysconfdir}/init.d/mysql ] ; then
         %{_sysconfdir}/init.d/mysql stop > /dev/null 2>&1
         echo "Giving mysqld 5 seconds to exit nicely"
         sleep 5
 fi
-%endif
 
 %post -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
+
+%if 0%{?systemd}
+  %systemd_post mysql
+%endif
+
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
 # There are users who deviate from the default file system layout.
@@ -888,6 +883,10 @@ else
 fi
 
 if [ $1 -eq 1 ]; then
+
+%if 0%{?systemd}
+  %tmpfiles_create mysql.conf
+%endif
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
@@ -931,9 +930,9 @@ fi
 # for the other run levels exist(ed) before the upgrade?
 # use chkconfig on Enterprise Linux and newer SuSE releases
 %if 0%{?systemd}
-if [ -x %{_bindir}/systemctl ] ; then
-	%{_bindir}/systemctl enable mysqld >/dev/null 2>&1
-fi
+
+# Do NOTHING for PXC
+
 %else
 if [ -x /sbin/chkconfig ] ; then
         /sbin/chkconfig --add mysql
@@ -983,9 +982,9 @@ fi
 # Was the server running before the upgrade? If so, restart the new one.
 if [ "$SERVER_TO_START" = "true" ] ; then
 %if 0%{?systemd}
-if [ -x %{_bindir}/systemctl ] ; then
-	%{_bindir}/systemctl start mysqld
-fi
+
+# Check %postun
+
 %else
 # Restart in the same way that mysqld will be started normally.
 if [ -x %{_sysconfdir}/init.d/mysql ] ; then
@@ -1031,10 +1030,7 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
  
 if [ $1 = 0 ] ; then
 %if 0%{?systemd}
-	if [ -x %{_bindir}/systemctl ] ; then
-		%{_bindir}/systemctl stop mysqld > /dev/null
-		%{_bindir}/systemctl disable mysqld > /dev/null
-	fi
+    %systemd_preun mysql
 %else
         # Stop MySQL before uninstalling it
         if [ -x %{_sysconfdir}/init.d/mysql ] ; then
@@ -1093,7 +1089,7 @@ echo "Analyzed: SERVER_TO_START=$SERVER_TO_START"
 
 %if 0%{?systemd}
 if [ -x %{_bindir}/systemctl ] ; then
-	%{_bindir}/systemctl enable mysqld >/dev/null 2>&1
+	%{_bindir}/systemctl enable mysql >/dev/null 2>&1
 fi
 %else
 if [ -x /sbin/chkconfig ] ; then
@@ -1109,7 +1105,7 @@ if [ "$SERVER_TO_START" = "true" ] ; then
 # Restart in the same way that mysqld will be started normally.
 %if 0%{?systemd}
 	if [ -x %{_bindir}/systemctl ] ; then 
-               	%{_bindir}/systemctl start mysqld
+               	%{_bindir}/systemctl start mysql
                 echo "Giving mysqld 5 seconds to start"
                 sleep 5
         fi
@@ -1189,9 +1185,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
-%if 0%{?systemd}
-%attr(755, root, root) %{_bindir}/mysql-systemd
-%endif
 
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
@@ -1300,6 +1293,8 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(644, root, root) %{_unitdir}/mysql.service
 %attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql.bootstrap
+%attr(644, root, root) %{_tmpfilesdir}/mysql.conf
+%attr(755, root, root) %{_bindir}/mysql-systemd
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
@@ -1362,12 +1357,19 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysqlclient*.so*
+%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
 
 %postun -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
+
+%postun -n Percona-XtraDB-Cluster-server%{product_suffix}
+
+%if 0%{?systemd}
+%systemd_postun_with_restart mysql
+%endif
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-test%{product_suffix}
