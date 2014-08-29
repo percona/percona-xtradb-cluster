@@ -439,6 +439,9 @@ Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
+%if "%rhel" > "6"
+Obsoletes:      mariadb-libs >= 5.5.37
+%endif
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -1250,7 +1253,6 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
 
-%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
 
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
@@ -1384,6 +1386,7 @@ fi
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysql*.so.*
+%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 # Added for compatibility
