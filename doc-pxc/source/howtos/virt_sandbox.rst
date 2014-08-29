@@ -7,7 +7,7 @@ You will need 4 virtual machines. 3 for |PXC| and 1 for the client, which will h
 
 The client node will have HAProxy installed and it will redirect requests to |PXC| nodes. This approach works well in real-world scenarios too. Running HAProxy on the application servers instead of having them as dedicated entities gives you benefits like no need for an extra network roundtrip, because loadbalancer and scalability of |PXC|'s load balancing layer scales simply with application servers.
 
-We'll use `Percona <http://www.percona.com/docs/wiki/repositories:yum>`_ and `EPEL <http://fedoraproject.org/wiki/EPEL>`_ repositories for software installation.
+We'll use `Percona <yum-repo>`_ and `EPEL <http://fedoraproject.org/wiki/EPEL>`_ repositories for software installation.
 
 After configuring the repositories you'll be able to install software that will be used. First, install |PXC| on the database nodes. ::
 

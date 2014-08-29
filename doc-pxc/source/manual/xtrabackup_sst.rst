@@ -75,7 +75,7 @@ over WAN and security constraints are higher, while ``encrypt=1``
 
   * OpenSSL based encryption with ``encrypt=2``. Socat must be built with openSSL for encryption: ``socat -V | grep OPENSSL``.
 
-  * Support for SSL encryption for just the key and crt files as implemented in `Galera <http://www.codership.com/wiki/doku.php?id=ssl_support>`_ can be enabled with ``encrypt=3`` option. Information on this option can be found :ref:`here <galera_sst_encryption>`.
+  * Support for SSL encryption for just the key and crt files as implemented in `Galera <http://galeracluster.com/documentation-webpages/ssl.html?highlight=ssl#enabling-ssl>`_ can be enabled with ``encrypt=3`` option. Information on this option can be found :ref:`here <galera_sst_encryption>`.
 
 Refer to this :ref:`document <xtrabackup_sst_encryption>` when enabling with ``encrypt=1``.
 
@@ -208,7 +208,7 @@ Following are optional dependencies of PXC introduced by wsrep_sst_xtrabackup: (
 Galera compatible encryption
 ----------------------------
 
-Support for SSL encryption for just the key and crt files as implemented in `Galera <http://www.codership.com/wiki/doku.php?id=ssl_support>`_ can be enabled with ``encrypt=3`` option. This has been implemented in :rn:`5.5.34-23.7.6` for compatibility with Galera. **NOTE**: This option does not provide certificate validation. In order to work correctly paths to the key and cert files need to be specified as well, like: ::
+Support for SSL encryption for just the key and crt files as implemented in `Galera <http://galeracluster.com/documentation-webpages/ssl.html?highlight=ssl#enabling-ssl>`_ can be enabled with ``encrypt=3`` option. This has been implemented in :rn:`5.5.34-23.7.6` for compatibility with Galera. **NOTE**: This option does not provide certificate validation. In order to work correctly paths to the key and cert files need to be specified as well, like: ::
 
    [sst] 
    encrypt=3

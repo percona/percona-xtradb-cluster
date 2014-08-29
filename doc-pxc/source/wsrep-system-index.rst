@@ -231,7 +231,7 @@ This variable is used to set up the unique node name.
    :scope: Global
    :dyn: Yes
 
-This variable is used to set the notification `command <http://www.codership.com/wiki/doku.php?id=notification_command>`_ that server will execute every time cluster membership or local node status changes.
+This variable is used to set the notification `command <http://galeracluster.com/documentation-webpages/notification-cmd.html>`_ that server will execute every time cluster membership or local node status changes.
 
 .. variable:: wsrep_on
 
@@ -316,7 +316,7 @@ This variable sets the number of times autocommitted transactions will be tried 
    :dyn: Yes
    :default: 1
 
-This variable controls the number of threads that can apply replication transactions in parallel. Galera supports true parallel replication, replication that applies transactions in parallel only when it is safe to do so. The variable is dynamic, you can increase/decrease it anytime, note that, when you decrease it, it won't kill the threads immediately but stop them after they are done applying current transaction (the effect with increase is immediate though).  If any replication consistency problems are encountered, it's recommended to set this back to ``1`` to see if that resolves the issue. The default value can be increased for better throughput. You may want to increase it many a time as suggested `in Codership documentation <http://www.codership.com/wiki/doku.php?id=flow_control>`_, in JOINED state for instance to speed up the catchup process to SYNCED. You can also estimate the optimal value for this from :variable:`wsrep_cert_deps_distance` as suggested `on this page <http://www.codership.com/wiki/doku.php?id=monitoring#checking_replication_health>`_. You can also refer to `this <http://www.codership.com/wiki/doku.php?id=configuration_tips#parallel_applying_wsrep_slave_threads>`_ for more configuration tips.
+This variable controls the number of threads that can apply replication transactions in parallel. Galera supports true parallel replication, replication that applies transactions in parallel only when it is safe to do so. The variable is dynamic, you can increase/decrease it anytime, note that, when you decrease it, it won't kill the threads immediately but stop them after they are done applying current transaction (the effect with increase is immediate though).  If any replication consistency problems are encountered, it's recommended to set this back to ``1`` to see if that resolves the issue. The default value can be increased for better throughput. You may want to increase it many a time as suggested `in Codership documentation <http://galeracluster.com/documentation-webpages/nodestates.html#flow-control>`_, in ``JOINED`` state for instance to speed up the catchup process to ``SYNCED``. You can also estimate the optimal value for this from :variable:`wsrep_cert_deps_distance` as suggested `on this page <http://galeracluster.com/documentation-webpages/monitoringthecluster.html#checking-the-replication-health>`_. You can also refer to `this <http://galeracluster.com/documentation-webpages/configurationtips.html#setting-parallel-slave-threads>`_ for more configuration tips.
 
 .. variable:: wsrep_sst_auth
 
@@ -361,7 +361,7 @@ This variable sets up the method for taking the State Snapshot Transfer (SST). A
  * xtrabackup-v2 - This is same as xtrabackup SST except that it uses newer protocol, hence is not compatible. This is the **recommended** option for PXC 5.5.34 and above. For more details, please check :ref:`xtrabackup_sst` and :ref:`errata`.
  * rsync - uses ``rsync`` to perform the SST, this method doesn't use the :variable:`wsrep_sst_auth`
  * mysqldump - uses ``mysqldump`` to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password>, where user has root privileges on the server.
- * custom_script_name - Galera supports `Scriptable State Snapshot Transfer <http://www.codership.com/wiki/doku.php?id=scriptable_state_snapshot_transfer>`_. This enables users to create their own custom script for performing an SST.
+ * custom_script_name - Galera supports `Scriptable State Snapshot Transfer <http://galeracluster.com/documentation-webpages/scriptablesst.html>`_. This enables users to create their own custom script for performing an SST.
  * skip - this option can be used to skip the SST, it can be used when initially starting the cluster and manually restore the same data to all nodes. It shouldn't be used as permanent setting because it could lead to data inconsistency across the nodes.
 
 .. note:: 
