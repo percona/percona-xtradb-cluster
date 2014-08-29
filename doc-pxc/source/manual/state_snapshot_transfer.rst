@@ -50,5 +50,5 @@ Script used for this method can be found in :file:`/usr/bin/wsrep_sst_rsync` and
 Other Reading
 =============
 
-* `SST Methods for MySQL <http://www.codership.com/wiki/doku.php?id=sst_mysql>`_
+* `SST Methods for MySQL <http://galeracluster.com/documentation-webpages/statetransfer.html#state-snapshot-transfer-sst>`_
 * :ref:`Xtrabackup SST configuration<xtrabackup_sst>`

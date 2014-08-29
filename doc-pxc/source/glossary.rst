@@ -32,7 +32,7 @@
      *Percona XtraBackup* is an open-source hot backup utility for |MySQL| - based servers that doesn’t lock your database during the backup.
 
    XtraDB
-     *Percona XtraDB* is an enhanced version of the InnoDB storage engine, designed to better scale on modern hardware, and including a variety of other features useful in high performance environments. It is fully backwards compatible, and so can be used as a drop-in replacement for standard InnoDB. More information `here <http://www.percona.com/docs/wiki/Percona-XtraDB:start>`_ .
+     *Percona XtraDB* is an enhanced version of the InnoDB storage engine, designed to better scale on modern hardware, and including a variety of other features useful in high performance environments. It is fully backwards compatible, and so can be used as a drop-in replacement for standard InnoDB. More information `here <http://www.percona.com/software/percona-xtradb>`_ .
 
    XtraDB Cluster
      *Percona XtraDB Cluster* is a high availability solution for MySQL.

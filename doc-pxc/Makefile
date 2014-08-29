@@ -42,7 +42,7 @@ source/percona-theme/built:
 	@echo "Downloading percona-theme ..."
 	@wget -O percona-theme.tar.gz http://www.percona.com/docs/theme/percona-xtradb-cluster/5.5/
 	@echo "Extracting theme."
-	@tar -zxf percona-theme.tar.gz
+	@tar -mzxf percona-theme.tar.gz
 	@rm -rf source/percona-theme
 	@mv percona-theme source/percona-theme
 	@rm percona-theme.tar.gz

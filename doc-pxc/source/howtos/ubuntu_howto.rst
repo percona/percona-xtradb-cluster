@@ -52,11 +52,8 @@ Configuration file :file:`/etc/mysql/my.cnf` for the first node should look like
   # Path to Galera library
   wsrep_provider=/usr/lib/libgalera_smm.so
 
-  # Empty gcomm address is being used when cluster is getting bootstrapped
-  wsrep_cluster_address=gcomm://
-
   # Cluster connection URL contains the IPs of node#1, node#2 and node#3
-  #wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
+  wsrep_cluster_address=gcomm://192.168.70.61,192.168.70.62,192.168.70.63
 
   # In order for Galera to work correctly binlog format should be ROW
   binlog_format=ROW
