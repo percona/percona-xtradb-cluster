@@ -646,6 +646,7 @@ install -D -m 0644 $MBD/build-ps/rpm/mysql.conf $RBR%{_tmpfilesdir}/mysql.conf
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
 install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
+install -d $RBR%{_sysconfdir}/my.cnf.d
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
@@ -1357,6 +1358,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysqlclient*.so*
+%{_sysconfdir}/my.cnf.d
 %attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
