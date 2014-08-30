@@ -1370,7 +1370,12 @@ echo "====="                                     >> $STATUS_HISTORY
 %postun -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 %if 0%{?systemd}
-%systemd_postun_with_restart mysql
+serv=$(systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
+if [[ -n ${serv:-} ]] && systemctl is-active $serv;then
+    %systemd_postun_with_restart $serv
+else
+    %systemd_postun_with_restart mysql
+fi
 %endif
 
 # ----------------------------------------------------------------------------
@@ -1387,7 +1392,11 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysqltest_embedded.1*
 
 %changelog
-* Thu May 29 2014 Tomislav Plavcic <tomislav.plavcic@percona.com>
+* Sat Aug 30 2014 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+
+- Add packaging for systemd and related changes.
+
+* Mon May 26 2014 Tomislav Plavcic <tomislav.plavcic@percona.com>
 
 - UDF and HandlerSocket moved to plugin
 - Fixed version reported in mysql client
