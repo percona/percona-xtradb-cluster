@@ -1397,8 +1397,9 @@ done
 %postun -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 %if 0%{?systemd}
-if systemctl is-active mysql@bootstrap &>/dev/null;then
-    %systemd_postun_with_restart mysql@bootstrap
+serv=$(systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }'))
+if [[ -n ${serv:-} ]] && systemctl is-active $serv;then
+    %systemd_postun_with_restart $serv
 else
     %systemd_postun_with_restart mysql
 fi
