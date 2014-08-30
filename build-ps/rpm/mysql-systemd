@@ -71,6 +71,7 @@ log_info_msg() {
     echo " INFO: $@"
 }
 
+
 log_warning_msg() {
     echo " WARNING: $@"
 }
@@ -184,7 +185,7 @@ fi
 
 if [[ $action == 'reload' || $action == 'stop' ]];then
     if [[ ! -s $pid_path ]];then 
-        log_error_msg "mysql pid file $pid_path empty or not readable"
+        log_failure_msg "mysql pid file $pid_path empty or not readable"
         [[ $action == 'stop' ]] && log_warning_msg "mysql may be already dead"
         exit 2
     fi
@@ -193,7 +194,7 @@ fi
 
 if [[ $action == 'start-post' ]];then 
     if ! kill -0 $manager;then 
-        log_error_msg "mysqld_safe with PID $manager has already exited"
+        log_failure_msg "mysqld_safe with PID $manager has already exited"
         exit 1
     fi
 fi
