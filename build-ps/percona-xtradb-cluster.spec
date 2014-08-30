@@ -817,10 +817,10 @@ if [ -d $mysql_datadir ] ; then
 	echo "'pre' step running at `date`"          >> $STATUS_FILE
 	echo                                         >> $STATUS_FILE
 	echo "ERR file(s):"                          >> $STATUS_FILE
-	ls -ltr $mysql_datadir/*.err                 >> $STATUS_FILE
+	ls -ltr $mysql_datadir/*.err 2>/dev/null     >> $STATUS_FILE
 	echo                                         >> $STATUS_FILE
 	echo "Latest 'Version' line in latest file:" >> $STATUS_FILE
-	grep '^Version' `ls -tr $mysql_datadir/*.err | tail -1` | \
+	grep '^Version' `ls -tr $mysql_datadir/*.err 2>/dev/null | tail -1` | \
 		tail -1                              >> $STATUS_FILE
 	echo                                         >> $STATUS_FILE
 
