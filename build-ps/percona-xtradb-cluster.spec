@@ -1397,7 +1397,11 @@ done
 %postun -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 %if 0%{?systemd}
-%systemd_postun_with_restart mysql
+if systemctl is-active mysql@bootstrap &>/dev/null;then
+    %systemd_postun_with_restart mysql@bootstrap
+else
+    %systemd_postun_with_restart mysql
+fi
 %endif
 
 # ----------------------------------------------------------------------------
