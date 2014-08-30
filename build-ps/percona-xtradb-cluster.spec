@@ -1424,6 +1424,10 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Sat Aug 30 2014 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+
+- Add packaging for systemd and related changes.
+
 * Mon May 26 2014 Tomislav Plavcic <tomislav.plavcic@percona.com>
 
 - Added packaging changes regarding TokuDB
