@@ -1,0 +1,6 @@
+#!/bin/bash -eu
+
+getent group  mysql >/dev/null || addgroup --system mysql >/dev/null
+getent passwd mysql >/dev/null || \
+adduser --system --disabled-login --ingroup mysql --home /var/lib/mysql \
+        --gecos "MySQL Server" --shell /bin/false mysql >/dev/null
