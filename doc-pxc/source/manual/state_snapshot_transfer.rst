@@ -11,6 +11,11 @@ There are three methods of SST available in Percona XtraDB Cluster: :program:`my
 
  If the variable :variable:`gcs.sync_donor` is set to ``Yes`` (default ``No``), whole cluster will get blocked if the donor is blocked by the State Snapshot Transfer and not just the donor node.
 
+Choosing the SST Donor
+======================
+
+If there are no nodes available that can safely perform an incremental state transfer, the cluster defaults to a state snapshot transfer. If there are nodes available that can safely perform an incremental state transfer, the cluster prefers a local node over remote nodes to serve as the donor. If there are no local nodes available that can safely perform an incremental state transfer, the cluster chooses a remote node to serve as the donor. Where there are several local or remote nodes available that can safely perform an incremental state transfer, the cluster chooses the node with the highest ``seqno`` to serve as the donor.
+
 Using *Percona Xtrabackup*
 ==========================
 
