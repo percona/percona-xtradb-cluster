@@ -908,9 +908,6 @@ fi
 
 if [ $1 -eq 1 ]; then
 
-%if 0%{?systemd}
-  %tmpfiles_create mysql.conf
-%endif
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
@@ -948,6 +945,9 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
     fi
 fi
 
+%if 0%{?systemd}
+  %tmpfiles_create mysql.conf
+%endif
 # ----------------------------------------------------------------------
 # Make MySQL start/shutdown automatically when the machine does it.
 # ----------------------------------------------------------------------
