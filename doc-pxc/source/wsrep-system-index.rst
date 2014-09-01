@@ -29,6 +29,7 @@ This may not be desirable depending on application's use and assumptions of auto
 
 .. variable:: wsrep_causal_reads
 
+   :version 5.6.20-25.7: Variable deprecated by :variable:`wsrep_sync_wait`
    :cli: Yes
    :conf: Yes
    :scope: Global, Local
@@ -431,3 +432,20 @@ This variable is used to configure address on which the node expects the SST.
 
 This variable contains the ``UUID:seqno`` value. By setting all the nodes to have the same value for this option cluster can be set up without the state transfer.
 
+.. variable:: wsrep_sync_wait
+
+   :version 5.6.20-25.7: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+
+This variable is used to control causality checks on some SQL statements, such as ``SELECT``, ``BEGIN``/``END``, ``SHOW STATUS``, but not on some autocommit SQL statements ``UPDATE`` and ``INSERT``. Causality check is determined by bitmask: 
+
+ * ``1`` Indicates check on ``READ`` statements, including ``SELECT``, ``SHOW``, ``BEGIN``/``START TRANSACTION``.
+
+ * ``2`` Indicates check on ``UPDATE`` and ``DELETE`` statements.
+
+ * ``4`` Indicates check on ``INSERT`` and ``REPLACE`` statements
+
+This variable deprecates the :variable:`wsrep_causal_reads` variable. Setting :variable:`wsrep_sync_wait` to ``1`` is the equivalent of setting :variable:`wsrep_causal_reads` to ``ON``.
