@@ -9,13 +9,7 @@ Known Issues
 
 Following are issues which may impact you while running PXC:
  - Create Table As Select (CTAS) under highly concurent DDL workload (other than CTAS) may deadlock.
- - clustercheck looks for my.cnf under /etc for defaults-extra-file and returns 503 if that file is not there. Workaround is to provide location of my.cnf (or its variants) in server_args of xinetd config. You can also symlink to /etc/my.cnf to fix this. Bug:1276076
  - For fresh installs, it is highly recommended to use the meta-packages to install packages. Refer to  :ref:`installation` guide for more details.
- - 'pc.bootstrap=1' and 'debug=1' don't work as expected.
- - Partition tables are not replicated unless debugging is turned on.
- - garbd from galera3 crashes when listen address is not specified.
- - wsrep-load-data-splitting=ON doesn't work (default is OFF now).
- - socket.ssl = yes is required to turn on SSL.
 
 Also make sure to check limitations page :ref:`here <limitations>`. You can also review this `milestone <https://launchpad.net/percona-xtradb-cluster/+milestone/future-5.5>`_ for features/bugfixes to be included in future releases (i.e. releases after the upcoming/recent release).
 
