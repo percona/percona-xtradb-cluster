@@ -66,3 +66,25 @@
     seqno:   -1
     cert_index:
 
+* :file:`gvwstate.dat`
+  This file is used for Primary Component recovery feature. This file is created once primary component is formed or changed, so you can get the latest primary component this node was in. And this file is deleted when the node is shutdown gracefully.
+
+  First part contains the node UUID information. Second part contains the view information. View information is written between ``#vwbeg`` and ``#vwend``. View information consists of:
+
+ - view_id: [view_type] [view_uuid] [view_seq]. - ``view_type`` is always ``3`` which means primary view. ``view_uuid`` and ``view_seq`` identifies a unique view, which could be perceived as identifier of this primary component.
+
+ - bootstrap: [bootstarp_or_not]. - It could be ``0`` or ``1``, but it does not affect primary component recovery process now.
+
+ - member: [node's uuid] [node's segment]. - it represents all nodes in this primary component.
+
+   Example of this file looks like this: ::
+
+    my_uuid: c5d5d990-30ee-11e4-aab1-46d0ed84b408
+    #vwbeg
+    view_id: 3 bc85bd53-31ac-11e4-9895-1f2ce13f2542 2
+    bootstrap: 0
+    member: bc85bd53-31ac-11e4-9895-1f2ce13f2542 0
+    member: c5d5d990-30ee-11e4-aab1-46d0ed84b408 0
+    #vwend
+
+
