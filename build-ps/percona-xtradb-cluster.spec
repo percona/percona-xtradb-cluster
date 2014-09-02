@@ -628,12 +628,6 @@ install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
 install -d $RBR%{_libdir}/mysql/plugin
 
-# SElinux
-pushd ${MBD}/policy
-make -f /usr/share/selinux/devel/Makefile
-install -D -m 0644 $MBD/policy/percona-server.pp $RBR%{_datadir}/selinux/packages/percona-server/percona-server.pp
-popd
-# SElinux END
 
 (
   cd $MBD/release
@@ -998,7 +992,7 @@ if test -x /usr/sbin/selinuxenabled && test -r /selinux/enforce
 then
     if /usr/sbin/selinuxenabled && "x$(cat /selinux/enforce)" == "x1"
     then
-        echo "WARNING. SELinux is ebabled. For proper work of a cluster it is recommended"
+        echo "WARNING. SELinux is enabled. For proper work of a cluster it is recommended"
         echo "to disable it. To do so, run (for example):"
         echo "  echo 0 > /selinux/enforce"
         echo
