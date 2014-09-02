@@ -881,18 +881,6 @@ if [ -x %{_sysconfdir}/init.d/mysql ] ; then
         echo "Giving mysqld 5 seconds to exit nicely"
         sleep 5
 fi
-%endif
-
-# SElinux
-%post -n Percona-Server-selinux%{product_suffix}
-/usr/sbin/semodule -i %{_datadir}/selinux/packages/percona-server/percona-server.pp >/dev/null 2>&1 || :
-
-%postun -n Percona-Server-selinux%{product_suffix}
-if [ $1 -eq 0 ] ; then
-    /usr/sbin/semodule -r percona-server >/dev/null 2>&1 || :
-fi
-
-#SElinux
 
 %post -n Percona-XtraDB-Cluster-server%{product_suffix}
 
