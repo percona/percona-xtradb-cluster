@@ -299,7 +299,6 @@ This is a meta-package which installs server, client and galera-2.
 # Sub package definition
 ##############################################################################
 
-<<<<<<< TREE
 %package -n Percona-XtraDB-Cluster-full%{product_suffix}
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
@@ -1161,7 +1160,6 @@ echo "====="                                     >> $STATUS_HISTORY
 #  Files section
 ##############################################################################
 
-<<<<<<< TREE
 # Empty section for metapackage
 %files 
 
