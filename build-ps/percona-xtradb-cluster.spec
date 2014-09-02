@@ -63,6 +63,19 @@ Prefix: %{_sysconfdir}
 %endif
 
 #
+%bcond_with systemd
+#
+%if %{with systemd}
+  %define systemd 1
+%else
+  %if 0%{?rhel} > 6
+    %define systemd 1
+  %else
+    %define systemd 0
+  %endif
+%endif
+
+#
 # Macros we use which are not available in all supported versions of RPM
 #
 # - defined/undefined are missing on RHEL4
@@ -286,6 +299,7 @@ This is a meta-package which installs server, client and galera-2.
 # Sub package definition
 ##############################################################################
 
+<<<<<<< TREE
 %package -n Percona-XtraDB-Cluster-full%{product_suffix}
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
@@ -614,6 +628,13 @@ install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
 install -d $RBR%{_libdir}/mysql/plugin
 
+# SElinux
+pushd ${MBD}/policy
+make -f /usr/share/selinux/devel/Makefile
+install -D -m 0644 $MBD/policy/percona-server.pp $RBR%{_datadir}/selinux/packages/percona-server/percona-server.pp
+popd
+# SElinux END
+
 (
   cd $MBD/release
   make DESTDIR=$RBR benchdir_root=%{_datadir} install
@@ -689,6 +710,15 @@ rm -rf $RBR%{_sysconfdir}/init.d/mysql
 
 %pre -n Percona-XtraDB-Cluster-server%{product_suffix}
 
+
+# On rhel7 change default MariaDB options if they exists (only on initial installation)
+%if "%rhel" > "6"
+if [ $1 -eq 1 -a -f /etc/my.cnf ]; then
+  sed -i 's/log-error=\/var\/log\/mariadb\/mariadb.log/log-error=\/var\/log\/mysqld.log/g' /etc/my.cnf;
+  sed -i 's/pid-file=\/var\/run\/mariadb\/mariadb.pid/pid-file=\/var\/run\/mysqld\/mysqld.pid/g' /etc/my.cnf;
+  sed -i 's/\!includedir \/etc\/my.cnf.d/\#\!includedir \/etc\/my.cnf.d/g' /etc/my.cnf;
+fi
+%endif
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
@@ -851,6 +881,18 @@ if [ -x %{_sysconfdir}/init.d/mysql ] ; then
         echo "Giving mysqld 5 seconds to exit nicely"
         sleep 5
 fi
+%endif
+
+# SElinux
+%post -n Percona-Server-selinux%{product_suffix}
+/usr/sbin/semodule -i %{_datadir}/selinux/packages/percona-server/percona-server.pp >/dev/null 2>&1 || :
+
+%postun -n Percona-Server-selinux%{product_suffix}
+if [ $1 -eq 0 ] ; then
+    /usr/sbin/semodule -r percona-server >/dev/null 2>&1 || :
+fi
+
+#SElinux
 
 %post -n Percona-XtraDB-Cluster-server%{product_suffix}
 
@@ -989,10 +1031,10 @@ if [ "$SERVER_TO_START" = "true" ] ; then
 # Check %postun
 
 %else
-# Restart in the same way that mysqld will be started normally.
-if [ -x %{_sysconfdir}/init.d/mysql ] ; then
-  %{_sysconfdir}/init.d/mysql start
-fi
+	# Restart in the same way that mysqld will be started normally.
+	if [ -x %{_sysconfdir}/init.d/mysql ] ; then
+		%{_sysconfdir}/init.d/mysql start
+	fi
 %endif
   echo "Giving mysqld 5 seconds to start"
   sleep 5
@@ -1137,6 +1179,7 @@ echo "====="                                     >> $STATUS_HISTORY
 #  Files section
 ##############################################################################
 
+<<<<<<< TREE
 # Empty section for metapackage
 %files 
 
@@ -1188,6 +1231,9 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
+%if 0%{?systemd}
+%attr(755, root, root) %{_bindir}/mysql-systemd
+%endif
 
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck

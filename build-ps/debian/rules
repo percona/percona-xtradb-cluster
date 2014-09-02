@@ -78,13 +78,8 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		cmake -DCMAKE_INSTALL_PREFIX=/usr \
 		\
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
-	       	-DMYSQL_USER=mysql \
 		-DCMAKE_BUILD_TYPE=Debug \
 		-DWITH_LIBWRAP=ON \
-		-DWITH_READLINE=OFF \
-		-DWITH_LIBEDIT=OFF \
-		$(USE_STATIC_MYSQLD) \
-		$(USE_LINUX_NATIVE_AIO) \
 		-DWITH_SSL=system \
 		-DWITH_ZLIB=system \
 		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
@@ -147,6 +142,10 @@ build-stamp: configure
 
 ifeq ($(SKIP_DEBUG_BINARY),)
 	cd debug && $(MAKE) $(MAKE_JFLAG)
+endif
+
+ifeq ($(SKIP_DEBUG_BINARY),)
+	cd $(builddebug) && $(MAKE) $(MAKE_JFLAG)
 endif
 
 	cd $(builddir) && $(MAKE) $(MAKE_JFLAG) VERBOSE=1
