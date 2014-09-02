@@ -656,11 +656,11 @@ install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
 install -D -m 0644 $MBD/build-ps/rpm/mysql.conf $RBR%{_tmpfilesdir}/mysql.conf
+install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
+install -d $RBR%{_sysconfdir}/my.cnf.d
 %else
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
 %endif
-install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
-install -d $RBR%{_sysconfdir}/my.cnf.d
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
@@ -702,17 +702,6 @@ rm -rf $RBR%{_sysconfdir}/init.d/mysql
 ##############################################################################
 
 %pre -n Percona-XtraDB-Cluster-server%{product_suffix}
-
-
-# On rhel7 change default MariaDB options if they exists (only on initial installation)
-%if "%rhel" > "6"
-if [ $1 -eq 1 -a -f /etc/my.cnf ]; then
-  sed -i 's/log-error=\/var\/log\/mariadb\/mariadb.log/log-error=\/var\/log\/mysqld.log/g' /etc/my.cnf;
-  sed -i 's/pid-file=\/var\/run\/mariadb\/mariadb.pid/pid-file=\/var\/run\/mysqld\/mysqld.pid/g' /etc/my.cnf;
-  sed -i 's/\!includedir \/etc\/my.cnf.d/\#\!includedir \/etc\/my.cnf.d/g' /etc/my.cnf;
-fi
-%endif
-
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
 # There are users who deviate from the default file system layout.
@@ -1386,8 +1375,10 @@ echo "====="                                     >> $STATUS_HISTORY
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysqlclient*.so*
+%if 0%{?systemd}
 %{_sysconfdir}/my.cnf.d
 %attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
+%endif
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
