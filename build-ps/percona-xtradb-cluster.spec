@@ -434,7 +434,7 @@ Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:	Percona-Server-shared-55 Percona-XtraDB-Cluster-shared-56
 Obsoletes:      Percona-XtraDB-Cluster-shared
 %if "%rhel" > "6"
-obsoletes:      mariadb-libs >= 5.5.37
+Obsoletes:      mariadb-libs >= 5.5.37
 %endif
 
 
@@ -885,9 +885,6 @@ fi
 
 if [ $1 -eq 1 ]; then
 
-%if 0%{?systemd}
-  %tmpfiles_create mysql.conf
-%endif
 # ----------------------------------------------------------------------
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
@@ -922,6 +919,11 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
     then
         %{_bindir}/mysql_install_db --rpm --user=%{mysqld_user}
     fi
+
+%if 0%{?systemd}
+  %tmpfiles_create mysql.conf
+%endif
+
 fi 
 
 # ----------------------------------------------------------------------
