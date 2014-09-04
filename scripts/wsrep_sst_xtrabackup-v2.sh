@@ -172,7 +172,7 @@ get_transfer()
             if nc -h | grep -q ncat;then 
                 tcmd="nc -l ${TSST_PORT}"
             else 
-            tcmd="nc -dl ${TSST_PORT}"
+                tcmd="nc -dl ${TSST_PORT}"
             fi
         else
             tcmd="nc ${REMOTEIP} ${TSST_PORT}"
