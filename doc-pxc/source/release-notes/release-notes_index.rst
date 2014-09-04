@@ -6,6 +6,7 @@
    :maxdepth: 1
    :glob:
    
+   Percona-XtraDB-Cluster-5.5.39-25.11
    Percona-XtraDB-Cluster-5.5.37-25.10
    Percona-XtraDB-Cluster-5.5.34-25.9
    Percona-XtraDB-Cluster-5.5.34-23.7.6
