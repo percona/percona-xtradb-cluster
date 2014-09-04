@@ -29,6 +29,7 @@ This may not be desirable depending on application's use and assumptions of auto
 
 .. variable:: wsrep_causal_reads
 
+   :version 5.5.39-25.11: Variable deprecated by :variable:`wsrep_sync_wait`
    :cli: Yes
    :conf: Yes
    :scope: Global, Local
@@ -308,6 +309,28 @@ This variable controls if *MyISAM* will be replicated or not. *MyISAM* replicati
 
 This variable sets the number of times autocommitted transactions will be tried in the cluster if it encounters certification errors. In case there is a conflict, it should be safe for the cluster node to simply retry the statement without the client's knowledge with the hopes that it will pass the next time. This can be useful to help an application using autocommit to avoid the deadlock errors that can be triggered by replication conflicts. If this variable is set to ``0`` transaction won't be retried and if it is set to ``1`` it will be retried once.
 
+.. variable:: wsrep_slave_FK_checks
+
+   :version 5.5.39-25.11: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ON
+
+This variable is used to control if Foreign Key checking is done for applier threads.
+
+.. variable:: wsrep_slave_UK_checks
+
+   :version 5.5.39-25.11: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: OFF
+
+This variable is used to control if Unique Key checking is done for applier threads.
+
 .. variable:: wsrep_slave_threads
 
    :cli: Yes
@@ -388,3 +411,20 @@ This variable is used to configure address on which the node expects the SST.
 
 This variable contains the ``UUID:seqno`` value. By setting all the nodes to have the same value for this option cluster can be set up without the state transfer.
 
+.. variable:: wsrep_sync_wait
+
+   :version 5.5.39-25.11: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+
+This variable is used to control causality checks on some SQL statements, such as ``SELECT``, ``BEGIN``/``END``, ``SHOW STATUS``, but not on some autocommit SQL statements ``UPDATE`` and ``INSERT``. Causality check is determined by bitmask: 
+
+ * ``1`` Indicates check on ``READ`` statements, including ``SELECT``, ``SHOW``, ``BEGIN``/``START TRANSACTION``.
+
+ * ``2`` Indicates check on ``UPDATE`` and ``DELETE`` statements.
+
+ * ``4`` Indicates check on ``INSERT`` and ``REPLACE`` statements
+
+This variable deprecates the :variable:`wsrep_causal_reads` variable. Setting :variable:`wsrep_sync_wait` to ``1`` is the equivalent of setting :variable:`wsrep_causal_reads` to ``ON``.
