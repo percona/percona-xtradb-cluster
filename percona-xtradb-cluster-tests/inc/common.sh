@@ -282,6 +282,7 @@ server-id=$id
 basedir=${MYSQL_BASEDIR}
 datadir=${MYSQLD_DATADIR}
 tmpdir=${MYSQLD_TMPDIR}
+innodb-log-file-size=100M
 log-error=${MYSQLD_ERRFILE}
 pid-file=${MYSQLD_PIDFILE}
 ${MYSQLD_EXTRA_MY_CNF_OPTS:-}
