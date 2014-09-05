@@ -20,7 +20,7 @@ override_dh_auto_configure:
 		-DWITH_ZLIB=system \
 		-DWITH_EXTRA_CHARSETS=all \
 		-DWITH_INNODB_MEMCACHED=ON \
-		-DWITH_LIBEVENT=system ..
+		-DWITH_LIBEVENT=bundled ..
 
 override_dh_auto_build:
 	cd build_release && make -j3
@@ -68,7 +68,6 @@ override_dh_auto_install:
 	install -D -m 644 Docs/sp-imp-spec.txt \
 		$(TMP)/usr/share/doc/mysql-server-wsrep/sp-imp-spec.txt
 # Clean up unnecessary
-	rm $(TMP)/usr/share/mysql/dictionary.txt
 	rm $(TMP)/usr/share/mysql/magic
 
 
@@ -77,7 +76,7 @@ override_dh_auto_install:
 .PHONY: override_dh_strip
 
 override_dh_strip:
-# 	dh_strip -pmysql-client-wsrep --dbg-package=mysql-client-wsrep-dbg
+	dh_strip -pmysql-client-wsrep --dbg-package=mysql-client-wsrep-dbg
 	dh_strip -pmysql-server-wsrep --dbg-package=mysql-server-wsrep-dbg
 
 %:
