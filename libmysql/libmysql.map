@@ -117,6 +117,10 @@ libmysqlclient_16 {
 # de-facto API as well.  We're not going to export the deprecated version
 # make_scrambled_password, however.
 	my_make_scrambled_password;
+# DBD::mysql requires this
+	is_prefix;
+# fedora18 export
+	THR_KEY_mysys;
   local:
 	*;
 };
@@ -140,7 +144,13 @@ libmysqlclient_18 {
 	mysql_get_charset;
 	mysql_get_charset_by_csname;
 	mysql_net_realloc;
+	default_charset_info;
+	get_charset;
+	get_charset_by_csname;
+	net_realloc;
 # PHP's mysqli.so requires this (via the ER() macro)
 	client_errors;
 	mysql_client_errors;
+# Required for postfix
+	mysql_real_connect;
 };
