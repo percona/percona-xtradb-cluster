@@ -587,7 +587,7 @@ mkdir release
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            -DWITH_PAM=ON
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
-  make %{?_smp_mflags}
+  make %{?_smp_mflags} VERBOSE=1
   cd ../
   d="`pwd`"
   BuildHandlerSocket
