@@ -37,6 +37,10 @@ Once the repository is set up, use the following commands: ::
 
 More detailed example of the |Percona XtraDB Cluster| installation and configuration can be seen in :ref:`centos_howto` tutorial.
 
+.. note:: 
+
+   In *CentOS* 5 ``mysql`` package (a dependency of ``perl-DBD-MySQL`` for ``libmysqlclient.so.15``) conflicts with ``Percona-XtraDB-Cluster-client-55.x86_64`` package. To avoid this, install ``Percona-Server-shared-compat-51`` first and then proceed to install |Percona XtraDB Cluster| with ``yum install Percona-XtraDB-Cluster-55``.  Also, in case, ``mysql`` package was installed,  you will need to remove the it before installing |Percona XtraDB Cluster| as mentioned before.
+
 ``DEB``-Based Systems
 ---------------------
 
