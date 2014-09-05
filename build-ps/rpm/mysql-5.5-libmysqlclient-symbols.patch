@@ -13,7 +13,7 @@ diff -rup old/libmysql/CMakeLists.txt new/libmysql/CMakeLists.txt
        ENDIF()
      IF(INSTALL_LAYOUT STREQUAL "RPM")
 -      SET_TARGET_PROPERTIES(libmysql PROPERTIES LINK_FLAGS "${libmysql_link_flags} -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libmysql.map ${LINK_FLAG_NO_UNDEFINED}")
-+      SET_TARGET_PROPERTIES(libmysql PROPERTIES LINK_FLAGS "${libmysql_link_flags} -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libmysql.ver ${LINK_FLAG_NO_UNDEFINED}")
++      SET_TARGET_PROPERTIES(libmysql PROPERTIES LINK_FLAGS "${libmysql_link_flags} -Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/libmysql.ver ${LINK_FLAG_NO_UNDEFINED}")
      ELSE()
        SET_TARGET_PROPERTIES(libmysql PROPERTIES LINK_FLAGS "${libmysql_link_flags} ${LINK_FLAG_NO_UNDEFINED}")
      ENDIF(INSTALL_LAYOUT STREQUAL "RPM")
