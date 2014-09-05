@@ -473,7 +473,7 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 #
 %setup -n %{src_dir}
 %if "%rhel" == "7"
-%patch0 -p1
+%patch0 -p1 -F2
 %endif
 #
 ##############################################################################
