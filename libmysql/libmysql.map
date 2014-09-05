@@ -151,6 +151,4 @@ libmysqlclient_18 {
 # PHP's mysqli.so requires this (via the ER() macro)
 	client_errors;
 	mysql_client_errors;
-# Required for postfix
-	mysql_real_connect;
 };
