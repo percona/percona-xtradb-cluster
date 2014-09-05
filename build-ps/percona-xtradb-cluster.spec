@@ -1043,24 +1043,29 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
 #   Remove last version of package   0 "
 #
 #  http://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04s05.html
+
+%if 0%{?systemd}
+    serv=$(systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
+    if [[ -n ${serv:-} ]] && systemctl is-active $serv;then
+        %systemd_preun $serv
+    else
+        %systemd_preun mysql
+    fi
+%endif
  
 if [ $1 = 0 ] ; then
-%if 0%{?systemd}
-    %systemd_preun mysql
-%else
-        # Stop MySQL before uninstalling it
-        if [ -x %{_sysconfdir}/init.d/mysql ] ; then
-                %{_sysconfdir}/init.d/mysql stop > /dev/null
-                # Remove autostart of MySQL
-                # use chkconfig on Enterprise Linux and newer SuSE releases
-                if [ -x /sbin/chkconfig ] ; then
-                        /sbin/chkconfig --del mysql
-                # For older SuSE Linux versions
-                elif [ -x /sbin/insserv ] ; then
-                        /sbin/insserv -r %{_sysconfdir}/init.d/mysql
-                fi
-        fi
-%endif
+    # Stop MySQL before uninstalling it
+    if [ -x %{_sysconfdir}/init.d/mysql ] ; then
+            %{_sysconfdir}/init.d/mysql stop > /dev/null
+            # Remove autostart of MySQL
+            # use chkconfig on Enterprise Linux and newer SuSE releases
+            if [ -x /sbin/chkconfig ] ; then
+                    /sbin/chkconfig --del mysql
+            # For older SuSE Linux versions
+            elif [ -x /sbin/insserv ] ; then
+                    /sbin/insserv -r %{_sysconfdir}/init.d/mysql
+            fi
+    fi
 fi
 
 # We do not remove the mysql user since it may still own a lot of
