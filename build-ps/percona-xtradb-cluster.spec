@@ -275,6 +275,7 @@ BuildRequires:  %{distro_buildreq} pam-devel openssl-devel
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
+Patch0:         mysql-5.5-libmysqlclient-symbols.patch 
 Obsoletes:      Percona-XtraDB-Cluster
 
 # Think about what you use here since the first step is to
@@ -471,6 +472,9 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 %prep
 #
 %setup -n %{src_dir}
+%if "%rhel" == "7"
+%patch0 -p1
+%endif
 #
 ##############################################################################
 %build
