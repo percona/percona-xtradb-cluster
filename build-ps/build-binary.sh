@@ -246,7 +246,7 @@ fi
 
     ) || exit 1
 
-    make -f Makefile-pxc all
+    #make -f Makefile-pxc all
 
     if grep -q builtin <<< "$STAG" || [[ $WITH_SSL_TYPE == 'bundled' ]];then 
         # builtin
