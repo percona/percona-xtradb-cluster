@@ -276,7 +276,6 @@ fi
         make clean
         cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
-            $DEBUG_EXTNAME \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
             -DENABLE_DTRACE=OFF \
@@ -288,7 +287,6 @@ fi
             -DWITH_WSREP=ON \
             -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
-            -DWITH_INNODB_MEMCACHED=ON \
             $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
         make $MAKE_JFLAG $QUIET
 
