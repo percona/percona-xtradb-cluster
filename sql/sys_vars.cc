@@ -4103,15 +4103,9 @@ static Sys_var_have Sys_have_profiling(
        READ_ONLY GLOBAL_VAR(have_profiling), NO_CMD_LINE, NO_MUTEX_GUARD,
        NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0), DEPRECATED(""));
 
-/*
-  Do not report backup locks as supported until a proper support is 
-  implemented
-*/
-#if 0
 static Sys_var_have Sys_have_backup_locks(
        "have_backup_locks", "have_backup_locks",
        READ_ONLY GLOBAL_VAR(have_backup_locks), NO_CMD_LINE);
-#endif
 
 static Sys_var_have Sys_have_snapshot_cloning(
        "have_snapshot_cloning", "have_snapshot_cloning",
