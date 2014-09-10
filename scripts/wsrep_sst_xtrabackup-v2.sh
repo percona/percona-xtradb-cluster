@@ -473,6 +473,7 @@ recv_joiner()
     local dir=$1
     local msg=$2 
     local tmt=$3
+    local checkf=$4
     local ltcmd
 
     pushd ${dir} 1>/dev/null
@@ -505,7 +506,7 @@ recv_joiner()
         fi
     done
 
-    if [ ! -r "${MAGIC_FILE}" ];then
+    if [[ $checkf -eq 1 && ! -r "${MAGIC_FILE}" ]];then
         # this message should cause joiner to abort
         wsrep_log_error "xtrabackup process ended without creating '${MAGIC_FILE}'"
         wsrep_log_info "Contents of datadir" 
@@ -756,7 +757,7 @@ then
 
     STATDIR=$(mktemp -d)
     MAGIC_FILE="${STATDIR}/${INFO_FILE}"
-    recv_joiner $STATDIR  "${stagemsg}-gtid" $stimeout
+    recv_joiner $STATDIR  "${stagemsg}-gtid" $stimeout 1
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
@@ -806,7 +807,7 @@ then
 
 
         MAGIC_FILE="${DATA}/${INFO_FILE}"
-        recv_joiner $DATA "${stagemsg}-SST" 0
+        recv_joiner $DATA "${stagemsg}-SST" 0 0
 
         get_proc
 
