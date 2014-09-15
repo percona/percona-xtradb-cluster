@@ -320,7 +320,7 @@ fi
         make $MAKE_JFLAG $QUIET
 
         echo "Copying mysqld-debug"
-        cp -v sql/mysqld-debug $WORKDIR/usr/local/$PRODUCT_FULL/bin/
+        cp -v sql/mysqld $WORKDIR/usr/local/$PRODUCT_FULL/bin/mysqld-debug
     fi
 
 

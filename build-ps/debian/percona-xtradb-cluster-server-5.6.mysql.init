@@ -150,12 +150,14 @@ case "${1:-''}" in
 	   log_progress_msg "already running"
 	   log_end_msg 0
 	else
+	    if [[ -r $pid_file ]];then 
+                log_warning_msg "Stale PID file found: $pid_file with $(cat $pid_file)"
+            fi
   	    "${PERCONA_PREFIX}"/bin/mysqld_safe > /dev/null 2>&1 &
   	    safe_pid=$!
             avoid_race_condition="by checking again"
 
 	    for i in `seq 1 $startup_timeout`; do
-                test -s $pid_file && break
 
                 if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
                     log_daemon_msg "State transfer in progress, setting sleep higher" "mysqld"
@@ -164,7 +166,7 @@ case "${1:-''}" in
                 # if server isn't running, then pid-file will never be updated
                 if test -n "$safe_pid"; then
                     if kill -0 "$safe_pid" 2>/dev/null; then
-                        :  # the server still runs
+                        test -s $pid_file && break
                     else
                         # The server may have exited between the last pid-file check and now.  
                         if test -n "$avoid_race_condition"; then
@@ -284,7 +286,6 @@ case "${1:-''}" in
             avoid_race_condition="by checking again"
 
 	    for i in `seq 1 $startup_timeout`; do
-                test -s $pid_file && break
 
                 if test -e $sst_progress_file && [ $startup_sleep -ne 10 ];then
                     log_daemon_msg "State transfer in progress, setting sleep higher" "mysqld"
@@ -293,7 +294,7 @@ case "${1:-''}" in
                 # if server isn't running, then pid-file will never be updated
                 if test -n "$safe_pid"; then
                     if kill -0 "$safe_pid" 2>/dev/null; then
-                        :  # the server still runs
+                        test -s $pid_file && break
                     else
                         # The server may have exited between the last pid-file check and now.  
                         if test -n "$avoid_race_condition"; then
