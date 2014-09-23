@@ -2857,6 +2857,13 @@ bool one_thread_per_connection_end(THD *thd, bool block_pthread)
     block_pthread= false;
   }
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && thd->wsrep_applier)
+  {
+    WSREP_DEBUG("avoiding thread re-use for applier, thd: %lu", thd->thread_id);
+    block_pthread= false;
+  }
+#endif /* WITH_WSREP */
   // Clean up errors now, before possibly waiting for a new connection.
 #ifndef EMBEDDED_LIBRARY
   ERR_remove_state(0);
