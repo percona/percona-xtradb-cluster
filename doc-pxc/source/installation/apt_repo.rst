@@ -37,7 +37,6 @@ Ubuntu
 
  * 10.04LTS lucid
  * 12.04LTS precise
- * 13.04 raring
  * 13.10 saucy
  * 14.04LTS trusty
 
@@ -61,10 +60,21 @@ Instead of ``percona-xtradb-cluster-55`` you can install ``percona-xtradb-cluste
     
    Garbd is packaged separately as part of debian split packaging. The garbd debian package is ``percona-xtradb-cluster-garbd-2.x``. The package contains, garbd, daemon init script and related config files. This package will be installed if you install the ``percona-xtradb-cluster-full-55`` meta package.
 
-Percona `apt` Experimental repository
-=====================================
+Percona `apt` Testing repository
+================================
 
 Percona offers fresh beta builds from the experimental repository. To enable it add the following lines to your  :file:`/etc/apt/sources.list` , replacing ``VERSION`` with the name of your distribution: ::
 
-  deb http://repo.percona.com/apt VERSION main experimental
-  deb-src http://repo.percona.com/apt VERSION main experimental
+  deb http://repo.percona.com/apt VERSION main testing
+  deb-src http://repo.percona.com/apt VERSION main testing
+
+Apt-Pinning the packages
+========================
+
+In some cases you might need to "pin" the selected packages to avoid the upgrades from the distribution repositories. You'll need to make a new file :file:`/etc/apt/preferences.d/00percona.pref` and add the following lines in it: :: 
+
+  Package: *
+  Pin: release o=Percona Development Team
+  Pin-Priority: 1001
+
+For more information about the pinning you can check the official `debian wiki <http://wiki.debian.org/AptPreferences>`_.
