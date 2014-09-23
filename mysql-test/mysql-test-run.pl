@@ -359,6 +359,8 @@ sub main {
     gcov_prepare($basedir);
   }
 
+  check_wsrep_support();
+
   if (!$opt_suites) {
     $opt_suites= $DEFAULT_SUITES;
   }
@@ -3295,6 +3297,48 @@ sub ndbcluster_start ($) {
 }
 
 
+sub have_wsrep() {
+  my $wsrep_on= $mysqld_variables{'wsrep-on'};
+  return defined $wsrep_on
+}
+
+
+sub check_wsrep_support() {
+  if (have_wsrep())
+  {
+    mtr_report(" - binaries built with wsrep patch");
+
+    # Add galera test suites
+    mtr_report(" - adding wsrep, galera to default test suites");
+    $DEFAULT_SUITES.=",wsrep,galera";
+
+    # Check whether WSREP_PROVIDER environment variable is set.
+    if (defined $ENV{'WSREP_PROVIDER'}) {
+      if ((mtr_file_exists($ENV{'WSREP_PROVIDER'}) eq "")  &&
+          ($ENV{'WSREP_PROVIDER'} ne "none")) {
+        mtr_error("WSREP_PROVIDER env set to an invalid path");
+      }
+      # WSREP_PROVIDER is valid; set to a valid path or "none").
+      mtr_verbose("WSREP_PROVIDER env set to $ENV{'WSREP_PROVIDER'}");
+    } else {
+      # WSREP_PROVIDER env not defined. Lets try to locate the wsrep provider
+      # library.
+      my $file_wsrep_provider=
+        mtr_file_exists("/usr/lib/galera/libgalera_smm.so",
+                        "/usr/lib64/galera/libgalera_smm.so");
+
+      if ($file_wsrep_provider ne "") {
+        # wsrep provider library found !
+        mtr_verbose("wsrep provider library found : $file_wsrep_provider");
+        $ENV{'WSREP_PROVIDER'}= $file_wsrep_provider;
+      } else {
+        mtr_verbose("Could not find wsrep provider library, setting it to 'none'");
+        $ENV{'WSREP_PROVIDER'}= "none";
+      }
+    }
+  }
+}
+
 sub create_config_file_for_extern {
   my %opts=
     (
@@ -3718,6 +3762,24 @@ sub run_query {
     );
 
   return $res
+}
+
+
+sub sleep_until_returns_true($$$) {
+  my ($tinfo, $mysqld, $query)= @_;
+
+  my $timeout = $opt_start_timeout;
+  my $sleeptime= 100; # Milliseconds
+  my $loops= ($timeout * 1000) / $sleeptime;
+
+  for ( my $loop= 1; $loop <= $loops; $loop++ ) {
+    my $query_result = run_query($tinfo, $mysqld, $query);
+    if (run_query($tinfo, $mysqld, $query) == 1) {
+      return 0;
+    }
+  }
+  
+  return 1;
 }
 
 
@@ -5757,6 +5819,13 @@ sub start_servers($) {
 	$tinfo->{logfile}= "Could not open server logfile: '$logfile'";
       }
       return 1;
+    }
+
+    if (have_wsrep()) {
+      if(sleep_until_returns_true($tinfo, $mysqld, 'SELECT @@wsrep_ready')) {
+         $tinfo->{logfile}= "WSREP did not transition to state READY";
+         return 1;
+      }
     }
   }
 
