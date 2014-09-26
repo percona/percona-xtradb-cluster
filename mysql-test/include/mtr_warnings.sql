@@ -264,6 +264,7 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Failed to guess base node address"),
  ("WSREP: Guessing address for incoming client connections failed"),
  ("WSREP: Failed to read output of: '/sbin/ifconfig"),
+ ("WSREP: SQL statement was ineffective"),
 
  ("THE_LAST_SUPPRESSION")||
 
