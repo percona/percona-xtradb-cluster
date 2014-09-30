@@ -265,6 +265,12 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Guessing address for incoming client connections failed"),
  ("WSREP: Failed to read output of: '/sbin/ifconfig"),
  ("WSREP: SQL statement was ineffective"),
+ ("WSREP: Refusing exit for the last slave thread"),
+ ("WSREP: Quorum: No node with complete state"),
+ ("WSREP: Failed to report last committed"),
+ ("Slave SQL: Error 'Duplicate entry"),
+ ("Query apply warning:"),
+ ("WSREP: Ignoring error for TO isolated action:"),
 
  ("THE_LAST_SUPPRESSION")||
 
