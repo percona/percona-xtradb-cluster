@@ -607,6 +607,8 @@ then
 
         check_extra
 
+        wsrep_log_info "WARNING: Donor on Backup Lock enabled PXC, make sure Joiner is on 5.6.21 PXC or higher"
+
         wsrep_log_info "Streaming GTID file before SST"
 
         echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
