@@ -263,6 +263,15 @@ wsrep_recover_position() {
     wsrep_start_position_opt="--wsrep_start_position=$start_pos"
   fi
 
+  if test -f $err_log && test $logging = 'file';then 
+      echo "Log of wsrep recovery (--wsrep-recover):" >> $err_log
+      cat $wr_logfile >> $err_log
+  elif test $logging = 'syslog';then
+      logger -t "$syslog_tag_mysqld_safe" -p "$priority" \
+          "Log of wsrep recovery (--wsrep-recover):"
+      logger -t "$syslog_tag_mysqld_safe" -p "$priority" < $wr_logfile
+  fi
+
   rm $wr_logfile
 
   return $ret
