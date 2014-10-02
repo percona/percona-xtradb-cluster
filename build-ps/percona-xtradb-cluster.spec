@@ -446,7 +446,7 @@ http://www.percona.com/software/percona-xtradb-cluster/
 Summary:        Percona XtraDB Cluster - Shared libraries
 Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
-Conflicts:	Percona-Server-shared-55 Percona-XtraDB-Cluster-shared-56
+Conflicts:	Percona-Server-shared-55
 Obsoletes:      Percona-XtraDB-Cluster-shared
 %if "%rhel" > "6"
 Obsoletes:      mariadb-libs >= 5.5.37
