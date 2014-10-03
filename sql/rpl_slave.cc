@@ -510,6 +510,21 @@ int global_init_info(Master_info* mi, bool ignore_if_no_info, int thread_mask)
   int init_error= 0;
   enum_return_check check_return= ERROR_CHECKING_REPOSITORY;
   THD *thd= current_thd;
+  bool binlog_prot_acquired= false;
+
+  if (thd && !thd->backup_binlog_lock.is_acquired())
+  {
+    const ulong timeout= thd->variables.lock_wait_timeout;
+
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&mi->rli->data_lock);
+
+    if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
+                                                   timeout))
+      DBUG_RETURN(1);
+
+    binlog_prot_acquired= true;
+  }
 
   /*
     We need a mutex while we are changing master info parameters to
@@ -573,6 +588,13 @@ end:
 
   mysql_mutex_unlock(&mi->rli->data_lock);
   mysql_mutex_unlock(&mi->data_lock);
+
+  if (binlog_prot_acquired)
+  {
+      DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+      thd->backup_binlog_lock.release_protection(thd);
+  }
+
   DBUG_RETURN(check_return == ERROR_CHECKING_REPOSITORY || init_error);
 }
 
@@ -3304,9 +3326,13 @@ static ulong read_event(MYSQL* mysql, Master_info *mi, bool* suppress_warnings)
   /* Check if eof packet */
   if (len < 8 && mysql->net.read_pos[0] == 254)
   {
-    sql_print_information("Slave: received end packet from server, apparent "
-                          "master shutdown: %s",
-                     mysql_error(mysql));
+     sql_print_information("Slave: received end packet from server due to dump "
+                           "thread being killed on master. Dump threads are "
+                           "killed for example during master shutdown, "
+                           "explicitly by a user, or when the master receives "
+                           "a binlog send request from a duplicate server "
+                           "UUID <%s> : Error %s", ::server_uuid,
+                           mysql_error(mysql));
      DBUG_RETURN(packet_error);
   }
 
@@ -3871,6 +3897,88 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
                        : SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK);
 }
 
+/**
+  Let the worker applying the current group to rollback and gracefully
+  finish its work before.
+
+  @param rli The slave's relay log info.
+
+  @param ev a pointer to the event on hold before applying this rollback
+  procedure.
+
+  @retval false The rollback succeeded.
+
+  @retval true  There was an error while injecting events.
+*/
+static bool coord_handle_partial_binlogged_transaction(Relay_log_info *rli,
+                                                       const Log_event *ev)
+{
+  DBUG_ENTER("coord_handle_partial_binlogged_transaction");
+  /*
+    This function is called holding the rli->data_lock.
+    We must return it still holding this lock, except in the case of returning
+    error.
+  */
+  mysql_mutex_assert_owner(&rli->data_lock);
+  THD *thd= rli->info_thd;
+
+  if (!rli->curr_group_seen_begin)
+  {
+    DBUG_PRINT("info",("Injecting QUERY(BEGIN) to rollback worker"));
+    Log_event *begin_event= new Query_log_event(thd,
+                                                STRING_WITH_LEN("BEGIN"),
+                                                true, /* using_trans */
+                                                false, /* immediate */
+                                                true, /* suppress_use */
+                                                0, /* error */
+                                                true /* ignore_command */);
+    ((Query_log_event*) begin_event)->db= "";
+    begin_event->data_written= 0;
+    begin_event->server_id= ev->server_id;
+    /*
+      We must be careful to avoid SQL thread increasing its position
+      farther than the event that triggered this QUERY(BEGIN).
+    */
+    begin_event->log_pos= ev->log_pos;
+    begin_event->future_event_relay_log_pos= ev->future_event_relay_log_pos;
+
+    if (apply_event_and_update_pos(&begin_event, thd, rli) !=
+        SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK)
+    {
+      delete begin_event;
+      DBUG_RETURN(true);
+    }
+    mysql_mutex_lock(&rli->data_lock);
+  }
+
+  DBUG_PRINT("info",("Injecting QUERY(ROLLBACK) to rollback worker"));
+  Log_event *rollback_event= new Query_log_event(thd,
+                                                 STRING_WITH_LEN("ROLLBACK"),
+                                                 true, /* using_trans */
+                                                 false, /* immediate */
+                                                 true, /* suppress_use */
+                                                 0, /* error */
+                                                 true /* ignore_command */);
+  ((Query_log_event*) rollback_event)->db= "";
+  rollback_event->data_written= 0;
+  rollback_event->server_id= ev->server_id;
+  /*
+    We must be careful to avoid SQL thread increasing its position
+    farther than the event that triggered this QUERY(ROLLBACK).
+  */
+  rollback_event->log_pos= ev->log_pos;
+  rollback_event->future_event_relay_log_pos= ev->future_event_relay_log_pos;
+
+  if (apply_event_and_update_pos(&rollback_event, thd, rli) !=
+      SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK)
+  {
+    delete rollback_event;
+    DBUG_RETURN(true);
+  }
+  mysql_mutex_lock(&rli->data_lock);
+
+  DBUG_RETURN(false);
+}
 
 /**
   Top-level function for executing the next event in the relay log.
@@ -4000,6 +4108,28 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
                         rli->inc_event_relay_log_pos();
                         DBUG_RETURN(0);
                       };);
+    }
+
+    /*
+      GTID protocol will put a ROTATE_EVENT from the master after each
+      (re)connection if auto positioning is enabled.
+      This means that the SQL thread might have already started to apply the
+      current group but, as the IO thread had to reconnect, it left this
+      group incomplete and will start it again from the beginning.
+      So, before applying this ROTATE_EVENT we must let the worker applying
+      the current group rollback and gracefully finish its work before
+      starting to applying the new (complete) copy of the group.
+    */
+    if (ev->get_type_code() == ROTATE_EVENT &&
+        ev->server_id != ::server_id && rli->is_parallel_exec() &&
+        rli->curr_group_seen_gtid)
+    {
+      if (coord_handle_partial_binlogged_transaction(rli, ev))
+        /*
+          In the case of an error, coord_handle_partial_binlogged_transaction
+          will not try to get the rli->data_lock again.
+        */
+        DBUG_RETURN(1);
     }
 
     /* ptr_ev can change to NULL indicating MTS coorinator passed to a Worker */
@@ -4569,19 +4699,23 @@ log space");
         }
       DBUG_EXECUTE_IF("stop_io_after_reading_gtid_log_event",
         if (event_buf[EVENT_TYPE_OFFSET] == GTID_LOG_EVENT)
-           thd->killed= THD::KILLED_NO_VALUE;
+          thd->killed= THD::KILLED_NO_VALUE;
       );
       DBUG_EXECUTE_IF("stop_io_after_reading_query_log_event",
         if (event_buf[EVENT_TYPE_OFFSET] == QUERY_EVENT)
-           thd->killed= THD::KILLED_NO_VALUE;
+          thd->killed= THD::KILLED_NO_VALUE;
+      );
+      DBUG_EXECUTE_IF("stop_io_after_reading_user_var_log_event",
+        if (event_buf[EVENT_TYPE_OFFSET] == USER_VAR_EVENT)
+          thd->killed= THD::KILLED_NO_VALUE;
       );
       DBUG_EXECUTE_IF("stop_io_after_reading_xid_log_event",
         if (event_buf[EVENT_TYPE_OFFSET] == XID_EVENT)
-           thd->killed= THD::KILLED_NO_VALUE;
+          thd->killed= THD::KILLED_NO_VALUE;
       );
       DBUG_EXECUTE_IF("stop_io_after_reading_write_rows_log_event",
         if (event_buf[EVENT_TYPE_OFFSET] == WRITE_ROWS_EVENT)
-           thd->killed= THD::KILLED_NO_VALUE;
+          thd->killed= THD::KILLED_NO_VALUE;
       );
     }
   }
@@ -5157,6 +5291,7 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period,
   ulong cnt;
   bool error= FALSE;
   struct timespec curr_clock;
+  bool binlog_prot_acquired= false;
 
   DBUG_ENTER("checkpoint_routine");
 
@@ -5228,9 +5363,32 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period,
   sort_dynamic(&rli->least_occupied_workers, (qsort_cmp) ulong_cmp);
 
   if (need_data_lock)
+  {
+    THD * const info_thd= rli->info_thd;
+    const ulong timeout= info_thd->variables.lock_wait_timeout;
+
+    /*
+      Acquire protection against global BINLOG lock before rli->data_lock is
+      locked (otherwise we would also block SHOW SLAVE STATUS).
+    */
+    DBUG_ASSERT(!info_thd->backup_binlog_lock.is_acquired());
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&rli->data_lock);
+    error= info_thd->backup_binlog_lock.acquire_protection(info_thd,
+                                                           MDL_EXPLICIT,
+                                                           timeout);
+    if (error)
+      goto end;
+
+    binlog_prot_acquired= true;
+
     mysql_mutex_lock(&rli->data_lock);
+  }
   else
+  {
     mysql_mutex_assert_owner(&rli->data_lock);
+    DBUG_ASSERT(rli->info_thd->backup_binlog_lock.is_protection_acquired());
+  }
 
   /*
     "Coordinator::commit_positions" {
@@ -5275,6 +5433,13 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period,
   /* end-of "Coordinator::"commit_positions" */
 
 end:
+
+  if (binlog_prot_acquired)
+  {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    rli->info_thd->backup_binlog_lock.release_protection(rli->info_thd);
+  }
+
 #ifndef DBUG_OFF
   if (DBUG_EVALUATE_IF("check_slave_debug_group", 1, 0))
     DBUG_SUICIDE();
@@ -8280,6 +8445,7 @@ bool change_master(THD* thd, Master_info* mi)
   my_off_t saved_log_pos= 0;
   my_bool save_relay_log_purge= relay_log_purge;
   bool mts_remove_workers= false;
+  bool binlog_prot_acquired= false;
 
   DBUG_ENTER("change_master");
 
@@ -8627,6 +8793,22 @@ bool change_master(THD* thd, Master_info* mi)
   }
   relay_log_purge= save_relay_log_purge;
 
+  if (!thd->backup_binlog_lock.is_acquired())
+  {
+    const ulong timeout= thd->variables.lock_wait_timeout;
+
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&mi->rli->data_lock);
+    if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
+                                                   timeout))
+    {
+      ret= true;
+      goto err;
+    }
+
+    binlog_prot_acquired= true;
+  }
+
   /*
     Coordinates in rli were spoilt by the 'if (need_relay_log_purge)' block,
     so restore them to good values. If we left them to ''/0, that would work;
@@ -8679,6 +8861,13 @@ bool change_master(THD* thd, Master_info* mi)
   mysql_mutex_unlock(&mi->rli->data_lock);
 
 err:
+
+  if (binlog_prot_acquired)
+  {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    thd->backup_binlog_lock.release_protection(thd);
+  }
+
   unlock_slave_threads(mi);
   if (ret == FALSE)
   {

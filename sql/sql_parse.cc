@@ -2225,12 +2225,6 @@ bool log_slow_applicable(THD *thd)
 
   ulonglong end_utime_of_query= thd->current_utime();
   ulonglong query_exec_time= get_query_exec_time(thd, end_utime_of_query);
-#ifdef HAVE_RESPONSE_TIME_DISTRIBUTION
-  if (opt_query_response_time_stats)
-  {
-    query_response_time_collect(query_exec_time);
-  }
-#endif
 
   /*
     Low long_query_time value most likely means user is debugging stuff and even
@@ -2741,6 +2735,17 @@ static bool lock_tables_for_backup(THD *thd)
   if (thd->backup_tables_lock.is_acquired() ||
       thd->global_read_lock.is_acquired())
     DBUG_RETURN(false);
+
+  /*
+    Do not allow backup locks under regular LOCK TABLES, FLUSH TABLES ... FOR
+    EXPORT, or FLUSH TABLES <table_list> WITH READ LOCK.
+  */
+  if (thd->variables.option_bits & OPTION_TABLE_LOCK)
+  {
+    my_message(ER_LOCK_OR_ACTIVE_TRANSACTION,
+               ER(ER_LOCK_OR_ACTIVE_TRANSACTION), MYF(0));
+    DBUG_RETURN(true);
+  }
 
   DBUG_RETURN(thd->backup_tables_lock.acquire(thd));
 }
@@ -4510,6 +4515,7 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
+      DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
         transactional metadata locks.
@@ -4524,11 +4530,13 @@ end_with_restore_list:
 
     if (thd->backup_tables_lock.is_acquired())
     {
+      DBUG_ASSERT(!(thd->variables.option_bits & OPTION_TABLE_LOCK));
       DBUG_ASSERT(!thd->global_read_lock.is_acquired());
 
       thd->backup_tables_lock.release(thd);
     }
-    else if (thd->global_read_lock.is_acquired())
+
+    if (thd->global_read_lock.is_acquired())
       thd->global_read_lock.unlock_global_read_lock(thd);
 
     if (res)
@@ -4544,6 +4552,13 @@ end_with_restore_list:
     break;
 
   case SQLCOM_LOCK_TABLES:
+    /*
+      Do not allow LOCK TABLES under an active LOCK TABLES FOR BACKUP in the
+      same connection.
+    */
+    if (thd->backup_tables_lock.abort_if_acquired())
+      goto error;
+
     /*
       Can we commit safely? If not, return to avoid releasing
       transactional metadata locks.
@@ -4981,6 +4996,13 @@ end_with_restore_list:
 
     if (first_table && lex->type & REFRESH_READ_LOCK)
     {
+      /*
+         Do not allow FLUSH TABLES <table_list> WITH READ LOCK under an active
+         LOCK TABLES FOR BACKUP lock.
+       */
+      if (thd->backup_tables_lock.abort_if_acquired())
+        goto error;
+
       /* Check table-level privileges. */
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
@@ -4992,6 +5014,13 @@ end_with_restore_list:
     }
     else if (first_table && lex->type & REFRESH_FOR_EXPORT)
     {
+      /*
+         Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
+         FOR BACKUP lock.
+       */
+      if (thd->backup_tables_lock.abort_if_acquired())
+        goto error;
+
       /* Check table-level privileges. */
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))

@@ -466,7 +466,7 @@ my_bool use_temp_pool, relay_log_purge;
 my_bool relay_log_recovery;
 my_bool opt_sync_frm, opt_allow_suspicious_udfs;
 my_bool opt_secure_auth= 0;
-char* opt_secure_file_priv;
+char* opt_secure_file_priv= NULL;
 my_bool opt_secure_file_priv_noarg= FALSE;
 my_bool opt_log_slow_admin_statements= 0;
 my_bool opt_log_slow_slave_statements= 0;
@@ -505,6 +505,7 @@ const char *wsrep_binlog_format_names[]=
                                    {"MIXED", "STATEMENT", "ROW", "NONE", NullS};
 #endif /*WITH_WSREP */
 my_bool enforce_gtid_consistency;
+my_bool simplified_binlog_gtid_recovery;
 ulong binlogging_impossible_mode;
 const char *binlogging_impossible_err[]= {"IGNORE_ERROR", "ABORT_SERVER", NullS};
 ulong gtid_mode;
@@ -6291,7 +6292,7 @@ int mysqld_main(int argc, char **argv)
             const_cast<Gtid_set *>(gtid_state->get_lost_gtids()),
             NULL,
             opt_master_verify_checksum,
-            true/*true=need lock*/))
+            true/*true=need lock*/, true))
         unireg_abort(1);
 
       /*
@@ -9376,6 +9377,9 @@ mysqld_get_one_option(int optid,
     test_flags= argument ? (uint) atoi(argument) : 0;
     opt_endinfo=1;
     break;
+  case OPT_THREAD_CONCURRENCY:
+    WARN_DEPRECATED_NO_REPLACEMENT(NULL, "THREAD_CONCURRENCY");
+    break;
   case (int) OPT_ISAM_LOG:
     opt_myisam_log=1;
     break;
@@ -9710,7 +9714,7 @@ pfs_error:
     if (argument == NULL)
     {
       opt_secure_file_priv_noarg= TRUE;
-      opt_secure_file_priv= my_strdup("ON", MYF(0));
+      opt_secure_file_priv= const_cast<char*>("ON");
     }
     else
     {

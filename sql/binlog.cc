@@ -2744,8 +2744,13 @@ bool MYSQL_BIN_LOG::open_index_file(const char *index_file_name_arg,
   this object.
   @param prev_gtids If not NULL, then the GTIDs from the
   Previous_gtids_log_events are stored in this object.
+  @param first_gtid If not NULL, then the first GTID information from the
+  file will be stored in this object.
   @param last_gtid If not NULL, then the last GTID information from the
   file will be stored in this object.
+  @param sid_map The sid_map object to use in the rpl_sidno generation
+  of the Gtid_log_event. If lock is needed in the sid_map, the caller
+  must hold it.
   @param verify_checksum Set to true to verify event checksums.
 
   @retval GOT_GTIDS The file was successfully read and it contains
@@ -2764,7 +2769,9 @@ enum enum_read_gtids_from_binlog_status
 { GOT_GTIDS, GOT_PREVIOUS_GTIDS, NO_GTIDS, ERROR, TRUNCATED };
 static enum_read_gtids_from_binlog_status
 read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
-                       Gtid_set *prev_gtids, Gtid *last_gtid,
+                       Gtid_set *prev_gtids, Gtid *first_gtid,
+                       Gtid *last_gtid,
+                       Sid_map* sid_map,
                        bool verify_checksum)
 {
   DBUG_ENTER("read_gtids_from_binlog");
@@ -2780,6 +2787,20 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
 
   File file;
   IO_CACHE log;
+
+  /*
+    We assert here that both all_gtids and prev_gtids, if specified,
+    uses the same sid_map as the one passed as a parameter. This is just
+    to ensure that, if the sid_map needed some lock and was locked by
+    the caller, the lock applies to all the GTID sets this function is
+    dealing with.
+  */
+#ifndef DBUG_OFF
+  if (all_gtids)
+    DBUG_ASSERT(all_gtids->get_sid_map() == sid_map);
+  if (prev_gtids)
+    DBUG_ASSERT(prev_gtids->get_sid_map() == sid_map);
+#endif
 
   const char *errmsg= NULL;
   if ((file= open_binlog_file(&log, filename, &errmsg)) < 0)
@@ -2801,6 +2822,7 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
   Log_event *ev= NULL;
   enum_read_gtids_from_binlog_status ret= NO_GTIDS;
   bool done= false;
+  bool seen_first_gtid= false;
   while (!done &&
          (ev= Log_event::read_log_event(&log, 0, fd_ev_p, verify_checksum)) !=
          NULL)
@@ -2869,21 +2891,24 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
           ret= GOT_GTIDS;
       }
       /*
-        When all_gtids==NULL, we just check if the binary log contains
-        at least one Gtid_log_event, so that we can distinguish the
-        return values GOT_GTID and GOT_PREVIOUS_GTIDS. We don't need
-        to read anything else from the binary log.
-        But if last_gtid is requested (i.e., NOT NULL), we should continue to
-        read all gtids. Otherwise, we are done.
+        When all_gtids, first_gtid and last_gtid are all NULL,
+        we just check if the binary log contains at least one Gtid_log_event,
+        so that we can distinguish the return values GOT_GTID and
+        GOT_PREVIOUS_GTIDS. We don't need to read anything else from the
+        binary log.
+        If all_gtids or last_gtid is requested (i.e., NOT NULL), we should
+        continue to read all gtids.
+        If just first_gtid was requested, we will be done after storing this
+        Gtid_log_event info on it.
       */
-      if (all_gtids == NULL && last_gtid == NULL)
+      if (all_gtids == NULL && first_gtid == NULL && last_gtid == NULL)
       {
         ret= GOT_GTIDS, done= true;
       }
       else
       {
         Gtid_log_event *gtid_ev= (Gtid_log_event *)ev;
-        rpl_sidno sidno= gtid_ev->get_sidno(false/*false=don't need lock*/);
+        rpl_sidno sidno= gtid_ev->get_sidno(sid_map);
         if (sidno < 0)
           ret= ERROR, done= true;
         else
@@ -2898,6 +2923,17 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
             DBUG_PRINT("info", ("Got Gtid from file '%s': Gtid(%d, %lld).",
                                 filename, sidno, gtid_ev->get_gno()));
           }
+
+          /* If the first GTID was requested, stores it */
+          if (first_gtid && !seen_first_gtid)
+          {
+            first_gtid->set(sidno, gtid_ev->get_gno());
+            seen_first_gtid= true;
+            /* If the first_gtid was the only thing requested, we are done */
+            if (all_gtids == NULL && last_gtid == NULL)
+              ret= GOT_GTIDS, done= true;
+          }
+
           if (last_gtid)
             last_gtid->set(sidno, gtid_ev->get_gno());
         }
@@ -2941,6 +2977,7 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
 
 bool MYSQL_BIN_LOG::find_first_log_not_in_gtid_set(char *binlog_file_name,
                                                    const Gtid_set *gtid_set,
+                                                   Gtid *first_gtid,
                                                    const char **errmsg)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::gtid_read_start_binlog");
@@ -2986,6 +3023,8 @@ bool MYSQL_BIN_LOG::find_first_log_not_in_gtid_set(char *binlog_file_name,
     subset of the given gtid set. Since every binary log begins with
     a Previous_gtids_log_event, that contains all GTIDs in all
     previous binary logs.
+    We also ask for the first GTID in the binary log to know if we
+    should send the FD event with the "created" field cleared or not.
   */
   DBUG_PRINT("info", ("Iterating backwards through binary logs, and reading "
                       "only the Previous_gtids_log_event, to find the first "
@@ -2997,7 +3036,9 @@ bool MYSQL_BIN_LOG::find_first_log_not_in_gtid_set(char *binlog_file_name,
     const char *filename= rit->c_str();
     DBUG_PRINT("info", ("Read Previous_gtids_log_event from filename='%s'",
                         filename));
-    switch (read_gtids_from_binlog(filename, NULL, &previous_gtid_set, NULL,
+    switch (read_gtids_from_binlog(filename, NULL, &previous_gtid_set,
+                                   first_gtid, NULL/* last_gtid */,
+                                   previous_gtid_set.get_sid_map(),
                                    opt_master_verify_checksum))
     {
     case ERROR:
@@ -3048,8 +3089,8 @@ end:
 }
 
 bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
-                                   Gtid *last_gtid,
-                                   bool verify_checksum, bool need_lock)
+                                   Gtid *last_gtid, bool verify_checksum,
+                                   bool need_lock, bool is_server_starting)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::init_gtid_sets");
   DBUG_PRINT("info", ("lost_gtids=%p; so we are recovering a %s log",
@@ -3085,6 +3126,13 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
   list<string>::reverse_iterator rit;
   bool reached_first_file= false;
 
+  /* Initialize the sid_map to be used in read_gtids_from_binlog */
+  Sid_map *sid_map= NULL;
+  if (all_gtids)
+    sid_map= all_gtids->get_sid_map();
+  else if (lost_gtids)
+    sid_map= lost_gtids->get_sid_map();
+
   for (error= find_log_pos(&linfo, NULL, false/*need_lock_index=false*/); !error;
        error= find_next_log(&linfo, false/*need_lock_index=false*/))
   {
@@ -3096,6 +3144,16 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
     DBUG_PRINT("error", ("Error reading binlog index"));
     goto end;
   }
+  /*
+    On server starting, one new empty binlog file is created and
+    its file name is put into index file before initializing
+    GLOBAL.GTID_EXECUTED AND GLOBAL.GTID_PURGED, it is not the
+    last binlog file before the server restarts, so we remove
+    its file name from filename_list.
+  */
+  if (is_server_starting && !is_relay_log && !filename_list.empty())
+    filename_list.pop_back();
+
   error= 0;
 
   if (all_gtids != NULL)
@@ -3118,19 +3176,40 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
                           filename, got_gtids, reached_first_file));
       switch (read_gtids_from_binlog(filename, got_gtids ? NULL : all_gtids,
                                      reached_first_file ? lost_gtids : NULL,
-                                     last_gtid,
-                                     verify_checksum))
+                                     NULL/* first_gtid */, last_gtid,
+                                     sid_map, verify_checksum))
       {
-      case ERROR:
-        error= 1;
-        goto end;
-      case GOT_GTIDS:
-      case GOT_PREVIOUS_GTIDS:
-        got_gtids= true;
-        /*FALLTHROUGH*/
-      case NO_GTIDS:
-      case TRUNCATED:
-        break;
+        case ERROR:
+        {
+          error= 1;
+          goto end;
+        }
+        case GOT_GTIDS:
+        case GOT_PREVIOUS_GTIDS:
+        {
+          got_gtids= true;
+          break;
+        }
+        case NO_GTIDS:
+        {
+          /*
+            If the simplified_binlog_gtid_recovery is enabled, and the
+            last binary log does not contain any GTID event, do not
+            read any more binary logs, GLOBAL.GTID_EXECUTED and
+            GLOBAL.GTID_PURGED should be empty in the case. Otherwise,
+            initialize GTID_EXECUTED as usual.
+          */
+          if (simplified_binlog_gtid_recovery && !is_relay_log)
+          {
+            DBUG_ASSERT(all_gtids->is_empty() && lost_gtids->is_empty());
+            goto end;
+          }
+          /*FALLTHROUGH*/
+        }
+        case TRUNCATED:
+        {
+          break;
+        }
       }
     }
   }
@@ -3141,18 +3220,39 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
     {
       const char *filename= it->c_str();
       DBUG_PRINT("info", ("filename='%s'", filename));
-      switch (read_gtids_from_binlog(filename, NULL, lost_gtids, NULL,
-                                     verify_checksum))
+      switch (read_gtids_from_binlog(filename, NULL, lost_gtids,
+                                     NULL/* first_gtid */, NULL/* last_gtid */,
+                                     sid_map, verify_checksum))
       {
-      case ERROR:
-        error= 1;
-        /*FALLTHROUGH*/
-      case GOT_GTIDS:
-        goto end;
-      case GOT_PREVIOUS_GTIDS:
-      case NO_GTIDS:
-      case TRUNCATED:
-        break;
+        case ERROR:
+        {
+          error= 1;
+          /*FALLTHROUGH*/
+        }
+        case GOT_GTIDS:
+        {
+          goto end;
+        }
+        case NO_GTIDS:
+        {
+          /*
+            If the simplified_binlog_gtid_recovery is enabled, and the
+            first binary log does not contain any GTID event, do not
+            read any more binary logs, GLOBAL.GTID_PURGED should be
+            empty in the case.
+          */
+          if (simplified_binlog_gtid_recovery && !is_relay_log)
+          {
+            DBUG_ASSERT(lost_gtids->is_empty());
+            goto end;
+          }
+          /*FALLTHROUGH*/
+        }
+        case GOT_PREVIOUS_GTIDS:
+        case TRUNCATED:
+        {
+          break;
+        }
       }
     }
   }
@@ -5089,7 +5189,7 @@ int MYSQL_BIN_LOG::new_file_impl(bool need_lock_log, Format_description_log_even
     /* reopen the binary log file. */
     file_to_open= new_name_ptr;
     error= open_binlog(old_name, new_name_ptr, io_cache_type,
-                       max_size, true,
+                       max_size, true/*null_created_arg=true*/,
                        false/*need_lock_index=false*/,
                        true/*need_sid_lock=true*/,
                        extra_description_event);
@@ -6521,6 +6621,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
 #endif /* WITH_WSREP */
   int error= RESULT_SUCCESS;
   bool stuff_logged= false;
+  bool binlog_prot_acquired= false;
 
   DBUG_PRINT("enter", ("thd: 0x%llx, all: %s, xid: %llu, cache_mngr: 0x%llx",
                        (ulonglong) thd, YESNO(all), (ulonglong) xid,
@@ -6665,8 +6766,15 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   {
     int rc;
 
-    /* Block binlog updates if there's an active BINLOG lock. */
-    if (!thd->backup_binlog_lock.is_acquired())
+    /*
+       Block binlog updates if there's an active BINLOG lock.
+
+       We allow binlog lock owner to commit, assuming it knows what it does. We
+       also check if protection has not been acquired earlier, which is possible
+       in slave threads to protect master binlog coordinates.
+    */
+    if (!thd->backup_binlog_lock.is_acquired() &&
+        !thd->backup_binlog_lock.is_protection_acquired())
     {
       const ulong timeout= thd->variables.lock_wait_timeout;
 
@@ -6679,11 +6787,13 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
 
         DBUG_RETURN(RESULT_ABORTED);
       }
+
+      binlog_prot_acquired= true;
     }
 
     rc= ordered_commit(thd, all);
 
-    if (!thd->backup_binlog_lock.is_acquired())
+    if (binlog_prot_acquired)
     {
       DBUG_PRINT("debug", ("Releasing binlog protection lock"));
       thd->backup_binlog_lock.release_protection(thd);

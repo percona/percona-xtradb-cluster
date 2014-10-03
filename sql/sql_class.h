@@ -2188,6 +2188,8 @@ public:
 
   bool is_acquired() const { return m_lock != NULL; }
 
+  bool is_protection_acquired() const { return m_prot_lock != NULL; }
+
 private:
   MDL_key::enum_mdl_namespace m_namespace;
   MDL_ticket *m_lock;
@@ -2397,7 +2399,7 @@ public:
   struct timeval user_time;
   // track down slow pthread_create
   ulonglong  prior_thr_create_utime, thr_create_utime;
-  ulonglong  start_utime, utime_after_lock;
+  ulonglong  start_utime, utime_after_lock, utime_after_query;
 
   thr_lock_type update_lock_default;
   Delayed_insert *di;
@@ -3721,8 +3723,8 @@ public:
   */
   void update_server_status()
   {
-    ulonglong end_utime_of_query= current_utime();
-    if (end_utime_of_query > utime_after_lock + variables.long_query_time)
+    utime_after_query= current_utime();
+    if (utime_after_query > utime_after_lock + variables.long_query_time)
       server_status|= SERVER_QUERY_WAS_SLOW;
   }
   inline ulonglong found_rows(void)

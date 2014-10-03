@@ -230,7 +230,7 @@ Prefix: %{_sysconfdir}
   %define distro_description            Generic Linux (kernel %{generic_kernel})
   %define distro_releasetag             linux%{generic_kernel}
   %define distro_buildreq               gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake 
-  %define distro_requires               coreutils grep procps /usr/sbin/useradd /usr/sbin/groupadd
+  %define distro_requires               coreutils grep procps /sbin/chkconfig /usr/sbin/useradd /usr/sbin/groupadd
 %endif
 
 # ----------------------------------------------------------------------------
@@ -1368,7 +1368,6 @@ fi
 %files -n Percona-Server-tokudb%{product_suffix}
 %attr(-, root, root) 
 %{_bindir}/tokuftdump
-%{_includedir}/tdb-internal.h
 %{_libdir}/mysql/plugin/ha_tokudb.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/ha_tokudb.so
 %endif
