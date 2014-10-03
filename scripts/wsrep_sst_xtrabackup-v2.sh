@@ -930,6 +930,7 @@ then
         wsrep_log_error "SST magic file ${MAGIC_FILE} not found/readable"
         exit 2
     fi
+    wsrep_log_info "Galera co-ords from recovery: $(cat ${MAGIC_FILE})"
     cat "${MAGIC_FILE}" # output UUID:seqno
     wsrep_log_info "Total time on joiner: $totime seconds"
 fi
