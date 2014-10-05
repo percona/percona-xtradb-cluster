@@ -166,7 +166,7 @@ case "${1:-''}" in
                 # if server isn't running, then pid-file will never be updated
                 if test -n "$safe_pid"; then
                     if kill -0 "$safe_pid" 2>/dev/null; then
-                        test -s $pid_file && break
+                        test -s $pid_file && kill -0 $(cat $pid_file) && break
                     else
                         # The server may have exited between the last pid-file check and now.  
                         if test -n "$avoid_race_condition"; then
@@ -281,6 +281,9 @@ case "${1:-''}" in
 	   log_progress_msg "already running"
 	   log_end_msg 0
 	else
+	    if [[ -r $pid_file ]];then 
+                log_warning_msg "Stale PID file found: $pid_file with $(cat $pid_file)"
+            fi
              "${PERCONA_PREFIX}"/bin/mysqld_safe --wsrep-new-cluster > /dev/null 2>&1 &
   	    safe_pid=$!
             avoid_race_condition="by checking again"
@@ -294,7 +297,7 @@ case "${1:-''}" in
                 # if server isn't running, then pid-file will never be updated
                 if test -n "$safe_pid"; then
                     if kill -0 "$safe_pid" 2>/dev/null; then
-                        test -s $pid_file && break
+                        test -s $pid_file && kill -0 $(cat $pid_file) && break
                     else
                         # The server may have exited between the last pid-file check and now.  
                         if test -n "$avoid_race_condition"; then
