@@ -351,8 +351,7 @@ cleanup_joiner()
     local estatus=$?
     if [[ $estatus -ne 0 ]];then 
         wsrep_log_error "Cleanup after exit with status:$estatus"
-    fi
-    if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
+    elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_log_info "Removing the sst_in_progress file"
         wsrep_cleanup_progress_file
     fi
