@@ -3313,7 +3313,9 @@ sub check_wsrep_support() {
     $DEFAULT_SUITES.=",wsrep,galera";
 
     # ADD scripts to $PATH to that wsrep_sst_* can be found
-    $ENV{'PATH'} = $ENV{'PATH'}.':'.$basedir.'/scripts';
+    my ($path) = grep { -f "$_/wsrep_sst_rsync"; } "$::bindir/scripts", $::path_client_bindir;
+    mtr_error("No SST scripts") unless $path;
+    $ENV{PATH}="$path:$ENV{PATH}";
 
     # Check whether WSREP_PROVIDER environment variable is set.
     if (defined $ENV{'WSREP_PROVIDER'}) {
