@@ -303,7 +303,7 @@ fi
         make clean
         cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
-            $DEBUG_EXTNAME \
+            -DDEBUG_EXTNAME=ON \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
             -DENABLE_DTRACE=OFF \
@@ -313,14 +313,14 @@ fi
             -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
             -DWITH_INNODB_DISALLOW_WRITES=ON \
             -DWITH_WSREP=ON \
-            -DCOMPILATION_COMMENT="$COMMENT" \
+            -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
             $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
         make $MAKE_JFLAG $QUIET
 
         echo "Copying mysqld-debug"
-        cp -v sql/mysqld $WORKDIR/usr/local/$PRODUCT_FULL/bin/mysqld-debug
+        cp -v sql/mysqld-debug $WORKDIR/usr/local/$PRODUCT_FULL/bin/mysqld-debug
     fi
 
 
