@@ -140,9 +140,6 @@ build-stamp: configure
 	--exclude=debian . \
 	--transform="s,^\./,percona-xtradb-cluster-5.5/,"
 
-ifeq ($(SKIP_DEBUG_BINARY),)
-	cd debug && $(MAKE) $(MAKE_JFLAG)
-endif
 
 ifeq ($(SKIP_DEBUG_BINARY),)
 	cd $(builddebug) && $(MAKE) $(MAKE_JFLAG)
