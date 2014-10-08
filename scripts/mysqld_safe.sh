@@ -1009,7 +1009,7 @@ do
         log_error " --exit-on-recover-fail is provided, bailing out"
         exit 2
       fi
-  else
+  elif test $retcode -ne 0;then
       log_error "Unknown error: $retcode"
       exit $retcode
   fi
