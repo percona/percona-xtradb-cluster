@@ -271,6 +271,9 @@ INSERT INTO global_suppressions VALUES
  ("Slave SQL: Error 'Duplicate entry"),
  ("Query apply warning:"),
  ("WSREP: Ignoring error for TO isolated action:"),
+ ("WSREP: Initial position was provided by configuration or SST, avoiding override"),
+ ("Warning: Using a password on the command line interface can be insecure"),
+ ("InnoDB: Error: Table \"mysql\"\\.\"innodb_table_stats\" not found"),
 
  ("THE_LAST_SUPPRESSION")||
 
