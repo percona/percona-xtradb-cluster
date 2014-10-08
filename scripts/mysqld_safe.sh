@@ -19,6 +19,7 @@ mysqld_ld_preload=
 mysqld_ld_library_path=
 flush_caches=0
 numa_interleave=0
+resume_on_fail=1
 
 # Initial logging status: error log is not open, and not using syslog
 logging=init
@@ -252,7 +253,7 @@ wsrep_recover_position() {
     local skipped="$(grep WSREP $wr_logfile | grep 'skipping position recovery')"
     if [ -z "$skipped" ]; then
       log_error "WSREP: Failed to recover position: "
-      ret=1
+      ret=2
     else
       log_notice "WSREP: Position recovery skipped"
     fi
@@ -336,6 +337,7 @@ parse_arguments() {
       --wsrep-data-home-dir=*) wsrep_data_home_dir="$val"; ;;
       --flush-caches=*) flush_caches="$val" ;;
       --numa-interleave=*) numa_interleave="$val" ;;
+      --exit-on-recover-fail) resume_on_fail=0 ;;
       --wsrep[-_]provider=*)
         if test -n "$val" && test "$val" != "none"
         then
@@ -997,8 +999,20 @@ do
     wsrep_start_position_opt="--wsrep_start_position='00000000-0000-0000-0000-000000000000:-1'"
   fi
 
+  retcode=$?
 
-  [ $? -ne 0 ] && exit 1 #
+  if test $retcode -eq 2;then
+      if  test $resume_on_fail -eq 1;then
+        log_notice "wsrep-recovery has failed to recover, continuing with startup"
+        wsrep_start_position_opt=""
+      else 
+        log_error " --exit-on-recover-fail is provided, bailing out"
+        exit 2
+      fi
+  else
+      log_error "Unknown error: $retcode"
+      exit $retcode
+  fi
 
   [ -n "$wsrep_urls" ] && url=`wsrep_pick_url $wsrep_urls` # check connect address
 
