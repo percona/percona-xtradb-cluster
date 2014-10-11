@@ -546,7 +546,7 @@ mkdir debug
            %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
 %if %{defined with_wsrep}
-           -DWITH_WSREP=1 ${MEMCACHED_OPT} \
+           -DWITH_WSREP=1 -DWITH_LIBEVENT=system \
 %endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
@@ -565,7 +565,7 @@ mkdir release
            %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
 %if %{defined with_wsrep}
-           -DWITH_WSREP=1 ${MEMCACHED_OPT} \
+           -DWITH_WSREP=1 -DWITH_LIBEVENT=system \
 %endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG

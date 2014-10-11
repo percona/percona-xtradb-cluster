@@ -246,6 +246,35 @@ INSERT INTO global_suppressions VALUES
  ("Changed limits: table_cache: *"),
  ("Could not increase number of max_open_files to more than *"),
 
+ /*
+   Galera suppressions 
+ */
+ ("WSREP:*down context*"),
+ ("WSREP: Failed to send state UUID:*"),
+ ("WSREP: wsrep_sst_receive_address is set to '127.0.0.1"),
+ ("WSREP: option --wsrep-casual-reads is deprecated"),
+ ("WSREP: --wsrep-casual-reads=ON takes precedence over --wsrep-sync-wait=0"),
+ ("WSREP: Could not open saved state file for reading: "),
+ ("WSREP: access file\\(gvwstate\\.dat\\) failed\\(No such file or directory\\)"),
+ ("WSREP: Gap in state sequence\\. Need state transfer\\."),
+ ("WSREP: Failed to prepare for incremental state transfer: Local state UUID \\(00000000-0000-0000-0000-000000000000\\) does not match group state UUID"),
+ ("WSREP: No existing UUID has been found, so we assume that this is the first time that this server has been started\\. Generating a new UUID: "),
+ ("WSREP: last inactive check more than"),
+ ("WSREP: binlog cache not empty \\(0 bytes\\) at connection close"),
+ ("WSREP: Failed to guess base node address"),
+ ("WSREP: Guessing address for incoming client connections failed"),
+ ("WSREP: Failed to read output of: '/sbin/ifconfig"),
+ ("WSREP: SQL statement was ineffective"),
+ ("WSREP: Refusing exit for the last slave thread"),
+ ("WSREP: Quorum: No node with complete state"),
+ ("WSREP: Failed to report last committed"),
+ ("Slave SQL: Error 'Duplicate entry"),
+ ("Query apply warning:"),
+ ("WSREP: Ignoring error for TO isolated action:"),
+ ("WSREP: Initial position was provided by configuration or SST, avoiding override"),
+ ("Warning: Using a password on the command line interface can be insecure"),
+ ("InnoDB: Error: Table \"mysql\"\\.\"innodb_table_stats\" not found"),
+
  ("THE_LAST_SUPPRESSION")||
 
 
