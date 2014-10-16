@@ -2926,7 +2926,9 @@ btr_cur_del_mark_set_clust_rec(
 #endif /* UNIV_DEBUG */
 
 	ut_ad(dict_index_is_clust(index));
+#ifndef WITH_WSREP
 	ut_ad(!rec_get_deleted_flag(rec, rec_offs_comp(offsets)));
+#endif
 
 	err = lock_clust_rec_modify_check_and_lock(BTR_NO_LOCKING_FLAG, block,
 						   rec, index, offsets, thr);

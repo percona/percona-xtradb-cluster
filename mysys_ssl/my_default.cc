@@ -110,6 +110,11 @@ static char my_login_file[FN_REFLEN];
 
 static my_bool defaults_already_read= FALSE;
 
+#ifdef WITH_WSREP
+/* The only purpose of this global array is to hold full name of my.cnf
+ * which seems to be otherwise unavailable */
+char wsrep_defaults_file[FN_REFLEN + 10]={0,};
+#endif /* WITH_WREP */
 /* Set to TRUE, if --no-defaults is found. */
 static my_bool found_no_defaults= FALSE;
 
@@ -893,6 +898,11 @@ static int search_default_file_with_ext(Process_option_func opt_handler,
     if ( !(fp = mysql_file_fopen(key_file_cnf, name, O_RDONLY, MYF(0))))
       return 1;                                 /* Ignore wrong files */
   }
+#ifdef WITH_WSREP
+  /* make sure we do this only once - for top-level file */
+  if ('\0' == wsrep_defaults_file[0])
+    strncpy(wsrep_defaults_file, name, sizeof(wsrep_defaults_file) - 1);
+#endif /* WITH_WSREP */
 
   while (mysql_file_getline(buff, sizeof(buff) - 1, fp))
   {

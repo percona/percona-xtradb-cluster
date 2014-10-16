@@ -18,6 +18,9 @@
                                              // mysql_exchange_partition
 #include "sql_base.h"                        // open_temporary_tables
 #include "sql_alter.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 
 
 Alter_info::Alter_info(const Alter_info &rhs, MEM_ROOT *mem_root)
@@ -304,6 +307,17 @@ bool Sql_cmd_alter_table::execute(THD *thd)
 
   thd->enable_slow_log= opt_log_slow_admin_statements;
 
+#ifdef WITH_WSREP
+  TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
+
+  if ((!thd->is_current_stmt_binlog_format_row() ||
+       !find_temporary_table(thd, first_table)))
+    {
+      WSREP_TO_ISOLATION_BEGIN(((lex->name.str) ? select_lex->db : NULL),
+			       ((lex->name.str) ? lex->name.str : NULL),
+			       first_table);
+    }
+#endif /* WITH_WSREP */
   result= mysql_alter_table(thd, select_lex->db, lex->name.str,
                             &create_info,
                             first_table,
@@ -313,6 +327,13 @@ bool Sql_cmd_alter_table::execute(THD *thd)
                             lex->ignore);
 
   DBUG_RETURN(result);
+#ifdef WITH_WSREP
+ error:
+  {
+    WSREP_WARN("ALTER TABLE isolation failure");
+    DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
 }
 
 

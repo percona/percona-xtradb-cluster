@@ -893,9 +893,6 @@ lock_trx_has_rec_x_lock(
 				or if the lock is inherited to a neighboring
 				record */
 
-#if (LOCK_WAIT|LOCK_GAP|LOCK_REC_NOT_GAP|LOCK_INSERT_INTENTION)&LOCK_MODE_MASK
-# error
-#endif
 #if (LOCK_WAIT|LOCK_GAP|LOCK_REC_NOT_GAP|LOCK_INSERT_INTENTION)&LOCK_TYPE_MASK
 # error
 #endif
@@ -972,6 +969,16 @@ extern lock_sys_t*	lock_sys;
 	mutex_exit(&lock_sys->wait_mutex);	\
 } while (0)
 
+#ifdef WITH_WSREP
+/*********************************************************************//**
+Cancels a waiting lock request and releases possible other transactions
+waiting behind it. */
+UNIV_INTERN
+void
+lock_cancel_waiting_and_release(
+/*============================*/
+	lock_t*	lock);	/*!< in/out: waiting lock request */
+#endif /* WITH_WSREP */
 #ifndef UNIV_NONINL
 #include "lock0lock.ic"
 #endif

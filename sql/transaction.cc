@@ -102,6 +102,9 @@ static bool xa_trans_force_rollback(THD *thd)
     by ha_rollback()/THD::transaction::cleanup().
   */
   thd->transaction.xid_state.rm_error= 0;
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, TRUE);
+#endif /* WITH_WSREP */
   if (ha_rollback_trans(thd, true))
   {
     my_error(ER_XAER_RMERR, MYF(0));
@@ -140,10 +143,16 @@ bool trans_begin(THD *thd, uint flags)
       (thd->variables.option_bits & OPTION_TABLE_LOCK))
   {
     thd->variables.option_bits&= ~OPTION_TABLE_LOCK;
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, TRUE);
+#endif /* WITH_WSREP */
     thd->server_status&=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
     DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
     res= MY_TEST(ha_commit_trans(thd, TRUE));
+#ifdef WITH_WSREP
+    wsrep_post_commit(thd, TRUE);
+#endif /* WITH_WSREP */
   }
 
   thd->variables.option_bits&= ~OPTION_BEGIN;
@@ -180,6 +189,12 @@ bool trans_begin(THD *thd, uint flags)
     }
     thd->tx_read_only= false;
   }
+
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+  if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd))
+    DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 
   thd->variables.option_bits|= OPTION_BEGIN;
   thd->server_status|= SERVER_STATUS_IN_TRANS;
@@ -222,12 +237,18 @@ bool trans_commit(THD *thd)
   if (trans_check_state(thd))
     DBUG_RETURN(TRUE);
 
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, TRUE);
+#endif /* WITH_WSREP */
   thd->server_status&=
     ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
   res= ha_commit_trans(thd, TRUE);
   thd->variables.option_bits&= ~OPTION_BEGIN;
   thd->transaction.all.reset_unsafe_rollback_flags();
+#ifdef WITH_WSREP
+  wsrep_post_commit(thd, TRUE);
+#endif /* WITH_WSREP */
   thd->lex->start_transaction_opt= 0;
 
   DBUG_RETURN(MY_TEST(res));
@@ -275,10 +296,16 @@ bool trans_commit_implicit(THD *thd)
     /* Safety if one did "drop table" on locked tables */
     if (!thd->locked_tables_mode)
       thd->variables.option_bits&= ~OPTION_TABLE_LOCK;
-    thd->server_status&=
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, TRUE);
+#endif /* WITH_WSREP */
+     thd->server_status&=
       ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
     DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
     res= MY_TEST(ha_commit_trans(thd, TRUE));
+#ifdef WITH_WSREP
+    wsrep_post_commit(thd, TRUE);
+#endif /* WITH_WSREP */
   }
   else if (tc_log)
     tc_log->commit(thd, true);
@@ -312,6 +339,9 @@ bool trans_rollback(THD *thd)
 {
   int res;
   DBUG_ENTER("trans_rollback");
+#ifdef WITH_WSREP
+  thd->wsrep_PA_safe= true;
+#endif /* WITH_WSREP */
 
 #ifndef DBUG_OFF
   char buf1[256], buf2[256];
@@ -326,6 +356,9 @@ bool trans_rollback(THD *thd)
   if (trans_check_state(thd))
     DBUG_RETURN(TRUE);
 
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, TRUE);
+#endif /* WITH_WSREP */
   thd->server_status&=
     ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
@@ -366,6 +399,9 @@ bool trans_rollback_implicit(THD *thd)
   */
   DBUG_ASSERT(thd->transaction.stmt.is_empty() && !thd->in_sub_stmt);
 
+#ifdef WITH_WSREP
+  wsrep_register_hton(thd, true);
+#endif /* WITH_WSREP */
   thd->server_status&=
     ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
   DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
@@ -431,12 +467,20 @@ bool trans_commit_stmt(THD *thd)
 
   if (thd->transaction.stmt.ha_list)
   {
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, FALSE);
+#endif /* WITH_WSREP */
     res= ha_commit_trans(thd, FALSE);
     if (! thd->in_active_multi_stmt_transaction())
+#ifdef WITH_WSREP
     {
+#endif /* WITH_WSREP */
       thd->tx_isolation= (enum_tx_isolation) thd->variables.tx_isolation;
       thd->tx_read_only= thd->variables.tx_read_only;
+#ifdef WITH_WSREP
+      wsrep_post_commit(thd, FALSE);
     }
+#endif /* WITH_WSREP */
   }
   else if (tc_log)
     tc_log->commit(thd, false);
@@ -481,6 +525,9 @@ bool trans_rollback_stmt(THD *thd)
 
   if (thd->transaction.stmt.ha_list)
   {
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, FALSE);
+#endif /* WITH_WSREP */
     ha_rollback_trans(thd, FALSE);
     if (! thd->in_active_multi_stmt_transaction())
     {
@@ -652,9 +699,16 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
     For backward-compatibility reasons we always release MDL if binary
     logging is off.
   */
+#ifdef WITH_WSREP
+  bool mdl_can_safely_rollback_to_savepoint=
+                (!((WSREP_EMULATE_BINLOG(thd) ||  mysql_bin_log.is_open()) 
+		   && thd->variables.sql_log_bin) ||
+                 ha_rollback_to_savepoint_can_release_mdl(thd));
+#else
   bool mdl_can_safely_rollback_to_savepoint=
                 (!(mysql_bin_log.is_open() && thd->variables.sql_log_bin) ||
                  ha_rollback_to_savepoint_can_release_mdl(thd));
+#endif /* WITH_WSREP */
 
   if (ha_rollback_to_savepoint(thd, sv))
     res= TRUE;
@@ -663,6 +717,12 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
 
   thd->transaction.savepoints= sv;
 
+  /*
+    Release metadata locks that were acquired during this savepoint unit
+    unless binlogging is on. Releasing locks with binlogging on can break
+    replication as it allows other connections to drop these tables before
+    rollback to savepoint is written to the binlog.
+  */
   if (!res && mdl_can_safely_rollback_to_savepoint)
     thd->mdl_context.rollback_to_savepoint(sv->mdl_savepoint);
 
@@ -871,9 +931,15 @@ bool trans_xa_commit(THD *thd)
   }
   else if (xa_state == XA_IDLE && thd->lex->xa_opt == XA_ONE_PHASE)
   {
+#ifdef WITH_WSREP
+    wsrep_register_hton(thd, TRUE);
+#endif /* WITH_WSREP */
     int r= ha_commit_trans(thd, TRUE);
     if ((res= MY_TEST(r)))
       my_error(r == 1 ? ER_XA_RBROLLBACK : ER_XAER_RMERR, MYF(0));
+#ifdef WITH_WSREP
+    wsrep_post_commit(thd, TRUE);
+#endif /* WITH_WSREP */
   }
   else if (xa_state == XA_PREPARED && thd->lex->xa_opt == XA_NONE)
   {
@@ -892,6 +958,9 @@ bool trans_xa_commit(THD *thd)
     if (thd->mdl_context.acquire_lock(&mdl_request,
                                       thd->variables.lock_wait_timeout))
     {
+#ifdef WITH_WSREP
+      wsrep_register_hton(thd, TRUE);
+#endif /* WITH_WSREP */
       ha_rollback_trans(thd, TRUE);
       my_error(ER_XAER_RMERR, MYF(0));
     }

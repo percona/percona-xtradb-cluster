@@ -55,6 +55,9 @@
 #include "rpl_rli_pdb.h"
 #include "global_threads.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 #ifdef HAVE_REPLICATION
 
 #include "rpl_tblmap.h"
@@ -3487,6 +3490,94 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
                        rli->mts_recovery_index));
   }
 #endif
+#ifdef WITH_WSREP
+  if (wsrep_preordered_opt && WSREP_ON &&
+      (ev->get_type_code() == QUERY_EVENT ||
+       ev->get_type_code() == XID_EVENT ||
+       ev->get_type_code() == TABLE_MAP_EVENT ||
+       ev->get_type_code() == WRITE_ROWS_EVENT ||
+       ev->get_type_code() == UPDATE_ROWS_EVENT ||
+       ev->get_type_code() == DELETE_ROWS_EVENT ||
+       ev->get_type_code() == GTID_LOG_EVENT))
+  {
+    if (ev->get_type_code() == GTID_LOG_EVENT)
+    {
+      thd->wsrep_po_sid= *((Gtid_log_event*)ev)->get_sid();
+    }
+    wsrep_status_t err;
+    if (thd->wsrep_po_cnt == 0)
+    {
+      /* First event in write set, write format description event
+         as a write set header so that the receiver will know how
+         to interpret following events. */
+      Log_event* fde= rli->get_rli_description_event();
+      ulong len= uint4korr(fde->temp_buf + EVENT_LEN_OFFSET);
+      wsrep_buf_t data= {fde->temp_buf, len};
+      if ((err= wsrep->preordered_collect(
+               wsrep, &thd->wsrep_po_handle, &data, 1, true)) != WSREP_OK)
+      {
+        WSREP_ERROR("wsrep preordered collect failed: %d", err);
+        if (err == WSREP_TRX_FAIL &&
+            wsrep->preordered_commit(wsrep, &thd->wsrep_po_handle, NULL,
+                                     0, 0, false))
+        {
+          WSREP_WARN("failed to cancel preordered write set");
+        }
+        DBUG_RETURN(SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR);
+      }
+    }
+    ++thd->wsrep_po_cnt;
+    ulong len= uint4korr(ev->temp_buf + EVENT_LEN_OFFSET);
+    wsrep_buf_t data= {ev->temp_buf, len};
+    if ((err= wsrep->preordered_collect(wsrep, &thd->wsrep_po_handle,
+                                        &data, 1, 1)) != WSREP_OK)
+    {
+      WSREP_ERROR("wsrep preordered collect failed: %d", err);
+      DBUG_RETURN(SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR);
+    }
+
+    if (ev->get_type_code() == QUERY_EVENT &&
+        ((Query_log_event*)ev)->starts_group())
+    {
+      thd->wsrep_po_in_trans= TRUE;
+    }
+    else if (ev->get_type_code() == XID_EVENT ||
+             (ev->get_type_code() == QUERY_EVENT &&
+              (thd->wsrep_po_in_trans == FALSE ||
+               ((Query_log_event*)ev)->ends_group())))
+    {
+      int flags= WSREP_FLAG_COMMIT | (thd->wsrep_po_in_trans == FALSE ?
+                                      WSREP_FLAG_ISOLATION : 0);
+      thd->wsrep_po_in_trans= FALSE;
+      thd->wsrep_po_cnt= 0;
+      wsrep_uuid_t source;
+      memcpy(source.data, thd->wsrep_po_sid.bytes, sizeof(source.data));
+      if ((err= wsrep->preordered_commit(wsrep, &thd->wsrep_po_handle,
+                                         &source, flags, 1, true)) != WSREP_OK)
+      {
+        WSREP_ERROR("failed to commit preordered event: %d", err);
+        DBUG_RETURN(SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR);
+      }
+    }
+    reason= Log_event::EVENT_SKIP_IGNORE;
+    skip_event= TRUE;
+  }
+  else if (WSREP_ON && (ev->get_type_code() == XID_EVENT ||
+      (ev->get_type_code() == QUERY_EVENT && thd->wsrep_mysql_replicated > 0 &&
+       (!strncasecmp(((Query_log_event*)ev)->query , "BEGIN", 5) ||
+        !strncasecmp(((Query_log_event*)ev)->query , "COMMIT", 6) ))))
+  {
+    if (++thd->wsrep_mysql_replicated < (int)wsrep_mysql_replication_bundle)
+    {
+      WSREP_DEBUG("skipping wsrep commit %d", thd->wsrep_mysql_replicated);
+      reason = Log_event::EVENT_SKIP_IGNORE;
+    }
+    else
+    {
+      thd->wsrep_mysql_replicated = 0;
+    }
+  }
+#endif /* WITH_WSREP */
   if (reason == Log_event::EVENT_SKIP_COUNT)
   {
     sql_slave_skip_counter= --rli->slave_skip_counter;
@@ -5589,6 +5680,9 @@ pthread_handler_t handle_slave_sql(void *arg)
   my_off_t saved_log_pos= 0;
   my_off_t saved_master_log_pos= 0;
   my_off_t saved_skip= 0;
+#ifdef WITH_WSREP
+  my_bool wsrep_node_dropped= FALSE;
+#endif /* WITH_WSREP */
 
   Relay_log_info* rli = ((Master_info*)arg)->rli;
   const char *errmsg;
@@ -5597,6 +5691,9 @@ pthread_handler_t handle_slave_sql(void *arg)
   // needs to call my_thread_init(), otherwise we get a coredump in DBUG_ stuff
   my_thread_init();
   DBUG_ENTER("handle_slave_sql");
+#ifdef WITH_WSREP
+ wsrep_restart_point:
+#endif /* WITH_WSREP */
 
   DBUG_ASSERT(rli->inited);
   mysql_mutex_lock(&rli->run_lock);
@@ -5740,6 +5837,18 @@ pthread_handler_t handle_slave_sql(void *arg)
   }
 #endif
 
+#ifdef WITH_WSREP
+  thd->wsrep_exec_mode= LOCAL_STATE;
+  /* synchronize with wsrep replication */
+  if (WSREP_ON)
+  {
+    thd->wsrep_po_handle= WSREP_PO_INITIALIZER;
+    thd->wsrep_po_cnt= 0;
+    thd->wsrep_po_in_trans= FALSE;
+    memset(&thd->wsrep_po_sid, 0, sizeof(thd->wsrep_po_sid));
+    wsrep_ready_wait();
+  }
+#endif
   DBUG_PRINT("master_info",("log_file_name: %s  position: %s",
                             rli->get_group_master_log_name(),
                             llstr(rli->get_group_master_log_pos(),llbuff)));
@@ -5882,6 +5991,12 @@ Error running query, slave SQL thread aborted. Fix the problem, and restart \
 the slave SQL thread with \"SLAVE START\". We stopped at log \
 '%s' position %s", rli->get_rpl_log_name(),
 llstr(rli->get_group_master_log_pos(), llbuff));
+#ifdef WITH_WSREP
+        if (WSREP_ON && last_errno == ER_UNKNOWN_COM_ERROR)
+        {
+	  wsrep_node_dropped= TRUE;
+	}
+#endif /* WITH_WSREP */
       }
       goto err;
     }
@@ -5903,6 +6018,16 @@ llstr(rli->get_group_master_log_pos(), llbuff));
     rli->recovery_groups_inited= false;
   }
 
+#ifdef WITH_WSREP
+  if (WSREP_ON)
+  {
+    if (wsrep->preordered_commit(wsrep, &thd->wsrep_po_handle,
+                                 NULL, 0, 0, false))
+    {
+      WSREP_WARN("preordered cleanup failed");
+    }
+  }
+#endif /* WITH_WSREP */
   /*
     Some events set some playgrounds, which won't be cleared because thread
     stops. Stopping of this thread may not be known to these events ("stop"
@@ -5955,6 +6080,27 @@ llstr(rli->get_group_master_log_pos(), llbuff));
   if (thd_added)
     remove_global_thread(thd);
   delete thd;
+#ifdef WITH_WSREP
+  /* if slave stopped due to node going non primary, we set global flag to
+     trigger automatic restart of slave when node joins back to cluster
+  */
+   if (wsrep_node_dropped && wsrep_restart_slave)
+   {
+     if (wsrep_ready)
+     {
+       WSREP_INFO("Slave error due to node temporarily non-primary"
+		  "SQL slave will continue");
+       wsrep_node_dropped= FALSE;
+       mysql_mutex_unlock(&rli->run_lock);
+       goto wsrep_restart_point;
+     } else {
+       WSREP_INFO("Slave error due to node going non-primary");
+       WSREP_INFO("wsrep_restart_slave was set and therefore slave will be "
+		  "automatically restarted when node joins back to cluster");
+       wsrep_restart_slave_activated= TRUE;
+     }
+   }
+#endif /* WITH_WSREP */
  /*
   Note: the order of the broadcast and unlock calls below (first broadcast, then unlock)
   is important. Otherwise a killer_thread can execute between the calls and

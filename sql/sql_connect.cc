@@ -57,6 +57,9 @@ using std::max;
 #else
 #define MIN_HANDSHAKE_SIZE      6
 #endif /* HAVE_OPENSSL && !EMBEDDED_LIBRARY */
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 
 /*
   Get structure for logging connection data for the current user
@@ -706,7 +709,11 @@ bool setup_connection_thread_globals(THD *thd)
 {
   if (thd->store_globals())
   {
+#ifdef WITH_WSREP
+    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+#else
     close_connection(thd, ER_OUT_OF_RESOURCES);
+#endif
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     return 1;                                   // Error
@@ -772,6 +779,17 @@ bool login_connection(THD *thd)
 void end_connection(THD *thd)
 {
   NET *net= &thd->net;
+#ifdef WITH_WSREP
+  if (WSREP(thd))
+  {
+    wsrep_status_t rcode= wsrep->free_connection(wsrep, thd->thread_id);
+    if (rcode) {
+      WSREP_WARN("wsrep failed to free connection context: %lu, code: %d",
+                 thd->thread_id, rcode);
+    }
+  }
+  thd->wsrep_client_thread= 0;
+#endif
   plugin_thdvar_cleanup(thd);
 
   /*
@@ -912,6 +930,9 @@ bool thd_prepare_connection(THD *thd)
                          (char *) thd->security_ctx->host_or_ip);
 
   prepare_new_connection_state(thd);
+#ifdef WITH_WSREP
+  thd->wsrep_client_thread= 1;
+#endif /* WITH_WSREP */
   return FALSE;
 }
 
@@ -933,7 +954,11 @@ void do_handle_one_connection(THD *thd_arg)
 
   if (MYSQL_CALLBACK_ELSE(thread_scheduler, init_new_connection_thread, (), 0))
   {
+#ifdef WITH_WSREP
+    close_connection(thd, ER_OUT_OF_RESOURCES, 1);
+#else
     close_connection(thd, ER_OUT_OF_RESOURCES);
+#endif
     statistic_increment(aborted_connects,&LOCK_status);
     MYSQL_CALLBACK(thread_scheduler, end_thread, (thd, 0));
     return;
@@ -983,9 +1008,21 @@ void do_handle_one_connection(THD *thd_arg)
   break;
     }
     end_connection(thd);
+#ifdef WITH_WSREP
+  if (WSREP(thd))
+  {
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    thd->wsrep_query_state= QUERY_EXITING;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
+#endif
 
 end_thread:
+#ifdef WITH_WSREP
+    close_connection(thd, 0, 1);
+#else
     close_connection(thd);
+#endif
     if (MYSQL_CALLBACK_ELSE(thread_scheduler, end_thread, (thd, 1), 0))
       return;                                 // Probably no-threads
 

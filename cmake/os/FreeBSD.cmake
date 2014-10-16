@@ -22,3 +22,5 @@
 
 # The below was used for really old versions of FreeBSD, roughly: before 5.1.9
 # ADD_DEFINITIONS(-DHAVE_BROKEN_REALPATH)
+
+SET(HAVE_SYS_TIMEB_H CACHE  INTERNAL "")

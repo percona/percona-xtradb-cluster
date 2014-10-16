@@ -104,6 +104,14 @@ class TC_LOG
   virtual int prepare(THD *thd, bool all) = 0;
 };
 
+#ifdef WITH_WSREP
+/*
+  Wrappers to MYSQL_BIN_LOG commit()/rollback() when wsrep_emulate_bin_log
+  is on.
+ */
+TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all);
+int wsrep_thd_binlog_rollback(THD * thd, bool all);
+#endif /* WITH_WSREP */
 
 class TC_LOG_DUMMY: public TC_LOG // use it to disable the logging
 {
@@ -112,10 +120,18 @@ public:
   int open(const char *opt_name)        { return 0; }
   void close()                          { }
   enum_result commit(THD *thd, bool all) {
+#ifdef WITH_WSREP
+    return wsrep_thd_binlog_commit(thd, all);
+#else
     return ha_commit_low(thd, all) ? RESULT_ABORTED : RESULT_SUCCESS;
+#endif /* WITH_WSREP */
   }
   int rollback(THD *thd, bool all) {
+#ifdef WITH_WSREP
+    return wsrep_thd_binlog_rollback(thd, all);
+#else
     return ha_rollback_low(thd, all);
+#endif /* WITH_WSREP */
   }
   int prepare(THD *thd, bool all) {
     return ha_prepare_low(thd, all);
@@ -542,12 +558,28 @@ enum enum_binlog_row_image {
 };
 
 enum enum_binlog_format {
+  /*
+    statement-based except for cases where only row-based can work (UUID()
+    etc):
+  */
   BINLOG_FORMAT_MIXED= 0, ///< statement if safe, otherwise row - autodetected
   BINLOG_FORMAT_STMT=  1, ///< statement-based
   BINLOG_FORMAT_ROW=   2, ///< row-based
   BINLOG_FORMAT_UNSPEC=3  ///< thd_binlog_format() returns it when binlog is closed
 };
 
+#ifdef WITH_WSREP
+IO_CACHE* get_trans_log(THD * thd);
+bool wsrep_trans_cache_is_empty(THD *thd);
+void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
+void thd_binlog_trx_reset(THD * thd);
+
+#define WSREP_BINLOG_FORMAT(my_format)                         \
+   ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ?     \
+   wsrep_forced_binlog_format : my_format)
+#else
+#define WSREP_BINLOG_FORMAT(my_format) my_format
+#endif /* WITH_WSREP */
 int query_error_code(THD *thd, bool not_killed);
 uint purge_log_get_error_code(int res);
 

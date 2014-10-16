@@ -13,6 +13,7 @@
 *.dir
 *.dll
 *.dylib
+*.diff
 *.exe
 *.exp
 *.gcda
@@ -323,6 +324,9 @@ bkpull.log.6
 bkpush.log
 bkpush.log*
 build.log
+build_debug
+build_install
+build_release
 build_tags.sh
 client/#mysql.cc#
 client/*.ds?
@@ -2893,6 +2897,8 @@ support-files/mysql.server
 support-files/mysql.spec
 support-files/mysqld_multi.server
 support-files/ndb-config-2-node.ini
+support-files/wsrep.cnf
+support-files/wsrep_notify
 tags
 test/ndbapi/bank/bankCreator
 test/ndbapi/bank/bankMakeGL
@@ -3075,6 +3081,9 @@ storage/ndb/test/crund/tws/tws_java/run.properties
 storage/ndb/test/crund/tws/*.properties
 storage/ndb/test/crund/tws/tws_cpp/TwsDriver
 
+scripts/wsrep_sst_common
+scripts/wsrep_sst_rsync
+scripts/wsrep_sst_xtrabackup
 libmysqld/examples/mysqltest.cc
 libmysqld/sql_signal.cc
 libmysqld/debug_sync.cc

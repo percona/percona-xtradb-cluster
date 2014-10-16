@@ -87,6 +87,12 @@ UNIV_INTERN os_ib_mutex_t	os_file_seek_mutexes[OS_FILE_N_SEEK_MUTEXES];
 /* In simulated aio, merge at most this many consecutive i/os */
 #define OS_AIO_MERGE_N_CONSECUTIVE	64
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
+#define WAIT_ALLOW_WRITES() os_event_wait(srv_allow_writes_event)
+#else
+#define WAIT_ALLOW_WRITES() do { } while (0)
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 /**********************************************************************
 
 InnoDB AIO Implementation:
@@ -763,7 +769,9 @@ os_file_create_tmpfile(void)
 /*========================*/
 {
 	FILE*	file	= NULL;
-	int	fd	= innobase_mysql_tmpfile();
+	int	fd;
+	WAIT_ALLOW_WRITES();
+	fd	= innobase_mysql_tmpfile();
 
 	ut_ad(!srv_read_only_mode);
 
@@ -1089,6 +1097,7 @@ os_file_create_directory(
 	return(TRUE);
 #else
 	int	rcode;
+	WAIT_ALLOW_WRITES();
 
 	rcode = mkdir(pathname, 0770);
 
@@ -1215,6 +1224,8 @@ os_file_create_simple_func(
 
 #else /* __WIN__ */
 	int		create_flag;
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
 
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
@@ -1382,6 +1393,8 @@ os_file_create_simple_no_error_handling_func(
 	int		create_flag;
 
 	ut_a(name);
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
 
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
@@ -1673,6 +1686,8 @@ os_file_create_func(
 #else /* __WIN__ */
 	int		create_flag;
 	const char*	mode_str	= NULL;
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
 
 	on_error_no_exit = create_mode & OS_FILE_ON_ERROR_NO_EXIT
 		? TRUE : FALSE;
@@ -1852,6 +1867,7 @@ loop:
 	goto loop;
 #else
 	int	ret;
+	WAIT_ALLOW_WRITES();
 
 	ret = unlink(name);
 
@@ -1916,6 +1932,7 @@ loop:
 	goto loop;
 #else
 	int	ret;
+	WAIT_ALLOW_WRITES();
 
 	ret = unlink(name);
 
@@ -1969,6 +1986,7 @@ os_file_rename_func(
 	return(FALSE);
 #else
 	int	ret;
+	WAIT_ALLOW_WRITES();
 
 	ret = rename(oldpath, newpath);
 
@@ -2180,6 +2198,7 @@ os_file_set_eof(
 	HANDLE h = (HANDLE) _get_osfhandle(fileno(file));
 	return(SetEndOfFile(h));
 #else /* __WIN__ */
+	WAIT_ALLOW_WRITES();
 	return(!ftruncate(fileno(file), ftell(file)));
 #endif /* __WIN__ */
 }
@@ -2274,6 +2293,7 @@ os_file_flush_func(
 	return(FALSE);
 #else
 	int	ret;
+	WAIT_ALLOW_WRITES();
 
 #if defined(HAVE_DARWIN_THREADS)
 # ifndef F_FULLFSYNC
@@ -2955,6 +2975,7 @@ retry:
 	return(FALSE);
 #else
 	ssize_t	ret;
+	WAIT_ALLOW_WRITES();
 
 	ret = os_file_pwrite(file, buf, n, offset);
 
