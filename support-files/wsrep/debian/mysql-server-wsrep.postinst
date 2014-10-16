@@ -1,0 +1,13 @@
+#!/bin/bash -eu
+
+chmod 0755 /etc/init.d/mysql
+chmod 0755 /var/run/mysqld
+chown mysql:root /var/run/mysqld
+update-rc.d -f mysql remove >/dev/null
+ldconfig -n /usr/lib/mysql
+
+mysql_install_db --wsrep-on=0 --user=mysql --datadir=/var/lib/mysql --basedir=/usr
+# This is a fix/workaround for AppArmor profile provided with mysql-server deb
+[ ! -d /etc/apparmor.d/disable ] || \
+( cd /etc/apparmor.d/disable && ln -sf ../usr.sbin.mysqld ./ )
+[ ! -x /etc/init.d/apparmor ] || /etc/init.d/apparmor restart

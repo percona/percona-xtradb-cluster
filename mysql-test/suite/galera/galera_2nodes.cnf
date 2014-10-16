@@ -1,0 +1,41 @@
+# Use default setting for mysqld processes
+!include include/default_mysqld.cnf
+
+[mysqld.1]
+binlog-format=row
+
+wsrep_provider=@ENV.WSREP_PROVIDER
+wsrep_cluster_address='gcomm://'
+wsrep_provider_options='base_port=@mysqld.1.#galera_port'
+
+# enforce read-committed characteristics across the cluster
+wsrep_causal_reads=ON
+wsrep_sync_wait = 7
+
+wsrep_sst_receive_address=127.0.0.1:@mysqld.1.#sst_port
+
+# Required for Galera
+innodb_autoinc_lock_mode=2
+
+[mysqld.2]
+binlog-format=row
+
+wsrep_provider=@ENV.WSREP_PROVIDER
+wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.1.#galera_port'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port'
+
+# enforce read-committed characteristics across the cluster
+wsrep_causal_reads=ON
+wsrep_sync_wait = 7
+
+wsrep_sst_receive_address=127.0.0.1:@mysqld.2.#sst_port
+
+# Required for Galera
+innodb_autoinc_lock_mode=2
+
+[ENV]
+NODE_MYPORT_1= @mysqld.1.port
+NODE_MYSOCK_1= @mysqld.1.socket
+
+NODE_MYPORT_2= @mysqld.2.port
+NODE_MYSOCK_2= @mysqld.2.socket

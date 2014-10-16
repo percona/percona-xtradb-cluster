@@ -1,0 +1,77 @@
+#
+# Test wsrep_sst_method=mysqldump. This is the only method that can be applied to a running server
+# so we use the opportunity to perform some inserts before activating mysqldump.
+#
+# We also clear the gcache so that the a full mysqldump is taken and applied.
+#
+
+--source include/big_test.inc
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_1
+# We need a user with a password to perform SST, otherwise we hit LP #1378253
+GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
+
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+# Preserve the original configuration on Node #2
+--connection node_2
+--let $wsrep_provider_orig = `SELECT @@wsrep_provider`
+--let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
+--let $wsrep_sst_method_orig = `SELECT @@wsrep_sst_method`
+--let $wsrep_sst_auth_orig = `SELECT @@wsrep_sst_auth`
+
+# Stop wsrep on node #2
+SET GLOBAL wsrep_provider='none';
+INSERT INTO t1 VALUES (2);
+
+--connection node_1
+INSERT INTO t1 VALUES (3);
+SET GLOBAL wsrep_sst_auth = 'sst:sst';
+
+# Clear gcache
+SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
+
+--connection node_2
+# Restart wsrep on node #2
+SET GLOBAL wsrep_sst_method = 'mysqldump';
+
+--disable_query_log
+--eval SET GLOBAL wsrep_provider = '$wsrep_provider_orig';
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
+--enable_query_log
+
+--sleep 10
+
+# We reconnect the connection to node #2 because the previous one is dropped on SST
+--disconnect node_2
+--let $galera_connection_name = node_2
+--let $galera_server_number = 2
+--source include/galera_connect.inc
+--connection node_2
+
+--source include/galera_wait_ready.inc
+
+INSERT INTO t1 VALUES (4);
+
+# Node #2 has all the inserts from node 1 but not its own insert, as it was overwritten by the mysqldump SST
+SELECT COUNT(*) = 3 FROM t1;
+SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 2;
+
+--disable_query_log
+--eval SET GLOBAL wsrep_sst_method = $wsrep_sst_method_orig
+--enable_query_log
+
+--connection node_1
+# Node #1 has all the inserts except insert #2, which was never replicated
+SELECT COUNT(*) = 3 FROM t1;
+SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 2;
+
+--disable_query_log
+--eval SET GLOBAL wsrep_sst_auth = '$wsrep_sst_auth_orig'
+--enable_query_log
+
+DROP TABLE t1;
+DROP USER sst;

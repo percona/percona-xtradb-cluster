@@ -1,0 +1,2 @@
+/usr/bin/ar cr libwsrep.a  CMakeFiles/wsrep.dir/wsrep_gtid.c.o CMakeFiles/wsrep.dir/wsrep_uuid.c.o CMakeFiles/wsrep.dir/wsrep_loader.c.o CMakeFiles/wsrep.dir/wsrep_dummy.c.o
+/usr/bin/ranlib libwsrep.a
