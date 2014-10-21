@@ -274,6 +274,14 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Initial position was provided by configuration or SST, avoiding override"),
  ("Warning: Using a password on the command line interface can be insecure"),
  ("InnoDB: Error: Table \"mysql\"\\.\"innodb_table_stats\" not found"),
+ ("but it is impossible to select State Transfer donor: Resource temporarily unavailable"),
+ ("WSREP: Could not find peer"),
+ ("WSREP: discarding established \\(time wait\\)"),
+ ("sending install message failed: Resource temporarily unavailable"),
+ ("WSREP: Ignoring possible split-brain \\(allowed by configuration\\) from view"),
+ ("WSREP: no nodes coming from prim view, prim not possible"),
+ ("WSREP: Failed to prepare for incremental state transfer: Local state seqno is undefined:"),
+ ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
 
  ("THE_LAST_SUPPRESSION")||
 
@@ -321,7 +329,17 @@ BEGIN
   END IF;
 
   -- Cleanup for next test
-  TRUNCATE test_suppressions;
+  IF @@wsrep_on = 1 THEN
+    -- The TRUNCATE should not be replicated under Galera
+    -- as it causes the custom suppressions on the other
+    -- nodes to be deleted as well
+    SET wsrep_on = 0;
+    TRUNCATE test_suppressions;
+    SET wsrep_on = 1;
+  ELSE 
+    TRUNCATE test_suppressions;
+  END IF;    
+
   DROP TABLE error_log;
 
 END||

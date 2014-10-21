@@ -25,17 +25,17 @@ KEY `първи индекс` (`първа колона`)
 );
 INSERT INTO `втора таблица` VALUES (1, 1);
 USE `database with space`;
-SELECT * FROM `table with space`;
-column with space	second column with space
-1	1
+SELECT `second column with space` FROM `table with space`;
+second column with space
+1
 USE `база`;
 SELECT * FROM `таблица`;
 първа_колона	втора_колона
 1	1
 USE `втора база`;
-SELECT * FROM `втора таблица`;
-първа колона	втора колона
-1	1
+SELECT `втора колона` FROM `втора таблица`;
+втора колона
+1
 SET GLOBAL wsrep_sync_wait = (SELECT @@wsrep_sync_wait);
 DROP TABLE `database with space`.`table with space`;
 DROP TABLE `база`.`таблица`;

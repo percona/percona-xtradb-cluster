@@ -22,6 +22,7 @@ INSERT INTO t1 VALUES (1);
 --let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
 --let $wsrep_sst_method_orig = `SELECT @@wsrep_sst_method`
 --let $wsrep_sst_auth_orig = `SELECT @@wsrep_sst_auth`
+--let $wsrep_sst_receive_address_orig = `SELECT @@wsrep_sst_receive_address`
 
 # Stop wsrep on node #2
 SET GLOBAL wsrep_provider='none';
@@ -36,22 +37,27 @@ SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
 
 --connection node_2
 # Restart wsrep on node #2
+--disable_query_log
+# Set wsrep_sst_receive_address to the SQL port
+--eval SET GLOBAL wsrep_sst_receive_address = '127.0.0.2:$NODE_MYPORT_2';
+--enable_query_log
 SET GLOBAL wsrep_sst_method = 'mysqldump';
 
 --disable_query_log
 --eval SET GLOBAL wsrep_provider = '$wsrep_provider_orig';
 --eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
 --enable_query_log
+--disconnect node_2
 
 --sleep 10
 
 # We reconnect the connection to node #2 because the previous one is dropped on SST
---disconnect node_2
 --let $galera_connection_name = node_2
 --let $galera_server_number = 2
 --source include/galera_connect.inc
 --connection node_2
 
+--source include/wait_until_connected_again.inc
 --source include/galera_wait_ready.inc
 
 INSERT INTO t1 VALUES (4);
@@ -62,6 +68,7 @@ SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 2;
 
 --disable_query_log
 --eval SET GLOBAL wsrep_sst_method = $wsrep_sst_method_orig
+--eval SET GLOBAL wsrep_sst_receive_address = '$wsrep_sst_receive_address_orig'
 --enable_query_log
 
 --connection node_1

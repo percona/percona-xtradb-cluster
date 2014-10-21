@@ -60,11 +60,14 @@ BEGIN
 
   -- Dump all global variables except those that may change.
   -- timestamp changes if time passes. server_uuid changes if server restarts.
+  -- wsrep_start_position can change on mysqldump SST
+  -- auto_increment_offset can change on cluster reconfigurations
   SELECT * FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES
     WHERE variable_name NOT IN ('timestamp', 'server_uuid',
                                 'innodb_file_format_max',
                                 'gtid_executed', 'gtid_purged',
-                                'wsrep_start_position')
+                                'wsrep_start_position',
+                                'auto_increment_offset')
     ORDER BY VARIABLE_NAME;
 
   -- Dump all databases, there should be none
