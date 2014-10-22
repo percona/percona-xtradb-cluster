@@ -10066,7 +10066,6 @@ ha_innobase::wsrep_append_keys(
 		uint	len;
 		char 	keyval[WSREP_MAX_SUPPORTED_KEY_LENGTH+1] = {'\0'};
 		char 	*key 		= &keyval[0];
-		KEY	*key_info	= table->key_info;
 		ibool    is_null;
 
 		len = wsrep_store_key_val_for_row(
