@@ -1,0 +1,29 @@
+#
+# Test wsrep_desync = ON . Node should temporarily drop from the cluster
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+SET GLOBAL wsrep_desync = TRUE;
+
+--connection node_1
+INSERT INTO t1 VALUES (2);
+
+--connection node_2
+# Previous insert has not been delivered
+SELECT * FROM t1;
+SELECT COUNT(*) = 1 FROM t1;
+
+SET GLOBAL wsrep_desync = FALSE;
+
+# The insert has now been delivered
+SELECT COUNT(*) = 2 FROM t1;
+
+DROP TABLE t1;
+
