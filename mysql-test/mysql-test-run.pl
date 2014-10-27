@@ -3308,10 +3308,6 @@ sub check_wsrep_support() {
   {
     mtr_report(" - binaries built with wsrep patch");
 
-    # Add galera test suites
-    mtr_report(" - adding wsrep, galera to default test suites");
-    $DEFAULT_SUITES.=",wsrep,galera";
-
     # ADD scripts to $PATH to that wsrep_sst_* can be found
     my ($path) = grep { -f "$_/wsrep_sst_rsync"; } "$::bindir/scripts", $::path_client_bindir;
     mtr_error("No SST scripts") unless $path;
