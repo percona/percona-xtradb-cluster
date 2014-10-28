@@ -9,3 +9,5 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+
+perfschema.sizing_growth : Galera LP#1370988 2014-10-28 pstoev Performance schema heuristics need to be updated
