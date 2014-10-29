@@ -1802,6 +1802,7 @@ lock_sec_rec_some_has_impl(
 	return(trx_id);
 }
 
+#ifndef WITH_WSREP
 #ifdef UNIV_DEBUG
 /*********************************************************************//**
 Checks if some transaction, other than given trx_id, has an explicit
@@ -1852,6 +1853,7 @@ lock_rec_other_trx_holds_expl(
 	return(holds);
 }
 #endif /* UNIV_DEBUG */
+#endif /* !WITH_WSREP */
 
 /*********************************************************************//**
 Return approximate number or record locks (bits set in the bitmap) for
