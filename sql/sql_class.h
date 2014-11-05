@@ -41,6 +41,18 @@
                                      THR_LOCK_INFO */
 
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+struct wsrep_thd_shadow {
+  ulonglong            options;
+  uint                 server_status;
+  enum wsrep_exec_mode wsrep_exec_mode;
+  Vio                  *vio;
+  ulong                tx_isolation;
+  char                 *db;
+  size_t               db_length;
+};
+#endif
 class Reprepare_observer;
 class Relay_log_info;
 
@@ -505,6 +517,12 @@ typedef struct system_variables
 
   my_bool sysdate_is_now;
 
+#ifdef WITH_WSREP
+  my_bool wsrep_on;
+  my_bool wsrep_causal_reads;
+  uint wsrep_sync_wait;
+  ulong wsrep_retry_autocommit;
+#endif
   double long_query_time_double;
 
   my_bool pseudo_slave_mode;
@@ -1661,7 +1679,8 @@ public:
   int is_current_stmt_binlog_format_row() const {
     DBUG_ASSERT(current_stmt_binlog_format == BINLOG_FORMAT_STMT ||
                 current_stmt_binlog_format == BINLOG_FORMAT_ROW);
-    return current_stmt_binlog_format == BINLOG_FORMAT_ROW;
+    return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
+            BINLOG_FORMAT_ROW);
   }
 
 private:
@@ -2184,6 +2203,40 @@ public:
     query_id_t first_query_id;
   } binlog_evt_union;
 
+#ifdef WITH_WSREP
+  const bool                wsrep_applier; /* dedicated slave applier thread */
+  bool                      wsrep_applier_closing; /* applier marked to close */
+  bool                      wsrep_client_thread; /* to identify client threads*/
+  enum wsrep_exec_mode      wsrep_exec_mode;
+  query_id_t                wsrep_last_query_id;
+  enum wsrep_query_state    wsrep_query_state;
+  enum wsrep_conflict_state wsrep_conflict_state;
+  mysql_mutex_t             LOCK_wsrep_thd;
+  mysql_cond_t              COND_wsrep_thd;
+  // changed from wsrep_seqno_t to wsrep_trx_meta_t in wsrep API rev 75
+  // wsrep_seqno_t             wsrep_trx_seqno;
+  wsrep_trx_meta_t          wsrep_trx_meta;
+  uint32                    wsrep_rand;
+  Relay_log_info*           wsrep_rli;
+  bool                      wsrep_converted_lock_session;
+  wsrep_ws_handle_t         wsrep_ws_handle;
+#ifdef WSREP_PROC_INFO
+  char                      wsrep_info[128]; /* string for dynamic proc info */
+#endif /* WSREP_PROC_INFO */
+  ulong                     wsrep_retry_counter; // of autocommit
+  bool                      wsrep_PA_safe;
+  char*                     wsrep_retry_query;
+  size_t                    wsrep_retry_query_len;
+  enum enum_server_command  wsrep_retry_command;
+  enum wsrep_consistency_check_mode 
+                            wsrep_consistency_check;
+  wsrep_stats_var*          wsrep_status_vars;
+  int                       wsrep_mysql_replicated;
+  const char*               wsrep_TOI_pre_query; /* a query to apply before
+                                                    the actual TOI query */
+  size_t                    wsrep_TOI_pre_query_len;
+  bool                      wsrep_apply_toi; /* applier processing in TOI */
+#endif /* WITH_WSREP */
   /**
     Internal parser state.
     Note that since the parser is not re-entrant, we keep only one parser
@@ -2215,7 +2268,11 @@ public:
   /* Debug Sync facility. See debug_sync.cc. */
   struct st_debug_sync_control *debug_sync_control;
 #endif /* defined(ENABLED_DEBUG_SYNC) */
+#ifdef WITH_WSREP
+  THD(bool is_applier = false);
+#else
   THD();
+#endif
   ~THD();
 
   void init(void);
@@ -2579,7 +2636,7 @@ public:
       tests fail and so force them to propagate the
       lex->binlog_row_based_if_mixed upwards to the caller.
     */
-    if ((variables.binlog_format == BINLOG_FORMAT_MIXED) &&
+    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED)&&
         (in_sub_stmt == 0))
       set_current_stmt_binlog_format_row();
 
@@ -2621,7 +2678,7 @@ public:
                 show_system_thread(system_thread)));
     if (in_sub_stmt == 0)
     {
-      if (variables.binlog_format == BINLOG_FORMAT_ROW)
+      if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW)
         set_current_stmt_binlog_format_row();
       else if (temporary_tables == NULL)
         clear_current_stmt_binlog_format_row();

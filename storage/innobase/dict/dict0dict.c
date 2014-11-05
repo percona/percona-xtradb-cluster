@@ -2667,7 +2667,26 @@ next_rec:
 
 	return(NULL);
 }
-
+#ifdef WITH_WSREP
+dict_index_t*
+wsrep_dict_foreign_find_index(
+/*====================*/
+	dict_table_t*	table,	/*!< in: table */
+	const char**	columns,/*!< in: array of column names */
+	ulint		n_cols,	/*!< in: number of columns */
+	dict_index_t*	types_idx, /*!< in: NULL or an index to whose types the
+				   column types must match */
+	ibool		check_charsets,
+				/*!< in: whether to check charsets.
+				only has an effect if types_idx != NULL */
+	ulint		check_null)
+				/*!< in: nonzero if none of the columns must
+				be declared NOT NULL */
+{
+	return dict_foreign_find_index(
+		table, columns, n_cols, types_idx, check_charsets, check_null);
+}
+#endif /* WITH_WSREP */
 /**********************************************************************//**
 Find an index that is equivalent to the one passed in and is not marked
 for deletion.
@@ -4897,6 +4916,7 @@ dict_print_info_on_foreign_key_in_create_format(
 	dict_foreign_t*	foreign,	/*!< in: foreign key constraint */
 	ibool		add_newline)	/*!< in: whether to add a newline */
 {
+	char		constraint_name[MAX_TABLE_NAME_LEN];
 	const char*	stripped_id;
 	ulint	i;
 
@@ -4918,7 +4938,9 @@ dict_print_info_on_foreign_key_in_create_format(
 	}
 
 	fputs(" CONSTRAINT ", file);
-	ut_print_name(file, trx, FALSE, stripped_id);
+	innobase_convert_from_id(&my_charset_filename, constraint_name,
+				 stripped_id, MAX_TABLE_NAME_LEN);
+	ut_print_name(file, trx, FALSE, constraint_name);
 	fputs(" FOREIGN KEY (", file);
 
 	for (i = 0;;) {

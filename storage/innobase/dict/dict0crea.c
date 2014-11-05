@@ -1444,6 +1444,7 @@ dict_create_add_foreign_to_dictionary(
 	ut_ad(mutex_own(&(dict_sys->mutex)));
 
 	if (foreign->id == NULL) {
+		char*	stripped_name;
 		/* Generate a new constraint id */
 		ulint	namelen	= strlen(table->name);
 		char*	id	= mem_heap_alloc(foreign->heap, namelen + 20);
@@ -1477,6 +1478,13 @@ dict_create_add_foreign_to_dictionary(
 			}
 		}
 		foreign->id = id;
+
+		stripped_name = strchr(foreign->id, '/') + 1;
+		if (innobase_check_identifier_length(stripped_name)) {
+			fprintf(stderr, "InnoDB: Generated foreign key "
+				"name (%s) is too long\n", foreign->id);
+			return(DB_IDENTIFIER_TOO_LONG);
+		}
 	}
 
 	info = pars_info_create();

@@ -326,6 +326,7 @@ enum legacy_db_type
   DB_TYPE_MARIA,
   /** Performance schema engine. */
   DB_TYPE_PERFORMANCE_SCHEMA,
+  DB_TYPE_WSREP,
   DB_TYPE_FIRST_DYNAMIC=42,
   DB_TYPE_DEFAULT=127 // Must be last
 };
@@ -819,6 +820,11 @@ struct handlerton
                      const char *wild, bool dir, List<LEX_STRING> *files);
    int (*table_exists_in_engine)(handlerton *hton, THD* thd, const char *db,
                                  const char *name);
+   int (*wsrep_abort_transaction)(handlerton *hton, THD *bf_thd, 
+				  THD *victim_thd, my_bool signal);
+   int (*wsrep_set_checkpoint)(handlerton *hton, const XID* xid);
+   int (*wsrep_get_checkpoint)(handlerton *hton, XID* xid);
+   void (*wsrep_fake_trx_id)(handlerton *hton, THD *thd);
 
   /**
     List of all system tables specific to the SE.
@@ -2225,6 +2231,9 @@ private:
 extern const char *ha_row_type[];
 extern MYSQL_PLUGIN_IMPORT const char *tx_isolation_names[];
 extern MYSQL_PLUGIN_IMPORT const char *binlog_format_names[];
+#ifdef WITH_WSREP
+extern MYSQL_PLUGIN_IMPORT const char *wsrep_binlog_format_names[];
+#endif /* WITH_WSREP */
 extern TYPELIB tx_isolation_typelib;
 extern const char *myisam_stats_method_names[];
 extern ulong total_ha, total_ha_2pc;
@@ -2320,6 +2329,10 @@ int ha_enable_transaction(THD *thd, bool on);
 int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
+#ifdef WITH_WSREP
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal);
+void ha_wsrep_fake_trx_id(THD *thd);
+#endif /* WITH_WSREP */
 
 /* these are called by storage engines */
 void trans_register_ha(THD *thd, bool all, handlerton *ht);
@@ -2349,6 +2362,9 @@ int ha_binlog_end(THD *thd);
 #define ha_binlog_log_query(a,b,c,d,e,f,g) do {} while (0)
 #define ha_binlog_wait(a) do {} while (0)
 #define ha_binlog_end(a)  do {} while (0)
+#endif
+#ifdef WITH_WSREP
+void wsrep_brute_force_aborts();
 #endif
 
 const char *get_canonical_filename(handler *file, const char *path,

@@ -48,6 +48,9 @@
 #include <my_dir.h>
 #include "sql_show.h"    // append_identifier
 
+#if WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 #endif /* MYSQL_CLIENT */
 
 #include <base64.h>
@@ -2533,7 +2536,14 @@ Query_log_event::Query_log_event(THD* thd_arg, const char* query_arg,
    master_data_written(0)
 {
   time_t end_time;
-
+#ifdef WITH_WSREP
+  /*
+    If Query_log_event will contain non trans keyword (not BEGIN, COMMIT,
+    SAVEPOINT or ROLLBACK) we disable PA for this transaction.
+   */
+  if (!is_trans_keyword())
+    thd->wsrep_PA_safe= false;
+#endif /* WITH_WSREP */
   memset(&user, 0, sizeof(user));
   memset(&host, 0, sizeof(host));
 
@@ -3696,6 +3706,21 @@ Query_log_event::do_shall_skip(Relay_log_info *rli)
       DBUG_RETURN(Log_event::EVENT_SKIP_COUNT);
     }
   }
+#ifdef WITH_WSREP
+  else if (wsrep_mysql_replication_bundle && WSREP_ON && thd->wsrep_mysql_replicated > 0 &&
+       (!strncasecmp(query , "BEGIN", 5) || !strncasecmp(query , "COMMIT", 6)))
+  {
+    if (++thd->wsrep_mysql_replicated < (int)wsrep_mysql_replication_bundle)
+    {
+      WSREP_DEBUG("skipping wsrep commit %d", thd->wsrep_mysql_replicated);
+      DBUG_RETURN(Log_event::EVENT_SKIP_IGNORE);
+    }
+    else
+    {
+      thd->wsrep_mysql_replicated = 0;
+    }
+  }
+#endif
   DBUG_RETURN(Log_event::do_shall_skip(rli));
 }
 
@@ -5776,6 +5801,20 @@ Xid_log_event::do_shall_skip(Relay_log_info *rli)
     thd->variables.option_bits&= ~OPTION_BEGIN;
     DBUG_RETURN(Log_event::EVENT_SKIP_COUNT);
   }
+#ifdef WITH_WSREP
+  else if (wsrep_mysql_replication_bundle && WSREP_ON)
+  {
+    if (++thd->wsrep_mysql_replicated < (int)wsrep_mysql_replication_bundle)
+    {
+      WSREP_DEBUG("skipping wsrep commit %d", thd->wsrep_mysql_replicated);
+      DBUG_RETURN(Log_event::EVENT_SKIP_IGNORE);
+    }
+    else
+    {
+      thd->wsrep_mysql_replicated = 0;
+    }
+  }
+#endif
   DBUG_RETURN(Log_event::do_shall_skip(rli));
 }
 #endif /* !MYSQL_CLIENT */
@@ -6756,7 +6795,14 @@ err:
     end_io_cache(&file);
   if (fd >= 0)
     mysql_file_close(fd, MYF(0));
+#ifdef WITH_WSREP
+  if (WSREP(thd))
+    thd_proc_info(thd, "exit Create_file_log_event::do_apply_event()");
+  else
+    thd_proc_info(thd, 0);
+#else /* WITH_WSREP */
   thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
   return error != 0;
 }
 #endif /* defined(HAVE_REPLICATION) && !defined(MYSQL_CLIENT) */
@@ -6927,7 +6973,14 @@ int Append_block_log_event::do_apply_event(Relay_log_info const *rli)
 err:
   if (fd >= 0)
     mysql_file_close(fd, MYF(0));
+#ifdef WITH_WSREP
+  if (WSREP(thd))
+    thd_proc_info(thd, "exit Append_block_log_event::do_apply_event()");
+  else
+    thd_proc_info(thd, 0);
+#else /* WITH_WSREP */
   thd_proc_info(thd, 0);
+#endif /* WITH_WSREP */
   DBUG_RETURN(error);
 }
 #endif
@@ -7901,10 +7954,21 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
         thd->variables.option_bits&= ~OPTION_RELAXED_UNIQUE_CHECKS;
     /* A small test to verify that objects have consistent types */
     DBUG_ASSERT(sizeof(thd->variables.option_bits) == sizeof(OPTION_RELAXED_UNIQUE_CHECKS));
-
     if (open_and_lock_tables(thd, rli->tables_to_lock, FALSE, 0))
     {
       uint actual_error= thd->stmt_da->sql_errno();
+#ifdef WITH_WSREP
+      if (WSREP(thd))
+      {
+        WSREP_WARN("BF applier failed to open_and_lock_tables: %u, fatal: %d "
+                   "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld)",
+                   thd->stmt_da->sql_errno(),
+                   thd->is_fatal_error,
+                   thd->wsrep_exec_mode,
+                   thd->wsrep_conflict_state,
+                   (long long)wsrep_thd_trx_seqno(thd));
+      } 
+#endif
       if (thd->is_slave_error || thd->is_fatal_error)
       {
         /*
@@ -8782,8 +8846,12 @@ check_table_map(Relay_log_info const *rli, RPL_TABLE_LIST *table_list)
 {
   DBUG_ENTER("check_table_map");
   enum_tbl_map_status res= OK_TO_PROCESS;
-
+#ifdef WITH_WSREP
+  if ((rli->sql_thd->slave_thread /* filtering is for slave only */  ||
+       (WSREP(rli->sql_thd) && rli->sql_thd->wsrep_applier))         &&
+#else
   if (rli->sql_thd->slave_thread /* filtering is for slave only */ &&
+#endif /* WITH_WSREP */
       (!rpl_filter->db_ok(table_list->db) ||
        (rpl_filter->is_on() && !rpl_filter->tables_ok("", table_list))))
     res= FILTERED_OUT;
@@ -9479,8 +9547,23 @@ int
 Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   DBUG_ASSERT(m_table != NULL);
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
+           (long long) wsrep_thd_trx_seqno(thd));
+  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
+#else
+  const char* tmp = (WSREP(thd)) ?
+    thd_proc_info(thd,"Write_rows_log_event::write_row()") :  NULL;
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   int error= write_row(rli, slave_exec_mode == SLAVE_EXEC_MODE_IDEMPOTENT);
 
+#ifdef WITH_WSREP
+  if (WSREP(thd)) thd_proc_info(thd, tmp);
+#endif /* WITH_WSREP */
   if (error && !thd->is_error())
   {
     DBUG_ASSERT(0);
@@ -10084,13 +10167,38 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   int error;
   DBUG_ASSERT(m_table != NULL);
 
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  snprintf(info, sizeof(info) - 1, "Delete_rows_log_event::find_row(%lld)",
+           (long long) wsrep_thd_trx_seqno(thd));
+  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
+#else
+  const char* tmp = (WSREP(thd)) ?
+    thd_proc_info(thd,"Delete_rows_log_event::find_row()") : NULL;
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   if (!(error= find_row(rli))) 
   { 
     /*
       Delete the record found, located in record[0]
     */
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+    snprintf(info, sizeof(info) - 1,
+             "Delete_rows_log_event::ha_delete_row(%lld)",
+             (long long) wsrep_thd_trx_seqno(thd));
+    if (WSREP(thd)) thd_proc_info(thd, info);
+#else
+    if (WSREP(thd)) thd_proc_info(thd,"Delete_rows_log_event::ha_delete_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
     error= m_table->file->ha_delete_row(m_table->record[0]);
   }
+#ifdef WITH_WSREP
+  if (WSREP(thd)) thd_proc_info(thd, tmp);
+#endif /* WITH_WSREP */
   return error;
 }
 
@@ -10213,6 +10321,18 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   DBUG_ASSERT(m_table != NULL);
 
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  snprintf(info, sizeof(info) - 1, "Update_rows_log_event::find_row(%lld)",
+           (long long) wsrep_thd_trx_seqno(thd));
+  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
+#else
+  const char* tmp = (WSREP(thd)) ? 
+    thd_proc_info(thd,"Update_rows_log_event::find_row()") : NULL;
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   int error= find_row(rli); 
   if (error)
   {
@@ -10239,6 +10359,17 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   store_record(m_table,record[1]);
 
   m_curr_row= m_curr_row_end;
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  snprintf(info, sizeof(info) - 1,
+           "Update_rows_log_event::unpack_current_row(%lld)",
+           (long long) wsrep_thd_trx_seqno(thd));
+  if (WSREP(thd)) thd_proc_info(thd, info);
+#else
+  if (WSREP(thd)) 
+    thd_proc_info(thd,"Update_rows_log_event::unpack_current_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   /* this also updates m_curr_row_end */
   if ((error= unpack_current_row(rli)))
     return error;
@@ -10257,10 +10388,23 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 #endif
 
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  snprintf(info, sizeof(info) - 1,
+           "Update_rows_log_event::ha_update_row(%lld)",
+           (long long) wsrep_thd_trx_seqno(thd));
+  if (WSREP(thd)) thd_proc_info(thd, info);
+#else
+  if (WSREP(thd)) thd_proc_info(thd,"Update_rows_log_event::ha_update_row()");
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   error= m_table->file->ha_update_row(m_table->record[1], m_table->record[0]);
   if (error == HA_ERR_RECORD_IS_THE_SAME)
     error= 0;
 
+#ifdef WITH_WSREP
+  if (WSREP(thd)) thd_proc_info(thd, tmp);
+#endif /* WITH_WSREP */
   return error;
 }
 
