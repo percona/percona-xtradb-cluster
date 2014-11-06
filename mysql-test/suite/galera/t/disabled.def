@@ -1,0 +1,2 @@
+galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+galera_sst_mysqldump : lp1379276 '"State request preparation failed, aborting: unknown exception" when manipulating wsrep_provider'
