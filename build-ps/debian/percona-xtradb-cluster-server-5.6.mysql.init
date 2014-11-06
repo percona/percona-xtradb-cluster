@@ -167,7 +167,7 @@ case "${1:-''}" in
                 if test -n "$safe_pid"; then
                     if kill -0 "$safe_pid" 2>/dev/null; then
                         set +e 
-                        test -s $pid_file && kill -0 $(cat $pid_file) && break
+                        test -s $pid_file && kill -0 $(cat $pid_file) 2>/dev/null && break
                         set -e
                     else
                         # The server may have exited between the last pid-file check and now.  
@@ -300,7 +300,7 @@ case "${1:-''}" in
                 if test -n "$safe_pid"; then
                     if kill -0 "$safe_pid" 2>/dev/null; then
                         set +e
-                        test -s $pid_file && kill -0 $(cat $pid_file) && break
+                        test -s $pid_file && kill -0 $(cat $pid_file) 2>/dev/null && break
                         set -e
                     else
                         # The server may have exited between the last pid-file check and now.  
