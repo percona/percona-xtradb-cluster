@@ -43,6 +43,13 @@
 # If you change base dir, you must also change datadir. These may get
 # overwritten by settings in the MySQL configuration files.
 
+# source the defauts file /etc/sysconfig/mysql if it exists for any environment variables.
+# set -a is done so that  'FOO=BAR' just be used than 'export FOO=BAR' in the /etc/sysconfig/mysql.
+# However, export FOO=BAR in that file also should work.
+set -a
+[ -r /etc/sysconfig/mysql ] && . /etc/sysconfig/mysql
+set +a
+
 basedir=
 datadir=
 
