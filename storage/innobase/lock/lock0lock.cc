@@ -1798,7 +1798,7 @@ lock_sec_rec_some_has_impl(
 	return(trx_id);
 }
 
-#ifdef UNIV_DEBUG
+#if defined(UNIV_DEBUG) && !defined(WITH_WSREP)
 /*********************************************************************//**
 Checks if some transaction, other than given trx_id, has an explicit
 lock on the given rec, in the given precise_mode.
