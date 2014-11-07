@@ -130,6 +130,13 @@ wait_for_pid () {
     i=$(( i+1 ))
     sleep $startup_sleep
 
+    if [[ $verb = 'created' ]];then 
+        if ! kill -0 $manager;then 
+            log_failure_msg "mysqld_safe with PID $manager has already exited: FAILURE"
+            exit 1
+        fi
+    fi
+
   done
 
   if [[ -z "$i" ]]; then
