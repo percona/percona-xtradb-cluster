@@ -70,6 +70,11 @@ xtmpdir=""
 scomp=""
 sdecomp=""
 
+# Required for backup locks
+# For backup locks it is 1 sent by joiner
+# 5.6.21 PXC and later can't donate to an older joiner
+sst_ver=1
+
 if which pv &>/dev/null && pv --help | grep -q FORMAT;then 
     pvopts+=$pvformat
 fi
@@ -428,6 +433,7 @@ setup_ports()
         SST_PORT=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $2 }')
         REMOTEIP=$(echo $WSREP_SST_OPT_ADDR | awk -F ':' '{ print $1 }')
         lsn=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $4 }')
+        sst_ver=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $5 }')
     else
         SST_PORT=$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $2 }')
     fi
@@ -446,9 +452,9 @@ wait_for_listen()
         sleep 0.2
     done
     if [[ $incremental -eq 1 ]];then 
-        echo "ready ${ADDR}/${MODULE}/$lsn"
+        echo "ready ${ADDR}/${MODULE}/$lsn/$sst_ver"
     else 
-        echo "ready ${ADDR}/${MODULE}"
+        echo "ready ${ADDR}/${MODULE}//$sst_ver"
     fi
 }
 
@@ -580,6 +586,11 @@ then
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
+        if [[ -z $sst_ver ]];then 
+            wsrep_log_error "Upgrade joiner to 5.6.21 or higher for backup locks support"
+            wsrep_log_error "The joiner is not supported for this version of donor"
+            exit 93
+        fi
 
         if [[ -z $(parse_cnf mysqld tmpdir "") && -z $(parse_cnf xtrabackup tmpdir "") ]];then 
             xtmpdir=$(mktemp -d)
@@ -615,8 +626,6 @@ then
         fi
 
         check_extra
-
-        wsrep_log_info "WARNING: Donor on Backup Lock enabled PXC, make sure Joiner is on 5.6.21 PXC or higher"
 
         wsrep_log_info "Streaming GTID file before SST"
 
