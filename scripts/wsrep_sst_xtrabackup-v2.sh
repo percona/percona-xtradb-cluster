@@ -257,6 +257,16 @@ get_footprint()
 
 adjust_progress()
 {
+
+    if [[ ! -x `which pv` ]];then 
+        wsrep_log_error "pv not found in path: $PATH"
+        wsrep_log_error "Disabling all progress/rate-limiting"
+        pcmd=""
+        rlimit=""
+        progress=""
+        return
+    fi
+
     if [[ -n $progress && $progress != '1' ]];then 
         if [[ -e $progress ]];then 
             pcmd+=" 2>>$progress"
