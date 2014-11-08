@@ -137,6 +137,8 @@ The following options may be given as the first argument:
  --console           Write error output on screen; don't remove the console
  window on windows.
  --core-file         Write core on errors.
+ --csv-mode=name     Control CSV parser mode: []: default, ietf_quotes:
+ standards-compatible embedded quote and comma parsing
  -h, --datadir=name  Path to the database root directory
  --date-format=name  The DATE format (ignored)
  --datetime-format=name 
@@ -1006,6 +1008,8 @@ The following options may be given as the first argument:
  --stored-program-cache=# 
  The soft upper limit for number of cached stored routines
  for one connection.
+ --super-read-only   Enable read_only, and also block writes by users with the
+ SUPER privilege
  -s, --symbolic-links 
  Enable symbolic link support.
  --sync-binlog=#     Synchronously flush binary log to disk after every #th
@@ -1227,6 +1231,7 @@ completion-type NO_CHAIN
 concurrent-insert AUTO
 connect-timeout 10
 console FALSE
+csv-mode 
 date-format %Y-%m-%d
 datetime-format %Y-%m-%d %H:%i:%s
 default-storage-engine InnoDB
@@ -1475,6 +1480,7 @@ sort-buffer-size 262144
 sporadic-binlog-dump-fail FALSE
 sql-mode NO_ENGINE_SUBSTITUTION
 stored-program-cache 256
+super-read-only FALSE
 symbolic-links FALSE
 sync-binlog 0
 sync-frm TRUE

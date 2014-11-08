@@ -9957,7 +9957,10 @@ Rows_log_event::decide_row_lookup_algorithm_and_key()
   this->m_key_index= MAX_KEY;
   this->m_key_info= NULL;
 
-  if (event_type == WRITE_ROWS_EVENT)  // row lookup not needed
+  // row lookup not needed
+  if (event_type == WRITE_ROWS_EVENT ||
+     ((event_type == DELETE_ROWS_EVENT || event_type == UPDATE_ROWS_EVENT) &&
+      get_flags(COMPLETE_ROWS_F) && !m_table->file->rpl_lookup_rows()))
     DBUG_VOID_RETURN;
 
   if (!(slave_rows_search_algorithms_options & SLAVE_ROWS_INDEX_SCAN))
@@ -11429,7 +11432,9 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
         break;
 
       case ROW_LOOKUP_NOT_NEEDED:
-        DBUG_ASSERT(get_general_type_code() == WRITE_ROWS_EVENT);
+        DBUG_ASSERT(get_general_type_code() == WRITE_ROWS_EVENT ||
+                    get_general_type_code() == DELETE_ROWS_EVENT ||
+                    get_general_type_code() == UPDATE_ROWS_EVENT);
 
         /* No need to scan for rows, just apply it */
         do_apply_row_ptr= &Rows_log_event::do_apply_row;
@@ -12555,6 +12560,8 @@ Write_rows_log_event::do_before_row_operations(const Slave_reporting_capability 
 {
   int error= 0;
 
+  m_table->file->rpl_before_write_rows();
+
   /*
     Increment the global status insert count variable
   */
@@ -12685,6 +12692,7 @@ Write_rows_log_event::do_after_row_operations(const Slave_reporting_capability *
   }
 
   m_rows_lookup_algorithm= ROW_LOOKUP_UNDEFINED;
+  m_table->file->rpl_after_write_rows();
 
   return error? error : local_error;
 }
@@ -13075,6 +13083,7 @@ Delete_rows_log_event::do_before_row_operations(const Slave_reporting_capability
 {
   int error= 0;
   DBUG_ENTER("Delete_rows_log_event::do_before_row_operations");
+  m_table->file->rpl_before_delete_rows();
   /*
     Increment the global status delete count variable
    */
@@ -13091,6 +13100,7 @@ Delete_rows_log_event::do_after_row_operations(const Slave_reporting_capability 
 {
   DBUG_ENTER("Delete_rows_log_event::do_after_row_operations");
   error= row_operations_scan_and_key_teardown(error);
+  m_table->file->rpl_after_delete_rows();
   DBUG_RETURN(error);
 }
 
@@ -13098,6 +13108,11 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   int error;
   DBUG_ASSERT(m_table != NULL);
+  if (m_rows_lookup_algorithm == ROW_LOOKUP_NOT_NEEDED) {
+    error= unpack_current_row(rli, &m_cols);
+    if (error)
+      return error;
+  }
   /* m_table->record[0] contains the BI */
   m_table->mark_columns_per_binlog_row_image();
   error= m_table->file->ha_delete_row(m_table->record[0]);
@@ -13184,6 +13199,7 @@ Update_rows_log_event::do_before_row_operations(const Slave_reporting_capability
 {
   int error= 0;
   DBUG_ENTER("Update_rows_log_event::do_before_row_operations");
+  m_table->file->rpl_before_update_rows();
   /*
     Increment the global status update count variable
   */
@@ -13200,6 +13216,7 @@ Update_rows_log_event::do_after_row_operations(const Slave_reporting_capability 
 {
   DBUG_ENTER("Update_rows_log_event::do_after_row_operations");
   error= row_operations_scan_and_key_teardown(error);
+  m_table->file->rpl_after_update_rows();
   DBUG_RETURN(error);
 }
 
@@ -13208,6 +13225,12 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   DBUG_ASSERT(m_table != NULL);
   int error= 0;
+
+  if (m_rows_lookup_algorithm == ROW_LOOKUP_NOT_NEEDED) {
+    error= unpack_current_row(rli, &m_cols);
+    if (error)
+      return error;
+  }
 
   /*
     This is the situation after locating BI:
