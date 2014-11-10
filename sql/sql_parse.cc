@@ -3677,6 +3677,7 @@ case SQLCOM_PREPARE:
         res= 1;
         goto end_with_restore_list;
       }
+      WSREP_TO_ISOLATION_BEGIN(create_table->db, create_table->table_name, NULL);
 
       res= open_normal_and_derived_tables(thd, all_tables, 0);
       if (res)
