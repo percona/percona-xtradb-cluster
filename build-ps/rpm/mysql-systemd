@@ -1,6 +1,6 @@
 #! /bin/bash -ue
 #
-# Scripts to run by MySQL systemd service
+# Scripts to run by PXC systemd service
 # 
 
 parse_cnf()
