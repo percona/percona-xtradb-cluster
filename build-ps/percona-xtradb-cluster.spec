@@ -1069,7 +1069,12 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
  
 if [ $1 = 0 ] ; then
 %if 0%{?systemd}
-    %systemd_preun mysql
+    serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
+    if [[ -n ${serv:-} ]] && /usr/bin/systemctl is-active $serv;then
+        %systemd_preun $serv
+    else
+        %systemd_preun mysql
+    fi
 %else
         # Stop MySQL before uninstalling it
         if [ -x %{_sysconfdir}/init.d/mysql ] ; then
@@ -1398,11 +1403,45 @@ done
 %postun -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 %if 0%{?systemd}
-serv=$(systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
-if [[ -n ${serv:-} ]] && systemctl is-active $serv;then
-    %systemd_postun_with_restart $serv
+if [ $1 -eq 0 ];then
+    %systemd_postun
 else
-    %systemd_postun_with_restart mysql
+    serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
+    numint=0
+    if [[ -n ${serv:-} ]] && /usr/bin/systemctl is-active $serv;then
+        mysql_data=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
+        if [[ -z ${mysql_data:-} ]];then
+            echo "Unable to parse datadir with my_print_defaults, defaulting to /var/lib/mysql"
+            mysql_data="/var/lib/mysql"
+        fi
+        numint=$(grep -c 'member:' $mysql_data/gvwstate.dat) 
+        if mysql -e 'select 1' 2>/dev/null;then 
+            echo "$numint nodes currently up in the cluster primary component"
+        else
+            echo "Node is in non-PRIM."
+            numint=0
+        fi
+        if [[ $numint -gt 1 ]];then
+            if [[ $serv != 'mysql@bootstrap.service' ]];then
+                %systemd_postun_with_restart $serv
+            else
+                echo "Not bootstrapping with $(( numint-1 )) nodes already in cluster PC"
+                echo "Restarting with mysql.service in its stead"
+                %systemd_postun
+                /usr/bin/systemctl stop mysql@bootstrap.service
+                /usr/bin/systemctl start mysql.service
+            fi
+        elif [[ $numint -eq 1 ]];then 
+                # This doesn't second guess administrator for bootstrapping!
+                echo "$numint nodes up, restarting $serv after upgrade"
+                %systemd_postun_with_restart $serv
+        else
+            echo "Automatic restart after upgrade not feasible"
+            echo "Restart manually after upgrade"
+        fi
+    else
+        %systemd_postun_with_restart mysql
+    fi
 fi
 %endif
 
