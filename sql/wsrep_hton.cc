@@ -109,10 +109,6 @@ void wsrep_post_commit(THD* thd, bool all)
     }
     wsrep_cleanup_transaction(thd);
   } 
-  else if (wsrep_emulate_bin_log && thd->wsrep_exec_mode == TOTAL_ORDER && \
-          thd->lex->select_lex.item_list.elements) {
-    thd_binlog_trx_reset(thd);
-  }
 }
 
 /*
