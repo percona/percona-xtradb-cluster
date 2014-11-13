@@ -22,43 +22,23 @@ innodb_bug59733 : Test contains statements unsafe to replicate in statement-base
 innodb_gis : Test contains statements unsafe to replicate in statement-based replication
 innodb_prefix_index_restart_server : crash, lp1372288
 innodb_stats_external_pages : Test contains statements unsafe to replicate in statement-based replication
-innodb.innodb-2byte-collation : Unsafe statement written to the binary log
-innodb.innodb-table-online : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug12400341 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-change-buffer-recovery : Test contains statements unsafe to replicate in statement-based replication
-innodb.innodb_bug53756 : Cannot execute statement: impossible to write to binary log since BINLOG_FORMAT = STATEMENT
+innodb-2byte-collation : Unsafe statement written to the binary log
+innodb-change-buffer-recovery : Test contains statements unsafe to replicate in statement-based replication
+innodb_bug53756 : Cannot execute statement: impossible to write to binary log since BINLOG_FORMAT = STATEMENT
 innodb-alter-autoinc : AUTO_INCREMENT differences
-innodb.innodb-index-online : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug60049 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug14147491 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-alter-discard : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-alter : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-blob : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-double-write : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-index-online-delete : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-index-online-purge : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-log-file-size-1 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
 innodb_bug13635833 : Test contains statements unsafe to replicate in statement-based replication
-innodb.innodb-log-file-size : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-multiple-tablespaces : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-wl5522-1 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-wl5980-alter : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-wl5980-debug : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-wl5980-discard : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-wl6445-1 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-wl6445-2 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_blob_unrecoverable_crash : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug-13628249 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug11933790 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug13867871 : mysql-wsrep#3 - innodb_bug13867871 test fails with wsrep loaded
-innodb.innodb_bug14006907 : DDL lock wait timeout
-innodb.innodb_bug34300 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug54044 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug59641 : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_corrupt_bit : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_stats_create_on_corrupted : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_stats_drop_locked : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_stats_fetch_corrupted : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_trx_weight : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb-wl5522-debug : mysql-wsrep#2 - Assertion `!flags.finalized' failed in binlog_cache_data::finalize
-innodb.innodb_bug38231 : Deadlock on UNLOCK TABLE
+innodb_bug13867871 : mysql-wsrep#3 - innodb_bug13867871 test fails with wsrep loaded
+innodb_bug14006907 : DDL lock wait timeout
+innodb_bug38231 : Deadlock on UNLOCK TABLE
+innodb_bug-13628249 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart 
+innodb-wl6445-1 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart
+innodb-wl6445-2 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart
+innodb_bug12400341 : Test does not account for applier threads when performing SHOW PROCESSLIST
+innodb-tablespace : mysql-wsrep#11 CREATE + DROP causes Assertion `key_count > 0' failed in galera::Certification::do_test_v3()
+innodb_bug14169459 : mysql-wsrep#11 CREATE + DROP causes Assertion `key_count > 0' failed in galera::Certification::do_test_v3()
+innodb_bug54044 : mysql-wsrep#11 CREATE + DROP causes Assertion `key_count > 0' failed in galera::Certification::do_test_v3()
+innodb-blob : 'Cannot execute statement: impossible to write to binary log since BINLOG_FORMAT = STATEMENT and at least one table uses a storage engine limited to row-based logging'
+innodb_corrupt_bit : 'Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT.'
+innodb-index-online : ALTER succeeds as it is given a higher priority
+innodb-table-online : ALTER succeeds as it is given a higher priority
+innodb-index-online-purge : ALTER succeeds as it is given a higher priority
