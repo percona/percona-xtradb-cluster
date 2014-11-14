@@ -108,7 +108,7 @@ void wsrep_post_commit(THD* thd, bool all)
                    (long long)thd->real_id, thd->get_stmt_da()->status());
     }
     wsrep_cleanup_transaction(thd);
-  } 
+  }
 }
 
 /*
