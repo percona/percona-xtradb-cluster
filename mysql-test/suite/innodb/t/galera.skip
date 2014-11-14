@@ -34,11 +34,9 @@ innodb_bug-13628249 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_m
 innodb-wl6445-1 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart
 innodb-wl6445-2 : mysql-wsrep#12 InnoDB: Failing assertion: !srv_read_only_mode with server restart
 innodb_bug12400341 : Test does not account for applier threads when performing SHOW PROCESSLIST
-innodb-tablespace : mysql-wsrep#11 CREATE + DROP causes Assertion `key_count > 0' failed in galera::Certification::do_test_v3()
-innodb_bug14169459 : mysql-wsrep#11 CREATE + DROP causes Assertion `key_count > 0' failed in galera::Certification::do_test_v3()
-innodb_bug54044 : mysql-wsrep#11 CREATE + DROP causes Assertion `key_count > 0' failed in galera::Certification::do_test_v3()
 innodb-blob : 'Cannot execute statement: impossible to write to binary log since BINLOG_FORMAT = STATEMENT and at least one table uses a storage engine limited to row-based logging'
 innodb_corrupt_bit : 'Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT.'
 innodb-index-online : ALTER succeeds as it is given a higher priority
 innodb-table-online : ALTER succeeds as it is given a higher priority
 innodb-index-online-purge : ALTER succeeds as it is given a higher priority
+innodb-wl5522-debug : Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT.
