@@ -963,9 +963,15 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     uchar *buf;
     size_t len=0;
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog cache not empty (%lu bytes) at connection close %lu",
+    WSREP_WARN("binlog trx cache not empty (%lu bytes) @ connection close %lu",
                len, thd->thread_id);
-    wsrep_dump_rbr_buf(thd, buf, len);
+    if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
+
+    cache = cache_mngr->get_binlog_cache_log(false);
+    wsrep_write_cache_buf(cache, &buf, &len);
+    WSREP_WARN("binlog stmt cache not empty (%lu bytes) @ connection close %lu",
+               len, thd->thread_id);
+    if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
   DBUG_ASSERT(cache_mngr->is_binlog_empty());
@@ -7271,7 +7277,18 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
     /*
       Skip group commit, just do storage engine commit.
     */
-    DBUG_RETURN(ha_commit_low(thd, all));
+    int rcode = ha_commit_low(thd, all);
+
+    /* if there is myisam statement inside innodb transaction, we may
+       have events in stmt cache
+    */
+    binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+    if(!cache_mngr->stmt_cache.is_binlog_empty())
+    {
+      WSREP_DEBUG("stmt transaction inside MST, SQL: %s", thd->query());
+      cache_mngr->stmt_cache.reset();
+    }
+    DBUG_RETURN(rcode);
   }
 #endif /* WITH_WSREP */
 
@@ -9647,7 +9664,15 @@ void thd_binlog_trx_reset(THD * thd)
   if (thd_get_ha_data(thd, binlog_hton) != NULL)
   {
     binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
-    if (cache_mngr) cache_mngr->trx_cache.reset();
+    if (cache_mngr) 
+    {
+      cache_mngr->trx_cache.reset();
+      if (!cache_mngr->stmt_cache.is_binlog_empty())
+      {
+	WSREP_DEBUG("pending events in stmt cache, sql: %s", thd->query());
+	cache_mngr->stmt_cache.reset();
+      }
+    }
   }
   thd->clear_binlog_table_maps();
 }
