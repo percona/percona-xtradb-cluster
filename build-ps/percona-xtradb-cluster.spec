@@ -1420,10 +1420,10 @@ else
             mysql_data="/var/lib/mysql"
         fi
         numint=$(grep -c 'member:' $mysql_data/gvwstate.dat) 
-        if mysql -e 'select 1' 2>/dev/null;then 
+        if %{_bindir}/mysql -e 'select 1' &>/dev/null;then 
             echo "$numint nodes currently up in the cluster primary component"
         else
-            echo "Node is in non-PRIM."
+            echo "Node is in non-PRIM, with $numint nodes in gvwstate.dat"
             numint=0
         fi
         if [[ $numint -gt 1 ]];then
