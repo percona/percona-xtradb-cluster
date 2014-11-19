@@ -1,1 +1,6 @@
 galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+galera_kill_smallchanges : qa#20 test fails sporadically
+galera_kill_nochanges : qa#20 test fails sporadically
+galera_killall_nochanges : qa#20 test fails sporadically
+galera_kill_largechanges: qa#20 test fails sporadically
+
