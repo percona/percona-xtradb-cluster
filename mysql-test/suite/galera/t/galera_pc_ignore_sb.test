@@ -30,4 +30,6 @@ SET GLOBAL wsrep_cluster_address = '';
 --eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
 --enable_query_log
 
+--connection node_2
 --source include/start_mysqld.inc
+--source include/wait_until_connected_again.inc

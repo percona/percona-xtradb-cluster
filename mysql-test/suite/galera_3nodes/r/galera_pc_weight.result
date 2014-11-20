@@ -113,3 +113,4 @@ VARIABLE_VALUE = 4
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE = 'Synced'
 1
+CALL mtr.add_suppression('WSREP: gcs_caused\\(\\) returned -1');
