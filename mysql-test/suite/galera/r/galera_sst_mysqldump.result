@@ -20,5 +20,7 @@ COUNT(*) = 3
 SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 2;
 COUNT(*) = 0
 1
+CALL mtr.add_suppression('InnoDB: Error: Table "mysql"\\."innodb_index_stats" not found');
+CALL mtr.add_suppression('InnoDB: Error: Table "mysql"\\."innodb_table_stats" not found');
 DROP TABLE t1;
 DROP USER sst;
