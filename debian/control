@@ -152,7 +152,7 @@ Depends: ${misc:Depends}, ${shlibs:Depends}
 Provides: virtual-mysql-server-core
 Breaks: mysql-server-core-5.6, virtual-mysql-server-core
 Replaces: mysql-server-core-5.6, virtual-mysql-server-core
-Description: MySQL database server binaries
+Description: MySQL database wsrep server binaries
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
  language in the world. The main goals of MySQL are speed, robustness and
@@ -168,6 +168,7 @@ Suggests: mailx, tinyca
 Pre-Depends: adduser (>= 3.40), debconf, mysql-common (>= 5.5)
 Depends:
  initscripts,
+ galera,
  libdbi-perl,
  lsb-base (>= 3.0-10),
  mysql-client-5.6 (>= ${binary:Version}),
@@ -180,7 +181,7 @@ Depends:
 Provides: virtual-mysql-server
 Breaks: mysql-server-5.6, virtual-mysql-server
 Replaces: mysql-server-5.6, virtual-mysql-server
-Description: MySQL database server binaries and system database setup
+Description: MySQL database wsrep server binaries and system database setup
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
  language in the world. The main goals of MySQL are speed, robustness and
@@ -192,7 +193,7 @@ Description: MySQL database server binaries and system database setup
 Package: mysql-wsrep-server
 Architecture: all
 Depends: mysql-wsrep-server-5.6, ${misc:Depends}
-Description: MySQL database server (metapackage depending on the latest version)
+Description: MySQL database wsrep server (metapackage depending on the latest version)
  This is an empty package that depends on the current "best" version of
  mysql-wsrep-server (currently mysql-wsrep-server-5.6), as determined by the MySQL
  maintainers. Install this package if in doubt about which MySQL

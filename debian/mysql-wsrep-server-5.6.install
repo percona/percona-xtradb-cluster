@@ -23,6 +23,10 @@ usr/bin/perror
 usr/bin/replace
 usr/bin/resolve_stack_dump
 usr/bin/resolveip
+usr/bin/wsrep_sst_common
+usr/bin/wsrep_sst_mysqldump
+usr/bin/wsrep_sst_rsync
+usr/bin/wsrep_sst_xtrabackup
 usr/lib/mysql/plugin/*.so
 usr/share/doc/mysql-server-5.6/
 usr/share/mysql/debian-start.inc.sh
@@ -32,3 +36,4 @@ usr/share/mysql/errmsg-utf8.txt
 usr/share/mysql/mysql_test_data_timezone.sql
 usr/share/mysql/mysqld_multi.server
 etc/apparmor.d/usr.sbin.mysqld
+usr/share/mysql/wsrep.cnf
