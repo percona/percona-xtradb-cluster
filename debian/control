@@ -1,4 +1,4 @@
-Source: mysql-5.6
+Source: mysql-wsrep-5.6
 Section: database
 Priority: optional
 Maintainer: Debian MySQL Maintainers <pkg-mysql-maint@lists.alioth.debian.org>
@@ -146,12 +146,12 @@ Description: MySQL database client binaries
  This package includes the client binaries and the additional tools
  innotop and mysqlreport.
 
-Package: mysql-server-core-5.6
+Package: mysql-wsrep-server-core-5.6
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Provides: virtual-mysql-server-core
-Breaks: mysql-server-core-5.5, virtual-mysql-server-core
-Replaces: mysql-server-core-5.5, virtual-mysql-server-core
+Breaks: mysql-server-core-5.6, virtual-mysql-server-core
+Replaces: mysql-server-core-5.6, virtual-mysql-server-core
 Description: MySQL database server binaries
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -161,7 +161,7 @@ Description: MySQL database server binaries
  This package includes the server binaries but doesn't contain all the
  infrastructure needed to setup system databases.
 
-Package: mysql-server-5.6
+Package: mysql-wsrep-server-5.6
 Architecture: any
 Recommends: libhtml-template-perl, mysql-common-5.6
 Suggests: mailx, tinyca
@@ -171,15 +171,15 @@ Depends:
  libdbi-perl,
  lsb-base (>= 3.0-10),
  mysql-client-5.6 (>= ${binary:Version}),
- mysql-server-core-5.6 (= ${binary:Version}),
+ mysql-wsrep-server-core-5.6 (= ${binary:Version}),
  passwd,
  perl (>= 5.6),
  psmisc,
  ${misc:Depends},
  ${shlibs:Depends}
 Provides: virtual-mysql-server
-Breaks: mysql-server-5.5, virtual-mysql-server
-Replaces: mysql-server-5.5, virtual-mysql-server
+Breaks: mysql-server-5.6, virtual-mysql-server
+Replaces: mysql-server-5.6, virtual-mysql-server
 Description: MySQL database server binaries and system database setup
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -189,12 +189,12 @@ Description: MySQL database server binaries and system database setup
  This package contains all the infrastructure needed to setup system
  databases.
 
-Package: mysql-server
+Package: mysql-wsrep-server
 Architecture: all
-Depends: mysql-server-5.6, ${misc:Depends}
+Depends: mysql-wsrep-server-5.6, ${misc:Depends}
 Description: MySQL database server (metapackage depending on the latest version)
  This is an empty package that depends on the current "best" version of
- mysql-server (currently mysql-server-5.6), as determined by the MySQL
+ mysql-wsrep-server (currently mysql-wsrep-server-5.6), as determined by the MySQL
  maintainers. Install this package if in doubt about which MySQL
  version you need. That will install the version recommended by the
  package maintainers.
@@ -227,7 +227,7 @@ Package: mysql-testsuite-5.6
 Architecture: any
 Depends:
  mysql-client-5.6 (= ${binary:Version}),
- mysql-server-5.6 (= ${binary:Version}),
+ mysql-wsrep-server-5.6 (= ${binary:Version}),
  python,
  ${misc:Depends},
  ${shlibs:Depends}
@@ -241,16 +241,3 @@ Description: MySQL 5.6 testsuite
  ease of use.
  .
  This package includes the MySQL testsuite.
-
-Package: mysql-source-5.6
-Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: MySQL source
- MySQL is a fast, stable, and true multi-user, multi-threaded SQL database
- server.  SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the MySQL source code as configured before building
- - but after the arch specific configuration. This is currently required for
- building plugins.

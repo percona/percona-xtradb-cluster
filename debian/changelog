@@ -1,3 +1,9 @@
+mysql-wsrep-5.6 (5.6.20-1~exp1) UNRELEASED; urgency=low
+
+  * Initial wsrep version
+
+-- Otto Kekäläinen <otto@seravo.fi>  Fri, 21 Nov 2014 17:00:11 +0200
+
 mysql-5.6 (5.6.20-1~exp1) UNRELEASED; urgency=low
 
   [ Norvald H. Ryeng ]
