@@ -1,0 +1,12 @@
+Author: Clint Byrum <clint@ubuntu.com>
+Subject: Convenient place to disable tests that are currently failing
+Forwarded: not-needed
+Last-Update: 2012-03-07
+Reviewed-by: Nicholas Bamber <nicholas@periapt.co.uk>
+--- a/mysql-test/t/disabled.def
++++ b/mysql-test/t/disabled.def
+@@ -17,3 +17,4 @@ log_tables-big           : Bug#11756699
+ ds_mrr-big @solaris      : Bug#14168107 2012-04-03 Hemant disabled new test added by Olav Sandstå,since this leads to timeout on Solaris on slow sparc servers
+ mysql_embedded_client_test	: Bug#13964673 2012-04-16 amitbha since most of the test cases are failing
+ mysql_client_test_embedded : Bug#16084066 2013-01-08 Disabled since this test is failing
++file_contents            : Fails without bzr revision id

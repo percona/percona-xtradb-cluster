@@ -1,0 +1,8 @@
+fix-man-page-links.patch
+hurd.patch
+scripts__mysqld_safe.sh__signals.patch
+disable_tests.patch
+fix_standalone_tests.patch
+kfreebsd_tests.patch
+spelling.patch
+fix-mysqlhotcopy-test-failure.patch

@@ -1,0 +1,13 @@
+#
+# The MySQL 5.6 database server configuration file.
+#
+# This custom MySQL 5.6 specific configuration file
+# adds on top of the existing default my.cnf file at
+# - /etc/mysql/my.cnf.
+# 
+# Please add any extra MySQL 5.6 options in this file
+# for sake of clarity.
+#
+# You may uncomment any existing option to enable it
+#
+# sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
