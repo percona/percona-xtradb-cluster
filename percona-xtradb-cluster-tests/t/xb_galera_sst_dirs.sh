@@ -42,11 +42,13 @@ data1="/tmp/var-test/data1"
 log1="/tmp/var-test/log1"
 data2="/tmp/var-test/data2"
 log2="/tmp/var-test/log2"
+undo1="/tmp/var-test/undo1"
+undo2="/tmp/var-test/undo2"
 
 vlog "Initial cleanup"
-rm -rf $data1 $log1 $data2 $log2
+rm -rf $data1 $log1 $data2 $log2 $undo1 $undo2
 
-mkdir -p $data1 $log1 $data2 $log2
+mkdir -p $data1 $log1 $data2 $log2 $undo1 $undo2
 
 vlog "Starting server $node1"
 MYSQLD_EXTRA_MY_CNF_OPTS="!include $EXTRAFILE1"
@@ -95,7 +97,7 @@ stop_server_with_id $node2
 stop_server_with_id $node1
 
 vlog "Cleanup"
-rm -rf $data1 $log1 $data2 $log2
+rm -rf $data1 $log1 $data2 $log2 $undo1 $undo2
 
 free_reserved_port ${listen_addr1}
 free_reserved_port ${listen_addr2}

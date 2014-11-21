@@ -49,6 +49,7 @@ cpat=""
 speciald=0
 ib_home_dir=""
 ib_log_dir=""
+ib_undo_dir=""
 
 sfmt="tar"
 strmcmd=""
@@ -714,7 +715,8 @@ then
     if [[ $speciald -eq 1 ]];then 
         ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
         ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
-        if [[ -z $ib_home_dir && -z $ib_log_dir ]];then 
+        ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
+        if [[ -z $ib_home_dir && -z $ib_log_dir && -z $ib_undo_dir ]];then 
             speciald=0
         fi
     fi
@@ -796,7 +798,7 @@ then
         if [[ $incremental -ne 1 ]];then 
             if [[ $speciald -eq 1 ]];then 
                 wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
-                find $ib_home_dir $ib_log_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+                find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
             else 
                 wsrep_log_info "Cleaning the existing datadir"
                 find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+

@@ -1,0 +1,22 @@
+# compress+compact+xbstream+nc+encrypt1+threads
+
+[mysqld]
+innodb_data_home_dir=/tmp/var-test/data1
+innodb_log_group_home_dir=/tmp/var-test/log1
+innodb_undo_directory=/tmp/var-test/undo1
+
+[xtrabackup]
+compress
+parallel=4
+compress-threads=4
+encrypt-threads=4
+encrypt=AES256
+encrypt-key=6F3AD9F428143F133FD7D50D77D91EA4
+encrypt-chunk-size=16777216
+
+
+[sst]
+compressor="gzip"
+streamfmt=xbstream
+encrypt=1
+inno-backup-opts=" --kill-long-query-type=select  --parallel=8  --rebuild-threads=4 "
