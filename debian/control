@@ -44,18 +44,6 @@ Description: MySQL database client library
  .
  This package includes the client library.
 
-Package: libmysqld-pic
-Architecture: any
-Section: libdevel
-Depends: libmysqlclient-dev (>= ${source:Version}), ${misc:Depends}
-Description: PIC version of MySQL embedded server development files
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the -fPIC version of the embedded server library.
-
 Package: libmysqld-dev
 Architecture: any
 Section: libdevel
