@@ -89,6 +89,7 @@ configure-stamp configure-pic-stamp:
 		$(FORCE_FPIC) \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DWITH_WSREP=1 \
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_EDITLINE=system \
