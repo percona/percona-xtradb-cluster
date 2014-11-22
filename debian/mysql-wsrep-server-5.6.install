@@ -18,7 +18,6 @@ usr/bin/mysqld_multi
 usr/bin/mysqld_safe
 usr/bin/mysqlhotcopy
 usr/bin/mysqltest
-usr/bin/mysqltest_embedded
 usr/bin/perror
 usr/bin/replace
 usr/bin/resolve_stack_dump
