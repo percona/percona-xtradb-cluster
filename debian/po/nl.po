@@ -7,8 +7,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: mysql-5.6 5.6.6-1\n"
-"Report-Msgid-Bugs-To: mysql-5.6@packages.debian.org\n"
-"POT-Creation-Date: 2011-11-08 11:42-0800\n"
+"Report-Msgid-Bugs-To: mysql-wsrep-5.6@packages.debian.org\n"
+"POT-Creation-Date: 2014-11-23 01:05+0200\n"
 "PO-Revision-Date: 2012-05-23 10:26+0200\n"
 "Last-Translator: Jeroen Schot <schot@a-eskwadraat.nl>\n"
 "Language-Team: Debian l10n Dutch <debian-l10n-dutch@lists.debian.org>\n"
@@ -19,20 +19,20 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:2001
+#: ../mysql-wsrep-server-5.6.templates:2001
 msgid "Really proceed with downgrade?"
 msgstr "Wilt u echt een oude versie herstellen?"
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:2001
+#: ../mysql-wsrep-server-5.6.templates:2001
 msgid "A file named /var/lib/mysql/debian-*.flag exists on this system."
 msgstr ""
 "Er bestaat een bestand genaamd /var/lib/mysql/debian-*.flag op dit systeem."
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:2001
+#: ../mysql-wsrep-server-5.6.templates:2001
 msgid ""
 "Such a file is an indication that a mysql-server package with a higher "
 "version has been installed previously."
@@ -42,7 +42,7 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:2001
+#: ../mysql-wsrep-server-5.6.templates:2001
 msgid ""
 "There is no guarantee that the version you're currently installing will be "
 "able to use the current databases."
@@ -52,13 +52,13 @@ msgstr ""
 
 #. Type: note
 #. Description
-#: ../mysql-server-5.6.templates:3001
+#: ../mysql-wsrep-server-5.6.templates:3001
 msgid "Important note for NIS/YP users"
 msgstr "Belangrijke opmerking voor gebruikers van NIS/YP"
 
 #. Type: note
 #. Description
-#: ../mysql-server-5.6.templates:3001
+#: ../mysql-wsrep-server-5.6.templates:3001
 msgid ""
 "Using MySQL under NIS/YP requires a mysql user account to be added on the "
 "local system with:"
@@ -68,7 +68,7 @@ msgstr ""
 
 #. Type: note
 #. Description
-#: ../mysql-server-5.6.templates:3001
+#: ../mysql-wsrep-server-5.6.templates:3001
 msgid ""
 "You should also check the permissions and ownership of the /var/lib/mysql "
 "directory:"
@@ -78,13 +78,13 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:4001
+#: ../mysql-wsrep-server-5.6.templates:4001
 msgid "Remove all MySQL databases?"
 msgstr "Wilt u alle MySQL-databases verwijderen?"
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:4001
+#: ../mysql-wsrep-server-5.6.templates:4001
 msgid ""
 "The /var/lib/mysql directory which contains the MySQL databases is about to "
 "be removed."
@@ -94,7 +94,7 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:4001
+#: ../mysql-wsrep-server-5.6.templates:4001
 msgid ""
 "If you're removing the MySQL package in order to later install a more recent "
 "version or if a different mysql-server package is already using it, the data "
@@ -106,13 +106,13 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:5001
+#: ../mysql-wsrep-server-5.6.templates:5001
 msgid "Start the MySQL server on boot?"
 msgstr "Moet MySQL starten als de computer start?"
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.6.templates:5001
+#: ../mysql-wsrep-server-5.6.templates:5001
 msgid ""
 "The MySQL server can be launched automatically at boot time or manually with "
 "the '/etc/init.d/mysql start' command."
@@ -122,13 +122,13 @@ msgstr ""
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.6.templates:6001
+#: ../mysql-wsrep-server-5.6.templates:6001
 msgid "New password for the MySQL \"root\" user:"
 msgstr "Nieuw wachtwoord voor de MySQL \"root\"-gebruiker:"
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.6.templates:6001
+#: ../mysql-wsrep-server-5.6.templates:6001
 msgid ""
 "While not mandatory, it is highly recommended that you set a password for "
 "the MySQL administrative \"root\" user."
@@ -138,26 +138,26 @@ msgstr ""
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.6.templates:6001
+#: ../mysql-wsrep-server-5.6.templates:6001
 msgid "If this field is left blank, the password will not be changed."
 msgstr ""
 "Als dit veld leeg wordt gelaten, zal het wachtwoord niet worden veranderd."
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.6.templates:7001
+#: ../mysql-wsrep-server-5.6.templates:7001
 msgid "Repeat password for the MySQL \"root\" user:"
 msgstr "Herhaal het wachtwoord voor de MySQL \"root\"-gebruiker:"
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:8001
+#: ../mysql-wsrep-server-5.6.templates:8001
 msgid "Unable to set password for the MySQL \"root\" user"
 msgstr "Kan het wachtwoord voor de MySQL \"root\"-gebruiker niet instellen"
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:8001
+#: ../mysql-wsrep-server-5.6.templates:8001
 msgid ""
 "An error occurred while setting the password for the MySQL administrative "
 "user. This may have happened because the account already has a password, or "
@@ -170,7 +170,7 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:8001
+#: ../mysql-wsrep-server-5.6.templates:8001
 msgid "You should check the account's password after the package installation."
 msgstr ""
 "U zou het wachtwoord van het account moeten controleren nadat het pakket is "
@@ -178,7 +178,7 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:8001
+#: ../mysql-wsrep-server-5.6.templates:8001
 msgid ""
 "Please read the /usr/share/doc/mysql-server-5.6/README.Debian file for more "
 "information."
@@ -188,13 +188,13 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:9001
+#: ../mysql-wsrep-server-5.6.templates:9001
 msgid "Password input error"
 msgstr "Fout bij invoer wachtwoord"
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:9001
+#: ../mysql-wsrep-server-5.6.templates:9001
 msgid "The two passwords you entered were not the same. Please try again."
 msgstr ""
 "De twee wachtwoorden die u hebt ingevoerd zijn niet gelijk. Probeert u het "
@@ -202,13 +202,13 @@ msgstr ""
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:10001
+#: ../mysql-wsrep-server-5.6.templates:10001
 msgid "NDB Cluster seems to be in use"
 msgstr "De NDB-cluster lijkt in gebruik te zijn"
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.6.templates:10001
+#: ../mysql-wsrep-server-5.6.templates:10001
 msgid ""
 "MySQL-5.6 no longer provides NDB Cluster support. Please migrate to the new "
 "mysql-cluster-server package and remove all lines starting with \"ndb\" from "
