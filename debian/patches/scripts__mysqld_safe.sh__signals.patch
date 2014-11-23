@@ -29,7 +29,7 @@ Reviewed-by: Nicholas Bamber <nicholas@periapt.co.uk>
        ;;
      *)
        echo "Internal program error (non-fatal):" \
-@@ -740,6 +737,13 @@ mysqld daemon not started"
+@@ -815,6 +815,13 @@ mysqld daemon not started"
  fi
  
  #
