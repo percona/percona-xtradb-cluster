@@ -14286,9 +14286,13 @@ ha_innobase::get_auto_increment(
 				    increment,
 				    wsrep_thd_thread_id(ha_thd()),
 				    current, autoinc);
-#else
+			if (!wsrep_on(ha_thd()))
+			{
+#endif /* WITH_WSREP */
 			current = autoinc - prebuilt->autoinc_increment;
-#endif
+#ifdef WITH_WSREP
+			}
+#endif /* WITH_WSREP */
 
 			current = innobase_next_autoinc(
 				current, 1, increment, 1, col_max_value);
