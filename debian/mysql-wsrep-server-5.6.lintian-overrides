@@ -1,0 +1,3 @@
+# These long lines reproduce actual output and to reformat them
+# would damage the integrity of the man page.
+# mysql-server-5.6: manpage-has-errors-from-man usr/share/man/man1/mysqlbinlog.1.gz 1405: warning [p 9, 7.5i, div `3tbd3,2', 0.8i]: can't break line

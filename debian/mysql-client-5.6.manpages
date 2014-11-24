@@ -1,0 +1,3 @@
+debian/additions/innotop/innotop.1
+debian/tmp/usr/share/man/man1/mysqlman.1
+debian/additions/mysqlreport.1

@@ -1,0 +1,232 @@
+Source: mysql-wsrep-5.6
+Section: database
+Priority: optional
+Maintainer: Debian MySQL Maintainers <pkg-mysql-maint@lists.alioth.debian.org>
+Uploaders:
+ Norbert Tretkowski <norbert@tretkowski.de>,
+ Clint Byrum <clint@ubuntu.com>,
+ James Page <jamespage@debian.org>
+Build-Depends:
+ bison,
+ chrpath,
+ cmake,
+ debhelper (>= 8.1.3~),
+ dh-apparmor,
+ dpkg-dev (>= 1.16.1~),
+ gawk,
+ libaio-dev[linux-any],
+ libedit-dev,
+ libncurses5-dev (>= 5.0-6),
+ libwrap0-dev (>= 7.6-8.3),
+ lsb-release,
+ perl,
+ po-debconf,
+ psmisc,
+ zlib1g-dev (>= 1:1.1.3-5)
+Standards-Version: 3.9.3
+Homepage: http://dev.mysql.com/
+Vcs-Git: git://git.debian.org/git/pkg-mysql/mysql-5.6.git
+Vcs-Browser: http://git.debian.org/?p=pkg-mysql/mysql-5.6.git
+XS-Testsuite: autopkgtest
+
+Package: libmysqlclient18
+Section: libs
+Architecture: any
+Depends: mysql-common (>= 5.5), ${misc:Depends}, ${shlibs:Depends}
+Pre-Depends: multiarch-support, ${misc:Pre-Depends}
+Recommends: mysql-common-5.6
+Multi-Arch: same
+Description: MySQL database client library
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the client library.
+
+Package: libmysqld-dev
+Architecture: any
+Section: libdevel
+Depends: libmysqlclient-dev (>= ${source:Version}), ${misc:Depends}
+Description: MySQL embedded database development files
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the embedded server library and header files.
+
+Package: libmysqlclient-dev
+Architecture: any
+Section: libdevel
+Depends:
+ libmysqlclient18 (= ${binary:Version}),
+ zlib1g-dev,
+ ${misc:Depends},
+ ${shlibs:Depends}
+Description: MySQL database development files
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes development libraries and header files.
+
+Package: mysql-common
+Architecture: all
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Multi-Arch: foreign
+Description: MySQL database common files, e.g. /etc/mysql/my.cnf
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes files needed by all versions of the client library,
+ e.g. /etc/mysql/my.cnf.
+
+Package: mysql-common-5.6
+Architecture: all
+Depends: mysql-common, ${misc:Depends}, ${shlibs:Depends}
+Multi-Arch: foreign
+Description: MySQL 5.6 specific common files, e.g. /etc/mysql/conf.d/my-5.6.cnf
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+
+Package: mysql-client-core-5.6
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Provides: virtual-mysql-client-core
+Breaks: mysql-client-5.5, mysql-client-core-5.5, virtual-mysql-client-core
+Replaces: mysql-client-5.5, mysql-client-core-5.5, virtual-mysql-client-core
+Description: MySQL database core client binaries
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the core client files, as used by Akonadi.
+
+Package: mysql-client-5.6
+Architecture: any
+Depends:
+ debianutils (>=1.6),
+ libdbd-mysql-perl (>= 1.2202),
+ libdbi-perl,
+ libterm-readkey-perl,
+ mysql-client-core-5.6,
+ mysql-common (>= 5.5),
+ ${misc:Depends},
+ ${perl:Depends},
+ ${shlibs:Depends}
+Recommends: mysql-common-5.6
+Provides: virtual-mysql-client
+Breaks: mysql-client-5.5, virtual-mysql-client
+Replaces: mysql-client-5.5, virtual-mysql-client
+Description: MySQL database client binaries
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the client binaries and the additional tools
+ innotop and mysqlreport.
+
+Package: mysql-wsrep-server-core-5.6
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Provides: virtual-mysql-server-core
+Breaks: mysql-server-core-5.6, virtual-mysql-server-core
+Replaces: mysql-server-core-5.6, virtual-mysql-server-core
+Description: MySQL database wsrep server binaries
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the server binaries but doesn't contain all the
+ infrastructure needed to setup system databases.
+
+Package: mysql-wsrep-server-5.6
+Architecture: any
+Recommends: libhtml-template-perl, mysql-common-5.6
+Suggests: mailx, tinyca
+Pre-Depends: adduser (>= 3.40), debconf, mysql-common (>= 5.5)
+Depends:
+ initscripts,
+ galera,
+ libdbi-perl,
+ lsb-base (>= 3.0-10),
+ mysql-client-5.6 (>= ${binary:Version}),
+ mysql-wsrep-server-core-5.6 (= ${binary:Version}),
+ passwd,
+ perl (>= 5.6),
+ psmisc,
+ ${misc:Depends},
+ ${shlibs:Depends}
+Provides: virtual-mysql-server
+Breaks: mysql-server-5.6, virtual-mysql-server
+Replaces: mysql-server-5.6, virtual-mysql-server
+Description: MySQL database wsrep server binaries and system database setup
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package contains all the infrastructure needed to setup system
+ databases.
+
+Package: mysql-wsrep-server
+Architecture: all
+Depends: mysql-wsrep-server-5.6, ${misc:Depends}
+Description: MySQL database wsrep server (metapackage depending on the latest version)
+ This is an empty package that depends on the current "best" version of
+ mysql-wsrep-server (currently mysql-wsrep-server-5.6), as determined by the MySQL
+ maintainers. Install this package if in doubt about which MySQL
+ version you need. That will install the version recommended by the
+ package maintainers.
+ .
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+
+Package: mysql-client
+Architecture: all
+Depends: mysql-client-5.6, ${misc:Depends}
+Description: MySQL database client (metapackage depending on the latest version)
+ This is an empty package that depends on the current "best" version of
+ mysql-client (currently mysql-client-5.6), as determined by the MySQL
+ maintainers.  Install this package if in doubt about which MySQL version
+ you want, as this is the one considered to be in the best shape by the
+ Maintainers.
+
+Package: mysql-testsuite
+Architecture: all
+Depends: mysql-testsuite-5.6, ${misc:Depends}
+Description: MySQL testsuite
+ This is an empty package that depends on the current "best" version of
+ mysql-testsuite (currently mysql-testsuite-5.6), as determined by the
+ MySQL maintainers.  Install this package if in doubt about which MySQL
+ version you want, as this is the one we consider to be in the best shape.
+
+Package: mysql-testsuite-5.6
+Architecture: any
+Depends:
+ mysql-client-5.6 (= ${binary:Version}),
+ mysql-wsrep-server-5.6 (= ${binary:Version}),
+ python,
+ ${misc:Depends},
+ ${shlibs:Depends}
+Provides: virtual-mysql-testsuite
+Breaks: mysql-testsuite-5.5, virtual-mysql-testsuite
+Replaces: mysql-testsuite-5.5, virtual-mysql-testsuite
+Description: MySQL 5.6 testsuite
+ MySQL is a fast, stable, and true multi-user, multi-threaded SQL database
+ server.  SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the MySQL testsuite.

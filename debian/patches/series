@@ -1,0 +1,5 @@
+hurd.patch
+scripts__mysqld_safe.sh__signals.patch
+fix_standalone_tests.patch
+kfreebsd_tests.patch
+fix-mysqlhotcopy-test-failure.patch

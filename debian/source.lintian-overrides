@@ -1,0 +1,7 @@
+# The mysql-server-5.6.postrm script handles 
+# what debhelper normally would.
+# This is apparently related to #526464.
+maintainer-script-lacks-debhelper-token debian/mysql-server-5.6.postrm
+# Probably best to keep the debhelper version low in
+# case someone needs to backport
+package-needs-versioned-debhelper-build-depends 9

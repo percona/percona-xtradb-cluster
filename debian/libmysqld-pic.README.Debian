@@ -1,0 +1,5 @@
+This package was requested in http://bugs.debian.org/508406 because it
+is needed by programs want to include the embedded MySQL into their
+shared libraries.
+
+In order to get the full compile flags, use /bin/mysql_config_pic

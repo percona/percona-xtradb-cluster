@@ -1,0 +1,3 @@
+# this executable reprsent the embedded mysql server client
+usr/bin/mysql
+usr/bin/mysqlcheck
