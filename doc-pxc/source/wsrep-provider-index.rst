@@ -50,6 +50,17 @@ This variable sets the port on which the Galera listens for connections from oth
    :dyn: No
    :default: no
 
+.. variable:: evs.auto_evict
+  
+   :version: Introduced in :rn:`5.6.21-25.8`
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: 0
+
+Number of entries allowed on delayed list until auto eviction takes place. Setting value to 0 disables auto eviction protocol on the node, though node response times will still be monitored. For auto eviction to be enabled requires EVS protocol version (:variable:`evs.version`) ``1``. 
+
 .. variable:: evs.causal_keepalive_period
 
    :cli: Yes
@@ -69,6 +80,38 @@ This variable is used for development purposes and shouldn't be used by regular 
    :default: 0x1
 
 This variable is used for EVS (Extended Virtual Synchrony) debugging it can be used only when :variable:`wsrep_debug` is set to ``ON``.
+
+.. variable:: evs.delay_margin
+
+   :version: Introduced in :rn:`5.6.21-25.8`
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: PT1S
+
+Time period that a node can delay its response from expected until it is added to delayed list. The value must be higher than the highest RTT between nodes.
+
+.. variable:: evs.delayed_keep_period
+
+   :version: Introduced in :rn:`5.6.21-25.8`
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: PT30S
+
+Time period that node is required to remain responsive until one entry is removed from delayed list.
+
+.. variable:: evs.evict
+
+   :version: Introduced in :rn:`5.6.21-25.8`
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+
+Manual eviction can be triggered by setting the :variable:`evs.evict` to a certain node value. Setting the :variable:`evs.evict` to an empty string will clear the evict list on the node where it was set.
 
 .. variable:: evs.inactive_check_period
 
@@ -197,6 +240,8 @@ This variable defines the maximum number of data packets in replication at a tim
    :scope: Global
    :dyn: No
    :default: 0
+
+This variable defines the EVS protocol version. Auto eviction is enabled when this variable is set to ``1``. Default 0 for backwards compatibility.
 
 .. variable:: evs.view_forget_timeout
 

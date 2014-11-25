@@ -76,6 +76,10 @@ Configuration file :file:`/etc/my.cnf` for the first node should look like: ::
 After this, first node can be started with the following command: ::
 
   [root@percona1 ~]# /etc/init.d/mysql bootstrap-pxc
+
+In case you're running this tutorial on *CentOS* 7 server, systemd bootstrap service should be used instead: ::
+
+  [root@percona1 ~]#  systemctl start mysql@bootstrap.service
  
 This command will start the cluster with initial :variable:`wsrep_cluster_address` set to ``gcomm://``. This way the cluster will be bootstrapped and in case the node or |MySQL| have to be restarted later, there would be no need to change the configuration file.
 

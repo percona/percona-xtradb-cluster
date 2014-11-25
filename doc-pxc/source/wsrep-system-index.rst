@@ -53,7 +53,7 @@ When this variable is enabled, primary keys will be generated automatically for 
    :cli: Yes
    :conf: Yes
    :scope: Global
-   :dyn: No
+   :dyn: Yes
 
 This minimally needs to be any single other cluster node's address that is alive and a member of the cluster. In practice, it is best (but not necessary) to provide a complete list of all possible cluster nodes.  This takes the form of: :: 
 

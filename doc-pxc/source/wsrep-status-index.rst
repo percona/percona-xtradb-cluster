@@ -26,11 +26,19 @@ Total size (in bytes) of writesets sent to other nodes.
 
 .. variable:: wsrep_repl_keys
 
+Total number of keys replicated.
+
 .. variable:: wsrep_repl_keys_bytes
+
+Total size (in bytes) of keys replicated.
 
 .. variable:: wsrep_repl_data_bytes
 
+Total size (in bytes) of data replicated.
+
 .. variable:: wsrep_repl_other_bytes
+
+Total size of other bits replicated.
 
 .. variable:: wsrep_received
   
@@ -73,6 +81,8 @@ Average length of the receive queue since the last status query. When this numbe
 This variable shows the lowest sequence number in gcache. This information can be helpful with determining IST and/or SST. If the value is 18446744073709551615, then it means there are no writesets in cached in gcache (usual for a single node).
 
 .. variable:: wsrep_flow_control_paused_ns
+
+The total time spent in a paused state measured in nanoseconds.
 
 .. variable:: wsrep_flow_control_paused
   
@@ -128,6 +138,8 @@ Description of the :variable:`wsrep_local_state` variable.
 
 .. variable:: wsrep_cert_index_size
   
+This variable shows the number of entries in the certification index.
+
 .. variable:: wsrep_causal_reads_
 
 Shows the number of writesets processed while the variable :variable:`wsrep_causal_reads` was set to ``ON``.
@@ -140,6 +152,18 @@ Shows the comma-separated list of incoming node addresses in the cluster.
 
 This status variable provides the information regarding the group communication replication latency. This latency is measured from the time point when a message is sent out to the time point when a message is received.
   
+.. variable:: wsrep_evs_delayed
+
+List of UUIDs of the evicted nodes.
+
+.. variable:: wsrep_evs_evict_list
+
+Comma separated list of nodes that are considered delayed. The node format is ``<uuid>:<address>:<count>`` where ``<count>`` is the number of entries on delayed list for that node.
+
+.. variable:: wsrep_evs_state
+
+Internal EVS protocol state.
+
 .. variable:: wsrep_cluster_conf_id
 
 Number of cluster membership changes happened.
@@ -160,6 +184,8 @@ Status of the cluster component. Possible values are:
   * ``Disconnected`` -
   
 .. variable:: wsrep_connected
+
+This variable shows if the node is connected to the cluster. If the value is OFF, the node has not yet connected to any of the cluster components. This may be due to misconfiguration. 
   
 .. variable:: wsrep_local_bf_aborts
   
