@@ -95,21 +95,7 @@ Description: MySQL 5.6 specific common files, e.g. /etc/mysql/conf.d/my-5.6.cnf
  language in the world. The main goals of MySQL are speed, robustness and
  ease of use.
 
-Package: mysql-client-core-5.6
-Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
-Provides: virtual-mysql-client-core
-Breaks: mysql-client-5.5, mysql-client-core-5.5, virtual-mysql-client-core
-Replaces: mysql-client-5.5, mysql-client-core-5.5, virtual-mysql-client-core
-Description: MySQL database core client binaries
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the core client files, as used by Akonadi.
-
-Package: mysql-client-5.6
+Package: mysql-wsrep-client-5.6
 Architecture: any
 Depends:
  debianutils (>=1.6),
@@ -121,7 +107,7 @@ Depends:
  ${misc:Depends},
  ${perl:Depends},
  ${shlibs:Depends}
-Recommends: mysql-common-5.6
+Recommends: mysql-wsrep-common-5.6
 Provides: virtual-mysql-client
 Breaks: mysql-client-5.5, virtual-mysql-client
 Replaces: mysql-client-5.5, virtual-mysql-client
@@ -133,21 +119,6 @@ Description: MySQL database client binaries
  .
  This package includes the client binaries and the additional tools
  innotop and mysqlreport.
-
-Package: mysql-wsrep-server-core-5.6
-Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
-Provides: virtual-mysql-server-core
-Breaks: mysql-server-core-5.6, virtual-mysql-server-core
-Replaces: mysql-server-core-5.6, virtual-mysql-server-core
-Description: MySQL database wsrep server binaries
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the server binaries but doesn't contain all the
- infrastructure needed to setup system databases.
 
 Package: mysql-wsrep-server-5.6
 Architecture: any
@@ -193,7 +164,7 @@ Description: MySQL database wsrep server (metapackage depending on the latest ve
  language in the world. The main goals of MySQL are speed, robustness and
  ease of use.
 
-Package: mysql-client
+Package: mysql-wsrep-client
 Architecture: all
 Depends: mysql-client-5.6, ${misc:Depends}
 Description: MySQL database client (metapackage depending on the latest version)

@@ -16,3 +16,6 @@ usr/bin/mysqldumpslow
 usr/bin/mysqlimport
 usr/bin/mysqlshow
 usr/bin/mysqlslap
+# this executable reprsent the embedded mysql server client
+usr/bin/mysql
+usr/bin/mysqlcheck
