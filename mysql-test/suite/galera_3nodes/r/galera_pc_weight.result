@@ -114,3 +114,5 @@ SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VAR
 VARIABLE_VALUE = 'Synced'
 1
 CALL mtr.add_suppression('WSREP: gcs_caused\\(\\) returned -1');
+CALL mtr.add_suppression('WSREP: user message in state LEAVING');
+CALL mtr.add_suppression('sending install message failed: Transport endpoint is not connected');
