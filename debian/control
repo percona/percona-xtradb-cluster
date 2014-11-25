@@ -72,7 +72,7 @@ Description: MySQL database development files
  .
  This package includes development libraries and header files.
 
-Package: mysql-common
+Package: mysql-wsrep-common
 Architecture: all
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
@@ -85,9 +85,9 @@ Description: MySQL database common files, e.g. /etc/mysql/my.cnf
  This package includes files needed by all versions of the client library,
  e.g. /etc/mysql/my.cnf.
 
-Package: mysql-common-5.6
+Package: mysql-wsrep-common-5.6
 Architecture: all
-Depends: mysql-common, ${misc:Depends}, ${shlibs:Depends}
+Depends: mysql-wsrep-common, ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
 Description: MySQL 5.6 specific common files, e.g. /etc/mysql/conf.d/my-5.6.cnf
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
@@ -102,8 +102,7 @@ Depends:
  libdbd-mysql-perl (>= 1.2202),
  libdbi-perl,
  libterm-readkey-perl,
- mysql-client-core-5.6,
- mysql-common (>= 5.5),
+ mysql-wsrep-common (>= 5.5),
  ${misc:Depends},
  ${perl:Depends},
  ${shlibs:Depends}
@@ -122,15 +121,15 @@ Description: MySQL database client binaries
 
 Package: mysql-wsrep-server-5.6
 Architecture: any
-Recommends: libhtml-template-perl, mysql-common-5.6
+Recommends: libhtml-template-perl, mysql-wsrep-common-5.6
 Suggests: mailx, tinyca
-Pre-Depends: adduser (>= 3.40), debconf, mysql-common (>= 5.5)
+Pre-Depends: adduser (>= 3.40), debconf, mysql-wsrep-common (>= 5.5)
 Depends:
  initscripts,
  galera,
  libdbi-perl,
  lsb-base (>= 3.0-10),
- mysql-client-5.6 (>= ${binary:Version}),
+ mysql-wsrep-client-5.6 (>= ${binary:Version}),
  mysql-wsrep-server-core-5.6 (= ${binary:Version}),
  passwd,
  perl (>= 5.6),
@@ -166,10 +165,10 @@ Description: MySQL database wsrep server (metapackage depending on the latest ve
 
 Package: mysql-wsrep-client
 Architecture: all
-Depends: mysql-client-5.6, ${misc:Depends}
+Depends: mysql-wsrep-client-5.6, ${misc:Depends}
 Description: MySQL database client (metapackage depending on the latest version)
  This is an empty package that depends on the current "best" version of
- mysql-client (currently mysql-client-5.6), as determined by the MySQL
+ mysql-wsrep-client (currently mysql-wsrep-client-5.6), as determined by the MySQL
  maintainers.  Install this package if in doubt about which MySQL version
  you want, as this is the one considered to be in the best shape by the
  Maintainers.
@@ -186,7 +185,7 @@ Description: MySQL testsuite
 Package: mysql-testsuite-5.6
 Architecture: any
 Depends:
- mysql-client-5.6 (= ${binary:Version}),
+ mysql-wsrep-client-5.6 (= ${binary:Version}),
  mysql-wsrep-server-5.6 (= ${binary:Version}),
  python,
  ${misc:Depends},
