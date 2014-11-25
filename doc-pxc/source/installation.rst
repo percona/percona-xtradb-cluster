@@ -9,7 +9,7 @@
 
 Ready-to-use binaries are available from the *Percona XtraDB Cluster* `download page <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/>`_, including:
 
- * ``RPM`` packages for *RHEL* 5 and *RHEL* 6
+ * ``RPM`` packages for *RHEL* 5, *RHEL* 6, and *RHEL* 7
 
  * *Debian* packages
 

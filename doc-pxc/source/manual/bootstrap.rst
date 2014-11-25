@@ -32,6 +32,12 @@ In case cluster that's being bootstrapped has already been set up before, and to
  
   /etc/init.d/mysql bootstrap-pxc
 
+.. note:: 
+
+   On CentOS/RHEL 7 following bootstrap command should be used: :: 
+
+    systemctl start mysql@bootstrap.service
+
 This way values in :file:`my.cnf` would remain unchanged. Next time node is restarted it won't require updating the configuration file. This can be useful in case cluster has been previously set up and for some reason all nodes went down and the cluster needs to be bootstrapped again. 
 
 Other Reading
