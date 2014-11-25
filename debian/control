@@ -130,7 +130,6 @@ Depends:
  libdbi-perl,
  lsb-base (>= 3.0-10),
  mysql-wsrep-client-5.6 (>= ${binary:Version}),
- mysql-wsrep-server-core-5.6 (= ${binary:Version}),
  passwd,
  perl (>= 5.6),
  psmisc,
