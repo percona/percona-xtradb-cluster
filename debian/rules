@@ -70,7 +70,7 @@ override_dh_auto_clean:
 
 override_dh_prep: 
 
-override_dh_auto_configure: configure-stamp configure-pic-stamp
+override_dh_auto_configure: configure-stamp
 
 configure-pic-stamp: FORCE_FPIC_CFLAGS=-fPIC
 configure-pic-stamp: FORCE_FPIC=-DWITH_PIC=On

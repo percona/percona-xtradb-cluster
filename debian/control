@@ -29,12 +29,13 @@ Vcs-Git: git://git.debian.org/git/pkg-mysql/mysql-5.6.git
 Vcs-Browser: http://git.debian.org/?p=pkg-mysql/mysql-5.6.git
 XS-Testsuite: autopkgtest
 
-Package: libmysqlclient18
+Package: mysql-wsrep-libmysqlclient18
 Section: libs
 Architecture: any
-Depends: mysql-common (>= 5.5), ${misc:Depends}, ${shlibs:Depends}
+Depends: mysql-wsrep-common (>= 5.5), ${misc:Depends}, ${shlibs:Depends}
 Pre-Depends: multiarch-support, ${misc:Pre-Depends}
-Recommends: mysql-common-5.6
+Provides: libmysqlclient18
+Recommends: mysql-wsrep-common-5.6
 Multi-Arch: same
 Description: MySQL database client library
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
@@ -44,23 +45,11 @@ Description: MySQL database client library
  .
  This package includes the client library.
 
-Package: libmysqld-dev
-Architecture: any
-Section: libdevel
-Depends: libmysqlclient-dev (>= ${source:Version}), ${misc:Depends}
-Description: MySQL embedded database development files
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the embedded server library and header files.
-
-Package: libmysqlclient-dev
+Package: mysql-wsrep-libmysqlclient-dev
 Architecture: any
 Section: libdevel
 Depends:
- libmysqlclient18 (= ${binary:Version}),
+ mysql-wsrep-libmysqlclient18 (= ${binary:Version}),
  zlib1g-dev,
  ${misc:Depends},
  ${shlibs:Depends}
@@ -102,6 +91,7 @@ Depends:
  libdbd-mysql-perl (>= 1.2202),
  libdbi-perl,
  libterm-readkey-perl,
+ mysql-wsrep-libmysqlclient18,
  mysql-wsrep-common (>= 5.5),
  ${misc:Depends},
  ${perl:Depends},
