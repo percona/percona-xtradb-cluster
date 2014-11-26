@@ -34,6 +34,7 @@ Section: libs
 Architecture: any
 Depends: mysql-wsrep-common (>= 5.5), ${misc:Depends}, ${shlibs:Depends}
 Pre-Depends: multiarch-support, ${misc:Pre-Depends}
+Replaces: libmysqlclient18
 Provides: libmysqlclient18
 Recommends: mysql-wsrep-common-5.6
 Multi-Arch: same
@@ -65,6 +66,8 @@ Package: mysql-wsrep-common
 Architecture: all
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
+Provides: mysql-common
+Replaces: mysql-common
 Description: MySQL database common files, e.g. /etc/mysql/my.cnf
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -78,6 +81,8 @@ Package: mysql-wsrep-common-5.6
 Architecture: all
 Depends: mysql-wsrep-common, ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
+Provides: mysql-common-5.6
+Replaces: mysql-common-5.6
 Description: MySQL 5.6 specific common files, e.g. /etc/mysql/conf.d/my-5.6.cnf
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
