@@ -158,6 +158,7 @@ auto_install-stamp:
         # not handled by dh_fixperms.
 	mkdir -p $(TMP)/etc/mysql/conf.d/
 	touch $(TMP)/etc/mysql/conf.d/.keepme
+	install -D -m 0755 support-files/mysql.server $(TMP)/etc/init.d/mysql
 	install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
 	install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
 	install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
