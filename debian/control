@@ -167,7 +167,7 @@ Description: MySQL database client (metapackage depending on the latest version)
  you want, as this is the one considered to be in the best shape by the
  Maintainers.
 
-Package: mysql-testsuite
+Package: mysql-wsrep-testsuite
 Architecture: all
 Depends: mysql-testsuite-5.6, ${misc:Depends}
 Description: MySQL testsuite
@@ -176,7 +176,7 @@ Description: MySQL testsuite
  MySQL maintainers.  Install this package if in doubt about which MySQL
  version you want, as this is the one we consider to be in the best shape.
 
-Package: mysql-testsuite-5.6
+Package: mysql-wsrep-testsuite-5.6
 Architecture: any
 Depends:
  mysql-wsrep-client-5.6 (= ${binary:Version}),
