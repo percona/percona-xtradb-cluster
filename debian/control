@@ -46,6 +46,13 @@ Description: MySQL database client library
  .
  This package includes the client library.
 
+Package: mysql-wsrep-libmysqlclient18-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: mysql-wsrep-libmysqlclient18 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL database client library debugging symbols.
+
 Package: mysql-wsrep-libmysqlclient-dev
 Architecture: any
 Section: libdevel
@@ -114,6 +121,14 @@ Description: MySQL database client binaries
  This package includes the client binaries and the additional tools
  innotop and mysqlreport.
 
+Package: mysql-wsrep-client-dbg-5.6
+Architecture: any
+Section: debug
+Priority: extra
+Depends: mysql-wsrep-client-5.6 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL database client binary debugging symbols.
+
+
 Package: mysql-wsrep-server-5.6
 Architecture: any
 Recommends: libhtml-template-perl, mysql-wsrep-common-5.6
@@ -141,6 +156,14 @@ Description: MySQL database wsrep server binaries and system database setup
  .
  This package contains all the infrastructure needed to setup system
  databases.
+
+Package: mysql-wsrep-server-dbg-5.6
+Architecture: any
+Section: debug
+Priority: extra
+Depends: mysql-wsrep-client-5.6 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL database wsrep server binary debugging symbols.
+
 
 Package: mysql-wsrep-server
 Architecture: all
