@@ -190,13 +190,22 @@ else
   esac
 fi
 
-if [[ $action == 'reload' || $action == 'stop' ]];then
+if [[ $action == 'reload' || $action == 'stop' || $action == 'stop-post' ]];then
     if [[ ! -s $pid_path ]];then 
         log_failure_msg "mysql pid file $pid_path empty or not readable"
-        [[ $action == 'stop' ]] && log_warning_msg "mysql may be already dead"
+        [[ $action == 'stop' ]] && log_failure_msg "mysql already dead"
+        if [[ $action == 'stop-post' ]];then 
+            log_warning_msg "mysql may be already dead"
+            exit
+        fi
         exit 2
     fi
     mysql_pid=$(cat $pid_path)
+    if [[ $action == 'stop-post' && -n ${mysql_pid:-} ]]  && ! kill -0 $mysql_pid;then 
+        log_warning_msg "mysql already dead"
+        log_failure_msg "Stale PID file: $pid_path"
+        exit 3
+    fi
 fi
 
 if [[ $action == 'start-post' ]];then 
