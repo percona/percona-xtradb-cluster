@@ -2,27 +2,25 @@ Source: mysql-wsrep-5.6
 Section: database
 Priority: optional
 Maintainer: Debian MySQL Maintainers <pkg-mysql-maint@lists.alioth.debian.org>
-Uploaders:
- Norbert Tretkowski <norbert@tretkowski.de>,
- Clint Byrum <clint@ubuntu.com>,
- James Page <jamespage@debian.org>
-Build-Depends:
- bison,
- chrpath,
- cmake,
- debhelper (>= 8.1.3~),
- dh-apparmor,
- dpkg-dev (>= 1.16.1~),
- gawk,
- libaio-dev[linux-any],
- libedit-dev,
- libncurses5-dev (>= 5.0-6),
- libwrap0-dev (>= 7.6-8.3),
- lsb-release,
- perl,
- po-debconf,
- psmisc,
- zlib1g-dev (>= 1:1.1.3-5)
+Uploaders: Norbert Tretkowski <norbert@tretkowski.de>,
+           Clint Byrum <clint@ubuntu.com>,
+           James Page <jamespage@debian.org>
+Build-Depends: bison,
+               chrpath,
+               cmake,
+               debhelper (>= 8.1.3~),
+               dh-apparmor,
+               dpkg-dev (>= 1.16.1~),
+               gawk,
+               libaio-dev[linux-any],
+               libedit-dev,
+               libncurses5-dev (>= 5.0-6),
+               libwrap0-dev (>= 7.6-8.3),
+               lsb-release,
+               perl,
+               po-debconf,
+               psmisc,
+               zlib1g-dev (>= 1:1.1.3-5)
 Standards-Version: 3.9.3
 Homepage: http://dev.mysql.com/
 Vcs-Git: git://git.debian.org/git/pkg-mysql/mysql-5.6.git
@@ -56,11 +54,10 @@ Description: MySQL database client library debugging symbols.
 Package: mysql-wsrep-libmysqlclient-dev
 Architecture: any
 Section: libdevel
-Depends:
- mysql-wsrep-libmysqlclient18 (= ${binary:Version}),
- zlib1g-dev,
- ${misc:Depends},
- ${shlibs:Depends}
+Depends: mysql-wsrep-libmysqlclient18 (= ${binary:Version}),
+         zlib1g-dev,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: MySQL database development files
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -98,16 +95,15 @@ Description: MySQL 5.6 specific common files, e.g. /etc/mysql/conf.d/my-5.6.cnf
 
 Package: mysql-wsrep-client-5.6
 Architecture: any
-Depends:
- debianutils (>=1.6),
- libdbd-mysql-perl (>= 1.2202),
- libdbi-perl,
- libterm-readkey-perl,
- mysql-wsrep-libmysqlclient18,
- mysql-wsrep-common (>= 5.5),
- ${misc:Depends},
- ${perl:Depends},
- ${shlibs:Depends}
+Depends: debianutils (>=1.6),
+         libdbd-mysql-perl (>= 1.2202),
+         libdbi-perl,
+         libterm-readkey-perl,
+         mysql-wsrep-common (>= 5.5),
+         mysql-wsrep-libmysqlclient18,
+         ${misc:Depends},
+         ${perl:Depends},
+         ${shlibs:Depends}
 Recommends: mysql-wsrep-common-5.6
 Provides: virtual-mysql-client
 Breaks: mysql-client-5.5, virtual-mysql-client
@@ -128,23 +124,21 @@ Priority: extra
 Depends: mysql-wsrep-client-5.6 (= ${binary:Version}), ${misc:Depends}
 Description: MySQL database client binary debugging symbols.
 
-
 Package: mysql-wsrep-server-5.6
 Architecture: any
 Recommends: libhtml-template-perl, mysql-wsrep-common-5.6
 Suggests: mailx, tinyca
 Pre-Depends: adduser (>= 3.40), debconf, mysql-wsrep-common (>= 5.5)
-Depends:
- initscripts,
- galera,
- libdbi-perl,
- lsb-base (>= 3.0-10),
- mysql-wsrep-client-5.6 (>= ${binary:Version}),
- passwd,
- perl (>= 5.6),
- psmisc,
- ${misc:Depends},
- ${shlibs:Depends}
+Depends: galera,
+         initscripts,
+         libdbi-perl,
+         lsb-base (>= 3.0-10),
+         mysql-wsrep-client-5.6 (>= ${binary:Version}),
+         passwd,
+         perl (>= 5.6),
+         psmisc,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Provides: virtual-mysql-server
 Breaks: mysql-server-5.6, virtual-mysql-server
 Replaces: mysql-server-5.6, virtual-mysql-server
@@ -163,7 +157,6 @@ Section: debug
 Priority: extra
 Depends: mysql-wsrep-client-5.6 (= ${binary:Version}), ${misc:Depends}
 Description: MySQL database wsrep server binary debugging symbols.
-
 
 Package: mysql-wsrep-server
 Architecture: all
@@ -201,12 +194,11 @@ Description: MySQL testsuite
 
 Package: mysql-wsrep-testsuite-5.6
 Architecture: any
-Depends:
- mysql-wsrep-client-5.6 (= ${binary:Version}),
- mysql-wsrep-server-5.6 (= ${binary:Version}),
- python,
- ${misc:Depends},
- ${shlibs:Depends}
+Depends: mysql-wsrep-client-5.6 (= ${binary:Version}),
+         mysql-wsrep-server-5.6 (= ${binary:Version}),
+         python,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Provides: virtual-mysql-testsuite
 Breaks: mysql-testsuite-5.5, virtual-mysql-testsuite
 Replaces: mysql-testsuite-5.5, virtual-mysql-testsuite

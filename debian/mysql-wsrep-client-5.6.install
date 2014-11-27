@@ -1,7 +1,9 @@
+# this executable reprsent the embedded mysql server client
 debian/additions/innotop/innotop usr/bin/
 debian/additions/mysqlreport usr/bin/
 usr/bin/innochecksum
 usr/bin/myisam_ftdump
+usr/bin/mysql
 usr/bin/mysql_client_test
 usr/bin/mysql_config_editor
 usr/bin/mysql_find_rows
@@ -11,11 +13,9 @@ usr/bin/mysql_waitpid
 usr/bin/mysqlaccess
 usr/bin/mysqladmin
 usr/bin/mysqlbug
+usr/bin/mysqlcheck
 usr/bin/mysqldump
 usr/bin/mysqldumpslow
 usr/bin/mysqlimport
 usr/bin/mysqlshow
 usr/bin/mysqlslap
-# this executable reprsent the embedded mysql server client
-usr/bin/mysql
-usr/bin/mysqlcheck
