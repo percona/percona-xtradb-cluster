@@ -292,7 +292,7 @@ When server is started with this variable it will parse Global Transaction ID fr
    :dyn: Yes
    :default: NONE
  
-This variable can be used to reject queries for that node. This can be useful if someone wants to manually run maintenance on the node like mysqldump without need to change the settings on the load balancer. Following values are supported: 
+This variable can be used to reject queries for that node. This can be useful during upgrades for keeping node up (with provider enabled) without accepting queries. Using read-only is recommended here unless you want to kill existing queries. Following values are supported: 
  
  - ``NONE`` - default - nothing is rejected. 
  - ``ALL`` - all queries are rejected with 'Error 1047: Unknown command'. 
