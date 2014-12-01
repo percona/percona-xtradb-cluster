@@ -1,4 +1,3 @@
-CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=13000;;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.

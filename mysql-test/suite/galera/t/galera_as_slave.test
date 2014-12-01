@@ -12,7 +12,9 @@
 --source include/galera_cluster.inc
 
 --connection node_2
+--disable_query_log
 --eval CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=$NODE_MYPORT_1;
+--enable_query_log
 START SLAVE USER='root';
 
 --connection node_1
