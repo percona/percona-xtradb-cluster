@@ -10,21 +10,21 @@ id INT PRIMARY KEY AUTO_INCREMENT,
 parent_id INT
 ) ENGINE=InnoDB;
 INSERT INTO parent VALUES (DEFAULT, 0);
-INSERT INTO child (parent_id) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;;
-INSERT INTO parent (f2) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;;
-INSERT INTO parent (f2) SELECT 2 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;;
+INSERT INTO child (parent_id) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;;
+INSERT INTO parent (f2) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;;
+INSERT INTO parent (f2) SELECT 2 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4;;
 ALTER TABLE child ADD FOREIGN KEY (parent_id) REFERENCES parent(id);;
-SELECT COUNT(*) = 200001 FROM parent;
-COUNT(*) = 200001
+SELECT COUNT(*) = 20001 FROM parent;
+COUNT(*) = 20001
 1
-SELECT COUNT(*) = 100000 FROM child;
-COUNT(*) = 100000
+SELECT COUNT(*) = 10000 FROM child;
+COUNT(*) = 10000
 1
-SELECT COUNT(*) = 200001 FROM parent;
-COUNT(*) = 200001
+SELECT COUNT(*) = 20001 FROM parent;
+COUNT(*) = 20001
 1
-SELECT COUNT(*) = 100000 FROM child;
-COUNT(*) = 100000
+SELECT COUNT(*) = 10000 FROM child;
+COUNT(*) = 10000
 1
 DROP TABLE child;
 DROP TABLE parent;
