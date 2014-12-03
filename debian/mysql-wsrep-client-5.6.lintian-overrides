@@ -1,0 +1,9 @@
+# Will look at man pages later 
+# 2012-03-08 periapt
+# still no update
+# 2012-01-09 jesusch-guest
+mysql-client-5.6: binary-without-manpage usr/bin/innochecksum
+# These long lines reproduce actual output and to reformat them
+# would damage the integrity of the man page.
+mysql-client-5.6: manpage-has-errors-from-man usr/share/man/man1/mysqladmin.1.gz 28: warning [p 1, 1.5i]: can't break line
+mysql-client-5.6: manpage-has-errors-from-man usr/share/man/man1/mysqldump.1.gz 2151: warning [p 12, 6.5i, div `3tbd2,1', 0.2i]: can't break line

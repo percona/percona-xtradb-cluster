@@ -1,0 +1,3 @@
+# I take this issue seriously but as per bug #590905
+# it will need playing with in experimental. - periapt
+libmysqlclient18: no-symbols-control-file usr/lib/i386-linux-gnu/libmysqlclient.so.18.1.0

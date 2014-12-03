@@ -1,0 +1,2 @@
+debian/additions/my.cnf etc/mysql/
+debian/tmp/etc/mysql/conf.d/.keepme etc/mysql/conf.d
