@@ -117,7 +117,7 @@ Description: MySQL database client binaries
  This package includes the client binaries and the additional tools
  innotop and mysqlreport.
 
-Package: mysql-wsrep-client-dbg-5.6
+Package: mysql-wsrep-client-5.6-dbg
 Architecture: any
 Section: debug
 Priority: extra
@@ -129,7 +129,7 @@ Architecture: any
 Recommends: libhtml-template-perl, mysql-wsrep-common-5.6
 Suggests: mailx, tinyca
 Pre-Depends: adduser (>= 3.40), debconf, mysql-wsrep-common (>= 5.5)
-Depends: galera,
+Depends: galera-3,
          initscripts,
          libdbi-perl,
          lsb-base (>= 3.0-10),
@@ -151,7 +151,7 @@ Description: MySQL database wsrep server binaries and system database setup
  This package contains all the infrastructure needed to setup system
  databases.
 
-Package: mysql-wsrep-server-dbg-5.6
+Package: mysql-wsrep-server-5.6-dbg
 Architecture: any
 Section: debug
 Priority: extra
