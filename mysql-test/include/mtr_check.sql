@@ -67,7 +67,9 @@ BEGIN
                                 'innodb_file_format_max',
                                 'gtid_executed', 'gtid_purged',
                                 'wsrep_start_position',
-                                'auto_increment_offset')
+                                'auto_increment_offset',
+                                'auto_increment_increment',
+                                'wsrep_data_home_dir')
     ORDER BY VARIABLE_NAME;
 
   -- Dump all databases, there should be none

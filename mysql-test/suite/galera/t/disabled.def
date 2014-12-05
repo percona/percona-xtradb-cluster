@@ -1,1 +1,2 @@
 galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+galera_kill_nochanges : mysql-wsrep#24 Galera server does not restart properly if killed
