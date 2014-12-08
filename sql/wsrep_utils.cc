@@ -25,7 +25,6 @@
 
 #include <sql_class.h>
 
-#include <spawn.h>    // posix_spawn()
 #include <unistd.h>   // pipe()
 #include <errno.h>    // errno
 #include <string.h>   // strerror()
@@ -33,6 +32,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>    // getaddrinfo()
+
+#ifdef HAVE_SYS_PRCTL_H
+#include <sys/prctl.h>
+#endif
 
 extern char** environ; // environment variables
 
@@ -89,13 +92,12 @@ namespace wsp
 #define STDIN_FD   0
 #define STDOUT_FD  1
 
-#ifndef POSIX_SPAWN_USEVFORK
-# define POSIX_SPAWN_USEVFORK 0
-#endif
-
 process::process (const char* cmd, const char* type)
-    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), err_(EINVAL), pid_(0)
+    : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), err_(0), pid_(0)
 {
+    int sig;
+    struct sigaction sa;
+
     if (0 == str_)
     {
         WSREP_ERROR ("Can't allocate command line of size: %zu", strlen(cmd));
@@ -128,105 +130,99 @@ process::process (const char* cmd, const char* type)
     int const child_end  (parent_end == PIPE_READ ? PIPE_WRITE : PIPE_READ);
     int const close_fd   (parent_end == PIPE_READ ? STDOUT_FD : STDIN_FD);
 
-    char* const pargv[4] = { strdup("sh"), strdup("-c"), strdup(str_), NULL };
-    if (!(pargv[0] && pargv[1] && pargv[2]))
+    pid_ = fork();
+
+    if (pid_ == -1)
     {
-        err_ = ENOMEM;
-        WSREP_ERROR ("Failed to allocate pargv[] array.");
-        goto cleanup_pipe;
+      err_= errno;
+      WSREP_ERROR ("fork() failed: %d (%s)", err_, strerror(err_));
+      pid_ = 0;
+      goto cleanup;
     }
-
-    posix_spawnattr_t attr;
-    err_ = posix_spawnattr_init (&attr);
-    if (err_)
+    else if (pid_ > 0)
     {
-        WSREP_ERROR ("posix_spawnattr_init() failed: %d (%s)",
-                     err_, strerror(err_));
-        goto cleanup_pipe;
-    }
+      /* Parent */
 
-    err_ = posix_spawnattr_setflags (&attr, POSIX_SPAWN_SETSIGDEF |
-                                            POSIX_SPAWN_USEVFORK);
-    if (err_)
-    {
-        WSREP_ERROR ("posix_spawnattr_setflags() failed: %d (%s)",
-                     err_, strerror(err_));
-        goto cleanup_attr;
-    }
+      io_ = fdopen (pipe_fds[parent_end], type);
 
-    posix_spawn_file_actions_t fact;
-    err_ = posix_spawn_file_actions_init (&fact);
-    if (err_)
-    {
-        WSREP_ERROR ("posix_spawn_file_actions_init() failed: %d (%s)",
-                     err_, strerror(err_));
-        goto cleanup_attr;
-    }
-
-    // close child's stdout|stdin depending on what we returning
-    err_ = posix_spawn_file_actions_addclose (&fact, close_fd);
-    if (err_)
-    {
-        WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)",
-                     err_, strerror(err_));
-        goto cleanup_fact;
-    }
-
-    // substitute our pipe descriptor in place of the closed one
-    err_ = posix_spawn_file_actions_adddup2 (&fact,
-                                             pipe_fds[child_end], close_fd);
-    if (err_)
-    {
-        WSREP_ERROR ("posix_spawn_file_actions_addup2() failed: %d (%s)",
-                     err_, strerror(err_));
-        goto cleanup_fact;
-    }
-
-    err_ = posix_spawnp (&pid_, pargv[0], &fact, &attr, pargv, environ);
-    if (err_)
-    {
-        WSREP_ERROR ("posix_spawnp(%s) failed: %d (%s)",
-                     pargv[2], err_, strerror(err_));
-        pid_ = 0; // just to make sure it was not messed up in the call
-        goto cleanup_fact;
-    }
-
-    io_ = fdopen (pipe_fds[parent_end], type);
-
-    if (io_)
-    {
+      if (io_)
+      {
         pipe_fds[parent_end] = -1; // skip close on cleanup
-    }
-    else
-    {
+      }
+      else
+      {
         err_ = errno;
         WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+      }
+
+      goto cleanup;
     }
 
-cleanup_fact:
-    int err; // to preserve err_ code
-    err = posix_spawn_file_actions_destroy (&fact);
-    if (err)
+    /* Child */
+
+#ifdef PR_SET_PDEATHSIG
+    /*
+      Ensure this process gets SIGTERM when the server is terminated for
+      whatever reasons.
+    */
+
+    if (prctl(PR_SET_PDEATHSIG, SIGTERM))
     {
-        WSREP_ERROR ("posix_spawn_file_actions_destroy() failed: %d (%s)\n",
-                     err, strerror(err));
+      sql_perror("prctl() failed");
+      _exit(EXIT_FAILURE);
     }
+#endif
 
-cleanup_attr:
-    err = posix_spawnattr_destroy (&attr);
-    if (err)
+    /* Reset all ignored signals to SIG_DFL */
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_DFL;
+
+    for (sig = 1; sig < NSIG; sig++)
     {
-        WSREP_ERROR ("posix_spawnattr_destroy() failed: %d (%s)",
-                     err, strerror(err));
+      /*
+        For some signals sigaction() even when SIG_DFL handler is set, so don't
+        check for return value here.
+      */
+      sigaction(sig, &sa, NULL);
     }
 
-cleanup_pipe:
+    /*
+      Make the child process a session/group leader. This is required to
+      simplify cleanup procedure for SST process, so that all processes spawned
+      by the SST script could be killed by killing the entire process group.
+    */
+
+    if (setsid() < 0)
+    {
+      sql_perror("setsid() failed");
+      _exit(EXIT_FAILURE);
+    }
+
+    /* close child's stdout|stdin depending on what we returning */
+
+    if (close(close_fd) < 0)
+    {
+      sql_perror("close() failed");
+      _exit(EXIT_FAILURE);
+    }
+
+    /* substitute our pipe descriptor in place of the closed one */
+
+    if (dup2(pipe_fds[child_end], close_fd) < 0)
+    {
+      sql_perror("dup2() failed");
+      _exit(EXIT_FAILURE);
+    }
+
+    execlp("sh", "sh", "-c", str_, NULL);
+
+    sql_perror("execlp() failed");
+    _exit(EXIT_FAILURE);
+
+cleanup:
     if (pipe_fds[0] >= 0) close (pipe_fds[0]);
     if (pipe_fds[1] >= 0) close (pipe_fds[1]);
-
-    free (pargv[0]);
-    free (pargv[1]);
-    free (pargv[2]);
 }
 
 process::~process ()
