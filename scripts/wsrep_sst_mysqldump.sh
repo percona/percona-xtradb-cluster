@@ -54,7 +54,8 @@ then
 fi
 
 # Check client version
-if ! $MYSQL_CLIENT --version | grep 'Distrib 5.6' >/dev/null
+CLIENT_MINOR=$(mysql --version | cut -d ' ' -f 6 | cut -d '.' -f 2)
+if [ $CLIENT_MINOR -lt "6" ]
 then
     $MYSQL_CLIENT --version >&2
     wsrep_log_error "this operation requires MySQL client version 5.6.x"
@@ -75,7 +76,7 @@ STOP_WSREP="SET wsrep_on=OFF;"
 MYSQLDUMP="$MYSQLDUMP $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --all-databases"
+--skip-comments --flush-privileges --all-databases --events"
 
 # mysqldump cannot restore CSV tables, fix this issue
 CSV_TABLES_FIX="
@@ -118,7 +119,7 @@ RESET_MASTER="RESET MASTER;"
 
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
-# commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
+    # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
     # error is ignored because joiner binlog might be disabled.
     # and if joiner binlog is disabled, 'RESET MASTER' returns error
     # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER
