@@ -38,6 +38,10 @@ Created 9/30/1995 Heikki Tuuri
 #include <sys/utsname.h>	/* uname() */
 #endif
 
+#if defined(WITH_WSREP) && defined(UNIV_LINUX)
+#include <sys/mman.h>		/* madvise() */
+#endif
+
 /* FreeBSD for example has only MAP_ANON, Linux has MAP_ANONYMOUS and
 MAP_ANON but MAP_ANON is marked as deprecated */
 #if defined(MAP_ANONYMOUS)
@@ -229,6 +233,16 @@ skip:
 		memset(ptr, '\0', size);
 	}
 
+#if defined(WITH_WSREP) && defined(UNIV_LINUX)
+	/* Do not make the pages from this block available to the child after a
+	fork(). This is required to speed up process spawning for Galera SST. */
+
+	if (madvise(ptr, size, MADV_DONTFORK)) {
+		fprintf(stderr, "InnoDB: Warning: madvise(MADV_DONTFORK) is "
+			"not supported by the kernel. Spawning SST processes "
+			"can be slow.\n");
+	}
+#endif
 	return(ptr);
 }
 
