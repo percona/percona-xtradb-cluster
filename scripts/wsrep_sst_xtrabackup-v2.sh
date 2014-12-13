@@ -378,6 +378,14 @@ cleanup_joiner()
     if [[ -n ${STATDIR:-} ]];then 
        [[ -d $STATDIR ]] && rm -rf $STATDIR
     fi
+
+    sleep 10
+
+    # Final cleanup 
+    pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
+    kill -TERM -$pgid || true
+
+    exit $estatus
 }
 
 check_pid()
@@ -418,6 +426,14 @@ cleanup_donor()
     if [[ -n $itmpdir ]];then 
        [[ -d $itmpdir ]] &&  rm -rf $itmpdir || true
     fi
+
+    sleep 10
+
+    # Final cleanup 
+    pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
+    kill -TERM -$pgid || true
+
+    exit $estatus
 }
 
 kill_xtrabackup()
