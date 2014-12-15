@@ -27,12 +27,14 @@
 #include <cstdlib>
 
 extern const char wsrep_defaults_file[];
+extern const char wsrep_defaults_group_suffix[];
 
 #define WSREP_SST_OPT_ROLE     "--role"
 #define WSREP_SST_OPT_ADDR     "--address"
 #define WSREP_SST_OPT_AUTH     "--auth"
 #define WSREP_SST_OPT_DATA     "--datadir"
 #define WSREP_SST_OPT_CONF     "--defaults-file"
+#define WSREP_SST_OPT_CONF_SUFFIX "--defaults-group-suffix"
 #define WSREP_SST_OPT_PARENT   "--parent"
 #define WSREP_SST_OPT_BINLOG   "--binlog"
 
@@ -459,10 +461,11 @@ static ssize_t sst_prepare_other (const char*  method,
                  WSREP_SST_OPT_AUTH" '%s' "
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX" '%s' "
                  WSREP_SST_OPT_PARENT" '%d'"
                  " %s '%s' ",
                  method, addr_in, (sst_auth_real) ? sst_auth_real : "",
-                 sst_dir, wsrep_defaults_file, (int)getpid(),
+                 sst_dir, wsrep_defaults_file, wsrep_defaults_group_suffix, (int)getpid(),
                  binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
@@ -759,10 +762,11 @@ static int sst_donate_mysqldump (const char*         addr,
               WSREP_SST_OPT_LPORT" '%u' "
               WSREP_SST_OPT_SOCKET" '%s' "
               WSREP_SST_OPT_CONF" '%s' "
+              WSREP_SST_OPT_CONF_SUFFIX" '%s' "
               WSREP_SST_OPT_GTID" '%s:%lld'"
               "%s",
               user, pswd, host, port, mysqld_port, mysqld_unix_port,
-              wsrep_defaults_file, uuid_str,
+              wsrep_defaults_file, wsrep_defaults_group_suffix, uuid_str,
               (long long)seqno, bypass ? " "WSREP_SST_OPT_BYPASS : "");
 
     WSREP_DEBUG("Running: '%s'", cmd_str);
@@ -1001,11 +1005,12 @@ static int sst_donate_other (const char*   method,
                  WSREP_SST_OPT_SOCKET" '%s' "
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX" '%s' "
                  " %s '%s' "
                  WSREP_SST_OPT_GTID" '%s:%lld'"
                  "%s",
                  method, addr, sst_auth_real, mysqld_unix_port,
-                 mysql_real_data_home, wsrep_defaults_file,
+                 mysql_real_data_home, wsrep_defaults_file, wsrep_defaults_group_suffix,
                  binlog_opt, binlog_opt_val,
                  uuid, (long long) seqno,
                  bypass ? " "WSREP_SST_OPT_BYPASS : "");
