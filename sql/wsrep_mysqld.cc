@@ -1418,7 +1418,7 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
 
 
   lex = thd->lex;
-  if (!wsrep_replicate_myisam && lex->create_info.db_type->db_type == DB_TYPE_MYISAM) 
+  if (!wsrep_replicate_myisam && lex->create_info.db_type && lex->create_info.db_type->db_type == DB_TYPE_MYISAM) 
   {
     if (db_) {
         WSREP_INFO("Cannot replicate MyISAM DDL for %s.%s with wsrep_replicate_myisam OFF", db_, table_);
