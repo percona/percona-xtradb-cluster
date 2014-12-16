@@ -114,7 +114,7 @@ static my_bool defaults_already_read= FALSE;
 /* The only purpose of this global array is to hold full name of my.cnf
  * which seems to be otherwise unavailable */
 char wsrep_defaults_file[FN_REFLEN + 10]={0,};
-char wsrep_defaults_group_suffix[FN_REFLEN]={0,};
+char wsrep_defaults_group_suffix[FN_EXTLEN]={0,};
 #endif /* WITH_WREP */
 /* Set to TRUE, if --no-defaults is found. */
 static my_bool found_no_defaults= FALSE;
