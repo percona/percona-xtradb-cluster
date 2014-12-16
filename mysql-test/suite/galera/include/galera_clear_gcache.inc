@@ -1,0 +1,3 @@
+--echo Clearing gcache ...
+SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
+
