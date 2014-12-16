@@ -240,6 +240,8 @@ my @mysqld_rules=
  { 'port' => \&fix_port },
  # galera base_port and port used during SST
  { '#galera_port' => \&fix_port },
+ # Galera uses base_port + 1 for IST, so we do not use it for things such as SST
+ { '#ist_port' => \&fix_port },
  { '#sst_port' => \&fix_port },
  { '#memcached_port' => \&fix_port },
  { 'socket' => \&fix_socket },
