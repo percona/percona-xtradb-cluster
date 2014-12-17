@@ -29,6 +29,8 @@ ekeyfile=""
 encrypt=0
 nproc=1
 ecode=0
+ssyslog=""
+ssystag=""
 XTRABACKUP_PID=""
 SST_PORT=""
 REMOTEIP=""
@@ -325,6 +327,8 @@ read_cnf()
     impts=$(parse_cnf sst inno-move-opts "")
     stimeout=$(parse_cnf sst sst-initial-timeout 100)
     ssyslog=$(parse_cnf sst sst-syslog 0)
+    ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
+    ssystag+="-"
 
     if [[ $ssyslog -ne -1 ]];then 
         if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld_safe | tr '_' '-' | grep -q -- "--syslog";then 
@@ -607,21 +611,21 @@ if [[ $ssyslog -eq 1 ]];then
 
         wsrep_log_info "Logging all stderr of SST/Innobackupex to syslog"
 
-        exec 2> >(logger -p daemon.err -t wsrep-sst-$WSREP_SST_OPT_ROLE)
+        exec 2> >(logger -p daemon.err -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE)
 
         wsrep_log_error()
         {
-            logger  -p daemon.err -t wsrep-sst-$WSREP_SST_OPT_ROLE "$@" 
+            logger  -p daemon.err -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE "$@" 
         }
 
         wsrep_log_info()
         {
-            logger  -p daemon.info -t wsrep-sst-$WSREP_SST_OPT_ROLE "$@" 
+            logger  -p daemon.info -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE "$@" 
         }
 
-        INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} 2>&1  | logger -p daemon.err -t innobackupex-apply "
-        INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} 2>&1 | logger -p daemon.err -t innobackupex-move "
-        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2> >(logger -p daemon.err -t innobackupex-backup)"
+        INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} 2>&1  | logger -p daemon.err -t ${ssystag}innobackupex-apply "
+        INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
+        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
     fi
 
 else 
