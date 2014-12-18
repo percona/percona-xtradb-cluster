@@ -57,5 +57,8 @@ COMMIT;
 --error ER_LOCK_DEADLOCK
 COMMIT;
 
+# Work around for mysql-wsrep#29 'Spurious deadlock error on a DROP TABLE'
+--error 0,ER_LOCK_DEADLOCK
+COMMIT;
 
 DROP TABLE t1;
