@@ -137,6 +137,7 @@ Depends: galera-3,
          passwd,
          perl (>= 5.6),
          psmisc,
+         socat,
          ${misc:Depends},
          ${shlibs:Depends}
 Provides: virtual-mysql-server
