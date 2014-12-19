@@ -1,4 +1,4 @@
---echo 
+--echo Performing --wsrep-recover ...
 --exec $MYSQLD --defaults-group-suffix=.$galera_wsrep_recover_server_id --defaults-file=$MYSQLTEST_VARDIR/my.cnf --wsrep-recover > $MYSQL_TMP_DIR/galera_wsrep_recover.log 2>&1
 
 --perl
@@ -15,3 +15,4 @@
 EOF
 
 --source $MYSQL_TMP_DIR/galera_wsrep_start_position.inc
+--remove_file $MYSQL_TMP_DIR/galera_wsrep_start_position.inc

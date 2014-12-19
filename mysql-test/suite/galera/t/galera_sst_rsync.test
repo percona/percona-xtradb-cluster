@@ -4,3 +4,4 @@
 
 --source suite/galera/include/galera_st_shutdown_slave.inc
 --source suite/galera/include/galera_st_kill_slave.inc
+--source suite/galera/include/galera_st_kill_slave_ddl.inc

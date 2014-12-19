@@ -20,6 +20,3 @@ SET GLOBAL wsrep_sst_auth = 'sst:sst';
 --eval SET GLOBAL wsrep_sst_receive_address = '127.0.0.2:$NODE_MYPORT_2';
 --enable_query_log
 SET GLOBAL wsrep_sst_method = 'mysqldump';
-
---connection node_2
-CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
