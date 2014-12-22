@@ -10,6 +10,8 @@
 --let $start_mysqld_params = --wsrep_sst_auth=sst:sst --wsrep_sst_method=mysqldump --wsrep-sst-receive-address=127.0.0.1:$NODE_MYPORT_2 --skip-grant-tables
 
 --source suite/galera/include/galera_st_shutdown_slave.inc
+--source suite/galera/include/galera_st_clean_slave.inc
+
 --source suite/galera/include/galera_st_kill_slave.inc
 --source suite/galera/include/galera_st_kill_slave_ddl.inc
 
