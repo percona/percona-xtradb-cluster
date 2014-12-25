@@ -798,7 +798,7 @@ then
 
 
         MAGIC_FILE="${DATA}/${INFO_FILE}"
-        echo "Waiting for SST streaming to complete!"
+        wsrep_log_info "Waiting for SST streaming to complete!"
         wait $jpid
 
         get_proc
