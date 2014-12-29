@@ -6109,6 +6109,39 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
           wsrep_copy_query(thd);
           thd->set_time();
           parser_state->reset(rawbuf, length);
+
+          /* PSI end */
+          MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+          thd->m_statement_psi= NULL;
+
+          /* DTRACE end */
+          if (MYSQL_QUERY_DONE_ENABLED())
+          {
+            MYSQL_QUERY_DONE(thd->is_error());
+          }
+
+          /* SHOW PROFILE end */
+#if defined(ENABLED_PROFILING)
+          thd->profiling.finish_current_query();
+#endif
+
+          /* SHOW PROFILE begin */
+#if defined(ENABLED_PROFILING)
+          thd->profiling.start_new_query("continuing");
+          thd->profiling.set_query_source(rawbuf, length);
+#endif
+
+          /* DTRACE begin */
+          MYSQL_QUERY_START(rawbuf, thd->thread_id,
+                            (char *) (thd->db ? thd->db : ""),
+                            &thd->security_ctx->priv_user[0],
+                            (char *) thd->security_ctx->host_or_ip);
+
+          /* PSI begin */
+          thd->m_statement_psi= MYSQL_START_STATEMENT(&thd->m_statement_state,
+                                                      com_statement_info[thd->get_command()].m_key,
+                                                      thd->db, thd->db_length,
+                                                      thd->charset());
         }
         else
         {
