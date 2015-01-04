@@ -8038,6 +8038,9 @@ mysqld_get_one_option(int optid,
     test_flags= argument ? (uint) atoi(argument) : 0;
     opt_endinfo=1;
     break;
+  case OPT_THREAD_CONCURRENCY:
+    WARN_DEPRECATED_NO_REPLACEMENT(NULL, "THREAD_CONCURRENCY");
+    break;
   case (int) OPT_ISAM_LOG:
     opt_myisam_log=1;
     break;
@@ -8427,7 +8430,7 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
   } else {
       if (global_system_variables.wsrep_sync_wait &
           WSREP_SYNC_WAIT_BEFORE_READ) {
-          WSREP_WARN("--wsrep-sync-wait=%lu takes precedence over --wsrep-causal-reads=OFF. "
+          WSREP_WARN("--wsrep-sync-wait=%u takes precedence over --wsrep-causal-reads=OFF. "
                      "WSREP_SYNC_WAIT_BEFORE_READ is on",
                      global_system_variables.wsrep_sync_wait);
           global_system_variables.wsrep_causal_reads = 1;
