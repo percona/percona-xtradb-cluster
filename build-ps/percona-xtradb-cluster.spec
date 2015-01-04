@@ -75,6 +75,14 @@ Prefix: %{_sysconfdir}
   %endif
 %endif
 
+%if "%rhel" > "6"
+%define shared_lib_pri_name libmysqlclient
+%define shared_lib_sec_name libperconaserverclient
+%else
+%define shared_lib_pri_name libperconaserverclient
+%define shared_lib_sec_name libmysqlclient
+%endif
+
 #
 # Macros we use which are not available in all supported versions of RPM
 #
@@ -943,6 +951,10 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
 
 fi 
 
+%if 0%{?systemd}
+  %tmpfiles_create mysql.conf
+%endif
+
 # ----------------------------------------------------------------------
 # Make MySQL start/shutdown automatically when the machine does it.
 # ----------------------------------------------------------------------
@@ -999,6 +1011,8 @@ if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
 fi
 
+# For systemd check postun
+%if 0%{?systemd} == 0
 # Was the server running before the upgrade? If so, restart the new one.
 if [ "$SERVER_TO_START" = "true" ] ; then
 %if 0%{?systemd}
@@ -1009,11 +1023,11 @@ if [ "$SERVER_TO_START" = "true" ] ; then
 	# Restart in the same way that mysqld will be started normally.
 	if [ -x %{_sysconfdir}/init.d/mysql ] ; then
 		%{_sysconfdir}/init.d/mysql start
+		echo "Giving mysqld 5 seconds to start"
+		sleep 5
 	fi
-%endif
-  echo "Giving mysqld 5 seconds to start"
-  sleep 5
 fi
+%endif
 
 echo "Percona XtraDB Cluster is distributed with several useful UDFs from Percona Toolkit."
 echo "Run the following commands to create these functions:"
@@ -1114,7 +1128,7 @@ echo "Analyzed: SERVER_TO_START=$SERVER_TO_START"
 
 %if 0%{?systemd}
 if [ -x %{_bindir}/systemctl ] ; then
-	%{_bindir}/systemctl enable mysql >/dev/null 2>&1
+	%{_bindir}/systemctl enable mysqld >/dev/null 2>&1
 fi
 %else
 if [ -x /sbin/chkconfig ] ; then
@@ -1147,6 +1161,11 @@ echo "Trigger 'postun --community' finished at `date`"        >> $STATUS_HISTORY
 echo                                             >> $STATUS_HISTORY
 echo "====="                                     >> $STATUS_HISTORY
 
+
+%postun -n Percona-Server-server%{product_suffix}
+%if 0%{?systemd}
+%systemd_postun_with_restart mysqld
+%endif
 
 # ----------------------------------------------------------------------
 # Clean up the BuildRoot after build is done
