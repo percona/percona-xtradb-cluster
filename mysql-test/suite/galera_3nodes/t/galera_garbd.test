@@ -30,7 +30,7 @@ INSERT INTO t1 VALUES (1);
 SELECT COUNT(*) = 1 FROM t1;
 
 --echo Killing garbd ...
---exec pkill --full garbd.*$NODE_GALERAPORT_3
+--exec pkill --oldest --full garbd.*$NODE_GALERAPORT_3
 
 --connection node_1
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
