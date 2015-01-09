@@ -214,7 +214,7 @@ fi
         -DWITH_PAM=ON \
         -DENABLE_DTRACE=OFF
 
-    make $MAKE_JFLAG $QUIET
+    make $MAKE_JFLAG $QUIET -k
     make DESTDIR="$WORKDIR" install
 
     # Build HandlerSocket
