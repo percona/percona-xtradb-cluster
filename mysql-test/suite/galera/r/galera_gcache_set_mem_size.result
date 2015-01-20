@@ -1,0 +1,4 @@
+SET GLOBAL wsrep_provider_options="gcache.mem_size=262144";
+Deprecation warning count: 1
+SET GLOBAL wsrep_provider_options="gcache.mem_size=0";
+Deprecation warning count: 1
