@@ -1169,6 +1169,11 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Tue Jan 20 2015 Teemu Ollakka <teemu.ollakka@galeracluster.com>
+
+- Reworked to build wsrep patched packages exclusively
+- OBS compatible
+
 * Wed May 28 2014 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com>
 - Updated usergroup to mysql on datadir
 
