@@ -226,7 +226,7 @@ fi
         -DCOMPILATION_COMMENT="$COMMENT" \
         -DWITH_PAM=ON
 
-    make $MAKE_JFLAG $QUIET
+    make $MAKE_JFLAG $QUIET -k
     make DESTDIR="$WORKDIR" install
 
 

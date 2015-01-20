@@ -316,7 +316,9 @@ void wsrep_dump_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len)
   FILE *of= fopen(filename, "wb");
   if (of)
   {
-    fwrite (rbr_buf, buf_len, 1, of);
+    size_t ret;
+    ret= fwrite(rbr_buf, buf_len, 1, of);
+    (void)ret;
     fclose(of);
   }
   else
