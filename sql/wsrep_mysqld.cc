@@ -1417,12 +1417,16 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
   if (thd->wsrep_exec_mode == REPL_RECV) return 0;
 
 
-  lex = thd->lex;
-  if (!wsrep_replicate_myisam && lex->create_info.db_type && lex->create_info.db_type->db_type == DB_TYPE_MYISAM) 
+  lex= thd->lex;
+  if (!wsrep_replicate_myisam && lex->create_info.db_type && \
+          lex->create_info.db_type->db_type == DB_TYPE_MYISAM)
   {
-    if (db_) {
+    if (db_) 
+    {
         WSREP_INFO("Cannot replicate MyISAM DDL for %s.%s with wsrep_replicate_myisam OFF", db_, table_);
-    } else {
+    } 
+    else 
+    {
         WSREP_INFO("Cannot replicate MyISAM DDL with wsrep_replicate_myisam OFF");
     }
 
