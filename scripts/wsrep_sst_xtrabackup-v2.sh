@@ -570,7 +570,7 @@ setup_ports
 get_stream
 get_transfer
 
-if ${INNOBACKUPEX_BIN} /tmp --help  | grep -q -- '--version-check'; then 
+if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then 
     disver="--no-version-check"
 fi
 
@@ -802,6 +802,11 @@ then
         wait $jpid
 
         get_proc
+
+        if [[ ! -s ${DATA}/xtrabackup_checkpoints ]];then 
+            wsrep_log_error "xtrabackup_checkpoints missing, failed innobackupex/SST on donor"
+            exit 2
+        fi
 
         # Rebuild indexes for compact backups
         if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
