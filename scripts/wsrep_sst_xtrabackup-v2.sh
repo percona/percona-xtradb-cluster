@@ -499,7 +499,7 @@ recv_joiner()
         if timeout --help | grep -q -- '-k';then 
             ltcmd="timeout -k $(( tmt+10 )) $tmt $tcmd"
         else 
-            ltcmd="timeout $tmt $tcmd"
+            ltcmd="timeout -s9 $tmt $tcmd"
         fi
         timeit "$msg" "$ltcmd | $strmcmd; RC=( "\${PIPESTATUS[@]}" )"
     else 
