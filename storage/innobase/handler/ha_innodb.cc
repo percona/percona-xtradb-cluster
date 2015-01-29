@@ -7737,19 +7737,24 @@ no_commit:
 			;
 		} else if (src_table == prebuilt->table) {
 #ifdef WITH_WSREP
-			switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+			if (wsrep_on(user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+					      user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 			{
-			case WSREP_TRX_OK:
-				break;
-			case WSREP_TRX_SIZE_EXCEEDED:
-			case WSREP_TRX_CERT_FAIL:
-			case WSREP_TRX_ERROR:
-				DBUG_RETURN(1);
-			}
+				switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+				  DBUG_RETURN(1);
+				}
 
-			if (tc_log->commit(user_thd, 1))
-                                DBUG_RETURN(1);
-                        wsrep_post_commit(user_thd, TRUE);
+				if (tc_log->commit(user_thd, 1)) DBUG_RETURN(1);
+				wsrep_post_commit(user_thd, TRUE);
+			}
 #endif /* WITH_WSREP */
 			/* Source table is not in InnoDB format:
 			no need to re-acquire locks on it. */
@@ -7762,18 +7767,23 @@ no_commit:
 			prebuilt->sql_stat_start = TRUE;
 		} else {
 #ifdef WITH_WSREP
-			switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+			if (wsrep_on(user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+					      user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 			{
-			case WSREP_TRX_OK:
-				break;
-			case WSREP_TRX_SIZE_EXCEEDED:
-			case WSREP_TRX_CERT_FAIL:
-			case WSREP_TRX_ERROR:
-				DBUG_RETURN(1);
+				switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+				  DBUG_RETURN(1);
+				}
+				if (tc_log->commit(user_thd, 1))  DBUG_RETURN(1);
+				wsrep_post_commit(user_thd, TRUE);
 			}
-			if (tc_log->commit(user_thd, 1))
-                                DBUG_RETURN(1);
-                        wsrep_post_commit(user_thd, TRUE);
 #endif /* WITH_WSREP */
 			/* Ensure that there are no other table locks than
 			LOCK_IX and LOCK_AUTO_INC on the destination table. */
