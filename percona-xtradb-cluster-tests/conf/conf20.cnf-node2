@@ -15,5 +15,5 @@ encrypt=AES256
 encrypt-key=6F3AD9F428143F133FD7D50D77D91EA4
 
 [sst]
-cpat='.*galera\.cache$\|.*sst_in_progress$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*\.borr$\|.*\.brn$'
+cpat='.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*\.borr$\|.*\.brn$'
 encrypt=1

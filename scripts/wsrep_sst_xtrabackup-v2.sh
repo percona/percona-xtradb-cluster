@@ -40,13 +40,12 @@ progress=""
 ttime=0
 totime=0
 lsn=""
-incremental=0
 ecmd=""
 rlimit=""
 # Initially
 stagemsg="${WSREP_SST_OPT_ROLE}"
 cpat=""
-speciald=0
+speciald=1
 ib_home_dir=""
 ib_log_dir=""
 ib_undo_dir=""
@@ -302,8 +301,7 @@ read_cnf()
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
-    cpat=$(parse_cnf sst cpat '.*galera\.cache$\|.*sst_in_progress$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
-    incremental=$(parse_cnf sst incremental 0)
+    cpat=$(parse_cnf sst cpat '.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
@@ -324,6 +322,11 @@ read_cnf()
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
     stimeout=$(parse_cnf sst sst-initial-timeout 100)
+
+    if [[ $speciald -eq 0 ]];then 
+        wsrep_log_error "sst-special-dirs equal to 0 is not supported, falling back to 1"
+        speciald=1
+    fi
 }
 
 get_stream()
@@ -452,11 +455,7 @@ wait_for_listen()
         ss -p state listening "( sport = :$PORT )" | grep -qE 'socat|nc' && break
         sleep 0.2
     done
-    if [[ $incremental -eq 1 ]];then 
-        echo "ready ${ADDR}/${MODULE}/$lsn/$sst_ver"
-    else 
-        echo "ready ${ADDR}/${MODULE}//$sst_ver"
-    fi
+    echo "ready ${ADDR}/${MODULE}//$sst_ver"
 }
 
 check_extra()
@@ -571,7 +570,7 @@ setup_ports
 get_stream
 get_transfer
 
-if ${INNOBACKUPEX_BIN} /tmp --help  | grep -q -- '--version-check'; then 
+if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then 
     disver="--no-version-check"
 fi
 
@@ -622,15 +621,12 @@ then
             fi
         fi
 
-        if [[ -n $lsn ]];then 
-                INNOEXTRA+=" --incremental --incremental-lsn=$lsn "
-        fi
 
         check_extra
 
         wsrep_log_info "Streaming GTID file before SST"
 
-        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+        wsrep_log_info "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
 
         ttcmd="$tcmd"
 
@@ -712,26 +708,12 @@ then
     [[ -e $SST_PROGRESS_FILE ]] && wsrep_log_info "Stale sst_in_progress file: $SST_PROGRESS_FILE"
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
-    if [[ $speciald -eq 1 ]];then 
-        ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
-        ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
-        ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
-        if [[ -z $ib_home_dir && -z $ib_log_dir && -z $ib_undo_dir ]];then 
-            speciald=0
-        fi
-    fi
+    ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
+    ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
+    ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
 
     stagemsg="Joiner-Recv"
 
-    if [[ ! -e ${DATA}/ibdata1 ]];then 
-        incremental=0
-    fi
-
-    if [[ $incremental -eq 1 ]];then 
-        wsrep_log_info "Incremental SST enabled: NOT SUPPORTED yet"
-        lsn=$(grep to_lsn xtrabackup_checkpoints | cut -d= -f2 | tr -d ' ')
-        wsrep_log_info "Recovered LSN: $lsn"
-    fi
 
     sencrypted=1
     nthreads=1
@@ -760,11 +742,6 @@ then
         tcmd+=" | $pcmd"
     fi
 
-    if [[ $incremental -eq 1 ]];then 
-        BDATA=$DATA
-        DATA=$(mktemp -d)
-        MAGIC_FILE="${DATA}/${INFO_FILE}"
-    fi
 
     get_keys
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
@@ -781,6 +758,13 @@ then
     MAGIC_FILE="${STATDIR}/${INFO_FILE}"
     recv_joiner $STATDIR  "${stagemsg}-gtid" $stimeout 1
 
+    if [[ -d ${DATA}/.sst ]];then 
+        wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer"
+    fi
+    mkdir -p ${DATA}/.sst
+    (recv_joiner $DATA/.sst "${stagemsg}-SST" 0 0) &
+    jpid=$!
+
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
         wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly." 
@@ -791,47 +775,38 @@ then
     then
         wsrep_log_info "Proceeding with SST"
 
-        if [[ $speciald -eq 1 && -d ${DATA}/.sst ]];then 
-            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous SST"
-        fi
 
-        if [[ $incremental -ne 1 ]];then 
-            if [[ $speciald -eq 1 ]];then 
-                wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
-                find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
-            else 
-                wsrep_log_info "Cleaning the existing datadir"
-                find $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+        wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
+        find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
+
+        tempdir=$(parse_cnf mysqld log-bin "")
+        if [[ -n ${tempdir:-} ]];then
+            binlog_dir=$(dirname $tempdir)
+            binlog_file=$(basename $tempdir)
+            if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
+                pattern="$binlog_dir/$binlog_file\.[0-9]+$"
+                wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
+                find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
+                rm $binlog_dir/*.index || true
             fi
-            tempdir=$(parse_cnf mysqld log-bin "")
-            if [[ -n ${tempdir:-} ]];then
-                binlog_dir=$(dirname $tempdir)
-                binlog_file=$(basename $tempdir)
-                if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
-                    pattern="$binlog_dir/$binlog_file\.[0-9]+$"
-                    wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
-                    find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
-                    rm $binlog_dir/*.index || true
-                fi
-            fi
-
-        else
-            wsrep_log_info "Removing existing ib_logfile files"
-            rm -f ${BDATA}/ib_logfile*
         fi
 
 
-        if [[ $speciald -eq 1 ]];then 
-            mkdir -p ${DATA}/.sst
-            TDATA=${DATA}
-            DATA="${DATA}/.sst"
-        fi
+
+        TDATA=${DATA}
+        DATA="${DATA}/.sst"
 
 
         MAGIC_FILE="${DATA}/${INFO_FILE}"
-        recv_joiner $DATA "${stagemsg}-SST" 0 0
+        wsrep_log_info "Waiting for SST streaming to complete!"
+        wait $jpid
 
         get_proc
+
+        if [[ ! -s ${DATA}/xtrabackup_checkpoints ]];then 
+            wsrep_log_error "xtrabackup_checkpoints missing, failed innobackupex/SST on donor"
+            exit 2
+        fi
 
         # Rebuild indexes for compact backups
         if grep -q 'compact = 1' ${DATA}/xtrabackup_checkpoints;then 
@@ -904,11 +879,6 @@ then
 
         fi
 
-        if [[ $incremental -eq 1 ]];then 
-            # Added --ibbackup=xtrabackup_55 because it fails otherwise citing connection issues.
-            INNOAPPLY="${INNOBACKUPEX_BIN} $disver --defaults-file=${WSREP_SST_OPT_CONF} \
-                --ibbackup=xtrabackup_56 --apply-log $rebuildcmd --redo-only $BDATA --incremental-dir=${DATA} &>>${BDATA}/innobackup.prepare.log"
-        fi
 
         wsrep_log_info "Preparing the backup at ${DATA}"
         timeit "Xtrabackup prepare stage" "$INNOAPPLY"
@@ -919,30 +889,25 @@ then
             exit 22
         fi
 
-        if [[ $speciald -eq 1 ]];then 
-            MAGIC_FILE="${TDATA}/${INFO_FILE}"
-            set +e
-            rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
-            set -e
-            wsrep_log_info "Moving the backup to ${TDATA}"
-            timeit "Xtrabackup move stage" "$INNOMOVE"
-            if [[ $? -eq 0 ]];then 
-                wsrep_log_info "Move successful, removing ${DATA}"
-                rm -rf $DATA
-                DATA=${TDATA}
-            else 
-                wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis"
-                wsrep_log_error "Check ${DATA}/innobackup.move.log for details"
-            fi
+        MAGIC_FILE="${TDATA}/${INFO_FILE}"
+        set +e
+        rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
+        set -e
+        wsrep_log_info "Moving the backup to ${TDATA}"
+        timeit "Xtrabackup move stage" "$INNOMOVE"
+        if [[ $? -eq 0 ]];then 
+            wsrep_log_info "Move successful, removing ${DATA}"
+            rm -rf $DATA
+            DATA=${TDATA}
+        else 
+            wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis"
+            wsrep_log_error "Check ${DATA}/innobackup.move.log for details"
         fi
 
-        if [[ $incremental -eq 1 ]];then 
-            wsrep_log_info "Cleaning up ${DATA} after incremental SST"
-            [[ -d ${DATA} ]] && rm -rf ${DATA}
-            DATA=$BDATA
-        fi
 
     else 
+        kill -KILL -$(ps -o pgid= $jpid | grep -o '[0-9]*')
+        rm -rf $DATA/.sst
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi
 
