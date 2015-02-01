@@ -485,7 +485,7 @@ wsrep_sst_donor=
 6) Due to cluster level optimistic concurrency control, transactions issuing
    COMMIT may still be aborted at that stage.  There can be two transactions
    writing to same rows and committing in separate cluster nodes.  Only one of
-   the them can successfully commit.  The failing one will be aborted.  For
+   them can successfully commit.  The failing one will be aborted.  For
    cluster level aborts, MySQL/galera cluster will return a deadlock error
    code.  (Error: 1213 SQLSTATE: 40001 (ER_LOCK_DEADLOCK)).
 
