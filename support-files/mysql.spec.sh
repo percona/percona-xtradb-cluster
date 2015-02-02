@@ -205,7 +205,7 @@ Release:        %{release}%{dist}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. All rights reserved. Under %{license_type} license as shown in the Description field.
 Source:         %{src_dir}.tar.gz
 Source99:       mysql-rpmlintrc
-Patch:          cmake-no-wix.patch
+Patch0:          cmake-no-wix.patch
 URL:            http://www.mysql.com/
 Packager:       Codership Oy <info@galeracluster.com>
 Vendor:         %{mysql_vendor}
