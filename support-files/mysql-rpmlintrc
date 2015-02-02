@@ -62,4 +62,3 @@ addFilter("mysql.*server.* no-manual-page-for-binary mysqld-debug")
 addFilter("MySQL.*server.* incoherent-init-script-name mysql")
 addFilter("mysql.*server.* incoherent-init-script-name mysql")
 # End of the "false positive" messages which we cannot prevent.
-
