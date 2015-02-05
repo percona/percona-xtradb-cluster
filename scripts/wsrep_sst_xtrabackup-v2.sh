@@ -707,7 +707,7 @@ then
 
         wsrep_log_info "Streaming GTID file before SST"
 
-        wsrep_log_info "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
+        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
 
         ttcmd="$tcmd"
 
