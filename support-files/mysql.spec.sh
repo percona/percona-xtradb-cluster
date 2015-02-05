@@ -124,7 +124,7 @@
 # ----------------------------------------------------------------------------
 
 # Disable post build checks for time being.
-BuildConflicts: post-build-checks rpmlint
+BuildConflicts: post-build-checks
 
 BuildRequires: gcc-c++ ncurses-devel perl zlib-devel cmake libaio-devel bison flex
 
@@ -142,17 +142,25 @@ BuildRequires: gperf procps time
 %endif
 
 # Define dist tag if not given by platform
-
-# For suse versions see:
-# https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
-%if 0%{?suse_version} == 1310
-%define dist suse13.1
-%endif
-%if 0%{?suse_version} == 1315
-%define dist sle12
-%endif
-%if 0%{?suse_version} == 1320
-%define dist suse13.2
+%if %{undefined dist}
+  # For suse versions see:
+  # https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
+  %if 0%{?suse_version} == 1110
+    %define dist .sle11
+  %endif
+  %if 0%{?suse_version} == 1310
+    %define dist .suse13.1
+  %endif
+  %if 0%{?suse_version} == 1315
+    %define dist .sle12
+  %endif
+  %if 0%{?suse_version} == 1320
+    %define dist .suse13.2
+  %endif
+  # Still missing?
+  %if %{undefined dist}
+    %define dist .DIST
+  %endif
 %endif
 
 
@@ -196,6 +204,8 @@ Release:        %{release}%{dist}
 # Distribution:   %{distro_description}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. All rights reserved. Under %{license_type} license as shown in the Description field.
 Source:         %{src_dir}.tar.gz
+Source99:       mysql-rpmlintrc
+Patch0:          cmake-no-wix.patch
 URL:            http://www.mysql.com/
 Packager:       Codership Oy <info@galeracluster.com>
 Vendor:         %{mysql_vendor}
@@ -232,14 +242,30 @@ documentation and the manual for more information.
 # Sub package definition
 ##############################################################################
 
+%package -n mysql-wsrep%{product_suffix}
+Summary:        MySQL: meta package for a server+client setup
+Group:          Applications/Databases
+Requires:       mysql-wsrep-server%{product_suffix}
+Requires:       mysql-wsrep-client%{product_suffix}
+
+%description -n mysql-wsrep%{product_suffix}
+This meta package ensures the installation of a MySQL server and the necessary
+client programs for operation and administration. It does not itself
+contain those files but rather causes the installation of the subpackages
+"mysql-wsrep-server%{product_suffix}" and "mysql-wsrep-client%{product_suffix}".
+As indicated in the name, the server is built with the "wsrep" plugin so that
+it can be a node in a MySQL Galera Cluster.
+
+# ----------------------------------------------------------------------------
+
 %package -n mysql-wsrep-server%{product_suffix}
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
 # Distro requirements
 # RedHat
 %if 0%{?fedora} || 0%{?rhel}
-Requires:       ckconfig coreutils grep procps shadow-utils net-tools rsync lsof
-%if 0%{?rhel} == 7
+Requires:       chkconfig coreutils grep procps shadow-utils net-tools rsync lsof
+%if 0%{?rhel} == 7 || 0%{?fedora} >= 20
 Requires: perl-Data-Dumper
 %endif
 %endif
@@ -378,6 +404,9 @@ and applications need to dynamically load and use MySQL.
 ##############################################################################
 %prep
 %setup -n %{src_dir}
+# That patch is needed with old cmake only, on SLES 11, but it won't do any harm
+# outside Windows, so it may be used in all RPM builds.
+%patch0 -p1
 #wsrep_apply_patch_tag
 ##############################################################################
 %build
@@ -418,7 +447,7 @@ export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
-export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-}
+export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:--j$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
 
 # By default, a build will include the bundeled "yaSSL" library for SSL.
 # However, there may be a need to override.
@@ -993,6 +1022,10 @@ echo "====="                                     >> $STATUS_HISTORY
 #  Files section
 ##############################################################################
 
+%files -n mysql-wsrep%{product_suffix}
+# Intentionally empty - this is a pure meta package.
+
+# ----------------------------------------------------------------------------
 %files -n mysql-wsrep-server%{product_suffix} -f release/support-files/plugins.files
 %defattr(-,root,root,0755)
 
@@ -1169,6 +1202,16 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Jan 29 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Add a meta-package "mysql-wsrep" that requires both "server" and "client".
+- Fix the fall-back definition of "dist", it must start with a period.
+
+* Mon Jan 26 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Allow "rpmlint", but suppress "post-build-checks" (fail on SuSE 12 + 13).
+- Improve handling of undefined "%%{dist}".
+- Fix wrong changelog dates, to get rid of warnings about "bogus date".
+- Escape percent signs in changelog, to get rid of "rpmlint" warnings.
+
 * Tue Jan 20 2015 Teemu Ollakka <teemu.ollakka@galeracluster.com>
 
 - Reworked to build wsrep patched packages exclusively
@@ -1268,7 +1311,7 @@ echo "====="                                     >> $STATUS_HISTORY
 * Fri Aug 19 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Null-upmerge the fix of bug#37165: This spec file is not affected.
-- Replace "/var/lib/mysql" by the spec file variable "%{mysqldatadir}".
+- Replace "/var/lib/mysql" by the spec file variable "%%{mysqldatadir}".
 
 * Fri Aug 12 2011 Daniel Fischer <daniel.fischer@oracle.com>
 
@@ -1289,7 +1332,7 @@ echo "====="                                     >> $STATUS_HISTORY
   not in an RPM upgrade.
   This affects both the "mkdir" and the call of "mysql_install_db".
 
-* Thu Feb 09 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
+* Thu Feb 10 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Fix bug#56581: If an installation deviates from the default file locations
   ("datadir" and "pid-file"), the mechanism to detect a running server (on upgrade)
@@ -1410,7 +1453,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Fix some problems with the directives around "tcmalloc" (experimental),
   remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
-* Fri Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
+* Fri Oct 09 2009 Magnus Blaudd <mvensson@mysql.com>
 
 - Removed mysql_fix_privilege_tables
 
@@ -1528,7 +1571,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 * Thu Nov 30 2006 Joerg Bruehe <joerg@mysql.com>
 
-- Call "make install" using "benchdir_root=%{_datadir}",
+- Call "make install" using "benchdir_root=%%{_datadir}",
   because that is affecting the regression test suite as well.
 
 * Thu Nov 16 2006 Joerg Bruehe <joerg@mysql.com>
@@ -1607,7 +1650,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - Set $LDFLAGS from $MYSQL_BUILD_LDFLAGS
 
-* Wed Mar 07 2006 Kent Boortz <kent@mysql.com>
+* Wed Mar 08 2006 Kent Boortz <kent@mysql.com>
 
 - Changed product name from "Community Edition" to "Community Server"
 
@@ -1645,7 +1688,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Added zlib to the list of (static) libraries installed
 - Added check against libtool wierdness (WRT: sql/mysqld || sql/.libs/mysqld)
 - Compile MySQL with bundled zlib
-- Fixed %packager name to "MySQL Production Engineering Team"
+- Fixed %%packager name to "MySQL Production Engineering Team"
 
 * Mon Dec 05 2005 Joerg Bruehe <joerg@mysql.com>
 
@@ -1702,7 +1745,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 * Thu Sep 29 2005 Lenz Grimmer <lenz@mysql.com>
 
-- fixed the removing of the RPM_BUILD_ROOT in the %clean section (the
+- fixed the removing of the RPM_BUILD_ROOT in the %%clean section (the
   $RBR variable did not get expanded, thus leaving old build roots behind)
 
 * Thu Aug 04 2005 Lenz Grimmer <lenz@mysql.com>
@@ -1795,7 +1838,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - ISAM and merge storage engines were purged. As well as appropriate
   tools and manpages (isamchk and isamlog)
 
-* Thu Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
+* Fri Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
 
 - enabled the "Archive" storage engine for the max binary
 - enabled the "CSV" storage engine for the max binary
@@ -1855,7 +1898,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - marked /etc/logrotate.d/mysql as a config file (BUG 2156)
 
-* Fri Dec 13 2003 Lenz Grimmer <lenz@mysql.com>
+* Fri Dec 12 2003 Lenz Grimmer <lenz@mysql.com>
 
 - fixed file permissions (BUG 1672)
 
@@ -1997,7 +2040,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Added separate libmysql_r directory; now both a threaded
   and non-threaded library is shipped.
 
-* Wed Sep 28 1999 David Axmark <davida@mysql.com>
+* Wed Sep 29 1999 David Axmark <davida@mysql.com>
 
 - Added the support-files/my-example.cnf to the docs directory.
 

@@ -1,0 +1,14 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9e235ba..15c3414 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -569,7 +569,8 @@ IF(WIN32)
+ ELSE()
+   SET(CPACK_GENERATOR "TGZ")
+ ENDIF() 
+-ADD_SUBDIRECTORY(packaging/WiX)
++# Trouble on SLES 11 due to old cmake ...
++# ADD_SUBDIRECTORY(packaging/WiX)
+ ADD_SUBDIRECTORY(packaging/solaris)
+ 
+ # Create a single package with "make package"
