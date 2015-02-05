@@ -390,11 +390,17 @@ cleanup_joiner()
        [[ -d $STATDIR ]] && rm -rf $STATDIR
     fi
 
-    sleep 10
 
     # Final cleanup 
     pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
     kill -TERM -$pgid || true
+
+    # This means a signal was delivered to the process 
+    # So, more cleanup. 
+    if [[ $estatus -ge 128 ]];then 
+        sleep 10
+        kill -KILL -$pgid || true
+    fi
 
     exit $estatus
 }
@@ -438,11 +444,17 @@ cleanup_donor()
        [[ -d $itmpdir ]] &&  rm -rf $itmpdir || true
     fi
 
-    sleep 10
 
     # Final cleanup 
     pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
     kill -TERM -$pgid || true
+
+    # This means a signal was delivered to the process 
+    # So, more cleanup. 
+    if [[ $estatus -ge 128 ]];then 
+        sleep 10
+        kill -KILL -$pgid || true
+    fi
 
     exit $estatus
 }
