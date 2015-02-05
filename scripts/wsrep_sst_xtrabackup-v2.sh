@@ -393,13 +393,20 @@ cleanup_joiner()
 
     # Final cleanup 
     pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
-    kill -TERM -$pgid || true
 
-    # This means a signal was delivered to the process 
-    # So, more cleanup. 
-    if [[ $estatus -ge 128 ]];then 
-        sleep 10
-        kill -KILL -$pgid || true
+    # This means no setsid done in mysqld.
+    # We don't want to kill mysqld here otherwise.
+    if [[ $$ -eq $pgid ]];then
+
+        kill -TERM -$$ || true
+
+        # This means a signal was delivered to the process.
+        # So, more cleanup. 
+        if [[ $estatus -ge 128 ]];then 
+            sleep 10
+            kill -KILL -$$ || true
+        fi
+
     fi
 
     exit $estatus
