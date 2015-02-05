@@ -29,6 +29,8 @@ ekeyfile=""
 encrypt=0
 nproc=1
 ecode=0
+ssyslog=""
+ssystag=""
 XTRABACKUP_PID=""
 SST_PORT=""
 REMOTEIP=""
@@ -322,10 +324,19 @@ read_cnf()
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
     stimeout=$(parse_cnf sst sst-initial-timeout 100)
+    ssyslog=$(parse_cnf sst sst-syslog 0)
+    ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
+    ssystag+="-"
 
     if [[ $speciald -eq 0 ]];then 
         wsrep_log_error "sst-special-dirs equal to 0 is not supported, falling back to 1"
         speciald=1
+    fi 
+
+    if [[ $ssyslog -ne -1 ]];then 
+        if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld_safe | tr '_' '-' | grep -q -- "--syslog";then 
+            ssyslog=1
+        fi
     fi
 }
 
@@ -381,6 +392,26 @@ cleanup_joiner()
     if [[ -n ${STATDIR:-} ]];then 
        [[ -d $STATDIR ]] && rm -rf $STATDIR
     fi
+
+    # Final cleanup 
+    pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
+
+    # This means no setsid done in mysqld.
+    # We don't want to kill mysqld here otherwise.
+    if [[ $$ -eq $pgid ]];then
+
+        kill -TERM -$$ || true
+
+        # This means a signal was delivered to the process.
+        # So, more cleanup. 
+        if [[ $estatus -ge 128 ]];then 
+            sleep 10
+            kill -KILL -$$ || true
+        fi
+
+    fi
+
+    exit $estatus
 }
 
 check_pid()
@@ -421,6 +452,27 @@ cleanup_donor()
     if [[ -n $itmpdir ]];then 
        [[ -d $itmpdir ]] &&  rm -rf $itmpdir || true
     fi
+
+    # Final cleanup 
+    pgid=$(ps -o pgid= $$ | grep -o '[0-9]*')
+
+    # This means no setsid done in mysqld.
+    # We don't want to kill mysqld here otherwise.
+    if [[ $$ -eq $pgid ]];then
+
+        kill -TERM -$$ || true
+
+        # This means a signal was delivered to the process.
+        # So, more cleanup. 
+        if [[ $estatus -ge 128 ]];then 
+            sleep 10
+            kill -KILL -$$ || true
+        fi
+
+    fi
+
+    exit $estatus
+
 }
 
 kill_xtrabackup()
@@ -567,8 +619,6 @@ fi
 
 read_cnf
 setup_ports
-get_stream
-get_transfer
 
 if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then 
     disver="--no-version-check"
@@ -576,9 +626,40 @@ fi
 
 
 INNOEXTRA=""
-INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
-INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
-INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2>\${DATA}/innobackup.backup.log"
+
+if [[ $ssyslog -eq 1 ]];then 
+
+    if [[ ! -x `which logger` ]];then 
+        wsrep_log_error "logger not in path: $PATH. Ignoring"
+    else
+
+        wsrep_log_info "Logging all stderr of SST/Innobackupex to syslog"
+
+        exec 2> >(logger -p daemon.err -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE)
+
+        wsrep_log_error()
+        {
+            logger  -p daemon.err -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE "$@" 
+        }
+
+        wsrep_log_info()
+        {
+            logger  -p daemon.info -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE "$@" 
+        }
+
+        INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} 2>&1  | logger -p daemon.err -t ${ssystag}innobackupex-apply "
+        INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
+        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
+    fi
+
+else 
+    INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+    INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $impts  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
+    INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2>\${DATA}/innobackup.backup.log"
+fi
+
+get_stream
+get_transfer
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
