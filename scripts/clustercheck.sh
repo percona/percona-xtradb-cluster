@@ -41,10 +41,12 @@ fi
 #
 # Perform the query to check the wsrep_local_state
 #
-WSREP_STATUS=$($MYSQL_CMDLINE -e "SHOW STATUS LIKE 'wsrep_local_state';" \
-    2>${ERR_FILE} | tail -1 2>>${ERR_FILE})
+WSREP_STATUS=($($MYSQL_CMDLINE -e "SHOW GLOBAL STATUS LIKE 'wsrep_%';"  \
+    2>${ERR_FILE} | grep -A 1 -E 'wsrep_local_state$|wsrep_cluster_status$' \
+    | sed -n -e '2p'  -e '5p' | tr '\n' ' '))
  
-if [[ "${WSREP_STATUS}" == "4" ]] || [[ "${WSREP_STATUS}" == "2" && ${AVAILABLE_WHEN_DONOR} == 1 ]]
+if [[ ${WSREP_STATUS[1]} == 'Primary' && ( ${WSREP_STATUS[0]} -eq 4 || \
+    ( ${WSREP_STATUS[0]} -eq 2 && $AVAILABLE_WHEN_DONOR -eq 1 ) ) ]]
 then 
 
     # Check only when set to 0 to avoid latency in response.
@@ -84,9 +86,9 @@ else
     echo -en "HTTP/1.1 503 Service Unavailable\r\n" 
     echo -en "Content-Type: text/plain\r\n" 
     echo -en "Connection: close\r\n" 
-    echo -en "Content-Length: 44\r\n" 
+    echo -en "Content-Length: 57\r\n" 
     echo -en "\r\n" 
-    echo -en "Percona XtraDB Cluster Node is not synced.\r\n" 
+    echo -en "Percona XtraDB Cluster Node is not synced or non-PRIM. \r\n" 
     sleep 0.1
     exit 1
 fi 
