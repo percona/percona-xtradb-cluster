@@ -38,6 +38,7 @@ ORDER BY VARIABLE_NAME;
 --perl
 	use strict;
 	my $wsrep_provider_options = $ENV{'_WSREP_PROVIDER_OPTIONS'};
+	$wsrep_provider_options =~ s/base_dir = .*?;/<BASE_DIR>;/sgio;
 	$wsrep_provider_options =~ s/base_host = .*?;/<BASE_HOST>;/sgio;
 	$wsrep_provider_options =~ s/base_port = .*?;/<BASE_PORT>;/sgio;
 	$wsrep_provider_options =~ s/gcache\.dir = .*?;/<GCACHE_DIR>;/sgio;
