@@ -41,7 +41,7 @@ INSERT INTO parent VALUES (DEFAULT, 0);
 --let $galera_server_number = 1
 --source include/galera_connect.inc
 --connection node_1b
---sleep 1
+--sleep 2
 --send ALTER TABLE child ADD FOREIGN KEY (parent_id) REFERENCES parent(id);
 
 --connection node_1a

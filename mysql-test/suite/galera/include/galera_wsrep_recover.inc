@@ -15,4 +15,9 @@
 EOF
 
 --source $MYSQL_TMP_DIR/galera_wsrep_start_position.inc
+
+if ($galera_wsrep_start_position == '') {
+    --die "Could not obtain wsrep_start_position."
+}
+
 --remove_file $MYSQL_TMP_DIR/galera_wsrep_start_position.inc
