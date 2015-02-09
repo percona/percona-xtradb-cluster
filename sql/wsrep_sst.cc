@@ -439,7 +439,7 @@ static ssize_t sst_prepare_other (const char*  method,
                                   const char** addr_out)
 {
   ssize_t cmd_len= 1024;
-  char    cmd_str[cmd_len];
+  char    cmd_str[1024];
   const char* sst_dir= mysql_real_data_home;
   const char* binlog_opt= "";
   char* binlog_opt_val= NULL;
@@ -720,7 +720,7 @@ static int sst_donate_mysqldump (const char*         addr,
     host_len = strlen (addr) + 1;
   }
 
-  char host[host_len];
+  char *host= (char*) malloc(host_len);
 
   strncpy (host, addr, host_len - 1);
   host[host_len - 1] = '\0';
@@ -740,7 +740,7 @@ static int sst_donate_mysqldump (const char*         addr,
     user_len = (auth) ? strlen (auth) + 1 : 1;
   }
 
-  char user[user_len];
+  char* user= (char*) malloc(user_len);
 
   strncpy (user, (auth) ? auth : "", user_len - 1);
   user[user_len - 1] = '\0';
@@ -749,7 +749,7 @@ static int sst_donate_mysqldump (const char*         addr,
   if (!ret)
   {
     size_t cmd_len= 1024;
-    char   cmd_str[cmd_len];
+    char   cmd_str[1024];
 
     if (!bypass && wsrep_sst_donor_rejects_queries) sst_reject_queries(TRUE);
 
@@ -776,6 +776,9 @@ static int sst_donate_mysqldump (const char*         addr,
   wsrep_gtid_t const state_id = { *uuid, (ret ? WSREP_SEQNO_UNDEFINED : seqno)};
 
   wsrep->sst_sent (wsrep, &state_id, ret);
+
+  free(user);
+  free(host);
 
   return ret;
 }
@@ -834,9 +837,9 @@ static int sst_flush_tables(THD* thd)
     WSREP_INFO("Tables flushed.");
     const char base_name[]= "tables_flushed";
     ssize_t const full_len= strlen(mysql_real_data_home) + strlen(base_name)+2;
-    char real_name[full_len];
+    char *real_name = (char*) malloc(full_len);
     sprintf(real_name, "%s/%s", mysql_real_data_home, base_name);
-    char tmp_name[full_len + 4];
+    char *tmp_name = (char*) malloc(full_len + 4);
     sprintf(tmp_name, "%s.tmp", real_name);
 
     FILE* file= fopen(tmp_name, "w+");
@@ -858,6 +861,8 @@ static int sst_flush_tables(THD* thd)
                      tmp_name, real_name, err,strerror(err));
       }
     }
+    free(real_name);
+    free(tmp_name);
   }
 
   return err;
@@ -984,7 +989,7 @@ static int sst_donate_other (const char*   method,
                              bool          bypass)
 {
   ssize_t cmd_len = 4096;
-  char    cmd_str[cmd_len];
+  char    cmd_str[4096];
   const char* binlog_opt= "";
   char* binlog_opt_val= NULL;
 
