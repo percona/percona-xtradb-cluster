@@ -138,6 +138,8 @@ Depends: initscripts,
          perl (>= 5.6),
          psmisc,
          socat,
+         rsync,
+         lsof,
          ${misc:Depends},
          ${shlibs:Depends}
 Provides: virtual-mysql-server
