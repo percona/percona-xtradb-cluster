@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 %global mysqldatadir    /var/lib/mysql
 
 %global release         %{wsrep_version}
-
+%global short_product_tag 5.6
 
 
 
@@ -83,9 +83,9 @@
 # Source name
 # ----------------------------------------------------------------------------
 %if %{undefined src_base}
-%define src_base mysql
+%define src_base mysql-wsrep
 %endif
-%define src_dir %{src_base}-%{mysql_version}
+%define src_dir %{src_base}-%{mysql_version}-%{wsrep_version}
 
 # ----------------------------------------------------------------------------
 # Feature set (storage engines, options).  Default to community (everything)
@@ -122,94 +122,47 @@
 # ----------------------------------------------------------------------------
 # Distribution support
 # ----------------------------------------------------------------------------
-%if %{undefined distro_specific}
-%define distro_specific 0
+
+# Disable post build checks for time being.
+BuildConflicts: post-build-checks
+
+BuildRequires: gcc-c++ ncurses-devel perl zlib-devel cmake libaio-devel bison flex
+
+%if 0%{?rhel} == 6 || 0%{?rhel} == 7 || 0%{?fedora} == 20 || 0%{?fedora} == 21
+BuildRequires: time
 %endif
-%if %{distro_specific}
-  %if %(test -f /etc/enterprise-release && echo 1 || echo 0)
-    %define oelver %(rpm -qf --qf '%%{version}\\n' /etc/enterprise-release | sed -e 's/^\\([0-9]*\\).*/\\1/g')
-    %if "%oelver" == "4"
-      %define distro_description        Oracle Enterprise Linux 4
-      %define distro_releasetag         oel4
-      %define distro_buildreq           gcc-c++ gperf ncurses-devel perl time zlib-devel cmake libaio-devel
-      %define distro_requires           chkconfig coreutils grep procps shadow-utils net-tools
-    %else
-      %if "%oelver" == "5"
-        %define distro_description      Oracle Enterprise Linux 5
-        %define distro_releasetag       oel5
-        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl time zlib-devel cmake libaio-devel
-        %define distro_requires         chkconfig coreutils grep procps shadow-utils net-tools
-      %else
-        %{error:Oracle Enterprise Linux %{oelver} is unsupported}
-      %endif
-    %endif
-  %else
-    %if %(test -f /etc/oracle-release && echo 1 || echo 0)
-      %define elver %(rpm -qf --qf '%%{version}\\n' /etc/oracle-release | sed -e 's/^\\([0-9]*\\).*/\\1/g')
-      %if "%elver" == "6" || "%elver" == "7"
-        %define distro_description      Oracle Linux %elver
-        %define distro_releasetag       el%elver
-        %define distro_buildreq         gcc-c++ ncurses-devel perl time zlib-devel cmake libaio-devel
-        %define distro_requires         chkconfig coreutils grep procps shadow-utils net-tools
-      %else
-        %{error:Oracle Linux %{elver} is unsupported}
-      %endif
-    %else
-      %if %(test -f /etc/redhat-release && echo 1 || echo 0)
-        %define rhelver %(rpm -qf --qf '%%{version}\\n' /etc/redhat-release | sed -e 's/^\\([0-9]*\\).*/\\1/g')
-        %if "%rhelver" == "4"
-          %define distro_description      Red Hat Enterprise Linux 4
-          %define distro_releasetag       rhel4
-          %define distro_buildreq         gcc-c++ gperf ncurses-devel perl time zlib-devel cmake libaio-devel
-          %define distro_requires         chkconfig coreutils grep procps shadow-utils net-tools
-        %else
-          %if "%rhelver" == "5"
-            %define distro_description    Red Hat Enterprise Linux 5
-            %define distro_releasetag     rhel5
-            %define distro_buildreq       gcc-c++ gperf ncurses-devel perl time zlib-devel cmake libaio-devel
-            %define distro_requires       chkconfig coreutils grep procps shadow-utils net-tools
-          %else
-            %if "%rhelver" == "6"
-              %define distro_description    Red Hat Enterprise Linux 6
-              %define distro_releasetag     rhel6
-              %define distro_buildreq       gcc-c++ ncurses-devel perl time zlib-devel cmake libaio-devel
-              %define distro_requires       chkconfig coreutils grep procps shadow-utils net-tools
-            %else
-              %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
-            %endif
-          %endif
-        %endif
-      %else
-        %if %(test -f /etc/SuSE-release && echo 1 || echo 0)
-          %define susever %(rpm -qf --qf '%%{version}\\n' /etc/SuSE-release | cut -d. -f1)
-          %if "%susever" == "10"
-            %define distro_description    SUSE Linux Enterprise Server 10
-            %define distro_releasetag     sles10
-            %define distro_buildreq       gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client zlib-devel cmake libaio-devel
-            %define distro_requires       aaa_base coreutils grep procps pwdutils
-          %else
-            %if "%susever" == "11"
-              %define distro_description  SUSE Linux Enterprise Server 11
-              %define distro_releasetag   sles11
-              %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils zlib-devel cmake libaio-devel
-              %define distro_requires     aaa_base coreutils grep procps pwdutils
-            %else
-              %{error:SuSE %{susever} is unsupported}
-            %endif
-          %endif
-        %else
-          %{error:Unsupported distribution}
-        %endif
-      %endif
-    %endif
+
+%if 0%{?suse_version}
+%if 0%{?suse_version} == 1110
+BuildRequires: gdbm-devel gperf openldap2-client procps pwdutils
+%endif
+%if 0%{?suse_version} == 1310 || 0%{?suse_version} == 1315 || 0%{?suse_version} == 1320
+BuildRequires: gperf procps time
+%endif
+%endif
+
+# Define dist tag if not given by platform
+%if %{undefined dist}
+  # For suse versions see:
+  # https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
+  %if 0%{?suse_version} == 1110
+    %define dist .sle11
   %endif
-%else
-  %define glibc_version %(/lib/libc.so.6 | grep stable | cut -d, -f1 | cut -c38-)
-  %define distro_description            Generic Linux (glibc %{glibc_version})
-  %define distro_releasetag             linux_glibc%{glibc_version}
-  %define distro_buildreq               gcc-c++ gperf ncurses-devel perl  time zlib-devel
-  %define distro_requires               coreutils grep procps /sbin/chkconfig /usr/sbin/useradd /usr/sbin/groupadd
+  %if 0%{?suse_version} == 1310
+    %define dist .suse13.1
+  %endif
+  %if 0%{?suse_version} == 1315
+    %define dist .sle12
+  %endif
+  %if 0%{?suse_version} == 1320
+    %define dist .suse13.2
+  %endif
+  # Still missing?
+  %if %{undefined dist}
+    %define dist .DIST
+  %endif
 %endif
+
 
 # Avoid debuginfo RPMs, leaves binaries unstripped
 %define debug_package   %{nil}
@@ -235,7 +188,7 @@
 %define license_files_server    %{src_dir}/LICENSE.mysql
 %define license_type            Commercial
 %else
-%define license_files_server    %{src_dir}/COPYING %{src_dir}/README
+%define license_files_server    COPYING README
 %define license_type            GPL
 %endif
 
@@ -247,17 +200,20 @@ Name:           MySQL%{product_suffix}
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
 Version:        @MYSQL_RPM_VERSION@
-Release:        %{release}%{?distro_releasetag:.%{distro_releasetag}}
-Distribution:   %{distro_description}
+Release:        %{release}%{dist}
+# Distribution:   %{distro_description}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. All rights reserved. Under %{license_type} license as shown in the Description field.
-Source:         http://www.mysql.com/Downloads/MySQL-@MYSQL_BASE_VERSION@/%{src_dir}.tar.gz
+Source:         %{src_dir}.tar.gz
+Source99:       mysql-rpmlintrc
+Patch0:          cmake-no-wix.patch
 URL:            http://www.mysql.com/
-Packager:       MySQL Release Engineering <mysql-build@oss.oracle.com> 
+Packager:       Codership Oy <info@galeracluster.com>
 Vendor:         %{mysql_vendor}
-BuildRequires:  %{distro_buildreq}
+# BuildRequires:  %{distro_buildreq}
+#wsrep_patch_tag
 
 # Regression tests may take a long time, override the default to skip them 
-%{!?runselftest:%global runselftest 1}
+%{!?runselftest:%global runselftest 0}
 
 # Think about what you use here since the first step is to
 # run a rm -rf
@@ -286,10 +242,41 @@ documentation and the manual for more information.
 # Sub package definition
 ##############################################################################
 
-%package -n MySQL-server%{product_suffix}
+%package -n mysql-wsrep%{product_suffix}
+Summary:        MySQL: meta package for a server+client setup
+Group:          Applications/Databases
+Requires:       mysql-wsrep-server%{product_suffix}
+Requires:       mysql-wsrep-client%{product_suffix}
+
+%description -n mysql-wsrep%{product_suffix}
+This meta package ensures the installation of a MySQL server and the necessary
+client programs for operation and administration. It does not itself
+contain those files but rather causes the installation of the subpackages
+"mysql-wsrep-server%{product_suffix}" and "mysql-wsrep-client%{product_suffix}".
+As indicated in the name, the server is built with the "wsrep" plugin so that
+it can be a node in a MySQL Galera Cluster.
+
+# ----------------------------------------------------------------------------
+
+%package -n mysql-wsrep-server%{product_suffix}
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
-Requires:       %{distro_requires}
+# Distro requirements
+# RedHat
+%if 0%{?fedora} || 0%{?rhel}
+Requires:       chkconfig coreutils grep procps shadow-utils net-tools rsync lsof
+%if 0%{?rhel} == 7 || 0%{?fedora} >= 20
+Requires: perl-Data-Dumper
+%endif
+%endif
+# SUSE
+%if 0%{?suse_version}
+Requires: aaa_base coreutils grep procps rsync lsof
+%if 0%{suse_version} == 1110
+Requires: pwdutils
+%endif
+%endif
+
 %if 0%{?commercial}
 Obsoletes:      MySQL-server
 %else
@@ -302,7 +289,7 @@ Obsoletes:      MySQL-server-advanced-gpl MySQL-server-enterprise-gpl
 Provides:       mysql-server = %{version}-%{release}
 Provides:       mysql-server%{?_isa} = %{version}-%{release}
 
-%description -n MySQL-server%{product_suffix}
+%description -n mysql-wsrep-server%{product_suffix}
 The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
 and robust SQL (Structured Query Language) database server. MySQL Server
 is intended for mission-critical, heavy-load production systems as well
@@ -323,11 +310,13 @@ and the manual for more information.
 This package includes the MySQL server binary as well as related utilities
 to run and administer a MySQL server.
 
+Built with wsrep patch %{wsrep_version}.
+
 If you want to access and work with the database, you have to install
-package "MySQL-client%{product_suffix}" as well!
+package "mysql-wsrep-client%{product_suffix}" as well!
 
 # ----------------------------------------------------------------------------
-%package -n MySQL-client%{product_suffix}
+%package -n mysql-wsrep-client%{product_suffix}
 Summary:        MySQL - Client
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -342,13 +331,13 @@ Obsoletes:      MySQL-client-advanced-gpl MySQL-client-enterprise-gpl
 Provides:       mysql = %{version}-%{release} 
 Provides:       mysql%{?_isa} = %{version}-%{release}
 
-%description -n MySQL-client%{product_suffix}
+%description -n mysql-wsrep-client%{product_suffix}
 This package contains the standard MySQL clients and administration tools.
 
 For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 
 # ----------------------------------------------------------------------------
-%package -n MySQL-test%{product_suffix}
+%package -n mysql-wsrep-test%{product_suffix}
 Summary:        MySQL - Test suite
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -366,13 +355,13 @@ Provides:       mysql-test = %{version}-%{release}
 Provides:       mysql-test%{?_isa} = %{version}-%{release}
 AutoReqProv:    no
 
-%description -n MySQL-test%{product_suffix}
+%description -n mysql-wsrep-test%{product_suffix}
 This package contains the MySQL regression test suite.
 
 For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 
 # ----------------------------------------------------------------------------
-%package -n MySQL-devel%{product_suffix}
+%package -n mysql-wsrep-devel%{product_suffix}
 Summary:        MySQL - Development header files and libraries
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -387,14 +376,14 @@ Obsoletes:      MySQL-devel-advanced-gpl MySQL-devel-enterprise-gpl
 Provides:       mysql-devel = %{version}-%{release}
 Provides:       mysql-devel%{?_isa} = %{version}-%{release}
 
-%description -n MySQL-devel%{product_suffix}
+%description -n mysql-wsrep-devel%{product_suffix}
 This package contains the development header files and libraries necessary
 to develop MySQL client applications.
 
 For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 
 # ----------------------------------------------------------------------------
-%package -n MySQL-shared%{product_suffix}
+%package -n mysql-wsrep-shared%{product_suffix}
 Summary:        MySQL - Shared libraries
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -408,44 +397,17 @@ Obsoletes:      MySQL-shared-pro-gpl-cert
 Obsoletes:      MySQL-shared-classic MySQL-shared-community MySQL-shared-enterprise
 Obsoletes:      MySQL-shared-advanced-gpl MySQL-shared-enterprise-gpl
 
-%description -n MySQL-shared%{product_suffix}
+%description -n mysql-wsrep-shared%{product_suffix}
 This package contains the shared libraries (*.so*) which certain languages
 and applications need to dynamically load and use MySQL.
 
-# ----------------------------------------------------------------------------
-%package -n MySQL-embedded%{product_suffix}
-Summary:        MySQL - Embedded library
-Group:          Applications/Databases
-%if 0%{?commercial}
-Requires:       MySQL-devel-advanced
-Obsoletes:      MySQL-embedded
-%else
-Requires:       MySQL-devel
-Obsoletes:      MySQL-embedded-advanced
-%endif
-Obsoletes:      mysql-embedded < %{version}-%{release}
-Obsoletes:      mysql-embedded-advanced
-Obsoletes:      MySQL-embedded-pro
-Obsoletes:      MySQL-embedded-classic MySQL-embedded-community MySQL-embedded-enterprise
-Obsoletes:      MySQL-embedded-advanced-gpl MySQL-embedded-enterprise-gpl
-Provides:       mysql-embedded = %{version}-%{release}
-Provides:       mysql-emdedded%{?_isa} = %{version}-%{release}
-
-%description -n MySQL-embedded%{product_suffix}
-This package contains the MySQL server as an embedded library.
-
-The embedded MySQL server library makes it possible to run a full-featured
-MySQL server inside the client application. The main benefits are increased
-speed and more simple management for embedded applications.
-
-The API is identical for the embedded MySQL version and the
-client/server version.
-
-For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
-
 ##############################################################################
 %prep
-%setup -T -a 0 -c -n %{src_dir}
+%setup -n %{src_dir}
+# That patch is needed with old cmake only, on SLES 11, but it won't do any harm
+# outside Windows, so it may be used in all RPM builds.
+%patch0 -p1
+#wsrep_apply_patch_tag
 ##############################################################################
 %build
 
@@ -485,7 +447,7 @@ export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
 export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
-export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-}
+export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:--j$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
 
 # By default, a build will include the bundeled "yaSSL" library for SSL.
 # However, there may be a need to override.
@@ -503,25 +465,30 @@ mkdir debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -O[0-9]* / /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
                 -e 's/ -unroll2 / /' \
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
               sed -e 's/ -O[0-9]* / /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
                   -e 's/ -unroll2 / /' \
                   -e 's/ -ip / /' \
                   -e 's/^ //' \
                   -e 's/ $//'`
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DCMAKE_BUILD_TYPE=Debug \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DWITH_WSREP=1 \
+           -DWSREP_VERSION="%{wsrep_version}" \
+           -DWSREP_REVISION="%{wsrep_revision}"
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make ${MAKE_JFLAG} VERBOSE=1
 )
@@ -531,13 +498,16 @@ mkdir release
   cd release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
-  ${CMAKE} ../%{src_dir} -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+  ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
-           -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
+           -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           -DWITH_WSREP=1 \
+           -DWSREP_VERSION="%{wsrep_version}" \
+           -DWSREP_REVISION="%{wsrep_revision}"
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG} VERBOSE=1
 )
@@ -584,14 +554,20 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
-ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
+ln -sf %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
+
+# Create a wsrep_sst_rsync_wan symlink.
+install -d $RBR%{_bindir}
+ln -sf wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 # Touch the place where the my.cnf config file might be located
 # Just to make sure it's in the file list and marked as a config file
 touch $RBR%{_sysconfdir}/my.cnf
+touch $RBR%{_sysconfdir}/wsrep.cnf
+
 
 # Install SELinux files in datadir
-install -m 600 $MBD/%{src_dir}/support-files/RHEL4-SElinux/mysql.{fc,te} \
+install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
   $RBR%{_datadir}/mysql/SELinux/RHEL4
 
 %if %{WITH_TCMALLOC}
@@ -610,7 +586,7 @@ install -m 644 "%{malloc_lib_source}" \
 #  Post processing actions, i.e. when installed
 ##############################################################################
 
-%pre -n MySQL-server%{product_suffix}
+%pre -n mysql-wsrep-server%{product_suffix}
 # This is the code running at the beginning of a RPM upgrade action,
 # before replacing the old files with the new ones.
 
@@ -788,7 +764,7 @@ if [ -x %{_sysconfdir}/init.d/mysql ] ; then
         sleep 5
 fi
 
-%post -n MySQL-server%{product_suffix}
+%post -n mysql-wsrep-server%{product_suffix}
 # This is the code running at the end of a RPM install or upgrade action,
 # after the (new) files have been written.
 
@@ -948,7 +924,7 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
 #scheduled service packs and more.  Visit www.mysql.com/enterprise for more
 #information."
 
-%preun -n MySQL-server%{product_suffix}
+%preun -n mysql-wsrep-server%{product_suffix}
 
 # Which '$1' does this refer to?  Fedora docs have info:
 # " ... a count of the number of versions of the package that are installed.
@@ -977,7 +953,7 @@ fi
 # We do not remove the mysql user since it may still own a lot of
 # database files.
 
-%triggerpostun -n MySQL-server%{product_suffix} --MySQL-server-community
+%triggerpostun -n mysql-wsrep-server%{product_suffix} --MySQL-server-community
 
 # Setup: We renamed this package, so any existing "server-community"
 #   package will be removed when this "server" is installed.
@@ -1048,16 +1024,22 @@ echo "====="                                     >> $STATUS_HISTORY
 #  Files section
 ##############################################################################
 
-%files -n MySQL-server%{product_suffix} -f release/support-files/plugins.files
-%defattr(-,root,root,0755)
+%files -n mysql-wsrep%{product_suffix}
+# Intentionally empty - this is a pure meta package.
 
+# ----------------------------------------------------------------------------
+%files -n mysql-wsrep-server%{product_suffix} -f release/support-files/plugins.files
+%defattr(-,root,root,0755)
 %if %{defined license_files_server}
 %doc %{license_files_server}
 %endif
-%doc %{src_dir}/Docs/ChangeLog
-%doc %{src_dir}/Docs/INFO_SRC*
+%doc Docs/ChangeLog
+%doc release/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
 %doc release/support-files/my-default.cnf
+%doc Docs/README-wsrep
+%doc release/support-files/wsrep.cnf
+%doc release/support-files/wsrep_notify
 
 %if 0%{?commercial}
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
@@ -1093,6 +1075,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 
 %ghost %config(noreplace,missingok) %{_sysconfdir}/my.cnf
+%ghost %config(noreplace,missingok) %{_sysconfdir}/wsrep.cnf
 %dir %{_sysconfdir}/my.cnf.d
 
 %attr(755, root, root) %{_bindir}/innochecksum
@@ -1120,10 +1103,18 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/replace
 %attr(755, root, root) %{_bindir}/resolve_stack_dump
 %attr(755, root, root) %{_bindir}/resolveip
+%attr(755, root, root) %{_bindir}/wsrep_sst_common
+%attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
+%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
+%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
 %attr(755, root, root) %{_sbindir}/rcmysql
+%dir %{_libdir}/mysql/plugin
+%dir %{_libdir}/mysql/plugin/debug
 %attr(755, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 
 %if %{WITH_TCMALLOC}
@@ -1136,9 +1127,12 @@ echo "====="                                     >> $STATUS_HISTORY
 %dir %attr(755, mysql, mysql) /var/lib/mysql
 
 # ----------------------------------------------------------------------------
-%files -n MySQL-client%{product_suffix}
+%files -n mysql-wsrep-client%{product_suffix}
 
 %defattr(-, root, root, 0755)
+%if %{defined license_files_server}
+%doc %{license_files_server}
+%endif
 %attr(755, root, root) %{_bindir}/msql2mysql
 %attr(755, root, root) %{_bindir}/mysql
 %attr(755, root, root) %{_bindir}/mysql_find_rows
@@ -1170,8 +1164,11 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config_editor.1*
 
 # ----------------------------------------------------------------------------
-%files -n MySQL-devel%{product_suffix} -f optional-files-devel
+%files -n mysql-wsrep-devel%{product_suffix} -f optional-files-devel
 %defattr(-, root, root, 0755)
+%if %{defined license_files_server}
+%doc %{license_files_server}
+%endif
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
 %attr(755, root, root) %{_bindir}/mysql_config
@@ -1206,23 +1203,11 @@ echo "====="                                     >> $STATUS_HISTORY
 %endif
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
-%attr(755, root, root) %{_bindir}/mysql_client_test_embedded
-%attr(755, root, root) %{_bindir}/mysqltest_embedded
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql-stress-test.pl.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql-test-run.pl.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test_embedded.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqltest_embedded.1*
-
-# ----------------------------------------------------------------------------
-%files -n MySQL-embedded%{product_suffix}
-%defattr(-, root, root, 0755)
-%if %{defined license_files_server}
-%doc %{license_files_server}
-%endif
-%attr(755, root, root) %{_bindir}/mysql_embedded
-%attr(644, root, root) %{_libdir}/mysql/libmysqld.a
-%attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file
@@ -1363,7 +1348,7 @@ echo "====="                                     >> $STATUS_HISTORY
   not in an RPM upgrade.
   This affects both the "mkdir" and the call of "mysql_install_db".
 
-* Wed Feb 09 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
+* Thu Feb 10 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Fix bug#56581: If an installation deviates from the default file locations
   ("datadir" and "pid-file"), the mechanism to detect a running server (on upgrade)
@@ -1484,7 +1469,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Fix some problems with the directives around "tcmalloc" (experimental),
   remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
-* Tue Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
+* Fri Oct 09 2009 Magnus Blaudd <mvensson@mysql.com>
 
 - Removed mysql_fix_privilege_tables
 
@@ -1681,7 +1666,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - Set $LDFLAGS from $MYSQL_BUILD_LDFLAGS
 
-* Tue Mar 07 2006 Kent Boortz <kent@mysql.com>
+* Wed Mar 08 2006 Kent Boortz <kent@mysql.com>
 
 - Changed product name from "Community Edition" to "Community Server"
 
@@ -1776,7 +1761,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 * Thu Sep 29 2005 Lenz Grimmer <lenz@mysql.com>
 
-- fixed the removing of the RPM_BUILD_ROOT in the %clean section (the
+- fixed the removing of the RPM_BUILD_ROOT in the %%clean section (the
   $RBR variable did not get expanded, thus leaving old build roots behind)
 
 * Thu Aug 04 2005 Lenz Grimmer <lenz@mysql.com>
@@ -1869,7 +1854,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - ISAM and merge storage engines were purged. As well as appropriate
   tools and manpages (isamchk and isamlog)
 
-* Thu Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
+* Fri Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
 
 - enabled the "Archive" storage engine for the max binary
 - enabled the "CSV" storage engine for the max binary
@@ -1929,7 +1914,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - marked /etc/logrotate.d/mysql as a config file (BUG 2156)
 
-* Sat Dec 13 2003 Lenz Grimmer <lenz@mysql.com>
+* Fri Dec 12 2003 Lenz Grimmer <lenz@mysql.com>
 
 - fixed file permissions (BUG 1672)
 
@@ -2071,7 +2056,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Added separate libmysql_r directory; now both a threaded
   and non-threaded library is shipped.
 
-* Tue Sep 28 1999 David Axmark <davida@mysql.com>
+* Wed Sep 29 1999 David Axmark <davida@mysql.com>
 
 - Added the support-files/my-example.cnf to the docs directory.
 
