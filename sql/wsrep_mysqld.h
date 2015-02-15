@@ -93,7 +93,6 @@ extern ulong       wsrep_OSU_method_options;
 extern my_bool     wsrep_desync;
 extern ulong       wsrep_reject_queries_options;
 extern my_bool     wsrep_recovery;
-extern my_bool     wsrep_replicate_myisam;
 extern my_bool     wsrep_log_conflicts;
 extern ulong       wsrep_mysql_replication_bundle;
 extern my_bool     wsrep_load_data_splitting;

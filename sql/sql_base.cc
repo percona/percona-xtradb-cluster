@@ -5370,7 +5370,7 @@ restart:
        thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
        thd->lex->sql_command== SQLCOM_LOAD           ||
        thd->lex->sql_command== SQLCOM_DELETE)        &&
-      wsrep_replicate_myisam                         &&
+      thd->variables.wsrep_replicate_myisam          &&
       (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM)
     {
       WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
