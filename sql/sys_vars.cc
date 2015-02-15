@@ -4916,7 +4916,7 @@ static Sys_var_mybool Sys_wsrep_recover_datadir(
 
 static Sys_var_mybool Sys_wsrep_replicate_myisam(
        "wsrep_replicate_myisam", "To enable myisam replication",
-       GLOBAL_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       SESSION_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_mybool Sys_wsrep_log_conflicts(
        "wsrep_log_conflicts", "To log multi-master conflicts",

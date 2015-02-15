@@ -1,0 +1,34 @@
+--source include/have_wsrep.inc
+
+--echo #
+--echo # wsrep_replicate_myisam
+--echo #
+
+--echo # save the initial value
+SET @wsrep_replicate_myisam_session_saved = @@session.wsrep_replicate_myisam;
+
+--echo # default
+SELECT @@global.wsrep_replicate_myisam;
+SELECT @@session.wsrep_replicate_myisam;
+
+--echo
+--echo # scope and valid values
+SET @@session.wsrep_replicate_myisam=OFF;
+SELECT @@session.wsrep_replicate_myisam;
+SET @@session.wsrep_replicate_myisam=ON;
+SELECT @@session.wsrep_replicate_myisam;
+SET @@session.wsrep_replicate_myisam=default;
+SELECT @@session.wsrep_replicate_myisam;
+
+--echo
+--echo # invalid values
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@session.wsrep_replicate_myisam=NULL;
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@session.wsrep_replicate_myisam='junk';
+
+--echo
+--echo # restore the initial values
+SET @@session.wsrep_replicate_myisam = @wsrep_replicate_myisam_session_saved;
+
+--echo # End of test
