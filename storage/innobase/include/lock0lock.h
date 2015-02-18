@@ -893,6 +893,9 @@ lock_trx_has_rec_x_lock(
 				or if the lock is inherited to a neighboring
 				record */
 
+#if (LOCK_WAIT|LOCK_GAP|LOCK_REC_NOT_GAP|LOCK_INSERT_INTENTION)&LOCK_MODE_MASK
+# error
+#endif
 #if (LOCK_WAIT|LOCK_GAP|LOCK_REC_NOT_GAP|LOCK_INSERT_INTENTION)&LOCK_TYPE_MASK
 # error
 #endif

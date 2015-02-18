@@ -329,6 +329,9 @@ ELSE()
       wsrep_sst_xtrabackup-v2
     )
   ENDIF()
+  # Configure this one, for testing, but do not install it.
+  CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql_config.pl.in
+    ${CMAKE_CURRENT_BINARY_DIR}/mysql_config.pl ESCAPE_QUOTES @ONLY)
   # On Unix, most of the files end up in the bin directory
   SET(mysql_config_COMPONENT COMPONENT Development)
   SET(BIN_SCRIPTS

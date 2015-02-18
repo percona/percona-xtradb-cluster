@@ -3491,6 +3491,9 @@ void wsrep_brute_force_aborts();
 /* It is required by basic binlog features on both MySQL server and libmysqld */
 int ha_binlog_end(THD *thd);
 
+/* It is required by basic binlog features on both MySQL server and libmysqld */
+int ha_binlog_end(THD *thd);
+
 const char *ha_legacy_type_name(legacy_db_type legacy_type);
 const char *get_canonical_filename(handler *file, const char *path,
                                    char *tmp_path);
