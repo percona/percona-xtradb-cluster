@@ -1005,6 +1005,8 @@ struct handlerton
 */
 
 #define HTON_SUPPORTS_EXTENDED_KEYS  (1 << 10)
+// Engine supports foreign key constraint.
+#define HTON_SUPPORTS_FOREIGN_KEYS   (1 << 11)
 
 
 enum enum_tx_isolation { ISO_READ_UNCOMMITTED, ISO_READ_COMMITTED,
@@ -3485,6 +3487,9 @@ void ha_binlog_wait(THD *thd);
 #ifdef WITH_WSREP
 void wsrep_brute_force_aborts();
 #endif
+
+/* It is required by basic binlog features on both MySQL server and libmysqld */
+int ha_binlog_end(THD *thd);
 
 /* It is required by basic binlog features on both MySQL server and libmysqld */
 int ha_binlog_end(THD *thd);

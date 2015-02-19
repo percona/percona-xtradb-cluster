@@ -27,12 +27,14 @@
 #include <cstdlib>
 
 extern const char wsrep_defaults_file[];
+extern const char wsrep_defaults_group_suffix[];
 
 #define WSREP_SST_OPT_ROLE     "--role"
 #define WSREP_SST_OPT_ADDR     "--address"
 #define WSREP_SST_OPT_AUTH     "--auth"
 #define WSREP_SST_OPT_DATA     "--datadir"
 #define WSREP_SST_OPT_CONF     "--defaults-file"
+#define WSREP_SST_OPT_CONF_SUFFIX "--defaults-group-suffix"
 #define WSREP_SST_OPT_PARENT   "--parent"
 #define WSREP_SST_OPT_BINLOG   "--binlog"
 
@@ -437,7 +439,7 @@ static ssize_t sst_prepare_other (const char*  method,
                                   const char** addr_out)
 {
   ssize_t cmd_len= 1024;
-  char    cmd_str[cmd_len];
+  char    cmd_str[1024];
   const char* sst_dir= mysql_real_data_home;
   const char* binlog_opt= "";
   char* binlog_opt_val= NULL;
@@ -459,10 +461,11 @@ static ssize_t sst_prepare_other (const char*  method,
                  WSREP_SST_OPT_AUTH" '%s' "
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX" '%s' "
                  WSREP_SST_OPT_PARENT" '%d'"
                  " %s '%s' ",
                  method, addr_in, (sst_auth_real) ? sst_auth_real : "",
-                 sst_dir, wsrep_defaults_file, (int)getpid(),
+                 sst_dir, wsrep_defaults_file, wsrep_defaults_group_suffix, (int)getpid(),
                  binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
@@ -717,7 +720,7 @@ static int sst_donate_mysqldump (const char*         addr,
     host_len = strlen (addr) + 1;
   }
 
-  char host[host_len];
+  char *host= (char*) malloc(host_len);
 
   strncpy (host, addr, host_len - 1);
   host[host_len - 1] = '\0';
@@ -737,7 +740,7 @@ static int sst_donate_mysqldump (const char*         addr,
     user_len = (auth) ? strlen (auth) + 1 : 1;
   }
 
-  char user[user_len];
+  char* user= (char*) malloc(user_len);
 
   strncpy (user, (auth) ? auth : "", user_len - 1);
   user[user_len - 1] = '\0';
@@ -746,7 +749,7 @@ static int sst_donate_mysqldump (const char*         addr,
   if (!ret)
   {
     size_t cmd_len= 1024;
-    char   cmd_str[cmd_len];
+    char   cmd_str[1024];
 
     if (!bypass && wsrep_sst_donor_rejects_queries) sst_reject_queries(TRUE);
 
@@ -773,6 +776,9 @@ static int sst_donate_mysqldump (const char*         addr,
   wsrep_gtid_t const state_id = { *uuid, (ret ? WSREP_SEQNO_UNDEFINED : seqno)};
 
   wsrep->sst_sent (wsrep, &state_id, ret);
+
+  free(user);
+  free(host);
 
   return ret;
 }
@@ -831,9 +837,9 @@ static int sst_flush_tables(THD* thd)
     WSREP_INFO("Tables flushed.");
     const char base_name[]= "tables_flushed";
     ssize_t const full_len= strlen(mysql_real_data_home) + strlen(base_name)+2;
-    char real_name[full_len];
+    char *real_name = (char*) malloc(full_len);
     sprintf(real_name, "%s/%s", mysql_real_data_home, base_name);
-    char tmp_name[full_len + 4];
+    char *tmp_name = (char*) malloc(full_len + 4);
     sprintf(tmp_name, "%s.tmp", real_name);
 
     FILE* file= fopen(tmp_name, "w+");
@@ -855,6 +861,8 @@ static int sst_flush_tables(THD* thd)
                      tmp_name, real_name, err,strerror(err));
       }
     }
+    free(real_name);
+    free(tmp_name);
   }
 
   return err;
@@ -981,7 +989,7 @@ static int sst_donate_other (const char*   method,
                              bool          bypass)
 {
   ssize_t cmd_len = 4096;
-  char    cmd_str[cmd_len];
+  char    cmd_str[4096];
   const char* binlog_opt= "";
   char* binlog_opt_val= NULL;
 
@@ -1001,11 +1009,12 @@ static int sst_donate_other (const char*   method,
                  WSREP_SST_OPT_SOCKET" '%s' "
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX" '%s' "
                  " %s '%s' "
                  WSREP_SST_OPT_GTID" '%s:%lld'"
                  "%s",
                  method, addr, sst_auth_real, mysqld_unix_port,
-                 mysql_real_data_home, wsrep_defaults_file,
+                 mysql_real_data_home, wsrep_defaults_file, wsrep_defaults_group_suffix,
                  binlog_opt, binlog_opt_val,
                  uuid, (long long) seqno,
                  bypass ? " "WSREP_SST_OPT_BYPASS : "");

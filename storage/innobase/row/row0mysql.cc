@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -610,6 +610,7 @@ handle_new_error:
 	case DB_DUPLICATE_KEY:
 	case DB_FOREIGN_DUPLICATE_KEY:
 	case DB_TOO_BIG_RECORD:
+	case DB_TOO_BIG_FOR_REDO:
 	case DB_UNDO_RECORD_TOO_BIG:
 	case DB_ROW_IS_REFERENCED:
 	case DB_NO_REFERENCED_ROW:
@@ -3764,6 +3765,10 @@ row_drop_table_for_mysql(
 	pars_info_t*	info			= NULL;
 	mem_heap_t*	heap			= NULL;
 
+	DBUG_ENTER("row_drop_table_for_mysql");
+
+	DBUG_PRINT("row_drop_table_for_mysql", ("table: %s", name));
+
 	ut_a(name != NULL);
 
 	if (srv_created_new_raw) {
@@ -3773,7 +3778,7 @@ row_drop_table_for_mysql(
 		      "InnoDB: Shut down mysqld and edit my.cnf so that newraw"
 		      " is replaced with raw.\n", stderr);
 
-		return(DB_ERROR);
+		DBUG_RETURN(DB_ERROR);
 	}
 
 	/* The table name is prefixed with the database name and a '/'.
@@ -4401,7 +4406,7 @@ funct_exit:
 
 	srv_wake_master_thread();
 
-	return(err);
+	DBUG_RETURN(err);
 }
 
 /*********************************************************************//**

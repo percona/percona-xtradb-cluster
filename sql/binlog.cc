@@ -1905,7 +1905,10 @@ static int log_in_use(const char* log_name)
 {
   size_t log_name_len = strlen(log_name) + 1;
   int thread_count=0;
-  DEBUG_SYNC(current_thd,"purge_logs_after_lock_index_before_thread_count");
+#ifndef DBUG_OFF
+  if (current_thd)
+    DEBUG_SYNC(current_thd,"purge_logs_after_lock_index_before_thread_count");
+#endif
   mysql_mutex_lock(&LOCK_thread_count);
 
   Thread_iterator it= global_thread_list_begin();
@@ -3077,13 +3080,13 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
         case NO_GTIDS:
         {
           /*
-            If the simplified_binlog_gtid_recovery is enabled, and the
+            If the binlog_gtid_simple_recovery is enabled, and the
             last binary log does not contain any GTID event, do not
             read any more binary logs, GLOBAL.GTID_EXECUTED and
             GLOBAL.GTID_PURGED should be empty in the case. Otherwise,
             initialize GTID_EXECUTED as usual.
           */
-          if (simplified_binlog_gtid_recovery && !is_relay_log)
+          if (binlog_gtid_simple_recovery && !is_relay_log)
           {
             DBUG_ASSERT(all_gtids->is_empty() && lost_gtids->is_empty());
             goto end;
@@ -3120,12 +3123,12 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
         case NO_GTIDS:
         {
           /*
-            If the simplified_binlog_gtid_recovery is enabled, and the
+            If the binlog_gtid_simple_recovery is enabled, and the
             first binary log does not contain any GTID event, do not
             read any more binary logs, GLOBAL.GTID_PURGED should be
             empty in the case.
           */
-          if (simplified_binlog_gtid_recovery && !is_relay_log)
+          if (binlog_gtid_simple_recovery && !is_relay_log)
           {
             DBUG_ASSERT(lost_gtids->is_empty());
             goto end;
@@ -3302,6 +3305,8 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     else
       global_sid_lock->assert_some_wrlock();
     Previous_gtids_log_event prev_gtids_ev(previous_gtid_set);
+    if (is_relay_log)
+      prev_gtids_ev.set_relay_log_event();
     if (need_sid_lock)
       global_sid_lock->unlock();
     prev_gtids_ev.checksum_alg= s.checksum_alg;
@@ -3398,7 +3403,7 @@ err:
   my_free(name);
   name= NULL;
   log_state= LOG_CLOSED;
-  if (binlogging_impossible_mode == ABORT_SERVER)
+  if (binlog_error_action == ABORT_SERVER)
   {
     THD *thd= current_thd;
     /*
@@ -4809,6 +4814,43 @@ int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time, bool auto_purge)
                         no_of_log_files_purged, no_of_log_files_to_purge);
   }
 
+  if (log_is_active)
+  {
+    if(!auto_purge)
+      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                          ER_WARN_PURGE_LOG_IS_ACTIVE,
+                          ER(ER_WARN_PURGE_LOG_IS_ACTIVE),
+                          log_info.log_file_name);
+
+  }
+
+  if (log_is_in_use)
+  {
+    int no_of_log_files_to_purge= no_of_log_files_purged+1;
+    while (strcmp(log_file_name, log_info.log_file_name))
+    {
+      if (mysql_file_stat(m_key_file_log, log_info.log_file_name,
+                          &stat_area, MYF(0)))
+      {
+        if (stat_area.st_mtime < purge_time)
+          no_of_log_files_to_purge++;
+        else
+          break;
+      }
+      if (find_next_log(&log_info, false/*need_lock_index=false*/))
+      {
+        no_of_log_files_to_purge++;
+        break;
+      }
+    }
+
+    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                        ER_WARN_PURGE_LOG_IN_USE,
+                        ER(ER_WARN_PURGE_LOG_IN_USE),
+                        copy_log_in_use, no_of_threads_locking_log,
+                        no_of_log_files_purged, no_of_log_files_to_purge);
+  }
+
   error= (to_log[0] ? purge_logs(to_log, true,
                                  false/*need_lock_index=false*/,
                                  true/*need_update_threads=true*/,
@@ -5039,7 +5081,7 @@ end:
        - ...
     */
     close(LOG_CLOSE_INDEX);
-    if (binlogging_impossible_mode == ABORT_SERVER)
+    if (binlog_error_action == ABORT_SERVER)
     {
       THD *thd= current_thd;
       /*
@@ -5543,11 +5585,18 @@ void MYSQL_BIN_LOG::purge()
   @retval
     nonzero - error in rotating routine.
 */
-int MYSQL_BIN_LOG::rotate_and_purge(bool force_rotate)
+int MYSQL_BIN_LOG::rotate_and_purge(THD* thd, bool force_rotate)
 {
   int error= 0;
   DBUG_ENTER("MYSQL_BIN_LOG::rotate_and_purge");
   bool check_purge= false;
+
+  /*
+    Wait for handlerton to insert any pending information into the binlog.
+    For e.g. ha_ndbcluster which updates the binlog asynchronously this is
+    needed so that the user see its own commands in the binlog.
+  */
+  ha_binlog_wait(thd);
 
   DBUG_ASSERT(!is_relay_log);
   mysql_mutex_lock(&LOCK_log);
@@ -9111,6 +9160,15 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, char const *query_arg,
 #else
   DBUG_ASSERT(query_arg && mysql_bin_log.is_open());
 #endif /* WITH_WSREP */
+
+  if (get_binlog_local_stmt_filter() == BINLOG_FILTER_SET)
+  {
+    /*
+      The current statement is to be ignored, and not written to
+      the binlog. Do not call issue_unsafe_warnings().
+    */
+    DBUG_RETURN(0);
+  }
 
   if (get_binlog_local_stmt_filter() == BINLOG_FILTER_SET)
   {

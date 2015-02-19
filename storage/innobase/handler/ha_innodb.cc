@@ -1551,6 +1551,15 @@ convert_error_code_to_mysql(
 		return(HA_ERR_TO_BIG_ROW);
 	}
 
+
+	case DB_TOO_BIG_FOR_REDO:
+		my_printf_error(ER_TOO_BIG_ROWSIZE, "%s" , MYF(0),
+				"The size of BLOB/TEXT data inserted"
+				" in one transaction is greater than"
+				" 10% of redo log size. Increase the"
+				" redo log size using innodb_log_file_size.");
+		return(HA_ERR_TO_BIG_ROW);
+
 	case DB_TOO_BIG_INDEX_COL:
 		my_error(ER_INDEX_COLUMN_TOO_LONG, MYF(0),
 			 DICT_MAX_FIELD_LEN_BY_FORMAT_FLAG(flags));
@@ -2889,7 +2898,8 @@ innobase_init(
 
 	innobase_hton->flush_logs = innobase_flush_logs;
 	innobase_hton->show_status = innobase_show_status;
-	innobase_hton->flags = HTON_SUPPORTS_EXTENDED_KEYS;
+	innobase_hton->flags =
+		HTON_SUPPORTS_EXTENDED_KEYS | HTON_SUPPORTS_FOREIGN_KEYS;
 
 	innobase_hton->release_temporary_latches =
 		innobase_release_temporary_latches;
@@ -7074,19 +7084,24 @@ no_commit:
 			;
 		} else if (src_table == prebuilt->table) {
 #ifdef WITH_WSREP
-			switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+			if (wsrep_on(user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+					      user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 			{
-			case WSREP_TRX_OK:
-				break;
-			case WSREP_TRX_SIZE_EXCEEDED:
-			case WSREP_TRX_CERT_FAIL:
-			case WSREP_TRX_ERROR:
-				DBUG_RETURN(1);
-			}
+				switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+				  DBUG_RETURN(1);
+				}
 
-			if (tc_log->commit(user_thd, 1))
-                                DBUG_RETURN(1);
-                        wsrep_post_commit(user_thd, TRUE);
+				if (tc_log->commit(user_thd, 1)) DBUG_RETURN(1);
+				wsrep_post_commit(user_thd, TRUE);
+			}
 #endif /* WITH_WSREP */
 			/* Source table is not in InnoDB format:
 			no need to re-acquire locks on it. */
@@ -7099,18 +7114,23 @@ no_commit:
 			prebuilt->sql_stat_start = TRUE;
 		} else {
 #ifdef WITH_WSREP
-			switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+			if (wsrep_on(user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+					      user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 			{
-			case WSREP_TRX_OK:
-				break;
-			case WSREP_TRX_SIZE_EXCEEDED:
-			case WSREP_TRX_CERT_FAIL:
-			case WSREP_TRX_ERROR:
-				DBUG_RETURN(1);
+				switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+				  DBUG_RETURN(1);
+				}
+				if (tc_log->commit(user_thd, 1))  DBUG_RETURN(1);
+				wsrep_post_commit(user_thd, TRUE);
 			}
-			if (tc_log->commit(user_thd, 1))
-                                DBUG_RETURN(1);
-                        wsrep_post_commit(user_thd, TRUE);
 #endif /* WITH_WSREP */
 			/* Ensure that there are no other table locks than
 			LOCK_IX and LOCK_AUTO_INC on the destination table. */
@@ -8888,7 +8908,6 @@ innobase_fts_create_doc_id_key(
 	dfield_t*	dfield = dtuple_get_nth_field(tuple, 0);
 
 	ut_a(dict_index_get_n_unique(index) == 1);
-
 	dtuple_set_n_fields(tuple, index->n_fields);
 	dict_index_copy_types(tuple, index, index->n_fields);
 
@@ -13059,6 +13078,7 @@ ha_innobase::start_stmt(
 	thr_lock_type	lock_type)
 {
 	trx_t*		trx;
+	DBUG_ENTER("ha_innobase::start_stmt");
 
 	update_thd(thd);
 
@@ -13081,6 +13101,29 @@ ha_innobase::start_stmt(
 	prebuilt->sql_stat_start = TRUE;
 	prebuilt->hint_need_to_fetch_extra_cols = 0;
 	reset_template();
+
+	if (dict_table_is_temporary(prebuilt->table)
+	    && prebuilt->mysql_has_locked
+	    && prebuilt->select_lock_type == LOCK_NONE) {
+		dberr_t error;
+
+		switch (thd_sql_command(thd)) {
+		case SQLCOM_INSERT:
+		case SQLCOM_UPDATE:
+		case SQLCOM_DELETE:
+			init_table_handle_for_HANDLER();
+			prebuilt->select_lock_type = LOCK_X;
+			prebuilt->stored_select_lock_type = LOCK_X;
+			error = row_lock_table_for_mysql(prebuilt, NULL, 1);
+
+			if (error != DB_SUCCESS) {
+				int st = convert_error_code_to_mysql(
+					error, 0, thd);
+				DBUG_RETURN(st);
+			}
+			break;
+		}
+	}
 
 	if (!prebuilt->mysql_has_locked) {
 		/* This handle is for a temporary table created inside
@@ -13119,7 +13162,7 @@ ha_innobase::start_stmt(
 		++trx->will_lock;
 	}
 
-	return(0);
+	DBUG_RETURN(0);
 }
 
 /******************************************************************//**
@@ -13195,6 +13238,33 @@ ha_innobase::external_lock(
 			}
 #endif /* WITH_WSREP */
 		}
+	}
+
+	/* Check for UPDATEs in read-only mode. */
+	if (srv_read_only_mode
+	    && (thd_sql_command(thd) == SQLCOM_UPDATE
+		|| thd_sql_command(thd) == SQLCOM_INSERT
+		|| thd_sql_command(thd) == SQLCOM_REPLACE
+		|| thd_sql_command(thd) == SQLCOM_DROP_TABLE
+		|| thd_sql_command(thd) == SQLCOM_ALTER_TABLE
+		|| thd_sql_command(thd) == SQLCOM_OPTIMIZE
+		|| (thd_sql_command(thd) == SQLCOM_CREATE_TABLE
+		    && lock_type == F_WRLCK)
+		|| thd_sql_command(thd) == SQLCOM_CREATE_INDEX
+		|| thd_sql_command(thd) == SQLCOM_DROP_INDEX
+		|| thd_sql_command(thd) == SQLCOM_DELETE)) {
+
+		if (thd_sql_command(thd) == SQLCOM_CREATE_TABLE)
+		{
+			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
+				    ER_INNODB_READ_ONLY);
+			DBUG_RETURN(HA_ERR_INNODB_READ_ONLY);
+		} else {
+			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
+				    ER_READ_ONLY_MODE);
+			DBUG_RETURN(HA_ERR_TABLE_READONLY);
+		}
+
 	}
 
 	/* Check for UPDATEs in read-only mode. */
@@ -14293,7 +14363,6 @@ ha_innobase::get_auto_increment(
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
-
 			current = innobase_next_autoinc(
 				current, 1, increment, 1, col_max_value);
 
@@ -14493,10 +14562,8 @@ ha_innobase::cmp_ref(
 			len1 = innobase_read_from_2_little_endian(ref1);
 			len2 = innobase_read_from_2_little_endian(ref2);
 
-			ref1 += 2;
-			ref2 += 2;
 			result = ((Field_blob*) field)->cmp(
-				ref1, len1, ref2, len2);
+				ref1 + 2, len1, ref2 + 2, len2);
 		} else {
 			result = field->key_cmp(ref1, ref2);
 		}
@@ -18550,4 +18617,29 @@ innobase_convert_to_system_charset(
 
 	return(strconvert(
 		cs1, from, cs2, to, static_cast<uint>(len), errors));
+}
+
+/**********************************************************************
+Issue a warning that the row is too big. */
+void
+ib_warn_row_too_big(const dict_table_t*	table)
+{
+	/* If prefix is true then a 768-byte prefix is stored
+	locally for BLOB fields. Refer to dict_table_get_format() */
+	const bool prefix = (dict_tf_get_format(table->flags)
+			     == UNIV_FORMAT_A);
+
+	const ulint	free_space = page_get_free_space_of_empty(
+		table->flags & DICT_TF_COMPACT) / 2;
+
+	THD*	thd = current_thd;
+
+	push_warning_printf(
+		thd, Sql_condition::WARN_LEVEL_WARN, HA_ERR_TO_BIG_ROW,
+		"Row size too large (> %lu). Changing some columns to TEXT"
+		" or BLOB %smay help. In current row format, BLOB prefix of"
+		" %d bytes is stored inline.", free_space
+		, prefix ? "or using ROW_FORMAT=DYNAMIC or"
+		" ROW_FORMAT=COMPRESSED ": ""
+		, prefix ? DICT_MAX_FIXED_COL_LEN : 0);
 }

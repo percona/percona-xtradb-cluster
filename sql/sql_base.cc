@@ -4242,8 +4242,8 @@ recover_from_failed_open()
           do not modify data but only read it, since in this case nothing is
           written to the binary log. Argument routine_modifies_data
           denotes the same. So effectively, if the statement is not a
-          update query and routine_modifies_data is false, then
-          prelocking_placeholder does not take importance.
+          LOCK TABLE, not a update query and routine_modifies_data is false
+          then prelocking_placeholder does not take importance.
 
           Furthermore, this does not apply to I_S and log tables as it's
           always unsafe to replicate such tables under statement-based
@@ -4270,17 +4270,37 @@ thr_lock_type read_lock_type_for_table(THD *thd,
     at THD::variables::sql_log_bin member.
   */
   bool log_on= mysql_bin_log.is_open() && thd->variables.sql_log_bin;
-  ulong binlog_format= thd->variables.binlog_format;
-  if ((log_on == FALSE) || (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW) ||
-      (table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
-      (table_list->table->s->table_category == TABLE_CATEGORY_RPL_INFO) ||
-      (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE) ||
-      !(is_update_query(prelocking_ctx->sql_command) ||
-        (routine_modifies_data && table_list->prelocking_placeholder) ||
-        (thd->locked_tables_mode > LTM_LOCK_TABLES)))
+
+  /*
+    When we do not write to binlog or when we use row based replication,
+    it is safe to use a weaker lock.
+  */
+  if (log_on == false ||
+      thd->variables.binlog_format == BINLOG_FORMAT_ROW)
     return TL_READ;
-  else
+
+  if ((table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
+      (table_list->table->s->table_category == TABLE_CATEGORY_RPL_INFO) ||
+      (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE))
+    return TL_READ;
+
+  // SQL queries which updates data need a stronger lock.
+  if (is_update_query(prelocking_ctx->sql_command))
     return TL_READ_NO_INSERT;
+
+  /*
+    table_list is placeholder for prelocking.
+    Ignore prelocking_placeholder status for non "LOCK TABLE" statement's
+    table_list objects when routine_modifies_data is false.
+  */
+  if (table_list->prelocking_placeholder &&
+      (routine_modifies_data || thd->in_lock_tables))
+    return TL_READ_NO_INSERT;
+
+  if (thd->locked_tables_mode > LTM_LOCK_TABLES)
+    return TL_READ_NO_INSERT;
+
+  return TL_READ;
 }
 
 
@@ -4971,15 +4991,8 @@ bool open_tables(THD *thd, TABLE_LIST **start, uint *counter, uint flags,
   bool error= FALSE;
   bool some_routine_modifies_data= FALSE;
   bool has_prelocking_list;
+  enum xa_states xa_state;
   DBUG_ENTER("open_tables");
-
-  /* Accessing data in XA_IDLE or XA_PREPARED is not allowed. */
-  enum xa_states xa_state= thd->transaction.xid_state.xa_state;
-  if (*start && (xa_state == XA_IDLE || xa_state == XA_PREPARED))
-  {
-    my_error(ER_XAER_RMFAIL, MYF(0), xa_state_names[xa_state]);
-    DBUG_RETURN(true);
-  }
 
   thd->current_tablenr= 0;
 restart:
@@ -5178,6 +5191,15 @@ restart:
         some_routine_modifies_data|= routine_modifies_data;
       }
     }
+  }
+
+  /* Accessing data in XA_IDLE or XA_PREPARED is not allowed. */
+  xa_state= thd->transaction.xid_state.xa_state;
+  if (*start && (xa_state == XA_IDLE || xa_state == XA_PREPARED))
+  {
+    my_error(ER_XAER_RMFAIL, MYF(0), xa_state_names[xa_state]);
+    error= true;
+    goto err;
   }
 
   /*
@@ -5957,7 +5979,7 @@ bool lock_tables(THD *thd, TABLE_LIST *tables, uint count,
         We can solve these problems in mixed mode by switching to binlogging 
         if at least one updated table is used by sub-statement
       */
-      if (WSREP_BINLOG_FORMAT(thd->variables.binlog_format) != BINLOG_FORMAT_ROW && tables && 
+      if (thd->variables.binlog_format != BINLOG_FORMAT_ROW && tables && 
           has_write_table_with_auto_increment(thd->lex->first_not_own_table()))
         thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_AUTOINC_COLUMNS);
     }
@@ -9281,13 +9303,9 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
   else
     table_cache_manager.assert_owner_all_and_tdc();
 
-#ifdef WITH_WSREP
-  /* if thd was BF aborted, exclusive locks were canceled */
-#else
   DBUG_ASSERT(remove_type == TDC_RT_REMOVE_UNUSED ||
               thd->mdl_context.is_lock_owner(MDL_key::TABLE, db, table_name,
                                              MDL_EXCLUSIVE));
-#endif /* WITH_WSREP */
 
   key_length= create_table_def_key(thd, key, db, table_name, false);
 

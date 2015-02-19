@@ -18,6 +18,7 @@
 
 #include "log_event.h" // class THD, EVENT_LEN_OFFSET, etc.
 #include "wsrep_applier.h"
+#include "debug_sync.h"
 
 /*
   read the first event from (*buf). The size of the (*buf) is (*buf_len).
@@ -203,6 +204,16 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
                                  const wsrep_trx_meta_t* meta)
 {
   THD* const thd((THD*)ctx);
+
+// Allow tests to block the applier thread using the DBUG facilities
+  DBUG_EXECUTE_IF("sync.wsrep_apply_cb",
+                 {
+                   const char act[]=
+                     "now "
+                     "wait_for signal.wsrep_apply_cb";
+                   DBUG_ASSERT(!debug_sync_set_action(thd,
+                                                      STRING_WITH_LEN(act)));
+                 };);
 
   thd->wsrep_trx_meta = *meta;
 

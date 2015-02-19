@@ -27,4 +27,5 @@ INSERT INTO t1 VALUES ('текст4');
 COMMIT;
 COMMIT;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+COMMIT;
 DROP TABLE t1;

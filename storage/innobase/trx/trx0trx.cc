@@ -1043,11 +1043,11 @@ trx_write_serialisation_history(
 		trx_sys_update_mysql_binlog_offset(
 			trx->mysql_log_file_name,
 			trx->mysql_log_offset,
-			TRX_SYS_MYSQL_LOG_INFO,
 #ifdef WITH_WSREP
-                        sys_header,
+			TRX_SYS_MYSQL_LOG_INFO, sys_header, mtr);
+#else
+			TRX_SYS_MYSQL_LOG_INFO, mtr);
 #endif /* WITH_WSREP */
-                        mtr);
 
 		trx->mysql_log_file_name = NULL;
 	}
@@ -2325,11 +2325,11 @@ trx_start_for_ddl_low(
 		trx->will_lock = 1;
 
 		trx->ddl = true;
-
 #ifdef WITH_WSREP
 		ut_d(trx->start_file = __FILE__);
 		ut_d(trx->start_line = __LINE__);
 #endif /* WITH_WSREP */
+
 		trx_start_low(trx);
 		return;
 

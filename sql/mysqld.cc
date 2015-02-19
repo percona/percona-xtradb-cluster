@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights
    reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -494,9 +494,9 @@ const char *wsrep_binlog_format_names[]=
                                    {"MIXED", "STATEMENT", "ROW", "NONE", NullS};
 #endif /*WITH_WSREP */
 my_bool enforce_gtid_consistency;
-my_bool simplified_binlog_gtid_recovery;
-ulong binlogging_impossible_mode;
-const char *binlogging_impossible_err[]= {"IGNORE_ERROR", "ABORT_SERVER", NullS};
+my_bool binlog_gtid_simple_recovery;
+ulong binlog_error_action;
+const char *binlog_error_action_list[]= {"IGNORE_ERROR", "ABORT_SERVER", NullS};
 ulong gtid_mode;
 const char *gtid_mode_names[]=
 {"OFF", "UPGRADE_STEP_1", "UPGRADE_STEP_2", "ON", NullS};
@@ -9120,6 +9120,14 @@ mysqld_get_one_option(int optid,
     break;
   case OPT_BINLOG_FORMAT:
     binlog_format_used= true;
+    break;
+  case OPT_BINLOGGING_IMPOSSIBLE_MODE:
+    WARN_DEPRECATED(NULL, "--binlogging_impossible_mode",
+                    "'--binlog_error_action'");
+    break;
+  case OPT_SIMPLIFIED_BINLOG_GTID_RECOVERY:
+    WARN_DEPRECATED(NULL, "--simplified_binlog_gtid_recovery",
+                    "'--binlog_gtid_simple_recovery'");
     break;
 #include <sslopt-case.h>
 #ifndef EMBEDDED_LIBRARY

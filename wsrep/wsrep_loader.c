@@ -40,7 +40,7 @@ static wsrep_log_cb_t logger = default_logger;
 static int verify(const wsrep_t *wh, const char *iface_ver)
 {
     const size_t msg_len = 128;
-    char msg[msg_len];
+    char msg[128];
 
 #define VERIFY(_p) if (!(_p)) {                                       \
         snprintf(msg, msg_len, "wsrep_load(): verify(): %s\n", # _p); \
@@ -116,7 +116,7 @@ int wsrep_load(const char *spec, wsrep_t **hptr, wsrep_log_cb_t log_cb)
     void *dlh = NULL;
     wsrep_loader_fun dlfun;
     const size_t msg_len = 1024;
-    char msg[msg_len + 1];
+    char msg[1024 + 1];
     msg[msg_len] = 0;
 
     if (NULL != log_cb)

@@ -87,6 +87,7 @@ Depends: mysql-wsrep-common, ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
 Provides: mysql-common-5.6
 Replaces: mysql-common-5.6
+Breaks: mysql-common-5.5, mysql-common-5.6
 Description: MySQL 5.6 specific common files, e.g. /etc/mysql/conf.d/my-5.6.cnf
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -106,8 +107,8 @@ Depends: debianutils (>=1.6),
          ${shlibs:Depends}
 Recommends: mysql-wsrep-common-5.6
 Provides: virtual-mysql-client
-Breaks: mysql-client-5.5, virtual-mysql-client
-Replaces: mysql-client-5.5, virtual-mysql-client
+Breaks: mysql-client-5.5, mysql-client-5.6, mysql-client-core-5.5, mysql-client-core-5.6, virtual-mysql-client
+Replaces: mysql-client-5.5, mysql-client-5.6, mysql-client-core-5.5, mysql-client-core-5.6, virtual-mysql-client
 Description: MySQL database client binaries
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -117,7 +118,7 @@ Description: MySQL database client binaries
  This package includes the client binaries and the additional tools
  innotop and mysqlreport.
 
-Package: mysql-wsrep-client-dbg-5.6
+Package: mysql-wsrep-client-5.6-dbg
 Architecture: any
 Section: debug
 Priority: extra
@@ -129,19 +130,21 @@ Architecture: any
 Recommends: libhtml-template-perl, mysql-wsrep-common-5.6
 Suggests: mailx, tinyca
 Pre-Depends: adduser (>= 3.40), debconf, mysql-wsrep-common (>= 5.5)
-Depends: galera,
-         initscripts,
+Depends: initscripts,
          libdbi-perl,
          lsb-base (>= 3.0-10),
          mysql-wsrep-client-5.6 (>= ${binary:Version}),
          passwd,
          perl (>= 5.6),
          psmisc,
+         socat,
+         rsync,
+         lsof,
          ${misc:Depends},
          ${shlibs:Depends}
 Provides: virtual-mysql-server
-Breaks: mysql-server-5.6, virtual-mysql-server
-Replaces: mysql-server-5.6, virtual-mysql-server
+Breaks: mysql-server-5.6, mysql-server-5.5, mysql-server-core-5.6, mysql-server-core-5.5, virtual-mysql-server
+Replaces: mysql-server-5.6, mysql-server-5.5,  virtual-mysql-server
 Description: MySQL database wsrep server binaries and system database setup
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -151,7 +154,7 @@ Description: MySQL database wsrep server binaries and system database setup
  This package contains all the infrastructure needed to setup system
  databases.
 
-Package: mysql-wsrep-server-dbg-5.6
+Package: mysql-wsrep-server-5.6-dbg
 Architecture: any
 Section: debug
 Priority: extra
@@ -209,3 +212,9 @@ Description: MySQL 5.6 testsuite
  ease of use.
  .
  This package includes the MySQL testsuite.
+
+Package: mysql-wsrep-5.6
+Architecture: any
+Depends: mysql-wsrep-client-5.6 (= ${binary:Version}),
+         mysql-wsrep-server-5.6 (= ${binary:Version})
+Description: Metapackage that installs mysql-wsrep client and server packages.

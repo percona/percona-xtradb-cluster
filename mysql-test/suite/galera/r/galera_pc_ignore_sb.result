@@ -1,4 +1,5 @@
 SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=true';
+Killing server ...
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 DROP TABLE t1;

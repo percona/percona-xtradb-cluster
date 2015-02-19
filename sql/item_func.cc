@@ -3692,8 +3692,12 @@ bool udf_handler::get_arguments()
 	{
 	  f_args.args[i]=    (char*) res->ptr();
 	  f_args.lengths[i]= res->length();
-	  break;
 	}
+	else
+	{
+	  f_args.lengths[i]= 0;
+	}
+	break;
       }
     case INT_RESULT:
       *((longlong*) to) = args[i]->val_int();
@@ -6511,21 +6515,24 @@ longlong Item_func_is_free_lock::val_int()
   DBUG_ASSERT(fixed == 1);
   String *res=args[0]->val_str(&value);
   User_level_lock *ull;
+  longlong ret_val= 0LL;
 
   null_value=0;
   if (!res || !res->length())
   {
     null_value=1;
-    return 0;
+    return ret_val;
   }
   
   mysql_mutex_lock(&LOCK_user_locks);
   ull= (User_level_lock *) my_hash_search(&hash_user_locks, (uchar*) res->ptr(),
                                           (size_t) res->length());
-  mysql_mutex_unlock(&LOCK_user_locks);
   if (!ull || !ull->locked)
-    return 1;
-  return 0;
+    ret_val= 1;
+  mysql_mutex_unlock(&LOCK_user_locks);
+  DEBUG_SYNC(current_thd, "after_getting_user_level_lock_info");
+
+  return ret_val;
 }
 
 longlong Item_func_is_used_lock::val_int()
@@ -6533,6 +6540,7 @@ longlong Item_func_is_used_lock::val_int()
   DBUG_ASSERT(fixed == 1);
   String *res=args[0]->val_str(&value);
   User_level_lock *ull;
+  my_thread_id thread_id= 0UL;
 
   null_value=1;
   if (!res || !res->length())
@@ -6541,12 +6549,15 @@ longlong Item_func_is_used_lock::val_int()
   mysql_mutex_lock(&LOCK_user_locks);
   ull= (User_level_lock *) my_hash_search(&hash_user_locks, (uchar*) res->ptr(),
                                           (size_t) res->length());
+  if ((ull != NULL) && ull->locked)
+  {
+    null_value= 0;
+    thread_id= ull->thread_id;
+  }
   mysql_mutex_unlock(&LOCK_user_locks);
-  if (!ull || !ull->locked)
-    return 0;
+  DEBUG_SYNC(current_thd, "after_getting_user_level_lock_info");
 
-  null_value=0;
-  return ull->thread_id;
+  return thread_id;
 }
 
 

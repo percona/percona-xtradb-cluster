@@ -2917,16 +2917,17 @@ int main(int argc, char** argv)
   DBUG_PROCESS(argv[0]);
 
   my_init_time(); // for time functions
-   /*
+  tzset(); // set tzname
+  /*
     A pointer of type Log_event can point to
      INTVAR
      USER_VAR
      RANDOM
-    events,  when we allocate a element of sizeof(Log_event*) 
+    events,  when we allocate a element of sizeof(Log_event*)
     for the DYNAMIC_ARRAY.
   */
 
-  if((my_init_dynamic_array(&buff_ev, sizeof(buff_event_info), 
+  if((my_init_dynamic_array(&buff_ev, sizeof(buff_event_info),
                             INTVAR_DYNAMIC_INIT, INTVAR_DYNAMIC_INCR)))
     exit(1);
 
@@ -2952,6 +2953,7 @@ int main(int argc, char** argv)
     exit(1);
   }
 
+  umask(((~my_umask) & 0666));
   /* Check for argument conflicts and do any post-processing */
   if (args_post_process() == ERROR_STOP)
     exit(1);

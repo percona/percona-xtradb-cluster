@@ -56,6 +56,10 @@ The following options may be given as the first argument:
  --binlog-do-db=name Tells the master it should log updates for the specified
  database, and exclude all others not explicitly
  mentioned.
+ --binlog-error-action=name 
+ When statements cannot be written to the binary log due
+ to a fatal error, the server can either ignore the error
+ and let the master continue, or abort.
  --binlog-format=name 
  What form of binary logging the master will use: either
  ROW for row-based binary logging, STATEMENT for
@@ -68,6 +72,19 @@ The following options may be given as the first argument:
  binlog-format is MIXED, the format switches to row-based
  and back implicitly per each query accessing an
  NDBCLUSTER table
+ --binlog-gtid-simple-recovery 
+ If this option is enabled, the server does not scan more
+ than one binary log for every iteration when initializing
+ GTID sets on server restart. Enabling this option is very
+ useful when restarting a server which has already
+ generated lots of binary logs without GTID events. Note:
+ If this option is enabled, GLOBAL.GTID_EXECUTED and
+ GLOBAL.GTID_PURGED cannot be initialized correctly if
+ binary log(s) with GTID events were generated before
+ binary log(s) without GTID events, for example if
+ gtid_mode is disabled when the server has already
+ generated binary log(s) with GTID events and not purged
+ them.
  --binlog-ignore-db=name 
  Tells the master that updates to the given database
  should not be logged to the binary log.
@@ -106,7 +123,9 @@ The following options may be given as the first argument:
  --binlogging-impossible-mode=name 
  On a fatal error when statements cannot be binlogged the
  behaviour can be ignore the error and let the master
- continue or abort the server. 
+ continue or abort the server. This variable is deprecated
+ and will be removed in a future release. Please use
+ binlog_error_action instead.
  --block-encryption-mode=name 
  mode for AES_ENCRYPT/AES_DECRYPT
  --bootstrap         Used by mysql installation scripts.
@@ -816,18 +835,7 @@ The following options may be given as the first argument:
  Show user and password in SHOW SLAVE HOSTS on this
  master.
  --simplified-binlog-gtid-recovery 
- If this option is enabled, the server does not scan more
- than one binary log for every iteration when initializing
- GTID sets on server restart. Enabling this option is very
- useful when restarting a server which has already
- generated lots of binary logs without GTID events. Note:
- If this option is enabled, GLOBAL.GTID_EXECUTED and
- GLOBAL.GTID_PURGED cannot be initialized correctly if
- binary log(s) with GTID events were generated before
- binary log(s) without GTID events, for example if
- gtid_mode is disabled when the server has already
- generated binary log(s) with GTID events and not purged
- them. 
+ Alias for @@binlog_gtid_simple_recovery. Deprecated
  --skip-grant-tables Start without grant tables. This gives all users FULL
  ACCESS to all tables.
  --skip-host-cache   Don't cache host names.
@@ -1104,7 +1112,9 @@ bind-address *
 binlog-cache-size 32768
 binlog-checksum CRC32
 binlog-direct-non-transactional-updates FALSE
+binlog-error-action IGNORE_ERROR
 binlog-format STATEMENT
+binlog-gtid-simple-recovery FALSE
 binlog-max-flush-queue-time 0
 binlog-order-commits TRUE
 binlog-row-event-max-size 8192

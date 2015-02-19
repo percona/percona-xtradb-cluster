@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2013, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2014, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -3885,7 +3885,7 @@ check_watch:
 	{
 		buf_page_t*	bpage;
 		buf_pool_t*	buf_pool = buf_pool_get(space, page_no);
-		bpage = buf_page_hash_get(buf_pool, space, page_no);
+		bpage = buf_page_get_also_watch(buf_pool, space, page_no);
 
 		if (UNIV_LIKELY_NULL(bpage)) {
 			/* A buffer pool watch has been set or the
@@ -4614,7 +4614,7 @@ ibuf_merge_or_delete_for_page(
 		function. When the counter is > 0, that prevents tablespace
 		from being dropped. */
 
-		tablespace_being_deleted = fil_inc_pending_ops(space);
+		tablespace_being_deleted = fil_inc_pending_ops(space, true);
 
 		if (UNIV_UNLIKELY(tablespace_being_deleted)) {
 			/* Do not try to read the bitmap page from space;
