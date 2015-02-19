@@ -1,0 +1,19 @@
+Description: fix failing rpl.rpl_deadlock_innodb test by ignoring warnings
+Origin: vendor, http://permalink.gmane.org/gmane.linux.redhat.fedora.extras.cvs/1029971
+Bug: http://bugs.mysql.com/bug.php?id=69458
+Bug: http://bugs.mysql.com/bug.php?id=69455
+
+Index: mysql-5.5-5.5.32.orig/mysql-test/include/mtr_warnings.sql
+===================================================================
+--- mysql-5.5-5.5.32.orig.orig/mysql-test/include/mtr_warnings.sql	2013-06-19 11:26:28.000000000 -0400
++++ mysql-5.5-5.5.32.orig/mysql-test/include/mtr_warnings.sql	2013-07-23 14:49:38.233802237 -0400
+@@ -162,6 +162,9 @@
+  ("InnoDB: Error: in RENAME TABLE table `test`.`t1`"),
+  ("InnoDB: Error: table `test`.`t[123]` does not exist in the InnoDB internal"),
+ 
++ /* rpl.rpl_deadlock_innodb fails when trying DROP tables */
++ ("InnoDB: Error: table `mysqld.2`.`#sql.*` does not exist in the InnoDB internal"),
++
+  /*
+    BUG#32080 - Excessive warnings on Solaris: setrlimit could not
+    change the size of core files

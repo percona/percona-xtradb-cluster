@@ -1,0 +1,6 @@
+etc/init.d
+etc/logrotate.d
+etc/mysql/conf.d
+usr/bin
+usr/share/mysql
+var/lib/mysql-upgrade

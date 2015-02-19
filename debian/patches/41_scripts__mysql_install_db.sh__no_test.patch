@@ -1,0 +1,16 @@
+From: ch@debian.org
+Bug: http://bugs.mysql.com/bug.php?id=6901
+
+Index: mysql-5.5-5.5.33+dfsg/scripts/mysql_install_db.sh
+===================================================================
+--- mysql-5.5-5.5.33+dfsg.orig/scripts/mysql_install_db.sh	2013-09-26 18:57:32.730764845 -0700
++++ mysql-5.5-5.5.33+dfsg/scripts/mysql_install_db.sh	2013-09-26 18:57:32.726765077 -0700
+@@ -356,7 +356,7 @@
+ fi
+ 
+ # Create database directories
+-for dir in $ldata $ldata/mysql $ldata/test
++for dir in $ldata $ldata/mysql
+ do
+   if test ! -d $dir
+   then

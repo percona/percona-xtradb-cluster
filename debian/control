@@ -1,0 +1,198 @@
+Source: mysql-wsrep-5.5
+Section: database
+Priority: optional
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+XSBC-Original-Maintainer: Debian MySQL Maintainers <pkg-mysql-maint@lists.alioth.debian.org>
+Uploaders: Norbert Tretkowski <norbert@tretkowski.de>, Clint Byrum <clint@ubuntu.com>
+Build-Depends: libtool (>= 1.4.2-7), procps | hurd,  debhelper (>= 8.1.3~), file (>= 3.28), libncurses5-dev (>= 5.0-6), perl (>= 5.6.0), libwrap0-dev (>= 7.6-8.3), zlib1g-dev (>= 1:1.1.3-5), libreadline-dev, psmisc, po-debconf, chrpath, doxygen-latex, ghostscript,  gawk, bison, lsb-release, hardening-wrapper, cmake, gcc-4.5, g++-4.5, dh-apparmor
+Standards-Version: 3.9.2
+Homepage: http://dev.mysql.com/
+Vcs-Browser: http://svn.debian.org/wsvn/pkg-mysql/mysql-5.5/
+Vcs-Svn: svn://svn.debian.org/svn/pkg-mysql/mysql-5.5/
+
+Package: libmysqlclient18
+Section: libs
+Architecture: any
+Depends: mysql-common (>= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
+Pre-Depends: multiarch-support, ${misc:Pre-Depends}
+Multi-Arch: same
+Description: MySQL database client library
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the client library.
+
+Package: libmysqld-pic
+Architecture: any
+Section: libdevel
+Depends: libmysqlclient-dev (>= ${source:Version}), ${misc:Depends}
+Description: MySQL database development files
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the -fPIC version of the embedded server library.
+
+Package: libmysqld-dev
+Architecture: any
+Section: libdevel
+Depends: libmysqlclient-dev (>= ${source:Version}), ${misc:Depends}
+Description: MySQL embedded database development files
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the embedded server library and header files.
+
+Package: libmysqlclient-dev
+Architecture: any
+Section: libdevel
+Depends: libmysqlclient18 (= ${binary:Version}), zlib1g-dev, , ${shlibs:Depends}, ${misc:Depends}
+Conflicts: libmysqlclient14-dev, libmysqlclient12-dev, libmysqlclient10-dev, libmysqlclient15-dev
+Provides: libmysqlclient15-dev
+Replaces: libmysqlclient15-dev
+Description: MySQL database development files
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes development libraries and header files.
+
+Package: mysql-common
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: mysql-common-4.1
+Provides: mysql-common-4.1
+Replaces: mysql-common-4.1
+Breaks: mysql-server-5.1, mysql-client-5.1, mysql-server-core-5.1, mysql-client-core-5.1
+Multi-Arch: foreign
+Description: MySQL database common files, e.g. /etc/mysql/my.cnf
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes files needed by all versions of the client library,
+ e.g. /etc/mysql/my.cnf.
+
+Package: mysql-client-core-5.5
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Breaks: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-core-5.1
+Replaces: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-core-5.1
+Description: MySQL database core client binaries
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the core client files, as used by Akonadi.
+
+Package: mysql-client-5.5
+Architecture: any
+Depends: debianutils (>=1.6), libdbi-perl, libdbd-mysql-perl (>= 1.2202), mysql-common (>= ${source:Version}), ${perl:Depends}, ${shlibs:Depends}, ${misc:Depends}, mysql-client-core-5.5, libterm-readkey-perl
+Provides: virtual-mysql-client, mysql-client, mysql-client-4.1
+Breaks: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1
+Replaces: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1
+Description: MySQL database client binaries
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the client binaries and the additional tools
+ innotop and mysqlreport.
+
+Package: mysql-server-core-5.5
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Breaks: mysql-server-5.1, mysql-server-5.0, mysql-server-core-5.1
+Provides: mysql-server-core
+Replaces: mysql-server-core-5.0, mysql-server-core-5.1, mysql-server-5.0, mysql-server-5.1, mysql-server-core-5.1
+Description: MySQL database server binaries
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the server binaries but doesn't contain all the
+ infrastructure needed to setup system databases.
+
+Package: mysql-server-5.5
+Architecture: any
+Suggests: tinyca, mailx
+Recommends: libhtml-template-perl
+Pre-Depends: mysql-common (>= ${source:Version}), adduser (>= 3.40), debconf
+Depends: mysql-client-5.5 (>= ${source:Version}), libdbi-perl, perl (>= 5.6), ${shlibs:Depends}, ${misc:Depends}, psmisc, passwd, lsb-base (>= 3.0-10), mysql-server-core-5.5 (= ${binary:Version}), upstart (>= 0.6.7-2)
+Breaks: mysql-server (<< ${source:Version}), mysql-server-4.1, mysql-server-5.1, libmysqlclient-dev ( << 5.5.17~ )
+Provides: virtual-mysql-server
+Replaces: mysql-server (<< ${source:Version}), mysql-server-5.1,  mysql-server-5.0, mysql-server-4.1, libmysqlclient-dev ( << 5.5.17~ )
+Description: MySQL database server binaries and system database setup 
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package contains all the infrastructure needed to setup system
+ databases.
+
+Package: mysql-server
+Architecture: all
+Depends: mysql-server-5.5
+Description: MySQL database server (metapackage depending on the latest version)
+ This is an empty package that depends on the current "best" version of
+ mysql-server (currently mysql-server-5.5), as determined by the MySQL
+ maintainers. Install this package if in doubt about which MySQL
+ version you need. That will install the version recommended by the
+ package maintainers.
+ .
+ MySQL is a fast, stable and true multi-user, multi-threaded SQL database
+ server. SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+
+Package: mysql-client
+Architecture: all
+Depends: mysql-client-5.5
+Description: MySQL database client (metapackage depending on the latest version)
+ This is an empty package that depends on the current "best" version of
+ mysql-client (currently mysql-client-5.5), as determined by the MySQL
+ maintainers.  Install this package if in doubt about which MySQL version
+ you want, as this is the one we consider to be in the best shape.
+
+Package: mysql-testsuite
+Architecture: all
+Depends: mysql-testsuite-5.5
+Description: MySQL testsuite
+ This is an empty package that depends on the current "best" version of
+ mysql-testsuite (currently mysql-testsuite-5.5), as determined by the
+ MySQL maintainers.  Install this package if in doubt about which MySQL
+ version you want, as this is the one we consider to be in the best shape.
+
+Package: mysql-testsuite-5.5
+Architecture: any
+Depends: mysql-server, mysql-client, ${misc:Depends},  ${shlibs:Depends}
+Conflicts: mysql-testsuite (<< ${source:Version})
+Description: MySQL testsuite
+ MySQL is a fast, stable, and true multi-user, multi-threaded SQL database
+ server.  SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the MySQL testsuite.
+
+Package: mysql-source-5.5
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: MySQL source
+ MySQL is a fast, stable, and true multi-user, multi-threaded SQL database
+ server.  SQL (Structured Query Language) is the most popular database query
+ language in the world. The main goals of MySQL are speed, robustness and
+ ease of use.
+ .
+ This package includes the MySQL source code as configured before building.
