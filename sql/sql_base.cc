@@ -5232,6 +5232,22 @@ restart:
         goto err;
       }
     }
+#ifdef WITH_WSREP
+  if ((thd->lex->sql_command== SQLCOM_INSERT         ||
+       thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
+       thd->lex->sql_command== SQLCOM_REPLACE        ||
+       thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
+       thd->lex->sql_command== SQLCOM_UPDATE         ||
+       thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
+       thd->lex->sql_command== SQLCOM_LOAD           ||
+       thd->lex->sql_command== SQLCOM_DELETE)        &&
+      wsrep_replicate_myisam                         &&
+      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM)
+    {
+      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
+    }
+ error:
+#endif
 
     /* Set appropriate TABLE::lock_type. */
     if (tbl && tables->lock_type != TL_UNLOCK && 
