@@ -13,8 +13,8 @@ DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
 DEBVERSION = $(shell dpkg-parsechangelog | awk '/^Version: / { print $$2 }' | sed 's/^.*-//' )
 
-export MYSQL_BUILD_CC=$(DEB_HOST_GNU_TYPE)-gcc-4.5
-export MYSQL_BUILD_CXX=$(DEB_HOST_GNU_TYPE)-g++-4.5
+# export MYSQL_BUILD_CC=$(DEB_HOST_GNU_TYPE)-gcc-4.5
+# export MYSQL_BUILD_CXX=$(DEB_HOST_GNU_TYPE)-g++-4.5
 
 DEB_SOURCE_PACKAGE ?= $(strip $(shell egrep '^Source: ' debian/control | cut -f 2 -d ':'))
 DEB_VERSION ?= $(shell dpkg-parsechangelog | egrep '^Version:' | cut -f 2 -d ' ')
@@ -82,7 +82,7 @@ endif
 	    -DINSTALL_LAYOUT=RPM \
 	    -DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
 	    -DINSTALL_PLUGINDIR=lib/mysql/plugin \
-        -DWITH_EMBEDDED_SERVER=ON \
+        -DWITH_EMBEDDED_SERVER=OFF \
         -DHAVE_EMBEDDED_PRIVILEGE_CONTROL=ON \
 	    -DWITH_ARCHIVE_STORAGE_ENGINE=ON \
 	    -DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
