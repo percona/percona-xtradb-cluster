@@ -1,5 +1,5 @@
 etc/apparmor.d/usr.sbin.mysqld
-usr/share/apport/package-hooks/source_mysql-5.5.py
+usr/share/apport/package-hooks/source_mysql-wsrep-5.5.py
 usr/lib/mysql/*so*
 usr/lib/mysql/plugin/*.so
 etc/mysql/debian-start
