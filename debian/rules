@@ -210,15 +210,6 @@ install: build
 		ln -sf `basename $$i` $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/$$rlib ;\
 	done
 
-	# libmysqlclient-dev: forgotten header file since 3.23.25?
-	#cp $(BUILDDIR)/include/my_config.h $(TMP)/usr/include/mysql/
-	#cp include/my_dir.h $(TMP)/usr/include/mysql/
-	# install libmysqld built with -FPIC
-	install -d -m 0755 -o root -g root $(TMP)/usr/lib/mysql
-	install -m 0644 -o root -g root $(BUILDDIR_PIC)/libmysqld/libmysqld.a $(TMP)/usr/lib/mysql/libmysqld_pic.a
-	# mysql_config won't report the -fPIC, so give libmysqld-pic users a way to get their flags
-	install -m 0755 -o root -g root $(BUILDDIR_PIC)/scripts/mysql_config $(TMP)/usr/bin/mysql_config_pic
-
 	# mysql-common: We now provide our own config file.
 	install -d $(TMP)/etc/mysql
 	install -m 0644 debian/additions/my.cnf $(TMP)/etc/mysql/my.cnf
