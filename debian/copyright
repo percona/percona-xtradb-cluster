@@ -3,7 +3,7 @@ Upstream-Name: MySQL 5.5
 Upstream-Contact: http://bugs.mysql.com/
 Source: http://dev.mysql.com/downloads/mysql/5.5.html
 Comments: originally produced by a modified version of licensecheck2dep5
- from CDBS by Clint Byrum <clint@ubuntu.com>. Hand modified to reduce 
+ from CDBS by Clint Byrum <clint@ubuntu.com>. Hand modified to reduce
  redundancy in the output and add appropriate license text.
  .
  Also, MySQL carries the "FOSS License Exception" specified in README
@@ -60,7 +60,7 @@ Comments: originally produced by a modified version of licensecheck2dep5
  > .
  > "Program" means a copy of Oracle¿s MySQL Client Libraries that
  > contains a FOSS Notice.
- > . 
+ > .
  > A FOSS application developer ("you" or "your") may distribute a
  > Derivative Work provided that you and the Derivative Work meet all
  > of the following conditions: You obey the GPL in all respects for
@@ -82,7 +82,7 @@ Comments: originally produced by a modified version of licensecheck2dep5
  > does not apply to you or your Derivative Work.
  > .
  > FOSS License List
- > . 
+ > .
  > License Name    Version(s)/Copyright Date
  > Release Early    Certified Software
  > Academic Free License    2.0
@@ -152,11 +152,11 @@ Comment: These files fall under the blanket license specified in the file
 License: GPL-2
  GPLv2 Disclaimer
  For the avoidance of doubt, except that if any license choice
- other than GPL or LGPL is available it will apply instead, 
- Oracle elects to use only the General Public License version 2 
- (GPLv2) at this time for any software where a choice of GPL 
- license versions is made available with the language indicating 
- that GPLv2 or any later version may be used, or where a choice 
+ other than GPL or LGPL is available it will apply instead,
+ Oracle elects to use only the General Public License version 2
+ (GPLv2) at this time for any software where a choice of GPL
+ license versions is made available with the language indicating
+ that GPLv2 or any later version may be used, or where a choice
  of which version of the GPL is applied is otherwise unspecified.
 
 Files: BUILD/*
@@ -484,29 +484,29 @@ Files: dbug/dbug.c
  dbug/dbug_long.h
 Copyright: 1987 Abandoned Fred Fish
 License: UNKNOWN
- N O T I C E				      
+ N O T I C E
  .
- Copyright Abandoned, 1987, Fred Fish		      
+ Copyright Abandoned, 1987, Fred Fish
  .
  .
- This previously copyrighted work has been placed into the  public     
- domain	by  the  author  and  may be freely used for any purpose,     
- private or commercial.						      
+ This previously copyrighted work has been placed into the  public
+ domain	by  the  author  and  may be freely used for any purpose,
+ private or commercial.
  .
- Because of the number of inquiries I was receiving about the  use     
- of this product in commercially developed works I have decided to     
- simply make it public domain to further its unrestricted use.	I     
- specifically  would  be  most happy to see this material become a     
- part of the standard Unix distributions by AT&T and the  Berkeley     
- Computer  Science  Research Group, and a standard part of the GNU     
- system from the Free Software Foundation.			      
+ Because of the number of inquiries I was receiving about the  use
+ of this product in commercially developed works I have decided to
+ simply make it public domain to further its unrestricted use.	I
+ specifically  would  be  most happy to see this material become a
+ part of the standard Unix distributions by AT&T and the  Berkeley
+ Computer  Science  Research Group, and a standard part of the GNU
+ system from the Free Software Foundation.
  .
- I would appreciate it, as a courtesy, if this notice is  left  in     
- all copies and derivative works.  Thank you.			      
+ I would appreciate it, as a courtesy, if this notice is  left  in
+ all copies and derivative works.  Thank you.
  .
- The author makes no warranty of any kind  with	respect  to  this     
- product  and  explicitly disclaims any implied warranties of mer-     
- chantability or fitness for any particular purpose.		      
+ The author makes no warranty of any kind  with	respect  to  this
+ product  and  explicitly disclaims any implied warranties of mer-
+ chantability or fitness for any particular purpose.
 
 Files: cmd-line-utils/libedit/np/vis.c
 Copyright: 1989-1993 The Regents of the University of California.
@@ -562,35 +562,35 @@ License: BSD (3 clause) GPL-2
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
  .
  Copyright (c) 1997, 1999 Kungliga Tekniska Högskolan
- (Royal Institute of Technology, Stockholm, Sweden). 
- All rights reserved. 
+ (Royal Institute of Technology, Stockholm, Sweden).
+ All rights reserved.
  .
- Redistribution and use in source and binary forms, with or without 
- modification, are permitted provided that the following conditions 
- are met: 
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
  .
- 1. Redistributions of source code must retain the above copyright 
-    notice, this list of conditions and the following disclaimer. 
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
  .
- 2. Redistributions in binary form must reproduce the above copyright 
-    notice, this list of conditions and the following disclaimer in the 
-    documentation and/or other materials provided with the distribution. 
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
  .
- 3. Neither the name of the Institute nor the names of its contributors 
-    may be used to endorse or promote products derived from this software 
-    without specific prior written permission. 
+ 3. Neither the name of the Institute nor the names of its contributors
+    may be used to endorse or promote products derived from this software
+    without specific prior written permission.
  .
- THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND 
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE 
- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS 
- OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
- HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
- SUCH DAMAGE. 
+ THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
 
 Files: storage/innobase/handler/ha_innodb.cc
 Copyright: 2008-2009 Google Inc
@@ -647,7 +647,7 @@ License: SWsoft
  This material is provided "as is", with absolutely no warranty expressed
  or implied. Any use is at your own risk.
  .
- Permission to use or copy this software for any purpose is hereby granted 
+ Permission to use or copy this software for any purpose is hereby granted
  without fee, provided the above notices are retained on all copies.
  Permission to modify the code and to distribute modified code is granted,
  provided the above notices are retained, and a notice that the code was

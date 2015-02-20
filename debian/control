@@ -3,8 +3,30 @@ Section: database
 Priority: optional
 Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
 XSBC-Original-Maintainer: Debian MySQL Maintainers <pkg-mysql-maint@lists.alioth.debian.org>
-Uploaders: Norbert Tretkowski <norbert@tretkowski.de>, Clint Byrum <clint@ubuntu.com>
-Build-Depends: libtool (>= 1.4.2-7), procps | hurd,  debhelper (>= 8.1.3~), file (>= 3.28), libncurses5-dev (>= 5.0-6), perl (>= 5.6.0), libwrap0-dev (>= 7.6-8.3), zlib1g-dev (>= 1:1.1.3-5), libreadline-dev, psmisc, po-debconf, chrpath, doxygen-latex, ghostscript,  gawk, bison, lsb-release, hardening-wrapper, cmake, gcc, g++, dh-apparmor
+Uploaders: Norbert Tretkowski <norbert@tretkowski.de>,
+           Clint Byrum <clint@ubuntu.com>
+Build-Depends: bison,
+               chrpath,
+               cmake,
+               debhelper (>= 8.1.3~),
+               dh-apparmor,
+               doxygen-latex,
+               file (>= 3.28),
+               g++,
+               gawk,
+               gcc,
+               ghostscript,
+               hardening-wrapper,
+               libncurses5-dev (>= 5.0-6),
+               libreadline-dev,
+               libtool (>= 1.4.2-7),
+               libwrap0-dev (>= 7.6-8.3),
+               lsb-release,
+               perl (>= 5.6.0),
+               po-debconf,
+               procps | hurd,
+               psmisc,
+               zlib1g-dev (>= 1:1.1.3-5)
 Standards-Version: 3.9.2
 Homepage: http://dev.mysql.com/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-mysql/mysql-5.5/
@@ -13,7 +35,9 @@ Vcs-Svn: svn://svn.debian.org/svn/pkg-mysql/mysql-5.5/
 Package: mysql-wsrep-libmysqlclient18
 Section: libs
 Architecture: any
-Depends: mysql-wsrep-common (>= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: mysql-wsrep-common (>= ${source:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
 Pre-Depends: multiarch-support, ${misc:Pre-Depends}
 Replaces: libmysqlclient18
 Provides: libmysqlclient18
@@ -50,7 +74,7 @@ Description: MySQL database development files
 
 Package: mysql-wsrep-common
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
 Provides: mysql-common
 Replaces: mysql-common
@@ -65,8 +89,16 @@ Description: MySQL database common files, e.g. /etc/mysql/my.cnf
 
 Package: mysql-wsrep-client-5.5
 Architecture: any
-Depends: debianutils (>=1.6), libdbi-perl, libdbd-mysql-perl (>= 1.2202), mysql-wsrep-common (>= ${source:Version}), mysql-wsrep-libmysqlclient18, ${perl:Depends}, ${shlibs:Depends}, ${misc:Depends}, libterm-readkey-perl
-Provides: virtual-mysql-client, mysql-client
+Depends: debianutils (>=1.6),
+         libdbd-mysql-perl (>= 1.2202),
+         libdbi-perl,
+         libterm-readkey-perl,
+         mysql-wsrep-common (>= ${source:Version}),
+         mysql-wsrep-libmysqlclient18,
+         ${misc:Depends},
+         ${perl:Depends},
+         ${shlibs:Depends}
+Provides: mysql-client, virtual-mysql-client
 Breaks: mysql-client (<< ${source:Version})
 Replaces: mysql-client (<< ${source:Version})
 Description: MySQL database client binaries
@@ -87,13 +119,21 @@ Description: MySQL database client binary debugging symbols.
 
 Package: mysql-wsrep-server-5.5
 Architecture: any
-Suggests: tinyca, mailx
+Suggests: mailx, tinyca
 Recommends: libhtml-template-perl
 Pre-Depends: mysql-wsrep-common (>= ${source:Version}), adduser (>= 3.40), debconf
-Depends: mysql-wsrep-client-5.5 (>= ${source:Version}), libdbi-perl, perl (>= 5.6), ${shlibs:Depends}, ${misc:Depends}, psmisc, passwd, lsb-base (>= 3.0-10), upstart (>= 0.6.7-2)
-Breaks: mysql-server (<< ${source:Version}), libmysqlclient-dev
+Depends: libdbi-perl,
+         lsb-base (>= 3.0-10),
+         mysql-wsrep-client-5.5 (>= ${source:Version}),
+         passwd,
+         perl (>= 5.6),
+         psmisc,
+         upstart (>= 0.6.7-2),
+         ${misc:Depends},
+         ${shlibs:Depends}
+Breaks: libmysqlclient-dev, mysql-server (<< ${source:Version})
 Provides: virtual-mysql-server
-Replaces: mysql-server (<< ${source:Version}), libmysqlclient-dev
+Replaces: libmysqlclient-dev, mysql-server (<< ${source:Version})
 Description: MySQL database server binaries and system database setup
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -145,7 +185,7 @@ Description: MySQL testsuite
 
 Package: mysql-wsrep-testsuite-5.5
 Architecture: any
-Depends: mysql-server, mysql-client, ${misc:Depends},  ${shlibs:Depends}
+Depends: mysql-client, mysql-server, ${misc:Depends}, ${shlibs:Depends}
 Conflicts: mysql-testsuite (<< ${source:Version})
 Description: MySQL testsuite
  MySQL is a fast, stable, and true multi-user, multi-threaded SQL database
