@@ -3,7 +3,7 @@
 export DH_VERBOSE=1
 export DEB_BUILD_HARDENING=1
 
-PACKAGE=mysql-5.5
+PACKAGE=mysql-wsrep-5.5
 
 TMP=$(CURDIR)/debian/tmp/
 
@@ -34,12 +34,12 @@ endif
 
 MAKE_TEST_TARGET=test-force
 ifneq ($(findstring fulltest,$(DEB_BUILD_OPTIONS)),)
-# make test-bt is the testsuite run by the MySQL build team 
+# make test-bt is the testsuite run by the MySQL build team
 # before a release, but it is long
     MAKE_TEST_TARGET=test-bt
 endif
 
-USE_ASSEMBLER=--enable-assembler 
+USE_ASSEMBLER=--enable-assembler
 
 ifneq (,$(filter $(ARCH), amd64 i386))
     TESTSUITE_FAIL_CMD=exit 1
@@ -51,25 +51,13 @@ BUILDDIR = builddir
 BUILDDIR_PIC = builddir-pic
 builddir = $(if $(findstring -pic,$@),$(BUILDDIR_PIC),$(BUILDDIR))
 
-# This causes seg11 crashes if LDAP is used for groups in /etc/nsswitch.conf
-# so it is disabled by default although, according to MySQL, it brings >10%
-# performance gain if enabled. See #299382.
-ifeq ($(STATIC_MYSQLD), 1)
-    USE_STATIC_MYSQLD=--with-mysqld-ldflags=-all-static
-endif
-		
 
-configure-stamp-pic: FORCE_FPIC_CFLAGS=-fPIC
-configure-stamp-pic: FORCE_FPIC=-DWITH_PIC=On -DINSTALL_LIBDIR=lib/mysql
-
-configure: patch configure-stamp
-configure-pic: patch configure-stamp-pic
-configure-stamp configure-stamp-pic:
+configure: patch
 	@echo "RULES.$@"
 	dh_testdir
 
 ifneq ($(ARCH_OS),hurd)
-	if [ ! -d /proc/self ]; then echo "/proc IS NEEDED" 1>&2; exit 1; fi 
+	if [ ! -d /proc/self ]; then echo "/proc IS NEEDED" 1>&2; exit 1; fi
 endif
 
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
@@ -83,10 +71,10 @@ endif
 		$(FORCE_FPIC) \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 	       	-DMYSQL_USER=mysql \
+	       	-DWITH_WSREP=1 \
 		-DWITH_LIBWRAP=ON \
 		-DWITH_READLINE=OFF \
 		-DWITH_LIBEDIT=OFF \
-		$(USE_STATIC_MYSQLD) \
 		-DWITH_SSL=yes \
 	    -DCOMPILATION_COMMENT="($(DISTRIBUTION))" \
 	    -DMYSQL_SERVER_SUFFIX="-$(DEBVERSION)" \
@@ -100,20 +88,20 @@ endif
 	    -DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
 	    -DWITH_FEDERATED_STORAGE_ENGINE=ON \
 		-DWITH_EXTRA_CHARSETS=all ..'
-		
+
 	#       --sysconfdir=/etc/mysql  -- Appends /etc/mysql after ~/ in the my.cnf search patch!
 	#
 	#	--with-debug
-	
+
 	touch $@
 
 
-build: build-stamp build-stamp-pic
+build: build-stamp
 
 build-stamp: configure
 	@echo "RULES.$@"
 	dh_testdir
-	
+
 	[ -f $(EXPORTED_SOURCE_TARBALL) ] || tar -zcf $(EXPORTED_SOURCE_TARBALL) \
 	--exclude=debian . \
 	--transform="s,^\./,mysql-5.5/,"
@@ -155,22 +143,22 @@ build-stamp-pic: configure-pic
 	$(MAKE_PIC) -C scripts
 	# Build libmysqld itself
 	$(MAKE_PIC) -C libmysqld
-	
+
 	touch $@
 
 clean: clean-patched unpatch
 	rm -rf debian/patched
 clean-patched:
 	@echo "RULES.clean-patched"
-	dh_testdir 
+	dh_testdir
 	dh_testroot
 	rm -f configure-stamp*
 	rm -f build-stamp*
 	rm -f testsuite-stamp
-	
+
 	[ ! -f Makefile ] || $(MAKE) clean
 	[ ! -d mysql-test/var ] || rm -rf mysql-test/var
-	
+
 	rm -rf $(BUILDDIR) $(BUILDDIR_PIC)
 
 	debconf-updatepo
@@ -178,8 +166,7 @@ clean-patched:
 	dh_clean -v
 
 
-install:
-install install-pic: build
+install: build
 	@echo "RULES.$@"
 	dh_testdir
 	dh_testroot
@@ -196,7 +183,7 @@ install install-pic: build
 
 	# make install (trailing slash needed for innobase)
 	cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/
-		
+
 	# After installing, remove rpath to make lintian happy.
 	set +e; \
 	find ./debian/tmp/ -type f -print0 \
@@ -214,7 +201,7 @@ install install-pic: build
 	#if [ "`objdump -T $(TMP)/usr/lib/libmysqlclient.so.16.0.0 | grep -c libmysqlclient_16`" -lt 500 ]; then \
 	#  echo "ERROR: versioned symbols are absent"; \
 	#  exit 1; \
-	#fi     
+	#fi
 	# libmysqlclient_r is now a symlink to libmysqlclient. But it is
 	# created wrong by the cmake build system and points at
 	# libmysqlclient.so instead of the corresponding versioned lib.
@@ -258,6 +245,11 @@ install install-pic: build
 	install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
 	install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
 
+	# Install wsrep specific stuff
+	install -m 0644 Docs/README-wsrep $(TMP)/usr/share/doc/mysql-server-5.5
+	install -m 0644 support-files/wsrep.cnf $(TMP)/usr/share/mysql
+	install -D -m 0755 $(builddir)/support-files/mysql.server $(TMP)/etc/init.d/mysql
+
 	# install AppArmor profile
 	install -D -m 644 debian/apparmor-profile $(TMP)/etc/apparmor.d/usr.sbin.mysqld
 	# install Apport hook
@@ -268,7 +260,7 @@ install install-pic: build
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/mysql/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 	dh_movefiles
-	
+
 # Build architecture-independent files here.
 binary-indep: build install
 	@echo "RULES.binary-indep"
@@ -280,7 +272,7 @@ binary-indep: build install
 	dh_installmenu -i
 	dh_installlogrotate -i
 	dh_installinit -i
-	dh_installcron -i 
+	dh_installcron -i
 	dh_installman -i
 	dh_installinfo -i
 	dh_installlogcheck -i
@@ -293,11 +285,11 @@ binary-indep: build install
 	dh_gencontrol -i
 	dh_md5sums -i
 	dh_builddeb -i
-	
+
 # Build architecture-dependent files here.
 binary-arch: build install
 	@echo "RULES.binary-arch"
-	dh_testdir 
+	dh_testdir
 	dh_testroot
 
 	dh_installdebconf -a
@@ -332,6 +324,11 @@ binary-arch: build install
 
 source diff:
 	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+override_dh_strip:
+	dh_strip --dbg-package=mysql-wsrep-server-5.5-dbg
+	dh_strip --dbg-package=mysql-wsrep-client-5.5-dbg
+	dh_strip --dbg-package=mysql-wsrep-libmysqlclient18-dbg
 
 binary:	binary-indep binary-arch
 

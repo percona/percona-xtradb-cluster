@@ -8,4 +8,3 @@ usr/lib/*/mysql/plugin/ha_example.*
 usr/lib/*/mysql/plugin/ha_*_plugin.a
 usr/lib/*/mysql/plugin/ha_*_plugin.la
 usr/share/aclocal/mysql.m4
-usr/share/man/man1/mysql_config.1

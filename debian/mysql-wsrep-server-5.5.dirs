@@ -4,3 +4,5 @@ etc/mysql/conf.d
 usr/bin
 usr/share/mysql
 var/lib/mysql-upgrade
+usr/sbin
+usr/share/man/man8

@@ -10,11 +10,13 @@ Homepage: http://dev.mysql.com/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-mysql/mysql-5.5/
 Vcs-Svn: svn://svn.debian.org/svn/pkg-mysql/mysql-5.5/
 
-Package: libmysqlclient18
+Package: mysql-wsrep-libmysqlclient18
 Section: libs
 Architecture: any
-Depends: mysql-common (>= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: mysql-wsrep-common (>= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
 Pre-Depends: multiarch-support, ${misc:Pre-Depends}
+Replaces: libmysqlclient18
+Provides: libmysqlclient18
 Multi-Arch: same
 Description: MySQL database client library
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
@@ -24,37 +26,20 @@ Description: MySQL database client library
  .
  This package includes the client library.
 
-Package: libmysqld-pic
+Package: mysql-wsrep-libmysqlclient18-dbg
 Architecture: any
-Section: libdevel
-Depends: libmysqlclient-dev (>= ${source:Version}), ${misc:Depends}
-Description: MySQL database development files
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the -fPIC version of the embedded server library.
+Section: debug
+Priority: extra
+Depends: mysql-wsrep-libmysqlclient18 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL database client library debugging symbols.
 
-Package: libmysqld-dev
+Package: mysql-wsrep-libmysqlclient-dev
 Architecture: any
 Section: libdevel
-Depends: libmysqlclient-dev (>= ${source:Version}), ${misc:Depends}
-Description: MySQL embedded database development files
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the embedded server library and header files.
-
-Package: libmysqlclient-dev
-Architecture: any
-Section: libdevel
-Depends: libmysqlclient18 (= ${binary:Version}), zlib1g-dev, , ${shlibs:Depends}, ${misc:Depends}
-Conflicts: libmysqlclient14-dev, libmysqlclient12-dev, libmysqlclient10-dev, libmysqlclient15-dev
-Provides: libmysqlclient15-dev
-Replaces: libmysqlclient15-dev
+Depends: mysql-wsrep-libmysqlclient18 (= ${binary:Version}),
+         zlib1g-dev,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: MySQL database development files
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -63,14 +48,12 @@ Description: MySQL database development files
  .
  This package includes development libraries and header files.
 
-Package: mysql-common
+Package: mysql-wsrep-common
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Conflicts: mysql-common-4.1
-Provides: mysql-common-4.1
-Replaces: mysql-common-4.1
-Breaks: mysql-server-5.1, mysql-client-5.1, mysql-server-core-5.1, mysql-client-core-5.1
 Multi-Arch: foreign
+Provides: mysql-common
+Replaces: mysql-common
 Description: MySQL database common files, e.g. /etc/mysql/my.cnf
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -80,25 +63,12 @@ Description: MySQL database common files, e.g. /etc/mysql/my.cnf
  This package includes files needed by all versions of the client library,
  e.g. /etc/mysql/my.cnf.
 
-Package: mysql-client-core-5.5
+Package: mysql-wsrep-client-5.5
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Breaks: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-core-5.1
-Replaces: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-core-5.1
-Description: MySQL database core client binaries
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the core client files, as used by Akonadi.
-
-Package: mysql-client-5.5
-Architecture: any
-Depends: debianutils (>=1.6), libdbi-perl, libdbd-mysql-perl (>= 1.2202), mysql-common (>= ${source:Version}), ${perl:Depends}, ${shlibs:Depends}, ${misc:Depends}, mysql-client-core-5.5, libterm-readkey-perl
-Provides: virtual-mysql-client, mysql-client, mysql-client-4.1
-Breaks: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1
-Replaces: mysql-client (<< ${source:Version}), mysql-client-5.0, mysql-client-5.1
+Depends: debianutils (>=1.6), libdbi-perl, libdbd-mysql-perl (>= 1.2202), mysql-wsrep-common (>= ${source:Version}), mysql-wsrep-libmysqlclient18, ${perl:Depends}, ${shlibs:Depends}, ${misc:Depends}, libterm-readkey-perl
+Provides: virtual-mysql-client, mysql-client
+Breaks: mysql-client (<< ${source:Version})
+Replaces: mysql-client (<< ${source:Version})
 Description: MySQL database client binaries
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
@@ -108,31 +78,23 @@ Description: MySQL database client binaries
  This package includes the client binaries and the additional tools
  innotop and mysqlreport.
 
-Package: mysql-server-core-5.5
+Package: mysql-wsrep-client-5.5-dbg
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Breaks: mysql-server-5.1, mysql-server-5.0, mysql-server-core-5.1
-Provides: mysql-server-core
-Replaces: mysql-server-core-5.0, mysql-server-core-5.1, mysql-server-5.0, mysql-server-5.1, mysql-server-core-5.1
-Description: MySQL database server binaries
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the server binaries but doesn't contain all the
- infrastructure needed to setup system databases.
+Section: debug
+Priority: extra
+Depends: mysql-wsrep-client-5.5 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL database client binary debugging symbols.
 
-Package: mysql-server-5.5
+Package: mysql-wsrep-server-5.5
 Architecture: any
 Suggests: tinyca, mailx
 Recommends: libhtml-template-perl
-Pre-Depends: mysql-common (>= ${source:Version}), adduser (>= 3.40), debconf
-Depends: mysql-client-5.5 (>= ${source:Version}), libdbi-perl, perl (>= 5.6), ${shlibs:Depends}, ${misc:Depends}, psmisc, passwd, lsb-base (>= 3.0-10), mysql-server-core-5.5 (= ${binary:Version}), upstart (>= 0.6.7-2)
-Breaks: mysql-server (<< ${source:Version}), mysql-server-4.1, mysql-server-5.1, libmysqlclient-dev ( << 5.5.17~ )
+Pre-Depends: mysql-wsrep-common (>= ${source:Version}), adduser (>= 3.40), debconf
+Depends: mysql-wsrep-client-5.5 (>= ${source:Version}), libdbi-perl, perl (>= 5.6), ${shlibs:Depends}, ${misc:Depends}, psmisc, passwd, lsb-base (>= 3.0-10), upstart (>= 0.6.7-2)
+Breaks: mysql-server (<< ${source:Version}), libmysqlclient-dev
 Provides: virtual-mysql-server
-Replaces: mysql-server (<< ${source:Version}), mysql-server-5.1,  mysql-server-5.0, mysql-server-4.1, libmysqlclient-dev ( << 5.5.17~ )
-Description: MySQL database server binaries and system database setup 
+Replaces: mysql-server (<< ${source:Version}, libmysqlclient-dev
+Description: MySQL database server binaries and system database setup
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query
  language in the world. The main goals of MySQL are speed, robustness and
@@ -141,9 +103,16 @@ Description: MySQL database server binaries and system database setup
  This package contains all the infrastructure needed to setup system
  databases.
 
-Package: mysql-server
+Package: mysql-wsrep-server-5.5-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: mysql-wsrep-client-5.5 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL database wsrep server binary debugging symbols.
+
+Package: mysql-wsrep-server
 Architecture: all
-Depends: mysql-server-5.5
+Depends: mysql-wsrep-server-5.5
 Description: MySQL database server (metapackage depending on the latest version)
  This is an empty package that depends on the current "best" version of
  mysql-server (currently mysql-server-5.5), as determined by the MySQL
@@ -156,25 +125,25 @@ Description: MySQL database server (metapackage depending on the latest version)
  language in the world. The main goals of MySQL are speed, robustness and
  ease of use.
 
-Package: mysql-client
+Package: mysql-wsrep-client
 Architecture: all
-Depends: mysql-client-5.5
+Depends: mysql-wsrep-client-5.5
 Description: MySQL database client (metapackage depending on the latest version)
  This is an empty package that depends on the current "best" version of
  mysql-client (currently mysql-client-5.5), as determined by the MySQL
  maintainers.  Install this package if in doubt about which MySQL version
  you want, as this is the one we consider to be in the best shape.
 
-Package: mysql-testsuite
+Package: mysql-wsrep-testsuite
 Architecture: all
-Depends: mysql-testsuite-5.5
+Depends: mysql-wsrep-testsuite-5.5
 Description: MySQL testsuite
  This is an empty package that depends on the current "best" version of
  mysql-testsuite (currently mysql-testsuite-5.5), as determined by the
  MySQL maintainers.  Install this package if in doubt about which MySQL
  version you want, as this is the one we consider to be in the best shape.
 
-Package: mysql-testsuite-5.5
+Package: mysql-wsrep-testsuite-5.5
 Architecture: any
 Depends: mysql-server, mysql-client, ${misc:Depends},  ${shlibs:Depends}
 Conflicts: mysql-testsuite (<< ${source:Version})
@@ -186,13 +155,8 @@ Description: MySQL testsuite
  .
  This package includes the MySQL testsuite.
 
-Package: mysql-source-5.5
+Package: mysql-wsrep-5.5
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: MySQL source
- MySQL is a fast, stable, and true multi-user, multi-threaded SQL database
- server.  SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
- .
- This package includes the MySQL source code as configured before building.
+Depends: mysql-wsrep-client-5.5 (= ${binary:Version}),
+         mysql-wsrep-server-5.5 (= ${binary:Version})
+Description: Metapackage that installs mysql-wsrep client and server packages.
