@@ -54,9 +54,10 @@ then
 fi
 
 # Check client version
-if ! mysql --version | grep 'Distrib 5.5' >/dev/null
+CLIENT_MINOR=$(mysql --version | cut -d ' ' -f 6 | cut -d '.' -f 2)
+if [ $CLIENT_MINOR -lt "5" ]
 then
-    mysql --version >&2
+    $MYSQL_CLIENT --version >&2
     wsrep_log_error "this operation requires MySQL client version 5.5.x"
     exit $EINVAL
 fi
@@ -72,10 +73,10 @@ if test -n "$WSREP_SST_OPT_PSWD"; then AUTH="$AUTH -p$WSREP_SST_OPT_PSWD"; fi
 STOP_WSREP="SET wsrep_on=OFF;"
 
 # NOTE: we don't use --routines here because we're dumping mysql.proc table
-MYSQLDUMP="mysqldump $AUTH -S$WSREP_SST_OPT_SOCKET \
+MYSQLDUMP="$MYSQLDUMP $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --all-databases"
+--skip-comments --flush-privileges --all-databases --events"
 
 # mysqldump cannot restore CSV tables, fix this issue
 CSV_TABLES_FIX="
@@ -97,7 +98,7 @@ DROP PREPARE stmt;"
 
 SET_START_POSITION="SET GLOBAL wsrep_start_position='$WSREP_SST_OPT_GTID';"
 
-MYSQL="mysql $AUTH -h$WSREP_SST_OPT_HOST -P$WSREP_SST_OPT_PORT "\
+MYSQL="$MYSQL_CLIENT $AUTH -h$WSREP_SST_OPT_HOST -P$WSREP_SST_OPT_PORT "\
 "--disable-reconnect --connect_timeout=10"
 
 # need to disable logging when loading the dump

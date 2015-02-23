@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2013, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2014, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -100,6 +100,14 @@ SET (SQL_SOURCE
                ${WSREP_SOURCES}
                ${GEN_SOURCES}
                ${MYSYS_LIBWRAP_SOURCE})
+
+# These files have unused result errors, so we skip Werror
+CHECK_C_COMPILER_FLAG("-Werror" HAVE_WERROR_FLAG)
+IF(HAVE_WERROR_FLAG)
+  INCLUDE(${MYSQL_CMAKE_SCRIPT_DIR}/compile_flags.cmake)
+  ADD_COMPILE_FLAGS(filesort.cc  COMPILE_FLAGS "-Wno-error")
+  ADD_COMPILE_FLAGS(opt_range.cc COMPILE_FLAGS "-Wno-error")
+ENDIF()
 
 MYSQL_ADD_PLUGIN(partition ha_partition.cc STORAGE_ENGINE DEFAULT STATIC_ONLY
 RECOMPILE_FOR_EMBEDDED)
@@ -259,14 +267,15 @@ IF(WIN32 OR HAVE_DLOPEN AND NOT DISABLE_SHARED)
 ENDIF()
 
 FOREACH(tool glibtoolize libtoolize aclocal autoconf autoheader automake gtar 
- tar bzr)
+ tar git)
  STRING(TOUPPER ${tool}  TOOL)
  FIND_PROGRAM(${TOOL}_EXECUTABLE ${tool} DOC "path to the executable")
  MARK_AS_ADVANCED(${TOOL}_EXECUTABLE)
 ENDFOREACH()
 
 CONFIGURE_FILE(
-  ${CMAKE_SOURCE_DIR}/cmake/make_dist.cmake.in ${CMAKE_BINARY_DIR}/make_dist.cmake @ONLY)
+  ${CMAKE_SOURCE_DIR}/cmake/make_dist.cmake.in
+  ${CMAKE_BINARY_DIR}/make_dist.cmake @ONLY)
 
 ADD_CUSTOM_TARGET(dist 
   COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/make_dist.cmake
@@ -276,8 +285,7 @@ ADD_CUSTOM_TARGET(dist
 
 ADD_CUSTOM_TARGET(distclean
   COMMAND ${CMAKE_COMMAND} -E echo  WARNING: distclean target is not functional
-  COMMAND ${CMAKE_COMMAND} -E echo  Use 'bzr clean-tree' with --unknown and/or
-    --ignored parameter instead
+  COMMAND ${CMAKE_COMMAND} -E echo  Use 'git clean -fdx' instead
   VERBATIM
   )
 

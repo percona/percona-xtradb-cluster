@@ -34,6 +34,11 @@
 #include <sys/socket.h>
 #include <netdb.h>    // getaddrinfo()
 
+#ifdef HAVE_GETIFADDRS
+#include <net/if.h>
+#include <ifaddrs.h>
+#endif // HAVE_GETIFADDRS
+
 extern char** environ; // environment variables
 
 static wsp::string wsrep_PATH;
@@ -145,7 +150,35 @@ process::process (const char* cmd, const char* type)
         goto cleanup_pipe;
     }
 
-    err_ = posix_spawnattr_setflags (&attr, POSIX_SPAWN_SETSIGDEF |
+    /* make sure that no signlas are masked in child process */
+    sigset_t sigmask_empty; sigemptyset(&sigmask_empty);
+    err_ = posix_spawnattr_setsigmask(&attr, &sigmask_empty);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawnattr_setsigmask() failed: %d (%s)",
+                     err_, strerror(err_));
+        goto cleanup_attr;
+    }
+
+    /* make sure the following signals are not ignored in child process */
+    sigset_t default_signals; sigemptyset(&default_signals);
+    sigaddset(&default_signals, SIGHUP);
+    sigaddset(&default_signals, SIGINT);
+    sigaddset(&default_signals, SIGQUIT);
+    sigaddset(&default_signals, SIGPIPE);
+    sigaddset(&default_signals, SIGTERM);
+    sigaddset(&default_signals, SIGCHLD);
+    err_ = posix_spawnattr_setsigdefault(&attr, &default_signals);
+    if (err_)
+    {
+        WSREP_ERROR ("posix_spawnattr_setsigdefault() failed: %d (%s)",
+                     err_, strerror(err_));
+        goto cleanup_attr;
+    }
+
+    err_ = posix_spawnattr_setflags (&attr, POSIX_SPAWN_SETSIGDEF  |
+                                            POSIX_SPAWN_SETSIGMASK |
+            /* start a new process group */ POSIX_SPAWN_SETPGROUP  |
                                             POSIX_SPAWN_USEVFORK);
     if (err_)
     {
@@ -368,7 +401,7 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
 {
   size_t ip_len = 0;
 
-  if (my_bind_addr_str && strlen(my_bind_addr_str))
+  if (my_bind_addr_str && my_bind_addr_str[0] != '\0')
   {
     unsigned int const ip_type= wsrep_check_ip(my_bind_addr_str);
 
@@ -377,7 +410,7 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
       return 0;
     }
 
-    if (INADDR_ANY != ip_type) {;
+    if (INADDR_ANY != ip_type) {
       strncpy (buf, my_bind_addr_str, buf_len);
       return strlen(buf);
     }
@@ -402,65 +435,38 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
     return ip_len;
   }
 
-  // try to find the address of the first one
-#if (TARGET_OS_LINUX == 1)
-  const char cmd[] = "ip addr show | grep -E '^\\s*inet' | grep -m1 global |"
-                     " awk '{ print $2 }' | sed 's/\\/.*//'";
-#elif defined(__sun__)
-  const char cmd[] = "/sbin/ifconfig -a | "
-      "/usr/gnu/bin/grep -m1 -1 -E 'net[0-9]:' | tail -n 1 | awk '{ print $2 }'";
-#elif defined(__APPLE__) || defined(__FreeBSD__)
-  const char cmd[] = "/sbin/route -nv get 8.8.8.8 | tail -n1 | awk '{print $(NF)}'";
-#else
-  char *cmd;
-#error "OS not supported"
-#endif
-  wsp::process proc (cmd, "r");
 
-  if (NULL != proc.pipe()) {
-    char* ret;
+//
+// getifaddrs() is avaiable at least on Linux since glib 2.3, FreeBSD
+// MAC OS X, opensolaris, Solaris.
+//
+// On platforms which do not support getifaddrs() this function returns
+// a failure and user is prompted to do manual configuration.
+//
+#if HAVE_GETIFADDRS
+  struct ifaddrs *ifaddr, *ifa;
+  if (getifaddrs(&ifaddr) == 0)
+  {
+    for (ifa= ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
+      if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) // TODO AF_INET6
+        continue;
 
-    ret = fgets (buf, buf_len, proc.pipe());
+      // Skip loopback interfaces (like lo:127.0.0.1)
+      if (ifa->ifa_flags & IFF_LOOPBACK)
+        continue;
 
-    if (proc.wait()) return 0;
+      if (vio_getnameinfo(ifa->ifa_addr, buf, buf_len, NULL, 0, NI_NUMERICHOST))
+        continue;
 
-    if (NULL == ret) {
-      WSREP_ERROR("Failed to read output of: '%s'", cmd);
-      return 0;
+      freeifaddrs(ifaddr);
+      return strlen(buf);
     }
+    freeifaddrs(ifaddr);
   }
-  else {
-    WSREP_ERROR("Failed to execute: '%s'", cmd);
-    return 0;
-  }
+#endif // HAVE_GETIFADDRS
 
-  // clear possible \n at the end of ip string left by fgets()
-  ip_len = strlen (buf);
-  if (ip_len > 0 && '\n' == buf[ip_len - 1]) {
-    ip_len--;
-    buf[ip_len] = '\0';
-  }
-
-  if (INADDR_NONE == inet_addr(buf)) {
-    if (strlen(buf) != 0) {
-      WSREP_WARN("Shell command returned invalid address: '%s'", buf);
-    }
-    return 0;
-  }
-
-  return ip_len;
-}
-
-size_t wsrep_guess_address(char* buf, size_t buf_len)
-{
-  size_t addr_len = wsrep_guess_ip (buf, buf_len);
-
-  if (addr_len && addr_len < buf_len) {
-    addr_len += snprintf (buf + addr_len, buf_len - addr_len,
-                          ":%u", mysqld_port);
-  }
-
-  return addr_len;
+  return 0;
 }
 
 /*
