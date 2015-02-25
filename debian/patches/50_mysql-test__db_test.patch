@@ -4,7 +4,7 @@ Description: restores the rights for anybody to connect to the test
 
 --- a/mysql-test/mysql-test-run.pl
 +++ b/mysql-test/mysql-test-run.pl
-@@ -3355,6 +3355,10 @@ sub mysql_install_db {
+@@ -3367,6 +3367,10 @@ sub mysql_install_db {
      mtr_appendfile_to_file("$sql_dir/mysql_system_tables_data.sql",
  			   $bootstrap_sql_file);
  
