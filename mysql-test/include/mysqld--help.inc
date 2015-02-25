@@ -39,6 +39,10 @@ perl;
     next if /Value \(after reading options\)/; # skip table header
     next if /^($re1) /;
     next if /^($re2)-/;
+
+    next if /WSREP: Service disconnected/;
+    next if /WSREP: Some threads may fail to exit/;
+
     $skip=0 if /^  -/;
     $skip=1 if / --($re2)\b/;
     y!\\!/!;
