@@ -1091,7 +1091,7 @@ wsrep-sst-donor
 wsrep-sst-donor-rejects-queries FALSE
 wsrep-sst-method rsync
 wsrep-sst-receive-address AUTO
- 00000000-0000-0000-0000-000000000000:-1
+wsrep-start-position 00000000-0000-0000-0000-000000000000:-1
 wsrep-sync-wait 0
 
 To see what values a running MySQL server is using, type
