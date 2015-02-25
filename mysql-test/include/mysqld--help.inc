@@ -40,6 +40,8 @@ perl;
     next if /^($re1) /;
     next if /^($re2)-/;
 
+    next if /wsrep-node-name/;
+
     $skip=0 if /^  -/;
     $skip=1 if / --($re2)\b/;
     y!\\!/!;

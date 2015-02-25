@@ -784,7 +784,6 @@ The following options may be given as the first argument:
  Node address
  --wsrep-node-incoming-address=name 
  Client connection address
- --wsrep-node-name=name 
  Node name
  --wsrep-notify-cmd=name 
  --wsrep-on          To enable wsrep replication 
@@ -1074,7 +1073,6 @@ wsrep-max-ws-size 1073741824
 wsrep-mysql-replication-bundle 0
 wsrep-node-address 
 wsrep-node-incoming-address AUTO
-wsrep-node-name localhost.localdomain
 wsrep-notify-cmd 
 wsrep-on FALSE
 wsrep-provider none
