@@ -122,13 +122,13 @@ Architecture: any
 Suggests: mailx, tinyca
 Recommends: libhtml-template-perl
 Pre-Depends: mysql-wsrep-common (>= ${source:Version}), adduser (>= 3.40), debconf
-Depends: libdbi-perl,
+Depends: initscripts (>= 2.88dsf-13.3),
+         libdbi-perl,
          lsb-base (>= 3.0-10),
          mysql-wsrep-client-5.5 (>= ${source:Version}),
          passwd,
          perl (>= 5.6),
          psmisc,
-         upstart (>= 0.6.7-2),
          ${misc:Depends},
          ${shlibs:Depends}
 Breaks: libmysqlclient-dev, mysql-server (<< ${source:Version})
