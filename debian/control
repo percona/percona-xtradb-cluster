@@ -32,10 +32,10 @@ Homepage: http://dev.mysql.com/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-mysql/mysql-5.5/
 Vcs-Svn: svn://svn.debian.org/svn/pkg-mysql/mysql-5.5/
 
-Package: mysql-wsrep-libmysqlclient18
+Package: mysql-wsrep-libmysqlclient18.0
 Section: libs
 Architecture: any
-Depends: mysql-wsrep-common (>= ${source:Version}),
+Depends: mysql-wsrep-common-5.5 (>= ${source:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Pre-Depends: multiarch-support, ${misc:Pre-Depends}
@@ -50,10 +50,10 @@ Description: MySQL database client library
  .
  This package includes the client library.
 
-Package: mysql-wsrep-libmysqlclient-dev
+Package: mysql-wsrep-libmysqlclient18.0-dev
 Architecture: any
 Section: libdevel
-Depends: mysql-wsrep-libmysqlclient18 (= ${binary:Version}),
+Depends: mysql-wsrep-libmysqlclient18.0 (= ${binary:Version}),
          zlib1g-dev,
          ${misc:Depends},
          ${shlibs:Depends}
@@ -65,7 +65,7 @@ Description: MySQL database development files
  .
  This package includes development libraries and header files.
 
-Package: mysql-wsrep-common
+Package: mysql-wsrep-common-5.5
 Architecture: all
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
@@ -86,8 +86,8 @@ Depends: debianutils (>=1.6),
          libdbd-mysql-perl (>= 1.2202),
          libdbi-perl,
          libterm-readkey-perl,
-         mysql-wsrep-common (>= ${source:Version}),
-         mysql-wsrep-libmysqlclient18,
+         mysql-wsrep-common-5.5 (>= ${source:Version}),
+         mysql-wsrep-libmysqlclient18.0,
          ${misc:Depends},
          ${perl:Depends},
          ${shlibs:Depends}
@@ -107,7 +107,7 @@ Package: mysql-wsrep-server-5.5
 Architecture: any
 Suggests: mailx, tinyca
 Recommends: libhtml-template-perl
-Pre-Depends: mysql-wsrep-common (>= ${source:Version}), adduser (>= 3.40), debconf
+Pre-Depends: mysql-wsrep-common-5.5 (>= ${source:Version}), adduser (>= 3.40), debconf
 Depends: initscripts (>= 2.88dsf-13.3),
          libdbi-perl,
          lsb-base (>= 3.0-10),
@@ -129,42 +129,9 @@ Description: MySQL database server binaries and system database setup
  This package contains all the infrastructure needed to setup system
  databases.
 
-Package: mysql-wsrep-server
-Architecture: all
-Depends: mysql-wsrep-server-5.5
-Description: MySQL database server (metapackage depending on the latest version)
- This is an empty package that depends on the current "best" version of
- mysql-server (currently mysql-server-5.5), as determined by the MySQL
- maintainers. Install this package if in doubt about which MySQL
- version you need. That will install the version recommended by the
- package maintainers.
- .
- MySQL is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MySQL are speed, robustness and
- ease of use.
-
-Package: mysql-wsrep-client
-Architecture: all
-Depends: mysql-wsrep-client-5.5
-Description: MySQL database client (metapackage depending on the latest version)
- This is an empty package that depends on the current "best" version of
- mysql-client (currently mysql-client-5.5), as determined by the MySQL
- maintainers.  Install this package if in doubt about which MySQL version
- you want, as this is the one we consider to be in the best shape.
-
-Package: mysql-wsrep-testsuite
-Architecture: all
-Depends: mysql-wsrep-testsuite-5.5
-Description: MySQL testsuite
- This is an empty package that depends on the current "best" version of
- mysql-testsuite (currently mysql-testsuite-5.5), as determined by the
- MySQL maintainers.  Install this package if in doubt about which MySQL
- version you want, as this is the one we consider to be in the best shape.
-
 Package: mysql-wsrep-testsuite-5.5
 Architecture: any
-Depends: mysql-client, mysql-server, ${misc:Depends}, ${shlibs:Depends}
+Depends: mysql-wsrep-5.5, ${misc:Depends}, ${shlibs:Depends}
 Conflicts: mysql-testsuite (<< ${source:Version})
 Description: MySQL testsuite
  MySQL is a fast, stable, and true multi-user, multi-threaded SQL database
