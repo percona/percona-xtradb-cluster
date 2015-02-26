@@ -317,9 +317,7 @@ source diff:
 	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
 
 override_dh_strip:
-	dh_strip --dbg-package=mysql-wsrep-server-5.5-dbg
-	dh_strip --dbg-package=mysql-wsrep-client-5.5-dbg
-	dh_strip --dbg-package=mysql-wsrep-libmysqlclient18-dbg
+	@echo "Notice: not stripping debug symbols from any binaries"
 
 binary:	binary-indep binary-arch
 

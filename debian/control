@@ -50,13 +50,6 @@ Description: MySQL database client library
  .
  This package includes the client library.
 
-Package: mysql-wsrep-libmysqlclient18-dbg
-Architecture: any
-Section: debug
-Priority: extra
-Depends: mysql-wsrep-libmysqlclient18 (= ${binary:Version}), ${misc:Depends}
-Description: MySQL database client library debugging symbols.
-
 Package: mysql-wsrep-libmysqlclient-dev
 Architecture: any
 Section: libdevel
@@ -110,13 +103,6 @@ Description: MySQL database client binaries
  This package includes the client binaries and the additional tools
  innotop and mysqlreport.
 
-Package: mysql-wsrep-client-5.5-dbg
-Architecture: any
-Section: debug
-Priority: extra
-Depends: mysql-wsrep-client-5.5 (= ${binary:Version}), ${misc:Depends}
-Description: MySQL database client binary debugging symbols.
-
 Package: mysql-wsrep-server-5.5
 Architecture: any
 Suggests: mailx, tinyca
@@ -142,13 +128,6 @@ Description: MySQL database server binaries and system database setup
  .
  This package contains all the infrastructure needed to setup system
  databases.
-
-Package: mysql-wsrep-server-5.5-dbg
-Architecture: any
-Section: debug
-Priority: extra
-Depends: mysql-wsrep-client-5.5 (= ${binary:Version}), ${misc:Depends}
-Description: MySQL database wsrep server binary debugging symbols.
 
 Package: mysql-wsrep-server
 Architecture: all
