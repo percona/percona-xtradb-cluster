@@ -1,0 +1,14 @@
+#
+# Dirty reads from INFORMATION_SCHEMA tables.
+#
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+--disable_info
+USE information_schema;
+SELECT * FROM SESSION_VARIABLES WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
+SET GLOBAL wsrep_reject_queries=ALL;
+--error ER_UNKNOWN_COM_ERROR
+SELECT * FROM SESSION_VARIABLES WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
+SET SESSION wsrep_dirty_reads=TRUE;
+SELECT * FROM SESSION_VARIABLES WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
+SET GLOBAL wsrep_reject_queries=NONE;

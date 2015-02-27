@@ -608,6 +608,7 @@ typedef struct system_variables
   my_bool wsrep_on;
   my_bool wsrep_causal_reads;
   my_bool wsrep_replicate_myisam;               // enable myisam replication
+  my_bool wsrep_dirty_reads;
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
 #endif
@@ -5634,6 +5635,11 @@ public:
   sent by the user (ie: stored procedure).
 */
 #define CF_SKIP_QUESTIONS       (1U << 1)
+
+/**
+  Do not check that wsrep snapshot is ready before allowing this command
+*/
+#define CF_SKIP_WSREP_CHECK     (1U << 2)
 
 void add_to_status(STATUS_VAR *to_var, STATUS_VAR *from_var);
 
