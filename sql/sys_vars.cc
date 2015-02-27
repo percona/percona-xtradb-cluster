@@ -5389,3 +5389,11 @@ static Sys_var_enum Sys_block_encryption_mode(
   "block_encryption_mode", "mode for AES_ENCRYPT/AES_DECRYPT",
   SESSION_VAR(my_aes_mode), CMD_LINE(REQUIRED_ARG),
   my_aes_opmode_names, DEFAULT(my_aes_128_ecb));
+
+#ifdef WITH_WSREP
+static Sys_var_mybool Sys_wsrep_dirty_reads(
+       "wsrep_dirty_reads",
+       "Allow dirty reads when the node is not ready.",
+       SESSION_ONLY(wsrep_dirty_reads),
+       NO_CMD_LINE, DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+#endif
