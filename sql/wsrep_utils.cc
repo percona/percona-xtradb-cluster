@@ -174,6 +174,17 @@ process::process (const char* cmd, const char* type)
     }
 #endif
 
+    /* Reset the process signal mask to unblock signals blocked by the server */
+
+    sigset_t set;
+    (void) sigemptyset(&set);
+
+    if (sigprocmask(SIG_SETMASK, &set, NULL))
+    {
+      sql_perror("sigprocmask() failed");
+      _exit(EXIT_FAILURE);
+    }
+
     /* Reset all ignored signals to SIG_DFL */
 
     memset(&sa, 0, sizeof(sa));
