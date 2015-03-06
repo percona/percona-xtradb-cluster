@@ -38,7 +38,7 @@ ifneq (,$(filter $(ARCH), i386 kfreebsd-i386 hurd-i386))
 	TAOCRYPT_OPT="-DTAOCRYPT_DISABLE_X86ASM"
 endif
 
-# make test-bt is the testsuite run by the MySQL build team 
+# make test-bt is the testsuite run by the MySQL build team
 # before a release, but it is long
 MAKE_TEST_TARGET:=test-mtr
 ifneq ($(findstring fulltest,$(DEB_BUILD_OPTIONS)),)
@@ -57,10 +57,10 @@ endif
 ifeq ($(STATIC_MYSQLD), 1)
     USE_STATIC_MYSQLD:=--with-mysqld-ldflags=-all-static
 endif
-	
+
 override_dh_auto_clean:
 	@echo "RULES.$@"
-	dh_testdir 
+	dh_testdir
 	dh_testroot
 	[ ! -d mysql-test/var ] || rm -rf mysql-test/var
 	rm -rf $(BUILDDIR) $(BUILDDIR_PIC) .pc
@@ -68,7 +68,7 @@ override_dh_auto_clean:
 	rm -f $(EXPORTED_SOURCE_TARBALL)
 	rm -f cmake/os/GNU.cmake
 
-override_dh_prep: 
+override_dh_prep:
 
 override_dh_auto_configure: configure-stamp
 
@@ -133,7 +133,7 @@ ifeq ($(findstring nocheck,$(DEB_BUILD_OPTIONS)),)
 	cp -r mysql-test/* $(builddir)/mysql-test/
 	cp -r sql/share/* $(builddir)/sql/share/
 	cp -r scripts/*sql $(builddir)/scripts/
-	cd $(builddir) && $(MAKE) $(MAKE_TEST_TARGET) || $(TESTSUITE_FAIL_CMD) ; 
+	cd $(builddir) && $(MAKE) $(MAKE_TEST_TARGET) || $(TESTSUITE_FAIL_CMD) ;
 endif
 
 override_dh_auto_install: auto_install-stamp
@@ -231,4 +231,3 @@ get-orig-source:
 
 %:
 	dh $@ --parallel
-
