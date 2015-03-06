@@ -1,0 +1,5 @@
+mysql-wsrep-5.5 (5.5.41-1) UNRELEASED; urgency=medium
+
+  * Initial Debian packaging based on MySQL 5.5.41-0ubuntu0.12.04.1
+
+ -- Otto Kekäläinen <otto@seravo.fi>  Wed, 21 Feb 2015 08:51:36 +0200

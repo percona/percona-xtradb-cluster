@@ -1,0 +1,40 @@
+From: 38_scripts__mysqld_safe.sh__signals.dpatch by  <ch@debian.org>
+Subject: Executes /etc/init.d/mysql on signals
+Bug: http://bugs.mysql.com/bug.php?id=31361
+
+Index: mysql-5.5-5.5.29/scripts/mysqld_safe.sh
+===================================================================
+--- mysql-5.5-5.5.29.orig/scripts/mysqld_safe.sh	2012-12-10 01:16:24.000000000 -0500
++++ mysql-5.5-5.5.29/scripts/mysqld_safe.sh	2013-01-16 08:28:47.961776400 -0500
+@@ -31,8 +31,6 @@
+ syslog_tag_mysqld=mysqld
+ syslog_tag_mysqld_safe=mysqld_safe
+
+-trap '' 1 2 3 15			# we shouldn't let anyone kill us
+-
+ # MySQL-specific environment variable. First off, it's not really a umask,
+ # it's the desired mode. Second, it follows umask(2), not umask(3) in that
+ # octal needs to be explicit. Our shell might be a proper sh without printf,
+@@ -159,7 +157,7 @@
+       # sed buffers output (only GNU sed supports a -u (unbuffered) option)
+       # which means that messages may not get sent to syslog until the
+       # mysqld process quits.
+-      cmd="$cmd 2>&1 | logger -t '$syslog_tag_mysqld' -p daemon.error"
++      cmd="$cmd 2>&1 | logger -t '$syslog_tag_mysqld' -p daemon.error & wait"
+       ;;
+     *)
+       echo "Internal program error (non-fatal):" \
+@@ -862,6 +860,13 @@
+ fi
+
+ #
++# From now on, we catch signals to do a proper shutdown of mysqld
++# when signalled to do so.
++#
++trap '/usr/bin/mysqladmin --defaults-extra-file=/etc/mysql/debian.cnf refresh & wait' 1 # HUP
++trap '/usr/bin/mysqladmin --defaults-extra-file=/etc/mysql/debian.cnf shutdown' 2 3 15 # INT QUIT and TERM
++
++#
+ # Uncomment the following lines if you want all tables to be automatically
+ # checked and repaired during startup. You should add sensible key_buffer
+ # and sort_buffer values to my.cnf to improve check performance or require
