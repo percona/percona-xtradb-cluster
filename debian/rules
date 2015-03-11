@@ -262,7 +262,6 @@ binary-indep: build install
 	dh_installexamples -i
 	dh_installmenu -i
 	dh_installlogrotate -i
-	dh_installinit -i
 	dh_installcron -i
 	dh_installman -i
 	dh_installinfo -i
