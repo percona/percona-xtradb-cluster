@@ -101,7 +101,12 @@ extern my_bool     wsrep_restart_slave_activated;
 extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
 
-enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
+enum enum_wsrep_OSU_method {
+    WSREP_OSU_TOI,
+    WSREP_OSU_RSU,
+    WSREP_OSU_NONE,
+};
+
 enum enum_wsrep_sync_wait {
     WSREP_SYNC_WAIT_NONE = 0x0,
     // show, select, begin
