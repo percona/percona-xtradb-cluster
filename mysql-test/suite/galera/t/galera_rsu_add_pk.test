@@ -19,9 +19,9 @@ INSERT INTO t1 (f1) SELECT 000000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3
 --send INSERT INTO t1 (f1) SELECT 100000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3.f1) + (10 * a4.f1) + a5.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
 
 --connection node_2
-SET GLOBAL wsrep_OSU_method = "RSU";
+SET SESSION wsrep_OSU_method = "RSU";
 ALTER TABLE t1 ADD PRIMARY KEY (f1);
-SET GLOBAL wsrep_OSU_method = "TOI";
+SET SESSION wsrep_OSU_method = "TOI";
 
 # Insert values after the ALTER
 INSERT INTO t1 (f1) SELECT 200000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3.f1) + (10 * a4.f1) + a5.f1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
@@ -35,10 +35,9 @@ SELECT MAX(f1) =  299999 FROM t1;
 SELECT COUNT(*) = 300000 FROM t1;
 SELECT MAX(f1) =  299999 FROM t1;
 
-SET GLOBAL wsrep_OSU_method = "RSU";
+SET SESSION wsrep_OSU_method = "RSU";
 ALTER TABLE t1 ADD PRIMARY KEY (f1);
-SET GLOBAL wsrep_OSU_method = "TOI";
-
+SET SESSION wsrep_OSU_method = "TOI";
 
 DROP TABLE t1;
 DROP TABLE ten;
