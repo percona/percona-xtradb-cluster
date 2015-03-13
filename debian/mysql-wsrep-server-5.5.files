@@ -4,6 +4,7 @@ usr/lib/mysql/*so*
 usr/lib/mysql/plugin/*.so
 etc/mysql/debian-start
 etc/mysql/conf.d/mysqld_safe_syslog.cnf
+etc/init.d/mysql
 usr/bin/msql2mysql
 usr/bin/myisamchk
 usr/bin/myisamlog
