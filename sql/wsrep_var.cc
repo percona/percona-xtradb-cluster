@@ -1,4 +1,4 @@
-/* Copyright 2008 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include <sql_acl.h>
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
+#include "wsrep_xid.h"
 #include <my_dir.h>
 #include <cstdio>
 #include <cstdlib>
@@ -150,12 +151,9 @@ void wsrep_set_local_position (const char* value)
 {
   size_t value_len  = strlen (value);
   size_t uuid_len   = wsrep_uuid_scan (value, value_len, &local_uuid);
+  local_seqno       = strtoll (value + uuid_len + 1, NULL, 10);
 
-  local_seqno = strtoll (value + uuid_len + 1, NULL, 10);
-
-  XID xid;
-  wsrep_xid_init(&xid, &local_uuid, local_seqno);
-  wsrep_set_SE_checkpoint(&xid);
+  wsrep_set_SE_checkpoint(local_uuid, local_seqno);
   WSREP_INFO ("wsrep_start_position var submitted: '%s'", wsrep_start_position);
 }
 

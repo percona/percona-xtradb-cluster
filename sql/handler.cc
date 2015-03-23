@@ -62,6 +62,7 @@ inline double log2(double x)
 #endif
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_xid.h"
 #endif
 /*
   While we have legacy_db_type, we have this array to
@@ -1838,7 +1839,7 @@ static my_bool xarecover_handlerton(THD *unused, plugin_ref plugin,
       {
 #ifdef WITH_WSREP
         my_xid x=(wsrep_is_wsrep_xid(&info->list[i]) ?
-                  wsrep_xid_seqno(&info->list[i]) :
+                  wsrep_xid_seqno(info->list[i]) :
                   info->list[i].get_my_xid());
 #else
         my_xid x=info->list[i].get_my_xid();

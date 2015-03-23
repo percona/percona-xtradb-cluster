@@ -54,7 +54,7 @@ then
 fi
 
 # Check client version
-CLIENT_MINOR=$(mysql --version | cut -d ' ' -f 6 | cut -d '.' -f 2)
+CLIENT_MINOR=$($MYSQL_CLIENT --version | cut -d ' ' -f 6 | cut -d '.' -f 2)
 if [ $CLIENT_MINOR -lt "6" ]
 then
     $MYSQL_CLIENT --version >&2
