@@ -110,6 +110,7 @@ using std::min;
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
+#include "wsrep_binlog.h"
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                               Parser_state *parser_state);
 #endif /* WITH_WSREP */
