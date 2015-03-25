@@ -41,7 +41,6 @@ void wsrep_xid_init(XID* xid, const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
   memcpy(xid->data + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));
 }
 
-inline
 int wsrep_is_wsrep_xid(const void* xid_ptr)
 {
   const XID* xid= reinterpret_cast<const XID*>(xid_ptr);
