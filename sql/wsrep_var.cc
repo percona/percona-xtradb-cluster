@@ -147,26 +147,30 @@ err:
   return 1;
 }
 
-void wsrep_set_local_position (const char* value)
+static
+void wsrep_set_local_position(const char* const value, bool const sst)
 {
-  size_t value_len  = strlen (value);
-  size_t uuid_len   = wsrep_uuid_scan (value, value_len, &local_uuid);
-  local_seqno       = strtoll (value + uuid_len + 1, NULL, 10);
+  size_t const value_len(strlen(value));
+  wsrep_uuid_t uuid;
+  size_t const uuid_len(wsrep_uuid_scan(value, value_len, &uuid));
+  wsrep_seqno_t const seqno(strtoll(value + uuid_len + 1, NULL, 10));
 
-  wsrep_set_SE_checkpoint(local_uuid, local_seqno);
-  WSREP_INFO ("wsrep_start_position var submitted: '%s'", wsrep_start_position);
+  if (sst) {
+    wsrep_sst_received (wsrep, uuid, seqno, NULL, 0);
+  } else {
+    // initialization
+    local_uuid = uuid;
+    local_seqno = seqno;
+  }
 }
 
 bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
 {
+  WSREP_INFO ("wsrep_start_position var submitted: '%s'",
+              wsrep_start_position);
   // since this value passed wsrep_start_position_check, don't check anything
   // here
-  wsrep_set_local_position (wsrep_start_position);
-
-  if (wsrep) {
-    wsrep_sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
-  }
-
+  wsrep_set_local_position (wsrep_start_position, true);
   return 0;
 }
 
@@ -179,7 +183,7 @@ void wsrep_start_position_init (const char* val)
     return;
   }
 
-  wsrep_set_local_position (val);
+  wsrep_set_local_position (val, false);
 }
 
 static bool refresh_provider_options()
