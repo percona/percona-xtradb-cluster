@@ -152,6 +152,24 @@ static void wsrep_log_states (wsrep_log_level_t   const level,
   wsrep_log_cb (level, msg);
 }
 
+void wsrep_init_sidno(const wsrep_uuid_t& wsrep_uuid)
+{
+  /* generate new Sid map entry from inverted uuid */
+  rpl_sid sid;
+  wsrep_uuid_t ltid_uuid;
+
+  for (size_t i= 0; i < sizeof(ltid_uuid.data); ++i)
+  {
+      ltid_uuid.data[i] = ~wsrep_uuid.data[i];
+  }
+
+  sid.copy_from(ltid_uuid.data);
+  global_sid_lock->wrlock();
+  wsrep_sidno= global_sid_map->add_sid(sid);
+  WSREP_INFO("Initialized wsrep sidno %d", wsrep_sidno);
+  global_sid_lock->unlock();
+}
+
 static wsrep_cb_status_t
 wsrep_view_handler_cb (void*                    app_ctx,
                        void*                    recv_ctx,

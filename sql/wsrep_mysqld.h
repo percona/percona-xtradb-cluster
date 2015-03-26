@@ -310,4 +310,7 @@ int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len);
 int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len);
 
 bool wsrep_stmt_rollback_is_safe(THD* thd);
+
+void wsrep_init_sidno(const wsrep_uuid_t&);
+
 #endif /* WSREP_MYSQLD_H */
