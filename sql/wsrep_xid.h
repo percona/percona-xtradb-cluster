@@ -28,6 +28,5 @@ wsrep_seqno_t wsrep_xid_seqno(const XID&);
 void wsrep_get_SE_checkpoint(wsrep_uuid_t&, wsrep_seqno_t&);
 //void wsrep_set_SE_checkpoint(XID&); uncomment if needed
 void wsrep_set_SE_checkpoint(const wsrep_uuid_t&, wsrep_seqno_t);
-void wsrep_init_sidno(const wsrep_uuid_t&);
 
 #endif /* WSREP_UTILS_H */

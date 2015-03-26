@@ -263,13 +263,14 @@ void wsrep_sst_received (wsrep_t*            const wsrep,
         current_seqno < state_id.seqno)
     {
         wsrep_set_SE_checkpoint(state_id.uuid, state_id.seqno);
-        wsrep_init_sidno(state_id.uuid);
     }
     else
     {
         // we should not be receiving SSTs in the past...
         assert(current_seqno == state_id.seqno);
     }
+
+    wsrep_init_sidno(state_id.uuid);
 
     wsrep->sst_received(wsrep, &state_id, state, state_len, rcode);
 }

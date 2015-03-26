@@ -148,21 +148,3 @@ void wsrep_get_SE_checkpoint(wsrep_uuid_t& uuid, wsrep_seqno_t& seqno)
   uuid= *wsrep_xid_uuid(xid);
   seqno= wsrep_xid_seqno(xid);
 }
-
-void wsrep_init_sidno(const wsrep_uuid_t& wsrep_uuid)
-{
-  /* generate new Sid map entry from inverted uuid */
-  rpl_sid sid;
-  wsrep_uuid_t ltid_uuid;
-
-  for (size_t i= 0; i < sizeof(ltid_uuid.data); ++i)
-  {
-      ltid_uuid.data[i] = ~wsrep_uuid.data[i];
-  }
-
-  sid.copy_from(ltid_uuid.data);
-  global_sid_lock->wrlock();
-  wsrep_sidno= global_sid_map->add_sid(sid);
-  WSREP_INFO("Initialized wsrep sidno %d", wsrep_sidno);
-  global_sid_lock->unlock();
-}
