@@ -33,6 +33,10 @@
 #include <string>
 #include <my_stacktrace.h>
 
+#ifdef WITH_WSREP
+#include "wsrep_xid.h"
+#endif /* WITH_WSREP */
+
 using std::max;
 using std::min;
 using std::string;
@@ -6457,7 +6461,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(thd);
 #ifdef WITH_WSREP
   my_xid xid= (wsrep_is_wsrep_xid(&thd->transaction.xid_state.xid) ?
-               wsrep_xid_seqno(&thd->transaction.xid_state.xid) :
+               wsrep_xid_seqno(thd->transaction.xid_state.xid) :
                thd->transaction.xid_state.xid.get_my_xid());
 #else
   my_xid xid= thd->transaction.xid_state.xid.get_my_xid();
@@ -7277,16 +7281,15 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
     Read current wsrep position from storage engines to have consistent
     end position for binlog scan.
   */
-  XID xid;
-  memset(&xid, 0, sizeof(xid));
-  xid.formatID= -1;
-  wsrep_get_SE_checkpoint(&xid);
+  wsrep_uuid_t uuid;
+  wsrep_seqno_t seqno;
+  wsrep_get_SE_checkpoint(uuid, seqno);
   char uuid_str[40];
-  wsrep_uuid_print(wsrep_xid_uuid(&xid), uuid_str, sizeof(uuid_str));
+  wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
   WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
-             (long long)wsrep_xid_seqno(&xid));
-  const wsrep_seqno_t last_xid_seqno= wsrep_xid_seqno(&xid);
-  wsrep_seqno_t cur_xid_seqno=WSREP_SEQNO_UNDEFINED;
+             (long long)seqno);
+  const wsrep_seqno_t last_xid_seqno= seqno;
+  wsrep_seqno_t cur_xid_seqno= WSREP_SEQNO_UNDEFINED;
 #endif /* WITH_WSREP */
 
 

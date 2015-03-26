@@ -110,6 +110,7 @@ using std::min;
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
+#include "wsrep_binlog.h"
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                               Parser_state *parser_state);
 #endif /* WITH_WSREP */
@@ -4563,6 +4564,21 @@ end_with_restore_list:
       my_ok(thd);
       break;
     }
+
+#ifdef WITH_WSREP
+    if (lex->type & (
+            REFRESH_GRANT            |
+            REFRESH_HOSTS            |
+            REFRESH_DES_KEY_FILE     |
+#ifdef HAVE_QUERY_CACHE
+            REFRESH_QUERY_CACHE_FREE |
+#endif /* HAVE_QUERY_CACHE */
+            REFRESH_STATUS           |
+            REFRESH_USER_RESOURCES))
+    {
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    }
+#endif /* WITH_WSREP*/
 
     /*
       reload_acl_and_cache() will tell us if we are allowed to write to the

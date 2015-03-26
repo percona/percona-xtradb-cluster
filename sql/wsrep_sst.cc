@@ -1,4 +1,4 @@
-/* Copyright 2008-2012 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include <sql_parse.h>
 #include "wsrep_priv.h"
 #include "wsrep_utils.h"
+#include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
 
@@ -253,7 +254,24 @@ void wsrep_sst_received (wsrep_t*            const wsrep,
     wsrep_gtid_t const state_id = {
         *uuid, (rcode ? WSREP_SEQNO_UNDEFINED : seqno)
     };
+
+    wsrep_uuid_t current_uuid;
+    wsrep_seqno_t current_seqno;
+    wsrep_get_SE_checkpoint(current_uuid, current_seqno);
+
+    if (memcmp(&current_uuid, &state_id.uuid, sizeof(wsrep_uuid_t)) ||
+        current_seqno < state_id.seqno)
+    {
+        wsrep_set_SE_checkpoint(state_id.uuid, state_id.seqno);
+    }
+    else
+    {
+        // we should not be receiving SSTs in the past...
+        assert(current_seqno == state_id.seqno);
+    }
+
     wsrep_init_sidno(state_id.uuid);
+
     wsrep->sst_received(wsrep, &state_id, state, state_len, rcode);
 }
 
