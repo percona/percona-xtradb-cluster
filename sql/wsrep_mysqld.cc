@@ -1395,19 +1395,24 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
 
   if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
   {
-    switch (wsrep_OSU_method_options) {
+    switch (thd->variables.wsrep_OSU_method) {
     case WSREP_OSU_TOI: ret =  wsrep_TOI_begin(thd, db_, table_,
                                                table_list); break;
     case WSREP_OSU_RSU: ret =  wsrep_RSU_begin(thd, db_, table_); break;
+    default:
+      WSREP_ERROR("Unsupported OSU method: %lu",
+                  thd->variables.wsrep_OSU_method);
+      ret= -1;
+      break;
     }
     switch (ret) {
     case 0:  thd->wsrep_exec_mode= TOTAL_ORDER; break;
-    case 1: 
-      /* TOI replication skipped, treat as success */ 
-      ret = 0; 
+    case 1:
+      /* TOI replication skipped, treat as success */
+      ret = 0;
       break;
     case -1:
-      /* TOI replication failed, treat as error */ 
+      /* TOI replication failed, treat as error */
       break;
     }
   }
@@ -1418,10 +1423,14 @@ void wsrep_to_isolation_end(THD *thd)
 {
   if (thd->wsrep_exec_mode == TOTAL_ORDER)
   {
-    switch(wsrep_OSU_method_options)
+    switch(thd->variables.wsrep_OSU_method)
     {
     case WSREP_OSU_TOI: wsrep_TOI_end(thd); break;
     case WSREP_OSU_RSU: wsrep_RSU_end(thd); break;
+    default:
+      WSREP_WARN("Unsupported wsrep OSU method at isolation end: %lu",
+                 thd->variables.wsrep_OSU_method);
+      break;
     }
     wsrep_cleanup_transaction(thd);
   }

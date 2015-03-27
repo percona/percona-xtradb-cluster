@@ -564,6 +564,7 @@ typedef struct system_variables
   my_bool wsrep_causal_reads;
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
+  ulong wsrep_OSU_method;
 #endif
   double long_query_time_double;
 

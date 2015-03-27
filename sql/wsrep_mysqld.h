@@ -89,7 +89,6 @@ extern my_bool     wsrep_certify_nonPK;
 extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;
-extern ulong       wsrep_OSU_method_options;
 extern my_bool     wsrep_desync;
 extern my_bool     wsrep_recovery;
 extern my_bool     wsrep_replicate_myisam;
@@ -101,7 +100,12 @@ extern my_bool     wsrep_restart_slave_activated;
 extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
 
-enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
+enum enum_wsrep_OSU_method {
+    WSREP_OSU_TOI,
+    WSREP_OSU_RSU,
+    WSREP_OSU_NONE,
+};
+
 enum enum_wsrep_sync_wait {
     WSREP_SYNC_WAIT_NONE = 0x0,
     // show, select, begin
