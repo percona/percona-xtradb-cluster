@@ -39,3 +39,14 @@ SELECT COUNT(*) = 2 FROM t1;
 
 --connection node_1
 DROP TABLE t1;
+
+
+# Workaround for galera#204
+
+CALL mtr.add_suppression("SYNC message from member 1 in non-primary configuration");
+
+--connection node_2
+CALL mtr.add_suppression("SYNC message from member 1 in non-primary configuration");
+
+--connection node_3
+CALL mtr.add_suppression("SYNC message from member 1 in non-primary configuration");
