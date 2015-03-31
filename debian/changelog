@@ -1,3 +1,9 @@
+mysql-wsrep-5.6 (5.6.23-25.10-1) UNRELEASED; urgency=low
+
+  * Bumped version numbers
+
+ -- Otto Kekäläinen <otto@seravo.fi>  Thu, 26 Mar 2015 15:49:37 +0200
+
 mysql-wsrep-5.6 (5.6.21-25.6-1) UNRELEASED; urgency=low
 
   * Initial wsrep version
