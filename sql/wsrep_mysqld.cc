@@ -16,6 +16,7 @@
 #include <mysqld.h>
 #include <sql_class.h>
 #include <sql_parse.h>
+#include "debug_sync.h"
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
 #include "wsrep_sst.h"
@@ -1332,13 +1333,32 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, thd->query() );
 
+  DEBUG_SYNC(thd,"wsrep_RSU_begin_enter");
+
+  mysql_mutex_lock(&LOCK_wsrep_desync_count);
+
+  DEBUG_SYNC(thd,"wsrep_RSU_begin_after_lock");
+
+  if (wsrep_desync_count++)
+  {
+     mysql_mutex_lock(&LOCK_wsrep_replaying);
+     wsrep_replaying++;
+     mysql_mutex_unlock(&LOCK_wsrep_replaying);
+     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+     DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
+     return 0;
+  }
+
   ret = wsrep->desync(wsrep);
   if (ret != WSREP_OK)
   {
-    WSREP_WARN("RSU desync failed %d for %s", ret, thd->query());
-    my_error(ER_LOCK_DEADLOCK, MYF(0));
-    return(ret);
+     wsrep_desync_count--;
+     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+     WSREP_WARN("RSU desync failed %d for %s", ret, thd->query());
+     my_error(ER_LOCK_DEADLOCK, MYF(0));
+     return(ret);
   }
+
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying++;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1350,8 +1370,9 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
-
+    wsrep_desync_count--;
     ret = wsrep->resync(wsrep);
+    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     if (ret != WSREP_OK)
     {
       WSREP_WARN("resync failed %d for %s", ret, thd->query());
@@ -1363,11 +1384,17 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   wsrep_seqno_t seqno = wsrep->pause(wsrep);
   if (seqno == WSREP_SEQNO_UNDEFINED)
   {
+    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     WSREP_WARN("pause failed %lld for %s", (long long)seqno, thd->query());
     return(1);
   }
-  WSREP_DEBUG("paused at %lld", (long long)seqno);
   thd->variables.wsrep_on = 0;
+  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+
+  WSREP_DEBUG("paused at %lld", (long long)seqno);
+
+  DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
+
   return 0;
 }
 
@@ -1377,23 +1404,30 @@ static void wsrep_RSU_end(THD *thd)
   WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, thd->query() );
 
+  mysql_mutex_lock(&LOCK_wsrep_desync_count);
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying--;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
-  ret = wsrep->resume(wsrep);
-  if (ret != WSREP_OK)
+  if (--wsrep_desync_count == 0)
   {
-    WSREP_WARN("resume failed %d for %s", ret, thd->query());
+     ret = wsrep->resume(wsrep);
+     if (ret != WSREP_OK)
+     {
+       WSREP_WARN("resume failed %d for %s", ret, thd->query());
+     }
+     ret = wsrep->resync(wsrep);
+     if (ret != WSREP_OK)
+     {
+       mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+       WSREP_WARN("resync failed %d for %s", ret, thd->query());
+       return;
+     }
+     thd->variables.wsrep_on = 1;
   }
-  ret = wsrep->resync(wsrep);
-  if (ret != WSREP_OK)
-  {
-    WSREP_WARN("resync failed %d for %s", ret, thd->query());
-    return;
-  }
-  thd->variables.wsrep_on = 1;
+
+  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
 }
 
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
