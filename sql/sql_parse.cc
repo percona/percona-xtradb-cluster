@@ -4098,6 +4098,11 @@ end_with_restore_list:
   }
 
   case SQLCOM_UNLOCK_TABLES:
+#ifdef WITH_WSREP
+    mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    if (thd->wsrep_exec_mode == LOCAL_FLUSH) thd->wsrep_exec_mode = LOCAL_STATE;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4548,6 +4553,11 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      thd->wsrep_exec_mode = LOCAL_FLUSH;
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
       if (flush_tables_with_read_lock(thd, all_tables))
         goto error;
       my_ok(thd);
@@ -4559,6 +4569,11 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+#ifdef WITH_WSREP
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      thd->wsrep_exec_mode = LOCAL_FLUSH;
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
       if (flush_tables_for_export(thd, all_tables))
         goto error;
       my_ok(thd);
@@ -4577,6 +4592,12 @@ end_with_restore_list:
             REFRESH_USER_RESOURCES))
     {
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    }
+    else
+    {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      thd->wsrep_exec_mode = LOCAL_FLUSH;
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
 #endif /* WITH_WSREP*/
 
