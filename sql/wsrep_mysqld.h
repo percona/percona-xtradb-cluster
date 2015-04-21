@@ -29,6 +29,7 @@ class THD;
 
 enum wsrep_exec_mode {
     LOCAL_STATE,
+    LOCAL_FLUSH,
     REPL_RECV,
     TOTAL_ORDER,
     LOCAL_COMMIT
