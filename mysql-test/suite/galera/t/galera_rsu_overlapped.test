@@ -1,0 +1,52 @@
+#
+# Test for overlapped RSU transactions.
+#
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+--source include/have_debug_sync.inc
+
+--let $galera_connection_name = node_1a
+--let $galera_server_number = 1
+--source include/galera_connect.inc
+
+--connection node_1
+
+CREATE TABLE ten (f1 INTEGER);
+INSERT INTO ten VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
+
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+CREATE TABLE t2 (f1 INTEGER) Engine=InnoDB;
+
+# Insert some values before the ALTER
+INSERT INTO t1 (f1) SELECT 0000 + (100 * a1.f1) + (10 * a2.f1) + a3.f1 FROM ten AS a1, ten AS a2, ten AS a3;
+INSERT INTO t2 (f1) SELECT 0000 + (100 * a1.f1) + (10 * a2.f1) + a3.f1 FROM ten AS a1, ten AS a2, ten AS a3;
+
+SET GLOBAL wsrep_OSU_method = "RSU";
+
+SET DEBUG_SYNC='wsrep_RSU_begin_after_lock SIGNAL alter1 WAIT_FOR alter2';
+send ALTER TABLE t1 ADD PRIMARY KEY (f1);
+
+--connection node_1a
+
+SET DEBUG_SYNC='now WAIT_FOR alter1';
+SET DEBUG_SYNC='wsrep_RSU_begin_enter SIGNAL alter2';
+send ALTER TABLE t2 ADD PRIMARY KEY (f1);
+
+--connection node_1
+reap;
+
+--connection node_1a
+reap;
+
+--connection node_1
+
+SET DEBUG_SYNC='RESET';
+
+SET GLOBAL wsrep_OSU_method = "TOI";
+
+SELECT COUNT(*) FROM t1;
+SELECT COUNT(*) FROM t2;
+
+DROP TABLE t1;
+DROP TABLE t2;
+DROP TABLE ten;

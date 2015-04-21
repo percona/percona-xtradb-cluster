@@ -806,7 +806,10 @@ mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
+mysql_mutex_t LOCK_wsrep_desync_count;
 int wsrep_replaying= 0;
+int wsrep_desync_count= 0;
+int wsrep_desync_count_manual= 0;
 static void wsrep_close_threads(THD* thd);
 #endif /* WITH_WSREP */
 mysql_rwlock_t LOCK_consistent_snapshot;
@@ -2179,6 +2182,7 @@ static void clean_up_mutexes()
   (void) mysql_cond_destroy(&COND_wsrep_replaying);
   (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_desync_count);
 #endif
   mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 }
@@ -4520,6 +4524,8 @@ static int init_thread_environment()
                    &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync,
                    &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_desync_count,
+                   &LOCK_wsrep_desync_count, MY_MUTEX_INIT_FAST);
 #endif
   return 0;
 }
@@ -10424,7 +10430,7 @@ PSI_mutex_key
 PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
   key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
   key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
-  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync;
+  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync, key_LOCK_wsrep_desync_count;
 #endif
 PSI_mutex_key key_LOCK_thd_remove;
 PSI_mutex_key key_RELAYLOG_LOCK_commit;
@@ -10530,6 +10536,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_desync_count, "LOCK_wsrep_desync_count", PSI_FLAG_GLOBAL},
 #endif
   { &key_LOCK_thd_remove, "LOCK_thd_remove", PSI_FLAG_GLOBAL},
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
