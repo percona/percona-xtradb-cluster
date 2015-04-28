@@ -76,6 +76,33 @@ function mysql_ping()
     return 1
 }
 
+function logs()
+{
+    for id in "${!SRV_MYSQLD_ERRFILE[@]}"; do
+        vlog "----------------"
+        vlog "Error log for server with id: $id"
+        errfile=${SRV_MYSQLD_ERRFILE[$id]}
+        cat ${errfile} >&2 || true
+        vlog "----------------"
+    done 
+
+    for id in "${!SRV_MYSQLD_DATADIR[@]}"; do
+        vlog "----------------"
+        vlog "Innobackupex log for server with id: $id"
+        errdir=${SRV_MYSQLD_DATADIR[$id]}
+        cat ${errdir}/innobackup*.log >&2 || true
+        vlog "----------------"
+    done 
+
+    for id in "${!SRV_MYSQLD_VARDIR[@]}"; do
+        vlog "----------------"
+        vlog "Configuration for server with id: $id"
+        vardir=${SRV_MYSQLD_VARDIR[$id]}
+        cat ${vardir}/my.cnf >&2 || true
+        vlog "----------------"
+    done 
+}
+
 function run_cmd()
 {
   vlog "===> $@"
@@ -86,6 +113,7 @@ function run_cmd()
   if [ $rc -ne 0 ]
   then
       die "===> `basename $1` failed with exit code $rc"
+      logs
   fi
 }
 
@@ -99,6 +127,7 @@ function run_cmd_expect_failure()
   if [ $rc -eq 0 ]
   then
       die "===> `basename $1` succeeded when it was expected to fail"
+      logs
   fi
 }
 
@@ -333,29 +362,7 @@ EOF
                 fi
             fi
             vlog "Can't start the server. Server log (if exists):"
-            for id in "${!SRV_MYSQLD_ERRFILE[@]}"; do
-                vlog "----------------"
-                vlog "Error log for server with id: $id"
-                errfile=${SRV_MYSQLD_ERRFILE[$id]}
-                cat ${errfile} >&2 || true
-                vlog "----------------"
-            done 
-
-            for id in "${!SRV_MYSQLD_DATADIR[@]}"; do
-                vlog "----------------"
-                vlog "Innobackupex log for server with id: $id"
-                errdir=${SRV_MYSQLD_DATADIR[$id]}
-                cat ${errdir}/innobackup*.log >&2 || true
-                vlog "----------------"
-            done 
-
-            for id in "${!SRV_MYSQLD_VARDIR[@]}"; do
-                vlog "----------------"
-                vlog "Configuration for server with id: $id"
-                vardir=${SRV_MYSQLD_VARDIR[$id]}
-                cat ${vardir}/my.cnf >&2 || true
-                vlog "----------------"
-            done 
+            logs
             exit -1
         else
             break
@@ -365,6 +372,7 @@ EOF
      vlog "Server with id=$id has been started on port $MYSQLD_PORT, \
 socket $MYSQLD_SOCKET"
 }
+
 
 ########################################################################
 # Stop server with the id specified as the first argument.  The server 
