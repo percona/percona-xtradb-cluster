@@ -574,3 +574,9 @@ int wsrep_thd_in_locking_session(void *thd_ptr)
   }
   return 0;
 }
+
+bool wsrep_thd_has_explicit_locks(THD *thd)
+{
+  assert(thd);
+  return (thd->mdl_context.wsrep_has_explicit_locks());
+}
