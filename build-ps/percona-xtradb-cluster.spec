@@ -363,7 +363,7 @@ This package contains the TokuDB plugin for Percona Server %{version}-%{release}
 %package -n Percona-XtraDB-Cluster-client%{product_suffix}
 Summary:        Percona XtraDB Cluster - client package
 Group:          Applications/Databases
-Provides:       mysql-client MySQL-client MySQL Percona-XtraDB-Cluster-client
+Provides:       mysql-client MySQL-client MySQL Percona-XtraDB-Cluster-client mysql
 Conflicts:      Percona-SQL-client-50 Percona-Server-client-51 Percona-Server-client-55 Percona-XtraDB-Cluster-client-55
 Requires:       perl-DBI
 

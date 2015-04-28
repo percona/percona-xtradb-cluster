@@ -1,14 +1,52 @@
 percona-xtradb-cluster-5.6 (@@MYSQL_VERSION@@-rel@@PERCONA_VERSION@@) unstable; urgency=low
 
-  * Merge TokuDB packaging changes.
-
- -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Mon, 26 May 2014 08:28:27 +0200
-
-percona-xtradb-cluster-5.6 (5.6.17-rel66.0) unstable; urgency=low
-
   * Packaging updates for PXC 5.6.
 
- -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Wed, 14 May 2014 16:12:23 -0500
+ -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Sun, 15 Feb 2015 08:28:27 +0200
+
+percona-server-5.6 (5.6.22-rel72.0) unstable; urgency=low
+
+  * Added ps_tokudb_admin script for TokuDB plugin installation (BLD-212)
+
+ -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Wed, 04 Feb 2015 20:14:05 +0100
+
+percona-server-5.6 (5.6.22-rel71.0) unstable; urgency=low
+
+  * init script timeout is too short when resizing logs (bug1328262)
+  * innodb_blocking_buffer_pool_restore cause startup return fail (bug1072538) 
+  * Set MYSQL_MAINTAINER_MODE=OFF for debug build (bug1408232)
+
+ -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Fri, 09 Jan 2015 17:39:39 +0100
+
+percona-server-5.6 (5.6.21-rel70.1) unstable; urgency=low
+
+  * Fixed missing query_response_time plugin mtr tests
+
+ -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Thu, 20 Nov 2014 09:55:00 +0100
+
+percona-server-5.6 (5.6.21-rel70.0) unstable; urgency=low
+
+  * Removed references to subunit2junitxml which has been removed from source
+
+ -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Tue, 21 Oct 2014 11:49:39 +0200
+
+percona-server-5.6 (5.6.20-rel68.0) unstable; urgency=low
+
+  * Added mysqld-debug
+
+ -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Tue, 26 Aug 2014 16:18:06 +0200
+
+percona-server-5.6 (5.6.19-rel67.0) unstable; urgency=low
+
+  * Fixed missing libperconaserverclient library
+
+ -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Thu, 26 Jun 2014 16:55:24 +0200
+
+percona-server-5.6 (5.6.17-rel66.0) unstable; urgency=low
+
+  * Added packaging changes regarding TokuDB
+
+ -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Mon, 26 May 2014 08:28:27 +0200
 
 percona-server-5.6 (5.6.17-rel65.0) unstable; urgency=low
 
