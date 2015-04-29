@@ -400,12 +400,9 @@ cleanup_joiner()
     # We don't want to kill mysqld here otherwise.
     if [[ $$ -eq $pgid ]];then
 
-        kill -TERM -$$ || true
-
         # This means a signal was delivered to the process.
         # So, more cleanup. 
         if [[ $estatus -ge 128 ]];then 
-            sleep 10
             kill -KILL -$$ || true
         fi
 
@@ -460,12 +457,9 @@ cleanup_donor()
     # We don't want to kill mysqld here otherwise.
     if [[ $$ -eq $pgid ]];then
 
-        kill -TERM -$$ || true
-
         # This means a signal was delivered to the process.
         # So, more cleanup. 
         if [[ $estatus -ge 128 ]];then 
-            sleep 10
             kill -KILL -$$ || true
         fi
 
@@ -622,6 +616,11 @@ setup_ports
 
 if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then 
     disver="--no-version-check"
+fi
+
+if [[ ${FORCE_FTWRL:-0} -eq 1 ]];then 
+    wsrep_log_info "Forcing FTWRL due to environment variable FORCE_FTWRL equal to $FORCE_FTWRL"
+    iopts+=" --no-backup-locks "
 fi
 
 
@@ -987,7 +986,8 @@ then
 
 
     else 
-        kill -KILL -$(ps -o pgid= $jpid | grep -o '[0-9]*')
+        # || true if it has already exited
+        kill $jpid || true
         rm -rf $DATA/.sst
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi

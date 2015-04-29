@@ -33,6 +33,14 @@ if [[ -n ${WSREP_DEBUG:-} ]];then
     pdebug=";debug=1"
 fi
 
+if [[ -n ${FORCE_FTWRL:-} ]];then 
+    grep -q 'no-backup-locks' $EXTRAFILE1 \
+        || echo "inno-backup-opts='--no-backup-locks'" >> $EXTRAFILE1
+    grep -q 'no-backup-locks' $EXTRAFILE2 \
+        || echo "inno-backup-opts='--no-backup-locks'" >> $EXTRAFILE2
+fi
+
+
 recv_addr1="${ADDR}:$(get_free_port 2)"
 recv_addr2="${ADDR}:$(get_free_port 3)"
 listen_addr1="${ADDR}:$(get_free_port 4)"
