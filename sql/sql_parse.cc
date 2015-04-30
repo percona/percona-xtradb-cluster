@@ -4521,6 +4521,8 @@ end_with_restore_list:
   }
 
   case SQLCOM_UNLOCK_TABLES:
+  {
+    bool table_lock= false;
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4529,6 +4531,7 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
+      table_lock= true;
       DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
@@ -4565,8 +4568,7 @@ end_with_restore_list:
         This is important because provider is resumed there
         and we don't want do it again.
       */
-    if (thd->variables.option_bits & OPTION_TABLE_LOCK &&
-            !thd->global_read_lock.provider_resumed())
+    if (table_lock && !thd->global_read_lock.provider_resumed())
             thd->global_read_lock.wsrep_resume();
 #endif
 
@@ -4574,7 +4576,7 @@ end_with_restore_list:
       goto error;
     my_ok(thd);
     break;
-
+  }
   case SQLCOM_UNLOCK_BINLOG:
     if (thd->backup_binlog_lock.is_acquired())
       thd->backup_binlog_lock.release(thd);
