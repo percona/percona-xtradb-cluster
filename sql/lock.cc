@@ -1042,11 +1042,11 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
   {
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
     m_mdl_blocks_commits_lock= NULL;
-#ifdef WITH_WSREP
-    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
-    wsrep->resume(wsrep);
-#endif /* WITH_WSREP */
   }
+#ifdef WITH_WSREP
+  if (!provider_resumed())
+        wsrep_resume();
+#endif /* WITH_WSREP */
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
   m_mdl_global_shared_lock= NULL;
   m_state= GRL_NONE;
@@ -1119,14 +1119,15 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
 */
 bool Global_read_lock::wsrep_pause(void)
 {
-  long long ret = wsrep->pause(wsrep);
+  wsrep_seqno_t ret = wsrep->pause(wsrep);
   if (ret >= 0)
   {
     wsrep_locked_seqno= ret;
+    pause_provider(TRUE);
   }
   else if (ret != -ENOSYS) /* -ENOSYS - no provider */
   {
-    WSREP_ERROR("Failed to pause provider: %lld (%s)", -ret, strerror(-ret));
+    WSREP_ERROR("Failed to pause provider: %ld (%s)", -ret, strerror(-ret));
 
     /* m_mdl_blocks_commits_lock is always NULL here */
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
@@ -1135,6 +1136,32 @@ bool Global_read_lock::wsrep_pause(void)
   }
   return TRUE;
 }
+
+/**
+  Pause the galera provider.
+  Also set wsrep_locked_seqno to sequence number returned.
+
+  @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
+  @retval True   Provider has been paused.
+*/
+wsrep_status_t Global_read_lock::wsrep_resume(void)
+{
+    wsrep_status_t ret(WSREP_WARNING);
+
+    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    ret = wsrep->resume(wsrep);
+
+    if (!ret)
+    {
+        pause_provider(FALSE);
+    }
+    else
+    {
+       WSREP_WARN("resume failed: %d", ret);
+    }
+    return ret;
+}
+
 #endif /* WITH_WSREP */
 
 /**
