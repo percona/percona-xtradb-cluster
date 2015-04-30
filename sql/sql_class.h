@@ -2134,6 +2134,9 @@ public:
     return FALSE;
   }
   bool make_global_read_lock_block_commit(THD *thd);
+#ifdef WITH_WSREP
+  bool wsrep_pause(void);
+#endif
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
 private:

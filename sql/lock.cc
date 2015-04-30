@@ -1104,7 +1104,21 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   m_mdl_blocks_commits_lock= mdl_request.ticket;
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
+  if (!wsrep_pause())
+    DBUG_RETURN(TRUE);
+  DBUG_RETURN(FALSE);
+}
+
 #ifdef WITH_WSREP
+/**
+  Pause the galera provider.
+  Also set wsrep_locked_seqno to sequence number returned.
+
+  @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
+  @retval True   Provider has been paused.
+*/
+bool Global_read_lock::wsrep_pause(void)
+{
   long long ret = wsrep->pause(wsrep);
   if (ret >= 0)
   {
@@ -1117,12 +1131,11 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     /* m_mdl_blocks_commits_lock is always NULL here */
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
     my_error(ER_LOCK_DEADLOCK, MYF(0));
-    DBUG_RETURN(TRUE);
+    return FALSE;
   }
-#endif /* WITH_WSREP */
-  DBUG_RETURN(FALSE);
+  return TRUE;
 }
-
+#endif /* WITH_WSREP */
 
 /**
   Set explicit duration for metadata locks which are used to implement GRL.
