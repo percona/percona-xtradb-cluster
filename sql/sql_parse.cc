@@ -5023,6 +5023,21 @@ end_with_restore_list:
         goto error;
       if (flush_tables_with_read_lock(thd, all_tables))
         goto error;
+      /*
+        Note:
+        We don't check for multiple non-idempotent invocations
+        because that is checked in flush_tables_with_read_lock.
+
+        We also intend to maintain GRL compatibility,
+        hence check for m_mdl_blocks_commits_lock.
+        This is to ensure we don't try pause an already paused provider.
+       */
+#ifdef WITH_WSREP
+      if (WSREP(thd) &&
+              !thd->global_read_lock.is_acquired() &&
+              !thd->global_read_lock.wsrep_pause())
+        goto error;
+#endif
       my_ok(thd);
       break;
     }
@@ -5041,6 +5056,21 @@ end_with_restore_list:
         goto error;
       if (flush_tables_for_export(thd, all_tables))
         goto error;
+      /*
+        Note:
+        We don't check for multiple non-idempotent invocations
+        because that is checked in flush_tables_for_export.
+
+        We also intend to maintain GRL compatibility,
+        hence check for m_mdl_blocks_commits_lock.
+        This is to ensure we don't try pause an already paused provider.
+       */
+#ifdef WITH_WSREP
+      if (WSREP(thd) &&
+              !thd->global_read_lock.is_acquired() &&
+              !thd->global_read_lock.wsrep_pause())
+        goto error;
+#endif
       my_ok(thd);
       break;
     }
