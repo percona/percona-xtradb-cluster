@@ -1388,6 +1388,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     WSREP_WARN("pause failed %lld for %s", (long long)seqno, thd->query());
     return(1);
   }
+  thd->global_read_lock.pause_provider(TRUE);
   thd->variables.wsrep_on = 0;
   mysql_mutex_unlock(&LOCK_wsrep_desync_count);
 
@@ -1417,6 +1418,7 @@ static void wsrep_RSU_end(THD *thd)
      {
        WSREP_WARN("resume failed %d for %s", ret, thd->query());
      }
+     thd->global_read_lock.pause_provider(FALSE);
      ret = wsrep->resync(wsrep);
      if (ret != WSREP_OK)
      {
