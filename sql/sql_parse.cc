@@ -926,6 +926,28 @@ void cleanup_items(Item *item)
   DBUG_VOID_RETURN;
 }
 
+#ifdef WITH_WSREP
+
+static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
+{
+  for (const TABLE_LIST *table= tables; table; table= table->next_global)
+  {
+    TABLE_CATEGORY c;
+    LEX_STRING     db, tn;
+    lex_string_set(&db, table->db);
+    lex_string_set(&tn, table->table_name);
+    c= get_table_category(&db, &tn);
+    if (c != TABLE_CATEGORY_INFORMATION &&
+        c != TABLE_CATEGORY_PERFORMANCE)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+#endif /* WITH_WSREP */
+
 #ifndef EMBEDDED_LIBRARY
 
 /**
@@ -3073,8 +3095,10 @@ mysql_execute_command(THD *thd)
      * allow SET and SHOW queries
      */
     if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        !(wsrep_ready || (thd->variables.wsrep_dirty_reads &&
-                          (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)) &&
+        !(wsrep_ready ||
+          (thd->variables.wsrep_dirty_reads &&
+           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0) ||
+          wsrep_tables_accessible_when_detached(all_tables)) &&
         lex->sql_command != SQLCOM_SET_OPTION &&
         !wsrep_is_show_query(lex->sql_command))
     {
