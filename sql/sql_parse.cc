@@ -4545,6 +4545,8 @@ end_with_restore_list:
   }
 
   case SQLCOM_UNLOCK_TABLES:
+  {
+    bool table_lock= false;
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4553,6 +4555,7 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
+      table_lock= true;
       DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
@@ -4577,11 +4580,27 @@ end_with_restore_list:
     if (thd->global_read_lock.is_acquired())
       thd->global_read_lock.unlock_global_read_lock(thd);
 
+#ifdef WITH_WSREP
+      /*
+        This is for resuming the provider when used for
+        FLUSH TABLES <table> WITH READ LOCK  or
+        FLUSH TABLES <table> FOR EXPORT.
+        Note, the return value for resume is ignored here because
+        we don't want to fail the query if provider is already resumed.
+
+        Also, note that this is done after GRL is unlocked.
+        This is important because provider is resumed there
+        and we don't want do it again.
+      */
+    if (table_lock && !thd->global_read_lock.provider_resumed())
+            thd->global_read_lock.wsrep_resume();
+#endif
+
     if (res)
       goto error;
     my_ok(thd);
     break;
-
+  }
   case SQLCOM_UNLOCK_BINLOG:
     if (thd->backup_binlog_lock.is_acquired())
       thd->backup_binlog_lock.release(thd);
@@ -5045,6 +5064,20 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+      /*
+        Note:
+        We don't check for multiple non-idempotent invocations
+        because that is checked in flush_tables_with_read_lock.
+
+        We also intend to maintain GRL compatibility,
+        hence check for provider_paused.
+        This is to ensure we don't try pause an already paused provider.
+       */
+#ifdef WITH_WSREP
+      if (WSREP(thd) && thd->global_read_lock.provider_resumed())
+        if (!thd->global_read_lock.wsrep_pause())
+          goto error;
+#endif
       if (flush_tables_with_read_lock(thd, all_tables))
         goto error;
       my_ok(thd);
@@ -5063,6 +5096,20 @@ end_with_restore_list:
       if (check_table_access(thd, LOCK_TABLES_ACL | SELECT_ACL, all_tables,
                              FALSE, UINT_MAX, FALSE))
         goto error;
+      /*
+        Note:
+        We don't check for multiple non-idempotent invocations
+        because that is checked in flush_tables_for_export.
+
+        We also intend to maintain GRL compatibility,
+        hence check for provider_paused.
+        This is to ensure we don't try pause an already paused provider.
+       */
+#ifdef WITH_WSREP
+      if (WSREP(thd) && thd->global_read_lock.provider_resumed())
+        if (!thd->global_read_lock.wsrep_pause())
+          goto error;
+#endif
       if (flush_tables_for_export(thd, all_tables))
         goto error;
       my_ok(thd);
