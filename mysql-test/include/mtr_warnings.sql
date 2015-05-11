@@ -255,6 +255,7 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: option --wsrep-causal-reads is deprecated"),
  ("WSREP: --wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=0"),
  ("WSREP: Could not open saved state file for reading: "),
+ ("WSREP: Could not open state file for reading: "),
  ("WSREP: access file\\(.*gvwstate\\.dat\\) failed\\(No such file or directory\\)"),
  ("WSREP: Gap in state sequence\\. Need state transfer\\."),
  ("WSREP: Failed to prepare for incremental state transfer: Local state UUID \\(00000000-0000-0000-0000-000000000000\\) does not match group state UUID"),
