@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -64,6 +64,7 @@ Note: YYTHD is passed as an argument to yyparse(), and subsequently to yylex().
 #include "set_var.h"
 #include "opt_explain_traditional.h"
 #include "opt_explain_json.h"
+#include "lex_token.h"
 
 /* this is to get the bison compilation windows warnings out */
 #ifdef _MSC_VER
@@ -9972,6 +9973,7 @@ function_call_conflict:
           }
         | OLD_PASSWORD '(' expr ')'
           {
+            WARN_DEPRECATED(YYTHD, "OLD_PASSWORD", "PASSWORD");
             $$=  new (YYTHD->mem_root) Item_func_old_password($3);
             Lex->contains_plaintext_password= true;
             if ($$ == NULL)
@@ -13570,6 +13572,14 @@ literal:
         | temporal_literal { $$= $1; }
         | NULL_SYM
           {
+            Lex_input_stream *lip= YYLIP;
+            /*
+              For the digest computation, in this context only,
+              NULL is considered a literal, hence reduced to '?'
+              REDUCE:
+                TOK_GENERIC_VALUE := NULL_SYM
+            */
+            lip->reduce_digest_token(TOK_GENERIC_VALUE, NULL_SYM);
             $$ = new (YYTHD->mem_root) Item_null();
             if ($$ == NULL)
               MYSQL_YYABORT;
@@ -15238,6 +15248,7 @@ text_or_password:
           }
         | OLD_PASSWORD '(' TEXT_STRING ')'
           {
+		    WARN_DEPRECATED(YYTHD, "OLD_PASSWORD", "PASSWORD");
             $$= $3.length ? Item_func_old_password::
               alloc(YYTHD, $3.str, $3.length) :
               $3.str;
@@ -16150,6 +16161,13 @@ subselect_end:
             */
             lex->current_select->select_n_where_fields+=
             child->select_n_where_fields;
+
+            /*
+              Aggregate functions in having clause may add fields to an outer
+              select. Count them also.
+            */
+            lex->current_select->select_n_having_items+=
+            child->select_n_having_items;
           }
         ;
 

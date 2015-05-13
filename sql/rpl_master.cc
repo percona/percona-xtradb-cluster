@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -854,13 +854,16 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
   bool searching_first_gtid= using_gtid_protocol;
   bool skip_group= false;
   bool binlog_has_previous_gtids_log_event= false;
+  bool gtid_event_logged= false;
   bool has_transmit_started= false;
   Sid_map *sid_map= slave_gtid_executed ? slave_gtid_executed->get_sid_map() : NULL;
 
   IO_CACHE log;
   File file = -1;
   String* packet = &thd->packet;
-  int error;
+  time_t last_event_sent_ts= time(0);
+  bool time_for_hb_event= false;
+  int error= 0;
   const char *errmsg = "Unknown error";
   char error_text[MAX_SLAVE_ERRMSG]; // to be send to slave via my_message()
   NET* net = &thd->net;
@@ -950,6 +953,68 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
   {
     if (using_gtid_protocol)
     {
+      /*
+        In normal scenarios, it is not possible that Slave will
+        contain more gtids than Master with resepctive to Master's
+        UUID. But it could be possible case if Master's binary log
+        is truncated(due to raid failure) or Master's binary log is
+        deleted but GTID_PURGED was not set properly. That scenario
+        needs to be validated, i.e., it should *always* be the case that
+        Slave's gtid executed set (+retrieved set) is a subset of
+        Master's gtid executed set with respective to Master's UUID.
+        If it happens, dump thread will be stopped during the handshake
+        with Slave (thus the Slave's I/O thread will be stopped with the
+        error. Otherwise, it can lead to data inconsistency between Master
+        and Slave.
+      */
+      Sid_map* slave_sid_map= slave_gtid_executed->get_sid_map();
+      DBUG_ASSERT(slave_sid_map);
+      global_sid_lock->wrlock();
+      const rpl_sid &server_sid= gtid_state->get_server_sid();
+      rpl_sidno subset_sidno= slave_sid_map->sid_to_sidno(server_sid);
+      if (!slave_gtid_executed->is_subset_for_sid(gtid_state->get_logged_gtids(),
+                                                  gtid_state->get_server_sidno(),
+                                                  subset_sidno))
+      {
+        errmsg= ER(ER_SLAVE_HAS_MORE_GTIDS_THAN_MASTER);
+        my_errno= ER_MASTER_FATAL_ERROR_READING_BINLOG;
+        global_sid_lock->unlock();
+        GOTO_ERR;
+      }
+      /*
+        Setting GTID_PURGED (when GTID_EXECUTED set is empty i.e., when
+        previous_gtids are also empty) will make binlog rotate. That
+        leaves first binary log with empty previous_gtids and second
+        binary log's previous_gtids with the value of gtid_purged.
+        In find_first_log_not_in_gtid_set() while we search for a binary
+        log whose previous_gtid_set is subset of slave_gtid_executed,
+        in this particular case, server will always find the first binary
+        log with empty previous_gtids which is subset of any given
+        slave_gtid_executed. Thus Master thinks that it found the first
+        binary log which is actually not correct and unable to catch
+        this error situation. Hence adding below extra if condition
+        to check the situation. Slave should know about Master's purged GTIDs.
+        If Slave's GTID executed + retrieved set does not contain Master's
+        complete purged GTID list, that means Slave is requesting(expecting)
+        GTIDs which were purged by Master. We should let Slave know about the
+        situation. i.e., throw error if slave's GTID executed set is not
+        a superset of Master's purged GTID set.
+        The other case, where user deleted binary logs manually
+        (without using 'PURGE BINARY LOGS' command) but gtid_purged
+        is not set by the user, the following if condition cannot catch it.
+        But that is not a problem because in find_first_log_not_in_gtid_set()
+        while checking for subset previous_gtids binary log, the logic
+        will not find one and an error ER_MASTER_HAS_PURGED_REQUIRED_GTIDS
+        is thrown from there.
+      */
+      if (!gtid_state->get_lost_gtids()->is_subset(slave_gtid_executed))
+      {
+        errmsg= ER(ER_MASTER_HAS_PURGED_REQUIRED_GTIDS);
+        my_errno= ER_MASTER_FATAL_ERROR_READING_BINLOG;
+        global_sid_lock->unlock();
+        GOTO_ERR;
+      }
+      global_sid_lock->unlock();
       first_gtid.clear();
       if (mysql_bin_log.find_first_log_not_in_gtid_set(name,
                                                        slave_gtid_executed,
@@ -1178,11 +1243,21 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
                                                          STRING_WITH_LEN(act)));
                     };);
     bool is_active_binlog= false;
-    while (!(error= Log_event::read_log_event(&log, packet, log_lock,
+    while (!thd->killed &&
+           !(error= Log_event::read_log_event(&log, packet, log_lock,
                                               current_checksum_alg,
                                               log_file_name,
                                               &is_active_binlog)))
     {
+      DBUG_EXECUTE_IF("hold_dump_thread_inside_inner_loop",
+                    {
+                      const char act[]= "now "
+                                        "signal signal_inside_inner_loop "
+                                        "wait_for signal_continue";
+                      DBUG_ASSERT(!debug_sync_set_action(current_thd,
+                                                         STRING_WITH_LEN(act)));
+                      DBUG_ASSERT(thd->killed);
+                    };);
       time_t created;
       DBUG_PRINT("info", ("read_log_event returned 0 on line %d", __LINE__));
 #ifndef DBUG_OFF
@@ -1310,6 +1385,7 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
                               "searching gtid(%d).",
                               gtid_ev.get_sidno(sid_map), gtid_ev.get_gno(),
                               skip_group, searching_first_gtid));
+          gtid_event_logged= true;
         }
         break;
 
@@ -1343,6 +1419,19 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
           */
           goto_next_binlog= true;
 
+        if (!gtid_event_logged && using_gtid_protocol)
+        {
+          /*
+             Skip groups in the binlogs which don't have any gtid event
+             logged before them. When gtid_deployment_step is ON, the server
+             doesn't generate GTID and so no gtid_event is logged before binlog
+             events. But when gtid_deployment_step is OFF, the server starts
+             writing gtid_events in the middle of active binlog. When slave
+             connects with gtid_protocol, master needs to skip binlog events
+             which don't have corresponding gtid_event.
+          */
+          skip_group= true;
+        }
         break;
       }
 
@@ -1368,14 +1457,28 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
       {
         p_last_skip_coord->pos= p_coord->pos;
         strcpy(p_last_skip_coord->file_name, p_coord->file_name);
+        /*
+          If we have not send any event from past 'heartbeat_period' time
+          period, then it is time to send a packet before skipping this group.
+         */
+        DBUG_EXECUTE_IF("inject_2sec_sleep_when_skipping_an_event",
+                        {
+                          my_sleep(2000000);
+                        });
+        time_t now= time(0);
+        DBUG_ASSERT(now >= last_event_sent_ts);
+        time_for_hb_event= ((ulonglong)(now - last_event_sent_ts) >=
+                            (ulonglong)(heartbeat_period/1000000000UL));
       }
 
-      if (!skip_group && last_skip_group
-          && event_type != FORMAT_DESCRIPTION_EVENT)
+      if ((!skip_group && last_skip_group
+           && event_type != FORMAT_DESCRIPTION_EVENT) || time_for_hb_event)
       {
         /*
           Dump thread is ready to send it's first transaction after
-          one or more skipped transactions. Send a heart beat event
+          one or more skipped transactions or dump thread did not
+          send any event from past 'heartbeat_period' time frame
+          (busy skipping gtid groups). Send a heart beat event
           to update slave IO thread coordinates before that happens.
 
           Notice that for a new binary log file, FORMAT_DESCRIPTION_EVENT
@@ -1390,16 +1493,12 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
         {
           GOTO_ERR;
         }
+        last_event_sent_ts= time(0);
+        last_skip_group= time_for_hb_event= false;
       }
-
-      /* save this flag for next iteration */
-      last_skip_group= skip_group;
-
-      if (skip_group == false && my_net_write(net, (uchar*) packet->ptr(), packet->length()))
+      else
       {
-        errmsg = "Failed on my_net_write()";
-        my_errno= ER_UNKNOWN_ERROR;
-        GOTO_ERR;
+        last_skip_group= skip_group;
       }
 
       DBUG_EXECUTE_IF("master_xid_trigger",
@@ -1412,6 +1511,17 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
           DBUG_ASSERT(!debug_sync_set_action(current_thd,
                                              STRING_WITH_LEN(act)));
       }});
+
+      if (skip_group == false)
+      {
+        if (my_net_write(net, (uchar*) packet->ptr(), packet->length()))
+        {
+          errmsg = "Failed on my_net_write()";
+          my_errno= ER_UNKNOWN_ERROR;
+          GOTO_ERR;
+        }
+        last_event_sent_ts= time(0);
+      }
 
       DBUG_EXECUTE_IF("dump_thread_wait_before_send_xid",
                       {
@@ -1613,6 +1723,11 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
             */
             if (skip_group)
             {
+              /*
+                TODO: Number of HB events sent from here can be reduced
+               by checking whehter it is time to send a HB event or not.
+               (i.e., using the flag time_for_hb_event)
+              */
               if (send_last_skip_group_heartbeat(thd, net, packet,
                                                  p_coord, &ev_offset,
                                                  current_checksum_alg, &errmsg,
@@ -1698,6 +1813,7 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
                                   "skip group(%d) searching gtid(%d).",
                                   gtid_ev.get_sidno(sid_map), gtid_ev.get_gno(),
                                   skip_group, searching_first_gtid));
+              gtid_event_logged= true;
             }
             break;
 
@@ -1729,6 +1845,14 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
                 and jump to the next one.
               */
               goto_next_binlog= true;
+            if (!gtid_event_logged && using_gtid_protocol)
+            {
+              /*
+                 Skip groups in the binlogs which don't have any gtid event
+                 logged before them.
+              */
+              skip_group= true;
+            }
 
             break;
           }
@@ -1769,6 +1893,7 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
              my_errno= ER_UNKNOWN_ERROR;
              GOTO_ERR;
             }
+            last_event_sent_ts= time(0);
 
             if (event_type == LOAD_EVENT)
             {
@@ -1996,7 +2121,7 @@ void kill_zombie_dump_threads(String *slave_uuid)
       sql_print_information("While initializing dump thread for slave with "
                             "UUID <%s>, found a zombie dump thread with "
                             "the same UUID. Master is killing the zombie dump "
-                            "thread.", slave_uuid->c_ptr());
+                            "thread(%lu).", slave_uuid->c_ptr(), tmp->thread_id);
     tmp->awake(THD::KILL_QUERY);
     mysql_mutex_unlock(&tmp->LOCK_thd_data);
   }

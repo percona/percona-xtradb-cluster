@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -207,6 +207,7 @@ extern ulong slow_launch_threads, slow_launch_time;
 extern ulong table_cache_size, table_def_size;
 extern ulong table_cache_size_per_instance, table_cache_instances;
 extern MYSQL_PLUGIN_IMPORT ulong max_connections;
+extern ulong max_digest_length;
 extern ulong max_connect_errors, connect_timeout;
 extern my_bool opt_slave_allow_batching;
 extern my_bool allow_slave_start;
@@ -236,16 +237,16 @@ extern const char *binlog_checksum_type_names[];
 extern my_bool opt_master_verify_checksum;
 extern my_bool opt_slave_sql_verify_checksum;
 extern my_bool enforce_gtid_consistency;
-extern my_bool simplified_binlog_gtid_recovery;
-extern ulong binlogging_impossible_mode;
-enum enum_binlogging_impossible_mode
+extern my_bool binlog_gtid_simple_recovery;
+extern ulong binlog_error_action;
+enum enum_binlog_error_action
 {
   /// Ignore the error and let server continue without binlogging
   IGNORE_ERROR= 0,
   /// Abort the server
   ABORT_SERVER= 1
 };
-extern const char *binlogging_impossible_err[];
+extern const char *binlog_error_action_list[];
 enum enum_gtid_mode
 {
   /// Support only anonymous groups, not GTIDs.
@@ -258,6 +259,8 @@ enum enum_gtid_mode
   GTID_MODE_ON= 3
 };
 extern ulong gtid_mode;
+extern bool gtid_deployment_step;
+extern bool opt_gtid_deployment_step;
 extern const char *gtid_mode_names[];
 extern TYPELIB gtid_mode_typelib;
 
@@ -307,6 +310,7 @@ extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;
 extern pthread_attr_t connection_attrib;
 extern MYSQL_FILE *bootstrap_file;
 extern my_bool old_mode;
+extern my_bool avoid_temporal_upgrade;
 extern LEX_STRING opt_init_connect, opt_init_slave;
 extern int bootstrap_error;
 extern char err_shared_dir[];
@@ -663,6 +667,8 @@ enum options_mysqld
   OPT_BINLOG_FORMAT,
   OPT_BINLOG_IGNORE_DB,
   OPT_BIN_LOG,
+  OPT_BINLOGGING_IMPOSSIBLE_MODE,
+  OPT_SIMPLIFIED_BINLOG_GTID_RECOVERY,
   OPT_BOOTSTRAP,
   OPT_CONSOLE,
   OPT_DEBUG_SYNC_TIMEOUT,
@@ -722,7 +728,9 @@ enum options_mysqld
   OPT_THREAD_CACHE_SIZE,
   OPT_HOST_CACHE_SIZE,
   OPT_TABLE_DEFINITION_CACHE,
-  OPT_SECURE_FILE_PRIV
+  OPT_SECURE_FILE_PRIV,
+  OPT_AVOID_TEMPORAL_UPGRADE,
+  OPT_SHOW_OLD_TEMPORALS
 };
 
 

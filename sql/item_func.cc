@@ -3692,9 +3692,13 @@ bool udf_handler::get_arguments()
 	{
 	  f_args.args[i]=    (char*) res->ptr();
 	  f_args.lengths[i]= res->length();
+	}
+	else
+	{
+	  f_args.lengths[i]= 0;
+	}
 	  break;
 	}
-      }
     case INT_RESULT:
       *((longlong*) to) = args[i]->val_int();
       if (!args[i]->null_value)
@@ -4433,7 +4437,9 @@ longlong Item_func_is_free_lock::val_int()
   ull_key.mdl_key_init(MDL_key::USER_LOCK, res->c_ptr_safe(), "");
 
   null_value= 0;
-  return thd->mdl_context.get_lock_owner(&ull_key) == 0;
+  longlong ret_val= thd->mdl_context.get_lock_owner(&ull_key) == 0;
+  DEBUG_SYNC(current_thd, "after_getting_user_level_lock_info");
+  return ret_val;
 }
 
 
@@ -4460,6 +4466,7 @@ longlong Item_func_is_used_lock::val_int()
     return 0;
 
   null_value= 0;
+  DEBUG_SYNC(current_thd, "after_getting_user_level_lock_info");
   return thread_id;
 }
 

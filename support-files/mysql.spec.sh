@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -69,14 +69,6 @@
 #
 
 # ----------------------------------------------------------------------------
-# wsrep builds
-# ----------------------------------------------------------------------------
-%if %{defined with_wsrep}
-%define mysql_version @VERSION@_wsrep_@WSREP_API_VERSION@.@WSREP_PATCH_VERSION@
-%define wsrep_version @WSREP_VERSION@
-%endif
-
-# ----------------------------------------------------------------------------
 # Commercial builds
 # ----------------------------------------------------------------------------
 %if %{undefined commercial}
@@ -121,13 +113,6 @@
 
 %if %{undefined server_suffix}
 %define server_suffix   %{nil}
-%endif
-
-# ----------------------------------------------------------------------------
-# Packager
-# ----------------------------------------------------------------------------
-%if %{undefined mysql_packager}
-%define mysql_packager MySQL Build Team <build@mysql.com>
 %endif
 
 # ----------------------------------------------------------------------------
@@ -298,17 +283,9 @@ documentation and the manual for more information.
 ##############################################################################
 
 %package -n MySQL-server%{product_suffix}
-%if %{defined with_wsrep}
-Version:        %{mysql_version}
-#Release:        %{wsrep_version}.%{release}
-%endif
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
-%if %{defined with_wsrep}
-Requires:       %{distro_requires} rsync lsof
-%else
 Requires:       %{distro_requires}
-%endif
 %if 0%{?commercial}
 Obsoletes:      MySQL-server
 %else
@@ -342,9 +319,6 @@ and the manual for more information.
 This package includes the MySQL server binary as well as related utilities
 to run and administer a MySQL server.
 
-%if %{defined with_wsrep}
-Built with wsrep patch %{wsrep_version}.
-%endif
 If you want to access and work with the database, you have to install
 package "MySQL-client%{product_suffix}" as well!
 
@@ -435,7 +409,6 @@ This package contains the shared libraries (*.so*) which certain languages
 and applications need to dynamically load and use MySQL.
 
 # ----------------------------------------------------------------------------
-%if %{undefined with_wsrep}
 %package -n MySQL-embedded%{product_suffix}
 Summary:        MySQL - Embedded library
 Group:          Applications/Databases
@@ -465,7 +438,6 @@ The API is identical for the embedded MySQL version and the
 client/server version.
 
 For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
-%endif
 
 ##############################################################################
 %prep
@@ -527,12 +499,14 @@ mkdir debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -O[0-9]* / /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
                 -e 's/ -unroll2 / /' \
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
               sed -e 's/ -O[0-9]* / /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
                   -e 's/ -unroll2 / /' \
                   -e 's/ -ip / /' \
                   -e 's/^ //' \
@@ -545,9 +519,6 @@ mkdir debug
            -DFEATURE_SET="%{feature_set}" \
            %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
-%if %{defined with_wsrep}
-           -DWITH_WSREP=1 -DWITH_LIBEVENT=system \
-%endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make ${MAKE_JFLAG} VERBOSE=1
@@ -564,9 +535,6 @@ mkdir release
            -DFEATURE_SET="%{feature_set}" \
            %{ssl_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
-%if %{defined with_wsrep}
-           -DWITH_WSREP=1 -DWITH_LIBEVENT=system \
-%endif
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}"
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make ${MAKE_JFLAG} VERBOSE=1
@@ -614,20 +582,11 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
-ln -sf %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
-
-%if %{defined with_wsrep}
-# Create a wsrep_sst_rsync_wan symlink.
-install -d $RBR%{_bindir}
-ln -sf wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
-%endif
+ln -s %{_sysconfdir}/init.d/mysql $RBR%{_sbindir}/rcmysql
 
 # Touch the place where the my.cnf config file might be located
 # Just to make sure it's in the file list and marked as a config file
 touch $RBR%{_sysconfdir}/my.cnf
-%if %{defined with_wsrep}
-touch $RBR%{_sysconfdir}/wsrep.cnf
-%endif
 
 # Install SELinux files in datadir
 install -m 600 $MBD/%{src_dir}/support-files/RHEL4-SElinux/mysql.{fc,te} \
@@ -734,7 +693,7 @@ A manual upgrade is required.
   rpm -qa | grep -i '^mysql-'
 
   You may choose to use 'rpm --nodeps -ev <package-name>' to remove
-  the package which contains the mysqlclient shared library.  The
+  the package which contains the perconaserverclient shared library.  The
   library will be reinstalled by the MySQL-shared-compat package.
 - Install the new MySQL packages supplied by $myvendor
 - Ensure that the MySQL server is started
@@ -1089,7 +1048,6 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %files -n MySQL-server%{product_suffix} -f release/support-files/plugins.files
 %defattr(-,root,root,0755)
-
 %if %{defined license_files_server}
 %doc %{license_files_server}
 %endif
@@ -1097,11 +1055,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %{src_dir}/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
 %doc release/support-files/my-default.cnf
-%if %{defined with_wsrep}
-%doc %{src_dir}/Docs/README-wsrep
-%doc release/support-files/wsrep.cnf
-%doc release/support-files/wsrep_notify
-%endif
 
 %if 0%{?commercial}
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
@@ -1164,14 +1117,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/replace
 %attr(755, root, root) %{_bindir}/resolve_stack_dump
 %attr(755, root, root) %{_bindir}/resolveip
-%if %{defined with_wsrep}
-%attr(755, root, root) %{_bindir}/wsrep_sst_common
-%attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
-%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
-%attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
-%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
-%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
-%endif
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1189,8 +1134,10 @@ echo "====="                                     >> $STATUS_HISTORY
 
 # ----------------------------------------------------------------------------
 %files -n MySQL-client%{product_suffix}
-
 %defattr(-, root, root, 0755)
+%if %{defined license_files_server}
+%doc %{license_files_server}
+%endif
 %attr(755, root, root) %{_bindir}/msql2mysql
 %attr(755, root, root) %{_bindir}/mysql
 %attr(755, root, root) %{_bindir}/mysql_find_rows
@@ -1224,6 +1171,9 @@ echo "====="                                     >> $STATUS_HISTORY
 # ----------------------------------------------------------------------------
 %files -n MySQL-devel%{product_suffix} -f optional-files-devel
 %defattr(-, root, root, 0755)
+%if %{defined license_files_server}
+%doc %{license_files_server}
+%endif
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
 %attr(755, root, root) %{_bindir}/mysql_config
@@ -1231,13 +1181,16 @@ echo "====="                                     >> $STATUS_HISTORY
 %dir %attr(755, root, root) %{_libdir}/mysql
 %{_includedir}/mysql/*
 %{_datadir}/aclocal/mysql.m4
-%{_libdir}/mysql/libmysqlclient.a
-%{_libdir}/mysql/libmysqlclient_r.a
+%{_libdir}/mysql/libperconaserverclient.a
+%{_libdir}/mysql/libperconaserverclient_r.a
 %{_libdir}/mysql/libmysqlservices.a
 
 # ----------------------------------------------------------------------------
 %files -n MySQL-shared%{product_suffix}
 %defattr(-, root, root, 0755)
+%if %{defined license_files_server}
+%doc %{license_files_server}
+%endif
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libmysql*.so*
 
@@ -1250,12 +1203,13 @@ echo "====="                                     >> $STATUS_HISTORY
 # ----------------------------------------------------------------------------
 %files -n MySQL-test%{product_suffix}
 %defattr(-, root, root, 0755)
+%if %{defined license_files_server}
+%doc %{license_files_server}
+%endif
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
-%if %{undefined with_wsrep}
 %attr(755, root, root) %{_bindir}/mysql_client_test_embedded
 %attr(755, root, root) %{_bindir}/mysqltest_embedded
-%endif
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql-stress-test.pl.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql-test-run.pl.1*
@@ -1263,13 +1217,14 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysqltest_embedded.1*
 
 # ----------------------------------------------------------------------------
-%if %{undefined with_wsrep}
 %files -n MySQL-embedded%{product_suffix}
 %defattr(-, root, root, 0755)
+%if %{defined license_files_server}
+%doc %{license_files_server}
+%endif
 %attr(755, root, root) %{_bindir}/mysql_embedded
 %attr(644, root, root) %{_libdir}/mysql/libmysqld.a
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
-%endif
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file
@@ -1277,6 +1232,9 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Mon Oct 06 2014 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com>
+- Add license info in each subpackage
+
 * Wed May 28 2014 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com>
 - Updated usergroup to mysql on datadir
 
@@ -1328,15 +1286,11 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - Removal all traces of the readline library from mysql (BUG 13738013)
 
-* Wed Dec 07 2011 Alexey Yurchenko <alexey.yurchenko@codership.com>
-
-- wsrep-related cleanups.
-
 * Wed Sep 28 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Fix duplicate mentioning of "mysql_plugin" and its manual page,
   it is better to keep alphabetic order in the files list (merging!).
-  
+
 * Wed Sep 14 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Let the RPM capabilities ("obsoletes" etc) ensure that an upgrade may replace
@@ -1375,7 +1329,7 @@ echo "====="                                     >> $STATUS_HISTORY
 * Fri Aug 19 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Null-upmerge the fix of bug#37165: This spec file is not affected.
-- Replace "/var/lib/mysql" by the spec file variable "%{mysqldatadir}".
+- Replace "/var/lib/mysql" by the spec file variable "%%{mysqldatadir}".
 
 * Fri Aug 12 2011 Daniel Fischer <daniel.fischer@oracle.com>
 
@@ -1390,18 +1344,19 @@ echo "====="                                     >> $STATUS_HISTORY
 - Fix bug#12561297: Added the MySQL embedded binary
 
 * Thu Jul 07 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
+
 - Fix bug#45415: "rpm upgrade recreates test database"
   Let the creation of the "test" database happen only during a new installation,
   not in an RPM upgrade.
   This affects both the "mkdir" and the call of "mysql_install_db".
 
-* Thu Feb 09 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
+* Wed Feb 09 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Fix bug#56581: If an installation deviates from the default file locations
   ("datadir" and "pid-file"), the mechanism to detect a running server (on upgrade)
   should still work, and use these locations.
   The problem was that the fix for bug#27072 did not check for local settings.
-  
+
 * Mon Jan 31 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Install the new "manifest" files: "INFO_SRC" and "INFO_BIN".
@@ -1516,7 +1471,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Fix some problems with the directives around "tcmalloc" (experimental),
   remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
-* Fri Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
+* Tue Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
 
 - Removed mysql_fix_privilege_tables
 
@@ -1634,7 +1589,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 * Thu Nov 30 2006 Joerg Bruehe <joerg@mysql.com>
 
-- Call "make install" using "benchdir_root=%{_datadir}",
+- Call "make install" using "benchdir_root=%%{_datadir}",
   because that is affecting the regression test suite as well.
 
 * Thu Nov 16 2006 Joerg Bruehe <joerg@mysql.com>
@@ -1713,7 +1668,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - Set $LDFLAGS from $MYSQL_BUILD_LDFLAGS
 
-* Wed Mar 07 2006 Kent Boortz <kent@mysql.com>
+* Tue Mar 07 2006 Kent Boortz <kent@mysql.com>
 
 - Changed product name from "Community Edition" to "Community Server"
 
@@ -1751,7 +1706,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Added zlib to the list of (static) libraries installed
 - Added check against libtool wierdness (WRT: sql/mysqld || sql/.libs/mysqld)
 - Compile MySQL with bundled zlib
-- Fixed %packager name to "MySQL Production Engineering Team"
+- Fixed %%packager name to "MySQL Production Engineering Team"
 
 * Mon Dec 05 2005 Joerg Bruehe <joerg@mysql.com>
 
@@ -1901,7 +1856,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - ISAM and merge storage engines were purged. As well as appropriate
   tools and manpages (isamchk and isamlog)
 
-* Thu Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
+* Fri Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
 
 - enabled the "Archive" storage engine for the max binary
 - enabled the "CSV" storage engine for the max binary
@@ -1961,7 +1916,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - marked /etc/logrotate.d/mysql as a config file (BUG 2156)
 
-* Fri Dec 13 2003 Lenz Grimmer <lenz@mysql.com>
+* Sat Dec 13 2003 Lenz Grimmer <lenz@mysql.com>
 
 - fixed file permissions (BUG 1672)
 
@@ -2103,7 +2058,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Added separate libmysql_r directory; now both a threaded
   and non-threaded library is shipped.
 
-* Wed Sep 28 1999 David Axmark <davida@mysql.com>
+* Tue Sep 28 1999 David Axmark <davida@mysql.com>
 
 - Added the support-files/my-example.cnf to the docs directory.
 

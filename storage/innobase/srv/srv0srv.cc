@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2013, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2014, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, Percona Inc.
 
@@ -1574,15 +1574,6 @@ srv_printf_innodb_monitor(
 	srv_n_rows_updated_old = srv_stats.n_rows_updated;
 	srv_n_rows_deleted_old = srv_stats.n_rows_deleted;
 	srv_n_rows_read_old = srv_stats.n_rows_read;
-
-	/* Only if lock_print_info_summary proceeds correctly,
-	before we call the lock_print_info_all_transactions
-	to print all the lock information. */
-	ret = lock_print_info_summary(file, nowait);
-
-	if (ret) {
-		lock_print_info_all_transactions(file);
-	}
 
 	fputs("----------------------------\n"
 	      "END OF INNODB MONITOR OUTPUT\n"
@@ -3255,7 +3246,9 @@ srv_do_purge(
 
 		*n_total_purged += n_pages_purged;
 
-	} while (!srv_purge_should_exit(n_pages_purged) && n_pages_purged > 0);
+	} while (!srv_purge_should_exit(n_pages_purged)
+		 && n_pages_purged > 0
+		 && purge_sys->state == PURGE_STATE_RUN);
 
 	return(rseg_history_len);
 }

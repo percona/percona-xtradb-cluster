@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -49,6 +49,18 @@
 using std::min;
 using std::max;
 using std::list;
+
+// This is a temporary backporting fix.
+#ifndef HAVE_LOG2
+/*
+  This will be slightly slower and perhaps a tiny bit less accurate than
+  doing it the IEEE754 way but log2() should be available on C99 systems.
+*/
+inline double log2(double x)
+{
+  return (log(x) / M_LN2);
+}
+#endif
 
 // This is a temporary backporting fix.
 #ifndef HAVE_LOG2
@@ -2661,7 +2673,7 @@ int ha_delete_table(THD *thd, handlerton *table_type, const char *path,
 ****************************************************************************/
 handler *handler::clone(const char *name, MEM_ROOT *mem_root)
 {
-  handler *new_handler= get_new_handler(table->s, mem_root, ht);
+  handler *new_handler= table ? get_new_handler(table->s, mem_root, ht) : NULL;
 
   if (!new_handler)
     return NULL;
@@ -6658,7 +6670,7 @@ end:
 ha_rows DsMrr_impl::dsmrr_info(uint keyno, uint n_ranges, uint rows,
                                uint *bufsz, uint *flags, Cost_estimate *cost)
 {  
-  ha_rows res;
+  ha_rows res __attribute__((unused));
   uint def_flags= *flags;
   uint def_bufsz= *bufsz;
 

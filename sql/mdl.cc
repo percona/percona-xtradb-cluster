@@ -1,4 +1,4 @@
-/* Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2007, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
 
 #include "mdl.h"
 #include "debug_sync.h"
+#include "mysqld.h"
 #include "sql_array.h"
 #include <hash.h>
 #include <mysqld_error.h>
@@ -961,18 +962,29 @@ MDL_map_partition::get_lock_owner(my_hash_value_type hash_value,
 {
   unsigned long res = 0;
   MDL_lock *lock;
+
+retry:
   mysql_mutex_lock(&m_mutex);
+
+  DEBUG_SYNC(current_thd, "mdl_map_partition_get_lock_owner_m_mutex_locked");
+
   lock= (MDL_lock*) my_hash_search_using_hash_value(&m_locks,
                                                     hash_value,
                                                     mdl_key->ptr(),
                                                     mdl_key->length());
   if (lock)
   {
-    mysql_prlock_rdlock(&lock->m_rwlock);
+    if (move_from_hash_to_lock_mutex(lock))
+      goto retry;
+
     res= lock->get_lock_owner();
     mysql_prlock_unlock(&lock->m_rwlock);
   }
+  else
+  {
   mysql_mutex_unlock(&m_mutex);
+  }
+
   return res;
 }
 
@@ -1990,6 +2002,9 @@ MDL_lock::get_lock_owner() const
 void MDL_lock::remove_ticket(Ticket_list MDL_lock::*list, MDL_ticket *ticket)
 {
   mysql_prlock_wrlock(&m_rwlock);
+
+  DEBUG_SYNC(current_thd, "mdl_lock_remove_ticket_m_rwlock_locked");
+
   (this->*list).remove_ticket(ticket);
   if (is_empty())
     mdl_locks.remove(this);
@@ -2149,7 +2164,7 @@ MDL_context::find_ticket(MDL_request *mdl_request,
 bool
 MDL_context::try_acquire_lock(MDL_request *mdl_request)
 {
-  MDL_ticket *ticket;
+  MDL_ticket *ticket= NULL;
 
   if (try_acquire_lock_impl(mdl_request, &ticket))
     return TRUE;
@@ -2403,7 +2418,7 @@ bool
 MDL_context::acquire_lock(MDL_request *mdl_request, ulong lock_wait_timeout)
 {
   MDL_lock *lock;
-  MDL_ticket *ticket;
+  MDL_ticket *ticket= NULL;
   struct timespec abs_timeout;
   MDL_wait::enum_wait_status wait_status;
   /* Do some work outside the critical section. */

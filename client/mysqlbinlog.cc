@@ -3095,6 +3095,7 @@ int main(int argc, char** argv)
   DBUG_PROCESS(argv[0]);
 
   my_init_time(); // for time functions
+  tzset(); // set tzname
    /*
     A pointer of type Log_event can point to
      INTVAR
@@ -3130,6 +3131,7 @@ int main(int argc, char** argv)
     exit(1);
   }
 
+  umask(((~my_umask) & 0666));
   /* Check for argument conflicts and do any post-processing */
   if (args_post_process() == ERROR_STOP)
     exit(1);

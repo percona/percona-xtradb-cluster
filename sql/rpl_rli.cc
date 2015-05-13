@@ -98,8 +98,7 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery
    mts_group_status(MTS_NOT_IN_GROUP), reported_unsafe_warning(false),
    rli_description_event(NULL),
    sql_delay(0), sql_delay_end(0), m_flags(0), row_stmt_start_timestamp(0),
-   long_find_row_note_printed(false), error_on_rli_init_info(false),
-   rli_next_event(NULL)
+   long_find_row_note_printed(false), error_on_rli_init_info(false)
 {
   DBUG_ENTER("Relay_log_info::Relay_log_info");
 
@@ -138,7 +137,6 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery
   relay_log.init_pthread_objects();
   do_server_version_split(::server_version, slave_version_split);
   last_retrieved_gtid.clear();
-  init_sql_alloc(&lock_tables_mem_root, 4096, 0);
   DBUG_VOID_RETURN;
 }
 
@@ -179,7 +177,6 @@ Relay_log_info::~Relay_log_info()
   relay_log.cleanup();
   set_rli_description_event(NULL);
   last_retrieved_gtid.clear();
-  free_root(&lock_tables_mem_root, MYF(0));
 
   DBUG_VOID_RETURN;
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -174,9 +174,12 @@ static void print_system_time()
   Helper class to perform a thread excursion.
 
   This class is used to temporarily switch to another session (THD
-  structure). It will set up the PSI structures and other "globals"
-  correctly (e.g., thread-specific variables) so that the POSIX thread
-  looks exactly like the session attached to.
+  structure). It will set up thread specific "globals" correctly
+  so that the POSIX thread looks exactly like the session attached to.
+  However, PSI_thread info is not touched as it is required to show
+  the actual physial view in PFS instrumentation i.e., it should
+  depict as the real thread doing the work instead of thread it switched
+  to.
 
   On destruction, the original session (which is supplied to the
   constructor) will be re-attached automatically. For example, with
@@ -199,17 +202,10 @@ class Thread_excursion
 public:
   Thread_excursion(THD *thd)
     : m_original_thd(thd)
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-    , m_saved_psi(PSI_server ? PSI_server->get_thread() : NULL)
-#endif
   {
   }
 
   ~Thread_excursion() {
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-    if (PSI_server)
-      PSI_server->set_thread(m_saved_psi);
-#endif
 #ifndef EMBEDDED_LIBRARY
     if (unlikely(setup_thread_globals(m_original_thd)))
       DBUG_ASSERT(0);                           // Out of memory?!
@@ -272,18 +268,10 @@ private:
    */
   int attach_to(THD *thd)
   {
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-    if (PSI_server)
-      PSI_server->set_thread(thd_get_psi(thd));
-#endif
 #ifndef EMBEDDED_LIBRARY
     if (DBUG_EVALUATE_IF("simulate_session_attach_error", 1, 0)
         || unlikely(setup_thread_globals(thd)))
     {
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-      if (PSI_server)
-        PSI_server->set_thread(m_saved_psi);
-#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
       /*
         Indirectly uses pthread_setspecific, which can only return
         ENOMEM or EINVAL. Since store_globals are using correct keys,
@@ -315,7 +303,6 @@ exit0:
   }
 
   THD *m_original_thd;
-  PSI_thread *m_saved_psi;
 };
 
 
@@ -789,7 +776,7 @@ public:
   {
     my_off_t stmt_bytes= 0;
     my_off_t trx_bytes= 0;
-    DBUG_ASSERT(stmt_cache.has_xid() == 0 && trx_cache.has_xid() <= 1);
+    DBUG_ASSERT(stmt_cache.has_xid() == 0);
     if (int error= stmt_cache.flush(thd, &stmt_bytes, wrote_xid))
       return error;
     if (int error= trx_cache.flush(thd, &trx_bytes, wrote_xid))
@@ -984,11 +971,37 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
   DBUG_RETURN(0);
 }
 
+static bool should_write_gtids(const THD *thd) {
+  /*
+    Return false in the situation where slave sql_thread is
+    trying to generate gtid's for binlog events received from master.
+
+    Note that the check thd->variables.gtid_next.type == AUTOMATIC_GROUP
+    is used to ensure that a new gtid is generated for the transaction group,
+    instead of using SESSION.gtid_next value.
+  */
+  if (thd->rli_slave &&
+      thd->variables.gtid_next.type == AUTOMATIC_GROUP)
+    return false;
+  /*
+    Return true (allow gtids to be generated) in the scenario where
+    gtid_deployment_step is false (Normal run after deployment procedure
+    is done).
+
+    Return true in the scenario where slave sql_thread uses gtid received from
+    master. This is necessary in the situation where deployment is done on
+    master, but slave still in deployment mode (gtid_deployment_step is true).
+  */
+  return (!gtid_deployment_step || (thd->rli_slave &&
+          thd->variables.gtid_next.type != AUTOMATIC_GROUP));
+
+}
+
 int binlog_cache_data::write_event(THD *thd, Log_event *ev)
 {
   DBUG_ENTER("binlog_cache_data::write_event");
 
-  if (gtid_mode > 0)
+  if (gtid_mode > 0 && should_write_gtids(thd))
   {
     Group_cache::enum_add_group_status status= 
       group_cache.add_logged_group(thd, get_byte_position());
@@ -1120,8 +1133,10 @@ gtid_before_write_cache(THD* thd, binlog_cache_data* cache_data)
 
   DBUG_ASSERT(thd->variables.gtid_next.type != UNDEFINED_GROUP);
 
-  if (gtid_mode == 0)
+  if (gtid_mode == 0 || !should_write_gtids(thd))
+  {
     DBUG_RETURN(0);
+  }
 
   Group_cache* group_cache= &cache_data->group_cache;
 
@@ -1593,11 +1608,6 @@ Stage_manager::enroll_for(StageID stage, THD *thd, mysql_mutex_t *stage_mutex)
   */
   if (!leader)
   {
-#ifdef HAVE_PSI_THREAD_INTERFACE
-    PSI_thread *psi_thread;
-    psi_thread= PSI_THREAD_CALL(get_thread)();
-    PSI_THREAD_CALL(set_thread)(NULL);
-#endif
     mysql_mutex_lock(&m_lock_done);
 #ifndef DBUG_OFF
     /*
@@ -1613,9 +1623,6 @@ Stage_manager::enroll_for(StageID stage, THD *thd, mysql_mutex_t *stage_mutex)
       mysql_cond_wait(&m_cond_done, &m_lock_done);
     }
     mysql_mutex_unlock(&m_lock_done);
-#ifdef HAVE_PSI_THREAD_INTERFACE
-    PSI_THREAD_CALL(set_thread)(psi_thread);
-#endif
   }
   return leader;
 }
@@ -2027,7 +2034,10 @@ static int log_in_use(const char* log_name)
 {
   size_t log_name_len = strlen(log_name) + 1;
   int thread_count=0;
-  DEBUG_SYNC(current_thd,"purge_logs_after_lock_index_before_thread_count");
+#ifndef DBUG_OFF
+  if (current_thd)
+    DEBUG_SYNC(current_thd,"purge_logs_after_lock_index_before_thread_count");
+#endif
   mysql_mutex_lock(&LOCK_thread_count);
 
   Thread_iterator it= global_thread_list_begin();
@@ -3199,13 +3209,13 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
         case NO_GTIDS:
         {
           /*
-            If the simplified_binlog_gtid_recovery is enabled, and the
+            If the binlog_gtid_simple_recovery is enabled, and the
             last binary log does not contain any GTID event, do not
             read any more binary logs, GLOBAL.GTID_EXECUTED and
             GLOBAL.GTID_PURGED should be empty in the case. Otherwise,
             initialize GTID_EXECUTED as usual.
           */
-          if (simplified_binlog_gtid_recovery && !is_relay_log)
+          if (binlog_gtid_simple_recovery && !is_relay_log)
           {
             DBUG_ASSERT(all_gtids->is_empty() && lost_gtids->is_empty());
             goto end;
@@ -3242,12 +3252,12 @@ bool MYSQL_BIN_LOG::init_gtid_sets(Gtid_set *all_gtids, Gtid_set *lost_gtids,
         case NO_GTIDS:
         {
           /*
-            If the simplified_binlog_gtid_recovery is enabled, and the
+            If the binlog_gtid_simple_recovery is enabled, and the
             first binary log does not contain any GTID event, do not
             read any more binary logs, GLOBAL.GTID_PURGED should be
             empty in the case.
           */
-          if (simplified_binlog_gtid_recovery && !is_relay_log)
+          if (binlog_gtid_simple_recovery && !is_relay_log)
           {
             DBUG_ASSERT(lost_gtids->is_empty());
             goto end;
@@ -3424,6 +3434,8 @@ bool MYSQL_BIN_LOG::open_binlog(const char *log_name,
     else
       global_sid_lock->assert_some_wrlock();
     Previous_gtids_log_event prev_gtids_ev(previous_gtid_set);
+    if (is_relay_log)
+      prev_gtids_ev.set_relay_log_event();
     if (need_sid_lock)
       global_sid_lock->unlock();
     prev_gtids_ev.checksum_alg= s.checksum_alg;
@@ -3520,7 +3532,7 @@ err:
   my_free(name);
   name= NULL;
   log_state= LOG_CLOSED;
-  if (binlogging_impossible_mode == ABORT_SERVER)
+  if (binlog_error_action == ABORT_SERVER)
   {
     THD *thd= current_thd;
     /*
@@ -5229,7 +5241,7 @@ end:
        - ...
     */
     close(LOG_CLOSE_INDEX);
-    if (binlogging_impossible_mode == ABORT_SERVER)
+    if (binlog_error_action == ABORT_SERVER)
     {
       THD *thd= current_thd;
       /*
@@ -5747,11 +5759,18 @@ void MYSQL_BIN_LOG::purge()
   @retval
     nonzero - error in rotating routine.
 */
-int MYSQL_BIN_LOG::rotate_and_purge(bool force_rotate)
+int MYSQL_BIN_LOG::rotate_and_purge(THD* thd, bool force_rotate)
 {
   int error= 0;
   DBUG_ENTER("MYSQL_BIN_LOG::rotate_and_purge");
   bool check_purge= false;
+
+  /*
+    Wait for handlerton to insert any pending information into the binlog.
+    For e.g. ha_ndbcluster which updates the binlog asynchronously this is
+    needed so that the user see its own commands in the binlog.
+  */
+  ha_binlog_wait(thd);
 
   DBUG_ASSERT(!is_relay_log);
   mysql_mutex_lock(&LOCK_log);
@@ -6229,9 +6248,9 @@ bool MYSQL_BIN_LOG::write_cache(THD *thd, binlog_cache_data *cache_data)
 
 err:
   if (!write_error)
-    write_error= 1;
   {
     char errbuf[MYSYS_STRERROR_SIZE];
+    write_error= 1;
     sql_print_error(ER(ER_ERROR_ON_WRITE), name,
                     errno, my_strerror(errbuf, sizeof(errbuf), errno));
   }

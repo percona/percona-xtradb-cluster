@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2007, 2013, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2007, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -41,9 +41,6 @@ Completed 2011/7/10 Sunny and Jimmy Yang
 
 /** The FTS optimize thread's work queue. */
 static ib_wqueue_t* fts_optimize_wq;
-
-/** The number of document ids to delete in one statement. */
-static const ulint FTS_MAX_DELETE_DOC_IDS = 1000;
 
 /** Time to wait for a message. */
 static const ulint FTS_QUEUE_WAIT_IN_USECS = 5000000;
@@ -189,6 +186,8 @@ struct fts_encode_t {
 cycle for a table. */
 struct fts_slot_t {
 	dict_table_t*	table;		/*!< Table to optimize */
+
+	table_id_t	table_id;	/*!< Table id */
 
 	fts_state_t	state;		/*!< State of this slot */
 
@@ -1152,6 +1151,7 @@ fts_optimize_encode_node(
 	}
 
 	/* Calculate the space required to store the ilist. */
+	ut_ad(doc_id > node->last_doc_id);
 	doc_id_delta = doc_id - node->last_doc_id;
 	enc_len = fts_get_encoded_len(static_cast<ulint>(doc_id_delta));
 
@@ -1394,7 +1394,8 @@ fts_optimize_word(
 
 		src_node = (fts_node_t*) ib_vector_get(word->nodes, i);
 
-		if (!dst_node) {
+		if (dst_node == NULL
+		    || dst_node->last_doc_id > src_node->first_doc_id) {
 
 			dst_node = static_cast<fts_node_t*>(
 				ib_vector_push(nodes, NULL));
@@ -2741,6 +2742,7 @@ fts_optimize_new_table(
 	memset(slot, 0x0, sizeof(*slot));
 
 	slot->table = table;
+	slot->table_id = table->id;
 	slot->state = FTS_STATE_LOADED;
 	slot->interval_time = FTS_OPTIMIZE_INTERVAL_IN_SECS;
 
@@ -2865,7 +2867,8 @@ fts_is_sync_needed(
 		slot = static_cast<const fts_slot_t*>(
 			ib_vector_get_const(tables, i));
 
-		if (slot->table && slot->table->fts) {
+		if (slot->state != FTS_STATE_EMPTY && slot->table
+		    && slot->table->fts) {
 			total_memory += slot->table->fts->cache->total_size;
 		}
 
@@ -2948,6 +2951,7 @@ fts_optimize_thread(
 	ib_wqueue_t*	wq = (ib_wqueue_t*) arg;
 
 	ut_ad(!srv_read_only_mode);
+	my_thread_init();
 
 	heap = mem_heap_create(sizeof(dict_table_t*) * 64);
 	heap_alloc = ib_heap_allocator_create(heap);
@@ -3076,9 +3080,11 @@ fts_optimize_thread(
 			if (slot->state != FTS_STATE_EMPTY) {
 				dict_table_t*	table = NULL;
 
-			        table = dict_table_open_on_name(
-					slot->table->name, FALSE, FALSE,
-					DICT_ERR_IGNORE_INDEX_ROOT);
+				/*slot->table may be freed, so we try to open
+				table by slot->table_id.*/
+				table = dict_table_open_on_id(
+					slot->table_id, FALSE,
+					DICT_TABLE_OP_NORMAL);
 
 				if (table) {
 
@@ -3101,6 +3107,7 @@ fts_optimize_thread(
 	ib_logf(IB_LOG_LEVEL_INFO, "FTS optimize thread exiting.");
 
 	os_event_set(exit_event);
+	my_thread_end();
 
 	/* We count the number of threads in os_thread_exit(). A created
 	thread should always use that to exit and not use return() to exit. */
