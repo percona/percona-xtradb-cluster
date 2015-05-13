@@ -64,17 +64,6 @@ inline double log2(double x)
 }
 #endif
 
-// This is a temporary backporting fix.
-#ifndef HAVE_LOG2
-/*
-  This will be slightly slower and perhaps a tiny bit less accurate than
-  doing it the IEEE754 way but log2() should be available on C99 systems.
-*/
-inline double log2(double x)
-{
-  return (log(x) / M_LN2);
-}
-#endif
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif
