@@ -116,6 +116,7 @@ using std::min;
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
+#include "wsrep_binlog.h"
 static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                               Parser_state *parser_state);
 #endif /* WITH_WSREP */
@@ -1047,21 +1048,6 @@ bool do_command(THD *thd)
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 #endif /* WITH_WSREP */
-  /*
-    Because of networking layer callbacks in place,
-    this call will maintain the following instrumentation:
-    - IDLE events
-    - SOCKET events
-    - STATEMENT events
-    - STAGE events
-    when reading a new network packet.
-    In particular, a new instrumented statement is started.
-    See init_net_server_extension()
-  */
-  thd->m_server_idle= true;
-  packet_length= my_net_read(net);
-  thd->m_server_idle= false;
-
   if (packet_length == packet_error)
   {
     DBUG_PRINT("info",("Got error %d reading command from socket %s",
@@ -1385,7 +1371,6 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
   bool error= 0;
   DBUG_ENTER("dispatch_command");
   DBUG_PRINT("info",("packet: '%*.s'; command: %d", packet_length, packet, command));
-
   DBUG_EXECUTE_IF("crash_dispatch_command_before",
                   { DBUG_PRINT("crash_dispatch_command_before", ("now"));
                     DBUG_ABORT(); });
@@ -3089,8 +3074,6 @@ mysql_execute_command(THD *thd)
 #ifdef HAVE_REPLICATION
   } /* endif unlikely slave */
 #endif
-
-  bool reset_timer= set_statement_timer(thd);
 
   status_var_increment(thd->status_var.com_stat[lex->sql_command]);
 
@@ -5104,6 +5087,21 @@ end_with_restore_list:
       break;
     }
 
+#ifdef WITH_WSREP
+    if (lex->type & (
+            REFRESH_GRANT            |
+            REFRESH_HOSTS            |
+            REFRESH_DES_KEY_FILE     |
+#ifdef HAVE_QUERY_CACHE
+            REFRESH_QUERY_CACHE_FREE |
+#endif /* HAVE_QUERY_CACHE */
+            REFRESH_STATUS           |
+            REFRESH_USER_RESOURCES))
+    {
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    }
+#endif /* WITH_WSREP*/
+
     /*
       reload_acl_and_cache() will tell us if we are allowed to write to the
       binlog or not.
@@ -5657,9 +5655,6 @@ create_sp_error:
                                false))
         goto error;
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-
-      enum_sp_type sp_type= (lex->sql_command == SQLCOM_DROP_PROCEDURE) ?
-                            SP_TYPE_PROCEDURE : SP_TYPE_FUNCTION;
 
       enum_sp_type sp_type= (lex->sql_command == SQLCOM_DROP_PROCEDURE) ?
                             SP_TYPE_PROCEDURE : SP_TYPE_FUNCTION;
@@ -7344,6 +7339,39 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
           wsrep_copy_query(thd);
           thd->set_time();
           parser_state->reset(rawbuf, length);
+
+          /* PSI end */
+          MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+          thd->m_statement_psi= NULL;
+
+          /* DTRACE end */
+          if (MYSQL_QUERY_DONE_ENABLED())
+          {
+            MYSQL_QUERY_DONE(thd->is_error());
+          }
+
+          /* SHOW PROFILE end */
+#if defined(ENABLED_PROFILING)
+          thd->profiling.finish_current_query();
+#endif
+
+          /* SHOW PROFILE begin */
+#if defined(ENABLED_PROFILING)
+          thd->profiling.start_new_query("continuing");
+          thd->profiling.set_query_source(rawbuf, length);
+#endif
+
+          /* DTRACE begin */
+          MYSQL_QUERY_START(rawbuf, thd->thread_id,
+                            (char *) (thd->db ? thd->db : ""),
+                            &thd->security_ctx->priv_user[0],
+                            (char *) thd->security_ctx->host_or_ip);
+
+          /* PSI begin */
+          thd->m_statement_psi= MYSQL_START_STATEMENT(&thd->m_statement_state,
+                                                      com_statement_info[thd->get_command()].m_key,
+                                                      thd->db, thd->db_length,
+                                                      thd->charset());
         }
         else
         {

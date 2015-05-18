@@ -1,4 +1,4 @@
-/* Copyright 2008-2012 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -23,16 +23,19 @@
 #include <sql_parse.h>
 #include "wsrep_priv.h"
 #include "wsrep_utils.h"
+#include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
 
 extern const char wsrep_defaults_file[];
+extern const char wsrep_defaults_group_suffix[];
 
 #define WSREP_SST_OPT_ROLE     "--role"
 #define WSREP_SST_OPT_ADDR     "--address"
 #define WSREP_SST_OPT_AUTH     "--auth"
 #define WSREP_SST_OPT_DATA     "--datadir"
 #define WSREP_SST_OPT_CONF     "--defaults-file"
+#define WSREP_SST_OPT_CONF_SUFFIX "--defaults-group-suffix"
 #define WSREP_SST_OPT_PARENT   "--parent"
 #define WSREP_SST_OPT_BINLOG   "--binlog"
 
@@ -242,17 +245,39 @@ void wsrep_sst_complete (const wsrep_uuid_t* sst_uuid,
 }
 
 void wsrep_sst_received (wsrep_t*            const wsrep,
-                         const wsrep_uuid_t* const uuid,
+                         const wsrep_uuid_t& uuid,
                          wsrep_seqno_t       const seqno,
                          const void*         const state,
                          size_t              const state_len)
 {
-    int const rcode(seqno < 0 ? seqno : 0);
-    wsrep_gtid_t const state_id = {
-        *uuid, (rcode ? WSREP_SEQNO_UNDEFINED : seqno)
-    };
-    wsrep_init_sidno(state_id.uuid);
-    wsrep->sst_received(wsrep, &state_id, state, state_len, rcode);
+    wsrep_get_SE_checkpoint(local_uuid, local_seqno);
+
+    if (memcmp(&local_uuid, &uuid, sizeof(wsrep_uuid_t)) ||
+        local_seqno < seqno || seqno < 0)
+    {
+        wsrep_set_SE_checkpoint(uuid, seqno);
+        local_uuid = uuid;
+        local_seqno = seqno;
+    }
+    else if (local_seqno > seqno)
+    {
+        WSREP_WARN("SST postion is in the past: %lld, current: %lld. "
+                   "Can't continue.",
+                   (long long)seqno, (long long)local_seqno);
+        unireg_abort(1);
+    }
+
+    wsrep_init_sidno(uuid);
+
+    if (wsrep)
+    {
+        int const rcode(seqno < 0 ? seqno : 0);
+        wsrep_gtid_t const state_id = {
+            uuid, (rcode ? WSREP_SEQNO_UNDEFINED : seqno)
+        };
+
+        wsrep->sst_received(wsrep, &state_id, state, state_len, rcode);
+    }
 }
 
 // Let applier threads to continue
@@ -261,7 +286,7 @@ void wsrep_sst_continue ()
   if (sst_needed)
   {
     WSREP_INFO("Signalling provider to continue.");
-    wsrep_sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
+    wsrep_sst_received (wsrep, local_uuid, local_seqno, NULL, 0);
   }
 }
 
@@ -459,10 +484,11 @@ static ssize_t sst_prepare_other (const char*  method,
                  WSREP_SST_OPT_AUTH" '%s' "
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX" '%s' "
                  WSREP_SST_OPT_PARENT" '%d'"
                  " %s '%s' ",
                  method, addr_in, (sst_auth_real) ? sst_auth_real : "",
-                 sst_dir, wsrep_defaults_file, (int)getpid(),
+                 sst_dir, wsrep_defaults_file, wsrep_defaults_group_suffix, (int)getpid(),
                  binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
@@ -774,6 +800,9 @@ static int sst_donate_mysqldump (const char*         addr,
 
   wsrep->sst_sent (wsrep, &state_id, ret);
 
+  free(user);
+  free(host);
+
   return ret;
 }
 
@@ -855,6 +884,8 @@ static int sst_flush_tables(THD* thd)
                      tmp_name, real_name, err,strerror(err));
       }
     }
+    free(real_name);
+    free(tmp_name);
   }
 
   return err;
@@ -1001,11 +1032,12 @@ static int sst_donate_other (const char*   method,
                  WSREP_SST_OPT_SOCKET" '%s' "
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
+                 WSREP_SST_OPT_CONF_SUFFIX" '%s' "
                  " %s '%s' "
                  WSREP_SST_OPT_GTID" '%s:%lld'"
                  "%s",
                  method, addr, sst_auth_real, mysqld_unix_port,
-                 mysql_real_data_home, wsrep_defaults_file,
+                 mysql_real_data_home, wsrep_defaults_file, wsrep_defaults_group_suffix,
                  binlog_opt, binlog_opt_val,
                  uuid, (long long) seqno,
                  bypass ? " "WSREP_SST_OPT_BYPASS : "");

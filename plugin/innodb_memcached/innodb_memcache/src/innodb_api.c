@@ -678,7 +678,6 @@ innodb_api_copy_mci(
 
 		} else {
 			mci_item->value_str = malloc(data_len);
-
 			if (!mci_item->value_str) {
 				return(false);
 			}

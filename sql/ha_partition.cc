@@ -97,23 +97,6 @@ static handler *partition_create_handler(handlerton *hton,
 static uint partition_flags();
 static uint alter_table_flags(uint flags);
 
-#ifdef HAVE_PSI_INTERFACE
-PSI_mutex_key key_partition_auto_inc_mutex;
-
-static PSI_mutex_info all_partition_mutexes[]=
-{
-  { &key_partition_auto_inc_mutex, "Partition_share::auto_inc_mutex", 0}
-};
-
-static void init_partition_psi_keys(void)
-{
-  const char* category= "partition";
-  int count;
-
-  count= array_elements(all_partition_mutexes);
-  mysql_mutex_register(category, all_partition_mutexes, count);
-}
-#endif /* HAVE_PSI_INTERFACE */
 
 /****************************************************************************
     Check whether the partition column order changes after alter

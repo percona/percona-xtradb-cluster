@@ -1841,7 +1841,6 @@ convert_error_code_to_mysql(
 				" 10% of redo log size. Increase the"
 				" redo log size using innodb_log_file_size.");
 		return(HA_ERR_TO_BIG_ROW);
-	}
 
 	case DB_TOO_BIG_INDEX_COL:
 		my_error(ER_INDEX_COLUMN_TOO_LONG, MYF(0),
@@ -4786,7 +4785,6 @@ ha_innobase::max_supported_key_length() const
 		return(3500);
 #endif
 	}
-}
 }
 
 /****************************************************************//**
@@ -9638,7 +9636,6 @@ innobase_fts_create_doc_id_key(
 	dfield_t*	dfield = dtuple_get_nth_field(tuple, 0);
 
 	ut_a(dict_index_get_n_unique(index) == 1);
-
 	dtuple_set_n_fields(tuple, index->n_fields);
 	dict_index_copy_types(tuple, index, index->n_fields);
 
@@ -14020,9 +14017,36 @@ ha_innobase::external_lock(
 			         "READ COMMITTED or READ UNCOMMITTED.");
 			DBUG_RETURN(HA_ERR_LOGGING_IMPOSSIBLE);
 #ifdef WITH_WSREP
-			}
+		}
 #endif /* WITH_WSREP */
 		}
+	}
+
+	/* Check for UPDATEs in read-only mode. */
+	if (srv_read_only_mode
+	    && (thd_sql_command(thd) == SQLCOM_UPDATE
+		|| thd_sql_command(thd) == SQLCOM_INSERT
+		|| thd_sql_command(thd) == SQLCOM_REPLACE
+		|| thd_sql_command(thd) == SQLCOM_DROP_TABLE
+		|| thd_sql_command(thd) == SQLCOM_ALTER_TABLE
+		|| thd_sql_command(thd) == SQLCOM_OPTIMIZE
+		|| (thd_sql_command(thd) == SQLCOM_CREATE_TABLE
+		    && lock_type == F_WRLCK)
+		|| thd_sql_command(thd) == SQLCOM_CREATE_INDEX
+		|| thd_sql_command(thd) == SQLCOM_DROP_INDEX
+		|| thd_sql_command(thd) == SQLCOM_DELETE)) {
+
+		if (thd_sql_command(thd) == SQLCOM_CREATE_TABLE)
+		{
+			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
+				    ER_INNODB_READ_ONLY);
+			DBUG_RETURN(HA_ERR_INNODB_READ_ONLY);
+		} else {
+			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
+				    ER_READ_ONLY_MODE);
+			DBUG_RETURN(HA_ERR_TABLE_READONLY);
+		}
+
 	}
 
 	/* Check for UPDATEs in read-only mode. */
@@ -15141,7 +15165,6 @@ ha_innobase::get_auto_increment(
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
-
 			current = innobase_next_autoinc(
 				current, 1, increment, 1, col_max_value);
 
@@ -18127,9 +18150,8 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
                                                         victim_trx, signal);
                 trx_mutex_exit(victim_trx);
                 lock_mutex_exit();
-#ifndef HAVE_ATOMIC_BUILTINS
 		wsrep_srv_conc_cancel_wait(victim_trx);
-#endif
+
  		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction");

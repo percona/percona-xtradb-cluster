@@ -1031,9 +1031,6 @@ have_sleep=1
 # maximum number of wsrep restarts
 max_wsrep_restarts=0
 
-# maximum number of wsrep restarts
-max_wsrep_restarts=0
-
 if [ $wsrep_data_home_dir ];then 
     grastate_loc="$wsrep_data_home_dir/grastate.dat"
 else 

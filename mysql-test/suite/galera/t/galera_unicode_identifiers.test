@@ -50,13 +50,13 @@ INSERT INTO `втора таблица` VALUES (1, 1);
 
 --connection node_2
 USE `database with space`;
-SELECT * FROM `table with space`;
+SELECT `second column with space` FROM `table with space`;
 
 USE `база`;
 SELECT * FROM `таблица`;
 
 USE `втора база`;
-SELECT * FROM `втора таблица`;
+SELECT `втора колона` FROM `втора таблица`;
 
 --eval SET GLOBAL wsrep_sync_wait = $wsrep_sync_wait_orig
 

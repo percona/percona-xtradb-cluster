@@ -34,6 +34,10 @@
 #include <string>
 #include <my_stacktrace.h>
 
+#ifdef WITH_WSREP
+#include "wsrep_xid.h"
+#endif /* WITH_WSREP */
+
 using std::max;
 using std::min;
 using std::string;
@@ -1894,6 +1898,12 @@ static int binlog_savepoint_set(handlerton *hton, THD *thd, void *sv)
 {
   DBUG_ENTER("binlog_savepoint_set");
   int error= 1;
+
+  /*
+    Clear table maps before writing SAVEPOINT event. This enforces
+    recreation of table map events for the following row event.
+   */
+  thd->clear_binlog_table_maps();
 
   String log_query;
   if (log_query.append(STRING_WITH_LEN("SAVEPOINT ")))
@@ -5011,6 +5021,43 @@ int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time, bool auto_purge)
                         no_of_log_files_purged, no_of_log_files_to_purge);
   }
 
+  if (log_is_active)
+  {
+    if(!auto_purge)
+      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                          ER_WARN_PURGE_LOG_IS_ACTIVE,
+                          ER(ER_WARN_PURGE_LOG_IS_ACTIVE),
+                          log_info.log_file_name);
+
+  }
+
+  if (log_is_in_use)
+  {
+    int no_of_log_files_to_purge= no_of_log_files_purged+1;
+    while (strcmp(log_file_name, log_info.log_file_name))
+    {
+      if (mysql_file_stat(m_key_file_log, log_info.log_file_name,
+                          &stat_area, MYF(0)))
+      {
+        if (stat_area.st_mtime < purge_time)
+          no_of_log_files_to_purge++;
+        else
+          break;
+      }
+      if (find_next_log(&log_info, false/*need_lock_index=false*/))
+      {
+        no_of_log_files_to_purge++;
+        break;
+      }
+    }
+
+    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+                        ER_WARN_PURGE_LOG_IN_USE,
+                        ER(ER_WARN_PURGE_LOG_IN_USE),
+                        copy_log_in_use, no_of_threads_locking_log,
+                        no_of_log_files_purged, no_of_log_files_to_purge);
+  }
+
   error= (to_log[0] ? purge_logs(to_log, true,
                                  false/*need_lock_index=false*/,
                                  true/*need_update_threads=true*/,
@@ -6639,7 +6686,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(thd);
 #ifdef WITH_WSREP
   my_xid xid= (wsrep_is_wsrep_xid(&thd->transaction.xid_state.xid) ?
-               wsrep_xid_seqno(&thd->transaction.xid_state.xid) :
+               wsrep_xid_seqno(thd->transaction.xid_state.xid) :
                thd->transaction.xid_state.xid.get_my_xid());
 #else
   my_xid xid= thd->transaction.xid_state.xid.get_my_xid();
@@ -7520,15 +7567,14 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
     Read current wsrep position from storage engines to have consistent
     end position for binlog scan.
   */
-  XID xid;
-  memset(&xid, 0, sizeof(xid));
-  xid.formatID= -1;
-  wsrep_get_SE_checkpoint(&xid);
+  wsrep_uuid_t uuid;
+  wsrep_seqno_t seqno;
+  wsrep_get_SE_checkpoint(uuid, seqno);
   char uuid_str[40];
-  wsrep_uuid_print(wsrep_xid_uuid(&xid), uuid_str, sizeof(uuid_str));
+  wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
   WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
-             (long long)wsrep_xid_seqno(&xid));
-  const wsrep_seqno_t last_xid_seqno= wsrep_xid_seqno(&xid);
+             (long long)seqno);
+  const wsrep_seqno_t last_xid_seqno= seqno;
   wsrep_seqno_t cur_xid_seqno=WSREP_SEQNO_UNDEFINED;
 #endif /* WITH_WSREP */
 

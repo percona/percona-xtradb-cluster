@@ -54,45 +54,6 @@ static inline uint make_user_name(THD *thd, char *buf)
                   "", "]", NullS) - buf;
 }
 
-static inline
-void set_audit_mask(unsigned long *mask, uint event_class)
-{
-  mask[0]= 1;
-  mask[0]<<= event_class;
-}
-
-static inline
-void add_audit_mask(unsigned long *mask, const unsigned long *rhs)
-{
-  mask[0]|= rhs[0];
-}
-
-static inline
-bool check_audit_mask(const unsigned long *lhs,
-                      const unsigned long *rhs)
-{
-  return !(lhs[0] & rhs[0]);
-}
-
-/**
-  @brief Check if audit logging enables for specified class
-
-  @param[in]   thd              MySQL thread handle
-  @param[in]   event_class      Audit event class
-*/
-static inline
-bool mysql_audit_enabled(THD *thd, uint event_class)
-{
-#ifndef EMBEDDED_LIBRARY
-  unsigned long event_class_mask[MYSQL_AUDIT_CLASS_MASK_SIZE];
-  set_audit_mask(event_class_mask, event_class);
-  if (thd && !check_audit_mask(mysql_global_audit_mask, event_class_mask) &&
-      check_audit_mask(thd->audit_class_mask, event_class_mask))
-    return true;
-#endif
-  return false;
-}
-
 /**
   Call audit plugins of GENERAL audit class, MYSQL_AUDIT_GENERAL_LOG subtype.
   
@@ -119,9 +80,6 @@ void mysql_audit_general_log(THD *thd, const char *cmd, uint cmdlen,
     const char *user= user_buff;
     uint userlen= make_user_name(thd, user_buff);
     time_t time= (time_t) thd->start_time.tv_sec;
-
-    MYSQL_LEX_STRING sql_command, ip, host, external_user;
-    static MYSQL_LEX_STRING empty= { C_STRING_WITH_LEN("") };
 
     if (thd)
     {

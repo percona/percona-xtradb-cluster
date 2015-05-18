@@ -147,7 +147,22 @@ enum_return_status Group_cache::generate_automatic_gno(THD *thd)
         else
         {
           automatic_type= GTID_GROUP;
+#ifdef WITH_WSREP
+          /*
+            Replace sidno with wsrep_sidno
+            if transaction went through wsrep commit
+          */
+          if (WSREP(thd) && thd->wsrep_trx_meta.gtid.seqno != -1)
+          {
+            automatic_gtid.sidno= wsrep_sidno;
+          }
+          else
+          {
+#endif /* WITH_WSREP */
           automatic_gtid.sidno= gtid_state->get_server_sidno();
+#ifdef WITH_WSREP
+          }
+#endif /* WITH_WSREP */
           gtid_state->lock_sidno(automatic_gtid.sidno);
           automatic_gtid.gno=
             gtid_state->get_automatic_gno(automatic_gtid.sidno);

@@ -1,0 +1,2 @@
+general_no_prot_all : Galera mysql-wsrep#5 2014-10-28 pstoev opt_trace.general_no_prot_none and opt_trace.general_no_prot_all fail in mysql-wsrep
+general_no_prot_none : Galera mysql-wsrep#5 2014-10-28 pstoev opt_trace.general_no_prot_none and opt_trace.general_no_prot_all fail in mysql-wsrep

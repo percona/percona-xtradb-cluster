@@ -1284,7 +1284,9 @@ bool mysqld_embedded=0;
 bool mysqld_embedded=1;
 #endif
 
+#ifndef EMBEDDED_LIBRARY
 static my_bool plugins_are_initialized= FALSE;
+#endif
 
 #ifndef DBUG_OFF
 static const char* default_dbug_option;
@@ -4879,7 +4881,6 @@ initialize_storage_engine(char *se_name, const char *se_kind,
   }
   return false;
 }
-
 
 static int init_server_components()
 {
@@ -9941,10 +9942,10 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
 
 #ifdef WITH_WSREP
   if (global_system_variables.wsrep_causal_reads) {
-      WSREP_WARN("option --wsrep-casual-reads is deprecated");
+      WSREP_WARN("option --wsrep-causal-reads is deprecated");
       if (!(global_system_variables.wsrep_sync_wait &
             WSREP_SYNC_WAIT_BEFORE_READ)) {
-          WSREP_WARN("--wsrep-casual-reads=ON takes precedence over --wsrep-sync-wait=%u. "
+          WSREP_WARN("--wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=%u. "
                      "WSREP_SYNC_WAIT_BEFORE_READ is on",
                      global_system_variables.wsrep_sync_wait);
           global_system_variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;

@@ -1,4 +1,4 @@
-/* Copyright 2008 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include <sql_acl.h>
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
+#include "wsrep_xid.h"
 #include <my_dir.h>
 #include <cstdio>
 #include <cstdlib>
@@ -37,7 +38,6 @@ const  char* wsrep_node_name        = 0;
 const  char* wsrep_node_address     = 0;
 const  char* wsrep_node_incoming_address = 0;
 const  char* wsrep_start_position   = 0;
-ulong  wsrep_OSU_method_options;
 ulong   wsrep_reject_queries_options;
 
 int wsrep_init_vars()
@@ -147,29 +147,30 @@ err:
   return 1;
 }
 
-void wsrep_set_local_position (const char* value)
+static
+void wsrep_set_local_position(const char* const value, bool const sst)
 {
-  size_t value_len  = strlen (value);
-  size_t uuid_len   = wsrep_uuid_scan (value, value_len, &local_uuid);
+  size_t const value_len = strlen(value);
+  wsrep_uuid_t uuid;
+  size_t const uuid_len = wsrep_uuid_scan(value, value_len, &uuid);
+  wsrep_seqno_t const seqno = strtoll(value + uuid_len + 1, NULL, 10);
 
-  local_seqno = strtoll (value + uuid_len + 1, NULL, 10);
-
-  XID xid;
-  wsrep_xid_init(&xid, &local_uuid, local_seqno);
-  wsrep_set_SE_checkpoint(&xid);
-  WSREP_INFO ("wsrep_start_position var submitted: '%s'", wsrep_start_position);
+  if (sst) {
+    wsrep_sst_received (wsrep, uuid, seqno, NULL, 0);
+  } else {
+    // initialization
+    local_uuid = uuid;
+    local_seqno = seqno;
+  }
 }
 
 bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
 {
+  WSREP_INFO ("wsrep_start_position var submitted: '%s'",
+              wsrep_start_position);
   // since this value passed wsrep_start_position_check, don't check anything
   // here
-  wsrep_set_local_position (wsrep_start_position);
-
-  if (wsrep) {
-    wsrep_sst_received (wsrep, &local_uuid, local_seqno, NULL, 0);
-  }
-
+  wsrep_set_local_position (wsrep_start_position, true);
   return 0;
 }
 
@@ -182,7 +183,7 @@ void wsrep_start_position_init (const char* val)
     return;
   }
 
-  wsrep_set_local_position (val);
+  wsrep_set_local_position (val, false);
 }
 
 static bool refresh_provider_options()
@@ -677,7 +678,9 @@ static void export_wsrep_status_to_mysql(THD* thd)
 
   for (wsrep_status_len = 0;
        thd->wsrep_status_vars[wsrep_status_len].name != NULL;
-       wsrep_status_len++);
+       wsrep_status_len++) {
+      /* */
+  }
 
 #if DYNAMIC
   if (wsrep_status_len != mysql_status_len) {

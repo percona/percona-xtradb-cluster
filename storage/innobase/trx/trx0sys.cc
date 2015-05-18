@@ -405,9 +405,10 @@ trx_sys_read_wsrep_checkpoint(XID* xid)
 	mtr_start(&mtr);
 
 	sys_header = trx_sysf_get(&mtr);
-        magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_MAGIC_N_FLD);
 
-        if (magic != TRX_SYS_WSREP_XID_MAGIC_N) {
+        if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
+                                      + TRX_SYS_WSREP_XID_MAGIC_N_FLD))
+            != TRX_SYS_WSREP_XID_MAGIC_N) {
                 memset(xid, 0, sizeof(*xid));
                 xid->formatID = -1;
                 trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);

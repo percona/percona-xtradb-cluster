@@ -1867,7 +1867,7 @@ lock_rec_other_trx_holds_expl(
 
 	return(holds);
 }
-#endif /* UNIV_DEBUG */
+#endif /* UNIV_DEBUG && !WITH_WSREP */
 
 /*********************************************************************//**
 Return approximate number or record locks (bits set in the bitmap) for
@@ -2103,7 +2103,6 @@ lock_rec_create(
 
 	MONITOR_INC(MONITOR_RECLOCK_CREATED);
 	MONITOR_INC(MONITOR_NUM_RECLOCK);
-
 	return(lock);
 }
 
@@ -2180,7 +2179,6 @@ lock_rec_enqueue_waiting(
 
 	/* Enqueue the lock request that will wait to be granted, note that
 	we already own the trx mutex. */
-
 #ifdef WITH_WSREP
 	if (wsrep_on(trx->mysql_thd) &&
 	        trx->lock.was_chosen_as_deadlock_victim) {

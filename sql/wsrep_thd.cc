@@ -551,7 +551,7 @@ int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr, my_bool signal)
   DBUG_ENTER("wsrep_abort_thd");
 
   if ( (WSREP(bf_thd) ||
-         ( (WSREP_ON || wsrep_OSU_method_options == WSREP_OSU_RSU) &&
+         ( (WSREP_ON || bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU) &&
            bf_thd->wsrep_exec_mode == TOTAL_ORDER) )               &&
        victim_thd)
   {
@@ -573,4 +573,10 @@ int wsrep_thd_in_locking_session(void *thd_ptr)
     return 1;
   }
   return 0;
+}
+
+bool wsrep_thd_has_explicit_locks(THD *thd)
+{
+  assert(thd);
+  return (thd->mdl_context.wsrep_has_explicit_locks());
 }

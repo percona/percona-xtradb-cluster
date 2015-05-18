@@ -1110,7 +1110,6 @@ bool Drop_table_error_handler::handle_condition(THD *thd,
           sql_errno == ER_TRG_NO_DEFINER);
 }
 
-
 void Open_tables_state::set_open_tables_state(Open_tables_state *state)
 {
   this->open_tables= state->open_tables;

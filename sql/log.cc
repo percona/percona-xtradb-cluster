@@ -2403,8 +2403,6 @@ bool general_log_print(THD *thd, enum enum_server_command command,
 bool general_log_write(THD *thd, enum enum_server_command command,
                        const char *query, uint query_length)
 {
-  mysql_audit_general_log(thd, command, query, query_length);
-
   /* Write the message to the log if we want to log this king of commands */
   if (logger.log_command(thd, command, query, query_length))
     return logger.general_log_write(thd, command, query, query_length);
@@ -2702,7 +2700,6 @@ int my_plugin_log_message(MYSQL_PLUGIN *plugin_ptr, plugin_log_level level,
 
 
 /********* transaction coordinator log for 2pc - mmap() based solution *******/
-
 
 /*
   the log consists of a file, mmapped to a memory.

@@ -613,6 +613,7 @@ typedef struct system_variables
   my_bool wsrep_dirty_reads;
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
+  ulong wsrep_OSU_method;
 #endif
   ulong log_slow_rate_limit;
   ulonglong log_slow_filter;
@@ -737,35 +738,6 @@ typedef struct system_status_var
 */
 
 #define last_system_status_var questions
-
-
-/**
-  Get collation by name, send error to client on failure.
-  @param name     Collation name
-  @param name_cs  Character set of the name string
-  @return
-  @retval         NULL on error
-  @retval         Pointter to CHARSET_INFO with the given name on success
-*/
-inline CHARSET_INFO *
-mysqld_collation_get_by_name(const char *name,
-                             CHARSET_INFO *name_cs= system_charset_info)
-{
-  CHARSET_INFO *cs;
-  MY_CHARSET_LOADER loader;
-  my_charset_loader_init_mysys(&loader);
-  if (!(cs= my_collation_get_by_name(&loader, name, MYF(0))))
-  {
-    ErrConvString err(name, name_cs);
-    my_error(ER_UNKNOWN_COLLATION, MYF(0), err.ptr());
-    if (loader.error[0])
-      push_warning_printf(current_thd,
-                          Sql_condition::WARN_LEVEL_WARN,
-                          ER_UNKNOWN_COLLATION, "%s", loader.error);
-  }
-  return cs;
-}
-
 
 
 /**
@@ -2586,11 +2558,6 @@ public:
                 current_stmt_binlog_format == BINLOG_FORMAT_ROW);
     return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
-  }
-  /** Tells whether the given optimizer_switch flag is on */
-  inline bool optimizer_switch_flag(ulonglong flag) const
-  {
-    return (variables.optimizer_switch & flag);
   }
   /** Tells whether the given optimizer_switch flag is on */
   inline bool optimizer_switch_flag(ulonglong flag) const

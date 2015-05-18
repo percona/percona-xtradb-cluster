@@ -23,10 +23,10 @@ INSERT INTO t1 (f2) SELECT 1 FROM ten;
 --connection node_1
 INSERT INTO t1 (f2) SELECT 1 FROM ten;
 
-SELECT MIN(f1) = 1000, MAX(f1) = 1037, COUNT(*) = 20, COUNT(DISTINCT f1) = 20 FROM t1 WHERE f1 >= 1000;
+SELECT MIN(f1) >= 1000, COUNT(*) = 20, COUNT(DISTINCT f1) = 20 FROM t1 WHERE f1 >= 1000;
 
 --connection node_2
-SELECT MIN(f1) = 1000, MAX(f1) = 1037, COUNT(*) = 20, COUNT(DISTINCT f1) = 20 FROM t1 WHERE f1 >= 1000;
+SELECT MIN(f1) >= 1000, COUNT(*) = 20, COUNT(DISTINCT f1) = 20 FROM t1 WHERE f1 >= 1000;
 
 #
 # AUTO_INCREMENT set to a value lower than the current one.
@@ -39,10 +39,10 @@ INSERT INTO t1 (f2) SELECT 1 FROM ten;
 
 --connection node_2
 INSERT INTO t1 (f2) SELECT 1 FROM ten;
-SELECT MIN(f1) = 1000, MAX(f1) = 1076, COUNT(*) = 40, COUNT(DISTINCT f1) = 40 FROM t1 WHERE f1 >= 1000;
+SELECT MIN(f1) >= 1000, COUNT(*) = 40, COUNT(DISTINCT f1) = 40 FROM t1 WHERE f1 >= 1000;
 
 --connection node_1
-SELECT MIN(f1) = 1000, MAX(f1) = 1076, COUNT(*) = 40, COUNT(DISTINCT f1) = 40 FROM t1 WHERE f1 >= 1000;
+SELECT MIN(f1) >= 1000, COUNT(*) = 40, COUNT(DISTINCT f1) = 40 FROM t1 WHERE f1 >= 1000;
 
 DROP TABLE t1;
 
@@ -103,6 +103,8 @@ DROP TABLE t1;
 # Restore all variables as they were
 #
 
+--disable_query_log
+
 --connection node_1
 --eval SET GLOBAL wsrep_auto_increment_control = $auto_increment_control_orig
 --eval SET GLOBAL auto_increment_increment = $auto_increment_increment_node1
@@ -112,5 +114,7 @@ DROP TABLE t1;
 --eval SET GLOBAL wsrep_auto_increment_control = $auto_increment_control_orig
 --eval SET GLOBAL auto_increment_increment = $auto_increment_increment_node2
 --eval SET GLOBAL auto_increment_offset = $auto_increment_offset_node2
+
+--enable_query_log
 
 DROP TABLE ten;

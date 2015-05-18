@@ -1078,6 +1078,20 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     If we didn't succeed lock_global_read_lock(), or if we already suceeded
     make_global_read_lock_block_commit(), do nothing.
   */
+
+#ifdef WITH_WSREP
+  if (m_mdl_blocks_commits_lock)
+  {
+    WSREP_DEBUG("GRL was in block commit mode when entering "
+		"make_global_read_lock_block_commit");
+    thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
+    m_mdl_blocks_commits_lock= NULL;
+    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    wsrep->resume(wsrep);
+    m_state= GRL_ACQUIRED;
+  }
+#endif /* WITH_WSREP */
+
   if (m_state != GRL_ACQUIRED)
     DBUG_RETURN(0);
 

@@ -38,6 +38,7 @@ INSERT INTO t1 VALUES (2), (1);
 COMMIT;
 COMMIT;
 ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ROLLBACK;
 INSERT INTO t1 VALUES (1), (2);
 ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
 DROP TABLE t1;

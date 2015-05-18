@@ -63,9 +63,9 @@ inline double log2(double x)
   return (log(x) / M_LN2);
 }
 #endif
-
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "wsrep_xid.h"
 #endif
 /*
   While we have legacy_db_type, we have this array to
@@ -1918,7 +1918,7 @@ static my_bool xarecover_handlerton(THD *unused, plugin_ref plugin,
       {
 #ifdef WITH_WSREP
         my_xid x=(wsrep_is_wsrep_xid(&info->list[i]) ?
-                  wsrep_xid_seqno(&info->list[i]) :
+                  wsrep_xid_seqno(info->list[i]) :
                   info->list[i].get_my_xid());
 #else
         my_xid x=info->list[i].get_my_xid();
@@ -7961,7 +7961,7 @@ int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
 {
   DBUG_ENTER("ha_wsrep_abort_transaction");
   if (!WSREP(bf_thd) &&  
-      !(wsrep_OSU_method_options == WSREP_OSU_RSU &&
+      !(bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU &&
         bf_thd->wsrep_exec_mode == TOTAL_ORDER)) {
     DBUG_RETURN(0);
   }
