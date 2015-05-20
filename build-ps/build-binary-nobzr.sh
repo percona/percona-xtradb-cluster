@@ -152,7 +152,23 @@ COMMENT="$COMMENT, Revision $REVISION"
 # Compilation flags
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
-COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$PERCONA_SERVER_VERSION "
+if [ -n "$(which rpm)" ]; then
+  export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
+else
+  COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
+  # Attempt to remove any optimisation flags from the debug build
+  # BLD-238 - bug1408232
+  if test "x$CMAKE_BUILD_TYPE" = "xDebug"
+  then
+    COMMON_FLAGS=`echo " ${COMMON_FLAGS} " | \
+              sed -e 's/ -O[0-9]* / /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                  -e 's/ -unroll2 / /' \
+                  -e 's/ -ip / /' \
+                  -e 's/^ //' \
+                  -e 's/ $//'`
+  fi
+fi
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
