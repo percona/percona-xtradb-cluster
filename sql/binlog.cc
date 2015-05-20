@@ -954,13 +954,13 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     uchar *buf;
     size_t len=0;
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog trx cache not empty (%lu bytes) @ connection close %lu",
+    WSREP_WARN("binlog trx cache not empty (%zu bytes) @ connection close %lu",
                len, thd->thread_id);
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
     cache = cache_mngr->get_binlog_cache_log(false);
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog stmt cache not empty (%lu bytes) @ connection close %lu",
+    WSREP_WARN("binlog stmt cache not empty (%zu bytes) @ connection close %lu",
                len, thd->thread_id);
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
@@ -1899,12 +1899,14 @@ static int binlog_savepoint_set(handlerton *hton, THD *thd, void *sv)
   DBUG_ENTER("binlog_savepoint_set");
   int error= 1;
 
+#ifdef WITH_WSREP
   /*
     Clear table maps before writing SAVEPOINT event. This enforces
     recreation of table map events for the following row event.
    */
   thd->clear_binlog_table_maps();
 
+#endif
   String log_query;
   if (log_query.append(STRING_WITH_LEN("SAVEPOINT ")))
     DBUG_RETURN(error);
@@ -4982,43 +4984,6 @@ int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time, bool auto_purge)
     }
     if (find_next_log(&log_info, false/*need_lock_index=false*/))
       break;
-  }
-
-  if (log_is_active)
-  {
-    if(!auto_purge)
-      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                          ER_WARN_PURGE_LOG_IS_ACTIVE,
-                          ER(ER_WARN_PURGE_LOG_IS_ACTIVE),
-                          log_info.log_file_name);
-
-  }
-
-  if (log_is_in_use)
-  {
-    int no_of_log_files_to_purge= no_of_log_files_purged+1;
-    while (strcmp(log_file_name, log_info.log_file_name))
-    {
-      if (mysql_file_stat(m_key_file_log, log_info.log_file_name,
-                          &stat_area, MYF(0)))
-      {
-        if (stat_area.st_mtime < purge_time)
-          no_of_log_files_to_purge++;
-        else
-          break;
-      }
-      if (find_next_log(&log_info, false/*need_lock_index=false*/))
-      {
-        no_of_log_files_to_purge++;
-        break;
-      }
-    }
-
-    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                        ER_WARN_PURGE_LOG_IN_USE,
-                        ER(ER_WARN_PURGE_LOG_IN_USE),
-                        copy_log_in_use, no_of_threads_locking_log,
-                        no_of_log_files_purged, no_of_log_files_to_purge);
   }
 
   if (log_is_active)
