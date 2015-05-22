@@ -1593,7 +1593,6 @@ void Relay_log_info::clear_tables_to_lock()
     tables_to_lock_count--;
     my_free(to_free);
   }
-  free_root(&lock_tables_mem_root, MYF(MY_MARK_BLOCKS_FREE));
   DBUG_ASSERT(tables_to_lock == NULL && tables_to_lock_count == 0);
   DBUG_VOID_RETURN;
 }
@@ -1733,7 +1732,6 @@ int Relay_log_info::rli_init_info()
   log_space_total= 0;
   tables_to_lock= 0;
   tables_to_lock_count= 0;
-  free_root(&lock_tables_mem_root, MYF(MY_MARK_BLOCKS_FREE));
 
   char pattern[FN_REFLEN];
   (void) my_realpath(pattern, slave_load_tmpdir, 0);
