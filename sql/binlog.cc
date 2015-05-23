@@ -4824,43 +4824,6 @@ int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time, bool auto_purge)
                         no_of_log_files_purged, no_of_log_files_to_purge);
   }
 
-  if (log_is_active)
-  {
-    if(!auto_purge)
-      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                          ER_WARN_PURGE_LOG_IS_ACTIVE,
-                          ER(ER_WARN_PURGE_LOG_IS_ACTIVE),
-                          log_info.log_file_name);
-
-  }
-
-  if (log_is_in_use)
-  {
-    int no_of_log_files_to_purge= no_of_log_files_purged+1;
-    while (strcmp(log_file_name, log_info.log_file_name))
-    {
-      if (mysql_file_stat(m_key_file_log, log_info.log_file_name,
-                          &stat_area, MYF(0)))
-      {
-        if (stat_area.st_mtime < purge_time)
-          no_of_log_files_to_purge++;
-        else
-          break;
-      }
-      if (find_next_log(&log_info, false/*need_lock_index=false*/))
-      {
-        no_of_log_files_to_purge++;
-        break;
-      }
-    }
-
-    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                        ER_WARN_PURGE_LOG_IN_USE,
-                        ER(ER_WARN_PURGE_LOG_IN_USE),
-                        copy_log_in_use, no_of_threads_locking_log,
-                        no_of_log_files_purged, no_of_log_files_to_purge);
-  }
-
   error= (to_log[0] ? purge_logs(to_log, true,
                                  false/*need_lock_index=false*/,
                                  true/*need_update_threads=true*/,
