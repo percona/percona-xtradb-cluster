@@ -6,6 +6,7 @@ service mysqlchk
         disable = no 
         flags           = REUSE 
         socket_type     = stream 
+        type            = UNLISTED
         port            = 9200 
         wait            = no 
         user            = nobody 
