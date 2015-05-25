@@ -537,6 +537,11 @@ recv_joiner()
     local checkf=$4
     local ltcmd
 
+    if [[ ! -d ${dir} ]];then
+        # This indicates that IST is in progress
+        return
+    fi
+
     pushd ${dir} 1>/dev/null
     set +e
 
@@ -822,7 +827,6 @@ then
         tcmd+=" | $pcmd"
     fi
 
-
     get_keys
     if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]];then
         if [[ -n $sdecomp ]];then 
@@ -838,12 +842,6 @@ then
     MAGIC_FILE="${STATDIR}/${INFO_FILE}"
     recv_joiner $STATDIR  "${stagemsg}-gtid" $stimeout 1
 
-    if [[ -d ${DATA}/.sst ]];then 
-        wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer"
-    fi
-    mkdir -p ${DATA}/.sst
-    (recv_joiner $DATA/.sst "${stagemsg}-SST" 0 0) &
-    jpid=$!
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
@@ -853,6 +851,13 @@ then
 
     if [ ! -r "${STATDIR}/${IST_FILE}" ]
     then
+
+        if [[ -d ${DATA}/.sst ]];then
+            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer"
+        fi
+        mkdir -p ${DATA}/.sst
+        (recv_joiner $DATA/.sst "${stagemsg}-SST" 0 0) &
+        jpid=$!
         wsrep_log_info "Proceeding with SST"
 
 
@@ -986,9 +991,6 @@ then
 
 
     else 
-        # || true if it has already exited
-        kill $jpid || true
-        rm -rf $DATA/.sst
         wsrep_log_info "${IST_FILE} received from donor: Running IST"
     fi
 
