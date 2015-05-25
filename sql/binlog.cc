@@ -1898,15 +1898,13 @@ static int binlog_savepoint_set(handlerton *hton, THD *thd, void *sv)
 {
   DBUG_ENTER("binlog_savepoint_set");
   int error= 1;
-
 #ifdef WITH_WSREP
   /*
     Clear table maps before writing SAVEPOINT event. This enforces
     recreation of table map events for the following row event.
    */
   thd->clear_binlog_table_maps();
-
-#endif
+#endif /* WITH_WSREP */
   String log_query;
   if (log_query.append(STRING_WITH_LEN("SAVEPOINT ")))
     DBUG_RETURN(error);
