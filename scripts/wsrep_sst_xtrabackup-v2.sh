@@ -987,6 +987,7 @@ then
         else 
             wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis"
             wsrep_log_error "Check ${DATA}/innobackup.move.log for details"
+            exit 22
         fi
 
 
