@@ -6797,6 +6797,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
           /* PSI end */
           MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
           thd->m_statement_psi= NULL;
+          thd->m_digest= NULL;
 
           /* DTRACE end */
           if (MYSQL_QUERY_DONE_ENABLED())
