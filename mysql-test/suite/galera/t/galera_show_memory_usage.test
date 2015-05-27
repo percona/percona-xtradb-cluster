@@ -1,0 +1,12 @@
+#
+# Checking variables that indicate the memory usage.
+#
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE '%cert_index_size%';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE '%cert_bucket_count%';
+--replace_column 2 *
+SHOW GLOBAL STATUS LIKE '%gcache_pool_size%';
