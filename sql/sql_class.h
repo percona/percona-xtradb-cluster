@@ -2122,6 +2122,9 @@ public:
 
   Global_read_lock()
     : m_state(GRL_NONE),
+#ifdef WITH_WSREP
+      provider_paused(FALSE),
+#endif
       m_mdl_global_shared_lock(NULL),
       m_mdl_blocks_commits_lock(NULL)
   {}
@@ -2142,10 +2145,23 @@ public:
     return FALSE;
   }
   bool make_global_read_lock_block_commit(THD *thd);
+#ifdef WITH_WSREP
+  bool wsrep_pause(void);
+  wsrep_status_t wsrep_resume(void);
+  bool provider_resumed() { return !provider_paused; }
+  void pause_provider(bool val) { provider_paused= val; }
+#endif
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
 private:
   enum_grl_state m_state;
+  /**
+   Set to true when wsrep->pause is invoked and
+   toggled back at wsrep->resume.
+  */
+#ifdef WITH_WSREP
+  bool provider_paused;
+#endif
   /**
     In order to acquire the global read lock, the connection must
     acquire shared metadata lock in GLOBAL namespace, to prohibit

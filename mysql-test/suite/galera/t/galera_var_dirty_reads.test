@@ -27,9 +27,30 @@ SHOW STATUS LIKE 'wsrep_cluster_status';
 --error ER_UNKNOWN_COM_ERROR
 SELECT * FROM t1;
 
+--error ER_UNKNOWN_COM_ERROR
+SELECT 1 FROM t1;
+
 SET @@session.wsrep_dirty_reads=ON;
 
 SELECT * FROM t1;
+SELECT 1 FROM t1;
+
+SELECT i, variable_name, variable_value FROM t1, information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
+
+SET @@session.wsrep_dirty_reads=OFF;
+
+--error ER_UNKNOWN_COM_ERROR
+SELECT i, variable_name, variable_value FROM t1, information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
+
+SELECT 1;
+
+USE information_schema;
+SELECT * FROM session_variables WHERE variable_name LIKE "wsrep_dirty_reads";
+
+USE performance_schema;
+SELECT COUNT(*) >= 10 FROM events_statements_history;
+
+USE test;
 
 --disable_query_log
 --eval SET @@global.wsrep_cluster_address = '$wsrep_cluster_address_saved'
