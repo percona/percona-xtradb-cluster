@@ -1141,7 +1141,7 @@ bool Global_read_lock::wsrep_pause(void)
   }
   else if (ret != -ENOSYS) /* -ENOSYS - no provider */
   {
-    WSREP_ERROR("Failed to pause provider: %ld (%s)", -ret, strerror(-ret));
+    WSREP_ERROR("Failed to pause provider: %lld (%s)", (long long)-ret, strerror(-ret));
 
     /* m_mdl_blocks_commits_lock is always NULL here */
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
