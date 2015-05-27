@@ -119,8 +119,9 @@ mysqld_status () {
     ping_alive=1
     ps_alive=0
     
-    soutput=$(mysql -u root -pabcd -e 'select 1;' 2>&1 | grep 'ERROR 2002')
-    [ "$soutput" ] && ping_alive=0
+    if ! mysqladmin ping &>/dev/null;then
+        ping_alive=0
+    fi
     
     /bin/kill -0 $mysqld_pid &>/dev/null && ps_alive=1
     
@@ -130,7 +131,7 @@ mysqld_status () {
     else
   	if [ "$2" = "warn" ]; then
   	    warn_msg=
-  	    [ $ping_alive = 0 ] && warn_msg+="mysql ping failed with $soutput"
+	    [ $ping_alive = 0 ] && warn_msg+="mysql ping failed"
   	    [ $ps_alive = 0 ] && \
   	        warn_msg+=" and/or mysqld with pid $mysqld_pid is not alive"
   	    echo -e "$warn_msg" | $ERR_LOGGER -p daemon.debug
