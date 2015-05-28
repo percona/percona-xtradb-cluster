@@ -32,7 +32,7 @@ COMMON_FLAGS=''
 #
 # Some programs that may be overriden
 TAR=${TAR:-tar}
-SCONS_ARGS:${SCONS_ARGS:-""}
+SCONS_ARGS=${SCONS_ARGS:-""}
 
 # Check if we have a functional getopt(1)
 if ! getopt --test
