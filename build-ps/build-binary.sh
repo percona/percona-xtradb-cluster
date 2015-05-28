@@ -32,6 +32,7 @@ COMMON_FLAGS=''
 #
 # Some programs that may be overriden
 TAR=${TAR:-tar}
+SCONS_ARGS:${SCONS_ARGS:-""}
 
 # Check if we have a functional getopt(1)
 if ! getopt --test
@@ -264,14 +265,14 @@ fi
         cd "percona-xtradb-cluster-galera"
         if grep builtin <<< "$STAG";then 
             # No builtin SSL in galera yet.
-            scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" boost_pool=0 \
+            scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
                 garb/garbd libgalera_smm.so
         elif grep static <<< "$STAG";then 
             # Disable SSL in galera for now
             scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
-            revno="$GALERA_REVISION" boost_pool=0 garb/garbd libgalera_smm.so
+            revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 garb/garbd libgalera_smm.so
         else 
-            scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" \
+            scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
                 garb/garbd libgalera_smm.so
         fi
         mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
