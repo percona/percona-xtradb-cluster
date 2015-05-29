@@ -2,12 +2,12 @@
 .\"     Title: \fBmysqldump\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 09/11/2014
+.\"      Date: 03/25/2015
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.6
 .\"  Language: English
 .\"
-.TH "\FBMYSQLDUMP\FR" "1" "09/11/2014" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYSQLDUMP\FR" "1" "03/25/2015" "MySQL 5\&.6" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -69,6 +69,47 @@ ALTER DATABASE
 statements that change the database collation\&. These may be used when dumping stored programs to preserve their character encodings\&. To reload a dump file containing such statements, the
 ALTER
 privilege for the affected database is required\&.
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.PP
+A dump made using PowerShell on Windows with output redirection creates a file that has UTF\-16 encoding:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+mysqldump [options] > dump\&.sql
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+However, UTF\-16 is not permitted as a connection character set (see
+Section\ \&10.1.4, \(lqConnection Character Sets and Collations\(rq), so the dump file will not load correctly\&. To work around this issue, use the
+\fB\-\-result\-file\fR
+option, which creates the output in ASCII format:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+mysqldump [options] \-\-result\-file=dump\&.sql
+.fi
+.if n \{\
+.RE
+.\}
+.sp .5v
+.RE
 Performance and Scalability Considerations.PP
 mysqldump
 advantages include the convenience and flexibility of viewing or even editing the output before restoring\&. You can clone databases for development and DBA work, or produce slight variations of an existing database for testing\&. It is not intended as a fast or scalable solution for backing up substantial amounts of data\&. With large data sizes, even if the backup step takes a reasonable time, restoring the data can be very slow because replaying the SQL statements involves disk I/O for insertion, index creation, and so on\&.
@@ -98,7 +139,7 @@ InnoDB
 backups with minimal disruption; it can also back up tables from
 MyISAM
 and other storage engines; and it provides a number of convenient options to accommodate different backup scenarios\&. See
-Section\ \&25.2, \(lqMySQL Enterprise Backup\(rq\&.
+Section\ \&25.2, \(lqMySQL Enterprise Backup Overview\(rq\&.
 .RE
 .sp
 .RS 4
@@ -176,7 +217,7 @@ supports the following options, which can be specified on the command line or in
 [mysqldump]
 and
 [client]
-groups of an option file\&. For information about option files, see
+groups of an option file\&. For information about option files used by MySQL programs, see
 Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
 Connection Options.PP
 The
@@ -228,7 +269,7 @@ Compress all information sent between the client and the server if both support 
 .\" default-auth option: mysqldump
 \fB\-\-default\-auth=\fR\fB\fIplugin\fR\fR
 .sp
-The client\-side authentication plugin to use\&. See
+A hint about the client\-side authentication plugin to use\&. See
 Section\ \&6.3.7, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
@@ -268,7 +309,7 @@ login file\&. A
 is an option group that permits only a limited set of options:
 \fBhost\fR,
 \fBuser\fR, and
-\fBpassword\fR\&. Think of a login path as a set of values that indicate the server host and the credentials for authenticating with the server\&. To create the login file, use the
+\fBpassword\fR\&. Think of a login path as a set of values that indicate the server host and the credentials for authenticating with the server\&. To create the login path file, use the
 \fBmysql_config_editor\fR
 utility\&. See
 \fBmysql_config_editor\fR(1)\&. This option was added in MySQL 5\&.6\&.6\&.
@@ -1063,8 +1104,7 @@ as the default character set\&. See
 Section\ \&10.5, \(lqCharacter Set Configuration\(rq\&. If no character set is specified,
 \fBmysqldump\fR
 uses
-utf8, and earlier versions use
-latin1\&.
+utf8\&.
 .RE
 .sp
 .RS 4
@@ -1787,7 +1827,9 @@ statements are included in the output before each new database\&.
 \fB\-\-events\fR,
 \fB\-E\fR
 .sp
-Include Event Scheduler events for the dumped databases in the output\&.
+Include Event Scheduler events for the dumped databases in the output\&. This option requires the
+EVENT
+privileges for those databases\&.
 .RE
 .sp
 .RS 4
@@ -2466,7 +2508,7 @@ provides a way of making an online backup:
 .RS 4
 .\}
 .nf
-shell> \fBmysqldump \-\-all\-databases \-\-single\-transaction > all_databases\&.sql\fR
+shell> \fBmysqldump \-\-all\-databases \-\-master\-data \-\-single\-transaction > all_databases\&.sql\fR
 .fi
 .if n \{\
 .RE
@@ -2591,7 +2633,7 @@ for a workaround\&.
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2014, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2015, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP

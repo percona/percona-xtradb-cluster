@@ -69,6 +69,14 @@ case "$1" in
 esac
 
 usage () {
+        thp_usage=""
+        if [ -f /sys/kernel/mm/transparent_hugepage/enabled ]; then
+          thp_usage=$(cat <<'EOF'
+  --thp-setting=SETTING      Change transparent huge pages setting
+                             on the system before starting mysqld
+EOF
+);
+        fi
         cat <<EOF
 Usage: $0 [OPTIONS]
   --no-defaults              Don't read the system defaults file
@@ -333,6 +341,7 @@ parse_arguments() {
       --open-files-limit=*) open_files="$val" ;;
       --open_files_limit=*) open_files="$val" ;;
       --skip-kill-mysqld*) KILL_MYSQLD=0 ;;
+      --thp-setting=*) thp_setting="$val" ;;
       --syslog) want_syslog=1 ;;
       --skip-syslog) want_syslog=0 ;;
       --syslog-tag=*) syslog_tag="$val" ;;
@@ -638,7 +647,7 @@ if [ -n "${PLUGIN_DIR}" ]; then
   plugin_dir="${PLUGIN_DIR}"
 else
   # Try to find plugin dir relative to basedir
-  for dir in lib/mysql/plugin lib/plugin
+  for dir in lib64/mysql/plugin lib64/plugin lib/mysql/plugin lib/plugin
   do
     if [ -d "${MY_BASEDIR_VERSION}/${dir}" ]; then
       plugin_dir="${MY_BASEDIR_VERSION}/${dir}"
@@ -908,6 +917,53 @@ then
   exit 1
 fi
 
+# If thp-setting is specified, check to see if thp is supported
+# on this kernel and clear the value if it isn't
+if [ -n "$thp_setting" ] && [ ! -f /sys/kernel/mm/transparent_hugepage/enabled ]
+then
+  log_notice "Transparent huge pages is not supported on this system, ignoring thp-setting."
+  thp_setting=
+fi
+
+# Change transparent huge pages setting if thp-setting option specified
+if [ -n "$thp_setting" ]
+then
+  if [ $(id -u) -ne 0 ]; then
+    log_error "mysqld_safe must be run as root for setting transparent huge pages!"
+    exit 1
+  elif [ $thp_setting != "always" -a $thp_setting != "madvise" -a $thp_setting != "never" ]; then
+    log_error "Invalid value for thp-setting=$thp_setting in config file. Valid values are: always, madvise or never"
+    exit 1
+  else
+    if [ -f /sys/kernel/mm/transparent_hugepage/enabled ]; then
+      CONTENT_THP=$(cat /sys/kernel/mm/transparent_hugepage/enabled)
+      STATUS_THP=0
+      set +e
+      STATUS_THP=$(echo $CONTENT_THP | grep -cv "\[${thp_setting}\]")
+      set -e
+    fi
+    if [ $STATUS_THP -eq 0 ]; then
+      log_notice "Transparent huge pages are already set to: ${thp_setting}."
+    else
+      if [ -f /sys/kernel/mm/transparent_hugepage/defrag ]; then
+        echo $thp_setting > /sys/kernel/mm/transparent_hugepage/defrag
+        if [ $? -ne 0 ]; then
+	  log_error "Error setting transparent huge pages to: ${thp_setting}."
+          exit 1
+        fi
+      fi
+      if [ -f /sys/kernel/mm/transparent_hugepage/enabled ]; then
+        echo $thp_setting > /sys/kernel/mm/transparent_hugepage/enabled
+        if [ $? -ne 0 ]; then
+	  log_error "Error setting transparent huge pages to: ${thp_setting}."
+          exit 1
+        fi
+      fi
+      log_notice "Successfuly set transparent huge pages to: ${thp_setting}."
+    fi
+  fi
+fi
+
 #
 # Uncomment the following lines if you want all tables to be automatically
 # checked and repaired during startup. You should add sensible key_buffer
@@ -971,9 +1027,6 @@ fast_restart=0
 max_fast_restarts=5
 # flag whether a usable sleep command exists
 have_sleep=1
-
-# maximum number of wsrep restarts
-max_wsrep_restarts=0
 
 # maximum number of wsrep restarts
 max_wsrep_restarts=0

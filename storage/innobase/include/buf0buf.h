@@ -1271,7 +1271,7 @@ page_hash lock is acquired in the specified lock mode. Otherwise,
 mode value is ignored. It is up to the caller to release the
 lock. If the block is found and the lock is NULL then the page_hash
 lock is released by this function.
-@return	block, NULL if not found */
+@return	block, NULL if not found, or watch sentinel (if watch is true) */
 UNIV_INLINE
 buf_page_t*
 buf_page_hash_get_locked(
@@ -1287,9 +1287,11 @@ buf_page_hash_get_locked(
 					found. NULL otherwise. If NULL
 					is passed then the hash_lock
 					is released by this function */
-	ulint		lock_mode);	/*!< in: RW_LOCK_EX or
+	ulint		lock_mode,	/*!< in: RW_LOCK_EX or
 					RW_LOCK_SHARED. Ignored if
 					lock == NULL */
+	bool		watch = false);	/*!< in: if true, return watch
+					sentinel also. */
 /******************************************************************//**
 Returns the control block of a file page, NULL if not found.
 If the block is found and lock is not NULL then the appropriate
@@ -1329,6 +1331,8 @@ buf_page_hash_get_low() function.
 	buf_page_hash_get_locked(b, s, o, l, RW_LOCK_EX)
 #define buf_page_hash_get(b, s, o)				\
 	buf_page_hash_get_locked(b, s, o, NULL, 0)
+#define buf_page_get_also_watch(b, s, o)			\
+	buf_page_hash_get_locked(b, s, o, NULL, 0, true)
 
 #define buf_block_hash_get_s_locked(b, s, o, l)			\
 	buf_block_hash_get_locked(b, s, o, l, RW_LOCK_SHARED)
@@ -1356,7 +1360,10 @@ buf_pool_watch_is_sentinel(
 	const buf_page_t*	bpage)		/*!< in: block */
 	__attribute__((nonnull, warn_unused_result));
 /****************************************************************//**
-Add watch for the given page to be read in. Caller must have the buffer pool
+Add watch for the given page to be read in. Caller must have
+appropriate hash_lock for the bpage and hold the LRU list mutex to avoid a race
+condition with buf_LRU_free_page inserting the same page into the page hash.
+This function may release the hash_lock and reacquire it.
 @return NULL if watch set, block if the page is in the buffer pool */
 UNIV_INTERN
 buf_page_t*

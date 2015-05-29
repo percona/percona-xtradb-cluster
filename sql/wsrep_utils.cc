@@ -1,4 +1,4 @@
-/* Copyright 2010 Codership Oy <http://www.codership.com>
+/* Copyright 2010-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -37,6 +37,11 @@
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
 #endif
+
+#ifdef HAVE_GETIFADDRS
+#include <net/if.h>
+#include <ifaddrs.h>
+#endif // HAVE_GETIFADDRS
 
 extern char** environ; // environment variables
 
@@ -339,32 +344,34 @@ unsigned int wsrep_check_ip (const char* const addr)
   hints.ai_socktype= SOCK_STREAM;
   hints.ai_family= AF_UNSPEC;
 
-  if (strcasecmp(my_bind_addr_str, MY_BIND_ALL_ADDRESSES) != 0)
+  int gai_ret = getaddrinfo(addr, NULL, &hints, &res);
+  if (0 == gai_ret)
   {
-    int gai_ret = getaddrinfo(addr, NULL, &hints, &res);
-    if (0 == gai_ret)
+    if (AF_INET == res->ai_family) /* IPv4 */
     {
-        if (AF_INET == res->ai_family) /* IPv4 */
-        {
             struct sockaddr_in* a= (struct sockaddr_in*)res->ai_addr;
             ret= htonl(a->sin_addr.s_addr);
-        }
-        else /* IPv6 */
-        {
-            struct sockaddr_in6* a= (struct sockaddr_in6*)res->ai_addr;
-            if (IN6_IS_ADDR_UNSPECIFIED(&a->sin6_addr))
-                ret= INADDR_ANY;
-            else if (IN6_IS_ADDR_LOOPBACK(&a->sin6_addr))
-                ret= INADDR_LOOPBACK;
-            else
-                ret= 0xdeadbeef;
-        }
-        freeaddrinfo (res);
-    } else {
-        WSREP_ERROR ("getaddrinfo() failed on '%s': %d (%s)",
-                    addr, gai_ret, gai_strerror(gai_ret));
     }
+    else /* IPv6 */
+    {
+        struct sockaddr_in6* a= (struct sockaddr_in6*)res->ai_addr;
+        if (IN6_IS_ADDR_UNSPECIFIED(&a->sin6_addr))
+            ret= INADDR_ANY;
+        else if (IN6_IS_ADDR_LOOPBACK(&a->sin6_addr))
+            ret= INADDR_LOOPBACK;
+        else
+            ret= 0xdeadbeef;
+    }
+    freeaddrinfo (res);
   }
+  else {
+    WSREP_ERROR ("getaddrinfo() failed on '%s': %d (%s)",
+                 addr, gai_ret, gai_strerror(gai_ret));
+  }
+
+  // uint8_t* b= (uint8_t*)&ret;
+  // fprintf (stderr, "########## wsrep_check_ip returning: %hhu.%hhu.%hhu.%hhu\n",
+  //          b[0], b[1], b[2], b[3]);
 
   return ret;
 }
@@ -373,13 +380,16 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
 {
   size_t ip_len = 0;
 
-  if (my_bind_addr_str && strlen(my_bind_addr_str))
+  if (my_bind_addr_str && my_bind_addr_str[0] != '\0')
   {
     unsigned int const ip_type= wsrep_check_ip(my_bind_addr_str);
 
     if (INADDR_NONE == ip_type) {
-      WSREP_ERROR("Node IP address not obtained from bind_address, trying alternate methods");
-    } else if (INADDR_ANY != ip_type) {
+      WSREP_ERROR("Networking not configured, cannot receive state transfer.");
+      return 0;
+    }
+
+    if (INADDR_ANY != ip_type) {
       strncpy (buf, my_bind_addr_str, buf_len);
       return strlen(buf);
     }
@@ -404,118 +414,36 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
     return ip_len;
   }
 
-  // try to find the address of the first one
-#if (TARGET_OS_LINUX == 1)
-  const char cmd[] = "ip addr show | grep -E '^[ ]*inet' | grep -m1 global | "
-                     "awk '{ print $2 }' | sed -e 's/\\/.*//'";
-#elif defined(__sun__)
-  const char cmd[] = "/sbin/ifconfig -a | "
-      "/usr/gnu/bin/grep -m1 -1 -E 'net[0-9]:' | tail -n 1 | awk '{ print $2 }'";
-#elif defined(__APPLE__) || defined(__FreeBSD__)
-  const char cmd[] = "/sbin/route -nv get 8.8.8.8 | tail -n1 | awk '{print $(NF)}'";
-#else
-  char *cmd;
-#error "OS not supported"
-#endif
-  wsp::process proc (cmd, "r");
 
-  if (NULL != proc.pipe()) {
-    char* ret;
-
-    ret = fgets (buf, buf_len, proc.pipe());
-
-    if (proc.wait()) return 0;
-
-    if (NULL == ret) {
-      WSREP_ERROR("Failed to read output of: '%s'", cmd);
-      return 0;
-    }
-  }
-  else {
-    WSREP_ERROR("Failed to execute: '%s'", cmd);
-    return 0;
-  }
-
-  // clear possible \n at the end of ip string left by fgets()
-  ip_len = strlen (buf);
-  if (ip_len > 0 && '\n' == buf[ip_len - 1]) {
-    ip_len--;
-    buf[ip_len] = '\0';
-  }
-
-  if (INADDR_NONE == inet_addr(buf)) {
-    if (strlen(buf) != 0) {
-      WSREP_WARN("Shell command returned invalid address: '%s'", buf);
-    }
-    return 0;
-  }
-
-  return ip_len;
-}
-
-size_t wsrep_guess_address(char* buf, size_t buf_len)
-{
-  size_t addr_len = wsrep_guess_ip (buf, buf_len);
-
-  if (addr_len && addr_len < buf_len) {
-    addr_len += snprintf (buf + addr_len, buf_len - addr_len,
-                          ":%u", mysqld_port);
-  }
-
-  return addr_len;
-}
-
-/*
- * WSREPXid
- */
-
-#define WSREP_XID_PREFIX "WSREPXid"
-#define WSREP_XID_PREFIX_LEN MYSQL_XID_PREFIX_LEN
-#define WSREP_XID_UUID_OFFSET 8
-#define WSREP_XID_SEQNO_OFFSET (WSREP_XID_UUID_OFFSET + sizeof(wsrep_uuid_t))
-#define WSREP_XID_GTRID_LEN (WSREP_XID_SEQNO_OFFSET + sizeof(wsrep_seqno_t))
-
-void wsrep_xid_init(XID* xid, const wsrep_uuid_t* uuid, wsrep_seqno_t seqno)
-{
-  xid->formatID= 1;
-  xid->gtrid_length= WSREP_XID_GTRID_LEN;
-  xid->bqual_length= 0;
-  memset(xid->data, 0, sizeof(xid->data));
-  memcpy(xid->data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
-  memcpy(xid->data + WSREP_XID_UUID_OFFSET, uuid, sizeof(wsrep_uuid_t));
-  memcpy(xid->data + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));
-}
-
-const wsrep_uuid_t* wsrep_xid_uuid(const XID* xid)
-{
-  if (wsrep_is_wsrep_xid(xid))
-    return reinterpret_cast<const wsrep_uuid_t*>(xid->data
-                                                 + WSREP_XID_UUID_OFFSET);
-  else
-    return &WSREP_UUID_UNDEFINED;
-}
-
-wsrep_seqno_t wsrep_xid_seqno(const XID* xid)
-{
-
-  if (wsrep_is_wsrep_xid(xid))
+//
+// getifaddrs() is avaiable at least on Linux since glib 2.3, FreeBSD
+// MAC OS X, opensolaris, Solaris.
+//
+// On platforms which do not support getifaddrs() this function returns
+// a failure and user is prompted to do manual configuration.
+//
+#if HAVE_GETIFADDRS
+  struct ifaddrs *ifaddr, *ifa;
+  if (getifaddrs(&ifaddr) == 0)
   {
-    wsrep_seqno_t seqno;
-    memcpy(&seqno, xid->data + WSREP_XID_SEQNO_OFFSET, sizeof(wsrep_seqno_t));
-    return seqno;
-  }
-  else
-  {
-    return WSREP_SEQNO_UNDEFINED;
-  }
-}
+    for (ifa= ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
+      if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) // TODO AF_INET6
+        continue;
 
-extern
-int wsrep_is_wsrep_xid(const void* xid_ptr)
-{
-  const XID* xid= reinterpret_cast<const XID*>(xid_ptr);
-  return (xid->formatID      == 1                   &&
-          xid->gtrid_length  == WSREP_XID_GTRID_LEN &&
-          xid->bqual_length  == 0                   &&
-          !memcmp(xid->data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN));
+      // Skip loopback interfaces (like lo:127.0.0.1)
+      if (ifa->ifa_flags & IFF_LOOPBACK)
+        continue;
+
+      if (vio_getnameinfo(ifa->ifa_addr, buf, buf_len, NULL, 0, NI_NUMERICHOST))
+        continue;
+
+      freeifaddrs(ifaddr);
+      return strlen(buf);
+    }
+    freeifaddrs(ifaddr);
+  }
+#endif // HAVE_GETIFADDRS
+
+  return 0;
 }

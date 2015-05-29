@@ -25,6 +25,15 @@
 # Description: Percona-Server is a SQL database engine with focus on high performance.
 ### END INIT INFO
  
+# Prevent OpenSUSE's init scripts from calling systemd, so that
+# both 'bootstrap' and 'start' are handled entirely within this script
+
+SYSTEMD_NO_WRAP=1
+
+# Prevent Debian's init scripts from calling systemctl
+
+_SYSTEMCTL_SKIP_REDIRECT=true
+ 
 # If you install MySQL on some other places than @prefix@, then you
 # have to do one of the following things for this script to work:
 #
@@ -448,6 +457,12 @@ case "$mode" in
       # Bootstrap the Percona XtraDB Cluster, start the first node
       # that initiate the cluster
       echo $echo_n "Bootstrapping PXC (Percona XtraDB Cluster)"
+      $0 start $other_args --wsrep-new-cluster
+      ;;
+    'bootstrap')
+      # Bootstrap the cluster, start the first node
+      # that initiate the cluster
+      echo $echo_n "Bootstrapping the cluster"
       $0 start $other_args --wsrep-new-cluster
       ;;
     *)

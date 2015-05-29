@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2015, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, Percona Inc.
 Copyright (c) 2012, Facebook Inc.
@@ -372,7 +372,6 @@ static PSI_mutex_info all_innodb_mutexes[] = {
 #  ifndef PFS_SKIP_BUFFER_MUTEX_RWLOCK
 	{&buffer_block_mutex_key, "buffer_block_mutex", 0},
 #  endif /* !PFS_SKIP_BUFFER_MUTEX_RWLOCK */
-	{&buf_pool_mutex_key, "buf_pool_mutex", 0},
 	{&buf_pool_zip_mutex_key, "buf_pool_zip_mutex", 0},
 	{&buf_pool_LRU_list_mutex_key, "buf_pool_LRU_list_mutex", 0},
 	{&buf_pool_free_list_mutex_key, "buf_pool_free_list_mutex", 0},
@@ -1834,6 +1833,15 @@ convert_error_code_to_mysql(
 		return(HA_ERR_TO_BIG_ROW);
 	}
 
+
+	case DB_TOO_BIG_FOR_REDO:
+		my_printf_error(ER_TOO_BIG_ROWSIZE, "%s" , MYF(0),
+				"The size of BLOB/TEXT data inserted"
+				" in one transaction is greater than"
+				" 10% of redo log size. Increase the"
+				" redo log size using innodb_log_file_size.");
+		return(HA_ERR_TO_BIG_ROW);
+
 	case DB_TOO_BIG_INDEX_COL:
 		my_error(ER_INDEX_COLUMN_TOO_LONG, MYF(0),
 			 DICT_MAX_FIELD_LEN_BY_FORMAT_FLAG(flags));
@@ -3122,19 +3130,6 @@ trx_is_strict(
 	return(trx && trx->mysql_thd && THDVAR(trx->mysql_thd, strict_mode));
 }
 
-/**********************************************************************//**
-Determines if the current MySQL thread is running in strict mode.
-If thd==NULL, THDVAR returns the global value of innodb-strict-mode.
-@return	TRUE if strict */
-UNIV_INLINE
-ibool
-thd_is_strict(
-/*==========*/
-	THD*	thd)	/*!< in: MySQL thread descriptor */
-{
-	return(THDVAR(thd, strict_mode));
-}
-
 /**************************************************************//**
 Resets some fields of a prebuilt struct. The template is used in fast
 retrieval of just those column values MySQL needs in its processing. */
@@ -3266,7 +3261,7 @@ innobase_init(
 	innobase_hton->flush_logs = innobase_flush_logs;
 	innobase_hton->show_status = innobase_show_status;
 	innobase_hton->flags = HTON_SUPPORTS_EXTENDED_KEYS |
-		HTON_SUPPORTS_ONLINE_BACKUPS;
+		HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_FOREIGN_KEYS;
 
 	innobase_hton->release_temporary_latches =
 		innobase_release_temporary_latches;
@@ -8012,6 +8007,10 @@ wsrep_error:
 		my_error(HA_FTS_INVALID_DOCID, MYF(0));
 	}
 
+	if (error_result == HA_FTS_INVALID_DOCID) {
+		my_error(HA_FTS_INVALID_DOCID, MYF(0));
+	}
+
 func_exit:
 	innobase_active_small();
 
@@ -9637,7 +9636,6 @@ innobase_fts_create_doc_id_key(
 	dfield_t*	dfield = dtuple_get_nth_field(tuple, 0);
 
 	ut_a(dict_index_get_n_unique(index) == 1);
-
 	dtuple_set_n_fields(tuple, index->n_fields);
 	dict_index_copy_types(tuple, index, index->n_fields);
 
@@ -10380,18 +10378,18 @@ create_table_def(
 		/* Adjust for the FTS hidden field */
 		if (!has_doc_id_col) {
 			table = dict_mem_table_create(table_name, 0, n_cols + 1,
-						      flags, flags2, false);
+						      flags, flags2);
 
 			/* Set the hidden doc_id column. */
 			table->fts->doc_col = n_cols;
 		} else {
 			table = dict_mem_table_create(table_name, 0, n_cols,
-						      flags, flags2, false);
+						      flags, flags2);
 			table->fts->doc_col = doc_id_col;
 		}
 	} else {
 		table = dict_mem_table_create(table_name, 0, n_cols,
-					      flags, flags2, false);
+					      flags, flags2);
 	}
 
 	if (flags2 & DICT_TF2_TEMPORARY) {
@@ -13862,6 +13860,7 @@ ha_innobase::start_stmt(
 	thr_lock_type	lock_type)
 {
 	trx_t*		trx;
+	DBUG_ENTER("ha_innobase::start_stmt");
 
 	update_thd(thd);
 
@@ -13884,6 +13883,29 @@ ha_innobase::start_stmt(
 	prebuilt->sql_stat_start = TRUE;
 	prebuilt->hint_need_to_fetch_extra_cols = 0;
 	reset_template();
+
+	if (dict_table_is_temporary(prebuilt->table)
+	    && prebuilt->mysql_has_locked
+	    && prebuilt->select_lock_type == LOCK_NONE) {
+		dberr_t error;
+
+		switch (thd_sql_command(thd)) {
+		case SQLCOM_INSERT:
+		case SQLCOM_UPDATE:
+		case SQLCOM_DELETE:
+			init_table_handle_for_HANDLER();
+			prebuilt->select_lock_type = LOCK_X;
+			prebuilt->stored_select_lock_type = LOCK_X;
+			error = row_lock_table_for_mysql(prebuilt, NULL, 1);
+
+			if (error != DB_SUCCESS) {
+				int st = convert_error_code_to_mysql(
+					error, 0, thd);
+				DBUG_RETURN(st);
+			}
+			break;
+		}
+	}
 
 	if (!prebuilt->mysql_has_locked) {
 		/* This handle is for a temporary table created inside
@@ -13922,7 +13944,7 @@ ha_innobase::start_stmt(
 		++trx->will_lock;
 	}
 
-	return(0);
+	DBUG_RETURN(0);
 }
 
 /******************************************************************//**
@@ -13995,9 +14017,36 @@ ha_innobase::external_lock(
 			         "READ COMMITTED or READ UNCOMMITTED.");
 			DBUG_RETURN(HA_ERR_LOGGING_IMPOSSIBLE);
 #ifdef WITH_WSREP
-			}
+		}
 #endif /* WITH_WSREP */
 		}
+	}
+
+	/* Check for UPDATEs in read-only mode. */
+	if (srv_read_only_mode
+	    && (thd_sql_command(thd) == SQLCOM_UPDATE
+		|| thd_sql_command(thd) == SQLCOM_INSERT
+		|| thd_sql_command(thd) == SQLCOM_REPLACE
+		|| thd_sql_command(thd) == SQLCOM_DROP_TABLE
+		|| thd_sql_command(thd) == SQLCOM_ALTER_TABLE
+		|| thd_sql_command(thd) == SQLCOM_OPTIMIZE
+		|| (thd_sql_command(thd) == SQLCOM_CREATE_TABLE
+		    && lock_type == F_WRLCK)
+		|| thd_sql_command(thd) == SQLCOM_CREATE_INDEX
+		|| thd_sql_command(thd) == SQLCOM_DROP_INDEX
+		|| thd_sql_command(thd) == SQLCOM_DELETE)) {
+
+		if (thd_sql_command(thd) == SQLCOM_CREATE_TABLE)
+		{
+			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
+				    ER_INNODB_READ_ONLY);
+			DBUG_RETURN(HA_ERR_INNODB_READ_ONLY);
+		} else {
+			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
+				    ER_READ_ONLY_MODE);
+			DBUG_RETURN(HA_ERR_TABLE_READONLY);
+		}
+
 	}
 
 	/* Check for UPDATEs in read-only mode. */
@@ -15116,7 +15165,6 @@ ha_innobase::get_auto_increment(
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
-
 			current = innobase_next_autoinc(
 				current, 1, increment, 1, col_max_value);
 
@@ -15316,10 +15364,8 @@ ha_innobase::cmp_ref(
 			len1 = innobase_read_from_2_little_endian(ref1);
 			len2 = innobase_read_from_2_little_endian(ref2);
 
-			ref1 += 2;
-			ref2 += 2;
 			result = ((Field_blob*) field)->cmp(
-				ref1, len1, ref2, len2);
+				ref1 + 2, len1, ref2 + 2, len2);
 		} else {
 			result = field->key_cmp(ref1, ref2);
 		}
@@ -18104,9 +18150,8 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
                                                         victim_trx, signal);
                 trx_mutex_exit(victim_trx);
                 lock_mutex_exit();
-#ifndef HAVE_ATOMIC_BUILTINS
 		wsrep_srv_conc_cancel_wait(victim_trx);
-#endif
+
  		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction");
@@ -19992,4 +20037,29 @@ innobase_convert_to_system_charset(
 
 	return(strconvert(
 		cs1, from, cs2, to, static_cast<uint>(len), errors));
+}
+
+/**********************************************************************
+Issue a warning that the row is too big. */
+void
+ib_warn_row_too_big(const dict_table_t*	table)
+{
+	/* If prefix is true then a 768-byte prefix is stored
+	locally for BLOB fields. Refer to dict_table_get_format() */
+	const bool prefix = (dict_tf_get_format(table->flags)
+			     == UNIV_FORMAT_A);
+
+	const ulint	free_space = page_get_free_space_of_empty(
+		table->flags & DICT_TF_COMPACT) / 2;
+
+	THD*	thd = current_thd;
+
+	push_warning_printf(
+		thd, Sql_condition::WARN_LEVEL_WARN, HA_ERR_TO_BIG_ROW,
+		"Row size too large (> %lu). Changing some columns to TEXT"
+		" or BLOB %smay help. In current row format, BLOB prefix of"
+		" %d bytes is stored inline.", free_space
+		, prefix ? "or using ROW_FORMAT=DYNAMIC or"
+		" ROW_FORMAT=COMPRESSED ": ""
+		, prefix ? DICT_MAX_FIXED_COL_LEN : 0);
 }

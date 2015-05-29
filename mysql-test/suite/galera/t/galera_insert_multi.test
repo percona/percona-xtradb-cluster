@@ -79,6 +79,10 @@ COMMIT;
 --error ER_LOCK_DEADLOCK
 COMMIT;
 
+# Workaround for mysql-wsrep#39 Transaction receives deadlock error twice in row
+--error 0,ER_LOCK_DEADLOCK
+ROLLBACK;
+
 --error ER_DUP_ENTRY
 INSERT INTO t1 VALUES (1), (2);
 

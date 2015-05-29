@@ -325,7 +325,7 @@ Requires(post):   /sbin/chkconfig
 Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
-Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
+Provides:       mysql-server MySQL-server
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
@@ -525,12 +525,14 @@ mkdir debug
   # Attempt to remove any optimisation flags from the debug build
   CFLAGS=`echo " ${CFLAGS} " | \
             sed -e 's/ -O[0-9]* / /' \
+                -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
                 -e 's/ -unroll2 / /' \
                 -e 's/ -ip / /' \
                 -e 's/^ //' \
                 -e 's/ $//'`
   CXXFLAGS=`echo " ${CXXFLAGS} " | \
               sed -e 's/ -O[0-9]* / /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
                   -e 's/ -unroll2 / /' \
                   -e 's/ -ip / /' \
                   -e 's/^ //' \
@@ -725,11 +727,17 @@ rm -rf $RBR%{_sysconfdir}/init.d/mysql
 if [ -x %{_bindir}/my_print_defaults ]
 then
   mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
+  PID_FILE_PATT=`%{_bindir}/my_print_defaults server mysqld | grep '^--pid-file=' | sed -n 's/--pid-file=//p'`
 fi
 if [ -z "$mysql_datadir" ]
 then
   mysql_datadir=%{mysqldatadir}
 fi
+if [ -z "$PID_FILE_PATT" ]
+then
+  PID_FILE_PATT="$mysql_datadir/*.pid"
+fi
+
 # Check if we can safely upgrade.  An upgrade is only safe if it's from one
 # of our RPMs in the same version family.
 
@@ -807,7 +815,7 @@ fi
 
 # We assume that if there is exactly one ".pid" file,
 # it contains the valid PID of a running MySQL server.
-NR_PID_FILES=`ls $mysql_datadir/*.pid 2>/dev/null | wc -l`
+NR_PID_FILES=`ls -1 $PID_FILE_PATT 2>/dev/null | wc -l`
 case $NR_PID_FILES in
 	0 ) SERVER_TO_START=''  ;;  # No "*.pid" file == no running server
 	1 ) SERVER_TO_START='true' ;;
@@ -829,8 +837,8 @@ if [ -f $STATUS_FILE ]; then
 	echo "before repeating the MySQL upgrade."
 	exit 1
 elif [ -n "$SEVERAL_PID_FILES" ] ; then
-	echo "Your MySQL directory '$mysql_datadir' has more than one PID file:"
-	ls -ld $mysql_datadir/*.pid
+	echo "You have more than one PID file:"
+	ls -ld $PID_FILE_PATT
 	echo "Please check which one (if any) corresponds to a running server"
 	echo "and delete all others before repeating the MySQL upgrade."
 	exit 1
@@ -844,8 +852,10 @@ if [ -d $mysql_datadir ] ; then
 	echo "MySQL RPM upgrade to version $NEW_VERSION"  > $STATUS_FILE
 	echo "'pre' step running at `date`"          >> $STATUS_FILE
 	echo                                         >> $STATUS_FILE
+	fcount=`ls -ltr $mysql_datadir/*.err 2>/dev/null | wc -l`
+	if [ $fcount -gt 0 ] ; then
 	echo "ERR file(s):"                          >> $STATUS_FILE
-	ls -ltr $mysql_datadir/*.err 2>/dev/null     >> $STATUS_FILE
+		ls -ltr $mysql_datadir/*.err                 >> $STATUS_FILE
 	echo                                         >> $STATUS_FILE
 	echo "Latest 'Version' line in latest file:" >> $STATUS_FILE
 	grep '^Version' `ls -tr $mysql_datadir/*.err 2>/dev/null | tail -1` | \
@@ -855,17 +865,17 @@ if [ -d $mysql_datadir ] ; then
 	if [ -n "$SERVER_TO_START" ] ; then
 		# There is only one PID file, race possibility ignored
 		echo "PID file:"                           >> $STATUS_FILE
-		ls -l   $mysql_datadir/*.pid               >> $STATUS_FILE
-		cat     $mysql_datadir/*.pid               >> $STATUS_FILE
+		ls -l   $PID_FILE_PATT                     >> $STATUS_FILE
+		cat     $PID_FILE_PATT                     >> $STATUS_FILE
 		echo                                       >> $STATUS_FILE
 		echo "Server process:"                     >> $STATUS_FILE
-		ps -fp `cat $mysql_datadir/*.pid`          >> $STATUS_FILE
+		ps -fp `cat $PID_FILE_PATT`                >> $STATUS_FILE
 		echo                                       >> $STATUS_FILE
 		echo "SERVER_TO_START=$SERVER_TO_START"    >> $STATUS_FILE
 	else
 		# Take a note we checked it ...
 		echo "PID file:"                           >> $STATUS_FILE
-		ls -l   $mysql_datadir/*.pid               >> $STATUS_FILE 2>&1
+		ls -l   $PID_FILE_PATT                     >> $STATUS_FILE 2>&1
 	fi
 fi
 
@@ -935,6 +945,12 @@ useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
 # The user may already exist, make sure it has the proper group nevertheless
 # (BUG#12823)
 usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+
+# ----------------------------------------------------------------------
+# Change permissions so that the user that will run the MySQL daemon
+# owns all database files.
+# ----------------------------------------------------------------------
+chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
 
 # ----------------------------------------------------------------------
 # Initiate databases if needed

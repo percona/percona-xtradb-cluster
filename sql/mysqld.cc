@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights
    reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -506,9 +506,11 @@ const char *wsrep_binlog_format_names[]=
                                    {"MIXED", "STATEMENT", "ROW", "NONE", NullS};
 #endif /*WITH_WSREP */
 my_bool enforce_gtid_consistency;
-my_bool simplified_binlog_gtid_recovery;
-ulong binlogging_impossible_mode;
-const char *binlogging_impossible_err[]= {"IGNORE_ERROR", "ABORT_SERVER", NullS};
+my_bool binlog_gtid_simple_recovery;
+ulong binlog_error_action;
+const char *binlog_error_action_list[]= {"IGNORE_ERROR", "ABORT_SERVER", NullS};
+bool gtid_deployment_step= false;
+bool opt_gtid_deployment_step= false;
 ulong gtid_mode;
 const char *gtid_mode_names[]=
 {"OFF", "UPGRADE_STEP_1", "UPGRADE_STEP_2", "ON", NullS};
@@ -567,6 +569,7 @@ ulong binlog_cache_use= 0, binlog_cache_disk_use= 0;
 ulong binlog_stmt_cache_use= 0, binlog_stmt_cache_disk_use= 0;
 ulong max_connections, max_connect_errors;
 ulong extra_max_connections;
+ulong max_digest_length= 0;
 ulong rpl_stop_slave_timeout= LONG_TIMEOUT;
 my_bool log_bin_use_v1_row_events= 0;
 bool thread_cache_size_specified= false;
@@ -608,6 +611,11 @@ ulong expire_logs_days = 0;
   in the sp_cache for one connection.
 */
 ulong stored_program_cache_size= 0;
+/**
+  Compatibility option to prevent auto upgrade of old temporals
+  during certain ALTER TABLE operations.
+*/
+my_bool avoid_temporal_upgrade;
 
 const double log_10[] = {
   1e000, 1e001, 1e002, 1e003, 1e004, 1e005, 1e006, 1e007, 1e008, 1e009,
@@ -1276,7 +1284,9 @@ bool mysqld_embedded=0;
 bool mysqld_embedded=1;
 #endif
 
+#ifndef EMBEDDED_LIBRARY
 static my_bool plugins_are_initialized= FALSE;
+#endif
 
 #ifndef DBUG_OFF
 static const char* default_dbug_option;
@@ -4091,6 +4101,9 @@ int init_common_variables()
     return 1;
   set_server_version();
 
+  sql_print_information("%s (mysqld %s) starting as process %lu ...",
+                        my_progname, server_version, (ulong) getpid());
+
 #ifndef EMBEDDED_LIBRARY
   if (opt_help && !opt_verbose)
     unireg_abort(0);
@@ -6073,6 +6086,8 @@ int mysqld_main(int argc, char **argv)
         pfs_param.m_hints.m_table_open_cache= table_cache_size;
         pfs_param.m_hints.m_max_connections= max_connections;
 	pfs_param.m_hints.m_open_files_limit= requested_open_files;
+        /* the performance schema digest size is the same as the SQL layer */
+        pfs_param.m_max_digest_length= max_digest_length;
         PSI_hook= initialize_performance_schema(&pfs_param);
         if (PSI_hook == NULL)
         {
@@ -7849,7 +7864,7 @@ void adjust_table_cache_size(ulong requested_open_files)
     char msg[1024];
 
     snprintf(msg, sizeof(msg),
-             "Changed limits: table_cache: %lu (requested %lu)",
+             "Changed limits: table_open_cache: %lu (requested %lu)",
              limit, table_cache_size);
     buffered_logs.buffer(WARNING_LEVEL, msg);
 
@@ -9373,6 +9388,14 @@ mysqld_get_one_option(int optid,
   case OPT_BINLOG_FORMAT:
     binlog_format_used= true;
     break;
+  case OPT_BINLOGGING_IMPOSSIBLE_MODE:
+    WARN_DEPRECATED(NULL, "--binlogging_impossible_mode",
+                    "'--binlog_error_action'");
+    break;
+  case OPT_SIMPLIFIED_BINLOG_GTID_RECOVERY:
+    WARN_DEPRECATED(NULL, "--simplified_binlog_gtid_recovery",
+                    "'--binlog_gtid_simple_recovery'");
+    break;
 #include <sslopt-case.h>
 #ifndef EMBEDDED_LIBRARY
   case 'V':
@@ -9734,6 +9757,13 @@ pfs_error:
     {
       opt_secure_file_priv_noarg= FALSE;
     }
+    break;
+  case OPT_AVOID_TEMPORAL_UPGRADE:
+    WARN_DEPRECATED_NO_REPLACEMENT(NULL, "avoid_temporal_upgrade");
+    break;
+  case OPT_SHOW_OLD_TEMPORALS:
+    WARN_DEPRECATED_NO_REPLACEMENT(NULL, "show_old_temporals");
+    break;
   }
   return 0;
 }
@@ -9912,10 +9942,10 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
 
 #ifdef WITH_WSREP
   if (global_system_variables.wsrep_causal_reads) {
-      WSREP_WARN("option --wsrep-casual-reads is deprecated");
+      WSREP_WARN("option --wsrep-causal-reads is deprecated");
       if (!(global_system_variables.wsrep_sync_wait &
             WSREP_SYNC_WAIT_BEFORE_READ)) {
-          WSREP_WARN("--wsrep-casual-reads=ON takes precedence over --wsrep-sync-wait=%u. "
+          WSREP_WARN("--wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=%u. "
                      "WSREP_SYNC_WAIT_BEFORE_READ is on",
                      global_system_variables.wsrep_sync_wait);
           global_system_variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;

@@ -1027,6 +1027,8 @@ struct handlerton
 */
 
 #define HTON_SUPPORTS_EXTENDED_KEYS  (1 << 10)
+// Engine supports foreign key constraint.
+#define HTON_SUPPORTS_FOREIGN_KEYS   (1 << 11)
 
 /**
    Set if the storage engine supports 'online' backups. This means that there
@@ -1034,12 +1036,12 @@ struct handlerton
    updates to them. If so, statements that update such tables will not be
    affected by an active LOCK TABLES FOR BACKUP.
 */
-#define HTON_SUPPORTS_ONLINE_BACKUPS (1 << 11)
+#define HTON_SUPPORTS_ONLINE_BACKUPS (1 << 12)
 
 /**
   Engine supports secondary clustered keys.
 */
-#define HTON_SUPPORTS_CLUSTERED_KEYS (1 << 12)
+#define HTON_SUPPORTS_CLUSTERED_KEYS (1 << 13)
 
 enum enum_tx_isolation { ISO_READ_UNCOMMITTED, ISO_READ_COMMITTED,
 			 ISO_REPEATABLE_READ, ISO_SERIALIZABLE};
@@ -3571,6 +3573,9 @@ int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal);
 void ha_wsrep_fake_trx_id(THD *thd);
 #endif /* WITH_WSREP */
+
+/* Build pushed joins in handlers implementing this feature */
+int ha_make_pushed_joins(THD *thd, const AQP::Join_plan* plan);
 
 /* Build pushed joins in handlers implementing this feature */
 int ha_make_pushed_joins(THD *thd, const AQP::Join_plan* plan);

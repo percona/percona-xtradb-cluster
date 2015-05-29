@@ -1,4 +1,4 @@
-/* Copyright 2008 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include <sql_class.h>
 #include "wsrep_mysqld.h"
 #include "wsrep_binlog.h"
+#include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
 
@@ -500,7 +501,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     if (thd->transaction.xid_state.xid.get_my_xid())
     {
       wsrep_xid_init(&thd->transaction.xid_state.xid,
-                     &thd->wsrep_trx_meta.gtid.uuid,
+                     thd->wsrep_trx_meta.gtid.uuid,
                      thd->wsrep_trx_meta.gtid.seqno);
     }
     DBUG_PRINT("wsrep", ("replicating commit success"));

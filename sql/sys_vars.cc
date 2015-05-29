@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1594,13 +1594,28 @@ static Sys_var_ulong Sys_rpl_stop_slave_timeout(
        "warning.",
        GLOBAL_VAR(rpl_stop_slave_timeout), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(2, LONG_TIMEOUT), DEFAULT(LONG_TIMEOUT), BLOCK_SIZE(1));
+/*
+  alias for binlogging_imposible_mode as per the appropriate naming
+  convention
+*/
+static Sys_var_enum Sys_binlog_error_action(
+       "binlog_error_action",
+       "When statements cannot be written to the binary log due to a fatal "
+       "error, the server can either ignore the error and let the master "
+       "continue, or abort.", GLOBAL_VAR(binlog_error_action),
+       CMD_LINE(REQUIRED_ARG), binlog_error_action_list, DEFAULT(IGNORE_ERROR));
 
 static Sys_var_enum Sys_binlogging_impossible_mode(
        "binlogging_impossible_mode",
        "On a fatal error when statements cannot be binlogged the behaviour can "
-       "be ignore the error and let the master continue or abort the server. ",
-       GLOBAL_VAR(binlogging_impossible_mode), CMD_LINE(REQUIRED_ARG),
-       binlogging_impossible_err, DEFAULT(IGNORE_ERROR));
+       "be ignore the error and let the master continue or abort the server. "
+       "This variable is deprecated and will be removed in a future release. "
+       "Please use binlog_error_action instead.",
+       GLOBAL_VAR(binlog_error_action),
+       CMD_LINE(REQUIRED_ARG, OPT_BINLOGGING_IMPOSSIBLE_MODE),
+       binlog_error_action_list, DEFAULT(IGNORE_ERROR),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(0),
+       DEPRECATED("'@@binlog_error_action'"));
 
 static Sys_var_mybool Sys_trust_function_creators(
        "log_bin_trust_function_creators",
@@ -1897,6 +1912,21 @@ static Sys_var_ulong Sys_extra_max_connections(
        VALID_RANGE(1, MAX_CONNECTIONS), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
        NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(fix_max_connections));
 
+static Sys_var_long Sys_max_digest_length(
+       "max_digest_length",
+       "Maximum length considered for digest text.",
+       READ_ONLY GLOBAL_VAR(max_digest_length),
+       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 1024 * 1024),
+       DEFAULT(1024),
+       BLOCK_SIZE(1),
+       NO_MUTEX_GUARD,
+       NOT_IN_BINLOG,
+       ON_CHECK(0),
+       ON_UPDATE(0),
+       NULL,
+       /* max_digest_length is used as a sizing hint by the performance schema. */
+       sys_var::PARSE_EARLY);
+
 static bool check_max_delayed_threads(sys_var *self, THD *thd, set_var *var)
 {
   return var->type != OPT_GLOBAL &&
@@ -2160,7 +2190,7 @@ static Sys_var_ulong Sys_open_files_limit(
        "open_files_limit",
        "If this is not 0, then mysqld will use this value to reserve file "
        "descriptors to use with setrlimit(). If this value is 0 then mysqld "
-       "will reserve max_connections*5 or max_connections + table_cache*2 "
+       "will reserve max_connections*5 or max_connections + table_open_cache*2 "
        "(whichever is larger) number of file descriptors",
        READ_ONLY GLOBAL_VAR(open_files_limit), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(0, OS_FILE_LIMIT), DEFAULT(0), BLOCK_SIZE(1),
@@ -2630,7 +2660,7 @@ static Sys_var_ulong Sys_trans_alloc_block_size(
        "transaction_alloc_block_size",
        "Allocation block size for transactions to be stored in binary log",
        SESSION_VAR(trans_alloc_block_size), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1024, ULONG_MAX), DEFAULT(QUERY_ALLOC_BLOCK_SIZE),
+       VALID_RANGE(1024, 128 * 1024 * 1024), DEFAULT(QUERY_ALLOC_BLOCK_SIZE),
        BLOCK_SIZE(1024), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(fix_trans_mem_root));
 
@@ -2638,7 +2668,7 @@ static Sys_var_ulong Sys_trans_prealloc_size(
        "transaction_prealloc_size",
        "Persistent buffer for transactions to be stored in binary log",
        SESSION_VAR(trans_prealloc_size), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1024, ULONG_MAX), DEFAULT(TRANS_ALLOC_PREALLOC_SIZE),
+       VALID_RANGE(1024, 128 * 1024 * 1024), DEFAULT(TRANS_ALLOC_PREALLOC_SIZE),
        BLOCK_SIZE(1024), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(fix_trans_mem_root));
 
@@ -3599,13 +3629,13 @@ static Sys_var_bit Sys_log_off(
 static bool fix_sql_log_bin_after_update(sys_var *self, THD *thd,
                                          enum_var_type type)
 {
-  if (type == OPT_SESSION)
-  {
+  DBUG_ASSERT(type == OPT_SESSION);
+
     if (thd->variables.sql_log_bin)
       thd->variables.option_bits |= OPTION_BIN_LOG;
     else
       thd->variables.option_bits &= ~OPTION_BIN_LOG;
-  }
+
   return FALSE;
 }
 
@@ -3627,7 +3657,7 @@ static bool check_sql_log_bin(sys_var *self, THD *thd, set_var *var)
     return TRUE;
 
   if (var->type == OPT_GLOBAL)
-    return FALSE;
+    return TRUE;
 
   /* If in a stored function/trigger, it's too late to change sql_log_bin. */
   if (thd->in_sub_stmt)
@@ -3646,9 +3676,9 @@ static bool check_sql_log_bin(sys_var *self, THD *thd, set_var *var)
 }
 
 static Sys_var_mybool Sys_log_binlog(
-       "sql_log_bin", "sql_log_bin",
-       SESSION_VAR(sql_log_bin), NO_CMD_LINE,
-       DEFAULT(TRUE), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_sql_log_bin),
+       "sql_log_bin", "Controls whether logging to the binary log is done",
+       SESSION_VAR(sql_log_bin), NO_CMD_LINE, DEFAULT(TRUE),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_sql_log_bin),
        ON_UPDATE(fix_sql_log_bin_after_update));
 
 static Sys_var_bit Sys_transaction_allow_batching(
@@ -4879,7 +4909,7 @@ static Sys_var_uint Sys_wsrep_sync_wait(
 static const char *wsrep_OSU_method_names[]= { "TOI", "RSU", NullS };
 static Sys_var_enum Sys_wsrep_OSU_method(
        "wsrep_OSU_method", "Method for Online Schema Upgrade",
-       GLOBAL_VAR(wsrep_OSU_method_options), CMD_LINE(OPT_ARG),
+       SESSION_VAR(wsrep_OSU_method), CMD_LINE(OPT_ARG),
        wsrep_OSU_method_names, DEFAULT(WSREP_OSU_TOI),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(0));
@@ -5018,8 +5048,8 @@ static Sys_var_mybool Sys_enforce_gtid_consistency(
        );
 #endif
 
-static Sys_var_mybool Sys_simplified_binlog_gtid_recovery(
-       "simplified_binlog_gtid_recovery",
+static Sys_var_mybool Sys_binlog_gtid_simple_recovery(
+       "binlog_gtid_simple_recovery",
        "If this option is enabled, the server does not scan more than one "
        "binary log for every iteration when initializing GTID sets on server "
        "restart. Enabling this option is very useful when restarting a server "
@@ -5028,10 +5058,17 @@ static Sys_var_mybool Sys_simplified_binlog_gtid_recovery(
        "GLOBAL.GTID_PURGED cannot be initialized correctly if binary log(s) "
        "with GTID events were generated before binary log(s) without GTID "
        "events, for example if gtid_mode is disabled when the server has "
-       "already generated binary log(s) with GTID events and not purged "
-       "them. ",
-       READ_ONLY GLOBAL_VAR(simplified_binlog_gtid_recovery),
+       "already generated binary log(s) with GTID events and not purged them.",
+       READ_ONLY GLOBAL_VAR(binlog_gtid_simple_recovery),
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+
+static Sys_var_mybool Sys_simplified_binlog_gtid_recovery(
+       "simplified_binlog_gtid_recovery",
+       "Alias for @@binlog_gtid_simple_recovery. Deprecated",
+       READ_ONLY GLOBAL_VAR(binlog_gtid_simple_recovery),
+       CMD_LINE(OPT_ARG, OPT_SIMPLIFIED_BINLOG_GTID_RECOVERY),
+       DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(0), DEPRECATED("'@@binlog_gtid_simple_recovery'"));
 
 static Sys_var_ulong Sys_sp_cache_size(
        "stored_program_cache",
@@ -5344,6 +5381,72 @@ static bool check_gtid_mode(sys_var *self, THD *thd, set_var *var)
 }
 #endif
 
+/* This function is based on check_read_only() */
+static bool check_gtid_deployment_step(sys_var *self, THD *thd, set_var *var)
+{
+  if (thd->locked_tables_mode || thd->in_active_multi_stmt_transaction())
+  {
+    my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+    return true;
+  }
+  return false;
+}
+
+/* This function is based on fix_read_only() */
+static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type)
+{
+  DBUG_ENTER("fix_gtid_deployment_step");
+  bool new_gtid_deployment_step= gtid_deployment_step;
+  bool result= true;
+
+  if (gtid_deployment_step == FALSE ||
+      gtid_deployment_step == opt_gtid_deployment_step)
+  {
+    opt_gtid_deployment_step= gtid_deployment_step;
+    DBUG_RETURN(false);
+  }
+
+  if (check_gtid_deployment_step(self, thd, 0)) // just in case
+    goto end;
+
+  gtid_deployment_step= opt_gtid_deployment_step;
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  if (thd->global_read_lock.lock_global_read_lock(thd))
+    goto end_with_mutex_unlock;
+
+  if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
+    goto end_with_read_lock;
+
+  /*
+   Change the opt_deployment_step system variable,
+   safe because the lock is held
+  */
+  opt_gtid_deployment_step= new_gtid_deployment_step;
+  result= false;
+
+ end_with_read_lock:
+  /* Release the lock */
+  thd->global_read_lock.unlock_global_read_lock(thd);
+ end_with_mutex_unlock:
+  mysql_mutex_lock(&LOCK_global_system_variables);
+ end:
+  gtid_deployment_step= opt_gtid_deployment_step;
+  DBUG_RETURN(result);
+}
+
+static Sys_var_mybool Sys_gtid_deployment_step(
+       "gtid_deployment_step",
+       "Whether gtid_deployment_step is enabled: OFF or ON. ON means "
+       "GTIDs are supported by the server but no GTID is generated. If the "
+       "server is a slave and gtid_deployment_step is ON, the slave doesn't "
+       "generate any GTIDs but logs any GTID received from master. OFF means "
+       "the server supports GTID depending on the option gtid_mode.",
+       GLOBAL_VAR(gtid_deployment_step), CMD_LINE(OPT_ARG), DEFAULT(FALSE),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG,
+       ON_CHECK(check_gtid_deployment_step),
+       ON_UPDATE(fix_gtid_deployment_step));
+
 static Sys_var_enum Sys_gtid_mode(
        "gtid_mode",
        /*
@@ -5397,3 +5500,27 @@ static Sys_var_mybool Sys_wsrep_dirty_reads(
        SESSION_ONLY(wsrep_dirty_reads),
        NO_CMD_LINE, DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 #endif
+static Sys_var_mybool Sys_avoid_temporal_upgrade(
+       "avoid_temporal_upgrade",
+       "When this option is enabled, the pre-5.6.4 temporal types are "
+       "not upgraded to the new format for ALTER TABLE requests ADD/CHANGE/MODIFY"
+       " COLUMN, ADD INDEX or FORCE operation. "
+       "This variable is deprecated and will be removed in a future release.",
+        GLOBAL_VAR(avoid_temporal_upgrade),
+        CMD_LINE(OPT_ARG, OPT_AVOID_TEMPORAL_UPGRADE),
+        DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+        ON_CHECK(0), ON_UPDATE(0),
+        DEPRECATED(""));
+
+static Sys_var_mybool Sys_show_old_temporals(
+       "show_old_temporals",
+       "When this option is enabled, the pre-5.6.4 temporal types will "
+       "be marked in the 'SHOW CREATE TABLE' and 'INFORMATION_SCHEMA.COLUMNS' "
+       "table as a comment in COLUMN_TYPE field. "
+       "This variable is deprecated and will be removed in a future release.",
+        SESSION_VAR(show_old_temporals),
+        CMD_LINE(OPT_ARG, OPT_SHOW_OLD_TEMPORALS),
+        DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+        ON_CHECK(0), ON_UPDATE(0),
+        DEPRECATED(""));
+

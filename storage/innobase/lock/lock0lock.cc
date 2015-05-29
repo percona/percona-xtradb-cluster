@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -382,8 +382,10 @@ because there is no parallel deadlock check. This stack is protected by
 the lock_sys_t::mutex. */
 static lock_stack_t*	lock_stack;
 
+#ifdef UNIV_DEBUG
 /** The count of the types of locks. */
 static const ulint	lock_types = UT_ARR_SIZE(lock_compatibility_matrix);
+#endif /* UNIV_DEBUG */
 
 #ifdef UNIV_PFS_MUTEX
 /* Key to register mutex with performance schema */
@@ -1865,7 +1867,7 @@ lock_rec_other_trx_holds_expl(
 
 	return(holds);
 }
-#endif /* UNIV_DEBUG */
+#endif /* UNIV_DEBUG && !WITH_WSREP */
 
 /*********************************************************************//**
 Return approximate number or record locks (bits set in the bitmap) for
@@ -2089,6 +2091,7 @@ lock_rec_create(
 	ut_ad(trx_mutex_own(trx));
 
 	if (type_mode & LOCK_WAIT) {
+
 		lock_set_lock_and_trx_wait(lock, trx);
 	}
 
@@ -2174,8 +2177,8 @@ lock_rec_enqueue_waiting(
 		ut_ad(0);
 	}
 
-	/* Enqueue the lock request that will wait to be granted */
-
+	/* Enqueue the lock request that will wait to be granted, note that
+	we already own the trx mutex. */
 #ifdef WITH_WSREP
 	if (wsrep_on(trx->mysql_thd) &&
 	        trx->lock.was_chosen_as_deadlock_victim) {
@@ -2274,7 +2277,8 @@ lock_rec_add_to_queue(
 
 	ut_ad(lock_mutex_own());
 	ut_ad(caller_owns_trx_mutex == trx_mutex_own(trx));
-	ut_ad(dict_index_is_clust(index) || !dict_index_is_online_ddl(index));
+	ut_ad(dict_index_is_clust(index)
+	      || dict_index_get_online_status(index) != ONLINE_INDEX_CREATION);
 #ifdef UNIV_DEBUG
 	switch (type_mode & LOCK_MODE_MASK) {
 	case LOCK_X:
@@ -5769,7 +5773,7 @@ loop:
 		}
 	}
 
-        if (!srv_print_innodb_lock_monitor && !srv_show_locks_held) {
+	if (!srv_print_innodb_lock_monitor || !srv_show_locks_held) {
 		nth_trx++;
 		goto loop;
 	}
@@ -5798,6 +5802,7 @@ loop:
 			ulint	space	= lock->un_member.rec_lock.space;
 			ulint	zip_size= fil_space_get_zip_size(space);
 			ulint	page_no = lock->un_member.rec_lock.page_no;
+			ibool	tablespace_being_deleted = FALSE;
 
 			if (UNIV_UNLIKELY(zip_size == ULINT_UNDEFINED)) {
 
@@ -5818,14 +5823,31 @@ loop:
 
 			if (srv_show_verbose_locks) {
 
-				mtr_start(&mtr);
+				DEBUG_SYNC_C("innodb_monitor_before_lock_page_read");
 
-				buf_page_get_gen(space, zip_size, page_no,
-						 RW_NO_LATCH, NULL,
-						 BUF_GET_POSSIBLY_FREED,
-						 __FILE__, __LINE__, &mtr);
+				/* Check if the space is exists or not. only
+                                when the space is valid, try to get the page. */
+				tablespace_being_deleted
+					= fil_inc_pending_ops(space, false);
 
-				mtr_commit(&mtr);
+				if (!tablespace_being_deleted) {
+					mtr_start(&mtr);
+
+					buf_page_get_gen(space, zip_size,
+							 page_no, RW_NO_LATCH,
+							 NULL,
+							 BUF_GET_POSSIBLY_FREED,
+							 __FILE__, __LINE__,
+							 &mtr);
+
+					mtr_commit(&mtr);
+
+					fil_decr_pending_ops(space);
+				} else {
+					fprintf(file, "RECORD LOCKS on"
+						" non-existing space %lu\n",
+						(ulong) space);
+				}
 			}
 
 			load_page_first = FALSE;
@@ -6255,7 +6277,7 @@ lock_rec_block_validate(
 
 	/* Make sure that the tablespace is not deleted while we are
 	trying to access the page. */
-	if (!fil_inc_pending_ops(space)) {
+	if (!fil_inc_pending_ops(space, true)) {
 		mtr_start(&mtr);
 		block = buf_page_get_gen(
 			space, fil_space_get_zip_size(space),

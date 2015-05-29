@@ -1,5 +1,6 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+--source include/big_test.inc
 
 #
 # Test the operation of DDLs that fail partway through

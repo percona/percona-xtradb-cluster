@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2013, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2014, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2009, Google Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
@@ -48,6 +48,7 @@ Created 12/9/1995 Heikki Tuuri
 #include "srv0start.h"
 #include "trx0sys.h"
 #include "trx0trx.h"
+#include "trx0roll.h"
 #include "srv0mon.h"
 
 /*
@@ -225,7 +226,7 @@ log_buffer_extend(
 {
 	ulint	move_start;
 	ulint	move_end;
-	byte	tmp_buf[OS_FILE_LOG_BLOCK_SIZE];
+	byte*	tmp_buf = static_cast<byte *>(alloca(OS_FILE_LOG_BLOCK_SIZE));
 
 	mutex_enter(&(log_sys->mutex));
 
@@ -2933,8 +2934,8 @@ log_archive_do(
 			archive */
 {
 	ibool		calc_new_limit;
-	ib_uint64_t	start_lsn;
-	ib_uint64_t	limit_lsn;
+	lsn_t	start_lsn;
+	lsn_t	limit_lsn	= LSN_MAX;
 
 	calc_new_limit = TRUE;
 loop:
@@ -3392,6 +3393,12 @@ logs_empty_and_mark_files_at_shutdown(void)
 
 	ib_logf(IB_LOG_LEVEL_INFO, "Starting shutdown...");
 
+	while (srv_fast_shutdown == 0 && trx_rollback_or_clean_is_active) {
+		/* we should wait until rollback after recovery end
+		for slow shutdown */
+		os_thread_sleep(100000);
+	}
+
 	/* Wait until the master thread and all other operations are idle: our
 	algorithm only works if the server is idle at shutdown */
 
@@ -3596,8 +3603,14 @@ loop:
 
 	lsn = log_sys->lsn;
 
-	if (lsn != log_sys->last_checkpoint_lsn
-	    || (srv_track_changed_pages	&& (tracked_lsn != log_sys->last_checkpoint_lsn))
+	ut_ad(srv_force_recovery != SRV_FORCE_NO_LOG_REDO
+	      || lsn == log_sys->last_checkpoint_lsn + LOG_BLOCK_HDR_SIZE);
+
+
+	if ((srv_force_recovery != SRV_FORCE_NO_LOG_REDO
+	     && lsn != log_sys->last_checkpoint_lsn)
+	    || (srv_track_changed_pages
+		&& (tracked_lsn != log_sys->last_checkpoint_lsn))
 #ifdef UNIV_LOG_ARCHIVE
 	    || (srv_log_archive_on
 		&& lsn != log_sys->archived_lsn + LOG_BLOCK_HDR_SIZE)

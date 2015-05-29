@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -4192,7 +4192,7 @@ request_backoff_action(enum_open_table_action action_arg,
   if (action_arg != OT_REOPEN_TABLES && m_has_locks)
   {
     my_error(ER_LOCK_DEADLOCK, MYF(0));
-    mark_transaction_to_rollback(m_thd, true);
+    m_thd->mark_transaction_to_rollback(true);
     return TRUE;
   }
   /*
@@ -4313,8 +4313,8 @@ recover_from_failed_open()
           do not modify data but only read it, since in this case nothing is
           written to the binary log. Argument routine_modifies_data
           denotes the same. So effectively, if the statement is not a
-          update query and routine_modifies_data is false, then
-          prelocking_placeholder does not take importance.
+          LOCK TABLE, not a update query and routine_modifies_data is false
+          then prelocking_placeholder does not take importance.
 
           Furthermore, this does not apply to I_S and log tables as it's
           always unsafe to replicate such tables under statement-based
@@ -4341,17 +4341,34 @@ thr_lock_type read_lock_type_for_table(THD *thd,
     at THD::variables::sql_log_bin member.
   */
   bool log_on= mysql_bin_log.is_open() && thd->variables.sql_log_bin;
+  /*
+    When we do not write to binlog or when we use row based replication,
+    it is safe to use a weaker lock.
+  */
   ulong binlog_format= thd->variables.binlog_format;
   if ((log_on == FALSE) || (WSREP_BINLOG_FORMAT(binlog_format) == BINLOG_FORMAT_ROW) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
       (table_list->table->s->table_category == TABLE_CATEGORY_RPL_INFO) ||
-      (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE) ||
-      !(is_update_query(prelocking_ctx->sql_command) ||
-        (routine_modifies_data && table_list->prelocking_placeholder) ||
-        (thd->locked_tables_mode > LTM_LOCK_TABLES)))
+      (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE))
     return TL_READ;
-  else
+
+  // SQL queries which updates data need a stronger lock.
+  if (is_update_query(prelocking_ctx->sql_command))
     return TL_READ_NO_INSERT;
+
+  /*
+    table_list is placeholder for prelocking.
+    Ignore prelocking_placeholder status for non "LOCK TABLE" statement's
+    table_list objects when routine_modifies_data is false.
+  */
+  if (table_list->prelocking_placeholder &&
+      (routine_modifies_data || thd->in_lock_tables))
+    return TL_READ_NO_INSERT;
+
+  if (thd->locked_tables_mode > LTM_LOCK_TABLES)
+    return TL_READ_NO_INSERT;
+
+  return TL_READ;
 }
 
 
@@ -4558,10 +4575,16 @@ open_and_process_table(THD *thd, LEX *lex, TABLE_LIST *tables,
       obtain proper metadata locks and do other necessary steps like
       stored routine processing.
     */
+    if (tables->db != tables->view_db.str)
+    {
     tables->db= tables->view_db.str;
     tables->db_length= tables->view_db.length;
+    }
+    if (tables->table_name != tables->view_name.str)
+    {
     tables->table_name= tables->view_name.str;
     tables->table_name_length= tables->view_name.length;
+  }
   }
   /*
     If this TABLE_LIST object is a placeholder for an information_schema
@@ -5116,15 +5139,8 @@ bool open_tables(THD *thd, TABLE_LIST **start, uint *counter, uint flags,
   bool error= FALSE;
   bool some_routine_modifies_data= FALSE;
   bool has_prelocking_list;
+  enum xa_states xa_state;
   DBUG_ENTER("open_tables");
-
-  /* Accessing data in XA_IDLE or XA_PREPARED is not allowed. */
-  enum xa_states xa_state= thd->transaction.xid_state.xa_state;
-  if (*start && (xa_state == XA_IDLE || xa_state == XA_PREPARED))
-  {
-    my_error(ER_XAER_RMFAIL, MYF(0), xa_state_names[xa_state]);
-    DBUG_RETURN(true);
-  }
 
   thd->current_tablenr= 0;
 restart:
@@ -5329,6 +5345,15 @@ restart:
         some_routine_modifies_data|= routine_modifies_data;
       }
     }
+  }
+
+  /* Accessing data in XA_IDLE or XA_PREPARED is not allowed. */
+  xa_state= thd->transaction.xid_state.xa_state;
+  if (*start && (xa_state == XA_IDLE || xa_state == XA_PREPARED))
+  {
+    my_error(ER_XAER_RMFAIL, MYF(0), xa_state_names[xa_state]);
+    error= true;
+    goto err;
   }
 
   /*

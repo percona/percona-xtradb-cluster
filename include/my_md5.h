@@ -43,6 +43,7 @@ static inline void array_to_hex(char *to, const unsigned char *str, uint len)
     *to++= _dig_vec_lower[((uchar) *str) & 0x0F];
   }
 }
+
 #ifdef WITH_WSREP
 void *wsrep_md5_init();
 void wsrep_md5_update(void *ctx, char* buf, int len);

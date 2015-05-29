@@ -16,8 +16,6 @@ set -ue
 TARGET="$(uname -m)"
 TARGET_CFLAGS=''
 QUIET='VERBOSE=1'
-CMAKE_BUILD_TYPE='RelWithDebInfo'
-DEBUG_COMMENT=''
 WITH_JEMALLOC=''
 DEBUG_EXTNAME=''
 WITH_SSL='/usr'
@@ -183,10 +181,10 @@ PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_XTRADB_CLUSTER_VERSION"
 # Build information
 if test -e "$SOURCEDIR/Docs/INFO_SRC"
 then
-    REVISION="$(cd "$SOURCEDIR"; grep '^revno: ' Docs/INFO_SRC |sed -e 's/revno: //')"
-elif test -e "$SOURCEDIR/.bzr/branch/last-revision"
+    REVISION="$(cd "$SOURCEDIR"; grep '^short: ' Docs/INFO_SRC |sed -e 's/short: //')"
+elif [ -n "$(which git)" -a -d "$SOURCEDIR/.git" ];
 then
-    REVISION="$(cd "$SOURCEDIR"; cat .bzr/branch/last-revision | awk -F ' ' '{print $1}')"
+    REVISION="$(git rev-parse --short HEAD)"
 else
     REVISION=""
 fi
@@ -224,6 +222,18 @@ if [ -n "$(which rpm)" ]; then
   export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
 else
   COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
+  # Attempt to remove any optimisation flags from the debug build
+  # BLD-238 - bug1408232
+  if test "x$CMAKE_BUILD_TYPE" = "xDebug"
+  then
+    COMMON_FLAGS=`echo " ${COMMON_FLAGS} " | \
+              sed -e 's/ -O[0-9]* / /' \
+                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
+                  -e 's/ -unroll2 / /' \
+                  -e 's/ -ip / /' \
+                  -e 's/^ //' \
+                  -e 's/ $//'`
+  fi
 fi
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2013, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
  
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -121,6 +121,8 @@
 /* Readline */
 #cmakedefine HAVE_HIST_ENTRY 1
 #cmakedefine USE_LIBEDIT_INTERFACE 1
+#cmakedefine USE_NEW_READLINE_INTERFACE 1
+#cmakedefine HAVE_READLINE_HISTORY_H 1
 
 #cmakedefine FIONREAD_IN_SYS_IOCTL 1
 #cmakedefine GWINSZ_IN_SYS_IOCTL 1
@@ -155,6 +157,7 @@
 #cmakedefine HAVE_FSYNC 1
 #cmakedefine HAVE_FTIME 1
 #cmakedefine HAVE_GETADDRINFO 1
+#cmakedefine HAVE_GETIFADDRS 1
 #cmakedefine HAVE_GETCWD 1
 #cmakedefine HAVE_GETHOSTBYADDR_R 1
 #cmakedefine HAVE_GETHRTIME 1

@@ -1,4 +1,4 @@
-/* Copyright 2008-2013 Codership Oy <http://www.codership.com>
+/* Copyright 2008-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -89,7 +89,6 @@ extern my_bool     wsrep_certify_nonPK;
 extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;
-extern ulong       wsrep_OSU_method_options;
 extern my_bool     wsrep_desync;
 extern ulong       wsrep_reject_queries_options;
 extern my_bool     wsrep_recovery;
@@ -101,8 +100,13 @@ extern my_bool     wsrep_restart_slave_activated;
 extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
 
-enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
 enum enum_wsrep_reject_types { WSREP_REJ_NONE, WSREP_REJ_ALL, WSREP_REJ_ALL_KILL };
+enum enum_wsrep_OSU_method {
+    WSREP_OSU_TOI,
+    WSREP_OSU_RSU,
+    WSREP_OSU_NONE,
+};
+
 enum enum_wsrep_sync_wait {
     WSREP_SYNC_WAIT_NONE = 0x0,
     // show, select, begin
@@ -315,13 +319,8 @@ int wsrep_create_trigger_query(THD *thd, uchar** buf, size_t* buf_len);
 int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len);
 int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len);
 
-struct xid_t;
-void wsrep_get_SE_checkpoint(xid_t*);
-void wsrep_set_SE_checkpoint(xid_t*);
+bool wsrep_stmt_rollback_is_safe(THD* thd);
+
 void wsrep_init_sidno(const wsrep_uuid_t&);
-void wsrep_xid_init(xid_t*, const wsrep_uuid_t*, wsrep_seqno_t);
-const wsrep_uuid_t* wsrep_xid_uuid(const xid_t*);
-wsrep_seqno_t wsrep_xid_seqno(const xid_t*);
-int wsrep_is_wsrep_xid(const void* xid);
 
 #endif /* WSREP_MYSQLD_H */

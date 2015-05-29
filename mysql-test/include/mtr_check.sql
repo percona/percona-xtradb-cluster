@@ -60,16 +60,23 @@ BEGIN
 
   -- Dump all global variables except those that may change.
   -- timestamp changes if time passes. server_uuid changes if server restarts.
+  -- wsrep_start_position can change on mysqldump SST
+  -- auto_increment_offset can change on cluster reconfigurations
   SELECT * FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES
     WHERE variable_name NOT IN ('timestamp', 'server_uuid',
                                 'innodb_file_format_max',
                                 'gtid_executed', 'gtid_purged',
-                                'wsrep_start_position')
+                                'wsrep_start_position',
+                                'auto_increment_offset',
+                                'auto_increment_increment',
+                                'wsrep_data_home_dir')
     ORDER BY VARIABLE_NAME;
 
   -- Dump all databases, there should be none
   -- except those that was created during bootstrap
-  SELECT * FROM INFORMATION_SCHEMA.SCHEMATA;
+  -- and the mtr_wsrep_notify schema which is populated by the std_data/wsrep_notify.sh script
+  -- and the suite/galera/t/galera_var_notify_cmd.test
+  SELECT * FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME != 'mtr_wsrep_notify';
 
   -- The test database should not contain any tables
   SELECT table_name AS tables_in_test FROM INFORMATION_SCHEMA.TABLES

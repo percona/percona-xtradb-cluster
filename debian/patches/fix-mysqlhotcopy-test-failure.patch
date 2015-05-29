@@ -1,0 +1,18 @@
+Description: Include return code 255 in list of valid error codes
+ Perl 5.20 changed the behaviour of mysqlhotcopy to return 255 on error
+ .
+ Add this error code to the list of allowable return codes
+Author: James Page <james.page@ubuntu.com>
+Forwarded: no
+
+--- a/mysql-test/include/mysqlhotcopy.inc
++++ b/mysql-test/include/mysqlhotcopy.inc
+@@ -107,7 +107,7 @@ DROP DATABASE hotcopy_save;
+ --replace_result $MYSQLD_DATADIR MYSQLD_DATADIR
+ --list_files $MYSQLD_DATADIR/hotcopy_save
+ --replace_result $MASTER_MYSOCK MASTER_MYSOCK
+---error 9,11,110,2304
++--error 9,11,110,255,2304
+ --exec $MYSQLHOTCOPY --quiet -S $MASTER_MYSOCK -u root hotcopy_test hotcopy_save
+ --replace_result $MASTER_MYSOCK MASTER_MYSOCK
+ --exec $MYSQLHOTCOPY --quiet --allowold -S $MASTER_MYSOCK -u root hotcopy_test hotcopy_save

@@ -56,7 +56,6 @@ Created 12/27/1996 Heikki Tuuri
 #ifdef WITH_WSREP
 extern my_bool wsrep_debug;
 #endif
-
 #include <algorithm>
 
 /* What kind of latch and lock can we assume when the control comes to

@@ -216,7 +216,7 @@ IF(UNIX)
 ENDIF()
 
 IF(NOT DISABLE_SHARED)
-  # Merge several convenience libraries into one big mysqlclient
+  # Merge several convenience libraries into one big perconaserverclient
   # and link them together into shared library.
   MERGE_LIBRARIES(libmysql SHARED ${LIBS}
     EXPORTS ${CLIENT_API_FUNCTIONS}

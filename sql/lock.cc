@@ -1078,6 +1078,20 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     If we didn't succeed lock_global_read_lock(), or if we already suceeded
     make_global_read_lock_block_commit(), do nothing.
   */
+
+#ifdef WITH_WSREP
+  if (m_mdl_blocks_commits_lock)
+  {
+    WSREP_DEBUG("GRL was in block commit mode when entering "
+		"make_global_read_lock_block_commit");
+    thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
+    m_mdl_blocks_commits_lock= NULL;
+    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
+    wsrep->resume(wsrep);
+    m_state= GRL_ACQUIRED;
+  }
+#endif /* WITH_WSREP */
+
   if (m_state != GRL_ACQUIRED)
     DBUG_RETURN(0);
 
@@ -1226,6 +1240,31 @@ void Global_backup_lock::release(THD *thd)
   thd->mdl_context.release_lock(m_lock);
 
   m_lock= NULL;
+
+  DBUG_VOID_RETURN;
+}
+
+/**
+   Set explicit lock duration for the backup metadata lock.
+
+   @param thd     Reference to connection.
+*/
+
+void Global_backup_lock::set_explicit_lock_duration(THD *thd)
+{
+  DBUG_ENTER("Global_backup_lock::set_explicit_lock_duration");
+
+  if (m_lock)
+  {
+    DBUG_ASSERT(thd->mdl_context.is_lock_owner(m_namespace, "", "",
+                                               MDL_SHARED));
+    thd->mdl_context.set_lock_duration(m_lock, MDL_EXPLICIT);
+  }
+  else
+  {
+    DBUG_ASSERT(!thd->mdl_context.is_lock_owner(m_namespace, "", "",
+                                                MDL_SHARED));
+  }
 
   DBUG_VOID_RETURN;
 }

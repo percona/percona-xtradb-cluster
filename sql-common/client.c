@@ -1,4 +1,4 @@
-/* Copyright (c) 2003, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2003, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1679,8 +1679,8 @@ mysql_init(MYSQL *mysql)
   strmov(mysql->net.sqlstate, not_error_sqlstate);
 
   /*
-    Only enable LOAD DATA INFILE by default if configured with
-    --enable-local-infile
+    Only enable LOAD DATA INFILE by default if configured with option
+    ENABLED_LOCAL_INFILE
   */
 
 #if defined(ENABLED_LOCAL_INFILE) && !defined(MYSQL_SERVER)
@@ -3557,8 +3557,7 @@ CLI_MYSQL_REAL_CONNECT(MYSQL *mysql,const char *host, const char *user,
       */
       saved_error= socket_errno;
 
-      DBUG_PRINT("info", ("No success, close socket, try next address."));
-      closesocket(sock);
+      DBUG_PRINT("info", ("No success, try next address."));
     }
     DBUG_PRINT("info",
                ("End of connect attempts, sock: %d  status: %d  error: %d",
@@ -4065,8 +4064,8 @@ void STDCALL mysql_close(MYSQL *mysql)
     {
       free_old_query(mysql);
       mysql->status=MYSQL_STATUS_READY; /* Force command */
-      mysql->reconnect=0;
       simple_command(mysql,COM_QUIT,(uchar*) 0,0,1);
+      mysql->reconnect=0;
       end_server(mysql);			/* Sets mysql->net.vio= 0 */
     }
     mysql_close_free_options(mysql);
