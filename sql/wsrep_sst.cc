@@ -800,8 +800,6 @@ static int sst_donate_mysqldump (const char*         addr,
 
   wsrep->sst_sent (wsrep, &state_id, ret);
 
-  free(user);
-  free(host);
 
   return ret;
 }
@@ -884,8 +882,6 @@ static int sst_flush_tables(THD* thd)
                      tmp_name, real_name, err,strerror(err));
       }
     }
-    free(real_name);
-    free(tmp_name);
   }
 
   return err;

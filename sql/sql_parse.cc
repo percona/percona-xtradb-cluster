@@ -2274,7 +2274,7 @@ bool log_slow_applicable(THD *thd)
     Don't log the CALL statement if slow statements logging
     inside of stored procedures is enabled.
   */
-  if (opt_log_slow_sp_statements && thd->lex)
+  if (opt_log_slow_sp_statements > 0 && thd->lex)
   {
     if (thd->lex->sql_command == SQLCOM_CALL)
     {
@@ -7414,6 +7414,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
           /* PSI end */
           MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
           thd->m_statement_psi= NULL;
+          thd->m_digest= NULL;
 
           /* DTRACE end */
           if (MYSQL_QUERY_DONE_ENABLED())
@@ -7439,6 +7440,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                             (char *) thd->security_ctx->host_or_ip);
 
           /* PSI begin */
+          thd->m_digest= & thd->m_digest_state;
           thd->m_statement_psi= MYSQL_START_STATEMENT(&thd->m_statement_state,
                                                       com_statement_info[thd->get_command()].m_key,
                                                       thd->db, thd->db_length,
