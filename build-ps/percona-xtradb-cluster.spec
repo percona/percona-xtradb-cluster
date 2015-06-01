@@ -326,6 +326,7 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 Provides:       mysql-server MySQL-server
+Conflicts:	Percona-SQL-server-50 Percona-Server-server-51 Percona-Server-server-55 Percona-Server-server-56
 
 %description -n Percona-XtraDB-Cluster-server%{product_suffix}
 Percona XtraDB Cluster is based on the Percona Server database server and
