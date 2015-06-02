@@ -862,6 +862,7 @@ if [ -d $mysql_datadir ] ; then
 	grep '^Version' `ls -tr $mysql_datadir/*.err 2>/dev/null | tail -1` | \
 		tail -1                              >> $STATUS_FILE
 	echo                                         >> $STATUS_FILE
+	fi
 
 	if [ -n "$SERVER_TO_START" ] ; then
 		# There is only one PID file, race possibility ignored
