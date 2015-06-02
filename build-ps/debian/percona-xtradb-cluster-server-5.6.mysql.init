@@ -210,7 +210,7 @@ case "${1:-''}" in
 	fi
 	;;
 
-  'stop')
+  'stop'|'bootstrap-stop')
 	# * As a passwordless mysqladmin (e.g. via ~/.my.cnf) must be possible
 	# at least for cron, we can rely on it here, too. (although we have 
 	# to specify it explicit as e.g. sudo environments points to the normal
@@ -256,7 +256,7 @@ case "${1:-''}" in
 	$SELF bootstrap-pxc 
 	;;
 
-  'reload'|'force-reload')
+  'reload'|'force-reload'|'reload-bootstrap')
   	log_daemon_msg "Reloading MySQL (Percona XtraDB Cluster)" "mysqld"
         mysqld_pid=$(cat $pid_file 2>/dev/null)
 
@@ -276,7 +276,7 @@ case "${1:-''}" in
         fi
 	;;
 
-  'status')
+  'status'|'status-bootstrap')
 	if mysqld_status check_alive nowarn; then
 	  log_action_msg "Percona XtraDB Cluster up and running"
 	else
