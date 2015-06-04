@@ -2568,9 +2568,10 @@ lock_rec_lock_slow(
 #ifdef WITH_WSREP
         if (wsrep_log_conflicts)
                 mutex_exit(&trx_sys->mutex);
-#endif /* WITH_WSREP */
 released:
-        trx_mutex_exit(trx);
+#endif /* WITH_WSREP */
+
+	trx_mutex_exit(trx);
 
 	return(err);
 }
@@ -6444,14 +6445,17 @@ lock_rec_insert_check_and_lock(
 		    static_cast<enum lock_mode>(
 			    LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION),
 		    block, next_rec_heap_no, trx))) {
+
+ 		if (wsrep_log_conflicts) {
+
+			mutex_exit(&trx_sys->mutex);
+		}
 #else
 	if (lock_rec_other_has_conflicting(
 		    static_cast<enum lock_mode>(
 			    LOCK_X | LOCK_GAP | LOCK_INSERT_INTENTION),
 		    block, next_rec_heap_no, trx)) {
-#endif /* WITH_WSREP */
-                if (wsrep_log_conflicts)
-                        mutex_exit(&trx_sys->mutex);
+#endif
 		/* Note that we may get DB_SUCCESS also here! */
 		trx_mutex_enter(trx);
 
@@ -6467,8 +6471,12 @@ lock_rec_insert_check_and_lock(
 
 		trx_mutex_exit(trx);
 	} else {
-                if (wsrep_log_conflicts)
-                        mutex_exit(&trx_sys->mutex);
+#ifdef WITH_WSREP
+		if (wsrep_log_conflicts) {
+
+			mutex_exit(&trx_sys->mutex);
+		}
+#endif
 		err = DB_SUCCESS;
 	}
 

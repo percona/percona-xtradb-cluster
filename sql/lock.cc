@@ -1118,8 +1118,10 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   m_mdl_blocks_commits_lock= mdl_request.ticket;
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
+#ifdef WITH_WSREP
   if (!wsrep_pause())
     DBUG_RETURN(TRUE);
+#endif
   DBUG_RETURN(FALSE);
 }
 
