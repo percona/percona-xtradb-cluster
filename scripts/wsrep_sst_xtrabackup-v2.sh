@@ -769,7 +769,8 @@ then
         wsrep_log_info "Proceeding with SST"
 
         if [[ $speciald -eq 1 && -d ${DATA}/.sst ]];then 
-            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous SST"
+            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous SST. Removing"
+            rm -rf ${DATA}/.sst
         fi
 
         if [[ $incremental -ne 1 ]];then 
