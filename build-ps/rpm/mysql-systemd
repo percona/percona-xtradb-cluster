@@ -192,7 +192,7 @@ fi
 
 if [[ $action == 'reload' || $action == 'stop' || $action == 'stop-post' ]];then
     if [[ ! -s $pid_path ]];then 
-        log_failure_msg "mysql pid file $pid_path empty or not readable"
+        log_warning_msg "mysql pid file $pid_path empty or not readable"
         [[ $action == 'stop' ]] && log_failure_msg "mysql already dead"
         if [[ $action == 'stop-post' ]];then 
             log_warning_msg "mysql may be already dead"
@@ -215,11 +215,23 @@ if [[ $action == 'start-post' ]];then
     fi
 fi
 
+check_running()
+{
+    if [[ -s $pid_path ]];then
+	    mysql_pid=$(cat $pid_path)
+	    if [[ -n ${mysql_pid:-} ]]  && kill -0 $mysql_pid 2>/dev/null;then
+		log_warning_msg "Another instance of mysqld running on $mysql_pid, exiting.."
+		exit 1
+	    fi
+    fi
+}
+
+
 
 ret=0
 
 case $action in
-    "start-pre") install_db ;;
+    "start-pre") check_running; install_db ;;
     "start-post") 
       wait_for_pid created  "$pid_path"; ret=$?
       if [[ $ret -eq 1 ]];then 
