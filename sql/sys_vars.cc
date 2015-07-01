@@ -576,6 +576,15 @@ static Sys_var_charptr Sys_my_bind_addr(
        READ_ONLY GLOBAL_VAR(my_bind_addr_str), CMD_LINE(REQUIRED_ARG),
        IN_FS_CHARSET, DEFAULT(MY_BIND_ALL_ADDRESSES));
 
+static Sys_var_charptr Sys_my_proxy_protocol_networks(
+       "proxy_protocol_networks", "Enable proxy protocol for these source "
+       "networks. The syntax is a comma separated list of IPv4 and IPv6 "
+       "networks. If the network doesn't contain mask, it is considered to be "
+       "a single host. \"*\" represents all networks and must the only "
+       "directive on the line.",
+       READ_ONLY GLOBAL_VAR(my_proxy_protocol_networks),
+       CMD_LINE(REQUIRED_ARG), IN_FS_CHARSET, DEFAULT(""));
+
 static bool fix_binlog_cache_size(sys_var *self, THD *thd, enum_var_type type)
 {
   check_binlog_cache_size(thd);
@@ -2660,7 +2669,7 @@ static Sys_var_ulong Sys_trans_alloc_block_size(
        "transaction_alloc_block_size",
        "Allocation block size for transactions to be stored in binary log",
        SESSION_VAR(trans_alloc_block_size), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1024, 128 * 1024 * 1024), DEFAULT(QUERY_ALLOC_BLOCK_SIZE),
+       VALID_RANGE(1024, 128 * 1024), DEFAULT(QUERY_ALLOC_BLOCK_SIZE),
        BLOCK_SIZE(1024), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(fix_trans_mem_root));
 
@@ -2668,7 +2677,7 @@ static Sys_var_ulong Sys_trans_prealloc_size(
        "transaction_prealloc_size",
        "Persistent buffer for transactions to be stored in binary log",
        SESSION_VAR(trans_prealloc_size), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1024, 128 * 1024 * 1024), DEFAULT(TRANS_ALLOC_PREALLOC_SIZE),
+       VALID_RANGE(1024, 128 * 1024), DEFAULT(TRANS_ALLOC_PREALLOC_SIZE),
        BLOCK_SIZE(1024), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(fix_trans_mem_root));
 
@@ -5070,15 +5079,20 @@ static Sys_var_mybool Sys_enforce_gtid_consistency(
 
 static Sys_var_mybool Sys_binlog_gtid_simple_recovery(
        "binlog_gtid_simple_recovery",
-       "If this option is enabled, the server does not scan more than one "
-       "binary log for every iteration when initializing GTID sets on server "
-       "restart. Enabling this option is very useful when restarting a server "
-       "which has already generated lots of binary logs without GTID events. "
-       "Note: If this option is enabled, GLOBAL.GTID_EXECUTED and "
-       "GLOBAL.GTID_PURGED cannot be initialized correctly if binary log(s) "
-       "with GTID events were generated before binary log(s) without GTID "
-       "events, for example if gtid_mode is disabled when the server has "
-       "already generated binary log(s) with GTID events and not purged them.",
+       "If this option is enabled, the server does not open more than "
+       "two binary logs when initializing GTID_PURGED and "
+       "GTID_EXECUTED, either during server restart or when binary "
+       "logs are being purged. Enabling this option is useful when "
+       "the server has already generated many binary logs without "
+       "GTID events (e.g., having GTID_MODE = OFF). Note: If this "
+       "option is enabled, GLOBAL.GTID_EXECUTED and "
+       "GLOBAL.GTID_PURGED may be initialized wrongly in two cases: "
+       "(1) GTID_MODE was ON for some binary logs but OFF for the "
+       "newest binary log. (2) SET GTID_PURGED was issued after the "
+       "oldest existing binary log was generated. If a wrong set is "
+       "computed in one of case (1) or case (2), it will remain "
+       "wrong even if the server is later restarted with this option "
+       "disabled.",
        READ_ONLY GLOBAL_VAR(binlog_gtid_simple_recovery),
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
