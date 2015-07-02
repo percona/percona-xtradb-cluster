@@ -1,9 +1,0 @@
-SHOW GLOBAL STATUS LIKE '%cert_index_size%';
-Variable_name	Value
-wsrep_cert_index_size	*
-SHOW GLOBAL STATUS LIKE '%cert_bucket_count%';
-Variable_name	Value
-wsrep_cert_bucket_count	*
-SHOW GLOBAL STATUS LIKE '%gcache_pool_size%';
-Variable_name	Value
-wsrep_gcache_pool_size	*
