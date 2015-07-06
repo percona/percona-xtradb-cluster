@@ -245,6 +245,9 @@ int bootstrap(MYSQL_FILE *file)
   DBUG_ENTER("bootstrap");
 
   THD *thd= new THD;
+#ifdef WITH_WSREP
+  thd->variables.wsrep_on= 0;
+#endif
   thd->bootstrap= 1;
   my_net_init(&thd->net,(st_vio*) 0);
   thd->max_client_packet_length= thd->net.max_packet;

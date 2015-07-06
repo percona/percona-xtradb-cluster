@@ -46,6 +46,10 @@ Created 5/7/1996 Heikki Tuuri
 #include "ut0new.h"
 
 #include <set>
+#ifdef WITH_WSREP
+extern my_bool wsrep_debug;
+extern my_bool wsrep_log_conflicts;
+#endif
 
 /** Total number of cached record locks */
 static const ulint	REC_LOCK_CACHE = 8;
@@ -1176,6 +1180,58 @@ lock_rec_other_has_expl_req(
 }
 #endif /* UNIV_DEBUG */
 
+#ifdef WITH_WSREP
+static void 
+wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
+        ut_ad(lock_mutex_own());
+        ut_ad(trx_mutex_own(lock->trx));
+	my_bool bf_this  = wsrep_thd_is_BF(trx->mysql_thd, FALSE);
+	my_bool bf_other = wsrep_thd_is_BF(lock->trx->mysql_thd, TRUE);
+
+	if ((bf_this && !bf_other) ||
+		(bf_this && bf_other && wsrep_trx_order_before(
+			trx->mysql_thd, lock->trx->mysql_thd))) {
+          
+		if (lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
+			if (wsrep_debug)
+				fprintf(stderr, "WSREP: BF victim waiting\n");
+			/* cannot release lock, until our lock
+			is in the queue*/
+		} else if (lock->trx != trx) {
+			if (wsrep_log_conflicts) {
+				mutex_enter(&trx_sys->mutex);
+				if (bf_this)
+					fputs("\n*** Priority TRANSACTION:\n", 
+					      stderr);
+				else
+					fputs("\n*** Victim TRANSACTION:\n", 
+					      stderr);
+				trx_print_latched(stderr, trx, 3000);
+
+				if (bf_other)
+					fputs("\n*** Priority TRANSACTION:\n", 
+					      stderr);
+				else
+					fputs("\n*** Victim TRANSACTION:\n", 
+					      stderr);
+				trx_print_latched(stderr, lock->trx, 3000);
+
+				mutex_exit(&trx_sys->mutex);
+				fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n",
+				      stderr);
+
+				if (lock_get_type(lock) == LOCK_REC) {
+					lock_rec_print(stderr, lock);
+				} else {
+					lock_table_print(stderr, lock);
+				}
+			}
+			wsrep_innobase_kill_one_trx(trx->mysql_thd,
+				(const trx_t*) trx, lock->trx, TRUE);
+		}
+	}
+}
+#endif
 /*********************************************************************//**
 Checks if some other transaction has a conflicting explicit lock request
 in the queue, so that we have to wait.
@@ -1203,7 +1259,14 @@ lock_rec_other_has_conflicting(
 	     lock != NULL;
 	     lock = lock_rec_get_next_const(heap_no, lock)) {
 
+#ifdef WITH_WSREP_NOT_NEEDED
+		if (lock_rec_has_to_wait(TRUE, trx, mode, lock, is_supremum)) {
+			trx_mutex_enter(lock->trx);
+			wsrep_kill_victim(trx, lock);
+			trx_mutex_exit(lock->trx);
+#else
 		if (lock_rec_has_to_wait(trx, mode, lock, is_supremum)) {
+#endif /* WITH_WSREP */
 			return(lock);
 		}
 	}
@@ -1357,6 +1420,27 @@ lock_number_of_tables_locked(
 }
 
 /*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
+#ifdef WITH_WSREP_OUT
+static
+void
+wsrep_print_wait_locks(
+/*============*/
+	lock_t*		c_lock) /* conflicting lock to print */
+{
+	if (wsrep_debug &&  c_lock->trx->lock.wait_lock != c_lock) {
+		fprintf(stderr, "WSREP: c_lock != wait lock\n");
+		if (lock_get_type_low(c_lock) & LOCK_TABLE)
+			lock_table_print(stderr, c_lock);
+		else
+			lock_rec_print(stderr, c_lock);
+
+		if (lock_get_type_low(c_lock->trx->lock.wait_lock) & LOCK_TABLE)
+			lock_table_print(stderr, c_lock->trx->lock.wait_lock);
+		else
+			lock_rec_print(stderr, c_lock->trx->lock.wait_lock);
+	}
+}
+#endif /* WITH_WSREP */
 
 /**
 Check of the lock is on m_rec_id.
@@ -3966,6 +4050,13 @@ lock_table_other_has_incompatible(
 		    && !lock_mode_compatible(lock_get_mode(lock), mode)
 		    && (wait || !lock_get_wait(lock))) {
 
+#ifdef WITH_WSREP
+			if (wsrep_debug) 
+				fprintf(stderr, "WSREP: table lock abort");
+			trx_mutex_enter(lock->trx);
+			wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
+			trx_mutex_exit(lock->trx);
+#endif
 			return(lock);
 		}
 	}

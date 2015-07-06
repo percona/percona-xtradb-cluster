@@ -541,7 +541,11 @@ cleanup:
   if ((error < 0) || thd->get_transaction()->cannot_safely_rollback(
       Transaction_ctx::STMT))
   {
+#ifdef WITH_WSREP
+    if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()))
+#else
     if (mysql_bin_log.is_open())
+#endif
     {
       int errcode= 0;
       if (error < 0)
@@ -1110,7 +1114,11 @@ void Query_result_delete::abort_result_set()
     /* 
        there is only side effects; to binlog with the error
     */
+#ifdef WITH_WSREP
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
     if (mysql_bin_log.is_open())
+#endif
     {
       int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
       /* possible error of writing binary log is ignored deliberately */
@@ -1295,7 +1303,11 @@ bool Query_result_delete::send_eof()
   if ((local_error == 0) ||
       thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT))
   {
+#ifdef WITH_WSREP
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
     if (mysql_bin_log.is_open())
+#endif
     {
       int errcode= 0;
       if (local_error == 0)

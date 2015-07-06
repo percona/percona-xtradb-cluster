@@ -31,6 +31,17 @@
 
 static PSI_memory_key key_memory_MDL_context_acquire_locks;
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "wsrep_thd.h"
+//extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
+//extern "C" char *wsrep_thd_query(THD *thd);
+void sql_print_information(const char *format, ...)
+  __attribute__((format(printf, 1, 2)));
+extern bool
+wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
+                          MDL_ticket *ticket);
+#endif /* WITH_WSREP */
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_MDL_wait_LOCK_wait_status;
 
@@ -1828,6 +1839,13 @@ MDL_wait::timed_wait(MDL_context_owner *owner, struct timespec *abs_timeout,
   while (!m_wait_status && !owner->is_killed() &&
          wait_result != ETIMEDOUT && wait_result != ETIME)
   {
+#ifdef WITH_WSREP
+    if (wsrep_thd_is_BF(owner->get_thd(), true))
+    {
+      wait_result= mysql_cond_wait(&m_COND_wait_status, &m_LOCK_wait_status);
+    }
+    else
+#endif /* WITH_WSREP */
     wait_result= mysql_cond_timedwait(&m_COND_wait_status, &m_LOCK_wait_status,
                                       abs_timeout);
   }
@@ -1894,11 +1912,54 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
     called by other threads.
   */
   DBUG_ASSERT(ticket->get_lock());
+#ifdef WITH_WSREP
+  if ((this == &(ticket->get_lock()->m_waiting)) &&
+      wsrep_thd_is_BF((void *)(ticket->get_ctx()->wsrep_get_thd()), false))
+  {
+    Ticket_iterator itw(ticket->get_lock()->m_waiting);
+    Ticket_iterator itg(ticket->get_lock()->m_granted);
+
+    MDL_ticket *waiting, *granted;
+    MDL_ticket *prev=NULL;
+    bool added= false;
+
+    while ((waiting= itw++) && !added)
+    {
+      if (!wsrep_thd_is_BF((void *)(waiting->get_ctx()->wsrep_get_thd()), true))
+      {
+        WSREP_DEBUG("MDL add_ticket inserted before: %u %s", 
+                    wsrep_thd_thread_id(waiting->get_ctx()->wsrep_get_thd()), 
+                    wsrep_thd_query(waiting->get_ctx()->wsrep_get_thd()));
+        m_list.insert_after(prev, ticket);
+        added= true;
+      }
+      prev= waiting;
+    }
+    if (!added)   m_list.push_back(ticket);
+
+    while ((granted= itg++))
+    {
+      if (granted->get_ctx() != ticket->get_ctx() &&
+          granted->is_incompatible_when_granted(ticket->get_type()))
+      {
+        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted))
+        {
+          WSREP_DEBUG("MDL victim killed at add_ticket");
+        }
+      }
+    }
+  }
+  else
+  {
+#endif /* WITH_WSREP */
   /*
     Add ticket to the *back* of the queue to ensure fairness
     among requests with the same priority.
   */
   m_list.push_back(ticket);
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
   m_bitmap|= MDL_BIT(ticket->get_type());
 }
 
@@ -2446,7 +2507,6 @@ const MDL_lock::MDL_lock_strategy MDL_lock::m_object_lock_strategy =
   &MDL_lock::object_lock_needs_connection_check
 };
 
-
 /**
   Check if request for the metadata lock can be satisfied given its
   current state.
@@ -2469,6 +2529,9 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
   bool can_grant= FALSE;
   bitmap_t waiting_incompat_map= incompatible_waiting_types_bitmap()[type_arg];
   bitmap_t granted_incompat_map= incompatible_granted_types_bitmap()[type_arg];
+#ifdef WITH_WSREP
+  bool  wsrep_can_grant= TRUE;
+#endif /* WITH_WSREP */
 
   /*
     New lock request can be satisfied iff:
@@ -2507,9 +2570,42 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         {
           if (ticket->get_ctx() != requestor_ctx &&
               ticket->is_incompatible_when_granted(type_arg))
-            break;
+#ifdef WITH_WSREP
+        {
+          if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),false) &&
+              key.mdl_namespace() == MDL_key::GLOBAL)
+          {
+            WSREP_DEBUG("global lock granted for BF: %u %s",
+                        wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
+                        wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
+            can_grant = true;
+          }
+          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
+          {
+            wsrep_can_grant= FALSE;
+            if (wsrep_log_conflicts) 
+	    {
+	      MDL_lock * lock = ticket->get_lock();
+              WSREP_INFO(
+                "MDL conflict db=%s table=%s ticket=%d solved by %s",
+                lock->key.db_name(), lock->key.name(), ticket->get_type(), "abort"
+       	      );
+            }
+          }
+          else
+          {	  
+            can_grant= TRUE;
+          }
         }
+#else
+            break;
+#endif /* WITH_WSREP */
+        }
+#ifdef WITH_WSREP
+        if ((ticket == NULL) && wsrep_can_grant)
+#else
         if (ticket == NULL)             /* Incompatible locks are our own. */
+#endif /* WITH_WSREP */
           can_grant= TRUE;
       }
     }
@@ -2531,6 +2627,19 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
       */
     }
   }
+#ifdef WITH_WSREP
+  else
+  {
+    if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()), false) &&
+	key.mdl_namespace() == MDL_key::GLOBAL)
+    {
+      WSREP_DEBUG("global lock granted for BF (waiting queue): %u %s",
+		  wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
+		  wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
+      can_grant = true;
+    }
+  }
+#endif /* WITH_WSREP */
   return can_grant;
 }
 
@@ -4271,6 +4380,12 @@ void MDL_context::release_locks_stored_before(enum_mdl_duration duration,
 }
 
 
+#ifdef WITH_WSREP
+void MDL_context::release_explicit_locks()
+{
+  release_locks_stored_before(MDL_EXPLICIT, NULL);
+}
+#endif
 /**
   Release all explicit locks in the context which correspond to the
   same name/object as this lock request.
@@ -4648,3 +4763,46 @@ void MDL_context::set_transaction_duration_for_all_locks()
     ticket->m_duration= MDL_TRANSACTION;
 #endif
 }
+#ifdef WITH_WSREP
+void MDL_ticket::wsrep_report(bool debug)
+{
+  if (debug) 
+    {
+      WSREP_DEBUG("MDL ticket: type: %s space: %s db: %s name: %s",
+       	 (get_type()  == MDL_INTENTION_EXCLUSIVE)  ? "intention exclusive"  :
+       	 ((get_type() == MDL_SHARED)               ? "shared"               :
+       	 ((get_type() == MDL_SHARED_HIGH_PRIO      ? "shared high prio"     :
+       	 ((get_type() == MDL_SHARED_READ)          ? "shared read"          :
+       	 ((get_type() == MDL_SHARED_WRITE)         ? "shared write"         :
+       	 ((get_type() == MDL_SHARED_NO_WRITE)      ? "shared no write"      :
+         ((get_type() == MDL_SHARED_NO_READ_WRITE) ? "shared no read write" :
+       	 ((get_type() == MDL_EXCLUSIVE)            ? "exclusive"            :
+          "UNKNOWN")))))))),
+         (m_lock->key.mdl_namespace()  == MDL_key::GLOBAL) ? "GLOBAL"       :
+         ((m_lock->key.mdl_namespace() == MDL_key::SCHEMA) ? "SCHEMA"       :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "TABLE"        :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "FUNCTION"     :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "PROCEDURE"    :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "TRIGGER"      :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "EVENT"        :
+         ((m_lock->key.mdl_namespace() == MDL_key::COMMIT) ? "COMMIT"       :
+         (char *)"UNKNOWN"))))))),
+         m_lock->key.db_name(),
+         m_lock->key.name());
+    }
+}
+bool MDL_context::wsrep_has_explicit_locks()
+{
+  MDL_ticket *ticket = NULL;
+
+  Ticket_iterator it(m_tickets[MDL_EXPLICIT]);
+
+  while ((ticket = it++))
+  {
+    return true;
+  }
+
+  return false;
+}
+
+#endif /* WITH_WSREP */

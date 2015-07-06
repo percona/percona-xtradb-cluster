@@ -560,8 +560,23 @@ enum_return_status Gtid_state::generate_automatic_gtid(THD *thd,
   {
     Gtid automatic_gtid= { specified_sidno, specified_gno };
 
+#ifdef WITH_WSREP
+    /*
+      Replace sidno with wsrep_sidno
+      if transaction went through wsrep commit
+    */
+    if (WSREP(thd) && thd->wsrep_trx_meta.gtid.seqno != -1)
+    {
+      automatic_gtid.sidno= wsrep_sidno;
+    }
+    else
+    {
+#endif /* WITH_WSREP */
     if (automatic_gtid.sidno == 0)
       automatic_gtid.sidno= get_server_sidno();
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
 
     lock_sidno(automatic_gtid.sidno);
 

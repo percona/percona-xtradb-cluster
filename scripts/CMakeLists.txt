@@ -323,6 +323,15 @@ IF(WIN32)
     INSTALL_SCRIPT(${CMAKE_CURRENT_BINARY_DIR}/${file}.pl COMPONENT Server_Scripts)
   ENDFOREACH()
 ELSE()
+  IF(WITH_WSREP)
+    SET(WSREP_BINARIES
+      wsrep_sst_common
+      wsrep_sst_mysqldump
+      wsrep_sst_rsync
+      wsrep_sst_xtrabackup
+      wsrep_sst_xtrabackup-v2
+    )
+  ENDIF()
   # Configure this one, for testing, but do not install it.
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql_config.pl.in
     ${CMAKE_CURRENT_BINARY_DIR}/mysql_config.pl ESCAPE_QUOTES @ONLY)

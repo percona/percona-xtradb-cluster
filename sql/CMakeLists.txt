@@ -14,6 +14,10 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 
+IF(WITH_WSREP)
+ SET(WSREP_INCLUDES ${CMAKE_SOURCE_DIR}/wsrep)
+ENDIF()
+
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/include 
   ${CMAKE_SOURCE_DIR}/sql/conn_handler
@@ -24,6 +28,7 @@ INCLUDE_DIRECTORIES(
   ${ZLIB_INCLUDE_DIR}
   ${SSL_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}/sql
+  ${WSREP_INCLUDES}
 )
 
 SET(CONF_SOURCES
@@ -237,7 +242,25 @@ SET(SQL_SHARED_SOURCES
 
 SET(SQL_EXPORTED_SOURCES ${SQL_SHARED_SOURCES} PARENT_SCOPE)
 
+IF(WITH_WSREP)
+ SET(WSREP_SOURCES
+   wsrep_utils.cc
+   wsrep_xid.cc
+   wsrep_check_opts.cc
+   wsrep_hton.cc
+   wsrep_mysqld.cc
+   wsrep_notify.cc
+   wsrep_sst.cc
+   wsrep_var.cc
+   wsrep_binlog.cc
+   wsrep_applier.cc
+   wsrep_thd.cc
+ )
+ SET(WSREP_LIB wsrep)
+ENDIF()
+
 SET(SQL_SOURCE
+  ${WSREP_SOURCES}
   ${GEN_SOURCES}
   ${GEN_DIGEST_SOURCES}
   ${CONF_SOURCES}
@@ -337,6 +360,7 @@ DTRACE_INSTRUMENT(sql)
 TARGET_LINK_LIBRARIES(sql ${MYSQLD_STATIC_PLUGIN_LIBS} 
   mysys mysys_ssl dbug strings vio regex binlogevents_static
   ${LIBWRAP} ${LIBCRYPT} ${LIBDL}
+  ${WSREP_LIB}
   ${SSL_LIBRARIES})
 
 #
@@ -393,7 +417,6 @@ ADD_LIBRARY(sqlgunitlib ${SQL_GUNIT_LIB_SOURCE})
 ADD_DEPENDENCIES(sqlgunitlib GenError)
 
 ######################### GUnit Lib #################################
-
 
 IF(WIN32)
   SET(MYSQLD_SOURCE main.cc nt_servc.cc nt_servc.h message.rc)

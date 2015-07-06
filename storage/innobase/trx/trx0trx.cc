@@ -459,7 +459,7 @@ trx_create_low()
 	trx_free(). */
 	ut_a(trx->mod_tables.size() == 0);
 
-	return(trx);
+ 	return(trx);
 }
 
 /**
@@ -1355,6 +1355,11 @@ trx_start_low(
 	}
 #endif /* UNIV_DEBUG */
 
+#ifdef WITH_WSREP
+        memset(&trx->xid, 0, sizeof(trx->xid));
+        trx->xid->set_format_id(1);
+#endif /* WITH_WSREP */
+
 	/* The initial value for trx->no: TRX_ID_MAX is used in
 	read_view_open_now: */
 
@@ -1670,6 +1675,15 @@ trx_write_serialisation_history(
 
 	MONITOR_INC(MONITOR_TRX_COMMIT_UNDO);
 
+#ifdef WITH_WSREP
+        trx_sysf_t* sys_header = trx_sysf_get(mtr);
+        /* Update latest MySQL wsrep XID in trx sys header. */
+        if (wsrep_is_wsrep_xid(&trx->xid))
+        {
+            trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
+        }
+#endif /* WITH_WSREP */
+
 	/* Update the latest MySQL binlog name and offset info
 	in trx sys header if MySQL binlogging is on or the database
 	server is a MySQL replication slave */
@@ -1680,7 +1694,11 @@ trx_write_serialisation_history(
 		trx_sys_update_mysql_binlog_offset(
 			trx->mysql_log_file_name,
 			trx->mysql_log_offset,
+#ifdef WITH_WSREP
+			TRX_SYS_MYSQL_LOG_INFO, sys_header, mtr);
+#else
 			TRX_SYS_MYSQL_LOG_INFO, mtr);
+#endif /* WITH_WSREP */
 
 		trx->mysql_log_file_name = NULL;
 	}
@@ -2056,6 +2074,11 @@ trx_commit_in_memory(
                 trx_finalize_for_fts(trx, trx->undo_no != 0);
         }
 
+#ifdef WITH_WSREP
+	if (wsrep_on(trx->mysql_thd)) {
+		trx->lock.was_chosen_as_deadlock_victim = FALSE;
+	}
+#endif
 	trx->dict_operation = TRX_DICT_OP_NONE;
 
 	/* Because we can rollback transactions asynchronously, we change
@@ -2282,6 +2305,10 @@ trx_commit_or_rollback_prepare(
 
 	switch (trx->state) {
 	case TRX_STATE_NOT_STARTED:
+#ifdef WITH_WSREP
+		ut_d(trx->start_file = __FILE__);
+		ut_d(trx->start_line = __LINE__);
+#endif /* WITH_WSREP */
 	case TRX_STATE_FORCED_ROLLBACK:
 
 		trx_start_low(trx, true);
@@ -3047,6 +3074,10 @@ trx_start_if_not_started_xa_low(
 	switch (trx->state) {
 	case TRX_STATE_NOT_STARTED:
 	case TRX_STATE_FORCED_ROLLBACK:
+#ifdef WITH_WSREP
+		ut_d(trx->start_file = __FILE__);
+		ut_d(trx->start_line = __LINE__);
+#endif /* WITH_WSREP */
 
 		/* Update the info whether we should skip XA steps
 		that eat CPU time.
@@ -3094,6 +3125,10 @@ trx_start_if_not_started_low(
 	switch (trx->state) {
 	case TRX_STATE_NOT_STARTED:
 	case TRX_STATE_FORCED_ROLLBACK:
+#ifdef WITH_WSREP
+		ut_d(trx->start_file = __FILE__);
+		ut_d(trx->start_line = __LINE__);
+#endif /* WITH_WSREP */
 
 		trx_start_low(trx, read_write);
 		return;
@@ -3157,6 +3192,10 @@ trx_start_for_ddl_low(
 	switch (trx->state) {
 	case TRX_STATE_NOT_STARTED:
 	case TRX_STATE_FORCED_ROLLBACK:
+#ifdef WITH_WSREP
+		ut_d(trx->start_file = __FILE__);
+		ut_d(trx->start_line = __LINE__);
+#endif /* WITH_WSREP */
 
 		/* Flag this transaction as a dictionary operation, so that
 		the data dictionary will be locked in crash recovery. */

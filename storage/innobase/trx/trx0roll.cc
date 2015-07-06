@@ -47,6 +47,9 @@ Created 3/26/1996 Heikki Tuuri
 #include "trx0trx.h"
 #include "trx0undo.h"
 #include "usr0sess.h"
+#ifdef WITH_WSREP
+#include "ha_prototypes.h"
+#endif /* WITH_WSREP */
 
 /** This many pages must be undone before a truncate is tried within
 rollback */
@@ -393,6 +396,11 @@ trx_rollback_to_savepoint_for_mysql_low(
 
 	trx->op_info = "";
 
+#ifdef WITH_WSREP_OUT
+	if (wsrep_on(trx->mysql_thd)) {
+		trx->lock.was_chosen_as_deadlock_victim = FALSE;
+	}
+#endif /* WITH_WSREP */
 	return(err);
 }
 
@@ -841,6 +849,11 @@ trx_roll_try_truncate(
 	if (undo_ptr->update_undo) {
 		trx_undo_truncate_end(trx, undo_ptr->update_undo, trx->undo_no);
 	}
+#ifdef WITH_WSREP_OUT
+	if (wsrep_on(trx->mysql_thd)) {
+		trx->lock.was_chosen_as_deadlock_victim = FALSE;
+	}
+#endif /* WITH_WSREP */
 }
 
 /***********************************************************************//**

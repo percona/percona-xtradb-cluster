@@ -39,6 +39,10 @@
 #include <list>
 #include <string>
 
+#ifdef WITH_WSREP
+#include "wsrep_xid.h"
+#endif /* WITH_WSREP */
+
 using std::max;
 using std::min;
 using std::string;
@@ -68,7 +72,11 @@ static ulonglong limit_unsafe_suppression_start_time= 0;
 static bool unsafe_warning_suppression_is_activated= false;
 static int limit_unsafe_warning_count= 0;
 
+#ifndef WITH_WSREP
 static handlerton *binlog_hton;
+#else
+handlerton *binlog_hton; // we need it in wsrep_binlog.cc
+#endif
 bool opt_binlog_order_commits= true;
 
 const char *log_bin_index= 0;
@@ -772,7 +780,9 @@ static binlog_cache_mngr *thd_get_cache_mngr(const THD *thd)
     If opt_bin_log is not set, binlog_hton->slot == -1 and hence
     thd_get_ha_data(thd, hton) segfaults.
   */
+#ifndef WITH_WSREP
   DBUG_ASSERT(opt_bin_log);
+#endif
   return (binlog_cache_mngr *)thd_get_ha_data(thd, binlog_hton);
 }
 
@@ -858,7 +868,11 @@ binlog_trans_log_savepos(THD *thd, my_off_t *pos)
   DBUG_ENTER("binlog_trans_log_savepos");
   DBUG_ASSERT(pos != NULL);
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+#ifdef WITH_WSREP
+  DBUG_ASSERT((WSREP_EMULATE_BINLOG(thd)) || mysql_bin_log.is_open());
+#else
   DBUG_ASSERT(mysql_bin_log.is_open());
+#endif /* WITH_WSREP */
   *pos= cache_mngr->trx_cache.get_byte_position();
   DBUG_PRINT("return", ("position: %lu", (ulong) *pos));
   DBUG_VOID_RETURN;
@@ -1039,7 +1053,16 @@ public:
 static int binlog_init(void *p)
 {
   binlog_hton= (handlerton *)p;
+#ifdef WITH_WSREP
+  if (WSREP_ON)
+    binlog_hton->state= SHOW_OPTION_YES;
+  else
+  {
+#endif /* WITH_WSREP */
   binlog_hton->state=opt_bin_log ? SHOW_OPTION_YES : SHOW_OPTION_NO;
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
   binlog_hton->db_type=DB_TYPE_BINLOG;
   binlog_hton->savepoint_offset= sizeof(my_off_t);
   binlog_hton->close_connection= binlog_close_connection;
@@ -1057,10 +1080,30 @@ static int binlog_init(void *p)
   return 0;
 }
 
+#ifdef WITH_WSREP
+#include "wsrep_binlog.h"
+#endif /* WITH_WSREP */
 static int binlog_close_connection(handlerton *hton, THD *thd)
 {
   DBUG_ENTER("binlog_close_connection");
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+#ifdef WITH_WSREP
+  if (!cache_mngr->is_binlog_empty()) {
+    IO_CACHE* cache= get_trans_log(thd);
+    uchar *buf;
+    size_t len=0;
+    wsrep_write_cache_buf(cache, &buf, &len);
+    WSREP_WARN("binlog trx cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id());
+    if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
+
+    cache = cache_mngr->get_binlog_cache_log(false);
+    wsrep_write_cache_buf(cache, &buf, &len);
+    WSREP_WARN("binlog stmt cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id());
+    if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
+  }
+#endif /* WITH_WSREP */
   DBUG_ASSERT(cache_mngr->is_binlog_empty());
   DBUG_PRINT("debug", ("Set ha_data slot %d to 0x%llx", binlog_hton->slot, (ulonglong) NULL));
   thd_set_ha_data(thd, binlog_hton, NULL);
@@ -2055,7 +2098,11 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
   if (!error && thd->lex->sql_command == SQLCOM_XA_ROLLBACK)
     error= ha_rollback_low(thd, all);
 
+#ifdef WITH_WSREP
+  if (!WSREP_EMULATE_BINLOG(thd) && check_write_error(thd))
+#else
   if (check_write_error(thd))
+#endif
   {
     /*
       "all == true" means that a "rollback statement" triggered the error and
@@ -2115,7 +2162,13 @@ static int binlog_savepoint_set(handlerton *hton, THD *thd, void *sv)
 {
   DBUG_ENTER("binlog_savepoint_set");
   int error= 1;
-
+#ifdef WITH_WSREP
+  /*
+    Clear table maps before writing SAVEPOINT event. This enforces
+    recreation of table map events for the following row event.
+   */
+  thd->clear_binlog_table_maps();
+#endif /* WITH_WSREP */
   String log_query;
   if (log_query.append(STRING_WITH_LEN("SAVEPOINT ")))
     DBUG_RETURN(error);
@@ -6556,7 +6609,11 @@ MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
                                                 bool is_transactional)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::flush_and_set_pending_rows_event(event)");
+#ifdef WITH_WSREP
+  DBUG_ASSERT(WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
+#else
   DBUG_ASSERT(mysql_bin_log.is_open());
+#endif /* WITH_WSREP */
   DBUG_PRINT("enter", ("event: 0x%lx", (long) event));
 
   int error= 0;
@@ -6631,7 +6688,13 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
      mostly called if is_open() *was* true a few instructions before, but it
      could have changed since.
   */
+#ifdef WITH_WSREP
+  /* applier and replayer can skip writing binlog events */
+  if ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) || 
+      is_open())
+#else
   if (likely(is_open()))
+#endif
   {
 #ifdef HAVE_REPLICATION
     /*
@@ -6777,6 +6840,15 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
 {
   int error= 0;
   DBUG_ENTER("MYSQL_BIN_LOG::rotate");
+#ifdef WITH_WSREP
+  if (WSREP_ON && wsrep_to_isolation)
+    {
+      *check_purge= false;
+      WSREP_DEBUG("avoiding binlog rotate due to TO isolation: %d", 
+		  wsrep_to_isolation);
+      DBUG_RETURN(0);
+    }
+#endif
 
   DBUG_ASSERT(!is_relay_log);
   mysql_mutex_assert_owner(&LOCK_log);
@@ -7140,6 +7212,9 @@ bool MYSQL_BIN_LOG::write_cache(THD *thd, binlog_cache_data *cache_data,
                                 Binlog_event_writer *writer)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::write_cache(THD *, binlog_cache_data *, bool)");
+#ifdef WITH_WSREP
+  if (WSREP_EMULATE_BINLOG(thd)) DBUG_RETURN(0);
+#endif /* WITH_WSREP */
 
   IO_CACHE *cache= &cache_data->cache_log;
   bool incident= cache_data->has_incident();
@@ -7668,7 +7743,13 @@ TC_LOG::enum_result MYSQL_BIN_LOG::write_binlog_and_commit_engine(THD *thd,
   DBUG_ENTER("MYSQL_BIN_LOG::write_binlog_and_commit_engine");
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(thd);
   Transaction_ctx *trn_ctx= thd->get_transaction();
-  my_xid xid= trn_ctx->xid_state()->get_xid()->get_my_xid();
+#ifdef WITH_WSREP
+  my_xid xid= (wsrep_is_wsrep_xid(trn_ctx->xid_state()->get_xid()) ?
+               wsrep_xid_seqno(  (*trn_ctx->xid_state()->get_xid()) ) :
+               trn_ctx->xid_state()->get_xid()->get_my_xid());
+#else
+ my_xid xid= trn_ctx->xid_state()->get_xid()->get_my_xid();
+#endif /* WITH_WSREP */
   bool stuff_logged= false;
   bool skip_commit= false;
 
@@ -8383,6 +8464,27 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
   my_off_t total_bytes= 0;
   bool do_rotate= false;
 
+#ifdef WITH_WSREP
+  if (WSREP_EMULATE_BINLOG(thd))
+  {
+    /*
+      Skip group commit, just do storage engine commit.
+    */
+    int rcode = ha_commit_low(thd, all);
+
+    /* if there is myisam statement inside innodb transaction, we may
+       have events in stmt cache
+    */
+    binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+    if(!cache_mngr->stmt_cache.is_binlog_empty())
+    {
+      WSREP_DEBUG("stmt transaction inside MST, SQL: %s", thd->query().str);
+      cache_mngr->stmt_cache.reset();
+    }
+    DBUG_RETURN(rcode);
+  }
+#endif /* WITH_WSREP */
+
   /*
     These values are used while flushing a transaction, so clear
     everything.
@@ -8653,6 +8755,23 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
   */
   bool in_transaction= FALSE;
 
+#ifdef WITH_WSREP
+  /*
+    Read current wsrep position from storage engines to have consistent
+    end position for binlog scan.
+  */
+  wsrep_uuid_t uuid;
+  wsrep_seqno_t seqno;
+  wsrep_get_SE_checkpoint(uuid, seqno);
+  char uuid_str[40];
+  wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
+  WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
+             (long long)seqno);
+  const wsrep_seqno_t last_xid_seqno= seqno;
+  wsrep_seqno_t cur_xid_seqno= WSREP_SEQNO_UNDEFINED;
+#endif /* WITH_WSREP */
+
+
   if (! fdle->is_valid() ||
       my_hash_init(&xids, &my_charset_bin, TC_LOG_PAGE_SIZE/3, 0,
                    sizeof(my_xid), 0, 0, MYF(0)))
@@ -8662,7 +8781,12 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                   &mem_root, TC_LOG_PAGE_SIZE, TC_LOG_PAGE_SIZE);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
-         && ev->is_valid())
+         && ev->is_valid()
+#ifdef WITH_WSREP
+         && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
+             last_xid_seqno != cur_xid_seqno)
+#endif
+      )
   {
     if (ev->get_type_code() == binary_log::QUERY_EVENT &&
         !strcmp(((Query_log_event*)ev)->query, "BEGIN"))
@@ -8683,6 +8807,9 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                                       sizeof(xev->xid));
       if (!x || my_hash_insert(&xids, x))
         goto err2;
+#ifdef WITH_WSREP
+      cur_xid_seqno= xev->xid;
+#endif /* WITH_WSREP */
     }
 
     /*
@@ -8757,7 +8884,9 @@ bool THD::is_binlog_cache_empty(bool is_transactional)
 
   // If opt_bin_log==0, it is not safe to call thd_get_cache_mngr
   // because binlog_hton has not been completely set up.
+#ifndef WITH_WSREP
   DBUG_ASSERT(opt_bin_log);
+#endif
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(this);
 
   // cache_mngr is NULL until we call thd->binlog_setup_trx_data, so
@@ -8974,7 +9103,12 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional,
                        table->s->table_map_id.id()));
 
   /* Pre-conditions */
+#ifdef WITH_WSREP
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      (WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open()));
+#else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
+#endif /* WITH_WSREP */
   DBUG_ASSERT(table->s->table_map_id.is_valid());
 
   Table_map_log_event
@@ -9282,9 +9416,16 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     binlogging is off, or if the statement is filtered out from the
     binlog by filtering rules.
   */
+#ifdef WITH_WSREP
+  if ((WSREP_EMULATE_BINLOG(this) || 
+       (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG))) &&
+      !(WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT    &&
+	!binlog_filter->db_ok(m_db.str)))
+#else
   if (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG) &&
       !(variables.binlog_format == BINLOG_FORMAT_STMT &&
         !binlog_filter->db_ok(m_db.str)))
+#endif /* WITH_WSREP */
   {
     /*
       Compute one bit field with the union of all the engine
@@ -9544,7 +9685,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
         */
         my_error((error= ER_BINLOG_ROW_INJECTION_AND_STMT_ENGINE), MYF(0));
       }
-      else if (variables.binlog_format == BINLOG_FORMAT_ROW &&
+      else if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_ROW &&
                sqlcom_can_generate_row_events(this))
       {
         /*
@@ -9573,8 +9714,8 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     else
     {
       /* binlog_format = STATEMENT */
-      if (variables.binlog_format == BINLOG_FORMAT_STMT)
-      {
+      if (WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_STMT)
+       {
         if (lex->is_stmt_row_injection())
         {
           /*
@@ -9590,7 +9731,14 @@ int THD::decide_logging_format(TABLE_LIST *tables)
             5. Error: Cannot modify table that uses a storage engine
                limited to row-logging when binlog_format = STATEMENT
           */
+#ifdef WITH_WSREP
+          if (!WSREP(this) || wsrep_exec_mode == LOCAL_STATE)
+          {
+#endif /* WITH_WSREP */
           my_error((error= ER_BINLOG_STMT_MODE_AND_ROW_ENGINE), MYF(0), "");
+#ifdef WITH_WSREP
+          }
+#endif /* WITH_WSREP */
         }
         else if (is_write && (unsafe_flags= lex->get_stmt_unsafe_flags()) != 0)
         {
@@ -10210,7 +10358,12 @@ int THD::binlog_write_row(TABLE* table, bool is_trans,
                           uchar const *record,
                           const uchar* extra_row_info)
 { 
+#ifdef WITH_WSREP
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      ((WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open())));
+#else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
+#endif /* WITH_WSREP */
 
   /*
     Pack records into format for transfer. We are allocating more
@@ -10240,7 +10393,13 @@ int THD::binlog_update_row(TABLE* table, bool is_trans,
                            const uchar *after_record,
                            const uchar* extra_row_info)
 { 
+#ifdef WITH_WSREP
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      ((WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open())));
+#else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
+#endif /* WITH_WSREP */
+
   int error= 0;
 
   /**
@@ -10302,7 +10461,13 @@ int THD::binlog_delete_row(TABLE* table, bool is_trans,
                            uchar const *record,
                            const uchar* extra_row_info)
 { 
+#ifdef WITH_WSREP
+  DBUG_ASSERT(is_current_stmt_binlog_format_row() && 
+	      ((WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open())));
+#else
   DBUG_ASSERT(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
+#endif /* WITH_WSREP */
+
   int error= 0;
 
   /**
@@ -10421,7 +10586,11 @@ int THD::binlog_flush_pending_rows_event(bool stmt_end, bool is_transactional)
     mode: it might be the case that we left row-based mode before
     flushing anything (e.g., if we have explicitly locked tables).
    */
-  if (!mysql_bin_log.is_open())
+#ifdef WITH_WSREP
+  if (!(WSREP_EMULATE_BINLOG(this) || mysql_bin_log.is_open()))
+#else
+ if (!mysql_bin_log.is_open())
+#endif /* WITH_WSREP */
     DBUG_RETURN(0);
 
   /*
@@ -10766,7 +10935,21 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
   DBUG_ENTER("THD::binlog_query");
   DBUG_PRINT("enter", ("qtype: %s  query: '%s'",
                        show_query_type(qtype), query_arg));
+#ifdef WITH_WSREP
+  DBUG_ASSERT(query_arg && (WSREP_EMULATE_BINLOG(this)
+			    || mysql_bin_log.is_open()));
+#else
   DBUG_ASSERT(query_arg && mysql_bin_log.is_open());
+#endif /* WITH_WSREP */
+
+  if (get_binlog_local_stmt_filter() == BINLOG_FILTER_SET)
+  {
+    /*
+      The current statement is to be ignored, and not written to
+      the binlog. Do not call issue_unsafe_warnings().
+    */
+    DBUG_RETURN(0);
+  }
 
   if (get_binlog_local_stmt_filter() == BINLOG_FILTER_SET)
   {
@@ -10870,6 +11053,72 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
 }
 
 #endif /* !defined(MYSQL_CLIENT) */
+#ifdef WITH_WSREP
+IO_CACHE * get_trans_log(THD * thd)
+{
+  binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+  if (cache_mngr)
+  {
+    return cache_mngr->get_binlog_cache_log(true);
+  }
+  else
+  {
+    WSREP_DEBUG("binlog cache not initialized, conn :%u", thd->thread_id());
+    return NULL;
+  }
+}
+
+bool wsrep_trans_cache_is_empty(THD *thd)
+{
+  binlog_cache_mngr *const cache_mngr=
+      (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
+  return (!cache_mngr || cache_mngr->trx_cache.is_binlog_empty());
+}
+
+void thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end)
+{
+  thd->binlog_flush_pending_rows_event(stmt_end);
+}
+void thd_binlog_trx_reset(THD * thd)
+{
+  /*
+    todo: fix autocommit select to not call the caller
+  */
+  if (thd_get_ha_data(thd, binlog_hton) != NULL)
+  {
+    binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+    if (cache_mngr) 
+    {
+      cache_mngr->trx_cache.reset();
+      if (!cache_mngr->stmt_cache.is_binlog_empty())
+      {
+	WSREP_DEBUG("pending events in stmt cache, sql: %s", thd->query().str);
+	cache_mngr->stmt_cache.reset();
+      }
+    }
+  }
+  thd->clear_binlog_table_maps();
+}
+
+TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
+{
+  /* applier and replayer can skip binlog commit */
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV))
+    return mysql_bin_log.commit(thd, all);
+  else
+    return (ha_commit_low(thd, all) ?
+            TC_LOG::RESULT_ABORTED : TC_LOG::RESULT_SUCCESS);
+}
+
+int wsrep_thd_binlog_rollback(THD* thd, bool all)
+{
+  /* applier and replayer can skip binlog rollback */
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV))
+    return mysql_bin_log.rollback(thd, all);
+  else
+    return ha_rollback_low(thd, all);
+}
+#endif /* WITH_WSREP */
 
 struct st_mysql_storage_engine binlog_storage_engine=
 { MYSQL_HANDLERTON_INTERFACE_VERSION };

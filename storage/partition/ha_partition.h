@@ -1156,6 +1156,9 @@ public:
     return (HA_PARTITION_FUNCTION_SUPPORTED |
             HA_FAST_CHANGE_PARTITION);
   }
+#ifdef WITH_WSREP
+  bool wsrep_is_innodb() { return m_innodb; }
+#endif /* WITH_WSREP */
 
 private:
   /* private support functions for Partition_helper: */

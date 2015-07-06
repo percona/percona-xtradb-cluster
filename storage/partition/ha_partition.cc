@@ -72,6 +72,10 @@
 
 #include "pfs_file_provider.h"
 #include "mysql/psi/mysql_file.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "wsrep_xid.h"
+#endif
 
 using std::min;
 using std::max;

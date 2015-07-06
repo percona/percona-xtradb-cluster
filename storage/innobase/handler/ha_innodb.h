@@ -385,6 +385,10 @@ public:
 	@return idx_cond if pushed; NULL if not pushed */
 	Item* idx_cond_push(uint keyno, Item* idx_cond);
 	/* @} */
+#ifdef WITH_WSREP
+	int wsrep_append_keys(THD *thd, bool shared,
+				  const uchar* record0, const uchar* record1);
+#endif
 
 private:
 	void update_thd();
@@ -546,6 +550,40 @@ thd_get_work_part_info(
 	THD*	thd);
 } /* extern "C" */
 
+#ifdef WITH_WSREP
+#include <wsrep_mysqld.h>
+#ifdef OUT
+extern "C" bool wsrep_thd_is_wsrep_on(THD *thd);
+
+extern "C" enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd);
+extern "C" enum wsrep_conflict_state wsrep_thd_conflict_state(THD *thd);
+extern "C" enum wsrep_query_state wsrep_thd_query_state(THD *thd);
+extern "C" const char * wsrep_thd_exec_mode_str(THD *thd);
+extern "C" const char * wsrep_thd_conflict_state_str(THD *thd);
+extern "C" const char * wsrep_thd_query_state_str(THD *thd);
+extern "C" wsrep_ws_handle_t* wsrep_thd_ws_handle(THD *thd);
+
+extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode);
+extern "C" void wsrep_thd_set_query_state(
+	THD *thd, enum wsrep_query_state state);
+extern "C" void wsrep_thd_set_conflict_state(
+	THD *thd, enum wsrep_conflict_state state);
+
+extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
+
+extern "C"void wsrep_thd_LOCK(THD *thd);
+extern "C"void wsrep_thd_UNLOCK(THD *thd);
+extern "C" uint32 wsrep_thd_wsrep_rand(THD *thd);
+extern "C" time_t wsrep_thd_query_start(THD *thd);
+extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
+extern "C" int64_t wsrep_thd_trx_seqno(THD *thd);
+extern "C" query_id_t wsrep_thd_query_id(THD *thd);
+extern "C" const char * wsrep_thd_query(THD *thd);
+extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
+extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
+extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
+#endif
+#endif
 struct trx_t;
 
 extern const struct _ft_vft ft_vft_result;

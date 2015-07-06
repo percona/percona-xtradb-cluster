@@ -4777,6 +4777,9 @@ btr_cur_del_mark_set_clust_rec(
 
 	if (rec_get_deleted_flag(rec, rec_offs_comp(offsets))) {
 		/* While cascading delete operations, this becomes possible. */
+#ifdef WITH_WSREP
+          // following may assert with wsrep
+#endif
 		ut_ad(rec_get_trx_id(rec, index) == thr_get_trx(thr)->id);
 		return(DB_SUCCESS);
 	}

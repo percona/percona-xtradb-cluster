@@ -421,6 +421,11 @@ extern PSI_mutex_key key_LOCK_default_password_lifetime;
 extern PSI_mutex_key key_commit_order_manager_mutex;
 extern PSI_mutex_key key_mutex_slave_worker_hash;
 #endif
+#ifdef WITH_WSREP
+extern PSI_mutex_key key_LOCK_wsrep_thd;
+extern PSI_cond_key  key_COND_wsrep_thd;
+extern PSI_thread_key key_thread_handle_wsrep;
+#endif /* HAVE_WSREP */
 
 extern PSI_rwlock_key key_rwlock_LOCK_grant, key_rwlock_LOCK_logger,
   key_rwlock_LOCK_sys_init_connect, key_rwlock_LOCK_sys_init_slave,
@@ -599,6 +604,9 @@ extern PSI_memory_key key_memory_Quick_ranges;
 extern PSI_memory_key key_memory_File_query_log_name;
 extern PSI_memory_key key_memory_Table_trigger_dispatcher;
 extern PSI_memory_key key_memory_show_slave_status_io_gtid_set;
+#ifdef WITH_WSREP
+extern PSI_memory_key key_memory_wsrep;
+#endif /* WITH_WSREP */
 extern PSI_memory_key key_memory_write_set_extraction;
 #ifdef HAVE_MY_TIMER
 extern PSI_memory_key key_memory_thd_timer;
@@ -864,6 +872,14 @@ enum options_mysqld
   OPT_UPDATE_LOG,
   OPT_WANT_CORE,
   OPT_LOG_ERROR,
+#ifdef WITH_WSREP
+  OPT_WSREP_PROVIDER,
+  OPT_WSREP_PROVIDER_OPTIONS,
+  OPT_WSREP_CLUSTER_ADDRESS,
+  OPT_WSREP_START_POSITION,
+  OPT_WSREP_SST_AUTH,
+  OPT_WSREP_RECOVER,
+#endif /* WITH_WSREP */
   OPT_MAX_LONG_DATA_SIZE,
   OPT_PLUGIN_LOAD,
   OPT_PLUGIN_LOAD_ADD,
@@ -945,5 +961,9 @@ static inline THD *_current_thd(void)
 #define current_thd _current_thd()
 
 #define ER(X)         ER_THD(current_thd,X)
+
+#ifdef WITH_WSREP
+extern "C" void *start_wsrep_THD(void*);
+#endif /* WITH_WSREP */
 
 #endif /* MYSQLD_INCLUDED */

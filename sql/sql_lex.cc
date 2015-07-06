@@ -1949,6 +1949,17 @@ static int lex_one_token(YYSTYPE *yylval, THD *thd)
           }
           else
           {
+#ifdef WITH_WSREP
+	    if (version == 99997 && thd->wsrep_exec_mode == LOCAL_STATE)
+	    {
+	      WSREP_DEBUG("consistency check: %s", thd->query().str);
+	      thd->wsrep_consistency_check= CONSISTENCY_CHECK_DECLARED;
+	      lip->yySkipn(5);
+	      lip->set_echo(TRUE);
+	      state=MY_LEX_START;
+	      break;  /* Do not treat contents as a comment.  */
+	    }
+#endif /* WITH_WSREP */
             /*
               Patch and skip the conditional comment to avoid it
               being propagated infinitely (eg. to a slave).

@@ -1035,7 +1035,11 @@ bool mysql_update(THD *thd,
   if ((error < 0) || thd->get_transaction()->cannot_safely_rollback(
       Transaction_ctx::STMT))
   {
+#ifdef WITH_WSREP
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
     if (mysql_bin_log.is_open())
+#endif
     {
       int errcode= 0;
       if (error < 0)
@@ -2424,7 +2428,11 @@ void Query_result_update::abort_result_set()
       The query has to binlog because there's a modified non-transactional table
       either from the query's list or via a stored routine: bug#13270,23333
     */
+#ifdef WITH_WSREP
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
     if (mysql_bin_log.is_open())
+#endif
     {
       /*
         THD::killed status might not have been set ON at time of an error
@@ -2694,7 +2702,11 @@ bool Query_result_update::send_eof()
   if (local_error == 0 ||
       thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT))
   {
+#ifdef WITH_WSREP
+    if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
     if (mysql_bin_log.is_open())
+#endif
     {
       int errcode= 0;
       if (local_error == 0)

@@ -2992,7 +2992,11 @@ void plugin_thdvar_init(THD *thd, bool enable_plugins)
   thd->variables.dynamic_variables_size= 0;
   thd->variables.dynamic_variables_ptr= 0;
 
+#ifdef WITH_WSREP
+  if ((!WSREP(thd) || !thd->wsrep_applier) && enable_plugins)
+#else
   if (enable_plugins)
+#endif
   {
     mysql_mutex_lock(&LOCK_plugin);
     thd->variables.table_plugin=
@@ -4127,17 +4131,37 @@ int unlock_plugin_data()
 
 bool Sql_cmd_install_plugin::execute(THD *thd)
 {
+#ifdef WITH_WSREP
+  bool st;
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
+  st= mysql_install_plugin(thd, &m_comment, &m_ident);
+#else
   bool st= mysql_install_plugin(thd, &m_comment, &m_ident);
+#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
   return st;
+#ifdef WITH_WSREP
+ error:
+  return true;
+#endif /* WITH_WSREP */
 }
 
 
 bool Sql_cmd_uninstall_plugin::execute(THD *thd)
 {
+#ifdef WITH_WSREP
+  bool st;
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+  st= mysql_uninstall_plugin(thd, &m_comment);
+#else
   bool st= mysql_uninstall_plugin(thd, &m_comment);
+#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
   return st;
+#ifdef WITH_WSREP
+ error:
+  return true;
+#endif /* WITH_WSREP */
 }

@@ -36,6 +36,9 @@
 
 #include <my_dir.h>
 #include <stdarg.h>
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 
 #include "pfs_file_provider.h"
 #include "mysql/psi/mysql_file.h"
@@ -1974,6 +1977,7 @@ int my_plugin_log_message(MYSQL_PLUGIN *plugin_ptr, plugin_log_level level,
 
 
 /********* transaction coordinator log for 2pc - mmap() based solution *******/
+
 
 /*
   the log consists of a file, mmapped to a memory.

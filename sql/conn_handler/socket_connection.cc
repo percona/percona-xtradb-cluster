@@ -636,6 +636,9 @@ public:
 #if !defined(NO_FCNTL_NONBLOCK)
     (void) mysql_sock_set_nonblocking(listener_socket);
 #endif
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    (void) fcntl(mysql_socket_getfd(listener_socket), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
 
     return listener_socket;
   }

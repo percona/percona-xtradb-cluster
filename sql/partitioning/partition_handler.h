@@ -377,6 +377,11 @@ private:
   */
   virtual handler *get_handler()
   { return NULL; }
+#ifdef WITH_WSREP
+ public:
+  /* TODO: track if partitioning is for innodb table */
+  bool wsrep_is_innodb() { return TRUE; }
+#endif /* WITH_WSREP */
 };
 
 

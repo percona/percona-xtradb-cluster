@@ -14,6 +14,10 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "sql_alter.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "sql_parse.h"
+#endif /* WITH_WSREP */
 
 #include "auth_common.h"                     // check_access
 #include "sql_table.h"                       // mysql_alter_table,
@@ -312,12 +316,30 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->push_internal_handler(&strict_handler);
 
+#ifdef WITH_WSREP
+  TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
+
+  if ((!thd->is_current_stmt_binlog_format_row() ||
+       !find_temporary_table(thd, first_table)))
+    {
+      WSREP_TO_ISOLATION_BEGIN(((lex->name.str) ? select_lex->db : NULL),
+			       ((lex->name.str) ? lex->name.str : NULL),
+			       first_table);
+    }
+#endif /* WITH_WSREP */
   result= mysql_alter_table(thd, select_lex->db, lex->name.str,
                             &create_info, first_table, &alter_info);
 
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->pop_internal_handler();
   DBUG_RETURN(result);
+#ifdef WITH_WSREP
+ error:
+  {
+    WSREP_WARN("ALTER TABLE isolation failure");
+    DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
 }
 
 

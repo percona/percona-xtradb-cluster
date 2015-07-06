@@ -638,6 +638,9 @@ public:
   MDL_ticket *next_in_lock;
   MDL_ticket **prev_in_lock;
 public:
+#ifdef WITH_WSREP
+  void wsrep_report(bool debug);
+#endif /* WITH_WSREP */
   bool has_pending_conflicting_lock() const;
 
   MDL_context *get_ctx() const { return m_ctx; }
@@ -857,6 +860,13 @@ public:
              m_tickets[MDL_EXPLICIT].is_empty());
   }
 
+#ifdef WITH_WSREP
+  inline bool has_transactional_locks() const
+  {
+    return !m_tickets[MDL_TRANSACTION].is_empty();
+  }
+#endif /* WITH_WSREP */
+
   MDL_savepoint mdl_savepoint()
   {
     return MDL_savepoint(m_tickets[MDL_STATEMENT].front(),
@@ -869,6 +879,9 @@ public:
 
   void release_statement_locks();
   void release_transactional_locks();
+#ifdef WITH_WSREP
+  void release_explicit_locks();
+#endif
   void rollback_to_savepoint(const MDL_savepoint &mdl_savepoint);
 
   MDL_context_owner *get_owner() const { return m_owner; }
@@ -1064,6 +1077,10 @@ private:
   inline bool fix_pins();
 
 public:
+#ifdef WITH_WSREP
+  THD *wsrep_get_thd() const { return get_thd(); }
+  bool wsrep_has_explicit_locks();
+#endif /* WITH_WSREP */
   void find_deadlock();
 
   bool visit_subgraph(MDL_wait_for_graph_visitor *dvisitor);

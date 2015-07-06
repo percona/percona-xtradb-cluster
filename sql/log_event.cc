@@ -45,6 +45,9 @@
 #include "sql_class.h"
 #include "mysql/psi/mysql_transaction.h"
 #include "sql_plugin.h" // plugin_foreach
+#if WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 #define window_size Log_throttle::LOG_THROTTLE_WINDOW_SIZE
 Error_log_throttle
 slave_ignored_err_throttle(window_size,
@@ -3911,6 +3914,14 @@ Query_log_event::Query_log_event(THD* thd_arg, const char* query_arg,
             header(), footer()),
   data_buf(0)
 {
+#ifdef WITH_WSREP
+  /*
+    If Query_log_event will contain non trans keyword (not BEGIN, COMMIT,
+    SAVEPOINT or ROLLBACK) we disable PA for this transaction.
+   */
+  if (!is_trans_keyword())
+    thd->wsrep_PA_safe= false;
+#endif /* WITH_WSREP */
   /* save the original thread id; we already know the server id */
   slave_proxy_id= thd_arg->variables.pseudo_thread_id;
   if (query != 0)
@@ -10745,6 +10756,18 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
     if (open_and_lock_tables(thd, rli->tables_to_lock, 0))
     {
       uint actual_error= thd->get_stmt_da()->mysql_errno();
+#ifdef WITH_WSREP
+      if (WSREP(thd))
+      {
+        WSREP_WARN("BF applier failed to open_and_lock_tables: %u, fatal: %d "
+                   "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld)",
+                   thd->get_stmt_da()->mysql_errno(),
+                   thd->is_fatal_error,
+                   thd->wsrep_exec_mode,
+                   thd->wsrep_conflict_state,
+                   (long long)wsrep_thd_trx_seqno(thd));
+      } 
+#endif
       if (thd->is_slave_error || thd->is_fatal_error)
       {
         /*
@@ -11639,7 +11662,12 @@ check_table_map(Relay_log_info const *rli, RPL_TABLE_LIST *table_list)
   DBUG_ENTER("check_table_map");
   enum_tbl_map_status res= OK_TO_PROCESS;
 
+#ifdef WITH_WSREP
+  if ((rli->info_thd->slave_thread /* filtering is for slave only */  ||
+       (WSREP(rli->info_thd) && rli->info_thd->wsrep_applier))        &&
+#else
   if (rli->info_thd->slave_thread /* filtering is for slave only */ &&
+#endif /* WITH_WSREP */
       (!rpl_filter->db_ok(table_list->db) ||
        (rpl_filter->is_on() && !rpl_filter->tables_ok("", table_list))))
     res= FILTERED_OUT;
@@ -12407,8 +12435,23 @@ int
 Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   DBUG_ASSERT(m_table != NULL);
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
+           (long long) wsrep_thd_trx_seqno(thd));
+  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
+#else
+  const char* tmp = (WSREP(thd)) ?
+    thd_proc_info(thd,"Write_rows_log_event::write_row()") :  NULL;
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
   int error= write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
 
+#ifdef WITH_WSREP
+  if (WSREP(thd)) thd_proc_info(thd, tmp);
+#endif /* WITH_WSREP */
   if (error && !thd->is_error())
   {
     DBUG_ASSERT(0);

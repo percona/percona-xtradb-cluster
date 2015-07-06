@@ -40,6 +40,9 @@
 #include "sql_resolver.h"             // validate_gc_assignment
 #include "partition_info.h"           // partition_info
 #include "probes_mysql.h"             // MYSQL_INSERT_START
+#ifdef WITH_WSREP
+#include "sql_parse.h"                // WSREP_TO_ISOLATION
+#endif /* WITH_WSREP */
 
 static bool check_view_insertability(THD *thd, TABLE_LIST *view,
                                      const TABLE_LIST *insert_table_ref);
@@ -741,7 +744,11 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
     if (error <= 0 || thd->get_transaction()->cannot_safely_rollback(
         Transaction_ctx::STMT))
     {
+#ifdef WITH_WSREP
+      if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
       if (mysql_bin_log.is_open())
+#endif
       {
         int errcode= 0;
 	if (error <= 0)
@@ -2269,7 +2276,13 @@ bool Query_result_insert::send_eof()
   DBUG_PRINT("enter", ("trans_table=%d, table_type='%s'",
                        trans_table, table->file->table_type()));
 
+#ifdef WITH_WSREP
+  error= (thd->wsrep_conflict_state == MUST_ABORT ||
+          thd->wsrep_conflict_state == CERT_FAILURE) ? -1 :
+    (bulk_insert_started ?
+#else
   error= (bulk_insert_started ?
+#endif /* WITH_WSREP */
           table->file->ha_end_bulk_insert() : 0);
   if (!error && thd->is_error())
     error= thd->get_stmt_da()->mysql_errno();
@@ -2297,9 +2310,15 @@ bool Query_result_insert::send_eof()
     events are in the transaction cache and will be written when
     ha_autocommit_or_rollback() is issued below.
   */
+#ifdef WITH_WSREP
+  if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()) &&
+      (!error || thd->get_transaction()->cannot_safely_rollback(
+        Transaction_ctx::STMT)))
+#else
   if (mysql_bin_log.is_open() &&
       (!error || thd->get_transaction()->cannot_safely_rollback(
         Transaction_ctx::STMT)))
+#endif
   {
     int errcode= 0;
     if (!error)
@@ -2399,7 +2418,11 @@ void Query_result_insert::abort_result_set()
     transactional_table= table->file->has_transactions();
     if (thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT))
     {
+#ifdef WITH_WSREP
+        if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
         if (mysql_bin_log.is_open())
+#endif
         {
           int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
           /* error of writing binary log is ignored */
@@ -2846,7 +2869,11 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
                             /* show_database */ TRUE);
   DBUG_ASSERT(result == 0); /* store_create_info() always return 0 */
 
+#ifdef WITH_WSREP
+  if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+#else
   if (mysql_bin_log.is_open())
+#endif /* WITH_WSREP */
   {
     int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
     result= thd->binlog_query(THD::STMT_QUERY_TYPE,
@@ -2860,6 +2887,9 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
     thd->is_commit_in_middle_of_statement= false;
     thd->pending_gtid_state_update= true;
   }
+#ifdef WITH_WSREP
+  ha_wsrep_fake_trx_id(thd);
+#endif
   DBUG_RETURN(result);
 }
 
@@ -2926,6 +2956,18 @@ bool Query_result_create::send_eof()
     {
       trans_commit_stmt(thd);
       trans_commit_implicit(thd);
+#ifdef WITH_WSREP
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      if (thd->wsrep_conflict_state != NO_CONFLICT)
+      {
+        WSREP_DEBUG("select_create commit failed, thd: %u err: %d %s", 
+                    thd->thread_id(), thd->wsrep_conflict_state, thd->query().str);
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+        abort_result_set();
+	return TRUE;
+      }
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
     }
 
     table->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
@@ -3057,6 +3099,14 @@ bool Sql_cmd_insert_select::execute(THD *thd)
   Query_result_insert *sel_result;
   if (insert_precheck(thd, all_tables))
     return true;
+#ifdef WITH_WSREP
+    if (thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED)
+    {
+      thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
+      WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL);
+    }
+
+#endif
   /*
     INSERT...SELECT...ON DUPLICATE KEY UPDATE/REPLACE SELECT/
     INSERT...IGNORE...SELECT can be unsafe, unless ORDER BY PRIMARY KEY
@@ -3132,6 +3182,10 @@ bool Sql_cmd_insert_select::execute(THD *thd)
       thd->first_successful_insert_id_in_prev_stmt;
 
   return res;
+#ifdef WITH_WSREP
+ error:
+  return true;
+#endif /* WITH_WSREP */
 }
 
 

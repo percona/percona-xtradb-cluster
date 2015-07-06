@@ -50,6 +50,9 @@
 #include <mysql/psi/mysql_transaction.h>
 #include "opt_hints.h"
 
+#ifdef WITH_WSREP
+#include "partitioning/partition_handler.h"
+#endif
 #include <list>
 
 /**
@@ -167,7 +170,10 @@ inline double log2(double x)
   return (log(x) / M_LN2);
 }
 #endif
-
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "wsrep_xid.h"
+#endif
 /*
   While we have legacy_db_type, we have this array to
   check for dups and to find handlerton from legacy_db_type.
@@ -1382,10 +1388,27 @@ int ha_prepare(THD *thd)
       {
         if ((err= ht->prepare(ht, thd, true)))
         {
+#ifdef WITH_WSREP
+          if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
+          {
+	    error= 1;
+	    /* avoid sending error, if we need to replay */
+            if (thd->wsrep_conflict_state!= MUST_REPLAY)
+            {
+              my_error(ER_LOCK_DEADLOCK, MYF(0), err);
+            }
+          }
+          else
+          {
+            /* not wsrep hton, bail to native mysql behavior */
+#endif
           my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
           ha_rollback_trans(thd, true);
           error=1;
           break;
+#ifdef WITH_WSREP
+          }
+#endif
         }
       }
       else
@@ -1397,7 +1420,6 @@ int ha_prepare(THD *thd)
       ha_info= ha_info->next();
     }
   }
-
   DBUG_RETURN(error);
 }
 
@@ -1587,7 +1609,12 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
                        MDL_EXPLICIT);
 
       DBUG_PRINT("debug", ("Acquire MDL commit lock"));
+#ifdef WITH_WSREP
+      if (!WSREP(thd) &&
+          thd->mdl_context.acquire_lock(&mdl_request,
+#else
       if (thd->mdl_context.acquire_lock(&mdl_request,
+#endif /* WITH_WSREP */
                                         thd->variables.lock_wait_timeout))
       {
         ha_rollback_trans(thd, all);
@@ -1696,6 +1723,17 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
   bool restore_backup_trx= false;
 
   DBUG_ENTER("ha_commit_low");
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64]= { 0, };
+  snprintf (info, sizeof(info) - 1, "ha_commit_one_phase(%lld)",
+            (long long)wsrep_thd_trx_seqno(thd));
+#else
+  const char info[]="ha_commit_one_phase()";
+#endif /* WSREP_PROC_INFO */
+  char* tmp_info= NULL;
+  if (WSREP(thd)) tmp_info= (char *)thd_proc_info(thd, info);
+#endif /* WITH_WSREP */
 
   if (ha_info)
   {
@@ -1742,6 +1780,9 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
   /* Free resources and perform other cleanup even for 'empty' transactions. */
   if (all)
     trn_ctx->cleanup();
+#ifdef WITH_WSREP
+  if (WSREP(thd)) thd_proc_info(thd, tmp_info);
+#endif /* WITH_WSREP */
   /*
     When the transaction has been committed, we clear the commit_low
     flag. This allow other parts of the system to check if commit_low
@@ -2065,8 +2106,35 @@ int ha_prepare_low(THD *thd, bool all)
         continue;
       if ((err= ht->prepare(ht, thd, all)))
       {
+#ifdef WITH_WSREP
+	if (WSREP(thd) && ht->db_type== DB_TYPE_WSREP)
+        {
+	  error= 1;
+	  switch (err)
+          {
+	  case WSREP_TRX_SIZE_EXCEEDED:
+	    /* give user size exeeded erro from wsrep_api.h */
+	    my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED);
+	    break;
+	  case WSREP_TRX_CERT_FAIL:
+	  case WSREP_TRX_ERROR:
+	    /* avoid sending error, if we need to replay */
+	    if (thd->wsrep_conflict_state!= MUST_REPLAY)
+            {
+	      my_error(ER_LOCK_DEADLOCK, MYF(0), err);
+	    }
+	  }
+	}
+
+        else
+        {
+          /* not wsrep hton, bail to native mysql behavior */
+#endif
         my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
         error= 1;
+#ifdef WITH_WSREP
+        }
+#endif
       }
       thd->status_var.ha_prepare_count++;
     }
@@ -3313,7 +3381,12 @@ int handler::update_auto_increment()
                                           variables->auto_increment_increment);
     auto_inc_intervals_count++;
     /* Row-based replication does not need to store intervals in binlog */
+#ifdef WITH_WSREP
+    if (((WSREP_EMULATE_BINLOG(thd)) || mysql_bin_log.is_open()) &&
+	!thd->is_current_stmt_binlog_format_row())
+#else
     if (mysql_bin_log.is_open() && !thd->is_current_stmt_binlog_format_row())
+#endif /* WITH_WSREP */
         thd->auto_inc_intervals_in_cur_stmt_for_binlog.append(auto_inc_interval_for_cur_row.minimum(),
                                                               auto_inc_interval_for_cur_row.values(),
                                                               variables->auto_increment_increment);
@@ -4634,6 +4707,9 @@ int ha_enable_transaction(THD *thd, bool on)
   DBUG_ENTER("ha_enable_transaction");
   DBUG_PRINT("enter", ("on: %d", (int) on));
 
+#ifdef WITH_WSREP
+  if (thd->wsrep_applier) DBUG_RETURN(0);
+#endif
   if ((thd->get_transaction()->m_flags.enabled= on))
   {
     /*
@@ -7237,7 +7313,13 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
   return (thd->is_current_stmt_binlog_format_row() &&
           table->s->cached_row_logging_check &&
           (thd->variables.option_bits & OPTION_BIN_LOG) &&
+#ifdef WITH_WSREP
+	  /* applier and replayer should not binlog */
+          ((WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV)) ||
+           mysql_bin_log.is_open()));
+#else
           mysql_bin_log.is_open());
+#endif
 }
 
 
@@ -7338,6 +7420,19 @@ int binlog_log_row(TABLE* table,
   bool error= 0;
   THD *const thd= table->in_use;
 
+#ifdef WITH_WSREP
+  //#include "partitioning/partition_handler.h"
+  /* only InnoDB tables will be replicated through binlog emulation */
+  if (WSREP_EMULATE_BINLOG(thd)                          && 
+      table->file->ht->db_type != DB_TYPE_INNODB         &&
+      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB && 
+      //      !((Partition_handler*)table->file->ht->get_handler() == DB_TYPE_PARTITION_DB && 
+        (((Partition_handler*)(table->file))->wsrep_is_innodb())))
+	//	!strcmp(table->file->table_type(), "InnoDB"))
+  {
+    return 0;
+  } 
+#endif /* WITH_WSREP */
   if (check_table_binlog_row_based(thd, table))
   {
     if (thd->variables.transaction_write_set_extraction != HASH_ALGORITHM_OFF)
@@ -7678,3 +7773,61 @@ void handler::unlock_shared_ha_data()
   if (table_share->tmp_table == NO_TMP_TABLE)
     mysql_mutex_unlock(&table_share->LOCK_ha_data);
 }
+#ifdef WITH_WSREP
+/**
+  @details
+  This function makes the storage engine to force the victim transaction
+  to abort. Currently, only innodb has this functionality, but any SE
+  implementing the wsrep API should provide this service to support
+  multi-master operation.
+
+  @param bf_thd       brute force THD asking for the abort
+  @param victim_thd   victim THD to be aborted
+
+  @return
+    always 0
+*/
+
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
+{
+  DBUG_ENTER("ha_wsrep_abort_transaction");
+  if (!WSREP(bf_thd) &&  
+      !(bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU &&
+        bf_thd->wsrep_exec_mode == TOTAL_ORDER)) {
+    DBUG_RETURN(0);
+  }
+
+  handlerton *hton= installed_htons[DB_TYPE_INNODB];
+  if (hton && hton->wsrep_abort_transaction)
+  {
+    hton->wsrep_abort_transaction(hton, bf_thd, victim_thd, signal);
+  } 
+  else 
+  {
+    WSREP_WARN("cannot abort InnoDB transaction");
+  }
+
+  DBUG_RETURN(0);
+}
+
+void ha_wsrep_fake_trx_id(THD *thd)
+{
+  DBUG_ENTER("ha_wsrep_fake_trx_id");
+  if (!WSREP(thd)) 
+  {
+    DBUG_VOID_RETURN;
+  }
+
+  handlerton *hton= installed_htons[DB_TYPE_INNODB];
+  if (hton && hton->wsrep_fake_trx_id)
+  {
+    hton->wsrep_fake_trx_id(hton, thd);
+  } 
+  else 
+  {
+    WSREP_WARN("cannot get get fake InnoDB transaction ID");
+  }
+
+  DBUG_VOID_RETURN;
+}
+#endif /* WITH_WSREP */
