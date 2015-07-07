@@ -508,6 +508,9 @@ sub collect_one_suite($)
       my @new_cases;
       foreach my $comb (@combinations)
       {
+	# ENV is used in My::Config::ENV to store the environment so is not a true combination
+	next if ( $comb->{'name'} eq 'ENV' );
+
 	foreach my $test (@cases)
 	{
 

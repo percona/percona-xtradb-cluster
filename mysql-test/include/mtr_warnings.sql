@@ -253,6 +253,41 @@ INSERT INTO global_suppressions VALUES
  */
  ("Insecure configuration for --secure-file-priv:*"),
 
+ /*
+   Galera suppressions 
+ */
+ ("WSREP:*down context*"),
+ ("WSREP: Failed to send state UUID:*"),
+ ("WSREP: wsrep_sst_receive_address is set to '127.0.0.1"),
+ ("WSREP: option --wsrep-causal-reads is deprecated"),
+ ("WSREP: --wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=0"),
+ ("WSREP: Could not open saved state file for reading: "),
+ ("WSREP: Could not open state file for reading: "),
+ ("WSREP: access file\\(.*gvwstate\\.dat\\) failed\\(No such file or directory\\)"),
+ ("WSREP: Gap in state sequence\\. Need state transfer\\."),
+ ("WSREP: Failed to prepare for incremental state transfer: Local state UUID \\(00000000-0000-0000-0000-000000000000\\) does not match group state UUID"),
+ ("WSREP: No existing UUID has been found, so we assume that this is the first time that this server has been started\\. Generating a new UUID: "),
+ ("WSREP: last inactive check more than"),
+ ("WSREP: binlog cache not empty \\(0 bytes\\) at connection close"),
+ ("WSREP: SQL statement was ineffective"),
+ ("WSREP: Refusing exit for the last slave thread"),
+ ("WSREP: Quorum: No node with complete state"),
+ ("WSREP: Failed to report last committed"),
+ ("Slave SQL: Error 'Duplicate entry"),
+ ("Query apply warning:"),
+ ("WSREP: Ignoring error for TO isolated action:"),
+ ("WSREP: Initial position was provided by configuration or SST, avoiding override"),
+ ("Warning: Using a password on the command line interface can be insecure"),
+ ("InnoDB: Error: Table \"mysql\"\\.\"innodb_table_stats\" not found"),
+ ("but it is impossible to select State Transfer donor: Resource temporarily unavailable"),
+ ("WSREP: Could not find peer"),
+ ("WSREP: discarding established \\(time wait\\)"),
+ ("sending install message failed: Resource temporarily unavailable"),
+ ("WSREP: Ignoring possible split-brain \\(allowed by configuration\\) from view"),
+ ("WSREP: no nodes coming from prim view, prim not possible"),
+ ("WSREP: Failed to prepare for incremental state transfer: Local state seqno is undefined:"),
+ ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
+
  ("THE_LAST_SUPPRESSION")||
 
 
@@ -299,7 +334,17 @@ BEGIN
   END IF;
 
   -- Cleanup for next test
-  TRUNCATE test_suppressions;
+  IF @@wsrep_on = 1 THEN
+    -- The TRUNCATE should not be replicated under Galera
+    -- as it causes the custom suppressions on the other
+    -- nodes to be deleted as well
+    SET wsrep_on = 0;
+    TRUNCATE test_suppressions;
+    SET wsrep_on = 1;
+  ELSE 
+    TRUNCATE test_suppressions;
+  END IF;    
+
   DROP TABLE error_log;
 
 END||

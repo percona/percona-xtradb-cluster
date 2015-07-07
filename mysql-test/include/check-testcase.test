@@ -6,6 +6,7 @@
 # tescase.  In that way, it is possible to check that a testcase does
 # not have any unwanted side affects.
 
+--source include/wait_until_connected_again.inc
 --disable_query_log
 
 # We want to ensure all slave configuration is restored.  But SHOW

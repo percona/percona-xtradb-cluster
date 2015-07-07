@@ -320,7 +320,10 @@ SET(INSTALL_BINDIR_RPM                  "bin")
 SET(INSTALL_SBINDIR_RPM                 "sbin")
 SET(INSTALL_SCRIPTDIR_RPM               "bin")
 #
-IF(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+# Deciding via system processor may give wrong answer in
+# virtual environments that see host CPU directly.
+# IF(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+IF(64BIT)
   SET(INSTALL_LIBDIR_RPM                "lib64")
   SET(INSTALL_PLUGINDIR_RPM             "lib64/mysql/plugin")
 ELSE()
