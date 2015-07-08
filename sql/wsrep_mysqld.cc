@@ -935,12 +935,11 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
     if (db || table)
     {
         TABLE_LIST tmp_table;
-	MDL_request mdl_request;
 
         memset(&tmp_table, 0, sizeof(tmp_table));
         tmp_table.table_name= (char*)table;
         tmp_table.db= (char*)db;
-	MDL_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, (db) ? db :  "",
+	MDL_REQUEST_INIT(&tmp_table.mdl_request, MDL_key::GLOBAL, (db) ? db :  "",
                          (table) ? table : "",
                          MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
 
