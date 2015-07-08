@@ -1356,8 +1356,9 @@ trx_start_low(
 #endif /* UNIV_DEBUG */
 
 #ifdef WITH_WSREP
-        memset(&trx->xid, 0, sizeof(trx->xid));
-        trx->xid->set_format_id(1);
+        //memset(&trx->xid, 0, sizeof(trx->xid));
+        //trx->xid->set_format_id(1);
+        trx->xid->reset();
 #endif /* WITH_WSREP */
 
 	/* The initial value for trx->no: TRX_ID_MAX is used in

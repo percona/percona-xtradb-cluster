@@ -324,13 +324,17 @@ extern "C" void *handle_connection(void *arg)
       break;
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && thd->wsrep_applier)
-  {
-    WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", thd->thread_id());
-    channel_info = NULL;
-  }
-#else
+    if (WSREP(thd) && thd->wsrep_applier)
+    {
+      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", thd->thread_id());
+      channel_info = NULL;
+    }
+    else
+    {
+#endif /* WITH_WSREP */
     channel_info= Per_thread_connection_handler::block_until_new_connection();
+#ifdef WITH_WSREP
+    }
 #endif /* WITH_WSREP */
     if (channel_info == NULL)
       break;

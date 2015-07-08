@@ -4286,6 +4286,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       opt_bin_logname=my_strdup(key_memory_opt_bin_logname,
                                 buf, MYF(0));
     }
+  }
 #ifdef WITH_WSREP /* WSREP BEFORE SE */
     /*
       Wsrep initialization must happen at this point, because:
@@ -4294,7 +4295,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       - SST may modify binlog index file, so it must be opened
         after SST has happened
      */
-  }
   if (!wsrep_recovery)
   {
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
@@ -4418,6 +4418,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+#ifdef WITH_WSREP
+/* innodb plugin initializes in following plugin_init() */
+#endif
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? PLUGIN_INIT_SKIP_INITIALIZATION : 0)))
@@ -6463,7 +6466,8 @@ extern "C" void *start_wsrep_THD(void *arg)
     return(NULL);
   }
 #else
-  thd = new THD; // note that contructor of THD uses DBUG_ !
+  thd = new THD(false, true); // note that contructor of THD uses DBUG_ !
+                              // (not enablin plugins, is applier)
   thd->thread_stack = (char*)&thd; // remember where our stack is
 #endif
 
