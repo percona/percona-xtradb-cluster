@@ -151,16 +151,21 @@ enum enum_server_command
 #define REFRESH_FAST		32768	/* Intern flag */
 
 /* RESET (remove all queries) from query cache */
-#define REFRESH_QUERY_CACHE	     65536
-#define REFRESH_QUERY_CACHE_FREE    0x20000L /* pack query cache */
-#define REFRESH_DES_KEY_FILE	     0x40000L
-#define REFRESH_USER_RESOURCES	     0x80000L
-#define REFRESH_QUERY_RESPONSE_TIME 0x100000L /* response time distibution */
-#define REFRESH_TABLE_STATS    0x200000L /* Refresh table stats my_hash table */
-#define REFRESH_INDEX_STATS    0x400000L /* Refresh index stats my_hash table */
-#define REFRESH_USER_STATS     0x800000L /* Refresh user stats my_hash table */
-#define REFRESH_CLIENT_STATS   0x1000000L /* Refresh client stats my_hash table */
-#define REFRESH_THREAD_STATS   0x2000000L /* Refresh thread stats my_hash table */
+#define REFRESH_QUERY_CACHE	65536
+#define REFRESH_QUERY_CACHE_FREE 0x20000L /* pack query cache */
+#define REFRESH_DES_KEY_FILE	0x40000L
+#define REFRESH_USER_RESOURCES	0x80000L
+#define REFRESH_FOR_EXPORT      0x100000L /* FLUSH TABLES ... FOR EXPORT */
+#define REFRESH_TABLE_STATS     0x200000L /* Refresh table stats my_hash
+                                             table */
+#define REFRESH_INDEX_STATS     0x400000L /* Refresh index stats my_hash
+                                             table */
+#define REFRESH_USER_STATS      0x800000L /* Refresh user stats my_hash
+                                             table */
+#define REFRESH_CLIENT_STATS    0x1000000L /* Refresh client stats my_hash
+                                              table */
+#define REFRESH_THREAD_STATS    0x2000000L /* Refresh thread stats my_hash
+                                              table */
 #define REFRESH_FLUSH_PAGE_BITMAPS 0x4000000L
 #define REFRESH_RESET_PAGE_BITMAPS 0x8000000L
 
