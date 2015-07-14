@@ -1460,6 +1460,14 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
     return -1;
   }
 
+  if (!thd->global_read_lock.provider_resumed())
+  {
+    WSREP_DEBUG("Aborting TOI: Galera provider paused due to lock: %s %lu",
+                thd->query(), thd->thread_id);
+    my_error(ER_CANT_UPDATE_WITH_READLOCK, MYF(0));
+    return -1;
+  }
+
   if (wsrep_debug && thd->mdl_context.has_locks())
   {
     WSREP_DEBUG("thread holds MDL locks at TI begin: %s %lu",
