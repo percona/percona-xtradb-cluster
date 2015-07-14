@@ -2148,7 +2148,9 @@ public:
 #ifdef WITH_WSREP
   bool wsrep_pause(void);
   wsrep_status_t wsrep_resume(void);
-  bool provider_resumed() { return !provider_paused; }
+  bool wsrep_pause_once(void);
+  wsrep_status_t wsrep_resume_once(void);
+  bool provider_resumed() const { return !provider_paused; }
   void pause_provider(bool val) { provider_paused= val; }
 #endif
   bool is_acquired() const { return m_state != GRL_NONE; }

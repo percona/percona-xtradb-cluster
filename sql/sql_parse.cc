@@ -4634,8 +4634,8 @@ end_with_restore_list:
         This is important because provider is resumed there
         and we don't want do it again.
       */
-    if (table_lock && !thd->global_read_lock.provider_resumed())
-            thd->global_read_lock.wsrep_resume();
+    if (WSREP(thd) && table_lock)
+        thd->global_read_lock.wsrep_resume_once();
 #endif
 
     if (res)
@@ -5116,12 +5116,19 @@ end_with_restore_list:
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) && thd->global_read_lock.provider_resumed())
-        if (!thd->global_read_lock.wsrep_pause())
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
           goto error;
 #endif
       if (flush_tables_with_read_lock(thd, all_tables))
+#ifdef WITH_WSREP
+      {
+        if (WSREP(thd))
+            thd->global_read_lock.wsrep_resume_once();
         goto error;
+      }
+#else
+        goto error;
+#endif
       my_ok(thd);
       break;
     }
@@ -5148,12 +5155,19 @@ end_with_restore_list:
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) && thd->global_read_lock.provider_resumed())
-        if (!thd->global_read_lock.wsrep_pause())
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
           goto error;
 #endif
       if (flush_tables_for_export(thd, all_tables))
+#ifdef WITH_WSREP
+      {
+        if (WSREP(thd))
+            thd->global_read_lock.wsrep_resume_once();
         goto error;
+      }
+#else
+        goto error;
+#endif
       my_ok(thd);
       break;
     }

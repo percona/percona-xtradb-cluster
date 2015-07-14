@@ -1119,7 +1119,7 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
 #ifdef WITH_WSREP
-  if (!wsrep_pause())
+  if (WSREP(thd) && !wsrep_pause())
     DBUG_RETURN(TRUE);
 #endif
   DBUG_RETURN(FALSE);
@@ -1176,6 +1176,19 @@ wsrep_status_t Global_read_lock::wsrep_resume(void)
        WSREP_WARN("resume failed: %d", ret);
     }
     return ret;
+}
+
+bool Global_read_lock::wsrep_pause_once(void)
+{
+    if (!provider_paused)
+        return wsrep_pause();
+    return TRUE;
+}
+wsrep_status_t Global_read_lock::wsrep_resume_once(void)
+{
+    if (provider_paused)
+        return wsrep_resume();
+    return WSREP_OK;
 }
 
 #endif /* WITH_WSREP */
