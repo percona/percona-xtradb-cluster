@@ -5517,8 +5517,8 @@ static Sys_var_enum Sys_block_encryption_mode(
 static Sys_var_mybool Sys_wsrep_dirty_reads(
        "wsrep_dirty_reads",
        "Allow dirty reads when the node is not ready.",
-       SESSION_ONLY(wsrep_dirty_reads),
-       NO_CMD_LINE, DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+       SESSION_VAR(wsrep_dirty_reads),
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
 #endif
 static Sys_var_mybool Sys_avoid_temporal_upgrade(
        "avoid_temporal_upgrade",
