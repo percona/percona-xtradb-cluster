@@ -310,8 +310,9 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         }
       }
 #ifdef WITH_WSREP
-      if (WSREP(thd) && (options & REFRESH_TABLES) &&
-              !(options & (REFRESH_FOR_EXPORT|REFRESH_READ_LOCK)))
+      if (WSREP(thd) && !thd->lex->no_write_to_binlog
+                     && (options & REFRESH_TABLES)
+                     && !(options & (REFRESH_FOR_EXPORT|REFRESH_READ_LOCK)))
       {
         /*
           This is done here because LOCK TABLES is not replicated in galera,
