@@ -5191,7 +5191,7 @@ end_with_restore_list:
     REFRESH_CLIENT_STATS                    |
     REFRESH_THREAD_STATS))
     {
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      WSREP_TO_ISOLATION_BEGIN_WRTCHK(WSREP_MYSQL_DB, NULL, NULL)
     }
 #endif /* WITH_WSREP*/
 
