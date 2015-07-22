@@ -2,6 +2,10 @@ Setting SST method to mysqldump ...
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
+CREATE USER sslsst;
+GRANT ALL PRIVILEGES ON *.* TO sslsst;
+GRANT USAGE ON *.* TO sslsst REQUIRE SSL;
+SET GLOBAL wsrep_sst_auth = 'sslsst:';
 Performing State Transfer on a server that has been temporarily disconnected
 CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;
 SET AUTOCOMMIT=OFF;
@@ -99,5 +103,4 @@ CALL mtr.add_suppression("Can't open and lock time zone table");
 CALL mtr.add_suppression("Can't open and lock privilege tables");
 CALL mtr.add_suppression("Info table is not ready to be used");
 CALL mtr.add_suppression("Native table .* has the wrong structure");
-SET GLOBAL general_log = ON;
-SET GLOBAL slow_query_log = ON;
+DROP USER sslsst;

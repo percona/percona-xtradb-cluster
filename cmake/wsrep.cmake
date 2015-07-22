@@ -18,6 +18,8 @@
 
 # Set the patch version
 SET(WSREP_PATCH_VERSION "11")
+INCLUDE(CheckFunctionExists)
+CHECK_FUNCTION_EXISTS(execvpe HAVE_EXECVPE)
 
 # Obtain patch revision number
 SET(WSREP_REVISION $ENV{WSREP_REV})

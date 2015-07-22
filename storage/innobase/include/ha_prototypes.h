@@ -280,7 +280,7 @@ innobase_casedn_str(
 /*================*/
 	char*	a);	/*!< in/out: string to put in lower case */
 
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && !defined(UNIV_INNOCHECKSUM)
 UNIV_INTERN
 int
 wsrep_innobase_kill_one_trx(void *thd_ptr,
@@ -296,7 +296,7 @@ UNIV_INTERN
 int 
 wsrep_on(void *thd_ptr);
 int wsrep_is_wsrep_xid(const void*);
-#endif /* WITH_WSREP */
+#endif /* WITH_WSREP && !UNIV_INNOCHECKSUM */
 /**********************************************************************//**
 Determines the connection character set.
 @return	connection character set */
