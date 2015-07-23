@@ -551,6 +551,7 @@ mkdir debug
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DWITH_READLINE=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
            -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
@@ -576,6 +577,7 @@ mkdir release
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DWITH_READLINE=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
            -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
@@ -1507,6 +1509,10 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Jul 23 2015 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+
+- Merge updates from Percona Server spec file.
+
 * Sat Aug 30 2014 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 
 - Add packaging for systemd and related changes.
