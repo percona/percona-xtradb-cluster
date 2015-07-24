@@ -463,6 +463,13 @@ static void* sst_joiner_thread (void* a)
 
 static int sst_append_auth_env(wsp::env& env, const char* sst_auth)
 {
+#ifndef HAVE_EXECVPE
+  if (setenv(WSREP_SST_AUTH_ENV, sst_auth ? sst_auth : "", 1)) 
+  {
+      return -errno;
+  }
+  return 0;
+#else
   int const sst_auth_size= strlen(WSREP_SST_AUTH_ENV) + 1 /* = */
     + (sst_auth ? strlen(sst_auth) : 0) + 1 /* \0 */;
 
@@ -480,6 +487,7 @@ static int sst_append_auth_env(wsp::env& env, const char* sst_auth)
 
   env.append(sst_auth_str());
   return -env.error();
+#endif
 }
 
 static ssize_t sst_prepare_other (const char*  method,

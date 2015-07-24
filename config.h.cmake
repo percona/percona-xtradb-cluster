@@ -459,6 +459,7 @@
 #cmakedefine HAVE_WCTYPE_T 1
 #cmakedefine HAVE_WINT_T 1
 
+#cmakedefine HAVE_EXECVPE 1
 
 #cmakedefine HAVE_STRCASECMP 1
 #cmakedefine HAVE_STRNCASECMP 1
