@@ -79,7 +79,7 @@ configure-stamp configure-pic-stamp:
 	@echo "RULES.$@"
 	dh_testdir
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
-	sh -c  'PATH=$${MYSQL_BUILD_PATH:-"/bin:/usr/bin"} \
+	sh -c  'PATH=$${MYSQL_BUILD_PATH:-"/usr/local/bin:/usr/bin:/bin"} \
 		CC=$${MYSQL_BUILD_CC:-gcc} \
 		CFLAGS=$${MYSQL_BUILD_CFLAGS:-"-O2 -DBIG_JOINS=1 ${FORCE_FPIC_CFLAGS} -fno-strict-aliasing ${TAOCRYPT_OPT}"} \
 		CXX=$${MYSQL_BUILD_CXX:-g++} \
