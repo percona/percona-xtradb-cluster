@@ -1119,7 +1119,7 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && !wsrep_pause())
+  if (!wsrep_pause())
     DBUG_RETURN(TRUE);
 #endif
   DBUG_RETURN(FALSE);
