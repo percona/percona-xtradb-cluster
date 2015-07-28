@@ -16744,6 +16744,16 @@ sp_tail:
             THD *thd= YYTHD;
             LEX *lex= Lex;
 
+            sp_head *sp= lex->sphead;
+
+            if (sp->m_flags & sp_head::CONTAINS_SAVEPOINT_OR_ROLLBACK)
+            {
+              my_error(ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP,
+              MYF(0),
+              "'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT'");
+              MYSQL_YYABORT;
+            }
+
             sp_finish_parsing(thd);
 
             lex->sql_command= SQLCOM_CREATE_PROCEDURE;

@@ -7117,6 +7117,8 @@ ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 	eng "Can't execute the query because you have a conflicting backup lock"
 	rus "Запрос не может быть выполнен из-за конфликтующей блокировки резервного копирования"
 
+ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP
+  eng "%s is not allowed in stored procedures, stored functions, triggers"
 #
 #  End of 5.6 error messages.
 #

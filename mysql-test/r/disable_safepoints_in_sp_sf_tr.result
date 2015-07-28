@@ -1,0 +1,46 @@
+############
+# Test for savepoint outside of SP, SF, TR
+############
+BEGIN;
+SAVEPOINT S;
+ROLLBACK TO SAVEPOINT S;
+COMMIT;
+
+############################################################
+# There must be error during parsing for the following tests
+############################################################
+
+############
+# Procedure
+############
+CREATE PROCEDURE p() BEGIN SAVEPOINT S; END|
+ERROR HY000: 'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT' is not allowed in stored procedures, stored functions, triggers
+CREATE PROCEDURE p() BEGIN ROLLBACK TO SAVEPOINT S; END|
+ERROR HY000: 'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT' is not allowed in stored procedures, stored functions, triggers
+
+############
+# Function
+############
+CREATE FUNCTION f() RETURNS INT BEGIN SAVEPOINT S; RETURN 1; END|
+ERROR HY000: 'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT' is not allowed in stored procedures, stored functions, triggers
+CREATE FUNCTION f() RETURNS INT BEGIN ROLLBACK TO SAVEPOINT S; RETURN 1; END|
+ERROR HY000: 'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT' is not allowed in stored procedures, stored functions, triggers
+
+############
+# Trigger
+############
+CREATE TABLE t1 (a INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+b INT(10) UNSIGNED NOT NULL DEFAULT 0)|
+CREATE TRIGGER test_trigger BEFORE INSERT ON t1
+FOR EACH ROW
+BEGIN
+SAVEPOINT S; 
+END|
+ERROR HY000: 'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT' is not allowed in stored procedures, stored functions, triggers
+CREATE TRIGGER test_trigger BEFORE INSERT ON t1
+FOR EACH ROW
+BEGIN
+ROLLBACK TO SAVEPOINT S; 
+END|
+ERROR HY000: 'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT' is not allowed in stored procedures, stored functions, triggers
+DROP TABLE t1|
