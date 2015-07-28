@@ -1,0 +1,62 @@
+# Disable SAVEPOINT and ROLLBACK TO SAVEPOINT in SP, SF, TR.
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+
+--echo ############
+--echo # Test for savepoint outside of SP, SF, TR
+--echo ############
+
+--connection node_1
+BEGIN;
+SAVEPOINT S;
+ROLLBACK TO SAVEPOINT S;
+COMMIT;
+
+--delimiter |
+
+--echo
+--echo ############################################################
+--echo # There must be error during parsing for the following tests
+--echo ############################################################
+
+--echo
+--echo ############
+--echo # Procedure
+--echo ############
+--error ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP
+CREATE PROCEDURE p() BEGIN SAVEPOINT S; END|
+--error ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP
+CREATE PROCEDURE p() BEGIN ROLLBACK TO SAVEPOINT S; END|
+
+--echo
+--echo ############
+--echo # Function
+--echo ############
+--error ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP
+CREATE FUNCTION f() RETURNS INT BEGIN SAVEPOINT S; RETURN 1; END|
+--error ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP
+CREATE FUNCTION f() RETURNS INT BEGIN ROLLBACK TO SAVEPOINT S; RETURN 1; END|
+
+--echo
+--echo ############
+--echo # Trigger
+--echo ############
+CREATE TABLE t1 (a INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                 b INT(10) UNSIGNED NOT NULL DEFAULT 0)|
+--error ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP
+CREATE TRIGGER test_trigger BEFORE INSERT ON t1
+  FOR EACH ROW
+  BEGIN
+    SAVEPOINT S; 
+  END|
+--error ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP
+CREATE TRIGGER test_trigger BEFORE INSERT ON t1
+  FOR EACH ROW
+  BEGIN
+    ROLLBACK TO SAVEPOINT S; 
+  END|
+DROP TABLE t1|
+
+--delimiter |
