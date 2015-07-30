@@ -1950,11 +1950,6 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 #ifndef EMBEDDED_LIBRARY
   case COM_SHUTDOWN:
   {
-    if (packet_length < 1)
-    {
-      my_error(ER_MALFORMED_PACKET, MYF(0));
-      break;
-    }
     status_var_increment(thd->status_var.com_other);
     if (check_global_access(thd,SHUTDOWN_ACL))
       break; /* purecov: inspected */
@@ -1965,7 +1960,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       packet[0].
     */
     enum mysql_enum_shutdown_level level;
-    if (!thd->is_valid_time())
+    if (packet_length == 0 || !thd->is_valid_time())
       level= SHUTDOWN_DEFAULT;
     else
       level= (enum mysql_enum_shutdown_level) (uchar) packet[0];
@@ -4603,8 +4598,12 @@ end_with_restore_list:
         Can we commit safely? If not, return to avoid releasing
         transactional metadata locks.
       */
-      if (trans_check_state(thd))
+      if (trans_check_state(thd)) {
+        /* Cannot happen, but still reset this for safety */
+        if (reset_timer)
+          reset_statement_timer(thd);
         DBUG_RETURN(-1);
+      }
       res= trans_commit_implicit(thd);
       thd->locked_tables_list.unlock_locked_tables(thd);
       thd->mdl_context.release_transactional_locks();
@@ -4663,7 +4662,11 @@ end_with_restore_list:
       transactional metadata locks.
     */
     if (trans_check_state(thd))
+    {
+      if (reset_timer)
+        reset_statement_timer(thd);
       DBUG_RETURN(-1);
+    }
     /* We must end the transaction first, regardless of anything */
     res= trans_commit_implicit(thd);
     thd->locked_tables_list.unlock_locked_tables(thd);
@@ -5215,6 +5218,25 @@ end_with_restore_list:
     */
     if (!reload_acl_and_cache(thd, lex->type, first_table, &write_to_binlog))
     {
+#ifdef WITH_WSREP
+      if ((lex->type & REFRESH_TABLES) && !(lex->type & (REFRESH_FOR_EXPORT|REFRESH_READ_LOCK)))
+      {
+        /*
+          This is done after reload_acl_and_cache is because
+          LOCK TABLES is not replicated in galera, the upgrade of which
+          is checked in reload_acl_and_cache.
+          Hence, done after/if we are able to upgrade locks.
+        */
+        if (first_table)
+        {
+            WSREP_TO_ISOLATION_BEGIN(NULL, NULL, first_table);
+        }
+        else
+        {
+            WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
+        }
+      }
+#endif /* WITH_WSREP */
       /*
         We WANT to write and we CAN write.
         ! we write after unlocking the table.

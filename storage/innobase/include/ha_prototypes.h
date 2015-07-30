@@ -28,13 +28,16 @@ Created 5/11/2006 Osku Salerma
 #define HA_INNODB_PROTOTYPES_H
 
 #include "my_dbug.h"
-#include "mysqld_error.h"
 #include "my_compare.h"
 #include "my_sys.h"
 #include "m_string.h"
-#include "debug_sync.h"
 
+#ifndef UNIV_INNOCHECKSUM
+#include "mysqld_error.h"
+#include "debug_sync.h"
 #include "trx0types.h"
+#endif
+
 #include "m_ctype.h" /* CHARSET_INFO */
 
 // Forward declarations
@@ -80,6 +83,8 @@ innobase_raw_format(
 	ulint		buf_size);	/*!< in: output buffer size
 					in bytes */
 
+#ifndef UNIV_INNOCHECKSUM
+
 /*****************************************************************//**
 Invalidates the MySQL query cache for the table. */
 UNIV_INTERN
@@ -95,6 +100,8 @@ innobase_invalidate_query_cache(
 					always in LOWER CASE! */
 	ulint		full_name_len);	/*!< in: full name length where
 					also the null chars count */
+
+#endif /* #ifndef UNIV_INNOCHECKSUM */
 
 /*****************************************************************//**
 Convert a table or index name to the MySQL system_charset_info (UTF-8)
@@ -273,7 +280,7 @@ innobase_casedn_str(
 /*================*/
 	char*	a);	/*!< in/out: string to put in lower case */
 
-#ifdef WITH_WSREP
+#if defined(WITH_WSREP) && !defined(UNIV_INNOCHECKSUM)
 UNIV_INTERN
 int
 wsrep_innobase_kill_one_trx(void *thd_ptr,
@@ -289,7 +296,7 @@ UNIV_INTERN
 int 
 wsrep_on(void *thd_ptr);
 int wsrep_is_wsrep_xid(const void*);
-#endif /* WITH_WSREP */
+#endif /* WITH_WSREP && !UNIV_INNOCHECKSUM */
 /**********************************************************************//**
 Determines the connection character set.
 @return	connection character set */
