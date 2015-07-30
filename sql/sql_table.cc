@@ -7571,7 +7571,7 @@ static Create_field *get_field_by_old_name(Alter_info *alter_info,
 enum fk_column_change_type
 {
   FK_COLUMN_NO_CHANGE, FK_COLUMN_DATA_CHANGE,
-  FK_COLUMN_RENAMED, FK_COLUMN_DROPPED
+  FK_COLUMN_RENAMED, FK_COLUMN_DROPPED, FK_COLUMN_CHANGE_SAFE_FOR_PARENT
 };
 
 
@@ -7595,6 +7595,9 @@ enum fk_column_change_type
                                  foreign_key_checks is on).
   @retval FK_COLUMN_RENAMED      Foreign key column is renamed.
   @retval FK_COLUMN_DROPPED      Foreign key column is dropped.
+  @retval FK_COLUMN_CHANGE_SAFE_FOR_PARENT
+                                 The column change is safe is this is a
+                                 referenced column
 */
 
 static enum fk_column_change_type
@@ -7628,7 +7631,9 @@ fk_check_column_changes(THD *thd, Alter_info *alter_info,
         return FK_COLUMN_RENAMED;
       }
 
-      if ((old_field->is_equal(new_field) == IS_EQUAL_NO) ||
+      bool fields_differ= (old_field->is_equal(new_field) == IS_EQUAL_NO);
+
+      if (fields_differ ||
           ((new_field->flags & NOT_NULL_FLAG) &&
            !(old_field->flags & NOT_NULL_FLAG)))
       {
@@ -7641,7 +7646,9 @@ fk_check_column_changes(THD *thd, Alter_info *alter_info,
             and thus referential integrity might be broken,
           */
           *bad_column_name= column->str;
-          return FK_COLUMN_DATA_CHANGE;
+          /* NULL to NOT NULL column change is safe for referenced columns */
+          return fields_differ
+            ? FK_COLUMN_DATA_CHANGE : FK_COLUMN_CHANGE_SAFE_FOR_PARENT;
         }
       }
     }
@@ -7760,6 +7767,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
     switch(changes)
     {
     case FK_COLUMN_NO_CHANGE:
+    case FK_COLUMN_CHANGE_SAFE_FOR_PARENT:
       /* No significant changes. We can proceed with ALTER! */
       break;
     case FK_COLUMN_DATA_CHANGE:
@@ -7833,6 +7841,7 @@ static bool fk_prepare_copy_alter_table(THD *thd, TABLE *table,
     case FK_COLUMN_NO_CHANGE:
       /* No significant changes. We can proceed with ALTER! */
       break;
+    case FK_COLUMN_CHANGE_SAFE_FOR_PARENT:
     case FK_COLUMN_DATA_CHANGE:
       my_error(ER_FK_COLUMN_CANNOT_CHANGE, MYF(0), bad_column_name,
                f_key->foreign_id->str);
