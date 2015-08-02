@@ -6,6 +6,7 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
+set session wsrep_replicate_myisam=ON;
 CREATE TABLE t1 (f1 INTEGER) ENGINE=MyISAM;
 CREATE TEMPORARY TABLE t2 (f1 INTEGER) ENGINE=MyISAM;
 CREATE TABLE t3 (f1 INTEGER) ENGINE=InnoDB;
