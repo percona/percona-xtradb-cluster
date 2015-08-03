@@ -468,8 +468,7 @@ public:
       b) because in CONTAINS SQL case they don't provide enough
       information anyway.
      */
-    MODIFIES_DATA= 4096,
-    CONTAINS_SAVEPOINT_OR_ROLLBACK= 8192
+    MODIFIES_DATA= 4096
   };
 
 public:
@@ -866,15 +865,10 @@ public:
       my_error(ER_STMT_NOT_ALLOWED_IN_SF_OR_TRG, MYF(0), "RESET");
     else if (m_flags & HAS_SQLCOM_FLUSH)
       my_error(ER_STMT_NOT_ALLOWED_IN_SF_OR_TRG, MYF(0), "FLUSH");
-    else if (m_flags & CONTAINS_SAVEPOINT_OR_ROLLBACK)
-      my_error(ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP,
-               MYF(0),
-               "'SAVEPOINT' or 'ROLLBACK TO SAVEPOINT'");
 
     return MY_TEST(m_flags &
                    (CONTAINS_DYNAMIC_SQL|MULTI_RESULTS|HAS_SET_AUTOCOMMIT_STMT|
-                    HAS_COMMIT_OR_ROLLBACK|HAS_SQLCOM_RESET|HAS_SQLCOM_FLUSH|
-                    CONTAINS_SAVEPOINT_OR_ROLLBACK));
+                    HAS_COMMIT_OR_ROLLBACK|HAS_SQLCOM_RESET|HAS_SQLCOM_FLUSH));
   }
 
 #ifndef DBUG_OFF

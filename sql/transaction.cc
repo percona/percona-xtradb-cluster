@@ -578,14 +578,6 @@ bool trans_savepoint(THD *thd, LEX_STRING name)
   SAVEPOINT **sv, *newsv;
   DBUG_ENTER("trans_savepoint");
 
-  if (thd->sp_runtime_ctx)
-  {
-    my_error(ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP,
-             MYF(0),
-             "'SAVEPOINT'");
-    DBUG_RETURN(TRUE);
-  }
-
   if (!(thd->in_multi_stmt_transaction_mode() || thd->in_sub_stmt) ||
       !opt_using_transactions)
     DBUG_RETURN(FALSE);
@@ -663,14 +655,6 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
   int res= FALSE;
   SAVEPOINT *sv= *find_savepoint(thd, name);
   DBUG_ENTER("trans_rollback_to_savepoint");
-
-  if (thd->sp_runtime_ctx)
-  {
-    my_error(ER_SAVEPOINT_OR_ROLLBACK_TO_SAVEPOINT_NOT_ALLOWED_IN_SP,
-             MYF(0),
-             "'ROLLBACK TO SAVEPOINT'");
-    DBUG_RETURN(TRUE);
-  }
 
 #ifndef DBUG_OFF
   char buf1[256], buf2[256];

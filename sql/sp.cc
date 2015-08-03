@@ -2479,10 +2479,6 @@ uint sp_get_flags_for_command(LEX *lex)
   case SQLCOM_DEALLOCATE_PREPARE:
     flags= sp_head::CONTAINS_DYNAMIC_SQL;
     break;
-  case SQLCOM_SAVEPOINT:
-  case SQLCOM_ROLLBACK_TO_SAVEPOINT:
-    flags= sp_head::CONTAINS_SAVEPOINT_OR_ROLLBACK;
-    break;
   case SQLCOM_CREATE_TABLE:
     if (lex->create_info.options & HA_LEX_CREATE_TMP_TABLE)
       flags= 0;
