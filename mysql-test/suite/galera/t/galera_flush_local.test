@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS t1, t2, x1, x2;
 # The following FLUSH LOCAL statements should *not* be replicated
 #
 --connection node_1
+set session wsrep_sync_wait=1;
 CREATE TABLE t1 (f1 INTEGER);
 CREATE TABLE t2 (f1 INT PRIMARY KEY AUTO_INCREMENT, f2 INTEGER);
 SET SESSION wsrep_replicate_myisam = TRUE;
@@ -24,6 +25,7 @@ INSERT INTO t2 (f2) SELECT 1 FROM t1 AS a1, t1 AS a2, t1 AS a3, t1 AS a4;
 INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 
 --connection node_2
+set session wsrep_sync_wait=1;
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --connection node_1
 FLUSH LOCAL DES_KEY_FILE;
@@ -106,6 +108,12 @@ FLUSH SLOW LOGS;
 FLUSH GENERAL LOGS;
 FLUSH ENGINE LOGS;
 FLUSH RELAY LOGS;
+--connection node_2
+--let $wsrep_last_committed_after2 = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--disable_query_log
+--eval SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before2 AS wsrep_last_committed_diff;
+--enable_query_log
+--connection node_1
 FLUSH CLIENT_STATISTICS;
 FLUSH INDEX_STATISTICS;
 FLUSH TABLE_STATISTICS;
@@ -123,6 +131,12 @@ UNLOCK TABLES;
 LOCK TABLES t1 WRITE;
 FLUSH TABLES t1;
 UNLOCK TABLES;
+--connection node_2
+--let $wsrep_last_committed_after2 = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--disable_query_log
+--eval SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before2 AS wsrep_last_committed_diff;
+--enable_query_log
+--connection node_1
 LOCK TABLES t1 READ;
 --error ER_TABLE_NOT_LOCKED_FOR_WRITE
 FLUSH TABLES t1;

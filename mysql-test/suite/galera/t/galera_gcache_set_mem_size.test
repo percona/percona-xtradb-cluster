@@ -6,6 +6,11 @@
 --let LOGF=$MYSQLTEST_VARDIR/log/mysqld.1.err
 --disable_info
 
+
+# Required to disable earlier warnings, if any.
+--exec cp $MYSQLTEST_VARDIR/log/mysqld.1.err $MYSQLTEST_VARDIR/log/mysqld.1.err.bkp
+--exec echo > $MYSQLTEST_VARDIR/log/mysqld.1.err
+
 SET GLOBAL wsrep_provider_options="gcache.mem_size=262144";
 
 # Search for deprecation warnings in error log.
@@ -29,3 +34,6 @@ perl;
   print "Deprecation warning count: $count_warnings\n";
   close(FILE);
 EOF
+
+--exec cat $MYSQLTEST_VARDIR/log/mysqld.1.err.bkp > $MYSQLTEST_VARDIR/log/mysqld.1.err
+--remove_file  $MYSQLTEST_VARDIR/log/mysqld.1.err.bkp
