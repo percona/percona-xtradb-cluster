@@ -10,7 +10,7 @@
 
 --disable_result_log
 --disable_query_log
-let $counter= 500;
+let $counter= 1200;
 let $mysql_errno= 9999;
 let $successes= 2;
 
