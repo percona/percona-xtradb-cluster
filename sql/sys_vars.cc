@@ -4741,12 +4741,13 @@ static Sys_var_tz Sys_time_zone(
 #include "wsrep_sst.h"
 #include "wsrep_binlog.h"
 
+static PolyLock_mutex PLock_wsrep_slave_threads(&LOCK_wsrep_slave_threads);
 static Sys_var_charptr Sys_wsrep_provider(
        "wsrep_provider", "Path to replication provider library",
        PREALLOCATED GLOBAL_VAR(wsrep_provider), CMD_LINE(REQUIRED_ARG, OPT_WSREP_PROVIDER),
        IN_FS_CHARSET, DEFAULT(wsrep_provider), 
        //       IN_FS_CHARSET, DEFAULT(wsrep_provider_default), 
-       NO_MUTEX_GUARD, NOT_IN_BINLOG,
+       &PLock_wsrep_slave_threads, NOT_IN_BINLOG,
        ON_CHECK(wsrep_provider_check), ON_UPDATE(wsrep_provider_update));
 
 static Sys_var_charptr Sys_wsrep_provider_options(
@@ -4772,7 +4773,6 @@ static Sys_var_charptr Sys_wsrep_cluster_name(
        ON_CHECK(wsrep_cluster_name_check),
        ON_UPDATE(wsrep_cluster_name_update));
 
-static PolyLock_mutex PLock_wsrep_slave_threads(&LOCK_wsrep_slave_threads);
 static Sys_var_charptr Sys_wsrep_cluster_address (
        "wsrep_cluster_address", "Address to initially connect to cluster",
        PREALLOCATED GLOBAL_VAR(wsrep_cluster_address), 
