@@ -137,6 +137,8 @@ then
 else
     wsrep_log_info "Bypassing state dump."
     echo $SET_START_POSITION | $MYSQL
+    (echo $RESTORE_GENERAL_LOG && \
+        echo $RESTORE_SLOW_QUERY_LOG) | $MYSQL
 fi
 wsrep_cleanup_progress_file
 #

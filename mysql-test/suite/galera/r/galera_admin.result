@@ -13,22 +13,16 @@ ANALYZE TABLE t1, t2;
 Table	Op	Msg_type	Msg_text
 test.t1	analyze	status	OK
 test.t2	analyze	status	OK
-wsrep_last_committed_diff
-1
 OPTIMIZE TABLE t1, t2;
 Table	Op	Msg_type	Msg_text
 test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
 test.t1	optimize	status	OK
 test.t2	optimize	note	Table does not support optimize, doing recreate + analyze instead
 test.t2	optimize	status	OK
-wsrep_last_committed_diff
-1
 REPAIR TABLE x1, x2;
 Table	Op	Msg_type	Msg_text
 test.x1	repair	status	OK
 test.x2	repair	status	OK
-wsrep_last_committed_diff
-1
 SELECT COUNT(*) = 10 FROM t1;
 COUNT(*) = 10
 1
