@@ -5,13 +5,15 @@
 # Use default setting for mysqld processes
 !include include/default_mysqld.cnf
 
-[mysqld.1]
+[mysqld]
+log-slave-updates
 log-bin=mysqld-bin
 binlog-format=row
+
+[mysqld.1]
 server-id=1
 
 [mysqld.2]
-binlog-format=row
 server-id=2
 
 wsrep_provider=@ENV.WSREP_PROVIDER
@@ -32,8 +34,6 @@ innodb_autoinc_lock_mode=2
 innodb_flush_log_at_trx_commit=2
 
 [mysqld.3]
-binlog-format=row
-
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.2.#galera_port'
 wsrep_provider_options='base_port=@mysqld.3.#galera_port'
@@ -58,8 +58,8 @@ NODE_MYSOCK_1= @mysqld.1.socket
 NODE_MYPORT_2= @mysqld.2.port
 NODE_MYSOCK_2= @mysqld.2.socket
 
-NODE_MYPORT_3= @mysqld.2.port
-NODE_MYSOCK_3= @mysqld.2.socket
+NODE_MYPORT_3= @mysqld.3.port
+NODE_MYSOCK_3= @mysqld.3.socket
 
 NODE_GALERAPORT_2= @mysqld.2.#galera_port
 NODE_GALERAPORT_3= @mysqld.3.#galera_port
