@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -398,6 +398,37 @@ Obsoletes:      MySQL-shared-advanced-gpl MySQL-shared-enterprise-gpl
 %description -n mysql-wsrep-shared%{product_suffix}
 This package contains the shared libraries (*.so*) which certain languages
 and applications need to dynamically load and use MySQL.
+
+# ----------------------------------------------------------------------------
+%package -n MySQL-embedded%{product_suffix}
+Summary:        MySQL - Embedded library
+Group:          Applications/Databases
+%if 0%{?commercial}
+Requires:       MySQL-devel-advanced
+Obsoletes:      MySQL-embedded
+%else
+Requires:       MySQL-devel
+Obsoletes:      MySQL-embedded-advanced
+%endif
+Obsoletes:      mysql-embedded < %{version}-%{release}
+Obsoletes:      mysql-embedded-advanced
+Obsoletes:      MySQL-embedded-pro
+Obsoletes:      MySQL-embedded-classic MySQL-embedded-community MySQL-embedded-enterprise
+Obsoletes:      MySQL-embedded-advanced-gpl MySQL-embedded-enterprise-gpl
+Provides:       mysql-embedded = %{version}-%{release}
+Provides:       mysql-embedded%{?_isa} = %{version}-%{release}
+
+%description -n MySQL-embedded%{product_suffix}
+This package contains the MySQL server as an embedded library.
+
+The embedded MySQL server library makes it possible to run a full-featured
+MySQL server inside the client application. The main benefits are increased
+speed and more simple management for embedded applications.
+
+The API is identical for the embedded MySQL version and the
+client/server version.
+
+For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 
 ##############################################################################
 %prep
