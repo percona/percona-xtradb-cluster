@@ -82,7 +82,7 @@
 #include "sql_acl.h"                       // SUPER_ACL
 #include <hash.h>
 #include <assert.h>
-
+#include "my_atomic.h"
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
