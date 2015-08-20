@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -203,6 +203,13 @@ ha_rows filesort(THD *thd, TABLE *table, SORT_FIELD *sortorder, uint s_length,
     const ulong min_sort_memory=
       max(MIN_SORT_MEMORY,
           ALIGN_SIZE(MERGEBUFF2 * (param.rec_length + sizeof(uchar*))));
+    /*
+      Cannot depend on num_rows. For external sort, space for upto MERGEBUFF2
+      rows is required.
+    */
+    if (num_rows < MERGEBUFF2)
+      num_rows= MERGEBUFF2;
+
     while (memory_available >= min_sort_memory)
     {
       ulong keys= memory_available / (param.rec_length + sizeof(char*));
@@ -258,9 +265,6 @@ ha_rows filesort(THD *thd, TABLE *table, SORT_FIELD *sortorder, uint s_length,
   }
   else
   {
-    /* filesort cannot handle zero-length records during merge. */
-    DBUG_ASSERT(param.sort_length != 0);
-
     if (table_sort.buffpek && table_sort.buffpek_len < maxbuffer)
     {
       my_free(table_sort.buffpek);
