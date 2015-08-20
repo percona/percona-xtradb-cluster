@@ -5,11 +5,7 @@
 # Access Type: Dynamic                                                        #
 # Data Type: numeric                                                          #
 # Default Value: 8192                                                         #
-<<<<<<< HEAD:mysql-test/suite/sys_vars/t/transaction_alloc_block_size_basic.test
-# Range: 1024-134217728                                                       #
-=======
 # Range: 1024-131072                                                          #
->>>>>>> mysql-5.5.44:mysql-test/suite/sys_vars/t/transaction_alloc_block_size_basic.test
 #                                                                             #
 #                                                                             #
 # Creation Date: 2008-02-14                                                   #
@@ -89,12 +85,9 @@ SELECT @@global.transaction_alloc_block_size;
 # Change the value of variable to a valid value for SESSION Scope #
 ###################################################################
 
-<<<<<<< HEAD:mysql-test/suite/sys_vars/t/transaction_alloc_block_size_basic.test
-=======
 SET @@session.transaction_alloc_block_size = 1024;
 SELECT @@session.transaction_alloc_block_size;
 
->>>>>>> mysql-5.5.44:mysql-test/suite/sys_vars/t/transaction_alloc_block_size_basic.test
 SET @@session.transaction_alloc_block_size = 65535;
 SELECT @@session.transaction_alloc_block_size;
 
