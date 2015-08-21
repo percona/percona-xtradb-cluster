@@ -1950,11 +1950,6 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
 #ifndef EMBEDDED_LIBRARY
   case COM_SHUTDOWN:
   {
-    if (packet_length < 1)
-    {
-      my_error(ER_MALFORMED_PACKET, MYF(0));
-      break;
-    }
     status_var_increment(thd->status_var.com_other);
     if (check_global_access(thd,SHUTDOWN_ACL))
       break; /* purecov: inspected */
@@ -1965,7 +1960,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       packet[0].
     */
     enum mysql_enum_shutdown_level level;
-    if (!thd->is_valid_time())
+    if (packet_length == 0 || !thd->is_valid_time())
       level= SHUTDOWN_DEFAULT;
     else
       level= (enum mysql_enum_shutdown_level) (uchar) packet[0];
@@ -4603,8 +4598,12 @@ end_with_restore_list:
         Can we commit safely? If not, return to avoid releasing
         transactional metadata locks.
       */
-      if (trans_check_state(thd))
+      if (trans_check_state(thd)) {
+        /* Cannot happen, but still reset this for safety */
+        if (reset_timer)
+          reset_statement_timer(thd);
         DBUG_RETURN(-1);
+      }
       res= trans_commit_implicit(thd);
       thd->locked_tables_list.unlock_locked_tables(thd);
       thd->mdl_context.release_transactional_locks();
@@ -4634,8 +4633,8 @@ end_with_restore_list:
         This is important because provider is resumed there
         and we don't want do it again.
       */
-    if (table_lock && !thd->global_read_lock.provider_resumed())
-            thd->global_read_lock.wsrep_resume();
+    if (WSREP(thd) && table_lock)
+        thd->global_read_lock.wsrep_resume_once();
 #endif
 
     if (res)
@@ -4663,7 +4662,11 @@ end_with_restore_list:
       transactional metadata locks.
     */
     if (trans_check_state(thd))
+    {
+      if (reset_timer)
+        reset_statement_timer(thd);
       DBUG_RETURN(-1);
+    }
     /* We must end the transaction first, regardless of anything */
     res= trans_commit_implicit(thd);
     thd->locked_tables_list.unlock_locked_tables(thd);
@@ -5116,12 +5119,19 @@ end_with_restore_list:
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) && thd->global_read_lock.provider_resumed())
-        if (!thd->global_read_lock.wsrep_pause())
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
           goto error;
 #endif
       if (flush_tables_with_read_lock(thd, all_tables))
+#ifdef WITH_WSREP
+      {
+        if (WSREP(thd))
+            thd->global_read_lock.wsrep_resume_once();
         goto error;
+      }
+#else
+        goto error;
+#endif
       my_ok(thd);
       break;
     }
@@ -5148,28 +5158,57 @@ end_with_restore_list:
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) && thd->global_read_lock.provider_resumed())
-        if (!thd->global_read_lock.wsrep_pause())
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
           goto error;
 #endif
       if (flush_tables_for_export(thd, all_tables))
+#ifdef WITH_WSREP
+      {
+        if (WSREP(thd))
+            thd->global_read_lock.wsrep_resume_once();
         goto error;
+      }
+#else
+        goto error;
+#endif
       my_ok(thd);
       break;
     }
 
 #ifdef WITH_WSREP
     if (lex->type & (
-            REFRESH_GRANT            |
-            REFRESH_HOSTS            |
-            REFRESH_DES_KEY_FILE     |
+    REFRESH_GRANT                           |
+    REFRESH_HOSTS                           |
+#ifdef HAVE_OPENSSL
+    REFRESH_DES_KEY_FILE                    |
+#endif
+    /*
+      Write all flush log statements except
+      FLUSH LOGS
+      FLUSH BINARY LOGS
+      Check reload_acl_and_cache for why.
+    */
+    REFRESH_RELAY_LOG                       |
+    REFRESH_SLOW_LOG                        |
+    REFRESH_GENERAL_LOG                     |
+    REFRESH_ENGINE_LOG                      |
+    REFRESH_ERROR_LOG                       |
 #ifdef HAVE_QUERY_CACHE
-            REFRESH_QUERY_CACHE_FREE |
+    REFRESH_QUERY_CACHE_FREE                |
 #endif /* HAVE_QUERY_CACHE */
-            REFRESH_STATUS           |
-            REFRESH_USER_RESOURCES))
+    REFRESH_STATUS                          |
+    REFRESH_USER_RESOURCES                  |
+    /*
+      Percona Server specific
+    */
+    REFRESH_FLUSH_PAGE_BITMAPS              |
+    REFRESH_TABLE_STATS                     |
+    REFRESH_INDEX_STATS                     |
+    REFRESH_USER_STATS                      |
+    REFRESH_CLIENT_STATS                    |
+    REFRESH_THREAD_STATS))
     {
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      WSREP_TO_ISOLATION_BEGIN_WRTCHK(WSREP_MYSQL_DB, NULL, NULL)
     }
 #endif /* WITH_WSREP*/
 

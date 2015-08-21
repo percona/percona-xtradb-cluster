@@ -18,6 +18,7 @@ niceness=0
 mysqld_ld_preload=
 mysqld_ld_library_path=
 load_jemalloc=1
+load_hotbackup=1
 flush_caches=0
 numa_interleave=0
 resume_on_fail=1
@@ -630,11 +631,24 @@ parse_arguments PICK-ARGS-FROM-ARGV "$@"
 #
 if test $load_jemalloc -eq 1
 then
-  for libjemall in "/usr/lib64" "/usr/lib/x86_64-linux-gnu" "/usr/lib"; do
+  for libjemall in "${MY_BASEDIR_VERSION}/lib/mysql" "/usr/lib64" "/usr/lib/x86_64-linux-gnu" "/usr/lib"; do
     if [ -r "$libjemall/libjemalloc.so.1" ]; then
       add_mysqld_ld_preload "$libjemall/libjemalloc.so.1"
       break
     fi  
+  done
+fi
+
+#
+# Add TokuDB HotBackup library to ld_preload
+#
+if test $load_hotbackup -eq 1
+then
+  for libhb in "${MY_BASEDIR_VERSION}/lib" "/usr/lib64" "/usr/lib/x86_64-linux-gnu" "/usr/lib"; do
+    if [ -r "$libhb/libHotBackup.so" ]; then
+      add_mysqld_ld_preload "$libhb/libHotBackup.so"
+      break
+    fi
   done
 fi
 

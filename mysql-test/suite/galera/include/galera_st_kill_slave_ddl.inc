@@ -1,6 +1,8 @@
 --echo Performing State Transfer on a server that has been killed and restarted
 --echo while a DDL was in progress on it
 
+--source include/have_debug.inc
+
 --connection node_1
 CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;
 SET AUTOCOMMIT=OFF;

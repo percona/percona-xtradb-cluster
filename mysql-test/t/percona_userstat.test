@@ -1,5 +1,7 @@
 --source include/have_innodb.inc
 
+--source include/count_sessions.inc
+
 --disable_warnings
 DROP TABLE IF EXISTS t1; 
 --enable_warnings
@@ -12,6 +14,26 @@ FLUSH INDEX_STATISTICS;
 FLUSH TABLE_STATISTICS;
 FLUSH THREAD_STATISTICS;
 FLUSH USER_STATISTICS;
+
+# Test FLUSH with non-SUPER users
+CREATE USER mysqltest_1@localhost;
+GRANT RELOAD ON *.* TO mysqltest_1@localhost;
+
+connect (conn1,localhost,mysqltest_1,,);
+--echo conn1 by mysqltest_1
+FLUSH CLIENT_STATISTICS;
+# Bug 1472251: mixup of FLUSH INDEX_STATISTICS and CHANGED_PAGE_BITMAPS
+# requires SUPER for the former
+FLUSH INDEX_STATISTICS;
+FLUSH TABLE_STATISTICS;
+FLUSH THREAD_STATISTICS;
+FLUSH USER_STATISTICS;
+disconnect conn1;
+
+--echo default connection
+connection default;
+
+DROP USER mysqltest_1@localhost;
 
 # Test that I_S and SHOW queries work with userstat disabled
 SELECT * FROM INFORMATION_SCHEMA.CLIENT_STATISTICS;
@@ -28,6 +50,8 @@ SHOW USER_STATISTICS;
 
 SET @userstat_old= @@userstat;
 SET GLOBAL userstat=ON;
+SET @thread_statistics_old= @@thread_statistics;
+SET GLOBAL thread_statistics=ON;
 
 # Test that statistics start at empty state
 
@@ -35,7 +59,7 @@ SET GLOBAL userstat=ON;
 SELECT * FROM INFORMATION_SCHEMA.CLIENT_STATISTICS;
 SELECT * FROM INFORMATION_SCHEMA.INDEX_STATISTICS;
 SELECT * FROM INFORMATION_SCHEMA.TABLE_STATISTICS;
---replace_column 3 CONNECTED_TIME 4 BUSY_TIME 5 CPU_TIME
+--replace_column 1 THREAD_ID 4 CONNECTED_TIME 5 BUSY_TIME 6 CPU_TIME
 SELECT * FROM INFORMATION_SCHEMA.THREAD_STATISTICS;
 --replace_column 3 CONNECTED_TIME 4 BUSY_TIME 5 CPU_TIME
 SELECT * FROM INFORMATION_SCHEMA.USER_STATISTICS;
@@ -44,10 +68,12 @@ SELECT * FROM INFORMATION_SCHEMA.USER_STATISTICS;
 SHOW CLIENT_STATISTICS;
 SHOW INDEX_STATISTICS;
 SHOW TABLE_STATISTICS;
---replace_column 3 CONNECTED_TIME 4 BUSY_TIME 5 CPU_TIME
+--replace_column 1 THREAD_ID 3 CONNECTED_TIME 4 BUSY_TIME 5 CPU_TIME
 SHOW THREAD_STATISTICS;
 --replace_column 3 CONNECTED_TIME 4 BUSY_TIME 5 CPU_TIME
 SHOW USER_STATISTICS;
+
+SET GLOBAL thread_statistics= @thread_statistics_old;
 
 # Bug 602047 (wrong rows_read value)
 
@@ -89,3 +115,5 @@ SELECT * FROM INFORMATION_SCHEMA.TABLE_STATISTICS WHERE TABLE_NAME='t2';
 DROP TABLE t2;
 
 SET GLOBAL userstat= @userstat_old;
+
+--source include/wait_until_count_sessions.inc

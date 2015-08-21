@@ -45,6 +45,7 @@
 #include <mysql/psi/mysql_idle.h>
 #include <mysql_com_server.h>
 #include "sql_data_change.h"
+#include "my_atomic.h"
 
 #ifdef HAVE_QUERY_CACHE
 #include "query_strip_comments.h"
@@ -2131,6 +2132,16 @@ public:
 
   bool lock_global_read_lock(THD *thd);
   void unlock_global_read_lock(THD *thd);
+
+  /**
+    Used by innodb memcached server to check if any connections
+    have global read lock
+  */
+  static bool global_read_lock_active()
+  {
+    return my_atomic_load32(&m_active_requests) ? true : false;
+  }
+
   /**
     Check if this connection can acquire protection against GRL and
     emit error if otherwise.
@@ -2148,12 +2159,15 @@ public:
 #ifdef WITH_WSREP
   bool wsrep_pause(void);
   wsrep_status_t wsrep_resume(void);
-  bool provider_resumed() { return !provider_paused; }
+  bool wsrep_pause_once(void);
+  wsrep_status_t wsrep_resume_once(void);
+  bool provider_resumed() const { return !provider_paused; }
   void pause_provider(bool val) { provider_paused= val; }
 #endif
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
 private:
+  volatile static int32 m_active_requests;
   enum_grl_state m_state;
   /**
    Set to true when wsrep->pause is invoked and
@@ -2190,7 +2204,7 @@ public:
   bool acquire(THD *thd);
   void release(THD *thd);
 
-  void set_explicit_lock_duration(THD *thd);
+  void set_explicit_locks_duration(THD *thd);
 
   bool acquire_protection(THD *thd, enum_mdl_duration duration,
                           ulong lock_wait_timeout);
@@ -2499,6 +2513,7 @@ public:
     decremented each time before it returns from the function.
   */
   uint fill_status_recursion_level;
+  uint fill_variables_recursion_level;
 
   /* container for handler's private per-connection data */
   Ha_data ha_data[MAX_HA];

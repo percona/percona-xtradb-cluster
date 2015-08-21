@@ -1,0 +1,9 @@
+#
+# Test that various FLUSH commands are replicated.
+# This is similar to galera_flush.test except
+# with gtid and binlogging enabled.
+#
+
+--source include/have_log_bin.inc
+--source suite/galera/t/galera_flush.test
+

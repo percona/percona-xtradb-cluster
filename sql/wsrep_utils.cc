@@ -67,7 +67,7 @@ wsrep_prepend_PATH (const char* path)
         size_t const new_path_len(strlen(old_path) + strlen(":") +
                                   strlen(path) + 1);
 
-        char* const new_path (reinterpret_cast<char*>(malloc(new_path_len)));
+        char* const new_path (static_cast<char*>(malloc(new_path_len)));
 
         if (new_path)
         {
@@ -93,12 +93,96 @@ wsrep_prepend_PATH (const char* path)
 namespace wsp
 {
 
+bool
+env::ctor_common(char** e)
+{
+    env_ = static_cast<char**>(malloc((len_ + 1) * sizeof(char*)));
+
+    if (env_)
+    {
+        for (size_t i(0); i < len_; ++i)
+        {
+            assert(e[i]); // caller should make sure about len_
+            env_[i] = strdup(e[i]);
+            if (!env_[i])
+            {
+                errno_ = errno;
+                WSREP_ERROR("Failed to allocate env. var: %s", e[i]);
+                return true;
+            }
+        }
+
+        env_[len_] = NULL;
+        return false;
+    }
+    else
+    {
+        errno_ = errno;
+        WSREP_ERROR("Failed to allocate env. var vector of length: %zu", len_);
+        return true;
+    }
+}
+
+void
+env::dtor()
+{
+    if (env_)
+    {
+        /* don't need to go beyond the first NULL */
+        for (size_t i(0); env_[i] != NULL; ++i) { free(env_[i]); }
+        free(env_);
+        env_ = NULL;
+    }
+    len_ = 0;
+}
+
+env::env(char** e)
+    : len_(0), env_(NULL), errno_(0)
+{
+    if (!e) { e = environ; }
+    /* count the size of the vector */
+    while (e[len_]) { ++len_; }
+
+    if (ctor_common(e)) dtor();
+}
+
+env::env(const env& e)
+    : len_(e.len_), env_(0), errno_(0)
+{
+    if (ctor_common(e.env_)) dtor();
+}
+
+env::~env() { dtor(); }
+
+int
+env::append(const char* val)
+{
+    char** tmp = static_cast<char**>(realloc(env_, (len_ + 2)*sizeof(char*)));
+
+    if (tmp)
+    {
+        env_ = tmp;
+        env_[len_] = strdup(val);
+
+        if (env_[len_])
+        {
+            ++len_;
+            env_[len_] = NULL;
+        }
+        else errno_ = errno;
+    }
+    else errno_ = errno;
+
+    return errno_;
+}
+
+
 #define PIPE_READ  0
 #define PIPE_WRITE 1
 #define STDIN_FD   0
 #define STDOUT_FD  1
 
-process::process (const char* cmd, const char* type)
+process::process (const char* cmd, const char* type, char** env)
     : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), err_(0), pid_(0)
 {
     int sig;
@@ -123,6 +207,8 @@ process::process (const char* cmd, const char* type)
         return;
     }
 
+    if (NULL == env) { env = environ; } // default to global environment
+
     int pipe_fds[2] = { -1, };
     if (::pipe(pipe_fds))
     {
@@ -136,6 +222,16 @@ process::process (const char* cmd, const char* type)
     int const child_end  (parent_end == PIPE_READ ? PIPE_WRITE : PIPE_READ);
     int const close_fd   (parent_end == PIPE_READ ? STDOUT_FD : STDIN_FD);
 
+#ifdef HAVE_EXECVPE
+    char* const pargv[4] = { strdup("sh"), strdup("-c"), strdup(str_), NULL };
+    if (!(pargv[0] && pargv[1] && pargv[2]))
+    {
+        err_ = ENOMEM;
+        WSREP_ERROR ("Failed to allocate pargv[] array.");
+        goto cleanup_pipe;
+    }
+#endif
+
     pid_ = fork();
 
     if (pid_ == -1)
@@ -143,7 +239,7 @@ process::process (const char* cmd, const char* type)
       err_= errno;
       WSREP_ERROR ("fork() failed: %d (%s)", err_, strerror(err_));
       pid_ = 0;
-      goto cleanup;
+      goto cleanup_pipe;
     }
     else if (pid_ > 0)
     {
@@ -161,7 +257,7 @@ process::process (const char* cmd, const char* type)
         WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
       }
 
-      goto cleanup;
+      goto cleanup_pipe;
     }
 
     /* Child */
@@ -232,14 +328,24 @@ process::process (const char* cmd, const char* type)
       _exit(EXIT_FAILURE);
     }
 
+#ifdef HAVE_EXECVPE
+    execvpe(pargv[0], pargv, env);
+#else
     execlp("sh", "sh", "-c", str_, NULL);
+#endif
 
     sql_perror("execlp() failed");
     _exit(EXIT_FAILURE);
 
-cleanup:
+cleanup_pipe:
     if (pipe_fds[0] >= 0) close (pipe_fds[0]);
     if (pipe_fds[1] >= 0) close (pipe_fds[1]);
+
+#ifdef HAVE_EXECVPE
+    free (pargv[0]);
+    free (pargv[1]);
+    free (pargv[2]);
+#endif
 }
 
 process::~process ()
@@ -289,6 +395,7 @@ process::wait ()
               {
               case 126: err_ = EACCES; break; /* Permission denied */
               case 127: err_ = ENOENT; break; /* No such file or directory */
+              case 143: err_ = EINTR;  break; /* Subprocess killed */
               }
               WSREP_ERROR("Process completed with error: %s: %d (%s)",
                           str_, err_, strerror(err_));

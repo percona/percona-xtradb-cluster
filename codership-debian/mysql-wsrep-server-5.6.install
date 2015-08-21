@@ -97,3 +97,4 @@ usr/share/mysql/swedish
 usr/share/mysql/ukrainian
 usr/share/mysql/ukrainian
 usr/share/mysql/wsrep.cnf
+usr/share/mysql/my-default.cnf

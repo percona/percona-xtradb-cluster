@@ -29,6 +29,10 @@
 #include "rpl_mi.h"
 #include "debug_sync.h"
 
+#ifdef WITH_WSREP
+#include "sql_parse.h"
+#endif /* WITH_WSREP */
+
 /**
   Reload/resets privileges and the different caches.
 
@@ -305,6 +309,36 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
           }
         }
       }
+#ifdef WITH_WSREP
+      if (WSREP(thd) && !thd->lex->no_write_to_binlog
+                     && (options & REFRESH_TABLES)
+                     && !(options & (REFRESH_FOR_EXPORT|REFRESH_READ_LOCK)))
+      {
+        /*
+          This is done here because LOCK TABLES is not replicated in galera,
+          the upgrade of which is checked above.  Hence, done after/if we
+          are able to upgrade locks.
+
+          Also, note that, in error log with debug you may see
+          'thread holds MDL locks at TI' but since this is a flush
+          tables and is required for LOCK TABLE WRITE
+          it can be ignored there.
+        */
+        if (tables)
+        {
+            if (wsrep_to_isolation_begin(thd, NULL, NULL, tables))
+            {
+                result= 1;
+                goto cleanup;
+            }
+        }
+        else if (wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+        {
+                result= 1;
+                goto cleanup;
+        }
+      }
+#endif /* WITH_WSREP */
 
       if (close_cached_tables(thd, tables,
                               ((options & REFRESH_FAST) ?  FALSE : TRUE),
@@ -318,6 +352,9 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         result= 1;
       }
     }
+#ifdef WITH_WSREP
+cleanup:
+#endif /* WITH_WSREP */
     my_dbopt_cleanup();
   }
   if (options & REFRESH_HOSTS)

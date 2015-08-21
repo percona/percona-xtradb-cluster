@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -82,11 +82,12 @@
 #include "sql_acl.h"                       // SUPER_ACL
 #include <hash.h>
 #include <assert.h>
-
+#include "my_atomic.h"
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 
+#include "my_atomic.h"
 /**
   @defgroup Locking Locking
   @{
@@ -913,6 +914,7 @@ static void print_lock_error(int error, const char *table)
   DBUG_VOID_RETURN;
 }
 
+volatile int32 Global_read_lock::m_active_requests;
 
 /****************************************************************************
   Handling of global read locks
@@ -1003,9 +1005,15 @@ bool Global_read_lock::lock_global_read_lock(THD *thd)
 
     mdl_request.init(MDL_key::GLOBAL, "", "", MDL_SHARED, MDL_EXPLICIT);
 
+    /* Increment static variable first to signal innodb memcached server
+       to release mdl locks held by it */
+    my_atomic_add32(&Global_read_lock::m_active_requests, 1);
     if (thd->mdl_context.acquire_lock(&mdl_request,
                                       thd->variables.lock_wait_timeout))
+    {
+      my_atomic_add32(&Global_read_lock::m_active_requests, -1);
       DBUG_RETURN(1);
+    }
 
     m_mdl_global_shared_lock= mdl_request.ticket;
     m_state= GRL_ACQUIRED;
@@ -1048,9 +1056,9 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
         wsrep_resume();
 #endif /* WITH_WSREP */
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
+  my_atomic_add32(&Global_read_lock::m_active_requests, -1);
   m_mdl_global_shared_lock= NULL;
   m_state= GRL_NONE;
- 
   DBUG_VOID_RETURN;
 }
 
@@ -1178,6 +1186,19 @@ wsrep_status_t Global_read_lock::wsrep_resume(void)
     return ret;
 }
 
+bool Global_read_lock::wsrep_pause_once(void)
+{
+    if (!provider_paused)
+        return wsrep_pause();
+    return TRUE;
+}
+wsrep_status_t Global_read_lock::wsrep_resume_once(void)
+{
+    if (provider_paused)
+        return wsrep_resume();
+    return WSREP_OK;
+}
+
 #endif /* WITH_WSREP */
 
 /**
@@ -1252,21 +1273,39 @@ void Global_backup_lock::release(THD *thd)
    @param thd     Reference to connection.
 */
 
-void Global_backup_lock::set_explicit_lock_duration(THD *thd)
+void Global_backup_lock::set_explicit_locks_duration(THD *thd)
 {
+  bool should_own;
+
   DBUG_ENTER("Global_backup_lock::set_explicit_lock_duration");
 
   if (m_lock)
   {
-    DBUG_ASSERT(thd->mdl_context.is_lock_owner(m_namespace, "", "",
-                                               MDL_SHARED));
+    should_own= true;
     thd->mdl_context.set_lock_duration(m_lock, MDL_EXPLICIT);
   }
   else
   {
-    DBUG_ASSERT(!thd->mdl_context.is_lock_owner(m_namespace, "", "",
-                                                MDL_SHARED));
+    should_own= false;
   }
+
+  DBUG_ASSERT(should_own ==
+              thd->mdl_context.is_lock_owner(m_namespace, "", "",
+                                             MDL_SHARED));
+
+  if (m_prot_lock)
+  {
+    should_own= true;
+    thd->mdl_context.set_lock_duration(m_prot_lock, MDL_EXPLICIT);
+  }
+  else
+  {
+    should_own= false;
+  }
+
+  DBUG_ASSERT(should_own ==
+              thd->mdl_context.is_lock_owner(m_namespace, "", "",
+                                             MDL_INTENTION_EXCLUSIVE));
 
   DBUG_VOID_RETURN;
 }

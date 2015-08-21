@@ -551,6 +551,7 @@ mkdir debug
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DWITH_READLINE=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
            -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
@@ -576,6 +577,7 @@ mkdir release
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
+           -DWITH_READLINE=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
            -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
@@ -1395,6 +1397,22 @@ fi
 %{_libdir}/libmysqlservices.a
 %{_libdir}/*.so
 
+%post -n Percona-Server-devel%{product_suffix}
+# For compatibility after reverting name to libmysql
+for lib in %{shared_lib_sec_name}{.a,_r.a}; do
+if [ ! -f %{_libdir}/mysql/$lib ]; then
+	ln -s %{shared_lib_pri_name}.a %{_libdir}/mysql/$lib;
+fi
+done
+
+%postun -n Percona-Server-devel%{product_suffix}
+# Cleanup of symlinks after uninstall
+for lib in %{shared_lib_sec_name}{.a,_r.a}; do
+if [ -h %{_libdir}/mysql/$lib ]; then
+	rm -f %{_libdir}/mysql/$lib;
+fi
+done
+
 # ----------------------------------------------------------------------------
 %if %{with tokudb}
 %files -n Percona-Server-tokudb%{product_suffix}
@@ -1491,6 +1509,10 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Jul 23 2015 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+
+- Merge updates from Percona Server spec file.
+
 * Sat Aug 30 2014 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 
 - Add packaging for systemd and related changes.
