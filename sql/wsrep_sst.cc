@@ -436,10 +436,15 @@ static void* sst_joiner_thread (void* a)
     proc.wait();
     err= EINVAL;
 
-    if (!tmp)
+    if (!tmp || proc.error())
     {
       WSREP_ERROR("Failed to read uuid:seqno from joiner script.");
-      if (proc.error()) err = proc.error();
+      if (proc.error())
+      {
+        err= proc.error();
+        char errbuf[MYSYS_STRERROR_SIZE];
+        WSREP_ERROR("SST script aborted with error %d (%s)", err, my_strerror(errbuf, sizeof(errbuf), err));
+      }
     }
     else
     {
