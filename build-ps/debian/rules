@@ -83,7 +83,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
-		-DWITH_READLINE=ON \
+		-DWITH_READLINE=system \
 		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
 		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
@@ -114,7 +114,7 @@ endif
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
-		-DWITH_READLINE=ON \
+		-DWITH_READLINE=system \
 		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
 		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
