@@ -176,7 +176,7 @@ wsrep_log_info()
 
 wsrep_cleanup_progress_file()
 {
-    [ -n "$SST_PROGRESS_FILE" ] && rm -f "$SST_PROGRESS_FILE" 2>/dev/null
+    [ -n "${SST_PROGRESS_FILE:-}" ] && rm -f "$SST_PROGRESS_FILE" 2>/dev/null || true
 }
 
 wsrep_check_program()

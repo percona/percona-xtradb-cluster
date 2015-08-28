@@ -61,7 +61,7 @@ then
     exit $EINVAL
 fi
 
-[ -n "$WSREP_SST_OPT_USER" ] && AUTH="-u$WSREP_SST_OPT_USER" || AUTH=
+[ -n "${WSREP_SST_OPT_USER:-}" ] && AUTH="-u$WSREP_SST_OPT_USER" || AUTH=
 
 # Refs https://github.com/codership/mysql-wsrep/issues/141
 # Passing password in MYSQL_PWD environment variable is considered
@@ -72,7 +72,8 @@ fi
 # whereas (at least on Linux) unprivileged user can't see process environment
 # that he does not own. So while it may be not secure in the NSA sense of the
 # word, it is arguably more secure than passing password on the command line.
-[ -n "$WSREP_SST_OPT_PSWD" ] && export MYSQL_PWD="$WSREP_SST_OPT_PSWD"
+[ -n "${WSREP_SST_OPT_PSWD:-}" ] && export MYSQL_PWD="$WSREP_SST_OPT_PSWD"
+[ -n "${SST_PROGRESS_FILE:-}" ] && touch $SST_PROGRESS_FILE
 
 STOP_WSREP="SET wsrep_on=OFF;"
 
