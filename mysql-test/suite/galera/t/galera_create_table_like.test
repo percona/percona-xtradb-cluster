@@ -12,6 +12,7 @@ CREATE SCHEMA schema2;
 USE schema1;
 CREATE TABLE real_table (f1 INTEGER) ENGINE=InnoDB;
 CREATE TEMPORARY TABLE temp_table (f1 INTEGER) ENGINE=InnoDB;
+SET SESSION wsrep_replicate_myisam=ON;
 CREATE TABLE myisam_table (f1 INTEGER) ENGINE=MyISAM;
 
 USE schema2;

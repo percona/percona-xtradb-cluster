@@ -118,6 +118,7 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 --eval SET GLOBAL wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'
 --enable_query_log
 
+--sleep 360
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
@@ -195,7 +196,7 @@ DROP USER sst;
 
 --connection node_4
 SET GLOBAL wsrep_provider = 'none';
-SET GLOBAL wsrep_sst_method = 'rsync';
+SET GLOBAL wsrep_sst_method = 'xtrabackup-v2';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;

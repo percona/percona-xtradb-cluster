@@ -1,7 +1,7 @@
-SET GLOBAL wsrep_replicate_myisam = FALSE;
+SET SESSION wsrep_replicate_myisam = FALSE;
 CREATE TABLE t1 (f1 INT PRIMARY KEY) Engine=MyISAM;
 INSERT INTO t1 VALUES (1);
+call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t1'' on query. Default database: 'test'. Query: 'DROP TABLE t1', Error_code: 1051");
 SELECT * FROM t1;
 ERROR 42S02: Table 'test.t1' doesn't exist
-SET GLOBAL wsrep_replicate_myisam = 0;
 DROP TABLE t1;

@@ -1,4 +1,5 @@
 SET GLOBAL binlog_format = 'STATEMENT';
+ERROR 42000: Variable 'binlog_format' can't be set to the value of 'STATEMENT'
 SET SESSION binlog_format = 'STATEMENT';
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);

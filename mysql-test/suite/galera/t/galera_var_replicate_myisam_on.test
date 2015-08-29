@@ -5,12 +5,11 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
---let $wsrep_replicate_myisam_orig = `SELECT @@wsrep_replicate_myisam`
 
 --connection node_1
-SET GLOBAL wsrep_replicate_myisam = TRUE;
+SET SESSION wsrep_replicate_myisam = TRUE;
 --connection node_2
-SET GLOBAL wsrep_replicate_myisam = TRUE;
+SET SESSION wsrep_replicate_myisam = TRUE;
 
 #
 # Simple INSERT
@@ -131,8 +130,3 @@ COMMIT;
 DROP TABLE t1;
 DROP TABLE t2;
 
---connection node_1
---eval SET GLOBAL wsrep_replicate_myisam = $wsrep_replicate_myisam_orig
-
---connection node_2
---eval SET GLOBAL wsrep_replicate_myisam = $wsrep_replicate_myisam_orig

@@ -4,14 +4,15 @@ CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) Engine=InnoDB;
 INSERT INTO t1 (f1) SELECT 0000 + (100 * a1.f1) + (10 * a2.f1) + a3.f1 FROM ten AS a1, ten AS a2, ten AS a3;
 INSERT INTO t2 (f1) SELECT 0000 + (100 * a1.f1) + (10 * a2.f1) + a3.f1 FROM ten AS a1, ten AS a2, ten AS a3;
-SET GLOBAL wsrep_OSU_method = "RSU";
+SET SESSION wsrep_OSU_method = "RSU";
 SET DEBUG_SYNC='wsrep_RSU_begin_after_lock SIGNAL alter1 WAIT_FOR alter2';
 ALTER TABLE t1 ADD PRIMARY KEY (f1);
+SET SESSION wsrep_OSU_method = "RSU";
 SET DEBUG_SYNC='now WAIT_FOR alter1';
 SET DEBUG_SYNC='wsrep_RSU_begin_enter SIGNAL alter2';
 ALTER TABLE t2 ADD PRIMARY KEY (f1);
 SET DEBUG_SYNC='RESET';
-SET GLOBAL wsrep_OSU_method = "TOI";
+SET SESSION wsrep_OSU_method = "TOI";
 SELECT COUNT(*) FROM t1;
 COUNT(*)
 1000
