@@ -16,7 +16,8 @@ Build-Depends: bison,
                perl,
                po-debconf,
                psmisc,
-               zlib1g-dev (>= 1:1.1.3-5)
+               zlib1g-dev (>= 1:1.1.3-5),
+               libssl-dev
 Standards-Version: 3.9.3
 Homepage: http://galeracluster.com/
 Vcs-Git: https://github.com/codership/mysql-wsrep.git
