@@ -50,8 +50,6 @@ using std::min;
 using std::max;
 using std::list;
 
-static int write_locked_table_maps(THD *thd, bool force= false);
-
 // This is a temporary backporting fix.
 #ifndef HAVE_LOG2
 /*
@@ -2185,14 +2183,6 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv)
     status_var_increment(thd->status_var.ha_savepoint_rollback_count);
     trans->no_2pc|= ht->prepare == 0;
   }
-
-  /*
-    Write tables map once more for trigger as it will be wiped out in
-    Query_log_event::do_apply_event() on slave.
-  */
-  if (thd->in_sub_stmt == SUB_STMT_TRIGGER)
-    error= write_locked_table_maps(thd, true);
-
   /*
     rolling back the transaction in all storage engines that were not part of
     the transaction when the savepoint was set
@@ -2315,14 +2305,6 @@ int ha_savepoint(THD *thd, SAVEPOINT *sv)
     }
     status_var_increment(thd->status_var.ha_savepoint_count);
   }
-
-  /*
-     Write tables map once more for trigger as it will be wiped out in
-     Query_log_event::do_apply_event() on slave.
-   */
-   if (thd->in_sub_stmt == SUB_STMT_TRIGGER)
-     error= write_locked_table_maps(thd, true);
-
   /*
     Remember the list of registered storage engines. All new
     engines are prepended to the beginning of the list.
@@ -7533,7 +7515,7 @@ static bool check_table_binlog_row_based(THD *thd, TABLE *table)
        THD::lock
 */
 
-static int write_locked_table_maps(THD *thd, bool force)
+static int write_locked_table_maps(THD *thd)
 {
   DBUG_ENTER("write_locked_table_maps");
   DBUG_PRINT("enter", ("thd: 0x%lx  thd->lock: 0x%lx "
@@ -7542,7 +7524,7 @@ static int write_locked_table_maps(THD *thd, bool force)
 
   DBUG_PRINT("debug", ("get_binlog_table_maps(): %d", thd->get_binlog_table_maps()));
 
-  if (force || (thd->get_binlog_table_maps() == 0))
+  if (thd->get_binlog_table_maps() == 0)
   {
     MYSQL_LOCK *locks[2];
     locks[0]= thd->extra_lock;
