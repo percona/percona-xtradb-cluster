@@ -3,8 +3,6 @@ SHOW STATUS;
 ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 SET SESSION wsrep_sync_wait=0;
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
-COUNT(*)
-461
 SHOW STATUS LIKE 'wsrep_ready';
 Variable_name	Value
 wsrep_ready	OFF
@@ -32,8 +30,6 @@ VARIABLE_VALUE = 2
 1
 SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
-COUNT(*)
-461
 SHOW STATUS LIKE 'wsrep_ready';
 Variable_name	Value
 wsrep_ready	OFF

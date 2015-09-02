@@ -20,7 +20,11 @@ SHOW STATUS;
 SET SESSION wsrep_sync_wait=0;
 
 # This should work even with wsrep_ready OFF in PXC
+--disable_result_log
+# OFF to avoid variability among debug and release builds
+# We are only interested in non-error result.
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
+--enable_result_log
 
 # Must return 'OFF'
 SHOW STATUS LIKE 'wsrep_ready';
@@ -64,7 +68,9 @@ SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_N
 SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
 
 # This should work even with wsrep_ready OFF in PXC
+--disable_result_log
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
+--enable_result_log
 
 # Must return 'OFF'
 SHOW STATUS LIKE 'wsrep_ready';
