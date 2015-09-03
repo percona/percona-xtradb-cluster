@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights
    reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -3419,6 +3419,9 @@ static int init_common_variables()
   if (get_options(&remaining_argc, &remaining_argv))
     return 1;
   set_server_version();
+
+  sql_print_information("%s (mysqld %s) starting as process %lu ...",
+                        my_progname, server_version, (ulong) getpid());
 
 #ifndef EMBEDDED_LIBRARY
   if (opt_help && !opt_verbose)
@@ -8134,10 +8137,10 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
 
 #ifdef WITH_WSREP
   if (global_system_variables.wsrep_causal_reads) {
-      WSREP_WARN("option --wsrep-casual-reads is deprecated");
+      WSREP_WARN("option --wsrep-causal-reads is deprecated");
       if (!(global_system_variables.wsrep_sync_wait &
             WSREP_SYNC_WAIT_BEFORE_READ)) {
-          WSREP_WARN("--wsrep-casual-reads=ON takes precedence over --wsrep-sync-wait=%u. "
+          WSREP_WARN("--wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=%u. "
                      "WSREP_SYNC_WAIT_BEFORE_READ is on",
                      global_system_variables.wsrep_sync_wait);
           global_system_variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;

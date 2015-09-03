@@ -1,0 +1,5 @@
+mysql-client-5.5: package-has-a-duplicate-relation
+mysql-client-5.5: wrong-name-for-upstream-changelog usr/share/doc/mysql-client-5.5/changelog.innotop.gz
+mysql-client-5.5: pkg-not-in-package-test innotop
+mysql-client-5.5: binary-without-manpage usr/bin/innochecksum
+mysql-client-5.5: binary-without-manpage usr/bin/mysqltest_embedded

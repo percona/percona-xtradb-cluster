@@ -1,4 +1,4 @@
-/* Copyright 2010 Codership Oy <http://www.codership.com>
+/* Copyright 2010-2015 Codership Oy <http://www.codership.com>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -34,6 +34,11 @@
 #include <sys/socket.h>
 #include <netdb.h>    // getaddrinfo()
 
+#ifdef HAVE_GETIFADDRS
+#include <net/if.h>
+#include <ifaddrs.h>
+#endif // HAVE_GETIFADDRS
+
 extern char** environ; // environment variables
 
 static wsp::string wsrep_PATH;
@@ -58,7 +63,7 @@ wsrep_prepend_PATH (const char* path)
         size_t const new_path_len(strlen(old_path) + strlen(":") +
                                   strlen(path) + 1);
 
-        char* const new_path (reinterpret_cast<char*>(malloc(new_path_len)));
+        char* const new_path (static_cast<char*>(malloc(new_path_len)));
 
         if (new_path)
         {
@@ -84,6 +89,90 @@ wsrep_prepend_PATH (const char* path)
 namespace wsp
 {
 
+bool
+env::ctor_common(char** e)
+{
+    env_ = static_cast<char**>(malloc((len_ + 1) * sizeof(char*)));
+
+    if (env_)
+    {
+        for (size_t i(0); i < len_; ++i)
+        {
+            assert(e[i]); // caller should make sure about len_
+            env_[i] = strdup(e[i]);
+            if (!env_[i])
+            {
+                errno_ = errno;
+                WSREP_ERROR("Failed to allocate env. var: %s", e[i]);
+                return true;
+            }
+        }
+
+        env_[len_] = NULL;
+        return false;
+    }
+    else
+    {
+        errno_ = errno;
+        WSREP_ERROR("Failed to allocate env. var vector of length: %zu", len_);
+        return true;
+    }
+}
+
+void
+env::dtor()
+{
+    if (env_)
+    {
+        /* don't need to go beyond the first NULL */
+        for (size_t i(0); env_[i] != NULL; ++i) { free(env_[i]); }
+        free(env_);
+        env_ = NULL;
+    }
+    len_ = 0;
+}
+
+env::env(char** e)
+    : len_(0), env_(NULL), errno_(0)
+{
+    if (!e) { e = environ; }
+    /* count the size of the vector */
+    while (e[len_]) { ++len_; }
+
+    if (ctor_common(e)) dtor();
+}
+
+env::env(const env& e)
+    : len_(e.len_), env_(0), errno_(0)
+{
+    if (ctor_common(e.env_)) dtor();
+}
+
+env::~env() { dtor(); }
+
+int
+env::append(const char* val)
+{
+    char** tmp = static_cast<char**>(realloc(env_, (len_ + 2)*sizeof(char*)));
+
+    if (tmp)
+    {
+        env_ = tmp;
+        env_[len_] = strdup(val);
+
+        if (env_[len_])
+        {
+            ++len_;
+            env_[len_] = NULL;
+        }
+        else errno_ = errno;
+    }
+    else errno_ = errno;
+
+    return errno_;
+}
+
+
 #define PIPE_READ  0
 #define PIPE_WRITE 1
 #define STDIN_FD   0
@@ -93,7 +182,7 @@ namespace wsp
 # define POSIX_SPAWN_USEVFORK 0
 #endif
 
-process::process (const char* cmd, const char* type)
+process::process (const char* cmd, const char* type, char** env)
     : str_(cmd ? strdup(cmd) : strdup("")), io_(NULL), err_(EINVAL), pid_(0)
 {
     if (0 == str_)
@@ -114,6 +203,8 @@ process::process (const char* cmd, const char* type)
         WSREP_ERROR ("type argument should be either \"r\" or \"w\".");
         return;
     }
+
+    if (NULL == env) { env = environ; } // default to global environment
 
     int pipe_fds[2] = { -1, };
     if (::pipe(pipe_fds))
@@ -210,7 +301,7 @@ process::process (const char* cmd, const char* type)
         goto cleanup_fact;
     }
 
-    err_ = posix_spawnp (&pid_, pargv[0], &fact, &attr, pargv, environ);
+    err_ = posix_spawnp (&pid_, pargv[0], &fact, &attr, pargv, env);
     if (err_)
     {
         WSREP_ERROR ("posix_spawnp(%s) failed: %d (%s)",
@@ -304,6 +395,7 @@ process::wait ()
               {
               case 126: err_ = EACCES; break; /* Permission denied */
               case 127: err_ = ENOENT; break; /* No such file or directory */
+              case 143: err_ = EINTR;  break; /* Subprocess killed */
               }
               WSREP_ERROR("Process completed with error: %s: %d (%s)",
                           str_, err_, strerror(err_));
@@ -396,7 +488,7 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
 {
   size_t ip_len = 0;
 
-  if (my_bind_addr_str && strlen(my_bind_addr_str))
+  if (my_bind_addr_str && my_bind_addr_str[0] != '\0')
   {
     unsigned int const ip_type= wsrep_check_ip(my_bind_addr_str);
 
@@ -405,7 +497,7 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
       return 0;
     }
 
-    if (INADDR_ANY != ip_type) {;
+    if (INADDR_ANY != ip_type) {
       strncpy (buf, my_bind_addr_str, buf_len);
       return strlen(buf);
     }
@@ -430,65 +522,38 @@ size_t wsrep_guess_ip (char* buf, size_t buf_len)
     return ip_len;
   }
 
-  // try to find the address of the first one
-#if (TARGET_OS_LINUX == 1)
-  const char cmd[] = "ip addr show | grep -E '^\\s*inet' | grep -m1 global |"
-                     " awk '{ print $2 }' | sed 's/\\/.*//'";
-#elif defined(__sun__)
-  const char cmd[] = "/sbin/ifconfig -a | "
-      "/usr/gnu/bin/grep -m1 -1 -E 'net[0-9]:' | tail -n 1 | awk '{ print $2 }'";
-#elif defined(__APPLE__) || defined(__FreeBSD__)
-  const char cmd[] = "/sbin/route -nv get 8.8.8.8 | tail -n1 | awk '{print $(NF)}'";
-#else
-  char *cmd;
-#error "OS not supported"
-#endif
-  wsp::process proc (cmd, "r");
 
-  if (NULL != proc.pipe()) {
-    char* ret;
+//
+// getifaddrs() is avaiable at least on Linux since glib 2.3, FreeBSD
+// MAC OS X, opensolaris, Solaris.
+//
+// On platforms which do not support getifaddrs() this function returns
+// a failure and user is prompted to do manual configuration.
+//
+#if HAVE_GETIFADDRS
+  struct ifaddrs *ifaddr, *ifa;
+  if (getifaddrs(&ifaddr) == 0)
+  {
+    for (ifa= ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
+      if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET) // TODO AF_INET6
+        continue;
 
-    ret = fgets (buf, buf_len, proc.pipe());
+      // Skip loopback interfaces (like lo:127.0.0.1)
+      if (ifa->ifa_flags & IFF_LOOPBACK)
+        continue;
 
-    if (proc.wait()) return 0;
+      if (vio_getnameinfo(ifa->ifa_addr, buf, buf_len, NULL, 0, NI_NUMERICHOST))
+        continue;
 
-    if (NULL == ret) {
-      WSREP_ERROR("Failed to read output of: '%s'", cmd);
-      return 0;
+      freeifaddrs(ifaddr);
+      return strlen(buf);
     }
+    freeifaddrs(ifaddr);
   }
-  else {
-    WSREP_ERROR("Failed to execute: '%s'", cmd);
-    return 0;
-  }
+#endif // HAVE_GETIFADDRS
 
-  // clear possible \n at the end of ip string left by fgets()
-  ip_len = strlen (buf);
-  if (ip_len > 0 && '\n' == buf[ip_len - 1]) {
-    ip_len--;
-    buf[ip_len] = '\0';
-  }
-
-  if (INADDR_NONE == inet_addr(buf)) {
-    if (strlen(buf) != 0) {
-      WSREP_WARN("Shell command returned invalid address: '%s'", buf);
-    }
-    return 0;
-  }
-
-  return ip_len;
-}
-
-size_t wsrep_guess_address(char* buf, size_t buf_len)
-{
-  size_t addr_len = wsrep_guess_ip (buf, buf_len);
-
-  if (addr_len && addr_len < buf_len) {
-    addr_len += snprintf (buf + addr_len, buf_len - addr_len,
-                          ":%u", mysqld_port);
-  }
-
-  return addr_len;
+  return 0;
 }
 
 /*

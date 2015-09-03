@@ -1,0 +1,19 @@
+From: Clint Byrum <clint@ubuntu.com>
+Description: makes mtr look in the standard location from the 
+ mysql-testsuite-5.5 package.
+Forwarded: not-needed
+
+Index: mysql-5.5-5.5.28/mysql-test/lib/mtr_cases.pm
+===================================================================
+--- mysql-5.5-5.5.28.orig/mysql-test/lib/mtr_cases.pm	2012-10-18 11:20:41.735381191 -0400
++++ mysql-5.5-5.5.28/mysql-test/lib/mtr_cases.pm	2012-10-18 11:20:44.059381249 -0400
+@@ -287,7 +287,8 @@
+     else
+     {
+       $suitedir= my_find_dir($::basedir,
+-			     ["share/mysql-test/suite",
++			     ["lib/mysql-testsuite/suite",
++			      "share/mysql-test/suite",
+ 			      "mysql-test/suite",
+ 			      "internal/mysql-test/suite",
+ 			      "mysql-test",

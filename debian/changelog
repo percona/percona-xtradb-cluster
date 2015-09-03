@@ -1,0 +1,11 @@
+mysql-wsrep-5.5 (5.5.42-25.11-1) UNRELEASED; urgency=low
+
+  * Bumped version numbers
+
+ -- Otto Kekäläinen <otto@seravo.fi>  Fri, 27 Mar 2015 15:50:10 +0200
+
+mysql-wsrep-5.5 (5.5.41-1) UNRELEASED; urgency=medium
+
+  * Initial Debian packaging based on MySQL 5.5.41-0ubuntu0.12.04.1
+
+ -- Otto Kekäläinen <otto@seravo.fi>  Wed, 21 Feb 2015 08:51:36 +0200

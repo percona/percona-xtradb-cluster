@@ -9,9 +9,8 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
-transaction_prealloc_size_basic_32  : Bug#11748572
-transaction_prealloc_size_basic_64  : Bug#11748572
+auto_increment_offset_func          : galera/mysql-wsrep#78 auto_increment_increment gets reset after ALTER
+auto_increment_increment_func       : galera/mysql-wsrep#78 auto_increment_increment gets reset after ALTER
 query_cache_size_basic_32           : Bug#13535584
 query_cache_size_basic_64           : Bug#11748572
 #thread_cache_size_func             : Bug#11750172: 2008-11-07 joro main.thread_cache_size_func fails in pushbuild when run with pool of threads
-

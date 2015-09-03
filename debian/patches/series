@@ -1,0 +1,9 @@
+38_scripts__mysqld_safe.sh__signals.patch
+62_disable_tests.patch
+70_mysql_va_list.patch
+71_disable_rpl_tests.patch
+72_fix_standalone_tests.patch
+73_fix_rpl_deadlock_innodb_test.patch
+33_scripts__mysql_create_system_tables__no_test.patch
+41_scripts__mysql_install_db.sh__no_test.patch
+50_mysql-test__db_test.patch

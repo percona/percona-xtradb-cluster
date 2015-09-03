@@ -519,8 +519,6 @@ dbug/main.r
 dbug/output*.r
 dbug/user.ps
 dbug/user.t
-debian/control
-debian/defs.mk
 depcomp
 emacs.h
 examples/*.ds?

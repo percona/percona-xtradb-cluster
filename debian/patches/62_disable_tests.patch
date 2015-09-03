@@ -1,0 +1,9 @@
+Index: mysql-5.5/mysql-test/t/disabled.def
+===================================================================
+--- mysql-5.5.orig/mysql-test/t/disabled.def	2012-03-06 13:10:09.085143548 -0800
++++ mysql-5.5/mysql-test/t/disabled.def	2012-03-06 15:23:22.905149613 -0800
+@@ -17,3 +17,4 @@ log_tables-big           : Bug#11756699 2010-11-15 mattiasj report already exist
+ mysql_embedded           : Bug#12561297 2011-05-14 Anitha Dependent on PB2 changes - eventum#41836
+ file_contents            : Codership mysql-wsrep#4 2014-10-28 pstoev main.file_contents MTR test fails in mysql-wsrep
+ flush_read_lock          : Galera mysql-wsrep#80 ALTER TABLE fails under read lock 
++partition_rename_longfilename : Fails when building with sbuild and schroots

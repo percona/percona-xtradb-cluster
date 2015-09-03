@@ -8,7 +8,7 @@
 # force symbolic-links=0 (valgrind build has a different default)
 #
 
-exec $MYSQLD_BOOTSTRAP_CMD --symbolic-links=0 --lower-case-table-names=1 --help --verbose > $MYSQL_TMP_DIR/mysqld--help.txt 2>&1;
+exec $MYSQLD_BOOTSTRAP_CMD --symbolic-links=0 --lower-case-table-names=1 --help --verbose > $MYSQL_TMP_DIR/mysqld--help.txt;
 
 # The inline perl code below will copy $MYSQL_TMP_DIR/mysqld--help.txt
 # to output, but filter away some variable stuff (e.g. paths).
@@ -39,6 +39,9 @@ perl;
     next if /Value \(after reading options\)/; # skip table header
     next if /^($re1) /;
     next if /^($re2)-/;
+
+    next if /wsrep-node-name/;
+
     $skip=0 if /^  -/;
     $skip=1 if / --($re2)\b/;
     y!\\!/!;

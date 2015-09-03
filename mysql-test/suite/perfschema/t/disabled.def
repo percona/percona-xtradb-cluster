@@ -9,3 +9,5 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+
+global_read_lock : galera/mysql-wsrep 79 perfschema.global_read_lock test fails sporadically

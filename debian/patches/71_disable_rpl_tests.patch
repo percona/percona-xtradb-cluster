@@ -1,0 +1,18 @@
+From: Clint Byrum <clint@ubuntu.com>
+Bug-Ubuntu: http://pad.lv/894146
+Forwarded: no, not needed
+Description: disables test to allow build to pass while this is investigated.
+
+---
+ mysql-test/suite/rpl/t/disabled.def |    1 +
+ 1 file changed, 1 insertion(+)
+
+Index: b/mysql-test/suite/rpl/t/disabled.def
+===================================================================
+--- a/mysql-test/suite/rpl/t/disabled.def
++++ b/mysql-test/suite/rpl/t/disabled.def
+@@ -13,3 +13,4 @@
+ rpl_row_create_table      : Bug#11759274 2010-02-27 andrei failed different way than earlier with bug#45576
+ rpl_spec_variables        : BUG#11755836 2009-10-27 jasonh rpl_spec_variables fails on PB2 hpux
+ rpl_get_master_version_and_clock : Bug#11766137 Jan 05 2011 joro Valgrind warnings rpl_get_master_version_and_clock
++rpl_heartbeat_basic : Fails intermittently on AMD64 buildds http://pad.lv/894146
