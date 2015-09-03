@@ -30,6 +30,7 @@ ANALYZE TABLE t1, t2;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
+let $wait_timeout= 180;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -42,6 +43,7 @@ OPTIMIZE TABLE t1, t2;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
+let $wait_timeout= 180;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -54,6 +56,7 @@ REPAIR TABLE x1, x2;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
+let $wait_timeout= 180;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
