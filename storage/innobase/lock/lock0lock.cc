@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -382,8 +382,10 @@ because there is no parallel deadlock check. This stack is protected by
 the lock_sys_t::mutex. */
 static lock_stack_t*	lock_stack;
 
+#ifdef UNIV_DEBUG
 /** The count of the types of locks. */
 static const ulint	lock_types = UT_ARR_SIZE(lock_compatibility_matrix);
+#endif /* UNIV_DEBUG */
 
 #ifdef UNIV_PFS_MUTEX
 /* Key to register mutex with performance schema */
@@ -2321,8 +2323,8 @@ lock_rec_add_to_queue(
 			if (wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
 				if (wsrep_debug) {
 					fprintf(stderr, 
-						"BF skipping wait: %lu\n", 
-						trx->id);
+						"BF skipping wait: %llu\n",
+						(unsigned long long) trx->id);
 					lock_rec_print(stderr, lock);
 				}
 		  } else

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Library General Public
@@ -5572,15 +5572,6 @@ my_toupper_utf8mb3(MY_UNICASE_INFO *uni_plane, my_wc_t *wc)
 }
 
 
-static inline void
-my_tosort_utf8mb3(MY_UNICASE_INFO *uni_plane, my_wc_t *wc)
-{
-  MY_UNICASE_CHARACTER *page;
-  if ((page= uni_plane->page[(*wc >> 8) & 0xFF]))
-    *wc= page[*wc & 0xFF].sort;
-}
-
-
 static size_t
 my_caseup_utf8(const CHARSET_INFO *cs, char *src, size_t srclen,
                char *dst, size_t dstlen)
@@ -8298,7 +8289,8 @@ my_strnncoll_utf8mb4(const CHARSET_INFO *cs,
                      const uchar *t, size_t tlen,
                      my_bool t_is_prefix)
 {
-  my_wc_t s_wc,t_wc;
+  my_wc_t s_wc= 0;
+  my_wc_t t_wc= 0;
   const uchar *se= s + slen;
   const uchar *te= t + tlen;
   MY_UNICASE_INFO *uni_plane= cs->caseinfo;
@@ -8366,7 +8358,8 @@ my_strnncollsp_utf8mb4(const CHARSET_INFO *cs,
                        my_bool diff_if_only_endspace_difference)
 {
   int res;
-  my_wc_t s_wc, t_wc;
+  my_wc_t s_wc= 0;
+  my_wc_t t_wc= 0;
   const uchar *se= s + slen, *te= t + tlen;
   MY_UNICASE_INFO *uni_plane= cs->caseinfo;
   LINT_INIT(s_wc);

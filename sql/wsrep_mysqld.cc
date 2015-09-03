@@ -774,19 +774,10 @@ bool wsrep_start_replication()
                               wsrep_sst_donor,
                               bootstrap)))
   {
-    if (-ESOCKTNOSUPPORT == rcode)
-    {
-      DBUG_PRINT("wsrep",("unrecognized cluster address: '%s', rcode: %d",
-                          wsrep_cluster_address, rcode));
-      WSREP_ERROR("unrecognized cluster address: '%s', rcode: %d",
-                  wsrep_cluster_address, rcode);
-    }
-    else
-    {
-      DBUG_PRINT("wsrep",("wsrep->connect() failed: %d", rcode));
-      WSREP_ERROR("wsrep::connect() failed: %d", rcode);
-    }
-
+    DBUG_PRINT("wsrep",("wsrep->connect(%s) failed: %d",
+                        wsrep_cluster_address, rcode));
+    WSREP_ERROR("wsrep::connect(%s) failed: %d",
+                wsrep_cluster_address, rcode);
     return false;
   }
   else
@@ -1477,7 +1468,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
       ret = TRUE;
     }
     else if (granted_thd->lex->sql_command == SQLCOM_FLUSH ||
-             granted_thd->wsrep_exec_mode == LOCAL_FLUSH)
+             granted_thd->mdl_context.wsrep_has_explicit_locks())
     {
       WSREP_DEBUG("BF thread waiting for FLUSH");
       ticket->wsrep_report(wsrep_debug);

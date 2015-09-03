@@ -1,6 +1,6 @@
 /***********************************************************************
 
-Copyright (c) 2011, 2014, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -36,6 +36,8 @@ Created 04/12/2011 Jimmy Yang
 
 /** Whether to update all columns' value or a specific column value */
 #define UPDATE_ALL_VAL_COL	-1
+
+extern bool    release_mdl_lock;
 
 extern option_t config_option_names[];
 
@@ -101,7 +103,8 @@ static ib_cb_t* innodb_memcached_api[] = {
 	(ib_cb_t*) &ib_cb_get_idx_field_name,
 	(ib_cb_t*) &ib_cb_trx_get_start_time,
 	(ib_cb_t*) &ib_cb_cfg_bk_commit_interval,
-	(ib_cb_t*) &ib_cb_cursor_stmt_begin
+	(ib_cb_t*) &ib_cb_cursor_stmt_begin,
+	(ib_cb_t*) &ib_cb_trx_read_only
 };
 
 /** Set expiration time. If the exp sent by client is larger than
@@ -170,6 +173,46 @@ innodb_api_begin(
 			return(err);
 		}
 
+		/* If MDL is enabled, we need to create mysql handler. */
+		if (engine) {
+
+			if (lock_mode == IB_LOCK_NONE) {
+
+				/* Skip MDL locking for enabling reads */
+			} else if (conn_data && (engine->enable_binlog
+						 || engine->enable_mdl
+						 || lock_mode == IB_LOCK_TABLE_X)) {
+
+				/* Create a "Fake" THD if binlog is enabled */
+				/* For flush_all which request IB_LOCK_TABLE_X
+				lock, we need to add MDL lock. It's because we need
+				to block DMLs from sql layer. */
+
+				if (!conn_data->thd) {
+					conn_data->thd = handler_create_thd(
+						engine->enable_binlog);
+
+					if (!conn_data->thd) {
+						innodb_cb_cursor_close(*crsr);
+						*crsr = NULL;
+						return(DB_ERROR);
+					}
+				}
+
+				if (!conn_data->mysql_tbl) {
+					int lock_type =
+						(lock_mode == IB_LOCK_TABLE_X?
+							HDL_FLUSH : HDL_WRITE);
+					conn_data->mysql_tbl =
+						handler_open_table(
+							conn_data->thd,
+							dbname,
+							name,
+							lock_type);
+				}
+			}
+		}
+
 		err = innodb_cb_cursor_lock(engine, *crsr, lock_mode);
 
 		if (err != DB_SUCCESS) {
@@ -208,30 +251,8 @@ innodb_api_begin(
 				err = innodb_cb_cursor_lock(engine, *idx_crsr,
 						      lock_mode);
 			}
-
-			/* Create a "Fake" THD if binlog is enabled */
-			if (conn_data && (engine->enable_binlog
-					  || engine->enable_mdl)) {
-				if (!conn_data->thd) {
-					conn_data->thd = handler_create_thd(
-						engine->enable_binlog);
-
-					if (!conn_data->thd) {
-						innodb_cb_cursor_close(*crsr);
-						*crsr = NULL;
-						return(DB_ERROR);
-					}
-				}
-
-				if (!conn_data->mysql_tbl) {
-					conn_data->mysql_tbl =
-						handler_open_table(
-							conn_data->thd,
-							dbname,
-							name, HDL_WRITE);
-				}
-			}
 		}
+
 	} else {
 		ib_cb_cursor_new_trx(*crsr, ib_trx);
 
@@ -1487,9 +1508,19 @@ innodb_api_link(
 			column_used = 0;
 		}
 
+		/* For int column, we don't support append command. */
+		if (append && !result->extra_col_value[column_used].is_str) {
+			return DB_UNSUPPORTED;
+		}
+
 		before_len = result->extra_col_value[column_used].value_len;
 		before_val = result->extra_col_value[column_used].value_str;
 	} else {
+		/* For int column, we don't support append command. */
+		if (append && !result->col_value[MCI_COL_VALUE].is_str) {
+			return DB_UNSUPPORTED;
+		}
+
 		before_len = result->col_value[MCI_COL_VALUE].value_len;
 		before_val = result->col_value[MCI_COL_VALUE].value_str;
 		column_used = UPDATE_ALL_VAL_COL;
@@ -1609,7 +1640,7 @@ innodb_api_arithmetic(
 		} else {
 			/* cursor_data->mysql_tbl can't be created.
 			So safe to return here */
-			return(DB_RECORD_NOT_FOUND);
+			return(ENGINE_KEY_ENOENT);
 		}
 	}
 
@@ -2014,7 +2045,8 @@ innodb_api_cursor_reset(
 		break;
 	}
 
-	if (conn_data->n_reads_since_commit >= engine->read_batch_size
+	if (release_mdl_lock
+	    || conn_data->n_reads_since_commit >= engine->read_batch_size
 	    || conn_data->n_writes_since_commit >= engine->write_batch_size
 	    || (op_type == CONN_OP_FLUSH) || !commit) {
 		commit_trx = innodb_reset_conn(

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -183,220 +183,8 @@ TABLE_FIELD_TYPE mysql_db_table_fields[MYSQL_DB_FIELD_COUNT] = {
   }
 };
 
-static const
-TABLE_FIELD_TYPE mysql_user_table_fields[MYSQL_USER_FIELD_COUNT] = {
-  {
-    { C_STRING_WITH_LEN("Host") },            
-    { C_STRING_WITH_LEN("char(60)") },
-    { NULL, 0 }
-  },
-  {
-    { C_STRING_WITH_LEN("User") },            
-    { C_STRING_WITH_LEN("char(16)") },
-    { NULL, 0 }
-  },
-  {
-    { C_STRING_WITH_LEN("Password") },            
-    { C_STRING_WITH_LEN("char(41)") },
-    { C_STRING_WITH_LEN("latin1") }
-  }, 
-  {
-    { C_STRING_WITH_LEN("Select_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  {
-    { C_STRING_WITH_LEN("Insert_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  {
-    { C_STRING_WITH_LEN("Update_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  {
-    { C_STRING_WITH_LEN("Delete_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  {
-    { C_STRING_WITH_LEN("Create_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  {
-    { C_STRING_WITH_LEN("Drop_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  {
-    { C_STRING_WITH_LEN("Reload_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  {
-    { C_STRING_WITH_LEN("Shutdown_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Process_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("File_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Grant_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("References_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Index_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Alter_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Show_db_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Super_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Create_tmp_table_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Lock_tables_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Execute_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Repl_slave_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Repl_client_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Create_view_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Show_view_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Create_routine_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Alter_routine_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Create_user_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Event_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Trigger_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("Create_tablespace_priv") },
-    { C_STRING_WITH_LEN("enum('N','Y')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("ssl_type") },
-    { C_STRING_WITH_LEN("enum('','ANY','X509','SPECIFIED')") },
-    { C_STRING_WITH_LEN("utf8") }
-  },
-  { 
-    { C_STRING_WITH_LEN("ssl_cipher") },
-    { C_STRING_WITH_LEN("blob") },
-    { NULL, 0 }
-  },
-  { 
-    { C_STRING_WITH_LEN("x509_issuer") },
-    { C_STRING_WITH_LEN("blob") },
-    { NULL, 0 }
-  },
-  { 
-    { C_STRING_WITH_LEN("x509_subject") },
-    { C_STRING_WITH_LEN("blob") },
-    { NULL, 0 }
-  },
-  { 
-    { C_STRING_WITH_LEN("max_questions") },
-    { C_STRING_WITH_LEN("int(11)") },
-    { NULL, 0 }
-  },
-  { 
-    { C_STRING_WITH_LEN("max_updates") },
-    { C_STRING_WITH_LEN("int(11)") },
-    { NULL, 0 }
-  },
-  { 
-    { C_STRING_WITH_LEN("max_connections") },
-    { C_STRING_WITH_LEN("int(11)") },
-    { NULL, 0 }
-  },
-  { 
-    { C_STRING_WITH_LEN("plugin") },
-    { C_STRING_WITH_LEN("char(64)") },
-    { NULL, 0 }
-  },
-  { 
-    { C_STRING_WITH_LEN("authentication_string") },
-    { C_STRING_WITH_LEN("text") },
-    { NULL, 0 }
-  } 
-};
-
 const TABLE_FIELD_DEF
   mysql_db_table_def= {MYSQL_DB_FIELD_COUNT, mysql_db_table_fields};
-
-const TABLE_FIELD_DEF
-  mysql_user_table_def= {MYSQL_USER_FIELD_COUNT, mysql_user_table_fields};
 
 static LEX_STRING native_password_plugin_name= {
   C_STRING_WITH_LEN("mysql_native_password")
@@ -1468,12 +1256,12 @@ void acl_free(bool end)
   delete_dynamic(&acl_wild_hosts);
   delete_dynamic(&acl_proxy_users);
   my_hash_free(&acl_check_hosts);
-  plugin_unlock(0, native_password_plugin);
-  plugin_unlock(0, old_password_plugin);
   if (!end)
     acl_cache->clear(1); /* purecov: inspected */
   else
   {
+    plugin_unlock(0, native_password_plugin);
+    plugin_unlock(0, old_password_plugin);
     delete acl_cache;
     acl_cache=0;
   }
@@ -1716,7 +1504,8 @@ static ulong get_access(TABLE *form, uint fieldnr, uint *next_field)
 /*
   Return a number which, if sorted 'desc', puts strings in this order:
     no wildcards
-    wildcards
+    strings containg wildcards and non-wildcard characters
+    single muilt-wildcard character('%')
     empty string
 */
 
@@ -1733,7 +1522,16 @@ static ulong get_sort(uint count,...)
   {
     char *start, *str= va_arg(args,char*);
     uint chars= 0;
-    uint wild_pos= 0;           /* first wildcard position */
+    uint wild_pos= 0;
+
+    /*
+      wild_pos
+        0                            if string is empty
+        1                            if string is a single muilt-wildcard
+                                     character('%')
+        first wildcard position + 1  if string containg wildcards and
+                                     non-wildcard characters
+    */
 
     if ((start= str))
     {
@@ -1744,6 +1542,8 @@ static ulong get_sort(uint count,...)
         else if (*str == wild_many || *str == wild_one)
         {
           wild_pos= (uint) (str - start) + 1;
+          if (!(wild_pos == 1 && *str == wild_many && *(++str) == '\0'))
+            wild_pos++;
           break;
         }
         chars= 128;                             // Marker that chars existed
@@ -2934,8 +2734,14 @@ update_user_table(THD *thd, TABLE *table,
   */
   if (!password_expired)
   {
-    table->field[(int) password_field]->store(new_password, new_password_len,
-                                              system_charset_info);
+    if (table->s->fields >= (uint) password_field)
+      table->field[(uint) password_field]->store(new_password, new_password_len,
+                                                 system_charset_info);
+    else
+    {
+      my_error(ER_BAD_FIELD_ERROR, MYF(0), "authentication string", "mysql.user");
+      DBUG_RETURN(1);
+    }
     if (new_password_len == SCRAMBLED_PASSWORD_CHAR_LENGTH_323 &&
         password_field == MYSQL_USER_FIELD_PASSWORD)
     {
@@ -3139,17 +2945,24 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
       /* Use the authentication_string field */
       combo->auth.str= password;
       combo->auth.length= password_len;
-      if (password_len > 0)
+      if (table->s->fields >= MYSQL_USER_FIELD_AUTHENTICATION_STRING)
+      {
+        if (password_len > 0)
+          table->
+            field[MYSQL_USER_FIELD_AUTHENTICATION_STRING]->
+              store(password, password_len, &my_charset_utf8_bin);
+        /* Assert that the proper plugin is set */
         table->
-          field[MYSQL_USER_FIELD_AUTHENTICATION_STRING]->
-            store(password, password_len, &my_charset_utf8_bin);
-      /* Assert that the proper plugin is set */
-      table->
-        field[MYSQL_USER_FIELD_PLUGIN]->
-          store(sha256_password_plugin_name.str,
-                sha256_password_plugin_name.length,
-                system_charset_info);
-
+          field[MYSQL_USER_FIELD_PLUGIN]->
+            store(sha256_password_plugin_name.str,
+                  sha256_password_plugin_name.length,
+                  system_charset_info);
+      }
+      else
+      {
+        my_error(ER_BAD_FIELD_ERROR, MYF(0), "plugin", "mysql.user");
+        goto end;
+      }
     }
     else
 #endif
@@ -3157,8 +2970,9 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
       /* Use the legacy Password field */
       table->field[MYSQL_USER_FIELD_PASSWORD]->store(password, password_len,
                                                      system_charset_info);
-      table->field[MYSQL_USER_FIELD_AUTHENTICATION_STRING]->store("\0", 0,
-                                                     &my_charset_utf8_bin);
+      if (table->s->fields >= MYSQL_USER_FIELD_AUTHENTICATION_STRING)
+        table->field[MYSQL_USER_FIELD_AUTHENTICATION_STRING]->store("\0", 0,
+                                                       &my_charset_utf8_bin);
     }
   }
   else // if (table->file->ha_index_read_idx_map [..]
@@ -3227,7 +3041,8 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
 	}
       }
     }
-    old_plugin.length= 0;
+    else
+      old_plugin.length= 0;
     combo->plugin= old_plugin;
 
     /*
@@ -3311,7 +3126,6 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
       else
         combo->auth.length= 0;
     }
-    
     /* 2. Digest password if needed (plugin must have been resolved */
     if (combo->uses_identified_by_clause)
     {
@@ -5643,6 +5457,7 @@ end_index_init:
     exists.
 
   @param thd A pointer to the thread handler object.
+  @param table A pointer to the table list.
 
   @see grant_reload
 
@@ -5651,31 +5466,22 @@ end_index_init:
     @retval TRUE An error has occurred.
 */
 
-static my_bool grant_reload_procs_priv(THD *thd)
+static my_bool grant_reload_procs_priv(THD *thd, TABLE_LIST *table)
 {
   HASH old_proc_priv_hash, old_func_priv_hash;
-  TABLE_LIST table;
   my_bool return_val= FALSE;
   DBUG_ENTER("grant_reload_procs_priv");
 
-  table.init_one_table("mysql", 5, "procs_priv",
-                       strlen("procs_priv"), "procs_priv",
-                       TL_READ);
-  table.open_type= OT_BASE_ONLY;
-
-  if (open_and_lock_tables(thd, &table, FALSE, MYSQL_LOCK_IGNORE_TIMEOUT))
-    DBUG_RETURN(TRUE);
-
-  mysql_rwlock_wrlock(&LOCK_grant);
   /* Save a copy of the current hash if we need to undo the grant load */
   old_proc_priv_hash= proc_priv_hash;
   old_func_priv_hash= func_priv_hash;
 
-  if ((return_val= grant_load_procs_priv(table.table)))
+  if ((return_val= grant_load_procs_priv(table->table)))
   {
     /* Error; Reverting to old hash */
     DBUG_PRINT("error",("Reverting to old privileges"));
-    grant_free();
+    my_hash_free(&proc_priv_hash);
+    my_hash_free(&func_priv_hash);
     proc_priv_hash= old_proc_priv_hash;
     func_priv_hash= old_func_priv_hash;
   }
@@ -5684,7 +5490,6 @@ static my_bool grant_reload_procs_priv(THD *thd)
     my_hash_free(&old_proc_priv_hash);
     my_hash_free(&old_func_priv_hash);
   }
-  mysql_rwlock_unlock(&LOCK_grant);
 
   DBUG_RETURN(return_val);
 }
@@ -5707,7 +5512,7 @@ static my_bool grant_reload_procs_priv(THD *thd)
 
 my_bool grant_reload(THD *thd)
 {
-  TABLE_LIST tables[2];
+  TABLE_LIST tables[3];
   HASH old_column_priv_hash;
   MEM_ROOT old_mem;
   my_bool return_val= 1;
@@ -5723,15 +5528,57 @@ my_bool grant_reload(THD *thd)
   tables[1].init_one_table(C_STRING_WITH_LEN("mysql"),
                            C_STRING_WITH_LEN("columns_priv"),
                            "columns_priv", TL_READ);
+  tables[2].init_one_table(C_STRING_WITH_LEN("mysql"),
+                           C_STRING_WITH_LEN("procs_priv"),
+                           "procs_priv", TL_READ);
+
   tables[0].next_local= tables[0].next_global= tables+1;
-  tables[0].open_type= tables[1].open_type= OT_BASE_ONLY;
+  tables[1].next_local= tables[1].next_global= tables+2;
+  tables[0].open_type= tables[1].open_type= tables[2].open_type= OT_BASE_ONLY;
+
+  /*
+    Reload will work in the following manner:-
+
+                             proc_priv_hash structure
+                              /                     \
+                    not initialized                 initialized
+                   /               \                     |
+    mysql.procs_priv table        Server Startup         |
+        is missing                      \                |
+             |                         open_and_lock_tables()
+    Assume we are working on           /success             \failure
+    pre 4.1 system tables.        Normal Scenario.          An error is thrown.
+    A warning is printed          Reload column privilege.  Retain the old hash.
+    and continue with             Reload function and
+    reloading the column          procedure privileges,
+    privileges.                   if available.
+  */
+
+  if (!(my_hash_inited(&proc_priv_hash)))
+    tables[2].open_strategy= TABLE_LIST::OPEN_IF_EXISTS;
 
   /*
     To avoid deadlocks we should obtain table locks before
     obtaining LOCK_grant rwlock.
   */
   if (open_and_lock_tables(thd, tables, FALSE, MYSQL_LOCK_IGNORE_TIMEOUT))
+  {
+    if (thd->get_stmt_da()->is_error())
+    {
+      sql_print_error("Fatal error: Can't open and lock privilege tables: %s",
+                      thd->get_stmt_da()->message());
+    }
     goto end;
+  }
+
+  if (tables[2].table == NULL)
+  {
+    sql_print_warning("Table 'mysql.procs_priv' does not exist. "
+                      "Please run mysql_upgrade.");
+    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN, ER_NO_SUCH_TABLE,
+                        ER(ER_NO_SUCH_TABLE), tables[2].db,
+                        tables[2].table_name);
+  }
 
   mysql_rwlock_wrlock(&LOCK_grant);
   old_column_priv_hash= column_priv_hash;
@@ -5742,11 +5589,18 @@ my_bool grant_reload(THD *thd)
   */
   old_mem= memex;
   init_sql_alloc(&memex, ACL_ALLOC_BLOCK_SIZE, 0);
-
-  if ((return_val= grant_load(thd, tables)))
+  /*
+    tables[2].table i.e. procs_priv can be null if we are working with
+    pre 4.1 privilage tables
+  */
+  if ((return_val= grant_load(thd, tables)) ||
+                   (tables[2].table != NULL &&
+                    grant_reload_procs_priv(thd, &tables[2]))
+     )
   {						// Error. Revert to old hash
     DBUG_PRINT("error",("Reverting to old privileges"));
-    grant_free();				/* purecov: deadcode */
+    my_hash_free(&column_priv_hash);
+    free_root(&memex,MYF(0));
     column_priv_hash= old_column_priv_hash;	/* purecov: deadcode */
     memex= old_mem;				/* purecov: deadcode */
   }
@@ -5754,19 +5608,8 @@ my_bool grant_reload(THD *thd)
   {
     my_hash_free(&old_column_priv_hash);
     free_root(&old_mem,MYF(0));
+    grant_version++;
   }
-  mysql_rwlock_unlock(&LOCK_grant);
-  close_acl_tables(thd);
-
-  /*
-    It is OK failing to load procs_priv table because we may be
-    working with 4.1 privilege tables.
-  */
-  if (grant_reload_procs_priv(thd))
-    return_val= 1;
-
-  mysql_rwlock_wrlock(&LOCK_grant);
-  grant_version++;
   mysql_rwlock_unlock(&LOCK_grant);
 
 end:
@@ -6239,7 +6082,7 @@ bool check_grant_db(THD *thd,const char *db)
   bool error= TRUE;
   size_t copy_length;
 
-  copy_length= (size_t) (strlen(sctx->priv_user ? sctx->priv_user : "") +
+  copy_length= (size_t) (strlen(sctx->priv_user) +
                  strlen(db ? db : "")) + 1; /* Added 1 at the end to avoid  
                                                buffer overflow at strmov()*/
 
@@ -6588,24 +6431,36 @@ bool mysql_show_grants(THD *thd,LEX_USER *lex_user)
 		  system_charset_info);
     global.append ('\'');
 #if defined(HAVE_OPENSSL)
-    if (acl_user->plugin.str == sha256_password_plugin_name.str)
+    if (acl_user->plugin.str == sha256_password_plugin_name.str &&
+        acl_user->auth_string.length > 0)
     {
-      global.append(STRING_WITH_LEN(" IDENTIFIED BY PASSWORD '"));
-      global.append((const char *) &acl_user->auth_string.str[0]);
-      global.append('\'');
+      global.append(STRING_WITH_LEN(" IDENTIFIED BY PASSWORD"));
+      if ((thd->security_ctx->master_access & SUPER_ACL) == SUPER_ACL)
+      {
+        global.append(" \'");
+        global.append((const char *) &acl_user->auth_string.str[0]);
+        global.append('\'');
+      }
     }
     else
 #endif
     if (acl_user->salt_len)
     {
-      char passwd_buff[SCRAMBLED_PASSWORD_CHAR_LENGTH+1];
-      if (acl_user->salt_len == SCRAMBLE_LENGTH)
-        make_password_from_salt(passwd_buff, acl_user->salt);
+      global.append(STRING_WITH_LEN(" IDENTIFIED BY PASSWORD"));
+      if ((thd->security_ctx->master_access & SUPER_ACL) == SUPER_ACL)
+      {
+        char passwd_buff[SCRAMBLED_PASSWORD_CHAR_LENGTH+1];
+        if (acl_user->salt_len == SCRAMBLE_LENGTH)
+          make_password_from_salt(passwd_buff, acl_user->salt);
+        else
+          make_password_from_salt_323(passwd_buff, (ulong *) acl_user->salt);
+
+        global.append(" \'");
+        global.append(passwd_buff);
+        global.append('\'');
+      }
       else
-        make_password_from_salt_323(passwd_buff, (ulong *) acl_user->salt);
-      global.append(STRING_WITH_LEN(" IDENTIFIED BY PASSWORD '"));
-      global.append(passwd_buff);
-      global.append('\'');
+        global.append(" <secret>");
     }
     /* "show grants" SSL related stuff */
     if (acl_user->ssl_type == SSL_TYPE_ANY)
@@ -9325,7 +9180,7 @@ void fill_effective_table_privileges(THD *thd, GRANT_INFO *grant,
   DBUG_PRINT("enter", ("Host: '%s', Ip: '%s', User: '%s', table: `%s`.`%s`",
                        sctx->priv_host, (sctx->get_ip()->length() ?
                        sctx->get_ip()->ptr() : "(NULL)"),
-                       (sctx->priv_user ? sctx->priv_user : "(NULL)"),
+                       sctx->priv_user,
                        db, table));
   /* --skip-grants */
   if (!initialized)
@@ -9338,12 +9193,6 @@ void fill_effective_table_privileges(THD *thd, GRANT_INFO *grant,
 
   /* global privileges */
   grant->privilege= sctx->master_access;
-
-  if (!sctx->priv_user)
-  {
-    DBUG_PRINT("info", ("privilege 0x%lx", grant->privilege));
-    DBUG_VOID_RETURN;                         // it is slave
-  }
 
   /* db privileges */
   grant->privilege|= acl_get(sctx->get_host()->ptr(), sctx->get_ip()->ptr(),
@@ -11324,8 +11173,7 @@ acl_authenticate(THD *thd, uint com_change_user_pkt_len)
     {
       general_log_print(thd, command, "%s@%s as %s on %s",
                         mpvio.auth_info.user_name, mpvio.auth_info.host_or_ip,
-                        mpvio.auth_info.authenticated_as ? 
-                          mpvio.auth_info.authenticated_as : "anonymous",
+                        mpvio.auth_info.authenticated_as,
                         mpvio.db.str ? mpvio.db.str : (char*) "");
     }
     else

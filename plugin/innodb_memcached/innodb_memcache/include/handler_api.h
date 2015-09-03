@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2011, 2013, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -32,6 +32,7 @@ Created 3/14/2011 Jimmy Yang
 /** Defines for handler_unlock_table()'s mode field */
 #define HDL_READ	0x1
 #define HDL_WRITE	0x2
+#define HDL_FLUSH	0x3
 
 /** Defines for handler_binlog_row()'s mode field */
 typedef enum hdl_op_type {
@@ -135,6 +136,14 @@ handler_rec_setup_uint64(
 			value,		/*!< in: value to set */
 	bool		unsigned_flag,	/*!< in: whether it is unsigned */
 	bool		is_null);	/*!< in: whether it is null value */
+
+
+
+/**********************************************************************//**
+Check if global read lock is active */
+bool
+handler_check_global_read_lock_active();
+/*====================================*/
 
 /**********************************************************************//**
 Unlock a table and commit the transaction

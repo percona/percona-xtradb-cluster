@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2011, 2013, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -150,6 +150,17 @@ handler_open_table(
 				(lock_mode > TL_READ)
 				? MDL_SHARED_WRITE
 				: MDL_SHARED_READ, MDL_TRANSACTION);
+
+	/* For flush, we need to request exclusive mdl lock. */
+	if (lock_type == HDL_FLUSH) {
+		tables.mdl_request.init(MDL_key::TABLE, db_name, table_name,
+					MDL_EXCLUSIVE, MDL_TRANSACTION);
+	} else {
+		tables.mdl_request.init(MDL_key::TABLE, db_name, table_name,
+					(lock_mode > TL_READ)
+					? MDL_SHARED_WRITE
+					: MDL_SHARED_READ, MDL_TRANSACTION);
+	}
 
 	if (!open_table(thd, &tables, &table_ctx)) {
 		TABLE*	table = tables.table;
@@ -371,6 +382,15 @@ handler_close_thd(
 
 	/* Don't have a THD anymore */
 	my_pthread_setspecific_ptr(THR_THD,  0);
+}
+
+/**********************************************************************//**
+Check if global read lock is active */
+
+bool
+handler_check_global_read_lock_active()
+{
+        return Global_read_lock::global_read_lock_active();
 }
 
 /**********************************************************************//**

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1564,13 +1564,20 @@ bool close_temporary_tables(THD *thd)
   DBUG_ASSERT(!thd->slave_thread ||
               thd->system_thread != SYSTEM_THREAD_SLAVE_WORKER);
 
+  /*
+    Ensure we don't have open HANDLERs for tables we are about to close.
+    This is necessary when close_temporary_tables() is called as part
+    of execution of BINLOG statement (e.g. for format description event).
+  */
+  mysql_ha_rm_temporary_tables(thd);
   if (!mysql_bin_log.is_open())
   {
     TABLE *tmp_next;
-    for (table= thd->temporary_tables; table; table= tmp_next)
+    for (TABLE *t= thd->temporary_tables; t; t= tmp_next)
     {
-      tmp_next= table->next;
-      close_temporary(table, 1, 1);
+      tmp_next= t->next;
+      mysql_lock_remove(thd, thd->lock, t);
+      close_temporary(t, 1, 1);
     }
     thd->temporary_tables= 0;
     if (thd->slave_thread)
@@ -1699,6 +1706,7 @@ bool close_temporary_tables(THD *thd)
         }
 
         next= table->next;
+        mysql_lock_remove(thd, thd->lock, table);
         close_temporary(table, 1, 1);
       }
       thd->clear_error();
@@ -4121,7 +4129,7 @@ request_backoff_action(enum_open_table_action action_arg,
   if (action_arg != OT_REOPEN_TABLES && m_has_locks)
   {
     my_error(ER_LOCK_DEADLOCK, MYF(0));
-    mark_transaction_to_rollback(m_thd, true);
+    m_thd->mark_transaction_to_rollback(true);
     return TRUE;
   }
   /*
@@ -4507,10 +4515,16 @@ open_and_process_table(THD *thd, LEX *lex, TABLE_LIST *tables,
       obtain proper metadata locks and do other necessary steps like
       stored routine processing.
     */
-    tables->db= tables->view_db.str;
-    tables->db_length= tables->view_db.length;
-    tables->table_name= tables->view_name.str;
-    tables->table_name_length= tables->view_name.length;
+    if (tables->db != tables->view_db.str)
+    {
+      tables->db= tables->view_db.str;
+      tables->db_length= tables->view_db.length;
+    }
+    if (tables->table_name != tables->view_name.str)
+    {
+      tables->table_name= tables->view_name.str;
+      tables->table_name_length= tables->view_name.length;
+    }
   }
   /*
     If this TABLE_LIST object is a placeholder for an information_schema
@@ -6558,10 +6572,7 @@ find_field_in_view(THD *thd, TABLE_LIST *table_list,
           Use own arena for Prepared Statements or data will be freed after
           PREPARE.
         */
-        Prepared_stmt_arena_holder ps_arena_holder(
-          thd,
-          register_tree_change &&
-            thd->stmt_arena->is_stmt_prepare_or_first_stmt_execute());
+        Prepared_stmt_arena_holder ps_arena_holder(thd, register_tree_change);
 
         /*
           create_item() may, or may not create a new Item, depending on

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -163,9 +163,12 @@ static void print_system_time()
   Helper class to perform a thread excursion.
 
   This class is used to temporarily switch to another session (THD
-  structure). It will set up the PSI structures and other "globals"
-  correctly (e.g., thread-specific variables) so that the POSIX thread
-  looks exactly like the session attached to.
+  structure). It will set up thread specific "globals" correctly
+  so that the POSIX thread looks exactly like the session attached to.
+  However, PSI_thread info is not touched as it is required to show
+  the actual physial view in PFS instrumentation i.e., it should
+  depict as the real thread doing the work instead of thread it switched
+  to.
 
   On destruction, the original session (which is supplied to the
   constructor) will be re-attached automatically. For example, with
@@ -188,17 +191,10 @@ class Thread_excursion
 public:
   Thread_excursion(THD *thd)
     : m_original_thd(thd)
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-    , m_saved_psi(PSI_server ? PSI_server->get_thread() : NULL)
-#endif
   {
   }
 
   ~Thread_excursion() {
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-    if (PSI_server)
-      PSI_server->set_thread(m_saved_psi);
-#endif
 #ifndef EMBEDDED_LIBRARY
     if (unlikely(setup_thread_globals(m_original_thd)))
       DBUG_ASSERT(0);                           // Out of memory?!
@@ -261,18 +257,10 @@ private:
    */
   int attach_to(THD *thd)
   {
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-    if (PSI_server)
-      PSI_server->set_thread(thd_get_psi(thd));
-#endif
 #ifndef EMBEDDED_LIBRARY
     if (DBUG_EVALUATE_IF("simulate_session_attach_error", 1, 0)
         || unlikely(setup_thread_globals(thd)))
     {
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
-      if (PSI_server)
-        PSI_server->set_thread(m_saved_psi);
-#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
       /*
         Indirectly uses pthread_setspecific, which can only return
         ENOMEM or EINVAL. Since store_globals are using correct keys,
@@ -304,7 +292,6 @@ exit0:
   }
 
   THD *m_original_thd;
-  PSI_thread *m_saved_psi;
 };
 
 
@@ -778,7 +765,7 @@ public:
   {
     my_off_t stmt_bytes= 0;
     my_off_t trx_bytes= 0;
-    DBUG_ASSERT(stmt_cache.has_xid() == 0 && trx_cache.has_xid() <= 1);
+    DBUG_ASSERT(stmt_cache.has_xid() == 0);
     if (int error= stmt_cache.flush(thd, &stmt_bytes, wrote_xid))
       return error;
     if (int error= trx_cache.flush(thd, &trx_bytes, wrote_xid))
@@ -948,14 +935,14 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     uchar *buf;
     size_t len=0;
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog trx cache not empty (%lu bytes) @ connection close %lu",
-               len, thd->thread_id);
+    WSREP_WARN("binlog trx cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id);
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
     cache = cache_mngr->get_binlog_cache_log(false);
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog stmt cache not empty (%lu bytes) @ connection close %lu",
-               len, thd->thread_id);
+    WSREP_WARN("binlog stmt cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id);
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
@@ -1769,13 +1756,13 @@ static int binlog_savepoint_set(handlerton *hton, THD *thd, void *sv)
 {
   DBUG_ENTER("binlog_savepoint_set");
   int error= 1;
-
+#ifdef WITH_WSREP
   /*
     Clear table maps before writing SAVEPOINT event. This enforces
     recreation of table map events for the following row event.
    */
   thd->clear_binlog_table_maps();
-
+#endif /* WITH_WSREP */
   String log_query;
   if (log_query.append(STRING_WITH_LEN("SAVEPOINT ")))
     DBUG_RETURN(error);
@@ -4785,43 +4772,6 @@ int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time, bool auto_purge)
     }
     if (find_next_log(&log_info, false/*need_lock_index=false*/))
       break;
-  }
-
-  if (log_is_active)
-  {
-    if(!auto_purge)
-      push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                          ER_WARN_PURGE_LOG_IS_ACTIVE,
-                          ER(ER_WARN_PURGE_LOG_IS_ACTIVE),
-                          log_info.log_file_name);
-
-  }
-
-  if (log_is_in_use)
-  {
-    int no_of_log_files_to_purge= no_of_log_files_purged+1;
-    while (strcmp(log_file_name, log_info.log_file_name))
-    {
-      if (mysql_file_stat(m_key_file_log, log_info.log_file_name,
-                          &stat_area, MYF(0)))
-      {
-        if (stat_area.st_mtime < purge_time)
-          no_of_log_files_to_purge++;
-        else
-          break;
-      }
-      if (find_next_log(&log_info, false/*need_lock_index=false*/))
-      {
-        no_of_log_files_to_purge++;
-        break;
-      }
-    }
-
-    push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
-                        ER_WARN_PURGE_LOG_IN_USE,
-                        ER(ER_WARN_PURGE_LOG_IN_USE),
-                        copy_log_in_use, no_of_threads_locking_log,
-                        no_of_log_files_purged, no_of_log_files_to_purge);
   }
 
   if (log_is_active)

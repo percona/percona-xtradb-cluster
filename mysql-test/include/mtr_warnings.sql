@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2013, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2015, Oracle and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -243,7 +243,7 @@ INSERT INTO global_suppressions VALUES
  
  ("Changed limits: max_open_files: *"),
  ("Changed limits: max_connections: *"),
- ("Changed limits: table_cache: *"),
+ ("Changed limits: table_open_cache: *"),
  ("Could not increase number of max_open_files to more than *"),
 
  /*
@@ -252,9 +252,10 @@ INSERT INTO global_suppressions VALUES
  ("WSREP:*down context*"),
  ("WSREP: Failed to send state UUID:*"),
  ("WSREP: wsrep_sst_receive_address is set to '127.0.0.1"),
- ("WSREP: option --wsrep-casual-reads is deprecated"),
- ("WSREP: --wsrep-casual-reads=ON takes precedence over --wsrep-sync-wait=0"),
+ ("WSREP: option --wsrep-causal-reads is deprecated"),
+ ("WSREP: --wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=0"),
  ("WSREP: Could not open saved state file for reading: "),
+ ("WSREP: Could not open state file for reading: "),
  ("WSREP: access file\\(.*gvwstate\\.dat\\) failed\\(No such file or directory\\)"),
  ("WSREP: Gap in state sequence\\. Need state transfer\\."),
  ("WSREP: Failed to prepare for incremental state transfer: Local state UUID \\(00000000-0000-0000-0000-000000000000\\) does not match group state UUID"),
@@ -279,7 +280,7 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: no nodes coming from prim view, prim not possible"),
  ("WSREP: Failed to prepare for incremental state transfer: Local state seqno is undefined:"),
  ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
-
+ ("WSREP: Action message in non-primary configuration from member 0"),
  ("THE_LAST_SUPPRESSION")||
 
 

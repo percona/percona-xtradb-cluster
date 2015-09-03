@@ -553,6 +553,7 @@ ulong specialflag=0;
 ulong binlog_cache_use= 0, binlog_cache_disk_use= 0;
 ulong binlog_stmt_cache_use= 0, binlog_stmt_cache_disk_use= 0;
 ulong max_connections, max_connect_errors;
+ulong max_digest_length= 0;
 ulong rpl_stop_slave_timeout= LONG_TIMEOUT;
 my_bool log_bin_use_v1_row_events= 0;
 bool thread_cache_size_specified= false;
@@ -592,6 +593,11 @@ ulong expire_logs_days = 0;
   in the sp_cache for one connection.
 */
 ulong stored_program_cache_size= 0;
+/**
+  Compatibility option to prevent auto upgrade of old temporals
+  during certain ALTER TABLE operations.
+*/
+my_bool avoid_temporal_upgrade;
 
 const double log_10[] = {
   1e000, 1e001, 1e002, 1e003, 1e004, 1e005, 1e006, 1e007, 1e008, 1e009,
@@ -2481,7 +2487,7 @@ static void network_init(void)
       returned by getaddrinfo();
     */
 
-    struct addrinfo *a;
+    struct addrinfo *a = NULL;
     ip_sock= create_socket(ai, AF_INET, &a);
 
     if (mysql_socket_getfd(ip_sock) == INVALID_SOCKET)
@@ -3982,6 +3988,9 @@ int init_common_variables()
     return 1;
   set_server_version();
 
+  sql_print_information("%s (mysqld %s) starting as process %lu ...",
+                        my_progname, server_version, (ulong) getpid());
+
 #ifndef EMBEDDED_LIBRARY
   if (opt_help && !opt_verbose)
     unireg_abort(0);
@@ -4208,17 +4217,11 @@ int init_common_variables()
                       "--slow-query-log-file option, log tables are used. "
                       "To enable logging to files use the --log-output=file option.");
 
-#define FIX_LOG_VAR(VAR, ALT)                                   \
-  if (!VAR || !*VAR)                                            \
-  {                                                             \
-    my_free(VAR); /* it could be an allocated empty string "" */ \
-    VAR= ALT;                                                    \
-  }
+  if (!opt_logname || !*opt_logname)
+    opt_logname= make_default_log_name(logname_path, ".log");
 
-  FIX_LOG_VAR(opt_logname,
-              make_default_log_name(logname_path, ".log"));
-  FIX_LOG_VAR(opt_slow_logname,
-              make_default_log_name(slow_logname_path, "-slow.log"));
+  if (!opt_slow_logname || !*opt_slow_logname)
+    opt_slow_logname= make_default_log_name(slow_logname_path, "-slow.log");
 
 #if defined(ENABLED_DEBUG_SYNC)
   /* Initialize the debug sync facility. See debug_sync.cc. */
@@ -5889,6 +5892,8 @@ int mysqld_main(int argc, char **argv)
         pfs_param.m_hints.m_table_open_cache= table_cache_size;
         pfs_param.m_hints.m_max_connections= max_connections;
 	pfs_param.m_hints.m_open_files_limit= requested_open_files;
+        /* the performance schema digest size is the same as the SQL layer */
+        pfs_param.m_max_digest_length= max_digest_length;
         PSI_hook= initialize_performance_schema(&pfs_param);
         if (PSI_hook == NULL)
         {
@@ -6336,6 +6341,8 @@ int mysqld_main(int argc, char **argv)
                       opt_ndb_wait_setup);
   }
 #endif
+
+  (void)MYSQL_SET_STAGE(0 ,__FILE__, __LINE__);
 
 #if defined(_WIN32) || defined(HAVE_SMEM)
   handle_connections_methods();
@@ -7635,7 +7642,7 @@ void adjust_table_cache_size(ulong requested_open_files)
     char msg[1024];
 
     snprintf(msg, sizeof(msg),
-             "Changed limits: table_cache: %lu (requested %lu)",
+             "Changed limits: table_open_cache: %lu (requested %lu)",
              limit, table_cache_size);
     buffered_logs.buffer(WARNING_LEVEL, msg);
 
@@ -9480,6 +9487,12 @@ pfs_error:
   case OPT_TABLE_DEFINITION_CACHE:
     table_definition_cache_specified= true;
     break;
+  case OPT_AVOID_TEMPORAL_UPGRADE:
+    WARN_DEPRECATED_NO_REPLACEMENT(NULL, "avoid_temporal_upgrade");
+    break;
+  case OPT_SHOW_OLD_TEMPORALS:
+    WARN_DEPRECATED_NO_REPLACEMENT(NULL, "show_old_temporals");
+    break;
   }
   return 0;
 }
@@ -9654,10 +9667,10 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
 
 #ifdef WITH_WSREP
   if (global_system_variables.wsrep_causal_reads) {
-      WSREP_WARN("option --wsrep-casual-reads is deprecated");
+      WSREP_WARN("option --wsrep-causal-reads is deprecated");
       if (!(global_system_variables.wsrep_sync_wait &
             WSREP_SYNC_WAIT_BEFORE_READ)) {
-          WSREP_WARN("--wsrep-casual-reads=ON takes precedence over --wsrep-sync-wait=%u. "
+          WSREP_WARN("--wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=%u. "
                      "WSREP_SYNC_WAIT_BEFORE_READ is on",
                      global_system_variables.wsrep_sync_wait);
           global_system_variables.wsrep_sync_wait |= WSREP_SYNC_WAIT_BEFORE_READ;
