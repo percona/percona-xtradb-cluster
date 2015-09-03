@@ -361,7 +361,12 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     // Using timedwait is a hack to avoid deadlock in case if BF victim
     // misses the signal.
-    struct timespec wtime = {0, 1000000};
+    struct timespec wtime;
+    clock_gettime(CLOCK_REALTIME, &wtime);
+    long prev_nsec = wtime.tv_nsec;
+    wtime.tv_nsec = (wtime.tv_nsec + 1000000) % 1000000000;
+    // If nsecs rolled over, increment seconds.
+    wtime.tv_sec += (wtime.tv_nsec < prev_nsec ? 1 : 0);
     mysql_cond_timedwait(&COND_wsrep_replaying, &LOCK_wsrep_replaying,
 			 &wtime);
 
