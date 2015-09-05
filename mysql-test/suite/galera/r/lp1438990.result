@@ -15,6 +15,7 @@ RELEASE SAVEPOINT event_logging;
 END|
 INSERT INTO t2 VALUES (1);
 INSERT INTO t1 VALUES (1);
+ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP PROCEDURE p1;
 DROP TABLE t1;
 DROP TABLE t2;

@@ -5,18 +5,49 @@
 
 
 --connection node_1
+--echo SAVEPOINT in a stored function should be forbidden
+--delimiter |
+CREATE FUNCTION f1 () RETURNS INT BEGIN
+       SAVEPOINT s;
+       RETURN 1;
+END|
+--delimiter ;
+
+--error ER_NOT_SUPPORTED_YET
+SELECT f1();
+
+DROP FUNCTION f1;
+
+--echo ROLLBACK TO SAVEPOINT in a stored function should be forbidden
+--delimiter |
+CREATE FUNCTION f2 () RETURNS INT BEGIN
+       ROLLBACK TO SAVEPOINT s;
+       RETURN 1;
+END|
+--delimiter ;
+
+BEGIN;
+SAVEPOINT s;
+--error ER_NOT_SUPPORTED_YET
+SELECT f2();
+COMMIT;
+
+DROP FUNCTION f2;
+
 BEGIN;
 SAVEPOINT S;
 ROLLBACK TO SAVEPOINT S;
 COMMIT;
 
+
 CREATE TABLE t1 (a INT PRIMARY KEY) ENGINE=InnoDB;
 CREATE TABLE t2 (a INT PRIMARY KEY AUTO_INCREMENT) ENGINE=InnoDB;
 INSERT INTO t1 values (110), (111), (112), (113), (114);
 
---connection node_2
 --echo Direct SAVEPOINT in a trigger should be forbidden
+--connection node_2
 CREATE TRIGGER i1_t1 BEFORE INSERT ON t1 FOR EACH ROW SAVEPOINT s;
+
 --connection node_1
 --error ER_NOT_SUPPORTED_YET
 INSERT INTO t1 VALUES (1);
@@ -163,7 +194,6 @@ CALL p5();
 COMMIT;
 DROP TRIGGER i6_t1;
 
-
 --connection node_2
 delimiter |;
 create trigger t1 before insert on t1 for each row
@@ -183,6 +213,7 @@ SELECT * FROM t2;
 SELECT * FROM t1;
 SELECT * FROM t2;
 
+
 --connection node_1
 DEALLOCATE PREPARE call_p1;
 
@@ -193,5 +224,4 @@ DROP PROCEDURE p2;
 DROP PROCEDURE p3;
 DROP PROCEDURE p4;
 DROP PROCEDURE p5;
-
 DROP FUNCTION f1;

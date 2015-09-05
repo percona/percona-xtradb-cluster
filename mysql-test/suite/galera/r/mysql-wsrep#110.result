@@ -14,23 +14,24 @@ INSERT INTO t2 VALUES (x);
 END|
 INSERT INTO t2 VALUES (1);
 INSERT INTO t1 VALUES (1);
-SELECT COUNT(*) = 1 FROM t1;
-COUNT(*) = 1
+ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
 1
 SELECT COUNT(*) = 1 FROM t2;
 COUNT(*) = 1
 1
-SELECT COUNT(*) = 1 FROM t3;
-COUNT(*) = 1
+SELECT COUNT(*) = 0 FROM t3;
+COUNT(*) = 0
 1
-SELECT COUNT(*) = 1 FROM t1;
-COUNT(*) = 1
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
 1
 SELECT COUNT(*) = 1 FROM t2;
 COUNT(*) = 1
 1
-SELECT COUNT(*) = 1 FROM t3;
-COUNT(*) = 1
+SELECT COUNT(*) = 0 FROM t3;
+COUNT(*) = 0
 1
 DROP TABLE t1;
 DROP TABLE t2;
