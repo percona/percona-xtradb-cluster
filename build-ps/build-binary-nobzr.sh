@@ -230,6 +230,7 @@ fi
         -DENABLE_DTRACE=OFF \
         -DWITH_SSL=system \
         -DWITH_ZLIB=system \
+        -DWITH_READLINE=system \
         -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
         -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
         -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
