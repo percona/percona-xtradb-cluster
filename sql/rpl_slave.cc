@@ -3861,9 +3861,11 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
 #ifdef WITH_WSREP
     if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT)
     {
-      WSREP_DEBUG("SQL apply failed, res %d conflict state: %d", 
+      WSREP_DEBUG("SQL apply failed, res %d conflict state: %d",
                  exec_res, thd->wsrep_conflict_state);
       rli->abort_slave = 1;
+      rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
+                  "Node has dropped from cluster");
     }
 #endif
 
