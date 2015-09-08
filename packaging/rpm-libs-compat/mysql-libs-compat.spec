@@ -87,10 +87,13 @@
 %endif
 
 %if 0%{?rhel} == 7
-%global compatver             5.5.37
+%global compatver             5.5.45
 %global compatlib             18
 %global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.5/mysql-%{compatver}.tar.gz
-%global compatch              mysql-5537-charset-dir.patch
+%global compatch              mysql-5545-charset-dir.patch
+# By default, a build will include the bundeled "yaSSL" library for SSL.
+%{?with_ssl:                  %global ssl_option -DWITH_SSL=%{with_ssl}}
+%{!?feature_set:              %global feature_set community}
 %endif
 
 # Hack to support el5 where __isa_bits not defined. Note: supports i386 and x86_64 only, sorry.
@@ -120,16 +123,19 @@ Summary:        Shared libraries for MySQL %{compatver} database client applicat
 Group:          Applications/Databases
 # "Version = 5.6" because this libs-compat will fit all mysql-wsrep-server-5.6.* packages.
 # "fullversion = 5.6.23" for better conflict handling.
-Version:        5.6
-%global fullversion        5.6.23
-Release:        11%{?dist}
+Version:        5.5
+%global fullversion        5.5.45
+Release:        12%{?dist}
 License:        Copyright (c) 2000, 2015, %{mysql_vendor}. All rights reserved. Under GPLv2 license as shown in the Description field.
 URL:            http://www.mysql.com/
 Packager:       FromDual GmbH <joerg.bruehe@fromdual.com>
 Vendor:         %{mysql_vendor}
 %if 0%{?compatlib}
 Source7:        %{compatsrc}
-Patch:          %{compatch}
+Patch0:         %{compatch}
+%if 0%{?rhel} > 6
+Patch1:         mysql-5.5-libmysqlclient-symbols.patch
+%endif
 %endif
 BuildRequires:  gcc-c++
 BuildRequires:  perl
@@ -141,15 +147,18 @@ BuildRequires:  libaio-devel
 BuildRequires:  ncurses-devel
 BuildRequires:  openssl-devel
 BuildRequires:  zlib-devel
+%{?el7:BuildRequires: cmake}
+%{?el7:BuildRequires: perl(Time::HiRes)}
+%{?el7:BuildRequires: perl(Env)}
 BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 
-Obsoletes:      mysql-libs-compat < %{fullversion}-%{release}
 Provides:       mysql-libs-compat = %{fullversion}-%{release}
 Provides:       mysql-libs-compat%{?_isa} = %{fullversion}-%{release}
+Obsoletes:      mysql-libs-compat < %{fullversion}-%{release}
 Provides:       MySQL-shared-compat%{?_isa} = %{fullversion}-%{release}
 Obsoletes:      MySQL-shared-compat < %{fullversion}-%{release}
-%if 0%{?rhel} < 6
+%if 0%{?rhel} == 5
 # Dealing with RHEL 5 (and compatible ...)
 # "mysql" without a subpackage specification is a RedHat convention,
 # a package with client, lib, and server parts that blocks the server upgrade.
@@ -186,7 +195,8 @@ while the MySQL software on the machine is updated to a newer release series.
 %prep
 %setup -q -T      -a 7 -c -n %{src_dir}
 pushd %{src_dir}
-%patch -p 1
+%patch0 -p 1
+%{?el7:%patch1 -p1}
 popd
 
 %build
@@ -235,22 +245,53 @@ popd
 
 %endif
 
+%if 0%{?rhel} == 7
+
+mkdir release
+cd release
+cmake ../%{src_dir} \
+         -DBUILD_CONFIG=mysql_release \
+         -DINSTALL_LAYOUT=RPM \
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+         -DENABLE_DTRACE=OFF \
+         -DCMAKE_C_FLAGS="%{optflags}" \
+         -DCMAKE_CXX_FLAGS="%{optflags}" \
+         -DINSTALL_LIBDIR="%{_lib}/mysql" \
+         -DINSTALL_PLUGINDIR="%{_lib}/mysql/plugin" \
+         -DINSTALL_SQLBENCHDIR=share \
+         -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
+         -DFEATURE_SET="%{feature_set}" \
+         -DWITH_EMBEDDED_SERVER=1 \
+         -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
+         %{?ssl_option} \
+         -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+         -DMYSQL_SERVER_SUFFIX="%{?server_suffix}"
+echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
+make %{?_smp_mflags} VERBOSE=1
+
+%endif
+
 )
 
 
 %install
+cd $RPM_BUILD_DIR/mysql-%{compatver}
+
 # Install compat libs
-for dir in libmysql libmysql_r ; do
-    pushd mysql-%{compatver}/$dir
+%if 0%{?rhel} < 7
+for dir in mysql-%{compatver}/libmysql mysql-%{compatver}/libmysql_r ; do
+%else
+for dir in            release/libmysql            ; do
+%endif
+    pushd $dir
     make DESTDIR=%{buildroot} install
     popd
 done
 rm -f %{buildroot}%{_libdir}/mysql/libmysqlclient{,_r}.{a,la,so}
 
 # "charsets/"
-MBD=$RPM_BUILD_DIR/mysql-%{mysql_version}/mysql-release-%{mysql_version}
-install -d -m 0755 %{buildroot}/usr/share/mysql-%{compatver}/charsets/
-install -m 644 mysql-%{compatver}/sql/share/charsets/* %{buildroot}/usr/share/mysql-%{compatver}/charsets/
+install -d -m 0755 %{buildroot}/usr/share/mysql/charsets-%{compatver}/
+install -m 644 mysql-%{compatver}/sql/share/charsets/* %{buildroot}/usr/share/mysql/charsets-%{compatver}/
 
 # Add libdir to linker
 install -d -m 0755 %{buildroot}%{_sysconfdir}/ld.so.conf.d
@@ -272,11 +313,17 @@ echo "%{_libdir}/mysql" > %{buildroot}%{_sysconfdir}/ld.so.conf.d/mysql-%{_arch}
 %{_libdir}/mysql/libmysqlclient.so.%{compatlib}.0.0
 %{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}
 %{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}.0.0
-%dir %attr(755, root, root) %{_datadir}/mysql-%{compatver}
-%attr(644, root, root) %{_datadir}/mysql-%{compatver}/charsets/
+%dir %attr(755, root, root) %{_datadir}/mysql/
+%dir %attr(755, root, root) %{_datadir}/mysql/charsets-%{compatver}/
+%attr(644, root, root) %{_datadir}/mysql/charsets-%{compatver}/*
 
 
 %changelog
+* Tue Sep 08 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Finish the code for RHEL 7, using MySQL 5.5.45 as published by Oracle.
+- Severe bug: Path for "charsets" files did not match the patch, fix it.
+- This is in the 5.5 branch, fix the spec file version.
+
 * Thu Sep 03 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Change the name from "mysql-libs-compat" to "mysql-wsrep-libs-compat".
 - Change the compatibility version for RHEL 6 from MySQL 5.1.72 to 5.1.73.
