@@ -24,6 +24,7 @@ DEBUG_EXTNAME=''
 
 # Some programs that may be overriden
 TAR=${TAR:-tar}
+SCONS_ARGS=${SCONS_ARGS:-""}
 
 # Check if we have a functional getopt(1)
 if ! getopt --test
@@ -49,6 +50,7 @@ do
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
         DEBUG_EXTNAME='-DDEBUG_EXTNAME=OFF'
+        SCONS_ARGS+=' debug=1'
         ;;
     -G | --copygalera)
         shift
@@ -203,7 +205,7 @@ fi
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        scons --config=force boost_pool=0 revno="$GALERA_REVISION" $MAKE_JFLAG \
+        scons --config=force boost_pool=0 revno="$GALERA_REVISION" ${SCONS_ARGS} $MAKE_JFLAG \
               garb/garbd libgalera_smm.so
         mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
              "$WORKDIR/usr/local/$PRODUCT_FULL/lib"

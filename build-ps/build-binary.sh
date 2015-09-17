@@ -58,6 +58,7 @@ do
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
         DEBUG_EXTNAME='-DDEBUG_EXTNAME=OFF'
+        SCONS_ARGS+=' debug=1'
         ;;
     -v | --valgrind )
         shift
