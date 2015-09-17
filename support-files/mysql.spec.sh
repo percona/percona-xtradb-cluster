@@ -127,9 +127,13 @@
 BuildConflicts: post-build-checks
 
 BuildRequires: gcc-c++ ncurses-devel perl zlib-devel cmake libaio-devel bison flex
+BuildRequires: openssl-devel
 
 %if 0%{?rhel} == 6 || 0%{?rhel} == 7 || 0%{?fedora} == 20 || 0%{?fedora} == 21
 BuildRequires: time
+%endif
+%if 0%{?rhel} == 7
+BuildRequires: perl(Time::HiRes) perl(Env)
 %endif
 
 %if 0%{?suse_version}
@@ -142,6 +146,7 @@ BuildRequires: gperf procps time
 %endif
 
 # Define dist tag if not given by platform
+# In case of problems, check "/etc/rpm/macros.dist"
 %if %{undefined dist}
   # For suse versions see:
   # https://en.opensuse.org/openSUSE:Build_Service_cross_distribution_howto
@@ -162,14 +167,13 @@ BuildRequires: gperf procps time
     %define dist .DIST
   %endif
 %endif
-
+# CentOS 7 would force ".el7.centos", we want to avoid that.
+%if 0%{?rhel} == 7
+  %define dist .el7
+%endif
 
 # Avoid debuginfo RPMs, leaves binaries unstripped
 %define debug_package   %{nil}
-
-# Hack to work around bug in RHEL5 __os_install_post macro, wrong inverted
-# test for __debug_package
-%define __strip         /bin/true
 
 # ----------------------------------------------------------------------------
 # Support optional "tcmalloc" library (experimental)
@@ -181,6 +185,38 @@ BuildRequires: gperf procps time
 %endif
 
 ##############################################################################
+# Settings for the "compatibility libs", the version depends on the target platform
+##############################################################################
+
+# To differ between current main version and libs-compat:
+%global currentlib            18
+
+%if 0%{?rhel} == 6
+%global compatver             5.1.73
+%global compatlib             16
+%global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.1/mysql-%{compatver}.tar.gz
+%global compatch              mysql-5173-charset-dir.patch
+%endif
+
+# mysql-wsrep-5.5 has libmysqlclient.so.18, as have 5.6 and 5.7; 
+# same as preinstalled mariadb-libs, so we currently need no libs-compat on RHEL 7.
+# This becomes relevant with a MySQL 5.8 (or higher) that has a libmysqlclient.so.19 or higher.
+#
+# %%if 0%%{?rhel} == 7
+# %%global compatver             5.5.45
+# %%global compatlib             18
+# %%global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.5/mysql-%%{compatver}.tar.gz
+# %%global compatch              mysql-5545-charset-dir.patch
+# # By default, a build will include the bundeled "yaSSL" library for SSL.
+# %%{?with_ssl:                  %%global ssl_option -DWITH_SSL=%%{with_ssl}}
+# %%endif
+
+%if 0%{?compatlib}
+# Attention: "compat_src_dir" is the old version (e.g. 5.1.73), depends on platform
+%global compat_src_dir               mysql-%{compatver}
+%endif
+
+##############################################################################
 # Configuration based upon above user input, not to be set directly
 ##############################################################################
 
@@ -188,15 +224,16 @@ BuildRequires: gperf procps time
 %define license_files_server    %{src_dir}/LICENSE.mysql
 %define license_type            Commercial
 %else
-%define license_files_server    COPYING README
+%define license_files_server    %{src_dir}/COPYING %{src_dir}/README
 %define license_type            GPL
+%define compat_license_files_server   %{compat_src_dir}/COPYING %{compat_src_dir}/README
 %endif
 
 ##############################################################################
 # Main spec file section
 ##############################################################################
 
-Name:           MySQL%{product_suffix}
+Name:           mysql-wsrep%{product_suffix}
 Summary:        MySQL: a very fast and reliable SQL database server
 Group:          Applications/Databases
 Version:        @MYSQL_RPM_VERSION@
@@ -204,13 +241,25 @@ Release:        %{release}%{dist}
 # Distribution:   %{distro_description}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. All rights reserved. Under %{license_type} license as shown in the Description field.
 Source:         %{src_dir}.tar.gz
+%if 0%{?compatlib}
+Source7:        %{compatsrc}
+%endif
 Source99:       mysql-rpmlintrc
 Patch0:          cmake-no-wix.patch
+%if 0%{?compatlib}
+Patch7:         %{compatch}
+%if 0%{?compatlib} == 18
+Patch8:         mysql-5.5-libmysqlclient-symbols.patch
+%endif
+%endif
 URL:            http://www.mysql.com/
 Packager:       Codership Oy <info@galeracluster.com>
 Vendor:         %{mysql_vendor}
 # BuildRequires:  %{distro_buildreq}
 #wsrep_patch_tag
+
+Requires:       mysql-wsrep-server%{product_suffix}
+Requires:       mysql-wsrep-client%{product_suffix}
 
 # Regression tests may take a long time, override the default to skip them 
 %{!?runselftest:%global runselftest 0}
@@ -238,25 +287,15 @@ The MySQL web site (http://www.mysql.com/) provides the latest
 news and information about the MySQL software. Also please see the
 documentation and the manual for more information.
 
+This is a meta package of the MySQL software combined with the "wsrep plugin"
+aka "Galera Cluster", all governed by the GPL.
+It causes the installation of both the server and the client subpackages
+so that the machine can be used both as a local database server and as a node
+in a MySQL Galera Cluster.
+
 ##############################################################################
 # Sub package definition
 ##############################################################################
-
-%package -n mysql-wsrep%{product_suffix}
-Summary:        MySQL: meta package for a server+client setup
-Group:          Applications/Databases
-Requires:       mysql-wsrep-server%{product_suffix}
-Requires:       mysql-wsrep-client%{product_suffix}
-
-%description -n mysql-wsrep%{product_suffix}
-This meta package ensures the installation of a MySQL server and the necessary
-client programs for operation and administration. It does not itself
-contain those files but rather causes the installation of the subpackages
-"mysql-wsrep-server%{product_suffix}" and "mysql-wsrep-client%{product_suffix}".
-As indicated in the name, the server is built with the "wsrep" plugin so that
-it can be a node in a MySQL Galera Cluster.
-
-# ----------------------------------------------------------------------------
 
 %package -n mysql-wsrep-server%{product_suffix}
 Summary:        MySQL: a very fast and reliable SQL database server
@@ -286,6 +325,10 @@ Obsoletes:      mysql-server < %{version}-%{release}
 Obsoletes:      mysql-server-advanced
 Obsoletes:      MySQL-server-classic MySQL-server-community MySQL-server-enterprise
 Obsoletes:      MySQL-server-advanced-gpl MySQL-server-enterprise-gpl
+%if 0%{?rhel}
+# RedHat has /usr/share/mysql/* in a separate package
+Obsoletes:      mysql-common
+%endif
 Provides:       mysql-server = %{version}-%{release}
 Provides:       mysql-server%{?_isa} = %{version}-%{release}
 
@@ -310,9 +353,9 @@ and the manual for more information.
 This package includes the MySQL server binary as well as related utilities
 to run and administer a MySQL server.
 
-Built with wsrep patch %{wsrep_version}.
+Built with wsrep patch %{wsrep_version}, to be a node in a Galera cluster.
 
-If you want to access and work with the database, you have to install
+If you want to access and work with the database locally, you have to install
 package "mysql-wsrep-client%{product_suffix}" as well!
 
 # ----------------------------------------------------------------------------
@@ -330,6 +373,8 @@ Obsoletes:      MySQL-client-classic MySQL-client-community MySQL-client-enterpr
 Obsoletes:      MySQL-client-advanced-gpl MySQL-client-enterprise-gpl
 Provides:       mysql = %{version}-%{release} 
 Provides:       mysql%{?_isa} = %{version}-%{release}
+Provides:       mysql-client = %{version}
+Provides:       MySQL-client = %{version}
 
 %description -n mysql-wsrep-client%{product_suffix}
 This package contains the standard MySQL clients and administration tools.
@@ -351,6 +396,8 @@ Obsoletes:      mysql-test < %{version}-%{release}
 Obsoletes:      mysql-test-advanced
 Obsoletes:      MySQL-test-classic MySQL-test-community MySQL-test-enterprise
 Obsoletes:      MySQL-test-advanced-gpl MySQL-test-enterprise-gpl
+Obsoletes:      mysql-bench
+Obsoletes:      MySQL-bench
 Provides:       mysql-test = %{version}-%{release}
 Provides:       mysql-test%{?_isa} = %{version}-%{release}
 AutoReqProv:    no
@@ -396,10 +443,52 @@ Obsoletes:      MySQL-shared-pro-cert MySQL-shared-pro-gpl
 Obsoletes:      MySQL-shared-pro-gpl-cert
 Obsoletes:      MySQL-shared-classic MySQL-shared-community MySQL-shared-enterprise
 Obsoletes:      MySQL-shared-advanced-gpl MySQL-shared-enterprise-gpl
+# RHEL uses other names:
+Obsoletes:      mysql-libs
+# Necessary on RHEL 7, no harm on other platforms:
+Obsoletes:      mariadb-libs
 
 %description -n mysql-wsrep-shared%{product_suffix}
 This package contains the shared libraries (*.so*) which certain languages
 and applications need to dynamically load and use MySQL.
+
+# ----------------------------------------------------------------------------
+%if 0%{?compatlib}
+%package -n mysql-wsrep-libs-compat%{product_suffix}
+Summary:        Shared libraries for MySQL %{compatver} database client applications
+Group:          Applications/Databases
+
+Provides:       mysql-libs-compat = %{version}
+Provides:       mysql-libs-compat%{?_isa} = %{version}
+Obsoletes:      mysql-libs-compat < %{version}
+Provides:       MySQL-shared-compat%{?_isa} = %{version}
+Obsoletes:      MySQL-shared-compat < %{version}
+
+# Dealing with RHEL 6 and upwards (and compatible ...)
+# Directly, we replace "libs" only; but RedHat "client" and "server" need files from "libs"
+Provides:       mysql-libs = %{compatver}
+Obsoletes:      mysql-libs < %{version}
+
+%if 0%{?rhel} > 6
+# Dealing with RHEL 7 and upwards (and compatible ...)
+# Above general section for RHEL also applies, it deals with "mysql" packages.
+# But with RHEL 7, we also get "mariadb" ...
+Obsoletes:      mariadb-libs
+%endif
+
+%description -n mysql-wsrep-libs-compat%{product_suffix}
+The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
+and robust SQL (Structured Query Language) database server.
+See the MySQL web site (http://www.mysql.com/) for further information,
+including its dual licensing (GNU GPL or commercial licenses).
+
+This package contains the shared libraries for (old) MySQL %{compatver} client
+applications.
+It is intended for RHEL %{?rhel} and compatible distributions,
+to satisfy the dependencies of several applications shipping with that distro
+while the MySQL software on the machine is updated to a newer release series.
+
+%endif
 
 # ----------------------------------------------------------------------------
 %package -n MySQL-embedded%{product_suffix}
@@ -434,13 +523,92 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 
 ##############################################################################
 %prep
-%setup -n %{src_dir}
+%if 0%{?compatlib}
+%setup -q -T -a 0 -a 7 -c -n %{name}
+# -q = quiet,  -T = no default unpack,  -n = source dir name,  -c = create,  -a = unpack after cd
+# https://docs.fedoraproject.org/ro/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04.html
+# http://rpm.org/max-rpm-snapshot/s1-rpm-inside-macros.html
+pushd %{compat_src_dir}
+%patch7 -p 1
+%if 0%{?compatlib} == 18
+%patch8 -p 1
+%endif
+popd
+%else
+%setup -q -T -a 0      -c -n %{name}
+%endif # 0%{?compatlib}
+
 # That patch is needed with old cmake only, on SLES 11, but it won't do any harm
 # outside Windows, so it may be used in all RPM builds.
+pushd %{src_dir}
 %patch0 -p1
 #wsrep_apply_patch_tag
+popd
+
 ##############################################################################
 %build
+
+# Build compat libs
+%if 0%{?compatlib}
+(
+%if 0%{?compatlib} == 16
+# RHEL 6: MySQL 5.1, using traditional "configure ; make"
+export CC="gcc" CXX="g++"
+export CFLAGS="%{optflags} -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -fno-strict-aliasing -fwrapv"
+export CXXFLAGS="$CFLAGS %{?el6:-felide-constructors} -fno-rtti -fno-exceptions"
+pushd %{compat_src_dir}
+%configure \
+    --with-readline \
+    --without-debug \
+    --enable-shared \
+    --localstatedir=/var/lib/mysql \
+    --with-unix-socket-path=/var/lib/mysql/mysql.sock \
+    --with-mysqld-user="mysql" \
+    --with-extra-charsets=all \
+    --enable-local-infile \
+    --enable-largefile \
+    --enable-thread-safe-client \
+    --with-ssl=%{_prefix} \
+    --with-embedded-server \
+    --with-big-tables \
+    --with-pic \
+    --with-plugin-innobase \
+    --with-plugin-innodb_plugin \
+    --with-plugin-partition \
+    --disable-dependency-tracking
+make %{?_smp_mflags}
+popd
+%endif
+#####
+%if 0%{?compatlib} == 18
+# RHEL 7: MySQL 5.5, using "cmake ; make"
+mkdir release
+cd release
+cmake ../%{compat_src_dir} \
+         -DBUILD_CONFIG=mysql_release \
+         -DINSTALL_LAYOUT=RPM \
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+         -DENABLE_DTRACE=OFF \
+         -DCMAKE_C_FLAGS="%{optflags}" \
+         -DCMAKE_CXX_FLAGS="%{optflags}" \
+         -DINSTALL_LIBDIR="%{_lib}/mysql" \
+         -DINSTALL_PLUGINDIR="%{_lib}/mysql/plugin" \
+         -DINSTALL_SQLBENCHDIR=share \
+         -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
+         -DFEATURE_SET="%{feature_set}" \
+         -DWITH_EMBEDDED_SERVER=1 \
+         -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
+         %{?ssl_option} \
+         -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
+         -DMYSQL_SERVER_SUFFIX="%{?server_suffix}"
+echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
+make %{?_smp_mflags} VERBOSE=1
+cd ..
+%endif
+)
+%endif
+
+pushd %{src_dir}
 
 # Fail quickly and obviously if user tries to build as root
 %if %runselftest
@@ -547,12 +715,40 @@ mkdir release
 
   (cd release && make test-bt-fast || true)
 %endif
+popd
 
 ##############################################################################
 %install
+%if 0%{?compatlib}
+(
+cd $RPM_BUILD_DIR/%{name}
+
+# Install compat libs
+# This must be done *before* the current libs are installed, for the "rm *.{a,la,so}"
+%if 0%{?compatlib} == 16
+for dir in mysql-%{compatver}/libmysql mysql-%{compatver}/libmysql_r ; do
+%else
+for dir in            release/libmysql            ; do
+%endif
+    pushd $dir
+    make DESTDIR=%{buildroot} install
+    popd
+done
+rm -f %{buildroot}%{_libdir}/mysql/libmysqlclient{,_r}.{a,la,so}
+
+# "charsets/"
+install -d -m 0755 %{buildroot}/usr/share/mysql/charsets-%{compatver}/
+install -m 644 mysql-%{compatver}/sql/share/charsets/* %{buildroot}/usr/share/mysql/charsets-%{compatver}/
+
+# Add libdir to linker
+install -d -m 0755 %{buildroot}%{_sysconfdir}/ld.so.conf.d
+echo "%{_libdir}/mysql" > %{buildroot}%{_sysconfdir}/ld.so.conf.d/mysql-%{_arch}.conf
+)
+%endif
 
 RBR=$RPM_BUILD_ROOT
-MBD=$RPM_BUILD_DIR/%{src_dir}
+MBD=$RPM_BUILD_DIR/%{name}/%{src_dir}
+cd $MBD
 
 # Ensure that needed directories exists
 install -d $RBR%{_sysconfdir}/{logrotate.d,init.d}
@@ -590,7 +786,7 @@ mkdir -p $RBR%{_sysconfdir}/my.cnf.d
 )
 
 # FIXME: at some point we should stop doing this and just install everything
-# FIXME: directly into %{_libdir}/mysql - perhaps at the same time as renaming
+# FIXME: directly into %%{_libdir}/mysql - perhaps at the same time as renaming
 # FIXME: the shared libraries to use libmysql*-$major.$minor.so syntax
 mv -v $RBR/%{_libdir}/*.a $RBR/%{_libdir}/mysql/
 
@@ -615,6 +811,10 @@ touch $RBR%{_sysconfdir}/wsrep.cnf
 install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
   $RBR%{_datadir}/mysql/SELinux/RHEL4
 
+# Get the list of "_datadir" files, remove those that go into "libs-compat"
+find $RBR%{_datadir}/mysql -type f -print | sed -e "s=$RBR==" \
+  | fgrep -v "charsets-%{compatver}" | sort > $MBD/release/datadir.files
+
 %if %{WITH_TCMALLOC}
 # Even though this is a shared library, put it under /usr/lib*/mysql, so it
 # doesn't conflict with possible shared lib by the same name in /usr/lib*.  See
@@ -625,7 +825,9 @@ install -m 644 "%{malloc_lib_source}" \
 
 # Remove man pages we explicitly do not want to package, avoids 'unpackaged
 # files' warning.
-# This has become obsolete:  rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
+# This has become obsolete:  rm -f $RBR%%{_mandir}/man1/make_win_bin_dist.1*
+
+%check
 
 ##############################################################################
 #  Post processing actions, i.e. when installed
@@ -1065,19 +1267,19 @@ echo "====="                                     >> $STATUS_HISTORY
 # Intentionally empty - this is a pure meta package.
 
 # ----------------------------------------------------------------------------
-%files -n mysql-wsrep-server%{product_suffix} -f release/support-files/plugins.files
+%files -n mysql-wsrep-server%{product_suffix} -f %{src_dir}/release/support-files/plugins.files -f %{src_dir}/release/datadir.files
 %defattr(-,root,root,0755)
 
 %if %{defined license_files_server}
 %doc %{license_files_server}
 %endif
-%doc Docs/ChangeLog
-%doc release/Docs/INFO_SRC*
-%doc release/Docs/INFO_BIN*
-%doc release/support-files/my-*.cnf
-%doc Docs/README-wsrep
-%doc release/support-files/wsrep.cnf
-%doc release/support-files/wsrep_notify
+%doc %{src_dir}/Docs/ChangeLog
+%doc %{src_dir}/release/Docs/INFO_SRC*
+%doc %{src_dir}/release/Docs/INFO_BIN*
+%doc %{src_dir}/release/support-files/my-*.cnf
+%doc %{src_dir}/Docs/README-wsrep
+%doc %{src_dir}/release/support-files/wsrep.cnf
+%doc %{src_dir}/release/support-files/wsrep_notify
 
 %if 0%{?commercial}
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
@@ -1144,13 +1346,13 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
 %attr(755, root, root) %{_bindir}/wsrep_sst_rsync
-%attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
+%attr( - , root, root) %{_bindir}/wsrep_sst_rsync_wan
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
-%attr(755, root, root) %{_sbindir}/rcmysql
+%attr( - , root, root) %{_sbindir}/rcmysql
 %attr(755, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 
 %if %{WITH_TCMALLOC}
@@ -1159,7 +1361,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
-%attr(755, root, root) %{_datadir}/mysql/
+# %%attr(755, root, root) %%{_datadir}/mysql/  ## See "-f datadir.files" at section top
 
 # ----------------------------------------------------------------------------
 %files -n mysql-wsrep-client%{product_suffix}
@@ -1170,7 +1372,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/mysql_find_rows
 %attr(755, root, root) %{_bindir}/mysql_waitpid
 %attr(755, root, root) %{_bindir}/mysqlaccess
-# XXX: This should be moved to %{_sysconfdir}
+# XXX: This should be moved to %%{_sysconfdir}
 %attr(644, root, root) %{_bindir}/mysqlaccess.conf
 %attr(755, root, root) %{_bindir}/mysqladmin
 %attr(755, root, root) %{_bindir}/mysqlbinlog
@@ -1194,7 +1396,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlslap.1*
 
 # ----------------------------------------------------------------------------
-%files -n mysql-wsrep-devel%{product_suffix} -f optional-files-devel
+%files -n mysql-wsrep-devel%{product_suffix} -f %{src_dir}/optional-files-devel
 %defattr(-, root, root, 0755)
 %doc %attr(644, root, man) %{_mandir}/man1/comp_err.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config.1*
@@ -1211,13 +1413,36 @@ echo "====="                                     >> $STATUS_HISTORY
 %files -n mysql-wsrep-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libmysql*.so*
+%{_libdir}/libmysql*.so
+%{_libdir}/libmysql*.so.%{currentlib}*
 
 %post -n mysql-wsrep-shared%{product_suffix}
 /sbin/ldconfig
 
 %postun -n mysql-wsrep-shared%{product_suffix}
 /sbin/ldconfig
+
+# ----------------------------------------------------------------------------
+%if 0%{?compatlib}
+%files -n mysql-wsrep-libs-compat%{product_suffix}
+%defattr(-, root, root, -)
+%doc %{?compat_license_files_server}
+%dir %attr(755, root, root) %{_libdir}/mysql
+%attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/mysql-%{_arch}.conf
+%{_libdir}/mysql/libmysqlclient.so.%{compatlib}
+%{_libdir}/mysql/libmysqlclient.so.%{compatlib}.0.0
+%{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}
+%{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}.0.0
+%dir %attr(755, root, root) %{_datadir}/mysql/
+%dir %attr(755, root, root) %{_datadir}/mysql/charsets-%{compatver}/
+%attr(644, root, root) %{_datadir}/mysql/charsets-%{compatver}/*
+
+%post -n mysql-wsrep-libs-compat%{product_suffix}
+/sbin/ldconfig
+
+%postun -n mysql-wsrep-libs-compat%{product_suffix}
+/sbin/ldconfig
+%endif
 
 # ----------------------------------------------------------------------------
 %files -n mysql-wsrep-test%{product_suffix}
@@ -1236,6 +1461,58 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Sep 17 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Let the "server" RPM get rid of RedHat's "common" ("charsets/", "errmsg.sys").
+
+* Tue Sep 15 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Fixed the issue with "-f plugins.files", switched back to that approach.
+  The base cause was a wrong use of "%%setup" for this multi-source build.
+- Let the meta package of client and server be the main package, not a subpackage.
+- Use the "%%files ... -f LIST_FILE" mechanism for "%%{_datadir}", it is the
+  best way to get rid of files that go into "libs-compat" only.
+
+* Mon Sep 14 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- The mechanism "%%files ... -f LIST_FILE" doesn't work, so the plugin files
+  must be listed directly in the section "%%files -n mysql-wsrep-server".
+
+* Fri Sep 11 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Integrate the separate "libs-compat" spec file with the general "mysql-wsrep",
+  so that "libs-compat" becomes just another subpackage.
+- Change history of the separate "libs-compat" spec file, all by this author in 2015:
+- Thu Sep 10:
+- - Remove code to deal with RHEL 5, there will not be any support for that
+    obsolete platform.
+- - For MySQl 5.5 / 5.6 / 5.7, there is no need for "libs-compat" on RHEL 7
+    because both are SO version 18; turn description into comment.
+- Tue Sep 08:
+- - Finish the code for RHEL 7, using MySQL 5.5.45 as published by Oracle.
+- - Severe bug: Path for "charsets" files did not match the patch, fix it.
+- - This is in the 5.5 branch, fix the spec file version.
+- Thu Sep 03 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- - Change the name from "mysql-libs-compat" to "mysql-wsrep-libs-compat".
+- - Change the compatibility version for RHEL 6 from MySQL 5.1.72 to 5.1.73.
+- - Start adding settings for RHEL 7, to replace the pre-installed "mariadb-libs 5.5.37".
+- Tue Apr 28:
+- - Improve the dependency / conflicts settings.
+- - Drop the name component "community", 3rd party builds don't use it.
+- Tue Mar 10:
+- - Sometimes, "libmysqlclient.so" needs the files in "/usr/share/mysql/charsets/",
+    so the package should better contain them, but have the path name contain the
+    version number to make it independent of other packages.
+- Mon Feb 09:
+- - "g++: command not found" on RedHat 5 + 6, added "BuildRequires: gcc-c++".
+- - "time" is a RedHat-only package, not needed to build on SuSE.
+- Fri Feb 06:
+- - Add code to identify RedHat 5 during build, "rhel" is not predefined there.
+- - Start adding "conflicts" directives to get rid of other MySQL library RPMs.
+- - Try with "CXX=g++".
+- Thu Feb 05:
+- - This spec file handles the "compat" RPM for the "libmysqlclient.so" only.
+    It is created as a subset of the overall MySQL 5.6.23 spec file
+    (file "packaging/rpm-oel/mysql.spec.in" in the source tree),
+    see that file's "changelog" section for its history.
+- - Add "CC=gcc CXX=gcc" as used in 5.0 and 5.1 builds (missing in that 5.6.23 spec file)
+
 * Sat Feb 7 2015 Teemu Ollakka <teemu.ollakka@galeracluster.com>
 - Merged OBS changes from 5.6 branch
 
