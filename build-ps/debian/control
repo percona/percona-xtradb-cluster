@@ -255,15 +255,10 @@ Description: Percona XtraDB Cluster with Galera
 Package: percona-xtradb-cluster-test-5.6
 Architecture: any
 Depends: percona-xtradb-cluster-client-5.6 (>= ${source:Version}), percona-xtradb-cluster-server-5.6 (>= ${source:Version})
-Description: Percona Server database test suite
- Percona Server is a fast, stable and true multi-user, multi-threaded SQL
- database server. SQL (Structured Query Language) is the most popular database
- query language in the world. The main goals of Percona Server are speed,
- robustness and ease of use.
- .
- This package includes the Percona Server test framework that provides 
- a means for verifying that Percona Server and its client programs 
- operate according to expectations
+Description: Percona XtraDB Cluster database test suite
+ This package includes the Percona XtraDB Cluster test framework that provides 
+ a means for verifying that Percona XtraDB Cluster and its client programs 
+ operate according to expectations.
 
 Package: percona-xtradb-cluster-5.6-dbg
 Architecture: any

@@ -1,5 +1,5 @@
 Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?rev=174
-Upstream-Name: Percona Server 5.6
+Upstream-Name: Percona XtraDB Cluster 5.6
 Upstream-Contact: https://bugs.launchpad.net/percona-xtradb-cluster/
 Source: http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/
 Comments: Modified from original MySQL 5.5 debian/copyright file by
