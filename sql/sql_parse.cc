@@ -1286,19 +1286,30 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     }
     if (thd->wsrep_conflict_state== ABORTED)
     {
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-      WSREP_DEBUG("Deadlock error for: %s", thd->query());
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      thd->killed               = THD::NOT_KILLED;
-      thd->mysys_var->abort     = 0;
-      thd->wsrep_conflict_state = NO_CONFLICT;
-      thd->wsrep_retry_counter  = 0;
-      /*
-        Increment threads running to compensate dec_thread_running() called
-        after dispatch_end label.
-      */
-      inc_thread_running();
-      goto dispatch_end;
+      if (command == COM_STMT_PREPARE          ||
+          command == COM_STMT_FETCH            ||
+          command == COM_STMT_SEND_LONG_DATA   ||
+          command == COM_STMT_CLOSE
+         )
+      {
+        WSREP_DEBUG("Prepared Statement bail out");
+      }
+      else
+      {
+        my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+        WSREP_DEBUG("Deadlock error for: %s", thd->query());
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+        thd->killed               = THD::NOT_KILLED;
+        thd->mysys_var->abort     = 0;
+        thd->wsrep_conflict_state = NO_CONFLICT;
+        thd->wsrep_retry_counter  = 0;
+        /*
+          Increment threads running to compensate dec_thread_running() called
+          after dispatch_end label.
+        */
+        inc_thread_running();
+        goto dispatch_end;
+      }
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
