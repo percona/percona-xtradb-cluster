@@ -1105,6 +1105,12 @@ bool do_command(THD *thd)
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
 	       "WSREP has not yet prepared node for application use");
       thd->protocol->end_statement();
+
+      /* Performance Schema Interface instrumentation end */
+      MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+      thd->m_statement_psi= NULL;
+      thd->m_digest= NULL;
+
       return_value= FALSE;
       goto out;
     }
