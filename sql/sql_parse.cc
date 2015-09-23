@@ -1100,7 +1100,8 @@ bool do_command(THD *thd)
         command != COM_SLEEP        &&
         command != COM_STATISTICS   &&
         command != COM_TIME         &&
-        command != COM_END
+        command != COM_END          &&
+        command != COM_STMT_CLOSE
     ) {
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
 	       "WSREP has not yet prepared node for application use");
