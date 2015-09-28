@@ -341,7 +341,7 @@ fi
        echo "Packaging the test files"
        # mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL
        cp -R percona-xtradb-cluster-tests $WORKDIR/usr/local/$PRODUCT_FULL/
-    )
+    ) || exit 1
 
     # Build jemalloc
     if test "x$WITH_JEMALLOC" != x
@@ -357,10 +357,10 @@ fi
         # Copy COPYING file
         cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
 
-    )
+    ) || exit 1
     fi
 
-)
+) || exit 1
 
 # Package the archive
 (
@@ -377,5 +377,5 @@ fi
         $TAR --owner=0 --group=0 -czf "$WORKDIR/$TARGETTOKU.tar.gz" -T $WORKDIR/tokudb_plugin.list
         rm -f $WORKDIR/tokudb_plugin.list
     fi
-)
+) || exit 1
 
