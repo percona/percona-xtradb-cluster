@@ -9,6 +9,7 @@
 log-slave-updates
 log-bin=mysqld-bin
 binlog-format=row
+default-storage-engine=InnoDB
 
 [mysqld.1]
 server-id=1
@@ -18,7 +19,7 @@ server-id=2
 
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://'
-wsrep_provider_options='base_port=@mysqld.2.#galera_port'
+wsrep_provider_options='base_port=@mysqld.2.#galera_port;evs.install_timeout = PT15S; evs.max_install_timeouts=1;pc.ignore_sb=true'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
@@ -36,7 +37,7 @@ innodb_flush_log_at_trx_commit=2
 [mysqld.3]
 wsrep_provider=@ENV.WSREP_PROVIDER
 wsrep_cluster_address='gcomm://127.0.0.1:@mysqld.2.#galera_port'
-wsrep_provider_options='base_port=@mysqld.3.#galera_port'
+wsrep_provider_options='base_port=@mysqld.3.#galera_port;evs.install_timeout = PT15S; evs.max_install_timeouts = 1;pc.ignore_sb=true'
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
