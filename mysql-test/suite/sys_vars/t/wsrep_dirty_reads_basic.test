@@ -6,14 +6,25 @@
 
 --echo # save the initial value
 SET @wsrep_dirty_reads_session_saved = @@session.wsrep_dirty_reads;
+SET @wsrep_dirty_reads_global_saved = @@global.wsrep_dirty_reads;
 
 --echo # default
---error ER_INCORRECT_GLOBAL_LOCAL_VAR
 SELECT @@global.wsrep_dirty_reads;
 SELECT @@session.wsrep_dirty_reads;
 
 --echo
---echo # scope and valid values
+--echo # global scope and valid values
+SET @@global.wsrep_dirty_reads=OFF;
+SELECT @@global.wsrep_dirty_reads;
+SET @@global.wsrep_dirty_reads=ON;
+SELECT @@global.wsrep_dirty_reads;
+SELECT @@session.wsrep_dirty_reads;
+SET @@global.wsrep_dirty_reads=default;
+SELECT @@global.wsrep_dirty_reads;
+SELECT @@session.wsrep_dirty_reads;
+
+--echo
+--echo # local (session) scope and valid values
 SET @@session.wsrep_dirty_reads=OFF;
 SELECT @@session.wsrep_dirty_reads;
 SET @@session.wsrep_dirty_reads=ON;
@@ -31,5 +42,6 @@ SET @@session.wsrep_dirty_reads='junk';
 --echo
 --echo # restore the initial values
 SET @@session.wsrep_dirty_reads = @wsrep_dirty_reads_session_saved;
+SET @@global.wsrep_dirty_reads = @wsrep_dirty_reads_global_saved;
 
 --echo # End of test
