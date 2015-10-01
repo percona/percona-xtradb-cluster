@@ -570,7 +570,6 @@ ulong binlog_cache_use= 0, binlog_cache_disk_use= 0;
 ulong binlog_stmt_cache_use= 0, binlog_stmt_cache_disk_use= 0;
 ulong max_connections, max_connect_errors;
 ulong extra_max_connections;
-ulong max_digest_length= 0;
 ulong rpl_stop_slave_timeout= LONG_TIMEOUT;
 my_bool log_bin_use_v1_row_events= 0;
 bool thread_cache_size_specified= false;
@@ -738,6 +737,7 @@ SHOW_COMP_OPTION have_geometry, have_rtree_keys;
 SHOW_COMP_OPTION have_crypt, have_compress;
 SHOW_COMP_OPTION have_profiling;
 SHOW_COMP_OPTION have_backup_locks;
+SHOW_COMP_OPTION have_backup_safe_binlog_info;
 SHOW_COMP_OPTION have_snapshot_cloning;
 
 ulonglong opt_log_warnings_suppress= 0;
@@ -6274,8 +6274,6 @@ int mysqld_main(int argc, char **argv)
         pfs_param.m_hints.m_table_open_cache= table_cache_size;
         pfs_param.m_hints.m_max_connections= max_connections;
 	pfs_param.m_hints.m_open_files_limit= requested_open_files;
-        /* the performance schema digest size is the same as the SQL layer */
-        pfs_param.m_max_digest_length= max_digest_length;
         PSI_hook= initialize_performance_schema(&pfs_param);
         if (PSI_hook == NULL)
         {
@@ -6652,6 +6650,26 @@ int mysqld_main(int argc, char **argv)
   if (Events::init(opt_noacl || opt_bootstrap))
     unireg_abort(1);
 
+  /*
+    If super_read_only = 1 and read_only = 0 set in my.cnf or startup params,
+    auto update read_only = 1.
+    Super users are read only meaning normal users must be read only.
+  */
+  if (read_only == FALSE && super_read_only == TRUE)
+  {
+    read_only = TRUE;
+  }
+  /*
+    Originally assigned in get_options().
+    But when super_read_only = 1 and read_only = 1 simultaneously,
+    Event_db_repository::check_system_tables will return false
+    as there are no write permission,
+    causing 'Failed to open table mysql.event' error.
+    So move here after Events::init().
+  */
+  opt_super_readonly= super_read_only;
+  opt_readonly= read_only;
+
 #ifdef WITH_WSREP /* WSREP AFTER SE */
   if (opt_bootstrap)
   {
@@ -6724,7 +6742,7 @@ int mysqld_main(int argc, char **argv)
   }
 #endif
 
-  (void)MYSQL_SET_STAGE(0 ,__FILE__, __LINE__);
+  MYSQL_SET_STAGE(0 ,__FILE__, __LINE__);
 
 #if defined(_WIN32) || defined(HAVE_SMEM)
   handle_connections_methods();
@@ -9501,6 +9519,7 @@ static int mysql_init_variables(void)
 #endif
 
   have_backup_locks= SHOW_OPTION_YES;
+  have_backup_safe_binlog_info= SHOW_OPTION_YES;
   have_snapshot_cloning= SHOW_OPTION_YES;
 
 #if defined(__WIN__)
@@ -10250,9 +10269,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
     MY_TEST(global_system_variables.optimizer_switch &
             OPTIMIZER_SWITCH_ENGINE_CONDITION_PUSHDOWN);
 
-  opt_super_readonly= super_read_only;
-  opt_readonly= read_only;
-
   return 0;
 }
 
@@ -10644,6 +10660,7 @@ PSI_mutex_key
   key_relay_log_info_sleep_lock,
   key_relay_log_info_log_space_lock, key_relay_log_info_run_lock,
   key_mutex_slave_parallel_pend_jobs, key_mutex_mts_temp_tables_lock,
+  key_mutex_slave_parallel_worker_count,
   key_mutex_slave_parallel_worker,
   key_structure_guard_mutex, key_TABLE_SHARE_LOCK_ha_data,
   key_LOCK_error_messages, key_LOG_INFO_lock, key_LOCK_thread_count,
@@ -10740,6 +10757,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_relay_log_info_log_space_lock, "Relay_log_info::log_space_lock", 0},
   { &key_relay_log_info_run_lock, "Relay_log_info::run_lock", 0},
   { &key_mutex_slave_parallel_pend_jobs, "Relay_log_info::pending_jobs_lock", 0},
+  { &key_mutex_slave_parallel_worker_count, "Relay_log_info::exit_count_lock", 0},
   { &key_mutex_mts_temp_tables_lock, "Relay_log_info::temp_tables_lock", 0},
   { &key_mutex_slave_parallel_worker, "Worker_info::jobs_lock", 0},
   { &key_structure_guard_mutex, "Query_cache::structure_guard_mutex", 0},

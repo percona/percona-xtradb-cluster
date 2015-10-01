@@ -98,8 +98,8 @@ static const LEX_STRING sys_table_aliases[]=
 const char *ha_row_type[] = {
   "", "FIXED", "DYNAMIC", "COMPRESSED", "REDUNDANT", "COMPACT",
   /* Reserved to be "PAGE" in future versions */ "?",
-  "TOKUDB_UNCOMPRESSED", "TOKUDB_ZLIB", "TOKUDB_QUICKLZ", "TOKUDB_LZMA",
-  "TOKUDB_FAST", "TOKUDB_SMALL",
+  "TOKUDB_UNCOMPRESSED", "TOKUDB_ZLIB", "TOKUDB_SNAPPY", "TOKUDB_QUICKLZ",
+  "TOKUDB_LZMA", "TOKUDB_FAST", "TOKUDB_SMALL",
   "?","?","?"
 };
 
@@ -2474,6 +2474,50 @@ int ha_start_consistent_snapshot(THD *thd)
 }
 
 
+static my_bool store_binlog_info_handlerton(THD *thd, plugin_ref plugin,
+                                            void *arg)
+{
+  handlerton *hton= plugin_data(plugin, handlerton *);
+
+  if (hton->state == SHOW_OPTION_YES &&
+      hton->store_binlog_info)
+  {
+    hton->store_binlog_info(hton, thd);
+    *((bool *)arg)= false;
+  }
+
+  return FALSE;
+}
+
+
+int ha_store_binlog_info(THD *thd)
+{
+  LOG_INFO li;
+  bool warn= true;
+
+  if (!mysql_bin_log.is_open())
+    return 0;
+
+  DBUG_ASSERT(tc_log == &mysql_bin_log);
+
+  /* Block commits to get consistent binlog coordinates */
+  tc_log->xlock();
+
+  mysql_bin_log.raw_get_current_log(&li);
+  thd->set_trans_pos(li.log_file_name, li.pos);
+
+  plugin_foreach(thd, store_binlog_info_handlerton, MYSQL_STORAGE_ENGINE_PLUGIN,
+                 &warn);
+
+  tc_log->xunlock();
+
+  if (warn)
+    push_warning(thd, Sql_condition::WARN_LEVEL_WARN, ER_UNKNOWN_ERROR,
+                 "No support for storing binlog coordinates in any storage");
+  return 0;
+}
+
+
 static my_bool flush_handlerton(THD *thd, plugin_ref plugin,
                                 void *arg)
 {
@@ -2677,6 +2721,9 @@ handler *handler::clone(const char *name, MEM_ROOT *mem_root)
   if (!(new_handler->ref= (uchar*) alloc_root(mem_root,
                                               ALIGN_SIZE(ref_length)*2)))
     goto err;
+
+  new_handler->cloned= true;
+
   /*
     TODO: Implement a more efficient way to have more than one index open for
     the same table instance. The ha_open call is not cachable for clone.
@@ -2706,6 +2753,8 @@ void **handler::ha_data(THD *thd) const
 
 THD *handler::ha_thd(void) const
 {
+  if (unlikely(cloned))
+    return current_thd;
   DBUG_ASSERT(!table || !table->in_use || table->in_use == current_thd);
   return (table && table->in_use) ? table->in_use : current_thd;
 }

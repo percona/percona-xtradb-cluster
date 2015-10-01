@@ -555,6 +555,8 @@ typedef struct system_variables
     thread the query is being run to replicate temp tables properly
   */
   my_thread_id pseudo_thread_id;
+
+  ulong pseudo_server_id;
   /**
     Default transaction access mode. READ ONLY (true) or READ WRITE (false).
   */
@@ -948,7 +950,7 @@ public:
   String      rewritten_query;
 
   inline char *query() const { return query_string.str(); }
-  inline uint32 query_length() const { return query_string.length(); }
+  inline uint32 query_length() const { return (uint32)query_string.length(); }
   const CHARSET_INFO *query_charset() const { return query_string.charset(); }
   void set_query_inner(const CSET_STRING &string_arg)
   {
@@ -1015,7 +1017,7 @@ public:
 
   int insert(THD *thd, Statement *statement);
 
-  Statement *find_by_name(LEX_STRING *name)
+  Statement *find_by_name(const LEX_STRING *name) const
   {
     Statement *stmt;
     stmt= (Statement*)my_hash_search(&names_hash, (uchar*)name->str,
@@ -4500,6 +4502,14 @@ private:
    */
   LEX_STRING invoker_user;
   LEX_STRING invoker_host;
+public:
+  /**
+    This is only used by master dump threads.
+    When the master receives a new connection from a slave with a UUID that
+    is already connected, it will set this flag TRUE before killing the old
+    slave connection.
+  */
+  bool duplicate_slave_uuid;
 };
 
 /* Returns string as 'IP' for the client-side of the connection represented by
@@ -5345,7 +5355,7 @@ public:
   static user_var_entry *create(const Name_string &name)
   {
     user_var_entry *entry;
-    uint size= ALIGN_SIZE(sizeof(user_var_entry)) +
+    size_t size= ALIGN_SIZE(sizeof(user_var_entry)) +
                (name.length() + 1) + extra_size;
     if (!(entry= (user_var_entry*) my_malloc(size, MYF(MY_WME |
                                                        ME_FATALERROR))))

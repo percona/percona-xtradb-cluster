@@ -30,6 +30,8 @@ TAG=''
 CMAKE_BUILD_TYPE=''
 COMMON_FLAGS=''
 #
+TOKUDB_BACKUP_VERSION='@@TOKUDB_BACKUP_VERSION@@'
+#
 # Some programs that may be overriden
 TAR=${TAR:-tar}
 SCONS_ARGS=${SCONS_ARGS:-""}
@@ -203,7 +205,7 @@ export CXX=${CXX:-g++}
 # TokuDB cmake flags
 if test -d "$SOURCEDIR/storage/tokudb"
 then
-    CMAKE_OPTS="${CMAKE_OPTS:-} -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF"
+    CMAKE_OPTS="${CMAKE_OPTS:-} -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=${TOKUDB_BACKUP_VERSION}"
     
     if test "x$CMAKE_BUILD_TYPE" != "xDebug"
     then
@@ -366,16 +368,5 @@ fi
 (
     cd "$WORKDIR/usr/local/"
 
-    find $PRODUCT_FULL ! -type d  ! \( -iname '*toku*' -o -iwholename '*/tokudb*/*'  \) | sort > $WORKDIR/tokudb_server.list
-    $TAR --owner=0 --group=0 -czf "$WORKDIR/$PRODUCT_FULL.tar.gz" -T $WORKDIR/tokudb_server.list
-    rm -f $WORKDIR/tokudb_server.list
-
-    if test -e "$PRODUCT_FULL/lib/mysql/plugin/ha_tokudb.so"
-    then
-        TARGETTOKU=$(echo $PRODUCT_FULL | sed 's/.Linux/.TokuDB.Linux/')
-	find $PRODUCT_FULL ! -type d \( -iname '*toku*' -o -iwholename '*/tokudb*/*' \) > $WORKDIR/tokudb_plugin.list
-        $TAR --owner=0 --group=0 -czf "$WORKDIR/$TARGETTOKU.tar.gz" -T $WORKDIR/tokudb_plugin.list
-        rm -f $WORKDIR/tokudb_plugin.list
-    fi
+    $TAR --owner=0 --group=0 -czf "$WORKDIR/$PRODUCT_FULL.tar.gz" $PRODUCT_FULL 
 ) || exit 1
-

@@ -1399,7 +1399,6 @@ static int binlog_prepare(handlerton *hton, THD *thd, bool all)
 static int binlog_start_consistent_snapshot(handlerton *hton, THD *thd)
 {
   int err= 0;
-  LOG_INFO li;
   DBUG_ENTER("binlog_start_consistent_snapshot");
 
 #ifdef WSREP
@@ -3554,6 +3553,8 @@ err:
     my_error(ER_BINLOG_LOGGING_IMPOSSIBLE, MYF(0), "Either disk is full or "
              "file system is read only while opening the binlog. Aborting the "
              "server");
+    sql_print_error("Either disk is full or file system is read only while "
+                    "opening the binlog. Aborting the server");
     thd->protocol->end_statement();
     _exit(EXIT_FAILURE);
   }
@@ -5263,6 +5264,8 @@ end:
       my_error(ER_BINLOG_LOGGING_IMPOSSIBLE, MYF(0), "Either disk is full or "
                "file system is read only while rotating the binlog. Aborting "
                "the server");
+      sql_print_error("Either disk is full or file system is read only while "
+                      "rotating the binlog. Aborting the server");
       thd->protocol->end_statement();
       _exit(EXIT_FAILURE);
     }
@@ -7136,8 +7139,39 @@ MYSQL_BIN_LOG::change_stage(THD *thd,
 int
 MYSQL_BIN_LOG::flush_cache_to_file(my_off_t *end_pos_var)
 {
-  if (flush_io_cache(&log_file))
-    return ER_ERROR_ON_WRITE;
+  if (DBUG_EVALUATE_IF("simulate_error_during_flush_cache_to_file", 1,
+                       flush_io_cache(&log_file)))
+  {
+    if (binlog_error_action == ABORT_SERVER)
+    {
+      THD *thd= current_thd;
+      /*
+        On fatal error when code enters here we should forcefully clear the
+        previous errors so that a new critical error message can be pushed
+        to the client side.
+       */
+      thd->clear_error();
+      my_error(ER_BINLOG_LOGGING_IMPOSSIBLE, MYF(0), "An error occured during "
+                "flushing cache to file. 'binlog_error_action' is set to "
+                "'ABORT_SERVER'. Hence aborting the server");
+      sql_print_error("An error occured during flushing cache to file. "
+                      "'binlog_error_action' is set to 'ABORT_SERVER'. "
+                      "Hence aborting the server");
+      thd->protocol->end_statement();
+      _exit(EXIT_FAILURE);
+    }
+    else
+    {
+      sql_print_error("An error occured during flushing cache to file. "
+                      "'binlog_error_action' is set to 'IGNORE_ERROR'. "
+                      "Hence turning logging off for the whole duration "
+                      "of the MySQL server process. To turn it on "
+                      "again: fix the cause, shutdown the MySQL "
+                      "server and restart it.");
+      close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
+      return ER_ERROR_ON_WRITE;
+    }
+  }
   *end_pos_var= my_b_tell(&log_file);
   return 0;
 }
@@ -7194,9 +7228,9 @@ MYSQL_BIN_LOG::finish_commit(THD *thd)
     if (thd->commit_error == THD::CE_NONE)
     {
       /*
-        Acquire a shared lock to block commits until START TRANSACTION WITH
-        CONSISTENT SNAPSHOT completes snapshot creation for all storage
-        engines. We only reach this code if binlog_order_commits=0.
+        Acquire a shared lock to block commits if an X lock has been acquired by
+        LOCK TABLES FOR BACKUP or START TRANSACTION WITH CONSISTENT SNAPSHOT. We
+        only reach this code if binlog_order_commits=0.
       */
       DBUG_ASSERT(opt_binlog_order_commits == 0);
 
@@ -7709,7 +7743,7 @@ void MYSQL_BIN_LOG::xlock(void)
     threads with each acquiring a shared lock on LOCK_consistent_snapshot.
 
     binlog_order_commits is a dynamic variable, so we have to keep track what
-    primitives should be used in unlock_for_snapshot().
+    primitives should be used in xunlock().
   */
   if (opt_binlog_order_commits)
   {

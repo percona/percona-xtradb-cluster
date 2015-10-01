@@ -35,7 +35,7 @@ Prefix: %{_sysconfdir}
 %bcond_with tokudb
 #
 %if %{with tokudb}
-  %define TOKUDB_FLAGS -DWITH_VALGRIND=OFF -DUSE_VALGRIND=OFF -DDEBUG_EXTNAME=OFF -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF
+  %define TOKUDB_FLAGS -DWITH_VALGRIND=OFF -DUSE_VALGRIND=OFF -DDEBUG_EXTNAME=OFF -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=%{tokudb_backup_version}
   %define TOKUDB_DEBUG_ON -DTOKU_DEBUG_PARANOID=ON
   %define TOKUDB_DEBUG_OFF -DTOKU_DEBUG_PARANOID=OFF
 %else
@@ -267,9 +267,6 @@ Epoch:		1
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
 Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz 
-%if %{with tokudb}
-Source1:        http://www.percona.com/downloads/Percona-Server-5.6/Percona-Server-%{mysql_version}-%{percona_server_version}/source/%{src_dir}.tokudb.tar.gz
-%endif
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
@@ -469,9 +466,6 @@ and applications need to dynamically load and use Percona XtraDB Cluster.
 ##############################################################################
 %prep
 %setup -n %{src_dir}
-%if %{with tokudb}
-%setup -n %{src_dir} -T -D -b 1
-%endif
 ##############################################################################
 %build
 
@@ -682,7 +676,13 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 %endif
 
 #
-%{__rm} -f $RBR/%{_prefix}/README*
+%{__rm} -f $RBR/%{_prefix}/README
+%if %{with tokudb}
+%{__rm} -f $RBR/%{_prefix}/README.md
+%{__rm} -f $RBR/%{_prefix}/COPYING.AGPLv3
+%{__rm} -f $RBR/%{_prefix}/COPYING.GPLv2
+%{__rm} -f $RBR/%{_prefix}/PATENTS
+%endif
 #
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
@@ -1402,15 +1402,6 @@ fi
 %{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
-%if %{with tokudb}
-%files -n Percona-Server-tokudb%{product_suffix}
-%attr(-, root, root) 
-%{_bindir}/tokuftdump
-%{_libdir}/mysql/plugin/ha_tokudb.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/debug/ha_tokudb.so
-%endif
-
-# ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
@@ -1497,6 +1488,10 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Oct 01 2015 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
+
+- Merge updates from Percona Server spec file.
+
 * Thu Jul 23 2015 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 
 - Merge updates from Percona Server spec file.

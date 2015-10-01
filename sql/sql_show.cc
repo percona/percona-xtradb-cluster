@@ -4241,18 +4241,15 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
       }
 #endif
 
-      THD *t= tmp->in_use;
-      tmp->in_use= thd;
+      DEBUG_SYNC(thd, "fill_global_temporary_tables_before_storing_rec");
 
       if (store_temporary_table_record(thd_item, tables->table, tmp,
                                        thd->lex->select_lex.db)) {
-        tmp->in_use= t;
         mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);
         mysql_mutex_unlock(&LOCK_thread_count); 
         DBUG_RETURN(1);
       }
 
-      tmp->in_use= t;
     }
     mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);
   }
@@ -5137,6 +5134,9 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
         break;
       case ROW_TYPE_TOKU_ZLIB:
         tmp_buff= "tokudb_zlib";
+        break;
+      case ROW_TYPE_TOKU_SNAPPY:
+        tmp_buff= "tokudb_snappy";
         break;
       case ROW_TYPE_TOKU_QUICKLZ:
         tmp_buff= "tokudb_quicklz";
@@ -7315,6 +7315,8 @@ int fill_status(THD *thd, TABLE_LIST *tables, Item *cond)
     Avoid recursive acquisition of LOCK_status in cases when WHERE clause
     represented by "cond" contains subquery on I_S.SESSION/GLOBAL_STATUS.
   */
+  DEBUG_SYNC(thd, "before_preparing_global_status_array");
+
   if (thd->fill_status_recursion_level++ == 0) 
     mysql_mutex_lock(&LOCK_status);
   if (option_type == OPT_GLOBAL)
@@ -7325,6 +7327,8 @@ int fill_status(THD *thd, TABLE_LIST *tables, Item *cond)
                          upper_case_names, cond);
   if (thd->fill_status_recursion_level-- == 1) 
     mysql_mutex_unlock(&LOCK_status);
+
+  DEBUG_SYNC(thd, "after_preparing_global_status_array");
   DBUG_RETURN(res);
 }
 

@@ -2779,11 +2779,13 @@ static bool wsrep_is_show_query(enum enum_sql_command command)
 
   @param thd     Thread context.
 
-  @return FALSE on success, TRUE in case of error.
+  @return false on success, true in case of error.
 */
 
 static bool lock_tables_for_backup(THD *thd)
 {
+  bool res;
+
   DBUG_ENTER("lock_tables_for_backup");
 
   if (check_global_access(thd, RELOAD_ACL))
@@ -2813,7 +2815,15 @@ static bool lock_tables_for_backup(THD *thd)
     DBUG_RETURN(true);
   }
 
-  DBUG_RETURN(thd->backup_tables_lock.acquire(thd));
+  res= thd->backup_tables_lock.acquire(thd);
+
+  if (ha_store_binlog_info(thd))
+  {
+    thd->backup_tables_lock.release(thd);
+    res= true;
+  }
+
+  DBUG_RETURN(res);
 }
 
 /**
@@ -2956,7 +2966,11 @@ mysql_execute_command(THD *thd)
         lex->sql_command != SQLCOM_ROLLBACK &&
         lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT &&
         !rpl_filter->db_ok(thd->db))
+    {
+      /* we warn the slave SQL thread */
+      my_message(ER_SLAVE_IGNORED_TABLE, ER(ER_SLAVE_IGNORED_TABLE), MYF(0));
       DBUG_RETURN(0);
+    }
 
     if (lex->sql_command == SQLCOM_DROP_TRIGGER)
     {
