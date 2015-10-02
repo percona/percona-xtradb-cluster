@@ -4011,7 +4011,6 @@ innobase_store_binlog_info(
 	mtr_t			mtr;
 #ifdef WITH_WSREP
         trx_sysf_t* sys_header;
-	trx_t*	trx;
 #endif /* WITH_WSREP */
 
 	DBUG_ENTER("innobase_store_binlog_info");
@@ -4021,14 +4020,7 @@ innobase_store_binlog_info(
 	mtr_start(&mtr);
 
 #ifdef WITH_WSREP
-	trx= thd_to_trx(thd);
-	ut_ad(trx);
         sys_header = trx_sysf_get(&mtr);
-        /* Update latest MySQL wsrep XID in trx sys header. */
-        if (wsrep_is_wsrep_xid(&trx->xid))
-        {
-            trx_sys_update_wsrep_checkpoint(&trx->xid, sys_header, &mtr);
-        }
 #endif /* WITH_WSREP */
 
 	trx_sys_update_mysql_binlog_offset(file_name, pos,
