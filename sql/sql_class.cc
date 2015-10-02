@@ -2295,6 +2295,10 @@ void THD::cleanup_after_query()
   if (rli_slave)
     rli_slave->cleanup_after_query();
 #endif
+
+#ifdef WITH_WSREP
+  wsrep_free_status(this);
+#endif /* WITH_WSREP */
 }
 
 
