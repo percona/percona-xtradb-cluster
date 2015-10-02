@@ -4009,6 +4009,10 @@ innobase_store_binlog_info(
 	const char*			file_name;
 	unsigned long long 	pos;
 	mtr_t			mtr;
+#ifdef WITH_WSREP
+        trx_sysf_t* sys_header;
+	trx_t*	trx;
+#endif /* WITH_WSREP */
 
 	DBUG_ENTER("innobase_store_binlog_info");
 
@@ -4016,8 +4020,23 @@ innobase_store_binlog_info(
 
 	mtr_start(&mtr);
 
+#ifdef WITH_WSREP
+	trx= thd_to_trx(thd);
+	ut_ad(trx);
+        sys_header = trx_sysf_get(&mtr);
+        /* Update latest MySQL wsrep XID in trx sys header. */
+        if (wsrep_is_wsrep_xid(&trx->xid))
+        {
+            trx_sys_update_wsrep_checkpoint(&trx->xid, sys_header, &mtr);
+        }
+#endif /* WITH_WSREP */
+
 	trx_sys_update_mysql_binlog_offset(file_name, pos,
+#ifdef WITH_WSREP
+					   TRX_SYS_MYSQL_LOG_INFO, sys_header, &mtr);
+#else
 					   TRX_SYS_MYSQL_LOG_INFO, &mtr);
+#endif
 
 	mtr_commit(&mtr);
 
@@ -10105,6 +10124,7 @@ ha_innobase::wsrep_append_keys(
 	const uchar*	record1)	/* in: row in MySQL format */
 {
 	int rcode;
+	const dict_foreign_set* fks;
 	DBUG_ENTER("wsrep_append_keys");
 
 	bool key_appended = false;
@@ -10161,6 +10181,7 @@ ha_innobase::wsrep_append_keys(
 			char* key1 		= &keyval1[1];
 			KEY*  key_info	= table->key_info + i;
 			ibool is_null;
+			ibool has_foreign_ref;
 
 			dict_index_t* idx  = innobase_get_index(i);
 			dict_table_t* tab  = (idx) ? idx->table : NULL;
@@ -10173,10 +10194,19 @@ ha_innobase::wsrep_append_keys(
 					   table->s->table_name.str, 
 					   key_info->name);
 			}
+			fks= &tab->referenced_set;
+                        for (dict_foreign_set::const_iterator it = fks->begin();
+                            it != fks->end(); ++it) {
+
+                                dict_foreign_t* foreign = *it;
+                                if (foreign->referenced_index == idx) {
+                                        has_foreign_ref= true;
+                                        break;
+                                }
+                        }
 			/* !hasPK == table with no PK, must append all non-unique keys */
 			if (!hasPK || key_info->flags & HA_NOSAME ||
-			    ((tab &&
-			      dict_table_get_referenced_constraint(tab, idx)) ||
+			    ((tab && has_foreign_ref) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
 				len = wsrep_store_key_val_for_row(
