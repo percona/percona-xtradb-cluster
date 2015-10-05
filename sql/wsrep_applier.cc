@@ -144,6 +144,9 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
 
     thd->server_id = ev->server_id; // use the original server id for logging
     thd->set_time();                // time the query
+    wsrep_xid_init(&thd->transaction.xid_state.xid,
+                   thd->wsrep_trx_meta.gtid.uuid,
+                   thd->wsrep_trx_meta.gtid.seqno);
     thd->lex->current_select= 0;
     if (!ev->when.tv_sec)
       my_micro_time_to_timeval(my_micro_time(), &ev->when);
