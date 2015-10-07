@@ -127,10 +127,11 @@ BuildConflicts: post-build-checks
 BuildRequires: gcc-c++ ncurses-devel perl zlib-devel cmake libaio-devel bison flex
 
 %if 0%{?rhel} == 6 || 0%{?rhel} == 7 || 0%{?fedora} == 20 || 0%{?fedora} == 21
-BuildRequires: time
+BuildRequires: time openssl-devel
 %endif
 
 %if 0%{?suse_version}
+BuildRequires: libopenssl-devel
 %if 0%{?suse_version} == 1110
 BuildRequires: gdbm-devel gperf openldap2-client procps pwdutils
 %endif
@@ -478,11 +479,11 @@ export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:--j$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && echo $(($ncpu > 4 ? 4 : $ncpu)))}
 
-# By default, a build will include the bundeled "yaSSL" library for SSL.
+# By default, a build will use the system library for SSL.
 # However, there may be a need to override.
 # Protect against undefined variables if there is no override option.
 %if %{undefined with_ssl}
-%define ssl_option   %{nil}
+%define ssl_option   -DWITH_SSL=system
 %else
 %define ssl_option   -DWITH_SSL=%{with_ssl}
 %endif
