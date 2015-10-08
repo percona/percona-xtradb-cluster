@@ -131,9 +131,10 @@ BuildRequires: time openssl-devel
 %endif
 
 %if 0%{?suse_version}
-BuildRequires: libopenssl-devel
 %if 0%{?suse_version} == 1110
-BuildRequires: gdbm-devel gperf openldap2-client procps pwdutils
+BuildRequires: gdbm-devel gperf openldap2-client procps pwdutils libopenssl1-devel
+%else
+BuildRequires: libopenssl-devel
 %endif
 %if 0%{?suse_version} == 1310 || 0%{?suse_version} == 1315 || 0%{?suse_version} == 1320
 BuildRequires: gperf procps time
