@@ -202,6 +202,10 @@ case "${1:-''}" in
                 if test -e /etc/mysql/DEBIAN-START;then
 	            output=$(/etc/mysql/debian-start)
                     [ "$output" ] && log_action_msg "$output"
+                    # Set mysql as owner of mysql_upgrade_info file - TokuBackup needs this to work (BLD-297)
+                    # Needed here because debian-start runs mysql_upgrade
+                    datadir=`mysqld_get_param datadir`
+                    if [ -f "$datadir/mysql_upgrade_info" ]; then chown mysql:mysql "$datadir/mysql_upgrade_info"; fi
                 fi
             else
                 log_startup_failure "Please take a look at the syslog."
@@ -335,6 +339,10 @@ case "${1:-''}" in
                 if test -e /etc/mysql/DEBIAN-START;then
                     output=$(/etc/mysql/debian-start)
                     [ "$output" ] && log_action_msg "$output"
+                    # Set mysql as owner of mysql_upgrade_info file - TokuBackup needs this to work (BLD-297)
+                    # Needed here because debian-start runs mysql_upgrade
+                    datadir=`mysqld_get_param datadir`
+                    if [ -f "$datadir/mysql_upgrade_info" ]; then chown mysql:mysql "$datadir/mysql_upgrade_info"; fi
                 fi
             else
                 log_startup_failure "Please take a look at the syslog."

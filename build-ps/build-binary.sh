@@ -305,6 +305,7 @@ fi
         -DWITH_INNODB_DISALLOW_WRITES=ON \
         -DWITH_WSREP=ON \
         -DWITH_READLINE=system \
+        -DWITHOUT_TOKUDB=ON \
         -DCOMPILATION_COMMENT="$COMMENT" \
         -DWITH_PAM=ON \
         -DWITH_INNODB_MEMCACHED=ON \
@@ -328,6 +329,7 @@ fi
             -DWITH_INNODB_DISALLOW_WRITES=ON \
             -DWITH_WSREP=ON \
             -DWITH_READLINE=system \
+            -DWITHOUT_TOKUDB=ON \
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \

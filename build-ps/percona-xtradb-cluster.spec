@@ -550,6 +550,7 @@ mkdir debug
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
            -DWITH_READLINE=system \
+           -DWITHOUT_TOKUDB=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
            -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
@@ -576,6 +577,7 @@ mkdir release
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
            -DWITH_READLINE=system \
+           -DWITHOUT_TOKUDB=ON \
            -DINSTALL_MYSQLSHAREDIR=share/percona-xtradb-cluster \
            -DINSTALL_SUPPORTFILESDIR=share/percona-xtradb-cluster \
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \

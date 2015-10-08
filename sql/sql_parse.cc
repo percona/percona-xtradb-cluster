@@ -1152,6 +1152,12 @@ bool do_command(THD *thd)
       my_message(ER_UNKNOWN_COM_ERROR,
 	         "WSREP has not yet prepared node for application use", MYF(0));
       thd->protocol->end_statement();
+
+      /* Performance Schema Interface instrumentation end */
+      MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+      thd->m_statement_psi= NULL;
+      thd->m_digest= NULL;
+
       return_value= FALSE;
       goto out;
     }
@@ -1415,19 +1421,30 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     }
     if (thd->wsrep_conflict_state== ABORTED)
     {
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-      WSREP_DEBUG("Deadlock error for: %s", thd->query());
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      thd->killed               = THD::NOT_KILLED;
-      thd->mysys_var->abort     = 0;
-      thd->wsrep_conflict_state = NO_CONFLICT;
-      thd->wsrep_retry_counter  = 0;
-      /*
-        Increment threads running to compensate dec_thread_running() called
-        after dispatch_end label.
-      */
-      inc_thread_running();
-      goto dispatch_end;
+      if (command == COM_STMT_PREPARE          ||
+          command == COM_STMT_FETCH            ||
+          command == COM_STMT_SEND_LONG_DATA   ||
+          command == COM_STMT_CLOSE
+         )
+      {
+        WSREP_DEBUG("Prepared Statement bail out");
+      }
+      else
+      {
+        my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+        WSREP_DEBUG("Deadlock error for: %s", thd->query());
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+        thd->killed               = THD::NOT_KILLED;
+        thd->mysys_var->abort     = 0;
+        thd->wsrep_conflict_state = NO_CONFLICT;
+        thd->wsrep_retry_counter  = 0;
+        /*
+          Increment threads running to compensate dec_thread_running() called
+          after dispatch_end label.
+        */
+        inc_thread_running();
+        goto dispatch_end;
+      }
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
