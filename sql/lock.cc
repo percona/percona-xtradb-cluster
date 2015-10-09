@@ -1095,27 +1095,14 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
     m_mdl_blocks_commits_lock= NULL;
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
-    wsrep->resume(wsrep);
+    DBUG_ASSERT(!provider_resumed());
+    wsrep_resume();
     m_state= GRL_ACQUIRED;
   }
 #endif /* WITH_WSREP */
 
   if (m_state != GRL_ACQUIRED)
     DBUG_RETURN(0);
-
-#ifdef WITH_WSREP
-  if (m_mdl_blocks_commits_lock)
-  {
-    WSREP_DEBUG("GRL was in block commit mode when entering "
-		"make_global_read_lock_block_commit");
-    thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
-    m_mdl_blocks_commits_lock= NULL;
-    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
-    wsrep->resume(wsrep);
-    m_state= GRL_ACQUIRED;
-  }
-#endif /* WITH_WSREP */
-
 
   mdl_request.init(MDL_key::COMMIT, "", "", MDL_SHARED, MDL_EXPLICIT);
 
@@ -1181,7 +1168,7 @@ wsrep_status_t Global_read_lock::wsrep_resume(void)
     }
     else
     {
-       WSREP_WARN("resume failed: %d", ret);
+       WSREP_WARN("Failed to resume provider: %d", ret);
     }
     return ret;
 }
