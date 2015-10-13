@@ -89,6 +89,7 @@ DELETE FROM t2;
 SET SESSION sql_mode = STRICT_TRANS_TABLES;
 
 SELECT @@SESSION.sql_mode;
+SELECT @@GLOBAL.sql_mode;
 
 INSERT INTO t1 VALUES('t1a1','t1b1');
 INSERT INTO t1 VALUES('t1a2','t1b2');
@@ -100,6 +101,7 @@ INSERT INTO t2 VALUES('t2a2','t2b2');
 INSERT INTO t2 VALUES('t2a3','t2b3');
 INSERT INTO t2 VALUES('t2a4','t2b4');
 
+analyze table t1;
 --error ER_BAD_NULL_ERROR
 INSERT INTO t1 SELECT * FROM t2;
 --echo Expected error Bad NULL value

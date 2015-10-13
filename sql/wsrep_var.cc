@@ -27,9 +27,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
-#define WSREP_CLUSTER_NAME "my_wsrep_cluster"
-
 const  char* wsrep_provider         = 0;
 const  char* wsrep_provider_options = 0;
 const  char* wsrep_cluster_address  = 0;
@@ -126,25 +123,27 @@ static int wsrep_start_position_verify (const char* start_str)
   return 1;
 }
 
+/* Function checks if the new value for start_position is valid.
+@return false if no error encountered with check else return true. */
 bool wsrep_start_position_check (sys_var *self, THD* thd, set_var* var)
 {
-  char   buff[FN_REFLEN];
-  String str(buff, sizeof(buff), system_charset_info), *res;
-  const char*   start_str = NULL;
+  char start_pos_buf[FN_REFLEN];
 
-  if (!(res = var->value->val_str(&str))) goto err;
+  if ((! var->save_result.string_value.str) ||
+      (var->save_result.string_value.length > (FN_REFLEN - 1))) // safety
+    goto err;
 
-  start_str = res->c_ptr();
+  memcpy(start_pos_buf, var->save_result.string_value.str,
+         var->save_result.string_value.length);
+  start_pos_buf[var->save_result.string_value.length]= 0;
 
-  if (!start_str) goto err;
-
-  if (!wsrep_start_position_verify(start_str)) return 0;
+  if (!wsrep_start_position_verify(start_pos_buf)) return false;
 
 err:
-
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
-           start_str ? start_str : "NULL");
-  return 1;
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+           var->save_result.string_value.str ?
+           var->save_result.string_value.str : "NULL");
+  return true;
 }
 
 static
@@ -228,25 +227,27 @@ static int wsrep_provider_verify (const char* provider_str)
   return 0;
 }
 
+/* Function checks if the new value for provider is valid.
+@return false if no error encountered with check else return true. */
 bool wsrep_provider_check (sys_var *self, THD* thd, set_var* var)
 {
-  char   buff[FN_REFLEN];
-  String str(buff, sizeof(buff), system_charset_info), *res;
-  const char*   provider_str = NULL;
+  char wsrep_provider_buf[FN_REFLEN];
 
-  if (!(res = var->value->val_str(&str))) goto err;
+  if ((! var->save_result.string_value.str) ||
+      (var->save_result.string_value.length > (FN_REFLEN - 1))) // safety
+    goto err;
 
-  provider_str = res->c_ptr();
+  memcpy(wsrep_provider_buf, var->save_result.string_value.str,
+         var->save_result.string_value.length);
+  wsrep_provider_buf[var->save_result.string_value.length]= 0;
 
-  if (!provider_str) goto err;
-
-  if (!wsrep_provider_verify(provider_str)) return 0;
+  if (!wsrep_provider_verify(wsrep_provider_buf)) return false;
 
 err:
-
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
-           provider_str ? provider_str : "NULL");
-  return 1;
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+           var->save_result.string_value.str ?
+           var->save_result.string_value.str : "NULL");
+  return true;
 }
 
 bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
@@ -313,13 +314,19 @@ void wsrep_provider_init (const char* value)
   wsrep_provider = my_strdup(value, MYF(0));
 }
 
-bool wsrep_provider_options_check(sys_var *self, THD* thd, set_var* var)
+bool wsrep_provider_options_check (sys_var *self, THD* thd, set_var* var)
 {
   return 0;
 }
 
 bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
 {
+  if (wsrep == NULL)
+  {
+    my_message(ER_WRONG_ARGUMENTS, "WSREP (galera) not started", MYF(0));
+    return true;
+  }
+
   wsrep_status_t ret= wsrep->options_set(wsrep, wsrep_provider_options);
   if (ret != WSREP_OK)
   {
@@ -328,6 +335,13 @@ bool wsrep_provider_options_update(sys_var *self, THD* thd, enum_var_type type)
     return true;
   }
   return refresh_provider_options();
+}
+
+void wsrep_provider_options_init(const char* value)
+{
+  if (wsrep_provider_options && wsrep_provider_options != value)
+    my_free((void *)wsrep_provider_options);
+  wsrep_provider_options = (value) ? my_strdup(value, MYF(0)) : NULL;
 }
 
 bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
@@ -353,36 +367,34 @@ bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
     return false;
 }
 
-void wsrep_provider_options_init(const char* value)
-{
-  if (wsrep_provider_options && wsrep_provider_options != value) 
-    my_free((void *)wsrep_provider_options);
-  wsrep_provider_options = (value) ? my_strdup(value, MYF(0)) : NULL;
-}
-
 static int wsrep_cluster_address_verify (const char* cluster_address_str)
 {
   /* There is no predefined address format, it depends on provider. */
   return 0;
+
 }
 
+/* Function checks if the new value for cluster_address is valid.
+@return false if no error encountered with check else return true. */
 bool wsrep_cluster_address_check (sys_var *self, THD* thd, set_var* var)
 {
-  char   buff[FN_REFLEN];
-  String str(buff, sizeof(buff), system_charset_info), *res;
-  const char*   cluster_address_str = NULL;
+  char addr_buf[FN_REFLEN];
 
-  if (!(res = var->value->val_str(&str))) goto err;
+  if ((! var->save_result.string_value.str) ||
+      (var->save_result.string_value.length > (FN_REFLEN - 1))) // safety
+    goto err;
 
-  cluster_address_str = res->c_ptr();
+  memcpy(addr_buf, var->save_result.string_value.str,
+         var->save_result.string_value.length);
+  addr_buf[var->save_result.string_value.length]= 0;
 
-  if (!wsrep_cluster_address_verify(cluster_address_str)) return 0;
+  if (!wsrep_cluster_address_verify(addr_buf)) return false;
 
  err:
-
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
-             cluster_address_str ? cluster_address_str : "NULL");
-  return 1    ;
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+           var->save_result.string_value.str ?
+           var->save_result.string_value.str : "NULL");
+  return true;
 }
 
 bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
@@ -428,25 +440,19 @@ void wsrep_cluster_address_init (const char* value)
   wsrep_cluster_address = (value) ? my_strdup(value, MYF(0)) : NULL;
 }
 
+/* Function checks if the new value for cluster_name is valid.
+@return false if no error encountered with check else return true. */
 bool wsrep_cluster_name_check (sys_var *self, THD* thd, set_var* var)
 {
-  char   buff[FN_REFLEN];
-  String str(buff, sizeof(buff), system_charset_info), *res;
-  const char* cluster_name_str = NULL;
-
-  if (!(res = var->value->val_str(&str))) goto err;
-
-  cluster_name_str = res->c_ptr();
-
-  if (!cluster_name_str || strlen(cluster_name_str) == 0) goto err;
-
-  return 0;
-
- err:
-
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str, 
-             cluster_name_str ? cluster_name_str : "NULL");
-  return 1;
+  if (!var->save_result.string_value.str ||
+      (var->save_result.string_value.length == 0))
+  {
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             (var->save_result.string_value.str ?
+              var->save_result.string_value.str : "NULL"));
+    return true;
+  }
+  return false;
 }
 
 bool wsrep_cluster_name_update (sys_var *self, THD* thd, enum_var_type type)
@@ -454,25 +460,19 @@ bool wsrep_cluster_name_update (sys_var *self, THD* thd, enum_var_type type)
   return 0;
 }
 
+/* Function checks if the new value for node_name is valid.
+@return false if no error encountered with check else return true. */
 bool wsrep_node_name_check (sys_var *self, THD* thd, set_var* var)
 {
-  char   buff[FN_REFLEN];
-  String str(buff, sizeof(buff), system_charset_info), *res;
-  const char* node_name_str = NULL;
-
-  if (!(res = var->value->val_str(&str))) goto err;
-
-  node_name_str = res->c_ptr();
-
-  if (!node_name_str || strlen(node_name_str) == 0) goto err;
-
-  return 0;
-
- err:
-
-  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-           node_name_str ? node_name_str : "NULL");
-  return 1;
+  // TODO: for now 'allow' 0-length string to be valid (default)
+  if (!var->save_result.string_value.str)
+  {
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             (var->save_result.string_value.str ?
+              var->save_result.string_value.str : "NULL"));
+    return true;
+  }
+  return false;
 }
 
 bool wsrep_node_name_update (sys_var *self, THD* thd, enum_var_type type)
@@ -480,26 +480,29 @@ bool wsrep_node_name_update (sys_var *self, THD* thd, enum_var_type type)
   return 0;
 }
 
-// TODO: do something more elaborate, like checking connectivity
+/* Function checks if the new value for node_address is valid.
+TODO: do something more elaborate, like checking connectivity
+@return false if no error encountered with check else return true. */
 bool wsrep_node_address_check (sys_var *self, THD* thd, set_var* var)
 {
-  char   buff[FN_REFLEN];
-  String str(buff, sizeof(buff), system_charset_info), *res;
-  const char* node_address_str = NULL;
+  char addr_buf[FN_REFLEN];
 
-  if (!(res = var->value->val_str(&str))) goto err;
+  if ((! var->save_result.string_value.str) ||
+      (var->save_result.string_value.length > (FN_REFLEN - 1))) // safety
+    goto err;
 
-  node_address_str = res->c_ptr();
+  memcpy(addr_buf, var->save_result.string_value.str,
+         var->save_result.string_value.length);
+  addr_buf[var->save_result.string_value.length]= 0;
 
-  if (!node_address_str || strlen(node_address_str) == 0) goto err;
+  // TODO: for now 'allow' 0-length string to be valid (default)
+  return false;
 
-  return 0;
-
- err:
-
+err:
   my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-           node_address_str ? node_address_str : "NULL");
-  return 1;
+           var->save_result.string_value.str ?
+           var->save_result.string_value.str : "NULL");
+  return true;
 }
 
 bool wsrep_node_address_update (sys_var *self, THD* thd, enum_var_type type)

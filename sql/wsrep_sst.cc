@@ -69,19 +69,20 @@ const char* wsrep_sst_donor           = "";
 static const char* sst_auth_real      = NULL;
 my_bool wsrep_sst_donor_rejects_queries = FALSE;
 
+/* Function checks if the new value for sst_method is valid.
+@return false if no error encountered with check else return true. */
 bool wsrep_sst_method_check (sys_var *self, THD* thd, set_var* var)
 {
-    char   buff[FN_REFLEN];
-    String str(buff, sizeof(buff), system_charset_info), *res;
-    const char* c_str = NULL;
+  if ((! var->save_result.string_value.str) ||
+      (var->save_result.string_value.length == 0 ))
+  {
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.string_value.str ?
+             var->save_result.string_value.str : "NULL");
+    return true;
+  }
 
-    if ((res   = var->value->val_str(&str)) &&
-        (c_str = res->c_ptr()) &&
-        strlen(c_str) > 0)
-        return 0;
-
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "wsrep_sst_method", c_str ? c_str : "NULL");
-    return 1;
+  return false;
 }
 
 bool wsrep_sst_method_update (sys_var *self, THD* thd, enum_var_type type)
@@ -100,17 +101,34 @@ static bool sst_receive_address_check (const char* str)
     return 0;
 }
 
-bool  wsrep_sst_receive_address_check (sys_var *self, THD* thd, set_var* var)
+/* Function checks if the new value for sst_recieve_address is valid.
+@return false if no error encountered with check else return true. */
+bool wsrep_sst_receive_address_check (sys_var *self, THD* thd, set_var* var)
 {
-    const char* c_str = var->value->str_value.c_ptr();
+  char addr_buf[FN_REFLEN];
 
-    if (sst_receive_address_check (c_str))
-    {
-        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "wsrep_sst_receive_address", c_str ? c_str : "NULL");
-        return 1;
-    }
+  if ((! var->save_result.string_value.str) ||
+      (var->save_result.string_value.length > (FN_REFLEN - 1))) // safety
+  {
+    goto err;
+  }
 
-    return 0;
+  memcpy(addr_buf, var->save_result.string_value.str,
+         var->save_result.string_value.length);
+  addr_buf[var->save_result.string_value.length]= 0;
+
+  if (sst_receive_address_check(addr_buf))
+  {
+    goto err;
+  }
+
+  return false;
+
+err:
+  my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+           var->save_result.string_value.str ?
+           var->save_result.string_value.str : "NULL");
+  return true;
 }
 
 bool wsrep_sst_receive_address_update (sys_var *self, THD* thd,
@@ -123,31 +141,44 @@ bool wsrep_sst_auth_check (sys_var *self, THD* thd, set_var* var)
 {
     return 0;
 }
+
+void wsrep_sst_auth_free()
+{
+  if (wsrep_sst_auth) { my_free((void *) wsrep_sst_auth); }
+  if (sst_auth_real) { my_free((void *) sst_auth_real); }
+  wsrep_sst_auth= NULL;
+  sst_auth_real= NULL;
+}
+
 static bool sst_auth_real_set (const char* value)
 {
-    const char* v = strdup (value);
+  const char* v= NULL;
 
-    if (v)
+  if (value)
+  {
+    v= my_strdup(value, MYF(0));
+  }
+  else                                          // its NULL
+  {
+    wsrep_sst_auth_free();
+    return 0;
+  }
+
+  if (v)
+  {
+    // set sst_auth_real
+    if (sst_auth_real) { my_free((void *) sst_auth_real); }
+    sst_auth_real = v;
+
+    // mask wsrep_sst_auth
+    if (strlen(sst_auth_real))
     {
-        if (sst_auth_real) free (const_cast<char*>(sst_auth_real));
-        sst_auth_real = v;
-
-        if (strlen(sst_auth_real))
-        {
-          if (wsrep_sst_auth)
-          {
-            my_free ((void*)wsrep_sst_auth);
-            wsrep_sst_auth = my_strdup(WSREP_SST_AUTH_MASK, MYF(0));
-            //strncpy (wsrep_sst_auth, WSREP_SST_AUTH_MASK,
-            //     sizeof(wsrep_sst_auth) - 1);
-          }
-          else
-            wsrep_sst_auth = my_strdup (WSREP_SST_AUTH_MASK, MYF(0));
-        }
-        return 0;
+      if (wsrep_sst_auth) { my_free((void*) wsrep_sst_auth); }
+      wsrep_sst_auth= my_strdup(WSREP_SST_AUTH_MASK, MYF(0));
     }
-
-    return 1;
+    return 0;
+  }
+  return 1;
 }
 
 bool wsrep_sst_auth_update (sys_var *self, THD* thd, enum_var_type type)

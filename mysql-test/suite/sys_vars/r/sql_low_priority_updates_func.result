@@ -70,12 +70,12 @@ UNLOCK TABLES;
 ** Connection con0 **
 ** Asynchronous Result **
 a
-1-updated
-2-updated
-3-updated
-4-updated
-5-updated
 6-updated
+5-updated
+4-updated
+3-updated
+2-updated
+1-updated
 Expected values of a with -updated;
 ** Connection default**
 DELETE FROM t1;
