@@ -1,6 +1,6 @@
 SHOW GLOBAL STATUS LIKE 'wsrep_cert_index_size';
 Variable_name	Value
-wsrep_cert_index_size	0
+wsrep_cert_index_size	*
 SHOW GLOBAL STATUS LIKE 'wsrep_cert_bucket_count';
 Variable_name	Value
 wsrep_cert_bucket_count	*
