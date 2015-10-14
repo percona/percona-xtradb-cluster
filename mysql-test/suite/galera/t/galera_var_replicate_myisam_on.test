@@ -90,11 +90,15 @@ COMMIT;
 SELECT COUNT(*) = 1 FROM t1;
 SELECT COUNT(*) = 1 FROM t2;
 
+--connection node_1
+SET AUTOCOMMIT=ON;
+
 #
 # Transaction rollback
 #
 
 --connection node_1
+SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (2);
 INSERT INTO t2 VALUES (2);
@@ -107,6 +111,9 @@ SELECT COUNT(*) = 1 FROM t2;
 DROP TABLE t1;
 DROP TABLE t2;
 
+--connection node_1
+SET AUTOCOMMIT=ON;
+
 #
 # Transaction conflict
 #
@@ -115,6 +122,7 @@ DROP TABLE t2;
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
 CREATE TABLE t2 (f2 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 
+SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (1);
 INSERT INTO t2 VALUES (1);
@@ -126,7 +134,34 @@ INSERT INTO t1 VALUES (1);
 
 --connection node_1
 COMMIT;
+SET AUTOCOMMIT=ON;
 
 DROP TABLE t1;
 DROP TABLE t2;
 
+#
+# INSERT .... SELECT
+#
+--connection node_1
+use test;
+create table is1 (i int) engine=myisam;
+create table is2 (i int) engine=myisam;
+create table is3 (i int) engine=innodb;
+insert into is1 select 1;
+insert into is1 (i) select i from is1;
+insert into is1 values (2), (3);
+insert into is1 (i) select i from is1;
+select * from is1;
+#
+insert into is2 (i) select i from is1;
+#
+insert into is3 (i) select i from is1;
+insert into is1 (i) select i from is3;
+
+--connection node_2
+select count(*) from is1;
+select count(*) from is2;
+select count(*) from is3;
+drop table is1;
+drop table is2;
+drop table is3;

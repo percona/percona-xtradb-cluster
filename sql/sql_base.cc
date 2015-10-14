@@ -5439,6 +5439,12 @@ restart:
       }
     }
 #ifdef WITH_WSREP
+  /* It is not recommended to replicate MyISAM as it lacks rollback feature
+  but if user demands then actions are replicated using TOI.
+  Following code will kick-start the TOI but this has to be done only once
+  per statement.
+  Note: kick-start will take-care of creating isolation key for all tables
+  involved in the list (provided all of them are MYISAM tables). */
   if ((thd->lex->sql_command== SQLCOM_INSERT         ||
        thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
        thd->lex->sql_command== SQLCOM_REPLACE        ||
@@ -5448,7 +5454,8 @@ restart:
        thd->lex->sql_command== SQLCOM_LOAD           ||
        thd->lex->sql_command== SQLCOM_DELETE)        &&
       thd->variables.wsrep_replicate_myisam          &&
-      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM)
+      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM &&
+      thd->wsrep_exec_mode== LOCAL_STATE)
     {
       WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
     }
