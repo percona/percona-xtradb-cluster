@@ -12,3 +12,8 @@
 query_cache_size_basic_32           : Bug#13535584
 query_cache_size_basic_64           : Bug#11748572
 #thread_cache_size_func             : Bug#11750172: 2008-11-07 joro main.thread_cache_size_func fails in pushbuild when run with pool of threads
+wsrep_start_position_basic          : This needs server to start in cluster mode with wsrep initialized.
+wsrep_desync_basic                  : State transition that percona has to avoid race condition block setting of desync to OFF in some cases.
+wsrep_preordered_basic              : TC pending.
+wsrep_reject_queries_basic          : TC pending.
+sql_mode_func                       : Differences in result likely due to configuration. Need more investigation.
