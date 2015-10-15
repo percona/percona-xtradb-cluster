@@ -502,6 +502,22 @@ int wsrep_init()
             wsrep->provider_vendor,  sizeof(provider_vendor) - 1);
   }
 
+  /* wsrep_cluster_name is restricted to WSREP_CLUSTER_NAME_MAX_LEN characters
+  only. For now galera supports only UTF-8 so WSREP_CLUSTER_NAME_MAX_LEN is ok
+  on that front too. This limitation is indirectly enforced by limitation of
+  gcomm */
+  size_t const wsrep_len = strlen (wsrep_cluster_name);
+  if (wsrep_len > WSREP_CLUSTER_NAME_MAX_LEN)
+  {
+    rcode = 1;
+    WSREP_ERROR("wsrep_cluster_name too long (%zu)", wsrep_len);
+    WSREP_ERROR("wsrep::init() failed: %d, must shutdown", rcode);
+    wsrep->free(wsrep);
+    free(wsrep);
+    wsrep = NULL;
+    return rcode;
+  }
+
   if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)
     wsrep_data_home_dir = mysql_real_data_home;
 
