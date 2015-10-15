@@ -10261,6 +10261,18 @@ ha_innobase::wsrep_append_keys(
 		DBUG_RETURN(0);
 	}
 
+	/* If certification of table with non-PK is blocked by setting
+	relevant configuration option wsrep_certify_nonPK = OFF/0 then
+	ensure that thd->wsrep_ws_handle->trx_id = WSREP_UNDEFINED_TRX_ID.
+	If not then make sure you set it to WSREP_UNDEFINED_TRX_ID.
+	But what may cause trx_id to set if append-key is blocked ?
+	CREATE TABLE ... SELECT statement will cause a fake_trx_id to set
+	while processing SELECT statement. */
+	if (!key_appended && !wsrep_certify_nonPK) {
+		wsrep_ws_handle_for_trx(
+			wsrep_thd_ws_handle(thd), WSREP_UNDEFINED_TRX_ID);
+	}
+
 	DBUG_RETURN(0);
 }
 #endif
