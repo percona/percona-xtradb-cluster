@@ -166,7 +166,7 @@ our $opt_vs_config = $ENV{'MTR_VS_CONFIG'};
 #
 my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,rpl,innodb,innodb_fts,"
   ."innodb_zip,perfschema,funcs_1,funcs_2,opt_trace,parts,auth_sec,jp,stress,"
-  ."engines/iuds,engines/funcs,query_response_time,innodb_stress";
+  ."engines/iuds,engines/funcs,query_response_time,innodb_stress,galera";
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -3359,6 +3359,12 @@ sub check_wsrep_support() {
     # ADD scripts to $PATH to that wsrep_sst_* can be found
     my ($path) = grep { -f "$_/wsrep_sst_rsync"; } "$::bindir/scripts", $::path_client_bindir;
     mtr_error("No SST scripts") unless $path;
+    $ENV{PATH}="$path:$ENV{PATH}";
+
+    # ADD mysql client library path to path so that wsrep_notify_cmd can find mysql
+    # client for loading the tables. (Don't assume each machine has mysql install)
+    my ($path) = grep { -f "$_/mysql"; } "$::bindir/scripts", $::path_client_bindir;
+    mtr_error("No mysql client found") unless $path;
     $ENV{PATH}="$path:$ENV{PATH}";
 
     # Check whether WSREP_PROVIDER environment variable is set.
