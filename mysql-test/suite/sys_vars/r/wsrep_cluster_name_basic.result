@@ -37,6 +37,22 @@ my_wsrep_cluster
 # invalid values
 SET @@global.wsrep_cluster_name=NULL;
 ERROR 42000: Variable 'wsrep_cluster_name' can't be set to the value of 'NULL'
+SELECT @@global.wsrep_cluster_name;
+@@global.wsrep_cluster_name
+my_wsrep_cluster
+set @@global.wsrep_cluster_name="1234567890123456789012345678901234567890";
+ERROR 42000: Variable 'wsrep_cluster_name' can't be set to the value of '1234567890123456789012345678901234567890'
+SELECT @@global.wsrep_cluster_name;
+@@global.wsrep_cluster_name
+my_wsrep_cluster
+set @@global.wsrep_cluster_name="12345678901234567890123456789012";
+SELECT @@global.wsrep_cluster_name;
+@@global.wsrep_cluster_name
+12345678901234567890123456789012
+SET @@global.wsrep_cluster_name=default;
+SELECT @@global.wsrep_cluster_name;
+@@global.wsrep_cluster_name
+my_wsrep_cluster
 
 # restore the initial value
 SET @@global.wsrep_cluster_name = @wsrep_cluster_name_global_saved;

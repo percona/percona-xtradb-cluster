@@ -32,6 +32,15 @@ SELECT @@global.wsrep_cluster_name;
 --echo # invalid values
 --error ER_WRONG_VALUE_FOR_VAR
 SET @@global.wsrep_cluster_name=NULL;
+# trying to set the cluster-name of size > 32 bytes.
+SELECT @@global.wsrep_cluster_name;
+--error ER_WRONG_VALUE_FOR_VAR
+set @@global.wsrep_cluster_name="1234567890123456789012345678901234567890";
+SELECT @@global.wsrep_cluster_name;
+set @@global.wsrep_cluster_name="12345678901234567890123456789012";
+SELECT @@global.wsrep_cluster_name;
+SET @@global.wsrep_cluster_name=default;
+SELECT @@global.wsrep_cluster_name;
 
 --echo
 --echo # restore the initial value

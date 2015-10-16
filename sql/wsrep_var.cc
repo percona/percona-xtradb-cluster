@@ -445,7 +445,8 @@ void wsrep_cluster_address_init (const char* value)
 bool wsrep_cluster_name_check (sys_var *self, THD* thd, set_var* var)
 {
   if (!var->save_result.string_value.str ||
-      (var->save_result.string_value.length == 0))
+      (var->save_result.string_value.length == 0) ||
+      (var->save_result.string_value.length > WSREP_CLUSTER_NAME_MAX_LEN))
   {
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
              (var->save_result.string_value.str ?
