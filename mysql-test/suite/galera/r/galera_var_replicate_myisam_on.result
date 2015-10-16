@@ -50,6 +50,8 @@ COUNT(*) = 1
 SELECT COUNT(*) = 1 FROM t2;
 COUNT(*) = 1
 1
+SET AUTOCOMMIT=ON;
+SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (2);
 INSERT INTO t2 VALUES (2);
@@ -64,13 +66,49 @@ COUNT(*) = 1
 1
 DROP TABLE t1;
 DROP TABLE t2;
+SET AUTOCOMMIT=ON;
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=MyISAM;
 CREATE TABLE t2 (f2 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES (1);
 INSERT INTO t2 VALUES (1);
 INSERT INTO t1 VALUES (1);
 ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
 COMMIT;
+SET AUTOCOMMIT=ON;
 DROP TABLE t1;
 DROP TABLE t2;
+use test;
+create table is1 (i int) engine=myisam;
+create table is2 (i int) engine=myisam;
+create table is3 (i int) engine=innodb;
+insert into is1 select 1;
+insert into is1 (i) select i from is1;
+insert into is1 values (2), (3);
+insert into is1 (i) select i from is1;
+select * from is1;
+i
+1
+1
+2
+3
+1
+1
+2
+3
+insert into is2 (i) select i from is1;
+insert into is3 (i) select i from is1;
+insert into is1 (i) select i from is3;
+select count(*) from is1;
+count(*)
+16
+select count(*) from is2;
+count(*)
+8
+select count(*) from is3;
+count(*)
+8
+drop table is1;
+drop table is2;
+drop table is3;
