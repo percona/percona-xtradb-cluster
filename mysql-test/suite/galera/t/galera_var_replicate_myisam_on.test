@@ -147,6 +147,7 @@ use test;
 create table is1 (i int) engine=myisam;
 create table is2 (i int) engine=myisam;
 create table is3 (i int) engine=innodb;
+create table is4 (i int) engine=myisam;
 insert into is1 select 1;
 insert into is1 (i) select i from is1;
 insert into is1 values (2), (3);
@@ -157,6 +158,8 @@ insert into is2 (i) select i from is1;
 #
 insert into is3 (i) select i from is1;
 insert into is1 (i) select i from is3;
+#
+insert into is4 (i) select 1 from information_schema.tables;
 
 --connection node_2
 select count(*) from is1;
@@ -165,3 +168,4 @@ select count(*) from is3;
 drop table is1;
 drop table is2;
 drop table is3;
+drop table is4;
