@@ -572,6 +572,8 @@ static void export_wsrep_status_to_mysql(THD* thd)
 {
   int wsrep_status_len, i;
 
+  wsrep_free_status(thd);
+
   thd->wsrep_status_vars = wsrep->stats_get(wsrep);
 
   if (!thd->wsrep_status_vars) {
