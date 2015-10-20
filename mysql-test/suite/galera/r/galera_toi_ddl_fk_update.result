@@ -9,14 +9,14 @@ id INT PRIMARY KEY AUTO_INCREMENT,
 parent_id INT
 ) ENGINE=InnoDB;
 INSERT INTO parent VALUES (1);
-INSERT INTO child (parent_id) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;
+INSERT INTO child (parent_id) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
 ALTER TABLE child ADD FOREIGN KEY (parent_id) REFERENCES parent(id) ON UPDATE CASCADE;;
 UPDATE parent SET id = 2 WHERE id = 1;;
-SELECT COUNT(*) = 1000000 FROM child WHERE parent_id = 2;
-COUNT(*) = 1000000
+SELECT COUNT(*) = 100000 FROM child WHERE parent_id = 2;
+COUNT(*) = 100000
 1
-SELECT COUNT(*) = 1000000 FROM child WHERE parent_id = 2;
-COUNT(*) = 1000000
+SELECT COUNT(*) = 100000 FROM child WHERE parent_id = 2;
+COUNT(*) = 100000
 1
 DROP TABLE child;
 DROP TABLE parent;

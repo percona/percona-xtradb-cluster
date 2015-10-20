@@ -70,7 +70,7 @@ Asynchronous "reap" result
 The next result suffers from
 '# Bug#35386 insert delayed inserts 1 + limit rows instead of just limit rows'
 COUNT(*)
-43
+NUMBER
 ** Connection default **
 Checking if the delayed insert continued afterwards
 SELECT COUNT(*) FROM t1;
