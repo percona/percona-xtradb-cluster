@@ -677,13 +677,6 @@ static MYSQL_THDVAR_ULONG(flush_log_at_trx_commit, PLUGIN_VAR_OPCMDARG,
   " or 2 (write at commit, flush once per second).",
   NULL, NULL, 1, 0, 2, 0);
 
-static MYSQL_THDVAR_BOOL(fake_changes, PLUGIN_VAR_OPCMDARG,
-  "In the transaction after enabled, UPDATE, INSERT and DELETE only move the cursor to the records "
-  "and do nothing other operations (no changes, no ibuf, no undo, no transaction log) in the transaction. "
-  "This is to cause replication prefetch IO. ATTENTION: the transaction started after enabled is affected.",
-  NULL, NULL, FALSE);
-
-
 static SHOW_VAR innodb_status_variables[]= {
   {"buffer_pool_dump_status",
   (char*) &export_vars.innodb_buffer_pool_dump_status,	  SHOW_CHAR},
@@ -2390,8 +2383,6 @@ innobase_trx_init(
 
 	trx->check_unique_secondary = !thd_test_options(
 		thd, OPTION_RELAXED_UNIQUE_CHECKS);
-
-	trx->fake_changes = THDVAR(thd, fake_changes);
 
 #ifdef EXTENDED_SLOWLOG
 	if (thd_log_slow_verbosity(thd) & (1ULL << SLOG_V_INNODB)) {
@@ -19402,13 +19393,6 @@ static	MYSQL_SYSVAR_ENUM(corrupt_table_action, srv_pass_corrupt_table,
   "except for the deletion.",
   NULL, NULL, 0, &corrupt_table_action_typelib);
 
-static MYSQL_SYSVAR_BOOL(locking_fake_changes, srv_fake_changes_locks,
-  PLUGIN_VAR_NOCMDARG,
-  "###EXPERIMENTAL### if enabled, transactions will get S row locks instead "
-  "of X locks for fake changes.  If disabled, fake change transactions will "
-  "not take any locks at all.",
-  NULL, NULL, TRUE);
-
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(log_block_size),
   MYSQL_SYSVAR(additional_mem_pool_size),
@@ -19603,8 +19587,6 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(saved_page_number_debug),
 #endif /* UNIV_DEBUG */
   MYSQL_SYSVAR(corrupt_table_action),
-  MYSQL_SYSVAR(fake_changes),
-  MYSQL_SYSVAR(locking_fake_changes),
   NULL
 };
 
