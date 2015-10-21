@@ -280,6 +280,7 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: no nodes coming from prim view, prim not possible"),
  ("WSREP: Failed to prepare for incremental state transfer: Local state seqno is undefined:"),
  ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
+ ("WSREP: gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)"),
  ("WSREP: Action message in non-primary configuration from member 0"),
  ("THE_LAST_SUPPRESSION")||
 
