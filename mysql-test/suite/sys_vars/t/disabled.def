@@ -17,3 +17,4 @@ wsrep_desync_basic                  : State transition that percona has to avoid
 wsrep_preordered_basic              : TC pending.
 wsrep_reject_queries_basic          : TC pending.
 sql_mode_func                       : Differences in result likely due to configuration. Need more investigation.
+innodb_locking_fake_changes_basic   : fake change is disable for PXC
