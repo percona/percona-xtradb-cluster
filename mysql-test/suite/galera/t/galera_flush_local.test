@@ -133,4 +133,5 @@ SELECT COUNT(*) = 10 FROM x2;
 
 --connection node_1
 set wsrep_on=1;
+SET GLOBAL wsrep_replicate_myisam = FALSE;
 DROP TABLE t1, t2, x1, x2;
