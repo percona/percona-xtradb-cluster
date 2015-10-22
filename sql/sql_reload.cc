@@ -29,6 +29,9 @@
 #include "rpl_mi.h"
 #include "debug_sync.h"
 
+#ifdef WITH_WSREP
+#include "sql_parse.h" // WSREP_MYSQL_DB
+#endif /* WITH_WSREP */
 
 /**
   Reload/resets privileges and the different caches.
@@ -346,6 +349,9 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         result= 1;
       }
     }
+#ifdef WITH_WSREP
+cleanup:
+#endif /* WITH_WSREP */
     my_dbopt_cleanup();
   }
   if (options & REFRESH_HOSTS)
