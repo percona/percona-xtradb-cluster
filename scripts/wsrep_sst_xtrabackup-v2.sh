@@ -692,8 +692,7 @@ then
         fi
 
         if [ -n "${WSREP_SST_OPT_PSWD:-}" ]; then
-#           INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
-           export MYSQL_PWD="$WSREP_SST_OPT_PSWD"
+           INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
         elif [[ $usrst -eq 1 ]];then
            # Empty password, used for testing, debugging etc.
            INNOEXTRA+=" --password="
