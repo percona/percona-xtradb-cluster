@@ -3198,6 +3198,7 @@ public:
   rpl_sid                   wsrep_po_sid;
   void*                     wsrep_apply_format;
   bool                      wsrep_apply_toi; /* applier processing in TOI */
+  wsrep_gtid_t              wsrep_sync_wait_gtid;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
