@@ -9312,6 +9312,25 @@ wsrep_append_key(
 extern void compute_md5_hash(char *digest, const char *buf, int len);
 #define MD5_HASH compute_md5_hash
 
+bool
+wsrep_is_FK_index(dict_table_t* table,
+                  dict_index_t* index)
+{
+	const dict_foreign_set*	fks = &table->referenced_set;
+
+	/* Check for all FK references from other tables to the index. */
+	for (dict_foreign_set::const_iterator it = fks->begin();
+	     it != fks->end(); ++it) {
+
+		dict_foreign_t*	foreign = *it;
+		if (foreign->referenced_index == index) {
+                	ut_ad(table == foreign->referenced_table);
+			return true;
+		}
+        }
+        return false;
+}
+
 int
 ha_innobase::wsrep_append_keys(
 /*==================*/
@@ -9388,10 +9407,10 @@ ha_innobase::wsrep_append_keys(
 					   table->s->table_name.str, 
 					   key_info->name);
 			}
-			/* !hasPK == table with no PK, must append all non-unique keys */
+			/* !hasPK == table with no PK, 
+                           must append all non-unique keys */
 			if (!hasPK || key_info->flags & HA_NOSAME ||
-			    ((tab &&
-			      dict_table_get_referenced_constraint(tab, idx)) ||
+			    ((tab && wsrep_is_FK_index(tab, idx)) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
 				len = wsrep_store_key_val_for_row(
@@ -9603,13 +9622,23 @@ create_table_def(
 
 	/* MySQL does the name length check. But we do additional check
 	on the name length here */
-	if (strlen(table_name) > MAX_FULL_NAME_LEN) {
+	const size_t	table_name_len = strlen(table_name);
+	if (table_name_len > MAX_FULL_NAME_LEN) {
 		push_warning_printf(
 			thd, Sql_condition::WARN_LEVEL_WARN,
 			ER_TABLE_NAME,
 			"InnoDB: Table Name or Database Name is too long");
 
 		DBUG_RETURN(ER_TABLE_NAME);
+	}
+
+	if (table_name[table_name_len - 1] == '/') {
+		push_warning_printf(
+			thd, Sql_condition::WARN_LEVEL_WARN,
+			ER_TABLE_NAME,
+			"InnoDB: Table name is empty");
+
+		DBUG_RETURN(ER_WRONG_TABLE_NAME);
 	}
 
 	n_cols = form->s->fields;
