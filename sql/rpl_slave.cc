@@ -661,12 +661,20 @@ int init_recovery(Master_info* mi, const char** errmsg)
     error= mts_recovery_groups(rli);
     if (rli->mts_recovery_group_cnt)
     {
-      error= 1;
-      sql_print_error("--relay-log-recovery cannot be executed when the slave "
+      if (gtid_mode == GTID_MODE_ON)
+      {
+        rli->recovery_parallel_workers= 0;
+        rli->clear_mts_recovery_groups();
+      }
+      else
+      {
+        error= 1;
+        sql_print_error("--relay-log-recovery cannot be executed when the slave "
                         "was stopped with an error or killed in MTS mode; "
                         "consider using RESET SLAVE or restart the server "
                         "with --relay-log-recovery = 0 followed by "
                         "START SLAVE UNTIL SQL_AFTER_MTS_GAPS");
+      }
     }
   }
 
@@ -692,8 +700,11 @@ int init_recovery(Master_info* mi, const char** errmsg)
                                                rli->get_group_master_log_pos()));
     mi->set_master_log_name(rli->get_group_master_log_name());
 
-    sql_print_warning("Recovery from master pos %ld and file %s.",
-                      (ulong) mi->get_master_log_pos(), mi->get_master_log_name());
+    sql_print_warning("Recovery from master pos %ld and file %s. "
+                      "Previous relay log pos and relay log file had "
+                      "been set to %lld, %s respectively.",
+                      (ulong) mi->get_master_log_pos(), mi->get_master_log_name(),
+                      rli->get_group_relay_log_pos(), rli->get_group_relay_log_name());
 
     rli->set_group_relay_log_name(rli->relay_log.get_log_fname());
     rli->set_event_relay_log_name(rli->relay_log.get_log_fname());
@@ -4451,6 +4462,12 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
         if (rli->trans_retries < slave_trans_retries)
         {
           /*
+            The transactions has to be rolled back before global_init_info is
+            called. Because global_init_info will starts a new transaction if
+            master_info_repository is TABLE.
+          */
+          rli->cleanup_context(thd, 1);
+          /*
              We need to figure out if there is a test case that covers
              this part. \Alfranio.
           */
@@ -4465,7 +4482,6 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
           else
           {
             exec_res= SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK;
-            rli->cleanup_context(thd, 1);
             /* chance for concurrent connection to get more locks */
             slave_sleep(thd, min<ulong>(rli->trans_retries, MAX_SLAVE_RETRY_PAUSE),
                         sql_slave_killed, rli);
@@ -4953,6 +4969,17 @@ ignore_log_space_limit=%d",
 log space");
           goto err;
         }
+      DBUG_EXECUTE_IF("flush_after_reading_user_var_event",
+                      {
+                      if (event_buf[EVENT_TYPE_OFFSET] == USER_VAR_EVENT)
+                      {
+                      const char act[]= "now signal Reached wait_for signal.flush_complete_continue";
+                      DBUG_ASSERT(opt_debug_sync_timeout > 0);
+                      DBUG_ASSERT(!debug_sync_set_action(current_thd,
+                                                         STRING_WITH_LEN(act)));
+
+                      }
+                      });
       DBUG_EXECUTE_IF("stop_io_after_reading_gtid_log_event",
         if (event_buf[EVENT_TYPE_OFFSET] == GTID_LOG_EVENT)
           thd->killed= THD::KILLED_NO_VALUE;
@@ -5531,11 +5558,8 @@ err:
   }
 
   delete_dynamic(&above_lwm_jobs);
-  if (rli->recovery_groups_inited && rli->mts_recovery_group_cnt == 0)
-  {
-    bitmap_free(groups);
-    rli->recovery_groups_inited= false;
-  }
+  if (rli->mts_recovery_group_cnt == 0)
+    rli->clear_mts_recovery_groups();
 
   DBUG_RETURN(error ? ER_MTS_RECOVERY_FAILURE : 0);
 }
@@ -5862,55 +5886,36 @@ void slave_stop_workers(Relay_log_info *rli, bool *mts_inited)
 {
   int i;
   THD *thd= rli->info_thd;
-
-  if (!*mts_inited) 
+  if (!*mts_inited)
     return;
   else if (rli->slave_parallel_workers == 0)
     goto end;
 
   /*
-    In case of the "soft" graceful stop Coordinator
-    guaranteed Workers were assigned with full groups so waiting
-    will be resultful.
-    "Hard" stop with KILLing Coordinator or erroring out by a Worker
-    can't wait for Workers' completion because those may not receive
-    commit-events of last assigned groups.
+    If request for stop slave is received notify worker
+    to stop.
   */
-  if (rli->mts_group_status != Relay_log_info::MTS_KILLED_GROUP &&
-      thd->killed == THD::NOT_KILLED)
-  {
-    DBUG_ASSERT(rli->mts_group_status != Relay_log_info::MTS_IN_GROUP ||
-                thd->is_error());
+  // Initialize worker exit count and max_updated_index to 0 during each stop.
+  rli->exit_counter= 0;
+  rli->max_updated_index= (rli->until_condition !=
+                           Relay_log_info::UNTIL_NONE)?
+                           rli->mts_groups_assigned:0;
 
-#ifndef DBUG_OFF
-    if (DBUG_EVALUATE_IF("check_slave_debug_group", 1, 0))
-    {
-      sql_print_error("This is not supposed to happen at this point...");
-      DBUG_SUICIDE();
-    }
-#endif
-    // No need to know a possible error out of synchronization call.
-    (void) wait_for_workers_to_finish(rli);
-    /*
-      At this point the coordinator has been stopped and the checkpoint
-      routine is executed to eliminate possible gaps.
-    */
-    (void) mts_checkpoint_routine(rli, 0, false, true/*need_data_lock=true*/); // TODO: ALFRANIO ERROR
-  }
   for (i= rli->workers.elements - 1; i >= 0; i--)
   {
     Slave_worker *w;
+    struct slave_job_item item= {NULL}, *job_item= &item;
     get_dynamic((DYNAMIC_ARRAY*)&rli->workers, (uchar*) &w, i);
-    
     mysql_mutex_lock(&w->jobs_lock);
-    
+    //Inform all workers to stop
     if (w->running_status != Slave_worker::RUNNING)
     {
       mysql_mutex_unlock(&w->jobs_lock);
       continue;
     }
 
-    w->running_status= Slave_worker::KILLED;
+    w->running_status= Slave_worker::STOP;
+    (void) set_max_updated_index_on_stop(w, job_item);
     mysql_cond_signal(&w->jobs_cond);
 
     mysql_mutex_unlock(&w->jobs_lock);
@@ -5931,8 +5936,9 @@ void slave_stop_workers(Relay_log_info *rli, bool *mts_inited)
     while (w->running_status != Slave_worker::NOT_RUNNING)
     {
       PSI_stage_info old_stage;
-      DBUG_ASSERT(w->running_status == Slave_worker::KILLED ||
-                  w->running_status == Slave_worker::ERROR_LEAVING);
+      DBUG_ASSERT(w->running_status == Slave_worker::ERROR_LEAVING ||
+                  w->running_status == Slave_worker::STOP ||
+                  w->running_status == Slave_worker::STOP_ACCEPTED);
 
       thd->ENTER_COND(&w->jobs_cond, &w->jobs_lock,
                       &stage_slave_waiting_workers_to_exit, &old_stage);
@@ -5941,11 +5947,18 @@ void slave_stop_workers(Relay_log_info *rli, bool *mts_inited)
       mysql_mutex_lock(&w->jobs_lock);
     }
     mysql_mutex_unlock(&w->jobs_lock);
+  }
 
+  if (thd->killed == THD::NOT_KILLED)
+    (void) mts_checkpoint_routine(rli, 0, false, true/*need_data_lock=true*/); // TODO:consider to propagate an error out of the function
+
+  for (i= rli->workers.elements - 1; i >= 0; i--)
+  {
+    Slave_worker *w= NULL;
+    get_dynamic((DYNAMIC_ARRAY*)&rli->workers, (uchar*) &w, i);
     delete_dynamic_element(&rli->workers, i);
     delete w;
   }
-
   if (log_warnings > 1)
     sql_print_information("Total MTS session statistics: "
                           "events processed = %llu; "
@@ -6334,12 +6347,7 @@ llstr(rli->get_group_master_log_pos(), llbuff));
  err:
 
   slave_stop_workers(rli, &mts_inited); // stopping worker pool
-  if (rli->recovery_groups_inited)
-  {
-    bitmap_free(&rli->recovery_groups);
-    rli->mts_recovery_group_cnt= 0;
-    rli->recovery_groups_inited= false;
-  }
+  rli->clear_mts_recovery_groups();
 
 #ifdef WITH_WSREP
   if (WSREP_ON)
@@ -6859,6 +6867,7 @@ static int queue_event(Master_info* mi,const char* buf, ulong event_len)
   char *save_buf= NULL; // needed for checksumming the fake Rotate event
   char rot_buf[LOG_EVENT_HEADER_LEN + ROTATE_HEADER_LEN + FN_REFLEN];
   Gtid gtid= { 0, 0 };
+  Gtid old_retrieved_gtid= { 0, 0 };
   Log_event_type event_type= (Log_event_type)buf[EVENT_TYPE_OFFSET];
 
   DBUG_ASSERT(checksum_alg == BINLOG_CHECKSUM_ALG_OFF || 
@@ -7286,29 +7295,58 @@ static int queue_event(Master_info* mi,const char* buf, ulong event_len)
   }
   else
   {
+    DBUG_EXECUTE_IF("flush_after_reading_gtid_event",
+                    if (event_type == GTID_LOG_EVENT && gtid.gno == 4)
+                      DBUG_SET("+d,set_max_size_zero");
+                   );
+    DBUG_EXECUTE_IF("set_append_buffer_error",
+                    if (event_type == GTID_LOG_EVENT && gtid.gno == 4)
+                      DBUG_SET("+d,simulate_append_buffer_error");
+                   );
+    /*
+      Add the GTID to the retrieved set before actually appending it to relay
+      log. This will ensure that if a rotation happens at this point of time the
+      new GTID will be reflected as part of Previous_Gtid set and
+      Retrieved_Gtid_Set will not have any gaps.
+    */
+    if (event_type == GTID_LOG_EVENT)
+    {
+      global_sid_lock->rdlock();
+      old_retrieved_gtid= *(mi->rli->get_last_retrieved_gtid());
+      int ret= rli->add_logged_gtid(gtid.sidno, gtid.gno);
+      if (!ret)
+        rli->set_last_retrieved_gtid(gtid);
+      global_sid_lock->unlock();
+      if (ret != 0)
+      {
+        mysql_mutex_unlock(log_lock);
+        goto err;
+      }
+    }
     /* write the event to the relay log */
-    if (likely(rli->relay_log.append_buffer(buf, event_len, mi) == 0))
+    if (!DBUG_EVALUATE_IF("simulate_append_buffer_error", 1, 0) &&
+       likely(rli->relay_log.append_buffer(buf, event_len, mi) == 0))
     {
       mi->set_master_log_pos(mi->get_master_log_pos() + inc_pos);
       DBUG_PRINT("info", ("master_log_pos: %lu", (ulong) mi->get_master_log_pos()));
       rli->relay_log.harvest_bytes_written(&rli->log_space_total);
-
-      if (event_type == GTID_LOG_EVENT)
-      {
-        global_sid_lock->rdlock();
-        int ret= rli->add_logged_gtid(gtid.sidno, gtid.gno);
-        if (!ret)
-          rli->set_last_retrieved_gtid(gtid);
-        global_sid_lock->unlock();
-        if (ret != 0)
-        {
-          mysql_mutex_unlock(log_lock);
-          goto err;
-        }
-      }
     }
     else
     {
+      if (event_type == GTID_LOG_EVENT)
+      {
+        global_sid_lock->rdlock();
+        Gtid_set * retrieved_set= (const_cast<Gtid_set *>(mi->rli->get_gtid_set()));
+        if (retrieved_set->_remove_gtid(gtid) != RETURN_STATUS_OK)
+        {
+          global_sid_lock->unlock();
+          mysql_mutex_unlock(log_lock);
+          goto err;
+        }
+        if (!old_retrieved_gtid.empty())
+          rli->set_last_retrieved_gtid(old_retrieved_gtid);
+        global_sid_lock->unlock();
+      }
       error= ER_SLAVE_RELAY_LOG_WRITE_FAILURE;
     }
     rli->ign_master_log_name_end[0]= 0; // last event is not ignored

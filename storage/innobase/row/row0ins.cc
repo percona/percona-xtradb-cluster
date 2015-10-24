@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -2735,6 +2735,8 @@ row_ins_sec_index_entry_low(
 			    &mtr, index, check, search_mode)) {
 			goto func_exit;
 		}
+
+		DEBUG_SYNC_C("row_ins_sec_index_entry_dup_locks_created");
 
 		/* We did not find a duplicate and we have now
 		locked with s-locks the necessary records to

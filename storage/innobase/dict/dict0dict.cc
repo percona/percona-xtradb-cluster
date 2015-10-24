@@ -207,14 +207,6 @@ dict_index_remove_from_cache_low(
 	dict_index_t*	index,		/*!< in, own: index */
 	ibool		lru_evict);	/*!< in: TRUE if page being evicted
 					to make room in the table LRU list */
-/**********************************************************************//**
-Removes a table object from the dictionary cache. */
-static
-void
-dict_table_remove_from_cache_low(
-/*=============================*/
-	dict_table_t*	table,		/*!< in, own: table */
-	ibool		lru_evict);	/*!< in: TRUE if evicting from LRU */
 #ifdef UNIV_DEBUG
 /**********************************************************************//**
 Validate the dictionary table LRU list.
@@ -748,6 +740,45 @@ dict_table_get_all_fts_indexes(
 	return(ib_vector_size(indexes));
 }
 
+/** Store autoinc value when the table is evicted.
+@param[in]	table	table evicted */
+UNIV_INTERN
+void
+dict_table_autoinc_store(
+	const dict_table_t*	table)
+{
+	ut_ad(mutex_own(&dict_sys->mutex));
+
+	if (table->autoinc != 0) {
+		ut_ad(dict_sys->autoinc_map->find(table->id)
+		      == dict_sys->autoinc_map->end());
+
+		dict_sys->autoinc_map->insert(
+			std::pair<table_id_t, ib_uint64_t>(
+			table->id, table->autoinc));
+	}
+}
+
+/** Restore autoinc value when the table is loaded.
+@param[in]	table	table loaded */
+UNIV_INTERN
+void
+dict_table_autoinc_restore(
+	dict_table_t*	table)
+{
+	ut_ad(mutex_own(&dict_sys->mutex));
+
+	autoinc_map_t::iterator	it;
+	it = dict_sys->autoinc_map->find(table->id);
+
+	if (it != dict_sys->autoinc_map->end()) {
+		table->autoinc = it->second;
+		ut_ad(table->autoinc != 0);
+
+		dict_sys->autoinc_map->erase(it);
+	}
+}
+
 /********************************************************************//**
 Reads the next autoinc value (== autoinc counter value), 0 if not yet
 initialized.
@@ -1041,6 +1072,8 @@ dict_init(void)
 		mutex_create(dict_foreign_err_mutex_key,
 			     &dict_foreign_err_mutex, SYNC_NO_ORDER_CHECK);
 	}
+
+	dict_sys->autoinc_map = new autoinc_map_t();
 }
 
 /**********************************************************************//**
@@ -1287,6 +1320,8 @@ dict_table_add_to_cache(
 	} else {
 		UT_LIST_ADD_FIRST(table_LRU, dict_sys->table_non_LRU, table);
 	}
+
+	dict_table_autoinc_restore(table);
 
 	ut_ad(dict_lru_validate());
 
@@ -1978,7 +2013,6 @@ dict_table_change_id_in_cache(
 
 /**********************************************************************//**
 Removes a table object from the dictionary cache. */
-static
 void
 dict_table_remove_from_cache_low(
 /*=============================*/
@@ -2039,6 +2073,10 @@ dict_table_remove_from_cache_low(
 	}
 
 	ut_ad(dict_lru_validate());
+
+	if (lru_evict) {
+		dict_table_autoinc_store(table);
+	}
 
 	if (lru_evict && table->drop_aborted) {
 		/* Do as dict_table_try_drop_aborted() does. */
@@ -3231,71 +3269,6 @@ dict_table_is_referenced_by_foreign_key(
 	const dict_table_t*	table)	/*!< in: InnoDB table */
 {
 	return(!table->referenced_set.empty());
-}
-
-/*********************************************************************//**
-Check if the index is referenced by a foreign key, if TRUE return foreign
-else return NULL
-@return pointer to foreign key struct if index is defined for foreign
-key, otherwise NULL */
-UNIV_INTERN
-dict_foreign_t*
-dict_table_get_referenced_constraint(
-/*=================================*/
-	dict_table_t*	table,	/*!< in: InnoDB table */
-	dict_index_t*	index)	/*!< in: InnoDB index */
-{
-	dict_foreign_t*	foreign;
-
-	ut_ad(index != NULL);
-	ut_ad(table != NULL);
-
-	for (dict_foreign_set::iterator it = table->referenced_set.begin();
-	     it != table->referenced_set.end();
-	     ++it) {
-
-		foreign = *it;
-
-		if (foreign->referenced_index == index) {
-
-			return(foreign);
-		}
-	}
-
-	return(NULL);
-}
-
-/*********************************************************************//**
-Checks if a index is defined for a foreign key constraint. Index is a part
-of a foreign key constraint if the index is referenced by foreign key
-or index is a foreign key index.
-@return pointer to foreign key struct if index is defined for foreign
-key, otherwise NULL */
-UNIV_INTERN
-dict_foreign_t*
-dict_table_get_foreign_constraint(
-/*==============================*/
-	dict_table_t*	table,	/*!< in: InnoDB table */
-	dict_index_t*	index)	/*!< in: InnoDB index */
-{
-	dict_foreign_t*	foreign;
-
-	ut_ad(index != NULL);
-	ut_ad(table != NULL);
-
-	for (dict_foreign_set::iterator it = table->foreign_set.begin();
-	     it != table->foreign_set.end();
-	     ++it) {
-
-		foreign = *it;
-
-		if (foreign->foreign_index == index) {
-
-			return(foreign);
-		}
-	}
-
-	return(NULL);
 }
 
 /**********************************************************************//**
@@ -6416,6 +6389,8 @@ dict_close(void)
 	if (!srv_read_only_mode) {
 		mutex_free(&dict_foreign_err_mutex);
 	}
+
+	delete dict_sys->autoinc_map;
 
 	mem_free(dict_sys);
 	dict_sys = NULL;

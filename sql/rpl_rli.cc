@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -91,8 +91,10 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery
    tables_to_lock(0), tables_to_lock_count(0),
    rows_query_ev(NULL), last_event_start_time(0), deferred_events(NULL),
    slave_parallel_workers(0),
+   exit_counter(0),
+   max_updated_index(0),
    recovery_parallel_workers(0), checkpoint_seqno(0),
-   checkpoint_group(opt_mts_checkpoint_group), 
+   checkpoint_group(opt_mts_checkpoint_group),
    recovery_groups_inited(false), mts_recovery_group_cnt(0),
    mts_recovery_index(0), mts_recovery_group_seen_begin(0),
    mts_group_status(MTS_NOT_IN_GROUP), reported_unsafe_warning(false),
@@ -132,11 +134,14 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery
   mysql_mutex_init(key_mutex_slave_parallel_pend_jobs, &pending_jobs_lock,
                    MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_cond_slave_parallel_pend_jobs, &pending_jobs_cond, NULL);
+  mysql_mutex_init(key_mutex_slave_parallel_worker_count, &exit_count_lock,
+                   MY_MUTEX_INIT_FAST);
   my_atomic_rwlock_init(&slave_open_temp_tables_lock);
 
   relay_log.init_pthread_objects();
   do_server_version_split(::server_version, slave_version_split);
   last_retrieved_gtid.clear();
+  force_flush_postponed_due_to_split_trans= false;
   DBUG_VOID_RETURN;
 }
 
@@ -173,6 +178,7 @@ Relay_log_info::~Relay_log_info()
   mysql_cond_destroy(&log_space_cond);
   mysql_mutex_destroy(&pending_jobs_lock);
   mysql_cond_destroy(&pending_jobs_cond);
+  mysql_mutex_destroy(&exit_count_lock);
   my_atomic_rwlock_destroy(&slave_open_temp_tables_lock);
   relay_log.cleanup();
   set_rli_description_event(NULL);
@@ -392,7 +398,7 @@ void Relay_log_info::clear_until_condition()
   acquired it.
   @param errmsg[out] On error, this function will store a pointer to
   an error message here
-  @param look_for_description_event[in] If true, this function will
+  @param keep_looking_for_fd[in] If true, this function will
   look for a Format_description_log_event.  We only need this when the
   SQL thread starts and opens an existing relay log and has to execute
   it (possibly from an offset >4); then we need to read the first
@@ -407,7 +413,7 @@ void Relay_log_info::clear_until_condition()
 int Relay_log_info::init_relay_log_pos(const char* log,
                                        ulonglong pos, bool need_data_lock,
                                        const char** errmsg,
-                                       bool look_for_description_event)
+                                       bool keep_looking_for_fd)
 {
   DBUG_ENTER("Relay_log_info::init_relay_log_pos");
   DBUG_PRINT("info", ("pos: %lu", (ulong) pos));
@@ -496,7 +502,7 @@ int Relay_log_info::init_relay_log_pos(const char* log,
   if (pos > BIN_LOG_HEADER_SIZE) /* If pos<=4, we stay at 4 */
   {
     Log_event* ev;
-    while (look_for_description_event)
+    while (keep_looking_for_fd)
     {
       /*
         Read the possible Format_description_log_event; if position
@@ -537,23 +543,27 @@ int Relay_log_info::init_relay_log_pos(const char* log,
           describes the whole relay log; indeed, one can have this sequence
           (starting from position 4):
           Format_desc (of slave)
+          Previous-GTIDs (of slave IO thread, if GTIDs are enabled)
           Rotate (of master)
           Format_desc (of master)
           So the Format_desc which really describes the rest of the relay log
-          is the 3rd event (it can't be further than that, because we rotate
+          can be the 3rd or the 4th event (depending on GTIDs being enabled or
+          not, it can't be further than that, because we rotate
           the relay log when we queue a Rotate event from the master).
           But what describes the Rotate is the first Format_desc.
           So what we do is:
           go on searching for Format_description events, until you exceed the
-          position (argument 'pos') or until you find another event than Rotate
-          or Format_desc.
+          position (argument 'pos') or until you find an event other than
+          Previous-GTIDs, Rotate or Format_desc.
         */
       }
       else
       {
         DBUG_PRINT("info",("found event of another type=%d",
                            ev->get_type_code()));
-        look_for_description_event= (ev->get_type_code() == ROTATE_EVENT);
+        keep_looking_for_fd=
+          (ev->get_type_code() == ROTATE_EVENT ||
+           ev->get_type_code() == PREVIOUS_GTIDS_LOG_EVENT);
         delete ev;
       }
     }
@@ -2024,9 +2034,10 @@ int Relay_log_info::flush_info(const bool force)
   if (write_info(handler))
     goto err;
 
-  if (handler->flush_info(force))
+  if (handler->flush_info(force || force_flush_postponed_due_to_split_trans))
     goto err;
 
+  force_flush_postponed_due_to_split_trans= false;
   DBUG_RETURN(0);
 
 err:

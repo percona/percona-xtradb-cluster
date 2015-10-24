@@ -520,6 +520,14 @@ static Sys_var_long Sys_pfs_digest_size(
        DEFAULT(-1),
        BLOCK_SIZE(1), PFS_TRAILING_PROPERTIES);
 
+static Sys_var_long Sys_pfs_max_digest_length(
+       "performance_schema_max_digest_length",
+       "Maximum length considered for digest text, when stored in performance_schema tables.",
+       READ_ONLY GLOBAL_VAR(pfs_param.m_max_digest_length),
+       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 1024 * 1024),
+       DEFAULT(1024),
+       BLOCK_SIZE(1), PFS_TRAILING_PROPERTIES);
+
 static Sys_var_long Sys_pfs_connect_attrs_size(
        "performance_schema_session_connect_attrs_size",
        "Size of session attribute string buffer per thread."
@@ -822,13 +830,12 @@ static Sys_var_mybool Sys_explicit_defaults_for_timestamp(
 static bool repository_check(sys_var *self, THD *thd, set_var *var, SLAVE_THD_TYPE thread_mask)
 {
   bool ret= FALSE;
-#ifndef NO_EMBEDDED_ACCESS_CHECKS
-  if (!(thd->security_ctx->master_access & SUPER_ACL))
+  if (thd->in_active_multi_stmt_transaction())
   {
-    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "SUPER");
-    return TRUE;
+    my_error(ER_VARIABLE_NOT_SETTABLE_IN_TRANSACTION, MYF(0),
+             var->var->name.str);
+    return true;
   }
-#endif
 #ifdef HAVE_REPLICATION
   int running= 0;
   const char *msg= NULL;
@@ -1785,14 +1792,7 @@ static Sys_var_long Sys_max_digest_length(
        READ_ONLY GLOBAL_VAR(max_digest_length),
        CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 1024 * 1024),
        DEFAULT(1024),
-       BLOCK_SIZE(1),
-       NO_MUTEX_GUARD,
-       NOT_IN_BINLOG,
-       ON_CHECK(0),
-       ON_UPDATE(0),
-       NULL,
-       /* max_digest_length is used as a sizing hint by the performance schema. */
-       sys_var::PARSE_EARLY);
+       BLOCK_SIZE(1));
 
 static bool check_max_delayed_threads(sys_var *self, THD *thd, set_var *var)
 {

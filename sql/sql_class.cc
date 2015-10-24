@@ -1107,7 +1107,8 @@ THD::THD(bool enable_plugins)
    m_enable_plugins(enable_plugins),
    owned_gtid_set(global_sid_map),
    main_da(0, false),
-   m_stmt_da(&main_da)
+   m_stmt_da(&main_da),
+   duplicate_slave_uuid(false)
 {
   ulong tmp;
 
@@ -1681,6 +1682,7 @@ void THD::change_user(void)
 {
   mysql_mutex_lock(&LOCK_status);
   add_to_status(&global_status_var, &status_var);
+  memset(&status_var, 0, sizeof(status_var));
   mysql_mutex_unlock(&LOCK_status);
 
   cleanup();
@@ -1704,6 +1706,7 @@ void THD::cleanup(void)
 {
   DBUG_ENTER("THD::cleanup");
   DBUG_ASSERT(cleanup_done == 0);
+  DEBUG_SYNC(this, "thd_cleanup_start");
 
   killed= KILL_CONNECTION;
 #ifdef ENABLE_WHEN_BINLOG_WILL_BE_ABLE_TO_PREPARE
@@ -1783,6 +1786,7 @@ void THD::release_resources()
 
   mysql_mutex_lock(&LOCK_status);
   add_to_status(&global_status_var, &status_var);
+  memset(&status_var, 0, sizeof(status_var));
   mysql_mutex_unlock(&LOCK_status);
 
   /* Ensure that no one is using THD */
@@ -2340,21 +2344,17 @@ LEX_STRING *THD::make_lex_string(LEX_STRING *lex_str,
 /*
   Convert a string to another character set
 
-  SYNOPSIS
-    convert_string()
-    to				Store new allocated string here
-    to_cs			New character set for allocated string
-    from			String to convert
-    from_length			Length of string to convert
-    from_cs			Original character set
+  @param to             Store new allocated string here
+  @param to_cs          New character set for allocated string
+  @param from           String to convert
+  @param from_length    Length of string to convert
+  @param from_cs        Original character set
 
-  NOTES
-    to will be 0-terminated to make it easy to pass to system funcs
+  @note to will be 0-terminated to make it easy to pass to system funcs
 
-  RETURN
-    0	ok
-    1	End of memory.
-        In this case to->str will point to 0 and to->length will be 0.
+  @retval false ok
+  @retval true  End of memory.
+                In this case to->str will point to 0 and to->length will be 0.
 */
 
 bool THD::convert_string(LEX_STRING *to, const CHARSET_INFO *to_cs,
@@ -2363,15 +2363,26 @@ bool THD::convert_string(LEX_STRING *to, const CHARSET_INFO *to_cs,
 {
   DBUG_ENTER("convert_string");
   size_t new_length= to_cs->mbmaxlen * from_length;
-  uint dummy_errors;
+  uint errors= 0;
   if (!(to->str= (char*) alloc(new_length+1)))
   {
     to->length= 0;				// Safety fix
     DBUG_RETURN(1);				// EOM
   }
   to->length= copy_and_convert((char*) to->str, new_length, to_cs,
-			       from, from_length, from_cs, &dummy_errors);
+			       from, from_length, from_cs, &errors);
   to->str[to->length]=0;			// Safety
+  if (errors != 0)
+  {
+    char printable_buff[32];
+    convert_to_printable(printable_buff, sizeof(printable_buff),
+                         from, from_length, from_cs, 6);
+    push_warning_printf(this, Sql_condition::WARN_LEVEL_WARN,
+                        ER_INVALID_CHARACTER_STRING,
+                        ER_THD(this, ER_INVALID_CHARACTER_STRING),
+                        from_cs->csname, printable_buff);
+  }
+
   DBUG_RETURN(0);
 }
 
