@@ -1225,6 +1225,17 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     break;
   }
 
+  if (buf_err == 1) {
+    /* Given the existing error handling setup, all errors with write-set
+    are classified under single error code. It would be good to have a proper
+    error code reporting mechanism. */
+    WSREP_WARN("Append/Write to writeset buffer failed (either due to IO "
+		"issues (including memory allocation) or hitting a configured "
+                "limit viz. write set size, etc.");
+    my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED);
+    return -1;
+  }
+
   wsrep_key_arr_t key_arr= {0, 0};
   struct wsrep_buf buff = { buf, buf_len };
   if (WSREP(thd))
