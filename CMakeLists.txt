@@ -77,6 +77,9 @@ OPTION(WITH_PAM "Build with Percona PAM plugin" OFF)
 # where WITH_DEBUG is  reset from ON to OFF  and here we need to reset 
 # CMAKE_BUILD_TYPE to either none or default RelWithDebInfo
 
+# TokuDB is not supported currently in PXC
+OPTION(WITHOUT_TOKUDB "Build without TokuDB plugin and tools" ON)
+
 SET(BUILDTYPE_DOCSTRING
  "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or
  CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel")
