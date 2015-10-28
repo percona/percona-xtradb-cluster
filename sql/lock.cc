@@ -983,9 +983,11 @@ volatile int32 Global_read_lock::m_active_requests;
   @retval True   Failure, thread was killed.
 */
 
-bool Global_read_lock::lock_global_read_lock(THD *thd)
+bool Global_read_lock::lock_global_read_lock(THD *thd, bool *own_lock)
 {
   DBUG_ENTER("lock_global_read_lock");
+
+  *own_lock= FALSE;
 
   if (!m_state)
   {
@@ -1017,6 +1019,8 @@ bool Global_read_lock::lock_global_read_lock(THD *thd)
 
     m_mdl_global_shared_lock= mdl_request.ticket;
     m_state= GRL_ACQUIRED;
+
+    *own_lock= TRUE;
   }
   /*
     We DON'T set global_read_lock_blocks_commit now, it will be set after
@@ -1164,25 +1168,34 @@ wsrep_status_t Global_read_lock::wsrep_resume(void)
 
     if (!ret)
     {
-        pause_provider(FALSE);
+      pause_provider(FALSE);
     }
     else
     {
-       WSREP_WARN("Failed to resume provider: %d", ret);
+      WSREP_WARN("Failed to resume provider: %d", ret);
     }
     return ret;
 }
 
-bool Global_read_lock::wsrep_pause_once(void)
+bool Global_read_lock::wsrep_pause_once(bool *already_paused)
 {
     if (!provider_paused)
-        return wsrep_pause();
+    {
+      *already_paused= FALSE;
+      if (wsrep_pause())
+      {
+        return TRUE;
+      }
+      return FALSE;
+    }
+    *already_paused= TRUE;
     return TRUE;
 }
+
 wsrep_status_t Global_read_lock::wsrep_resume_once(void)
 {
     if (provider_paused)
-        return wsrep_resume();
+      return wsrep_resume();
     return WSREP_OK;
 }
 

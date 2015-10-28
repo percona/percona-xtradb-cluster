@@ -1,0 +1,42 @@
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+#
+# FTWRL or FTFE should ensure that they unlock/resume wsrep only
+# if they have lock/pause wsrep
+#
+use test;
+FLUSH TABLE WITH READ LOCK;
+--error ER_NO_SUCH_TABLE
+FLUSH TABLES wl0.t0 FOR EXPORT;
+FLUSH TABLE WITH READ LOCK;
+UNLOCK TABLES;
+
+#
+# Another use-case where-in setting gtid_deployment_step releases
+# flush table read lock.
+#
+--connection node_1
+--echo #node_1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+FLUSH TABLE WITH READ LOCK;
+SET GLOBAL gtid_deployment_step=ON;
+SET GLOBAL gtid_deployment_step=OFF;
+#
+--connection node_2
+--echo #node_2
+INSERT INTO t1 VALUES (1);
+INSERT INTO t1 VALUES (2);
+#
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node_1a
+SET SESSION wsrep_sync_wait = 0;
+SELECT COUNT(*) FROM t1;
+SET SESSION wsrep_sync_wait = 7;
+#
+--connection node_1
+--echo #node_1
+UNLOCK TABLES;
+SELECT COUNT(*) FROM t1;
+DROP TABLE t1;

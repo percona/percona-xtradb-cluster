@@ -2132,7 +2132,7 @@ public:
       m_mdl_blocks_commits_lock(NULL)
   {}
 
-  bool lock_global_read_lock(THD *thd);
+  bool lock_global_read_lock(THD *thd, bool *own_lock);
   void unlock_global_read_lock(THD *thd);
 
   /**
@@ -2161,7 +2161,7 @@ public:
 #ifdef WITH_WSREP
   bool wsrep_pause(void);
   wsrep_status_t wsrep_resume(void);
-  bool wsrep_pause_once(void);
+  bool wsrep_pause_once(bool *already_paused);
   wsrep_status_t wsrep_resume_once(void);
   bool provider_resumed() const { return !provider_paused; }
   void pause_provider(bool val) { provider_paused= val; }
