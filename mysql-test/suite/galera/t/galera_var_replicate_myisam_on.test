@@ -169,3 +169,56 @@ drop table is1;
 drop table is2;
 drop table is3;
 drop table is4;
+
+#
+# In INSERT DELAYED statement DELAYED clause is ignored.
+# (Why ? DELAYED clause is execute in async fashion which interfere with
+# sync replication from galera)
+#
+--connection node_1
+--echo #node-1
+#
+--let $wsrep_replicate_myisam_cached = `select @@global.wsrep_replicate_myisam`
+--let $wsrep_OSU_method_cached = `select @@global.wsrep_OSU_method`
+#
+set @@global.wsrep_replicate_myisam = 1;
+set @@global.wsrep_OSU_method="TOI";
+#
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (1), (2);
+#
+--connection node_2
+--echo #node-2
+select * from is1;
+#
+--connection node_1
+--echo #node-1
+insert delayed is1 values (3), (4);
+alter table is1 add column j int;
+#
+--connection node_2
+--echo #node-2
+select * from is1;
+drop table is1;
+
+#
+# with OSU method = RSU
+--connection node_1
+--echo #node-1
+set @@global.wsrep_OSU_method="RSU";
+set @@session.wsrep_OSU_method="RSU";
+select @@global.wsrep_OSU_method;
+select @@session.wsrep_OSU_method;
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (11), (12);
+insert delayed is1 values (13), (14);
+rename table is1 to is2;
+select * from is2;
+drop table is2;
+
+--connection node_1
+--echo #node-1
+--eval set global wsrep_replicate_myisam = $wsrep_replicate_myisam_cached
+--eval set global wsrep_OSU_method = $wsrep_OSU_method_cached

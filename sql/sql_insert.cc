@@ -423,6 +423,17 @@ void upgrade_lock_type(THD *thd, thr_lock_type *lock_type,
     return;
   }
 
+#if WITH_WSREP
+  /* DELAYED clause is ignored while operating node as a cluster node.
+  DELAYED clause causes async insertion which doesn't go well with sync cluster
+  replication semantics. */
+  if (WSREP(thd) && *lock_type == TL_WRITE_DELAYED)
+  {
+    *lock_type= TL_WRITE;
+     return;
+  }
+#endif
+
   if (*lock_type == TL_WRITE_DELAYED)
   {
     /*

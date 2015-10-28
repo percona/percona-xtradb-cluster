@@ -115,3 +115,53 @@ drop table is1;
 drop table is2;
 drop table is3;
 drop table is4;
+#node-1
+set @@global.wsrep_replicate_myisam = 1;
+set @@global.wsrep_OSU_method="TOI";
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (1), (2);
+#node-2
+select * from is1;
+i
+1
+2
+#node-1
+insert delayed is1 values (3), (4);
+Warnings:
+Warning	1287	'INSERT DELAYED' is deprecated and will be removed in a future release. Please use INSERT instead
+alter table is1 add column j int;
+#node-2
+select * from is1;
+i	j
+1	NULL
+2	NULL
+3	NULL
+4	NULL
+drop table is1;
+#node-1
+set @@global.wsrep_OSU_method="RSU";
+set @@session.wsrep_OSU_method="RSU";
+select @@global.wsrep_OSU_method;
+@@global.wsrep_OSU_method
+RSU
+select @@session.wsrep_OSU_method;
+@@session.wsrep_OSU_method
+RSU
+use test;
+create table is1 (i int) engine=myisam;
+insert into is1 values (11), (12);
+insert delayed is1 values (13), (14);
+Warnings:
+Warning	1287	'INSERT DELAYED' is deprecated and will be removed in a future release. Please use INSERT instead
+rename table is1 to is2;
+select * from is2;
+i
+11
+12
+13
+14
+drop table is2;
+#node-1
+set global wsrep_replicate_myisam = 0;
+set global wsrep_OSU_method = TOI;
