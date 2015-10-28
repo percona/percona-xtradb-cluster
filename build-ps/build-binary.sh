@@ -177,7 +177,6 @@ fi
 # Extract version from the VERSION file
 source "$SOURCEDIR/VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
-# Extract version from the Makefile-pxc
 PERCONA_XTRADB_CLUSTER_VERSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
 RELEASE_TAG=''
 PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_XTRADB_CLUSTER_VERSION"
@@ -283,8 +282,6 @@ fi
         cp libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
 
     ) || exit 1
-
-    #make -f Makefile-pxc all
 
     if grep -q builtin <<< "$STAG" || [[ $WITH_SSL_TYPE == 'bundled' ]];then 
         # builtin
