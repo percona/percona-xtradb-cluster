@@ -2424,6 +2424,7 @@ static bool check_read_only(sys_var *self, THD *thd, set_var *var)
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
   bool result= true;
+  bool own_lock= false;
 
   if (read_only == FALSE && super_read_only == TRUE)
   {
@@ -2476,7 +2477,7 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
   read_only= opt_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
-  if (thd->global_read_lock.lock_global_read_lock(thd))
+  if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -2489,7 +2490,10 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
  end_with_read_lock:
   /* Release the lock */
-  thd->global_read_lock.unlock_global_read_lock(thd);
+  if (own_lock)
+  {
+    thd->global_read_lock.unlock_global_read_lock(thd);
+  }
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:
@@ -5454,6 +5458,7 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   DBUG_ENTER("fix_gtid_deployment_step");
   bool new_gtid_deployment_step= gtid_deployment_step;
   bool result= true;
+  bool own_lock= false;
 
   if (gtid_deployment_step == FALSE ||
       gtid_deployment_step == opt_gtid_deployment_step)
@@ -5468,7 +5473,7 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   gtid_deployment_step= opt_gtid_deployment_step;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
-  if (thd->global_read_lock.lock_global_read_lock(thd))
+  if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
     goto end_with_mutex_unlock;
 
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -5483,7 +5488,10 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
 
  end_with_read_lock:
   /* Release the lock */
-  thd->global_read_lock.unlock_global_read_lock(thd);
+  if (own_lock)
+  {
+    thd->global_read_lock.unlock_global_read_lock(thd);
+  }
  end_with_mutex_unlock:
   mysql_mutex_lock(&LOCK_global_system_variables);
  end:
