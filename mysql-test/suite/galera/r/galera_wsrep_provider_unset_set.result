@@ -1,13 +1,35 @@
+#node-1
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
+#node-2
+#node-2a
+begin;
+insert into t1 values (101);
+select * from t1;
+f1
+1
+101
+#node-2
+call mtr.add_suppression('WSREP: Cannot modify wsrep_provider inside a transaction');
+BEGIN;
+INSERT INTO t1 VALUES (100);
+SET GLOBAL wsrep_provider='none';
+ERROR 42000: Variable 'wsrep_provider' can't be set to the value of 'none'
+COMMIT;
 SET GLOBAL wsrep_provider='none';
 INSERT INTO t1 VALUES (2);
+#node-1
 INSERT INTO t1 VALUES (3);
+#node-2a
+select * from t1;
+ERROR HY000: Lost connection to MySQL server during query
+#node-2
 INSERT INTO t1 VALUES (4);
+SELECT COUNT(*) = 5 FROM t1;
+COUNT(*) = 5
+1
+#node-1
 SELECT COUNT(*) = 4 FROM t1;
 COUNT(*) = 4
-1
-SELECT COUNT(*) = 3 FROM t1;
-COUNT(*) = 3
 1
 DROP TABLE t1;
