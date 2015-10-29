@@ -35,6 +35,7 @@ int wsrep_init_vars();
 #define DEFAULT_ARGS (THD* thd, enum_var_type var_type)
 #define INIT_ARGS    (const char* opt)
 
+extern bool wsrep_on_check                   CHECK_ARGS;
 extern bool wsrep_on_update                  UPDATE_ARGS;
 extern bool wsrep_causal_reads_update        UPDATE_ARGS;
 extern bool wsrep_sync_wait_update           UPDATE_ARGS;
