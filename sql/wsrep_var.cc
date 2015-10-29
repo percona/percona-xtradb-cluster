@@ -52,12 +52,37 @@ int wsrep_init_vars()
   return 0;
 }
 
+/* Function checks if the new value for wsrep_on is valid.
+Toggling of the value inside function or transaction is not allowed
+@return false if no error encountered with check else return true. */
+bool wsrep_on_check (sys_var *self, THD* thd, set_var* var)
+{
+  if (var->type == OPT_GLOBAL)
+    return true;
+
+  /* If in a stored function/trigger, it's too late to change wsrep_on. */
+  if (thd->in_sub_stmt)
+  {
+    WSREP_WARN("Cannot modify @@session.wsrep_on inside a stored function "
+               " or trigger");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value ? "ON" : "OFF");
+    return true;
+  }
+  /* Make the session variable 'wsrep_on' read-only inside a transaction. */
+  if (thd->in_active_multi_stmt_transaction())
+  {
+    WSREP_WARN("Cannot modify @@session.wsrep_on inside a transaction");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value ? "ON" : "OFF");
+    return true;
+  }
+
+  return false;
+}
+
 bool wsrep_on_update (sys_var *self, THD* thd, enum_var_type var_type)
 {
-  if (var_type == OPT_GLOBAL) {
-    // FIXME: this variable probably should be changed only per session
-    thd->variables.wsrep_on = global_system_variables.wsrep_on;
-  }
   return false;
 }
 
