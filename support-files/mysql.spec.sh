@@ -813,7 +813,7 @@ install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
 
 # Get the list of "_datadir" files, remove those that go into "libs-compat"
 find $RBR%{_datadir}/mysql -type f -print | sed -e "s=$RBR==" \
-  | fgrep -v "charsets-%{compatver}" | sort > $MBD/release/datadir.files
+  | fgrep -v "charsets-%{compatver}" | sort >> $MBD/release/support-files/plugins.files
 
 %if %{WITH_TCMALLOC}
 # Even though this is a shared library, put it under /usr/lib*/mysql, so it
@@ -1267,7 +1267,7 @@ echo "====="                                     >> $STATUS_HISTORY
 # Intentionally empty - this is a pure meta package.
 
 # ----------------------------------------------------------------------------
-%files -n mysql-wsrep-server%{product_suffix} -f %{src_dir}/release/support-files/plugins.files -f %{src_dir}/release/datadir.files
+%files -n mysql-wsrep-server%{product_suffix} -f %{src_dir}/release/support-files/plugins.files
 %defattr(-,root,root,0755)
 
 %if %{defined license_files_server}
@@ -1361,7 +1361,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
-# %%attr(755, root, root) %%{_datadir}/mysql/  ## See "-f datadir.files" at section top
+# %%attr(755, root, root) %%{_datadir}/mysql/  ## Contained in "plugins.files", see "%%install" code
 
 # ----------------------------------------------------------------------------
 %files -n mysql-wsrep-client%{product_suffix}
@@ -1461,6 +1461,10 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Fri Oct 30 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Combine "plugins.files" and "datadir.files" into one, it seems rpmbuild 4.4
+  (used on SLES 11) cannot handle two "-f" directives for one "%%files" section.
+
 * Thu Sep 17 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Let the "server" RPM get rid of RedHat's "common" ("charsets/", "errmsg.sys").
 
