@@ -34,6 +34,7 @@
 
 %global release         %{wsrep_version}
 %global short_product_tag 5.6
+%global previous_tag      5.5
 
 #
 # Macros we use which are not available in all supported versions of RPM
@@ -108,6 +109,7 @@
 %if %{undefined product_suffix}
   %if %{defined short_product_tag}
     %define product_suffix      -%{short_product_tag}
+    %define previous_suffix     -%{previous_tag}
   %else
     %define product_suffix      %{nil}
   %endif
@@ -135,7 +137,7 @@ BuildRequires: perl(Time::HiRes) perl(Env)
 
 %if 0%{?suse_version}
 %if 0%{?suse_version} == 1110
-BuildRequires: gdbm-devel gperf openldap2-client procps pwdutils libopenssl1-devel
+BuildRequires: gdbm-devel gperf openldap2-client procps pwdutils libopenssl-devel
 %else
 BuildRequires: libopenssl-devel
 %endif
@@ -260,6 +262,10 @@ Vendor:         %{mysql_vendor}
 Requires:       mysql-wsrep-server%{product_suffix}
 Requires:       mysql-wsrep-client%{product_suffix}
 
+%if %{defined previous_suffix}
+Obsoletes:      mysql-wsrep%{previous_suffix}
+%endif
+
 # Regression tests may take a long time, override the default to skip them 
 %{!?runselftest:%global runselftest 0}
 
@@ -315,6 +321,9 @@ Requires: pwdutils
 %endif
 %endif
 
+%if %{defined previous_suffix}
+Obsoletes:      mysql-wsrep-server%{previous_suffix}
+%endif
 %if 0%{?commercial}
 Obsoletes:      MySQL-server
 %else
@@ -361,6 +370,10 @@ package "mysql-wsrep-client%{product_suffix}" as well!
 %package -n mysql-wsrep-client%{product_suffix}
 Summary:        MySQL - Client
 Group:          Applications/Databases
+
+%if %{defined previous_suffix}
+Obsoletes:      mysql-wsrep-client%{previous_suffix}
+%endif
 %if 0%{?commercial}
 Obsoletes:      MySQL-client
 %else
@@ -384,6 +397,10 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 %package -n mysql-wsrep-test%{product_suffix}
 Summary:        MySQL - Test suite
 Group:          Applications/Databases
+
+%if %{defined previous_suffix}
+Obsoletes:      mysql-wsrep-test%{previous_suffix}
+%endif
 %if 0%{?commercial}
 Requires:       MySQL-client-advanced perl
 Obsoletes:      MySQL-test
@@ -410,6 +427,10 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 %package -n mysql-wsrep-devel%{product_suffix}
 Summary:        MySQL - Development header files and libraries
 Group:          Applications/Databases
+
+%if %{defined previous_suffix}
+Obsoletes:      mysql-wsrep-devel%{previous_suffix}
+%endif
 %if 0%{?commercial}
 Obsoletes:      MySQL-devel
 %else
@@ -432,6 +453,10 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 %package -n mysql-wsrep-shared%{product_suffix}
 Summary:        MySQL - Shared libraries
 Group:          Applications/Databases
+
+%if %{defined previous_suffix}
+Obsoletes:      mysql-wsrep-shared%{previous_suffix}
+%endif
 %if 0%{?commercial}
 Obsoletes:      MySQL-shared
 %else
@@ -457,6 +482,9 @@ and applications need to dynamically load and use MySQL.
 Summary:        Shared libraries for MySQL %{compatver} database client applications
 Group:          Applications/Databases
 
+%if %{defined previous_suffix}
+Obsoletes:      mysql-wsrep-libs-compat%{previous_suffix}
+%endif
 Provides:       mysql-libs-compat = %{version}
 Provides:       mysql-libs-compat%{?_isa} = %{version}
 Obsoletes:      mysql-libs-compat < %{version}
@@ -800,7 +828,7 @@ install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
 
 # Get the list of "_datadir" files, remove those that go into "libs-compat"
 find $RBR%{_datadir}/mysql -type f -print | sed -e "s=$RBR==" \
-  | fgrep -v "charsets-%{compatver}" | sort > $MBD/release/datadir.files
+  | fgrep -v "charsets-%{compatver}" | sort >> $MBD/release/support-files/plugins.files
 
 %if %{WITH_TCMALLOC}
 # Even though this is a shared library, put it under /usr/lib*/mysql, so it
@@ -1262,7 +1290,7 @@ echo "====="                                     >> $STATUS_HISTORY
 # Intentionally empty - this is a pure meta package.
 
 # ----------------------------------------------------------------------------
-%files -n mysql-wsrep-server%{product_suffix} -f %{src_dir}/release/support-files/plugins.files -f %{src_dir}/release/datadir.files
+%files -n mysql-wsrep-server%{product_suffix} -f %{src_dir}/release/support-files/plugins.files
 %defattr(-,root,root,0755)
 %if %{defined license_files_server}
 %doc %{license_files_server}
@@ -1357,7 +1385,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
-# %%attr(755, root, root) %%{_datadir}/mysql/  ## See "-f datadir.files" at section top
+# %%attr(755, root, root) %%{_datadir}/mysql/  ## Contained in "plugins.files", see "%%install" code
 %dir %attr(755, mysql, mysql) /var/lib/mysql
 
 # ----------------------------------------------------------------------------
@@ -1472,6 +1500,15 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Fri Oct 30 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Combine "plugins.files" and "datadir.files" into one, it seems rpmbuild 4.4
+  (used on SLES 11) cannot handle two "-f" directives for one "%%files" section.
+  This solves issue Github-223.
+- Introduce a macro "previous_suffix" and set it to "-5.5", so that installing a
+  "mysql-wsrep-*-5.6" package will "obsolete" the corresponding "mysql-wsrep-*-5.5"
+  package. This solves issue Github-224.
+- Fix dependency: There is no "libopenssl1-devel", just "libopenssl-devel".
+
 * Tue Oct 27 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Add the spec file changes coded in mysql-wsrep 5.5 to create "libs-compat",
   visible and documented (Sep 11 - 17) in the 5.5 spec file.
