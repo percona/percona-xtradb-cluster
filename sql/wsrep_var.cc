@@ -262,6 +262,25 @@ bool wsrep_provider_check (sys_var *self, THD* thd, set_var* var)
       (var->save_result.string_value.length > (FN_REFLEN - 1))) // safety
     goto err;
 
+  /* Changing wsrep_provider in middle of function/trigger is not allowed. */
+  if (thd->in_sub_stmt)
+  {
+    WSREP_WARN("Cannot modify wsrep_provider inside a stored function "
+              " or trigger");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.string_value.str);
+    return true;
+   }
+
+  /* Changing wsrep_provider in middle of transaction is not allowed. */
+  if (thd->in_active_multi_stmt_transaction())
+  {
+    WSREP_WARN("Cannot modify wsrep_provider inside a transaction");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.string_value.str);
+    return true;
+  }
+
   memcpy(wsrep_provider_buf, var->save_result.string_value.str,
          var->save_result.string_value.length);
   wsrep_provider_buf[var->save_result.string_value.length]= 0;
