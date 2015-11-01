@@ -466,7 +466,7 @@ copy_extra_record_fields(TABLE *table,
         Set the null bit according to the values in record[1]
        */
       if ((*field_ptr)->maybe_null() &&
-          (*field_ptr)->is_null_in_record(reinterpret_cast<uchar*>(table->record[1])))
+          (*field_ptr)->is_null_in_record(table->record[1]))
         (*field_ptr)->set_null();
       else
         (*field_ptr)->set_notnull();
@@ -1033,7 +1033,7 @@ int Delete_rows_log_event_old::do_before_row_operations(TABLE *table)
   {
     m_after_image= (uchar*) my_malloc(key_memory_log_event_old,
                                       table->s->reclength, MYF(MY_WME));
-    m_memory= (uchar*)m_after_image;
+    m_memory= m_after_image;
     m_key= NULL;
   }
   if (!m_memory)
@@ -1455,7 +1455,7 @@ int Old_rows_log_event::do_add_row_data(uchar *row_data, size_t length)
         block_size * ((cur_size + length + block_size - 1) / block_size);
 
     uchar* const new_buf= (uchar*)my_realloc(key_memory_log_event_old,
-                                             (uchar*)m_rows_buf, (uint) new_alloc,
+                                             m_rows_buf, (uint) new_alloc,
                                            MYF(MY_ALLOW_ZERO_PTR|MY_WME));
     if (unlikely(!new_buf))
       DBUG_RETURN(HA_ERR_OUT_OF_MEM);
@@ -1541,10 +1541,11 @@ int Old_rows_log_event::do_apply_event(Relay_log_info const *rli)
           Error reporting borrowed from Query_log_event with many excessive
           simplifications (we don't honour --slave-skip-errors)
         */
-        uint actual_error= thd->net.last_errno;
+        uint actual_error= thd->get_protocol_classic()->get_last_errno();
         rli->report(ERROR_LEVEL, actual_error,
                     "Error '%s' in %s event: when locking tables",
-                    (actual_error ? thd->net.last_error :
+                    (actual_error ?
+                     thd->get_protocol_classic()->get_last_error() :
                      "unexpected success or fatal error"),
                     get_type_str());
         thd->is_fatal_error= 1;
@@ -1707,11 +1708,12 @@ int Old_rows_log_event::do_apply_event(Relay_log_info const *rli)
         break;
 
       default:
-	rli->report(ERROR_LEVEL, thd->net.last_errno,
-                    "Error in %s event: row application failed. %s",
-                    get_type_str(), thd->net.last_error);
-       thd->is_slave_error= 1;
-	break;
+        rli->report(ERROR_LEVEL,
+          thd->get_protocol_classic()->get_last_errno(),
+          "Error in %s event: row application failed. %s",
+          get_type_str(), thd->get_protocol_classic()->get_last_error());
+        thd->is_slave_error= 1;
+        break;
       }
 
       /*
@@ -1744,11 +1746,12 @@ int Old_rows_log_event::do_apply_event(Relay_log_info const *rli)
 
   if (error)
   {                     /* error has occured during the transaction */
-    rli->report(ERROR_LEVEL, thd->net.last_errno,
+    rli->report(ERROR_LEVEL,
+                thd->get_protocol_classic()->get_last_errno(),
                 "Error in %s event: error during transaction execution "
                 "on table %s.%s. %s",
-                get_type_str(), table->s->db.str,
-                table->s->table_name.str, thd->net.last_error);
+                get_type_str(), table->s->db.str, table->s->table_name.str,
+                thd->get_protocol_classic()->get_last_error());
 
     /*
       If one day we honour --skip-slave-errors in row-based replication, and
@@ -2635,8 +2638,8 @@ Write_rows_log_event_old::do_exec_row(const Relay_log_info *const rli)
   DBUG_ASSERT(m_table != NULL);
   int error= write_row(rli, TRUE /* overwrite */);
   
-  if (error && !thd->net.last_errno)
-    thd->net.last_errno= error;
+  if (error && !thd->get_protocol_classic()->get_last_errno())
+    thd->get_protocol_classic()->set_last_errno(error);
       
   return error; 
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ int _my_b_net_read(IO_CACHE *info, uchar *Buffer,
 		   size_t Count __attribute__((unused)))
 {
   ulong read_length;
-  NET *net= &(current_thd)->net;
+  NET *net= current_thd->get_protocol_classic()->get_net();
   DBUG_ENTER("_my_b_net_read");
 
   if (!info->end_of_file)
@@ -68,7 +68,7 @@ int _my_b_net_read(IO_CACHE *info, uchar *Buffer,
     DBUG_RETURN(1);
   }
   /* to set up stuff for my_b_get (no _) */
-  info->read_end = (info->read_pos = (uchar*) net->read_pos) + read_length;
+  info->read_end = (info->read_pos = net->read_pos) + read_length;
   Buffer[0] = info->read_pos[0];		/* length is always 1 */
 
   /*

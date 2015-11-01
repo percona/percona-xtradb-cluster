@@ -64,7 +64,7 @@ query_vertical SELECT User,plugin,length(authentication_string),max_user_connect
 CREATE USER u15@localhost,
             u16@localhost IDENTIFIED BY 'auth_string',
             u17@localhost IDENTIFIED WITH 'sha256_password' BY 'auth_string' PASSWORD EXPIRE;
-query_vertical SELECT User,plugin,password_expired,password_lifetime FROM mysql.user WHERE USER BETWEEN 'u15' AND 'u17';
+query_vertical SELECT User,plugin,password_expired,password_lifetime FROM mysql.user WHERE USER BETWEEN 'u15' AND 'u17' ORDER BY User;
 
 CREATE USER u18@localhost,
             u19@localhost IDENTIFIED BY 'auth_string',
@@ -74,7 +74,7 @@ CREATE USER u18@localhost,
             PASSWORD EXPIRE NEVER;
 query_vertical SELECT User,plugin,ssl_type,ssl_cipher,x509_issuer,x509_subject,
        max_questions,max_user_connections,password_expired,password_lifetime
-       FROM mysql.user WHERE USER BETWEEN 'u18' AND 'u21';
+       FROM mysql.user WHERE USER BETWEEN 'u18' AND 'u21' ORDER BY User;
 
 drop user u1@localhost, u2@localhost, u3@localhost, u4@localhost, u5@localhost,
           u6@localhost, u7@localhost, u8@localhost, u9@localhost, u10@localhost,
@@ -563,6 +563,66 @@ SET GLOBAL general_log_file=  @old_general_log_file;
 SET GLOBAL general_log=       @old_general_log;
 SET GLOBAL log_output=        @old_log_output;
 
+
+--echo #
+--echo # Bug #20553132 USER WITH EXPIRED PASSWORD ABLE TO EXECUTE
+--echo #               ALTER USER .. PASSWORD EXPIRE COMMAND
+--echo #
+
+connection default;
+
+CREATE USER 20553132_u1@localhost;
+CREATE USER 20553132_u2@localhost;
+CREATE USER '20553132_u3'@'%';
+GRANT ALL ON *.* TO 20553132_u1@localhost;
+ALTER USER 20553132_u1@localhost PASSWORD EXPIRE;
+ALTER USER '20553132_u3'@'%' PASSWORD EXPIRE;
+
+--connect(con_20553132_u1, localhost, 20553132_u1)
+--error ER_MUST_CHANGE_PASSWORD
+ALTER USER 20553132_u1@localhost PASSWORD EXPIRE NEVER;
+--error ER_MUST_CHANGE_PASSWORD
+ALTER USER 20553132_u1@localhost PASSWORD EXPIRE DEFAULT;
+--error ER_MUST_CHANGE_PASSWORD
+ALTER USER 20553132_u1@localhost, 20553132_u2@localhost IDENTIFIED BY 'abcd' PASSWORD EXPIRE NEVER;
+
+# Must succeed
+ALTER USER 20553132_u2@localhost IDENTIFIED BY 'abcd', 20553132_u1@localhost IDENTIFIED BY 'defg' PASSWORD EXPIRE NEVER;
+
+disconnect con_20553132_u1;
+
+connection default;
+ALTER USER 20553132_u1@localhost PASSWORD EXPIRE;
+
+--connect(con_20553132_u1, localhost, 20553132_u1, defg)
+# Must succeed
+ALTER USER 20553132_u2@localhost IDENTIFIED BY 'abcd', 20553132_u1@localhost IDENTIFIED WITH 'mysql_native_password' BY 'hijk' PASSWORD EXPIRE DEFAULT;
+disconnect con_20553132_u1;
+
+--connect(con_20553132_u1, localhost, 20553132_u1, hijk)
+SELECT USER();
+
+disconnect con_20553132_u1;
+
+--connect(con_20553132_u3, localhost, 20553132_u3)
+ALTER USER CURRENT_USER() IDENTIFIED BY 'abcd';
+SELECT CURRENT_USER();
+disconnect con_20553132_u3;
+
+connection default;
+ALTER USER '20553132_u3'@'%' PASSWORD EXPIRE;
+
+--connect(con_20553132_u3, localhost, 20553132_u3, abcd)
+ALTER USER '20553132_u3'@'%' IDENTIFIED BY 'abcd';
+SELECT CURRENT_USER();
+disconnect con_20553132_u3;
+
+connection default;
+DROP USER 20553132_u1@localhost;
+DROP USER 20553132_u2@localhost;
+DROP USER '20553132_u3'@'%';
+
+--source include/wait_until_count_sessions.inc
 --echo
 --echo End of 5.7 tests!
 --echo
@@ -596,3 +656,50 @@ ALTER USER u1 IDENTIFIED BY PASSWORD '*67092806AE91BFB6BE72DE6C7BE2B7CCA8CFA9DF'
 
 #Cleanup
 DROP USER u1;
+
+--echo
+--echo Bug #20634154 GRANT/ALTER USER CLEARS PASSWORD EXPIRE.
+--echo
+
+CREATE USER bug20634154@localhost IDENTIFIED BY 'abc';
+--connect(con1, localhost, bug20634154, abc)
+SELECT CURRENT_USER();
+disconnect con1;
+connection default;
+ALTER USER bug20634154@localhost PASSWORD EXPIRE;
+--connect(con1, localhost, bug20634154, abc)
+--error ER_MUST_CHANGE_PASSWORD
+SELECT CURRENT_USER();
+disconnect con1;
+connection default;
+GRANT USAGE ON *.* TO bug20634154@localhost;
+--connect(con1, localhost, bug20634154, abc)
+--error ER_MUST_CHANGE_PASSWORD
+SELECT CURRENT_USER();
+disconnect con1;
+connection default;
+ALTER USER bug20634154@localhost;
+--connect(con1, localhost, bug20634154, abc)
+--error ER_MUST_CHANGE_PASSWORD
+SELECT CURRENT_USER();
+disconnect con1;
+connection default;
+ALTER USER bug20634154@localhost IDENTIFIED BY 'def';
+--connect(con1, localhost, bug20634154, def)
+SELECT CURRENT_USER();
+disconnect con1;
+connection default;
+ALTER USER bug20634154@localhost IDENTIFIED BY 'abc' PASSWORD EXPIRE;
+--connect(con1, localhost, bug20634154, abc)
+--error ER_MUST_CHANGE_PASSWORD
+SELECT CURRENT_USER();
+disconnect con1;
+connection default;
+ALTER USER bug20634154@localhost IDENTIFIED BY 'def' PASSWORD EXPIRE INTERVAL 10 DAY;
+--connect(con1, localhost, bug20634154, def)
+# this will work
+SELECT CURRENT_USER();
+disconnect con1;
+connection default;
+#cleanup
+DROP USER bug20634154@localhost;

@@ -76,6 +76,17 @@ TrxVersion::TrxVersion(trx_t* trx)
 	/* No op */
 }
 
+/** Set flush observer for the transaction
+@param[in/out]	trx		transaction struct
+@param[in]	observer	flush observer */
+void
+trx_set_flush_observer(
+	trx_t*		trx,
+	FlushObserver*	observer)
+{
+	trx->flush_observer = observer;
+}
+
 /*************************************************************//**
 Set detailed error message for the transaction. */
 void
@@ -191,6 +202,8 @@ trx_init(
 
 	trx->hit_list.clear();
 
+	trx->flush_observer = NULL;
+
 	++trx->version;
 }
 
@@ -238,8 +251,8 @@ struct TrxFactory {
 			trx->trx_savepoints,
 			&trx_named_savept_t::trx_savepoints);
 
-		mutex_create("trx", &trx->mutex);
-		mutex_create("trx_undo", &trx->undo_mutex);
+		mutex_create(LATCH_ID_TRX, &trx->mutex);
+		mutex_create(LATCH_ID_TRX_UNDO, &trx->undo_mutex);
 
 		lock_trx_alloc_locks(trx);
 	}
@@ -352,7 +365,7 @@ struct TrxPoolLock {
 	/** Create the mutex */
 	void create()
 	{
-		mutex_create("trx_pool", &m_mutex);
+		mutex_create(LATCH_ID_TRX_POOL, &m_mutex);
 	}
 
 	/** Acquire the mutex */
@@ -375,7 +388,7 @@ struct TrxPoolManagerLock {
 	/** Create the mutex */
 	void create()
 	{
-		mutex_create("trx_pool_manager", &m_mutex);
+		mutex_create(LATCH_ID_TRX_POOL_MANAGER, &m_mutex);
 	}
 
 	/** Acquire the mutex */
@@ -599,11 +612,10 @@ trx_free_prepared(
 /*==============*/
 	trx_t*	trx)	/*!< in, own: trx object */
 {
-	ut_ad(trx_sys_mutex_own());
-
 	ut_a(trx_state_eq(trx, TRX_STATE_PREPARED));
 	ut_a(trx->magic_n == TRX_MAGIC_N);
 
+	lock_trx_release_locks(trx);
 	trx_undo_free_prepared(trx);
 
 	assert_trx_in_rw_list(trx);
@@ -2808,12 +2820,12 @@ trx_prepare_low(
 			because only a single OS thread is allowed to do the
 			transaction prepare for this transaction. */
 			trx_undo_set_state_at_prepare(
-				trx, undo_ptr->insert_undo, &mtr);
+				trx, undo_ptr->insert_undo, false, &mtr);
 		}
 
 		if (undo_ptr->update_undo != NULL) {
 			trx_undo_set_state_at_prepare(
-				trx, undo_ptr->update_undo, &mtr);
+				trx, undo_ptr->update_undo, false, &mtr);
 		}
 
 		mutex_exit(&rseg->mutex);
@@ -3386,6 +3398,10 @@ trx_kill_blocking(trx_t* trx)
 		if (trx_is_started(victim_trx) && rollback) {
 
 			trx_id_t	id = victim_trx->id;
+			char*		thr_text = thd_security_context(
+							victim_trx->mysql_thd,
+							buffer, sizeof(buffer),
+							512);
 
 			ut_ad(victim_trx->in_innodb & TRX_FORCE_ROLLBACK_ASYNC);
 
@@ -3394,9 +3410,7 @@ trx_kill_blocking(trx_t* trx)
 			trx_rollback_for_mysql(victim_trx);
 
 			ib::info() << "Killed transaction: ID: " << id
-				<< " - " << thd_security_context(
-					victim_trx->mysql_thd,
-					buffer, sizeof(buffer), 512);
+				<< " - " << thr_text;
 		}
 
 		trx_mutex_enter(victim_trx);

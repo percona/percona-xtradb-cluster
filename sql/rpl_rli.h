@@ -396,7 +396,25 @@ public:
 
   char cached_charset[6];
 
+  /*
+    View_id until which UNTIL_SQL_VIEW_ID condition will wait.
+  */
   std::string until_view_id;
+  /*
+    Flag used to indicate that view_id identified by 'until_view_id'
+    was found on the current UNTIL_SQL_VIEW_ID condition.
+    It is set to false on the beginning of the UNTIL_SQL_VIEW_ID
+    condition, and set to true when view_id is found.
+  */
+  bool until_view_id_found;
+  /*
+    Flag used to indicate that commit event after view_id identified
+    by 'until_view_id' was found on the current UNTIL_SQL_VIEW_ID condition.
+    It is set to false on the beginning of the UNTIL_SQL_VIEW_ID
+    condition, and set to true when commit event after view_id is found.
+  */
+  bool until_view_id_commit_found;
+
   /*
     trans_retries varies between 0 to slave_transaction_retries and counts how
     many times the slave has retried the present transaction; gets reset to 0
@@ -574,6 +592,7 @@ public:
   volatile ulong pending_jobs;
   mysql_mutex_t pending_jobs_lock;
   mysql_cond_t pending_jobs_cond;
+  mysql_mutex_t exit_count_lock; // mutex of worker exit count
   ulong       mts_slave_worker_queue_len_max;
   ulonglong   mts_pending_jobs_size;      // actual mem usage by WQ:s
   ulonglong   mts_pending_jobs_size_max;  // max of WQ:s size forcing C to wait
@@ -612,9 +631,11 @@ public:
   ulong mts_coordinator_basic_nap; // C sleeps to avoid WQs overrun
   ulong opt_slave_parallel_workers; // cache for ::opt_slave_parallel_workers
   ulong slave_parallel_workers; // the one slave session time number of workers
+  ulong exit_counter; // Number of workers contributed to max updated group index
+  ulonglong max_updated_index;
   ulong recovery_parallel_workers; // number of workers while recovering
   uint checkpoint_seqno;  // counter of groups executed after the most recent CP
-  uint checkpoint_group;  // cache for ::opt_mts_checkpoint_group 
+  uint checkpoint_group;  // cache for ::opt_mts_checkpoint_group
   MY_BITMAP recovery_groups;  // bitmap used during recovery
   bool recovery_groups_inited;
   ulong mts_recovery_group_cnt; // number of groups to execute at recovery
@@ -745,6 +766,16 @@ public:
   inline bool is_mts_recovery() const
   {
     return mts_recovery_group_cnt != 0;
+  }
+
+  inline void clear_mts_recovery_groups()
+  {
+    if (recovery_groups_inited)
+    {
+      bitmap_free(&recovery_groups);
+      mts_recovery_group_cnt= 0;
+      recovery_groups_inited= false;
+    }
   }
 
   /**

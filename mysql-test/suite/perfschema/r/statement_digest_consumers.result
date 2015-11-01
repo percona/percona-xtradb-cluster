@@ -128,42 +128,41 @@ DROP TRIGGER trg;
 ####################################
 SELECT schema_name, digest, digest_text, count_star FROM performance_schema.events_statements_summary_by_digest;
 schema_name	digest	digest_text	count_star
-statements_digest	aa61be84e229b6c3ab5b925b89d57a47	TRUNCATE TABLE performance_schema . events_statements_summary_by_digest 	1
-statements_digest	0fcfc1e506af5108c8a1a15c8d72abcf	SELECT ? FROM t1 	1
-statements_digest	585ab874815885a42f05b10a8f76bf99	SELECT ? FROM `t1` 	1
-statements_digest	e70f766daa86da9f533b4e06694065b0	SELECT ?, ... FROM t1 	2
-statements_digest	7759e63c70ba7b1d98933b6241a7683b	SELECT ? FROM t2 	1
-statements_digest	461be55b182c42815184909b67d9d770	SELECT ?, ... FROM t2 	2
-statements_digest	153ef5e393dbcb0a243101c6156cc1e8	INSERT INTO t1 VALUES (?) 	2
-statements_digest	c03aa653f1cb4af06b479eb92cfb0d7e	INSERT INTO t2 VALUES (?) 	1
-statements_digest	db1672e4699d0791d7157ee195056fd1	INSERT INTO t3 VALUES (...) 	4
-statements_digest	4bc529b9f8abc788bf12cb651af39207	INSERT INTO t4 VALUES (...) 	1
-statements_digest	bb903ac347f1c76b6e6e0a49564b9a65	INSERT INTO t5 VALUES (...) 	1
-statements_digest	aef14aeed800f0e040695bdb7e3d7b32	INSERT INTO t1 VALUES (?) /* , ... */ 	2
-statements_digest	eb896b34088cd5822d585a653147e815	INSERT INTO t3 VALUES (...) /* , ... */ 	1
-statements_digest	35ed45e723e7a690aa94fa9096fa2283	INSERT INTO t5 VALUES (...) /* , ... */ 	1
-statements_digest	e2132b264fbc7884c073d67d0a4fb622	INSERT INTO t6 VALUES (...) 	5
-statements_digest	2b9da67f9eec6f06d0a7b1f5ba1a1869	SELECT ? + ? 	3
-statements_digest	b4b4bbb145d74363fec80d6be58a637a	SELECT ? 	1
-statements_digest	d6046edfae562473d55936712af41947	CREATE SCHEMA statements_digest_temp 	2
-statements_digest	aefcc5dad571f3aa77b5ee950e14e542	DROP SCHEMA statements_digest_temp 	2
-statements_digest	388e748bea55c316ee6bdd777aaf962a	SELECT ? FROM no_such_table 	1
-statements_digest	4583c51c2be68b0992ebc1a5a0197aa0	CREATE TABLE dup_table ( c CHARACTER (?) ) 	2
-statements_digest	d878b07d3b7bfd73e5383613a02830b9	DROP TABLE dup_table 	1
-statements_digest	b3d4cc2f0c0303bb92bec1a8aac62283	INSERT IGNORE INTO t11 VALUES (?) 	1
-statements_digest	7c0dce767531d3937f8ff44c72f9a841	SHOW WARNINGS 	1
-statements_digest	22a4cccefe7384bbb20eebe7faaa46f8	PREPARE stmt FROM ? 	1
-statements_digest	555ad72ce5fe2593566df60706f0be13	EXECUTE stmt 	2
-statements_digest	2ad259bc21bacd5beaf1e138f3231972	DEALLOCATE PREPARE stmt 	1
-statements_digest	44a025dbc8bbcee98dc645723a1f7952	CREATE PROCEDURE p1 ( ) BEGIN SELECT * FROM t12 ; END 	1
-statements_digest	67e44f277603a1818c1c97a0c79284be	CALL p1 ( ) 	2
-statements_digest	2c517bf25d0c26930d2753f08e310747	DROP PROCEDURE p1 	1
-statements_digest	6bd5e06190a3f8f104ae72ce86604a5a	CREATE FUNCTION `func` ( a INTEGER , b INTEGER ) RETURNS INTEGER (?) RETURN a + b 	1
-statements_digest	c8e9c7750734b6066803e8efc032c8ad	SELECT func (...) 	2
-statements_digest	8fada9d87a2f6307c25b133197e413e5	DROP FUNCTION func 	1
-statements_digest	102535800bce6df3bf2eda89f317e364	CREATE TRIGGER trg BEFORE INSERT ON t12 FOR EACH ROW SET @? := ? 	1
-statements_digest	4f1f91d5bf66365e7e9d8a9a8cdebd66	INSERT INTO t12 VALUES (?) 	2
-statements_digest	a6cdf4330814a01e5d7a53cd1820ba11	DROP TRIGGER trg 	1
+statements_digest	92a829ab1b5f8e6e54ad5bbf6d6810c8	TRUNCATE TABLE `performance_schema` . `events_statements_summary_by_digest` 	1
+statements_digest	e2571f6c4c66b218ecce182384ea37ec	SELECT ? FROM `t1` 	2
+statements_digest	f709bb30bcd5dc17d004f8b8ac5a1829	SELECT ?, ... FROM `t1` 	2
+statements_digest	5b0bf3ea2f14e295995d7ac243fb7caa	SELECT ? FROM `t2` 	1
+statements_digest	9443bc81928e402c37503ee57e26ad6d	SELECT ?, ... FROM `t2` 	2
+statements_digest	cf5edd547c156e12b115e1a5c723efaa	INSERT INTO `t1` VALUES (?) 	2
+statements_digest	0fff8bed90eb3fa6f561390969f7fdbd	INSERT INTO `t2` VALUES (?) 	1
+statements_digest	37a1a9f02d18bb600d7f4e363920df7a	INSERT INTO `t3` VALUES (...) 	4
+statements_digest	972f248e632775874662020dec38dfb0	INSERT INTO `t4` VALUES (...) 	1
+statements_digest	541ae2a2a36789546616031df9ce55f5	INSERT INTO `t5` VALUES (...) 	1
+statements_digest	061060f7baec26683137c88a913b14db	INSERT INTO `t1` VALUES (?) /* , ... */ 	2
+statements_digest	f5a27a2ba4908e086994d24ca8001903	INSERT INTO `t3` VALUES (...) /* , ... */ 	1
+statements_digest	1b9a79a15361323dbfb1de3a975c6abf	INSERT INTO `t5` VALUES (...) /* , ... */ 	1
+statements_digest	74bb51765f867302121670d33ccce99f	INSERT INTO `t6` VALUES (...) 	5
+statements_digest	c7960c0da975fcab25926fa3fad4db74	SELECT ? + ? 	3
+statements_digest	46b876e64cd5c41009d91c754921f1d4	SELECT ? 	1
+statements_digest	18be0920953fd691160df2c9e9c334c1	CREATE SCHEMA `statements_digest_temp` 	2
+statements_digest	b3964452b4c0351e9a88d5a37aa169e0	DROP SCHEMA `statements_digest_temp` 	2
+statements_digest	d26356fdc4b1aab357c534a45dde2de4	SELECT ? FROM `no_such_table` 	1
+statements_digest	f925a16b0e24a0c65e7351e438e504ff	CREATE TABLE `dup_table` ( `c` CHARACTER (?) ) 	2
+statements_digest	243f3d90362d5fa91ba16f094cf220b3	DROP TABLE `dup_table` 	1
+statements_digest	8113c2409843400f4af1ae988bca1acf	INSERT IGNORE INTO `t11` VALUES (?) 	1
+statements_digest	772541c10f9960f050d7a71bf5db2679	SHOW WARNINGS 	1
+statements_digest	9358f94f7e142683f8a70c18e6d4598e	PREPARE `stmt` FROM ? 	1
+statements_digest	bbab1832594766dbd4893e34b8d3b38c	EXECUTE `stmt` 	2
+statements_digest	5f5b0f87f81b8865dee8f7f3c3ee46f0	DEALLOCATE PREPARE `stmt` 	1
+statements_digest	6a1ded8a5b59c3704bc08ab2c8c9e8b1	CREATE PROCEDURE `p1` ( ) BEGIN SELECT * FROM `t12` ; END 	1
+statements_digest	568fd390614913e06686ba9e77541ee8	CALL `p1` ( ) 	2
+statements_digest	61c539fd8068430b684aa85242ddc6aa	DROP PROCEDURE `p1` 	1
+statements_digest	8176fc47c1abdf51ee6c8c67857efcb6	CREATE FUNCTION `func` ( `a` INTEGER , `b` INTEGER ) RETURNS INTEGER (?) RETURN `a` + `b` 	1
+statements_digest	15dde009db338f5778589fc8a5c7bb15	SELECT `func` (...) 	2
+statements_digest	87325cb5c8ad0597d2d443e6f186b291	DROP FUNCTION `func` 	1
+statements_digest	05e6c232fa716074f6b5702112ba8a44	CREATE TRIGGER `trg` BEFORE INSERT ON `t12` FOR EACH ROW SET @? := ? 	1
+statements_digest	53d5dbb447a4711b8007af9b230d3060	INSERT INTO `t12` VALUES (?) 	2
+statements_digest	0ae9ee42c54fc5ab370d8e25d6bfa6b2	DROP TRIGGER `trg` 	1
 SELECT digest, digest_text FROM performance_schema.events_statements_current;
 digest	digest_text
 ####################################

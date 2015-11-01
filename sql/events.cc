@@ -572,7 +572,6 @@ bool
 Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
 {
   int ret;
-  bool save_binlog_row_based;
   DBUG_ENTER("Events::drop_event");
 
   if (check_if_system_tables_error())
@@ -580,13 +579,6 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
 
   if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
     DBUG_RETURN(TRUE);
-
-  /*
-    Turn off row binlogging of this statement and use statement-based so
-    that all supporting tables are updated for DROP EVENT command.
-  */
-  if ((save_binlog_row_based= thd->is_current_stmt_binlog_format_row()))
-    thd->clear_current_stmt_binlog_format_row();
 
   if (lock_object_name(thd, MDL_key::EVENT,
                        dbname.str, name.str))
@@ -607,10 +599,6 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
                   dbname.str, dbname.length, name.str, name.length);
 #endif 
   }
-  /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
-  if (save_binlog_row_based)
-    thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(ret);
 }
 
@@ -690,11 +678,11 @@ send_show_create_event(THD *thd, Event_timed *et, Protocol *protocol)
   field_list.push_back(
     new Item_empty_string("Database Collation", MY_CS_NAME_SIZE));
 
-  if (protocol->send_result_set_metadata(&field_list,
-                            Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
+  if (thd->send_result_metadata(&field_list,
+                                Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
     DBUG_RETURN(TRUE);
 
-  protocol->prepare_for_resend();
+  protocol->start_row();
 
   protocol->store(et->name.str, et->name.length, system_charset_info);
   protocol->store(sql_mode.str, sql_mode.length, system_charset_info);
@@ -711,7 +699,7 @@ send_show_create_event(THD *thd, Event_timed *et, Protocol *protocol)
                   strlen(et->creation_ctx->get_db_cl()->name),
                   system_charset_info);
 
-  if (protocol->write())
+  if (protocol->end_row())
     DBUG_RETURN(TRUE);
 
   my_eof(thd);
@@ -758,7 +746,7 @@ Events::show_create_event(THD *thd, LEX_STRING dbname, LEX_STRING name)
   ret= db_repository->load_named_event(thd, dbname, name, &et);
 
   if (!ret)
-    ret= send_show_create_event(thd, &et, thd->protocol);
+    ret= send_show_create_event(thd, &et, thd->get_protocol());
 
   DBUG_RETURN(ret);
 }
@@ -1022,7 +1010,7 @@ PSI_stage_info *all_events_stages[]=
 
 static PSI_memory_info all_events_memory[]=
 {
-  { &key_memory_event_basic_root, "Event_basic::mem_root", 0}
+  { &key_memory_event_basic_root, "Event_basic::mem_root", PSI_FLAG_GLOBAL}
 };
 
 static void init_events_psi_keys(void)

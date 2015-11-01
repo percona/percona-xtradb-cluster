@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -115,6 +115,27 @@ cmp_dtuple_rec_with_match_low(
 	cmp_dtuple_rec_with_match_low(					\
 		tuple,rec,offsets,dtuple_get_n_fields_cmp(tuple),fields)
 /** Compare a data tuple to a physical record.
+@param[in]	dtuple		data tuple
+@param[in]	rec		B-tree or R-tree index record
+@param[in]	index		index tree
+@param[in]	offsets		rec_get_offsets(rec)
+@param[in,out]	matched_fields	number of completely matched fields
+@param[in,out]	matched_bytes	number of matched bytes in the first
+field that is not matched
+@return the comparison result of dtuple and rec
+@retval 0 if dtuple is equal to rec
+@retval negative if dtuple is less than rec
+@retval positive if dtuple is greater than rec */
+int
+cmp_dtuple_rec_with_match_bytes(
+	const dtuple_t*		dtuple,
+	const rec_t*		rec,
+	const dict_index_t*	index,
+	const ulint*		offsets,
+	ulint*			matched_fields,
+	ulint*			matched_bytes)
+	__attribute__((warn_unused_result));
+/** Compare a data tuple to a physical record.
 @see cmp_dtuple_rec_with_match
 @param[in] dtuple data tuple
 @param[in] rec B-tree record
@@ -178,8 +199,8 @@ cmp_rec_rec_with_match(
 	const ulint*		offsets2,
 	const dict_index_t*	index,
 	bool			nulls_unequal,
-	ulint*			matched_fields)
-	__attribute__((nonnull));
+	ulint*			matched_fields);
+
 /** Compare two B-tree records.
 Only the common first fields are compared, and externally stored field
 are treated as equal.

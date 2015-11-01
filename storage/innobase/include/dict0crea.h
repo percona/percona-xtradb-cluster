@@ -213,6 +213,12 @@ not of the right form.
 dberr_t
 dict_create_or_check_sys_tablespace(void);
 /*=====================================*/
+/** Creates the virtual column system tables inside InnoDB
+at server bootstrap or server start if they are not found or are
+not of the right form.
+@return DB_SUCCESS or error code */
+dberr_t
+dict_create_or_check_sys_virtual();
 
 /** Put a tablespace definition into the data dictionary,
 replacing what was there previously.
@@ -231,17 +237,6 @@ dict_replace_tablespace_in_dictionary(
 	const char*	path,
 	trx_t*		trx,
 	bool		commit);
-
-/** Add another datafile to the data dictionary for a given space_id.
-@param[in]	space	Tablespace ID
-@param[in]	path	Tablespace path
-@param[in,out]	trx	Transaction**
-@return error code or DB_SUCCESS */
-dberr_t
-dict_add_datafile_to_dictionary(
-	ulint		space_id,
-	const char*	path,
-	trx_t*		trx);
 
 /** Delete records from SYS_TABLESPACES and SYS_DATAFILES associated
 with a particular tablespace ID.
@@ -277,10 +272,15 @@ struct tab_node_t{
 					of the column definitions; the row to
 					be inserted is built by the parent
 					node  */
+	ins_node_t*	v_col_def;	/*!< child node which does the inserts
+					of the sys_virtual row definitions;
+					the row to be inserted is built by
+					the parent node  */
 	/*----------------------*/
 	/* Local storage for this graph node */
 	ulint		state;		/*!< node execution state */
 	ulint		col_no;		/*!< next column definition to insert */
+	ulint		base_col_no;	/*!< next base column to insert */
 	mem_heap_t*	heap;		/*!< memory heap used as auxiliary
 					storage */
 };
@@ -288,8 +288,9 @@ struct tab_node_t{
 /* Table create node states */
 #define	TABLE_BUILD_TABLE_DEF	1
 #define	TABLE_BUILD_COL_DEF	2
-#define	TABLE_ADD_TO_CACHE	3
-#define	TABLE_COMPLETED		4
+#define	TABLE_BUILD_V_COL_DEF	3
+#define	TABLE_ADD_TO_CACHE	4
+#define	TABLE_COMPLETED		5
 
 /* Index create node struct */
 
@@ -315,6 +316,36 @@ struct ind_node_t{
 	mem_heap_t*	heap;		/*!< memory heap used as auxiliary
 					storage */
 };
+
+/** Compose a column number for a virtual column, stored in the "POS" field
+of Sys_columns. The column number includes both its virtual column sequence
+(the "nth" virtual column) and its actual column position in original table
+@param[in]	v_pos		virtual column sequence
+@param[in]	col_pos		column position in original table definition
+@return	composed column position number */
+UNIV_INLINE
+ulint
+dict_create_v_col_pos(
+	ulint	v_pos,
+	ulint	col_pos);
+
+/** Get the column number for a virtual column (the column position in
+original table), stored in the "POS" field of Sys_columns
+@param[in]      pos             virtual column position
+@return column position in original table */
+UNIV_INLINE
+ulint
+dict_get_v_col_mysql_pos(
+        ulint   pos);
+
+/** Get a virtual column sequence (the "nth" virtual column) for a
+virtual column, stord in the "POS" field of Sys_columns
+@param[in]      pos             virtual column position
+@return virtual column sequence */
+UNIV_INLINE
+ulint
+dict_get_v_col_pos(
+        ulint   pos);
 
 /* Index create node states */
 #define	INDEX_BUILD_INDEX_DEF	1

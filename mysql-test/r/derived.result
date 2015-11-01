@@ -352,7 +352,7 @@ Note	1003	/* select#1 */ select `test`.`t2`.`a` AS `a` from `test`.`t2` where (`
 drop table t2;
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 CREATE TABLE `t1` ( `itemid` int(11) NOT NULL default '0', `grpid` varchar(15) NOT NULL default '', `vendor` int(11) NOT NULL default '0', `date_` date NOT NULL default '0000-00-00', `price` decimal(12,2) NOT NULL default '0.00', PRIMARY KEY  (`itemid`,`grpid`,`vendor`,`date_`), KEY `itemid` (`itemid`,`vendor`), KEY `itemid_2` (`itemid`,`date_`));
 insert into t1 values (128, 'rozn', 2, curdate(), 10),
 (128, 'rozn', 1, curdate(), 10);
@@ -2606,7 +2606,7 @@ UPDATE t1 JOIN (SELECT * FROM t2) AS dt ON t1.a=dt.a SET dt.b=dt.b+1;
 ERROR HY000: The target table t2 of the UPDATE is not updatable
 DELETE FROM (SELECT * FROM t1) AS dt WHERE a=1;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(SELECT * FROM t1) AS dt WHERE a=1' at line 1
-DELETE dt FROM t1 JOIN (SELECT * FROM t2) AS dt ON t1.a=dt.a WHERE a=1;
+DELETE dt FROM t1 JOIN (SELECT * FROM t2) AS dt ON t1.a=dt.a WHERE t1.a=1;
 ERROR HY000: The target table dt of the DELETE is not updatable
 UPDATE t1 JOIN (SELECT * FROM t2) AS dt ON t1.a=dt.a SET t1.b=t1.b+1;
 DELETE t1 FROM t1 JOIN (SELECT * FROM t2) AS dt ON t1.a=dt.a WHERE t1.a=1;
@@ -3510,3 +3510,16 @@ k
 20
 SET @@optimizer_switch=@optimizer_switch_saved;
 DROP TABLE t1;
+# Bug#20733540: Assertion failed: !table || (!table->read_set ...)
+CREATE TABLE t1(a INTEGER, b VARCHAR(10));
+INSERT INTO t1 VALUES (1,'a');
+CREATE TABLE t2(c INTEGER);
+INSERT INTO t2 VALUES(0);
+SELECT 1
+FROM (SELECT b FROM t1 WHERE a) AS dt1
+RIGHT JOIN t2
+ON c NOT BETWEEN 1 AND 2
+NATURAL JOIN t1 AS t3;
+1
+1
+DROP TABLE t1, t2;

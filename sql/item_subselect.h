@@ -39,6 +39,8 @@ typedef class st_select_lex SELECT_LEX;
 /**
   Convenience typedef used in this file, and further used by any files
   including this file.
+
+  @retval NULL In case of semantic errors.
 */
 typedef Comp_creator* (*chooser_compare_func_creator)(bool invert);
 
@@ -212,6 +214,7 @@ public:
   longlong val_int ();
   String *val_str (String *);
   my_decimal *val_decimal(my_decimal *);
+  bool val_json(Json_wrapper *result);
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate);
   bool get_time(MYSQL_TIME *ltime);
   bool val_bool();

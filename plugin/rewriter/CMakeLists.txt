@@ -20,12 +20,14 @@ SET(REWRITER_SOURCES
   rewriter.cc
   services.cc)
 
+IF (DISABLE_SHARED)
+  RETURN()
+ENDIF()
+
 MYSQL_ADD_PLUGIN(rewriter ${REWRITER_SOURCES}
                  MODULE_ONLY MODULE_OUTPUT_NAME "rewriter")
 
-TARGET_LINK_LIBRARIES(rewriter mysys)
-
-IF(WIN32 OR HAVE_DLOPEN AND NOT DISABLE_SHARED)
+IF(WIN32 OR HAVE_DLOPEN)
   IF(WIN32)
     SET(DYNLIB_EXTENSION "dll")
     IF(MSVC)
@@ -47,7 +49,6 @@ ENDIF()
 #
 FOREACH(file
     install_rewriter
-    install_rewriter_with_optional_columns
     uninstall_rewriter)
 
   CONFIGURE_FILE(

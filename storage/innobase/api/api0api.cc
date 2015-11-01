@@ -235,7 +235,7 @@ ib_open_table_by_id(
 		dict_mutex_enter_for_mysql();
 	}
 
-	table = dict_table_open_on_id(table_id, FALSE, DICT_TABLE_OP_NORMAL);
+	table = dict_table_open_on_id(table_id, TRUE, DICT_TABLE_OP_NORMAL);
 
 	if (table != NULL && table->ibd_file_missing) {
 		table = NULL;
@@ -582,6 +582,18 @@ ib_trx_begin(
 	return(static_cast<ib_trx_t>(trx));
 }
 
+/*****************************************************************//**
+Check if transaction is read_only
+@return transaction read_only status */
+ib_u32_t
+ib_trx_read_only(
+/*=============*/
+	ib_trx_t	ib_trx)		/*!< in: trx handle */
+{
+	trx_t*		trx = (trx_t*) ib_trx;
+
+	return(trx->read_only);
+}
 /*****************************************************************//**
 Get a trx start time.
 @return trx start_time */
@@ -1919,6 +1931,10 @@ ib_cursor_moveto(
 	ut_a(tuple->type == TPL_TYPE_KEY);
 
 	n_fields = dict_index_get_n_ordering_defined_by_user(prebuilt->index);
+
+	if (n_fields > dtuple_get_n_fields(tuple->ptr)) {
+		n_fields = dtuple_get_n_fields(tuple->ptr);
+	}
 
 	dtuple_set_n_fields(search_tuple, n_fields);
 	dtuple_set_n_fields_cmp(search_tuple, n_fields);
@@ -3284,13 +3300,13 @@ ib_table_truncate(
 
 	if (trunc_err == DB_SUCCESS) {
 		ut_a(!trx_is_started(static_cast<trx_t*>(ib_trx)));
-
-		err = ib_trx_release(ib_trx);
-		ut_a(err == DB_SUCCESS);
 	} else {
 		err = ib_trx_rollback(ib_trx);
 		ut_a(err == DB_SUCCESS);
 	}
+
+	err = ib_trx_release(ib_trx);
+	ut_a(err == DB_SUCCESS);
 
 	/* Set the memcached_sync_count back. */
 	if (table != NULL && memcached_sync != 0) {

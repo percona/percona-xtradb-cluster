@@ -232,6 +232,11 @@ static void set_thread_command_noop(int command NNN)
   return;
 }
 
+static void set_connection_type_noop(opaque_vio_type conn_type NNN)
+{
+  return;
+}
+
 static void set_thread_start_time_noop(time_t start_time NNN)
 {
   return;
@@ -794,17 +799,23 @@ static void register_memory_noop(const char *category NNN,
   return;
 }
 
-static PSI_memory_key memory_alloc_noop(PSI_memory_key key NNN, size_t size NNN)
+static PSI_memory_key memory_alloc_noop(PSI_memory_key key NNN, size_t size NNN, struct PSI_thread ** owner NNN)
 {
   return PSI_NOT_INSTRUMENTED;
 }
 
-static PSI_memory_key memory_realloc_noop(PSI_memory_key key NNN, size_t old_size NNN, size_t new_size NNN)
+static PSI_memory_key memory_realloc_noop(PSI_memory_key key NNN, size_t old_size NNN, size_t new_size NNN, struct PSI_thread ** owner NNN)
 {
   return PSI_NOT_INSTRUMENTED;
 }
 
-static void memory_free_noop(PSI_memory_key key NNN, size_t size NNN)
+static PSI_memory_key memory_claim_noop(PSI_memory_key key NNN, size_t size NNN, struct PSI_thread ** owner)
+{
+  *owner= NULL;
+  return PSI_NOT_INSTRUMENTED;
+}
+
+static void memory_free_noop(PSI_memory_key key NNN, size_t size NNN, struct PSI_thread * owner NNN)
 {
   return;
 }
@@ -887,6 +898,7 @@ static PSI PSI_noop=
   set_thread_user_host_noop,
   set_thread_db_noop,
   set_thread_command_noop,
+  set_connection_type_noop,
   set_thread_start_time_noop,
   set_thread_state_noop,
   set_thread_info_noop,
@@ -975,6 +987,7 @@ static PSI PSI_noop=
   register_memory_noop,
   memory_alloc_noop,
   memory_realloc_noop,
+  memory_claim_noop,
   memory_free_noop,
 
   unlock_table_noop,

@@ -148,41 +148,6 @@ struct fts_aux_table_t {
 	char*		name;		/*!< Name of the table */
 };
 
-/** SQL statements for creating the ancillary common FTS tables.
-The table name here shall be consistent with fts_common_tables. */
-static const char* fts_create_common_tables_sql = {
-	"BEGIN\n"
-	""
-	"CREATE TABLE $DELETED (\n"
-	"  doc_id BIGINT UNSIGNED\n"
-	") COMPACT;\n"
-	"CREATE UNIQUE CLUSTERED INDEX IND ON $DELETED (doc_id);\n"
-	""
-	"CREATE TABLE $DELETED_CACHE (\n"
-	"  doc_id BIGINT UNSIGNED\n"
-	") COMPACT;\n"
-	"CREATE UNIQUE CLUSTERED INDEX IND"
-		" ON $DELETED_CACHE(doc_id);\n"
-	""
-	"CREATE TABLE $BEING_DELETED (\n"
-	"  doc_id BIGINT UNSIGNED\n"
-	") COMPACT;\n"
-	"CREATE UNIQUE CLUSTERED INDEX IND"
-		" ON $BEING_DELETED(doc_id);\n"
-	""
-	"CREATE TABLE $BEING_DELETED_CACHE (\n"
-	"  doc_id BIGINT UNSIGNED\n"
-	") COMPACT;\n"
-	"CREATE UNIQUE CLUSTERED INDEX IND"
-		" ON $BEING_DELETED_CACHE(doc_id);\n"
-	""
-	"CREATE TABLE $CONFIG (\n"
-	"  key CHAR(50),\n"
-	"  value CHAR(200) NOT NULL\n"
-	") COMPACT;\n"
-	"CREATE UNIQUE CLUSTERED INDEX IND ON $CONFIG(key);\n"
-};
-
 #ifdef FTS_DOC_STATS_DEBUG
 /** Template for creating the FTS auxiliary index specific tables. This is
 mainly designed for the statistics work in the future */
@@ -196,14 +161,6 @@ static const char* fts_create_index_tables_sql = {
 	"CREATE UNIQUE CLUSTERED INDEX IND ON $doc_id_table(doc_id);\n"
 };
 #endif
-
-/** Template for creating the ancillary FTS tables word index tables. */
-static const char* fts_create_index_sql = {
-	"BEGIN\n"
-	""
-	"CREATE UNIQUE CLUSTERED INDEX FTS_INDEX_TABLE_IND"
-		" ON $table (word, first_doc_id);\n"
-};
 
 /** FTS auxiliary table suffixes that are common to all FT indexes. */
 const char* fts_common_tables[] = {
@@ -649,11 +606,11 @@ fts_cache_create(
 		fts_cache_init_rw_lock_key, &cache->init_lock,
 		SYNC_FTS_CACHE_INIT);
 
-	mutex_create("fts_delete", &cache->deleted_lock);
+	mutex_create(LATCH_ID_FTS_DELETE, &cache->deleted_lock);
 
-	mutex_create("fts_optimize", &cache->optimize_lock);
+	mutex_create(LATCH_ID_FTS_OPTIMIZE, &cache->optimize_lock);
 
-	mutex_create("fts_doc_id", &cache->doc_id_lock);
+	mutex_create(LATCH_ID_FTS_DOC_ID, &cache->doc_id_lock);
 
 	/* This is the heap used to create the cache itself. */
 	cache->self_heap = ib_heap_allocator_create(heap);
@@ -723,9 +680,8 @@ fts_reset_get_doc(
 	fts_get_doc_t*  get_doc;
 	ulint		i;
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own(&cache->init_lock, RW_LOCK_X));
-#endif
+
 	ib_vector_reset(cache->get_docs);
 
 	for (i = 0; i < ib_vector_size(cache->indexes); i++) {
@@ -1005,9 +961,7 @@ fts_cache_index_cache_create(
 
 	ut_a(cache != NULL);
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own(&cache->init_lock, RW_LOCK_X));
-#endif
 
 	/* Must not already exist in the cache vector. */
 	ut_a(fts_find_index_cache(cache, index) == NULL);
@@ -1145,10 +1099,8 @@ fts_get_index_cache(
 {
 	ulint			i;
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own((rw_lock_t*) &cache->lock, RW_LOCK_X)
 	      || rw_lock_own((rw_lock_t*) &cache->init_lock, RW_LOCK_X));
-#endif
 
 	for (i = 0; i < ib_vector_size(cache->indexes); ++i) {
 		fts_index_cache_t*	index_cache;
@@ -1178,9 +1130,7 @@ fts_get_index_get_doc(
 {
 	ulint			i;
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own((rw_lock_t*) &cache->init_lock, RW_LOCK_X));
-#endif
 
 	for (i = 0; i < ib_vector_size(cache->get_docs); ++i) {
 		fts_get_doc_t*	get_doc;
@@ -1237,9 +1187,7 @@ fts_tokenizer_word_get(
 	fts_tokenizer_word_t*	word;
 	ib_rbt_bound_t		parent;
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own(&cache->lock, RW_LOCK_X));
-#endif
 
 	/* If it is a stopword, do not index it */
 	if (!fts_check_token(text,
@@ -1298,11 +1246,12 @@ fts_cache_node_add_positions(
 	byte*		ptr_start;
 	ulint		doc_id_delta;
 
-#ifdef UNIV_SYNC_DEBUG
+#ifdef UNIV_DEBUG
 	if (cache) {
 		ut_ad(rw_lock_own(&cache->lock, RW_LOCK_X));
 	}
-#endif
+#endif /* UNIV_DEBUG */
+
 	ut_ad(doc_id >= node->last_doc_id);
 
 	/* Calculate the space required to store the ilist. */
@@ -1412,9 +1361,7 @@ fts_cache_add_doc(
 		return;
 	}
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own(&cache->lock, RW_LOCK_X));
-#endif
 
 	n_words = rbt_size(tokens);
 
@@ -1796,18 +1743,154 @@ fts_drop_tables(
 	return(error);
 }
 
-/*********************************************************************//**
-Creates the common ancillary tables needed for supporting an FTS index
+/** Extract only the required flags from table->flags2 for FTS Aux
+tables.
+@param[in]	in_flags2	Table flags2
+@return extracted flags2 for FTS aux tables */
+static inline
+ulint
+fts_get_table_flags2_for_aux_tables(
+	ulint	flags2)
+{
+	/* Extract the file_per_table flag & temporary file flag
+	from the main FTS table flags2 */
+	return((flags2 & DICT_TF2_USE_FILE_PER_TABLE) |
+	       (flags2 & DICT_TF2_TEMPORARY));
+}
+
+/** Create dict_table_t object for FTS Aux tables.
+@param[in]	aux_table_name	FTS Aux table name
+@param[in]	table		table object of FTS Index
+@param[in]	n_cols		number of columns for FTS Aux table
+@return table object for FTS Aux table */
+static
+dict_table_t*
+fts_create_in_mem_aux_table(
+	const char*		aux_table_name,
+	const dict_table_t*	table,
+	ulint			n_cols)
+{
+	dict_table_t*	new_table = dict_mem_table_create(
+		aux_table_name, table->space, n_cols, 0, table->flags,
+		fts_get_table_flags2_for_aux_tables(table->flags2));
+
+	if (DICT_TF_HAS_SHARED_SPACE(table->flags)) {
+		ut_ad(table->space == fil_space_get_id_by_name(
+			table->tablespace()));
+		new_table->tablespace = mem_heap_strdup(
+			new_table->heap, table->tablespace);
+	}
+
+	if (DICT_TF_HAS_DATA_DIR(table->flags)) {
+		ut_ad(table->data_dir_path != NULL);
+		new_table->data_dir_path = mem_heap_strdup(
+			new_table->heap, table->data_dir_path);
+	}
+
+	return(new_table);
+}
+
+/** Function to create on FTS common table.
+@param[in,out]	trx		InnoDB transaction
+@param[in]	table		Table that has FTS Index
+@param[in]	fts_table_name	FTS AUX table name
+@param[in]	fts_suffix	FTS AUX table suffix
+@param[in]	heap		heap
+@return table object if created, else NULL */
+static
+dict_table_t*
+fts_create_one_common_table(
+	trx_t*			trx,
+	const dict_table_t*	table,
+	const char*		fts_table_name,
+	const char*		fts_suffix,
+	mem_heap_t*		heap)
+{
+	dict_table_t*		new_table = NULL;
+	dberr_t			error;
+	bool			is_config = strcmp(fts_suffix, "CONFIG") == 0;
+
+	if (!is_config) {
+
+		new_table = fts_create_in_mem_aux_table(
+			fts_table_name, table, FTS_DELETED_TABLE_NUM_COLS);
+
+		dict_mem_table_add_col(
+			new_table, heap, "doc_id", DATA_INT, DATA_UNSIGNED,
+			FTS_DELETED_TABLE_COL_LEN);
+	} else {
+		/* Config table has different schema. */
+		new_table = fts_create_in_mem_aux_table(
+			fts_table_name, table, FTS_CONFIG_TABLE_NUM_COLS);
+
+		dict_mem_table_add_col(
+			new_table, heap, "key", DATA_VARCHAR, 0,
+			FTS_CONFIG_TABLE_KEY_COL_LEN);
+
+		dict_mem_table_add_col(
+			new_table, heap, "value", DATA_VARCHAR, DATA_NOT_NULL,
+			FTS_CONFIG_TABLE_VALUE_COL_LEN);
+	}
+
+	error = row_create_table_for_mysql(new_table, NULL, trx, false);
+
+	if (error == DB_SUCCESS) {
+
+		dict_index_t*	index = dict_mem_index_create(
+			fts_table_name, "FTS_COMMON_TABLE_IND",
+			new_table->space, DICT_UNIQUE|DICT_CLUSTERED, 1);
+
+		if (!is_config) {
+			dict_mem_index_add_field(index, "doc_id", 0);
+		} else {
+			dict_mem_index_add_field(index, "key", 0);
+		}
+
+		/* We save and restore trx->dict_operation because
+		row_create_index_for_mysql() changes the operation to
+		TRX_DICT_OP_TABLE. */
+		trx_dict_op_t op = trx_get_dict_operation(trx);
+
+		error =	row_create_index_for_mysql(index, trx, NULL, NULL);
+
+		trx->dict_operation = op;
+	}
+
+	if (error != DB_SUCCESS) {
+		trx->error_state = error;
+		dict_mem_table_free(new_table);
+		new_table = NULL;
+		ib::warn() << "Failed to create FTS common table "
+			<< fts_table_name;
+	}
+	return(new_table);
+}
+
+/** Creates the common auxiliary tables needed for supporting an FTS index
 on the given table. row_mysql_lock_data_dictionary must have been called
 before this.
+The following tables are created.
+CREATE TABLE $FTS_PREFIX_DELETED
+	(doc_id BIGINT UNSIGNED, UNIQUE CLUSTERED INDEX on doc_id)
+CREATE TABLE $FTS_PREFIX_DELETED_CACHE
+	(doc_id BIGINT UNSIGNED, UNIQUE CLUSTERED INDEX on doc_id)
+CREATE TABLE $FTS_PREFIX_BEING_DELETED
+	(doc_id BIGINT UNSIGNED, UNIQUE CLUSTERED INDEX on doc_id)
+CREATE TABLE $FTS_PREFIX_BEING_DELETED_CACHE
+	(doc_id BIGINT UNSIGNED, UNIQUE CLUSTERED INDEX on doc_id)
+CREATE TABLE $FTS_PREFIX_CONFIG
+	(key CHAR(50), value CHAR(200), UNIQUE CLUSTERED INDEX on key)
+@param[in,out]	trx			transaction
+@param[in]	table			table with FTS index
+@param[in]	name			table name normalized
+@param[in]	skip_doc_id_index	Skip index on doc id
 @return DB_SUCCESS if succeed */
 dberr_t
 fts_create_common_tables(
-/*=====================*/
-	trx_t*		trx,		/*!< in: transaction */
-	const dict_table_t* table,	/*!< in: table with FTS index */
-	const char*	name,		/*!< in: table name normalized.*/
-	bool		skip_doc_id_index)/*!< in: Skip index on doc id */
+	trx_t*			trx,
+	const dict_table_t*	table,
+	const char*		name,
+	bool			skip_doc_id_index)
 {
 	dberr_t		error;
 	que_t*		graph;
@@ -1817,7 +1900,13 @@ fts_create_common_tables(
 	char		fts_name[MAX_FULL_NAME_LEN];
 	char		full_name[sizeof(fts_common_tables) / sizeof(char*)]
 				[MAX_FULL_NAME_LEN];
-	ulint		i;
+
+	dict_index_t*					index = NULL;
+	trx_dict_op_t					op;
+	/* common_tables vector is used for dropping FTS common tables
+	on error condition. */
+	std::vector<dict_table_t*>			common_tables;
+	std::vector<dict_table_t*>::const_iterator	it;
 
 	FTS_INIT_FTS_TABLE(&fts_table, NULL, FTS_COMMON_TABLE, table);
 
@@ -1829,27 +1918,28 @@ fts_create_common_tables(
 	}
 
 	/* Create the FTS tables that are common to an FTS index. */
-	info = pars_info_create();
-
-	for (i = 0; fts_common_tables[i] != NULL; ++i) {
+	for (ulint i = 0; fts_common_tables[i] != NULL; ++i) {
 
 		fts_table.suffix = fts_common_tables[i];
 		fts_get_table_name(&fts_table, full_name[i]);
+		dict_table_t*	common_table = fts_create_one_common_table(
+			trx, table, full_name[i], fts_table.suffix, heap);
 
-		pars_info_bind_id(info, true,
-				  fts_common_tables[i], full_name[i]);
-	}
+		 if (common_table == NULL) {
+			error = DB_ERROR;
+			goto func_exit;
+		} else {
+			common_tables.push_back(common_table);
+		}
 
-	graph = fts_parse_sql_no_dict_lock(NULL, info,
-					   fts_create_common_tables_sql);
+		DBUG_EXECUTE_IF("ib_fts_aux_table_error",
+			/* Return error after creating FTS_AUX_CONFIG table. */
+			if (i == 4) {
+				error = DB_ERROR;
+				goto func_exit;
+			}
+		);
 
-	error = fts_eval_sql(trx, graph);
-
-	que_graph_free(graph);
-
-	if (error != DB_SUCCESS) {
-
-		goto func_exit;
 	}
 
 	/* Write the default settings to the config table. */
@@ -1871,80 +1961,59 @@ fts_create_common_tables(
 		goto func_exit;
 	}
 
-	info = pars_info_create();
+	index = dict_mem_index_create(
+		name, FTS_DOC_ID_INDEX_NAME, table->space,
+		DICT_UNIQUE, 1);
+	dict_mem_index_add_field(index, FTS_DOC_ID_COL_NAME, 0);
 
-	pars_info_bind_id(info, TRUE, "table_name", name);
-	pars_info_bind_id(info, TRUE, "index_name", FTS_DOC_ID_INDEX_NAME);
-	pars_info_bind_id(info, TRUE, "doc_id_col_name", FTS_DOC_ID_COL_NAME);
+	op = trx_get_dict_operation(trx);
 
-	/* Create the FTS DOC_ID index on the hidden column. Currently this
-	is common for any FT index created on the table. */
-	graph = fts_parse_sql_no_dict_lock(
-		NULL,
-		info,
-		mem_heap_printf(
-			heap,
-			"BEGIN\n"
-			""
-			"CREATE UNIQUE INDEX $index_name ON $table_name("
-			"$doc_id_col_name);\n"));
+	error =	row_create_index_for_mysql(index, trx, NULL, NULL);
 
-	error = fts_eval_sql(trx, graph);
-	que_graph_free(graph);
+	trx->dict_operation = op;
 
 func_exit:
 	if (error != DB_SUCCESS) {
-		/* We have special error handling here */
 
-		trx->error_state = DB_SUCCESS;
-
-		trx_rollback_to_savepoint(trx, NULL);
-
-		row_drop_table_for_mysql(table->name.m_name, trx, FALSE);
-
-		trx->error_state = DB_SUCCESS;
+		for (it = common_tables.begin(); it != common_tables.end();
+		     ++it) {
+			row_drop_table_for_mysql(
+				(*it)->name.m_name, trx, FALSE);
+		}
 	}
 
+	common_tables.clear();
 	mem_heap_free(heap);
 
 	return(error);
 }
-
-/*************************************************************//**
-Wrapper function of fts_create_index_tables_low(), create auxiliary
-tables for an FTS index
-@return: DB_SUCCESS or error code */
+/** Creates one FTS auxiliary index table for an FTS index.
+@param[in,out]	trx		transaction
+@param[in]	index		the index instance
+@param[in]	fts_table	fts_table structure
+@param[in]	heap		memory heap
+@return DB_SUCCESS or error code */
 static
 dict_table_t*
 fts_create_one_index_table(
-/*=======================*/
-	trx_t*		trx,		/*!< in: transaction */
-	const dict_index_t*
-			index,		/*!< in: the index instance */
-	fts_table_t*	fts_table,	/*!< in: fts_table structure */
-	mem_heap_t*	heap)		/*!< in: heap */
+	trx_t*			trx,
+	const dict_index_t*	index,
+	fts_table_t*		fts_table,
+	mem_heap_t*		heap)
 {
 	dict_field_t*		field;
 	dict_table_t*		new_table = NULL;
 	char			table_name[MAX_FULL_NAME_LEN];
 	dberr_t			error;
 	CHARSET_INFO*		charset;
-	ulint			flags2 = 0;
 
 	ut_ad(index->type & DICT_FTS);
 
 	fts_get_table_name(fts_table, table_name);
 
-	/* Use the file_per_table setting from the main file */
-	flags2 = fts_table->table->flags2
-		 & DICT_TF2_USE_FILE_PER_TABLE;
-
-	new_table = dict_mem_table_create(table_name, 0, 5, 1, flags2);
-
-	if (DICT_TF_HAS_SHARED_SPACE(fts_table->table->flags)) {
-		new_table->tablespace = mem_heap_strdup(
-			heap, fts_table->table->tablespace);
-	}
+	new_table = fts_create_in_mem_aux_table(
+			table_name, fts_table->table,
+			FTS_AUX_INDEX_TABLE_NUM_COLS);
 
 	field = dict_index_get_nth_field(index, 0);
 	charset = fts_get_charset(field->col->prtype);
@@ -1952,23 +2021,46 @@ fts_create_one_index_table(
 	dict_mem_table_add_col(new_table, heap, "word",
 			       charset == &my_charset_latin1
 			       ? DATA_VARCHAR : DATA_VARMYSQL,
-			       field->col->prtype, FTS_MAX_WORD_LEN);
+			       field->col->prtype,
+			       FTS_INDEX_WORD_LEN);
 
 	dict_mem_table_add_col(new_table, heap, "first_doc_id", DATA_INT,
 			       DATA_NOT_NULL | DATA_UNSIGNED,
-			       sizeof(doc_id_t));
+			       FTS_INDEX_FIRST_DOC_ID_LEN);
 
 	dict_mem_table_add_col(new_table, heap, "last_doc_id", DATA_INT,
 			       DATA_NOT_NULL | DATA_UNSIGNED,
-			       sizeof(doc_id_t));
+			       FTS_INDEX_LAST_DOC_ID_LEN);
 
 	dict_mem_table_add_col(new_table, heap, "doc_count", DATA_INT,
-			       DATA_NOT_NULL | DATA_UNSIGNED, 4);
+			       DATA_NOT_NULL | DATA_UNSIGNED,
+			       FTS_INDEX_DOC_COUNT_LEN);
 
-	dict_mem_table_add_col(new_table, heap, "ilist", DATA_BLOB,
-			       4130048,	0);
+	/* The precise type calculation is as follows:
+	least signficiant byte: MySQL type code (not applicable for sys cols)
+	second least : DATA_NOT_NULL | DATA_BINARY_TYPE
+	third least  : the MySQL charset-collation code (DATA_MTYPE_MAX) */
 
-	error = row_create_table_for_mysql(new_table, trx, false);
+	dict_mem_table_add_col(
+		new_table, heap, "ilist", DATA_BLOB,
+		(DATA_MTYPE_MAX << 16) | DATA_UNSIGNED | DATA_NOT_NULL,
+		FTS_INDEX_ILIST_LEN);
+
+	error = row_create_table_for_mysql(new_table, NULL, trx, false);
+
+	if (error == DB_SUCCESS) {
+		dict_index_t*	index = dict_mem_index_create(
+			table_name, "FTS_INDEX_TABLE_IND", new_table->space,
+			DICT_UNIQUE|DICT_CLUSTERED, 2);
+		dict_mem_index_add_field(index, "word", 0);
+		dict_mem_index_add_field(index, "first_doc_id", 0);
+
+		trx_dict_op_t op = trx_get_dict_operation(trx);
+
+		error =	row_create_index_for_mysql(index, trx, NULL, NULL);
+
+		trx->dict_operation = op;
+	}
 
 	if (error != DB_SUCCESS) {
 		trx->error_state = error;
@@ -1981,27 +2073,23 @@ fts_create_one_index_table(
 	return(new_table);
 }
 
-/*************************************************************//**
-Wrapper function of fts_create_index_tables_low(), create auxiliary
-tables for an FTS index
-@return: DB_SUCCESS or error code */
+/** Create auxiliary index tables for an FTS index.
+@param[in,out]	trx		transaction
+@param[in]	index		the index instance
+@param[in]	table_name	table name
+@param[in]	table_id	the table id
+@return DB_SUCCESS or error code */
 dberr_t
 fts_create_index_tables_low(
-/*========================*/
-	trx_t*		trx,		/*!< in: transaction */
-	const dict_index_t*
-			index,		/*!< in: the index instance */
-	const char*	table_name,	/*!< in: the table name */
-	table_id_t	table_id)	/*!< in: the table id */
-
+	trx_t*			trx,
+	const dict_index_t*	index,
+	const char*		table_name,
+	table_id_t		table_id)
 {
 	ulint		i;
-	que_t*		graph;
 	fts_table_t	fts_table;
 	dberr_t		error = DB_SUCCESS;
-	pars_info_t*	info;
 	mem_heap_t*	heap = mem_heap_create(1024);
-	char		fts_name[MAX_FULL_NAME_LEN];
 
 	fts_table.type = FTS_INDEX_TABLE;
 	fts_table.index_id = index->id;
@@ -2026,10 +2114,13 @@ fts_create_index_tables_low(
 	que_graph_free(graph);
 #endif /* FTS_DOC_STATS_DEBUG */
 
+	/* aux_idx_tables vector is used for dropping FTS AUX INDEX
+	tables on error condition. */
+	std::vector<dict_table_t*>			aux_idx_tables;
+	std::vector<dict_table_t*>::const_iterator	it;
+
 	for (i = 0; i < FTS_NUM_AUX_INDEX && error == DB_SUCCESS; ++i) {
 		dict_table_t*	new_table;
-
-		info = pars_info_create();
 
 		/* Create the FTS auxiliary tables that are specific
 		to an FTS index. We need to preserve the table_id %s
@@ -2039,49 +2130,57 @@ fts_create_index_tables_low(
 		new_table = fts_create_one_index_table(
 			trx, index, &fts_table, heap);
 
-		if (!new_table) {
+		if (new_table == NULL) {
 			error = DB_FAIL;
 			break;
+		} else {
+			aux_idx_tables.push_back(new_table);
 		}
 
-		fts_get_table_name(&fts_table, fts_name);
-
-		pars_info_bind_id(info, true, "table", fts_name);
-
-		graph = fts_parse_sql_no_dict_lock(
-			&fts_table, info, fts_create_index_sql);
-
-		error = fts_eval_sql(trx, graph);
-		que_graph_free(graph);
+		DBUG_EXECUTE_IF("ib_fts_index_table_error",
+			/* Return error after creating FTS_INDEX_5
+			aux table. */
+			if (i == 4) {
+				error = DB_FAIL;
+				break;
+			}
+		);
 	}
 
 	if (error != DB_SUCCESS) {
-		/* We have special error handling here */
 
-		trx->error_state = DB_SUCCESS;
-
-		trx_rollback_to_savepoint(trx, NULL);
-
-		row_drop_table_for_mysql(table_name, trx, FALSE);
-
-		trx->error_state = DB_SUCCESS;
+		for (it = aux_idx_tables.begin(); it != aux_idx_tables.end();
+		     ++it) {
+			row_drop_table_for_mysql(
+				(*it)->name.m_name, trx, FALSE);
+		}
 	}
 
+	aux_idx_tables.clear();
 	mem_heap_free(heap);
 
 	return(error);
 }
 
-/******************************************************************//**
-Creates the column specific ancillary tables needed for supporting an
+/** Creates the column specific ancillary tables needed for supporting an
 FTS index on the given table. row_mysql_lock_data_dictionary must have
 been called before this.
+
+All FTS AUX Index tables have the following schema.
+CREAT TABLE $FTS_PREFIX_INDEX_[1-6](
+	word		VARCHAR(FTS_MAX_WORD_LEN),
+	first_doc_id	INT NOT NULL,
+	last_doc_id	UNSIGNED NOT NULL,
+	doc_count	UNSIGNED INT NOT NULL,
+	ilist		VARBINARY NOT NULL,
+	UNIQUE CLUSTERED INDEX ON (word, first_doc_id))
+@param[in,out]	trx	transaction
+@param[in]	index	index instance
 @return DB_SUCCESS or error code */
 dberr_t
 fts_create_index_tables(
-/*====================*/
-	trx_t*			trx,	/*!< in: transaction */
-	const dict_index_t*	index)	/*!< in: the index instance */
+	trx_t*			trx,
+	const dict_index_t*	index)
 {
 	dberr_t		err;
 	dict_table_t*	table;
@@ -3185,9 +3284,7 @@ fts_doc_free(
 		rbt_free(doc->tokens);
 	}
 
-#ifdef UNIV_DEBUG
-	memset(doc, 0, sizeof(*doc));
-#endif /* UNIV_DEBUG */
+	ut_d(memset(doc, 0, sizeof(*doc)));
 
 	mem_heap_free(heap);
 }
@@ -4593,7 +4690,7 @@ fts_check_token(
 }
 
 /** Add the token and its start position to the token's list of positions.
-@param[in/out]	result_doc	result doc rb tree
+@param[in,out]	result_doc	result doc rb tree
 @param[in]	str		token string
 @param[in]	position	token position */
 static
@@ -4913,19 +5010,16 @@ fts_get_docs_create(
 						fts_get_doc_t instances */
 	fts_cache_t*	cache)			/*!< in: fts cache */
 {
-	ulint		i;
 	ib_vector_t*	get_docs;
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own(&cache->init_lock, RW_LOCK_X));
-#endif
+
 	/* We need one instance of fts_get_doc_t per index. */
-	get_docs = ib_vector_create(
-		cache->self_heap, sizeof(fts_get_doc_t), 4);
+	get_docs = ib_vector_create(cache->self_heap, sizeof(fts_get_doc_t), 4);
 
 	/* Create the get_doc instance, we need one of these
 	per FTS index. */
-	for (i = 0; i < ib_vector_size(cache->indexes); ++i) {
+	for (ulint i = 0; i < ib_vector_size(cache->indexes); ++i) {
 
 		dict_index_t**	index;
 		fts_get_doc_t*	get_doc;
@@ -5296,36 +5390,37 @@ fts_get_doc_id_from_row(
 	return(doc_id);
 }
 
-/*********************************************************************//**
-Extract the doc id from the FTS hidden column.
+/** Extract the doc id from the record that belongs to index.
+@param[in]	table	table
+@param[in]	rec	record contains FTS_DOC_ID
+@param[in]	index	index of rec
+@param[in]	heap	heap memory
 @return doc id that was extracted from rec */
 doc_id_t
 fts_get_doc_id_from_rec(
-/*====================*/
-	dict_table_t*	table,			/*!< in: table */
-	const rec_t*	rec,			/*!< in: rec */
-	mem_heap_t*	heap)			/*!< in: heap */
+	dict_table_t*		table,
+	const rec_t*		rec,
+	const dict_index_t*	index,
+	mem_heap_t*		heap)
 {
 	ulint		len;
 	const byte*	data;
 	ulint		col_no;
 	doc_id_t	doc_id = 0;
-	dict_index_t*	clust_index;
 	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
 	ulint*		offsets = offsets_;
 	mem_heap_t*	my_heap = heap;
 
 	ut_a(table->fts->doc_col != ULINT_UNDEFINED);
 
-	clust_index = dict_table_get_first_index(table);
-
 	rec_offs_init(offsets_);
 
 	offsets = rec_get_offsets(
-		rec, clust_index, offsets, ULINT_UNDEFINED, &my_heap);
+		rec, index, offsets, ULINT_UNDEFINED, &my_heap);
 
-	col_no = dict_col_get_clust_pos(
-		&table->cols[table->fts->doc_col], clust_index);
+	col_no = dict_col_get_index_pos(
+		&table->cols[table->fts->doc_col], index);
+
 	ut_ad(col_no != ULINT_UNDEFINED);
 
 	data = rec_get_nth_field(rec, offsets, col_no, &len);
@@ -5367,12 +5462,12 @@ fts_cache_find_word(
 {
 	ib_rbt_bound_t		parent;
 	const ib_vector_t*	nodes = NULL;
-#ifdef UNIV_SYNC_DEBUG
+#ifdef UNIV_DEBUG
 	dict_table_t*		table = index_cache->index->table;
 	fts_cache_t*		cache = table->fts->cache;
 
-	ut_ad(rw_lock_own((rw_lock_t*) &cache->lock, RW_LOCK_X));
-#endif
+	ut_ad(rw_lock_own(&cache->lock, RW_LOCK_X));
+#endif /* UNIV_DEBUG */
 
 	/* Lookup the word in the rb tree */
 	if (rbt_search(index_cache->words, &parent, text) == 0) {
@@ -5395,13 +5490,9 @@ fts_cache_is_deleted_doc_id(
 	const fts_cache_t*	cache,		/*!< in: cache ito search */
 	doc_id_t		doc_id)		/*!< in: doc id to search for */
 {
-	ulint			i;
-
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(mutex_own(&cache->deleted_lock));
-#endif
 
-	for (i = 0; i < ib_vector_size(cache->deleted_doc_ids); ++i) {
+	for (ulint i = 0; i < ib_vector_size(cache->deleted_doc_ids); ++i) {
 		const fts_update_t*	update;
 
 		update = static_cast<const fts_update_t*>(
@@ -5424,9 +5515,7 @@ fts_cache_append_deleted_doc_ids(
 	const fts_cache_t*	cache,		/*!< in: cache to use */
 	ib_vector_t*		vector)		/*!< in: append to this vector */
 {
-	ulint			i;
-
-	mutex_enter((ib_mutex_t*) &cache->deleted_lock);
+	mutex_enter(const_cast<ib_mutex_t*>(&cache->deleted_lock));
 
 	if (cache->deleted_doc_ids == NULL) {
 		mutex_exit((ib_mutex_t*) &cache->deleted_lock);
@@ -5434,7 +5523,7 @@ fts_cache_append_deleted_doc_ids(
 	}
 
 
-	for (i = 0; i < ib_vector_size(cache->deleted_doc_ids); ++i) {
+	for (ulint i = 0; i < ib_vector_size(cache->deleted_doc_ids); ++i) {
 		fts_update_t*	update;
 
 		update = static_cast<fts_update_t*>(
@@ -5526,15 +5615,23 @@ fts_add_doc_id_column(
 	DICT_TF2_FLAG_SET(table, DICT_TF2_FTS_HAS_DOC_ID);
 }
 
-/*********************************************************************//**
-Update the query graph with a new document id.
-@return Doc ID used */
+/** Add new fts doc id to the update vector.
+@param[in]	table		the table that contains the FTS index.
+@param[in,out]	ufield		the fts doc id field in the update vector.
+				No new memory is allocated for this in this
+				function.
+@param[in,out]	next_doc_id	the fts doc id that has been added to the
+				update vector.  If 0, a new fts doc id is
+				automatically generated.  The memory provided
+				for this argument will be used by the update
+				vector. Ensure that the life time of this
+				memory matches that of the update vector.
+@return the fts doc id used in the update vector */
 doc_id_t
 fts_update_doc_id(
-/*==============*/
-	dict_table_t*	table,		/*!< in: table */
-	upd_field_t*	ufield,		/*!< out: update node */
-	doc_id_t*	next_doc_id)	/*!< in/out: buffer for writing */
+	dict_table_t*	table,
+	upd_field_t*	ufield,
+	doc_id_t*	next_doc_id)
 {
 	doc_id_t	doc_id;
 	dberr_t		error = DB_SUCCESS;
@@ -5600,7 +5697,7 @@ fts_t::fts_t(
 {
 	ut_a(table->fts == NULL);
 
-	mutex_create("fts_bg_threads", &bg_threads_mutex);
+	mutex_create(LATCH_ID_FTS_BG_THREADS, &bg_threads_mutex);
 
 	ib_alloc_t*	heap_alloc = ib_heap_allocator_create(fts_heap);
 
@@ -6268,7 +6365,7 @@ fts_update_hex_format_flag(
 
 	ut_a(flags2 != ULINT32_UNDEFINED);
 
-	return (err);
+	return(err);
 }
 
 /*********************************************************************//**
@@ -6349,7 +6446,7 @@ fts_rename_one_aux_table_to_hex_format(
 			<< "' to '" << new_name << "'.";
 	}
 
-	return (error);
+	return(error);
 }
 
 /**********************************************************************//**
@@ -6381,7 +6478,7 @@ fts_rename_aux_tables_to_hex_format_low(
 		ib::warn() << "Setting parent table " << parent_table->name
 			<< " to hex format failed.";
 		fts_sql_rollback(trx);
-		return (error);
+		return(error);
 	}
 
 	DICT_TF2_FLAG_SET(parent_table, DICT_TF2_FTS_AUX_HEX_NAME);
@@ -6500,7 +6597,7 @@ fts_rename_aux_tables_to_hex_format_low(
 		DICT_TF2_FLAG_UNSET(parent_table, DICT_TF2_FTS_AUX_HEX_NAME);
 	}
 
-	return (error);
+	return(error);
 }
 
 /**********************************************************************//**
@@ -6517,12 +6614,12 @@ fts_fake_hex_to_dec(
 
 #ifdef UNIV_DEBUG
 	int		ret =
-#endif
+#endif /* UNIV_DEBUG */
 	sprintf(tmp_id, UINT64PFx, id);
 	ut_ad(ret == 16);
 #ifdef UNIV_DEBUG
 	ret =
-#endif
+#endif /* UNIV_DEBUG */
 #ifdef _WIN32
 	sscanf(tmp_id, "%016llu", &dec_id);
 #else
@@ -7728,4 +7825,3 @@ func_exit:
 
 	return(TRUE);
 }
-

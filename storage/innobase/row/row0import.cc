@@ -50,7 +50,7 @@ reads to fail. If you set the buffer size to be greater than a multiple of the
 file size then it will assert. TODO: Fix this limitation of the IO functions.
 @param n page size of the tablespace.
 @retval number of pages */
-#define IO_BUFFER_SIZE(n)	((1024 * 1024) / n)
+#define IO_BUFFER_SIZE(m, n)	((m) / (n))
 
 /** For gathering stats on records during phase I */
 struct row_stats_t {
@@ -137,13 +137,6 @@ struct row_import {
 	@param name of column to look for.
 	@return ULINT_UNDEFINED if not found. */
 	ulint find_col(const char* name) const UNIV_NOTHROW;
-
-	/** Find the index field entry in in the cfg indexes fields.
-	@name - of the index to look for
-	@return instance if found else 0. */
-	const dict_field_t* find_field(
-		const row_index_t*	cfg_index,
-		const char* 		name) const UNIV_NOTHROW;
 
 	/** Get the number of rows for which purge failed during the
 	convert phase.
@@ -1096,30 +1089,6 @@ row_import::find_col(
 }
 
 /**
-Find the index field entry in in the cfg indexes fields.
-@name - of the index to look for
-@return instance if found else 0. */
-const dict_field_t*
-row_import::find_field(
-	const row_index_t*	cfg_index,
-	const char* 		name) const UNIV_NOTHROW
-{
-	const dict_field_t*	field = cfg_index->m_fields;
-
-	for (ulint i = 0; i < cfg_index->m_n_fields; ++i, ++field) {
-		const char*	field_name;
-
-		field_name = field->name();
-
-		if (strcmp(field_name, name) == 0) {
-			return(field);
-		}
-	}
-
-	return(0);
-}
-
-/**
 Check if the index schema that was read from the .cfg file matches the
 in memory index definition.
 @return DB_SUCCESS or error code. */
@@ -1142,51 +1111,60 @@ row_import::match_index_columns(
 		return(DB_ERROR);
 	}
 
+	if (cfg_index->m_n_fields != index->n_fields) {
+
+		ib_errf(thd, IB_LOG_LEVEL_ERROR,
+			ER_TABLE_SCHEMA_MISMATCH,
+			"Index field count %lu doesn't match"
+			" tablespace metadata file value %lu",
+			(ulong) index->n_fields,
+			(ulong) cfg_index->m_n_fields);
+
+		return(DB_ERROR);
+	}
+
 	cfg_index->m_srv_index = index;
 
 	const dict_field_t*	field = index->fields;
+	const dict_field_t*	cfg_field = cfg_index->m_fields;
 
-	for (ulint i = 0; i < index->n_fields; ++i, ++field) {
+	for (ulint i = 0; i < index->n_fields; ++i, ++field, ++cfg_field) {
 
-		const dict_field_t*	cfg_field;
-
-		cfg_field = find_field(cfg_index, field->name);
-
-		if (cfg_field == 0) {
+		if (strcmp(field->name(), cfg_field->name()) != 0) {
 			ib_errf(thd, IB_LOG_LEVEL_ERROR,
 				ER_TABLE_SCHEMA_MISMATCH,
-				"Index %s field %s not found in tablespace"
-				" meta-data file.",
-				index->name(), field->name());
+				"Index field name %s doesn't match"
+				" tablespace metadata field name %s"
+				" for field position %lu",
+				field->name(), cfg_field->name(), (ulong) i);
 
 			err = DB_ERROR;
-		} else {
+		}
 
-			if (cfg_field->prefix_len != field->prefix_len) {
-				ib_errf(thd, IB_LOG_LEVEL_ERROR,
-					ER_TABLE_SCHEMA_MISMATCH,
-					"Index %s field %s prefix len %lu"
-					" doesn't match meta-data file value"
-					" %lu",
-					index->name(), field->name(),
-					(ulong) field->prefix_len,
-					(ulong) cfg_field->prefix_len);
+		if (cfg_field->prefix_len != field->prefix_len) {
+			ib_errf(thd, IB_LOG_LEVEL_ERROR,
+				ER_TABLE_SCHEMA_MISMATCH,
+				"Index %s field %s prefix len %lu"
+				" doesn't match metadata file value"
+				" %lu",
+				index->name(), field->name(),
+				(ulong) field->prefix_len,
+				(ulong) cfg_field->prefix_len);
 
-				err = DB_ERROR;
-			}
+			err = DB_ERROR;
+		}
 
-			if (cfg_field->fixed_len != field->fixed_len) {
-				ib_errf(thd, IB_LOG_LEVEL_ERROR,
-					ER_TABLE_SCHEMA_MISMATCH,
-					"Index %s field %s fixed len %lu"
-					" doesn't match meta-data file value"
-					" %lu",
-					index->name(), field->name(),
-					(ulong) field->fixed_len,
-					(ulong) cfg_field->fixed_len);
+		if (cfg_field->fixed_len != field->fixed_len) {
+			ib_errf(thd, IB_LOG_LEVEL_ERROR,
+				ER_TABLE_SCHEMA_MISMATCH,
+				"Index %s field %s fixed len %lu"
+				" doesn't match metadata file value"
+				" %lu",
+				index->name(), field->name(),
+				(ulong) field->fixed_len,
+				(ulong) cfg_field->fixed_len);
 
-				err = DB_ERROR;
-			}
+			err = DB_ERROR;
 		}
 	}
 
@@ -1918,9 +1896,6 @@ PageConverter::update_header(
 		return(DB_UNSUPPORTED);
 	}
 
-	mach_write_to_8(
-		get_frame(block) + FIL_PAGE_FILE_FLUSH_LSN, m_current_lsn);
-
 	/* Write space_id to the tablespace header, page 0. */
 	mach_write_to_4(
 		get_frame(block) + FSP_HEADER_OFFSET + FSP_SPACE_ID,
@@ -2021,21 +1996,9 @@ PageConverter::validate(
 		return(IMPORT_PAGE_STATUS_CORRUPTED);
 
 	} else if (offset > 0 && page_get_page_no(page) == 0) {
-		const byte*	b = page;
-		const byte*	e = b + m_page_size.physical();
 
-		/* If the page number is zero and offset > 0 then
-		the entire page MUST consist of zeroes. If not then
-		we flag it as corrupt. */
-
-		while (b != e) {
-
-			if (*b++ && !trigger_corruption()) {
-				return(IMPORT_PAGE_STATUS_CORRUPTED);
-			}
-		}
-
-		/* The page is all zero: do nothing. */
+		/* The page is all zero: do nothing. We already checked
+		for all NULs in buf_page_is_corrupted() */
 		return(IMPORT_PAGE_STATUS_ALL_ZERO);
 	}
 
@@ -3466,7 +3429,7 @@ row_import_for_mysql(
 
 	/* Prevent DDL operations while we are checking. */
 
-	rw_lock_s_lock_func(&dict_operation_lock, 0, __FILE__, __LINE__);
+	rw_lock_s_lock_func(dict_operation_lock, 0, __FILE__, __LINE__);
 
 	row_import	cfg;
 
@@ -3493,14 +3456,14 @@ row_import_for_mysql(
 			autoinc = cfg.m_autoinc;
 		}
 
-		rw_lock_s_unlock_gen(&dict_operation_lock, 0);
+		rw_lock_s_unlock_gen(dict_operation_lock, 0);
 
 		DBUG_EXECUTE_IF("ib_import_set_index_root_failure",
 				err = DB_TOO_MANY_CONCURRENT_TRXS;);
 
 	} else if (cfg.m_missing) {
 
-		rw_lock_s_unlock_gen(&dict_operation_lock, 0);
+		rw_lock_s_unlock_gen(dict_operation_lock, 0);
 
 		/* We don't have a schema file, we will have to discover
 		the index root pages from the .ibd file and skip the schema
@@ -3513,7 +3476,9 @@ row_import_for_mysql(
 		FetchIndexRootPages	fetchIndexRootPages(table, trx);
 
 		err = fil_tablespace_iterate(
-			table, IO_BUFFER_SIZE(cfg.m_page_size.physical()),
+			table, IO_BUFFER_SIZE(
+				cfg.m_page_size.physical(),
+				cfg.m_page_size.physical()),
 			fetchIndexRootPages);
 
 		if (err == DB_SUCCESS) {
@@ -3530,7 +3495,7 @@ row_import_for_mysql(
 		}
 
 	} else {
-		rw_lock_s_unlock_gen(&dict_operation_lock, 0);
+		rw_lock_s_unlock_gen(dict_operation_lock, 0);
 	}
 
 	if (err != DB_SUCCESS) {
@@ -3549,7 +3514,9 @@ row_import_for_mysql(
 	/* Set the IO buffer size in pages. */
 
 	err = fil_tablespace_iterate(
-		table, IO_BUFFER_SIZE(cfg.m_page_size.physical()), converter);
+		table, IO_BUFFER_SIZE(
+			cfg.m_page_size.physical(),
+			cfg.m_page_size.physical()), converter);
 
 	DBUG_EXECUTE_IF("ib_import_reset_space_and_lsn_failure",
 			err = DB_TOO_MANY_CONCURRENT_TRXS;);
@@ -3711,7 +3678,7 @@ row_import_for_mysql(
 	of delete marked records that couldn't be purged in Phase I. */
 
 	buf_LRU_flush_or_remove_pages(
-		prebuilt->table->space, BUF_REMOVE_FLUSH_WRITE, trx);
+		prebuilt->table->space, BUF_REMOVE_FLUSH_WRITE,	trx);
 
 	if (trx_is_interrupted(trx)) {
 		ib::info() << "Phase III - Flush interrupted";
@@ -3743,14 +3710,15 @@ row_import_for_mysql(
 	table->ibd_file_missing = false;
 	table->flags2 &= ~DICT_TF2_DISCARDED;
 
-	if (autoinc != 0) {
-		ib::info() << table->name << " autoinc value set to "
-			<< autoinc;
+	/* Set autoinc value read from cfg file. The value is set to zero
+	if the cfg file is missing and is initialized later from table
+	column value. */
+	ib::info() << table->name << " autoinc value set to "
+		<< autoinc;
 
-		dict_table_autoinc_lock(table);
-		dict_table_autoinc_initialize(table, autoinc);
-		dict_table_autoinc_unlock(table);
-	}
+	dict_table_autoinc_lock(table);
+	dict_table_autoinc_initialize(table, autoinc);
+	dict_table_autoinc_unlock(table);
 
 	ut_a(err == DB_SUCCESS);
 

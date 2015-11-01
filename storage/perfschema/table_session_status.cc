@@ -58,7 +58,8 @@ table_session_status::m_share=
   sizeof(pos_t),
   &m_table_lock,
   &m_field_def,
-  false /* checked */
+  false, /* checked */
+  true   /* perpetual */
 };
 
 PFS_engine_table*
@@ -92,7 +93,7 @@ int table_session_status::rnd_init(bool scan)
     return 0;
 
  /* Build a cache of all status variables for this thread. */
-  m_status_cache.materialize_session(current_thd);
+  m_status_cache.materialize_all(current_thd);
 
   /* Record the current number of status variables to detect subsequent changes. */
   ulonglong status_version= m_status_cache.get_status_array_version();

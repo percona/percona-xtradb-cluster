@@ -15,7 +15,7 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
 
-/* 
+/*
 
    TODO: print the catalog (some USE catalog.db ????).
 
@@ -68,6 +68,185 @@ using std::min;
 using std::max;
 
 #define PROBE_HEADER_LEN	(EVENT_LEN_OFFSET+4)
+
+/*
+  Map containing the names of databases to be rewritten,
+  to a different one.
+*/
+static
+std::map<std::string, std::string> map_mysqlbinlog_rewrite_db;
+
+static bool
+rewrite_db(char **buf, ulong *buf_size,
+           uint offset_db, uint offset_len)
+{
+  char* ptr= *buf;
+  char* old_db= ptr + offset_db;
+  uint old_db_len= (uint) ptr[offset_len];
+  std::map<std::string, std::string>::iterator new_db_it=
+    map_mysqlbinlog_rewrite_db.find(std::string(old_db, old_db_len));
+  if (new_db_it == map_mysqlbinlog_rewrite_db.end())
+    return false;
+  const char *new_db=new_db_it->second.c_str();
+  DBUG_ASSERT(new_db && new_db != old_db);
+
+  size_t new_db_len= strlen(new_db);
+
+  // Reallocate buffer if needed.
+  if (new_db_len > old_db_len)
+  {
+    char *new_buf= (char *) my_realloc(PSI_NOT_INSTRUMENTED, *buf,
+                                       *buf_size + new_db_len - old_db_len, MYF(0));
+    if (!new_buf)
+      return true;
+    *buf= new_buf;
+  }
+
+  // Move the tail of buffer to the correct place.
+  if (new_db_len != old_db_len)
+    memmove(*buf + offset_db + new_db_len,
+            *buf + offset_db + old_db_len,
+            *buf_size - (offset_db + old_db_len));
+
+  // Write new_db and new_db_len.
+  strncpy((*buf) + offset_db, new_db, new_db_len);
+  (*buf)[offset_len]= (char) new_db_len;
+
+  // Update event length in header.
+  int4store((*buf) + EVENT_LEN_OFFSET, (*buf_size) - old_db_len + new_db_len);
+
+  // finally update the event len argument
+  *buf_size= (*buf_size) - old_db_len + new_db_len;
+
+  return false;
+}
+
+/**
+  Replace the database by another database in the buffer of a
+  Table_map_log_event.
+
+  The TABLE_MAP event buffer structure :
+
+  Before Rewriting :
+
+    +-------------+-----------+----------+------+----------------+
+    |common_header|post_header|old_db_len|old_db|event data...   |
+    +-------------+-----------+----------+------+----------------+
+
+  After Rewriting :
+
+    +-------------+-----------+----------+------+----------------+
+    |common_header|post_header|new_db_len|new_db|event data...   |
+    +-------------+-----------+----------+------+----------------+
+
+  In case the new database name is longer than the old database
+  length, it will reallocate the buffer.
+
+  @param[in,out] buf                Pointer to event buffer to be processed
+  @param[in,out] event_len          Length of the event
+  @param[in]     fde                The Format_description_log_event
+
+  @retval false Success
+  @retval true Out of memory
+*/
+bool
+Table_map_log_event::rewrite_db_in_buffer(char **buf, ulong *event_len,
+                                          const Format_description_log_event *fde)
+{
+  uint headers_len= fde->common_header_len +
+    fde->post_header_len[binary_log::TABLE_MAP_EVENT - 1];
+
+  return rewrite_db(buf, event_len, headers_len+1, headers_len);
+}
+
+/**
+  Replace the database by another database in the buffer of a
+  Query_log_event.
+
+  The QUERY_EVENT buffer structure:
+
+  Before Rewriting :
+
+    +-------------+-----------+-----------+------+------+
+    |common_header|post_header|status_vars|old_db|...   |
+    +-------------+-----------+-----------+------+------+
+
+  After Rewriting :
+
+    +-------------+-----------+-----------+------+------+
+    |common_header|post_header|status_vars|new_db|...   |
+    +-------------+-----------+-----------+------+------+
+
+  The db_len is inside the post header, more specifically:
+
+    +---------+---------+------+--------+--------+------+
+    |thread_id|exec_time|db_len|err_code|status_vars_len|
+    +---------+---------+------+--------+--------+------+
+
+  Thence we need to change the post header and the payload,
+  which is the one carrying the database name.
+
+  In case the new database name is longer than the old database
+  length, it will reallocate the buffer.
+
+  @param[in,out] buf                Pointer to event buffer to be processed
+  @param[in,out] event_len          Length of the event
+  @param[in]     fde                The Format_description_log_event
+
+  @retval false Success
+  @retval true Out of memory
+*/
+bool
+Query_log_event::rewrite_db_in_buffer(char **buf, ulong *event_len,
+                                      const Format_description_log_event *fde)
+{
+  uint8 common_header_len= fde->common_header_len;
+  uint8 query_header_len= fde->post_header_len[binary_log::QUERY_EVENT-1];
+  char* ptr= *buf;
+  uint sv_len= 0;
+
+  /* Error if the event content is too small */
+  if (*event_len < (common_header_len + query_header_len))
+    return true;
+
+  /* Check if there are status variables in the event */
+  if ((query_header_len - QUERY_HEADER_MINIMAL_LEN) > 0)
+  {
+    sv_len= uint2korr(ptr + common_header_len + Q_STATUS_VARS_LEN_OFFSET);
+  }
+
+  /* now we have a pointer to the position where the database is. */
+  uint offset_len= common_header_len + Q_DB_LEN_OFFSET;
+  uint offset_db= common_header_len + query_header_len + sv_len;
+
+  if ((uint)((*buf)[EVENT_TYPE_OFFSET]) == binary_log::EXECUTE_LOAD_QUERY_EVENT)
+    offset_db+= Binary_log_event::EXECUTE_LOAD_QUERY_EXTRA_HEADER_LEN;
+
+  return rewrite_db(buf, event_len, offset_db, offset_len);
+}
+
+
+static
+bool rewrite_db_filter(char **buf, ulong *event_len,
+                       const Format_description_log_event *fde)
+{
+  if (map_mysqlbinlog_rewrite_db.empty())
+    return false;
+
+  uint event_type= (uint)((*buf)[EVENT_TYPE_OFFSET]);
+
+  switch(event_type)
+  {
+    case binary_log::TABLE_MAP_EVENT:
+      return Table_map_log_event::rewrite_db_in_buffer(buf, event_len, fde);
+    case binary_log::QUERY_EVENT:
+    case binary_log::EXECUTE_LOAD_QUERY_EVENT:
+      return Query_log_event::rewrite_db_in_buffer(buf, event_len, fde);
+    default:
+      break;
+  }
+  return false;
+}
 
 /*
   The character set used should be equal to the one used in mysqld.cc for
@@ -182,19 +361,6 @@ Sid_map *global_sid_map= NULL;
 Checkable_rwlock *global_sid_lock= NULL;
 Gtid_set *gtid_set_included= NULL;
 Gtid_set *gtid_set_excluded= NULL;
-
-/**
-  Function to add a new member in the binlog_rewrite_db list
-  in the form of from_db, to_db pair
-
-  @param from_db    database to be rewritten.
-  @param to_db      new database name to replace from_db.
- */
-void add_binlog_db_rewrite(const char* from_db, const char* to_db)
-{
-  i_string_pair *db_pair = new i_string_pair(from_db, to_db);
-  binlog_rewrite_db.push_back(db_pair);
-}
 
 /**
   Pointer to the Format_description_log_event of the currently active binlog.
@@ -907,9 +1073,9 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
     switch (ev_type) {
     case binary_log::QUERY_EVENT:
     {
+      Query_log_event *qle= (Query_log_event*) ev;
       bool parent_query_skips=
-          !((Query_log_event*) ev)->is_trans_keyword() &&
-           shall_skip_database(((Query_log_event*) ev)->db);
+          !qle->is_trans_keyword() && shall_skip_database(qle->db);
       bool ends_group= ((Query_log_event*) ev)->ends_group();
       bool starts_group= ((Query_log_event*) ev)->starts_group();
 
@@ -1092,9 +1258,66 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
     case binary_log::FORMAT_DESCRIPTION_EVENT:
       delete glob_description_event;
       glob_description_event= (Format_description_log_event*) ev;
+      /*
+        The first FD event in log is always generated
+        from the local server. So if it is first FD event to be
+        processed (i.e., if server_id_from_fd_event is 0),
+        get server_id from the FD event and keep it in
+        server_id_from_fd_event to differentiate between FDs
+        (originated from local server vs another server).
+       */
+      if (print_event_info->server_id_from_fd_event == 0)
+        print_event_info->server_id_from_fd_event= ev->server_id;
+
       print_event_info->common_header_len=
         glob_description_event->common_header_len;
       ev->print(result_file, print_event_info);
+      /*
+        At this point, if we are in transaction that means
+        we are reading a relay log file (transaction cannot
+        spawn across two binary log files, they are writen
+        at once in binlog). When AUTO_POSITION is enabled
+        and if IO thread stopped in between the GTID transaction,
+        upon IO thread restart, Master will send the GTID events
+        again from the begin of the transaction. Hence, we should
+        rollback the old transaction.
+
+        If you are reading FD event that came from Master
+        (first FD event is from the server that owns the relaylog
+        and second one is from Master) and if it's log_pos is > 0
+        then it represents the begin of a master's binary log
+        (any unfinished transaction will not be finished) or that
+        auto_position is enabled (any partial transaction left will
+        not be finished but will be fully retrieved again). On both
+        cases, the next transaction in the relay log will start from the
+        beginning and we must rollback any unfinished transaction
+      */
+      if (ev->server_id !=0 &&
+          ev->server_id != print_event_info->server_id_from_fd_event &&
+          ev->common_header->log_pos > 0)
+      {
+        if (in_transaction)
+        {
+          my_b_printf(&print_event_info->head_cache,
+                      "ROLLBACK /* added by mysqlbinlog */ %s\n",
+                      print_event_info->delimiter);
+        }
+        else if (print_event_info->is_gtid_next_set &&
+                 print_event_info->is_gtid_next_valid)
+        {
+          /*
+            If we are here, then we have seen only GTID_LOG_EVENT
+            of a transaction and did not see even a BEGIN event
+            (in_transaction flag is false). So generate BEGIN event
+            also along with ROLLBACK event.
+          */
+          my_b_printf(&print_event_info->head_cache,
+                      "BEGIN /*added by mysqlbinlog */ %s\n"
+                      "ROLLBACK /* added by mysqlbinlog */ %s\n",
+                      print_event_info->delimiter,
+                      print_event_info->delimiter);
+        }
+      }
       if (head->error == -1)
         goto err;
       if (opt_remote_proto == BINLOG_LOCAL)
@@ -1137,7 +1360,6 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
     {
       Execute_load_query_log_event *exlq= (Execute_load_query_log_event*)ev;
       char *fname= load_processor.grab_fname(exlq->file_id);
-
       if (shall_skip_database(exlq->db))
         print_event_info->skipped_event_in_transaction= true;
       else
@@ -1342,7 +1564,21 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
           Fake rotate events have 'when' set to zero. @c fake_rotate_event(...).
         */
         bool is_fake= (rev->common_header->when.tv_sec == 0);
-        if (!in_transaction && !is_fake)
+        /*
+          'in_transaction' flag is not set to true even after GTID_LOG_EVENT
+          of a transaction is seen. ('mysqlbinlog' tool assumes that there
+          is only one event per DDL transaction other than BEGIN and COMMIT
+          events. Using 'in_transaction' flag and 'starts_group', 'ends_group'
+          flags, DDL transaction generation is handled. Hence 'in_transaction'
+          cannot be set to true after seeing GTID_LOG_EVENT). So in order to
+          see if we are out of a transaction or not, we should check that
+          'in_transaction' is false and we have not seen GTID_LOG_EVENT.
+          To see if a GTID_LOG_EVENT of a transaction is seen or not,
+          we should check is_gtid_next_valid flag is false.
+        */
+        if (!is_fake && !in_transaction &&
+            print_event_info->is_gtid_next_set &&
+            !print_event_info->is_gtid_next_valid)
         {
           /*
             If processing multiple files, we must reset this flag,
@@ -1726,16 +1962,6 @@ static void cleanup()
   }
   delete buff_ev;
 
-  /*
-    @todo Move this clean up code as part 'binlog_rewrite_db' class destructor
-    at the time of its implementation.
-  */
-  i_string_pair *tmp;
-  while ((tmp= binlog_rewrite_db.get()))
-  {
-    delete tmp;
-  }
-
   delete glob_description_event;
   if (mysql)
     mysql_close(mysql);
@@ -1836,9 +2062,8 @@ get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
       sql_print_error("Bad syntax in mysqlbinlog-rewrite-db - empty TO db!\n");
       return 1;
     }
-    option_rewrite_set= TRUE;
-    add_binlog_db_rewrite(from_db, to_db); //add the new from_db, to_db pair in
-                                           // I_List ie. binlog_rewrite_db.
+    /* Add the database to the mapping */
+    map_mysqlbinlog_rewrite_db[from_db]= to_db;
     break;
   }
   case 'p':
@@ -1966,6 +2191,9 @@ static Exit_status safe_connect()
   mysql_options(mysql, MYSQL_OPT_CONNECT_ATTR_RESET, 0);
   mysql_options4(mysql, MYSQL_OPT_CONNECT_ATTR_ADD,
                  "program_name", "mysqlbinlog");
+  mysql_options4(mysql, MYSQL_OPT_CONNECT_ATTR_ADD,
+                "_client_role", "binary_log_listener");
+
   if (!mysql_real_connect(mysql, host, user, pass, 0, port, sock, 0))
   {
     error("Failed on connect: %s", mysql_error(mysql));
@@ -2686,7 +2914,8 @@ static Exit_status check_header(IO_CACHE* file,
         my_b_seek(file, tmp_pos); /* seek back to event's start */
         if (!(new_description_event= (Format_description_log_event*) 
               Log_event::read_log_event(file, glob_description_event,
-                                        opt_verify_binlog_checksum)))
+                                        opt_verify_binlog_checksum,
+                                        rewrite_db_filter)))
           /* EOF can't be hit here normally, so it's a real error */
         {
           error("Could not read a Format_description_log_event event at "
@@ -2719,7 +2948,8 @@ static Exit_status check_header(IO_CACHE* file,
         Log_event *ev;
         my_b_seek(file, tmp_pos); /* seek back to event's start */
         if (!(ev= Log_event::read_log_event(file, glob_description_event,
-                                            opt_verify_binlog_checksum)))
+                                            opt_verify_binlog_checksum,
+                                            rewrite_db_filter)))
         {
           /* EOF can't be hit here normally, so it's a real error */
           error("Could not read a Rotate_log_event event at offset %llu;"
@@ -2833,7 +3063,8 @@ static Exit_status dump_local_log_entries(PRINT_EVENT_INFO *print_event_info,
     my_off_t old_off = my_b_tell(file);
 
     Log_event* ev = Log_event::read_log_event(file, glob_description_event,
-                                              opt_verify_binlog_checksum);
+                                              opt_verify_binlog_checksum,
+                                              rewrite_db_filter);
     if (!ev)
     {
       /*
@@ -3164,7 +3395,6 @@ int main(int argc, char** argv)
 #include "rpl_utility.cc"
 #include "rpl_gtid_sid_map.cc"
 #include "rpl_gtid_misc.cc"
-#include "uuid.cc"
 #include "rpl_gtid_set.cc"
 #include "rpl_gtid_specification.cc"
 #include "rpl_tblmap.cc"

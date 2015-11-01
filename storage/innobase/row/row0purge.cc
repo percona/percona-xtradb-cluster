@@ -46,6 +46,8 @@ Created 3/14/1997 Heikki Tuuri
 #include "log0log.h"
 #include "srv0mon.h"
 #include "srv0start.h"
+#include "handler.h"
+#include "ha_innodb.h"
 
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
@@ -57,18 +59,19 @@ check.
 If you make a change in this module make sure that no codepath is
 introduced where a call to log_free_check() is bypassed. */
 
-/********************************************************************//**
-Creates a purge node to a query graph.
+/** Create a purge node to a query graph.
+@param[in]	parent	parent node, i.e., a thr node
+@param[in]	heap	memory heap where created
 @return own: purge node */
 purge_node_t*
 row_purge_node_create(
-/*==================*/
-	que_thr_t*	parent,		/*!< in: parent node  */
-	mem_heap_t*	heap)		/*!< in: memory heap where created */
+	que_thr_t*	parent,
+	mem_heap_t*	heap)
 {
 	purge_node_t*	node;
 
-	ut_ad(parent && heap);
+	ut_ad(parent != NULL);
+	ut_ad(heap != NULL);
 
 	node = static_cast<purge_node_t*>(
 		mem_heap_zalloc(heap, sizeof(*node)));
@@ -83,7 +86,7 @@ row_purge_node_create(
 
 /***********************************************************//**
 Repositions the pcur in the purge node on the clustered index record,
-if found.
+if found. If the record is not found, close pcur.
 @return TRUE if the record was found */
 static
 ibool
@@ -94,11 +97,10 @@ row_purge_reposition_pcur(
 	mtr_t*		mtr)	/*!< in: mtr */
 {
 	if (node->found_clust) {
-		ibool	found;
+		ut_ad(node->validate_pcur());
 
-		found = btr_pcur_restore_position(mode, &node->pcur, mtr);
+		node->found_clust = btr_pcur_restore_position(mode, &node->pcur, mtr);
 
-		return(found);
 	} else {
 		node->found_clust = row_search_on_row_ref(
 			&node->pcur, mode, node->table, node->ref, mtr);
@@ -106,6 +108,11 @@ row_purge_reposition_pcur(
 		if (node->found_clust) {
 			btr_pcur_store_position(&node->pcur, mtr);
 		}
+	}
+
+	/* Close the current cursor if we fail to position it correctly. */
+	if (!node->found_clust) {
+		btr_pcur_close(&node->pcur);
 	}
 
 	return(node->found_clust);
@@ -131,9 +138,7 @@ row_purge_remove_clust_if_poss_low(
 	ulint			offsets_[REC_OFFS_NORMAL_SIZE];
 	rec_offs_init(offsets_);
 
-#ifdef UNIV_SYNC_DEBUG
-	ut_ad(rw_lock_own(&dict_operation_lock, RW_LOCK_S));
-#endif /* UNIV_SYNC_DEBUG */
+	ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_S));
 
 	index = dict_table_get_first_index(node->table);
 
@@ -184,7 +189,12 @@ func_exit:
 		mem_heap_free(heap);
 	}
 
-	btr_pcur_commit_specify_mtr(&node->pcur, &mtr);
+	/* Persistent cursor is closed if reposition fails. */
+	if (node->found_clust) {
+		btr_pcur_commit_specify_mtr(&node->pcur, &mtr);
+	} else {
+		mtr_commit(&mtr);
+	}
 
 	return(success);
 }
@@ -250,9 +260,15 @@ row_purge_poss_sec(
 	can_delete = !row_purge_reposition_pcur(BTR_SEARCH_LEAF, node, &mtr)
 		|| !row_vers_old_has_index_entry(TRUE,
 						 btr_pcur_get_rec(&node->pcur),
-						 &mtr, index, entry);
+						 &mtr, index, entry,
+						 node->roll_ptr, node->trx_id);
 
-	btr_pcur_commit_specify_mtr(&node->pcur, &mtr);
+	/* Persistent cursor is closed if reposition fails. */
+	if (node->found_clust) {
+		btr_pcur_commit_specify_mtr(&node->pcur, &mtr);
+	} else {
+		mtr_commit(&mtr);
+	}
 
 	return(can_delete);
 }
@@ -487,7 +503,9 @@ row_purge_remove_sec_if_poss_leaf(
 			}
 
 			if (dict_index_is_spatial(index)) {
-				const page_t*   page = btr_cur_get_page(btr_cur);
+				const page_t*   page;
+
+				page = btr_cur_get_page(btr_cur);
 
 				if (!lock_test_prdt_page_lock(
 					page_get_space_id(page),
@@ -504,7 +522,7 @@ row_purge_remove_sec_if_poss_leaf(
 						" record on page "
 						<< page_get_page_no(page)
 						<< ".";
-#endif
+#endif /* UNIV_DEBUG */
 
 					btr_pcur_close(&pcur);
 					mtr_commit(&mtr);
@@ -634,9 +652,7 @@ row_purge_upd_exist_or_extern_func(
 {
 	mem_heap_t*	heap;
 
-#ifdef UNIV_SYNC_DEBUG
-	ut_ad(rw_lock_own(&dict_operation_lock, RW_LOCK_S));
-#endif /* UNIV_SYNC_DEBUG */
+	ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_S));
 
 	if (node->rec_type == TRX_UNDO_UPD_DEL_REC
 	    || (node->cmpl_info & UPD_NODE_NO_ORD_CHANGE)) {
@@ -788,7 +804,8 @@ row_purge_parse_undo_rec(
 	ulint		info_bits;
 	ulint		type;
 
-	ut_ad(node && thr);
+	ut_ad(node != NULL);
+	ut_ad(thr != NULL);
 
 	ptr = trx_undo_rec_get_pars(
 		undo_rec, &type, &node->cmpl_info,
@@ -804,11 +821,13 @@ row_purge_parse_undo_rec(
 	ptr = trx_undo_update_rec_get_sys_cols(ptr, &trx_id, &roll_ptr,
 					       &info_bits);
 	node->table = NULL;
+	node->trx_id = trx_id;
 
 	/* Prevent DROP TABLE etc. from running when we are doing the purge
 	for this row */
 
-	rw_lock_s_lock_inline(&dict_operation_lock, 0, __FILE__, __LINE__);
+try_again:
+	rw_lock_s_lock_inline(dict_operation_lock, 0, __FILE__, __LINE__);
 
 	node->table = dict_table_open_on_id(
 		table_id, FALSE, DICT_TABLE_OP_NORMAL);
@@ -816,6 +835,24 @@ row_purge_parse_undo_rec(
 	if (node->table == NULL) {
 		/* The table has been dropped: no need to do purge */
 		goto err_exit;
+	}
+
+	if (node->table->n_v_cols && !node->table->vc_templ
+	    && dict_table_has_indexed_v_cols(node->table)) {
+		/* Need server fully up for virtual column computation */
+		if (!mysqld_server_started) {
+
+			dict_table_close(node->table, FALSE, FALSE);
+			rw_lock_s_unlock(dict_operation_lock);
+			if (srv_shutdown_state != SRV_SHUTDOWN_NONE) {
+				return(false);
+			}
+			os_thread_sleep(1000000);
+			goto try_again;
+		}
+
+		/* Initialize the template for the table */
+		innobase_init_vc_templ(node->table);
 	}
 
 	/* Disable purging for temp-tables as they are short-lived
@@ -836,14 +873,15 @@ row_purge_parse_undo_rec(
 
 	clust_index = dict_table_get_first_index(node->table);
 
-	if (clust_index == NULL) {
+	if (clust_index == NULL
+	    || dict_index_is_corrupted(clust_index)) {
 		/* The table was corrupt in the data dictionary.
 		dict_set_corrupted() works on an index, and
 		we do not have an index to call it with. */
 close_exit:
 		dict_table_close(node->table, FALSE, FALSE);
 err_exit:
-		rw_lock_s_unlock(&dict_operation_lock);
+		rw_lock_s_unlock(dict_operation_lock);
 		return(false);
 	}
 
@@ -893,6 +931,8 @@ row_purge_record_func(
 {
 	dict_index_t*	clust_index;
 	bool		purged		= true;
+
+	ut_ad(!node->found_clust);
 
 	clust_index = dict_table_get_first_index(node->table);
 
@@ -960,7 +1000,7 @@ row_purge(
 			bool purged = row_purge_record(
 				node, undo_rec, thr, updated_extern);
 
-			rw_lock_s_unlock(&dict_operation_lock);
+			rw_lock_s_unlock(dict_operation_lock);
 
 			if (purged
 			    || srv_shutdown_state != SRV_SHUTDOWN_NONE) {
@@ -1049,3 +1089,52 @@ row_purge_step(
 
 	return(thr);
 }
+
+#ifdef UNIV_DEBUG
+/***********************************************************//**
+Validate the persisent cursor. The purge node has two references
+to the clustered index record - one via the ref member, and the
+other via the persistent cursor.  These two references must match
+each other if the found_clust flag is set.
+@return true if the stored copy of persistent cursor is consistent
+with the ref member.*/
+bool
+purge_node_t::validate_pcur()
+{
+	if (!found_clust) {
+		return(true);
+	}
+
+	if (index == NULL) {
+		return(true);
+	}
+
+	if (index->type == DICT_FTS) {
+		return(true);
+	}
+
+	if (!pcur.old_stored) {
+		return(true);
+	}
+
+	dict_index_t*	clust_index = pcur.btr_cur.index;
+
+	ulint*	offsets = rec_get_offsets(
+		pcur.old_rec, clust_index, NULL, pcur.old_n_fields, &heap);
+
+	/* Here we are comparing the purge ref record and the stored initial
+	part in persistent cursor. Both cases we store n_uniq fields of the
+	cluster index and so it is fine to do the comparison. We note this
+	dependency here as pcur and ref belong to different modules. */
+	int st = cmp_dtuple_rec(ref, pcur.old_rec, offsets);
+
+	if (st != 0) {
+		ib::error() << "Purge node pcur validation failed";
+		ib::error() << rec_printer(ref).str();
+		ib::error() << rec_printer(pcur.old_rec, offsets).str();
+		return(false);
+	}
+
+	return(true);
+}
+#endif /* UNIV_DEBUG */

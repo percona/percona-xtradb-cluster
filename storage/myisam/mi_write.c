@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -527,7 +527,7 @@ int _mi_insert(MI_INFO *info, MI_KEYDEF *keyinfo,
       uint alen, blen, ft2len=info->s->ft2_keyinfo.keylength;
       /* the very first key on the page is always unpacked */
       DBUG_ASSERT((*b & 128) == 0);
-#if HA_FT_MAXLEN >= 127
+#if HA_FT_MAXLEN >= 127 /* TODO: Undefined symbol */
       blen= mi_uint2korr(b); b+=2;
 #else
       blen= *b++;
@@ -541,7 +541,9 @@ int _mi_insert(MI_INFO *info, MI_KEYDEF *keyinfo,
         info->ft1_to_ft2=(DYNAMIC_ARRAY *)
           my_malloc(mi_key_memory_MI_INFO_ft1_to_ft2,
                     sizeof(DYNAMIC_ARRAY), MYF(MY_WME));
-        my_init_dynamic_array(info->ft1_to_ft2, ft2len, NULL, 300, 50);
+        my_init_dynamic_array(info->ft1_to_ft2,
+                              mi_key_memory_MI_INFO_ft1_to_ft2,
+                              ft2len, NULL, 300, 50);
 
         /*
           now, adding all keys from the page to dynarray

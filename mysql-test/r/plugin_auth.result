@@ -26,9 +26,9 @@ SHOW CREATE TABLE mysql.proxies_priv;
 Table	Create Table
 proxies_priv	CREATE TABLE `proxies_priv` (
   `Host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
-  `User` char(16) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `User` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Proxied_host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
-  `Proxied_user` char(16) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Proxied_user` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
   `With_grant` tinyint(1) NOT NULL DEFAULT '0',
   `Grantor` char(77) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -41,6 +41,8 @@ plug@localhost	plug_dest@%
 ## test SET PASSWORD
 Setting password is allowed but it won't affect the authentication mechanism.
 SET PASSWORD = 'plug_dest';
+Warnings:
+Note	1699	SET PASSWORD has no significance for user 'plug'@'%' as authentication plugin does not support it.
 ## test bad credentials
 ERROR 28000: Access denied for user 'plug'@'localhost' (using password: YES)
 ## test bad default plugin : should get CR_AUTH_PLUGIN_CANNOT_LOAD
@@ -277,13 +279,13 @@ SET GLOBAL general_log= @old_general_log;
 set @orig_sql_mode = @@sql_mode;
 set sql_mode=(select replace(@@sql_mode,'NO_AUTO_CREATE_USER',''));
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 GRANT ALL PRIVILEGES ON *.* TO power_user;
 Warnings:
 Warning	1287	Using GRANT for creating new user is deprecated and will be removed in future release. Create new user with CREATE USER statement.
 set sql_mode= @orig_sql_mode;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 GRANT USAGE ON anonymous_db.* TO ''@''
   IDENTIFIED WITH 'test_plugin_server' AS 'power_user';
 Warnings:
@@ -544,6 +546,8 @@ SELECT USER(),CURRENT_USER();
 USER()	CURRENT_USER()
 bug12818542@localhost	bug12818542_dest@localhost
 SET PASSWORD = 'bruhaha';
+Warnings:
+Note	1699	SET PASSWORD has no significance for user 'bug12818542'@'localhost' as authentication plugin does not support it.
 SELECT USER(),CURRENT_USER();
 USER()	CURRENT_USER()
 bug12818542@localhost	bug12818542_dest@localhost
@@ -562,6 +566,8 @@ SELECT USER(),CURRENT_USER();
 USER()	CURRENT_USER()
 bug12818542@localhost	bug12818542_dest@localhost
 SET PASSWORD = 'bruhaha';
+Warnings:
+Note	1699	SET PASSWORD has no significance for user 'bug12818542'@'localhost' as authentication plugin does not support it.
 SELECT USER(),CURRENT_USER();
 USER()	CURRENT_USER()
 bug12818542@localhost	bug12818542_dest@localhost
@@ -581,7 +587,7 @@ ALTER USER employee@localhost PASSWORD EXPIRE;
 # Connecting with the proxied user and executing a query after the
 # proxied user's password is expired
 mysql: [Warning] Using a password on the command line interface can be insecure.
-ERROR 1820 (HY000) at line 1: You must SET PASSWORD before executing this statement
+ERROR 1820 (HY000) at line 1: You must reset your password using ALTER USER statement before executing this statement.
 # Connecting with the proxy user and executing a query after the proxied
 # user's password is expired. Here we are not supposed to get error.
 mysql: [Warning] Using a password on the command line interface can be insecure.
@@ -601,3 +607,158 @@ select USER(),CURRENT_USER();
 USER()	CURRENT_USER()
 bug20537246@localhost	bug20537246@localhost
 DROP USER bug20537246@localhost;
+#
+# Bug #20599280 PASSWORD EXPIRED FLAG SET FOR PROXY USER SESSION WHEN
+#               IT SET FOR PROXIED USER
+#
+CREATE USER 'empl_external'@'localhost' IDENTIFIED WITH test_plugin_server AS 'employee';
+CREATE USER 'employee'@'localhost' IDENTIFIED BY 'passkey';
+GRANT ALL ON *.* TO 'employee'@'localhost';
+GRANT PROXY ON 'employee'@'localhost' TO 'empl_external'@'localhost';
+SELECT USER(), CURRENT_USER, @@PROXY_USER;
+USER()	CURRENT_USER	@@PROXY_USER
+empl_external@localhost	employee@localhost	'empl_external'@'localhost'
+ALTER USER 'employee'@'localhost' PASSWORD EXPIRE;
+SELECT USER(), CURRENT_USER, @@PROXY_USER;
+USER()	CURRENT_USER	@@PROXY_USER
+empl_external@localhost	employee@localhost	'empl_external'@'localhost'
+SELECT USER(), CURRENT_USER, @@PROXY_USER;
+USER()	CURRENT_USER	@@PROXY_USER
+empl_external@localhost	employee@localhost	'empl_external'@'localhost'
+SELECT USER(), CURRENT_USER, @@PROXY_USER;
+ERROR HY000: You must reset your password using ALTER USER statement before executing this statement.
+DROP USER 'employee'@'localhost', 'empl_external'@'localhost';
+#
+# WL#2284: Increase the length of a user name
+#
+# Testing 32 proxy users
+CREATE USER user_name_len_22_01234 IDENTIFIED WITH 'test_plugin_server' AS 'user_name_len_22_0dest';
+CREATE USER user_name_len_22_0dest IDENTIFIED BY 'plug_dest_passwd';
+SELECT plugin,authentication_string FROM mysql.user WHERE User='plug';
+plugin	authentication_string
+## test plugin auth
+ERROR 28000: Access denied for user 'user_name_len_22_01234'@'localhost' (using password: YES)
+GRANT PROXY ON user_name_len_22_0dest TO user_name_len_22_01234;
+test proxies_priv columns
+SELECT * FROM mysql.proxies_priv WHERE user !='root';
+Host	User	Proxied_host	Proxied_user	With_grant	Grantor	Timestamp
+xx	user_name_len_22_01234	%	user_name_len_22_0dest	0	root@localhost	xx
+test mysql.proxies_priv;
+SHOW CREATE TABLE mysql.proxies_priv;
+Table	Create Table
+proxies_priv	CREATE TABLE `proxies_priv` (
+  `Host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `User` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Proxied_host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Proxied_user` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `With_grant` tinyint(1) NOT NULL DEFAULT '0',
+  `Grantor` char(77) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Host`,`User`,`Proxied_host`,`Proxied_user`),
+  KEY `Grantor` (`Grantor`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_bin COMMENT='User proxy privileges'
+SELECT USER(),CURRENT_USER();
+USER()	CURRENT_USER()
+user_name_len_22_01234@localhost	user_name_len_22_0dest@%
+SET NAMES utf8;
+CREATE USER очень_очень_очень_длинный_юзер__ IDENTIFIED WITH 'test_plugin_server' AS 'очень_очень_очень_длинный_дест__';
+CREATE USER очень_очень_очень_длинный_дест__ IDENTIFIED BY 'plug_dest_passwd';
+SELECT plugin,authentication_string FROM mysql.user WHERE User='plug';
+plugin	authentication_string
+## test plugin auth
+ERROR 28000: Access denied for user 'очень_очень_очень_длинный_'@'localhost' (using password: YES)
+GRANT PROXY ON очень_очень_очень_длинный_дест__ TO очень_очень_очень_длинный_юзер__;
+test proxies_priv columns
+SELECT * FROM mysql.proxies_priv WHERE user !='root';
+Host	User	Proxied_host	Proxied_user	With_grant	Grantor	Timestamp
+xx	user_name_len_22_01234	%	user_name_len_22_0dest	0	root@localhost	xx
+xx	очень_очень_очень_длинный_юзер__	%	очень_очень_очень_длинный_дест__	0	root@localhost	xx
+test mysql.proxies_priv;
+SHOW CREATE TABLE mysql.proxies_priv;
+Table	Create Table
+proxies_priv	CREATE TABLE `proxies_priv` (
+  `Host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `User` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Proxied_host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Proxied_user` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `With_grant` tinyint(1) NOT NULL DEFAULT '0',
+  `Grantor` char(77) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Host`,`User`,`Proxied_host`,`Proxied_user`),
+  KEY `Grantor` (`Grantor`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_bin COMMENT='User proxy privileges'
+SELECT USER(),CURRENT_USER();
+USER()	CURRENT_USER()
+очень_очень_очень_длинный_юзер__@localhost	очень_очень_очень_длинный_дест__@%
+# Testing 32 proxy users cleanup
+DROP USER user_name_len_22_01234;
+DROP USER user_name_len_22_0dest;
+DROP USER очень_очень_очень_длинный_юзер__;
+DROP USER очень_очень_очень_длинный_дест__;
+SET NAMES default;
+# Testing 32 users with different authentication plugins
+CREATE USER user_name_len_22_01234@localhost IDENTIFIED WITH 'sha256_password' BY 'auth_string';
+SELECT CURRENT_USER();
+CURRENT_USER()
+user_name_len_22_01234@localhost
+DROP USER user_name_len_22_01234@localhost;
+CREATE USER user_name_len_32_012345678901234@localhost IDENTIFIED WITH 'mysql_native_password' BY 'auth_string';
+SELECT CURRENT_USER();
+CURRENT_USER()
+user_name_len_32_012345678901234@localhost
+DROP USER user_name_len_32_012345678901234@localhost;
+CREATE USER user_name_len_32_012345678901234@localhost IDENTIFIED WITH 'cleartext_plugin_server' AS 'auth_string';
+SELECT CURRENT_USER();
+CURRENT_USER()
+user_name_len_32_012345678901234@localhost
+DROP USER user_name_len_32_012345678901234@localhost;
+# Testing 32 users with different authentication plugins WITH REQUIRE SSL
+CREATE USER user_name_len_22_01234@localhost IDENTIFIED WITH 'sha256_password' BY 'auth_string' REQUIRE SSL;
+SELECT CURRENT_USER();
+CURRENT_USER()
+user_name_len_22_01234@localhost
+DROP USER user_name_len_22_01234@localhost;
+CREATE USER user_name_len_32_012345678901234@localhost IDENTIFIED WITH 'mysql_native_password' BY 'auth_string' REQUIRE SSL;
+SELECT CURRENT_USER();
+CURRENT_USER()
+user_name_len_32_012345678901234@localhost
+DROP USER user_name_len_32_012345678901234@localhost;
+CREATE USER user_name_len_32_012345678901234@localhost IDENTIFIED WITH 'cleartext_plugin_server' AS 'auth_string' REQUIRE SSL;
+SELECT CURRENT_USER();
+CURRENT_USER()
+user_name_len_32_012345678901234@localhost
+DROP USER user_name_len_32_012345678901234@localhost;
+# Testing 32 utf users with different authentication plugins
+SET NAMES utf8;
+CREATE USER очень_очень_очень_длинный_юзер__@localhost IDENTIFIED WITH 'sha256_password' BY 'auth_string';
+SELECT CURRENT_USER();
+CURRENT_USER()
+очень_очень_очень_длинный_юзер__@localhost
+DROP USER очень_очень_очень_длинный_юзер__@localhost;
+CREATE USER очень_очень_очень_длинный_юзер__@localhost IDENTIFIED WITH 'mysql_native_password' BY 'auth_string';
+SELECT CURRENT_USER();
+CURRENT_USER()
+очень_очень_очень_длинный_юзер__@localhost
+DROP USER очень_очень_очень_длинный_юзер__@localhost;
+CREATE USER очень_очень_очень_длинный_юзер__@localhost IDENTIFIED WITH 'cleartext_plugin_server' AS 'auth_string';
+SELECT CURRENT_USER();
+CURRENT_USER()
+очень_очень_очень_длинный_юзер__@localhost
+DROP USER очень_очень_очень_длинный_юзер__@localhost;
+# Testing 32 utf users with different authentication plugins WITH REQUIRE SSL
+CREATE USER очень_очень_очень_длинный_юзер__@localhost IDENTIFIED WITH 'sha256_password' BY 'auth_string' REQUIRE SSL;
+SELECT CURRENT_USER();
+CURRENT_USER()
+очень_очень_очень_длинный_юзер__@localhost
+DROP USER очень_очень_очень_длинный_юзер__@localhost;
+CREATE USER очень_очень_очень_длинный_юзер__@localhost IDENTIFIED WITH 'mysql_native_password' BY 'auth_string' REQUIRE SSL;
+SELECT CURRENT_USER();
+CURRENT_USER()
+очень_очень_очень_длинный_юзер__@localhost
+DROP USER очень_очень_очень_длинный_юзер__@localhost;
+CREATE USER очень_очень_очень_длинный_юзер__@localhost IDENTIFIED WITH 'cleartext_plugin_server' AS 'auth_string' REQUIRE SSL;
+SELECT CURRENT_USER();
+CURRENT_USER()
+очень_очень_очень_длинный_юзер__@localhost
+DROP USER очень_очень_очень_длинный_юзер__@localhost;
+SET NAMES default;

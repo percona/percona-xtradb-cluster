@@ -530,7 +530,7 @@ int set_default_auth_plugin(char *plugin_name, size_t plugin_name_length);
 void acl_log_connect(const char *user, const char *host, const char *auth_as,
 	const char *db, THD *thd,
 enum enum_server_command command);
-int acl_authenticate(THD *thd, size_t com_change_user_pkt_len);
+int acl_authenticate(THD *thd, enum_server_command command);
 bool acl_check_host(const char *host, const char *ip);
 
 /*
@@ -538,13 +538,15 @@ bool acl_check_host(const char *host, const char *ip);
   statement. These attributes are divided into following catagories.
 */
 
-#define DEFAULT_AUTH_ATTR       1    /* update defaults auth */
-#define PLUGIN_ATTR             2    /* update plugin, authentication_string */
-#define SSL_ATTR                4    /* ex: SUBJECT,CIPHER.. */
-#define RESOURCE_ATTR           8    /* ex: MAX_QUERIES_PER_HOUR.. */
-#define PASSWORD_EXPIRE_ATTR    16   /* update password expire col */
-#define ACCESS_RIGHTS_ATTR      32   /* update privileges */
-#define ACCOUNT_LOCK_ATTR       64   /* update account lock status */
+#define NONE_ATTR               0L
+#define DEFAULT_AUTH_ATTR       (1L << 0)    /* update defaults auth */
+#define PLUGIN_ATTR             (1L << 1)    /* update plugin */
+                                             /* authentication_string */
+#define SSL_ATTR                (1L << 2)    /* ex: SUBJECT,CIPHER.. */
+#define RESOURCE_ATTR           (1L << 3)    /* ex: MAX_QUERIES_PER_HOUR.. */
+#define PASSWORD_EXPIRE_ATTR    (1L << 4)    /* update password expire col */
+#define ACCESS_RIGHTS_ATTR      (1L << 5)    /* update privileges */
+#define ACCOUNT_LOCK_ATTR       (1L << 6)    /* update account lock status */
 
 /* rewrite CREATE/ALTER/GRANT user */
 void mysql_rewrite_create_alter_user(THD *thd, String *rlb);
@@ -558,13 +560,15 @@ int check_change_password(THD *thd, const char *host, const char *user,
                           const char *password, size_t password_len);
 bool change_password(THD *thd, const char *host, const char *user,
                      char *password);
-bool mysql_create_user(THD *thd, List <LEX_USER> &list);
-bool mysql_alter_user(THD *thd, List <LEX_USER> &list);
-bool mysql_drop_user(THD *thd, List <LEX_USER> &list);
+bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists);
+bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists);
+bool mysql_drop_user(THD *thd, List <LEX_USER> &list, bool if_exists);
 bool mysql_rename_user(THD *thd, List <LEX_USER> &list);
 
-bool update_auth_str(THD *thd, LEX_USER *Str);
-bool set_and_validate_user_attributes(THD *thd, LEX_USER *Str, ulong &what_to_set);
+bool set_and_validate_user_attributes(THD *thd,
+                                      LEX_USER *Str,
+                                      ulong &what_to_set,
+                                      bool is_privileged_user);
 
 /* sql_auth_cache */
 int wild_case_compare(CHARSET_INFO *cs, const char *str,const char *wildstr);
@@ -572,7 +576,7 @@ bool hostname_requires_resolving(const char *hostname);
 my_bool acl_init(bool dont_read_acl_tables);
 void acl_free(bool end=0);
 my_bool acl_reload(THD *thd); 
-my_bool grant_init();
+bool grant_init(bool skip_grant_tables);
 void grant_free(void);
 my_bool grant_reload(THD *thd);
 ulong acl_get(const char *host, const char *ip,
@@ -641,6 +645,10 @@ bool create_table_precheck(THD *thd, TABLE_LIST *tables,
 bool check_fk_parent_table_access(THD *thd,
                                   HA_CREATE_INFO *create_info,
                                   Alter_info *alter_info);
+bool check_readonly(THD *thd, bool err_if_readonly);
+void err_readonly(THD *thd);
+
+bool is_secure_transport(int vio_type);
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
 
@@ -701,6 +709,17 @@ bool check_global_access(THD *thd, ulong want_access);
 
 /* sql_user_table */
 void close_acl_tables(THD *thd);
+
+#ifndef EMBEDDED_LIBRARY
+typedef enum ssl_artifacts_status
+{
+  SSL_ARTIFACTS_NOT_FOUND= 0,
+  SSL_ARTIFACTS_VIA_OPTIONS,
+  SSL_ARTIFACT_TRACES_FOUND,
+  SSL_ARTIFACTS_AUTO_DETECTED
+} ssl_artifacts_status;
+
+#endif /* EMBEDDED_LIBRARY */
 
 #if defined(HAVE_OPENSSL) && !defined(HAVE_YASSL)
 extern my_bool opt_auto_generate_certs;

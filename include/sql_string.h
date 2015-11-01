@@ -1,7 +1,7 @@
 #ifndef SQL_STRING_INCLUDED
 #define SQL_STRING_INCLUDED
 
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -177,7 +177,7 @@ public:
      m_is_alloced(false)
   { }
   static void *operator new(size_t size, MEM_ROOT *mem_root) throw ()
-  { return (void*) alloc_root(mem_root, size); }
+  { return alloc_root(mem_root, size); }
   static void operator delete(void *ptr_arg, size_t size)
   {
     (void) ptr_arg;
@@ -320,6 +320,14 @@ public:
     DBUG_ASSERT(strlen(m_ptr) == m_length);
   }
 
+  void mem_claim()
+  {
+    if (m_is_alloced)
+    {
+      my_claim(m_ptr);
+    }
+  }
+
   void mem_free()
   {
     if (m_is_alloced)
@@ -331,6 +339,7 @@ public:
       m_length= 0;				/* Safety */
     }
   }
+
   bool alloc(size_t arg_length)
   {
     if (arg_length < m_alloced_length)
@@ -434,6 +443,7 @@ public:
   bool append(const char *s, size_t arg_length);
   bool append(const char *s, size_t arg_length, const CHARSET_INFO *cs);
   bool append_ulonglong(ulonglong val);
+  bool append_longlong(longlong val);
   bool append(IO_CACHE* file, size_t arg_length);
   bool append_with_prefill(const char *s, size_t arg_length, 
 			   size_t full_length, char fill_char);
@@ -511,8 +521,7 @@ public:
   }
 
   void qs_append(const char *str, size_t len);
-  void qs_append(double d);
-  void qs_append(double *d);
+  void qs_append(double d, size_t len);
   void qs_append(const char c)
   {
      m_ptr[m_length]= c;
@@ -645,4 +654,8 @@ inline LEX_CSTRING to_lex_cstring(const char *s)
   LEX_CSTRING cstr= { s, s != NULL ? strlen(s) : 0 };
   return cstr;
 }
+
+bool
+validate_string(const CHARSET_INFO *cs, const char *str, uint32 length,
+                size_t *valid_length, bool *length_error);
 #endif /* SQL_STRING_INCLUDED */

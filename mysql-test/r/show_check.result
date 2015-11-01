@@ -308,7 +308,7 @@ i	float(3,0)	NULL	YES		NULL		select,insert,update,references
 drop table t1;
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 create table t1 (
 type_bool bool not null default 0,
 type_tiny tinyint not null auto_increment primary key,
@@ -389,7 +389,7 @@ f	float(3,3)	YES		NULL
 drop table t1;
 SET @old_sql_mode= @@sql_mode, sql_mode= '';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 SET @old_sql_quote_show_create= @@sql_quote_show_create, sql_quote_show_create= OFF;
 CREATE TABLE ```ab``cd``` (i INT);
 SHOW CREATE TABLE ```ab``cd```;
@@ -446,7 +446,7 @@ DROP TABLE `table`;
 SET sql_quote_show_create= @old_sql_quote_show_create;
 SET sql_mode= @old_sql_mode;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 select @@max_heap_table_size;
 @@max_heap_table_size
 1048576
@@ -530,7 +530,7 @@ insert into mysqltest.t1 values(1);
 set @orig_sql_mode = @@sql_mode;
 set sql_mode=(select replace(@@sql_mode,'NO_AUTO_CREATE_USER',''));
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 grant select on `mysqltest`.* to mysqltest_1@localhost;
 Warnings:
 Warning	1287	Using GRANT for creating new user is deprecated and will be removed in future release. Create new user with CREATE USER statement.
@@ -542,7 +542,7 @@ Warnings:
 Warning	1287	Using GRANT for creating new user is deprecated and will be removed in future release. Create new user with CREATE USER statement.
 set sql_mode= @orig_sql_mode;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 select * from t1;
 a
 1
@@ -1141,11 +1141,11 @@ def	information_schema	ROUTINES	ROUTINES	IS_DETERMINISTIC	IS_DETERMINISTIC	253	9
 def	information_schema	ROUTINES	ROUTINES	SQL_DATA_ACCESS	SQL_DATA_ACCESS	253	192	12	N	1	0	33
 def	information_schema	ROUTINES	ROUTINES	SQL_PATH	SQL_PATH	253	192	0	Y	0	0	33
 def	information_schema	ROUTINES	ROUTINES	SECURITY_TYPE	SECURITY_TYPE	253	21	7	N	1	0	33
-def	information_schema	ROUTINES	ROUTINES	SQL_MODE	SQL_MODE	253	24576	81	N	1	0	33
+def	information_schema	ROUTINES	ROUTINES	SQL_MODE	SQL_MODE	253	24576	137	N	1	0	33
 def	information_schema	ROUTINES	ROUTINES	ROUTINE_COMMENT	ROUTINE_COMMENT	252	589815	0	N	17	0	33
 def	information_schema	ROUTINES	ROUTINES	DEFINER	DEFINER	253	231	14	N	1	0	33
 SPECIFIC_NAME	ROUTINE_CATALOG	ROUTINE_SCHEMA	ROUTINE_NAME	ROUTINE_TYPE	DTD_IDENTIFIER	ROUTINE_BODY	ROUTINE_DEFINITION	EXTERNAL_NAME	EXTERNAL_LANGUAGE	PARAMETER_STYLE	IS_DETERMINISTIC	SQL_DATA_ACCESS	SQL_PATH	SECURITY_TYPE	SQL_MODE	ROUTINE_COMMENT	DEFINER
-p1	def	test	p1	PROCEDURE	NULL	SQL	SELECT 1	NULL	NULL	SQL	NO	CONTAINS SQL	NULL	DEFINER	ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION		root@localhost
+p1	def	test	p1	PROCEDURE	NULL	SQL	SELECT 1	NULL	NULL	SQL	NO	CONTAINS SQL	NULL	DEFINER	ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION		root@localhost
 ----------------------------------------------------------------
 SHOW CREATE FUNCTION f1;
 Catalog	Database	Table	Table_alias	Column	Column_alias	Type	Length	Max length	Is_null	Flags	Decimals	Charsetnr
@@ -1196,11 +1196,11 @@ def	information_schema	ROUTINES	ROUTINES	IS_DETERMINISTIC	IS_DETERMINISTIC	253	9
 def	information_schema	ROUTINES	ROUTINES	SQL_DATA_ACCESS	SQL_DATA_ACCESS	253	192	12	N	1	0	33
 def	information_schema	ROUTINES	ROUTINES	SQL_PATH	SQL_PATH	253	192	0	Y	0	0	33
 def	information_schema	ROUTINES	ROUTINES	SECURITY_TYPE	SECURITY_TYPE	253	21	7	N	1	0	33
-def	information_schema	ROUTINES	ROUTINES	SQL_MODE	SQL_MODE	253	24576	81	N	1	0	33
+def	information_schema	ROUTINES	ROUTINES	SQL_MODE	SQL_MODE	253	24576	137	N	1	0	33
 def	information_schema	ROUTINES	ROUTINES	ROUTINE_COMMENT	ROUTINE_COMMENT	252	589815	0	N	17	0	33
 def	information_schema	ROUTINES	ROUTINES	DEFINER	DEFINER	253	231	14	N	1	0	33
 SPECIFIC_NAME	ROUTINE_CATALOG	ROUTINE_SCHEMA	ROUTINE_NAME	ROUTINE_TYPE	DTD_IDENTIFIER	ROUTINE_BODY	ROUTINE_DEFINITION	EXTERNAL_NAME	EXTERNAL_LANGUAGE	PARAMETER_STYLE	IS_DETERMINISTIC	SQL_DATA_ACCESS	SQL_PATH	SECURITY_TYPE	SQL_MODE	ROUTINE_COMMENT	DEFINER
-f1	def	test	f1	FUNCTION	int(11)	SQL	RETURN 1	NULL	NULL	SQL	NO	CONTAINS SQL	NULL	DEFINER	ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION		root@localhost
+f1	def	test	f1	FUNCTION	int(11)	SQL	RETURN 1	NULL	NULL	SQL	NO	CONTAINS SQL	NULL	DEFINER	ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION		root@localhost
 ----------------------------------------------------------------
 DROP DATABASE mysqltest1;
 DROP TABLE t1;
@@ -1300,13 +1300,13 @@ insert into mysqltest.t1 values(1);
 set @orig_sql_mode = @@sql_mode;
 set sql_mode='';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 grant select on `mysqltest`.`t1` to mysqltest_4@localhost;
 Warnings:
 Warning	1287	Using GRANT for creating new user is deprecated and will be removed in future release. Create new user with CREATE USER statement.
 set sql_mode= @orig_sql_mode;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 show create database mysqltest;
 Database	Create Database
 mysqltest	CREATE DATABASE `mysqltest` /*!40100 DEFAULT CHARACTER SET latin1 */
@@ -1605,3 +1605,22 @@ SHOW AUTHORS;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AUTHORS' at line 1
 SHOW CONTRIBUTORS;
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONTRIBUTORS' at line 1
+#
+# Bug#20709462: GENERATED COLUMNS NOT PRINTED CORRECTLY IN
+#               SHOW CREATE TABLE
+#
+CREATE TABLE t1 (i CHAR(3),
+n CHAR(20) CHARACTER SET utf8 GENERATED ALWAYS AS (md5(i)));
+# Use SHOW CREATE TABLE output below unmodified to re-create table
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `i` char(3) DEFAULT NULL,
+  `n` char(20) CHARACTER SET utf8 GENERATED ALWAYS AS (md5(i)) VIRTUAL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+DROP TABLE t1;
+CREATE TABLE `t1` (
+`i` char(3) DEFAULT NULL,
+`n` char(20) CHARACTER SET utf8 GENERATED ALWAYS AS (md5(i)) VIRTUAL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+DROP TABLE t1;

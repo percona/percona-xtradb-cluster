@@ -435,29 +435,6 @@ void Item_sum::fix_length_and_dec()
     reject_geometry_args(arg_count, args, this);
 }
 
-
-Item *Item_sum::get_tmp_table_item(THD *thd)
-{
-  Item_sum* sum_item= (Item_sum *) copy_or_same(thd);
-  if (sum_item && sum_item->result_field)	   // If not a const sum func
-  {
-    Field *result_field_tmp= sum_item->result_field;
-    for (uint i=0 ; i < sum_item->arg_count ; i++)
-    {
-      Item *arg= sum_item->args[i];
-      if (!arg->const_item())
-      {
-	if (arg->type() == Item::FIELD_ITEM)
-	  ((Item_field*) arg)->field= result_field_tmp++;
-	else
-	  sum_item->args[i]= new Item_field(result_field_tmp++);
-      }
-    }
-  }
-  return sum_item;
-}
-
-
 bool Item_sum::walk(Item_processor processor, enum_walk walk, uchar *argument)
 {
   if ((walk & WALK_PREFIX) && (this->*processor)(argument))
@@ -1122,7 +1099,8 @@ bool Aggregator_distinct::add()
       sum->count= 1;
       return 0;
     }
-    copy_fields(tmp_table_param);
+    if (copy_fields(tmp_table_param, table->in_use))
+      return true;
     if (copy_funcs(tmp_table_param->items_to_copy, table->in_use))
       return TRUE;
 
@@ -1219,6 +1197,9 @@ void Aggregator_distinct::endup()
           table->file->ha_index_or_rnd_end();
         ha_rows num_rows= 0;
         table->file->ha_records(&num_rows);
+        // We have to initialize hash_index because update_sum_func needs it
+        if (table->hash_field)
+          table->file->ha_index_init(0, false);
         sum->count= static_cast<longlong>(num_rows);
       }
       endup_done= TRUE;
@@ -1715,7 +1696,7 @@ longlong Item_sum_count::val_int()
   DBUG_ASSERT(fixed == 1);
   if (aggr)
     aggr->endup();
-  return (longlong) count;
+  return count;
 }
 
 
@@ -2174,6 +2155,17 @@ Item_sum_hybrid::val_str(String *str)
   if ((null_value= value->null_value))
     DBUG_ASSERT(retval == NULL);
   return retval;
+}
+
+
+bool Item_sum_hybrid::val_json(Json_wrapper *wr)
+{
+  DBUG_ASSERT(fixed);
+  if (null_value)
+    return false;
+  bool ok= value->val_json(wr);
+  null_value= value->null_value;
+  return ok;
 }
 
 
@@ -3506,7 +3498,8 @@ bool Item_func_group_concat::add()
 {
   if (always_null)
     return 0;
-  copy_fields(tmp_table_param);
+  if (copy_fields(tmp_table_param, table->in_use))
+    return true;
   if (copy_funcs(tmp_table_param->items_to_copy, table->in_use))
     return TRUE;
 

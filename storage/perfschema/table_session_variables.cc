@@ -58,7 +58,8 @@ table_session_variables::m_share=
   sizeof(pos_t),
   &m_table_lock,
   &m_field_def,
-  false /* checked */
+  false, /* checked */
+  true   /* perpetual */
 };
 
 PFS_engine_table*
@@ -90,11 +91,8 @@ void table_session_variables::reset_position(void)
 
 int table_session_variables::rnd_init(bool scan)
 {
-  if (show_compatibility_56)
-    return 0;
-
   /* Build a cache of system variables for this thread. */
-  m_sysvar_cache.materialize_session(current_thd);
+  m_sysvar_cache.materialize_all(current_thd);
 
   /* Record the version of the system variable hash. */
   ulonglong hash_version= m_sysvar_cache.get_sysvar_hash_version();
@@ -111,9 +109,6 @@ int table_session_variables::rnd_init(bool scan)
 
 int table_session_variables::rnd_next(void)
 {
-  if (show_compatibility_56)
-    return HA_ERR_END_OF_FILE;
-
   for (m_pos.set_at(&m_next_pos);
        m_pos.m_index < m_sysvar_cache.size();
        m_pos.next())
@@ -134,9 +129,6 @@ int table_session_variables::rnd_next(void)
 
 int table_session_variables::rnd_pos(const void *pos)
 {
-  if (show_compatibility_56)
-    return HA_ERR_RECORD_DELETED;
-
   /* If system variable hash changes, do nothing. */
   if (!m_context->versions_match())
     return HA_ERR_RECORD_DELETED;

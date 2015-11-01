@@ -42,6 +42,7 @@
 #include "sql_show.h"            // append_identifier
 #include "sql_time.h"            // TIME_from_longlong_packed
 #include "strfunc.h"             // find_type
+#include "item_json_func.h"      // Item_func_json_quote
 
 using std::min;
 using std::max;
@@ -94,6 +95,8 @@ void Item_func::set_arguments(List<Item> &list, bool context_free)
         with_sum_func|= item->with_sum_func;
     }
   }
+  else
+    arg_count= 0; // OOM
   list.empty();					// Fields are used
 }
 
@@ -575,6 +578,29 @@ my_decimal *Item_func::val_decimal(my_decimal *decimal_value)
 }
 
 
+type_conversion_status Item_func::save_possibly_as_json(Field *field,
+                                                        bool no_conversions)
+{
+  if (field->type() == MYSQL_TYPE_JSON)
+  {
+    // Store the value in the JSON binary format.
+    Field_json *f= down_cast<Field_json *>(field);
+    Json_wrapper wr;
+    val_json(&wr);
+
+    if (null_value)
+      return set_field_to_null(field);
+
+    field->set_notnull();
+    return f->store_json(&wr);
+  }
+  else
+  {
+    // TODO Convert the JSON value to text.
+    return Item_func::save_in_field(field, no_conversions);
+  }
+}
+
 String *Item_real_func::val_str(String *str)
 {
   DBUG_ASSERT(fixed == 1);
@@ -763,7 +789,7 @@ bool Item_func::count_string_result_length(enum_field_types field_type,
 void Item_func::signal_divide_by_null()
 {
   THD *thd= current_thd;
-  if (thd->is_strict_mode())
+  if (thd->variables.sql_mode & MODE_ERROR_FOR_DIVISION_BY_ZERO)
     push_warning(thd, Sql_condition::SL_WARNING, ER_DIVISION_BY_ZERO,
                  ER(ER_DIVISION_BY_ZERO));
   null_value= 1;
@@ -889,6 +915,174 @@ Item_func::contributes_to_filter(table_map read_tables,
   }
   return (found_comparable ? usable_field : NULL);
 }
+
+/**
+  Return new Item_field if given expression matches GC
+
+  @see JOIN::substitute_gc()
+
+  @param func           Expression to be replaced
+  @param fld            GCs field
+  @param type           Result type to match with Field
+
+  @returns
+    item new Item_field for matched GC
+    NULL otherwise
+*/
+
+Item_field *get_gc_for_expr(Item_func **func, Field *fld, Item_result type)
+{
+  Item_func *expr= down_cast<Item_func*>(fld->gcol_info->expr_item);
+  /*
+    Skip unquoting function. This is needed to address JSON string
+    comparison issue. All JSON_* functions return quoted strings. In
+    order to create usable index, GC column expression has to include
+    JSON_UNQUOTE function, e.g JSON_UNQUOTE(JSON_EXTRACT(..)).
+    Hence, the unquoting function in column expression have to be
+    skipped in order to correctly match GC expr to expr in
+    WHERE condition.  The exception is if user has explicitly used
+    JSON_QUOTE in WHERE condition.
+  */
+  if (!strcmp(expr->func_name(),"json_unquote") &&
+      strcmp((*func)->func_name(),"json_unquote"))
+  {
+    if (expr->arguments()[0]->type() != Item::FUNC_ITEM)
+      return NULL;
+    expr= (Item_func*)expr->arguments()[0];
+  }
+  DBUG_ASSERT(expr->type() == Item::FUNC_ITEM);
+
+  if (type == fld->result_type() && (*func)->eq(expr, false))
+  {
+    Item_field *field= new Item_field(fld);
+    // Mark field for read
+    fld->table->mark_column_used(fld->table->in_use, fld, MARK_COLUMNS_READ);
+    return field;
+  }
+  return NULL;
+}
+
+
+/**
+  Transformer function for GC substitution.
+
+  @param arg  List of indexed GC field
+
+  @return this item 
+
+  @details This function transforms the WHERE condition. It doesn't change
+  'this' item but rather changes its arguments. It takes list of GC fields
+  and checks whether arguments of 'this' item matches them and index over
+  the GC field isn't disabled with hints. If so, it replaces
+  the argument with newly created Item_field which uses the matched GC
+  field. Following functions' arguments could be transformed:
+  - EQ_FUNC, LT_FUNC, LE_FUNC, GE_FUNC, GT_FUNC
+    - Left _or_ right argument if the opposite argument is a constant.
+  - IN_FUNC, BETWEEN
+    - Left argument if all other arguments are constant and of the same type.
+
+  After transformation comparators are updated to take into account the new
+  field.
+*/
+
+Item *Item_func::gc_subst_transformer(uchar *arg)
+{
+  switch(functype()) {
+  case EQ_FUNC:
+  case LT_FUNC:
+  case LE_FUNC:
+  case GE_FUNC:
+  case GT_FUNC:
+  {
+    Item_func **func= NULL;
+    Item **val= NULL;
+    List<Field> *gc_fields= (List<Field> *)arg;
+    List_iterator<Field> li(*gc_fields);
+    // Check if we can substitute a function with a GC
+    if (args[0]->type() == FUNC_ITEM && args[1]->const_item())
+    {
+      func= (Item_func**)args;
+      val= args + 1;
+    }
+    else if (args[1]->type() == FUNC_ITEM && args[0]->const_item())
+    {
+      func= (Item_func**)args + 1;
+      val= args;
+    }
+    if (func)
+    {
+      Field *fld;
+      while((fld= li++))
+      {
+        // Check whether field has usable keys
+        key_map tkm= fld->part_of_key;
+        tkm.intersect(fld->table->keys_in_use_for_query);
+        Item_field *field;
+
+        if (!tkm.is_clear_all() &&
+            (field= get_gc_for_expr(func, fld, (*val)->result_type())))
+        {
+          // Matching expression is found, substutite arg with the new
+          // field
+          fld->table->in_use->change_item_tree(pointer_cast<Item**>(func),
+                                               field);
+          // Adjust comparator
+          ((Item_bool_func2*)this)->set_cmp_func();
+          break;
+        }
+      }
+    }
+    break;
+  }
+  case BETWEEN:
+  case IN_FUNC:
+  {
+    List<Field> *gc_fields= (List<Field> *)arg;
+    List_iterator<Field> li(*gc_fields);
+    if (args[0]->type() != FUNC_ITEM)
+      break;
+    Item_result type= args[1]->result_type();
+    bool can_do_subst= args[1]->const_item();
+    for (uint i= 2; i < arg_count && can_do_subst; i++)
+      if (!args[i]->const_item() || args[i]->result_type() != type)
+      {
+        can_do_subst= false;
+        break;
+      }
+    if (can_do_subst)
+    {
+      Field *fld;
+      while ((fld= li++))
+      {
+        // Check whether field has usable keys
+        key_map tkm= fld->part_of_key;
+        tkm.intersect(fld->table->keys_in_use_for_query);
+        Item_field *field;
+
+        if (!tkm.is_clear_all() &&
+            (field= get_gc_for_expr(pointer_cast<Item_func**>(args), fld,
+                                    type)))
+        {
+          // Matching expression is found, substutite arg[0] with the new
+          // field
+          fld->table->in_use->change_item_tree(pointer_cast<Item**>(args),
+                                               field);
+          // Adjust comparators
+          if (functype() == IN_FUNC)
+            ((Item_func_in*)this)->cleanup_arrays();
+          fix_length_and_dec();
+          break;
+        }
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  return this;
+}
+
 
 double Item_int_func::val_real()
 {
@@ -1220,7 +1414,7 @@ my_decimal *Item_func_numhybrid::val_decimal(my_decimal *decimal_value)
   }
   case REAL_RESULT:
   {
-    double result= (double)real_op();
+    double result= real_op();
     double2my_decimal(E_DEC_FATAL_ERROR, result, decimal_value);
     break;
   }
@@ -3005,7 +3199,8 @@ double my_double_round(double value, longlong dec, bool dec_unsigned,
 
   if (dec_negative && my_isinf(tmp))
     tmp2= 0.0;
-  else if (!dec_negative && my_isinf(value_mul_tmp))
+  else if (!dec_negative &&
+           (my_isinf(value_mul_tmp) || my_isnan(value_mul_tmp)))
     tmp2= value;
   else if (truncate)
   {
@@ -3274,7 +3469,6 @@ void Item_func_min_max::fix_length_and_dec()
                                                        args, arg_count);
     if (datetime_found)
     {
-      thd= current_thd;
       compare_as_dates= TRUE;
       /*
         We should not do this:
@@ -3327,6 +3521,7 @@ uint Item_func_min_max::cmp_datetimes(longlong *value)
   {
     Item **arg= args + i;
     bool is_null;
+    THD *thd= current_thd;
     longlong res= get_datetime_value(thd, &arg, 0, datetime_item, &is_null);
 
     /* Check if we need to stop (because of error or KILL)  and stop the loop */
@@ -3697,6 +3892,16 @@ my_decimal *Item_func_rollup_const::val_decimal(my_decimal *dec)
   return res;
 }
 
+
+bool Item_func_rollup_const::val_json(Json_wrapper *result)
+{
+  DBUG_ASSERT(fixed == 1);
+  bool res= args[0]->val_json(result);
+  null_value= args[0]->null_value;
+  return res;
+}
+
+
 longlong Item_func_length::val_int()
 {
   DBUG_ASSERT(fixed == 1);
@@ -3800,8 +4005,10 @@ void Item_func_locate::print(String *str, enum_query_type query_type)
 
 longlong Item_func_validate_password_strength::val_int()
 {
+  char buff[STRING_BUFFER_USUAL_SIZE];
+  String value(buff, sizeof(buff), system_charset_info);
   String *field= args[0]->val_str(&value);
-  if ((null_value= args[0]->null_value))
+  if ((null_value= args[0]->null_value) || field->length() == 0)
     return 0;
   return (my_calculate_password_strength(field->ptr(), field->length()));
 }
@@ -4160,7 +4367,7 @@ udf_handler::fix_fields(THD *thd, Item_result_field *func,
       f_args.args[i]= NULL;         /* Non-const unless updated below. */
 
       f_args.lengths[i]= arguments[i]->max_length;
-      f_args.maybe_null[i]= (char) arguments[i]->maybe_null;
+      f_args.maybe_null[i]= arguments[i]->maybe_null;
       f_args.attributes[i]= (char*) arguments[i]->item_name.ptr();
       f_args.attribute_lengths[i]= arguments[i]->item_name.length();
 
@@ -4174,7 +4381,7 @@ udf_handler::fix_fields(THD *thd, Item_result_field *func,
           String *res= arguments[i]->val_str(&buffers[i]);
           if (arguments[i]->null_value)
             continue;
-          f_args.args[i]= (char*) res->c_ptr_safe();
+          f_args.args[i]= res->c_ptr_safe();
           f_args.lengths[i]= res->length();
           break;
         }
@@ -4246,7 +4453,7 @@ bool udf_handler::get_arguments()
 	String *res=args[i]->val_str(&buffers[str_count++]);
 	if (!(args[i]->null_value))
 	{
-	  f_args.args[i]=    (char*) res->ptr();
+	  f_args.args[i]=    res->c_ptr_safe();
 	  f_args.lengths[i]= res->length();
 	}
 	else
@@ -5122,7 +5329,8 @@ longlong Item_func_get_lock::val_int()
   /* HASH entries are of type User_level_lock. */
   if (! my_hash_inited(&thd->ull_hash) &&
       my_hash_init(&thd->ull_hash, &my_charset_bin,
-                   16 /* small hash */, 0, 0, ull_get_key, NULL, 0))
+                   16 /* small hash */, 0, 0, ull_get_key, NULL, 0,
+                   key_memory_User_level_lock))
   {
     DBUG_RETURN(0);
   }
@@ -5824,8 +6032,7 @@ bool user_var_entry::store(const void *from, size_t length, Item_result type)
   if (type == DECIMAL_RESULT)
   {
     DBUG_ASSERT(length == sizeof(my_decimal));
-    const my_decimal* dec=
-      static_cast<const my_decimal*>(static_cast<const void*>(from));
+    const my_decimal* dec= static_cast<const my_decimal*>(from);
     dec->sanity_check();
     new (m_ptr) my_decimal(*dec);
   }
@@ -6316,7 +6523,14 @@ bool Item_func_set_user_var::send(Protocol *protocol, String *str_arg)
   {
     check(1);
     update();
-    return protocol->store(result_field);
+    /*
+      Workaround for metadata check in Protocol_text. Legacy Protocol_text
+      is so well designed that it sends fields in text format, and functions'
+      results in binary format. When this func tries to send its data as a
+      field it breaks metadata asserts in the P_text.
+      TODO This func have to be changed to avoid sending data as a field.
+    */
+    return result_field->send_binary(protocol);
   }
   return Item::send(protocol, str_arg);
 }
@@ -7303,7 +7517,15 @@ bool Item_func_match::itemize(Parse_context *pc, Item **res)
 }
 
 
-void Item_func_match::init_search()
+/**
+  Initialize searching within full-text index.
+
+  @param thd    Thread handler
+
+  @returns false if success, true if error
+*/
+
+bool Item_func_match::init_search(THD *thd)
 {
   DBUG_ENTER("Item_func_match::init_search");
 
@@ -7312,7 +7534,7 @@ void Item_func_match::init_search()
     with fix_field
   */
   if (!fixed)
-    DBUG_VOID_RETURN;
+    DBUG_RETURN(false);
 
   TABLE *const table= table_ref->table;
   /* Check if init_search() has been called before */
@@ -7326,16 +7548,19 @@ void Item_func_match::init_search()
     */
     if (join_key)
       table->file->ft_handler= ft_handler;
-    DBUG_VOID_RETURN;
+    DBUG_RETURN(false);
   }
 
   if (key == NO_SUCH_KEY)
   {
     List<Item> fields;
-    fields.push_back(new Item_string(" ",1, cmp_collation.collation));
+    if (fields.push_back(new Item_string(" ",1, cmp_collation.collation)))
+      DBUG_RETURN(true);
     for (uint i= 0; i < arg_count; i++)
       fields.push_back(args[i]);
     concat_ws=new Item_func_concat_ws(fields);
+    if (concat_ws == NULL)
+      DBUG_RETURN(true);
     /*
       Above function used only to get value and do not need fix_fields for it:
       Item_string - basic constant
@@ -7347,9 +7572,11 @@ void Item_func_match::init_search()
 
   if (master)
   {
-    master->init_search();
+    if (master->init_search(thd))
+      DBUG_RETURN(true);
+
     ft_handler=master->ft_handler;
-    DBUG_VOID_RETURN;
+    DBUG_RETURN(false);
   }
 
   String *ft_tmp= 0;
@@ -7372,16 +7599,18 @@ void Item_func_match::init_search()
   if (!table->is_created())
   {
      my_error(ER_NO_FT_MATERIALIZED_SUBQUERY, MYF(0));
-     DBUG_VOID_RETURN;
+     DBUG_RETURN(true);
   }
 
   DBUG_ASSERT(master == NULL);
   ft_handler= table->file->ft_init_ext_with_hints(key, ft_tmp, get_hints());
+  if (thd->is_error())
+    DBUG_RETURN(true);
 
   if (join_key)
     table->file->ft_handler=ft_handler;
 
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(false);
 }
 
 
@@ -7452,16 +7681,16 @@ bool Item_func_match::fix_fields(THD *thd, Item **ref)
   const_item_cache=0;
   for (uint i= 0 ; i < arg_count ; i++)
   {
-    item=args[i];
-    if (item->type() == Item::REF_ITEM)
-      args[i]= item= *((Item_ref *)item)->ref;
-    if (item->type() != Item::FIELD_ITEM)
+    item= args[i]= args[i]->real_item(); 
+    if (item->type() != Item::FIELD_ITEM ||
+        /* Cannot use FTS index with outer table field */
+        (item->used_tables() & OUTER_REF_TABLE_BIT))
     {
-      my_error(ER_WRONG_ARGUMENTS, MYF(0), "AGAINST");
+      my_error(ER_WRONG_ARGUMENTS, MYF(0), "MATCH");
       return TRUE;
     }
     allows_multi_table_search &= 
-      allows_search_on_non_indexed_columns(((Item_field *)item)->table_ref);
+      allows_search_on_non_indexed_columns(((Item_field *)item)->field->table);
   }
 
   /*
@@ -7514,10 +7743,7 @@ bool Item_func_match::fix_fields(THD *thd, Item **ref)
       is made later by JOIN::fts_index_access() function.
     */
     else
-    {
-      table->no_keyread= true;
-      cleanup_table_ref= true;
-    }
+      table->covering_keys.clear_all();
   }
   else
   {
@@ -7551,19 +7777,23 @@ bool Item_func_match::fix_index()
   uint ft_to_key[MAX_KEY], ft_cnt[MAX_KEY], fts=0, keynr;
   uint max_cnt=0, mkeys=0, i;
 
+  if (!table_ref)
+    goto err;
+
   /*
     We will skip execution if the item is not fixed
     with fix_field
   */
   if (!fixed)
-    return false;
+  {
+    if (allows_search_on_non_indexed_columns(table_ref->table))
+      key= NO_SUCH_KEY;
 
+    return false;
+  }
   if (key == NO_SUCH_KEY)
     return 0;
   
-  if (!table_ref) 
-    goto err;
-
   table= table_ref->table;
   for (keynr=0 ; keynr < table->s->keys ; keynr++)
   {
@@ -7628,7 +7858,7 @@ bool Item_func_match::fix_index()
   }
 
 err:
-  if (allows_search_on_non_indexed_columns(table_ref))
+  if (table_ref != 0 && allows_search_on_non_indexed_columns(table_ref->table))
   {
     key=NO_SUCH_KEY;
     return 0;
@@ -8041,6 +8271,34 @@ void Item_func_sp::fix_length_and_dec()
   unsigned_flag= MY_TEST(sp_result_field->flags & UNSIGNED_FLAG);
 
   DBUG_VOID_RETURN;
+}
+
+
+bool Item_func_sp::val_json(Json_wrapper *result)
+{
+  if (sp_result_field->type() == MYSQL_TYPE_JSON)
+  {
+    if (execute())
+    {
+      return true;
+    }
+
+    Field_json *json_value= down_cast<Field_json *>(sp_result_field);
+    return json_value->val_json(result);
+  }
+
+  /* purecov: begin deadcode */
+  DBUG_ABORT();
+  my_error(ER_INVALID_CAST_TO_JSON, MYF(0));
+  return error_json();
+  /* purecov: end */
+}
+
+
+type_conversion_status
+Item_func_sp::save_in_field(Field *field, bool no_conversions)
+{
+  return save_possibly_as_json(field, no_conversions);
 }
 
 

@@ -34,6 +34,7 @@
 #include "mysql/psi/psi.h"
 
 #include <algorithm>
+#include <string>
 
 class Alter_info;
 class SE_cost_constants;     // see opt_costconstants.h
@@ -282,8 +283,12 @@ enum enum_alter_inplace_result {
 /**
   Handler supports Generated Columns
 */
-#define HA_GENERATED_COLUMNS            (1LL << 45)
+#define HA_GENERATED_COLUMNS            (1LL << 46)
 
+/**
+  Supports index on virtual generated column
+*/
+#define HA_CAN_INDEX_VIRTUAL_GENERATED_COLUMN (1LL << 47)
 
 /* bits in index_flags(index_number) for what you can do with index */
 #define HA_READ_NEXT            1       /* TODO really use this flag */
@@ -487,6 +492,9 @@ given at all. */
    This is set whenever a 'TABLESPACE=...' phrase is used on CREATE TABLE
 */
 #define HA_CREATE_USED_TABLESPACE       (1L << 25)
+
+/** COMPRESS="zlib|lz4|none" used during table create. */
+#define HA_CREATE_USED_COMPRESS         (1L << 26)
 
 /*
   This is master database for most of system tables. However there
@@ -768,6 +776,24 @@ struct handlerton
      implemented.
    */
    uint (*partition_flags)();
+
+
+  /**
+    Get the tablespace name from the SE for the given schema and table.
+
+    @param       thd              Thread context.
+    @param       db_name          Name of the relevant schema.
+    @param       table_name       Name of the relevant table.
+    @param [out] tablespace_name  Name of the tablespace containing the table.
+
+    @return Operation status.
+      @retval == 0  Success.
+      @retval != 0  Error (handler error code returned).
+   */
+
+  int (*get_tablespace)(THD* thd, LEX_CSTRING db_name, LEX_CSTRING table_name,
+                        LEX_CSTRING *tablespace_name);
+
    int (*alter_tablespace)(handlerton *hton, THD *thd, st_alter_tablespace *ts_info);
    int (*fill_is_table)(handlerton *hton, THD *thd, TABLE_LIST *tables, 
                         class Item *cond, 
@@ -954,6 +980,16 @@ typedef struct st_ha_create_information
   LEX_STRING connect_string;
   const char *password, *tablespace;
   LEX_STRING comment;
+
+  /**
+  Algorithm (and possible options) to be used for InnoDB's transparent
+  page compression. If this attribute is set then it is hint to the
+  storage engine to try and compress the data using the specified algorithm
+  where possible. Note: this value is interpreted by the storage engine only.
+  and ignored by the Server layer. */
+
+  LEX_STRING compress;
+
   const char *data_file_name, *index_file_name;
   const char *alias;
   ulonglong max_rows,min_rows;
@@ -1169,6 +1205,10 @@ public:
 
   // Alter generated column
   static const HA_ALTER_FLAGS HA_ALTER_STORED_GCOL       = 1ULL << 32;
+
+  // Alter index comment
+  static const HA_ALTER_FLAGS ALTER_INDEX_COMMENT        = 1ULL << 33;
+
   /**
     Create options (like MAX_ROWS) for the new version of table.
 
@@ -3579,6 +3619,29 @@ public:
     return false;
   }
   int get_lock_type() const { return m_lock_type; }
+
+  /**
+    Callback function that will be called by my_prepare_gcolumn_template
+    once the table has been opened.
+  */
+  typedef void (*my_gcolumn_template_callback_t)(const TABLE*, void*);
+  static bool my_prepare_gcolumn_template(THD *thd,
+                                          const char *db_name,
+                                          const char *table_name,
+                                          my_gcolumn_template_callback_t myc,
+                                          void *ib_table);
+  static bool my_eval_gcolumn_expr(THD *thd,
+                                   bool open_in_engine,
+                                   const char *db_name,
+                                   const char *table_name,
+                                   ulonglong fields,
+                                   uchar *record);
+  static bool my_eval_gcolumn_expr(THD *thd,
+                                   const char *db_name,
+                                   const char *table_name,
+                                   ulonglong fields,
+                                   uchar *record);
+
   /* This must be implemented if the handlerton's partition_flags() is set. */
   virtual Partition_handler *get_partition_handler()
   { return NULL; }
@@ -3819,14 +3882,14 @@ int ha_prepare(THD *thd);
   @note
     there are three modes of operation:
     - automatic recover after a crash
-    in this case commit_list != 0, tc_heuristic_recover==0
+    in this case commit_list != 0, tc_heuristic_recover==TC_HEURISTIC_NOT_USED
     all xids from commit_list are committed, others are rolled back
     - manual (heuristic) recover
-    in this case commit_list==0, tc_heuristic_recover != 0
+    in this case commit_list==0, tc_heuristic_recover != TC_HEURISTIC_NOT_USED
     DBA has explicitly specified that all prepared transactions should
     be committed (or rolled back).
     - no recovery (MySQL did not detect a crash)
-    in this case commit_list==0, tc_heuristic_recover == 0
+    in this case commit_list==0, tc_heuristic_recover == TC_HEURISTIC_NOT_USED
     there should be no prepared transactions in this case.
 */
 
@@ -3895,4 +3958,6 @@ inline const char *table_case_name(HA_CREATE_INFO *info, const char *name)
 void print_keydup_error(TABLE *table, KEY *key, const char *msg, myf errflag);
 void print_keydup_error(TABLE *table, KEY *key, myf errflag);
 
+void ha_set_normalized_disabled_se_str(const std::string &disabled_se_str);
+bool ha_is_storage_engine_disabled(handlerton *se_engine);
 #endif /* HANDLER_INCLUDED */

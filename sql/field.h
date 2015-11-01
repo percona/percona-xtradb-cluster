@@ -31,6 +31,8 @@
 #include "mysql_version.h"                      // FRM_VER
 
 class Create_field;
+class Json_dom;
+class Json_wrapper;
 class Protocol;
 class Relay_log_info;
 class Send_field;
@@ -65,6 +67,7 @@ Field (abstract)
 |  |  +--Field_varstring
 |  |  +--Field_blob
 |  |     +--Field_geom
+|  |     +--Field_json
 |  |
 |  +--Field_null
 |  +--Field_enum
@@ -479,11 +482,15 @@ public:
   LEX_STRING expr_str;
   /* It's used to free the items created in parsing generated expression */
   Item *item_free_list;
-  List<Field> base_columns_list;
-  Generated_column() 
-  : expr_item(0), item_free_list(0),
-    field_type(MYSQL_TYPE_LONG),
-    stored_in_db(FALSE)
+  /*
+    A list of all stored (non-generated and stored generated) columns which a
+    generated column depends on. It is used by storage engines.
+  */
+  List<Field> base_columns;
+
+  Generated_column()
+    : expr_item(0), item_free_list(0), base_columns(),
+    field_type(MYSQL_TYPE_LONG), stored_in_db(false)
   {
     expr_str.str= NULL;
     expr_str.length= 0;
@@ -507,6 +514,8 @@ public:
   {
     stored_in_db= stored;
   }
+  bool register_base_columns(TABLE *table);
+
 private:
   /*
     The following data is only updated by the parser and read
@@ -517,7 +526,14 @@ private:
                                     phisically stored in the database*/
 };
 
-class Field
+class Proto_field
+{
+public:
+  virtual bool send_binary(Protocol *protocol)= 0;
+  virtual bool send_text(Protocol *protocol)= 0;
+};
+
+class Field: public Proto_field
 {
   Field(const Item &);				/* Prevent use of these */
   void operator=(Field &);
@@ -595,9 +611,11 @@ public:
   LEX_STRING	comment;
   /* Field is part of the following keys */
   key_map key_start;                /* Keys that starts with this field */
-  key_map part_of_key;              /* All keys that includes this field */
+  /// Indexes which contain this field entirely (not only a prefix)
+  key_map part_of_key;
   key_map part_of_key_not_clustered;/* ^ but only for non-clustered keys */
   key_map part_of_sortkey;          /* ^ but only keys usable for sorting */
+
   /* 
     We use three additional unireg types for TIMESTAMP to overcome limitation 
     of current binary format of .frm file. We'd like to be able to support 
@@ -634,7 +652,11 @@ public:
 
    */
   bool is_created_from_null_item;
-
+  /**
+     True if this field belongs to some index (unlike part_of_key, the index
+     might have only a prefix).
+  */
+  bool m_indexed;
 private:
   enum enum_pushed_warnings
   {
@@ -659,6 +681,8 @@ public:
     As of now, FALSE can only be set for virtual generated columns.
   */
   bool stored_in_db;
+  bool is_gcol() const { return gcol_info; }
+  bool is_virtual_gcol() const { return gcol_info && !stored_in_db; }
 
   Field(uchar *ptr_arg,uint32 length_arg,uchar *null_ptr_arg,
         uchar null_bit_arg, utype unireg_check_arg,
@@ -1300,6 +1324,7 @@ public:
     return str;
   }
   virtual bool send_binary(Protocol *protocol);
+  virtual bool send_text(Protocol *protocol);
 
   virtual uchar *pack(uchar *to, const uchar *from,
                       uint max_length, bool low_byte_first);
@@ -2523,7 +2548,7 @@ protected:
     check_date(), number_to_datetime(), str_to_datetime().
 
     Flags depend on the session sql_mode settings, such as
-    MODE_STRICT_ALL_TABLES, MODE_STRICT_TRANS_TABLES.
+    MODE_NO_ZERO_DATE, MODE_NO_ZERO_IN_DATE.
     Also, Field_newdate, Field_datetime, Field_datetimef add TIME_FUZZY_DATE
     to the session sql_mode settings, to allow relaxed date format,
     while Field_timestamp, Field_timestampf do not.
@@ -2573,7 +2598,7 @@ public:
                  enum utype unireg_check_arg, const char *field_name_arg,
                  uint32 len_arg, uint8 dec_arg)
     :Field(ptr_arg,
-           len_arg + ((dec= normalize_dec(dec_arg)) ? dec + 1 : 0),
+           len_arg + ((dec= normalize_dec(dec_arg)) ? normalize_dec(dec_arg) + 1 : 0),
            null_ptr_arg, null_bit_arg,
            unireg_check_arg, field_name_arg)
     { flags|= BINARY_FLAG; }
@@ -2587,7 +2612,7 @@ public:
   Field_temporal(bool maybe_null_arg, const char *field_name_arg,
                  uint32 len_arg, uint8 dec_arg)
     :Field((uchar *) 0, 
-           len_arg + ((dec= normalize_dec(dec_arg)) ? dec + 1 : 0),
+           len_arg + ((dec= normalize_dec(dec_arg)) ? normalize_dec(dec_arg) + 1 : 0),
            maybe_null_arg ? (uchar *) "" : 0, 0,
            NONE, field_name_arg)
     { flags|= BINARY_FLAG; }
@@ -3582,6 +3607,21 @@ protected:
   */
   String value;
 
+private:
+  /**
+    In order to support update virtual generated columns of blob type,
+    we need to allocate the space blob needs on server for old_row and
+    new_row respectively. This variable is used to record the
+    allocated blob space for old_row.
+  */
+  String old_value;
+  /**
+    Mark if we should copy the content of 'value' to 'old_value'
+    before doing the update. This is used to support update of
+    indexes on virtual generated columns of blob type.
+  */
+  bool keep_old_value;
+protected:
   /**
     Store ptr and length.
   */
@@ -3599,14 +3639,14 @@ public:
              const CHARSET_INFO *cs)
     :Field_longstr((uchar*) 0, len_arg, maybe_null_arg ? (uchar*) "": 0, 0,
                    NONE, field_name_arg, cs),
-    packlength(4)
+    packlength(4), keep_old_value(false)
   {
     flags|= BLOB_FLAG;
   }
   Field_blob(uint32 len_arg,bool maybe_null_arg, const char *field_name_arg,
 	     const CHARSET_INFO *cs, bool set_packlength)
     :Field_longstr((uchar*) 0,len_arg, maybe_null_arg ? (uchar*) "": 0, 0,
-                   NONE, field_name_arg, cs)
+                   NONE, field_name_arg, cs), keep_old_value(false)
   {
     flags|= BLOB_FLAG;
     packlength= 4;
@@ -3620,7 +3660,8 @@ public:
   }
   Field_blob(uint32 packlength_arg)
     :Field_longstr((uchar*) 0, 0, (uchar*) "", 0, NONE, "temp", system_charset_info),
-    packlength(packlength_arg) {}
+    packlength(packlength_arg), keep_old_value(false) {}
+  ~Field_blob() { mem_free(); }
   /* Note that the default copy constructor is used, in clone() */
   enum_field_types type() const { return MYSQL_TYPE_BLOB;}
   bool match_collation_to_optimize_range() const { return true; }
@@ -3667,7 +3708,11 @@ public:
     memset(ptr, 0, packlength+sizeof(uchar*));
     return TYPE_OK;
   }
-  void reset_fields() { memset(&value, 0, sizeof(value)); }
+  void reset_fields()
+  { 
+    memset(&value, 0, sizeof(value)); 
+    memset(&old_value, 0, sizeof(old_value));
+  }
   size_t get_field_buffer_size() { return value.alloced_length(); }
 #ifndef WORDS_BIGENDIAN
   static
@@ -3742,7 +3787,12 @@ public:
                               uint param_data, bool low_byte_first);
   uint packed_col_length(const uchar *col_ptr, uint length);
   uint max_packed_col_length();
-  void mem_free() { value.mem_free(); }
+  void mem_free()
+  {
+    // Free all allocated space
+    value.mem_free();
+    old_value.mem_free();
+  }
   inline void clear_temporary() { memset(&value, 0, sizeof(value)); }
   friend type_conversion_status field_conv(Field *to,Field *from);
   bool has_charset(void) const
@@ -3753,6 +3803,29 @@ public:
   inline bool in_read_set() { return bitmap_is_set(table->read_set, field_index); }
   inline bool in_write_set() { return bitmap_is_set(table->write_set, field_index); }
   virtual bool is_text_key_type() const { return binary() ? false : true; }
+
+  /**
+    Whether to update the current value object or create a new value object.
+
+    This is used when updating virtual generated columns that are BLOBs.
+    In this case we will not update the existing 'value' but move it
+    to 'old_value' and then allocate a new string for storing the new value.
+    This is needed for supporting storage engines that requires the current
+    value for virtual generated columns to be available during an update.
+
+    @param value whether to create a new value string for the blob or just
+                 update the current value
+  */
+  void set_keep_old_value(bool value) { keep_old_value= value; }
+
+  /**
+    Use to store the blob value into an allocated space.
+  */ 
+  void store_in_allocated_space(const char *from, uint32 length)
+  {
+    store_ptr_and_length(from, length);
+  }
+
 private:
   int do_save_field_metadata(uchar *first_byte);
 };
@@ -3783,6 +3856,8 @@ public:
   type_conversion_status store(double nr);
   type_conversion_status store(longlong nr, bool unsigned_val);
   type_conversion_status store_decimal(const my_decimal *);
+  type_conversion_status store(const char *from, size_t length,
+                               const CHARSET_INFO *cs);
 
   /**
     Non-nullable GEOMETRY types cannot have defaults,
@@ -3806,6 +3881,104 @@ public:
     return new Field_geom(*this);
   }
   uint is_equal(Create_field *new_field);
+};
+
+
+/// A field that stores a JSON value.
+class Field_json :public Field_blob
+{
+  type_conversion_status unsupported_conversion();
+  type_conversion_status store_dom(const Json_dom *dom);
+  type_conversion_status store_binary(const char *ptr, size_t length);
+public:
+  Field_json(uchar *ptr_arg, uchar *null_ptr_arg, uint null_bit_arg,
+             enum utype unireg_check_arg, const char *field_name_arg,
+             TABLE_SHARE *share, uint blob_pack_length)
+    : Field_blob(ptr_arg, null_ptr_arg, null_bit_arg, unireg_check_arg,
+                 field_name_arg, share, blob_pack_length, &my_charset_bin)
+  {}
+
+  Field_json(uint32 len_arg, bool maybe_null_arg, const char *field_name_arg)
+    : Field_blob(len_arg, maybe_null_arg, field_name_arg, &my_charset_bin)
+  {}
+
+  enum_field_types type() const { return MYSQL_TYPE_JSON; }
+  void sql_type(String &str) const;
+  /**
+    Return a text charset so that string functions automatically
+    convert the field value to string and treat it as a non-binary
+    string.
+  */
+  const CHARSET_INFO *charset() const { return &my_charset_utf8mb4_bin; }
+  /**
+    Sort should treat the field as binary and not attempt any
+    conversions.
+  */
+  const CHARSET_INFO *sort_charset() const { return field_charset; }
+  /**
+    JSON columns don't have an associated charset. Returning false
+    here prevents SHOW CREATE TABLE from attaching a CHARACTER SET
+    clause to the column.
+  */
+  bool has_charset() const { return false; }
+  type_conversion_status store(const char *to, size_t length,
+                               const CHARSET_INFO *charset);
+  type_conversion_status store(double nr);
+  type_conversion_status store(longlong nr, bool unsigned_val);
+  type_conversion_status store_decimal(const my_decimal *);
+  type_conversion_status store_json(Json_wrapper *json);
+  type_conversion_status store_time(MYSQL_TIME *ltime, uint8 dec_arg);
+  type_conversion_status store(Field_json *field);
+
+  /**
+    Retrieve the field's value as a JSON wrapper. It
+    there is an error, wr is not modified and we return
+    false, else true.
+
+    @param[out]    wr   the JSON value
+    @return true if a value is retrieved (or NULL), false if error
+  */
+  bool val_json(Json_wrapper *wr);
+
+  /**
+    Retrieve the JSON as an int if possible. This requires a JSON scalar
+    of suitable type.
+
+    @returns the JSON value as an int
+  */
+  longlong val_int();
+
+  /**
+   Retrieve the JSON as a double if possible. This requires a JSON scalar
+   of suitable type.
+
+   @returns the JSON value as a double
+   */
+  double val_real();
+
+  /**
+    Retrieve the JSON value stored in this field as text
+
+    @param[in,out] buf1 string buffer for converting JSON value to string
+    @param[in,out] buf2 unused
+  */
+  String *val_str(String *tmp, String *str);
+  my_decimal *val_decimal(my_decimal *m);
+  bool get_time(MYSQL_TIME *ltime);
+  bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate);
+  Field_json *clone(MEM_ROOT *mem_root) const;
+  Field_json *clone() const;
+  uint is_equal(Create_field *new_field);
+  Item_result cast_to_int_type () const { return INT_RESULT; }
+  void make_sort_key(uchar *to, size_t length);
+
+  /**
+    Make a hash key that can be used by sql_executor.cc/unique_hash
+    in order to support SELECT DISTINCT
+
+    @param[in]  hash_val  An initial hash value.
+  */
+  ulonglong make_hash_key(ulonglong *hash_val);
 };
 
 
@@ -4160,6 +4333,12 @@ class Send_field :public Sql_alloc {
   ulong length;
   uint charsetnr, flags, decimals;
   enum_field_types type;
+  /*
+    TRUE <=> source item is an Item_field. Needed to workaround lack of
+    architecture in legacy Protocol_text implementation. Needed only for
+    Protocol_classic and descendants.
+  */
+  bool field;
   Send_field() {}
 };
 
@@ -4275,6 +4454,8 @@ type_conversion_status set_field_to_null_with_conversions(Field *field,
 #define FIELDFLAG_BITFIELD		512	// mangled with decimals!
 #define FIELDFLAG_BLOB			1024	// mangled with decimals!
 #define FIELDFLAG_GEOM			2048    // mangled with decimals!
+#define FIELDFLAG_JSON                  4096    /* mangled with decimals and
+                                                   with bitfields! */
 
 #define FIELDFLAG_TREAT_BIT_AS_CHAR     4096    /* use Field_bit_as_char */
 
@@ -4292,22 +4473,78 @@ type_conversion_status set_field_to_null_with_conversions(Field *field,
 
 #define MTYP_TYPENR(type) (type & 127)	/* Remove bits from type */
 
-#define f_is_dec(x)		((x) & FIELDFLAG_DECIMAL)
-#define f_is_num(x)		((x) & FIELDFLAG_NUMBER)
-#define f_is_zerofill(x)	((x) & FIELDFLAG_ZEROFILL)
-#define f_is_packed(x)		((x) & FIELDFLAG_PACK)
-#define f_packtype(x)		(((x) >> FIELDFLAG_PACK_SHIFT) & 15)
-#define f_decimals(x)		((uint8) (((x) >> FIELDFLAG_DEC_SHIFT) & FIELDFLAG_MAX_DEC))
-#define f_is_alpha(x)		(!f_is_num(x))
-#define f_is_binary(x)          ((x) & FIELDFLAG_BINARY) // 4.0- compatibility
-#define f_is_enum(x)            (((x) & (FIELDFLAG_INTERVAL | FIELDFLAG_NUMBER)) == FIELDFLAG_INTERVAL)
-#define f_is_bitfield(x)        (((x) & (FIELDFLAG_BITFIELD | FIELDFLAG_NUMBER)) == FIELDFLAG_BITFIELD)
-#define f_is_blob(x)		(((x) & (FIELDFLAG_BLOB | FIELDFLAG_NUMBER)) == FIELDFLAG_BLOB)
-#define f_is_geom(x)		(((x) & (FIELDFLAG_GEOM | FIELDFLAG_NUMBER)) == FIELDFLAG_GEOM)
-#define f_is_equ(x)		((x) & (1+2+FIELDFLAG_PACK+31*256))
-#define f_settype(x)		(((int) x) << FIELDFLAG_PACK_SHIFT)
-#define f_maybe_null(x)		(x & FIELDFLAG_MAYBE_NULL)
-#define f_no_default(x)		(x & FIELDFLAG_NO_DEFAULT)
-#define f_bit_as_char(x)        ((x) & FIELDFLAG_TREAT_BIT_AS_CHAR)
+inline int f_is_dec(int x)
+{
+  return (x & FIELDFLAG_DECIMAL);
+}
+inline int f_is_num(int x)
+{
+  return (x & FIELDFLAG_NUMBER);
+}
+inline int f_is_zerofill(int x)
+{
+  return (x & FIELDFLAG_ZEROFILL);
+}
+inline int f_is_packed(int x)
+{
+  return (x & FIELDFLAG_PACK);
+}
+inline int f_packtype(int x)
+{
+  return ((x >> FIELDFLAG_PACK_SHIFT) & 15);
+}
+inline uint8 f_decimals(int x)
+{
+  return ((uint8) ((x >> FIELDFLAG_DEC_SHIFT) & FIELDFLAG_MAX_DEC));
+}
+inline int f_is_alpha(int x)
+{
+  return (!f_is_num(x));
+}
+inline int f_is_binary(int x)
+{
+  return (x & FIELDFLAG_BINARY); // 4.0- compatibility
+}
+inline int f_is_enum(int x)
+{
+  return ((x & (FIELDFLAG_INTERVAL | FIELDFLAG_NUMBER)) == FIELDFLAG_INTERVAL);
+}
+inline int f_is_bitfield(int x)
+{
+  return ((x & (FIELDFLAG_BITFIELD | FIELDFLAG_NUMBER)) == FIELDFLAG_BITFIELD);
+}
+inline int f_is_blob(int x)
+{
+  return ((x & (FIELDFLAG_BLOB | FIELDFLAG_NUMBER)) == FIELDFLAG_BLOB);
+}
+inline int f_is_geom(int x)
+{
+  return ((x & (FIELDFLAG_GEOM | FIELDFLAG_NUMBER)) == FIELDFLAG_GEOM);
+}
+inline int f_is_json(int x)
+{
+  return ((x & (FIELDFLAG_JSON | FIELDFLAG_NUMBER | FIELDFLAG_BITFIELD)) ==
+          FIELDFLAG_JSON);
+}
+inline int f_is_equ(int x)
+{
+  return (x & (1+2+FIELDFLAG_PACK+31*256));
+}
+inline int f_settype(int x)
+{
+  return (x << FIELDFLAG_PACK_SHIFT);
+}
+inline int f_maybe_null(int x)
+{
+  return (x & FIELDFLAG_MAYBE_NULL);
+}
+inline int f_no_default(int x)
+{
+  return (x & FIELDFLAG_NO_DEFAULT);
+}
+inline int f_bit_as_char(int x)
+{
+  return (x & FIELDFLAG_TREAT_BIT_AS_CHAR);
+}
 
 #endif /* FIELD_INCLUDED */

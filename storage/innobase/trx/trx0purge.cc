@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -236,7 +236,7 @@ trx_purge_sys_create(
 	rw_lock_create(trx_purge_latch_key,
 		       &purge_sys->latch, SYNC_PURGE_LATCH);
 
-	mutex_create("purge_sys_pq", &purge_sys->pq_mutex);
+	mutex_create(LATCH_ID_PURGE_SYS_PQ, &purge_sys->pq_mutex);
 
 	ut_a(n_purge_threads > 0);
 
@@ -689,7 +689,12 @@ namespace undo {
 		byte*	log_buf = static_cast<byte*>(
 			ut_align(buf, UNIV_PAGE_SIZE));
 
-		os_file_write(log_file_name, handle, log_buf, 0, sz);
+		IORequest	request(IORequest::WRITE);
+
+		request.disable_compression();
+
+		err = os_file_write(
+			request, log_file_name, handle, log_buf, 0, sz);
 
 		os_file_flush(handle);
 		os_file_close(handle);
@@ -697,7 +702,7 @@ namespace undo {
 		ut_free(buf);
 		delete[] log_file_name;
 
-		return(DB_SUCCESS);
+		return(err);
 	}
 
 	/** Mark completion of undo truncate action by writing magic number to
@@ -749,7 +754,14 @@ namespace undo {
 
 		mach_write_to_4(log_buf, undo::s_magic);
 
-		os_file_write(log_file_name, handle, log_buf, 0, sz);
+		IORequest	request(IORequest::WRITE);
+
+		request.disable_compression();
+
+		err = os_file_write(
+			request, log_file_name, handle, log_buf, 0, sz);
+
+		ut_ad(err == DB_SUCCESS);
 
 		os_file_flush(handle);
 		os_file_close(handle);
@@ -779,10 +791,11 @@ namespace undo {
 		os_file_type_t	type;
 		os_file_status(log_file_name, &exist, &type);
 
-		/* Step-3: If file exist, check if for presence of magic number.
-		If found, then simple delete the file and report file
-		doesn't exist as presence of magic number suggest that truncate
-		action was complete. */
+		/* Step-3: If file exists, check it for presence of magic
+		number.  If found, then delete the file and report file
+		doesn't exist as presence of magic number suggest that
+		truncate action was complete. */
+
 		if (exist) {
 			bool    ret;
 			os_file_t	handle =
@@ -809,11 +822,38 @@ namespace undo {
 
 			byte*	log_buf = static_cast<byte*>(
 				ut_align(buf, UNIV_PAGE_SIZE));
-			os_file_read(handle, log_buf, 0, sz);
+
+			IORequest	request(IORequest::READ);
+
+			request.disable_compression();
+
+			dberr_t	err;
+
+			err = os_file_read(request, handle, log_buf, 0, sz);
+
 			os_file_close(handle);
 
+			if (err != DB_SUCCESS) {
+
+				ib::info()
+					<< "Unable to read '"
+					<< log_file_name << "' : "
+					<< ut_strerr(err);
+
+				os_file_delete(
+					innodb_log_file_key, log_file_name);
+
+				ut_free(buf);
+
+				delete[] log_file_name;
+
+				return(false);
+			}
+
 			ulint	magic_no = mach_read_from_4(log_buf);
+
 			ut_free(buf);
+
 			if (magic_no == undo::s_magic) {
 				/* Found magic number. */
 				os_file_delete(innodb_log_file_key,
@@ -850,7 +890,7 @@ trx_purge_mark_undo_for_truncate(
 	   is being truncated server can continue to operate.
 	b. At-least 2 UNDO redo rseg/undo logs (besides the default rseg-0)
 	b. At-least 1 UNDO tablespace size > threshold. */
-	if (srv_undo_tablespaces_open < 2
+	if (srv_undo_tablespaces_active < 2
 	    || (srv_undo_logs < (1 + srv_tmp_undo_logs + 2))) {
 		return;
 	}
@@ -859,7 +899,7 @@ trx_purge_mark_undo_for_truncate(
 	of last selected UNDO tablespace for truncate. */
 	ulint space_id = undo_trunc->get_scan_start();
 
-	for (ulint i = 1; i <= srv_undo_tablespaces_open; i++) {
+	for (ulint i = 1; i <= srv_undo_tablespaces_active; i++) {
 
 		if (fil_space_get_size(space_id)
 		    > (srv_max_undo_log_size / srv_page_size)) {
@@ -869,7 +909,7 @@ trx_purge_mark_undo_for_truncate(
 			break;
 		}
 
-		space_id = ((space_id + 1) % (srv_undo_tablespaces_open + 1));
+		space_id = ((space_id + 1) % (srv_undo_tablespaces_active + 1));
 		if (space_id == 0) {
 			/* Note: UNDO tablespace ids starts from 1. */
 			++space_id;
@@ -1174,7 +1214,7 @@ trx_purge_truncate_history(
 	/* UNDO tablespace truncate. We will try to truncate as much as we
 	can (greedy approach). This will ensure when the server is idle we
 	try and truncate all the UNDO tablespaces. */
-	ulint	nchances = srv_undo_tablespaces_open;
+	ulint	nchances = srv_undo_tablespaces_active;
 	for (i = 0; i < nchances; i++) {
 		trx_purge_mark_undo_for_truncate(&purge_sys->undo_trunc);
 		trx_purge_initiate_truncate(limit, &purge_sys->undo_trunc);

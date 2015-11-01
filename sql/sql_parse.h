@@ -29,6 +29,8 @@ class Table_ident;
 struct LEX;
 struct Parse_context;
 struct TABLE_LIST;
+class THD;
+union COM_DATA;
 typedef struct st_lex_user LEX_USER;
 typedef struct st_order ORDER;
 typedef class st_select_lex SELECT_LEX;
@@ -50,6 +52,7 @@ void free_items(Item *item);
 void cleanup_items(Item *item);
 
 Comp_creator *comp_eq_creator(bool invert);
+Comp_creator *comp_equal_creator(bool invert);
 Comp_creator *comp_ge_creator(bool invert);
 Comp_creator *comp_gt_creator(bool invert);
 Comp_creator *comp_le_creator(bool invert);
@@ -80,8 +83,8 @@ void mysql_init_multi_delete(LEX *lex);
 void create_table_set_open_action_and_adjust_tables(LEX *lex);
 int mysql_execute_command(THD *thd);
 bool do_command(THD *thd);
-bool dispatch_command(enum enum_server_command command, THD *thd,
-		      char* packet, size_t packet_length);
+bool dispatch_command(THD *thd,COM_DATA *com_data,
+                      enum enum_server_command command);
 bool append_file_to_dir(THD *thd, const char **filename_ptr,
                         const char *table_name);
 bool append_file_to_dir(THD *thd, const char **filename_ptr,
@@ -115,10 +118,8 @@ void killall_non_super_threads(THD *thd);
 extern uint sql_command_flags[];
 extern const LEX_STRING command_name[];
 
-#ifdef HAVE_MY_TIMER
 // Statement timeout function(s)
-extern void reset_statement_timer(THD *thd);
-#endif
+void reset_statement_timer(THD *thd);
 
 inline bool is_supported_parser_charset(const CHARSET_INFO *cs)
 {

@@ -94,7 +94,7 @@ SELECT * FROM t1 WHERE MATCH(a, b) AGAINST ('TEST2');
 SELECT * FROM t1 WHERE MATCH(c) AGAINST ('TEXT5');
 
 CHECK TABLE t1;
---error ER_CHECK_NO_SUCH_TABLE
+--error ER_INNODB_INDEX_CORRUPT
 ALTER TABLE t1 ADD FULLTEXT(b);
 
 let $restart_parameters = restart;
@@ -130,7 +130,7 @@ SELECT * FROM t1 WHERE MATCH(a, b) AGAINST ('TEST2');
 SELECT * FROM t1 WHERE MATCH(c) AGAINST ('TEXT5');
 
 --source include/shutdown_mysqld.inc
---error 3
+--error 2
 --exec $MYSQLD_CMD --debug="d,parent_table_flag_fail"
 
 --source include/start_mysqld.inc

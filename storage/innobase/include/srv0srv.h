@@ -49,7 +49,6 @@ Created 10/10/1995 Heikki Tuuri
 #include "univ.i"
 #ifndef UNIV_HOTBACKUP
 #include "log0log.h"
-#include "sync0mutex.h"
 #include "os0event.h"
 #include "que0types.h"
 #include "trx0types.h"
@@ -235,6 +234,11 @@ extern ulong	srv_undo_tablespaces;
 /** The number of UNDO tablespaces that are open and ready to use. */
 extern ulint	srv_undo_tablespaces_open;
 
+/** The number of UNDO tablespaces that are active (hosting some rollback
+segment). It is quite possible that some of the tablespaces doesn't host
+any of the rollback-segment based on configuration used. */
+extern ulint	srv_undo_tablespaces_active;
+
 /** The number of undo segments to use */
 extern ulong	srv_undo_logs;
 
@@ -266,6 +270,7 @@ extern ulong	srv_flush_log_at_trx_commit;
 extern uint	srv_flush_log_at_timeout;
 extern ulong	srv_log_write_ahead_size;
 extern char	srv_adaptive_flushing;
+extern my_bool	srv_flush_sync;
 
 #ifdef WITH_INNODB_DISALLOW_WRITES
 /* When this event is reset we do not allow any file writes to take place. */
@@ -280,6 +285,8 @@ extern my_bool	srv_load_corrupted;
 extern ulint		srv_buf_pool_size;
 /** Minimum pool size in bytes */
 extern const ulint	srv_buf_pool_min_size;
+/** Default pool size in bytes */
+extern const ulint	srv_buf_pool_def_size;
 /** Requested buffer pool chunk size. Each buffer pool instance consists
 of one or more chunks. */
 extern ulong		srv_buf_pool_chunk_unit;
@@ -365,6 +372,9 @@ extern ibool	srv_use_doublewrite_buf;
 extern ulong	srv_doublewrite_batch_size;
 extern ulong	srv_checksum_algorithm;
 
+/* Checksum algorithm used for the redo log file blocks */
+extern ulong	srv_log_checksum_algorithm;
+
 extern double	srv_max_buf_pool_modified_pct;
 extern ulong	srv_max_purge_lag;
 extern ulong	srv_max_purge_lag_delay;
@@ -402,6 +412,7 @@ extern my_bool	srv_ibuf_disable_background_merge;
 #endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
 
 #ifdef UNIV_DEBUG
+extern my_bool	srv_sync_debug;
 extern my_bool	srv_purge_view_update_only_debug;
 #endif /* UNIV_DEBUG */
 
@@ -574,6 +585,11 @@ enum srv_stats_method_name_enum {
 };
 
 typedef enum srv_stats_method_name_enum		srv_stats_method_name_t;
+
+#ifdef UNIV_DEBUG
+/** Force all user tables to use page compression. */
+extern ulong	srv_debug_compress;
+#endif /* UNIV_DEBUG */
 
 #ifndef UNIV_HOTBACKUP
 /** Types of threads existing in the system. */
@@ -788,6 +804,10 @@ void
 srv_purge_wakeup(void);
 /*==================*/
 
+/** Call exit(3) */
+void
+srv_fatal_error();
+
 /** Check if tablespace is being truncated.
 (Ignore system-tablespace as we don't re-create the tablespace
 and so some of the action that are suppressed by this function
@@ -797,6 +817,13 @@ for independent tablespace are not applicable to system-tablespace).
 			truncated or tablespace is system-tablespace. */
 bool
 srv_is_tablespace_truncated(ulint space_id);
+
+/** Check if tablespace was truncated.
+@param	space_id	space_id to check for truncate action
+@return true if tablespace was truncated and we still have an active
+MLOG_TRUNCATE REDO log record. */
+bool
+srv_was_tablespace_truncated(ulint space_id);
 
 /** Status variables to be passed to MySQL */
 struct export_var_t{

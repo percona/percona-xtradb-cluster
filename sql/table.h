@@ -581,6 +581,7 @@ struct TABLE_SHARE
 
   uchar	*default_values;		/* row with default values */
   LEX_STRING comment;			/* Comment about table */
+  LEX_STRING compress;			/* Compression algorithm */
   const CHARSET_INFO *table_charset;	/* Default charset of string fields */
 
   MY_BITMAP all_set;
@@ -1191,6 +1192,10 @@ public:
      tree only.
    */
   my_bool key_read;
+  /**
+     Certain statements which need the full row, set this to ban index-only
+     access.
+  */
   my_bool no_keyread;
   my_bool locked_by_logger;
   /**
@@ -1274,7 +1279,8 @@ public:
   void mark_columns_needed_for_insert(void);
   void mark_columns_per_binlog_row_image(void);
   void mark_generated_columns(bool is_update);
-  bool is_field_dependent_on_generated_columns(uint field_index);
+  bool is_field_used_by_generated_columns(uint field_index);
+  void mark_gcol_in_maps(Field *field);
   inline void column_bitmaps_set(MY_BITMAP *read_set_arg,
                                  MY_BITMAP *write_set_arg)
   {
@@ -1328,6 +1334,19 @@ public:
     }
   }
 
+  /**
+    Check whether the given index has a virtual generated columns.
+
+    @param index_no        the given index to check
+
+    @returns true if if index is defined over at least one virtual generated
+    column
+  */
+  inline bool index_contains_some_virtual_gcol(uint index_no)
+  {
+    DBUG_ASSERT(index_no < s->keys);
+    return key_info[index_no].flags & HA_VIRTUAL_GEN_KEY;
+  }
   bool update_const_key_parts(Item *conds);
 
   bool check_read_removal(uint index);
@@ -1363,6 +1382,12 @@ public:
 
   /// Return whether table is nullable
   bool is_nullable() const { return nullable; }
+
+  /// @return true if table contains one or more generated columns
+  bool has_gcol() const { return vfield; }
+
+  /// @return true if table contains one or more virtual generated columns
+  bool has_virtual_gcol() const;
 
   /**
     Initialize the optimizer cost model.
@@ -1763,14 +1788,7 @@ struct TABLE_LIST
   }
 
   /// Prepare check option for a view
-  inline bool prepare_check_option(THD *thd)
-  {
-    DBUG_ASSERT(is_view());
-    bool res= false;
-    if (effective_with_check)
-      res= prep_check_option(thd, effective_with_check);
-    return res;
-  }
+  bool prepare_check_option(THD *thd, bool is_cascaded= false);
 
   /// Merge WHERE condition of view or derived table into outer query
   bool merge_where(THD *thd);
@@ -1836,33 +1854,31 @@ struct TABLE_LIST
   }
 
   /// Return true if table is updatable
-  bool is_updatable() const
-  {
-    return updatable;
-  }
+  bool is_updatable() const { return m_updatable; }
 
   /// Set table as updatable. (per default, a table is non-updatable)
-  void set_updatable()
-  {
-    updatable= true;
-  }
+  void set_updatable() { m_updatable= true; }
+
+  /// Return true if table is insertable-into
+  bool is_insertable() const { return m_insertable; }
+
+  /// Set table as insertable-into. (per default, a table is not insertable)
+  void set_insertable() { m_insertable= true; }
 
   /**
     Return true if this is a view or derived table that is defined over
-    more than one base tables, and false otherwise.
-    Only to be used for updatable tables/views.
-    An updatable view has to be merged (materialization not allowed), so
-    it is safe to call leaf_tables_count().
+    more than one base table, and false otherwise.
   */
   bool is_multiple_tables() const
   {
-    DBUG_ASSERT(is_updatable());
     if (is_view_or_derived())
+    {
+      DBUG_ASSERT(is_merged());         // Cannot be a materialized view
       return leaf_tables_count() > 1;
+    }
     else
     {
-      // A nested_join cannot be an updatable table.
-      DBUG_ASSERT(nested_join == NULL);
+      DBUG_ASSERT(nested_join == NULL); // Must be a base table
       return false;
     }
   }
@@ -1910,6 +1926,30 @@ struct TABLE_LIST
   {
     DBUG_ASSERT(derived);
     return derived;
+  }
+
+  /// Set temporary name from underlying temporary table:
+  void set_name_temporary()
+  {
+    DBUG_ASSERT(is_view_or_derived() && uses_materialization());
+    table_name= table->s->table_name.str;
+    table_name_length= table->s->table_name.length;
+    db= (char *)"";
+    db_length= 0;
+  }
+
+  /// Reset original name for temporary table.
+  void reset_name_temporary()
+  {
+    DBUG_ASSERT(is_view_or_derived() && uses_materialization());
+    DBUG_ASSERT(db != view_db.str && table_name != view_name.str);
+    if (is_view())
+    {
+      db= view_db.str;
+      db_length= view_db.length;
+    }
+    table_name= view_name.str;
+    table_name_length= view_name.length;
   }
 
   /// Resolve a derived table or view reference
@@ -2265,6 +2305,12 @@ public:
   LEX_STRING    timestamp;              ///< GMT time stamp of last operation
   st_lex_user   definer;                ///< definer of view
   ulonglong     file_version;           ///< version of file's field set
+  /**
+    @note: This field is currently not reliable when read from dictionary:
+    If an underlying view is changed, updatable_view is not changed,
+    due to lack of dependency checking in dictionary implementation.
+    Prefer to use is_updatable() during preparation and optimization.
+  */
   ulonglong     updatable_view;         ///< VIEW can be updated
   /** 
       @brief The declared algorithm, if this is a view.
@@ -2277,11 +2323,6 @@ public:
   ulonglong     algorithm;
   ulonglong     view_suid;              ///< view is suid (TRUE by default)
   ulonglong     with_check;             ///< WITH CHECK OPTION
-  /*
-    effective value of WITH CHECK OPTION (differ for temporary table
-    algorithm)
-  */
-  uint8         effective_with_check;
 
 private:
   /// The view algorithm that is actually used, if this is a view.
@@ -2298,7 +2339,8 @@ public:
   size_t        db_length;
   size_t        table_name_length;
 private:
-  bool          updatable;		/* VIEW/TABLE can be updated now */
+  bool          m_updatable;		/* VIEW/TABLE can be updated */
+  bool          m_insertable;           /* VIEW/TABLE can be inserted into */
 public:
   bool		straight;		/* optimize with prev table */
   bool          updating;               /* for replicate-do/ignore table */
@@ -2446,7 +2488,6 @@ public:
   // End of group for optimization
 
 private:
-  bool prep_check_option(THD *thd, uint8 check_opt_type);
   /** See comments for set_metadata_id() */
   enum enum_table_ref_type m_table_ref_type;
   /** See comments for TABLE_SHARE::get_table_ref_version() */
@@ -2658,6 +2699,10 @@ typedef struct st_nested_join
     Query block id if this struct is generated from a subquery transform.
   */
   uint query_block_id;
+
+  /// Bitmap of which strategies are enabled for this semi-join nest
+  uint sj_enabled_strategies;
+
   /*
     Lists of trivially-correlated expressions from the outer and inner tables
     of the semi-join, respectively.
@@ -2756,10 +2801,13 @@ void free_table_share(TABLE_SHARE *share);
 
 
 /**
-  Get the tablespace name from within an .FRM file.
+  Get the tablespace name for a table.
 
   This function will open the .FRM file for the given TABLE_LIST element
-  and find the tablespace name, if present.
+  and get the tablespace name, if present. For NDB tables with version
+  before 50120, the function will ask the SE for the tablespace name,
+  because for these tables, the tablespace name is not stored in the.FRM
+  file, but only within the SE itself.
 
   @note The function does *not* consider errors. If the file is not present,
         this does not raise an error. The reason is that this function will
@@ -2875,8 +2923,10 @@ inline void mark_as_null_row(TABLE *table)
 
 bool is_simple_order(ORDER *order);
 
+void repoint_field_to_record(TABLE *table, uchar *old_rec, uchar *new_rec);
 bool update_generated_write_fields(TABLE *table);
-bool update_generated_read_fields(TABLE *table);
+bool update_generated_read_fields(uchar *buf, TABLE *table,
+                                  uint active_index= MAX_KEY);
 
 #endif /* MYSQL_CLIENT */
 

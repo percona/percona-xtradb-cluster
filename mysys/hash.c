@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -94,7 +94,8 @@ _my_hash_init(HASH *hash, uint growth_size, CHARSET_INFO *charset,
               my_hash_function hash_function,
               ulong size, size_t key_offset, size_t key_length,
               my_hash_get_key get_key,
-              void (*free_element)(void*), uint flags)
+              void (*free_element)(void*), uint flags,
+              PSI_memory_key psi_key)
 {
   my_bool retval;
 
@@ -110,12 +111,23 @@ _my_hash_init(HASH *hash, uint growth_size, CHARSET_INFO *charset,
   hash->flags=flags;
   hash->charset=charset;
   hash->hash_function= hash_function ? hash_function : cset_hash_sort_adapter;
-  retval= my_init_dynamic_array(&hash->array, sizeof(HASH_LINK),
+  hash->m_psi_key= psi_key;
+  retval= my_init_dynamic_array(&hash->array,
+                                psi_key,
+                                sizeof(HASH_LINK),
                                 NULL,  /* init_buffer */
                                 size, growth_size);
   DBUG_RETURN(retval);
 }
 
+
+static inline void my_hash_claim_elements(HASH *hash)
+{
+  HASH_LINK *data= dynamic_element(&hash->array, 0, HASH_LINK*);
+  HASH_LINK *end= data + hash->records;
+  while (data < end)
+    my_claim((data++)->data);
+}
 
 /*
   Call hash->free on all elements in hash.
@@ -138,6 +150,16 @@ static inline void my_hash_free_elements(HASH *hash)
       (*hash->free)((data++)->data);
   }
   hash->records=0;
+}
+
+void my_hash_claim(HASH *hash)
+{
+  DBUG_ENTER("my_hash_claim");
+  DBUG_PRINT("enter",("hash: 0x%lx", (long) hash));
+
+  my_hash_claim_elements(hash);
+  claim_dynamic(&hash->array);
+  DBUG_VOID_RETURN;
 }
 
 

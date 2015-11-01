@@ -47,6 +47,8 @@
 static bool check_view_insertability(THD *thd, TABLE_LIST *view,
                                      const TABLE_LIST *insert_table_ref);
 
+static void prepare_for_positional_update(TABLE *table, TABLE_LIST *tables);
+
 /**
   Check that insert fields are from a single table of a multi-table view.
 
@@ -61,10 +63,10 @@ static bool check_view_insertability(THD *thd, TABLE_LIST *view,
   @return false if success, true if an error was raised.
 */
 
-static bool check_view_single_update(List<Item> &fields, TABLE_LIST *view,
-                                     TABLE_LIST **insert_table_ref)
+static bool check_single_table_insert(List<Item> &fields, TABLE_LIST *view,
+                                      TABLE_LIST **insert_table_ref)
 {
-  /* it is join view => we need to find the table for update */
+  // It is join view => we need to find the table for insert
   List_iterator_fast<Item> it(fields);
   Item *item;
   *insert_table_ref= NULL;          // reset for call to check_single_table()
@@ -73,13 +75,14 @@ static bool check_view_single_update(List<Item> &fields, TABLE_LIST *view,
   while ((item= it++))
     tables|= item->used_tables();
 
-  if (view->check_single_table(insert_table_ref, tables) ||
-      *insert_table_ref == NULL)
+  if (view->check_single_table(insert_table_ref, tables))
   {
     my_error(ER_VIEW_MULTIUPDATE, MYF(0),
              view->view_db.str, view->view_name.str);
     return true;
   }
+  DBUG_ASSERT(*insert_table_ref && (*insert_table_ref)->is_insertable());
+
   return false;
 }
 
@@ -94,9 +97,10 @@ static bool check_view_single_update(List<Item> &fields, TABLE_LIST *view,
   @param value_count_known if false, delay field count check
                       @todo: Eliminate this when preparation is properly phased
   @param check_unique If duplicate values should be rejected.
-  @param[out] insert_table_ref resolved reference to base table
 
   @return false if success, true if error
+
+  Resolved reference to base table is returned in lex->insert_table_leaf.
 
   @todo check_insert_fields() should be refactored as follows:
         - Remove the argument value_count_known and all predicates involving it.
@@ -107,15 +111,17 @@ static bool check_view_single_update(List<Item> &fields, TABLE_LIST *view,
 
 static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
                                 List<Item> &fields, uint value_count,
-                                bool value_count_known,
-                                bool check_unique,
-                                TABLE_LIST **insert_table_ref)
+                                bool value_count_known, bool check_unique)
 {
-  *insert_table_ref= NULL;
+  LEX *const lex= thd->lex;
+
+#ifndef DBUG_OFF
+  TABLE_LIST *const saved_insert_table_leaf= lex->insert_table_leaf;
+#endif
 
   TABLE *table= table_list->table;
 
-  DBUG_ASSERT(table_list->is_updatable());
+  DBUG_ASSERT(table_list->is_insertable());
 
   if (fields.elements == 0 && value_count_known && value_count > 0)
   {
@@ -125,7 +131,7 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
     */
     DBUG_ASSERT(table);    // This branch is not reached with a view:
 
-    *insert_table_ref= table_list;
+    lex->insert_table_leaf= table_list;
 
     // Values for all fields in table are needed
     if (value_count != table->s->fields)
@@ -170,7 +176,8 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
     */
     table_list->next_local= NULL;
     context->resolve_in_table_list_only(table_list);
-    res= setup_fields(thd, Ref_ptr_array(), fields, INSERT_ACL, 0, 0);
+    res= setup_fields(thd, Ref_ptr_array(), fields, INSERT_ACL, NULL,
+                      false, true);
 
     /* Restore the current context. */
     ctx_state.restore_state(context, table_list);
@@ -180,13 +187,14 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
 
     if (table_list->is_merged())
     {
-      if (check_view_single_update(fields, table_list, insert_table_ref))
+      if (check_single_table_insert(fields, table_list,
+                                    &lex->insert_table_leaf))
         return true;
-      table= (*insert_table_ref)->table;
+      table= lex->insert_table_leaf->table;
     }
     else
     {
-      *insert_table_ref= table_list;
+      lex->insert_table_leaf= table_list;
     }
 
     if (check_unique && thd->dup_field)
@@ -199,13 +207,16 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
   if (table->vfield)
     table->mark_generated_columns(false);
 
-  if (check_key_in_view(thd, table_list, *insert_table_ref) ||
+  if (check_key_in_view(thd, table_list, lex->insert_table_leaf) ||
       (table_list->is_view() &&
-       check_view_insertability(thd, table_list, *insert_table_ref)))
+       check_view_insertability(thd, table_list, lex->insert_table_leaf)))
   {
     my_error(ER_NON_INSERTABLE_TABLE, MYF(0), table_list->alias, "INSERT");
     return true;
   }
+
+  DBUG_ASSERT(saved_insert_table_leaf == NULL ||
+              lex->insert_table_leaf == saved_insert_table_leaf);
 
   return false;
 }
@@ -336,6 +347,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
 {
   DBUG_ENTER("mysql_insert");
 
+  LEX *const lex= thd->lex;
   int error, res;
   bool err= true;
   bool transactional_table, joins_freed= FALSE;
@@ -370,7 +382,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
   MY_BITMAP used_partitions;
   bool prune_needs_default_values;
 
-  SELECT_LEX *const select_lex= thd->lex->select_lex;
+  SELECT_LEX *const select_lex= lex->select_lex;
 
   select_lex->make_active_options(0, 0);
 
@@ -381,20 +393,22 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
     DBUG_RETURN(true);
 
   THD_STAGE_INFO(thd, stage_init);
-  thd->lex->used_tables=0;
+  lex->used_tables=0;
 
   List_iterator_fast<List_item> its(insert_many_values);
   List_item *values= its++;
   const uint value_count= values->elements;
-  TABLE_LIST *insert_table_ref= NULL;
   TABLE      *insert_table= NULL;
-  if (mysql_prepare_insert(thd, table_list, &insert_table_ref, values, false))
+  if (mysql_prepare_insert(thd, table_list, values, false))
     goto exit_without_my_ok;
 
   if (select_lex->apply_local_transforms(thd, false))
     goto exit_without_my_ok;
 
-  insert_table= insert_table_ref->table;
+  insert_table= lex->insert_table_leaf->table;
+
+  if (duplicates == DUP_UPDATE || duplicates == DUP_REPLACE)
+    prepare_for_positional_update(insert_table, table_list);
 
   /* Must be done before can_prune_insert, due to internal initialization. */
   if (info.add_function_default_columns(insert_table, insert_table->write_set))
@@ -469,7 +483,8 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
       my_error(ER_WRONG_VALUE_COUNT_ON_ROW, MYF(0), counter);
       goto exit_without_my_ok;
     }
-    if (setup_fields(thd, Ref_ptr_array(), *values, SELECT_ACL, 0, 0))
+    if (setup_fields(thd, Ref_ptr_array(), *values, SELECT_ACL, NULL,
+                     false, false))
       goto exit_without_my_ok;
 
     /*
@@ -508,7 +523,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
 
   { // Statement plan is available within these braces
   Modification_plan plan(thd,
-                         (thd->lex->sql_command == SQLCOM_INSERT) ?
+                         (lex->sql_command == SQLCOM_INSERT) ?
                          MT_INSERT : MT_REPLACE, insert_table,
                          NULL, false, 0);
   DEBUG_SYNC(thd, "planned_single_insert");
@@ -535,10 +550,10 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
 
   // Lock the tables now if not locked already.
   if (!is_locked &&
-      lock_tables(thd, table_list, thd->lex->table_count, 0))
+      lock_tables(thd, table_list, lex->table_count, 0))
     DBUG_RETURN(true);
  
-  if (thd->lex->describe)
+  if (lex->describe)
   {
     err= explain_single_table_modification(thd, &plan, select_lex);
     goto exit_without_my_ok;
@@ -550,7 +565,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
     to NULL.
   */
   thd->count_cuted_fields= ((insert_many_values.elements == 1 &&
-                             !thd->lex->is_ignore()) ?
+                             !lex->is_ignore()) ?
                             CHECK_FIELD_ERROR_FOR_NULL :
                             CHECK_FIELD_WARN);
   thd->cuted_fields = 0L;
@@ -589,7 +604,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
     insert_many_values.elements, and - if nothing else - to initialize
     the code to make the call of end_bulk_insert() below safe.
   */
-  if (duplicates != DUP_ERROR || thd->lex->is_ignore())
+  if (duplicates != DUP_ERROR || lex->is_ignore())
     insert_table->file->extra(HA_EXTRA_IGNORE_DUP_KEY);
   /**
      This is a simple check for the case when the table has a trigger
@@ -649,7 +664,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
     }
     else
     {
-      if (thd->lex->used_tables)               // Column used in values()
+      if (lex->used_tables)               // Column used in values()
         restore_record(insert_table, s->default_values); // Get empty record
       else
       {
@@ -725,7 +740,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
       error= 1;
       /* purecov: end */
     }
-    if (duplicates != DUP_ERROR || thd->lex->is_ignore())
+    if (duplicates != DUP_ERROR || lex->is_ignore())
       insert_table->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
 
     transactional_table= insert_table->file->has_transactions();
@@ -737,7 +752,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
         For the transactional algorithm to work the invalidation must be
         before binlog writing and ha_autocommit_or_rollback
       */
-      query_cache.invalidate_single(thd, insert_table_ref, true);
+      query_cache.invalidate_single(thd, lex->insert_table_leaf, true);
       DEBUG_SYNC(thd, "wait_after_query_cache_invalidate");
     }
 
@@ -824,16 +839,17 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
       (!(thd->variables.option_bits & OPTION_WARNINGS) || !thd->cuted_fields))
   {
     my_ok(thd, info.stats.copied + info.stats.deleted +
-               ((thd->client_capabilities & CLIENT_FOUND_ROWS) ?
-                info.stats.touched : info.stats.updated),
+          (thd->get_protocol()->has_client_capability(CLIENT_FOUND_ROWS) ?
+           info.stats.touched : info.stats.updated),
           id);
   }
   else
   {
     char buff[160];
-    ha_rows updated=((thd->client_capabilities & CLIENT_FOUND_ROWS) ?
-                     info.stats.touched : info.stats.updated);
-    if (thd->lex->is_ignore())
+    ha_rows updated=
+      thd->get_protocol()->has_client_capability(CLIENT_FOUND_ROWS) ?
+        info.stats.touched : info.stats.updated;
+    if (lex->is_ignore())
       my_snprintf(buff, sizeof(buff),
                   ER(ER_INSERT_INFO), (long) info.stats.records,
                   (long) (info.stats.records - info.stats.copied),
@@ -1025,7 +1041,7 @@ Sql_cmd_insert_base::mysql_prepare_insert_check_table(THD *thd,
       DBUG_RETURN(true);           /* purecov: inspected */
   }
 
-  if (!table_list->is_updatable())
+  if (!table_list->is_insertable())
   {
     my_error(ER_NON_INSERTABLE_TABLE, MYF(0), table_list->alias, "INSERT");
     DBUG_RETURN(true);
@@ -1102,8 +1118,6 @@ static void prepare_for_positional_update(TABLE *table, TABLE_LIST *tables)
 
   @param thd                   Thread handler
   @param table_list            Global/local table list
-  @param[out] insert_table_ref Table to insert into (can be NULL if table should
-                               be taken from underlying table of table_list)
   @param values                List of values to be inserted
   @param duplic                What to do on duplicate key error
   @param where                 Where clause (for insert ... select)
@@ -1123,9 +1137,8 @@ static void prepare_for_positional_update(TABLE *table, TABLE_LIST *tables)
 */
 
 bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
-                          TABLE_LIST **insert_table_ref,
-                          List_item *values,
-                          bool select_insert)
+                                               List_item *values,
+                                               bool select_insert)
 {
   DBUG_ENTER("mysql_prepare_insert");
 
@@ -1145,8 +1158,6 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
   DBUG_PRINT("enter", ("table_list 0x%lx, view %d",
                        (ulong)table_list,
                        (int)insert_into_view));
-
-  *insert_table_ref= NULL;
   /*
     For subqueries in VALUES() we should not see the table in which we are
     inserting (for INSERT ... SELECT this is done by changing table_list,
@@ -1205,27 +1216,26 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
 
     if (!res)
       res= check_insert_fields(thd, context->table_list, insert_field_list,
-                               values->elements, true,
-                               !insert_into_view, insert_table_ref);
+                               values->elements, true, !insert_into_view);
     table_map map= 0;
     if (!res)
-      map= (*insert_table_ref)->map();
+      map= lex->insert_table_leaf->map();
 
     if (!res)
       res= setup_fields(thd, Ref_ptr_array(),
-                        *values, SELECT_ACL, 0, 0);
+                        *values, SELECT_ACL, NULL, false, false);
     if (!res)
       res= check_valid_table_refs(table_list, *values, map);
 
     thd->lex->in_update_value_clause= true;
     if (!res)
       res= setup_fields(thd, Ref_ptr_array(),
-                        insert_value_list, SELECT_ACL, 0, 0);
+                        insert_value_list, SELECT_ACL, NULL, false, false);
     if (!res)
       res= check_valid_table_refs(table_list, insert_value_list, map);
-    if (!res && (*insert_table_ref)->table->vfield)
+    if (!res && lex->insert_table_leaf->table->vfield)
       res= validate_gc_assignment(thd, &insert_field_list, values,
-                                  (*insert_table_ref)->table);
+                                  lex->insert_table_leaf->table);
     thd->lex->in_update_value_clause= false;
 
     if (!res && duplicates == DUP_UPDATE)
@@ -1235,13 +1245,13 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
 #endif
       // Setup the columns to be updated
       res= setup_fields(thd, Ref_ptr_array(),
-                        insert_update_list, UPDATE_ACL, 0, 0);
+                        insert_update_list, UPDATE_ACL, NULL, false, true);
       if (!res)
         res= check_valid_table_refs(table_list, insert_update_list, map);
-      if (!res && (*insert_table_ref)->table->vfield)
+      if (!res && lex->insert_table_leaf->table->vfield)
         res= validate_gc_assignment(thd, &insert_update_list,
                                     &insert_value_list,
-                                    (*insert_table_ref)->table);
+                                    lex->insert_table_leaf->table);
     }
   }
   else if (thd->stmt_arena->is_stmt_prepare())
@@ -1267,14 +1277,14 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
       for value_count_known.
     */
     res= check_insert_fields(thd, context->table_list, insert_field_list, 0,
-                             false, !insert_into_view, insert_table_ref);
+                             false, !insert_into_view);
     table_map map= 0;
     if (!res)
-      map= (*insert_table_ref)->map();
+      map= lex->insert_table_leaf->map();
 
-    if (!res && (*insert_table_ref)->table->vfield)
+    if (!res && lex->insert_table_leaf->table->vfield)
       res= validate_gc_assignment(thd, &insert_field_list, values,
-                                  (*insert_table_ref)->table);
+                                  lex->insert_table_leaf->table);
 
     if (!res && duplicates == DUP_UPDATE)
     {
@@ -1283,14 +1293,14 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
 #endif
       // Setup the columns to be modified
       res= setup_fields(thd, Ref_ptr_array(),
-                        insert_update_list, UPDATE_ACL, 0, 0);
+                        insert_update_list, UPDATE_ACL, NULL, false, true);
       if (!res)
         res= check_valid_table_refs(table_list, insert_update_list, map);
 
-      if (!res && (*insert_table_ref)->table->vfield)
+      if (!res && lex->insert_table_leaf->table->vfield)
         res= validate_gc_assignment(thd, &insert_update_list,
                                     &insert_value_list,
-                                    (*insert_table_ref)->table);
+                                    lex->insert_table_leaf->table);
       DBUG_ASSERT(!table_list->next_name_resolution_table);
       if (select_lex->group_list.elements == 0 && !select_lex->with_sum_func)
       {
@@ -1305,7 +1315,7 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
       thd->lex->in_update_value_clause= true;
       if (!res)
         res= setup_fields(thd, Ref_ptr_array(), insert_value_list,
-                          SELECT_ACL, 0, 0);
+                          SELECT_ACL, NULL, false, false);
       thd->lex->in_update_value_clause= false;
 
       /*
@@ -1322,13 +1332,10 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
   if (res)
     DBUG_RETURN(res);
 
-  if (*insert_table_ref == NULL)
-    *insert_table_ref= table_list;
-
   if (!select_insert)
   {
     TABLE_LIST *const duplicate=
-      unique_table(thd, *insert_table_ref, table_list->next_global, true);
+      unique_table(thd, lex->insert_table_leaf, table_list->next_global, true);
     if (duplicate)
     {
       update_non_unique_table_error(table_list, "INSERT", duplicate);
@@ -1340,16 +1347,13 @@ bool Sql_cmd_insert_base::mysql_prepare_insert(THD *thd, TABLE_LIST *table_list,
   {
     Column_privilege_tracker column_privilege(thd, SELECT_ACL);
 
-    if (table_list->effective_with_check &&
-        table_list->prepare_check_option(thd))
+    if (table_list->prepare_check_option(thd))
       DBUG_RETURN(true);
 
     if (duplicates == DUP_REPLACE &&
         table_list->prepare_replace_filter(thd))
       DBUG_RETURN(true);
   }
-  if (duplicates == DUP_UPDATE || duplicates == DUP_REPLACE)
-    prepare_for_positional_update((*insert_table_ref)->table, table_list);
 
   DBUG_RETURN(false);
 }
@@ -1875,39 +1879,28 @@ bool Sql_cmd_insert_select::mysql_insert_select_prepare(THD *thd)
 {
   LEX *lex= thd->lex;
   SELECT_LEX *select_lex= lex->select_lex;
-  TABLE_LIST *first_select_leaf_table;
   DBUG_ENTER("mysql_insert_select_prepare");
 
   /*
     SELECT_LEX do not belong to INSERT statement, so we can't add WHERE
     clause if table is VIEW
   */
-  TABLE_LIST *insert_table_ref;
-  if (mysql_prepare_insert(thd, lex->query_tables, &insert_table_ref, NULL,
-                           true))
-    DBUG_RETURN(TRUE);
+  if (mysql_prepare_insert(thd, lex->query_tables, NULL, true))
+    DBUG_RETURN(true);
 
   /*
     exclude first table from leaf tables list, because it belong to
     INSERT
   */
-  DBUG_ASSERT(select_lex->leaf_tables != 0);
+  DBUG_ASSERT(select_lex->leaf_tables != NULL);
   DBUG_ASSERT(lex->insert_table == select_lex->leaf_tables->top_table());
 
-  lex->leaf_tables_insert= select_lex->leaf_tables;
-  select_lex->leaf_table_count--;
-  /* skip all leaf tables belonged to view where we are insert */
-  for (first_select_leaf_table= select_lex->leaf_tables->next_leaf;
-       first_select_leaf_table &&
-       first_select_leaf_table->belong_to_view &&
-       first_select_leaf_table->belong_to_view ==
-       lex->leaf_tables_insert->belong_to_view;
-       first_select_leaf_table= first_select_leaf_table->next_leaf)
-  {
-    select_lex->leaf_table_count--;
-  }
-  select_lex->leaf_tables= first_select_leaf_table;
-  DBUG_RETURN(FALSE);
+  select_lex->leaf_tables= lex->insert_table->next_local;
+  if (select_lex->leaf_tables != NULL)
+    select_lex->leaf_tables= select_lex->leaf_tables->first_leaf_table();
+  select_lex->leaf_table_count-= 
+    lex->insert_table->is_view() ? lex->insert_table->leaf_tables_count() : 1;
+  DBUG_RETURN(false);
 }
 
 
@@ -1917,7 +1910,6 @@ int Query_result_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
 
   LEX *const lex= thd->lex;
   bool res;
-  TABLE_LIST *insert_table_ref;
   SELECT_LEX *const lex_current_select_save= lex->current_select();
   const enum_duplicates duplicate_handling= info.get_duplicate_handling();
 
@@ -1931,9 +1923,10 @@ int Query_result_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
   lex->set_current_select(lex->select_lex);
 
   res= check_insert_fields(thd, table_list, *fields, values.elements, true,
-                           !insert_into_view, &insert_table_ref);
+                           !insert_into_view);
   if (!res)
-    res= setup_fields(thd, Ref_ptr_array(), values, SELECT_ACL, 0, 0);
+    res= setup_fields(thd, Ref_ptr_array(), values, SELECT_ACL, NULL,
+                      false, false);
 
   if (duplicate_handling == DUP_UPDATE && !res)
   {
@@ -1950,8 +1943,9 @@ int Query_result_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
     table_list->set_want_privilege(UPDATE_ACL);
 #endif
-    res= res || setup_fields(thd, Ref_ptr_array(),
-                             *update.get_changed_columns(), UPDATE_ACL, 0, 0);
+    if (!res)
+      res= setup_fields(thd, Ref_ptr_array(), *update.get_changed_columns(),
+                        UPDATE_ACL, NULL, false, true);
     /*
       When we are not using GROUP BY and there are no ungrouped aggregate
       functions 
@@ -1973,8 +1967,9 @@ int Query_result_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
         ctx_state.get_first_name_resolution_table();
     }
     lex->in_update_value_clause= true;
-    res= res || setup_fields(thd, Ref_ptr_array(), *update.update_values,
-                             SELECT_ACL, 0, 0);
+    if (!res)
+      res= setup_fields(thd, Ref_ptr_array(), *update.update_values,
+                        SELECT_ACL, NULL, false, false);
     lex->in_update_value_clause= false;
     if (!res)
     {
@@ -2005,7 +2000,10 @@ int Query_result_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
     if it is INSERT into join view then check_insert_fields already found
     real table for insert
   */
-  table= insert_table_ref->table;
+  table= lex->insert_table_leaf->table;
+
+  if (duplicate_handling == DUP_UPDATE || duplicate_handling == DUP_REPLACE)
+    prepare_for_positional_update(table, table_list);
 
   if (info.add_function_default_columns(table, table->write_set))
     DBUG_RETURN(1);
@@ -2017,7 +2015,7 @@ int Query_result_insert::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
     Is table which we are changing used somewhere in other parts of
     query
   */
-  if (unique_table(thd, insert_table_ref, table_list->next_global, 0))
+  if (unique_table(thd, lex->insert_table_leaf, table_list->next_global, 0))
   {
     // Using same table for INSERT and SELECT
     /*
@@ -2366,7 +2364,7 @@ bool Query_result_insert::send_eof()
                 (long) (info.stats.deleted+info.stats.updated),
                 (long) thd->get_stmt_da()->current_statement_cond_count());
   row_count= info.stats.copied + info.stats.deleted +
-             ((thd->client_capabilities & CLIENT_FOUND_ROWS) ?
+             (thd->get_protocol()->has_client_capability(CLIENT_FOUND_ROWS) ?
               info.stats.touched : info.stats.updated);
   id= (thd->first_successful_insert_id_in_cur_stmt > 0) ?
     thd->first_successful_insert_id_in_cur_stmt :
@@ -2570,6 +2568,12 @@ static TABLE *create_table_from_items(THD *thd, HA_CREATE_INFO *create_info,
     if (!cr_field)
       DBUG_RETURN(NULL);
 
+    /*
+      Inheriting vitual generated information is not allowed.
+    */
+    cr_field->gcol_info= NULL;
+    cr_field->stored_in_db= TRUE;
+
     if (item->maybe_null)
       cr_field->flags &= ~NOT_NULL_FLAG;
     alter_info->create_list.push_back(cr_field);
@@ -2673,6 +2677,19 @@ int Query_result_create::prepare(List<Item> &values, SELECT_LEX_UNIT *u)
   }
   /* First field to copy */
   field= table->field+table->s->fields - values.elements;
+  for (Field **f= field ; *f ; f++)
+  {
+    if ((*f)->gcol_info)
+    {
+      /*
+        Generated columns are not allowed to be given a value for CREATE TABLE ..
+        SELECT statment.
+      */
+      my_error(ER_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN, MYF(0),
+               (*f)->field_name, (*f)->table->s->table_name.str);
+      DBUG_RETURN(true);
+    }
+  }
 
   // Turn off function defaults for columns filled from SELECT list:
   const bool retval= info.ignore_last_columns(table, values.elements);

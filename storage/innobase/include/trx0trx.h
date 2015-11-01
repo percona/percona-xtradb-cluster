@@ -52,6 +52,9 @@ struct mtr_t;
 // Forward declaration
 class ReadView;
 
+// Forward declaration
+class FlushObserver;
+
 /** Dummy session used currently in MySQL interface */
 extern sess_t*	trx_dummy_sess;
 
@@ -62,19 +65,13 @@ UNIV_INLINE
 void
 trx_search_latch_release_if_reserved(trx_t* trx);
 
-/**
-Reserve the AHI latch if not already reserved by this transaction.
-@param[in,out] trx		Transaction that may own the AHI latch */
-UNIV_INLINE
+/** Set flush observer for the transaction
+@param[in/out]	trx		transaction struct
+@param[in]	observer	flush observer */
 void
-trx_reserve_search_latch_if_not_reserved(trx_t* trx);
-
-/**
-Releases the search latch if the transaction has been hogging it for too long.
-@param[in,out] trx		Transaction that may own the AHI latch */
-UNIV_INLINE
-void
-trx_search_latch_timeout(trx_t* trx);
+trx_set_flush_observer(
+	trx_t*		trx,
+	FlushObserver*	observer);
 
 /******************************************************************//**
 Set detailed error message for the transaction. */
@@ -181,15 +178,6 @@ trx_start_internal_low(
 void
 trx_start_internal_read_only_low(
 	trx_t*	trx);
-
-/**
-Check if transaction is started.
-@param[in] trx		Transaction whose state we need to check
-@reutrn true if transaction is in state started */
-UNIV_INLINE
-bool
-trx_is_started(
-	const trx_t*	trx);
 
 #ifdef UNIV_DEBUG
 #define trx_start_if_not_started_xa(t, rw)			\
@@ -1282,6 +1270,8 @@ struct trx_t {
 	/*------------------------------*/
 	char*		detailed_error;	/*!< detailed error message for last
 					error, or empty. */
+	FlushObserver*	flush_observer;	/*!< flush observer */
+
 #ifdef UNIV_DEBUG
 	bool		is_dd_trx;	/*!< True if the transaction is used for
 					doing Non-locking Read-only Read
@@ -1289,6 +1279,19 @@ struct trx_t {
 #endif /* UNIV_DEBUG */
 	ulint		magic_n;
 };
+
+/**
+Check if transaction is started.
+@param[in] trx		Transaction whose state we need to check
+@reutrn true if transaction is in state started */
+inline
+bool
+trx_is_started(
+	const trx_t*	trx)
+{
+	return(trx->state != TRX_STATE_NOT_STARTED
+	       && trx->state != TRX_STATE_FORCED_ROLLBACK);
+}
 
 /* Transaction isolation levels (trx->isolation_level) */
 #define TRX_ISO_READ_UNCOMMITTED	0	/* dirty read: non-locking
@@ -1359,21 +1362,6 @@ struct commit_node_t{
 #define trx_mutex_exit(t) do {			\
 	mutex_exit(&t->mutex);			\
 } while (0)
-
-/** @brief The latch protecting the adaptive search system
-
-This latch protects the
-(1) hash index;
-(2) columns of a record to which we have a pointer in the hash index;
-
-but does NOT protect:
-
-(3) next record offset field in a record;
-(4) next or previous records on the same page.
-
-Bear in mind (3) and (4) when using the hash index.
-*/
-extern rw_lock_t*	btr_search_latch_temp;
 
 /** Track if a transaction is executing inside InnoDB code. It acts
 like a gate between the Server and InnoDB.  */
@@ -1583,9 +1571,6 @@ private:
 	Transaction instance crossing the handler boundary from the Server. */
 	trx_t*			m_trx;
 };
-
-/** The latch protecting the adaptive search system */
-#define btr_search_latch	(*btr_search_latch_temp)
 
 #ifndef UNIV_NONINL
 #include "trx0trx.ic"

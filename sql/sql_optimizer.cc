@@ -91,6 +91,8 @@ test_if_skip_sort_order(JOIN_TAB *tab, ORDER *order, ha_rows select_limit,
 static Item_func_match *test_if_ft_index_order(ORDER *order);
 
 
+static uint32 get_key_length_tmp_table(Item *item);
+
 /**
   Optimizes one query block into a query execution plan (QEP.)
 
@@ -222,7 +224,6 @@ JOIN::optimize()
   }
   if (having_cond || calc_found_rows)
     m_select_limit= HA_POS_ERROR;
-  do_send_rows = unit->select_limit_cnt > 0;
 
   where_cond= optimize_cond(thd, where_cond, &cond_equal,
                             &select_lex->top_join_list, true,
@@ -344,6 +345,9 @@ JOIN::optimize()
   }
   error= -1;					// Error is sent to client
   sort_by_table= get_sort_by_table(order, group_list, select_lex->leaf_tables);
+
+  if (where_cond || group_list || order)
+    substitute_gc();
 
   // Set up join order and initial access paths
   THD_STAGE_INFO(thd, stage_statistics);
@@ -480,7 +484,8 @@ JOIN::optimize()
     no_jbuf_after= 0;
 
   /* Perform FULLTEXT search before all regular searches */
-  optimize_fts_query();
+  if (select_lex->has_ft_funcs() && optimize_fts_query())
+    DBUG_RETURN(1);
 
   /*
     By setting child_subquery_can_materialize so late we gain the following:
@@ -721,6 +726,124 @@ setup_subq_exit:
 }
 
 
+/*
+  Substitute all expressions in the WHERE condition and ORDER/GROUP lists
+  that matches generated columns (GC) expressions with GC fields, if any.
+
+  @details This function does 3 things:
+  1) Creates list of all GC fields that are a part of a key and the GC
+    expression is a function. All query tables are scanned. If there's no
+    such fields, function exits.
+  2) By means of Item::compile() WHERE clause is transformed.
+    @see Item_func::gc_subst_transformer() for details.
+  3) If there's ORDER/GROUP BY clauses, this function tries to substitute
+    expressions in these lists with GC too. It removes from the list of
+    indexed GC all elements which index blocked by hints. This is done to
+    reduce amount of further work. Next it goes through ORDER/GROUP BY list
+    and matches the expression in it against GC expressions in indexed GC
+    list. When a match is found, the expression is replaced with a new
+    Item_field for the matched GC field. Also, this new field is added to
+    the hidden part of all_fields list.
+*/
+
+void JOIN::substitute_gc()
+{
+  List<Field> indexed_gc;
+  Opt_trace_context * const trace= &thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  Opt_trace_object subst_gc(trace, "substitute_generated_columns");
+
+  // Collect all GCs that are a part of a key
+  for (TABLE_LIST *tl= select_lex->leaf_tables;
+       tl;
+       tl= tl->next_leaf)
+  {
+    if (tl->table->s->keys == 0)
+      continue;
+    for (uint i= 0; i < tl->table->s->fields; i++)
+    {
+      Field *fld= tl->table->field[i];
+      if (!fld->gcol_info || fld->part_of_key.is_clear_all() ||
+           fld->gcol_info->expr_item->type() != Item::FUNC_ITEM)
+        continue;
+      // Don't check allowed keys here as conditions/group/order use
+      // different keymaps for that
+      indexed_gc.push_back(fld);
+    }
+  }
+  // No GC in the tables used in the query
+  if (indexed_gc.elements == 0)
+    return;
+
+  if (where_cond)
+  {
+    // Item_func::compile will dereference this pointer, provide valid value.
+    uchar i, *dummy= &i;
+    where_cond->compile(&Item::gc_subst_analyzer, &dummy,
+                        &Item::gc_subst_transformer, (uchar*) &indexed_gc);
+    subst_gc.add("resulting_condition", where_cond);
+  }
+
+  if (!(group_list || order))
+    return;
+  // Filter out GCs that do not have index usable for GROUP/ORDER
+  Field *gc;
+  List_iterator<Field> li(indexed_gc);
+
+  while ((gc= li++))
+  {
+    key_map tkm= gc->part_of_key;
+    tkm.intersect(group_list ? gc->table->keys_in_use_for_group_by :
+                  gc->table->keys_in_use_for_order_by);
+    if (tkm.is_clear_all())
+      li.remove();
+  }
+  if (!indexed_gc.elements)
+    return;
+
+  // Index could be used for ORDER only if there is no GROUP
+  ORDER *list= group_list ? group_list : order;
+  bool changed= false;
+  for (ORDER *ord= list; ord; ord= ord->next)
+  {
+    li.rewind();
+    if ((*ord->item)->type() != Item::FUNC_ITEM)
+      continue;
+    while ((gc= li++))
+    {
+      Item_func *tmp= pointer_cast<Item_func*>(*ord->item);
+      Item_field *field;
+      if ((field= get_gc_for_expr(&tmp, gc, gc->result_type())))
+      {
+
+        changed= true;
+        /* Add new field to field list. */
+        ord->item= select_lex->add_hidden_item(field);
+        break;
+      }
+    }
+  }
+  if (changed)
+  {
+    // We added hidden fields to the all_fields list, count them.
+    count_field_types(select_lex, &tmp_table_param, select_lex->all_fields,
+                      false, false);
+    if (trace->is_started())
+    {
+      String str;
+      st_select_lex::print_order(&str, list,
+                                 enum_query_type(QT_TO_SYSTEM_CHARSET |
+                                                 QT_SHOW_SELECT_NUMBER |
+                                                 QT_NO_DEFAULT_DB));
+      subst_gc.add_utf8(group_list ? "resulting_GROUP_BY" :
+                          "resulting_ORDER_BY",
+                        str.ptr(), str.length());
+    }
+  }
+  return;
+}
+
+
 /**
    Sets the plan's state of the JOIN. This is always the final step of
    optimization; starting from this call, we expose the plan to other
@@ -752,9 +875,15 @@ void JOIN::set_plan_state(enum_plan_state plan_state_arg)
   }
 
   DEBUG_SYNC(thd, "before_set_plan");
-  mysql_mutex_lock(&thd->LOCK_query_plan);
+
+  // If SQLCOM_END, no thread is explaining our statement anymore.
+  const bool need_lock= thd->query_plan.get_command() != SQLCOM_END;
+
+  if (need_lock)
+    thd->lock_query_plan();
   plan_state= plan_state_arg;
-  mysql_mutex_unlock(&thd->LOCK_query_plan);
+  if (need_lock)
+    thd->unlock_query_plan();
 }
 
 
@@ -790,6 +919,53 @@ uint QEP_TAB::get_sj_strategy() const
   const uint s= join()->qep_tab[first_sj_inner()].position()->sj_strategy;
   DBUG_ASSERT(s != SJ_OPT_NONE);
   return s;
+}
+
+/**
+  Return the index used for a table in a QEP
+
+  The various access methods have different places where the index/key
+  number is stored, so this function is needed to return the correct value.
+
+  @returns index number, or MAX_KEY if not applicable.
+
+  JT_SYSTEM and JT_ALL does not use an index, and will always return MAX_KEY.
+
+  JT_INDEX_MERGE supports more than one index. Hence MAX_KEY is returned and
+  a further inspection is needed.
+*/
+uint QEP_TAB::effective_index() const
+{
+  switch (type())
+  {
+  case JT_SYSTEM:
+    DBUG_ASSERT(ref().key == -1);
+    return MAX_KEY;
+
+  case JT_CONST:
+  case JT_EQ_REF:
+  case JT_REF_OR_NULL:
+  case JT_REF:
+    DBUG_ASSERT(ref().key != -1);
+    return uint(ref().key);
+
+  case JT_INDEX_SCAN:
+  case JT_FT:
+    return index();
+
+  case JT_INDEX_MERGE:
+    DBUG_ASSERT(quick()->index == MAX_KEY);
+    return MAX_KEY;
+
+  case JT_RANGE:
+    return quick()->index;
+
+  case JT_ALL:
+  default:
+    // @todo Check why JT_UNKNOWN is a valid value here.
+    DBUG_ASSERT(type() == JT_ALL || type() == JT_UNKNOWN);
+    return MAX_KEY;
+  }
 }
 
 uint JOIN_TAB::get_sj_strategy() const
@@ -934,6 +1110,10 @@ bool JOIN::optimize_distinct_group_order()
      be the same (as long as they are unique).
 
      The FROM clause must contain a single non-constant table.
+
+     @todo Apart from the LIS test, every condition depends only on facts
+     which can be known in SELECT_LEX::prepare(), possibly this block should
+     move there.
   */
 
   JOIN_TAB *const tab= best_ref[const_tables];
@@ -957,7 +1137,7 @@ bool JOIN::optimize_distinct_group_order()
         <fields> to ORDER BY <fields>. There are three exceptions:
         - if skip_sort_order is set (see above), then we can simply skip
           GROUP BY;
-        - if we are in a subquery, we don't have to maintain order
+        - if IN(subquery), likewise (see remove_redundant_subquery_clauses())
         - we can only rewrite ORDER BY if the ORDER BY fields are 'compatible'
           with the GROUP BY ones, i.e. either one is a prefix of another.
           We only check if the ORDER BY is a prefix of GROUP BY. In this case
@@ -967,13 +1147,10 @@ bool JOIN::optimize_distinct_group_order()
           'order' as is.
        */
       if (!order || test_if_subpart(group_list, order))
-      {
-        if (skip_sort_order ||
-            select_lex->master_unit()->item) // This is a subquery
-          order= NULL;
-        else
-          order= group_list;
-      }
+        order= (skip_sort_order ||
+                (unit->item && unit->item->substype() ==
+                 Item_subselect::IN_SUBS)) ? NULL : group_list;
+
       /*
         If we have an IGNORE INDEX FOR GROUP BY(fields) clause, this must be 
         rewritten to IGNORE INDEX FOR ORDER BY(fields).
@@ -2377,7 +2554,8 @@ void JOIN::adjust_access_methods()
         ((i == const_tables && tab->type() == JT_REF) ||
          ((tab->type() == JT_ALL || tab->type() == JT_RANGE ||
            tab->type() == JT_INDEX_MERGE || tab->type() == JT_INDEX_SCAN) &&
-           tab->use_quick != QS_RANGE)))
+           tab->use_quick != QS_RANGE)) &&
+        !tab->table_ref->is_inner_table_of_outer_join())
       zero_result_cause=
         "Impossible WHERE noticed after reading const tables";
   }
@@ -3008,7 +3186,7 @@ class COND_CMP :public ilink<COND_CMP> {
 public:
   static void *operator new(size_t size)
   {
-    return (void*) sql_alloc((uint) size);
+    return sql_alloc(size);
   }
   static void operator delete(void *ptr __attribute__((unused)),
                               size_t size __attribute__((unused)))
@@ -4675,7 +4853,10 @@ bool JOIN::make_join_plan()
     DBUG_RETURN(true);
 
   if (sj_nests)
+  {
     set_semijoin_embedding();
+    select_lex->update_semijoin_strategies(thd);
+  }
 
   if (!plan_is_const())
     optimize_keyuse();
@@ -5269,7 +5450,7 @@ bool JOIN::estimate_rowcount()
 
       // Only one matching row and one block to read
       tab->set_records(tab->found_records= 1);
-      tab->worst_seeks= cost_model->io_block_read_cost(1.0);
+      tab->worst_seeks= cost_model->page_read_cost(1.0);
       tab->read_time= static_cast<ha_rows>(tab->worst_seeks);
       continue;
     }
@@ -5279,13 +5460,14 @@ bool JOIN::estimate_rowcount()
     tab->read_time= static_cast<ha_rows>(table_scan_time.total_cost());
 
     /*
-      Set a max range of how many seeks we can expect when using keys
-      This is can't be to high as otherwise we are likely to use table scan.
+      Set a max value for the cost of seek operations we can expect
+      when using key lookup. This can't be too high as otherwise we
+      are likely to use table scan.
     */
-    tab->worst_seeks= 
-      min(cost_model->io_block_read_cost((double) tab->found_records / 10),
+    tab->worst_seeks=
+      min(cost_model->page_read_cost((double) tab->found_records / 10),
           (double) tab->read_time * 3);
-    double min_worst_seek= cost_model->io_block_read_cost(2.0);
+    const double min_worst_seek= cost_model->page_read_cost(2.0);
     if (tab->worst_seeks < min_worst_seek)      // Fix for small tables
       tab->worst_seeks= min_worst_seek;
 
@@ -5471,10 +5653,7 @@ void semijoin_types_allow_materialization(TABLE_LIST *sj_nest)
     blobs_involved|= inner->is_blob_field();
 
     // Calculate the index length of materialized table
-    const uint lookup_index_length=((inner->type() == Item::FIELD_ITEM) ?
-                            ((Item_field *)inner)->field->pack_length() :
-                            inner->max_length) +
-                            (inner->maybe_null ? HA_KEY_NULL_LENGTH : 0);
+    const uint lookup_index_length= get_key_length_tmp_table(inner);
     if (lookup_index_length > max_key_part_length)
       sj_nest->nested_join->sjm.lookup_allowed= false;
     total_lookup_index_length+= lookup_index_length ; 
@@ -5926,8 +6105,8 @@ static bool optimize_semijoin_nests_for_materialization(JOIN *join)
     sj_nest->nested_join->sjm.positions= NULL;
 
     /* Calculate the cost of materialization if materialization is allowed. */
-    if (join->thd->optimizer_switch_flag(OPTIMIZER_SWITCH_SEMIJOIN) &&
-        join->thd->optimizer_switch_flag(OPTIMIZER_SWITCH_MATERIALIZATION))
+    if (sj_nest->nested_join->sj_enabled_strategies &
+        OPTIMIZER_SWITCH_MATERIALIZATION)
     {
       /* A semi-join nest should not contain tables marked as const */
       DBUG_ASSERT(!(sj_nest->sj_inner_tables & join->const_table_map));
@@ -6659,6 +6838,19 @@ add_key_field(Key_field **key_fields, uint and_level, Item_func *cond,
           }
         }
       }
+
+      /*
+        We can't use indexes when comparing to a JSON value. For example,
+        the string '{}' should compare equal to the JSON string "{}". If
+        we use a string index to compare the two strings, we will be
+        comparing '{}' and '"{}"', which don't compare equal.
+      */
+      if (value[0]->result_type() == STRING_RESULT &&
+          value[0]->field_type() == MYSQL_TYPE_JSON)
+      {
+        warn_index_not_applicable(stat->join()->thd, field, possible_keys);
+        return;
+      }
     }
   }
   /*
@@ -7245,8 +7437,8 @@ add_ft_keys(Key_use_array *keyuse_array,
     }
     else if (func->arg_count == 2)
     {
-      Item *arg0=(Item *)(func->arguments()[0]),
-           *arg1=(Item *)(func->arguments()[1]);
+      Item *arg0=(func->arguments()[0]),
+           *arg1=(func->arguments()[1]);
       if (arg1->const_item() &&
            arg0->type() == Item::FUNC_ITEM &&
            ((Item_func *) arg0)->functype() == Item_func::FT_FUNC &&
@@ -7297,11 +7489,6 @@ add_ft_keys(Key_use_array *keyuse_array,
   if (!cond_func || cond_func->key == NO_SUCH_KEY ||
       !(usable_tables & cond_func->table_ref->map()))
     return FALSE;
-
-  // Cannot do index lookup into outer table:
-  for (uint i= 0; i < cond_func->arg_count ; ++i)
-    if (!is_local_field(cond_func->arguments()[i]))
-      return false;
 
   cond_func->set_simple_expression(simple_match_expr);
 
@@ -8510,31 +8697,6 @@ bool JOIN::cache_const_exprs()
       return true;
   }
   return false;
-}
-
-
-void JOIN::replace_item_field(const char* field_name, Item* new_item)
-{
-  if (where_cond)
-  {
-    where_cond= where_cond->compile(&Item::item_field_by_name_analyzer,
-                                    (uchar **)&field_name,
-                                    &Item::item_field_by_name_transformer,
-                                    (uchar *)new_item);
-    where_cond->update_used_tables();
-  }
-
-  List_iterator<Item> it(fields_list);
-  Item *item;
-  while ((item= it++))
-  {
-    item= item->compile(&Item::item_field_by_name_analyzer,
-                        (uchar **)&field_name,
-                        &Item::item_field_by_name_transformer,
-                        (uchar *)new_item);
-    it.replace(item);
-    item->update_used_tables();
-  }
 }
 
 
@@ -10026,7 +10188,6 @@ create_distinct_group(THD *thd, Ref_ptr_array ref_pointer_array,
 {
   List_iterator<Item> li(fields);
   Item *item;
-  Ref_ptr_array orig_ref_pointer_array= ref_pointer_array;
   ORDER *order,*group,**prev;
 
   *all_order_by_fields_used= 1;
@@ -10078,10 +10239,7 @@ create_distinct_group(THD *thd, Ref_ptr_array ref_pointer_array,
           @note setup_ref_array() needs to account for the extra space.
         */
         Item_field *new_item= new Item_field(thd, (Item_field*)item);
-        int el= all_fields.elements;
-        orig_ref_pointer_array[el]= new_item;
-        all_fields.push_front(new_item);
-        ord->item= &orig_ref_pointer_array[el];
+        ord->item= thd->lex->current_select()->add_hidden_item(new_item);
       }
       else
       {
@@ -10298,12 +10456,11 @@ void JOIN::optimize_keyuse()
   and checks if FT index can be used as covered.
 */
 
-void JOIN::optimize_fts_query()
+bool JOIN::optimize_fts_query()
 {
   ASSERT_BEST_REF_IN_JOIN_ORDER(this);
 
-  if (!select_lex->ftfunc_list->elements)
-    return;
+  DBUG_ASSERT(select_lex->has_ft_funcs());
 
   for (uint i= const_tables; i < tables; i++)
   {
@@ -10349,7 +10506,7 @@ void JOIN::optimize_fts_query()
                          !order ? m_select_limit : HA_POS_ERROR, false);
   }
 
-  init_ftfuncs(thd, select_lex);
+  return init_ftfuncs(thd, select_lex);
 }
 
 
@@ -10586,8 +10743,14 @@ bool JOIN::compare_costs_of_subquery_strategies(
 {
   *method= Item_exists_subselect::EXEC_EXISTS;
 
-  if (!thd->optimizer_switch_flag(OPTIMIZER_SWITCH_MATERIALIZATION))
+  Item_exists_subselect::enum_exec_method allowed_strategies=
+    select_lex->subquery_strategy(thd);
+
+  if (allowed_strategies == Item_exists_subselect::EXEC_EXISTS)
     return false;
+
+  DBUG_ASSERT(allowed_strategies == Item_exists_subselect::EXEC_EXISTS_OR_MAT ||
+              allowed_strategies == Item_exists_subselect::EXEC_MATERIALIZATION);
 
   const JOIN *parent_join= unit->outer_select()->join;
   if (!parent_join || !parent_join->child_subquery_can_materialize)
@@ -10769,7 +10932,7 @@ bool JOIN::compare_costs_of_subquery_strategies(
   const double cost_mat= cost_mat_table + subq_executions *
     sjm.lookup_cost.total_cost();
   const bool mat_chosen=
-    thd->optimizer_switch_flag(OPTIMIZER_SWITCH_SUBQ_MAT_COST_BASED) ?
+    (allowed_strategies == Item_exists_subselect::EXEC_EXISTS_OR_MAT) ?
     (cost_mat < cost_exists) : true;
   trace_subq_mat_decision
     .add("cost_to_create_and_fill_materialized_table",
@@ -10891,3 +11054,37 @@ void JOIN::refine_best_rowcount()
 /**
   @} (end of group Query_Optimizer)
 */
+
+/**
+  This function is used to get the key length of Item object on
+  which one tmp field will be created during create_tmp_table.
+  This function references KEY_PART_INFO::init_from_field().
+
+  @param item  A inner item of outer join
+
+  @return  The length of a item to be as a key of a temp table
+*/
+
+static uint32 get_key_length_tmp_table(Item *item)
+{
+  uint32 len= 0;
+
+  item= item->real_item();
+  if (item->type() == Item::FIELD_ITEM)
+    len= ((Item_field *)item)->field->key_length();
+  else
+    len= item->max_length;
+
+  if (item->maybe_null)
+    len+= HA_KEY_NULL_LENGTH;
+
+  // references KEY_PART_INFO::init_from_field()
+  enum_field_types type= item->field_type();
+  if (type == MYSQL_TYPE_BLOB ||
+      type == MYSQL_TYPE_VARCHAR ||
+      type == MYSQL_TYPE_GEOMETRY)
+    len+= HA_KEY_BLOB_LENGTH;
+
+  return len;
+}
+

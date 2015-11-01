@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -217,6 +217,20 @@ row_undo_search_clust_to_pcur(
 		node->row = row_build(ROW_COPY_DATA, clust_index, rec,
 				      offsets, NULL,
 				      NULL, NULL, ext, node->heap);
+
+		/* We will need to parse out virtual column info from undo
+		log, first mark them DATA_MISSING. So we will know if the
+		value gets updated */
+		if (node->table->n_v_cols
+		    && node->state != UNDO_NODE_INSERT
+		    && !(node->cmpl_info & UPD_NODE_NO_ORD_CHANGE)) {
+			for (ulint i = 0;
+			     i < dict_table_get_n_v_cols(node->table); i++) {
+				dfield_get_type(dtuple_get_nth_v_field(
+					node->row, i))->mtype = DATA_MISSING;
+			}
+		}
+
 		if (node->rec_type == TRX_UNDO_UPD_EXIST_REC) {
 			node->undo_row = dtuple_copy(node->row, node->heap);
 			row_upd_replace(node->undo_row, &node->undo_ext,
@@ -243,7 +257,7 @@ Fetches an undo log record and does the undo for the recorded operation.
 If none left, or a partial rollback completed, returns control to the
 parent node, which is always a query thread node.
 @return DB_SUCCESS if operation successfully completed, else error code */
-static __attribute__((nonnull, warn_unused_result))
+static __attribute__((warn_unused_result))
 dberr_t
 row_undo(
 /*=====*/
@@ -255,7 +269,8 @@ row_undo(
 	roll_ptr_t	roll_ptr;
 	ibool		locked_data_dict;
 
-	ut_ad(node && thr);
+	ut_ad(node != NULL);
+	ut_ad(thr != NULL);
 
 	trx = node->trx;
 	ut_ad(trx->in_rollback);

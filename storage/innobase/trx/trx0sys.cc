@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -25,8 +25,9 @@ Created 3/26/1996 Heikki Tuuri
 
 #include "ha_prototypes.h"
 
+#include "mysqld.h"
 #include "trx0sys.h"
-
+#include "sql_error.h"
 #ifdef UNIV_NONINL
 #include "trx0sys.ic"
 #endif
@@ -97,6 +98,40 @@ static const char*	file_format_name_map[] = {
 /** The number of elements in the file format name array. */
 static const ulint	FILE_FORMAT_NAME_N
 	= sizeof(file_format_name_map) / sizeof(file_format_name_map[0]);
+
+/** Check whether transaction id is valid.
+@param[in]	id              transaction id to check
+@param[in]      name            table name */
+void
+ReadView::check_trx_id_sanity(
+	trx_id_t		id,
+	const table_name_t&	name)
+{
+	if (id >= trx_sys->max_trx_id) {
+
+		ib::warn() << "A transaction id"
+			   << " in a record of table "
+			   << name
+			   << " is newer than the"
+			   << " system-wide maximum.";
+		ut_ad(0);
+		THD *thd = current_thd;
+		if (thd != NULL) {
+			char    table_name[MAX_FULL_NAME_LEN + 1];
+
+			innobase_format_name(
+				table_name, sizeof(table_name),
+				name.m_name);
+
+			push_warning_printf(thd, Sql_condition::SL_WARNING,
+					    ER_SIGNAL_WARN,
+					    "InnoDB: Transaction id"
+					    " in a record of table"
+					    " %s is newer than system-wide"
+					    " maximum.", table_name);
+		}
+	}
+}
 
 #ifndef UNIV_HOTBACKUP
 #ifdef UNIV_DEBUG
@@ -640,7 +675,7 @@ trx_sys_create(void)
 
 	trx_sys = static_cast<trx_sys_t*>(ut_zalloc_nokey(sizeof(*trx_sys)));
 
-	mutex_create("trx_sys", &trx_sys->mutex);
+	mutex_create(LATCH_ID_TRX_SYS, &trx_sys->mutex);
 
 	UT_LIST_INIT(trx_sys->serialisation_list, &trx_t::no_list);
 	UT_LIST_INIT(trx_sys->rw_trx_list, &trx_t::trx_list);
@@ -904,7 +939,7 @@ void
 trx_sys_file_format_init(void)
 /*==========================*/
 {
-	mutex_create("file_format_max", &file_format_max.mutex);
+	mutex_create(LATCH_ID_FILE_FORMAT_MAX, &file_format_max.mutex);
 
 	/* We don't need a mutex here, as this function should only
 	be called once at start up. */
@@ -1101,10 +1136,13 @@ trx_sys_read_file_format_id(
 
 	/* Read the page on which file format is stored */
 
-	success = os_file_read_no_error_handling(
-		file, page, TRX_SYS_PAGE_NO * UNIV_PAGE_SIZE, UNIV_PAGE_SIZE);
+	IORequest	read_req(IORequest::READ)
 
-	if (!success) {
+	dberr_t	err = os_file_read_no_error_handling(
+		read_req, file, page, TRX_SYS_PAGE_NO * UNIV_PAGE_SIZE,
+		UNIV_PAGE_SIZE, NULL);
+
+	if (err != DB_SUCCESS) {
 		/* The following call prints an error message */
 		os_file_get_last_error(true);
 
@@ -1172,11 +1210,14 @@ trx_sys_read_pertable_file_format_id(
 		return(FALSE);
 	}
 
+	IORequest	read_req(IORequest::READ);
+
 	/* Read the first page of the per-table datafile */
 
-	success = os_file_read_no_error_handling(file, page, 0, UNIV_PAGE_SIZE);
+	dberr_t	err = os_file_read_no_error_handling(
+		read_req, file, page, 0, UNIV_PAGE_SIZE, NULL);
 
-	if (!success) {
+	if (err != DB_SUCCESS) {
 		/* The following call prints an error message */
 		os_file_get_last_error(true);
 
@@ -1250,8 +1291,6 @@ trx_sys_close(void)
 	/* Free the double write data structures. */
 	buf_dblwr_free();
 
-	trx_sys_mutex_enter();
-
 	/* Only prepared transactions may be left in the system. Free them. */
 	ut_a(UT_LIST_GET_LEN(trx_sys->rw_trx_list) == trx_sys->n_prepared_trx);
 
@@ -1296,8 +1335,6 @@ trx_sys_close(void)
 	ut_a(UT_LIST_GET_LEN(trx_sys->mysql_trx_list) == 0);
 	ut_a(UT_LIST_GET_LEN(trx_sys->serialisation_list) == 0);
 
-	trx_sys_mutex_exit();
-
 	/* We used placement new to create this mutex. Call the destructor. */
 	mutex_free(&trx_sys->mutex);
 
@@ -1310,6 +1347,33 @@ trx_sys_close(void)
 	trx_sys = NULL;
 }
 
+/** @brief Convert an undo log to TRX_UNDO_PREPARED state on shutdown.
+
+If any prepared ACTIVE transactions exist, and their rollback was
+prevented by innodb_force_recovery, we convert these transactions to
+XA PREPARE state in the main-memory data structures, so that shutdown
+will proceed normally. These transactions will again recover as ACTIVE
+on the next restart, and they will be rolled back unless
+innodb_force_recovery prevents it again.
+
+@param[in]	trx	transaction
+@param[in,out]	undo	undo log to convert to TRX_UNDO_PREPARED */
+static
+void
+trx_undo_fake_prepared(
+	const trx_t*	trx,
+	trx_undo_t*	undo)
+{
+	ut_ad(srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO);
+	ut_ad(trx_state_eq(trx, TRX_STATE_ACTIVE));
+	ut_ad(trx->is_recovered);
+
+	if (undo != NULL) {
+		ut_ad(undo->state == TRX_UNDO_ACTIVE);
+		undo->state = TRX_UNDO_PREPARED;
+	}
+}
+
 /*********************************************************************
 Check if there are any active (non-prepared) transactions.
 @return total number of active transactions or 0 if none */
@@ -1317,15 +1381,46 @@ ulint
 trx_sys_any_active_transactions(void)
 /*=================================*/
 {
-	ulint	total_trx = 0;
-
 	trx_sys_mutex_enter();
 
-	total_trx = UT_LIST_GET_LEN(trx_sys->rw_trx_list)
-		  + UT_LIST_GET_LEN(trx_sys->mysql_trx_list);
+	ulint	total_trx = UT_LIST_GET_LEN(trx_sys->mysql_trx_list);
 
-	ut_a(total_trx >= trx_sys->n_prepared_trx);
-	total_trx -= trx_sys->n_prepared_trx;
+	if (total_trx == 0) {
+		total_trx = UT_LIST_GET_LEN(trx_sys->rw_trx_list);
+		ut_a(total_trx >= trx_sys->n_prepared_trx);
+
+		if (total_trx > trx_sys->n_prepared_trx
+		    && srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO) {
+			for (trx_t* trx = UT_LIST_GET_FIRST(
+				     trx_sys->rw_trx_list);
+			     trx != NULL;
+			     trx = UT_LIST_GET_NEXT(trx_list, trx)) {
+				if (!trx_state_eq(trx, TRX_STATE_ACTIVE)
+				    || !trx->is_recovered) {
+					continue;
+				}
+				/* This was a recovered transaction
+				whose rollback was disabled by
+				the innodb_force_recovery setting.
+				Pretend that it is in XA PREPARE
+				state so that shutdown will work. */
+				trx_undo_fake_prepared(
+					trx, trx->rsegs.m_redo.insert_undo);
+				trx_undo_fake_prepared(
+					trx, trx->rsegs.m_redo.update_undo);
+				trx_undo_fake_prepared(
+					trx, trx->rsegs.m_noredo.insert_undo);
+				trx_undo_fake_prepared(
+					trx, trx->rsegs.m_noredo.update_undo);
+				trx->state = TRX_STATE_PREPARED;
+				trx_sys->n_prepared_trx++;
+				trx_sys->n_prepared_recovered_trx++;
+			}
+		}
+
+		ut_a(total_trx >= trx_sys->n_prepared_trx);
+		total_trx -= trx_sys->n_prepared_trx;
+	}
 
 	trx_sys_mutex_exit();
 

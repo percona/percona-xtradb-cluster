@@ -121,6 +121,10 @@ int STDCALL mysql_server_init(int argc __attribute__((unused)),
     init_client_errs();
     if (mysql_client_plugin_init())
       return 1;
+#if defined (HAVE_OPENSSL) && !defined(HAVE_YASSL)
+    ssl_start();
+#endif
+
     if (!mysql_port)
     {
       char *env;
@@ -1224,7 +1228,7 @@ ulong STDCALL
 mysql_real_escape_string_quote(MYSQL *mysql, char *to, const char *from,
                                ulong length, char quote)
 {
-  if (mysql->server_status & SERVER_STATUS_NO_BACKSLASH_ESCAPES)
+  if (quote == '`' || mysql->server_status & SERVER_STATUS_NO_BACKSLASH_ESCAPES)
     return (uint)escape_quotes_for_mysql(mysql->charset, to, 0,
                                          from, length, quote);
   return (uint)escape_string_for_mysql(mysql->charset, to, 0, from, length);
@@ -1431,7 +1435,7 @@ void set_stmt_errmsg(MYSQL_STMT *stmt, NET *net)
   DBUG_ASSERT(stmt != 0);
 
   stmt->last_errno= net->last_errno;
-  if (net->last_error && net->last_error[0])
+  if (net->last_error[0] != '\0')
     my_stpcpy(stmt->last_error, net->last_error);
   my_stpcpy(stmt->sqlstate, net->sqlstate);
 
@@ -2945,6 +2949,7 @@ my_bool STDCALL mysql_stmt_bind_param(MYSQL_STMT *stmt, MYSQL_BIND *my_bind)
     case MYSQL_TYPE_STRING:
     case MYSQL_TYPE_DECIMAL:
     case MYSQL_TYPE_NEWDECIMAL:
+    case MYSQL_TYPE_JSON:
       param->store_param_func= store_param_str;
       /*
         For variable length types user must set either length or
@@ -4031,6 +4036,7 @@ static my_bool setup_one_fetch_function(MYSQL_BIND *param, MYSQL_FIELD *field)
   case MYSQL_TYPE_DECIMAL:
   case MYSQL_TYPE_NEWDECIMAL:
   case MYSQL_TYPE_NEWDATE:
+  case MYSQL_TYPE_JSON:
     DBUG_ASSERT(param->buffer_length != 0);
     param->fetch_result= fetch_result_str;
     break;
@@ -4104,6 +4110,7 @@ static my_bool setup_one_fetch_function(MYSQL_BIND *param, MYSQL_FIELD *field)
   case MYSQL_TYPE_STRING:
   case MYSQL_TYPE_BIT:
   case MYSQL_TYPE_NEWDATE:
+  case MYSQL_TYPE_JSON:
     param->skip_result= skip_result_string;
     break;
   default:

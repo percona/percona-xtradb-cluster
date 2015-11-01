@@ -36,7 +36,7 @@ SELECT variable_value FROM information_schema.global_status
 # to use a freshly created database for this test we do not return the
 # table or index IDs. We can return the space IS of mysql schema tables
 # since they are created consistently during bootstrap.
-SELECT	t.space, t.name table_name, t.n_cols, t.flag table_flags,
+SELECT	t.name table_name, t.n_cols, t.flag table_flags,
 	i.name index_name, i.page_no root_page, i.type,
 	i.n_fields, i.merge_threshold
 	FROM	INFORMATION_SCHEMA.INNODB_SYS_TABLES  t,
@@ -323,7 +323,7 @@ CREATE TABLE t1(a int, b blob, c text, d text NOT NULL)
 ENGINE=innodb DEFAULT CHARSET=utf8 STATS_PERSISTENT=0;
 
 INSERT INTO t1
-SELECT a,LEFT(REPEAT(d,100*a),65535),REPEAT(d,20*a),d FROM t2,t3;
+SELECT a,LEFT(REPEAT(d,100*a),65535),REPEAT(d,20*a),d FROM t2,t3 order by a, d;
 DROP TABLE t2, t3;
 SELECT COUNT(*) FROM t1 WHERE a=44;
 SELECT a,
@@ -339,10 +339,7 @@ DELETE FROM t1 WHERE a%2;
 CHECK TABLE t1;
 # NULL -> NOT NULL only allowed INPLACE if strict sql_mode is on.
 # And adding a PRIMARY KEY will also add NOT NULL implicitly!
-SET @old_sql_mode = @@sql_mode;
-SET @@sql_mode = 'STRICT_TRANS_TABLES';
 ALTER TABLE t1 ADD PRIMARY KEY (a,b(255),c(255)), ADD KEY (b(767));
-SET @@sql_mode = @old_sql_mode;
 SELECT COUNT(*) FROM t1 WHERE a=44;
 SELECT a,
 LENGTH(b), b=LEFT(REPEAT(d,100*a), 65535),LENGTH(c), c=REPEAT(d,20*a), d FROM t1;

@@ -15,6 +15,7 @@
 
 #include "parse_tree_hints.h"
 #include "sql_class.h"
+#include "mysqld.h"        // table_alias_charset
 #include "sql_lex.h"
 
 
@@ -95,7 +96,7 @@ static Opt_hints_qb *find_qb_hints(Parse_context *pc,
     return pc->select->opt_hints_qb;
 
   Opt_hints_qb *qb= static_cast<Opt_hints_qb *>
-    (pc->thd->lex->opt_hints_global->find_by_name(qb_name));
+    (pc->thd->lex->opt_hints_global->find_by_name(qb_name, system_charset_info));
 
   if (qb == NULL)
   {
@@ -123,8 +124,9 @@ static Opt_hints_table *get_table_hints(Parse_context *pc,
                                         Hint_param_table *table_name,
                                         Opt_hints_qb *qb)
 {
-  Opt_hints_table *tab= 
-    static_cast<Opt_hints_table *> (qb->find_by_name(&table_name->table));
+  Opt_hints_table *tab=
+    static_cast<Opt_hints_table *> (qb->find_by_name(&table_name->table,
+                                                     table_alias_charset));
   if (!tab)
   {
     tab= new Opt_hints_table(&table_name->table, qb, pc->thd->mem_root);
@@ -193,6 +195,90 @@ void PT_hint::print_warn(THD *thd, uint err_code,
 
   push_warning_printf(thd, Sql_condition::SL_WARNING,
                       err_code, ER_THD(thd, err_code), str.c_ptr_safe());
+}
+
+
+bool PT_qb_level_hint::contextualize(Parse_context *pc)
+{
+  if (super::contextualize(pc))
+    return true;
+
+  Opt_hints_qb *qb= find_qb_hints(pc, &qb_name, this);
+  if (qb == NULL)
+    return false;  // TODO: Should this generate a warning?
+
+  bool conflict= false;  // true if this hint conflicts with a previous hint
+  switch (type()) {
+  case SEMIJOIN_HINT_ENUM:
+    if (qb->subquery_hint)
+      conflict= true;
+    else if(!qb->semijoin_hint)
+      qb->semijoin_hint= this;
+    break;
+  case SUBQUERY_HINT_ENUM:
+    if (qb->semijoin_hint)
+      conflict= true;
+    else if (!qb->subquery_hint)
+      qb->subquery_hint= this;
+    break;
+  default:
+      DBUG_ASSERT(0);
+  }
+
+  if (conflict ||
+      // Set hint or detect if hint has been set before
+      qb->set_switch(switch_on(), type(), false))
+    print_warn(pc->thd, ER_WARN_CONFLICTING_HINT, &qb_name, NULL, NULL, this);
+
+  return false;
+}
+
+void PT_qb_level_hint::append_args(THD *thd, String *str) const
+{
+  switch (type()) {
+  case SEMIJOIN_HINT_ENUM:
+  {
+    int count= 0;
+    if (args & OPTIMIZER_SWITCH_FIRSTMATCH)
+    {
+      str->append(STRING_WITH_LEN(" FIRSTMATCH"));
+      ++count;
+    }
+    if (args & OPTIMIZER_SWITCH_LOOSE_SCAN)
+    {
+      if (count++ > 0)
+        str->append(STRING_WITH_LEN(","));
+      str->append(STRING_WITH_LEN(" LOOSESCAN"));
+    }
+    if (args & OPTIMIZER_SWITCH_MATERIALIZATION)
+    {
+      if (count++ > 0)
+        str->append(STRING_WITH_LEN(","));
+      str->append(STRING_WITH_LEN(" MATERIALIZATION"));
+    }
+    if (args & OPTIMIZER_SWITCH_DUPSWEEDOUT)
+    {
+      if (count++ > 0)
+        str->append(STRING_WITH_LEN(","));
+      str->append(STRING_WITH_LEN(" DUPSWEEDOUT"));
+    }
+    break;
+  }
+  case SUBQUERY_HINT_ENUM:
+    switch (args) {
+    case Item_exists_subselect::EXEC_MATERIALIZATION:
+      str->append(STRING_WITH_LEN(" MATERIALIZATION"));
+      break;
+    case Item_exists_subselect::EXEC_EXISTS:
+      str->append(STRING_WITH_LEN(" INTOEXISTS"));
+      break;
+    default:      // Exactly one of above strategies should always be specified
+      DBUG_ASSERT(false);
+    }
+    break;
+  default:
+    DBUG_ASSERT(false);
+  }
 }
 
 
@@ -284,14 +370,15 @@ bool PT_key_level_hint::contextualize(Parse_context *pc)
   for (uint i= 0; i < key_list.size(); i++)
   {
     LEX_CSTRING *key_name= &key_list.at(i);
-    Opt_hints_key *key= (Opt_hints_key *)tab->find_by_name(key_name);
+    Opt_hints_key *key= (Opt_hints_key *)tab->find_by_name(key_name,
+                                                           system_charset_info);
 
     if (!key)
     {
       key= new Opt_hints_key(key_name, tab, pc->thd->mem_root);
       tab->register_child(key);
     }
-    
+
     if (key->set_switch(switch_on(), type(), true))
       print_warn(pc->thd, ER_WARN_CONFLICTING_HINT,
                  &table_name.opt_query_block,
@@ -312,7 +399,8 @@ bool PT_hint_qb_name::contextualize(Parse_context *pc)
   DBUG_ASSERT(qb);
 
   if (qb->get_name() ||                         // QB name is already set
-      qb->get_parent()->find_by_name(&qb_name)) // Name is already used
+      qb->get_parent()->find_by_name(&qb_name,  // Name is already used
+                                     system_charset_info))
   {
     print_warn(pc->thd, ER_WARN_CONFLICTING_HINT,
                NULL, NULL, NULL, this);
@@ -329,20 +417,26 @@ bool PT_hint_max_execution_time::contextualize(Parse_context *pc)
   if (super::contextualize(pc))
     return true;
 
-  if (pc->thd->lex->sql_command != SQLCOM_SELECT)
+  if (pc->thd->lex->sql_command != SQLCOM_SELECT || // not a SELECT statement
+      pc->thd->lex->sphead ||                       // or in a SP/trigger/event
+      pc->select != pc->thd->lex->select_lex)       // or in a subquery
+  {
     push_warning(pc->thd, Sql_condition::SL_WARNING,
                  ER_WARN_UNSUPPORTED_MAX_EXECUTION_TIME,
                  ER_THD(pc->thd, ER_WARN_UNSUPPORTED_MAX_EXECUTION_TIME));
+    return false;
+  }
 
   Opt_hints_global *global_hint= get_global_hints(pc);
   if (global_hint->is_specified(type()))
   {
+    // Hint duplication: /*+ MAX_EXECUTION_TIME ... MAX_EXECUTION_TIME */
     print_warn(pc->thd, ER_WARN_CONFLICTING_HINT,
                NULL, NULL, NULL, this);
     return false;
   }
 
-  pc->thd->lex->max_statement_time= milliseconds;
+  pc->thd->lex->max_execution_time= milliseconds;
   global_hint->set_switch(switch_on(), type(), false);
   global_hint->max_exec_time= this;
   return false;

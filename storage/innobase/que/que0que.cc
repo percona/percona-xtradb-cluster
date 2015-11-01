@@ -164,7 +164,8 @@ que_thr_create(
 {
 	que_thr_t*	thr;
 
-	ut_ad(parent && heap);
+	ut_ad(parent != NULL);
+	ut_ad(heap != NULL);
 
 	thr = static_cast<que_thr_t*>(mem_heap_zalloc(heap, sizeof(*thr)));
 
@@ -509,6 +510,7 @@ que_graph_free_recursive(
 
 		que_graph_free_recursive(cre_tab->tab_def);
 		que_graph_free_recursive(cre_tab->col_def);
+		que_graph_free_recursive(cre_tab->v_col_def);
 
 		mem_heap_free(cre_tab->heap);
 

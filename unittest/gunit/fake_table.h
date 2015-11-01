@@ -58,6 +58,8 @@ public:
   {
     static const char *fakepath= "fakepath";
     fields= number_of_columns;
+    db_create_options= 0;
+    primary_key= 0;
     column_bitmap_size= sizeof(int);
     tmp_table= NO_TMP_TABLE;
     db_low_byte_first= true;
@@ -104,7 +106,6 @@ class Fake_TABLE: public TABLE
     TABLE *as_table= static_cast<TABLE*>(this);
     memset(as_table, 0, sizeof(*as_table));
     s= &table_share;
-    file= NULL;
     in_use= current_thd;
     null_row= '\0';
     read_set= &read_set_struct;
@@ -125,6 +126,7 @@ class Fake_TABLE: public TABLE
     highest_index_id= 3;
 
     set_handler(&mock_handler);
+    mock_handler.change_table_ptr(this, &table_share);
     field= m_field_array;
   }
 

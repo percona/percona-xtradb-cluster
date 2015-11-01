@@ -736,7 +736,7 @@ DROP TABLE t1;
 SET @org_mode=@@sql_mode;
 SET @@sql_mode='NO_DIR_IN_CREATE';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 SELECT @@sql_mode;
 @@sql_mode
 NO_DIR_IN_CREATE
@@ -803,7 +803,7 @@ t1	CREATE TABLE `t1` (
 DROP TABLE t1;
 SET @@sql_mode= @org_mode;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 CREATE TABLE t1 (a INTEGER NOT NULL, PRIMARY KEY (a));
 INSERT INTO t1 VALUES (1),(1);
 ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
@@ -1090,7 +1090,7 @@ partition by key (a)
 subpartition by hash (sin(a+b))
 (partition x1 (subpartition x11, subpartition x12),
 partition x2 (subpartition x21, subpartition x22));
-ERROR HY000: It is only possible to mix RANGE/LIST partitioning with HASH/KEY partitioning for subpartitioning
+ERROR HY000: This partition function is not allowed
 select load_file('$MYSQLD_DATADIR/test/t1.par');
 load_file('$MYSQLD_DATADIR/test/t1.par')
 NULL
@@ -1461,7 +1461,7 @@ ERROR HY000: This partition function is not allowed
 #
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 CREATE TABLE old (a TIMESTAMP NOT NULL PRIMARY KEY)
 PARTITION BY RANGE (UNIX_TIMESTAMP(a)) (
 PARTITION p VALUES LESS THAN (1219089600),

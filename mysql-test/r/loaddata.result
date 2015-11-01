@@ -71,7 +71,7 @@ a	b
 drop table t1;
 SET @OLD_SQL_MODE=@@SQL_MODE, @@SQL_MODE=NO_AUTO_VALUE_ON_ZERO;
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 create table t1(id integer not null auto_increment primary key);
 insert into t1 values(0);
 select * from t1;
@@ -82,7 +82,7 @@ id
 0
 SET @@SQL_MODE=@OLD_SQL_MODE;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 drop table t1;
 create table t1 (a varchar(20), b varchar(20));
 load data infile '../../std_data/loaddata_dq.dat' into table t1 fields terminated by ',' enclosed by '"' escaped by '"' (a,b);
@@ -223,14 +223,14 @@ create table t1(f1 int);
 insert into t1 values(1),(null);
 create table t2(f2 int auto_increment primary key);
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 select * from t2;
 f2
 1
 2
 SET @@SQL_MODE=@OLD_SQL_MODE;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 drop table t1,t2;
 create table t1(f1 int, f2 timestamp not null default current_timestamp);
 create table t2(f1 int);
@@ -330,7 +330,7 @@ FIELDS ESCAPED BY '\\'
   TERMINATED BY ','
   ENCLOSED BY '"'
   LINES TERMINATED BY '\n' (c0, c2);
-ERROR HY000: Invalid column reference (v2.c0) in LOAD DATA
+ERROR HY000: Column 'c0' is not updatable
 
 LOAD DATA INFILE '../../std_data/bug35469.dat' INTO TABLE v3
 FIELDS ESCAPED BY '\\'
@@ -353,7 +353,7 @@ SET @OLD_SQL_MODE=@@SESSION.SQL_MODE;
 test LOAD DATA INFILE
 SET sql_mode = '';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 SELECT '1 \\aa\n' INTO DUMPFILE 'MYSQLTEST_VARDIR/tmp/bug37114.txt';
 CREATE TABLE t1 (id INT, val1 CHAR(3));
 SET sql_mode = 'NO_BACKSLASH_ESCAPES';
@@ -466,7 +466,7 @@ LOAD_FILE("MYSQLTEST_VARDIR/tmp/bug37114.txt")
 
 set session sql_mode=@OLD_SQL_MODE;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 DROP TABLE t1,t2;
 #
 # Bug #51893: crash with certain characters given to load_file 
@@ -553,14 +553,47 @@ DROP TABLE t1;
 #
 SET @old_mode= @@sql_mode;
 CREATE TABLE t1 (fld1 INT);
-SET sql_mode='strict_all_tables';
-Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+SET sql_mode=default;
 # Without fix, load data hangs forever.
 LOAD DATA LOCAL INFILE 'MYSQLTEST_VARDIR/mysql' REPLACE INTO TABLE t1
 FIELDS TERMINATED BY 't' LINES TERMINATED BY '';
 Got one of the listed errors
 SET @@sql_mode= @old_mode;
-Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
 DROP TABLE t1;
+#
+# Bug#20683959 LOAD DATA INFILE IGNORES A SPECIFIC ROW SILENTLY
+#              UNDER DB CHARSET IS UTF8
+#
+CREATE DATABASE d1 CHARSET latin1;
+USE d1;
+CREATE TABLE t1 (val TEXT);
+LOAD DATA INFILE '../../std_data/bug20683959loaddata.txt' INTO TABLE t1;
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+1
+SELECT HEX(val) FROM t1;
+HEX(val)
+22525420406E696F757A656368756E3A20E7A781E381AFE3838FE38383E38394E383BCE382A8E383B3E38389E58EA8E381AAE38293E381A0E38191E3828CE381A9E38081E382A2E383B3E3838FE38383E38394E383BCE382A8E383B3E38389E38284E683A8E58A87E79A84E381AAE3818AE8A9B1E38292E38182E381BEE3828AE7A98DE6A5B5E79A84E381ABE69182E58F96E38197E381AAE38184E79086E794B1E381AFE38081E78FBEE5AE9FE381AEE4BABAE7949FE381AFE59FBAE69CACE79A84E381ABE38186E381BEE3818FE38184E3818BE381AAE38184E38197E4B88DE5B9B3E7AD89E381A0E38197E79086E4B88DE5B0BDE381A0E38197E8BE9BE38184
+CREATE DATABASE d2 CHARSET utf8;
+USE d2;
+CREATE TABLE t1 (val TEXT);
+LOAD DATA INFILE '../../std_data/bug20683959loaddata.txt' INTO TABLE t1;
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+1
+SELECT HEX(val) FROM t1;
+HEX(val)
+22525420406E696F757A656368756E3A20E7A781E381AFE3838FE38383E38394E383BCE382A8E383B3E38389E58EA8E381AAE38293E381A0E38191E3828CE381A9E38081E382A2E383B3E3838FE38383E38394E383BCE382A8E383B3E38389E38284E683A8E58A87E79A84E381AAE3818AE8A9B1E38292E38182E381BEE3828AE7A98DE6A5B5E79A84E381ABE69182E58F96E38197E381AAE38184E79086E794B1E381AFE38081E78FBEE5AE9FE381AEE4BABAE7949FE381AFE59FBAE69CACE79A84E381ABE38186E381BEE3818FE38184E3818BE381AAE38184E38197E4B88DE5B9B3E7AD89E381A0E38197E79086E4B88DE5B0BDE381A0E38197E8BE9BE38184
+DROP TABLE d1.t1, d2.t1;
+DROP DATABASE d1;
+DROP DATABASE d2;
+USE test;
+# Bug#21097485 *insert_table_ref && (insert_table_ref)->is_insertable
+CREATE TABLE t(a INTEGER PRIMARY KEY, b INTEGER, c INTEGER);
+CREATE VIEW v AS SELECT a, b+c AS d FROM t;
+LOAD DATA INFILE 'test.dat' INTO TABLE v(a, d);
+ERROR HY000: Column 'd' is not updatable
+LOAD DATA INFILE 'test.dat' INTO TABLE v(@a, @d) SET a= @a, d= @d;
+ERROR HY000: Column 'd' is not updatable
+DROP VIEW v;
+DROP TABLE t;

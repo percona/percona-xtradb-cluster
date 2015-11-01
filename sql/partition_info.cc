@@ -1008,7 +1008,8 @@ char *partition_info::find_duplicate_name()
   if (is_sub_partitioned())
     max_names+= num_parts * num_subparts;
   if (my_hash_init(&partition_names, system_charset_info, max_names, 0, 0,
-                   (my_hash_get_key) get_part_name_from_elem, 0, HASH_UNIQUE))
+                   (my_hash_get_key) get_part_name_from_elem, 0, HASH_UNIQUE,
+                   PSI_INSTRUMENT_ME))
   {
     DBUG_ASSERT(0);
     curr_name= (const uchar*) "Internal failure";
@@ -1645,15 +1646,22 @@ bool partition_info::check_partition_info(THD *thd, handlerton **eng_type,
   {
     int err= 0;
 
+    /* Check for partition expression. */
     if (!list_of_part_fields)
     {
       DBUG_ASSERT(part_expr);
       err= part_expr->walk(&Item::check_partition_func_processor,
                            Item::WALK_POSTFIX, NULL);
-      if (!err && is_sub_partitioned() && !list_of_subpart_fields)
-        err= subpart_expr->walk(&Item::check_partition_func_processor,
-                                Item::WALK_POSTFIX, NULL);
     }
+
+    /* Check for sub partition expression. */
+    if (!err && is_sub_partitioned() && !list_of_subpart_fields)
+    {
+      DBUG_ASSERT(subpart_expr);
+      err= subpart_expr->walk(&Item::check_partition_func_processor,
+                              Item::WALK_POSTFIX, NULL);
+    }
+
     if (err)
     {
       my_error(ER_PARTITION_FUNCTION_IS_NOT_ALLOWED, MYF(0));

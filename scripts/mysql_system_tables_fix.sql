@@ -26,6 +26,68 @@
 set sql_mode='';
 set default_storage_engine=MyISAM;
 
+# Move distributed grant tables to default engine during upgrade, remember
+# which tables was moved so they can be moved back after upgrade
+SET @had_distributed_user =
+  (SELECT COUNT(table_name) FROM information_schema.tables
+     WHERE table_schema = 'mysql' AND table_name = 'user' AND
+           table_type = 'BASE TABLE' AND engine = 'NDBCLUSTER');
+SET @cmd="ALTER TABLE mysql.user ENGINE=MyISAM";
+SET @str = IF(@had_distributed_user > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @had_distributed_db =
+  (SELECT COUNT(table_name) FROM information_schema.tables
+     WHERE table_schema = 'mysql' AND table_name = 'db' AND
+           table_type = 'BASE TABLE' AND engine = 'NDBCLUSTER');
+SET @cmd="ALTER TABLE mysql.db ENGINE=MyISAM";
+SET @str = IF(@had_distributed_db > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @had_distributed_tables_priv =
+  (SELECT COUNT(table_name) FROM information_schema.tables
+     WHERE table_schema = 'mysql' AND table_name = 'tables_priv' AND
+           table_type = 'BASE TABLE' AND engine = 'NDBCLUSTER');
+SET @cmd="ALTER TABLE mysql.tables_priv ENGINE=MyISAM";
+SET @str = IF(@had_distributed_tables_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @had_distributed_columns_priv =
+  (SELECT COUNT(table_name) FROM information_schema.tables
+     WHERE table_schema = 'mysql' AND table_name = 'columns_priv' AND
+           table_type = 'BASE TABLE' AND engine = 'NDBCLUSTER');
+SET @cmd="ALTER TABLE mysql.columns_priv ENGINE=MyISAM";
+SET @str = IF(@had_distributed_columns_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @had_distributed_procs_priv =
+  (SELECT COUNT(table_name) FROM information_schema.tables
+     WHERE table_schema = 'mysql' AND table_name = 'procs_priv' AND
+           table_type = 'BASE TABLE' AND engine = 'NDBCLUSTER');
+SET @cmd="ALTER TABLE mysql.procs_priv ENGINE=MyISAM";
+SET @str = IF(@had_distributed_procs_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @had_distributed_proxies_priv =
+  (SELECT COUNT(table_name) FROM information_schema.tables
+     WHERE table_schema = 'mysql' AND table_name = 'proxies_priv' AND
+           table_type = 'BASE TABLE' AND engine = 'NDBCLUSTER' );
+SET @cmd="ALTER TABLE mysql.proxies_priv ENGINE=MyISAM";
+SET @str = IF(@had_distributed_proxies_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
 ALTER TABLE user add File_priv enum('N','Y') COLLATE utf8_general_ci NOT NULL;
 
 # Detect whether or not we had the Grant_priv column
@@ -59,7 +121,7 @@ ALTER TABLE tables_priv
 ALTER TABLE tables_priv
   MODIFY Host char(60) NOT NULL default '',
   MODIFY Db char(64) NOT NULL default '',
-  MODIFY User char(16) NOT NULL default '',
+  MODIFY User char(32) NOT NULL default '',
   MODIFY Table_name char(64) NOT NULL default '',
   MODIFY Grantor char(77) NOT NULL default '',
   ENGINE=MyISAM,
@@ -87,7 +149,7 @@ ALTER TABLE columns_priv
 ALTER TABLE columns_priv
   MODIFY Host char(60) NOT NULL default '',
   MODIFY Db char(64) NOT NULL default '',
-  MODIFY User char(16) NOT NULL default '',
+  MODIFY User char(32) NOT NULL default '',
   MODIFY Table_name char(64) NOT NULL default '',
   MODIFY Column_name char(64) NOT NULL default '',
   ENGINE=MyISAM,
@@ -154,7 +216,7 @@ alter table func comment='User defined functions';
 # and reset all char columns to correct width
 ALTER TABLE user
   MODIFY Host char(60) NOT NULL default '',
-  MODIFY User char(16) NOT NULL default '',
+  MODIFY User char(32) NOT NULL default '',
   ENGINE=MyISAM, CONVERT TO CHARACTER SET utf8 COLLATE utf8_bin;
 ALTER TABLE user
   MODIFY Select_priv enum('N','Y') COLLATE utf8_general_ci DEFAULT 'N' NOT NULL,
@@ -183,7 +245,7 @@ ALTER TABLE user
 ALTER TABLE db
   MODIFY Host char(60) NOT NULL default '',
   MODIFY Db char(64) NOT NULL default '',
-  MODIFY User char(16) NOT NULL default '',
+  MODIFY User char(32) NOT NULL default '',
   ENGINE=MyISAM, CONVERT TO CHARACTER SET utf8 COLLATE utf8_bin;
 ALTER TABLE db
   MODIFY  Select_priv enum('N','Y') COLLATE utf8_general_ci DEFAULT 'N' NOT NULL,
@@ -331,6 +393,7 @@ UPDATE user LEFT JOIN db USING (Host,User) SET Create_user_priv='Y'
 #
 
 ALTER TABLE procs_priv
+  MODIFY User char(32) NOT NULL default '',
   ENGINE=MyISAM,
   CONVERT TO CHARACTER SET utf8 COLLATE utf8_bin;
 
@@ -820,3 +883,39 @@ ALTER TABLE time_zone_name ENGINE=InnoDB STATS_PERSISTENT=0;
 ALTER TABLE time_zone_transition ENGINE=InnoDB STATS_PERSISTENT=0;
 ALTER TABLE time_zone_transition_type ENGINE=InnoDB STATS_PERSISTENT=0;
 
+# Move any distributed grant tables back to NDB after upgrade
+SET @cmd="ALTER TABLE mysql.user ENGINE=NDB";
+SET @str = IF(@had_distributed_user > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @cmd="ALTER TABLE mysql.db ENGINE=NDB";
+SET @str = IF(@had_distributed_db > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @cmd="ALTER TABLE mysql.tables_priv ENGINE=NDB";
+SET @str = IF(@had_distributed_tables_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @cmd="ALTER TABLE mysql.columns_priv ENGINE=NDB";
+SET @str = IF(@had_distributed_columns_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @cmd="ALTER TABLE mysql.procs_priv ENGINE=NDB";
+SET @str = IF(@had_distributed_procs_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+SET @cmd="ALTER TABLE mysql.proxies_priv ENGINE=NDB";
+SET @str = IF(@had_distributed_proxies_priv > 0, @cmd, "SET @dummy = 0");
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;

@@ -199,8 +199,6 @@ command. */
 #define UNIV_DEBUG_LOCK_VALIDATE		/* Enable
 						ut_ad(lock_rec_validate_page())
 						assertions. */
-#define UNIV_DEBUG_FILE_ACCESSES		/* Enable freed block access
-						debugging without UNIV_DEBUG */
 #define UNIV_LRU_DEBUG				/* debug the buffer pool LRU */
 #define UNIV_HASH_DEBUG				/* debug HASH_ macros */
 #define UNIV_LOG_LSN_DEBUG			/* write LSN to the redo log;
@@ -213,10 +211,6 @@ and the insert buffer must be empty when the database is started */
 #define UNIV_PERF_DEBUG                         /* debug flag that enables
                                                 light weight performance
                                                 related stuff. */
-#define UNIV_SYNC_DEBUG				/* debug mutex and latch
-operations (very slow); also UNIV_DEBUG must be defined */
-#define UNIV_SYNC_PERF_STAT			/* operation counts for
-						rw-locks and mutexes */
 #define UNIV_SEARCH_PERF_STAT			/* statistics for the
 						adaptive hash index */
 #define UNIV_SRV_PRINT_LATCH_WAITS		/* enable diagnostic output
@@ -399,6 +393,10 @@ database name and table name. In addition, 14 bytes is added for:
 #define MAX_FULL_NAME_LEN				\
 	(MAX_TABLE_NAME_LEN + MAX_DATABASE_NAME_LEN + 14)
 
+/** Maximum length of the compression alogrithm string. Currently we support
+only (NONE | ZLIB | LZ4). */
+#define MAX_COMPRESSION_LEN     4
+
 /** The maximum length in bytes that a database name can occupy when stored in
 UTF8, including the terminating '\0', see dict_fs2utf8(). You must include
 mysql_com.h if you are to use this macro. */
@@ -574,12 +572,14 @@ functions. */
 
 #ifdef _WIN32
 typedef ulint os_thread_ret_t;
-#define OS_THREAD_DUMMY_RETURN return(0)
-#define OS_PATH_SEPARATOR '\\'
+# define OS_THREAD_DUMMY_RETURN		return(0)
+# define OS_PATH_SEPARATOR		'\\'
+# define OS_PATH_SEPARATOR_ALT		'/'
 #else
 typedef void* os_thread_ret_t;
-#define OS_THREAD_DUMMY_RETURN return(NULL)
-#define OS_PATH_SEPARATOR '/'
+# define OS_THREAD_DUMMY_RETURN		return(NULL)
+# define OS_PATH_SEPARATOR		'/'
+# define OS_PATH_SEPARATOR_ALT		'\\'
 #endif
 
 #include <stdio.h>
@@ -651,6 +651,8 @@ typedef void* os_thread_ret_t;
 
 extern ulong	srv_page_size_shift;
 extern ulong	srv_page_size;
+
+static const size_t UNIV_SECTOR_SIZE = 512;
 
 /* Dimension of spatial object we support so far. It has its root in
 myisam/sp_defs.h. We only support 2 dimension data */

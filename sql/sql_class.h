@@ -29,7 +29,7 @@
 #include "discrete_interval.h"            // Discrete_interval
 #include "handler.h"                      // KEY_CREATE_INFO
 #include "opt_trace_context.h"            // Opt_trace_context
-#include "protocol.h"                     // Protocol_text
+#include "protocol_classic.h"             // Protocol_text
 #include "rpl_context.h"                  // Rpl_thd_context
 #include "rpl_gtid.h"                     // Gtid_specification
 #include "session_tracker.h"              // Session_tracker
@@ -224,10 +224,6 @@ public:
 
 #define TC_LOG_PAGE_SIZE   8192
 #define TC_LOG_MIN_SIZE    (3*TC_LOG_PAGE_SIZE)
-
-#define TC_HEURISTIC_RECOVER_COMMIT   1
-#define TC_HEURISTIC_RECOVER_ROLLBACK 2
-extern ulong tc_heuristic_recover;
 
 typedef struct st_user_var_events
 {
@@ -463,6 +459,7 @@ typedef struct system_variables
   ulong max_allowed_packet;
   ulong max_error_count;
   ulong max_length_for_sort_data;
+  ulong max_points_in_geometry;
   ulong max_sort_length;
   ulong max_tmp_tables;
   ulong max_insert_delayed_threads;
@@ -572,11 +569,12 @@ typedef struct system_variables
   Gtid_set_or_null gtid_next_list;
   ulong session_track_gtids;
 
-  ulong max_statement_time;
+  ulong max_execution_time;
 
   char *track_sysvars_ptr;
   my_bool session_track_schema;
   my_bool session_track_state_change;
+  ulong   session_track_transaction_info;
   /**
     Compatibility option to mark the pre MySQL-5.6.4 temporals columns using
     the old format using comments for SHOW CREATE TABLE and in I_S.COLUMNS
@@ -647,9 +645,9 @@ typedef struct system_status_var
   ulonglong bytes_received;
   ulonglong bytes_sent;
 
-  ulonglong max_statement_time_exceeded;
-  ulonglong max_statement_time_set;
-  ulonglong max_statement_time_set_failed;
+  ulonglong max_execution_time_exceeded;
+  ulonglong max_execution_time_set;
+  ulonglong max_execution_time_set_failed;
 
   /* Number of statements sent from the client. */
   ulonglong questions;
@@ -840,6 +838,8 @@ public:
 
   /** Erase all prepared statements (calls Prepared_statement destructor). */
   void erase(Prepared_statement *statement);
+
+  void claim_memory_ownership();
 
   void reset();
 
@@ -1085,7 +1085,8 @@ enum enum_thread_type
   SYSTEM_THREAD_EVENT_WORKER= 16,
   SYSTEM_THREAD_INFO_REPOSITORY= 32,
   SYSTEM_THREAD_SLAVE_WORKER= 64,
-  SYSTEM_THREAD_COMPRESS_GTID_TABLE= 128
+  SYSTEM_THREAD_COMPRESS_GTID_TABLE= 128,
+  SYSTEM_THREAD_BACKGROUND= 256
 };
 
 inline char const *
@@ -1103,6 +1104,7 @@ show_system_thread(enum_thread_type thread)
     RETURN_NAME_AS_STRING(SYSTEM_THREAD_INFO_REPOSITORY);
     RETURN_NAME_AS_STRING(SYSTEM_THREAD_SLAVE_WORKER);
     RETURN_NAME_AS_STRING(SYSTEM_THREAD_COMPRESS_GTID_TABLE);
+    RETURN_NAME_AS_STRING(SYSTEM_THREAD_BACKGROUND);
   default:
     sprintf(buf, "<UNKNOWN SYSTEM THREAD: %d>", thread);
     return buf;
@@ -1362,6 +1364,16 @@ public:
 
   bool lock_global_read_lock(THD *thd);
   void unlock_global_read_lock(THD *thd);
+
+  /**
+    Used by innodb memcached server to check if any connections
+    have global read lock
+  */
+  static bool global_read_lock_active()
+  {
+    return my_atomic_load32(&m_active_requests) ? true : false;
+  }
+
   /**
     Check if this connection can acquire protection against GRL and
     emit error if otherwise.
@@ -1379,6 +1391,7 @@ public:
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
 private:
+  volatile static int32 m_active_requests;
   enum_grl_state m_state;
   /**
     In order to acquire the global read lock, the connection must
@@ -1543,12 +1556,8 @@ public:
   struct st_mysql_stmt *current_stmt;
 #endif
   Query_cache_tls query_cache_tls;
-  NET	  net;				// client connection descriptor
   /** Aditional network instrumentation for the server only. */
   NET_SERVER m_net_server_extension;
-  Protocol *protocol;			// Current protocol
-  Protocol_text   protocol_text;	// Normal protocol
-  Protocol_binary protocol_binary;	// Binary protocol
   /**
     Hash for user variables.
     User variables are per session,
@@ -1557,12 +1566,13 @@ public:
     Protected by @c LOCK_thd_data.
   */
   HASH    user_vars;			// hash for user variables
-  String  packet;			// dynamic buffer for network I/O
   String  convert_buffer;               // buffer for charset conversions
   struct  rand_struct rand;		// used for authentication
   struct  system_variables variables;	// Changeable local variables
   struct  system_status_var status_var; // Per thread statistic vars
   struct  system_status_var *initial_status_var; /* used by show status */
+  // has status_var already been added to global_status_var?
+  bool status_var_aggregated;
   THR_LOCK_INFO lock_info;              // Locking info of this thread
   /**
     Protects THD data accessed from other threads.
@@ -1602,10 +1612,20 @@ public:
       explain_single_table_modification
       explain_query
       mysql_explain_other
-    All explain code assumes that this mutex is already taken.
+    When doing EXPLAIN CONNECTION:
+      all explain code assumes that this mutex is already taken.
+    When doing ordinary EXPLAIN:
+      the mutex does need to be taken (no need to protect reading my own data,
+      moreover EXPLAIN CONNECTION can't run on an ordinary EXPLAIN).
   */
+private:
   mysql_mutex_t LOCK_query_plan;
-    
+
+public:
+  /// Locks the query plan of this THD
+  void lock_query_plan() { mysql_mutex_lock(&LOCK_query_plan); }
+  void unlock_query_plan() { mysql_mutex_unlock(&LOCK_query_plan); }
+
   /** All prepared statements of this connection. */
   Prepared_statement_map stmt_map;
   /*
@@ -1647,6 +1667,36 @@ public:
   */
   const char *proc_info;
 
+  Protocol_text   protocol_text;    // Normal protocol
+  Protocol_binary protocol_binary;  // Binary protocol
+
+  Protocol *get_protocol()
+  {
+    return m_protocol;
+  }
+
+  /**
+    Asserts that the protocol is of type text or binary and then
+    returns the m_protocol casted to Protocol_classic. This method
+    is needed to prevent misuse of pluggable protocols by legacy code
+  */
+  Protocol_classic *get_protocol_classic() const
+  {
+    DBUG_ASSERT(m_protocol->type() == Protocol::PROTOCOL_TEXT ||
+                m_protocol->type() == Protocol::PROTOCOL_BINARY);
+
+    return (Protocol_classic *) m_protocol;
+  }
+
+  void set_protocol(Protocol * protocol)
+  {
+    m_protocol= protocol;
+  }
+
+private:
+  Protocol *m_protocol;           // Current protocol
+
+public:
   /**
      Query plan for EXPLAINable commands, should be locked with
      LOCK_query_plan before using.
@@ -1664,57 +1714,58 @@ public:
     /// True if query is run in prepared statement
     bool is_ps;
 
+    explicit Query_plan(const Query_plan&);     ///< not defined
+    Query_plan& operator=(const Query_plan&);   ///< not defined
+
   public:
-    Query_plan(THD *thd_arg) : thd(thd_arg), sql_command(SQLCOM_END),
-      modification_plan(NULL)
+    /// Asserts that current_thd has locked this plan, if it does not own it.
+    void assert_plan_is_locked_if_other() const
+#ifdef DBUG_OFF
     {}
-    explicit Query_plan(const Query_plan&); ///< not defined
-    Query_plan& operator=(const Query_plan&); ///< not defined
+#else
+    ;
+#endif
+
+    explicit Query_plan(THD *thd_arg)
+      : thd(thd_arg),
+        sql_command(SQLCOM_END),
+        modification_plan(NULL)
+    {}
+
     /**
       Set query plan.
 
       @note This function takes THD::LOCK_query_plan mutex.
     */
     void set_query_plan(enum_sql_command sql_cmd, LEX *lex_arg, bool ps);
-    /**
-      Change current command.
 
-      @details This function is needed for single UPDATE statement, for which
-      after opening tables we can find out that the statement have to be
-      converted multi UPDATE.
-
-      @note This function takes THD::LOCK_query_plan mutex.
-    */
-    void set_command(enum_sql_command sql_cmd);
     /*
-      5 functions below expect THD::LOCK_query_plan to be already taken by a
-      caller.
+      The 4 getters below expect THD::LOCK_query_plan to be already taken
+      if called from another thread.
     */
     enum_sql_command get_command() const
     {
-      mysql_mutex_assert_owner(&thd->LOCK_query_plan);
+      assert_plan_is_locked_if_other();
       return sql_command;
     }
     LEX *get_lex() const
     {
-      mysql_mutex_assert_owner(&thd->LOCK_query_plan);
+      assert_plan_is_locked_if_other();
       return lex;
     }
-    Modification_plan const *get_plan()
+    Modification_plan const *get_modification_plan() const
     {
-      mysql_mutex_assert_owner(&thd->LOCK_query_plan);
+      assert_plan_is_locked_if_other();
       return modification_plan;
     }
     bool is_ps_query() const
     {
-      mysql_mutex_assert_owner(&thd->LOCK_query_plan);
+      assert_plan_is_locked_if_other();
       return is_ps;
     }
-    void set_modification_plan(Modification_plan *plan_arg)
-    {
-      mysql_mutex_assert_owner(&thd->LOCK_query_plan);
-      modification_plan= plan_arg;
-    }
+
+    void set_modification_plan(Modification_plan *plan_arg);
+
   } query_plan;
 
   const LEX_CSTRING &catalog() const
@@ -1743,7 +1794,6 @@ public:
   */
   const char *where;
 
-  ulong client_capabilities;		/* What the client supports */
   ulong max_client_packet_length;
 
   HASH		handler_tables_hash;
@@ -1822,6 +1872,7 @@ public:
     decremented each time before it returns from the function.
   */
   uint fill_status_recursion_level;
+  uint fill_variables_recursion_level;
 
   /* container for handler's private per-connection data */
   Ha_data ha_data[MAX_HA];
@@ -1936,7 +1987,6 @@ public:
     return m_binlog_filter_state;
   }
 
-#ifdef HAVE_MY_TIMER
   /** Holds active timer object */
   struct st_thd_timer_info *timer;
   /**
@@ -1944,7 +1994,6 @@ public:
     with timer_cache timer to reuse.
   */
   struct st_thd_timer_info *timer_cache;
-#endif
 
 private:
   /**
@@ -2004,7 +2053,10 @@ private:
   char *m_trans_fixed_log_file;
   my_off_t m_trans_end_pos;
   /**@}*/
-
+  // NOTE: Ideally those two should be in Protocol,
+  // but currently its design doesn't allow that.
+  NET     net;                          // client connection descriptor
+  String  packet;                       // dynamic buffer for network I/O
 public:
   void issue_unsafe_warnings();
 
@@ -2244,10 +2296,26 @@ public:
   */
   ulonglong  limit_found_rows;
   /*
-    Indicate if the gtid_executed table is being operated
-    in current transaction.
+    Indicate if the gtid_executed table is being operated implicitly
+    within current transaction. This happens because we are inserting
+    a GTID specified through SET GTID_NEXT by user client or
+    slave SQL thread/workers.
   */
-  bool  is_operating_gtid_table;
+  bool is_operating_gtid_table_implicitly;
+  /*
+    Indicate that a sub-statement is being operated implicitly
+    within current transaction.
+    As we don't want that this implicit sub-statement to consume the
+    GTID of the actual transaction, we set it true at the beginning of
+    the sub-statement and set it false again after "committing" the
+    sub-statement.
+    When it is true, the applier will not save the transaction owned
+    gtid into mysql.gtid_executed table before transaction prepare, as
+    it does when binlog is disabled, or binlog is enabled and
+    log_slave_updates is disabled.
+    Rpl_info_table::do_flush_info() uses this flag.
+  */
+  bool is_operating_substatement_implicitly;
 
 private:
   /**
@@ -2486,6 +2554,15 @@ public:
     group commit.
   */
   THD *next_to_commit;
+
+  /**
+    The member is served for marking a query that CREATEs or ALTERs
+    a table declared with a TIMESTAMP column as dependent on
+    @@session.explicit_defaults_for_timestamp.
+    Is set to true by parser, unset at the end of the query.
+    Possible marking in checked by binary logger.
+  */
+  bool binlog_need_explicit_defaults_ts;
 
   /**
      Functions to set and get transaction position.
@@ -2827,6 +2904,8 @@ public:
     mysql_mutex_unlock(&LOCK_thd_data);
   }
 
+  enum_vio_type get_vio_type();
+
   void shutdown_active_vio();
   void awake(THD::killed_state state_to_set);
 
@@ -3129,7 +3208,10 @@ public:
     DBUG_VOID_RETURN;
   }
 #ifndef EMBEDDED_LIBRARY
-  inline bool vio_ok() const { return net.vio != 0; }
+  inline bool vio_ok() const
+  {
+    return get_protocol_classic()->vio_ok();
+  }
   /** Return FALSE if connection to client is broken. */
   virtual bool is_connected()
   {
@@ -3138,7 +3220,8 @@ public:
       not using vio. So this function always returns true for all
       system threads.
     */
-    return system_thread || (vio_ok() ? vio_is_connected(net.vio) : FALSE);
+    return system_thread ||
+      (vio_ok() ? vio_is_connected(get_protocol_classic()->get_vio()) : FALSE);
   }
 #else
   inline bool vio_ok() const { return TRUE; }
@@ -4143,14 +4226,6 @@ public:
 
   void mark_transaction_to_rollback(bool all);
 
-#ifndef DBUG_OFF
-private:
-  int gis_debug; // Storage for "SELECT ST_GIS_DEBUG(param);"
-public:
-  int get_gis_debug() { return gis_debug; }
-  void set_gis_debug(int arg) { gis_debug= arg; }
-#endif
-
 private:
 
   /** The current internal error handler for this thread, or NULL. */
@@ -4198,6 +4273,7 @@ private:
    */
   LEX_CSTRING m_invoker_user;
   LEX_CSTRING m_invoker_host;
+  friend class Protocol_classic;
 
 private:
   /**
@@ -4222,6 +4298,108 @@ public:
   Session_sysvar_resource_manager session_sysvar_res_mgr;
 
   void parse_error_at(const YYLTYPE &location, const char *s= NULL);
+
+  /**
+    Send name and type of result to client.
+
+    Sum fields has table name empty and field_name.
+
+    @param list         List of items to send to client
+    @param flag         Bit mask with the following functions:
+                          - 1 send number of rows
+                          - 2 send default values
+                          - 4 don't write eof packet
+
+    @retval
+      false ok
+    @retval
+      true Error  (Note that in this case the error is not sent to the client)
+  */
+
+  bool send_result_metadata(List<Item> *list, uint flags);
+
+  /**
+    Send one result set row.
+
+    @param row_items a collection of column values for that row
+
+    @return Error status.
+    @retval true  Error.
+    @retval false Success.
+  */
+
+  bool send_result_set_row(List<Item> *row_items);
+
+
+  /*
+    Send the status of the current statement execution over network.
+
+    In MySQL, there are two types of SQL statements: those that return
+    a result set and those that return status information only.
+
+    If a statement returns a result set, it consists of 3 parts:
+    - result set meta-data
+    - variable number of result set rows (can be 0)
+    - followed and terminated by EOF or ERROR packet
+
+    Once the  client has seen the meta-data information, it always
+    expects an EOF or ERROR to terminate the result set. If ERROR is
+    received, the result set rows are normally discarded (this is up
+    to the client implementation, libmysql at least does discard them).
+    EOF, on the contrary, means "successfully evaluated the entire
+    result set". Since we don't know how many rows belong to a result
+    set until it's evaluated, EOF/ERROR is the indicator of the end
+    of the row stream. Note, that we can not buffer result set rows
+    on the server -- there may be an arbitrary number of rows. But
+    we do buffer the last packet (EOF/ERROR) in the Diagnostics_area and
+    delay sending it till the very end of execution (here), to be able to
+    change EOF to an ERROR if commit failed or some other error occurred
+    during the last cleanup steps taken after execution.
+
+    A statement that does not return a result set doesn't send result
+    set meta-data either. Instead it returns one of:
+    - OK packet
+    - ERROR packet.
+    Similarly to the EOF/ERROR of the previous statement type, OK/ERROR
+    packet is "buffered" in the Diagnostics Area and sent to the client
+    in the end of statement.
+
+    @note This method defines a template, but delegates actual
+    sending of data to virtual Protocol::send_{ok,eof,error}. This
+    allows for implementation of protocols that "intercept" ok/eof/error
+    messages, and store them in memory, etc, instead of sending to
+    the client.
+
+    @pre  The Diagnostics Area is assigned or disabled. It can not be empty
+          -- we assume that every SQL statement or COM_* command
+          generates OK, ERROR, or EOF status.
+
+    @post The status information is encoded to protocol format and sent to the
+          client.
+
+    @return We conventionally return void, since the only type of error
+            that can happen here is a NET (transport) error, and that one
+            will become visible when we attempt to read from the NET the
+            next command.
+            Diagnostics_area::is_sent is set for debugging purposes only.
+  */
+
+  void send_statement_status();
+
+  /**
+    This is only used by master dump threads.
+    When the master receives a new connection from a slave with a UUID that
+    is already connected, it will set this flag TRUE before killing the old
+    slave connection.
+  */
+  bool duplicate_slave_uuid;
+
+  /**
+    Claim all the memory used by the THD object.
+    This method is to keep memory instrumentation statistics
+    updated, when an object is transfered across threads.
+  */
+  void claim_memory_ownership();
 };
 
 /**
@@ -4295,6 +4473,12 @@ my_eof(THD *thd)
 {
   thd->set_row_count_func(-1);
   thd->get_stmt_da()->set_eof_status(thd);
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE)
+  {
+    ((Transaction_state_tracker *)
+     thd->session_tracker.get_tracker(TRANSACTION_INFO_TRACKER))
+      ->add_trx_state(thd, TX_RESULT_SET);
+  }
 }
 
 #define tmp_disable_binlog(A)       \
@@ -4648,6 +4832,14 @@ public:
   */
   bool bit_fields_as_long;
 
+  /*
+    Generally, pk of internal temp table can be used as unique key to eliminate
+    the duplication of records. But because Innodb doesn't support disable PK
+    (cluster key)when doing operations mixed UNION ALL and UNION, the PK can't
+    be used as the unique key in such a case.
+  */
+  bool can_use_pk_for_unique;
+
   Temp_table_param()
     :copy_field(NULL), copy_field_end(NULL),
      recinfo(NULL), start_recinfo(NULL),
@@ -4659,7 +4851,7 @@ public:
      using_outer_summary_function(false),
      table_charset(NULL),
      schema_table(false), precomputed_group_by(false), force_copy_fields(false),
-     skip_create_table(false), bit_fields_as_long(false)
+     skip_create_table(false), bit_fields_as_long(false), can_use_pk_for_unique(true)
   {}
   ~Temp_table_param()
   {
@@ -4700,7 +4892,7 @@ public:
 		     bool force)
     :table(table_arg), sel(NULL)
   {
-    if (!force && (thd->client_capabilities & CLIENT_NO_SCHEMA))
+    if (!force && thd->get_protocol()->has_client_capability(CLIENT_NO_SCHEMA))
       db= NULL_CSTR;
     else
       db= db_arg;
@@ -5086,11 +5278,16 @@ public:
 */
 #define CF_SKIP_QUESTIONS       (1U << 1)
 
+/**
+  Used to mark commands that can be used with Protocol Plugin
+*/
+#define CF_ALLOW_PROTOCOL_PLUGIN (1U << 2)
+
 void add_diff_to_status(STATUS_VAR *to_var, STATUS_VAR *from_var,
                         STATUS_VAR *dec_var);
 
 
-void add_to_status(STATUS_VAR *to_var, const STATUS_VAR *from_var, bool add_com_vars);
+void add_to_status(STATUS_VAR *to_var, STATUS_VAR *from_var, bool reset_from_var);
 
 /* Inline functions */
 

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -75,8 +75,6 @@ ut_dbg_assertion_failed(
 @param A the unused variable */
 #define UT_NOT_USED(A)	A = A
 
-#ifdef UNIV_COMPILE_TEST_FUNCS
-
 #if defined(HAVE_SYS_TIME_H) && defined(HAVE_SYS_RESOURCE_H)
 
 #define HAVE_UT_CHRONO_T
@@ -139,7 +137,9 @@ public:
 
 #define CHRONO_PRINT(type, tvp)						\
 		fprintf(stderr, "%s: %s% 5ld.%06ld sec\n",		\
-			m_name, type, (tvp)->tv_sec, (tvp)->tv_usec)
+			m_name, type,					\
+			static_cast<long>((tvp)->tv_sec),		\
+			static_cast<long>((tvp)->tv_usec))
 
 		timersub(&tv_now, &m_tv, &tv_diff);
 		CHRONO_PRINT("real", &tv_diff);
@@ -180,8 +180,6 @@ private:
 };
 
 #endif /* HAVE_SYS_TIME_H && HAVE_SYS_RESOURCE_H */
-
-#endif /* UNIV_COMPILE_TEST_FUNCS */
 
 #endif /* !UNIV_INNOCHECKSUM */
 

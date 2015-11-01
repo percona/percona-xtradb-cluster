@@ -68,14 +68,14 @@ INSERT INTO t1 VALUES ('1.2345', 2.3456);
 INSERT INTO t1 VALUES ("1.2345", 2.3456);
 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ANSI_QUOTES';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 INSERT INTO t1 VALUES (1.2345, 2.3456);
 INSERT INTO t1 VALUES ('1.2345', 2.3456);
 INSERT INTO t1 VALUES ("1.2345", 2.3456);
 ERROR 42S22: Unknown column '1.2345' in 'field list'
 SET SQL_MODE=@OLD_SQL_MODE;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `t1` (
@@ -366,7 +366,7 @@ UNLOCK TABLES;
 
 set global sql_mode='ANSI_QUOTES';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -2631,7 +2631,7 @@ select sum(id) from t1 into a;
 END //
 set sql_mode='ansi';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 create procedure `a'b` () select 1;
 set sql_mode='';
 
@@ -5401,3 +5401,59 @@ HEX(a)
 00000000010200000005000000000000000000F03F000000000000F03F0000000000000040000000000000F03F00000000000000400000000000000040000000000000F03F0000000000000040000000000000F03F000000000000F03F
 INSERT INTO `t1` (`a`) VALUES (0x00000000010200000005000000000000000000F03F000000000000F03F0000000000000040000000000000F03F00000000000000400000000000000040000000000000F03F0000000000000040000000000000F03F000000000000F03F);
 DROP DATABASE dump_gis;
+#
+# Bug #20772273 : MYSQLIMPORT --USE-THREADS DOESN'T USE MULTIPLE THREADS
+#
+CREATE DATABASE db_20772273;
+USE db_20772273;
+CREATE TABLE t1(a INT);
+INSERT INTO t1 VALUES (1), (2);
+CREATE TABLE t2(a INT);
+INSERT INTO t2 VALUES (3), (4);
+SELECT * FROM t1;
+a
+1
+2
+SELECT * FROM t2;
+a
+3
+4
+SELECT * FROM t1;
+a
+1
+2
+SELECT * FROM t2;
+a
+3
+4
+DROP TABLE t1;
+DROP TABLE t2;
+DROP DATABASE db_20772273;
+#
+# WL#8132 JSON datatype and binary storage format
+#
+CREATE DATABASE dump_json;
+USE dump_json;
+CREATE TABLE t1 (j JSON);
+INSERT INTO t1 VALUES (JSON_ARRAY(1, 2, 3, "one", "two", "three"));
+SELECT * FROM t1;
+j
+[1, 2, 3, "one", "two", "three"]
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `t1` (
+  `j` json DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+INSERT INTO `t1` VALUES ('[1, 2, 3, \"one\", \"two\", \"three\"]');
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `t1` (
+  `j` json DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+INSERT INTO `t1` VALUES ('[1, 2, 3, \"one\", \"two\", \"three\"]');
+DROP DATABASE dump_json;
+#
+# End of 5.7 tests
+#

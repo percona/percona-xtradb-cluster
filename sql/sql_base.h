@@ -238,7 +238,8 @@ bool insert_fields(THD *thd, Name_resolution_context *context,
                    List_iterator<Item> *it, bool any_privileges);
 bool setup_fields(THD *thd, Ref_ptr_array ref_pointer_array,
                   List<Item> &item, ulong privilege,
-                  List<Item> *sum_func_list, bool allow_sum_func);
+                  List<Item> *sum_func_list,
+                  bool allow_sum_func, bool column_update);
 bool fill_record(THD * thd, List<Item> &fields, List<Item> &values,
                  MY_BITMAP *bitmap, MY_BITMAP *insert_into_fields_bitmap);
 bool fill_record(THD *thd, Field **field, List<Item> &values,
@@ -279,7 +280,7 @@ void update_non_unique_table_error(TABLE_LIST *update,
                                    const char *operation,
                                    TABLE_LIST *duplicate);
 int setup_ftfuncs(SELECT_LEX* select);
-int init_ftfuncs(THD *thd, SELECT_LEX* select);
+bool init_ftfuncs(THD *thd, SELECT_LEX* select);
 int run_before_dml_hook(THD *thd);
 bool lock_table_names(THD *thd, TABLE_LIST *table_list,
                       TABLE_LIST *table_list_end, ulong lock_wait_timeout,

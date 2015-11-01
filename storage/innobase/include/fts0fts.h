@@ -100,6 +100,31 @@ those defined in mysql file ft_global.h */
 #define FTS_OPTIMIZE_THRESHOLD		10000000
 
 #define FTS_DOC_ID_MAX_STEP		10000
+
+/** Maximum possible Fulltext word length */
+#define FTS_MAX_WORD_LEN		HA_FT_MAXBYTELEN
+
+/** Maximum possible Fulltext word length (in characters) */
+#define FTS_MAX_WORD_LEN_IN_CHAR	HA_FT_MAXCHARLEN
+
+/** Number of columns in FTS AUX Tables */
+#define FTS_DELETED_TABLE_NUM_COLS	1
+#define FTS_CONFIG_TABLE_NUM_COLS	2
+#define FTS_AUX_INDEX_TABLE_NUM_COLS	5
+
+/** DELETED_TABLE(doc_id BIGINT UNSIGNED) */
+#define FTS_DELETED_TABLE_COL_LEN	8
+/** CONFIG_TABLE(key CHAR(50), value CHAR(200)) */
+#define FTS_CONFIG_TABLE_KEY_COL_LEN	50
+#define FTS_CONFIG_TABLE_VALUE_COL_LEN	200
+
+#define FTS_INDEX_WORD_LEN		FTS_MAX_WORD_LEN
+#define FTS_INDEX_FIRST_DOC_ID_LEN	8
+#define FTS_INDEX_LAST_DOC_ID_LEN	8
+#define FTS_INDEX_DOC_COUNT_LEN		4
+/* BLOB COLUMN, 0 means VARIABLE SIZE */
+#define FTS_INDEX_ILIST_LEN		0
+
 /** Variable specifying the FTS parallel sort degree */
 extern ulong		fts_sort_pll_degree;
 
@@ -378,12 +403,6 @@ extern ulong		fts_min_token_size;
 need a sync to free some memory */
 extern bool		fts_need_sync;
 
-/** Maximum possible Fulltext word length */
-#define FTS_MAX_WORD_LEN		HA_FT_MAXBYTELEN
-
-/** Maximum possible Fulltext word length (in characters) */
-#define FTS_MAX_WORD_LEN_IN_CHAR	HA_FT_MAXCHARLEN
-
 /** Variable specifying the table that has Fulltext index to display its
 content through information schema table */
 extern char*		fts_internal_tbl_name;
@@ -600,24 +619,36 @@ fts_get_doc_id_from_row(
 	dtuple_t*	row);			/*!< in: row whose FTS doc id we
 						want to extract.*/
 
-/******************************************************************//**
-Extract the doc id from the FTS hidden column. */
+/** Extract the doc id from the record that belongs to index.
+@param[in]	table	table
+@param[in]	rec	record contains FTS_DOC_ID
+@param[in]	index	index of rec
+@param[in]	heap	heap memory
+@return doc id that was extracted from rec */
 doc_id_t
 fts_get_doc_id_from_rec(
-/*====================*/
-	dict_table_t*	table,			/*!< in: table */
-	const rec_t*	rec,			/*!< in: rec */
-	mem_heap_t*	heap);			/*!< in: heap */
+        dict_table_t*           table,
+        const rec_t*            rec,
+        const dict_index_t*     index,
+        mem_heap_t*             heap);
 
-/******************************************************************//**
-Update the query graph with a new document id.
-@return Doc ID used */
+/** Add new fts doc id to the update vector.
+@param[in]	table		the table that contains the FTS index.
+@param[in,out]	ufield		the fts doc id field in the update vector.
+				No new memory is allocated for this in this
+				function.
+@param[in,out]	next_doc_id	the fts doc id that has been added to the
+				update vector.  If 0, a new fts doc id is
+				automatically generated.  The memory provided
+				for this argument will be used by the update
+				vector. Ensure that the life time of this
+				memory matches that of the update vector.
+@return the fts doc id used in the update vector */
 doc_id_t
 fts_update_doc_id(
-/*==============*/
-	dict_table_t*	table,			/*!< in: table */
-	upd_field_t*	ufield,			/*!< out: update node */
-	doc_id_t*	next_doc_id);		/*!< out: buffer for writing */
+	dict_table_t*	table,
+	upd_field_t*	ufield,
+	doc_id_t*	next_doc_id);
 
 /******************************************************************//**
 FTS initialize. */
@@ -1000,5 +1031,6 @@ ibool
 fts_check_cached_index(
 /*===================*/
 	dict_table_t*	table);  /*!< in: Table where indexes are dropped */
+
 #endif /*!< fts0fts.h */
 

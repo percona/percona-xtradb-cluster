@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2007, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2007, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -1408,12 +1408,6 @@ fts_query_union(
 
 	if (token->f_len == 0) {
 		return(query->error);
-	}
-
-	if (query->index->parser != NULL
-	    && *token->f_str == '%') {
-		/* A parser plugin may not filter '%' out. */
-		return(DB_SUCCESS);
 	}
 
 	fts_query_cache(query, token);
@@ -4176,7 +4170,6 @@ fts_query_sort_result_on_rank(
 	result->rankings_by_rank = ranked;
 }
 
-#ifdef UNIV_DEBUG
 /*******************************************************************//**
 A debug function to print result doc_id set. */
 static
@@ -4204,7 +4197,6 @@ fts_print_doc_id(
 		}
 	}
 }
-#endif
 
 /*************************************************************//**
 This function implements a simple "blind" query expansion search:
@@ -4248,9 +4240,10 @@ fts_expand_query(
 	result_doc.is_ngram = index_cache->index->is_ngram;
 
 	query->total_size += SIZEOF_RBT_CREATE;
-#ifdef UNIV_DEBUG
-	fts_print_doc_id(query);
-#endif
+
+	if (fts_enable_diag_print) {
+		fts_print_doc_id(query);
+	}
 
 	for (node = rbt_first(query->doc_ids);
 	     node;

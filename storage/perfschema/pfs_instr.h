@@ -51,6 +51,7 @@ class THD;
 #include "pfs_con_slice.h"
 #include "pfs_column_types.h"
 #include "mdl.h"
+#include "violite.h" /* enum_vio_type */
 
 extern PFS_single_stat *thread_instr_class_waits_array_start;
 extern PFS_single_stat *thread_instr_class_waits_array_end;
@@ -324,9 +325,9 @@ struct PFS_ALIGNED PFS_metadata_lock : public PFS_instr
 /** Max size of the statements stack. */
 extern uint statement_stack_max;
 /** Max size of the digests token array. */
-extern uint pfs_max_digest_length;
+extern size_t pfs_max_digest_length;
 /** Max size of SQL TEXT. */
-extern uint pfs_max_sqltext;
+extern size_t pfs_max_sqltext;
 
 /** Instrumented thread implementation. @see PSI_thread. */
 struct PFS_ALIGNED PFS_thread : PFS_connection_slice
@@ -335,6 +336,74 @@ struct PFS_ALIGNED PFS_thread : PFS_connection_slice
 
   /** Thread instrumentation flag. */
   bool m_enabled;
+  /** Thread history instrumentation flag. */
+  bool m_history;
+
+  /**
+    Derived flag flag_events_waits_history, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_WAITS_HISTORY].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_waits_history;
+  /**
+    Derived flag flag_events_waits_history_long, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_WAITS_HISTORY_LONG].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_waits_history_long;
+  /**
+    Derived flag flag_events_stages_history, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_STAGES_HISTORY].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_stages_history;
+  /**
+    Derived flag flag_events_stages_history_long, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_STAGES_HISTORY_LONG].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_stages_history_long;
+  /**
+    Derived flag flag_events_statements_history, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_STATEMENTS_HISTORY].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_statements_history;
+  /**
+    Derived flag flag_events_statements_history_long, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_STATEMENTS_HISTORY_LONG].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_statements_history_long;
+  /**
+    Derived flag flag_events_transactions_history, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_TRANSACTIONS_HISTORY].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_transactions_history;
+  /**
+    Derived flag flag_events_transactions_history_long, per thread.
+    Cached computation of
+      TABLE SETUP_CONSUMERS[EVENTS_TRANSACTIONS_HISTORY_LONG].ENABLED == 'YES'
+    AND
+      TABLE THREADS[THREAD_ID].HISTORY == 'YES'
+  */
+  bool m_flag_events_transactions_history_long;
+
   /** Current wait event in the event stack. */
   PFS_events_waits *m_events_waits_current;
   /** Event ID counter */
@@ -486,6 +555,8 @@ struct PFS_ALIGNED PFS_thread : PFS_connection_slice
   uint m_dbname_length;
   /** Current command. */
   int m_command;
+  /** Connection type. */
+  enum_vio_type m_connection_type;
   /** Start time. */
   time_t m_start_time;
   /**
@@ -543,7 +614,18 @@ struct PFS_ALIGNED PFS_thread : PFS_connection_slice
 
   void carry_memory_stat_delta(PFS_memory_stat_delta *delta, uint index);
 
-  void set_enabled(bool enabled);
+  void set_enabled(bool enabled)
+  {
+    m_enabled= enabled;
+  }
+
+  void set_history(bool history)
+  {
+    m_history= history;
+    set_history_derived_flags();
+  }
+
+  void set_history_derived_flags();
 };
 
 void carry_global_memory_stat_delta(PFS_memory_stat_delta *delta, uint index);

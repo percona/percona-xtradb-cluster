@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1994, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1994, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -69,7 +69,8 @@ dtuple_coll_cmp(
 	ulint	i;
 	int	cmp;
 
-	ut_ad(tuple1 && tuple2);
+	ut_ad(tuple1 != NULL);
+	ut_ad(tuple2 != NULL);
 	ut_ad(tuple1->magic_n == DATA_TUPLE_MAGIC_N);
 	ut_ad(tuple2->magic_n == DATA_TUPLE_MAGIC_N);
 	ut_ad(dtuple_check_typed(tuple1));
@@ -736,6 +737,7 @@ skip_field:
 			upd_field.field_no = longest_i;
 			upd_field.orig_len = 0;
 			upd_field.exp = NULL;
+			upd_field.old_v_val = NULL;
 			dfield_copy(&upd_field.new_val,
 				    dfield->clone(upd->heap));
 			upd->append(upd_field);

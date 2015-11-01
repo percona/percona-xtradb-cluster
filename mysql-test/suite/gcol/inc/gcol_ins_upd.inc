@@ -314,3 +314,69 @@ UPDATE t1 SET col7 = DEFAULT;
 UPDATE t1 SET col8 = DEFAULT;
 DROP TABLE t1;
 
+if ($support_virtual_index)
+{
+--echo Bug#20797344: WL#8149: ALLOCATED SPACE FOR INDEXED BLOB VGC CAN BE
+--echo               OVERWRITTEN FOR UPDATE
+--echo #
+CREATE TABLE t (a varchar(100), b blob,
+c blob GENERATED ALWAYS AS (concat(a,b)) VIRTUAL,
+d blob GENERATED ALWAYS AS (b) VIRTUAL,
+e int(11) GENERATED ALWAYS AS (10) VIRTUAL,
+h int(11) NOT NULL, PRIMARY KEY (h), key(c(20)));
+INSERT INTO t(a,b,h) VALUES('aaaaaaa','1111111', 11);
+INSERT INTO t(a,b,h) VALUES('bbbbbbb','2222222', 22);
+SELECT c FROM t;
+UPDATE t SET a='ccccccc';
+SELECT c FROM t;
+DROP TABLE t;
+}
+
+--echo # Bug#21081742: ASSERTION !TABLE || (!TABLE->WRITE_SET || 
+--echo # BITMAP_IS_SET(TABLE->WRITE_SET
+--echo #
+
+CREATE TABLE b ( 
+pk INTEGER AUTO_INCREMENT,
+col_varchar_nokey VARCHAR(1),
+col_varchar_key VARCHAR(2) GENERATED ALWAYS AS
+(CONCAT(col_varchar_nokey, col_varchar_nokey)),
+PRIMARY KEY (pk)
+);
+
+INSERT INTO b (col_varchar_nokey) VALUES ('v'),('v');
+
+CREATE TABLE d (
+pk INTEGER AUTO_INCREMENT,
+col_varchar_nokey VARCHAR(1),
+col_varchar_key VARCHAR(2) GENERATED ALWAYS AS
+(CONCAT(col_varchar_nokey, col_varchar_nokey)),
+PRIMARY KEY (pk)
+) ;
+
+INSERT INTO d (col_varchar_nokey) VALUES ('q'),('g'),('e'),('l'),(NULL),('v'),('c'),('u'),('x');
+
+CREATE TABLE bb (
+pk INTEGER AUTO_INCREMENT,
+col_varchar_nokey VARCHAR(1) /*! NULL */,
+col_varchar_key VARCHAR(2) GENERATED ALWAYS AS
+(CONCAT(col_varchar_nokey, col_varchar_nokey)),
+PRIMARY KEY (pk)
+);
+
+INSERT INTO bb (col_varchar_nokey) VALUES ('j'),('h');
+
+EXPLAIN UPDATE
+d AS OUTR1, b AS OUTR2
+SET OUTR1.col_varchar_nokey = NULL
+WHERE
+( 't', 'b' )  IN
+(
+SELECT
+INNR1.col_varchar_nokey AS x,
+INNR1.col_varchar_key AS y
+FROM bb AS INNR1
+WHERE OUTR1.pk = 1
+);
+
+DROP TABLE IF EXISTS b,bb,d;

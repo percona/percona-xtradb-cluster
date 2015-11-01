@@ -23,7 +23,6 @@
 #include "violite.h"                    // SSL_type
 #include "hash_filo.h"                  // HASH, hash_filo
 #include "records.h"                    // READ_RECORD
-#include "read_write_lock.h"            // Write_lock, Read_lock, lock_at
 #include "partitioned_rwlock.h"         // Partitioned_rwlock
 
 #include "prealloced_array.h"
@@ -248,7 +247,8 @@ public:
 
   GRANT_TABLE(const char *h, const char *d,const char *u,
               const char *t, ulong p, ulong c);
-  GRANT_TABLE (TABLE *form, TABLE *col_privs);
+  explicit GRANT_TABLE(TABLE *form);
+  bool init(TABLE *col_privs);
   ~GRANT_TABLE();
   bool ok() { return privs != 0 || cols != 0; }
 };
@@ -271,7 +271,6 @@ extern Prealloced_array<ACL_HOST_AND_IP, ACL_PREALLOC_SIZE> *acl_wild_hosts;
 extern HASH column_priv_hash, proc_priv_hash, func_priv_hash;
 extern hash_filo *acl_cache;
 extern HASH acl_check_hosts;
-extern mysql_rwlock_t proxy_users_rwlock;
 extern bool allow_all_hosts;
 extern uint grant_version; /* Version of priv tables */
 extern Partitioned_rwlock LOCK_grant;

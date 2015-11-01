@@ -166,21 +166,15 @@ void rewrite_user_resources(LEX *lex, String *rlb)
   }
 }
 
-void rewrite_account_lock(LEX *lex, String *rlb, bool lock_only)
+void rewrite_account_lock(LEX *lex, String *rlb)
 {
-  if (!lex->alter_password.account_locked)
+  if (lex->alter_password.account_locked)
   {
-    if (lock_only)
-    {
-      /* Do not write account enable state. */
-      return;
-    }
-
-    rlb->append(STRING_WITH_LEN(" ACCOUNT UNLOCK"));
+    rlb->append(STRING_WITH_LEN(" ACCOUNT LOCK"));
   }
   else
   {
-    rlb->append(STRING_WITH_LEN(" ACCOUNT LOCK"));
+    rlb->append(STRING_WITH_LEN(" ACCOUNT UNLOCK"));
   }
 }
 
@@ -194,7 +188,7 @@ void rewrite_account_lock(LEX *lex, String *rlb, bool lock_only)
 void mysql_rewrite_grant(THD *thd, String *rlb)
 {
   LEX        *lex= thd->lex;
-  TABLE_LIST *first_table= (TABLE_LIST*) lex->select_lex->table_list.first;
+  TABLE_LIST *first_table= lex->select_lex->table_list.first;
   bool        comma= FALSE, comma_inner;
   String      cols(1024);
   int         c;
@@ -363,6 +357,13 @@ void mysql_rewrite_create_alter_user(THD *thd, String *rlb)
   else
     rlb->append(STRING_WITH_LEN("ALTER USER "));
 
+  if (thd->lex->sql_command == SQLCOM_CREATE_USER &&
+      thd->lex->create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS)
+    rlb->append(STRING_WITH_LEN("IF NOT EXISTS "));
+  if (thd->lex->sql_command == SQLCOM_ALTER_USER &&
+      thd->lex->drop_if_exists)
+    rlb->append(STRING_WITH_LEN("IF EXISTS "));
+
   while ((tmp_user_name= user_list++))
   {
     if ((user_name= get_current_user(thd, tmp_user_name)))
@@ -395,7 +396,16 @@ void mysql_rewrite_create_alter_user(THD *thd, String *rlb)
   else
     rlb->append(STRING_WITH_LEN(" PASSWORD EXPIRE NEVER"));
 
-  rewrite_account_lock(lex, rlb, false);
+  if (thd->lex->sql_command == SQLCOM_ALTER_USER)
+  {
+    if (lex->alter_password.update_account_locked_column)
+      rewrite_account_lock(lex, rlb);
+  }
+  else if (!opt_log_backward_compatible_user_definitions ||
+            lex->alter_password.update_account_locked_column)
+  {
+    rewrite_account_lock(lex, rlb);
+  }
 }
 
 /**

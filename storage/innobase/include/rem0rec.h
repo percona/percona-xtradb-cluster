@@ -760,17 +760,19 @@ rec_get_end(
 # define rec_get_start(rec, offsets) ((rec) - rec_offs_extra_size(offsets))
 # define rec_get_end(rec, offsets) ((rec) + rec_offs_data_size(offsets))
 #endif /* UNIV_DEBUG */
-/***************************************************************//**
-Copies a physical record to a buffer.
+
+/** Copy a physical record to a buffer.
+@param[in]	buf	buffer
+@param[in]	rec	physical record
+@param[in]	offsets	array returned by rec_get_offsets()
 @return pointer to the origin of the copy */
 UNIV_INLINE
 rec_t*
 rec_copy(
-/*=====*/
-	void*		buf,	/*!< in: buffer */
-	const rec_t*	rec,	/*!< in: physical record */
-	const ulint*	offsets)/*!< in: array returned by rec_get_offsets() */
-	__attribute__((nonnull));
+	void*		buf,
+	const rec_t*	rec,
+	const ulint*	offsets);
+
 #ifndef UNIV_HOTBACKUP
 /**********************************************************//**
 Determines the size of a data tuple prefix in a temporary file.
@@ -781,8 +783,10 @@ rec_get_converted_size_temp(
 	const dict_index_t*	index,	/*!< in: record descriptor */
 	const dfield_t*		fields,	/*!< in: array of data fields */
 	ulint			n_fields,/*!< in: number of data fields */
+	const dtuple_t*		v_entry,/*!< in: dtuple contains virtual column
+					data */
 	ulint*			extra)	/*!< out: extra size */
-	__attribute__((warn_unused_result, nonnull));
+	__attribute__((warn_unused_result));
 
 /******************************************************//**
 Determine the offset to each field in temporary file.
@@ -805,8 +809,10 @@ rec_convert_dtuple_to_temp(
 	rec_t*			rec,		/*!< out: record */
 	const dict_index_t*	index,		/*!< in: record descriptor */
 	const dfield_t*		fields,		/*!< in: array of data fields */
-	ulint			n_fields)	/*!< in: number of fields */
-	__attribute__((nonnull));
+	ulint			n_fields,	/*!< in: number of fields */
+	const dtuple_t*		v_entry);	/*!< in: dtuple contains
+						virtual column data */
+
 
 /**************************************************************//**
 Copies the first n fields of a physical record to a new physical record in
@@ -824,19 +830,21 @@ rec_copy_prefix_to_buf(
 						or NULL */
 	ulint*			buf_size)	/*!< in/out: buffer size */
 	__attribute__((nonnull));
-/************************************************************//**
-Folds a prefix of a physical record to a ulint.
+/** Fold a prefix of a physical record.
+@param[in]	rec		index record
+@param[in]	offsets		return value of rec_get_offsets()
+@param[in]	n_fields	number of complete fields to fold
+@param[in]	n_bytes		number of bytes to fold in the last field
+@param[in]	index_id	index tree ID
 @return the folded value */
 UNIV_INLINE
 ulint
 rec_fold(
-/*=====*/
-	const rec_t*	rec,		/*!< in: the physical record */
-	const ulint*	offsets,	/*!< in: array returned by
-					rec_get_offsets() */
-	ulint		n_fields,	/*!< in: number of complete
-					fields to fold */
-	index_id_t	tree_id)	/*!< in: index tree id */
+	const rec_t*	rec,
+	const ulint*	offsets,
+	ulint		n_fields,
+	ulint		n_bytes,
+	index_id_t	tree_id)
 	__attribute__((warn_unused_result));
 #endif /* !UNIV_HOTBACKUP */
 /*********************************************************//**
@@ -852,7 +860,7 @@ rec_convert_dtuple_to_rec(
 	const dtuple_t*		dtuple,	/*!< in: data tuple */
 	ulint			n_ext)	/*!< in: number of
 					externally stored columns */
-	__attribute__((nonnull, warn_unused_result));
+	__attribute__((warn_unused_result));
 /**********************************************************//**
 Returns the extra size of an old-style physical record if we know its
 data size and number of fields.

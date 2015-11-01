@@ -56,8 +56,8 @@ ulong events_stages_history_per_thread= 0;
 /** Number of EVENTS_STATEMENTS_HISTORY records per thread. */
 ulong events_statements_history_per_thread= 0;
 uint statement_stack_max= 0;
-uint pfs_max_digest_length= 0;
-uint pfs_max_sqltext= 0;
+size_t pfs_max_digest_length= 0;
+size_t pfs_max_sqltext= 0;
 /** Number of locker lost. @sa LOCKER_STACK_SIZE. */
 ulong locker_lost= 0;
 /** Number of statements lost. @sa STATEMENT_STACK_SIZE. */
@@ -139,7 +139,9 @@ int init_instruments(const PFS_global_param *param)
   if (file_handle_max > 0)
   {
     file_handle_array= PFS_MALLOC_ARRAY(& builtin_memory_file_handle,
-                                        file_handle_max, PFS_file*, MYF(MY_ZEROFILL));
+                                        file_handle_max,
+                                        sizeof(PFS_file*), PFS_file*,
+                                        MYF(MY_ZEROFILL));
     if (unlikely(file_handle_array == NULL))
       return 1;
   }
@@ -161,7 +163,8 @@ int init_instruments(const PFS_global_param *param)
     global_instr_class_stages_array=
       PFS_MALLOC_ARRAY(& builtin_memory_global_stages,
                        stage_class_max,
-                       PFS_stage_stat, MYF(MY_ZEROFILL));
+                       sizeof(PFS_stage_stat), PFS_stage_stat,
+                       MYF(MY_ZEROFILL));
     if (unlikely(global_instr_class_stages_array == NULL))
       return 1;
 
@@ -174,7 +177,8 @@ int init_instruments(const PFS_global_param *param)
     global_instr_class_statements_array=
       PFS_MALLOC_ARRAY(& builtin_memory_global_statements,
                        statement_class_max,
-                       PFS_statement_stat, MYF(MY_ZEROFILL));
+                       sizeof(PFS_statement_stat), PFS_statement_stat,
+                       MYF(MY_ZEROFILL));
     if (unlikely(global_instr_class_statements_array == NULL))
       return 1;
 
@@ -187,7 +191,8 @@ int init_instruments(const PFS_global_param *param)
     global_instr_class_memory_array=
       PFS_MALLOC_ARRAY(& builtin_memory_global_memory,
                        memory_class_max,
-                       PFS_memory_stat, MYF(MY_ZEROFILL));
+                       sizeof(PFS_memory_stat), PFS_memory_stat,
+                       MYF(MY_ZEROFILL));
     if (unlikely(global_instr_class_memory_array == NULL))
       return 1;
 
@@ -207,7 +212,7 @@ void cleanup_instruments(void)
   global_file_container.cleanup();
 
   PFS_FREE_ARRAY(& builtin_memory_file_handle,
-                 file_handle_max, PFS_file*,
+                 file_handle_max, sizeof(PFS_file*),
                  file_handle_array);
   file_handle_array= NULL;
   file_handle_max= 0;
@@ -219,19 +224,19 @@ void cleanup_instruments(void)
 
   PFS_FREE_ARRAY(& builtin_memory_global_stages,
                  stage_class_max,
-                 PFS_stage_stat,
+                 sizeof(PFS_stage_stat),
                  global_instr_class_stages_array);
   global_instr_class_stages_array= NULL;
 
   PFS_FREE_ARRAY(& builtin_memory_global_statements,
                  statement_class_max,
-                 PFS_statement_stat,
+                 sizeof(PFS_statement_stat),
                  global_instr_class_statements_array);
   global_instr_class_statements_array= NULL;
 
   PFS_FREE_ARRAY(& builtin_memory_global_memory,
                  memory_class_max,
-                 PFS_memory_stat,
+                 sizeof(PFS_memory_stat),
                  global_instr_class_memory_array);
   global_instr_class_memory_array= NULL;
 }
@@ -435,9 +440,30 @@ void PFS_thread::reset_session_connect_attrs()
   }
 }
 
-void PFS_thread::set_enabled(bool enabled)
+void PFS_thread::set_history_derived_flags()
 {
-  m_enabled= enabled;
+  if (m_history)
+  {
+    m_flag_events_waits_history= flag_events_waits_history;
+    m_flag_events_waits_history_long= flag_events_waits_history_long;
+    m_flag_events_stages_history= flag_events_stages_history;
+    m_flag_events_stages_history_long= flag_events_stages_history_long;
+    m_flag_events_statements_history= flag_events_statements_history;
+    m_flag_events_statements_history_long= flag_events_statements_history_long;
+    m_flag_events_transactions_history= flag_events_transactions_history;
+    m_flag_events_transactions_history_long= flag_events_transactions_history_long;
+  }
+  else
+  {
+    m_flag_events_waits_history= false;
+    m_flag_events_waits_history_long= false;
+    m_flag_events_stages_history= false;
+    m_flag_events_stages_history_long= false;
+    m_flag_events_statements_history= false;
+    m_flag_events_statements_history_long= false;
+    m_flag_events_transactions_history= false;
+    m_flag_events_transactions_history_long= false;
+  }
 }
 
 void PFS_thread::carry_memory_stat_delta(PFS_memory_stat_delta *delta, uint index)
@@ -497,7 +523,8 @@ PFS_thread* create_thread(PFS_thread_class *klass, const void *identity,
     pfs->m_event_id= 1;
     pfs->m_stmt_lock.set_allocated();
     pfs->m_session_lock.set_allocated();
-    pfs->m_enabled= true;
+    pfs->set_enabled(true);
+    pfs->set_history(true);
     pfs->m_class= klass;
     pfs->m_events_waits_current= & pfs->m_events_waits_stack[WAIT_STACK_BOTTOM];
     pfs->m_waits_history_full= false;
@@ -531,7 +558,9 @@ PFS_thread* create_thread(PFS_thread_class *klass, const void *identity,
     pfs->m_stage_progress= NULL;
     pfs->m_processlist_info[0]= '\0';
     pfs->m_processlist_info_length= 0;
+    pfs->m_connection_type= NO_VIO_TYPE;
 
+    pfs->m_thd= NULL;
     pfs->m_host= NULL;
     pfs->m_user= NULL;
     pfs->m_account= NULL;
@@ -769,7 +798,7 @@ find_or_create_file(PFS_thread *thread, PFS_file_class *klass,
   char dirbuffer[FN_REFLEN];
   size_t dirlen;
   const char *normalized_filename;
-  size_t normalized_length;
+  uint normalized_length;
 
   dirlen= dirname_length(safe_filename);
   if (dirlen == 0)
@@ -800,7 +829,7 @@ find_or_create_file(PFS_thread *thread, PFS_file_class *klass,
   *buf_end= '\0';
 
   normalized_filename= buffer;
-  normalized_length= strlen(normalized_filename);
+  normalized_length= (uint)strlen(normalized_filename);
 
   PFS_file **entry;
   uint retry_count= 0;
@@ -1557,13 +1586,6 @@ void aggregate_thread_status(PFS_thread *thread,
   {
     safe_host->aggregate_status_stats(&thd->status_var);
   }
-#if 0
-  else
-  {
-    /* TODO: Requires LOCK_status. global_status_var updated by server on THD disconnect. */
-    add_to_status(&global_status_var, &thd->status_var, false);
-  }
-#endif
   return;
 }
 
@@ -2135,9 +2157,14 @@ void update_metadata_derived_flags()
   global_mdl_container.apply_all(fct_update_metadata_derived_flags);
 }
 
+static void fct_update_thread_derived_flags(PFS_thread *pfs)
+{
+  pfs->set_history_derived_flags();
+}
+
 void update_thread_derived_flags()
 {
-  /* None */
+  global_thread_container.apply(fct_update_thread_derived_flags);
 }
 
 void update_instruments_derived_flags()

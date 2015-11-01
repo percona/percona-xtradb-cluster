@@ -57,7 +57,7 @@ Created 9/20/1997 Heikki Tuuri
 # include "srv0start.h"
 # include "trx0roll.h"
 # include "row0merge.h"
-# include "sync0mutex.h"
+#include "row0trunc.h"
 #else /* !UNIV_HOTBACKUP */
 /** This is set to FALSE if the backup was originally taken with the
 mysqlbackup --include regexp option: then we do not want to create tables in
@@ -267,7 +267,8 @@ fil_name_process(
 				Enable some more diagnostics when
 				forcing recovery. */
 
-				ib::info() << "At " << recv_sys->recovered_lsn
+				ib::info()
+					<< "At LSN: " << recv_sys->recovered_lsn
 					<< ": unable to open file " << name
 					<< " for tablespace " << space_id;
 			}
@@ -446,8 +447,8 @@ recv_sys_create(void)
 
 	recv_sys = static_cast<recv_sys_t*>(ut_zalloc_nokey(sizeof(*recv_sys)));
 
-	mutex_create("recv_sys", &recv_sys->mutex);
-	mutex_create("recv_writer", &recv_sys->writer_mutex);
+	mutex_create(LATCH_ID_RECV_SYS, &recv_sys->mutex);
+	mutex_create(LATCH_ID_RECV_WRITER, &recv_sys->writer_mutex);
 
 	recv_sys->heap = NULL;
 	recv_sys->addr_hash = NULL;
@@ -927,6 +928,125 @@ recv_read_checkpoint_info_for_backup(
 }
 #endif /* !UNIV_HOTBACKUP */
 
+/** Calculate the checksum of the given redo log block using different
+checksum algorithms and see if any of them matches with what has been
+stored in the block itself.
+@param[in]	block		the redo log block
+@param[in]	block_checksum	checksum stored in the redo log block.
+@return true if there is a checksum match, false otherwise. */
+static
+bool
+log_block_checksum_weak_validation(
+	const byte*	block,
+	ulint		block_checksum)
+{
+	/* The algorithm specified in srv_log_checksum_algorithm has already
+	been checked.  So no need to check it again */
+	switch (srv_log_checksum_algorithm) {
+	case SRV_CHECKSUM_ALGORITHM_CRC32:
+		if (block_checksum == log_block_calc_checksum_none(block)
+		    || block_checksum == log_block_calc_checksum_innodb(block)) {
+			return(true);
+		}
+		break;
+	case SRV_CHECKSUM_ALGORITHM_INNODB:
+		if (block_checksum == log_block_calc_checksum_none(block)
+		    || block_checksum == log_block_calc_checksum_crc32(block)
+		    || block_checksum
+		    == log_block_calc_checksum_crc32_legacy_big_endian(block)) {
+			return(true);
+		}
+		break;
+	case SRV_CHECKSUM_ALGORITHM_NONE:
+		if (block_checksum == log_block_calc_checksum_crc32(block)
+		    || block_checksum
+		    == log_block_calc_checksum_crc32_legacy_big_endian(block)
+		    || block_checksum
+		    == log_block_calc_checksum_innodb(block)) {
+			return(true);
+		}
+		break;
+	}
+	return(false);
+}
+
+/** Get the name of the checksum algorithm that matches with the checksum
+stored in the redo log block.
+@param[in]	block		the redo log block
+@param[in]	block_checksum	checksum stored in the redo log block.
+@return name of the checksum algorithm, if a match is found.
+@return the string "NULL", if no match is found.*/
+static
+const char*
+log_block_checksum_what_matches(
+	const byte*	block,
+	ulint		block_checksum)
+{
+	/* The algorithm specified in srv_log_checksum_algorithm has already
+	been checked.  So no need to check it again */
+	switch (srv_log_checksum_algorithm) {
+	case SRV_CHECKSUM_ALGORITHM_CRC32:
+		if (block_checksum == log_block_calc_checksum_none(block)) {
+			return("none");
+		}
+		if (block_checksum == log_block_calc_checksum_innodb(block)) {
+			return("innodb");
+		}
+		break;
+	case SRV_CHECKSUM_ALGORITHM_INNODB:
+		if (block_checksum == log_block_calc_checksum_none(block)) {
+			return("none");
+		}
+		if (block_checksum == log_block_calc_checksum_crc32(block)
+		    || block_checksum
+		    == log_block_calc_checksum_crc32_legacy_big_endian(block)) {
+			return("crc32");
+		}
+		break;
+	case SRV_CHECKSUM_ALGORITHM_NONE:
+		if (block_checksum == log_block_calc_checksum_crc32(block)
+		    || block_checksum
+		    == log_block_calc_checksum_crc32_legacy_big_endian(block)) {
+			return("crc32");
+		}
+		if (block_checksum == log_block_calc_checksum_innodb(block)) {
+			return("innodb");
+		}
+		break;
+	}
+	return("NULL");
+}
+
+static
+void
+log_block_checksum_fail_fatal(
+	const byte*	block,
+	ulint		block_checksum,
+	ulint		calc_checksum)
+{
+	ib::error() << "log block checksum mismatch: expected checksum is "
+		<< block_checksum << ", but calculated checksum is "
+		<< calc_checksum;
+
+	/* Find the algorithm that matches */
+	const char*	algo = log_block_checksum_what_matches(
+		block, block_checksum);
+
+	/* Get the algorithm specified */
+	const char*	current_algo = buf_checksum_algorithm_name(
+		static_cast<srv_checksum_algorithm_t>(
+			srv_log_checksum_algorithm));
+
+	ib::error() << "current InnoDB log checksum type: "
+		<< current_algo
+		<< ", detected log checksum type: "
+		<< algo;
+
+	ib::fatal() << "STRICT method was specified for"
+		" innodb_log_checksum, so we intentionally"
+		" assert here.";
+}
+
 /******************************************************//**
 Checks the 4-byte checksum to the trailer checksum field of a log
 block.  We also accept a log block in the old format before
@@ -939,12 +1059,42 @@ log_block_checksum_is_ok_or_old_format(
 /*===================================*/
 	const byte*	block)	/*!< in: pointer to a log block */
 {
-	if (log_block_calc_checksum(block) == log_block_get_checksum(block)) {
+	const srv_checksum_algorithm_t	curr_algo
+		= static_cast<const srv_checksum_algorithm_t>(
+			srv_log_checksum_algorithm);
 
+	if (curr_algo == SRV_CHECKSUM_ALGORITHM_NONE) {
 		return(TRUE);
 	}
 
-	if (log_block_get_hdr_no(block) == log_block_get_checksum(block)) {
+	const ulint	block_checksum = log_block_get_checksum(block);
+	const ulint	calc_checksum  = log_block_calc_checksum(block);
+
+	if (block_checksum == calc_checksum) {
+		return(TRUE);
+	}
+
+	if ((curr_algo == SRV_CHECKSUM_ALGORITHM_CRC32
+	     || curr_algo == SRV_CHECKSUM_ALGORITHM_STRICT_CRC32)
+	    /* Normal crc32 has already been checked above by
+	    log_block_calc_checksum(). */
+	    && block_checksum
+	    == log_block_calc_checksum_crc32_legacy_big_endian(block)) {
+		return(TRUE);
+	}
+
+	if (is_checksum_strict(curr_algo)) {
+
+		log_block_checksum_fail_fatal(block, block_checksum,
+					      calc_checksum);
+
+	} else if (log_block_checksum_weak_validation(block,
+						      block_checksum)) {
+
+			return(TRUE);
+	}
+
+	if (log_block_get_hdr_no(block) == block_checksum) {
 
 		/* We assume the log block is in the format of
 		InnoDB version < 3.23.52 and the block is ok */
@@ -1089,6 +1239,8 @@ recv_parse_or_apply_log_rec_body(
 		before applying any log records. */
 		return(fil_name_parse(ptr, end_ptr, space_id, page_no, type,
 				      apply));
+	case MLOG_TRUNCATE:
+		return(truncate_t::parse_redo_entry(ptr, end_ptr));
 	default:
 		break;
 	}
@@ -1407,6 +1559,7 @@ recv_parse_or_apply_log_rec_body(
 		ptr = ibuf_parse_bitmap_init(ptr, end_ptr, block, mtr);
 		break;
 	case MLOG_INIT_FILE_PAGE:
+	case MLOG_INIT_FILE_PAGE2:
 		/* Allow anything in page_type when creating a page. */
 		ptr = fsp_parse_init_file_page(ptr, end_ptr, block);
 		break;
@@ -1776,6 +1929,23 @@ recv_recover_page_func(
 			}
 		}
 
+		/* If per-table tablespace was truncated and there exist REDO
+		records before truncate that are to be applied as part of
+		recovery (checkpoint didn't happen since truncate was done)
+		skip such records using lsn check as they may not stand valid
+		post truncate.
+		LSN at start of truncate is recorded and any redo record
+		with LSN less than recorded LSN is skipped.
+		Note: We can't skip complete recv_addr as same page may have
+		valid REDO records post truncate those needs to be applied. */
+		bool	skip_recv = false;
+		if (srv_was_tablespace_truncated(recv_addr->space)) {
+			lsn_t	init_lsn =
+				truncate_t::get_truncated_tablespace_init_lsn(
+				recv_addr->space);
+			skip_recv = (recv->start_lsn < init_lsn);
+		}
+
 		/* Ignore applying the redo logs for tablespace that is
 		truncated. Post recovery there is fixup action that will
 		restore the tablespace back to normal state.
@@ -1784,7 +1954,8 @@ recv_recover_page_func(
 		was re-inited and that would lead to an error while applying
 		such action. */
 		if (recv->start_lsn >= page_lsn
-		    && !srv_is_tablespace_truncated(recv_addr->space)) {
+		    && !srv_is_tablespace_truncated(recv_addr->space)
+		    && !skip_recv) {
 
 			lsn_t	end_lsn;
 
@@ -1966,6 +2137,15 @@ loop:
 		     recv_addr != 0;
 		     recv_addr = static_cast<recv_addr_t*>(
 				HASH_GET_NEXT(addr_hash, recv_addr))) {
+
+			if (srv_is_tablespace_truncated(recv_addr->space)) {
+				/* Avoid applying REDO log for the tablespace
+				that is schedule for TRUNCATE. */
+				ut_a(recv_sys->n_addrs);
+				recv_addr->state = RECV_DISCARDED;
+				recv_sys->n_addrs--;
+				continue;
+			}
 
 			if (recv_addr->state == RECV_DISCARDED) {
 				ut_a(recv_sys->n_addrs);
@@ -2172,18 +2352,24 @@ recv_apply_log_recs_for_backup(void)
 						recv_addr->page_no);
 
 			if (page_size.is_compressed()) {
-				error = fil_io(OS_FILE_READ, true, page_id,
-					       page_size, 0, page_size.bytes(),
-					       block->page.zip.data, NULL);
+
+				error = fil_io(
+					IORequestRead, true,
+					page_id,
+					page_size, 0, page_size.physical(),
+					block->page.zip.data, NULL);
 
 				if (error == DB_SUCCESS
 				    && !buf_zip_decompress(block, TRUE)) {
 					ut_error;
 				}
 			} else {
-				error = fil_io(OS_FILE_READ, true, page_id,
-					       page_size, 0, page_size.bytes(),
-					       block->frame, NULL);
+
+				error = fil_io(
+					IORequestRead, true,
+					page_id, page_size, 0,
+					page_size.logical(),
+					block->frame, NULL);
 			}
 
 			if (error != DB_SUCCESS) {
@@ -2205,13 +2391,16 @@ recv_apply_log_recs_for_backup(void)
 					block->page.id.space()));
 
 			if (page_size.is_compressed()) {
-				error = fil_io(OS_FILE_WRITE, true, page_id,
-					       0, page_size.bytes(),
-					       block->page.zip.data, NULL);
+
+				error = fil_io(
+					IORequestWrite, true, page_id,
+					page_size, 0, page_size.physical(),
+					block->page.zip.data, NULL);
 			} else {
-				error = fil_io(OS_FILE_WRITE, true, page_id,
-					       0, page_size.bytes(),
-					       block->frame, NULL);
+				error = fil_io(
+					IORequestWrite, true, page_id,
+					page_size, 0, page_size.logical(),
+					block->frame, NULL);
 			}
 skip_this_recv_addr:
 			recv_addr = HASH_GET_NEXT(addr_hash, recv_addr);
@@ -3270,8 +3459,6 @@ recv_recovery_from_checkpoint_start(
 	flush_list during recovery process. */
 	buf_flush_init_flush_rbt();
 
-	ut_when_dtor<recv_dblwr_t> tmp(recv_sys->dblwr);
-
 	if (srv_force_recovery >= SRV_FORCE_NO_LOG_REDO) {
 
 		ib::info() << "The user has set SRV_FORCE_NO_LOG_REDO on,"
@@ -3307,7 +3494,7 @@ recv_recovery_from_checkpoint_start(
 
 	const page_id_t	page_id(max_cp_group->space_id, 0);
 
-	fil_io(OS_FILE_READ | OS_FILE_LOG, true, page_id, univ_page_size, 0,
+	fil_io(IORequestLogRead, true, page_id, univ_page_size, 0,
 	       LOG_FILE_HDR_SIZE, log_hdr_buf, max_cp_group);
 
 	if (0 == ut_memcmp(log_hdr_buf + LOG_FILE_WAS_CREATED_BY_HOT_BACKUP,
@@ -3335,8 +3522,9 @@ recv_recovery_from_checkpoint_start(
 
 		memset(log_hdr_buf + LOG_FILE_WAS_CREATED_BY_HOT_BACKUP,
 		       ' ', 4);
+
 		/* Write to the log file to wipe over the label */
-		fil_io(OS_FILE_WRITE | OS_FILE_LOG, true, page_id,
+		fil_io(IORequestLogWrite, true, page_id,
 		       univ_page_size, 0, OS_FILE_LOG_BLOCK_SIZE, log_hdr_buf,
 		       max_cp_group);
 	}
@@ -3600,6 +3788,10 @@ recv_recovery_rollback_active(void)
 {
 	ut_ad(!recv_writer_thread_active);
 
+	/* Switch latching order checks on in sync0debug.cc, if
+	--innodb-sync-debug=true (default) */
+	ut_d(sync_check_enable());
+
 	/* We can't start any (DDL) transactions if UNDO logging
 	has been disabled, additionally disable ROLLBACK of recovered
 	user transactions. */
@@ -3748,8 +3940,14 @@ recv_reset_log_files_for_backup(
 		ib::fatal() << "Cannot open " << name << ".";
 	}
 
-	os_file_write(name, log_file, buf, 0,
-		      LOG_FILE_HDR_SIZE + OS_FILE_LOG_BLOCK_SIZE);
+	IORequest	request(IORequest::WRITE);
+
+	dberr_t	err = os_file_write(
+		request, name, log_file, buf, 0,
+		LOG_FILE_HDR_SIZE + OS_FILE_LOG_BLOCK_SIZE);
+
+	ut_a(err == DB_SUCCESS);
+
 	os_file_flush(log_file);
 	os_file_close(log_file);
 

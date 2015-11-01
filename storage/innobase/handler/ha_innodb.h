@@ -22,6 +22,15 @@ this program; if not, write to the Free Software Foundation, Inc.,
 system clustered index when there is no primary key. */
 extern const char innobase_index_reserve_name[];
 
+/* "innodb_file_per_table" tablespace name  is reserved by InnoDB in order
+to explicitly create a file_per_table tablespace for the table. */
+extern const char reserved_file_per_table_space_name[];
+
+/* "innodb_system" tablespace name is reserved by InnoDB for the system tablespace
+which uses space_id 0 and stores extra types of system pages like UNDO
+and doublewrite. */
+extern const char reserved_system_space_name[];
+
 /* Structure defines translation table between mysql index and InnoDB
 index structures */
 struct innodb_idx_translate_t {
@@ -37,6 +46,35 @@ struct innodb_idx_translate_t {
 };
 
 
+/** Structure defines template related to virtual columns and
+their base columns */
+struct innodb_col_templ_t {
+	/** number of regular columns */
+	ulint			n_col;
+
+	/** number of virtual columns */
+	ulint			n_v_col;
+
+	/** array of templates for virtual col and their base columns */
+	mysql_row_templ_t**	vtempl;
+
+	/** table's database name */
+	char			db_name[MAX_DATABASE_NAME_LEN];
+
+	/** table name */
+	char			tb_name[MAX_TABLE_NAME_LEN];
+
+	/** share->table_name */
+	char			share_name[MAX_DATABASE_NAME_LEN
+					   + MAX_TABLE_NAME_LEN];
+
+	/** MySQL record length */
+	ulint			rec_len;
+
+	/** default column value if any */
+	const byte*		default_rec;
+};
+
 /** InnoDB table share */
 typedef struct st_innobase_share {
 	const char*	table_name;	/*!< InnoDB table name */
@@ -49,6 +87,9 @@ typedef struct st_innobase_share {
 	innodb_idx_translate_t
 			idx_trans_tbl;	/*!< index translation table between
 					MySQL and InnoDB */
+	innodb_col_templ_t
+			s_templ;	/*!< table virtual column template
+					info */
 } INNOBASE_SHARE;
 
 /** Prebuilt structures in an InnoDB table handle used within MySQL */
@@ -413,12 +454,6 @@ private:
 	int intrinsic_table_write_row(uchar* record);
 
 protected:
-	uint store_key_val_for_row(
-		uint			keynr,
-		char*			buff,
-		uint			buff_len,
-		const uchar*		record);
-
 	void update_thd(THD* thd);
 
 	int general_fetch(uchar* buf, uint direction, uint match_mode);
@@ -637,7 +672,7 @@ extern const char reserved_file_per_table_space_name[];
 @return true if the table is intended to use a file_per_table tablespace. */
 UNIV_INLINE
 bool
-target_is_file_per_table(
+tablespace_is_file_per_table(
 	const HA_CREATE_INFO*	create_info)
 {
 	return(create_info->tablespace != NULL
@@ -650,10 +685,11 @@ target_is_file_per_table(
 @return true if the table will use an existing shared general tablespace. */
 UNIV_INLINE
 bool
-target_is_shared_space(
+tablespace_is_shared_space(
 	const HA_CREATE_INFO*	create_info)
 {
 	return(create_info->tablespace != NULL
+	       && create_info->tablespace[0] != '\0'
 	       && (0 != strcmp(create_info->tablespace,
 			       reserved_file_per_table_space_name)));
 }
@@ -684,8 +720,7 @@ public:
 		char*		table_name,
 		char*		temp_path,
 		char*		remote_path,
-		char*		tablespace,
-		bool		file_per_table)
+		char*		tablespace)
 	:m_thd(thd),
 	m_form(form),
 	m_create_info(create_info),
@@ -693,19 +728,14 @@ public:
 	m_temp_path(temp_path),
 	m_remote_path(remote_path),
 	m_tablespace(tablespace),
-	m_file_per_table(file_per_table)
-	{
-		/* Note whether this table will be created using a shared,
-		general or system tablespace. */
-		m_use_shared_space = target_is_shared_space(m_create_info);
+	m_innodb_file_per_table(srv_file_per_table)
+	{}
 
-		/* DATA DIRECTORY must have m_file_per_table but cannot be
-		used with TEMPORARY tables. */
-		m_use_data_dir =
-			m_file_per_table
-			&& ((m_create_info->data_file_name != NULL)
-			&& !(m_create_info->options & HA_LEX_CREATE_TMP_TABLE));
-	}
+	/** Initialize the object. */
+	int initialize();
+
+	/** Set m_tablespace_type. */
+	void set_tablespace_type(bool table_being_altered_is_file_per_table);
 
 	/** Create the internal innodb table. */
 	int create_table();
@@ -729,12 +759,9 @@ public:
 	/** Validate TABLESPACE option. */
 	bool create_option_tablespace_is_valid();
 
-	/** Parses the table name into normal name and either temp path or
-	remote path if needed.*/
-	int parse_table_name(const char*	name);
-
 	/** Prepare to create a table. */
 	int prepare_create_table(const char*		name);
+
 	void allocate_trx();
 
 	/** Determines InnoDB table flags.
@@ -760,8 +787,10 @@ public:
 	/** Return table name. */
 	const char* table_name() const
 	{ return(m_table_name); }
+
 	THD* thd() const
 	{ return(m_thd); }
+
 	inline bool is_intrinsic_temp_table() const
 	{
 		/* DICT_TF2_INTRINSIC implies DICT_TF2_TEMPORARY */
@@ -777,13 +806,20 @@ public:
 	"set_lower_case" is set to true.
 	@param[in,out]	norm_name	Buffer to return the normalized name in.
 	@param[in]	name		Table name string.
-	@param[in]	set_lower_case	True if we want to set name to lower case. */
+	@param[in]	set_lower_case	True if we want to set name to lower
+					case. */
 	static void normalize_table_name_low(
 		char*           norm_name,
 		const char*     name,
 		ibool           set_lower_case);
 
 private:
+	/** Parses the table name into normal name and either temp path or
+	remote path if needed.*/
+	int
+	parse_table_name(
+		const char*	name);
+
 	/** Create the internal innodb table definition. */
 	int create_table_def();
 
@@ -814,8 +850,18 @@ private:
 	/** Tablespace name or zero length-string. */
 	char*		m_tablespace;
 
-	/** Using file per table. */
-	bool		m_file_per_table;
+	/** Local copy of srv_file_per_table. */
+	bool		m_innodb_file_per_table;
+
+	/** Allow file_per_table for this table either because:
+	1) the setting innodb_file_per_table=on,
+	2) it was explicitly requested by tablespace=innodb_file_per_table.
+	3) the table being altered is currently file_per_table */
+	bool		m_allow_file_per_table;
+
+	/** After all considerations, this shows whether we will actually
+	create a table and tablespace using file-per-table. */
+	bool		m_use_file_per_table;
 
 	/** Using DATA DIRECTORY */
 	bool		m_use_data_dir;
@@ -940,6 +986,19 @@ innobase_copy_frm_flags_from_table_share(
 	dict_table_t*		innodb_table,	/*!< in/out: InnoDB table */
 	const TABLE_SHARE*	table_share);	/*!< in: table share */
 
+/** Set up base columns for virtual column
+@param[in]	table	the InnoDB table
+@param[in]	field	MySQL field
+@param[in,out]	v_col	virtual column to be set up */
+void
+innodb_base_col_setup(
+	dict_table_t*	table,
+	const Field*	field,
+	dict_v_col_t*	v_col);
+
+/** whether this is a computed virtual column */
+#define innobase_is_v_fld(field) ((field)->gcol_info && !(field)->stored_in_db)
+
 /** Release temporary latches.
 Call this function when mysqld passes control to the client. That is to
 avoid deadlocks on the adaptive hash S-latch possibly held by thd. For more
@@ -965,17 +1024,6 @@ innobase_release_temporary_latches(
 @param[in,out]	thd	MySQL thread handler.
 @return reference to transaction pointer */
 trx_t*& thd_to_trx(THD*	thd);
-
-/** Check if transaction is started.
-@param[in]	trx	Transaction.
-@return true if transaction is in state started */
-inline
-bool
-trx_is_started(
-	trx_t*	trx)
-{
-	return(trx->state != TRX_STATE_NOT_STARTED);
-}
 
 /** Converts an InnoDB error code to a MySQL error code.
 Also tells to MySQL about a possible transaction rollback inside InnoDB caused
@@ -1017,3 +1065,59 @@ innodb_rec_per_key(
 	dict_index_t*	index,
 	ulint		i,
 	ha_rows		records);
+
+/** Build template for the virtual columns and their base columns
+@param[in]	table		MySQL TABLE
+@param[in]	ib_table	InnoDB dict_table_t
+@param[in,out]	share		InnoDB share structure
+@param[in]	locked		true if innobase_share_mutex is held
+@param[in]	share_tbl_name	original MySQL table name */
+void
+innobase_build_v_templ(
+	const TABLE*		table,
+	const dict_table_t*	ib_table,
+	innodb_col_templ_t*	s_templ,
+	bool			locked,
+	const char*		share_tbl_name);
+
+/** Free a virtual template in INNOBASE_SHARE structure
+@param[in,out]  share   table share holds the template to free */
+void
+free_share_vtemp(
+	INNOBASE_SHARE* share);
+
+/** Refresh template for the virtual columns and their base columns if
+the share structure exists
+@param[in]	table		MySQL TABLE
+@param[in]	ib_table	InnoDB dict_table_t
+@param[in]	table_name	table_name used to find the share structure */
+void
+refresh_share_vtempl(
+	const TABLE*		mysql_table,
+	const dict_table_t*	ib_table,
+	const char*	table_name);
+
+/** callback used by MySQL server layer to initialized
+the table virtual columns' template
+@param[in]	table		MySQL TABLE
+@param[in,out]	ib_table	InnoDB dict_table_t */
+void
+innobase_build_v_templ_callback(
+        const TABLE*	table,
+        void*		ib_table);
+
+/** Callback function definition, used by MySQL server layer to initialized
+the table virtual columns' template */
+typedef void (*my_gcolumn_templatecallback_t)(const TABLE*, void*);
+
+/** Get the computed value by supplying the base column values.
+@param[in,out]  table   the table whose virtual column template to be built */
+void
+innobase_init_vc_templ(
+        dict_table_t*   table);
+
+/** Free the virtual column template
+@param[in,out]  vc_templ        virtual column template */
+void
+free_vc_templ(
+	innodb_col_templ_t*	vc_templ);

@@ -16,6 +16,7 @@
 #include "my_global.h"    // NO_EMBEDDED_ACCESS_CHECKS
 #include "sp_instr.h"
 #include "item.h"         // Item_splocal
+#include "log.h"          // query_logger
 #include "opt_trace.h"    // opt_trace_disable_etc
 #include "probes_mysql.h" // MYSQL_QUERY_EXEC_START
 #include "sp_head.h"      // sp_head
@@ -255,8 +256,6 @@ bool sp_lex_instr::reset_lex_and_exec_core(THD *thd,
                                            uint *nextp,
                                            bool open_tables)
 {
-  bool rc= false;
-
   /*
     The flag is saved at the entry to the following substatement.
     It's reset further in the common code part.
@@ -307,9 +306,7 @@ bool sp_lex_instr::reset_lex_and_exec_core(THD *thd,
     }
   }
 
-  /* Reset LEX-object before re-use. */
-
-  reinit_stmt_before_use(thd, m_lex);
+  bool error= reinit_stmt_before_use(thd, m_lex);
 
   /*
     In case a session state exists do not cache the SELECT stmt. If we
@@ -324,7 +321,7 @@ bool sp_lex_instr::reset_lex_and_exec_core(THD *thd,
   */
 
 #ifndef EMBEDDED_LIBRARY
-  if ((thd->client_capabilities & CLIENT_SESSION_TRACK) &&
+  if (thd->get_protocol()->has_client_capability(CLIENT_SESSION_TRACK) &&
       thd->session_tracker.enabled_any() &&
       thd->session_tracker.changed_any())
     thd->lex->safe_to_cache_query= 0;
@@ -332,75 +329,79 @@ bool sp_lex_instr::reset_lex_and_exec_core(THD *thd,
 
   /* Open tables if needed. */
 
-  if (open_tables)
+  if (!error)
   {
-    /*
-      IF, CASE, DECLARE, SET, RETURN, have 'open_tables' true; they may
-      have a subquery in parameter and are worth tracing. They don't
-      correspond to a SQL command so we pretend that they are SQLCOM_SELECT.
-    */
-    Opt_trace_start ots(thd, m_lex->query_tables, SQLCOM_SELECT,
-                        &m_lex->var_list, NULL, 0, this,
-                        thd->variables.character_set_client);
-    Opt_trace_object trace_command(&thd->opt_trace);
-    Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
-
-    /*
-      Check whenever we have access to tables for this statement
-      and open and lock them before executing instructions core function.
-      If we are not opening any tables, we don't need to check permissions
-      either.
-    */
-    if (m_lex->query_tables)
-      rc= (open_temporary_tables(thd, m_lex->query_tables) ||
-            check_table_access(thd, SELECT_ACL, m_lex->query_tables, false,
-                               UINT_MAX, false));
-
-    if (!rc)
-      rc= open_and_lock_tables(thd, m_lex->query_tables, 0);
-
-    if (!rc)
+    if (open_tables)
     {
-      rc= exec_core(thd, nextp);
-      DBUG_PRINT("info",("exec_core returned: %d", rc));
-    }
+      // todo: break this block out into a separate function.
+      /*
+        IF, CASE, DECLARE, SET, RETURN, have 'open_tables' true; they may
+        have a subquery in parameter and are worth tracing. They don't
+        correspond to a SQL command so we pretend that they are SQLCOM_SELECT.
+      */
+      Opt_trace_start ots(thd, m_lex->query_tables, SQLCOM_SELECT,
+                          &m_lex->var_list, NULL, 0, this,
+                          thd->variables.character_set_client);
+      Opt_trace_object trace_command(&thd->opt_trace);
+      Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
 
-    /*
-      Call after unit->cleanup() to close open table
-      key read.
-    */
+      /*
+        Check whenever we have access to tables for this statement
+        and open and lock them before executing instructions core function.
+        If we are not opening any tables, we don't need to check permissions
+        either.
+      */
+      if (m_lex->query_tables)
+        error= (open_temporary_tables(thd, m_lex->query_tables) ||
+                check_table_access(thd, SELECT_ACL, m_lex->query_tables, false,
+                                   UINT_MAX, false));
 
-    m_lex->unit->cleanup(true);
+      if (!error)
+        error= open_and_lock_tables(thd, m_lex->query_tables, 0);
 
-    /* Here we also commit or rollback the current statement. */
-
-    if (! thd->in_sub_stmt)
-    {
-      thd->get_stmt_da()->set_overwrite_status(true);
-      thd->is_error() ? trans_rollback_stmt(thd) : trans_commit_stmt(thd);
-      thd->get_stmt_da()->set_overwrite_status(false);
-    }
-    thd_proc_info(thd, "closing tables");
-    close_thread_tables(thd);
-    thd_proc_info(thd, 0);
-
-    if (! thd->in_sub_stmt)
-    {
-      if (thd->transaction_rollback_request)
+      if (!error)
       {
-        trans_rollback_implicit(thd);
-        thd->mdl_context.release_transactional_locks();
+        error= exec_core(thd, nextp);
+        DBUG_PRINT("info",("exec_core returned: %d", error));
       }
-      else if (! thd->in_multi_stmt_transaction_mode())
-        thd->mdl_context.release_transactional_locks();
-      else
-        thd->mdl_context.release_statement_locks();
+
+      /*
+        Call after unit->cleanup() to close open table
+        key read.
+      */
+
+      m_lex->unit->cleanup(true);
+
+      /* Here we also commit or rollback the current statement. */
+
+      if (! thd->in_sub_stmt)
+      {
+        thd->get_stmt_da()->set_overwrite_status(true);
+        thd->is_error() ? trans_rollback_stmt(thd) : trans_commit_stmt(thd);
+        thd->get_stmt_da()->set_overwrite_status(false);
+      }
+      thd_proc_info(thd, "closing tables");
+      close_thread_tables(thd);
+      thd_proc_info(thd, 0);
+
+      if (! thd->in_sub_stmt)
+      {
+        if (thd->transaction_rollback_request)
+        {
+          trans_rollback_implicit(thd);
+          thd->mdl_context.release_transactional_locks();
+        }
+        else if (! thd->in_multi_stmt_transaction_mode())
+          thd->mdl_context.release_transactional_locks();
+        else
+          thd->mdl_context.release_statement_locks();
+      }
     }
-  }
-  else
-  {
-    rc= exec_core(thd, nextp);
-    DBUG_PRINT("info",("exec_core returned: %d", rc));
+    else
+    {
+      error= exec_core(thd, nextp);
+      DBUG_PRINT("info",("exec_core returned: %d", error));
+    }
   }
 
   if (m_lex->query_tables_own_last)
@@ -429,7 +430,7 @@ bool sp_lex_instr::reset_lex_and_exec_core(THD *thd,
     open_tables stage.
   */
 
-  if (!rc || !thd->is_error() ||
+  if (!error || !thd->is_error() ||
       (thd->get_stmt_da()->mysql_errno() != ER_CANT_REOPEN_TABLE &&
        thd->get_stmt_da()->mysql_errno() != ER_NO_SUCH_TABLE &&
        thd->get_stmt_da()->mysql_errno() != ER_UPDATE_TABLE_USED))
@@ -443,6 +444,13 @@ bool sp_lex_instr::reset_lex_and_exec_core(THD *thd,
   thd->get_transaction()->add_unsafe_rollback_flags(
     Transaction_ctx::STMT,
     parent_unsafe_rollback_flags);
+
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE)
+  {
+    ((Transaction_state_tracker *)
+     thd->session_tracker.get_tracker(TRANSACTION_INFO_TRACKER))
+      ->add_trx_state_from_thd(thd);
+  }
 
   /* Restore original lex. */
 
@@ -458,7 +466,7 @@ bool sp_lex_instr::reset_lex_and_exec_core(THD *thd,
     cleanup_items() is called in sp_head::execute()
   */
 
-  return rc || thd->is_error();
+  return error || thd->is_error();
 }
 
 
@@ -838,7 +846,7 @@ bool sp_instr_stmt::execute(THD *thd, uint *nextp)
       /* Finalize server status flags after executing a statement. */
       thd->update_server_status();
 
-      thd->protocol->end_statement();
+      thd->send_statement_status();
     }
 
     query_cache.end_of_result(thd);

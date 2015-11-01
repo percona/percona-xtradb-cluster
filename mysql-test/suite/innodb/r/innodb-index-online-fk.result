@@ -116,12 +116,13 @@ SELECT t2.name, t1.name FROM information_schema.innodb_sys_columns t1, informati
 name	name
 test/child	a1
 test/child	a2
-SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
+SELECT NAME FROM information_schema.INNODB_SYS_TABLES WHERE NAME not like 'sys\/%';
 NAME
 SYS_DATAFILES
 SYS_FOREIGN
 SYS_FOREIGN_COLS
 SYS_TABLESPACES
+SYS_VIRTUAL
 mysql/engine_cost
 mysql/gtid_executed
 mysql/help_category
@@ -141,7 +142,6 @@ mysql/time_zone_leap_second
 mysql/time_zone_name
 mysql/time_zone_transition
 mysql/time_zone_transition_type
-sys/sys_config
 test/child
 test/parent
 INSERT INTO child VALUES(5,4);
@@ -324,12 +324,13 @@ SELECT t2.name, t1.name FROM information_schema.innodb_sys_columns t1, informati
 name	name
 test/child	a1
 test/child	a2
-SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
+SELECT NAME FROM information_schema.INNODB_SYS_TABLES WHERE NAME not like 'sys\/%';
 NAME
 SYS_DATAFILES
 SYS_FOREIGN
 SYS_FOREIGN_COLS
 SYS_TABLESPACES
+SYS_VIRTUAL
 mysql/engine_cost
 mysql/gtid_executed
 mysql/help_category
@@ -349,7 +350,6 @@ mysql/time_zone_leap_second
 mysql/time_zone_name
 mysql/time_zone_transition
 mysql/time_zone_transition_type
-sys/sys_config
 test/child
 test/parent
 ALTER TABLE child ADD PRIMARY KEY idx (a3), CHANGE a1 a3 INT,
@@ -366,12 +366,13 @@ SELECT t2.name, t1.name FROM information_schema.innodb_sys_columns t1, informati
 name	name
 test/child	a2
 test/child	a3
-SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
+SELECT NAME FROM information_schema.INNODB_SYS_TABLES WHERE NAME not like 'sys\/%';
 NAME
 SYS_DATAFILES
 SYS_FOREIGN
 SYS_FOREIGN_COLS
 SYS_TABLESPACES
+SYS_VIRTUAL
 mysql/engine_cost
 mysql/gtid_executed
 mysql/help_category
@@ -391,7 +392,6 @@ mysql/time_zone_leap_second
 mysql/time_zone_name
 mysql/time_zone_transition
 mysql/time_zone_transition_type
-sys/sys_config
 test/child
 test/parent
 SHOW CREATE TABLE child;
@@ -419,12 +419,13 @@ SELECT t2.name, t1.name FROM information_schema.innodb_sys_columns t1, informati
 name	name
 test/child	a1
 test/child	a2
-SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
+SELECT NAME FROM information_schema.INNODB_SYS_TABLES WHERE NAME not like 'sys\/%';
 NAME
 SYS_DATAFILES
 SYS_FOREIGN
 SYS_FOREIGN_COLS
 SYS_TABLESPACES
+SYS_VIRTUAL
 mysql/engine_cost
 mysql/gtid_executed
 mysql/help_category
@@ -444,7 +445,6 @@ mysql/time_zone_leap_second
 mysql/time_zone_name
 mysql/time_zone_transition
 mysql/time_zone_transition_type
-sys/sys_config
 test/child
 test/parent
 SHOW CREATE TABLE child;
@@ -472,12 +472,13 @@ SELECT t2.name, t1.name FROM information_schema.innodb_sys_columns t1, informati
 name	name
 test/child	a2
 test/child	a3
-SELECT NAME FROM information_schema.INNODB_SYS_TABLES;
+SELECT NAME FROM information_schema.INNODB_SYS_TABLES WHERE NAME not like 'sys\/%';
 NAME
 SYS_DATAFILES
 SYS_FOREIGN
 SYS_FOREIGN_COLS
 SYS_TABLESPACES
+SYS_VIRTUAL
 mysql/engine_cost
 mysql/gtid_executed
 mysql/help_category
@@ -497,7 +498,6 @@ mysql/time_zone_leap_second
 mysql/time_zone_name
 mysql/time_zone_transition
 mysql/time_zone_transition_type
-sys/sys_config
 test/child
 test/parent
 SHOW CREATE TABLE child;

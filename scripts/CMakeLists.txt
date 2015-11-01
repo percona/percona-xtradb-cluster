@@ -64,21 +64,41 @@ ADD_CUSTOM_TARGET(GenFixPrivs
   ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_sys_schema.h
 )
 
-ADD_CUSTOM_COMMAND(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_sys_schema.h
-  COMMAND comp_sql
-  mysql_sys_schema
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
-  sql_commands_sys_schema.h
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  DEPENDS comp_sql
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
-)
+# If we do not have performance schema compiled in then sys will not work,
+# so only create an empty sys database with an auto-generated file,
+# otherwise, load the full schema file normally.
+IF(NOT WITH_PERFSCHEMA_STORAGE_ENGINE)
+  FILE(WRITE ${CMAKE_CURRENT_BINARY_DIR}/mysql_sys_schema_empty.sql "CREATE DATABASE sys;")
 
-ADD_CUSTOM_TARGET(GenSysSchema
-  ALL
-  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_sys_schema.h
-)
+  ADD_CUSTOM_COMMAND(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_sys_schema.h
+    COMMAND comp_sql
+    mysql_sys_schema
+    ${CMAKE_CURRENT_BINARY_DIR}/mysql_sys_schema_empty.sql
+    sql_commands_sys_schema.h
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS comp_sql
+    ${CMAKE_CURRENT_BINARY_DIR}/mysql_sys_schema_empty.sql
+  )
+ELSE()
+  ADD_CUSTOM_COMMAND(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_sys_schema.h
+    COMMAND comp_sql
+    mysql_sys_schema
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
+    sql_commands_sys_schema.h
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS comp_sql
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
+  )
+ENDIF()
+
+IF(NOT WITHOUT_SERVER)
+  ADD_CUSTOM_TARGET(GenSysSchema
+    ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_sys_schema.h
+  )
+ENDIF()
 
 ADD_CUSTOM_COMMAND(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_data.h
@@ -114,12 +134,14 @@ ADD_CUSTOM_COMMAND(
 )
 
 # Add target for the above to be built
-ADD_CUSTOM_TARGET(GenBootstrapPriv
-  ALL
-  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_data.h
-  ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_tables.h
-  ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_help_data.h
-)
+IF(NOT WITHOUT_SERVER)
+  ADD_CUSTOM_TARGET(GenBootstrapPriv
+    ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_data.h
+    ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_tables.h
+    ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_help_data.h
+  )
+ENDIF()
 
 IF(UNIX)
  FILE(WRITE ${CMAKE_CURRENT_BINARY_DIR}/make_binary_distribution 
@@ -129,18 +151,19 @@ IF(UNIX)
 )
 ENDIF()
 
-INSTALL(FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables.sql
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data.sql
-  ${CMAKE_CURRENT_SOURCE_DIR}/fill_help_tables.sql
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_test_data_timezone.sql
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_security_commands.sql
-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_fix_for_downgrade.sql
-  ${FIX_PRIVILEGES_SQL}
-  DESTINATION ${INSTALL_MYSQLSHAREDIR} COMPONENT Server
-)
-
+IF(NOT WITHOUT_SERVER)
+  INSTALL(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables.sql
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data.sql
+    ${CMAKE_CURRENT_SOURCE_DIR}/fill_help_tables.sql
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_sys_schema.sql
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_test_data_timezone.sql
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_security_commands.sql
+    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_fix_for_downgrade.sql
+    ${FIX_PRIVILEGES_SQL}
+    DESTINATION ${INSTALL_MYSQLSHAREDIR} COMPONENT Server
+  )
+ENDIF()
 
 # TCMalloc hacks
 IF(MALLOC_LIB)
@@ -165,6 +188,60 @@ ELSE()
   STRING(REPLACE "${MY_CXX_WARNING_FLAGS}" "" CXXFLAGS
     "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 ENDIF()
+
+# Add trailing whitespace, before substitution below.
+SET(CFLAGS "${CFLAGS} ")
+SET(CXXFLAGS "${CXXFLAGS} ")
+
+SET(REPLACE_OPTIONS
+  "-DDBUG_OFF "
+  "-DEXTRA_DEBUG "
+  "-DHAVE_VALGRIND "
+  "-DSAFE_MUTEX "
+  "-fPIC "
+  "-fno-inline "
+  "-fno-strict-aliasing "
+  "-fstack-protector-strong "
+  "-grecord-gcc-switches "
+  "-ip "
+  "-mp "
+  "-pipe "
+  "-restrict "
+  "-unroll2 "
+)
+
+# Note sequence of -W options here, most specific first.
+SET(REPLACE_REGEX_OPTIONS
+  "-Wp,[-=_A-Za-z0-9]*"
+  "-Werror=[-A-Za-z]*"
+  "-W[-A-Za-z]*"
+  "--param=[-=a-z0-9]*"
+  "-O[0-9]"
+  "-march=[-A-Za-z0-9]*"
+  "-mcpu=[-A-Za-z0-9]*"
+  "-mtune=[-A-Za-z0-9]*"
+  "-specs=[-A-Za-z0-9/]*"
+  "-xO[0-9]"
+)
+
+FOREACH(option ${REPLACE_REGEX_OPTIONS})
+  STRING(REGEX REPLACE "${option}" "" CFLAGS   "${CFLAGS}")
+  STRING(REGEX REPLACE "${option}" "" CXXFLAGS "${CXXFLAGS}")
+ENDFOREACH()
+
+FOREACH(option ${REPLACE_OPTIONS})
+  STRING(REPLACE "${option}" " " CFLAGS   "${CFLAGS}")
+  STRING(REPLACE "${option}" " " CXXFLAGS "${CXXFLAGS}")
+ENDFOREACH()
+STRING(REPLACE "-fexceptions " " " CFLAGS "${CFLAGS}")
+
+# Finally: strip away whitespace.
+STRING(REGEX REPLACE "[ ]+" " " CFLAGS   "${CFLAGS}")
+STRING(REGEX REPLACE "[ ]+" " " CXXFLAGS "${CXXFLAGS}")
+STRING(REGEX REPLACE "^[ ]+" "" CFLAGS   "${CFLAGS}")
+STRING(REGEX REPLACE "^[ ]+" "" CXXFLAGS "${CXXFLAGS}")
+STRING(REGEX REPLACE "[ ]+$" "" CFLAGS   "${CFLAGS}")
+STRING(REGEX REPLACE "[ ]+$" "" CXXFLAGS "${CXXFLAGS}")
 
 IF(UNIX)
   # FIND_PROC and CHECK_PID are used by mysqld_safe

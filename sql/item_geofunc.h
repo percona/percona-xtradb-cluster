@@ -23,6 +23,7 @@
 #include "prealloced_array.h"
 #include "spatial.h"           // gis_wkb_raw_free
 #include "item_strfunc.h"      // Item_str_func
+#include "item_json_func.h"    // Item_json_func
 
 #include <vector>
 #include <set>
@@ -329,9 +330,10 @@ public:
                           Geometry::wkbType type, bool *rollback,
                           String *buffer, bool is_parent_featurecollection,
                           Geometry **geometry);
-  bool check_argument_valid_integer(Item *argument);
+  static bool check_argument_valid_integer(Item *argument);
   bool parse_crs_object(const rapidjson::Value *crs_object);
-  bool is_member_valid(const rapidjson::Value::Member *member,
+  bool is_member_valid(const rapidjson::Value *parent,
+                       rapidjson::Value::ConstMemberIterator member,
                        const char *member_name, rapidjson::Type expected_type,
                        bool allow_null, bool *was_null);
   rapidjson::Value::ConstMemberIterator
@@ -374,6 +376,70 @@ private:
   longlong m_srid_found_in_document;
   /// rapidjson document to hold the parsed GeoJSON.
   rapidjson::Document m_document;
+};
+
+
+/// Max width of long CRS URN supported + max width of SRID + '\0'.
+static const int MAX_CRS_WIDTH= (22 + MAX_INT_WIDTH + 1);
+
+/**
+  This class handles the following function:
+
+  <json> = ST_ASGEOJSON(<geometry>[, <maxdecimaldigits>[, <options>]])
+
+  It converts a GEOMETRY into a valid GeoJSON string. If maxdecimaldigits is
+  specified, the coordinates written are rounded to the number of decimals
+  specified (e.g with decimaldigits = 3: 10.12399 => 10.124).
+
+  Options is a bitmask with the following flags:
+  0  No options (default values).
+  1  Add a bounding box to the output.
+  2  Add a short CRS URN to the output. The default format is a
+     short format ("EPSG:<srid>").
+  4  Add a long format CRS URN ("urn:ogc:def:crs:EPSG::<srid>"). This
+     implies 2. This means that, e.g., bitmask 5 and 7 mean the
+     same: add a bounding box and a long format CRS URN.
+*/
+class Item_func_as_geojson :public Item_json_func
+{
+private:
+  /// Maximum number of decimal digits in printed coordinates.
+  int m_max_decimal_digits;
+  /// If true, the output GeoJSON has a bounding box for each GEOMETRY.
+  bool m_add_bounding_box;
+  /**
+    If true, the output GeoJSON has a CRS object in the short
+    form (e.g "EPSG:4326").
+  */
+  bool m_add_short_crs_urn;
+  /**
+    If true, the output GeoJSON has a CRS object in the long
+    form (e.g "urn:ogc:def:crs:EPSG::4326").
+  */
+  bool m_add_long_crs_urn;
+  /// The SRID found in the input GEOMETRY.
+  uint32 m_geometry_srid;
+public:
+  Item_func_as_geojson(THD *thd, const POS &pos, Item *geometry)
+    :Item_json_func(thd, pos, geometry), m_add_bounding_box(false),
+    m_add_short_crs_urn(false), m_add_long_crs_urn(false)
+  {}
+  Item_func_as_geojson(THD *thd, const POS &pos, Item *geometry, Item *maxdecimaldigits)
+    :Item_json_func(thd, pos, geometry, maxdecimaldigits),
+    m_add_bounding_box(false), m_add_short_crs_urn(false),
+    m_add_long_crs_urn(false)
+  {}
+  Item_func_as_geojson(THD *thd, const POS &pos, Item *geometry, Item *maxdecimaldigits,
+                       Item *options)
+    :Item_json_func(thd, pos, geometry, maxdecimaldigits, options),
+    m_add_bounding_box(false), m_add_short_crs_urn(false),
+    m_add_long_crs_urn(false)
+  {}
+  bool fix_fields(THD *thd, Item **ref);
+  bool val_json(Json_wrapper *wr);
+  const char *func_name() const { return "st_asgeojson"; }
+  bool parse_options_argument();
+  bool parse_maxdecimaldigits_argument();
 };
 
 
@@ -625,9 +691,6 @@ public:
 class Item_func_spatial_rel: public Item_bool_func2
 {
   enum Functype spatial_rel;
-  Gcalc_heap collector;
-  Gcalc_scan_iterator scan_it;
-  Gcalc_function func;
   String tmp_value1,tmp_value2;
 public:
   Item_func_spatial_rel(const POS &pos, Item *a,Item *b, enum Functype sp_rel);
@@ -714,10 +777,6 @@ protected:
                           Geometry_list *gv1,
                           const typename BG_geometry_collection::
                           Geometry_list *gv2);
-
-  int func_touches();
-  int func_equals();
-
 };
 
 
@@ -737,7 +796,7 @@ protected:
   friend class BG_geometry_collection;
 
   template<typename Coord_type, typename Coordsys>
-  Geometry *bg_geo_set_op(Geometry *g1, Geometry *g2, String *result, bool *);
+  Geometry *bg_geo_set_op(Geometry *g1, Geometry *g2, String *result);
 
   template<typename Coord_type, typename Coordsys>
   Geometry *combine_sub_results(Geometry *g1, Geometry *g2, String *result);
@@ -746,52 +805,54 @@ protected:
 
   template<typename Coord_type, typename Coordsys>
   Geometry *geometry_collection_set_operation(Geometry *g1, Geometry *g2,
-                                              String *result, bool *);
+                                              String *result);
 
   Geometry *empty_result(String *str, uint32 srid);
 
-  Gcalc_function::op_type spatial_op;
-  Gcalc_heap collector;
-  Gcalc_function func;
-
-  Gcalc_result_receiver res_receiver;
-  Gcalc_operation_reducer operation;
   String tmp_value1,tmp_value2;
   BG_result_buf_mgr bg_resbuf_mgr;
 
   bool assign_result(Geometry *geo, String *result);
 
   template <typename Geotypes>
-  Geometry *intersection_operation(Geometry *g1, Geometry *g2,
-                                   String *result, bool *opdone);
+  Geometry *intersection_operation(Geometry *g1, Geometry *g2, String *result);
   template <typename Geotypes>
-  Geometry *union_operation(Geometry *g1, Geometry *g2,
-                            String *result, bool *opdone);
+  Geometry *union_operation(Geometry *g1, Geometry *g2, String *result);
   template <typename Geotypes>
-  Geometry *difference_operation(Geometry *g1, Geometry *g2,
-                                 String *result, bool *opdone);
+  Geometry *difference_operation(Geometry *g1, Geometry *g2, String *result);
   template <typename Geotypes>
-  Geometry *symdifference_operation(Geometry *g1, Geometry *g2,
-                                    String *result, bool *opdone);
+  Geometry *symdifference_operation(Geometry *g1, Geometry *g2, String *result);
   template<typename Coord_type, typename Coordsys>
   Geometry *geocol_symdifference(const BG_geometry_collection &bggc1,
                                  const BG_geometry_collection &bggc2,
-                                 String *result, bool *opdone);
+                                 String *result);
   template<typename Coord_type, typename Coordsys>
   Geometry *geocol_difference(const BG_geometry_collection &bggc1,
                               const BG_geometry_collection &bggc2,
-                              String *result, bool *opdone);
+                              String *result);
   template<typename Coord_type, typename Coordsys>
   Geometry *geocol_intersection(const BG_geometry_collection &bggc1,
                                 const BG_geometry_collection &bggc2,
-                                String *result, bool *opdone);
+                                String *result);
   template<typename Coord_type, typename Coordsys>
   Geometry *geocol_union(const BG_geometry_collection &bggc1,
                          const BG_geometry_collection &bggc2,
-                         String *result, bool *opdone);
+                         String *result);
 public:
+  enum op_type
+  {
+    op_shape= 0,
+    op_not= 0x80000000,
+    op_union= 0x10000000,
+    op_intersection= 0x20000000,
+    op_symdifference= 0x30000000,
+    op_difference= 0x40000000,
+    op_backdifference= 0x50000000,
+    op_any= 0x70000000
+  };
+
   Item_func_spatial_operation(const POS &pos, Item *a, Item *b,
-                              Gcalc_function::op_type sp_op) :
+                              Item_func_spatial_operation::op_type sp_op) :
     Item_geometry_func(pos, a, b), spatial_op(sp_op)
   {
   }
@@ -802,6 +863,8 @@ public:
   {
     Item_func::print(str, query_type);
   }
+private:
+  op_type spatial_op;
 };
 
 
@@ -901,9 +964,6 @@ public:
 
 class Item_func_issimple: public Item_bool_func
 {
-  Gcalc_heap collector;
-  Gcalc_function func;
-  Gcalc_scan_iterator scan_it;
   String tmp;
 public:
   Item_func_issimple(const POS &pos, Item *a): Item_bool_func(pos, a) {}

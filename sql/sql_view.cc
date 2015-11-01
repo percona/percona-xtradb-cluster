@@ -969,27 +969,22 @@ static int mysql_register_view(THD *thd, TABLE_LIST *view,
 
   if ((view->updatable_view= can_be_merged))
   {
-    /* TODO: change here when we will support UNIONs */
+    /// @see SELECT_LEX::merge_derived()
+    bool updatable= false;
+    bool outer_joined= false;
     for (TABLE_LIST *tbl= lex->select_lex->table_list.first;
-	 tbl;
-	 tbl= tbl->next_local)
+         tbl;
+         tbl= tbl->next_local)
     {
-      if ((tbl->is_view() && !tbl->updatable_view) || tbl->schema_table)
-      {
-	view->updatable_view= 0;
-	break;
-      }
-      for (TABLE_LIST *up= tbl; up; up= up->embedding)
-      {
-	if (up->outer_join)
-	{
-	  view->updatable_view= 0;
-	  goto loop_out;
-	}
-      }
+      updatable|= !((tbl->is_view() && !tbl->updatable_view) ||
+                  tbl->schema_table);
+      outer_joined|= tbl->is_inner_table_of_outer_join();
     }
+    updatable&= !outer_joined;
+    if (!updatable)
+      view->updatable_view= 0;
   }
-loop_out:
+
   /* print file name */
   dir.length= build_table_filename(dir_buff, sizeof(dir_buff) - 1,
                                    view->db, "", "", 0);
@@ -1459,8 +1454,7 @@ bool mysql_make_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *view_ref,
     }
   }
 
-  if (!(view_ref->view_tables=
-      (List<TABLE_LIST>*) new(thd->mem_root) List<TABLE_LIST>))
+  if (!(view_ref->view_tables= new(thd->mem_root) List<TABLE_LIST>))
   {
     result= true;
     DBUG_RETURN(true);
@@ -1689,9 +1683,6 @@ bool mysql_make_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *view_ref,
 
   // Updatability is not decided yet
   DBUG_ASSERT(!view_ref->is_updatable());
-
-  // Should be in constructor
-  view_ref->effective_with_check= VIEW_CHECK_NONE;
 
   // Link query expression of view into the outer query
   view_lex->unit->include_down(old_lex, view_ref->select_lex);
@@ -1985,21 +1976,21 @@ bool insert_view_fields(THD *thd, List<Item> *list, TABLE_LIST *view)
   DBUG_ENTER("insert_view_fields");
 
   if (!(trans= view->field_translation))
-    DBUG_RETURN(FALSE);
+    DBUG_RETURN(false);
   trans_end= view->field_translation_end;
 
   for (Field_translator *entry= trans; entry < trans_end; entry++)
   {
-    Item_field *fld;
-    if ((fld= entry->item->field_for_view_update()))
-      list->push_back(fld);
-    else
+    Item_field *fld= entry->item->field_for_view_update();
+    if (fld == NULL)
     {
-      my_error(ER_NON_INSERTABLE_TABLE, MYF(0), view->alias, "INSERT");
+      my_error(ER_NONUPDATEABLE_COLUMN, MYF(0), entry->item->item_name.ptr());
       DBUG_RETURN(TRUE);
     }
+
+    list->push_back(fld);
   }
-  DBUG_RETURN(FALSE);
+  DBUG_RETURN(false);
 }
 
 /*

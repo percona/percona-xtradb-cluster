@@ -74,7 +74,8 @@ Ha_innopart_share::Ha_innopart_share(
 	m_tot_parts(),
 	m_index_count(),
 	m_ref_count(),
-	m_table_share(table_share)
+	m_table_share(table_share),
+	m_s_templ()
 {}
 
 Ha_innopart_share::~Ha_innopart_share()
@@ -87,6 +88,11 @@ Ha_innopart_share::~Ha_innopart_share()
 	if (m_index_mapping != NULL) {
 		ut_free(m_index_mapping);
 		m_index_mapping = NULL;
+	}
+	if (m_s_templ != NULL) {
+		free_vc_templ(m_s_templ);
+		ut_free(m_s_templ);
+		m_s_templ = NULL;
 	}
 }
 
@@ -163,10 +169,13 @@ Ha_innopart_share::open_one_table_part(
 
 	dict_table_t *ib_table = m_table_parts[part_id];
 	if ((!DICT_TF2_FLAG_IS_SET(ib_table, DICT_TF2_FTS_HAS_DOC_ID)
-	     && m_table_share->fields != dict_table_get_n_user_cols(ib_table))
+	     && m_table_share->fields
+		 != (dict_table_get_n_user_cols(ib_table)
+		     + dict_table_get_n_v_cols(ib_table)))
 	    || (DICT_TF2_FLAG_IS_SET(ib_table, DICT_TF2_FTS_HAS_DOC_ID)
 		&& (m_table_share->fields
-		    != dict_table_get_n_user_cols(ib_table) - 1))) {
+		    != dict_table_get_n_user_cols(ib_table)
+		       + dict_table_get_n_v_cols(ib_table) - 1))) {
 		ib::warn() << "Partition `" << get_partition_name(part_id)
 			<< "` contains " << dict_table_get_n_user_cols(ib_table)
 			<< " user defined columns in InnoDB, but "
@@ -189,6 +198,39 @@ Ha_innopart_share::open_one_table_part(
 	the column names etc. in the internal InnoDB meta-data cache. */
 
 	return(false);
+}
+
+/** Set up the virtual column template for partition table, and points
+all m_table_parts[]->vc_templ to it.
+@param[in]	table		MySQL TABLE object
+@param[in]	ib_table	InnoDB dict_table_t
+@param[in]	table_name	Table name (db/table_name) */
+void
+Ha_innopart_share::set_v_templ(
+	TABLE*		table,
+	dict_table_t*	ib_table,
+	const char*	name)
+{
+#ifndef DBUG_OFF
+	if (m_table_share->tmp_table == NO_TMP_TABLE) {
+		mysql_mutex_assert_owner(&m_table_share->LOCK_ha_data);
+	}
+#endif /* DBUG_OFF */
+
+	if (ib_table->n_v_cols > 0) {
+		if (!m_s_templ) {
+			m_s_templ = static_cast<innodb_col_templ_t*>(
+				ut_zalloc_nokey( sizeof *m_s_templ));
+			innobase_build_v_templ(table, ib_table,
+					       m_s_templ, false, name);
+
+			for (ulint i = 0; i < m_tot_parts; i++) {
+				m_table_parts[i]->vc_templ = m_s_templ;
+			}
+		}
+	} else {
+		ut_ad(!m_s_templ);
+	}
 }
 
 /** Initialize the share with table and indexes per partition.
@@ -215,14 +257,24 @@ Ha_innopart_share::open_table_parts(
 	m_ref_count++;
 	if (m_table_parts != NULL) {
 		ut_ad(m_ref_count > 1);
-		ut_ad(m_tot_parts);
+		ut_ad(m_tot_parts > 0);
+
+		/* Increment dict_table_t reference count for all partitions */
+		mutex_enter(&dict_sys->mutex);
+		for (uint i = 0; i < m_tot_parts; i++) {
+			dict_table_t*	table = m_table_parts[i];
+			table->acquire();
+			ut_ad(table->get_ref_count() >= m_ref_count);
+		}
+		mutex_exit(&dict_sys->mutex);
+
 		return(false);
 	}
 	ut_ad(m_ref_count == 1);
 	m_tot_parts = part_info->get_tot_partitions();
-	m_table_parts = static_cast<dict_table_t**>
-			(ut_malloc(sizeof(dict_table_t*) * m_tot_parts,
-				mem_key_partitioning));
+	size_t	table_parts_size = sizeof(dict_table_t*) * m_tot_parts;
+	m_table_parts = static_cast<dict_table_t**>(
+		ut_zalloc(table_parts_size, mem_key_partitioning));
 	if (m_table_parts == NULL) {
 		m_ref_count--;
 		return(true);
@@ -283,19 +335,18 @@ Ha_innopart_share::open_table_parts(
 	}
 
 	if (mysql_num_index != 0) {
-		m_index_mapping =
-			static_cast<dict_index_t**>
-			(ut_malloc(mysql_num_index * m_tot_parts
-					* sizeof(dict_index_t*),
-				   mem_key_partitioning));
+		size_t	alloc_size = mysql_num_index * m_tot_parts
+			* sizeof(*m_index_mapping);
+		m_index_mapping = static_cast<dict_index_t**>(
+			ut_zalloc(alloc_size, mem_key_partitioning));
 		if (m_index_mapping == NULL) {
 
 			/* Report an error if index_mapping continues to be
 			NULL and mysql_num_index is a non-zero value. */
 
-			ib::error() << "InnoDB: fail to allocate memory for"
-				<< " index translation table. Number of"
-				<< " Index:" << mysql_num_index;
+			ib::error() << "Failed to allocate memory for"
+				" index translation table. Number of"
+				" Index:" << mysql_num_index;
 			goto err;
 		}
 	}
@@ -319,7 +370,7 @@ Ha_innopart_share::open_table_parts(
 				ib::error() << "Cannot find index `"
 					<< part_info->table->key_info[idx].name
 					<< "` in InnoDB index dictionary"
-					<< " partition `"
+					" partition `"
 					<< get_partition_name(part) << "`.";
 				index_loaded = false;
 				break;
@@ -334,7 +385,7 @@ Ha_innopart_share::open_table_parts(
 				ib::error() << "Found index `"
 					<< part_info->table->key_info[idx].name
 					<< "` whose column info does not match"
-					<< " that of MySQL.";
+					" that of MySQL.";
 				index_loaded = false;
 				break;
 			}
@@ -366,6 +417,16 @@ Ha_innopart_share::close_table_parts()
 #endif /* DBUG_OFF */
 	m_ref_count--;
 	if (m_ref_count != 0) {
+
+		/* Decrement dict_table_t reference count for all partitions */
+		mutex_enter(&dict_sys->mutex);
+		for (uint i = 0; i < m_tot_parts; i++) {
+			dict_table_t*	table = m_table_parts[i];
+			table->release();
+			ut_ad(table->get_ref_count() >= m_ref_count);
+		}
+		mutex_exit(&dict_sys->mutex);
+
 		return;
 	}
 
@@ -387,6 +448,13 @@ Ha_innopart_share::close_table_parts()
 		ut_free(m_index_mapping);
 		m_index_mapping = NULL;
 	}
+
+	if (m_s_templ != NULL) {
+		free_vc_templ(m_s_templ);
+		ut_free(m_s_templ);
+		m_s_templ = NULL;
+	}
+
 	m_tot_parts = 0;
 	m_index_count = 0;
 }
@@ -467,26 +535,38 @@ Ha_innopart_share::get_mysql_key(
 	return(UINT_MAX);
 }
 
-/** Helper function for updating bit in bitmap.
+/** Helper function for set bit in bitmap.
 @param[in,out]	buf	Bitmap buffer to update bit in.
-@param[in]	bit_pos	Bit number (index starts at 0).
-@param[in]	val	Value to set (true - 0x1, false - 0x0). */
+@param[in]	bit_pos	Bit number (index starts at 0). */
 static
 inline
 void
-update_bit(
+set_bit(
 	byte*	buf,
-	size_t	pos,
-	bool	val)
+	size_t	pos)
 {
-	unsigned int	b = (val ? 0x1 : 0x0);
-	buf[pos/8] &= ~(0x1 << (pos & 0x7)) | (b << (pos & 0x7));
+	buf[pos/8] |= (0x1 << (pos & 0x7));
 }
 
-/** Helper function for updating bit in bitmap.
+/** Helper function for clear bit in bitmap.
 @param[in,out]	buf	Bitmap buffer to update bit in.
+@param[in]	bit_pos	Bit number (index starts at 0). */
+static
+inline
+void
+clear_bit(
+	byte*	buf,
+	size_t	pos)
+{
+	buf[pos/8] &= ~(0x1 << (pos & 0x7));
+}
+
+/** Helper function for get bit in bitmap.
+@param[in,out]	buf	Bitmap buffer.
 @param[in]	bit_pos	Bit number (index starts at 0).
-@param[in]	val	Value to set (true - 0x1, false - 0x0). */
+@return	byte set to 0x0 or 0x1.
+@retval	0x0 bit not set.
+@retval	0x1 bet set. */
 static
 inline
 byte
@@ -547,8 +627,7 @@ public:
 	{
 		ut_ad(m_new_table_parts[new_part_id] == NULL);
 		m_new_table_parts[new_part_id] = part;
-		ut_ad(get_bit(m_sql_stat_start, new_part_id) == 0x1);
-		update_bit(m_sql_stat_start, new_part_id, true);
+		set_bit(m_sql_stat_start, new_part_id);
 	}
 
 	/** Get lower level InnoDB table for partition.
@@ -592,8 +671,9 @@ public:
 		ut_ad(m_new_table_parts[new_part_id] == prebuilt->table);
 		m_ins_nodes[new_part_id] = prebuilt->ins_node;
 		m_trx_ids[new_part_id] = prebuilt->trx_id;
-		update_bit(m_sql_stat_start, new_part_id,
-			prebuilt->sql_stat_start == 0 ? false : true);
+		if (prebuilt->sql_stat_start == 0) {
+			clear_bit(m_sql_stat_start, new_part_id);
+		}
 	}
 };
 
@@ -654,25 +734,24 @@ Altered_partitions::initialize()
 {
 	size_t	alloc_size = sizeof(*m_new_table_parts) * m_num_new_parts;
 	m_new_table_parts = static_cast<dict_table_t**>(
-				ut_malloc(alloc_size, mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
 	if (m_new_table_parts == NULL) {
 		return(true);
 	}
-	memset(m_new_table_parts, 0, alloc_size);
 
 	alloc_size = sizeof(*m_ins_nodes) * m_num_new_parts;
 	m_ins_nodes = static_cast<ins_node_t**>(
-				ut_malloc(alloc_size, mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
 	if (m_ins_nodes == NULL) {
 		ut_free(m_new_table_parts);
 		m_new_table_parts = NULL;
 		return(true);
 	}
-	memset(m_ins_nodes, 0, alloc_size);
 
-	alloc_size = sizeof(*m_sql_stat_start) * (m_num_new_parts + 7) / 8;
+	alloc_size = sizeof(*m_sql_stat_start)
+		* UT_BITS_IN_BYTES(m_num_new_parts);
 	m_sql_stat_start = static_cast<byte*>(
-				ut_malloc(alloc_size, mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
 	if (m_sql_stat_start == NULL) {
 		ut_free(m_new_table_parts);
 		m_new_table_parts = NULL;
@@ -680,11 +759,10 @@ Altered_partitions::initialize()
 		m_ins_nodes = NULL;
 		return(true);
 	}
-	memset(m_sql_stat_start, 0xff, alloc_size);
 
 	alloc_size = sizeof(*m_trx_ids) * m_num_new_parts;
 	m_trx_ids = static_cast<trx_id_t*>(
-				ut_malloc(alloc_size, mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
 	if (m_trx_ids == NULL) {
 		ut_free(m_new_table_parts);
 		m_new_table_parts = NULL;
@@ -914,7 +992,7 @@ ha_innopart::open(
 	thd = ha_thd();
 
 	/* Under some cases MySQL seems to call this function while
-	holding btr_search_latch. This breaks the latching order as
+	holding search latch(es). This breaks the latching order as
 	we acquire dict_sys->mutex below and leads to a deadlock. */
 
 	if (thd != NULL) {
@@ -1032,6 +1110,12 @@ share_error:
 	m_prebuilt->default_rec = table->s->default_values;
 	ut_ad(m_prebuilt->default_rec);
 
+	if (ib_table->n_v_cols > 0) {
+		lock_shared_ha_data();
+		m_part_share->set_v_templ(table, ib_table, name);
+		unlock_shared_ha_data();
+	}
+
 	/* Looks like MySQL-3.23 sometimes has primary key number != 0. */
 	m_primary_key = table->s->primary_key;
 	key_used_on_scan = m_primary_key;
@@ -1051,7 +1135,7 @@ share_error:
 			table_name.m_name = const_cast<char*>(name);
 			ib::error() << "Table " << table_name
 				<< " has a primary key in InnoDB data"
-				<< " dictionary, but not in MySQL!";
+				" dictionary, but not in MySQL!";
 
 			/* This mismatch could cause further problems
 			if not attended, bring this to the user's attention
@@ -1060,7 +1144,7 @@ share_error:
 
 			push_warning_printf(thd, Sql_condition::SL_WARNING,
 					    ER_NO_SUCH_INDEX,
-					    "InnoDB: Table %s has a"
+					    "Table %s has a"
 					    " primary key in InnoDB data"
 					    " dictionary, but not in"
 					    " MySQL!", name);
@@ -1119,14 +1203,14 @@ share_error:
 			table_name.m_name = const_cast<char*>(name);
 			ib::error() << "Table " << table_name
 				<< " has no primary key in InnoDB data"
-				<< " dictionary, but has one in MySQL! If you"
-				<< " created the table with a MySQL version <"
-				<< " 3.23.54 and did not define a primary key,"
-				<< " but defined a unique key with all non-NULL"
-				<< " columns, then MySQL internally treats that"
-				<< " key as the primary key. You can fix this"
-				<< " error by dump + DROP + CREATE + reimport"
-				<< " of the table.";
+				" dictionary, but has one in MySQL! If you"
+				" created the table with a MySQL version <"
+				" 3.23.54 and did not define a primary key,"
+				" but defined a unique key with all non-NULL"
+				" columns, then MySQL internally treats that"
+				" key as the primary key. You can fix this"
+				" error by dump + DROP + CREATE + reimport"
+				" of the table.";
 
 			/* This mismatch could cause further problems
 			if not attended, bring this to the user attention
@@ -1160,7 +1244,7 @@ share_error:
 			ib::warn() << "Table " << table_name
 				<< " key_used_on_scan is "
 				<< key_used_on_scan << " even though there is"
-				<< " no primary key inside InnoDB.";
+				" no primary key inside InnoDB.";
 		}
 	}
 
@@ -1216,28 +1300,27 @@ share_error:
 	}
 #endif /* HA_INNOPART_SUPPORTS_FULLTEXT */
 
+	size_t	alloc_size = sizeof(*m_ins_node_parts) * m_tot_parts;
 	m_ins_node_parts = static_cast<ins_node_t**>(
-				ut_malloc(sizeof(*m_ins_node_parts)
-					    * m_tot_parts,
-					  mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
+
+	alloc_size = sizeof(*m_upd_node_parts) * m_tot_parts;
 	m_upd_node_parts = static_cast<upd_node_t**>(
-				ut_malloc(sizeof(*m_upd_node_parts)
-					    * m_tot_parts,
-					  mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
 
 	alloc_blob_heap_array();
 
+	alloc_size = sizeof(*m_trx_id_parts) * m_tot_parts;
 	m_trx_id_parts = static_cast<trx_id_t*>(
-				ut_malloc(sizeof(*m_trx_id_parts)
-					    * m_tot_parts,
-					  mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
+
+	alloc_size = sizeof(*m_row_read_type_parts) * m_tot_parts;
 	m_row_read_type_parts = static_cast<ulint*>(
-				ut_malloc(sizeof(*m_row_read_type_parts)
-					    * m_tot_parts,
-					  mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
+
+	alloc_size = UT_BITS_IN_BYTES(m_tot_parts);
 	m_sql_stat_start_parts = static_cast<uchar*>(
-				ut_malloc((m_tot_parts + 7) / 8,
-					  mem_key_partitioning));
+		ut_zalloc(alloc_size, mem_key_partitioning));
 	if (m_ins_node_parts == NULL
 	    || m_upd_node_parts == NULL
 	    || m_blob_heap_parts == NULL
@@ -1247,13 +1330,6 @@ share_error:
 		close();  // Frees all the above.
 		DBUG_RETURN(HA_ERR_OUT_OF_MEM);
 	}
-	memset(m_ins_node_parts, 0, sizeof(*m_ins_node_parts) * m_tot_parts);
-	memset(m_upd_node_parts, 0, sizeof(*m_upd_node_parts) * m_tot_parts);
-	memset(m_trx_id_parts, 0, sizeof(*m_trx_id_parts) * m_tot_parts);
-	memset(m_row_read_type_parts, 0,
-		sizeof(*m_row_read_type_parts) * m_tot_parts);
-	memset(m_sql_stat_start_parts, 0,
-		sizeof(*m_sql_stat_start_parts) * (m_tot_parts + 7) / 8);
 	info(HA_STATUS_NO_LOCK | HA_STATUS_VARIABLE | HA_STATUS_CONST);
 
 	DBUG_RETURN(0);
@@ -1432,15 +1508,18 @@ ha_innopart::set_partition(
 	m_prebuilt->ins_node = m_ins_node_parts[part_id];
 	m_prebuilt->upd_node = m_upd_node_parts[part_id];
 
+	/* For unordered scan and table scan, use blob_heap from first
+	partition as we need exactly one blob. */
+	m_prebuilt->blob_heap = m_blob_heap_parts[m_ordered ? part_id : 0];
+
 #ifdef UNIV_DEBUG
-	if (m_blob_heap_parts[part_id] != NULL) {
+	if (m_prebuilt->blob_heap != NULL) {
 		DBUG_PRINT("ha_innopart", ("validating blob_heap: %p",
-					   m_blob_heap_parts[part_id]));
-		mem_heap_validate(m_blob_heap_parts[part_id]);
+					   m_prebuilt->blob_heap));
+		mem_heap_validate(m_prebuilt->blob_heap);
 	}
 #endif
 
-	m_prebuilt->blob_heap = m_blob_heap_parts[part_id];
 	m_prebuilt->trx_id = m_trx_id_parts[part_id];
 	m_prebuilt->row_read_type = m_row_read_type_parts[part_id];
 	m_prebuilt->sql_stat_start = get_bit(m_sql_stat_start_parts, part_id);
@@ -1475,11 +1554,15 @@ ha_innopart::update_partition(
 	}
 #endif
 
-	m_blob_heap_parts[part_id] = m_prebuilt->blob_heap;
+	/* For unordered scan and table scan, use blob_heap from first
+	partition as we need exactly one blob anytime. */
+	m_blob_heap_parts[m_ordered ? part_id : 0] = m_prebuilt->blob_heap;
+
 	m_trx_id_parts[part_id] = m_prebuilt->trx_id;
 	m_row_read_type_parts[part_id] = m_prebuilt->row_read_type;
-	update_bit(m_sql_stat_start_parts, part_id,
-			m_prebuilt->sql_stat_start == 0 ? false : true);
+	if (m_prebuilt->sql_stat_start == 0) {
+		clear_bit(m_sql_stat_start_parts, part_id);
+	}
 	m_last_part = part_id;
 	DBUG_VOID_RETURN;
 }
@@ -1637,6 +1720,8 @@ ha_innopart::index_init(
 	int	error;
 	uint	part_id = m_part_info->get_first_used_partition();
 	DBUG_ENTER("ha_innopart::index_init");
+
+	active_index = keynr;
 	if (part_id == MY_BIT_NONE) {
 		DBUG_RETURN(0);
 	}
@@ -1653,6 +1738,11 @@ ha_innopart::index_init(
 			destroy_record_priority_queue();
 			DBUG_RETURN(error);
 		}
+		/* Disable prefetch.
+		The prefetch buffer is not partitioning aware, so it may return
+		rows from a different partition if either the prefetch buffer is
+		full, or it is non-empty and the partition is exhausted. */
+		m_prebuilt->m_no_prefetch = true;
 	}
 
 	error = change_active_index(part_id, keynr);
@@ -1683,6 +1773,7 @@ ha_innopart::index_end()
 	}
 	if (m_ordered) {
 		destroy_record_priority_queue();
+		m_prebuilt->m_no_prefetch = false;
 	}
 
 	DBUG_RETURN(ha_innobase::index_end());
@@ -1736,8 +1827,8 @@ ha_innopart::init_record_priority_queue_for_parts(
 		m_clust_pcur_parts = &m_pcur_parts[used_parts];
 	}
 	/* mapping from part_id to pcur. */
-	buf = ut_zalloc(m_tot_parts * sizeof(*m_pcur_map),
-			mem_key_partitioning);
+	alloc_size = m_tot_parts * sizeof(*m_pcur_map);
+	buf = ut_zalloc(alloc_size, mem_key_partitioning);
 	if (buf == NULL) {
 		DBUG_RETURN(true);
 	}
@@ -2003,7 +2094,6 @@ ha_innopart::index_next_in_part(
 
 	int	error;
 
-	clear_blob_heap_part(part);
 	set_partition(part);
 	error = ha_innobase::index_next(record);
 	update_partition(part);
@@ -2012,18 +2102,6 @@ ha_innopart::index_next_in_part(
 	      || m_ordered_rec_buffer == NULL
 	      || m_prebuilt->used_in_HANDLER
 	      || m_part_info->num_partitions_used() <= 1);
-
-	/* TODO: Handle this in a nicer way!
-	Reset the fetch count, so the prefetch buffer is never used when
-	sorting records through the priority queue.
-	The prefetch buffer is not partitioning aware, so it may return
-	rows from the current partition if either the prefetch buffer is
-	full, or it is non-empty and the partition is exhausted. */
-
-	if (m_ordered_scan_ongoing) {
-		ut_ad(m_ordered_rec_buffer != NULL);
-		m_prebuilt->n_rows_fetched = 0;
-	}
 
 	DBUG_RETURN(error);
 }
@@ -2044,8 +2122,6 @@ ha_innopart::index_next_same_in_part(
 	uint		length)
 {
 	int	error;
-
-	clear_blob_heap_part(part);
 
 	set_partition(part);
 	error = ha_innobase::index_next_same(record, key, length);
@@ -2081,28 +2157,15 @@ ha_innopart::index_prev_in_part(
 {
 	int	error;
 
-	clear_blob_heap_part(part);
-
 	set_partition(part);
 	error = ha_innobase::index_prev(record);
 	update_partition(part);
-
-	/* TODO: Handle this in a nicer way!
-	Reset the fetch count, so the prefetch buffer is never used when
-	sorting records through the priority queue.
-	The prefetch buffer is not partitioning aware, so it may return
-	rows from the current partition if either the prefetch buffer is
-	full, or it is non-empty and the partition is exhausted. */
 
 	ut_ad(m_ordered_scan_ongoing
 	      || m_ordered_rec_buffer == NULL
 	      || m_prebuilt->used_in_HANDLER
 	      || m_part_info->num_partitions_used() <= 1);
 
-	if (m_ordered_scan_ongoing) {
-		ut_ad(m_ordered_rec_buffer != NULL);
-		m_prebuilt->n_rows_fetched = 0;
-	}
 	return(error);
 }
 
@@ -2255,7 +2318,6 @@ ha_innopart::read_range_next_in_part(
 	int	error;
 	uchar*	read_record = record;
 
-	clear_blob_heap_part(part);
 	set_partition(part);
 	if (read_record == NULL) {
 		read_record = table->record[0];
@@ -2283,18 +2345,6 @@ ha_innopart::read_range_next_in_part(
 	}
 	update_partition(part);
 
-	/* TODO: Handle this in a nicer way!
-	Reset the fetch count, so the prefetch buffer is never used when
-	sorting records through the priority queue.
-	The prefetch buffer is not partitioning aware, so it may return
-	rows from the current partition if either the prefetch buffer is
-	full, or it is non-empty and the partition is exhausted. */
-
-	if (m_ordered_scan_ongoing) {
-		ut_ad(m_ordered_rec_buffer != NULL);
-		m_prebuilt->n_rows_fetched = 0;
-	}
-
 	return(error);
 }
 
@@ -2308,8 +2358,6 @@ ha_innopart::rnd_init_in_part(
 	bool	scan)
 {
 	int	err;
-
-	clear_blob_heap_part(part_id);
 
 	if (m_prebuilt->clust_index_was_generated) {
 		err = change_active_index(part_id, MAX_KEY);
@@ -2338,9 +2386,6 @@ ha_innopart::rnd_end_in_part(
 	uint	part_id,
 	bool	scan)
 {
-
-	m_prebuilt->blob_heap = NULL;
-
 	return(index_end());
 }
 
@@ -2359,7 +2404,6 @@ ha_innopart::rnd_next_in_part(
 
 	DBUG_ENTER("ha_innopart::rnd_next_in_part");
 
-	clear_blob_heap_part(part_id);
 	set_partition(part_id);
 	if (m_start_of_scan) {
 		error = ha_innobase::index_first(buf);
@@ -2393,6 +2437,7 @@ ha_innopart::rnd_pos(
 	uint	part_id;
 	DBUG_ENTER("ha_innopart::rnd_pos");
 	ut_ad(PARTITION_BYTES_IN_POS == 2);
+	DBUG_DUMP("pos", pos, ref_length);
 
 	ha_statistic_increment(&SSV::ha_read_rnd_count);
 
@@ -2409,6 +2454,8 @@ ha_innopart::rnd_pos(
 	error = ha_innobase::index_read(buf, pos + PARTITION_BYTES_IN_POS,
 				ref_length - PARTITION_BYTES_IN_POS,
 				HA_READ_KEY_EXACT);
+	DBUG_PRINT("info", ("part %u index_read returned %d", part_id, error));
+	DBUG_DUMP("buf", buf, table_share->reclength);
 
 	update_partition(part_id);
 
@@ -2438,10 +2485,55 @@ ha_innopart::position_in_last_part(
 
 		memcpy(ref_arg, m_prebuilt->row_id, DATA_ROW_ID_LEN);
 	} else {
-		store_key_val_for_row(m_primary_key,
-				(char*) ref_arg,
-				ref_length - PARTITION_BYTES_IN_POS,
-				record);
+
+		/* Copy primary key as the row reference */
+		KEY*	key_info = table->key_info + m_primary_key;
+		key_copy(ref_arg, (uchar*)record, key_info,
+			 key_info->key_length);
+	}
+}
+
+/** Fill in data_dir_path and tablespace name from internal data
+dictionary.
+@param	part_elem	Partition element to fill.
+@param	ib_table	InnoDB table to copy from. */
+void
+ha_innopart::update_part_elem(
+	partition_element*	part_elem,
+	dict_table_t*		ib_table)
+{
+	dict_get_and_save_data_dir_path(ib_table, false);
+	if (ib_table->data_dir_path != NULL) {
+		if (part_elem->data_file_name == NULL
+		    || strcmp(ib_table->data_dir_path,
+			part_elem->data_file_name) != 0) {
+
+			/* Play safe and allocate memory from TABLE and copy
+			instead of expose the internal data dictionary. */
+			part_elem->data_file_name =
+				strdup_root(&table->mem_root,
+					ib_table->data_dir_path);
+		}
+	} else {
+		part_elem->data_file_name = NULL;
+	}
+
+	part_elem->index_file_name = NULL;
+	dict_get_and_save_space_name(ib_table, false);
+	if (ib_table->tablespace != NULL) {
+		ut_ad(part_elem->tablespace_name == NULL
+		      || 0 == strcmp(part_elem->tablespace_name,
+				ib_table->tablespace));
+		if (part_elem->tablespace_name == NULL
+		    || strcmp(ib_table->tablespace,
+			part_elem->tablespace_name) != 0) {
+
+			/* Play safe and allocate memory from TABLE and copy
+			instead of expose the internal data dictionary. */
+			part_elem->tablespace_name =
+				strdup_root(&table->mem_root,
+					ib_table->tablespace);
+		}
 	}
 }
 
@@ -2508,8 +2600,8 @@ ha_innopart::update_create_info(
 		DBUG_VOID_RETURN;
 	}
 
-	/* part_elem->data_file_name should be correct from the .frm,
-	but may have been changed, so update from SYS_DATAFILES.
+	/* part_elem->data_file_name and tablespace_name should be correct from
+	the .frm, but may have been changed, so update from SYS_DATAFILES.
 	index_file_name is ignored, so remove it. */
 
 	part = 0;
@@ -2520,16 +2612,11 @@ ha_innopart::update_create_info(
 				subpart_it(part_elem->subpartitions);
 			while ((sub_elem = subpart_it++)) {
 				table = m_part_share->get_table_part(part++);
-				dict_get_and_save_data_dir_path(table, false);
-				sub_elem->data_file_name =
-					table->data_dir_path;
-				sub_elem->index_file_name = NULL;
+				update_part_elem(sub_elem, table);
 			}
 		} else {
 			table = m_part_share->get_table_part(part++);
-			dict_get_and_save_data_dir_path(table, false);
-			part_elem->data_file_name = table->data_dir_path;
-			part_elem->index_file_name = NULL;
+			update_part_elem(part_elem, table);
 		}
 	}
 	DBUG_VOID_RETURN;
@@ -2547,10 +2634,16 @@ set_create_info_dir(
 	if (part_elem->data_file_name != NULL
 	    && part_elem->data_file_name[0] != '\0') {
 		info->data_file_name = part_elem->data_file_name;
+		/* Also implies non-default tablespace. */
+		info->tablespace = NULL;
 	}
 	if (part_elem->index_file_name != NULL
 	    && part_elem->index_file_name[0] != '\0') {
 		info->index_file_name = part_elem->index_file_name;
+	}
+	if (part_elem->tablespace_name != NULL
+	    && part_elem->tablespace_name[0] != '\0') {
+		info->tablespace = part_elem->tablespace_name;
 	}
 }
 
@@ -2559,7 +2652,7 @@ void
 create_table_info_t::set_remote_path_flags()
 {
 	if (m_remote_path[0] != '\0') {
-		m_flags |= DICT_TF_MASK_DATA_DIR;
+		ut_ad(DICT_TF_HAS_DATA_DIR(m_flags) != 0);
 
 		/* os_file_make_remote_pathname will truncate
 		everything after the last '/', so append '/'
@@ -2571,7 +2664,7 @@ create_table_info_t::set_remote_path_flags()
 			m_remote_path[len + 1] = '\0';
 		}
 	} else {
-		m_flags &= ~DICT_TF_MASK_DATA_DIR;
+		ut_ad(DICT_TF_HAS_DATA_DIR(m_flags) == 0);
 	}
 }
 
@@ -2596,19 +2689,14 @@ ha_innopart::create(
 	/** absolute path of table */
 	char		remote_path[FN_REFLEN];
 	char		partition_name[FN_REFLEN];
-	char		tablespace_name[NAME_LEN];
+	char		tablespace_name[NAME_LEN + 1];
 	char*		table_name_end;
 	size_t		table_name_len;
 	char*		partition_name_start;
 	char		table_data_file_name[FN_REFLEN];
+	char		table_level_tablespace_name[NAME_LEN + 1];
 	const char*	index_file_name;
 	size_t		len;
-
-	/* Determine if this CREATE TABLE will be making a file-per-table
-	tablespace.  Note that "srv_file_per_table" is not under
-	dict_sys mutex protection, and could be changed while creating the
-	table. So we read the current value here and make all further
-	decisions based on this. */
 
 	create_table_info_t	info(ha_thd(),
 				     form,
@@ -2616,8 +2704,7 @@ ha_innopart::create(
 				     table_name,
 				     temp_path,
 				     remote_path,
-				     tablespace_name,
-				     srv_file_per_table);
+				     tablespace_name);
 
 	DBUG_ENTER("ha_innopart::create");
 	ut_ad(create_info != NULL);
@@ -2632,7 +2719,12 @@ ha_innopart::create(
 		DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
 	}
 
-	// TODO: check how m_use_data_dir is handled per partition!
+	error = info.initialize();
+	if (error != 0) {
+		DBUG_RETURN(error);
+	}
+
+	/* Setup and check table level options. */
 	error = info.prepare_create_table(name);
 	if (error != 0) {
 		DBUG_RETURN(error);
@@ -2658,6 +2750,11 @@ ha_innopart::create(
 		table_data_file_name[0] = '\0';
 	}
 	index_file_name = create_info->index_file_name;
+	if (create_info->tablespace != NULL) {
+		strcpy(table_level_tablespace_name, create_info->tablespace);
+	} else {
+		table_level_tablespace_name[0] = '\0';
+	}
 
 	info.allocate_trx();
 
@@ -2685,13 +2782,9 @@ ha_innopart::create(
 
 		/* Override table level DATA/INDEX DIRECTORY. */
 		set_create_info_dir(part_elem, create_info);
-		if (info.create_options_are_invalid() != NULL) {
-			error = HA_WRONG_CREATE_OPTION;
-			goto cleanup;
-		}
 
 		if (!form->part_info->is_sub_partitioned()) {
-			error = info.parse_table_name(partition_name);
+			error = info.prepare_create_table(partition_name);
 			if (error != 0) {
 				goto cleanup;
 			}
@@ -2727,14 +2820,10 @@ ha_innopart::create(
 				}
 				/* Override part level DATA/INDEX DIRECTORY. */
 				set_create_info_dir(sub_elem, create_info);
-				if (info.create_options_are_invalid() != NULL) {
-					error = HA_WRONG_CREATE_OPTION;
-					goto cleanup;
-				}
 
 				Ha_innopart_share::partition_name_casedn_str(
 					part_name_end + 4);
-				error = info.parse_table_name(partition_name);
+				error = info.prepare_create_table(partition_name);
 				if (error != 0) {
 					goto cleanup;
 				}
@@ -2751,12 +2840,15 @@ ha_innopart::create(
 					table_data_file_name;
 				create_info->index_file_name =
 					index_file_name;
+				create_info->tablespace =
+					table_level_tablespace_name;
 				set_create_info_dir(part_elem, create_info);
 			}
 		}
 		/* Reset table level DATA/INDEX DIRECTORY. */
 		create_info->data_file_name = table_data_file_name;
 		create_info->index_file_name = index_file_name;
+		create_info->tablespace = table_level_tablespace_name;
 	}
 
 	innobase_commit_low(info.trx());
@@ -2838,14 +2930,6 @@ ha_innopart::discard_or_import_tablespace(
 	uint	i;
 	DBUG_ENTER("ha_innopart::discard_or_import_tablespace");
 
-	/* IMPORT/DISCARD also means resetting auto_increment. */
-	if (table->found_next_number_field != NULL) {
-		lock_auto_increment();
-		m_part_share->next_auto_inc_val = 0;
-		m_part_share->auto_inc_initialized = false;
-		unlock_auto_increment();
-	}
-
 	for (i= m_part_info->get_first_used_partition();
 	     i < m_tot_parts;
 	     i= m_part_info->get_next_used_partition(i)) {
@@ -2857,6 +2941,16 @@ ha_innopart::discard_or_import_tablespace(
 		}
 	}
 	m_prebuilt->table = m_part_share->get_table_part(0);
+
+	/* IMPORT/DISCARD also means resetting auto_increment. Make sure
+	that auto_increment initialization is done after all partitions
+	are imported. */
+	if (table->found_next_number_field != NULL) {
+		lock_auto_increment();
+		m_part_share->next_auto_inc_val = 0;
+		m_part_share->auto_inc_initialized = false;
+		unlock_auto_increment();
+	}
 
 	DBUG_RETURN(error);
 }
@@ -3367,22 +3461,6 @@ ha_innopart::info_low(
 			m_prebuilt->trx->op_info =
 				"returning various info to MySQL";
 		}
-
-		char		path[FN_REFLEN];
-		os_file_stat_t	stat_info;
-		/* Use the first partition for create time until new DD. */
-		ib_table = m_part_share->get_table_part(0);
-		my_snprintf(path, sizeof(path), "%s/%s%s",
-			    mysql_data_home, ib_table->name, reg_ext);
-
-		unpack_filename(path,path);
-
-		/* Note that we do not know the access time of the table,
-		nor the CHECK TABLE time, nor the UPDATE or INSERT time. */
-
-		if (os_file_get_status(path, &stat_info, false, false) == DB_SUCCESS) {
-			stats.create_time = (ulong) stat_info.ctime;
-		}
 	}
 
 	if ((flag & HA_STATUS_VARIABLE) != 0) {
@@ -3599,12 +3677,12 @@ ha_innopart::info_low(
 		}
 
 		if (table->s->keys != num_innodb_index) {
-			ib::error() << "InnoDB: Table "
+			ib::error() << "Table "
 				<< ib_table->name << " contains "
 				<< num_innodb_index
 				<< " indexes inside InnoDB, which"
-				<< " is different from the number of"
-				<< " indexes " << table->s->keys
+				" is different from the number of"
+				" indexes " << table->s->keys
 				<< " defined in the MySQL";
 		}
 
@@ -3627,11 +3705,11 @@ ha_innopart::info_low(
 			if (index == NULL) {
 				ib::error() << "Table "
 					<< ib_table->name << " contains fewer"
-					<< " indexes inside InnoDB than"
-					<< " are defined in the MySQL"
-					<< " .frm file. Have you mixed up"
-					<< " .frm files from different"
-					<< " installations? "
+					" indexes inside InnoDB than"
+					" are defined in the MySQL"
+					" .frm file. Have you mixed up"
+					" .frm files from different"
+					" installations? "
 					<< TROUBLESHOOTING_MSG;
 				break;
 			}
@@ -3653,12 +3731,12 @@ ha_innopart::info_low(
 						<< " of " << ib_table->name
 						<< " has " << index->n_uniq
 						<< " columns unique inside"
-						<< " InnoDB, but MySQL is"
-						<< " asking statistics for "
+						" InnoDB, but MySQL is"
+						" asking statistics for "
 						<< j + 1 << " columns. Have"
-						<< " you mixed up .frm files"
-						<< " from different"
-						<< " installations? "
+						" you mixed up .frm files"
+						" from different"
+						" installations? "
 						<< TROUBLESHOOTING_MSG;
 					break;
 				}
@@ -3710,6 +3788,21 @@ ha_innopart::info_low(
 
 		if ((flag & HA_STATUS_NO_LOCK) == 0) {
 			dict_table_stats_unlock(ib_table, RW_S_LATCH);
+		}
+
+		char		path[FN_REFLEN];
+		os_file_stat_t	stat_info;
+		/* Use the first partition for create time until new DD. */
+		ib_table = m_part_share->get_table_part(0);
+		my_snprintf(path, sizeof(path), "%s/%s%s",
+			    mysql_data_home,
+			    table->s->normalized_path.str,
+			    reg_ext);
+
+		unpack_filename(path,path);
+
+		if (os_file_get_status(path, &stat_info, false, true) == DB_SUCCESS) {
+			stats.create_time = (ulong) stat_info.ctime;
 		}
 	}
 
@@ -3808,7 +3901,7 @@ ha_innopart::check(
 
 	if (set_altered_partitions()) {
 		ut_ad(0);   // Already checked by set_part_state()!
-		return(HA_ADMIN_INVALID);
+		DBUG_RETURN(HA_ADMIN_INVALID);
 	}
 	for (i = m_part_info->get_first_used_partition();
 	     i < m_tot_parts;
@@ -3870,11 +3963,11 @@ ha_innopart::repair(
 
 	/* Only repair partitions for MEDIUM or EXTENDED options. */
 	if ((repair_opt->flags & (T_MEDIUM | T_EXTEND)) == 0) {
-		return(HA_ADMIN_OK);
+		DBUG_RETURN(HA_ADMIN_OK);
 	}
 	if (set_altered_partitions()) {
 		ut_ad(0);   // Already checked by set_part_state()!
-		return(HA_ADMIN_INVALID);
+		DBUG_RETURN(HA_ADMIN_INVALID);
 	}
 	for (uint i = m_part_info->get_first_used_partition();
 	     i < m_tot_parts;
@@ -3965,9 +4058,11 @@ ha_innopart::start_stmt(
 
 	error = ha_innobase::start_stmt(thd, lock_type);
 	if (m_prebuilt->sql_stat_start) {
-		memset(m_sql_stat_start_parts, 0xff, (m_tot_parts + 7) / 8);
+		memset(m_sql_stat_start_parts, 0xff,
+		       UT_BITS_IN_BYTES(m_tot_parts));
 	} else {
-		memset(m_sql_stat_start_parts, 0, (m_tot_parts + 7) / 8);
+		memset(m_sql_stat_start_parts, 0,
+		       UT_BITS_IN_BYTES(m_tot_parts));
 	}
 	return(error);
 }
@@ -4064,9 +4159,11 @@ ha_innopart::external_lock(
 	ut_ad(!m_auto_increment_safe_stmt_log_lock);
 
 	if (m_prebuilt->sql_stat_start) {
-		memset(m_sql_stat_start_parts, 0xff, (m_tot_parts + 7) / 8);
+		memset(m_sql_stat_start_parts, 0xff,
+		       UT_BITS_IN_BYTES(m_tot_parts));
 	} else {
-		memset(m_sql_stat_start_parts, 0, (m_tot_parts + 7) / 8);
+		memset(m_sql_stat_start_parts, 0,
+		       UT_BITS_IN_BYTES(m_tot_parts));
 	}
 	return(error);
 }
@@ -4169,15 +4266,32 @@ ha_innopart::create_new_partition(
 	uint			new_part_id,
 	partition_element*	part_elem)
 {
-	int	error;
-	char	norm_name[FN_REFLEN];
+	int		error;
+	char		norm_name[FN_REFLEN];
+	const char*	tablespace_name_backup = create_info->tablespace;
+	const char*	data_file_name_backup = create_info->data_file_name;
 	DBUG_ENTER("ha_innopart::create_new_partition");
 	/* Delete by ddl_log on failure. */
 	normalize_table_name(norm_name, part_name);
+	set_create_info_dir(part_elem, create_info);
+
+	/* The below check is the same as for CREATE TABLE, but since we are
+	doing an alter here it will not trigger the check in
+	create_option_tablespace_is_valid(). */
+	if (tablespace_is_shared_space(create_info)
+	    && create_info->data_file_name != NULL
+	    && create_info->data_file_name[0] != '\0') {
+		my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION,
+			"InnoDB: DATA DIRECTORY cannot be used"
+			" with a TABLESPACE assignment.", MYF(0));
+		DBUG_RETURN(HA_WRONG_CREATE_OPTION);
+	}
+
 	error = ha_innobase::create(norm_name, table, create_info);
+	create_info->tablespace = tablespace_name_backup;
+	create_info->data_file_name = data_file_name_backup;
 	if (error == HA_ERR_FOUND_DUPP_KEY) {
-		return(HA_ERR_TABLE_EXIST);
-		error = HA_ERR_TABLE_EXIST;
+		DBUG_RETURN(HA_ERR_TABLE_EXIST);
 	}
 	if (error != 0) {
 		DBUG_RETURN(error);
@@ -4190,7 +4304,7 @@ ha_innopart::create_new_partition(
 					       true,
 					       DICT_ERR_IGNORE_NONE);
 		if (part == NULL) {
-			return(HA_ERR_INTERNAL_ERROR);
+			DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
 		}
 		m_new_partitions->set_part(new_part_id, part);
 	}
@@ -4237,11 +4351,10 @@ ha_innopart::alloc_blob_heap_array()
 
 	const ulint	len = sizeof(mem_heap_t*) * m_tot_parts;
 	m_blob_heap_parts = static_cast<mem_heap_t**>(
-		ut_malloc(len, mem_key_partitioning));
+		ut_zalloc(len, mem_key_partitioning));
 	if (m_blob_heap_parts == NULL) {
 		DBUG_RETURN(NULL);
 	}
-	memset(m_blob_heap_parts, 0, len);
 
 	DBUG_RETURN(m_blob_heap_parts);
 }
@@ -4257,29 +4370,6 @@ ha_innopart::free_blob_heap_array()
 		ut_free(m_blob_heap_parts);
 		m_blob_heap_parts = NULL;
 	}
-
-	DBUG_VOID_RETURN;
-}
-
-/** Clear the blob heap for the given partition */
-void
-ha_innopart::clear_blob_heap_part(uint part_id)
-{
-	DBUG_ENTER("ha_innopart::clear_blob_heap_part");
-	DBUG_PRINT("ha_innopart", ("partition id: %u", part_id));
-
-
-	if (m_blob_heap_parts != NULL
-	    && m_blob_heap_parts[part_id] != NULL) {
-
-		DBUG_PRINT("ha_innopart", ("freeing blob_heap: %p",
-					   m_blob_heap_parts[part_id]));
-		mem_heap_free(m_blob_heap_parts[part_id]);
-		m_blob_heap_parts[part_id] = NULL;
-
-	}
-
-	m_prebuilt->blob_heap = NULL;
 
 	DBUG_VOID_RETURN;
 }
@@ -4302,6 +4392,8 @@ ha_innopart::clear_blob_heaps()
 		}
 	}
 
+	/* Reset blob_heap in m_prebuilt after freeing all heaps. It is set in
+	ha_innopart::set_partition to the blob heap of current partition. */
 	m_prebuilt->blob_heap = NULL;
 
 	DBUG_VOID_RETURN;

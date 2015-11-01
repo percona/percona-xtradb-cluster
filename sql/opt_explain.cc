@@ -97,8 +97,8 @@ protected:
     explain_other(thd_arg != select_lex_arg->master_unit()->thd)
   {
     if (explain_other)
-      mysql_mutex_assert_owner
-        (&select_lex_arg->master_unit()->thd->LOCK_query_plan);
+      select_lex_arg->master_unit()
+        ->thd->query_plan.assert_plan_is_locked_if_other();
   }
 
 public:
@@ -995,7 +995,7 @@ bool Explain_table_base::explain_extra_common(int quick_type,
       StringBuffer<64> str(STRING_WITH_LEN("index map: 0x"), cs);
       /* 4 bits per 1 hex digit + terminating '\0' */
       char buf[MAX_KEY / 4 + 1];
-      str.append(const_cast<QEP_TAB*>(tab)->keys().print(buf));
+      str.append(tab->keys().print(buf));
       if (push_extra(ET_RANGE_CHECKED_FOR_EACH_RECORD, str))
         return true;
     }
@@ -1081,11 +1081,11 @@ bool Explain_table_base::explain_extra_common(int quick_type,
       {
         case FT_OP_GT:
           len= my_snprintf(buf, sizeof(buf) - 1,
-                           "rank > %f", ft_hints->get_op_value());
+                           "rank > %g", ft_hints->get_op_value());
           break;
         case FT_OP_GE:
           len= my_snprintf(buf, sizeof(buf) - 1,
-                           "rank >= %f", ft_hints->get_op_value());
+                           "rank >= %g", ft_hints->get_op_value());
           break;
         default:
           DBUG_ASSERT(0);
@@ -1161,11 +1161,11 @@ bool Explain_join::explain_modify_flags()
     }
     break;
   case SQLCOM_INSERT_SELECT:
-    if (table == query_plan->get_lex()->leaf_tables_insert->table)
+    if (table == query_plan->get_lex()->insert_table_leaf->table)
       fmt->entry()->mod_type= MT_INSERT;
     break;
   case SQLCOM_REPLACE_SELECT:
-    if (table == query_plan->get_lex()->leaf_tables_insert->table)
+    if (table == query_plan->get_lex()->insert_table_leaf->table)
       fmt->entry()->mod_type= MT_REPLACE;
     break;
   default: ;
@@ -1221,10 +1221,10 @@ bool Explain_join::shallow_explain()
   join_entry->col_read_cost.set(join->best_read);
 
   LEX const*query_lex= join->thd->query_plan.get_lex();
-  if (query_lex->leaf_tables_insert &&
-      query_lex->leaf_tables_insert->select_lex == join->select_lex)
+  if (query_lex->insert_table_leaf &&
+      query_lex->insert_table_leaf->select_lex == join->select_lex)
   {
-    table= query_lex->leaf_tables_insert->table;
+    table= query_lex->insert_table_leaf->table;
     /*
       The target table for INSERT/REPLACE doesn't actually belong to join,
       thus tab is set to NULL. But in order to print it we add it to the
@@ -1819,7 +1819,8 @@ bool Explain_table::explain_rows_and_filtered()
       fmt->entry()->mod_type == MT_REPLACE)
     return false;
 
-  ha_rows examined_rows= table->in_use->query_plan.get_plan()->examined_rows;
+  ha_rows examined_rows=
+    table->in_use->query_plan.get_modification_plan()->examined_rows;
   fmt->entry()->col_rows.set(static_cast<long long>(examined_rows));
 
   fmt->entry()->col_filtered.set(100.0);
@@ -1969,7 +1970,6 @@ bool explain_single_table_modification(THD *ethd,
       if (!unit->is_optimized() && unit->optimize(ethd))
         DBUG_RETURN(true);  /* purecov: inspected */
     }
-    mysql_mutex_lock(&ethd->LOCK_query_plan);
   }
 
 
@@ -1998,8 +1998,6 @@ bool explain_single_table_modification(THD *ethd,
                          plan->message).send() ||
         ethd->is_error();
   }
-  if (!other)
-    mysql_mutex_unlock(&ethd->LOCK_query_plan);
   if (ret)
     result.abort_result_set();
   else
@@ -2053,12 +2051,12 @@ explain_query_specification(THD *ethd, SELECT_LEX *select_lex,
     }
     case JOIN::NO_TABLES:
     {
-      if (query_plan->get_lex()->leaf_tables_insert &&
-          query_plan->get_lex()->leaf_tables_insert->select_lex == select_lex)
+      if (query_plan->get_lex()->insert_table_leaf &&
+          query_plan->get_lex()->insert_table_leaf->select_lex == select_lex)
       {
         // INSERT/REPLACE SELECT ... FROM dual
         ret= Explain_table(ethd, select_lex,
-                           query_plan->get_lex()->leaf_tables_insert->table,
+                           query_plan->get_lex()->insert_table_leaf->table,
                            NULL,
                            MAX_KEY,
                            HA_POS_ERROR,
@@ -2080,7 +2078,12 @@ explain_query_specification(THD *ethd, SELECT_LEX *select_lex,
     }
     case JOIN::PLAN_READY:
     {
-      if (!other && join->prepare_result())
+      /*
+        (1) If this connection is explaining its own query
+        (2) and it hasn't already prepared the JOIN's result,
+        then we need to prepare it (for example, to materialize I_S tables).
+      */
+      if (!other && !join->is_executed() && join->prepare_result())
         return true; /* purecov: inspected */
 
       /*
@@ -2162,11 +2165,11 @@ bool explain_query(THD *ethd, SELECT_LEX_UNIT *unit)
   if (other)  
   {
     if (!((explain_result= new Query_result_send)))
-      return true; /* purecov: inspected */
+      DBUG_RETURN(true); /* purecov: inspected */
     List<Item> dummy;
     if (explain_result->prepare(dummy, ethd->lex->unit) ||
         explain_result->prepare2())
-      return true; /* purecov: inspected */
+      DBUG_RETURN(true); /* purecov: inspected */
   }
   else
   {
@@ -2177,10 +2180,6 @@ bool explain_query(THD *ethd, SELECT_LEX_UNIT *unit)
 
   ethd->lex->explain_format->send_headers(explain_result);
 
-  if (!other)
-  {
-    mysql_mutex_lock(&ethd->LOCK_query_plan);
-  }
   // Reset OFFSET/LIMIT for EXPLAIN output
   ethd->lex->unit->offset_limit_cnt= 0;
   ethd->lex->unit->select_limit_cnt= 0;
@@ -2206,8 +2205,6 @@ bool explain_query(THD *ethd, SELECT_LEX_UNIT *unit)
     str.append('\0');
     push_warning(ethd, Sql_condition::SL_NOTE, ER_YES, str.ptr());
   }
-  if (!other)
-    mysql_mutex_unlock(&ethd->LOCK_query_plan);
 
   if (res)
     explain_result->abort_result_set();
@@ -2252,24 +2249,34 @@ bool mysql_explain_unit(THD *ethd, SELECT_LEX_UNIT *unit)
 
   @note It acquires LOCK_thd_data mutex and LOCK_query_plan mutex,
   when it finds matching thd.
-  It is the responsibility of the caller to release this mutex.
+  It is the responsibility of the caller to release LOCK_thd_data.
+  We release LOCK_query_plan in the DTOR.
 */
 class Find_thd_query_lock: public Find_THD_Impl
 {
 public:
-  Find_thd_query_lock(my_thread_id value): m_id(value) {}
+  explicit Find_thd_query_lock(my_thread_id value)
+    : m_id(value), m_thd(NULL)
+  {}
+  ~Find_thd_query_lock()
+  {
+    if (m_thd)
+      m_thd->unlock_query_plan();
+  }
   virtual bool operator()(THD *thd)
   {
     if (thd->thread_id() == m_id)
     {
       mysql_mutex_lock(&thd->LOCK_thd_data);
-      mysql_mutex_lock(&thd->LOCK_query_plan);
+      thd->lock_query_plan();
+      m_thd= thd;
       return true;
     }
     return false;
   }
 private:
-  my_thread_id m_id;
+  const my_thread_id m_id; ///< The thread id we are looking for.
+  THD *m_thd;              ///< THD we found, having this ID.
 };
 
 
@@ -2311,16 +2318,20 @@ void mysql_explain_other(THD *thd)
   }
 
   // Pick thread
+  Find_thd_query_lock find_thd_query_lock(thd->lex->query_id);
   if (!thd->killed)
   {
-    Find_thd_query_lock find_thd_query_lock(thd->lex->query_id);
     query_thd= Global_THD_manager::
                get_instance()->find_thd(&find_thd_query_lock);
-    if (query_thd) unlock_thd_data= true;
+    if (query_thd)
+      unlock_thd_data= true;
   }
 
   if (!query_thd)
+  {
+    my_error(ER_NO_SUCH_THREAD, MYF(0), thd->lex->query_id);
     goto err;
+  }
 
   qp= &query_thd->query_plan;
 
@@ -2379,7 +2390,7 @@ void mysql_explain_other(THD *thd)
     case SQLCOM_DELETE:
     case SQLCOM_INSERT:
     case SQLCOM_REPLACE:
-      res= explain_single_table_modification(thd, qp->get_plan(),
+      res= explain_single_table_modification(thd, qp->get_modification_plan(),
                                              qp->get_lex()->unit->first_select());
       break;
     default:
@@ -2389,14 +2400,8 @@ void mysql_explain_other(THD *thd)
   }
 
 err:
-  if (query_thd)
-  {
-    mysql_mutex_unlock(&query_thd->LOCK_query_plan);
-    if (unlock_thd_data)
-      mysql_mutex_unlock(&query_thd->LOCK_thd_data);
-  } 
-  else
-    my_error(ER_NO_SUCH_THREAD, MYF(0), thd->lex->query_id);
+  if (unlock_thd_data)
+    mysql_mutex_unlock(&query_thd->LOCK_thd_data);
 
   DEBUG_SYNC(thd, "after_explain_other");
   if (!res && send_ok)
@@ -2406,10 +2411,10 @@ err:
 
 void Modification_plan::register_in_thd()
 {
-  mysql_mutex_lock(&thd->LOCK_query_plan);
-  DBUG_ASSERT(!thd->query_plan.get_plan());
+  thd->lock_query_plan();
+  DBUG_ASSERT(thd->query_plan.get_modification_plan() == NULL);
   thd->query_plan.set_modification_plan(this);
-  mysql_mutex_unlock(&thd->LOCK_query_plan);
+  thd->unlock_query_plan();
 }
 
 
@@ -2494,10 +2499,10 @@ Modification_plan::~Modification_plan()
 {
   if (!thd->in_sub_stmt)
   {
-    mysql_mutex_lock(&thd->LOCK_query_plan);
+    thd->lock_query_plan();
     DBUG_ASSERT(current_thd == thd &&
-                thd->query_plan.get_plan() == this);
+                thd->query_plan.get_modification_plan() == this);
     thd->query_plan.set_modification_plan(NULL);
-    mysql_mutex_unlock(&thd->LOCK_query_plan);
+    thd->unlock_query_plan();
   }
 }

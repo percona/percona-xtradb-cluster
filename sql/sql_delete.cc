@@ -353,23 +353,22 @@ bool Sql_cmd_delete::mysql_delete(THD *thd, ha_rows limit)
 
     if (need_sort)
     {
-      ha_rows examined_rows;
-      ha_rows found_rows;
+      ha_rows examined_rows, found_rows, returned_rows;
 
       {
-        Filesort fsort(order, HA_POS_ERROR);
+        Filesort fsort(&qep_tab, order, HA_POS_ERROR);
         DBUG_ASSERT(usable_index == MAX_KEY);
         table->sort.io_cache= (IO_CACHE *) my_malloc(key_memory_TABLE_sort_io_cache,
                                                      sizeof(IO_CACHE),
                                                      MYF(MY_FAE | MY_ZEROFILL));
 
-        if ((table->sort.found_records= filesort(thd, &qep_tab, &fsort, true,
-                                                 &examined_rows, &found_rows))
-            == HA_POS_ERROR)
+        if (filesort(thd, &fsort, true,
+                     &examined_rows, &found_rows, &returned_rows))
         {
           err= true;
           goto exit_without_my_ok;
         }
+        table->sort.found_records= returned_rows;
         thd->inc_examined_row_count(examined_rows);
         free_underlaid_joins(thd, select_lex);
         /*
@@ -404,7 +403,9 @@ bool Sql_cmd_delete::mysql_delete(THD *thd, ha_rows limit)
       goto exit_without_my_ok;
     }
 
-    init_ftfuncs(thd, select_lex);
+    if (select_lex->has_ft_funcs() && init_ftfuncs(thd, select_lex))
+      goto exit_without_my_ok;
+
     THD_STAGE_INFO(thd, stage_updating);
 
     if (table->triggers &&
@@ -838,7 +839,9 @@ bool Query_result_delete::initialize_tables(JOIN *join)
 {
   DBUG_ENTER("Query_result_delete::initialize_tables");
   ASSERT_BEST_REF_IN_JOIN_ORDER(join);
-  DBUG_ASSERT(join == unit->first_select()->join);
+
+  SELECT_LEX *const select= unit->first_select();
+  DBUG_ASSERT(join == select->join);
 
   if ((thd->variables.option_bits & OPTION_SAFE_UPDATES) &&
       error_if_full_join(join))
@@ -928,8 +931,11 @@ bool Query_result_delete::initialize_tables(JOIN *join)
       DBUG_RETURN(true);                     /* purecov: inspected */
     *(table_ptr++)= table;
   }
-  DBUG_ASSERT(unit->first_select() == thd->lex->current_select());
-  init_ftfuncs(thd, unit->first_select());
+  DBUG_ASSERT(select == thd->lex->current_select());
+
+  if (select->has_ft_funcs() && init_ftfuncs(thd, select))
+    DBUG_RETURN(true);
+
   DBUG_RETURN(thd->is_fatal_error != 0);
 }
 
@@ -942,7 +948,6 @@ Query_result_delete::~Query_result_delete()
     TABLE *table= tbl_ref->correspondent_table->updatable_base_table()->table;
     if (thd->lex->is_ignore())
       table->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
-    table->no_keyread=0;
   }
 
   for (uint counter= 0; counter < num_of_tables; counter++)

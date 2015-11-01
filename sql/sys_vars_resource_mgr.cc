@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -58,13 +58,14 @@ bool Session_sysvar_resource_manager::init(char **var, const CHARSET_INFO * char
       my_hash_init(&m_sysvar_string_alloc_hash,
 	           const_cast<CHARSET_INFO *> (charset),
 		   4, 0, 0, (my_hash_get_key) sysvars_mgr_get_key,
-		   my_free, HASH_UNIQUE);
+		   my_free, HASH_UNIQUE,
+                   key_memory_THD_Session_sysvar_resource_manager);
     /* Create a new node & add it to the hash. */
     if ( !(element=
            (sys_var_ptr *) my_malloc(key_memory_THD_Session_sysvar_resource_manager,
                                      sizeof(sys_var_ptr), MYF(MY_WME))) ||
          !(ptr=
-           (char *) my_memdup(PSI_NOT_INSTRUMENTED,
+           (char *) my_memdup(key_memory_THD_Session_sysvar_resource_manager,
                               *var, strlen(*var) + 1, MYF(MY_WME))))
       return true;                            /* Error */
     element->data= (void *) ptr;
@@ -125,7 +126,7 @@ bool Session_sysvar_resource_manager::update(char **var, char *val,
   if (val && *var)
   {
     /* Free the existing one & update the current address. */
-    element->data= (char *) ptr;
+    element->data= ptr;
     my_hash_update(&m_sysvar_string_alloc_hash, (uchar *) element,
 	           (uchar *)old_key, strlen(old_key));
     if (old_key)
@@ -156,7 +157,7 @@ bool Session_sysvar_resource_manager::update(char **var, char *val,
           (sys_var_ptr*) my_malloc(key_memory_THD_Session_sysvar_resource_manager,
 				   sizeof(sys_var_ptr), MYF(MY_WME))))
       return true;                            /* Error */
-    element->data= (char *) ptr;
+    element->data= ptr;
     my_hash_insert(&m_sysvar_string_alloc_hash, (uchar *) element);
   }
 
@@ -169,6 +170,24 @@ bool Session_sysvar_resource_manager::update(char **var, char *val,
   */
   *var= ptr;
   return false;
+}
+
+void Session_sysvar_resource_manager::claim_memory_ownership()
+{
+  /* Release Sys_var_charptr resources here. */
+  sys_var_ptr *ptr;
+  int i= 0;
+  while ((ptr= (sys_var_ptr*)my_hash_element(&m_sysvar_string_alloc_hash, i)))
+  {
+    if (ptr->data)
+      my_claim(ptr->data);
+    i++;
+  }
+
+  if (m_sysvar_string_alloc_hash.records)
+  {
+    my_hash_claim(&m_sysvar_string_alloc_hash);
+  }
 }
 
 

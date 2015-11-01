@@ -6736,7 +6736,26 @@ ORDER BY r1.col_date_key;
 --disable_warnings
 eval EXPLAIN $query1;
 --enable_warnings
+# test Bug#20119743 and Bug#20239912.
 eval $query1;
+
+# test Bug#20239912 QUERY RESULTS ARE DIFFERENT WHEN OPENING OR 
+#                   CLOSING SEMIJOIN OPTIMIZER_SWITCH
+let $query2=
+SELECT COUNT(r1.col_date_key) AS COUNT_NUM
+FROM t2 AS r1
+WHERE r1.col_int_key NOT IN
+      (SELECT ir2.pk
+       FROM t2 AS ir1 STRAIGHT_JOIN t1 AS ir2
+            ON ir2.col_varchar_nokey = ir1.col_varchar_key
+       WHERE ir2.col_varchar_nokey > r1.col_varchar_nokey
+         AND ir2.pk IN
+             (SELECT iir2.pk
+              FROM t2 AS iir1 RIGHT JOIN t3 AS iir2
+                   ON iir2.col_varchar_nokey = iir1.col_varchar_key
+              WHERE iir2.pk<3)); 
+
+eval $query2;
 
 DROP TABLE t1,t2,t3;
 
@@ -6818,3 +6837,210 @@ ORDER BY field1
 DROP TABLE t1, t2, t3, t4, t5;
 
 # New tests go here.
+
+--echo #
+--echo # Bug#18892055: MISSING DATA ON SELECT ... IN WITH JOINS AND INNODB
+--echo #               ENGINE
+--echo #
+
+CREATE TABLE t1 (
+  col_int_key INT,
+  pk INT NOT NULL,
+  PRIMARY KEY (pk),
+  KEY col_int_key (col_int_key)
+) ENGINE = INNODB;
+INSERT INTO t1 VALUES
+( 0, 3 ),
+( 0, 4 ),
+( 3, 1 ),
+( 900000000, 2 ),
+( 1368719360, 5 ),
+( 1922236416, 6 ),
+( 8,7 );
+
+CREATE TABLE t2 (
+  pk INT NOT NULL,
+  col_int INT,
+  PRIMARY KEY (pk)
+) ENGINE = INNODB;
+INSERT INTO t2 VALUES
+( 1, 3 ),
+( 2, 2 ),
+( 3, 8 ),
+( 4, 7 );
+
+CREATE TABLE t3 (
+  col_int_key INT,
+  col_int INT,
+  KEY (col_int_key)
+) ENGINE = INNODB;
+INSERT INTO t3 VALUES
+( 5, 1 ),
+( -1, -1 ),
+( 300000000, 1 ),
+( 8, 1 );
+
+CREATE TABLE t4 ( col_int_key INT ) ENGINE = INNODB;
+INSERT INTO t4 VALUES
+(0),
+(3),
+(8),
+(900000000),
+(1368719360),
+(1922236416);
+
+ANALYZE TABLE t1, t2, t3, t4;
+
+let $query=
+SELECT *
+FROM t4
+WHERE (col_int_key) IN (
+  SELECT t1.col_int_key
+  FROM t1 LEFT JOIN ( t2 JOIN t3 ON t3.col_int_key = t2.col_int ) USING ( pk )
+  WHERE t3.col_int IS NULL
+)
+ORDER BY col_int_key
+;
+
+eval explain $query;
+
+eval $query;
+
+DROP TABLE t1, t2, t3, t4;
+
+--echo #
+--echo # Bug#20835095 CRASH AT CREATE_REF_FOR_KEY IN SQL/SQL_SELECT.CC
+--echo #
+CREATE TABLE t1 (
+pk INTEGER,
+var_10_latin1 VARCHAR(10) CHARACTER SET latin1,
+var_255_utf8 VARCHAR(255) CHARACTER SET utf8,
+var_255_latin1 VARCHAR(255) CHARACTER SET latin1,
+var_10_utf8 VARCHAR(10) CHARACTER SET utf8,
+PRIMARY KEY (pk)
+);
+
+CREATE VIEW v1 AS SELECT * FROM t1;
+
+INSERT INTO t1 VALUES
+(1,'FROCJ','korrhrspki','UAYVL','BPZIS'),
+(2,'him','a','CHYKN','OZZQT'),
+(3,'WBITK','ULWBF','have','rhrh'),
+(4,'or','right','up','it'),
+(5,'GGDCP','x','who','as'),
+(6,'j','i','e','w');
+
+CREATE TABLE tv
+SELECT var_255_utf8 AS field1
+FROM t1;
+
+let query=
+SELECT * FROM tv
+WHERE field1 IN (
+  SELECT tv1.var_255_utf8
+  FROM v1 AS tv1 LEFT JOIN v1 AS tv2 ON tv1.var_10_latin1=tv2.var_10_utf8);
+
+eval EXPLAIN $query;
+eval $query;
+
+DROP VIEW v1;
+DROP TABLE t1, tv;
+
+--echo # 17832047 Crash in calculate_materialization_costs
+
+CREATE TABLE t1(a INTEGER PRIMARY KEY);
+INSERT INTO t1 VALUES (0),(1),(2);
+
+SELECT 1 FROM t1
+WHERE 1 IN
+   (SELECT 1 BETWEEN (LENGTH(a) IN (SELECT 1 FROM t1)) AND 1
+    FROM t1
+   );
+
+DROP TABLE t1;
+
+--echo # 17845989 Assertion failed: !(used_tables() & ...
+
+CREATE TABLE a(b INTEGER) engine=innodb;
+CREATE TABLE c(a INTEGER) engine=innodb;
+
+SELECT 1
+FROM a
+WHERE 1 IN (SELECT (a.b IS NULL) IN (SELECT 1 FROM c) FROM c)
+;
+
+DROP TABLE a, c;
+
+--echo #
+--echo # Bug#18194196: OPTIMIZER EXECUTES STATEMENT INPERFORMANT
+--echo #
+  
+CREATE TABLE t1 (uid INTEGER, fid INTEGER, INDEX(uid));
+INSERT INTO t1 VALUES
+(1,1), (1,2), (1,3), (1,4),
+(2,5), (2,6), (2,7), (2,8),
+(3,1), (3,2), (3,9);
+  
+CREATE TABLE t2 (uid INT PRIMARY KEY, name VARCHAR(128), INDEX(name));
+INSERT INTO t2 VALUES
+(1, "A"), (2, "B"), (3, "C"), (4, "D"), (5, "E"),
+(6, "F"), (7, "G"), (8, "H"), (9, "I");
+  
+CREATE TABLE t3 (uid INT, fid INT, INDEX(uid));
+INSERT INTO t3 VALUES
+(1,1), (1,2), (1,3),(1,4),
+(2,5), (2,6), (2,7), (2,8),
+(3,1), (3,2), (3,9);
+  
+CREATE TABLE t4 (uid INT PRIMARY KEY, name VARCHAR(128), INDEX(name));
+INSERT INTO t4 VALUES
+(1, "A"), (2, "B"), (3, "C"), (4, "D"), (5, "E"),
+(6, "F"), (7, "G"), (8, "H"), (9, "I");
+
+ANALYZE TABLE t1,t2,t3,t4;
+
+EXPLAIN SELECT name FROM t2, t1
+WHERE t1.uid IN (SELECT t4.uid FROM t4, t3 WHERE t3.uid=1 AND t4.uid=t3.fid)
+AND t2.uid=t1.fid;
+
+FLUSH STATUS;
+
+SELECT name FROM t2, t1
+WHERE t1.uid IN (SELECT t4.uid FROM t4, t3 WHERE t3.uid=1 AND t4.uid=t3.fid)
+AND t2.uid=t1.fid;
+
+SHOW STATUS LIKE '%handler_read%';
+
+DROP TABLE t1,t2,t3,t4;
+
+--echo # End of test for Bug#18194196
+
+--echo #
+--echo # Bug#21184091 ASSERT `READ_ROWS >= 0.0' AT 
+--echo #              COST_MODEL_SERVER::TMPTABLE_READWRITE_COST()
+--echo #
+
+CREATE TABLE t1 (
+pk INTEGER,
+col_varchar varchar(1),
+col_int INTEGER,
+PRIMARY KEY (pk)
+) ENGINE=MyISAM;
+
+CREATE TABLE t2 (
+col_int INTEGER,
+col_varchar varchar(1)
+) ENGINE=MyISAM;
+
+INSERT INTO t2 VALUES (7,'x');
+INSERT INTO t2 VALUES (4,'z');
+
+SELECT t2.col_varchar
+FROM t2 STRAIGHT_JOIN t1 ON t2.col_varchar = t1.col_varchar
+JOIN t2 AS table3 ON t1.pk = table3.col_int
+WHERE t1.pk IN (SELECT col_int FROM t1);
+
+DROP TABLE t1,t2;
+
+--echo # End of test for Bug#21184091
+

@@ -996,6 +996,9 @@ internal_str2dec(const char *from, decimal_t *to, char **end, my_bool fixed)
         error= decimal_shift(to, (int) exponent);
     }
   }
+  /* Avoid returning negative zero, cfr. decimal_cmp() */
+  if (to->sign && decimal_is_zero(to))
+    to->sign= FALSE;
   return error;
 
 fatal_error:
@@ -1060,26 +1063,34 @@ int double2decimal(double from, decimal_t *to)
 
 static int ull2dec(ulonglong from, decimal_t *to)
 {
-  int intg1, error=E_DEC_OK;
-  ulonglong x=from;
+  int intg1;
+  int error= E_DEC_OK;
+  ulonglong x= from;
   dec1 *buf;
 
   sanity(to);
 
-  for (intg1=1; from >= DIG_BASE; intg1++, from/=DIG_BASE) ;
+  if (from == 0)
+    intg1= 1;
+  else
+  {
+    /* Count the number of decimal_digit_t's we need. */
+    for (intg1= 0; from != 0; intg1++, from/= DIG_BASE)
+      ;
+  }
   if (unlikely(intg1 > to->len))
   {
-    intg1=to->len;
-    error=E_DEC_OVERFLOW;
+    intg1= to->len;
+    error= E_DEC_OVERFLOW;
   }
-  to->frac=0;
-  to->intg=intg1*DIG_PER_DEC1;
+  to->frac= 0;
+  to->intg= intg1 * DIG_PER_DEC1;
 
-  for (buf=to->buf+intg1; intg1; intg1--)
+  for (buf= to->buf + intg1; intg1; intg1--)
   {
-    ulonglong y=x/DIG_BASE;
-    *--buf=(dec1)(x-y*DIG_BASE);
-    x=y;
+    ulonglong y= x / DIG_BASE;
+    *--buf=(dec1)(x - y * DIG_BASE);
+    x= y;
   }
   return error;
 }
@@ -2115,6 +2126,11 @@ int decimal_cmp(const decimal_t *from1, const decimal_t *from2)
 {
   if (likely(from1->sign == from2->sign))
     return do_sub(from1, from2, 0);
+
+  // Reject negative zero, cfr. internal_str2dec()
+  DBUG_ASSERT(!(decimal_is_zero(from1) && from1->sign));
+  DBUG_ASSERT(!(decimal_is_zero(from2) && from2->sign));
+
   return from1->sign > from2->sign ? -1 : 1;
 }
 

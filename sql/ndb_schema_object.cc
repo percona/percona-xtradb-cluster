@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2011, 2013, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -39,7 +39,8 @@ public:
   Ndb_schema_objects()
   {
     (void)my_hash_init(&m_hash, &my_charset_bin, 1, 0, 0,
-                       (my_hash_get_key)ndb_schema_objects_get_key, 0, 0);
+                       (my_hash_get_key)ndb_schema_objects_get_key, 0, 0,
+                       PSI_INSTRUMENT_ME);
   }
 
   ~Ndb_schema_objects()
@@ -54,7 +55,7 @@ NDB_SCHEMA_OBJECT *ndb_get_schema_object(const char *key,
                                          bool create_if_not_exists)
 {
   NDB_SCHEMA_OBJECT *ndb_schema_object;
-  uint length= (uint) strlen(key);
+  size_t length= strlen(key);
   DBUG_ENTER("ndb_get_schema_object");
   DBUG_PRINT("enter", ("key: '%s'", key));
 
@@ -88,7 +89,10 @@ NDB_SCHEMA_OBJECT *ndb_get_schema_object(const char *key,
     native_mutex_init(&ndb_schema_object->mutex, MY_MUTEX_INIT_FAST);
     bitmap_init(&ndb_schema_object->slock_bitmap, ndb_schema_object->slock,
                 sizeof(ndb_schema_object->slock)*8, FALSE);
-    bitmap_clear_all(&ndb_schema_object->slock_bitmap);
+    // Expect answer from all other nodes by default(those
+    // who are not subscribed will be filtered away by
+    // the Coordinator which keep track of that stuff)
+    bitmap_set_all(&ndb_schema_object->slock_bitmap);
     break;
   }
   if (ndb_schema_object)

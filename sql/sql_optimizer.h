@@ -225,7 +225,7 @@ public:
   bool     sort_and_group; 
   bool     first_record;
   bool     grouped;          ///< If query contains GROUP BY clause
-  bool     do_send_rows;
+  bool     do_send_rows;     ///< If true, send produced rows using query_result
   table_map all_table_map;   ///< Set of tables contained in query
   table_map const_table_map; ///< Set of tables found to be const
   /**
@@ -592,7 +592,10 @@ public:
   void join_free();
   /** Cleanup this JOIN. Not a full cleanup. reusable? */
   void cleanup();
-  void clear();
+
+  __attribute__((warn_unused_result))
+  bool clear();
+
   bool save_join_tab();
   void restore_join_tab();
   bool init_save_join_tab();
@@ -707,20 +710,7 @@ private:
     Function sets FT hints, initializes FT handlers and
     checks if FT index can be used as covered.
   */
-  void optimize_fts_query();
-
-  /**
-     Replace all Item_field objects with the given field name with the
-     given item in all parts of the query.
-
-     @todo So far this function only handles SELECT list and WHERE clause,
-           For more general use, ON clause, ORDER BY list, GROUP BY list and
-	   HAVING clause also needs to be handled.
-
-     @param field_name Name of the field to search for
-     @param new_item Replacement item
-  */
-  void replace_item_field(const char* field_name, Item* new_item);
+  bool optimize_fts_query();
 
   bool prune_table_partitions();
 
@@ -844,6 +834,7 @@ private:
       use by 'execute' or 'explain'
   */
   void test_skip_sort();
+  void substitute_gc();
 };
 
 /// RAII class to ease the call of LEX::mark_broken() if error.

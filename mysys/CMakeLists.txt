@@ -42,6 +42,7 @@ IF (WIN32)
     my_windac.c
     my_winerr.c
     my_winfile.c
+    win_timers.c
   )
 ENDIF()
 
@@ -51,10 +52,6 @@ ENDIF()
 
 IF(HAVE_KQUEUE_TIMERS)
   SET(MYSYS_SOURCES ${MYSYS_SOURCES} kqueue_timers.c)
-ENDIF()
-
-IF(HAVE_WINDOWS_TIMERS)
-  SET(MYSYS_SOURCES ${MYSYS_SOURCES} win_timers.c)
 ENDIF()
 
 IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND CMAKE_C_COMPILER_ID MATCHES "SunPro")
@@ -85,7 +82,19 @@ TARGET_LINK_LIBRARIES(queues mysys)
 SET_TARGET_PROPERTIES(queues PROPERTIES COMPILE_FLAGS "-DMAIN")
 ADD_TEST(queues_test queues)
 
+ADD_EXECUTABLE(base64_test base64.c)
+SET_TARGET_PROPERTIES(base64_test PROPERTIES COMPILE_FLAGS "-DMAIN")
+TARGET_LINK_LIBRARIES(base64_test mysys)
+
 IF(MSVC)
    INSTALL_DEBUG_TARGET(mysys DESTINATION ${INSTALL_LIBDIR}/debug)
 ENDIF()
 
+MY_CHECK_CXX_COMPILER_FLAG("-Wno-deprecated-declarations" HAVE_NO_DEPREC_CONST)
+
+IF(CMAKE_GENERATOR MATCHES "Xcode" AND HAVE_NO_DEPREC_CONST)
+  INCLUDE(${MYSQL_CMAKE_SCRIPT_DIR}/compile_flags.cmake)
+  ADD_COMPILE_FLAGS(
+    stacktrace.c
+    COMPILE_FLAGS -Wno-deprecated-declarations)
+ENDIF()

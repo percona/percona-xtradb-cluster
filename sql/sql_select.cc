@@ -90,8 +90,8 @@ uint find_shortest_key(TABLE *table, const key_map *usable_keys);
     @todo make this function also handle INSERT ... VALUES, single-table
           UPDATE and DELETE, SET and DO.
     
-    The function processes queries where the outer-most query expression
-    contains one query block and no fake_select_lex separately.
+    The function processes simple query expressions without UNION and
+    without multi-level ORDER BY/LIMIT separately.
     Such queries are executed with a more direct code path.
 */
 bool handle_query(THD *thd, LEX *lex, Query_result *result,
@@ -114,7 +114,8 @@ bool handle_query(THD *thd, LEX *lex, Query_result *result,
     DBUG_RETURN(true);
   }
 
-  const bool single_query= !(unit->is_union() || unit->fake_select_lex);
+  const bool single_query= unit->is_simple();
+
   lex->used_tables=0;                         // Updated by setup_fields
 
   THD_STAGE_INFO(thd, stage_init);
@@ -864,7 +865,15 @@ void JOIN::reset()
       func->clear();
   }
 
-  init_ftfuncs(thd, select_lex);
+  if (select_lex->has_ft_funcs())
+  {
+#ifdef DBUG_OFF
+    (void)init_ftfuncs(thd, select_lex);
+#else
+    // Should not return an error on second execution
+    DBUG_ASSERT(!init_ftfuncs(thd, select_lex));
+#endif
+  }
 
   DBUG_VOID_RETURN;
 }
@@ -1685,6 +1694,11 @@ void QEP_TAB::push_index_cond(const JOIN_TAB *join_tab,
       tbl->s->tmp_table != NO_TMP_TABLE &&
       tbl->s->tmp_table != TRANSACTIONAL_TMP_TABLE)
     DBUG_VOID_RETURN;
+
+  // TODO: Currently, index on virtual generated column doesn't support ICP
+  if (tbl->vfield && tbl->index_contains_some_virtual_gcol(keyno))
+    DBUG_VOID_RETURN;
+
   /*
     Fields of other non-const tables aren't allowed in following cases:
        type is:
@@ -1727,6 +1741,7 @@ void QEP_TAB::push_index_cond(const JOIN_TAB *join_tab,
        of pushing an index condition on a clustered key is much lower 
        than on a non-clustered key. This restriction should be 
        re-evaluated when WL#6061 is implemented.
+    7. The index on virtual generated columns is not supported for ICP.
   */
   if (condition() &&
       tbl->file->index_flags(keyno, 0, 1) &
@@ -3271,9 +3286,13 @@ bool JOIN::rollup_make_fields(List<Item> &fields_arg, List<Item> &sel_fields,
 /**
   clear results if there are not rows found for group
   (end_send_group/end_write_group)
+  @retval
+    FALSE if OK
+  @retval
+    TRUE on error  
 */
 
-void JOIN::clear()
+bool JOIN::clear()
 {
   /* 
     must clear only the non-const tables, as const tables
@@ -3282,7 +3301,8 @@ void JOIN::clear()
   for (uint tableno= const_tables; tableno < primary_tables; tableno++)
     mark_as_null_row(qep_tab[tableno].table());  // All fields are NULL
 
-  copy_fields(&tmp_table_param);
+  if (copy_fields(&tmp_table_param, thd))
+    return true;
 
   if (sum_funcs)
   {
@@ -3290,6 +3310,7 @@ void JOIN::clear()
     while ((func= *(func_ptr++)))
       func->clear();
   }
+  return false;
 }
 
 
@@ -3690,19 +3711,27 @@ bool JOIN::make_tmp_tables_info()
     /* If we have already done the group, add HAVING to sorted table */
     if (having_cond && !group_list && !sort_and_group)
     {
-      /*
-        Fields in HAVING condition may have been replaced with fields in an
-        internal temporary table. This table has map=1, hence we check that
-        we have no fields from other tables (outer references are fine).
-      */
       having_cond->update_used_tables();
       QEP_TAB *const curr_table= &qep_tab[curr_tmp_table];
-      DBUG_ASSERT(curr_table->table_ref ||
-                  !(having_cond->used_tables() &
-                    ~(1 | PSEUDO_TABLE_BITS)));
-      table_map used_tables= curr_table->table_ref ?
-                               curr_table->table_ref->map() :
-                               1; // Internal temporary table
+      table_map used_tables;
+
+      if (curr_table->table_ref)
+        used_tables= curr_table->table_ref->map();
+      else
+      {
+        /*
+          Pushing parts of HAVING to an internal temporary table.
+          Fields in HAVING condition may have been replaced with fields in an
+          internal temporary table. This table has map=1, hence we check that
+          we have no fields from other tables (outer references are fine).
+          Unfortunaly, update_used_tables() is not reliable for subquery
+          items, which could thus still have other tables in their
+          used_tables() information.
+        */
+        DBUG_ASSERT(having_cond->has_subquery() ||
+                    !(having_cond->used_tables() & ~(1 | PSEUDO_TABLE_BITS)));
+        used_tables= 1;
+      }
 
       Item* sort_table_cond= make_cond_for_table(having_cond, used_tables,
                                                  (table_map) 0, false);
@@ -3844,7 +3873,7 @@ JOIN::add_sorting_to_table(uint idx, ORDER_with_src *sort_order)
   explain_flags.set(sort_order->src, ESP_USING_FILESORT);
   QEP_TAB *const tab= &qep_tab[idx]; 
   tab->filesort=
-    new (thd->mem_root) Filesort(*sort_order, HA_POS_ERROR);
+    new (thd->mem_root) Filesort(tab, *sort_order, HA_POS_ERROR);
   if (!tab->filesort)
     return true;
   {
@@ -4106,7 +4135,8 @@ test_if_cheaper_ordering(const JOIN_TAB *tab, ORDER *order, TABLE *table,
         */
         const Cost_estimate table_scan_time= table->file->table_scan_cost();
         const double index_scan_time= select_limit / rec_per_key *
-          min<double>(rec_per_key, table_scan_time.total_cost());
+          min<double>(table->cost_model()->page_read_cost(rec_per_key),
+                      table_scan_time.total_cost());
 
         /*
           Switch to index that gives order if its scan time is smaller than

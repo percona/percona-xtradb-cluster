@@ -188,7 +188,7 @@ bool Item_in_subselect::finalize_exists_transform(SELECT_LEX *select_lex)
     Note that if the subquery is "SELECT1 UNION SELECT2" then this is not
     working optimally (Bug#14215895).
   */
-  unit->global_parameters()->select_limit= new Item_int((int32) 1);
+  unit->global_parameters()->select_limit= new Item_int(1);
   unit->set_limit(unit->global_parameters());
 
   select_lex->join->allow_outer_refs= true;   // for JOIN::set_prefix_tables()
@@ -628,12 +628,12 @@ void Item_subselect::fix_after_pullout(st_select_lex *parent_select,
 
     /* Re-resolve ORDER BY and GROUP BY fields */
 
-    for (ORDER *order= (ORDER*) sel->order_list.first;
+    for (ORDER *order= sel->order_list.first;
          order;
          order= order->next)
       (*order->item)->fix_after_pullout(parent_select, removed_select);
 
-    for (ORDER *group= (ORDER*) sel->group_list.first;
+    for (ORDER *group= sel->group_list.first;
          group;
          group= group->next)
       (*group->item)->fix_after_pullout(parent_select, removed_select);
@@ -717,7 +717,7 @@ void Item_subselect::fix_length_and_dec()
 
 table_map Item_subselect::used_tables() const
 {
-  return (table_map) (engine->uncacheable() ? used_tables_cache : 0L);
+  return (engine->uncacheable() ? used_tables_cache : 0ULL);
 }
 
 
@@ -1269,6 +1269,21 @@ my_decimal *Item_singlerow_subselect::val_decimal(my_decimal *decimal_value)
 }
 
 
+bool Item_singlerow_subselect::val_json(Json_wrapper *result)
+{
+  if (!no_rows && !exec() && !value->null_value)
+  {
+    null_value= false;
+    return value->val_json(result);
+  }
+  else
+  {
+    reset();
+    return false;
+  }
+}
+
+
 bool Item_singlerow_subselect::get_date(MYSQL_TIME *ltime,
                                         my_time_flags_t fuzzydate)
 {
@@ -1458,7 +1473,7 @@ void Item_exists_subselect::fix_length_and_dec()
        Note that if the subquery is "SELECT1 UNION SELECT2" then this is not
        working optimally (Bug#14215895).
      */
-     unit->global_parameters()->select_limit= new Item_int((int32) 1);
+     unit->global_parameters()->select_limit= new Item_int(1);
    }
 }
 
@@ -1994,7 +2009,7 @@ Item_in_subselect::single_value_in_to_exists_transformer(SELECT_LEX *select,
   {
     Item *orig_item= select->item_list.head()->real_item();
 
-    if (select->table_list.elements)
+    if (select->table_list.elements || select->where_cond())
     {
       bool tmp;
       Item_bool_func *item= func->create(expr, orig_item);
@@ -2122,9 +2137,13 @@ Item_in_subselect::single_value_in_to_exists_transformer(SELECT_LEX *select,
       }
       else
       {
-	// it is single select without tables => possible optimization
-        // remove the dependence mark since the item is moved to upper
-        // select and is not outer anymore.
+	/*
+          Single query block, without tables, without WHERE, HAVING, LIMIT:
+          its content has one row and is equal to the item in the SELECT list,
+          so we can replace the IN(subquery) with an equality.
+          The expression is moved to the immediately outer query block, so it
+          may no longer contain outer references.
+        */
         orig_item->walk(&Item::remove_dependence_processor, WALK_POSTFIX,
                         (uchar *) select->outer_select());
         /*
@@ -2729,6 +2748,18 @@ bool Item_subselect::subq_opt_away_processor(uchar *arg)
  */
 bool Item_subselect::clean_up_after_removal(uchar *arg)
 {
+  /*
+    Some commands still execute subqueries during resolving.
+    Make sure they are cleaned up properly.
+    @todo: Remove this code when SET is also refactored.
+  */
+  if (unit->is_executed())
+  {
+    DBUG_ASSERT(unit->first_select()->parent_lex->sql_command ==
+                SQLCOM_SET_OPTION);
+    unit->cleanup(true);
+  } 
+
   st_select_lex *root=
     static_cast<st_select_lex*>(static_cast<void*>(arg));
   st_select_lex *sl= unit->outer_select();
@@ -2926,13 +2957,13 @@ void subselect_union_engine::fix_length_and_dec(Item_cache **row)
 
   if (unit->first_select()->item_list.elements == 1)
   {
-    set_row(unit->types, row);
+    set_row(unit->item_list, row);
     item->collation.set(row[0]->collation);
   }
   else
   {
     bool maybe_null_saved= maybe_null;
-    set_row(unit->types, row);
+    set_row(unit->item_list, row);
     maybe_null= maybe_null_saved;
   }
 }
@@ -2981,7 +3012,7 @@ bool subselect_single_select_engine::exec()
         pushed down into the subquery. Those optimizations are ref[_or_null]
         acceses. Change them to be full table scans.
       */
-      for (uint j= join->const_tables; j < join->primary_tables; j++)
+      for (uint j= join->const_tables; j < join->tables; j++)
       {
         QEP_TAB *tab= join->qep_tab + j;
         if (tab->ref().key_parts)
@@ -3003,14 +3034,15 @@ bool subselect_single_select_engine::exec()
               DBUG_ASSERT(!(tab->op && tab->op->type() == QEP_operation::OT_CACHE &&
                             static_cast<JOIN_CACHE*>(tab->op)->is_key_access()));
 
+              TABLE *table= tab->table();
               /* Change the access method to full table scan */
               tab->save_read_first_record= tab->read_first_record;
               tab->save_read_record= tab->read_record.read_record;
               tab->read_record.read_record= rr_sequential;
               tab->read_first_record= read_first_record_seq;
-              tab->read_record.record= tab->table()->record[0];
+              tab->read_record.record= table->record[0];
               tab->read_record.thd= join->thd;
-              tab->read_record.ref_length= tab->table()->file->ref_length;
+              tab->read_record.ref_length= table->file->ref_length;
               tab->read_record.unlock_row= rr_unlock_row;
               *(last_changed_tab++)= tab;
               break;

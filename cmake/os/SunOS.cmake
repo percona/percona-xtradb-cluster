@@ -1,4 +1,4 @@
-# Copyright (c) 2010, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,7 +51,22 @@ ADD_DEFINITIONS(-D__EXTENSIONS__)
 
 # Solaris threads with POSIX semantics:
 # http://docs.oracle.com/cd/E19455-01/806-5257/6je9h033k/index.html
-ADD_DEFINITIONS(-D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT)
+ADD_DEFINITIONS(-D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT -D_PTHREADS)
+
+IF (NOT "${CMAKE_C_FLAGS}${CMAKE_CXX_FLAGS}" MATCHES "-m32|-m64")
+  EXECUTE_PROCESS(COMMAND isainfo -b
+    OUTPUT_VARIABLE ISAINFO_B
+    RESULT_VARIABLE ISAINFO_B_RES
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  IF(ISAINFO_B_RES)
+    MESSAGE(STATUS "Failed to run isainfo -b to determine arch bits: "
+      "${ISAINFO_B_RES}. Falling back to compiler's default.")
+  ELSE()
+    MESSAGE("Adding -m${ISAINFO_B}")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m${ISAINFO_B}")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${ISAINFO_B}")
+  ENDIF()
+ENDIF()
 
 # On  Solaris, use of intrinsics will screw the lib search logic
 # Force using -lm, so rint etc are found.
@@ -59,7 +74,7 @@ SET(LIBM m)
 
 # CMake defined -lthread as thread flag. This crashes in dlopen 
 # when trying to load plugins workaround with -lpthread
-SET(CMAKE_THREADS_LIBS_INIT -lpthread CACHE INTERNAL "" FORCE)
+SET(CMAKE_THREAD_LIBS_INIT -lpthread CACHE INTERNAL "" FORCE)
 
 # Solaris specific large page support
 CHECK_SYMBOL_EXISTS(MHA_MAPSIZE_VA sys/mman.h  HAVE_SOLARIS_LARGE_PAGES)

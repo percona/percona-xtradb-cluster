@@ -41,14 +41,16 @@ extern "C" void test_error_handler_hook(uint err, const char *str, myf MyFlags)
   EXPECT_EQ(expected_error, err) << str;
 }
 
-char *secure_file_priv_arg;
 void setup_server_for_unit_tests()
 {
   static char *my_name= strdup(my_progname);
-  secure_file_priv_arg= strdup("--secure-file-priv=NULL");
-  char *argv[] = { my_name, secure_file_priv_arg, 0 };
-  set_remaining_args(2, argv);
-  mysql_mutex_init(key_LOCK_error_log, &LOCK_error_log, MY_MUTEX_INIT_FAST);
+  char *argv[] = { my_name,
+                   const_cast<char*>("--secure-file-priv=NULL"),
+                   const_cast<char*>("--log_syslog=0"),
+                   const_cast<char*>("--explicit_defaults_for_timestamp"),
+                   const_cast<char*>("--datadir=" DATA_DIR),
+                   const_cast<char*>("--lc-messages-dir=" ERRMSG_DIR), 0 };
+  set_remaining_args(6, argv);
   system_charset_info= &my_charset_utf8_general_ci;
   sys_var_init();
   init_common_variables();
@@ -69,10 +71,8 @@ void teardown_server_for_unit_tests()
   delegates_destroy();
   transaction_cache_free();
   gtid_server_cleanup();
-  mysql_mutex_destroy(&LOCK_error_log);
   query_logger.cleanup();
   delete_optimizer_cost_module();
-  free(secure_file_priv_arg);
 }
 
 void Server_initializer::set_expected_error(uint val)

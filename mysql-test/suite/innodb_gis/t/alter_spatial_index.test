@@ -283,6 +283,7 @@ SELECT c1,ST_Astext(c2),ST_Astext(c4) FROM tab WHERE MBRIntersects(tab.c4, @g1) 
 UPDATE tab SET c2 = ST_GeomFromText('POINT(4000 4000)')
 WHERE MBRIntersects(tab.c4, @g1);
 
+--error ER_CANT_CREATE_GEOMETRY_OBJECT
 UPDATE tab SET c4 = ST_GeomFromText('POINT(4000 4000)')
 WHERE MBRIntersects(tab.c4, @g1);
 
@@ -495,6 +496,7 @@ SET @g2 = ST_GeomFromText('LINESTRING(140 140,150 150,160 160)');
 SELECT c1,ST_Astext(c2),ST_AsText(c3),ST_Astext(c4) FROM tab WHERE MBREquals(tab.c4, @g1) 
 AND MBREquals(tab.c3,@g2) ORDER BY c1;
 
+--error ER_CANT_CREATE_GEOMETRY_OBJECT
 UPDATE tab SET C2 = ST_GeomFromText('POINT(2000 2000)')
 WHERE MBREquals(tab.c4, @g1) AND MBREquals(tab.c3,@g2);
 
@@ -583,6 +585,7 @@ SET @g2 = ST_GeomFromText('LINESTRING(400 400,500 500,600 700)');
 
 SELECT c1,ST_AsText(c2),ST_AsText(c3),ST_Astext(c4) FROM tab WHERE MBRWithin(tab.c4, @g1) AND MBRWithin(tab.c3, @g2);
 
+--error ER_CANT_CREATE_GEOMETRY_OBJECT
 UPDATE tab SET c2 = ST_GeomFromText('POINT(2000 2000)'),
            c3=ST_GeomFromText('POINT(2000 2000)')
 WHERE MBRWithin(tab.c4, @g1) AND MBRWithin(tab.c3, @g2);
@@ -644,8 +647,76 @@ SHOW INDEX FROM parent;
 
 SHOW INDEX FROM child;
 
---error ER_CANNOT_ADD_FOREIGN
+--error ER_BLOB_KEY_WITHOUT_LENGTH
 ALTER TABLE child ADD FOREIGN KEY(parent_id) REFERENCES parent(id) ;
 
 #cleanup
 DROP table child,parent;
+
+# Check add spatial index when table already has rows (inplace).
+create table t1 (c1 int) engine=innodb;
+insert into t1 values(NULL);
+
+# Add spatial index fail, since geometry column can't be null.
+--error ER_SPATIAL_CANT_HAVE_NULL
+alter table t1 add b geometry, add spatial index(b), algorithm=inplace;
+
+# Add spatial index fail, since there's invalid geo data.
+# The case has to be commented because it no longer fails and following cases
+# don't expect the effect of such a statement.
+#--error ER_CANT_CREATE_GEOMETRY_OBJECT
+# alter table t1 add b geometry not null, add spatial index(b), algorithm=inplace;
+
+# Add a geometry column.
+alter table t1 add b geometry not null, algorithm=inplace;
+
+# Add spatial index fail, since there's a NULL or invalid geo data.
+# The case has to be commented because it no longer fails and following cases
+# don't expect the effect of such a statement.
+#--error ER_CANT_CREATE_GEOMETRY_OBJECT
+#alter table t1 add spatial index(b), algorithm=inplace;
+
+# Update invalide geo data to point(0 0).
+update t1 set b = st_geomfromtext('point(0 0)');
+
+# Add spatial index success.
+alter table t1 add spatial index(b), algorithm=inplace;
+
+# Delete rows.
+delete from t1;
+
+#cleanup
+DROP table t1;
+
+# Check add spatial index when table already has rows (copy).
+create table t1 (c1 int) engine=innodb;
+insert into t1 values(NULL);
+
+# Add spatial index fail, since geometry column can't be null.
+--error ER_SPATIAL_CANT_HAVE_NULL
+alter table t1 add b geometry, add spatial index(b), algorithm=copy;
+
+# Add spatial index fail, since there's a NULL or invalid geo data.
+--error ER_CANT_CREATE_GEOMETRY_OBJECT
+alter table t1 add b geometry not null, add spatial index(b), algorithm=copy;
+
+# Add a geometry column.
+alter table t1 add b geometry not null, algorithm=copy;
+
+# Add spatial index.
+# The case has to be commented because it no longer fails and following cases
+# don't expect the effect of such a statement.
+#--error ER_CANT_CREATE_GEOMETRY_OBJECT
+#alter table t1 add spatial index(b), algorithm=copy;
+
+# Update invalide geo data to point(0 0).
+update t1 set b = st_geomfromtext('point(0 0)');
+
+# Add spatial index success.
+alter table t1 add spatial index(b), algorithm=copy;
+
+# Delete rows.
+delete from t1;
+
+#cleanup
+DROP table t1;

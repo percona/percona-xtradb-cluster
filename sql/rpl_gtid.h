@@ -27,6 +27,7 @@
 
 #ifdef MYSQL_SERVER
 #include "mysqld.h"             // key_rwlock_global_sid_lock
+#include "table.h"
 #endif
 
 #include <list>
@@ -446,7 +447,7 @@ public:
                    )
   {
 #ifndef DBUG_OFF
-    lock_state= 0;
+    my_atomic_store32(&lock_state, 0);
     dbug_trace= true;
 #else
     is_write_lock= false;
@@ -551,7 +552,7 @@ private:
     -1 - write locked
     >0 - read locked by that many threads
   */
-  volatile int32 lock_state;
+  int32 lock_state;
   /// Read lock_state atomically and return the value.
   inline int32 get_state() const
   {
@@ -1337,39 +1338,6 @@ public:
     Gtid_set, false otherwise.
   */
   static bool is_valid(const char *text);
-  /**
-    Return a newly allocated string containing this Gtid_set, or NULL
-    on out of memory.
-  */
-  char *to_string() const
-  {
-    char *str= (char *)my_malloc(key_memory_Gtid_set_to_string,
-                                 get_string_length() + 1, MYF(MY_WME));
-    if (str != NULL)
-      to_string(str);
-    return str;
-  }
-#ifndef DBUG_OFF
-  /// Debug only: Print this Gtid_set to stdout.
-  void print() const
-  {
-    char *str= to_string();
-    printf("%s\n", str);
-    my_free(str);
-  }
-#endif
-  /**
-    Print this Gtid_set to the trace file if debug is enabled; no-op
-    otherwise.
-  */
-  void dbug_print(const char *text= "") const
-  {
-#ifndef DBUG_OFF
-    char *str= to_string();
-    DBUG_PRINT("info", ("%s%s'%s'", text, *text ? ": " : "", str));
-    my_free(str);
-#endif
-  }
 
   /**
     Class Gtid_set::String_format defines the separators used by
@@ -1416,20 +1384,58 @@ public:
 
     @param[out] buf Pointer to the buffer where the string should be
     stored. This should have size at least get_string_length()+1.
+    @param need_lock If this Gtid_set has a sid_lock, then the write
+    lock must be held while generating the string. If this parameter
+    is true, then this function acquires and releases the lock;
+    otherwise it asserts that the caller holds the lock.
     @param string_format String_format object that specifies
     separators in the resulting text.
     @return Length of the generated string.
   */
-  int to_string(char *buf, const String_format *string_format= NULL) const;
+  int to_string(char *buf, bool need_lock= false,
+                const String_format *string_format= NULL) const;
 
   /**
     Formats a Gtid_set as a string and saves in a newly allocated buffer.
     @param[out] buf Pointer to pointer to string. The function will
     set it to point to the newly allocated buffer, or NULL on out of memory.
+    @param need_lock If this Gtid_set has a sid_lock, then the write
+    lock must be held while generating the string. If this parameter
+    is true, then this function acquires and releases the lock;
+    otherwise it asserts that the caller holds the lock.
     @param string_format Specifies how to format the string.
     @retval Length of the generated string, or -1 on out of memory.
   */
-  int to_string(char **buf, const String_format *string_format= NULL) const;
+  int to_string(char **buf, bool need_lock= false,
+                const String_format *string_format= NULL) const;
+#ifndef DBUG_OFF
+  /// Debug only: Print this Gtid_set to stdout.
+  void print(bool need_lock= false,
+             const Gtid_set::String_format *sf= NULL) const
+  {
+    char *str;
+    to_string(&str, need_lock, sf);
+    printf("%s\n", str ? str : "out of memory in Gtid_set::print");
+    my_free(str);
+  }
+#endif
+  /**
+    Print this Gtid_set to the trace file if debug is enabled; no-op
+    otherwise.
+  */
+  void dbug_print(const char *text= "", bool need_lock= false,
+                  const Gtid_set::String_format *sf= NULL) const
+  {
+#ifndef DBUG_OFF
+    char *str;
+    to_string(&str, need_lock, sf);
+    DBUG_PRINT("info", ("%s%s'%s'",
+                        text,
+                        *text ? ": " : "",
+                        str ? str : "out of memory in Gtid_set::dbug_print"));
+    my_free(str);
+#endif
+  }
   /**
     Gets all gtid intervals from this Gtid_set.
 
@@ -2046,6 +2052,12 @@ public:
     0 if the group is not owned.
   */
   my_thread_id get_owner(const Gtid &gtid) const;
+
+  /*
+    Fill all gtids into the given Gtid_set object. It doesn't clear the given
+    gtid set before filling its owned gtids into it.
+  */
+  void get_gtids(Gtid_set &gtid_set) const;
   /**
     Removes the given GTID.
 
@@ -2749,16 +2761,15 @@ public:
   int wait_for_gtid_set(THD* thd, String* gtid, longlong timeout);
 #endif
   /**
-    Adds the given Gtid_set that contains the groups in the given
-    string to lost_gtids and executed_gtids, since lost_gtids must
-    be a subset of executed_gtids.
-    Requires that the write lock on sid_locks is held.
+    Adds the given Gtid_set to lost_gtids and executed_gtids.
+    lost_gtids must be a subset of executed_gtids.
 
-    @param text The string to parse, see Gtid_set:add_gtid_text(const
-    char *, bool) for format details.
+    Requires that the caller holds global_sid_lock.wrlock.
+
+    @param gtid_set The Gtid_set to add.
     @return RETURN_STATUS_OK or RETURN_STATUS_REPORTED_ERROR.
    */
-  enum_return_status add_lost_gtids(const char *text);
+  enum_return_status add_lost_gtids(const Gtid_set *gtid_set);
   /// Return a pointer to the Gtid_set that contains the lost groups.
   const Gtid_set *get_lost_gtids() const { return &lost_gtids; }
   /*
@@ -2871,7 +2882,7 @@ public:
     @retval
       -1   Error
   */
-  int save(Gtid_set *gtid_set);
+  int save(const Gtid_set *gtid_set);
   /**
     Save the set of gtids logged in the last binlog into gtid_executed table.
 
@@ -2911,20 +2922,27 @@ public:
       -1   Error
   */
   int compress(THD *thd);
-private:
-#ifdef HAVE_GTID_NEXT_LIST
-  /// Lock all SIDNOs owned by the given THD.
-  void lock_owned_sidnos(const THD *thd);
+#ifdef MYSQL_SERVER
+  /**
+    Push a waring to client if user is modifying
+    the gtid_executed table explicitly.
+
+    @param  thd Thread requesting to access the table
+    @param  table the table is being accessed.
+
+    @retval
+      true    Push a warning to client.
+    @retval
+      false   Do not push a warning.
+  */
+  bool warn_on_modify_gtid_table(THD *thd, TABLE_LIST *table);
 #endif
-  /// Unlock all SIDNOs owned by the given THD.
-  void unlock_owned_sidnos(const THD *thd);
-  /// Broadcast the condition for all SIDNOs owned by the given THD.
-  void broadcast_owned_sidnos(const THD *thd);
   /**
     Remove the GTID owned by thread from owned GTIDs.
 
     This will:
 
+    - Clean up the thread state if the thread owned GTIDs is empty.
     - Release ownership of all GTIDs owned by the THD. This removes
       the GTID from Owned_gtids and clears the ownership status in the
       THD object.
@@ -2938,7 +2956,15 @@ private:
   */
   void update_gtids_impl(THD *thd, bool is_commit);
 
-
+private:
+#ifdef HAVE_GTID_NEXT_LIST
+  /// Lock all SIDNOs owned by the given THD.
+  void lock_owned_sidnos(const THD *thd);
+#endif
+  /// Unlock all SIDNOs owned by the given THD.
+  void unlock_owned_sidnos(const THD *thd);
+  /// Broadcast the condition for all SIDNOs owned by the given THD.
+  void broadcast_owned_sidnos(const THD *thd);
   /// Read-write lock that protects updates to the number of SIDs.
   mutable Checkable_rwlock *sid_lock;
   /// The Sid_map used by this Gtid_state.
@@ -3300,14 +3326,6 @@ enum_gtid_statement_status gtid_pre_statement_checks(THD *thd);
   been reported by (a function called by) this function.
 */
 bool gtid_pre_statement_post_implicit_commit_checks(THD *thd);
-
-/**
-  Check if the current statement terminates a transaction, and if so
-  set GTID_NEXT.type to UNDEFINED_GROUP.
-
-  @param thd THD object for the session.
-*/
-void gtid_post_statement_checks(THD *thd);
 
 /**
   Acquire ownership of the given Gtid_specification.

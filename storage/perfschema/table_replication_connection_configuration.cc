@@ -54,7 +54,7 @@ static const TABLE_FIELD_TYPE field_types[]=
   },
   {
     {C_STRING_WITH_LEN("USER")},
-    {C_STRING_WITH_LEN("char(16)")},
+    {C_STRING_WITH_LEN("char(" USERNAME_CHAR_LENGTH_STR ")")},
     {NULL, 0}
   },
   {
@@ -145,7 +145,8 @@ table_replication_connection_configuration::m_share=
   sizeof(PFS_simple_index), /* ref length */
   &m_table_lock,
   &m_field_def,
-  false /* checked */
+  false, /* checked */
+  false  /* perpetual */
 };
 
 

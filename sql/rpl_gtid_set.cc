@@ -32,7 +32,7 @@ using std::min;
 using std::max;
 using std::list;
 
-#define MAX_NEW_TRUNK_ALLOCATE_TRIES 10
+#define MAX_NEW_CHUNK_ALLOCATE_TRIES 10
 
 const Gtid_set::String_format Gtid_set::default_string_format=
 {
@@ -213,10 +213,10 @@ void Gtid_set::create_new_chunk(int size)
 
   assert_free_intervals_locked();
   /*
-    Try to allocate the new chunk in MAX_NEW_TRUNK_ALLOCATE_TRIES
+    Try to allocate the new chunk in MAX_NEW_CHUNK_ALLOCATE_TRIES
     tries when encountering 'out of memory' situation.
   */
-  while (i < MAX_NEW_TRUNK_ALLOCATE_TRIES)
+  while (i < MAX_NEW_CHUNK_ALLOCATE_TRIES)
   {
     /*
       Allocate the new chunk. one element is already pre-allocated, so
@@ -242,10 +242,10 @@ void Gtid_set::create_new_chunk(int size)
   }
   /*
     Terminate the server after failed to allocate the new chunk
-    in MAX_NEW_TRUNK_ALLOCATE_TRIES tries.
+    in MAX_NEW_CHUNK_ALLOCATE_TRIES tries.
   */
-  if (MAX_NEW_TRUNK_ALLOCATE_TRIES == i ||
-      DBUG_EVALUATE_IF("rpl_simulate_new_trunk_allocate_failure", 1, 0))
+  if (MAX_NEW_CHUNK_ALLOCATE_TRIES == i ||
+      DBUG_EVALUATE_IF("rpl_simulate_new_chunk_allocate_failure", 1, 0))
   {
     my_safe_print_system_time();
     my_safe_printf_stderr("%s", "[Fatal] Out of memory while allocating "
@@ -273,7 +273,7 @@ void Gtid_set::get_free_interval(Interval **out)
     DBUG_EVALUATE_IF("rpl_gtid_get_free_interval_simulate_out_of_memory",
                      true, false);
   if (simulate_failure)
-    DBUG_SET("+d,rpl_simulate_new_trunk_allocate_failure");
+    DBUG_SET("+d,rpl_simulate_new_chunk_allocate_failure");
   if (ivit.get() == NULL || simulate_failure)
     create_new_chunk(CHUNK_GROW_SIZE);
   *out= ivit.get();
@@ -829,30 +829,48 @@ rpl_gno Gtid_set::get_last_gno(rpl_sidno sidno) const
   DBUG_RETURN(gno);
 }
 
-int Gtid_set::to_string(char **buf_arg, const Gtid_set::String_format *sf_arg) const
+int Gtid_set::to_string(char **buf_arg, bool need_lock,
+                        const Gtid_set::String_format *sf_arg) const
 {
   DBUG_ENTER("Gtid_set::to_string");
+  if (sid_lock != NULL)
+  {
+    if (need_lock)
+      sid_lock->wrlock();
+    else
+      sid_lock->assert_some_wrlock();
+  }
   int len= get_string_length(sf_arg);
   *buf_arg= (char *)my_malloc(key_memory_Gtid_set_to_string,
                               len + 1, MYF(MY_WME));
   if (*buf_arg == NULL)
     DBUG_RETURN(-1);
-  to_string(*buf_arg, sf_arg);
+  to_string(*buf_arg, false/*need_lock*/, sf_arg);
+  if (sid_lock != NULL && need_lock)
+    sid_lock->unlock();
   DBUG_RETURN(len);
 }
 
-int Gtid_set::to_string(char *buf, const Gtid_set::String_format *sf) const
+int Gtid_set::to_string(char *buf, bool need_lock,
+                        const Gtid_set::String_format *sf) const
 {
   DBUG_ENTER("Gtid_set::to_string");
   DBUG_ASSERT(sid_map != NULL);
   if (sid_lock != NULL)
-    sid_lock->assert_some_wrlock();
+  {
+    if (need_lock)
+      sid_lock->wrlock();
+    else
+      sid_lock->assert_some_wrlock();
+  }
   if (sf == NULL)
     sf= &default_string_format;
   if (sf->empty_set_string != NULL && is_empty())
   {
     memcpy(buf, sf->empty_set_string, sf->empty_set_string_length);
     buf[sf->empty_set_string_length]= '\0';
+    if (sid_lock != NULL && need_lock)
+      sid_lock->unlock();
     DBUG_RETURN(sf->empty_set_string_length);
   } 
   rpl_sidno map_max_sidno= sid_map->get_max_sidno();
@@ -907,6 +925,8 @@ int Gtid_set::to_string(char *buf, const Gtid_set::String_format *sf) const
   DBUG_PRINT("info", ("ret='%s' strlen(s)=%zu s-buf=%lu get_string_length=%d", buf,
              strlen(buf), (ulong) (s - buf), get_string_length(sf)));
   DBUG_ASSERT(s - buf == get_string_length(sf));
+  if (sid_lock != NULL && need_lock)
+    sid_lock->unlock();
   DBUG_RETURN((int)(s - buf));
 }
 

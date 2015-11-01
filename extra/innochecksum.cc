@@ -50,6 +50,7 @@ The parts not included are excluded by #ifndef UNIV_INNOCHECKSUM. */
 #include "fut0lst.h"			/* FLST_NODE_SIZE */
 #include "buf0checksum.h"		/* buf_calc_page_*() */
 #include "fil0fil.h"			/* FIL_* */
+#include "os0file.h"
 #include "fsp0fsp.h"			/* fsp_flags_get_page_size() &
 					   fsp_flags_get_zip_size() */
 #include "mach0data.h"			/* mach_read_from_4() */
@@ -174,6 +175,27 @@ get_page_size(
 		page_size_t(srv_page_size, srv_page_size, false));
 
 	return(page_size_t(flags));
+}
+
+/** Decompress a page
+@param[in,out]	buf		Page read from disk, uncompressed data will
+				also be copied to this page
+@param[in, out] scratch		Page to use for temporary decompress
+@param[in]	page_size	scratch physical size
+@return true if decompress succeeded */
+static
+bool page_decompress(
+	byte*		buf,
+	byte*		scratch,
+	page_size_t	page_size)
+{
+	dberr_t		err;
+
+	/* Set the dblwr recover flag to false. */
+	err = os_file_decompress_page(
+		false, buf, scratch, page_size.physical());
+
+	return(err == DB_SUCCESS);
 }
 
 #ifdef _WIN32
@@ -435,8 +457,9 @@ update_checksum(
 
 	if (iscompressed) {
 		/* page is compressed */
-		checksum = page_zip_calc_checksum(page, physical_page_size,
-						  static_cast<srv_checksum_algorithm_t>(write_check));
+		checksum = page_zip_calc_checksum(
+			page, physical_page_size,
+			static_cast<srv_checksum_algorithm_t>(write_check));
 
 		mach_write_to_4(page + FIL_PAGE_SPACE_OR_CHKSUM, checksum);
 		if (is_log_enabled) {
@@ -1064,11 +1087,11 @@ int main(
 	/* our input filename. */
 	char*		filename;
 	/* Buffer to store pages read. */
-	byte* buf = (uchar*) malloc(
-			sizeof(uchar) * (UNIV_PAGE_SIZE_MAX));
-
+	byte*		buf = NULL;
 	/* bytes read count */
 	ulong		bytes;
+	/* Buffer to decompress page.*/
+	byte*		tbuf = NULL;
 	/* current time */
 	time_t		now;
 	/* last time */
@@ -1142,6 +1165,10 @@ int main(
 	if (verbose) {
 		my_print_variables_ex(innochecksum_options, stderr);
 	}
+
+
+	buf = (byte*) malloc(UNIV_PAGE_SIZE_MAX * 2);
+	tbuf = buf + UNIV_PAGE_SIZE_MAX;
 
 	/* The file name is not optional. */
 	for (int i = 0; i < argc; ++i) {
@@ -1220,6 +1247,7 @@ int main(
 			fprintf(stderr, "of %d bytes.  Bytes read was %lu\n",
 				UNIV_ZIP_SIZE_MIN, bytes);
 
+			free(buf);
 			DBUG_RETURN(1);
 		}
 
@@ -1278,12 +1306,15 @@ int main(
 					perror("Error: Unable to seek to "
 						"necessary offset");
 
+					free(buf);
 					DBUG_RETURN(1);
 				}
 				/* Save the current file pointer in
 				pos variable. */
 				if (0 != fgetpos(fil_in, &pos)) {
 					perror("fgetpos");
+
+					free(buf);
 					DBUG_RETURN(1);
 				}
 			} else {
@@ -1315,6 +1346,7 @@ int main(
 							"to seek to necessary "
 							"offset");
 
+						free(buf);
 						DBUG_RETURN(1);
 					}
 				}
@@ -1354,6 +1386,7 @@ int main(
 					page_size.physical());
 				perror(" ");
 
+				free(buf);
 				DBUG_RETURN(1);
 			}
 
@@ -1361,6 +1394,7 @@ int main(
 				fprintf(stderr, "Error: bytes read (%lu) "
 					"doesn't match page size (%lu)\n",
 					bytes, page_size.physical());
+				free(buf);
 				DBUG_RETURN(1);
 			}
 
@@ -1369,6 +1403,15 @@ int main(
 				skip_page = is_page_doublewritebuffer(buf);
 			} else {
 				skip_page = false;
+
+				if (!page_decompress(buf, tbuf, page_size)) {
+
+					fprintf(stderr,
+						"Page decompress failed");
+
+					free(buf);
+					DBUG_RETURN(1);
+				}
 			}
 
 			/* If no-check is enabled, skip the
@@ -1394,6 +1437,7 @@ int main(
 								"count::%" PRIuMAX "\n",
 								allow_mismatches);
 
+							free(buf);
 							DBUG_RETURN(1);
 						}
 					}
@@ -1406,6 +1450,7 @@ int main(
 					   page_size.is_compressed(), &pos,
 					   static_cast<ulong>(page_size.physical()))) {
 
+				free(buf);
 				DBUG_RETURN(1);
 			}
 
@@ -1459,5 +1504,6 @@ int main(
 		fclose(log_file);
 	}
 
+	free(buf);
 	DBUG_RETURN(0);
 }

@@ -169,7 +169,7 @@ bool SELECT_LEX::prepare(THD *thd)
     DBUG_RETURN(true); /* purecov: inspected */
   
   if (setup_fields(thd, ref_ptrs, fields_list, thd->want_privilege,
-                   &all_fields, true))
+                   &all_fields, true, false))
     DBUG_RETURN(true);
 
   resolve_place= RESOLVE_NONE;
@@ -319,16 +319,13 @@ bool SELECT_LEX::prepare(THD *thd)
       converted to a LONG field. Original field will remain of the
       BIT type and will be returned to a client.
     */
-    for (ORDER *ord= (ORDER *)group_list.first; ord; ord= ord->next)
+    for (ORDER *ord= group_list.first; ord; ord= ord->next)
     {
       if ((*ord->item)->type() == Item::FIELD_ITEM &&
           (*ord->item)->field_type() == MYSQL_TYPE_BIT)
       {
         Item_field *field= new Item_field(thd, *(Item_field**)ord->item);
-        int el= all_fields.elements;
-        ref_ptrs[el]= field;
-        all_fields.push_front(field);
-        ord->item= &ref_ptrs[el];
+        ord->item= add_hidden_item(field);
       }
     }
   }
@@ -347,7 +344,9 @@ bool SELECT_LEX::prepare(THD *thd)
 
   sj_candidates= NULL;
 
-  if (!outer_select())
+  if (outer_select() == NULL ||
+      (parent_lex->sql_command == SQLCOM_SET_OPTION &&
+       outer_select()->outer_select() == NULL))
   {
     /*
       This code is invoked in the following cases:
@@ -357,6 +356,8 @@ bool SELECT_LEX::prepare(THD *thd)
       - if this is one of highest-level subqueries, if the statement is
         something else; like subq-i in:
           UPDATE t1 SET col1=(subq-1), col2=(subq-2);
+      - If this is a subquery in a SET command
+        @todo: Refactor SET so that this is not needed.
 
       Local transforms are applied after query block merging.
       This means that we avoid unnecessary invocations, as local transforms
@@ -436,13 +437,13 @@ bool SELECT_LEX::apply_local_transforms(THD *thd, bool prune)
     build_bitmap_for_nested_joins(&top_join_list, 0);
 
     /*
-      Here are reasons why we do the following check here (i.e. late).
+      Here are the reasons why we do the following check here (i.e. late).
       * setup_fields () may have done split_sum_func () on aggregate items of
       the SELECT list, so for reliable comparison of the ORDER BY list with
-      the SELECT list, we need to wait until split_sum_func() has been done on
+      the SELECT list, we need to wait until split_sum_func() is done with
       the ORDER BY list.
-      * we get "most of the time" fixed items, which is always a good
-      thing. Some outer references may not be fixed, though.
+      * we get resolved expressions "most of the time", which is always a good
+      thing. Some outer references may not be resolved, though.
       * we need nested_join::used_tables, and this member is set in
       simplify_joins()
       * simplify_joins() does outer-join-to-inner conversion, which increases
@@ -738,8 +739,6 @@ bool st_select_lex::setup_tables(THD *thd, TABLE_LIST *tables,
   leaf_table_count= 0;
   partitioned_table_count= 0;
 
-  Opt_hints_qb *qb_hints= context.select_lex->opt_hints_qb;
-
   for (TABLE_LIST *tr= leaf_tables; tr; tr= tr->next_leaf, tableno++)
   {
     TABLE *const table= tr->table;
@@ -764,10 +763,15 @@ bool st_select_lex::setup_tables(THD *thd, TABLE_LIST *tables,
     table->pos_in_table_list= tr;
     tr->reset();
 
-    if (qb_hints &&                          // QB hints initialized
+    /*
+      Only set hints on first execution.  Otherwise, hints will refer to
+      wrong query block after semijoin transformation
+    */
+    if (first_execution &&                 
+        opt_hints_qb &&                      // QB hints initialized
         !tr->opt_hints_table)                // Table hints are not adjusted yet
     {
-      tr->opt_hints_table= qb_hints->adjust_table_hints(table, tr->alias);
+      tr->opt_hints_table= opt_hints_qb->adjust_table_hints(table, tr->alias);
     }
 
     if (tr->process_index_hints(table))
@@ -776,8 +780,8 @@ bool st_select_lex::setup_tables(THD *thd, TABLE_LIST *tables,
       partitioned_table_count++;
   }
 
-  if (qb_hints)
-    qb_hints->check_unresolved(thd);
+  if (opt_hints_qb)
+    opt_hints_qb->check_unresolved(thd);
  
   DBUG_RETURN(false);
 }
@@ -838,8 +842,6 @@ bool st_select_lex::resolve_derived(THD *thd, bool apply_semijoin)
 
   DBUG_ASSERT(derived_table_count);
 
-  materialized_derived_table_count= 0;
-
   // Prepare derived tables and views that belong to this query block.
   for (TABLE_LIST *tl= get_table_list(); tl; tl= tl->next_local)
   {
@@ -899,7 +901,10 @@ bool st_select_lex::resolve_derived(THD *thd, bool apply_semijoin)
         DBUG_RETURN(true);        /* purecov: inspected */
       if (tl->setup_materialized_derived(thd))
         DBUG_RETURN(true);        /* purecov: inspected */
-      materialized_derived_table_count++;
+      /*
+        materialized_derived_table_count was incremented during preparation,
+        so do not do it once more.
+      */
     }
   }
 
@@ -1003,7 +1008,7 @@ bool SELECT_LEX::resolve_subquery(THD *thd)
       9. Parent select is not a confluent table-less select
       10. Neither parent nor child select have STRAIGHT_JOIN option.
   */
-  if (thd->optimizer_switch_flag(OPTIMIZER_SWITCH_SEMIJOIN) &&
+  if (semijoin_enabled(thd) &&
       in_predicate &&                                                   // 1
       !is_part_of_union() &&                                            // 2
       !group_list.elements &&                                           // 3
@@ -1181,7 +1186,7 @@ bool SELECT_LEX::setup_conds(THD *thd)
     if (it_is_update)
     {
       TABLE_LIST *view= table->top_table();
-      if (view->effective_with_check)
+      if (view->is_view() && view->is_merged())
       {
         if (view->prepare_check_option(thd))
           DBUG_RETURN(true);        /* purecov: inspected */
@@ -1235,22 +1240,24 @@ void SELECT_LEX::reset_nj_counters(List<TABLE_LIST> *join_list)
     It also moves the join conditions for the converted outer joins
     and from inner joins to conds.
     The function also calculates some attributes for nested joins:
-    - used_tables    
-    - not_null_tables
-    - dep_tables.
-    - on_expr_dep_tables
+
+    -# used_tables
+    -# not_null_tables
+    -# dep_tables.
+    -# on_expr_dep_tables
+
     The first two attributes are used to test whether an outer join can
-    be substituted for an inner join. The third attribute represents the
+    be substituted by an inner join. The third attribute represents the
     relation 'to be dependent on' for tables. If table t2 is dependent
     on table t1, then in any evaluated execution plan table access to
     table t2 must precede access to table t2. This relation is used also
     to check whether the query contains  invalid cross-references.
-    The forth attribute is an auxiliary one and is used to calculate
+    The fourth attribute is an auxiliary one and is used to calculate
     dep_tables.
     As the attribute dep_tables qualifies possibles orders of tables in the
     execution plan, the dependencies required by the straight join
     modifiers are reflected in this attribute as well.
-    The function also removes all braces that can be removed from the join
+    The function also removes all parentheses that can be removed from the join
     expression without changing its meaning.
 
   @note
@@ -1295,7 +1302,7 @@ void SELECT_LEX::reset_nj_counters(List<TABLE_LIST> *join_list)
         WHERE t3 IS NOT NULL AND t3.b=t2.b AND t2.a=t1.a
   @endcode
 
-    The function removes all unnecessary braces from the expression
+    The function removes all unnecessary parentheses from the expression
     produced by the conversions.
     E.g.
     @code
@@ -1308,14 +1315,14 @@ void SELECT_LEX::reset_nj_counters(List<TABLE_LIST> *join_list)
     @endcode
 
 
-    It also will remove braces from the following queries:
+    It also will remove parentheses from the following queries:
     @code
       SELECT * from (t1 LEFT JOIN t2 ON t2.a=t1.a) LEFT JOIN t3 ON t3.b=t2.b
       SELECT * from (t1, (t2,t3)) WHERE t1.a=t2.a AND t2.b=t3.b.
     @endcode
 
     The benefit of this simplification procedure is that it might return 
-    a query for which the optimizer can evaluate execution plan with more
+    a query for which the optimizer can evaluate execution plans with more
     join orders. With a left join operation the optimizer does not
     consider any plan where one of the inner tables is before some of outer
     tables.
@@ -1323,7 +1330,7 @@ void SELECT_LEX::reset_nj_counters(List<TABLE_LIST> *join_list)
   IMPLEMENTATION
     The function is implemented by a recursive procedure.  On the recursive
     ascent all attributes are calculated, all outer joins that can be
-    converted are replaced and then all unnecessary braces are removed.
+    converted are replaced and then all unnecessary parentheses are removed.
     As join list contains join tables in the reverse order sequential
     elimination of outer joins does not require extra recursive calls.
 
@@ -2232,6 +2239,11 @@ bool SELECT_LEX::merge_derived(THD *thd, TABLE_LIST *derived_table)
       lex->can_not_use_merged())
     DBUG_RETURN(false);
 
+  /*
+    @todo: The implementation of LEX::can_use_merged() currently avoids
+           merging of views that are contained in other views if
+           can_use_merged() returns false.
+  */
   // Check whether derived table is mergeable, and directives allow merging
   if (!derived_unit->is_mergeable() ||
       derived_table->algorithm == VIEW_ALGORITHM_TEMPTABLE ||
@@ -2271,14 +2283,32 @@ bool SELECT_LEX::merge_derived(THD *thd, TABLE_LIST *derived_table)
   // Set up permanent list of underlying tables of a merged view
   derived_table->merge_underlying_list= derived_select->get_table_list();
 
-  if (derived_table->updatable_view &&
-      (derived_table->merge_underlying_list == NULL ||
-       derived_table->merge_underlying_list->is_updatable()))
-    derived_table->set_updatable();
-
-  derived_table->effective_with_check=
-    lex->get_effective_with_check(derived_table);
-
+  /**
+    A view is updatable if any underlying table is updatable.
+    A view is insertable-into if all underlying tables are insertable.
+    A view is not updatable nor insertable if it contains an outer join
+    @see mysql_register_view()
+  */
+  if (derived_table->is_view())
+  {
+    bool updatable= false;
+    bool insertable= true;
+    bool outer_joined= false;
+    for (TABLE_LIST *tr= derived_table->merge_underlying_list;
+         tr;
+         tr= tr->next_local)
+    {
+      updatable|= tr->is_updatable();
+      insertable&= tr->is_insertable();
+      outer_joined|= tr->is_inner_table_of_outer_join();
+    }
+    updatable&= !outer_joined;
+    insertable&= !outer_joined;
+    if (updatable)
+      derived_table->set_updatable();
+    if (insertable)
+      derived_table->set_insertable();
+  }
   // Add a nested join object to the derived table object
   if (!(derived_table->nested_join=
        (NESTED_JOIN *) thd->mem_calloc(sizeof(NESTED_JOIN))))
@@ -2378,6 +2408,9 @@ bool SELECT_LEX::merge_derived(THD *thd, TABLE_LIST *derived_table)
         itself ordered.
      Otherwise the ORDER BY clause is ignored.
 
+     Only SELECT statements and single-table UPDATE and DELETE statements
+     allow ordering.
+
      Up to version 5.6 included, ORDER BY was unconditionally merged.
      Currently we only merge in the simple case above, which ensures
      backward compatibility for most reasonable use cases.
@@ -2388,9 +2421,10 @@ bool SELECT_LEX::merge_derived(THD *thd, TABLE_LIST *derived_table)
     // LIMIT currently blocks derived table merge
     DBUG_ASSERT(!derived_select->has_limit());
 
-    if (!(master_unit()->is_union() ||
-          lex->sql_command == SQLCOM_UPDATE_MULTI ||
-          lex->sql_command == SQLCOM_DELETE_MULTI ||
+    if ((lex->sql_command == SQLCOM_SELECT ||
+         lex->sql_command == SQLCOM_UPDATE ||
+         lex->sql_command == SQLCOM_DELETE) &&
+        !(master_unit()->is_union() ||
           is_grouped() ||
           is_distinct() ||
           is_ordered() ||
@@ -2803,15 +2837,12 @@ bool SELECT_LEX::fix_inner_refs(THD *thd)
     */
     if (!ref_ptrs.is_null() && !ref->found_in_select_list)
     {
-      int el= all_fields.elements;
-      ref_ptrs[el]= item;
-      /* Add the field item to the select list of the current select. */
-      all_fields.push_front(item);
-      /*
+      /* 
+        Add the field item to the select list of the current select.
         If it's needed reset each Item_ref item that refers this field with
         a new reference taken from ref_pointer_array.
       */
-      item_ref= &ref_ptrs[el];
+      item_ref= add_hidden_item(item);
     }
 
     if (ref->in_sum_func)
@@ -3030,8 +3061,9 @@ void SELECT_LEX::empty_order_list(int hidden_order_field_count)
 */
 
 static bool
-find_order_in_list(THD *thd, Ref_ptr_array ref_pointer_array, TABLE_LIST *tables,
-                   ORDER *order, List<Item> &fields, List<Item> &all_fields,
+find_order_in_list(THD *thd, Ref_ptr_array ref_pointer_array,
+                   TABLE_LIST *tables, ORDER *order,
+                   List<Item> &fields, List<Item> &all_fields,
                    bool is_group_field)
 {
   Item *order_item= *order->item; /* The item from the GROUP/ORDER caluse. */
@@ -3080,7 +3112,7 @@ find_order_in_list(THD *thd, Ref_ptr_array ref_pointer_array, TABLE_LIST *tables
 
     /* Lookup the current GROUP field in the FROM clause. */
     order_item_type= order_item->type();
-    from_field= (Field*) not_found_field;
+    from_field= not_found_field;
     if ((is_group_field &&
         order_item_type == Item::FIELD_ITEM) ||
         order_item_type == Item::REF_ITEM)
@@ -3088,8 +3120,11 @@ find_order_in_list(THD *thd, Ref_ptr_array ref_pointer_array, TABLE_LIST *tables
       from_field= find_field_in_tables(thd, (Item_ident*) order_item, tables,
                                        NULL, &view_ref, IGNORE_ERRORS, TRUE,
                                        FALSE);
+      if (thd->is_error())
+        return true;
+
       if (!from_field)
-        from_field= (Field*) not_found_field;
+        from_field= not_found_field;
     }
 
     if (from_field == not_found_field ||
@@ -3340,7 +3375,7 @@ bool SELECT_LEX::setup_order_final(THD *thd, int hidden_order_field_count)
     return false;
   }
 
-  for (ORDER *ord= (ORDER *)order_list.first; ord; ord= ord->next)
+  for (ORDER *ord= order_list.first; ord; ord= ord->next)
   {
     Item *const item= *ord->item;
 
@@ -3437,7 +3472,7 @@ bool SELECT_LEX::change_group_ref(THD *thd, Item_func *expr, bool *changed)
     Item *const item= *arg;
     if (item->type() == Item::FIELD_ITEM || item->type() == Item::REF_ITEM)
     {
-      for (ORDER *group= (ORDER *)group_list.first; group; group= group->next)
+      for (ORDER *group= group_list.first; group; group= group->next)
       {
         if (item->eq(*group->item, 0))
         {
@@ -3481,7 +3516,7 @@ bool SELECT_LEX::resolve_rollup(THD *thd)
   {
     bool found_in_group= false;
 
-    for (ORDER *group= (ORDER *)group_list.first; group; group= group->next)
+    for (ORDER *group= group_list.first; group; group= group->next)
     {
       if (*group->item == item)
       {
@@ -3610,6 +3645,22 @@ void SELECT_LEX::delete_unused_merged_columns(List<TABLE_LIST> *tables)
   DBUG_VOID_RETURN;
 }
 
+
+/**
+  Add item to the hidden part of select list.
+
+  @param item  item to add
+
+  @return Pointer to ref_ptr for the added item
+*/
+
+Item **SELECT_LEX::add_hidden_item(Item *item)
+{
+  uint el= all_fields.elements;
+  ref_ptrs[el]= item;
+  all_fields.push_front(item);
+  return &ref_ptrs[el];
+}
 
 /**
   @} (end of group Query_Resolver)

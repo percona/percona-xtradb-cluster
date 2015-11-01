@@ -71,11 +71,6 @@ Created 9/17/2000 Heikki Tuuri
 #include <deque>
 #include <vector>
 
-const char* MODIFICATIONS_NOT_ALLOWED_MSG_RAW_PARTITION =
-	"A new raw disk partition was initialized. We do not allow database"
-	" modifications by the user at this time.  Shut down mysqld and edit"
-	" my.cnf so that newraw is replaced with raw.";
-
 const char* MODIFICATIONS_NOT_ALLOWED_MSG_FORCE_RECOVERY =
 	"innodb_force_recovery is on. We do not allow database modifications"
 	" by the user. Shut down mysqld and edit my.cnf to set"
@@ -621,14 +616,18 @@ row_mysql_convert_row_to_innobase(
 					copied there! */
 	row_prebuilt_t*	prebuilt,	/*!< in: prebuilt struct where template
 					must be of type ROW_MYSQL_WHOLE_ROW */
-	const byte*	mysql_rec)	/*!< in: row in the MySQL format;
+	const byte*	mysql_rec,	/*!< in: row in the MySQL format;
 					NOTE: do not discard as long as
 					row is used, as row may contain
 					pointers to this record! */
+	mem_heap_t**	blob_heap)	/*!< in: FIX_ME, remove this after
+					server fixes its issue */
 {
 	const mysql_row_templ_t*templ;
 	dfield_t*		dfield;
 	ulint			i;
+	ulint			n_col = 0;
+	ulint			n_v_col = 0;
 
 	ut_ad(prebuilt->template_type == ROW_MYSQL_WHOLE_ROW);
 	ut_ad(prebuilt->mysql_template);
@@ -636,7 +635,15 @@ row_mysql_convert_row_to_innobase(
 	for (i = 0; i < prebuilt->n_template; i++) {
 
 		templ = prebuilt->mysql_template + i;
-		dfield = dtuple_get_nth_field(row, i);
+
+		if (templ->is_virtual) {
+			ut_ad(n_v_col < dtuple_get_n_v_fields(row));
+			dfield = dtuple_get_nth_v_field(row, n_v_col);
+			n_v_col++;
+		} else {
+			dfield = dtuple_get_nth_field(row, n_col);
+			n_col++;
+		}
 
 		if (templ->mysql_null_bit_mask != 0) {
 			/* Column may be SQL NULL */
@@ -659,6 +666,16 @@ row_mysql_convert_row_to_innobase(
 			mysql_rec + templ->mysql_col_offset,
 			templ->mysql_col_len,
 			dict_table_is_comp(prebuilt->table));
+
+		/* server has issue regarding handling BLOB virtual fields,
+		and we need to duplicate it with our own memory here */
+		if (templ->is_virtual
+		    && DATA_LARGE_MTYPE(dfield_get_type(dfield)->mtype)) {
+			if (*blob_heap == NULL) {
+				*blob_heap = mem_heap_create(dfield->len);
+			}
+			dfield_dup(dfield, *blob_heap);
+		}
 next_column:
 		;
 	}
@@ -718,6 +735,9 @@ handle_new_error:
 	case DB_INTERRUPTED:
 	case DB_DICT_CHANGED:
 	case DB_CANT_CREATE_GEOMETRY_OBJECT:
+		DBUG_EXECUTE_IF("row_mysql_crash_if_error", {
+					log_buffer_flush_to_disk();
+					DBUG_SUICIDE(); });
 		if (savept) {
 			/* Roll back the latest, possibly incomplete insertion
 			or update */
@@ -952,6 +972,8 @@ row_create_prebuilt(
 	prebuilt->fts_doc_id_in_read_set = 0;
 	prebuilt->blob_heap = NULL;
 
+	prebuilt->m_no_prefetch = false;
+
 	DBUG_RETURN(prebuilt);
 }
 
@@ -1110,7 +1132,9 @@ row_get_prebuilt_insert_row(
 
 	dtuple_t*	row;
 
-	row = dtuple_create(prebuilt->heap, dict_table_get_n_cols(table));
+	row = dtuple_create_with_vcol(
+			prebuilt->heap, dict_table_get_n_cols(table),
+			dict_table_get_n_v_cols(table));
 
 	dict_table_copy_types(row, table);
 
@@ -1364,7 +1388,7 @@ row_explicit_rollback(
 		err = btr_cur_del_mark_set_clust_rec(
 			flags, btr_cur_get_block(&cursor),
 			btr_cur_get_rec(&cursor), index,
-			offsets, thr, mtr);
+			offsets, thr, entry, mtr);
 	} else {
 		err = btr_cur_del_mark_set_sec_rec(
 			flags, &cursor, TRUE, thr, mtr);
@@ -1389,7 +1413,7 @@ row_explicit_rollback(
 
 /** Convert a row in the MySQL format to a row in the Innobase format.
 This is specialized function used for intrinsic table with reduce branching.
-@param[in/out]	row		row where field values are copied.
+@param[in,out]	row		row where field values are copied.
 @param[in]	prebuilt	prebuilt handler
 @param[in]	mysql_rec	row in mysql format. */
 static
@@ -1615,6 +1639,10 @@ row_insert_for_mysql_using_ins_graph(
 	ins_node_t*	node		= prebuilt->ins_node;
 	dict_table_t*	table		= prebuilt->table;
 
+	/* FIX_ME: This blob heap is used to compensate an issue in server
+	for virtual column blob handling */
+	mem_heap_t*	blob_heap = NULL;
+
 	ut_ad(trx);
 	ut_a(prebuilt->magic_n == ROW_PREBUILT_ALLOCATED);
 	ut_a(prebuilt->magic_n2 == ROW_PREBUILT_ALLOCATED);
@@ -1634,11 +1662,6 @@ row_insert_for_mysql_using_ins_graph(
 
 		return(DB_TABLESPACE_NOT_FOUND);
 
-	} else if (srv_sys_space.created_new_raw()) {
-
-		ib::error() << MODIFICATIONS_NOT_ALLOWED_MSG_RAW_PARTITION;
-
-		return(DB_ERROR);
 	} else if (srv_force_recovery) {
 
 		ib::error() << MODIFICATIONS_NOT_ALLOWED_MSG_FORCE_RECOVERY;
@@ -1667,7 +1690,8 @@ row_insert_for_mysql_using_ins_graph(
 	row_get_prebuilt_insert_row(prebuilt);
 	node = prebuilt->ins_node;
 
-	row_mysql_convert_row_to_innobase(node->row, prebuilt, mysql_rec);
+	row_mysql_convert_row_to_innobase(node->row, prebuilt, mysql_rec,
+					  &blob_heap);
 
 	savept = trx_savept_take(trx);
 
@@ -1710,6 +1734,10 @@ error_exit:
 
 		node->duplicate = NULL;
 		trx->op_info = "";
+
+		if (blob_heap != NULL) {
+			mem_heap_free(blob_heap);
+		}
 
 		return(err);
 	}
@@ -1777,6 +1805,10 @@ error_exit:
 
 	row_update_statistics_if_needed(table);
 	trx->op_info = "";
+
+	if (blob_heap != NULL) {
+		mem_heap_free(blob_heap);
+	}
 
 	return(err);
 }
@@ -1853,7 +1885,8 @@ row_create_update_node_for_mysql(
 
 	node->table = table;
 
-	node->update = upd_create(dict_table_get_n_cols(table), heap);
+	node->update = upd_create(dict_table_get_n_cols(table)
+				  + dict_table_get_n_v_cols(table), heap);
 
 	node->update_n_fields = dict_table_get_n_cols(table);
 
@@ -1864,6 +1897,8 @@ row_create_update_node_for_mysql(
 
 	node->table_sym = NULL;
 	node->col_assign_list = NULL;
+	node->fts_doc_id = FTS_NULL_DOC_ID;
+	node->fts_next_doc_id = UINT64_UNDEFINED;
 
 	DBUG_RETURN(node);
 }
@@ -1916,8 +1951,9 @@ row_fts_do_update(
 	doc_id_t	old_doc_id,	/* in: old document id */
 	doc_id_t	new_doc_id)	/* in: new document id */
 {
-	if (trx->fts_next_doc_id) {
-		fts_trx_add_op(trx, table, old_doc_id, FTS_DELETE, NULL);
+	fts_trx_add_op(trx, table, old_doc_id, FTS_DELETE, NULL);
+
+	if (new_doc_id != FTS_NULL_DOC_ID) {
 		fts_trx_add_op(trx, table, new_doc_id, FTS_INSERT, NULL);
 	}
 }
@@ -1929,34 +1965,28 @@ static
 dberr_t
 row_fts_update_or_delete(
 /*=====================*/
-	row_prebuilt_t*	prebuilt)	/* in: prebuilt struct in MySQL
+	trx_t*		trx,
+	upd_node_t*	node)	/* in: prebuilt struct in MySQL
 					handle */
 {
-	trx_t*		trx = prebuilt->trx;
-	dict_table_t*	table = prebuilt->table;
-	upd_node_t*	node = prebuilt->upd_node;
-	doc_id_t	old_doc_id = prebuilt->fts_doc_id;
+	dict_table_t*	table = node->table;
+	doc_id_t	old_doc_id = node->fts_doc_id;
+	DBUG_ENTER("row_fts_update_or_delete");
 
-	ut_a(dict_table_has_fts_index(prebuilt->table));
+	ut_a(dict_table_has_fts_index(node->table));
 
 	/* Deletes are simple; get them out of the way first. */
 	if (node->is_delete) {
 		/* A delete affects all FTS indexes, so we pass NULL */
 		fts_trx_add_op(trx, table, old_doc_id, FTS_DELETE, NULL);
 	} else {
-		doc_id_t	new_doc_id;
-
-		new_doc_id = fts_read_doc_id((byte*) &trx->fts_next_doc_id);
-
-		if (new_doc_id == 0) {
-			ib::error() << "InnoDB FTS: Doc ID cannot be 0";
-			return(DB_FTS_INVALID_DOCID);
-		}
+		doc_id_t	new_doc_id = node->fts_next_doc_id;
+		ut_ad(new_doc_id != UINT64_UNDEFINED);
 
 		row_fts_do_update(trx, table, old_doc_id, new_doc_id);
 	}
 
-	return(DB_SUCCESS);
+	DBUG_RETURN(DB_SUCCESS);
 }
 
 /*********************************************************************//**
@@ -2336,6 +2366,7 @@ row_update_for_mysql_using_upd_graph(
 	trx_t*		trx		= prebuilt->trx;
 	ulint		fk_depth	= 0;
 	upd_cascade_t*	cascade_upd_nodes;
+	upd_cascade_t*	new_upd_nodes;
 	upd_cascade_t*	processed_cascades;
 	bool		got_s_lock	= false;
 
@@ -2353,11 +2384,6 @@ row_update_for_mysql_using_upd_graph(
 			" the .ibd file from the database directory under"
 			" the MySQL datadir, or have you used DISCARD"
 			" TABLESPACE? " << TROUBLESHOOTING_MSG;
-		DBUG_RETURN(DB_ERROR);
-	}
-
-	if (srv_sys_space.created_new_raw()) {
-		ib::error() << MODIFICATIONS_NOT_ALLOWED_MSG_RAW_PARTITION;
 		DBUG_RETURN(DB_ERROR);
 	}
 
@@ -2402,6 +2428,10 @@ row_update_for_mysql_using_upd_graph(
 		(mem_heap_ator.allocate(sizeof(upd_cascade_t)))
 		upd_cascade_t(deque_mem_heap_t(mem_heap_ator));
 
+	new_upd_nodes = new
+		(mem_heap_ator.allocate(sizeof(upd_cascade_t)))
+		upd_cascade_t(deque_mem_heap_t(mem_heap_ator));
+
 	processed_cascades = new
 		(mem_heap_ator.allocate(sizeof(upd_cascade_t)))
 		upd_cascade_t(deque_mem_heap_t(mem_heap_ator));
@@ -2432,7 +2462,16 @@ row_update_for_mysql_using_upd_graph(
 
 	node->cascade_top = true;
 	node->cascade_upd_nodes = cascade_upd_nodes;
+	node->new_upd_nodes = new_upd_nodes;
 	node->processed_cascades = processed_cascades;
+	node->fts_doc_id = prebuilt->fts_doc_id;
+
+	if (trx->fts_next_doc_id != UINT64_UNDEFINED) {
+		node->fts_next_doc_id = fts_read_doc_id(
+			(byte*) &trx->fts_next_doc_id);
+	} else {
+		node->fts_next_doc_id = UINT64_UNDEFINED;
+	}
 
 	ut_ad(!prebuilt->sql_stat_start);
 
@@ -2451,9 +2490,12 @@ run_again:
 
 	row_upd_step(thr);
 
+	DBUG_EXECUTE_IF("dml_cascade_only_once", node->check_cascade_only_once(););
+
 	err = trx->error_state;
 
 	if (err != DB_SUCCESS) {
+
 		que_thr_stop_for_mysql(thr);
 
 		if (err == DB_RECORD_NOT_FOUND) {
@@ -2485,6 +2527,13 @@ run_again:
 		thr->lock_state= QUE_THR_LOCK_NOLOCK;
 
 		if (was_lock_wait) {
+			std::for_each(new_upd_nodes->begin(),
+				      new_upd_nodes->end(),
+				      ib_dec_counter());
+			std::for_each(new_upd_nodes->begin(),
+				      new_upd_nodes->end(),
+				      que_graph_free_recursive);
+			node->new_upd_nodes->clear();
 			goto run_again;
 		}
 
@@ -2494,8 +2543,21 @@ run_again:
 			que_graph_free_recursive(node);
 		}
 		goto error;
+	} else {
+
+		std::copy(node->new_upd_nodes->begin(),
+			  node->new_upd_nodes->end(),
+			  std::back_inserter(*node->cascade_upd_nodes));
+
+		node->new_upd_nodes->clear();
 	}
 
+	if (dict_table_has_fts_index(node->table)
+	    && node->fts_doc_id != FTS_NULL_DOC_ID
+	    && node->fts_next_doc_id != UINT64_UNDEFINED) {
+		err = row_fts_update_or_delete(trx, node);
+		ut_a(err == DB_SUCCESS);
+	}
 
 	if (thr->fk_cascade_depth > 0) {
 		/* Processing cascade operation */
@@ -2521,15 +2583,6 @@ run_again:
 	}
 
 	thr->fk_cascade_depth = 0;
-
-	if (dict_table_has_fts_index(table)
-	    && trx->fts_next_doc_id != UINT64_UNDEFINED) {
-		err = row_fts_update_or_delete(prebuilt);
-		if (err != DB_SUCCESS) {
-			trx->op_info = "";
-			DBUG_RETURN(err);
-		}
-	}
 
 	/* Update the statistics only after completing all cascaded
 	operations */
@@ -2599,8 +2652,16 @@ error:
 		      cascade_upd_nodes->end(),
 		      ib_dec_counter());
 
+	std::for_each(new_upd_nodes->begin(),
+		      new_upd_nodes->end(),
+		      ib_dec_counter());
+
 	std::for_each(cascade_upd_nodes->begin(),
 		      cascade_upd_nodes->end(),
+		      que_graph_free_recursive);
+
+	std::for_each(new_upd_nodes->begin(),
+		      new_upd_nodes->end(),
 		      que_graph_free_recursive);
 
 	std::for_each(processed_cascades->begin(),
@@ -2653,11 +2714,10 @@ row_delete_all_rows(
 		ut_ad(err == DB_SUCCESS);
 	}
 
-	return (err);
+	return(err);
 }
 
-/*********************************************************************//**
-This can only be used when srv_locks_unsafe_for_binlog is TRUE or this
+/** This can only be used when srv_locks_unsafe_for_binlog is TRUE or this
 session is using a READ COMMITTED or READ UNCOMMITTED isolation level.
 Before calling this function row_search_for_mysql() must have
 initialized prebuilt->new_rec_locks to store the information which new
@@ -2665,23 +2725,22 @@ record locks really were set. This function removes a newly set
 clustered index record lock under prebuilt->pcur or
 prebuilt->clust_pcur.  Thus, this implements a 'mini-rollback' that
 releases the latest clustered index record lock we set.
-@return error code or DB_SUCCESS */
+@param[in,out]	prebuilt		prebuilt struct in MySQL handle
+@param[in]	has_latches_on_recs	TRUE if called so that we have the
+					latches on the records under pcur
+					and clust_pcur, and we do not need
+					to reposition the cursors. */
 void
 row_unlock_for_mysql(
-/*=================*/
-	row_prebuilt_t*	prebuilt,	/*!< in/out: prebuilt struct in MySQL
-					handle */
-	ibool		has_latches_on_recs)/*!< in: TRUE if called so
-					that we have the latches on
-					the records under pcur and
-					clust_pcur, and we do not need
-					to reposition the cursors. */
+	row_prebuilt_t*	prebuilt,
+	ibool		has_latches_on_recs)
 {
 	btr_pcur_t*	pcur		= prebuilt->pcur;
 	btr_pcur_t*	clust_pcur	= prebuilt->clust_pcur;
 	trx_t*		trx		= prebuilt->trx;
 
-	ut_ad(prebuilt && trx);
+	ut_ad(prebuilt != NULL);
+	ut_ad(trx != NULL);
 
 	if (UNIV_UNLIKELY
 	    (!srv_locks_unsafe_for_binlog
@@ -2816,7 +2875,7 @@ row_mysql_freeze_data_dictionary_func(
 {
 	ut_a(trx->dict_operation_lock_mode == 0);
 
-	rw_lock_s_lock_inline(&dict_operation_lock, 0, file, line);
+	rw_lock_s_lock_inline(dict_operation_lock, 0, file, line);
 
 	trx->dict_operation_lock_mode = RW_S_LATCH;
 }
@@ -2832,7 +2891,7 @@ row_mysql_unfreeze_data_dictionary(
 
 	ut_a(trx->dict_operation_lock_mode == RW_S_LATCH);
 
-	rw_lock_s_unlock(&dict_operation_lock);
+	rw_lock_s_unlock(dict_operation_lock);
 
 	trx->dict_operation_lock_mode = 0;
 }
@@ -2853,7 +2912,7 @@ row_mysql_lock_data_dictionary_func(
 	/* Serialize data dictionary operations with dictionary mutex:
 	no deadlocks or lock waits can occur then in these operations */
 
-	rw_lock_x_lock_inline(&dict_operation_lock, 0, file, line);
+	rw_lock_x_lock_inline(dict_operation_lock, 0, file, line);
 	trx->dict_operation_lock_mode = RW_X_LATCH;
 
 	mutex_enter(&dict_sys->mutex);
@@ -2874,7 +2933,7 @@ row_mysql_unlock_data_dictionary(
 	no deadlocks can occur then in these operations */
 
 	mutex_exit(&dict_sys->mutex);
-	rw_lock_x_unlock(&dict_operation_lock);
+	rw_lock_x_unlock(dict_operation_lock);
 
 	trx->dict_operation_lock_mode = 0;
 }
@@ -2889,6 +2948,9 @@ row_create_table_for_mysql(
 	dict_table_t*	table,	/*!< in, own: table definition
 				(will be freed, or on DB_SUCCESS
 				added to the data dictionary cache) */
+	const char*	compression,
+				/*!< in: compression algorithm to use,
+				can be NULL */
 	trx_t*		trx,	/*!< in/out: transaction */
 	bool		commit)	/*!< in: if true, commit the transaction */
 {
@@ -2897,9 +2959,7 @@ row_create_table_for_mysql(
 	que_thr_t*	thr;
 	dberr_t		err;
 
-#ifdef UNIV_SYNC_DEBUG
-	ut_ad(rw_lock_own(&dict_operation_lock, RW_LOCK_X));
-#endif /* UNIV_SYNC_DEBUG */
+	ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_X));
 	ut_ad(mutex_own(&dict_sys->mutex));
 	ut_ad(trx->dict_operation_lock_mode == RW_X_LATCH);
 
@@ -2908,19 +2968,6 @@ row_create_table_for_mysql(
 		goto err_exit;
 	);
 
-	if (srv_sys_space.created_new_raw()) {
-		ib::info() << MODIFICATIONS_NOT_ALLOWED_MSG_RAW_PARTITION;
-
-err_exit:
-		dict_mem_table_free(table);
-
-		if (commit) {
-			trx_commit_for_mysql(trx);
-		}
-
-		return(DB_ERROR);
-	}
-
 	trx->op_info = "creating table";
 
 	if (row_mysql_is_system_table(table->name.m_name)) {
@@ -2928,7 +2975,18 @@ err_exit:
 		ib::error() << "Trying to create a MySQL system table "
 			<< table->name << " of type InnoDB. MySQL system"
 			" tables must be of the MyISAM type!";
-		goto err_exit;
+#ifndef DBUG_OFF
+err_exit:
+#endif /* !DBUG_OFF */
+		dict_mem_table_free(table);
+
+		if (commit) {
+			trx_commit_for_mysql(trx);
+		}
+
+		trx->op_info = "";
+
+		return(DB_ERROR);
 	}
 
 	trx_start_if_not_started_xa(trx, true);
@@ -2975,13 +3033,38 @@ err_exit:
 			ut_free(path);
 
 		if (err != DB_SUCCESS) {
+
 			/* We must delete the link file. */
 			RemoteDatafile::delete_link_file(table->name.m_name);
+
+		} else if (compression != NULL) {
+
+			ut_ad(!is_shared_tablespace(table->space));
+
+			ut_ad(Compression::validate(compression) == DB_SUCCESS);
+
+			err = fil_set_compression(table->space, compression);
+
+			/* The tablespace must be found and we have already
+			done the check for the system tablespace and the
+			temporary tablespace. Compression must be a valid
+			and supported algorithm. */
+
+			/* However, we can check for file system punch hole
+			support only after creating the tablespace. On Windows
+			we can query that information but not on Linux. */
+
+			ut_ad(err == DB_SUCCESS
+			      || err == DB_IO_NO_PUNCH_HOLE_FS);
+
+                        /* In non-strict mode we ignore dodgy compression
+                        settings. */
 		}
 	}
 
 	switch (err) {
 	case DB_SUCCESS:
+	case DB_IO_NO_PUNCH_HOLE_FS:
 		break;
 	case DB_OUT_OF_FILE_SPACE:
 		trx->error_state = DB_SUCCESS;
@@ -3005,6 +3088,7 @@ err_exit:
 
 		break;
 
+        case DB_UNSUPPORTED:
 	case DB_TOO_MANY_CONCURRENT_TRXS:
 		/* We already have .ibd file here. it should be deleted. */
 
@@ -3082,16 +3166,14 @@ row_create_index_for_mysql(
 
 	if (table == NULL) {
 
-#ifdef UNIV_SYNC_DEBUG
-		ut_ad(rw_lock_own(&dict_operation_lock, RW_LOCK_X));
-#endif /* UNIV_SYNC_DEBUG */
+		ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_X));
 		ut_ad(mutex_own(&dict_sys->mutex));
 
 		table = dict_table_open_on_name(table_name, TRUE, TRUE,
 						DICT_ERR_IGNORE_NONE);
 
 	} else {
-		++table->n_ref_count;
+		table->acquire();
 		ut_ad(dict_table_is_intrinsic(table));
 	}
 
@@ -3244,8 +3326,6 @@ fields than mentioned in the constraint.
 				database id the database of parameter name
 @param[in]	sql_length	length of sql_string
 @param[in]	name		table full name in normalized form
-@param[in[	is_temp_table	true if table is temporary
-@param[in,out]	handler		table handler if table is intrinsic
 @param[in]	reject_fks	if TRUE, fail with error code
 				DB_CANNOT_ADD_CONSTRAINT if any
 				foreign keys are found.
@@ -3256,30 +3336,24 @@ row_table_add_foreign_constraints(
 	const char*		sql_string,
 	size_t			sql_length,
 	const char*		name,
-	bool			is_temp_table,
-	dict_table_t*		handler,
 	ibool			reject_fks)
 {
 	dberr_t	err;
 
 	DBUG_ENTER("row_table_add_foreign_constraints");
 
-	ut_ad(mutex_own(&dict_sys->mutex) || handler);
-#ifdef UNIV_SYNC_DEBUG
-	ut_ad(rw_lock_own(&dict_operation_lock, RW_LOCK_X) || handler);
-#endif /* UNIV_SYNC_DEBUG */
+	ut_ad(mutex_own(&dict_sys->mutex));
+	ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_X));
 	ut_a(sql_string);
 
 	trx->op_info = "adding foreign keys";
 
-	if (!is_temp_table) {
-		trx_start_if_not_started_xa(trx, true);
-	}
+	trx_start_if_not_started_xa(trx, true);
 
 	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
 
 	err = dict_create_foreign_constraints(
-		trx, sql_string, sql_length, name, handler, reject_fks);
+		trx, sql_string, sql_length, name, reject_fks);
 
 	DBUG_EXECUTE_IF("ib_table_add_foreign_fail",
 			err = DB_DUPLICATE_KEY;);
@@ -3289,7 +3363,7 @@ row_table_add_foreign_constraints(
 	/* Check like this shouldn't be done for table that doesn't
 	have foreign keys but code still continues to run with void action.
 	Disable it for intrinsic table at-least */
-	if (err == DB_SUCCESS && handler == NULL) {
+	if (err == DB_SUCCESS) {
 		/* Check that also referencing constraints are ok */
 		dict_names_t	fk_tables;
 		err = dict_load_foreigns(name, NULL, false, true,
@@ -3312,7 +3386,7 @@ row_table_add_foreign_constraints(
 			trx_rollback_to_savepoint(trx, NULL);
 		}
 
-		row_drop_table_for_mysql(name, trx, FALSE, true, handler);
+		row_drop_table_for_mysql(name, trx, FALSE, true);
 
 		if (trx_is_started(trx)) {
 
@@ -3945,7 +4019,7 @@ row_drop_ancillary_fts_tables(
 	if (dict_table_has_fts_index(table)
 	    || DICT_TF2_FLAG_IS_SET(table, DICT_TF2_FTS_HAS_DOC_ID)) {
 
-		ut_ad(table->n_ref_count == 0);
+		ut_ad(table->get_ref_count() == 0);
 		ut_ad(trx_is_started(trx));
 
 		dberr_t err = fts_drop_tables(trx, table);
@@ -4109,11 +4183,6 @@ row_drop_table_for_mysql(
 
 	ut_a(name != NULL);
 
-	if (srv_sys_space.created_new_raw()) {
-		ib::info() << MODIFICATIONS_NOT_ALLOWED_MSG_RAW_PARTITION;
-		DBUG_RETURN(DB_ERROR);
-	}
-
 	/* Serialize data dictionary operations with dictionary mutex:
 	no deadlocks can occur then in these operations */
 
@@ -4137,9 +4206,7 @@ row_drop_table_for_mysql(
 		}
 
 		ut_ad(mutex_own(&dict_sys->mutex));
-#ifdef UNIV_SYNC_DEBUG
-		ut_ad(rw_lock_own(&dict_operation_lock, RW_LOCK_X));
-#endif /* UNIV_SYNC_DEBUG */
+		ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_X));
 
 		table = dict_table_open_on_name(
 			name, TRUE, FALSE,
@@ -4147,7 +4214,7 @@ row_drop_table_for_mysql(
 				DICT_ERR_IGNORE_INDEX_ROOT
 				| DICT_ERR_IGNORE_CORRUPT));
 	} else {
-		++table->n_ref_count;
+		table->acquire();
 		ut_ad(dict_table_is_intrinsic(table));
 	}
 
@@ -4312,13 +4379,13 @@ row_drop_table_for_mysql(
 	shouldn't have to. There should never be record locks on a table
 	that is going to be dropped. */
 
-	if (table->n_ref_count == 0) {
+	if (table->get_ref_count() == 0) {
 		/* We don't take lock on intrinsic table so nothing to remove.*/
 		if (!dict_table_is_intrinsic(table)) {
 			lock_remove_all_on_table(table, TRUE);
 		}
 		ut_a(table->n_rec_locks == 0);
-	} else if (table->n_ref_count > 0 || table->n_rec_locks > 0) {
+	} else if (table->get_ref_count() > 0 || table->n_rec_locks > 0) {
 		ibool	added;
 
 		ut_ad(!dict_table_is_intrinsic(table));
@@ -4509,6 +4576,10 @@ row_drop_table_for_mysql(
 				"DELETE FROM SYS_DATAFILES\n"
 				"WHERE SPACE = space_id;\n";
 		}
+
+		sql +=	"DELETE FROM SYS_VIRTUAL\n"
+			"WHERE TABLE_ID = table_id;\n";
+
 		sql += "END;\n";
 
 		err = que_eval_sql(info, sql.c_str(), FALSE, trx);
@@ -4825,21 +4896,25 @@ drop_all_foreign_keys_in_db(
 	return(err);
 }
 
-/*********************************************************************//**
-Drops a database for MySQL.
+/** Drop a database for MySQL.
+@param[in]	name	database name which ends at '/'
+@param[in]	trx	transaction handle
+@param[out]	found	number of dropped tables/partitions
 @return error code or DB_SUCCESS */
 dberr_t
 row_drop_database_for_mysql(
-/*========================*/
-	const char*	name,	/*!< in: database name which ends to '/' */
-	trx_t*		trx,	/*!< in: transaction handle */
-	ulint*		found)	/*!< out: Number of dropped tables/partitions */
+	const char*	name,
+	trx_t*		trx,
+	ulint*		found)
 {
 	dict_table_t*	table;
 	char*		table_name;
 	dberr_t		err	= DB_SUCCESS;
 	ulint		namelen	= strlen(name);
 	bool		is_partition = false;
+
+	ut_ad(found != NULL);
+
 	DBUG_ENTER("row_drop_database_for_mysql");
 
 	DBUG_PRINT("row_drop_database_for_mysql", ("db: '%s'", name));
@@ -4855,9 +4930,7 @@ row_drop_database_for_mysql(
 		trx->op_info = "dropping database";
 	}
 
-	if (found) {
-		*found = 0;
-	}
+	*found = 0;
 
 	trx_set_dict_operation(trx, TRX_DICT_OP_TABLE);
 
@@ -4922,7 +4995,7 @@ loop:
 		/* Wait until MySQL does not have any queries running on
 		the table */
 
-		if (table->n_ref_count > 0) {
+		if (table->get_ref_count() > 0) {
 			row_mysql_unlock_data_dictionary(trx);
 
 			ib::warn() << "MySQL is trying to drop database "
@@ -4950,9 +5023,7 @@ loop:
 		}
 
 		ut_free(table_name);
-		if (found) {
-			(*found)++;
-		}
+		(*found)++;
 	}
 
 	/* Partitioning does not yet support foreign keys. */
@@ -5075,11 +5146,7 @@ row_rename_table_for_mysql(
 	ut_a(new_name != NULL);
 	ut_ad(trx->state == TRX_STATE_ACTIVE);
 
-	if (srv_sys_space.created_new_raw()) {
-		ib::info() << MODIFICATIONS_NOT_ALLOWED_MSG_RAW_PARTITION;
-		goto funct_exit;
-
-	} else if (srv_force_recovery) {
+	if (srv_force_recovery) {
 		ib::info() << MODIFICATIONS_NOT_ALLOWED_MSG_FORCE_RECOVERY;
 		err = DB_READ_ONLY;
 		goto funct_exit;
@@ -5718,7 +5785,7 @@ void
 row_mysql_init(void)
 /*================*/
 {
-	mutex_create("row_drop_list", &row_drop_list_mutex);
+	mutex_create(LATCH_ID_ROW_DROP_LIST, &row_drop_list_mutex);
 
 	UT_LIST_INIT(
 		row_mysql_drop_list,

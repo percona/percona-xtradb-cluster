@@ -19,6 +19,7 @@
 
 #include "sql_lex.h"
 
+#include "mysql_version.h"             // MYSQL_VERSION_ID
 #include "sp_head.h"                   // sp_head
 #include "sql_class.h"                 // THD
 #include "sql_parse.h"                 // add_to_list
@@ -502,7 +503,7 @@ void LEX::reset()
   derived_tables= 0;
   safe_to_cache_query= true;
   insert_table= NULL;
-  leaf_tables_insert= NULL;
+  insert_table_leaf= NULL;
   parsing_options.reset();
   length= 0;
   part_info= NULL;
@@ -539,9 +540,10 @@ void LEX::reset()
   exchange= NULL;
   is_set_password_sql= false;
   mark_broken(false);
-  max_statement_time= 0;
+  max_execution_time= 0;
   parse_gcol_expr= false;
   opt_hints_global= NULL;
+  binlog_need_explicit_defaults_ts= false;
 }
 
 
@@ -604,7 +606,6 @@ st_select_lex *LEX::new_empty_query_block()
     return NULL;             /* purecov: inspected */
 
   select->parent_lex= this;
-  select->opt_hints_qb= NULL;
 
   return select;
 }
@@ -2316,6 +2317,7 @@ st_select_lex::st_select_lex
   prev_join_using(NULL),
   select_list_tables(0),
   outer_join(0),
+  opt_hints_qb(NULL),
   m_agg_func_used(false),
   sj_candidates(NULL)
 {
@@ -2356,7 +2358,7 @@ void st_select_lex_unit::exclude_level()
     Changing unit tree should be done only when LOCK_query_plan mutex is
     taken. This is needed to provide stable tree for EXPLAIN FOR CONNECTION.
   */
-  mysql_mutex_lock(&thd->LOCK_query_plan);
+  thd->lock_query_plan();
   SELECT_LEX_UNIT *units= NULL;
   SELECT_LEX_UNIT **units_last= &units;
   SELECT_LEX *sl= first_select();
@@ -2419,7 +2421,7 @@ void st_select_lex_unit::exclude_level()
   }
 
   invalidate();
-  mysql_mutex_unlock(&thd->LOCK_query_plan);
+  thd->unlock_query_plan();
 }
 
 
@@ -2540,25 +2542,25 @@ bool st_select_lex::test_limit()
 
 enum_parsing_context st_select_lex_unit::get_explain_marker() const
 {
-  mysql_mutex_assert_owner(&thd->LOCK_query_plan);
+  thd->query_plan.assert_plan_is_locked_if_other();
   return explain_marker;
 }
 
 
 void st_select_lex_unit::set_explain_marker(enum_parsing_context m)
 {
-  mysql_mutex_lock(&thd->LOCK_query_plan);
+  thd->lock_query_plan();
   explain_marker= m;
-  mysql_mutex_unlock(&thd->LOCK_query_plan);
+  thd->unlock_query_plan();
 }
 
 
 void st_select_lex_unit::
 set_explain_marker_from(const st_select_lex_unit *u)
 {
-  mysql_mutex_lock(&thd->LOCK_query_plan);
+  thd->lock_query_plan();
   explain_marker= u->explain_marker;
-  mysql_mutex_unlock(&thd->LOCK_query_plan);
+  thd->unlock_query_plan();
 }
 
 
@@ -3154,6 +3156,7 @@ void st_select_lex::print(THD *thd, String *str, enum_query_type query_type)
       Item::val*() don't have an error status). In this case the query block
       may be broken and printing it may crash.
     */
+    DBUG_ASSERT(0);
     str->append(STRING_WITH_LEN("had some error"));
     return;
   }
@@ -3524,27 +3527,29 @@ LEX::LEX()
    // Quite unlikely to overflow initial allocation, so no instrumentation.
    plugins(PSI_NOT_INSTRUMENTED),
    option_type(OPT_DEFAULT),
-  is_set_password_sql(false), is_lex_started(0),
+   is_set_password_sql(false),
+   // Initialize here to avoid uninitialized variable warnings.
+   keep_diagnostics(DA_KEEP_UNSPECIFIED),
+   is_lex_started(0),
   in_update_value_clause(false)
 {
   reset_query_tables_list(TRUE);
 }
 
 
-/*
+/**
   check if command can use VIEW with MERGE algorithm (for top VIEWs)
 
-  SYNOPSIS
-    LEX::can_use_merged()
-
-  DESCRIPTION
+  @details
     Only listed here commands can use merge algorithm in top level
     SELECT_LEX (for subqueries will be used merge algorithm if
     LEX::can_not_use_merged() is not TRUE).
 
-  RETURN
-    FALSE - command can't use merged VIEWs
-    TRUE  - VIEWs with MERGE algorithms can be used
+  @todo - Add SET as a command that can use merged views. Due to how
+          all uses would be embedded in subqueries, this test is worthless
+          for the SET command anyway.
+
+  @returns true if command can use merged VIEWs, false otherwise
 */
 
 bool LEX::can_use_merged()
@@ -3568,19 +3573,14 @@ bool LEX::can_use_merged()
   }
 }
 
-/*
+/**
   Check if command can't use merged views in any part of command
 
-  SYNOPSIS
-    LEX::can_not_use_merged()
-
-  DESCRIPTION
+  @details
     Temporary table algorithm will be used on all SELECT levels for queries
     listed here (see also LEX::can_use_merged()).
 
-  RETURN
-    FALSE - command can't use merged VIEWs
-    TRUE  - VIEWs with MERGE algorithms can be used
+  @returns true if command cannot use merged view, false otherwise
 */
 
 bool LEX::can_not_use_merged()
@@ -3652,31 +3652,6 @@ bool LEX::need_correct_ident()
   default:
     return FALSE;
   }
-}
-
-/*
-  Get effective type of CHECK OPTION for given view
-
-  SYNOPSIS
-    get_effective_with_check()
-    view    given view
-
-  NOTE
-    It have not sense to set CHECK OPTION for SELECT satement or subqueries,
-    so we do not.
-
-  RETURN
-    VIEW_CHECK_NONE      no need CHECK OPTION
-    VIEW_CHECK_LOCAL     CHECK OPTION LOCAL
-    VIEW_CHECK_CASCADED  CHECK OPTION CASCADED
-*/
-
-uint8 LEX::get_effective_with_check(TABLE_LIST *view)
-{
-  if (view->select_lex->master_unit() == unit &&
-      which_check_option_applicable())
-    return (uint8)view->with_check;
-  return VIEW_CHECK_NONE;
 }
 
 
@@ -4408,9 +4383,9 @@ void st_select_lex::include_chain_in_global(st_select_lex **start)
 
 void st_select_lex::set_join(JOIN *join_arg)
 {
-  mysql_mutex_lock(&master_unit()->thd->LOCK_query_plan);
+  master_unit()->thd->lock_query_plan();
   join= join_arg;
-  mysql_mutex_unlock(&master_unit()->thd->LOCK_query_plan);
+  master_unit()->thd->unlock_query_plan();
 }
 
 
@@ -4492,6 +4467,57 @@ bool SELECT_LEX::get_optimizable_conditions(THD *thd,
   return get_optimizable_join_conditions(thd, top_join_list);
 }
 
+Item_exists_subselect::enum_exec_method
+st_select_lex::subquery_strategy(THD *thd) const
+{
+  if (opt_hints_qb)
+  {
+    Item_exists_subselect::enum_exec_method strategy=
+      opt_hints_qb->subquery_strategy();
+    if (strategy != Item_exists_subselect::EXEC_UNSPECIFIED)
+      return strategy;
+  }
+
+  // No SUBQUERY hint given, base possible strategies on optimizer_switch
+  if (thd->optimizer_switch_flag(OPTIMIZER_SWITCH_MATERIALIZATION))
+    return thd->optimizer_switch_flag(OPTIMIZER_SWITCH_SUBQ_MAT_COST_BASED) ?
+      Item_exists_subselect::EXEC_EXISTS_OR_MAT :
+      Item_exists_subselect::EXEC_MATERIALIZATION;
+
+  return Item_exists_subselect::EXEC_EXISTS;
+}
+
+bool st_select_lex::semijoin_enabled(THD *thd) const
+{
+  return opt_hints_qb ?
+    opt_hints_qb->semijoin_enabled(thd) :
+    thd->optimizer_switch_flag(OPTIMIZER_SWITCH_SEMIJOIN);
+}
+
+void st_select_lex::update_semijoin_strategies(THD *thd)
+{
+  uint sj_strategy_mask= OPTIMIZER_SWITCH_FIRSTMATCH |
+    OPTIMIZER_SWITCH_LOOSE_SCAN | OPTIMIZER_SWITCH_MATERIALIZATION |
+    OPTIMIZER_SWITCH_DUPSWEEDOUT;
+
+  uint opt_switches= thd->variables.optimizer_switch & sj_strategy_mask;
+
+  List_iterator<TABLE_LIST> sj_list_it(sj_nests);
+  TABLE_LIST *sj_nest;
+  while ((sj_nest= sj_list_it++))
+  {
+    /*
+      After semi-join transformation, original SELECT_LEX with hints is lost.
+      Fetch hints from first table in semijoin nest.
+    */
+    List_iterator<TABLE_LIST> table_list(sj_nest->nested_join->join_list);
+    TABLE_LIST *table= table_list++;
+    sj_nest->nested_join->sj_enabled_strategies= table->opt_hints_qb ?
+      table->opt_hints_qb->sj_enabled_strategies(opt_switches) : opt_switches;
+  }
+}
+
+
 /**
   Check if an option that can be used only for an outer-most query block is
   applicable to this query block.
@@ -4532,7 +4558,6 @@ bool st_select_lex::validate_outermost_option(LEX *lex,
           SELECT_BIG_RESULT
           OPTION_BUFFER_RESULT
           OPTION_FOUND_ROWS
-          SELECT_MAX_STATEMENT_TIME
           OPTION_TO_QUERY_CACHE
   DELETE: OPTION_QUICK
           LOW_PRIORITY
@@ -4553,7 +4578,6 @@ bool st_select_lex::validate_base_options(LEX *lex, ulonglong options_arg) const
                                 SELECT_BIG_RESULT |
                                 OPTION_BUFFER_RESULT |
                                 OPTION_FOUND_ROWS |
-                                SELECT_MAX_STATEMENT_TIME |
                                 OPTION_TO_QUERY_CACHE)));
 
   if (options_arg & SELECT_DISTINCT &&
@@ -4571,26 +4595,6 @@ bool st_select_lex::validate_base_options(LEX *lex, ulonglong options_arg) const
   if (options_arg & OPTION_FOUND_ROWS &&
       validate_outermost_option(lex, "SQL_CALC_FOUND_ROWS"))
     return true;
-
-  if (options_arg & SELECT_MAX_STATEMENT_TIME)
-  {
-    /*
-      MAX_STATEMENT_TIME is applicable to SELECT query and that too
-      only for the TOP LEVEL SELECT statement.
-      MAX_STATEMENT_TIME is not appliable to SELECTs of stored routines.
-    */
-    if (validate_outermost_option(lex, "MAX_STATEMENT_TIME"))
-      return true;
-    if (lex->sphead ||
-        (lex->sql_command == SQLCOM_CREATE_TABLE   ||
-         lex->sql_command == SQLCOM_CREATE_VIEW    ||
-         lex->sql_command == SQLCOM_REPLACE_SELECT ||
-         lex->sql_command == SQLCOM_INSERT_SELECT))
-    {
-      my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "MAX_STATEMENT_TIME");
-      return true;
-    }
-  }
 
   return false;
 }
@@ -4628,8 +4632,6 @@ bool Query_options::merge(const Query_options &a,
     }
   }
   sql_cache= b.sql_cache;
-  max_statement_time= b.max_statement_time ? b.max_statement_time
-                                           : a.max_statement_time;
   return false;
 }
 
@@ -4670,8 +4672,6 @@ bool Query_options::save_to(Parse_context *pc)
   if (pc->select->validate_base_options(lex, options))
     return true;
   pc->select->set_base_options(options);
-  if (options & SELECT_MAX_STATEMENT_TIME)
-    lex->max_statement_time= max_statement_time;
 
   return false;
 }

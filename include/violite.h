@@ -42,9 +42,24 @@ typedef struct st_vio Vio;
 
 enum enum_vio_type
 {
-  VIO_TYPE_TCPIP, VIO_TYPE_SOCKET, VIO_TYPE_NAMEDPIPE, VIO_TYPE_SSL, 
-  VIO_TYPE_SHARED_MEMORY
+  NO_VIO_TYPE= 0,
+  VIO_TYPE_TCPIP= 1,
+  VIO_TYPE_SOCKET= 2,
+  VIO_TYPE_NAMEDPIPE= 3,
+  VIO_TYPE_SSL= 4,
+  VIO_TYPE_SHARED_MEMORY= 5,
+
+  FIRST_VIO_TYPE= VIO_TYPE_TCPIP,
+  LAST_VIO_TYPE= VIO_TYPE_SHARED_MEMORY
 };
+
+/**
+  Convert a vio type to a printable string.
+  @param vio_type the type
+  @param[out] str the string
+  @param[out] len the string length
+*/
+void get_vio_type_name(enum enum_vio_type vio_type, const char ** str, int * len);
 
 /**
   VIO I/O events.
@@ -176,6 +191,9 @@ struct st_VioSSLFd
                       const char *cipher, enum enum_ssl_init_error *error,
                       const char *crl_file, const char *crl_path);
 void free_vio_ssl_acceptor_fd(struct st_VioSSLFd *fd);
+
+void vio_ssl_end();
+
 #endif /* ! EMBEDDED_LIBRARY */
 #endif /* HAVE_OPENSSL */
 

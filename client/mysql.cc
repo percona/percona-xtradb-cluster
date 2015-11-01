@@ -72,6 +72,7 @@
 #endif
 
 #include <algorithm>
+#include <sql_common.h>
 
 using std::min;
 using std::max;
@@ -943,6 +944,24 @@ static COMMANDS commands[] = {
   { "ISNULL", 0, 0, 0, ""},
   { "IS_FREE_LOCK", 0, 0, 0, ""},
   { "IS_USED_LOCK", 0, 0, 0, ""},
+  { "JSON_APPEND", 0, 0, 0, ""},
+  { "JSON_ARRAY", 0, 0, 0, ""},
+  { "JSON_CONTAINS", 0, 0, 0, ""},
+  { "JSON_DEPTH", 0, 0, 0, ""},
+  { "JSON_EXTRACT", 0, 0, 0, ""},
+  { "JSON_INSERT", 0, 0, 0, ""},
+  { "JSON_KEYS", 0, 0, 0, ""},
+  { "JSON_LENGTH", 0, 0, 0, ""},
+  { "JSON_MERGE", 0, 0, 0, ""},
+  { "JSON_QUOTE", 0, 0, 0, ""},
+  { "JSON_REPLACE", 0, 0, 0, ""},
+  { "JSON_ROWOBJECT", 0, 0, 0, ""},
+  { "JSON_SEARCH", 0, 0, 0, ""},
+  { "JSON_SET", 0, 0, 0, ""},
+  { "JSON_TYPE", 0, 0, 0, ""},
+  { "JSON_UNQUOTE", 0, 0, 0, ""},
+  { "JSON_VALID", 0, 0, 0, ""},
+  { "JSON_CONTAINS_PATH", 0, 0, 0, ""},
   { "LAST_INSERT_ID", 0, 0, 0, ""},
   { "ISSIMPLE", 0, 0, 0, ""},
   { "LAST_DAY", 0, 0, 0, ""},
@@ -1393,6 +1412,12 @@ int main(int argc,char *argv[])
 	  "Type 'help;' or '\\h' for help. Type '\\c' to clear the current input "
     "statement.\n");
   put_info(buff,INFO_INFO);
+  if (mysql.options.protocol == MYSQL_PROTOCOL_SOCKET &&
+      mysql.options.extension->ssl_enforce == TRUE)
+  put_info("You are enforcing ssl conection via unix socket. Please consider\n"
+           "switching ssl off as it does not make connection via unix socket\n"
+           "any more secure.", INFO_INFO);
+
   status.exit_status= read_and_execute(!status.batch);
   if (opt_outfile)
     end_tee();
@@ -3742,6 +3767,7 @@ static const char *fieldtype2str(enum enum_field_types type)
     case MYSQL_TYPE_FLOAT:       return "FLOAT";
     case MYSQL_TYPE_GEOMETRY:    return "GEOMETRY";
     case MYSQL_TYPE_INT24:       return "INT24";
+    case MYSQL_TYPE_JSON:        return "JSON";
     case MYSQL_TYPE_LONG:        return "LONG";
     case MYSQL_TYPE_LONGLONG:    return "LONGLONG";
     case MYSQL_TYPE_LONG_BLOB:   return "LONG_BLOB";

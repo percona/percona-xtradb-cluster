@@ -1652,7 +1652,7 @@ page_zip_fields_decode(
 		return(NULL);
 	}
 
-	table = dict_mem_table_create("ZIP_DUMMY", DICT_HDR_SPACE, n,
+	table = dict_mem_table_create("ZIP_DUMMY", DICT_HDR_SPACE, n, 0,
 				      DICT_TF_COMPACT, 0);
 	index = dict_mem_index_create("ZIP_DUMMY", "ZIP_DUMMY",
 				      DICT_HDR_SPACE, 0, n);
@@ -3823,6 +3823,8 @@ page_zip_parse_write_blob_ptr(
 	ulint	offset;
 	ulint	z_offset;
 
+	ut_ad(ptr != NULL);
+	ut_ad(end_ptr != NULL);
 	ut_ad(!page == !page_zip);
 
 	if (UNIV_UNLIKELY
@@ -3888,6 +3890,10 @@ page_zip_write_blob_ptr(
 	ulint		blob_no;
 	ulint		len;
 
+	ut_ad(page_zip != NULL);
+	ut_ad(rec != NULL);
+	ut_ad(index != NULL);
+	ut_ad(offsets != NULL);
 	ut_ad(PAGE_ZIP_MATCH(rec, page_zip));
 	ut_ad(page_simple_validate_new((page_t*) page));
 	ut_ad(page_zip_simple_validate(page_zip));
@@ -3963,6 +3969,8 @@ page_zip_parse_write_node_ptr(
 	ulint	offset;
 	ulint	z_offset;
 
+	ut_ad(ptr != NULL);
+	ut_ad(end_ptr!= NULL);
 	ut_ad(!page == !page_zip);
 
 	if (UNIV_UNLIKELY(end_ptr < ptr + (2 + 2 + REC_NODE_PTR_SIZE))) {
@@ -4527,7 +4535,8 @@ page_zip_parse_write_header(
 	ulint	offset;
 	ulint	len;
 
-	ut_ad(ptr && end_ptr);
+	ut_ad(ptr != NULL);
+	ut_ad(end_ptr!= NULL);
 	ut_ad(!page == !page_zip);
 
 	if (UNIV_UNLIKELY(end_ptr < ptr + (1 + 1))) {
@@ -4813,7 +4822,8 @@ page_zip_parse_compress(
 	ulint	size;
 	ulint	trailer_size;
 
-	ut_ad(ptr && end_ptr);
+	ut_ad(ptr != NULL);
+	ut_ad(end_ptr!= NULL);
 	ut_ad(!page == !page_zip);
 
 	if (UNIV_UNLIKELY(ptr + (2 + 2) > end_ptr)) {
@@ -4859,18 +4869,23 @@ corrupt:
 }
 
 #endif /* !UNIV_INNOCHECKSUM */
-/**********************************************************************//**
-Calculate the compressed page checksum.
+
+/** Calculate the compressed page checksum.
+@param[in]	data			compressed page
+@param[in]	size			size of compressed page
+@param[in]	algo			algorithm to use
+@param[in]	use_legacy_big_endian	only used if algo is
+SRV_CHECKSUM_ALGORITHM_CRC32 or SRV_CHECKSUM_ALGORITHM_STRICT_CRC32 - if true
+then use big endian byteorder when converting byte strings to integers.
 @return page checksum */
-ib_uint32_t
+uint32_t
 page_zip_calc_checksum(
-/*===================*/
-	const void*	data,	/*!< in: compressed page */
-	ulint		size,	/*!< in: size of compressed page */
-	srv_checksum_algorithm_t algo) /*!< in: algorithm to use */
+	const void*			data,
+	ulint				size,
+	srv_checksum_algorithm_t	algo,
+	bool				use_legacy_big_endian /* = false */)
 {
-	uLong		adler;
-	ib_uint32_t	crc32;
+	uint32_t	adler;
 	const Bytef*	s = static_cast<const byte*>(data);
 
 	/* Exclude FIL_PAGE_SPACE_OR_CHKSUM, FIL_PAGE_LSN,
@@ -4879,16 +4894,25 @@ page_zip_calc_checksum(
 	switch (algo) {
 	case SRV_CHECKSUM_ALGORITHM_CRC32:
 	case SRV_CHECKSUM_ALGORITHM_STRICT_CRC32:
+		{
+			ut_ad(size > FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
-		ut_ad(size > FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+			ut_crc32_func_t	crc32_func = use_legacy_big_endian
+				? ut_crc32_legacy_big_endian
+				: ut_crc32;
 
-		crc32 = ut_crc32(s + FIL_PAGE_OFFSET,
-				 FIL_PAGE_LSN - FIL_PAGE_OFFSET)
-			^ ut_crc32(s + FIL_PAGE_TYPE, 2)
-			^ ut_crc32(s + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID,
-				   size - FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+			const uint32_t	crc32
+				= crc32_func(
+					s + FIL_PAGE_OFFSET,
+					FIL_PAGE_LSN - FIL_PAGE_OFFSET)
+				^ crc32_func(
+					s + FIL_PAGE_TYPE, 2)
+				^ crc32_func(
+					s + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID,
+					size - FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
-		return(crc32);
+			return(crc32);
+		}
 	case SRV_CHECKSUM_ALGORITHM_INNODB:
 	case SRV_CHECKSUM_ALGORITHM_STRICT_INNODB:
 		ut_ad(size > FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
@@ -4901,7 +4925,7 @@ page_zip_calc_checksum(
 			static_cast<uInt>(size)
 			- FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
-		return((ib_uint32_t) adler);
+		return(adler);
 	case SRV_CHECKSUM_ALGORITHM_NONE:
 	case SRV_CHECKSUM_ALGORITHM_STRICT_NONE:
 		return(BUF_NO_CHECKSUM_MAGIC);
@@ -4935,13 +4959,11 @@ page_zip_verify_checksum(
 #endif /* UNIV_INNOCHECKSUM */
 )
 {
-	ib_uint32_t	stored;
-	ib_uint32_t	calc;
-	ib_uint32_t	crc32 = 0 /* silence bogus warning */;
-	ib_uint32_t	innodb = 0 /* silence bogus warning */;
+	const unsigned char*	p = static_cast<const unsigned char*>(data)
+		+ FIL_PAGE_SPACE_OR_CHKSUM;
 
-	stored = static_cast<ib_uint32_t>(mach_read_from_4(
-		static_cast<const unsigned char*>(data) + FIL_PAGE_SPACE_OR_CHKSUM));
+	const uint32_t		stored = static_cast<uint32_t>(
+		mach_read_from_4(p));
 
 #if FIL_PAGE_LSN % 8
 #error "FIL_PAGE_LSN must be 64 bit aligned"
@@ -4978,9 +5000,24 @@ page_zip_verify_checksum(
 #endif /* UNIV_INNOCHECKSUM */
 	}
 
-	calc = static_cast<ib_uint32_t>(page_zip_calc_checksum(
-		data, size, static_cast<srv_checksum_algorithm_t>(
-			srv_checksum_algorithm)));
+	const srv_checksum_algorithm_t	curr_algo =
+		static_cast<srv_checksum_algorithm_t>(srv_checksum_algorithm);
+
+	if (curr_algo == SRV_CHECKSUM_ALGORITHM_NONE) {
+		return(TRUE);
+	}
+
+#ifndef	UNIV_INNOCHECKSUM
+	ulint		page_no = mach_read_from_4(static_cast<
+						   const unsigned char*>
+						   (data) + FIL_PAGE_OFFSET);
+	ulint		space_id = mach_read_from_4(static_cast<
+						    const unsigned char*>
+						    (data) + FIL_PAGE_SPACE_ID);
+	const page_id_t	page_id(space_id, page_no);
+#endif	/* UNIV_INNOCHECKSUM */
+
+	const uint32_t	calc = page_zip_calc_checksum(data, size, curr_algo);
 
 #ifdef UNIV_INNOCHECKSUM
 	if (is_log_enabled) {
@@ -4995,8 +5032,9 @@ page_zip_verify_checksum(
 
 	if (!strict_check) {
 
-		crc32 = page_zip_calc_checksum(data, size,
-					       SRV_CHECKSUM_ALGORITHM_CRC32);
+		const uint32_t	crc32 = page_zip_calc_checksum(
+			data, size, SRV_CHECKSUM_ALGORITHM_CRC32);
+
 		if (is_log_enabled) {
 			fprintf(log_file, "page::%" PRIuMAX ": crc32 checksum:"
 				" calculated = %u; recorded = %u\n",
@@ -5011,32 +5049,113 @@ page_zip_verify_checksum(
 		return(TRUE);
 	}
 
-	switch ((srv_checksum_algorithm_t) srv_checksum_algorithm) {
+	switch (curr_algo) {
 	case SRV_CHECKSUM_ALGORITHM_STRICT_CRC32:
-	case SRV_CHECKSUM_ALGORITHM_STRICT_INNODB:
-	case SRV_CHECKSUM_ALGORITHM_STRICT_NONE:
-		return(stored == calc);
 	case SRV_CHECKSUM_ALGORITHM_CRC32:
+
 		if (stored == BUF_NO_CHECKSUM_MAGIC) {
+#ifndef	UNIV_INNOCHECKSUM
+			if (curr_algo
+			    == SRV_CHECKSUM_ALGORITHM_STRICT_CRC32) {
+				page_warn_strict_checksum(
+					curr_algo,
+					SRV_CHECKSUM_ALGORITHM_NONE,
+					page_id);
+			}
+#endif	/* UNIV_INNOCHECKSUM */
+
 			return(TRUE);
 		}
-		crc32 = calc;
-		innodb = static_cast<ib_uint32_t>(page_zip_calc_checksum(
-			data, size, SRV_CHECKSUM_ALGORITHM_INNODB));
+
+		if (stored == page_zip_calc_checksum(data, size, curr_algo,
+						     true)) {
+			return(TRUE);
+		}
+
+		if (stored == page_zip_calc_checksum(
+			data, size, SRV_CHECKSUM_ALGORITHM_INNODB)) {
+
+#ifndef	UNIV_INNOCHECKSUM
+			if (curr_algo
+			    == SRV_CHECKSUM_ALGORITHM_STRICT_CRC32) {
+				page_warn_strict_checksum(
+					curr_algo,
+					SRV_CHECKSUM_ALGORITHM_INNODB,
+					page_id);
+			}
+#endif	/* UNIV_INNOCHECKSUM */
+
+			return(TRUE);
+		}
+
 		break;
+	case SRV_CHECKSUM_ALGORITHM_STRICT_INNODB:
 	case SRV_CHECKSUM_ALGORITHM_INNODB:
+
 		if (stored == BUF_NO_CHECKSUM_MAGIC) {
+#ifndef	UNIV_INNOCHECKSUM
+			if (curr_algo
+			    == SRV_CHECKSUM_ALGORITHM_STRICT_INNODB) {
+				page_warn_strict_checksum(
+					curr_algo,
+					SRV_CHECKSUM_ALGORITHM_NONE,
+					page_id);
+			}
+#endif	/* UNIV_INNOCHECKSUM */
+
 			return(TRUE);
 		}
-		crc32 = static_cast<ib_uint32_t>(page_zip_calc_checksum(
-			data, size, SRV_CHECKSUM_ALGORITHM_CRC32));
-		innodb = calc;
+
+		if (stored == page_zip_calc_checksum(
+			data, size, SRV_CHECKSUM_ALGORITHM_CRC32)
+		    || stored == page_zip_calc_checksum(
+			data, size, SRV_CHECKSUM_ALGORITHM_CRC32, true)) {
+#ifndef	UNIV_INNOCHECKSUM
+			if (curr_algo
+			    == SRV_CHECKSUM_ALGORITHM_STRICT_INNODB) {
+				page_warn_strict_checksum(
+					curr_algo,
+					SRV_CHECKSUM_ALGORITHM_CRC32,
+					page_id);
+			}
+#endif	/* UNIV_INNOCHECKSUM */
+			return(TRUE);
+		}
+
+		break;
+	case SRV_CHECKSUM_ALGORITHM_STRICT_NONE:
+
+		if (stored == page_zip_calc_checksum(
+			data, size, SRV_CHECKSUM_ALGORITHM_CRC32)
+		    || stored == page_zip_calc_checksum(
+			data, size, SRV_CHECKSUM_ALGORITHM_CRC32, true)) {
+#ifndef	UNIV_INNOCHECKSUM
+			page_warn_strict_checksum(
+				curr_algo,
+				SRV_CHECKSUM_ALGORITHM_CRC32,
+				page_id);
+#endif	/* UNIV_INNOCHECKSUM */
+			return(TRUE);
+		}
+
+		if (stored == page_zip_calc_checksum(
+			data, size, SRV_CHECKSUM_ALGORITHM_INNODB)) {
+
+#ifndef	UNIV_INNOCHECKSUM
+			page_warn_strict_checksum(
+				curr_algo,
+				SRV_CHECKSUM_ALGORITHM_INNODB,
+				page_id);
+#endif	/* UNIV_INNOCHECKSUM */
+			return(TRUE);
+		}
+
 		break;
 	case SRV_CHECKSUM_ALGORITHM_NONE:
-		return(TRUE);
+		ut_error;
 	/* no default so the compiler will emit a warning if new enum
 	is added and not handled here */
 	}
 
-	return(stored == crc32 || stored == innodb);
+	return(FALSE);
 }

@@ -36,11 +36,8 @@ Created 12/9/1995 Heikki Tuuri
 #include "univ.i"
 #include "dyn0buf.h"
 #ifndef UNIV_HOTBACKUP
-#include "sync0mutex.h"
 #include "sync0rw.h"
 #endif /* !UNIV_HOTBACKUP */
-
-class ut_stage_alter_t;
 
 /* Type used for all log sequence number storage and arithmetics */
 typedef	ib_uint64_t		lsn_t;
@@ -54,6 +51,15 @@ struct log_t;
 
 /** Redo log group */
 struct log_group_t;
+
+/** Magic value to use instead of log checksums when they are disabled */
+#define LOG_NO_CHECKSUM_MAGIC 0xDEADBEEFUL
+
+typedef ulint (*log_checksum_func_t)(const byte* log_block);
+
+/** Pointer to the log checksum calculation function. Protected with
+log_sys->mutex. */
+extern log_checksum_func_t log_checksum_algorithm_ptr;
 
 /** Maximum number of log groups in log_group_t::checkpoint_buf */
 #define LOG_MAX_N_GROUPS	32
@@ -223,15 +229,11 @@ log_checkpoint(
 @param[in]	lsn		the log sequence number, or LSN_MAX
 for the latest LSN
 @param[in]	write_always	force a write even if no log
-has been generated since the latest checkpoint
-@param[in,out]	stage		performance schema accounting object, used by
-ALTER TABLE. It is passed to log_preflush_pool_modified_pages() for
-accounting. */
+has been generated since the latest checkpoint */
 void
 log_make_checkpoint_at(
 	lsn_t			lsn,
-	bool			write_always,
-	ut_stage_alter_t*	stage = NULL);
+	bool			write_always);
 
 /****************************************************************//**
 Makes a checkpoint at the latest lsn and writes it to first page of each
@@ -358,6 +360,39 @@ ulint
 log_block_calc_checksum(
 /*====================*/
 	const byte*	block);	/*!< in: log block */
+
+/** Calculates the checksum for a log block using the legacy InnoDB algorithm.
+@param[in]	block	the redo log block
+@return		the calculated checksum value */
+UNIV_INLINE
+ulint
+log_block_calc_checksum_innodb(const byte*	block);
+
+/** Calculates the checksum for a log block using the CRC32 algorithm.
+@param[in]	block	log block
+@return checksum */
+UNIV_INLINE
+ulint
+log_block_calc_checksum_crc32(
+	const byte*	block);
+
+/** Calculates the checksum for a log block using the CRC32 algorithm.
+This function uses big endian byteorder when converting byte strings to
+integers.
+@param[in]	block	log block
+@return checksum */
+UNIV_INLINE
+ulint
+log_block_calc_checksum_crc32_legacy_big_endian(
+	const byte*	block);
+
+/** Calculates the checksum for a log block using the "no-op" algorithm.
+@param[in]	block	the redo log block
+@return		the calculated checksum value */
+UNIV_INLINE
+ulint
+log_block_calc_checksum_none(const byte*	block);
+
 /************************************************************//**
 Gets a log block checksum field value.
 @return checksum */

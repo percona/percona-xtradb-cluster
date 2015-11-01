@@ -868,13 +868,16 @@ my_decimal *Item_temporal_hybrid_func::val_decimal(my_decimal *decimal_value)
   {
     MYSQL_TIME ltime;
     my_time_flags_t flags= TIME_FUZZY_DATE;
-    if (sql_mode & (MODE_STRICT_TRANS_TABLES | MODE_STRICT_ALL_TABLES))
-      flags|= TIME_NO_ZERO_IN_DATE | TIME_NO_ZERO_DATE;
+    if (sql_mode & MODE_NO_ZERO_IN_DATE)
+      flags|= TIME_NO_ZERO_IN_DATE;
+    if (sql_mode & MODE_NO_ZERO_DATE)
+      flags|= TIME_NO_ZERO_DATE;
     if (sql_mode & MODE_INVALID_DATES)
       flags|= TIME_INVALID_DATES;
+
     val_datetime(&ltime, flags);
     return null_value ? 0:
-           ltime.time_type == MYSQL_TIMESTAMP_TIME ? 
+           ltime.time_type == MYSQL_TIMESTAMP_TIME ?
            time2my_decimal(&ltime, decimal_value) :
            date2my_decimal(&ltime, decimal_value);
   }
@@ -2824,6 +2827,17 @@ bool Item_func_add_time::val_datetime(MYSQL_TIME *time,
   {
     get_date_from_daynr(days, &time->year, &time->month, &time->day);
     time->time_type= MYSQL_TIMESTAMP_DATETIME;
+
+    if (check_datetime_range(time))
+    {
+      // Value is out of range, cannot use our printing functions to output it.
+      push_warning_printf(current_thd, Sql_condition::SL_WARNING,
+                          ER_DATETIME_FUNCTION_OVERFLOW,
+                          ER_THD(current_thd, ER_DATETIME_FUNCTION_OVERFLOW),
+                          func_name());
+      goto null_date;
+    }
+
     if (time->day)
       return false;
     goto null_date;
@@ -3314,8 +3328,8 @@ void Item_func_str_to_date::fix_length_and_dec()
   cached_timestamp_type= MYSQL_TIMESTAMP_DATETIME;
   fix_length_and_dec_and_charset_datetime(MAX_DATETIME_WIDTH,
                                           DATETIME_MAX_DECIMALS);
-  sql_mode= current_thd->variables.sql_mode & (MODE_STRICT_ALL_TABLES |
-                                               MODE_STRICT_TRANS_TABLES |
+  sql_mode= current_thd->variables.sql_mode & (MODE_NO_ZERO_DATE |
+                                               MODE_NO_ZERO_IN_DATE |
                                                MODE_INVALID_DATES);
   if ((const_item= args[1]->const_item()))
   {
@@ -3336,8 +3350,10 @@ bool Item_func_str_to_date::val_datetime(MYSQL_TIME *ltime,
   String val_string(val_buff, sizeof(val_buff), &my_charset_bin), *val;
   String format_str(format_buff, sizeof(format_buff), &my_charset_bin), *format;
 
-  if (sql_mode & (MODE_STRICT_TRANS_TABLES | MODE_STRICT_ALL_TABLES))
-    fuzzy_date|= TIME_NO_ZERO_IN_DATE | TIME_NO_ZERO_DATE;
+  if (sql_mode & MODE_NO_ZERO_IN_DATE)
+    fuzzy_date|= TIME_NO_ZERO_IN_DATE;
+  if (sql_mode & MODE_NO_ZERO_DATE)
+    fuzzy_date|= TIME_NO_ZERO_DATE;
   if (sql_mode & MODE_INVALID_DATES)
     fuzzy_date|= TIME_INVALID_DATES;
 
@@ -3394,7 +3410,7 @@ bool Item_func_last_day::get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzy_date)
     */
     ltime->time_type= MYSQL_TIMESTAMP_DATE;
     ErrConvString str(ltime, 0);
-    make_truncated_value_warning(ErrConvString(str), MYSQL_TIMESTAMP_ERROR);
+    make_truncated_value_warning(str, MYSQL_TIMESTAMP_ERROR);
     return (null_value= true);
   }
 

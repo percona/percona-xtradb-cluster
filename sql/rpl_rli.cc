@@ -16,6 +16,7 @@
 #include "rpl_rli.h"
 
 #include "my_dir.h"                // MY_STAT
+#include "log.h"                   // sql_print_error
 #include "log_event.h"             // Log_event
 #include "rpl_group_replication.h" // set_group_replication_retrieved_certifi...
 #include "rpl_info_factory.h"      // Rpl_info_factory
@@ -100,6 +101,8 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery
    curr_group_assigned_parts(PSI_NOT_INSTRUMENTED),
    curr_group_da(PSI_NOT_INSTRUMENTED),
    slave_parallel_workers(0),
+   exit_counter(0),
+   max_updated_index(0),
    recovery_parallel_workers(0), checkpoint_seqno(0),
    checkpoint_group(opt_mts_checkpoint_group),
    recovery_groups_inited(false), mts_recovery_group_cnt(0),
@@ -150,6 +153,8 @@ Relay_log_info::Relay_log_info(bool is_slave_recovery
     mysql_mutex_init(key_mutex_slave_parallel_pend_jobs, &pending_jobs_lock,
                      MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_cond_slave_parallel_pend_jobs, &pending_jobs_cond);
+    mysql_mutex_init(key_mutex_slave_parallel_worker_count, &exit_count_lock,
+                   MY_MUTEX_INIT_FAST);
     mysql_mutex_init(key_mts_temp_table_LOCK, &mts_temp_table_LOCK,
                      MY_MUTEX_INIT_FAST);
     mysql_mutex_init(key_mts_gaq_LOCK, &mts_gaq_LOCK,
@@ -210,6 +215,7 @@ Relay_log_info::~Relay_log_info()
     mysql_cond_destroy(&log_space_cond);
     mysql_mutex_destroy(&pending_jobs_lock);
     mysql_cond_destroy(&pending_jobs_cond);
+    mysql_mutex_destroy(&exit_count_lock);
     mysql_mutex_destroy(&mts_temp_table_LOCK);
     mysql_mutex_destroy(&mts_gaq_LOCK);
     mysql_cond_destroy(&logical_clock_cond);
@@ -576,23 +582,26 @@ int Relay_log_info::init_relay_log_pos(const char* log,
           describes the whole relay log; indeed, one can have this sequence
           (starting from position 4):
           Format_desc (of slave)
+          Previous-GTIDs (of slave IO thread)
           Rotate (of master)
           Format_desc (of master)
           So the Format_desc which really describes the rest of the relay log
-          is the 3rd event (it can't be further than that, because we rotate
+          is the 4rd event (it can't be further than that, because we rotate
           the relay log when we queue a Rotate event from the master).
           But what describes the Rotate is the first Format_desc.
           So what we do is:
           go on searching for Format_description events, until you exceed the
-          position (argument 'pos') or until you find another event than Rotate
-          or Format_desc.
+          position (argument 'pos') or until you find another event than
+          Previous-GTIDs, Rotate or Format_desc.
         */
       }
       else
       {
         DBUG_PRINT("info",("found event of another type=%d",
                            ev->get_type_code()));
-        look_for_description_event= (ev->get_type_code() == binary_log::ROTATE_EVENT);
+        look_for_description_event=
+          (ev->get_type_code() == binary_log::ROTATE_EVENT ||
+           ev->get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT);
         delete ev;
       }
     }
@@ -786,7 +795,7 @@ int Relay_log_info::wait_for_pos(THD* thd, String* log_name,
         and protect against user's input error :
         if the names do not match up to '.' included, return error
       */
-      char *q= (char*)(fn_ext(basename)+1);
+      char *q= (fn_ext(basename)+1);
       if (strncmp(basename, log_name_tmp, (int)(q-basename)))
       {
         error= -2;
@@ -947,10 +956,14 @@ int Relay_log_info::wait_for_gtid_set(THD* thd, const Gtid_set* wait_gtid_set,
     const Gtid_set* executed_gtids= gtid_state->get_executed_gtids();
     const Owned_gtids* owned_gtids= gtid_state->get_owned_gtids();
 
+    char *wait_gtid_set_buf;
+    wait_gtid_set->to_string(&wait_gtid_set_buf);
     DBUG_PRINT("info", ("Waiting for '%s'. is_subset: %d and "
                         "!is_intersection_nonempty: %d",
-      wait_gtid_set->to_string(), wait_gtid_set->is_subset(executed_gtids),
-      !owned_gtids->is_intersection_nonempty(wait_gtid_set)));
+                        wait_gtid_set_buf,
+                        wait_gtid_set->is_subset(executed_gtids),
+                        !owned_gtids->is_intersection_nonempty(wait_gtid_set)));
+    my_free(wait_gtid_set_buf);
     executed_gtids->dbug_print("gtid_executed:");
     owned_gtids->dbug_print("owned_gtids:");
 
@@ -1438,7 +1451,8 @@ bool Relay_log_info::is_until_satisfied(THD *thd, Log_event *ev)
       const Gtid_set* executed_gtids= gtid_state->get_executed_gtids();
       if (until_sql_gtids.is_intersection_nonempty(executed_gtids))
       {
-        char *buffer= until_sql_gtids.to_string();
+        char *buffer;
+        until_sql_gtids.to_string(&buffer);
         global_sid_lock->unlock();
         sql_print_information("Slave SQL thread stopped because "
                               "UNTIL SQL_BEFORE_GTIDS %s is already "
@@ -1454,7 +1468,8 @@ bool Relay_log_info::is_until_satisfied(THD *thd, Log_event *ev)
       global_sid_lock->rdlock();
       if (until_sql_gtids.contains_gtid(gev->get_sidno(false), gev->get_gno()))
       {
-        char *buffer= until_sql_gtids.to_string();
+        char *buffer;
+        until_sql_gtids.to_string(&buffer);
         global_sid_lock->unlock();
         sql_print_information("Slave SQL thread stopped because it reached "
                               "UNTIL SQL_BEFORE_GTIDS %s", buffer);
@@ -1472,7 +1487,8 @@ bool Relay_log_info::is_until_satisfied(THD *thd, Log_event *ev)
       const Gtid_set* executed_gtids= gtid_state->get_executed_gtids();
       if (until_sql_gtids.is_subset(executed_gtids))
       {
-        char *buffer= until_sql_gtids.to_string();
+        char *buffer;
+        until_sql_gtids.to_string(&buffer);
         global_sid_lock->unlock();
         sql_print_information("Slave SQL thread stopped because it reached "
                               "UNTIL SQL_AFTER_GTIDS %s", buffer);
@@ -1521,9 +1537,22 @@ bool Relay_log_info::is_until_satisfied(THD *thd, Log_event *ev)
       if (until_view_id.compare(view_event->get_view_id()) == 0)
       {
         set_group_replication_retrieved_certification_info(view_event);
-        DBUG_RETURN(true);
+        until_view_id_found= true;
+        DBUG_RETURN(false);
       }
     }
+
+    if (until_view_id_found && ev != NULL && ev->ends_group())
+    {
+      until_view_id_commit_found= true;
+      DBUG_RETURN(false);
+    }
+
+    if (until_view_id_commit_found && ev == NULL)
+    {
+      DBUG_RETURN(true);
+    }
+
     DBUG_RETURN(false);
     break;
 
@@ -1777,7 +1806,6 @@ bool mysql_show_relaylog_events(THD* thd)
 {
 
   Master_info *mi =0;
-  Protocol *protocol= thd->protocol;
   List<Item> field_list;
   bool res;
   DBUG_ENTER("mysql_show_relaylog_events");
@@ -1791,8 +1819,8 @@ bool mysql_show_relaylog_events(THD* thd)
   }
 
   Log_event::init_show_field_list(&field_list);
-  if (protocol->send_result_set_metadata(&field_list,
-                            Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
+  if (thd->send_result_metadata(&field_list,
+                                Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
     DBUG_RETURN(TRUE);
 
   mysql_mutex_lock(&LOCK_msr_map);
@@ -2404,30 +2432,30 @@ bool Relay_log_info::read_info(Rpl_info_handler *from)
   else
      DBUG_PRINT("info", ("relay_log_info file is in old format."));
 
-  if (from->get_info((ulong *) &temp_group_relay_log_pos,
+  if (from->get_info(&temp_group_relay_log_pos,
                      (ulong) BIN_LOG_HEADER_SIZE) ||
       from->get_info(group_master_log_name,
                      sizeof(group_relay_log_name),
                      (char *) "") ||
-      from->get_info((ulong *) &temp_group_master_log_pos,
-                     (ulong) 0))
+      from->get_info(&temp_group_master_log_pos,
+                     0UL))
     DBUG_RETURN(TRUE);
 
   if (lines >= LINES_IN_RELAY_LOG_INFO_WITH_DELAY)
   {
-    if (from->get_info((int *) &temp_sql_delay, (int) 0))
+    if (from->get_info(&temp_sql_delay, 0))
       DBUG_RETURN(TRUE);
   }
 
   if (lines >= LINES_IN_RELAY_LOG_INFO_WITH_WORKERS)
   {
-    if (from->get_info(&recovery_parallel_workers,(ulong) 0))
+    if (from->get_info(&recovery_parallel_workers, 0UL))
       DBUG_RETURN(TRUE);
   }
 
   if (lines >= LINES_IN_RELAY_LOG_INFO_WITH_ID)
   {
-    if (from->get_info(&temp_internal_id, (int) 1))
+    if (from->get_info(&temp_internal_id, 1))
       DBUG_RETURN(TRUE);
   }
 

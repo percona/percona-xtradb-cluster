@@ -365,7 +365,7 @@ rtr_pcur_getnext_from_path(
 					rtr_store_parent_path(
 						block, btr_cur, rw_latch,
 						level, mtr);
-#endif
+#endif /* UNIV_DEBUG */
 				}
 			}
 		} else {
@@ -727,28 +727,31 @@ rtr_page_get_father_node_ptr_func(
 	ulint	child_page = btr_node_ptr_get_child_page_no(node_ptr, offsets);
 
 	if (child_page != page_no) {
-		rec_t*	print_rec;
-		fputs("InnoDB: Dump of the child page:\n", stderr);
-		buf_page_print(page_align(user_rec), univ_page_size,
-			       BUF_PAGE_PRINT_NO_CRASH);
-		fputs("InnoDB: Dump of the parent page:\n", stderr);
-		buf_page_print(page_align(node_ptr), univ_page_size,
-			       BUF_PAGE_PRINT_NO_CRASH);
+		const rec_t*	print_rec;
 
-		ib::error() << "Corruption of index " << index->name
+		ib::fatal	error;
+
+		error << "Corruption of index " << index->name
 			<< " of table " << index->table->name
 			<< " parent page " << page_no
 			<< " child page " << child_page;
+
 		print_rec = page_rec_get_next(
 			page_get_infimum_rec(page_align(user_rec)));
 		offsets = rec_get_offsets(print_rec, index,
 					  offsets, ULINT_UNDEFINED, &heap);
-		page_rec_print(print_rec, offsets);
+		error << "; child ";
+		rec_print(error.m_oss, print_rec,
+			  rec_get_info_bits(print_rec, rec_offs_comp(offsets)),
+			  offsets);
 		offsets = rec_get_offsets(node_ptr, index, offsets,
 					  ULINT_UNDEFINED, &heap);
-		page_rec_print(node_ptr, offsets);
+		error << "; parent ";
+		rec_print(error.m_oss, print_rec,
+			  rec_get_info_bits(print_rec, rec_offs_comp(offsets)),
+			  offsets);
 
-		ib::fatal() << "You should dump + drop + reimport the table to"
+		error << ". You should dump + drop + reimport the table to"
 			" fix the corruption. If the crash happens at"
 			" database startup, see " REFMAN
 			"forcing-innodb-recovery.html about forcing"
@@ -880,8 +883,7 @@ get_parent:
 			is run out, the spatial index is corrupted. */
 			if (!ret) {
 				mutex_enter(&dict_sys->mutex);
-				dict_set_corrupted_index_cache_only(
-					index, index->table);
+				dict_set_corrupted_index_cache_only(index);
 				mutex_exit(&dict_sys->mutex);
 
 				ib::info() << "InnoDB: Corruption of a"
@@ -951,7 +953,7 @@ rtr_create_rtr_info(
 
 		rtr_info->matches->bufp = page_align(rtr_info->matches->rec_buf
 						     + UNIV_PAGE_SIZE_MAX + 1);
-		mutex_create("rtr_match_mutex",
+		mutex_create(LATCH_ID_RTR_MATCH_MUTEX,
 			     &rtr_info->matches->rtr_match_mutex);
 		rw_lock_create(PFS_NOT_INSTRUMENTED,
 			       &(rtr_info->matches->block.lock),
@@ -961,7 +963,7 @@ rtr_create_rtr_info(
 	rtr_info->path = UT_NEW_NOKEY(rtr_node_path_t());
 	rtr_info->parent_path = UT_NEW_NOKEY(rtr_node_path_t());
 	rtr_info->need_prdt_lock = need_prdt;
-	mutex_create("rtr_path_mutex",
+	mutex_create(LATCH_ID_RTR_PATH_MUTEX,
 		     &rtr_info->rtr_path_mutex);
 
 	mutex_enter(&index->rtr_track->rtr_active_mutex);
@@ -1004,7 +1006,10 @@ rtr_init_rtr_info(
 		rtr_info->path = NULL;
 		rtr_info->parent_path = NULL;
 		rtr_info->matches = NULL;
-		mutex_create("rtr_path_mutex", &rtr_info->rtr_path_mutex);
+
+		mutex_create(LATCH_ID_RTR_PATH_MUTEX,
+			     &rtr_info->rtr_path_mutex);
+
 		memset(rtr_info->tree_blocks, 0x0,
 		       sizeof(rtr_info->tree_blocks));
 		memset(rtr_info->tree_savepoints, 0x0,
@@ -1131,7 +1136,7 @@ rtr_rebuild_path(
 	rtr_node_path_t::iterator	rit;
 #ifdef UNIV_DEBUG
 	ulint	before_size = rtr_info->path->size();
-#endif
+#endif /* UNIV_DEBUG */
 
 	for (rit = rtr_info->path->begin();
 	     rit != rtr_info->path->end(); ++rit) {
@@ -1146,13 +1151,13 @@ rtr_rebuild_path(
 		node_visit_t	rec = new_path->back();
 		ut_ad(rec.level < rtr_info->cursor->tree_height
 		      && rec.page_no > 0);
-#endif
+#endif /* UNIV_DEBUG */
 	}
 
 	UT_DELETE(rtr_info->path);
-#ifdef UNIV_DEBUG
+
 	ut_ad(new_path->size() == before_size - 1);
-#endif
+
 	rtr_info->path = new_path;
 
 	if (!rtr_info->parent_path->empty()) {
@@ -1323,7 +1328,7 @@ rtr_cur_restore_position_func(
 
 			mem_heap_free(heap);
 		} while (0);
-#endif
+#endif /* UNIV_DEBUG */
 
 		return(true);
 	}
@@ -1540,10 +1545,10 @@ rtr_copy_buf(
 	matches->block.frame = block->frame;
 #ifndef UNIV_HOTBACKUP
 	matches->block.unzip_LRU = block->unzip_LRU;
-#ifdef UNIV_DEBUG
-	matches->block.in_unzip_LRU_list = block->in_unzip_LRU_list;
-	matches->block.in_withdraw_list = block->in_withdraw_list;
-#endif /* UNIV_DEBUG */
+
+	ut_d(matches->block.in_unzip_LRU_list = block->in_unzip_LRU_list);
+	ut_d(matches->block.in_withdraw_list = block->in_withdraw_list);
+
 	/* Skip buf_block_t::mutex */
 	/* Skip buf_block_t::lock */
 	matches->block.lock_hash_val = block->lock_hash_val;
@@ -1559,9 +1564,9 @@ rtr_copy_buf(
 	matches->block.index = block->index;
 	matches->block.made_dirty_with_no_latch
 		= block->made_dirty_with_no_latch;
-#ifdef UNIV_SYNC_DEBUG
-	matches->block.debug_latch = block->debug_latch;
-#endif /* UNIV_SYNC_DEBUG */
+
+	ut_d(matches->block.debug_latch = block->debug_latch);
+
 #endif /* !UNIV_HOTBACKUP */
 }
 

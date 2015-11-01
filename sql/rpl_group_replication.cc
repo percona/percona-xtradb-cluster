@@ -13,10 +13,15 @@
    along with this program; if not, write to the Free Software Foundation,
    51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA */
 
+#ifndef HAVE_REPLICATION
+#define HAVE_REPLICATION
+#endif
+
 #include "rpl_group_replication.h"
 #include "rpl_channel_service_interface.h"
 #include "rpl_info_factory.h"
-#include "log.h"
+#include "rpl_slave.h"
+#include "tc_log.h"
 #include "mysqld_thd_manager.h"
 
 
@@ -134,7 +139,10 @@ Group_replication_handler* group_replication_handler= NULL;
 */
 int group_replication_init(const char* plugin_name)
 {
-  intialize_channel_service_interface();
+  if (initialize_channel_service_interface())
+  {
+    return 1;
+  }
 
   if (group_replication_handler != NULL)
     return 1;
@@ -149,7 +157,7 @@ int group_replication_init(const char* plugin_name)
 int group_replication_cleanup()
 {
   if (!group_replication_handler)
-    return 0;
+    return 1;
 
   delete group_replication_handler;
   group_replication_handler= NULL;
@@ -243,17 +251,51 @@ unsigned int get_group_replication_members_number_info()
   include/mysql/group_replication_priv.h
 */
 
-bool is_server_engine_ready()
-{
-  return (tc_log != NULL);
-}
-
 void get_server_host_port_uuid(char **hostname, uint *port, char** uuid)
 {
-  *hostname= glob_hostname;
-  *port= mysqld_port;
+  /*
+    use startup option report-host and report-port when provided,
+    as value provided by glob_hostname, which used gethostname() function
+    internally to determine hostname, will not always provide correct
+    network interface, especially in case of multiple network interfaces.
+  */
+  if (report_host)
+    *hostname= report_host;
+  else
+    *hostname= glob_hostname;
+
+  if (report_port)
+    *port= report_port;
+  else
+    *port= mysqld_port;
+
   *uuid= server_uuid;
   return;
+}
+
+ulong get_server_id()
+{
+  return server_id;
+}
+
+ulong get_auto_increment_increment()
+{
+  return global_system_variables.auto_increment_increment;
+}
+
+ulong get_auto_increment_offset()
+{
+  return global_system_variables.auto_increment_offset;
+}
+
+void set_auto_increment_increment(ulong auto_increment_increment)
+{
+  global_system_variables.auto_increment_increment= auto_increment_increment;
+}
+
+void set_auto_increment_offset(ulong auto_increment_offset)
+{
+  global_system_variables.auto_increment_offset= auto_increment_offset;
 }
 
 #ifdef HAVE_REPLICATION
@@ -271,6 +313,8 @@ get_server_startup_prerequirements(Trans_context_info& requirements,
     global_system_variables.transaction_write_set_extraction;
   requirements.mi_repository_type= opt_mi_repository_id;
   requirements.rli_repository_type= opt_rli_repository_id;
+  requirements.parallel_applier_type= mts_parallel_option;
+  requirements.parallel_applier_workers= opt_mts_slave_parallel_workers;
 }
 #endif //HAVE_REPLICATION
 
@@ -308,7 +352,9 @@ char* encoded_gtid_set_to_string(uchar *encoded_gtid_set,
       RETURN_STATUS_OK)
     return NULL;
 
-  return set.to_string();
+  char *buf;
+  set.to_string(&buf);
+  return buf;
 }
 #endif
 

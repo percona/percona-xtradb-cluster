@@ -394,6 +394,7 @@ public:
   */
   // the index in GAQ of the last processed group by this Worker
   volatile ulong last_group_done_index;
+  ulonglong last_groups_assigned_index; // index of previous group assigned to worker
   ulong wq_empty_waits;  // how many times got idle
   ulong events_done;     // how many events (statements) processed
   ulong groups_done;     // how many groups (transactions) processed
@@ -440,8 +441,9 @@ public:
   {
     NOT_RUNNING= 0,
     RUNNING= 1,
-    ERROR_LEAVING,         // is set by Worker
-    KILLED                 // is set by Coordinator
+    ERROR_LEAVING= 2,         // is set by Worker
+    STOP= 3,                  // is set by Coordinator upon reciving STOP
+    STOP_ACCEPTED= 4          // is set by worker upon completing job when STOP SLAVE is issued
   };
 
   /*
@@ -460,11 +462,17 @@ public:
   */
   en_running_state volatile running_status;
   /*
+    exit_incremented indicates whether worker has contributed to max updated index.
+    By default it is set to false. When the worker contibutes for the first time this
+    variable is set to true.
+  */
+  bool exit_incremented;
+  /*
     The gtid (or anonymous) of the currently executing transaction, or
     of the last executing transaction if no transaction is currently
     executing.  This is used to fill the last_seen_transaction column
     of the table
-    performance_schema.replication_execute_status_by_worker.
+    performance_schema.replication_applier_status_by_worker.
   */
   Gtid_specification currently_executing_gtid;
 
@@ -559,6 +567,15 @@ public:
   */
   const char* get_for_channel_str(bool upper_case= false) const;
 
+  longlong sequence_number()
+  {
+    Slave_job_group* ptr_g= c_rli->gaq->get_job_group(gaq_index);
+    return ptr_g->sequence_number;
+  }
+
+  bool found_order_commit_deadlock() { return m_order_commit_deadlock; }
+  void report_order_commit_deadlock() { m_order_commit_deadlock= true; }
+
 protected:
 
   virtual void do_report(loglevel level, int err_code,
@@ -570,13 +587,22 @@ private:
   void end_info();
   bool read_info(Rpl_info_handler *from);
   bool write_info(Rpl_info_handler *to);
+  bool m_order_commit_deadlock;
+
   Slave_worker& operator=(const Slave_worker& info);
   Slave_worker(const Slave_worker& info);
   bool worker_sleep(ulong seconds);
   bool read_and_apply_events(uint start_relay_number, my_off_t start_relay_pos,
                              uint end_relay_number, my_off_t end_relay_pos);
   void assign_partition_db(Log_event *ev);
+
+  void reset_order_commit_deadlock() { m_order_commit_deadlock= false; }
 };
+
+void * head_queue(Slave_jobs_queue *jobs, Slave_job_item *ret);
+bool handle_slave_worker_stop(Slave_worker *worker, Slave_job_item *job_item);
+bool set_max_updated_index_on_stop(Slave_worker *worker,
+                                   Slave_job_item *job_item);
 
 TABLE* mts_move_temp_table_to_entry(TABLE*, THD*, db_worker_hash_entry*);
 TABLE* mts_move_temp_tables_to_thd(THD*, TABLE*);
@@ -586,6 +612,11 @@ TABLE* mts_move_temp_tables_to_thd(THD*, TABLE*, enum_mts_parallel_type);
 bool append_item_to_jobs(slave_job_item *job_item,
                          Slave_worker *w, Relay_log_info *rli);
 Slave_job_item* de_queue(Slave_jobs_queue *jobs, Slave_job_item *ret);
+
+inline Slave_worker* get_thd_worker(THD *thd)
+{
+  return static_cast<Slave_worker *>(thd->rli_slave);
+}
 
 #endif // HAVE_REPLICATION
 #endif

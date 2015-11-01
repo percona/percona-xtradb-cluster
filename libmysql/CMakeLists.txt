@@ -155,6 +155,7 @@ get_tty_password
 # will have a FR to replace this for decent name/functionality and document it.
 my_load_defaults
 handle_options
+mysql_get_parameters
 
 CACHE INTERNAL "Undocumented Functions exported by client API"
 
@@ -271,7 +272,7 @@ IF(NOT DISABLE_SHARED)
       SET(OS_SHARED_LIB_VERSION "${SHARED_LIB_MAJOR_VERSION}")
     ELSE()
       SET(OS_SHARED_LIB_VERSION
-        "${SHARED_LIB_MAJOR_VERSION}.${SHARED_LIB_MINOR_VERSION}.0")
+        "${SHARED_LIB_MAJOR_VERSION}.${SHARED_LIB_MINOR_VERSION}.${SHARED_LIB_PATCH_VERSION}")
     ENDIF()
     # Name of shared library is mysqlclient on Unix
     SET_TARGET_PROPERTIES(libmysql PROPERTIES 

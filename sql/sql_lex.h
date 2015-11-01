@@ -171,14 +171,16 @@ typedef YYSTYPE *LEX_YYSTYPE;
   If we encounter a diagnostics statement (GET DIAGNOSTICS, or e.g.
   the old SHOW WARNINGS|ERRORS, or "diagnostics variables" such as
   @@warning_count | @@error_count, we'll set some hints so this
-  information is not lost.
+  information is not lost. DA_KEEP_UNSPECIFIED is used in LEX constructor to
+  avoid leaving variables uninitialized.
  */
 enum enum_keep_diagnostics
 {
   DA_KEEP_NOTHING= 0,   /**< keep nothing */
   DA_KEEP_DIAGNOSTICS,  /**< keep the diagnostics area */
   DA_KEEP_COUNTS,       /**< keep @@warning_count / @error_count */
-  DA_KEEP_PARSE_ERROR   /**< keep diagnostics area after parse error */
+  DA_KEEP_PARSE_ERROR,  /**< keep diagnostics area after parse error */
+  DA_KEEP_UNSPECIFIED   /**< keep semantics is unspecified */
 };
 
 enum enum_sp_suid_behaviour
@@ -539,7 +541,7 @@ private:
   TABLE_LIST result_table_list;
   Query_result_union *union_result;
   TABLE *table; /* temporary table using for appending UNION results */
-
+  /// Object to which the result for this query expression is sent
   Query_result *m_query_result;
 
 public:
@@ -551,7 +553,10 @@ public:
   */
   uint8 uncacheable;
 
-  st_select_lex_unit(enum_parsing_context parsing_context);
+  explicit st_select_lex_unit(enum_parsing_context parsing_context);
+
+  /// @return true for a query expression without UNION or multi-level ORDER
+  bool is_simple() const { return !(is_union() || fake_select_lex); }
 
   /// Values for st_select_lex_unit::cleaned
   enum enum_clean_state
@@ -579,18 +584,18 @@ public:
   */
   List<Item> types;
   /**
-    Pointer to 'last' select, or pointer to select where we stored
-    global parameters for union.
+    Pointer to query block containing global parameters for query.
+    Global parameters may include ORDER BY, LIMIT and OFFSET.
 
-    If this is a union of multiple selects, the parser puts the global
-    parameters in fake_select_lex. If the union doesn't use a
-    temporary table, st_select_lex_unit::prepare() nulls out
-    fake_select_lex, but saves a copy in saved_fake_select_lex in
-    order to preserve the global parameters.
+    If this is a union of multiple query blocks, the global parameters are
+    stored in fake_select_lex. If the union doesn't use a temporary table,
+    st_select_lex_unit::prepare() nulls out fake_select_lex, but saves a copy
+    in saved_fake_select_lex in order to preserve the global parameters.
 
-    If it is not a union, first_select() is the last select.
+    If this is not a union, and the query expression has no multi-level
+    ORDER BY/LIMIT, global parameters are in the single query block.
 
-    @return select containing the global parameters
+    @return query block containing the global parameters
   */
   inline st_select_lex *global_parameters() const
   {
@@ -602,13 +607,12 @@ public:
   };
   /* LIMIT clause runtime counters */
   ha_rows select_limit_cnt, offset_limit_cnt;
-  /* not NULL if unit used in subselect, point to subselect item */
+  /// Points to subquery if this query expression is used in one, otherwise NULL
   Item_subselect *item;
-  /* thread handler */
-  THD *thd;
-  /*
-    SELECT_LEX for hidden SELECT in onion which process global
-    ORDER BY and LIMIT
+  THD *thd;                   ///< Thread handler
+  /**
+    Helper query block for query expression with UNION or multi-level
+    ORDER BY/LIMIT
   */
   st_select_lex *fake_select_lex;
   /**
@@ -616,20 +620,27 @@ public:
     fake_select_lex is used.
   */
   st_select_lex *saved_fake_select_lex;
+  /// Points to last query block used by UNION DISTINCT query
+  st_select_lex *union_distinct;
 
-  st_select_lex *union_distinct; /* pointer to the last UNION DISTINCT */
-
-  /// Return true if query expression can be merged into an outer query
+  /// @return true if query expression can be merged into an outer query
   bool is_mergeable() const;
 
+  /// @return the query block this query expression belongs to as subquery
   st_select_lex* outer_select() const { return master; }
+
+  /// @return the first query block inside this query expression
   st_select_lex* first_select() const { return slave; }
 
+  /// @return the next query expression within same query block (next subquery)
   st_select_lex_unit* next_unit() const { return next; }
 
+  /// @return the query result object in use for this query expression
   Query_result *query_result() const { return m_query_result; }
+
+  /// Set new query result object for this query expression
   void set_query_result(Query_result *res) { m_query_result= res; }
-  /* UNION methods */
+
   bool prepare(THD *thd, Query_result *result, ulonglong added_options,
                ulonglong removed_options);
   bool optimize(THD *thd);
@@ -1081,6 +1092,7 @@ public:
   table_map select_list_tables;
   table_map outer_join;       ///< Bitmap of all inner tables from outer joins
 
+  /// Query-block-level hints, for this query block
   Opt_hints_qb *opt_hints_qb;
 
 
@@ -1157,6 +1169,10 @@ public:
   /// @return true if this query block has a LIMIT clause
   bool has_limit() const
   { return select_limit != NULL; }
+
+  /// @return true if query block references full-text functions
+  bool has_ft_funcs() const
+  { return ftfunc_list->elements > 0; }
 
   void invalidate();
 
@@ -1381,6 +1397,52 @@ public:
   bool optimize(THD *thd);
   void reset_nj_counters(List<TABLE_LIST> *join_list= NULL);
   bool check_only_full_group_by(THD *thd);
+
+  /**
+    Returns which subquery execution strategies can be used for this query block.
+
+    @param thd  Pointer to THD object for session.
+                Used to access optimizer_switch
+
+    @retval EXEC_MATERIALIZATION  Subquery Materialization should be used
+    @retval EXEC_EXISTS           In-to-exists execution should be used
+    @retval EXEC_EXISTS_OR_MAT    A cost-based decision should be made
+  */
+  Item_exists_subselect::enum_exec_method subquery_strategy(THD *thd) const;
+
+  /**
+    Returns whether semi-join is enabled for this query block
+
+    @see @c Opt_hints_qb::semijoin_enabled for details on how hints
+    affect this decision.  If there are no hints for this query block,
+    optimizer_switch setting determines whether semi-join is used.
+
+    @param thd  Pointer to THD object for session.
+                Used to access optimizer_switch
+
+    @return true if semijoin is enabled,
+            false otherwise
+  */
+  bool semijoin_enabled(THD *thd) const;
+  /**
+    Update available semijoin strategies for semijoin nests.
+
+    Available semijoin strategies needs to be updated on every execution since
+    optimizer_switch setting may have changed.
+
+    @param thd  Pointer to THD object for session.
+                Used to access optimizer_switch
+  */
+  void update_semijoin_strategies(THD *thd);
+
+  /**
+    Add item to the hidden part of select list
+
+    @param item  item to add
+
+    @return Pointer to ref_ptr for the added item
+  */
+  Item **add_hidden_item(Item *item);
 };
 typedef class st_select_lex SELECT_LEX;
 
@@ -1416,7 +1478,6 @@ struct Limit_options
 struct Query_options {
   ulonglong query_spec_options;
   enum SELECT_LEX::e_sql_cache sql_cache;
-  ulong max_statement_time;
 
   bool merge(const Query_options &a, const Query_options &b);
   bool save_to(Parse_context *);
@@ -2939,8 +3000,8 @@ public:
 
   /// Table being inserted into (may be a view)
   TABLE_LIST *insert_table;
-  /// store original leaf_tables for INSERT SELECT and PS/SP
-  TABLE_LIST *leaf_tables_insert;
+  /// Leaf table being inserted into (always a base table)
+  TABLE_LIST *insert_table_leaf;
 
   /** SELECT of CREATE VIEW statement */
   LEX_STRING create_view_select;
@@ -2993,9 +3054,6 @@ public:
 
   // CALL statement-specific fields:
   List<Item>          call_value_list;
-
-  // DO statement-specific fields:
-  List<Item>          *do_insert_list;
 
   // HANDLER statement-specific fields:
   List<Item>          *handler_insert_list;
@@ -3241,8 +3299,12 @@ public:
   class Explain_format *explain_format;
 
   // Maximum execution time for a statement.
-  ulong max_statement_time;
-
+  ulong max_execution_time;
+  /*
+    To flag the current statement as dependent for binary logging
+    on explicit_defaults_for_timestamp
+  */
+  bool binlog_need_explicit_defaults_ts;
   LEX();
 
   virtual ~LEX();
@@ -3308,7 +3370,6 @@ public:
   bool can_not_use_merged();
   bool only_view_structure();
   bool need_correct_ident();
-  uint8 get_effective_with_check(TABLE_LIST *view);
   /*
     Is this update command where 'WHITH CHECK OPTION' clause is important
 
@@ -3559,7 +3620,7 @@ struct st_lex_local: public LEX
   }
   static void *operator new(size_t size, MEM_ROOT *mem_root) throw()
   {
-    return (void*) alloc_root(mem_root, (uint) size);
+    return alloc_root(mem_root, size);
   }
   static void operator delete(void *ptr,size_t size)
   { TRASH(ptr, size); }

@@ -66,7 +66,8 @@ enum_return_status Owned_gtids::ensure_sidno(rpl_sidno sidno)
         goto error;
       my_hash_init(hash, &my_charset_bin, 20,
                    offsetof(Node, gno), sizeof(rpl_gno), NULL,
-                   my_free, 0);
+                   my_free, 0,
+                   key_memory_Owned_gtids_sidno_to_hash);
       sidno_to_hash[i]= hash;
     }
   }
@@ -148,4 +149,22 @@ bool Owned_gtids::is_intersection_nonempty(const Gtid_set *other) const
     g= git.get();
   }
   DBUG_RETURN(false);
+}
+
+void Owned_gtids::get_gtids(Gtid_set &gtid_set) const
+{
+  DBUG_ENTER("Owned_gtids::get_gtids");
+
+  if (sid_lock != NULL)
+    sid_lock->assert_some_wrlock();
+
+  Gtid_iterator git(this);
+  Gtid g= git.get();
+  while (g.sidno != 0)
+  {
+    gtid_set._add_gtid(g);
+    git.next();
+    g= git.get();
+  }
+  DBUG_VOID_RETURN;
 }

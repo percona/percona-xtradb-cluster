@@ -258,6 +258,33 @@ ulint
 fsp_header_get_tablespace_size(void);
 /*================================*/
 
+/** Calculate the number of pages to extend a datafile.
+We extend single-table and general tablespaces first one extent at a time,
+but 4 at a time for bigger tablespaces. It is not enough to extend always
+by one extent, because we need to add at least one extent to FSP_FREE.
+A single extent descriptor page will track many extents. And the extent
+that uses its extent descriptor page is put onto the FSP_FREE_FRAG list.
+Extents that do not use their extent descriptor page are added to FSP_FREE.
+The physical page size is used to determine how many extents are tracked
+on one extent descriptor page. See xdes_calc_descriptor_page().
+@param[in]	page_size	page_size of the datafile
+@param[in]	size		current number of pages in the datafile
+@return number of pages to extend the file. */
+ulint
+fsp_get_pages_to_extend_ibd(
+	const page_size_t&	page_size,
+	ulint			size);
+
+/** Calculate the number of physical pages in an extent for this file.
+@param[in]	page_size	page_size of the datafile
+@return number of pages in an extent for this file. */
+UNIV_INLINE
+ulint
+fsp_get_extent_size_in_pages(const page_size_t&	page_size)
+{
+	return(FSP_EXTENT_SIZE * UNIV_PAGE_SIZE / page_size.physical());
+}
+
 /**********************************************************************//**
 Reads the space id from the first page of a tablespace.
 @return space id, ULINT UNDEFINED if error */
@@ -451,16 +478,25 @@ fsp_reserve_free_extents(
 	fsp_reserve_t	alloc_type,
 			/*!< in: page reservation type */
 	mtr_t*	mtr);	/*!< in/out: mini-transaction */
-/**********************************************************************//**
-This function should be used to get information on how much we still
-will be able to insert new data to the database without running out the
-tablespace. Only free extents are taken into account and we also subtract
-the safety margin required by the above function fsp_reserve_free_extents.
-@return available space in kB */
+
+/** Calculate how many KiB of new data we will be able to insert to the
+tablespace without running out of space.
+@param[in]	space_id	tablespace ID
+@return available space in KiB
+@retval UINTMAX_MAX if unknown */
 uintmax_t
 fsp_get_available_space_in_free_extents(
-/*====================================*/
-	ulint	space_id);	/*!< in: space id */
+	ulint		space_id);
+
+/** Calculate how many KiB of new data we will be able to insert to the
+tablespace without running out of space. Start with a space object that has
+been acquired by the caller who holds it for the calculation,
+@param[in]	space		tablespace object from fil_space_acquire()
+@return available space in KiB */
+uintmax_t
+fsp_get_available_space_in_free_extents(
+	const fil_space_t*	space);
+
 /**********************************************************************//**
 Frees a single page of a segment. */
 void
@@ -471,8 +507,7 @@ fseg_free_page(
 	ulint		page,	/*!< in: page offset */
 	bool		ahi,	/*!< in: whether we may need to drop
 				the adaptive hash index */
-	mtr_t*		mtr)	/*!< in/out: mini-transaction */
-	__attribute__((nonnull));
+	mtr_t*		mtr);	/*!< in/out: mini-transaction */
 /**********************************************************************//**
 Checks if a single page of a segment is free.
 @return true if free */
@@ -499,7 +534,7 @@ fseg_free_step(
 	bool		ahi,	/*!< in: whether we may need to drop
 				the adaptive hash index */
 	mtr_t*		mtr)	/*!< in/out: mini-transaction */
-	__attribute__((nonnull, warn_unused_result));
+	__attribute__((warn_unused_result));
 /**********************************************************************//**
 Frees part of a segment. Differs from fseg_free_step because this function
 leaves the header page unfreed.
@@ -512,7 +547,7 @@ fseg_free_step_not_header(
 	bool		ahi,	/*!< in: whether we may need to drop
 				the adaptive hash index */
 	mtr_t*		mtr)	/*!< in/out: mini-transaction */
-	__attribute__((nonnull, warn_unused_result));
+	__attribute__((warn_unused_result));
 
 /** Checks if a page address is an extent descriptor page address.
 @param[in]	page_id		page id

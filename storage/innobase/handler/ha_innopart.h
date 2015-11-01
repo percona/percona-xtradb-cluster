@@ -60,6 +60,8 @@ private:
 	/** Pointer back to owning TABLE_SHARE. */
 	TABLE_SHARE*		m_table_share;
 
+	/** Virtual column template */
+	innodb_col_templ_t*	m_s_templ;
 public:
 	Ha_innopart_share(
 		TABLE_SHARE*	table_share);
@@ -146,6 +148,17 @@ public:
 		const char*	from,
 		const char*	sep,
 		size_t		len);
+
+	/** Set up the virtual column template for partition table, and points
+	all m_table_parts[]->vc_templ to it.
+	@param[in]      table           MySQL TABLE object
+	@param[in]      ib_table        InnoDB dict_table_t
+	@param[in]      table_name      Table name (db/table_name) */
+	void
+	set_v_templ(
+		TABLE*		table,
+		dict_table_t*	ib_table,
+		const char*	name);
 
 private:
 	/** Disable default constructor. */
@@ -678,10 +691,6 @@ private:
 	void
 	free_blob_heap_array();
 
-	/** Clear the blob heap for the given partition */
-	void
-	clear_blob_heap_part(uint part_id);
-
 	/** Changes the active index of a handle.
 	@param[in]	part_id	Use this partition.
 	@param[in]	keynr	Use this index; MAX_KEY means always
@@ -1176,6 +1185,14 @@ private:
 	}
 	/** @} */
 
+	/** Fill in data_dir_path and tablespace name from internal data
+	dictionary.
+	@param	part_elem	Partition element to fill.
+	@param	ib_table	InnoDB table to copy from. */
+	void
+	update_part_elem(
+		partition_element*	part_elem,
+		dict_table_t*		ib_table);
 protected:
 	/* Protected handler:: functions specific for native InnoDB partitioning.
 	@see handler.h @{ */

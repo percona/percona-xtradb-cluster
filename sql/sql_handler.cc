@@ -196,7 +196,8 @@ bool Sql_cmd_handler_open::execute(THD *thd)
     if (my_hash_init(&thd->handler_tables_hash, &my_charset_latin1,
                      HANDLER_TABLES_HASH_SIZE, 0, 0,
                      (my_hash_get_key) mysql_ha_hash_get_key,
-                     (my_hash_free_key) mysql_ha_hash_free, 0))
+                     (my_hash_free_key) mysql_ha_hash_free, 0,
+                     key_memory_THD_handler_tables_hash))
     {
       DBUG_PRINT("exit",("ERROR"));
       DBUG_RETURN(TRUE);
@@ -453,7 +454,7 @@ bool Sql_cmd_handler_read::execute(THD *thd)
   TABLE         *table, *backup_open_tables;
   MYSQL_LOCK    *lock;
   List<Item>	list;
-  Protocol	*protocol= thd->protocol;
+  Protocol	*protocol= thd->get_protocol();
   char		buff[MAX_FIELD_WIDTH];
   String	buffer(buff, sizeof(buff), system_charset_info);
   int           error, keyno= -1;
@@ -662,7 +663,8 @@ retry:
                     tables->db, tables->alias, &it, 0))
     goto err;
 
-  protocol->send_result_set_metadata(&list, Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF);
+  thd->send_result_metadata(&list,
+                            Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF);
 
   /*
     In ::external_lock InnoDB resets the fields which tell it that
@@ -764,8 +766,17 @@ retry:
 	  goto err;
         }
         old_map= dbug_tmp_use_all_columns(table, table->write_set);
-	item->save_in_field(key_part->field, true);
+        type_conversion_status conv_status=
+          item->save_in_field(key_part->field, true);
         dbug_tmp_restore_column_map(table->write_set, old_map);
+        /*
+          If conversion status is TYPE_ERR_BAD_VALUE, the target index value
+          is not stored into record buffer, so we can't proceed with the
+          index search.
+        */
+	if (conv_status == TYPE_ERR_BAD_VALUE)
+          goto err;
+
 	key_len+=key_part->store_length;
         keypart_map= (keypart_map << 1) | 1;
       }
@@ -808,12 +819,10 @@ retry:
     }
     if (num_rows >= offset_limit_cnt)
     {
-      protocol->prepare_for_resend();
-
-      if (protocol->send_result_set_row(&list))
+      protocol->start_row();
+      if (thd->send_result_set_row(&list))
         goto err;
-
-      protocol->write();
+      protocol->end_row();
     }
     num_rows++;
     thd->inc_sent_row_count(1);

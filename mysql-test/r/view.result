@@ -507,7 +507,7 @@ create algorithm=temptable view v5 (x,y,z) as select c, b, a from t1;
 insert into v3 values (-60,4,30);
 ERROR HY000: The target table v3 of the INSERT is not insertable-into
 insert into v4 values (-60,4,30);
-ERROR HY000: The target table v4 of the INSERT is not insertable-into
+ERROR HY000: Column 'x' is not updatable
 insert into v5 values (-60,4,30);
 ERROR HY000: The target table v5 of the INSERT is not insertable-into
 insert into v1 values (-60,4,30);
@@ -534,7 +534,7 @@ create algorithm=temptable view v5 (x,y,z) as select c, b, a from t1;
 insert into v3 select c, b, a from t2;
 ERROR HY000: The target table v3 of the INSERT is not insertable-into
 insert into v4 select c, b, a from t2;
-ERROR HY000: The target table v4 of the INSERT is not insertable-into
+ERROR HY000: Column 'x' is not updatable
 insert into v5 select c, b, a from t2;
 ERROR HY000: The target table v5 of the INSERT is not insertable-into
 insert into v1 select c, b, a from t2;
@@ -595,7 +595,7 @@ drop view v1;
 drop table t1;
 set sql_mode='ansi';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 create table t1 ("a*b" int);
 create view v1 as select "a*b" from t1;
 show create view v1;
@@ -621,7 +621,7 @@ drop view v1;
 drop table `t1a``b`;
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 create table t1 (col1 char(5),col2 char(5));
 create view v1 as select * from t1;
 drop table t1;
@@ -1196,13 +1196,13 @@ ERROR HY000: CHECK OPTION failed 'test.v2'
 insert into v3 values (0);
 ERROR HY000: CHECK OPTION failed 'test.v3'
 insert into v2 values (2);
+ERROR HY000: CHECK OPTION failed 'test.v2'
 insert into v3 values (2);
 ERROR HY000: CHECK OPTION failed 'test.v3'
 select * from t1;
 a
 1
 1
-2
 drop view v3,v2,v1;
 drop table t1;
 create table t1 (a int, primary key (a));
@@ -1322,7 +1322,7 @@ drop view v1;
 drop table t1;
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 create table t1 (s1 tinyint);
 create trigger t1_bi before insert on t1 for each row set new.s1 = 500;
 create view v1 as select * from t1 where s1 <> 127 with check option;
@@ -2050,9 +2050,6 @@ View	Create View	character_set_client	collation_connection
 v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select var_samp(`t1`.`s1`) AS `var_samp(s1)` from `t1`	latin1	latin1_swedish_ci
 drop view v1;
 drop table t1;
-set sql_mode='strict_all_tables';
-Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
 CREATE TABLE t1 (col1 INT NOT NULL, col2 INT NOT NULL);
 CREATE VIEW v1 (vcol1) AS SELECT col1 FROM t1;
 CREATE VIEW v2 (vcol1) AS SELECT col1 FROM t1 WHERE col2 > 2;
@@ -2062,7 +2059,6 @@ INSERT INTO v1 (vcol1) VALUES(12);
 ERROR HY000: Field of view 'test.v1' underlying table doesn't have a default value
 INSERT INTO v2 (vcol1) VALUES(12);
 ERROR HY000: Field of view 'test.v2' underlying table doesn't have a default value
-set sql_mode=default;
 drop view v2,v1;
 drop table t1;
 create table t1 (f1 int);
@@ -2826,7 +2822,8 @@ Warnings:
 Warning	1423	Field of view 'test.v1' underlying table doesn't have a default value
 SET SQL_MODE = STRICT_ALL_TABLES;
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3135	'NO_ZERO_DATE', 'NO_ZERO_IN_DATE' and 'ERROR_FOR_DIVISION_BY_ZERO' sql modes should be used with strict mode. They will be merged with strict mode in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 INSERT INTO v1 (b) VALUES (4);
 ERROR HY000: Field of view 'test.v1' underlying table doesn't have a default value
 SET SQL_MODE = '';
@@ -2969,9 +2966,9 @@ DROP TABLE IF EXISTS t1;
 DROP VIEW IF EXISTS v1;
 DROP VIEW IF EXISTS v2;
 CREATE TABLE t1(a INT, b INT);
-CREATE DEFINER=1234567890abcdefGHIKL@localhost
+CREATE DEFINER=1234567890abcdefGHIKL1234567890abcdefGHIKL@localhost
 VIEW v1 AS SELECT a FROM t1;
-ERROR HY000: String '1234567890abcdefGHIKL' is too long for user name (should be no longer than 16)
+ERROR HY000: String '1234567890abcdefGHIKL1234567890abcdefGHIKL' is too long for user name (should be no longer than 32)
 CREATE DEFINER=some_user_name@1234567890abcdefghij1234567890abcdefghij1234567890abcdefghijQWERTY
 VIEW v2 AS SELECT b FROM t1;
 ERROR HY000: String '1234567890abcdefghij1234567890abcdefghij1234567890abcdefghijQWERTY' is too long for host name (should be no longer than 60)
@@ -3378,13 +3375,22 @@ gid int NOT NULL,
 lid int NOT NULL,
 dt date
 );
+CREATE TABLE t3 (
+id int NOT NULL PRIMARY KEY,
+gid int NOT NULL,
+lid int NOT NULL,
+dt date
+);
 INSERT INTO t2 (id, gid, lid, dt) VALUES
 (1, 1, 1, '2007-01-01'),(2, 1, 2, '2007-01-02'),
 (3, 2, 2, '2007-02-01'),(4, 2, 1, '2007-02-02');
+INSERT INTO t3 (id, gid, lid, dt) VALUES
+(1, 1, 1, '2007-01-01'),(2, 1, 2, '2007-01-02'),
+(3, 2, 2, '2007-02-01'),(4, 2, 1, '2007-02-02');
 SELECT DISTINCT t2.gid AS lgid,
-(SELECT t1.name FROM t1, t2
-WHERE t1.lid  = t2.lid AND t2.gid = lgid
-ORDER BY t2.dt DESC LIMIT 1
+(SELECT t1.name FROM t1, t3
+WHERE t1.lid  = t3.lid AND t3.gid = t2.gid
+ORDER BY t3.dt DESC LIMIT 1
 ) as clid
 FROM t2;
 lgid	clid
@@ -3392,9 +3398,9 @@ lgid	clid
 2	YES
 CREATE VIEW v1 AS
 SELECT DISTINCT t2.gid AS lgid,
-(SELECT t1.name FROM t1, t2
-WHERE t1.lid  = t2.lid AND t2.gid = lgid
-ORDER BY t2.dt DESC LIMIT 1
+(SELECT t1.name FROM t1, t3
+WHERE t1.lid  = t3.lid AND t3.gid = t2.gid
+ORDER BY t3.dt DESC LIMIT 1
 ) as clid
 FROM t2;
 SELECT * FROM v1;
@@ -3402,7 +3408,7 @@ lgid	clid
 1	NO
 2	YES
 DROP VIEW v1;
-DROP table t1,t2;
+DROP table t1,t2,t3;
 CREATE TABLE t1 (a INT);
 INSERT INTO t1 VALUES (1),(2),(3);
 CREATE VIEW v1 AS SELECT a FROM t1 ORDER BY a;
@@ -3696,12 +3702,12 @@ Warning	1423	Field of view 'test.v1' underlying table doesn't have a default val
 set @old_mode=@@sql_mode;
 set @@sql_mode=traditional;
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 insert into v1 values(1);
 ERROR HY000: Field of view 'test.v1' underlying table doesn't have a default value
 set @@sql_mode=@old_mode;
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 drop view v1;
 drop table t1;
 create table t1 (a int, key(a));
@@ -5859,25 +5865,25 @@ CREATE VIEW v3 AS (SELECT 'BUG#14117018' AS col1 FROM DUAL) UNION ALL
 CREATE VIEW v4 AS (SELECT 'BUG#14117018' AS col1 FROM DUAL) UNION ALL
 (SELECT '' AS col2 FROM DUAL) UNION ALL
 (SELECT '' FROM DUAL);
-# Name for the column in select1 is set properly with or 
+# Name for the column in select1 is set properly with or
 # without this fix.
 SHOW CREATE VIEW v1;
 View	Create View	character_set_client	collation_connection
 v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS (select '' AS `Name_exp_1`)	latin1	latin1_swedish_ci
 # Name for the column in select2 is set with this fix.
-# Without this fix, name would not have set for the 
+# Without this fix, name would not have set for the
 # columns in select2.
 SHOW CREATE VIEW v2;
 View	Create View	character_set_client	collation_connection
 v2	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS (select 'BUG#14117018' AS `col1`) union all (select '' AS `Name_exp_2`)	latin1	latin1_swedish_ci
 # Name for the field item in select2 & select3 is set with this fix.
-# Without this fix, name would not have set for the 
+# Without this fix, name would not have set for the
 # columns in select2 & select3.
 SHOW CREATE VIEW v3;
 View	Create View	character_set_client	collation_connection
 v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS (select 'BUG#14117018' AS `col1`) union all (select '' AS `Name_exp_2`) union all (select '' AS `Name_exp_3`)	latin1	latin1_swedish_ci
 # Name for the field item in select3 is set with this fix.
-# Without this fix, name would not have set for the 
+# Without this fix, name would not have set for the
 # columns in select3.
 SHOW CREATE VIEW v4;
 View	Create View	character_set_client	collation_connection
@@ -5941,3 +5947,356 @@ ON alias2.col_varchar_key = alias1.col_varchar_key;
 pk
 DROP VIEW v2;
 DROP TABLE t1, t2, t3;
+CREATE TABLE t0(x INTEGER);
+INSERT INTO t0 VALUES(0);
+CREATE TABLE t1(a1 INTEGER PRIMARY KEY, b1 INTEGER);
+CREATE TABLE t2(a2 INTEGER PRIMARY KEY, b2 INTEGER);
+CREATE VIEW v0 AS SELECT DISTINCT x FROM t0;
+CREATE VIEW vmat1 AS SELECT DISTINCT * FROM t1;
+CREATE VIEW vmat2 AS SELECT DISTINCT * FROM t2;
+CREATE VIEW vtt AS
+SELECT * FROM t1 JOIN t2 ON t1.a1=t2.a2;
+CREATE VIEW vtr AS
+SELECT * FROM t1 JOIN vmat2 AS dt2 ON t1.a1=dt2.a2;
+CREATE VIEW vtrd AS
+SELECT * FROM t1 JOIN (SELECT DISTINCT * FROM t2) AS dt2 ON t1.a1=dt2.a2;
+CREATE VIEW vrt AS
+SELECT * FROM vmat1 AS dt1 JOIN t2 ON dt1.a1=t2.a2;
+CREATE VIEW vrtd AS
+SELECT * FROM (SELECT DISTINCT * FROM t1) AS dt1 JOIN t2 ON dt1.a1=t2.a2;
+CREATE VIEW vrr AS
+SELECT * FROM vmat1 AS dt1 JOIN vmat2 AS dt2 ON dt1.a1=dt2.a2;
+CREATE VIEW vrrd AS
+SELECT * FROM (SELECT DISTINCT * FROM t1) AS dt1 JOIN
+(SELECT DISTINCT * FROM t2) AS dt2 ON dt1.a1=dt2.a2;
+INSERT INTO vtt(a1,b1) VALUES (1,100);
+INSERT INTO vtt(a2,b2) VALUES (1,100);
+INSERT INTO vtr(a1,b1) VALUES (2,100);
+ERROR HY000: The target table vtr of the INSERT is not insertable-into
+INSERT INTO vtrd(a1,b1) VALUES (3,100);
+ERROR HY000: The target table vtrd of the INSERT is not insertable-into
+INSERT INTO vtr(a2,b2) VALUES (2,100);
+ERROR HY000: The target table vtr of the INSERT is not insertable-into
+INSERT INTO vtrd(a2,b2) VALUES (3,100);
+ERROR HY000: The target table vtrd of the INSERT is not insertable-into
+INSERT INTO vrt(a1,b1) VALUES (4,100);
+ERROR HY000: The target table vrt of the INSERT is not insertable-into
+INSERT INTO vrtd(a1,b1) VALUES (5,100);
+ERROR HY000: The target table vrtd of the INSERT is not insertable-into
+INSERT INTO vrt(a2,b2) VALUES (4,100);
+ERROR HY000: The target table vrt of the INSERT is not insertable-into
+INSERT INTO vrtd(a2,b2) VALUES (5,100);
+ERROR HY000: The target table vrtd of the INSERT is not insertable-into
+INSERT INTO vrr(a1,b1) VALUES (6,100);
+ERROR HY000: The target table vrr of the INSERT is not insertable-into
+INSERT INTO vrrd(a1,b1) VALUES (7,100);
+ERROR HY000: The target table vrrd of the INSERT is not insertable-into
+INSERT INTO vrr(a2,b2) VALUES (6,100);
+ERROR HY000: The target table vrr of the INSERT is not insertable-into
+INSERT INTO vrrd(a2,b2) VALUES (7,100);
+ERROR HY000: The target table vrrd of the INSERT is not insertable-into
+SELECT * FROM vtt;
+a1	b1	a2	b2
+1	100	1	100
+DELETE FROM t1;
+DELETE FROM t2;
+INSERT INTO vtt(a1,b1) SELECT 1,100;
+INSERT INTO vtt(a2,b2) SELECT 1,100;
+INSERT INTO vtr(a1,b1) SELECT 2,100;
+ERROR HY000: The target table vtr of the INSERT is not insertable-into
+INSERT INTO vtrd(a1,b1) SELECT 3,100;
+ERROR HY000: The target table vtrd of the INSERT is not insertable-into
+INSERT INTO vtr(a2,b2) SELECT 2,100;
+ERROR HY000: The target table vtr of the INSERT is not insertable-into
+INSERT INTO vtrd(a2,b2) SELECT 3,100;
+ERROR HY000: The target table vtrd of the INSERT is not insertable-into
+INSERT INTO vrt(a1,b1) SELECT 4,100;
+ERROR HY000: The target table vrt of the INSERT is not insertable-into
+INSERT INTO vrtd(a1,b1) SELECT 5,100;
+ERROR HY000: The target table vrtd of the INSERT is not insertable-into
+INSERT INTO vrt(a2,b2) SELECT 4,100;
+ERROR HY000: The target table vrt of the INSERT is not insertable-into
+INSERT INTO vrtd(a2,b2) SELECT 5,100;
+ERROR HY000: The target table vrtd of the INSERT is not insertable-into
+INSERT INTO vrr(a1,b1) SELECT 6,100;
+ERROR HY000: The target table vrr of the INSERT is not insertable-into
+INSERT INTO vrrd(a1,b1) SELECT 7,100;
+ERROR HY000: The target table vrrd of the INSERT is not insertable-into
+INSERT INTO vrr(a2,b2) SELECT 6,100;
+ERROR HY000: The target table vrr of the INSERT is not insertable-into
+INSERT INTO vrrd(a2,b2) SELECT 7,100;
+ERROR HY000: The target table vrrd of the INSERT is not insertable-into
+SELECT * FROM vtt;
+a1	b1	a2	b2
+1	100	1	100
+DELETE FROM t1;
+DELETE FROM t2;
+INSERT INTO t1 VALUES
+(1,100), (2,100), (3,100), (4,100), (5,100),
+(6,100), (7,100), (8,100), (9,100), (10,100),
+(11,100), (12,100), (13,100), (14,100);
+INSERT INTO t2 VALUES
+(1,100), (2,100), (3,100), (4,100), (5,100),
+(6,100), (7,100), (8,100), (9,100), (10,100),
+(11,100), (12,100), (13,100), (14,100);
+DELETE FROM vtt WHERE a1=1;
+ERROR HY000: Can not delete from join view 'test.vtt'
+DELETE FROM vtr WHERE a1=2;
+ERROR HY000: Can not delete from join view 'test.vtr'
+DELETE FROM vtrd WHERE a1=3;
+ERROR HY000: Can not delete from join view 'test.vtrd'
+DELETE FROM vrt WHERE a1=4;
+ERROR HY000: Can not delete from join view 'test.vrt'
+DELETE FROM vrtd WHERE a1=5;
+ERROR HY000: Can not delete from join view 'test.vrtd'
+DELETE FROM vrr WHERE a1=6;
+ERROR HY000: The target table vrr of the DELETE is not updatable
+DELETE FROM vrrd WHERE a1=7;
+ERROR HY000: The target table vrrd of the DELETE is not updatable
+DELETE vtt FROM vtt WHERE a1=8;
+ERROR HY000: Can not delete from join view 'test.vtt'
+DELETE vtr FROM vtr WHERE a1=9;
+ERROR HY000: Can not delete from join view 'test.vtr'
+DELETE vtrd FROM vtrd WHERE a1=10;
+ERROR HY000: Can not delete from join view 'test.vtrd'
+DELETE vrt FROM vrt WHERE a1=11;
+ERROR HY000: Can not delete from join view 'test.vrt'
+DELETE vrtd FROM vrtd WHERE a1=12;
+ERROR HY000: Can not delete from join view 'test.vrtd'
+DELETE vrr FROM vrr WHERE a1=13;
+ERROR HY000: The target table vrr of the DELETE is not updatable
+DELETE vrrd FROM vrrd WHERE a1=14;
+ERROR HY000: The target table vrrd of the DELETE is not updatable
+SELECT * FROM vtt;
+a1	b1	a2	b2
+1	100	1	100
+2	100	2	100
+3	100	3	100
+4	100	4	100
+5	100	5	100
+6	100	6	100
+7	100	7	100
+8	100	8	100
+9	100	9	100
+10	100	10	100
+11	100	11	100
+12	100	12	100
+13	100	13	100
+14	100	14	100
+DELETE FROM t1;
+DELETE FROM t2;
+INSERT INTO t1 VALUES (1,100);
+INSERT INTO t2 VALUES (1,100);
+UPDATE vtt SET b1=b1+1 WHERE a1=1;
+UPDATE vtt SET b2=b2+1 WHERE a2=1;
+UPDATE vtr SET b1=b1+1 WHERE a1=1;
+UPDATE vtrd SET b1=b1+1 WHERE a1=1;
+UPDATE vtr SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table dt2 of the UPDATE is not updatable
+UPDATE vtrd SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table dt2 of the UPDATE is not updatable
+UPDATE vrt SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table dt1 of the UPDATE is not updatable
+UPDATE vrtd SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table dt1 of the UPDATE is not updatable
+UPDATE vrt SET b2=b2+1 WHERE a2=1;
+UPDATE vrtd SET b2=b2+1 WHERE a2=1;
+UPDATE vrr SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table vrr of the UPDATE is not updatable
+UPDATE vrrd SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table vrrd of the UPDATE is not updatable
+UPDATE vrr SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table vrr of the UPDATE is not updatable
+UPDATE vrrd SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table vrrd of the UPDATE is not updatable
+UPDATE vtt, v0 AS dt SET b1=b1+1 WHERE a1=1;
+UPDATE vtt, v0 SET b2=b2+1 WHERE a2=1;
+UPDATE vtr, v0 SET b1=b1+1 WHERE a1=1;
+UPDATE vtrd, v0 SET b1=b1+1 WHERE a1=1;
+UPDATE vtr, v0 SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table dt2 of the UPDATE is not updatable
+UPDATE vtrd, v0 SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table dt2 of the UPDATE is not updatable
+UPDATE vrt, v0 SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table dt1 of the UPDATE is not updatable
+UPDATE vrtd, v0 SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table dt1 of the UPDATE is not updatable
+UPDATE vrt, v0 SET b2=b2+1 WHERE a2=1;
+UPDATE vrtd, v0 SET b2=b2+1 WHERE a2=1;
+UPDATE vrr, v0 SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table dt1 of the UPDATE is not updatable
+UPDATE vrrd, v0 SET b1=b1+1 WHERE a1=1;
+ERROR HY000: The target table dt1 of the UPDATE is not updatable
+UPDATE vrr, v0 SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table dt2 of the UPDATE is not updatable
+UPDATE vrrd, v0 SET b2=b2+1 WHERE a2=1;
+ERROR HY000: The target table dt2 of the UPDATE is not updatable
+SELECT * FROM vtt;
+a1	b1	a2	b2
+1	106	1	106
+DROP VIEW v0, vtt, vtr, vrt, vrr, vmat1, vmat2;
+DROP VIEW vtrd, vrtd, vrrd;
+DROP TABLE t0, t1, t2;
+#
+# Bug#20407961 VIEW'S CHECK OPTION SOMETIMES NOT HONOURED IF INCLUDED IN A TOP VIEW
+#
+create table t1 (a varchar(100));
+# n/c/l letter suffix means: no/cascaded/local check option
+create view v1n as select * from t1 where a like '%v1n%';
+create view v2c as select * from t1 where a like '%v2c%'
+ with check option;
+show create view v2c;
+View	Create View	character_set_client	collation_connection
+v2c	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2c` AS select `t1`.`a` AS `a` from `t1` where (`t1`.`a` like '%v2c%') WITH CASCADED CHECK OPTION	latin1	latin1_swedish_ci
+create view v3l as select * from t1 where a like '%v3l%'
+ with local check option;
+show create view v3l;
+View	Create View	character_set_client	collation_connection
+v3l	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3l` AS select `t1`.`a` AS `a` from `t1` where (`t1`.`a` like '%v3l%') WITH LOCAL CHECK OPTION	latin1	latin1_swedish_ci
+# The basic, single-view feature works:
+insert into t1 values('');
+insert into v1n values('');
+insert into v2c values('');
+ERROR HY000: CHECK OPTION failed 'test.v2c'
+insert into v2c values('v2c');
+insert into v3l values('');
+ERROR HY000: CHECK OPTION failed 'test.v3l'
+insert into v3l values('v3l');
+# We also test UPDATE of the successfully inserted row
+update v1n set a='_';
+# if this update to v2c was allowed, it would be produce a row in t1
+# not matching v2c's filter, which is against the goal of CHECK
+# OPTION.
+update v2c set a='';
+ERROR HY000: CHECK OPTION failed 'test.v2c'
+update v3l set a='';
+ERROR HY000: CHECK OPTION failed 'test.v3l'
+# Top view without no CHECK OPTION, still CHECK OPTION conditions
+# of underlying views are checked.
+create view v4n as select * from v2c where a like '%v4n%';
+create view v5n as select * from v3l where a like '%v5n%';
+# The view's nesting structure is:
+# v4n -> v2c -> t1
+# We present the query with needed tags, verify that it passes,
+# then we take each tag away and verify that it fails.
+insert into v4n values('v2c');
+insert into v4n values('');
+ERROR HY000: CHECK OPTION failed 'test.v4n'
+# To check UPDATE on v4n, we need to update a row originally
+# visible in v4n, so we create it:
+insert into v4n values('v4n v2c');
+# This row can legally disappear from v4n:
+update v4n set a='v2c';
+insert into v4n values('v4n v2c');
+# But this row cannot disappear from v2c:
+update v4n set a='v4n';
+ERROR HY000: CHECK OPTION failed 'test.v4n'
+# Lest we delete it:
+delete from v4n;
+# v5n -> v3l -> t1
+insert into v5n values('v3l');
+insert into v5n values('');
+ERROR HY000: CHECK OPTION failed 'test.v5n'
+# Top view with LOCAL CHECK OPTION, still CHECK OPTION conditions
+# of underlying views are checked.
+create view v4l as select * from v2c where a like '%v4l%'
+ with local check option;
+create view v5l as select * from v3l where a like '%v5l%'
+ with local check option;
+# v4l -> v2c -> t1
+insert into v4l values('v4l v2c');
+insert into v4l values('v2c');
+ERROR HY000: CHECK OPTION failed 'test.v4l'
+update v4l set a='v2c';
+ERROR HY000: CHECK OPTION failed 'test.v4l'
+insert into v4l values('v4l');
+ERROR HY000: CHECK OPTION failed 'test.v4l'
+update v4l set a='v4l';
+ERROR HY000: CHECK OPTION failed 'test.v4l'
+# v5l -> v3l -> t1
+insert into v5l values('v5l v3l');
+insert into v5l values('v3l');
+ERROR HY000: CHECK OPTION failed 'test.v5l'
+update v5l set a='v3l';
+ERROR HY000: CHECK OPTION failed 'test.v5l'
+insert into v5l values('v5l');
+ERROR HY000: CHECK OPTION failed 'test.v5l'
+update v5l set a='v5l';
+ERROR HY000: CHECK OPTION failed 'test.v5l'
+# CASCADED makes all filtering conditions a requirement
+create view v6c as select * from v5n where a like '%v6c%'
+ with cascaded check option;
+# v6c -> v5n -> v3l -> t1
+insert into v6c values('v6c v5n v3l');
+insert into v6c values('v5n v3l');
+ERROR HY000: CHECK OPTION failed 'test.v6c'
+update v6c set a='v5n v3l';
+ERROR HY000: CHECK OPTION failed 'test.v6c'
+insert into v6c values('v6c v3l');
+ERROR HY000: CHECK OPTION failed 'test.v6c'
+update v6c set a='v6c v3l';
+ERROR HY000: CHECK OPTION failed 'test.v6c'
+insert into v6c values('v6c v5n');
+ERROR HY000: CHECK OPTION failed 'test.v6c'
+update v6c set a='v6c v5n';
+ERROR HY000: CHECK OPTION failed 'test.v6c'
+# Also true if top view has no check option:
+create view v7n as select * from v6c where a like '%v7n%';
+# v7n -> v6c -> v5n -> v3l -> t1
+insert into v7n values('v6c v5n v3l');
+insert into v7n values('v5n v3l');
+ERROR HY000: CHECK OPTION failed 'test.v7n'
+insert into v7n values('v6c v3l');
+ERROR HY000: CHECK OPTION failed 'test.v7n'
+insert into v7n values('v6c v5n');
+ERROR HY000: CHECK OPTION failed 'test.v7n'
+# Make a visible row to update:
+insert into v7n values('v7n v6c v5n v3l');
+update v7n set a='v7n v5n v3l';
+ERROR HY000: CHECK OPTION failed 'test.v7n'
+update v7n set a='v7n v6c v3l';
+ERROR HY000: CHECK OPTION failed 'test.v7n'
+update v7n set a='v7n v6c v5nà';
+ERROR HY000: CHECK OPTION failed 'test.v7n'
+# Also true if top view has LOCAL:
+create view v8l as select * from v7n where a like '%v8l%'
+ with local check option;
+# v8l -> v7n -> v6c -> v5n -> v3l -> t1
+insert into v8l values('v8l v6c v5n v3l');
+insert into v8l values('v6c v5n v3l');
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+insert into v8l values('v8l v5n v3l');
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+insert into v8l values('v8l v6c v3l');
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+insert into v8l values('v8l v6c v5n');
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+# Make a visible row (=> satisfy v7n's WHERE clause):
+insert into v8l values('v8l v7n v6c v5n v3l');
+update v8l set a='v7n v6c v5n v3l';
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+update v8l set a='v8l v7n v5n v3l';
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+update v8l set a='v8l v7n v6c v3l';
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+update v8l set a='v8l v7n v6c v5n';
+ERROR HY000: CHECK OPTION failed 'test.v8l'
+drop view v1n,v2c,v3l,v4n,v5n,v4l,v5l,v6c,v7n,v8l;
+drop table t1;
+# Bug#20982756 Crash in Table_list::fetch_number_of_rows
+CREATE TABLE t1(a INTEGER) engine=innodb;
+CREATE VIEW v3 AS SELECT 1 FROM t1;
+CREATE VIEW v2 AS SELECT 1 FROM v3 LEFT JOIN t1 ON 1;
+PREPARE s FROM "set @a:=(SELECT 1 FROM t1,v2);";
+EXECUTE s;
+EXECUTE s;
+DROP VIEW  v2,v3;
+DROP TABLE t1;
+# Bug#21097485 *insert_table_ref && (*insert_table_ref)->is_insertable
+CREATE TABLE t1 (r INTEGER) engine=innodb;
+CREATE VIEW v1 AS
+SELECT 1 AS z from t1;
+INSERT INTO v1(z) VALUES(1);
+ERROR HY000: Column 'z' is not updatable
+DROP VIEW  v1;
+DROP TABLE t1;

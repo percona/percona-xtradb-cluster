@@ -57,7 +57,6 @@ my_bool	srv_ibuf_disable_background_merge;
 #include "btr0pcur.h"
 #include "btr0btr.h"
 #include "row0upd.h"
-#include "sync0mutex.h"
 #include "dict0boot.h"
 #include "fut0lst.h"
 #include "lock0lock.h"
@@ -385,7 +384,7 @@ ibuf_header_page_get(
 }
 
 /******************************************************************//**
-Gets the root page and x-latches it.
+Gets the root page and sx-latches it.
 @return insert buffer tree root page */
 static
 page_t*
@@ -511,11 +510,12 @@ ibuf_init_at_db_start(void)
 	ibuf->max_size = ((buf_pool_get_curr_size() / UNIV_PAGE_SIZE)
 			  * CHANGE_BUFFER_DEFAULT_SIZE) / 100;
 
-	mutex_create("ibuf", &ibuf_mutex);
+	mutex_create(LATCH_ID_IBUF, &ibuf_mutex);
 
-	mutex_create("ibuf_bitmap", &ibuf_bitmap_mutex);
+	mutex_create(LATCH_ID_IBUF_BITMAP, &ibuf_bitmap_mutex);
 
-	mutex_create("ibuf_pessimistic_insert", &ibuf_pessimistic_insert_mutex);
+	mutex_create(LATCH_ID_IBUF_PESSIMISTIC_INSERT,
+		     &ibuf_pessimistic_insert_mutex);
 
 	mtr_start(&mtr);
 
@@ -556,7 +556,7 @@ ibuf_init_at_db_start(void)
 		IBUF_SPACE_ID, DICT_CLUSTERED | DICT_IBUF, 1);
 	ibuf->index->id = DICT_IBUF_ID_MIN + IBUF_SPACE_ID;
 	ibuf->index->table = dict_mem_table_create(
-		"innodb_change_buffer", IBUF_SPACE_ID, 1, 0, 0);
+		"innodb_change_buffer", IBUF_SPACE_ID, 1, 0, 0, 0);
 	ibuf->index->n_uniq = REC_MAX_N_FIELDS;
 	rw_lock_create(index_tree_rw_lock_key, &ibuf->index->lock,
 		       SYNC_IBUF_INDEX_TREE);
@@ -621,7 +621,8 @@ ibuf_parse_bitmap_init(
 	buf_block_t*	block,	/*!< in: block or NULL */
 	mtr_t*		mtr)	/*!< in: mtr or NULL */
 {
-	ut_ad(ptr && end_ptr);
+	ut_ad(ptr != NULL);
+	ut_ad(end_ptr != NULL);
 
 	if (block) {
 		ibuf_bitmap_page_init(block, mtr);
@@ -1468,7 +1469,7 @@ ibuf_dummy_index_create(
 	dict_index_t*	index;
 
 	table = dict_mem_table_create("IBUF_DUMMY",
-				      DICT_HDR_SPACE, n,
+				      DICT_HDR_SPACE, n, 0,
 				      comp ? DICT_TF_COMPACT : 0, 0);
 
 	index = dict_mem_index_create("IBUF_DUMMY", "IBUF_DUMMY",
@@ -2132,9 +2133,7 @@ ibuf_remove_free_page(void)
 
 	const page_id_t	page_id(IBUF_SPACE_ID, page_no);
 
-#if defined UNIV_DEBUG_FILE_ACCESSES || defined UNIV_DEBUG
-	buf_page_reset_file_page_was_freed(page_id);
-#endif /* UNIV_DEBUG_FILE_ACCESSES || UNIV_DEBUG */
+	ut_d(buf_page_reset_file_page_was_freed(page_id));
 
 	ibuf_enter(&mtr);
 
@@ -2176,9 +2175,8 @@ ibuf_remove_free_page(void)
 		bitmap_page, page_id, page_size, IBUF_BITMAP_IBUF, FALSE,
 		&mtr);
 
-#if defined UNIV_DEBUG_FILE_ACCESSES || defined UNIV_DEBUG
-	buf_page_set_file_page_was_freed(page_id);
-#endif /* UNIV_DEBUG_FILE_ACCESSES || UNIV_DEBUG */
+	ut_d(buf_page_set_file_page_was_freed(page_id));
+
 	ibuf_mtr_commit(&mtr);
 }
 
@@ -2190,12 +2188,7 @@ void
 ibuf_free_excess_pages(void)
 /*========================*/
 {
-	ulint		i;
-
-#ifdef UNIV_SYNC_DEBUG
-	ut_ad(rw_lock_own(fil_space_get_latch(IBUF_SPACE_ID, NULL),
-			  RW_LOCK_X));
-#endif /* UNIV_SYNC_DEBUG */
+	ut_ad(rw_lock_own(fil_space_get_latch(IBUF_SPACE_ID, NULL), RW_LOCK_X));
 
 	ut_ad(rw_lock_get_x_lock_count(
 		fil_space_get_latch(IBUF_SPACE_ID, NULL)) == 1);
@@ -2214,7 +2207,7 @@ ibuf_free_excess_pages(void)
 	/* Free at most a few pages at a time, so that we do not delay the
 	requested service too much */
 
-	for (i = 0; i < 4; i++) {
+	for (ulint i = 0; i < 4; i++) {
 
 		ibool	too_much_free;
 
@@ -2350,16 +2343,23 @@ ibuf_get_merge_page_nos_func(
 		} else {
 			rec_page_no = ibuf_rec_get_page_no(mtr, rec);
 			rec_space_id = ibuf_rec_get_space(mtr, rec);
-			/* In the system tablespace, the smallest
+			/* In the system tablespace the smallest
 			possible secondary index leaf page number is
-			bigger than IBUF_TREE_ROOT_PAGE_NO (4). In
-			other tablespaces, the clustered index tree is
-			created at page 3, which makes page 4 the
-			smallest possible secondary index leaf page
-			(and that only after DROP INDEX). */
-			ut_ad(rec_page_no
-			      > (ulint) IBUF_TREE_ROOT_PAGE_NO
-			      - (rec_space_id != 0));
+			bigger than FSP_DICT_HDR_PAGE_NO (7).
+			In all tablespaces, pages 0 and 1 are reserved
+			for the allocation bitmap and the change
+			buffer bitmap. In file-per-table tablespaces,
+			a file segment inode page will be created at
+			page 2 and the clustered index tree is created
+			at page 3.  So for file-per-table tablespaces,
+			page 4 is the smallest possible secondary
+			index leaf page. CREATE TABLESPACE also initially
+			uses pages 2 and 3 for the first created table,
+			but that table may be dropped, allowing page 2
+			to be reused for a secondary index leaf page.
+			To keep this assertion simple, just
+			make sure the page is >= 2. */
+			ut_ad(rec_page_no >= FSP_FIRST_INODE_PAGE_NO);
 		}
 
 #ifdef UNIV_IBUF_DEBUG
@@ -2617,9 +2617,9 @@ ibuf_merge_space(
 
 		ut_a(*n_pages > 0 || sum_sizes == 1);
 
-#ifdef UNIV_DEBUG
 		ut_ad(*n_pages <= UT_ARR_SIZE(pages));
 
+#ifdef UNIV_DEBUG
 		for (ulint i = 0; i < *n_pages; ++i) {
 			ut_ad(spaces[i] == space);
 		}
@@ -2831,7 +2831,8 @@ ibuf_get_volume_buffered_hash(
 #else /* UNIV_DEBUG */
 # define ibuf_get_volume_buffered_count(mtr,rec,hash,size,n_recs)	\
 	ibuf_get_volume_buffered_count_func(rec,hash,size,n_recs)
-#endif
+#endif /* UNIV_DEBUG */
+
 /*********************************************************************//**
 Update the estimate of the number of records on a page, and
 get the space taken by merging the buffered record to the index page.
@@ -3278,7 +3279,7 @@ ibuf_get_entry_counter_low_func(
 #else /* UNIV_DEBUG */
 # define ibuf_get_entry_counter(space,page_no,rec,mtr,exact_leaf) \
 	ibuf_get_entry_counter_func(space,page_no,rec,exact_leaf)
-#endif
+#endif /* UNIV_DEBUG */
 
 /****************************************************************//**
 Calculate the counter field for an entry based on the current
@@ -3604,9 +3605,9 @@ fail_exit:
 		ut_ad(BTR_LATCH_MODE_WITHOUT_INTENTION(mode)
 		      == BTR_MODIFY_TREE);
 
-		/* We acquire an x-latch to the root page before the insert,
+		/* We acquire an sx-latch to the root page before the insert,
 		because a pessimistic insert releases the tree x-latch,
-		which would cause the x-latching of the root after that to
+		which would cause the sx-latching of the root after that to
 		break the latching order. */
 
 		root = ibuf_tree_root_get(&mtr);
@@ -3956,9 +3957,8 @@ ibuf_insert_to_index_page(
 		ib::warn() << "Trying to insert a record from the insert"
 			" buffer to an index page but the number of fields"
 			" does not match!";
+		rec_print(stderr, rec, index);
 dump:
-		buf_page_print(page, univ_page_size, BUF_PAGE_PRINT_NO_CRASH);
-
 		dtuple_print(stderr, entry);
 		ut_ad(0);
 
@@ -4357,7 +4357,8 @@ ibuf_delete_rec(
 			<< ibuf_count_get(page_id) << " by 1";
 
 		ibuf_count_set(page_id, ibuf_count_get(page_id) - 1);
-#endif
+#endif /* UNIV_IBUF_COUNT_DEBUG */
+
 		return(FALSE);
 	}
 
@@ -4395,7 +4396,8 @@ ibuf_delete_rec(
 
 #ifdef UNIV_IBUF_COUNT_DEBUG
 	ibuf_count_set(page_id, ibuf_count_get(page_id) - 1);
-#endif
+#endif /* UNIV_IBUF_COUNT_DEBUG */
+
 	ibuf_size_update(root);
 	mutex_exit(&ibuf_mutex);
 
@@ -4433,7 +4435,7 @@ ibuf_merge_or_delete_for_page(
 	dtuple_t*	search_tuple;
 #ifdef UNIV_IBUF_DEBUG
 	ulint		volume			= 0;
-#endif
+#endif /* UNIV_IBUF_DEBUG */
 	page_zip_des_t*	page_zip		= NULL;
 	fil_space_t*	space			= NULL;
 	bool		corruption_noticed	= false;
@@ -4529,27 +4531,7 @@ ibuf_merge_or_delete_for_page(
 		if (!fil_page_index_page_check(block->frame)
 		    || !page_is_leaf(block->frame)) {
 
-			page_t*	bitmap_page;
-
 			corruption_noticed = true;
-
-			ibuf_mtr_start(&mtr);
-
-			ib::info() << "Dump of the ibuf bitmap page:";
-
-			ut_ad(page_size != NULL);
-
-			bitmap_page = ibuf_bitmap_get_map_page(
-				page_id, *page_size, &mtr);
-
-			buf_page_print(bitmap_page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
-			ibuf_mtr_commit(&mtr);
-
-			fputs("\nInnoDB: Dump of the page:\n", stderr);
-
-			buf_page_print(block->frame, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
 
 			ib::error() << "Corruption in the tablespace. Bitmap"
 				" shows insert buffer records to page "

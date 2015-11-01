@@ -137,7 +137,6 @@ static uint my_end_arg;
 static char * opt_mysql_unix_port=0;
 static char *opt_bind_addr = NULL;
 static int   first_error=0;
-static DYNAMIC_STRING extended_row;
 #include <sslopt-vars.h>
 FILE *md_result_file= 0;
 FILE *stderror_file=0;
@@ -284,7 +283,7 @@ static struct my_option my_long_options[] =
   {"debug-check", OPT_DEBUG_CHECK, "This is a non-debug version. Catch this and exit.",
    0, 0, 0,
    GET_DISABLED, NO_ARG, 0, 0, 0, 0, 0, 0},
-  {"debug-info", 'T', "This is a non-debug version. Catch this and exit.", 0,
+  {"debug-info", OPT_DEBUG_INFO, "This is a non-debug version. Catch this and exit.", 0,
    0, 0, GET_DISABLED, NO_ARG, 0, 0, 0, 0, 0, 0},
 #else
   {"debug", '#', "Output debug log.", &default_dbug_option,
@@ -987,7 +986,8 @@ static int get_options(int *argc, char ***argv)
   defaults_argv= *argv;
 
   if (my_hash_init(&ignore_table, charset_info, 16, 0, 0,
-                   (my_hash_get_key) get_table_key, my_free, 0))
+                   (my_hash_get_key) get_table_key, my_free, 0,
+                   PSI_NOT_INSTRUMENTED))
     return(EX_EOM);
   /* Don't copy internal log tables */
   if (my_hash_insert(&ignore_table,
@@ -1517,8 +1517,6 @@ static void free_resources()
   my_free(opt_password);
   if (my_hash_inited(&ignore_table))
     my_hash_free(&ignore_table);
-  if (extended_insert)
-    dynstr_free(&extended_row);
   if (insert_pat_inited)
     dynstr_free(&insert_pat);
   if (defaults_argv)
@@ -1546,7 +1544,9 @@ int parse_ignore_error()
 
   DBUG_ENTER("parse_ignore_error");
 
-  if (my_init_dynamic_array(&ignore_error, sizeof(uint), NULL, 12, 12))
+  if (my_init_dynamic_array(&ignore_error,
+                           PSI_NOT_INSTRUMENTED,
+                           sizeof(uint), NULL, 12, 12))
     goto error;
 
   token= strtok(opt_ignore_error, search);
@@ -1719,11 +1719,9 @@ static void unescape(FILE *file,char *pos,uint length)
 
 static my_bool test_if_special_chars(const char *str)
 {
-#if MYSQL_VERSION_ID >= 32300
   for ( ; *str ; str++)
     if (!my_isvar(charset_info,*str) && *str != '$')
       return 1;
-#endif
   return 0;
 } /* test_if_special_chars */
 
@@ -2313,6 +2311,7 @@ static uint dump_events_for_db(char *db)
                   (const char *) (query_str != NULL ? query_str : row[3]),
                   (const char *) delimiter);
 
+          my_free(query_str);
           restore_time_zone(sql_file, delimiter);
           restore_sql_mode(sql_file, delimiter);
 
@@ -3486,6 +3485,7 @@ static void dump_table(char *table, char *db)
   char ignore_flag;
   char buf[200], table_buff[NAME_LEN+3];
   DYNAMIC_STRING query_string;
+  DYNAMIC_STRING extended_row;
   char table_type[NAME_LEN];
   char *result_table, table_buff2[NAME_LEN*2+3], *opt_quoted_table;
   int error= 0;
@@ -3544,6 +3544,8 @@ static void dump_table(char *table, char *db)
   verbose_msg("-- Sending SELECT query...\n");
 
   init_dynamic_string_checked(&query_string, "", 1024, 1024);
+  if (extended_insert)
+    init_dynamic_string_checked(&extended_row, "", 1024, 1024);
 
   if (path)
   {
@@ -3951,10 +3953,14 @@ static void dump_table(char *table, char *db)
     mysql_free_result(res);
   }
   dynstr_free(&query_string);
+  if (extended_insert)
+    dynstr_free(&extended_row);
   DBUG_VOID_RETURN;
 
 err:
   dynstr_free(&query_string);
+  if (extended_insert)
+    dynstr_free(&extended_row);
   maybe_exit(error);
   DBUG_VOID_RETURN;
 } /* dump_table */
@@ -4082,7 +4088,8 @@ static int dump_tablespaces(char* ts_where)
                       " EXTRA"
                       " FROM INFORMATION_SCHEMA.FILES"
                       " WHERE FILE_TYPE = 'UNDO LOG'"
-                      " AND FILE_NAME IS NOT NULL",
+                      " AND FILE_NAME IS NOT NULL"
+                      " AND LOGFILE_GROUP_NAME IS NOT NULL",
                       256, 1024);
   if(ts_where)
   {
@@ -4295,12 +4302,17 @@ static int dump_all_databases()
         !my_strcasecmp(&my_charset_latin1, row[0], PERFORMANCE_SCHEMA_DB_NAME))
       continue;
 
+    if (mysql_get_server_version(mysql) >= FIRST_SYS_SCHEMA_VERSION &&
+        !my_strcasecmp(&my_charset_latin1, row[0], SYS_SCHEMA_DB_NAME))
+      continue;
+
     if (is_ndbinfo(mysql, row[0]))
       continue;
 
     if (dump_all_tables_in_db(row[0]))
       result=1;
   }
+  mysql_free_result(tableres);
   if (seen_views)
   {
     if (mysql_query(mysql, "SHOW DATABASES") ||
@@ -4320,12 +4332,17 @@ static int dump_all_databases()
           !my_strcasecmp(&my_charset_latin1, row[0], PERFORMANCE_SCHEMA_DB_NAME))
         continue;
 
+      if (mysql_get_server_version(mysql) >= FIRST_SYS_SCHEMA_VERSION &&
+          !my_strcasecmp(&my_charset_latin1, row[0], SYS_SCHEMA_DB_NAME))
+        continue;
+
       if (is_ndbinfo(mysql, row[0]))
         continue;
 
       if (dump_all_views_in_db(row[0]))
         result=1;
     }
+    mysql_free_result(tableres);
   }
   return result;
 }
@@ -4460,8 +4477,6 @@ static int init_dumping(char *database, int init_func(char*))
       check_io(md_result_file);
     }
   }
-  if (extended_insert)
-    init_dynamic_string_checked(&extended_row, "", 1024, 1024);
   return 0;
 } /* init_dumping */
 
@@ -5577,17 +5592,22 @@ static my_bool process_set_gtid_purged(MYSQL* mysql_con)
 
     set_session_binlog(FALSE);
     if (add_set_gtid_purged(mysql_con))
+    {
+      mysql_free_result(gtid_mode_res);
       return TRUE;
+    }
   }
   else /* gtid_mode is off */
   {
     if (opt_set_gtid_purged_mode == SET_GTID_PURGED_ON)
     {
       fprintf(stderr, "Error: Server has GTIDs disabled.\n");
+      mysql_free_result(gtid_mode_res);
       return TRUE;
     }
   }
 
+  mysql_free_result(gtid_mode_res);
   return FALSE;
 }
 
@@ -5642,6 +5662,7 @@ static my_bool get_view_structure(char *table, char* db)
   {
     switch_character_set_results(mysql, default_charset);
     verbose_msg("-- It's base table, skipped\n");
+    mysql_free_result(table_res);
     DBUG_RETURN(0);
   }
 

@@ -55,14 +55,12 @@ using std::max;
 static PSI_memory_key key_memory_plugin_ref;
 #endif
 
-volatile int32 num_pre_parse_plugins= 0;
-volatile int32 num_post_parse_plugins= 0;
-
 static PSI_memory_key key_memory_plugin_mem_root;
 static PSI_memory_key key_memory_plugin_init_tmp;
 static PSI_memory_key key_memory_plugin_int_mem_root;
 static PSI_memory_key key_memory_mysql_plugin;
 static PSI_memory_key key_memory_mysql_plugin_dl;
+static PSI_memory_key key_memory_plugin_bookmark;
 
 extern st_mysql_plugin *mysql_optional_plugins[];
 extern st_mysql_plugin *mysql_mandatory_plugins[];
@@ -96,8 +94,6 @@ const LEX_STRING plugin_type_names[MYSQL_MAX_PLUGIN_TYPE_NUM]=
   { C_STRING_WITH_LEN("REPLICATION") },
   { C_STRING_WITH_LEN("AUTHENTICATION") },
   { C_STRING_WITH_LEN("VALIDATE PASSWORD") },
-  { C_STRING_WITH_LEN("QUERY REWRITE PRE PARSE") },
-  { C_STRING_WITH_LEN("QUERY REWRITE POST PARSE") },
   { C_STRING_WITH_LEN("GROUP REPLICATION") }
 };
 
@@ -107,10 +103,6 @@ extern int finalize_schema_table(st_plugin_int *plugin);
 extern int initialize_audit_plugin(st_plugin_int *plugin);
 extern int finalize_audit_plugin(st_plugin_int *plugin);
 
-extern int initialize_rewrite_pre_parse_plugin(st_plugin_int *plugin);
-extern int initialize_rewrite_post_parse_plugin(st_plugin_int *plugin);
-extern int finalize_rewrite_plugin(st_plugin_int *plugin);
-
 /*
   The number of elements in both plugin_type_initialize and
   plugin_type_deinitialize should equal to the number of plugins
@@ -119,25 +111,13 @@ extern int finalize_rewrite_plugin(st_plugin_int *plugin);
 plugin_type_init plugin_type_initialize[MYSQL_MAX_PLUGIN_TYPE_NUM]=
 {
   0,ha_initialize_handlerton,0,0,initialize_schema_table,
-  initialize_audit_plugin,0,0,0,
-
-  /// Initializer function for pre parse query rewrite plugins.
-  initialize_rewrite_pre_parse_plugin,
-
-  /// Initializer function for post parse query rewrite plugins.
-  initialize_rewrite_post_parse_plugin
+  initialize_audit_plugin,0,0,0
 };
 
 plugin_type_init plugin_type_deinitialize[MYSQL_MAX_PLUGIN_TYPE_NUM]=
 {
   0,ha_finalize_handlerton,0,0,finalize_schema_table,
-  finalize_audit_plugin,0,0,0,
-
-  /* Finalizer function for pre parse query rewrite plugins. */
-  finalize_rewrite_plugin,
-
-  /* Finalizer function for post parse query rewrite plugins. */
-  finalize_rewrite_plugin
+  finalize_audit_plugin,0,0,0
 };
 
 #ifdef HAVE_DLOPEN
@@ -165,8 +145,6 @@ static int min_plugin_info_interface_version[MYSQL_MAX_PLUGIN_TYPE_NUM]=
   MYSQL_REPLICATION_INTERFACE_VERSION,
   MYSQL_AUTHENTICATION_INTERFACE_VERSION,
   MYSQL_VALIDATE_PASSWORD_INTERFACE_VERSION,
-  MYSQL_REWRITE_PRE_PARSE_INTERFACE_VERSION,
-  MYSQL_REWRITE_POST_PARSE_INTERFACE_VERSION,
   MYSQL_GROUP_REPLICATION_INTERFACE_VERSION
 };
 static int cur_plugin_info_interface_version[MYSQL_MAX_PLUGIN_TYPE_NUM]=
@@ -180,8 +158,6 @@ static int cur_plugin_info_interface_version[MYSQL_MAX_PLUGIN_TYPE_NUM]=
   MYSQL_REPLICATION_INTERFACE_VERSION,
   MYSQL_AUTHENTICATION_INTERFACE_VERSION,
   MYSQL_VALIDATE_PASSWORD_INTERFACE_VERSION,
-  MYSQL_REWRITE_PRE_PARSE_INTERFACE_VERSION,
-  MYSQL_REWRITE_POST_PARSE_INTERFACE_VERSION,
   MYSQL_GROUP_REPLICATION_INTERFACE_VERSION
 };
 
@@ -279,7 +255,7 @@ public:
   const char *orig_pluginvar_name;
 
   static void *operator new(size_t size, MEM_ROOT *mem_root)
-  { return (void*) alloc_root(mem_root, size); }
+  { return alloc_root(mem_root, size); }
   static void operator delete(void *ptr_arg,size_t size)
   { TRASH(ptr_arg, size); }
 
@@ -958,12 +934,6 @@ static bool plugin_add(MEM_ROOT *tmp_root,
         {
           init_alloc_root(key_memory_plugin_int_mem_root,
                           &tmp_plugin_ptr->mem_root, 4096, 4096);
-
-          if (plugin->type == MYSQL_REWRITE_PRE_PARSE_PLUGIN)
-            my_atomic_add32(&num_pre_parse_plugins, 1);
-          if (plugin->type == MYSQL_REWRITE_POST_PARSE_PLUGIN)
-            my_atomic_add32(&num_post_parse_plugins, 1);
-
           DBUG_RETURN(FALSE);
         }
         tmp_plugin_ptr->state= PLUGIN_IS_FREED;
@@ -1038,11 +1008,6 @@ static void plugin_del(st_plugin_int *plugin)
   restore_pluginvar_names(plugin->system_vars);
   plugin_vars_free_values(plugin->system_vars);
   my_hash_delete(&plugin_hash[plugin->plugin->type], (uchar*)plugin);
-
-  if (plugin->plugin->type == MYSQL_REWRITE_PRE_PARSE_PLUGIN)
-    my_atomic_add32(&num_pre_parse_plugins, -1);
-  if (plugin->plugin->type == MYSQL_REWRITE_POST_PARSE_PLUGIN)
-    my_atomic_add32(&num_post_parse_plugins, -1);
 
   if (plugin->plugin_dl)
     plugin_dl_del(&plugin->plugin_dl->dl);
@@ -1216,7 +1181,7 @@ static int plugin_initialize(st_plugin_int *plugin)
   else if (plugin->plugin->init)
   {
     if (strcmp(plugin->name.str, "daemon_memcached") == 0) {
-       plugin->data = (void*)innodb_callback_data;
+       plugin->data = innodb_callback_data;
     }
 
     if (plugin->plugin->init(plugin))
@@ -1309,13 +1274,14 @@ static PSI_mutex_info all_plugin_mutexes[]=
 static PSI_memory_info all_plugin_memory[]=
 {
 #ifndef DBUG_OFF
-  { &key_memory_plugin_ref, "plugin_ref", 0},
+  { &key_memory_plugin_ref, "plugin_ref", PSI_FLAG_GLOBAL},
 #endif
   { &key_memory_plugin_mem_root, "plugin_mem_root", PSI_FLAG_GLOBAL},
   { &key_memory_plugin_init_tmp, "plugin_init_tmp", 0},
   { &key_memory_plugin_int_mem_root, "plugin_int_mem_root", 0},
   { &key_memory_mysql_plugin_dl, "mysql_plugin_dl", 0},
-  { &key_memory_mysql_plugin, "mysql_plugin", 0}
+  { &key_memory_mysql_plugin, "mysql_plugin", 0},
+  { &key_memory_plugin_bookmark, "plugin_bookmark", PSI_FLAG_GLOBAL}
 };
 
 static void init_plugin_psi_keys(void)
@@ -1341,7 +1307,6 @@ static void init_plugin_psi_keys(void)
 int plugin_init(int *argc, char **argv, int flags)
 {
   uint i;
-  bool is_myisam;
   st_mysql_plugin **builtins;
   st_mysql_plugin *plugin;
   st_plugin_int tmp, *plugin_ptr, **reap;
@@ -1361,11 +1326,13 @@ int plugin_init(int *argc, char **argv, int flags)
   init_alloc_root(key_memory_plugin_init_tmp, &tmp_root, 4096, 4096);
 
   if (my_hash_init(&bookmark_hash, &my_charset_bin, 16, 0, 0,
-                   get_bookmark_hash_key, NULL, HASH_UNIQUE))
+                   get_bookmark_hash_key, NULL, HASH_UNIQUE,
+                   key_memory_plugin_bookmark))
       goto err;
 
   if (my_hash_init(&malloced_string_type_sysvars_bookmark_hash, &my_charset_bin,
-                   16, 0, 0, get_bookmark_hash_key, NULL, HASH_UNIQUE))
+                   16, 0, 0, get_bookmark_hash_key, NULL, HASH_UNIQUE,
+                   key_memory_plugin_bookmark))
       goto err;
 
   mysql_mutex_init(key_LOCK_plugin, &LOCK_plugin, MY_MUTEX_INIT_FAST);
@@ -1381,7 +1348,8 @@ int plugin_init(int *argc, char **argv, int flags)
   for (i= 0; i < MYSQL_MAX_PLUGIN_TYPE_NUM; i++)
   {
     if (my_hash_init(&plugin_hash[i], system_charset_info, 16, 0, 0,
-                     get_plugin_hash_key, NULL, HASH_UNIQUE))
+                     get_plugin_hash_key, NULL, HASH_UNIQUE,
+                     key_memory_plugin_mem_root))
       goto err;
   }
 
@@ -1428,13 +1396,7 @@ int plugin_init(int *argc, char **argv, int flags)
       */
       if (!my_strcasecmp(&my_charset_latin1, plugin->name, "PERFORMANCE_SCHEMA"))
       {
-        if (load_perfschema_engine)
-          tmp.load_option= PLUGIN_FORCE;
-        else
-        {
-          tmp.load_option= PLUGIN_OFF;
-          continue;
-        }
+        tmp.load_option= PLUGIN_FORCE;
       }
 
       free_root(&tmp_root, MYF(MY_MARK_BLOCKS_FREE));
@@ -1445,11 +1407,18 @@ int plugin_init(int *argc, char **argv, int flags)
       if (register_builtin(plugin, &tmp, &plugin_ptr))
         goto err_unlock;
 
-      /* only initialize MyISAM, InnoDB and CSV at this stage */
-      is_myisam= !my_strcasecmp(&my_charset_latin1, plugin->name, "MyISAM");
+      /*
+        Only initialize MyISAM, InnoDB and CSV at this stage.
+        Note that when the --help option is supplied, InnoDB is not
+        initialized because the plugin table will not be read anyway,
+        as indicated by the flag set when the plugin_init() function
+        is called.
+      */
+      bool is_myisam= !my_strcasecmp(&my_charset_latin1, plugin->name, "MyISAM");
+      bool is_innodb= !my_strcasecmp(&my_charset_latin1, plugin->name, "InnoDB");
       if (!is_myisam &&
-          my_strcasecmp(&my_charset_latin1, plugin->name, "CSV") &&
-          my_strcasecmp(&my_charset_latin1, plugin->name, "InnoDB"))
+          (!is_innodb || opt_help) &&
+          my_strcasecmp(&my_charset_latin1, plugin->name, "CSV"))
         continue;
 
       if (plugin_ptr->state != PLUGIN_IS_UNINITIALIZED ||
@@ -1592,7 +1561,7 @@ static void plugin_load(MEM_ROOT *tmp_root, int *argc, char **argv)
   new_thd->store_globals();
   LEX_CSTRING db_lex_cstr= { STRING_WITH_LEN("mysql") };
   new_thd->set_db(db_lex_cstr);
-  memset(&thd.net, 0, sizeof(thd.net));
+  thd.get_protocol_classic()->wipe_net();
   tables.init_one_table("mysql", 5, "plugin", 6, "plugin", TL_READ);
 
 #ifdef EMBEDDED_LIBRARY
@@ -2375,7 +2344,7 @@ static int check_func_int(THD *thd, st_mysql_sys_var *var,
   }
 
   return throw_bounds_warning(thd, var->name, fixed1 || fixed2,
-                              value->is_unsigned(value), (longlong) orig);
+                              value->is_unsigned(value), orig);
 }
 
 
@@ -2404,7 +2373,7 @@ static int check_func_long(THD *thd, st_mysql_sys_var *var,
   }
 
   return throw_bounds_warning(thd, var->name, fixed1 || fixed2,
-                              value->is_unsigned(value), (longlong) orig);
+                              value->is_unsigned(value), orig);
 }
 
 
@@ -2433,7 +2402,7 @@ static int check_func_longlong(THD *thd, st_mysql_sys_var *var,
   }
 
   return throw_bounds_warning(thd, var->name, fixed1 || fixed2,
-                              value->is_unsigned(value), (longlong) orig);
+                              value->is_unsigned(value), orig);
 }
 
 static int check_func_str(THD *thd, st_mysql_sys_var *var,

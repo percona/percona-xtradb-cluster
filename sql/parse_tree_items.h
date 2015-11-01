@@ -41,35 +41,6 @@ public:
   virtual bool itemize(Parse_context *pc, Item **item);
 };
 
-class PTI_expr_or : public Parse_tree_item
-{
-  typedef Parse_tree_item super;
-
-  Item *left;
-  Item *right;
-
-public:
-  PTI_expr_or(const POS &pos, Item *left_arg, Item *right_arg)
-  : super(pos), left(left_arg), right(right_arg)
-  {}
-
-  virtual bool itemize(Parse_context *pc, Item **res);
-};
-
-class PTI_expr_and : public Parse_tree_item
-{
-  typedef Parse_tree_item super;
-
-  Item *left;
-  Item *right;
-
-public:
-  PTI_expr_and(const POS &pos, Item *left_arg, Item *right_arg)
-  : super(pos), left(left_arg), right(right_arg)
-  {}
-
-  virtual bool itemize(Parse_context *pc, Item **res);
-};
 
 class PTI_negate_expression : public Parse_tree_item
 {
@@ -173,7 +144,8 @@ public:
       return true;
 
     THD *thd= pc->thd;
-    const char* schema= thd->client_capabilities & CLIENT_NO_SCHEMA ? NULL : db;
+    const char* schema=
+      thd->get_protocol()->has_client_capability(CLIENT_NO_SCHEMA) ? NULL : db;
     if (pc->select->no_table_names_allowed)
     {
       my_error(ER_TABLENAME_NOT_ALLOWED_HERE,
@@ -620,7 +592,7 @@ class PTI_num_literal_num : public Item_int
 public:
   PTI_num_literal_num(const POS &pos,
                        const LEX_STRING &num, int dummy_error= 0)
-  : super(pos, num, (longlong) my_strtoll10(num.str, NULL, &dummy_error),
+  : super(pos, num, my_strtoll10(num.str, NULL, &dummy_error),
           static_cast<uint>(num.length))
   {}
 };
@@ -672,7 +644,7 @@ public:
 
     set_repertoire_from_value();
     set_cs_specified(TRUE);
-    return check_well_formed_result(&str_value, TRUE) == NULL;
+    return check_well_formed_result(&str_value, true, true) == NULL;
   }
 };
 
@@ -695,7 +667,7 @@ public:
       return true;
 
     set_cs_specified(TRUE);
-    return check_well_formed_result(&str_value, TRUE) == NULL;
+    return check_well_formed_result(&str_value, true, true) == NULL;
   }
 };
 
@@ -1058,7 +1030,7 @@ public:
     */
     DBUG_ASSERT(tmp_param == param_marker);
 
-    static_cast<Item_param *>(param_marker)->limit_clause_param= true;
+    param_marker->limit_clause_param= true;
     *res= param_marker;
     return false;
   }

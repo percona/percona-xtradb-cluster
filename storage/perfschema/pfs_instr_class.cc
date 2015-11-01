@@ -284,7 +284,8 @@ int init_sync_class(uint mutex_class_sizing,
   if (mutex_class_max > 0)
   {
     mutex_class_array= PFS_MALLOC_ARRAY(& builtin_memory_mutex_class,
-                                        mutex_class_max, PFS_mutex_class,
+                                        mutex_class_max,
+                                        sizeof(PFS_mutex_class), PFS_mutex_class,
                                         MYF(MY_ZEROFILL));
     if (unlikely(mutex_class_array == NULL))
       return 1;
@@ -293,7 +294,8 @@ int init_sync_class(uint mutex_class_sizing,
   if (rwlock_class_max > 0)
   {
     rwlock_class_array= PFS_MALLOC_ARRAY(& builtin_memory_rwlock_class,
-                                         rwlock_class_max, PFS_rwlock_class,
+                                         rwlock_class_max,
+                                         sizeof(PFS_rwlock_class), PFS_rwlock_class,
                                          MYF(MY_ZEROFILL));
     if (unlikely(rwlock_class_array == NULL))
       return 1;
@@ -302,7 +304,8 @@ int init_sync_class(uint mutex_class_sizing,
   if (cond_class_max > 0)
   {
     cond_class_array= PFS_MALLOC_ARRAY(& builtin_memory_cond_class,
-                                       cond_class_max, PFS_cond_class,
+                                       cond_class_max,
+                                       sizeof(PFS_cond_class), PFS_cond_class,
                                        MYF(MY_ZEROFILL));
     if (unlikely(cond_class_array == NULL))
       return 1;
@@ -315,19 +318,19 @@ int init_sync_class(uint mutex_class_sizing,
 void cleanup_sync_class(void)
 {
   PFS_FREE_ARRAY(& builtin_memory_mutex_class,
-                 mutex_class_max, PFS_mutex_class,
+                 mutex_class_max, sizeof(PFS_mutex_class),
                  mutex_class_array);
   mutex_class_array= NULL;
   mutex_class_dirty_count= mutex_class_allocated_count= mutex_class_max= 0;
 
   PFS_FREE_ARRAY(& builtin_memory_rwlock_class,
-                 rwlock_class_max, PFS_rwlock_class,
+                 rwlock_class_max, sizeof(PFS_rwlock_class),
                  rwlock_class_array);
   rwlock_class_array= NULL;
   rwlock_class_dirty_count= rwlock_class_allocated_count= rwlock_class_max= 0;
 
   PFS_FREE_ARRAY(& builtin_memory_cond_class,
-                 cond_class_max, PFS_cond_class,
+                 cond_class_max, sizeof(PFS_cond_class),
                  cond_class_array);
   cond_class_array= NULL;
   cond_class_dirty_count= cond_class_allocated_count= cond_class_max= 0;
@@ -348,7 +351,8 @@ int init_thread_class(uint thread_class_sizing)
   if (thread_class_max > 0)
   {
     thread_class_array= PFS_MALLOC_ARRAY(& builtin_memory_thread_class,
-                                         thread_class_max, PFS_thread_class,
+                                         thread_class_max,
+                                         sizeof(PFS_thread_class), PFS_thread_class,
                                          MYF(MY_ZEROFILL));
     if (unlikely(thread_class_array == NULL))
       result= 1;
@@ -363,7 +367,7 @@ int init_thread_class(uint thread_class_sizing)
 void cleanup_thread_class(void)
 {
   PFS_FREE_ARRAY(& builtin_memory_thread_class,
-                 thread_class_max, PFS_thread_class,
+                 thread_class_max, sizeof(PFS_thread_class),
                  thread_class_array);
   thread_class_array= NULL;
   thread_class_dirty_count= thread_class_allocated_count= 0;
@@ -812,7 +816,8 @@ int init_file_class(uint file_class_sizing)
   if (file_class_max > 0)
   {
     file_class_array= PFS_MALLOC_ARRAY(& builtin_memory_file_class,
-                                       file_class_max, PFS_file_class,
+                                       file_class_max,
+                                       sizeof(PFS_file_class), PFS_file_class,
                                        MYF(MY_ZEROFILL));
     if (unlikely(file_class_array == NULL))
       return 1;
@@ -827,7 +832,7 @@ int init_file_class(uint file_class_sizing)
 void cleanup_file_class(void)
 {
   PFS_FREE_ARRAY(& builtin_memory_file_class,
-                 file_class_max, PFS_file_class,
+                 file_class_max, sizeof(PFS_file_class),
                  file_class_array);
   file_class_array= NULL;
   file_class_dirty_count= file_class_allocated_count= 0;
@@ -849,7 +854,8 @@ int init_stage_class(uint stage_class_sizing)
   if (stage_class_max > 0)
   {
     stage_class_array= PFS_MALLOC_ARRAY(& builtin_memory_stage_class,
-                                        stage_class_max, PFS_stage_class,
+                                        stage_class_max,
+                                        sizeof(PFS_stage_class), PFS_stage_class,
                                         MYF(MY_ZEROFILL));
     if (unlikely(stage_class_array == NULL))
       return 1;
@@ -864,7 +870,7 @@ int init_stage_class(uint stage_class_sizing)
 void cleanup_stage_class(void)
 {
   PFS_FREE_ARRAY(& builtin_memory_stage_class,
-                 stage_class_max, PFS_stage_class,
+                 stage_class_max, sizeof(PFS_stage_class),
                  stage_class_array);
   stage_class_array= NULL;
   stage_class_dirty_count= stage_class_allocated_count= 0;
@@ -886,7 +892,8 @@ int init_statement_class(uint statement_class_sizing)
   if (statement_class_max > 0)
   {
     statement_class_array= PFS_MALLOC_ARRAY(& builtin_memory_statement_class,
-                                            statement_class_max, PFS_statement_class,
+                                            statement_class_max,
+                                            sizeof(PFS_statement_class), PFS_statement_class,
                                             MYF(MY_ZEROFILL));
     if (unlikely(statement_class_array == NULL))
       return 1;
@@ -901,7 +908,7 @@ int init_statement_class(uint statement_class_sizing)
 void cleanup_statement_class(void)
 {
   PFS_FREE_ARRAY(& builtin_memory_statement_class,
-                 statement_class_max, PFS_statement_class,
+                 statement_class_max, sizeof(PFS_statement_class),
                  statement_class_array);
   statement_class_array= NULL;
   statement_class_dirty_count= statement_class_allocated_count= 0;
@@ -923,7 +930,8 @@ int init_socket_class(uint socket_class_sizing)
   if (socket_class_max > 0)
   {
     socket_class_array= PFS_MALLOC_ARRAY(& builtin_memory_socket_class,
-                                         socket_class_max, PFS_socket_class,
+                                         socket_class_max,
+                                         sizeof(PFS_socket_class), PFS_socket_class,
                                          MYF(MY_ZEROFILL));
     if (unlikely(socket_class_array == NULL))
       return 1;
@@ -938,7 +946,7 @@ int init_socket_class(uint socket_class_sizing)
 void cleanup_socket_class(void)
 {
   PFS_FREE_ARRAY(& builtin_memory_socket_class,
-                 socket_class_max, PFS_socket_class,
+                 socket_class_max, sizeof(PFS_socket_class),
                  socket_class_array);
   socket_class_array= NULL;
   socket_class_dirty_count= socket_class_allocated_count= 0;
@@ -960,7 +968,8 @@ int init_memory_class(uint memory_class_sizing)
   if (memory_class_max > 0)
   {
     memory_class_array= PFS_MALLOC_ARRAY(& builtin_memory_memory_class,
-                                         memory_class_max, PFS_memory_class,
+                                         memory_class_max,
+                                         sizeof(PFS_memory_class), PFS_memory_class,
                                          MYF(MY_ZEROFILL));
     if (unlikely(memory_class_array == NULL))
       return 1;
@@ -975,7 +984,7 @@ int init_memory_class(uint memory_class_sizing)
 void cleanup_memory_class(void)
 {
   PFS_FREE_ARRAY(& builtin_memory_memory_class,
-                 memory_class_max, PFS_memory_class,
+                 memory_class_max, sizeof(PFS_memory_class),
                  memory_class_array);
   memory_class_array= NULL;
   memory_class_dirty_count= memory_class_allocated_count= 0;
@@ -1138,7 +1147,8 @@ PFS_sync_key register_mutex_class(const char *name, uint name_length,
     Out of space, report to SHOW STATUS that
     the allocated memory was too small.
   */
-  mutex_class_lost++;
+  if (pfs_enabled)
+    mutex_class_lost++;
   return 0;
 }
 
@@ -1176,7 +1186,8 @@ PFS_sync_key register_rwlock_class(const char *name, uint name_length,
     return (index + 1);
   }
 
-  rwlock_class_lost++;
+  if (pfs_enabled)
+    rwlock_class_lost++;
   return 0;
 }
 
@@ -1213,7 +1224,8 @@ PFS_sync_key register_cond_class(const char *name, uint name_length,
     return (index + 1);
   }
 
-  cond_class_lost++;
+  if (pfs_enabled)
+    cond_class_lost++;
   return 0;
 }
 
@@ -1303,7 +1315,8 @@ PFS_thread_key register_thread_class(const char *name, uint name_length,
     return (index + 1);
   }
 
-  thread_class_lost++;
+  if (pfs_enabled)
+    thread_class_lost++;
   return 0;
 }
 
@@ -1356,7 +1369,8 @@ PFS_file_key register_file_class(const char *name, uint name_length,
     return (index + 1);
   }
 
-  file_class_lost++;
+  if (pfs_enabled)
+    file_class_lost++;
   return 0;
 }
 
@@ -1409,7 +1423,8 @@ PFS_stage_key register_stage_class(const char *name,
     return (index + 1);
   }
 
-  stage_class_lost++;
+  if (pfs_enabled)
+    stage_class_lost++;
   return 0;
 }
 
@@ -1446,7 +1461,8 @@ PFS_statement_key register_statement_class(const char *name, uint name_length,
     return (index + 1);
   }
 
-  statement_class_lost++;
+  if (pfs_enabled)
+    statement_class_lost++;
   return 0;
 }
 
@@ -1528,7 +1544,8 @@ PFS_socket_key register_socket_class(const char *name, uint name_length,
     return (index + 1);
   }
 
-  socket_class_lost++;
+  if (pfs_enabled)
+    socket_class_lost++;
   return 0;
 }
 
@@ -1579,7 +1596,8 @@ PFS_memory_key register_memory_class(const char *name, uint name_length,
     return (index + 1);
   }
 
-  memory_class_lost++;
+  if (pfs_enabled)
+    memory_class_lost++;
   return 0;
 }
 
@@ -1740,9 +1758,14 @@ search:
         - keep the lock stats, they are unaffected
         - destroy the index stats, indexes changed.
         - adjust the expected key count
+        - recreate index stats
       */
       pfs->destroy_index_stats();
       pfs->m_key_count= share->keys;
+      for (uint index= 0; index < pfs->m_key_count; index++)
+      {
+        (void)pfs->find_or_create_index_stat(share, index);
+      }
     }
     lf_hash_search_unpin(pins);
     return pfs;
@@ -1783,8 +1806,14 @@ search:
     int res;
     pfs->m_lock.dirty_to_allocated(& dirty_state);
     res= lf_hash_insert(&table_share_hash, pins, &pfs);
+
     if (likely(res == 0))
     {
+      /* Create table share index stats. */
+      for (uint index= 0; index < pfs->m_key_count; index++)
+      {
+        (void)pfs->find_or_create_index_stat(share, index);
+      }
       return pfs;
     }
 

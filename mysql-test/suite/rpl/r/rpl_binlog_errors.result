@@ -191,7 +191,6 @@ include/rpl_restart_server.inc [server_number=1]
 FLUSH LOGS;
 ERROR HY000: Can't open file: 'master-bin.index' (errno: 1 - Operation not permitted)
 RESET MASTER;
-ERROR HY000: Binlog closed, cannot RESET MASTER
 CREATE TABLE t5 (a INT);
 INSERT INTO t4 VALUES ('bbbbb');
 INSERT INTO t2 VALUES ('aaaaa');
@@ -203,7 +202,6 @@ include/rpl_restart_server.inc [server_number=1]
 FLUSH LOGS;
 ERROR HY000: Can't open file: 'master-bin' (errno: 2 - No such file or directory)
 RESET MASTER;
-ERROR HY000: Binlog closed, cannot RESET MASTER
 CREATE TABLE t5 (a INT);
 INSERT INTO t4 VALUES ('bbbbb');
 INSERT INTO t2 VALUES ('aaaaa');
@@ -231,10 +229,10 @@ SET GLOBAL debug="+d,error_unique_log_filename";
 START SLAVE io_thread;
 include/wait_for_slave_io_error.inc [errno=1595]
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 Last_IO_Error = 'Relay log write failure: could not queue event from master'
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 SET GLOBAL debug="-d,error_unique_log_filename";
 SET GLOBAL debug=@old_debug;
 include/rpl_restart_server.inc [server_number=2]
@@ -246,10 +244,10 @@ SET GLOBAL debug="+d,fault_injection_new_file_rotate_event";
 START SLAVE io_thread;
 include/wait_for_slave_io_error.inc [errno=1595]
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 Last_IO_Error = 'Relay log write failure: could not queue event from master'
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 SET GLOBAL debug="-d,fault_injection_new_file_rotate_event";
 SET GLOBAL debug=@old_debug;
 include/rpl_restart_server.inc [server_number=2]
@@ -261,10 +259,10 @@ SET GLOBAL debug="+d,fault_injection_registering_index";
 START SLAVE io_thread;
 include/wait_for_slave_io_error.inc [errno=1595]
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 Last_IO_Error = 'Relay log write failure: could not queue event from master'
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 SET GLOBAL debug="-d,fault_injection_registering_index";
 SET GLOBAL debug=@old_debug;
 include/rpl_restart_server.inc [server_number=2]
@@ -276,10 +274,10 @@ SET GLOBAL debug="+d,fault_injection_openning_index";
 START SLAVE io_thread;
 include/wait_for_slave_io_error.inc [errno=1595]
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 Last_IO_Error = 'Relay log write failure: could not queue event from master'
 Warnings:
-Warning	3090	Setting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 SET GLOBAL debug="-d,fault_injection_openning_index";
 SET GLOBAL debug=@old_debug;
 include/rpl_restart_server.inc [server_number=2]

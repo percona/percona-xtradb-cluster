@@ -9,8 +9,6 @@
 --source include/no_valgrind_without_big.inc
 # Adding big test option for this test.
 --source include/big_test.inc
-# Disabled for non-16k pages until bug #20427694 is fixed.
---source include/have_innodb_16k.inc
 
 -- source include/have_innodb.inc
 let $engine_type= InnoDB;
@@ -813,12 +811,10 @@ DROP TABLE t1;
 
 CREATE TABLE t1(a INT) ENGINE=innodb;
 INSERT INTO t1 VALUES (0);
-SET SQL_MODE='STRICT_ALL_TABLES';
 --error ER_TRUNCATED_WRONG_VALUE
 CREATE TABLE t2 
   SELECT LEAST((SELECT '' FROM t1),NOW()) FROM `t1`;
 DROP TABLE t1;  
-SET SQL_MODE=DEFAULT;
 
 --echo #
 --echo # Bug#56862 Moved to innodb_16k.test

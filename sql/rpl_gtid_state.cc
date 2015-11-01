@@ -192,6 +192,8 @@ void Gtid_state::update_gtids_impl(THD *thd, bool is_commit)
   */
   if (thd->owned_gtid.is_empty() && !thd->has_gtid_consistency_violation)
   {
+    if (thd->variables.gtid_next.type == GTID_GROUP)
+      thd->variables.gtid_next.set_undefined();
     thd->pending_gtid_state_update= false;
     DBUG_PRINT("info", ("skipping update_gtids_impl because "
                         "thread does not own anything and does not violate "
@@ -383,8 +385,14 @@ void Gtid_state::update_gtids_impl(THD *thd, bool is_commit)
         this.  Then, if GTID_NEXT=AUTOMATIC, nothing will be owned at
         this point.  Thus, to cover this case we add the
         '||thd->pending_gtid_state_update' clause.
+
+      - There is another corner case. A transaction with an empty gtid
+        should call gtid_end_transaction(...) to check a possible
+        violation of gtid consistency on commit, if it has set
+        has_gtid_consistency_violation to true.
     */
-    DBUG_ASSERT(!is_commit || thd->pending_gtid_state_update);
+    DBUG_ASSERT(!is_commit || thd->pending_gtid_state_update ||
+                thd->has_gtid_consistency_violation);
     DBUG_ASSERT(thd->variables.gtid_next.type == AUTOMATIC_GROUP);
   }
 
@@ -619,7 +627,7 @@ int Gtid_state::wait_for_gtid(THD *thd, const Gtid &gtid, struct timespec* timeo
                       owned_gtids.get_owner(gtid), thd->thread_id()));
   DBUG_ASSERT(owned_gtids.get_owner(gtid) != thd->thread_id());
   sid_locks.enter_cond(thd, gtid.sidno,
-                       &stage_waiting_for_gtid_to_be_written_to_binary_log,
+                       &stage_waiting_for_gtid_to_be_committed,
                        &old_stage);
   //while (get_owner(g.sidno, g.gno) != 0 && !thd->killed && !abort_loop)
 
@@ -694,12 +702,12 @@ enum_return_status Gtid_state::ensure_sidno()
 }
 
 
-enum_return_status Gtid_state::add_lost_gtids(const char *text)
+enum_return_status Gtid_state::add_lost_gtids(const Gtid_set *gtid_set)
 {
   DBUG_ENTER("Gtid_state::add_lost_gtids()");
   sid_lock->assert_some_wrlock();
 
-  DBUG_PRINT("info", ("add_lost_gtids '%s'", text));
+  gtid_set->dbug_print("add_lost_gtids");
 
   if (!executed_gtids.is_empty())
   {
@@ -717,8 +725,11 @@ enum_return_status Gtid_state::add_lost_gtids(const char *text)
   }
   DBUG_ASSERT(lost_gtids.is_empty());
 
-  PROPAGATE_REPORTED_ERROR(lost_gtids.add_gtid_text(text));
-  PROPAGATE_REPORTED_ERROR(executed_gtids.add_gtid_text(text));
+  if (save(gtid_set))
+    RETURN_REPORTED_ERROR;
+  PROPAGATE_REPORTED_ERROR(gtids_only_in_table.add_gtid_set(gtid_set));
+  PROPAGATE_REPORTED_ERROR(lost_gtids.add_gtid_set(gtid_set));
+  PROPAGATE_REPORTED_ERROR(executed_gtids.add_gtid_set(gtid_set));
 
   DBUG_RETURN(RETURN_STATUS_OK);
 }
@@ -767,7 +778,7 @@ int Gtid_state::save(THD *thd)
 }
 
 
-int Gtid_state::save(Gtid_set *gtid_set)
+int Gtid_state::save(const Gtid_set *gtid_set)
 {
   DBUG_ENTER("Gtid_state::save(Gtid_set *gtid_set)");
   int ret= gtid_table_persistor->save(gtid_set);
@@ -831,3 +842,13 @@ int Gtid_state::compress(THD *thd)
 {
   return gtid_table_persistor->compress(thd);
 }
+
+
+#ifdef MYSQL_SERVER
+bool Gtid_state::warn_on_modify_gtid_table(THD *thd, TABLE_LIST *table)
+{
+  DBUG_ENTER("Gtid_state::warn_on_modify_gtid_table");
+  bool ret= gtid_table_persistor->warn_on_explicit_modification(thd, table);
+  DBUG_RETURN(ret);
+}
+#endif

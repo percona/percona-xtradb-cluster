@@ -184,8 +184,9 @@ btr_cur_search_to_nth_level(
 				to protect the record! */
 	btr_cur_t*	cursor, /*!< in/out: tree cursor; the cursor page is
 				s- or x-latched, but see also above! */
-	ulint		has_search_latch,/*!< in: latch mode the caller
-				currently has on btr_search_latch:
+	ulint		has_search_latch,
+				/*!< in: latch mode the caller
+				currently has on search system:
 				RW_S_LATCH, or 0 */
 	const char*	file,	/*!< in: file name */
 	ulint		line,	/*!< in: line where called */
@@ -493,6 +494,7 @@ btr_cur_del_mark_set_clust_rec(
 	dict_index_t*	index,	/*!< in: clustered index of the record */
 	const ulint*	offsets,/*!< in: rec_get_offsets(rec) */
 	que_thr_t*	thr,	/*!< in: query thread */
+	const dtuple_t*	entry,	/*!< in: dtuple for the deleting record */
 	mtr_t*		mtr)	/*!< in/out: mini-transaction */
 	__attribute__((nonnull, warn_unused_result));
 /***********************************************************//**
@@ -615,17 +617,22 @@ btr_cur_parse_del_mark_set_sec_rec(
 	page_t*		page,	/*!< in/out: page or NULL */
 	page_zip_des_t*	page_zip);/*!< in/out: compressed page, or NULL */
 #ifndef UNIV_HOTBACKUP
-/*******************************************************************//**
-Estimates the number of rows in a given index range.
+
+/** Estimates the number of rows in a given index range.
+@param[in]	index	index
+@param[in]	tuple1	range start, may also be empty tuple
+@param[in]	mode1	search mode for range start
+@param[in]	tuple2	range end, may also be empty tuple
+@param[in]	mode2	search mode for range end
 @return estimated number of rows */
 int64_t
 btr_estimate_n_rows_in_range(
-/*=========================*/
-	dict_index_t*	index,	/*!< in: index */
-	const dtuple_t*	tuple1,	/*!< in: range start, may also be empty tuple */
-	page_cur_mode_t	mode1,	/*!< in: search mode for range start */
-	const dtuple_t*	tuple2,	/*!< in: range end, may also be empty tuple */
-	page_cur_mode_t	mode2);	/*!< in: search mode for range end */
+	dict_index_t*	index,
+	const dtuple_t*	tuple1,
+	page_cur_mode_t	mode1,
+	const dtuple_t*	tuple2,
+	page_cur_mode_t	mode2);
+
 /*******************************************************************//**
 Estimates the number of different key values in a given index, for
 each n-column prefix of the index where 1 <= n <= dict_index_get_n_unique(index).
@@ -857,19 +864,29 @@ limit, merging it to a neighbor is tried */
 
 /** A slot in the path array. We store here info on a search path down the
 tree. Each slot contains data on a single level of the tree. */
+struct btr_path_t {
+	/* Assume a page like:
+	records:             (inf, a, b, c, d, sup)
+	index of the record:    0, 1, 2, 3, 4, 5
+	*/
 
-struct btr_path_t{
-	ulint	nth_rec;	/*!< index of the record
-				where the page cursor stopped on
-				this level (index in alphabetical
-				order); value ULINT_UNDEFINED
-				denotes array end */
-	ulint	n_recs;		/*!< number of records on the page */
-	ulint	page_no;	/*!< no of the page containing the record */
-	ulint	page_level;	/*!< level of the page, if later we fetch
-				the page under page_no and it is no different
-				level then we know that the tree has been
-				reorganized */
+	/** Index of the record where the page cursor stopped on this level
+	(index in alphabetical order). Value ULINT_UNDEFINED denotes array
+	end. In the above example, if the search stopped on record 'c', then
+	nth_rec will be 3. */
+	ulint	nth_rec;
+
+	/** Number of the records on the page, not counting inf and sup.
+	In the above example n_recs will be 4. */
+	ulint	n_recs;
+
+	/** Number of the page containing the record. */
+	ulint	page_no;
+
+	/** Level of the page. If later we fetch the page under page_no
+	and it is no different level then we know that the tree has been
+	reorganized. */
+	ulint	page_level;
 };
 
 #define BTR_PATH_ARRAY_N_SLOTS	250	/*!< size of path array (in slots) */
@@ -933,6 +950,10 @@ struct btr_cur_t {
 					record if that record is on a
 					different leaf page! (See the note in
 					row_ins_duplicate_error_in_clust.) */
+	ulint		up_bytes;	/*!< number of matched bytes to the
+					right at the time cursor positioned;
+					only used internally in searches: not
+					defined after the search */
 	ulint		low_match;	/*!< if search mode was PAGE_CUR_LE,
 					the number of matched fields to the
 					first user record AT THE CURSOR or
@@ -941,6 +962,10 @@ struct btr_cur_t {
 					NOT defined for PAGE_CUR_GE or any
 					other search modes; see also the NOTE
 					in up_match! */
+	ulint		low_bytes;	/*!< number of matched bytes to the
+					left at the time cursor positioned;
+					only used internally in searches: not
+					defined after the search */
 	ulint		n_fields;	/*!< prefix length used in a hash
 					search if hash_node != NULL */
 	ulint		n_bytes;	/*!< hash prefix bytes if hash_node !=

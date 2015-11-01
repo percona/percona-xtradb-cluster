@@ -53,7 +53,6 @@ Created 12/9/1995 Heikki Tuuri
 #include "trx0roll.h"
 #include "srv0mon.h"
 #include "sync0sync.h"
-#include "ut0stage.h"
 
 /*
 General philosophy of InnoDB redo-logs:
@@ -83,6 +82,10 @@ reduce the size of the log.
 
 /* Global log system variable */
 log_t*	log_sys	= NULL;
+
+/** Pointer to the log checksum calculation function */
+log_checksum_func_t log_checksum_algorithm_ptr =
+	log_block_calc_checksum_innodb;
 
 /* These control how often we print warnings if the last checkpoint is too
 old */
@@ -737,9 +740,9 @@ log_init(void)
 {
 	log_sys = static_cast<log_t*>(ut_zalloc_nokey(sizeof(log_t)));
 
-	mutex_create("log_sys", &log_sys->mutex);
+	mutex_create(LATCH_ID_LOG_SYS, &log_sys->mutex);
 
-	mutex_create("log_flush_order", &log_sys->log_flush_order_mutex);
+	mutex_create(LATCH_ID_LOG_FLUSH_ORDER, &log_sys->log_flush_order_mutex);
 
 	/* Start the lsn from one log block from zero: this way every
 	log record has a start lsn != zero, a fact which we will use */
@@ -965,7 +968,7 @@ log_group_file_header_flush(
 	const ulint	page_no
 		= (ulint) (dest_offset / univ_page_size.physical());
 
-	fil_io(OS_FILE_WRITE | OS_FILE_LOG, true,
+	fil_io(IORequestLogWrite, true,
 	       page_id_t(group->space_id, page_no),
 	       univ_page_size,
 	       (ulint) (dest_offset % univ_page_size.physical()),
@@ -1088,7 +1091,7 @@ loop:
 	const ulint	page_no
 		= (ulint) (next_offset / univ_page_size.physical());
 
-	fil_io(OS_FILE_WRITE | OS_FILE_LOG, true,
+	fil_io(IORequestLogWrite, true,
 	       page_id_t(group->space_id, page_no),
 	       univ_page_size,
 	       (ulint) (next_offset % UNIV_PAGE_SIZE), write_len, buf,
@@ -1402,15 +1405,12 @@ NOTE: this function may only be called if the calling thread owns no
 synchronization objects!
 @param[in]	new_oldest	try to advance oldest_modified_lsn at least to
 this lsn
-@param[in,out]	stage		performance schema accounting object, used by
-ALTER TABLE. It is passed to buf_flush_lists() for accounting.
 @return false if there was a flush batch of the same type running,
 which means that we could not start this flush batch */
 static
 bool
 log_preflush_pool_modified_pages(
-	lsn_t			new_oldest,
-	ut_stage_alter_t*	stage = NULL)
+	lsn_t			new_oldest)
 {
 	bool	success;
 
@@ -1433,8 +1433,7 @@ log_preflush_pool_modified_pages(
 
 		ulint	n_pages;
 
-		success = buf_flush_lists(ULINT_MAX, new_oldest, &n_pages,
-					  stage);
+		success = buf_flush_lists(ULINT_MAX, new_oldest, &n_pages);
 
 		buf_flush_wait_batch_end(NULL, BUF_FLUSH_LIST);
 
@@ -1449,6 +1448,11 @@ log_preflush_pool_modified_pages(
 			n_pages);
 	} else {
 		/* better to wait for flushed by page cleaner */
+
+		if (srv_flush_sync) {
+			/* wake page cleaner for IO burst */
+			buf_flush_request_force(new_oldest);
+		}
 
 		buf_flush_wait_flushed(new_oldest);
 
@@ -1611,14 +1615,17 @@ log_group_checkpoint(
 				   LOG_CHECKPOINT);
 	}
 
+	/* Note: We alternate the physical place of the checkpoint info.
+	See the (next_checkpoint_no & 1) below. */
+
 	/* We send as the last parameter the group machine address
 	added with 1, as we want to distinguish between a normal log
 	file write and a checkpoint field write */
 
-	fil_io(OS_FILE_WRITE | OS_FILE_LOG, false,
+	fil_io(IORequestLogWrite, false,
 	       page_id_t(group->space_id, 0),
 	       univ_page_size,
-	       log_sys->next_checkpoint_no & 1
+	       (log_sys->next_checkpoint_no & 1)
 	       ? LOG_CHECKPOINT_2 : LOG_CHECKPOINT_1,
 	       OS_FILE_LOG_BLOCK_SIZE,
 	       buf, (byte*) group + 1);
@@ -1696,7 +1703,7 @@ log_group_read_checkpoint_info(
 
 	MONITOR_INC(MONITOR_LOG_IO);
 
-	fil_io(OS_FILE_READ | OS_FILE_LOG, true,
+	fil_io(IORequestLogRead, true,
 	       page_id_t(group->space_id, field / univ_page_size.physical()),
 	       univ_page_size, field % univ_page_size.physical(),
 	       OS_FILE_LOG_BLOCK_SIZE, log_sys->checkpoint_buf, NULL);
@@ -1862,19 +1869,15 @@ log_checkpoint(
 @param[in]	lsn		the log sequence number, or LSN_MAX
 for the latest LSN
 @param[in]	write_always	force a write even if no log
-has been generated since the latest checkpoint
-@param[in,out]	stage		performance schema accounting object, used by
-ALTER TABLE. It is passed to log_preflush_pool_modified_pages() for
-accounting. */
+has been generated since the latest checkpoint */
 void
 log_make_checkpoint_at(
 	lsn_t			lsn,
-	bool			write_always,
-	ut_stage_alter_t*	stage /* = NULL */)
+	bool			write_always)
 {
 	/* Preflush pages synchronously */
 
-	while (!log_preflush_pool_modified_pages(lsn, stage)) {
+	while (!log_preflush_pool_modified_pages(lsn)) {
 		/* Flush as much as we can */
 	}
 
@@ -2010,7 +2013,7 @@ loop:
 	const ulint	page_no
 		= (ulint) (source_offset / univ_page_size.physical());
 
-	fil_io(OS_FILE_READ | OS_FILE_LOG, true,
+	fil_io(IORequestLogRead, true,
 	       page_id_t(group->space_id, page_no),
 	       univ_page_size,
 	       (ulint) (source_offset % univ_page_size.physical()),

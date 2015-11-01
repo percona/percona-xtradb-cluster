@@ -78,12 +78,13 @@
 #include "sql_base.h"                       // close_tables_for_reopen
 #include "sql_parse.h"                     // is_log_table_write_query
 #include "auth_common.h"                   // SUPER_ACL
+#include "session_tracker.h"
 #include <hash.h>
 #include <assert.h>
+#include "my_atomic.h"
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
-
 /**
   @defgroup Locking Locking
   @{
@@ -117,7 +118,6 @@ static int
 lock_tables_check(THD *thd, TABLE **tables, size_t count, uint flags)
 {
   uint system_count= 0, i= 0;
-  bool is_superuser= false;
   /*
     Identifies if the executed sql command can updated either a log
     or rpl info table.
@@ -126,7 +126,6 @@ lock_tables_check(THD *thd, TABLE **tables, size_t count, uint flags)
 
   DBUG_ENTER("lock_tables_check");
 
-  is_superuser= thd->security_context()->check_access(SUPER_ACL);
   log_table_write_query=
      is_log_table_write_query(thd->lex->sql_command);
 
@@ -192,11 +191,8 @@ lock_tables_check(THD *thd, TABLE **tables, size_t count, uint flags)
     if (!(flags & MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY) && !t->s->tmp_table)
     {
       if (t->reginfo.lock_type >= TL_WRITE_ALLOW_WRITE &&
-          !is_superuser && opt_readonly && !thd->slave_thread)
-      {
-        my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "--read-only");
-        DBUG_RETURN(1);
-      }
+        check_readonly(thd, true))
+          DBUG_RETURN(1);
     }
   }
 
@@ -249,6 +245,35 @@ static void reset_lock_data(MYSQL_LOCK *sql_lock)
     (*ldata)->type= TL_UNLOCK;
   }
   DBUG_VOID_RETURN;
+}
+
+
+/**
+  Scan array of tables for access types; update transaction tracker
+  accordingly.
+
+   @param thd          The current thread.
+   @param tables       An array of pointers to the tables to lock.
+   @param count        The number of tables to lock.
+*/
+
+static void track_table_access(THD *thd, TABLE **tables, size_t count)
+{
+  Transaction_state_tracker *tst= (Transaction_state_tracker *)
+    thd->session_tracker.get_tracker(TRANSACTION_INFO_TRACKER);
+  enum enum_tx_state         s;
+
+  while (count--)
+  {
+    TABLE *t= tables[count];
+
+    if (t)
+    {
+      s= tst->calc_trx_state(thd, t->reginfo.lock_type,
+                             t->file->has_transactions());
+      tst->add_trx_state(thd, s);
+    }
+  }
 }
 
 
@@ -319,6 +344,10 @@ MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, size_t count, uint flags
                                                    sql_lock->lock_count,
                                                    &thd->lock_info, timeout,
                                                    thd->mysys_var)];
+
+  DBUG_EXECUTE_IF("mysql_lock_tables_kill_query",
+                  thd->killed= THD::KILL_QUERY;);
+
   if (rc)
   {
     if (sql_lock->table_count)
@@ -327,6 +356,7 @@ MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, size_t count, uint flags
     if (! thd->killed)
       my_error(rc, MYF(0));
   }
+
 end:
   if (!(flags & MYSQL_OPEN_IGNORE_KILLED) && thd->killed)
   {
@@ -337,6 +367,9 @@ end:
       sql_lock= 0;
     }
   }
+
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE)
+    track_table_access(thd, tables, count);
 
   thd->set_time_after_lock();
   DBUG_RETURN(sql_lock);
@@ -944,6 +977,7 @@ static void print_lock_error(int error, const char *table)
   DBUG_VOID_RETURN;
 }
 
+volatile int32 Global_read_lock::m_active_requests;
 
 /****************************************************************************
   Handling of global read locks
@@ -1026,9 +1060,15 @@ bool Global_read_lock::lock_global_read_lock(THD *thd)
     MDL_REQUEST_INIT(&mdl_request,
                      MDL_key::GLOBAL, "", "", MDL_SHARED, MDL_EXPLICIT);
 
+    /* Increment static variable first to signal innodb memcached server
+       to release mdl locks held by it */
+    my_atomic_add32(&Global_read_lock::m_active_requests, 1);
     if (thd->mdl_context.acquire_lock(&mdl_request,
                                       thd->variables.lock_wait_timeout))
+    {
+      my_atomic_add32(&Global_read_lock::m_active_requests, -1);
       DBUG_RETURN(1);
+    }
 
     m_mdl_global_shared_lock= mdl_request.ticket;
     m_state= GRL_ACQUIRED;
@@ -1071,6 +1111,7 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
 #endif /* WITH_WSREP */
   }
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
+  my_atomic_add32(&Global_read_lock::m_active_requests, -1);
   m_mdl_global_shared_lock= NULL;
   m_state= GRL_NONE;
 

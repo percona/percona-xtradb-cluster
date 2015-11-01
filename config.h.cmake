@@ -164,8 +164,6 @@
 
 #cmakedefine HAVE_KQUEUE_TIMERS 1
 #cmakedefine HAVE_POSIX_TIMERS 1
-#cmakedefine HAVE_WINDOWS_TIMERS 1
-#cmakedefine HAVE_MY_TIMER 1
 
 /* Endianess */
 #cmakedefine WORDS_BIGENDIAN 1 
@@ -253,7 +251,6 @@
 #cmakedefine INSTALL_PLUGINTESTDIR "@INSTALL_PLUGINTESTDIR@"
 #cmakedefine INSTALL_INFODIR "@default_prefix@/@INSTALL_INFODIR@"
 #cmakedefine INSTALL_MYSQLTESTDIR "@default_prefix@/@INSTALL_MYSQLTESTDIR@"
-#cmakedefine INSTALL_SQLBENCHDIR "@default_prefix@/@INSTALL_SQLBENCHDIR@"
 #cmakedefine INSTALL_DOCREADMEDIR "@default_prefix@/@INSTALL_DOCREADMEDIR@"
 #cmakedefine INSTALL_DOCDIR "@default_prefix@/@INSTALL_DOCDIR@"
 #cmakedefine INSTALL_MANDIR "@default_prefix@/@INSTALL_MANDIR@"
@@ -422,5 +419,6 @@
 
 /* For --secure-file-priv */
 #cmakedefine DEFAULT_SECURE_FILE_PRIV_DIR @DEFAULT_SECURE_FILE_PRIV_DIR@
+#cmakedefine DEFAULT_SECURE_FILE_PRIV_EMBEDDED_DIR @DEFAULT_SECURE_FILE_PRIV_EMBEDDED_DIR@
 
 #endif

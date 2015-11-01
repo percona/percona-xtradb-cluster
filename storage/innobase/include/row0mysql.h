@@ -298,26 +298,24 @@ row_delete_all_rows(
 	dict_table_t*	table)
 	__attribute__((warn_unused_result));
 
-/*********************************************************************//**
-This can only be used when srv_locks_unsafe_for_binlog is TRUE or this
+/** This can only be used when srv_locks_unsafe_for_binlog is TRUE or this
 session is using a READ COMMITTED or READ UNCOMMITTED isolation level.
 Before calling this function row_search_for_mysql() must have
 initialized prebuilt->new_rec_locks to store the information which new
 record locks really were set. This function removes a newly set
 clustered index record lock under prebuilt->pcur or
 prebuilt->clust_pcur.  Thus, this implements a 'mini-rollback' that
-releases the latest clustered index record lock we set. */
+releases the latest clustered index record lock we set.
+@param[in,out]	prebuilt		prebuilt struct in MySQL handle
+@param[in]	has_latches_on_recs	TRUE if called so that we have the
+					latches on the records under pcur
+					and clust_pcur, and we do not need
+					to reposition the cursors. */
 void
 row_unlock_for_mysql(
-/*=================*/
-	row_prebuilt_t*	prebuilt,	/*!< in/out: prebuilt struct in MySQL
-					handle */
-	ibool		has_latches_on_recs)/*!< in: TRUE if called
-					so that we have the latches on
-					the records under pcur and
-					clust_pcur, and we do not need
-					to reposition the cursors. */
-	__attribute__((nonnull));
+	row_prebuilt_t*	prebuilt,
+	ibool		has_latches_on_recs);
+
 /*********************************************************************//**
 Checks if a table name contains the string "/#sql" which denotes temporary
 tables in MySQL.
@@ -382,9 +380,12 @@ row_create_table_for_mysql(
 	dict_table_t*	table,	/*!< in, own: table definition
 				(will be freed, or on DB_SUCCESS
 				added to the data dictionary cache) */
+        const char*     compression,
+                                /*!< in: compression algorithm to use,
+                                can be NULL */
 	trx_t*		trx,	/*!< in/out: transaction */
 	bool		commit)	/*!< in: if true, commit the transaction */
-	__attribute__(( warn_unused_result));
+	__attribute__((warn_unused_result));
 /*********************************************************************//**
 Does an index creation operation for MySQL. TODO: currently failure
 to create an index results in dropping the whole table! This is no problem
@@ -433,8 +434,6 @@ row_table_add_foreign_constraints(
 	const char*		sql_string,
 	size_t			sql_length,
 	const char*		name,
-	bool			is_temp_table,
-	dict_table_t*		handler,
 	ibool			reject_fks)
 	__attribute__((warn_unused_result));
 
@@ -518,16 +517,18 @@ row_import_tablespace_for_mysql(
 	dict_table_t*	table,		/*!< in/out: table */
 	row_prebuilt_t*	prebuilt)	/*!< in: prebuilt struct in MySQL */
         __attribute__((nonnull, warn_unused_result));
-/*********************************************************************//**
-Drops a database for MySQL.
+
+/** Drop a database for MySQL.
+@param[in]	name	database name which ends at '/'
+@param[in]	trx	transaction handle
+@param[out]	found	number of dropped tables/partitions
 @return error code or DB_SUCCESS */
 dberr_t
 row_drop_database_for_mysql(
-/*========================*/
-	const char*	name,	/*!< in: database name which ends to '/' */
-	trx_t*		trx,	/*!< in: transaction handle */
-	ulint*		found)	/*!< out: Number of dropped tables/partitions */
-	__attribute__((nonnull));
+	const char*	name,
+	trx_t*		trx,
+	ulint*		found);
+
 /*********************************************************************//**
 Renames a table for MySQL.
 @return error code or DB_SUCCESS */
@@ -641,6 +642,7 @@ struct mysql_row_templ_t {
 	ulint	is_unsigned;		/*!< if a column type is an integer
 					type and this field is != 0, then
 					it is an unsigned integer type */
+	ulint	is_virtual;		/*!< if a column is a virtual column */
 };
 
 #define MYSQL_FETCH_CACHE_SIZE		8
@@ -891,6 +893,8 @@ struct row_prebuilt_t {
 					search key values from MySQL format
 					to InnoDB format.*/
 	uint		srch_key_val_len; /*!< Size of search key */
+	/** Disable prefetch. */
+	bool		m_no_prefetch;
 
 };
 
@@ -904,7 +908,24 @@ struct SysIndexCallback {
 	virtual void operator()(mtr_t* mtr, btr_pcur_t* pcur) throw() = 0;
 };
 
-
+/** Get the computed value by supplying the base column values.
+@param[in,out]	row		the data row
+@param[in]	col		virtual column
+@param[in]	index		index on the virtual column
+@param[in,out]	my_rec		MySQL record to store the rows
+@param[in,out]	local_heap	heap memory for processing large data etc.
+@param[in]	heap		memory heap that copies the actual index row
+@param[in]	in_purge	whether this is called by purge
+@return the field filled with computed value */
+dfield_t*
+innobase_get_computed_value(
+	const dtuple_t*		row,
+	const dict_v_col_t*	col,
+	const dict_index_t*	index,
+	byte*			my_rec,
+	mem_heap_t**		local_heap,
+	mem_heap_t*		heap,
+	bool			in_purge= false);
 
 #define ROW_PREBUILT_FETCH_MAGIC_N	465765687
 

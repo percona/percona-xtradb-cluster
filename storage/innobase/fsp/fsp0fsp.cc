@@ -40,7 +40,6 @@ Created 11/29/1995 Heikki Tuuri
 #ifdef UNIV_HOTBACKUP
 # include "fut0lst.h"
 #else /* UNIV_HOTBACKUP */
-# include "sync0mutex.h"
 # include "fut0fut.h"
 # include "srv0srv.h"
 # include "srv0start.h"
@@ -146,7 +145,7 @@ fseg_alloc_free_page_low(
 	mtr_t*			init_mtr
 #ifdef UNIV_DEBUG
 	, ibool			has_done_reservation
-#endif
+#endif /* UNIV_DEBUG */
 )
 	__attribute__((warn_unused_result));
 
@@ -248,9 +247,10 @@ fsp_flags_is_valid(
 	Atomic BLOBs. */
 	if (post_antelope != atomic_blobs) {
 		return(false);
+	}
 
 	/* Make sure there are no bits that we do not know about. */
-	if (unused != 0)
+	if (unused != 0) {
 		return(false);
 	}
 
@@ -285,7 +285,7 @@ fsp_flags_is_valid(
 }
 
 /** Check if tablespace is system temporary.
-@param[in]	space_id	Tablespace ID
+@param[in]	space_id	tablespace ID
 @return true if tablespace is system temporary. */
 bool
 fsp_is_system_temporary(
@@ -295,7 +295,7 @@ fsp_is_system_temporary(
 }
 
 /** Check if checksum is disabled for the given space.
-@param[in]	space_id	Tablespace ID
+@param[in]	space_id	tablespace ID
 @return true if checksum is disabled for given space. */
 bool
 fsp_is_checksum_disabled(
@@ -305,8 +305,8 @@ fsp_is_checksum_disabled(
 }
 
 /** Check if tablespace is file-per-table.
-@param[in]	space_id	Tablespace ID
-@param[in]	fsp_flags	Tablespace Flags
+@param[in]	space_id	tablespace ID
+@param[in]	fsp_flags	tablespace flags
 @return true if tablespace is file-per-table. */
 bool
 fsp_is_file_per_table(
@@ -572,7 +572,7 @@ xdes_get_descriptor_with_space_hdr(
 #ifdef UNIV_DEBUG
 	const fil_space_t*	fspace = fil_space_get(space);
 	ut_ad(fspace != NULL);
-#endif
+#endif /* UNIV_DEBUG */
 	ut_ad(mtr_memo_contains(mtr, &fspace->latch, MTR_MEMO_X_LOCK));
 	ut_ad(mtr_memo_contains_page(mtr, sp_header, MTR_MEMO_PAGE_SX_FIX));
 	ut_ad(page_offset(sp_header) == FSP_HEADER_OFFSET);
@@ -785,7 +785,7 @@ fsp_init_file_page(
 
 	ut_d(fsp_space_modify_check(block->page.id.space(), mtr));
 	mlog_write_initial_log_record(buf_block_get_frame(block),
-				      MLOG_INIT_FILE_PAGE, mtr);
+				      MLOG_INIT_FILE_PAGE2, mtr);
 }
 #endif /* !UNIV_HOTBACKUP */
 
@@ -799,7 +799,8 @@ fsp_parse_init_file_page(
 	byte*		end_ptr __attribute__((unused)), /*!< in: buffer end */
 	buf_block_t*	block)	/*!< in: block or NULL */
 {
-	ut_ad(ptr && end_ptr);
+	ut_ad(ptr != NULL);
+	ut_ad(end_ptr != NULL);
 
 	if (block) {
 		fsp_init_file_page_low(block);
@@ -1059,8 +1060,8 @@ fsp_try_extend_data_file(
 	fsp_header_t*	header,
 	mtr_t*		mtr)
 {
-	ulint	size;
-	ulint	size_increase;
+	ulint	size;		/* current number of pages in the datafile */
+	ulint	size_increase;	/* number of pages to extend this file */
 	const char* OUT_OF_SPACE_MSG =
 		"ran out of space. Please add another file or use"
 		" 'autoextend' for the last file in setting";
@@ -1100,8 +1101,8 @@ fsp_try_extend_data_file(
 	size = mach_read_from_4(header + FSP_SIZE);
 	ut_ad(size == space->size_in_header);
 
-	const page_size_t	page_size(mach_read_from_4(header
-							   + FSP_SPACE_FLAGS));
+	const page_size_t	page_size(
+		mach_read_from_4(header + FSP_SPACE_FLAGS));
 
 	if (space->id == srv_sys_space.space_id()) {
 
@@ -1112,48 +1113,19 @@ fsp_try_extend_data_file(
 		size_increase = srv_tmp_space.get_increment();
 
 	} else {
-		/* We extend single-table tablespaces first one extent
-		at a time, but 4 at a time for bigger tablespaces. It is
-		not enough to extend always by one extent, because we need
-		to add at least one extent to FSP_FREE.
-		A single extent descriptor page will track many extents.
-		And the extent that uses its extent descriptor page is
-		put onto the FSP_FREE_FRAG list.  Extents that do not
-		use their extent descriptor page are added to FSP_FREE.
-		The physical page size is used to determine how many
-		extents are tracked on one extent descriptor page.
-		See xdes_calc_descriptor_page() */
-		ulint	extent_size;	/*!< one megabyte, in pages */
-		ulint	threshold;	/*!< The size of the tablespace
-					(in number of pages) where we
-					start allocating more than one
-					extent at a time. */
-
-		extent_size = FSP_EXTENT_SIZE
-			* UNIV_PAGE_SIZE / page_size.physical();
-
-		/* The threshold is set at 32mb except when the physical page
-		size is small enough that it must be done sooner. */
-		threshold = ut_min((32 * extent_size), page_size.physical());
-
-		if (size < extent_size) {
+		ulint	extent_pages
+			= fsp_get_extent_size_in_pages(page_size);
+		if (size < extent_pages) {
 			/* Let us first extend the file to extent_size */
 			if (!fsp_try_extend_data_file_with_pages(
-				    space, extent_size - 1, header, mtr)) {
+				    space, extent_pages - 1, header, mtr)) {
 				return(false);
 			}
 
-			size = extent_size;
+			size = extent_pages;
 		}
 
-		if (size < threshold) {
-			size_increase = extent_size;
-		} else {
-			/* Below in fsp_fill_free_list() we assume
-			that we add at most FSP_FREE_ADD extents at
-			a time */
-			size_increase = FSP_FREE_ADD * extent_size;
-		}
+		size_increase = fsp_get_pages_to_extend_ibd(page_size, size);
 	}
 
 	if (size_increase == 0) {
@@ -1175,6 +1147,47 @@ fsp_try_extend_data_file(
 		header + FSP_SIZE, space->size_in_header, MLOG_4BYTES, mtr);
 
 	return(true);
+}
+
+/** Calculate the number of pages to extend a datafile.
+We extend single-table and general tablespaces first one extent at a time,
+but 4 at a time for bigger tablespaces. It is not enough to extend always
+by one extent, because we need to add at least one extent to FSP_FREE.
+A single extent descriptor page will track many extents. And the extent
+that uses its extent descriptor page is put onto the FSP_FREE_FRAG list.
+Extents that do not use their extent descriptor page are added to FSP_FREE.
+The physical page size is used to determine how many extents are tracked
+on one extent descriptor page. See xdes_calc_descriptor_page().
+@param[in]	page_size	page_size of the datafile
+@param[in]	size		current number of pages in the datafile
+@return number of pages to extend the file. */
+ulint
+fsp_get_pages_to_extend_ibd(
+	const page_size_t&	page_size,
+	ulint			size)
+{
+	ulint	size_increase;	/* number of pages to extend this file */
+	ulint	extent_size;	/* one megabyte, in pages */
+	ulint	threshold;	/* The size of the tablespace (in number
+				of pages) where we start allocating more
+				than one extent at a time. */
+
+	extent_size = fsp_get_extent_size_in_pages(page_size);
+
+	/* The threshold is set at 32MiB except when the physical page
+	size is small enough that it must be done sooner. */
+	threshold = ut_min(32 * extent_size, page_size.physical());
+
+	if (size < threshold) {
+		size_increase = extent_size;
+	} else {
+		/* Below in fsp_fill_free_list() we assume
+		that we add at most FSP_FREE_ADD extents at
+		a time */
+		size_increase = FSP_FREE_ADD * extent_size;
+	}
+
+	return(size_increase);
 }
 
 /** Put new extents to the free list if there are free extents above the free
@@ -1461,12 +1474,12 @@ fsp_page_create(
 {
 	buf_block_t*	block = buf_page_create(page_id, page_size, init_mtr);
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(mtr_memo_contains(mtr, block, MTR_MEMO_PAGE_X_FIX)
 	      == rw_lock_own(&block->lock, RW_LOCK_X));
+
 	ut_ad(mtr_memo_contains(mtr, block, MTR_MEMO_PAGE_SX_FIX)
 	      == rw_lock_own(&block->lock, RW_LOCK_SX));
-#endif /* UNIV_SYNC_DEBUG */
+
 	ut_ad(rw_latch == RW_X_LATCH || rw_latch == RW_SX_LATCH);
 
 	/* Mimic buf_page_get(), but avoid the buf_pool->page_hash lookup. */
@@ -2280,7 +2293,7 @@ fseg_create_general(
 						 mtr, mtr
 #ifdef UNIV_DEBUG
 						 , has_done_reservation
-#endif
+#endif /* UNIV_DEBUG */
 						 );
 
 		/* The allocation cannot fail if we have already reserved a
@@ -2557,7 +2570,7 @@ fseg_alloc_free_page_low(
 	mtr_t*			init_mtr
 #ifdef UNIV_DEBUG
 	, ibool			has_done_reservation
-#endif
+#endif /* UNIV_DEBUG */
 )
 {
 	fsp_header_t*	space_header;
@@ -2850,7 +2863,7 @@ fseg_alloc_free_page_general(
 					 RW_X_LATCH, mtr, init_mtr
 #ifdef UNIV_DEBUG
 					 , has_done_reservation
-#endif
+#endif /* UNIV_DEBUG */
 					 );
 
 	/* The allocation cannot fail if we have already reserved a
@@ -3030,42 +3043,36 @@ try_to_extend:
 	return(false);
 }
 
-/**********************************************************************//**
-This function should be used to get information on how much we still
-will be able to insert new data to the database without running out the
-tablespace. Only free extents are taken into account and we also subtract
-the safety margin required by the above function fsp_reserve_free_extents.
-@return available space in kB */
+/** Calculate how many KiB of new data we will be able to insert to the
+tablespace without running out of space.
+@param[in]	space_id	tablespace ID
+@return available space in KiB
+@retval UINTMAX_MAX if unknown */
 uintmax_t
 fsp_get_available_space_in_free_extents(
-/*====================================*/
-	ulint	space_id)	/*!< in: space id */
+	ulint	space_id)
 {
-	ulint		n_free_list_ext;
-	ulint		free_limit;
-	ulint		size;
-	ulint		n_free;
-	ulint		n_free_up;
-	ulint		reserve;
-
-	fil_space_t*	space = fil_space_acquire(space_id);
-	if (!space) {
+	FilSpace	space(space_id);
+	if (space() == NULL) {
 		return(UINTMAX_MAX);
 	}
 
-	size = space->size_in_header;
+	return(fsp_get_available_space_in_free_extents(space));
+}
 
-	n_free_list_ext = space->free_len;
-	free_limit = space->free_limit;
+/** Calculate how many KiB of new data we will be able to insert to the
+tablespace without running out of space. Start with a space object that has
+been acquired by the caller who holds it for the calculation,
+@param[in]	space		tablespace object from fil_space_acquire()
+@return available space in KiB */
+uintmax_t
+fsp_get_available_space_in_free_extents(
+	const fil_space_t*	space)
+{
+	ut_ad(space->n_pending_ops > 0);
 
-	const page_size_t	page_size(space->flags);
-
-	fil_space_release(space);
-
-	if (size < FSP_EXTENT_SIZE) {
-		/* This must be a single-table tablespace */
-		ut_a(!is_system_tablespace(space_id));
-
+	ulint	size_in_header = space->size_in_header;
+	if (size_in_header < FSP_EXTENT_SIZE) {
 		return(0);		/* TODO: count free frag pages and
 					return a value based on that */
 	}
@@ -3073,30 +3080,30 @@ fsp_get_available_space_in_free_extents(
 	/* Below we play safe when counting free extents above the free limit:
 	some of them will contain extent descriptor pages, and therefore
 	will not be free extents */
+	ut_ad(size_in_header >= space->free_limit);
+	ulint	n_free_up =
+		(size_in_header - space->free_limit) / FSP_EXTENT_SIZE;
 
-	ut_ad(size >= free_limit);
-	n_free_up = (size - free_limit) / FSP_EXTENT_SIZE;
-
+	page_size_t	page_size(space->flags);
 	if (n_free_up > 0) {
 		n_free_up--;
 		n_free_up -= n_free_up / (page_size.physical()
 					  / FSP_EXTENT_SIZE);
 	}
 
-	n_free = n_free_list_ext + n_free_up;
-
 	/* We reserve 1 extent + 0.5 % of the space size to undo logs
 	and 1 extent + 0.5 % to cleaning operations; NOTE: this source
 	code is duplicated in the function above! */
 
-	reserve = 2 + ((size / FSP_EXTENT_SIZE) * 2) / 200;
+	ulint	reserve = 2 + ((size_in_header / FSP_EXTENT_SIZE) * 2) / 200;
+	ulint	n_free = space->free_len + n_free_up;
 
 	if (reserve > n_free) {
 		return(0);
 	}
 
-	return(static_cast<uintmax_t>(n_free - reserve) * FSP_EXTENT_SIZE
-	       * (page_size.physical() / 1024));
+	return(static_cast<uintmax_t>(n_free - reserve)
+	       * FSP_EXTENT_SIZE * (page_size.physical() / 1024));
 }
 
 /********************************************************************//**
@@ -3178,7 +3185,8 @@ fseg_free_page_low(
 	ib_id_t	seg_id;
 	ulint	i;
 
-	ut_ad(seg_inode && mtr);
+	ut_ad(seg_inode != NULL);
+	ut_ad(mtr != NULL);
 	ut_ad(mach_read_from_4(seg_inode + FSEG_MAGIC_N)
 	      == FSEG_MAGIC_N_VALUE);
 	ut_ad(!((page_offset(seg_inode) - FSEG_ARR_OFFSET) % FSEG_INODE_SIZE));
@@ -3302,9 +3310,7 @@ fseg_free_page(
 
 	fseg_free_page_low(seg_inode, page_id, page_size, ahi, mtr);
 
-#if defined UNIV_DEBUG_FILE_ACCESSES || defined UNIV_DEBUG
-	buf_page_set_file_page_was_freed(page_id);
-#endif /* UNIV_DEBUG_FILE_ACCESSES || UNIV_DEBUG */
+	ut_d(buf_page_set_file_page_was_freed(page_id));
 }
 
 /**********************************************************************//**
@@ -3364,7 +3370,8 @@ fseg_free_extent(
 	ulint	descr_n_used;
 	ulint	i;
 
-	ut_ad(seg_inode && mtr);
+	ut_ad(seg_inode != NULL);
+	ut_ad(mtr != NULL);
 
 	descr = xdes_get_descriptor(space, page, page_size, mtr);
 
@@ -3414,13 +3421,13 @@ fseg_free_extent(
 
 	fsp_free_extent(page_id_t(space, page), page_size, mtr);
 
-#if defined UNIV_DEBUG_FILE_ACCESSES || defined UNIV_DEBUG
+#ifdef UNIV_DEBUG
 	for (i = 0; i < FSP_EXTENT_SIZE; i++) {
 
 		buf_page_set_file_page_was_freed(
 			page_id_t(space, first_page_in_extent + i));
 	}
-#endif /* UNIV_DEBUG_FILE_ACCESSES || UNIV_DEBUG */
+#endif /* UNIV_DEBUG */
 }
 
 /**********************************************************************//**

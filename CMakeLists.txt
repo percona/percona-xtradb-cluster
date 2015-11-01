@@ -179,23 +179,6 @@ IF(DEFINED ENV{CPPFLAGS})
   ADD_DEFINITIONS($ENV{CPPFLAGS})
 ENDIF()
 
-IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
-  IF (NOT "${CMAKE_C_FLAGS}${CMAKE_CXX_FLAGS}" MATCHES "-m32|-m64")
-    EXECUTE_PROCESS(COMMAND isainfo -b
-      OUTPUT_VARIABLE ISAINFO_B
-      RESULT_VARIABLE ISAINFO_B_RES
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    IF(ISAINFO_B_RES)
-      MESSAGE(STATUS "Failed to run isainfo -b to determine arch bits: "
-        "${ISAINFO_B_RES}. Falling back to compiler's default.")
-    ELSE()
-      MESSAGE("Adding -m${ISAINFO_B}")
-      SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m${ISAINFO_B}")
-      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m${ISAINFO_B}")
-    ENDIF()
-  ENDIF()
-ENDIF()
-
 INCLUDE(CheckTypeSize)
 CHECK_TYPE_SIZE("void *" SIZEOF_VOIDP)
 MESSAGE(STATUS "SIZEOF_VOIDP ${SIZEOF_VOIDP}")
@@ -211,6 +194,7 @@ INCLUDE(wsrep)
 INCLUDE(character_sets)
 INCLUDE(cpu_info)
 INCLUDE(zlib)
+INCLUDE(lz4)
 INCLUDE(libevent)
 INCLUDE(ssl)
 INCLUDE(readline)
@@ -361,9 +345,6 @@ OPTION(ENABLED_LOCAL_INFILE
  "If we should enable LOAD DATA LOCAL by default" ${IF_WIN})
 MARK_AS_ADVANCED(ENABLED_LOCAL_INFILE)
 
-OPTION(WITH_FAST_MUTEXES "Compile with fast mutexes" OFF)
-MARK_AS_ADVANCED(WITH_FAST_MUTEXES)
-
 OPTION(OPTIMIZER_TRACE "Support tracing of Optimizer" ON)
 
 #
@@ -400,10 +381,6 @@ FOREACH(BUILD_TYPE RELEASE RELWITHDEBINFO MINSIZEREL)
   FOREACH(LANG C CXX)
     SET(CMAKE_${LANG}_FLAGS_${BUILD_TYPE} 
      "${CMAKE_${LANG}_FLAGS_${BUILD_TYPE}} -DDBUG_OFF")
-    IF(WITH_FAST_MUTEXES)
-      SET(CMAKE_${LANG}_FLAGS_${BUILD_TYPE} 
-        "${CMAKE_${LANG}_FLAGS_${BUILD_TYPE}} -DMY_PTHREAD_FASTMUTEX=1")
-    ENDIF()
   ENDFOREACH()
 ENDFOREACH()
 
@@ -488,6 +465,8 @@ MYSQL_CHECK_SSL()
 MYSQL_CHECK_EDITLINE()
 # Add libevent
 MYSQL_CHECK_LIBEVENT()
+# Add lz4 library
+MYSQL_CHECK_LZ4()
 
 #
 # Setup maintainer mode options by the end. Platform checks are
@@ -573,13 +552,13 @@ IF(NOT WITHOUT_SERVER)
   ADD_SUBDIRECTORY(mysql-test)
   ADD_SUBDIRECTORY(mysql-test/lib/My/SafeProcess)
   ADD_SUBDIRECTORY(support-files)
-  ADD_SUBDIRECTORY(sql-bench)
   IF(EXISTS ${CMAKE_SOURCE_DIR}/internal/CMakeLists.txt)
     ADD_SUBDIRECTORY(internal)
   ENDIF()
   ADD_SUBDIRECTORY(packaging/rpm-oel)
   ADD_SUBDIRECTORY(packaging/rpm-fedora)
   ADD_SUBDIRECTORY(packaging/rpm-sles)
+  ADD_SUBDIRECTORY(packaging/rpm-docker)
 ENDIF()
 
 INCLUDE(cmake/abi_check.cmake)

@@ -137,13 +137,19 @@ static Field *create_tmp_field_from_item(THD *thd, Item *item, TABLE *table,
     DBUG_ASSERT(item->collation.collation);
   
     /*
-      DATE/TIME and GEOMETRY fields have STRING_RESULT result type. 
+      DATE/TIME, GEOMETRY and JSON fields have STRING_RESULT result type.
       To preserve type they needed to be handled separately.
     */
-    if (item->is_temporal() || item->field_type() == MYSQL_TYPE_GEOMETRY)
+    if (item->is_temporal() ||
+        item->field_type() == MYSQL_TYPE_GEOMETRY ||
+        item->field_type() == MYSQL_TYPE_JSON)
+    {
       new_field= item->tmp_table_field_from_field_type(table, 1);
+    }
     else
+    {
       new_field= item->make_string_field(table);
+    }
     new_field->set_derivation(item->collation.derivation);
     break;
   case DECIMAL_RESULT:
@@ -1264,7 +1270,7 @@ update_hidden:
   setup_tmp_table_column_bitmaps(table, bitmaps);
 
   recinfo=param->start_recinfo;
-  null_flags=(uchar*) table->record[0];
+  null_flags= table->record[0];
   pos= table->record[0] + null_pack_length;
   if (null_pack_length)
   {
@@ -1274,7 +1280,7 @@ update_hidden:
     recinfo++;
     memset(null_flags, 255, null_pack_length);	// Set null fields
 
-    table->null_flags= (uchar*) table->record[0];
+    table->null_flags= table->record[0];
     share->null_fields= null_count+ hidden_null_count;
     share->null_bytes= null_pack_length;
   }
@@ -1399,7 +1405,8 @@ update_hidden:
   {
     ORDER *cur_group= group;
     key_part_info= keyinfo->key_part;
-    share->primary_key= 0;
+    if (param->can_use_pk_for_unique)
+      share->primary_key= 0;
     keyinfo->key_length= 0;  // Will compute the sum of the parts below.
     /*
       Here, we have to make the group fields point to the right record
@@ -1441,7 +1448,8 @@ update_hidden:
   {
     null_pack_length-=hidden_null_pack_length;
     key_part_info= keyinfo->key_part;
-    share->primary_key= 0;
+    if (param->can_use_pk_for_unique)
+      share->primary_key= 0;
     keyinfo->key_length= 0;  // Will compute the sum of the parts below.
     /*
       Here, we have to make the key fields point to the right record
@@ -1742,7 +1750,7 @@ TABLE *create_duplicate_weedout_tmp_table(THD *thd,
   setup_tmp_table_column_bitmaps(table, bitmaps);
 
   recinfo= start_recinfo;
-  null_flags=(uchar*) table->record[0];
+  null_flags= table->record[0];
 
   pos= table->record[0] + null_pack_length;
   if (null_pack_length)
@@ -1753,7 +1761,7 @@ TABLE *create_duplicate_weedout_tmp_table(THD *thd,
     recinfo++;
     memset(null_flags, 255, null_pack_length);	// Set null fields
 
-    table->null_flags= (uchar*) table->record[0];
+    table->null_flags= table->record[0];
     share->null_fields= null_count;
     share->null_bytes= null_pack_length;
   }
@@ -1979,7 +1987,7 @@ TABLE *create_virtual_tmp_table(THD *thd, List<Create_field> &field_list)
 
   if (null_pack_length)
   {
-    table->null_flags= (uchar*) table->record[0];
+    table->null_flags= table->record[0];
     share->null_fields= null_count;
     share->null_bytes= null_pack_length;
   }
@@ -1998,7 +2006,7 @@ TABLE *create_virtual_tmp_table(THD *thd, List<Create_field> &field_list)
         cur_field->move_field(field_pos);
       else
       {
-        cur_field->move_field(field_pos, (uchar*) null_pos, null_bit);
+        cur_field->move_field(field_pos, null_pos, null_bit);
         null_bit<<= 1;
         if (null_bit == (uint8)1 << 8)
         {
@@ -2316,6 +2324,15 @@ bool instantiate_tmp_table(TABLE *table, KEY *keyinfo,
                            ulonglong options, my_bool big_tables,
                            Opt_trace_context *trace)
 {
+  /*
+    For internal tmp table, we don't support generated columns.
+    Because gcol_info is copied during create_tmp_field_from_field,
+    we have to clear it.
+    @todo it would be better to do it when creating the field.
+  */
+  for (uint i= 0; i < table->s->fields; i++)
+    table->field[i]->gcol_info= NULL;
+
   if (table->s->db_type() == innodb_hton)
   {
     if (create_innodb_tmp_table(table, keyinfo))

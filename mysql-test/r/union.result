@@ -166,8 +166,7 @@ drop table t1,t2,t3;
 select * union select 1;
 ERROR HY000: No tables used
 select 1 as a,(select a union select a);
-a	(select a union select a)
-1	1
+ERROR 42S22: Unknown column 'a' in 'field list'
 (select 1) union (select 2) order by 0;
 ERROR 42S22: Unknown column '0' in 'order clause'
 SELECT @a:=1 UNION SELECT @a:=@a+1;
@@ -1075,7 +1074,7 @@ a
 drop table t1;
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 CREATE TABLE t1 ( ID1 int(10) unsigned NOT NULL DEFAULT '0' , ID2 datetime NOT NULL DEFAULT '0000-00-00 00:00:00' , DATA1 varchar(10) , DATA2 double(5,4) , DATA3 datetime , PRIMARY KEY (ID1,ID2));
 CREATE TABLE t2 ( ID int(3) unsigned NOT NULL DEFAULT '0' , DATA1 timestamp DEFAULT '0000-00-00 00:00:00' , PRIMARY KEY (ID));
 (SELECT * FROM t1 AS PARTITIONED, t2 AS
@@ -1474,7 +1473,7 @@ id
 drop table t1;
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 Warnings:
-Warning	3129	Unsetting sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be made read-only in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 create table t1(f1 char(1), f2 char(5), f3 binary(1), f4 binary(5), f5 timestamp NOT NULL DEFAULT '0000-00-00 00:00:00', f6 varchar(1) character set utf8 collate utf8_general_ci, f7 text);
 create table t2 as select *, f6 as f8 from t1 union select *, f7 from t1;
 show create table t2;
@@ -2689,3 +2688,11 @@ a
 a
 1
 DROP TABLE t1, t2;
+#
+# Bug #21156155 UNION GEOMETRY TYPE: UNITIALIZED VALUE IN
+# ITEM_TYPE_HOLDER::JOIN_TYPES
+#
+SELECT NULL UNION SELECT POINT(1,1);
+NULL
+NULL
+             ð?      ð?

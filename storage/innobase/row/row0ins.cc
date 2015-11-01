@@ -124,8 +124,9 @@ ins_node_create_entry_list(
 	     index != 0;
 	     index = dict_table_get_next_index(index)) {
 
-		entry = row_build_index_entry(
-			node->row, NULL, index, node->entry_sys_heap);
+		entry = row_build_index_entry_low(
+			node->row, NULL, index, node->entry_sys_heap,
+			ROW_BUILD_FOR_INSERT);
 
 		UT_LIST_ADD_LAST(node->entry_list, entry);
 	}
@@ -645,7 +646,8 @@ row_ins_cascade_calc_update_vec(
 				if (table->fts
 				    && dict_table_is_fts_column(
 					table->fts->indexes,
-					dict_col_get_no(col))
+					dict_col_get_no(col),
+					dict_col_is_virtual(col))
 					!= ULINT_UNDEFINED) {
 					*fts_col_affected = TRUE;
 				}
@@ -694,21 +696,24 @@ row_ins_cascade_calc_update_vec(
 	if (table->fts && *fts_col_affected) {
 		if (DICT_TF2_FLAG_IS_SET(table, DICT_TF2_FTS_HAS_DOC_ID)) {
 			doc_id_t	doc_id;
-                        upd_field_t*	ufield;
+			doc_id_t*	next_doc_id;
+			upd_field_t*	ufield;
+
+			next_doc_id = static_cast<doc_id_t*>(mem_heap_alloc(
+				heap, sizeof(doc_id_t)));
 
 			ut_ad(!doc_id_updated);
 			ufield = update->fields + n_fields_updated;
-			fts_get_next_doc_id(table, &trx->fts_next_doc_id);
-			doc_id = fts_update_doc_id(table, ufield,
-						   &trx->fts_next_doc_id);
+			fts_get_next_doc_id(table, next_doc_id);
+			doc_id = fts_update_doc_id(table, ufield, next_doc_id);
 			n_fields_updated++;
-			fts_trx_add_op(trx, table, doc_id, FTS_INSERT, NULL);
+			cascade->fts_next_doc_id = doc_id;
 		} else  {
 			if (doc_id_updated) {
 				ut_ad(new_doc_id);
-				fts_trx_add_op(trx, table, new_doc_id,
-					       FTS_INSERT, NULL);
+				cascade->fts_next_doc_id = new_doc_id;
 			} else {
+				cascade->fts_next_doc_id = FTS_NULL_DOC_ID;
 				ib::error() << "FTS Doc ID must be updated"
 					" along with FTS indexed column for"
 					" table " << table->name;
@@ -975,7 +980,7 @@ row_ins_foreign_check_on_constraint(
 	/* Since we are going to delete or update a row, we have to invalidate
 	the MySQL query cache for table. A deadlock of threads is not possible
 	here because the caller of this function does not hold any latches with
-	the sync0mutex.h rank above the lock_sys_t::mutex. The query cache mutex
+	the mutex rank above the lock_sys_t::mutex. The query cache mutex
 	has a rank just above the lock_sys_t::mutex. */
 
 	row_ins_invalidate_query_cache(thr, table->name.m_name);
@@ -1015,6 +1020,7 @@ row_ins_foreign_check_on_constraint(
 	only in the first update node */
 	cascade->cascade_heap = node->cascade_heap;
 	cascade->cascade_upd_nodes = node->cascade_upd_nodes;
+	cascade->new_upd_nodes = node->new_upd_nodes;
 	cascade->processed_cascades = node->processed_cascades;
 
 	cascade->table = table;
@@ -1154,7 +1160,8 @@ row_ins_foreign_check_on_constraint(
 
 
 	if (table->fts) {
-		doc_id = fts_get_doc_id_from_rec(table, clust_rec, tmp_heap);
+		doc_id = fts_get_doc_id_from_rec(table, clust_rec,
+						 clust_index, tmp_heap);
 	}
 
 	if (node->is_delete
@@ -1163,6 +1170,14 @@ row_ins_foreign_check_on_constraint(
 
 		/* Build the appropriate update vector which sets
 		foreign->n_fields first fields in rec to SQL NULL */
+		if (table->fts) {
+
+			/* For the clause ON DELETE SET NULL, the cascade
+			operation is actually an update operation with the new
+			values being null.  For FTS, this means that the old
+			values be deleted and no new values to be added.*/
+			cascade->fts_next_doc_id = FTS_NULL_DOC_ID;
+		}
 
 		update = cascade->update;
 
@@ -1173,38 +1188,47 @@ row_ins_foreign_check_on_constraint(
 
 		for (i = 0; i < foreign->n_fields; i++) {
 			upd_field_t*	ufield = &update->fields[i];
+			ulint		col_no = dict_index_get_nth_col_no(
+						index, i);
 
 			ufield->field_no = dict_table_get_nth_col_pos(
-				table,
-				dict_index_get_nth_col_no(index, i));
+				table, col_no);
+			dict_col_t*	col = dict_table_get_nth_col(
+				table, col_no);
+			dict_col_copy_type(col, dfield_get_type(&ufield->new_val));
+
 			ufield->orig_len = 0;
 			ufield->exp = NULL;
 			dfield_set_null(&ufield->new_val);
 
 			if (table->fts && dict_table_is_fts_column(
-				    table->fts->indexes,
-				    dict_index_get_nth_col_no(index, i))
+				table->fts->indexes,
+				dict_index_get_nth_col_no(index, i),
+				dict_col_is_virtual(
+					dict_index_get_nth_col(index, i)))
 			    != ULINT_UNDEFINED) {
 				fts_col_affacted = TRUE;
 			}
 		}
 
 		if (fts_col_affacted) {
-			fts_trx_add_op(trx, table, doc_id, FTS_DELETE, NULL);
+			cascade->fts_doc_id = doc_id;
 		}
 	} else if (table->fts && cascade->is_delete) {
 		/* DICT_FOREIGN_ON_DELETE_CASCADE case */
 		for (i = 0; i < foreign->n_fields; i++) {
 			if (table->fts && dict_table_is_fts_column(
-				    table->fts->indexes,
-				    dict_index_get_nth_col_no(index, i))
+				table->fts->indexes,
+				dict_index_get_nth_col_no(index, i),
+				dict_col_is_virtual(
+					dict_index_get_nth_col(index, i)))
 			    != ULINT_UNDEFINED) {
 				fts_col_affacted = TRUE;
 			}
 		}
 
 		if (fts_col_affacted) {
-			fts_trx_add_op(trx, table, doc_id, FTS_DELETE, NULL);
+			cascade->fts_doc_id = doc_id;
 		}
 	}
 
@@ -1247,7 +1271,7 @@ row_ins_foreign_check_on_constraint(
 		/* Mark the old Doc ID as deleted */
 		if (fts_col_affacted) {
 			ut_ad(table->fts);
-			fts_trx_add_op(trx, table, doc_id, FTS_DELETE, NULL);
+			cascade->fts_doc_id = doc_id;
 		}
 	}
 
@@ -1280,7 +1304,7 @@ row_ins_foreign_check_on_constraint(
 			"WSREP: foreign key append failed: %d\n", err);
 	} else
 #endif
-	node->cascade_upd_nodes->push_back(cascade);
+	node->new_upd_nodes->push_back(cascade);
 
 	os_atomic_increment_ulint(&table->n_foreign_key_checks_running, 1);
 
@@ -1436,10 +1460,7 @@ row_ins_check_foreign_constraint(
 
 	rec_offs_init(offsets_);
 
-run_again:
-#ifdef UNIV_SYNC_DEBUG
-	ut_ad(rw_lock_own(&dict_operation_lock, RW_LOCK_S));
-#endif /* UNIV_SYNC_DEBUG */
+	ut_ad(rw_lock_own(dict_operation_lock, RW_LOCK_S));
 
 	err = DB_SUCCESS;
 
@@ -1753,17 +1774,16 @@ do_possible_lock_wait:
 
 		if (!verified) {
 			err = DB_DICT_CHANGED;
-		} else if (trx->error_state == DB_SUCCESS) {
-			goto run_again;
-		} else {
-			err = trx->error_state;
+			trx->error_state = err;
 		}
 	}
+
 
 exit_func:
 	if (heap != NULL) {
 		mem_heap_free(heap);
 	}
+
 	DBUG_RETURN(err);
 }
 
@@ -1922,10 +1942,8 @@ row_ins_scan_sec_index_for_duplicate(
 	DBUG_ENTER("row_ins_scan_sec_index_for_duplicate");
 
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(s_latch == rw_lock_own_flagged(
 			&index->lock, RW_LOCK_FLAG_S | RW_LOCK_FLAG_SX));
-#endif /* UNIV_SYNC_DEBUG */
 
 	n_unique = dict_index_get_n_unique(index);
 
@@ -2391,7 +2409,7 @@ row_ins_clust_index_entry_low(
 		ut_ad(page_rec_is_supremum(first_rec)
 		      || rec_n_fields_is_sane(index, first_rec, entry));
 	}
-#endif
+#endif /* UNIV_DEBUG */
 
 	/* Allowing duplicates in clustered index is currently enabled
 	only for intrinsic table and caller understand the limited
@@ -2463,7 +2481,7 @@ err_exit:
 			entry_heap, entry, thr, &mtr);
 
 		if (err == DB_SUCCESS && dict_index_is_online_ddl(index)) {
-			row_log_table_insert(btr_cur_get_rec(cursor),
+			row_log_table_insert(btr_cur_get_rec(cursor), entry,
 					     index, offsets);
 		}
 
@@ -2524,7 +2542,7 @@ err_exit:
 			if (err == DB_SUCCESS
 			    && dict_index_is_online_ddl(index)) {
 				row_log_table_insert(
-					insert_rec, index, offsets);
+					insert_rec, entry, index, offsets);
 			}
 
 			mtr_commit(&mtr);
@@ -2888,7 +2906,7 @@ row_ins_sec_index_entry_low(
 		ut_ad(page_rec_is_supremum(first_rec)
 		      || rec_n_fields_is_sane(index, first_rec, entry));
 	}
-#endif
+#endif /* UNIV_DEBUG */
 
 	n_unique = dict_index_get_n_unique(index);
 
@@ -2916,8 +2934,7 @@ row_ins_sec_index_entry_low(
 				ut_ad(!thr_get_trx(thr)
 				      ->dict_operation_lock_mode);
 				mutex_enter(&dict_sys->mutex);
-				dict_set_corrupted_index_cache_only(
-					index, index->table);
+				dict_set_corrupted_index_cache_only(index);
 				mutex_exit(&dict_sys->mutex);
 				/* Do not return any error to the
 				caller. The duplicate will be reported
@@ -3129,7 +3146,8 @@ row_ins_index_entry_big_rec_func(
 
 	if (error == DB_SUCCESS
 	    && dict_index_is_online_ddl(index)) {
-		row_log_table_insert(btr_pcur_get_rec(&pcur), index, offsets);
+		row_log_table_insert(btr_pcur_get_rec(&pcur), entry,
+				     index, offsets);
 	}
 
 	mtr_commit(&mtr);
@@ -3372,22 +3390,43 @@ row_ins_index_entry_set_vals(
 {
 	ulint	n_fields;
 	ulint	i;
+	ulint	num_v = dtuple_get_n_v_fields(entry);
 
 	n_fields = dtuple_get_n_fields(entry);
 
-	for (i = 0; i < n_fields; i++) {
-		dict_field_t*	ind_field;
+	for (i = 0; i < n_fields + num_v; i++) {
+		dict_field_t*	ind_field = NULL;
 		dfield_t*	field;
 		const dfield_t*	row_field;
 		ulint		len;
+		dict_col_t*	col;
 
-		field = dtuple_get_nth_field(entry, i);
-		ind_field = dict_index_get_nth_field(index, i);
-		row_field = dtuple_get_nth_field(row, ind_field->col->ind);
+		if (i >= n_fields) {
+			/* This is virtual field */
+			field = dtuple_get_nth_v_field(entry, i - n_fields);
+			col = &dict_table_get_nth_v_col(
+				index->table, i - n_fields)->m_col;
+		} else {
+			field = dtuple_get_nth_field(entry, i);
+			ind_field = dict_index_get_nth_field(index, i);
+			col = ind_field->col;
+		}
+
+		if (dict_col_is_virtual(col)) {
+			const dict_v_col_t*     v_col
+				= reinterpret_cast<const dict_v_col_t*>(col);
+			ut_ad(dtuple_get_n_fields(row)
+			      == dict_table_get_n_cols(index->table));
+			row_field = dtuple_get_nth_v_field(row, v_col->v_pos);
+		} else {
+			row_field = dtuple_get_nth_field(
+				row, ind_field->col->ind);
+		}
+
 		len = dfield_get_len(row_field);
 
 		/* Check column prefix indexes */
-		if (ind_field->prefix_len > 0
+		if (ind_field != NULL && ind_field->prefix_len > 0
 		    && dfield_get_len(row_field) != UNIV_SQL_NULL) {
 
 			const	dict_col_t*	col
@@ -3406,7 +3445,8 @@ row_ins_index_entry_set_vals(
 		/* Handle spatial index. For the first field, replace
 		the data with its MBR (Minimum Bounding Box). */
 		if ((i == 0) && dict_index_is_spatial(index)) {
-			if (!row_field->data) {
+			if (!row_field->data
+			    || row_field->len < GEO_DATA_HEADER_SIZE) {
 				return(DB_CANT_CREATE_GEOMETRY_OBJECT);
 			}
 			row_ins_spatial_index_entry_set_mbr_field(
@@ -3694,6 +3734,8 @@ row_ins_step(
 	dberr_t		err;
 
 	ut_ad(thr);
+
+	DEBUG_SYNC_C("innodb_row_ins_step_enter");
 
 	trx = thr_get_trx(thr);
 

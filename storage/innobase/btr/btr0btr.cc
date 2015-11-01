@@ -74,14 +74,6 @@ btr_corruption_report(
 		<< "Flag mismatch in page " << block->page.id
 		<< " index " << index->name
 		<< " of table " << index->table->name;
-
-	if (block->page.size.is_compressed()) {
-		ut_ad(block->page.zip.data != NULL);
-		buf_page_print(block->page.zip.data,
-			       block->page.size,
-			       BUF_PAGE_PRINT_NO_CRASH);
-	}
-	buf_page_print(buf_block_get_frame(block), univ_page_size, 0);
 }
 
 #ifndef UNIV_HOTBACKUP
@@ -238,9 +230,7 @@ btr_height_get(
 	/* Release the S latch on the root page. */
 	mtr->memo_release(root_block, MTR_MEMO_PAGE_S_FIX);
 
-#ifdef UNIV_SYNC_DEBUG
 	ut_d(sync_check_unlock(&root_block->lock));
-#endif /* UNIV_SYNC_DEBUG */
 
 	return(height);
 }
@@ -788,12 +778,6 @@ btr_page_get_father_node_ptr_func(
 
 	if (btr_node_ptr_get_child_page_no(node_ptr, offsets) != page_no) {
 		rec_t*	print_rec;
-		fputs("InnoDB: Dump of the child page:\n", stderr);
-		buf_page_print(page_align(user_rec), univ_page_size,
-			       BUF_PAGE_PRINT_NO_CRASH);
-		fputs("InnoDB: Dump of the parent page:\n", stderr);
-		buf_page_print(page_align(node_ptr), univ_page_size,
-			       BUF_PAGE_PRINT_NO_CRASH);
 
 		ib::error()
 			<< "Corruption of an index tree: table "
@@ -1400,11 +1384,6 @@ btr_page_reorganize_low(
 	max_ins_size2 = page_get_max_insert_size_after_reorganize(page, 1);
 
 	if (data_size1 != data_size2 || max_ins_size1 != max_ins_size2) {
-		buf_page_print(page, univ_page_size,
-			       BUF_PAGE_PRINT_NO_CRASH);
-		buf_page_print(temp_page, univ_page_size,
-			       BUF_PAGE_PRINT_NO_CRASH);
-
 		ib::error()
 			<< "Page old data size " << data_size1
 			<< " new data size " << data_size2
@@ -1540,7 +1519,9 @@ btr_parse_page_reorganize(
 {
 	ulint	level;
 
-	ut_ad(ptr && end_ptr);
+	ut_ad(ptr != NULL);
+	ut_ad(end_ptr != NULL);
+	ut_ad(index != NULL);
 
 	/* If dealing with a compressed page the record has the
 	compression level used during original compression written in
@@ -2584,11 +2565,9 @@ func_start:
 	ut_ad(!dict_index_is_online_ddl(cursor->index)
 	      || (flags & BTR_CREATE_FLAG)
 	      || dict_index_is_clust(cursor->index));
-#ifdef UNIV_SYNC_DEBUG
 	ut_ad(rw_lock_own_flagged(dict_index_get_lock(cursor->index),
 				  RW_LOCK_FLAG_X | RW_LOCK_FLAG_SX)
 	      || dict_table_is_intrinsic(cursor->index->table));
-#endif /* UNIV_SYNC_DEBUG */
 
 	block = btr_cur_get_block(cursor);
 	page = buf_block_get_frame(block);
@@ -2954,7 +2933,8 @@ btr_level_list_remove_func(
 	const dict_index_t*	index,
 	mtr_t*			mtr)
 {
-	ut_ad(page && mtr);
+	ut_ad(page != NULL);
+	ut_ad(mtr != NULL);
 	ut_ad(mtr_is_page_fix(mtr, page, MTR_MEMO_PAGE_X_FIX, index->table));
 	ut_ad(space == page_get_space_id(page));
 	/* Get the previous and next page numbers of page */
@@ -3256,9 +3236,9 @@ btr_lift_page_up(
 #endif /* UNIV_ZIP_DEBUG */
 	}
 
-        if (dict_index_is_spatial(index)) {
-                rtr_check_discard_page(index, NULL, block);
-        }
+	if (dict_index_is_spatial(index)) {
+		rtr_check_discard_page(index, NULL, block);
+	}
 
 	/* Free the file page */
 	btr_page_free(index, block, mtr);
@@ -4234,6 +4214,11 @@ btr_index_rec_validate(
 		return(TRUE);
 	}
 
+#ifdef VIRTUAL_INDEX_DEBUG
+	if (dict_index_has_virtual(index)) {
+		fprintf(stderr, "index name is %s\n", index->name());
+	}
+#endif
 	if ((ibool)!!page_is_comp(page) != dict_table_is_comp(index->table)) {
 		btr_index_rec_validate_report(page, rec, index);
 
@@ -4257,9 +4242,6 @@ btr_index_rec_validate(
 			<< " fields, should have " << n;
 
 		if (dump_on_error) {
-			buf_page_print(page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
-
 			fputs("InnoDB: corrupt record ", stderr);
 			rec_print_old(stderr, rec);
 			putc('\n', stderr);
@@ -4311,16 +4293,17 @@ btr_index_rec_validate(
 
 			btr_index_rec_validate_report(page, rec, index);
 
-			ib::error() << "Field " << i << " len is " << len
+			ib::error	error;
+
+			error << "Field " << i << " len is " << len
 				<< ", should be " << fixed_size;
 
 			if (dump_on_error) {
-				buf_page_print(page, univ_page_size,
-					       BUF_PAGE_PRINT_NO_CRASH);
-
-				fputs("InnoDB: corrupt record ", stderr);
-				rec_print_new(stderr, rec, offsets);
-				putc('\n', stderr);
+				error << "; ";
+				rec_print(error.m_oss, rec,
+					  rec_get_info_bits(
+						  rec, rec_offs_comp(offsets)),
+					  offsets);
 			}
 			if (heap) {
 				mem_heap_free(heap);
@@ -4328,6 +4311,12 @@ btr_index_rec_validate(
 			return(FALSE);
 		}
 	}
+
+#ifdef VIRTUAL_INDEX_DEBUG
+	if (dict_index_has_virtual(index)) {
+		rec_print_new(stderr, rec, offsets);
+	}
+#endif
 
 	if (heap) {
 		mem_heap_free(heap);
@@ -4652,10 +4641,6 @@ loop:
 			btr_validate_report2(index, level, block, right_block);
 			fputs("InnoDB: broken FIL_PAGE_NEXT"
 			      " or FIL_PAGE_PREV links\n", stderr);
-			buf_page_print(page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
-			buf_page_print(right_page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
 
 			ret = false;
 		}
@@ -4663,10 +4648,6 @@ loop:
 		if (page_is_comp(right_page) != page_is_comp(page)) {
 			btr_validate_report2(index, level, block, right_block);
 			fputs("InnoDB: 'compact' flag mismatch\n", stderr);
-			buf_page_print(page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
-			buf_page_print(right_page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
 
 			ret = false;
 
@@ -4692,11 +4673,6 @@ loop:
 
 			fputs("InnoDB: records in wrong order"
 			      " on adjacent pages\n", stderr);
-
-			buf_page_print(page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
-			buf_page_print(right_page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
 
 			fputs("InnoDB: record ", stderr);
 			rec = page_rec_get_prev(page_get_supremum_rec(page));
@@ -4761,11 +4737,6 @@ loop:
 			fputs("InnoDB: node pointer to the page is wrong\n",
 			      stderr);
 
-			buf_page_print(father_page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
-			buf_page_print(page, univ_page_size,
-				       BUF_PAGE_PRINT_NO_CRASH);
-
 			fputs("InnoDB: node ptr ", stderr);
 			rec_print(stderr, node_ptr, index);
 
@@ -4795,13 +4766,6 @@ loop:
 					page_get_infimum_rec(page));
 
 				btr_validate_report1(index, level, block);
-
-				buf_page_print(
-					father_page, univ_page_size,
-					BUF_PAGE_PRINT_NO_CRASH);
-				buf_page_print(
-					page, univ_page_size,
-					BUF_PAGE_PRINT_NO_CRASH);
 
 				ib::error() << "Node ptrs differ on levels > 0";
 
@@ -4874,19 +4838,6 @@ loop:
 
 					btr_validate_report1(index, level,
 							     block);
-
-					buf_page_print(
-						father_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						right_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
 				}
 			} else {
 				page_t*	right_father_page
@@ -4903,23 +4854,6 @@ loop:
 
 					btr_validate_report1(index, level,
 							     block);
-
-					buf_page_print(
-						father_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						right_father_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						right_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
 				}
 
 				if (page_get_page_no(right_father_page)
@@ -4932,23 +4866,6 @@ loop:
 
 					btr_validate_report1(index, level,
 							     block);
-
-					buf_page_print(
-						father_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						right_father_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
-					buf_page_print(
-						right_page,
-						univ_page_size,
-						BUF_PAGE_PRINT_NO_CRASH);
 				}
 			}
 		}

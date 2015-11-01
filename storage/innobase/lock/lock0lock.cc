@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2015, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -25,6 +25,7 @@ Created 5/7/1996 Heikki Tuuri
 
 #define LOCK_MODULE_IMPLEMENTATION
 
+#include <mysql/service_thd_engine_lock.h>
 #include "ha_prototypes.h"
 
 #include "lock0lock.h"
@@ -373,7 +374,7 @@ lock_clust_rec_cons_read_sees(
 
 	trx_id_t	trx_id = row_get_rec_trx_id(rec, index, offsets);
 
-	return(view->changes_visible(trx_id));
+	return(view->changes_visible(trx_id, index->table->name));
 }
 
 /*********************************************************************//**
@@ -440,9 +441,9 @@ lock_sys_create(
 
 	lock_sys->last_slot = lock_sys->waiting_threads;
 
-	mutex_create("lock_sys", &lock_sys->mutex);
+	mutex_create(LATCH_ID_LOCK_SYS, &lock_sys->mutex);
 
-	mutex_create("lock_sys_wait", &lock_sys->wait_mutex);
+	mutex_create(LATCH_ID_LOCK_SYS_WAIT, &lock_sys->wait_mutex);
 
 	lock_sys->timeout_event = os_event_create(0);
 
@@ -1139,6 +1140,7 @@ lock_rec_has_expl(
 /*********************************************************************//**
 Checks if some other transaction has a lock request in the queue.
 @return lock or NULL */
+static
 const lock_t*
 lock_rec_other_has_expl_req(
 /*========================*/
@@ -1169,7 +1171,7 @@ lock_rec_other_has_expl_req(
 
 		if (lock->trx != trx
 		    && !lock_rec_get_gap(lock)
-		    && (!wait || !lock_get_wait(lock))
+		    && (wait || !lock_get_wait(lock))
 		    && lock_mode_stronger_or_eq(lock_get_mode(lock), mode)) {
 
 			return(lock);
@@ -1312,8 +1314,6 @@ lock_sec_rec_some_has_impl(
 		trx = 0;
 
 	} else if (!lock_check_trx_id_sanity(max_trx_id, rec, index, offsets)) {
-
-		buf_page_print(page, univ_page_size, 0);
 
 		/* The page is corrupt: try to avoid a crash by returning 0 */
 		trx = 0;
@@ -1720,6 +1720,7 @@ RecLock::rollback_blocking_trx(lock_t* lock) const
 	ut_ad(!trx_mutex_own(m_trx));
 	ut_ad(lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT);
 
+	ib::info() << "Blocking transaction wake up: ID: " << lock->trx->id;
 	lock->trx->lock.was_chosen_as_deadlock_victim = true;
 
 	/* Remove the blocking transaction from the hit list. */
@@ -1764,6 +1765,7 @@ RecLock::mark_trx_for_rollback(trx_t* trx)
 		char	buffer[1024];
 
 		ib::info() << "Blocking transaction: ID: " << trx->id << " - "
+			<< " Blocked transaction ID: "<< m_trx->id << " - "
 			<< thd_security_context(thd, buffer, sizeof(buffer),
 						512);
 	}
@@ -2095,6 +2097,10 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 	ut_ad(trx_mutex_own(m_trx));
 
+	/* m_trx->mysql_thd is NULL if it's an internal trx. So current_thd is used */
+	if (err == DB_LOCK_WAIT) {
+		thd_report_row_lock_wait(current_thd, wait_for->trx->mysql_thd);
+	}
 	return(err);
 }
 
@@ -2891,6 +2897,39 @@ lock_rec_move_low(
 				 donator, donator_heap_no) == NULL);
 }
 
+/** Move all the granted locks to the front of the given lock list.
+All the waiting locks will be at the end of the list.
+@param[in,out]	lock_list	the given lock list.  */
+static
+void
+lock_move_granted_locks_to_front(
+	UT_LIST_BASE_NODE_T(lock_t)&	lock_list)
+{
+	lock_t*	lock;
+
+	bool seen_waiting_lock = false;
+
+	for (lock = UT_LIST_GET_FIRST(lock_list); lock;
+	     lock = UT_LIST_GET_NEXT(trx_locks, lock)) {
+
+		if (!seen_waiting_lock) {
+			if (lock->is_waiting()) {
+				seen_waiting_lock = true;
+			}
+			continue;
+		}
+
+		ut_ad(seen_waiting_lock);
+
+		if (!lock->is_waiting()) {
+			lock_t* prev = UT_LIST_GET_PREV(trx_locks, lock);
+			ut_a(prev);
+			UT_LIST_MOVE_TO_FRONT(lock_list, lock);
+			lock = prev;
+		}
+	}
+}
+
 /*************************************************************//**
 Updates the lock table when we have reorganized a page. NOTE: we copy
 also the locks set on the infimum of the page; the infimum may carry
@@ -2948,8 +2987,14 @@ lock_move_reorganize_page(
 	comp = page_is_comp(block->frame);
 	ut_ad(comp == page_is_comp(oblock->frame));
 
+	lock_move_granted_locks_to_front(old_locks);
+
+	DBUG_EXECUTE_IF("do_lock_reverse_page_reorganize",
+			UT_LIST_REVERSE(old_locks););
+
 	for (lock = UT_LIST_GET_FIRST(old_locks); lock;
 	     lock = UT_LIST_GET_NEXT(trx_locks, lock)) {
+
 		/* NOTE: we copy also the locks set on the infimum and
 		supremum of the page; the infimum may carry locks if an
 		update of a record is occurring on the page, and its locks
@@ -5429,7 +5474,8 @@ lock_rec_queue_validate(
 
 	if (!page_rec_is_user_rec(rec)) {
 
-		for (lock = lock_rec_get_first(lock_sys->rec_hash, block, heap_no);
+		for (lock = lock_rec_get_first(lock_sys->rec_hash,
+					       block, heap_no);
 		     lock != NULL;
 		     lock = lock_rec_get_next_const(heap_no, lock)) {
 
@@ -5439,7 +5485,7 @@ lock_rec_queue_validate(
 				ut_a(lock_rec_has_to_wait_in_queue(lock));
 			}
 
-			if (index) {
+			if (index != NULL) {
 				ut_a(lock->index == index);
 			}
 		}
@@ -5447,8 +5493,11 @@ lock_rec_queue_validate(
 		goto func_exit;
 	}
 
-	if (!index);
-	else if (dict_index_is_clust(index)) {
+	if (index == NULL) {
+
+		/* Nothing we can do */
+
+	} else if (dict_index_is_clust(index)) {
 		trx_id_t	trx_id;
 
 		/* Unlike the non-debug code, this invariant can only succeed
@@ -5461,12 +5510,24 @@ lock_rec_queue_validate(
 		/* impl_trx cannot be committed until lock_mutex_exit()
 		because lock_trx_release_locks() acquires lock_sys->mutex */
 
-		if (impl_trx != NULL
-		    && lock_rec_other_has_expl_req(
-			    LOCK_S, block, false, heap_no, impl_trx)) {
+		if (impl_trx != NULL) {
+			const lock_t*	other_lock
+				= lock_rec_other_has_expl_req(
+					LOCK_S, block, true, heap_no,
+					impl_trx);
 
-			ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP,
-					       block, heap_no, impl_trx));
+			/* The impl_trx is holding an implicit lock on the
+			given record 'rec'. So there cannot be another
+			explicit granted lock.  Also, there can be another
+			explicit waiting lock only if the impl_trx has an
+			explicit granted lock. */
+
+			if (other_lock != NULL) {
+				ut_a(lock_get_wait(other_lock));
+				ut_a(lock_rec_has_expl(
+					LOCK_X | LOCK_REC_NOT_GAP,
+					block, heap_no, impl_trx));
+			}
 		}
 	}
 
@@ -5489,8 +5550,12 @@ lock_rec_queue_validate(
 			} else {
 				mode = LOCK_S;
 			}
-			ut_a(!lock_rec_other_has_expl_req(
-				     mode, block, true, heap_no, lock->trx));
+
+			const lock_t*	other_lock
+				= lock_rec_other_has_expl_req(
+					mode, block, false, heap_no,
+					lock->trx);
+			ut_a(!other_lock);
 
 		} else if (lock_get_wait(lock) && !lock_rec_get_gap(lock)) {
 
@@ -5539,9 +5604,7 @@ loop:
 		goto function_exit;
 	}
 
-#if defined UNIV_DEBUG_FILE_ACCESSES || defined UNIV_DEBUG
-	ut_a(!block->page.file_page_was_freed);
-#endif
+	ut_ad(!block->page.file_page_was_freed);
 
 	for (i = 0; i < nth_lock; i++) {
 
@@ -5554,13 +5617,13 @@ loop:
 
 	ut_ad(!trx_is_ac_nl_ro(lock->trx));
 
-# ifdef UNIV_SYNC_DEBUG
+# ifdef UNIV_DEBUG
 	/* Only validate the record queues when this thread is not
 	holding a space->latch.  Deadlocks are possible due to
 	latching order violation when UNIV_DEBUG is defined while
-	UNIV_SYNC_DEBUG is not. */
+	UNIV_DEBUG is not. */
 	if (!sync_check_find(SYNC_FSP))
-# endif /* UNIV_SYNC_DEBUG */
+# endif /* UNIV_DEBUG */
 	for (i = nth_bit; i < lock_rec_get_n_bits(lock); i++) {
 
 		if (i == 1 || lock_rec_get_nth_bit(lock, i)) {

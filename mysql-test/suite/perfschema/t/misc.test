@@ -155,8 +155,6 @@ DELETE FROM t_60905 WHERE i = 1;
 DELETE FROM t_60905 WHERE j = 8;
 
 # show the instrument data.
-# Note that the index name "i" is not known yet, displayed as "(index 0)",
-# as the only opened table handle has never been closed yet.
 SELECT object_schema,
        object_name,
        index_name,
@@ -167,21 +165,6 @@ SELECT object_schema,
   FROM performance_schema.table_io_waits_summary_by_index_usage
  WHERE object_schema = 'test'
    AND object_name = 't_60905';
-
-flush table t_60905;
-
-# show the instrument data (index names are now known)
-SELECT object_schema,
-       object_name,
-       index_name,
-       count_fetch,
-       count_insert,
-       count_update,
-       count_delete
-  FROM performance_schema.table_io_waits_summary_by_index_usage
- WHERE object_schema = 'test'
-   AND object_name = 't_60905';
-
 
 DROP TABLE t_60905;
 
@@ -202,3 +185,23 @@ show events from performance_schema;
 show events where Db= 'performance_schema';
 use test;
 
+
+#
+# Bug#11929832 - EVENTS_STATEMENTS_HISTORY HAS ERRORS=0 WHEN THERE ARE ERRORS
+#
+# Verify that SQL errors are properly counted.
+
+use test;
+truncate performance_schema.events_statements_history;
+truncate performance_schema.events_statements_history_long;
+
+--error ER_NO_SUCH_TABLE
+select * from t1;
+
+--echo 
+select sql_text, mysql_errno, returned_sqlstate, message_text, errors, warnings
+  from performance_schema.events_statements_history where errors > 0;
+  
+--echo
+select sql_text, mysql_errno, returned_sqlstate, message_text, errors, warnings from 
+  performance_schema.events_statements_history_long where errors > 0;

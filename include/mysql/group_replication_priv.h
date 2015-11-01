@@ -65,6 +65,45 @@ void get_server_host_port_uuid(char **hostname, uint *port, char** uuid);
 
 
 /**
+  Returns the server_id.
+
+  @return server_id
+*/
+ulong get_server_id();
+
+/**
+  Returns the server auto_increment_increment
+
+  @return auto_increment_increment
+*/
+ulong get_auto_increment_increment();
+
+
+/**
+  Returns the server auto_increment_offset
+
+  @return auto_increment_offset
+*/
+ulong get_auto_increment_offset();
+
+
+/**
+  Set server auto_increment_increment
+
+  @param[in] auto_increment_increment
+*/
+void set_auto_increment_increment(ulong auto_increment_increment);
+
+
+/**
+  Set server auto_increment_offset
+
+  @param[in] auto_increment_offset
+*/
+void set_auto_increment_offset(ulong auto_increment_offset);
+
+
+/**
   Returns a struct containing all server startup information needed to evaluate
   if one has conditions to proceed executing master-master replication.
 
@@ -75,16 +114,6 @@ void get_server_host_port_uuid(char **hostname, uint *port, char** uuid);
 */
 void get_server_startup_prerequirements(Trans_context_info& requirements,
                                         bool has_lock);
-
-
-/**
-  Returns if the server engine initialization as ended or not.
-
-  @return is the server ready
-    @retval false     not ready
-    @retval true      ready
-*/
-bool is_server_engine_ready();
 
 
 /**
