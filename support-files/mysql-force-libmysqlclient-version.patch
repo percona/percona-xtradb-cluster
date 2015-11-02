@@ -1,0 +1,19 @@
+diff -rup old/libmysql/CMakeLists.txt new/libmysql/CMakeLists.txt
+--- old/libmysql/CMakeLists.txt	2013-11-05 08:19:26.000000000 +0100
++++ new/libmysql/CMakeLists.txt	2014-01-10 15:41:30.530068723 +0100
+@@ -219,13 +219,14 @@ IF(NOT DISABLE_SHARED)
+       OUTPUT_NAME mysqlclient 
+       VERSION "${OS_SHARED_LIB_VERSION}" 
+       SOVERSION "${SHARED_LIB_MAJOR_VERSION}")
++    CONFIGURE_FILE(libmysql.ver.in ${CMAKE_CURRENT_BINARY_DIR}/libmysql.ver)
+     IF(LINK_FLAG_NO_UNDEFINED)
+       GET_TARGET_PROPERTY(libmysql_link_flags libmysql LINK_FLAGS)
+       IF(NOT libmysql_link_flag)
+         SET(libmysql_link_flags)
+       ENDIF()
+       SET_TARGET_PROPERTIES(libmysql PROPERTIES LINK_FLAGS 
+-        "${libmysql_link_flags} ${LINK_FLAG_NO_UNDEFINED}")
++        "${libmysql_link_flags} -Wl,--version-script=libmysql.ver ${LINK_FLAG_NO_UNDEFINED}")
+     ENDIF() 
+     # clean direct output needs to be set several targets have the same name
+     #(mysqlclient in this case)

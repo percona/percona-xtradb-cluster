@@ -251,6 +251,8 @@ Patch7:         %{compatch}
 %if 0%{?compatlib} == 18
 Patch8:         mysql-5.5-libmysqlclient-symbols.patch
 %endif
+%else
+Patch8:         mysql-force-libmysqlclient-version.patch
 %endif
 URL:            http://www.mysql.com/
 Packager:       Codership Oy <info@galeracluster.com>
@@ -260,6 +262,11 @@ Vendor:         %{mysql_vendor}
 
 Requires:       mysql-wsrep-server%{product_suffix}
 Requires:       mysql-wsrep-client%{product_suffix}
+%if 0%{?compatlib}
+Requires:       mysql-wsrep-libs-compat%{product_suffix}
+%else
+Requires:       mysql-wsrep-shared%{product_suffix}
+%endif
 
 # Regression tests may take a long time, override the default to skip them 
 %{!?runselftest:%global runselftest 0}
@@ -433,6 +440,7 @@ For a description of MySQL see the base MySQL RPM or http://www.mysql.com/
 %package -n mysql-wsrep-shared%{product_suffix}
 Summary:        MySQL - Shared libraries
 Group:          Applications/Databases
+Requires:       /sbin/ldconfig
 %if 0%{?commercial}
 Obsoletes:      MySQL-shared
 %else
@@ -463,6 +471,7 @@ Provides:       mysql-libs-compat%{?_isa} = %{version}
 Obsoletes:      mysql-libs-compat < %{version}
 Provides:       MySQL-shared-compat%{?_isa} = %{version}
 Obsoletes:      MySQL-shared-compat < %{version}
+Requires:       /sbin/ldconfig
 
 # Dealing with RHEL 6 and upwards (and compatible ...)
 # Directly, we replace "libs" only; but RedHat "client" and "server" need files from "libs"
@@ -542,6 +551,15 @@ popd
 # outside Windows, so it may be used in all RPM builds.
 pushd %{src_dir}
 %patch0 -p1
+
+# "ld.so" needs a version script to really make the SO version show up in "objdump" output.
+# Without this, (at least) on RedHat 6 the "requires" of "postfix" is not satisfied.
+# For more detailed research, start with the "find-provides" script.
+# This can't be a permanent solution, but it works in 5.5.
+%if 0%{?compatlib}
+%else
+%patch8 -p 1
+%endif
 #wsrep_apply_patch_tag
 popd
 
@@ -1461,6 +1479,13 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Mon Nov 02 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- "libmysqlclient.so" is not always recognized to satisfy the "requires"
+  of pre-installed applications (notably "postfix" on RedHat-like distros).
+  Force setting the current ABI version via a linker script.
+- Let the meta RPM "require" "shared" or "libs-compat", so that it will
+  "obsolete" any pre-installed packages (expecially the client library).
+
 * Fri Oct 30 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Combine "plugins.files" and "datadir.files" into one, it seems rpmbuild 4.4
   (used on SLES 11) cannot handle two "-f" directives for one "%%files" section.
