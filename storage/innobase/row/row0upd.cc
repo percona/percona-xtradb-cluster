@@ -297,9 +297,6 @@ row_upd_check_references_constraints(
 			err = row_ins_check_foreign_constraint(
 				FALSE, foreign, table, entry, thr);
 
-			DBUG_EXECUTE_IF("row_ins_dict_change_err",
-					err = DB_DICT_CHANGED;);
-
 			if (ref_table != NULL) {
 				dict_table_close(ref_table, FALSE, FALSE);
 			}
@@ -376,8 +373,6 @@ wsrep_row_upd_check_foreign_constraints(
 		row_mysql_freeze_data_dictionary(trx);
 	}
 
-run_again:
-
 	for (dict_foreign_set::iterator it = table->foreign_set.begin();
 	     it != table->foreign_set.end();
 	     ++it) {
@@ -417,10 +412,7 @@ run_again:
 				}
 			}
 
-			/* Some table foreign key dropped, try again */
-			if (err == DB_DICT_CHANGED) {
-				goto run_again;
-			} else if (err != DB_SUCCESS) {
+			if (err != DB_SUCCESS) {
 				goto func_exit;
 			}
 		}
@@ -1079,7 +1071,7 @@ row_upd_build_difference_binary(
 
 			dfield_t*	vfield = innobase_get_computed_value(
 				update->old_vrow, col, index, NULL,
-				&v_heap, heap);
+				&v_heap, heap, NULL, false);
 
 			if (!dfield_data_is_binary_equal(
 				dfield, vfield->len,
@@ -1441,6 +1433,8 @@ row_upd_replace_vcol(
 		}
 	}
 
+	bool	first_v_col = true;
+
 	/* We will read those unchanged (but indexed) virtual columns in */
 	if (ptr != NULL) {
 		const byte*	end_ptr;
@@ -1453,14 +1447,27 @@ row_upd_replace_vcol(
 			ulint                   field_no;
 			ulint                   len;
 			ulint                   orig_len;
+			bool			is_v;
 
 			field_no = mach_read_next_compressed(&ptr);
+
+			is_v = (field_no >= REC_MAX_N_FIELDS);
+
+			if (is_v) {
+				ptr = trx_undo_read_v_idx(
+					table, ptr, first_v_col, &field_no);
+				first_v_col = false;
+			}
 
 			ptr = trx_undo_rec_get_col_val(
 				ptr, &field, &len, &orig_len);
 
-			if (field_no >= REC_MAX_N_FIELDS) {
-				field_no -= REC_MAX_N_FIELDS;
+			if (field_no == ULINT_UNDEFINED) {
+				ut_ad(is_v);
+				continue;
+			}
+
+			if (is_v) {
 				dict_v_col_t* vcol = dict_table_get_nth_v_col(
 							table, field_no);
 
@@ -1673,6 +1680,7 @@ row_upd_changes_ord_field_binary_func(
 
 			ut_ad(dfield->data != NULL
 			      && dfield->len > GEO_DATA_HEADER_SIZE);
+			ut_ad(dict_col_get_spatial_status(col) != SPATIAL_NONE);
 
 			/* Get the old mbr. */
 			if (dfield_is_ext(dfield)) {
@@ -2054,7 +2062,8 @@ row_upd_store_v_row(
 					deleting row */
 					innobase_get_computed_value(
 						node->row, col, index, NULL,
-						&heap, node->heap);
+						&heap, node->heap, NULL,
+						false);
 				}
 			}
 		}

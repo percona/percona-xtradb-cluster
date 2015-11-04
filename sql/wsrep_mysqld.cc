@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include "log_event.h"
 #include <rpl_slave.h>
+#include "rpl_msr.h"            // channel_map
 
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
@@ -395,7 +396,7 @@ static void wsrep_synced_cb(void* app_ctx)
     WSREP_INFO("MySQL slave restart");
     wsrep_restart_slave_activated= FALSE;
 
-    mysql_mutex_lock(&LOCK_msr_map);
+    channel_map.rdlock();
     if ((rcode = start_slave_threads(1 /* need mutex */,
                             0 /* no wait for start*/,
                             active_mi,
@@ -403,8 +404,7 @@ static void wsrep_synced_cb(void* app_ctx)
     {
       WSREP_WARN("Failed to create slave threads: %d", rcode);
     }
-    mysql_mutex_unlock(&LOCK_msr_map);
-
+    channel_map.unlock();
   }
 }
 

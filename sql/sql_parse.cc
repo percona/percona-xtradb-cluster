@@ -907,7 +907,7 @@ bool do_command(THD *thd)
     ) {
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
 	       "WSREP has not yet prepared node for application use");
-      thd->protocol->end_statement();
+      thd->end_statement();
       return_value= FALSE;
       goto out;
     }
@@ -934,9 +934,9 @@ bool do_command(THD *thd)
   if (WSREP(thd)) {
     while (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
-      return_value= dispatch_command(command, thd, thd->wsrep_retry_query,
-				     thd->wsrep_retry_query_len);
+      return_value= dispatch_command(thd, &com_data, command);
     }
+    //(thd->wsrep_retry_query, thd->wsrep_retry_query_len);
   }
   if (thd->wsrep_retry_query && thd->wsrep_conflict_state != REPLAYING)
   {
@@ -1161,7 +1161,7 @@ void reset_statement_timer(THD *thd)
     1   request of thread shutdown, i. e. if command is
         COM_QUIT/COM_SHUTDOWN
 */
-bool dispatch_command(THD *thd, COM_DATA *com_data,
+bool dispatch_command(THD *thd, const COM_DATA *com_data,
                       enum enum_server_command command)
 {
   bool error= 0;
@@ -1192,7 +1192,6 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
       WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed               = THD::NOT_KILLED;
-      thd->mysys_var->abort     = 0;
       thd->wsrep_conflict_state = NO_CONFLICT;
       thd->wsrep_retry_counter  = 0;
       /*
@@ -1283,13 +1282,22 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
     goto done;
   }
 
+#ifndef EMBEDDED_LIBRARY
+  if (mysql_audit_notify(thd,
+                         AUDIT_EVENT(MYSQL_AUDIT_COMMAND_START),
+                         command, command_name[command].str))
+  {
+    goto done;
+  }
+#endif /* !EMBEDDED_LIBRARY */
+
   switch (command) {
   case COM_INIT_DB:
   {
     LEX_STRING tmp;
     thd->status_var.com_stat[SQLCOM_CHANGE_DB]++;
     thd->convert_string(&tmp, system_charset_info,
-                        (char*) com_data->com_init_db.db_name,
+                        com_data->com_init_db.db_name,
                         com_data->com_init_db.length, thd->charset());
 
     LEX_CSTRING tmp_cstr= {tmp.str, tmp.length};
@@ -1331,7 +1339,10 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
     Security_context save_security_ctx(*(thd->security_context()));
 
     auth_rc= acl_authenticate(thd, COM_CHANGE_USER);
-    MYSQL_AUDIT_NOTIFY_CONNECTION_CHANGE_USER(thd);
+#ifndef EMBEDDED_LIBRARY
+    auth_rc|= mysql_audit_notify(thd,
+                             AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_CHANGE_USER));
+#endif
     if (auth_rc)
     {
       *thd->security_context()= save_security_ctx;
@@ -1444,7 +1455,6 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
       WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
-      thd->mysys_var->abort= 0;
       goto dispatch_end;
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -1480,10 +1490,12 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
       thd->send_statement_status();
       query_cache.end_of_result(thd);
 
+#ifndef EMBEDDED_LIBRARY
       mysql_audit_general(thd, MYSQL_AUDIT_GENERAL_STATUS,
                           thd->get_stmt_da()->is_error() ?
                           thd->get_stmt_da()->mysql_errno() : 0,
                           command_name[command].str);
+#endif
 
       size_t length= static_cast<size_t>(packet_end - beginning_of_next_stmt);
 
@@ -1555,6 +1567,10 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
       mysql_parse(thd, &parser_state);
 #endif /* WITH_WSREP */
     }
+
+    /* Need to set error to true for graceful shutdown */
+    if((thd->lex->sql_command == SQLCOM_SHUTDOWN) && (thd->get_stmt_da()->is_ok()))
+      error= TRUE;
 
     DBUG_PRINT("info",("query ready"));
     break;
@@ -1669,7 +1685,8 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
     query_logger.general_log_print(thd, command, NullS);
     // Don't give 'abort' message
     // TODO: access of protocol_classic should be removed
-    thd->get_protocol_classic()->get_net()->error= 0;
+    if (thd->is_classic_protocol())
+      thd->get_protocol_classic()->get_net()->error= 0;
     thd->get_stmt_da()->disable_status();       // Don't send anything back
     error=TRUE;					// End server
     break;
@@ -1742,8 +1759,6 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
   case COM_SHUTDOWN:
   {
     thd->status_var.com_other++;
-    if (check_global_access(thd,SHUTDOWN_ACL))
-      break; /* purecov: inspected */
     /*
       If the client is < 4.1.3, it is going to send us no argument; then
       packet_length is 0, packet[0] is the end 0 of the packet. Note that
@@ -1755,18 +1770,9 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
       level= SHUTDOWN_DEFAULT;
     else
       level= com_data->com_shutdown.level;
-    if (level == SHUTDOWN_DEFAULT)
-      level= SHUTDOWN_WAIT_ALL_BUFFERS; // soon default will be configurable
-    else if (level != SHUTDOWN_WAIT_ALL_BUFFERS)
-    {
-      my_error(ER_NOT_SUPPORTED_YET, MYF(0), "this shutdown level");
+    if(!shutdown(thd, level, command))
       break;
-    }
-    DBUG_PRINT("quit",("Got shutdown command for level %u", level));
-    query_logger.general_log_print(thd, command, NullS);
-    my_eof(thd);
-    kill_mysql();
-    error=TRUE;
+    error= TRUE;
     break;
   }
 #endif
@@ -1889,7 +1895,7 @@ bool dispatch_command(THD *thd, COM_DATA *com_data,
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
       thd->update_server_status();
-      thd->protocol->end_statement();
+      thd->end_statement();
       query_cache.end_of_result(thd);
     } 
     else
@@ -1909,12 +1915,12 @@ done:
   if (thd->killed)
     thd->send_kill_message();
   thd->send_statement_status();
-  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
   query_cache.end_of_result(thd);
 #ifdef WITH_WSREP
   }
 #endif /* WITH_WSREP */
 
+#ifndef EMBEDDED_LIBRARY
   if (!thd->is_error() && !thd->killed_errno())
     mysql_audit_general(thd, MYSQL_AUDIT_GENERAL_RESULT, 0, 0);
 
@@ -1922,6 +1928,12 @@ done:
                       thd->get_stmt_da()->is_error() ?
                       thd->get_stmt_da()->mysql_errno() : 0,
                       command_name[command].str);
+
+  /* command_end is informational only. The plugin cannot abort
+     execution of the command at thie point. */
+  mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_COMMAND_END),
+                     command, command_name[command].str);
+#endif
 
   log_slow_statement(thd);
 
@@ -1956,6 +1968,56 @@ done:
   DBUG_RETURN(error);
 }
 
+/**
+  Shutdown the mysqld server.
+
+  @param  thd        Thread (session) context.
+  @param  level      Shutdown level.
+  @param command     type of command to perform
+
+  @retval
+    true                 success
+  @retval
+    false                When user has insufficient privilege or unsupported shutdown level
+
+*/
+#ifndef EMBEDDED_LIBRARY
+bool shutdown(THD *thd, enum mysql_enum_shutdown_level level, enum enum_server_command command)
+{
+  DBUG_ENTER("shutdown");
+  bool res= FALSE;
+  thd->lex->no_write_to_binlog= 1;
+
+  if (check_global_access(thd,SHUTDOWN_ACL))
+    goto error; /* purecov: inspected */
+
+  if (level == SHUTDOWN_DEFAULT)
+    level= SHUTDOWN_WAIT_ALL_BUFFERS; // soon default will be configurable
+  else if (level != SHUTDOWN_WAIT_ALL_BUFFERS)
+  {
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "this shutdown level");
+    goto error;;
+  }
+
+  if(command == COM_SHUTDOWN)
+    my_eof(thd);
+  else if(command == COM_QUERY)
+    my_ok(thd);
+  else
+  {
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "shutdown from this server command");
+    goto error;
+  }
+
+  DBUG_PRINT("quit",("Got shutdown command for level %u", level));
+  query_logger.general_log_print(thd, command, NullS);
+  kill_mysql();
+  res= TRUE;
+
+  error:
+  DBUG_RETURN(res);
+}
+#endif
 
 /**
   Create a TABLE_LIST object for an INFORMATION_SCHEMA table.
@@ -2399,7 +2461,7 @@ static inline void binlog_gtid_end_transaction(THD *thd)
 */
 
 int
-mysql_execute_command(THD *thd)
+mysql_execute_command(THD *thd, bool first_level)
 {
   int res= FALSE;
   LEX  *const lex= thd->lex;
@@ -2694,6 +2756,18 @@ mysql_execute_command(THD *thd)
   if (gtid_pre_statement_post_implicit_commit_checks(thd))
     DBUG_RETURN(-1);
 
+#ifndef EMBEDDED_LIBRARY
+  if (mysql_audit_notify(thd, first_level ?
+                              MYSQL_AUDIT_QUERY_START :
+                              MYSQL_AUDIT_QUERY_NESTED_START,
+                              first_level ?
+                              "MYSQL_AUDIT_QUERY_START" :
+                              "MYSQL_AUDIT_QUERY_NESTED_START"))
+  {
+    DBUG_RETURN(1);
+  }
+#endif /* !EMBEDDED_LIBRARY */
+
 #ifndef DBUG_OFF
   if (lex->sql_command != SQLCOM_SET_OPTION)
     DEBUG_SYNC(thd,"before_execute_sql_command");
@@ -2807,13 +2881,14 @@ mysql_execute_command(THD *thd)
     DBUG_EXECUTE_IF("use_attachable_trx",
                     thd->begin_attachable_transaction(););
 
-    thd->status_var.last_query_cost= 0.0;
-    thd->status_var.last_query_partial_plans= 0;
+    thd->clear_current_query_costs();
 
     res= select_precheck(thd, lex, all_tables, first_table);
 
     if (!res)
       res= execute_sqlcom_select(thd, all_tables);
+
+    thd->save_current_query_costs();
 
     DBUG_EXECUTE_IF("use_attachable_trx",
                     thd->end_attachable_transaction(););
@@ -3052,6 +3127,10 @@ case SQLCOM_PREPARE:
       }
     }
 
+    // Reject invalid tablespace names specified for partitions.
+    if (check_partition_tablespace_names(thd->lex->part_info))
+      goto end_with_restore_list;
+
     /* Fix names if symlinked or relocated tables */
     if (append_file_to_dir(thd, &create_info.data_file_name,
 			   create_table->table_name) ||
@@ -3082,7 +3161,7 @@ case SQLCOM_PREPARE:
 
     {
       partition_info *part_info= thd->lex->part_info;
-      if (part_info && !(part_info= thd->lex->part_info->get_clone()))
+      if (part_info && !(part_info= thd->lex->part_info->get_clone(true)))
       {
         res= -1;
         goto end_with_restore_list;
@@ -4315,7 +4394,9 @@ end_with_restore_list:
   case SQLCOM_SHOW_CREATE_USER:
   {
     LEX_USER *show_user= get_current_user(thd, lex->grant_user);
-    if (!strcmp(thd->security_context()->priv_user().str, show_user->user.str) ||
+    if (!(strcmp(thd->security_context()->priv_user().str, show_user->user.str) ||
+         my_strcasecmp(system_charset_info, show_user->host.str,
+                              thd->security_context()->priv_host().str)) ||
         !check_access(thd, SELECT_ACL, "mysql", NULL, NULL, 1, 0))
       res= mysql_show_create_user(thd, show_user);
     break;
@@ -4620,6 +4701,17 @@ end_with_restore_list:
           if (sp->is_not_allowed_in_function(where))
             goto error;
         }
+
+#ifndef EMBEDDED_LIBRARY
+        if (mysql_audit_notify(thd,
+                              AUDIT_EVENT(MYSQL_AUDIT_STORED_PROGRAM_EXECUTE),
+                              lex->spname->m_db.str,
+                              lex->spname->m_name.str,
+                              NULL))
+        {
+          goto error;
+        }
+#endif /* !EMBEDDED_LIBRARY */
 
 	if (sp->m_flags & sp_head::MULTI_RESULTS)
 	{
@@ -4961,6 +5053,7 @@ end_with_restore_list:
   case SQLCOM_XA_RECOVER:
   case SQLCOM_INSTALL_PLUGIN:
   case SQLCOM_UNINSTALL_PLUGIN:
+  case SQLCOM_SHUTDOWN:
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;
@@ -5039,6 +5132,7 @@ end_with_restore_list:
       }
 
       if (update_password_only &&
+          !opt_bootstrap &&
           !strcmp(thd->security_context()->priv_user().str,""))
       {
         my_message(ER_PASSWORD_ANONYMOUS_USER, ER(ER_PASSWORD_ANONYMOUS_USER),
@@ -5094,6 +5188,14 @@ finish:
 
   if (! thd->in_sub_stmt)
   {
+#ifndef EMBEDDED_LIBRARY
+    mysql_audit_notify(thd,
+                       first_level ? MYSQL_AUDIT_QUERY_STATUS_END :
+                                     MYSQL_AUDIT_QUERY_NESTED_STATUS_END,
+                       first_level ? "MYSQL_AUDIT_QUERY_STATUS_END" :
+                                     "MYSQL_AUDIT_QUERY_NESTED_STATUS_END");
+#endif /* !EMBEDDED_LIBRARY */
+
     /* report error issued during command execution */
     if (thd->killed_errno())
       thd->send_kill_message();
@@ -5111,7 +5213,6 @@ finish:
         thd->killed == THD::KILL_BAD_DATA)
     {
       thd->killed= THD::NOT_KILLED;
-      thd->mysys_var->abort= 0;
     }
   }
 
@@ -5280,7 +5381,7 @@ static bool execute_sqlcom_select(THD *thd, TABLE_LIST *all_tables)
       if (save_result != lex->result)
         delete save_result;
     }
-    MYSQL_SELECT_DONE((int) res, (ulong) thd->limit_found_rows);
+    MYSQL_SELECT_DONE((int) res, (ulong) thd->current_found_rows);
   }
 
   if (statement_timer_armed && thd->timer)
@@ -5482,9 +5583,6 @@ void THD::reset_for_next_command()
   thd->binlog_unsafe_warning_flags= 0;
   thd->binlog_need_explicit_defaults_ts= false;
 
-  thd->m_trans_end_pos= 0;
-  thd->m_trans_log_file= NULL;
-  thd->m_trans_fixed_log_file= NULL;
   thd->commit_error= THD::CE_NONE;
   thd->durability_property= HA_REGULAR_DURABILITY;
   thd->set_trans_pos(NULL, 0);
@@ -5493,6 +5591,8 @@ void THD::reset_for_next_command()
 
   // Need explicit setting, else demand all privileges to a table.
   thd->want_privilege= ~NO_ACCESS;
+
+  thd->gtid_executed_warning_issued= false;
 
   DBUG_PRINT("debug",
              ("is_current_stmt_binlog_format_row(): %d",
@@ -5662,8 +5762,7 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
       if (mqh_used && thd->get_user_connect() &&
           check_mqh(thd, lex->sql_command))
       {
-        if (thd->get_protocol()->type() == Protocol::PROTOCOL_TEXT ||
-            thd->get_protocol()->type() == Protocol::PROTOCOL_BINARY)
+        if (thd->is_classic_protocol())
           thd->get_protocol_classic()->get_net()->error = 0;
       }
       else
@@ -5707,7 +5806,7 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
             error= 1;
           }
           else
-            error= mysql_execute_command(thd);
+            error= mysql_execute_command(thd, true);
 
           MYSQL_QUERY_EXEC_DONE(error);
 	}
