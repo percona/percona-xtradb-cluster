@@ -9,15 +9,36 @@
 # order to avoid polluting the current directory after a test run.
 #
 
-# Bail out on errors, be strict
+# bail out on errors, be strict
 set -ue
 
-# Examine parameters
-TARGET="$(uname -m)"
-TARGET_CFLAGS=''
-QUIET='VERBOSE=1'
+#-------------------------------------------------------------------------------
+#
+# Step-0: Set default configuration.
+#
+
+# check the machine type (x86_64, i686) and accordingly configure
+# the compliation flag.
+MACHINE_SPECS="$(uname -m)"
+MACHINE_SPECS_CFLAGS=''
+
+# define verbosity while running make. default is off.
+QUIET='VERBOSE=0'
+
+# link jemalloc (needed for tokudb). For now pxc doesn't build tokudb
+# if in future pxc supports tokudb we will need it.
 WITH_JEMALLOC=''
+
+# Galera can be build locally as part of the script if the directory is placed
+# at said location. Alternatively, skip building galera instead just copy
+# the pre-build binary/so file to TARGETDIR (target-directory specified) and this
+# script will install it at said location while making file tar.gz.
+COPYGALERA=0
+
+# suffix to add in case of debug build to tar.gz.
 DEBUG_EXTNAME=''
+
+# build with ssl. configuration related to ssl.
 WITH_SSL='/usr'
 WITH_SSL_TYPE='system'
 OPENSSL_INCLUDE=''
@@ -25,22 +46,32 @@ OPENSSL_LIBRARY=''
 CRYPTO_LIBRARY=''
 GALERA_SSL=''
 SSL_OPT=''
+
+# tag build with this name.
 TAG=''
-#
-CMAKE_BUILD_TYPE=''
+
+# cmake build option to preset. based on configuration default options are used.
+CMAKE_BUILD_TYPE='RelWithDebInfo'
 COMMON_FLAGS=''
-#
+
+# tokudb backup version [IGNORED]
 TOKUDB_BACKUP_VERSION='@@TOKUDB_BACKUP_VERSION@@'
-#
-# Some programs that may be overriden
+
+# build related utilities
 TAR=${TAR:-tar}
 SCONS_ARGS=${SCONS_ARGS:-""}
 
-# Check if we have a functional getopt(1)
+#-------------------------------------------------------------------------------
+#
+# Step-1: Set default configuration.
+#
+
+#
+# parse input option and configure build enviornment acccordingly.
 if ! getopt --test
 then
-    go_out="$(getopt --options=iqdvjt: \
-        --longoptions=i686,quiet,debug,valgrind,with-jemalloc:,with-yassl,with-ssl:,tag: \
+    go_out="$(getopt --options=iqGdvjt: \
+        --longoptions=i686,verbose,copygalera,debug,valgrind,with-jemalloc:,with-yassl,with-ssl:,tag: \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -52,8 +83,8 @@ do
     -- ) shift; break;;
     -i | --i686 )
         shift
-        TARGET="i686"
-        TARGET_CFLAGS="-m32 -march=i686"
+        MACHINE_SPECS="i686"
+        MACHINE_SPECS_CFLAGS="-m32 -march=i686"
         ;;
     -d | --debug )
         shift
@@ -62,14 +93,18 @@ do
         DEBUG_EXTNAME='-DDEBUG_EXTNAME=OFF'
         SCONS_ARGS+=' debug=1'
         ;;
+    -G | --copygalera )
+        shift
+        COPYGALERA=1
+        ;;
     -v | --valgrind )
         shift
         CMAKE_OPTS="${CMAKE_OPTS:-} -DWITH_VALGRIND=ON"
         BUILD_COMMENT="${BUILD_COMMENT:-}-valgrind"
         ;;
-    -q | --quiet )
+    -q | --verbose)
         shift
-        QUIET=''
+        QUIET='VERBOSE=1'
         ;;
     -j | --with-jemalloc )
         shift
@@ -110,11 +145,18 @@ do
     esac
 done
 
-# Working directory
+#-------------------------------------------------------------------------------
+#
+# Step-2: Set working/source/galera directories.
+#
+
+#
+# Set working directory (default = current directory).
+# if working directory is not empty the it will bail out.
 if test "$#" -eq 0
 then
-    WORKDIR="$(pwd)"
-    
+    TARGETDIR="$(pwd)"
+
     # Check that the current directory is not empty
     if test "x$(echo *)" != "x*"
     then
@@ -122,38 +164,45 @@ then
             "Current directory is not empty. Use $0 . to force build in ."
         exit 1
     fi
-
 elif test "$#" -eq 1
 then
-    WORKDIR="$1"
+    TARGETDIR="$1"
 
     # Check that the provided directory exists and is a directory
-    if ! test -d "$WORKDIR"
+    if ! test -d "$TARGETDIR"
     then
-        echo >&2 "$WORKDIR is not a directory"
+        echo >&2 "$TARGETDIR is not a directory"
         exit 1
     fi
 
 else
     echo >&2 "Usage: $0 [target dir]"
     exit 1
-
 fi
 
-# Workdir path should be absolute
-WORKDIR="$(cd "$WORKDIR"; pwd)"
+#
+# target directory path should be absolute
+TARGETDIR="$(cd "$TARGETDIR"; pwd)"
+echo "Using $TARGETDIR as target/output directory"
 
+#
+# source directory hold target directory as immediately child.
+# as in cd source-dir/target-dir should be true
 SOURCEDIR="$(cd $(dirname "$0"); cd ..; pwd)"
 test -e "$SOURCEDIR/VERSION" || exit 2
+echo "Using $SOURCEDIR as source directory"
 
-# Test for the galera sources
-if ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
+#
+# Check if galera sources are part of source directory and needs to be build
+# or it is just a copy-over operation.
+if [[ $COPYGALERA -eq 0 ]] && ! test -d "$SOURCEDIR/percona-xtradb-cluster-galera"
 then
     echo >&2 "Subdir percona-xtradb-cluster-galera not found"
     exit 1
 fi
 
-# The number of processors is a good default for -j
+#
+# Find the number of processor to parallelize build (make -j<parallel>)
 if test -e "/proc/cpuinfo"
 then
     PROCESSORS="$(grep -c ^processor /proc/cpuinfo)"
@@ -161,28 +210,40 @@ else
     PROCESSORS=4
 fi
 
-if [[ -z ${STAG:-} ]];then 
-    STAG=""
-fi
+#-------------------------------------------------------------------------------
+#
+# Step-3: Extract and set PXC version
+# (It is made up from all contributing components)
+#
 
+#
+# PXC is made up from multiple upstream component.
+# PS: Percona Server Version
+# WSREP: wsrep plugin.
+# (Galera: This is standalone so nothing to consider from here)
+# Extract the version from of each component.
 
-# Build information
-if [[ -z ${REVISION:-} ]];then 
-    REVISION=500 
-else 
-    REVISION=$REVISION
-    echo "Building with revision $REVISION"
-fi
-
-# Extract version from the VERSION file
 source "$SOURCEDIR/VERSION"
 MYSQL_VERSION="$MYSQL_VERSION_MAJOR.$MYSQL_VERSION_MINOR.$MYSQL_VERSION_PATCH"
-# Extract version from the Makefile-pxc
-PERCONA_XTRADB_CLUSTER_VERSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
-RELEASE_TAG=''
-PRODUCT="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_XTRADB_CLUSTER_VERSION"
+PERCONA_SERVER_EXTENSION="$(echo $MYSQL_VERSION_EXTRA | sed 's/^-/rel/')"
+PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
-# Build information
+# Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
+# and galera plugin so we include it as part of our component.
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
+
+if [[ $COPYGALERA -eq 0 ]];then
+    GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
+fi
+
+PXC_MAJOR_MINOR="$PXC_MAJOR_VERSION.$PXC_MINOR_VERSION"
+PXC_VERSION="$PS_VERSION-$WSREP_VERSION-$PXC_MAJOR_MINOR"
+
+PRODUCT_NAME="Percona-XtraDB-Cluster-$PXC_VERSION"
+PRODUCT_FULL_NAME="$PRODUCT_NAME${BUILD_COMMENT:-}-$TAG$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+
+#
+# This corresponds to GIT revision when the build/package is created.
 if test -e "$SOURCEDIR/Docs/INFO_SRC"
 then
     REVISION="$(cd "$SOURCEDIR"; grep '^short: ' Docs/INFO_SRC |sed -e 's/short: //')"
@@ -192,21 +253,23 @@ then
 else
     REVISION=""
 fi
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
-GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
-PRODUCT_FULL="$PRODUCT-$RELEASE_TAG$WSREP_VERSION.${BUILD_COMMENT:-}$TAG.$(uname -s)${DIST_NAME:-}.$TARGET${SSL_VER:-}"
-COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
+COMMENT="Percona XtraDB Cluster binary (GPL) $PXC_VERSION"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 
-# Compilation flags
+#-------------------------------------------------------------------------------
+#
+# Step-4: Set compilation options.
+#
+
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
 
-# TokuDB cmake flags
+#
+# TokuDB cmake flags [IGNORED FOR PXC]
 if test -d "$SOURCEDIR/storage/tokudb"
 then
     CMAKE_OPTS="${CMAKE_OPTS:-} -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=${TOKUDB_BACKUP_VERSION}"
-    
+
     if test "x$CMAKE_BUILD_TYPE" != "xDebug"
     then
         CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=OFF"
@@ -221,26 +284,12 @@ then
 fi
 
 #
-if [ -n "$(which rpm)" ]; then
-  export COMMON_FLAGS=$(rpm --eval %optflags | sed -e "s|march=i386|march=i686|g")
-else
-  COMMON_FLAGS="-Wall -Wp,-D_FORTIFY_SOURCE=2 -DPERCONA_INNODB_VERSION=$MYSQL_RELEASE "
-  # Attempt to remove any optimisation flags from the debug build
-  # BLD-238 - bug1408232
-  if test "x$CMAKE_BUILD_TYPE" = "xDebug"
-  then
-    COMMON_FLAGS=`echo " ${COMMON_FLAGS} " | \
-              sed -e 's/ -O[0-9]* / /' \
-                  -e 's/-Wp,-D_FORTIFY_SOURCE=2/ /' \
-                  -e 's/ -unroll2 / /' \
-                  -e 's/ -ip / /' \
-                  -e 's/^ //' \
-                  -e 's/ $//'`
-  fi
-fi
-export CFLAGS=" $COMMON_FLAGS -static-libgcc $TARGET_CFLAGS ${CFLAGS:-}"
-export CXXFLAGS=" $COMMON_FLAGS $TARGET_CFLAGS ${CXXFLAGS:-}"
+
+COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
+export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
+export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
+
 #
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
@@ -250,101 +299,116 @@ then
         echo >&2 "Jemalloc dir $WITH_JEMALLOC does not exist"
         exit 1
     fi
-    
+
     JEMALLOCDIR="$(cd "$WITH_JEMALLOC"; pwd)"
 
 fi
 
-# Build
+#-------------------------------------------------------------------------------
+#
+# Step-4: Finally Build.
+#
+
 (
     cd "$SOURCEDIR"
- 
-    # Build galera
+
+    # Build/Copy galera as configured
     (
+    if [[ $COPYGALERA -eq 0 ]];then
         export CC=${GALERA_CC:-gcc}
         export CXX=${GALERA_CXX:-g++}
 
         cd "percona-xtradb-cluster-galera"
-        if grep builtin <<< "$STAG";then 
+        if grep builtin <<< "$STAG";then
             # No builtin SSL in galera yet.
             scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
                 garb/garbd libgalera_smm.so
-        elif grep static <<< "$STAG";then 
+        elif grep static <<< "$STAG";then
             # Disable SSL in galera for now
             scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
             revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 garb/garbd libgalera_smm.so
-        else 
+        else
             scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
                 garb/garbd libgalera_smm.so
         fi
-        mkdir -p "$WORKDIR/usr/local/$PRODUCT_FULL/bin" \
-             "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
-        cp garb/garbd "$WORKDIR/usr/local/$PRODUCT_FULL/bin"
-        cp libgalera_smm.so "$WORKDIR/usr/local/$PRODUCT_FULL/lib"
-
+        mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
+             "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+        cp garb/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        cp libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+    else
+        mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
+             "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+        cp $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        cp $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+    fi
     ) || exit 1
 
-    #make -f Makefile-pxc all
-
-    if grep -q builtin <<< "$STAG" || [[ $WITH_SSL_TYPE == 'bundled' ]];then 
+    if grep -q builtin <<< "$STAG" || [[ $WITH_SSL_TYPE == 'bundled' ]];then
         # builtin
         SSL_OPT='-DWITH_SSL=bundled -DWITH_ZLIB=bundled'
-    else 
+    else
         SSL_OPT='-DWITH_SSL=system -DWITH_ZLIB=system'
     fi
-    cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-        $DEBUG_EXTNAME \
-        -DWITH_EMBEDDED_SERVER=OFF \
-        -DFEATURE_SET=community \
-        -DENABLE_DTRACE=OFF \
-         $SSL_OPT \
-        -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
-        -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-        -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
-        -DWITH_INNODB_DISALLOW_WRITES=ON \
-        -DWITH_WSREP=ON \
-        -DWITH_READLINE=system \
-        -DWITHOUT_TOKUDB=ON \
-        -DCOMPILATION_COMMENT="$COMMENT" \
-        -DWITH_PAM=ON \
-        -DWITH_INNODB_MEMCACHED=ON \
-        $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
-    make $MAKE_JFLAG $QUIET
-    make DESTDIR="$WORKDIR" install
+    mkdir "$TARGETDIR/bld"
+    cd "$TARGETDIR/bld"
+    echo "$(pwd)"
 
-    if [[ $CMAKE_BUILD_TYPE != 'Debug' ]];then
-        make clean
-        cmake . ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+    if [[ $CMAKE_BUILD_TYPE == 'Debug' ]]; then
+        cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
             -DDEBUG_EXTNAME=ON \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
             -DENABLE_DTRACE=OFF \
             $SSL_OPT \
-            -DCMAKE_INSTALL_PREFIX="/usr/local/$PRODUCT_FULL" \
-            -DMYSQL_DATADIR="/usr/local/$PRODUCT_FULL/data" \
-            -DMYSQL_SERVER_SUFFIX="-$RELEASE_TAG$WSREP_VERSION" \
+            -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
+            -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
+            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
             -DWITH_INNODB_DISALLOW_WRITES=ON \
             -DWITH_WSREP=ON \
+            -DWITH_UNIT_TESTS=0 \
             -DWITH_READLINE=system \
             -DWITHOUT_TOKUDB=ON \
+            -DWITH_DEBUG=ON
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
             $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+
         make $MAKE_JFLAG $QUIET
+        make install
+        cp -v sql/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld
+        echo "mysqld in build in debug mode"
+    else
+        cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
+            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
+            $DEBUG_EXTNAME \
+            -DWITH_EMBEDDED_SERVER=OFF \
+            -DFEATURE_SET=community \
+            -DENABLE_DTRACE=OFF \
+            $SSL_OPT \
+            -DCMAKE_INSTALL_PREFIX="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME" \
+            -DMYSQL_DATADIR="$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/data" \
+            -DMYSQL_SERVER_SUFFIX="-$WSREP_VERSION" \
+            -DWITH_INNODB_DISALLOW_WRITES=ON \
+            -DWITH_WSREP=ON \
+            -DWITH_UNIT_TESTS=0 \
+            -DWITH_READLINE=system \
+            -DWITHOUT_TOKUDB=ON \
+            -DCOMPILATION_COMMENT="$COMMENT" \
+            -DWITH_PAM=ON \
+            -DWITH_INNODB_MEMCACHED=ON \
+            $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
-        echo "Copying mysqld-debug"
-        cp -v sql/mysqld-debug $WORKDIR/usr/local/$PRODUCT_FULL/bin/mysqld-debug
+        make $MAKE_JFLAG $QUIET
+        make install
+        echo "mysqld in build in release mode"
     fi
-
 
     (
        echo "Packaging the test files"
-       # mkdir -p $WORKDIR/usr/local/$PRODUCT_FULL
-       cp -R percona-xtradb-cluster-tests $WORKDIR/usr/local/$PRODUCT_FULL/
+       cp -R $SOURCEDIR/percona-xtradb-cluster-tests $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/
     ) || exit 1
 
     # Build jemalloc
@@ -353,13 +417,13 @@ fi
     (
         cd "$JEMALLOCDIR"
 
-        CFLAGS= ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL/" \
-            --libdir="/usr/local/$PRODUCT_FULL/lib/mysql/"
+        CFLAGS= ./autogen.sh --disable-valgrind --prefix="/usr/local/$PRODUCT_FULL_NAME/" \
+            --libdir="/usr/local/$PRODUCT_FULL_NAME/lib/mysql/"
         make $MAKE_JFLAG
-        make DESTDIR="$WORKDIR" install_lib_shared
+        make DESTDIR="$TARGETDIR" install_lib_shared
         strip lib/libjemalloc* || true
         # Copy COPYING file
-        cp COPYING "$WORKDIR/usr/local/$PRODUCT_FULL/COPYING-jemalloc"
+        cp COPYING "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/COPYING-jemalloc"
 
     ) || exit 1
     fi
@@ -368,7 +432,9 @@ fi
 
 # Package the archive
 (
-    cd "$WORKDIR/usr/local/"
+    cd "$TARGETDIR/usr/local/"
 
-    $TAR --owner=0 --group=0 -czf "$WORKDIR/$PRODUCT_FULL.tar.gz" $PRODUCT_FULL 
+    $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 ) || exit 1
+
+echo "Build Complete"
