@@ -6397,6 +6397,15 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
     thd->cleanup_after_query();
     DBUG_ASSERT(thd->change_list.is_empty());
   }
+#ifdef WITH_WSREP
+  else
+  {
+    if (WSREP_CLIENT(thd))
+    {
+      thd->wsrep_sync_wait_gtid = WSREP_GTID_UNDEFINED;
+    }
+  }
+#endif /* WITH_WSREP */
 
   DBUG_VOID_RETURN;
 }
