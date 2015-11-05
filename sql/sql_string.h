@@ -174,6 +174,10 @@ public:
     Alloced_length=str.Alloced_length; alloced=0; 
     str_charset=str.str_charset;
   }
+#ifdef WITH_WSREP
+  static void *operator new(size_t size)
+  { return ::operator new(size); }
+#endif
   static void *operator new(size_t size, MEM_ROOT *mem_root) throw ()
   { return (void*) alloc_root(mem_root, (uint) size); }
   static void operator delete(void *ptr_arg, size_t size)

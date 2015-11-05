@@ -19,6 +19,9 @@
 
 /* Classes in mysql */
 
+#include <vector>
+using std::vector;
+
 #include "my_global.h"                          /* NO_EMBEDDED_ACCESS_CHECKS */
 #ifdef MYSQL_SERVER
 #include "unireg.h"                    // REQUIRED: for other includes
@@ -3475,9 +3478,12 @@ public:
                             wsrep_consistency_check;
   wsrep_stats_var*          wsrep_status_vars;
   int                       wsrep_mysql_replicated;
-  const char*               wsrep_TOI_pre_query; /* a query to apply before 
-                                                    the actual TOI query */
-  size_t                    wsrep_TOI_pre_query_len;
+
+  /* query to apply before actual TOI query. Needed in case of
+  CREATE LIKE or DROP TABLE (with mix of temp/non-temp) */
+  typedef vector<String*>   wsrep_queries;
+  wsrep_queries             wsrep_TOI_pre_queries;
+
   wsrep_po_handle_t         wsrep_po_handle;
   size_t                    wsrep_po_cnt;
   my_bool                   wsrep_po_in_trans;

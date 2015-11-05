@@ -4504,16 +4504,66 @@ end_with_restore_list:
 	goto error;				/* purecov: inspected */
     }
 #ifdef WITH_WSREP
+   /* DROP TABLE <table> drops the table from database.
+   DROP TABLE is valid even if table is temporary but given that temporary
+   tables are not replicated it doesn't make sense to drop temporary table.
+   (CREATE TEMPORARY TABLE is blocked as temporary tables are localized to
+    the connection that created it which in replication case would be applier
+    thread. No user-thread will be able to access it.)
+
+   Check if table is temporary if found skip it.
+
+   Exception: drop table <non-temporary> <temporary>;
+   This involves mix of temporary and non-temporary table.
+   Algorithm will identify such case create a fake temporary table and
+   that will allow mix statement to succeed. */
+
+   bool involves_temporary = false;
+   bool involves_non_temporary = false;
+
+   /* Check for mix of temp/non-temp only if drop statement is confusing.
+   DROP TEMPORARY is meant only for TEMPORARY so skip check in this case. */
+   for (TABLE_LIST *table= all_tables;
+        table && !lex->drop_temporary;
+        table= table->next_global)
+   {
+     if (find_temporary_table(thd, table))
+       involves_temporary = true;
+     else
+       involves_non_temporary = true;
+   }
+
+  /* We take a 2 pass approach because:
+  1. We don't know involvement of mix till we are done with complete list scan
+  2. logic to find is less costly than logic to create and append query. */
+   for (TABLE_LIST *table= all_tables;
+        table && (involves_non_temporary && involves_temporary);
+        table= table->next_global)
+   {
+     if (find_temporary_table(thd, table))
+     {
+       thd->wsrep_TOI_pre_queries.push_back(new String());
+       String* query = thd->wsrep_TOI_pre_queries.back();
+       query->length(0);
+       (void) store_create_info(thd, table, query, NULL, TRUE);
+     }
+   }
+
    for (TABLE_LIST *table= all_tables; table; table= table->next_global)
    {
      if (!lex->drop_temporary                       &&
-	 (!thd->is_current_stmt_binlog_format_row() ||
-	  !find_temporary_table(thd, table)))
+         (!thd->is_current_stmt_binlog_format_row() ||
+          !find_temporary_table(thd, table)))
      {
        WSREP_TO_ISOLATION_BEGIN(NULL, NULL, all_tables);
        break;
      }
    }
+
+   for (uint i = 0; i < thd->wsrep_TOI_pre_queries.size(); ++i)
+     delete thd->wsrep_TOI_pre_queries[i];
+   thd->wsrep_TOI_pre_queries.clear();
+   THD::wsrep_queries().swap(thd->wsrep_TOI_pre_queries);
 #endif /* WITH_WSREP */
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->drop_if_exists,
