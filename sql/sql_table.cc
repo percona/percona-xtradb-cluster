@@ -5410,20 +5410,19 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
       tbl.db= src_table->db;
       tbl.table_name= tbl.alias= src_table->table_name;
       tbl.table= tmp_table;
-      char buf[2048];
-      String query(buf, sizeof(buf), system_charset_info);
-      query.length(0);  // Have to zero it since constructor doesn't
 
-      (void)  store_create_info(thd, &tbl, &query, NULL, TRUE);
-      WSREP_DEBUG("TMP TABLE: %s", query.ptr());
+      thd->wsrep_TOI_pre_queries.push_back(new String());
+      String* query = thd->wsrep_TOI_pre_queries.back();
+      query->length(0);
+      (void)  store_create_info(thd, &tbl, query, NULL, TRUE);
+      WSREP_DEBUG("TMP TABLE: %s", query->ptr());
 
-      thd->wsrep_TOI_pre_query=     query.ptr();
-      thd->wsrep_TOI_pre_query_len= query.length();
-      
       WSREP_TO_ISOLATION_BEGIN(table->db, table->table_name, NULL);
 
-      thd->wsrep_TOI_pre_query=      NULL;
-      thd->wsrep_TOI_pre_query_len= 0;
+      for (uint i = 0; i < thd->wsrep_TOI_pre_queries.size(); ++i)
+        delete thd->wsrep_TOI_pre_queries[i];
+      thd->wsrep_TOI_pre_queries.clear();
+      THD::wsrep_queries().swap(thd->wsrep_TOI_pre_queries);
     }
   }
 #endif
@@ -5609,7 +5608,6 @@ err:
   DBUG_RETURN(res);
 #ifdef WITH_WSREP
  error:
-  thd->wsrep_TOI_pre_query= NULL;
   DBUG_RETURN(TRUE);
 #endif /* WITH_WSREP */
 }

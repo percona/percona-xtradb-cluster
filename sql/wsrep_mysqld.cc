@@ -1095,10 +1095,10 @@ int wsrep_to_buf_helper(
   }
 
   /* if there is prepare query, add event for it */
-  if (!ret && thd->wsrep_TOI_pre_query)
+  for (uint i = 0; i < thd->wsrep_TOI_pre_queries.size() && !ret; ++i)
   {
-    Query_log_event ev(thd, thd->wsrep_TOI_pre_query,
-		       thd->wsrep_TOI_pre_query_len,
+    Query_log_event ev(thd, thd->wsrep_TOI_pre_queries[i]->ptr(),
+                       thd->wsrep_TOI_pre_queries[i]->length(),
 		       FALSE, FALSE, FALSE, 0);
     if (ev.write(&tmp_io_cache)) ret= 1;
   }
