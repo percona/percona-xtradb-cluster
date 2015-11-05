@@ -37,3 +37,34 @@ SELECT COUNT(*) = 95000 FROM t1;
 --eval SET GLOBAL wsrep_load_data_splitting = $wsrep_load_data_splitting_orig;
 
 DROP TABLE t1;
+
+
+#
+# test scenario where-in data is loaded using LOAD DATA INFILE
+# into a partitioned table.
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
+PARTITION BY RANGE(f1) (
+    PARTITION p0 VALUES LESS THAN (10000),
+    PARTITION p1 VALUES LESS THAN (20000),
+    PARTITION p2 VALUES LESS THAN (100000)
+);
+
+--connection node_2
+--echo #node-2
+SHOW CREATE TABLE t1;
+SELECT COUNT(*) FROM t1;
+
+--connection node_1
+--echo #node-1
+--disable_query_log
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+SELECT COUNT(*) FROM t1;
+
+--connection node_2
+--echo #node-2
+SELECT COUNT(*) FROM t1;
+DROP TABLE t1;

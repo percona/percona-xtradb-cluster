@@ -8033,10 +8033,19 @@ report_error:
 						   prebuilt->table->flags,
 						   user_thd);
 #ifdef WITH_WSREP
+	/* Append key
+	a. there is no error in insert
+	b. exec mode is local (it is workload executor node and replicator node)
+	c. wsrep is enabled
+	d. LDI conditionality (which actually is confusing)
+	e. row_format = ROW
+	f. If table is partition with innodb being used for storing partition.
+	   (Note: Condition inherently evaluated only for LDI due to d) */
 	if (!error_result && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
 	    wsrep_on(user_thd) && !wsrep_consistency_check(user_thd) &&
 	    (sql_command != SQLCOM_LOAD || 
-	     thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW)) {
+	     thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW ||
+	     table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
 
 		if (wsrep_append_keys(user_thd, false, record, NULL)) {
  			DBUG_PRINT("wsrep", ("row key failed"));
