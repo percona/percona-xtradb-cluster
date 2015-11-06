@@ -7108,6 +7108,13 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
     if (!opt_log_raw)
       general_log_write(thd, COM_QUERY, thd->query(), thd->query_length());
     parser_state->m_lip.found_semicolon= NULL;
+
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd))
+    {
+      thd->wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+    }
+#endif /* WITH_WSREP */
   }
 
   DBUG_VOID_RETURN;
