@@ -1096,6 +1096,7 @@ THD::THD()
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_query     = NULL;
   wsrep_TOI_pre_query_len = 0;
+  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state(this);
@@ -1469,6 +1470,7 @@ void THD::init(void)
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_query     = NULL;
   wsrep_TOI_pre_query_len = 0;
+  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
 #endif
 
   if (variables.sql_log_bin)
@@ -1992,6 +1994,10 @@ void THD::cleanup_after_query()
   if (rli_slave)
     rli_slave->cleanup_after_query();
 #endif
+
+#ifdef WITH_WSREP
+  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+#endif /* WITH_WSREP */
 }
 
 
