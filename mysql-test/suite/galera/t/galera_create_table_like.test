@@ -83,3 +83,73 @@ insert into t1 values (11);
 --echo #node-2
 select * from t1;
 drop table t1;
+
+#
+# Scenario that involves use of CTAS (CREATE TABLE ... AS SELECT)
+#
+
+--connection node_1
+--echo #node-1
+--let $wsrep_replicate_myisam_orig = `SELECT @@wsrep_replicate_myisam`
+set wsrep_replicate_myisam = 1;
+select @@wsrep_replicate_myisam;
+
+#
+use test;
+create table src_i (i int, primary key pk(i)) engine=innodb;
+create table src_m (i int, primary key pk(i)) engine=myisam;
+#
+create table t1 engine=innodb as select * from src_i;
+create table t2 engine=innodb as select * from src_m;
+create table t3 engine=innodb as select 1;
+create table t4 engine=innodb as select 1 from src_i;
+create table t5 engine=innodb as select 1 from src_m;
+create table t6 engine=myisam as select * from src_i;
+create table t7 engine=myisam as select * from src_m;
+create table t8 engine=myisam as select 1;
+create table t9 engine=myisam as select 1 from src_i;
+create table t10 engine=myisam as select 1 from src_m;
+
+--connection node_2
+--echo #node-2
+call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t7,test.t8,test.t10''.*");
+# with dest = myisam only few of the tables are replicated
+# this issue exist in upstream too (but they are hitting
+# a bug before). Upstream may not fix it given that it is
+# an issue only with myisam and not with innodb.
+use test;
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1, t2, t3, t4, t5;
+drop table t6, t7, t8, t9, t10;
+insert into src_i values (1), (2);
+insert into src_m values (1), (2);
+#
+create table t1 engine=innodb as select * from src_i;
+create table t2 engine=innodb as select * from src_m;
+create table t3 engine=innodb as select 1;
+create table t4 engine=innodb as select 1 from src_i;
+create table t5 engine=innodb as select 1 from src_m;
+create table t6 engine=myisam as select * from src_i;
+create table t7 engine=myisam as select * from src_m;
+create table t8 engine=myisam as select 1;
+create table t9 engine=myisam as select 1 from src_i;
+create table t10 engine=myisam as select 1 from src_m;
+
+--connection node_2
+--echo #node-2
+# with dest = myisam only few of the tables are replicated
+# this issue exist in upstream too (but they are hitting
+# a bug before). Upstream may not fix it given that it is
+# an issue only with myisam and not with innodb.
+use test;
+show tables;
+
+--connection node_1
+--echo #node-1
+drop table t1, t2, t3, t4, t5;
+drop table t6, t7, t8, t9, t10;
+drop table src_i, src_m;
+--eval set wsrep_replicate_myisam = $wsrep_replicate_myisam_orig;
