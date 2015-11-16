@@ -46,6 +46,7 @@ OPENSSL_LIBRARY=''
 CRYPTO_LIBRARY=''
 GALERA_SSL=''
 SSL_OPT=''
+STAG=${STAG:-}
 
 # tag build with this name.
 TAG=''
@@ -236,11 +237,9 @@ if [[ $COPYGALERA -eq 0 ]];then
     GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
 fi
 
-PXC_MAJOR_MINOR="$PXC_MAJOR_VERSION.$PXC_MINOR_VERSION"
-PXC_VERSION="$PS_VERSION-$WSREP_VERSION-$PXC_MAJOR_MINOR"
-
-PRODUCT_NAME="Percona-XtraDB-Cluster-$PXC_VERSION"
-PRODUCT_FULL_NAME="$PRODUCT_NAME${BUILD_COMMENT:-}-$TAG$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
+RELEASE_TAG=''
+PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
+PRODUCT_FULL_NAME="$PRODUCT_NAME-$RELEASE_TAG$WSREP_VERSION.${BUILD_COMMENT:-}$TAG.$(uname -s)${DIST_NAME:-}.$MACHINE_SPECS${SSL_VER:-}"
 
 #
 # This corresponds to GIT revision when the build/package is created.
@@ -253,7 +252,7 @@ then
 else
     REVISION=""
 fi
-COMMENT="Percona XtraDB Cluster binary (GPL) $PXC_VERSION"
+COMMENT="Percona XtraDB Cluster binary (GPL) $MYSQL_VERSION-$RELEASE_TAG$WSREP_VERSION"
 COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 
 #-------------------------------------------------------------------------------
