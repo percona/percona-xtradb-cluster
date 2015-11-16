@@ -2,12 +2,12 @@
 .\"     Title: \fBndb_restore\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 06/25/2015
+.\"      Date: 09/18/2015
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.5
 .\"  Language: English
 .\"
-.TH "\FBNDB_RESTORE\FR" "1" "06/25/2015" "MySQL 5\&.5" "MySQL Database System"
+.TH "\FBNDB_RESTORE\FR" "1" "09/18/2015" "MySQL 5\&.5" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -308,7 +308,7 @@ All MySQL 5.5 based releases
 T}
 T{
 .PP
---backup_path=path
+--backup_path=dir_name
 T}:T{
 Path to backup files directory
 T}:T{
@@ -386,9 +386,9 @@ All MySQL 5.5 based releases
 T}
 T{
 .PP
---tab=path,
+--tab=dir_name,
 .PP
--T
+-T dir_name
 T}:T{
 Creates a tab-separated .txt file for each table in the given path
 T}:T{
@@ -753,7 +753,7 @@ column can be restored to a column of type
 INT
 or
 BIGINT\&. See
-Section\ \&17.4.1.9.2, \(lqReplication of Columns Having Different Data Types\(rq, for a table of type conversions currently supported by attribute promotion\&.
+Section\ \&17.4.1.10.2, \(lqReplication of Columns Having Different Data Types\(rq, for a table of type conversions currently supported by attribute promotion\&.
 .PP
 Attribute promotion by
 \fBndb_restore\fR
@@ -868,7 +868,7 @@ This option is intended to complement the
 option\&. Using
 \fB\-\-lossy\-conversions\fR
 allows lossy conversions of column values (type demotions or changes in sign) when restoring data from backup\&. With some exceptions, the rules governing demotion are the same as for MySQL replication; see
-Section\ \&17.4.1.9.2, \(lqReplication of Columns Having Different Data Types\(rq, for information about specific type conversions currently supported by attribute demotion\&.
+Section\ \&17.4.1.10.2, \(lqReplication of Columns Having Different Data Types\(rq, for information about specific type conversions currently supported by attribute demotion\&.
 .PP
 \fBndb_restore\fR
 reports any truncation of data that it performs during lossy conversions once per attribute and column\&.
@@ -1097,11 +1097,19 @@ stdout, or to a file\&. These are similar to some of the options used with
 \fB\-T\fR
 .TS
 allbox tab(:);
-l l s s.
+l l s s
+l l l s.
 T{
 \fBCommand\-Line Format\fR
 T}:T{
-\-\-tab=path
+\-\-tab=dir_name
+T}
+T{
+\fBPermitted Values\fR
+T}:T{
+\fBType\fR
+T}:T{
+directory name
 T}
 .TE
 .sp 1

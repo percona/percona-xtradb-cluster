@@ -2,12 +2,12 @@
 .\"     Title: Options Common to MySQL Cluster Programs
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 06/25/2015
+.\"      Date: 09/18/2015
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.5
 .\"  Language: English
 .\"
-.TH "OPTIONS COMMON TO MY" "1" "06/25/2015" "MySQL 5\&.5" "MySQL Database System"
+.TH "OPTIONS COMMON TO MY" "1" "09/18/2015" "MySQL 5\&.5" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -175,7 +175,7 @@ All MySQL 5.5 based releases
 T}
 T{
 .PP
---character-sets-dir=path
+--character-sets-dir=dir_name
 T}:T{
 Directory where character sets are installed
 T}:T{
@@ -275,14 +275,14 @@ l l l s
 T{
 \fBCommand\-Line Format\fR
 T}:T{
-\-\-character\-sets\-dir=path
+\-\-character\-sets\-dir=dir_name
 T}
 T{
 \fBPermitted Values\fR
 T}:T{
 \fBType\fR
 T}:T{
-file name
+directory name
 T}
 :T{
 \fBDefault\fR
@@ -304,9 +304,9 @@ Tells the program where to find character set information\&.
 .\" ndb-connectstring option (MySQL Cluster programs)
 .\" connect-string option (MySQL Cluster programs)
 .\" -c option (MySQL Cluster programs)
-\fB\-\-ndb\-connectstring=\fR\fB\fIconnect_string\fR\fR,
-\fB\-\-connect\-string=\fR\fB\fIconnect_string\fR\fR,
-\fB\-c \fR\fB\fIconnect_string\fR\fR
+\fB\-\-ndb\-connectstring=\fR\fB\fIconnection_string\fR\fR,
+\fB\-\-connect\-string=\fR\fB\fIconnection_string\fR\fR,
+\fB\-c \fR\fB\fIconnection_string\fR\fR
 .TS
 allbox tab(:);
 l l s s
