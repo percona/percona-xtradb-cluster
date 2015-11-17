@@ -106,6 +106,8 @@ void wsrep_register_hton(THD* thd, bool all)
  */
 void wsrep_post_commit(THD* thd, bool all)
 {
+  if (!WSREP(thd)) return;
+
   switch (thd->wsrep_exec_mode)
   {
   case LOCAL_COMMIT:
@@ -471,7 +473,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     }
   } else {
     WSREP_ERROR("I/O error reading from thd's binlog iocache: "
-                "errno=%d, io cache code=%d", my_errno, cache->error);
+                "errno=%d, io cache code=%d", my_errno(), cache->error);
     DBUG_ASSERT(0); // failure like this can not normally happen
     DBUG_RETURN(WSREP_TRX_ERROR);
   }

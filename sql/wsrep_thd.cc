@@ -97,7 +97,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->options       = thd->variables.option_bits;
   shadow->server_status = thd->server_status;
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
-  shadow->vio           = thd->net.vio;
+  shadow->vio           = thd->active_vio;
 
   if (opt_log_slave_updates)
     thd->variables.option_bits|= OPTION_BIN_LOG;
@@ -108,7 +108,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->wsrep_rli->info_thd = thd;
 
   thd->wsrep_exec_mode= REPL_RECV;
-  thd->net.vio= 0;
+  thd->set_active_vio(0);
   thd->clear_error();
 
   shadow->tx_isolation        = thd->variables.tx_isolation;
@@ -125,7 +125,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.option_bits  = shadow->options;
   thd->server_status          = shadow->server_status;
   thd->wsrep_exec_mode        = shadow->wsrep_exec_mode;
-  thd->net.vio                = shadow->vio;
+  thd->set_active_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
 }

@@ -1887,15 +1887,24 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 #ifdef WITH_WSREP
  dispatch_end:
 
-  if (WSREP(thd)) {
+  if (WSREP(thd))
+  {
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if ((thd->wsrep_conflict_state != REPLAYING) &&
-        (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT)) {
+        (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT))
+    {
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
+      DBUG_ASSERT(thd->derived_tables == NULL &&
+                  (thd->open_tables == NULL ||
+                   (thd->locked_tables_mode == LTM_LOCK_TABLES)));
+
+      /* Finalize server status flags after executing a command. */
       thd->update_server_status();
-      thd->end_statement();
+      if (thd->killed)
+        thd->send_kill_message();
+      thd->send_statement_status();
       query_cache.end_of_result(thd);
     } 
     else
@@ -6708,6 +6717,7 @@ static uint kill_one_thread(THD *thd, my_thread_id id, bool only_kill_query)
 static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                               Parser_state *parser_state)
 {
+  DBUG_ENTER("wsrep_mysql_parse");
   bool is_autocommit=
     !thd->in_multi_stmt_transaction_mode()                  &&
     thd->wsrep_conflict_state == NO_CONFLICT                &&
@@ -6829,6 +6839,7 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
     thd->wsrep_retry_query_len  = 0;
     thd->wsrep_retry_command    = COM_CONNECT;
   }
+  DBUG_VOID_RETURN;
 }
 #endif /* WITH_WSREP */
 

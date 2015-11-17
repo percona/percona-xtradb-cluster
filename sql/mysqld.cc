@@ -1023,9 +1023,9 @@ public:
     if (WSREP(closing_thd) && closing_thd->wsrep_exec_mode==REPL_RECV)
     {
       sql_print_information("closing wsrep system thread");
-      closing_thd->killed= THD::KILL_CONNECTION;
 
       mysql_mutex_lock(&closing_thd->LOCK_thd_data);
+      closing_thd->killed= THD::KILL_CONNECTION;
       if (closing_thd->current_cond)
       {
         mysql_mutex_lock(closing_thd->current_mutex);
@@ -1148,7 +1148,18 @@ public:
   {
     if (WSREP(thd) && thd->wsrep_applier)
     {
-      close_connection(thd);
+      // redundant, system thread should not have vio
+      //close_connection(thd);
+
+      mysql_mutex_lock(&thd->LOCK_thd_data);
+      thd->killed= THD::KILL_CONNECTION;
+      if (thd->current_cond)
+      {
+        mysql_mutex_lock(thd->current_mutex);
+        mysql_cond_broadcast(thd->current_cond);
+        mysql_mutex_unlock(thd->current_mutex);
+      }
+      mysql_mutex_unlock(&thd->LOCK_thd_data);
     }
   }
 };
@@ -4079,6 +4090,51 @@ will be ignored as the --log-bin option is not defined.");
   }
 #endif
 
+#ifdef WITH_WSREP /* WSREP BEFORE SE */
+    /*
+      Wsrep initialization must happen at this point, because:
+      - opt_bin_logname must be known when starting replication
+        since SST may need it
+      - SST may modify binlog index file, so it must be opened
+        after SST has happened
+     */
+  if (!wsrep_recovery)
+  {
+    if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
+    {
+      wsrep_provider_init(WSREP_NONE);
+      if (wsrep_init()) unireg_abort(1);
+    }
+    else // full wsrep initialization
+    {
+      // add basedir/bin to PATH to resolve wsrep script names
+      char* const tmp_path((char*)alloca(strlen(mysql_home) +
+                                           strlen("/bin") + 1));
+      if (tmp_path)
+      {
+        strcpy(tmp_path, mysql_home);
+        strcat(tmp_path, "/bin");
+        wsrep_prepend_PATH(tmp_path);
+      }
+      else
+      {
+        WSREP_ERROR("Could not append %s/bin to PATH", mysql_home);
+      }
+      if (wsrep_before_SE())
+      {
+        if (gtid_server_init())
+        {
+          sql_print_error("Failed to initialize GTID structures.");
+          unireg_abort(MYSQLD_ABORT_EXIT);
+        }
+
+        set_ports(); // this is also called in network_init() later but we need
+                     // to know mysqld_port now - lp:1071882
+        wsrep_init_startup(true);
+      }
+    }
+  }
+#endif /* WITH_WSREP */
   if (opt_bin_log)
   {
     /* Reports an error and aborts, if the --log-bin's path
@@ -4126,8 +4182,19 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       opt_bin_logname=my_strdup(key_memory_opt_bin_logname,
                                 buf, MYF(0));
     }
+#ifdef WITH_WSREP
+    if (!wsrep_before_SE())
+    {
+#endif /* WITH_WSREP */
+    if (mysql_bin_log.open_index_file(opt_binlog_index_name, ln, TRUE))
+    {
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
   }
-#ifdef WITH_WSREP /* WSREP BEFORE SE */
+#ifdef WITH_WSREP_OUT /* WSREP BEFORE SE */
     /*
       Wsrep initialization must happen at this point, because:
       - opt_bin_logname must be known when starting replication
@@ -4160,6 +4227,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
 
       if (wsrep_before_SE())
       {
+        if (gtid_server_init())
+        {
+          sql_print_error("Failed to initialize GTID structures.");
+          unireg_abort(MYSQLD_ABORT_EXIT);
+        }
+
         set_ports(); // this is also called in network_init() later but we need
                      // to know mysqld_port now - lp:1071882
         wsrep_init_startup(true);
@@ -4176,18 +4249,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       - if new log name is generated, return value is assigned to ln and copied
         to opt_bin_logname above
      */
-    if (mysql_bin_log.open_index_file(opt_binlog_index_name, opt_bin_logname,
-                                      TRUE))
+    if (mysql_bin_log.open_index_file(opt_binlog_index_name, ln, TRUE))
     {
       unireg_abort(1);
     }
-#else
-    if (mysql_bin_log.open_index_file(opt_binlog_index_name, ln, TRUE))
-    {
-      unireg_abort(MYSQLD_ABORT_EXIT);
-    }
-#endif /* WITH_WSREP */
   }
+#endif /* WITH_WSREP */
 
   if (opt_bin_log)
   {
@@ -4255,12 +4322,18 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   if (opt_ignore_builtin_innodb)
     sql_print_warning("ignore-builtin-innodb is ignored "
                       "and will be removed in future releases.");
+#ifdef WITH_WSREP
+    if (!wsrep_before_SE())
+    {
+#endif /* WITH_WSREP */
   if (gtid_server_init())
   {
     sql_print_error("Failed to initialize GTID structures.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
-
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
   /*
     Set tc_log to point to TC_LOG_DUMMY early in order to allow plugin_init()
     to commit attachable transaction after reading from mysql.plugin table.

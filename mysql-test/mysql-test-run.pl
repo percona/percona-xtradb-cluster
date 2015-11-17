@@ -371,6 +371,8 @@ sub main {
     gcov_prepare($basedir);
   }
 
+  check_wsrep_support();
+
   # New: collect suites and test cases from test list (file containing suite.testcase on each line)
   #      and put suites to $opt_suites and test case to @opt_cases.
   if ($opt_do_test_list ne "") {
