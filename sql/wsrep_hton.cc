@@ -68,6 +68,8 @@ handlerton *wsrep_hton;
 */
 void wsrep_register_hton(THD* thd, bool all)
 {
+  if (!WSREP(thd)) return;
+
   if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
     Transaction_ctx *trn_ctx= thd->get_transaction();

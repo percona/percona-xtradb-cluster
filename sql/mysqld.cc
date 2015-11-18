@@ -4182,79 +4182,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       opt_bin_logname=my_strdup(key_memory_opt_bin_logname,
                                 buf, MYF(0));
     }
-#ifdef WITH_WSREP
-    if (!wsrep_before_SE())
-    {
-#endif /* WITH_WSREP */
+
     if (mysql_bin_log.open_index_file(opt_binlog_index_name, ln, TRUE))
     {
       unireg_abort(MYSQLD_ABORT_EXIT);
     }
-#ifdef WITH_WSREP
-    }
-#endif /* WITH_WSREP */
   }
-#ifdef WITH_WSREP_OUT /* WSREP BEFORE SE */
-    /*
-      Wsrep initialization must happen at this point, because:
-      - opt_bin_logname must be known when starting replication
-        since SST may need it
-      - SST may modify binlog index file, so it must be opened
-        after SST has happened
-     */
-  if (!wsrep_recovery)
-  {
-    if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
-    {
-      wsrep_provider_init(WSREP_NONE);
-      if (wsrep_init()) unireg_abort(1);
-    }
-    else // full wsrep initialization
-    {
-      // add basedir/bin to PATH to resolve wsrep script names
-      char* const tmp_path((char*)alloca(strlen(mysql_home) +
-                                           strlen("/bin") + 1));
-      if (tmp_path)
-      {
-        strcpy(tmp_path, mysql_home);
-        strcat(tmp_path, "/bin");
-        wsrep_prepend_PATH(tmp_path);
-      }
-      else
-      {
-        WSREP_ERROR("Could not append %s/bin to PATH", mysql_home);
-      }
-
-      if (wsrep_before_SE())
-      {
-        if (gtid_server_init())
-        {
-          sql_print_error("Failed to initialize GTID structures.");
-          unireg_abort(MYSQLD_ABORT_EXIT);
-        }
-
-        set_ports(); // this is also called in network_init() later but we need
-                     // to know mysqld_port now - lp:1071882
-        wsrep_init_startup(true);
-      }
-    }
-  }
-  if (opt_bin_log)
-  {
-    /*
-      Variable ln is not defined at this scope. We use opt_bin_logname instead.
-      It should be the same as ln since
-      - mysql_bin_log.generate_name() returns first argument if new log name
-        is not generated
-      - if new log name is generated, return value is assigned to ln and copied
-        to opt_bin_logname above
-     */
-    if (mysql_bin_log.open_index_file(opt_binlog_index_name, ln, TRUE))
-    {
-      unireg_abort(1);
-    }
-  }
-#endif /* WITH_WSREP */
 
   if (opt_bin_log)
   {
