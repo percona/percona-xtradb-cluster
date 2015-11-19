@@ -89,6 +89,7 @@ static Relay_log_info* wsrep_relay_log_init(const char* log_fname)
   rli->set_rli_description_event(
       new Format_description_log_event(BINLOG_VERSION));
 
+  rli->current_mts_submode= new Mts_submode_wsrep();
   return (rli);
 }
 
@@ -116,8 +117,9 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->tx_isolation           = ISO_READ_COMMITTED;
 
   shadow->db = thd->db();
-  const LEX_CSTRING dir = {"",0};
-  thd->reset_db(dir);
+  thd->reset_db(NULL_CSTR);
+  //const LEX_CSTRING dir = {"",0};
+  //thd->reset_db(dir);
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -128,6 +130,11 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->set_active_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
+
+  delete thd->wsrep_rli->current_mts_submode;
+  thd->wsrep_rli->current_mts_submode = 0;
+  delete thd->wsrep_rli;
+  thd->wsrep_rli = 0;
 }
 
 void wsrep_replay_transaction(THD *thd)
