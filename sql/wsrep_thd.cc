@@ -61,6 +61,9 @@ void wsrep_client_rollback(THD *thd)
   /* Release transactional metadata locks. */
   thd->mdl_context.release_transactional_locks();
 
+  /* Release all user-locks. */
+  mysql_ull_cleanup(thd);
+
   /* release explicit MDL locks */
   thd->mdl_context.release_explicit_locks();
 

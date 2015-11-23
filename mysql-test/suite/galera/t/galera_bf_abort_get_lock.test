@@ -34,3 +34,38 @@ INSERT INTO t1 VALUES (1);
 --enable_query_log
 
 DROP TABLE t1;
+
+#
+# GET_LOCK is still not fully supported by Galera and listed as limitation
+# part of it works part of it may not work.
+# One such case is when error occurs while INSERTing duplicate data
+# to auto-incremented column.
+#
+--connection node_1
+--echo #node-1
+
+connect(con_node_1a, localhost, root,,);
+#
+use test;
+--let $existing_sql_mode = `SELECT @@sql_mode`
+--let $existing_sql_log_bin = `SELECT @@session.sql_log_bin`
+--let $existing_drupal_workaround = `SELECT @@wsrep_drupal_282555_workaround`
+
+set @@sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
+set @@session.sql_log_bin = 0;
+set @@global.wsrep_drupal_282555_workaround = 1;
+
+select get_lock("lock-1", 100000);
+create table t1 (c1 int auto_increment unique key) engine=innodb;
+insert into t1 values ('a');
+--error ER_DUP_ENTRY
+insert into t1 values ('a');
+
+--eval set @@global.wsrep_drupal_282555_workaround = $existing_drupal_workaround;
+--eval set @@session.sql_log_bin = $existing_sql_log_bin;
+--eval set @@sql_mode = $existing_sql_mode;
+#
+disconnect con_node_1a;
+
+--connection node_1
+drop table t1;
