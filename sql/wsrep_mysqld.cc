@@ -1404,68 +1404,12 @@ static void wsrep_RSU_end(THD *thd)
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
                              const TABLE_LIST* table_list)
 {
-  int ret= 0;
-  LEX *lex;
   /*
     No isolation for applier or replaying threads.
    */
   if (thd->wsrep_exec_mode == REPL_RECV) return 0;
 
-
-  lex= thd->lex;
-  /*
-    Note: We don't check if enforce_storage_engine succeeds or not
-    We check only the replication requirements here.
-   */
-  if (!thd->variables.wsrep_replicate_myisam && (!enforce_storage_engine ||
-					       (enforce_storage_engine
-						&&
-						strcasecmp
-						(enforce_storage_engine,
-						 "InnoDB")))
-    && lex->sql_command == SQLCOM_CREATE_TABLE)
-  {
-    if (table_ && lex->create_info.db_type &&
-	lex->create_info.db_type->db_type == DB_TYPE_MYISAM)
-      {
-	if (db_)
-	  {
-	    WSREP_INFO
-	      ("Cannot replicate MyISAM DDL for %s.%s with wsrep_replicate_myisam OFF",
-	       db_, table_);
-	  }
-	else
-	  {
-	    WSREP_INFO
-	      ("Cannot replicate MyISAM DDL for %s with wsrep_replicate_myisam OFF",
-	       table_);
-	  }
-	return ret;
-      }
-    else if (table_list)
-      {
-	for (const TABLE_LIST * table = table_list; table;
-	     table = table->next_global)
-	  {
-	    /*
-	     * First condition is required for IF EXISTS queries
-	     */
-	    if (table->table
-		&& table->table->file->ht->db_type == DB_TYPE_MYISAM)
-	      {
-		WSREP_INFO
-		  ("Cannot replicate MyISAM DDL for %s.%s with wsrep_replicate_myisam OFF",
-		   table->db, table->table_name);
-		/* 
-		 * Break even if one table is MyISAM
-		 * Note: This may not work well with CREATE TABLE .. SELECT (CTAS)
-		 * but CTAS is not executed as TOI currently.
-		 */
-		return ret;
-	      }
-	  }
-      }
-  }
+  int ret= 0;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 
   if (thd->wsrep_conflict_state == MUST_ABORT)

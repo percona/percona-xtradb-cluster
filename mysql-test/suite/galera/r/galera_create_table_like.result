@@ -69,13 +69,13 @@ c1
 11
 drop table t1;
 #node-1
+use test;
+create table src_i (i int, primary key pk(i)) engine=innodb;
+create table src_m (j int, primary key pk(j)) engine=myisam;
 set wsrep_replicate_myisam = 1;
 select @@wsrep_replicate_myisam;
 @@wsrep_replicate_myisam
 1
-use test;
-create table src_i (i int, primary key pk(i)) engine=innodb;
-create table src_m (i int, primary key pk(i)) engine=myisam;
 create table t1 engine=innodb as select * from src_i;
 create table t2 engine=innodb as select * from src_m;
 create table t3 engine=innodb as select 1;
@@ -86,15 +86,65 @@ create table t7 engine=myisam as select * from src_m;
 create table t8 engine=myisam as select 1;
 create table t9 engine=myisam as select 1 from src_i;
 create table t10 engine=myisam as select 1 from src_m;
+create table t101 engine=innodb as select * from src_i, src_m;
+create table t102 engine=myisam as select * from src_i, src_m;
+create table t103 like src_i;
+create table t104 like src_m;
+set default_storage_engine = 'MyISAM';
+create table t105 like src_i;
+create table t106 like src_m;
+set default_storage_engine = 'InnoDB';
+set wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+0
+create table t11 engine=innodb as select * from src_i;
+create table t12 engine=innodb as select * from src_m;
+create table t13 engine=innodb as select 1;
+create table t14 engine=innodb as select 1 from src_i;
+create table t15 engine=innodb as select 1 from src_m;
+create table t16 engine=myisam as select * from src_i;
+create table t17 engine=myisam as select * from src_m;
+create table t18 engine=myisam as select 1;
+create table t19 engine=myisam as select 1 from src_i;
+create table t20 engine=myisam as select 1 from src_m;
+create table t201 engine=innodb as select * from src_i, src_m;
+create table t202 engine=myisam as select * from src_i, src_m;
+create table t203 like src_i;
+create table t204 like src_m;
+set default_storage_engine = 'MyISAM';
+create table t205 like src_i;
+create table t206 like src_m;
+set default_storage_engine = 'InnoDB';
 #node-2
 call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t7,test.t8,test.t10''.*");
+call mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t17,test.t18,test.t20''.*");
 use test;
 show tables;
 Tables_in_test
 src_i
 src_m
 t1
+t101
+t102
+t103
+t104
+t105
+t106
+t11
+t12
+t13
+t14
+t15
+t16
+t19
 t2
+t201
+t202
+t203
+t204
+t205
+t206
 t3
 t4
 t5
@@ -103,8 +153,18 @@ t9
 #node-1
 drop table t1, t2, t3, t4, t5;
 drop table t6, t7, t8, t9, t10;
+drop table t11, t12, t13, t14, t15;
+drop table t16, t17, t18, t19, t20;
+drop table t101, t102;
+drop table t201, t202;
+drop table t103, t104, t105, t106;
+drop table t203, t204, t205, t206;
 insert into src_i values (1), (2);
 insert into src_m values (1), (2);
+set wsrep_replicate_myisam = 1;
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+1
 create table t1 engine=innodb as select * from src_i;
 create table t2 engine=innodb as select * from src_m;
 create table t3 engine=innodb as select 1;
@@ -115,6 +175,24 @@ create table t7 engine=myisam as select * from src_m;
 create table t8 engine=myisam as select 1;
 create table t9 engine=myisam as select 1 from src_i;
 create table t10 engine=myisam as select 1 from src_m;
+create table t101 engine=innodb as select * from src_i, src_m;
+create table t102 engine=myisam as select * from src_i, src_m;
+set wsrep_replicate_myisam = 0;
+select @@wsrep_replicate_myisam;
+@@wsrep_replicate_myisam
+0
+create table t11 engine=innodb as select * from src_i;
+create table t12 engine=innodb as select * from src_m;
+create table t13 engine=innodb as select 1;
+create table t14 engine=innodb as select 1 from src_i;
+create table t15 engine=innodb as select 1 from src_m;
+create table t16 engine=myisam as select * from src_i;
+create table t17 engine=myisam as select * from src_m;
+create table t18 engine=myisam as select 1;
+create table t19 engine=myisam as select 1 from src_i;
+create table t20 engine=myisam as select 1 from src_m;
+create table t201 engine=innodb as select * from src_i, src_m;
+create table t202 engine=myisam as select * from src_i, src_m;
 #node-2
 use test;
 show tables;
@@ -122,7 +200,18 @@ Tables_in_test
 src_i
 src_m
 t1
+t101
+t102
+t11
+t12
+t13
+t14
+t15
+t16
+t19
 t2
+t201
+t202
 t3
 t4
 t5
@@ -131,5 +220,9 @@ t9
 #node-1
 drop table t1, t2, t3, t4, t5;
 drop table t6, t7, t8, t9, t10;
+drop table t11, t12, t13, t14, t15;
+drop table t16, t17, t18, t19, t20;
+drop table t101, t102, t201, t202;
 drop table src_i, src_m;
+set @@default_storage_engine = InnoDB;;
 set wsrep_replicate_myisam = 1;;
