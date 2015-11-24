@@ -7873,7 +7873,11 @@ int MYSQL_BIN_LOG::prepare(THD *thd, bool all)
     The applier thread explicitly overrides the value of sql_log_bin
     with the value of log_slave_updates.
   */
+#ifdef WITH_WSREP
+  DBUG_ASSERT(thd->wsrep_applier || thd->slave_thread ?
+#else
   DBUG_ASSERT(thd->slave_thread ?
+#endif /* WITH_WSREP */
               opt_log_slave_updates : thd->variables.sql_log_bin);
 
   /*
