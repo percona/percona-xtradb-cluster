@@ -10,3 +10,21 @@ ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
 wsrep_local_aborts_increment
 1
 DROP TABLE t1;
+#node-1
+use test;
+set @@sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
+set @@session.sql_log_bin = 0;
+set @@global.wsrep_drupal_282555_workaround = 1;
+select get_lock("lock-1", 100000);
+get_lock("lock-1", 100000)
+1
+create table t1 (c1 int auto_increment unique key) engine=innodb;
+insert into t1 values ('a');
+Warnings:
+Warning	1366	Incorrect integer value: 'a' for column 'c1' at row 1
+insert into t1 values ('a');
+ERROR 23000: Duplicate entry '0' for key 'c1'
+set @@global.wsrep_drupal_282555_workaround = 0;;
+set @@session.sql_log_bin = 1;;
+set @@sql_mode = NO_ENGINE_SUBSTITUTION;;
+drop table t1;
