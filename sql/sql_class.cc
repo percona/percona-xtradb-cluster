@@ -2135,7 +2135,12 @@ void THD::release_resources()
   mysql_mutex_lock(&LOCK_wsrep_thd);
   mysql_mutex_unlock(&LOCK_wsrep_thd);
   mysql_mutex_destroy(&LOCK_wsrep_thd);
-  if (wsrep_rli) delete wsrep_rli;
+  if (wsrep_rli)
+  {
+    delete wsrep_rli->current_mts_submode;
+    wsrep_rli->current_mts_submode = 0;
+    delete wsrep_rli;
+  }
   if (wsrep_status_vars) wsrep->stats_free(wsrep, wsrep_status_vars);
 #endif
 }

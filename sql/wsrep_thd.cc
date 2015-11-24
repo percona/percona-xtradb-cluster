@@ -105,7 +105,12 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   else
     thd->variables.option_bits&= ~(OPTION_BIN_LOG);
 
-  if (!thd->wsrep_rli) thd->wsrep_rli= wsrep_relay_log_init("wsrep_relay");
+  if (!thd->wsrep_rli)
+  {
+    thd->wsrep_rli = wsrep_relay_log_init("wsrep_relay");
+    assert(!thd->rli_slave);
+    thd->rli_slave = thd->wsrep_rli;
+  }
   thd->wsrep_rli->info_thd = thd;
 
   thd->wsrep_exec_mode= REPL_RECV;
@@ -118,8 +123,6 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
 
   shadow->db = thd->db();
   thd->reset_db(NULL_CSTR);
-  //const LEX_CSTRING dir = {"",0};
-  //thd->reset_db(dir);
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -130,6 +133,9 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->set_active_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
+
+  assert(thd->rli_slave == thd->wsrep_rli);
+  thd->rli_slave = NULL;
 
   delete thd->wsrep_rli->current_mts_submode;
   thd->wsrep_rli->current_mts_submode = 0;

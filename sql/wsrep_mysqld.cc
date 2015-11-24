@@ -807,8 +807,8 @@ bool wsrep_sync_wait (THD* thd, uint mask)
       !thd->in_active_multi_stmt_transaction() &&
       thd->wsrep_conflict_state != REPLAYING)
   {
-    WSREP_DEBUG("wsrep_sync_wait: thd->variables.wsrep_sync_wait = %u, mask = %u",
-                thd->variables.wsrep_sync_wait, mask);
+    WSREP_DEBUG("wsrep_sync_wait: thd->variables.wsrep_sync_wait = %u, mask = %u, SQL: %s",
+                thd->variables.wsrep_sync_wait, mask, thd->query().str);
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
     wsrep_gtid_t  gtid;
@@ -836,7 +836,6 @@ bool wsrep_sync_wait (THD* thd, uint mask)
         err= ER_LOCK_WAIT_TIMEOUT; // NOTE: the above msg won't be displayed
                                    //       with ER_LOCK_WAIT_TIMEOUT
       }
-
       my_error(err, MYF(0), msg);
 
       return true;
