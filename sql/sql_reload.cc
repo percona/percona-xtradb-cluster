@@ -303,7 +303,6 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
           }
         }
       }
-
       if (close_cached_tables(thd, tables,
                               ((options & REFRESH_FAST) ?  FALSE : TRUE),
                               (thd ? thd->variables.lock_wait_timeout :

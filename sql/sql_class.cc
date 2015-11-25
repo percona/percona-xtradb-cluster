@@ -2226,6 +2226,7 @@ bool THD::restore_globals()
 
 void THD::cleanup_after_query()
 {
+
   /*
     Reset rand_used so that detection of calls to rand() will save random 
     seeds if needed by the slave.
