@@ -1304,7 +1304,10 @@ thd_trx_arbitrate(THD* requestor, THD* holder)
 	THD*	victim = thd_tx_arbitrate(requestor, holder);
 
 	ut_a(victim == NULL || victim == requestor || victim == holder);
-
+#ifdef WITH_WSREP
+        WSREP_DEBUG("victim: %d", wsrep_thd_exec_mode(victim));
+        wsrep_thd_set_conflict_state(victim, MUST_ABORT);
+#endif /* WITH_WSREP */
 	return(victim);
 }
 
