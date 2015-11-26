@@ -6788,6 +6788,22 @@ int TC_LOG_BINLOG::recover(IO_CACHE *log, Format_description_log_event *fdle)
   HASH xids;
   MEM_ROOT mem_root;
 
+#ifdef WITH_WSREP
+  /*
+    Read current wsrep position from storage engines to have consistent
+    end position for binlog scan.
+  */
+  wsrep_uuid_t uuid;
+  wsrep_seqno_t seqno;
+  wsrep_get_SE_checkpoint(uuid, seqno);
+  char uuid_str[40];
+  wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
+  WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
+             (long long)seqno);
+  const wsrep_seqno_t last_xid_seqno= seqno;
+  wsrep_seqno_t cur_xid_seqno= WSREP_SEQNO_UNDEFINED;
+#endif /* WITH_WSREP */
+
   if (! fdle->is_valid() ||
       my_hash_init(&xids, &my_charset_bin, TC_LOG_PAGE_SIZE/3, 0,
                    sizeof(my_xid), 0, 0, MYF(0)))
@@ -6797,7 +6813,12 @@ int TC_LOG_BINLOG::recover(IO_CACHE *log, Format_description_log_event *fdle)
 
   fdle->flags&= ~LOG_EVENT_BINLOG_IN_USE_F; // abort on the first error
 
-  while ((ev= Log_event::read_log_event(log,0,fdle)) && ev->is_valid())
+  while ((ev= Log_event::read_log_event(log,0,fdle)) && ev->is_valid()
+#ifdef WITH_WSREP
+         && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
+             last_xid_seqno != cur_xid_seqno)
+#endif
+        )
   {
     if (ev->get_type_code() == XID_EVENT)
     {
@@ -6806,9 +6827,17 @@ int TC_LOG_BINLOG::recover(IO_CACHE *log, Format_description_log_event *fdle)
                                       sizeof(xev->xid));
       if (!x || my_hash_insert(&xids, x))
         goto err2;
+#ifdef WITH_WSREP
+      cur_xid_seqno= xev->xid;
+#endif /* WITH_WSREP */
     }
     delete ev;
   }
+
+#ifdef WITH_WSREP
+  WSREP_INFO("Binlog recovery scan stopped at Xid event %lld",
+             (long long)cur_xid_seqno);
+#endif /* WITH_WSREP */
 
   if (ha_recover(&xids))
     goto err2;
