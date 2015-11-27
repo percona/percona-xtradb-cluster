@@ -6793,8 +6793,8 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
           /* DTRACE begin */
           MYSQL_QUERY_START(rawbuf, thd->thread_id(),
                             (char *) (thd->db().str ? thd->db().str : ""),
-                            (char *) thd->security_context->priv_user().str,
-                            (char *) thd->security_context->host_or_ip().str);
+                            (char *) thd->security_context()->priv_user().str,
+                            (char *) thd->security_context()->host_or_ip().str);
 
           /* PSI begin */
           thd->m_statement_psi= MYSQL_START_STATEMENT(&thd->m_statement_state,
