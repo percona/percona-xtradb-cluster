@@ -1,0 +1,78 @@
+
+#
+# This test exercises multiple scenario that involves testing
+# different DDL + DML statement for innodb and myisam engine
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+
+#-------------------------------------------------------------------------------
+#
+# Test-Scenarios
+#
+# 1. DDL/DML statement and their replication
+# 2. DDL/DML statement and their replication with enforce_storage_engine
+#
+#
+
+#-------------------------------------------------------------------------------
+#
+# create test-bed
+#
+--let $wsrep_replicate_myisam_saved = `select @@wsrep_replicate_myisam`
+
+
+
+#-------------------------------------------------------------------------------
+#
+# 1. DDL/DML statement and their replication
+#
+--connection node_1
+--echo #node-1
+
+create table t1 (i int) engine=innodb;
+insert into t1 values (1), (2), (3);
+
+set wsrep_replicate_myisam = 0;
+create table t2 (j int) engine=myisam;
+insert into t2 values (10), (20), (30);
+set wsrep_replicate_myisam = 0;
+
+set wsrep_replicate_myisam = 1;
+create table t3 (j int) engine=myisam;
+insert into t3 values (100), (200), (300);
+set wsrep_replicate_myisam = 0;
+
+--connection node_2
+--echo #node-2
+show tables;
+select * from t1;
+select * from t2;
+select * from t3;
+
+--connection node_1
+--echo #node-1
+truncate table t1;
+truncate table t2;
+truncate table t3;
+
+--connection node_2
+--echo #node-2
+show tables;
+select * from t1;
+select * from t2;
+select * from t3;
+
+--connection node_1
+--echo #node-1
+drop table t1;
+drop table t2;
+drop table t3;
+
+#-------------------------------------------------------------------------------
+#
+# remove test-bed
+#
+--eval set @@wsrep_replicate_myisam = $wsrep_replicate_myisam_saved;

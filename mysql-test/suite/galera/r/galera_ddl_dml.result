@@ -1,0 +1,50 @@
+#node-1
+create table t1 (i int) engine=innodb;
+insert into t1 values (1), (2), (3);
+set wsrep_replicate_myisam = 0;
+create table t2 (j int) engine=myisam;
+insert into t2 values (10), (20), (30);
+set wsrep_replicate_myisam = 0;
+set wsrep_replicate_myisam = 1;
+create table t3 (j int) engine=myisam;
+insert into t3 values (100), (200), (300);
+set wsrep_replicate_myisam = 0;
+#node-2
+show tables;
+Tables_in_test
+t1
+t2
+t3
+select * from t1;
+i
+1
+2
+3
+select * from t2;
+j
+select * from t3;
+j
+100
+200
+300
+#node-1
+truncate table t1;
+truncate table t2;
+truncate table t3;
+#node-2
+show tables;
+Tables_in_test
+t1
+t2
+t3
+select * from t1;
+i
+select * from t2;
+j
+select * from t3;
+j
+#node-1
+drop table t1;
+drop table t2;
+drop table t3;
+set @@wsrep_replicate_myisam = 0;;
