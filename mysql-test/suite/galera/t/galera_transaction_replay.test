@@ -8,7 +8,7 @@
 --source include/have_debug_sync.inc
 --source suite/galera/include/galera_have_debug_sync.inc
 
---let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_old = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
 INSERT INTO t1 VALUES (1, 'a');
@@ -31,7 +31,7 @@ SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
 # Wait until commit is blocked
 --connection node_1a
 SET SESSION wsrep_sync_wait = 0;
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_debug_sync_waiters' AND VARIABLE_VALUE = 'commit_monitor_enter_sync'
+--let $wait_condition = SELECT COUNT(*) = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_debug_sync_waiters' AND VARIABLE_VALUE = 'commit_monitor_enter_sync'
 --source include/wait_condition.inc
 
 # Issue a conflicting update on node #2
@@ -59,7 +59,7 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
 SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
 
 # wsrep_local_replays has increased by 1
---let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays'`
+--let $wsrep_local_replays_new = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays'`
 --disable_query_log
 --eval SELECT $wsrep_local_replays_new - $wsrep_local_replays_old = 1 AS wsrep_local_replays;
 --enable_query_log

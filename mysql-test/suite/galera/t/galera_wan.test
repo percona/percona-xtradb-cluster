@@ -9,7 +9,7 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER);

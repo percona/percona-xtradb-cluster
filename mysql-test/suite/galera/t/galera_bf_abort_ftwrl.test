@@ -9,7 +9,7 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 
 --connection node_2
 SET AUTOCOMMIT=OFF;
---let $wsrep_local_bf_aborts_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
+--let $wsrep_local_bf_aborts_before = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
 --send FLUSH TABLES WITH READ LOCK;
 
 --connection node_1
@@ -20,7 +20,7 @@ INSERT INTO t1 VALUES (1);
 
 UNLOCK TABLES;
 
---let $wsrep_local_bf_aborts_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
+--let $wsrep_local_bf_aborts_after = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
 
 # No aborts should be registered on the counter
 --disable_query_log

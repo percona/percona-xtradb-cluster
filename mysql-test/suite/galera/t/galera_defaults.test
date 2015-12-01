@@ -54,11 +54,11 @@ EOF
 
 # Global Status
 
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+SELECT COUNT(*) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters';
 
-SELECT VARIABLE_NAME FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+SELECT VARIABLE_NAME FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'
 ORDER BY VARIABLE_NAME;

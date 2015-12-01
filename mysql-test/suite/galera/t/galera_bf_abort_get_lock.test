@@ -15,7 +15,7 @@ SELECT GET_LOCK("foo", 1000);
 
 --connection node_2
 SET AUTOCOMMIT=OFF;
---let $wsrep_local_bf_aborts_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
+--let $wsrep_local_bf_aborts_before = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
 INSERT INTO t1 VALUES (1);
 --send SELECT GET_LOCK("foo", 1000);
 
@@ -26,7 +26,7 @@ INSERT INTO t1 VALUES (1);
 --error ER_LOCK_DEADLOCK
 --reap
 
---let $wsrep_local_bf_aborts_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
+--let $wsrep_local_bf_aborts_after = `SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
 
 # Check that wsrep_local_bf_aborts has been incremented by exactly 1
 --disable_query_log
