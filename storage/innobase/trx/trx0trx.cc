@@ -56,6 +56,9 @@ Created 3/26/1996 Heikki Tuuri
 #include <set>
 #include <new>
 
+#ifdef WITH_WSREP
+#include <wsrep_mysqld.h>
+#endif /* WITH_WSREP */
 static const ulint MAX_DETAILED_ERROR_LEN = 256;
 
 /** Set of table_id */
@@ -3407,6 +3410,12 @@ trx_kill_blocking(trx_t* trx)
 
 			ib::info() << "Killed transaction: ID: " << id
 				<< " - " << thr_text;
+#ifdef WITH_WSREP
+                        ib::info() << "WSREP seqnos, BF: "      <<
+                          wsrep_thd_trx_seqno(trx->mysql_thd)   <<
+                          ", victim: "                          <<
+                          wsrep_thd_trx_seqno(victim_trx->mysql_thd);
+#endif /* WITH_WSREP */
 		}
 
 		trx_mutex_enter(victim_trx);

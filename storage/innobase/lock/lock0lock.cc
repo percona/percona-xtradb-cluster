@@ -50,6 +50,7 @@ Created 5/7/1996 Heikki Tuuri
 #ifdef WITH_WSREP
 extern my_bool wsrep_debug;
 extern my_bool wsrep_log_conflicts;
+#include <wsrep_mysqld.h>
 #endif
 
 /** Total number of cached record locks */
@@ -865,6 +866,20 @@ lock_rec_has_to_wait(
 
 			return(FALSE);
 		}
+#ifdef WITH_WSREP
+		if (trx_is_high_priority(trx)        &&
+                    trx_is_high_priority(lock2->trx) &&
+                    (type_mode & LOCK_GAP)) {
+
+                  ib::info() << "WSREP BF-BF conflict skipped" <<
+                    "request - GAP: 1 + intention: "           <<
+                    (type_mode & LOCK_INSERT_INTENTION)        <<
+                    "\ngranted - GAP: "                        <<
+		    lock_rec_get_rec_not_gap(lock2)            <<
+                    " intention: " <<  lock_rec_get_insert_intention(lock2);
+                  return FALSE;
+                }
+#endif /* WITH_WSREP */
 
 		return(TRUE);
 	}
@@ -2080,6 +2095,42 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 					<< thd_security_context(
 						thd, buffer, sizeof(buffer),
 						512);
+#ifdef WITH_WSREP
+                                ib::info() << "WSREP seqnos, BF: "           <<
+                                  wsrep_thd_trx_seqno(
+                                           wait_for->trx->mysql_thd)         <<
+                                  ", victim: "                               <<
+                                  wsrep_thd_trx_seqno(victim_trx->mysql_thd);
+
+                                lock_rec_print(stderr, lock);
+
+                                ulint max_query_len = 1024;
+                                ulint n_rec_locks   =
+                                  lock_number_of_rows_locked(&m_trx->lock);
+                                ulint n_trx_locks = UT_LIST_GET_LEN(
+                                        m_trx->lock.trx_locks);
+                                ulint heap_size = mem_heap_get_size(
+                                        m_trx->lock.lock_heap);
+
+                                mutex_enter(&trx_sys->mutex);
+                                trx_print_low(stderr, m_trx, max_query_len,
+                                              n_rec_locks, n_trx_locks,
+                                              heap_size);
+
+                                n_rec_locks = lock_number_of_rows_locked(
+                                              &wait_for->trx->lock);
+                                n_trx_locks = UT_LIST_GET_LEN(
+                                              wait_for->trx->lock.trx_locks);
+                                heap_size = mem_heap_get_size(
+                                              wait_for->trx->lock.lock_heap);
+
+                                trx_print_low(stderr, wait_for->trx,
+                                              max_query_len,
+                                              n_rec_locks, n_trx_locks,
+                                              heap_size);
+                                mutex_exit(&trx_sys->mutex);
+
+#endif /* WITH_WSREP */
 			}
 
 			return(DB_DEADLOCK);
