@@ -7874,11 +7874,12 @@ int MYSQL_BIN_LOG::prepare(THD *thd, bool all)
     with the value of log_slave_updates.
   */
 #ifdef WITH_WSREP
-  DBUG_ASSERT(thd->wsrep_applier || thd->slave_thread ?
+  DBUG_ASSERT(thd->wsrep_applier || (thd->slave_thread ?
+              opt_log_slave_updates : thd->variables.sql_log_bin));
 #else
   DBUG_ASSERT(thd->slave_thread ?
-#endif /* WITH_WSREP */
               opt_log_slave_updates : thd->variables.sql_log_bin);
+#endif /* WITH_WSREP */
 
   /*
     Set HA_IGNORE_DURABILITY to not flush the prepared record of the
