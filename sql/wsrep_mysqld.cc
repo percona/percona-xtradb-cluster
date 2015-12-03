@@ -1137,6 +1137,7 @@ create_view_query(THD *thd, uchar** buf, size_t* buf_len)
         If this is an ALTER VIEW then the current user should be set as
         the definer.
       */
+      Prepared_stmt_arena_holder ps_arena_holder(thd);
 
       if (!(lex->definer= create_default_definer(thd)))
       {
