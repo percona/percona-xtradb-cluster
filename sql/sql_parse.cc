@@ -5314,10 +5314,11 @@ end_with_restore_list:
       /*
         Presumably, RESET and binlog writing doesn't require synchronization
       */
+      bool skip_bin_logging = ((lex->type == REFRESH_TABLES) && WSREP(thd));
 
       if (write_to_binlog > 0)  // we should write
       { 
-        if (!lex->no_write_to_binlog)
+        if (!lex->no_write_to_binlog && !skip_bin_logging)
           res= write_bin_log(thd, FALSE, thd->query(), thd->query_length());
       } else if (write_to_binlog < 0) 
       {
