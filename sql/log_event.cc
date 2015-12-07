@@ -6755,7 +6755,7 @@ bool slave_execute_deferred_events(THD *thd)
   bool res= false;
   Relay_log_info *rli= thd->rli_slave;
 #ifdef WITH_WSREP
-  rli = thd->wsrep_rli;
+  if (thd->wsrep_applier) rli = thd->wsrep_rli;
 #endif /* WITH_WSREP */
 
   DBUG_ASSERT(rli && (!rli->deferred_events_collecting || rli->deferred_events));
