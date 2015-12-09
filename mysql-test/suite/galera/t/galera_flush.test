@@ -10,6 +10,12 @@
 --disable_warnings
 DROP TABLE IF EXISTS t1, t2; 
 --enable_warnings
+
+--connection node_2
+call mtr.add_suppression("InnoDB: Resizing redo log from .*");
+call mtr.add_suppression("InnoDB: Starting to delete and rewrite log files");
+call mtr.add_suppression("InnoDB: New log files created.*");
+
 #
 # The following FLUSH statements should be replicated
 #
@@ -297,8 +303,26 @@ let $wait_timeout= 90;
 #--source include/wait_condition.inc
 #--enable_query_log
 
-
-
 --connection node_1
 DROP TABLE t1;
 DROP TABLE t2;
+
+#
+# If FTWRL has paused the node then avoid toggling desync.
+#
+--connection node_1
+call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+--echo #node-1
+--let $wsrep_desync_saved = `select @@wsrep_desync`
+#
+select @@wsrep_desync;
+set global wsrep_desync = 1;
+set global wsrep_desync = 0;
+flush table with read lock;
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_desync = 1;
+--error ER_WRONG_VALUE_FOR_VAR
+set global wsrep_desync = 0;
+unlock tables;
+set global wsrep_desync = 1;
+--eval set global wsrep_desync = $wsrep_desync_saved;
