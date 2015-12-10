@@ -1,4 +1,7 @@
 DROP TABLE IF EXISTS t1, t2;
+call mtr.add_suppression("InnoDB: Resizing redo log from .*");
+call mtr.add_suppression("InnoDB: Starting to delete and rewrite log files");
+call mtr.add_suppression("InnoDB: New log files created.*");
 FLUSH DES_KEY_FILE;
 FLUSH HOSTS;
 SET SESSION wsrep_replicate_myisam = TRUE;
@@ -35,3 +38,18 @@ RESET CHANGED_PAGE_BITMAPS;
 RESET QUERY CACHE;
 DROP TABLE t1;
 DROP TABLE t2;
+call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+#node-1
+select @@wsrep_desync;
+@@wsrep_desync
+0
+set global wsrep_desync = 1;
+set global wsrep_desync = 0;
+flush table with read lock;
+set global wsrep_desync = 1;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'ON'
+set global wsrep_desync = 0;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'OFF'
+unlock tables;
+set global wsrep_desync = 1;
+set global wsrep_desync = 0;;
