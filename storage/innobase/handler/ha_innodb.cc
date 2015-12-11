@@ -1306,7 +1306,7 @@ thd_trx_arbitrate(THD* requestor, THD* holder)
 	ut_a(victim == NULL || victim == requestor || victim == holder);
 #ifdef WITH_WSREP
         WSREP_DEBUG("victim: %d", wsrep_thd_exec_mode(victim));
-        wsrep_thd_set_conflict_state(victim, MUST_ABORT);
+        wsrep_thd_set_conflict_state(victim, true, MUST_ABORT);
 #endif /* WITH_WSREP */
 	return(victim);
 }
@@ -7846,7 +7846,7 @@ no_commit:
 						(char *)"void");
 					error= DB_SUCCESS;
 					wsrep_thd_set_conflict_state(
-						current_thd, MUST_ABORT);
+						current_thd, true, MUST_ABORT);
                                         innobase_srv_conc_exit_innodb(
 						m_prebuilt);
                                         /* jump straight to func exit over
@@ -19746,7 +19746,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 	switch (wsrep_thd_conflict_state(thd)) {
 	case NO_CONFLICT: 
-		wsrep_thd_set_conflict_state(thd, MUST_ABORT);
+		wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
 		break;
         case MUST_ABORT:
 		WSREP_DEBUG("victim %llu in MUST ABORT state",
@@ -19855,7 +19855,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			DBUG_RETURN(0);
 		}
                 /* This will lock thd from proceeding after net_read() */
-		wsrep_thd_set_conflict_state(thd, ABORTING);
+		wsrep_thd_set_conflict_state(thd, false, ABORTING);
 
 		mysql_mutex_lock(&LOCK_wsrep_rollback);
 
@@ -19923,9 +19923,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
  		DBUG_RETURN(rcode);
 	} else {
 		WSREP_DEBUG("victim does not have transaction");
-		wsrep_thd_LOCK(victim_thd);
-		wsrep_thd_set_conflict_state(victim_thd, MUST_ABORT);
-		wsrep_thd_UNLOCK(victim_thd);
+		wsrep_thd_set_conflict_state(victim_thd, true, MUST_ABORT);
 		wsrep_thd_awake(victim_thd, signal); 
 	}
 	DBUG_RETURN(-1);

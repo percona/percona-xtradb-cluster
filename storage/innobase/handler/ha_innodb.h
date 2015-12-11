@@ -624,7 +624,7 @@ extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode);
 extern "C" void wsrep_thd_set_query_state(
 	THD *thd, enum wsrep_query_state state);
 extern "C" void wsrep_thd_set_conflict_state(
-	THD *thd, enum wsrep_conflict_state state);
+        THD *thd, bool lock, enum wsrep_conflict_state state);
 
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 

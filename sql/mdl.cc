@@ -2592,7 +2592,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
               WSREP_INFO(
                 "MDL conflict db=%s table=%s ticket=%d solved by %s",
                 lock->key.db_name(), lock->key.name(), ticket->get_type(), "abort"
-       	      );
+             );
             }
           }
           else
@@ -2628,6 +2628,39 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         The above means that conflicting granted "fast path" lock cannot
         belong to us and our request cannot be satisfied.
       */
+#ifdef WITH_WSREP
+      if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),false) &&
+          key.mdl_namespace() == MDL_key::GLOBAL)
+      {
+            WSREP_DEBUG("global lock granted over unobstrusive locks, for BF: %u %s",
+                        wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
+                        wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
+            can_grant = true;
+      }
+#ifdef WITH_WSREP_TODO
+      /* victim unobstrusive lock holder is hard to find.
+         Skipping here to allow high priority thread to continue,
+         it will have earlier seqno and victims will die at certification stage
+       */
+      else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
+      {
+        wsrep_can_grant= FALSE;
+        if (wsrep_log_conflicts)
+        {
+          MDL_lock * lock = ticket->get_lock();
+          WSREP_INFO(
+                     "MDL conflict db=%s table=%s ticket=%d solved by %s",
+                     lock->key.db_name(), lock->key.name(), ticket->get_type(), "abort"
+                     );
+        }
+      }
+#endif /* WITH_WSREP_TODO */
+      else
+      {
+        WSREP_DEBUG("granting MDL for BF thread over unobstrusive locks");
+        can_grant= TRUE;
+      }
+#endif /* WITH_WSREP */
     }
   }
 #ifdef WITH_WSREP
