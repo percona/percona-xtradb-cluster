@@ -339,27 +339,15 @@ typedef struct st_mysql_lock
 
 
 /**
- To be used for pool-of-threads (implemeneted differently on various OSs)
+  To be used for pool-of-threads (implemented differently on various OSs)
 */
 class thd_scheduler
 {
 public:
-  /*
-    Thread instrumentation for the user job.
-    This member holds the instrumentation while the user job is not run
-    by a thread.
-
-    Note that this member is not conditionally declared
-    (ifdef HAVE_PSI_INTERFACE), because doing so will change the binary
-    layout of THD, which is exposed to plugin code that may be compiled
-    differently.
-  */
-  PSI_thread *m_psi;
-
   void *data;                  /* scheduler-specific data structure */
 
   thd_scheduler()
-  : m_psi(NULL), data(NULL)
+  : data(NULL)
   { }
 
   ~thd_scheduler() { }
@@ -2688,6 +2676,7 @@ public:
   {
     CE_NONE= 0,
     CE_FLUSH_ERROR,
+    CE_SYNC_ERROR,
     CE_COMMIT_ERROR,
     CE_ERROR_COUNT
   } commit_error;
@@ -4021,6 +4010,30 @@ public:
   thd_scheduler scheduler;
 
 public:
+  /**
+    Save the performance schema thread instrumentation
+    associated with this user session.
+    @param psi Performance schema thread instrumentation
+  */
+  void set_psi(PSI_thread *psi);
+  /**
+    Read the performance schema thread instrumentation
+    associated with this user session.
+    This method is safe to use from a different thread.
+  */
+  PSI_thread* get_psi();
+
+private:
+  /**
+    Performance schema thread instrumentation for this session.
+    This member is maintained using atomic operations,
+    do not access it directly.
+    @sa set_psi
+    @sa get_psi
+  */
+  PSI_thread* m_psi;
+
+public:
   inline Internal_error_handler *get_internal_handler()
   { return m_internal_handler; }
 
@@ -5350,6 +5363,11 @@ public:
 */
 #define CF_DISALLOW_IN_RO_TRANS   (1U << 15)
 
+/**
+  Identifies statements and commands that can be used with Protocol Plugin
+*/
+#define CF_ALLOW_PROTOCOL_PLUGIN (1U << 16)
+
 /* Bits in server_command_flags */
 
 /**
@@ -5369,10 +5387,9 @@ public:
 */
 #define CF_SKIP_QUESTIONS       (1U << 1)
 
-/**
-  Used to mark commands that can be used with Protocol Plugin
+/*
+  1U << 16 is reserved for Protocol Plugin statements and commands
 */
-#define CF_ALLOW_PROTOCOL_PLUGIN (1U << 2)
 
 void add_diff_to_status(STATUS_VAR *to_var, STATUS_VAR *from_var,
                         STATUS_VAR *dec_var);

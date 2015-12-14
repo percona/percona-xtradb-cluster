@@ -162,7 +162,6 @@ public:
   virtual void start_row();
   virtual bool end_row();
   virtual void abort_row(){};
-  virtual void free();
   virtual uint get_rw_status();
   virtual bool get_compression();
 
@@ -3106,8 +3105,10 @@ Prepared_statement::~Prepared_statement()
   free_items();
   if (lex)
   {
+    DBUG_ASSERT(lex->sphead == NULL);
+    lex_end(lex);
     delete lex->result;
-    delete (st_lex_local *) lex;
+    delete (st_lex_local *) lex;                // TRASH memory
   }
   free_root(&main_mem_root, MYF(0));
   DBUG_VOID_RETURN;
@@ -3765,7 +3766,6 @@ Prepared_statement::swap_prepared_statement(Prepared_statement *copy)
   /* Ditto */
   swap_variables(LEX_CSTRING, m_db, copy->m_db);
 
-  DBUG_ASSERT(m_db.length == copy->m_db.length);
   DBUG_ASSERT(param_count == copy->param_count);
   DBUG_ASSERT(thd == copy->thd);
   last_error[0]= '\0';
@@ -4590,8 +4590,6 @@ bool Protocol_local::end_row()
   DBUG_ENTER("Protocol_local::end_row");
   DBUG_RETURN(FALSE);
 }
-
-void Protocol_local::free() {}
 
 uint Protocol_local::get_rw_status()
 {

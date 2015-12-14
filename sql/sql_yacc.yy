@@ -778,6 +778,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, YYLTYPE **c, ulong *yystacksize);
 %token  MASTER_RETRY_COUNT_SYM
 %token  MASTER_SERVER_ID_SYM
 %token  MASTER_SSL_CAPATH_SYM
+%token  MASTER_TLS_VERSION_SYM
 %token  MASTER_SSL_CA_SYM
 %token  MASTER_SSL_CERT_SYM
 %token  MASTER_SSL_CIPHER_SYM
@@ -2091,6 +2092,10 @@ master_def:
         | MASTER_SSL_CAPATH_SYM EQ TEXT_STRING_sys_nonewline
           {
             Lex->mi.ssl_capath= $3.str;
+          }
+        | MASTER_TLS_VERSION_SYM EQ TEXT_STRING_sys_nonewline
+          {
+            Lex->mi.tls_version= $3.str;
           }
         | MASTER_SSL_CERT_SYM EQ TEXT_STRING_sys_nonewline
           {
@@ -6355,6 +6360,7 @@ gcol_attribute:
           }
         | COMMENT_SYM TEXT_STRING_sys { Lex->comment= $2; }
         | not NULL_SYM { Lex->type|= NOT_NULL_FLAG; }
+        | NULL_SYM
         | opt_primary KEY_SYM
           {
             LEX *lex=Lex;
@@ -6399,9 +6405,7 @@ generated_column_func:
             }
             ITEMIZE($1, &$1);
             uint expr_len= (uint)@1.cpp.length();
-            Lex->gcol_info->expr_str.str=
-              (char* ) sql_memdup(@1.cpp.start, expr_len);
-            Lex->gcol_info->expr_str.length= expr_len;
+            Lex->gcol_info->dup_expr_str(YYTHD->mem_root, @1.cpp.start, expr_len);
             Lex->gcol_info->expr_item= $1;
             /*
               @todo: problems:
@@ -9926,7 +9930,15 @@ fulltext_options:
           opt_natural_language_mode opt_query_expansion
           { $$= $1 | $2; }
         | IN_SYM BOOLEAN_SYM MODE_SYM
-          { $$= FT_BOOL; }
+          {
+            $$= FT_BOOL;
+            DBUG_EXECUTE_IF("simulate_bug18831513",
+                            {
+                              THD *thd= YYTHD;
+                              if (thd->sp_runtime_ctx)
+                                MYSQLerror(NULL,thd,"syntax error");
+                            });
+          }
         ;
 
 opt_natural_language_mode:
@@ -10779,6 +10791,7 @@ alter_order_item:
               MYSQL_YYABORT;
             order->item_ptr= $1;
             order->direction= ($2 == 1) ? ORDER::ORDER_ASC : ORDER::ORDER_DESC;
+            order->is_position= false;
             add_order_to_list(thd, order);
           }
         ;
@@ -13408,6 +13421,7 @@ keyword_sp:
         | MASTER_SSL_SYM           {}
         | MASTER_SSL_CA_SYM        {}
         | MASTER_SSL_CAPATH_SYM    {}
+        | MASTER_TLS_VERSION_SYM   {}
         | MASTER_SSL_CERT_SYM      {}
         | MASTER_SSL_CIPHER_SYM    {}
         | MASTER_SSL_CRL_SYM       {}
