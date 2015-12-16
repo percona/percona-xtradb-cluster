@@ -868,11 +868,13 @@ lock_rec_has_to_wait(
 		}
 #ifdef WITH_WSREP
 		if (trx_is_high_priority(trx)        &&
-                    trx_is_high_priority(lock2->trx) &&
-                    (type_mode & LOCK_GAP)) {
+                    trx_is_high_priority(lock2->trx)) {
+                    //                   && (type_mode & LOCK_GAP)) {
 
                   ib::info() << "WSREP BF-BF conflict skipped" <<
-                    "request - GAP: 1 + intention: "           <<
+                    "request - GAP: "                          <<
+                    (type_mode & LOCK_GAP)                     <<
+                    " request - intention: "                   <<
                     (type_mode & LOCK_INSERT_INTENTION)        <<
                     "\ngranted - GAP: "                        <<
 		    lock_rec_get_rec_not_gap(lock2)            <<
@@ -2199,7 +2201,12 @@ lock_rec_add_to_queue(
 		const lock_t*	other_lock
 			= lock_rec_other_has_expl_req(
 				mode, block, false, heap_no, trx);
+#ifdef WITH_WSREP
+		ut_a(!other_lock || (trx_is_high_priority(trx) &&
+                                     trx_is_high_priority(other_lock->trx)));
+#else
 		ut_a(!other_lock);
+#endif /* WITH_WSREP */
 	}
 #endif /* UNIV_DEBUG */
 
@@ -5606,7 +5613,11 @@ lock_rec_queue_validate(
 				= lock_rec_other_has_expl_req(
 					mode, block, false, heap_no,
 					lock->trx);
+#ifdef WITH_WSREP
+                        ut_a(!other_lock || trx_is_high_priority(lock->trx));
+#else
 			ut_a(!other_lock);
+#endif /* WITH_WSREP */
 
 		} else if (lock_get_wait(lock) && !lock_rec_get_gap(lock)) {
 

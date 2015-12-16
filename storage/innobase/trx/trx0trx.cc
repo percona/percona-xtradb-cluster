@@ -1367,8 +1367,6 @@ trx_start_low(
 #endif /* UNIV_DEBUG */
 
 #ifdef WITH_WSREP
-        //memset(&trx->xid, 0, sizeof(trx->xid));
-        //trx->xid->set_format_id(1);
         trx->xid->reset();
 #endif /* WITH_WSREP */
 
@@ -2082,6 +2080,7 @@ trx_commit_in_memory(
         }
 
 #ifdef WITH_WSREP
+        /* WSREP_TODO: this should be obsolete */
 	if (wsrep_on(trx->mysql_thd)) {
 		trx->lock.was_chosen_as_deadlock_victim = FALSE;
 	}
