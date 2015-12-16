@@ -143,16 +143,29 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
     }
 
     thd->server_id = ev->server_id; // use the original server id for logging
+    thd->unmasked_server_id = ev->common_header->unmasked_server_id;
     thd->set_time();                // time the query
     wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx_meta.gtid.uuid,
                    thd->wsrep_trx_meta.gtid.seqno);
     thd->lex->set_current_select(NULL);
-#ifdef TODO
-    if (!ev->get_time())
-      my_micro_time_to_timeval(my_micro_time(), ev->get_time());
-#endif
-    ev->thd = thd;
+    if (!ev->common_header->when.tv_sec)
+      my_micro_time_to_timeval(my_micro_time(), &ev->common_header->when);
+    ev->thd = thd; // because up to this point, ev->thd == 0
+
+    set_timespec_nsec(&thd->wsrep_rli->ts_exec[0], 0);
+    thd->wsrep_rli->stats_read_time += diff_timespec(&thd->wsrep_rli->ts_exec[0],
+                                                     &thd->wsrep_rli->ts_exec[1]);
+
+    /* MySQL slave "Sleeps if needed, and unlocks rli->data_lock."
+     * at this point. But this does not apply for wsrep, we just do the unlock part
+     * of sql_delay_event()
+     *
+     * if (sql_delay_event(ev, thd, rli))
+     */
+    //mysql_mutex_assert_owner(&rli->data_lock);
+    //mysql_mutex_unlock(&rli->data_lock);
+
     exec_res = ev->apply_event(thd->wsrep_rli);
     DBUG_PRINT("info", ("exec_event result: %d", exec_res));
 
@@ -166,6 +179,12 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
       delete ev;
       goto error;
     }
+
+    set_timespec_nsec(&thd->wsrep_rli->ts_exec[1], 0);
+    thd->wsrep_rli->stats_exec_time += diff_timespec(&thd->wsrep_rli->ts_exec[1],
+                                          &thd->wsrep_rli->ts_exec[0]);
+
+    DBUG_PRINT("info", ("wsrep apply_event error = %d", exec_res));
     event++;
 
     if (thd->wsrep_conflict_state!= NO_CONFLICT &&

@@ -110,6 +110,8 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
     thd->wsrep_rli = wsrep_relay_log_init("wsrep_relay");
     assert(!thd->rli_slave);
     thd->rli_slave = thd->wsrep_rli;
+    thd->wsrep_rli->info_thd= thd;
+    thd->init_for_queries(thd->wsrep_rli);
   }
   thd->wsrep_rli->info_thd = thd;
 
