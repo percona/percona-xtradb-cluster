@@ -50,13 +50,6 @@ MAP_ANON but MAP_ANON is marked as deprecated */
 #define OS_MAP_ANON	MAP_ANON
 #endif
 
-/* Linux's MAP_POPULATE */
-#if defined(MAP_POPULATE)
-#define OS_MAP_POPULATE	MAP_POPULATE
-#else
-#define OS_MAP_POPULATE	0
-#endif
-
 UNIV_INTERN ibool os_use_large_pages;
 /* Large page size. This may be a boot-time option on some platforms */
 UNIV_INTERN ulint os_large_page_size;
@@ -83,32 +76,13 @@ os_proc_get_number(void)
 }
 
 /****************************************************************//**
-Retrieve and compare operating system release.
-@return	TRUE if the OS release is equal to, or later than release. */
-UNIV_INTERN
-ibool
-os_compare_release(
-/*===============*/
-	const char*	release		/*!< in: OS release */
-	__attribute__((unused)))
-{
-#if defined(UNIV_LINUX) && defined(_GNU_SOURCE)
-	struct utsname name;
-	return uname(&name) == 0 && strverscmp(name.release, release) >= 0;
-#else
-	return 0;
-#endif
-}
-
-/****************************************************************//**
 Allocates large pages memory.
 @return	allocated memory */
 UNIV_INTERN
 void*
 os_mem_alloc_large(
 /*===============*/
-	ulint*	n,			/*!< in/out: number of bytes */
-	ibool	populate)		/*!< in: virtual page preallocation */
+	ulint*	n)			/*!< in/out: number of bytes */
 {
 	void*	ptr;
 	ulint	size;
@@ -200,13 +174,12 @@ skip:
 	ut_ad(ut_is_2pow(size));
 	size = *n = ut_2pow_round(*n + (size - 1), size);
 	ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
-		   MAP_PRIVATE | OS_MAP_ANON |
-		   (populate ? OS_MAP_POPULATE : 0), -1, 0);
+		   MAP_PRIVATE | OS_MAP_ANON, -1, 0);
 	if (UNIV_UNLIKELY(ptr == (void*) -1)) {
 		fprintf(stderr, "InnoDB: mmap(%lu bytes) failed;"
 			" errno %lu\n",
 			(ulong) size, (ulong) errno);
-		return(NULL);
+		ptr = NULL;
 	} else {
 		os_fast_mutex_lock(&ut_list_mutex);
 		ut_total_allocated_memory += size;

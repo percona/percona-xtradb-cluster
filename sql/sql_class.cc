@@ -1252,6 +1252,7 @@ THD::THD(bool enable_plugins)
   current_linfo =  0;
   slave_thread = 0;
   memset(&variables, 0, sizeof(variables));
+  system_tid = -1;
   thread_id= 0;
   one_shot_set= 0;
   file_id = 0;
@@ -1807,7 +1808,7 @@ void THD::update_stats(bool ran_command)
         if (!sent_row_count_2)
           diff_empty_queries++;
       }
-      else if (!(sql_command_flags[lex->sql_command] & CF_STATUS_COMMAND))
+      else if ((sql_command_flags[lex->sql_command] & CF_STATUS_COMMAND) != 0)
       {
         // 'SHOW ' commands become SQLCOM_SELECT.
         diff_other_commands++;
@@ -2432,6 +2433,7 @@ bool THD::store_globals()
   */
   mysys_var->id= thread_id;
   real_id= pthread_self();                      // For debugging
+  system_tid = my_current_system_tid();
   vio_set_thread_id(net.vio, real_id);
   /*
     We have to call thr_lock_info_init() again here as THD may have been
@@ -2593,21 +2595,17 @@ LEX_STRING *THD::make_lex_string(LEX_STRING *lex_str,
 /*
   Convert a string to another character set
 
-  SYNOPSIS
-    convert_string()
-    to				Store new allocated string here
-    to_cs			New character set for allocated string
-    from			String to convert
-    from_length			Length of string to convert
-    from_cs			Original character set
+  @param to             Store new allocated string here
+  @param to_cs          New character set for allocated string
+  @param from           String to convert
+  @param from_length    Length of string to convert
+  @param from_cs        Original character set
 
-  NOTES
-    to will be 0-terminated to make it easy to pass to system funcs
+  @note to will be 0-terminated to make it easy to pass to system funcs
 
-  RETURN
-    0	ok
-    1	End of memory.
-        In this case to->str will point to 0 and to->length will be 0.
+  @retval false ok
+  @retval true  End of memory.
+                In this case to->str will point to 0 and to->length will be 0.
 */
 
 bool THD::convert_string(LEX_STRING *to, const CHARSET_INFO *to_cs,
@@ -2616,15 +2614,26 @@ bool THD::convert_string(LEX_STRING *to, const CHARSET_INFO *to_cs,
 {
   DBUG_ENTER("convert_string");
   size_t new_length= to_cs->mbmaxlen * from_length;
-  uint dummy_errors;
+  uint errors= 0;
   if (!(to->str= (char*) alloc(new_length+1)))
   {
     to->length= 0;				// Safety fix
     DBUG_RETURN(1);				// EOM
   }
   to->length= copy_and_convert((char*) to->str, new_length, to_cs,
-			       from, from_length, from_cs, &dummy_errors);
+			       from, from_length, from_cs, &errors);
   to->str[to->length]=0;			// Safety
+  if (errors != 0)
+  {
+    char printable_buff[32];
+    convert_to_printable(printable_buff, sizeof(printable_buff),
+                         from, from_length, from_cs, 6);
+    push_warning_printf(this, Sql_condition::WARN_LEVEL_WARN,
+                        ER_INVALID_CHARACTER_STRING,
+                        ER_THD(this, ER_INVALID_CHARACTER_STRING),
+                        from_cs->csname, printable_buff);
+  }
+
   DBUG_RETURN(0);
 }
 

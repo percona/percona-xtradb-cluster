@@ -66,8 +66,10 @@ Percona `apt` Testing repository
 
 Percona offers pre-release builds from the testing repository. To enable it add the following lines to your  :file:`/etc/apt/sources.list` , replacing ``VERSION`` with the name of your distribution: ::
 
-  deb http://repo.percona.com/apt VERSION main testing
-  deb-src http://repo.percona.com/apt VERSION main testing
+  # Testing & pre-release packages
+  #
+  deb http://repo.percona.com/apt VERSION testing
+  deb-src http://repo.percona.com/apt VERSION testing
 
 Apt-Pinning the packages
 ========================

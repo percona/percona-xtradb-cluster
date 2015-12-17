@@ -2368,7 +2368,8 @@ partititon_err:
   outparam->default_column_bitmaps();
 
   /* Fill record with default values */
-  restore_record(outparam, s->default_values);
+  if (outparam->record[0] != outparam->s->default_values)
+    restore_record(outparam, s->default_values);
 
   /* The table struct is now initialized;  Open the table */
   error= 2;
@@ -3920,6 +3921,13 @@ void TABLE_LIST::set_underlying_merge()
       if (!merge_underlying_list->updatable)
         updatable= false;
       schema_table= merge_underlying_list->schema_table;
+    }
+    else
+    {
+      for (tbl= merge_underlying_list; tbl; tbl= tbl->next_local)
+      {
+          updatable&= tbl->updatable;
+      }
     }
   }
 }

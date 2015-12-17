@@ -61,3 +61,4 @@ usr/share/mysql
 etc/xinetd.d/mysqlchk
 etc/mysql/debian-start
 usr/share/mysql/debian-start.inc.sh
+etc/default/mysql

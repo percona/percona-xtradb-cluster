@@ -272,7 +272,7 @@ Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 
 Provides:       mysql-server
-BuildRequires:  %{distro_buildreq} pam-devel openssl-devel
+BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
@@ -740,7 +740,7 @@ rm -rf $RBR%{_sysconfdir}/init.d/mysql
 if [ -x %{_bindir}/my_print_defaults ]
 then
   mysql_datadir=`%{_bindir}/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1`
-  PID_FILE_PATT=`%{_bindir}/my_print_defaults server mysqld | grep '^--pid-file=' | sed -n 's/--pid-file=//p'`
+  PID_FILE_PATT=`%{_bindir}/my_print_defaults server mysqld | grep '^--pid-file=' | sed -n 's/--pid-file=//p' | sort -u`
 fi
 if [ -z "$mysql_datadir" ]
 then
