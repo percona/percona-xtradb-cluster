@@ -164,12 +164,6 @@ skip:
 # else
 	size = UNIV_PAGE_SIZE;
 # endif
-#ifdef WITH_WSREP
-	/* Don't populate if wsrep_recovery is ON */
-	if (wsrep_recovery) {
-		populate = FALSE;
-	}
-#endif /* WITH_WSREP */
 	/* Align block size to system page size */
 	ut_ad(ut_is_2pow(size));
 	size = *n = ut_2pow_round(*n + (size - 1), size);
@@ -187,24 +181,6 @@ skip:
 		UNIV_MEM_ALLOC(ptr, size);
 	}
 #endif
-
-#if OS_MAP_ANON && OS_MAP_POPULATE
-	/* MAP_POPULATE is only supported for private mappings
-	since Linux 2.6.23. */
-	populate = populate && !os_compare_release("2.6.23");
-
-	if (populate) {
-		fprintf(stderr, "InnoDB: Warning: mmap(MAP_POPULATE) "
-			"is not supported for private mappings. "
-			"Forcing preallocation by faulting in pages.\n");
-	}
-#endif
-
-	/* Initialize the entire buffer to force the allocation
-	of physical memory page frames. */
-	if (populate) {
-		memset(ptr, '\0', size);
-	}
 
 #if defined(WITH_WSREP) && defined(UNIV_LINUX)
 	/* Do not make the pages from this block available to the child after a
