@@ -16,8 +16,8 @@ SET SESSION wsrep_sync_wait = 0;
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
-SET GLOBAL wsrep_desync = FALSE;
 UNLOCK TABLES;
+SET GLOBAL wsrep_desync = FALSE;
 SET SESSION wsrep_sync_wait = 1;
 SELECT COUNT(*) = 10 FROM t1;
 COUNT(*) = 10

@@ -4,7 +4,8 @@ SAVEPOINT s;
 RETURN 1;
 END|
 SELECT f1();
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in functions'
+f1()
+1
 DROP FUNCTION f1;
 ROLLBACK TO SAVEPOINT in a stored function should be forbidden
 CREATE FUNCTION f2 () RETURNS INT BEGIN
@@ -14,7 +15,7 @@ END|
 BEGIN;
 SAVEPOINT s;
 SELECT f2();
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in functions'
+ERROR 42000: SAVEPOINT s does not exist
 COMMIT;
 DROP FUNCTION f2;
 BEGIN;
@@ -27,35 +28,28 @@ INSERT INTO t1 values (110), (111), (112), (113), (114);
 Direct SAVEPOINT in a trigger should be forbidden
 CREATE TRIGGER i1_t1 BEFORE INSERT ON t1 FOR EACH ROW SAVEPOINT s;
 INSERT INTO t1 VALUES (1);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER i1_t1;
 CREATE TRIGGER i2_t1 AFTER INSERT ON t1 FOR EACH ROW SAVEPOINT s;
 INSERT INTO t1 VALUES (2);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER i2_t1;
 INSERT INTO t1 VALUES (3);
 CREATE TRIGGER u1_t1 BEFORE UPDATE ON t1 FOR EACH ROW SAVEPOINT s;
 UPDATE t1 SET a=4 WHERE a=3;
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER u1_t1;
 CREATE TRIGGER u2_t1 AFTER UPDATE ON t1 FOR EACH ROW SAVEPOINT s;
 UPDATE t1 SET a=4 WHERE a=3;
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER u2_t1;
 CREATE TRIGGER d1_t1 BEFORE DELETE ON t1 FOR EACH ROW SAVEPOINT s;
 DELETE FROM t1;
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER d1_t1;
 CREATE TRIGGER d1_t1 AFTER DELETE ON t1 FOR EACH ROW SAVEPOINT s;
 DELETE FROM t1;
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER d1_t1;
 SAVEPOINT in a compound statement in a trigger should be forbidden
 CREATE TRIGGER i3_t1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
 SAVEPOINT s;
 END|
 INSERT INTO t1 VALUES (5);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER i3_t1;
 SAVEPOINT in a PS call in a trigger should be forbidden
 CREATE TRIGGER i4_t1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
@@ -70,7 +64,6 @@ SAVEPOINT s;
 END|
 CREATE TRIGGER i5_t1 BEFORE INSERT ON t1 FOR EACH ROW CALL p1;
 INSERT INTO t1 VALUES (6);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER i5_t1;
 SAVEPOINT in a SP called from a PS called from a trigger be forbidden
 PREPARE call_p1 FROM "CALL p1";
@@ -83,7 +76,6 @@ RETURN 1;
 END|
 CREATE TRIGGER i7_t1 BEFORE INSERT ON t1 FOR EACH ROW SET @foo = f1();
 INSERT INTO t1 VALUES (7);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER i7_t1;
 SAVEPOINT in a SP called from a SP called from a trigger should be forbidden
 CREATE PROCEDURE p2() BEGIN
@@ -91,7 +83,6 @@ CALL p1();
 END|
 CREATE TRIGGER i8_t1 BEFORE INSERT ON t1 FOR EACH ROW CALL p2;
 INSERT INTO t1 VALUES (8);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER i8_t1;
 SAVEPOINT in a SP called from a trigger called from a SP should be forbidden
 CREATE TRIGGER i9_t1 BEFORE INSERT ON t1 FOR EACH ROW CALL p1;
@@ -99,14 +90,13 @@ CREATE PROCEDURE p3() BEGIN
 INSERT INTO t1 VALUES (9);
 END|
 CALL p3();
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
 DROP TRIGGER i9_t1;
 ROLLBACK TO SAVEPOINT in trigger as a trivial statement should be forbidden
 CREATE TRIGGER i4_t1 BEFORE INSERT ON t1 FOR EACH ROW ROLLBACK TO SAVEPOINT s;
 BEGIN;
 SAVEPOINT s;
 INSERT INTO t1 VALUES (5);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
+ERROR 42000: SAVEPOINT s does not exist
 COMMIT;
 DROP TRIGGER i4_t1;
 ROLLBACK TO SAVEPOINT in a trigger in a SP call should be forbidden
@@ -117,7 +107,7 @@ CREATE TRIGGER i5_t1 BEFORE INSERT ON t1 FOR EACH ROW CALL p4;
 BEGIN;
 SAVEPOINT s;
 INSERT INTO t1 VALUES (6);
-ERROR 42000: This version of MySQL doesn't yet support 'savepoints in triggers'
+ERROR 42000: SAVEPOINT s does not exist
 COMMIT;
 DROP TRIGGER i5_t1;
 SAVEPOINT in a SP next to a trigger should work
@@ -138,12 +128,11 @@ end|
 INSERT INTO t1 VALUES (201), (202), (203);
 SELECT * FROM t1;
 a
-3
-110
-111
-112
-113
-114
+5
+6
+7
+8
+9
 201
 202
 203
@@ -154,12 +143,11 @@ a
 5
 SELECT * FROM t1;
 a
-3
-110
-111
-112
-113
-114
+5
+6
+7
+8
+9
 201
 202
 203

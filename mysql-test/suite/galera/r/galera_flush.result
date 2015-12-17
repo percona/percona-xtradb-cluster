@@ -1,7 +1,4 @@
 DROP TABLE IF EXISTS t1, t2;
-call mtr.add_suppression("InnoDB: Resizing redo log from .*");
-call mtr.add_suppression("InnoDB: Starting to delete and rewrite log files");
-call mtr.add_suppression("InnoDB: New log files created.*");
 FLUSH DES_KEY_FILE;
 FLUSH HOSTS;
 SET SESSION wsrep_replicate_myisam = TRUE;

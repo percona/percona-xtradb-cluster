@@ -13,6 +13,7 @@ INSERT INTO t1 VALUES (1);
 --connection node_2
 --let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options`
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=1';
+# node desynced and so will not participate in flow control
 SET GLOBAL wsrep_desync = TRUE;
 
 # Block the slave applier thread 
@@ -38,11 +39,12 @@ SET SESSION wsrep_sync_wait = 0;
 SELECT COUNT(*) = 1 FROM t1;
 
 # Resync the slave
-SET GLOBAL wsrep_desync = FALSE;
 --disable_query_log
 --eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
 --enable_query_log
 UNLOCK TABLES;
+# re-sync the node only after resuming the node from pause state.
+SET GLOBAL wsrep_desync = FALSE;
 
 SET SESSION wsrep_sync_wait = 1;
 # The slave is now fully caught up
