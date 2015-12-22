@@ -86,8 +86,6 @@
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
-
-#include "my_atomic.h"
 /**
   @defgroup Locking Locking
   @{

@@ -1316,6 +1316,7 @@ THD::THD(bool enable_plugins)
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_status_vars       = 0;
   wsrep_mysql_replicated  = 0;
+  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1731,6 +1732,7 @@ void THD::init(void)
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_queries.clear();
+  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
 #endif
   binlog_row_event_extra_data= 0;
 
@@ -2023,7 +2025,7 @@ void THD::release_resources()
   mysql_mutex_unlock(&LOCK_wsrep_thd);
   mysql_mutex_destroy(&LOCK_wsrep_thd);
   if (wsrep_rli) delete wsrep_rli;
-  if (wsrep_status_vars) wsrep->stats_free(wsrep, wsrep_status_vars);
+  wsrep_free_status(this);
 #endif
 }
 
@@ -2556,6 +2558,10 @@ void THD::cleanup_after_query()
   if (rli_slave)
     rli_slave->cleanup_after_query();
 #endif
+
+#ifdef WITH_WSREP
+  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+#endif /* WITH_WSREP */
 }
 
 

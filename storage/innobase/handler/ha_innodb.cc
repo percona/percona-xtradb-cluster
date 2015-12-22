@@ -10118,6 +10118,25 @@ wsrep_append_key(
 extern void compute_md5_hash(char *digest, const char *buf, int len);
 #define MD5_HASH compute_md5_hash
 
+bool
+wsrep_is_FK_index(dict_table_t* table,
+                  dict_index_t* index)
+{
+	const dict_foreign_set*	fks = &table->referenced_set;
+
+	/* Check for all FK references from other tables to the index. */
+	for (dict_foreign_set::const_iterator it = fks->begin();
+	     it != fks->end(); ++it) {
+
+		dict_foreign_t*	foreign = *it;
+		if (foreign->referenced_index == index) {
+                	ut_ad(table == foreign->referenced_table);
+			return true;
+		}
+        }
+        return false;
+}
+
 int
 ha_innobase::wsrep_append_keys(
 /*==================*/
@@ -10127,7 +10146,6 @@ ha_innobase::wsrep_append_keys(
 	const uchar*	record1)	/* in: row in MySQL format */
 {
 	int rcode;
-	const dict_foreign_set* fks;
 	DBUG_ENTER("wsrep_append_keys");
 
 	bool key_appended = false;
@@ -10184,7 +10202,6 @@ ha_innobase::wsrep_append_keys(
 			char* key1 		= &keyval1[1];
 			KEY*  key_info	= table->key_info + i;
 			ibool is_null;
-			ibool has_foreign_ref;
 
 			dict_index_t* idx  = innobase_get_index(i);
 			dict_table_t* tab  = (idx) ? idx->table : NULL;
@@ -10197,19 +10214,11 @@ ha_innobase::wsrep_append_keys(
 					   table->s->table_name.str, 
 					   key_info->name);
 			}
-			fks= &tab->referenced_set;
-                        for (dict_foreign_set::const_iterator it = fks->begin();
-                            it != fks->end(); ++it) {
 
-                                dict_foreign_t* foreign = *it;
-                                if (foreign->referenced_index == idx) {
-                                        has_foreign_ref= true;
-                                        break;
-                                }
-                        }
-			/* !hasPK == table with no PK, must append all non-unique keys */
+			/* !hasPK == table with no PK, 
+                           must append all non-unique keys */
 			if (!hasPK || key_info->flags & HA_NOSAME ||
-			    ((tab && has_foreign_ref) ||
+			    ((tab && wsrep_is_FK_index(tab, idx)) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
 				len = wsrep_store_key_val_for_row(

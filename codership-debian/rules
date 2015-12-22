@@ -83,7 +83,7 @@ configure-stamp configure-pic-stamp:
 		CC=$${MYSQL_BUILD_CC:-gcc} \
 		CFLAGS=$${MYSQL_BUILD_CFLAGS:-"-O2 -DBIG_JOINS=1 ${FORCE_FPIC_CFLAGS} -fno-strict-aliasing ${TAOCRYPT_OPT}"} \
 		CXX=$${MYSQL_BUILD_CXX:-g++} \
-		CXXFLAGS=$${MYSQL_BUILD_CXXFLAGS:-"-O3 -DBIG_JOINS=1 -felide-constructors -fno-exceptions -fpermissive -fno-rtti ${FORCE_FPIC_CFLAGS} -fno-strict-aliasing ${TAOCRYPT_OPT}"} \
+		CXXFLAGS=$${MYSQL_BUILD_CXXFLAGS:-"-O3 -DBIG_JOINS=1 -felide-constructors -fpermissive ${FORCE_FPIC_CFLAGS} -fno-strict-aliasing ${TAOCRYPT_OPT}"} \
 		cmake -DCMAKE_INSTALL_PREFIX=/usr \
 		-DCMAKE_VERBOSE_MAKEFILE=ON \
 		$(FORCE_FPIC) \
@@ -94,7 +94,7 @@ configure-stamp configure-pic-stamp:
 		-DWITH_ZLIB=system \
 		-DWITH_EDITLINE=system \
 		$(USE_STATIC_MYSQLD) \
-		-DWITH_SSL=bundled \
+		-DWITH_SSL=system \
 		-DCOMPILATION_COMMENT="($(DISTRIBUTION))" \
 		-DMYSQL_SERVER_SUFFIX="-$(DEBVERSION)" \
 		-DSYSTEM_TYPE="debian-$(DEB_BUILD_GNU_SYSTEM)" \

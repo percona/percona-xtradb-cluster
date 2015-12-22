@@ -3310,9 +3310,6 @@ mysql_execute_command(THD *thd)
                        &old_status_var);
     thd->status_var= old_status_var;
     mysql_mutex_unlock(&LOCK_status);
-#ifdef WITH_WSREP
-    if (lex->sql_command == SQLCOM_SHOW_STATUS) wsrep_free_status(thd);
-#endif /* WITH_WSREP */
     break;
   }
   case SQLCOM_SHOW_EVENTS:
@@ -7854,6 +7851,13 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
     if (!opt_log_raw)
       general_log_write(thd, COM_QUERY, thd->query(), thd->query_length());
     parser_state->m_lip.found_semicolon= NULL;
+
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd))
+    {
+      thd->wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+    }
+#endif /* WITH_WSREP */
   }
 
   if (opt_userstat)
