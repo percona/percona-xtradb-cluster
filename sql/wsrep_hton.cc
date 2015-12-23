@@ -23,6 +23,7 @@
 #include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
+#include "debug_sync.h"
 
 extern ulonglong thd_to_trx_id(THD *thd);
 
@@ -312,6 +313,9 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   }
 
   DBUG_ENTER("wsrep_run_wsrep_commit");
+#ifdef WITH_WSREP
+  DEBUG_SYNC(thd, "wsrep_before_replication");
+#endif /* WITH_WSREP */
 
   if (thd->slave_thread && !opt_log_slave_updates) DBUG_RETURN(WSREP_TRX_OK);
 
