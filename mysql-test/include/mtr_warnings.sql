@@ -285,6 +285,7 @@ INSERT INTO global_suppressions VALUES
  ("InnoDB: Resizing redo log from"),
  ("InnoDB: Starting to delete and rewrite log files"),
  ("InnoDB: New log files created, LSN="),
+ ("IP address \'127.0.0.2\' could not be resolved: Name or service not known"),
 
  ("THE_LAST_SUPPRESSION")||
 
