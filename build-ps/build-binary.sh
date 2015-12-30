@@ -23,7 +23,7 @@ MACHINE_SPECS="$(uname -m)"
 MACHINE_SPECS_CFLAGS=''
 
 # define verbosity while running make. default is off.
-QUIET='VERBOSE=0'
+QUIET=''
 
 # link jemalloc (needed for tokudb). For now pxc doesn't build tokudb
 # if in future pxc supports tokudb we will need it.
