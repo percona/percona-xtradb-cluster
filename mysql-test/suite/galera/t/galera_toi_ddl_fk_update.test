@@ -28,6 +28,7 @@ INSERT INTO child (parent_id) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten
 --send ALTER TABLE child ADD FOREIGN KEY (parent_id) REFERENCES parent(id) ON UPDATE CASCADE;
 
 --connection node_2
+--sleep 1
 --send UPDATE parent SET id = 2 WHERE id = 1;
 
 --connection node_1
