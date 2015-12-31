@@ -1,41 +1,97 @@
-===========================================
- Compiling and Installing from Source Code
-===========================================
+.. _compile:
 
-The source code is available from the *Launchpad* project `here <https://launchpad.net/percona-xtradb-cluster>`_. The easiest way to get the code is with :command:`bzr branch` of the desired release, such as the following: ::
+=========================================
+Compiling and Installing from Source Code
+=========================================
 
-  bzr branch lp:percona-xtradb-cluster/5.6
+If you want to compile Percona XtraDB Cluster, you can find the source code on GitHub. Before you begin, make sure that the following packages are installed:
 
-You should then have a directory named after the release you branched, such as ``percona-xtradb-cluster``.
+.. list-table::
+   :header-rows: 1
+   :stub-columns: 1
 
+   * - 
+     - apt
+     - yum
+   * - Git
+     - ``git``
+     - ``git``
+   * - SCons
+     - ``scons``
+     - ``scons``
+   * - GCC
+     - ``gcc``
+     - ``gcc``
+   * - g++
+     - ``g++``
+     - ``gcc-c++``
+   * - OpenSSL
+     - ``openssl``
+     - ``openssl``
+   * - Check
+     - ``check``
+     - ``check``
+   * - CMake
+     - ``cmake``
+     - ``cmake``
+   * - Bison
+     - ``bison``
+     - ``bison``
+   * - Boost
+     - ``libboost-all-dev``
+     - ``boost-devel``
+   * - Asio
+     - ``libasio-dev``
+     - ``asio-devel``
+   * - Async I/O
+     - ``libaio-dev``
+     - ``libaio-devel``
+   * - ncurses
+     - ``libncurses5-dev``
+     - ``ncurses-devel``
+   * - Readline
+     - ``libreadline-dev``
+     - ``readline-devel``
+   * - PAM
+     - ``libpam-dev``
+     - ``pam-devel``
 
-Compiling on Linux
-==================
+You will likely have all or most of the packages already installed. If you are not sure, run one of the following commands to install any missing dependencies:
 
-Prerequisites
--------------
+.. code-block:: bash
 
-The following packages and tools must be installed to compile *Percona XtraDB Cluster* from source. These might vary from system to system.
+   $ sudo apt-get install -y git scons gcc g++ openssl check cmake bison \
+   libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
+   libpam-dev
 
-In Debian-based distributions, you need to: ::
+.. code-block:: bash
 
-  $ apt-get install build-essential flex bison automake autoconf bzr \
-    libtool cmake libaio-dev mysql-client libncurses-dev zlib1g-dev
+   $ sudo yum install -y git scons gcc gcc-c++ openssl check cmake bison \
+   boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel
 
-In ``RPM``-based distributions, you need to: ::
+To compile Percona XtraDB Cluster from source code:
 
-  $ yum install cmake gcc gcc-c++ libaio libaio-devel automake autoconf bzr \
-    bison libtool ncurses5-devel
+1. Clone the Percona XtraDB Cluster repository:
 
-Compiling 
-------------
+   .. code-block:: bash
 
-The most esiest way to build binaries is to run script: ::
+      $ git clone https://github.com/percona/percona-xtradb-cluster.git
 
-  BUILD/compile-pentium64-wsrep
+   .. note:: You have to clone the latest repository or update it to the latest state. Old codebase may not be compatible with the build script.
 
-If you feel confident to use cmake, you make compile with cmake adding
--DWITH_WSREP=1 to parameters.
+2. Clone Percona's fork of Galera into the same directory:
 
-Examples how to build RPM and DEB packages you can find in packaging/percona directory in the source code.
+   .. code-block:: bash
+
+      $ cd percona-xtradb-cluster
+      $ git clone https://github.com/percona/galera percona-xtradb-cluster-galera
+
+   .. note:: The directory for Galera repository must be named ``percona-xtradb-cluster-galera``.
+
+3. Run the build script :file:`./build-ps/build-binary.sh`. By default, it will build into the current directory, but you can specify another target output directory. For example, if you want to build into :file:`./pxc-build`, run the following:
+
+   .. code-block:: bash
+
+      $ mkdir ./pxc-build
+      $ ./build-ps/build-binary.sh ./pxc-build
 
