@@ -5337,7 +5337,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
     {
       /* CREATE TEMPORARY TABLE LIKE must be skipped from replication */
       WSREP_DEBUG("CREATE TEMPORARY TABLE LIKE... skipped replication\n %s", 
-                  thd->query());
+                  (!opt_log_raw) && thd->rewritten_query.length() ? thd->rewritten_query.c_ptr_safe() : thd->query());
     } 
     else if (!is_tmp_table)
     {

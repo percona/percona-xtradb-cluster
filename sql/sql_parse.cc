@@ -1304,7 +1304,9 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       else
       {
         my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-        WSREP_DEBUG("Deadlock error for: %s", thd->query());
+        WSREP_DEBUG("Deadlock error for: %s",
+                    (!opt_log_raw) && thd->rewritten_query.length() ?
+                    thd->rewritten_query.c_ptr_safe() : thd->query());
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         thd->killed               = THD::NOT_KILLED;
         thd->mysys_var->abort     = 0;
@@ -1529,7 +1531,9 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     if (thd->wsrep_conflict_state== ABORTED) 
     {
       my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-      WSREP_DEBUG("Deadlock error for: %s", thd->query());
+      WSREP_DEBUG("Deadlock error for: %s",
+                  (!opt_log_raw) && thd->rewritten_query.length() ?
+                  thd->rewritten_query.c_ptr_safe() : thd->query());
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
       thd->mysys_var->abort= 0;
@@ -6844,7 +6848,8 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
            (thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit))
         {
           WSREP_DEBUG("wsrep retrying AC query: %s",
-                      (thd->query()) ? thd->query() : "void");
+                      (!opt_log_raw) && thd->rewritten_query.length() ?
+                      thd->rewritten_query.c_ptr_safe() : thd->query());
 
           close_thread_tables(thd);
 
@@ -6894,7 +6899,9 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                       (thd->wsrep_conflict_state == ABORTED) ?
                       "BF Aborted" : "cert failure",
                       thd->thread_id, is_autocommit, thd->wsrep_retry_counter,
-                      thd->variables.wsrep_retry_autocommit, thd->query());
+                      thd->variables.wsrep_retry_autocommit,
+                      (!opt_log_raw) && thd->rewritten_query.length() ?
+                      thd->rewritten_query.c_ptr_safe() : thd->query());
           my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
           thd->killed= THD::NOT_KILLED;
           thd->wsrep_conflict_state= NO_CONFLICT;
