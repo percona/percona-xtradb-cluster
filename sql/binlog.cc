@@ -7130,8 +7130,7 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
     if(!cache_mngr->stmt_cache.is_binlog_empty())
     {
       WSREP_DEBUG("stmt transaction inside MST, SQL: %s", 
-                  (!opt_log_raw) && thd->rewritten_query.length() ? 
-                  thd->rewritten_query.c_ptr_safe() : thd->query());
+                  WSREP_QUERY(thd));
       cache_mngr->stmt_cache.reset();
     }
     DBUG_RETURN(rcode);
@@ -9428,8 +9427,7 @@ void thd_binlog_trx_reset(THD * thd)
       if (!cache_mngr->stmt_cache.is_binlog_empty())
       {
 	WSREP_DEBUG("pending events in stmt cache, sql: %s",
-                    (!opt_log_raw) && thd->rewritten_query.length() ?
-                    thd->rewritten_query.c_ptr_safe() : thd->query());
+                    WSREP_QUERY(thd));
 	cache_mngr->stmt_cache.reset();
       }
     }
