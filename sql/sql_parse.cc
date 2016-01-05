@@ -1533,6 +1533,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
       thd->mysys_var->abort= 0;
+      thd->wsrep_conflict_state= NO_CONFLICT;
       goto dispatch_end;
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
