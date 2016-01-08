@@ -313,6 +313,8 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
           }
         }
       }
+
+#if 0
 #ifdef WITH_WSREP
       if (WSREP(thd) && !thd->lex->no_write_to_binlog
                      && (options & REFRESH_TABLES)
@@ -343,6 +345,7 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         }
       }
 #endif /* WITH_WSREP */
+#endif
 
       if (close_cached_tables(thd, tables,
                               ((options & REFRESH_FAST) ?  FALSE : TRUE),
@@ -356,9 +359,11 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         result= 1;
       }
     }
+#if 0
 #ifdef WITH_WSREP
 cleanup:
 #endif /* WITH_WSREP */
+#endif
     my_dbopt_cleanup();
   }
   if (options & REFRESH_HOSTS)
