@@ -1035,12 +1035,6 @@ bool close_cached_tables(THD *thd, TABLE_LIST *tables,
       }
     }
 
-#ifdef WITH_WSREP
-    if (thd->wsrep_applier)
-    {
-      found = FALSE;
-    }
-#endif /* WITH_WSREP */
     if (found)
     {
       /*
