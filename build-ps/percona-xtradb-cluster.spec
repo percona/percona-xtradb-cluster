@@ -29,6 +29,7 @@ Prefix: %{_sysconfdir}
 %define mysql_version @@MYSQL_VERSION@@
 %define redhatversion %(lsb_release -rs | awk -F. '{ print $1}')
 %define percona_server_version @@PERCONA_VERSION@@
+%define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}
 
 #
@@ -51,15 +52,15 @@ Prefix: %{_sysconfdir}
 #
 %{!?wsrep_version:%global wsrep_version @@WSREP_VERSION@@}
 #
-%if %{undefined revision}
-%define revision	1
+%if %{undefined rpm_version}
+%define rpm_version	1
 %endif
 
 %define release_tag	%{nil}
 %if %{undefined dist}
-    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{distribution}
+    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{distribution}
 %else
-    %define release         %{release_tag}%{wsrep_version}.%{revision}.%{dist}
+    %define release         %{release_tag}%{wsrep_version}.%{rpm_version}.%{dist}
 %endif
 
 #
