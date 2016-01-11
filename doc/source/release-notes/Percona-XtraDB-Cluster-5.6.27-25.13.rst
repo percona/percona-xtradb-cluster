@@ -20,6 +20,12 @@ All Percona software is open-source and free. Details of this release can be fou
 
 For more information about relevant Codership releases, see `this announcement <http://galeracluster.com/2015/11/announcing-galera-cluster-5-5-42-and-5-6-25-with-galera-3-12-2/>`_.
 
+.. note:: Due to new dependency on ``libnuma1`` package in Debian/Ubuntu, please run one of the following commands to upgrade the ``percona-xtradb-cluster-server-56`` package:
+
+   * ``aptitude safe-upgrade``
+   * ``apt-get dist-upgrade``
+   * ``apt-get install percona-xtradb-cluster-server-5.6``
+
 New Features
 ============
 
