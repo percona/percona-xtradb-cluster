@@ -128,10 +128,6 @@ rst_prolog = '''
 
 .. |Percona|  replace:: *Percona*
 
-.. |TokuDB|  replace:: *TokuDB*
-
-.. |Percona FT|  replace:: *Percona FT*
-
 .. |MySQL|  replace:: *MySQL*
 
 .. |sysbench|  replace:: *sysbench*
@@ -258,12 +254,8 @@ latex_logo = 'percona-logo.jpg'
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
-latex_use_parts = True
+#latex_use_parts = False
 
-latex_elements = {
-  'classoptions': ',oneside',
-  'babel': '\\usepackage[english]{babel}'
-}
 # If true, show page references after internal links.
 #latex_show_pagerefs = False
 
