@@ -36,10 +36,10 @@ Debian
 Ubuntu
 ------
 
- * 12.04LTS precise
- * 14.04LTS trusty
- * 14.10 utopic
- * 15.04 vivid
+ * 12.04LTS Precise Pangolin
+ * 14.04LTS Trusty Tahr
+ * 15.04 Vivid Vervet
+ * 15.10 Wily Werewolf
 
 
 Install Percona XtraDB Cluster

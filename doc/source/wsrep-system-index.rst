@@ -243,9 +243,10 @@ This variable is used to set the `notification command <http://galeracluster.com
 
 .. variable:: wsrep_on
 
+   :version 5.6.27-25.13: Variable available only in session scope
    :cli: No
    :conf: No
-   :scope: Local, Global
+   :scope: Session
    :dyn: Yes
    :default: ON
 
@@ -276,7 +277,9 @@ This variable can be used to select schema upgrade method. Available values are:
    :dyn: Yes
    :default: OFF
 
-Use this variable to enable new, transparent handling of preordered replication events (like replication from traditional master).
+Use this variable to enable new, transparent handling of preordered replication events (like replication from traditional master). When this variable is enabled, such events will be applied locally first before being replicated to the other nodes of the cluster. This could increase the rate at which they can be processed, which would be otherwise limited by the latency between the nodes in the cluster.
+
+Preordered events should not interfere with events that originate on the local node. Therefore, you should not run local update queries on a table that is also being updated through asynchronous replication.
 
 .. variable:: wsrep_provider
 
