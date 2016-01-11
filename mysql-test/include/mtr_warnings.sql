@@ -282,6 +282,11 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
  ("WSREP: gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)"),
  ("WSREP: Action message in non-primary configuration from member 0"),
+ ("InnoDB: Resizing redo log from"),
+ ("InnoDB: Starting to delete and rewrite log files"),
+ ("InnoDB: New log files created, LSN="),
+ ("IP address \'127.0.0.2\' could not be resolved: Name or service not known"),
+
  ("THE_LAST_SUPPRESSION")||
 
 

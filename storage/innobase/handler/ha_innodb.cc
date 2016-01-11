@@ -4215,15 +4215,26 @@ innobase_commit(
 	/* No-op in XtraDB */
 	trx_search_latch_release_if_reserved(trx);
 
-	if (UNIV_UNLIKELY(trx->fake_changes &&
-	    (commit_trx ||
-	     (!thd_test_options(thd,
+	/* If fake-changes mode = ON then allow
+	SELECT (they are read-only) and
+	CREATE ... SELECT * from table (Well this doesn't open up DDL for InnoDB
+	as ha_innobase::create will return appropriate error if fake-change = ON
+	but if create is trying to use other SE and SELECT is executing on
+	InnoDB table then we allow SELECT to proceed.
+	Ideally, statement like this should be marked CREATE_SELECT like
+	INSERT_SELECT but unfortunately it doesn't). */
+	if (UNIV_UNLIKELY(trx->fake_changes
+			  && (thd_sql_command(thd) != SQLCOM_SELECT
+			      && thd_sql_command(thd) != SQLCOM_CREATE_TABLE)
+			  && (commit_trx || (!thd_test_options(thd,
 				OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))))) {
 
 		/* rollback implicitly */
 		innobase_rollback(hton, thd, commit_trx);
+
 		/* because debug assertion code complains, if something left */
 		thd->get_stmt_da()->reset_diagnostics_area();
+
 		DBUG_RETURN(HA_ERR_WRONG_COMMAND);
 	}
 	/* Transaction is deregistered only in a commit or a rollback. If
@@ -7696,7 +7707,7 @@ ha_innobase::write_row(
 
 	DBUG_ENTER("ha_innobase::write_row");
 
-	if (srv_read_only_mode) {
+	if (high_level_read_only) {
 		ib_senderrf(ha_thd(), IB_LOG_LEVEL_WARN, ER_READ_ONLY_MODE);
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
 	} else if (prebuilt->trx != trx) {
@@ -8450,7 +8461,7 @@ ha_innobase::update_row(
 
 	ut_a(prebuilt->trx == trx);
 
-	if (srv_read_only_mode) {
+	if (high_level_read_only) {
 		ib_senderrf(ha_thd(), IB_LOG_LEVEL_WARN, ER_READ_ONLY_MODE);
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
 	} else if (!trx_is_started(trx)) {
@@ -8610,7 +8621,7 @@ ha_innobase::delete_row(
 
 	ut_a(prebuilt->trx == trx);
 
-	if (srv_read_only_mode) {
+	if (high_level_read_only) {
 		ib_senderrf(ha_thd(), IB_LOG_LEVEL_WARN, ER_READ_ONLY_MODE);
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
 	} else if (!trx_is_started(trx)) {
@@ -10107,6 +10118,25 @@ wsrep_append_key(
 extern void compute_md5_hash(char *digest, const char *buf, int len);
 #define MD5_HASH compute_md5_hash
 
+bool
+wsrep_is_FK_index(dict_table_t* table,
+                  dict_index_t* index)
+{
+	const dict_foreign_set*	fks = &table->referenced_set;
+
+	/* Check for all FK references from other tables to the index. */
+	for (dict_foreign_set::const_iterator it = fks->begin();
+	     it != fks->end(); ++it) {
+
+		dict_foreign_t*	foreign = *it;
+		if (foreign->referenced_index == index) {
+                	ut_ad(table == foreign->referenced_table);
+			return true;
+		}
+        }
+        return false;
+}
+
 int
 ha_innobase::wsrep_append_keys(
 /*==================*/
@@ -10116,7 +10146,6 @@ ha_innobase::wsrep_append_keys(
 	const uchar*	record1)	/* in: row in MySQL format */
 {
 	int rcode;
-	const dict_foreign_set* fks;
 	DBUG_ENTER("wsrep_append_keys");
 
 	bool key_appended = false;
@@ -10173,7 +10202,6 @@ ha_innobase::wsrep_append_keys(
 			char* key1 		= &keyval1[1];
 			KEY*  key_info	= table->key_info + i;
 			ibool is_null;
-			ibool has_foreign_ref;
 
 			dict_index_t* idx  = innobase_get_index(i);
 			dict_table_t* tab  = (idx) ? idx->table : NULL;
@@ -10186,19 +10214,11 @@ ha_innobase::wsrep_append_keys(
 					   table->s->table_name.str, 
 					   key_info->name);
 			}
-			fks= &tab->referenced_set;
-                        for (dict_foreign_set::const_iterator it = fks->begin();
-                            it != fks->end(); ++it) {
 
-                                dict_foreign_t* foreign = *it;
-                                if (foreign->referenced_index == idx) {
-                                        has_foreign_ref= true;
-                                        break;
-                                }
-                        }
-			/* !hasPK == table with no PK, must append all non-unique keys */
+			/* !hasPK == table with no PK, 
+                           must append all non-unique keys */
 			if (!hasPK || key_info->flags & HA_NOSAME ||
-			    ((tab && has_foreign_ref) ||
+			    ((tab && wsrep_is_FK_index(tab, idx)) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
 				len = wsrep_store_key_val_for_row(
@@ -11418,7 +11438,7 @@ ha_innobase::create(
 
 	if (form->s->fields > REC_MAX_N_USER_FIELDS) {
 		DBUG_RETURN(HA_ERR_TOO_MANY_FIELDS);
-	} else if (srv_read_only_mode) {
+	} else if (high_level_read_only) {
 		DBUG_RETURN(HA_ERR_INNODB_READ_ONLY);
 	}
 
@@ -11754,7 +11774,7 @@ ha_innobase::discard_or_import_tablespace(
 	ut_a(prebuilt->trx->magic_n == TRX_MAGIC_N);
 	ut_a(prebuilt->trx == thd_to_trx(ha_thd()));
 
-	if (srv_read_only_mode) {
+	if (high_level_read_only) {
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
 	}
 
@@ -11852,7 +11872,7 @@ ha_innobase::truncate()
 
 	DBUG_ENTER("ha_innobase::truncate");
 
-	if (srv_read_only_mode) {
+	if (high_level_read_only) {
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
 	}
 
@@ -12228,7 +12248,7 @@ ha_innobase::rename_table(
 
 	DBUG_ENTER("ha_innobase::rename_table");
 
-	if (srv_read_only_mode) {
+	if (high_level_read_only) {
 		ib_senderrf(thd, IB_LOG_LEVEL_WARN, ER_READ_ONLY_MODE);
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
 	}
@@ -16385,6 +16405,12 @@ innodb_internal_table_validate(
 		}
 
 		dict_table_close(user_table, FALSE, TRUE);
+
+		DBUG_EXECUTE_IF("innodb_evict_autoinc_table",
+			mutex_enter(&dict_sys->mutex);
+			dict_table_remove_from_cache_low(user_table, TRUE);
+			mutex_exit(&dict_sys->mutex);
+		);
 	}
 
 	return(ret);
@@ -17526,6 +17552,46 @@ innodb_sched_priority_master_update(
 #endif /* defined(UNIV_DEBUG) || (UNIV_PERF_DEBUG) */
 
 #endif /* UNIV_LINUX */
+
+#ifdef UNIV_DEBUG
+/*************************************************************//**
+Check if it is a valid value of innodb_track_changed_pages.
+Changed pages tracking is not working correctly without initialization
+procedure on server startup. The function allows to temporary
+disable tracking, but only if the feature was enabled on startup.
+This function is registered as a callback with MySQL.
+@return	0 for valid innodb_track_changed_pages */
+static
+int
+innodb_track_changed_pages_validate(
+	THD*				thd,	/*!< in: thread handle */
+	struct st_mysql_sys_var*	var,	/*!< in: pointer to system
+						variable */
+	void*				save,	/*!< out: immediate result
+						for update function */
+	struct st_mysql_value*		value)	/*!< in: incoming bool */
+{
+	static bool     enabled_on_startup = false;
+	long long	intbuf = 0;
+
+	if (value->val_int(value, &intbuf)) {
+		/* The value is NULL. That is invalid. */
+		return 1;
+	}
+
+	if (srv_track_changed_pages || enabled_on_startup) {
+		enabled_on_startup = true;
+		*reinterpret_cast<ulong*>(save)
+			= static_cast<ulong>(intbuf);
+		return 0;
+	}
+
+	if (intbuf == srv_track_changed_pages)
+		return 0;
+
+	return 1;
+}
+#endif
 
 /****************************************************************//**
 Callback function for accessing the InnoDB variables from MySQL:
@@ -18710,10 +18776,9 @@ static MYSQL_SYSVAR_LONGLONG(buffer_pool_size, innobase_buffer_pool_size,
   "The size of the memory buffer InnoDB uses to cache data and indexes of its tables.",
   NULL, NULL, 128*1024*1024L, 5*1024*1024L, LONGLONG_MAX, 1024*1024L);
 
-static MYSQL_SYSVAR_BOOL(buffer_pool_populate, srv_buf_pool_populate,
+static MYSQL_SYSVAR_BOOL(buffer_pool_populate, srv_numa_interleave,
   PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
-  "Preallocate (pre-fault) the page frames required for the mapping "
-  "established by the buffer pool memory region. Disabled by default.",
+  "Depricated. This option is temporary alias of --innodb-numa-interleave.",
   NULL, NULL, FALSE);
 
 static MYSQL_SYSVAR_ENUM(foreground_preflush, srv_foreground_preflush,
@@ -19157,6 +19222,13 @@ static MYSQL_SYSVAR_BOOL(use_native_aio, srv_use_native_aio,
   "Use native AIO if supported on this platform.",
   NULL, NULL, TRUE);
 
+#ifdef HAVE_LIBNUMA
+static MYSQL_SYSVAR_BOOL(numa_interleave, srv_numa_interleave,
+  PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
+  "Use NUMA interleave memory policy to allocate InnoDB buffer pool.",
+  NULL, NULL, FALSE);
+#endif // HAVE_LIBNUMA
+
 static MYSQL_SYSVAR_BOOL(api_enable_binlog, ib_binlog_enabled,
   PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
   "Enable binlog for applications direct access InnoDB through InnoDB APIs",
@@ -19219,7 +19291,12 @@ static MYSQL_SYSVAR_BOOL(track_changed_pages, srv_track_changed_pages,
 #endif
   ,
   "Track the redo log for changed pages and output a changed page bitmap",
-  NULL, NULL, FALSE);
+#ifdef UNIV_DEBUG
+  innodb_track_changed_pages_validate,
+#else
+  NULL,
+#endif
+  NULL, FALSE);
 
 static MYSQL_SYSVAR_ULONGLONG(max_bitmap_file_size, srv_max_bitmap_file_size,
     PLUGIN_VAR_RQCMDARG,
@@ -19522,6 +19599,9 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(version),
   MYSQL_SYSVAR(use_sys_malloc),
   MYSQL_SYSVAR(use_native_aio),
+#ifdef HAVE_LIBNUMA
+  MYSQL_SYSVAR(numa_interleave),
+#endif // HAVE_LIBNUMA
   MYSQL_SYSVAR(change_buffering),
   MYSQL_SYSVAR(change_buffer_max_size),
   MYSQL_SYSVAR(track_changed_pages),

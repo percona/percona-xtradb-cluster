@@ -12759,7 +12759,6 @@ show_param:
 	/* SHOW SLAVE STATUS NOLOCK */
         | SLAVE STATUS_SYM NOLOCK_SYM
           {
-            WARN_DEPRECATED(YYTHD, "SHOW SLAVE STATUS NOLOCK", "SHOW SLAVE STATUS NONBLOCKING");
             Lex->sql_command = SQLCOM_SHOW_SLAVE_NOLOCK_STAT;
           }
         | SLAVE STATUS_SYM NONBLOCKING_SYM
@@ -13630,7 +13629,9 @@ literal:
                                     str ? str->length() : 0,
                                     $1);
             if (!item_str ||
-                !item_str->check_well_formed_result(&item_str->str_value, TRUE))
+                !item_str->check_well_formed_result(&item_str->str_value,
+                                                    true, //send error
+                                                    true))  //truncate
             {
               MYSQL_YYABORT;
             }
@@ -13659,7 +13660,9 @@ literal:
                                     str ? str->length() : 0,
                                     $1);
             if (!item_str ||
-                !item_str->check_well_formed_result(&item_str->str_value, TRUE))
+                !item_str->check_well_formed_result(&item_str->str_value,
+                                                    true, //send error
+                                                    true)) //truncate
             {
               MYSQL_YYABORT;
             }

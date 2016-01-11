@@ -26,7 +26,8 @@ Build-Depends: libtool (>= 1.4.2-7),
                g++ (>= 4.4),
                libaio-dev[linux-any],
                libpam-dev,
-               libssl-dev
+               libssl-dev,
+               libnuma-dev
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster

@@ -242,8 +242,9 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
     if (wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle))
     {
       DBUG_PRINT("wsrep", ("setting rollback fail"));
-      WSREP_ERROR("settting rollback fail: thd: %llu SQL: %s",
-                  (long long)thd->real_id, thd->query());
+      WSREP_ERROR("settting rollback fail: thd: %llu, schema: %s, SQL: %s",
+                  (long long)thd->real_id, (thd->db ? thd->db : "(null)"),
+                  thd->query());
     }
     wsrep_cleanup_transaction(thd);
   }
@@ -282,8 +283,9 @@ int wsrep_commit(handlerton *hton, THD *thd, bool all)
       if (wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle))
       {
         DBUG_PRINT("wsrep", ("setting rollback fail"));
-        WSREP_ERROR("settting rollback fail: thd: %llu SQL: %s",
-                    (long long)thd->real_id, thd->query());
+        WSREP_ERROR("settting rollback fail: thd: %llu, schema: %s, SQL: %s",
+                    (long long)thd->real_id, (thd->db ? thd->db : "(null)"),
+                    thd->query());
       }
       wsrep_cleanup_transaction(thd);
     }
@@ -372,7 +374,12 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     // Using timedwait is a hack to avoid deadlock in case if BF victim
     // misses the signal.
-    struct timespec wtime = {0, 1000000};
+    struct timespec wtime;
+    clock_gettime(CLOCK_REALTIME, &wtime);
+    long prev_nsec = wtime.tv_nsec;
+    wtime.tv_nsec = (wtime.tv_nsec + 1000000) % 1000000000;
+    // If nsecs rolled over, increment seconds.
+    wtime.tv_sec += (wtime.tv_nsec < prev_nsec ? 1 : 0);
     mysql_cond_timedwait(&COND_wsrep_replaying, &LOCK_wsrep_replaying,
 			 &wtime);
 
@@ -444,9 +451,11 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
   {
     WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %zu\n"
+               "schema: %s \n"
 	       "QUERY: %s\n"
 	       " => Skipping replication",
-	       thd->thread_id, data_len, thd->query());
+	       thd->thread_id, data_len,
+               (thd->db ? thd->db : "(null)"), thd->query());
     rcode = WSREP_TRX_FAIL;
   }
   else if (!rcode)
@@ -464,8 +473,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     }
 
     if (rcode == WSREP_TRX_MISSING) {
-      WSREP_WARN("Transaction missing in provider, thd: %ld, SQL: %s",
-                 thd->thread_id, thd->query());
+      WSREP_WARN("Transaction missing in provider, thd: %ld, schema: %s, SQL: %s",
+                 thd->thread_id, (thd->db ? thd->db : "(null)"), thd->query());
       rcode = WSREP_TRX_FAIL;
     } else if (rcode == WSREP_BF_ABORT) {
       WSREP_DEBUG("thd %lu seqno %lld BF aborted by provider, will replay",

@@ -644,8 +644,8 @@ bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
               wsrep_desync_count--;
               wsrep_desync_count_manual--;
               mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-              WSREP_WARN ("SET desync failed %d for %s", ret,
-                          thd->query());
+              WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
+                          (thd->db ? thd->db : "(null)"), thd->query());
               my_error (ER_CANNOT_USER, MYF(0), "'wsrep->desync()'",
                         thd->query());
               return true;
@@ -666,7 +666,8 @@ bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
               if (ret != WSREP_OK)
               {
                   mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-                  WSREP_WARN ("SET resync failed %d for %s", ret,
+                  WSREP_WARN ("SET resync failed %d for schema: %s, query: %s",
+                              ret, (thd->db ? thd->db : "(null)"),
                               thd->query());
                   my_error (ER_CANNOT_USER, MYF(0), "'wsrep->resync()'",
                             thd->query());
@@ -723,6 +724,8 @@ static const int          mysql_status_len  = 512;
 static void export_wsrep_status_to_mysql(THD* thd)
 {
   int wsrep_status_len, i;
+
+  wsrep_free_status(thd);
 
   thd->wsrep_status_vars = wsrep->stats_get(wsrep);
 

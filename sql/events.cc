@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2005, 2013, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1144,11 +1144,24 @@ Events::load_events_from_db(THD *thd)
     // this is problematic because there are two nodes with same events and both enabled.
     if (et->originator != thd->server_id)
     {
+        if (et->status == Event_parse_data::SLAVESIDE_DISABLED)
+          continue;
+
         store_record(table, record[1]);
         table->field[ET_FIELD_STATUS]->
                 store((longlong) Event_parse_data::SLAVESIDE_DISABLED,
                       TRUE);
+
+	/* All the dmls to mysql.events tables are stmt bin-logged. */
+        bool save_binlog_row_based;
+        if ((save_binlog_row_based= thd->is_current_stmt_binlog_format_row()))
+          thd->clear_current_stmt_binlog_format_row();
+
         (void) table->file->ha_update_row(table->record[1], table->record[0]);
+
+        if (save_binlog_row_based)
+          thd->set_current_stmt_binlog_format_row();
+
         delete et;
         continue;
     }
@@ -1203,7 +1216,8 @@ int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len)
 
   if (create_query_string(thd, &log_query))
   {
-    WSREP_WARN("events create string failed: %s", thd->query());
+    WSREP_WARN("events create string failed: schema: %s, query: %s",
+               (thd->db ? thd->db : "(null)"), thd->query());
     return 1;
   }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);
@@ -1230,7 +1244,8 @@ int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len)
 
   if (wsrep_alter_query_string(thd, &log_query))
   {
-    WSREP_WARN("events alter string failed: %s", thd->query());
+    WSREP_WARN("events alter string failed: schema: %s, query: %s",
+               (thd->db ? thd->db : "(null)"), thd->query());
     return 1;
   }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);

@@ -1,0 +1,1 @@
+!include ../galera_2nodes_as_master_with_repl_filter.cnf

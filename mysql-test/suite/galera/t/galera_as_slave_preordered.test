@@ -28,12 +28,7 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 INTEGER) ENGINE=InnoDB;
 
 --disable_query_log
---let $count = 100
-while ($count)
-{
-  --eval INSERT INTO t1 (f2) SELECT 1 FROM ten AS a1, ten AS a2;
-  --dec $count
-}
+INSERT INTO t1 (f2) SELECT 1 from ten AS a1, ten AS a2, ten AS a3, ten AS a4;
 --enable_query_log
 
 #
@@ -45,13 +40,8 @@ while ($count)
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
---let $count = 100
 --disable_query_log
-while ($count)
-{
-  --eval INSERT INTO t1 (f2) SELECT 1 FROM ten AS a1, ten AS a2;
-  --dec $count
-}
+INSERT INTO t1 (f2) SELECT 1 from ten AS a1, ten AS a2, ten AS a3, ten AS a4;
 --enable_query_log
 
 #

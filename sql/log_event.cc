@@ -4976,7 +4976,13 @@ compare_errors:
     DBUG_PRINT("info",("expected_error: %d  sql_errno: %d",
                        expected_error, actual_error));
 
-    if ((expected_error && expected_error != actual_error &&
+    /*
+      If a statement with expected error is received on slave and if the
+      statement is not filtered on the slave, only then compare the expected
+      error with the actual error that happened on slave.
+    */
+    if ((expected_error && rpl_filter->db_ok(thd->db) &&
+         expected_error != actual_error &&
          !concurrency_error_code(expected_error)) &&
         !ignored_error_code(actual_error) &&
         !ignored_error_code(expected_error))
@@ -11380,7 +11386,18 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       const_cast<Relay_log_info*>(rli)->m_table_map.set_table(ptr->table_id, ptr->table);
 
 #ifdef HAVE_QUERY_CACHE
-    query_cache.invalidate_locked_for_write(rli->tables_to_lock);
+#ifdef WITH_WSREP
+    /*
+      Moved invalidation right before the call to rows_event_stmt_cleanup(),
+      to avoid query cache being polluted with stale entries,
+    */
+    if (! (WSREP(thd) && (thd->wsrep_exec_mode == REPL_RECV)))
+    {
+#endif /* WITH_WSREP */
+      query_cache.invalidate_locked_for_write(rli->tables_to_lock);
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
 #endif
   }
 
@@ -11623,6 +11640,14 @@ AFTER_MAIN_EXEC_ROW_LOOP:
 
   if (get_flags(STMT_END_F))
   {
+
+#if defined(WITH_WSREP) && defined(HAVE_QUERY_CACHE)
+    if (WSREP(thd) && thd->wsrep_exec_mode == REPL_RECV)
+    {
+      query_cache.invalidate_locked_for_write(rli->tables_to_lock);
+    }
+#endif /* WITH_WSREP && HAVE_QUERY_CACHE */
+
    if((error= rows_event_stmt_cleanup(rli, thd)))
     slave_rows_error_report(ERROR_LEVEL,
                             thd->is_error() ? 0 : error,

@@ -3147,6 +3147,7 @@ public:
   ulong      statement_id_counter;
   ulong	     rand_saved_seed1, rand_saved_seed2;
   pthread_t  real_id;                           /* For debugging */
+  my_system_tid system_tid;
   my_thread_id  thread_id;
   uint	     tmp_table;
   uint	     server_status,open_options;
@@ -3490,6 +3491,7 @@ public:
   rpl_sid                   wsrep_po_sid;
   void*                     wsrep_apply_format;
   bool                      wsrep_apply_toi; /* applier processing in TOI */
+  wsrep_gtid_t              wsrep_sync_wait_gtid;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
