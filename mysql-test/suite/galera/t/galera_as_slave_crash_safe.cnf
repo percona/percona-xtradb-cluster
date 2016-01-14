@@ -1,0 +1,14 @@
+!include ../galera_2nodes_as_slave.cnf
+
+[mysqld.2]
+relay_log_info_repository = TABLE
+master_info_repository = TABLE
+relay_log_recovery = 1
+relay-log=mysqld2-relay-bin
+
+[mysqld.3]
+relay_log_info_repository = TABLE
+master_info_repository = TABLE
+relay_log_recovery = 1
+relay-log=mysqld3-relay-bin
+

@@ -9,7 +9,7 @@
 
 --connection node_1
 # Not allowed in PXC
---error 1231
+--error ER_WRONG_VALUE_FOR_VAR
 SET GLOBAL binlog_format = 'STATEMENT';
 --disable_warnings
 SET SESSION binlog_format = 'STATEMENT';
@@ -22,10 +22,11 @@ INSERT INTO t1 VALUES (1);
 SET SESSION binlog_format = 'MIXED';
 --enable_warnings
 
+--error ER_LOCK_DEADLOCK
 INSERT INTO t1 VALUES (2);
 
 --connection node_2
-SELECT COUNT(*) = 2 FROM t1;
+SELECT COUNT(*) = 1 FROM t1;
 
 DROP TABLE t1;
 

@@ -8046,17 +8046,34 @@ report_error:
 #ifdef WITH_WSREP
 	/* Append key
 	a. there is no error in insert
-	b. exec mode is local (it is workload executor node and replicator node)
+	b. exec mode is local
+	   (it is workload executor node and not replicator node)
 	c. wsrep is enabled
-	d. LDI conditionality (which actually is confusing)
-	e. row_format = ROW
-	f. If table is partition with innodb being used for storing partition.
-	   (Note: Condition inherently evaluated only for LDI due to d) */
-	if (!error_result && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
-	    wsrep_on(user_thd) && !wsrep_consistency_check(user_thd) &&
-	    (sql_command != SQLCOM_LOAD || 
-	     thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW ||
-	     table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
+	d. No consistency check enforced.
+	e. Ensure that bin-logging is enabled.
+	   Either mysql bin-logging or emulated bin logging.
+	f. If db_type = PARTITION and InnoDB parts are created then MySQL flow
+	   will disable bin-logging before inserting data to indivdual parts.
+	   This is to avoid double bin-logging. Generic level bin-logging is
+	   done at ha_partition level. This causes LDI on partition table
+	   to fail as thd_binlog_format() will then return != ROW.
+	   In order to take care of this situation we ORed that condition
+	   with db_type
+	TODO: We allow replication even if binlog-format = STATEMENT.
+	This is needed by pt-table-checksum. Now it is not a good idea
+	to open this hook for pt-table-checksum but it exist like this for
+	while now so to maintain compatibility we continue to provide it.
+	With that there comes another existing dependency.
+	Why not allow LDI operating with binlog-format = STATEMENT.
+	There is no reason documented so will leave it as is for now. */
+	if (!error_result
+	    && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE
+	    && wsrep_on(user_thd)
+	    && !wsrep_consistency_check(user_thd)
+	    && (thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW
+		|| (thd_binlog_format(user_thd) == BINLOG_FORMAT_STMT
+		    && sql_command != SQLCOM_LOAD)
+	        || table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
 
 		if (wsrep_append_keys(user_thd, false, record, NULL)) {
  			DBUG_PRINT("wsrep", ("row key failed"));
@@ -8585,8 +8602,33 @@ func_exit:
 	innobase_active_small();
 
 #ifdef WITH_WSREP
-	if (!err && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
-            wsrep_on(user_thd)) {
+	/* Append key
+	a. there is no error in update
+	b. exec mode is local
+	   (it is workload executor node and not replicator node)
+	c. wsrep is enabled
+	d. No consistency check enforced.
+	e. Ensure that bin-logging is enabled.
+	   Either mysql bin-logging or emulated bin logging.
+	f. If db_type = PARTITION and InnoDB parts are created then MySQL flow
+	   will disable bin-logging before inserting data to indivdual parts.
+	   This is to avoid double bin-logging. Generic level bin-logging is
+	   done at ha_partition level. This causes LDI on partition table
+	   to fail as thd_binlog_format() will then return != ROW.
+	   In order to take care of this situation we ORed that condition
+	   with db_type
+	TODO: We allow replication even if binlog-format = STATEMENT.
+	This is needed by pt-table-checksum. Now it is not a good idea
+	to open this hook for pt-table-checksum but it exist like this for
+	while now so to maintain compatibility we continue to provide it.
+	With that there comes another existing dependency. */
+	if (!err
+	    && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE
+	    && wsrep_on(user_thd)
+	    && !wsrep_consistency_check(user_thd)
+	    && (thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW
+		|| thd_binlog_format(user_thd) == BINLOG_FORMAT_STMT
+	        || table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
 
 		DBUG_PRINT("wsrep", ("update row key"));
 
@@ -8661,8 +8703,33 @@ ha_innobase::delete_row(
 	innobase_active_small();
 
 #ifdef WITH_WSREP
-	if (error == DB_SUCCESS && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
-            wsrep_on(user_thd)) {
+	/* Append key
+	a. there is no error in delete
+	b. exec mode is local
+	   (it is workload executor node and not replicator node)
+	c. wsrep is enabled
+	d. No consistency check enforced.
+	e. Ensure that bin-logging is enabled.
+	   Either mysql bin-logging or emulated bin logging.
+	f. If db_type = PARTITION and InnoDB parts are created then MySQL flow
+	   will disable bin-logging before inserting data to indivdual parts.
+	   This is to avoid double bin-logging. Generic level bin-logging is
+	   done at ha_partition level. This causes LDI on partition table
+	   to fail as thd_binlog_format() will then return != ROW.
+	   In order to take care of this situation we ORed that condition
+	   with db_type
+	TODO: We allow replication even if binlog-format = STATEMENT.
+	This is needed by pt-table-checksum. Now it is not a god idea
+	to open this hook for pt-table-checksum but it exist like this for
+	while now so to maintain compatibility we continue to provide it.
+	With that there comes another existing dependency. */
+	if (error == DB_SUCCESS
+	    && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE
+	    && wsrep_on(user_thd)
+	    && !wsrep_consistency_check(user_thd)
+	    && (thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW
+		|| thd_binlog_format(user_thd) == BINLOG_FORMAT_STMT
+	        || table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
 
 		if (wsrep_append_keys(user_thd, false, record, NULL)) {
 			DBUG_PRINT("wsrep", ("delete fail"));
