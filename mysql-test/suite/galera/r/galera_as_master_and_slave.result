@@ -1,0 +1,147 @@
+#node-2 (galera-cluster-node acting as slave to an independent master)
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#node-4 (independent slave replicating from galera-node-2)
+START SLAVE USER='root';
+Warnings:
+Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+#node-1 (independent master)
+use test;
+create table t (i int, c char(10), primary key pk(i)) engine=innodb;
+insert into t values (1, 'aaaaaa'), (2, 'bbbbbb'), (3, 'cccccc'),
+(4, 'dddddd'), (5, 'eeeeee');
+select right(@@global.gtid_executed, 3);
+right(@@global.gtid_executed, 3)
+1-2
+select * from t;
+i	c
+1	aaaaaa
+2	bbbbbb
+3	cccccc
+4	dddddd
+5	eeeeee
+#node-2 (galera-cluster-node acting as slave to an independent master)
+select * from t;
+i	c
+1	aaaaaa
+2	bbbbbb
+3	cccccc
+4	dddddd
+5	eeeeee
+#node-3 (galera-cluster-node-2 that act as master to independent slave)
+select * from t;
+i	c
+1	aaaaaa
+2	bbbbbb
+3	cccccc
+4	dddddd
+5	eeeeee
+#node-4 (independent slave replicating from galera-node-2)
+select * from t;
+i	c
+1	aaaaaa
+2	bbbbbb
+3	cccccc
+4	dddddd
+5	eeeeee
+#node-2 (galera-cluster-node acting as slave to an independent master)
+delete from t where i = 2;
+update t set c = 'zzzzzz' where i = 4;
+update t set c = 'pppppp', i = 50 where i = 5;
+select * from t;
+i	c
+1	aaaaaa
+3	cccccc
+4	zzzzzz
+50	pppppp
+select locate('1-3', @@global.gtid_executed);
+locate('1-3', @@global.gtid_executed)
+VALID_POS
+#node-4 (independent slave replicating from galera-node-2)
+select * from t;
+i	c
+1	aaaaaa
+3	cccccc
+4	zzzzzz
+50	pppppp
+select locate('1-3', @@global.gtid_executed);
+locate('1-3', @@global.gtid_executed)
+VALID_POS
+#node-1 (independent master)
+delete from t where i = 2;
+update t set c = 'zzzzzz' where i = 4;
+update t set c = 'pppppp', i = 50 where i = 5;
+select * from t;
+i	c
+1	aaaaaa
+3	cccccc
+4	zzzzzz
+50	pppppp
+select right(@@global.gtid_executed, 3);
+right(@@global.gtid_executed, 3)
+1-5
+#node-2 (galera-cluster-node acting as slave to an independent master)
+select * from t;
+i	c
+1	aaaaaa
+3	cccccc
+4	zzzzzz
+50	pppppp
+select locate('1-5', @@global.gtid_executed);
+locate('1-5', @@global.gtid_executed)
+VALID_POS
+#node-3 (galera-cluster-node-2 that act as master to independent slave)
+select * from t;
+i	c
+1	aaaaaa
+3	cccccc
+4	zzzzzz
+50	pppppp
+select locate('1-5', @@global.gtid_executed);
+locate('1-5', @@global.gtid_executed)
+VALID_POS
+#node-4 (independent slave replicating from galera-node-2)
+select * from t;
+i	c
+1	aaaaaa
+3	cccccc
+4	zzzzzz
+50	pppppp
+select locate('1-5', @@global.gtid_executed);
+locate('1-5', @@global.gtid_executed)
+VALID_POS
+#node-1 (independent master)
+update t set c = 'kkkkk' where i = 1;
+update t set c = 'k2', i = 100 where i = 1;
+select * from t;
+i	c
+3	cccccc
+4	zzzzzz
+50	pppppp
+100	k2
+select right(@@global.gtid_executed, 3);
+right(@@global.gtid_executed, 3)
+1-7
+#node-3 (galera-cluster-node-2 that act as master to independent slave)
+select * from t;
+i	c
+3	cccccc
+4	zzzzzz
+50	pppppp
+100	k2
+select locate('1-7', @@global.gtid_executed);
+locate('1-7', @@global.gtid_executed)
+VALID_POS
+#node-1 (independent master)
+drop table t;
+#node-2 (galera-cluster-node acting as slave to an independent master)
+STOP SLAVE;
+RESET SLAVE ALL;
+#node-1 (independent master)
+RESET MASTER;
+#node-4 (independent slave replicating from galera-node-2)
+STOP SLAVE;
+RESET SLAVE ALL;
+#node-3 (galera-cluster-node-2 that act as master to independent slave)
+RESET MASTER;

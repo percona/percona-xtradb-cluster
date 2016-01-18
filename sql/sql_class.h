@@ -3492,6 +3492,7 @@ public:
   void*                     wsrep_apply_format;
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
+  bool                      wsrep_certify_empty_trx;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
