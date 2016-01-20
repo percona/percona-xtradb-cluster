@@ -1196,6 +1196,7 @@ THD::THD(bool enable_plugins)
    wsrep_po_in_trans(FALSE),
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
+   wsrep_certify_empty_trx(false),
 #endif
    m_parser_state(NULL),
 #if defined(ENABLED_DEBUG_SYNC)
@@ -1733,6 +1734,7 @@ void THD::init(void)
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_queries.clear();
   wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+  wsrep_certify_empty_trx= false;
 #endif
   binlog_row_event_extra_data= 0;
 

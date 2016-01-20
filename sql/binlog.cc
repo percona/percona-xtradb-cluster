@@ -36,6 +36,7 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_xid.h"
+extern handlerton* wsrep_hton;
 #endif /* WITH_WSREP */
 
 using std::max;
@@ -7382,6 +7383,12 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
       cache_mngr->stmt_cache.reset();
     }
     DBUG_RETURN(rcode);
+  }
+
+  if (thd->wsrep_certify_empty_trx)
+  {
+    wsrep_run_wsrep_commit(thd, wsrep_hton, true);
+    wsrep_post_commit(thd, true);
   }
 #endif /* WITH_WSREP */
 

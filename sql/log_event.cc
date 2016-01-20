@@ -7443,6 +7443,23 @@ bool Xid_log_event::do_commit(THD *thd)
   if (thd->variables.gtid_next.type == GTID_GROUP &&
       thd->owned_gtid.sidno != 0)
   {
+#ifdef WITH_WSREP
+    /* Action below will log an empty group of GTID.
+    This is done when the real action fails to generate any meaningful result on
+    executing slave.
+    Let's understand with an example:
+    * Topology master <-> slave
+    * Some action is performed on slave which put it out-of-sync from master.
+    * Master then execute same action. Slave may choose to ignore error arising
+      from execution of these actions using slave_skip_errors configuration but
+      the GTID sequence increment still need to register on slave to keep it in
+      sync with master. So a dummy trx of this form is created. Galera
+      eco-system too will capture this dummy trx and will execute it for
+      internal replication to keep GTID sequence consistent across
+      the cluster. */
+    ha_wsrep_fake_trx_id(thd);
+    thd->wsrep_certify_empty_trx= true;
+#endif
     // GTID logging and cleanup runs regardless of the current res
     error |= gtid_empty_group_log_and_cleanup(thd);
   }
