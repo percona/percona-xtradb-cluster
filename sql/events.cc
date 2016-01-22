@@ -1217,7 +1217,7 @@ int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len)
   if (create_query_string(thd, &log_query))
   {
     WSREP_WARN("events create string failed: schema: %s, query: %s",
-               (thd->db ? thd->db : "(null)"), thd->query());
+               (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
     return 1;
   }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);
@@ -1245,7 +1245,7 @@ int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len)
   if (wsrep_alter_query_string(thd, &log_query))
   {
     WSREP_WARN("events alter string failed: schema: %s, query: %s",
-               (thd->db ? thd->db : "(null)"), thd->query());
+               (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
     return 1;
   }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);

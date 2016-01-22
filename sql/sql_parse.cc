@@ -1432,7 +1432,7 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
       else
       {
         my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-        WSREP_DEBUG("Deadlock error for: %s", thd->query());
+        WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         thd->killed               = THD::NOT_KILLED;
         thd->mysys_var->abort     = 0;
@@ -1659,10 +1659,11 @@ bool dispatch_command(enum enum_server_command command, THD *thd,
     if (thd->wsrep_conflict_state== ABORTED) 
     {
       my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-      WSREP_DEBUG("Deadlock error for: %s", thd->query());
+      WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
       thd->mysys_var->abort= 0;
+      thd->wsrep_conflict_state= NO_CONFLICT;
       goto dispatch_end;
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -4910,6 +4911,9 @@ end_with_restore_list:
   {
     DBUG_EXECUTE_IF("4x_server_emul",
                     my_error(ER_UNKNOWN_ERROR, MYF(0)); goto error;);
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
     if (check_and_convert_db_name(&lex->name, TRUE) != IDENT_NAME_OK)
       break;
     res= mysqld_show_create_db(thd, lex->name.str, &lex->create_info);
@@ -4963,6 +4967,9 @@ end_with_restore_list:
   /* lex->unit.cleanup() is called outside, no need to call it here */
   break;
   case SQLCOM_SHOW_CREATE_EVENT:
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
     res= Events::show_create_event(thd, lex->spname->m_db,
                                    lex->spname->m_name);
     break;
@@ -5312,11 +5319,9 @@ end_with_restore_list:
       /*
         Presumably, RESET and binlog writing doesn't require synchronization
       */
-      bool skip_bin_logging = ((lex->type == REFRESH_TABLES) && WSREP(thd));
-
       if (write_to_binlog > 0)  // we should write
       { 
-        if (!lex->no_write_to_binlog && !skip_bin_logging)
+        if (!lex->no_write_to_binlog)
           res= write_bin_log(thd, FALSE, thd->query(), thd->query_length());
       } else if (write_to_binlog < 0) 
       {
@@ -5920,12 +5925,18 @@ create_sp_error:
     }
   case SQLCOM_SHOW_CREATE_PROC:
     {
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (sp_show_create_routine(thd, SP_TYPE_PROCEDURE, lex->spname))
         goto error;
       break;
     }
   case SQLCOM_SHOW_CREATE_FUNC:
     {
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (sp_show_create_routine(thd, SP_TYPE_FUNCTION, lex->spname))
 	goto error;
       break;
@@ -5938,6 +5949,9 @@ create_sp_error:
       enum_sp_type sp_type= (lex->sql_command == SQLCOM_SHOW_PROC_CODE) ?
                             SP_TYPE_PROCEDURE : SP_TYPE_FUNCTION;
 
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (sp_cache_routine(thd, sp_type, lex->spname, false, &sp))
         goto error;
       if (!sp || sp->show_routine_code(thd))
@@ -5962,6 +5976,9 @@ create_sp_error:
         goto error;
       }
 
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (show_create_trigger(thd, lex->spname))
         goto error; /* Error has been already logged. */
 
@@ -7527,8 +7544,7 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
             thd->lex->sql_command != SQLCOM_SELECT  &&
            (thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit))
         {
-          WSREP_DEBUG("wsrep retrying AC query: %s",
-                      (thd->query()) ? thd->query() : "void");
+          WSREP_DEBUG("wsrep retrying AC query: %s", WSREP_QUERY(thd));
 
           close_thread_tables(thd);
 
@@ -7579,7 +7595,8 @@ static void wsrep_mysql_parse(THD *thd, char *rawbuf, uint length,
                       (thd->wsrep_conflict_state == ABORTED) ?
                       "BF Aborted" : "cert failure",
                       thd->thread_id, is_autocommit, thd->wsrep_retry_counter,
-                      thd->variables.wsrep_retry_autocommit, thd->query());
+                      thd->variables.wsrep_retry_autocommit,
+                      WSREP_QUERY(thd));
           my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
           thd->killed= THD::NOT_KILLED;
           thd->wsrep_conflict_state= NO_CONFLICT;

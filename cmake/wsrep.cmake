@@ -17,7 +17,7 @@
 # so WSREP_VERSION is produced regardless
 
 # Set the patch version
-SET(WSREP_PATCH_VERSION "13")
+SET(WSREP_PATCH_VERSION "14")
 INCLUDE(CheckFunctionExists)
 CHECK_FUNCTION_EXISTS(execvpe HAVE_EXECVPE)
 

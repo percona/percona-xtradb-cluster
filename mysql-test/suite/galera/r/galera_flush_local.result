@@ -144,4 +144,5 @@ SELECT COUNT(*) = 10 FROM x2;
 COUNT(*) = 10
 1
 set wsrep_on=1;
+SET SESSION wsrep_replicate_myisam = FALSE;
 DROP TABLE t1, t2, x1, x2;

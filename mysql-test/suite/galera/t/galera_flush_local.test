@@ -64,6 +64,7 @@ FLUSH LOCAL TABLES t1;
 ANALYZE LOCAL TABLE t1, t2;
 OPTIMIZE LOCAL TABLE t1, t2;
 REPAIR LOCAL TABLE x1, x2;
+
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
@@ -91,6 +92,7 @@ INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 
 --connection node_2
 --let $wsrep_last_committed_before2 = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
 --connection node_1
 set wsrep_on=0;
 FLUSH DES_KEY_FILE;
@@ -106,7 +108,6 @@ FLUSH SLOW LOGS;
 FLUSH GENERAL LOGS;
 FLUSH ENGINE LOGS;
 FLUSH RELAY LOGS;
---connection node_1
 FLUSH CLIENT_STATISTICS;
 FLUSH INDEX_STATISTICS;
 FLUSH TABLE_STATISTICS;
@@ -124,7 +125,6 @@ UNLOCK TABLES;
 LOCK TABLES t1 WRITE;
 FLUSH TABLES t1;
 UNLOCK TABLES;
---connection node_1
 LOCK TABLES t1 READ;
 --error ER_TABLE_NOT_LOCKED_FOR_WRITE
 FLUSH TABLES t1;
@@ -133,15 +133,21 @@ FLUSH TABLES t1;
 ANALYZE TABLE t1, t2;
 OPTIMIZE TABLE t1, t2;
 REPAIR TABLE x1, x2;
+
+
 --connection node_2
 --let $wsrep_last_committed_after2 = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
 --disable_query_log
+
 let $wait_timeout= 180;
 --let $wait_condition =  SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before2 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
+
 let $wait_timeout= 180;
 --let $wait_condition = SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before + 9 AS wsrep_last_committed_diff2;
 --source include/wait_condition.inc
+
 --enable_query_log
 
 SELECT COUNT(*) = 10 FROM t1;
@@ -151,4 +157,5 @@ SELECT COUNT(*) = 10 FROM x2;
 
 --connection node_1
 set wsrep_on=1;
+SET SESSION wsrep_replicate_myisam = FALSE;
 DROP TABLE t1, t2, x1, x2;

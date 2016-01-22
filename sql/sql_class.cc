@@ -1027,7 +1027,9 @@ extern "C" query_id_t wsrep_thd_query_id(THD *thd)
 }
 extern "C" char *wsrep_thd_query(THD *thd) 
 {
-  return (thd) ? thd->query() : NULL;
+  return (thd) ? ((!opt_log_raw) && thd->rewritten_query.length() ?
+                  thd->rewritten_query.c_ptr_safe() : thd->query())
+    : NULL;
 }
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd) 
 {
@@ -2485,6 +2487,7 @@ bool THD::restore_globals()
 
 void THD::cleanup_after_query()
 {
+
   /*
     Reset rand_used so that detection of calls to rand() will save random 
     seeds if needed by the slave.

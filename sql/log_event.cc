@@ -4928,12 +4928,23 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
       else
       {
         rli->report(ERROR_LEVEL, expected_error, 
+#ifdef WITH_WSREP
+                          "\
+Query partially completed on the master (error on master: %d) \
+and was aborted. There is a chance that your master is inconsistent at this \
+point. If you are sure that your master is ok, run this query manually on the \
+slave and then restart the slave with SET GLOBAL SQL_SLAVE_SKIP_COUNTER=1; \
+START SLAVE; . Query: '%s'", expected_error,
+        (!opt_log_raw) && thd->rewritten_query.length()
+          ? thd->rewritten_query.c_ptr_safe() : thd->query());
+#else
                           "\
 Query partially completed on the master (error on master: %d) \
 and was aborted. There is a chance that your master is inconsistent at this \
 point. If you are sure that your master is ok, run this query manually on the \
 slave and then restart the slave with SET GLOBAL SQL_SLAVE_SKIP_COUNTER=1; \
 START SLAVE; . Query: '%s'", expected_error, thd->query());
+#endif /* WITH_WSREP */
         thd->is_slave_error= 1;
       }
       goto end;
@@ -4997,7 +5008,13 @@ Default database: '%s'. Query: '%s'",
                       expected_error,
                       actual_error ? thd->get_stmt_da()->message() : "no error",
                       actual_error,
+#ifdef WITH_WSREP
+                      print_slave_db_safe(db),
+                  (!opt_log_raw) && thd->rewritten_query.length()
+                  ? thd->rewritten_query.c_ptr_safe() : query_arg);
+#else
                       print_slave_db_safe(db), query_arg);
+#endif /* WITH_WSREP */
       thd->is_slave_error= 1;
     }
     /*
@@ -5040,7 +5057,13 @@ Default database: '%s'. Query: '%s'",
                     "Error '%s' on query. Default database: '%s'. Query: '%s'",
                     (actual_error ? thd->get_stmt_da()->message() :
                      "unexpected success or fatal error"),
+#ifdef WITH_WSREP
+                      print_slave_db_safe(thd->db),
+                  (!opt_log_raw) && thd->rewritten_query.length()
+                  ? thd->rewritten_query.c_ptr_safe() : query_arg);
+#else
                     print_slave_db_safe(thd->db), query_arg);
+#endif /* WITH_WSREP */
       }
       thd->is_slave_error= 1;
     }
