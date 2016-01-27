@@ -257,7 +257,7 @@ This variable is used to enable/disable wsrep replication. When set to ``OFF``, 
    :version 5.6.24-25.11: Variable available both in global and session scope
    :cli: Yes
    :conf: Yes
-   :scope: Global/Session
+   :scope: Global and Session
    :dyn: Yes
    :default: TOI
 
@@ -329,16 +329,27 @@ This variable can be used to reject queries for the node. This can be useful dur
 
 .. variable:: wsrep_replicate_myisam
 
-   :version 5.6.24-25.11: Variable available both in global ans session scope
+   :version 5.6.24-25.11: Variable available both in global and session scope
    :cli: Yes
    :conf: Yes
    :scope: Session, Global
    :dyn: No
    :default: OFF
 
-This variable controls if *MyISAM* will be replicated or not. *MyISAM* replication is still experimental and that is one of the reasons why this variable is set to ``OFF`` by default. *MyISAM* ``CREATE TABLE`` isn't replicated any more when :variable:`wsrep_replicate_myisam` is ``OFF``.
+This variable defines whether MyISAM should be replicated or not. It is disabled by default, because MyISAM replication is still experimental.
 
-.. note:: For older nodes in the cluster, :variable:`wsrep_replicate_myisam` should work since the TOI decision (for *MyISAM* DDL) is done on origin node. Mixing of non-MyISAM and *MyISAM* tables in the same DDL statement is not recommended with :variable:`wsrep_replicate_myisam` set to ``OFF`` since if any table in the list is *MyISAM*, the whole DDL statement is not put under TOI.
+On the global level, :variable:`wsrep_replicate_myisam` can be set only before boot-up. On session level, you can change it during runtime as well.
+
+For older nodes in the cluster, :variable:`wsrep_replicate_myisam` should work since the TOI decision (for MyISAM DDL) is done on origin node. Mixing of non-MyISAM and MyISAM tables in the same DDL statement is not recommended when :variable:`wsrep_replicate_myisam` is disabled, since if any table in the list is MyISAM, the whole DDL statement is not put under TOI.
+
+.. note:: You should keep in mind the following when using MyISAM replication:
+
+  * DDL (CREATE/DROP/TRUNCATE) statements on MyISAM will be replicated irrespective of :variable:`wsrep_replicate_miysam` value
+  * DML (INSERT/UPDATE/DELETE) statements on MyISAM will be replicated only if :variable:`wsrep_replicate_myisam` is enabled
+  * SST will get full transfer irrespective of :variable:`wsrep_replicate_myisam` value (it will get MyISAM tables from donor)
+  * Difference in configuration of ``pxc-cluster`` node on `enforce_storage_engine <https://www.percona.com/doc/percona-server/5.6/management/enforce_engine.html>`_ front may result in picking up different engine for same table on different nodes
+  * ``CREATE TABLE AS SELECT`` (CTAS) statements use non-TOI replication and are replicated only if there is involvement of InnoDB table that needs transactions (involvement of MyISAM table will cause CTAS statement to skip replication)
+
 
 .. variable:: wsrep_restart_slave
 
