@@ -3878,6 +3878,43 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
       continue;
     case Key::CLUSTERING | Key::UNIQUE:
     case Key::CLUSTERING | Key::MULTIPLE:
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+      if (thd->work_part_info)
+      {
+        partition_info *part_info= thd->work_part_info;
+        List_iterator<partition_element> part_it(part_info->partitions);
+        partition_element *part_elem;
+
+        while ((part_elem= part_it++))
+        {
+          if (part_elem->subpartitions.elements)
+          {
+            List_iterator<partition_element> sub_it(part_elem->subpartitions);
+            partition_element *subpart_elem;
+            while ((subpart_elem= sub_it++))
+            {
+              if (unlikely(!ha_check_storage_engine_flag(
+                  subpart_elem->engine_type, HTON_SUPPORTS_CLUSTERED_KEYS)))
+              {
+                my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),
+                         ha_resolve_storage_engine_name(
+                         subpart_elem->engine_type), "CLUSTERING");
+                DBUG_RETURN(TRUE);
+              }
+            }
+          }
+          else if (unlikely(!ha_check_storage_engine_flag(
+                   part_elem->engine_type, HTON_SUPPORTS_CLUSTERED_KEYS)))
+          {
+            my_error(ER_ILLEGAL_HA_CREATE_OPTION, MYF(0),
+                     ha_resolve_storage_engine_name(part_elem->engine_type),
+                     "CLUSTERING");
+            DBUG_RETURN(TRUE);
+          }
+        }
+      }
+      else
+#endif
       if (unlikely(!ha_check_storage_engine_flag(
                      file->ht, HTON_SUPPORTS_CLUSTERED_KEYS)))
       {
@@ -5398,7 +5435,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
     {
       /* CREATE TEMPORARY TABLE LIKE must be skipped from replication */
       WSREP_DEBUG("CREATE TEMPORARY TABLE LIKE... skipped replication\n %s", 
-                  thd->query());
+                  WSREP_QUERY(thd));
     } 
     else if (!is_tmp_table)
     {
@@ -9734,7 +9771,19 @@ static bool check_engine(THD *thd, const char *db_name,
         MY_TEST(thd->variables.sql_mode & MODE_NO_ENGINE_SUBSTITUTION);
 
   if (!in_bootstrap && !opt_noacl)
-    enf_engine= ha_enforce_handlerton(thd);
+  {
+    /*
+      Storage engine enforcement must be forbidden:
+      1. for "OPTIMIZE TABLE" statements.
+      2. for "ALTER TABLE" statements without explicit "... ENGINE=xxx" part
+    */
+    bool enforcement_forbidden =
+          ((thd->lex->sql_command == SQLCOM_ALTER_TABLE) &&
+          (create_info->used_fields & HA_CREATE_USED_ENGINE) == 0) ||
+          (thd->lex->sql_command == SQLCOM_OPTIMIZE);
+    if (!enforcement_forbidden)
+      enf_engine= ha_enforce_handlerton(thd);
+  }
 
   if (!(*new_engine= ha_checktype(thd, ha_legacy_type(req_engine),
                                   no_substitution, 1)))

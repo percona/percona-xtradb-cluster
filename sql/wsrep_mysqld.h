@@ -243,6 +243,10 @@ extern wsrep_seqno_t wsrep_locked_seqno;
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");       \
   }
 
+#define WSREP_QUERY(thd)                                \
+  ((!opt_log_raw) && thd->rewritten_query.length()      \
+   ? thd->rewritten_query.c_ptr_safe() : thd->query())
+
 extern void wsrep_ready_wait();
 
 enum wsrep_trx_status {

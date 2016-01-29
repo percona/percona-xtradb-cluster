@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@
 #include "rpl_rli.h"     // rotate_relay_log
 #include "rpl_mi.h"
 #include "debug_sync.h"
+#include "des_key_file.h"
 
 #ifdef WITH_WSREP
 #include "sql_parse.h"
@@ -314,7 +315,6 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         }
       }
 
-#if 0
 #ifdef WITH_WSREP
       if (WSREP(thd) && !thd->lex->no_write_to_binlog
                      && (options & REFRESH_TABLES)
@@ -344,8 +344,33 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
                 goto cleanup;
         }
       }
+
+      if (thd && thd->wsrep_applier)
+      {
+        /*
+          In case of applier thread, do not wait for table share(s) to be
+          removed from table definition cache.
+
+          This is important otherwise it can lead to a deadlock in following
+          scenario:
+          * A parallel DML workload is being carried out on node-1
+          * FLUSH TABLE is executed on node-2 which is then replicated.
+            Applier applies this action on node-1. For doing this it register
+            it with galera eco-system and get a commit order seqno assigned.
+          * FLUSH TABLE will wait for TABLE SHARE count to drop to 0.
+          * This table share count can't drop to 0 till all DML are done.
+          * Take a case where-in a DML action entered galera post FLUSH TABLE
+            got its seqno assigned and then immediately went ahead and opened
+            the table. This thread will release TABLE SHARE only on commit.
+            But commit can't proceed as its seqno is > seqno of FLUSH TABLE.
+          * FLUSH TABLE continue to wait for TABLE SHARE count to drop to 0.
+          This all leads to DEADLOCK.
+          With REFRESH_FAST, FLUSH_TABLE thread will not wait for TABLE SHARE
+          count to drop to 0 and avoiding DEADLOCK.
+        */
+        options|= REFRESH_FAST;
+      }
 #endif /* WITH_WSREP */
-#endif
 
       if (close_cached_tables(thd, tables,
                               ((options & REFRESH_FAST) ?  FALSE : TRUE),
@@ -359,11 +384,11 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         result= 1;
       }
     }
-#if 0
+
 #ifdef WITH_WSREP
 cleanup:
 #endif /* WITH_WSREP */
-#endif
+
     my_dbopt_cleanup();
   }
   if (options & REFRESH_HOSTS)
@@ -384,7 +409,7 @@ cleanup:
     }
   }
 #endif
-#ifdef OPENSSL
+#ifdef HAVE_OPENSSL
    if (options & REFRESH_DES_KEY_FILE)
    {
      if (des_key_file && load_des_key_file(des_key_file))

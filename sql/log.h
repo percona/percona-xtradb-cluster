@@ -617,6 +617,7 @@ void thd_binlog_trx_reset(THD * thd);
 #else
 #define WSREP_BINLOG_FORMAT(my_format) my_format
 #endif /* WITH_WSREP */
+void exec_binlog_error_action_abort(const char* err_string);
 int query_error_code(THD *thd, bool not_killed);
 uint purge_log_get_error_code(int res);
 

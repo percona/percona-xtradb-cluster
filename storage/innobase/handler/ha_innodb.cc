@@ -17518,7 +17518,6 @@ innodb_sched_priority_purge_update(
 		return;
 	}
 
-	ut_ad(purge_sys->state == PURGE_STATE_RUN);
 	for (ulint i = 0; i < srv_n_purge_threads; i++) {
 
 		ulint actual_priority
@@ -18200,6 +18199,15 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		  (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
 
 	wsrep_thd_LOCK(thd);
+        DBUG_EXECUTE_IF("sync.wsrep_after_BF_victim_lock",
+                 {
+                   const char act[]=
+                     "now "
+                     "wait_for signal.wsrep_after_BF_victim_lock";
+                   DBUG_ASSERT(!debug_sync_set_action(bf_thd,
+                                                      STRING_WITH_LEN(act)));
+                 };);
+
 
 	if (wsrep_thd_query_state(thd) == QUERY_EXITING) {
 		WSREP_DEBUG("kill trx EXITING for %llu",
