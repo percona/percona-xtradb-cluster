@@ -46,7 +46,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Percona XtraDB Cluster'
-copyright = u'2012-2015, Percona LLC and/or its affiliates'
+copyright = u'2012-2016, Percona LLC and/or its affiliates'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -198,8 +198,9 @@ html_static_path = ['_static']
 #html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-#html_sidebars = {}
-
+html_sidebars = {'**': ['globaltoc.html', 'sourcelink.html'],
+                        'using/windows': ['windowssidebar.html'],
+                }
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
 #html_additional_pages = {}
@@ -246,7 +247,7 @@ htmlhelp_basename = 'PerconaXtraDBClusterDoc'
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'PerconaXtraDBCluster-5.5.tex', u'Percona XtraDB Cluster 5.5 Documentation', 
-   u'2012-2015, Percona LLC and/or its affiliates', 'manual'),
+   u'2012-2016, Percona LLC and/or its affiliates', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -279,5 +280,5 @@ latex_logo = 'percona-logo.jpg'
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'perconaxtradbcluster', u'Percona XtraDB Cluster Documentation',
-     [u'2012-2015, Percona LLC and/or its affiliates'], 1)
+     [u'2012-2016, Percona LLC and/or its affiliates'], 1)
 ]
