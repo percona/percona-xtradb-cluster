@@ -13,31 +13,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA 
 
-IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND CMAKE_COMPILER_IS_GNUCXX
-  AND CMAKE_SIZEOF_VOID_P EQUAL 4)
-  IF(NOT DEFINED BUGGY_GCC_NO_DTRACE_MODULES)
-    EXECUTE_PROCESS(
-      COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1}  --version
-      OUTPUT_VARIABLE out)
-    IF(out MATCHES "3.4.6")
-     # This gcc causes crashes in dlopen() for dtraced shared libs,
-     # while standard shipped with Solaris10 3.4.3 is ok
-     SET(BUGGY_GCC_NO_DTRACE_MODULES 1 CACHE INTERNAL "")
-    ELSE()
-     SET(BUGGY_GCC_NO_DTRACE_MODULES 0 CACHE INTERNAL "")
-    ENDIF()
-  ENDIF()
-ENDIF()
-
 # Check if OS supports DTrace
 MACRO(CHECK_DTRACE)
  FIND_PROGRAM(DTRACE dtrace)
  MARK_AS_ADVANCED(DTRACE)
 
  # On FreeBSD, dtrace does not handle userland tracing yet
- IF(ENABLE_DTRACE AND (CMAKE_SYSTEM_NAME MATCHES "FreeBSD"
-    OR BUGGY_GCC_NO_DTRACE_MODULES OR NOT DTRACE))
-  MESSAGE(FATAL_ERROR "dtrace is not supported on this system")
+ IF(ENABLE_DTRACE AND NOT CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+   MESSAGE(FATAL_ERROR "dtrace is not supported on this system")
  ENDIF()
 
  SET(HAVE_DTRACE ${ENABLE_DTRACE})
@@ -51,7 +34,7 @@ MACRO(CHECK_DTRACE)
    ENDIF()
  ENDIF()
  IF(HAVE_REAL_DTRACE_INSTRUMENTING)
-   IF(CMAKE_SIZEOF_VOID_P EQUAL 4)
+   IF(SIZEOF_VOIDP EQUAL 4)
      SET(DTRACE_FLAGS -32 CACHE INTERNAL "DTrace architecture flags")
    ELSE()
      SET(DTRACE_FLAGS -64 CACHE INTERNAL "DTrace architecture flags")
@@ -93,12 +76,6 @@ IF(ENABLE_DTRACE)
 ENDIF()
 
 FUNCTION(DTRACE_INSTRUMENT target)
-  IF(BUGGY_GCC_NO_DTRACE_MODULES)
-    GET_TARGET_PROPERTY(target_type ${target} TYPE)
-    IF(target_type MATCHES "MODULE_LIBRARY")
-      RETURN()
-    ENDIF()
-  ENDIF()
   IF(ENABLE_DTRACE)
     ADD_DEPENDENCIES(${target} gen_dtrace_header)
 

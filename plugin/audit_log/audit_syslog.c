@@ -17,6 +17,7 @@
 #include <syslog.h>
 #include <string.h>
 #include "audit_handler.h"
+#include "audit_log.h"
 
 typedef struct audit_handler_syslog_data_struct audit_handler_syslog_data_t;
 
@@ -37,7 +38,9 @@ int audit_handler_syslog_close(audit_handler_t *handler);
 audit_handler_t *audit_handler_syslog_open(audit_handler_syslog_config_t *opts)
 {
   audit_handler_t *handler= (audit_handler_t*)
-       calloc(sizeof(audit_handler_t) + sizeof(audit_handler_syslog_data_t), 1);
+    my_malloc(key_memory_audit_log_handler,
+              sizeof(audit_handler_t) + sizeof(audit_handler_syslog_data_t),
+              MY_ZEROFILL);
   if (handler != NULL)
   {
     audit_handler_syslog_data_t *data=
@@ -86,6 +89,6 @@ int audit_handler_syslog_close(audit_handler_t *handler)
                                    (audit_handler_syslog_data_t*) handler->data;
   data->footer(NULL, 0);
   closelog();
-  free(handler);
+  my_free(handler);
   return 0;
 }

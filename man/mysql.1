@@ -2,12 +2,12 @@
 .\"     Title: \fBmysql\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 11/16/2015
+.\"      Date: 11/28/2015
 .\"    Manual: MySQL Database System
-.\"    Source: MySQL 5.6
+.\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQL\FR" "1" "11/16/2015" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYSQL\FR" "1" "11/28/2015" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -86,13 +86,7 @@ and press Enter\&.
 .PP
 Typing
 Control+C
-causes
-\fBmysql\fR
-to attempt to kill the current statement\&. If this cannot be done, or
-Control+C
-is typed again before the statement is killed,
-\fBmysql\fR
-exits\&.
+interrupts the current statement if there is one, or cancels any partial input line otherwise\&.
 .PP
 You can execute SQL statements in a script file (batch file) like this:
 .sp
@@ -263,8 +257,6 @@ in non\-interactive mode (for input piped to
 or loaded using the
 source
 command)\&.
-.sp
-This option was added in MySQL 5\&.6\&.3\&.
 .RE
 .sp
 .RS 4
@@ -280,8 +272,6 @@ This option was added in MySQL 5\&.6\&.3\&.
 \fB\-\-bind\-address=\fR\fB\fIip_address\fR\fR
 .sp
 On a computer having multiple network interfaces, use this option to select which interface to use for connecting to the MySQL server\&.
-.sp
-This option is supported beginning with MySQL 5\&.6\&.1\&.
 .RE
 .sp
 .RS 4
@@ -377,7 +367,7 @@ Compress all information sent between the client and the server if both support 
 Indicate to the server that the client can handle sandbox mode if the account used to connect has an expired password\&. This can be useful for noninteractive invocations of
 \fBmysql\fR
 because normally the server disconnects noninteractive clients that attempt to connect using an account with an expired password\&. (See
-Section\ \&6.3.6, \(lqPassword Expiration and Sandbox Mode\(rq\&.) This option was added in MySQL 5\&.6\&.12\&.
+Section\ \&6.3.7, \(lqPassword Expiration and Sandbox Mode\(rq\&.) This option was added in MySQL 5\&.7\&.2\&.
 .RE
 .sp
 .RS 4
@@ -414,6 +404,11 @@ Write a debugging log\&. A typical
 string is
 d:t:o,\fIfile_name\fR\&. The default is
 d:t:o,/tmp/mysql\&.trace\&.
+.sp
+This option is available only if MySQL was built using
+\fBWITH_DEBUG\fR\&. MySQL release binaries provided by Oracle are
+\fInot\fR
+built using this option\&.
 .RE
 .sp
 .RS 4
@@ -460,7 +455,7 @@ Print debugging information and memory and CPU usage statistics when the program
 \fB\-\-default\-auth=\fR\fB\fIplugin\fR\fR
 .sp
 A hint about the client\-side authentication plugin to use\&. See
-Section\ \&6.3.7, \(lqPluggable Authentication\(rq\&.
+Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -607,7 +602,7 @@ the section called \(lqMYSQL COMMANDS\(rq\&.
 Enable the
 mysql_clear_password
 cleartext authentication plugin\&. (See
-Section\ \&6.3.8.7, \(lqThe Cleartext Client-Side Authentication Plugin\(rq\&.) This option was added in MySQL 5\&.6\&.7\&.
+Section\ \&6.3.9.8, \(lqThe Cleartext Client-Side Authentication Plugin\(rq\&.)
 .RE
 .sp
 .RS 4
@@ -658,8 +653,12 @@ Continue even if an SQL error occurs\&.
 .\" histignore option: mysql
 \fB\-\-histignore\fR
 .sp
-A colon\-separated list of one or more patterns specifying statements to ignore for logging purposes\&. These patterns are added to the default pattern list ("*IDENTIFIED*:*PASSWORD*")\&. The value specified for this option affects logging of statements written to the history file\&. For more information, see
-the section called \(lqMYSQL LOGGING\(rq\&. This option was added in MySQL 5\&.6\&.8\&.
+A colon\-separated list of one or more patterns specifying statements to ignore for logging purposes\&. These patterns are added to the default pattern list ("*IDENTIFIED*:*PASSWORD*")\&. The value specified for this option affects logging of statements written to the history file, and to
+syslog
+if the
+\fB\-\-syslog\fR
+option is given\&. For more information, see
+the section called \(lqMYSQL LOGGING\(rq\&.
 .RE
 .sp
 .RS 4
@@ -789,7 +788,7 @@ login path file\&. A
 is an option group containing options that specify which MySQL server to connect to and which account to authenticate as\&. To create or modify a login path file, use the
 \fBmysql_config_editor\fR
 utility\&. See
-\fBmysql_config_editor\fR(1)\&. This option was added in MySQL 5\&.6\&.6\&.
+\fBmysql_config_editor\fR(1)\&.
 .RE
 .sp
 .RS 4
@@ -1066,7 +1065,7 @@ The directory in which to look for plugins\&. Specify this option if the
 option is used to specify an authentication plugin but
 \fBmysql\fR
 does not find it\&. See
-Section\ \&6.3.7, \(lqPluggable Authentication\(rq\&.
+Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -1261,9 +1260,10 @@ the section called \(lqMYSQL TIPS\(rq, for more information about this option\&.
 .\" secure-auth option: mysql
 \fB\-\-secure\-auth\fR
 .sp
-Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&. As of MySQL 5\&.6\&.7, this option is enabled by default; use
-\fB\-\-skip\-secure\-auth\fR
-to disable it\&.
+Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&.
+.sp
+As of MySQL 5\&.7\&.5, this option is deprecated and will be removed in a future MySQL release\&. It is always enabled and attempting to disable it (\fB\-\-skip\-secure\-auth\fR,
+\fB\-\-secure\-auth=0\fR) produces an error\&. Before MySQL 5\&.7\&.5, this option is enabled by default but can be disabled\&.
 .if n \{\
 .sp
 .\}
@@ -1276,8 +1276,8 @@ to disable it\&.
 \fBNote\fR
 .ps -1
 .br
-Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them will be removed in a future MySQL release\&. For account upgrade instructions, see
-Section\ \&6.3.8.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
+Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them is removed in MySQL 5\&.7\&.5\&. For account upgrade instructions, see
+Section\ \&6.3.9.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
 .sp .5v
 .RE
 .RE
@@ -1303,12 +1303,9 @@ The server sends the public key to the client as needed, so it is not necessary 
 For additional discussion regarding use of the
 sha256_password
 plugin, including how to get the RSA public key, see
-Section\ \&6.3.8.4, \(lqThe SHA-256 Authentication Plugin\(rq\&.
+Section\ \&6.3.9.4, \(lqThe SHA-256 Authentication Plugin\(rq\&.
 .sp
-This option is available only if MySQL was built using OpenSSL\&. It was added in MySQL 5\&.6\&.6 under the name
-\fB\-\-server\-public\-key\fR
-and renamed in 5\&.6\&.7 to
-\fB\-\-server\-public\-key\-path\fR\&.
+This option is available only if MySQL was built using OpenSSL\&.
 .RE
 .sp
 .RS 4
@@ -1448,7 +1445,53 @@ localhost, the Unix socket file to use, or, on Windows, the name of the named pi
 Options that begin with
 \fB\-\-ssl\fR
 specify whether to connect to the server using SSL and indicate where to find SSL keys and certificates\&. See
-Section\ \&6.3.10.4, \(lqSSL Command Options\(rq\&.
+Section\ \&6.3.12.4, \(lqSSL Command Options\(rq\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql: syslog option
+.\" syslog option: mysql
+\fB\-\-syslog\fR,
+\fB\-j\fR
+.sp
+This option causes
+\fBmysql\fR
+to send interactive statements to the system logging facility\&. On Unix, this is
+syslog; on Windows, it is the Windows Event Log\&. The destination where logged messages appear is system dependent\&. On Linux, the destination is often the
+/var/log/messages
+file\&.
+.sp
+Here is a sample of output generated on Linux by using
+\fB\-\-syslog\fR\&. This output is formatted for readability; each logged message actually takes a single line\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Mar  7 12:39:25 myhost MysqlClient[20824]:
+  SYSTEM_USER:\*(Aqoscar\*(Aq, MYSQL_USER:\*(Aqmy_oscar\*(Aq, CONNECTION_ID:23,
+  DB_SERVER:\*(Aq127\&.0\&.0\&.1\*(Aq, DB:\*(Aq\-\-\*(Aq, QUERY:\*(AqUSE test;\*(Aq
+Mar  7 12:39:28 myhost MysqlClient[20824]:
+  SYSTEM_USER:\*(Aqoscar\*(Aq, MYSQL_USER:\*(Aqmy_oscar\*(Aq, CONNECTION_ID:23,
+  DB_SERVER:\*(Aq127\&.0\&.0\&.1\*(Aq, DB:\*(Aqtest\*(Aq, QUERY:\*(AqSHOW TABLES;\*(Aq
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+For more information, see
+the section called \(lqMYSQL LOGGING\(rq\&.
+.sp
+The
+\fB\-\-syslog\fR
+option was added in MySQL 5\&.7\&.1\&.
 .RE
 .sp
 .RS 4
@@ -1750,7 +1793,7 @@ mysql> \fBhelp\fR
 List of all MySQL commands:
 Note that all text commands must be first on line and end with \*(Aq;\*(Aq
 ?         (\e?) Synonym for `help\*(Aq\&.
-clear     (\ec) Clear command\&.
+clear     (\ec) Clear the current input statement\&.
 connect   (\er) Reconnect to the server\&. Optional arguments are db and host\&.
 delimiter (\ed) Set statement delimiter\&.
 edit      (\ee) Edit command with $EDITOR\&.
@@ -1775,6 +1818,7 @@ charset   (\eC) Switch to another charset\&. Might be needed for processing
                binlog with multi\-byte charsets\&.
 warnings  (\eW) Show warnings after every statement\&.
 nowarning (\ew) Don\*(Aqt show warnings after every statement\&.
+resetconnection(\ex) Clean session context\&.
 For server side help, type \*(Aqhelp contents\*(Aq
 .fi
 .if n \{\
@@ -1921,7 +1965,7 @@ is set to something other than the default of
 \(lq;\(rq
 as a statement delimiter and processes statements accordingly\&. This behavior on the server side comes into play for multiple\-statement execution (see
 Section\ \&23.8.17, \(lqC API Support for Multiple Statement Execution\(rq), and for parsing the body of stored procedures and functions, triggers, and events (see
-Section\ \&20.1, \(lqDefining Stored Programs\(rq)\&.
+Section\ \&19.1, \(lqDefining Stored Programs\(rq)\&.
 .RE
 .sp
 .RS 4
@@ -2169,6 +2213,60 @@ rehash,
 Rebuild the completion hash that enables database, table, and column name completion while you are entering statements\&. (See the description for the
 \fB\-\-auto\-rehash\fR
 option\&.)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql: resetconnection command
+.\" resetconnection command: mysql
+resetconnection,
+\ex
+.sp
+Reset the connection to clear the session state\&. This command was added in MySQL 5\&.7\&.3\&.
+.sp
+Resetting a connection has effects similar to
+mysql_change_user()
+or an auto\-reconnect except that the connection is not closed and reopened, and re\-authentication is not done\&. See
+Section\ \&23.8.7.3, \(lqmysql_change_user()\(rq) and see
+Section\ \&23.8.16, \(lqControlling Automatic Reconnection Behavior\(rq)\&.
+.sp
+This example shows how
+resetconnection
+clears a value maintained in the session state:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+mysql> \fBSELECT LAST_INSERT_ID(3);\fR
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+| LAST_INSERT_ID(3) |
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+|                 3 |
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+mysql> \fBSELECT LAST_INSERT_ID();\fR
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+| LAST_INSERT_ID() |
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+|                3 |
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+mysql> \fBresetconnection;\fR
+mysql> \fBSELECT LAST_INSERT_ID();\fR
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+| LAST_INSERT_ID() |
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+|                0 |
++\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
+.fi
+.if n \{\
+.RE
+.\}
 .RE
 .sp
 .RS 4
@@ -2498,7 +2596,13 @@ l l
 l l
 l l
 l l
+l l
 l l.
+T{
+\eC
+T}:T{
+The current connection identifier (MySQL 5\&.7\&.6 and up)
+T}
 T{
 \ec
 T}:T{
@@ -2791,15 +2895,48 @@ mysql>
 .\" command-line history: mysql
 .\" .mysql_history file
 .PP
-On Unix, the
+The
 \fBmysql\fR
-client logs statements executed interactively to a history file\&. By default, this file is named
+client can do these types of logging for statements executed interactively:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+On Unix,
+\fBmysql\fR
+writes the statements to a history file\&. By default, this file is named
 \&.mysql_history
 in your home directory\&. To specify a different file, set the value of the
 MYSQL_HISTFILE
 environment variable\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+On all platforms, if the
+\fB\-\-syslog\fR
+option is given,
+\fBmysql\fR
+writes the statements to the system logging facility\&. On Unix, this is
+syslog; on Windows, it is the Windows Event Log\&. The destination where logged messages appear is system dependent\&. On Linux, the destination is often the
+/var/log/messages
+file\&.
+.RE
+.PP
+The following discussion describes characteristics that apply to all logging types and provides information specific to each logging type\&.
 How Logging Occurs.PP
-Statement logging occurs as follows:
+For each enabled logging destination, statement logging occurs as follows:
 .sp
 .RS 4
 .ie n \{\
@@ -2898,7 +3035,6 @@ SELECT \*(AqToday is\*(Aq , CURDATE();
 .RE
 .\}
 .PP
-As of MySQL 5\&.6\&.8,
 \fBmysql\fR
 ignores for logging purposes statements that match any pattern in the
 \(lqignore\(rq
@@ -3000,6 +3136,138 @@ shell> \fBln \-s /dev/null $HOME/\&.mysql_history\fR
 .RE
 .\}
 .RE
+syslog Logging Characteristics.PP
+If the
+\fB\-\-syslog\fR
+option is given,
+\fBmysql\fR
+writes interactive statements to the system logging facility\&. Message logging has the following characteristics\&.
+.PP
+Logging occurs at the
+\(lqinformation\(rq
+level\&. This corresponds to the
+LOG_INFO
+priority for
+syslog
+on Unix/Linux
+syslog
+capability and to
+EVENTLOG_INFORMATION_TYPE
+for the Windows Event Log\&. Consult your system documentation for configuration of your logging capability\&.
+.PP
+Message size is limited to 1024 bytes\&.
+.PP
+Messages consist of the identifier
+MysqlClient
+followed by these values:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+SYSTEM_USER
+.sp
+The system user name (login name) or
+\-\-
+if the user is unknown\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+MYSQL_USER
+.sp
+The MySQL user name (specified with the
+\fB\-\-user\fR
+option) or
+\-\-
+if the user is unknown\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+CONNECTION_ID:
+.sp
+The client connection identifier\&. This is the same as the
+CONNECTION_ID()
+function value within the session\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+DB_SERVER
+.sp
+The server host or
+\-\-
+if the host is unknown\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+DB
+.sp
+The default database or
+\-\-
+if no database has been selected\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+QUERY
+.sp
+The text of the logged statement\&.
+.RE
+.PP
+Here is a sample of output generated on Linux by using
+\fB\-\-syslog\fR\&. This output is formatted for readability; each logged message actually takes a single line\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+Mar  7 12:39:25 myhost MysqlClient[20824]:
+  SYSTEM_USER:\*(Aqoscar\*(Aq, MYSQL_USER:\*(Aqmy_oscar\*(Aq, CONNECTION_ID:23,
+  DB_SERVER:\*(Aq127\&.0\&.0\&.1\*(Aq, DB:\*(Aq\-\-\*(Aq, QUERY:\*(AqUSE test;\*(Aq
+Mar  7 12:39:28 myhost MysqlClient[20824]:
+  SYSTEM_USER:\*(Aqoscar\*(Aq, MYSQL_USER:\*(Aqmy_oscar\*(Aq, CONNECTION_ID:23,
+  DB_SERVER:\*(Aq127\&.0\&.0\&.1\*(Aq, DB:\*(Aqtest\*(Aq, QUERY:\*(AqSHOW TABLES;\*(Aq
+.fi
+.if n \{\
+.RE
+.\}
 .SH "MYSQL SERVER-SIDE HELP"
 .sp
 .if n \{\
@@ -3329,9 +3597,9 @@ at the end of
 will show the bindings when it starts\&.
 .SS "Unicode Support on Windows"
 .PP
-Windows provides APIs based on UTF\-16LE for reading from and writing to the console\&. As of MySQL 5\&.6\&.2, the
+Windows provides APIs based on UTF\-16LE for reading from and writing to the console; the
 \fBmysql\fR
-client for Windows is able to use these APIs\&. As of 5\&.6\&.3, the Windows installer creates an item in the MySQL menu named
+client for Windows is able to use these APIs\&. The Windows installer creates an item in the MySQL menu named
 MySQL command line client \- Unicode\&. This item invokes the
 \fBmysql\fR
 client with properties set to communicate through the console to the MySQL server using Unicode\&.

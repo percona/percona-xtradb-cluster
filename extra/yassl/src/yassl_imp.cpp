@@ -2435,6 +2435,12 @@ void Finished::Process(input_buffer& input, SSL& ssl)
         return;
     }
 
+    // verify mac
+    if (memcmp(mac, verifyMAC, digestSz)) {
+        ssl.SetError(verify_error);
+        return;
+    }
+
     // update states
     ssl.useStates().useHandShake() = handShakeReady;
     if (ssl.getSecurity().get_parms().entity_ == client_end)

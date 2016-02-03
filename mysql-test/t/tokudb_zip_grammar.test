@@ -6,6 +6,7 @@
 #
 # InnoDB returns a warning on unsupported format if InnoDB strict mode off
 #
+SET @@SESSION.innodb_strict_mode=OFF;
 
 CREATE TABLE t1 (a INT) ENGINE=InnoDB ROW_FORMAT=TOKUDB_UNCOMPRESSED;
 
@@ -33,8 +34,6 @@ ALTER TABLE t1 ROW_FORMAT=TOKUDB_LZMA;
 ALTER TABLE t1 ROW_FORMAT=TOKUDB_FAST;
 --error ER_ILLEGAL_HA_CREATE_OPTION
 ALTER TABLE t1 ROW_FORMAT=TOKUDB_SMALL;
-
-SET @@SESSION.innodb_strict_mode=DEFAULT;
 
 #
 # Other storage engines silently convert unsupported formats to default

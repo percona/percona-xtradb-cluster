@@ -2,7 +2,6 @@
 # Bug 67504: Duplicate error in replication with slave triggers and
 #            auto increment
 ########################################################################
---source include/have_innodb.inc
 --source include/have_binlog_format_mixed_or_statement.inc 
 --source include/master-slave.inc
 
@@ -21,8 +20,8 @@ sync_slave_with_master;
 --enable_warnings
 
 connection master;
-CREATE TABLE t1(id INT AUTO_INCREMENT PRIMARY KEY) ENGINE=INNODB;
-CREATE TABLE t2(id INT AUTO_INCREMENT PRIMARY KEY) ENGINE=INNODB;
+CREATE TABLE t1(id INT AUTO_INCREMENT PRIMARY KEY);
+CREATE TABLE t2(id INT AUTO_INCREMENT PRIMARY KEY);
 
 sync_slave_with_master;
 CREATE TABLE slave_only(id INT AUTO_INCREMENT PRIMARY KEY) ENGINE=INNODB;

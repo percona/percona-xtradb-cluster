@@ -23,10 +23,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <trx0types.h>
 
 struct i_s_xtradb_read_view_struct {
-	undo_no_t	undo_no;/*!< 0 or if type is
-				VIEW_HIGH_GRANULARITY
-				transaction undo_no when this high-granularity
-				consistent read view was created */
 	trx_id_t	low_limit_no;
 				/*!< The view does not need to see the undo
 				logs for transactions whose transaction number
@@ -46,7 +42,6 @@ struct i_s_xtradb_read_view_struct {
 
 typedef struct i_s_xtradb_read_view_struct i_s_xtradb_read_view_t;
 
-UNIV_INTERN
 i_s_xtradb_read_view_t*
 read_fill_i_s_xtradb_read_view(i_s_xtradb_read_view_t *rv);
 

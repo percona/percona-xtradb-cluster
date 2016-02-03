@@ -17,7 +17,7 @@ SET GLOBAL slow_query_log_use_global_control='long_query_time,min_examined_row_l
 SET SESSION query_exec_time=2.1;
 SELECT 1;
 
-SET GLOBAL min_examined_row_limit=5;
+SET GLOBAL min_examined_row_limit=7;
 
 SELECT * FROM t AS t1, t AS t2;
 SELECT 1;

@@ -5,9 +5,9 @@
 --source include/have_innodb.inc
 --source include/not_embedded.inc
 --source include/have_archive.inc
---source include/have_csv.inc
 --source include/have_blackhole.inc
 --source include/have_log_bin.inc
+--source include/have_myisam.inc
 
 SELECT @@binlog_format;
 
@@ -687,58 +687,6 @@ CREATE TABLE t_innodb(a INT NOT NULL) ENGINE=InnoDB;
 
 --connection default
 --echo # connection default
-
-#
-# INSERT DELAYED
-#
-
-LOCK BINLOG FOR BACKUP;
-
---let $orig_binlog_pos= query_get_value(SHOW MASTER STATUS, Position, 1)
-
---connection con1
---echo # connection con1
-
-if (`SELECT @@binlog_format = 'STATEMENT'`)
-{
-   --error ER_LOCK_WAIT_TIMEOUT
-   INSERT DELAYED INTO t_myisam VALUES(0);
-}
-if (!`SELECT @@binlog_format = 'STATEMENT'`)
-{
-   INSERT DELAYED INTO t_myisam VALUES(0);
-}
-
---connection default
---echo # connection default
-
-if (!`SELECT @@binlog_format = 'STATEMENT'`)
-{
-  let $wait_condition=
-      SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST
-      WHERE STATE = "Waiting for binlog lock" AND
-      COMMAND = "Delayed insert";
-  --source include/wait_condition.inc
-}
-  
---let $binlog_pos= query_get_value(SHOW MASTER STATUS, Position, 1)
---disable_query_log
---eval SELECT $orig_binlog_pos = $binlog_pos AS must_be_1
---enable_query_log
-
-UNLOCK BINLOG;
-
-if (!`SELECT @@binlog_format = 'STATEMENT'`)
-{
-  let $wait_condition=
-      SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.PROCESSLIST
-      WHERE STATE = "Waiting for binlog lock" AND
-      COMMAND = "Delayed";
-  --source include/wait_condition.inc
-}
-
-SELECT * FROm t_myisam;
-
 
 #
 # Log tables

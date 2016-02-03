@@ -150,7 +150,7 @@ SHOW SESSION STATUS LIKE 'Select_scan';
 #
 --let log_file=percona_slow_query_log.query_plan_5
 --source include/log_start.inc
-SELECT COUNT(*) FROM t1;
+SELECT COUNT(*) FROM t1 GROUP BY a;
 --source include/log_stop.inc
 --let grep_pattern = ^#.*Full_scan: Yes.*\$
 --source include/log_grep.inc

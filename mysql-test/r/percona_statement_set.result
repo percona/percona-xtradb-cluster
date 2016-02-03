@@ -688,18 +688,20 @@ SELECT @@myisam_sort_buffer_size,
 '# Pre-STATEMENT variable value
 SELECT @@sql_mode;
 @@sql_mode
-NO_ENGINE_SUBSTITUTION
+ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 ''
 ''
 SET STATEMENT sql_mode='ansi' FOR SELECT * FROM t1;
 v1	v2
 1	2
 3	4
+Warnings:
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 ''
 '# Post-STATEMENT
 SELECT @@sql_mode;
 @@sql_mode
-NO_ENGINE_SUBSTITUTION
+ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 ''
 ''
 '#------------------Test 17-----------------------#'
@@ -825,7 +827,7 @@ ERROR 42000: You have an error in your SQL syntax; check the manual that corresp
 SET max_error_count=100 FOR INSERT INTO t1 VALUES (1,2);
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FOR INSERT INTO t1 VALUES (1,2)' at line 1
 SET STATEMENT GLOBAL max_error_count=100 FOR INSERT INTO t1 VALUES (1,2);
-ERROR HY000: Unknown system variable 'GLOBAL'
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'max_error_count=100 FOR INSERT INTO t1 VALUES (1,2)' at line 1
 SET STATEMENT @@global.max_error_count=100 FOR INSERT INTO t1 VALUES (1,2);
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@global.max_error_count=100 FOR INSERT INTO t1 VALUES (1,2)' at line 1
 ''
@@ -843,7 +845,7 @@ SET STATEMENT myisam_sort_buffer_size = 700000, sort_buffer_size = 3000000
 FOR SET STATEMENT myisam_sort_buffer_size=200000
 FOR SELECT @@myisam_sort_buffer_size, @@sort_buffer_size;
 @@myisam_sort_buffer_size	@@sort_buffer_size
-200000	3000000
+700000	3000000
 SELECT @@myisam_sort_buffer_size, @@sort_buffer_size;
 @@myisam_sort_buffer_size	@@sort_buffer_size
 500000	100000

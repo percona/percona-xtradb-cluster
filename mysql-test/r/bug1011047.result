@@ -2,6 +2,7 @@ show variables like 'userstat%';
 Variable_name	Value
 userstat	ON
 INSTALL PLUGIN example SONAME 'ha_example.so';
+# restart
 show variables like 'userstat%';
 Variable_name	Value
 userstat	ON

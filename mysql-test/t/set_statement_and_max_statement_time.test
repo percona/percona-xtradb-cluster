@@ -11,4 +11,4 @@
 --echo # Note that if SLEEP() is interrupted, it returns 1.
 --echo #
 
-SET STATEMENT max_statement_time = 10 FOR SELECT SLEEP(1000);
+SET STATEMENT max_execution_time = 10 FOR SELECT SLEEP(1000);

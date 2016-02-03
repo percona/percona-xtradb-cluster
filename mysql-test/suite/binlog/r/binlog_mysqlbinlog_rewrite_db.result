@@ -9,15 +9,7 @@ DELETE FROM t1 WHERE i=2;
 [Syntax error in the use of the new option: The from database name is missing]
 [Syntax error in the use of the new option: The '->' is missing]
 [Syntax error in the use of the new option: The to database name is missing]
-[VALID SYNTAX,The from->to database names are correctly mentioned, but there is obsolete syntax warning 1]
-[Test that warning about obsolete syntax is shown only once for --rewrite-db="db1->db2,db3->db4,db5->db6"]
-[log_grep.inc] file: mysqltest.log pattern: The comma-separated list of rewritings syntax is obsolete and discarded
-[log_grep.inc] lines:   1
-[VALID SYNTAX,The from->to database names are correctly mentioned, but there is obsolete syntax warning 2]
-[Test that warning about obsolete syntax is shown only once for --rewrite-db="db1->db2,db3->db4" --rewrite-db="db5->db6,db6->db7"]
-[log_grep.inc] file: mysqltest.log pattern: The comma-separated list of rewritings syntax is obsolete and discarded
-[log_grep.inc] lines:   2
-[VALID SYNTAX,The from->to database names are correctly mentioned]
+[VALID SYNTAX,The from->to database names is correctly mentioned]
 #Dropping the database db1 and creating the table in the new database db2.
 CREATE DATABASE db2;
 DROP DATABASE db1;

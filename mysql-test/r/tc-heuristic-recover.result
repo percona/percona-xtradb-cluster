@@ -16,9 +16,8 @@ SET SESSION debug="d,crash_commit_after_prepare";
 COMMIT;
 Got one of the listed errors
 Restarting with --tc-heuristic-recover=COMMIT
-2 should be present:
+2 should be absent due to COMMIT to ROLLBACK conversion:
 SELECT * FROM t1;
 a
 1
-2
 DROP TABLE t1;

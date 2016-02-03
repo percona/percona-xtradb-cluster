@@ -14,12 +14,11 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
-#include <mysql/plugin.h>
-#include <mysql/plugin_audit.h>
 #include <my_global.h>
 #include <my_sys.h>
+#include <mysql/plugin.h>
+#include <mysql/plugin_audit.h>
 #include <my_list.h>
-#include <my_pthread.h>
 #include <typelib.h>
 #include <limits.h>
 #include <string.h>
@@ -31,7 +30,14 @@ static volatile ulonglong busytime= 0;
 static volatile ulonglong totaltime= 0;
 static volatile ulonglong queries= 0;
 
+static PSI_memory_key key_memory_sm_thd_data;
+
 #ifdef HAVE_PSI_INTERFACE
+static PSI_memory_info all_scalability_metrics_memory[]=
+{
+  {&key_memory_sm_thd_data, "scalability_metrics_thd_data", 0}
+};
+
 PSI_mutex_key key_thd_list_mutex;
 #endif
 mysql_mutex_t thd_list_mutex;
@@ -63,7 +69,7 @@ static ulong sm_ctl= CTL_OFF;
 static
 MYSQL_THDVAR_ULONGLONG(thd_data,
   PLUGIN_VAR_READONLY | PLUGIN_VAR_NOSYSVAR | PLUGIN_VAR_NOCMDOPT,
-  "scalability metrics data", NULL, NULL, 0, 0, ULONGLONG_MAX, 0);
+  "scalability metrics data", NULL, NULL, 0, 0, ULLONG_MAX, 0);
 
 
 static MYSQL_SYSVAR_ENUM(
@@ -109,7 +115,8 @@ sm_thd_data_t *sm_thd_data_get(MYSQL_THD thd)
   sm_thd_data_t *thd_data = (sm_thd_data_t *) (intptr) THDVAR(thd, thd_data);
   if (unlikely(thd_data == NULL))
   {
-    thd_data= calloc(sizeof(sm_thd_data_t), 1);
+    thd_data= my_malloc(key_memory_sm_thd_data, sizeof(sm_thd_data_t),
+                        MYF(MY_WME | MY_ZEROFILL));
     mysql_mutex_lock(&thd_list_mutex);
     thd_data->backref= list_push(thd_list_root, thd_data);
     mysql_mutex_unlock(&thd_list_mutex);
@@ -185,6 +192,12 @@ void sm_ctl_update(MYSQL_THD thd __attribute__((unused)),
 static
 int sm_plugin_init(void *arg __attribute__((unused)))
 {
+#ifdef HAVE_PSI_INTERFACE
+  int count;
+  count= array_elements(all_scalability_metrics_memory);
+  mysql_memory_register("scalability_metrics", all_scalability_metrics_memory,
+                        count);
+#endif
   mysql_mutex_init(key_thd_list_mutex, &thd_list_mutex, MY_MUTEX_INIT_FAST);
 
   sm_reset();
@@ -333,7 +346,7 @@ int sm_totaltime(MYSQL_THD thd __attribute__((unused)),
 }
 
 
-static void sm_notify(MYSQL_THD thd, unsigned int event_class,
+static int sm_notify(MYSQL_THD thd, mysql_event_class_t event_class,
                       const void *event)
 {
 
@@ -344,30 +357,30 @@ static void sm_notify(MYSQL_THD thd, unsigned int event_class,
 
     if (sm_ctl != CTL_ON)
     {
-      return;
+      return 0;
     }
 
-    if (event_general->general_command &&
+    if (event_general->general_command.str &&
         event_general->event_subclass == MYSQL_AUDIT_GENERAL_LOG &&
-        strcmp(event_general->general_command, "Query") == 0)
+        strcmp(event_general->general_command.str, "Query") == 0)
     {
-      sm_query_started(thd, event_general->general_query);
+      sm_query_started(thd, event_general->general_query.str);
     }
-    else if (event_general->general_command &&
+    else if (event_general->general_command.str &&
         event_general->event_subclass == MYSQL_AUDIT_GENERAL_LOG &&
-        strcmp(event_general->general_command, "Execute") == 0)
+        strcmp(event_general->general_command.str, "Execute") == 0)
     {
-      sm_query_started(thd, event_general->general_query);
+      sm_query_started(thd, event_general->general_query.str);
     }
-    else if (event_general->general_query &&
+    else if (event_general->general_query.str &&
         event_general->event_subclass == MYSQL_AUDIT_GENERAL_RESULT)
     {
-      sm_query_finished(thd, event_general->general_query);
+      sm_query_finished(thd, event_general->general_query.str);
     }
-    else if (event_general->general_query &&
+    else if (event_general->general_query.str &&
         event_general->event_subclass == MYSQL_AUDIT_GENERAL_ERROR)
     {
-      sm_query_failed(thd, event_general->general_query,
+      sm_query_failed(thd, event_general->general_query.str,
                                 event_general->general_error_code);
     }
 
@@ -388,6 +401,7 @@ static void sm_notify(MYSQL_THD thd, unsigned int event_class,
       break;
     }
   }
+  return 0;
 }
 
 /*
@@ -405,11 +419,12 @@ static struct st_mysql_sys_var* scalability_metrics_system_variables[] =
 */
 static struct st_mysql_audit scalability_metrics_descriptor=
 {
-  MYSQL_AUDIT_INTERFACE_VERSION,                    /* interface version    */
-  NULL,                                             /* release_thd function */
-  sm_notify,                                        /* notify function      */
-  { MYSQL_AUDIT_GENERAL_CLASSMASK |
-    MYSQL_AUDIT_CONNECTION_CLASSMASK }              /* class mask           */
+  MYSQL_AUDIT_INTERFACE_VERSION,                /* interface version    */
+  NULL,                                         /* release_thd function */
+  sm_notify,                                    /* notify function      */
+  { MYSQL_AUDIT_GENERAL_ALL,
+    MYSQL_AUDIT_CONNECTION_ALL,
+    0, 0, 0, 0, 0, 0, 0, 0 }                    /* class mask           */
 };
 
 /*
@@ -418,12 +433,17 @@ static struct st_mysql_audit scalability_metrics_descriptor=
 
 static struct st_mysql_show_var simple_status[]=
 {
-  { "scalability_metrics_elapsedtime", (char *) &sm_elapsedtime, SHOW_FUNC },
-  { "scalability_metrics_queries", (char *) &sm_queries, SHOW_FUNC },
-  { "scalability_metrics_concurrency", (char *) &concurrency, SHOW_LONGLONG },
-  { "scalability_metrics_totaltime", (char *) &sm_totaltime, SHOW_FUNC },
-  { "scalability_metrics_busytime", (char *) &busytime, SHOW_LONGLONG },
-  { 0, 0, 0}
+  { "scalability_metrics_elapsedtime", (char *) &sm_elapsedtime, SHOW_FUNC,
+    SHOW_SCOPE_GLOBAL },
+  { "scalability_metrics_queries", (char *) &sm_queries, SHOW_FUNC,
+    SHOW_SCOPE_GLOBAL },
+  { "scalability_metrics_concurrency", (char *) &concurrency, SHOW_LONGLONG,
+    SHOW_SCOPE_GLOBAL },
+  { "scalability_metrics_totaltime", (char *) &sm_totaltime, SHOW_FUNC,
+    SHOW_SCOPE_GLOBAL },
+  { "scalability_metrics_busytime", (char *) &busytime, SHOW_LONGLONG,
+    SHOW_SCOPE_GLOBAL },
+  {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}
 };
 
 

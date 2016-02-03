@@ -3,13 +3,11 @@
 #               binary log disabled
 ###############################################################################
 
---source include/have_innodb.inc
---let $rpl_skip_reset_master_and_slave=1
 --source include/master-slave.inc
 
 CREATE TABLE t1 (
   a int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) DEFAULT CHARSET=latin1;
 
 sync_slave_with_master;
 

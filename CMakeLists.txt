@@ -13,11 +13,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-# Avoid warnings in higher versions
-if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}" GREATER 2.6)
- CMAKE_POLICY(VERSION 2.8)
-endif()
+IF(WIN32)
+  # CMake 2.8.12 is needed for Visual Studio 2013
+  CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
+ELSE()
+  # There's a bug in unzipping prior to 2.8.2
+  CMAKE_MINIMUM_REQUIRED(VERSION 2.8.2)
+ENDIF()
 
 # We use CMAKE_SHARED_LIBRARY_<Lang>_FLAGS. See cmake --help-policy CMP0018
 IF(CMAKE_VERSION VERSION_GREATER "2.8.8")
@@ -48,15 +50,13 @@ FIND_PACKAGE(Git)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
 # First, decide about build type (debug or release)
-# If custom compiler flags are set or cmake is invoked with -DCMAKE_BUILD_TYPE, 
-# respect user wishes and do not (re)define CMAKE_BUILD_TYPE. If WITH_DEBUG{_FULL} 
+# If cmake is invoked with -DCMAKE_BUILD_TYPE, 
+# respect user wishes and do not (re)define CMAKE_BUILD_TYPE. If WITH_DEBUG
 # is given, set CMAKE_BUILD_TYPE = Debug. Otherwise, use Relwithdebinfo.
-
 
 IF(DEFINED CMAKE_BUILD_TYPE)
   SET(HAVE_CMAKE_BUILD_TYPE TRUE)
 ENDIF()
-SET(CUSTOM_C_FLAGS $ENV{CFLAGS})
 
 OPTION(WITH_DEBUG "Use dbug/safemutex" OFF)
 
@@ -74,8 +74,20 @@ IF(NOT DEFINED MANUFACTURER)
   MARK_AS_ADVANCED(MANUFACTURER)
 ENDIF()
 
-#PAM build Handling
+
+# MAX_INDEXES - Set the maximum number of indexes per table, default 64U
+IF (NOT MAX_INDEXES)
+  SET(MAX_INDEXES 64U)
+ENDIF(NOT MAX_INDEXES)
+
+IF (${MAX_INDEXES} GREATER 255)
+  MESSAGE(FATAL_ERROR "MAX_INDEXES values greater than 255 is not supported!")
+ENDIF()
+MESSAGE(STATUS "Configuring with MAX_INDEXES = ${MAX_INDEXES}")
+
+# PAM build Handling
 OPTION(WITH_PAM "Build with Percona PAM plugin" OFF)
+
 # We choose to provide WITH_DEBUG as alias to standard CMAKE_BUILD_TYPE=Debug
 # which turns out to be not trivial, as this involves synchronization 
 # between CMAKE_BUILD_TYPE and WITH_DEBUG. Besides, we have to deal with cases
@@ -98,9 +110,7 @@ IF(WITH_DEBUG)
   ENDIF()
   SET(OLD_WITH_DEBUG 1 CACHE INTERNAL "" FORCE)
 ELSEIF(NOT HAVE_CMAKE_BUILD_TYPE OR OLD_WITH_DEBUG)
-  IF(CUSTOM_C_FLAGS)
-    SET(CMAKE_BUILD_TYPE "" CACHE STRING ${BUILDTYPE_DOCSTRING} FORCE)
-  ELSE(CMAKE_BUILD_TYPE MATCHES "Debug" OR NOT HAVE_CMAKE_BUILD_TYPE)
+  IF(CMAKE_BUILD_TYPE MATCHES "Debug" OR NOT HAVE_CMAKE_BUILD_TYPE)
     SET(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING 
        ${BUILDTYPE_DOCSTRING} FORCE)
   ENDIF()
@@ -120,10 +130,9 @@ ELSE()
 ENDIF()
 PROJECT(${MYSQL_PROJECT_NAME})
 
-# Maintainer mode is default on only for Linux debug builds using GCC/G++
+# Maintainer mode is default on only for debug builds using GCC/G++
 IF(CMAKE_BUILD_TYPE MATCHES "Debug" OR WITH_DEBUG)
-  IF(CMAKE_SYSTEM_NAME MATCHES "Linux" AND
-     CMAKE_COMPILER_IS_GNUCC AND CMAKE_COMPILER_IS_GNUCXX)
+  IF(CMAKE_COMPILER_IS_GNUCC AND CMAKE_COMPILER_IS_GNUCXX)
     SET(MYSQL_MAINTAINER_MODE ON CACHE BOOL
         "MySQL maintainer-specific development environment")
   ENDIF()
@@ -178,6 +187,7 @@ ENDIF()
 
 INCLUDE(CheckTypeSize)
 CHECK_TYPE_SIZE("void *" SIZEOF_VOIDP)
+MESSAGE(STATUS "SIZEOF_VOIDP ${SIZEOF_VOIDP}")
 IF(WITH_DEFAULT_COMPILER_OPTIONS)
   INCLUDE(${CMAKE_SOURCE_DIR}/cmake/build_configurations/compiler_options.cmake)
   ENDIF()
@@ -190,6 +200,7 @@ INCLUDE(wsrep)
 INCLUDE(character_sets)
 INCLUDE(cpu_info)
 INCLUDE(zlib)
+INCLUDE(lz4)
 INCLUDE(libevent)
 INCLUDE(ssl)
 INCLUDE(readline)
@@ -209,16 +220,18 @@ IF(DISABLE_SHARED)
 ENDIF()
 OPTION(ENABLED_PROFILING "Enable profiling" ON)
 OPTION(ENABLE_DTRACE "Include support for DTrace probes" OFF)
-OPTION(CYBOZU "" OFF)
-OPTION(BACKUP_TEST "" OFF)
 OPTION(WITHOUT_SERVER OFF)
 IF(UNIX)
   OPTION(WITH_VALGRIND "Valgrind instrumentation" OFF)
 ENDIF()
+IF(WIN32)
+  OPTION(WITH_MSCRT_DEBUG "MS Visual Studio Debug CRT instrumentation" OFF)
+ENDIF()
 IF(NOT WITHOUT_SERVER)
   OPTION (WITH_UNIT_TESTS "Compile MySQL with unit tests" ON)
 ENDIF()
-MARK_AS_ADVANCED(CYBOZU BACKUP_TEST WITHOUT_SERVER DISABLE_SHARED)
+OPTION(FORCE_UNSUPPORTED_COMPILER "Disable compiler version checks" OFF)
+MARK_AS_ADVANCED(WITHOUT_SERVER DISABLE_SHARED FORCE_UNSUPPORTED_COMPILER)
 
 
 include(CheckCSourceCompiles)
@@ -253,46 +266,57 @@ MACRO (MY_CHECK_CXX_COMPILER_FLAG FLAG RESULT)
   SET(CMAKE_REQUIRED_FLAGS "${SAVE_CMAKE_REQUIRED_FLAGS}")
 ENDMACRO()
 
-OPTION(WITH_ASAN "Enable address sanitizer" OFF)
-IF (WITH_ASAN)
-  # gcc 4.8.1 and new versions of clang
-  MY_CHECK_C_COMPILER_FLAG("-fsanitize=address" HAVE_C_FSANITIZE)
-  MY_CHECK_CXX_COMPILER_FLAG("-fsanitize=address" HAVE_CXX_FSANITIZE)
-
-  IF(HAVE_C_FSANITIZE AND HAVE_CXX_FSANITIZE)
+MACRO(MY_SANITIZER_CHECK SAN_OPT RESULT)
+  MY_CHECK_C_COMPILER_FLAG("${SAN_OPT}" C_RESULT)
+  MY_CHECK_CXX_COMPILER_FLAG("${SAN_OPT}" CXX_RESULT)
+  IF(C_RESULT AND CXX_RESULT)
     # We switch on basic optimization also for debug builds.
     # With optimization we may get some warnings, so we switch off -Werror
     SET(CMAKE_C_FLAGS_DEBUG
-      "${CMAKE_C_FLAGS_DEBUG} -fsanitize=address -O1 -Wno-error -fPIC")
+      "${CMAKE_C_FLAGS_DEBUG} ${SAN_OPT} -O1 -Wno-error -fPIC")
     SET(CMAKE_C_FLAGS_RELWITHDEBINFO
-      "${CMAKE_C_FLAGS_RELWITHDEBINFO} -fsanitize=address -fPIC")
+      "${CMAKE_C_FLAGS_RELWITHDEBINFO} ${SAN_OPT} -fPIC")
     SET(CMAKE_CXX_FLAGS_DEBUG
-      "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -O1 -Wno-error -fPIC")
+      "${CMAKE_CXX_FLAGS_DEBUG} ${SAN_OPT} -O1 -Wno-error -fPIC")
     SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-      "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -fsanitize=address -fPIC")
-    SET(WITH_ASAN_OK 1)
+      "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${SAN_OPT} -fPIC")
+    SET(${RESULT} 1)
   ELSE()
-    # older versions of clang
-    MY_CHECK_C_COMPILER_FLAG("-faddress-sanitizer" HAVE_C_FADDRESS)
-    MY_CHECK_CXX_COMPILER_FLAG("-faddress-sanitizer" HAVE_CXX_FFADDRESS)
-
-    IF(HAVE_C_FADDRESS AND HAVE_CXX_FFADDRESS)
-      # We switch on basic optimization also for debug builds.
-      SET(CMAKE_C_FLAGS_DEBUG
-        "${CMAKE_C_FLAGS_DEBUG} -faddress-sanitizer -O1 -fPIC")
-      SET(CMAKE_C_FLAGS_RELWITHDEBINFO
-        "${CMAKE_C_FLAGS_RELWITHDEBINFO} -faddress-sanitizer -fPIC")
-      SET(CMAKE_CXX_FLAGS_DEBUG
-        "${CMAKE_CXX_FLAGS_DEBUG} -faddress-sanitizer -O1 -fPIC")
-      SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO
-        "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -faddress-sanitizer -fPIC")
-      SET(WITH_ASAN_OK 1)
-    ENDIF()
+    SET(${RESULT} 0)
   ENDIF()
+ENDMACRO()
 
-  IF(NOT WITH_ASAN_OK)
+OPTION(WITH_ASAN "Enable address sanitizer" OFF)
+IF(WITH_ASAN)
+  MY_SANITIZER_CHECK("-fsanitize=address" WITH_ASAN_OK)
+  IF(WITH_ASAN_OK)
+    SET(HAVE_ASAN 1)
+  ELSE()
     MESSAGE(FATAL_ERROR "Do not know how to enable address sanitizer")
   ENDIF()
+ENDIF()
+
+OPTION(WITH_MSAN "Enable memory sanitizer" OFF)
+IF(WITH_MSAN)
+  MY_SANITIZER_CHECK("-fsanitize=memory -fsanitize-memory-track-origins"
+                     WITH_MSAN_OK)
+  IF(NOT WITH_MSAN_OK)
+    MESSAGE(FATAL_ERROR "Do not know how to enable memory sanitizer")
+  ENDIF()
+ENDIF()
+
+OPTION(WITH_UBSAN "Enable undefined behavior sanitizer" OFF)
+IF(WITH_UBSAN)
+  MY_SANITIZER_CHECK("-fsanitize=undefined" WITH_UBSAN_OK)
+  IF(NOT WITH_UBSAN_OK)
+    MESSAGE(FATAL_ERROR
+            "Do not know how to enable undefined behavior sanitizer")
+  ENDIF()
+ENDIF()
+
+IF(WITH_ASAN AND WITH_MSAN)
+  MESSAGE(FATAL_ERROR
+          "Cannot use AddressSanitizer and MemorySanitizer together")
 ENDIF()
 
 
@@ -325,16 +349,14 @@ IF (ENABLE_GPROF AND NOT WIN32 AND NOT APPLE)
 ENDIF()
 
 OPTION(ENABLED_LOCAL_INFILE
- "If we should should enable LOAD DATA LOCAL by default" ${IF_WIN})
+ "If we should enable LOAD DATA LOCAL by default" ${IF_WIN})
 MARK_AS_ADVANCED(ENABLED_LOCAL_INFILE)
-
-OPTION(WITH_FAST_MUTEXES "Compile with fast mutexes" OFF)
-MARK_AS_ADVANCED(WITH_FAST_MUTEXES)
 
 OPTION(OPTIMIZER_TRACE "Support tracing of Optimizer" ON)
 
-OPTION(INNODB_COMPILER_HINTS "Compile InnoDB with compiler hints" ON)
-MARK_AS_ADVANCED(INNODB_COMPILER_HINTS)
+#
+# Options related to client-side protocol tracing
+#
 
 OPTION(WITH_INNODB_DISALLOW_WRITES "InnoDB freeze writes patch from Google" ${WITH_WSREP})
 IF (WITH_INNODB_DISALLOW_WRITES)
@@ -342,20 +364,23 @@ IF (WITH_INNODB_DISALLOW_WRITES)
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INNODB_DISALLOW_WRITES")
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWITH_INNODB_DISALLOW_WRITES")
 ENDIF()
-OPTION(INNODB_PAGE_ATOMIC_REF_COUNT "Use atomics for the page reference count"
-       ON)
-MARK_AS_ADVANCED(INNODB_PAGE_ATOMIC_REF_COUNT)
 
-IF (NOT MAX_INDEXES)
-  SET(MAX_INDEXES 64)
+OPTION(WITH_CLIENT_PROTOCOL_TRACING
+  "Support for client-side protocol tracing plugins" ON)
+OPTION(WITH_TEST_TRACE_PLUGIN
+  "Have a built-in test protocol trace plugin in libmysql (requires WITH_CLIENT_PROTOCOL_TRACING option)" OFF)
+
+# Sanity checks for protocol tracing options
+
+IF(WITH_TEST_TRACE_PLUGIN AND NOT WITH_CLIENT_PROTOCOL_TRACING)
+MESSAGE("WARNING: Test trace plugin was selected but client protocol tracing infrastructure is not enabled - ignoring")
+SET(WITH_TEST_TRACE_PLUGIN 0)
 ENDIF()
-SET(MAX_INDEXES ${MAX_INDEXES} CACHE STRING "Sets the maximum number of indexes per table, default 64")
 
-OPTION(WITH_INNODB_DISALLOW_WRITES "InnoDB freeze writes patch from Google" ${WITH_WSREP})
-IF (WITH_INNODB_DISALLOW_WRITES)
-  MESSAGE(STATUS "INNODB_DISALLOW_WRITES")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INNODB_DISALLOW_WRITES")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWITH_INNODB_DISALLOW_WRITES")
+IF(WITH_TEST_TRACE_PLUGIN AND NOT CMAKE_BUILD_TYPE MATCHES "Debug")
+  MESSAGE(SEND_ERROR 
+          "Test trace plugin was selected but it can be included only in debug binaries.
+          Set WITH_TEST_TRACE_PLUGIN to OFF or WITH_DEBUG to ON.")
 ENDIF()
 
 # Set DBUG_OFF and other optional release-only flags for non-debug project types
@@ -363,10 +388,6 @@ FOREACH(BUILD_TYPE RELEASE RELWITHDEBINFO MINSIZEREL)
   FOREACH(LANG C CXX)
     SET(CMAKE_${LANG}_FLAGS_${BUILD_TYPE} 
      "${CMAKE_${LANG}_FLAGS_${BUILD_TYPE}} -DDBUG_OFF")
-    IF(WITH_FAST_MUTEXES)
-      SET(CMAKE_${LANG}_FLAGS_${BUILD_TYPE} 
-        "${CMAKE_${LANG}_FLAGS_${BUILD_TYPE}} -DMY_PTHREAD_FASTMUTEX=1")
-    ENDIF()
   ENDFOREACH()
 ENDFOREACH()
 
@@ -375,16 +396,12 @@ IF(NOT CMAKE_BUILD_TYPE
     AND NOT CMAKE_GENERATOR MATCHES "Xcode") 
     # This is the case of no CMAKE_BUILD_TYPE choosen, typical for VS and Xcode
     # or if custom C flags are set. In VS and Xcode for non-Debug configurations 
-    # DBUG_OFF is already correctly set. Use DBUG_OFF for Makefile based projects 
-    # without build type too, unless user specifically requests DBUG. 
-    IF(NOT CMAKE_C_FLAGS MATCHES "-DDBUG_ON")
-      ADD_DEFINITIONS(-DDBUG_OFF)
-    ENDIF()
+    # DBUG_OFF is already correctly set.
+    ADD_DEFINITIONS(-DDBUG_OFF)
 ENDIF()
 
-# Add safemutex for debug configurations, except on Windows
-# (safemutex has never worked on Windows)
-IF(WITH_DEBUG AND NOT WIN32 AND NOT WITH_INNODB_MEMCACHED)
+# Add safemutex for debug configurations
+IF(NOT WITH_INNODB_MEMCACHED)
   FOREACH(LANG C CXX)
       SET(CMAKE_${LANG}_FLAGS_DEBUG
           "${CMAKE_${LANG}_FLAGS_DEBUG} -DSAFE_MUTEX")
@@ -413,9 +430,15 @@ IF(SYSCONFDIR)
   SET(DEFAULT_SYSCONFDIR "${SYSCONFDIR}")
 ENDIF()
 
-SET(TMPDIR "P_tmpdir"
-  CACHE PATH
-  "PATH to MySQL TMP dir. Defaults to the P_tmpdir macro in <stdio.h>")
+IF(WIN32) # P_tmpdir is not defined on Windows as of VS2015.
+  SET(TMPDIR "" # So we use empty path as default. In practice TMP/TEMP is used
+    CACHE PATH
+    "PATH to MySQL TMP dir")
+ELSE()
+  SET(TMPDIR "P_tmpdir"
+    CACHE PATH
+    "PATH to MySQL TMP dir. Defaults to the P_tmpdir macro in <stdio.h>")
+ENDIF()
 IF(TMPDIR STREQUAL "P_tmpdir")
   # Do not quote it, to refer to the P_tmpdir macro.
   SET(DEFAULT_TMPDIR "P_tmpdir")
@@ -424,13 +447,29 @@ ELSE()
   SET(DEFAULT_TMPDIR "\"${TMPDIR}\"")
 ENDIF()
 
+INCLUDE(cmake/boost.cmake)
+
+IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
+  OPTION(WITH_SYSTEMD "Enable installation of systemd support files" OFF)
+  IF (WITH_SYSTEMD)
+    INCLUDE(cmake/systemd.cmake)
+  ENDIF()
+ELSE()
+  IF (WITH_SYSTEMD)
+    MESSAGE(FATAL_ERROR "Installation of systemd support files not supported")
+  ENDIF()
+ENDIF()
+
 # Run platform tests
 INCLUDE(configure.cmake)
 
 # Common defines and includes
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/include)
-
+INCLUDE_DIRECTORIES(
+  ${CMAKE_CURRENT_BINARY_DIR}/include
+  ${CMAKE_SOURCE_DIR}/extra/rapidjson/include
+  ${CMAKE_CURRENT_BINARY_DIR}/libbinlogevents/include
+  ${CMAKE_SOURCE_DIR}/libbinlogevents/export)
 # Add bundled or system zlib.
 MYSQL_CHECK_ZLIB_WITH_COMPRESS()
 # Add bundled yassl/taocrypt or system openssl.
@@ -439,13 +478,62 @@ MYSQL_CHECK_SSL()
 MYSQL_CHECK_EDITLINE()
 # Add libevent
 MYSQL_CHECK_LIBEVENT()
+# Add lz4 library
+MYSQL_CHECK_LZ4()
+
+# Check for SYS_thread_selfid system call
+CHECK_C_SOURCE_COMPILES("
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+int main(int ac, char **av)
+{
+  unsigned long long tid = syscall(SYS_thread_selfid);
+  return (tid != 0 ? 0 : 1);
+}"
+HAVE_SYS_THREAD_SELFID)
+
+# Check for gettid() system call
+CHECK_C_SOURCE_COMPILES("
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+int main(int ac, char **av)
+{
+  unsigned long long tid = syscall(SYS_gettid);
+  return (tid != 0 ? 0 : 1);
+}"
+HAVE_SYS_GETTID)
+
+# Check for pthread_getthreadid_np()
+CHECK_C_SOURCE_COMPILES("
+#include <pthread_np.h>
+int main(int ac, char **av)
+{
+  unsigned long long tid = pthread_getthreadid_np();
+  return (tid != 0 ? 0 : 1);
+}"
+HAVE_PTHREAD_GETTHREADID_NP)
+
+# Check for pthread_self() returning an integer type
+CHECK_C_SOURCE_COMPILES("
+#include <sys/types.h>
+#include <pthread.h>
+int main(int ac, char **av)
+{
+  unsigned long long tid = pthread_self();
+  return (tid != 0 ? 0 : 1);
+}"
+HAVE_INTEGER_PTHREAD_SELF
+FAIL_REGEX "warning: incompatible pointer to integer conversion"
+)
 
 #
 # Setup maintainer mode options by the end. Platform checks are
 # not run with the warning options as to not perturb fragile checks
 # (i.e. do not make warnings into errors).
 #
-# Why doesn't these flags affect the entire build?
+# Why don't these flags affect the entire build?
 # Because things may already have been included with ADD_SUBDIRECTORY
 #
 OPTION(MYSQL_MAINTAINER_MODE
@@ -459,6 +547,7 @@ ENDIF()
 
 IF(NOT WITHOUT_SERVER)
   SET (MYSQLD_STATIC_PLUGIN_LIBS "" CACHE INTERNAL "")
+  SET (MYSQLD_STATIC_EMBEDDED_PLUGIN_LIBS "" CACHE INTERNAL "")
   # Add storage engines and plugins.
   CONFIGURE_PLUGINS()
 ELSE()
@@ -474,6 +563,8 @@ ADD_SUBDIRECTORY(regex)
 ADD_SUBDIRECTORY(mysys)
 ADD_SUBDIRECTORY(mysys_ssl)
 ADD_SUBDIRECTORY(libmysql)
+ADD_SUBDIRECTORY(libbinlogevents)
+ADD_SUBDIRECTORY(libbinlogstandalone)
 IF(WITH_WSREP)
 ADD_SUBDIRECTORY(wsrep)
 ENDIF()
@@ -504,7 +595,7 @@ IF(UNIX)
 ENDIF()
 
 IF(NOT WITHOUT_SERVER)
-  ADD_SUBDIRECTORY(tests)
+  ADD_SUBDIRECTORY(testclients)
   ADD_SUBDIRECTORY(sql)
   OPTION (WITH_EMBEDDED_SERVER "Compile MySQL with embedded server" OFF)
   IF(WITH_EMBEDDED_SERVER) 
@@ -521,7 +612,6 @@ IF(NOT WITHOUT_SERVER)
   ADD_SUBDIRECTORY(mysql-test)
   ADD_SUBDIRECTORY(mysql-test/lib/My/SafeProcess)
   ADD_SUBDIRECTORY(support-files)
-  ADD_SUBDIRECTORY(sql-bench)
   IF(EXISTS ${CMAKE_SOURCE_DIR}/internal/CMakeLists.txt)
     ADD_SUBDIRECTORY(internal)
   ENDIF()
@@ -569,10 +659,6 @@ ENDIF()
 ADD_SUBDIRECTORY(packaging/WiX)
 ADD_SUBDIRECTORY(packaging/solaris)
 
-# Create a single package with "make package"
-# (see http://public.kitware.com/Bug/view.php?id=11452)
-SET(CPACK_MONOLITHIC_INSTALL 1 CACHE INTERNAL "")
-
 IF(UNIX)
   INSTALL(FILES Docs/mysql.info DESTINATION ${INSTALL_INFODIR} OPTIONAL COMPONENT Info)
 ENDIF()
@@ -587,6 +673,7 @@ IF(NOT INSTALL_LAYOUT MATCHES "RPM")
   )
   INSTALL(FILES README.MySQL DESTINATION ${INSTALL_DOCREADMEDIR} COMPONENT Readme)
   INSTALL(FILES ${CMAKE_BINARY_DIR}/Docs/INFO_SRC ${CMAKE_BINARY_DIR}/Docs/INFO_BIN DESTINATION ${INSTALL_DOCDIR})
+
   IF(UNIX)
     INSTALL(FILES Docs/INSTALL-BINARY Docs/README-wsrep DESTINATION ${INSTALL_DOCREADMEDIR} COMPONENT Readme)
   ENDIF()

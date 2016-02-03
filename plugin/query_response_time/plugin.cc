@@ -20,6 +20,7 @@
 #include <mysql/plugin_audit.h>
 #include <sp_instr.h>
 #include <sql_parse.h>
+#include <sql_prepare.h>
 #include "query_response_time.h"
 
 
@@ -121,9 +122,9 @@ static int query_response_time_info_deinit(void *arg __attribute__((unused)))
 static struct st_mysql_information_schema query_response_time_info_descriptor=
 { MYSQL_INFORMATION_SCHEMA_INTERFACE_VERSION };
 
-static void query_response_time_audit_notify(MYSQL_THD thd,
-                                             unsigned int event_class,
-                                             const void *event)
+static int query_response_time_audit_notify(MYSQL_THD thd,
+                                            mysql_event_class_t event_class,
+                                            const void *event)
 {
   const struct mysql_event_general *event_general=
     (const struct mysql_event_general *) event;
@@ -149,7 +150,7 @@ static void query_response_time_audit_notify(MYSQL_THD thd,
       thd->lex->sql_command;
     if (sql_command == SQLCOM_EXECUTE)
     {
-      const LEX_STRING *name=
+      const LEX_CSTRING *name=
         (
           thd->sp_runtime_ctx &&
           thd->stmt_arena &&
@@ -159,8 +160,7 @@ static void query_response_time_audit_notify(MYSQL_THD thd,
         ((sp_lex_instr *)thd->stmt_arena)->get_prepared_stmt_name()     :
         /* otherwise */
         &thd->lex->prepared_stmt_name;
-      Statement *stmt=
-        (Statement *)thd->stmt_map.find_by_name(name);
+      Prepared_statement *stmt= thd->stmt_map.find_by_name(*name);
       sql_command= stmt->lex->sql_command;
     }
     QUERY_TYPE query_type=
@@ -169,7 +169,7 @@ static void query_response_time_audit_notify(MYSQL_THD thd,
     if (THDVAR(thd, exec_time_debug)) {
       ulonglong t = THDVAR(thd, exec_time_debug);
       if ((thd->lex->sql_command == SQLCOM_SET_OPTION) ||
-          (thd->lex->spname && thd->stmt_arena &&
+          (thd->lex->spname && thd->stmt_arena && thd->sp_runtime_ctx &&
               ((sp_lex_instr *)thd->stmt_arena)->get_command() ==
               SQLCOM_SET_OPTION )) {
           t = 0;
@@ -182,13 +182,14 @@ static void query_response_time_audit_notify(MYSQL_THD thd,
                                   thd->utime_after_query -
                                   thd->utime_after_lock);
   }
+  return 0;
 }
 
 
 static struct st_mysql_audit query_response_time_audit_descriptor=
 {
   MYSQL_AUDIT_INTERFACE_VERSION, NULL, query_response_time_audit_notify,
-  { (unsigned long) MYSQL_AUDIT_GENERAL_CLASSMASK }
+  { MYSQL_AUDIT_GENERAL_ALL, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
 

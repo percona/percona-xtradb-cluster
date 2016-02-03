@@ -54,9 +54,7 @@ SELECT a FROM x ORDER BY a;
 
 # Kill the slave to trigger binlog position recovery from
 # "prepare" point on the next startup
--- exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
--- shutdown_server 0
--- source include/wait_until_disconnected.inc
+--source include/kill_mysqld.inc
 
 --let $rpl_server_number= 2
 --let $rpl_server_parameters= --log-slave-updates=FALSE

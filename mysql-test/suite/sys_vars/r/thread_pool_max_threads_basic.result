@@ -13,9 +13,13 @@ thread_pool_max_threads	100000
 select * from information_schema.global_variables where variable_name='thread_pool_max_threads';
 VARIABLE_NAME	VARIABLE_VALUE
 THREAD_POOL_MAX_THREADS	100000
+Warnings:
+Warning	1287	'INFORMATION_SCHEMA.GLOBAL_VARIABLES' is deprecated and will be removed in a future release. Please use performance_schema.global_variables instead
 select * from information_schema.session_variables where variable_name='thread_pool_max_threads';
 VARIABLE_NAME	VARIABLE_VALUE
 THREAD_POOL_MAX_THREADS	100000
+Warnings:
+Warning	1287	'INFORMATION_SCHEMA.SESSION_VARIABLES' is deprecated and will be removed in a future release. Please use performance_schema.session_variables instead
 set global thread_pool_max_threads=1;
 select @@global.thread_pool_max_threads;
 @@global.thread_pool_max_threads

@@ -149,4 +149,120 @@ a
 6
 7
 8
+# Test cloning the same transaction twice
+START TRANSACTION WITH CONSISTENT SNAPSHOT;
+# connection con2
+INSERT INTO t1 VALUES(9);
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id;
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+# connection con1
+INSERT INTO t1 VALUES(10);
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id;
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+COMMIT;
+# connection con2
+COMMIT;
+# Test cascading cloning with RO/RW transactions
+# RO (con3) -> RW (con2) -> con1
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id;
+INSERT INTO t1 VALUES (11);
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+# connection con1
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con2_id;
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+COMMIT;
+# RW (con3) -> RW (con2) -> con1
+# connection con3
+INSERT INTO t1 VALUES (12);
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+12
+# connection con2
+COMMIT;
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id;
+INSERT INTO t1 VALUES (13);
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+12
+# connection con1
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con2_id;
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+12
+COMMIT;
+# RW (con3) -> RO (con2) -> con1
+# connection con2
+COMMIT;
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id;
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+12
+# connection con1
+START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con2_id;
+SELECT * FROM t1;
+a
+1
+2
+3
+4
+5
+6
+12
+COMMIT;
+# connection con3
+COMMIT;
+# connection con2
+COMMIT;
 DROP TABLE t1;

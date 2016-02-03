@@ -28,6 +28,18 @@
 #ifdef FIONREAD_IN_SYS_FILIO
 # include <sys/filio.h>
 #endif
+#ifndef _WIN32
+# include <netinet/tcp.h>
+#endif
+#ifdef HAVE_POLL_H
+# include <poll.h>
+#endif
+#ifdef HAVE_SYS_IOCTL_H
+# include <sys/ioctl.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+# include <arpa/inet.h>
+#endif
 
 /* Network io wait callbacks  for threadpool */
 static void (*before_io_wait)(void)= 0;
@@ -408,7 +420,7 @@ int vio_fastsend(Vio * vio __attribute__((unused)))
 #endif                                    /* IPTOS_THROUGHPUT */
   if (!r)
   {
-#ifdef __WIN__
+#ifdef _WIN32
     BOOL nodelay= 1;
 #else
     int nodelay = 1;
@@ -487,8 +499,11 @@ int vio_shutdown(Vio * vio, int how)
 
   r= vio_cancel(vio, how);
 
-  if (mysql_socket_close(vio->mysql_socket))
-    r= -1;
+  if (vio->inactive == FALSE)
+  {
+    if (mysql_socket_close(vio->mysql_socket))
+      r= -1;
+  }
 
   if (r)
   {
@@ -573,9 +588,9 @@ my_socket vio_fd(Vio* vio)
   @param dst_length [out] actual length of the normalized IP address.
 */
 static void vio_get_normalized_ip(const struct sockaddr *src,
-                                  int src_length,
+                                  size_t src_length,
                                   struct sockaddr *dst,
-                                  int *dst_length)
+                                  size_t *dst_length)
 {
   switch (src->sa_family) {
   case AF_INET:
@@ -649,13 +664,13 @@ static void vio_get_normalized_ip(const struct sockaddr *src,
 */
 
 my_bool vio_get_normalized_ip_string(const struct sockaddr *addr,
-                                     int addr_length,
+                                     size_t addr_length,
                                      char *ip_string,
                                      size_t ip_string_size)
 {
   struct sockaddr_storage norm_addr_storage;
   struct sockaddr *norm_addr= (struct sockaddr *) &norm_addr_storage;
-  int norm_addr_length;
+  size_t norm_addr_length;
   int err_code;
 
   vio_get_normalized_ip(addr, addr_length, norm_addr, &norm_addr_length);
@@ -680,7 +695,7 @@ void vio_proxy_protocol_add(const struct st_vio_network *net)
   is not particularly efficient, but this is done once per server startup with
   relatively few allowed networks. */
   vio_pp_networks_nb++;
-  vio_pp_networks= my_realloc(vio_pp_networks,
+  vio_pp_networks= my_realloc(key_memory_vio_proxy_networks, vio_pp_networks,
                               vio_pp_networks_nb * sizeof(*net),
                               MYF(MY_ALLOW_ZERO_PTR | MY_FAE | MY_WME));
   memcpy(&vio_pp_networks[vio_pp_networks_nb - 1], net, sizeof(*net));
@@ -722,7 +737,7 @@ static my_bool vio_client_must_be_proxied(const struct sockaddr *addr)
 
 /* Process the proxy protocol header. Return true on an error. */
 static my_bool vio_process_proxy_header(int socket_fd, struct sockaddr *addr,
-                                        size_socket *addr_length)
+                                        socket_len_t *addr_length)
 {
   /* The ip source network matches an expected proxy protocol network. */
   static const char v2sig[12]=
@@ -959,7 +974,7 @@ my_bool vio_peer_addr(Vio *vio, char *ip_buffer, uint16 *port,
 
     /* Initialize ip_buffer and port. */
 
-    strmov(ip_buffer, "127.0.0.1");
+    my_stpcpy(ip_buffer, "127.0.0.1");
     *port= 0;
   }
   else
@@ -969,7 +984,7 @@ my_bool vio_peer_addr(Vio *vio, char *ip_buffer, uint16 *port,
 
     struct sockaddr_storage addr_storage;
     struct sockaddr *addr= (struct sockaddr *) &addr_storage;
-    size_socket addr_length= sizeof (addr_storage);
+    socket_len_t addr_length= sizeof (addr_storage);
 
     /* Get sockaddr by socked fd. */
 
@@ -1100,7 +1115,9 @@ static my_bool socket_peek_read(Vio *vio, uint *bytes)
 int vio_io_wait(Vio *vio, enum enum_vio_io_event event, int timeout)
 {
   int ret;
-  short revents __attribute__((unused)) = 0;
+#ifndef DBUG_OFF
+  short revents= 0;
+#endif
   struct pollfd pfd;
   my_socket sd= mysql_socket_getfd(vio->mysql_socket);
   MYSQL_SOCKET_WAIT_VARIABLES(locker, state) /* no ';' */
@@ -1118,12 +1135,16 @@ int vio_io_wait(Vio *vio, enum enum_vio_io_event event, int timeout)
   {
   case VIO_IO_EVENT_READ:
     pfd.events= MY_POLL_SET_IN;
+#ifndef DBUG_OFF
     revents= MY_POLL_SET_IN | MY_POLL_SET_ERR | POLLRDHUP;
+#endif
     break;
   case VIO_IO_EVENT_WRITE:
   case VIO_IO_EVENT_CONNECT:
     pfd.events= MY_POLL_SET_OUT;
+#ifndef DBUG_OFF
     revents= MY_POLL_SET_OUT | MY_POLL_SET_ERR;
+#endif
     break;
   }
 
@@ -1171,6 +1192,11 @@ int vio_io_wait(Vio *vio, enum enum_vio_io_event event, int timeout)
   if (fd == INVALID_SOCKET)
     DBUG_RETURN(-1);
 
+#ifdef __APPLE__
+  if (fd >= FD_SETSIZE)
+    DBUG_RETURN(-1);
+#endif
+
   /* Convert the timeout, in milliseconds, to seconds and microseconds. */
   if (timeout >= 0)
   {
@@ -1202,7 +1228,7 @@ int vio_io_wait(Vio *vio, enum enum_vio_io_event event, int timeout)
                     PSI_SOCKET_SELECT, timeout);
 
   /* The first argument is ignored on Windows. */
-  ret= select(fd + 1, &readfds, &writefds, &exceptfds, 
+  ret= select((int)(fd + 1), &readfds, &writefds, &exceptfds, 
               (timeout >= 0) ? &tm : NULL);
 
   END_SOCKET_WAIT(locker, timeout);

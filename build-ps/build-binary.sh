@@ -38,6 +38,8 @@ COPYGALERA=0
 # suffix to add in case of debug build to tar.gz.
 DEBUG_EXTNAME=''
 
+WITH_MECAB_OPTION=''
+
 # build with ssl. configuration related to ssl.
 WITH_SSL='/usr'
 WITH_SSL_TYPE='system'
@@ -54,11 +56,10 @@ TAG=''
 # cmake build option to preset. based on configuration default options are used.
 CMAKE_BUILD_TYPE='RelWithDebInfo'
 COMMON_FLAGS=''
-
-# tokudb backup version [IGNORED]
-TOKUDB_BACKUP_VERSION='@@TOKUDB_BACKUP_VERSION@@'
-
-# build related utilities
+#
+TOKUDB_BACKUP_VERSION=''
+#
+# Some programs that may be overriden
 TAR=${TAR:-tar}
 SCONS_ARGS=${SCONS_ARGS:-""}
 
@@ -110,6 +111,11 @@ do
     -j | --with-jemalloc )
         shift
         WITH_JEMALLOC="$1"
+        shift
+        ;;
+    -m | --with-mecab )
+        shift
+        WITH_MECAB_OPTION="-DWITH_MECAB=$1"
         shift
         ;;
     --with-yassl )
@@ -175,7 +181,6 @@ then
         echo >&2 "$TARGETDIR is not a directory"
         exit 1
     fi
-
 else
     echo >&2 "Usage: $0 [target dir]"
     exit 1
@@ -236,6 +241,7 @@ WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f2
 if [[ $COPYGALERA -eq 0 ]];then
     GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
 fi
+TOKUDB_BACKUP_VERSION="${MYSQL_VERSION}${MYSQL_VERSION_EXTRA}"
 
 RELEASE_TAG=''
 PRODUCT_NAME="Percona-XtraDB-Cluster-$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
@@ -300,7 +306,6 @@ then
     fi
 
     JEMALLOCDIR="$(cd "$WITH_JEMALLOC"; pwd)"
-
 fi
 
 #-------------------------------------------------------------------------------
@@ -373,7 +378,9 @@ fi
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
-            $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+            -DDOWNLOAD_BOOST=1 \
+            -DWITH_BOOST="$TARGETDIR/libboost" \
+            $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         make $MAKE_JFLAG $QUIET
         make install
@@ -398,7 +405,9 @@ fi
             -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
-            $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
+            -DDOWNLOAD_BOOST=1 \
+            -DWITH_BOOST="$TARGETDIR/libboost" \
+            $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         make $MAKE_JFLAG $QUIET
         make install
@@ -435,5 +444,8 @@ fi
 
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 ) || exit 1
+
+rm -rf $TARGETDIR/boost
+rm -rf $TARGETDIR/bld
 
 echo "Build Complete"

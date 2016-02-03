@@ -1,232 +1,179 @@
-# Test of the SUPER_READ_ONLY modification to the READ_ONLY global variable:
-# check that it blocks updates even with SUPER privs
+############## mysql-test\t\super_read_only_basic.test ########################
+#                                                                             #
+# Variable Name: super_read_only                                              #
+# Scope: GLOBAL                                                               #
+# Access Type: Dynamic                                                        #
+# Data Type: BOOLEAN                                                          #
+# Default Value: OFF                                                          #
+#Values:      ON, OFF                                                         #
+#                                                                             #
+#                                                                             #
+# Creation Date: 2015-05-20                                                   #
+# Author:  Todd Farmer                                                        #
+#                                                                             #
+# Description: Test Cases of Dynamic System Variable super_read_only          #
+#              that checks the behavior of this variable in the following ways#
+#              * Default Value                                                #
+#              * Valid & Invalid values                                       #
+#              * Scope & Access method                                        #
+#              * Data Integrity                                               #
+#                                                                             #
+# Reference: http://dev.mysql.com/doc/refman/5.7/en/                          #
+#  server-system-variables.html                                               #
+#                                                                             #
+###############################################################################
 
-# should work with embedded server after mysqltest is fixed
---source include/not_embedded.inc
-
-
---echo #
---echo # Setup
---echo #
-
---echo # Save original value
-set @start_read_only= @@global.read_only;
-set @start_super_read_only= @@global.super_read_only;
-
-grant CREATE, SELECT, DROP on *.* to test@localhost;
-
---echo # connect (con1,localhost,test,,test);
-connect (con1,localhost,test,,test);
-
---echo # connection default;
-connection default;
-
-
---echo #
---echo # Test combinations of settings and changes
---echo #
-
---echo # ro,sro: 0,0: set ro->0: 0,0
-set global read_only=0;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-
---echo # ro,sro: 0,0: set ro->1: 1,0
-set global read_only=0;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
-
---echo # ro,sro: 0,0: set sro->0: 0,0
-set global read_only=0;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-
---echo # ro,sro: 0,0: set sro->1: 1,1
-set global read_only=0;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global super_read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
-
-# We don't care about 0,1 - since all this ensures it can't happen.
-
---echo # ro,sro: 1,0: set ro->0: 0,0
-set global read_only=1;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-
---echo # ro,sro: 1,0: set ro->1: 1,0
-set global read_only=1;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
-
---echo # ro,sro: 1,0: set sro->0: 1,0
-set global read_only=1;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-
---echo # ro,sro: 1,0: set sro->1: 1,1
-set global read_only=1;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
-set global super_read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
+--source include/load_sysvars.inc
 
 
---echo # ro,sro: 1,1: set ro->0: 0,0
-set global read_only=1;
-set global super_read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
-set global read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
+######################################################################
+#                    START OF super_read_only TESTS                  #
+######################################################################
 
---echo # ro,sro: 1,1: set ro->1: 1,1
-set global read_only=1;
-set global super_read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
-set global read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
 
---echo # ro,sro: 1,1: set sro->0: 1,0
-set global read_only=1;
-set global super_read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
-set global super_read_only=0;
-select @@global.read_only;
-select @@global.super_read_only;
+################################################################
+# Saving initial values of super_read_only and read_only       #
+# variables in a temporary variable                            #
+################################################################
 
---echo # ro,sro: 1,1: set sro->1: 1,1
-set global read_only=1;
-set global super_read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
-set global super_read_only=1;
-select @@global.read_only;
-select @@global.super_read_only;
+SET @start_read_only = @@global.read_only;
+SET @start_super_read_only = @@global.super_read_only;
+SELECT @start_read_only, @start_super_read_only;
+
+
+--echo '#--------------------FN_DYNVARS_139_01------------------------#'
+################################################################
+#              Display the DEFAULT value of super_read_only    #
+################################################################
+
+SET @@global.super_read_only = 1;
+SET @@global.super_read_only = DEFAULT;
+SELECT @@global.super_read_only;
+
+
+--echo '#---------------------FN_DYNVARS_139_02-------------------------#'
+############################################### 
+#     Verify default value of variable        #
+############################################### 
+
+SET @@global.super_read_only = @start_super_read_only;
+SELECT @@global.super_read_only = 0;
+
+
+--echo '#--------------------FN_DYNVARS_139_03------------------------#'
+#################################################################
+#        Change the value of super_read_only to a valid value   #
+#################################################################
+
+SET @@global.super_read_only = 0;
+SELECT @@global.super_read_only;
+SET @@global.super_read_only = 1;
+SELECT @@global.super_read_only;
+SET @@global.super_read_only = TRUE;
+SELECT @@global.super_read_only;
+SET @@global.super_read_only = FALSE;
+SELECT @@global.super_read_only;
+SET @@global.super_read_only = ON;
+SELECT @@global.super_read_only;
+SET @@global.super_read_only = OFF;
+SELECT @@global.super_read_only;
+
+--echo '#--------------------FN_DYNVARS_139_04-------------------------#'
+####################################################################
+#         Change the value of super_read_only to invalid value     #
+####################################################################
+
+--Error ER_WRONG_VALUE_FOR_VAR
+SET @@global.super_read_only = -1;
+SELECT @@global.super_read_only;
+--Error ER_WRONG_VALUE_FOR_VAR
+SET @@global.super_read_only = 4294967296;
+SELECT @@global.super_read_only;
+--Error ER_WRONG_VALUE_FOR_VAR
+SET @@global.super_read_only = 10240022115;
+SELECT @@global.super_read_only;
+--Error ER_WRONG_TYPE_FOR_VAR
+SET @@global.super_read_only = 10000.01;
+SELECT @@global.super_read_only;
+--Error ER_WRONG_VALUE_FOR_VAR
+SET @@global.super_read_only = -1024;
+SELECT @@global.super_read_only;
+--Error ER_WRONG_VALUE_FOR_VAR
+SET @@global.super_read_only = 42949672950;
+SELECT @@global.super_read_only;
+
+--Error ER_WRONG_VALUE_FOR_VAR
+SET @@global.super_read_only = 'test';
+SELECT @@global.super_read_only;
+
+
+--echo '#-------------------FN_DYNVARS_139_05----------------------------#'
+####################################################################
+#       Test if accessing session super_read_only gives error      #
+####################################################################
+
+--Error ER_GLOBAL_VARIABLE
+SET @@session.super_read_only = 0;
+SELECT @@super_read_only;
+
+
+--echo '#----------------------FN_DYNVARS_139_06------------------------#'
+############################################################################## 
+# Check if the value in GLOBAL & SESSION Tables matches values in variable   #
+##############################################################################
 
 --disable_warnings
-set global read_only=0;
-set global super_read_only=0;
-DROP TABLE IF EXISTS t1,t2,t3;
+SELECT IF(@@global.super_read_only, "ON", "OFF") = VARIABLE_VALUE 
+FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES 
+WHERE VARIABLE_NAME='super_read_only';
+
+SELECT IF(@@read_only, "ON", "OFF") = VARIABLE_VALUE 
+FROM INFORMATION_SCHEMA.SESSION_VARIABLES 
+WHERE VARIABLE_NAME='super_read_only';
 --enable_warnings
 
 
---echo #
---echo # Create tables/Make sure normal writes work
---echo #
+--echo '#---------------------FN_DYNVARS_139_07----------------------#'
+########################################################################################################
+#    Check if accessing variable with SESSION,LOCAL and without SCOPE points to same session variable  #
+########################################################################################################
 
-set global super_read_only=0;
-
---echo connection con1;
-connection con1;
-
-create table t1 (a int);
-
-insert into t1 values(1);
-
-create table t2 select * from t1;
-
-update t1, t2 set t1.a=2, t2.a=2;
-
-start transaction read write;
-commit;
-
-create trigger trig before insert on t1 for each row set new.a = new.a;
-
---echo connection default;
-connection default;
+SET @@global.super_read_only = 1;
+SELECT @@super_read_only = @@global.super_read_only;
 
 
---echo #
---echo # Make sure it blocks SUPER
---echo #
+--echo '#---------------------FN_DYNVARS_139_08----------------------#'
+#########################################################################
+#   Check if super_read_only can be accessed with and without @@ sign   #
+#########################################################################
 
-set global super_read_only=1;
+--Error ER_GLOBAL_VARIABLE
+SET super_read_only = 1;
+SELECT @@super_read_only;
+--Error ER_PARSE_ERROR
+SET local.super_read_only = 1;
+--Error ER_UNKNOWN_TABLE
+SELECT local.super_read_only;
+--Error ER_PARSE_ERROR
+SET global.super_read_only = 1;
+--Error ER_UNKNOWN_TABLE
+SELECT global.super_read_only;
+--Error ER_BAD_FIELD_ERROR
+SELECT super_read_only = @@session.super_read_only;
 
---error ER_OPTION_PREVENTS_STATEMENT
-create table t3 (a int);
 
---error ER_OPTION_PREVENTS_STATEMENT
-drop table t3;
+##############################  
+#   Restore initial value    #
+##############################
 
---error ER_OPTION_PREVENTS_STATEMENT
-update t1, t2 set t1.a=3, t2.a=3;
+SET @@global.read_only = @start_read_only;
+SET @@global.super_read_only = @start_super_read_only;
 
---error ER_OPTION_PREVENTS_STATEMENT
-start transaction read write;
+SELECT @@global.super_read_only;
+SELECT @@global.read_only;
 
---error ER_OPTION_PREVENTS_STATEMENT
-drop trigger trig;
 
---echo #
---echo # Make sure it still blocks for non-super
---echo #
+#######################################################################
+#              END OF super_read_only TESTS                           #
+#######################################################################
 
---echo connection con1;
-connection con1;
-
-select @@global.read_only;
-select @@global.super_read_only;
-
---error ER_OPTION_PREVENTS_STATEMENT
-create table t3 (a int);
-
---error ER_OPTION_PREVENTS_STATEMENT
-insert into t1 values(1);
-
---error ER_OPTION_PREVENTS_STATEMENT
-update t1, t2 set t1.a=3, t2.a=3;
-
---error ER_OPTION_PREVENTS_STATEMENT
-start transaction read write;
-
---error ER_OPTION_PREVENTS_STATEMENT
-drop trigger trig;
-
---echo #
---echo # Cleanup
---echo #
-
---echo connection default;
-connection default;
-set global super_read_only=0;
-disconnect con1;
-drop table t1,t2;
-drop user test@localhost;
-
-# Restore original value
-set global read_only= @start_read_only;
-set global super_read_only= @start_super_read_only;

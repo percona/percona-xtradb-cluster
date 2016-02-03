@@ -34,7 +34,10 @@
 cd /
 umask 077
 
-MYSQLDATA=/var/lib/mysql
+# In case server is taking more to start or stop increase the timeout here
+STARTTIMEOUT=180
+STOPTIMEOUT=60
+
 VERSION=$(mysqld --version | grep mysqld | cut -d' ' -f4)
 
 get_mysql_option() {
@@ -60,37 +63,51 @@ get_running () {
 	fi
 }
 
-server_stop () {
-	RUNNING=$(get_running)
+verify_server () {
+	TIMEOUT=0
+	if [ "${1}" = "start" ];
+	then
+		TIMEOUT=${STARTTIMEOUT}
+	elif [ "${1}" = "stop" ];
+	then
+		TIMEOUT=${STOPTIMEOUT}
+	fi
+
 	COUNT=0
-	while :; do
+	while [ ${COUNT} -lt ${TIMEOUT} ];
+	do
 		COUNT=$(( COUNT+1 ))
 		echo -n .
-		if [ "${RUNNING}" -eq 0 ];
+		if [ "${1}" = "start" ] && [ "$(get_running)" = 1 ];
 		then
-			echo
-			break
+			if [ -z ${2} ];
+			then
+				echo
+			fi
+			return 0
 		fi
-		if [ "${COUNT}" -gt 15 ];
+		if [ "${1}" = "stop" ] && [ "$(get_running)" = 0 ];
 		then
-			echo
-			return 1
+			if [ -z ${2} ];
+			then
+				echo
+			fi
+			return 0
 		fi
-		RUNNING=$(get_running)
 		sleep 1
 	done
-	return 0
+	return 1
 }
 
 case "$1" in
   'start')
-	RUNNING=$(get_running)
-	if [ "${RUNNING}" -eq 1 ];
+	if [ "$(get_running)" -eq 1 ];
 	then
 		log_action_msg "A MySQL Server is already started"
 	else
 		MYSQLRUN=/var/run/mysqld
-		MYSQLDATA=/var/lib/mysql
+		MYSQLDATA=$(get_mysql_option mysqld datadir "/var/lib/mysql")
+		MYSQLFILES=/var/lib/mysql-files
 		MYSQLLOG=/var/log/mysql
 
 		if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
@@ -100,16 +117,26 @@ case "$1" in
 			chmod 750 ${MYSQLDATA}
 		fi
 
-		if [ ! -d "${MYSQLDATA}/mysql" -a ! -L "${MYSQLDATA}/mysql" ];
+		if [ ! -d ${MYSQLFILES} -a ! -L ${MYSQLFILES} ];
 		then
-			mkdir ${MYSQLDATA}/mysql
-			chown mysql:mysql ${MYSQLDATA}/mysql
-			chmod 750 ${MYSQLDATA}/mysql
+			mkdir ${MYSQLFILES}
+			chown mysql:mysql ${MYSQLFILES}
+			chmod 770 ${MYSQLFILES}
 		fi
 
-		if [ ! "$(ls -A ${MYSQLDATA}/mysql)" ];
+		if [ ! "$(ls -A ${MYSQLDATA})" ] && [ -d ${MYSQLFILES} ];
 		then
-			mysql_install_db --user=mysql > /dev/null
+			su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
+			su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
+			verify_server start no-newline
+			mysql -e "INSTALL PLUGIN auth_socket SONAME 'auth_socket.so'"
+			mysql -e "USE mysql; UPDATE user SET plugin='auth_socket' WHERE user='root'"
+			mysqladmin shutdown
+		fi
+
+		if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${MYSQLDATA}/server-key.pem" ];
+		then
+			/usr/bin/mysql_ssl_rsa_setup --datadir="${MYSQLDATA}" --uid=mysql >/dev/null 2>&1
 		fi
 
 		if [ ! -d ${MYSQLLOG} -a ! -L ${MYSQLLOG} ];
@@ -132,14 +159,8 @@ case "$1" in
 		/lib/init/apparmor-profile-load usr.sbin.mysqld
 
 		su - mysql -s /bin/bash -c "mysqld_safe > /dev/null &"
-		for i in 1 2 3 4 5 6;
-		do
-			sleep 1
-			echo -n .
-		done
-		echo
-		RUNNING=$(get_running)
-		if [ "${RUNNING}" -eq 1 ];
+		verify_server start
+		if [ "$?" -eq 0 ];
 		then
 			log_action_msg "MySQL Community Server ${VERSION} is started"
 		else
@@ -149,11 +170,10 @@ case "$1" in
 	;;
 
   'stop')
-	RUNNING=$(get_running)
-	if [ "${RUNNING}" -eq 1 ];
+	if [ "$(get_running)" -eq 1 ];
 	then
-		killall -15 mysqld
-		server_stop
+		killall -u mysql
+		verify_server stop
 		if [ "$?" -eq 0 ];
 		then
 			log_action_msg "MySQL Community Server ${VERSION} is stopped"
@@ -173,8 +193,7 @@ case "$1" in
 	;;
 
   'status')
-	RUNNING=$(get_running)
-	if [ ${RUNNING} -eq 1 ];
+	if [ "$(get_running)" -eq 1 ];
 	then
 		log_action_msg "MySQL Community Server ${VERSION} is running"
 	else

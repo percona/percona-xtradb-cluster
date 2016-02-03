@@ -19,3 +19,5 @@ wsrep_reject_queries_basic          : TC pending.
 sql_mode_func                       : Differences in result likely due to configuration. Need more investigation.
 innodb_locking_fake_changes_basic   : fake change is disable for PXC
 innodb_buffer_pool_populate_basic   : is now mapped to use NUMA interleave policies and some of the modes are not supported on some distros.
+super_read_only_func2 : Percona regression in switching to upstream implementation https://bugs.mysql.com/bug.php?id=79328
+super_read_only_func3 : Percona regression in switching to upstream implementation https://bugs.mysql.com/bug.php?id=79328

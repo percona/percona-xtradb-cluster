@@ -15,17 +15,18 @@
 
 #include <my_global.h>
 #include <violite.h>
-#include <sql_priv.h>
 #include <sql_class.h>
-#include <my_pthread.h>
-#include <scheduler.h>
 #include <sql_connect.h>
 #include <sql_audit.h>
 #include <debug_sync.h>
 #include <threadpool.h>
-#include <global_threads.h>
 #include <probes_mysql.h>
-
+#include <my_thread_local.h>
+#include <mysql/psi/mysql_idle.h>
+#include <conn_handler/channel_info.h>
+#include <conn_handler/connection_handler_manager.h>
+#include <mysqld_thd_manager.h>
+#include <mysql/thread_pool_priv.h>
 
 /* Threadpool parameters */
 
@@ -40,7 +41,6 @@ uint threadpool_oversubscribe;
 TP_STATISTICS tp_stats;
 
 
-extern "C" pthread_key(struct st_my_thread_var*, THR_KEY_mysys);
 extern bool do_command(THD*);
 
 /*
@@ -55,8 +55,7 @@ extern bool do_command(THD*);
 
   1. Save worker thread context.
   2. Change TLS variables to connection specific ones using thread_attach(THD*).
-     This function does some additional work , e.g setting up 
-     thread_stack/thread_ends_here pointers.
+     This function does some additional work.
   3. Process query
   4. Restore worker thread context.
 
@@ -70,14 +69,18 @@ extern bool do_command(THD*);
 struct Worker_thread_context
 {
   PSI_thread *psi_thread;
-  st_my_thread_var* mysys_var;
+#ifndef DBUG_OFF
+  my_thread_id thread_id;
+#endif
 
   void save()
   {
 #ifdef HAVE_PSI_THREAD_INTERFACE
     psi_thread= PSI_THREAD_CALL(get_thread)();
 #endif
-    mysys_var= (st_my_thread_var *)pthread_getspecific(THR_KEY_mysys);
+#ifndef DBUG_OFF
+    thread_id= my_thread_var_id();
+#endif
   }
 
   void restore()
@@ -85,7 +88,9 @@ struct Worker_thread_context
 #ifdef HAVE_PSI_THREAD_INTERFACE
     PSI_THREAD_CALL(set_thread)(psi_thread);
 #endif
-    pthread_setspecific(THR_KEY_mysys,mysys_var);
+#ifndef DBUG_OFF
+    set_my_thread_var_id(thread_id);
+#endif
     pthread_setspecific(THR_THD, 0);
     pthread_setspecific(THR_MALLOC, 0);
   }
@@ -97,13 +102,16 @@ struct Worker_thread_context
 */
 static bool thread_attach(THD* thd)
 {
-  pthread_setspecific(THR_KEY_mysys,thd->mysys_var);
+#ifndef DBUG_OFF
+  set_my_thread_var_id(thd->thread_id());
+#endif
   thd->thread_stack=(char*)&thd;
   thd->store_globals();
 #ifdef HAVE_PSI_THREAD_INTERFACE
-  PSI_THREAD_CALL(set_thread)(thd->event_scheduler.m_psi);
+  PSI_THREAD_CALL(set_thread)(thd->get_psi());
 #endif
-  mysql_socket_set_thread_owner(thd->net.vio->mysql_socket);
+  mysql_socket_set_thread_owner(thd->get_protocol_classic()->get_vio()
+                                ->mysql_socket);
   return 0;
 }
 
@@ -111,134 +119,77 @@ static bool thread_attach(THD* thd)
 extern PSI_statement_info stmt_info_new_packet;
 #endif
 
-void threadpool_net_before_header_psi_noop(struct st_net * /* net */,
-                                           void * /* user_data */,
-                                           size_t /* count */)
+static void threadpool_net_before_header_psi_noop(struct st_net * /* net */,
+                                                  void * /* user_data */,
+                                                  size_t /* count */)
 { }
 
-void threadpool_net_after_header_psi(struct st_net *net, void *user_data,
-                                     size_t /* count */, my_bool rc)
-{
-  THD *thd;
-  thd= static_cast<THD*> (user_data);
-  DBUG_ASSERT(thd != NULL);
-
-  if (thd->m_server_idle)
-  {
-    /*
-      The server just got data for a network packet header,
-      from the network layer.
-      The IDLE event is now complete, since we now have a message to process.
-      We need to:
-      - start a new STATEMENT event
-      - start a new STAGE event, within this statement,
-      - start recording SOCKET WAITS events, within this stage.
-      The proper order is critical to get events numbered correctly,
-      and nested in the proper parent.
-    */
-    MYSQL_END_IDLE_WAIT(thd->m_idle_psi);
-
-    if (! rc)
-    {
-      thd->m_statement_psi= MYSQL_START_STATEMENT(&thd->m_statement_state,
-                                                  stmt_info_new_packet.m_key,
-                                                  thd->db, thd->db_length,
-                                                  thd->charset());
-
-      THD_STAGE_INFO(thd, stage_init);
-    }
-
-    /*
-      TODO: consider recording a SOCKET event for the bytes just read,
-      by also passing count here.
-    */
-    MYSQL_SOCKET_SET_STATE(net->vio->mysql_socket, PSI_SOCKET_STATE_ACTIVE);
-
-    thd->m_server_idle = false;
-  }
-}
-
-void threadpool_init_net_server_extension(THD *thd)
+static void threadpool_init_net_server_extension(THD *thd)
 {
 #ifdef HAVE_PSI_INTERFACE
-  /* Start with a clean state for connection events. */
-  thd->m_idle_psi= NULL;
-  thd->m_statement_psi= NULL;
-  thd->m_server_idle= false;
-  /* Hook up the NET_SERVER callback in the net layer. */
-  thd->m_net_server_extension.m_user_data= thd;
-  thd->m_net_server_extension.m_before_header= threadpool_net_before_header_psi_noop;
-  thd->m_net_server_extension.m_after_header= threadpool_net_after_header_psi;
-  /* Activate this private extension for the mysqld server. */
-  thd->net.extension= & thd->m_net_server_extension;
+  // socket_connection.cc:init_net_server_extension should have been called
+  // already for us. We only need to overwrite the "before" callback
+  DBUG_ASSERT(thd->m_net_server_extension.m_user_data == thd);
+  thd->m_net_server_extension.m_before_header=
+    threadpool_net_before_header_psi_noop;
 #else
-  thd->net.extension= NULL;
+  DBUG_ASSERT(thd->get_protocol_classic()->get_net()->extension == NULL);
 #endif
 }
 
-int threadpool_add_connection(THD *thd)
+int threadpool_add_connection(THD* thd)
 {
   int retval=1;
   Worker_thread_context worker_context;
   worker_context.save();
 
-  /*
-    Create a new connection context: mysys_thread_var and PSI thread
-    Store them in THD.
-  */
-
-  pthread_setspecific(THR_KEY_mysys, 0);
   my_thread_init();
-  thd->mysys_var= (st_my_thread_var *)pthread_getspecific(THR_KEY_mysys);
-  if (!thd->mysys_var)
-  {
-    /* Out of memory? */
-    worker_context.restore();
-    return 1;
-  }
 
   /* Create new PSI thread for use with the THD. */
 #ifdef HAVE_PSI_THREAD_INTERFACE
-  thd->event_scheduler.m_psi=
-    PSI_THREAD_CALL(new_thread)(key_thread_one_connection, thd, thd->thread_id);
+  thd->set_psi(PSI_THREAD_CALL(new_thread)(key_thread_one_connection, thd,
+                                           thd->thread_id()));
 #endif
 
 
   /* Login. */
   thread_attach(thd);
-  ulonglong now= my_micro_time();
-  thd->prior_thr_create_utime= now;
-  thd->start_utime= now;
-  thd->thr_create_utime= now;
+  thd->start_utime= thd->thr_create_utime= my_micro_time();
 
-  if (!setup_connection_thread_globals(thd))
+  if (thd->store_globals())
   {
-    bool rc= login_connection(thd);
-    MYSQL_AUDIT_NOTIFY_CONNECTION_CONNECT(thd);
-    if (!rc)
-    {
-      prepare_new_connection_state(thd);
-      
-      /* 
-        Check if THD is ok, as prepare_new_connection_state()
-        can fail, for example if init command failed.
-      */
-      if (thd_is_connection_alive(thd))
-      {
-        retval= 0;
-        thd->net.reading_or_writing= 1;
-        thd->skip_wait_timeout= true;
-        MYSQL_SOCKET_SET_STATE(thd->net.vio->mysql_socket, PSI_SOCKET_STATE_IDLE);
-        thd->m_server_idle= true;
-        threadpool_init_net_server_extension(thd);
-      }
+    close_connection(thd, ER_OUT_OF_RESOURCES);
+    goto end;
+  }
 
-      MYSQL_CONNECTION_START(thd->thread_id, &thd->security_ctx->priv_user[0],
-                             (char *) thd->security_ctx->host_or_ip);
-    }
+  if (thd_prepare_connection(thd, false))
+  {
+    goto end;
+  }
+
+  /*
+    Check if THD is ok, as prepare_new_connection_state()
+    can fail, for example if init command failed.
+  */
+  if (thd_connection_alive(thd))
+  {
+    retval= 0;
+    thd_set_net_read_write(thd, 1);
+    thd->skip_wait_timeout= true;
+    MYSQL_SOCKET_SET_STATE(thd->get_protocol_classic()->get_vio()->mysql_socket,
+                           PSI_SOCKET_STATE_IDLE);
+    thd->m_server_idle= true;
+    threadpool_init_net_server_extension(thd);
+  }
+
+end:
+  if (retval)
+  {
+    Connection_handler_manager *handler_manager=
+      Connection_handler_manager::get_instance();
+    handler_manager->inc_aborted_connects();
   }
   worker_context.restore();
-  thd->system_tid = -1;
   return retval;
 }
 
@@ -250,24 +201,16 @@ void threadpool_remove_connection(THD *thd)
   worker_context.save();
 
   thread_attach(thd);
-  thd->net.reading_or_writing= 0;
+  thd_set_net_read_write(thd, 0);
 
   end_connection(thd);
   close_connection(thd, 0);
 
   thd->release_resources();
-  dec_connection_count(thd);
+  Connection_handler_manager::dec_connection_count(false);
 
-  remove_global_thread(thd);
+  Global_THD_manager::get_instance()->remove_thd(thd);
   delete thd;
-
-  /*
-    Free resources associated with this connection: 
-    mysys thread_var and PSI thread.
-  */
-  my_thread_end();
-
-  mysql_cond_broadcast(&COND_thread_count);
 
   worker_context.restore();
 }
@@ -306,28 +249,28 @@ int threadpool_process_request(THD *thd)
   for(;;)
   {
     Vio *vio;
-    thd->net.reading_or_writing= 0;
+    thd_set_net_read_write(thd, 0);
     mysql_audit_release(thd);
 
     if ((retval= do_command(thd)) != 0)
       goto end;
 
-    if (!thd_is_connection_alive(thd))
+    if (!thd_connection_alive(thd))
     {
       retval= 1;
       goto end;
     }
 
-    vio= thd->net.vio;
+    vio= thd->get_protocol_classic()->get_vio();
     if (!vio->has_data(vio))
     { 
       /* More info on this debug sync is in sql_parse.cc*/
       DEBUG_SYNC(thd, "before_do_command_net_read");
-      thd->net.reading_or_writing= 1;
+      thd_set_net_read_write(thd, 1);
       goto end;
     }
     if (!thd->m_server_idle) {
-      MYSQL_SOCKET_SET_STATE(thd->net.vio->mysql_socket, PSI_SOCKET_STATE_IDLE);
+      MYSQL_SOCKET_SET_STATE(vio->mysql_socket, PSI_SOCKET_STATE_IDLE);
       MYSQL_START_IDLE_WAIT(thd->m_idle_psi, &thd->m_idle_state);
       thd->m_server_idle= true;
     }
@@ -335,39 +278,17 @@ int threadpool_process_request(THD *thd)
 
 end:
   if (!retval && !thd->m_server_idle) {
-    MYSQL_SOCKET_SET_STATE(thd->net.vio->mysql_socket, PSI_SOCKET_STATE_IDLE);
+    MYSQL_SOCKET_SET_STATE(thd->get_protocol_classic()->get_vio()
+                           ->mysql_socket, PSI_SOCKET_STATE_IDLE);
     MYSQL_START_IDLE_WAIT(thd->m_idle_psi, &thd->m_idle_state);
     thd->m_server_idle= true;
   }
 
   worker_context.restore();
-  thd->system_tid = -1;
   return retval;
 }
 
-
-static scheduler_functions tp_scheduler_functions=
+THD_event_functions tp_event_functions=
 {
-  0,                                  // max_threads
-  NULL,
-  NULL,
-  tp_init,                            // init
-  NULL,                               // init_new_connection_thread
-  tp_add_connection,                  // add_connection
-  tp_wait_begin,                      // thd_wait_begin
-  tp_wait_end,                        // thd_wait_end
-  tp_post_kill_notification,          // post_kill_notification
-  NULL,                               // end_thread
-  tp_end                              // end
+  tp_wait_begin, tp_wait_end, tp_post_kill_notification
 };
-
-void pool_of_threads_scheduler(struct scheduler_functions *func,
-    ulong *arg_max_connections,
-    uint *arg_connection_count)
-{
-  *func = tp_scheduler_functions;
-  func->max_threads= threadpool_max_threads;
-  func->max_connections= arg_max_connections;
-  func->connection_count= arg_connection_count;
-  scheduler_init();
-}

@@ -166,7 +166,133 @@ INSERT INTO t1 VALUES(8);
 --echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con1_id;
 --eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con1_id
 --enable_query_log
+
 SELECT * FROM t1;
+
+--echo # Test cloning the same transaction twice
+START TRANSACTION WITH CONSISTENT SNAPSHOT;
+
+--connection con2
+--echo # connection con2
+INSERT INTO t1 VALUES(9);
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con3_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id
+--enable_query_log
+
+SELECT * FROM t1;
+
+--connection con1
+--echo # connection con1
+INSERT INTO t1 VALUES(10);
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con3_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id
+--enable_query_log
+
+SELECT * FROM t1;
+
+COMMIT;
+
+--connection con2
+--echo # connection con2
+COMMIT;
+
+--let $con2_id=`SELECT CONNECTION_ID()`
+
+
+--echo # Test cascading cloning with RO/RW transactions
+
+# RO -> RO -> already tested above
+
+--echo # RO (con3) -> RW (con2) -> con1
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con3_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id
+--enable_query_log
+
+INSERT INTO t1 VALUES (11);
+
+SELECT * FROM t1;
+
+--connection con1
+--echo # connection con1
+
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con2_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con2_id
+--enable_query_log
+
+SELECT * FROM t1;
+
+COMMIT;
+
+--echo # RW (con3) -> RW (con2) -> con1
+
+--connection con3
+--echo # connection con3
+
+INSERT INTO t1 VALUES (12);
+
+SELECT * FROM t1;
+
+--connection con2
+--echo # connection con2
+COMMIT;
+
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con3_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id
+--enable_query_log
+
+INSERT INTO t1 VALUES (13);
+
+SELECT * FROM t1;
+
+--connection con1
+--echo # connection con1
+
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con2_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con2_id
+--enable_query_log
+
+SELECT * FROM t1;
+
+COMMIT;
+
+--echo # RW (con3) -> RO (con2) -> con1
+
+--connection con2
+--echo # connection con2
+COMMIT;
+
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con3_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con3_id
+--enable_query_log
+
+SELECT * FROM t1;
+
+--connection con1
+--echo # connection con1
+
+--disable_query_log
+--echo START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION \$con2_id;
+--eval START TRANSACTION WITH CONSISTENT SNAPSHOT FROM SESSION $con2_id
+--enable_query_log
+
+SELECT * FROM t1;
+
+COMMIT;
+
+--connection con3
+--echo # connection con3
+COMMIT;
+
+--connection con2
+--echo # connection con2
+COMMIT;
 
 --connection default
 --disconnect con1

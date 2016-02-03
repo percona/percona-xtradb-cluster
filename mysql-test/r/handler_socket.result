@@ -1,4 +1,0 @@
-call mtr.add_suppression("handlersocket: open_files_limit is too small");
-INSTALL PLUGIN handlersocket SONAME 'HANDLER_SOCKET';
-Restarting mysqld for bug 1397859 test...
-UNINSTALL PLUGIN handlersocket;

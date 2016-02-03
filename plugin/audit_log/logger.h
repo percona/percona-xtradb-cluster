@@ -53,7 +53,10 @@
 */
 
 #include <sys/types.h>
+#include <my_sys.h> // PSI_memory_key
 #include <my_dir.h>
+
+#define PSI_CATEGORY "audit_logger"
 
 #ifdef __cplusplus
 extern "C" {

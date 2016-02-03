@@ -1,5 +1,5 @@
 /*
-(C) 2011-2013 Percona LLC and/or its affiliates
+(C) 2011-2015 Percona LLC and/or its affiliates
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,14 +20,33 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #endif
 
 #include <string.h>
+#include <my_global.h>
+#include <my_sys.h>
+#include <mysql/psi/psi.h>
+#include <mysql/psi/mysql_memory.h>
 #include "auth_pam_common.h"
 #include "auth_mapping.h"
 #include "groups.h"
 
 /* The server plugin */
 
+PSI_memory_key key_memory_pam_mapping_iter;
+PSI_memory_key key_memory_pam_group_iter;
+
+static PSI_memory_info common_pam_memory[]=
+{
+  {&key_memory_pam_mapping_iter, "auth_pam_mapping_iterator", 0},
+  {&key_memory_pam_group_iter, "auth_pam_group_iterator", 0},
+};
+
 /** The MySQL service name for PAM configuration */
 static const char* service_name_default= "mysqld";
+
+void auth_pam_common_init(const char *psi_category)
+{
+  int count= array_elements(common_pam_memory);
+  mysql_memory_register(psi_category, common_pam_memory, count);
+}
 
 static int valid_pam_msg_style (int pam_msg_style)
 {
@@ -72,7 +91,7 @@ static int vio_server_conv (int num_msg, const struct pam_message **msg,
     return PAM_CONV_ERR;
   }
 
-  *resp = calloc (sizeof (struct pam_response), num_msg);
+  *resp = (struct pam_response *) calloc(sizeof(struct pam_response), num_msg);
   if (*resp == NULL)
     return PAM_BUF_ERR;
 
@@ -185,4 +204,32 @@ int authenticate_user_with_pam_server (MYSQL_PLUGIN_VIO *vio,
     return CR_ERROR;
 
   return CR_OK;
+}
+
+int auth_pam_generate_auth_string_hash(char *outbuf, unsigned int *buflen,
+                                       const char *inbuf, unsigned int inbuflen)
+{
+  /*
+    fail if buffer specified by server cannot be copied to output buffer
+  */
+  if (*buflen < inbuflen)
+    return 1;   /* error */
+  strncpy(outbuf, inbuf, inbuflen);
+  *buflen= strlen(inbuf);
+  return 0;     /* success */
+}
+
+int auth_pam_validate_auth_string_hash(char* const buf __attribute__((unused)),
+                                       unsigned int len __attribute__((unused)))
+{
+  return 0;     /* success */
+}
+
+int auth_pam_set_salt(const char* password __attribute__((unused)),
+                      unsigned int password_len __attribute__((unused)),
+                      unsigned char* salt __attribute__((unused)),
+                      unsigned char* salt_len)
+{
+  *salt_len= 0;
+  return 0;     /* success */
 }

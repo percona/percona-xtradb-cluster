@@ -40,12 +40,12 @@ FLUSH LOGS;
 
 --let BIN_LOG_FULL_PATH=`SELECT CONCAT("$MYSQLD_DATA_DIR", "$BIN_LOG_FILE_NAME")`
 
---let i=10
+--let i=8
 
 while ($i)
 {
 # Test for different combinations of syntax and db name filtering and rewriting
---let REWRITE=`SELECT CASE $i WHEN 10 THEN '' WHEN 9 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB4"' WHEN 8 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB3"' WHEN 7 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB2"' WHEN 6 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB1"' WHEN 5 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4"' WHEN 4 THEN '--rewrite-db="  $DB1  -> $DB2 , $DB3 ->   $DB4  "' WHEN 3 THEN '--rewrite-db="$DB1->$DB2,$DB3->$DB4"' WHEN 2 THEN '--rewrite-db="$DB1->$DB4"' WHEN 1 THEN '--rewrite-db="$DB1->$DB2"' END`
+--let REWRITE=`SELECT CASE $i WHEN 8 THEN '' WHEN 7 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB4"' WHEN 6 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB3"' WHEN 5 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB2"' WHEN 4 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4" --database="$DB1"' WHEN 3 THEN '--rewrite-db="$DB1->$DB2" --rewrite-db="$DB3->$DB4"' WHEN 2 THEN '--rewrite-db="$DB1->$DB4"' WHEN 1 THEN '--rewrite-db="$DB1->$DB2"' END`
 
 eval USE $DB1; DELETE FROM t1;
 eval USE $DB2; DELETE FROM t1;

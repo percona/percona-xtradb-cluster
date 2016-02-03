@@ -26,6 +26,7 @@ SELECT COUNT(*) = 10 AS engines_match FROM INFORMATION_SCHEMA.TABLES
 WHERE table_schema = DATABASE() AND table_name LIKE 't%';
 engines_match
 1
+# restart:--enforce_storage_engine=MyISAM
 After the first restart
 SELECT @@global.enforce_storage_engine = 'MyISAM' AS enforce_storage_engine_is_myisam;
 enforce_storage_engine_is_myisam
@@ -35,6 +36,8 @@ WHERE table_schema = DATABASE() AND table_name LIKE 't%';
 engines_match
 1
 SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
+Warnings:
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 OPTIMIZE TABLE t1;
 Table	Op	Msg_type	Msg_text
 test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
@@ -157,6 +160,7 @@ engine_match
 Checking 't10': Column = 'int(11)'
 column_match
 1
+# restart
 After the second restart
 SELECT @@global.enforce_storage_engine IS NULL AS enforce_storage_engine_is_disabled;
 enforce_storage_engine_is_disabled

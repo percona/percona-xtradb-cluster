@@ -13,7 +13,7 @@ SET GLOBAL long_query_time=0;
 SELECT 1;
 
 --source include/log_stop.inc
---let grep_pattern= ^# Time: \d{6} (\d| )\d:\d\d:\d\d\$
+--let grep_pattern= ^# Time: \d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d.\d{6}
 --source include/log_grep.inc
 
 SET GLOBAL long_query_time=default;

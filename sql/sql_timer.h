@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Twitter, Inc. All rights reserved.
+/* Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -9,42 +9,19 @@
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License along
-   with this program; if not, write to the Free Software Foundation, Inc.,
-   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. */
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #ifndef SQL_TIMER_INCLUDED
 #define SQL_TIMER_INCLUDED
 
 class THD;
 struct st_thd_timer;
-typedef struct st_thd_timer thd_timer_t;
+typedef struct st_thd_timer_info THD_timer_info;
 
-#ifdef HAVE_MY_TIMER
-
-thd_timer_t *thd_timer_set(THD *, thd_timer_t *, unsigned long);
-thd_timer_t *thd_timer_reset(thd_timer_t *);
-void thd_timer_end(thd_timer_t *);
-
-#else
-
-static inline thd_timer_t *
-thd_timer_set(THD *, thd_timer_t *, unsigned long)
-{
-  return NULL;
-}
-
-static inline thd_timer_t *
-thd_timer_reset(thd_timer_t *)
-{
-  return NULL;
-}
-
-static inline void
-thd_timer_end(thd_timer_t *)
-{
-}
-
-#endif
+THD_timer_info *thd_timer_set(THD *, THD_timer_info *, unsigned long);
+THD_timer_info *thd_timer_reset(THD_timer_info *);
+void thd_timer_destroy(THD_timer_info *);
 
 #endif /* SQL_TIMER_INCLUDED */

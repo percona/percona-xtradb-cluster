@@ -42,9 +42,14 @@
 #include <mysql.h>
 #include <mysql/plugin_auth.h>
 #include <mysql/client_plugin.h>
+#include <mysql/get_password.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
 
 #if !defined (_GNU_SOURCE)
 # define _GNU_SOURCE /* for RTLD_DEFAULT */
@@ -100,7 +105,11 @@ static struct st_mysql_auth two_handler=
 {
   MYSQL_AUTHENTICATION_INTERFACE_VERSION,
   "dialog", /* requires dialog client plugin */
-  two_questions
+  two_questions,
+  NULL,
+  NULL,
+  NULL,
+  0UL
 };
 
 /* dialog demo where the number of questions is not known in advance */
@@ -137,7 +146,11 @@ static struct st_mysql_auth three_handler=
 {
   MYSQL_AUTHENTICATION_INTERFACE_VERSION,
   "dialog", /* requires dialog client plugin */
-  three_attempts 
+  three_attempts,
+  NULL,
+  NULL,
+  NULL,
+  0UL
 };
 
 mysql_declare_plugin(dialog)
@@ -207,18 +220,21 @@ typedef char *(*mysql_authentication_dialog_ask_t)(struct st_mysql *mysql,
 
 static mysql_authentication_dialog_ask_t ask;
 
+
+static char * strdup_func(const char *str, myf flags __attribute__((unused)))
+{
+  return strdup(str);
+}
+
 static char *builtin_ask(MYSQL *mysql __attribute__((unused)),
                          int type __attribute__((unused)),
                          const char *prompt,
                          char *buf, int buf_len)
 {
-  fputs(prompt, stdout);
-  fputc(' ', stdout);
-
   if (type == 2) /* password */
   {
     char *password;
-    password= get_tty_password("");
+    password= get_tty_password_ext(prompt, strdup_func);
     strncpy(buf, password, buf_len-1);
     buf[buf_len-1]= 0;
     free(password);

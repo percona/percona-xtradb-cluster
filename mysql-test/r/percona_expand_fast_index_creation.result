@@ -1,6 +1,6 @@
 SET expand_fast_index_creation=ON;
 CREATE TABLE idx (a INT PRIMARY KEY);
-CREATE TABLE t (a INT PRIMARY KEY AUTO_INCREMENT, b FLOAT, c VARCHAR(15), d VARCHAR(17), z VARCHAR(1)) ENGINE=InnoDB;
+CREATE TABLE t (a INT PRIMARY KEY AUTO_INCREMENT, b FLOAT, c VARCHAR(15), d VARCHAR(17), z VARCHAR(2)) ENGINE=InnoDB;
 INSERT INTO t (b) VALUES (RAND());
 INSERT INTO t (b) SELECT RAND() FROM t;
 INSERT INTO t (b) SELECT RAND() FROM t;
@@ -36,7 +36,7 @@ k4	2	3	c	1
 k4	2	3	d	2
 PRIMARY	3	1	a	0
 TRUNCATE TABLE performance_schema.events_stages_history_long;
-ALTER TABLE t MODIFY COLUMN z VARCHAR(2);
+ALTER TABLE t MODIFY COLUMN z VARCHAR(1);
 SELECT COUNT(*)
 FROM performance_schema.events_stages_history_long e,
 performance_schema.threads t
@@ -92,23 +92,31 @@ EXPLAIN SELECT COUNT(*) FROM t1, t1 t2 WHERE t1.a = t2.a AND t1.b = t2.b;
 id	1
 select_type	SIMPLE
 table	t1
+partitions	NULL
 type	ALL
 possible_keys	a
 key	NULL
 key_len	NULL
 ref	NULL
 rows	16
+filtered	100.00
 Extra	NULL
 id	1
 select_type	SIMPLE
 table	t2
+partitions	NULL
 type	ALL
 possible_keys	a
 key	NULL
 key_len	NULL
 ref	NULL
 rows	16
+filtered	10.00
 Extra	Using where; Using join buffer (Block Nested Loop)
+Warnings:
+Level	Note
+Code	1003
+Message	/* select#1 */ select count(0) AS `COUNT(*)` from `test`.`t1` join `test`.`t1` `t2` where ((`test`.`t2`.`b` = `test`.`t1`.`b`) and (`test`.`t2`.`a` = `test`.`t1`.`a`))
 ALTER TABLE t1 DROP KEY a;
 SET expand_fast_index_creation = 1;
 SELECT @@expand_fast_index_creation;
@@ -121,22 +129,30 @@ EXPLAIN SELECT COUNT(*) FROM t1, t1 t2 WHERE t1.a = t2.a AND t1.b = t2.b;
 id	1
 select_type	SIMPLE
 table	t1
+partitions	NULL
 type	ALL
 possible_keys	a
 key	NULL
 key_len	NULL
 ref	NULL
 rows	16
+filtered	100.00
 Extra	NULL
 id	1
 select_type	SIMPLE
 table	t2
+partitions	NULL
 type	ALL
 possible_keys	a
 key	NULL
 key_len	NULL
 ref	NULL
 rows	16
+filtered	10.00
 Extra	Using where; Using join buffer (Block Nested Loop)
+Warnings:
+Level	Note
+Code	1003
+Message	/* select#1 */ select count(0) AS `COUNT(*)` from `test`.`t1` join `test`.`t1` `t2` where ((`test`.`t2`.`b` = `test`.`t1`.`b`) and (`test`.`t2`.`a` = `test`.`t1`.`a`))
 SET expand_fast_index_creation = 0;
 DROP TABLE t1;

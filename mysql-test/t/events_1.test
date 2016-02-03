@@ -1,3 +1,4 @@
+
 # changes 2008-02-20 hhunger splitted events.test into events_1 and events_2
 # changes 2008-02-22 hhunger replaced all sleep by wait_condition
 #
@@ -274,7 +275,9 @@ SHOW EVENTS;
 --echo 
 --echo First, let's add a column to the end and check the error is emitted.
 --echo 
+SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
 ALTER TABLE mysql.event ADD dummy INT;
+SET sql_mode = default;
 --error ER_EVENT_OPEN_TABLE_FAILED
 SHOW EVENTS;
 --error ER_EVENT_OPEN_TABLE_FAILED

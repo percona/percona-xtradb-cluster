@@ -260,6 +260,11 @@ call mtr.add_suppression("New log files created");
 call mtr.add_suppression("Creating foreign key constraint system tables");
 call mtr.add_suppression("Cannot open table mysql/[a-z_]+ from the internal data dictionary");
 call mtr.add_suppression("Info table is not ready to be used");
+call mtr.add_suppression("Can't open the mysql.plugin table.");
+call mtr.add_suppression("Gtid table is not ready to be used");
+call mtr.add_suppression("Failed to open optimizer cost constant tables");
+call mtr.add_suppression("Can't open and lock time zone table");
+call mtr.add_suppression("Can't open and lock privilege tables");
 --exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --shutdown_server
 --source include/wait_until_disconnected.inc
@@ -274,13 +279,8 @@ file_exists $MYSQLTEST_VARDIR/tmpdatadir/ib_modified_log_1_0.xdb;
 --replace_regex /_[[:digit:]]+\.xdb$//
 list_files $MYSQLTEST_VARDIR/tmpdatadir ib_modified_log*;
 
---exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---shutdown_server
---source include/wait_until_disconnected.inc
---remove_files_wildcard $MYSQLD_DATADIR ib_logfile*
---remove_files_wildcard $MYSQLD_DATADIR ibdata*
 --remove_files_wildcard $MYSQLD_DATADIR ib_modified_log*
---enable_reconnect
---echo 14th restart
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---source include/wait_until_connected_again.inc
+--remove_files_wildcard $MYSQLD_DATADIR ib_logfile*
+--source include/restart_mysqld.inc
+
+--remove_files_wildcard $MYSQLTEST_VARDIR tmpdatadir

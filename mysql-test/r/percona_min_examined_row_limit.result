@@ -10,7 +10,7 @@ SET SESSION query_exec_time=2.1;
 SELECT 1;
 1
 1
-SET GLOBAL min_examined_row_limit=5;
+SET GLOBAL min_examined_row_limit=7;
 SELECT * FROM t AS t1, t AS t2;
 id	id
 1	1

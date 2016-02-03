@@ -5,21 +5,7 @@
 
 --connect (con1,localhost,root,,)
 
-# Write file to make mysql-test-run.pl wait for the server to stop
---exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
-
---echo # Request clean shutdown
---send_shutdown
-
---echo # Wait for disconect
---source include/wait_until_disconnected.inc
-
---echo # Restart server.
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
-
--- enable_reconnect
--- source include/wait_until_connected_again.inc
--- disable_reconnect
+--source include/restart_mysqld.inc
 
 --connection con1
 SELECT 1;

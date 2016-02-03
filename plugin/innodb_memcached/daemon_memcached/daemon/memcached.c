@@ -35,6 +35,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <dlfcn.h>
 
 #include "memcached_mysql.h"
 
@@ -7020,9 +7021,8 @@ daemon_memcached_make_option(char* option, int* option_argc,
 		num_arg++;
 	}
 
-	free(my_str);
-
-	my_str = option;
+	/* reset my_str, since strtok_r could alter it */
+	strncpy(my_str, option, strlen(option));
 
 	*option_argv = (char**) malloc((num_arg + 1)
 				       * sizeof(**option_argv));
@@ -7030,7 +7030,7 @@ daemon_memcached_make_option(char* option, int* option_argc,
 	for (opt_str = strtok_r(my_str, sep, &last);
 	     opt_str;
 	     opt_str = strtok_r(NULL, sep, &last)) {
-		(*option_argv)[i] = my_strdupl(opt_str, strlen(opt_str));
+		(*option_argv)[i] = opt_str;
 		i++;
 	}
 
@@ -7081,6 +7081,8 @@ int main (int argc, char **argv) {
     int option_argc = 0;
     char** option_argv = NULL;
     eng_config_info_t my_eng_config;
+
+    memcached_initialized = 0;
 
     if (m_config->m_engine_library) {
 	engine = m_config->m_engine_library;
@@ -7985,6 +7987,14 @@ func_exit:
     /* Clean up strdup() call for bind() address */
     if (settings.inter)
       free(settings.inter);
+
+#ifdef INNODB_MEMCACHED
+    /* free event base */
+    if (main_base) {
+        event_base_free(main_base);
+        main_base = NULL;
+    }
+#endif
 
     memcached_shutdown = 2;
     memcached_initialized = 2;

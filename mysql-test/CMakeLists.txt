@@ -94,6 +94,7 @@ ADD_CUSTOM_TARGET(test-mtr
 ## ADD_TEST(xxx perl ./mysql-test-run.pl --force
 ##          ${VS_CONFIG} ${DEBUG_SERVER} ${EXP})
 
+
 # Process .in files with includes in collections/
 
 MACRO(PROCESS_COLLECTION_INCLUDE collin collection)
@@ -119,3 +120,18 @@ FOREACH(collin ${infiles})
     FILE(APPEND ${colldone} "${collin}\n")
   ENDIF()
 ENDFOREACH()
+
+# With different MAX_INDEXES values, server might behave differently in
+# certain cases. 'max_indexes.inc' file should be updated accordingly to
+# reflect the current MAX_INDEXES value. This file helps MTR to decide on
+# which tests should be skipped.
+# NOTE: While committing a patch please make sure that the file is unmodified
+# and should show the default MAX_INDEXES (i.e. 64U).
+IF (MAX_INDEXES)
+  IF(NOT (${MAX_INDEXES} EQUAL 64U))
+    FILE(WRITE include/max_indexes.inc
+         "# Warning: This is an auto-generated file. Please do not modify it.
+--let $max_indexes = ${MAX_INDEXES}\n")
+    MESSAGE(STATUS "mysql-test/include/max_indexes.inc adjusted")
+  ENDIF()
+ENDIF()

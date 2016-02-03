@@ -379,6 +379,9 @@ case "$mode" in
     echo $echo_n "Shutting down MySQL (Percona XtraDB Cluster)"
     if test -s "$mysqld_pid_file_path"
     then
+      # signal mysqld_safe that it needs to stop
+      touch "$mysqld_pid_file_path.shutdown"
+
       mysqld_pid=`cat "$mysqld_pid_file_path"`
 
       if (kill -0 $mysqld_pid 2>/dev/null)

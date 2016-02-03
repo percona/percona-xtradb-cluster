@@ -22,6 +22,10 @@
 # pre mode  :  try to perform sanity check for configuration, log, data
 # post mode :  ping server until answer is received
 
+get_path () {
+	my_print_defaults mysqld | grep ${1} | cut -d= -f2
+}
+
 pinger () {
 	while /bin/true ; do
 		sleep 1
@@ -31,7 +35,8 @@ pinger () {
 
 sanity () {
 	MYSQLRUN=/var/run/mysqld
-	MYSQLDATA=/var/lib/mysql
+	MYSQLDATA=$(get_path datadir)
+	MYSQLFILES=/var/lib/mysql-files
 	MYSQLLOG=/var/log/mysql
 
 	if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
@@ -39,6 +44,13 @@ sanity () {
 		mkdir ${MYSQLDATA}
 		chown mysql:mysql ${MYSQLDATA}
 		chmod 750 ${MYSQLDATA}
+	fi
+
+	if [ ! -d ${MYSQLFILES} -a ! -L ${MYSQLFILES} ];
+	then
+		mkdir ${MYSQLFILES}
+		chown mysql:mysql ${MYSQLFILES}
+		chmod 770 ${MYSQLFILES}
 	fi
 
 	if [ ! -d "${MYSQLDATA}/mysql" -a ! -L "${MYSQLDATA}/mysql" ];
@@ -50,7 +62,17 @@ sanity () {
 
 	if [ ! "$(ls -A ${MYSQLDATA}/mysql)" ];
 	then
-		mysql_install_db --user=mysql > /dev/null
+		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
+		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
+		pinger
+		mysql -e "INSTALL PLUGIN auth_socket SONAME 'auth_socket.so'"
+		mysql -e "USE mysql; UPDATE user SET plugin='auth_socket' WHERE user='root'"
+		mysqladmin shutdown
+	fi
+
+	if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${MYSQLDATA}/server-key.pem" ];
+	then
+		/usr/bin/mysql_ssl_rsa_setup --datadir="${MYSQLDATA}" --uid=mysql >/dev/null 2>&1
 	fi
 
 	if [ ! -d ${MYSQLLOG} -a ! -L ${MYSQLLOG} ];

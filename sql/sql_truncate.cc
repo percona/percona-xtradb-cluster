@@ -13,6 +13,8 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
+#include "sql_truncate.h"
+
 #include "debug_sync.h"  // DEBUG_SYNC
 #include "table.h"       // TABLE, FOREIGN_KEY_INFO
 #include "sql_class.h"   // THD
@@ -20,9 +22,8 @@
 #include "sql_table.h"   // write_bin_log
 #include "datadict.h"    // dd_recreate_table()
 #include "lock.h"        // MYSQL_OPEN_* flags
-#include "sql_acl.h"     // DROP_ACL
+#include "auth_common.h" // DROP_ACL
 #include "sql_parse.h"   // check_one_table_access()
-#include "sql_truncate.h"
 #include "sql_show.h"    //append_identifier()
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
@@ -234,7 +235,7 @@ Sql_cmd_truncate_table::handler_truncate(THD *thd, TABLE_LIST *table_ref,
   }
 
   /* Open the table as it will handle some required preparations. */
-  if (open_and_lock_tables(thd, table_ref, FALSE, flags))
+  if (open_and_lock_tables(thd, table_ref, flags))
     DBUG_RETURN(TRUNCATE_FAILED_SKIP_BINLOG);
 
   /* Whether to truncate regardless of foreign keys. */
@@ -436,10 +437,9 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
   if (is_temporary_table(table_ref))
   {
     TABLE *tmp_table= table_ref->table;
-    /*    
-      bug 1313901 : THD::decide_logging_format has not yet been called and
-                    may not be called at all dependig on the engine, so call it
-                    here.
+    /*
+      bug 72475 : THD::decide_logging_format has not yet been called and may
+      not be called at all depending on the engine, so call it here.
     */
     if (thd->decide_logging_format(table_ref) != 0)
       DBUG_RETURN(TRUE);
@@ -453,7 +453,8 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
       if ((error= recreate_temporary_table(thd, tmp_table)))
         binlog_stmt= FALSE; /* No need to binlog failed truncate-by-recreate. */
 
-      DBUG_ASSERT(! thd->transaction.stmt.cannot_safely_rollback());
+      DBUG_ASSERT(! thd->get_transaction()->cannot_safely_rollback(
+        Transaction_ctx::STMT));
     }
     else
     {
@@ -527,12 +528,12 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
       query_cache_invalidate does not need a valid TABLE object.
     */
     table_ref->table= NULL;
-    query_cache_invalidate3(thd, table_ref, FALSE);
+    query_cache.invalidate(thd, table_ref, FALSE);
   }
 
   /* DDL is logged in statement format, regardless of binlog format. */
   if (binlog_stmt)
-    error|= write_bin_log(thd, !error, thd->query(), thd->query_length());
+    error|= write_bin_log(thd, !error, thd->query().str, thd->query().length);
 
   /*
     A locked table ticket was upgraded to a exclusive lock. After the
@@ -556,7 +557,7 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
 bool Sql_cmd_truncate_table::execute(THD *thd)
 {
   bool res= TRUE;
-  TABLE_LIST *first_table= thd->lex->select_lex.table_list.first;
+  TABLE_LIST *first_table= thd->lex->select_lex->table_list.first;
   DBUG_ENTER("Sql_cmd_truncate_table::execute");
 
   if (check_one_table_access(thd, DROP_ACL, first_table))

@@ -1,3 +1,0 @@
-SELECT @@global.slow_query_log_timestamp_precision;
-@@global.slow_query_log_timestamp_precision
-second

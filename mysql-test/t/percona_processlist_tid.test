@@ -1,5 +1,6 @@
 --source include/linux.inc
 --source include/not_embedded.inc
+--source include/have_perfschema.inc
 
 --source include/count_sessions.inc
 
@@ -31,7 +32,7 @@ CREATE TABLE lwp_table(lwp_no INT);
 
 # checking that all Tids from the current connections can be found in the "ps" list
 # the result of the COUNT(*) is expected to be 0
-SELECT COUNT(*) = 0 AS must_be_true FROM information_schema.processlist WHERE tid NOT IN (SELECT lwp_no FROM lwp_table);
+SELECT COUNT(*) = 0 AS must_be_true FROM performance_schema.threads WHERE thread_os_id NOT IN (SELECT lwp_no FROM lwp_table);
 
 --disable_query_log
 

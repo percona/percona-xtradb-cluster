@@ -1,4 +1,4 @@
-/* Copyright (c) 2007, 2012, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2007, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,12 +29,11 @@
 */
 
 
-#include "sql_priv.h"
-#include "unireg.h"                    // REQUIRED: for other includes
 #include "sql_profile.h"
 #include "my_sys.h"
 #include "sql_show.h"                     // schema_table_store_record
 #include "sql_class.h"                    // THD
+#include "log.h"
 
 #include <algorithm>
 
@@ -45,7 +44,7 @@ using std::max;
 /** two vals encoded: (dec*100)+len */
 #define TIME_I_S_DECIMAL_SIZE (TIME_FLOAT_DIGITS*100)+(TIME_FLOAT_DIGITS-3)
 
-#define MAX_QUERY_LENGTH 300U
+static const size_t MAX_QUERY_LENGTH= 300;
 #define MAX_QUERY_HISTORY 101U
 
 /**
@@ -55,6 +54,12 @@ int fill_query_profile_statistics_info(THD *thd, TABLE_LIST *tables,
                                        Item *cond)
 {
 #if defined(ENABLED_PROFILING)
+  const char *old= thd->lex->sql_command == SQLCOM_SHOW_PROFILE ?
+                     "SHOW PROFILE" : "INFORMATION_SCHEMA.PROFILING";
+
+  DBUG_ASSERT(thd->lex->sql_command != SQLCOM_SHOW_PROFILES);
+
+  push_deprecated_warn(thd, old, "Performance Schema");
   return(thd->profiling.fill_statistics_info(thd, tables, cond));
 #else
   my_error(ER_FEATURE_DISABLED, MYF(0), "SHOW PROFILE", "enable-profiling");
@@ -112,7 +117,7 @@ int make_profile_table_for_show(THD *thd, ST_SCHEMA_TABLE *schema_table)
   };
 
   ST_FIELD_INFO *field_info;
-  Name_resolution_context *context= &thd->lex->select_lex.context;
+  Name_resolution_context *context= &thd->lex->select_lex->context;
   int i;
 
   for (i= 0; schema_table->fields_info[i].field_name != NULL; i++)
@@ -200,7 +205,8 @@ void PROF_MEASUREMENT::set_label(const char *status_arg,
   sizes[1]= (function_arg == NULL) ? 0 : strlen(function_arg) + 1;
   sizes[2]= (file_arg == NULL) ? 0 : strlen(file_arg) + 1;
 
-  allocated_status_memory= (char *) my_malloc(sizes[0] + sizes[1] + sizes[2], MYF(0));
+  allocated_status_memory= (char *) my_malloc(key_memory_PROFILE,
+                                              sizes[0] + sizes[1] + sizes[2], MYF(0));
   DBUG_ASSERT(allocated_status_memory != NULL);
 
   cursor= allocated_status_memory;
@@ -279,7 +285,7 @@ void PROF_MEASUREMENT::collect()
 
 
 QUERY_PROFILE::QUERY_PROFILE(PROFILING *profiling_arg, const char *status_arg)
-  :profiling(profiling_arg), profiling_query_id(0), query_source(NULL)
+  :profiling(profiling_arg), profiling_query_id(0), m_query_source(NULL_STR)
 {
   m_seq_counter= 1;
   PROF_MEASUREMENT *prof= new PROF_MEASUREMENT(this, status_arg);
@@ -294,21 +300,25 @@ QUERY_PROFILE::~QUERY_PROFILE()
   while (! entries.is_empty())
     delete entries.pop();
 
-  my_free(query_source);
+  my_free(m_query_source.str);
 }
 
 /**
   @todo  Provide a way to include the full text, as in  SHOW PROCESSLIST.
 */
-void QUERY_PROFILE::set_query_source(char *query_source_arg,
-                                     uint query_length_arg)
+void QUERY_PROFILE::set_query_source(const char *query_source_arg,
+                                     size_t query_length_arg)
 {
   /* Truncate to avoid DoS attacks. */
-  uint length= min(MAX_QUERY_LENGTH, query_length_arg);
+  size_t length= min(MAX_QUERY_LENGTH, query_length_arg);
 
-  DBUG_ASSERT(query_source == NULL); /* we don't leak memory */
+  DBUG_ASSERT(m_query_source.str == NULL); /* we don't leak memory */
   if (query_source_arg != NULL)
-    query_source= my_strndup(query_source_arg, length, MYF(0));
+  {
+    m_query_source.str= my_strndup(key_memory_PROFILE,
+                                   query_source_arg, length, MYF(0));
+    m_query_source.length= length;
+  }
 }
 
 void QUERY_PROFILE::new_status(const char *status_arg,
@@ -399,7 +409,8 @@ void PROFILING::start_new_query(const char *initial_state)
   }
 
   enabled= ((thd->variables.option_bits & OPTION_PROFILING) != 0) ||
-            ((thd->variables.log_slow_verbosity & (ULL(1) << SLOG_V_PROFILING)) != 0);
+            ((thd->variables.log_slow_verbosity
+              & (1ULL << SLOG_V_PROFILING)) != 0);
 
   if (! enabled) DBUG_VOID_RETURN;
 
@@ -438,8 +449,9 @@ void PROFILING::finish_current_query()
 
     if ((enabled) &&                                    /* ON at start? */
         (((thd->variables.option_bits & OPTION_PROFILING) != 0) ||
-          ((thd->variables.log_slow_verbosity & (ULL(1) << SLOG_V_PROFILING)) != 0)) &&   /* and ON at end? */
-        (current->query_source != NULL) &&
+          ((thd->variables.log_slow_verbosity & (1ULL << SLOG_V_PROFILING))
+           != 0)) &&   /* and ON at end? */
+        (current->m_query_source.str != NULL) &&
         (! current->entries.is_empty()))
     {
       current->profiling_query_id= next_profile_id();   /* assign an id */
@@ -474,14 +486,14 @@ bool PROFILING::show_profiles()
                                            MYSQL_TYPE_DOUBLE));
   field_list.push_back(new Item_empty_string("Query", 40));
 
-  if (thd->protocol->send_result_set_metadata(&field_list,
-                                 Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
+  if (thd->send_result_metadata(&field_list,
+                                Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
     DBUG_RETURN(TRUE);
 
-  SELECT_LEX *sel= &thd->lex->select_lex;
-  SELECT_LEX_UNIT *unit= &thd->lex->unit;
+  SELECT_LEX *sel= thd->lex->select_lex;
+  SELECT_LEX_UNIT *unit= thd->lex->unit;
   ha_rows idx= 0;
-  Protocol *protocol= thd->protocol;
+  Protocol *protocol= thd->get_protocol();
 
   unit->set_limit(sel);
 
@@ -501,17 +513,17 @@ bool PROFILING::show_profiles()
     if (idx > unit->select_limit_cnt)
       break;
 
-    protocol->prepare_for_resend();
+    protocol->start_row();
     protocol->store((uint32)(prof->profiling_query_id));
     protocol->store((double)(query_time_usecs/(1000.0*1000)),
                     (uint32) TIME_FLOAT_DIGITS-1, &elapsed);
-    if (prof->query_source != NULL)
-      protocol->store(prof->query_source, strlen(prof->query_source),
+    if (prof->m_query_source.str != NULL)
+      protocol->store(prof->m_query_source.str, prof->m_query_source.length,
                       system_charset_info);
     else
       protocol->store_null();
 
-    if (protocol->write())
+    if (protocol->end_row())
       DBUG_RETURN(TRUE);
   }
   my_eof(thd);
@@ -524,7 +536,7 @@ bool PROFILING::show_profiles()
 
   This must be called exactly once per descrete statement.
 */
-void PROFILING::set_query_source(char *query_source_arg, uint query_length_arg)
+void PROFILING::set_query_source(const char *query_source_arg, size_t query_length_arg)
 {
   DBUG_ENTER("PROFILING::set_query_source");
 
@@ -538,9 +550,10 @@ void PROFILING::set_query_source(char *query_source_arg, uint query_length_arg)
   DBUG_VOID_RETURN;
 }
 
-bool PROFILING::enabled_getrusage()
+bool PROFILING::enabled_getrusage() const
 {
-  return ((thd->variables.log_slow_verbosity & (ULL(1) << SLOG_V_PROFILING_USE_GETRUSAGE)) != 0);
+  return ((thd->variables.log_slow_verbosity
+           & (1ULL << SLOG_V_PROFILING_USE_GETRUSAGE)) != 0);
 }
 
 /**
@@ -559,7 +572,7 @@ static void my_b_print_status(IO_CACHE *log_file, const char *status,
 
   my_b_printf(log_file, "Profile_");
   for (tmp= status; *tmp; tmp++)
-    my_b_write_byte(log_file, *tmp == ' ' ? '_' : *tmp);
+    my_b_printf(log_file, "%c", *tmp == ' ' ? '_' : *tmp);
 
   snprintf(query_time_buff, sizeof(query_time_buff), "%.6f",
            (stop->time_usecs - start->time_usecs) / (1000.0 * 1000));
@@ -567,7 +580,7 @@ static void my_b_print_status(IO_CACHE *log_file, const char *status,
 
   my_b_printf(log_file, "Profile_");
   for (tmp= status; *tmp; tmp++)
-    my_b_write_byte(log_file, *tmp == ' ' ? '_' : *tmp);
+    my_b_printf(log_file, "%c", *tmp == ' ' ? '_' : *tmp);
   my_b_printf(log_file, "_cpu: ");
 
   snprintf(query_time_buff, sizeof(query_time_buff), "%.6f",
@@ -582,7 +595,7 @@ static void my_b_print_status(IO_CACHE *log_file, const char *status,
   Print output for current query to file 
 */
 
-int PROFILING::print_current(IO_CACHE *log_file)
+int PROFILING::print_current(IO_CACHE *log_file) const
 {
   DBUG_ENTER("PROFILING::print_current");
   ulonglong row_number= 0;
@@ -624,14 +637,14 @@ int PROFILING::print_current(IO_CACHE *log_file)
           struct where and having conditions at the SQL layer, then this
           condition should be ripped out.
         */
-        if (thd->lex->profile_query_id == 0) /* 0 == show final query */
+        if (thd->lex->query_id == 0) /* 0 == show final query */
         {
           if (query != last)
             continue;
         }
         else
         {
-          if (thd->lex->profile_query_id != query->profiling_query_id)
+          if (thd->lex->query_id != query->profiling_query_id)
             continue;
         }
       }
@@ -639,12 +652,12 @@ int PROFILING::print_current(IO_CACHE *log_file)
       my_b_print_status(log_file, previous->status, previous, entry);
     }
 
-    my_b_write_byte(log_file, '\n');
+    my_b_printf(log_file, "\n");
     if ((entry != NULL) && (first != NULL))
     {
       my_b_printf(log_file, "# ");
       my_b_print_status(log_file, "total", first, entry);
-      my_b_write_byte(log_file, '\n');
+      my_b_printf(log_file, "\n");
     }
 
   DBUG_RETURN(0);
@@ -704,14 +717,14 @@ int PROFILING::fill_statistics_info(THD *thd_arg, TABLE_LIST *tables, Item *cond
           struct where and having conditions at the SQL layer, then this
           condition should be ripped out.
         */
-        if (thd_arg->lex->profile_query_id == 0) /* 0 == show final query */
+        if (thd_arg->lex->query_id == 0) /* 0 == show final query */
         {
           if (query != last)
             continue;
         }
         else
         {
-          if (thd_arg->lex->profile_query_id != query->profiling_query_id)
+          if (thd_arg->lex->query_id != query->profiling_query_id)
             continue;
         }
       }
@@ -860,4 +873,15 @@ int PROFILING::fill_statistics_info(THD *thd_arg, TABLE_LIST *tables, Item *cond
 
   DBUG_RETURN(0);
 }
+/**
+  Clear all the profiling information.
+*/
+void PROFILING::cleanup()
+{
+  while (!history.is_empty())
+    delete history.pop();
+  delete current;
+  current= NULL;
+}
+
 #endif /* ENABLED_PROFILING */

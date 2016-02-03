@@ -68,7 +68,7 @@ INSERT INTO t1 VALUES(5);
 SET @@GLOBAL.innodb_track_changed_pages=FALSE;
 SET @@GLOBAL.innodb_log_checkpoint_now=TRUE;
 
-# 2. Rename a table to log a MLOG_FILE_RENAME operation
+# 2. Rename a table to log a MLOG_FILE_RENAME2 operation
 RENAME TABLE t1 TO t2;
 
 # 3. Start an ALTER TABLE and stop it after the table -> temp table rename
@@ -117,7 +117,7 @@ SET DEBUG_SYNC="now WAIT_FOR changed_pages_query_ready";
 # Remove the first bitmap file in the range after it has been enumerated 
 remove_files_wildcard $MYSQLD_DATADIR ib_modified_log_1_*.xdb;
 
-call mtr.add_suppression("InnoDB: Warning: inconsistent bitmap file directory");
+call mtr.add_suppression("Inconsistent bitmap file directory");
 
 SET DEBUG_SYNC="now SIGNAL finish_changed_pages_query";
 

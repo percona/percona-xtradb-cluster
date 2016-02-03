@@ -164,33 +164,20 @@ class time_collector
 public:
   time_collector(utility& u) : m_utility(&u)
   {
-    my_atomic_rwlock_init(&time_collector_lock);
-  }
-  ~time_collector()
-  {
-    my_atomic_rwlock_destroy(&time_collector_lock);
   }
   uint32 count(QUERY_TYPE type, uint index)
   {
-    my_atomic_rwlock_rdlock(&time_collector_lock);
-    uint32 result= my_atomic_load32((int32*)&m_count[type][index]);
-    my_atomic_rwlock_rdunlock(&time_collector_lock);
-    return result;
+    return my_atomic_load32((int32*)&m_count[type][index]);
   }
   uint64 total(QUERY_TYPE type, uint index)
   {
-    my_atomic_rwlock_rdlock(&time_collector_lock);
-    uint64 result= my_atomic_load64((int64*)&m_total[type][index]);
-    my_atomic_rwlock_rdunlock(&time_collector_lock);
-    return result;
+    return my_atomic_load64((int64*)&m_total[type][index]);
   }
 public:
   void flush()
   {
-    my_atomic_rwlock_wrlock(&time_collector_lock);
     memset((void*)&m_count,0,sizeof(m_count));
     memset((void*)&m_total,0,sizeof(m_total));
-    my_atomic_rwlock_wrunlock(&time_collector_lock);
   }
   void collect(QUERY_TYPE type, uint64 time)
   {
@@ -199,23 +186,16 @@ public:
     {
       if(m_utility->bound(i) > time)
       {
-        my_atomic_rwlock_wrlock(&time_collector_lock);
         my_atomic_add32((int32*)(&m_count[0][i]), 1);
         my_atomic_add64((int64*)(&m_total[0][i]), time);
         my_atomic_add32((int32*)(&m_count[type][i]), 1);
         my_atomic_add64((int64*)(&m_total[type][i]), time);
-        my_atomic_rwlock_wrunlock(&time_collector_lock);
         break;
       }
     }
   }
 private:
   utility* m_utility;
-  /* The lock for atomic operations on
-  m_count, m_total, m_r_count, m_r_total, m_w_count, m_w_total.
-  Only actually used on architectures that do not have atomic
-  implementation of atomic operations. */
-  my_atomic_rwlock_t time_collector_lock;
   /*
    The first row is for overall statistics,
    the second row is for 'read' queries,

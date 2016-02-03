@@ -17,7 +17,7 @@
 #define SQL_DIGEST_H
 
 #include <string.h>
-class String;
+#include "sql_string.h"
 #include "my_md5.h"
 
 #define MAX_DIGEST_STORAGE_SIZE (1024*1024)
@@ -49,14 +49,14 @@ struct sql_digest_storage
   */
   unsigned char *m_token_array;
   /* Length of the token array to be considered for DIGEST_TEXT calculation. */
-  uint m_token_array_length;
+  size_t m_token_array_length;
 
   sql_digest_storage()
   {
     reset(NULL, 0);
   }
 
-  inline void reset(unsigned char *token_array, uint length)
+  inline void reset(unsigned char *token_array, size_t length)
   {
     m_token_array= token_array;
     m_token_array_length= length;

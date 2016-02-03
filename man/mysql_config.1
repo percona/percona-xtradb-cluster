@@ -2,12 +2,12 @@
 .\"     Title: \fBmysql_config\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 11/16/2015
+.\"      Date: 11/28/2015
 .\"    Manual: MySQL Database System
-.\"    Source: MySQL 5.6
+.\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQL_CONFIG\FR" "1" "11/16/2015" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYSQL_CONFIG\FR" "1" "11/28/2015" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,6 +28,7 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .\" mysql_config
+.\" mysql_config_server
 .SH "NAME"
 mysql_config \- display options for compiling clients
 .SH "SYNOPSIS"
@@ -37,6 +38,47 @@ mysql_config \- display options for compiling clients
 .PP
 \fBmysql_config\fR
 provides you with useful information for compiling your MySQL client and connecting it to MySQL\&. It is a shell script, so it is available only on Unix and Unix\-like systems\&.
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.PP
+As of MySQL 5\&.7\&.9,
+\fBpkg\-config\fR
+can be used as an alternative to
+\fBmysql_config\fR
+for obtaining information such as compiler flags or link libraries required to compile MySQL applications\&. For more information, see
+Section\ \&23.8.4.2, \(lqBuilding C API Client Programs Using pkg-config\(rq\&.
+.sp .5v
+.RE
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.PP
+As of MySQL 5\&.7\&.4, for binary distributions for Solaris,
+\fBmysql_config\fR
+does not provide arguments for linking with the embedded library\&. To get linking arguments for the embedded library, use the
+\fBmysql_server_config\fR
+script instead\&.
+.sp .5v
+.RE
 .PP
 \fBmysql_config\fR
 supports the following options\&.
@@ -73,7 +115,7 @@ for more portable options that contain only include paths\&.
 \fB\-\-cxxflags\fR
 .sp
 Like
-\fB\-\-cflags\fR, but for C++ compiler flags\&. This option was added in MySQL 5\&.6\&.4\&.
+\fB\-\-cflags\fR, but for C++ compiler flags\&.
 .RE
 .sp
 .RS 4
@@ -136,7 +178,7 @@ Libraries and options required to link with the MySQL client library\&.
 .\" libs_r option: mysql_config
 \fB\-\-libs_r\fR
 .sp
-Libraries and options required to link with the thread\-safe MySQL client library\&. In MySQL 5\&.6, all client libraries are thread\-safe, so this option need not be used\&. The
+Libraries and options required to link with the thread\-safe MySQL client library\&. In MySQL 5\&.7, all client libraries are thread\-safe, so this option need not be used\&. The
 \fB\-\-libs\fR
 option can be used in all cases\&.
 .RE
@@ -246,7 +288,7 @@ Options:
   \-\-plugindir      [/usr/local/mysql/lib/plugin]
   \-\-socket         [/tmp/mysql\&.sock]
   \-\-port           [3306]
-  \-\-version        [5\&.6\&.11]
+  \-\-version        [5\&.7\&.9]
   \-\-libmysqld\-libs [\-L/usr/local/mysql/lib/mysql \-lmysqld
                     \-lpthread \-lm \-lrt \-lssl \-lcrypto \-ldl \-lcrypt]
   \-\-variable=VAR   VAR is one of:

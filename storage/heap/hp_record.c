@@ -437,7 +437,8 @@ int hp_extract_record(HP_INFO *info, uchar *record, const uchar *pos)
         if (info->blob_size < newsize)
         {
           uchar *ptr;
-          ptr= my_realloc(info->blob_buffer, newsize, MYF(MY_ALLOW_ZERO_PTR));
+          ptr= my_realloc(hp_key_memory_HP_INFO, info->blob_buffer, newsize,
+                          MYF(MY_ALLOW_ZERO_PTR));
           if (ptr == NULL)
           {
             DBUG_RETURN(1);

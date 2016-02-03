@@ -28,3 +28,4 @@ SET GLOBAL innodb_sched_priority_purge=1e1;
 ERROR 42000: Incorrect argument type to variable 'innodb_sched_priority_purge'
 SET GLOBAL innodb_sched_priority_purge='foo';
 ERROR 42000: Incorrect argument type to variable 'innodb_sched_priority_purge'
+# restart

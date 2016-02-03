@@ -1,1 +1,1 @@
---innodb-adaptive-hash-index-partitions=4
+--innodb-adaptive-hash-index-parts=4

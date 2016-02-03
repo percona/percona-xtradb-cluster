@@ -17,9 +17,19 @@
 # Allow config access
   /etc/mysql/** r,
 
+<<<<<<< HEAD
 # Allow pid and socket file access
   /run/mysqld/mysqld.pid rw,
   /run/mysqld/mysqld.sock rw,
+=======
+# Allow pid, socket, socket lock file access
+  /var/run/mysqld/mysqld.pid rw,
+  /var/run/mysqld/mysqld.sock rw,
+  /var/run/mysqld/mysqld.sock.lock rw,
+  /run/mysqld/mysqld.pid rw,
+  /run/mysqld/mysqld.sock rw,
+  /run/mysqld/mysqld.sock.lock rw,
+>>>>>>> ps-5.7
 
 # Allow read/ write to /tmp
   /tmp/ r,
@@ -41,6 +51,13 @@
   /var/lib/mysql/ r,
   /var/lib/mysql/** rwk,
 
+<<<<<<< HEAD
+=======
+# Allow data files dir access
+  /var/lib/mysql-files/ r,
+  /var/lib/mysql-files/** rwk,
+
+>>>>>>> ps-5.7
 # Allow log file access
   /var/log/mysql/ r,
   /var/log/mysql/** rw,

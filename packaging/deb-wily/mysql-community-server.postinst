@@ -29,11 +29,16 @@ case "$1" in
 
 	if [ -z "$2" ];
 	then
+<<<<<<< HEAD
+=======
+
+>>>>>>> ps-5.7
 		set -e
 
 		update-alternatives --install /etc/mysql/my.cnf my.cnf "/etc/mysql/mysql.cnf" 200
 
 		MYSQLDATA=/var/lib/mysql
+<<<<<<< HEAD
 
 		if [ ! -d "${MYSQLDATA}/mysql" -a ! -L "${MYSQLDATA}/mysql" ];
 		then
@@ -69,6 +74,37 @@ EOF
 			mysqld --basedir=/usr --bootstrap --user=mysql --skip-grant-tables < $SQL
 			PASSWD=""
 			rm -f ${SQL}
+=======
+		MYSQLFILES=/var/lib/mysql-files
+
+		if [ ! "$(ls -A ${MYSQLDATA})" ] && [ -d ${MYSQLFILES} ];
+		then
+			db_get mysql-community-server/root-pass && PASSWD=${RET}
+			if [ ! -z "${PASSWD}" ];
+			then
+				SQL=/var/lib/mysql-files/SQL
+				touch ${SQL}
+				chmod 600 ${SQL}
+				chown mysql:mysql ${SQL}
+
+				db_set mysql-community-server/root-pass ""
+				db_set mysql-community-server/re-root-pass ""
+				cat << EOF > ${SQL}
+USE mysql;
+UPDATE user SET authentication_string=PASSWORD('${PASSWD}') WHERE user='root';
+EOF
+				PASSWD=""
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
+				rm -f ${SQL}
+			else
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
+				while [ ! -e $(my_print_defaults mysqld | grep pid-file | cut -d= -f2) ]; do sleep 1; done
+				mysql -e "INSTALL PLUGIN auth_socket SONAME 'auth_socket.so'"
+				mysql -e "USE mysql; UPDATE user SET plugin='auth_socket' WHERE user='root'"
+				mysqladmin shutdown
+			fi
+>>>>>>> ps-5.7
 		fi
 
 		set +e

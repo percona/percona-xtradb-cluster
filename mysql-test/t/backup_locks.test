@@ -3,9 +3,9 @@
 ########################################################################
 
 --source include/have_innodb.inc
+--source include/have_myisam.inc
 --source include/not_embedded.inc
 --source include/have_archive.inc
---source include/have_csv.inc
 --source include/have_blackhole.inc
 
 SHOW VARIABLES LIKE 'have_backup_locks';
@@ -136,8 +136,6 @@ DELETE FROM t_myisam;
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 INSERT INTO t_myisam VALUES(0);
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
-INSERT DELAYED INTO t_myisam VALUES(0);
---error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 UPDATE t_myisam SET a = 1;
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 REPLACE INTO t_myisam VALUES(1);
@@ -151,8 +149,6 @@ DELETE FROM t_memory;
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 INSERT INTO t_memory VALUES(0);
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
-INSERT DELAYED INTO t_memory VALUES(0);
---error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 UPDATE t_memory SET a = 1;
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 REPLACE INTO t_memory VALUES(1);
@@ -162,8 +158,6 @@ SELECT * FROM t_memory;
 DELETE FROM t_archive;
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 INSERT INTO t_archive VALUES(0);
---error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
-INSERT DELAYED INTO t_archive VALUES(0);
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
 UPDATE t_archive SET a = 1;
 --error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
@@ -182,8 +176,6 @@ SELECT * FROM t_csv;
 
 DELETE FROM t_blackhole;
 INSERT INTO t_blackhole VALUES(0);
---error ER_CANT_EXECUTE_WITH_BACKUP_LOCK
-INSERT DELAYED INTO t_blackhole VALUES(0);
 UPDATE t_blackhole SET a = 1;
 REPLACE INTO t_blackhole VALUES(1);
 SELECT * FROM t_blackhole;
@@ -781,8 +773,6 @@ HANDLER t_innodb CLOSE;
 
 --error ER_LOCK_WAIT_TIMEOUT
 INSERT INTO t_myisam VALUES(0);
---error ER_LOCK_WAIT_TIMEOUT
-INSERT DELAYED INTO t_myisam VALUES(0);
 SELECT * FROM t_myisam;
 HANDLER t_myisam OPEN;
 HANDLER t_myisam READ a FIRST;

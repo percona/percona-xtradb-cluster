@@ -15,3 +15,9 @@
 
 MYSQL_ADD_PLUGIN(scalability_metrics scalability_metrics.c
  MODULE_ONLY MODULE_OUTPUT_NAME "scalability_metrics")
+
+IF(UNIX)
+  IF(INSTALL_MYSQLTESTDIR)
+    INSTALL(DIRECTORY tests/mtr/ DESTINATION ${INSTALL_MYSQLTESTDIR}/suite/scalability_metrics COMPONENT Test)
+  ENDIF()
+ENDIF()

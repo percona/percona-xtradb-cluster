@@ -28,6 +28,7 @@
 #include <m_string.h>
 #include <my_getopt.h>
 #include "my_default.h"
+#include <welcome_copyright_notice.h> /* ORACLE_WELCOME_COPYRIGHT_NOTICE */
 
 
 const char *config_file="my";			/* Default config file */
@@ -107,7 +108,7 @@ static void usage(my_bool version)
 	 MACHINE_TYPE);
   if (version)
     return;
-  puts("This software comes with ABSOLUTELY NO WARRANTY. This is free software,\nand you are welcome to modify and redistribute it under the GPL license\n");
+  puts(ORACLE_WELCOME_COPYRIGHT_NOTICE("2000"));
   puts("Prints all arguments that is give to some program using the default files");
   printf("Usage: %s [OPTIONS] groups\n", my_progname);
   my_print_help(my_long_options);
@@ -181,7 +182,8 @@ int main(int argc, char **argv)
   arguments[count]= 0;
 
   /* Check out the args */
-  if (!(load_default_groups=(char**) my_malloc((argc+1)*sizeof(char*),
+  if (!(load_default_groups=(char**) my_malloc(PSI_NOT_INSTRUMENTED,
+                                               (argc+1)*sizeof(char*),
 					       MYF(MY_WME))))
     exit(1);
   if (get_options(&argc,&argv))

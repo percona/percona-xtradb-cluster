@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,8 +14,10 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "mysys_priv.h"
+#include "my_sys.h"
 #include "mysys_err.h"
 #include <errno.h>
+#include "my_thread_local.h"
 
 
 /**
@@ -76,14 +78,13 @@ size_t my_write(File Filedes, const uchar *Buffer, size_t Count, myf MyFlags)
       Buffer+= writtenbytes;
       Count-= writtenbytes;
     }
-    my_errno= errno;
+    set_my_errno(errno);
     DBUG_PRINT("error",("Write only %ld bytes, error: %d",
-			(long) writtenbytes, my_errno));
-#ifndef NO_BACKGROUND
-    if (my_thread_var->abort)
+			(long) writtenbytes, my_errno()));
+    if (is_killed_hook(NULL))
       MyFlags&= ~ MY_WAIT_IF_FULL;		/* End if aborted by user */
 
-    if ((my_errno == ENOSPC || my_errno == EDQUOT) &&
+    if ((my_errno() == ENOSPC || my_errno() == EDQUOT) &&
         (MyFlags & MY_WAIT_IF_FULL))
     {
       wait_for_free_space(my_filename(Filedes), errors);
@@ -95,30 +96,38 @@ size_t my_write(File Filedes, const uchar *Buffer, size_t Count, myf MyFlags)
 
     if (writtenbytes != 0 && writtenbytes != (size_t) -1)
       continue;                                 /* Retry if something written */
-    else if (my_errno == EINTR)
-      {
-        DBUG_PRINT("debug", ("my_write() was interrupted and returned %ld",
-                             (long) writtenbytes));
+    else if (my_errno() == EINTR)
+    {
+      DBUG_PRINT("debug", ("my_write() was interrupted and returned %ld",
+                           (long) writtenbytes));
       continue;                                 /* Interrupted, retry */
       }
     else if (writtenbytes == 0 && !errors++)    /* Retry once */
-      {
-        /* We may come here if the file quota is exeeded */
-        continue;
-      }
-#endif
+    {
+      /* We may come here if the file quota is exeeded */
+      continue;
+    }
     break;
   }
     if (MyFlags & (MY_NABP | MY_FNABP))
     {
     if (sum_written == initial_count)
       DBUG_RETURN(0);        /* Want only errors, not bytes written */
+<<<<<<< HEAD
       if (MyFlags & (MY_WME | MY_FAE | MY_FNABP))
       {
         char errbuf[MYSYS_STRERROR_SIZE];
         my_error(EE_WRITE, MYF(ME_BELL+ME_WAITTANG), my_filename(Filedes),
                  my_errno, my_strerror(errbuf, sizeof(errbuf), my_errno));
       }
+=======
+    if (MyFlags & (MY_WME | MY_FAE | MY_FNABP))
+    {
+      char errbuf[MYSYS_STRERROR_SIZE];
+      my_error(EE_WRITE, MYF(0), my_filename(Filedes),
+               my_errno(), my_strerror(errbuf, sizeof(errbuf), my_errno()));
+    }
+>>>>>>> ps-5.7
     DBUG_RETURN(MY_FILE_ERROR);
     }
 

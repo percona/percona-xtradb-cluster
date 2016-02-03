@@ -40,14 +40,14 @@ typedef struct log_bitmap_iterator_struct log_bitmap_iterator_t;
 
 /*********************************************************************//**
 Initializes the online log following subsytem. */
-UNIV_INTERN
+
 void
 log_online_read_init(void);
 /*=======================*/
 
 /*********************************************************************//**
 Shuts down the online log following subsystem. */
-UNIV_INTERN
+
 void
 log_online_read_shutdown(void);
 /*===========================*/
@@ -56,37 +56,23 @@ log_online_read_shutdown(void);
 Reads and parses the redo log up to last checkpoint LSN to build the changed
 page bitmap which is then written to disk.
 
-@return TRUE if log tracking succeeded, FALSE if bitmap write I/O error */
-UNIV_INTERN
-ibool
+@return true if log tracking succeeded, false if bitmap write I/O error */
+
+bool
 log_online_follow_redo_log(void);
 /*=============================*/
 
 /************************************************************//**
 Delete all the bitmap files for data less than the specified LSN.
-If called with lsn == 0 (i.e. set by RESET request) or
-IB_ULONGLONG_MAX, restart the bitmap file sequence, otherwise
-continue it.
+If called with lsn == 0 (i.e. set by RESET request) or LSN_MAX, restart the
+bitmap file sequence, otherwise continue it.
 
-@return FALSE to indicate success, TRUE for failure. */
-UNIV_INTERN
-ibool
+@return false to indicate success, true for failure. */
+
+bool
 log_online_purge_changed_page_bitmaps(
 /*==================================*/
-	ib_uint64_t lsn);	/*!<in: LSN to purge files up to */
-
-/************************************************************//**
-Delete all the bitmap files for data less than the specified LSN.
-If called with lsn == 0 (i.e. set by RESET request) or
-IB_ULONGLONG_MAX, restart the bitmap file sequence, otherwise
-continue it.
-
-@return FALSE to indicate success, TRUE for failure. */
-UNIV_INTERN
-ibool
-log_online_purge_changed_page_bitmaps(
-/*==================================*/
-	ib_uint64_t lsn);	/*!<in: LSN to purge files up to */
+	lsn_t lsn);	/*!<in: LSN to purge files up to */
 
 #define LOG_BITMAP_ITERATOR_START_LSN(i) \
 	((i).start_lsn)
@@ -104,9 +90,9 @@ Initializes log bitmap iterator.  The minimum LSN is used for finding the
 correct starting file with records and it there may be records returned by
 the iterator that have LSN less than start_lsn.
 
-@return TRUE if the iterator is initialized OK, FALSE otherwise. */
-UNIV_INTERN
-ibool
+@return true if the iterator is initialized OK, false otherwise. */
+
+bool
 log_online_bitmap_iterator_init(
 /*============================*/
 	log_bitmap_iterator_t	*i,		/*!<in/out:  iterator */
@@ -117,7 +103,7 @@ log_online_bitmap_iterator_init(
 
 /*********************************************************************//**
 Releases log bitmap iterator. */
-UNIV_INTERN
+
 void
 log_online_bitmap_iterator_release(
 /*===============================*/
@@ -127,9 +113,9 @@ log_online_bitmap_iterator_release(
 Iterates through bits of saved bitmap blocks.
 Sequentially reads blocks from bitmap file(s) and interates through
 their bits. Ignores blocks with wrong checksum.
-@return TRUE if iteration is successful, FALSE if all bits are iterated. */
-UNIV_INTERN
-ibool
+@return true if iteration is successful, false if all bits are iterated. */
+
+bool
 log_online_bitmap_iterator_next(
 /*============================*/
 	log_bitmap_iterator_t *i); /*!<in/out: iterator */
@@ -160,7 +146,7 @@ struct log_online_bitmap_file_range_struct {
 /** Struct for an iterator through all bits of changed pages bitmap blocks */
 struct log_bitmap_iterator_struct
 {
-	ibool				failed;		/*!< Has the iteration
+	bool				failed;		/*!< Has the iteration
 							stopped prematurely */
 	log_online_bitmap_file_range_t	in_files;	/*!< The bitmap files
 							for this iterator */
@@ -181,10 +167,10 @@ struct log_bitmap_iterator_struct
 	ib_uint32_t			first_page_id;	/*!< Id of the first
 							page in the current
 							block */
-	ibool				last_page_in_run;/*!< "Last page in
+	bool				last_page_in_run;/*!< "Last page in
 							run" flag value for the
 							current block */
-	ibool				changed;	/*!< true if current
+	bool				changed;	/*!< true if current
 							page was changed */
 	byte*				page;		/*!< Bitmap block */
 };

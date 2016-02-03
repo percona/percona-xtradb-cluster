@@ -17,6 +17,10 @@
 %global mysql_vendor Oracle and/or its affiliates
 %global mysqldatadir /var/lib/mysql
 
+# Pass path to mecab lib
+%{?with_mecab: %global mecab_option -DWITH_MECAB=%{with_mecab}}
+%{?with_mecab: %global mecab 1}
+
 # Regression tests may take a long time, override the default to skip them
 %{!?runselftest:%global runselftest 0}
 
@@ -39,14 +43,15 @@
 Name:           mysql-%{product_suffix}-minimal
 Summary:        A very fast and reliable SQL database server
 Group:          Applications/Databases
-Version:        @VERSION@
-Release:        2%{?commercial:.1}%{?dist}
+Version:        @MYSQL_NO_DASH_VERSION@
+Release:        1%{?commercial:.1}%{?dist}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. All rights reserved. Under %{?license_type} license as shown in the Description field.
 URL:            http://www.mysql.com/
 Packager:       MySQL Release Engineering <mysql-build@oss.oracle.com>
 Vendor:         %{mysql_vendor}
 Source0:        https://cdn.mysql.com/Downloads/MySQL-@MYSQL_BASE_VERSION@/%{src_dir}.tar.gz
-BuildRequires:  cmake
+Source1:        http://downloads.sourceforge.net/boost/@BOOST_PACKAGE_NAME@.tar.bz2
+BuildRequires:  cmake >= 2.8.2
 BuildRequires:  perl
 BuildRequires:  perl(Time::HiRes)
 BuildRequires:  perl(Env)
@@ -84,7 +89,6 @@ documentation and the manual for more information.
 Summary:        A very fast and reliable SQL database server
 Group:          Applications/Databases
 Requires:       shadow-utils
-Requires:       perl(Data::Dumper)
 Provides:       mysql-server = %{version}-%{release}
 Provides:       mysql-server%{?_isa} = %{version}-%{release}
 Provides:       mysql-compat-server = %{version}-%{release}
@@ -111,7 +115,7 @@ and the manual for more information.
 This package includes the MySQL server binary as well as related utilities
 to run and administer a MySQL server.
 %prep
-%setup -q -T -a 0 -c -n %{src_dir}
+%setup -q -T -a 0 -a 1 -c -n %{src_dir}
 
 %build
 # Fail quickly and obviously if user tries to build as root
@@ -132,17 +136,18 @@ mkdir release
            -DBUILD_CONFIG=mysql_release \
            -DINSTALL_LAYOUT=RPM \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	   -DWITH_BOOST=.. \
            -DCMAKE_C_FLAGS="%{optflags}" \
            -DCMAKE_CXX_FLAGS="%{optflags}" \
            -DWITH_INNODB_MEMCACHED=1 \
            -DINSTALL_LIBDIR="%{_lib}/mysql" \
            -DINSTALL_PLUGINDIR="%{_lib}/mysql/plugin" \
-           -DINSTALL_SQLBENCHDIR="" \
            -DINSTALL_MYSQLTESTDIR="" \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DWITH_EMBEDDED_SERVER=0 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
+           %{?mecab_option} \
            -DWITH_SSL=system \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DMYSQL_SERVER_SUFFIX="%{?server_suffix}"
@@ -166,35 +171,34 @@ make DESTDIR=%{buildroot} install
 install -D -m 0644 $MBD/release/packaging/rpm-docker/my.cnf %{buildroot}%{_sysconfdir}/my.cnf
 install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 
-# Remove man, sql-bench, include, and libs
-for f in %{_mandir} %{_datadir}/sql-bench %{_includedir} %{_datadir}/aclocal/mysql.m4 ; do
+# Remove man, include, and libs
+for f in %{_mandir} %{_includedir} %{_datadir}/aclocal/mysql.m4 ; do
     rm -rf %{buildroot}$f
 done
 rm -rf %{buildroot}%{_libdir}/mysql/libmysql*
 
 # Removing some tools
-for f in msql2mysql mysqlaccess mysqlaccess.conf mysqlbug mysql_convert_table_format \
-         mysql_find_rows mysql_fix_extensions mysqlhotcopy mysql_setpermission \
-         mysql_waitpid mysql_zap; do
-    rm -f %{buildroot}%{_bindir}/$f
-done
-
 for f in innochecksum myisamchk myisam_ftdump myisamlog myisampack mysqladmin \
          mysqlbinlog mysqlcheck mysql_client_test mysql_config_editor \
          mysqld_multi mysqld_safe mysqldumpslow mysql_embedded mysqlimport \
          mysql_plugin mysql_secure_installation mysqlshow mysqlslap  mysqltest \
-         perror replace  resolveip  resolve_stack_dump; do
+         perror replace  resolveip  resolve_stack_dump lz4_decompress \
+         zlib_decompress; do
     rm -f %{buildroot}%{_bindir}/$f
 done
 
 #  Remove test plugins
 for p in auth.so auth_test_plugin.so daemon_example.ini libdaemon_example.so qa_auth_client.so \
-    qa_auth_interface.so qa_auth_server.so replication_observers_example_plugin.so ha_example.so ; do
+    qa_auth_interface.so qa_auth_server.so replication_observers_example_plugin.so ha_example.so \
+    test_security_context.so ; do
     rm -f %{buildroot}%{_libdir}/mysql/plugin/$p
 done
 
+rm -f %{buildroot}%{_libdir}/mysql/plugin/libtest_*.so
+rm -f %{buildroot}%{_libdir}/pkgconfig/mysqlclient.pc
+
 # No need for these scripts
-rm -f %{buildroot}%{_datadir}/mysql/{mysql.server,mysqld_multi.server,mysql-log-rotate,binary-configure}
+rm -f %{buildroot}%{_datadir}/mysql/{mysql.server,mysqld_multi.server,my-*.cnf,mysql-log-rotate}
 
 %check
 %if 0%{?runselftest}
@@ -222,16 +226,19 @@ rm -r $(readlink var) var
 
 %files -n mysql-%{product_suffix}-server-minimal
 %defattr(-, root, root, -)
-%doc %{?license_files_server}
+%doc %{?license_files_server} %{src_dir}/Docs/ChangeLog
 %doc %{src_dir}/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
+%doc release/support-files/my-default.cnf
 %config(noreplace) %{_sysconfdir}/my.cnf
 %dir %{_sysconfdir}/my.cnf.d
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_bindir}/mysql
 %attr(755, root, root) %{_bindir}/mysqldump
+%attr(755, root, root) %{_bindir}/mysqlpump
 %attr(755, root, root) %{_bindir}/mysql_config
 %attr(755, root, root) %{_bindir}/mysql_install_db
+%attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
 %attr(755, root, root) %{_bindir}/mysql_upgrade
 %attr(755, root, root) %{_bindir}/my_print_defaults
@@ -240,11 +247,19 @@ rm -r $(readlink var) var
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_socket.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/innodb_engine.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/libmemcached.so
+%if 0%{?mecab}
+%{_libdir}/mysql/mecab
+%attr(755, root, root) %{_libdir}/mysql/plugin/libpluginmecab.so
+%endif
+%attr(755, root, root) %{_libdir}/mysql/plugin/locking_service.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/mypluglib.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/mysql_no_login.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/rewrite_example.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/rewriter.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/semisync_master.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/semisync_slave.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/validate_password.so
-%attr(755, root, root) %{_libdir}/mysql/plugin/mysql_no_login.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/version_token.so
 %dir %{_datadir}/mysql/
 %{_datadir}/mysql/charsets/
 %{_datadir}/mysql/bulgarian/
@@ -272,25 +287,32 @@ rm -r $(readlink var) var
 %{_datadir}/mysql/swedish/
 %{_datadir}/mysql/ukrainian/
 %attr(644, root, root) %{_datadir}/mysql/errmsg-utf8.txt
-%attr(644, root, root) %{_datadir}/mysql/my-default.cnf
 %attr(644, root, root) %{_datadir}/mysql/fill_help_tables.sql
 %attr(644, root, root) %{_datadir}/mysql/mysql_system_tables.sql
 %attr(644, root, root) %{_datadir}/mysql/mysql_system_tables_data.sql
+%attr(644, root, root) %{_datadir}/mysql/mysql_sys_schema.sql
 %attr(644, root, root) %{_datadir}/mysql/mysql_test_data_timezone.sql
 %attr(644, root, root) %{_datadir}/mysql/mysql_security_commands.sql
 %attr(644, root, root) %{_datadir}/mysql/dictionary.txt
 %attr(644, root, root) %{_datadir}/mysql/innodb_memcached_config.sql
+%attr(644, root, root) %{_datadir}/mysql/install_rewriter.sql
+%attr(644, root, root) %{_datadir}/mysql/uninstall_rewriter.sql
 %attr(644, root, root) %{_datadir}/mysql/magic
 %dir %attr(750, mysql, mysql) /var/lib/mysql
 %dir %attr(755, mysql, mysql) /var/run/mysqld
 %dir %attr(750, mysql, mysql) /var/lib/mysql-files
 
 %changelog
-* Thu Jun 25 2015 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.6.26-1
-- Update package names
+* Mon Oct 19 2015 Bharathy Satish <bharathy.x.satish@oracle.com> - 5.7.10-1
+  Added new decompression utilities lz4_decompress and zlib_decompress binaries to
+  client subpackage.
 
-* Mon Feb 16 2015 Terje Rosten <terje.rosten@oracle.com> - 5.6.23-1
-- Port to 5.6.
+* Mon Jul 6 2015 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.9-1
+- Updated for 5.7.9
+
+* Wed Jul 1 2015 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.8-0.3.rc
+- Update package names
+- Handle plugin changes
 
 * Mon Feb 16 2015 Terje Rosten <terje.rosten@oracle.com> - 5.7.6-0.3.m16
 - Introduce minimal server for docker

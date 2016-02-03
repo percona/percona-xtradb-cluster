@@ -343,12 +343,9 @@ INSERT INTO ICP_COPY SELECT * FROM INFORMATION_SCHEMA.INNODB_CHANGED_PAGES
        WHERE END_LSN <= @max_end_lsn;
 
 # Restart with log tracking disabled       
---exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---shutdown_server 10
---source include/wait_until_disconnected.inc
---enable_reconnect
---exec echo "restart:--innodb-track-changed-pages=FALSE" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---source include/wait_until_connected_again.inc
+--let $restart_parameters=restart:--innodb_track_changed_pages=FALSE
+--source include/restart_mysqld.inc
+--let $restart_parameters=
 
 SELECT @@global.innodb_track_changed_pages;
 

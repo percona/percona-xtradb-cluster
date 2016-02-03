@@ -16,10 +16,11 @@
 #include <my_global.h>
 #include <mysql/plugin.h>
 #include <my_sys.h>
-#include <my_pthread.h>
 #include <string.h>
+#include <my_thread_local.h>
 
 #include "logger.h"
+#include "audit_log.h"
 
 extern char *mysql_data_home;
 
@@ -117,20 +118,21 @@ LOGGER_HANDLE *logger_open(const char *path,
 
   if ((new_log.file= my_open(new_log.path, LOG_FLAGS, 0666)) < 0)
   {
-    errno= my_errno;
+    errno= my_errno();
     /* Check errno for the cause */
     return 0;
   }
 
   if (my_fstat(new_log.file, &stat_arg, MYF(0)))
   {
-    errno= my_errno;
+    errno= my_errno();
     my_close(new_log.file, MYF(0));
     new_log.file= -1;
     return 0;
   }
 
-  if (!(l_perm= (LOGGER_HANDLE *) my_malloc(sizeof(LOGGER_HANDLE), MYF(0))))
+  if (!(l_perm= (LOGGER_HANDLE *) my_malloc(key_memory_audit_log_logger_handle,
+                                            sizeof(LOGGER_HANDLE), MYF(0))))
   {
     my_close(new_log.file, MYF(0));
     new_log.file= -1;
@@ -160,7 +162,7 @@ int logger_close(LOGGER_HANDLE *log, logger_epilog_func_t footer)
   flogger_mutex_destroy(log);
   my_free(log);
   if ((result= my_close(file, MYF(0))))
-    errno= my_errno;
+    errno= my_errno();
   return result;
 }
 
@@ -180,20 +182,20 @@ int logger_reopen(LOGGER_HANDLE *log, logger_prolog_func_t header,
 
   if ((result= my_close(log->file, MYF(0))))
   {
-    errno= my_errno;
+    errno= my_errno();
     goto error;
   }
 
   if ((log->file= my_open(log->path, LOG_FLAGS, MYF(0))) < 0)
   {
-    errno= my_errno;
+    errno= my_errno();
     result= 1;
     goto error;
   }
 
   if ((result= my_fstat(log->file, &stat_arg, MYF(0))))
   {
-    errno= my_errno;
+    errno= my_errno();
     goto error;
   }
 
@@ -207,9 +209,11 @@ error:
 }
 
 
-static char *logname(LOGGER_HANDLE *log, char *buf, unsigned int n_log)
+static char *logname(LOGGER_HANDLE *log, char *buf, size_t buf_len,
+                     unsigned int n_log)
 {
-  sprintf(buf+log->path_len, ".%0*u", n_dig(log->rotations), n_log);
+  snprintf(buf+log->path_len, buf_len, ".%0*u", n_dig(log->rotations),
+           n_log);
   return buf;
 }
 
@@ -226,11 +230,11 @@ static int do_rotate(LOGGER_HANDLE *log)
 
   memcpy(namebuf, log->path, log->path_len);
 
-  buf_new= logname(log, namebuf, log->rotations);
+  buf_new= logname(log, namebuf, sizeof(namebuf), log->rotations);
   buf_old= log->path;
   for (i=log->rotations-1; i>0; i--)
   {
-    logname(log, buf_old, i);
+    logname(log, buf_old, FN_REFLEN, i);
     if (!access(buf_old, F_OK) &&
         (result= my_rename(buf_old, buf_new, MYF(0))))
       goto exit;
@@ -241,10 +245,10 @@ static int do_rotate(LOGGER_HANDLE *log)
   if ((result= my_close(log->file, MYF(0))))
     goto exit;
   namebuf[log->path_len]= 0;
-  result= my_rename(namebuf, logname(log, log->path, 1), MYF(0));
+  result= my_rename(namebuf, logname(log, log->path, FN_REFLEN, 1), MYF(0));
   log->file= my_open(namebuf, LOG_FLAGS, MYF(0));
 exit:
-  errno= my_errno;
+  errno= my_errno();
   return log->file < 0 || result;
 }
 
@@ -263,7 +267,7 @@ int logger_vprintf(LOGGER_HANDLE *log, const char* fmt, va_list ap)
          do_rotate(log)))
     {
       result= -1;
-      errno= my_errno;
+      errno= my_errno();
       goto exit; /* Log rotation needed but failed */
     }
 
@@ -296,7 +300,7 @@ int logger_write(LOGGER_HANDLE *log, const char *buffer, size_t size,
          do_rotate(log)))
     {
       result= -1;
-      errno= my_errno;
+      errno= my_errno();
       goto exit; /* Log rotation needed but failed */
     }
   }
@@ -331,7 +335,7 @@ void logger_init_mutexes()
 {
 #if defined(HAVE_PSI_INTERFACE) && !defined(FLOGGER_NO_PSI) && !defined(FLOGGER_NO_THREADSAFE)
   if (PSI_server)
-    PSI_server->register_mutex("audit_logger", mutex_list, 1);
+    PSI_server->register_mutex(PSI_CATEGORY, mutex_list, 1);
 #endif /*HAVE_PSI_INTERFACE && !FLOGGER_NO_PSI*/
 }
 

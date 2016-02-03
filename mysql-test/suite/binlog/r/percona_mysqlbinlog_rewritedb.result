@@ -83,40 +83,6 @@ f
 2
 2
 #
-# Apply log with '--rewrite-db="  a  -> bbbbbbbbbbbbbbbbbbbb , cccccccccccccccc ->   d  "'
-#
-# use a
-f
-# use bbbbbbbbbbbbbbbbbbbb
-f
-0
-0
-1
-1
-# use cccccccccccccccc
-f
-# use d
-f
-2
-2
-#
-# Apply log with '--rewrite-db="a->bbbbbbbbbbbbbbbbbbbb,cccccccccccccccc->d"'
-#
-# use a
-f
-# use bbbbbbbbbbbbbbbbbbbb
-f
-0
-0
-1
-1
-# use cccccccccccccccc
-f
-# use d
-f
-2
-2
-#
 # Apply log with '--rewrite-db="a->d"'
 #
 # use a

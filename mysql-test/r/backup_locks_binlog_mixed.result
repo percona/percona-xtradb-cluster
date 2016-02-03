@@ -119,19 +119,19 @@ ALTER TABLE t_archive ADD COLUMN b CHAR(10) NOT NULL;
 ALTER TABLE t_archive DROP COLUMN b;
 ALTER TABLE t_innodb ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_innodb'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_innodb'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_innodb DROP KEY tmp;
 ALTER TABLE t_myisam ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_myisam'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_myisam'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_myisam DROP KEY tmp;
 ALTER TABLE t_memory ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_memory'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_memory'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_memory DROP KEY tmp;
 ALTER TABLE t_blackhole ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_blackhole'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_blackhole'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_blackhole DROP KEY tmp;
 CREATE DATABASE test1;
 DROP DATABASE test1;
@@ -519,25 +519,6 @@ t_innodb	CREATE TABLE `t_innodb` (
 DROP TABLE t_innodb;
 CREATE TABLE t_innodb(a INT NOT NULL) ENGINE=InnoDB;
 # connection default
-LOCK BINLOG FOR BACKUP;
-# connection con1
-INSERT DELAYED INTO t_myisam VALUES(0);
-Warnings:
-Warning	1287	'INSERT DELAYED' is deprecated and will be removed in a future release. Please use INSERT instead
-# connection default
-must_be_1
-1
-UNLOCK BINLOG;
-SELECT * FROm t_myisam;
-a
-0
-1
-1
-1
-1
-1
-1
-1
 SET @old_general_log = @@general_log;
 SET @old_slow_query_log = @@slow_query_log;
 SET @old_log_output = @@log_output;

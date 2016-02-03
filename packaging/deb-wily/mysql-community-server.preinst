@@ -57,6 +57,10 @@ case "$1" in
 		fi
 
 		MYSQLDATA=/var/lib/mysql
+<<<<<<< HEAD
+=======
+		MYSQLFILES=/var/lib/mysql-files
+>>>>>>> ps-5.7
 		MYSQLLOG=/var/log/mysql
 		MYSQLRUN=/var/run/mysqld
 
@@ -77,6 +81,16 @@ case "$1" in
 			chmod 750 ${MYSQLDATA}
 		fi
 
+<<<<<<< HEAD
+=======
+		if [ ! -d ${MYSQLFILES} -a ! -L ${MYSQLFILES} ];
+		then
+			mkdir ${MYSQLFILES}
+			chown mysql:mysql ${MYSQLFILES}
+			chmod 770 ${MYSQLFILES}
+		fi
+
+>>>>>>> ps-5.7
 		if [ ! -d ${MYSQLLOG} -a ! -L ${MYSQLLOG} ];
 		then
 			mkdir ${MYSQLLOG}

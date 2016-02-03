@@ -2,12 +2,12 @@
 .\"     Title: \fBmysql_config_editor\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 11/16/2015
+.\"      Date: 11/28/2015
 .\"    Manual: MySQL Database System
-.\"    Source: MySQL 5.6
+.\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQL_CONFIG_EDIT" "1" "11/16/2015" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYSQL_CONFIG_EDIT" "1" "11/28/2015" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -38,7 +38,7 @@ mysql_config_editor \- configure authentication information for connecting to My
 .PP
 The
 \fBmysql_config_editor\fR
-utility (available as of MySQL 5\&.6\&.6) enables you to store authentication credentials in an encrypted login path file named
+utility enables you to store authentication credentials in an encrypted login path file named
 \&.mylogin\&.cnf\&. The file location is the
 %APPDATA%\eMySQL
 directory on Windows and the current user\*(Aqs home directory on non\-Windows systems\&. The file can be read later by MySQL client programs to obtain authentication credentials for connecting to MySQL Server\&.
@@ -780,7 +780,7 @@ To see a general help message, use
 \fB\-\-host\fR,
 \fB\-h\fR
 .sp
-Remove the host name from the login path\&. This option was added in MySQL 5\&.6\&.9\&.
+Remove the host name from the login path\&.
 .RE
 .sp
 .RS 4
@@ -810,7 +810,7 @@ if this option is not given\&.
 \fB\-\-password\fR,
 \fB\-p\fR
 .sp
-Remove the password from the login path\&. This option was added in MySQL 5\&.6\&.9\&.
+Remove the password from the login path\&.
 .RE
 .sp
 .RS 4
@@ -824,7 +824,7 @@ Remove the password from the login path\&. This option was added in MySQL 5\&.6\
 \fB\-\-port\fR,
 \fB\-P\fR
 .sp
-Remove the TCP/IP port number from the login path\&. This option was added in MySQL 5\&.6\&.11\&.
+Remove the TCP/IP port number from the login path\&. This option was added in MySQL 5\&.7\&.1\&.
 .RE
 .sp
 .RS 4
@@ -838,7 +838,7 @@ Remove the TCP/IP port number from the login path\&. This option was added in My
 \fB\-\-socket\fR,
 \fB\-S\fR
 .sp
-Remove the Unix socket file name from the login path\&. This option was added in MySQL 5\&.6\&.11\&.
+Remove the Unix socket file name from the login path\&. This option was added in MySQL 5\&.7\&.1\&.
 .RE
 .sp
 .RS 4
@@ -852,7 +852,7 @@ Remove the Unix socket file name from the login path\&. This option was added in
 \fB\-\-user\fR,
 \fB\-u\fR
 .sp
-Remove the user name from the login path\&. This option was added in MySQL 5\&.6\&.9\&.
+Remove the user name from the login path\&.
 .RE
 .sp
 .RS 4
@@ -1026,7 +1026,7 @@ password =
 \fB\-\-port=\fR\fB\fIport_num\fR\fR,
 \fB\-P \fR\fB\fIport_num\fR\fR
 .sp
-The TCP/IP port number to write to the login path\&. This option was added in MySQL 5\&.6\&.11\&.
+The TCP/IP port number to write to the login path\&. This option was added in MySQL 5\&.7\&.1\&.
 .RE
 .sp
 .RS 4
@@ -1040,7 +1040,7 @@ The TCP/IP port number to write to the login path\&. This option was added in My
 \fB\-\-socket=\fR\fB\fIfile_name\fR\fR,
 \fB\-S \fR\fB\fIfile_name\fR\fR
 .sp
-The Unix socket file name to write to the login path\&. This option was added in MySQL 5\&.6\&.11\&.
+The Unix socket file name to write to the login path\&. This option was added in MySQL 5\&.7\&.1\&.
 .RE
 .sp
 .RS 4

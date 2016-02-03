@@ -6,16 +6,14 @@
 
 # Binary must be compiled with debug for crash to occur
 --source include/have_debug.inc
---source include/have_innodb.inc
 --source include/have_log_bin.inc
-call mtr.add_suppression('Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT.');
 
 CREATE TABLE t1(a CHAR(255),
                 b CHAR(255),
                 c CHAR(255),
                 d CHAR(255),
                 id INT AUTO_INCREMENT,
-                PRIMARY KEY(id)) ENGINE=InnoDB;
+                PRIMARY KEY(id));
 create table t2 like t1;
 delimiter //;
 create procedure setcrash(IN i INT)

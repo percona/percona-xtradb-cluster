@@ -41,8 +41,10 @@ CREATE TABLE t1(a INT, b INT, c INT, d INT, PRIMARY KEY(a,b,c), CLUSTERING KEY(b
 PARTITION BY RANGE(a) (PARTITION p0 VALUES LESS THAN (5) ENGINE = TOKUDB, PARTITION p2 VALUES LESS THAN MAXVALUE ENGINE = TOKUDB);
 insert into t1 values (1,10,100,1000),(2,20,200,2000),(3,30,300,3000),(4,40,400,4000),(5,50,500,5000),(6,60,600,6000),(7,70,700,7000),(8,80,800,8000),(9,90,900,9000);
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	PRIMARY	PRIMARY	4	NULL;	4	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d
 6	60	600	6000
@@ -50,8 +52,10 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d
 4	40	400	4000
@@ -61,21 +65,27 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select a from t1 where a > 8;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	PRIMARY	PRIMARY	4	NULL;	1	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where (`test`.`t1`.`a` > 8)
 select a from t1 where a > 8;
 a
 9
 explain select a,b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select a,b from t1 where b > 30;
 a	b
 4	40
@@ -85,8 +95,10 @@ a	b
 8	80
 9	90
 explain select a,b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	c	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select a,c from t1 where c > 750;
 a	c
 8	800
@@ -96,8 +108,10 @@ insert into t1 values (10,10,10,10);
 alter table t1 drop index bdca;
 alter table t1 drop primary key;
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	ALL	NULL	NULL	NULL	NULL;	6	33.33	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d
 6	60	600	6000
@@ -106,8 +120,10 @@ a	b	c	d
 9	90	900	9000
 10	10	10	10
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	8	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d
 4	40	400	4000
@@ -117,15 +133,19 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	3	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	8	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select b from t1 where b > 30;
 b
 40
@@ -135,8 +155,10 @@ b
 80
 90
 explain select b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	3	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select c from t1 where c > 750;
 c
 800
@@ -144,8 +166,10 @@ c
 alter table t1 add e varchar(20);
 alter table t1 add primary key (a,b,c);
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	PRIMARY	PRIMARY	4	NULL;	5	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d	e
 6	60	600	6000	NULL
@@ -154,8 +178,10 @@ a	b	c	d	e
 9	90	900	9000	NULL
 10	10	10	10	NULL
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	8	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d	e
 4	40	400	4000	NULL
@@ -165,22 +191,28 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	3	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select a from t1 where a > 8;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where (`test`.`t1`.`a` > 8)
 select a from t1 where a > 8;
 a
 9
 10
 explain select a,b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	8	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select a,b from t1 where b > 30;
 a	b
 4	40
@@ -190,16 +222,20 @@ a	b
 8	80
 9	90
 explain select a,b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	3	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select a,c from t1 where c > 750;
 a	c
 8	800
 9	900
 alter table t1 drop primary key;
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	ALL	NULL	NULL	NULL	NULL;	6	33.33	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d	e
 6	60	600	6000	NULL
@@ -208,8 +244,10 @@ a	b	c	d	e
 9	90	900	9000	NULL
 10	10	10	10	NULL
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	8	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d	e
 4	40	400	4000	NULL
@@ -219,15 +257,19 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	3	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	8	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select b from t1 where b > 30;
 b
 40
@@ -237,8 +279,10 @@ b
 80
 90
 explain select b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	3	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select c from t1 where c > 750;
 c
 800
@@ -248,8 +292,10 @@ CREATE TABLE t1(a INT, b INT, c INT, d INT, PRIMARY KEY(a,b,c), CLUSTERING KEY(b
 PARTITION BY RANGE(b) (PARTITION p0 VALUES LESS THAN (50) ENGINE = TOKUDB, PARTITION p2 VALUES LESS THAN MAXVALUE ENGINE = TOKUDB);
 insert into t1 values (1,10,100,1000),(2,20,200,2000),(3,30,300,3000),(4,40,400,4000),(5,50,500,5000),(6,60,600,6000),(7,70,700,7000),(8,80,800,8000),(9,90,900,9000);
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d
 6	60	600	6000
@@ -257,8 +303,10 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d
 4	40	400	4000
@@ -268,21 +316,27 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select a from t1 where a > 8;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where (`test`.`t1`.`a` > 8)
 select a from t1 where a > 8;
 a
 9
 explain select a,b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select a,b from t1 where b > 30;
 a	b
 4	40
@@ -292,8 +346,10 @@ a	b
 8	80
 9	90
 explain select a,b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	c	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select a,c from t1 where c > 750;
 a	c
 8	800
@@ -303,8 +359,10 @@ insert into t1 values (10,10,10,10);
 alter table t1 drop index bdca;
 alter table t1 drop primary key;
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	ALL	NULL	NULL	NULL	NULL;	10	33.33	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d
 10	10	10	10
@@ -313,8 +371,10 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d
 4	40	400	4000
@@ -324,15 +384,19 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select b from t1 where b > 30;
 b
 40
@@ -342,8 +406,10 @@ b
 80
 90
 explain select b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select c from t1 where c > 750;
 c
 800
@@ -351,8 +417,10 @@ c
 alter table t1 add e varchar(20);
 alter table t1 add primary key (a,b,c);
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d	e
 10	10	10	10	NULL
@@ -361,8 +429,10 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d	e
 4	40	400	4000	NULL
@@ -372,22 +442,28 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select a from t1 where a > 8;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where (`test`.`t1`.`a` > 8)
 select a from t1 where a > 8;
 a
 10
 9
 explain select a,b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select a,b from t1 where b > 30;
 a	b
 4	40
@@ -397,16 +473,20 @@ a	b
 8	80
 9	90
 explain select a,b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	c	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select a,c from t1 where c > 750;
 a	c
 8	800
 9	900
 alter table t1 drop primary key;
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	ALL	NULL	NULL	NULL	NULL;	10	33.33	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d	e
 10	10	10	10	NULL
@@ -415,8 +495,10 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d	e
 4	40	400	4000	NULL
@@ -426,15 +508,19 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select b from t1 where b > 30;
 b
 40
@@ -444,8 +530,10 @@ b
 80
 90
 explain select b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select c from t1 where c > 750;
 c
 800
@@ -455,8 +543,10 @@ CREATE TABLE t1(a INT, b INT, c INT, d INT, PRIMARY KEY(a,b,c), CLUSTERING KEY(b
 PARTITION BY RANGE(c) (PARTITION p0 VALUES LESS THAN (500) ENGINE = TOKUDB, PARTITION p2 VALUES LESS THAN MAXVALUE ENGINE = TOKUDB);
 insert into t1 values (1,10,100,1000),(2,20,200,2000),(3,30,300,3000),(4,40,400,4000),(5,50,500,5000),(6,60,600,6000),(7,70,700,7000),(8,80,800,8000),(9,90,900,9000);
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d
 6	60	600	6000
@@ -464,8 +554,10 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d
 4	40	400	4000
@@ -475,21 +567,27 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select a from t1 where a > 8;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where (`test`.`t1`.`a` > 8)
 select a from t1 where a > 8;
 a
 9
 explain select a,b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select a,b from t1 where b > 30;
 a	b
 4	40
@@ -499,8 +597,10 @@ a	b
 8	80
 9	90
 explain select a,b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	c	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select a,c from t1 where c > 750;
 a	c
 8	800
@@ -510,8 +610,10 @@ insert into t1 values (10,10,10,10);
 alter table t1 drop index bdca;
 alter table t1 drop primary key;
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	ALL	NULL	NULL	NULL	NULL;	10	33.33	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d
 10	10	10	10
@@ -520,8 +622,10 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d
 4	40	400	4000
@@ -531,15 +635,19 @@ a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d
 8	80	800	8000
 9	90	900	9000
 explain select b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select b from t1 where b > 30;
 b
 40
@@ -549,8 +657,10 @@ b
 80
 90
 explain select b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select c from t1 where c > 750;
 c
 800
@@ -558,8 +668,10 @@ c
 alter table t1 add e varchar(20);
 alter table t1 add primary key (a,b,c);
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d	e
 10	10	10	10	NULL
@@ -568,8 +680,10 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d	e
 4	40	400	4000	NULL
@@ -579,22 +693,28 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select a from t1 where a > 8;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	PRIMARY	PRIMARY	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	PRIMARY	PRIMARY	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a` from `test`.`t1` where (`test`.`t1`.`a` > 8)
 select a from t1 where a > 8;
 a
 10
 9
 explain select a,b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select a,b from t1 where b > 30;
 a	b
 4	40
@@ -604,16 +724,20 @@ a	b
 8	80
 9	90
 explain select a,b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	c	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select a,c from t1 where c > 750;
 a	c
 8	800
 9	900
 alter table t1 drop primary key;
 explain select * from t1 where a > 5;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	ALL	NULL	NULL	NULL	NULL;	10	33.33	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`a` > 5)
 select * from t1 where a > 5;
 a	b	c	d	e
 10	10	10	10	NULL
@@ -622,8 +746,10 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select * from t1 where b > 30;
 a	b	c	d	e
 4	40	400	4000	NULL
@@ -633,15 +759,19 @@ a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select * from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b`,`test`.`t1`.`c` AS `c`,`test`.`t1`.`d` AS `d`,`test`.`t1`.`e` AS `e` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select * from t1 where c > 750;
 a	b	c	d	e
 8	80	800	8000	NULL
 9	90	900	9000	NULL
 explain select b from t1 where b > 30;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	b	b	4	NULL	NULL;	Using where; Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p0,p2	range	b	b	4	NULL;	2	100.00	Using where; Using index
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`b` > 30)
 select b from t1 where b > 30;
 b
 40
@@ -651,8 +781,10 @@ b
 80
 90
 explain select b from t1 where c > 750;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	range	c	c	4	NULL	NULL;	Using where
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	p2	range	c	c	4	NULL;	2	100.00	Using where
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`b` AS `b` from `test`.`t1` where (`test`.`t1`.`c` > 750)
 select c from t1 where c > 750;
 c
 800

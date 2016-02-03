@@ -1,3 +1,4 @@
+--source include/have_myisam.inc
 #
 # Bug#11401: Load data infile 'REPLACE INTO' fails on slave.
 #
@@ -107,7 +108,7 @@ connection slave;
 SHOW CREATE TABLE mysqltest1.tmp;
 --error ER_NO_SUCH_TABLE
 SHOW CREATE TABLE mysqltest1.tmp2;
-# Aa a result of the bugfix for 1313901, t1 has one row here since the
+# Aa a result of the bugfix for 72475, t1 has one row here since the
 # CREATE TEMPORARY TABLE tmp2 above is not binlogged and thus changes the
 # transactional/non-transactional logic, causing the INSERT f1=2 to not be bilogged
 # on ROLLBACK
@@ -161,7 +162,7 @@ let $wait_condition=
   SELECT COUNT(*) = 1 FROM information_schema.processlist
   WHERE info = "RENAME TABLE t1 TO t3, t2 TO t1" and
   state = "Waiting for table metadata lock";
---source include/wait_condition.inc
+--source include/wait_condition_or_abort.inc
 
 COMMIT;
 

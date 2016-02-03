@@ -1,6 +1,6 @@
-# -- source include/have_innodb.inc
-# embedded server ignores 'delayed', so skip this
--- source include/not_embedded.inc
+--source include/have_myisam.inc
+
+call mtr.add_suppression("is not the same as enforced storage engine");
 
 --disable_warnings
 drop table if exists t1;

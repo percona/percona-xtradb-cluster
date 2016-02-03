@@ -11,6 +11,9 @@
 --disable_result_log
 --disable_query_log
 let $counter= 1200;
+if ($VALGRIND_TEST) {
+  let $counter= 6000;
+}
 let $mysql_errno= 9999;
 let $successes= 2;
 
@@ -19,8 +22,14 @@ while ($successes) {
     # Strangely enough, the server might return "Too many connections"
     # while being shutdown, thus 1040 is an "allowed" error
     # See BUG#36228
-    --error 0,1040,1047,1053,1205,2002,2003,2006,2013,1205
-    show status;
+    --error 0,1040,1047,1053,1205,2002,2003,2006,2013,1205,1045,ER_SECURE_TRANSPORT_REQUIRED
+    show session status;
+    if ($mysql_errno == 1045){
+      let mysql_errno=0;
+    }
+    if ($mysql_errname == ER_SECURE_TRANSPORT_REQUIRED){
+      let mysql_errno=0;
+    }
 
     --dec $counter
     if (!$counter) {

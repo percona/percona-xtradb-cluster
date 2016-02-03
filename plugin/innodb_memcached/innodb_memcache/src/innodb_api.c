@@ -51,28 +51,18 @@ static ib_cb_t* innodb_memcached_api[] = {
 	(ib_cb_t*) &ib_cb_moveto,
 	(ib_cb_t*) &ib_cb_cursor_first,
 	(ib_cb_t*) &ib_cb_cursor_next,
-	(ib_cb_t*) &ib_cb_cursor_last,
 	(ib_cb_t*) &ib_cb_cursor_set_match_mode,
 	(ib_cb_t*) &ib_cb_search_tuple_create,
 	(ib_cb_t*) &ib_cb_read_tuple_create,
 	(ib_cb_t*) &ib_cb_tuple_delete,
-	(ib_cb_t*) &ib_cb_tuple_copy,
 	(ib_cb_t*) &ib_cb_tuple_read_u8,
-	(ib_cb_t*) &ib_cb_tuple_write_u8,
 	(ib_cb_t*) &ib_cb_tuple_read_u16,
-	(ib_cb_t*) &ib_cb_tuple_write_u16,
 	(ib_cb_t*) &ib_cb_tuple_read_u32,
-	(ib_cb_t*) &ib_cb_tuple_write_u32,
 	(ib_cb_t*) &ib_cb_tuple_read_u64,
-	(ib_cb_t*) &ib_cb_tuple_write_u64,
 	(ib_cb_t*) &ib_cb_tuple_read_i8,
-	(ib_cb_t*) &ib_cb_tuple_write_i8,
 	(ib_cb_t*) &ib_cb_tuple_read_i16,
-	(ib_cb_t*) &ib_cb_tuple_write_i16,
 	(ib_cb_t*) &ib_cb_tuple_read_i32,
-	(ib_cb_t*) &ib_cb_tuple_write_i32,
 	(ib_cb_t*) &ib_cb_tuple_read_i64,
-	(ib_cb_t*) &ib_cb_tuple_write_i64,
 	(ib_cb_t*) &ib_cb_tuple_get_n_cols,
 	(ib_cb_t*) &ib_cb_col_set_value,
 	(ib_cb_t*) &ib_cb_col_get_value,
@@ -82,16 +72,13 @@ static ib_cb_t* innodb_memcached_api[] = {
 	(ib_cb_t*) &ib_cb_trx_rollback,
 	(ib_cb_t*) &ib_cb_trx_start,
 	(ib_cb_t*) &ib_cb_trx_release,
-	(ib_cb_t*) &ib_cb_trx_state,
 	(ib_cb_t*) &ib_cb_cursor_lock,
 	(ib_cb_t*) &ib_cb_cursor_close,
 	(ib_cb_t*) &ib_cb_cursor_new_trx,
 	(ib_cb_t*) &ib_cb_cursor_reset,
-	(ib_cb_t*) &ib_cb_open_table_by_name,
 	(ib_cb_t*) &ib_cb_col_get_name,
 	(ib_cb_t*) &ib_cb_table_truncate,
 	(ib_cb_t*) &ib_cb_cursor_open_index_using_name,
-	(ib_cb_t*) &ib_cb_close_thd,
 	(ib_cb_t*) &ib_cb_get_cfg,
 	(ib_cb_t*) &ib_cb_cursor_set_memcached_sync,
 	(ib_cb_t*) &ib_cb_cursor_set_cluster_access,
@@ -99,10 +86,10 @@ static ib_cb_t* innodb_memcached_api[] = {
 	(ib_cb_t*) &ib_cb_cfg_trx_level,
 	(ib_cb_t*) &ib_cb_get_n_user_cols,
 	(ib_cb_t*) &ib_cb_cursor_set_lock,
-	(ib_cb_t*) &ib_cb_cursor_clear_trx,
 	(ib_cb_t*) &ib_cb_get_idx_field_name,
 	(ib_cb_t*) &ib_cb_trx_get_start_time,
 	(ib_cb_t*) &ib_cb_cfg_bk_commit_interval,
+	(ib_cb_t*) &ib_cb_ut_strerr,
 	(ib_cb_t*) &ib_cb_cursor_stmt_begin,
 	(ib_cb_t*) &ib_cb_trx_read_only
 };
@@ -158,7 +145,7 @@ innodb_api_begin(
 	char		table_name[MAX_TABLE_NAME_LEN + MAX_DATABASE_NAME_LEN];
 
 	if (!*crsr) {
-#ifdef __WIN__
+#ifdef _WIN32
 		sprintf(table_name, "%s\%s", dbname, name);
 #else
 		snprintf(table_name, sizeof(table_name),
@@ -638,75 +625,6 @@ innodb_api_fill_mci(
 }
 
 /*************************************************************//**
-Copy data from a read tuple and instantiate a "mci_column_t" structure
-@return true if successful */
-static
-bool
-innodb_api_copy_mci(
-/*================*/
-	ib_tpl_t	read_tpl,	/*!< in: Read tuple */
-	int		col_id,		/*!< in: Column ID for the column to
-					read */
-	mci_column_t*	mci_item)	/*!< out: item to fill */
-{
-	ib_ulint_t      data_len;
-	ib_col_meta_t   col_meta;
-
-	data_len = ib_cb_col_get_meta(read_tpl, col_id, &col_meta);
-
-	if (data_len == IB_SQL_NULL) {
-		mci_item->value_str = NULL;
-		mci_item->value_len = 0;
-		mci_item->allocated = false;
-	} else {
-		if (col_meta.type == IB_INT) {
-			mci_item->value_str = malloc(50);
-			memset(mci_item->value_str, 0, 50);
-
-			if (col_meta.attr & IB_COL_UNSIGNED) {
-				uint64_t int_val = 0;
-
-				int_val = innodb_api_read_uint64(&col_meta,
-								 read_tpl,
-								 col_id);
-
-				sprintf(mci_item->value_str,
-					"%" PRIu64, int_val);
-			} else {
-				int64_t int_val = 0;
-
-				int_val = innodb_api_read_int(&col_meta,
-							      read_tpl,
-							      col_id);
-
-				sprintf(mci_item->value_str,
-					"%" PRIi64, int_val);
-			}
-
-			mci_item->value_len = strlen(mci_item->value_str);
-			mci_item->allocated = true;
-
-		} else {
-			mci_item->value_str = malloc(data_len);
-			if (!mci_item->value_str) {
-				return(false);
-			}
-
-			mci_item->allocated = true;
-			memcpy(mci_item->value_str,
-			       ib_cb_col_get_value(read_tpl, col_id),
-			       data_len);
-			mci_item->value_len = data_len;
-		}
-	}
-
-	mci_item->is_str = true;
-	mci_item->is_valid = true;
-
-	return(true);
-}
-
-/*************************************************************//**
 Fetch value from a read cursor into "mci_items"
 @return DB_SUCCESS if successful */
 static
@@ -717,8 +635,7 @@ innodb_api_fill_value(
 			meta_info,	/*!< in: Metadata */
 	mci_item_t*	item,		/*!< out: item to fill */
 	ib_tpl_t	read_tpl,	/*!< in: read tuple */
-	int		col_id,		/*!< in: column Id */
-	bool		alloc_mem)	/*!< in: allocate memory */
+	int		col_id)		/*!< in: column Id */
 {
 	ib_err_t	err = DB_NOT_FOUND;
 
@@ -729,20 +646,9 @@ innodb_api_fill_value(
 
 		if (col_id == col_info[CONTAINER_VALUE].field_id) {
 
-			if (alloc_mem) {
-
-				/* when using innodb memcache the
-				code  will never come here becasue
-				we do not allocate memory for column
-				objects */
-				innodb_api_copy_mci(
-					read_tpl, col_id,
-					&item->col_value[MCI_COL_VALUE]);
-			} else {
-				innodb_api_fill_mci(
-					read_tpl, col_id,
-					&item->col_value[MCI_COL_VALUE]);
-			}
+			innodb_api_fill_mci(
+				read_tpl, col_id,
+				&item->col_value[MCI_COL_VALUE]);
 
 			err = DB_SUCCESS;
 		}
@@ -751,15 +657,9 @@ innodb_api_fill_value(
 
 		for (i = 0; i < meta_info->n_extra_col; i++) {
 			if (col_id == meta_info->extra_col_info[i].field_id) {
-				if (alloc_mem) {
-					innodb_api_copy_mci(
-						read_tpl, col_id,
-						&item->extra_col_value[i]);
-				} else {
-					innodb_api_fill_mci(
-						read_tpl, col_id,
-						&item->extra_col_value[i]);
-				}
+				innodb_api_fill_mci(
+					read_tpl, col_id,
+					&item->extra_col_value[i]);
 
 				err = DB_SUCCESS;
 				break;
@@ -1009,7 +909,7 @@ innodb_api_search(
 			     && i == col_info[CONTAINER_VALUE].field_id)
 			    || meta_info->n_extra_col) {
 				innodb_api_fill_value(meta_info, item,
-						      read_tpl, i, false);
+						      read_tpl, i);
 			}
 		}
 
@@ -1914,7 +1814,7 @@ innodb_api_flush(
 				   + MAX_DATABASE_NAME_LEN + 1];
 	ib_id_u64_t	new_id;
 
-#ifdef __WIN__
+#ifdef _WIN32
 	sprintf(table_name, "%s\%s", dbname, name);
 #else
 	snprintf(table_name, sizeof(table_name), "%s/%s", dbname, name);
@@ -2096,17 +1996,6 @@ innodb_cb_trx_commit(
 	ib_trx_t	ib_trx)		/*!< in/out: transaction to commit */
 {
 	return(ib_cb_trx_commit(ib_trx));
-}
-
-/*************************************************************//**
-Close table associated to the connection
-@return DB_SUCCESS if successful or error code */
-ib_err_t
-innodb_cb_close_thd(
-/*=================*/
-	void*		thd)		/*!<in: THD */
-{
-	return(ib_cb_close_thd(thd));
 }
 
 /*****************************************************************//**

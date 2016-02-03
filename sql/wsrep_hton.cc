@@ -417,7 +417,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  cache = get_trans_log(thd);
+  cache = wsrep_get_trans_log(thd);
   rcode = 0;
   if (cache) {
     thd->binlog_flush_pending_rows_event(true);

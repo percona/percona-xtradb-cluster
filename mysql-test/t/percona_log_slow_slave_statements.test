@@ -1,7 +1,6 @@
 #
 # Test log_slow_slave_statements
 #
---source include/have_innodb.inc
 --source include/have_binlog_format_statement.inc
 --source include/master-slave.inc
 
@@ -9,7 +8,7 @@
 DROP TABLE IF EXISTS t;
 --enable_warnings
 
-CREATE TABLE t(id INT) ENGINE=InnoDB;
+CREATE TABLE t(id INT);
 sync_slave_with_master;
 
 SET GLOBAL min_examined_row_limit=0;

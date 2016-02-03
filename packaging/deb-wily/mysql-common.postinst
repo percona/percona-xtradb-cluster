@@ -18,8 +18,13 @@
 set -e
 
 if [ "$1" = "configure" ]; then
+<<<<<<< HEAD
     # Low priority fallback for client use when no server is installed.
     update-alternatives --install /etc/mysql/my.cnf my.cnf /etc/mysql/my.cnf.fallback 100
+=======
+	# Low priority fallback for client use when no server is installed.
+	update-alternatives --install /etc/mysql/my.cnf my.cnf /etc/mysql/my.cnf.fallback 100
+>>>>>>> ps-5.7
 fi
 
 #DEBHELPER#

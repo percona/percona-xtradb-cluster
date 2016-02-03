@@ -1,5 +1,4 @@
-/* Copyright (c) 2000-2002, 2005-2007 MySQL AB
-   Use is subject to license terms
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -38,14 +37,14 @@ int heap_rlast(HP_INFO *info, uchar *record, int inx)
       info->current_ptr = pos;
       if (hp_extract_record(info, record, pos))
       {
-        DBUG_RETURN(my_errno);
+        DBUG_RETURN(my_errno());
       }
       info->update = HA_STATE_AKTIV;
     }
     else
     {
-      my_errno = HA_ERR_END_OF_FILE;
-      DBUG_RETURN(my_errno);
+      set_my_errno(HA_ERR_END_OF_FILE);
+      DBUG_RETURN(my_errno());
     }
     DBUG_RETURN(0);
   }

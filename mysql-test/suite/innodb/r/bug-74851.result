@@ -5,5 +5,6 @@ DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE t1 CHANGE a2 a3 INT,
 ADD CONSTRAINT fk_1 FOREIGN KEY(a3) REFERENCES parent(b) ON
 DELETE SET NULL ON UPDATE CASCADE;
+ERROR HY000: Cannot drop index 'fk_a': needed in a foreign key constraint
 DROP TABLE t1;
 SET foreign_key_checks = default;

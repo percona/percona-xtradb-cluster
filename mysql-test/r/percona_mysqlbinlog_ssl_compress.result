@@ -13,8 +13,7 @@ BEGIN
 use `test`/*!*/;
 insert into t1 values ("abirvalg")
 /*!*/;
-COMMIT
-/*!*/;
+COMMIT/*!*/;
 DELIMITER ;
 # End of log file
 ROLLBACK /* added by mysqlbinlog */;

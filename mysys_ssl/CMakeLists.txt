@@ -15,6 +15,7 @@
 
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include
                     ${CMAKE_SOURCE_DIR}/mysys_ssl
+                    ${CMAKE_SOURCE_DIR}/mysys
                     ${SSL_INCLUDE_DIRS})
 
 IF(SSL_DEFINES)
@@ -47,6 +48,7 @@ ENDIF()
 
 SET(MYSYS_SSL_SOURCES
     crypt_genhash_impl.cc
+    mf_tempdir.cc
     my_default.cc
     my_getopt.cc
     my_aes.cc
@@ -60,9 +62,9 @@ SET(MYSYS_SSL_SOURCES
 
 ADD_CONVENIENCE_LIBRARY(mysys_ssl ${MYSYS_SSL_SOURCES})
 TARGET_LINK_LIBRARIES(mysys_ssl dbug strings ${SSL_LIBRARIES} ${ZLIB_LIBRARY})
-
 DTRACE_INSTRUMENT(mysys_ssl)
 
 IF(MSVC)
    INSTALL_DEBUG_TARGET(mysys_ssl DESTINATION ${INSTALL_LIBDIR}/debug)
 ENDIF()
+

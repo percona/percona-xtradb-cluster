@@ -1,7 +1,6 @@
---source include/have_innodb.inc
 --source include/have_log_bin.inc
 
-CREATE TABLE t1 (a INT PRIMARY KEY) ENGINE=InnoDB;
+CREATE TABLE t1 (a INT PRIMARY KEY);
 
 # Fix binlog format (otherwise SHOW BINLOG EVENTS will fluctuate).
 SET binlog_format= mixed;
@@ -27,6 +26,6 @@ SELECT * FROM t1 ORDER BY a;
 
 --replace_column 2 # 5 #
 --replace_regex /xid=[0-9]+/xid=XX/
-SHOW BINLOG EVENTS LIMIT 1,9;
+SHOW BINLOG EVENTS LIMIT 1,30;
 
 DROP TABLE t1;

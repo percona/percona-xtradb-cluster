@@ -1,3 +1,6 @@
+SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
+Warnings:
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 DROP TABLE IF EXISTS t1, t2;
 select format(1.5555,0),format(123.5555,1),format(1234.5555,2),format(12345.55555,3),format(123456.5555,4),format(1234567.5555,5),format("12345.2399",2);
 format(1.5555,0)	format(123.5555,1)	format(1234.5555,2)	format(12345.55555,3)	format(123456.5555,4)	format(1234567.5555,5)	format("12345.2399",2)
@@ -5,12 +8,18 @@ format(1.5555,0)	format(123.5555,1)	format(1234.5555,2)	format(12345.55555,3)	fo
 select inet_ntoa(inet_aton("255.255.255.255.255.255.255.255"));
 inet_ntoa(inet_aton("255.255.255.255.255.255.255.255"))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '255.255.255.255.255.255.255.255' for function inet_aton
 select inet_aton("255.255.255.255.255"),inet_aton("255.255.1.255"),inet_aton("0.1.255");
 inet_aton("255.255.255.255.255")	inet_aton("255.255.1.255")	inet_aton("0.1.255")
-1099511627775	4294902271	65791
+NULL	4294902271	65791
+Warnings:
+Warning	1411	Incorrect string value: '255.255.255.255.255' for function inet_aton
 select inet_ntoa(1099511627775),inet_ntoa(4294902271),inet_ntoa(511);
 inet_ntoa(1099511627775)	inet_ntoa(4294902271)	inet_ntoa(511)
 NULL	255.255.1.255	0.0.1.255
+Warnings:
+Warning	1411	Incorrect integer value: '1099511627775' for function inet_ntoa
 select hex(inet_aton('127'));
 hex(inet_aton('127'))
 7F
@@ -20,6 +29,27 @@ hex(inet_aton('127.1'))
 select hex(inet_aton('127.1.1'));
 hex(inet_aton('127.1.1'))
 7F010001
+select inet_aton("122.256");
+inet_aton("122.256")
+NULL
+Warnings:
+Warning	1411	Incorrect string value: '122.256' for function inet_aton
+select inet_aton("122.226.");
+inet_aton("122.226.")
+NULL
+Warnings:
+Warning	1411	Incorrect string value: '122.226.' for function inet_aton
+select inet_aton("");
+inet_aton("")
+NULL
+Warnings:
+Warning	1411	Incorrect string value: '' for function inet_aton
+explain extended select inet_aton("122.256"),inet_aton("122.226."),inet_aton("");
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	No tables used
+Warnings:
+Warning	1681	'EXTENDED' is deprecated and will be removed in a future release.
+Note	1003	/* select#1 */ select inet_aton('122.256') AS `inet_aton("122.256")`,inet_aton('122.226.') AS `inet_aton("122.226.")`,inet_aton('') AS `inet_aton("")`
 select length(uuid()), charset(uuid()), length(unhex(replace(uuid(),_utf8'-',_utf8'')));
 length(uuid())	charset(uuid())	length(unhex(replace(uuid(),_utf8'-',_utf8'')))
 36	utf8	16
@@ -57,41 +87,6 @@ select a from t1 where mid(a+0,6,3) = ( mid(20040106123400,6,3) );
 a
 2004-01-06 12:34:00
 drop table t1;
-CREATE TABLE t1 (conn CHAR(7), connection_id INT);
-INSERT INTO t1 VALUES ('default', CONNECTION_ID());
-SELECT GET_LOCK('bug16501',600);
-GET_LOCK('bug16501',600)
-1
-INSERT INTO t1 VALUES ('con1', CONNECTION_ID());
-SELECT IS_USED_LOCK('bug16501') = connection_id
-FROM t1
-WHERE conn = 'default';
-IS_USED_LOCK('bug16501') = connection_id
-1
-SELECT GET_LOCK('bug16501',600);
-SELECT IS_USED_LOCK('bug16501') = CONNECTION_ID();
-IS_USED_LOCK('bug16501') = CONNECTION_ID()
-1
-SELECT RELEASE_LOCK('bug16501');
-RELEASE_LOCK('bug16501')
-1
-GET_LOCK('bug16501',600)
-1
-SELECT IS_USED_LOCK('bug16501') = connection_id
-FROM t1
-WHERE conn = 'con1';
-IS_USED_LOCK('bug16501') = connection_id
-1
-SELECT IS_USED_LOCK('bug16501') = CONNECTION_ID();
-IS_USED_LOCK('bug16501') = CONNECTION_ID()
-1
-SELECT RELEASE_LOCK('bug16501');
-RELEASE_LOCK('bug16501')
-1
-SELECT IS_USED_LOCK('bug16501');
-IS_USED_LOCK('bug16501')
-NULL
-DROP TABLE t1;
 select export_set(3, _latin1'foo', _utf8'bar', ',', 4);
 export_set(3, _latin1'foo', _utf8'bar', ',', 4)
 foo,foo,bar,bar
@@ -102,7 +97,7 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `uuid()` varchar(36) CHARACTER SET utf8 NOT NULL DEFAULT '',
   `length(uuid())` int(10) NOT NULL DEFAULT '0'
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=ENGINE DEFAULT CHARSET=latin1
 drop table t1;
 #------------------------------------------------------------------------
 # Tests for Bug#6760 and Bug#12689
@@ -202,7 +197,7 @@ show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` bigint(21) unsigned DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
+) ENGINE=ENGINE DEFAULT CHARSET=latin1
 drop table t1;
 drop table if exists table_26093;
 drop function if exists func_26093_a;
@@ -306,6 +301,10 @@ insert into t1 values (-1), (-2);
 select min(a) from t1 group by inet_ntoa(a);
 min(a)
 -2
+Warnings:
+Warning	1411	Incorrect integer value: '-1' for function inet_ntoa
+Warning	1411	Incorrect integer value: '-1' for function inet_ntoa
+Warning	1411	Incorrect integer value: '-2' for function inet_ntoa
 drop table t1;
 SELECT NAME_CONST('var', 'value') COLLATE latin1_general_cs;
 NAME_CONST('var', 'value') COLLATE latin1_general_cs
@@ -405,227 +404,6 @@ SELECT 1 from t1 HAVING NAME_CONST('', a);
 ERROR HY000: Incorrect arguments to NAME_CONST
 DROP TABLE t1;
 #
-# GET_LOCK, RELEASE_LOCK, IS_USED_LOCK functions test
-#
-# IS_USED_LOCK, IS_FREE_LOCK: the  lock is not acquired
-# Note: IS_USED_LOCK returns NULL if the lock is unused
-select is_used_lock('test');
-is_used_lock('test')
-NULL
-select is_free_lock('test');
-is_free_lock('test')
-1
-# GET_LOCK returns 1 if it manages to acquire a lock
-select get_lock('test', 0);
-get_lock('test', 0)
-1
-# IS_USED_LOCK, IS_FREE_LOCK: the  lock is acquired
-select is_free_lock('test');
-is_free_lock('test')
-0
-select is_used_lock('test') = connection_id();
-is_used_lock('test') = connection_id()
-1
-# -> Switching to connection 'con1'
-# IS_USED_LOCK, IS_FREE_LOCK: the  lock is acquired in another
-# connection
-select is_used_lock('test') = connection_id();
-is_used_lock('test') = connection_id()
-0
-select is_free_lock('test');
-is_free_lock('test')
-0
-# GET_LOCK returns 0 if it can't acquire a lock (wait timeout)
-select get_lock('test', 0);
-get_lock('test', 0)
-0
-# RELEASE_LOCK returns 0 if the lock belongs to another connection 
-select release_lock('test');
-release_lock('test')
-0
-# -> Switching to connection 'default'
-# RELEASE_LOCK returns 1 if it successfully releases a lock
-select release_lock('test');
-release_lock('test')
-1
-# RELEASE_LOCK returns NULL if it doesn't release a lock and there is no such lock
-select release_lock('test');
-release_lock('test')
-NULL
-# Test that get_lock() returns NULL if error.
-select get_lock('test', 0);
-get_lock('test', 0)
-1
-# -> Switching to connection 'con1'
-create table t1 select connection_id() as id;
-select get_lock('test', 7200);
-# -> Switching to connection 'default'
-select (@id := id) - id from t1;
-(@id := id) - id
-0
-kill query @id;
-# -> Switching to connection 'con1'
-get_lock('test', 7200)
-NULL
-# -> Switching to connection 'default'
-# GET_LOCK() works recursively 
-select get_lock('test', 0);
-get_lock('test', 0)
-1
-select get_lock('test', 0);
-get_lock('test', 0)
-1
-select get_lock('test', 0);
-get_lock('test', 0)
-1
-# RELEASE_LOCK() needs to be called recursively then, too
-select release_lock('test');
-release_lock('test')
-1
-select release_lock('test');
-release_lock('test')
-1
-select release_lock('test');
-release_lock('test')
-1
-# Once the last instance of the lock is released, 
-# the next call returns NULL
-select release_lock('test');
-release_lock('test')
-1
-# Multiple locks in the same session are OK
-select get_lock('test1', 0);
-get_lock('test1', 0)
-1
-select get_lock('test2', 0);
-get_lock('test2', 0)
-1
-select get_lock('test3', 0);
-get_lock('test3', 0)
-1
-select release_lock('test1');
-release_lock('test1')
-1
-select release_lock('test2');
-release_lock('test2')
-1
-select release_lock('test3');
-release_lock('test3')
-1
-# Deadlocks are detected e.g. in case of a mutual wait
-select get_lock('test1', 0);
-get_lock('test1', 0)
-1
-# -> Switching to connection 'con1'
-select get_lock('test2', 0);
-get_lock('test2', 0)
-1
-select get_lock('test1', 7200);
-# -> Switching to connection 'default'
-select get_lock('test2', 7200);
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
-select release_lock('test1');
-release_lock('test1')
-1
-# -> Switching to connection 'con1'
-get_lock('test1', 7200)
-1
-select release_lock('test2');
-release_lock('test2')
-1
-select release_lock('test1');
-release_lock('test1')
-1
-# -> Switching to connection 'default'
-# LOCK/UNLOCK TABLES works fine with a user lock.
-lock table t1 write;
-select get_lock('test', 0);
-get_lock('test', 0)
-1
-unlock tables;
-commit;
-select release_lock('test');
-release_lock('test')
-1
-# GLOBAL READ LOCK works with fine with user locks
-select get_lock('test1', 0);
-get_lock('test1', 0)
-1
-flush tables with read lock;
-select get_lock('test2', 0);
-get_lock('test2', 0)
-1
-unlock tables;
-commit;
-select release_lock('test1');
-release_lock('test1')
-1
-select release_lock('test2');
-release_lock('test2')
-1
-# BEGIN/COMMIT/ROLLBACK don't unlock user locks.
-begin;
-select get_lock('test1', 0);
-get_lock('test1', 0)
-1
-select  get_lock('test2', 0);
-get_lock('test2', 0)
-1
-select count(*) from t1;
-count(*)
-1
-rollback;
-select release_lock('test1');
-release_lock('test1')
-1
-select release_lock('test2');
-release_lock('test2')
-1
-# Deadlocks between user locks and LOCK TABLES locks
-# are detected OK.
-select get_lock('test', 0);
-get_lock('test', 0)
-1
-# -> Switching to connection 'con1'
-lock table t1 write;
-select get_lock('test', 7200);
-# -> Switching to connection 'default'
-lock table t1 read;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
-select release_lock('test');
-release_lock('test')
-1
-# -> Switching to connection 'con1'
-get_lock('test', 7200)
-1
-select release_lock('test');
-release_lock('test')
-1
-unlock tables;
-# cleanup
-drop table t1;
-# check too long identifier names
-select get_lock(repeat('a', 192), 0);
-get_lock(repeat('a', 192), 0)
-1
-select is_used_lock(repeat('a', 192)) = connection_id();
-is_used_lock(repeat('a', 192)) = connection_id()
-1
-select is_free_lock(repeat('a', 192));
-is_free_lock(repeat('a', 192))
-0
-select release_lock(repeat('a', 192));
-release_lock(repeat('a', 192))
-1
-select get_lock(repeat('a', 193), 0);
-ERROR 42000: Identifier name 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' is too long
-select is_used_lock(repeat('a', 193));
-ERROR 42000: Identifier name 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' is too long
-select is_free_lock(repeat('a', 193));
-ERROR 42000: Identifier name 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' is too long
-select release_lock(repeat('a', 193));
-ERROR 42000: Identifier name 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' is too long
-#
 # End of 5.5 tests
 #
 
@@ -641,99 +419,163 @@ INET6_ATON(NULL) IS NULL
 SELECT INET6_ATON(123) IS NULL;
 INET6_ATON(123) IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '123' for function inet6_aton
 SELECT INET6_ATON(123.45) IS NULL;
 INET6_ATON(123.45) IS NULL
 1
-SELECT INET6_ATON(NOW()) IS NULL;
-INET6_ATON(NOW()) IS NULL
+Warnings:
+Warning	1411	Incorrect string value: '123.45' for function inet6_aton
+SELECT INET6_ATON(str_to_date('2014,2,28 09', '%Y,%m,%d %h')) IS NULL;
+INET6_ATON(str_to_date('2014,2,28 09', '%Y,%m,%d %h')) IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '2014-02-28 09:00:00' for function inet6_aton
 SELECT INET6_ATON('1.2.3') IS NULL;
 INET6_ATON('1.2.3') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3' for function inet6_aton
 SELECT INET6_ATON('1.2.3.') IS NULL;
 INET6_ATON('1.2.3.') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3.' for function inet6_aton
 SELECT INET6_ATON('1..3.4') IS NULL;
 INET6_ATON('1..3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1..3.4' for function inet6_aton
 SELECT INET6_ATON('-1.2.3.4') IS NULL;
 INET6_ATON('-1.2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '-1.2.3.4' for function inet6_aton
 SELECT INET6_ATON('1.2.3.256') IS NULL;
 INET6_ATON('1.2.3.256') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3.256' for function inet6_aton
 SELECT INET6_ATON('1.2.3.4.5') IS NULL;
 INET6_ATON('1.2.3.4.5') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3.4.5' for function inet6_aton
 SELECT INET6_ATON('0001.2.3.4') IS NULL;
 INET6_ATON('0001.2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '0001.2.3.4' for function inet6_aton
 SELECT INET6_ATON('0x1.2.3.4') IS NULL;
 INET6_ATON('0x1.2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '0x1.2.3.4' for function inet6_aton
 SELECT INET6_ATON('a.2.3.4') IS NULL;
 INET6_ATON('a.2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: 'a.2.3.4' for function inet6_aton
 SELECT INET6_ATON('1.2.3.4:80') IS NULL;
 INET6_ATON('1.2.3.4:80') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3.4:80' for function inet6_aton
 SELECT INET6_ATON('1.2.3.4/32') IS NULL;
 INET6_ATON('1.2.3.4/32') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3.4/32' for function inet6_aton
 SELECT INET6_ATON('mysql.com') IS NULL;
 INET6_ATON('mysql.com') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: 'mysql.com' for function inet6_aton
 SELECT INET6_ATON(':::') IS NULL;
 INET6_ATON(':::') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: ':::' for function inet6_aton
 SELECT INET6_ATON(':1:2:3') IS NULL;
 INET6_ATON(':1:2:3') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: ':1:2:3' for function inet6_aton
 SELECT INET6_ATON('1:2:3:') IS NULL;
 INET6_ATON('1:2:3:') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1:2:3:' for function inet6_aton
 SELECT INET6_ATON(':1::2:3') IS NULL;
 INET6_ATON(':1::2:3') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: ':1::2:3' for function inet6_aton
 SELECT INET6_ATON('1::2:3:') IS NULL;
 INET6_ATON('1::2:3:') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1::2:3:' for function inet6_aton
 SELECT INET6_ATON('::00001') IS NULL;
 INET6_ATON('::00001') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::00001' for function inet6_aton
 SELECT INET6_ATON('::00001:2') IS NULL;
 INET6_ATON('::00001:2') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::00001:2' for function inet6_aton
 SELECT INET6_ATON('::12345') IS NULL;
 INET6_ATON('::12345') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::12345' for function inet6_aton
 SELECT INET6_ATON('1020::3040::5060') IS NULL;
 INET6_ATON('1020::3040::5060') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '1020::3040::5060' for function inet6_aton
 SELECT INET6_ATON('::ABCZ') IS NULL;
 INET6_ATON('::ABCZ') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::ABCZ' for function inet6_aton
 SELECT INET6_ATON('::0x1.2.3.4') IS NULL;
 INET6_ATON('::0x1.2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::0x1.2.3.4' for function inet6_aton
 SELECT INET6_ATON('::1.0x2.3.4') IS NULL;
 INET6_ATON('::1.0x2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::1.0x2.3.4' for function inet6_aton
 SELECT INET6_ATON('::a.b.c.d') IS NULL;
 INET6_ATON('::a.b.c.d') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::a.b.c.d' for function inet6_aton
 SELECT INET6_ATON('::FFFF:0x1.2.3.4') IS NULL;
 INET6_ATON('::FFFF:0x1.2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::FFFF:0x1.2.3.4' for function inet6_aton
 SELECT INET6_ATON('::FFFF:1.0x2.3.4') IS NULL;
 INET6_ATON('::FFFF:1.0x2.3.4') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::FFFF:1.0x2.3.4' for function inet6_aton
 SELECT INET6_ATON('::FFFF:a.b.c.d') IS NULL;
 INET6_ATON('::FFFF:a.b.c.d') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::FFFF:a.b.c.d' for function inet6_aton
 SELECT INET6_ATON('::1.2.3.4:ABCD') IS NULL;
 INET6_ATON('::1.2.3.4:ABCD') IS NULL
 1
+Warnings:
+Warning	1411	Incorrect string value: '::1.2.3.4:ABCD' for function inet6_aton
 # NOTE: such addresses are supported because getaddrinfo() supports them.
 # This is just to record the current behaviour.
 SELECT HEX(INET6_ATON('::ABCD:1.2.3.4'));
@@ -892,36 +734,54 @@ NULL
 SELECT INET6_NTOA(123);
 INET6_NTOA(123)
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '123' for function inet6_ntoa
 SELECT INET6_NTOA(123.456);
 INET6_NTOA(123.456)
 NULL
-SELECT INET6_NTOA(NOW());
-INET6_NTOA(NOW())
+Warnings:
+Warning	1411	Incorrect string value: '123.456' for function inet6_ntoa
+SELECT INET6_NTOA(str_to_date('2014,2,28 09', '%Y,%m,%d %h'));
+INET6_NTOA(str_to_date('2014,2,28 09', '%Y,%m,%d %h'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '2014-02-28 09:00:00' for function inet6_ntoa
 SELECT INET6_NTOA(UNHEX('C0A801'));
 INET6_NTOA(UNHEX('C0A801'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '\xC0\xA8\x01' for function inet6_ntoa
 SELECT INET6_NTOA(UNHEX('C0A80102'));
 INET6_NTOA(UNHEX('C0A80102'))
 192.168.1.2
 SELECT INET6_NTOA(UNHEX('C0A8010203'));
 INET6_NTOA(UNHEX('C0A8010203'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '\xC0\xA8\x01\x02\x03' for function inet6_ntoa
 SELECT INET6_NTOA(UNHEX('0102030405060708090A0B0C0D0E0F'));
 INET6_NTOA(UNHEX('0102030405060708090A0B0C0D0E0F'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F' for function inet6_ntoa
 SELECT INET6_NTOA(UNHEX('0102030405060708090A0B0C0D0E0F10'));
 INET6_NTOA(UNHEX('0102030405060708090A0B0C0D0E0F10'))
 102:304:506:708:90a:b0c:d0e:f10
 SELECT INET6_NTOA(UNHEX('0102030405060708090A0B0C0D0E0F1011'));
 INET6_NTOA(UNHEX('0102030405060708090A0B0C0D0E0F1011'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10\x11' for function inet6_ntoa
 SELECT INET6_NTOA('1234'), INET6_NTOA(BINARY('1234'));
 INET6_NTOA('1234')	INET6_NTOA(BINARY('1234'))
 NULL	49.50.51.52
+Warnings:
+Warning	1411	Incorrect string value: '1234' for function inet6_ntoa
 SELECT INET6_NTOA('0123456789abcdef'), INET6_NTOA(BINARY('0123456789abcdef'));
 INET6_NTOA('0123456789abcdef')	INET6_NTOA(BINARY('0123456789abcdef'))
 NULL	3031:3233:3435:3637:3839:6162:6364:6566
+Warnings:
+Warning	1411	Incorrect string value: '0123456789abcdef' for function inet6_ntoa
 
 # -- Checking double-conversion...
 
@@ -1054,33 +914,49 @@ C0A80802
 SELECT HEX(INET_ATON('192.168.0x8.2'));
 HEX(INET_ATON('192.168.0x8.2'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '192.168.0x8.2' for function inet_aton
 SELECT HEX(INET6_ATON('192.168.0x8.2'));
 HEX(INET6_ATON('192.168.0x8.2'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '192.168.0x8.2' for function inet6_aton
 SELECT HEX(INET_ATON('1.2.255'));
 HEX(INET_ATON('1.2.255'))
 10200FF
 SELECT HEX(INET6_ATON('1.2.255'));
 HEX(INET6_ATON('1.2.255'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '1.2.255' for function inet6_aton
 SELECT HEX(INET_ATON('1.2.256'));
 HEX(INET_ATON('1.2.256'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '1.2.256' for function inet_aton
 SELECT HEX(INET6_ATON('1.2.256'));
 HEX(INET6_ATON('1.2.256'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '1.2.256' for function inet6_aton
 SELECT HEX(INET_ATON('1.0002.3.4'));
 HEX(INET_ATON('1.0002.3.4'))
 1020304
 SELECT HEX(INET6_ATON('1.0002.3.4'));
 HEX(INET6_ATON('1.0002.3.4'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '1.0002.3.4' for function inet6_aton
 SELECT HEX(INET_ATON('1.2.3.4.5'));
 HEX(INET_ATON('1.2.3.4.5'))
-102030405
+NULL
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3.4.5' for function inet_aton
 SELECT HEX(INET6_ATON('1.2.3.4.5'));
 HEX(INET6_ATON('1.2.3.4.5'))
 NULL
+Warnings:
+Warning	1411	Incorrect string value: '1.2.3.4.5' for function inet6_aton
 
 # -- Checking mix of INET- and INET6- functions...
 
@@ -1211,8 +1087,78 @@ INET6_NTOA(ip)	HEX(ip)	LENGTH(ip)
 ::1	00000000000000000000000000000001	16
 1020:3040:5060:7080:90a0:b0c0:d0e0:f010	102030405060708090A0B0C0D0E0F010	16
 
+DELETE FROM t2;
+INSERT INTO t2 VALUES (INET6_ATON('1.0002.3.4'));
+Warnings:
+Warning	1411	Incorrect string value: '1.0002.3.4' for function inet6_aton
+INSERT INTO t2 VALUES (INET6_ATON('1.2.255'));
+Warnings:
+Warning	1411	Incorrect string value: '1.2.255' for function inet6_aton
+INSERT INTO t2 VALUES (INET6_ATON('1.2.256'));
+Warnings:
+Warning	1411	Incorrect string value: '1.2.256' for function inet6_aton
+INSERT INTO t2 VALUES (INET6_ATON('192.168.0x8.2'));
+Warnings:
+Warning	1411	Incorrect string value: '192.168.0x8.2' for function inet6_aton
+INSERT INTO t2 VALUES (inet_aton("122.256"));
+Warnings:
+Warning	1411	Incorrect string value: '122.256' for function inet_aton
+INSERT INTO t2 VALUES (inet_aton("122.226."));
+Warnings:
+Warning	1411	Incorrect string value: '122.226.' for function inet_aton
+INSERT INTO t2 VALUES (inet_aton(""));
+Warnings:
+Warning	1411	Incorrect string value: '' for function inet_aton
+INSERT INTO t2 VALUES (UNHEX('Z0Q80F02'));
+Warnings:
+Warning	1411	Incorrect string value: 'Z0Q80F02' for function unhex
+SELECT INET6_NTOA(ip), HEX(ip), LENGTH(ip) FROM t2;
+INET6_NTOA(ip)	HEX(ip)	LENGTH(ip)
+NULL	NULL	NULL
+NULL	NULL	NULL
+NULL	NULL	NULL
+NULL	NULL	NULL
+NULL	NULL	NULL
+NULL	NULL	NULL
+NULL	NULL	NULL
+NULL	NULL	NULL
+DELETE FROM t2;
+
+SET sql_mode = default;
+INSERT INTO t2 VALUES (INET6_ATON('1.0002.3.4'));
+ERROR HY000: Incorrect string value: '1.0002.3.4' for function inet6_aton
+INSERT INTO t2 VALUES (INET6_ATON('1.2.255'));
+ERROR HY000: Incorrect string value: '1.2.255' for function inet6_aton
+INSERT INTO t2 VALUES (INET6_ATON('1.2.256'));
+ERROR HY000: Incorrect string value: '1.2.256' for function inet6_aton
+INSERT INTO t2 VALUES (INET6_ATON('192.168.0x8.2'));
+ERROR HY000: Incorrect string value: '192.168.0x8.2' for function inet6_aton
+INSERT INTO t2 VALUES (inet_aton("122.256"));
+ERROR HY000: Incorrect string value: '122.256' for function inet_aton
+INSERT INTO t2 VALUES (inet_aton("122.226."));
+ERROR HY000: Incorrect string value: '122.226.' for function inet_aton
+INSERT INTO t2 VALUES (inet_aton(""));
+ERROR HY000: Incorrect string value: '' for function inet_aton
+
+INSERT INTO t2 VALUES (UNHEX('Z0Q80F02'));
+ERROR HY000: Incorrect string value: 'Z0Q80F02' for function unhex
+SELECT INET6_NTOA(ip), HEX(ip), LENGTH(ip) FROM t2;
+INET6_NTOA(ip)	HEX(ip)	LENGTH(ip)
 DROP TABLE t1;
 DROP TABLE t2;
+#
+# Bug#22071558 INET_ATON ACCEPTS MORE THAN FOUR GROUPS OF DIGITS AND RETURNS INT BIGGER THAN 4G
+#
+select inet_aton("0.255.255.255.255");
+inet_aton("0.255.255.255.255")
+NULL
+Warnings:
+Warning	1411	Incorrect string value: '0.255.255.255.255' for function inet_aton
+select inet_aton("255.255.255.2551");
+inet_aton("255.255.255.2551")
+NULL
+Warnings:
+Warning	1411	Incorrect string value: '255.255.255.2551' for function inet_aton
 
 # -- Done.
 

@@ -1,7 +1,4 @@
 CREATE TABLE t1(a INT KEY) ENGINE=innodb ROW_FORMAT=compressed;
-Warnings:
-Warning	1478	InnoDB: ROW_FORMAT=COMPRESSED requires innodb_file_format > Antelope.
-Warning	1478	InnoDB: assuming ROW_FORMAT=COMPACT.
 CREATE VIEW v1 AS SELECT t1a.* FROM t1,t1 AS t1a;
 DROP TABLE t1;
 CREATE VIEW t1 AS SELECT 1 AS a;

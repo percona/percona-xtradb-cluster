@@ -1,5 +1,5 @@
 /*
-(C) 2012, 2013 Percona LLC and/or its affiliates
+(C) 2012, 2015 Percona LLC and/or its affiliates
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -54,17 +54,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <string.h>
 #include "auth_pam_common.h"
+#include <my_sys.h>
+#include <stdlib.h>
 
 int auth_pam_client_talk_init(void **talk_data)
 {
-  int *num_talks= calloc(1, sizeof(int));
+  int *num_talks= my_malloc(PSI_NOT_INSTRUMENTED, sizeof(int), MY_ZEROFILL);
   *talk_data= (void*)num_talks;
   return (num_talks != NULL) ? PAM_SUCCESS : PAM_BUF_ERR;
 }
 
 void auth_pam_client_talk_finalize(void *talk_data)
 {
-  free(talk_data);
+  my_free(talk_data);
 }
 
 int auth_pam_talk_perform(const struct pam_message *msg,
@@ -108,11 +110,22 @@ int auth_pam_talk_perform(const struct pam_message *msg,
   return PAM_SUCCESS;
 }
 
+static
+int auth_pam_compat_init(MYSQL_PLUGIN plugin_info __attribute__((unused)))
+{
+  auth_pam_common_init("auth_pam_compat");
+  return 0;
+}
+
 static struct st_mysql_auth pam_auth_handler=
 {
   MYSQL_AUTHENTICATION_INTERFACE_VERSION,
   "mysql_clear_password",
-  &authenticate_user_with_pam_server
+  &authenticate_user_with_pam_server,
+  &auth_pam_generate_auth_string_hash,
+  &auth_pam_validate_auth_string_hash,
+  &auth_pam_set_salt,
+  0UL
 };
 
 mysql_declare_plugin(auth_pam)
@@ -123,7 +136,7 @@ mysql_declare_plugin(auth_pam)
   "Percona, Inc.",
   "PAM authentication plugin",
   PLUGIN_LICENSE_GPL,
-  NULL,
+  auth_pam_compat_init,
   NULL,
   0x0001,
   NULL,

@@ -13,8 +13,10 @@ SET SESSION long_query_time=0;
 SET SESSION min_examined_row_limit=0;
 SET SESSION log_slow_verbosity='microtime,query_plan';
 EXPLAIN SELECT * FROM t1;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	2	NULL
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	NULL	ALL	NULL	NULL	NULL	NULL	2	100.00	NULL
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1`
 [log_start.inc] percona_slow_query_log.query_plan_0
 SELECT * FROM t1;
 a	b
@@ -24,8 +26,10 @@ a	b
 [log_grep.inc] file: percona_slow_query_log.query_plan_0 pattern: ^# Filesort: No  Filesort_on_disk: No  Merge_passes: 0$
 [log_grep.inc] lines:   2
 EXPLAIN SELECT * FROM t1 ORDER BY b;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	2	Using filesort
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	NULL	ALL	NULL	NULL	NULL	NULL	2	100.00	Using filesort
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t1`.`a` AS `a`,`test`.`t1`.`b` AS `b` from `test`.`t1` order by `test`.`t1`.`b`
 [log_start.inc] percona_slow_query_log.query_plan_1
 SELECT * FROM t1 ORDER BY b;
 a	b
@@ -63,8 +67,10 @@ SHOW SESSION STATUS LIKE 'Sort_merge_passes';
 Variable_name	Value
 Sort_merge_passes	0
 EXPLAIN SELECT * FROM t2 ORDER BY a;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	ROWS	Using filesort
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t2	NULL	ALL	NULL	NULL	NULL	ROWS	2560	100.00	Using filesort
+Warnings:
+Note	1003	/* select#1 */ select `test`.`t2`.`a` AS `a` from `test`.`t2` order by `test`.`t2`.`a`
 [log_start.inc] percona_slow_query_log.query_plan_2
 SELECT * FROM t2 ORDER BY a;
 [log_stop.inc] percona_slow_query_log.query_plan_2
@@ -113,9 +119,10 @@ SHOW SESSION STATUS LIKE 'Select_scan';
 Variable_name	Value
 Select_scan	40
 [log_start.inc] percona_slow_query_log.query_plan_5
-SELECT COUNT(*) FROM t1;
+SELECT COUNT(*) FROM t1 GROUP BY a;
 COUNT(*)
-2
+1
+1
 [log_stop.inc] percona_slow_query_log.query_plan_5
 [log_grep.inc] file: percona_slow_query_log.query_plan_5 pattern: ^#.*Full_scan: Yes.*$
 [log_grep.inc] lines:   1
@@ -132,7 +139,7 @@ COUNT(*)
 [log_grep.inc] lines:   0
 SHOW SESSION STATUS LIKE 'Select_scan';
 Variable_name	Value
-Select_scan	48
+Select_scan	47
 SET SESSION log_slow_filter=default;
 CREATE TABLE t3(a INT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t3 VALUES (1), (2), (3);
@@ -181,8 +188,10 @@ SHOW SESSION STATUS LIKE 'Created_tmp_disk_tables';
 Variable_name	Value
 Created_tmp_disk_tables	0
 EXPLAIN SELECT COUNT(*) FROM t1;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	NULL	PRIMARY	4	NULL	2	Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	Select tables optimized away
+Warnings:
+Note	1003	/* select#1 */ select count(0) AS `COUNT(*)` from `test`.`t1`
 [log_start.inc] percona_slow_query_log.query_plan_8
 SELECT COUNT(*) FROM t1;
 COUNT(*)
@@ -199,9 +208,11 @@ SHOW SESSION STATUS LIKE 'Created_tmp_disk_tables';
 Variable_name	Value
 Created_tmp_disk_tables	0
 EXPLAIN SELECT COUNT(*) FROM t1, t3 WHERE t1.a = t3.a GROUP BY t3.a;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	PRIMARY	PRIMARY	4	NULL	2	Using index; Using temporary; Using filesort
-1	SIMPLE	t3	eq_ref	PRIMARY	PRIMARY	4	test.t1.a	1	Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	NULL	index	PRIMARY	PRIMARY	4	NULL	2	100.00	Using index; Using temporary; Using filesort
+1	SIMPLE	t3	NULL	eq_ref	PRIMARY	PRIMARY	4	test.t1.a	1	100.00	Using index
+Warnings:
+Note	1003	/* select#1 */ select count(0) AS `COUNT(*)` from `test`.`t1` join `test`.`t3` where (`test`.`t3`.`a` = `test`.`t1`.`a`) group by `test`.`t3`.`a`
 [log_start.inc] percona_slow_query_log.query_plan_9
 SELECT COUNT(*) FROM t1, t3 WHERE t1.a = t3.a GROUP BY t3.a;
 COUNT(*)
@@ -242,9 +253,11 @@ ANALYZE TABLE t4;
 Table	Op	Msg_type	Msg_text
 test.t4	analyze	status	OK
 EXPLAIN SELECT COUNT(*) FROM t1, t4 WHERE t1.a = t4.a GROUP BY t4.a;
-id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	index	PRIMARY	PRIMARY	4	NULL	2	Using index; Using temporary; Using filesort
-1	SIMPLE	t4	eq_ref	PRIMARY	PRIMARY	4	test.t1.a	1	Using index
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	t1	NULL	index	PRIMARY	PRIMARY	4	NULL	2	100.00	Using index; Using temporary; Using filesort
+1	SIMPLE	t4	NULL	eq_ref	PRIMARY	PRIMARY	4	test.t1.a	1	100.00	Using index
+Warnings:
+Note	1003	/* select#1 */ select count(0) AS `COUNT(*)` from `test`.`t1` join `test`.`t4` where (`test`.`t4`.`a` = `test`.`t1`.`a`) group by `test`.`t4`.`a`
 [log_start.inc] percona_slow_query_log.query_plan_10
 SELECT COUNT(*) FROM t1, t4 WHERE t1.a = t4.a GROUP BY t4.b;
 COUNT(*)

@@ -28,3 +28,4 @@ SET GLOBAL innodb_sched_priority_master=1e1;
 ERROR 42000: Incorrect argument type to variable 'innodb_sched_priority_master'
 SET GLOBAL innodb_sched_priority_master='foo';
 ERROR 42000: Incorrect argument type to variable 'innodb_sched_priority_master'
+# restart

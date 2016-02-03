@@ -1,7 +1,7 @@
 FLUSH STATUS;
 SET SESSION min_examined_row_limit=0;
 DROP TABLE IF EXISTS t1;
-CREATE TABLE t1 (a INT) ENGINE=InnoDB;
+CREATE TABLE t1 (a INT);
 INSERT INTO t1 VALUE(5);
 SET SESSION query_cache_type=1;
 SET GLOBAL query_cache_size=1355776;

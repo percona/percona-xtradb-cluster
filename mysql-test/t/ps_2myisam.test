@@ -1,13 +1,12 @@
+
+ #Get deafult engine value
+--let $DEFAULT_ENGINE = `select @@global.default_storage_engine`
+
 ###############################################
 #                                             #
 #  Prepared Statements test on MYISAM tables  #
 #                                             #
 ###############################################
-
-# This test checks some limits which are related to MAX_INDEXES constant
-# which could be set to non-default value at build time.
-# We just skip the test in this case.
---source include/have_64_keys.inc
 
 #    
 # NOTE: PLEASE SEE ps_1general.test (bottom) 

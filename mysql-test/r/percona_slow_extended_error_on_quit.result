@@ -2,9 +2,9 @@ DROP TABLE IF EXISTS t;
 SET GLOBAL log_slow_admin_statements=ON;
 SET GLOBAL long_query_time=0;
 SET GLOBAL min_examined_row_limit=0;
-CREATE TABLE t(a INT) engine=InnoDB;
+CREATE TABLE t(a INT);
 [log_start.inc] percona.slow_extended.error_on_quit_1
-CREATE TABLE t(a INT) engine=InnoDB;
+CREATE TABLE t(a INT);
 ERROR 42S01: Table 't' already exists
 [log_stop.inc] percona.slow_extended.error_on_quit_1
 [log_grep.inc] file: percona.slow_extended.error_on_quit_1 pattern: Last_errno: [1-9]\d*\s

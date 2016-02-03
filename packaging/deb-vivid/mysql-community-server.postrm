@@ -73,6 +73,7 @@ case "$1" in
 	place_upstart_job_back
 
 	MYSQLDATA=/var/lib/mysql
+	MYSQLFILES=/var/lib/mysql-files
 	MYSQLLOG=/var/log/mysql
 	MYSQLRUN=/var/run/mysqld
 
@@ -96,6 +97,11 @@ case "$1" in
 		if [ -d ${MYSQLDATA} ] || [ -L ${MYSQLDATA} ];
 		then
 			rm -rf ${MYSQLDATA}
+		fi
+
+		if [ -d ${MYSQLFILES} ] || [ -L ${MYSQLFILES} ];
+		then
+			rm -rf ${MYSQLFILES}
 		fi
 
 		if getent passwd mysql >/dev/null;
@@ -130,6 +136,11 @@ case "$1" in
 		if [ -d ${MYSQLDATA} ] || [ -L ${MYSQLDATA} ];
 		then
 			rm -rf ${MYSQLDATA}
+		fi
+
+		if [ -d ${MYSQLFILES} ] || [ -L ${MYSQLFILES} ];
+		then
+			rm -rf ${MYSQLFILES}
 		fi
 
 		if getent passwd mysql >/dev/null;

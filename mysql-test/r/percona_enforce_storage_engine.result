@@ -1,3 +1,4 @@
+call mtr.add_suppression("is not the same as enforced storage engine");
 drop table if exists t1;
 SET @old_sql_mode= @@session.sql_mode;
 CREATE TABLE t1 (c1 INT PRIMARY KEY AUTO_INCREMENT, c2 VARCHAR(10)) ENGINE=MyISAM;
@@ -10,6 +11,8 @@ t1	CREATE TABLE `t1` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
 DROP TABLE t1;
 SET SESSION sql_mode='';
+Warnings:
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 CREATE TABLE t1 (c1 INT PRIMARY KEY AUTO_INCREMENT, c2 VARCHAR(10)) ENGINE=InnoDB;
 Warnings:
 Note	1266	Using storage engine MyISAM for table 't1'
@@ -34,3 +37,5 @@ DROP TABLE t1;
 CREATE TABLE t1 (c1 INT PRIMARY KEY AUTO_INCREMENT, c2 VARCHAR(10)) ENGINE=InnoDB;
 ERROR 42000: Unknown storage engine 'InnoDB'
 SET SESSION sql_mode=@old_sql_mode;
+Warnings:
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.

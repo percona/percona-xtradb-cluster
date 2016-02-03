@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "auth_pam_common.h"
+
+#include <my_sys.h>
+
 enum { max_nss_name_len = 10240 };
 enum { max_number_of_groups = 1024 };
 
@@ -41,14 +45,15 @@ struct groups_iter *groups_iter_new(const char *user_name)
   int error;
   struct groups_iter *it;
 
-  it= calloc(1, sizeof(struct groups_iter));
+  it= my_malloc(key_memory_pam_group_iter, sizeof(struct groups_iter),
+                MY_ZEROFILL);
   if (it == NULL)
     return NULL;
 
   error= getpwnam_r(user_name, &pwd, it->buf, max_nss_name_len, &pwd_result);
   if (error != 0 || pwd_result == NULL)
   {
-    free(it);
+    my_free(it);
     return NULL;
   }
 
@@ -56,7 +61,7 @@ struct groups_iter *groups_iter_new(const char *user_name)
   error= getgrouplist(user_name, pwd_result->pw_gid, it->groups, &it->ngroups);
   if (error == -1)
   {
-    free(it);
+    my_free(it);
     return NULL;
   }
 
@@ -93,6 +98,6 @@ void groups_iter_reset(struct groups_iter *it)
 /** Finish iteration and release iterator */
 void groups_iter_free(struct groups_iter *it)
 {
-  free(it);
+  my_free(it);
 }
 

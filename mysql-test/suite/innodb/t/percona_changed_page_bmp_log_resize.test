@@ -21,9 +21,7 @@ call mtr.add_suppression("Resizing redo log");
 call mtr.add_suppression("Starting to delete and rewrite log files");
 call mtr.add_suppression("New log files created");
 
---exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---shutdown_server
---source include/wait_until_disconnected.inc
+--source include/shutdown_mysqld.inc
 
 # The tracking should have worked before the restart
 file_exists $BITMAP_FILE;
@@ -31,9 +29,8 @@ file_exists $BITMAP_FILE;
 --replace_regex /_[[:digit:]]+\.xdb$//
 list_files $MYSQLD_DATADIR ib_modified_log*;
 
---enable_reconnect
---exec echo "restart:--innodb-log-file-size=10M" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---source include/wait_until_connected_again.inc
+--let $restart_parameters=restart:--innodb-log-file-size=10M
+--source include/start_mysqld.inc
 
 # Do not silently break the test if we happen to specify the same size and not resizing happens
 --let $assert_text= Redo log must have been resized on the last restart
@@ -49,9 +46,7 @@ INSERT INTO t2 SELECT x FROM t1;
 
 DROP TABLE t1, t2;
 
---exec echo "wait" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---shutdown_server
---source include/wait_until_disconnected.inc
+--source include/shutdown_mysqld.inc
 
 # The tracking should have worked after the restart
 file_exists $BITMAP_FILE;
@@ -59,6 +54,5 @@ file_exists $BITMAP_FILE;
 --replace_regex /_[[:digit:]]+\.xdb$//
 list_files $MYSQLD_DATADIR ib_modified_log*;
 
---enable_reconnect
---exec echo "restart" > $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
---source include/wait_until_connected_again.inc
+--let $restart_parameters=
+--source include/start_mysqld.inc

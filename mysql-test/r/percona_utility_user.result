@@ -51,11 +51,14 @@ information_schema
 mtr
 mysql
 performance_schema
+sys
 test
 CREATE USER 'frankjr'@'localhost' IDENTIFIED BY 'password';
 GRANT ALL ON mysql.* TO 'frankjr'@'localhost';
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'frankjr'@'localhost';
 SET PASSWORD FOR 'frankjr'@'localhost' = PASSWORD('');
+Warnings:
+Warning	1287	'SET PASSWORD FOR <user> = PASSWORD('<plaintext_password>')' is deprecated and will be removed in a future release. Please use SET PASSWORD FOR <user> = '<plaintext_password>' instead
 DROP USER 'frankjr'@'localhost';
 CREATE DATABASE mysqltest;
 CREATE TABLE mysqltest.t1 (a INT, b INT);
@@ -70,6 +73,8 @@ ALTER TABLE mysqltest.t1 DROP COLUMN b;
 ERROR 42000: ALTER command denied to user 'frank'@'localhost' for table 't1'
 DROP DATABASE mysqltest;
 SET PASSWORD FOR 'mysqltest_1'@'localhost' = PASSWORD('newpass');
+Warnings:
+Warning	1287	'SET PASSWORD FOR <user> = PASSWORD('<plaintext_password>')' is deprecated and will be removed in a future release. Please use SET PASSWORD FOR <user> = '<plaintext_password>' instead
 SET @testtemp= @@global.innodb_fast_shutdown;
 SET @@global.innodb_fast_shutdown= 2;
 SELECT @@global.innodb_fast_shutdown;
@@ -95,3 +100,36 @@ xx	root	%	frank	0	root@localhost	xx
 xx	plug	%	frank	0	root@localhost	xx
 ERROR 28000: Access denied for user 'plug'@'localhost' (using password: YES)
 DROP USER plug;
+#
+# 5.6 tests
+#
+#
+# Interaction with ALTER USER
+#
+ALTER USER 'frank'@'localhost' PASSWORD EXPIRE;
+ERROR HY000: Operation ALTER USER failed for 'frank'@'localhost'
+#
+# 5.7 tests
+#
+#
+# Interaction with offline mode
+#
+SELECT USER(), CURRENT_USER();
+USER()	CURRENT_USER()
+frank@localhost	frank@%
+SET @global_saved_tmp = @@global.offline_mode;
+SET @@global.offline_mode = ON;
+Existing utility user connection should not disconnect
+SELECT USER(), CURRENT_USER();
+USER()	CURRENT_USER()
+frank@localhost	frank@%
+Utility user should be able to connecect
+SELECT USER(), CURRENT_USER();
+USER()	CURRENT_USER()
+frank@localhost	frank@%
+SET @@global.offline_mode = @global_saved_tmp;
+#
+# Interaction with SHOW CREATE USER
+#
+SHOW CREATE USER 'frank'@'localhost';
+ERROR HY000: Operation SHOW CREATE USER failed for 'frank'@'localhost'

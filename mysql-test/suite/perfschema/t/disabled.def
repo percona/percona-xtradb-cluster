@@ -10,5 +10,6 @@
 #
 ##############################################################################
 
+# perfschema.pfs_ccccccc                   : Bug#nnnnnnnn 2014-09-10 Anitha Frequent failures on PB2
 perfschema.sizing_growth : Galera LP#1370988 2014-10-28 pstoev Performance schema heuristics need to be updated
 ortho_iter : Galera mysql-wsrep#34 2014-12-19 perfschema.ortho_iter MTR test fails sporadically

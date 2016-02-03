@@ -5,9 +5,9 @@
 # Just start with --userstat=1 --bootstrap. If the server doesn't crash the
 # test is passed.
 
-let $MYSQLD_BOOTSTRAP_CMD= $MYSQLD_BOOTSTRAP_CMD
-  --default-storage-engine=MyISAM
-  --userstat=on;
+--let $temp_data_dir= $MYSQLTEST_VARDIR/tmp/percona_bug1008609_ddir
+--mkdir $temp_data_dir
+--let $MYSQLD_BOOTSTRAP_CMD= $MYSQLD_BOOTSTRAP_CMD --datadir=$temp_data_dir --default-storage-engine=MyISAM --userstat=on
 
 --write_file $MYSQLTEST_VARDIR/tmp/percona_bug1008609.sql
 SELECT 1;
@@ -19,5 +19,7 @@ exec
 
 --remove_file $MYSQLTEST_VARDIR/tmp/percona_bug1008609.sql
 --remove_file $MYSQLTEST_VARDIR/tmp/percona_bug1008609.log
+--remove_files_wildcard $temp_data_dir *
+--rmdir $temp_data_dir
 
 --echo OK

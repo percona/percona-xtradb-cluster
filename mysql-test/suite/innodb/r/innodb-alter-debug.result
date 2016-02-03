@@ -25,10 +25,11 @@ t1ć	CREATE TABLE `t1ć` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 DROP TABLE t1ć, ①;
 #
-# Bug #21364096  THE BOGUS DUPLICATE KEY ERROR IN ONLINE DDL
-#                WITH INCORRECT KEY NAME
-create table t1 (id int auto_increment primary key, a int, unique key uk(a))
-engine = innodb;
+# Bug #21364096	THE BOGUS DUPLICATE KEY ERROR IN ONLINE DDL
+#		WITH INCORRECT KEY NAME
+create table t1 (id int auto_increment primary key,
+a int,
+unique key uk(a))engine=innodb;
 insert into t1 select 1, 1;
 insert into t1 select 2, 2;
 SET DEBUG_SYNC = 'row_log_table_apply1_before SIGNAL s1 WAIT_FOR s2';
@@ -40,7 +41,7 @@ ERROR 23000: Duplicate entry '1' for key 'uk'
 SET DEBUG_SYNC = 'now SIGNAL s2';
 /* connection default */
 /* reap */ alter table t1 add b int, ALGORITHM=inplace;
-ERROR 23000: Duplicate entry '1' for key 'uk'
+ERROR 23000: Duplicate entry '3' for key 'PRIMARY'
 SET DEBUG_SYNC = 'row_log_table_apply1_before SIGNAL s1 WAIT_FOR s2';
 alter table t1 add b int, ALGORITHM=inplace;;
 /* connection con1 */
@@ -50,5 +51,5 @@ ERROR 23000: Duplicate entry '1' for key 'uk'
 SET DEBUG_SYNC = 'now SIGNAL s2';
 /* connection default */
 /* reap */ alter table t1 add b int, ALGORITHM=inplace;
-ERROR 23000: Duplicate entry '1' for key 'uk'
+ERROR 23000: Duplicate entry '2' for key 'PRIMARY'
 drop table t1;

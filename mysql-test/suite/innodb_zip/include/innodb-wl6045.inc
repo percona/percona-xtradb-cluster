@@ -10,6 +10,10 @@ insert into t1 values(3,"COMPRESSED");
 --source include/shutdown_mysqld.inc
 
 --exec $INNOCHECKSUM $MYSQLD_DATADIR/test/t1.ibd
+--exec $INNOCHECKSUM --write=crc32 $MYSQLD_DATADIR/test/t1.ibd
+--exec $INNOCHECKSUM --strict-check=crc32 $MYSQLD_DATADIR/test/t1.ibd
+--exec $INNOCHECKSUM --write=none $MYSQLD_DATADIR/test/t1.ibd
+--exec $INNOCHECKSUM --strict-check=none $MYSQLD_DATADIR/test/t1.ibd
 
 --source include/start_mysqld.inc
 select * from t1;

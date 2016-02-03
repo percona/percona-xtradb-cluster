@@ -343,13 +343,13 @@ int hp_reallocate_chunkset(HP_DATASPACE *info, uint chunk_count, uchar *pos)
   if (!info->is_variable_size)
   {
     /* Update should never change chunk_count in fixed-size mode */
-    my_errno= HA_ERR_WRONG_COMMAND;
-    return my_errno;
+    set_my_errno(HA_ERR_WRONG_COMMAND);
+    DBUG_RETURN(HA_ERR_WRONG_COMMAND);
   }
 
   /* Reallocate never moves the first chunk */
   if (!hp_allocate_variable_chunkset(info, chunk_count, pos))
-    DBUG_RETURN(my_errno);
+    DBUG_RETURN(my_errno());
 
   DBUG_RETURN(0);
 }

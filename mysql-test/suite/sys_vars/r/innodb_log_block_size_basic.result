@@ -1,3 +1,0 @@
-SELECT @@global.innodb_log_block_size;
-@@global.innodb_log_block_size
-512

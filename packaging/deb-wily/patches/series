@@ -14,5 +14,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 #fix-man-page-links.patch
+<<<<<<< HEAD
 fix-mysql_install_db.patch
+=======
+>>>>>>> ps-5.7
 fix-mtr-search-paths.patch

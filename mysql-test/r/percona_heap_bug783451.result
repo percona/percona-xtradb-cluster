@@ -12,14 +12,10 @@ Warning	1265	Data truncated for column 'f4' at row 3
 Warning	1265	Data truncated for column 'f5' at row 3
 Warning	1265	Data truncated for column 'f1' at row 4
 Warning	1265	Data truncated for column 'f2' at row 4
-Warning	1048	Column 'f3' cannot be null
 Warning	1265	Data truncated for column 'f4' at row 4
 Warning	1265	Data truncated for column 'f1' at row 5
 Warning	1265	Data truncated for column 'f1' at row 6
-Warning	1048	Column 'f4' cannot be null
 Warning	1265	Data truncated for column 'f5' at row 6
-Warning	1048	Column 'f2' cannot be null
-Warning	1048	Column 'f4' cannot be null
 Warning	1265	Data truncated for column 'f5' at row 7
 INSERT IGNORE INTO local_1_1 VALUES ( 'ok' , NULL , REPEAT( 'Y' , 651 ) , 2 , 5 ) , ( REPEAT( 'zylcdzkfrqpihyshimervydbimvmbqmsowdbsaybu' , 3 ) , REPEAT( 'Y' , 282 ) , REPEAT( 'X' , 0 ) , REPEAT( 'Y' , 369 ) , 'g' ) , ( 'think' , REPEAT('X', POW(2, 20) * 2), NULL , NULL , REPEAT('X', POW(2, 20) * 2) ) , ( REPEAT( 'Y' , 468 ) , REPEAT( 'dfvbrzylcd' , 6 ) , REPEAT( 'Y' , 264 ) , NULL , 'c' ) , ( NULL , NULL , REPEAT( 'srdfvbrzylcdzkfrqpihyshimervydbimvmbqms' , 0 ) , REPEAT( 'Y' , 244 ) , 7 ) , ( REPEAT( 'Y' , 0 ) , 'how' , 'going' , 'q' , NULL );
 Warnings:
@@ -34,9 +30,7 @@ Warning	1048	Column 'f4' cannot be null
 Warning	1265	Data truncated for column 'f5' at row 3
 Warning	1265	Data truncated for column 'f1' at row 4
 Warning	1265	Data truncated for column 'f3' at row 4
-Warning	1048	Column 'f4' cannot be null
 Warning	1048	Column 'f1' cannot be null
-Warning	1048	Column 'f2' cannot be null
 Warning	1265	Data truncated for column 'f4' at row 5
 INSERT IGNORE INTO local_1_1 VALUES ( REPEAT('X', POW(2, 20) * 2) , NULL , NULL , NULL , REPEAT('X', POW(2, 20) * 2) ) , ( REPEAT('X', POW(2, 20) * 2) , NULL , REPEAT('X', POW(2, 20) * 2) , 'this' , 'e' ) , ( NULL , 'think' , NULL , 'were' , NULL ) , ( 9 , 'l' , 'c' , 3 , REPEAT( 'geysrdfvbrzylcdzkfrqpihyshimervydbi' , 5 ) ) , ( NULL , NULL , NULL , 'h' , 'w' );
 Warnings:
@@ -46,16 +40,11 @@ Warning	1048	Column 'f3' cannot be null
 Warning	1048	Column 'f4' cannot be null
 Warning	1265	Data truncated for column 'f5' at row 1
 Warning	1265	Data truncated for column 'f1' at row 2
-Warning	1048	Column 'f2' cannot be null
 Warning	1265	Data truncated for column 'f3' at row 2
 Warning	1048	Column 'f1' cannot be null
-Warning	1048	Column 'f3' cannot be null
-Warning	1048	Column 'f1' cannot be null
-Warning	1048	Column 'f2' cannot be null
-Warning	1048	Column 'f3' cannot be null
 INSERT IGNORE INTO local_1_1 SELECT * FROM local_1_1;
 INSERT IGNORE INTO local_1_1 SELECT * FROM local_1_1;
-UPDATE local_1_1 SET f5 = REPEAT ('X', 215566);
+UPDATE IGNORE local_1_1 SET f5 = REPEAT ('X', 215566);
 Warnings:
 Warning	1265	Data truncated for column 'f5' at row 1
 Warning	1265	Data truncated for column 'f5' at row 2

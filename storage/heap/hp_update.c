@@ -1,5 +1,4 @@
-/* Copyright (c) 2000-2002, 2004-2008 MySQL AB
-   Use is subject to license terms
+/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -32,7 +31,7 @@ int heap_update(HP_INFO *info, const uchar *old_record, const uchar *new_record)
   pos=info->current_ptr;
 
   if (info->opt_flag & READ_CHECK_USED && hp_rectest(info, old_record))
-    DBUG_RETURN(my_errno);				/* Record changed */
+    DBUG_RETURN(my_errno());				/* Record changed */
 
   hp_get_encoded_data_length(share, old_record, &old_chunk_count);
   hp_get_encoded_data_length(share, new_record, &new_chunk_count);
@@ -42,7 +41,7 @@ int heap_update(HP_INFO *info, const uchar *old_record, const uchar *new_record)
     /* extend the old chunkset size as necessary, but do not shrink yet */
     if (hp_reallocate_chunkset(&share->recordspace, new_chunk_count, pos))
     {
-      DBUG_RETURN(my_errno); /* Out of memory or table space */
+      DBUG_RETURN(my_errno()); /* Out of memory or table space */
     }
   }
 
@@ -80,7 +79,7 @@ int heap_update(HP_INFO *info, const uchar *old_record, const uchar *new_record)
   DBUG_RETURN(0);
 
  err:
-  if (my_errno == HA_ERR_FOUND_DUPP_KEY)
+  if (my_errno() == HA_ERR_FOUND_DUPP_KEY)
   {
     info->errkey = (int) (keydef - share->keydef);
     if (keydef->algorithm == HA_KEY_ALG_BTREE)
@@ -90,7 +89,7 @@ int heap_update(HP_INFO *info, const uchar *old_record, const uchar *new_record)
       {
         if (++(share->records) == share->blength)
 	  share->blength+= share->blength;
-        DBUG_RETURN(my_errno);
+        DBUG_RETURN(my_errno());
       }
       keydef--;
     }
@@ -114,5 +113,5 @@ int heap_update(HP_INFO *info, const uchar *old_record, const uchar *new_record)
     hp_reallocate_chunkset(&share->recordspace, old_chunk_count, pos);
   }
 
-  DBUG_RETURN(my_errno);
+  DBUG_RETURN(my_errno());
 } /* heap_update */

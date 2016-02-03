@@ -385,7 +385,7 @@ KEY k1 (id),
 KEY k2 (id)
 ) ENGINE=InnoDB;
 Warnings:
-Note	1831	Duplicate index 'k2' defined on the table 'test.t2'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'k2' defined on the table 'test.t2'. This is deprecated and will be disallowed in a future release.
 ######################################
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;

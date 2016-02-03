@@ -25,7 +25,7 @@ DELIMITER ;//
 --replace_result $AUDIT_NULL AUDIT_NULL
 --eval INSTALL PLUGIN NULL_AUDIT SONAME '$AUDIT_NULL'
 
-# status variable should show 8 general log events
+# status variable should show 7 general log events
 # Query SELECT 1
 # Query CALL simpleproc(@a)
 # Query SELECT 1 INTO param1          ; will not be emitted

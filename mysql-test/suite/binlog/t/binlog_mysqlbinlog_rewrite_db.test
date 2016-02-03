@@ -39,25 +39,7 @@ DELETE FROM t1 WHERE i=2;
 --error 1
 --exec $MYSQL_BINLOG --force-if-open --rewrite-db="db1->" $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/row_event_rewrite.sql
 
---echo [VALID SYNTAX,The from->to database names are correctly mentioned, but there is obsolete syntax warning 1]
---exec $MYSQL_BINLOG --force-if-open --rewrite-db="db1->db2,db3->db4,db5->db6" $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/row_event_rewrite.sql
-
---echo [Test that warning about obsolete syntax is shown only once for --rewrite-db="db1->db2,db3->db4,db5->db6"]
---let log_file=mysqltest.log
---let log_file_full_path=$MYSQLTEST_VARDIR/log/current_test
---let grep_pattern=The comma-separated list of rewritings syntax is obsolete and discarded
---source include/log_grep.inc
-
---echo [VALID SYNTAX,The from->to database names are correctly mentioned, but there is obsolete syntax warning 2]
---exec $MYSQL_BINLOG --force-if-open --rewrite-db="db1->db2,db3->db4" --rewrite-db="db5->db6,db6->db7" $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/row_event_rewrite.sql
-
---echo [Test that warning about obsolete syntax is shown only once for --rewrite-db="db1->db2,db3->db4" --rewrite-db="db5->db6,db6->db7"]
---let log_file=mysqltest.log
---let log_file_full_path=$MYSQLTEST_VARDIR/log/current_test
---let grep_pattern=The comma-separated list of rewritings syntax is obsolete and discarded
---source include/log_grep.inc
-
---echo [VALID SYNTAX,The from->to database names are correctly mentioned]
+--echo [VALID SYNTAX,The from->to database names is correctly mentioned]
 --exec $MYSQL_BINLOG --force-if-open --rewrite-db="db1->db2" $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/row_event_rewrite.sql
 
 --echo #Dropping the database db1 and creating the table in the new database db2.

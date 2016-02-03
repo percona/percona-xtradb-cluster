@@ -1,9 +1,8 @@
 #
 # Test for http://bugs.mysql.com/bug.php?id=57430.
 # 
---source include/have_innodb.inc
 
-CREATE TABLE t2970 (a INT, b INT, c INT, d INT, KEY(a), KEY(a, b)) ENGINE=InnoDB;
+CREATE TABLE t2970 (a INT, b INT, c INT, d INT, KEY(a), KEY(a, b));
 INSERT INTO t2970 VALUES (1,1,1,1), (1,2,3,4);
 
 # With the bug present the server will choose KEY(a) over KEY(a, b), because they have the same

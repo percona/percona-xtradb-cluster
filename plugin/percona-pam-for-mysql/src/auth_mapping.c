@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <stdlib.h>
 #include <ctype.h>
 
+#include "auth_pam_common.h"
+
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
 /** Token representation:
@@ -87,7 +89,8 @@ static const char *get_token(struct token *token,
     key-value pair. On success non-NULL pointer returned, otherwise NULL */
 struct mapping_iter *mapping_iter_new(const char *mapping_string)
 {
-  struct mapping_iter *it= malloc(sizeof(struct mapping_iter));
+  struct mapping_iter *it= my_malloc(key_memory_pam_mapping_iter,
+                                     sizeof(struct mapping_iter), 0);
   struct token token;
   if (it != NULL)
   {
@@ -136,7 +139,7 @@ const char *mapping_iter_next(struct mapping_iter *it)
 /** Finish iteration and release iterator */
 void mapping_iter_free(struct mapping_iter *it)
 {
-  free(it);
+  my_free(it);
 }
 
 /** Get mapped value for given user name.

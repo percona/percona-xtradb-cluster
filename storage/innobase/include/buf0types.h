@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2013, Oracle and/or its affiliates. All Rights Reserved
+Copyright (c) 1995, 2015, Oracle and/or its affiliates. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -26,12 +26,11 @@ Created 11/17/1995 Heikki Tuuri
 #ifndef buf0types_h
 #define buf0types_h
 
-#if defined(INNODB_PAGE_ATOMIC_REF_COUNT) && defined(HAVE_ATOMIC_BUILTINS)
-#define PAGE_ATOMIC_REF_COUNT
-#endif /* INNODB_PAGE_ATOMIC_REF_COUNT && HAVE_ATOMIC_BUILTINS */
+#include "os0event.h"
+#include "ut0ut.h"
 
 /** Buffer page (uncompressed or compressed) */
-struct buf_page_t;
+class buf_page_t;
 /** Buffer block for which an uncompressed page exists */
 struct buf_block_t;
 /** Buffer pool chunk comprising buf_block_t */
@@ -44,6 +43,8 @@ struct buf_pool_stat_t;
 struct buf_buddy_stat_t;
 /** Doublewrite memory struct */
 struct buf_dblwr_t;
+/** Flush observer for bulk create index */
+class FlushObserver;
 
 /** A buffer frame. @see page_t */
 typedef	byte	buf_frame_t;
@@ -111,17 +112,6 @@ enum srv_cleaner_lsn_age_factor_t {
 						checkpoint age higher.  */
 };
 
-/** Alternatives for srv_foreground_preflush, set through
-innodb_foreground_preflush variable  */
-enum srv_foreground_preflush_t {
-	SRV_FOREGROUND_PREFLUSH_SYNC_PREFLUSH,	/*!< Original Oracle MySQL 5.6
-						behavior of performing a sync
-						flush list flush  */
-	SRV_FOREGROUND_PREFLUSH_EXP_BACKOFF	/*!< Exponential backoff wait
-						for the page cleaner to flush
-						for us  */
-};
-
 /** Alternatives for srv_empty_free_list_algorithm, set through
 innodb_empty_free_list_algorithm variable  */
 enum srv_empty_free_list_t {
@@ -132,6 +122,24 @@ enum srv_empty_free_list_t {
 					free page is produced by the cleaner
 					thread */
 };
+
+inline
+bool
+is_checksum_strict(srv_checksum_algorithm_t algo)
+{
+	return(algo == SRV_CHECKSUM_ALGORITHM_STRICT_CRC32
+	       || algo == SRV_CHECKSUM_ALGORITHM_STRICT_INNODB
+	       || algo == SRV_CHECKSUM_ALGORITHM_STRICT_NONE);
+}
+
+inline
+bool
+is_checksum_strict(ulint algo)
+{
+	return(algo == SRV_CHECKSUM_ALGORITHM_STRICT_CRC32
+	       || algo == SRV_CHECKSUM_ALGORITHM_STRICT_INNODB
+	       || algo == SRV_CHECKSUM_ALGORITHM_STRICT_NONE);
+}
 
 /** Parameters of binary buddy system for compressed pages (buf0buddy.h) */
 /* @{ */
@@ -153,5 +161,17 @@ the underlying memory is aligned by this amount:
 this must be equal to UNIV_PAGE_SIZE */
 #define BUF_BUDDY_HIGH	(BUF_BUDDY_LOW << BUF_BUDDY_SIZES)
 /* @} */
+
+#ifndef UNIV_INNOCHECKSUM
+
+#include "ut0mutex.h"
+#include "sync0rw.h"
+
+typedef ib_bpmutex_t BPageMutex;
+typedef ib_mutex_t BufListMutex;
+typedef ib_mutex_t FlushListMutex;
+typedef BPageMutex BufPoolZipMutex;
+typedef rw_lock_t BPageLock;
+#endif /* !UNIV_INNOCHECKSUM */
 
 #endif /* buf0types.h */

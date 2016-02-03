@@ -14,9 +14,6 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "myisamdef.h"
-
-#ifdef HAVE_RTREE_KEYS
-
 #include "rt_index.h"
 #include "rt_key.h"
 #include "rt_mbr.h"
@@ -185,11 +182,11 @@ static int split_rtree_node(SplitStruct *node, int n_entries,
                    double **d_buffer, int n_dim)
 {
   SplitStruct *cur;
-  SplitStruct *UNINIT_VAR(a), *UNINIT_VAR(b);
+  SplitStruct *a= NULL, *b= NULL;
   double *g1 = reserve_coords(d_buffer, n_dim);
   double *g2 = reserve_coords(d_buffer, n_dim);
-  SplitStruct *UNINIT_VAR(next);
-  int UNINIT_VAR(next_node);
+  SplitStruct *next= NULL;
+  int next_node= 0;
   int i;
   SplitStruct *end = node + n_entries;
 
@@ -340,8 +337,5 @@ int rtree_split_page(MI_INFO *info, MI_KEYDEF *keyinfo, uchar *page, uchar *key,
   DBUG_PRINT("rtree", ("split new block: %lu", (ulong) *new_page_offs));
 
 split_err:
-  my_afree((uchar*) coord_buf);
   DBUG_RETURN(err_code);
 }
-
-#endif /*HAVE_RTREE_KEYS*/

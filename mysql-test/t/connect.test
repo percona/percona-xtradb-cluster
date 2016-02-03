@@ -1,4 +1,3 @@
-set global log_warnings=0;
 
 # This test is to check various cases of connections
 # with right and wrong password, with and without database
@@ -10,6 +9,8 @@ set global log_warnings=0;
 # Save the initial number of concurrent sessions
 --source include/count_sessions.inc
 
+let $saved_log_error_verbosity= `select @@global.log_error_verbosity`;
+set global log_error_verbosity= 1;
 
 --disable_warnings
 drop table if exists t1,t2;
@@ -39,8 +40,10 @@ disconnect con2;
 --source include/wait_until_disconnected.inc
 connection default;
 
-grant ALL on *.* to test@localhost identified by "gambling";
-grant ALL on *.* to test@127.0.0.1 identified by "gambling";
+create user test@localhost identified by "gambling";
+grant ALL on *.* to test@localhost;
+create user test@127.0.0.1 identified by "gambling";
+grant ALL on *.* to test@127.0.0.1;
 
 # Now check this user with different databases
 #connect (con1,localhost,test,gambling,"");
@@ -69,25 +72,6 @@ connect (fail_con,localhost,test,zorro,test2);
 --error ER_ACCESS_DENIED_ERROR
 connect (fail_con,localhost,test,zorro,);
 
-# check if old password version also works
-SET GLOBAL secure_auth = OFF;
-update mysql.user set password=old_password("gambling2"), plugin="mysql_old_password" where user=_binary"test";
-flush privileges;
-connect (con10,localhost,test,gambling2,,,,SKIPSECUREAUTH);
-connect (con5,localhost,test,gambling2,mysql,,,SKIPSECUREAUTH);
-connection con5;
-set password="";
---error ER_PASSWD_LENGTH
-set password='gambling3';
-set password=old_password('gambling3');
-show tables;
-connect (con6,localhost,test,gambling3,test,,,SKIPSECUREAUTH);
-show tables;
-
-disconnect con10;
-disconnect con5;
-disconnect con6;
---source include/wait_until_disconnected.inc
 connection default;
 
 --replace_result $MASTER_MYSOCK MASTER_SOCKET $MASTER_MYPORT MASTER_PORT
@@ -96,19 +80,12 @@ connect (fail_con,localhost,test,,test2);
 --replace_result $MASTER_MYSOCK MASTER_SOCKET $MASTER_MYPORT MASTER_PORT
 --error ER_ACCESS_DENIED_ERROR
 connect (fail_con,localhost,test,,);
---replace_result $MASTER_MYSOCK MASTER_SOCKET $MASTER_MYPORT MASTER_PORT
---error ER_ACCESS_DENIED_ERROR
-connect (fail_con,localhost,test,zorro,test2,,,SKIPSECUREAUTH);
---replace_result $MASTER_MYSOCK MASTER_SOCKET $MASTER_MYPORT MASTER_PORT
---error ER_ACCESS_DENIED_ERROR
-connect (fail_con,localhost,test,zorro,,,,SKIPSECUREAUTH);
 
 
 # remove user 'test' so that other tests which may use 'test'
 # do not depend on this test.
 delete from mysql.user where user=_binary"test";
 flush privileges;
-SET GLOBAL secure_auth = DEFAULT;
 
 #
 # Bug#12517 Clear user variables and replication events before
@@ -144,7 +121,7 @@ drop table t1;
 --echo # -- which results in user lockout.
 
 --echo
-GRANT USAGE ON *.* TO mysqltest_u1@localhost;
+CREATE USER mysqltest_u1@localhost;
 
 # NOTE: if the test case fails sporadically due to spurious connections,
 # consider disabling all users.
@@ -309,39 +286,6 @@ SET GLOBAL event_scheduler = OFF;
 --echo # -- End of 5.1 tests
 --echo # ------------------------------------------------------------------
 
---echo #
---echo # Bug #13586336 : SRVGEN - HIBISCUS: ISSUE DEPRECATION WARNING FOR
---echo # LEGACY AUTHENTICATION METHOD
---echo #
-
---echo #Expect 1
-SELECT @@global.secure_auth;
-
-SET old_passwords=1;
-
---echo #Expect deprecation warning
-CREATE USER old_pwd@localhost IDENTIFIED WITH 'mysql_old_password';
-SET PASSWORD FOR old_pwd@localhost= OLD_PASSWORD('aha');
-
---echo #Expect deprecation warning
-SET PASSWORD FOR old_pwd@localhost = OLD_PASSWORD('aha2');
-
---echo #Expect deprecation warning
---error ER_PASSWORD_FORMAT
-GRANT SELECT on test.* TO old_gpwd@localhost 
-  IDENTIFIED BY 'aha3';
-
---echo #Expect deprecation warning
-GRANT SELECT on test.* TO old_gpwd@localhost 
-  IDENTIFIED WITH 'mysql_old_password';
-SET PASSWORD FOR old_gpwd@localhost= OLD_PASSWORD('aha4');
-
---echo #Expected normal flush, no warnings  
-FLUSH PRIVILEGES;  
-
-DROP USER old_pwd@localhost, old_gpwd@localhost;  
-SET old_passwords=default;
-
 
 --echo #
 --echo # WL#2392: Change Password at next login
@@ -395,7 +339,7 @@ SELECT last_t1();
 CALL test_t1(last_t1() + 1);
 
 --echo # setting a password unlocks it
-SET PASSWORD = PASSWORD('aha2');
+ALTER USER must_change@localhost IDENTIFIED BY 'aha2';
 --echo # must not throw an error
 SELECT USER();
 --echo # must not throw an error
@@ -423,13 +367,13 @@ CALL test_t1(last_t1() + 1);
 
 --echo # setting a password with a user name is ok if it exactly matches the
 --echo # authenticated user.
-SET PASSWORD FOR must_change@localhost = PASSWORD('aha3');
+ALTER USER must_change@localhost IDENTIFIED BY 'aha3';
 SELECT USER();
 SELECT last_t1();
 CALL test_t1(last_t1() + 1);
 
 --echo # setting a password for the current user works
-SET PASSWORD FOR CURRENT_USER() = PASSWORD('aha3');
+ALTER USER must_change@localhost IDENTIFIED BY 'aha3';
 SELECT USER();
 SELECT last_t1();
 CALL test_t1(last_t1() + 1);
@@ -447,7 +391,7 @@ SELECT password_expired FROM mysql.user
 --connect(must_change_con, localhost, must_change, aha3)
 --error ER_MUST_CHANGE_PASSWORD
 SELECT USER();
-SET PASSWORD = PASSWORD('aha4');
+ALTER USER must_change@localhost IDENTIFIED BY 'aha4';
 
 connection default;
 disconnect must_change_con;
@@ -455,7 +399,7 @@ disconnect must_change_con;
 --echo # try a valid+invalid user combo
 --error ER_CANNOT_USER
 ALTER USER
-  invalid_user@localhost PASSWORD EXPIRE,
+  invalid_user@localhost,
   must_change@localhost PASSWORD EXPIRE;
 
 SELECT password_expired FROM mysql.user
@@ -464,7 +408,7 @@ SELECT password_expired FROM mysql.user
 --connect(must_change_con, localhost, must_change, aha4)
 --error ER_MUST_CHANGE_PASSWORD
 SELECT USER();
-SET PASSWORD = PASSWORD('aha5');
+ALTER USER must_change@localhost IDENTIFIED BY 'aha5';
 SELECT USER();
 
 connection default;
@@ -500,7 +444,7 @@ ALTER USER wl6587@localhost PASSWORD EXPIRE;
 --exec $MYSQLADMIN -S $MASTER_MYSOCK -P $MASTER_MYPORT -uwl6587 --password=wl6587 status 2>&1
 
 --echo # mysqladmin password should work
---exec $MYSQLADMIN -S $MASTER_MYSOCK -P $MASTER_MYPORT -uwl6587 --password=wl6587 password wl6587-2 2>&1
+--exec $MYSQLADMIN -S $MASTER_MYSOCK -P $MASTER_MYPORT -uwl6587 --password=wl6587 password wl6587-2 --ssl 2>&1
 
 DROP USER wl6587@localhost;
 
@@ -513,4 +457,5 @@ DROP USER wl6587@localhost;
 # Wait till all disconnects are completed
 --source include/wait_until_count_sessions.inc
 
-set global log_warnings=1;
+--replace_regex /[0-9]+/STARTVAL/
+eval set global log_error_verbosity= $saved_log_error_verbosity;

@@ -44,7 +44,7 @@ COMMIT;
 --enable_reconnect
 --source include/wait_until_connected_again.inc
 
---echo 2 should be present:
+--echo 2 should be absent due to COMMIT to ROLLBACK conversion:
 SELECT * FROM t1;
 
 DROP TABLE t1;

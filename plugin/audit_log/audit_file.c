@@ -15,6 +15,7 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include "audit_handler.h"
+#include "audit_log.h"
 #include "buffer.h"
 
 typedef struct audit_handler_file_data_struct audit_handler_file_data_t;
@@ -64,7 +65,9 @@ int write_callback(void *data, const char *buf, size_t len,
 audit_handler_t *audit_handler_file_open(audit_handler_file_config_t *opts)
 {
   audit_handler_t *handler= (audit_handler_t*)
-         calloc(sizeof(audit_handler_t) + sizeof(audit_handler_file_data_t), 1);
+    my_malloc(key_memory_audit_log_handler,
+              sizeof(audit_handler_t) + sizeof(audit_handler_file_data_t),
+              MY_ZEROFILL);
   if (handler != NULL)
   {
     audit_handler_file_data_t *data= (audit_handler_file_data_t*) (handler + 1);
@@ -99,7 +102,7 @@ error:
     {
       audit_log_buffer_shutdown(data->buffer);
     }
-    free(handler);
+    my_free(handler);
     handler= NULL;
   }
 success:
@@ -181,7 +184,7 @@ int audit_handler_file_close(audit_handler_t *handler)
 
   res= logger_close(logger, data->footer);
 
-  free(handler);
+  my_free(handler);
 
   return res;
 }

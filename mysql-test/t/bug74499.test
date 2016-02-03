@@ -4,7 +4,13 @@ CREATE DATABASE test2;
 
 SELECT COUNT(*) FROM mysql.proc WHERE DB='test2' AND NAME='' AND TYPE='';
 
+# Remove STRICT_TRANS_TABLES from sql_mode
+SELECT @@session.sql_mode INTO @old_sql_mode;
+SET SESSION sql_mode='NO_AUTO_CREATE_USER';
+
 INSERT INTO mysql.proc VALUES('test2','','','','','CONTAINS_SQL','','','','','BEGIN\r\n \r\nEND','root@%','','','','','utf0','ci','ci','n/a');
+
+SET SESSION sql_mode=@old_sql_mode;
 
 --error ER_SP_WRONG_NAME
 DROP DATABASE test2;

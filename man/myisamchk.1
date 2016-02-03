@@ -2,12 +2,12 @@
 .\"     Title: \fBmyisamchk\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 11/16/2015
+.\"      Date: 11/28/2015
 .\"    Manual: MySQL Database System
-.\"    Source: MySQL 5.6
+.\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYISAMCHK\FR" "1" "11/16/2015" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYISAMCHK\FR" "1" "11/28/2015" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -594,20 +594,12 @@ The possible
 variables and their default values can be examined with
 \fBmyisamchk \-\-help\fR:
 .PP
-sort_buffer_size
+myisam_sort_buffer_size
 is used when the keys are repaired by sorting keys, which is the normal case when you use
-\fB\-\-recover\fR\&. As of MySQL 5\&.6\&.9,
-myisam_sort_buffer_size
-is available as an alternative name to
-sort_buffer_size\&.
-myisam_sort_buffer_size
-is preferable to
+\fB\-\-recover\fR\&.
 sort_buffer_size
-because its name corresponds to the
-myisam_sort_buffer_size
-server system variable that has a similar meaning\&.
-sort_buffer_size
-should be considered deprecated\&.
+is a deprecated synonym for
+myisam_sort_buffer_size\&.
 .PP
 key_buffer_size
 is used when you are checking the table with
@@ -1625,7 +1617,7 @@ File\-version
 .sp
 Version of
 MyISAM
-format\&. Currently always 1\&.
+format\&. Always 1\&.
 .RE
 .sp
 .RS 4

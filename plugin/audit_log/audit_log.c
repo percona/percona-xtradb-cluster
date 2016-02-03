@@ -24,9 +24,9 @@
 #include <typelib.h>
 #include <mysql_version.h>
 #include <mysql_com.h>
-#include <my_pthread.h>
 #include <syslog.h>
 
+#include "audit_log.h"
 #include "logger.h"
 #include "buffer.h"
 #include "audit_handler.h"
@@ -60,6 +60,16 @@ char default_audit_log_syslog_ident[] = "percona-audit";
 ulong audit_log_syslog_facility= 0;
 ulong audit_log_syslog_priority= 0;
 
+PSI_memory_key key_memory_audit_log_logger_handle;
+PSI_memory_key key_memory_audit_log_handler;
+PSI_memory_key key_memory_audit_log_buffer;
+
+static PSI_memory_info all_audit_log_memory[]=
+{
+  {&key_memory_audit_log_logger_handle, "audit_log_logger_handle", 0},
+  {&key_memory_audit_log_handler, "audit_log_handler", 0},
+  {&key_memory_audit_log_buffer, "audit_log_buffer", 0},
+};
 
 static int audit_log_syslog_facility_codes[]=
   { LOG_USER,   LOG_AUTHPRIV, LOG_CRON,   LOG_DAEMON, LOG_FTP,
@@ -92,6 +102,7 @@ static const char *audit_log_syslog_priority_names[]=
   { "LOG_INFO",   "LOG_ALERT", "LOG_CRIT", "LOG_ERR", "LOG_WARNING",
     "LOG_NOTICE", "LOG_EMERG", "LOG_DEBUG", 0 };
 
+static MYSQL_PLUGIN plugin_ptr;
 
 static
 void init_record_id(off_t size)
@@ -112,23 +123,6 @@ ulonglong next_record_id()
 
 
 static
-void fprintf_timestamp(FILE *file)
-{
-  char timebuf[50];
-  struct tm tm;
-  time_t curtime;
-
-  memset(&tm, 0, sizeof(tm));
-  time(&curtime);
-  localtime_r(&curtime, &tm);
-
-  strftime(timebuf, sizeof(timebuf), "%FT%T", gmtime_r(&curtime, &tm));
-
-  fprintf(file, "%s audit_log: ", timebuf);
-}
-
-
-static
 char *make_timestamp(char *buf, size_t buf_len, time_t t)
 {
   struct tm tm;
@@ -146,7 +140,7 @@ char *make_record_id(char *buf, size_t buf_len)
   size_t len;
 
   memset(&tm, 0, sizeof(tm));
-  len= snprintf(buf, buf_len, "%llu_", next_record_id());
+  len= my_snprintf(buf, buf_len, "%llu_", next_record_id());
 
   strftime(buf + len, buf_len - len,
            "%FT%T", gmtime_r(&log_file_time, &tm));
@@ -267,6 +261,13 @@ char *escape_string(const char *in, size_t inlen,
   return out;
 }
 
+static
+void my_plugin_perror(void)
+{
+  char errbuf[MYSYS_STRERROR_SIZE];
+  my_strerror(errbuf, sizeof(errbuf), errno);
+  my_plugin_log_message(&plugin_ptr, MY_ERROR_LEVEL, "Error: %s", errbuf);
+}
 
 static
 void audit_log_write(const char *buf, size_t len)
@@ -278,9 +279,9 @@ void audit_log_write(const char *buf, size_t len)
     if (!write_error)
     {
       write_error= 1;
-      fprintf_timestamp(stderr);
-      fprintf(stderr, "Error writing to file %s. ", audit_log_file);
-      perror("Error: ");
+      my_plugin_log_message(&plugin_ptr, MY_ERROR_LEVEL,
+                            "Error writing to file %s.", audit_log_file);
+      my_plugin_perror();
     }
   }
   else
@@ -419,11 +420,11 @@ size_t audit_log_general_record(char *buf, size_t buflen,
                      event->general_sql_command.str,
                      event->general_thread_id,
                      status,
-                     escape_string(event->general_query,
-                                   event->general_query_length,
+                     escape_string(event->general_query.str,
+                                   event->general_query.length,
                                    query, sizeof(query), NULL),
-                     escape_string(event->general_user,
-                                   event->general_user_length,
+                     escape_string(event->general_user.str,
+                                   event->general_user.length,
                                    endptr, endtmp - endptr, &endptr),
                      escape_string(event->general_host.str,
                                    event->general_host.length,
@@ -498,28 +499,28 @@ size_t audit_log_connection_record(char *buf, size_t buflen,
                      name,
                      make_record_id(id_str, sizeof(id_str)),
                      make_timestamp(timestamp, sizeof(timestamp), t),
-                     event->thread_id,
+                     event->connection_id,
                      event->status,
-                     escape_string(event->user,
-                                   event->user_length,
+                     escape_string(event->user.str,
+                                   event->user.length,
                                    endptr, endtmp - endptr, &endptr),
-                     escape_string(event->priv_user,
-                                   event->priv_user_length,
+                     escape_string(event->priv_user.str,
+                                   event->priv_user.length,
                                    endptr, endtmp - endptr, &endptr),
-                     escape_string(event->external_user,
-                                   event->external_user_length,
+                     escape_string(event->external_user.str,
+                                   event->external_user.length,
                                    endptr, endtmp - endptr, &endptr),
-                     escape_string(event->proxy_user,
-                                   event->proxy_user_length,
+                     escape_string(event->proxy_user.str,
+                                   event->proxy_user.length,
                                    endptr, endtmp - endptr, &endptr),
-                     escape_string(event->host,
-                                   event->host_length,
+                     escape_string(event->host.str,
+                                   event->host.length,
                                    endptr, endtmp - endptr, &endptr),
-                     escape_string(event->ip,
-                                   event->ip_length,
+                     escape_string(event->ip.str,
+                                   event->ip.length,
                                    endptr, endtmp - endptr, &endptr),
-                     escape_string(event->database,
-                                   event->database_length,
+                     escape_string(event->database.str,
+                                   event->database.length,
                                    endptr, endtmp - endptr, &endptr));
 }
 
@@ -583,9 +584,9 @@ int init_new_log_file()
     log_handler= audit_handler_file_open(&opts);
     if (log_handler == NULL)
     {
-      fprintf_timestamp(stderr);
-      fprintf(stderr, "Cannot open file %s. ", audit_log_file);
-      perror("Error: ");
+      my_plugin_log_message(&plugin_ptr, MY_ERROR_LEVEL,
+                            "Cannot open file %s.", audit_log_file);
+      my_plugin_perror();
       return(1);
     }
   }
@@ -601,9 +602,9 @@ int init_new_log_file()
     log_handler= audit_handler_syslog_open(&opts);
     if (log_handler == NULL)
     {
-      fprintf_timestamp(stderr);
-      fprintf(stderr, "Cannot open syslog. ");
-      perror("Error: ");
+      my_plugin_log_message(&plugin_ptr, MY_ERROR_LEVEL,
+                            "Cannot open syslog.");
+      my_plugin_perror();
       return(1);
     }
   }
@@ -617,9 +618,9 @@ int reopen_log_file()
 {
   if (audit_handler_flush(log_handler))
   {
-    fprintf_timestamp(stderr);
-    fprintf(stderr, "Cannot open file %s. ", audit_log_file);
-    perror("Error: ");
+    my_plugin_log_message(&plugin_ptr, MY_ERROR_LEVEL, "Cannot open file %s.",
+                          audit_log_file);
+    my_plugin_perror();
     return(1);
   }
 
@@ -628,11 +629,16 @@ int reopen_log_file()
 
 
 static
-int audit_log_plugin_init(void *arg __attribute__((unused)))
+int audit_log_plugin_init(MYSQL_PLUGIN plugin_info)
 {
   char buf[1024];
   size_t len;
+  int count;
 
+  plugin_ptr= plugin_info;
+
+  count= array_elements(all_audit_log_memory);
+  mysql_memory_register(PSI_CATEGORY, all_audit_log_memory, count);
   logger_init_mutexes();
 
   if (init_new_log_file())
@@ -661,15 +667,16 @@ int audit_log_plugin_deinit(void *arg __attribute__((unused)))
 
 
 static
-int is_event_class_allowed_by_policy(unsigned int class,
+int is_event_class_allowed_by_policy(mysql_event_class_t class,
                                      enum audit_log_policy_t policy)
 {
   static unsigned int class_mask[]=
   {
-    MYSQL_AUDIT_GENERAL_CLASSMASK | MYSQL_AUDIT_CONNECTION_CLASSMASK, /* ALL */
-    0,                                                             /* NONE */
-    MYSQL_AUDIT_CONNECTION_CLASSMASK,                              /* LOGINS */
-    MYSQL_AUDIT_GENERAL_CLASSMASK,                                 /* QUERIES */
+    /* ALL */
+    (1 << MYSQL_AUDIT_GENERAL_CLASS) | (1 << MYSQL_AUDIT_CONNECTION_CLASS),
+    0,                                                        /* NONE */
+    (1 << MYSQL_AUDIT_CONNECTION_CLASS),                      /* LOGINS */
+    (1 << MYSQL_AUDIT_GENERAL_CLASS),                         /* QUERIES */
   };
 
   return (class_mask[policy] & (1 << class)) != 0;
@@ -677,15 +684,15 @@ int is_event_class_allowed_by_policy(unsigned int class,
 
 
 static
-void audit_log_notify(MYSQL_THD thd __attribute__((unused)),
-                      unsigned int event_class,
-                      const void *event)
+int audit_log_notify(MYSQL_THD thd __attribute__((unused)),
+                     mysql_event_class_t event_class,
+                     const void *event)
 {
   char buf[1024];
   size_t len;
 
   if (!is_event_class_allowed_by_policy(event_class, audit_log_policy))
-    return;
+    return 0;
 
   if (event_class == MYSQL_AUDIT_GENERAL_CLASS)
   {
@@ -694,15 +701,19 @@ void audit_log_notify(MYSQL_THD thd __attribute__((unused)),
     switch (event_general->event_subclass)
     {
     case MYSQL_AUDIT_GENERAL_STATUS:
-      if (event_general->general_command_length == 4 &&
-          strncmp(event_general->general_command, "Quit", 4) == 0)
+      if (event_general->general_command.length == 4 &&
+          strncmp(event_general->general_command.str, "Quit", 4) == 0)
         break;
       len= audit_log_general_record(buf, sizeof(buf),
-                                    event_general->general_command,
+                                    event_general->general_command.str,
                                     event_general->general_time,
                                     event_general->general_error_code,
                                     event_general);
       audit_log_write(buf, len);
+      break;
+    case MYSQL_AUDIT_GENERAL_LOG:
+    case MYSQL_AUDIT_GENERAL_ERROR:
+    case MYSQL_AUDIT_GENERAL_RESULT:
       break;
     }
   }
@@ -732,6 +743,7 @@ void audit_log_notify(MYSQL_THD thd __attribute__((unused)),
       break;
     }
   }
+  return 0;
 }
 
 
@@ -801,7 +813,7 @@ static MYSQL_SYSVAR_ULONGLONG(buffer_size, audit_log_buffer_size,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "The size of the buffer for asynchronous logging, "
   "if FILE handler is used.",
-  NULL, NULL, 1048576UL, 4096UL, ULONGLONG_MAX, 4096UL);
+  NULL, NULL, 1048576UL, 4096UL, ULLONG_MAX, 4096UL);
 
 static
 void audit_log_rotate_on_size_update(
@@ -820,7 +832,7 @@ void audit_log_rotate_on_size_update(
 static MYSQL_SYSVAR_ULONGLONG(rotate_on_size, audit_log_rotate_on_size,
   PLUGIN_VAR_RQCMDARG,
   "Maximum size of the log to start the rotation, if FILE handler is used.",
-  NULL, audit_log_rotate_on_size_update, 0UL, 0UL, ULONGLONG_MAX, 4096UL);
+  NULL, audit_log_rotate_on_size_update, 0UL, 0UL, ULLONG_MAX, 4096UL);
 
 static
 void audit_log_rotations_update(
@@ -918,11 +930,12 @@ static struct st_mysql_sys_var* audit_log_system_variables[] =
 */
 static struct st_mysql_audit audit_log_descriptor=
 {
-  MYSQL_AUDIT_INTERFACE_VERSION,                    /* interface version    */
-  NULL,                                             /* release_thd function */
-  audit_log_notify,                                 /* notify function      */
-  { MYSQL_AUDIT_GENERAL_CLASSMASK |
-    MYSQL_AUDIT_CONNECTION_CLASSMASK }              /* class mask           */
+  MYSQL_AUDIT_INTERFACE_VERSION,                /* interface version    */
+  NULL,                                         /* release_thd function */
+  audit_log_notify,                             /* notify function      */
+  { MYSQL_AUDIT_GENERAL_ALL,
+    MYSQL_AUDIT_CONNECTION_ALL,
+    0, 0, 0, 0, 0, 0, 0, 0 }                    /* class mask           */
 };
 
 /*
@@ -931,7 +944,7 @@ static struct st_mysql_audit audit_log_descriptor=
 
 static struct st_mysql_show_var audit_log_status_variables[]=
 {
-  { 0, 0, 0}
+  {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}
 };
 
 

@@ -1,3 +1,0 @@
-SELECT @@global.slow_query_log_timestamp_always;
-@@global.slow_query_log_timestamp_always
-0

@@ -101,8 +101,6 @@ DELETE FROM t_myisam;
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
 INSERT INTO t_myisam VALUES(0);
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
-INSERT DELAYED INTO t_myisam VALUES(0);
-ERROR HY000: Can't execute the query because you have a conflicting backup lock
 UPDATE t_myisam SET a = 1;
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
 REPLACE INTO t_myisam VALUES(1);
@@ -117,8 +115,6 @@ DELETE FROM t_memory;
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
 INSERT INTO t_memory VALUES(0);
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
-INSERT DELAYED INTO t_memory VALUES(0);
-ERROR HY000: Can't execute the query because you have a conflicting backup lock
 UPDATE t_memory SET a = 1;
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
 REPLACE INTO t_memory VALUES(1);
@@ -128,8 +124,6 @@ a
 DELETE FROM t_archive;
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
 INSERT INTO t_archive VALUES(0);
-ERROR HY000: Can't execute the query because you have a conflicting backup lock
-INSERT DELAYED INTO t_archive VALUES(0);
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
 UPDATE t_archive SET a = 1;
 ERROR HY000: Can't execute the query because you have a conflicting backup lock
@@ -149,8 +143,6 @@ SELECT * FROM t_csv;
 a
 DELETE FROM t_blackhole;
 INSERT INTO t_blackhole VALUES(0);
-INSERT DELAYED INTO t_blackhole VALUES(0);
-ERROR HY000: Can't execute the query because you have a conflicting backup lock
 UPDATE t_blackhole SET a = 1;
 REPLACE INTO t_blackhole VALUES(1);
 SELECT * FROM t_blackhole;
@@ -349,19 +341,19 @@ ALTER TABLE t_archive ADD COLUMN b CHAR(10) NOT NULL;
 ALTER TABLE t_archive DROP COLUMN b;
 ALTER TABLE t_innodb ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_innodb'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_innodb'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_innodb DROP KEY tmp;
 ALTER TABLE t_myisam ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_myisam'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_myisam'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_myisam DROP KEY tmp;
 ALTER TABLE t_memory ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_memory'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_memory'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_memory DROP KEY tmp;
 ALTER TABLE t_blackhole ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_blackhole'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_blackhole'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_blackhole DROP KEY tmp;
 CREATE DATABASE test1;
 DROP DATABASE test1;
@@ -645,8 +637,6 @@ a
 HANDLER t_innodb CLOSE;
 INSERT INTO t_myisam VALUES(0);
 ERROR HY000: Lock wait timeout exceeded; try restarting transaction
-INSERT DELAYED INTO t_myisam VALUES(0);
-ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 SELECT * FROM t_myisam;
 a
 0
@@ -812,19 +802,19 @@ ALTER TABLE t_archive ADD COLUMN b CHAR(10) NOT NULL;
 ALTER TABLE t_archive DROP COLUMN b;
 ALTER TABLE t_innodb ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_innodb'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_innodb'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_innodb DROP KEY tmp;
 ALTER TABLE t_myisam ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_myisam'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_myisam'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_myisam DROP KEY tmp;
 ALTER TABLE t_memory ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_memory'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_memory'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_memory DROP KEY tmp;
 ALTER TABLE t_blackhole ADD KEY tmp (a);
 Warnings:
-Note	1831	Duplicate index 'tmp' defined on the table 'test.t_blackhole'. This is deprecated and will be disallowed in a future release.
+Warning	1831	Duplicate index 'tmp' defined on the table 'test.t_blackhole'. This is deprecated and will be disallowed in a future release.
 ALTER TABLE t_blackhole DROP KEY tmp;
 CREATE DATABASE test1;
 DROP DATABASE test1;

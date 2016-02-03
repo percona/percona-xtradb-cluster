@@ -30,6 +30,7 @@
 #include <debug_sync.h>
 #include <threadpool.h>
 #include <windows.h>
+#include <conn_handler/connection_handler_impl.h>
 
 
 /*
@@ -459,13 +460,12 @@ void destroy_connection(connection_t *connection, PTP_CALLBACK_INSTANCE instance
   This function should be called first whenever a callback is invoked in the 
   threadpool, does my_thread_init() if not yet done
 */
-extern ulong thread_created;
 static void check_thread_init()
 {
   if (FlsGetValue(fls) == NULL)
   {
     FlsSetValue(fls, (void *)1);
-    thread_created++;
+    Global_THD_manager::get_instance()->inc_thread_created();
     InterlockedIncrement((volatile long *)&tp_stats.num_worker_threads);
   }
 }
@@ -672,19 +672,22 @@ static void CALLBACK shm_read_callback(PTP_CALLBACK_INSTANCE instance,
 
 /*
   Notify the thread pool about a new connection.
-  NOTE: LOCK_thread_count is locked on entry. This function must unlock it.
 */
-void tp_add_connection(THD *thd)
+bool Thread_pool_connection_handler::add_connection(Channel_info *channel_info)
 {
-  threads.append(thd);
-  mysql_mutex_unlock(&LOCK_thread_count);
+  THD* thd= channel_info->create_thd();
+
+  thd->scheduler= &tp_event_functions;
+
+  Global_THD_manager::get_instance()->add_thd(thd);
 
   connection_t *con = (connection_t *)malloc(sizeof(connection_t));
   if(!con)
   {
-    tp_log_warning("Allocation failed", "tp_add_connection");
+    tp_log_warning("Allocation failed",
+                   "Thread_pool_connection_handler::add_connection");
     threadpool_remove_connection(thd);
-    return;
+    return true;
   }
 
   init_connection(con);
@@ -703,6 +706,7 @@ void tp_add_connection(THD *thd)
     /* Likely memory pressure */
     login_callback(NULL, con, NULL); /* deletes connection if something goes wrong */
   }
+  return true;
 }
 
 

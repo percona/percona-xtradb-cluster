@@ -1,7 +1,6 @@
 # Current test checks Last_errno for administrative command "Quit"
 # See Launchpad Bug #716210
 
---source include/have_innodb.inc
 --source include/count_sessions.inc
 
 --disable_warnings
@@ -12,7 +11,7 @@ SET GLOBAL log_slow_admin_statements=ON;
 SET GLOBAL long_query_time=0;
 SET GLOBAL min_examined_row_limit=0;
 
-CREATE TABLE t(a INT) engine=InnoDB;
+CREATE TABLE t(a INT);
 
 --connect(additional,localhost,root,,)
 --connection additional
@@ -24,7 +23,7 @@ CREATE TABLE t(a INT) engine=InnoDB;
 --source include/log_start.inc
 
 --error ER_TABLE_EXISTS_ERROR
-CREATE TABLE t(a INT) engine=InnoDB;
+CREATE TABLE t(a INT);
 --source include/log_stop.inc
 
 --let grep_pattern=Last_errno: [1-9]\d*\s

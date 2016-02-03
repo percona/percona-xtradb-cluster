@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2013, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,4 +22,4 @@ IF(NOT WITH_FEDERATED AND NOT WITH_FEDERATED_STORAGE_ENGINE)
  SET(FEDERATED_SOURCES ${FEDERATED_SOURCES} ${CMAKE_SOURCE_DIR}/mysys/string.c)
 ENDIF()
 MYSQL_ADD_PLUGIN(federated ${FEDERATED_SOURCES} STORAGE_ENGINE
-                 DTRACE_INSTRUMENTED)
+RECOMPILE_FOR_EMBEDDED DTRACE_INSTRUMENTED)

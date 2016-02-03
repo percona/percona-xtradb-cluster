@@ -3,6 +3,7 @@ CREATE TABLE t1(a INT) ENGINE=InnoDB;
 INSERT INTO t1 VALUE(1);
 CREATE TABLE t2(a INT) ENGINE=InnoDB;
 INSERT INTO t2 VALUE(1);
+# restart
 SET SESSION min_examined_row_limit=0;
 SET SESSION long_query_time=0;
 SET @old_log_slow_verbosity := @@log_slow_verbosity;

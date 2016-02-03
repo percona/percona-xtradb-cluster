@@ -2,12 +2,12 @@
 .\"     Title: \fBmysqlcheck\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 11/16/2015
+.\"      Date: 11/28/2015
 .\"    Manual: MySQL Database System
-.\"    Source: MySQL 5.6
+.\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQLCHECK\FR" "1" "11/16/2015" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYSQLCHECK\FR" "1" "11/28/2015" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -307,8 +307,6 @@ If a checked table is corrupted, automatically fix it\&. Any necessary repairs a
 \fB\-\-bind\-address=\fR\fB\fIip_address\fR\fR
 .sp
 On a computer having multiple network interfaces, use this option to select which interface to use for connecting to the MySQL server\&.
-.sp
-This option is supported beginning with MySQL 5\&.6\&.1\&.
 .RE
 .sp
 .RS 4
@@ -589,9 +587,7 @@ If you are using this option to repair tables, it runs an extended repair that m
 \fB\-\-default\-auth=\fR\fB\fIplugin\fR\fR
 .sp
 A hint about the client\-side authentication plugin to use\&. See
-Section\ \&6.3.7, \(lqPluggable Authentication\(rq\&.
-.sp
-This option was added in MySQL 5\&.6\&.2\&.
+Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -609,9 +605,9 @@ This option was added in MySQL 5\&.6\&.2\&.
 Enable the
 mysql_clear_password
 cleartext authentication plugin\&. (See
-Section\ \&6.3.8.7, \(lqThe Cleartext Client-Side Authentication Plugin\(rq\&.)
+Section\ \&6.3.9.8, \(lqThe Cleartext Client-Side Authentication Plugin\(rq\&.)
 .sp
-This option was added in MySQL 5\&.6\&.28\&.
+This option was added in MySQL 5\&.7\&.10\&.
 .RE
 .sp
 .RS 4
@@ -643,6 +639,8 @@ Check only tables that have not been closed properly\&.
 \fB\-\-fix\-db\-names\fR
 .sp
 Convert database names to 5\&.1 format\&. Only database names that contain special characters are affected\&.
+.sp
+This option is deprecated in MySQL 5\&.7\&.6 and will be removed in a future version of MySQL\&. If it is necessary to convert MySQL 5\&.0 database or table names, a workaround is to upgrade a MySQL 5\&.0 installation to MySQL 5\&.1 before upgrading to a more recent release\&.
 .RE
 .sp
 .RS 4
@@ -658,6 +656,8 @@ Convert database names to 5\&.1 format\&. Only database names that contain speci
 \fB\-\-fix\-table\-names\fR
 .sp
 Convert table names to 5\&.1 format\&. Only table names that contain special characters are affected\&. This option also applies to views\&.
+.sp
+This option is deprecated in MySQL 5\&.7\&.6 and will be removed in a future version of MySQL\&. If it is necessary to convert MySQL 5\&.0 database or table names, a workaround is to upgrade a MySQL 5\&.0 installation to MySQL 5\&.1 before upgrading to a more recent release\&.
 .RE
 .sp
 .RS 4
@@ -711,7 +711,7 @@ login path file\&. A
 is an option group containing options that specify which MySQL server to connect to and which account to authenticate as\&. To create or modify a login path file, use the
 \fBmysql_config_editor\fR
 utility\&. See
-\fBmysql_config_editor\fR(1)\&. This option was added in MySQL 5\&.6\&.6\&.
+\fBmysql_config_editor\fR(1)\&.
 .RE
 .sp
 .RS 4
@@ -837,9 +837,7 @@ The directory in which to look for plugins\&. Specify this option if the
 option is used to specify an authentication plugin but
 \fBmysqlcheck\fR
 does not find it\&. See
-Section\ \&6.3.7, \(lqPluggable Authentication\(rq\&.
-.sp
-This option was added in MySQL 5\&.6\&.2\&.
+Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -935,9 +933,10 @@ Perform a repair that can fix almost anything except unique keys that are not un
 .\" secure-auth option: mysqlcheck
 \fB\-\-secure\-auth\fR
 .sp
-Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&. This option is enabled by default; use
-\fB\-\-skip\-secure\-auth\fR
-to disable it\&. This option was added in MySQL 5\&.6\&.17\&.
+Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&. This option was added in MySQL 5\&.7\&.4\&.
+.sp
+As of MySQL 5\&.7\&.5, this option is deprecated and will be removed in a future MySQL release\&. It is always enabled and attempting to disable it (\fB\-\-skip\-secure\-auth\fR,
+\fB\-\-secure\-auth=0\fR) produces an error\&. Before MySQL 5\&.7\&.5, this option is enabled by default but can be disabled\&.
 .if n \{\
 .sp
 .\}
@@ -950,8 +949,8 @@ to disable it\&. This option was added in MySQL 5\&.6\&.17\&.
 \fBNote\fR
 .ps -1
 .br
-Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them will be removed in a future MySQL release\&. For account upgrade instructions, see
-Section\ \&6.3.8.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
+Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them is removed in MySQL 5\&.7\&.5\&. For account upgrade instructions, see
+Section\ \&6.3.9.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
 .sp .5v
 .RE
 .RE
@@ -1005,7 +1004,7 @@ Silent mode\&. Print only error messages\&.
 \fB\-\-skip\-database=\fR\fB\fIdb_name\fR\fR
 .sp
 Do not include the named database (case sensitive) in the operations performed by
-\fBmysqlcheck\fR\&. This option was added in MySQL 5\&.6\&.11\&.
+\fBmysqlcheck\fR\&.
 .RE
 .sp
 .RS 4
@@ -1040,7 +1039,7 @@ localhost, the Unix socket file to use, or, on Windows, the name of the named pi
 Options that begin with
 \fB\-\-ssl\fR
 specify whether to connect to the server using SSL and indicate where to find SSL keys and certificates\&. See
-Section\ \&6.3.10.4, \(lqSSL Command Options\(rq\&.
+Section\ \&6.3.12.4, \(lqSSL Command Options\(rq\&.
 .RE
 .sp
 .RS 4

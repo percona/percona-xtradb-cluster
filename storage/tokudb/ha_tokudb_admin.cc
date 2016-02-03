@@ -26,6 +26,8 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #include "tokudb_sysvars.h"
 #include "toku_time.h"
 
+#include "my_check_opt.h"
+
 namespace tokudb {
 namespace analyze {
 
@@ -406,10 +408,10 @@ void standard_t::on_run() {
                     _share->database_name(),
                     _share->table_name(),
                     _share->_key_descriptors[_current_key]._name);
-            _thd->protocol->prepare_for_resend();
-            _thd->protocol->store(name, namelen,  system_charset_info);
-            _thd->protocol->store("analyze", 7, system_charset_info);
-            _thd->protocol->store("info", 4, system_charset_info);
+            _thd->get_protocol()->start_row();
+            _thd->get_protocol()->store(name, namelen,  system_charset_info);
+            _thd->get_protocol()->store("analyze", 7, system_charset_info);
+            _thd->get_protocol()->store("info", 4, system_charset_info);
             char rowmsg[256];
             int rowmsglen;
             rowmsglen =
@@ -419,8 +421,9 @@ void standard_t::on_run() {
                     "rows processed %llu rows deleted %llu",
                     _rows,
                     _deleted_rows);
-            _thd->protocol->store(rowmsg, rowmsglen, system_charset_info);
-            _thd->protocol->write();
+            _thd->get_protocol()->store(rowmsg, rowmsglen,
+                                        system_charset_info);
+            _thd->get_protocol()->end_row();
 
             sql_print_information(
                 "tokudb analyze on %.*s %.*s",
@@ -679,7 +682,11 @@ int standard_t::analyze_key(uint64_t* rec_per_key_part) {
             _key_elapsed_time >= _half_time &&
             _rows < _half_rows)) {
 
-            tokudb::memory::free(key.data); key.data = NULL;
+            // use global free as PerconaFT uses global malloc to allocate
+            // the keys...realistically, FT should have its own key free
+            // function to ensure the same allocater is used to free whatever
+            // it allocated
+            ::free(key.data); key.data = NULL;
             tokudb::memory::free(prev_key.data); prev_key.data = NULL;
             close_error = cursor->c_close(cursor);
             assert_always(close_error == 0);
@@ -688,7 +695,12 @@ int standard_t::analyze_key(uint64_t* rec_per_key_part) {
         }
     }
     // cleanup
-    if (key.data) tokudb::memory::free(key.data);
+    // use global free as PerconaFT uses global malloc to allocate
+    // the keys...realistically, FT should have its own key free
+    // function to ensure the same allocater is used to free whatever
+    // it allocated
+
+    if (key.data) ::free(key.data);
     if (prev_key.data) tokudb::memory::free(prev_key.data);
     if (cursor) close_error = cursor->c_close(cursor);
     assert_always(close_error == 0);
@@ -959,25 +971,26 @@ static int ha_tokudb_check_progress(void* extra, float progress) {
 }
 
 static void ha_tokudb_check_info(THD* thd, TABLE* table, const char* msg) {
-    if (thd->vio_ok()) {
-        char tablename[
-            table->s->db.length + 1 +
-            table->s->table_name.length + 1];
-        snprintf(
-            tablename,
-            sizeof(tablename),
-            "%.*s.%.*s",
-            (int)table->s->db.length,
-            table->s->db.str,
-            (int)table->s->table_name.length,
-            table->s->table_name.str);
-        thd->protocol->prepare_for_resend();
-        thd->protocol->store(tablename, strlen(tablename), system_charset_info);
-        thd->protocol->store("check", 5, system_charset_info);
-        thd->protocol->store("info", 4, system_charset_info);
-        thd->protocol->store(msg, strlen(msg), system_charset_info);
-        thd->protocol->write();
-    }
+    DBUG_ASSERT(thd->active_vio);
+
+    char tablename[
+        table->s->db.length + 1 +
+        table->s->table_name.length + 1];
+    snprintf(
+        tablename,
+        sizeof(tablename),
+        "%.*s.%.*s",
+        (int)table->s->db.length,
+        table->s->db.str,
+        (int)table->s->table_name.length,
+        table->s->table_name.str);
+    thd->get_protocol()->start_row();
+    thd->get_protocol()->store(tablename, strlen(tablename),
+                               system_charset_info);
+    thd->get_protocol()->store("check", 5, system_charset_info);
+    thd->get_protocol()->store("info", 4, system_charset_info);
+    thd->get_protocol()->store(msg, strlen(msg), system_charset_info);
+    thd->get_protocol()->end_row();
 }
 
 int ha_tokudb::check(THD* thd, HA_CHECK_OPT* check_opt) {
