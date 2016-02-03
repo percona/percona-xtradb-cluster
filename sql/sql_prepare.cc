@@ -3603,7 +3603,6 @@ bool Prepared_statement::prepare(const char *query_str, size_t query_length)
   error= parse_sql(thd, &parser_state, NULL) ||
     thd->is_error() ||
     init_param_array(this);
-  thd->m_statement_psi= parent_locker;
 
   if (!error)
   { // We've just created the statement maybe there is a rewrite
@@ -3802,6 +3801,7 @@ Prepared_statement::set_parameters(String *expanded_query,
   }
   return res;
 }
+
 
 #ifdef WITH_WSREP
 void wsrep_replay_transaction(THD *thd);

@@ -323,6 +323,8 @@ my @ndbd_rules=
  { 'BackupDataDir' => \&fix_cluster_backup_dir },
 );
 
+
+#
 # Rules to run for each memcached in the config
 #  - will be run in order listed here
 #

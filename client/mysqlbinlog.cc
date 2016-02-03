@@ -3327,7 +3327,7 @@ int main(int argc, char** argv)
 
   my_init_time(); // for time functions
   tzset(); // set tzname
-   /*
+  /*
     A pointer of type Log_event can point to
      INTVAR
      USER_VAR

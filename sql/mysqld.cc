@@ -4685,6 +4685,8 @@ a file name for --log-bin-index option", opt_binlog_index_name);
 #endif
   DBUG_RETURN(0);
 }
+
+
 #ifndef EMBEDDED_LIBRARY
 #ifdef _WIN32
 
@@ -4704,6 +4706,7 @@ extern "C" void *handle_shutdown(void *arg)
   }
   return 0;
 }
+
 
 static void create_shutdown_thread()
 {
@@ -5271,10 +5274,6 @@ int mysqld_main(int argc, char **argv)
     unireg_abort(0);
   }
 #endif /* WITH_WSREP */
-  /*
-    init signals & alarm
-    After this we can't quit by a simple unireg_abort
-  */
   error_handler_hook= my_message_sql;
 
   /* Save pid of this process in a file */

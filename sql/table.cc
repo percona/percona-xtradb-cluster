@@ -3395,7 +3395,7 @@ partititon_err:
 
   /* Increment the opened_tables counter, only when open flags set. */
   if (db_stat)
-  thd->status_var.opened_tables++;
+    thd->status_var.opened_tables++;
 
   DBUG_RETURN (0);
 

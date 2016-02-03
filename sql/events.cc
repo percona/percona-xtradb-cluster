@@ -1179,9 +1179,20 @@ Events::load_events_from_db(THD *thd)
       delete et;
       goto end;
     }
+
 #ifdef WITH_WSREP
-    // when SST from master node who initials event, the event status is ENABLED
-    // this is problematic because there are two nodes with same events and both enabled.
+    /**
+      IF SST is done from a galera node that is also acting as MASTER
+      newly synced node in galera eco-system will also copy-over the event state
+      enabling duplicate event in galera eco-system.
+      DISABLE such events if the current node is not event orginator.
+      (Also, make sure you skip disabling it if is already disabled to avoid
+       creation of redundant action)
+      NOTE:
+      This complete system relies on server-id. Ideally server-id should be same for
+      all nodes of galera eco-system but they aren't same.
+      Infact, it is recommended/set pratice to have each node with different server-id.
+    */
     if (et->originator != thd->server_id)
     {
         if (et->status == Event_parse_data::SLAVESIDE_DISABLED)
@@ -1249,11 +1260,11 @@ end:
   close_mysql_tables(thd);
   DBUG_RETURN(ret);
 }
+
 #ifdef WITH_WSREP
 int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len)
 {
   String log_query;
-
   if (create_query_string(thd, &log_query))
   {
     WSREP_WARN("events create string failed: schema: %s, query: %s",
@@ -1262,8 +1273,8 @@ int wsrep_create_event_query(THD *thd, uchar** buf, size_t* buf_len)
   }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);
 }
-static int
-wsrep_alter_query_string(THD *thd, String *buf)
+
+static int wsrep_alter_query_string(THD *thd, String *buf)
 {
   /* Append the "ALTER" part of the query */
   if (buf->append(STRING_WITH_LEN("ALTER ")))
@@ -1278,6 +1289,7 @@ wsrep_alter_query_string(THD *thd, String *buf)
  
   return 0;
 }
+
 int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len)
 {
   String log_query;

@@ -18,17 +18,10 @@ debian/extra/my.cnf.fallback etc/mysql/
 debian/extra/mysql.conf.cnf  etc/mysql/conf.d/mysql.cnf
 
 usr/share/aclocal/mysql.m4
-<<<<<<< HEAD
-usr/share/mysql/docs/INFO_SRC
-usr/share/mysql/docs/INFO_BIN
-usr/share/mysql/INSTALL-BINARY
-usr/share/mysql/docs/ChangeLog
-=======
 usr/share/mysql/docs/ChangeLog
 usr/share/mysql/docs/INFO_SRC
 usr/share/mysql/docs/INFO_BIN
 usr/share/mysql/INSTALL-BINARY
->>>>>>> ps-5.7
 # localized error msgs
 usr/share/mysql/*/errmsg.sys
 usr/share/mysql/errmsg-utf8.txt

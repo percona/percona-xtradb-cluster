@@ -76,13 +76,13 @@ lock at the same time as multiple read locks.
 
 ulong locks_immediate = 0L, locks_waited = 0L;
 enum thr_lock_type thr_upgraded_concurrent_insert_lock = TL_WRITE;
+
 #ifdef WITH_WSREP
 static wsrep_thd_is_brute_force_fun wsrep_thd_is_brute_force= NULL;
 static wsrep_abort_thd_fun wsrep_abort_thd= NULL;
 static my_bool wsrep_debug;
 static my_bool wsrep_convert_LOCK_to_trx;
 static wsrep_on_fun wsrep_on = NULL;
-
 void wsrep_thr_lock_init(
     wsrep_thd_is_brute_force_fun bf_fun, wsrep_abort_thd_fun abort_fun,
     my_bool debug, my_bool convert_LOCK_to_trx, wsrep_on_fun on_fun
@@ -93,7 +93,7 @@ void wsrep_thr_lock_init(
   wsrep_convert_LOCK_to_trx= convert_LOCK_to_trx;
   wsrep_on                 = on_fun;
 }
-#endif
+#endif /* WITH_WSREP */
 /* The following constants are only for debug output */
 #define MAX_THREADS 100
 #define MAX_LOCKS   100

@@ -173,7 +173,7 @@ row_upd_index_is_referenced(
 static
 ibool
 wsrep_row_upd_index_is_foreign(
-/*========================*/
+/*===========================*/
 	dict_index_t*	index,	/*!< in: index */
 	trx_t*		trx)	/*!< in: transaction */
 {
@@ -308,6 +308,7 @@ row_upd_check_references_constraints(
 	}
 
 	err = DB_SUCCESS;
+
 func_exit:
 	if (got_s_lock) {
 		row_mysql_unfreeze_data_dictionary(trx);

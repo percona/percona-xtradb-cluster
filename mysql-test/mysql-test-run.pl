@@ -376,16 +376,13 @@ sub main {
     gcov_prepare($basedir);
   }
 
-<<<<<<< HEAD
   check_wsrep_support();
 
-=======
   # New: collect suites and test cases from test list (file containing suite.testcase on each line)
   #      and put suites to $opt_suites and test case to @opt_cases.
   if ($opt_do_test_list ne "") {
       	collect_test_cases_from_list(\$opt_suites, \@opt_cases, $opt_do_test_list,\$opt_ctest);
   }
->>>>>>> ps-5.7
   if (!$opt_suites) {
     $opt_suites= $DEFAULT_SUITES;
   }
@@ -3046,6 +3043,7 @@ sub check_ndbcluster_support ($) {
       # which is the default case
       return;
     }
+
     if ($opt_skip_ndbcluster)
     {
       # Compiled with ndbcluster but ndbcluster skipped
@@ -5667,7 +5665,7 @@ sub mysqld_arguments ($$$) {
   {
     # Skip --defaults-file option since it's handled above.
     next if $arg =~ /^--defaults-file/;
-
+   
 
     if ($arg eq "--log-error")
     {
@@ -6663,7 +6661,7 @@ sub gdb_arguments {
   $$exe= "xterm";
 }
 
-#
+ #
 # Modify the exe and args so that program is run in lldb
 #
 sub lldb_arguments {
@@ -6682,12 +6680,12 @@ sub lldb_arguments {
 	     "b main\n" .
 	     $runline);
 
-  print "\nTo start lldb for $type, type in another window:\n";
+    print "\nTo start lldb for $type, type in another window:\n";
     print "cd $glob_mysql_test_dir && lldb -s $lldb_init_file $$exe\n";
 
-  # Indicate the exe should not be started
-  $$exe= undef;
-  return;
+    # Indicate the exe should not be started
+    $$exe= undef;
+    return;
 }
 
 #

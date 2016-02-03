@@ -22,13 +22,10 @@
 # pre mode  :  try to perform sanity check for configuration, log, data
 # post mode :  ping server until answer is received
 
-<<<<<<< HEAD
-=======
 get_path () {
 	my_print_defaults mysqld | grep ${1} | cut -d= -f2
 }
 
->>>>>>> ps-5.7
 pinger () {
 	while /bin/true ; do
 		sleep 1
@@ -38,12 +35,8 @@ pinger () {
 
 sanity () {
 	MYSQLRUN=/var/run/mysqld
-<<<<<<< HEAD
-	MYSQLDATA=/var/lib/mysql
-=======
 	MYSQLDATA=$(get_path datadir)
 	MYSQLFILES=/var/lib/mysql-files
->>>>>>> ps-5.7
 	MYSQLLOG=/var/log/mysql
 
 	if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
@@ -53,8 +46,6 @@ sanity () {
 		chmod 750 ${MYSQLDATA}
 	fi
 
-<<<<<<< HEAD
-=======
 	if [ ! -d ${MYSQLFILES} -a ! -L ${MYSQLFILES} ];
 	then
 		mkdir ${MYSQLFILES}
@@ -62,7 +53,6 @@ sanity () {
 		chmod 770 ${MYSQLFILES}
 	fi
 
->>>>>>> ps-5.7
 	if [ ! -d "${MYSQLDATA}/mysql" -a ! -L "${MYSQLDATA}/mysql" ];
 	then
 		mkdir ${MYSQLDATA}/mysql
@@ -72,9 +62,6 @@ sanity () {
 
 	if [ ! "$(ls -A ${MYSQLDATA}/mysql)" ];
 	then
-<<<<<<< HEAD
-		mysql_install_db --user=mysql > /dev/null
-=======
 		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
 		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
 		pinger
@@ -86,7 +73,6 @@ sanity () {
 	if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${MYSQLDATA}/server-key.pem" ];
 	then
 		/usr/bin/mysql_ssl_rsa_setup --datadir="${MYSQLDATA}" --uid=mysql >/dev/null 2>&1
->>>>>>> ps-5.7
 	fi
 
 	if [ ! -d ${MYSQLLOG} -a ! -L ${MYSQLLOG} ];

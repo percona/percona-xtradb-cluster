@@ -170,7 +170,7 @@ skip:
 			&os_total_large_mem_allocated, size);
 		UNIV_MEM_ALLOC(ptr, size);
 	}
-#endif
+#endif /* _WIN32 */
 
 #if defined(WITH_WSREP) && defined(UNIV_LINUX)
 	/* Do not make the pages from this block available to the child after a
@@ -181,7 +181,7 @@ skip:
 			"not supported by the kernel. Spawning SST processes "
 			"can be slow.\n");
 	}
-#endif
+#endif /* WITH_WSREP && UNIV_LINUX */
 	return(ptr);
 }
 

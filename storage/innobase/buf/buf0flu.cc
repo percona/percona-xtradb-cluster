@@ -979,12 +979,12 @@ buf_flush_init_for_writing(
 	be calculated after storing the new formula checksum.
 
 	In other cases we write the same value to both fields.
-		If CRC32 is used then it is faster to use that checksum
-		(calculated above) instead of calculating another one.
-		We can afford to store something other than
-		buf_calc_page_old_checksum() or BUF_NO_CHECKSUM_MAGIC in
-		this field because the file will not be readable by old
-		versions of MySQL/InnoDB anyway (older than MySQL 5.6.3) */
+	If CRC32 is used then it is faster to use that checksum
+	(calculated above) instead of calculating another one.
+	We can afford to store something other than
+	buf_calc_page_old_checksum() or BUF_NO_CHECKSUM_MAGIC in
+	this field because the file will not be readable by old
+	versions of MySQL/InnoDB anyway (older than MySQL 5.6.3) */
 
 	mach_write_to_4(page + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM,
 			checksum);

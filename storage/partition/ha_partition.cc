@@ -376,6 +376,7 @@ const char *ha_partition::table_type() const
   // we can do this since we only support a single engine type
   return m_file[0]->table_type();
 }
+
 #ifdef WITH_WSREP
 int ha_partition::wsrep_db_type() const
 { 

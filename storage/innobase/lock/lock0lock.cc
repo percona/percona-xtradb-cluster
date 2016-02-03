@@ -921,7 +921,7 @@ lock_rec_has_to_wait(
 #endif /* WITH_WSREP */
 		return(TRUE);
 	}
-	
+
 	return(FALSE);
 }
 
@@ -1478,7 +1478,7 @@ lock_number_of_tables_locked(
 	return(n_tables);
 }
 
-/*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
+
 #ifdef WITH_WSREP
 static
 void
@@ -1500,6 +1500,8 @@ wsrep_print_wait_locks(
 	}
 }
 #endif /* WITH_WSREP */
+
+/*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
 
 /**
 Check of the lock is on m_rec_id.
@@ -2178,7 +2180,6 @@ queue is itself waiting roll it back, also do a deadlock check and resolve.
 @param[in, out] wait_for	The lock that the joining transaction is
 				waiting for
 @param[in] prdt			Predicate [optional]
-@param[in,out] c_lock		conflicting lock
 @return DB_LOCK_WAIT, DB_DEADLOCK, or DB_QUE_THR_SUSPENDED, or
 	DB_SUCCESS_LOCKED_REC; DB_SUCCESS_LOCKED_REC means that
 	there was a deadlock, but another transaction was chosen
@@ -2454,7 +2455,6 @@ lock_rec_lock_fast(
 	if (lock == NULL) {
 
 		if (!impl) {
-			/* Note that we don't own the trx mutex. */
 #ifdef WITH_WSREP
 			RecLock	rec_lock(index, block, heap_no, mode);
 
@@ -2706,6 +2706,7 @@ lock_rec_has_to_wait_in_queue(
 				continue;
 			}
 #endif
+
 			return(lock);
 		}
 	}
@@ -6248,6 +6249,11 @@ lock_rec_insert_check_and_lock(
 	const lock_t*	wait_for = lock_rec_other_has_conflicting(
 				type_mode, block, heap_no, trx);
 
+#ifdef WITH_WSREP
+	if (wsrep_log_conflicts)
+		mutex_exit(&trx_sys->mutex);
+#endif
+
 	if (wait_for != NULL) {
 
 		RecLock	rec_lock(thr, index, block, heap_no, type_mode);
@@ -6259,10 +6265,6 @@ lock_rec_insert_check_and_lock(
 		trx_mutex_exit(trx);
 
 	} else {
-#ifdef WITH_WSREP
-	if (wsrep_log_conflicts)
-		mutex_exit(&trx_sys->mutex);
-#endif
 		err = DB_SUCCESS;
 	}
 

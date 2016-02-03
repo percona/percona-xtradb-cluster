@@ -319,7 +319,7 @@ ELSE()
 ENDIF()
 
 # Use cmake variables to inspect dependencies for 
-# mysqlclient library (add -l stuff)
+# perconaserverclient library (add -l stuff)
 SET(CLIENT_LIBS "")
 SET(LIBS "")
 
@@ -386,7 +386,6 @@ SET(CONFIG_EMBEDD_LIBS "${EMBEDD_LIBS}")
 IF(QUOTED_CMAKE_CXX_LINK_FLAGS)
   SET(CONFIG_EMBEDD_LIBS "${CONFIG_EMBEDD_LIBS} ${QUOTED_CMAKE_CXX_LINK_FLAGS}")
 ENDIF()
->>>>>>> ps-5.7
 
 SET(LIBMYSQLD_LIBS_USAGE "
         --libmysqld-libs [$embedded_libs]")

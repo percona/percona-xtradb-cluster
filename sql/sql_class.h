@@ -18,8 +18,10 @@
 
 /* Classes in mysql */
 
+#ifdef WITH_WSREP
 #include <vector>
 using std::vector;
+#endif /* WITH_WSREP */
 
 #include "my_global.h"
 
@@ -3229,7 +3231,9 @@ public:
 
   void shutdown_active_vio();
   void awake(THD::killed_state state_to_set);
+#ifdef WITH_WSREP
   void awake(void);
+#endif /* WITH_WSREP */
 
   /** Disconnect the associated communication endpoint. */
   void disconnect(bool server_shutdown= false);

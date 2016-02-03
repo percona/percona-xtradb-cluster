@@ -314,7 +314,6 @@ trx_sys_print_mysql_binlog_offset(void)
 	mtr_commit(&mtr);
 }
 
-<<<<<<< HEAD
 #ifdef WITH_WSREP
 
 #ifdef UNIV_DEBUG
@@ -441,7 +440,7 @@ UNIV_INTERN
 void
 trx_sys_print_mysql_master_log_pos(void)
 /*====================================*/
-=======
+
 /****************************************************************//**
 Looks for a free slot for a rollback segment in the trx system file copy.
 @return slot index or ULINT_UNDEFINED if not found */
@@ -453,7 +452,6 @@ trx_sysf_rseg_find_free(
 					for temp-tablespace as free slots. */
 	ulint	nth_free_slots)		/*!< in: allocate nth free slot.
 					0 means next free slot. */
->>>>>>> ps-5.7
 {
 	ulint		i;
 	trx_sysf_t*	sys_header;

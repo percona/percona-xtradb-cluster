@@ -50,7 +50,7 @@ MACRO(CREATE_INFO_SRC target_dir)
   SET(PERLSCRIPT
     "use warnings; use POSIX qw(strftime); "
     "print strftime \"%F %T %z\", localtime;")
-    EXECUTE_PROCESS(
+  EXECUTE_PROCESS(
     COMMAND perl -e "${PERLSCRIPT}"
     RESULT_VARIABLE result
     OUTPUT_VARIABLE bdate

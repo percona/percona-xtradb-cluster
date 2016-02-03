@@ -565,6 +565,7 @@ bool Sql_cmd_truncate_table::execute(THD *thd)
 
   if (! (res= truncate_table(thd, first_table)))
     my_ok(thd);
+
   DBUG_RETURN(res);
 }
 

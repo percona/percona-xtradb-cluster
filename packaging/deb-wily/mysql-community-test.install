@@ -13,10 +13,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-<<<<<<< HEAD
-usr/lib/mysql-test/*
-usr/share/man/man1/mysql-test-run.pl.1
-=======
 # binaries
 usr/bin/mysql_client_test
 usr/bin/mysql_client_test_embedded
@@ -95,7 +91,6 @@ usr/lib/mysql/plugin/debug/rewrite_example.so
 usr/lib/mysql/plugin/debug/test_security_context.so
 # test suite
 usr/lib/mysql-test/*
->>>>>>> ps-5.7
 # legal
 usr/share/doc/mysql-community-test/COPYING
 usr/share/doc/mysql-community-test/README

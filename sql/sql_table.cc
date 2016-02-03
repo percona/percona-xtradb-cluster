@@ -5684,6 +5684,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
   bool is_trans= FALSE;
   uint not_used;
   Tablespace_hash_set tablespace_set(PSI_INSTRUMENT_ME);
+
   DBUG_ENTER("mysql_create_like_table");
 
 #ifdef WITH_WSREP
@@ -9482,8 +9483,8 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
 
   if (check_temporal_upgrade)
   {
-  if (upgrade_old_temporal_types(thd, alter_info))
-    DBUG_RETURN(true);
+    if (upgrade_old_temporal_types(thd, alter_info))
+      DBUG_RETURN(true);
   }
 
   /*

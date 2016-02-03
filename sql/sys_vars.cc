@@ -953,7 +953,6 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     return true;
   }
 
-
   return false;
 }
 
@@ -979,9 +978,6 @@ static bool prevent_global_rbr_exec_mode_idempotent(sys_var *self, THD *thd,
 static Sys_var_test_flag Sys_core_file(
        "core_file", "write a core-file on crashes", TEST_CORE_ON_SIGNAL);
 
-/*
-  Bug#1243228 Changed from BINLOG_FORMAT_STMT to BINLOG_FORMAT_ROW here.
-*/
 static Sys_var_enum Sys_binlog_format(
        "binlog_format", "What form of binary logging the master will "
        "use: either ROW for row-based binary logging, STATEMENT "
@@ -3002,6 +2998,7 @@ static bool check_read_only(sys_var *self, THD *thd, set_var *var)
 
 static bool check_require_secure_transport(sys_var *self, THD *thd, set_var *var)
 {
+
 #if !defined (_WIN32)
   /*
     always allow require_secure_transport to be enabled on
@@ -4517,10 +4514,10 @@ static bool fix_sql_log_bin_after_update(sys_var *self, THD *thd,
 {
   DBUG_ASSERT(type == OPT_SESSION);
 
-    if (thd->variables.sql_log_bin)
-      thd->variables.option_bits |= OPTION_BIN_LOG;
-    else
-      thd->variables.option_bits &= ~OPTION_BIN_LOG;
+  if (thd->variables.sql_log_bin)
+    thd->variables.option_bits |= OPTION_BIN_LOG;
+  else
+    thd->variables.option_bits &= ~OPTION_BIN_LOG;
 
   return FALSE;
 }

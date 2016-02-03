@@ -4426,11 +4426,11 @@ static int store_temporary_table_record(THD *thd, TABLE *table, TABLE *tmp_table
   // file stats
   handler *file= tmp_table->file;
 
-    /* We have only one handler object for a temp table globally and it might
-    be in use by other thread.  Do not trash it by invoking handler methods on
-    it but rather clone it. */
+  /* We have only one handler object for a temp table globally and it might
+  be in use by other thread.  Do not trash it by invoking handler methods on
+  it but rather clone it. */
   if (file) {
-    file = file->clone(tmp_table->s->normalized_path.str, thd->mem_root);
+    file= file->clone(tmp_table->s->normalized_path.str, thd->mem_root);
   }
 
   if (file) {

@@ -1635,6 +1635,7 @@ row_ins_check_foreign_constraint(
 
 				if (check_ref) {
 					err = DB_SUCCESS;
+
 #ifdef WITH_WSREP
 					err = wsrep_append_foreign_key(
 						thr_get_trx(thr),

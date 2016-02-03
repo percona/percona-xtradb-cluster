@@ -1,6 +1,2 @@
 version=3
-<<<<<<< HEAD
-http://mysql.mirrors.pair.com/Downloads/MySQL-5.6/mysql-([\d\.]+).tar.gz
-=======
 http://mysql.mirrors.pair.com/Downloads/MySQL-5.7/mysql-([\d\.]+).tar.gz
->>>>>>> ps-5.7

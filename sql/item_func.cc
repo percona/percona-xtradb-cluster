@@ -4538,8 +4538,8 @@ bool udf_handler::get_arguments()
 	{
 	  f_args.lengths[i]= 0;
 	}
-	  break;
-	}
+	break;
+      }
     case INT_RESULT:
       *((longlong*) to) = args[i]->val_int();
       if (!args[i]->null_value)

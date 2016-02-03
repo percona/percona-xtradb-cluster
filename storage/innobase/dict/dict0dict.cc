@@ -3615,10 +3615,11 @@ dict_foreign_find_index(
 
 	return(NULL);
 }
+
 #ifdef WITH_WSREP
 dict_index_t*
 wsrep_dict_foreign_find_index(
-/*====================*/
+/*==========================*/
 	dict_table_t*	table,	/*!< in: table */
 	const char**	col_names, /*!< in: column names, or NULL
 					to use table->col_names */

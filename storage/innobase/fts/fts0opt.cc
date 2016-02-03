@@ -2561,8 +2561,6 @@ fts_optimize_add_table(
 		return;
 	}
 
-	ut_ad(table->cached && table->fts != NULL);
-
 	/* Make sure table with FTS index cannot be evicted */
 	dict_table_prevent_eviction(table);
 

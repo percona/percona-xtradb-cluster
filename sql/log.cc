@@ -39,9 +39,6 @@
 #include "sql_prepare.h"        // Prepared_statement
 #include "mysqld.h" // max_binlog_files etc
 
-#ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-#endif /* WITH_WSREP */
 #include "pfs_file_provider.h"
 #include "mysql/psi/mysql_file.h"
 

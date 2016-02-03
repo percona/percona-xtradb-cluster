@@ -3,10 +3,7 @@
 SET @@SESSION.sql_buffer_result= 1;
 CREATE TABLE t1(grp INT, a INT UNSIGNED, c CHAR, d CHAR);
 
-<<<<<<< HEAD
-=======
 --error ER_BAD_FIELD_ERROR
->>>>>>> ps-5.7
 SELECT grp, GROUP_CONCAT(c ORDER BY 2) FROM t1 GROUP BY grp;
 
 DROP TABLE t1;

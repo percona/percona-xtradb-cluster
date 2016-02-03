@@ -13,25 +13,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-<<<<<<< HEAD
-# obscured filename for mysqld-debug, libmysqld-debug.a and debug plugins
-debian/extra/server-binary
-debian/extra/embedded-server
-=======
 # obscured filename for mysqld-debug, libmysqld-debug.a
 debian/extra/server-binary
 debian/extra/embedded-server
 # obscured filenames for debug plugins
->>>>>>> ps-5.7
 debian/extra/adt_null-plugin
 debian/extra/auth-plugin
 debian/extra/auth_socket-plugin
 debian/extra/auth_test_plugin-plugin
-<<<<<<< HEAD
-debian/extra/innodb_engine-plugin
-debian/extra/libdaemon_example-plugin
-debian/extra/libmemcached-plugin
-=======
 debian/extra/ha_example-plugin
 debian/extra/innodb_engine-plugin
 debian/extra/libdaemon_example-plugin
@@ -59,17 +48,11 @@ debian/extra/libtest_sql_views_triggers-plugin
 debian/extra/libtest_x_sessions_deinit-plugin
 debian/extra/libtest_x_sessions_init-plugin
 debian/extra/locking_service-plugin
->>>>>>> ps-5.7
 debian/extra/mypluglib-plugin
 debian/extra/mysql_no_login-plugin
 debian/extra/qa_auth_client-plugin
 debian/extra/qa_auth_interface-plugin
 debian/extra/qa_auth_server-plugin
-<<<<<<< HEAD
-debian/extra/semisync_master-plugin
-debian/extra/semisync_slave-plugin
-debian/extra/validate_password-plugin
-=======
 debian/extra/replication_observers_example_plugin-plugin
 debian/extra/rewriter-plugin
 debian/extra/rewrite_example-plugin
@@ -78,4 +61,3 @@ debian/extra/semisync_slave-plugin
 debian/extra/test_security_context-plugin
 debian/extra/validate_password-plugin
 debian/extra/version_token-plugin
->>>>>>> ps-5.7

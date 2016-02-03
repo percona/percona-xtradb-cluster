@@ -29,52 +29,12 @@ case "$1" in
 
 	if [ -z "$2" ];
 	then
-<<<<<<< HEAD
-=======
 
->>>>>>> ps-5.7
 		set -e
 
 		update-alternatives --install /etc/mysql/my.cnf my.cnf "/etc/mysql/mysql.cnf" 200
 
 		MYSQLDATA=/var/lib/mysql
-<<<<<<< HEAD
-
-		if [ ! -d "${MYSQLDATA}/mysql" -a ! -L "${MYSQLDATA}/mysql" ];
-		then
-			mkdir ${MYSQLDATA}/mysql
-			chown mysql:mysql ${MYSQLDATA}/mysql
-			chmod 750 ${MYSQLDATA}/mysql
-			if [ ! "$(ls -A ${MYSQLDATA}/mysql)" ];
-			then
-				mysql_install_db --user=mysql > /dev/null
-			fi
-		fi
-
-		db_get mysql-community-server/root-pass && PASSWD=${RET}
-		if [ ! -z "${PASSWD}" ];
-		then
-			db_set mysql-community-server/root-pass ""
-			db_set mysql-community-server/re-root-pass ""
-			PASSWD="UPDATE user SET password=PASSWORD('${PASSWD}') WHERE user='root';"
-		else
-			PASSWD=""
-		fi
-
-		SQL=`mktemp`
-		if [ -f "${SQL}" ];
-		then
-			chmod 700 ${SQL}
-			cat << EOF > ${SQL}
-USE mysql;
-${PASSWD}
-DELETE FROM user WHERE user='';
-FLUSH PRIVILEGES;
-EOF
-			mysqld --basedir=/usr --bootstrap --user=mysql --skip-grant-tables < $SQL
-			PASSWD=""
-			rm -f ${SQL}
-=======
 		MYSQLFILES=/var/lib/mysql-files
 
 		if [ ! "$(ls -A ${MYSQLDATA})" ] && [ -d ${MYSQLFILES} ];
@@ -104,7 +64,6 @@ EOF
 				mysql -e "USE mysql; UPDATE user SET plugin='auth_socket' WHERE user='root'"
 				mysqladmin shutdown
 			fi
->>>>>>> ps-5.7
 		fi
 
 		set +e

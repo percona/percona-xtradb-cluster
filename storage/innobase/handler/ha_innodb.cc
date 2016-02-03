@@ -148,10 +148,9 @@ extern handlerton * wsrep_hton;
 extern TC_LOG* tc_log;
 extern void wsrep_cleanup_transaction(THD *thd);
 #endif /* WITH_WSREP */
-=======
+
 /* for ha_innopart, Native InnoDB Partitioning. */
 #include "ha_innopart.h"
->>>>>>> ps-5.7
 
 /** to protect innobase_open_files */
 static mysql_mutex_t innobase_share_mutex;
@@ -1613,7 +1612,6 @@ innobase_srv_conc_exit_innodb(
 
 	ut_ad(!sync_check_iterate(check));
 #endif /* UNIV_DEBUG */
->>>>>>> ps-5.7
 
 	/* This is to avoid making an unnecessary function call. */
 	if (trx->declared_to_be_inside_innodb
@@ -1800,7 +1798,6 @@ add_table_to_thread_cache(
 	innodb_session_t*& priv = thd_to_innodb_session(thd);
 	priv->register_table_handler(table->name.m_name, table);
 }
-
 
 /********************************************************************//**
 In XtraDB it is impossible for a transaction to own a search latch outside of
@@ -6557,7 +6554,7 @@ get_field_offset(
 UNIV_INTERN
 int
 wsrep_innobase_mysql_sort(
-/*===============*/
+/*======================*/
 					/* out: str contains sort string */
 	int		mysql_type,	/* in: MySQL type */
 	uint		charset_number,	/* in: number of the charset */
@@ -8023,13 +8020,14 @@ ha_innobase::write_row(
 			user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
 #endif /* WITH_WSREP */
 	     || sql_command == SQLCOM_DROP_INDEX)
+	    && m_num_write_row >= 10000) {
 #ifdef WITH_WSREP
 		if (wsrep_on(user_thd) && sql_command == SQLCOM_LOAD) {
 			WSREP_DEBUG("forced trx split for LOAD: %s", 
 				    wsrep_thd_query(user_thd));
 		}
 #endif /* WITH_WSREP */
-	    && m_num_write_row >= 10000) {
+
 		/* ALTER TABLE is COMMITted at every 10000 copied rows.
 		The IX table lock for the original table has to be re-issued.
 		As this method will be called on a temporary table where the
@@ -10343,6 +10341,7 @@ innobase_fts_create_doc_id_key(
 	dfield_t*	dfield = dtuple_get_nth_field(tuple, 0);
 
 	ut_a(dict_index_get_n_unique(index) == 1);
+
 	dtuple_set_n_fields(tuple, index->n_fields);
 	dict_index_copy_types(tuple, index, index->n_fields);
 
@@ -16622,7 +16621,6 @@ ha_innobase::external_lock(
 				    ER_READ_ONLY_MODE);
 			DBUG_RETURN(HA_ERR_TABLE_READONLY);
 		}
-
 	}
 
 	/* Check for UPDATEs in read-only mode. */
@@ -17801,6 +17799,7 @@ ha_innobase::get_auto_increment(
 			{
 #endif /* WITH_WSREP */
 			current = autoinc - m_prebuilt->autoinc_increment;
+
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
@@ -20880,7 +20879,6 @@ static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid)
 
 static void
 wsrep_fake_trx_id(
-/*==================*/
 	handlerton	*hton,
 	THD		*thd)	/*!< in: user thread handle */
 {
@@ -22003,7 +22001,6 @@ static	MYSQL_SYSVAR_ENUM(corrupt_table_action, srv_pass_corrupt_table,
   "All file io for the datafile after detected as corrupt are disabled, "
   "except for the deletion.",
   NULL, NULL, 0, &corrupt_table_action_typelib);
-
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(api_trx_level),
   MYSQL_SYSVAR(api_bk_commit_interval),

@@ -1342,6 +1342,7 @@ static int mdl_lock_match_unused(const uchar *arg)
     validated later anyway.
   */
   return (lock->m_fast_path_state == 0);
+}
 } /* extern "C" */
 
 
@@ -2555,6 +2556,7 @@ const MDL_lock::MDL_lock_strategy MDL_lock::m_object_lock_strategy =
   &MDL_lock::object_lock_fast_path_granted_bitmap,
   &MDL_lock::object_lock_needs_connection_check
 };
+
 
 /**
   Check if request for the metadata lock can be satisfied given its

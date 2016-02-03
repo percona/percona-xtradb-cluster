@@ -104,6 +104,7 @@ Usage: $0 [OPTIONS]
                              starting the server
   --numa-interleave          Run mysqld with its memory interleaved
                              on all NUMA nodes
+${thp_usage}
 
 All other options are passed to the mysqld program.
 

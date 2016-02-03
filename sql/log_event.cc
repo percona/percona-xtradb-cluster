@@ -1480,7 +1480,6 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
   binary_log_debug::debug_checksum_test=
     DBUG_EVALUATE_IF("simulate_checksum_test_failure", true, false);
 #endif
->>>>>>> ps-5.7
   if (crc_check &&
       Log_event_footer::event_checksum_test((uchar *) buf, event_len, alg) &&
       /* Skip the crc check when simulating an unknown ignorable log event. */
@@ -1537,8 +1536,8 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
         new_event_type= description_event->event_type_permutation[event_type];
 
       DBUG_PRINT("info", ("converting event type %d to %d (%s)",
-                   event_type, new_event_type,
-                   get_type_str((Log_event_type)new_event_type)));
+                 event_type, new_event_type,
+                 get_type_str((Log_event_type)new_event_type)));
       event_type= new_event_type;
     }
 
@@ -3640,7 +3639,7 @@ bool Query_log_event::write(IO_CACHE* file)
       }
     }
 
-      *start++= Q_INVOKER;
+    *start++= Q_INVOKER;
 
     /*
       Store user length and user. The max length of use is 16, so 1 byte is
@@ -7015,7 +7014,7 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli)
   /*
     Save the rli positions. We need them to temporarily reset the positions
     just before the commit.
-  */
+   */
   strmake(saved_group_master_log_name, rli_ptr->get_group_master_log_name(),
           FN_REFLEN - 1);
   saved_group_master_log_pos= rli_ptr->get_group_master_log_pos();
@@ -7057,16 +7056,16 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli)
       rli_ptr->is_transactional())
   {
     if ((error= rli_ptr->flush_info(true)))
-    goto err;
+      goto err;
   }
 
   DBUG_PRINT("info", ("do_apply group master %s %llu  group relay %s %llu event %s %llu\n",
-    rli_ptr->get_group_master_log_name(),
-    rli_ptr->get_group_master_log_pos(),
-    rli_ptr->get_group_relay_log_name(),
-    rli_ptr->get_group_relay_log_pos(),
-    rli_ptr->get_event_relay_log_name(),
-    rli_ptr->get_event_relay_log_pos()));
+                      rli_ptr->get_group_master_log_name(),
+                      rli_ptr->get_group_master_log_pos(),
+                      rli_ptr->get_group_relay_log_name(),
+                      rli_ptr->get_group_relay_log_pos(),
+                      rli_ptr->get_event_relay_log_name(),
+                      rli_ptr->get_event_relay_log_pos()));
 
   DBUG_EXECUTE_IF("crash_after_update_pos_before_apply",
                   sql_print_information("Crashing crash_after_update_pos_before_apply.");
@@ -7098,18 +7097,18 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli)
     Rollback positions in memory just before commit. Position values will be
     reset to their new values only on successful commit operation.
    */
-    rli_ptr->set_group_master_log_name(saved_group_master_log_name);
-    rli_ptr->notify_group_master_log_name_update();
-    rli_ptr->set_group_master_log_pos(saved_group_master_log_pos);
-    rli_ptr->set_group_relay_log_name(saved_group_relay_log_name);
-    rli_ptr->notify_group_relay_log_name_update();
-    rli_ptr->set_group_relay_log_pos(saved_group_relay_log_pos);
+  rli_ptr->set_group_master_log_name(saved_group_master_log_name);
+  rli_ptr->notify_group_master_log_name_update();
+  rli_ptr->set_group_master_log_pos(saved_group_master_log_pos);
+  rli_ptr->set_group_relay_log_name(saved_group_relay_log_name);
+  rli_ptr->notify_group_relay_log_name_update();
+  rli_ptr->set_group_relay_log_pos(saved_group_relay_log_pos);
 
-    DBUG_PRINT("info", ("Rolling back to group master %s %llu  group relay %s"
-                        " %llu\n", rli_ptr->get_group_master_log_name(),
-                        rli_ptr->get_group_master_log_pos(),
-                        rli_ptr->get_group_relay_log_name(),
-                        rli_ptr->get_group_relay_log_pos()));
+  DBUG_PRINT("info", ("Rolling back to group master %s %llu  group relay %s"
+                      " %llu\n", rli_ptr->get_group_master_log_name(),
+                      rli_ptr->get_group_master_log_pos(),
+                      rli_ptr->get_group_relay_log_name(),
+                      rli_ptr->get_group_relay_log_pos()));
   mysql_mutex_unlock(&rli_ptr->data_lock);
   error= do_commit(thd);
   mysql_mutex_lock(&rli_ptr->data_lock);
@@ -7144,7 +7143,7 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli)
       For transactional repository the positions are flushed ahead of commit.
       Where as for non transactional rli repository the positions are flushed
       only on succesful commit.
-    */
+     */
     if (!rli_ptr->is_transactional())
       rli_ptr->flush_info(false);
   }

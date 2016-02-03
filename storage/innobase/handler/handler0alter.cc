@@ -49,10 +49,6 @@ Smart ALTER TABLE
 #include "fts0priv.h"
 #include "fts0plugin.h"
 #include "pars0pars.h"
-#ifdef WITH_WSREP
-//#include "wsrep_api.h"
-#include <sql_acl.h>	// PROCESS_ACL
-#endif
 #include "row0sel.h"
 #include "ha_innodb.h"
 #include "ut0new.h"

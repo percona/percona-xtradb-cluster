@@ -1335,6 +1335,7 @@ bool Drop_table_error_handler::handle_condition(THD *thd,
           sql_errno == ER_TRG_NO_DEFINER);
 }
 
+
 void Open_tables_state::set_open_tables_state(Open_tables_state *state)
 {
   this->open_tables= state->open_tables;
@@ -1588,6 +1589,7 @@ THD::THD(bool enable_plugins)
 
   tablespace_op= false;
   substitute_null_with_insert_id = FALSE;
+
   /*
     Make sure thr_lock_info_init() is called for threads which do not get
     assigned a proper thread_id value but keep using reserved_thread_id.
@@ -2781,7 +2783,6 @@ void THD::restore_globals()
 
 void THD::cleanup_after_query()
 {
-
   /*
     Reset rand_used so that detection of calls to rand() will save random 
     seeds if needed by the slave.
@@ -4484,10 +4485,11 @@ extern "C" int thd_binlog_format(const MYSQL_THD thd)
 #ifdef WITH_WSREP
   if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
       (thd->variables.option_bits & OPTION_BIN_LOG))
+    return (int) WSREP_BINLOG_FORMAT(thd->variables.binlog_format);
 #else
   if (mysql_bin_log.is_open() && (thd->variables.option_bits & OPTION_BIN_LOG))
-#endif
-    return (int) WSREP_BINLOG_FORMAT(thd->variables.binlog_format);
+    return (int) thd->variables.binlog_format;
+#endif /* WITH_WSREP */
   else
     return BINLOG_FORMAT_UNSPEC;
 }

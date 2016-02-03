@@ -10,6 +10,14 @@ export CXXFLAGS=
 PACKAGE=percona-xtradb-cluster-5.6
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
+wsrep_version="@@WSREP_VERSION@@"
+percona_server_version="@@PERCONA_VERSION@@"
+revision="@@REVISION@@"
+compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+server_suffix="-57"
+prefix=/usr
+
 TMP=$(CURDIR)/debian/tmp/
 TMPD=$(CURDIR)/debian/tmp-debug/
 prefix=/usr
@@ -31,14 +39,6 @@ EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.7.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -c -s)
-
-wsrep_version="@@WSREP_VERSION@@"
-percona_server_version="@@PERCONA_VERSION@@"
-revision="@@REVISION@@"
-compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
-compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
-server_suffix="-57"
-prefix=/usr
 
 MYSQL_SRC = $(shell pwd)
 

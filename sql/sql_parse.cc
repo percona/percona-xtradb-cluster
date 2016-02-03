@@ -850,6 +850,7 @@ void execute_init_command(THD *thd, LEX_STRING *init_command,
 #endif
 }
 
+
 /* This works because items are allocated with sql_alloc() */
 
 void free_items(Item *item)
@@ -986,6 +987,7 @@ bool do_command(THD *thd)
     matter here, because the read/recv() below doesn't use it.
   */
   DEBUG_SYNC(thd, "before_do_command_net_read");
+
   /*
     Because of networking layer callbacks in place,
     this call will maintain the following instrumentation:
@@ -1770,7 +1772,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 #ifdef WITH_WSREP
       wsrep_mysql_parse(thd, beginning_of_next_stmt, length, &parser_state);
 #else
-      mysql_parse(thd, beginning_of_next_stmt, length, &parser_state);
       mysql_parse(thd, &parser_state);
 #endif /* WITH_WSREP */
     }
@@ -3894,9 +3895,7 @@ end_with_restore_list:
 
     WSREP_TO_ISOLATION_BEGIN(0, 0, first_table)
     if (mysql_rename_tables(thd, first_table, 0))
-    {
       goto error;
-    }
     break;
   }
 #ifndef EMBEDDED_LIBRARY
@@ -4177,6 +4176,7 @@ end_with_restore_list:
 
     if (!mysql_change_db(thd, db_str, FALSE))
       my_ok(thd);
+
     break;
   }
 
@@ -4245,7 +4245,9 @@ end_with_restore_list:
 
   case SQLCOM_UNLOCK_TABLES:
   {
+#ifdef WITH_WSREP
     bool table_lock= false;
+#endif /* WITH_WSREP */
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4254,7 +4256,9 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
+#ifdef WITH_WSREP
       table_lock= true;
+#endif /* WITH_WSREP */
       DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
@@ -4300,6 +4304,7 @@ end_with_restore_list:
     my_ok(thd);
     break;
   }
+
   case SQLCOM_UNLOCK_BINLOG:
     if (thd->backup_binlog_lock.is_acquired())
       thd->backup_binlog_lock.release(thd);
@@ -4910,6 +4915,7 @@ end_with_restore_list:
       /*
         Presumably, RESET and binlog writing doesn't require synchronization
       */
+
       if (write_to_binlog > 0)  // we should write
       { 
         if (!lex->no_write_to_binlog)
@@ -5172,11 +5178,11 @@ end_with_restore_list:
         insert routine privileges to mysql.procs_priv. If invoker is not
         available then consider using definer.
 
-        Check if the definer exists on slave, 
+        Check if the definer exists on slave,
         then use definer privilege to insert routine privileges to mysql.procs_priv.
 
-        For current user of SQL thread has GLOBAL_ACL privilege, 
-        which doesn't any check routine privileges, 
+        For current user of SQL thread has GLOBAL_ACL privilege,
+        which doesn't any check routine privileges,
         so no routine privilege record  will insert into mysql.procs_priv.
       */
 

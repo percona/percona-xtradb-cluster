@@ -4137,9 +4137,6 @@ void ha_binlog_log_query(THD *thd, handlerton *db_type,
                          const char *query, size_t query_length,
                          const char *db, const char *table_name);
 void ha_binlog_wait(THD *thd);
-#ifdef WITH_WSREP
-void wsrep_brute_force_aborts();
-#endif
 
 /* It is required by basic binlog features on both MySQL server and libmysqld */
 int ha_binlog_end(THD *thd);

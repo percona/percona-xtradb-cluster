@@ -30,3 +30,4 @@ if ($galera_wsrep_start_position == '') {
 
 # Turn off reconnect again
 --disable_reconnect
+

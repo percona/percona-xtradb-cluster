@@ -33,7 +33,7 @@ extern "C" {
   void wsrep_thr_lock_init(
     wsrep_thd_is_brute_force_fun bf_fun, wsrep_abort_thd_fun abort_fun,
     my_bool debug, my_bool convert_LOCK_to_trx, wsrep_on_fun on_fun);
-#endif
+#endif /* WITH_WSREP */
 
 struct st_thr_lock;
 extern ulong locks_immediate,locks_waited ;

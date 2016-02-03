@@ -488,7 +488,8 @@ trx_create_low()
 #ifdef WITH_WSREP
 	trx->wsrep_event = NULL;
 #endif /* WITH_WSREP */
- 	return(trx);
+
+	return(trx);
 }
 
 /**
@@ -2435,6 +2436,7 @@ trx_commit_or_rollback_prepare(
 	switch (trx->state) {
 	case TRX_STATE_NOT_STARTED:
 	case TRX_STATE_FORCED_ROLLBACK:
+
 #ifdef WITH_WSREP
 		ut_d(trx->start_file = __FILE__);
 		ut_d(trx->start_line = __LINE__);
