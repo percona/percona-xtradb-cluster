@@ -197,6 +197,7 @@ public:
       applier as well as rollbacker threads.
     */
     if (!thd->wsrep_applier)
+    {
 #endif /* WITH_WSREP */
 
     mysql_mutex_lock(&LOCK_connection_count);

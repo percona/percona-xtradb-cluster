@@ -72,7 +72,7 @@ SCONS_ARGS=${SCONS_ARGS:-""}
 # parse input option and configure build enviornment acccordingly.
 if ! getopt --test
 then
-    go_out="$(getopt --options=iqGdvjt: \
+    go_out="$(getopt --options=iqGdvjmt: \
         --longoptions=i686,verbose,copygalera,debug,valgrind,with-jemalloc:,with-yassl,with-ssl:,tag: \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
@@ -181,6 +181,7 @@ then
         echo >&2 "$TARGETDIR is not a directory"
         exit 1
     fi
+
 else
     echo >&2 "Usage: $0 [target dir]"
     exit 1
@@ -306,6 +307,7 @@ then
     fi
 
     JEMALLOCDIR="$(cd "$WITH_JEMALLOC"; pwd)"
+
 fi
 
 #-------------------------------------------------------------------------------
@@ -445,7 +447,7 @@ fi
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 ) || exit 1
 
-rm -rf $TARGETDIR/boost
+rm -rf $TARGETDIR/libboost
 rm -rf $TARGETDIR/bld
 
 echo "Build Complete"

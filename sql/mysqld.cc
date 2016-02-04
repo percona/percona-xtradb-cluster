@@ -988,6 +988,13 @@ public:
       if (killing_thd->slave_thread)
         return;
 
+#ifdef WITH_WSREP
+    // skip wsrep system threads as well
+    if (WSREP(killing_thd) &&
+        (killing_thd->wsrep_exec_mode==REPL_RECV || killing_thd->wsrep_applier))
+      continue;
+#endif /* WITH_WSREP */
+
       if (killing_thd->get_command() == COM_BINLOG_DUMP ||
           killing_thd->get_command() == COM_BINLOG_DUMP_GTID)
       {
@@ -1038,6 +1045,34 @@ public:
                         closing_thd->thread_id(),
                         (main_sctx_user.length ? main_sctx_user.str : ""));
       close_connection(closing_thd, 0, is_server_shutdown);
+
+#ifdef WITH_WSREP
+      /*
+       * TODO: this code block may turn out redundant. wsrep->disconnect()
+       *       should terminate slave threads gracefully, and we don't need
+       *       to signal them here.
+       *       The code here makes sure mysqld will not hang during shutdown
+       *       even if wsrep provider has problems in shutting down.
+       */
+      if (WSREP(closing_thd) && closing_thd->wsrep_exec_mode == REPL_RECV)
+      {
+        sql_print_information("closing wsrep system thread");
+        closing_thd->killed= THD::KILL_CONNECTION;
+        MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (closing_thd));
+        if (closing_thd->mysys_var)
+        {
+          closing_thd->mysys_var->abort=1;
+          mysql_mutex_lock(&closing_thd->mysys_var->mutex);
+          if (closing_thd->mysys_var->current_cond)
+          {
+            mysql_mutex_lock(closing_thd->mysys_var->current_mutex);
+            mysql_cond_broadcast(closing_thd->mysys_var->current_cond);
+            mysql_mutex_unlock(closing_thd->mysys_var->current_mutex);
+          }
+          mysql_mutex_unlock(&closing_thd->mysys_var->mutex);
+        }
+      }
+#endif
     }
   }
 private:
@@ -2423,7 +2458,15 @@ extern "C" void *signal_hand(void *arg __attribute__((unused)))
         }
         mysql_mutex_unlock(&LOCK_socket_listener_active);
 
+#ifdef WITH_WSREP
+        if (WSREP_ON) wsrep_stop_replication(NULL);
+#endif /* WITH_WSREP */
+
         close_connections();
+
+#ifdef WITH_WSREP
+        if (WSREP_ON) wsrep_deinit();
+#endif /* WITH_WSREP */
       }
       my_thread_end();
       my_thread_exit(0);
