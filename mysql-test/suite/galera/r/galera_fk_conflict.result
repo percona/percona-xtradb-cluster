@@ -18,6 +18,6 @@ START TRANSACTION;
 INSERT INTO child VALUES (2, 2);
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+Got one of the listed errors
 DROP TABLE child;
 DROP TABLE parent;

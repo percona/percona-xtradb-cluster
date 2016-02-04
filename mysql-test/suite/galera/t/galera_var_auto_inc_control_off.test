@@ -75,7 +75,7 @@ SELECT f1 FROM t1;
 COMMIT;
 
 --connection node_2a
---error ER_LOCK_DEADLOCK
+--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
 COMMIT;
 
 --connection node_1a

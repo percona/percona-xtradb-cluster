@@ -33,7 +33,7 @@ UPDATE t1 SET f1 = 'текст3';
 COMMIT;
 
 --connection node_2
---error ER_LOCK_DEADLOCK
+--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
 COMMIT;
 
 SELECT f1 = 'текст2' FROM t1;

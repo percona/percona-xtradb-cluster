@@ -5,6 +5,10 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
+--disable_warnings
+SET SESSION SQL_MODE='';
+--enable_warnings
+
 CREATE TABLE `r8kmb_redirect_links` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `old_url` varchar(255) DEFAULT NULL,

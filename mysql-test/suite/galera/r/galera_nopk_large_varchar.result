@@ -25,6 +25,6 @@ START TRANSACTION;
 UPDATE t2 SET f1 = 'xyz' WHERE f1 = CONCAT(REPEAT('x', 7999), 'a');
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+Got one of the listed errors
 DROP TABLE t1;
 DROP TABLE t2;

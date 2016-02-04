@@ -11,6 +11,7 @@ END|
 CALL p1();;
 CALL p1();;
 Killing server ...
+# restart
 INSERT INTO t1 VALUES (DEFAULT);
 INSERT INTO t1 VALUES (DEFAULT);
 Got one of the listed errors

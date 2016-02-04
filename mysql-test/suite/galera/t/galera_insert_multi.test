@@ -76,7 +76,7 @@ INSERT INTO t1 VALUES (2), (1);
 COMMIT;
 
 --connection node_2
---error ER_LOCK_DEADLOCK
+--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
 COMMIT;
 
 # Workaround for mysql-wsrep#39 Transaction receives deadlock error twice in row

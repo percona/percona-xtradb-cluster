@@ -13,7 +13,7 @@ START TRANSACTION;
 UPDATE t1 SET f1 = 'текст3';
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+Got one of the listed errors
 SELECT f1 = 'текст2' FROM t1;
 f1 = 'текст2'
 1
@@ -26,6 +26,6 @@ START TRANSACTION;
 INSERT INTO t1 VALUES ('текст4');
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+Got one of the listed errors
 COMMIT;
 DROP TABLE t1;
