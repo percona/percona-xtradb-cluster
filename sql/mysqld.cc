@@ -5791,7 +5791,7 @@ static bool read_init_file(char *file_name)
 #ifdef WITH_WSREP
 typedef void (*wsrep_thd_processor_fun)(THD *);
 
-pthread_handler_t start_wsrep_THD(void *arg)
+void* start_wsrep_THD(void *arg)
 {
   THD *thd;
   wsrep_thd_processor_fun processor= (wsrep_thd_processor_fun)arg;

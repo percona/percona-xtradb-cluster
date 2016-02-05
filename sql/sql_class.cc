@@ -1251,7 +1251,7 @@ extern "C" query_id_t wsrep_thd_query_id(THD *thd)
 }
 extern "C" char *wsrep_thd_query(THD *thd) 
 {
-  return (thd) ? ((!opt_log_raw) && thd->rewritten_query.length() ?
+  return (thd) ? ((!opt_general_log_raw) && thd->rewritten_query.length() ?
                   thd->rewritten_query.c_ptr_safe() : thd->query())
     : NULL;
 }

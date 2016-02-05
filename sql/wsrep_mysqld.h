@@ -17,12 +17,13 @@
 #define WSREP_MYSQLD_H
 
 #include "mysqld.h"
+#include "log.h"
 typedef struct st_mysql_show_var SHOW_VAR;
-#include <sql_priv.h>
+#include "query_options.h"
 #include "rpl_gtid.h"
 #include "../wsrep/wsrep_api.h"
 
-#define WSREP_UNDEFINED_TRX_ID ULONGLONG_MAX
+#define WSREP_UNDEFINED_TRX_ID ULLONG_MAX
 
 class set_var;
 class THD;
@@ -212,7 +213,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_LOG(fun, ...)                                       \
     {                                                             \
         char msg[1024] = {'\0'};                                  \
-        snprintf(msg, sizeof(msg) - 1, ## __VA_ARGS__);           \
+        snprintf(msg, sizeof(msg) - 1, ##__VA_ARGS__);            \
         fun("WSREP: %s", msg);                                    \
     }
 
@@ -225,7 +226,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_LOG_CONFLICT_THD(thd, role)                                      \
     WSREP_LOG(sql_print_information, 	                                       \
       "%s: \n "       	                                                       \
-      "  THD: %lu, mode: %s, state: %s, conflict: %s, seqno: %lld\n "          \
+      "  THD: %u, mode: %s, state: %s, conflict: %s, seqno: %lld\n "          \
       "  SQL: %s",							       \
       role, wsrep_thd_thread_id(thd), wsrep_thd_exec_mode_str(thd),            \
       wsrep_thd_query_state_str(thd),                                          \
@@ -243,9 +244,9 @@ extern wsrep_seqno_t wsrep_locked_seqno;
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");       \
   }
 
-#define WSREP_QUERY(thd)                                \
-  ((!opt_log_raw) && thd->rewritten_query.length()      \
-   ? thd->rewritten_query.c_ptr_safe() : thd->query())
+#define WSREP_QUERY(thd)					\
+  (((!opt_general_log_raw) && thd->rewritten_query.length())	\
+   ? (thd->rewritten_query.c_ptr_safe()) : (thd->query().str))
 
 extern void wsrep_ready_wait();
 

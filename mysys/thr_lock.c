@@ -525,7 +525,8 @@ wait_for_lock(struct st_lock_list *wait, THR_LOCK_DATA *data,
 static inline my_bool 
 wsrep_break_lock(
     THR_LOCK_DATA *data, struct st_lock_list *lock_queue1, 
-    struct st_lock_list *lock_queue2, struct st_lock_list *wait_queue)
+    struct st_lock_list *lock_queue2, struct st_lock_list *wait_queue,
+    THR_LOCK_INFO *owner)
 {
   if (wsrep_on(data->owner->mysql_thd) &&
       wsrep_thd_is_brute_force          &&
@@ -597,9 +598,9 @@ wsrep_break_lock(
     data->next=wait_queue->data;
     data->prev=&wait_queue->data;
     wait_queue->data=data;
-    data->cond=get_cond();
+    data->cond= owner->suspend;
 
-    statistic_increment(locks_immediate,&THR_LOCK_lock);
+    locks_immediate++;
     return TRUE;
   }
   return FALSE;
@@ -687,7 +688,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
       if (lock->write.data->type == TL_WRITE_ONLY)
       {
 #ifdef WITH_WSREP
-        if (wsrep_break_lock(data, &lock->write, NULL, &lock->read_wait))
+        if (wsrep_break_lock(data, &lock->write, NULL, &lock->read_wait, owner))
         {
           wsrep_lock_inserted= TRUE;
           goto wsrep_read_wait;
@@ -721,7 +722,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
       In the latter case we should yield the lock to the writer.
     */
 #ifdef WITH_WSREP
-    if (wsrep_break_lock(data, &lock->write, NULL, &lock->read_wait))
+    if (wsrep_break_lock(data, &lock->write, NULL, &lock->read_wait, owner))
     {
       wsrep_lock_inserted= TRUE;
     }
@@ -743,7 +744,8 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
         if (!thr_lock_owner_equal(data->owner, lock->write.data->owner))
         {
 #ifdef WITH_WSREP
-          if (wsrep_break_lock(data, &lock->write, NULL, &lock->write_wait))
+          if (wsrep_break_lock(
+            data, &lock->write, NULL, &lock->write_wait, owner))
           {
             wsrep_lock_inserted=TRUE;
             goto wsrep_write_wait;
@@ -850,7 +852,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
 			 lock->read.data->owner->thread_id, data->type));
     }
 #ifdef WITH_WSREP
-    if (wsrep_break_lock(data, &lock->write, NULL, &lock->write_wait))
+    if (wsrep_break_lock(data, &lock->write, NULL, &lock->write_wait, owner))
     {
       wsrep_lock_inserted= TRUE;
     }
@@ -861,7 +863,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
   /* Can't get lock yet;  Wait for it */
 #ifdef WITH_WSREP
   if (wsrep_on(data->owner->mysql_thd) && wsrep_lock_inserted)
-    DBUG_RETURN(wait_for_lock(wait_queue, data, 1, lock_wait_timeout));
+    DBUG_RETURN(wait_for_lock(wait_queue, data, owner, 1, lock_wait_timeout));
 #endif
   result= wait_for_lock(wait_queue, data, owner, 0,
                         lock_wait_timeout);

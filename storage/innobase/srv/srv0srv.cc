@@ -249,7 +249,7 @@ with mutex_enter(), which will wait until it gets the mutex. */
 #define MUTEX_NOWAIT(mutex_skipped)	((mutex_skipped) < MAX_MUTEX_NOWAIT)
 
 #ifdef WITH_INNODB_DISALLOW_WRITES
-UNIV_INTERN os_event_t	srv_allow_writes_event;
+os_event_t	srv_allow_writes_event;
 #endif /* WITH_INNODB_DISALLOW_WRITES */
 
 /** Requested size in bytes */
@@ -1095,7 +1095,7 @@ srv_init(void)
 	always set the event here regardless of innobase_disallow_writes.
 	That flag will always be 0 at this point because it isn't settable
 	via my.cnf or command line arg. */
-	srv_allow_writes_event = os_event_create();
+	srv_allow_writes_event = os_event_create("allow_write_events");
 	os_event_set(srv_allow_writes_event);
 #endif /* WITH_INNODB_DISALLOW_WRITES */
 	/* Initialize some INFORMATION SCHEMA internal structures */
@@ -1969,7 +1969,7 @@ loop:
 	if (sync_array_print_long_waits(&waiter, &sema)
 	    && sema == old_sema && os_thread_eq(waiter, old_waiter)) {
 #if defined(WITH_WSREP) && defined(WITH_INNODB_DISALLOW_WRITES)
-	  if (srv_allow_writes_event->is_set) {
+	  if (os_event_is_set(srv_allow_writes_event)) {
 #endif /* WITH_WSREP */
 		fatal_cnt++;
 #if defined(WITH_WSREP) && defined(WITH_INNODB_DISALLOW_WRITES)

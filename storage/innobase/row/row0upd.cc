@@ -324,6 +324,7 @@ func_exit:
 
 	DBUG_RETURN(err);
 }
+
 #ifdef WITH_WSREP
 static
 dberr_t
@@ -361,8 +362,7 @@ wsrep_row_upd_check_foreign_constraints(
 
 	heap = mem_heap_create(500);
 
-	entry = row_rec_to_index_entry(rec, index, offsets,
-				       &n_ext, heap);
+	entry = row_rec_to_index_entry(rec, index, offsets, &n_ext, heap);
 
 	mtr_commit(mtr);
 
@@ -373,8 +373,6 @@ wsrep_row_upd_check_foreign_constraints(
 
 		row_mysql_freeze_data_dictionary(trx);
 	}
-
-run_again:
 
 	for (dict_foreign_set::iterator it = table->foreign_set.begin();
 	     it != table->foreign_set.end();
@@ -400,12 +398,6 @@ run_again:
 				opened = TRUE;
 			}
 
-			if (foreign->referenced_table) {
-				os_inc_counter(dict_sys->mutex,
-					       foreign->referenced_table
-					       ->n_foreign_key_checks_running);
-			}
-
 			/* NOTE that if the thread ends up waiting for a lock
 			we will release dict_operation_lock temporarily!
 			But the counter on the table protects 'foreign' from
@@ -415,26 +407,20 @@ run_again:
 				TRUE, foreign, table, entry, thr);
 
 			if (foreign->referenced_table) {
-				os_dec_counter(dict_sys->mutex,
-					       foreign->referenced_table
-					       ->n_foreign_key_checks_running);
-
 				if (opened == TRUE) {
 					dict_table_close(foreign->referenced_table, TRUE, FALSE);
 					opened = FALSE;
 				}
 			}
 
-			/* Some table foreign key dropped, try again */
-			if (err == DB_DICT_CHANGED) {
-				goto run_again;
-			} else if (err != DB_SUCCESS) {
+			if (err != DB_SUCCESS) {
 				goto func_exit;
 			}
 		}
 	}
 
 	err = DB_SUCCESS;
+
 func_exit:
 	if (got_s_lock) {
 		row_mysql_unfreeze_data_dictionary(trx);
@@ -2391,14 +2377,14 @@ row_upd_sec_index_entry(
 		}
 
 #ifdef WITH_WSREP
-			que_node_t *parent = que_node_get_parent(node);
-			if (err == DB_SUCCESS && !referenced                  &&
-			    !(parent && que_node_get_type(parent) ==
-				QUE_NODE_UPDATE                               &&
-			      ((upd_node_t*)parent)->cascade_node == node)    &&
-			    foreign
-			) {
-				ulint*	offsets =
+		que_node_t *parent = que_node_get_parent(node);
+		if (err == DB_SUCCESS
+		    && !referenced
+		    && !(parent != NULL
+			 && que_node_get_type(parent) == QUE_NODE_UPDATE)
+		    && foreign) {
+
+				ulint*  offsets =
 					rec_get_offsets(
 						rec, index, NULL, ULINT_UNDEFINED,
 						&heap);
@@ -2597,9 +2583,6 @@ row_upd_clust_rec_by_insert(
 	rec_t*		rec;
 	ulint*		offsets			= NULL;
 
-#ifdef WITH_WSREP
-	que_node_t *parent = que_node_get_parent(node);
-#endif /* WITH_WSREP */
 	ut_ad(node);
 	ut_ad(dict_index_is_clust(index));
 
@@ -2687,9 +2670,9 @@ check_fk:
 			}
 		}
 #ifdef WITH_WSREP
+		que_node_t *parent = que_node_get_parent(node);
 		if (!referenced                                              &&
-		    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE &&
-		      ((upd_node_t*)parent)->cascade_node == node)           &&
+		    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE) &&
 		    foreign
 		) {
 			err = wsrep_row_upd_check_foreign_constraints(
@@ -2901,10 +2884,6 @@ row_upd_del_mark_clust_rec(
 	btr_pcur_t*	pcur;
 	btr_cur_t*	btr_cur;
 	dberr_t		err;
-#ifdef WITH_WSREP
-	rec_t*		rec;
-	que_node_t *parent = que_node_get_parent(node);
-#endif /* WITH_WSREP */
 
 	ut_ad(node);
 	ut_ad(dict_index_is_clust(index));
@@ -2921,10 +2900,6 @@ row_upd_del_mark_clust_rec(
 	/* Mark the clustered index record deleted; we do not have to check
 	locks, because we assume that we have an x-lock on the record */
 
-#ifdef WITH_WSREP
-	rec = btr_cur_get_rec(btr_cur);
-#endif /* WITH_WSREP */
-
 	err = btr_cur_del_mark_set_clust_rec(
 		flags, btr_cur_get_block(btr_cur), btr_cur_get_rec(btr_cur),
 		index, offsets, thr, node->row, mtr);
@@ -2935,9 +2910,9 @@ row_upd_del_mark_clust_rec(
 			node, pcur, index->table, index, offsets, thr, mtr);
 	}
 #ifdef WITH_WSREP
+	que_node_t *parent = que_node_get_parent(node);
 	if (err == DB_SUCCESS && !referenced                         &&
-	    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE &&
-	      ((upd_node_t*)parent)->cascade_node == node)           &&
+	    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE) &&
 	    thr_get_trx(thr)                                         &&
 	    foreign
 	) {

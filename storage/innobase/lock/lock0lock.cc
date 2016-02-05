@@ -892,8 +892,10 @@ lock_rec_has_to_wait(
 					   accepted */
 					fprintf(stderr, 
 						"BF-BF X lock conflict," 
-						"mode: %lu supremum: %lu\n", 
-						type_mode, lock_is_on_supremum);
+						"mode: %lu supremum: %s\n", 
+						type_mode,
+						lock_is_on_supremum
+						? "true" : "false");
 					fprintf(stderr, 
 						"conflicts states: my %d locked %d\n", 
 						wsrep_thd_conflict_state(trx->mysql_thd, FALSE), 
@@ -910,8 +912,8 @@ lock_rec_has_to_wait(
 				if (wsrep_debug) fprintf(stderr,
 					"BF conflict, modes: %lu %lu, "
 					"idx: %s-%s n_uniq %u n_user %u\n",
-					type_mode, lock2->type_mode,
-					lock2->index->name, 
+					type_mode, (ulint) lock2->type_mode,
+					lock2->index->name(), 
 					lock2->index->table_name,
 					lock2->index->n_uniq, 
 					lock2->index->n_user_defined_cols);
@@ -1193,7 +1195,6 @@ lock_rec_has_expl(
 }
 
 #ifdef WITH_WSREP
-static
 void
 lock_rec_discard(lock_t*	in_lock);
 #endif /* WITH_WSREP */
@@ -1631,8 +1632,8 @@ RecLock::lock_alloc(
 Add the lock to the record lock hash and the transaction's lock list
 @param[in,out] lock	Newly created record lock to add to the rec hash
 @param[in] add_to_hash	If the lock should be added to the hash table
-@param[in,out] c_lock		conflicting lock
-@param[in,out] thr		query thread handler */
+@param[in,out] c_lock	conflicting lock
+@param[in,out] thr	query thread handler */
 void
 RecLock::lock_add(
 	lock_t*			lock,
@@ -1652,6 +1653,7 @@ RecLock::lock_add(
 		++lock->index->table->n_rec_locks;
 
 #ifdef WITH_WSREP
+	trx_t*	trx = lock->trx;
 	
 	if (c_lock && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
 		lock_t *hash	= (lock_t *)c_lock->hash;
@@ -1684,7 +1686,7 @@ RecLock::lock_add(
 
 			trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
-			UT_LIST_ADD_LAST(trx_locks, trx->lock.trx_locks, lock);
+			UT_LIST_ADD_LAST(lock->trx->lock.trx_locks, lock);
 
 			ut_ad(thr != NULL);
 			trx->lock.wait_thr = thr;
@@ -1745,7 +1747,7 @@ RecLock::create(
 	bool			owns_trx_mutex,
 	const lock_prdt_t*	prdt
 #ifdef WITH_WSREP
-	,lock_t* const		c_lock
+	,lock_t* const		c_lock,
 	que_thr_t*		thr
 #endif /* WITH_WSREP */
 	)
@@ -2160,7 +2162,12 @@ RecLock::enqueue_priority(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 		trx_mutex_exit(wait_for->trx);
 
+#ifdef WITH_WSREP
+// TODO: Need to check if we need to pass conflicting lock = wait_for
+		lock_add(lock, false, const_cast<lock_t*>(wait_for), m_thr);
+#else
 		lock_add(lock, false);
+#endif
 	}
 
 	/* This state should not change even if we release the
@@ -2227,7 +2234,8 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 	        	m_trx->lock.was_chosen_as_deadlock_victim) {
 			return(DB_DEADLOCK);
 		}
-		lock = create(m_trx, true, prdt, wait_for, m_thr);
+		lock = create(m_trx, true, prdt,
+			      const_cast<lock_t*>(wait_for), m_thr);
 #else
 		lock = create(m_trx, true, prdt);
 #endif
@@ -2397,7 +2405,7 @@ lock_rec_add_to_queue(
 #ifdef WITH_WSREP
 	RecLock		rec_lock(index, block, heap_no, type_mode);
 
-	rec_lock.create(trx, caller_owns_trx_mutex, NULL, NULL);
+	rec_lock.create(trx, caller_owns_trx_mutex, NULL, NULL, NULL);
 #else
 	RecLock		rec_lock(index, block, heap_no, type_mode);
 
@@ -2459,7 +2467,7 @@ lock_rec_lock_fast(
 			RecLock	rec_lock(index, block, heap_no, mode);
 
 			/* Note that we don't own the trx mutex. */
-			rec_lock.create(trx, false, NULL, thr);
+			rec_lock.create(trx, false, NULL, NULL, thr);
 #else
 			RecLock	rec_lock(index, block, heap_no, mode);
 
@@ -2518,9 +2526,6 @@ lock_rec_lock_slow(
 	dict_index_t*		index,	/*!< in: index of record */
 	que_thr_t*		thr)	/*!< in: query thread */
 {
-#ifdef WITH_WSREP
-	lock_t*			c_lock(NULL);
-#endif
 	ut_ad(lock_mutex_own());
 	ut_ad(!srv_read_only_mode);
 	ut_ad((LOCK_MODE_MASK & mode) != LOCK_S
@@ -4068,7 +4073,7 @@ lock_table_create(
 
 #ifdef WITH_WSREP
 	if (c_lock && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
-        	UT_LIST_INSERT_AFTER(table->locks, c_lock, lock);
+        	ut_list_insert2(table->locks, c_lock, lock, TableLockGetNode());
         } else {
 		ut_list_append(table->locks, lock, TableLockGetNode());
         }
@@ -6188,9 +6193,6 @@ lock_rec_insert_check_and_lock(
 	trx_t*		trx = thr_get_trx(thr);
 	const rec_t*	next_rec = page_rec_get_next_const(rec);
 	ulint		heap_no = page_rec_get_heap_no(next_rec);
-#ifdef WITH_WSREP
-	lock_t*		c_lock;
-#endif
 
 	lock_mutex_enter();
 	/* Because this code is invoked for a running transaction by
@@ -7695,7 +7697,7 @@ DeadlockChecker::select_victim() const
 		choose it as the victim and roll it back. */
 
 #ifdef WITH_WSREP
-		if (wsrep_thd_is_BF(ctx->start->mysql_thd, TRUE))
+		if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
 			return(m_wait_lock->trx);
 		else
 #endif /* WITH_WSREP */
@@ -7703,7 +7705,7 @@ DeadlockChecker::select_victim() const
 	}
 
 #ifdef WITH_WSREP
-	if (wsrep_thd_is_BF(ctx->start->mysql_thd, TRUE))
+	if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
 		return(m_start);
 	else
 #endif /* WITH_WSREP */
@@ -7788,7 +7790,7 @@ DeadlockChecker::search()
 			if (victim_trx == NULL || victim_trx == m_start) {
 
 #ifdef WITH_WSREP
-			if (wsrep_thd_is_BF(ctx->start->mysql_thd, TRUE))
+			if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
 				return(m_wait_lock->trx);
 			else
 #endif /* WITH_WSREP */
@@ -7796,7 +7798,7 @@ DeadlockChecker::search()
 			}
 
 #ifdef WITH_WSREP
-			if (wsrep_thd_is_BF(ctx->start->mysql_thd, TRUE))
+			if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
 				return(m_start);
 			else
 #endif /* WITH_WSREP */

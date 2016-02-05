@@ -1134,14 +1134,14 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     uchar *buf;
     size_t len=0;
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog trx cache not empty (%zu bytes) @ connection close %lu",
-               len, thd->thread_id);
+    WSREP_WARN("binlog trx cache not empty (%zu bytes) @ connection close %u",
+               len, thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
     cache = cache_mngr->get_binlog_cache_log(false);
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog stmt cache not empty (%zu bytes) @ connection close %lu",
-               len, thd->thread_id);
+    WSREP_WARN("binlog stmt cache not empty (%zu bytes) @ connection close %u",
+               len, thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
@@ -8139,8 +8139,6 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(thd);
 #ifdef WITH_WSREP
   Transaction_ctx *trn_ctx= thd->get_transaction();
-  my_xid xid= trn_ctx->xid_state()->get_xid()->get_my_xid();
-
   my_xid xid= (wsrep_is_wsrep_xid(trn_ctx->xid_state()->get_xid()) ?
                wsrep_xid_seqno(*trn_ctx->xid_state()->get_xid()) :
                trn_ctx->xid_state()->get_xid()->get_my_xid());
@@ -11854,7 +11852,7 @@ IO_CACHE * wsrep_get_trans_log(THD * thd)
   }
   else
   {
-    WSREP_DEBUG("binlog cache not initialized, conn :%ld", thd->thread_id);
+    WSREP_DEBUG("binlog cache not initialized, conn :%u", thd->thread_id());
     return NULL;
   }
 }

@@ -1034,8 +1034,7 @@ static inline THD *_current_thd(void)
 #define ER(X)         ER_THD(current_thd,X)
 
 #ifdef WITH_WSREP
-#include "my_pthread.h"
-pthread_handler_t start_wsrep_THD(void*);
+void* start_wsrep_THD(void*);
 #endif /* WITH_WSREP */
 
 #endif /* MYSQLD_INCLUDED */

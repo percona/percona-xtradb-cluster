@@ -452,7 +452,11 @@ lock_prdt_add_to_queue(
 
 	RecLock	rec_lock(index, block, PRDT_HEAPNO, type_mode);
 
+#ifdef WITH_WSREP
+	return(rec_lock.create(trx, caller_owns_trx_mutex, prdt, NULL, NULL));
+#else
 	return(rec_lock.create(trx, caller_owns_trx_mutex, prdt));
+#endif /* WITH_WSREP */
 }
 
 /*********************************************************************//**
@@ -838,7 +842,11 @@ lock_prdt_lock(
 
 		RecLock	rec_lock(index, block, PRDT_HEAPNO, prdt_mode);
 
+#ifdef WITH_WSREP
+		lock = rec_lock.create(trx, false, NULL, NULL, NULL);
+#else
 		lock = rec_lock.create(trx, false);
+#endif /* WITH_WSREP */
 
 		status = LOCK_REC_SUCCESS_CREATED;
 
@@ -954,7 +962,11 @@ lock_place_prdt_page_lock(
 		RecID	rec_id(space, page_no, PRDT_HEAPNO);
 		RecLock	rec_lock(index, rec_id, mode);
 
+#ifdef WITH_WSREP
+		rec_lock.create(trx, false, NULL, NULL, NULL);
+#else
 		rec_lock.create(trx, false);
+#endif /* WITH_WSREP */
 
 #ifdef PRDT_DIAG
 		printf("GIS_DIAGNOSTIC: page lock %d\n", (int) page_no);

@@ -19,41 +19,42 @@
 #include "wsrep_xid.h"
 #include "sql_class.h"
 #include "wsrep_mysqld.h" // for logging macros
+#include "sql_plugin.h"
 
 /*
  * WSREPXid
  */
 
 #define WSREP_XID_PREFIX "WSREPXid"
-#define WSREP_XID_PREFIX_LEN MYSQL_XID_PREFIX_LEN
+#define WSREP_XID_PREFIX_LEN 8 
 #define WSREP_XID_UUID_OFFSET 8
 #define WSREP_XID_SEQNO_OFFSET (WSREP_XID_UUID_OFFSET + sizeof(wsrep_uuid_t))
 #define WSREP_XID_GTRID_LEN (WSREP_XID_SEQNO_OFFSET + sizeof(wsrep_seqno_t))
 
 void wsrep_xid_init(XID* xid, const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 {
-  xid->formatID= 1;
-  xid->gtrid_length= WSREP_XID_GTRID_LEN;
-  xid->bqual_length= 0;
-  memset(xid->data, 0, sizeof(xid->data));
-  memcpy(xid->data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
-  memcpy(xid->data + WSREP_XID_UUID_OFFSET,  &uuid,  sizeof(wsrep_uuid_t));
-  memcpy(xid->data + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));
+  xid->set_format_id(1);
+  xid->set_gtrid_length(WSREP_XID_GTRID_LEN);
+  xid->set_bqual_length(0);
+  xid->reset();
+  memcpy(xid->get_mutable_data(), WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
+  memcpy(xid->get_mutable_data() + WSREP_XID_UUID_OFFSET,  &uuid,  sizeof(wsrep_uuid_t));
+  memcpy(xid->get_mutable_data() + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));
 }
 
 int wsrep_is_wsrep_xid(const void* xid_ptr)
 {
   const XID* xid= reinterpret_cast<const XID*>(xid_ptr);
-  return (xid->formatID      == 1                   &&
-          xid->gtrid_length  == WSREP_XID_GTRID_LEN &&
-          xid->bqual_length  == 0                   &&
-          !memcmp(xid->data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN));
+  return (xid->get_format_id()		== 1                   &&
+          xid->get_gtrid_length()	== WSREP_XID_GTRID_LEN &&
+          xid->get_bqual_length()	== 0                   &&
+          !memcmp(xid->get_data(), WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN));
 }
 
 const wsrep_uuid_t* wsrep_xid_uuid(const XID& xid)
 {
   if (wsrep_is_wsrep_xid(&xid))
-    return reinterpret_cast<const wsrep_uuid_t*>(xid.data
+    return reinterpret_cast<const wsrep_uuid_t*>(xid.get_data()
                                                  + WSREP_XID_UUID_OFFSET);
   else
     return &WSREP_UUID_UNDEFINED;
@@ -64,7 +65,7 @@ wsrep_seqno_t wsrep_xid_seqno(const XID& xid)
   if (wsrep_is_wsrep_xid(&xid))
   {
     wsrep_seqno_t seqno;
-    memcpy(&seqno, xid.data + WSREP_XID_SEQNO_OFFSET, sizeof(wsrep_seqno_t));
+    memcpy(&seqno, xid.get_data() + WSREP_XID_SEQNO_OFFSET, sizeof(wsrep_seqno_t));
     return seqno;
   }
   else
@@ -76,7 +77,7 @@ wsrep_seqno_t wsrep_xid_seqno(const XID& xid)
 static my_bool set_SE_checkpoint(THD* unused, plugin_ref plugin, void* arg)
 {
   XID* xid= static_cast<XID*>(arg);
-  handlerton* hton= plugin_data(plugin, handlerton *);
+  handlerton* hton= plugin_data<handlerton*>(plugin);
 
   if (hton->db_type == DB_TYPE_INNODB)
   {
@@ -106,7 +107,7 @@ void wsrep_set_SE_checkpoint(const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 static my_bool get_SE_checkpoint(THD* unused, plugin_ref plugin, void* arg)
 {
   XID* xid= reinterpret_cast<XID*>(arg);
-  handlerton* hton= plugin_data(plugin, handlerton *);
+  handlerton* hton= plugin_data<handlerton*>(plugin);
 
   if (hton->db_type == DB_TYPE_INNODB)
   {
@@ -133,11 +134,11 @@ void wsrep_get_SE_checkpoint(wsrep_uuid_t& uuid, wsrep_seqno_t& seqno)
 
   XID xid;
   memset(&xid, 0, sizeof(xid));
-  xid.formatID= -1;
+  xid.set_format_id(-1);
 
   wsrep_get_SE_checkpoint(xid);
 
-  if (xid.formatID == -1) return; // nil XID
+  if (xid.get_format_id() == -1) return; // nil XID
 
   if (!wsrep_is_wsrep_xid(&xid))
   {

@@ -1424,8 +1424,8 @@ trx_start_low(
 #endif /* UNIV_DEBUG */
 
 #ifdef WITH_WSREP
-        memset(&trx->xid, 0, sizeof(trx->xid));
-        trx->xid.formatID = -1;
+        memset(trx->xid, 0, sizeof(*trx->xid));
+        trx->xid->set_format_id(-1);
 #endif /* WITH_WSREP */
 
 	/* The initial value for trx->no: TRX_ID_MAX is used in
@@ -1745,9 +1745,9 @@ trx_write_serialisation_history(
 #ifdef WITH_WSREP
         sys_header = trx_sysf_get(mtr);
         /* Update latest MySQL wsrep XID in trx sys header. */
-        if (wsrep_is_wsrep_xid(&trx->xid))
+        if (wsrep_is_wsrep_xid(trx->xid))
         {
-            trx_sys_update_wsrep_checkpoint(&trx->xid, sys_header, mtr);
+            trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
         }
 #endif /* WITH_WSREP */
 

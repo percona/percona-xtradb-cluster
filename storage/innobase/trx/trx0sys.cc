@@ -322,14 +322,16 @@ static unsigned char trx_sys_cur_xid_uuid[16];
 
 long long read_wsrep_xid_seqno(const XID* xid)
 {
+    // TODO: replace this with XID provided functions.
     long long seqno;
-    memcpy(&seqno, xid->data + 24, sizeof(long long));
+    memcpy(&seqno, xid->get_data() + 24, sizeof(long long));
     return seqno;
 }
 
 void read_wsrep_xid_uuid(const XID* xid, unsigned char* buf)
 {
-    memcpy(buf, xid->data + 8, 16);
+    // TODO: replace this with XID provided functions.
+    memcpy(buf, xid->get_data() + 8, 16);
 }
 
 #endif /* UNIV_DEBUG */
@@ -361,7 +363,7 @@ trx_sys_update_wsrep_checkpoint(
 #endif /* UNIV_DEBUG */
 
         ut_ad(xid && mtr && sys_header);
-        ut_a(xid->formatID == -1 || wsrep_is_wsrep_xid(xid));
+        ut_a(xid->get_format_id() == -1 || wsrep_is_wsrep_xid(xid));
 
         if (mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
                              + TRX_SYS_WSREP_XID_MAGIC_N_FLD)
@@ -374,19 +376,19 @@ trx_sys_update_wsrep_checkpoint(
 
         mlog_write_ulint(sys_header + TRX_SYS_WSREP_XID_INFO
                          + TRX_SYS_WSREP_XID_FORMAT,
-                         (int)xid->formatID,
+                         (int)xid->get_format_id(),
                          MLOG_4BYTES, mtr);
         mlog_write_ulint(sys_header + TRX_SYS_WSREP_XID_INFO
                          + TRX_SYS_WSREP_XID_GTRID_LEN,
-                         (int)xid->gtrid_length,
+                         (int)xid->get_gtrid_length(),
                          MLOG_4BYTES, mtr);
         mlog_write_ulint(sys_header + TRX_SYS_WSREP_XID_INFO
                          + TRX_SYS_WSREP_XID_BQUAL_LEN,
-                         (int)xid->bqual_length,
+                         (int)xid->get_bqual_length(),
                          MLOG_4BYTES, mtr);
         mlog_write_string(sys_header + TRX_SYS_WSREP_XID_INFO
                           + TRX_SYS_WSREP_XID_DATA,
-                          (const unsigned char*) xid->data,
+                          (const unsigned char*) xid->get_data(),
                           XIDDATASIZE, mtr);
 
 }
@@ -395,51 +397,46 @@ void
 trx_sys_read_wsrep_checkpoint(XID* xid)
 /*===================================*/
 {
-        trx_sysf_t* sys_header;
+	trx_sysf_t* sys_header;
 	mtr_t	    mtr;
-        ulint       magic;
+	ulint       magic;
 
-        ut_ad(xid);
+	ut_ad(xid);
 
 	mtr_start(&mtr);
 
 	sys_header = trx_sysf_get(&mtr);
 
-        if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-                                      + TRX_SYS_WSREP_XID_MAGIC_N_FLD))
-            != TRX_SYS_WSREP_XID_MAGIC_N) {
-                memset(xid, 0, sizeof(*xid));
-                xid->formatID = -1;
-                trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
-                mtr_commit(&mtr);
-                return;
-        }
+	if ((magic = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
+		+ TRX_SYS_WSREP_XID_MAGIC_N_FLD))
+		!= TRX_SYS_WSREP_XID_MAGIC_N) {
 
-        xid->formatID     = (int)mach_read_from_4(
-                sys_header
-                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_FORMAT);
-        xid->gtrid_length = (int)mach_read_from_4(
-                sys_header
-                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_GTRID_LEN);
-        xid->bqual_length = (int)mach_read_from_4(
-                sys_header
-                + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_BQUAL_LEN);
-        ut_memcpy(xid->data,
-                  sys_header + TRX_SYS_WSREP_XID_INFO + TRX_SYS_WSREP_XID_DATA,
-                  XIDDATASIZE);
+		memset(xid, 0, sizeof(*xid));
+		xid->set_format_id(-1);
+		trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
+		mtr_commit(&mtr);
+		return;
+
+	}
+
+	xid->set_format_id(mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
+				+ TRX_SYS_WSREP_XID_FORMAT));
+
+	xid->set_gtrid_length(mach_read_from_4(sys_header
+				+ TRX_SYS_WSREP_XID_INFO
+				+ TRX_SYS_WSREP_XID_GTRID_LEN));
+
+	xid->set_bqual_length(mach_read_from_4(sys_header
+				+ TRX_SYS_WSREP_XID_INFO
+				+ TRX_SYS_WSREP_XID_BQUAL_LEN));
+
+	xid->set_data(sys_header + TRX_SYS_WSREP_XID_INFO
+			+ TRX_SYS_WSREP_XID_DATA, XIDDATASIZE);
 
 	mtr_commit(&mtr);
 }
 
 #endif /* WITH_WSREP */
-
-/*****************************************************************//**
-Prints to stderr the MySQL master log offset info in the trx system header if
-the magic number shows it valid. */
-UNIV_INTERN
-void
-trx_sys_print_mysql_master_log_pos(void)
-/*====================================*/
 
 /****************************************************************//**
 Looks for a free slot for a rollback segment in the trx system file copy.

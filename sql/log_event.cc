@@ -4648,7 +4648,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
 #ifdef WITH_WSREP
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER, ER(ER_ERROR_ON_MASTER),
                     expected_error,
-                    (!opt_log_raw) && thd->rewritten_query.length()
+                    (!opt_general_log_raw) && thd->rewritten_query.length()
                       ? thd->rewritten_query.c_ptr_safe() : thd->query().str);
 #else
         rli->report(ERROR_LEVEL, ER_ERROR_ON_MASTER, ER(ER_ERROR_ON_MASTER),
@@ -4726,7 +4726,7 @@ compare_errors:
                    thd->get_stmt_da()->message_text() :
                    "no error"),
                   actual_error, print_slave_db_safe(db),
-                  (!opt_log_raw) && thd->rewritten_query.length()
+                  (!opt_general_log_raw) && thd->rewritten_query.length()
                   ? thd->rewritten_query.c_ptr_safe() : query_arg);
 #else
       rli->report(ERROR_LEVEL, ER_INCONSISTENT_ERROR, ER(ER_INCONSISTENT_ERROR),
@@ -4781,7 +4781,7 @@ compare_errors:
                      "unexpected success or fatal error"),
 #ifdef WITH_WSREP
                       print_slave_db_safe(thd->db().str),
-                  (!opt_log_raw) && thd->rewritten_query.length()
+                  (!opt_general_log_raw) && thd->rewritten_query.length()
                   ? thd->rewritten_query.c_ptr_safe() : query_arg);
 #else
                     print_slave_db_safe(thd->db().str), query_arg);

@@ -1093,7 +1093,6 @@ extern lock_sys_t*	lock_sys;
 /*********************************************************************//**
 Cancels a waiting lock request and releases possible other transactions
 waiting behind it. */
-UNIV_INTERN
 void
 lock_cancel_waiting_and_release(
 /*============================*/

@@ -23,7 +23,7 @@
 
 // MySQL variables funcs
 
-#include "sql_priv.h"
+#include "query_options.h"
 class sys_var;
 class set_var;
 class THD;

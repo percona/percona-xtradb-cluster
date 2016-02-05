@@ -38,7 +38,7 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *hton,
 */
 void wsrep_cleanup_transaction(THD *thd)
 {
-  if (wsrep_emulate_bin_log) thd_binlog_trx_reset(thd);
+  if (wsrep_emulate_bin_log) wsrep_thd_binlog_trx_reset(thd);
   thd->wsrep_ws_handle.trx_id= WSREP_UNDEFINED_TRX_ID;
   thd->wsrep_trx_meta.gtid= WSREP_GTID_UNDEFINED;
   thd->wsrep_trx_meta.depends_on= WSREP_SEQNO_UNDEFINED;
@@ -83,18 +83,23 @@ void wsrep_register_hton(THD* thd, bool all)
         return;
     }
 
-    THD_TRANS *trans=all ? &thd->transaction.all : &thd->transaction.stmt;
-    for (Ha_trx_info *i= trans->ha_list; i; i = i->next())
+    Transaction_ctx *trn_ctx= thd->get_transaction();
+    Transaction_ctx::enum_trx_scope trx_scope=
+      all ? Transaction_ctx::SESSION : Transaction_ctx::STMT;
+    Ha_trx_info *ha_info= trn_ctx->ha_trx_info(trx_scope), *ha_info_next;
+
+    for (; ha_info; ha_info= ha_info_next)
     {
-      if (i->ht()->db_type == DB_TYPE_INNODB)
+      handlerton *ht= ha_info->ht();
+      if (ht->db_type == DB_TYPE_INNODB)
       {
-        trans_register_ha(thd, all, wsrep_hton);
+        trans_register_ha(thd, all, wsrep_hton, NULL);
 
         /* follow innodb read/write settting
          * but, as an exception: CTAS with empty result set will not be
          * replicated unless we declare wsrep hton as read/write here
 	 */
-        if (i->is_trx_read_write() ||
+        if (ha_info->is_trx_read_write() ||
             (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
              thd->wsrep_exec_mode == LOCAL_STATE))
         {
@@ -247,7 +252,8 @@ static int wsrep_rollback(handlerton *hton, THD *thd, bool all)
     {
       DBUG_PRINT("wsrep", ("setting rollback fail"));
       WSREP_ERROR("settting rollback fail: thd: %llu, schema: %s, SQL: %s",
-                  (long long)thd->real_id, (thd->db ? thd->db : "(null)"),
+                  (long long)thd->real_id,
+                  ((thd->db().length != 0) ? thd->db().str : "(null)"),
                   WSREP_QUERY(thd));
     }
     wsrep_cleanup_transaction(thd);
@@ -288,7 +294,8 @@ int wsrep_commit(handlerton *hton, THD *thd, bool all)
       {
         DBUG_PRINT("wsrep", ("setting rollback fail"));
         WSREP_ERROR("settting rollback fail: thd: %llu, schema: %s, SQL: %s",
-                    (long long)thd->real_id, (thd->db ? thd->db : "(null)"),
+                    (long long)thd->real_id,
+                    ((thd->db().length != 0) ? thd->db().str : "(null)"),
                     WSREP_QUERY(thd));
       }
       wsrep_cleanup_transaction(thd);
@@ -312,7 +319,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
   if (thd->get_stmt_da()->is_error()) {
     WSREP_ERROR("commit issue, error: %d %s",
-                thd->get_stmt_da()->sql_errno(), thd->get_stmt_da()->message());
+                thd->get_stmt_da()->mysql_errno(),
+                thd->get_stmt_da()->message_text());
   }
 
   DBUG_ENTER("wsrep_run_wsrep_commit");
@@ -363,7 +371,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   while (wsrep_replaying > 0                       &&
          thd->wsrep_conflict_state == NO_CONFLICT  &&
          thd->killed == THD::NOT_KILLED            &&
-         !shutdown_in_progress)
+         !abort_loop)
   {
 
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -460,7 +468,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 	       "QUERY: %s\n"
 	       " => Skipping replication",
 	       thd->thread_id, data_len,
-               (thd->db ? thd->db : "(null)"),
+               ((thd->db().length != 0) ? thd->db().str : "(null)"),
                WSREP_QUERY(thd));
     rcode = WSREP_TRX_FAIL;
   }
@@ -479,8 +487,9 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     }
 
     if (rcode == WSREP_TRX_MISSING) {
-      WSREP_WARN("Transaction missing in provider thd: %ld schema: %s SQL: %s",
-                 thd->thread_id, (thd->db ? thd->db : "(null)"),
+      WSREP_WARN("Transaction missing in provider thd: %u schema: %s SQL: %s",
+                 thd->thread_id,
+                 ((thd->db().length != 0) ? thd->db().str : "(null)"),
                  WSREP_QUERY(thd));
       rcode = WSREP_TRX_FAIL;
     } else if (rcode == WSREP_BF_ABORT) {

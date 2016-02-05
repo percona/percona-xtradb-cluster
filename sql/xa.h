@@ -282,6 +282,11 @@ public:
     return data;
   }
 
+  char* get_mutable_data()
+  {
+    return data;
+  }
+
   void set_data(const void* v, long l)
   {
     DBUG_ASSERT(l <= XIDDATASIZE);

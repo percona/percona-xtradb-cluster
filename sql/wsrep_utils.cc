@@ -34,6 +34,8 @@
 #include <netdb.h>    // getaddrinfo()
 #include <signal.h>
 
+#include "socket_connection.h"           // MY_BIND_ALL_ADDRESSES
+
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
 #endif
@@ -270,7 +272,7 @@ process::process (const char* cmd, const char* type, char** env)
 
     if (prctl(PR_SET_PDEATHSIG, SIGTERM))
     {
-      sql_perror("prctl() failed");
+      sql_print_error("prctl() failed");
       _exit(EXIT_FAILURE);
     }
 #endif
@@ -282,7 +284,7 @@ process::process (const char* cmd, const char* type, char** env)
 
     if (sigprocmask(SIG_SETMASK, &set, NULL))
     {
-      sql_perror("sigprocmask() failed");
+      sql_print_error("sigprocmask() failed");
       _exit(EXIT_FAILURE);
     }
 
@@ -308,7 +310,7 @@ process::process (const char* cmd, const char* type, char** env)
 
     if (setsid() < 0)
     {
-      sql_perror("setsid() failed");
+      sql_print_error("setsid() failed");
       _exit(EXIT_FAILURE);
     }
 
@@ -316,7 +318,7 @@ process::process (const char* cmd, const char* type, char** env)
 
     if (close(close_fd) < 0)
     {
-      sql_perror("close() failed");
+      sql_print_error("close() failed");
       _exit(EXIT_FAILURE);
     }
 
@@ -324,7 +326,7 @@ process::process (const char* cmd, const char* type, char** env)
 
     if (dup2(pipe_fds[child_end], close_fd) < 0)
     {
-      sql_perror("dup2() failed");
+      sql_print_error("dup2() failed");
       _exit(EXIT_FAILURE);
     }
 
@@ -334,7 +336,7 @@ process::process (const char* cmd, const char* type, char** env)
     execlp("sh", "sh", "-c", str_, NULL);
 #endif
 
-    sql_perror("execlp() failed");
+    sql_print_error("execlp() failed");
     _exit(EXIT_FAILURE);
 
 cleanup_pipe:
@@ -422,7 +424,7 @@ thd::thd (my_bool won) : init(), ptr(new THD)
     ptr->store_globals();
     ptr->variables.option_bits&= ~OPTION_BIN_LOG; // disable binlog
     ptr->variables.wsrep_on = won;
-    ptr->security_ctx->master_access= ~(ulong)0;
+    ptr->m_security_ctx->set_master_access(~(ulong)0);
     lex_start(ptr);
   }
 }
@@ -432,7 +434,6 @@ thd::~thd ()
   if (ptr)
   {
     delete ptr;
-    my_pthread_setspecific_ptr (THR_THD, 0);
   }
 }
 

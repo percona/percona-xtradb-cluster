@@ -705,6 +705,8 @@ public:
 	@param[in, out] wait_for	The lock that the the joining
 					transaction is waiting for
 	@param[in] prdt			Predicate [optional]
+	@param[in,out] c_lock		conflicting lock
+	@param[in,out] thr		query thread handler
 	@return DB_LOCK_WAIT, DB_DEADLOCK, or DB_QUE_THR_SUSPENDED, or
 		DB_SUCCESS_LOCKED_REC; DB_SUCCESS_LOCKED_REC means that
 		there was a deadlock, but another transaction was chosen
@@ -720,12 +722,21 @@ public:
 	@param[in, out] trx		Transaction requesting the new lock
 	@param[in] owns_trx_mutex	true if caller owns the trx_t::mutex
 	@param[in] prdt			Predicate lock (optional)
+	@param[in,out] c_lock		conflicting lock
+	@param[in,out] thr		query thread handler
 	@return new lock instance */
 	lock_t* create(
 		trx_t*		trx,
 		bool		owns_trx_mutex,
+#ifndef WITH_WSREP
 		const lock_prdt_t*
 				prdt = NULL);
+#else
+		const lock_prdt_t*
+				prdt,
+		lock_t* const	c_lock,
+		que_thr_t*	thr);
+#endif /* !WITH_WSREP */
 
 	/**
 	Check of the lock is on m_rec_id.
@@ -803,8 +814,15 @@ private:
 	Add the lock to the record lock hash and the transaction's lock list
 	@param[in,out] lock	Newly created record lock to add to the
 				rec hash and the transaction lock list
-	@param[in] add_to_hash	If the lock should be added to the hash table */
-	void lock_add(lock_t* lock, bool add_to_hash);
+	@param[in] add_to_hash	If the lock should be added to the hash table
+	@param[in,out] c_lock	conflicting lock
+	@param[in,out] thr	query thread handler */
+	void lock_add(lock_t* lock, bool add_to_hash
+#ifdef WITH_WSREP
+		,lock_t* const	c_lock,
+		que_thr_t*	thr
+#endif /* WITH_WSREP */
+		     );
 
 	/**
 	Check and resolve any deadlocks
