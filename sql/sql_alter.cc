@@ -21,6 +21,7 @@
 #include "sql_base.h"                        // open_temporary_tables
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
+#include "sql_parse.h"
 #endif /* WITH_WSREP */
 #include "log.h"
 
@@ -314,6 +315,11 @@ bool Sql_cmd_alter_table::execute(THD *thd)
 
   thd->enable_slow_log= opt_log_slow_admin_statements;
 
+  /* Push Strict_error_handler for alter table*/
+  Strict_error_handler strict_handler;
+  if (!thd->lex->is_ignore() && thd->is_strict_mode())
+    thd->push_internal_handler(&strict_handler);
+
 #ifdef WITH_WSREP
   TABLE *find_temporary_table(THD *thd, const TABLE_LIST *tl);
 
@@ -326,11 +332,6 @@ bool Sql_cmd_alter_table::execute(THD *thd)
     }
 #endif /* WITH_WSREP */
 
-  /* Push Strict_error_handler for alter table*/
-  Strict_error_handler strict_handler;
-  if (!thd->lex->is_ignore() && thd->is_strict_mode())
-    thd->push_internal_handler(&strict_handler);
-
   result= mysql_alter_table(thd, select_lex->db, lex->name.str,
                             &create_info, first_table, &alter_info);
 
@@ -338,7 +339,7 @@ bool Sql_cmd_alter_table::execute(THD *thd)
     thd->pop_internal_handler();
   DBUG_RETURN(result);
 #ifdef WITH_WSREP
- error:
+error:
   {
     WSREP_WARN("ALTER TABLE isolation failure");
     DBUG_RETURN(TRUE);

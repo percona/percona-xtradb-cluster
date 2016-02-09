@@ -99,8 +99,7 @@ struct wsrep_thd_shadow {
   enum wsrep_exec_mode wsrep_exec_mode;
   Vio                  *vio;
   ulong                tx_isolation;
-  char                 *db;
-  size_t               db_length;
+  LEX_CSTRING          db;
 };
 #endif
 enum enum_delay_key_write { DELAY_KEY_WRITE_NONE, DELAY_KEY_WRITE_ON,

@@ -4573,15 +4573,15 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
 #endif
 #ifdef WITH_WSREP
   if (wsrep_preordered_opt && WSREP_ON &&
-      (ev->get_type_code() == QUERY_EVENT ||
-       ev->get_type_code() == XID_EVENT ||
-       ev->get_type_code() == TABLE_MAP_EVENT ||
-       ev->get_type_code() == WRITE_ROWS_EVENT ||
-       ev->get_type_code() == UPDATE_ROWS_EVENT ||
-       ev->get_type_code() == DELETE_ROWS_EVENT ||
-       ev->get_type_code() == GTID_LOG_EVENT))
+      (ev->get_type_code() == binary_log::QUERY_EVENT ||
+       ev->get_type_code() == binary_log::XID_EVENT ||
+       ev->get_type_code() == binary_log::TABLE_MAP_EVENT ||
+       ev->get_type_code() == binary_log::WRITE_ROWS_EVENT ||
+       ev->get_type_code() == binary_log::UPDATE_ROWS_EVENT ||
+       ev->get_type_code() == binary_log::DELETE_ROWS_EVENT ||
+       ev->get_type_code() == binary_log::GTID_LOG_EVENT))
   {
-    if (ev->get_type_code() == GTID_LOG_EVENT)
+    if (ev->get_type_code() == binary_log::GTID_LOG_EVENT)
     {
       thd->wsrep_po_sid= *((Gtid_log_event*)ev)->get_sid();
     }
@@ -4617,13 +4617,13 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
       DBUG_RETURN(SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR);
     }
 
-    if (ev->get_type_code() == QUERY_EVENT &&
+    if (ev->get_type_code() == binary_log::QUERY_EVENT &&
         ((Query_log_event*)ev)->starts_group())
     {
       thd->wsrep_po_in_trans= TRUE;
     }
-    else if (ev->get_type_code() == XID_EVENT ||
-             (ev->get_type_code() == QUERY_EVENT &&
+    else if (ev->get_type_code() == binary_log::XID_EVENT ||
+             (ev->get_type_code() == binary_log::QUERY_EVENT &&
               (thd->wsrep_po_in_trans == FALSE ||
                ((Query_log_event*)ev)->ends_group())))
     {
@@ -4643,8 +4643,9 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
     reason= Log_event::EVENT_SKIP_IGNORE;
     skip_event= TRUE;
   }
-  else if (WSREP_ON && (ev->get_type_code() == XID_EVENT ||
-      (ev->get_type_code() == QUERY_EVENT && thd->wsrep_mysql_replicated > 0 &&
+  else if (WSREP_ON && (ev->get_type_code() == binary_log::XID_EVENT ||
+      (ev->get_type_code() == binary_log::QUERY_EVENT &&
+       thd->wsrep_mysql_replicated > 0 &&
        (!strncasecmp(((Query_log_event*)ev)->query , "BEGIN", 5) ||
         !strncasecmp(((Query_log_event*)ev)->query , "COMMIT", 6) ))))
   {

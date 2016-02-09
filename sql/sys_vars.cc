@@ -903,7 +903,7 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
                 "STATEMENT" : "MIXED");
     WSREP_DEBUG("This is meant only for simple tasks/tools like checksumming");
     /* Push also warning, because error message is general */
-     push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
+     push_warning_printf(thd, Sql_condition::SL_WARNING,
                         ER_UNKNOWN_ERROR,
                         "PXC does not support binlog format: %s",
                         var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
@@ -3028,6 +3028,8 @@ static bool check_require_secure_transport(sys_var *self, THD *thd, set_var *var
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
   bool result= true;
+  bool own_lock= false;
+
   my_bool new_read_only= read_only; // make a copy before releasing a mutex
   DBUG_ENTER("sys_var_opt_readonly::update");
 
@@ -3103,6 +3105,7 @@ static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
 
 static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
 {
+  bool own_lock= false;
   DBUG_ENTER("sys_var_opt_super_readonly::update");
 
   /* return if no changes: */
@@ -3141,7 +3144,7 @@ static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
   super_read_only = opt_super_readonly;
   mysql_mutex_unlock(&LOCK_global_system_variables);
 
-  if (thd->global_read_lock.lock_global_read_lock(thd))
+  if (thd->global_read_lock.lock_global_read_lock(thd, &own_lock))
     goto end_with_mutex_unlock;
 
   if ((result = thd->global_read_lock.make_global_read_lock_block_commit(thd)))
@@ -3151,7 +3154,8 @@ static bool fix_super_read_only(sys_var *self, THD *thd, enum_var_type type)
 
   end_with_read_lock:
     /* Release the lock */
-    thd->global_read_lock.unlock_global_read_lock(thd);
+    if (own_lock)
+      thd->global_read_lock.unlock_global_read_lock(thd);
   end_with_mutex_unlock:
     mysql_mutex_lock(&LOCK_global_system_variables);
   end:
@@ -4444,7 +4448,7 @@ static bool fix_autocommit(sys_var *self, THD *thd, enum_var_type type)
       thd->variables.option_bits&= ~OPTION_AUTOCOMMIT;
       thd->mdl_context.release_transactional_locks();
 #ifdef WITH_WSREP
-      WSREP_DEBUG("autocommit, MDL TRX lock released: %lu", thd->thread_id);
+      WSREP_DEBUG("autocommit, MDL TRX lock released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       return true;
     }

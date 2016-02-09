@@ -11891,6 +11891,25 @@ void wsrep_thd_binlog_trx_reset(THD * thd)
   thd->clear_binlog_table_maps();
 }
 
+TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
+{
+  /* applier and replayer can skip binlog commit */
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV))
+    return mysql_bin_log.commit(thd, all);
+  else
+    return (ha_commit_low(thd, all) ?
+            TC_LOG::RESULT_ABORTED : TC_LOG::RESULT_SUCCESS);
+}
+
+int wsrep_thd_binlog_rollback(THD* thd, bool all)
+{
+  /* applier and replayer can skip binlog rollback */
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV))
+    return mysql_bin_log.rollback(thd, all);
+  else
+    return ha_rollback_low(thd, all);
+}
+
 #endif /* WITH_WSREP */
 
 static int show_binlog_vars(THD *thd, SHOW_VAR *var, char *buff)

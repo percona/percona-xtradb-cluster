@@ -1342,10 +1342,10 @@ void end_connection(THD *thd)
 #ifdef WITH_WSREP
   if (WSREP(thd))
   {
-    wsrep_status_t rcode= wsrep->free_connection(wsrep, thd->thread_id);
+    wsrep_status_t rcode= wsrep->free_connection(wsrep, thd->thread_id());
     if (rcode) {
-      WSREP_WARN("wsrep failed to free connection context: %lu, code: %d",
-                 thd->thread_id, rcode);
+      WSREP_WARN("wsrep failed to free connection context: %u, code: %d",
+                 thd->thread_id(), rcode);
     }
   }
   thd->wsrep_client_thread= 0;

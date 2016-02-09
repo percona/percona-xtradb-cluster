@@ -56,7 +56,8 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
           goto error;
       }
 
-      uchar* tmp = (uchar *)my_realloc(*buf, total_length, MYF(0));
+      uchar* tmp = (uchar *)my_realloc(PSI_NOT_INSTRUMENTED,
+                                       *buf, total_length, MYF(0));
       if (!tmp)
       {
           WSREP_ERROR("could not (re)allocate buffer: %zu + %u",
@@ -179,7 +180,8 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
         if (total_length > allocated)
         {
             size_t const new_size(heap_size(total_length));
-            uchar* tmp = (uchar *)my_realloc(heap_buf, new_size, MYF(0));
+            uchar* tmp = (uchar *)my_realloc(PSI_NOT_INSTRUMENTED,
+                                             heap_buf, new_size, MYF(0));
             if (!tmp)
             {
                 WSREP_ERROR("could not (re)allocate buffer: %zu + %u",
@@ -304,8 +306,8 @@ int wsrep_write_cache(wsrep_t*  const wsrep,
 void wsrep_dump_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len)
 {
   char filename[PATH_MAX]= {0};
-  int len= snprintf(filename, PATH_MAX, "%s/GRA_%ld_%lld.log",
-                    wsrep_data_home_dir, thd->thread_id,
+  int len= snprintf(filename, PATH_MAX, "%s/GRA_%u_%lld.log",
+                    wsrep_data_home_dir, thd->thread_id(),
                     (long long)wsrep_thd_trx_seqno(thd));
   if (len >= PATH_MAX)
   {
@@ -331,8 +333,8 @@ void wsrep_dump_rbr_buf(THD *thd, const void* rbr_buf, size_t buf_len)
 void wsrep_dump_rbr_direct(THD* thd, IO_CACHE* cache)
 {
   char filename[PATH_MAX]= {0};
-  int len= snprintf(filename, PATH_MAX, "%s/GRA_%ld_%lld.log",
-                    wsrep_data_home_dir, thd->thread_id,
+  int len= snprintf(filename, PATH_MAX, "%s/GRA_%u_%lld.log",
+                    wsrep_data_home_dir, thd->thread_id(),
                     (long long)wsrep_thd_trx_seqno(thd));
   size_t bytes_in_cache = 0;
   // check path

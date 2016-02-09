@@ -29,6 +29,8 @@
 #include <cstdlib>
 #include "log_event.h"
 #include <rpl_slave.h>
+#include "sql_base.h"		// TEMP_PREFIX 
+#include "rpl_msr.h"           // channel_map
 
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
@@ -236,7 +238,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
           WSREP_INFO("closing client connections for "
                      "protocol change %ld -> %d",
                      wsrep_protocol_version, view->proto_ver);
-          wsrep_close_client_connections(TRUE);
+          wsrep_close_client_connections(true);
           wsrep_protocol_version= view->proto_ver;
           wsrep_ready_set(wsrep_ready_saved);
       }
@@ -264,7 +266,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
     if (!wsrep_before_SE())
     {
         WSREP_DEBUG("[debug]: closing client connections for PRIM");
-        wsrep_close_client_connections(TRUE);
+        wsrep_close_client_connections(true);
     }
 
     ssize_t const req_len= wsrep_sst_prepare (sst_req);
@@ -398,7 +400,7 @@ static void wsrep_synced_cb(void* app_ctx)
     WSREP_INFO("MySQL slave restart");
     wsrep_restart_slave_activated= FALSE;
 
-    mysql_mutex_lock(&LOCK_active_mi);
+    channel_map.wrlock();
     if ((rcode = start_slave_threads(1 /* need mutex */,
                             0 /* no wait for start*/,
                             active_mi,
@@ -406,7 +408,7 @@ static void wsrep_synced_cb(void* app_ctx)
     {
       WSREP_WARN("Failed to create slave threads: %d", rcode);
     }
-    mysql_mutex_unlock(&LOCK_active_mi);
+    channel_map.unlock();
 
   }
 }
@@ -721,7 +723,7 @@ void wsrep_stop_replication(THD *thd)
 
   wsrep_connected= FALSE;
 
-  wsrep_close_client_connections(TRUE);
+  wsrep_close_client_connections(true);
 
   /* wait until appliers have stopped */
   wsrep_wait_appliers_close(thd);
@@ -964,20 +966,21 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
         memset(&tmp_table, 0, sizeof(tmp_table));
         tmp_table.table_name= (char*)table;
         tmp_table.db= (char*)db;
-	tmp_table.mdl_request.init(MDL_key::GLOBAL, (db) ? db :  "",
-				   (table) ? table : "",
-				   MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
+	MDL_REQUEST_INIT(&tmp_table.mdl_request,
+            MDL_key::GLOBAL, (db) ? db :  "", (table) ? table : "",
+            MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
 
         if (!table || !find_temporary_table(thd, &tmp_table))
         {
-            if (!(ka->keys= (wsrep_key_t*)my_malloc(sizeof(wsrep_key_t), MYF(0))))
+            if (!(ka->keys= (wsrep_key_t*)my_malloc(
+                PSI_NOT_INSTRUMENTED, sizeof(wsrep_key_t), MYF(0))))
             {
                 WSREP_ERROR("Can't allocate memory for key_array");
                 goto err;
             }
             ka->keys_len= 1;
-            if (!(ka->keys[0].key_parts= (wsrep_buf_t*)
-                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
+            if (!(ka->keys[0].key_parts= (wsrep_buf_t*) my_malloc(
+                PSI_NOT_INSTRUMENTED, sizeof(wsrep_buf_t)*2, MYF(0))))
             {
                 WSREP_ERROR("Can't allocate memory for key_parts");
                 goto err;
@@ -1000,15 +1003,16 @@ static bool wsrep_prepare_keys_for_isolation(THD*              thd,
         {
             wsrep_key_t* tmp;
             tmp= (wsrep_key_t*)my_realloc(
-                ka->keys, (ka->keys_len + 1) * sizeof(wsrep_key_t), MYF(0));
+                PSI_NOT_INSTRUMENTED, ka->keys,
+                (ka->keys_len + 1) * sizeof(wsrep_key_t), MYF(0));
             if (!tmp)
             {
                 WSREP_ERROR("Can't allocate memory for key_array");
                 goto err;
             }
             ka->keys= tmp;
-            if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*)
-                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
+            if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*) my_malloc(
+                PSI_NOT_INSTRUMENTED, sizeof(wsrep_buf_t)*2, MYF(0))))
             {
                 WSREP_ERROR("Can't allocate memory for key_parts");
                 goto err;
@@ -1094,7 +1098,14 @@ int wsrep_to_buf_helper(
 
   if (thd->variables.gtid_next.type == GTID_GROUP)
   {
-      Gtid_log_event gtid_ev(thd, FALSE, &thd->variables.gtid_next);
+      // TODO: Not sure if we need to pass valid values for 3/4 argument.
+      // but GTID being group is already set using set GTID command so
+      // arugment for 3/4 shouldn't matter.
+      // Also, note we are not passing thd but that should be fine
+      // as log event (base class of Gtid_log_event eventually extract
+      // server_id from it.
+      Gtid_log_event gtid_ev(thd->server_id, false, (int64) 0, (int64) 0,
+                             thd->variables.gtid_next);
       if (!gtid_ev.is_valid()) ret= 0;
       if (!ret && gtid_ev.write(&tmp_io_cache)) ret= 1;
   }
@@ -1121,7 +1132,7 @@ static int
 create_view_query(THD *thd, uchar** buf, size_t* buf_len)
 {
     LEX *lex= thd->lex;
-    SELECT_LEX *select_lex= &lex->select_lex;
+    SELECT_LEX *select_lex= lex->select_lex;
     TABLE_LIST *first_table= select_lex->table_list.first;
     TABLE_LIST *views = first_table;
 
@@ -1160,7 +1171,7 @@ create_view_query(THD *thd, uchar** buf, size_t* buf_len)
     buff.append(STRING_WITH_LEN("VIEW "));
     /* Test if user supplied a db (ie: we did not use thd->db) */
     if (views->db && views->db[0] &&
-        (thd->db == NULL || strcmp(views->db, thd->db)))
+        (thd->db().length == 0 || strcmp(views->db, thd->db().str)))
     {
       append_identifier(thd, &buff, views->db,
                         views->db_length);
@@ -1197,7 +1208,7 @@ create_view_query(THD *thd, uchar** buf, size_t* buf_len)
    1: TOI replication was skipped
   -1: TOI replication failed 
  */
-static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
+static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                            const TABLE_LIST* table_list)
 {
   wsrep_status_t ret(WSREP_WARNING);
@@ -1226,7 +1237,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     buf_err= wsrep_alter_event_query(thd, &buf, &buf_len);
     break;
   default:
-    buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(), &buf,
+    buf_err= wsrep_to_buf_helper(thd, thd->query().str, thd->query().length, &buf,
                                  &buf_len);
     break;
   }
@@ -1249,7 +1260,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   if (!buf_err                                                                &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       key_arr.keys_len > 0                                                    &&
-      WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
+      WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id(),
 						 key_arr.keys, key_arr.keys_len,
 						 &buff, 1,
 						 &thd->wsrep_trx_meta)))
@@ -1265,7 +1276,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     /* jump to error handler in mysql_execute_command() */
     WSREP_WARN("TO isolation failed for: %d, schema: %s, sql: %s. Check wsrep "
                "connection state and retry the query.",
-               ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+               ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
 	     "your wsrep connection state and retry the query.");
     if (buf) my_free(buf);
@@ -1294,16 +1305,16 @@ static void wsrep_TOI_end(THD *thd) {
   WSREP_DEBUG("TO END: %lld, update seqno",
               (long long)wsrep_thd_trx_seqno(thd));
   
-  if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id))) {
+  if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, thd->thread_id()))) {
     WSREP_DEBUG("TO END: %lld", (long long)wsrep_thd_trx_seqno(thd));
   }
   else {
     WSREP_WARN("TO isolation end failed for: %d, schema: %s, sql: %s",
-               ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+               ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
   }
 }
 
-static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
+static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
 {
   wsrep_status_t ret(WSREP_WARNING);
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
@@ -1331,7 +1342,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
      wsrep_desync_count--;
      mysql_mutex_unlock(&LOCK_wsrep_desync_count);
      WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
-                ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
      my_error(ER_LOCK_DEADLOCK, MYF(0));
      return(ret);
   }
@@ -1343,7 +1354,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   {
     /* no can do, bail out from DDL */
     WSREP_WARN("RSU failed due to pending transactions, schema: %s, query %s",
-               (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+               (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1353,7 +1364,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     if (ret != WSREP_OK)
     {
       WSREP_WARN("resync failed %d for schema: %s, query: %s",
-                 ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                 ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     }
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
@@ -1364,7 +1375,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   {
     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     WSREP_WARN("pause failed %lld for schema: %s, query: %s", (long long)seqno,
-               (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+               (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     return(1);
   }
   thd->global_read_lock.pause_provider(TRUE);
@@ -1396,7 +1407,7 @@ static void wsrep_RSU_end(THD *thd)
      if (ret != WSREP_OK)
      {
        WSREP_WARN("resume failed %d for schema: %s, query: %s", ret,
-                  (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
      }
      thd->global_read_lock.pause_provider(FALSE);
      ret = wsrep->resync(wsrep);
@@ -1404,7 +1415,7 @@ static void wsrep_RSU_end(THD *thd)
      {
        mysql_mutex_unlock(&LOCK_wsrep_desync_count);
        WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
-                  (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
        return;
      }
      thd->variables.wsrep_on = 1;
@@ -1413,7 +1424,7 @@ static void wsrep_RSU_end(THD *thd)
   mysql_mutex_unlock(&LOCK_wsrep_desync_count);
 }
 
-int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
+int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST* table_list)
 {
   /*
@@ -1426,8 +1437,8 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
 
   if (thd->wsrep_conflict_state == MUST_ABORT)
   {
-    WSREP_INFO("thread: %lu, schema: %s, query: %s has been aborted due to multi-master conflict",
-               thd->thread_id, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+    WSREP_INFO("thread: %u, schema: %s, query: %s has been aborted due to multi-master conflict",
+               thd->thread_id(), (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     return WSREP_TRX_FAIL;
   }
@@ -1438,23 +1449,23 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
 
   if (thd->global_read_lock.can_acquire_protection())
   {
-    WSREP_DEBUG("Aborting TOI: Global Read-Lock (FTWRL) in place: %s %lu",
-                WSREP_QUERY(thd), thd->thread_id);
+    WSREP_DEBUG("Aborting TOI: Global Read-Lock (FTWRL) in place: %s %u",
+                WSREP_QUERY(thd), thd->thread_id());
     return -1;
   }
 
   if (!thd->global_read_lock.provider_resumed())
   {
-    WSREP_DEBUG("Aborting TOI: Galera provider paused due to lock: %s %lu",
-                thd->query(), thd->thread_id);
+    WSREP_DEBUG("Aborting TOI: Galera provider paused due to lock: %s %u",
+                thd->query().str, thd->thread_id());
     my_error(ER_CANT_UPDATE_WITH_READLOCK, MYF(0));
     return -1;
   }
 
   if (wsrep_debug && thd->mdl_context.has_locks())
   {
-    WSREP_DEBUG("thread holds MDL locks at TI begin: %s %lu",
-                WSREP_QUERY(thd), thd->thread_id);
+    WSREP_DEBUG("thread holds MDL locks at TI begin: %s %u",
+                WSREP_QUERY(thd), thd->thread_id());
   }
 
   /*
@@ -1517,18 +1528,18 @@ void wsrep_to_isolation_end(THD *thd)
     WSREP_##severity(                                                          \
       "%s\n"                                                                   \
       "schema:  %.*s\n"                                                        \
-      "request: (%lu \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)\n"      \
-      "granted: (%lu \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)",       \
+      "request: (%u \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)\n"      \
+      "granted: (%u \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)",       \
       msg, schema_len, schema,                                                 \
-      req->thread_id, (long long)wsrep_thd_trx_seqno(req),                     \
+      req->thread_id(), (long long)wsrep_thd_trx_seqno(req),                   \
       req->wsrep_exec_mode, req->wsrep_query_state, req->wsrep_conflict_state, \
-      req->get_command(), req->lex->sql_command, req->query(),                 \
-      gra->thread_id, (long long)wsrep_thd_trx_seqno(gra),                     \
+      req->get_command(), req->lex->sql_command, req->query().str,             \
+      gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                   \
       gra->wsrep_exec_mode, gra->wsrep_query_state, gra->wsrep_conflict_state, \
-      gra->get_command(), gra->lex->sql_command, gra->query());
+      gra->get_command(), gra->lex->sql_command, gra->query().str);
 
 bool
-wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
+wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
                           MDL_ticket *ticket,
                           const MDL_key *key
 ) {

@@ -25,6 +25,10 @@
 #include <mysql/psi/mysql_transaction.h>
 #include "binlog.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_xid.h"
+#endif /* WITH_WSREP */
+
 const char *XID_STATE::xa_state_names[]={
   "NON-EXISTING", "ACTIVE", "IDLE", "PREPARED", "ROLLBACK ONLY"
 };

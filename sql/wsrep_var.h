@@ -24,6 +24,7 @@
 // MySQL variables funcs
 
 #include "query_options.h"
+#include "set_var.h"
 class sys_var;
 class set_var;
 class THD;

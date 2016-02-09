@@ -325,7 +325,7 @@ extern "C" void *handle_connection(void *arg)
     bool avoid_pthread_reuse= false;
     if (WSREP(thd) && thd->wsrep_applier)
     {
-      WSREP_DEBUG("avoiding thread re-use for applier, thd: %lu", thd->thread_id);
+      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", thd->thread_id());
       avoid_pthread_reuse= true;
       pthread_reused= false;
     }

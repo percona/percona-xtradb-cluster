@@ -1239,7 +1239,7 @@ extern "C" uint32 wsrep_thd_wsrep_rand(THD *thd)
 }
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd) 
 {
-  return thd->thread_id;
+  return thd->thread_id();
 }
 extern "C" wsrep_seqno_t wsrep_thd_trx_seqno(THD *thd) 
 {
@@ -1249,10 +1249,10 @@ extern "C" query_id_t wsrep_thd_query_id(THD *thd)
 {
   return thd->query_id;
 }
-extern "C" char *wsrep_thd_query(THD *thd) 
+extern "C" const char *wsrep_thd_query(THD *thd) 
 {
-  return (thd) ? ((!opt_general_log_raw) && thd->rewritten_query.length() ?
-                  thd->rewritten_query.c_ptr_safe() : thd->query())
+  return (thd) ? (((!opt_general_log_raw) && thd->rewritten_query.length()) ?
+                  thd->rewritten_query.c_ptr_safe() : thd->query().str)
     : NULL;
 }
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd) 
@@ -1371,6 +1371,7 @@ void Open_tables_state::reset_open_tables_state()
 THD::THD(bool enable_plugins, bool is_applier)
 #else
 THD::THD(bool enable_plugins)
+#endif /* WITH_WSREP */
   :Query_arena(&main_mem_root, STMT_CONVENTIONAL_EXECUTION),
    mark_used_columns(MARK_COLUMNS_READ),
    want_privilege(0),
@@ -1552,7 +1553,7 @@ THD::THD(bool enable_plugins)
 
 #ifdef WITH_WSREP
   mysql_mutex_init(key_LOCK_wsrep_thd, &LOCK_wsrep_thd, MY_MUTEX_INIT_FAST);
-  mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd, NULL);
+  mysql_cond_init(key_COND_wsrep_thd, &COND_wsrep_thd);
   wsrep_ws_handle.trx_id = WSREP_UNDEFINED_TRX_ID;
   wsrep_ws_handle.opaque = NULL;
   wsrep_retry_counter     = 0;
@@ -2593,11 +2594,9 @@ void THD::awake()
   killed= THD::KILL_QUERY;
 
   /* Broadcast a condition to kick the target if it is waiting on it. */
-  if (mysys_var)
+  if (is_killable)
   {
-    mysql_mutex_lock(&mysys_var->mutex);
-    if (!system_thread)		// Don't abort locks
-      mysys_var->abort=1;
+    mysql_mutex_lock(&LOCK_current_cond);
     /*
       This broadcast could be up in the air if the victim thread
       exits the cond in the time between read and broadcast, but that is
@@ -2622,13 +2621,13 @@ void THD::awake()
       However, there is still a small chance of failure on platforms with
       instruction or memory write reordering.
     */
-    if (mysys_var->current_cond && mysys_var->current_mutex)
+    if (current_cond && current_mutex)
     {
-      mysql_mutex_lock(mysys_var->current_mutex);
-      mysql_cond_broadcast(mysys_var->current_cond);
-      mysql_mutex_unlock(mysys_var->current_mutex);
+      mysql_mutex_lock(current_mutex);
+      mysql_cond_broadcast(current_cond);
+      mysql_mutex_unlock(current_mutex);
     }
-    mysql_mutex_unlock(&mysys_var->mutex);
+    mysql_mutex_unlock(&LOCK_current_cond);
   }
   DBUG_VOID_RETURN;
 }

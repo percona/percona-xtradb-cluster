@@ -107,6 +107,7 @@ void wsrep_register_hton(THD* thd, bool all)
         }
         break;
       }
+      ha_info_next= ha_info->next();
     }
   }
 }
@@ -377,11 +378,11 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-    mysql_mutex_lock(&thd->mysys_var->mutex);
+    mysql_mutex_lock(&thd->LOCK_current_cond);
     thd_proc_info(thd, "wsrep waiting on replaying");
-    thd->mysys_var->current_mutex= &LOCK_wsrep_replaying;
-    thd->mysys_var->current_cond=  &COND_wsrep_replaying;
-    mysql_mutex_unlock(&thd->mysys_var->mutex);
+    thd->current_mutex= &LOCK_wsrep_replaying;
+    thd->current_cond= &COND_wsrep_replaying;
+    mysql_mutex_unlock(&thd->LOCK_current_cond);
 
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     // Using timedwait is a hack to avoid deadlock in case if BF victim
@@ -396,17 +397,17 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 			 &wtime);
 
     if (replay_round++ % 100000 == 0)
-      WSREP_DEBUG("commit waiting for replaying: replayers %d, thd: (%lu) "
+      WSREP_DEBUG("commit waiting for replaying: replayers %d, thd: (%u) "
                   "conflict: %d (round: %d)",
-		  wsrep_replaying, thd->thread_id,
+		  wsrep_replaying, thd->thread_id(),
                   thd->wsrep_conflict_state, replay_round);
 
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
-    mysql_mutex_lock(&thd->mysys_var->mutex);
-    thd->mysys_var->current_mutex= 0;
-    thd->mysys_var->current_cond=  0;
-    mysql_mutex_unlock(&thd->mysys_var->mutex);
+    mysql_mutex_lock(&thd->LOCK_current_cond);
+    thd->current_mutex= 0;
+    thd->current_cond= 0;
+    mysql_mutex_unlock(&thd->LOCK_current_cond);
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     mysql_mutex_lock(&LOCK_wsrep_replaying);
@@ -463,11 +464,11 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
   {
-    WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %zu\n"
+    WSREP_WARN("SQL statement was ineffective, THD: %u, buf: %zu\n"
                "schema: %s \n"
 	       "QUERY: %s\n"
 	       " => Skipping replication",
-	       thd->thread_id, data_len,
+	       thd->thread_id(), data_len,
                ((thd->db().length != 0) ? thd->db().str : "(null)"),
                WSREP_QUERY(thd));
     rcode = WSREP_TRX_FAIL;
@@ -478,7 +479,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
       if (WSREP(thd))
         thd_proc_info(thd, "wsrep in pre-commit stage");
       rcode = wsrep->pre_commit(wsrep,
-                                (wsrep_conn_id_t)thd->thread_id,
+                                (wsrep_conn_id_t)thd->thread_id(),
                                 &thd->wsrep_ws_handle,
                                 WSREP_FLAG_COMMIT |
                                 ((thd->wsrep_PA_safe) ?
@@ -488,31 +489,33 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
     if (rcode == WSREP_TRX_MISSING) {
       WSREP_WARN("Transaction missing in provider thd: %u schema: %s SQL: %s",
-                 thd->thread_id,
+                 thd->thread_id(),
                  ((thd->db().length != 0) ? thd->db().str : "(null)"),
                  WSREP_QUERY(thd));
       rcode = WSREP_TRX_FAIL;
     } else if (rcode == WSREP_BF_ABORT) {
-      WSREP_DEBUG("thd %lu seqno %lld BF aborted by provider, will replay",
-                  thd->thread_id, (long long)thd->wsrep_trx_meta.gtid.seqno);
+      WSREP_DEBUG("thd %u seqno %lld BF aborted by provider, will replay",
+                  thd->thread_id(), (long long)thd->wsrep_trx_meta.gtid.seqno);
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       thd->wsrep_conflict_state = MUST_REPLAY;
       DBUG_ASSERT(wsrep_thd_trx_seqno(thd) > 0);
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       mysql_mutex_lock(&LOCK_wsrep_replaying);
       wsrep_replaying++;
-      WSREP_DEBUG("replaying increased: %d, thd: %lu",
-                  wsrep_replaying, thd->thread_id);
+      WSREP_DEBUG("replaying increased: %d, thd: %u",
+                  wsrep_replaying, thd->thread_id());
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   } else {
     WSREP_ERROR("I/O error reading from thd's binlog iocache: "
-                "errno=%d, io cache code=%d", my_errno, cache->error);
+                "errno=%d, io cache code=%d", my_errno(), cache->error);
     DBUG_ASSERT(0); // failure like this can not normally happen
     DBUG_RETURN(WSREP_TRX_ERROR);
   }
 
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  Transaction_ctx *trn_ctx= thd->get_transaction();
+
   switch(rcode) {
   case 0:
     /*
@@ -526,27 +529,29 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
     if (thd->wsrep_conflict_state != NO_CONFLICT)
     {
-      WSREP_WARN("thd %lu seqno %lld: conflict state %d after post commit",
-                 thd->thread_id,
+      WSREP_WARN("thd %u seqno %lld: conflict state %d after post commit",
+                 thd->thread_id(),
                  (long long)thd->wsrep_trx_meta.gtid.seqno,
                  thd->wsrep_conflict_state);
     }
     thd->wsrep_exec_mode= LOCAL_COMMIT;
     DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
     /* Override XID iff it was generated by mysql */
-    if (thd->transaction.xid_state.xid.get_my_xid())
+    if (trn_ctx->xid_state()->get_xid()->get_my_xid())
     {
-      wsrep_xid_init(&thd->transaction.xid_state.xid,
+      wsrep_xid_init(trn_ctx->xid_state()->get_xid(),
                      thd->wsrep_trx_meta.gtid.uuid,
                      thd->wsrep_trx_meta.gtid.seqno);
     }
     DBUG_PRINT("wsrep", ("replicating commit success"));
     break;
+
   case WSREP_BF_ABORT:
     DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
+
   case WSREP_TRX_FAIL:
-    WSREP_DEBUG("commit failed for reason: %d %lu %s",
-                rcode, thd->thread_id, WSREP_QUERY(thd));
+    WSREP_DEBUG("commit failed for reason: %d %u %s",
+                rcode, thd->thread_id(), WSREP_QUERY(thd));
     DBUG_PRINT("wsrep", ("replicating commit fail"));
 
     thd->wsrep_query_state= QUERY_EXEC;
@@ -571,10 +576,12 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     WSREP_ERROR("transaction size exceeded");
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
+
   case WSREP_CONN_FAIL:
     WSREP_ERROR("connection failure");
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     DBUG_RETURN(WSREP_TRX_ERROR);
+
   default:
     WSREP_ERROR("unknown connection failure");
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);

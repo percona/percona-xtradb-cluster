@@ -125,10 +125,10 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
     }
 
     switch (ev->get_type_code()) {
-    case FORMAT_DESCRIPTION_EVENT:
+    case binary_log::FORMAT_DESCRIPTION_EVENT:
       wsrep_set_apply_format(thd, (Format_description_log_event*)ev);
       continue;
-    case GTID_LOG_EVENT:
+    case binary_log::GTID_LOG_EVENT:
     {
       Gtid_log_event* gev= (Gtid_log_event*)ev;
       if (gev->get_gno() == 0)
@@ -144,12 +144,14 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
 
     thd->server_id = ev->server_id; // use the original server id for logging
     thd->set_time();                // time the query
-    wsrep_xid_init(&thd->transaction.xid_state.xid,
+
+    Transaction_ctx *trn_ctx= thd->get_transaction();
+    wsrep_xid_init(trn_ctx->xid_state()->get_xid(),
                    thd->wsrep_trx_meta.gtid.uuid,
                    thd->wsrep_trx_meta.gtid.seqno);
-    thd->lex->current_select= 0;
-    if (!ev->when.tv_sec)
-      my_micro_time_to_timeval(my_micro_time(), &ev->when);
+    thd->lex->set_current_select(0);
+    if (!ev->common_header->when.tv_sec)
+      my_micro_time_to_timeval(my_micro_time(), &ev->common_header->when);
     ev->thd = thd;
     exec_res = ev->apply_event(thd->wsrep_rli);
     DBUG_PRINT("info", ("exec_event result: %d", exec_res));
@@ -266,8 +268,8 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   TABLE *tmp;
   while ((tmp = thd->temporary_tables))
   {
-    WSREP_DEBUG("Applier %lu, has temporary tables: %s.%s",
-                  thd->thread_id, 
+    WSREP_DEBUG("Applier %u, has temporary tables: %s.%s",
+                  thd->thread_id(), 
                   (tmp->s) ? tmp->s->db.str : "void",
                   (tmp->s) ? tmp->s->table_name.str : "void");
       close_temporary_table(thd, tmp, 1, 1);    

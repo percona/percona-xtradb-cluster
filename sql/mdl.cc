@@ -37,11 +37,9 @@ static PSI_memory_key key_memory_MDL_context_acquire_locks;
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
-extern "C" char *wsrep_thd_query(THD *thd);
-void sql_print_information(const char *format, ...)
-  ATTRIBUTE_FORMAT(printf, 1, 2);
+extern "C" const char *wsrep_thd_query(THD *thd);
 extern bool
-wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
+wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
                           MDL_ticket *ticket,
                           const MDL_key *key);
 #endif /* WITH_WSREP */
@@ -1976,7 +1974,7 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
     {
       if (!wsrep_thd_is_BF((void *)(waiting->get_ctx()->wsrep_get_thd()), true))
       {
-        WSREP_DEBUG("MDL add_ticket inserted before: %lu %s", 
+        WSREP_DEBUG("MDL add_ticket inserted before: %u %s", 
                     wsrep_thd_thread_id(waiting->get_ctx()->wsrep_get_thd()), 
                     wsrep_thd_query(waiting->get_ctx()->wsrep_get_thd()));
         m_list.insert_after(prev, ticket);
@@ -2626,7 +2624,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
             if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),false) &&
                 key.mdl_namespace() == MDL_key::GLOBAL)
             {
-              WSREP_DEBUG("global lock granted for BF: %lu %s",
+              WSREP_DEBUG("global lock granted for BF: %u %s",
                           wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
                           wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
               can_grant = true;
@@ -2685,7 +2683,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
     if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()), false) &&
 	key.mdl_namespace() == MDL_key::GLOBAL)
     {
-      WSREP_DEBUG("global lock granted for BF (waiting queue): %lu %s",
+      WSREP_DEBUG("global lock granted for BF (waiting queue): %u %s",
 		  wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
 		  wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
       can_grant = true;

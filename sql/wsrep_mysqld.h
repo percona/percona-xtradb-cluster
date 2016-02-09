@@ -170,14 +170,14 @@ extern "C" time_t wsrep_thd_query_start(THD *thd);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 extern "C" int64_t wsrep_thd_trx_seqno(THD *thd);
 extern "C" query_id_t wsrep_thd_query_id(THD *thd);
-extern "C" char * wsrep_thd_query(THD *thd);
+extern "C" const char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
 extern "C" int wsrep_thd_retry_counter(THD *thd);
 
 
-extern void wsrep_close_client_connections(my_bool wait_to_end);
+extern void wsrep_close_client_connections(bool wait_to_end);
 extern int  wsrep_wait_committing_connections_close(int wait_time);
 extern void wsrep_close_applier(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd);
@@ -314,7 +314,7 @@ extern PSI_mutex_key key_LOCK_wsrep_desync;
 extern PSI_mutex_key key_LOCK_wsrep_desync_count;
 #endif /* HAVE_PSI_INTERFACE */
 struct TABLE_LIST;
-int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
+int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
                              const TABLE_LIST* table_list);
 void wsrep_to_isolation_end(THD *thd);
 void wsrep_cleanup_transaction(THD *thd);

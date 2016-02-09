@@ -32,6 +32,10 @@
 
 #include "mysql/psi/mysql_sp.h"
 
+#ifdef WITH_WSREP
+#include "sql_parse.h"               // create_default_definer
+#endif
+
 ///////////////////////////////////////////////////////////////////////////
 
 /**
@@ -501,8 +505,8 @@ int wsrep_create_trigger_query(THD *thd, uchar** buf, size_t* buf_len)
   LEX *lex= thd->lex;
   String stmt_query;
 
-  LEX_STRING definer_user;
-  LEX_STRING definer_host;
+  LEX_CSTRING definer_user;
+  LEX_CSTRING definer_host;
 
   if (!lex->definer)
   {
@@ -533,7 +537,7 @@ int wsrep_create_trigger_query(THD *thd, uchar** buf, size_t* buf_len)
 
   stmt_query.append(STRING_WITH_LEN("CREATE "));
 
-  append_definer(thd, &stmt_query, &definer_user, &definer_host);
+  append_definer(thd, &stmt_query, definer_user, definer_host);
 
   LEX_STRING stmt_definition;
   stmt_definition.str= (char*) thd->lex->stmt_definition_begin;

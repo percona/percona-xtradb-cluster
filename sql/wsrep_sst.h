@@ -16,7 +16,15 @@
 #ifndef WSREP_SST_H
 #define WSREP_SST_H
 
-#include <mysql.h> // my_bool
+// #include <mysql.h> // my_bool
+
+#include "mysqld.h"
+#include "log.h"
+typedef struct st_mysql_show_var SHOW_VAR;
+#include "query_options.h"
+#include "rpl_gtid.h"
+#include "../wsrep/wsrep_api.h"
+
 
 /* system variables */
 extern const char* wsrep_sst_method;

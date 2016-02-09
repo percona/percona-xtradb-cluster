@@ -19,7 +19,6 @@
 #include "rpl_rli.h"
 #include "log_event.h"
 #include "sql_parse.h"
-#include "global_threads.h" // LOCK_thread_count, etc.
 #include "sql_base.h" // close_thread_tables()
 #include "mysqld.h"   // start_wsrep_THD();
 
@@ -36,8 +35,8 @@ int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
 /* must have (&thd->LOCK_wsrep_thd) */
 void wsrep_client_rollback(THD *thd)
 {
-  WSREP_DEBUG("client rollback due to BF abort for (%ld), query: %s",
-              thd->thread_id, WSREP_QUERY(thd));
+  WSREP_DEBUG("client rollback due to BF abort for (%u), query: %s",
+              thd->thread_id(), WSREP_QUERY(thd));
 
   my_atomic_add64(&wsrep_bf_aborts_counter, 1);
 
@@ -47,14 +46,14 @@ void wsrep_client_rollback(THD *thd)
 
   if (thd->locked_tables_mode && thd->lock)
   {
-    WSREP_DEBUG("unlocking tables for BF abort (%ld)", thd->thread_id);
+    WSREP_DEBUG("unlocking tables for BF abort (%u)", thd->thread_id());
     thd->locked_tables_list.unlock_locked_tables(thd);
     thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
   }
 
   if (thd->global_read_lock.is_acquired())
   {
-    WSREP_DEBUG("unlocking GRL for BF abort (%ld)", thd->thread_id);
+    WSREP_DEBUG("unlocking GRL for BF abort (%u)", thd->thread_id());
     thd->global_read_lock.unlock_global_read_lock(thd);
   }
 
@@ -69,7 +68,7 @@ void wsrep_client_rollback(THD *thd)
 
   if (thd->get_binlog_table_maps())
   {
-    WSREP_DEBUG("clearing binlog table map for BF abort (%ld)", thd->thread_id);
+    WSREP_DEBUG("clearing binlog table map for BF abort (%u)", thd->thread_id());
     thd->clear_binlog_table_maps();
   }
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -84,7 +83,7 @@ static Relay_log_info* wsrep_relay_log_init(const char* log_fname)
 {
   uint rli_option = INFO_REPOSITORY_DUMMY;
   Relay_log_info *rli= NULL;
-  rli = Rpl_info_factory::create_rli(rli_option, false);
+  rli = Rpl_info_factory::create_rli(rli_option, false, (const char*)"", true);
   rli->set_rli_description_event(
       new Format_description_log_event(BINLOG_VERSION));
 
@@ -151,7 +150,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->options       = thd->variables.option_bits;
   shadow->server_status = thd->server_status;
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
-  shadow->vio           = thd->net.vio;
+  shadow->vio           = thd->get_protocol_classic()->get_vio();
 
   if (opt_log_slave_updates)
     thd->variables.option_bits|= OPTION_BIN_LOG;
@@ -162,16 +161,20 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->wsrep_rli->info_thd = thd;
 
   thd->wsrep_exec_mode= REPL_RECV;
-  thd->net.vio= 0;
+  thd->get_protocol_classic()->set_vio(NULL);
   thd->clear_error();
 
   shadow->tx_isolation        = thd->variables.tx_isolation;
   thd->variables.tx_isolation = ISO_READ_COMMITTED;
   thd->tx_isolation           = ISO_READ_COMMITTED;
 
-  shadow->db            = thd->db;
-  shadow->db_length     = thd->db_length;
-  thd->reset_db(NULL, 0);
+  // intended shallow copy.
+  shadow->db            = thd->db();
+
+  LEX_CSTRING  dummy;
+  dummy.str= NULL;
+  dummy.length= 0;
+  thd->reset_db(dummy);
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -179,9 +182,9 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.option_bits  = shadow->options;
   thd->server_status          = shadow->server_status;
   thd->wsrep_exec_mode        = shadow->wsrep_exec_mode;
-  thd->net.vio                = shadow->vio;
+  thd->get_protocol_classic()->set_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
-  thd->reset_db(shadow->db, shadow->db_length);
+  thd->reset_db(shadow->db);
 }
 
 void wsrep_replay_transaction(THD *thd)
@@ -204,8 +207,8 @@ void wsrep_replay_transaction(THD *thd)
       close_thread_tables(thd);
       if (thd->locked_tables_mode && thd->lock)
       {
-        WSREP_DEBUG("releasing table lock for replaying (%ld)",
-                    thd->thread_id);
+        WSREP_DEBUG("releasing table lock for replaying (%u)",
+                    thd->thread_id());
         thd->locked_tables_list.unlock_locked_tables(thd);
         thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
       }
@@ -244,8 +247,8 @@ void wsrep_replay_transaction(THD *thd)
       case WSREP_OK:
         thd->wsrep_conflict_state= NO_CONFLICT;
         wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
-        WSREP_DEBUG("trx_replay successful for: %ld %llu",
-                    thd->thread_id, (long long)thd->real_id);
+        WSREP_DEBUG("trx_replay successful for: %u %llu",
+                    thd->thread_id(), (long long)thd->real_id);
         if (thd->get_stmt_da()->is_sent())
         {
           WSREP_WARN("replay ok, thd has reported status");
@@ -278,7 +281,8 @@ void wsrep_replay_transaction(THD *thd)
         break;
       default:
         WSREP_ERROR("trx_replay failed for: %d, schema: %s, query: %s",
-                    rcode, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                    rcode, (thd->db().length ? thd->db().str : "(null)"),
+                    WSREP_QUERY(thd));
         /* we're now in inconsistent state, must abort */
 	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         unireg_abort(1);
@@ -289,14 +293,17 @@ void wsrep_replay_transaction(THD *thd)
 
       mysql_mutex_lock(&LOCK_wsrep_replaying);
       wsrep_replaying--;
-      WSREP_DEBUG("replaying decreased: %d, thd: %lu",
-                  wsrep_replaying, thd->thread_id);
+      WSREP_DEBUG("replaying decreased: %d, thd: %u",
+                  wsrep_replaying, thd->thread_id());
       mysql_cond_broadcast(&COND_wsrep_replaying);
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   }
 }
 
+/* Applier/Slave Threads. Controlled using wsrep_slave_threads configuration
+variable. These are worker thread capable of applying write-set in parallel.
+Parallelism is use to explore efficency. */
 static void wsrep_replication_process(THD *thd)
 {
   int rcode;
@@ -350,16 +357,15 @@ static void wsrep_replication_process(THD *thd)
     break;
   }
 
-  mysql_mutex_lock(&LOCK_thread_count);
+  thd_lock_thread_count(thd);
   wsrep_close_applier(thd);
-  mysql_cond_broadcast(&COND_thread_count);
-  mysql_mutex_unlock(&LOCK_thread_count);
+  thd_unlock_thread_count(thd);
 
   TABLE *tmp;
   while ((tmp = thd->temporary_tables))
   {
-    WSREP_WARN("Applier %lu, has temporary tables at exit: %s.%s",
-                  thd->thread_id, 
+    WSREP_WARN("Applier %u, has temporary tables at exit: %s.%s",
+                  thd->thread_id(), 
                   (tmp->s) ? tmp->s->db.str : "void",
                   (tmp->s) ? tmp->s->table_name.str : "void");
   }
@@ -367,6 +373,8 @@ static void wsrep_replication_process(THD *thd)
   DBUG_VOID_RETURN;
 }
 
+/* Create applier threads based on configuration.
+Applier thread are responsible for applying write-set. */
 void wsrep_create_appliers(long threads)
 {
   if (!wsrep_connected)
@@ -400,19 +408,22 @@ static void wsrep_rollback_process(THD *thd)
   wsrep_aborting_thd= NULL;
 
   while (thd->killed == THD::NOT_KILLED) {
+
+    mysql_mutex_lock(&thd->LOCK_current_cond);
     thd_proc_info(thd, "wsrep aborter idle");
-    thd->mysys_var->current_mutex= &LOCK_wsrep_rollback;
-    thd->mysys_var->current_cond=  &COND_wsrep_rollback;
+    thd->current_mutex= &LOCK_wsrep_rollback;
+    thd->current_cond= &COND_wsrep_rollback;
+    mysql_mutex_unlock(&thd->LOCK_current_cond);
 
     mysql_cond_wait(&COND_wsrep_rollback,&LOCK_wsrep_rollback);
 
     WSREP_DEBUG("WSREP rollback thread wakes for signal");
 
-    mysql_mutex_lock(&thd->mysys_var->mutex);
+    mysql_mutex_lock(&thd->LOCK_current_cond);
     thd_proc_info(thd, "wsrep aborter active");
-    thd->mysys_var->current_mutex= 0;
-    thd->mysys_var->current_cond=  0;
-    mysql_mutex_unlock(&thd->mysys_var->mutex);
+    thd->current_mutex= 0;
+    thd->current_cond= 0;
+    mysql_mutex_unlock(&thd->LOCK_current_cond);
 
     /* check for false alarms */
     if (!wsrep_aborting_thd)
@@ -451,8 +462,8 @@ static void wsrep_rollback_process(THD *thd)
 
       mysql_mutex_lock(&aborting->LOCK_wsrep_thd);
       wsrep_client_rollback(aborting);
-      WSREP_DEBUG("WSREP rollbacker aborted thd: (%lu %llu)",
-                  aborting->thread_id, (long long)aborting->real_id);
+      WSREP_DEBUG("WSREP rollbacker aborted thd: (%u %llu)",
+                  aborting->thread_id(), (long long)aborting->real_id);
       mysql_mutex_unlock(&aborting->LOCK_wsrep_thd);
 
       mysql_mutex_lock(&LOCK_wsrep_rollback);

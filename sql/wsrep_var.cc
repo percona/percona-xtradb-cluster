@@ -39,14 +39,18 @@ ulong   wsrep_reject_queries_options;
 
 int wsrep_init_vars()
 {
-  wsrep_provider        = my_strdup(WSREP_NONE, MYF(MY_WME));
-  wsrep_provider_options= my_strdup("", MYF(MY_WME));
-  wsrep_cluster_address = my_strdup("", MYF(MY_WME));
-  wsrep_cluster_name    = my_strdup(WSREP_CLUSTER_NAME, MYF(MY_WME));
-  wsrep_node_name       = my_strdup("", MYF(MY_WME));
-  wsrep_node_address    = my_strdup("", MYF(MY_WME));
-  wsrep_node_incoming_address= my_strdup(WSREP_NODE_INCOMING_AUTO, MYF(MY_WME));
-  wsrep_start_position  = my_strdup(WSREP_START_POSITION_ZERO, MYF(MY_WME));
+  wsrep_provider        = my_strdup(PSI_NOT_INSTRUMENTED,
+                                    WSREP_NONE, MYF(MY_WME));
+  wsrep_provider_options= my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
+  wsrep_cluster_address = my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
+  wsrep_cluster_name    = my_strdup(PSI_NOT_INSTRUMENTED,
+                                    WSREP_CLUSTER_NAME, MYF(MY_WME));
+  wsrep_node_name       = my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
+  wsrep_node_address    = my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
+  wsrep_node_incoming_address= my_strdup(PSI_NOT_INSTRUMENTED,
+                                         WSREP_NODE_INCOMING_AUTO, MYF(MY_WME));
+  wsrep_start_position  = my_strdup(PSI_NOT_INSTRUMENTED,
+                                    WSREP_START_POSITION_ZERO, MYF(MY_WME));
 
   global_system_variables.binlog_format=BINLOG_FORMAT_ROW;
   return 0;
@@ -218,8 +222,8 @@ static bool refresh_provider_options()
   if (opts)
   {
     if (wsrep_provider_options) my_free((void *)wsrep_provider_options);
-    wsrep_provider_options = (char*)my_memdup(opts, strlen(opts) + 1, 
-                                              MYF(MY_WME));
+    wsrep_provider_options = (char*)my_memdup(PSI_NOT_INSTRUMENTED, opts,
+                                              strlen(opts) + 1, MYF(MY_WME));
   }
   else
   {
@@ -355,7 +359,7 @@ void wsrep_provider_init (const char* value)
   }
 
   if (wsrep_provider) my_free((void *)wsrep_provider);
-  wsrep_provider = my_strdup(value, MYF(0));
+  wsrep_provider = my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0));
 }
 
 bool wsrep_provider_options_check (sys_var *self, THD* thd, set_var* var)
@@ -385,7 +389,7 @@ void wsrep_provider_options_init(const char* value)
 {
   if (wsrep_provider_options && wsrep_provider_options != value)
     my_free((void *)wsrep_provider_options);
-  wsrep_provider_options = (value) ? my_strdup(value, MYF(0)) : NULL;
+  wsrep_provider_options = (value) ? my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0)) : NULL;
 }
 
 bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
@@ -401,7 +405,7 @@ bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
             break;
         case WSREP_REJ_ALL_KILL:
             wsrep_ready_set(FALSE);
-            wsrep_close_client_connections(FALSE);
+            wsrep_close_client_connections(false);
             WSREP_INFO("Rejecting client queries and killing connections due to manual setting");
             break;
         default:
@@ -481,7 +485,7 @@ void wsrep_cluster_address_init (const char* value)
               (value) ? value : "null");
 
   if (wsrep_cluster_address) my_free ((void*)wsrep_cluster_address);
-  wsrep_cluster_address = (value) ? my_strdup(value, MYF(0)) : NULL;
+  wsrep_cluster_address = (value) ? my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0)) : NULL;
 }
 
 /* Function checks if the new value for cluster_name is valid.
@@ -560,7 +564,7 @@ void wsrep_node_address_init (const char* value)
   if (wsrep_node_address && strcmp(wsrep_node_address, value))
     my_free ((void*)wsrep_node_address);
 
-  wsrep_node_address = (value) ? my_strdup(value, MYF(0)) : NULL;
+  wsrep_node_address = (value) ? my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0)) : NULL;
 }
 
 bool wsrep_slave_threads_check (sys_var *self, THD* thd, set_var* var)
@@ -645,7 +649,7 @@ bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
               wsrep_desync_count_manual--;
               mysql_mutex_unlock(&LOCK_wsrep_desync_count);
               WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
-                          (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                          (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
               my_error (ER_CANNOT_USER, MYF(0), "'wsrep->desync()'",
                         thd->query());
               return true;
@@ -667,7 +671,7 @@ bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
               {
                   mysql_mutex_unlock(&LOCK_wsrep_desync_count);
                   WSREP_WARN ("SET resync failed %d for schema: %s, query: %s",
-                              ret, (thd->db ? thd->db : "(null)"),
+                              ret, (thd->db().length ? thd->db().str : "(null)"),
                               WSREP_QUERY(thd));
                   my_error (ER_CANNOT_USER, MYF(0), "'wsrep->resync()'",
                             thd->query());

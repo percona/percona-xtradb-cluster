@@ -476,6 +476,11 @@ enum enum_table_category
 };
 typedef enum enum_table_category TABLE_CATEGORY;
 
+#ifdef WITH_WSREP
+TABLE_CATEGORY get_table_category(const LEX_STRING& db,
+                                  const LEX_STRING& name);
+#endif /* WITH_WSREP */
+
 extern ulong refresh_version;
 
 typedef struct st_table_field_type
@@ -2093,6 +2098,17 @@ struct TABLE_LIST
   {
     return view != NULL ? view_name.str : table_name;
   }
+
+  /**
+     @brief Returns the table alias that this TABLE_LIST represents.
+     This is needed to get the real name of the temporary table as the normal
+     table name is temporary generated string.
+
+
+     @details The unqualified table alias
+   */
+  const char *get_table_alias() const { return alias; }
+
   int fetch_number_of_rows();
   bool update_derived_keys(Field*, Item**, uint);
   bool generate_keys();

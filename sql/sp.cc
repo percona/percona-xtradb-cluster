@@ -2828,12 +2828,12 @@ int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len)
                      sp->m_params.str, sp->m_params.length,
                      retstr.c_ptr(), retstr.length(),
                      sp->m_body.str, sp->m_body.length,
-                     sp->m_chistics, &(thd->lex->definer->user),
-                     &(thd->lex->definer->host),
+                     sp->m_chistics, thd->lex->definer->user,
+                     thd->lex->definer->host,
                      saved_mode))
   {
     WSREP_WARN("SP create string failed: schema: %s, query: %s",
-               (thd->db ? thd->db : "(null)"), thd->query());
+               (thd->db().length ? thd->db().str : "(null)"), thd->query().str);
     return 1;
   }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);

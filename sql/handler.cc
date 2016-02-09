@@ -1470,6 +1470,7 @@ int ha_prepare(THD *thd)
 
     while (ha_info)
     {
+      int err;
       handlerton *ht= ha_info->ht();
       thd->status_var.ha_prepare_count++;
       if (ht->prepare)
@@ -1478,7 +1479,7 @@ int ha_prepare(THD *thd)
           ha_rollback_trans(thd, true);
           DBUG_RETURN(1);
         });
-        if (ht->prepare(ht, thd, true))
+        if ((err= ht->prepare(ht, thd, true)))
         {
 #ifdef WITH_WSREP
           if (WSREP(thd) && ht->db_type == DB_TYPE_WSREP)
@@ -7999,9 +8000,7 @@ int binlog_log_row(TABLE* table,
   /* only InnoDB tables will be replicated through binlog emulation */
   if (WSREP_EMULATE_BINLOG(thd)                          && 
       table->file->ht->db_type != DB_TYPE_INNODB         &&
-      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB && 
-	(((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
-	//	!strcmp(table->file->table_type(), "InnoDB"))
+      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB))
   {
     return 0;
   } 

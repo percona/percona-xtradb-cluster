@@ -241,6 +241,30 @@ void Global_THD_manager::wait_till_no_thd()
   mysql_mutex_unlock(&LOCK_thd_list);
 }
 
+#ifdef WITH_WSREP
+void Global_THD_manager::wait_till_wsrep_thd_eq(Do_THD_Impl* func,
+                                                int threshold_count)
+{
+  Do_THD doit(func);
+
+  mysql_mutex_lock(&LOCK_thd_list);
+  while (true)
+  {
+    func->reset();
+
+    std::for_each(thd_list.begin(), thd_list.end(), doit);
+
+    /* done api evaluate the needed exit condition. */
+    if (func->done(threshold_count))
+      break;
+
+    mysql_cond_wait(&COND_thd_list, &LOCK_thd_list);
+    DBUG_PRINT("quit", ("One thread died (count=%u)", get_thd_count()));
+  }
+  mysql_mutex_unlock(&LOCK_thd_list);
+}
+#endif
+
 
 void Global_THD_manager::do_for_all_thd_copy(Do_THD_Impl *func)
 {

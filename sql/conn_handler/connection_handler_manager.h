@@ -191,25 +191,12 @@ public:
   */
   static void dec_connection_count(bool extra_port_connection)
   {
-#ifdef WITH_WSREP
-    /*
-      Do not decrement when its wsrep system thread. wsrep_applier is set for
-      applier as well as rollbacker threads.
-    */
-    if (!thd->wsrep_applier)
-    {
-#endif /* WITH_WSREP */
-
     mysql_mutex_lock(&LOCK_connection_count);
     if (extra_port_connection)
       extra_connection_count--;
     else
       connection_count--;
     mysql_mutex_unlock(&LOCK_connection_count);
-
-#ifdef WITH_WSREP
-    }
-#endif
   }
 
   void inc_aborted_connects()

@@ -1784,7 +1784,7 @@ static void print_pool_blocked_message(bool max_threads_reached)
     if (max_threads_reached)
       sql_print_error(MAX_THREADS_REACHED_MSG);
     else
-      sql_print_error(CREATE_THREAD_ERROR_MSG, my_errno);
+      sql_print_error(CREATE_THREAD_ERROR_MSG, my_errno());
     
     sql_print_information("Threadpool has been blocked for %u seconds\n",
       (uint)((now- pool_block_start)/1000000));

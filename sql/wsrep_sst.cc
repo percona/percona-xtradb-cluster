@@ -13,19 +13,25 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 
-#include "wsrep_sst.h"
-
 #include <mysqld.h>
 #include <sql_class.h>
-#include <set_var.h>
-#include <sql_acl.h>
-#include <sql_reload.h>
 #include <sql_parse.h>
+#include <sql_reload.h>
+#include "debug_sync.h"
 #include "wsrep_priv.h"
+#include "wsrep_thd.h"
+#include "wsrep_sst.h"
 #include "wsrep_utils.h"
+#include "wsrep_var.h"
+#include "wsrep_binlog.h"
+#include "wsrep_applier.h"
 #include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
+#include "log_event.h"
+#include <rpl_slave.h>
+#include "sql_base.h"           // TEMP_PREFIX 
+#include "rpl_msr.h"           // channel_map
 
 extern const char wsrep_defaults_file[];
 extern const char wsrep_defaults_group_suffix[];
@@ -156,7 +162,7 @@ static bool sst_auth_real_set (const char* value)
 
   if (value)
   {
-    v= my_strdup(value, MYF(0));
+    v= my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0));
   }
   else                                          // its NULL
   {
@@ -174,7 +180,7 @@ static bool sst_auth_real_set (const char* value)
     if (strlen(sst_auth_real))
     {
       if (wsrep_sst_auth) { my_free((void*) wsrep_sst_auth); }
-      wsrep_sst_auth= my_strdup(WSREP_SST_AUTH_MASK, MYF(0));
+      wsrep_sst_auth= my_strdup(PSI_NOT_INSTRUMENTED, WSREP_SST_AUTH_MASK, MYF(0));
     }
     return 0;
   }
@@ -334,7 +340,7 @@ struct sst_thread_arg
     : cmd(c), env(e), ret_str(0), err(-1)
   {
     mysql_mutex_init(key_LOCK_wsrep_sst_thread, &lock, MY_MUTEX_INIT_FAST);
-    mysql_cond_init(key_COND_wsrep_sst_thread, &cond, NULL);
+    mysql_cond_init(key_COND_wsrep_sst_thread, &cond);
   }
 
   ~sst_thread_arg()
@@ -389,15 +395,16 @@ static int generate_binlog_opt_val(char** ret)
 {
   DBUG_ASSERT(ret);
   *ret= NULL;
-  if (opt_bin_log && gtid_mode > 0)
+  if (opt_bin_log && get_gtid_mode(GTID_MODE_LOCK_NONE) > GTID_MODE_OFF)
   {
     assert(opt_bin_logname);
     *ret= strcmp(opt_bin_logname, "0") ?
-        my_strdup(opt_bin_logname, MYF(0)) : my_strdup("", MYF(0));
+        my_strdup(PSI_NOT_INSTRUMENTED, opt_bin_logname, MYF(0)) :
+        my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(0));
   }
   else
   {
-    *ret= my_strdup("", MYF(0));
+    *ret= my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(0));
   }
   if (!*ret) return -ENOMEM;
   return 0;
@@ -803,7 +810,7 @@ static void sst_reject_queries(my_bool close_conn)
 {
     wsrep_ready_set (FALSE); // this will be resotred when donor becomes synced
     WSREP_INFO("Rejecting client queries for the duration of SST.");
-    if (TRUE == close_conn) wsrep_close_client_connections(FALSE);
+    if (TRUE == close_conn) wsrep_close_client_connections(false);
 }
 
 static int sst_donate_mysqldump (const char*         addr,
@@ -882,18 +889,18 @@ static int run_sql_command(THD *thd, const char *query)
   thd->set_query((char *)query, strlen(query));
 
   Parser_state ps;
-  if (ps.init(thd, thd->query(), thd->query_length()))
+  if (ps.init(thd, thd->query().str, thd->query().length))
   {
     WSREP_ERROR("SST query: %s failed", query);
     return -1;
   }
 
-  mysql_parse(thd, thd->query(), thd->query_length(), &ps);
+  mysql_parse(thd, &ps);
   if (thd->is_error())
   {
-    int const err= thd->get_stmt_da()->sql_errno();
+    int const err= thd->get_stmt_da()->mysql_errno();
     WSREP_WARN ("error executing '%s': %d (%s)%s",
-                query, err, thd->get_stmt_da()->message(),
+                query, err, thd->get_stmt_da()->message_text(),
                 err == ER_UNKNOWN_SYSTEM_VARIABLE ?
                 ". Was mysqld built with --with-innodb-disallow-writes ?" : "");
     thd->clear_error();
