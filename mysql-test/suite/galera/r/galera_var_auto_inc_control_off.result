@@ -51,7 +51,7 @@ f1
 1
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+Got one of the listed errors
 SELECT * FROM t1;
 f1	node
 1	node1

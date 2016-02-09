@@ -21,6 +21,6 @@ UPDATE t1 SET f2 = 'bar' WHERE f1 = -9223372036854775808;
 COMMIT;
 SET AUTOCOMMIT=ON;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+Got one of the listed errors
 SET AUTOCOMMIT=ON;
 DROP TABLE t1;

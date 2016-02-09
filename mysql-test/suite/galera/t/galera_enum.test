@@ -14,12 +14,11 @@ CREATE TABLE t1 (f1 ENUM('', 'one', 'two'), KEY (f1)) ENGINE=InnoDB;
 
 INSERT INTO t1 VALUES ('');
 INSERT INTO t1 VALUES ('one'), ('two');
-INSERT INTO t1 VALUES (0), (1), (2);
 
 --connection node_2
-SELECT COUNT(*) = 6 FROM t1;
-SELECT COUNT(*) = 2 FROM t1 where f1 = '';
-SELECT COUNT(*) = 2 FROM t1 where f1 = 'one';
+SELECT COUNT(*) = 3 FROM t1;
+SELECT COUNT(*) = 1 FROM t1 where f1 = '';
+SELECT COUNT(*) = 1 FROM t1 where f1 = 'one';
 
 DROP TABLE t1;
 

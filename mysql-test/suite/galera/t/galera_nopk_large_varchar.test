@@ -43,7 +43,7 @@ UPDATE t2 SET f1 = 'xyz' WHERE f1 = CONCAT(REPEAT('x', 7999), 'a');
 COMMIT;
 
 --connection node_2
---error ER_LOCK_DEADLOCK
+--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
 COMMIT;
 
 DROP TABLE t1;
