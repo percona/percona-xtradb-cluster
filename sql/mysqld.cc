@@ -1123,7 +1123,8 @@ public:
   virtual void operator()(THD *closing_thd)
   {
     if (closing_thd->get_protocol()->connection_alive() &&
-        (WSREP(closing_thd) || closing_thd->wsrep_exec_mode == LOCAL_STATE))
+        (WSREP(closing_thd) || closing_thd->wsrep_exec_mode == LOCAL_STATE) &&
+        closing_thd != current_thd)
     {
       LEX_CSTRING main_sctx_user= closing_thd->m_main_security_ctx.user();
       sql_print_warning(ER_DEFAULT(ER_FORCING_CLOSE),my_progname,
@@ -6560,9 +6561,6 @@ void wsrep_close_client_connections(my_bool wait_to_end)
 
   sql_print_information("Giving %d client threads a chance to die gracefully",
                         static_cast<int>(thd_manager->get_thd_count()));
-
-  Set_kill_conn set_kill_conn;
-  thd_manager->do_for_all_thd(&set_kill_conn);
 
   Call_wsrep_close_client_conn call_wsrep_close_client_conn;
   thd_manager->do_for_all_thd(&call_wsrep_close_client_conn);
