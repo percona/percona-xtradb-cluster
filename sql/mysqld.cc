@@ -7460,7 +7460,7 @@ SHOW_VAR status_vars[]= {
   {"wsrep_provider_name",      (char*) &wsrep_provider_name,     SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
   {"wsrep_provider_version",   (char*) &wsrep_provider_version,  SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
   {"wsrep_provider_vendor",    (char*) &wsrep_provider_vendor,   SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
-  {"wsrep",                    (char*) &wsrep_show_status,       SHOW_FUNC, SHOW_SCOPE_GLOBAL},
+  {"wsrep",                    (char*) &wsrep_show_status,       SHOW_FUNC, SHOW_SCOPE_ALL},
 #endif
   {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}
 };
