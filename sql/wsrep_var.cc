@@ -543,6 +543,7 @@ bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
 static inline void
 wsrep_assign_to_mysql (SHOW_VAR* mysql, wsrep_stats_var* wsrep)
 {
+  mysql->scope = SHOW_SCOPE_ALL;
   mysql->name = wsrep->name;
   switch (wsrep->type) {
   case WSREP_VAR_INT64:

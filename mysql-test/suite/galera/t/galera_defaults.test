@@ -15,7 +15,7 @@
 
 SELECT COUNT(*) = 40 FROM performance_schema.global_variables WHERE VARIABLE_NAME LIKE 'wsrep_%';
 
-SELECT VARIABLE_NAME, VARIABLE_VALUE
+SELECT UPPER(VARIABLE_NAME), VARIABLE_VALUE
 FROM performance_schema.global_variables
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME NOT IN (
@@ -58,7 +58,7 @@ SELECT COUNT(*) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters';
 
-SELECT VARIABLE_NAME FROM performance_schema.global_status
+SELECT UPPER(VARIABLE_NAME) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'
 ORDER BY VARIABLE_NAME;
