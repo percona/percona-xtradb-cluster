@@ -80,6 +80,7 @@ How-tos
 .. toctree::
    :maxdepth: 1
    :glob:
+
    howtos/centos_howto
    howtos/ubuntu_howto
    howtos/singlebox
