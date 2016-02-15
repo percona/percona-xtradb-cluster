@@ -45,3 +45,18 @@ UNLOCK TABLES;
 FLUSH TABLES t1;
 DROP TABLE t1;
 DROP TABLE t2;
+call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+#node-1
+select @@wsrep_desync;
+@@wsrep_desync
+0
+set global wsrep_desync = 1;
+set global wsrep_desync = 0;
+flush table with read lock;
+set global wsrep_desync = 1;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'ON'
+set global wsrep_desync = 0;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'OFF'
+unlock tables;
+set global wsrep_desync = 1;
+set global wsrep_desync = 0;;
