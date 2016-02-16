@@ -1082,7 +1082,9 @@ static int binlog_init(void *p)
 {
   binlog_hton= (handlerton *)p;
 #ifdef WITH_WSREP
-  if (WSREP_ON)
+  /* During bootstrap we need to get binlog to on state as wsrep_on
+  is not yet set. Bootstrap will create seed database. */
+  if (WSREP_ON || opt_bootstrap)
     binlog_hton->state= SHOW_OPTION_YES;
   else
   {

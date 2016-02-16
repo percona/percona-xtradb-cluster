@@ -4533,6 +4533,13 @@ a file name for --log-bin-index option", opt_binlog_index_name);
         after SST has happened
      */
   }
+
+  if (gtid_server_init())
+  {
+    sql_print_error("Failed to initialize GTID structures.");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
   if (!wsrep_recovery)
   {
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
@@ -4564,6 +4571,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       }
     }
   }
+
   if (opt_bin_log)
   {
     /*
@@ -4581,6 +4589,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       unireg_abort(1);
     }
 #else
+
     /*
       Skip opening the index file if we start with --help. This is necessary
       to avoid creating the file in an otherwise empty datadir, which will
@@ -4659,11 +4668,19 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   if (opt_ignore_builtin_innodb)
     sql_print_warning("ignore-builtin-innodb is ignored "
                       "and will be removed in future releases.");
+
+#ifndef WITH_WSREP
+  /* Leave the original location if wsrep is not involved otherwise
+  we do this before initializing WSREP as wsrep needs access to
+  gtid_mode which and for accessing gtid_mode gtid_sid_locks has to be
+  initialized which is done by this function. */
+
   if (gtid_server_init())
   {
     sql_print_error("Failed to initialize GTID structures.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
+#endif /* !WITH_WSREP */
 
   /*
     Set tc_log to point to TC_LOG_DUMMY early in order to allow plugin_init()

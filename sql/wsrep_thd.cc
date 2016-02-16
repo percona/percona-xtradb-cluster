@@ -160,6 +160,11 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   if (!thd->wsrep_rli) thd->wsrep_rli= wsrep_relay_log_init("wsrep_relay");
   thd->wsrep_rli->info_thd = thd;
 
+  if (thd->wsrep_rli->channel_mts_submode != MTS_PARALLEL_TYPE_DB_NAME)
+    thd->wsrep_rli->current_mts_submode= new Mts_submode_logical_clock();
+  else
+    thd->wsrep_rli->current_mts_submode= new Mts_submode_database();
+
   thd->wsrep_exec_mode= REPL_RECV;
   thd->get_protocol_classic()->set_vio(NULL);
   thd->clear_error();
