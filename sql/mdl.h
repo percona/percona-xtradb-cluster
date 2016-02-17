@@ -907,7 +907,7 @@ public:
   void release_transactional_locks();
 #ifdef WITH_WSREP
   void release_explicit_locks();
-#endif
+#endif /* WITH_WSREP */
   void rollback_to_savepoint(const MDL_savepoint &mdl_savepoint);
 
   MDL_context_owner *get_owner() const { return m_owner; }

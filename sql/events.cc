@@ -1189,9 +1189,10 @@ Events::load_events_from_db(THD *thd)
       (Also, make sure you skip disabling it if is already disabled to avoid
        creation of redundant action)
       NOTE:
-      This complete system relies on server-id. Ideally server-id should be same for
-      all nodes of galera eco-system but they aren't same.
-      Infact, it is recommended/set pratice to have each node with different server-id.
+      This complete system relies on server-id. Ideally server-id should be
+      same for all nodes of galera eco-system but they aren't same.
+      Infact, based on galera use-case it seems like it rcommends to have each
+      node with different server-id.
     */
     if (et->originator != thd->server_id)
     {
@@ -1216,7 +1217,8 @@ Events::load_events_from_db(THD *thd)
         delete et;
         continue;
     }
-#endif
+#endif /* WITH_WSREP */
+
     /**
       Since the Event_queue_element object could be deleted inside
       Event_queue::create_event we should save the value of dropped flag
@@ -1303,6 +1305,7 @@ int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len)
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);
 }
 #endif /* WITH_WSREP */
+
 /**
   @} (End of group Event_Scheduler)
 */

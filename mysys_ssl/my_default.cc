@@ -120,6 +120,7 @@ static my_bool defaults_already_read= FALSE;
 char wsrep_defaults_file[FN_REFLEN + 10]={0,};
 char wsrep_defaults_group_suffix[FN_EXTLEN]={0,};
 #endif /* WITH_WREP */
+
 /* Set to TRUE, if --no-defaults is found. */
 static my_bool found_no_defaults= FALSE;
 

@@ -43,6 +43,7 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_xid.h"
+#include "wsrep_binlog.h"
 extern handlerton* wsrep_hton;
 #endif /* WITH_WSREP */
 
@@ -79,7 +80,7 @@ static int limit_unsafe_warning_count= 0;
 static handlerton *binlog_hton;
 #else
 handlerton *binlog_hton; // we need it in wsrep_binlog.cc
-#endif
+#endif /* WITH_WSREP */
 bool opt_binlog_order_commits= true;
 
 const char *log_bin_index= 0;
@@ -805,7 +806,7 @@ static binlog_cache_mngr *thd_get_cache_mngr(const THD *thd)
   */
 #ifndef WITH_WSREP
   DBUG_ASSERT(opt_bin_log);
-#endif
+#endif /* WITH_WSREP */
   return (binlog_cache_mngr *)thd_get_ha_data(thd, binlog_hton);
 }
 
@@ -1081,18 +1082,19 @@ public:
 static int binlog_init(void *p)
 {
   binlog_hton= (handlerton *)p;
+
 #ifdef WITH_WSREP
-  /* During bootstrap we need to get binlog to on state as wsrep_on
-  is not yet set. Bootstrap will create seed database. */
+  /* During bootstrap (seed-db creation) wsrep options may not be configured
+  which will then disable binlog_hton but other WSREP compiled checks needs
+  binlog_hton so enable it while operating in bootstrap mode. */
   if (WSREP_ON || opt_bootstrap)
     binlog_hton->state= SHOW_OPTION_YES;
   else
-  {
-#endif /* WITH_WSREP */
+    binlog_hton->state=opt_bin_log ? SHOW_OPTION_YES : SHOW_OPTION_NO;
+#else
   binlog_hton->state=opt_bin_log ? SHOW_OPTION_YES : SHOW_OPTION_NO;
-#ifdef WITH_WSREP
-  }
 #endif /* WITH_WSREP */
+
   binlog_hton->db_type=DB_TYPE_BINLOG;
   binlog_hton->savepoint_offset= sizeof(my_off_t);
   binlog_hton->close_connection= binlog_close_connection;
@@ -1112,10 +1114,6 @@ static int binlog_init(void *p)
   return 0;
 }
 
-#ifdef WITH_WSREP
-#include "wsrep_binlog.h"
-#endif /* WITH_WSREP */
-
 static int binlog_deinit(void *p)
 {
   /* Using binlog as TC after the binlog has been unloaded, won't work */
@@ -1130,6 +1128,7 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
 {
   DBUG_ENTER("binlog_close_connection");
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
+
 #ifdef WITH_WSREP
   if (!cache_mngr->is_binlog_empty()) {
     IO_CACHE* cache= wsrep_get_trans_log(thd);
@@ -1147,6 +1146,7 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
+
   DBUG_ASSERT(cache_mngr->is_binlog_empty());
   DBUG_PRINT("debug", ("Set ha_data slot %d to 0x%llx", binlog_hton->slot, (ulonglong) NULL));
   thd_set_ha_data(thd, binlog_hton, NULL);
@@ -9411,7 +9411,7 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
 #ifdef WITH_WSREP
          && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
              last_xid_seqno != cur_xid_seqno)
-#endif
+#endif /* WITH_WSREP */
       )
   {
     if (ev->get_type_code() == binary_log::QUERY_EVENT &&
@@ -9610,7 +9610,7 @@ bool THD::is_binlog_cache_empty(bool is_transactional)
   // because binlog_hton has not been completely set up.
 #ifndef WITH_WSREP
   DBUG_ASSERT(opt_bin_log);
-#endif
+#endif /* WITH_WSREP */
   binlog_cache_mngr *cache_mngr= thd_get_cache_mngr(this);
 
   // cache_mngr is NULL until we call thd->binlog_setup_trx_data, so
@@ -11845,6 +11845,7 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
 #endif /* !defined(MYSQL_CLIENT) */
 
 #ifdef WITH_WSREP
+
 IO_CACHE * wsrep_get_trans_log(THD * thd)
 {
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);

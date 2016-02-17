@@ -66,7 +66,14 @@ void compute_md5_hash(char *digest, const char *buf, int len)
   my_md5_hash((unsigned char*)digest, (unsigned const char*)buf, len);
 #endif /* HAVE_YASSL */
 }
+
 #ifdef WITH_WSREP
+
+/* For certification we need to identify each row uniquely.
+Generally this is done using PK but if table is created w/o PK
+then a md5-hash (16 bytes) string is generated using the complete record.
+Following functions act as helper function in generation of this md5-hash. */
+
 void *wsrep_md5_init()
 {
 #if defined(HAVE_YASSL)
@@ -78,6 +85,7 @@ void *wsrep_md5_init()
   return (void *)ctx;
 #endif /* HAVE_YASSL */
 }
+
 void wsrep_md5_update(void *ctx, char* buf, int len)
 {
 #if defined(HAVE_YASSL)
@@ -86,6 +94,7 @@ void wsrep_md5_update(void *ctx, char* buf, int len)
   MD5_Update((MD5_CTX*)(ctx), buf, len);
 #endif /* HAVE_YASSL */
 }
+
 void wsrep_compute_md5_hash(char *digest, void *ctx)
 {
 #if defined(HAVE_YASSL)
@@ -96,4 +105,5 @@ void wsrep_compute_md5_hash(char *digest, void *ctx)
   delete (MD5_CTX*)ctx;
 #endif /* HAVE_YASSL */
 }
-#endif
+
+#endif /* WITH_WSREP */
