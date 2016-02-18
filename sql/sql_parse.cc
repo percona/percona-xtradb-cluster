@@ -323,6 +323,7 @@ void init_update_queries(void)
   server_command_flags[COM_SHUTDOWN]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_SLEEP]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_TIME]= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_INIT_DB]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]= CF_SKIP_WSREP_CHECK;
 
   /*
@@ -1138,7 +1139,8 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow queries "SET" and "SHOW", they are trapped later in execute_command
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
+    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
+        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
         (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
     ) {
       my_message(ER_UNKNOWN_COM_ERROR,
@@ -2832,14 +2834,16 @@ mysql_execute_command(THD *thd)
 
     /*
      * bail out if DB snapshot has not been installed. We however,
-     * allow SET and SHOW queries
+     * allow SET and SHOW queries and reads from information schema
+     * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        !(wsrep_ready ||
-          (thd->variables.wsrep_dirty_reads &&
-           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0) ||
-          wsrep_tables_accessible_when_detached(all_tables)) &&
-        lex->sql_command != SQLCOM_SET_OPTION &&
+    if (thd->variables.wsrep_on                                            &&
+        !thd->wsrep_applier                                                &&
+        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+        !(thd->variables.wsrep_dirty_reads &&
+          (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
+        !wsrep_tables_accessible_when_detached(all_tables)                 &&
+        lex->sql_command != SQLCOM_SET_OPTION                              &&
         !wsrep_is_show_query(lex->sql_command))
     {
       my_message(ER_UNKNOWN_COM_ERROR,
