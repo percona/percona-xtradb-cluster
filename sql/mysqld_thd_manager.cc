@@ -263,7 +263,7 @@ void Global_THD_manager::wait_till_wsrep_thd_eq(Do_THD_Impl* func,
   }
   mysql_mutex_unlock(&LOCK_thd_list);
 }
-#endif
+#endif /* WITH_WSREP */
 
 
 void Global_THD_manager::do_for_all_thd_copy(Do_THD_Impl *func)

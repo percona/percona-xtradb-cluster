@@ -377,7 +377,7 @@ void Table_cache_manager::free_table(THD *thd,
                table->in_use->wsrep_conflict_state != MUST_ABORT)
 #else
           if (table->in_use != thd)
-#endif
+#endif /* WITH_WSREP */
             DBUG_ASSERT(0);
         }
       }

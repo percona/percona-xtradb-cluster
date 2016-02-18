@@ -4684,7 +4684,7 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
       rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
                   "Node has dropped from cluster");
     }
-#endif
+#endif /* WITH_WSREP */
 
     if (!exec_res && (ev->worker != rli))
     {
@@ -7290,7 +7290,7 @@ extern "C" void *handle_slave_sql(void *arg)
     memset(&thd->wsrep_po_sid, 0, sizeof(thd->wsrep_po_sid));
     wsrep_ready_wait();
   }
-#endif
+#endif /* WITH_WSREP */
   DBUG_PRINT("master_info",("log_file_name: %s  position: %s",
                             rli->get_group_master_log_name(),
                             llstr(rli->get_group_master_log_pos(),llbuff)));

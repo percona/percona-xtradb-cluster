@@ -2804,6 +2804,7 @@ String *sp_get_item_value(THD *thd, Item *item, String *str)
     return NULL;
   }
 }
+
 #ifdef WITH_WSREP
 int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len)
 {

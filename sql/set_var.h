@@ -280,7 +280,7 @@ public:
   int light_check(THD *thd);
 #ifdef WITH_WSREP
   int wsrep_store_variable(THD *thd);
-#endif
+#endif /* WITH_WSREP */
   void print(THD *thd, String *str);	/* To self-print */
 #ifdef OPTIMIZER_TRACE
   virtual bool is_var_optimizer_trace() const
@@ -390,7 +390,7 @@ const CHARSET_INFO *get_old_charset_by_name(const char *old_name);
 
 #ifdef WITH_WSREP
 int sql_set_wsrep_variables(THD *thd, List<set_var_base> *var_list);
-#endif
+#endif /* WITH_WSREP */
 int sys_var_init();
 int sys_var_add_options(std::vector<my_option> *long_options, int parse_flags);
 void sys_var_end(void);

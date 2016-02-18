@@ -1095,6 +1095,7 @@ struct srv_slot_t{
 # define srv_start_raw_disk_in_use		0
 # define srv_file_per_table			1
 #endif /* !UNIV_HOTBACKUP */
+
 #ifdef WITH_WSREP
 void
 wsrep_srv_conc_cancel_wait(

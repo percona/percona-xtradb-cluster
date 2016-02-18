@@ -644,6 +644,7 @@ be REC_VERSION_56_MAX_INDEX_COL_LEN (3072) bytes */
 
 /** Defines the maximum fixed length column size */
 #define DICT_MAX_FIXED_COL_LEN		DICT_ANTELOPE_MAX_INDEX_COL_LEN
+
 #ifdef WITH_WSREP
 #define WSREP_MAX_SUPPORTED_KEY_LENGTH 3500
 #endif /* WITH_WSREP */
@@ -1099,7 +1100,8 @@ struct dict_foreign_with_foreign_index {
 
 	const dict_index_t*	m_index;
 };
-#endif
+#endif /* WITH_WSREP */
+
 /* A function object to check if the foreign constraint is between different
 tables.  Returns true if foreign key constraint is between different tables,
 false otherwise. */

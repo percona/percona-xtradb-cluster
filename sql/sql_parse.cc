@@ -4298,7 +4298,7 @@ end_with_restore_list:
       */
     if (WSREP(thd) && table_lock)
         thd->global_read_lock.wsrep_resume_once();
-#endif
+#endif /* WITH_WSREP */
 
     if (res)
       goto error;
@@ -4783,7 +4783,7 @@ end_with_restore_list:
     {
 #ifdef WITH_WSREP
       bool already_paused;
-#endif
+#endif /* WITH_WSREP */
       /*
          Do not allow FLUSH TABLES <table_list> WITH READ LOCK under an active
          LOCK TABLES FOR BACKUP lock.
@@ -4808,7 +4808,7 @@ end_with_restore_list:
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
-#endif
+#endif /* WITH_WSREP */
       if (flush_tables_with_read_lock(thd, all_tables))
 #ifdef WITH_WSREP
       {
@@ -4818,7 +4818,7 @@ end_with_restore_list:
       }
 #else
         goto error;
-#endif
+#endif /* WITH_WSREP */
       my_ok(thd);
       break;
     }
@@ -4826,7 +4826,7 @@ end_with_restore_list:
     {
 #ifdef WITH_WSREP
       bool already_paused;
-#endif
+#endif /* WITH_WSREP */
       /*
          Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
          FOR BACKUP lock.
@@ -4851,7 +4851,7 @@ end_with_restore_list:
       if (WSREP(thd) &&
           !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
-#endif
+#endif /* WITH_WSREP */
       if (flush_tables_for_export(thd, all_tables))
 #ifdef WITH_WSREP
       {
@@ -4861,7 +4861,7 @@ end_with_restore_list:
       }
 #else
         goto error;
-#endif
+#endif /* WITH_WSREP */
       my_ok(thd);
       break;
     }
@@ -4901,7 +4901,7 @@ end_with_restore_list:
     {
       WSREP_TO_ISOLATION_BEGIN_WRTCHK(WSREP_MYSQL_DB, NULL, NULL)
     }
-#endif /* WITH_WSREP*/
+#endif /* WITH_WSREP */
 
     /*
       reload_acl_and_cache() will tell us if we are allowed to write to the

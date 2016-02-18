@@ -54,7 +54,8 @@
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
-#endif
+#endif /* WITH_WSREP */
+
 #include "pfs_file_provider.h"
 #include "mysql/psi/mysql_file.h"
 
@@ -1434,7 +1435,7 @@ THD::THD(bool enable_plugins)
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
    wsrep_certify_empty_trx(false),
-#endif
+#endif /* WITH_WSREP */
    m_parser_state(NULL),
    work_part_info(NULL),
 #ifndef EMBEDDED_LIBRARY
@@ -1565,7 +1566,7 @@ THD::THD(bool enable_plugins)
   wsrep_status_vars       = 0;
   wsrep_mysql_replicated  = 0;
   wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
-#endif
+#endif /* WITH_WSREP */
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
 
@@ -1958,7 +1959,7 @@ void THD::init(void)
   wsrep_TOI_pre_queries.clear();
   wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
   wsrep_certify_empty_trx= false;
-#endif
+#endif /* WITH_WSREP */
   binlog_row_event_extra_data= 0;
 
   if (variables.sql_log_bin)
@@ -2030,7 +2031,7 @@ void THD::update_stats(bool ran_command)
     // The replication thread has the COM_CONNECT command.
 #ifndef WITH_WSREP
     DBUG_ASSERT(get_command() != COM_SLEEP);
-#endif
+#endif /* !WITH_WSREP */
     if ((get_command() == COM_QUERY || get_command() == COM_CONNECT) &&
         (lex->sql_command >= 0 && lex->sql_command < SQLCOM_END)) {
       // A SQL query.
@@ -2701,7 +2702,7 @@ void THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
       }
 #else
         mysql_lock_abort_for_thread(this, thd_table);
-#endif
+#endif /* WITH_WSREP */
     }
     mysql_mutex_unlock(&in_use->LOCK_thd_data);
   }

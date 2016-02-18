@@ -273,6 +273,7 @@ int wsrep_on(void* thd_ptr);
 int wsrep_is_wsrep_xid(const void*);
 
 #endif /* WITH_WSREP && !UNIV_INNOCHECKSUM */
+
 /**********************************************************************//**
 Determines the connection character set.
 @return connection character set */

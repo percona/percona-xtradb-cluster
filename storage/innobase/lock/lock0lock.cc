@@ -51,7 +51,8 @@ Created 5/7/1996 Heikki Tuuri
 #ifdef WITH_WSREP
 extern my_bool wsrep_debug;
 extern my_bool wsrep_log_conflicts;
-#endif
+#endif /* WITH_WSREP */
+
 /** Total number of cached record locks */
 static const ulint	REC_LOCK_CACHE = 8;
 
@@ -1198,6 +1199,7 @@ lock_rec_has_expl(
 void
 lock_rec_discard(lock_t*	in_lock);
 #endif /* WITH_WSREP */
+
 #ifdef UNIV_DEBUG
 /*********************************************************************//**
 Checks if some other transaction has a lock request in the queue.
@@ -1292,7 +1294,7 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 		}
 	}
 }
-#endif
+#endif /* WITH_WSREP */
 
 /*********************************************************************//**
 Checks if some other transaction has a conflicting explicit lock request
@@ -1484,7 +1486,7 @@ lock_number_of_tables_locked(
 static
 void
 wsrep_print_wait_locks(
-/*============*/
+/*===================*/
 	lock_t*		c_lock) /* conflicting lock to print */
 {
 	if (wsrep_debug &&  c_lock->trx->lock.wait_lock != c_lock) {
@@ -1723,7 +1725,7 @@ RecLock::lock_add(
 	}
 #else
 		HASH_INSERT(lock_t, hash, lock_hash_get(m_mode), key, lock);
-#endif
+#endif /* WITH_WSREP */
 	}
 
 	if (m_mode & LOCK_WAIT) {
@@ -2163,7 +2165,7 @@ RecLock::enqueue_priority(const lock_t* wait_for, const lock_prdt_t* prdt)
 		trx_mutex_exit(wait_for->trx);
 
 #ifdef WITH_WSREP
-// TODO: Need to check if we need to pass conflicting lock = wait_for
+		// TODO: Need to check if we need to pass conflicting lock = wait_for
 		lock_add(lock, false, const_cast<lock_t*>(wait_for), m_thr);
 #else
 		lock_add(lock, false);
@@ -2227,6 +2229,10 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 	}
 
 	if (victim_trx == m_trx || victim_trx == NULL) {
+
+		/* Entering here means
+		priority(wait_for) >= priority(requestor).
+		OR priority couldn't be established. */
 
 		/* Ensure that the wait flag is not set. */
 #ifdef WITH_WSREP
@@ -2379,7 +2385,7 @@ lock_rec_add_to_queue(
 					lock_rec_print(stderr, lock);
 				}
 		  } else
-#endif
+#endif /* WITH_WSREP */
 
 			break;
 		}
@@ -2410,7 +2416,7 @@ lock_rec_add_to_queue(
 	RecLock		rec_lock(index, block, heap_no, type_mode);
 
 	rec_lock.create(trx, caller_owns_trx_mutex);
-#endif
+#endif /* WITH_WSREP */
 }
 
 /*********************************************************************//**
@@ -2473,7 +2479,7 @@ lock_rec_lock_fast(
 
 			/* Note that we don't own the trx mutex. */
 			rec_lock.create(trx, false);
-#endif
+#endif /* WITH_WSREP */
 		}
 
 		status = LOCK_REC_SUCCESS_CREATED;
@@ -2710,7 +2716,7 @@ lock_rec_has_to_wait_in_queue(
 				/* don't wait for another BF lock */
 				continue;
 			}
-#endif
+#endif /* WITH_WSREP */
 
 			return(lock);
 		}
@@ -4023,7 +4029,7 @@ lock_table_create(
 /*==============*/
 #ifdef WITH_WSREP
 	lock_t*		c_lock, /* conflicting lock */
-#endif
+#endif /* WITH_WSREP */
 	dict_table_t*	table,	/*!< in/out: database table
 				in dictionary cache */
 	ulint		type_mode,/*!< in: lock mode possibly ORed with
@@ -4268,7 +4274,7 @@ lock_table_enqueue_waiting(
 /*=======================*/
 #ifdef WITH_WSREP
 	lock_t*		c_lock, /* conflicting lock */
-#endif
+#endif /* WITH_WSREP */
 	ulint		mode,	/*!< in: lock mode this transaction is
 				requesting */
 	dict_table_t*	table,	/*!< in/out: table */
@@ -4401,7 +4407,7 @@ lock_table_other_has_incompatible(
 			trx_mutex_enter(lock->trx);
 			wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
 			trx_mutex_exit(lock->trx);
-#endif
+#endif /* WITH_WSREP */
 			return(lock);
 		}
 	}
@@ -6246,7 +6252,7 @@ lock_rec_insert_check_and_lock(
 #ifdef WITH_WSREP
 	if (wsrep_log_conflicts)
 		mutex_enter(&trx_sys->mutex);
-#endif
+#endif /* WITH_WSREP */
 
 	const lock_t*	wait_for = lock_rec_other_has_conflicting(
 				type_mode, block, heap_no, trx);
@@ -6254,7 +6260,7 @@ lock_rec_insert_check_and_lock(
 #ifdef WITH_WSREP
 	if (wsrep_log_conflicts)
 		mutex_exit(&trx_sys->mutex);
-#endif
+#endif /* WITH_WSREP */
 
 	if (wait_for != NULL) {
 
@@ -7683,7 +7689,11 @@ DeadlockChecker::select_victim() const
 
 		const trx_t*	victim;
 
+#ifdef WITH_WSREP
+		victim = trx_arbitrate(m_start, m_wait_lock->trx, TRUE);
+#else
 		victim = trx_arbitrate(m_start, m_wait_lock->trx);
+#endif /* WITH_WSREP */
 
 		if (victim != NULL) {
 
@@ -7697,6 +7707,8 @@ DeadlockChecker::select_victim() const
 		choose it as the victim and roll it back. */
 
 #ifdef WITH_WSREP
+		/* Transaction applying write-set (applier) or total-order
+		executor thread shouldn't be opted as vicitim. */
 		if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
 			return(m_wait_lock->trx);
 		else
@@ -7705,7 +7717,9 @@ DeadlockChecker::select_victim() const
 	}
 
 #ifdef WITH_WSREP
-	if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
+	/* Transaction applying write-set (applier) or total-order
+	executor thread shouldn't be opted as vicitim. */
+	if (wsrep_thd_is_BF(m_wait_lock->trx->mysql_thd, TRUE))
 		return(m_start);
 	else
 #endif /* WITH_WSREP */
@@ -7785,23 +7799,18 @@ DeadlockChecker::search()
 
 			/* Select the transaction to rollback */
 
+#ifdef WITH_WSREP
+			victim_trx = trx_arbitrate(
+				m_start, m_wait_lock->trx, TRUE);
+			// TODO: Ensure that these checks within trx_arbitrate
+			// are working as expected.
+#else
 			victim_trx = trx_arbitrate(m_start, m_wait_lock->trx);
+#endif /* WITH_WSREP */
 
 			if (victim_trx == NULL || victim_trx == m_start) {
-
-#ifdef WITH_WSREP
-			if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
-				return(m_wait_lock->trx);
-			else
-#endif /* WITH_WSREP */
 				return(m_start);
 			}
-
-#ifdef WITH_WSREP
-			if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE))
-				return(m_start);
-			else
-#endif /* WITH_WSREP */
 			return(m_wait_lock->trx);
 
 		} else if (lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
@@ -7916,8 +7925,19 @@ DeadlockChecker::check_and_resolve(const lock_t* lock, const trx_t* trx)
 #ifdef WITH_WSREP
 			if (!wsrep_thd_is_BF(checker.m_start->mysql_thd, TRUE))
 			{
-#endif /* WITH_WSREP */
+				victim_trx = trx_arbitrate(
+					trx, checker.m_wait_lock->trx, TRUE);
 
+				if (victim_trx == NULL) {
+					victim_trx = trx;
+				}
+
+				rollback_print(victim_trx, lock);
+			} else {
+				/* BF processor */
+			}
+
+#else
 			victim_trx = trx_arbitrate(
 				trx, checker.m_wait_lock->trx);
 
@@ -7926,11 +7946,6 @@ DeadlockChecker::check_and_resolve(const lock_t* lock, const trx_t* trx)
 			}
 
 			rollback_print(victim_trx, lock);
-
-#ifdef WITH_WSREP
-			} else {
-				/* BF processor */;
-			}
 #endif /* WITH_WSREP */
 
 		} else if (victim_trx != 0 && victim_trx != trx) {

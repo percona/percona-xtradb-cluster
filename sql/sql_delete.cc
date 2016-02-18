@@ -554,7 +554,7 @@ cleanup:
     if ((WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open()))
 #else
     if (mysql_bin_log.is_open())
-#endif
+#endif /* WITH_WSREP */
     {
       int errcode= 0;
       if (error < 0)
@@ -1136,7 +1136,7 @@ void Query_result_delete::abort_result_set()
     if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
     if (mysql_bin_log.is_open())
-#endif
+#endif /* WITH_WSREP */
     {
       int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
       /* possible error of writing binary log is ignored deliberately */
@@ -1325,7 +1325,7 @@ bool Query_result_delete::send_eof()
     if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
     if (mysql_bin_log.is_open())
-#endif
+#endif /* WITH_WSREP */
     {
       int errcode= 0;
       if (local_error == 0)

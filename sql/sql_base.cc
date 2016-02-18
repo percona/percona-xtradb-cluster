@@ -5861,6 +5861,7 @@ restart:
         goto err;
       }
     }
+
 #ifdef WITH_WSREP
   /* It is not recommended to replicate MyISAM as it lacks rollback feature
   but if user demands then actions are replicated using TOI.
@@ -5883,7 +5884,7 @@ restart:
       WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
     }
  error:
-#endif
+#endif /* WITH_WSREP */
 
     /* Set appropriate TABLE::lock_type. */
     if (tbl && tables->lock_type != TL_UNLOCK && 

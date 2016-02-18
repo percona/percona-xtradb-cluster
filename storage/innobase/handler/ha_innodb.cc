@@ -1779,15 +1779,16 @@ thd_is_ins_sel_stmt(THD* user_thd)
 	innodb_session_t*	innodb_priv = thd_to_innodb_session(user_thd);
 	return(innodb_priv->count_register_table_handler() > 0 ? true : false);
 }
+
 #ifdef WITH_WSREP
 ulonglong
 thd_to_trx_id(
-/*=======*/
+/*==========*/
 	THD*	thd)	/*!< in: MySQL thread */
 {
 	return(thd_to_trx(thd)->id);
 }
-#endif
+#endif /* WITH_WSREP */
 
 /** Add the table handler to thread cache.
 Obtain the InnoDB transaction of a MySQL thread.
@@ -1847,7 +1848,8 @@ static void
 wsrep_fake_trx_id(handlerton* hton, THD *thd);
 static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid);
 static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid);
-#endif
+#endif /* WITH_WSREP */
+
 /********************************************************************//**
 Increments innobase_active_counter and every INNOBASE_WAKE_INTERVALth
 time calls srv_active_wake_master_thread. This function should be used
@@ -3562,10 +3564,10 @@ innobase_init(
 	innobase_hton->purge_changed_page_bitmaps
 		= innobase_purge_changed_page_bitmaps;
 #ifdef WITH_WSREP
-        innobase_hton->wsrep_abort_transaction=wsrep_abort_transaction;
-        innobase_hton->wsrep_set_checkpoint=innobase_wsrep_set_checkpoint;
-        innobase_hton->wsrep_get_checkpoint=innobase_wsrep_get_checkpoint;
-        innobase_hton->wsrep_fake_trx_id=wsrep_fake_trx_id;
+        innobase_hton->wsrep_abort_transaction = wsrep_abort_transaction;
+        innobase_hton->wsrep_set_checkpoint = innobase_wsrep_set_checkpoint;
+        innobase_hton->wsrep_get_checkpoint = innobase_wsrep_get_checkpoint;
+        innobase_hton->wsrep_fake_trx_id = wsrep_fake_trx_id;
 #endif /* WITH_WSREP */
 
 	innobase_hton->is_supported_system_table=
@@ -4265,9 +4267,6 @@ innobase_store_binlog_info(
 	const char*			file_name;
 	unsigned long long 	pos;
 	mtr_t			mtr;
-#ifdef WITH_WSREP
-        trx_sysf_t* sys_header;
-#endif /* WITH_WSREP */
 
 	DBUG_ENTER("innobase_store_binlog_info");
 
@@ -4275,16 +4274,13 @@ innobase_store_binlog_info(
 
 	mtr_start(&mtr);
 
-#ifdef WITH_WSREP
-        sys_header = trx_sysf_get(&mtr);
-#endif /* WITH_WSREP */
-
 	trx_sys_update_mysql_binlog_offset(file_name, pos,
 #ifdef WITH_WSREP
-					   TRX_SYS_MYSQL_LOG_INFO, sys_header, &mtr);
+					   TRX_SYS_MYSQL_LOG_INFO,
+					   trx_sysf_get(&mtr), &mtr);
 #else
 					   TRX_SYS_MYSQL_LOG_INFO, &mtr);
-#endif
+#endif /* WITH_WSREP */
 
 	mtr_commit(&mtr);
 
@@ -5170,7 +5166,7 @@ ha_innobase::max_supported_key_length() const
 		return(3500);
 #else
 		return(3500);
-#endif
+#endif /* WITH_WSREP */
 	}
 }
 
@@ -6663,7 +6659,7 @@ wsrep_innobase_mysql_sort(
 
 	return ret_length;
 }
-#endif // WITH_WSREP
+#endif /* WITH_WSREP */
 
 /******************************************************************//**
 compare two character string according to their charset. */
@@ -8150,7 +8146,7 @@ no_commit:
 
 #ifdef WITH_WSREP
 		auto_inc_inserted= (table->next_number_field->val_int() == 0);
-#endif
+#endif /* WITH_WSREP */
 		if ((error_result = update_auto_increment())) {
 			/* We don't want to mask autoinc overflow errors. */
 
@@ -8270,7 +8266,7 @@ no_commit:
                                         goto func_exit;
 				}
                                 break;
-#endif
+#endif /* WITH_WSREP */
 			default:
 				break;
 			}
@@ -8369,7 +8365,7 @@ report_error:
 		}
 	}
 wsrep_error:
-#endif
+#endif /* WITH_WSREP */
 
 	if (error_result == HA_FTS_INVALID_DOCID) {
 		my_error(HA_FTS_INVALID_DOCID, MYF(0));
@@ -8392,7 +8388,8 @@ func_exit:
 #include "md5.hpp"
 #elif defined(HAVE_OPENSSL)
 #include <openssl/md5.h>
-#endif
+#endif /* WITH_WSREP */
+
 static
 int
 wsrep_calc_row_hash(
@@ -10546,6 +10543,7 @@ ha_innobase::ft_end()
 
 	rnd_end();
 }
+
 #ifdef WITH_WSREP
 dict_index_t*
 wsrep_dict_foreign_find_index(
@@ -10682,7 +10680,6 @@ wsrep_append_foreign_key(
 			foreign->foreign_table->name.m_name) :
 		foreign->foreign_table->name.m_name, sizeof(cache_key) - 1);
 	cache_key_len = strlen(cache_key);
-// #define WSREP_DEBUG_PRINT
 #ifdef WSREP_DEBUG_PRINT
 	ulint j;
 	fprintf(stderr, "FK parent key, table: %s %s len: %lu ",
@@ -10691,7 +10688,7 @@ wsrep_append_foreign_key(
 		fprintf(stderr, " %hhX, ", key[j]);
 	}
 	fprintf(stderr, "\n");
-#endif
+#endif /* WSREP_DEBUG_PRINT */
 	char *p = strchr(cache_key, '/');
 	if (p) {
 		*p = '\0';
@@ -10734,7 +10731,7 @@ wsrep_append_foreign_key(
 
 static int
 wsrep_append_key(
-/*==================*/
+/*=============*/
 	THD		*thd,
 	trx_t 		*trx,
 	TABLE_SHARE 	*table_share,
@@ -10757,7 +10754,7 @@ wsrep_append_key(
             }
             fprintf(stderr, "\n");
         }
-#endif
+#endif /* WSREP_DEBUG_PRINT */
 	wsrep_buf_t wkey_part[3];
 	wsrep_key_t wkey = {wkey_part, 3};
 	if (!wsrep_prepare_key_for_innodb(
@@ -10968,7 +10965,8 @@ ha_innobase::wsrep_append_keys(
 
 	DBUG_RETURN(0);
 }
-#endif
+#endif /* WITH_WSREP */
+
 /*********************************************************************//**
 Stores a reference to the current row to 'ref' field of the handle. Note
 that in the case where we have generated the clustered index for the
@@ -21711,7 +21709,7 @@ static MYSQL_SYSVAR_LONG(autoinc_lock_mode, innobase_autoinc_lock_mode,
   AUTOINC_NO_LOCKING,           /* Default setting: changed for galera Bug#1243228 */
 #else 
   AUTOINC_NEW_STYLE_LOCKING,   /*  Default setting */
-#endif
+#endif /* WITH_WSREP */
   AUTOINC_OLD_STYLE_LOCKING,	/* Minimum value */
   AUTOINC_NO_LOCKING, 0);	/* Maximum value */
 

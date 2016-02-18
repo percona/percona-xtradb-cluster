@@ -46,7 +46,7 @@ public:
 #ifdef WITH_WSREP
   virtual void reset() {}
   virtual bool done(int) { return(true); }
-#endif
+#endif /* WITH_WSREP */
 };
 
 

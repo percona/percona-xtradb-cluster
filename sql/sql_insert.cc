@@ -838,7 +838,7 @@ bool Sql_cmd_insert::mysql_insert(THD *thd,TABLE_LIST *table_list)
       if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
       if (mysql_bin_log.is_open())
-#endif
+#endif /* WITH_WSREP */
       {
         int errcode= 0;
 	if (error <= 0)
@@ -2371,7 +2371,7 @@ bool Query_result_insert::send_eof()
   if (mysql_bin_log.is_open() &&
       (!error || thd->get_transaction()->cannot_safely_rollback(
         Transaction_ctx::STMT)))
-#endif
+#endif /* WITH_WSREP */
   {
     int errcode= 0;
     if (!error)
@@ -2478,7 +2478,7 @@ void Query_result_insert::abort_result_set()
         if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
 #else
         if (mysql_bin_log.is_open())
-#endif
+#endif /* WITH_WSREP */
         {
           int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
           /* error of writing binary log is ignored */
@@ -2961,7 +2961,7 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
   }
 #ifdef WITH_WSREP
   ha_wsrep_fake_trx_id(thd);
-#endif
+#endif /* WITH_WSREP */
   DBUG_RETURN(result);
 }
 

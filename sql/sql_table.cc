@@ -5739,7 +5739,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
       THD::wsrep_queries().swap(thd->wsrep_TOI_pre_queries);
     }
   }
-#endif
+#endif /* WITH_WSREP */
 
   /*
     We the open source table to get its description in HA_CREATE_INFO
@@ -9156,7 +9156,7 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
                     DBUG_ASSERT(!debug_sync_set_action(thd,
                                                        STRING_WITH_LEN(act)));
                   };);
-#endif // WITH_WSREP
+#endif /* WITH_WSREP */
 
   if (error)
     DBUG_RETURN(true);

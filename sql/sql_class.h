@@ -101,7 +101,8 @@ struct wsrep_thd_shadow {
   ulong                tx_isolation;
   LEX_CSTRING          db;
 };
-#endif
+#endif /* WITH_WSREP */
+
 enum enum_delay_key_write { DELAY_KEY_WRITE_NONE, DELAY_KEY_WRITE_ON,
 			    DELAY_KEY_WRITE_ALL };
 enum enum_rbr_exec_mode { RBR_EXEC_MODE_STRICT,
@@ -615,7 +616,7 @@ typedef struct system_variables
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
   ulong wsrep_OSU_method;
-#endif
+#endif /* WITH_WSREP */
   ulong log_slow_rate_limit;
   ulonglong log_slow_filter;
   ulonglong log_slow_verbosity;
@@ -1446,7 +1447,7 @@ public:
     : m_state(GRL_NONE),
 #ifdef WITH_WSREP
       provider_paused(FALSE),
-#endif
+#endif /* WITH_WSREP */
       m_mdl_global_shared_lock(NULL),
       m_mdl_blocks_commits_lock(NULL)
   {}
@@ -1484,7 +1485,7 @@ public:
   wsrep_status_t wsrep_resume_once(void);
   bool provider_resumed() const { return !provider_paused; }
   void pause_provider(bool val) { provider_paused= val; }
-#endif
+#endif /* WITH_WSREP */
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
 private:
@@ -1496,7 +1497,7 @@ private:
   */
 #ifdef WITH_WSREP
   bool provider_paused;
-#endif
+#endif /* WITH_WSREP */
   /**
     In order to acquire the global read lock, the connection must
     acquire shared metadata lock in GLOBAL namespace, to prohibit
@@ -3184,7 +3185,7 @@ public:
   THD(bool enable_plugins= true, bool is_applier = false);
 #else
   THD(bool enable_plugins= true);
-#endif
+#endif /* WITH_WSREP */
 
   /*
     The THD dtor is effectively split in two:

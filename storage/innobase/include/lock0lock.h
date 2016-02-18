@@ -1098,6 +1098,7 @@ lock_cancel_waiting_and_release(
 /*============================*/
 	lock_t*	lock);	/*!< in/out: waiting lock request */
 #endif /* WITH_WSREP */
+
 #ifndef UNIV_NONINL
 #include "lock0lock.ic"
 #endif

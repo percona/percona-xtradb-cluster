@@ -3026,7 +3026,7 @@ void plugin_thdvar_init(THD *thd, bool enable_plugins)
   if ((!WSREP(thd) || !thd->wsrep_applier) && enable_plugins)
 #else
   if (enable_plugins)
-#endif
+#endif /* WITH_WSREP */
   {
     mysql_mutex_lock(&LOCK_plugin);
     thd->variables.table_plugin=

@@ -663,7 +663,7 @@ static bool update_auto_increment_increment (sys_var *self, THD *thd, enum_var_t
   return false;
 }
 
-#endif
+#endif /* WITH_WSREP */
 
 static Sys_var_ulong Sys_auto_increment_increment(
        "auto_increment_increment",
@@ -676,7 +676,7 @@ static Sys_var_ulong Sys_auto_increment_increment(
        ON_UPDATE(update_auto_increment_increment));
 #else
        NO_MUTEX_GUARD, IN_BINLOG);
-#endif
+#endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
 
@@ -695,7 +695,7 @@ static bool update_auto_increment_offset (sys_var *self, THD *thd, enum_var_type
   return false;
 }
 
-#endif
+#endif /* WITH_WSREP */
 
 static Sys_var_ulong Sys_auto_increment_offset(
        "auto_increment_offset",
@@ -709,7 +709,7 @@ static Sys_var_ulong Sys_auto_increment_offset(
        ON_UPDATE(update_auto_increment_offset));
 #else
        NO_MUTEX_GUARD, IN_BINLOG);
-#endif
+#endif /* WITH_WSREP */
 
 static Sys_var_mybool Sys_automatic_sp_privileges(
        "automatic_sp_privileges",
@@ -959,7 +959,7 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     if (var->type == OPT_GLOBAL)
         return true;
   }
-#endif
+#endif /* WITH_WSREP */
 
   if (var->type == OPT_GLOBAL)
     return false;
@@ -6294,7 +6294,7 @@ static Sys_var_mybool Sys_wsrep_dirty_reads(
        "Allow dirty reads when the node is not ready.",
        SESSION_VAR(wsrep_dirty_reads),
        CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
-#endif
+#endif /* WITH_WSREP */
 
 static bool check_track_session_sys_vars(sys_var *self, THD *thd, set_var *var)
 {

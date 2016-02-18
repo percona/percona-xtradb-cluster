@@ -62,7 +62,7 @@ using std::max;
 #endif /* HAVE_OPENSSL && !EMBEDDED_LIBRARY */
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-#endif
+#endif /* WITH_WSREP */
 
 #ifndef EMBEDDED_LIBRARY
 // Increments connection count for user.
@@ -1349,7 +1349,7 @@ void end_connection(THD *thd)
     }
   }
   thd->wsrep_client_thread= 0;
-#endif
+#endif /* WITH_WSREP */
   plugin_thdvar_cleanup(thd, thd->m_enable_plugins);
 
   /*

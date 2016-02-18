@@ -156,6 +156,7 @@ do {							\
 	}						\
 } while (0)
 #endif /*WITH_WSREP */
+
 #ifdef UNIV_HASH_DEBUG
 # define HASH_ASSERT_VALID(DATA) ut_a((void*) (DATA) != (void*) -1)
 # define HASH_INVALIDATE(DATA, NAME) *(void**) (&DATA->NAME) = (void*) -1

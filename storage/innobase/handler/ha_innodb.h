@@ -416,7 +416,7 @@ public:
 #ifdef WITH_WSREP
 	int wsrep_append_keys(THD *thd, bool shared,
 				  const uchar* record0, const uchar* record1);
-#endif
+#endif /* WITH_WSREP */
 
 private:
 	void update_thd();
@@ -607,7 +607,7 @@ extern "C" const char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
-#endif
+#endif /* WITH_WSREP */
 struct trx_t;
 
 extern const struct _ft_vft ft_vft_result;
