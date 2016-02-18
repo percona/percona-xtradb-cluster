@@ -53,7 +53,7 @@ Created 3/26/1996 Heikki Tuuri
 
 #ifdef WITH_WSREP
 #include "ha_prototypes.h" /* wsrep_is_wsrep_xid() */
-#endif /* */
+#endif /* WITH_WSREP */
 
 /** The file format tag structure with id and name. */
 struct file_format_t {
@@ -192,7 +192,7 @@ trx_sys_flush_max_trx_id(void)
 	 * Copied from trx_sys_get_new_trx_id
 	 */
 	ut_ad(trx_sys_mutex_own());
-#endif /* WITH_WSREP */
+#endif /* !WITH_WSREP */
 
 	if (!srv_read_only_mode) {
 		mtr_start(&mtr);

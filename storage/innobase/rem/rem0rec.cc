@@ -2433,7 +2433,7 @@ wsrep_rec_get_foreign_key(
 	}
 	return DB_ERROR;
 }
-#endif // WITH_WSREP
+#endif /* WITH_WSREP */
 
 /** Mark the nth field as externally stored.
 @param[in]	offsets		array returned by rec_get_offsets()

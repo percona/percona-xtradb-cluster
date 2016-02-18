@@ -205,6 +205,7 @@ mysql_pfs_key_t	srv_worker_thread_key;
 #ifdef WITH_WSREP
 extern my_bool wsrep_recovery;
 #endif /* WITH_WSREP */
+
 #ifdef HAVE_PSI_STAGE_INTERFACE
 /** Array of all InnoDB stage events for monitoring activities via
 performance schema. */
@@ -2693,23 +2694,26 @@ files_checked:
 	}
 
 	if (!srv_read_only_mode) {
+
 #ifdef WITH_WSREP
 	        /* Create the dump/load thread only when not running with
 	        --wsrep-recover */
                 if (!wsrep_recovery) {
-#endif
+#endif /* WITH_WSREP */
+
 		if (create_new_db) {
 			srv_buffer_pool_load_at_startup = FALSE;
 		}
 
 		/* Create the buffer pool dump/load thread */
 		os_thread_create(buf_dump_thread, NULL, NULL);
+
 #ifdef WITH_WSREP
                 } else { 
                     ib::warn() << "Skipping buffer pool dump/restore "
 				  "during wsrep recovery.";
                 }
-#endif
+#endif /* WITH_WSREP */
 
 		/* Create the dict stats gathering thread */
 		os_thread_create(dict_stats_thread, NULL, NULL);

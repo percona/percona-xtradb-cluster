@@ -46,7 +46,7 @@ Created 2011/04/18 Sunny Bains
 #ifdef WITH_WSREP
 extern "C" int wsrep_trx_is_aborting(void *thd_ptr);
 extern my_bool wsrep_debug;
-#endif
+#endif /* WITH_WSREP */
 #include "row0mysql.h"
 #include "dict0dict.h"
 

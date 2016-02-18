@@ -922,6 +922,7 @@ row_ins_invalidate_query_cache(
 	ulint	len = strlen(name) + 1;
 	innobase_invalidate_query_cache(thr_get_trx(thr), name, len);
 }
+
 #ifdef WITH_WSREP
 dberr_t wsrep_append_foreign_key(trx_t *trx,  
 				 dict_foreign_t*	foreign,
@@ -1303,7 +1304,7 @@ row_ins_foreign_check_on_constraint(
 		fprintf(stderr, 
 			"WSREP: foreign key append failed: %d\n", err);
 	} else
-#endif
+#endif /* WITH_WSREP */
 	node->new_upd_nodes->push_back(cascade);
 
 	os_atomic_increment_ulint(&table->n_foreign_key_checks_running, 1);

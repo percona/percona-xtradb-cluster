@@ -83,7 +83,7 @@ ulong		innobase_thd_get_thread_id(const void* thd);
 #ifdef WITH_WSREP
 extern int wsrep_debug;
 extern int wsrep_trx_is_aborting(void *thd_ptr);
-#endif
+#endif /* WITH_WSREP */
 /* The following is the maximum allowed duration of a lock wait. */
 ulint	srv_fatal_semaphore_wait_threshold = 600;
 
@@ -1970,7 +1970,7 @@ loop:
 	    && sema == old_sema && os_thread_eq(waiter, old_waiter)) {
 #if defined(WITH_WSREP) && defined(WITH_INNODB_DISALLOW_WRITES)
 	  if (os_event_is_set(srv_allow_writes_event)) {
-#endif /* WITH_WSREP */
+#endif /* WITH_WSREP && WITH_INNODB_DISALLOW_WRITES */
 		fatal_cnt++;
 #if defined(WITH_WSREP) && defined(WITH_INNODB_DISALLOW_WRITES)
 	  } else {
@@ -1981,7 +1981,7 @@ loop:
 			"fatal_cnt now: %lu",
 			(ulong) srv_fatal_semaphore_wait_threshold, fatal_cnt);
 	  }
-#endif /* WITH_WSREP */
+#endif /* WITH_WSREP && WITH_INNODB_DISALLOW_WRITES */
 		if (fatal_cnt > 10) {
 			ib::fatal() << "Semaphore wait has lasted > "
 				<< srv_fatal_semaphore_wait_threshold

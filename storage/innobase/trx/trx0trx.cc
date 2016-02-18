@@ -2177,7 +2177,7 @@ trx_commit_in_memory(
 	if (wsrep_on(trx->mysql_thd)) {
 		trx->lock.was_chosen_as_deadlock_victim = FALSE;
 	}
-#endif
+#endif /* WITH_WSREP */
 	if (UNIV_LIKELY_NULL(trx->distinct_page_access_hash)) {
 
 		ut_free(trx->distinct_page_access_hash);
