@@ -619,8 +619,17 @@ enum_return_status Gtid_state::generate_automatic_gtid(THD *thd,
   {
     Gtid automatic_gtid= { specified_sidno, specified_gno };
 
+#ifdef WITH_WSREP
+    /* If the trx has been executed in wsrep then get wsrep_sidno
+    and not the normal server_sid no. */
+    if (WSREP(thd) && thd->wsrep_trx_meta.gtid.seqno != -1)
+      automatic_gtid.sidno= wsrep_sidno;
+    else
+      automatic_gtid.sidno= get_server_sidno();
+#else
     if (automatic_gtid.sidno == 0)
       automatic_gtid.sidno= get_server_sidno();
+#endif /* WITH_WSREP */
 
     lock_sidno(automatic_gtid.sidno);
 

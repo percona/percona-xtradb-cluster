@@ -704,14 +704,17 @@ wsrep_assign_to_mysql (SHOW_VAR* mysql, wsrep_stats_var* wsrep)
   case WSREP_VAR_INT64:
     mysql->value = (char*) &wsrep->value._int64;
     mysql->type  = SHOW_LONGLONG;
+    mysql->scope = SHOW_SCOPE_GLOBAL;
     break;
   case WSREP_VAR_STRING:
     mysql->value = (char*) &wsrep->value._string;
     mysql->type  = SHOW_CHAR_PTR;
+    mysql->scope = SHOW_SCOPE_GLOBAL;
     break;
   case WSREP_VAR_DOUBLE:
     mysql->value = (char*) &wsrep->value._double;
     mysql->type  = SHOW_DOUBLE;
+    mysql->scope = SHOW_SCOPE_GLOBAL;
     break;
   }
 }
@@ -768,6 +771,7 @@ static void export_wsrep_status_to_mysql(THD* thd)
   mysql_status_vars[wsrep_status_len].name  = NullS;
   mysql_status_vars[wsrep_status_len].value = NullS;
   mysql_status_vars[wsrep_status_len].type  = SHOW_LONG;
+  mysql_status_vars[wsrep_status_len].scope = SHOW_SCOPE_GLOBAL;
 }
 
 int wsrep_show_status (THD *thd, SHOW_VAR *var, char *buff)
