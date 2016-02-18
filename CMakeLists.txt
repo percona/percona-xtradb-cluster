@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2016, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -395,9 +395,16 @@ IF(SYSCONFDIR)
   SET(DEFAULT_SYSCONFDIR "${SYSCONFDIR}")
 ENDIF()
 
-SET(TMPDIR "P_tmpdir"
-  CACHE PATH
-  "PATH to MySQL TMP dir. Defaults to the P_tmpdir macro in <stdio.h>")
+IF(WIN32) # P_tmpdir is not defined on Windows as of VS2015.
+  SET(TMPDIR "" # So we use empty path as default. In practice TMP/TEMP is used
+    CACHE PATH
+    "PATH to MySQL TMP dir")
+ELSE()
+  SET(TMPDIR "P_tmpdir"
+    CACHE PATH
+    "PATH to MySQL TMP dir. Defaults to the P_tmpdir macro in <stdio.h>")
+ENDIF()
+
 IF(TMPDIR STREQUAL "P_tmpdir")
   # Do not quote it, to refer to the P_tmpdir macro.
   SET(DEFAULT_TMPDIR "P_tmpdir")
@@ -569,15 +576,12 @@ IF(NOT INSTALL_LAYOUT MATCHES "RPM")
   )
   INSTALL(FILES README DESTINATION ${INSTALL_DOCREADMEDIR} COMPONENT Readme)
   INSTALL(FILES ${CMAKE_BINARY_DIR}/Docs/INFO_SRC ${CMAKE_BINARY_DIR}/Docs/INFO_BIN DESTINATION ${INSTALL_DOCDIR})
-  IF(UNIX)
-    INSTALL(FILES Docs/INSTALL-BINARY Docs/README-wsrep DESTINATION ${INSTALL_DOCREADMEDIR} COMPONENT Readme)
-  ENDIF()
+  INSTALL(FILES Docs/README-wsrep DESTINATION ${INSTALL_DOCREADMEDIR} COMPONENT Readme)
   # MYSQL_DOCS_LOCATON is used in "make dist", points to the documentation directory
   SET(MYSQL_DOCS_LOCATION "" CACHE PATH "Location from where documentation is copied")
   MARK_AS_ADVANCED(MYSQL_DOCS_LOCATION)
   INSTALL(DIRECTORY Docs/ DESTINATION ${INSTALL_DOCDIR}
     COMPONENT Documentation
-    PATTERN "INSTALL-BINARY" EXCLUDE
     PATTERN "README-wsrep" EXCLUDE
     PATTERN "Makefile.*" EXCLUDE
     PATTERN "glibc*" EXCLUDE
