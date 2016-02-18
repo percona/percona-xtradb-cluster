@@ -70,3 +70,60 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
 SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
 
 DROP TABLE t1;
+
+
+#
+# If 2 conflicting trx are executed then local trx is rolled back.
+# If the local trx is through exectuion of prepared statement it use
+# re-execution/replay of it use to fail.
+#
+--connection node_1
+--echo #node_1
+create table t1 (i int primary key, c char(1)) engine=innodb;
+insert into t1 values (1, 'a'), (2, 'a'), (5, 'a'), (6, 'a');
+select * from t1;
+
+prepare stmt1 from "update t1 set c = 'b' where i > 2 and i < 6";
+--let $galera_sync_point = commit_monitor_enter_sync
+--source include/galera_set_sync_point.inc
+--send execute stmt1;
+
+# Wait until commit is blocked
+--connection node_1a
+--echo #node_1a
+set session wsrep_sync_wait = 0;
+--source include/galera_wait_sync_point.inc
+
+# Issue a conflicting update on node #2
+--connection node_2
+--echo #node_2
+insert into t1 values (3, 'a');
+
+# Wait for both transactions to be blocked
+--connection node_1a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep in pre-commit stage';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'Write_rows_log_event::write_row%';
+--source include/wait_condition.inc
+
+# Unblock the commit
+--connection node_1a
+--echo #node_1a
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
+# Commit succeeds
+--connection node_1
+--echo #node_1
+--reap
+select * from t1;
+
+--connection node_2
+--echo #node_2
+select * from t1;
+
+--connection node_1
+--echo #node_1
+deallocate prepare stmt1;
+drop table t1;
