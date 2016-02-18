@@ -953,6 +953,10 @@ Channel_info* Mysqld_socket_listener::listen_for_connection_event()
     return NULL;
   }
 
+#if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+    (void) fcntl(mysql_socket_getfd(connect_sock), F_SETFD, FD_CLOEXEC);
+#endif /* WITH_WSREP */
+
 #ifdef __APPLE__
   if (mysql_socket_getfd(connect_sock) >= FD_SETSIZE)
   {

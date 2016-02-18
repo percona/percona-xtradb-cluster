@@ -33,10 +33,10 @@
 
 void wsrep_xid_init(XID* xid, const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 {
+  xid->reset();
   xid->set_format_id(1);
   xid->set_gtrid_length(WSREP_XID_GTRID_LEN);
   xid->set_bqual_length(0);
-  xid->reset();
   memcpy(xid->get_mutable_data(), WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
   memcpy(xid->get_mutable_data() + WSREP_XID_UUID_OFFSET,  &uuid,  sizeof(wsrep_uuid_t));
   memcpy(xid->get_mutable_data() + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));

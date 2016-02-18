@@ -177,10 +177,13 @@ inline double log2(double x)
   return (log(x) / M_LN2);
 }
 #endif
+
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #include "wsrep_xid.h"
-#endif
+#include "../storage/partition/ha_partition.h"
+#endif /* WITH_WSREP */
+
 /*
   While we have legacy_db_type, we have this array to
   check for dups and to find handlerton from legacy_db_type.
@@ -1486,21 +1489,24 @@ int ha_prepare(THD *thd)
           {
 	    error= 1;
 	    /* avoid sending error, if we need to replay */
+            // TODO: upstream has stopped issuing error message.
+            // we need to check if same has to be followed and if not
+            // then would that confuse end-user.
             if (thd->wsrep_conflict_state != MUST_REPLAY)
-            {
               my_error(ER_LOCK_DEADLOCK, MYF(0), err);
-            }
           }
           else
           {
             /* not wsrep hton, bail to native mysql behavior */
-#endif
+            ha_rollback_trans(thd, true);
+            error=1;
+            break;
+          }
+#else
           ha_rollback_trans(thd, true);
           error=1;
           break;
-#ifdef WITH_WSREP
-          }
-#endif
+#endif /* WITH_WSREP */
         }
       }
       else
@@ -7997,10 +8003,12 @@ int binlog_log_row(TABLE* table,
   THD *const thd= table->in_use;
 
 #ifdef WITH_WSREP
-  /* only InnoDB tables will be replicated through binlog emulation */
+  /* only InnoDB tables will be replicated through binlog emulation
+  Partition table using InnoDB as native engine should also be considered. */
   if (WSREP_EMULATE_BINLOG(thd)                          && 
       table->file->ht->db_type != DB_TYPE_INNODB         &&
-      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB))
+      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB &&
+        (((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
   {
     return 0;
   } 

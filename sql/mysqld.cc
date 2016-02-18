@@ -98,7 +98,7 @@
 #include "wsrep_thd.h"
 #include "wsrep_sst.h"
 #include "sql_thd_internal_api.h"
-#endif
+#endif /* WITH_WSREP */
 #include "sql_callback.h"
 #include "opt_trace_context.h"
 #include "opt_costconstantcache.h"
@@ -435,7 +435,7 @@ const char *binlog_format_names[]= {"MIXED", "STATEMENT", "ROW", NullS};
 #ifdef WITH_WSREP
 const char *wsrep_binlog_format_names[]= 
                                    {"MIXED", "STATEMENT", "ROW", "NONE", NullS};
-#endif /*WITH_WSREP */
+#endif /* WITH_WSREP */
 my_bool binlog_gtid_simple_recovery;
 ulong binlog_error_action;
 const char *binlog_error_action_list[]= {"IGNORE_ERROR", "ABORT_SERVER", NullS};
@@ -1156,7 +1156,7 @@ public:
         }
         mysql_mutex_unlock(&closing_thd->LOCK_thd_data);
       }
-#endif
+#endif /* WITH_WSREP */
     }
   }
 private:
@@ -1233,7 +1233,7 @@ public:
     DBUG_PRINT("quit",("Informing thread %u that it's time to die",
                        killing_thd->thread_id()));
 
-    if (killing_thd->wsrep_applier && killing_thd != current_thd)
+    if (killing_thd->wsrep_applier && killing_thd != m_thd)
     {
       WSREP_DEBUG("closing connection %u", killing_thd->thread_id());
       wsrep_close_thread(killing_thd);
@@ -1267,7 +1267,7 @@ public:
     DBUG_PRINT("quit",("Informing thread %u that it's time to die",
                        killing_thd->thread_id()));
 
-    if (killing_thd->wsrep_applier && killing_thd != current_thd)
+    if (killing_thd->wsrep_applier && killing_thd != m_thd)
       m_count++;
   }
 
@@ -1493,7 +1493,7 @@ extern "C" void unireg_abort(int exit_code)
   if (wsrep)
   {
     /* This is an abort situation, we cannot expect to gracefully close all
-     * wsrep threads here, we can only diconnect from service */
+     * wsrep threads here, we can only disconnect from service */
     wsrep_close_client_connections(false);
     THD* thd(0);
     wsrep->disconnect(wsrep);
@@ -1502,7 +1502,7 @@ extern "C" void unireg_abort(int exit_code)
     sleep(1); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
   }
-#endif // WITH_WSREP
+#endif /* WITH_WSREP */
 
   clean_up(!opt_help && (exit_code || !opt_bootstrap)); /* purecov: inspected */
   DBUG_PRINT("quit",("done with cleanup in unireg_abort"));
@@ -1820,7 +1820,7 @@ static void clean_up_mutexes()
   (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync_count);
-#endif
+#endif /* WITH_WSREP */
   mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 }
 
@@ -3851,7 +3851,7 @@ static int init_thread_environment()
                    &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync_count,
                    &LOCK_wsrep_desync_count, MY_MUTEX_INIT_FAST);
-#endif
+#endif /* WITH_WSREP */
   THR_THD_initialized= true;
   THR_MALLOC_initialized= true;
   return 0;
@@ -4453,7 +4453,7 @@ static int init_server_components()
   if (!WSREP_ON && binlog_format_used && !opt_bin_log)
 #else
   if (binlog_format_used && !opt_bin_log)
-#endif
+#endif /* WITH_WSREP */
     sql_print_warning("You need to use --log-bin to make "
                       "--binlog-format work.");
 
@@ -4547,6 +4547,13 @@ a file name for --log-bin-index option", opt_binlog_index_name);
         after SST has happened
      */
   }
+
+  if (gtid_server_init())
+  {
+    sql_print_error("Failed to initialize GTID structures.");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
   if (!wsrep_recovery)
   {
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
@@ -4578,6 +4585,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       }
     }
   }
+
   if (opt_bin_log)
   {
     /*
@@ -4595,6 +4603,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       unireg_abort(1);
     }
 #else
+
     /*
       Skip opening the index file if we start with --help. This is necessary
       to avoid creating the file in an otherwise empty datadir, which will
@@ -4673,11 +4682,19 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   if (opt_ignore_builtin_innodb)
     sql_print_warning("ignore-builtin-innodb is ignored "
                       "and will be removed in future releases.");
+
+#ifndef WITH_WSREP
+  /* Leave the original location if wsrep is not involved otherwise
+  we do this before initializing WSREP as wsrep needs access to
+  gtid_mode which and for accessing gtid_mode gtid_sid_locks has to be
+  initialized which is done by this function. */
+
   if (gtid_server_init())
   {
     sql_print_error("Failed to initialize GTID structures.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
+#endif /* !WITH_WSREP */
 
   /*
     Set tc_log to point to TC_LOG_DUMMY early in order to allow plugin_init()
@@ -4889,7 +4906,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   {
     wsrep_emulate_bin_log= 1;
   }
-#endif
+#endif /* WITH_WSREP */
   if (total_ha_2pc > 1 || (1 == total_ha_2pc && opt_bin_log))
   {
     if (opt_bin_log)
@@ -4909,7 +4926,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
               (tc_log == &tc_log_mmap) ? "mmap" :
               (tc_log == &tc_log_dummy) ? "dummy" : "unknown"
               );
-#endif
+#endif /* WITH_WSREP */
   if (tc_log->open(opt_bin_log ? opt_bin_logname : opt_tc_log_file))
   {
     sql_print_error("Can't init tc log");
@@ -6160,7 +6177,7 @@ int wsrep_wait_committing_connections_close(int wait_time)
   int sleep_time= 100;
 
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
-  Count_wsrep_commit_conn count_wsrep_commit_conn; 
+  Count_wsrep_commit_conn count_wsrep_commit_conn;
 
   while (wait_time > 0)
   {
@@ -7798,7 +7815,7 @@ SHOW_VAR status_vars[]= {
   {"wsrep_provider_version",   (char*) &wsrep_provider_version,  SHOW_CHAR_PTR,      SHOW_SCOPE_GLOBAL},
   {"wsrep_provider_vendor",    (char*) &wsrep_provider_vendor,   SHOW_CHAR_PTR,      SHOW_SCOPE_GLOBAL},
   {"wsrep",                    (char*) &wsrep_show_status,       SHOW_FUNC,          SHOW_SCOPE_GLOBAL},
-#endif
+#endif /* WITH_WSREP */
   {NullS, NullS, SHOW_LONG, SHOW_SCOPE_ALL}
 };
 
@@ -8107,7 +8124,7 @@ static int mysql_init_variables(void)
 #ifdef WITH_WSREP
   if (WSREP_ON && wsrep_init_vars())
     return 1;
-#endif
+#endif /* WITH_WSREP */
   return 0;
 }
 
@@ -8320,7 +8337,7 @@ mysqld_get_one_option(int optid,
   case OPT_WSREP_SST_AUTH:
     wsrep_sst_auth_init (argument);
     break;
-#endif
+#endif /* WITH_WSREP */
 #if defined(ENABLED_DEBUG_SYNC)
   case OPT_DEBUG_SYNC_TIMEOUT:
     /*
@@ -8742,7 +8759,7 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
           // they are turned off both.
       }
   }
-#endif // WITH_WSREP
+#endif /* WITH_WSREP */
 
   // Synchronize @@global.autocommit on --autocommit
   const ulonglong turn_bit_on= opt_autocommit ?
@@ -9488,7 +9505,7 @@ PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd,
   key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
   key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
   key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync, key_LOCK_wsrep_desync_count;
-#endif
+#endif /* WITH_WSREP */
 PSI_mutex_key key_RELAYLOG_LOCK_commit;
 PSI_mutex_key key_RELAYLOG_LOCK_commit_queue;
 PSI_mutex_key key_RELAYLOG_LOCK_done;
@@ -9604,7 +9621,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync_count, "LOCK_wsrep_desync_count", PSI_FLAG_GLOBAL},
-#endif
+#endif /* WITH_WSREP */
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},
   { &key_LOCK_query_plan, "THD::LOCK_query_plan", 0},
@@ -9739,7 +9756,7 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_rollback, "COND_wsrep_rollback", PSI_FLAG_GLOBAL},
   { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0},
   { &key_COND_wsrep_replaying, "COND_wsrep_replaying", PSI_FLAG_GLOBAL},
-#endif
+#endif /* WITH_WSREP */
   { &key_gtid_ensure_index_cond, "Gtid_state", PSI_FLAG_GLOBAL},
   { &key_COND_compress_gtid_table, "COND_compress_gtid_table", PSI_FLAG_GLOBAL}
 #ifdef HAVE_REPLICATION

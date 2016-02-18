@@ -41,7 +41,7 @@
 #include "mysql/psi/mysql_file.h"
 
 #include <mysql/psi/mysql_statement.h>
-#if WITH_WSREP
+#ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 #endif
 #include "transaction_info.h"
@@ -3807,6 +3807,7 @@ Query_log_event::Query_log_event(THD* thd_arg, const char* query_arg,
     If Query_log_event will contain non trans keyword (not BEGIN, COMMIT,
     SAVEPOINT or ROLLBACK) we disable PA for this transaction.
    */
+  /* PA_safe = true indicate that write-set can be applied in parallel. */
   if (!is_trans_keyword())
     thd->wsrep_PA_safe= false;
 #endif /* WITH_WSREP */
@@ -10718,7 +10719,7 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
                    thd->wsrep_conflict_state,
                    (long long)wsrep_thd_trx_seqno(thd));
       } 
-#endif
+#endif /* WITH_WSREP */
       if (thd->is_slave_error || thd->is_fatal_error)
       {
         /*
@@ -11066,12 +11067,12 @@ AFTER_MAIN_EXEC_ROW_LOOP:
   if (get_flags(STMT_END_F))
   {
 
-#if defined(WITH_WSREP) && defined(HAVE_QUERY_CACHE)
+#if defined(WITH_WSREP)
     if (WSREP(thd) && thd->wsrep_exec_mode == REPL_RECV)
     {
       query_cache.invalidate_locked_for_write(rli->tables_to_lock);
     }
-#endif /* WITH_WSREP && HAVE_QUERY_CACHE */
+#endif /* WITH_WSREP */
 
    if((error= rows_event_stmt_cleanup(rli, thd)))
     slave_rows_error_report(ERROR_LEVEL,

@@ -254,7 +254,7 @@ void Global_THD_manager::wait_till_wsrep_thd_eq(Do_THD_Impl* func,
 
     std::for_each(thd_list.begin(), thd_list.end(), doit);
 
-    /* done api evaluate the needed exit condition. */
+    /* Check if the exit condition is true based on evaluator execution. */
     if (func->done(threshold_count))
       break;
 

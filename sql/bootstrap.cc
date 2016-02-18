@@ -248,7 +248,7 @@ int bootstrap(MYSQL_FILE *file)
   THD *thd= new THD;
 #ifdef WITH_WSREP
   thd->variables.wsrep_on= 0;
-#endif
+#endif /* WITH_WSREP */
   thd->bootstrap= 1;
   thd->get_protocol_classic()->init_net(NULL);
   thd->security_context()->set_master_access(~(ulong)0);

@@ -1059,12 +1059,14 @@ end:
 
 
 #ifdef WITH_WSREP
+
 IO_CACHE* wsrep_get_trans_log(THD * thd);
 bool wsrep_trans_cache_is_empty(THD *thd);
 void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
 void wsrep_thd_binlog_trx_reset(THD * thd);
 TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all);
 int wsrep_thd_binlog_rollback(THD * thd, bool all);
+
 #endif /* WITH_WSREP */
 
 #endif /* BINLOG_H_INCLUDED */

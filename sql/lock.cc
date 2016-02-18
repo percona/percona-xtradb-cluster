@@ -337,7 +337,7 @@ MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, size_t count, uint flags
 #ifdef WITH_WSREP
   //thd->main_lock_id.info->in_lock_tables= thd->in_lock_tables;
     thd->lock_info.in_lock_tables= thd->in_lock_tables;
-#endif    /* Lock on the copied half of the lock data array. */
+#endif /* WITH_WSREP */
   /* Lock on the copied half of the lock data array. */
   rc= thr_lock_errno_to_mysql[(int) thr_multi_lock(sql_lock->locks +
                                                    sql_lock->lock_count,

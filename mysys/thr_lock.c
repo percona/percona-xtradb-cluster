@@ -78,22 +78,37 @@ ulong locks_immediate = 0L, locks_waited = 0L;
 enum thr_lock_type thr_upgraded_concurrent_insert_lock = TL_WRITE;
 
 #ifdef WITH_WSREP
+
+/* Function pointer to be used if there is thread locking conflicts.
+Thread locking conflicts can happen if 2 trx tend to modify same set
+of data. This mainly has 2 scenarios:
+a. Both trx are applier trx coming from different nodes.
+b. One trx is local trx and other is applier trx.
+Check usage of these function to understand there importance. */
+
+
 static wsrep_thd_is_brute_force_fun wsrep_thd_is_brute_force= NULL;
 static wsrep_abort_thd_fun wsrep_abort_thd= NULL;
 static my_bool wsrep_debug;
 static my_bool wsrep_convert_LOCK_to_trx;
 static wsrep_on_fun wsrep_on = NULL;
-void wsrep_thr_lock_init(
-    wsrep_thd_is_brute_force_fun bf_fun, wsrep_abort_thd_fun abort_fun,
-    my_bool debug, my_bool convert_LOCK_to_trx, wsrep_on_fun on_fun
-) {
+
+
+void wsrep_thr_lock_init(wsrep_thd_is_brute_force_fun bf_fun,
+                         wsrep_abort_thd_fun          abort_fun,
+                         my_bool                      debug,
+                         my_bool                      convert_LOCK_to_trx,
+                         wsrep_on_fun                 on_fun)
+{
   wsrep_thd_is_brute_force = bf_fun;
   wsrep_abort_thd          = abort_fun;
   wsrep_debug              = debug;
   wsrep_convert_LOCK_to_trx= convert_LOCK_to_trx;
   wsrep_on                 = on_fun;
 }
+
 #endif /* WITH_WSREP */
+
 /* The following constants are only for debug output */
 #define MAX_THREADS 100
 #define MAX_LOCKS   100
@@ -505,6 +520,9 @@ wait_for_lock(struct st_lock_list *wait, THR_LOCK_DATA *data,
 
 #ifdef WITH_WSREP
 /*
+ * WSREP algorithm to resolve lock conflict.
+   * Applier wins and local trx is forced to rollback.
+
  * If brute force applier would need to wait for a thr lock,
  * it needs to make sure that it will get the lock without (too much) 
  * delay. 
@@ -546,7 +564,7 @@ wsrep_break_lock(
         fprintf(stderr,"WSREP wsrep_break_lock read lock untouched\n");
       return FALSE;
     }
-#endif
+#endif /* TODO */
     if (wsrep_debug) 
       fprintf(stderr,"WSREP wsrep_break_lock aborting locks\n");
 
@@ -605,7 +623,7 @@ wsrep_break_lock(
   }
   return FALSE;
 }
-#endif
+#endif /* WITH_WSREP */
 
 enum enum_thr_lock_result
 thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
@@ -616,7 +634,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
   struct st_lock_list *wait_queue;
 #ifdef WITH_WSREP
   my_bool wsrep_lock_inserted= FALSE;
-#endif
+#endif /* WITH_WSREP */
   MYSQL_TABLE_WAIT_VARIABLES(locker, state) /* no ';' */
   DBUG_ENTER("thr_lock");
 
@@ -693,7 +711,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
           wsrep_lock_inserted= TRUE;
           goto wsrep_read_wait;
         }
-#endif
+#endif /* WITH_WSREP */
 	/* We are not allowed to get a READ lock in this case */
 	data->type=TL_UNLOCK;
         result= THR_LOCK_ABORTED;               /* Can't wait for this one */
@@ -727,7 +745,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
       wsrep_lock_inserted= TRUE;
     }
   wsrep_read_wait:
-#endif
+#endif /* WITH_WSREP */
     wait_queue= &lock->read_wait;
   }
   else						/* Request for WRITE lock */
@@ -750,7 +768,7 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
             wsrep_lock_inserted=TRUE;
             goto wsrep_write_wait;
           }
-#endif
+#endif /* WITH_WSREP */
           /* We are not allowed to get a lock in this case */
           data->type=TL_UNLOCK;
           result= THR_LOCK_ABORTED;               /* Can't wait for this one */
@@ -857,14 +875,14 @@ thr_lock(THR_LOCK_DATA *data, THR_LOCK_INFO *owner,
       wsrep_lock_inserted= TRUE;
     }
   wsrep_write_wait:
-#endif
+#endif /* WITH_WSREP */
     wait_queue= &lock->write_wait;
   }
   /* Can't get lock yet;  Wait for it */
 #ifdef WITH_WSREP
   if (wsrep_on(data->owner->mysql_thd) && wsrep_lock_inserted)
     DBUG_RETURN(wait_for_lock(wait_queue, data, owner, 1, lock_wait_timeout));
-#endif
+#endif /* WITH_WSREP */
   result= wait_for_lock(wait_queue, data, owner, 0,
                         lock_wait_timeout);
   MYSQL_END_TABLE_LOCK_WAIT(locker);
