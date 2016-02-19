@@ -5370,6 +5370,15 @@ void THD::send_statement_status()
   bool error= false;
   Diagnostics_area *da= get_stmt_da();
 
+#ifdef WITH_WSREP
+  /* sanity check, can be removed before 1.0 release */
+  if (WSREP(thd) && thd->wsrep_conflict_state == REPLAYING)
+  {
+    WSREP_ERROR("Attempting send statement status while replaying");
+    return;
+  }
+#endif /* WITH_WSREP */
+
   /* Can not be true, but do not take chances in production. */
   if (da->is_sent())
     DBUG_VOID_RETURN;

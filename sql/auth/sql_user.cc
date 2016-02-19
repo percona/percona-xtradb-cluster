@@ -207,6 +207,9 @@ int check_change_password(THD *thd, const char *host, const char *user,
 
   sctx= thd->security_context();
   if (!thd->slave_thread &&
+#ifdef WITH_WSREP
+      (!WSREP(thd) || !thd->wsrep_applier) &&
+#endif /* WITH_WSREP */
       (strcmp(sctx->user().str, user) ||
        my_strcasecmp(system_charset_info, host,
                      sctx->priv_host().str)))
@@ -220,6 +223,9 @@ int check_change_password(THD *thd, const char *host, const char *user,
       return(1);
   }
   if (!thd->slave_thread && !opt_bootstrap &&
+#ifdef WITH_WSREP
+      (!WSREP(thd) || !thd->wsrep_applier) &&
+#endif /* WITH_WSREP */
       !strcmp(thd->security_context()->priv_user().str,""))
   {
     my_message(ER_PASSWORD_ANONYMOUS_USER, ER(ER_PASSWORD_ANONYMOUS_USER),
@@ -632,6 +638,21 @@ bool change_password(THD *thd, const char *host, const char *user,
   if (check_change_password(thd, host, user, new_password, new_password_len))
     DBUG_RETURN(1);
 
+#ifdef WITH_WSREP
+  const CSET_STRING query_save = thd->query_string;
+  if (WSREP(thd) && !thd->wsrep_applier)
+  {
+    query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
+                          user ? user : "",
+                          host ? host : "",
+                          new_password);
+    thd->set_query_inner(buff, query_length, system_charset_info);
+
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, (char*)"user", NULL);
+  }
+#endif /* WITH_WSREP */
+
+
   tables.init_one_table("mysql", 5, "user", 4, "user", TL_WRITE);
 
 #ifdef HAVE_REPLICATION
@@ -781,12 +802,28 @@ end:
   if (!result)
     acl_notify_htons(thd, buff, query_length);
 
+#ifdef WITH_WSREP
+  if (WSREP(thd) && !thd->wsrep_applier)
+  {
+    WSREP_TO_ISOLATION_END;
+
+    thd->query_string     = query_save;
+    thd->wsrep_exec_mode  = LOCAL_STATE;
+  }
+#endif /* WITH_WSREP */
+
   /* Restore the state of binlog format */
   DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
 
   DBUG_RETURN(result);
+
+#ifdef WITH_WSREP
+error:
+  WSREP_ERROR("Replication of SET PASSWORD failed: %s", buff);
+  DBUG_RETURN(result);
+#endif /* WITH_WSREP */
 }
 
 /**

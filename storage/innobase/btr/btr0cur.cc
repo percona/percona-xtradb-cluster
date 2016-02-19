@@ -4905,6 +4905,15 @@ btr_cur_del_mark_set_clust_rec(
 		return(DB_SUCCESS);
 	}
 
+#ifdef WITH_WSREP
+	/* Original condition in PXC-5.6 let the code proceed even if record
+	is marked deleted. As per the new protocol in 5.7 record deleted
+	is valid condition but we don't allow function to proceed instead
+	return immediately. So added this assert to findout why WITH_WSREP
+	we want to proceed with normal flow even if record is marked deleted. */
+	ut_ad (!rec_get_deleted_flag(rec, rec_offs_comp(offsets)));
+#endif /* WITH_WSREP */
+
 	err = lock_clust_rec_modify_check_and_lock(BTR_NO_LOCKING_FLAG, block,
 						   rec, index, offsets, thr);
 
