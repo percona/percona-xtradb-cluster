@@ -22,7 +22,7 @@ FLUSH DES_KEY_FILE;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -35,7 +35,7 @@ FLUSH HOSTS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -58,7 +58,7 @@ FLUSH QUERY CACHE;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -72,7 +72,7 @@ FLUSH STATUS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -85,7 +85,7 @@ FLUSH USER_RESOURCES;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -98,7 +98,7 @@ FLUSH TABLES;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -113,7 +113,7 @@ FLUSH TABLES t2;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -126,7 +126,7 @@ FLUSH ERROR LOGS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -138,7 +138,7 @@ FLUSH SLOW LOGS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -150,7 +150,7 @@ FLUSH GENERAL LOGS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -162,7 +162,7 @@ FLUSH ENGINE LOGS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -174,7 +174,7 @@ FLUSH RELAY LOGS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -189,7 +189,7 @@ FLUSH USER_STATISTICS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 4 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -201,7 +201,7 @@ FLUSH THREAD_STATISTICS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -214,7 +214,7 @@ FLUSH CHANGED_PAGE_BITMAPS;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -245,7 +245,7 @@ RESET QUERY CACHE;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -265,7 +265,7 @@ UNLOCK TABLES;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -281,7 +281,7 @@ UNLOCK TABLES;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
@@ -290,7 +290,7 @@ FLUSH TABLES t1;
 --connection node_2
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
-let $wait_timeout= 90;
+let $wait_timeout= 300;
 --let $wait_condition = SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 --enable_query_log
