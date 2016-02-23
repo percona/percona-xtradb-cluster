@@ -24,7 +24,7 @@ Warnings:
 Warning	1366	Incorrect integer value: 'a' for column 'c1' at row 1
 insert into t1 values ('a');
 ERROR 23000: Duplicate entry '0' for key 'c1'
-set @@global.wsrep_drupal_282555_workaround = 0;;
-set @@session.sql_log_bin = 1;;
-set @@sql_mode = NO_ENGINE_SUBSTITUTION;;
+set @@global.wsrep_drupal_282555_workaround = 0;
+set @@session.sql_log_bin = 1;
+set @@sql_mode = default;
 drop table t1;

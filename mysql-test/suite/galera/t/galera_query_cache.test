@@ -20,12 +20,15 @@ FLUSH STATUS;
 #
 # 1. Cache works
 #
-
 SELECT COUNT(*) FROM t1;
+--disable_warnings
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'Qcache_queries_in_cache';
+--enable_warnings
 
 SELECT COUNT(*) FROM t1;
+--disable_warnings
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
+--enable_warnings
 
 #
 # 2. Cache is invalidated by DML on remote node
@@ -37,13 +40,21 @@ INSERT INTO t1 VALUES (2);
 --connection node_2
 FLUSH STATUS;
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'Qcache_queries_in_cache';
+--enable_warnings
 SELECT COUNT(*) FROM t1;
+--disable_warnings
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'Qcache_queries_in_cache';
+--enable_warnings
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
+--enable_warnings
 SELECT COUNT(*) FROM t1;
+--disable_warnings
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
+--enable_warnings
 
 #
 # 3. Cache is invalidated by DDL on remote node
@@ -55,13 +66,21 @@ ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 --connection node_2
 FLUSH STATUS;
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'Qcache_queries_in_cache';
+--enable_warnings
 SELECT COUNT(*) FROM t1;
+--disable_warnings
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'Qcache_queries_in_cache';
+--enable_warnings
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
+--enable_warnings
 SELECT COUNT(*) FROM t1;
+--disable_warnings
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
+--enable_warnings
 
 DROP TABLE t1;
 

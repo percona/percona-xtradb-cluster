@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS t1, t2;
 FLUSH DES_KEY_FILE;
 FLUSH HOSTS;
 SET SESSION wsrep_replicate_myisam = TRUE;
-INSERT INTO mysql.user VALUES('localhost','user1',PASSWORD('pass1'), 'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','','N');
+CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 FLUSH PRIVILEGES;
 DELETE FROM mysql.user WHERE user = 'user1';
 SET SESSION wsrep_replicate_myisam = FALSE;

@@ -5372,7 +5372,7 @@ void THD::send_statement_status()
 
 #ifdef WITH_WSREP
   /* sanity check, can be removed before 1.0 release */
-  if (WSREP(thd) && thd->wsrep_conflict_state == REPLAYING)
+  if (WSREP(this) && wsrep_conflict_state == REPLAYING)
   {
     WSREP_ERROR("Attempting send statement status while replaying");
     return;

@@ -13,8 +13,11 @@
 
 # Global Variables
 
+--disable_warnings
 SELECT COUNT(*) = 40 FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES WHERE VARIABLE_NAME LIKE 'wsrep_%';
+--enable_warnings
 
+--disable_warnings
 SELECT VARIABLE_NAME, VARIABLE_VALUE
 FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
@@ -29,6 +32,7 @@ AND VARIABLE_NAME NOT IN (
 	'WSREP_START_POSITION'
 )
 ORDER BY VARIABLE_NAME;
+--enable_warnings
 
 # wsrep_provider_options
 #
@@ -54,6 +58,7 @@ EOF
 
 # Global Status
 
+--disable_warnings
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters';
@@ -62,3 +67,4 @@ SELECT VARIABLE_NAME FROM INFORMATION_SCHEMA.GLOBAL_STATUS
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'
 ORDER BY VARIABLE_NAME;
+--enable_warnings

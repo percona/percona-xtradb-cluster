@@ -43,10 +43,7 @@ SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3';
 #
 
 --connection node_1
-SET PASSWORD FOR user3 = PASSWORD('foo');
-
---connection node_1
-SELECT password != '' FROM mysql.user WHERE user = 'user3';
+SET PASSWORD FOR user3 = 'foo';
 
 #
 # DROP USER
@@ -62,7 +59,8 @@ SELECT COUNT(*) = 0 FROM mysql.user WHERE user IN ('user1', 'user2');
 #
 
 --connection node_1
-GRANT ALL ON *.* TO user4 IDENTIFIED BY 'password';
+CREATE USER 'user4'@'%' IDENTIFIED BY 'password';
+GRANT ALL ON *.* TO 'user4'@'%';
 
 --connection node_2
 SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user4';

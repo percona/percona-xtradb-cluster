@@ -2945,9 +2945,41 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
 
 #ifdef WITH_WSREP
   if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
+  {
+    DEBUG_SYNC(thd, "create_select_before_write_create_event");
+    int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
+
+    /* Note: For wsrep we make the call transactional and so
+    is_trans = true and direct = false.
+
+    Why ?
+
+    * This is execution of CTAS query. Starting from 5.7 MySQL
+    has changed the approach to write the binlog as immediate action
+    and not a normal action that happens during commit/rollback.
+
+    * With that difference wsrep flow fails to understand if binlogging
+    was done for the said query and so wsrep flow is not invoked even
+    though bin-logging was done.
+
+    * Making CTAS transactional will ensure that binlogging uses
+    NORMAL logging approach so during commit WSREP flow can be
+    activated.
+
+    There are multiple solutions to solve this issue but for now
+    we will try to be complaint with 5.6 behavior for now. */
+
+    result= thd->binlog_query(THD::STMT_QUERY_TYPE,
+                              query.ptr(), query.length(),
+                              /* is_trans */ true,
+                              /* direct */ false,
+                              /* suppress_use */ FALSE,
+                              errcode);
+    DEBUG_SYNC(thd, "create_select_after_write_create_event");
+  }
+  ha_wsrep_fake_trx_id(thd);
 #else
   if (mysql_bin_log.is_open())
-#endif /* WITH_WSREP */
   {
     DEBUG_SYNC(thd, "create_select_before_write_create_event");
     int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
@@ -2959,8 +2991,6 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
                               errcode);
     DEBUG_SYNC(thd, "create_select_after_write_create_event");
   }
-#ifdef WITH_WSREP
-  ha_wsrep_fake_trx_id(thd);
 #endif /* WITH_WSREP */
   DBUG_RETURN(result);
 }

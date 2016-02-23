@@ -42,7 +42,7 @@ let $wait_timeout= 90;
 
 --connection node_1
 SET SESSION wsrep_replicate_myisam = TRUE;
-INSERT INTO mysql.user VALUES('localhost','user1',PASSWORD('pass1'), 'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','','N');
+CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 FLUSH PRIVILEGES;
 --connect node_2a, 127.0.0.1, user1, pass1, test, $NODE_MYPORT_2
 --connection node_1

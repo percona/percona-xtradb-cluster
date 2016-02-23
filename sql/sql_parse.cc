@@ -1394,6 +1394,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       }
       else
       {
+        mysql_reset_thd_for_next_command(thd);
         my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
         WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -4884,9 +4885,7 @@ end_with_restore_list:
     REFRESH_GENERAL_LOG                     |
     REFRESH_ENGINE_LOG                      |
     REFRESH_ERROR_LOG                       |
-#ifdef HAVE_QUERY_CACHE
     REFRESH_QUERY_CACHE_FREE                |
-#endif /* HAVE_QUERY_CACHE */
     REFRESH_STATUS                          |
     REFRESH_USER_RESOURCES                  |
     /*
@@ -6297,6 +6296,13 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
       /* wsrep BF abort in query exec phase */
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state == MUST_ABORT) {
+
+        /* Why this is needed ? If the current execution query on getting killed
+        still continue to set eof status (SELECT SLEEP(x)) then before new
+        statement (rollback) is initiated it is important to clear the old
+        status to ensure we are able to set valid status at this point. */
+        mysql_reset_thd_for_next_command(thd);
+
         wsrep_client_rollback(thd);
 
         WSREP_DEBUG("abort in exec query state, avoiding autocommit");
