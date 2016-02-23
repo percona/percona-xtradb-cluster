@@ -1,10 +1,5 @@
 galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
 pxc-421 : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
-galera_kill_nochanges : mysql-wsrep#24 Galera server does not restart properly if killed
 galera_bf_abort_for_update : mysql-wsrep#26 SELECT FOR UPDATE sometimes allowed to proceed in the face of a concurrent update
 galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
 galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
-galera_split_brain : fails with an assert on cent-os for while now. needs to be investigated.
-galera_flush_local : timeout failure
-galera_flush_gtid : timeout failure
-galera_admin : timeout failure
