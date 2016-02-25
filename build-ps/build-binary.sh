@@ -369,7 +369,7 @@ fi
             -DWITH_UNIT_TESTS=0 \
             -DWITH_READLINE=system \
             -DWITHOUT_TOKUDB=ON \
-            -DWITH_DEBUG=ON
+            -DWITH_DEBUG=ON \
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
