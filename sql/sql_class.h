@@ -3201,7 +3201,6 @@ public:
   void*                     wsrep_apply_format;
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
-  my_bool                   wsrep_donor; /* true if thread is SST donor servicing */
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
