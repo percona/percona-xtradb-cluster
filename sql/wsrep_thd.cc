@@ -377,7 +377,6 @@ void wsrep_create_appliers(long threads)
     {
       WSREP_ERROR("Trying to launch slave threads before creating "
                   "connection at '%s'", wsrep_cluster_address);
-      assert(0);
     }
     return;
   }
