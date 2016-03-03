@@ -1053,6 +1053,7 @@ The following options may be given as the first argument:
  DBUG options to provider library
  --wsrep-debug       To enable debug level logging
  --wsrep-desync      To desynchronize the node from the cluster
+ --wsrep-dirty-reads Allow reads from a node is not in primary component
  --wsrep-drupal-282555-workaround 
  To use a workaround forbad autoincrement value
  --wsrep-forced-binlog-format=name 
@@ -1084,6 +1085,8 @@ The following options may be given as the first argument:
  --wsrep-provider-options=name 
  provider specific options
  --wsrep-recover     Recover database state after crash and exit
+ --wsrep-reject-queries[=name] 
+ Variable to set to reject queries
  --wsrep-replicate-myisam 
  To enable myisam replication
  --wsrep-restart-slave 
@@ -1421,6 +1424,7 @@ wsrep-data-home-dir
 wsrep-dbug-option 
 wsrep-debug FALSE
 wsrep-desync FALSE
+wsrep-dirty-reads FALSE
 wsrep-drupal-282555-workaround FALSE
 wsrep-forced-binlog-format NONE
 wsrep-load-data-splitting TRUE
@@ -1436,6 +1440,7 @@ wsrep-preordered FALSE
 wsrep-provider none
 wsrep-provider-options 
 wsrep-recover FALSE
+wsrep-reject-queries NONE
 wsrep-replicate-myisam FALSE
 wsrep-restart-slave FALSE
 wsrep-retry-autocommit 1
