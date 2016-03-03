@@ -194,7 +194,7 @@ select * from is1;
 #
 --connection node_1
 --echo #node-1
-insert delayed is1 values (3), (4);
+insert is1 values (3), (4);
 alter table is1 add column j int;
 #
 --connection node_2
@@ -213,7 +213,7 @@ select @@session.wsrep_OSU_method;
 use test;
 create table is1 (i int) engine=myisam;
 insert into is1 values (11), (12);
-insert delayed is1 values (13), (14);
+insert is1 values (13), (14);
 rename table is1 to is2;
 select * from is2;
 drop table is2;

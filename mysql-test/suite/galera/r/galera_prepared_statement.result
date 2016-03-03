@@ -3,6 +3,9 @@ CREATE TABLE t2 (f1 CHAR(5)) ENGINE=InnoDB;
 CREATE TABLE t3 (f1 CHAR(5)) ENGINE=InnoDB;
 CREATE TABLE t4 (f1 CHAR(5)) ENGINE=InnoDB;
 SET SESSION sql_mode='STRICT_ALL_TABLES';
+Warnings:
+Warning	3135	'NO_ZERO_DATE', 'NO_ZERO_IN_DATE' and 'ERROR_FOR_DIVISION_BY_ZERO' sql modes should be used with strict mode. They will be merged with strict mode in a future release.
+Warning	3090	Changing sql mode 'NO_AUTO_CREATE_USER' is deprecated. It will be removed in a future release.
 PREPARE st1 FROM 'INSERT INTO t1 VALUES ("abc")';
 PREPARE st2 FROM 'INSERT INTO t2 VALUES ("abc")';
 PREPARE st3 FROM 'INSERT INTO t3 VALUES ("abc")';

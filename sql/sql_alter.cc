@@ -338,8 +338,13 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   if (!thd->lex->is_ignore() && thd->is_strict_mode())
     thd->pop_internal_handler();
   DBUG_RETURN(result);
+
 #ifdef WITH_WSREP
 error:
+
+  if (!thd->lex->is_ignore() && thd->is_strict_mode())
+    thd->pop_internal_handler();
+
   {
     WSREP_WARN("ALTER TABLE isolation failure");
     DBUG_RETURN(TRUE);

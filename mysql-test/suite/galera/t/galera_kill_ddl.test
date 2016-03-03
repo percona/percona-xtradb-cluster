@@ -29,7 +29,9 @@ ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 --connection node_2a
 
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='t1';
+--disable_warnings
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 --connection node_1
 --disable_query_log

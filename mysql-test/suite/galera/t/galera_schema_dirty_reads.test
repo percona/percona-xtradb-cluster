@@ -4,6 +4,7 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 --disable_info
+--disable_warnings
 USE information_schema;
 SELECT * FROM SESSION_VARIABLES WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
 SET GLOBAL wsrep_reject_queries=ALL;
@@ -11,3 +12,4 @@ SELECT * FROM SESSION_VARIABLES WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
 SET GLOBAL wsrep_reject_queries=NONE;
 SET SESSION wsrep_dirty_reads=TRUE;
 SELECT * FROM SESSION_VARIABLES WHERE VARIABLE_NAME LIKE "wsrep_dirty_reads";
+--enable_warnings

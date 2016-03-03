@@ -127,9 +127,7 @@ i
 1
 2
 #node-1
-insert delayed is1 values (3), (4);
-Warnings:
-Warning	1287	'INSERT DELAYED' is deprecated and will be removed in a future release. Please use INSERT instead
+insert is1 values (3), (4);
 alter table is1 add column j int;
 #node-2
 select * from is1;
@@ -151,9 +149,7 @@ RSU
 use test;
 create table is1 (i int) engine=myisam;
 insert into is1 values (11), (12);
-insert delayed is1 values (13), (14);
-Warnings:
-Warning	1287	'INSERT DELAYED' is deprecated and will be removed in a future release. Please use INSERT instead
+insert is1 values (13), (14);
 rename table is1 to is2;
 select * from is2;
 i

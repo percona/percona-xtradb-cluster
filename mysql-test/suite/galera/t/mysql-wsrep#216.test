@@ -22,10 +22,10 @@ CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 # Check that the obfuscated password appears in the logs
 
 # Four times for the first node, in the various wsrep_debug messages
---exec grep --count 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D $MYSQLTEST_VARDIR/log/mysqld.1.err
+--exec grep --count "'mysql_native_password' AS '<secret>'" $MYSQLTEST_VARDIR/log/mysqld.1.err
 
 # Once for the second node, in the 'Slave SQL' error
---exec grep --count 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D $MYSQLTEST_VARDIR/log/mysqld.2.err
+--exec grep --count "'mysql_native_password' AS '<secret>'" $MYSQLTEST_VARDIR/log/mysqld.2.err
 
 DROP USER u1;
 

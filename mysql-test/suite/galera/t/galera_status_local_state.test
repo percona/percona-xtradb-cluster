@@ -6,6 +6,7 @@
 # we can at least test for the ones we can.
 #
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state';
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 
@@ -22,6 +23,7 @@ SET GLOBAL wsrep_desync = 0;
 --source include/wait_condition.inc
 
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+--enable_warnings
 
 
 

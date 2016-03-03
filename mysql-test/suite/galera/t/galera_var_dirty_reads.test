@@ -35,7 +35,9 @@ SET @@session.wsrep_dirty_reads=ON;
 SELECT * FROM t1;
 SELECT 1 FROM t1;
 
+--disable_warnings
 SELECT i, variable_name, variable_value FROM t1, information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
+--enable_warnings
 
 SET @@session.wsrep_dirty_reads=OFF;
 
@@ -45,7 +47,9 @@ SELECT i, variable_name, variable_value FROM t1, information_schema.session_vari
 SELECT 1;
 
 USE information_schema;
+--disable_warnings
 SELECT * FROM session_variables WHERE variable_name LIKE "wsrep_dirty_reads";
+--enable_warnings
 
 USE performance_schema;
 SELECT COUNT(*) >= 10 FROM events_statements_history;

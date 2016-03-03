@@ -39,8 +39,10 @@ SHOW STATUS LIKE 'wsrep_local_state_comment';
 --connection node_2
 --sleep 1
 # Node #2 thinks that it is now part of a single-node primary cluster 
+--disable_warnings
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+--enable_warnings
 
 #
 # Reset everything as it was
@@ -57,8 +59,10 @@ SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
 --source include/wait_until_connected_again.inc
 
 --connection node_1
+--disable_warnings
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 #
 # Set to invalid host
@@ -96,8 +100,10 @@ SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
 --sleep 1
 
 --connection node_1
+--disable_warnings
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 CALL mtr.add_suppression("Backend not supported: foo");
 CALL mtr.add_suppression("Failed to initialize backend using 'foo");
