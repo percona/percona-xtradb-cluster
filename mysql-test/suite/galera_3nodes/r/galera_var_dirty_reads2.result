@@ -12,9 +12,6 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `f1` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-SET SESSION wsrep_sync_wait = 0;
-KILL 7;;
-ERROR 70100: Query execution was interrupted
 LOCK TABLE t1 WRITE;
 UNLOCK TABLES;
 FLUSH TABLES WITH READ LOCK;

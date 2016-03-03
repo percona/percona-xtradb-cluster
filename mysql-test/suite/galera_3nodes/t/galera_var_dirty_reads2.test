@@ -34,16 +34,6 @@ USE test;
 --error 0
 SHOW CREATE TABLE t1;
 
---connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
---connection node_2a
-SET SESSION wsrep_sync_wait = 0;
---let $connection_id = `SELECT CONNECTION_ID()`
-# Query execution was interrupted, so KILL was successfull
---error 1317
---eval KILL $connection_id;
-
---connection node_2
-
 --error 0
 LOCK TABLE t1 WRITE;
 
