@@ -7739,20 +7739,8 @@ ha_innobase::write_row(
 	if ((sql_command == SQLCOM_ALTER_TABLE
 	     || sql_command == SQLCOM_OPTIMIZE
 	     || sql_command == SQLCOM_CREATE_INDEX
-#ifdef WITH_WSREP
-	     || (wsrep_on(user_thd) && wsrep_load_data_splitting &&
-		 sql_command == SQLCOM_LOAD                      &&
-		 !thd_test_options(
-			user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
-#endif /* WITH_WSREP */
 	     || sql_command == SQLCOM_DROP_INDEX)
 	    && num_write_row >= 10000) {
-#ifdef WITH_WSREP
-		if (wsrep_on(user_thd) && sql_command == SQLCOM_LOAD) {
-			WSREP_DEBUG("forced trx split for LOAD: %s", 
-				    wsrep_thd_query(user_thd));
-		}
-#endif /* WITH_WSREP */
 		/* ALTER TABLE is COMMITted at every 10000 copied rows.
 		The IX table lock for the original table has to be re-issued.
 		As this method will be called on a temporary table where the
@@ -7786,26 +7774,6 @@ no_commit:
 			*/
 			;
 		} else if (src_table == prebuilt->table) {
-#ifdef WITH_WSREP
-			if (wsrep_on(user_thd) && wsrep_load_data_splitting &&
-			    sql_command == SQLCOM_LOAD                      &&
-			    !thd_test_options(
-					      user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
-			{
-				switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
-				{
-				case WSREP_TRX_OK:
-				  break;
-				case WSREP_TRX_SIZE_EXCEEDED:
-				case WSREP_TRX_CERT_FAIL:
-				case WSREP_TRX_ERROR:
-				  DBUG_RETURN(1);
-				}
-
-				if (tc_log->commit(user_thd, 1)) DBUG_RETURN(1);
-				wsrep_post_commit(user_thd, TRUE);
-			}
-#endif /* WITH_WSREP */
 			/* Source table is not in InnoDB format:
 			no need to re-acquire locks on it. */
 
@@ -7816,25 +7784,6 @@ no_commit:
 			/* We will need an IX lock on the destination table. */
 			prebuilt->sql_stat_start = TRUE;
 		} else {
-#ifdef WITH_WSREP
-			if (wsrep_on(user_thd) && wsrep_load_data_splitting &&
-			    sql_command == SQLCOM_LOAD                      &&
-			    !thd_test_options(
-					      user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
-			{
-				switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, 1))
-				{
-				case WSREP_TRX_OK:
-				  break;
-				case WSREP_TRX_SIZE_EXCEEDED:
-				case WSREP_TRX_CERT_FAIL:
-				case WSREP_TRX_ERROR:
-				  DBUG_RETURN(1);
-				}
-				if (tc_log->commit(user_thd, 1))  DBUG_RETURN(1);
-				wsrep_post_commit(user_thd, TRUE);
-			}
-#endif /* WITH_WSREP */
 			/* Ensure that there are no other table locks than
 			LOCK_IX and LOCK_AUTO_INC on the destination table. */
 
@@ -7854,6 +7803,52 @@ no_commit:
 			prebuilt->sql_stat_start = TRUE;
 		}
 	}
+
+#ifdef WITH_WSREP
+	/* Order of condition is important to avoid over-evaluation and save
+	on performance. */
+	if (num_write_row >= 10000
+	    && !(thd_test_options(user_thd,
+				  OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
+	    && sql_command == SQLCOM_LOAD
+	    && wsrep_load_data_splitting
+	    && wsrep_on(user_thd)) {
+
+		/* User is trying to load data using LOAD DATA statement
+		with autocommit = 1 and load data split = 1.
+		Logic will now commit after every 10K rows. */
+
+		WSREP_DEBUG("Forced transaction split for LOAD DATA: %s",
+			    wsrep_thd_query(user_thd));
+
+		num_write_row = 0;
+
+		switch (wsrep_run_wsrep_commit(user_thd, wsrep_hton, true))
+		{
+			case WSREP_TRX_OK:
+				break;
+			case WSREP_TRX_SIZE_EXCEEDED:
+			case WSREP_TRX_CERT_FAIL:
+			case WSREP_TRX_ERROR:
+				DBUG_RETURN(1);
+		}
+
+		if (tc_log->commit(user_thd, true)) {
+			DBUG_RETURN(1);
+		}
+		wsrep_post_commit(user_thd, true);
+
+		/* Commit the transaction.  This will release the table
+		locks, so they have to be acquired again. */
+		innobase_commit(ht, user_thd, 1);
+
+		/* Note that this transaction is still active. */
+		trx_register_for_2pc(prebuilt->trx);
+
+		/* We will need an IX lock on the destination table. */
+		prebuilt->sql_stat_start = TRUE;
+	}
+#endif /* WITH_WSREP */
 
 	num_write_row++;
 
