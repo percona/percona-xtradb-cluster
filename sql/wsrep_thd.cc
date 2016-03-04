@@ -36,14 +36,18 @@ int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
 /* must have (&thd->LOCK_wsrep_thd) */
 void wsrep_client_rollback(THD *thd)
 {
-  WSREP_DEBUG("client rollback due to BF abort for (%ld), query: %s",
-              thd->thread_id, WSREP_QUERY(thd));
+  WSREP_DEBUG("client rollback due to BF abort for (%ld %lld), query: %s",
+              thd->thread_id, thd->query_id, WSREP_QUERY(thd));
 
   my_atomic_add64(&wsrep_bf_aborts_counter, 1);
 
   thd->wsrep_conflict_state= ABORTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-  trans_rollback(thd);
+  if (trans_rollback(thd))
+  {
+    WSREP_WARN("client rollback failed for: %lu %lld, conf: %d",
+               thd->thread_id, thd->query_id, thd->wsrep_conflict_state);
+  }
 
   if (thd->locked_tables_mode && thd->lock)
   {
@@ -86,61 +90,6 @@ static Relay_log_info* wsrep_relay_log_init(const char* log_fname)
       new Format_description_log_event(BINLOG_VERSION));
 
   return (rli);
-
-#ifdef REMOVED
-  Rpl_info_handler* handler_src= NULL;
-  Rpl_info_handler* handler_dest= NULL;
-  ulong *key_info_idx= NULL;
-  const char *msg= "Failed to allocate memory for the relay log info "
-                   "structure";
-
-  DBUG_ENTER("Rpl_info_factory::create_rli");
-
-  if (!(rli= new Relay_log_info(false
-#ifdef HAVE_PSI_INTERFACE
-                                ,&key_relay_log_info_run_lock,
-                                &key_relay_log_info_data_lock,
-                                &key_relay_log_info_sleep_lock,
-                                &key_relay_log_info_data_cond,
-                                &key_relay_log_info_start_cond,
-                                &key_relay_log_info_stop_cond,
-                                &key_relay_log_info_sleep_cond
-#endif /* HAVE_PSI_INTERFACE */
-                               )))
-    goto err;
-
-  if (!(key_info_idx= new ulong[NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR]))
-     goto err;
-  key_info_idx[0]= server_id;
-  rli->set_idx_info(key_info_idx, NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR);
-
-  if(Rpl_info_factory::init_rli_repositories(rli, rli_option, &handler_src,
-                                             &handler_dest, &msg))
-    goto err;
-
-  if (Rpl_info_factory::decide_repository(rli, rli_option, &handler_src,
-                                          &handler_dest, &msg))
-    goto err;
-
-  DBUG_RETURN(rli);
-err:
-  delete handler_src;
-  delete handler_dest;
-  delete []key_info_idx;
-  if (rli)
-  {
-    /*
-      The handler was previously deleted so we need to remove
-      any reference to it.
-    */
-    rli->set_idx_info(NULL, 0);
-    rli->set_rpl_info_handler(NULL);
-    rli->set_rpl_info_type(INVALID_INFO_REPOSITORY);
-    delete rli;
-  }
-  WSREP_ERROR("Error creating relay log info: %s.", msg);
-  DBUG_RETURN(NULL);
-#endif /* REMOVED */
 }
 
 static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -447,6 +396,11 @@ static void wsrep_rollback_process(THD *thd)
       aborting->store_globals();
 
       mysql_mutex_lock(&aborting->LOCK_wsrep_thd);
+
+      /* prepare THD for rollback processing */
+      mysql_reset_thd_for_next_command(aborting);
+      aborting->lex->sql_command= SQLCOM_ROLLBACK;
+
       wsrep_client_rollback(aborting);
       WSREP_DEBUG("WSREP rollbacker aborted thd: (%lu %llu)",
                   aborting->thread_id, (long long)aborting->real_id);
