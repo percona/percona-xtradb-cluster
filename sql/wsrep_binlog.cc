@@ -15,6 +15,7 @@
 
 #include "wsrep_binlog.h"
 #include "wsrep_priv.h"
+#include "log_event.h"
 
 /*
   Write the contents of a cache to a memory buffer.
@@ -160,6 +161,22 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
     uint length(my_b_bytes_in_cache(cache));
     if (unlikely(0 == length)) length = my_b_fill(cache);
 
+    /* Start 5.7 MySQL server will write GTID directly to binlog file.
+    This means GTID event is not present in the case if GTID is set explictly.
+    Let's construct the GTID event and prefix it to wsrep-binlog-buffer. */
+    if (thd->variables.gtid_next.type != AUTOMATIC_GROUP)
+    {
+      Gtid_log_event gtid_event(thd, true, 0, 0);
+      uchar gtid_buf[Gtid_log_event::MAX_EVENT_LENGTH];
+      uint32 gtid_len = gtid_event.write_to_memory(gtid_buf);
+
+      assert(Gtid_log_event::MAX_EVENT_LENGTH < STACK_SIZE);
+
+      memcpy(buf, gtid_buf, gtid_len);
+      used = gtid_len;
+      total_length = gtid_len;
+    }
+
     if (likely(length > 0)) do
     {
         total_length += length;
@@ -250,6 +267,22 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
 
     uint length(my_b_bytes_in_cache(cache));
     if (unlikely(0 == length)) length = my_b_fill(cache);
+
+    /* Start 5.7 MySQL server will write GTID directly to binlog file.
+    This means GTID event is not present in the case if GTID is set explictly.
+    Let's construct the GTID event and prefix it to wsrep-binlog-buffer. */
+    if (thd->variables.gtid_next.type != AUTOMATIC_GROUP)
+    {
+      Gtid_log_event gtid_event(thd, true, 0, 0);
+      uchar gtid_buf[Gtid_log_event::MAX_EVENT_LENGTH];
+      uint32 gtid_len = gtid_event.write_to_memory(gtid_buf);
+
+      if (WSREP_OK != (err=wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
+                                            gtid_buf, gtid_len)))
+        goto cleanup;
+
+      total_length = gtid_len;
+    }
 
     if (likely(length > 0)) do
     {

@@ -1290,6 +1290,28 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd)
   {
     DBUG_ASSERT(thd->variables.gtid_next.type == GTID_GROUP);
 
+#ifdef WITH_WSREP
+    /* Action below will log an empty group of GTID.
+    This is done when the real action fails to generate any meaningful result on
+    executing slave.
+    Let's understand with an example:
+    * Topology master <-> slave
+    * Some action is performed on slave which put it out-of-sync from master.
+    * Master then execute same action. Slave may choose to ignore error arising
+      from execution of these actions using slave_skip_errors configuration but
+      the GTID sequence increment still needs to register on slave to keep it in
+      sync with master. So a dummy trx of this form is created. Galera
+      eco-system too will capture this dummy trx and will execute it for
+      internal replication to keep GTID sequence consistent across
+      the cluster. */
+    ha_wsrep_fake_trx_id(thd);
+    thd->wsrep_certify_empty_trx= true;
+
+    // TODO: Flow below avoid creating entry in binlog if binlog is disabled.
+    // For Galera replication binlog is must. Check if below code should be
+    // avoided with WSREP flow.
+#endif
+
     if (!opt_bin_log || (thd->slave_thread && !opt_log_slave_updates))
     {
       /*

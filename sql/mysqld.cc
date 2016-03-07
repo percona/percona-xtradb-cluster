@@ -6141,7 +6141,6 @@ void* start_wsrep_THD(void *arg)
 
   /* from handle_bootstrap() */
   thd->security_context()->skip_grants();
-  thd->system_thread= SYSTEM_THREAD_SLAVE_SQL;
 
   /* handle_one_connection() again... */
   thd->proc_info= 0;
