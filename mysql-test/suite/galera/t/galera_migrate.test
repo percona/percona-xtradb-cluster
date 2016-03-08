@@ -88,12 +88,16 @@ INSERT INTO t1 VALUES (5);
 --let $wait_condition = SELECT COUNT(*) = 5 FROM t1;
 --source include/wait_condition.inc
 
+--disable_warnings
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
+--enable_warnings
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 SELECT VARIABLE_VALUE = 'Primary'  FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 --connection node_1
 INSERT INTO t1 VALUES (6);
@@ -104,11 +108,17 @@ INSERT INTO t1 VALUES (6);
 
 --connection node_3
 # We need a user with a password for mysqldump SST
-GRANT ALL PRIVILEGES ON *.* TO 'sst';
+call mtr.add_suppression("WSREP: Read non-wsrep XID from storage engine");
+CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
+GRANT ALL ON *.* TO 'sst'@'localhost';
+FLUSH PRIVILEGES;
 SET GLOBAL wsrep_sst_auth = 'sst:';
 
 --connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
-GRANT ALL PRIVILEGES ON *.* TO 'sst';
+call mtr.add_suppression("WSREP: Read non-wsrep XID from storage engine");
+CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
+GRANT ALL ON *.* TO 'sst'@'localhost';
+FLUSH PRIVILEGES;
 
 --disable_query_log
 --eval SET GLOBAL wsrep_sst_method = 'mysqldump';
@@ -125,12 +135,16 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 --let $wait_condition = SELECT COUNT(*) = 6 FROM t1;
 --source include/wait_condition.inc
 
+--disable_warnings
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
+--enable_warnings
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 SELECT VARIABLE_VALUE = 'Primary'  FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 
 #
@@ -160,22 +174,30 @@ INSERT INTO t1 VALUES (8);
 --connection node_4a
 SELECT COUNT(*) = 8 FROM t1;
 
+--disable_warnings
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
+--enable_warnings
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 SELECT VARIABLE_VALUE = 'Primary'  FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 --connection node_3a
 SELECT COUNT(*) = 8 FROM t1;
 
+--disable_warnings
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
+--enable_warnings
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 SELECT VARIABLE_VALUE = 'Primary'  FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 #
 # Teardown
@@ -192,7 +214,7 @@ SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
-DROP USER sst;
+DROP USER 'sst'@'localhost';
 
 --connection node_4
 SET GLOBAL wsrep_provider = 'none';
@@ -200,6 +222,8 @@ SET GLOBAL wsrep_sst_method = 'xtrabackup-v2';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
-DROP USER sst;
+DROP USER 'sst'@'localhost';
 
 CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
+CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");

@@ -10,20 +10,23 @@
 --source suite/galera/include/galera_sst_set_mysqldump.inc
 
 --connection node_1
-CREATE USER sslsst;
-GRANT ALL PRIVILEGES ON *.* TO sslsst;
-GRANT USAGE ON *.* TO sslsst REQUIRE SSL;
+CREATE USER 'sslsst'@'localhost' IDENTIFIED BY '';
+GRANT ALL ON *.* TO 'sslsst'@'localhost';
+GRANT USAGE ON *.* TO 'sslsst'@'localhost' REQUIRE SSL;
+FLUSH PRIVILEGES;
 
 SET GLOBAL wsrep_sst_auth = 'sslsst:';
 
 --source suite/galera/include/galera_st_disconnect_slave.inc
 
 --source suite/galera/include/galera_sst_restore.inc
-DROP USER sslsst;
+DROP USER 'sslsst'@'localhost';
 
 --connection node_2
 # We have to manually restore global_log and slow_query_log due to mysql-wsrep#108
 # Otherwise MTR's check_testcases complains
+CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");
 
 SET GLOBAL general_log = ON;
 SET GLOBAL slow_query_log = ON;

@@ -81,12 +81,16 @@ INSERT INTO t1 VALUES (DEFAULT);
 
 CALL mtr.add_suppression("WSREP: Action message in non-primary configuration from member 0");
 
+--disable_warnings
 SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 --connection node_1a
+--disable_warnings
 SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 DROP PROCEDURE p1;
 DROP TABLE t1;

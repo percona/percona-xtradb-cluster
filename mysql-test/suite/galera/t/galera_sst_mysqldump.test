@@ -16,3 +16,7 @@
 --source suite/galera/include/galera_st_kill_slave_ddl.inc
 
 --source suite/galera/include/galera_sst_restore.inc
+
+--connection node_2
+CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");

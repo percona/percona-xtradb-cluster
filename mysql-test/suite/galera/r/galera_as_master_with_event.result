@@ -45,6 +45,7 @@ START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 #node-2
+# restart
 show events;
 Db	Name	Definer	Time zone	Type	Execute at	Interval value	Interval field	Starts	Ends	Status	Originator	character_set_client	collation_connection	Database Collation
 test	foo	root@localhost	SYSTEM	RECURRING	NULL	1	#	#	NULL	SLAVESIDE_DISABLED	1	latin1	latin1_swedish_ci	latin1_swedish_ci

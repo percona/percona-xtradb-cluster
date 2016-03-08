@@ -6,7 +6,9 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
+--disable_warnings
 SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER);

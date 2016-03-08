@@ -21,9 +21,15 @@ SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_N
 VARIABLE_VALUE = 1
 1
 INSERT INTO t1 VALUES (6);
-GRANT ALL PRIVILEGES ON *.* TO 'sst';
+call mtr.add_suppression("WSREP: Read non-wsrep XID from storage engine");
+CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
+GRANT ALL ON *.* TO 'sst'@'localhost';
+FLUSH PRIVILEGES;
 SET GLOBAL wsrep_sst_auth = 'sst:';
-GRANT ALL PRIVILEGES ON *.* TO 'sst';
+call mtr.add_suppression("WSREP: Read non-wsrep XID from storage engine");
+CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
+GRANT ALL ON *.* TO 'sst'@'localhost';
+FLUSH PRIVILEGES;
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE = 'Synced'
 1
@@ -69,11 +75,13 @@ SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
-DROP USER sst;
+DROP USER 'sst'@'localhost';
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = 'xtrabackup-v2';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
-DROP USER sst;
+DROP USER 'sst'@'localhost';
 CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
+CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");

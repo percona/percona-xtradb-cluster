@@ -6,7 +6,9 @@
 
 --connection node_1
 # We need a user with a password to perform SST, otherwise we hit LP #1378253
-GRANT ALL PRIVILEGES ON *.* TO 'sst';
+CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
+GRANT ALL ON *.* TO 'sst'@'localhost';
+FLUSH PRIVILEGES;
 
 --let $wsrep_sst_auth_orig = `SELECT @@wsrep_sst_auth`
 SET GLOBAL wsrep_sst_auth = 'sst:';
