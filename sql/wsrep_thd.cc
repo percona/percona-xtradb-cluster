@@ -196,11 +196,10 @@ void wsrep_replay_transaction(THD *thd)
       /* PS reprepare observer should have been removed already
          open_table() will fail if we have dangling observer here
        */
-      if (thd->get_reprepare_observer())
+      if (thd->get_reprepare_observer() && wsrep_log_conflicts)
       {
-        WSREP_INFO("dangling observer in replay transaction: (thr %lu %lld %s)",
+        WSREP_WARN("dangling observer in replay transaction: (thr %lu %lld %s)",
                    thd->thread_id, thd->query_id, thd->query());
-        thd->reset_reprepare_observers();
       }
       thd->get_stmt_da()->reset_diagnostics_area();
 
