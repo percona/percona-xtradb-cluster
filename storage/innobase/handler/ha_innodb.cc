@@ -19627,6 +19627,113 @@ wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno)
 	abort();
 }
 
+
+/*
+  This function is needed only for canceling thread, which are inside replicator processing
+  commit, when high priority transaction aborts the victim
+ */
+int
+wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx)
+{
+	DBUG_ENTER("wsrep_signal_replicator");
+        THD *bf_thd       = (THD*) bf_trx->mysql_thd;
+	THD *thd          = (THD *) victim_trx->mysql_thd;
+	int64_t bf_seqno  = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
+
+	if (!thd) {
+		DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
+		WSREP_WARN("no THD for trx: %llu", (long long)victim_trx->id);
+		DBUG_RETURN(1);
+	}
+	if (!bf_thd) {
+		DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
+		WSREP_WARN("no BF THD for trx: %llu",
+			   (bf_trx) ? (long long)bf_trx->id : 0);
+		DBUG_RETURN(1);
+	}
+
+	WSREP_LOG_CONFLICT(bf_thd, thd, TRUE);
+
+	WSREP_DEBUG("BF kill (seqno: %lld), victim: (%u) trx: %llu",
+		    (long long)bf_seqno,
+		    wsrep_thd_thread_id(thd),
+		    (long long)victim_trx->id);
+
+	WSREP_DEBUG("Aborting query: %s",
+		  (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+
+	wsrep_thd_LOCK(thd);
+
+	if (wsrep_thd_query_state(thd) == QUERY_EXITING) {
+		WSREP_DEBUG("kill trx EXITING for %llu",
+			    (long long)victim_trx->id);
+		wsrep_thd_UNLOCK(thd);
+		DBUG_RETURN(0);
+	}
+
+	switch (wsrep_thd_conflict_state(thd)) {
+	case NO_CONFLICT:
+		wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
+		break;
+        case MUST_ABORT:
+		WSREP_DEBUG("victim %llu in MUST ABORT state",
+			    (long long)victim_trx->id);
+		break;
+	case ABORTED:
+	case ABORTING: // fall through
+	default:
+		WSREP_DEBUG("victim %llu in state %d",
+			    (long long)victim_trx->id,
+			    wsrep_thd_conflict_state(thd));
+		wsrep_thd_UNLOCK(thd);
+		DBUG_RETURN(0);
+		break;
+	}
+
+	switch (wsrep_thd_query_state(thd)) {
+	case QUERY_COMMITTING:
+		enum wsrep_status rcode;
+
+		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu",
+			    (long long)victim_trx->id);
+
+		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
+			wsrep_abort_slave_trx(bf_seqno,
+					      wsrep_thd_trx_seqno(thd));
+		} else {
+			rcode = wsrep->abort_pre_commit(
+				wsrep, bf_seqno,
+				(wsrep_trx_id_t)victim_trx->id
+			);
+			switch (rcode) {
+			case WSREP_WARNING:
+				WSREP_DEBUG("cancel commit warning: %llu",
+					    (long long)victim_trx->id);
+				wsrep_thd_UNLOCK(thd);
+				DBUG_RETURN(1);
+				break;
+			case WSREP_OK:
+				break;
+			default:
+				WSREP_ERROR(
+					"cancel commit bad exit: %d %llu",
+					rcode,
+					(long long)victim_trx->id);
+				/* unable to interrupt, must abort */
+				/* note: kill_mysql() will block, if we cannot.
+				 * kill the lock holder first.
+				 */
+				abort();
+				break;
+			}
+		}
+		break;
+        default: break;
+        }
+	wsrep_thd_UNLOCK(thd);
+        DBUG_RETURN(0);
+}
+
 int
 wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                             const trx_t * const bf_trx,

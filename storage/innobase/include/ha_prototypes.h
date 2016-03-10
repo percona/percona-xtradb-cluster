@@ -240,6 +240,8 @@ innobase_casedn_str(
 
 #ifdef WITH_WSREP
 int
+wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx);
+int
 wsrep_innobase_kill_one_trx(void *thd_ptr,
                             const trx_t *bf_trx, trx_t *victim_trx, ibool signal);
 my_bool wsrep_thd_set_PA_safe(void *thd_ptr, my_bool safe);
