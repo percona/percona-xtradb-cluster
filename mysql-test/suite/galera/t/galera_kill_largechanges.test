@@ -32,7 +32,9 @@ INSERT INTO t1 SELECT REPEAT('a', 128) FROM ten AS a1, ten AS a2, ten AS a3, ten
 --connection node_2a
 
 SELECT COUNT(*) = 1000000 FROM t1;
+--disable_warnings
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 --connection node_1
 --disable_query_log

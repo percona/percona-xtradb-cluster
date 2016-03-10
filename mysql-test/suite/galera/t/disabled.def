@@ -8,3 +8,4 @@ galera_split_brain : fails with an assert on cent-os for while now. needs to be 
 galera_flush_local : timeout failure
 galera_flush_gtid : timeout failure
 galera_admin : timeout failure
+galera_fk_multitable : MySQL upstram bug#80478. Multi-table delete issue.
