@@ -419,8 +419,10 @@ trx_sys_read_wsrep_checkpoint(XID* xid)
 
 	}
 
-	xid->set_format_id(mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
-				+ TRX_SYS_WSREP_XID_FORMAT));
+	/* Make sure we first load it to int32_t so the sign bit is preserved.*/
+	int32_t format_id = mach_read_from_4(sys_header + TRX_SYS_WSREP_XID_INFO
+					     + TRX_SYS_WSREP_XID_FORMAT);
+	xid->set_format_id(format_id);
 
 	xid->set_gtrid_length(mach_read_from_4(sys_header
 				+ TRX_SYS_WSREP_XID_INFO

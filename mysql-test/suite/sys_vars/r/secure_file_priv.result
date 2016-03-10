@@ -7,11 +7,11 @@ SHOW VARIABLES LIKE 'secure_file_priv';
 Variable_name	Value
 secure_file_priv	
 c1
-five
-four
-three
-two
 one
+two
+three
+four
+five
 loaded_file
 one
 two

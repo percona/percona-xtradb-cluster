@@ -108,14 +108,12 @@ INSERT INTO t1 VALUES (6);
 
 --connection node_3
 # We need a user with a password for mysqldump SST
-call mtr.add_suppression("WSREP: Read non-wsrep XID from storage engine");
 CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
 GRANT ALL ON *.* TO 'sst'@'localhost';
 FLUSH PRIVILEGES;
 SET GLOBAL wsrep_sst_auth = 'sst:';
 
 --connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
-call mtr.add_suppression("WSREP: Read non-wsrep XID from storage engine");
 CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
 GRANT ALL ON *.* TO 'sst'@'localhost';
 FLUSH PRIVILEGES;
