@@ -3,12 +3,6 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) Engine=InnoDB;
 INSERT INTO t1 SELECT f1 FROM ten ORDER BY RAND();
 UPDATE IGNORE t1 SET f1 = FLOOR(1 + (RAND() * 10)) ORDER BY RAND() LIMIT 5;
-Warnings:
-Warning	1062	Duplicate entry '3' for key 'PRIMARY'
-Warning	1062	Duplicate entry '2' for key 'PRIMARY'
-Warning	1062	Duplicate entry '1' for key 'PRIMARY'
-Warning	1062	Duplicate entry '10' for key 'PRIMARY'
-Warning	1062	Duplicate entry '6' for key 'PRIMARY'
 sum_matches
 1
 max_matches

@@ -2100,7 +2100,9 @@ void THD::init_for_queries(Relay_log_info *rli)
 
 #ifdef WITH_WSREP
     DBUG_ASSERT(rli_slave->info_thd == this &&
-                (slave_thread || wsrep_applier));
+                (slave_thread ||
+                 wsrep_applier ||
+                 rli_slave->info_thd->wsrep_conflict_state == REPLAYING));
 #else
     DBUG_ASSERT(rli_slave->info_thd == this && slave_thread);
 #endif /* WITH_WSREP */

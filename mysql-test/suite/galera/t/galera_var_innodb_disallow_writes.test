@@ -18,8 +18,19 @@ SET GLOBAL innodb_disallow_writes=ON;
 --send INSERT INTO t1 VALUES (1);
 
 --connection node_1a
+
+# Why we need to switch this ?
+# INSERT IS BLOCKED DUE TO DISALLOW_WRITE which in turn holds dict_sys mutex.
+# SELECT ON INFORMATION_SCHEMA will create a new internal temporary table
+# that needs dict_sys mutex.
+# This result in blocking SELECT statement and so test-case can't proceed.
+--let $internal_tmp_table = `SELECT @@internal_tmp_disk_storage_engine`
+SET GLOBAL internal_tmp_disk_storage_engine = 'MyISAM';
+
 let $wait_condition = SELECT 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO = 'INSERT INTO t1 VALUES (1)' AND State = 'wsrep in pre-commit stage';
 --source include/wait_condition.inc
+
+--eval SET GLOBAL internal_tmp_disk_storage_engine = $internal_tmp_table
 
 SET GLOBAL innodb_disallow_writes=OFF;
 
