@@ -2655,7 +2655,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         }
       }
 #endif /* WITH_WSREP_TODO */
-      else
+      else if (WSREP(requestor_ctx->wsrep_get_thd()))
       {
         WSREP_DEBUG("granting MDL for BF thread over unobstrusive locks");
         can_grant= TRUE;
