@@ -4643,22 +4643,6 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
     reason= Log_event::EVENT_SKIP_IGNORE;
     skip_event= TRUE;
   }
-  else if (WSREP_ON && (ev->get_type_code() == binary_log::XID_EVENT ||
-      (ev->get_type_code() == binary_log::QUERY_EVENT &&
-       thd->wsrep_mysql_replicated > 0 &&
-       (!strncasecmp(((Query_log_event*)ev)->query , "BEGIN", 5) ||
-        !strncasecmp(((Query_log_event*)ev)->query , "COMMIT", 6) ))))
-  {
-    if (++thd->wsrep_mysql_replicated < (int)wsrep_mysql_replication_bundle)
-    {
-      WSREP_DEBUG("skipping wsrep commit %d", thd->wsrep_mysql_replicated);
-      reason = Log_event::EVENT_SKIP_IGNORE;
-    }
-    else
-    {
-      thd->wsrep_mysql_replicated = 0;
-    }
-  }
 #endif /* WITH_WSREP */
   if (reason == Log_event::EVENT_SKIP_COUNT)
   {

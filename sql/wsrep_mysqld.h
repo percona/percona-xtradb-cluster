@@ -94,7 +94,6 @@ extern my_bool     wsrep_desync;
 extern ulong       wsrep_reject_queries_options;
 extern my_bool     wsrep_recovery;
 extern my_bool     wsrep_log_conflicts;
-extern ulong       wsrep_mysql_replication_bundle;
 extern my_bool     wsrep_load_data_splitting;
 extern my_bool     wsrep_restart_slave;
 extern my_bool     wsrep_restart_slave_activated;

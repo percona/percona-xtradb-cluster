@@ -61,7 +61,6 @@ long    wsrep_max_protocol_version     = 3; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
 my_bool wsrep_log_conflicts            = 0;
-ulong   wsrep_mysql_replication_bundle = 0;
 my_bool wsrep_desync                   = 0; // desynchronize the node from the
                                             // cluster
 my_bool wsrep_load_data_splitting      = 1; // commit load data every 10K intervals
