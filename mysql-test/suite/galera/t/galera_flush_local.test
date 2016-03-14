@@ -140,11 +140,11 @@ REPAIR TABLE x1, x2;
 
 --disable_query_log
 
-let $wait_timeout= 300;
+let $wait_timeout= 600;
 --let $wait_condition =  SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before2 AS wsrep_last_committed_diff;
 --source include/wait_condition.inc
 
-let $wait_timeout= 300;
+let $wait_timeout= 600;
 --let $wait_condition = SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before + 9 AS wsrep_last_committed_diff2;
 --source include/wait_condition.inc
 
