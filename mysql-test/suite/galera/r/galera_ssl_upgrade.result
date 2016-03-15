@@ -4,18 +4,21 @@ VARIABLE_VALUE = 'Synced'
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
+# restart: --wsrep-cluster-address=gcomm://127.0.0.1:13005 --wsrep_provider_options=base_port=13001;socket.ssl=yes;socket.ssl_ca=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-upgrade-ca-cert.pem;socket.ssl_cert=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-cert.pem;socket.ssl_key=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-key.pem
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE = 'Synced'
 1
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
+# restart: --wsrep_provider_options=base_port=13005;socket.ssl=yes;socket.ssl_ca=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-upgrade-ca-cert.pem;socket.ssl_cert=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-upgrade-server-cert.pem;socket.ssl_key=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-upgrade-server-key.pem
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE = 'Synced'
 1
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
+# restart: --wsrep-cluster-address=gcomm://127.0.0.1:13005 --wsrep_provider_options=base_port=13001;socket.ssl=yes;socket.ssl_ca=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-upgrade-ca-cert.pem;socket.ssl_cert=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-upgrade-server-cert.pem;socket.ssl_key=/opt/projects/codebase/pxc/pxc57/mysql-test/std_data/galera-upgrade-server-key.pem
 SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE = 'Synced'
 1

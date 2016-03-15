@@ -3158,7 +3158,16 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
     as well for MDL_object_lock::notify_conflicting_locks() to work
     properly.
   */
+#ifdef WITH_WSREP
+  /* WSREP preempt lock if thread is applier or TOTAL_ORDER and so
+  we avoid using fast path as fast path locks needs to be materalize
+  before conflict checks can be done which causes issue with preempt
+  approach WSREP uses.
+  TODO: Check if this preempt approach can be relaxed. */
+  force_slow= true;
+#else
   force_slow= ! unobtrusive_lock_increment || m_needs_thr_lock_abort;
+#endif
 
   /*
     If "obtrusive" lock is requested we need to "materialize" all fast
