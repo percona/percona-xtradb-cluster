@@ -675,6 +675,17 @@ bool start_slave_cmd(THD *thd)
     my_message(ER_SLAVE_CONFIGURATION, ER(ER_SLAVE_CONFIGURATION), MYF(0));
     goto err;
   }
+#ifdef WITH_WSREP
+  if (WSREP_ON && !opt_log_slave_updates)
+  {
+    /*
+       bad configuration, mysql replication would not be forwarded to wsrep cluster
+       which would lead to immediate inconsistency
+    */
+    my_message(ER_SLAVE_CONFIGURATION, "bad configuration no log_slave_updates defined, slave would not replicate further to wsrep cluster", MYF(0));
+    goto err;
+  }
+#endif /* WITH_WSREP */
 
 
   if (!lex->mi.for_channel)
