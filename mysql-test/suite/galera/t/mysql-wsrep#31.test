@@ -25,7 +25,24 @@ if ($galera_wsrep_start_position != $expected_position)
   die(Expected position: $expected_position, found $galera_wsrep_start_position);
 }
 
+#
+# Test for removal of special value used in wsrep_recover
+#
+--source include/wait_until_disconnected.inc
+
+--echo Recovering server 2 ...
+--let $galera_wsrep_recover_server_id=2
+--let $galera_wsrep_extra_cmdline_parameter = '--wsrep-start-position=00000000-0000-0000-0000-000000000000:-2'
+--source suite/galera/include/galera_wsrep_recover.inc
+
+# This should give the same result as before, it should ignore the use of this special value
+if ($galera_wsrep_start_position != $expected_position)
+{
+  die(Expected position: $expected_position, found $galera_wsrep_start_position);
+}
+
 --echo Restarting server ...
+--let $galera_wsrep_extra_cmdline_parameter=''
 --source include/start_mysqld.inc
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
