@@ -1899,6 +1899,16 @@ int ha_rollback_low(THD *thd, bool all)
       handlerton *ht= ha_info->ht();
       if ((err= ht->rollback(ht, thd, all)))
       { // cannot happen
+#ifdef WITH_WSREP
+        WSREP_INFO("rollback failed for ht: %d, conf: %d SQL %s",
+                   ht->db_type, thd->wsrep_conflict_state, thd->query().str);
+        Diagnostics_area *da= thd->get_stmt_da();
+        if (da)
+        {
+          WSREP_INFO("stmt DA %d %s",
+                     da->status(), (da->is_error()) ? da->message_text() : "void");
+        }
+#endif /* WITH_WSREP */
         my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err);
         error= 1;
       }
