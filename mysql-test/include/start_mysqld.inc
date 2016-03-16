@@ -5,7 +5,10 @@ if (!$restart_parameters)
 
 # We use --exec echo instead of simple "--echo" because
 # replace_result works on --exec
---exec echo "# $restart_parameters"
+# we avoid printing restart argument as galera uses files specific names
+# that then needs to be either replaced so that result file is compatible
+# on all distro or we use generic restart keyword.
+--exec echo "# restart"
 
 # Include this script only after using shutdown_mysqld.inc
 # or kill_mysqld.inc or expect_crash.inc

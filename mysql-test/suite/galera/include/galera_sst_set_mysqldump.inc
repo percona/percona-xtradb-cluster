@@ -20,6 +20,6 @@ SET GLOBAL wsrep_sst_auth = 'sst:';
 
 --disable_query_log
 # Set wsrep_sst_receive_address to the SQL port
---eval SET GLOBAL wsrep_sst_receive_address = '127.0.0.2:$NODE_MYPORT_2';
+--eval SET GLOBAL wsrep_sst_receive_address = '127.0.0.1:$NODE_MYPORT_2';
 --enable_query_log
 SET GLOBAL wsrep_sst_method = 'mysqldump';

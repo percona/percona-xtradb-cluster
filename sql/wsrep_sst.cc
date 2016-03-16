@@ -96,6 +96,7 @@ bool wsrep_sst_method_update (sys_var *self, THD* thd, enum_var_type type)
     return 0;
 }
 
+#if 0
 static bool sst_receive_address_check (const char* str)
 {
     if (!strncasecmp(str, "127.0.0.1", strlen("127.0.0.1")) ||
@@ -106,6 +107,7 @@ static bool sst_receive_address_check (const char* str)
 
     return 0;
 }
+#endif
 
 /* Function checks if the new value for sst_recieve_address is valid.
 @return false if no error encountered with check else return true. */
@@ -123,10 +125,12 @@ bool wsrep_sst_receive_address_check (sys_var *self, THD* thd, set_var* var)
          var->save_result.string_value.length);
   addr_buf[var->save_result.string_value.length]= 0;
 
+#if 0
   if (sst_receive_address_check(addr_buf))
   {
     goto err;
   }
+#endif
 
   return false;
 
