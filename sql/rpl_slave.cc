@@ -1843,6 +1843,18 @@ bool start_slave_threads(bool need_lock_slave, bool wait_for_start,
              mi->get_for_channel_str());
     DBUG_RETURN(true);
   }
+#ifdef WITH_WSREP
+  if (WSREP_ON && !opt_log_slave_updates)
+  {
+    /*
+       bad configuration, mysql replication would not be forwarded to wsrep cluster
+       which would lead to immediate inconsistency
+    */
+    WSREP_WARN("Cannot start MySQL slave, when log_slave_updates is not set");
+    my_error(ER_SLAVE_CONFIGURATION, MYF(0), "bad configuration no log_slave_updates defined, slave would not replicate further to wsrep cluster");
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   if (need_lock_slave)
   {

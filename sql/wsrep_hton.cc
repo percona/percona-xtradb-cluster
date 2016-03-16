@@ -70,11 +70,6 @@ void wsrep_register_hton(THD* thd, bool all)
 {
   if (!WSREP(thd)) return;
 
-  if (thd->slave_thread && !opt_log_slave_updates)
-    {
-      WSREP_DEBUG("skipping binlogging for slave, with no log_slave_updates");
-      return;
-    }
   if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
     Transaction_ctx *trn_ctx= thd->get_transaction();
