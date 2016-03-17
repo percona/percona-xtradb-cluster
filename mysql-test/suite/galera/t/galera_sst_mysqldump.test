@@ -20,3 +20,6 @@
 --connection node_2
 CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
 CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");
+CALL mtr.add_suppression("Gtid table is not ready to be used..*");
+CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
+CALL mtr.add_suppression("InnoDB: Cannot open.*");
