@@ -1,0 +1,21 @@
+MySQL source package
+====================
+The question arises why we have the mysql-source-* packages and why
+they are arch:any wasting so much space. This conversation covered the
+issue although it should probably be looked at again.
+
+(26/05/12 16:24:18) SpamapS: periapt: hey, are you 100% sure that mysql-source-5.5 is arch: all ?
+(16:24:37) SpamapS: periapt: It includes generated files.. some of which might be arch specific. I've never taken the time to make sure.
+(16:35:56) periapt: SpamapS: Actually that's a fair point - cmake output. But then I think we ought to drop it. I view it as duplication which I think is against Debian policy.
+(16:44:04) periapt: It seems to be some sort of hangover from when the licensing issues were much worse. It's popcorn rating is almost lower than the arches we support.
+(16:49:27) SpamapS: Nope, its needed for plugins
+(16:49:39) SpamapS: It is only useful as a build-dep
+(16:49:57) SpamapS: Now, I have been made aware of the fact that source format 3.0 allows multiple upstreams..
+(16:50:24) SpamapS: periapt: I created the package, and I use it as a build-dep for handlersocket.
+(16:50:54) SpamapS: periapt: perhaps we should add handlersocket as a second upstream source. That would eliminate the need for it.
+(16:55:21) periapt: SpamapS: I would advise against multiple upstream sources. I actually tried to write some debhelper stuff to maange it. I never got the uscan wrapper working and it's horrible: pkg-components.
+(16:56:23) SpamapS: periapt: then we cannot remove the mysql-source-* packages
+(16:56:57) periapt: I'll put it back to arch:any for now and update the long description. I notice there are already bugs that cover the issue of how to manage plugins. I think it should be revisited. 
+(16:57:30) SpamapS: periapt: perhaps the clarity from this discussion belongs in README.source too :)
+(16:57:40) periapt: okay
+(16:58:15) periapt: Actually I would prefer the FAQ: http://wiki.debian.org/Teams/MySQL/FAQ

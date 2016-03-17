@@ -1,0 +1,4 @@
+version=3
+opts=\
+downloadurlmangle=s/\/downloads\/gpg\/?\?file=(mysql-boost-([\d\.]*).tar.gz)/\/get\/Downloads\/MySQL-5.7\/$1/,pgpsigurlmangle=s/\/get\/Downloads\/MySQL-5.7\/(mysql-boost-([\d\.]*).tar.gz)/\/downloads\/gpg\/?file=$1/,filenamemangle=s/\/downloads\/gpg\/?\?file=mysql\-boost\-([\d\.]*)\.tar\.gz/mysql-boost-$1.tar.gz/ \
+http://dev.mysql.com/downloads/mysql/5.7.html?os=src /downloads/gpg/\?file=mysql-boost-([\d\.]*).tar.gz

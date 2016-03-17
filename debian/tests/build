@@ -1,0 +1,35 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against libmysqlclient, to verify that the
+# headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# Author: Daniel Kessel <d.kessel@gmx.de>
+
+echo "test 'build' starting"
+set -e
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+
+cat <<EOF > libmysqltest.c
+#include <stdio.h>
+#include <mysql.h>
+
+int main()
+{
+    if (mysql_library_init(0, NULL, NULL)) {
+        fprintf(stderr, "failed to initialize mysql client library\n");
+	return 1;
+    }
+
+    mysql_library_end();
+    return 0;
+}
+EOF
+
+echo "building..."
+gcc -o libmysqltest libmysqltest.c `/usr/bin/mysql_config --cflags --libs` -Wall -Werror
+echo "build: OK"
+[ -x libmysqltest ]
+./libmysqltest
+echo "run: OK"

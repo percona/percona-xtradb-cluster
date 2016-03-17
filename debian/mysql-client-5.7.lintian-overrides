@@ -1,0 +1,8 @@
+# Will look at man pages later 
+# 2012-03-08 periapt
+# still no update
+# 2012-01-09 jesusch-guest
+# These long lines reproduce actual output and to reformat them
+# would damage the integrity of the man page.
+manpage-has-errors-from-man usr/share/man/man1/mysqladmin.1.gz 37: warning [p 1, 1.5i]: can't break line
+manpage-has-errors-from-man usr/share/man/man1/mysqldump.1.gz 1623: warning [p 9, 10.2i, div `3tbd3,1', 0.3i]: can't break line

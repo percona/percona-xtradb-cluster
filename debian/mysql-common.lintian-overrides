@@ -1,0 +1,3 @@
+# this removes the my.cnf.migrated alternative right before purging
+# my.cnf.migrated which is not a conffile
+maintainer-script-should-not-use-update-alternatives-remove postrm:5

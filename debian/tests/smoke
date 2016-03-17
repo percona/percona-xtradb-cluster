@@ -1,0 +1,59 @@
+#!/bin/sh
+set -ex
+
+# dep8 smoke test for mysql-server
+# Author: Robie Basak <robie.basak at canonical.com>
+#
+# This test should be declared in debian/tests/control with a dependency
+# on the package that provides a configured MySQL server (eg.
+# mysql-server-5.6).
+#
+# This test should be declared in debian/tests/control with the
+# following restrictions:
+#
+# needs-root (needed to reset the root mysql password)
+# breaks-testbed (because it resets the root mysql password)
+# allow-stderr
+#
+# This test:
+#
+# 1) Configures packaged mysql server root password with maintainer
+# scripts.
+#
+# 2) Creates a test database and test user as the root user.
+#
+# 3) Creates a test table and checks it appears to operate normally
+# using the test user and test database.
+
+debconf-set-selections <<EOT
+mysql-server-5.7 mysql-server/root_password password rootpassword
+mysql-server-5.7 mysql-server/root_password_again password rootpassword
+EOT
+
+DEBIAN_FRONTEND=noninteractive dpkg-reconfigure mysql-server-5.7
+
+mysql --user=root --password=rootpassword <<EOT
+CREATE DATABASE testdatabase;
+CREATE USER 'testuser'@'localhost' identified by 'testpassword';
+GRANT ALL ON testdatabase.* TO 'testuser'@'localhost';
+EOT
+
+mysql --user=testuser --password=testpassword testdatabase <<EOT
+CREATE TABLE foo (bar INTEGER);
+INSERT INTO foo (bar) VALUES (41);
+EOT
+
+result=`echo 'SELECT bar+1 FROM foo;'|mysql --batch --skip-column-names --user=testuser --password=testpassword testdatabase`
+if [ "$result" != "42" ]; then
+       echo "Unexpected result" >&2
+       exit 1
+fi
+
+mysql --user=testuser --password=testpassword testdatabase <<EOT
+DROP TABLE foo;
+EOT
+
+mysql --user=root --password=rootpassword <<EOT
+DROP DATABASE testdatabase;
+DROP USER 'testuser'@'localhost';
+EOT
