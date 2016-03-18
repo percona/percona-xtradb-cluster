@@ -1,4 +1,3 @@
-fix-man-page-links.patch
 fix-mtr-search-paths.patch
 fix_hurd_kfreebsd.patch
 mips64el.patch
