@@ -6,8 +6,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: templates\n"
-"Report-Msgid-Bugs-To: mysql-5.7@packages.debian.org\n"
-"POT-Creation-Date: 2016-03-16 15:13+0000\n"
+"Report-Msgid-Bugs-To: mysql-wsrep-5.7@packages.debian.org\n"
+"POT-Creation-Date: 2016-03-19 01:30+0200\n"
 "PO-Revision-Date: 2007-05-01 13:04+0300\n"
 "Last-Translator: Ossama M. Khayat <okhayat@yahoo.com>\n"
 "Language-Team: Arabic <support@arabeyes.org>\n"
@@ -27,19 +27,19 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:2001
+#: ../mysql-wsrep-server-5.7.templates:2001
 msgid "Really proceed with downgrade?"
 msgstr "هل فعلاً تريد التثبيط؟"
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:2001
+#: ../mysql-wsrep-server-5.7.templates:2001
 msgid "A file named /var/lib/mysql/debian-*.flag exists on this system."
 msgstr "هناك ملف مسمى /var/lib/mysql/debian-*.flag موجود على هذا النظام."
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:2001
+#: ../mysql-wsrep-server-5.7.templates:2001
 #, fuzzy
 #| msgid ""
 #| "Such file is an indication that a mysql-server package with a higher "
@@ -52,7 +52,7 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:2001
+#: ../mysql-wsrep-server-5.7.templates:2001
 msgid ""
 "There is no guarantee that the version you're currently installing will be "
 "able to use the current databases."
@@ -62,13 +62,13 @@ msgstr ""
 
 #. Type: note
 #. Description
-#: ../mysql-server-5.7.templates:3001
+#: ../mysql-wsrep-server-5.7.templates:3001
 msgid "Important note for NIS/YP users"
 msgstr "ملاحظة هامة لمستخدمي NIS/YP"
 
 #. Type: note
 #. Description
-#: ../mysql-server-5.7.templates:3001
+#: ../mysql-wsrep-server-5.7.templates:3001
 msgid ""
 "Using MySQL under NIS/YP requires a mysql user account to be added on the "
 "local system with:"
@@ -76,7 +76,7 @@ msgstr ""
 
 #. Type: note
 #. Description
-#: ../mysql-server-5.7.templates:3001
+#: ../mysql-wsrep-server-5.7.templates:3001
 #, fuzzy
 #| msgid ""
 #| "You should also check the permissions and the owner of the /var/lib/mysql "
@@ -88,13 +88,13 @@ msgstr "عليك أيضاً أن تقوم بالتأكد من صلاحيات م�
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:4001
+#: ../mysql-wsrep-server-5.7.templates:4001
 msgid "Remove all MySQL databases?"
 msgstr "إزالة جميع قواعد بيانات MySQL؟"
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:4001
+#: ../mysql-wsrep-server-5.7.templates:4001
 msgid ""
 "The /var/lib/mysql directory which contains the MySQL databases is about to "
 "be removed."
@@ -102,7 +102,7 @@ msgstr "الدليل /var/lib/mysql الذي يحتوي قواعد بيانات 
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:4001
+#: ../mysql-wsrep-server-5.7.templates:4001
 msgid ""
 "This will also erase all data in /var/lib/mysql-files as well as /var/lib/"
 "mysql-keyring."
@@ -110,7 +110,7 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:4001
+#: ../mysql-wsrep-server-5.7.templates:4001
 msgid ""
 "If you're removing the MySQL package in order to later install a more recent "
 "version or if a different mysql-server package is already using it, the data "
@@ -121,13 +121,13 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:5001
+#: ../mysql-wsrep-server-5.7.templates:5001
 msgid "Start the MySQL server on boot?"
 msgstr "تشغيل خادم MySQL عند الإقلاع؟"
 
 #. Type: boolean
 #. Description
-#: ../mysql-server-5.7.templates:5001
+#: ../mysql-wsrep-server-5.7.templates:5001
 msgid ""
 "The MySQL server can be launched automatically at boot time or manually with "
 "the '/etc/init.d/mysql start' command."
@@ -137,13 +137,13 @@ msgstr ""
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.7.templates:6001
+#: ../mysql-wsrep-server-5.7.templates:6001
 msgid "New password for the MySQL \"root\" user:"
 msgstr "كلمة المرور الجديدة لمستخد \"root\" الخاص بـMySQL:"
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.7.templates:6001
+#: ../mysql-wsrep-server-5.7.templates:6001
 msgid ""
 "While not mandatory, it is highly recommended that you set a password for "
 "the MySQL administrative \"root\" user."
@@ -153,7 +153,7 @@ msgstr ""
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.7.templates:6001
+#: ../mysql-wsrep-server-5.7.templates:6001
 #, fuzzy
 #| msgid "If that field is left blank, the password will not be changed."
 msgid "If this field is left blank, the password will not be changed."
@@ -161,7 +161,7 @@ msgstr "إن ترك الحقل فارغاً، فلن يتم تغيير كلمة 
 
 #. Type: password
 #. Description
-#: ../mysql-server-5.7.templates:7001
+#: ../mysql-wsrep-server-5.7.templates:7001
 #, fuzzy
 #| msgid "New password for the MySQL \"root\" user:"
 msgid "Repeat password for the MySQL \"root\" user:"
@@ -169,25 +169,25 @@ msgstr "كلمة المرور الجديدة لمستخد \"root\" الخاص ب
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.7.templates:8001
+#: ../mysql-wsrep-server-5.7.templates:8001
 msgid "Password input error"
 msgstr ""
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.7.templates:8001
+#: ../mysql-wsrep-server-5.7.templates:8001
 msgid "The two passwords you entered were not the same. Please try again."
 msgstr ""
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.7.templates:9001
+#: ../mysql-wsrep-server-5.7.templates:9001
 msgid "NDB Cluster seems to be in use"
 msgstr ""
 
 #. Type: error
 #. Description
-#: ../mysql-server-5.7.templates:9001
+#: ../mysql-wsrep-server-5.7.templates:9001
 msgid ""
 "MySQL-5.7 no longer provides NDB Cluster support. Please migrate to the new "
 "mysql-cluster-server package and remove all lines starting with \"ndb\" from "
