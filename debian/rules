@@ -46,14 +46,14 @@ endif
 
 override_dh_auto_clean:
 	@echo "RULES.$@"
-	dh_testdir 
+	dh_testdir
 	dh_testroot
 	[ ! -d mysql-test/var ] || rm -rf mysql-test/var
 	rm -rf $(BUILDDIR)
 	debconf-updatepo
 	rm -f $(EXPORTED_SOURCE_TARBALL)
 
-override_dh_prep: 
+override_dh_prep:
 
 override_dh_auto_configure: configure-stamp
 
@@ -62,7 +62,7 @@ configure-stamp:
 	@echo "RULES.$@"
 	dh_testdir
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
-	sh -c  'PATH=$${MYSQL_BUILD_PATH:-"/bin:/usr/bin"} \
+	sh -c  'PATH=$${MYSQL_BUILD_PATH:-"/usr/local/bin:/bin:/usr/bin"} \
 		CC=$${MYSQL_BUILD_CC:-gcc} \
 		CXX=$${MYSQL_BUILD_CXX:-g++} \
 		cmake -DCMAKE_INSTALL_PREFIX=/usr \
@@ -70,12 +70,13 @@ configure-stamp:
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DBUILD_CONFIG=mysql_release \
+		-DWITH_WSREP=1 \
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_EDITLINE=system \
 		-DWITH_SSL=bundled \
 		-DWITH_MECAB=system \
-		-DWITH_BOOST=../boost \
+		-DDOWNLOAD_BOOST=1 -DWITH_BOOST=/tmp \
 		-DCOMPILATION_COMMENT="($(DISTRIBUTION))" \
 		-DMYSQL_SERVER_SUFFIX="-$(DEBVERSION)" \
 		-DINSTALL_LAYOUT=DEB \
@@ -144,19 +145,14 @@ auto_install-stamp:
 	dh_testroot
 	# make install (trailing slash needed for innobase)
 	cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/
-	# After installing, remove rpath to make lintian happy.
-	set +e; \
-	find ./debian/tmp/ -type f -print0 \
-		| xargs -0 --no-run-if-empty chrpath -k 2>/dev/null \
-		| fgrep RPATH= \
-		| cut -d: -f 1 \
-		| xargs --no-run-if-empty chrpath -d; \
-	set -e
 	install -d -m 0755 -o root -g root $(TMP)/usr/lib/mysql
 	mkdir -p $(TMP)/usr/share/doc/mysql-server-5.7
+	install -m 0644 Docs/README-wsrep $(TMP)/usr/share/doc/mysql-server-5.7
 	nm -n $(BUILDDIR)/sql/mysqld |gzip -n -9 > $(TMP)/usr/share/doc/mysql-server-5.7/mysqld.sym.gz
+	install -m 0644 support-files/wsrep.cnf $(TMP)/usr/share/mysql
+	install -D -m 0755 $(builddir)/support-files/mysql.server $(TMP)/etc/init.d/mysql
 	# This seems to be the only safe place to fix permissions issues
-        # not handled by dh_fixperms.
+	# not handled by dh_fixperms.
 	install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
 	mkdir -p $(TMP)/etc/mysql
 	install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
@@ -202,4 +198,3 @@ get-orig-source:
 
 %:
 	dh $@ --parallel --with systemd
-
