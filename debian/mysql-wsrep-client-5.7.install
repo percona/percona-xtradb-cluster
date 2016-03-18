@@ -9,3 +9,6 @@ usr/bin/mysqlimport
 usr/bin/mysqlpump
 usr/bin/mysqlshow
 usr/bin/mysqlslap
+usr/bin/mysql
+usr/bin/mysql_embedded
+usr/bin/mysqlcheck
