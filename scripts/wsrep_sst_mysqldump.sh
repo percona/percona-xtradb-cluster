@@ -78,11 +78,20 @@ fi
 STOP_WSREP="SET wsrep_on=OFF;"
 
 # NOTE: we don't use --routines here because we're dumping mysql.proc table
-MYSQLDUMP="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
+MYSQLDUMP_GENERAL="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
 --skip-comments --flush-privileges --all-databases --events"
+
+# Neither mysqldump nor mysqlpump dump the sys schema by default. To generate
+# a dump file, name the sys schema explicitly on the command line using either
+# of these commands:
+MYSQLDUMP_SYS_SCHEMA="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
+$AUTH -S$WSREP_SST_OPT_SOCKET \
+--add-drop-database --add-drop-table --skip-add-locks --create-options \
+--disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
+--skip-comments --flush-privileges --events --routines --databases sys"
 
 # mysqldump cannot restore CSV tables, fix this issue
 CSV_TABLES_FIX="
@@ -131,7 +140,7 @@ then
     # and if joiner binlog is disabled, 'RESET MASTER' returns error
     # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER
     (echo $STOP_WSREP && echo $RESET_MASTER) | $MYSQL || true
-    (echo $STOP_WSREP && $MYSQLDUMP \
+    (echo $STOP_WSREP && $MYSQLDUMP_GENERAL && $MYSQLDUMP_SYS_SCHEMA \
         && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
         && echo $SET_START_POSITION \
         || echo "SST failed to complete;") | $MYSQL

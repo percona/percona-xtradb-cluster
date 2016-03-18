@@ -8,9 +8,6 @@ START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 INSERT INTO t1 VALUES (3);
-START SLAVE USER='root';
-Warnings:
-Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
 INSERT INTO t1 VALUES (4);
 SET GLOBAL wsrep_cluster_address='gcomm://';
 INSERT INTO t1 VALUES (5);
@@ -40,8 +37,6 @@ VARIABLE_VALUE = 'Primary'
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
-STOP SLAVE;
-RESET SLAVE ALL;
 STOP SLAVE;
 RESET SLAVE ALL;
 STOP SLAVE;

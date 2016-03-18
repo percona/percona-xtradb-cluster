@@ -1,10 +1,15 @@
 Setting SST method to mysqldump ...
-GRANT ALL PRIVILEGES ON *.* TO 'sst';
+CREATE USER 'sst'@'localhost' IDENTIFIED BY '';
+GRANT ALL ON *.* TO 'sst'@'localhost';
+FLUSH PRIVILEGES;
 SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
-CREATE USER sslsst;
-GRANT ALL PRIVILEGES ON *.* TO sslsst;
-GRANT USAGE ON *.* TO sslsst REQUIRE SSL;
+CREATE USER 'sslsst';
+GRANT ALL PRIVILEGES ON *.* TO 'sslsst';
+GRANT USAGE ON *.* TO 'sslsst' REQUIRE SSL;
+Warnings:
+Warning	1287	Using GRANT statement to modify existing user's properties other than privileges is deprecated and will be removed in future release. Use ALTER USER statement for this operation.
+FLUSH PRIVILEGES;
 SET GLOBAL wsrep_sst_auth = 'sslsst:';
 Performing State Transfer on a server that has been temporarily disconnected
 CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;
@@ -94,7 +99,7 @@ DROP TABLE t1;
 COMMIT;
 SET AUTOCOMMIT=ON;
 CALL mtr.add_suppression("Slave SQL: Error 'The MySQL server is running with the --skip-grant-tables option so it cannot execute this statement' on query");
-DROP USER sst;
+DROP USER 'sst'@'localhost';
 CALL mtr.add_suppression("Slave SQL: Error 'The MySQL server is running with the --skip-grant-tables option so it cannot execute this statement' on query");
 CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
 CALL mtr.add_suppression("InnoDB: New log files created");
@@ -104,5 +109,7 @@ CALL mtr.add_suppression("Can't open and lock privilege tables");
 CALL mtr.add_suppression("Info table is not ready to be used");
 CALL mtr.add_suppression("Native table .* has the wrong structure");
 DROP USER sslsst;
+CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");
 SET GLOBAL general_log = ON;
 SET GLOBAL slow_query_log = ON;
