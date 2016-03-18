@@ -3,6 +3,7 @@ debian/additions/mysql.cnf etc/mysql/
 debian/additions/mysql.conf.d etc/mysql/
 debian/additions/source_mysql-5.7.py usr/share/apport/package-hooks/
 etc/apparmor.d/usr.sbin.mysqld
+etc/init.d/mysql
 etc/mysql/debian-start
 usr/bin/lz4_decompress usr/lib/mysql/
 usr/bin/myisamchk
