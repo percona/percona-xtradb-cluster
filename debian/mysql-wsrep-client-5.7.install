@@ -1,14 +1,14 @@
 debian/additions/innotop/innotop usr/bin/
 debian/additions/mysqlreport usr/bin/
 usr/bin/myisam_ftdump
+usr/bin/mysql
 usr/bin/mysql_config_editor
+usr/bin/mysql_embedded
 usr/bin/mysqladmin
+usr/bin/mysqlcheck
 usr/bin/mysqldump
 usr/bin/mysqldumpslow
 usr/bin/mysqlimport
 usr/bin/mysqlpump
 usr/bin/mysqlshow
 usr/bin/mysqlslap
-usr/bin/mysql
-usr/bin/mysql_embedded
-usr/bin/mysqlcheck
