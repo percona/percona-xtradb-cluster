@@ -3,7 +3,6 @@ debian/additions/mysqlreport usr/bin/
 usr/bin/myisam_ftdump
 usr/bin/mysql
 usr/bin/mysql_config_editor
-usr/bin/mysql_embedded
 usr/bin/mysqladmin
 usr/bin/mysqlcheck
 usr/bin/mysqldump
