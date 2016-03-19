@@ -178,9 +178,6 @@ override_dh_install:
 		-Xusr/share/mysql/mysql.server
 	dh_apparmor -pmysql-server-5.7 --profile-name=usr.sbin.mysqld
 
-override_dh_installchangelogs:
-	dh_installchangelogs Docs/ChangeLog
-
 override_dh_systemd_enable:
 	dh_systemd_enable --name=mysql
 
