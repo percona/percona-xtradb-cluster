@@ -31,8 +31,9 @@ Vcs-Browser: https://github.com/codership/mysql-wsrep
 Package: mysql-wsrep-libmysqlclient20
 Section: libs
 Architecture: any
-Depends: mysql-wsrep-common (>= 5.5), ${misc:Depends}, ${shlibs:Depends}
+Depends: mysql-wsrep-common-5.7, ${misc:Depends}, ${shlibs:Depends}
 Pre-Depends: ${misc:Pre-Depends}
+Breaks: libmysqlclient20
 Replaces: libmysqlclient20
 Provides: libmysqlclient20
 Multi-Arch: same
@@ -63,17 +64,16 @@ Package: mysql-wsrep-common-5.7
 Architecture: all
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Provides: mysql-common, mysql-common-5.7
-Conflicts: mariadb-server-5.5,
-           mysql-common-5.6,
+Conflicts: mysql-common-5.6,
            mysql-server-5.5,
            percona-xtradb-cluster-common-5.5
-Replaces: mariadb-server-5.5,
-          mysql-common,
+Replaces: mysql-common,
           mysql-common-5.6,
           mysql-common-5.7,
           mysql-server-5.5,
-          percona-xtradb-cluster-common-5.5
-Breaks: mariadb-common (<< 10.0.20-3~)
+          percona-xtradb-cluster-common-5.5,
+          mysql-wsrep-common-5.6
+Breaks: mysql-wsrep-common-5.6
 Multi-Arch: foreign
 Description: MySQL database common files, e.g. /etc/mysql/my.cnf
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
@@ -90,9 +90,8 @@ Depends: debianutils (>=1.6),
          libdbd-mysql-perl (>= 1.2202),
          libdbi-perl,
          libterm-readkey-perl,
-         mysql-wsrep-common-5.6,
-         mysql-wsrep-common-5.7,
-         mysql-wsrep-libmysqlclient18,
+         mysql-wsrep-common-5.7 (>= ${binary:Version}),
+         mysql-wsrep-libmysqlclient20 (>= ${binary:Version}),
          ${misc:Depends},
          ${perl:Depends},
          ${shlibs:Depends}
@@ -102,13 +101,15 @@ Breaks: mysql-client-5.6,
         mysql-client-5.7,
         mysql-client-core-5.6,
         mysql-client-core-5.7,
-        mysql-server-core-5.6 (<< 5.6.22-1~)
+        mysql-server-core-5.6,
+        mysql-wsrep-client-5.6,
 Replaces: mysql-client-5.5,
           mysql-client-5.6,
           mysql-client-5.7,
           mysql-client-core-5.5,
           mysql-client-core-5.6,
           mysql-client-core-5.7,
+          mysql-wsrep-client-5.6,
           virtual-mysql-client
 Description: MySQL database client binaries
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
@@ -141,12 +142,14 @@ Conflicts: mysql-client-5.5, mysql-server-5.5, virtual-mysql-server
 Replaces: mysql-client-5.5,
           mysql-server-5.5,
           mysql-server-5.6,
+          mysql-wsrep-server-5.6,
           mysql-server-5.7,
           virtual-mysql-server
 Breaks: mysql-server-5.6,
         mysql-server-5.7,
         mysql-server-core-5.6,
         mysql-server-core-5.7,
+        mysql-wsrep-server-5.6,
         virtual-mysql-server
 Description: MySQL database wsrep server binaries and system database setup
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
@@ -168,10 +171,12 @@ Provides: virtual-mysql-testsuite
 Conflicts: mysql-testsuite-5.5, virtual-mysql-testsuite
 Replaces: mysql-testsuite-5.5,
           mysql-testsuite-5.6,
+          mysql-wsrep-testsuite-5.6,
           mysql-testsuite-5.7,
           virtual-mysql-testsuite
 Breaks: mysql-testsuite-5.5,
         mysql-testsuite-5.6,
+        mysql-wsrep-testsuite-5.6,
         mysql-testsuite-5.7,
         virtual-mysql-testsuite
 Description: MySQL 5.7 testsuite
