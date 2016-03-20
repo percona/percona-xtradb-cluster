@@ -87,7 +87,6 @@ Description: MySQL database common files, e.g. /etc/mysql/my.cnf
 Package: mysql-wsrep-client-5.7
 Architecture: any
 Depends: debianutils (>=1.6),
-         libdbd-mysql-perl (>= 1.2202),
          libdbi-perl,
          libterm-readkey-perl,
          mysql-wsrep-common-5.7 (>= ${binary:Version}),
