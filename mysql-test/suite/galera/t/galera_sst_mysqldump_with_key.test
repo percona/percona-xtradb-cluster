@@ -25,7 +25,7 @@ DROP USER sslsst;
 --connection node_2
 # We have to manually restore global_log and slow_query_log due to mysql-wsrep#108
 # Otherwise MTR's check_testcases complains
-CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
+CALL mtr.add_suppression("InnoDB: Table \`mysql\`\\.\`innodb_table_stats\` not found");
 CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");
 
 SET GLOBAL general_log = ON;
