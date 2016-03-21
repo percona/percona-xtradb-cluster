@@ -9,4 +9,3 @@ galera_flush_local : timeout failure
 galera_flush_gtid : timeout failure
 galera_admin : timeout failure
 galera_fk_multitable : MySQL upstram bug#80478. Multi-table delete issue.
-galera_sst_mysqldump : Failing. Need investigation.
