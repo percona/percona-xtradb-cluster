@@ -21,18 +21,17 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
 
 # Insert 1M rows
---send INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
+--send INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;
 
 --connection node_1a
 USE database1;
---send INSERT INTO t2 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5;
+--send INSERT INTO t2 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;
 
 --connection node_2
 --sleep 1
 --send DROP DATABASE database1;
 
 --connection node_1
---sleep 10
 --error ER_NO_SUCH_TABLE
 --reap
 
