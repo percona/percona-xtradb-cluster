@@ -74,7 +74,7 @@ configure-stamp:
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_EDITLINE=system \
-		-DWITH_SSL=bundled \
+		-DWITH_SSL=system \
 		-DWITH_MECAB=system \
 		-DDOWNLOAD_BOOST=1 -DWITH_BOOST=/tmp \
 		-DCOMPILATION_COMMENT="($(DISTRIBUTION))" \
