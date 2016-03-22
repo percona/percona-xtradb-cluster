@@ -23,8 +23,21 @@ INSERT INTO x1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 INSERT INTO t2 (f2) SELECT 1 FROM t1 AS a1, t1 AS a2, t1 AS a3, t1 AS a4;
 INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 
+# Wait until the tables have replicated
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 10 from t1;
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 10 from x1;
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 10000 from t2;
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 10 from x2;
+--source include/wait_condition.inc
+
+
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
 --connection node_1
 FLUSH LOCAL DES_KEY_FILE;
 FLUSH LOCAL HOSTS;
@@ -66,9 +79,8 @@ OPTIMIZE LOCAL TABLE t1, t2;
 REPAIR LOCAL TABLE x1, x2;
 
 --connection node_2
---let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
---eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
+--eval SELECT VARIABLE_VALUE = $wsrep_last_committed_before AS wsrep_last_committed_diff FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'
 --enable_query_log
 
 SELECT COUNT(*) = 10 FROM t1;
@@ -88,6 +100,17 @@ INSERT INTO t1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 INSERT INTO x1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 INSERT INTO t2 (f2) SELECT 1 FROM t1 AS a1, t1 AS a2, t1 AS a3, t1 AS a4;
 INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+
+# Wait until the tables have replicated
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 10 from t1;
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 10 from x1;
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 10000 from t2;
+--source include/wait_condition.inc
+--let $wait_condition = SELECT COUNT(*) = 10 from x2;
+--source include/wait_condition.inc
 
 
 --connection node_2
@@ -134,21 +157,13 @@ ANALYZE TABLE t1, t2;
 OPTIMIZE TABLE t1, t2;
 REPAIR TABLE x1, x2;
 
-
 --connection node_2
---let $wsrep_last_committed_after2 = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
-
---disable_query_log
-
-let $wait_timeout= 600;
---let $wait_condition =  SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before2 AS wsrep_last_committed_diff;
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before2 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed';
 --source include/wait_condition.inc
 
-let $wait_timeout= 600;
---let $wait_condition = SELECT $wsrep_last_committed_after2 = $wsrep_last_committed_before + 9 AS wsrep_last_committed_diff2;
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 9 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed';
 --source include/wait_condition.inc
 
---enable_query_log
 
 SELECT COUNT(*) = 10 FROM t1;
 SELECT COUNT(*) = 10 FROM x1;
