@@ -17,8 +17,27 @@
 
 --source suite/galera/include/galera_sst_restore.inc
 
+--connection node_1
+# Starting 5.7 if server is started with skip-grant-table then current_user
+# is default set to skip-grants user@skip-grants host.
+# We need skip-grant-tables as there are scenario where-in complete
+# var directory is removed and so there is no valid user.
+# But why does wsrep_sst_mysqldump fails
+# Failure reports that DEFINER user doesn't exist. This is another shortcoming
+# of mysqldump being used for complete dump where-in mysql fails to create
+# table with needed dependency. Logically user table should be created first
+# if definer clause is being enforced.
+CALL mtr.add_suppression("WSREP: Process completed with error.*");
+CALL mtr.add_suppression("WSREP: Try 1/3: 'wsrep_sst_mysqldump.*");
+
 --connection node_2
+# Why we get this error of table not present ?
+# mysqldump generates dump in sequential fashion failing to understand table
+# inter-dependency. For example: if any innodb table is created and loaded before
+# innodb_table_stats or innodb_index_stats tables are created then there is no table
+# to insert the said stats which then raises the error/warnings mentioned below.
 CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_table_stats\` not found");
+CALL mtr.add_suppression("Table \`mysql\`\\.\`innodb_index_stats\` not found");
 CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table.*");
 CALL mtr.add_suppression("Gtid table is not ready to be used..*");
 CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
