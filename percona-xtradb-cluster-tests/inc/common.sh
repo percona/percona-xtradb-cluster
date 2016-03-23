@@ -38,6 +38,7 @@ function call_mysql_install_db()
 
         if ! $MYSQL_INSTALL_DB --defaults-file=${MYSQLD_VARDIR}/my.cnf \
                     --basedir=${MYSQL_BASEDIR} \
+                    --datadir=${MYSQLD_DATADIR} \
                     ${MYSQLD_EXTRA_ARGS}
         then
             vlog "mysql_install_db failed. Server log (if exists):"
