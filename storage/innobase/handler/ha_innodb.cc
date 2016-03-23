@@ -4655,7 +4655,19 @@ innobase_rollback(
 				<< thd_security_context(thd, buffer,
 							sizeof(buffer), 512);
 
+#ifdef WITH_WSREP
+			/* This condition simply means the transaction was
+			rolled back by applier thread using the proactive logic
+			of killing blocking transaction in MySQL/InnoDB flow.
+			If rollback thread try to re-todo the same action
+			again then it should be ignored without raising an error
+			which is then treated in MySQL flow as rollback failure
+			action when ideally it is just re-validating the same
+			flow that is already executed. */
+			error = DB_SUCCESS;
+#else
 			error = DB_FORCED_ABORT;
+#endif /* WITH_WSREP */
 
 			trx->state = TRX_STATE_NOT_STARTED;
 		}
