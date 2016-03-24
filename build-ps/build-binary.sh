@@ -384,8 +384,8 @@ fi
             -DWITH_BOOST="$TARGETDIR/libboost" \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
-        make $MAKE_JFLAG $QUIET
-        make install
+        (make $MAKE_JFLAG $QUIET) || exit 1
+        (make install) || exit 1
         cp -v sql/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld
         echo "mysqld in build in debug mode"
     else
@@ -411,8 +411,8 @@ fi
             -DWITH_BOOST="$TARGETDIR/libboost" \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
-        make $MAKE_JFLAG $QUIET
-        make install
+        (make $MAKE_JFLAG $QUIET) || exit 1
+        (make install) || exit 1
         echo "mysqld in build in release mode"
     fi
 

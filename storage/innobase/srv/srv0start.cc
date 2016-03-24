@@ -1,8 +1,8 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2015, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 1996, 2016, Oracle and/or its affiliates. All rights reserved.
 Copyright (c) 2008, Google Inc.
-Copyright (c) 2009, Percona Inc.
+Copyright (c) 2009, 2016, Percona Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -1652,7 +1652,6 @@ innobase_start_or_create_for_mysql(void)
 			    + 1 /* buf_dump_thread */
 			    + 1 /* dict_stats_thread */
 			    + 1 /* fts_optimize_thread */
-			    + 1 /* recv_writer_thread */
 			    + 1 /* trx_rollback_or_clean_all_recovered */
 			    + 128 /* added as margin, for use of
 				  InnoDB Memcached etc. */
@@ -1756,7 +1755,7 @@ innobase_start_or_create_for_mysql(void)
 		} else {
 
 			srv_monitor_file_name = NULL;
-			srv_monitor_file = os_file_create_tmpfile();
+			srv_monitor_file = os_file_create_tmpfile(NULL);
 
 			if (!srv_monitor_file) {
 				return(srv_init_abort(DB_ERROR));
@@ -1766,7 +1765,7 @@ innobase_start_or_create_for_mysql(void)
 		mutex_create(LATCH_ID_SRV_DICT_TMPFILE,
 			     &srv_dict_tmpfile_mutex);
 
-		srv_dict_tmpfile = os_file_create_tmpfile();
+		srv_dict_tmpfile = os_file_create_tmpfile(NULL);
 
 		if (!srv_dict_tmpfile) {
 			return(srv_init_abort(DB_ERROR));
@@ -1775,7 +1774,7 @@ innobase_start_or_create_for_mysql(void)
 		mutex_create(LATCH_ID_SRV_MISC_TMPFILE,
 			     &srv_misc_tmpfile_mutex);
 
-		srv_misc_tmpfile = os_file_create_tmpfile();
+		srv_misc_tmpfile = os_file_create_tmpfile(NULL);
 
 		if (!srv_misc_tmpfile) {
 			return(srv_init_abort(DB_ERROR));
@@ -1884,6 +1883,13 @@ innobase_start_or_create_for_mysql(void)
 		os_thread_create(buf_flush_page_cleaner_worker,
 				 NULL, NULL);
 	}
+
+	for (i = 0; i < srv_buf_pool_instances; i++) {
+		os_thread_create(buf_lru_manager, reinterpret_cast<void *>(i),
+				 NULL);
+	}
+
+	buf_lru_manager_is_active = true;
 
 	/* Make sure page cleaner is active. */
 	while (!buf_page_cleaner_is_active) {
@@ -2171,6 +2177,11 @@ files_checked:
 
 		purge_queue = trx_sys_init_at_db_start();
 
+		/* Create the per-buffer pool instance doublewrite buffers */
+		err = buf_parallel_dblwr_create();
+		if (err != DB_SUCCESS)
+			return(srv_init_abort(err));
+
 		/* The purge system needs to create the purge view and
 		therefore requires that the trx_sys is inited. */
 
@@ -2233,7 +2244,18 @@ files_checked:
 
 		err = recv_recovery_from_checkpoint_start(flushed_lsn);
 
-		recv_sys->dblwr.pages.clear();
+		/* Doublewrite-recovered pages should have been either
+		processed, either it should have been impossible to process
+		them due to a missing tablespace or innodb_force_recovery
+		setting, or server being read-only, or instance being
+		corrupted. */
+		ut_ad(recv_sys->dblwr.pages.empty()
+		      || err == DB_TABLESPACE_NOT_FOUND
+		      || (err == DB_SUCCESS
+			  && (srv_force_recovery >= SRV_FORCE_NO_LOG_REDO))
+		      || err == DB_ERROR || err == DB_CORRUPTION
+		      || err == DB_READ_ONLY);
+		buf_parallel_dblwr_finish_recovery();
 
 		if (err == DB_SUCCESS) {
 			/* Initialize the change buffer. */
@@ -2254,6 +2276,10 @@ files_checked:
 
 			return(srv_init_abort(DB_ERROR));
 		}
+
+		err = buf_parallel_dblwr_create();
+		if (err != DB_SUCCESS)
+			return(srv_init_abort(err));
 
 		init_log_online();
 
@@ -2338,6 +2364,15 @@ files_checked:
 
 			dict_check_tablespaces_and_store_max_id(validate);
 		}
+
+		/* Rotate the encryption key for recovery. It's because
+		server could crash in middle of key rotation. Some tablespace
+		didn't complete key rotation. Here, we will resume the
+		rotation. */
+		if (srv_force_recovery < SRV_FORCE_NO_LOG_REDO) {
+			fil_encryption_rotate();
+		}
+
 
 		/* Fix-up truncate of table if server crashed while truncate
 		was active. */
@@ -2778,10 +2813,8 @@ innobase_shutdown_for_mysql(void)
 	}
 
 	if (!srv_read_only_mode) {
-		/* Shutdown the FTS optimize sub system. */
-		fts_optimize_start_shutdown();
-
-		fts_optimize_end();
+		fts_optimize_shutdown();
+		dict_stats_shutdown();
 	}
 
 	/* 1. Flush the buffer pool to disk, write the current lsn to
@@ -2984,6 +3017,41 @@ srv_get_meta_data_filename(
 			table->data_dir_path, table->name.m_name, CFG, true);
 	} else {
 		path = fil_make_filepath(NULL, table->name.m_name, CFG, false);
+	}
+
+	ut_a(path);
+	len = ut_strlen(path);
+	ut_a(max_len >= len);
+
+	strcpy(filename, path);
+
+	ut_free(path);
+}
+
+/** Get the encryption-data filename from the table name for a
+single-table tablespace.
+@param[in]	table		table object
+@param[out]	filename	filename
+@param[in]	max_len		filename max length */
+void
+srv_get_encryption_data_filename(
+	dict_table_t*	table,
+	char*		filename,
+	ulint		max_len)
+{
+	ulint		len;
+	char*		path;
+
+	/* Make sure the data_dir_path is set. */
+	dict_get_and_save_data_dir_path(table, false);
+
+	if (DICT_TF_HAS_DATA_DIR(table->flags)) {
+		ut_a(table->data_dir_path);
+
+		path = fil_make_filepath(
+			table->data_dir_path, table->name.m_name, CFP, true);
+	} else {
+		path = fil_make_filepath(NULL, table->name.m_name, CFP, false);
 	}
 
 	ut_a(path);

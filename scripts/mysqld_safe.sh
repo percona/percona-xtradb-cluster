@@ -34,6 +34,7 @@ pid_file=
 err_log=
 wsrep_data_home_dir=""
 grastate_loc=""
+timestamp_format=UTC
 
 syslog_tag_mysqld=mysqld
 syslog_tag_mysqld_safe=mysqld_safe
@@ -105,6 +106,10 @@ Usage: $0 [OPTIONS]
   --numa-interleave          Run mysqld with its memory interleaved
                              on all NUMA nodes
 ${thp_usage}
+  --mysqld-safe-log-         TYPE must be one of UTC (ISO 8601 UTC),
+    timestamps=TYPE          system (ISO 8601 local time), hyphen
+                             (hyphenated date a la mysqld 5.6), legacy
+                             (legacy non-ISO 8601 mysqld_safe timestamps)
 
 All other options are passed to the mysqld program.
 
@@ -145,7 +150,7 @@ log_generic () {
   priority="$1"
   shift
 
-  msg="`date +'%y%m%d %H:%M:%S'` mysqld_safe $*"
+  msg="`eval $DATE` mysqld_safe $*"
   echo "$msg"
   case $logging in
     init) ;;  # Just echo the message, don't save it anywhere
@@ -345,6 +350,7 @@ parse_arguments() {
       --skip-kill-mysqld*) KILL_MYSQLD=0 ;;
       --thp-setting=*) thp_setting="$val" ;;
       --preload-hotbackup) load_hotbackup=1 ;;
+      --mysqld-safe-log-timestamps=*) timestamp_format="$val" ;;
       --syslog) want_syslog=1 ;;
       --skip-syslog) want_syslog=0 ;;
       --syslog-tag=*) syslog_tag="$val" ;;
@@ -633,6 +639,19 @@ then
     fi
   done
 fi
+
+#
+# Sort out date command from $timestamp_format early so we'll start off
+# with correct log messages.
+#
+case "$timestamp_format" in
+    UTC|utc)       DATE="date -u +%Y-%m-%dT%H:%M:%S.%06NZ";;
+    SYSTEM|system) DATE="date +%Y-%m-%dT%H:%M:%S.%06N%:z";;
+    HYPHEN|hyphen) DATE="date +'%Y-%m-%d %H:%M:%S'";;
+    LEGACY|legacy) DATE="date +'%y%m%d %H:%M:%S'";;
+    *)             DATE="date -u +%Y-%m-%dT%H:%M:%S.%06NZ";
+                   log_error "unknown data format $timestamp_format, using UTC";;
+esac
 
 #
 # Try to find the plugin directory
@@ -961,10 +980,7 @@ fi
 # Change transparent huge pages setting if thp-setting option specified
 if [ -n "$thp_setting" ]
 then
-  if [ $(id -u) -ne 0 ]; then
-    log_error "mysqld_safe must be run as root for setting transparent huge pages!"
-    exit 1
-  elif [ $thp_setting != "always" -a $thp_setting != "madvise" -a $thp_setting != "never" ]; then
+  if [ $thp_setting != "always" -a $thp_setting != "madvise" -a $thp_setting != "never" ]; then
     log_error "Invalid value for thp-setting=$thp_setting in config file. Valid values are: always, madvise or never"
     exit 1
   else
@@ -977,6 +993,9 @@ then
     fi
     if [ $STATUS_THP -eq 0 ]; then
       log_notice "Transparent huge pages are already set to: ${thp_setting}."
+    elif [ $(id -u) -ne 0 ]; then
+      log_error "mysqld_safe must be run as root for setting transparent huge pages!"
+      exit 1
     else
       if [ -f /sys/kernel/mm/transparent_hugepage/defrag ]; then
         echo $thp_setting > /sys/kernel/mm/transparent_hugepage/defrag

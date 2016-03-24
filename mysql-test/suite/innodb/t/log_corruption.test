@@ -4,7 +4,7 @@
 let newdir= $MYSQLTEST_VARDIR/tmp/log_corruption;
 --mkdir $newdir
 let SEARCH_FILE = $newdir/my_restart.err;
-let $args=--no-defaults --datadir=$newdir --secure-file-priv="" --loose-skip-sha256-password-auto-generate-rsa-keys --loose-console > $SEARCH_FILE 2>&1 ;
+let $args=--no-defaults --datadir=$newdir --secure-file-priv="" --early_plugin_load="" --loose-skip-sha256-password-auto-generate-rsa-keys --loose-console > $SEARCH_FILE 2>&1 ;
 
 --echo # redo log from before MySQL 5.7.9
 --exec unzip $MYSQL_TEST_DIR/suite/innodb/t/log_corruption.zip -d $newdir > $SEARCH_FILE
@@ -83,6 +83,10 @@ let SEARCH_PATTERN=InnoDB: Ignoring the redo log due to missing MLOG_CHECKPOINT 
 --source include/search_pattern_in_file.inc
 let SEARCH_PATTERN=Plugin 'InnoDB' registration as a STORAGE ENGINE failed;
 --source include/search_pattern_in_file.inc
+
+# Remove parallel doublewrite buffer manually
+remove_file $newdir/xb_doublewrite;
+
 --echo # --innodb-force-recovery=6 (skip the entire redo log)
 --error 1
 --exec $MYSQLD $args --innodb-force-recovery=6
@@ -129,4 +133,5 @@ let SEARCH_PATTERN=InnoDB: Set innodb_force_recovery to ignore this error;
 --remove_file $newdir/ibdata1
 --remove_file $newdir/ib_logfile0
 --remove_file $newdir/ib_logfile1
+--remove_file $newdir/xb_doublewrite
 --rmdir $newdir

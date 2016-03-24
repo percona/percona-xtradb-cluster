@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2016, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, Google Inc.
 Copyright (c) 2012, Facebook Inc.
 
@@ -82,7 +82,6 @@ extern mysql_pfs_key_t	recalc_pool_mutex_key;
 extern mysql_pfs_key_t	page_cleaner_mutex_key;
 extern mysql_pfs_key_t	purge_sys_pq_mutex_key;
 extern mysql_pfs_key_t	recv_sys_mutex_key;
-extern mysql_pfs_key_t	recv_writer_mutex_key;
 extern mysql_pfs_key_t	rtr_active_mutex_key;
 extern mysql_pfs_key_t	rtr_match_mutex_key;
 extern mysql_pfs_key_t	rtr_path_mutex_key;
@@ -140,6 +139,7 @@ extern	mysql_pfs_key_t	index_online_log_key;
 extern	mysql_pfs_key_t	dict_table_stats_key;
 extern  mysql_pfs_key_t trx_sys_rw_lock_key;
 extern  mysql_pfs_key_t hash_table_locks_key;
+extern  mysql_pfs_key_t master_key_id_mutex_key;
 # ifdef UNIV_DEBUG
 extern	mysql_pfs_key_t buf_chunk_map_latch_key;
 # endif /* UNIV_DEBUG */

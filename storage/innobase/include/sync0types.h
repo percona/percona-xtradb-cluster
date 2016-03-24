@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -289,8 +289,6 @@ enum latch_level_t {
 
 	SYNC_TRX_I_S_RWLOCK,
 
-	SYNC_RECV_WRITER,
-
 	/** Level is varying. Only used with buffer pool page locks, which
 	do not have a fixed level, but instead have their level set after
 	the page is locked; see e.g.  ibuf_bitmap_get_map_page(). */
@@ -340,7 +338,6 @@ enum latch_id_t {
 	LATCH_ID_PURGE_SYS_PQ,
 	LATCH_ID_RECALC_POOL,
 	LATCH_ID_RECV_SYS,
-	LATCH_ID_RECV_WRITER,
 	LATCH_ID_REDO_RSEG,
 	LATCH_ID_NOREDO_RSEG,
 	LATCH_ID_RW_LOCK_DEBUG,
@@ -395,6 +392,7 @@ enum latch_id_t {
 	LATCH_ID_HASH_TABLE_RW_LOCK,
 	LATCH_ID_BUF_CHUNK_MAP_LATCH,
 	LATCH_ID_SYNC_DEBUG_MUTEX,
+	LATCH_ID_MASTER_KEY_ID_MUTEX,
 	LATCH_ID_TEST_MUTEX,
 	LATCH_ID_MAX = LATCH_ID_TEST_MUTEX
 };
@@ -1156,8 +1154,6 @@ struct dict_sync_check : public sync_check_functor_t {
 		    || (level != SYNC_DICT
 			&& level != SYNC_DICT_OPERATION
 			&& level != SYNC_FTS_CACHE
-			/* This only happens in recv_apply_hashed_log_recs. */
-			&& level != SYNC_RECV_WRITER
 			&& level != SYNC_NO_ORDER_CHECK)) {
 
 			m_result = true;

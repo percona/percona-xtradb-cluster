@@ -10,9 +10,9 @@
 
 --disable_result_log
 --disable_query_log
-let $counter= 1200;
+let $counter= 5000;
 if ($VALGRIND_TEST) {
-  let $counter= 6000;
+  let $counter= 10000;
 }
 let $mysql_errno= 9999;
 let $successes= 2;

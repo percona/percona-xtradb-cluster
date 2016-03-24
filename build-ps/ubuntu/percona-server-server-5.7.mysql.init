@@ -50,12 +50,26 @@ get_mysql_option() {
 	echo $RESULT
 }
 
+fix_thp_setting() {
+	THP_SETTING=$(get_mysql_option mysqld_safe thp-setting "")
+	if [ ! -z "${THP_SETTING}" ]; then
+	# Set whatever option is specified in config file
+		echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/defrag
+		echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/enabled
+	fi
+}
+
 get_running () {
 	PIDFILE=$(get_mysql_option mysqld_safe pid-file "")
+	MYSQLDATA=$(get_mysql_option mysqld datadir "/var/lib/mysql")
 	if [ -z "$PIDFILE" ];
 	then
 		PIDFILE=$(get_mysql_option mysqld pid-file "$MYSQLDATA/$(hostname).pid")
 	fi
+	case $PIDFILE in
+		/*) ;;
+		*) PIDFILE="$MYSQLDATA/$PIDFILE" ;;
+	esac
 	if [ -e "$PIDFILE" ] && [ -d "/proc/$(cat "$PIDFILE")" ];
 	then
 		echo 1
@@ -110,6 +124,7 @@ case "$1" in
 		MYSQLDATA=$(get_mysql_option mysqld datadir "/var/lib/mysql")
 		MYSQLFILES=/var/lib/mysql-files
 		MYSQLLOG=/var/log/mysql
+		MYSQLKEYRING=/var/lib/mysql-keyring
 
 		if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
 		then
@@ -125,7 +140,14 @@ case "$1" in
 			chmod 770 ${MYSQLFILES}
 		fi
 
-		if [ ! "$(ls -A ${MYSQLDATA})" ] && [ -d ${MYSQLFILES} ];
+		if [ ! -d ${MYSQLKEYRING} -a ! -L ${MYSQLKEYRING} ];
+		then
+			mkdir ${MYSQLKEYRING}
+			chown mysql:mysql ${MYSQLKEYRING}
+			chmod 750 ${MYSQLKEYRING}
+		fi
+
+		if [ ! "$(ls -A ${MYSQLDATA})" ] && [ -d ${MYSQLFILES} ] && [ -d ${MYSQLKEYRING} ];
 		then
 			su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
 			su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
@@ -157,7 +179,10 @@ case "$1" in
 			chmod 755 ${MYSQLRUN}
 		fi
 
-		mysqld_safe > /dev/null &
+		# Needed because of TokuDB
+		fix_thp_setting
+
+		su - mysql -s /bin/bash -c "mysqld_safe > /dev/null &"
 		verify_server start
 		if [ "$?" -eq 0 ];
 		then

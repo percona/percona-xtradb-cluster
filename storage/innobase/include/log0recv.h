@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -36,6 +36,7 @@ Created 9/20/1997 Heikki Tuuri
 #include "ut0new.h"
 
 #include <list>
+#include <vector>
 
 /** Check the 4-byte checksum to the trailer checksum field of a log
 block.
@@ -329,22 +330,26 @@ struct recv_dblwr_t {
 	list	pages;
 };
 
+/* Recovery encryption information */
+typedef	struct recv_encryption {
+	ulint		space_id;	/*!< the page number */
+	byte*		key;		/*!< encryption key */
+	byte*		iv;		/*!< encryption iv */
+} recv_encryption_t;
+
+typedef std::vector<recv_encryption_t, ut_allocator<recv_encryption_t> >
+		encryption_list_t;
+
 /** Recovery system data structure */
 struct recv_sys_t{
 #ifndef UNIV_HOTBACKUP
 	ib_mutex_t		mutex;	/*!< mutex protecting the fields apply_log_recs,
 				n_addrs, and the state field in each recv_addr
 				struct */
-	ib_mutex_t		writer_mutex;/*!< mutex coordinating
-				flushing between recv_writer_thread and
-				the recovery thread. */
 	os_event_t		flush_start;/*!< event to acticate
 				page cleaner threads */
 	os_event_t		flush_end;/*!< event to signal that the page
 				cleaner has finished the request */
-	buf_flush_t		flush_type;/*!< type of the flush request.
-				BUF_FLUSH_LRU: flush end of LRU, keeping free blocks.
-				BUF_FLUSH_LIST: flush all of blocks. */
 #endif /* !UNIV_HOTBACKUP */
 	ibool		apply_log_recs;
 				/*!< this is TRUE when log rec application to
@@ -397,6 +402,9 @@ struct recv_sys_t{
 				addresses in the hash table */
 
 	recv_dblwr_t	dblwr;
+
+	encryption_list_t*	/*!< Encryption information list */
+			encryption_list;
 };
 
 /** The recovery system */
@@ -432,11 +440,6 @@ extern bool		recv_lsn_checks_on;
 /** TRUE when the redo log is being backed up */
 extern bool		recv_is_making_a_backup;
 #endif /* UNIV_HOTBACKUP */
-
-#ifndef UNIV_HOTBACKUP
-/** Flag indicating if recv_writer thread is active. */
-extern volatile bool	recv_writer_thread_active;
-#endif /* !UNIV_HOTBACKUP */
 
 /** Size of the parsing buffer; it must accommodate RECV_SCAN_SIZE many
 times! */

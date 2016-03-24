@@ -2,7 +2,7 @@
 
 Copyright (c) 1995, 2015, Oracle and/or its affiliates. All rights reserved.
 Copyright (c) 2008, 2009, Google Inc.
-Copyright (c) 2009, Percona Inc.
+Copyright (c) 2009, 2016, Percona Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -164,6 +164,10 @@ extern char*		srv_buf_dump_filename;
 and/or load it during startup. */
 extern char		srv_buffer_pool_dump_at_shutdown;
 extern char		srv_buffer_pool_load_at_startup;
+
+/** Path to the parallel doublewrite buffer */
+#define SRV_PARALLEL_DOUBLEWRITE_PATH_DEFAULT	"xb_doublewrite"
+extern char*		srv_parallel_doublewrite_path;
 
 /* Whether to disable file system cache if it is defined */
 extern char		srv_disable_sort_file_cache;
@@ -565,7 +569,7 @@ extern mysql_pfs_key_t	io_log_thread_key;
 extern mysql_pfs_key_t	io_read_thread_key;
 extern mysql_pfs_key_t	io_write_thread_key;
 extern mysql_pfs_key_t	page_cleaner_thread_key;
-extern mysql_pfs_key_t	recv_writer_thread_key;
+extern mysql_pfs_key_t	buf_lru_manager_thread_key;
 extern mysql_pfs_key_t	srv_error_monitor_thread_key;
 extern mysql_pfs_key_t	srv_lock_timeout_thread_key;
 extern mysql_pfs_key_t	srv_master_thread_key;

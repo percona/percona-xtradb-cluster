@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2014, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -531,7 +531,6 @@ LatchDebug::LatchDebug()
 	LEVEL_MAP_INSERT(SYNC_FILE_FORMAT_TAG);
 	LEVEL_MAP_INSERT(SYNC_TRX_I_S_LAST_READ);
 	LEVEL_MAP_INSERT(SYNC_TRX_I_S_RWLOCK);
-	LEVEL_MAP_INSERT(SYNC_RECV_WRITER);
 	LEVEL_MAP_INSERT(SYNC_LEVEL_VARYING);
 	LEVEL_MAP_INSERT(SYNC_NO_ORDER_CHECK);
 
@@ -796,7 +795,6 @@ LatchDebug::check_order(
 	case SYNC_STATS_AUTO_RECALC:
 	case SYNC_POOL:
 	case SYNC_POOL_MANAGER:
-	case SYNC_RECV_WRITER:
 
 		basic_check(latches, level, level);
 		break;
@@ -1416,8 +1414,6 @@ sync_latch_meta_init()
 
 	LATCH_ADD(RECV_SYS, SYNC_RECV, recv_sys_mutex_key);
 
-	LATCH_ADD(RECV_WRITER, SYNC_RECV_WRITER, recv_writer_mutex_key);
-
 	LATCH_ADD(REDO_RSEG, SYNC_REDO_RSEG, redo_rseg_mutex_key);
 
 	LATCH_ADD(NOREDO_RSEG, SYNC_NOREDO_RSEG, noredo_rseg_mutex_key);
@@ -1556,6 +1552,8 @@ sync_latch_meta_init()
 #endif /* UNIV_DEBUG */
 
 	LATCH_ADD(SYNC_DEBUG_MUTEX, SYNC_NO_ORDER_CHECK, PFS_NOT_INSTRUMENTED);
+
+	LATCH_ADD(MASTER_KEY_ID_MUTEX, SYNC_NO_ORDER_CHECK, master_key_id_mutex_key);
 
 	latch_id_t	id = LATCH_ID_NONE;
 

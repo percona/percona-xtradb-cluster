@@ -1,7 +1,8 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2016, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2012, Facebook Inc.
+Copyright (c) 2016, Percona Inc. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -35,6 +36,8 @@ Created 9/20/1997 Heikki Tuuri
 #ifdef UNIV_NONINL
 #include "log0recv.ic"
 #endif
+
+#include <my_aes.h>
 
 #include "mem0mem.h"
 #include "buf0buf.h"
@@ -153,15 +156,6 @@ lsn_t	recv_max_page_lsn;
 mysql_pfs_key_t	trx_rollback_clean_thread_key;
 #endif /* UNIV_PFS_THREAD */
 
-#ifndef UNIV_HOTBACKUP
-# ifdef UNIV_PFS_THREAD
-mysql_pfs_key_t	recv_writer_thread_key;
-# endif /* UNIV_PFS_THREAD */
-
-/** Flag indicating if recv_writer thread is active. */
-volatile bool	recv_writer_thread_active = false;
-#endif /* !UNIV_HOTBACKUP */
-
 #ifndef	DBUG_OFF
 /** Return string name of the redo log record type.
 @param[in]	type	record log record enum
@@ -268,6 +262,40 @@ fil_name_process(
 		switch (fil_ibd_load(space_id, name, space)) {
 		case FIL_LOAD_OK:
 			ut_ad(space != NULL);
+
+			/* For encrypted tablespace, set key and iv. */
+			if (FSP_FLAGS_GET_ENCRYPTION(space->flags)
+			    && recv_sys->encryption_list != NULL) {
+				dberr_t				err;
+				encryption_list_t::iterator	it;
+
+				for (it = recv_sys->encryption_list->begin();
+				     it != recv_sys->encryption_list->end();
+				     it++) {
+					if (it->space_id == space->id) {
+						err = fil_set_encryption(
+							space->id,
+							Encryption::AES,
+							it->key,
+							it->iv);
+						if (err != DB_SUCCESS) {
+							ib::error()
+								<< "Can't set"
+								" encryption"
+								" information"
+								" for"
+								" tablespace"
+								<< space->name
+								<< "!";
+						}
+						ut_free(it->key);
+						ut_free(it->iv);
+						it->key = NULL;
+						it->iv = NULL;
+						it->space_id = 0;
+					}
+				}
+			}
 
 			if (f.space == NULL || f.space == space) {
 				f.name = fname.name;
@@ -467,9 +495,9 @@ fil_name_parse(
 			break;
 		}
 		if (!fil_op_replay_rename(
-			space_id, first_page_no,
-			reinterpret_cast<const char*>(ptr),
-			reinterpret_cast<const char*>(new_name))) {
+			    space_id, first_page_no,
+			    reinterpret_cast<const char*>(ptr),
+			    reinterpret_cast<const char*>(new_name))) {
 			recv_sys->found_corrupt_fs = true;
 		}
 	}
@@ -771,7 +799,6 @@ recv_sys_create(void)
 	recv_sys = static_cast<recv_sys_t*>(ut_zalloc_nokey(sizeof(*recv_sys)));
 
 	mutex_create(LATCH_ID_RECV_SYS, &recv_sys->mutex);
-	mutex_create(LATCH_ID_RECV_WRITER, &recv_sys->writer_mutex);
 
 	recv_sys->heap = NULL;
 	recv_sys->addr_hash = NULL;
@@ -802,11 +829,6 @@ recv_sys_close(void)
 #endif /* !UNIV_HOTBACKUP */
 		ut_free(recv_sys->buf);
 		ut_free(recv_sys->last_block_buf_start);
-
-#ifndef UNIV_HOTBACKUP
-		ut_ad(!recv_writer_thread_active);
-		mutex_free(&recv_sys->writer_mutex);
-#endif /* !UNIV_HOTBACKUP */
 
 		mutex_free(&recv_sys->mutex);
 
@@ -864,61 +886,6 @@ recv_sys_var_init(void)
 	recv_previous_parsed_rec_is_multi = 0;
 	recv_n_pool_free_frames	= 256;
 	recv_max_page_lsn = 0;
-}
-
-/******************************************************************//**
-recv_writer thread tasked with flushing dirty pages from the buffer
-pools.
-@return a dummy parameter */
-extern "C"
-os_thread_ret_t
-DECLARE_THREAD(recv_writer_thread)(
-/*===============================*/
-	void*	arg __attribute__((unused)))
-			/*!< in: a dummy parameter required by
-			os_thread_create */
-{
-	ut_ad(!srv_read_only_mode);
-
-#ifdef UNIV_PFS_THREAD
-	pfs_register_thread(recv_writer_thread_key);
-#endif /* UNIV_PFS_THREAD */
-
-#ifdef UNIV_DEBUG_THREAD_CREATION
-	ib::info() << "recv_writer thread running, id "
-		<< os_thread_pf(os_thread_get_curr_id());
-#endif /* UNIV_DEBUG_THREAD_CREATION */
-
-	recv_writer_thread_active = true;
-
-	while (srv_shutdown_state == SRV_SHUTDOWN_NONE) {
-
-		os_thread_sleep(100000);
-
-		mutex_enter(&recv_sys->writer_mutex);
-
-		if (!recv_recovery_on) {
-			mutex_exit(&recv_sys->writer_mutex);
-			break;
-		}
-
-		/* Flush pages from end of LRU if required */
-		os_event_reset(recv_sys->flush_end);
-		recv_sys->flush_type = BUF_FLUSH_LRU;
-		os_event_set(recv_sys->flush_start);
-		os_event_wait(recv_sys->flush_end);
-
-		mutex_exit(&recv_sys->writer_mutex);
-	}
-
-	recv_writer_thread_active = false;
-
-	/* We count the number of threads in os_thread_exit().
-	A created thread should always use that to exit and not
-	use return() to exit. */
-	os_thread_exit(NULL);
-
-	OS_THREAD_DUMMY_RETURN;
 }
 #endif /* !UNIV_HOTBACKUP */
 
@@ -981,6 +948,7 @@ recv_sys_init(
 	/* Call the constructor for recv_sys_t::dblwr member */
 	new (&recv_sys->dblwr) recv_dblwr_t();
 
+	recv_sys->encryption_list = NULL;
 	mutex_exit(&(recv_sys->mutex));
 }
 
@@ -1027,9 +995,30 @@ recv_sys_debug_free(void)
 	/* wake page cleaner up to progress */
 	if (!srv_read_only_mode) {
 		ut_ad(!recv_recovery_on);
-		ut_ad(!recv_writer_thread_active);
 		os_event_reset(buf_flush_event);
 		os_event_set(recv_sys->flush_start);
+	}
+
+	if (recv_sys->encryption_list != NULL) {
+		encryption_list_t::iterator	it;
+
+		for (it = recv_sys->encryption_list->begin();
+		     it != recv_sys->encryption_list->end();
+		     it++) {
+			if (it->key != NULL) {
+				ut_free(it->key);
+				it->key = NULL;
+			}
+			if (it->iv != NULL) {
+				ut_free(it->iv);
+				it->iv = NULL;
+			}
+		}
+
+		recv_sys->encryption_list->swap(*recv_sys->encryption_list);
+
+		UT_DELETE(recv_sys->encryption_list);
+		recv_sys->encryption_list = NULL;
 	}
 
 	mutex_exit(&(recv_sys->mutex));
@@ -1504,6 +1493,110 @@ recv_scan_log_seg_for_backup(
 }
 #endif /* UNIV_HOTBACKUP */
 
+/** Parse or process a write encryption info record.
+@param[in]	ptr		redo log record
+@param[in]	end		end of the redo log buffer
+@param[in]	space_id	the tablespace ID
+@return log record end, NULL if not a complete record */
+static
+byte*
+fil_write_encryption_parse(
+	byte*		ptr,
+	const byte*	end,
+	ulint		space_id)
+{
+	fil_space_t*	space;
+	ulint		offset;
+	ulint		len;
+	byte*		key = NULL;
+	byte*		iv = NULL;
+	bool		is_new = false;
+
+	space = fil_space_get(space_id);
+	if (space == NULL) {
+		encryption_list_t::iterator	it;
+
+		if (recv_sys->encryption_list == NULL) {
+			recv_sys->encryption_list =
+				UT_NEW_NOKEY(encryption_list_t());
+		}
+
+		for (it = recv_sys->encryption_list->begin();
+		     it != recv_sys->encryption_list->end();
+		     it++) {
+			if (it->space_id == space_id) {
+				key = it->key;
+				iv = it->iv;
+			}
+		}
+
+		if (key == NULL) {
+			key = static_cast<byte*>(ut_malloc_nokey(
+					ENCRYPTION_KEY_LEN));
+			iv = static_cast<byte*>(ut_malloc_nokey(
+					ENCRYPTION_KEY_LEN));
+			is_new = true;
+		}
+	} else {
+		key = space->encryption_key;
+		iv = space->encryption_iv;
+	}
+
+	offset = mach_read_from_2(ptr);
+	ptr += 2;
+	len = mach_read_from_2(ptr);
+
+	ptr += 2;
+	if (end < ptr + len) {
+		return(NULL);
+	}
+
+	if (offset >= UNIV_PAGE_SIZE
+	    || len + offset > UNIV_PAGE_SIZE
+	    || len != ENCRYPTION_INFO_SIZE) {
+		recv_sys->found_corrupt_log = TRUE;
+		return(NULL);
+	}
+
+#ifdef	UNIV_ENCRYPT_DEBUG
+	if (space) {
+		fprintf(stderr, "Got %lu from redo log:", space->id);
+	}
+#endif
+	if (!fsp_header_decode_encryption_info(key,
+					       iv,
+					       ptr)) {
+		recv_sys->found_corrupt_log = TRUE;
+		ib::warn() << "Encryption information"
+			<< " in the redo log of space "
+			<< space_id << " is invalid";
+	}
+
+	ut_ad(len == ENCRYPTION_INFO_SIZE);
+
+	ptr += ENCRYPTION_INFO_SIZE;
+
+	if (space == NULL) {
+		if (is_new) {
+			recv_encryption_t info;
+
+			/* Add key and iv to list */
+			info.space_id = space_id;
+			info.key = key;
+			info.iv = iv;
+
+			recv_sys->encryption_list->push_back(info);
+		}
+	} else {
+		ut_ad(FSP_FLAGS_GET_ENCRYPTION(space->flags));
+
+		space->encryption_type = Encryption::AES;
+		space->encryption_klen = ENCRYPTION_KEY_LEN;
+	}
+
+	return(ptr);
+}
+
 /** Try to parse a single log record body and also applies it if
 specified.
 @param[in]	type		redo log entry type
@@ -1612,6 +1705,19 @@ recv_parse_or_apply_log_rec_body(
 		return(ptr + 8);
 	case MLOG_TRUNCATE:
 		return(truncate_t::parse_redo_entry(ptr, end_ptr, space_id));
+	case MLOG_WRITE_STRING:
+		/* For encrypted tablespace, we need to get the
+		encryption key information before the page 0 is recovered.
+	        Otherwise, redo will not find the key to decrypt
+		the data pages. */
+		if (page_no == 0 && !is_system_tablespace(space_id)
+		    && !apply) {
+			return(fil_write_encryption_parse(ptr,
+							  end_ptr,
+							  space_id));
+		}
+		break;
+
 	default:
 		break;
 	}
@@ -1935,7 +2041,8 @@ recv_parse_or_apply_log_rec_body(
 		ptr = fsp_parse_init_file_page(ptr, end_ptr, block);
 		break;
 	case MLOG_WRITE_STRING:
-		ut_ad(!page || page_type != FIL_PAGE_TYPE_ALLOCATED);
+		ut_ad(!page || page_type != FIL_PAGE_TYPE_ALLOCATED
+		      || page_no == 0);
 		ptr = mlog_parse_string(ptr, end_ptr, page, page_zip);
 		break;
 	case MLOG_ZIP_WRITE_NODE_PTR:
@@ -2609,22 +2716,14 @@ loop:
 		mutex_exit(&(recv_sys->mutex));
 		log_mutex_exit();
 
-		/* Stop the recv_writer thread from issuing any LRU
-		flush batches. */
-		mutex_enter(&recv_sys->writer_mutex);
+		os_event_reset(recv_sys->flush_end);
+		os_event_set(recv_sys->flush_start);
+		os_event_wait(recv_sys->flush_end);
 
 		/* Wait for any currently run batch to end. */
 		buf_flush_wait_LRU_batch_end();
 
-		os_event_reset(recv_sys->flush_end);
-		recv_sys->flush_type = BUF_FLUSH_LIST;
-		os_event_set(recv_sys->flush_start);
-		os_event_wait(recv_sys->flush_end);
-
 		buf_pool_invalidate();
-
-		/* Allow batches from recv_writer thread. */
-		mutex_exit(&recv_sys->writer_mutex);
 
 		log_mutex_enter();
 		mutex_enter(&(recv_sys->mutex));
@@ -3642,7 +3741,6 @@ recv_group_scan_log_recs(
 	recv_previous_parsed_rec_offset	= 0;
 	recv_previous_parsed_rec_is_multi = 0;
 	ut_ad(recv_max_page_lsn == 0);
-	ut_ad(last_phase || !recv_writer_thread_active);
 	mutex_exit(&recv_sys->mutex);
 
 	lsn_t	checkpoint_lsn	= *contiguous_lsn;
@@ -3826,12 +3924,6 @@ recv_init_crash_recovery_spaces(void)
 
 	buf_dblwr_process();
 
-	if (srv_force_recovery < SRV_FORCE_NO_LOG_REDO) {
-		/* Spawn the background thread to flush dirty pages
-		from the buffer pools. */
-		os_thread_create(recv_writer_thread, 0, 0);
-	}
-
 	return(DB_SUCCESS);
 }
 
@@ -3948,7 +4040,12 @@ recv_recovery_from_checkpoint_start(
 	switch (group->format) {
 	case 0:
 		log_mutex_exit();
-		return(recv_log_format_0_recover(checkpoint_lsn));
+		err = recv_log_format_0_recover(checkpoint_lsn);
+		if (err == DB_SUCCESS) {
+			buf_parallel_dblwr_finish_recovery();
+			buf_parallel_dblwr_delete();
+		}
+		return(err);
 	case LOG_HEADER_FORMAT_CURRENT:
 		break;
 	default:
@@ -4051,6 +4148,8 @@ recv_recovery_from_checkpoint_start(
 			}
 		}
 	} else {
+		buf_parallel_dblwr_finish_recovery();
+		buf_parallel_dblwr_delete();
 		ut_ad(!rescan || recv_sys->n_addrs == 0);
 	}
 
@@ -4131,32 +4230,10 @@ recv_recovery_from_checkpoint_start(
 void
 recv_recovery_from_checkpoint_finish(void)
 {
-	/* Make sure that the recv_writer thread is done. This is
-	required because it grabs various mutexes and we want to
-	ensure that when we enable sync_order_checks there is no
-	mutex currently held by any thread. */
-	mutex_enter(&recv_sys->writer_mutex);
-
 	/* Free the resources of the recovery system */
 	recv_recovery_on = false;
 
-	/* By acquring the mutex we ensure that the recv_writer thread
-	won't trigger any more LRU batches. Now wait for currently
-	in progress batches to finish. */
 	buf_flush_wait_LRU_batch_end();
-
-	mutex_exit(&recv_sys->writer_mutex);
-
-	ulint count = 0;
-	while (recv_writer_thread_active) {
-		++count;
-		os_thread_sleep(100000);
-		if (srv_print_verbose_log && count > 600) {
-			ib::info() << "Waiting for recv_writer to"
-				" finish flushing of buffer pool";
-			count = 0;
-		}
-	}
 
 	recv_sys_debug_free();
 
@@ -4206,8 +4283,6 @@ void
 recv_recovery_rollback_active(void)
 /*===============================*/
 {
-	ut_ad(!recv_writer_thread_active);
-
 	/* Switch latching order checks on in sync0debug.cc, if
 	--innodb-sync-debug=true (default) */
 	ut_d(sync_check_enable());

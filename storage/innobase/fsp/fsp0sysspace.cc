@@ -1,6 +1,7 @@
 /*****************************************************************************
 
-Copyright (c) 2013, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2013, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2016, Percona Inc. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -571,13 +572,16 @@ SysTablespace::read_lsn_and_check_flags(lsn_t* flushed_lsn)
 	ut_a(it->order() == 0);
 
 
-	buf_dblwr_init_or_load_pages(it->handle(), it->filepath());
+	err = buf_dblwr_init_or_load_pages(it->handle(), it->filepath());
+	if (err != DB_SUCCESS) {
+		return(err);
+	}
 
 	/* Check the contents of the first page of the
 	first datafile. */
 	for (int retry = 0; retry < 2; ++retry) {
 
-		err = it->validate_first_page(flushed_lsn);
+		err = it->validate_first_page(flushed_lsn, false);
 
 		if (err != DB_SUCCESS
 		    && (retry == 1
@@ -775,11 +779,7 @@ SysTablespace::check_file_spec(
 		return(DB_ERROR);
 	}
 
-	ulint tablespace_size = get_sum_of_sizes();
-	if (tablespace_size == ULINT_UNDEFINED) {
-		return(DB_ERROR);
-	} else if (tablespace_size
-		   < min_expected_size / UNIV_PAGE_SIZE) {
+	if (get_sum_of_sizes() < min_expected_size / UNIV_PAGE_SIZE) {
 
 		ib::error() << "Tablespace size must be at least "
 			<< min_expected_size / (1024 * 1024) << " MB";
