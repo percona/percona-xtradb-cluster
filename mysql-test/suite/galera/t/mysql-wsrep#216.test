@@ -12,9 +12,20 @@ SET GLOBAL wsrep_debug = ON;
 
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE USER = 'u1';
+--source include/wait_condition.inc
+
+--connection node_1
 --error ER_CANNOT_USER
 CREATE USER u1 IDENTIFIED BY 'plaintext_password';
+DROP USER u1;
 
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM mysql.user WHERE USER = 'u1';
+--source include/wait_condition.inc
+
+--connection node_1
 # Check that the plaintext password does not appear in the logs
 --exec grep --count plaintext_password $MYSQLTEST_VARDIR/log/mysqld.1.err || true
 --exec grep --count plaintext_password $MYSQLTEST_VARDIR/log/mysqld.2.err || true
@@ -26,8 +37,6 @@ CREATE USER u1 IDENTIFIED BY 'plaintext_password';
 
 # Once for the second node, in the 'Slave SQL' error
 --exec grep --count "'mysql_native_password' AS '<secret>'" $MYSQLTEST_VARDIR/log/mysqld.2.err
-
-DROP USER u1;
 
 --disable_query_log
 --eval SET GLOBAL wsrep_debug = $wsrep_debug_orig

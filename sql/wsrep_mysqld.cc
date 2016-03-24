@@ -687,6 +687,7 @@ void wsrep_deinit()
 
 void wsrep_recover()
 {
+#if 0
   if (!memcmp(&local_uuid, &WSREP_UUID_UNDEFINED, sizeof(wsrep_uuid_t)) &&
       local_seqno == -2)
   {
@@ -696,6 +697,7 @@ void wsrep_recover()
                uuid_str, (long long)local_seqno);
     return;
   }
+#endif
   wsrep_uuid_t uuid;
   wsrep_seqno_t seqno;
   wsrep_get_SE_checkpoint(uuid, seqno);

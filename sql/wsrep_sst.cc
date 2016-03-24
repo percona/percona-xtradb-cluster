@@ -236,6 +236,8 @@ void wsrep_sst_grab ()
 // Wait for end of SST
 bool wsrep_sst_wait ()
 {
+  wsrep_seqno_t seqno;
+
   if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   while (!sst_complete)
   {
@@ -243,19 +245,26 @@ bool wsrep_sst_wait ()
     mysql_cond_wait (&COND_wsrep_sst, &LOCK_wsrep_sst);
   }
 
-  if (local_seqno >= 0)
+  // Save a local copy of a global variable prior to release
+  // of the mutex - to ensure that the return code from this
+  // function and a diagnostic message in the log will always
+  // be consistent with each other:
+
+  seqno = local_seqno;
+
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
+
+  if (seqno >= 0)
   {
-    WSREP_INFO("SST complete, seqno: %lld", (long long) local_seqno);
+    WSREP_INFO("SST complete, seqno: %lld", (long long) seqno);
   }
   else
   {
     WSREP_ERROR("SST failed: %d (%s)",
-                int(-local_seqno), strerror(-local_seqno));
+                int(-seqno), strerror(-seqno));
   }
 
-  mysql_mutex_unlock (&LOCK_wsrep_sst);
-
-  return (local_seqno >= 0);
+  return (seqno >= 0);
 }
 
 // Signal end of SST

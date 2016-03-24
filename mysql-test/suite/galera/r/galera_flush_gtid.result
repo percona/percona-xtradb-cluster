@@ -35,6 +35,8 @@ FLUSH TABLES t1 FOR EXPORT;
 UNLOCK TABLES;
 RESET CHANGED_PAGE_BITMAPS;
 RESET QUERY CACHE;
+wsrep_last_committed_diff
+1
 LOCK TABLES t1 WRITE;
 FLUSH TABLES t1;
 UNLOCK TABLES;
@@ -42,6 +44,23 @@ LOCK TABLES t1 READ;
 FLUSH TABLES t1;
 ERROR HY000: Table 't1' was locked with a READ lock and can't be updated
 UNLOCK TABLES;
+wsrep_last_committed_diff
+1
 FLUSH TABLES t1;
 DROP TABLE t1;
 DROP TABLE t2;
+call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+#node-1
+select @@wsrep_desync;
+@@wsrep_desync
+0
+set global wsrep_desync = 1;
+set global wsrep_desync = 0;
+flush table with read lock;
+set global wsrep_desync = 1;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'ON'
+set global wsrep_desync = 0;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'OFF'
+unlock tables;
+set global wsrep_desync = 1;
+set global wsrep_desync = 0;;

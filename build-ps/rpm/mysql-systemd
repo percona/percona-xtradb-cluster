@@ -9,9 +9,9 @@ parse_cnf()
     local def=$2
     shift
     local groups=$*
-    reval=$(my_print_defaults $groups | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
+    reval=$(my_print_defaults $groups | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -n 1)
     if [[ -z ${reval:-} ]];then 
-        val=$(tr ' ' '\n' <<< "$env_args" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
+        val=$(tr ' ' '\n' <<< "$env_args" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -n 1)
         if [[ -n ${val:-} ]];then
             reval=$val
         else 

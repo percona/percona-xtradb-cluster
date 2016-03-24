@@ -5616,7 +5616,7 @@ sub mysqld_arguments ($$$) {
   # to start unless we specify what user to run as, see BUG#30630
   my $euid= $>;
   if (!IS_WINDOWS and $euid == 0 and
-      (grep(/^--user/, @$extra_opts)) == 0) {
+      (grep(/^--user=/, @$extra_opts)) == 0) {
     mtr_add_arg($args, "--user=root");
   }
 

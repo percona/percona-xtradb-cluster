@@ -389,9 +389,8 @@ void wsrep_create_appliers(long threads)
     if (wsrep_cluster_address && strlen(wsrep_cluster_address) &&
         wsrep_provider && strcasecmp(wsrep_provider, "none"))
     {
-      WSREP_ERROR("Trying to launch slave threads before creating "
+      WSREP_WARN("Trying to launch slave threads before creating "
                   "connection at '%s'", wsrep_cluster_address);
-      assert(0);
     }
     return;
   }

@@ -49,6 +49,20 @@ VARIABLE_VALUE = 'Primary'
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
+SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
+SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
+SHOW STATUS LIKE 'wsrep_connected';
+Variable_name	Value
+wsrep_connected	OFF
+SET GLOBAL wsrep_slave_threads = 1 + 16;;
+SET GLOBAL wsrep_slave_threads = 1;;
+SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
+SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+VARIABLE_VALUE = 'Primary'
+1
+SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+VARIABLE_VALUE = 2
+1
 CALL mtr.add_suppression("Backend not supported: foo");
 CALL mtr.add_suppression("Failed to initialize backend using 'foo");
 CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'foo");
@@ -61,3 +75,4 @@ CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'gcomm://
 CALL mtr.add_suppression("gcs connect failed: Connection timed out");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(foo://\\) failed: 7");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(gcomm://192.0.2.1\\) failed: 7");
+CALL mtr.add_suppression("WSREP: Trying to launch slave threads before creating connection at 'gcomm://192.0.2.1'");
