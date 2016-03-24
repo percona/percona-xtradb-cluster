@@ -448,7 +448,7 @@ function get_version_info()
             ;;
         5.5 )
             ;;
-        5.6 | 10.0 )
+        5.6 | 10.0 | 5.7 )
             DEFAULT_IBDATA_SIZE="12M"
             ;;
         *)

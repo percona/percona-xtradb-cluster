@@ -36,7 +36,8 @@ function call_mysql_install_db()
 
 	cd $MYSQL_BASEDIR
 
-        if ! $MYSQL_INSTALL_DB --defaults-file=${MYSQLD_VARDIR}/my.cnf \
+        if ! ${MYSQLD} --defaults-file=${MYSQLD_VARDIR}/my.cnf \
+                    --initialize \
                     --basedir=${MYSQL_BASEDIR} \
                     --datadir=${MYSQLD_DATADIR} \
                     ${MYSQLD_EXTRA_ARGS}
@@ -346,8 +347,8 @@ EOF
         fi
 
         # Start the server
-        echo "Starting ${MYSQLD} ${MYSQLD_ARGS} $* "
-        ${MYSQLD} ${MYSQLD_ARGS} $* &
+        echo "Starting ${MYSQLD} ${MYSQLD_ARGS} $* --skip-grant-tables"
+        ${MYSQLD} ${MYSQLD_ARGS} $* --skip-grant-tables &
         if ! mysql_ping $!
         then
             if grep "another mysqld server running on port" $MYSQLD_ERRFILE
