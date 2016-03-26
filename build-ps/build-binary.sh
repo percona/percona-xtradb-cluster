@@ -337,8 +337,8 @@ fi
     else
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \
              "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
-        cp $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
-        cp $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
+        mv $TARGETDIR/garbd "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin"
+        mv $TARGETDIR/libgalera_smm.so "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/lib"
     fi
     ) || exit 1
 
@@ -435,5 +435,8 @@ fi
 
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 ) || exit 1
+
+rm -rf $TARGETDIR/bld
+rm -rf $TARGETDIR/usr
 
 echo "Build Complete"
