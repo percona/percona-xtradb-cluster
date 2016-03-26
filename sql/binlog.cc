@@ -1304,8 +1304,11 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd)
       eco-system too will capture this dummy trx and will execute it for
       internal replication to keep GTID sequence consistent across
       the cluster. */
-    ha_wsrep_fake_trx_id(thd);
-    thd->wsrep_certify_empty_trx= true;
+    if (WSREP(thd))
+    {
+      ha_wsrep_fake_trx_id(thd);
+      thd->wsrep_certify_empty_trx= true;
+    }
 
     // TODO: Flow below avoid creating entry in binlog if binlog is disabled.
     // For Galera replication binlog is must. Check if below code should be

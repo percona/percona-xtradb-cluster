@@ -17,7 +17,6 @@ ssl-cert=@ENV.MYSQL_TEST_DIR/std_data/galera-cert.pem
 ssl-key=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem
 
 [client]
-ssl
 ssl-ca=@ENV.MYSQL_TEST_DIR/std_data/cacert.pem
 ssl-cert=@ENV.MYSQL_TEST_DIR/std_data/client-cert.pem 
 ssl-key=@ENV.MYSQL_TEST_DIR/std_data/client-key.pem
