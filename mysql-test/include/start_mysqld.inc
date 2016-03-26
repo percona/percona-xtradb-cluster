@@ -1,6 +1,10 @@
+
+--let $restart_param= 1;
+
 if (!$restart_parameters)
 {
   let $restart_parameters = restart;
+  --let $restart_param = 0;
 }
 
 # We use --exec echo instead of simple "--echo" because
@@ -26,13 +30,25 @@ if (!$restart_parameters)
 
 if ($galera_wsrep_start_position != '') {
 	--echo Using --wsrep-start-position when starting mysqld ...
-	--exec echo "$restart_parameters --wsrep-start-position=$galera_wsrep_start_position" > $_expect_file_name
+
+	# starting 5.7 ":" is important otherwise the restart params are not passed.
+	if (!$restart_param)
+	{
+		--exec echo "restart: --wsrep-start-position=$galera_wsrep_start_position" > $_expect_file_name
+	}
+
+	if ($restart_param)
+	{
+		--exec echo "$restart_parameters --wsrep-start-position=$galera_wsrep_start_position" > $_expect_file_name
+	}
+
 	--let $galera_wsrep_start_position = 0
 }
 
 if ($galera_wsrep_start_position == '') {
 	--exec echo "$restart_parameters" > $_expect_file_name
 }
+
 
 # Turn on reconnect
 --enable_reconnect

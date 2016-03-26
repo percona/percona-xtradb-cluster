@@ -244,6 +244,13 @@ INSERT INTO global_suppressions VALUES
  ("Could not increase number of max_open_files to more than *"),
 
  /*
+   Warning message if xb-doublewrite buffer file is located on tmpfs
+   Introduced by the parallel doublewrite buffer feature introduced in
+   PS-5.7.11-4
+ */
+ ("InnoDB: Failed to set O_DIRECT on "),
+
+ /*
    Galera suppressions 
  */
  ("WSREP:*down context*"),

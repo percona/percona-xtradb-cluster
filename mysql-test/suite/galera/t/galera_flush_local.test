@@ -80,7 +80,9 @@ REPAIR LOCAL TABLE x1, x2;
 
 --connection node_2
 --disable_query_log
+--disable_warnings
 --eval SELECT VARIABLE_VALUE = $wsrep_last_committed_before AS wsrep_last_committed_diff FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--enable_warnings
 --enable_query_log
 
 SELECT COUNT(*) = 10 FROM t1;

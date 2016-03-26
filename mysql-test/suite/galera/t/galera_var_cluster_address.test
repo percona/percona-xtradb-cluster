@@ -99,8 +99,10 @@ SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
 --source include/wait_until_connected_again.inc
 
 --connection node_1
+--disable_warnings
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--enable_warnings
 
 #
 # Set to an invalid host and change the number of slave threads
