@@ -31,7 +31,6 @@ NUMBEROFTABLES=
 TABLESIZE=
 NUMBEROFTABLES=
 THREADS=
-BUILD_NUMBER=1
 
 SYSBENCH=`which sysbench` || (echo "Can't locate sysbench" && exit 1)
 echo "Using $SYSBENCH"
