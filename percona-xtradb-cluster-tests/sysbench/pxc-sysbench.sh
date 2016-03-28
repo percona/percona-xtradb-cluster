@@ -184,7 +184,8 @@ rw_workload() {
     echo "Sysbench Run: OLTP RW testing"
     $SYSBENCH --mysql-table-engine=innodb --num-threads=$THREADS \
               --report-interval=10 --oltp-auto-inc=1 \
-              --max-time=$DURATION --test=$LUASCRIPTS/oltp.lua \
+              --max-time=$DURATION --max-requests=0 \
+              --test=$LUASCRIPTS/oltp.lua \
               --init-rng=on --oltp_index_updates=10 \
               --oltp_non_index_updates=10 --oltp_distinct_ranges=15 \
               --oltp_order_ranges=15 --oltp_tables_count=$NUMBEROFTABLES \
@@ -213,7 +214,8 @@ ddl_workload()
     echo "Sysbench Run: OLTP DDL testing"
     $SYSBENCH --mysql-table-engine=innodb --num-threads=$THREADS \
               --report-interval=10 --oltp-auto-inc=1 \
-              --max-time=$DURATION --test=$BUILDDIR/sysbench/sysbench/tests/db/oltp_ddl.lua \
+              --max-time=$DURATION --max-requests=0 \
+              --test=$BUILDDIR/sysbench/sysbench/tests/db/oltp_ddl.lua \
               --init-rng=on --oltp_index_updates=10 --oltp_non_index_updates=10 \
               --oltp_distinct_ranges=15 --oltp_order_ranges=15 \
               --oltp_tables_count=$NUMBEROFTABLES --mysql-db=test \
