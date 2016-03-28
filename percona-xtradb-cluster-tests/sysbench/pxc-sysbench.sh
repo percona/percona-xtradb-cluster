@@ -14,10 +14,10 @@ set +e
 echo "Killing existing mysqld"
 pgrep -f mysqld
 pkill -f mysqld
-#sleep 10
+sleep 10
 pgrep mysqld || pkill -9 -f mysqld
-set -e 
-#sleep 5
+set -e
+sleep 5
 
 #-------------------------------------------------------------------------------
 #
@@ -270,12 +270,12 @@ mkdir -p $node3
 
 sysbench_run()
 {
-  set +e 
+  set +e
 
   echo "Starting PXC node1"
   ${MYSQL_BASEDIR}/bin/mysqld --basedir=${MYSQL_BASEDIR} \
 	--datadir=$MYSQL_VARDIR/node1 \
-	--socket=$node1/socket.sock \
+	--socket=/tmp/n1.sock \
 	--log-error=$BUILDDIR/logs/node1.err \
 	--skip-grant-tables --initialize 2>&1 || exit 1;
 
@@ -294,9 +294,9 @@ sysbench_run()
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node1.err \
-	--socket=$node1/socket.sock --log-output=none \
+	--socket=/tmp/n1.sock --log-output=none \
 	--port=$RBASE1 --skip-grant-tables \
-	--core-file > $BUILDDIR/logs/node1.err 2>&1 & 
+	--core-file > $BUILDDIR/logs/node1.err 2>&1 &
 
   echo "Waiting for node-1 to start ....."
   sleep 10
@@ -304,7 +304,7 @@ sysbench_run()
   echo "Starting PXC node2"
   ${MYSQL_BASEDIR}/bin/mysqld --basedir=${MYSQL_BASEDIR} \
 	--datadir=${MYSQL_VARDIR}/node2 \
-	--socket=$node2/socket.sock \
+	--socket=/tmp/n2.sock \
 	--log-error=$BUILDDIR/logs/node2.err \
 	--skip-grant-tables --initialize 2>&1 || exit 1;
 
@@ -323,25 +323,25 @@ sysbench_run()
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node2.err \
-	--socket=$node2/socket.sock --log-output=none \
+	--socket=/tmp/n2.sock --log-output=none \
 	--port=$RBASE2 --skip-grant-tables \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
   echo "Waiting for node-2 to start ....."
-  sleep 20
+  sleep 10
 
   set -e
 
   # load data. create seed data.
-  $MYSQL_BASEDIR/bin/mysql -S $node1/socket.sock -u root -e "create database test;" || true
-  prepare $node1/socket.sock $BUILDDIR/logs/sysbench_prepare.txt 
+  $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "create database test;" || true
+  prepare /tmp/n1.sock $BUILDDIR/logs/sysbench_prepare.txt
 
   set +e
   echo "Starting PXC node3"
   # this will get SST.
   ${MYSQL_BASEDIR}/bin/mysqld --basedir=${MYSQL_BASEDIR} \
 	--datadir=${MYSQL_VARDIR}/node3 \
-	--socket=$node3/socket.sock \
+	--socket=/tmp/n3.sock \
 	--log-error=$BUILDDIR/logs/node3.err \
 	--skip-grant-tables --initialize 2>&1 || exit 1;
 
@@ -360,27 +360,27 @@ sysbench_run()
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node3.err \
-	--socket=$node3/socket.sock --log-output=none \
+	--socket=/tmp/n3.sock --log-output=none \
 	--port=$RBASE3 --skip-grant-tables \
 	--core-file > $BUILDDIR/logs/node3.err 2>&1 &
 
   # let's wait for server(s) to start
   echo "Waiting for node-3 to start ....."
-  sleep 30 
+  sleep 10
 
   set -e
 
   # validate db before starting RW test.
   echo "Table count pre RW-load"
-  ver_and_row $node1/socket.sock
-  ver_and_row $node2/socket.sock
-  ver_and_row $node3/socket.sock
+  ver_and_row /tmp/n1.sock
+  ver_and_row /tmp/n2.sock
+  ver_and_row /tmp/n3.sock
 
-  # shutdown node-2 so that on re-join it will get IST from node-1/3 
-  ${MYSQL_BASEDIR}/bin/mysqladmin -uroot -S$node2/socket.sock shutdown > /dev/null 2>&1
+  # shutdown node-2 so that on re-join it will get IST from node-1/3
+  ${MYSQL_BASEDIR}/bin/mysqladmin -uroot -S/tmp/n2.sock shutdown > /dev/null 2>&1
   echo "Waiting for node-2 to shutdown....."
-  sleep 10 
-  rw_workload "$node1/socket.sock,$node3/socket.sock" $BUILDDIR/logs/sysbench_rw_run.txt
+  sleep 10
+  rw_workload "/tmp/n1.sock,/tmp/n3.sock" $BUILDDIR/logs/sysbench_rw_run.txt
 
   echo "Restarting node-2"
   ${MYSQL_BASEDIR}/bin/mysqld --defaults-group-suffix=.2 \
@@ -398,7 +398,7 @@ sysbench_run()
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node2.err \
-	--socket=$node2/socket.sock --log-output=none \
+	--socket=/tmp/n2.sock --log-output=none \
 	--port=$RBASE2 --skip-grant-tables \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
@@ -407,29 +407,29 @@ sysbench_run()
   # ensure that node-2 has restarted and has joined the group post IST
   MPID="$!"
   while true ; do
-    sleep 20
+    sleep 10
     if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node2.err ; then
      break
     fi
     if [ "${MPID}" == "" ]; then
       echoit "Error! server not started.. Terminating!"
-      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err 
+      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err
       exit 1
     fi
-  done 
+  done
 
   # validate db before starting RW test.
   echo "Table count post RW-load"
-  ver_and_row $node1/socket.sock
-  ver_and_row $node2/socket.sock
-  ver_and_row $node3/socket.sock
+  ver_and_row /tmp/n1.sock
+  ver_and_row /tmp/n2.sock
+  ver_and_row /tmp/n3.sock
 
-  #ddl_workload $node1/socket.sock $BUILDDIR/logs/sysbench_ddl.txt
-  cleanup $node3/socket.sock $BUILDDIR/logs/sysbench_cleanup.txt
+  #ddl_workload /tmp/n1.sock $BUILDDIR/logs/sysbench_ddl.txt
+  cleanup /tmp/n3.sock $BUILDDIR/logs/sysbench_cleanup.txt
 
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=$node1/socket.sock -u root shutdown
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=$node2/socket.sock -u root shutdown
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=$node3/socket.sock -u root shutdown
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
 }
 
 #-------------------------------------------------------------------------------
@@ -448,7 +448,6 @@ mkdir -p $node2
 mkdir -p $node3
 
 # CASE-2: sysbench run without binlog (will use emulation of binlog)
-echo "\n\n\n\n"
 echo "--------------------------------------------------"
 echo "Running sysbench with skip-log-bin"
 echo "--------------------------------------------------"
