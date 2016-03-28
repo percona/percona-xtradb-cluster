@@ -274,13 +274,13 @@ sysbench_run()
   set +e
 
   echo "Starting PXC node1"
-  ${MYSQL_BASEDIR}/bin/mysqld --basedir=${MYSQL_BASEDIR} \
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
 	--datadir=$MYSQL_VARDIR/node1 \
 	--socket=/tmp/n1.sock \
 	--log-error=$BUILDDIR/logs/node1.err \
 	--skip-grant-tables --initialize 2>&1 || exit 1;
 
-  ${MYSQL_BASEDIR}/bin/mysqld --defaults-group-suffix=.1 \
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.1 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node1 \
 	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
 	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
@@ -303,13 +303,13 @@ sysbench_run()
   sleep 10
 
   echo "Starting PXC node2"
-  ${MYSQL_BASEDIR}/bin/mysqld --basedir=${MYSQL_BASEDIR} \
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
 	--datadir=${MYSQL_VARDIR}/node2 \
 	--socket=/tmp/n2.sock \
 	--log-error=$BUILDDIR/logs/node2.err \
 	--skip-grant-tables --initialize 2>&1 || exit 1;
 
-  ${MYSQL_BASEDIR}/bin/mysqld --defaults-group-suffix=.2 \
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.2 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
 	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
 	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
@@ -340,13 +340,13 @@ sysbench_run()
   set +e
   echo "Starting PXC node3"
   # this will get SST.
-  ${MYSQL_BASEDIR}/bin/mysqld --basedir=${MYSQL_BASEDIR} \
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
 	--datadir=${MYSQL_VARDIR}/node3 \
 	--socket=/tmp/n3.sock \
 	--log-error=$BUILDDIR/logs/node3.err \
 	--skip-grant-tables --initialize 2>&1 || exit 1;
 
-  ${MYSQL_BASEDIR}/bin/mysqld --defaults-group-suffix=.3 \
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.3 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node3 \
 	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
 	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
@@ -384,7 +384,7 @@ sysbench_run()
   rw_workload "/tmp/n1.sock,/tmp/n3.sock" $BUILDDIR/logs/sysbench_rw_run.txt
 
   echo "Restarting node-2"
-  ${MYSQL_BASEDIR}/bin/mysqld --defaults-group-suffix=.2 \
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.2 \
       --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
 	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
 	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
