@@ -233,7 +233,7 @@ cleanup()
     echo "Sysbench Run: Cleanup"
     $SYSBENCH --test=$LUASCRIPTS/parallel_prepare.lua  \
         --oltp_tables_count=$NUMBEROFTABLES --mysql-db=test --mysql-user=root  \
-        --db-driver=mysql --mysql-socket=$socket cleanup 2>&1 | tee $logfile
+        --db-driver=mysql --mysql-socket=$socket cleanup 2>&1 | tee $logfile || exit 1;
 }
 
 MYSQL_BASEDIR="$BUILDDIR/$PXC_BASE"
@@ -365,9 +365,20 @@ sysbench_run()
 	--port=$RBASE3 --skip-grant-tables \
 	--core-file > $BUILDDIR/logs/node3.err 2>&1 &
 
-  # let's wait for server(s) to start
+  # ensure that node-3 has started and has joined the group post SST
   echo "Waiting for node-3 to start ....."
-  sleep 10
+  MPID="$!"
+  while true ; do
+    sleep 10
+    if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node3.err ; then
+     break
+    fi
+    if [ "${MPID}" == "" ]; then
+      echoit "Error! server not started.. Terminating!"
+      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err
+      exit 1
+    fi
+  done
 
   set -e
 

@@ -51,7 +51,7 @@ SSL_OPT=''
 STAG=${STAG:-}
 
 # tag build with this name.
-TAG=''
+TAG='1'
 
 # cmake build option to preset. based on configuration default options are used.
 CMAKE_BUILD_TYPE='RelWithDebInfo'
