@@ -11,6 +11,9 @@
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 
 --connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
@@ -20,6 +23,7 @@ START TRANSACTION;
 COMMIT;
 
 --connection node_2
+--sleep 1
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
@@ -36,6 +40,7 @@ SELECT COUNT(*) = 0 FROM t1;
 COMMIT;
 
 --connection node_2
+--sleep 1
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
@@ -49,6 +54,7 @@ SELECT COUNT(*) = 0 FROM t1;
 COMMIT;
 
 --connection node_2
+--sleep 1
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
