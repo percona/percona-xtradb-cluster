@@ -393,9 +393,17 @@ lock_wait_suspend_thread(
 		return;
 	}
 
+
+	bool is_high_priority =
+		trx_is_high_priority(trx)
+#ifdef WITH_WSREP
+		|| wsrep_thd_is_BF(trx->mysql_thd, TRUE)
+#endif /* WITH_WSREP */
+		;
+
 	if (lock_wait_timeout < 100000000
 	    && wait_time > (double) lock_wait_timeout
-	    && !trx_is_high_priority(trx)) {
+	    && !is_high_priority) {
 #ifdef WITH_WSREP
                 if (!wsrep_on(trx->mysql_thd) ||
                     (!wsrep_is_BF_lock_timeout(trx) &&

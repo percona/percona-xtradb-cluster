@@ -5,7 +5,6 @@
 # Script try to load data using parallel sysbench through multiple
 # nodes and validates that loaded data is sane on all nodes of the cluster.
 
-
 #-------------------------------------------------------------------------------
 #
 # Step-1: Clear pending backlog.
@@ -31,6 +30,7 @@ NUMBEROFTABLES=
 TABLESIZE=
 NUMBEROFTABLES=
 THREADS=
+SLAVE_THREADS=
 
 SYSBENCH=`which sysbench` || (echo "Can't locate sysbench" && exit 1)
 echo "Using $SYSBENCH"
@@ -63,6 +63,10 @@ while getopts $optspec option; do
     	;;
     t)
     	THREADS=$OPTARG
+	SLAVE_THREADS=`expr $THREADS / 4`
+	if [ $SLAVE_THREADS -eq 0 ]; then
+          SLAVE_THREADS=1
+	fi
     	;;
     h)
 	usage;
@@ -160,9 +164,9 @@ prepare() {
 
     echo "Sysbench Run: Prepare stage"
     $SYSBENCH --test=$LUASCRIPTS/parallel_prepare.lua --report-interval=10 \
-              --oltp-auto-inc=1 --mysql-engine-trx=yes \
+              --oltp-auto-inc=off --mysql-engine-trx=yes \
               --mysql-table-engine=innodb \
-              --oltp-table-size=$TABLESIZE --oltp_tables_count=$NUMBEROFTABLES \
+              --oltp_table_size=$TABLESIZE --oltp_tables_count=$NUMBEROFTABLES \
               --mysql-db=test --mysql-user=root  --num-threads=$THREADS \
               --db-driver=mysql --mysql-socket=$socket \
               prepare 2>&1 | tee $logfile || exit 1;
@@ -172,8 +176,18 @@ prepare() {
 ver_and_row(){
     local socket=$1
 
-    $MYSQL_BASEDIR/bin/mysql -S $socket -u root -e "show global variables like 'version';"
-    $MYSQL_BASEDIR/bin/mysql -S $socket -u root -e "select count(*) from test.sbtest1;"
+    $MYSQL_BASEDIR/bin/mysql -S $socket -u root -e "show variables like 'log_bin'";
+    ITR=1
+    DELIM=";"
+    #while [ $ITR -lt $NUMBEROFTABLES ]
+    while [ $ITR -lt $ITR ]
+    do
+      QUERY="select count(*) from test.sbtest"$ITR$DELIM
+      $MYSQL_BASEDIR/bin/mysql -S $socket -u root -e "$QUERY"
+      ITR=`expr $ITR + 1`
+    done
+    QUERY="select count(*) from test.sbtest"$ITR$DELIM
+    $MYSQL_BASEDIR/bin/mysql -S $socket -u root -e "$QUERY"
 }
 
 # Read-Write testing workload
@@ -183,12 +197,13 @@ rw_workload() {
 
     echo "Sysbench Run: OLTP RW testing"
     $SYSBENCH --mysql-table-engine=innodb --num-threads=$THREADS \
-              --report-interval=10 --oltp-auto-inc=1 \
+              --report-interval=10 --oltp-auto-inc=off \
               --max-time=$DURATION --max-requests=0 \
               --test=$LUASCRIPTS/oltp.lua \
               --init-rng=on --oltp_index_updates=10 \
               --oltp_non_index_updates=10 --oltp_distinct_ranges=15 \
               --oltp_order_ranges=15 --oltp_tables_count=$NUMBEROFTABLES \
+              --oltp_table_size=$TABLESIZE \
               --mysql-db=test --mysql-user=root --db-driver=mysql \
               --mysql-socket=$socket run  2>&1 | tee $logfile || exit 1;
 }
@@ -213,12 +228,13 @@ ddl_workload()
 
     echo "Sysbench Run: OLTP DDL testing"
     $SYSBENCH --mysql-table-engine=innodb --num-threads=$THREADS \
-              --report-interval=10 --oltp-auto-inc=1 \
+              --report-interval=10 --oltp-auto-inc=off \
               --max-time=$DURATION --max-requests=0 \
               --test=$BUILDDIR/sysbench/sysbench/tests/db/oltp_ddl.lua \
               --init-rng=on --oltp_index_updates=10 --oltp_non_index_updates=10 \
               --oltp_distinct_ranges=15 --oltp_order_ranges=15 \
               --oltp_tables_count=$NUMBEROFTABLES --mysql-db=test \
+              --oltp_table_size=$TABLESIZE \
               --mysql-user=root --db-driver=mysql --mysql-socket=$socket \
               run 2>&1 | tee $logfile  || exit 1;
    set +x
@@ -297,6 +313,7 @@ sysbench_run()
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node1.err \
 	--socket=/tmp/n1.sock --log-output=none \
 	--port=$RBASE1 --skip-grant-tables \
+	--server-id=1 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=ON \
 	--core-file > $BUILDDIR/logs/node1.err 2>&1 &
 
   echo "Waiting for node-1 to start ....."
@@ -326,6 +343,7 @@ sysbench_run()
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node2.err \
 	--socket=/tmp/n2.sock --log-output=none \
 	--port=$RBASE2 --skip-grant-tables \
+	--server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
   echo "Waiting for node-2 to start ....."
@@ -363,6 +381,7 @@ sysbench_run()
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node3.err \
 	--socket=/tmp/n3.sock --log-output=none \
 	--port=$RBASE3 --skip-grant-tables \
+	--server-id=3 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=ON \
 	--core-file > $BUILDDIR/logs/node3.err 2>&1 &
 
   # ensure that node-3 has started and has joined the group post SST
@@ -412,6 +431,7 @@ sysbench_run()
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node2.err \
 	--socket=/tmp/n2.sock --log-output=none \
 	--port=$RBASE2 --skip-grant-tables \
+	--server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
   echo "Waiting for node-2 to start ....."
@@ -451,7 +471,7 @@ sysbench_run()
 
 # CASE-1: sysbench with binlog-format=ROW
 echo "Running sysbench with binlog-format=ROW"
-sysbench_run --binlog-format=ROW
+sysbench_run "--log-bin=mysql-bin --binlog-format=ROW"
 mv $node1 ${MYSQL_VARDIR}/with_binlog_node1
 mv $node2 ${MYSQL_VARDIR}/with_binlog_node2
 mv $node3 ${MYSQL_VARDIR}/with_binlog_node3

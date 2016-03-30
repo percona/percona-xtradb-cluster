@@ -929,6 +929,11 @@ bool do_command(THD *thd)
   COM_DATA com_data;
   DBUG_ENTER("do_command");
 #ifdef WITH_WSREP
+  /* Why do we need to do an explicit rollback if rollback thread can do it ?
+  THD is added to rollback thread based on till what point query has executed.
+  if wsrep_query_state = QUERY_EXEC then thd is not added to rollback thread
+  instead it is left out for do_command and dispatch_command to do an explicit
+  rollback. */
   if (WSREP(thd))
   {
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);

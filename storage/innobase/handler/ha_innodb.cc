@@ -2869,18 +2869,42 @@ check_trx_exists(
 		/* User trx can be forced to rollback,
 		so we unset the disable flag. */
 		ut_ad(trx->in_innodb & TRX_FORCE_ROLLBACK_DISABLE);
+
 #ifdef WITH_WSREP
+		/* With 5.7 InnoDB introduce a mechanism for force rollback.
+		If a conflict is detected then high priority transaction can
+		cause low priority transaction to force rollback.
+		Rollback action is executed as part of high priority transaction
+		thread hogging it till it is done.
+		Galera uses different logic. It has a dedicated rollback thread
+		that does this on request. Also, not each transaction is
+		rollback by rollback thread. For example: if statement is in
+		advance mode with query_state = QUERY_EXEC then rollback is
+		done as part of do_command/dispatch_command flow.
+		For PXC we will disable InnoDB logic and opt for original Galera
+		logic. */
 		if (!wsrep_on(thd)) {
-			/* Allowing InnoDB to rollback the transaction
-			conflicts with Galera logic to do the same using
-			rollback thread. For now we would prefer to go ahead
-			with Galera logic. */
 			trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
 		}
 #else
 		trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
 #endif /* WITH_WSREP */
+
 	} else {
+
+#ifdef WITH_WSREP
+		/* Check comment above.
+		Why we need to re-set DISABLE for every call ?
+		* trx_init() resets the complete mask masking DISABLE bit
+		too without caring what was the original state of this bit.
+		If this bit is set and then trx_init so continue to keep it
+		and not mask it. This is InnoDB error we are will correct it
+		in PXC here. */
+		if (wsrep_on(thd)) {
+			trx->in_innodb |= TRX_FORCE_ROLLBACK_DISABLE;
+		}
+#endif /* WITH_WSREP */
+
 		ut_a(trx->magic_n == TRX_MAGIC_N);
 
 		innobase_trx_init(thd, trx);
