@@ -313,7 +313,7 @@ sysbench_run()
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node1.err \
 	--socket=/tmp/n1.sock --log-output=none \
 	--port=$RBASE1 --skip-grant-tables \
-	--server-id=1 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=ON \
+	--server-id=1 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=OFF \
 	--core-file > $BUILDDIR/logs/node1.err 2>&1 &
 
   echo "Waiting for node-1 to start ....."
@@ -381,7 +381,7 @@ sysbench_run()
 	--skip-name-resolve --log-error=$BUILDDIR/logs/node3.err \
 	--socket=/tmp/n3.sock --log-output=none \
 	--port=$RBASE3 --skip-grant-tables \
-	--server-id=3 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=ON \
+	--server-id=3 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=OFF \
 	--core-file > $BUILDDIR/logs/node3.err 2>&1 &
 
   # ensure that node-3 has started and has joined the group post SST
