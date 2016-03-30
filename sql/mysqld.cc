@@ -5302,12 +5302,18 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     else // full wsrep initialization
     {
       // add basedir/bin to PATH to resolve wsrep script names
-      char* const tmp_path((char*)alloca(strlen(mysql_home) +
-                                           strlen("/bin") + 1));
+      int mysql_home_len= strlen(mysql_home);
+      char* const tmp_path((char*)alloca(mysql_home_len +
+                                         strlen("/bin") + 1));
       if (tmp_path)
       {
         strcpy(tmp_path, mysql_home);
-        strcat(tmp_path, "/bin");
+        /*
+          mysql_home may already contain a trailing slash:
+        */
+        strcat(tmp_path, (mysql_home_len == 0 ||
+                          mysql_home[mysql_home_len - 1] != '/') ? "/bin" :
+                                                                    "bin");
         wsrep_prepend_PATH(tmp_path);
       }
       else
