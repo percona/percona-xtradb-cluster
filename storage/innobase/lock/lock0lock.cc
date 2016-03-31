@@ -1685,6 +1685,12 @@ RecLock::lock_add(
 		trx_mutex_enter(c_lock->trx);
 		if (c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
 
+			if (wsrep_debug) {
+				ib::error() << "WSREP: Applier thread waiting"
+					    << " as victim thread is waiting"
+					    << " for some other lock";
+			}
+
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
 			if (wsrep_debug) wsrep_print_wait_locks(c_lock);
@@ -2215,12 +2221,22 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 	prepare();
 
 	lock_t*		lock;
-	const trx_t*	victim_trx;
 
 	/* We don't rollback internal (basically background statistics
 	gathering) transactions. The problem is that we don't currently
 	block them using the TrxInInnoDB() mechanism. */
 
+#ifdef WITH_WSREP
+	if (wsrep_on(m_trx->mysql_thd) &&
+	    m_trx->lock.was_chosen_as_deadlock_victim) {
+		return(DB_DEADLOCK);
+	}
+
+	lock = create(m_trx, true, prdt,
+			const_cast<lock_t*>(wait_for), m_thr);
+
+#else
+	const trx_t*	victim_trx;
 	if (wait_for->trx->mysql_thd == NULL) {
 
 		victim_trx = NULL;
@@ -2240,16 +2256,7 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		OR priority couldn't be established. */
 
 		/* Ensure that the wait flag is not set. */
-#ifdef WITH_WSREP
-		if (wsrep_on(m_trx->mysql_thd) &&
-	        	m_trx->lock.was_chosen_as_deadlock_victim) {
-			return(DB_DEADLOCK);
-		}
-		lock = create(m_trx, true, prdt,
-			      const_cast<lock_t*>(wait_for), m_thr);
-#else
 		lock = create(m_trx, true, prdt);
-#endif
 
 		/* If a high priority transaction has been selected as
 		a victim there is nothing we can do. */
@@ -2279,6 +2286,8 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		/* Lock was granted */
 		return(DB_SUCCESS);
 	}
+
+#endif /* WITH_WSREP */
 
 	ut_ad(lock_get_wait(lock));
 
@@ -7881,12 +7890,9 @@ DeadlockChecker::search()
 			m_too_deep = true;
 
 			/* Select the transaction to rollback */
-
 #ifdef WITH_WSREP
 			victim_trx = trx_arbitrate(
 				m_start, m_wait_lock->trx, TRUE);
-			// TODO: Ensure that these checks within trx_arbitrate
-			// are working as expected.
 #else
 			victim_trx = trx_arbitrate(m_start, m_wait_lock->trx);
 #endif /* WITH_WSREP */
@@ -8006,6 +8012,7 @@ DeadlockChecker::check_and_resolve(const lock_t* lock, const trx_t* trx)
 			ut_ad(trx == checker.m_start);
 
 #ifdef WITH_WSREP
+			/* Requestor transaction is not an applier transaction.*/
 			if (!wsrep_thd_is_BF(checker.m_start->mysql_thd, TRUE))
 			{
 				victim_trx = trx_arbitrate(
@@ -8019,7 +8026,6 @@ DeadlockChecker::check_and_resolve(const lock_t* lock, const trx_t* trx)
 			} else {
 				/* BF processor */
 			}
-
 #else
 			victim_trx = trx_arbitrate(
 				trx, checker.m_wait_lock->trx);
