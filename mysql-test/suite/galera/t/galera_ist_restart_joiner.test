@@ -106,3 +106,5 @@ SELECT COUNT(*) = 0 FROM t3;
 
 --connection node_1
 DROP TABLE t1, t2, t3;
+
+SET DEBUG_SYNC='RESET';

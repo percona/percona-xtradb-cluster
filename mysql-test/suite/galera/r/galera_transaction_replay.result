@@ -70,3 +70,4 @@ i	c
 #node_1
 deallocate prepare stmt1;
 drop table t1;
+SET DEBUG_SYNC='RESET';
