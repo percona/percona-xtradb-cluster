@@ -2,12 +2,12 @@
 # wsrep_node_name
 #
 call mtr.add_suppression("WSREP: Failed to get provider options");
+# Extracting server node name
 # save the initial value
 SET @wsrep_node_name_global_saved = @@global.wsrep_node_name;
-# default
-SELECT @@global.wsrep_node_name;
-@@global.wsrep_node_name
-
+# check for proper default
+node_name_check
+1
 
 # scope
 SELECT @@session.wsrep_node_name;
@@ -26,7 +26,7 @@ SET @@global.wsrep_node_name='hyphenated-node-name';
 SELECT @@global.wsrep_node_name;
 @@global.wsrep_node_name
 hyphenated-node-name
-SET @@global.wsrep_node_name=default;
+SET @@global.wsrep_node_name='';
 SELECT @@global.wsrep_node_name;
 @@global.wsrep_node_name
 
