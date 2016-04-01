@@ -41,11 +41,7 @@ UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
 --let $show_rpl_debug_info= 1;
 # Wait for both transactions to be blocked
 --connection node_1a
-# BF applier transaction take precendence over local transaction.
-# MySQL-5.7 upgrade locking infrastructure now directly rolls back any such
-# conflicting transaction momemt it detects it without wait for them to
-# self-rollback.
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'applied write set%';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'System lock';
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep in pre-commit stage' AND INFO = 'COMMIT';
