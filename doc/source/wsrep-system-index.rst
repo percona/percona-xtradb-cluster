@@ -156,7 +156,7 @@ This variable defines a binlog format that will always be effective regardless o
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: OFF
+   :default: ON 
 
 This variable controls whether ``LOAD DATA`` transaction splitting is wanted or not. It doesn't work as expected with ``autocommit=0`` when enabled.
 
