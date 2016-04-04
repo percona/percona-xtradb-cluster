@@ -140,7 +140,7 @@ endif
 
 override_dh_auto_build:
 	@echo "RULES.$@"
-	
+
 	[ -f $(EXPORTED_SOURCE_TARBALL) ] || tar -zcf $(EXPORTED_SOURCE_TARBALL) \
 	--exclude=debian . \
 	--transform="s,^\./,percona-xtradb-cluster-5.7/,"
@@ -170,7 +170,7 @@ override_dh_auto_install:
 	install -m 0755 debian/extra/mysql-systemd-start $(TMP)/usr/share/mysql/
 
 	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
-	cp -rp $(TMP)/usr/share/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
+	cp -rp $(TMP)/usr/lib/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
 
 	# mysql-server
 	mkdir -p $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples
@@ -181,8 +181,9 @@ override_dh_auto_install:
 	       $(TMP)/usr/share/percona-xtradb-cluster/binary-configure
 	nm -n $(builddir)/sql/mysqld |gzip -9 > $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/mysqld.sym.gz
 	# FIXME install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
-	install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
-	install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
+	# install -d $(TMP)/etc/mysql
+	# install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
+	# install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
 
 	# install default file for init script timeout params
 	install -d $(TMP)/etc/default

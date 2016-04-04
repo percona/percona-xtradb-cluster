@@ -124,7 +124,8 @@ Prefix: %{_sysconfdir}
 %if %{undefined src_base}
 %define src_base Percona-XtraDB-Cluster
 %endif
-%define src_dir %{src_base}-%{mysql_version}-%{percona_server_version}
+# %define src_dir %{src_base}-%{mysql_version}-%{percona_server_version}
+%define src_dir %{src_base}-%{mysql_version}-%{wsrep_version}
 
 # ----------------------------------------------------------------------------
 # Feature set (storage engines, options).  Default to community (everything)
@@ -147,7 +148,7 @@ Prefix: %{_sysconfdir}
 # ----------------------------------------------------------------------------
 # Product and server suffixes
 # ----------------------------------------------------------------------------
-%define product_suffix -56
+%define product_suffix -57
 %if %{undefined product_suffix}
   %if %{defined short_product_tag}
     %define product_suffix      -%{short_product_tag}
@@ -173,13 +174,13 @@ Prefix: %{_sysconfdir}
     %if "%oelver" == "4"
       %define distro_description        Oracle Enterprise Linux 4
       %define distro_releasetag         oel4
-      %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake 
+      %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
       %define distro_requires           chkconfig coreutils grep procps shadow-utils
     %else
       %if "%oelver" == "5"
         %define distro_description      Oracle Enterprise Linux 5
         %define distro_releasetag       oel5
-        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake 
+        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
         %define distro_requires         chkconfig coreutils grep procps shadow-utils
       %else
         %{error:Oracle Enterprise Linux %{oelver} is unsupported}
@@ -191,13 +192,13 @@ Prefix: %{_sysconfdir}
       %if "%rhelver" == "4"
         %define distro_description      Red Hat Enterprise Linux 4
         %define distro_releasetag       rhel4
-        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake 
+        %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
         %define distro_requires         chkconfig coreutils grep procps shadow-utils
       %else
         %if "%rhelver" == "5"
           %define distro_description    Red Hat Enterprise Linux 5
           %define distro_releasetag     rhel5
-          %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake 
+          %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
           %define distro_requires       chkconfig coreutils grep procps shadow-utils
         %else
           %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
@@ -209,13 +210,13 @@ Prefix: %{_sysconfdir}
         %if "%susever" == "10"
           %define distro_description    SUSE Linux Enterprise Server 10
           %define distro_releasetag     sles10
-          %define distro_buildreq       gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client readline-devel zlib-devel libaio-devel bison cmake 
+          %define distro_buildreq       gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client readline-devel zlib-devel libaio-devel bison cmake
           %define distro_requires       aaa_base coreutils grep procps pwdutils
         %else
           %if "%susever" == "11"
             %define distro_description  SUSE Linux Enterprise Server 11
             %define distro_releasetag   sles11
-            %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils readline-devel zlib-devel libaio-devel bison cmake 
+            %define distro_buildreq     gcc-c++ gdbm-devel gperf ncurses-devel openldap2-client procps pwdutils readline-devel zlib-devel libaio-devel bison cmake
             %define distro_requires     aaa_base coreutils grep procps pwdutils
           %else
             %{error:SuSE %{susever} is unsupported}
@@ -230,7 +231,7 @@ Prefix: %{_sysconfdir}
   %define generic_kernel %(uname -r | cut -d. -f1-2)
   %define distro_description            Generic Linux (kernel %{generic_kernel})
   %define distro_releasetag             linux%{generic_kernel}
-  %define distro_buildreq               gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake 
+  %define distro_buildreq               gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
   %define distro_requires               coreutils grep procps /sbin/chkconfig /usr/sbin/useradd /usr/sbin/groupadd
 %endif
 
@@ -264,14 +265,14 @@ Summary:        A High Availability solution based on Percona Server and Galera
 Group:          Applications/Databases
 Version:        %{mysql_version}
 Release:        %{release}
-Epoch:		1
+
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
-Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz 
+Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 %if 0%{?systemd}
@@ -316,7 +317,7 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-3 percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -341,7 +342,7 @@ Percona recommends that all production deployments be protected with a support
 contract (http://www.percona.com/mysql-support/) to ensure the highest uptime,
 be eligible for hot fixes, and boost your team's productivity.
 
-This package includes the Percona XtraDB Cluster binary 
+This package includes the Percona XtraDB Cluster binary
 as well as related utilities to run and administer Percona XtraDB Cluster.
 
 If you want to access and work with the database, you have to install
@@ -493,7 +494,7 @@ RPM_OPT_FLAGS=
 %endif
 #
 %if %{with tokudb}
-RPM_OPT_FLAGS= 
+RPM_OPT_FLAGS=
 %else
 RPM_OPT_FLAGS=$(echo ${RPM_OPT_FLAGS} | sed -e 's|-march=i386|-march=i686|g')
 %endif
@@ -507,7 +508,7 @@ export PATH=${MYSQL_BUILD_PATH:-$PATH}
 export CC=${MYSQL_BUILD_CC:-${CC:-gcc}}
 export CXX=${MYSQL_BUILD_CXX:-${CXX:-g++}}
 export CFLAGS=${MYSQL_BUILD_CFLAGS:-${CFLAGS:-$RPM_OPT_FLAGS}}
-export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors -fno-rtti}}
+export CXXFLAGS=${MYSQL_BUILD_CXXFLAGS:-${CXXFLAGS:-$RPM_OPT_FLAGS -felide-constructors}}
 export LDFLAGS=${MYSQL_BUILD_LDFLAGS:-${LDFLAGS:-}}
 export CMAKE=${MYSQL_BUILD_CMAKE:-${CMAKE:-cmake}}
 export MAKE_JFLAG=${MYSQL_BUILD_MAKE_JFLAG:-${MAKE_JFLAG:-}}
@@ -544,9 +545,13 @@ mkdir debug
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
+%if 0%{?systemd}
+           -DWITH_SYSTEMD=ON \
+%endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
@@ -557,7 +562,7 @@ mkdir debug
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
-           -DWITH_WSREP=1 \
+           -DWITH_WSREP=ON \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
 	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON}
@@ -571,9 +576,13 @@ mkdir release
   # XXX: MYSQL_UNIX_ADDR should be in cmake/* but mysql_version is included before
   # XXX: install_layout so we can't just set it based on INSTALL_LAYOUT=RPM
   ${CMAKE} ../ -DBUILD_CONFIG=mysql_release -DINSTALL_LAYOUT=RPM \
+           -DDOWNLOAD_BOOST=1 -DWITH_BOOST=build-ps/boost \
            -DCMAKE_BUILD_TYPE=RelWithDebInfo  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
+%if 0%{?systemd}
+           -DWITH_SYSTEMD=ON \
+%endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
            -DWITH_ZLIB=system \
@@ -584,7 +593,7 @@ mkdir release
            -DMYSQL_UNIX_ADDR="/var/lib/mysql/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
-           -DWITH_WSREP=1 \
+           -DWITH_WSREP=ON \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF}
@@ -639,7 +648,7 @@ mv $RPM_BUILD_DIR/%{_libdir} $RBR%{_libdir}
 
 # Ensure that needed directories exists
 install -d $RBR%{_sysconfdir}/{logrotate.d,init.d}
-install -d $RBR%{mysqldatadir}/mysql
+install -d $RBR/var/lib/mysql-files
 install -d $RBR%{_datadir}/mysql-test
 install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 install -d $RBR%{_includedir}
@@ -667,11 +676,10 @@ install -d $RBR%{_libdir}/mysql/plugin
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 %if 0%{?systemd}
-install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
-install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
-install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
+#install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
+#install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
+#install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
-install -D -m 0644 $MBD/build-ps/rpm/mysql.conf $RBR%{_tmpfilesdir}/mysql.conf
 install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
 install -d $RBR%{_sysconfdir}/my.cnf.d
 %else
@@ -692,7 +700,7 @@ install -d $RBR%{_sysconfdir}/ld.so.conf.d
 echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Delete the symlinks to the libraries from the libdir. These are created by
 # ldconfig(8) afterwards.
-rm -f $RBR%{_libdir}/libmysqlclient*.so.18
+# rm -f $RBR%{_libdir}/libperconaserverclient.so.20*
 
 # Create a symlink "rcmysql", pointing to the init.script. SuSE users
 # will appreciate that, as all services usually offer this.
@@ -709,7 +717,7 @@ install -d $RBR%{_bindir}
 ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 # Install SELinux files in datadir
-install -m 600 $MBD/support-files/RHEL4-SElinux/mysql.{fc,te} \
+install -m 600 $MBD/support-files/SELinux/mysql.{fc,te} \
   $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 
 %if %{WITH_TCMALLOC}
@@ -723,6 +731,8 @@ install -m 644 "%{malloc_lib_source}" \
 # Remove files we explicitly do not want to package, avoids 'unpackaged
 # files' warning.
 rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
+rm -f $RBR%{_bindir}/ps_tokudb_admin
+
 %if 0%{?systemd}
 rm -rf $RBR%{_sysconfdir}/init.d/mysql
 %endif
@@ -943,10 +953,19 @@ if [ $1 -eq 1 ]; then
 # ----------------------------------------------------------------------
 if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir; fi
 # echo "Analyzed: SERVER_TO_START=$SERVER_TO_START"
-if [ ! -d $mysql_datadir/mysql ] ; then
+#
+if [ ! -d $mysql_datadir/mysql ]; then
+# ----------------------------------------------------------------------
+# Initiate databases if needed
+# ----------------------------------------------------------------------
+# Does $mysql_datadir/mysql exist? In this case, this is probably an
+# upgrade from a previous version or a reinstall. It's best not to
+# call mysql_install_db in this case since the test db would be
+# possibly recreated (bug #1169522).
+  %{_sbindir}/mysqld --initialize --user=%{mysqld_user} --datadir=$mysql_datadir
 	echo "MySQL RPM installation of version $NEW_VERSION" >> $STATUS_FILE
 else
-	# If the directory exists, we may assume it is an upgrade.
+# If the directory exists, we may assume it is an upgrade.
 	echo "MySQL RPM upgrade to version $NEW_VERSION" >> $STATUS_FILE
 fi
 
@@ -967,18 +986,6 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
 # ----------------------------------------------------------------------
 chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
 
-# ----------------------------------------------------------------------
-# Initiate databases if needed
-# ----------------------------------------------------------------------
-    # Does $mysql_datadir/mysql exist? In this case, this is probably an
-    # upgrade from a previous version or a reinstall. It's best not to
-    # call mysql_install_db in this case since the test db would be
-    # possibly recreated (bug #1169522).
-    if test ! -e $mysql_datadir/mysql
-    then
-        %{_bindir}/mysql_install_db --rpm --user=%{mysqld_user} \
-            --datadir=$mysql_datadir
-    fi
 fi
 
 %if 0%{?systemd}
@@ -1102,7 +1109,7 @@ mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
 #   Remove last version of package   0 "
 #
 #  http://docs.fedoraproject.org/en-US/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04s05.html
- 
+
 if [ $1 = 0 ] ; then
 %if 0%{?systemd}
     serv=$(/usr/bin/systemctl list-units | grep 'mysql@.*.service' | grep 'active running' | head -1 | awk '{ print $1 }')
@@ -1184,7 +1191,7 @@ fi
 if [ "$SERVER_TO_START" = "true" ] ; then
 # Restart in the same way that mysqld will be started normally.
 %if 0%{?systemd}
-	if [ -x %{_bindir}/systemctl ] ; then 
+	if [ -x %{_bindir}/systemctl ] ; then
                	%{_bindir}/systemctl start mysql
                 echo "Giving mysqld 5 seconds to start"
                 sleep 5
@@ -1239,7 +1246,8 @@ fi
 ##############################################################################
 
 # Empty section for metapackage
-%files 
+# mistake?
+# %files
 
 # Empty section for metapackage
 %files -n Percona-XtraDB-Cluster-full%{product_suffix}
@@ -1257,36 +1265,31 @@ fi
 %doc release/support-files/wsrep.cnf
 
 %doc %attr(644, root, root) %{_infodir}/mysql.info*
-
 %doc %attr(644, root, man) %{_mandir}/man1/innochecksum.1*
 %doc %attr(644, root, man) %{_mandir}/man1/my_print_defaults.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisam_ftdump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisamchk.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisamlog.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisampack.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_convert_table_format.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_fix_extensions.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqld_multi.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqld_safe.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqldumpslow.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_install_db.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_secure_installation.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_setpermission.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_upgrade.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqlhotcopy.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlman.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqltest.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_zap.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqlbug.1*
 %doc %attr(644, root, man) %{_mandir}/man1/perror.1*
 %doc %attr(644, root, man) %{_mandir}/man1/replace.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolve_stack_dump.1*
 %doc %attr(644, root, man) %{_mandir}/man1/resolveip.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_plugin.1*
 %doc %attr(644, root, man) %{_mandir}/man8/mysqld.8*
-
+%doc %attr(644, root, man) %{_mandir}/man1/lz4_decompress.1*
+%doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
+%doc %attr(644, root, root) %{_mandir}/man1/mysql_ssl_rsa_setup.1*
 
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
@@ -1296,20 +1299,16 @@ fi
 %attr(755, root, root) %{_bindir}/myisamchk
 %attr(755, root, root) %{_bindir}/myisamlog
 %attr(755, root, root) %{_bindir}/myisampack
-%attr(755, root, root) %{_bindir}/mysql_convert_table_format
-%attr(755, root, root) %{_bindir}/mysql_fix_extensions
 %attr(755, root, root) %{_bindir}/mysql_install_db
 %attr(755, root, root) %{_bindir}/mysql_secure_installation
-%attr(755, root, root) %{_bindir}/mysql_setpermission
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
 %attr(755, root, root) %{_bindir}/mysql_upgrade
 %attr(755, root, root) %{_bindir}/mysql_plugin
-%attr(755, root, root) %{_bindir}/mysql_zap
-%attr(755, root, root) %{_bindir}/mysqlbug
+%if 0%{?systemd} == 0
 %attr(755, root, root) %{_bindir}/mysqld_multi
 %attr(755, root, root) %{_bindir}/mysqld_safe
+%endif
 %attr(755, root, root) %{_bindir}/mysqldumpslow
-%attr(755, root, root) %{_bindir}/mysqlhotcopy
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
 %attr(755, root, root) %{_bindir}/replace
@@ -1320,7 +1319,11 @@ fi
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 %attr(755, root, root) %{_bindir}/wsrep_sst_rsync
-%attr(755, root, root) %{_bindir}/wsrep_sst_rsync_wan
+# Explicit %attr() mode not applicaple to symlink
+%{_bindir}/wsrep_sst_rsync_wan
+%attr(755, root, root) %{_bindir}/lz4_decompress
+%attr(755, root, root) %{_bindir}/zlib_decompress
+%attr(755, root, root) %{_bindir}/mysql_ssl_rsa_setup
 
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
@@ -1337,7 +1340,7 @@ fi
 
 %if "%rhel" >= "6"
     %attr(755, root, root) %{_datarootdir}/percona-xtradb-cluster/
-%endif 
+%endif
 
 %if %{WITH_TCMALLOC}
 %attr(755, root, root) %{_libdir}/mysql/%{malloc_lib_target}
@@ -1345,12 +1348,14 @@ fi
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
+%attr(750, mysql, mysql) %dir /var/lib/mysql-files
 %if 0%{?systemd}
-%attr(644, root, root) %{_unitdir}/mysql.service
-%attr(644, root, root) %{_unitdir}/mysql@.service
+%attr(644, root, root) %{_unitdir}/mysqld.service
+#%attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql.bootstrap
 %attr(644, root, root) %{_tmpfilesdir}/mysql.conf
-%attr(755, root, root) %{_bindir}/mysql-systemd
+#%attr(755, root, root) %{_bindir}/mysql-systemd
+%attr(755, root, root) %{_bindir}/mysqld_pre_systemd
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
@@ -1359,13 +1364,8 @@ fi
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}
 
 %defattr(-, root, root, 0755)
-%attr(755, root, root) %{_bindir}/msql2mysql
 %attr(755, root, root) %{_bindir}/mysql
-%attr(755, root, root) %{_bindir}/mysql_find_rows
-%attr(755, root, root) %{_bindir}/mysql_waitpid
-%attr(755, root, root) %{_bindir}/mysqlaccess
 # XXX: This should be moved to %{_sysconfdir}
-%attr(644, root, root) %{_bindir}/mysqlaccess.conf
 %attr(755, root, root) %{_bindir}/mysqladmin
 %attr(755, root, root) %{_bindir}/mysqlbinlog
 %attr(755, root, root) %{_bindir}/mysqlcheck
@@ -1374,12 +1374,9 @@ fi
 %attr(755, root, root) %{_bindir}/mysqlshow
 %attr(755, root, root) %{_bindir}/mysqlslap
 %attr(755, root, root) %{_bindir}/mysql_config_editor
+%attr(755, root, root) %{_bindir}/mysqlpump
 
-%doc %attr(644, root, man) %{_mandir}/man1/msql2mysql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_find_rows.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_waitpid.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqlaccess.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqladmin.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlbinlog.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlcheck.1*
@@ -1388,6 +1385,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlshow.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlslap.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_config_editor.1*
+%doc %attr(644, root, man) %{_mandir}/man1/mysqlpump.1*
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-devel%{product_suffix} -f optional-files-devel
@@ -1399,17 +1397,18 @@ fi
 %dir %attr(755, root, root) %{_libdir}/mysql
 %{_includedir}/mysql/*
 %{_datadir}/aclocal/mysql.m4
-%{_libdir}/libmysqlclient.a
-%{_libdir}/libmysqlclient_r.a
+%{_libdir}/pkgconfig/*
+%{_libdir}/libperconaserverclient*.a
 %{_libdir}/libmysqlservices.a
-%{_libdir}/*.so
+# mistake?
+# %{_libdir}/*.so
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-shared%{product_suffix}
 %defattr(-, root, root, 0755)
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
-%{_libdir}/libmysql*.so.*
+%{_libdir}/libperconaserver*.so*
 %if 0%{?systemd}
 %{_sysconfdir}/my.cnf.d
 %attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
@@ -1417,11 +1416,11 @@ fi
 
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 # Added for compatibility
-for lib in libmysqlclient{.so.18,_r.so.18}; do
-    if [ ! -f %{_libdir}/$lib ]; then
-            ln -s libmysqlclient.so.18.1.0 %{_libdir}/$lib
-    fi
-done
+#for lib in libperconaserverclient{.so.20,_r.so.20}; do
+#    if [ ! -f %{_libdir}/$lib ]; then
+#            ln -s libmysqlclient.so.20.1.0 %{_libdir}/$lib
+#    fi
+#done
 /sbin/ldconfig
 
 %postun -n Percona-XtraDB-Cluster-shared%{product_suffix}
@@ -1441,8 +1440,8 @@ else
             echo "Unable to parse datadir with my_print_defaults, defaulting to /var/lib/mysql"
             mysql_data="/var/lib/mysql"
         fi
-        numint=$(grep -c 'member:' $mysql_data/gvwstate.dat) 
-        if %{_bindir}/mysql -e 'select 1' &>/dev/null;then 
+        numint=$(grep -c 'member:' $mysql_data/gvwstate.dat)
+        if %{_bindir}/mysql -e 'select 1' &>/dev/null;then
             echo "$numint nodes currently up in the cluster primary component"
         else
             echo "Node is in non-PRIM, with $numint nodes in gvwstate.dat"
@@ -1458,7 +1457,7 @@ else
                 /usr/bin/systemctl stop mysql@bootstrap.service
                 /usr/bin/systemctl start mysql.service
             fi
-        elif [[ $numint -eq 1 ]];then 
+        elif [[ $numint -eq 1 ]];then
                 # This doesn't second guess administrator for bootstrapping!
                 echo "$numint nodes up, restarting $serv after upgrade"
                 %systemd_postun_with_restart $serv
@@ -1625,7 +1624,7 @@ fi
 - Fix some problems with the directives around "tcmalloc" (experimental),
   remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
-* Fri Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
+* Tue Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
 
 - Removed mysql_fix_privilege_tables
 
@@ -1822,7 +1821,7 @@ fi
 
 - Set $LDFLAGS from $MYSQL_BUILD_LDFLAGS
 
-* Wed Mar 07 2006 Kent Boortz <kent@mysql.com>
+* Tue Mar 07 2006 Kent Boortz <kent@mysql.com>
 
 - Changed product name from "Community Edition" to "Community Server"
 
@@ -2010,7 +2009,7 @@ fi
 - ISAM and merge storage engines were purged. As well as appropriate
   tools and manpages (isamchk and isamlog)
 
-* Thu Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
+* Fri Dec 31 2004 Lenz Grimmer <lenz@mysql.com>
 
 - enabled the "Archive" storage engine for the max binary
 - enabled the "CSV" storage engine for the max binary
@@ -2070,7 +2069,7 @@ fi
 
 - marked /etc/logrotate.d/mysql as a config file (BUG 2156)
 
-* Fri Dec 13 2003 Lenz Grimmer <lenz@mysql.com>
+* Sat Dec 13 2003 Lenz Grimmer <lenz@mysql.com>
 
 - fixed file permissions (BUG 1672)
 
@@ -2212,7 +2211,7 @@ fi
 - Added separate libmysql_r directory; now both a threaded
   and non-threaded library is shipped.
 
-* Wed Sep 28 1999 David Axmark <davida@mysql.com>
+* Tue Sep 28 1999 David Axmark <davida@mysql.com>
 
 - Added the support-files/my-example.cnf to the docs directory.
 
