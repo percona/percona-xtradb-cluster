@@ -20,14 +20,6 @@ wsrep_desync_count	2
 SHOW VARIABLES LIKE 'wsrep_desync';
 Variable_name	Value
 wsrep_desync	OFF
-SHOW PROCESSLIST;
-Id	User	Host	db	Command	Time	State	Info
-1	system user		NULL	Sleep	12	wsrep aborter idle	NULL
-2	system user		NULL	Sleep	12	NULL	NULL
-6	root	localhost	test	Sleep	5		NULL
-7	root	localhost:44610	test	Query	0	init	SHOW PROCESSLIST
-8	root	localhost:44612	test	Query	5	Waiting for table metadata lock	ALTER TABLE t1 ADD COLUMN f2 INTEGER
-9	root	localhost:44614	test	Query	5	checking permissions	ALTER TABLE t1 ADD COLUMN f3 INTEGER
 UNLOCK TABLES;
 value after RSU:
 SHOW STATUS LIKE 'wsrep_desync_count';
