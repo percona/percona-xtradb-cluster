@@ -7,7 +7,7 @@ export DH_VERBOSE=1
 export CFLAGS=
 export CXXFLAGS=
 
-PACKAGE=percona-xtradb-cluster-5.6
+PACKAGE=percona-xtradb-cluster-5.7
 PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 wsrep_version="@@WSREP_VERSION@@"
