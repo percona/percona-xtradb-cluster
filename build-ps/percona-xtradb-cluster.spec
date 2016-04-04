@@ -650,7 +650,7 @@ mv $RPM_BUILD_DIR/%{_libdir} $RBR%{_libdir}
 install -d $RBR%{_sysconfdir}/{logrotate.d,init.d}
 install -d $RBR/var/lib/mysql-files
 install -d $RBR%{_datadir}/mysql-test
-install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
+# install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 install -d $RBR%{_includedir}
 install -d $RBR%{_libdir}
 install -d $RBR%{_mandir}
@@ -717,8 +717,8 @@ install -d $RBR%{_bindir}
 ln -s wsrep_sst_rsync $RBR%{_bindir}/wsrep_sst_rsync_wan
 
 # Install SELinux files in datadir
-install -m 600 $MBD/support-files/SELinux/mysql.{fc,te} \
-  $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
+# install -m 600 $MBD/support-files/SELinux/mysql.{fc,te} \
+#  $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 
 %if %{WITH_TCMALLOC}
 # Even though this is a shared library, put it under /usr/lib*/mysql, so it
