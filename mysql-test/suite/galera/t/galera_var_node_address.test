@@ -2,11 +2,16 @@
 # Test wsrep_node_address . The galera_var_node_address.cnf contains various settings for
 # wsrep_node_address, so in this test we simply confirm that the cluster has started up correctly.
 #
+# This will also test the configuration behavior of wsrep_node_name:
+# 	Node 1: wsrep_node_name not specified, using default
+#	Node 2: In .cnf, wsrep_node_name = ''
+#	Node 3: In .cnf, wsrep_node_name = 'my_host_3'
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER);
@@ -20,3 +25,24 @@ SELECT COUNT(*) = 1 FROM t1;
 
 --connection node_1
 DROP TABLE t1;
+
+# Test the wsrep_node_name behavior
+--source include/galera_actual_node_name.inc
+
+#
+# Test that the node names were picked up from the configuration file
+#
+--connection node_1
+--echo # connection node_1
+--disable_query_log
+--eval SELECT @@global.wsrep_node_name = '$galera_actual_node_name' AS node_name_check;
+--enable_query_log
+
+--connection node_2
+--echo # connection node_2
+SELECT @@global.wsrep_node_name = '';
+
+--connection node_3
+--echo # connection node_3
+SELECT @@global.wsrep_node_name = 'my_host_3';
+
