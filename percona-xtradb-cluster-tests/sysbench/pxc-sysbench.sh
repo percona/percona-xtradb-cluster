@@ -37,7 +37,7 @@ echo "Using $SYSBENCH"
 XB_VER=2.4.1
 
 usage() {
-    echo "-d <insecs> -s <rsync|mysqldump|xtrabackup> -w <pxc/pxb tar directory> -l <sysbench lua script folder> -n <number-of-table> -x <each-table-size> -t <num-of-threads>"
+    echo "-d <insecs> -s <rsync|mysqldump|xtrabackup-v2> -w <pxc/pxb tar directory> -l <sysbench lua script folder> -n <number-of-table> -x <each-table-size> -t <num-of-threads>"
 }
 
 optspec=":d:s:w:l:n:x:t:h:"
@@ -132,6 +132,10 @@ echo "Builddir: $BUILDDIR"
 # on most unix system at default location.
 #
 if [[ $SST_METHOD == "xtrabackup" ]];then
+   SST_METHOD="xtrabackup-v2"
+fi
+
+if [[ $SST_METHOD == "xtrabackup-v2" ]];then
     mv $WORKDIR/percona-xtrabackup*.gz .
     XB_TAR=`ls -1ct percona-xtrabackup*.tar.gz | head -n1`
     tar -xf $XB_TAR
