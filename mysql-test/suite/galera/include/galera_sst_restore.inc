@@ -22,6 +22,7 @@ CALL mtr.add_suppression("Can't open and lock time zone table");
 CALL mtr.add_suppression("Can't open and lock privilege tables");
 CALL mtr.add_suppression("Info table is not ready to be used");
 CALL mtr.add_suppression("Native table .* has the wrong structure");
+CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
 
 --disable_query_log
 --eval SET GLOBAL wsrep_sst_method = '$wsrep_sst_method_orig';
