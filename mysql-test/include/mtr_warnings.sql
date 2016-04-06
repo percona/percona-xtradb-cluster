@@ -290,6 +290,7 @@ INSERT INTO global_suppressions VALUES
  ("InnoDB: Starting to delete and rewrite log files"),
  ("InnoDB: New log files created, LSN="),
  ("IP address \'127.0.0.2\' could not be resolved: Name or service not known"),
+ ("SYNC message from member"),
 
  /*
    Warning message introduced by wl#7706
