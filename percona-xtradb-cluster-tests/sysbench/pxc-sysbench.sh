@@ -136,8 +136,8 @@ if [[ $SST_METHOD == "xtrabackup-v2" ]];then
     mv $WORKDIR/percona-xtrabackup*.gz .
     XB_TAR=`ls -1ct percona-xtrabackup*.tar.gz | head -n1`
     tar -xf $XB_TAR
-    XB_BASE="percona-xtrabackup-${XB_VER}-Linux-x86_64"
-    export PATH="$WORKDIR/$XB_BASE/bin:$PATH"
+    XB_BASE=`echo $XB_TAR | sed 's/.tar.gz//g'`
+    export PATH="$BUILDDIR/$XB_BASE/bin:$PATH"
 fi
 
 PXC_TAR=`ls -1ct Percona-XtraDB-Cluster*.tar.gz | head -n1`
@@ -344,8 +344,26 @@ sysbench_run()
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
   echo "Waiting for node-2 to start ....."
-  sleep 10
+  MPID="$!"
+  while true ; do
+    sleep 10
 
+    if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node2.err ; then
+     break
+    fi
+
+    if egrep -qi "gcomm: closed" $BUILDDIR/logs/node2.err; then
+       echo "Failed to start node-2"
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
+       exit 1
+    fi
+
+    if [ "${MPID}" == "" ]; then
+      echoit "Error! server not started.. Terminating!"
+      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err
+      exit 1
+    fi
+  done
   set -e
 
   # load data. create seed data.
@@ -383,13 +401,23 @@ sysbench_run()
   echo "Waiting for node-3 to start ....."
   MPID="$!"
   while true ; do
+
     sleep 10
+
     if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node3.err ; then
      break
     fi
+
+    if egrep -qi "gcomm: closed" $BUILDDIR/logs/node3.err; then
+       echo "Failed to start node-3"
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+       exit 1
+    fi
+
     if [ "${MPID}" == "" ]; then
       echoit "Error! server not started.. Terminating!"
-      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err
+      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node3.err
       exit 1
     fi
   done
@@ -428,14 +456,21 @@ sysbench_run()
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
   echo "Waiting for node-2 to start ....."
-
-  # ensure that node-2 has restarted and has joined the group post IST
   MPID="$!"
   while true ; do
     sleep 10
+
     if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node2.err ; then
      break
     fi
+
+    if egrep -qi "gcomm: closed" $BUILDDIR/logs/node2.err; then
+       echo "Failed to start node-2"
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
+       exit 1
+    fi
+
     if [ "${MPID}" == "" ]; then
       echoit "Error! server not started.. Terminating!"
       egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err

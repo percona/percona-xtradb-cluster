@@ -92,7 +92,8 @@ MAGIC_FILE="${DATA}/${INFO_FILE}"
 # Setting the path for ss and ip
 export PATH="/usr/sbin:/sbin:$PATH"
 
-timeit(){
+timeit()
+{
     local stage=$1
     shift
     local cmd="$@"
@@ -609,6 +610,14 @@ send_donor()
 
 if [[ ! -x `which $INNOBACKUPEX_BIN` ]];then 
     wsrep_log_error "innobackupex not in path: $PATH"
+    exit 2
+fi
+
+# Start 5.7 redo log format has changed and so XB-2.4 or higher is needed
+# for performing backup (read SST)
+XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '2\.[234]' | head -n1`
+if [[ $XB_VERSION == "2.2" || $XB_VERSION == "2.3" ]]; then
+    wsrep_log_error "XB version is $XB_VERSION. Needs xtrabackup-2.4 or higher to perform SST"
     exit 2
 fi
 
