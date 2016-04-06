@@ -11,12 +11,9 @@
 #
 set +e
 echo "Killing existing mysqld"
-pgrep -f mysqld
-pkill -f mysqld
+killall -9 mysqld
 sleep 10
-pgrep mysqld || pkill -9 -f mysqld
 set -e
-sleep 5
 
 #-------------------------------------------------------------------------------
 #
@@ -298,26 +295,24 @@ sysbench_run()
 	--datadir=$MYSQL_VARDIR/node1 \
 	--socket=/tmp/n1.sock \
 	--log-error=$BUILDDIR/logs/node1.err \
-	--skip-grant-tables --initialize 2>&1 || exit 1;
+	--initialize-insecure 2>&1 || exit 1;
 
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.1 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node1 \
-	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
-	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
-	--innodb_file_per_table $1 --wsrep-slave-threads=2 \
+	--loose-debug-sync-timeout=600 --skip-performance-schema \
+	--innodb_file_per_table $1 \
 	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
 	--wsrep_cluster_address=gcomm:// \
-	--wsrep_sst_receive_address=$RADDR1 --wsrep_node_incoming_address=$ADDR \
+	--wsrep_node_incoming_address=$ADDR \
 	--wsrep_provider_options=gmcast.listen_addr=tcp://$LADDR1 \
 	--wsrep_sst_method=$SST_METHOD --wsrep_sst_auth=$SUSER:$SPASS \
 	--wsrep_node_address=$ADDR --innodb_flush_method=O_DIRECT \
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
-	--skip-name-resolve --log-error=$BUILDDIR/logs/node1.err \
+	--log-error=$BUILDDIR/logs/node1.err \
 	--socket=/tmp/n1.sock --log-output=none \
-	--port=$RBASE1 --skip-grant-tables \
-	--server-id=1 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=OFF \
+	--port=$RBASE1 --server-id=1 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node1.err 2>&1 &
 
   echo "Waiting for node-1 to start ....."
@@ -328,26 +323,24 @@ sysbench_run()
 	--datadir=${MYSQL_VARDIR}/node2 \
 	--socket=/tmp/n2.sock \
 	--log-error=$BUILDDIR/logs/node2.err \
-	--skip-grant-tables --initialize 2>&1 || exit 1;
+	--initialize-insecure 2>&1 || exit 1;
 
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.2 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
-	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
-	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
-	--innodb_file_per_table $1 --wsrep-slave-threads=2 \
+	--loose-debug-sync-timeout=600 --skip-performance-schema \
+	--innodb_file_per_table $1 \
 	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
         --wsrep_cluster_address=gcomm://$LADDR1,gcomm://$LADDR3 \
-	--wsrep_sst_receive_address=$RADDR2 --wsrep_node_incoming_address=$ADDR \
+	--wsrep_node_incoming_address=$ADDR \
 	--wsrep_provider_options=gmcast.listen_addr=tcp://$LADDR2 \
 	--wsrep_sst_method=$SST_METHOD --wsrep_sst_auth=$SUSER:$SPASS \
 	--wsrep_node_address=$ADDR --innodb_flush_method=O_DIRECT \
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
-	--skip-name-resolve --log-error=$BUILDDIR/logs/node2.err \
+	--log-error=$BUILDDIR/logs/node2.err \
 	--socket=/tmp/n2.sock --log-output=none \
-	--port=$RBASE2 --skip-grant-tables \
-	--server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
+	--port=$RBASE2 --server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
   echo "Waiting for node-2 to start ....."
@@ -366,26 +359,24 @@ sysbench_run()
 	--datadir=${MYSQL_VARDIR}/node3 \
 	--socket=/tmp/n3.sock \
 	--log-error=$BUILDDIR/logs/node3.err \
-	--skip-grant-tables --initialize 2>&1 || exit 1;
+	--initialize-insecure 2>&1 || exit 1;
 
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.3 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node3 \
-	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
-	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
-	--innodb_file_per_table $1 --wsrep-slave-threads=2 \
+	--loose-debug-sync-timeout=600 --skip-performance-schema \
+	--innodb_file_per_table $1 \
 	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
         --wsrep_cluster_address=gcomm://$LADDR1,gcomm://$LADDR2 \
-	--wsrep_sst_receive_address=$RADDR3 --wsrep_node_incoming_address=$ADDR \
+	--wsrep_node_incoming_address=$ADDR \
 	--wsrep_provider_options=gmcast.listen_addr=tcp://$LADDR3 \
 	--wsrep_sst_method=$SST_METHOD --wsrep_sst_auth=$SUSER:$SPASS \
 	--wsrep_node_address=$ADDR --innodb_flush_method=O_DIRECT \
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
-	--skip-name-resolve --log-error=$BUILDDIR/logs/node3.err \
+	--log-error=$BUILDDIR/logs/node3.err \
 	--socket=/tmp/n3.sock --log-output=none \
-	--port=$RBASE3 --skip-grant-tables \
-	--server-id=3 --wsrep_slave_threads=$SLAVE_THREADS --wsrep_debug=OFF \
+	--port=$RBASE3 --server-id=3 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node3.err 2>&1 &
 
   # ensure that node-3 has started and has joined the group post SST
@@ -420,22 +411,20 @@ sysbench_run()
   echo "Restarting node-2"
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.2 \
       --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
-	--loose-debug-sync-timeout=600 --default-storage-engine=InnoDB \
-	--default-tmp-storage-engine=InnoDB --skip-performance-schema \
-	--innodb_file_per_table $1 --wsrep-slave-threads=2 \
+	--loose-debug-sync-timeout=600 --skip-performance-schema \
+	--innodb_file_per_table $1 \
 	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
         --wsrep_cluster_address=gcomm://$LADDR1,gcomm://$LADDR3 \
-	--wsrep_sst_receive_address=$RADDR2 --wsrep_node_incoming_address=$ADDR \
+	--wsrep_node_incoming_address=$ADDR \
 	--wsrep_provider_options=gmcast.listen_addr=tcp://$LADDR2 \
 	--wsrep_sst_method=$SST_METHOD --wsrep_sst_auth=$SUSER:$SPASS \
 	--wsrep_node_address=$ADDR --innodb_flush_method=O_DIRECT \
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
-	--skip-name-resolve --log-error=$BUILDDIR/logs/node2.err \
+	--log-error=$BUILDDIR/logs/node2.err \
 	--socket=/tmp/n2.sock --log-output=none \
-	--port=$RBASE2 --skip-grant-tables \
-	--server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
+	--port=$RBASE2 --server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
   echo "Waiting for node-2 to start ....."
