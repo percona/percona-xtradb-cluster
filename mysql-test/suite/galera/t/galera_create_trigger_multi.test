@@ -18,6 +18,7 @@ INSERT INTO t1 VALUES (1);
 SELECT f1 = 1 FROM t2;
 SELECT f1 = 1 FROM t3;
 
+--replace_column 6 <Created>
 SHOW TRIGGERS FROM test;
 
 INSERT INTO t1 VALUES (2);

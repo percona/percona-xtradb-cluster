@@ -51,7 +51,7 @@ UPDATE t1 SET f1 = 'four' where f1 = '';
 COMMIT;
 
 --connection node_2
---error ER_LOCK_DEADLOCK
+--error ER_ERROR_DURING_ROLLBACK
 COMMIT;
 
 --connection node_1

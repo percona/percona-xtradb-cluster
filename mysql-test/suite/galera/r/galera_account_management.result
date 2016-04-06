@@ -10,14 +10,18 @@ SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3';
 COUNT(*) = 1
 1
 SET PASSWORD FOR user3 = PASSWORD('foo');
-SELECT password != '' FROM mysql.user WHERE user = 'user3';
-password != ''
+Warnings:
+Warning	1287	'SET PASSWORD FOR <user> = PASSWORD('<plaintext_password>')' is deprecated and will be removed in a future release. Please use SET PASSWORD FOR <user> = '<plaintext_password>' instead
+SELECT authentication_string != '' FROM mysql.user WHERE user = 'user3';
+authentication_string != ''
 1
 DROP USER user1, user3;
 SELECT COUNT(*) = 0 FROM mysql.user WHERE user IN ('user1', 'user2');
 COUNT(*) = 0
 1
 GRANT ALL ON *.* TO user4 IDENTIFIED BY 'password';
+Warnings:
+Warning	1287	Using GRANT for creating new user is deprecated and will be removed in future release. Create new user with CREATE USER statement.
 SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user4';
 COUNT(*) = 1
 1
