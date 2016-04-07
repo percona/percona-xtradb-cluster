@@ -28,6 +28,10 @@ TABLESIZE=
 NUMBEROFTABLES=
 THREADS=
 SLAVE_THREADS=
+NODE1PID=
+NODE2PID=
+NODE3PID=
+GARBDPID=
 
 SYSBENCH=`which sysbench` || (echo "Can't locate sysbench" && exit 1)
 echo "Using $SYSBENCH"
@@ -195,11 +199,12 @@ ver_and_row(){
 rw_workload() {
     local socket=$1
     local logfile=$2
+    local howlong=$3
 
     echo "Sysbench Run: OLTP RW testing"
     $SYSBENCH --mysql-table-engine=innodb --num-threads=$THREADS \
               --report-interval=10 --oltp-auto-inc=off \
-              --max-time=$DURATION --max-requests=0 \
+              --max-time=$howlong --max-requests=0 \
               --test=$LUASCRIPTS/oltp.lua \
               --init-rng=on --oltp_index_updates=10 \
               --oltp_non_index_updates=10 --oltp_distinct_ranges=15 \
@@ -276,6 +281,10 @@ echo "Setting base port for node-3 to $RBASE3"
 RADDR3="$ADDR:$(( RBASE3 + 7 ))"
 LADDR3="$ADDR:$(( RBASE3 + 8 ))"
 
+GARBDBASE="$(( RBASE3 + 100 ))"
+GARBDP="$ADDR:$GARBDBASE"
+echo "Setting base port for garbd to $GARBDBASE"
+
 SUSER=root
 SPASS=
 
@@ -286,17 +295,10 @@ mkdir -p $node2
 node3="${MYSQL_VARDIR}/node3"
 mkdir -p $node3
 
-sysbench_run()
+start_node_1()
 {
   set +e
-
-  echo "Starting PXC node1"
-  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
-	--datadir=$MYSQL_VARDIR/node1 \
-	--socket=/tmp/n1.sock \
-	--log-error=$BUILDDIR/logs/node1.err \
-	--initialize-insecure 2>&1 || exit 1;
-
+  echo "Starting node-1 ...."
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.1 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node1 \
 	--loose-debug-sync-timeout=600 --skip-performance-schema \
@@ -315,23 +317,26 @@ sysbench_run()
 	--port=$RBASE1 --server-id=1 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node1.err 2>&1 &
 
-  echo "Waiting for node-1 to start ....."
+  echo "Waiting for node-1 to start ...."
+  NODE1PID=$!
+
   sleep 10
 
-  echo "Starting PXC node2"
-  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
-	--datadir=${MYSQL_VARDIR}/node2 \
-	--socket=/tmp/n2.sock \
-	--log-error=$BUILDDIR/logs/node2.err \
-	--initialize-insecure 2>&1 || exit 1;
+  echo "Node-1 started"
+  set -e
+}
 
+start_node_2()
+{
+  set +e
+  echo "Starting node-2 ...."
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.2 \
-        --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
+      --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
 	--loose-debug-sync-timeout=600 --skip-performance-schema \
 	--innodb_file_per_table $1 \
 	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
-        --wsrep_cluster_address=gcomm://$LADDR1,gcomm://$LADDR3 \
+        --wsrep_cluster_address=gcomm://$LADDR1,$LADDR3 \
 	--wsrep_node_incoming_address=$ADDR \
 	--wsrep_provider_options=gmcast.listen_addr=tcp://$LADDR2 \
 	--wsrep_sst_method=$SST_METHOD --wsrep_sst_auth=$SUSER:$SPASS \
@@ -343,8 +348,8 @@ sysbench_run()
 	--port=$RBASE2 --server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
 
-  echo "Waiting for node-2 to start ....."
-  MPID="$!"
+  echo "Waiting for node-2 to start ...."
+  NODE2PID=$!
   while true ; do
     sleep 10
 
@@ -355,37 +360,32 @@ sysbench_run()
     if egrep -qi "gcomm: closed" $BUILDDIR/logs/node2.err; then
        echo "Failed to start node-2"
        $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
        exit 1
     fi
 
-    if [ "${MPID}" == "" ]; then
+    if [ "${NODE2PID}" == "" ]; then
       echoit "Error! server not started.. Terminating!"
       egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err
       exit 1
     fi
   done
+
+  echo "Node-2 started"
   set -e
+}
 
-  # load data. create seed data.
-  $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "create database test;" || true
-  prepare /tmp/n1.sock $BUILDDIR/logs/sysbench_prepare.txt
-
+start_node_3()
+{
   set +e
-  echo "Starting PXC node3"
-  # this will get SST.
-  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
-	--datadir=${MYSQL_VARDIR}/node3 \
-	--socket=/tmp/n3.sock \
-	--log-error=$BUILDDIR/logs/node3.err \
-	--initialize-insecure 2>&1 || exit 1;
-
+  echo "Starting node-3 ...."
   ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.3 \
         --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node3 \
 	--loose-debug-sync-timeout=600 --skip-performance-schema \
 	--innodb_file_per_table $1 \
 	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
 	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
-        --wsrep_cluster_address=gcomm://$LADDR1,gcomm://$LADDR2 \
+        --wsrep_cluster_address=gcomm://$LADDR1,$LADDR2 \
 	--wsrep_node_incoming_address=$ADDR \
 	--wsrep_provider_options=gmcast.listen_addr=tcp://$LADDR3 \
 	--wsrep_sst_method=$SST_METHOD --wsrep_sst_auth=$SUSER:$SPASS \
@@ -399,7 +399,7 @@ sysbench_run()
 
   # ensure that node-3 has started and has joined the group post SST
   echo "Waiting for node-3 to start ....."
-  MPID="$!"
+  NODE3PID=$!
   while true ; do
 
     sleep 10
@@ -415,14 +415,92 @@ sysbench_run()
        exit 1
     fi
 
-    if [ "${MPID}" == "" ]; then
+    if [ "${NODE3PID}" == "" ]; then
       echoit "Error! server not started.. Terminating!"
       egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node3.err
       exit 1
     fi
   done
 
+  echo "Node-3 started"
   set -e
+}
+
+boot_node1()
+{
+  set +e
+  echo "Creating seed-db for node-1"
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
+	--datadir=$MYSQL_VARDIR/node1 \
+	--socket=/tmp/n1.sock \
+	--log-error=$BUILDDIR/logs/node1.err \
+	--initialize-insecure 2>&1 || exit 1;
+  echo "Done"
+  set -e
+
+  start_node_1 $1
+}
+
+boot_node2()
+{
+  set +e
+  echo "Creating seed-db for node-2"
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
+	--datadir=${MYSQL_VARDIR}/node2 \
+	--socket=/tmp/n2.sock \
+	--log-error=$BUILDDIR/logs/node2.err \
+	--initialize-insecure 2>&1 || exit 1;
+  echo "Done"
+  set -e
+
+  start_node_2 $1
+}
+
+boot_node3()
+{
+  set +e
+  echo "Creating seed-db for node-3"
+  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --basedir=${MYSQL_BASEDIR} \
+	--datadir=${MYSQL_VARDIR}/node3 \
+	--socket=/tmp/n3.sock \
+	--log-error=$BUILDDIR/logs/node3.err \
+	--initialize-insecure 2>&1 || exit 1;
+  echo "Done"
+  set -e
+
+  start_node_3 $1
+}
+
+garbd_bootup()
+{
+  set +e
+  echo "Starting garbd"
+
+  ${MYSQL_BASEDIR}/bin/garbd --address gcomm://$LADDR1,$LADDR2,$LADDR3 \
+	--group "my_wsrep_cluster" \
+	--options "gmcast.listen_addr=tcp://$GARBDP" \
+	--log $BUILDDIR/logs/garbd.log 2>&1 &
+  GARBDPID=$!
+
+  echo "Waiting for garbd to start"
+  sleep 5
+  echo "Done"
+
+  set -e
+}
+
+
+sysbench_run()
+{
+  boot_node1 $1
+  boot_node2 $1
+
+  # load data. create seed data.
+  $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "create database test;" || true
+  prepare /tmp/n1.sock $BUILDDIR/logs/sysbench_prepare.txt
+
+  # will need SST for getting the seed-db
+  boot_node3 $1
 
   # validate db before starting RW test.
   echo "Table count pre RW-load"
@@ -431,52 +509,15 @@ sysbench_run()
   ver_and_row /tmp/n3.sock
 
   # shutdown node-2 so that on re-join it will get IST from node-1/3
-  ${MYSQL_BASEDIR}/bin/mysqladmin -uroot -S/tmp/n2.sock shutdown > /dev/null 2>&1
-  echo "Waiting for node-2 to shutdown....."
-  sleep 10
-  rw_workload "/tmp/n1.sock,/tmp/n3.sock" $BUILDDIR/logs/sysbench_rw_run.txt
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+  # let's wait for cluster to get the needed updates.
+  sleep 2
 
-  echo "Restarting node-2"
-  ${MYSQL_BASEDIR}/bin/mysqld --no-defaults --defaults-group-suffix=.2 \
-      --basedir=${MYSQL_BASEDIR} --datadir=$MYSQL_VARDIR/node2 \
-	--loose-debug-sync-timeout=600 --skip-performance-schema \
-	--innodb_file_per_table $1 \
-	--innodb_autoinc_lock_mode=2 --innodb_locks_unsafe_for_binlog=1 \
-	--wsrep-provider=${MYSQL_BASEDIR}/lib/libgalera_smm.so \
-        --wsrep_cluster_address=gcomm://$LADDR1,gcomm://$LADDR3 \
-	--wsrep_node_incoming_address=$ADDR \
-	--wsrep_provider_options=gmcast.listen_addr=tcp://$LADDR2 \
-	--wsrep_sst_method=$SST_METHOD --wsrep_sst_auth=$SUSER:$SPASS \
-	--wsrep_node_address=$ADDR --innodb_flush_method=O_DIRECT \
-	--core-file --loose-new --sql-mode=no_engine_substitution \
-	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
-	--log-error=$BUILDDIR/logs/node2.err \
-	--socket=/tmp/n2.sock --log-output=none \
-	--port=$RBASE2 --server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
-	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
+  # RW workload
+  rw_workload "/tmp/n1.sock,/tmp/n3.sock" $BUILDDIR/logs/sysbench_rw_run.txt $DURATION
 
-  echo "Waiting for node-2 to start ....."
-  MPID="$!"
-  while true ; do
-    sleep 10
-
-    if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node2.err ; then
-     break
-    fi
-
-    if egrep -qi "gcomm: closed" $BUILDDIR/logs/node2.err; then
-       echo "Failed to start node-2"
-       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
-       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
-       exit 1
-    fi
-
-    if [ "${MPID}" == "" ]; then
-      echoit "Error! server not started.. Terminating!"
-      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node2.err
-      exit 1
-    fi
-  done
+  # given that node-2 was down for sometime it would need either IST
+  start_node_2 $1
 
   # validate db before starting RW test.
   echo "Table count post RW-load"
@@ -484,11 +525,39 @@ sysbench_run()
   ver_and_row /tmp/n2.sock
   ver_and_row /tmp/n3.sock
 
+  # start garbd to ensure that node-1 doesn't become non-primary with follow-up
+  # action below.
+  garbd_bootup
+
+  # shutdown node-2 and kill node-3 so that quorum is lost
+  $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+  kill -9 $NODE3PID
+
+  # allow the status to get updated on node-1
+  sleep 5 
+  $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
+
+  # do so RW-workload while other nodes are down but node-1 is still primary
+  # due to garbd
+  rw_workload "/tmp/n1.sock" $BUILDDIR/logs/sysbench_rw_run.txt 30
+
+  # restart node-3
+  start_node_3 $1
+
+  # validate db before starting RW test.
+  echo "Table count post RW-load"
+  ver_and_row /tmp/n1.sock
+  ver_and_row /tmp/n3.sock
+
+  # let's get rid of garbd now that node-3 is up and running
+  kill -9 $GARBDPID
+  sleep 5
+
   #ddl_workload /tmp/n1.sock $BUILDDIR/logs/sysbench_ddl.txt
   cleanup /tmp/n3.sock $BUILDDIR/logs/sysbench_cleanup.txt
 
   $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
   $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
 }
 
