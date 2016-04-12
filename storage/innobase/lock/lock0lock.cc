@@ -743,6 +743,7 @@ lock_reset_lock_and_trx_wait(
 	ut_ad(lock_get_wait(lock));
 	ut_ad(lock_mutex_own());
 
+        ib::info() << "lock_reset_lock_and_trx_wait " << lock->trx->id << " lock's type_mode now: " << lock->type_mode;
 	lock->trx->lock.wait_lock = NULL;
 	lock->type_mode &= ~LOCK_WAIT;
 }
@@ -1056,6 +1057,7 @@ lock_rec_trx_wait(
 
 	if (type & LOCK_WAIT) {
 		lock_reset_lock_and_trx_wait(lock);
+        ib::info() << "lock_rec_trx_wait for " << lock->trx->id;
 	}
 }
 
@@ -1733,6 +1735,7 @@ RecLock::create(trx_t* trx, bool owns_trx_mutex, const lock_prdt_t* prdt)
 
 			trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
+                        ib::info() << "BF " << trx->id << " lock's type_mode now: " << lock->type_mode;
 			UT_LIST_ADD_LAST(trx->lock.trx_locks, lock);
 
 			ut_ad(m_thr != NULL);
@@ -1747,11 +1750,13 @@ RecLock::create(trx_t* trx, bool owns_trx_mutex, const lock_prdt_t* prdt)
 			lock_cancel_waiting_and_release(
 				c_lock->trx->lock.wait_lock);
 			if (owns_trx_mutex) trx_mutex_enter(trx);
+                        ib::info() << "BF " << trx->id << " lock's type_mode now 2: " << lock->type_mode;
 
 			/* trx might not wait for c_lock, but some other lock
 			   does not matter if wait_lock was released above
 			 */
 			if (c_lock->trx->lock.wait_lock == c_lock) {
+                          ib::info() << "victim trx waits for some other lock than c_lock";
 				lock_reset_lock_and_trx_wait(lock);
 			}
 			trx_mutex_exit(c_lock->trx);
@@ -1759,6 +1764,7 @@ RecLock::create(trx_t* trx, bool owns_trx_mutex, const lock_prdt_t* prdt)
 			if (wsrep_debug)
                           ib::info() << "WSREP: c_lock canceled " << c_lock->trx->id;
 
+                        ++lock->index->table->n_rec_locks;
 			/* have to bail out here to avoid lock_set_lock... */
 			return(lock);
 		}
@@ -1783,6 +1789,8 @@ RecLock::create(trx_t* trx, bool owns_trx_mutex, const lock_prdt_t* prdt)
         }
 #ifdef WITH_WSREP
 	}
+        ib::info() << "RecLock::create end, BF " << trx->id << " lock's type_mode now: " << lock->type_mode;
+
 #endif /* WITH_WSREP */
 
 	return(lock);
@@ -2234,7 +2242,8 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 		if (trx_is_high_priority(m_trx) && victim_trx != NULL) {
 
-			lock_reset_lock_and_trx_wait(lock);
+                  ib::info() << "high priority branch taken";
+                  lock_reset_lock_and_trx_wait(lock);
 
 			lock_rec_reset_nth_bit(lock, m_rec_id.m_heap_no);
 
@@ -2294,10 +2303,20 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		return(DB_SUCCESS);
 	}
 
-	ut_ad(lock_get_wait(lock));
+	dberr_t	err = DB_LOCK_WAIT;
+#ifdef WITH_WSREP
+        ib::info() << "type_mode " << lock->type_mode << " for " << m_trx->id;
+        if (wsrep_thd_is_BF(m_trx->mysql_thd, FALSE) && !lock_get_wait(lock)) {
+          ib::info() << "would ASSERT " << lock->trx->id << " type_mode " << lock->type_mode << " err " << err;
+          err = DB_SUCCESS;
+        } else {
+#endif /* WITH_WSREP */
+        ut_ad(lock_get_wait(lock));
 
-	dberr_t	err = deadlock_check(lock);
-
+	err = deadlock_check(lock);
+#ifdef WITH_WSREP
+        }
+#endif /* WITH_WSREP */
 	ut_ad(trx_mutex_own(m_trx));
 
 	/* m_trx->mysql_thd is NULL if it's an internal trx. So current_thd is used */
@@ -2352,8 +2371,8 @@ lock_rec_add_to_queue(
 			= lock_rec_other_has_expl_req(
 				mode, block, false, heap_no, trx);
 #ifdef WITH_WSREP
-		ut_a(!other_lock || (trx_is_high_priority(trx) &&
-                                     trx_is_high_priority(other_lock->trx)));
+		ut_a(!other_lock || (wsrep_thd_is_BF(trx->mysql_thd, FALSE) &&
+                                     wsrep_thd_is_BF(other_lock->trx->mysql_thd, TRUE)));
 #else
 		ut_a(!other_lock);
 #endif /* WITH_WSREP */
@@ -2711,7 +2730,7 @@ lock_grant(
 	ut_ad(lock_mutex_own());
 
 	lock_reset_lock_and_trx_wait(lock);
-
+        ib::info() << "lock_grant for " << lock->trx->id;
 	trx_mutex_enter(lock->trx);
 
 	if (lock_get_mode(lock) == LOCK_AUTO_INC) {
@@ -2769,6 +2788,7 @@ lock_rec_cancel(
 	/* Reset the wait flag and the back pointer to lock in trx */
 
 	lock_reset_lock_and_trx_wait(lock);
+        ib::info() << "lock_rec_cancel for " << lock->trx->id;
 
 	/* The following function releases the trx from lock wait */
 
@@ -3105,6 +3125,8 @@ lock_rec_move_low(
 
 		if (type_mode & LOCK_WAIT) {
 			lock_reset_lock_and_trx_wait(lock);
+                        ib::info() << "lock_rec_move_low for " << lock->trx->id;
+
 		}
 
 		/* Note that we FIRST reset the bit, and then set the lock:
@@ -3201,6 +3223,7 @@ lock_move_reorganize_page(
 		if (lock_get_wait(lock)) {
 
 			lock_reset_lock_and_trx_wait(lock);
+                        ib::info() << "lock_move_reorganize_page for " << lock->trx->id;
 		}
 
 		lock = lock_rec_get_next_on_page(lock);
@@ -3373,6 +3396,7 @@ lock_move_rec_list_end(
 			    && lock_rec_reset_nth_bit(lock, rec1_heap_no)) {
 				if (type_mode & LOCK_WAIT) {
 					lock_reset_lock_and_trx_wait(lock);
+                                        ib::info() << "lock_move_rec_list_end for " << lock->trx->id;
 				}
 
 				lock_rec_add_to_queue(
@@ -3463,6 +3487,7 @@ lock_move_rec_list_start(
 			    && lock_rec_reset_nth_bit(lock, rec1_heap_no)) {
 				if (type_mode & LOCK_WAIT) {
 					lock_reset_lock_and_trx_wait(lock);
+                                        ib::info() << "lock_move_rec_list_start for " << lock->trx->id;
 				}
 
 				lock_rec_add_to_queue(
@@ -3556,6 +3581,7 @@ lock_rtr_move_rec_list(
 			    && lock_rec_reset_nth_bit(lock, rec1_heap_no)) {
 				if (type_mode & LOCK_WAIT) {
 					lock_reset_lock_and_trx_wait(lock);
+                                        ib::info() << "lock_rtr... for " << lock->trx->id;
 				}
 
 				lock_rec_add_to_queue(
@@ -5954,7 +5980,7 @@ lock_rec_queue_validate(
 					mode, block, false, heap_no,
 					lock->trx);
 #ifdef WITH_WSREP
-                        ut_a(!other_lock || trx_is_high_priority(lock->trx));
+                        ut_a(!other_lock || wsrep_thd_is_BF(lock->trx->mysql_thd, FALSE));
 #else
 			ut_a(!other_lock);
 #endif /* WITH_WSREP */
@@ -7116,6 +7142,7 @@ lock_cancel_waiting_and_release(
 	/* Reset the wait flag and the back pointer to lock in trx. */
 
 	lock_reset_lock_and_trx_wait(lock);
+        ib::info() << "lock_cancel_waiting_and_release for " << lock->trx->id;
 
 	/* The following function releases the trx from lock wait. */
 
