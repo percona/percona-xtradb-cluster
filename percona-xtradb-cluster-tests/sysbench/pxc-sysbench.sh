@@ -483,7 +483,7 @@ garbd_bootup()
   GARBDPID=$!
 
   echo "Waiting for garbd to start"
-  sleep 5
+  sleep 10
   echo "Done"
 
   set -e
@@ -532,33 +532,34 @@ sysbench_run()
   # shutdown node-2 and kill node-3 so that quorum is lost
   $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
   $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+  # let's wait for cluster to probe node-2 and mark it inactive.
+  sleep 10
   kill -9 $NODE3PID
+  sleep 5
 
-  # allow the status to get updated on node-1
-  sleep 5 
   $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
 
   # do so RW-workload while other nodes are down but node-1 is still primary
   # due to garbd
   rw_workload "/tmp/n1.sock" $BUILDDIR/logs/sysbench_rw_run.txt 30
 
-  # restart node-3
-  start_node_3 $1
+  # restart node-2
+  start_node_2 $1
 
   # validate db before starting RW test.
   echo "Table count post RW-load"
   ver_and_row /tmp/n1.sock
-  ver_and_row /tmp/n3.sock
+  ver_and_row /tmp/n2.sock
 
-  # let's get rid of garbd now that node-3 is up and running
+  # let's get rid of garbd now that node-2 is up and running
   kill -9 $GARBDPID
   sleep 5
 
   #ddl_workload /tmp/n1.sock $BUILDDIR/logs/sysbench_ddl.txt
-  cleanup /tmp/n3.sock $BUILDDIR/logs/sysbench_cleanup.txt
+  cleanup /tmp/n2.sock $BUILDDIR/logs/sysbench_cleanup.txt
 
   $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
 }
 
 #-------------------------------------------------------------------------------
