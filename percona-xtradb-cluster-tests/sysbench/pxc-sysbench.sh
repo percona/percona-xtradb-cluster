@@ -528,40 +528,41 @@ sysbench_run()
 
   # start garbd to ensure that node-1 doesn't become non-primary with follow-up
   # action below.
-  garbd_bootup
+  #garbd_bootup
 
   # shutdown node-2 and kill node-3 so that quorum is lost
-  $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+  #$MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
+  #$MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
   # let's wait for cluster to probe node-2 and mark it inactive.
-  sleep 10
-  kill -9 $NODE3PID
+  #sleep 10
+  #kill -9 $NODE3PID
   # inactive timeout to get rid of node-3 is 15 secs.
-  sleep 20
+  #sleep 20
 
-  $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
+  #$MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
 
   # do so RW-workload while other nodes are down but node-1 is still primary
   # due to garbd
-  rw_workload "/tmp/n1.sock" $BUILDDIR/logs/sysbench_rw_run.txt 30
+  #rw_workload "/tmp/n1.sock" $BUILDDIR/logs/sysbench_rw_run.txt 30
 
   # restart node-2
-  start_node_2 $1
+  #start_node_2 $1
 
   # validate db before starting RW test.
-  echo "Table count post RW-load"
-  ver_and_row /tmp/n1.sock
-  ver_and_row /tmp/n2.sock
+  #echo "Table count post RW-load"
+  #ver_and_row /tmp/n1.sock
+  #ver_and_row /tmp/n2.sock
 
   # let's get rid of garbd now that node-2 is up and running
-  kill -9 $GARBDPID
-  sleep 5
+  #kill -9 $GARBDPID
+  #sleep 5
 
   #ddl_workload /tmp/n1.sock $BUILDDIR/logs/sysbench_ddl.txt
-  cleanup /tmp/n2.sock $BUILDDIR/logs/sysbench_cleanup.txt
+  cleanup /tmp/n3.sock $BUILDDIR/logs/sysbench_cleanup.txt
 
   $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
   $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
 }
 
 #-------------------------------------------------------------------------------
