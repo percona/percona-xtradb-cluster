@@ -1099,7 +1099,7 @@ THD* thd_tx_arbitrate(THD *requestor, THD* holder)
 {
  /* Should be different sessions. */
  DBUG_ASSERT(holder != requestor);
-
+ WSREP_DEBUG("thd_tx_arbitrate called");
  return(thd_tx_priority(requestor) == thd_tx_priority(holder)
 	? requestor
 	: ((thd_tx_priority(requestor)

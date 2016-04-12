@@ -1304,8 +1304,7 @@ row_ins_foreign_check_on_constraint(
 				       clust_index,
 				       FALSE, FALSE);
 	if (err != DB_SUCCESS) {
-		fprintf(stderr, 
-			"WSREP: foreign key append failed: %d\n", err);
+		ib::warn() << "WSREP: foreign key append failed: " << err;
 	} else
 #endif
 	node->new_upd_nodes->push_back(cascade);
@@ -1641,6 +1640,7 @@ row_ins_check_foreign_constraint(
 						check_index, 
 						check_ref, TRUE);
 #endif /* WITH_WSREP */
+
 					goto end_scan;
 				} else if (foreign->type != 0) {
 					/* There is an ON UPDATE or ON DELETE
