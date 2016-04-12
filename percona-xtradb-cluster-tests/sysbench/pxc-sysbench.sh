@@ -12,6 +12,7 @@
 set +e
 echo "Killing existing mysqld"
 killall -9 mysqld
+killall -9 garbd
 sleep 10
 set -e
 
