@@ -536,7 +536,8 @@ sysbench_run()
   # let's wait for cluster to probe node-2 and mark it inactive.
   sleep 10
   kill -9 $NODE3PID
-  sleep 5
+  # inactive timeout to get rid of node-3 is 15 secs.
+  sleep 20
 
   $MYSQL_BASEDIR/bin/mysql -S /tmp/n1.sock -u root -e "show status like 'wsrep_cluster_status'";
 
