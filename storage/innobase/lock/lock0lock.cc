@@ -4050,9 +4050,10 @@ lock_table_create(
 	UT_LIST_ADD_LAST(trx->lock.trx_locks, lock);
 #ifdef WITH_WSREP
 	if (c_lock && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
-        	//UT_LIST_INSERT_AFTER(table->locks, c_lock, lock);
-		ib::warn() << "table lock BF conflict not handled " << c_lock->trx->id;
-		assert(0);
+        	ut_list_insert(table->locks, c_lock, lock, TableLockGetNode());
+                if (wsrep_debug)
+			ib::info() << "table lock BF conflict for " <<
+			c_lock->trx->id;
         } else {
                 ut_list_append(table->locks, lock, TableLockGetNode());
         }
