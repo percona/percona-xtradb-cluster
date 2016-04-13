@@ -5920,7 +5920,8 @@ lock_rec_queue_validate(
 					mode, block, false, heap_no,
 					lock->trx);
 #ifdef WITH_WSREP
-                        ut_a(!other_lock || wsrep_thd_is_BF(lock->trx->mysql_thd, FALSE));
+			ut_a(!other_lock || wsrep_thd_is_BF(lock->trx->mysql_thd, FALSE) ||
+			     wsrep_thd_is_BF(other_lock->trx->mysql_thd, FALSE));
 #else
 			ut_a(!other_lock);
 #endif /* WITH_WSREP */
