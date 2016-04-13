@@ -587,6 +587,18 @@ process::wait ()
   return err_;
 }
 
+void process::terminate ()
+{
+  if (pid_)
+  {
+    if (kill(pid_, SIGTERM))
+    {
+      WSREP_WARN("Unable to terminate process: %s: %d (%s)",
+                 str_, errno, strerror(errno));
+    }
+  }
+}
+
 thd::thd (my_bool won) : init(), ptr(new THD)
 {
   if (ptr)

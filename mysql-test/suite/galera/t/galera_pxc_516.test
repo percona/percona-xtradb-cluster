@@ -1,0 +1,55 @@
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+# Suppress expected warnings:
+
+CALL mtr.add_suppression("Aborting");
+CALL mtr.add_suppression("unknown option '--galera-unknown-option'");
+
+# Initiate normal shutdown on the node 2 and
+# waiting until shutdown has been completed:
+
+--connection node_2
+
+--echo Shutting down server ...
+--source include/shutdown_mysqld.inc
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Remove the "grastate.dat" file (to initiate new SST)
+# and restart node 2 with unknown option:
+
+--connection node_2
+
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+--let $start_mysqld_params=--galera-unknown-option
+
+--enable_reconnect
+
+--echo Starting server ...
+--exec echo "restart:$start_mysqld_params" > $_expect_file_name
+
+--disable_reconnect
+
+# Wait for node failure
+
+--source include/wait_until_disconnected.inc
+
+# Restart node 2 without unknown options:
+
+--let $start_mysqld_params=
+
+--echo Starting server ...
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Sanity check (node 2 is running now and can perform SQL operators):
+
+--connection node_2
+
+SELECT 1;
