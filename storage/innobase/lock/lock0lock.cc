@@ -743,7 +743,6 @@ lock_reset_lock_and_trx_wait(
 	ut_ad(lock_get_wait(lock));
 	ut_ad(lock_mutex_own());
 
-        ib::info() << "lock_reset_lock_and_trx_wait " << lock->trx->id << " lock's type_mode now: " << lock->type_mode;
 	lock->trx->lock.wait_lock = NULL;
 	lock->type_mode &= ~LOCK_WAIT;
 }
@@ -873,22 +872,6 @@ lock_rec_has_to_wait(
 
 			return(FALSE);
 		}
-#ifdef WITH_WSREP_OLD
-		if (trx_is_high_priority(trx)        &&
-                    trx_is_high_priority(lock2->trx)) {
-                    //                   && (type_mode & LOCK_GAP)) {
-
-                  ib::info() << "WSREP BF-BF conflict skipped" <<
-                    "request - GAP: "                          <<
-                    (type_mode & LOCK_GAP)                     <<
-                    " request - intention: "                   <<
-                    (type_mode & LOCK_INSERT_INTENTION)        <<
-                    "\ngranted - GAP: "                        <<
-		    lock_rec_get_rec_not_gap(lock2)            <<
-                    " intention: " <<  lock_rec_get_insert_intention(lock2);
-                  return FALSE;
-                }
-#endif /* WITH_WSREP */
 #ifdef WITH_WSREP
 		/* if BF thread is locking and has conflict with another BF
 		   thread, we need to look at trx ordering and lock types */
@@ -1057,7 +1040,6 @@ lock_rec_trx_wait(
 
 	if (type & LOCK_WAIT) {
 		lock_reset_lock_and_trx_wait(lock);
-        ib::info() << "lock_rec_trx_wait for " << lock->trx->id;
 	}
 }
 
@@ -1509,7 +1491,7 @@ wsrep_print_wait_locks(
 	lock_t*		c_lock) /* conflicting lock to print */
 {
 	if (wsrep_debug &&  c_lock->trx->lock.wait_lock != c_lock) {
-          ib::info() << "WSREP: c_lock != wait lock";
+		ib::info() << "WSREP: c_lock != wait lock";
 		if (lock_get_type_low(c_lock) & LOCK_TABLE)
 			lock_table_print(stderr, c_lock);
 		else
@@ -1735,7 +1717,6 @@ RecLock::create(trx_t* trx, bool owns_trx_mutex, const lock_prdt_t* prdt)
 
 			trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
-                        ib::info() << "BF " << trx->id << " lock's type_mode now: " << lock->type_mode;
 			UT_LIST_ADD_LAST(trx->lock.trx_locks, lock);
 
 			ut_ad(m_thr != NULL);
@@ -1750,19 +1731,19 @@ RecLock::create(trx_t* trx, bool owns_trx_mutex, const lock_prdt_t* prdt)
 			lock_cancel_waiting_and_release(
 				c_lock->trx->lock.wait_lock);
 			if (owns_trx_mutex) trx_mutex_enter(trx);
-                        ib::info() << "BF " << trx->id << " lock's type_mode now 2: " << lock->type_mode;
 
 			/* trx might not wait for c_lock, but some other lock
 			   does not matter if wait_lock was released above
 			 */
 			if (c_lock->trx->lock.wait_lock == c_lock) {
-                          ib::info() << "victim trx waits for some other lock than c_lock";
+				if (wsrep_debug) ib::info() <<
+					"victim trx waits for some other lock than c_lock";
 				lock_reset_lock_and_trx_wait(lock);
 			}
 			trx_mutex_exit(c_lock->trx);
 
 			if (wsrep_debug)
-                          ib::info() << "WSREP: c_lock canceled " << c_lock->trx->id;
+				ib::info() << "WSREP: c_lock canceled " << c_lock->trx->id;
 
                         ++lock->index->table->n_rec_locks;
 			/* have to bail out here to avoid lock_set_lock... */
@@ -1789,8 +1770,6 @@ RecLock::create(trx_t* trx, bool owns_trx_mutex, const lock_prdt_t* prdt)
         }
 #ifdef WITH_WSREP
 	}
-        ib::info() << "RecLock::create end, BF " << trx->id << " lock's type_mode now: " << lock->type_mode;
-
 #endif /* WITH_WSREP */
 
 	return(lock);
@@ -2060,8 +2039,10 @@ roll it back.
 lock_t*
 RecLock::enqueue_priority(const lock_t* wait_for, const lock_prdt_t* prdt)
 {
+#ifdef WITH_WSREP
+	ib::info() << "enqueue_priority called, for: " << wait_for->trx->id;
+#endif /* WITH_WSREP */
 	/* Create the explicit lock instance and initialise it. */
-  ib::info() << "enqueue_priority called";
 	lock_t*	lock = lock_alloc(m_trx, m_index, m_mode, m_rec_id, m_size);
 
 	if (prdt != NULL && (m_mode & LOCK_PREDICATE)) {
@@ -2230,8 +2211,8 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		/* Ensure that the wait flag is not set. */
 #ifdef WITH_WSREP
 		if (wsrep_on(m_trx->mysql_thd) && 
-                    m_trx->lock.was_chosen_as_deadlock_victim) {
-                  return(DB_DEADLOCK);
+		    m_trx->lock.was_chosen_as_deadlock_victim) {
+			return(DB_DEADLOCK);
                 }
 		lock = create((lock_t *)wait_for, m_trx, true, prdt);
 #else
@@ -2242,7 +2223,6 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 		if (trx_is_high_priority(m_trx) && victim_trx != NULL) {
 
-                  ib::info() << "high priority branch taken";
                   lock_reset_lock_and_trx_wait(lock);
 
 			lock_rec_reset_nth_bit(lock, m_rec_id.m_heap_no);
@@ -2305,9 +2285,9 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 
 	dberr_t	err = DB_LOCK_WAIT;
 #ifdef WITH_WSREP
-        ib::info() << "type_mode " << lock->type_mode << " for " << m_trx->id;
         if (wsrep_thd_is_BF(m_trx->mysql_thd, FALSE) && !lock_get_wait(lock)) {
-          ib::info() << "would ASSERT " << lock->trx->id << " type_mode " << lock->type_mode << " err " << err;
+		if (wsrep_debug) ib::info() <<
+			"BF thread got lock granted early, ID " << lock->trx->id;
           err = DB_SUCCESS;
         } else {
 #endif /* WITH_WSREP */
@@ -2730,7 +2710,6 @@ lock_grant(
 	ut_ad(lock_mutex_own());
 
 	lock_reset_lock_and_trx_wait(lock);
-        ib::info() << "lock_grant for " << lock->trx->id;
 	trx_mutex_enter(lock->trx);
 
 	if (lock_get_mode(lock) == LOCK_AUTO_INC) {
@@ -2788,7 +2767,6 @@ lock_rec_cancel(
 	/* Reset the wait flag and the back pointer to lock in trx */
 
 	lock_reset_lock_and_trx_wait(lock);
-        ib::info() << "lock_rec_cancel for " << lock->trx->id;
 
 	/* The following function releases the trx from lock wait */
 
@@ -3125,8 +3103,6 @@ lock_rec_move_low(
 
 		if (type_mode & LOCK_WAIT) {
 			lock_reset_lock_and_trx_wait(lock);
-                        ib::info() << "lock_rec_move_low for " << lock->trx->id;
-
 		}
 
 		/* Note that we FIRST reset the bit, and then set the lock:
@@ -3223,7 +3199,6 @@ lock_move_reorganize_page(
 		if (lock_get_wait(lock)) {
 
 			lock_reset_lock_and_trx_wait(lock);
-                        ib::info() << "lock_move_reorganize_page for " << lock->trx->id;
 		}
 
 		lock = lock_rec_get_next_on_page(lock);
@@ -3396,7 +3371,6 @@ lock_move_rec_list_end(
 			    && lock_rec_reset_nth_bit(lock, rec1_heap_no)) {
 				if (type_mode & LOCK_WAIT) {
 					lock_reset_lock_and_trx_wait(lock);
-                                        ib::info() << "lock_move_rec_list_end for " << lock->trx->id;
 				}
 
 				lock_rec_add_to_queue(
@@ -3487,7 +3461,6 @@ lock_move_rec_list_start(
 			    && lock_rec_reset_nth_bit(lock, rec1_heap_no)) {
 				if (type_mode & LOCK_WAIT) {
 					lock_reset_lock_and_trx_wait(lock);
-                                        ib::info() << "lock_move_rec_list_start for " << lock->trx->id;
 				}
 
 				lock_rec_add_to_queue(
@@ -3581,7 +3554,6 @@ lock_rtr_move_rec_list(
 			    && lock_rec_reset_nth_bit(lock, rec1_heap_no)) {
 				if (type_mode & LOCK_WAIT) {
 					lock_reset_lock_and_trx_wait(lock);
-                                        ib::info() << "lock_rtr... for " << lock->trx->id;
 				}
 
 				lock_rec_add_to_queue(
@@ -4078,42 +4050,10 @@ lock_table_create(
 	UT_LIST_ADD_LAST(trx->lock.trx_locks, lock);
 #ifdef WITH_WSREP
 	if (c_lock && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
-          ib::info() << "TABLE LOCKS manipulated 1";
-#ifdef ALL_WRONG
-          //c_lock->trx->lock.table_locks.insert(lock);
-        	//UT_LIST_INSERT_AFTER(
-	        //    table->locks, c_lock, lock);
-		//typedef lock_pool_t::const_reverse_iterator iterator;
-		//iterator	end = trx->lock.table_locks.rend();
-		//iterator	it = trx->lock.table_locks.rbegin();
-		//typedef lock_pool_t::const_iterator iterator;
-		typedef lock_pool_t::iterator iterator;
-		iterator	end = trx->lock.table_locks.end();
-		iterator	it = trx->lock.table_locks.begin();
-
-		for (/* No op */; it != end; ++it) {
-			const lock_t*	next = *it;
-
-			if (next == c_lock) {
-                          it++;
-                          if (it != end) {
-                            trx->lock.table_locks.insert(it, lock);
-
-                          } else {
-                            trx->lock.table_locks.push_back(lock);
-                          }
-                        	break;
-                        }
-                }
-#endif
-        	//ut_list_insert(table->locks, c_lock, lock);
         	//UT_LIST_INSERT_AFTER(table->locks, c_lock, lock);
-        	//UT_LIST_INSERT_AFTER(table->locks, TableLockGetNode(*c_lock), TableLockGetNode(*lock));
-                assert(0);
+		ib::warn() << "table lock BF conflict not handled " << c_lock->trx->id;
+		assert(0);
         } else {
-
-  		//UT_LIST_ADD_LAST(table->locks, lock);
-        	//trx->lock.table_locks.push_back(lock);
                 ut_list_append(table->locks, lock, TableLockGetNode());
         }
 
@@ -4430,7 +4370,7 @@ lock_table_other_has_incompatible(
 
 #ifdef WITH_WSREP
 			if (wsrep_debug) 
-                          ib::info() << "WSREP: table lock abort";
+				ib::info() << "WSREP: table lock abort";
 			trx_mutex_enter(lock->trx);
 			wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
 			trx_mutex_exit(lock->trx);
@@ -7142,7 +7082,6 @@ lock_cancel_waiting_and_release(
 	/* Reset the wait flag and the back pointer to lock in trx. */
 
 	lock_reset_lock_and_trx_wait(lock);
-        ib::info() << "lock_cancel_waiting_and_release for " << lock->trx->id;
 
 	/* The following function releases the trx from lock wait. */
 

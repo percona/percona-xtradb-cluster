@@ -1445,14 +1445,7 @@ thd_trx_arbitrate(THD* requestor, THD* holder)
 
 	ut_a(victim == NULL || victim == requestor || victim == holder);
 #ifdef WITH_WSREP
-        WSREP_DEBUG("skipping thd_trx_arbitrate");
         return (NULL);
-        
-        if (wsrep_thd_is_BF(victim,false))
-        {
-          WSREP_DEBUG("victim is BF");
-        }
-        wsrep_thd_set_conflict_state(victim, true, MUST_ABORT);
 #endif /* WITH_WSREP */
 	return(victim);
 }
