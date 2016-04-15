@@ -412,6 +412,29 @@ static int generate_binlog_opt_val(char** ret)
   return 0;
 }
 
+// Pointer to SST process object:
+
+static wsp::process * sst_process= static_cast<wsp::process*>(NULL);
+
+// SST cancellation flag:
+
+static bool sst_cancelled= false;
+
+void wsrep_sst_cancel ()
+{
+  if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+  if (!sst_cancelled)
+  {
+    sst_cancelled=true;
+    if (sst_process)
+    {
+      sst_process->terminate();
+      sst_process = NULL;
+    }
+  }
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
+}
+
 static void* sst_joiner_thread (void* a)
 {
   sst_thread_arg* arg= (sst_thread_arg*) a;
@@ -425,7 +448,12 @@ static void* sst_joiner_thread (void* a)
 
     WSREP_INFO("Running: '%s'", arg->cmd);
 
+    // Launch the SST script and save pointer to its process:
+
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
     wsp::process proc (arg->cmd, "r", arg->env);
+    sst_process = &proc;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
 
     if (proc.pipe() && !proc.error())
     {
@@ -434,18 +462,44 @@ static void* sst_joiner_thread (void* a)
       if (!tmp || strlen(tmp) < (magic_len + 2) ||
           strncasecmp (tmp, magic, magic_len))
       {
-        WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
-                    magic, arg->cmd, tmp);
+        if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+        // Print error message if SST is not cancelled:
+        if (!sst_cancelled)
+        {
+          if (tmp)
+          {
+             WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
+                         magic, arg->cmd, tmp);
+          }
+          else
+          {
+            // Null-pointer is not valid argument for %s formatting (even
+            // though it is supported by many compilers):
+            WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '(null)'",
+                        magic, arg->cmd);
+          }
+        }
+        // Clear the pointer to SST process:
+        sst_process = NULL;
+        mysql_mutex_unlock (&LOCK_wsrep_sst);
         proc.wait();
         if (proc.error()) err = proc.error();
       }
       else
       {
+        // Clear the pointer to SST process:
+        if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+        sst_process = NULL;
+        mysql_mutex_unlock (&LOCK_wsrep_sst);
         err = 0;
       }
     }
     else
     {
+      // Clear the pointer to SST process:
+      if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+      sst_process = NULL;
+      mysql_mutex_unlock (&LOCK_wsrep_sst);
       err = proc.error();
       WSREP_ERROR("Failed to execute: %s : %d (%s)",
                   arg->cmd, err, strerror(err));
@@ -785,18 +839,39 @@ static int sst_run_shell (const char* cmd_str, char** env, int max_tries)
 
   for (int tries=1; tries <= max_tries; tries++)
   {
-    wsp::process proc (cmd_str, "r", env);
+    // Launch the SST script and save pointer to its process:
 
-    if (NULL != proc.pipe())
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+    wsp::process proc (cmd_str, "r", env);
+    sst_process = &proc;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
+
+    if (proc.pipe() && !proc.error())
     {
       proc.wait();
     }
 
+    // Clear the pointer to SST process:
+
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+    sst_process = NULL;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
+
     if ((ret = proc.error()))
     {
-      WSREP_ERROR("Try %d/%d: '%s' failed: %d (%s)",
-                  tries, max_tries, proc.cmd(), ret, strerror(ret));
-      sleep (1);
+      // Try again if SST is not cancelled:
+      if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+      if (!sst_cancelled)
+      {
+         mysql_mutex_unlock (&LOCK_wsrep_sst);
+         WSREP_ERROR("Try %d/%d: '%s' failed: %d (%s)",
+                     tries, max_tries, proc.cmd(), ret, strerror(ret));
+         sleep (1);
+      }
+      else
+      {
+         mysql_mutex_unlock (&LOCK_wsrep_sst);
+      }
     }
     else
     {
@@ -998,7 +1073,13 @@ static void* sst_donor_thread (void* a)
 
   wsp::thd thd(FALSE); // we turn off wsrep_on for this THD so that it can
                        // operate with wsrep_ready == OFF
+
+  // Launch the SST script and save pointer to its process:
+
+  if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   wsp::process proc(arg->cmd, "r", arg->env);
+  sst_process = &proc;
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
 
   err= proc.error();
 
@@ -1052,13 +1133,34 @@ wait_signal:
     }
     else
     {
-      WSREP_ERROR("Failed to read from: %s", proc.cmd());
+      if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+      // Print error message if SST is not cancelled:
+      if (!sst_cancelled)
+      {
+         WSREP_ERROR("Failed to read from: %s", proc.cmd());
+      }
+      // Clear the pointer to SST process:
+      sst_process = NULL;
+      mysql_mutex_unlock (&LOCK_wsrep_sst);
       proc.wait();
+      goto skip_clear_pointer;
     }
+    
+    // Clear the pointer to SST process:
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+    sst_process = NULL;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
+
+skip_clear_pointer:
+    sst_process = NULL;
     if (!err && proc.error()) err= proc.error();
   }
   else
   {
+    // Clear the pointer to SST process:
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+    sst_process = NULL;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
     WSREP_ERROR("Failed to execute: %s : %d (%s)",
                 proc.cmd(), err, strerror(err));
   }
