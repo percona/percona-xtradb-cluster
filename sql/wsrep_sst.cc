@@ -466,18 +466,10 @@ static void* sst_joiner_thread (void* a)
         // Print error message if SST is not cancelled:
         if (!sst_cancelled)
         {
-          if (tmp)
-          {
-             WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
-                         magic, arg->cmd, tmp);
-          }
-          else
-          {
-            // Null-pointer is not valid argument for %s formatting (even
-            // though it is supported by many compilers):
-            WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '(null)'",
-                        magic, arg->cmd);
-          }
+          // Null-pointer is not valid argument for %s formatting (even
+          // though it is supported by many compilers):
+           WSREP_ERROR("Failed to read '%s <addr>' from: %s\n\tRead: '%s'",
+                       magic, arg->cmd, tmp ? tmp : "(null)");
         }
         // Clear the pointer to SST process:
         sst_process = NULL;
@@ -562,13 +554,6 @@ static void* sst_joiner_thread (void* a)
 
 static int sst_append_auth_env(wsp::env& env, const char* sst_auth)
 {
-#ifndef HAVE_EXECVPE
-  if (setenv(WSREP_SST_AUTH_ENV, sst_auth ? sst_auth : "", 1)) 
-  {
-      return -errno;
-  }
-  return 0;
-#else
   int const sst_auth_size= strlen(WSREP_SST_AUTH_ENV) + 1 /* = */
     + (sst_auth ? strlen(sst_auth) : 0) + 1 /* \0 */;
 
@@ -586,7 +571,6 @@ static int sst_append_auth_env(wsp::env& env, const char* sst_auth)
 
   env.append(sst_auth_str());
   return -env.error();
-#endif
 }
 
 static ssize_t sst_prepare_other (const char*  method,
@@ -1152,7 +1136,6 @@ wait_signal:
     mysql_mutex_unlock (&LOCK_wsrep_sst);
 
 skip_clear_pointer:
-    sst_process = NULL;
     if (!err && proc.error()) err= proc.error();
   }
   else
