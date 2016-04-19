@@ -14,9 +14,7 @@ UPDATE t1 SET f2 = 'd' WHERE f1 > 3;
 CREATE TABLE t2 (f1 INTEGER);
 UPDATE t1 SET f2 = 'e' WHERE f1 > 4;
 CREATE TABLE t3 (f1 INTEGER);
-Performing --wsrep-recover ...
 Starting server ...
-Using --wsrep-start-position when starting mysqld ...
 UPDATE t1 SET f2 = 'f' WHERE f1 > 5;
 SELECT * FROM t1;
 f1	f2

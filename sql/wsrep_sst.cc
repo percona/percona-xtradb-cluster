@@ -284,6 +284,10 @@ void wsrep_sst_complete (const wsrep_uuid_t* sst_uuid,
   mysql_mutex_unlock (&LOCK_wsrep_sst);
 }
 
+// True if wsrep awaiting sst_received callback:
+
+static bool sst_awaiting_callback= false;
+
 void wsrep_sst_received (wsrep_t*            const wsrep,
                          const wsrep_uuid_t& uuid,
                          wsrep_seqno_t       const seqno,
@@ -315,8 +319,10 @@ void wsrep_sst_received (wsrep_t*            const wsrep,
         wsrep_gtid_t const state_id = {
             uuid, (rcode ? WSREP_SEQNO_UNDEFINED : seqno)
         };
-
+        if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+        sst_awaiting_callback = false;
         wsrep->sst_received(wsrep, &state_id, state, state_len, rcode);
+        mysql_mutex_unlock (&LOCK_wsrep_sst);
     }
 }
 
@@ -430,6 +436,16 @@ void wsrep_sst_cancel ()
     {
       sst_process->terminate();
       sst_process = NULL;
+    }
+    if (sst_awaiting_callback)
+    {
+      WSREP_INFO("Signalling cancellation of the SST request.");
+      wsrep_gtid_t const state_id = {
+          WSREP_UUID_UNDEFINED,
+          WSREP_SEQNO_UNDEFINED
+      };
+      sst_awaiting_callback = false;
+      wsrep->sst_received(wsrep, &state_id, NULL, 0, -ECANCELED);
     }
   }
   mysql_mutex_unlock (&LOCK_wsrep_sst);
@@ -804,6 +820,10 @@ ssize_t wsrep_sst_prepare (void** msg)
     strcpy (addr_ptr, addr_out);
 
     WSREP_INFO ("Prepared SST request: %s|%s", method_ptr, addr_ptr);
+
+    if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+    sst_awaiting_callback = true;
+    mysql_mutex_unlock (&LOCK_wsrep_sst);
   }
   else {
     WSREP_ERROR("Failed to allocate SST request of size %zu. Can't continue.",
