@@ -7051,19 +7051,17 @@ wsrep_store_key_val_for_row(
 
 			/* Note that we always reserve the maximum possible
 			length of the BLOB prefix in the key value. */
-                        if (wsrep_protocol_version > 1) {
-				if (true_len > buff_space) {
-					fprintf (stderr,
-						 "WSREP: key truncated: %s\n",
-						 wsrep_thd_query(thd));
-					true_len = buff_space;
-				}
-				buff       += true_len;
-				buff_space -= true_len;
-			} else {
-				buff += key_len;
+			ut_a(wsrep_protocol_version > 1);
+			if (true_len > buff_space) {
+				ib::warn() <<
+					"WSREP: key truncated: %s " <<
+					wsrep_thd_query(thd);
+				true_len = buff_space;
 			}
 			memcpy(buff, sorted, true_len);
+			buff       += true_len;
+			buff_space -= true_len;
+
 		} else {
 			/* Here we handle all other data types except the
 			true VARCHAR, BLOB and TEXT. Note that the column
