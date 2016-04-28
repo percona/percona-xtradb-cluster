@@ -365,7 +365,6 @@ static void wsrep_rollback_process(THD *thd)
 
   mysql_mutex_lock(&LOCK_wsrep_rollback);
   wsrep_aborting_thd= NULL;
-
   while (thd->killed == THD::NOT_KILLED) {
     thd_proc_info(thd, "wsrep aborter idle");
     mysql_mutex_lock(&thd->LOCK_thd_data);
@@ -375,6 +374,11 @@ static void wsrep_rollback_process(THD *thd)
 
     mysql_cond_wait(&COND_wsrep_rollback,&LOCK_wsrep_rollback);
 
+    if (thd->killed != THD::NOT_KILLED)
+    {
+      WSREP_DEBUG("rollbacker thread canceled");
+      break;
+    }
     WSREP_DEBUG("WSREP rollback thread wakes for signal");
 
     mysql_mutex_lock(&thd->LOCK_thd_data);
@@ -429,6 +433,12 @@ static void wsrep_rollback_process(THD *thd)
   }
 
   mysql_mutex_unlock(&LOCK_wsrep_rollback);
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+  thd_proc_info(thd, "wsrep aborter shutting down");
+  thd->current_mutex= 0;
+  thd->current_cond=  0;
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+
   sql_print_information("WSREP: rollbacker thread exiting");
 
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));

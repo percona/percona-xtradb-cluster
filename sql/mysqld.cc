@@ -1150,9 +1150,7 @@ public:
   {
     if (WSREP(thd) && thd->wsrep_applier)
     {
-      // redundant, system thread should not have vio
-      //close_connection(thd);
-
+      WSREP_DEBUG("Closing applier thread %u", thd->thread_id());
       mysql_mutex_lock(&thd->LOCK_thd_data);
       thd->killed= THD::KILL_CONNECTION;
       if (thd->current_cond)
@@ -1214,6 +1212,7 @@ private:
 static void close_connections(void)
 {
   DBUG_ENTER("close_connections");
+  WSREP_DEBUG("close_connections");
   (void) RUN_HOOK(server_state, before_server_shutdown, (NULL));
 
   Per_thread_connection_handler::kill_blocked_pthreads();
@@ -1347,14 +1346,15 @@ extern "C" void unireg_abort(int exit_code)
 #ifdef WITH_WSREP
   if (wsrep)
   {
+    WSREP_DEBUG("unireg_abort");
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only diconnect from service */
     wsrep_close_client_connections(FALSE);
-    //shutdown_in_progress= 1;
-    THD* thd(0);
+    wsrep_close_threads(NULL);
     wsrep->disconnect(wsrep);
+    wsrep_wait_appliers_close(NULL);
     WSREP_INFO("Service disconnected.");
-    wsrep_close_threads(thd); /* this won't close all threads */
+
     sleep(1); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
   }
@@ -4051,7 +4051,6 @@ static int init_server_components()
   enter_cond_hook= thd_enter_cond;
   exit_cond_hook= thd_exit_cond;
   is_killed_hook= (int(*)(const void*))thd_killed;
-
   if (transaction_cache_init())
   {
     sql_print_error("Out of memory");
@@ -6423,9 +6422,6 @@ extern "C" void *start_wsrep_THD(void *arg)
   thd_manager->add_thd(thd);
   thd_added= true;
 
-  /* set priority */
-  thd->thd_tx_priority = 1;
-
   THD_CHECK_SENTRY(thd);
 
   processor(thd);
@@ -6457,6 +6453,12 @@ extern "C" void *start_wsrep_THD(void *arg)
     // TODO: lightweight cleanup to get rid of:
     // 'Error in my_thread_global_end(): 2 threads didn't exit'
     // at server shutdown
+
+    if (thd_added)
+    {
+      thd->release_resources();
+      thd_manager->remove_thd(thd);
+    }
   }
 
   /*
@@ -6632,8 +6634,13 @@ void wsrep_wait_appliers_close(THD *thd)
   /* Now kill remaining wsrep threads: rollbacker */
   wsrep_close_threads (thd);
   /* and wait for them to die */
+  int round=0;
   while (have_wsrep_appliers(thd) > 0)
   {
+    WSREP_INFO("active appliers remaining");
+    wsrep_close_threads (thd);
+    sleep(1);
+    round++;
   }
 
   /* All wsrep applier threads have now been aborted. However, if this thread

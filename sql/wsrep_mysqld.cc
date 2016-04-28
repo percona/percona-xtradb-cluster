@@ -181,6 +181,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
                        void**                   sst_req,
                        size_t*                  sst_req_len)
 {
+  THD* thd = (THD*)recv_ctx;
   *sst_req     = NULL;
   *sst_req_len = 0;
 
@@ -294,7 +295,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
         // Signal mysqld init thread to continue
         wsrep_sst_complete (&cluster_uuid, view->state_id.seqno, false);
         // and wait for SE initialization
-        wsrep_SE_init_wait();
+        wsrep_SE_init_wait(thd);
       }
       else
       {
@@ -388,7 +389,8 @@ static void wsrep_synced_cb(void* app_ctx)
       // Signal mysqld init thread to continue
       wsrep_sst_complete (&local_uuid, local_seqno, false);
       // and wait for SE initialization
-      wsrep_SE_init_wait();
+      /* we don't have recv_ctx (THD*) here */
+      wsrep_SE_init_wait(current_thd);
   }
   if (wsrep_restart_slave_activated)
   {

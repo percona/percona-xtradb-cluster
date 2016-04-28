@@ -122,9 +122,31 @@ Global_THD_manager::Global_THD_manager()
 }
 
 
+#ifdef WITH_WSREP
+class Print_conn : public Do_THD_Impl
+{
+public:
+  Print_conn() { }
+
+  virtual void operator()(THD *thd)
+  {
+    WSREP_INFO("THD %u applier %d exec_mode %d killed %d",
+               thd->thread_id(), thd->wsrep_applier, thd->wsrep_exec_mode,
+               thd->killed);
+  }
+};
+#endif /* WITH_WSREP */
+
 Global_THD_manager::~Global_THD_manager()
 {
   thread_ids.erase_unique(reserved_thread_id);
+#ifdef WITH_WSREP
+  if (!(thd_list.empty()))
+  {
+    Print_conn print_conn;
+    do_for_all_thd(&print_conn);
+  }
+#endif /* WITH_WSREP */
   DBUG_ASSERT(thd_list.empty());
   DBUG_ASSERT(thread_ids.empty());
   mysql_mutex_destroy(&LOCK_thd_list);
