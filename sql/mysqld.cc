@@ -5185,6 +5185,14 @@ static int init_server_components()
     unireg_abort(1);
   }
 
+#ifdef WITH_WSREP
+  if (WSREP_ON && wsrep_desync)
+  {
+    sql_print_error("Can't desync a node even before it is synced with cluster");
+    unireg_abort(1);
+  }
+#endif /* WITH_WSREP */
+
   /*
     initialize delegates for extension observers, errors have already
     been reported in the function

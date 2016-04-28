@@ -31,3 +31,11 @@ INSERT INTO t1 (f1) VALUES (100);
 ERROR 23000: Duplicate entry '100' for key 'PRIMARY'
 DROP TABLE t1;
 DROP TABLE ten;
+call mtr.add_suppression("Can't desync a node even before it is synced with cluster");
+call mtr.add_suppression("Aborting");
+#node-2
+"Shutdown node-2 gracefully"
+"Restart with wsrep_desync=1"
+"Restart with default options"
+"grep --count "Can't desync a node even before it is synced with cluster""
+1
