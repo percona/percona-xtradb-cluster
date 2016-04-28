@@ -981,9 +981,7 @@ then
         fi
 
         MAGIC_FILE="${TDATA}/${INFO_FILE}"
-        set +e
-        rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
-        set -e
+        rm -f {$TDATA,$DATA}/innobackup.prepare.log {$TDATA,$DATA}/innobackup.move.log
         wsrep_log_info "Moving the backup to ${TDATA}"
         timeit "Xtrabackup move stage" "$INNOMOVE"
         if [[ $? -eq 0 ]];then 
