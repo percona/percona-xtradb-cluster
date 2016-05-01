@@ -4479,6 +4479,17 @@ end_with_restore_list:
             REFRESH_GRANT            |
             REFRESH_HOSTS            |
             REFRESH_DES_KEY_FILE     |
+    /*
+      Write all flush log statements except
+      FLUSH LOGS
+      FLUSH BINARY LOGS
+      Check reload_acl_and_cache for why.
+    */
+    REFRESH_RELAY_LOG                       |
+    REFRESH_SLOW_LOG                        |
+    REFRESH_GENERAL_LOG                     |
+    REFRESH_ENGINE_LOG                      |
+    REFRESH_ERROR_LOG                       |
 #ifdef HAVE_QUERY_CACHE
             REFRESH_QUERY_CACHE_FREE |
 #endif /* HAVE_QUERY_CACHE */
@@ -4495,6 +4506,25 @@ end_with_restore_list:
     */
     if (!reload_acl_and_cache(thd, lex->type, first_table, &write_to_binlog))
     {
+#ifdef WITH_WSREP
+      if ((lex->type & REFRESH_TABLES) && !(lex->type & (REFRESH_FOR_EXPORT|REFRESH_READ_LOCK)))
+      {
+        /*
+          This is done after reload_acl_and_cache is because
+          LOCK TABLES is not replicated in galera, the upgrade of which
+          is checked in reload_acl_and_cache.
+          Hence, done after/if we are able to upgrade locks.
+        */
+        if (first_table)
+        {
+            WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
+        }
+        else
+        {
+            WSREP_TO_ISOLATION_BEGIN_WRTCHK(WSREP_MYSQL_DB, NULL, NULL);
+        }
+      }
+#endif /* WITH_WSREP */
       /*
         We WANT to write and we CAN write.
         ! we write after unlocking the table.
@@ -5178,6 +5208,7 @@ end_with_restore_list:
   case SQLCOM_ALTER_TABLESPACE:
     if (check_global_access(thd, CREATE_TABLESPACE_ACL))
       break;
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
     if (!(res= mysql_alter_tablespace(thd, lex->alter_tablespace_info)))
       my_ok(thd);
     break;
