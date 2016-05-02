@@ -6635,7 +6635,7 @@ void wsrep_wait_appliers_close(THD *thd)
   wsrep_close_threads (thd);
   /* and wait for them to die */
   int round=0;
-  while (have_wsrep_appliers(thd) > 0)
+  while (have_wsrep_appliers(thd) > 0 && round < 5)
   {
     WSREP_INFO("active appliers remaining");
     wsrep_close_threads (thd);
