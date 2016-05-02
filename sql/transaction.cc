@@ -178,6 +178,7 @@ bool trans_begin(THD *thd, uint flags)
 
   DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
     DBUG_ASSERT(thd->tx_priority==0);
+    WSREP_WARN("InnoDB High Priority being used: %d -> %d", thd->tx_priority, 1);
     thd->tx_priority= 1;
   });
 

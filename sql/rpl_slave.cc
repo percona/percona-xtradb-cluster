@@ -239,7 +239,7 @@ static void set_thd_tx_priority(THD* thd, int priority)
   DBUG_ENTER("set_thd_tx_priority");
   DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
               thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
-
+  WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d", thd->thd_tx_priority, priority);
   thd->thd_tx_priority= priority;
   DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread",
   {

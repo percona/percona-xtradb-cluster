@@ -1099,7 +1099,6 @@ THD* thd_tx_arbitrate(THD *requestor, THD* holder)
 {
  /* Should be different sessions. */
  DBUG_ASSERT(holder != requestor);
-
  return(thd_tx_priority(requestor) == thd_tx_priority(holder)
 	? requestor
 	: ((thd_tx_priority(requestor)

@@ -308,7 +308,8 @@ row_upd_check_references_constraints(
 	}
 
 	err = DB_SUCCESS;
-func_exit:
+
+ func_exit:
 	if (got_s_lock) {
 		row_mysql_unfreeze_data_dictionary(trx);
 	}

@@ -111,6 +111,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "dict0priv.h"
+#include "tc_log.h"
 #endif /* WITH_WSREP */
 enum_tx_isolation thd_get_trx_isolation(const THD* thd);
 
@@ -146,9 +147,7 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
                                          size_t* key_len);
 
 extern handlerton * wsrep_hton;
-#ifdef WITH_WSREP_REFACTOR
 extern TC_LOG* tc_log;
-#endif
 extern void wsrep_cleanup_transaction(THD *thd);
 #endif /* WITH_WSREP */
 
@@ -1446,12 +1445,7 @@ thd_trx_arbitrate(THD* requestor, THD* holder)
 
 	ut_a(victim == NULL || victim == requestor || victim == holder);
 #ifdef WITH_WSREP
-        WSREP_DEBUG("victim: %d", wsrep_thd_exec_mode(victim));
-        if (wsrep_thd_is_BF(victim,false))
-        {
-          WSREP_DEBUG("victim is BF");
-        }
-        wsrep_thd_set_conflict_state(victim, true, MUST_ABORT);
+        return (NULL);
 #endif /* WITH_WSREP */
 	return(victim);
 }
@@ -7917,7 +7911,7 @@ no_commit:
 			/* Unknown situation: do not commit */
 			;
 		} else if (src_table == m_prebuilt->table) {
-#ifdef WITH_WSREP_REFACTOR
+#ifdef WITH_WSREP
 			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
 			    sql_command == SQLCOM_LOAD                      &&
 			    !thd_test_options(
@@ -7947,7 +7941,7 @@ no_commit:
 			/* We will need an IX lock on the destination table. */
 			m_prebuilt->sql_stat_start = TRUE;
 		} else {
-#ifdef WITH_WSREP_REFACTOR
+#ifdef WITH_WSREP
 			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
 			    sql_command == SQLCOM_LOAD                      &&
 			    !thd_test_options(
@@ -10049,6 +10043,7 @@ innobase_fts_create_doc_id_key(
 	dfield_t*	dfield = dtuple_get_nth_field(tuple, 0);
 
 	ut_a(dict_index_get_n_unique(index) == 1);
+
 	dtuple_set_n_fields(tuple, index->n_fields);
 	dict_index_copy_types(tuple, index, index->n_fields);
 
@@ -17501,6 +17496,7 @@ ha_innobase::get_auto_increment(
 			{
 #endif /* WITH_WSREP */
 			current = autoinc - m_prebuilt->autoinc_increment;
+
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
@@ -20159,6 +20155,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
         case MUST_ABORT:
 		WSREP_DEBUG("victim %llu in MUST ABORT state",
 			    (long long)victim_trx->id);
+                victim_trx->killed_by = bf_trx->id;
 		wsrep_thd_UNLOCK(thd);
 		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
@@ -20180,6 +20177,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    (long long)victim_trx->id);
+                victim_trx->killed_by = bf_trx->id;
 		wsrep_thd_awake(thd, signal); 
 
 		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
@@ -20231,6 +20229,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
+                        victim_trx->killed_by = bf_trx->id;
 			wsrep_thd_awake(thd, signal); 
 		} else {
 			/* abort currently executing query */
@@ -20238,6 +20237,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                                             wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
+                        victim_trx->killed_by = bf_trx->id;
 			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */
