@@ -38,29 +38,40 @@
 %{!?with_systemd:                %global systemd 0}
 %{?el7:                          %global systemd 1}
 %{!?with_debuginfo:              %global nodebuginfo 1}
-%{!?product_suffix:              %global product_suffix community}
+# %{!?product_suffix:              %global product_suffix community}
+%global product_suffix wsrep
 %{!?feature_set:                 %global feature_set community}
 %{!?compilation_comment_release: %global compilation_comment_release MySQL Community Server - (GPL)}
 %{!?compilation_comment_debug:   %global compilation_comment_debug MySQL Community Server - Debug (GPL)}
-%{!?src_base:                    %global src_base mysql}
+# %{!?src_base:                    %global src_base mysql}
+%global src_base mysql-wsrep
+
+# Stuff added for wsrep / Galera builds
+%global wsrep_embedded  0
+%global series          5.7
+%global wsrep_version   @WSREP_VERSION@
+%global wsrep_revision  @WSREP_REVISION@
 
 # Version for compat libs
 %if 0%{?rhel} == 5
 %global compatver             5.0.96
 %global compatlib             15
 %global compatsrc             http://downloads.mysql.com/archives/mysql-5.0/mysql-%{compatver}.tar.gz
+%global compatch              mysql-5096-charset-dir.patch
 %endif
 
 %if 0%{?rhel} == 6
 %global compatver             5.1.72
 %global compatlib             16
 %global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.1/mysql-%{compatver}.tar.gz
+%global compatch              mysql-5172-charset-dir.patch
 %endif
 
 %if 0%{?rhel} == 7
 %global compatver             5.6.25
 %global compatlib             18
 %global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.6/mysql-%{compatver}.tar.gz
+%global compatch              mysql-5625-charset-dir.patch
 %endif
 
 # multiarch
@@ -76,7 +87,13 @@
 %endif
 %endif
 
-%global src_dir               %{src_base}-%{version}
+# Support building for RHEL on CentOS: CentOS 7 would force ".el7.centos", we want to avoid that.
+%if 0%{?rhel} == 7
+  %define dist .el7
+%endif
+
+# %global src_dir               %{src_base}-%{version}
+%global src_dir               %{src_base}-%{version}-%{wsrep_version}
 
 # No debuginfo for now, ships /usr/sbin/mysqld-debug and libmysqlcliet-debug.a
 %if 0%{?nodebuginfo}
@@ -97,11 +114,11 @@ Name:           mysql-%{product_suffix}
 Summary:        A very fast and reliable SQL database server
 Group:          Applications/Databases
 Version:        @MYSQL_NO_DASH_VERSION@
-Release:        1%{?commercial:.1}%{?dist}
+Release:        %{wsrep_version}%{?dist}
 License:        Copyright (c) 2000, @MYSQL_COPYRIGHT_YEAR@, %{mysql_vendor}. All rights reserved. Under %{?license_type} license as shown in the Description field.
-Source0:        https://cdn.mysql.com/Downloads/MySQL-@MYSQL_BASE_VERSION@/%{src_dir}.tar.gz
+Source0:        %{src_dir}.tar.gz
 URL:            http://www.mysql.com/
-Packager:       MySQL Release Engineering <mysql-build@oss.oracle.com>
+Packager:       Codership Oy <info@galeracluster.com>
 Vendor:         %{mysql_vendor}
 Source4:        my_config.h
 Source5:        mysql_config.sh
@@ -151,18 +168,21 @@ is intended for mission-critical, heavy-load production systems as well
 as for embedding into mass-deployed software. MySQL is a trademark of
 %{mysql_vendor}
 
-The MySQL software has Dual Licensing, which means you can use the MySQL
-software free of charge under the GNU General Public License
-(http://www.gnu.org/licenses/). You can also purchase commercial MySQL
-licenses from %{mysql_vendor} if you do not wish to be bound by the terms of
-the GPL. See the chapter "Licensing and Support" in the manual for
-further info.
+The MySQL server in this package is built with the wsrep patch %{wsrep_version}.
+This means it can run as a node in a Galera Cluster(R).
+See http://www.http://galeracluster.com/ for further info and documentation.
+
+The MySQL software in this package is published by Oracle under the
+GNU General Public License (http://www.gnu.org/licenses/) ("GPL").
+The wsrep patch applied is published by Codership Oy also under the GPL.
+Opposed to un-patched builds of MySQL, for this combination there are
+no commercial licenses available.
 
 The MySQL web site (http://www.mysql.com/) provides the latest
 news and information about the MySQL software. Also please see the
 documentation and the manual for more information.
 
-%package        server
+%package        server-%{series}
 Summary:        A very fast and reliable SQL database server
 Group:          Applications/Databases
 Requires:       coreutils
@@ -179,8 +199,8 @@ Requires:       mysql-commercial-client%{?_isa} = %{version}-%{release}
 Requires:       mysql-commercial-common%{?_isa} = %{version}-%{release}
 %else
 Provides:       MySQL-server%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-client%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-common%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-client-%{series}%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-common-%{series}%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      mysql-community-bench < 5.7.8
 Obsoletes:      community-mysql-bench
@@ -204,19 +224,22 @@ Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
 
-%description    server
+%description    server-%{series}
 The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
 and robust SQL (Structured Query Language) database server. MySQL Server
 is intended for mission-critical, heavy-load production systems as well
 as for embedding into mass-deployed software. MySQL is a trademark of
 %{mysql_vendor}
 
-The MySQL software has Dual Licensing, which means you can use the MySQL
-software free of charge under the GNU General Public License
-(http://www.gnu.org/licenses/). You can also purchase commercial MySQL
-licenses from %{mysql_vendor} if you do not wish to be bound by the terms of
-the GPL. See the chapter "Licensing and Support" in the manual for
-further info.
+The MySQL server in this package is built with the wsrep patch %{wsrep_version}.
+This means it can run as a node in a Galera Cluster(R).
+See http://www.http://galeracluster.com/ for further info and documentation.
+
+The MySQL software in this package is published by Oracle under the
+GNU General Public License (http://www.gnu.org/licenses/) ("GPL").
+The wsrep patch applied is published by Codership Oy also under the GPL.
+Opposed to un-patched builds of MySQL, for this combination there are
+no commercial licenses available.
 
 The MySQL web site (http://www.mysql.com/) provides the latest news and
 information about the MySQL software.  Also please see the documentation
@@ -225,7 +248,7 @@ and the manual for more information.
 This package includes the MySQL server binary as well as related utilities
 to run and administer a MySQL server.
 
-%package        client
+%package        client-%{series}
 Summary:        MySQL database client applications and tools
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -235,7 +258,7 @@ Obsoletes:      mysql-community-client < %{version}-%{release}
 Requires:       mysql-commercial-libs%{?_isa} = %{version}-%{release}
 %else
 Provides:       MySQL-client%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-libs%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      MySQL-client < %{version}-%{release}
 Obsoletes:      mariadb
@@ -245,11 +268,11 @@ Provides:       mysql = %{version}-%{release}
 Provides:       mysql%{?_isa} = %{version}-%{release}
 %endif
 
-%description    client
+%description    client-%{series}
 This package contains the standard MySQL clients and administration
 tools.
 
-%package        common
+%package        common-%{series}
 Summary:        MySQL database common files for server and client libs
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -259,12 +282,12 @@ Provides:       mysql-common = %{version}-%{release}
 Provides:       mysql-common%{?_isa} = %{version}-%{release}
 %{?el5:Requires: mysql%{?_isa} = %{version}-%{release}} 
 
-%description    common
+%description    common-%{series}
 This packages contains common files needed by MySQL client library,
 MySQL database server, and MySQL embedded server.
 
 
-%package        test
+%package        test-%{series}
 Summary:        Test suite for the MySQL database server
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -274,7 +297,7 @@ Obsoletes:      mysql-community-test < %{version}-%{release}
 Requires:       mysql-commercial-server%{?_isa} = %{version}-%{release}
 %else
 Provides:       MySQL-test%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-server%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-server-%{series}%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      MySQL-test < %{version}-%{release}
 Obsoletes:      mysql-test < %{version}-%{release}
@@ -282,11 +305,11 @@ Obsoletes:      mariadb-test
 Provides:       mysql-test = %{version}-%{release}
 Provides:       mysql-test%{?_isa} = %{version}-%{release}
 
-%description    test
+%description    test-%{series}
 This package contains the MySQL regression test suite for MySQL
 database server.
 
-%package        devel
+%package        devel-%{series}
 Summary:        Development header files and libraries for MySQL database client applications
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -296,7 +319,7 @@ Obsoletes:      mysql-community-devel < %{version}-%{release}
 Requires:       mysql-commercial-libs%{?_isa} = %{version}-%{release}
 %else
 Provides:       MySQL-devel%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-libs%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      MySQL-devel < %{version}-%{release}
 Obsoletes:      mysql-devel < %{version}-%{release}
@@ -305,11 +328,11 @@ Obsoletes:      mysql-connector-c-devel < 6.2
 Provides:       mysql-devel = %{version}-%{release}
 Provides:       mysql-devel%{?_isa} = %{version}-%{release}
 
-%description    devel
+%description    devel-%{series}
 This package contains the development header files and libraries necessary
 to develop MySQL client applications.
 
-%package        libs
+%package        libs-%{series}
 Summary:        Shared libraries for MySQL database client applications
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -319,7 +342,7 @@ Obsoletes:      mysql-community-libs < %{version}-%{release}
 Requires:       mysql-commercial-common%{?_isa} = %{version}-%{release}
 %else
 Provides:       MySQL-shared%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-common%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-common-%{series}%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      MySQL-shared < %{version}-%{release}
 Obsoletes:      mysql-libs < %{version}-%{release}
@@ -328,12 +351,12 @@ Obsoletes:      mysql-connector-c-shared < 6.2
 Provides:       mysql-libs = %{version}-%{release}
 Provides:       mysql-libs%{?_isa} = %{version}-%{release}
 
-%description    libs
+%description    libs-%{series}
 This package contains the shared libraries for MySQL client
 applications.
 
 %if 0%{?compatlib}
-%package        libs-compat
+%package        libs-compat-%{series}
 Summary:        Shared compat libraries for MySQL %{compatver} database client applications
 Group:          Applications/Databases
 Obsoletes:      mysql-libs-compat < %{version}-%{release}
@@ -346,7 +369,6 @@ Obsoletes:      mysql-community-libs-compat < %{version}-%{release}
 Requires:       mysql-commercial-libs%{?_isa} = %{version}-%{release}
 %else
 Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-libs%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      MySQL-shared-compat < %{version}-%{release}
 %if 0%{?rhel} > 5
@@ -354,11 +376,13 @@ Obsoletes:      mysql-libs < %{version}-%{release}
 %endif
 Obsoletes:      mariadb-libs
 
-%description    libs-compat
+%description    libs-compat-%{series}
 This package contains the shared compat libraries for MySQL %{compatver} client
 applications.
 %endif
 
+%if 0%{?wsrep_embedded}
+# As of February, 2016, the wsrep patch will not work "embedded".
 %package        embedded
 Summary:        MySQL embedded library
 Group:          Applications/Databases
@@ -369,7 +393,7 @@ Obsoletes:      mysql-community-embedded < %{version}-%{release}
 Requires:       mysql-commercial-common%{?_isa} = %{version}-%{release}
 %else
 Provides:       MySQL-embedded%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-common%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-common-%{series}%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      mariadb-embedded
 Obsoletes:      MySQL-embedded < %{version}-%{release}
@@ -397,7 +421,7 @@ Group:          Applications/Databases
 Obsoletes:      mysql-community-embedded-compat < %{version}-%{release}
 Requires:       mysql-commercial-common%{?_isa} = %{version}-%{release}
 %else
-Requires:       mysql-community-common%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-common-%{series}%{?_isa} = %{version}-%{release}
 %endif
 
 %description    embedded-compat
@@ -405,7 +429,7 @@ This package contains the MySQL server as an embedded library with
 compatibility for applications using version %{compatlib} of the library.
 %endif
 
-%package        embedded-devel
+%package        embedded-devel-%{series}
 Summary:        Development header files and libraries for MySQL as an embeddable library
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -413,20 +437,21 @@ Obsoletes:      mysql-community-embedded-devel < %{version}-%{release}
 Requires:       mysql-commercial-devel%{?_isa} = %{version}-%{release}
 Requires:       mysql-commercial-embedded%{?_isa} = %{version}-%{release}
 %else
-Requires:       mysql-community-devel%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-embedded%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-devel-%{series}%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-embedded-%{series}%{?_isa} = %{version}-%{release}
 %endif
 Obsoletes:      mariadb-embedded-devel
 Obsoletes:      mysql-embedded-devel < %{version}-%{release}
 Provides:       mysql-embedded-devel = %{version}-%{release}
 Provides:       mysql-embedded-devel%{?_isa} = %{version}-%{release}
 
-%description    embedded-devel
+%description    embedded-devel-%{series}
 This package contains files needed for developing applications using
 the embedded version of the MySQL server.
+%endif
 
-%if 0%{?rhel} == 5
-%package -n     mysql
+# %if 0%{?rhel} == 5
+%package        %{series}
 Summary:        Convenience package for easy upgrades of MySQL package set
 Group:          Applications/Databases
 %if 0%{?commercial}
@@ -434,22 +459,29 @@ Requires:       mysql-commercial-client%{?_isa} = %{version}-%{release}
 Requires:       mysql-commercial-libs%{?_isa} = %{version}-%{release}
 Requires:       mysql-commercial-libs-compat%{?_isa} = %{version}-%{release}
 %else
-Requires:       mysql-community-client%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-libs%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-libs-compat%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-client-%{series}%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-server-%{series}%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-libs-compat-%{series}%{?_isa} = %{version}-%{release}
 %endif
 
-%description -n mysql
+%description    %{series}
 This package has as sole purpose to require other MySQL packages such
 that upgrades will be more convenient.
 
 Technical background: this is done to reflect the fact that mysql
 package has been split into several subpackages.
-%endif
+# %endif
 
 %prep
 %if 0%{?compatlib}
 %setup -q -T -a 0 -a 7 -a 10 -c -n %{src_dir}
+# -q = quiet,  -T = no default unpack,  -n = source dir name,  -c = create,  -a = unpack after cd
+# https://docs.fedoraproject.org/ro/Fedora_Draft_Documentation/0.1/html/RPM_Guide/ch09s04.html
+# http://rpm.org/max-rpm-snapshot/s1-rpm-inside-macros.html
+pushd mysql-%{compatver}
+patch -p 1 < ../%{src_dir}/packaging/libs-compat/%{compatch}
+popd
 %else
 %setup -q -T -a 0 -a 10 -c -n %{src_dir}
 %endif # 0%{?compatlib}
@@ -487,7 +519,9 @@ fi
     --enable-thread-safe-client \
 %if 0%{?rhel} == 6
     --with-ssl=%{_prefix} \
+%if 0%{?wsrep_embedded}
     --with-embedded-server \
+%endif
     --with-big-tables \
     --with-pic \
     --with-plugin-innobase \
@@ -523,8 +557,10 @@ fi
     -DINSTALL_SQLBENCHDIR=share \
     -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
     -DFEATURE_SET="%{feature_set}" \
+%if 0%{?wsrep_embedded}
     -DWITH_EMBEDDED_SERVER=1 \
     -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
+%endif
     %{?ssl_option} \
     -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
     -DMYSQL_SERVER_SUFFIX="%{?server_suffix}"
@@ -559,8 +595,13 @@ mkdir debug
            -DINSTALL_PLUGINDIR="%{_lib}/mysql/plugin" \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
+%if 0%{?wsrep_embedded}
            -DWITH_EMBEDDED_SERVER=1 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
+%endif
+           -DWITH_WSREP=1 \
+           -DWSREP_VERSION="%{wsrep_version}" \
+           -DWSREP_REVISION="%{wsrep_revision}" \
            %{?ssl_option} \
            %{?mecab_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
@@ -588,8 +629,13 @@ mkdir release
            -DINSTALL_PLUGINDIR="%{_lib}/mysql/plugin" \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
            -DFEATURE_SET="%{feature_set}" \
+%if 0%{?wsrep_embedded}
            -DWITH_EMBEDDED_SERVER=1 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
+%endif
+           -DWITH_WSREP=1 \
+           -DWSREP_VERSION="%{wsrep_version}" \
+           -DWSREP_REVISION="%{wsrep_revision}" \
            %{?ssl_option} \
            %{?mecab_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
@@ -602,7 +648,8 @@ mkdir release
 %if 0%{?compatlib}
 # Install compat libs
 dirs="libmysql libmysql_r"
-%{?el7:dirs="build/libmysql build/libmysqld"}
+# %{?el7:dirs="build/libmysql build/libmysqld"}
+%{?el7:dirs="build/libmysql"}
 for dir in $dirs ; do
     pushd mysql-%{compatver}/$dir
     make DESTDIR=%{buildroot} install
@@ -610,6 +657,9 @@ for dir in $dirs ; do
 done
 rm -f %{buildroot}%{_libdir}/mysql/libmysqlclient{,_r}.{a,la,so}
 %{?el7:rm -f %{buildroot}%{_libdir}/mysql/libmysqld.{a,la,so}}
+# "charsets/"
+install -d -m 0755 %{buildroot}/usr/share/mysql/charsets-%{compatver}/
+install -m 644 mysql-%{compatver}/sql/share/charsets/* %{buildroot}/usr/share/mysql/charsets-%{compatver}/
 %endif # 0%{?compatlib}
 
 MBD=$RPM_BUILD_DIR/%{src_dir}
@@ -656,6 +706,11 @@ rm -rf %{buildroot}%{_bindir}/mysql_embedded
 # Remove upcoming man pages, to avoid breakage when they materialize
 # Keep this comment as a placeholder for future cases
 # rm -f %{buildroot}%{_mandir}/man1/<manpage>.1
+%if 0%{?wsrep_embedded}
+%else
+rm -f %{buildroot}%{_mandir}/man1/mysql_client_test_embedded.1
+rm -f %{buildroot}%{_mandir}/man1/mysqltest_embedded.1
+%endif
 
 %check
 %if 0%{?runselftest}
@@ -671,12 +726,12 @@ pushd mysql-test
 rm -r $(readlink var) var
 %endif
 
-%pre server
+%pre server-%{series}
 /usr/sbin/groupadd -g 27 -o -r mysql >/dev/null 2>&1 || :
 /usr/sbin/useradd -M %{!?el5:-N} -g mysql -o -r -d /var/lib/mysql -s /bin/false \
     -c "MySQL Server" -u 27 mysql >/dev/null 2>&1 || :
 
-%post server
+%post server-%{series}
 datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p')
 /bin/chmod 0751 "$datadir" >/dev/null 2>&1 || :
 /bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
@@ -687,7 +742,7 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 /sbin/chkconfig --add mysqld
 %endif
 
-%preun server
+%preun server-%{series}
 %if 0%{?systemd}
 %systemd_preun mysqld.service
 %else
@@ -697,7 +752,7 @@ if [ "$1" = 0 ]; then
 fi
 %endif
 
-%postun server
+%postun server-%{series}
 %if 0%{?systemd}
 %systemd_postun_with_restart mysqld.service
 %else
@@ -706,25 +761,28 @@ if [ $1 -ge 1 ]; then
 fi
 %endif
 
-%post libs -p /sbin/ldconfig
+%post libs-%{series} -p /sbin/ldconfig
 
-%postun libs -p /sbin/ldconfig
+%postun libs-%{series} -p /sbin/ldconfig
 
 %if 0%{?compatlib}
-%post libs-compat -p /sbin/ldconfig
+%post libs-compat-%{series} -p /sbin/ldconfig
 
-%postun libs-compat -p /sbin/ldconfig
+%postun libs-compat-%{series} -p /sbin/ldconfig
 %endif
 
+%if 0%{?wsrep_embedded}
 %post embedded -p /sbin/ldconfig
 
 %postun embedded -p /sbin/ldconfig
 
 %{?el7:%postun embedded-compat -p /sbin/ldconfig}
+%endif
 
-%files server
+%files server-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server} %{src_dir}/Docs/ChangeLog
+%doc %{src_dir}/Docs/README-wsrep*
 %doc %{src_dir}/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
 %doc release/support-files/my-default.cnf
@@ -783,6 +841,12 @@ fi
 %endif
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
+
+%attr(755, root, root) %{_bindir}/wsrep_sst_common
+%attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
+%attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
+%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 
 %dir %{_libdir}/mysql/plugin
 %attr(755, root, root) %{_libdir}/mysql/plugin/adt_null.so
@@ -845,6 +909,7 @@ fi
 %attr(644, root, root) %{_datadir}/mysql/install_rewriter.sql
 %attr(644, root, root) %{_datadir}/mysql/uninstall_rewriter.sql
 %attr(644, root, root) %{_datadir}/mysql/magic
+%attr(644, root, root) %{_datadir}/mysql/wsrep_notify
 %if 0%{?systemd}
 %attr(644, root, root) %{_unitdir}/mysqld.service
 %attr(644, root, root) %{_prefix}/lib/tmpfiles.d/mysql.conf
@@ -856,7 +921,7 @@ fi
 %dir %attr(755, mysql, mysql) /var/run/mysqld
 %dir %attr(750, mysql, mysql) /var/lib/mysql-files
 
-%files common
+%files common-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %{_datadir}/mysql/charsets/
@@ -886,7 +951,7 @@ fi
 %{_datadir}/mysql/swedish/
 %{_datadir}/mysql/ukrainian/
 
-%files client
+%files client-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %attr(755, root, root) %{_bindir}/mysql
@@ -913,7 +978,7 @@ fi
 %attr(644, root, root) %{_mandir}/man1/mysqlslap.1*
 %attr(644, root, root) %{_mandir}/man1/mysql_config_editor.1*
 
-%files devel
+%files devel-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %attr(644, root, root) %{_mandir}/man1/comp_err.1*
@@ -927,7 +992,7 @@ fi
 %{_libdir}/mysql/libmysqlclient.so
 %{_libdir}/pkgconfig/mysqlclient.pc
 
-%files libs
+%files libs-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %dir %attr(755, root, root) %{_libdir}/mysql
@@ -935,7 +1000,7 @@ fi
 %{_libdir}/mysql/libmysqlclient.so.20*
 
 %if 0%{?compatlib}
-%files libs-compat
+%files libs-compat-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %dir %attr(755, root, root) %{_libdir}/mysql
@@ -944,16 +1009,23 @@ fi
 %{_libdir}/mysql/libmysqlclient.so.%{compatlib}.*.0
 %{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}
 %{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}.*.0
+%dir %attr(755, root, root) %{_datadir}/mysql/
+%dir %attr(755, root, root) %{_datadir}/mysql/charsets-%{compatver}/
+%attr(644, root, root) %{_datadir}/mysql/charsets-%{compatver}/*
 %endif
 
-%files test
+%files test-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
+%if 0%{?wsrep_embedded}
 %attr(755, root, root) %{_bindir}/mysql_client_test_embedded
+%endif
 %attr(755, root, root) %{_bindir}/mysqltest
+%if 0%{?wsrep_embedded}
 %attr(755, root, root) %{_bindir}/mysqltest_embedded
+%endif
 
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_test_plugin.so
@@ -1018,10 +1090,15 @@ fi
 %attr(644, root, root) %{_mandir}/man1/mysql_client_test.1*
 %attr(644, root, root) %{_mandir}/man1/mysql-stress-test.pl.1*
 %attr(644, root, root) %{_mandir}/man1/mysql-test-run.pl.1*
+%if 0%{?wsrep_embedded}
 %attr(644, root, root) %{_mandir}/man1/mysql_client_test_embedded.1*
+%endif
 %attr(644, root, root) %{_mandir}/man1/mysqltest.1*
+%if 0%{?wsrep_embedded}
 %attr(644, root, root) %{_mandir}/man1/mysqltest_embedded.1*
+%endif
 
+%if 0%{?wsrep_embedded}
 %files embedded
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
@@ -1038,20 +1115,46 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so.18*
 %endif
 
-%files embedded-devel
+%files embedded-devel-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %attr(644, root, root) %{_libdir}/mysql/libmysqld.a
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
-
-%if 0%{?rhel} == 5
-%files -n mysql
-%defattr(-, root, root, -)
-%doc %{?license_files_server}
 %endif
 
+# %if 0%{?rhel} == 5
+%files %{series}
+%defattr(-, root, root, -)
+%doc %{?license_files_server}
+# %endif
+
 %changelog
+* Tue Mar 08 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
+- Make the "libs-compat" subpackage stand-alone, drop its "requires"
+  (which were wrong anyway, should have been to "common" rather than "libs"),
+  by including the "charsets/" directory and its files in the subpackage;
+  name conflicts are avoided by the name patch "/usr/share/mysql/charsets-%%{compatver}/".
+- Store those patch files in "packaging/libs-compat/" and apply them directly
+  from there during build, avoid a separate source (patch) file.
+- This is now filed as bug#80981 and the patch provided under OCA, see
+  http://bugs.mysql.com/bug.php?id=80981
+
+* Fri Mar 04 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
+- Take the original MySQL spec file and convert it for mysql-wsrep:
+  - src_base: "mysql" -> "mysql-wsrep"
+  - product_suffix: "community" -> "wsrep"
+  - added macros wsrep_version and wsrep_revision (to be configured)
+  - change source tarball name, no download (no URL)
+  - Packager: Oracle -> Codership
+  - include "series" ("5.7") in the package names, maintain dependencies
+  - let the meta package be built for all RHEL versions (5, 6, and 7)
+  - mention Codership, Galera, and "GPL only" in the descriptions.
+  - disable "embedded", "embedded-compat", and "embedded-devel" subpackages
+    and remove "embedded" files and man pages from packaging
+  - add "Docs/README-wsrep", "support-files/wsrep_notify" and "Docs/README-wsrep"
+    to the "server-wsrep" file list.
+
 * Tue Nov 24 2015 Bjorn Munch <bjorn.munch@oracle.com> - 5.7.10-1
 - Included man pages for lz4_decompress and zlib_decompress
 
