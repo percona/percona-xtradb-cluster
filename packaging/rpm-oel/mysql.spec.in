@@ -783,7 +783,7 @@ fi
 %defattr(-, root, root, -)
 %doc %{?license_files_server} %{src_dir}/Docs/ChangeLog
 %doc %{src_dir}/Docs/README-wsrep*
-%doc %{src_dir}/Docs/INFO_SRC*
+%doc release/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
 %doc release/support-files/my-default.cnf
 %attr(644, root, root) %{_mandir}/man1/innochecksum.1*
@@ -1133,6 +1133,8 @@ fi
 * Tue May 03 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
 - Change the directory name for the "libs-compat" patches from
   "packaging/libs-compat/" to "packaging/rpm-libs-compat/", like it was in 5.6.
+- Take "INFO_SRC" from the "release/" build tree, in case the build process
+  generated it.
 
 * Tue Mar 08 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
 - Make the "libs-compat" subpackage stand-alone, drop its "requires"
