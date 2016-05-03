@@ -244,6 +244,15 @@ Prefix: %{_sysconfdir}
 %define WITH_TCMALLOC 0
 %endif
 
+# Version for compat libs
+%if 0%{?rhel} == 7
+%global compatver             5.6.28
+%global percona_compatver     25.14
+%global compatlib             18
+%global compatsrc             https://www.percona.com/downloads/Percona-XtraDB-Cluster-56/Percona-XtraDB-Cluster-%{compatver}-%{percona_compatver}/binary/redhat/6/x86_64/Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm
+%endif
+
+
 ##############################################################################
 # Configuration based upon above user input, not to be set directly
 ##############################################################################
@@ -465,6 +474,28 @@ be eligible for hot fixes, and boost your team's productivity.
 This package contains the shared libraries (*.so*) which certain languages
 and applications need to dynamically load and use Percona XtraDB Cluster.
 
+# ----------------------------------------------------------------------------
+%if 0%{?compatlib}
+%package -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+Summary:        Shared compat libraries for Percona Server %{compatver}--%{percona_compatver} database client applications
+Group:          Applications/Databases
+Provides:       mysql-libs-compat = %{version}-%{release}
+Provides:       mysql-libs-compat%{?_isa} = %{version}-%{release}
+Provides:       MySQL-shared-compat%{?_isa} = %{version}-%{release}
+%if 0%{?rhel} > 6
+Provides:       libmysqlclient.so.18()(64bit)
+Provides:       libmysqlclient.so.18(libmysqlclient_16)(64bit)
+Provides:       libmysqlclient.so.18(libmysqlclient_18)(64bit)
+Obsoletes:      mariadb-libs
+Conflicts:      Percona-XtraDB-Cluster-shared-55
+Conflicts:      Percona-XtraDB-Cluster-shared-56
+%endif
+
+%description -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+This package contains the shared compat libraries for Percona Server %{compatver}-%{percona_compatver} client
+applications.
+%endif
+
 ##############################################################################
 %prep
 %setup -n %{src_dir}
@@ -523,6 +554,20 @@ then
     sed -i 's/lib64/lib/' "cmake/install_layout.cmake"
 fi
 
+# Download compat libs
+%if 0%{?compatlib}
+%if 0%{?rhel} > 6
+(
+  rm -rf percona-compatlib
+  mkdir percona-compatlib
+  pushd percona-compatlib
+  wget %{compatsrc}
+  rpm2cpio Percona-XtraDB-Cluster-shared-56-%{compatver}-%{percona_compatver}.1.el6.x86_64.rpm | cpio --extract --make-directories --verbose
+  popd
+)
+%endif # 0%{?rhel} > 6
+%endif # 0%{?compatlib}
+
 # Build debug mysqld and libmysqld.a
 mkdir debug
 (
@@ -564,6 +609,11 @@ mkdir debug
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
            -DWITH_WSREP=ON \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DWITH_EMBEDDED_SERVER=0 \
+           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
+           -DWITH_PAM=1 \
+           -DWITH_INNODB_MEMCACHED=1 \
+           -DWITH_ZLIB=system \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
 	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
@@ -595,6 +645,11 @@ mkdir release
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
            -DWITH_WSREP=ON \
            -DWITH_INNODB_DISALLOW_WRITES=ON \
+           -DWITH_EMBEDDED_SERVER=0 \
+           -DWITH_EMBEDDED_SHARED_LIBRARY=0 \
+           -DWITH_PAM=1 \
+           -DWITH_INNODB_MEMCACHED=1 \
+           -DWITH_ZLIB=system \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF}
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
@@ -626,8 +681,8 @@ then
   if [ -f $libgcc ]
   then
     mkdir -p $RBR%{_libdir}/mysql
-    install -m 644 $libgcc $RBR%{_libdir}/mysql/libmygcc.a
-    echo "%{_libdir}/mysql/libmygcc.a" >>optional-files-devel
+#    install -m 644 $libgcc $RBR%{_libdir}/mysql/libmygcc.a
+#    echo "%{_libdir}/mysql/libmygcc.a" >>optional-files-devel
   fi
 fi
 
@@ -639,6 +694,14 @@ mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 ##############################################################################
 %install
 
+%if 0%{?compatlib}
+# Install compat libs
+%if 0%{?rhel} > 6
+install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient.so.18.1.0
+install -D -m 0755 percona-compatlib/usr/lib64/libmysqlclient_r.so.18.1.0 %{buildroot}%{_libdir}/mysql/libmysqlclient_r.so.18.1.0
+%endif # 0%{?rhel} > 6
+%endif # 0%{?compatlib}
+
 RBR=$RPM_BUILD_ROOT
 MBD=$RPM_BUILD_DIR/%{src_dir}
 
@@ -648,6 +711,7 @@ mv $RPM_BUILD_DIR/%{_libdir} $RBR%{_libdir}
 
 # Ensure that needed directories exists
 install -d $RBR%{_sysconfdir}/{logrotate.d,init.d}
+install -d $RBR/var/lib/mysql-files
 install -d $RBR/var/lib/mysql-files
 install -d $RBR%{_datadir}/mysql-test
 # install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
@@ -676,9 +740,9 @@ install -d $RBR%{_libdir}/mysql/plugin
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
 %if 0%{?systemd}
-#install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
-#install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
-#install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
+install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
+install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
+install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
 install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
 install -d $RBR%{_sysconfdir}/my.cnf.d
@@ -1351,10 +1415,11 @@ fi
 %attr(750, mysql, mysql) %dir /var/lib/mysql-files
 %if 0%{?systemd}
 %attr(644, root, root) %{_unitdir}/mysqld.service
-#%attr(644, root, root) %{_unitdir}/mysql@.service
+%attr(644, root, root) %{_unitdir}/mysql.service
+%attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql.bootstrap
 %attr(644, root, root) %{_tmpfilesdir}/mysql.conf
-#%attr(755, root, root) %{_bindir}/mysql-systemd
+%attr(755, root, root) %{_bindir}/mysql-systemd
 %attr(755, root, root) %{_bindir}/mysqld_pre_systemd
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
@@ -1414,6 +1479,16 @@ fi
 %attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
 %endif
 
+%if 0%{?compatlib}
+%files -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+%defattr(-, root, root, -)
+%doc %{?license_files_server}
+%dir %attr(755, root, root) %{_libdir}/mysql
+%attr(644, root, root) %{_sysconfdir}/ld.so.conf.d/*
+%{_libdir}/mysql/libmysqlclient.so.%{compatlib}.*
+%{_libdir}/mysql/libmysqlclient_r.so.%{compatlib}.*
+%endif
+
 %post -n Percona-XtraDB-Cluster-shared%{product_suffix}
 # Added for compatibility
 #for lib in libperconaserverclient{.so.20,_r.so.20}; do
@@ -1425,6 +1500,24 @@ fi
 
 %postun -n Percona-XtraDB-Cluster-shared%{product_suffix}
 /sbin/ldconfig
+
+%if 0%{?compatlib}
+%post -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+for lib in libmysqlclient{.so.18.0.0,.so.18,_r.so.18.0.0,_r.so.18}; do
+if [ ! -f %{_libdir}/mysql/${lib} ]; then
+  ln -s libmysqlclient.so.18.1.0 %{_libdir}/mysql/${lib};
+fi
+done
+/sbin/ldconfig
+
+%postun -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
+for lib in libmysqlclient{.so.18.0.0,.so.18,_r.so.18.0.0,_r.so.18}; do
+if [ -h %{_libdir}/mysql/${lib} ]; then
+  rm -f %{_libdir}/mysql/${lib};
+fi
+done
+/sbin/ldconfig
+%endif
 
 %postun -n Percona-XtraDB-Cluster-server%{product_suffix}
 
@@ -1490,6 +1583,10 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Tue May  3 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
+
+- Add compat rpm (BLD-414)
+
 * Thu Oct 01 2015 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 
 - Merge updates from Percona Server spec file.
