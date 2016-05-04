@@ -75,7 +75,7 @@ Used to enable and specify SST encryption mode:
 
 * Set ``encrypt=0`` to disable SST encryption. This is the default value.
 
-* Set ``encrypt=1`` to perform symmetric SST encryption based on XtraBackup. For more information, see :ref:`xtrabackup_sst_encryption>`.
+* Set ``encrypt=1`` to perform symmetric SST encryption based on XtraBackup. For more information, see :ref:`xtrabackup_sst_encryption`.
 
 * Set ``encrypt=2`` to perform SST encryption based on OpenSSL with ``socat``. Ensure that ``socat`` is built with OpenSSL: ``socat -V | grep OPENSSL``. This is recommended if your nodes are over WAN and security constraints are higher. For more information, see :ref:`socat_openssl_encryption`.
 
