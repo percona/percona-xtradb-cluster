@@ -65,6 +65,11 @@ STATDIR=""
 uextra=0
 disver=""
 
+keyring=""
+keyringsid=""
+keyringbackupopt=""
+keyringapplyopt=""
+
 tmpopts=""
 itmpdir=""
 xtmpdir=""
@@ -313,6 +318,8 @@ read_cnf()
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
+    keyring=$(parse_cnf sst keyring "")
+    keyringsid=$(parse_cnf sst server-id "")
 
 
     # Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
@@ -663,15 +670,15 @@ if [[ $ssyslog -eq 1 ]];then
             logger  -p daemon.info -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE "$@" 
         }
 
-        INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} 2>&1  | logger -p daemon.err -t ${ssystag}innobackupex-apply "
+        INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \$keyringapplyopt \${DATA} 2>&1  | logger -p daemon.err -t ${ssystag}innobackupex-apply "
         INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --datadir=\${TDATA} $disver $impts  --move-back --force-non-empty-directories \${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
-        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
+        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA \$keyringbackupopt --galera-info --stream=\$sfmt \$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
     fi
 
 else 
-    INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \${DATA} &>\${DATA}/innobackup.prepare.log"
+    INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --apply-log \$rebuildcmd \$keyringapplyopt \${DATA} &>\${DATA}/innobackup.prepare.log"
     INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} --datadir=\${TDATA} $disver $impts  --move-back --force-non-empty-directories \${DATA} &>\${DATA}/innobackup.move.log"
-    INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \$tmpopts \$INNOEXTRA --galera-info --stream=\$sfmt \$itmpdir 2>\${DATA}/innobackup.backup.log"
+    INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \$tmpopts \$INNOEXTRA \$keyringbackupopt --galera-info --stream=\$sfmt \$itmpdir 2>\${DATA}/innobackup.backup.log"
 fi
 
 get_stream
@@ -720,6 +727,9 @@ then
             fi
         fi
 
+        if [[ -n $keyring ]];then
+           keyringbackupopt=" --keyring-file-data=$keyring --server-id=$keyringsid "
+        fi
 
         check_extra
 
@@ -850,6 +860,12 @@ then
         fi
     elif [[ -n $sdecomp ]];then 
             strmcmd=" $sdecomp | $strmcmd"
+    fi
+
+    # server-id is already part of backup-my.cnf so avoid appending it.
+    # server-id is the id of the node that is acting as donor and not joiner node.
+    if [[ -n $keyring ]];then
+         keyringapplyopt=" --keyring-file-data=$keyring "
     fi
 
     STATDIR=$(mktemp -d)
