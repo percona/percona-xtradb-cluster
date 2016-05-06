@@ -102,9 +102,6 @@ CREATE TABLE t3 (f1 INTEGER);
 
 --connection node_2
 
---let $galera_wsrep_recover_server_id=2
---source suite/galera/include/galera_wsrep_recover.inc
-
 --echo Starting server ...
 --source include/start_mysqld.inc
 
