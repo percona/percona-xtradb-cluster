@@ -266,7 +266,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
         wsrep_close_client_connections(TRUE);
     }
 
-    ssize_t const req_len= wsrep_sst_prepare (sst_req);
+    ssize_t const req_len= wsrep_sst_prepare (sst_req, thd);
 
     if (req_len < 0)
     {

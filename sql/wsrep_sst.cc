@@ -612,7 +612,7 @@ static ssize_t sst_prepare_mysqldump (const char*  addr_in,
 
 static bool SE_initialized = false;
 
-ssize_t wsrep_sst_prepare (void** msg)
+ssize_t wsrep_sst_prepare (void** msg, THD *thd)
 {
   const ssize_t ip_max= 256;
   char ip_buf[ip_max];
@@ -665,6 +665,7 @@ ssize_t wsrep_sst_prepare (void** msg)
       WSREP_ERROR("Could not prepare state transfer request: "
                   "failed to guess address to accept state transfer at. "
                   "wsrep_sst_receive_address must be set manually.");
+      if (thd) delete thd;
       unireg_abort(1);
     }
   }
