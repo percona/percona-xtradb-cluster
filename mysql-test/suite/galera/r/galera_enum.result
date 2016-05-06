@@ -27,7 +27,7 @@ START TRANSACTION;
 UPDATE t1 SET f1 = 'four' where f1 = '';
 COMMIT;
 COMMIT;
-ERROR HY000: Got error 149 during ROLLBACK
+Got one of the listed errors
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 'three';
 COUNT(*) = 1
 1
