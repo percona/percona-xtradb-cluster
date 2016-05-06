@@ -2351,8 +2351,26 @@ lock_rec_add_to_queue(
 			= lock_rec_other_has_expl_req(
 				mode, block, false, heap_no, trx);
 #ifdef WITH_WSREP
-		ut_a(!other_lock || (wsrep_thd_is_BF(trx->mysql_thd, FALSE) &&
-                                     wsrep_thd_is_BF(other_lock->trx->mysql_thd, TRUE)));
+		//ut_a(!other_lock || (wsrep_thd_is_BF(trx->mysql_thd, FALSE) &&
+                //                     wsrep_thd_is_BF(other_lock->trx->mysql_thd, TRUE)));
+		if (other_lock &&
+			!wsrep_thd_is_BF(trx->mysql_thd, FALSE) &&
+			!wsrep_thd_is_BF(other_lock->trx->mysql_thd, TRUE)) {
+
+			ib::info() << "WSREP BF lock conflict for my lock:\n BF:" <<
+                          wsrep_thd_is_BF(trx->mysql_thd, FALSE) << " exec: " <<
+                          wsrep_thd_exec_mode(trx->mysql_thd) << " conflict: " <<
+                          wsrep_thd_conflict_state(trx->mysql_thd) << " seqno: " <<
+                          wsrep_thd_trx_seqno(trx->mysql_thd) << " SQL: " <<
+                          wsrep_thd_query(trx->mysql_thd);
+                        trx_t* otrx = other_lock->trx;
+			ib::info() << "WSREP other lock:\n BF:" <<
+                          wsrep_thd_is_BF(otrx->mysql_thd, FALSE) << " exec: " <<
+                          wsrep_thd_exec_mode(otrx->mysql_thd) << " conflict: " <<
+                          wsrep_thd_conflict_state(otrx->mysql_thd) << " seqno: " <<
+                          wsrep_thd_trx_seqno(otrx->mysql_thd) << " SQL: " <<
+                          wsrep_thd_query(otrx->mysql_thd);
+		}
 #else
 		ut_a(!other_lock);
 #endif /* WITH_WSREP */
