@@ -5906,10 +5906,39 @@ lock_rec_queue_validate(
 			explicit granted lock. */
 
 			if (other_lock != NULL) {
+#ifdef WITH_WSREP
+                          //ut_a(lock_get_wait(other_lock));
+				if (!lock_get_wait(other_lock)) {
+                                    
+			ib::info() << "WSREP impl BF lock conflict for my impl lock:\n BF:" <<
+                          wsrep_thd_is_BF(impl_trx->mysql_thd, FALSE) << " exec: " <<
+                          wsrep_thd_exec_mode(impl_trx->mysql_thd) << " conflict: " <<
+                          wsrep_thd_conflict_state(impl_trx->mysql_thd) << " seqno: " <<
+                          wsrep_thd_trx_seqno(impl_trx->mysql_thd) << " SQL: " <<
+                          wsrep_thd_query(impl_trx->mysql_thd);
+                        trx_t* otrx = other_lock->trx;
+			ib::info() << "WSREP other lock:\n BF:" <<
+                          wsrep_thd_is_BF(otrx->mysql_thd, FALSE) << " exec: " <<
+                          wsrep_thd_exec_mode(otrx->mysql_thd) << " conflict: " <<
+                          wsrep_thd_conflict_state(otrx->mysql_thd) << " seqno: " <<
+                          wsrep_thd_trx_seqno(otrx->mysql_thd) << " SQL: " <<
+                          wsrep_thd_query(otrx->mysql_thd);
+                                }
+
+				//ut_a(lock_rec_has_expl(
+				//	LOCK_X | LOCK_REC_NOT_GAP,
+				//	block, heap_no, impl_trx));
+				if (!lock_rec_has_expl(
+					LOCK_X | LOCK_REC_NOT_GAP,
+					block, heap_no, impl_trx)) {
+                                  ib::info() << "WSREP impl BF lock conflict";
+                                }
+#else
 				ut_a(lock_get_wait(other_lock));
 				ut_a(lock_rec_has_expl(
 					LOCK_X | LOCK_REC_NOT_GAP,
 					block, heap_no, impl_trx));
+#endif
 			}
 		}
 	}
