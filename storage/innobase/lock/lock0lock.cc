@@ -2358,14 +2358,14 @@ lock_rec_add_to_queue(
 			!wsrep_thd_is_BF(other_lock->trx->mysql_thd, TRUE)) {
 
 			ib::info() << "WSREP BF lock conflict for my lock:\n BF:" <<
-                          wsrep_thd_is_BF(trx->mysql_thd, FALSE) << " exec: " <<
+                          ((wsrep_thd_is_BF(trx->mysql_thd, FALSE)) ? "BF" : "normal") << " exec: " <<
                           wsrep_thd_exec_mode(trx->mysql_thd) << " conflict: " <<
                           wsrep_thd_conflict_state(trx->mysql_thd) << " seqno: " <<
                           wsrep_thd_trx_seqno(trx->mysql_thd) << " SQL: " <<
                           wsrep_thd_query(trx->mysql_thd);
                         trx_t* otrx = other_lock->trx;
 			ib::info() << "WSREP other lock:\n BF:" <<
-                          wsrep_thd_is_BF(otrx->mysql_thd, FALSE) << " exec: " <<
+                          ((wsrep_thd_is_BF(otrx->mysql_thd, FALSE)) ? "BF" : "normal") << " exec: " <<
                           wsrep_thd_exec_mode(otrx->mysql_thd) << " conflict: " <<
                           wsrep_thd_conflict_state(otrx->mysql_thd) << " seqno: " <<
                           wsrep_thd_trx_seqno(otrx->mysql_thd) << " SQL: " <<
@@ -5911,14 +5911,14 @@ lock_rec_queue_validate(
 				if (!lock_get_wait(other_lock)) {
                                     
 			ib::info() << "WSREP impl BF lock conflict for my impl lock:\n BF:" <<
-                          wsrep_thd_is_BF(impl_trx->mysql_thd, FALSE) << " exec: " <<
+                          ((wsrep_thd_is_BF(impl_trx->mysql_thd, FALSE)) ? "BF" : "normal") << " exec: " <<
                           wsrep_thd_exec_mode(impl_trx->mysql_thd) << " conflict: " <<
                           wsrep_thd_conflict_state(impl_trx->mysql_thd) << " seqno: " <<
                           wsrep_thd_trx_seqno(impl_trx->mysql_thd) << " SQL: " <<
                           wsrep_thd_query(impl_trx->mysql_thd);
                         trx_t* otrx = other_lock->trx;
 			ib::info() << "WSREP other lock:\n BF:" <<
-                          wsrep_thd_is_BF(otrx->mysql_thd, FALSE) << " exec: " <<
+                          ((wsrep_thd_is_BF(otrx->mysql_thd, FALSE)) ? "BF" : "normal")  << " exec: " <<
                           wsrep_thd_exec_mode(otrx->mysql_thd) << " conflict: " <<
                           wsrep_thd_conflict_state(otrx->mysql_thd) << " seqno: " <<
                           wsrep_thd_trx_seqno(otrx->mysql_thd) << " SQL: " <<
