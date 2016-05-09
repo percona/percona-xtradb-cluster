@@ -6,6 +6,8 @@ CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
 
 --connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+--source include/wait_condition.inc
 LOCK TABLE t2 WRITE;
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
