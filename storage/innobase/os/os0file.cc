@@ -3647,6 +3647,10 @@ os_file_create_simple_no_error_handling_func(
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
 
+#ifdef WITH_WSREP
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
+#endif /* WITH_WSREP */
 	*success = false;
 
 	if (create_mode == OS_FILE_OPEN) {
@@ -5546,6 +5550,7 @@ os_file_write_page(
 	ut_ad(type.validate());
 	ut_ad(n > 0);
 
+	WAIT_ALLOW_WRITES();
 	ssize_t	n_bytes = os_file_pwrite(type, file, buf, n, offset, &err);
 
 	if ((ulint) n_bytes != n && !os_has_said_disk_full) {
