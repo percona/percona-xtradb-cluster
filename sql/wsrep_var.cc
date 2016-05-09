@@ -35,7 +35,7 @@ const  char* wsrep_node_name        = 0;
 const  char* wsrep_node_address     = 0;
 const  char* wsrep_node_incoming_address = 0;
 const  char* wsrep_start_position   = 0;
-ulong   wsrep_reject_queries_options;
+ulong   wsrep_reject_queries;
 
 int wsrep_init_vars()
 {
@@ -390,22 +390,20 @@ void wsrep_provider_options_init(const char* value)
 
 bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
 {
-    switch (wsrep_reject_queries_options) {
-        case WSREP_REJ_NONE:
-            wsrep_ready_set(TRUE); 
+    switch (wsrep_reject_queries) {
+        case WSREP_REJECT_NONE:
             WSREP_INFO("Allowing client queries due to manual setting");
             break;
-        case WSREP_REJ_ALL:
-            wsrep_ready_set(FALSE);
+        case WSREP_REJECT_ALL:
             WSREP_INFO("Rejecting client queries due to manual setting");
             break;
-        case WSREP_REJ_ALL_KILL:
-            wsrep_ready_set(FALSE);
+        case WSREP_REJECT_ALL_KILL:
             wsrep_close_client_connections(FALSE);
             WSREP_INFO("Rejecting client queries and killing connections due to manual setting");
             break;
         default:
-            WSREP_INFO("Unknown value");
+          WSREP_INFO("Unknown value for wsrep_reject_queries: %lu",
+                     wsrep_reject_queries);
             return true;
     }
     return false;

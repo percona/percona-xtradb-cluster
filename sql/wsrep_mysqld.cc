@@ -1337,6 +1337,8 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
      my_error(ER_LOCK_DEADLOCK, MYF(0));
      return(ret);
   }
+  else
+    WSREP_DEBUG("RSU desync skipped: %d", wsrep_desync);
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying++;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1354,8 +1356,12 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     if (ret != WSREP_OK)
     {
-      WSREP_WARN("resync failed %d for schema: %s, query: %s",
-                 ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+      ret = wsrep->resync(wsrep);
+      if (ret != WSREP_OK)
+      {
+        WSREP_WARN("resync failed %d for schema: %s, query: %s",
+                   ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+      }
     }
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
@@ -1601,4 +1607,13 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
   }
   return ret;
+}
+
+bool wsrep_node_is_donor()
+{
+  return (WSREP_ON) ? (local_status.get() == 2) : false;
+}
+bool wsrep_node_is_synced()
+{
+  return (WSREP_ON) ? (local_status.get() == 4) : false;
 }

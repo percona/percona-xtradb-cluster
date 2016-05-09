@@ -626,10 +626,11 @@ typedef struct system_variables
   my_bool wsrep_on;
   my_bool wsrep_causal_reads;
   my_bool wsrep_replicate_myisam;               // enable myisam replication
-  my_bool wsrep_dirty_reads;
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
   ulong wsrep_OSU_method;
+  my_bool wsrep_dirty_reads;
+  ulong wsrep_auto_increment_control;
 #endif
   ulong log_slow_rate_limit;
   ulonglong log_slow_filter;
@@ -5715,6 +5716,14 @@ public:
   sent by the user (ie: stored procedure).
 */
 #define CF_SKIP_QUESTIONS       (1U << 1)
+#ifdef WITH_WSREP
+/**
+  Do not check that wsrep snapshot is ready before allowing this command
+*/
+#define CF_SKIP_WSREP_CHECK     (1U << 2)
+#else
+#define CF_SKIP_WSREP_CHECK     0
+#endif /* WITH_WSREP */
 
 /**
   Do not check that wsrep snapshot is ready before allowing this command

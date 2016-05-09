@@ -310,15 +310,20 @@ uint server_command_flags[COM_END+1];
 void init_update_queries(void)
 {
   /* Initialize the server command flags array. */
+#ifdef WITH_WSREP
   memset(server_command_flags, 0, sizeof(server_command_flags));
-
-  server_command_flags[COM_STATISTICS]=   CF_SKIP_QUESTIONS | CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_PING]=         CF_SKIP_QUESTIONS | CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_STMT_PREPARE]= CF_SKIP_QUESTIONS | CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STATISTICS]=   CF_SKIP_QUESTIONS |
+    CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_PING]=         CF_SKIP_QUESTIONS |
+    CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_PREPARE]= CF_SKIP_QUESTIONS |
+    CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_STMT_EXECUTE]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_STMT_FETCH]=   CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_STMT_CLOSE]=   CF_SKIP_QUESTIONS | CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_STMT_RESET]=   CF_SKIP_QUESTIONS | CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_CLOSE]=   CF_SKIP_QUESTIONS |
+    CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_RESET]=   CF_SKIP_QUESTIONS |
+    CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_STMT_SEND_LONG_DATA] = CF_SKIP_WSREP_CHECK;
 
   server_command_flags[COM_QUIT]= CF_SKIP_WSREP_CHECK;
@@ -327,6 +332,7 @@ void init_update_queries(void)
   server_command_flags[COM_SHUTDOWN]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_SLEEP]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_TIME]= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_INIT_DB]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]= CF_SKIP_WSREP_CHECK;
 
   /*
@@ -335,6 +341,13 @@ void init_update_queries(void)
   */
   server_command_flags[COM_QUERY]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_SET_OPTION]= CF_SKIP_WSREP_CHECK;
+#else
+  server_command_flags[COM_STATISTICS]= CF_SKIP_QUESTIONS;
+  server_command_flags[COM_PING]=       CF_SKIP_QUESTIONS;
+  server_command_flags[COM_STMT_PREPARE]= CF_SKIP_QUESTIONS;
+  server_command_flags[COM_STMT_CLOSE]=   CF_SKIP_QUESTIONS;
+  server_command_flags[COM_STMT_RESET]=   CF_SKIP_QUESTIONS;
+#endif /* WITH_WSREP */
 
   /* Initialize the sql command flags array. */
   memset(sql_command_flags, 0, sizeof(sql_command_flags));
@@ -931,9 +944,9 @@ void cleanup_items(Item *item)
 }
 
 #ifdef WITH_WSREP
-
 static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
 {
+  bool has_tables = false;
   for (const TABLE_LIST *table= tables; table; table= table->next_global)
   {
     TABLE_CATEGORY c;
@@ -946,12 +959,11 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
     {
       return false;
     }
+    has_tables = true;
   }
-  return true;
+  return has_tables;
 }
-
 #endif /* WITH_WSREP */
-
 #ifndef EMBEDDED_LIBRARY
 
 /**
@@ -1145,11 +1157,12 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow some commands, they are trapped later in execute_command.
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
+    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
+        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
         (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
     ) {
       my_message(ER_UNKNOWN_COM_ERROR,
-	         "WSREP has not yet prepared node for application use", MYF(0));
+	       "WSREP has not yet prepared node for application use", MYF(0));
       thd->protocol->end_statement();
 
       /* Performance Schema Interface instrumentation end */
@@ -3158,14 +3171,16 @@ mysql_execute_command(THD *thd)
 
     /*
      * bail out if DB snapshot has not been installed. We however,
-     * allow SET and SHOW queries
+     * allow SET and SHOW queries and reads from information schema
+     * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        !(wsrep_ready ||
-          (thd->variables.wsrep_dirty_reads &&
-           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0) ||
-          wsrep_tables_accessible_when_detached(all_tables)) &&
-        lex->sql_command != SQLCOM_SET_OPTION &&
+    if (thd->variables.wsrep_on                                            &&
+        !thd->wsrep_applier                                                &&
+        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+        !(thd->variables.wsrep_dirty_reads &&
+          (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
+        !wsrep_tables_accessible_when_detached(all_tables)                 &&
+        lex->sql_command != SQLCOM_SET_OPTION                              &&
         !wsrep_is_show_query(lex->sql_command))
     {
       my_message(ER_UNKNOWN_COM_ERROR,
@@ -7261,20 +7276,18 @@ void THD::reset_for_next_command()
   /*
     Autoinc variables should be adjusted only for locally executed
     transactions. Appliers and replayers are either processing ROW
-    events or get autoinc variable values from Query_log_event.
+    events or get autoinc variable values from Query_log_event and
+    mysql slave may be processing STATEMENT format events, but he should
+    use autoinc values passed in binlog events, not the values forced by
+    the cluster.
   */
-  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE && !thd->slave_thread) {
-    if (wsrep_auto_increment_control)
-    {
-      if (thd->variables.auto_increment_offset !=
-	  global_system_variables.auto_increment_offset)
-	thd->variables.auto_increment_offset=
-	  global_system_variables.auto_increment_offset;
-      if (thd->variables.auto_increment_increment !=
-	  global_system_variables.auto_increment_increment)
-	thd->variables.auto_increment_increment=
-	  global_system_variables.auto_increment_increment;
-    }
+  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE &&
+      !thd->slave_thread && wsrep_auto_increment_control)
+  {
+    thd->variables.auto_increment_offset=
+      global_system_variables.auto_increment_offset;
+    thd->variables.auto_increment_increment=
+      global_system_variables.auto_increment_increment;
   }
 #endif /* WITH_WSREP */
   thd->query_start_used= thd->query_start_usec_used= 0;

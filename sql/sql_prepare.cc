@@ -4017,8 +4017,9 @@ reexecute:
   thd->push_reprepare_observer(stmt_reprepare_observer);
 
   error= execute(expanded_query, open_cursor) || thd->is_error();
+
+  thd->pop_reprepare_observer();
 #ifdef WITH_WSREP
-  bool observer_popped= false;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch (thd->wsrep_conflict_state)
   {
@@ -4029,21 +4030,12 @@ reexecute:
     break;
 
   case MUST_REPLAY:
-    /* We don't need reprepare observer as the table will not be
-    open and locked when running in replay mode.
-    Replay mode will apply write-set directly there-by taking
-    a quicker and consistent path. */
-    thd->pop_reprepare_observer();
-    observer_popped= true;
     (void)wsrep_replay_transaction(thd);
 
   default: break;
   }
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-  if (!observer_popped)
 #endif /* WITH_WSREP */
-  thd->pop_reprepare_observer();
 
   if ((sql_command_flags[lex->sql_command] & CF_REEXECUTION_FRAGILE) &&
       error && !thd->is_fatal_error && !thd->killed &&

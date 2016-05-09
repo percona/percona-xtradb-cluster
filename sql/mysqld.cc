@@ -770,7 +770,7 @@ mysql_mutex_t
 mysql_mutex_t LOCK_sql_rand;
 
 mysql_mutex_t
-  LOCK_stats, LOCK_global_user_client_stats,
+  LOCK_global_user_client_stats,
   LOCK_global_table_stats, LOCK_global_index_stats;
 /**
   The below lock protects access to two global server variables:
@@ -2190,10 +2190,11 @@ static void clean_up_mutexes()
   mysql_cond_destroy(&COND_thread_cache);
   mysql_cond_destroy(&COND_flush_thread_cache);
   mysql_cond_destroy(&COND_manager);
-  mysql_mutex_destroy(&LOCK_stats);
   mysql_mutex_destroy(&LOCK_global_user_client_stats);
   mysql_mutex_destroy(&LOCK_global_table_stats);
   mysql_mutex_destroy(&LOCK_global_index_stats);
+  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
+  mysql_cond_destroy(&COND_connection_count);
 #ifdef WITH_WSREP
   (void) mysql_mutex_destroy(&LOCK_wsrep_ready);
   (void) mysql_cond_destroy(&COND_wsrep_ready);
@@ -2209,8 +2210,6 @@ static void clean_up_mutexes()
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync_count);
 #endif
-  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
-  mysql_cond_destroy(&COND_connection_count);
 }
 #endif /*EMBEDDED_LIBRARY*/
 
@@ -4710,7 +4709,6 @@ static int init_thread_environment()
   mysql_mutex_init(key_LOCK_server_started,
                    &LOCK_server_started, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_server_started, &COND_server_started, NULL);
-  mysql_mutex_init(key_LOCK_stats, &LOCK_stats, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_global_user_client_stats,
     &LOCK_global_user_client_stats, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_global_table_stats,
@@ -10721,7 +10719,7 @@ PSI_mutex_key
   key_delayed_insert_mutex, key_hash_filo_lock, key_LOCK_active_mi,
   key_LOCK_connection_count, key_LOCK_crypt, key_LOCK_delayed_create,
   key_LOCK_delayed_insert, key_LOCK_delayed_status, key_LOCK_error_log,
-  key_LOCK_stats, key_LOCK_global_user_client_stats,
+  key_LOCK_global_user_client_stats,
   key_LOCK_global_table_stats, key_LOCK_global_index_stats,
   key_LOCK_gdl, key_LOCK_global_system_variables,
   key_LOCK_manager,
@@ -10802,7 +10800,6 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_delayed_insert, "LOCK_delayed_insert", PSI_FLAG_GLOBAL},
   { &key_LOCK_delayed_status, "LOCK_delayed_status", PSI_FLAG_GLOBAL},
   { &key_LOCK_error_log, "LOCK_error_log", PSI_FLAG_GLOBAL},
-  { &key_LOCK_stats, "LOCK_stats", PSI_FLAG_GLOBAL},
   { &key_LOCK_global_user_client_stats,
     "LOCK_global_user_client_stats", PSI_FLAG_GLOBAL},
   { &key_LOCK_global_table_stats,
