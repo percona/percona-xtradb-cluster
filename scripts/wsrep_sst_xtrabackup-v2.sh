@@ -672,6 +672,42 @@ send_donor()
     done
 }
 
+# Returns the version string in a standardized format
+# Input "1.2.3" => echoes "010203"
+# Wrongly formatted values => echoes "000000"
+normalize_version()
+{
+    local major=0
+    local minor=0
+    local patch=0
+
+    # Only parses purely numeric version numbers, 1.2.3 
+    # Everything after the first three values are ignored
+    if [[ $1 =~ ^([0-9]+)\.([0-9]+)\.?([0-9]*)([\.0-9])*$ ]]; then
+        major=${BASH_REMATCH[1]}
+        minor=${BASH_REMATCH[2]}
+        patch=${BASH_REMATCH[3]}
+    fi
+
+    printf %02d%02d%02d $major $minor $patch
+}
+
+# Compares two version strings
+# The first parameter is the version to be checked
+# The second parameter is the minimum version required
+# Returns 1 (failure) if $1 >= $2, 0 (success) otherwise
+check_for_version()
+{
+    local local_version_str="$( normalize_version $1 )"
+    local required_version_str="$( normalize_version $2 )"
+
+    if [[ "$local_version_str" < "$required_version_str" ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
 
 #-------------------------------------------------------------------------------
 #
@@ -685,12 +721,20 @@ if [[ ! -x `which $INNOBACKUPEX_BIN` ]]; then
     exit 2
 fi
 
-#
-# Starting 5.7 redo log format has changed and so XB-2.4 or higher is needed
+# Starting with 5.7, the redo log format has changed and so XB-2.4.2 or higher is needed
 # for performing backup (read SST)
-XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '2\.[234]' | head -n1`
-if [[ $XB_VERSION == "2.2" || $XB_VERSION == "2.3" ]]; then
-    wsrep_log_error "XB version is $XB_VERSION. Needs xtrabackup-2.4 or higher to perform SST"
+
+# XB_REQUIRED_VERSION requires at least major.minor version (e.g. 2.4.1 or 3.0)
+XB_REQUIRED_VERSION="2.4.2"
+
+XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
+if [[ -z $XB_VERSION ]]; then
+    wsrep_log_error "Cannot determine the $INNOBACKUPEX_BIN version. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
+    exit 2
+fi
+
+if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION; then
+    wsrep_log_error "The $INNOBACKUPEX_BIN version is $XB_VERSION. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
     exit 2
 fi
 
