@@ -3055,10 +3055,12 @@ void dec_connection_count(THD *thd)
   */
   if (!thd->wsrep_applier)
 #endif /* WITH_WSREP */
-  mysql_mutex_lock(&LOCK_connection_count);
-  if (--(*thd->scheduler->connection_count) == 0)
-    mysql_cond_signal(&COND_connection_count);
-  mysql_mutex_unlock(&LOCK_connection_count);
+  {
+    mysql_mutex_lock(&LOCK_connection_count);
+    if (--(*thd->scheduler->connection_count) == 0)
+      mysql_cond_signal(&COND_connection_count);
+    mysql_mutex_unlock(&LOCK_connection_count);
+  }
 }
 
 
