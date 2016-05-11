@@ -5673,9 +5673,19 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
+  {
+
+#ifdef WITH_WSREP
+    if (lex->sql_command == SQLCOM_INSTALL_PLUGIN ||
+        lex->sql_command == SQLCOM_UNINSTALL_PLUGIN) {
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    }
+#endif /* WITH_WSREP */
+
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;
+  }
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
   case SQLCOM_ALTER_USER:
