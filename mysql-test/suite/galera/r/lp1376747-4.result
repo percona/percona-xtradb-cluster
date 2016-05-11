@@ -7,19 +7,21 @@ ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 INSERT INTO t1 VALUES (2,3);
 SET session wsrep_sync_wait=0;
 SET session wsrep_causal_reads=OFF;
-### t1 shouldn't have that column
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `id` int(11) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-### This should block following FTFE
 FLUSH TABLES t1 WITH READ LOCK;
-### This should unlock FTWRL and unblock FTRL.
 UNLOCK TABLES;
-### FTRL fot t1 should exit successfully here.
-### t1 should now have the column f2.
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `id` int(11) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+UNLOCK TABLES;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
@@ -27,42 +29,8 @@ t1	CREATE TABLE `t1` (
   `f2` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
-### t1 should have two rows.
 SELECT * from t1;
 id	f2
 1	NULL
 2	3
-### These should not make it to node2
-ALTER TABLE t1 ADD COLUMN f3 INTEGER;
-INSERT INTO t1 VALUES (4,5,6);
-### This should output only two rows
-SELECT * from t1;
-id	f2
-1	NULL
-2	3
-### This shouldn't show the column f3.
-SHOW CREATE TABLE t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL,
-  `f2` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
-### This should resume provider again
-UNLOCK TABLES;
-### This should output three rows
-SELECT * from t1;
-id	f2	f3
-1	NULL	NULL
-2	3	NULL
-4	5	6
-### This should show f3 column as well.
-SHOW CREATE TABLE t1;
-Table	Create Table
-t1	CREATE TABLE `t1` (
-  `id` int(11) NOT NULL,
-  `f2` int(11) DEFAULT NULL,
-  `f3` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
 DROP TABLE t1;

@@ -1321,7 +1321,6 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   If any of the action is already performed then avoid repeating it
   but make sure it is reference incremented to avoid release of resources. */
 
-  mysql_mutex_lock(&LOCK_wsrep_pause_count);
   mysql_mutex_lock(&LOCK_wsrep_desync_count);
 
   DEBUG_SYNC(thd,"wsrep_RSU_begin_after_lock");
@@ -1347,7 +1346,6 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   if (ret != WSREP_OK)
   {
      mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-     mysql_mutex_unlock(&LOCK_wsrep_pause_count);
      WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
                 ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
      my_error(ER_LOCK_DEADLOCK, MYF(0));
@@ -1373,7 +1371,6 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     wsrep_desync_count--;
     ret = wsrep->resync(wsrep);
     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
     if (ret != WSREP_OK)
     {
       ret = wsrep->resync(wsrep);
@@ -1395,6 +1392,8 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   mysql_mutex_unlock(&LOCK_wsrep_desync_count);
 
 rsu_begin_skip_desync:
+
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
 
   /* Node is already paused. */
   if (wsrep_pause_count)
