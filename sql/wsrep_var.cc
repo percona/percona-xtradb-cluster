@@ -586,17 +586,23 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
 {
   /* Setting desync to on/off signals participation of node in flow control.
   It doesn't turn-off recieval of write-sets.
-  If the node is already in paused state due to some previous action like FTWRL
-  then avoid desync as superset action of pausing the node is already active. */
+  Node is free to receive and apply write-sets.
+  But if node is already in paused state due to some previous action
+  likely RSU or FTWRL then avoid explict desync till node exit either of these
+  state as they too has done desyncing implicitly. */
   bool new_wsrep_desync = var->save_result.ulonglong_value;
-  if (!thd->global_read_lock.provider_resumed())
+
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
+  if (wsrep_pause_count)
   {
     WSREP_WARN ("Trying to desync a node that is already paused.");
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0),
              var->var->name.str,
              new_wsrep_desync ? "ON" : "OFF");
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
     return true;
   }
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
 
   mysql_mutex_lock(&LOCK_wsrep_desync_count);
   if (new_wsrep_desync)

@@ -1055,14 +1055,17 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
 #ifdef WITH_WSREP
     if (WSREP(thd) || wsrep_node_is_donor())
     {
-      if (!provider_resumed())
-        wsrep_resume();
+      /* Function will take care of decrementing reference count
+      if it is not the last one to get called. Last one will
+      perform the resume action. */
+      wsrep_resume();
 
-      /* resync here only if we did implicit desync earlier */
-      if (!wsrep_desync && wsrep_node_is_synced())
+      /* initiate resync. if this is not the last one reference counter
+      is decremented and flow proceed. */
+      mysql_mutex_lock(&LOCK_wsrep_desync_count);
+      assert(wsrep_desync_count > 0);
+      if (--wsrep_desync_count == 0)
       {
-        mysql_mutex_lock(&LOCK_wsrep_desync_count);
-        --wsrep_desync_count;
         int ret = wsrep->resync(wsrep);
         if (ret != WSREP_OK)
         {
@@ -1071,8 +1074,8 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
                      (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
           DBUG_VOID_RETURN;
         }
-        mysql_mutex_unlock(&LOCK_wsrep_desync_count);
       }
+      mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     }
 #endif /* WITH_WSREP */
   }
@@ -1147,6 +1150,10 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   {
     WSREP_DEBUG("desync set upfont, skipping implicit desync for FTWRL: %d",
                 wsrep_desync);
+
+    mysql_mutex_lock(&LOCK_wsrep_desync_count);
+    wsrep_desync_count++;
+    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
   }
   else
   {
@@ -1184,13 +1191,25 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
   @retval True   Provider has been paused.
 */
-bool Global_read_lock::wsrep_pause(void)
+bool Global_read_lock::wsrep_pause()
 {
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
+
+  /* Provider already paused. Avoid re-pausing it.
+  Just increment the count. */
+  if (wsrep_pause_count > 0)
+  {
+     ++wsrep_pause_count;
+     mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+     return(TRUE);
+  }
+
   wsrep_seqno_t ret = wsrep->pause(wsrep);
   if (ret >= 0)
   {
     wsrep_locked_seqno= ret;
-    pause_provider(TRUE);
+    assert(wsrep_pause_count == 0);
+    ++wsrep_pause_count;
   }
   else if (ret != -ENOSYS) /* -ENOSYS - no provider */
   {
@@ -1199,8 +1218,11 @@ bool Global_read_lock::wsrep_pause(void)
     /* m_mdl_blocks_commits_lock is always NULL here */
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
     my_error(ER_LOCK_DEADLOCK, MYF(0));
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
     return FALSE;
   }
+
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
   return TRUE;
 }
 
@@ -1211,44 +1233,40 @@ bool Global_read_lock::wsrep_pause(void)
   @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
   @retval True   Provider has been paused.
 */
-wsrep_status_t Global_read_lock::wsrep_resume(void)
+wsrep_status_t Global_read_lock::wsrep_resume(bool ignore_if_resumed)
 {
-    wsrep_status_t ret(WSREP_WARNING);
+  wsrep_status_t ret(WSREP_OK);
 
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
+
+  if (ignore_if_resumed && wsrep_pause_count == 0)
+  {
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+    return ret;
+  }
+
+  assert(wsrep_pause_count > 0);
+  if (--wsrep_pause_count == 0)
+  {
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
     ret = wsrep->resume(wsrep);
 
-    if (!ret)
-    {
-      pause_provider(FALSE);
-    }
-    else
-    {
+    if (ret)
       WSREP_WARN("Failed to resume provider: %d", ret);
-    }
-    return ret;
+  }
+
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+  return ret;
 }
 
-bool Global_read_lock::wsrep_pause_once(bool *already_paused)
+bool Global_read_lock::wsrep_pause_once()
 {
-    if (!provider_paused)
-    {
-      *already_paused= FALSE;
-      if (wsrep_pause())
-      {
-        return TRUE;
-      }
-      return FALSE;
-    }
-    *already_paused= TRUE;
-    return TRUE;
+    return wsrep_pause();
 }
 
 wsrep_status_t Global_read_lock::wsrep_resume_once(void)
 {
-    if (provider_paused)
-      return wsrep_resume();
-    return WSREP_OK;
+  return wsrep_resume(true);
 }
 
 #endif /* WITH_WSREP */

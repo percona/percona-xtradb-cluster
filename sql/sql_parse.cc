@@ -5198,9 +5198,6 @@ end_with_restore_list:
 
     if (first_table && lex->type & REFRESH_READ_LOCK)
     {
-#ifdef WITH_WSREP
-      bool already_paused;
-#endif
       /*
          Do not allow FLUSH TABLES <table_list> WITH READ LOCK under an active
          LOCK TABLES FOR BACKUP lock.
@@ -5218,18 +5215,17 @@ end_with_restore_list:
         because that is checked in flush_tables_with_read_lock.
 
         We also intend to maintain GRL compatibility,
-        hence check for provider_paused.
+        hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) &&
-          !thd->global_read_lock.wsrep_pause_once(&already_paused))
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
         goto error;
 #endif
       if (flush_tables_with_read_lock(thd, all_tables))
 #ifdef WITH_WSREP
       {
-        if (WSREP(thd) && !already_paused)
+        if (WSREP(thd))
           thd->global_read_lock.wsrep_resume_once();
         goto error;
       }
@@ -5241,9 +5237,6 @@ end_with_restore_list:
     }
     else if (first_table && lex->type & REFRESH_FOR_EXPORT)
     {
-#ifdef WITH_WSREP
-      bool already_paused;
-#endif
       /*
          Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
          FOR BACKUP lock.
@@ -5261,18 +5254,17 @@ end_with_restore_list:
         because that is checked in flush_tables_for_export.
 
         We also intend to maintain GRL compatibility,
-        hence check for provider_paused.
+        hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) &&
-          !thd->global_read_lock.wsrep_pause_once(&already_paused))
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
         goto error;
 #endif
       if (flush_tables_for_export(thd, all_tables))
 #ifdef WITH_WSREP
       {
-        if (WSREP(thd) && !already_paused)
+        if (WSREP(thd))
           thd->global_read_lock.wsrep_resume_once();
         goto error;
       }
