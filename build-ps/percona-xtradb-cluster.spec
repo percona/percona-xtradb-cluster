@@ -1491,10 +1491,6 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
-* Mon May 09 2015 Krunal Bauskar <krunal.bauskar@percona.com>
-
-- Merge updates from Percona Server spec file.
-
 * Thu Oct 01 2015 Raghavendra Prabhu <raghavendra.prabhu@percona.com>
 
 - Merge updates from Percona Server spec file.
