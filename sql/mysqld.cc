@@ -1497,6 +1497,8 @@ extern "C" void unireg_abort(int exit_code)
 #ifdef WITH_WSREP
   if (wsrep)
   {
+    /* Cancel the SST script if it is running: */
+    wsrep_sst_cancel();
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only disconnect from service */
     wsrep_close_client_connections(false);
@@ -4455,6 +4457,14 @@ static int init_server_components()
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+#ifdef WITH_WSREP
+  if (WSREP_ON && wsrep_desync)
+  {
+    sql_print_error("Can't desync a node even before it is synced with cluster");
+    unireg_abort(1);
+  }
+#endif /* WITH_WSREP */
+
   /*
     initialize delegates for extension observers, errors have already
     been reported in the function
@@ -4583,12 +4593,18 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     else // full wsrep initialization
     {
       // add basedir/bin to PATH to resolve wsrep script names
-      char* const tmp_path((char*)alloca(strlen(mysql_home) +
-                                           strlen("/bin") + 1));
+      int mysql_home_len= strlen(mysql_home);
+      char* const tmp_path((char*)alloca(mysql_home_len +
+                                         strlen("/bin") + 1));
       if (tmp_path)
       {
         strcpy(tmp_path, mysql_home);
-        strcat(tmp_path, "/bin");
+        /*
+          mysql_home may already contain a trailing slash:
+        */
+        strcat(tmp_path, (mysql_home_len == 0 ||
+                          mysql_home[mysql_home_len - 1] != '/') ? "/bin" :
+                                                                    "bin");
         wsrep_prepend_PATH(tmp_path);
       }
       else

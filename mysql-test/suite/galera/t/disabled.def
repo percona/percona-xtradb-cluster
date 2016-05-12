@@ -4,3 +4,4 @@ galera_bf_abort_for_update : mysql-wsrep#26 SELECT FOR UPDATE sometimes allowed 
 galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
 galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
 galera.galera_fk_multitable : check upstream bug http://bugs.mysql.com/bug.php?id=80478.
+galera_split_brain : fails quite often. bug logged to investigate the failure.

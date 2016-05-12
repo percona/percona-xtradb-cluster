@@ -63,6 +63,9 @@ TOKUDB_BACKUP_VERSION=''
 TAR=${TAR:-tar}
 SCONS_ARGS=${SCONS_ARGS:-""}
 
+# keep build files
+KEEP_BUILD=0
+
 #-------------------------------------------------------------------------------
 #
 # Step-1: Set default configuration.
@@ -73,7 +76,7 @@ SCONS_ARGS=${SCONS_ARGS:-""}
 if ! getopt --test
 then
     go_out="$(getopt --options=iqGdvjmt: \
-        --longoptions=i686,verbose,copygalera,debug,valgrind,with-jemalloc:,with-yassl,with-ssl:,tag: \
+        --longoptions=i686,verbose,copygalera,debug,valgrind,with-jemalloc:,with-yassl,keep-build,with-ssl:,tag: \
         --name="$(basename "$0")" -- "$@")"
     test $? -eq 0 || exit 1
     eval set -- $go_out
@@ -104,7 +107,7 @@ do
         CMAKE_OPTS="${CMAKE_OPTS:-} -DWITH_VALGRIND=ON"
         BUILD_COMMENT="${BUILD_COMMENT:-}-valgrind"
         ;;
-    -q | --verbose)
+    -q | --verbose )
         shift
         QUIET='VERBOSE=1'
         ;;
@@ -121,6 +124,10 @@ do
     --with-yassl )
         shift
         WITH_SSL_TYPE="bundled"
+        ;;
+    --keep-build )
+        shift
+        KEEP_BUILD=1
         ;;
     --with-ssl )
         shift
@@ -447,8 +454,11 @@ fi
     $TAR --owner=0 --group=0 -czf "$TARGETDIR/$PRODUCT_FULL_NAME.tar.gz" $PRODUCT_FULL_NAME
 ) || exit 1
 
-rm -rf $TARGETDIR/libboost
-rm -rf $TARGETDIR/bld
-rm -rf $TARGETDIR/usr
+if [[ $KEEP_BUILD -eq 0 ]]
+then
+    rm -rf $TARGETDIR/libboost
+    rm -rf $TARGETDIR/bld
+    rm -rf $TARGETDIR/usr
+fi
 
 echo "Build Complete"

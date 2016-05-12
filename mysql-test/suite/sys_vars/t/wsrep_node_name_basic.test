@@ -6,11 +6,16 @@
 
 call mtr.add_suppression("WSREP: Failed to get provider options");
 
+# Find the actual server node name
+--source include/galera_actual_node_name.inc
+
 --echo # save the initial value
 SET @wsrep_node_name_global_saved = @@global.wsrep_node_name;
 
---echo # default
-SELECT @@global.wsrep_node_name;
+--echo # check for proper default
+--disable_query_log
+--eval SELECT @@global.wsrep_node_name = '$galera_actual_node_name' AS 'node_name_check';
+--enable_query_log
 
 --echo
 --echo # scope
@@ -25,7 +30,7 @@ SET @@global.wsrep_node_name='my_node';
 SELECT @@global.wsrep_node_name;
 SET @@global.wsrep_node_name='hyphenated-node-name';
 SELECT @@global.wsrep_node_name;
-SET @@global.wsrep_node_name=default;
+SET @@global.wsrep_node_name='';
 SELECT @@global.wsrep_node_name;
 
 --echo

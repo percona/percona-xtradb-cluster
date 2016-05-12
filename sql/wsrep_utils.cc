@@ -40,6 +40,10 @@
 #include <sys/prctl.h>
 #endif
 
+#ifdef _POSIX_SPAWN
+#include <spawn.h>
+#endif
+
 #ifdef HAVE_GETIFADDRS
 #include <net/if.h>
 #include <ifaddrs.h>
@@ -178,6 +182,174 @@ env::append(const char* val)
     return errno_;
 }
 
+#if !(defined(_POSIX_SPAWN) || defined(HAVE_EXECVPE))
+
+#include <alloca.h>
+
+#define	_PATH_BSHELL "/bin/sh"
+
+/*
+  The Unix standard contains a long explanation of the way to signal
+  an error after the fork() was successful.  Since no new wait status
+  was wanted there is no way to signal an error using one of the
+  available methods.  The committee chose to signal an error by a
+  normal program exit with the exit code 127.
+*/
+
+#define SPAWN_ERROR     127
+
+/*
+  The file is accessible but it is not an executable file. Invoke
+  the shell to interpret it as a script.
+*/
+static void script_execute (const char * file,
+                            char * const argv[],
+                            char * const envp[])
+{
+    /* Count the arguments. */
+    int argc= 0;
+    while (argv[argc++]) ;
+
+    /* Construct an argument list for the shell. */
+    {
+        char * * new_argv =
+            static_cast<char* *>(alloca(sizeof(char *) * (argc + 1)));
+        new_argv[0] = (char *) _PATH_BSHELL;
+        new_argv[1] = (char *) file;
+        while (argc > 1)
+        {
+            new_argv[argc] = argv[argc - 1];
+            --argc;
+        }
+        /* Execute the shell. */
+        execve(new_argv[0], new_argv, envp);
+    }
+}
+
+/*
+  execvpe() emulation for old versions of Linux, based
+  on glibc implementation:
+*/
+
+static int execvpe (const char * file,
+                    char * const argv[],
+                    char * const envp[])
+{
+    char *path, *p, *name;
+    size_t len;
+    size_t pathlen;
+    bool got_eacces = false;
+
+    if (file == NULL || *file == '\0')
+    {
+       /* We check the simple case first. */
+       errno = ENOENT;
+       return -1;
+    }
+
+    if (strchr(file, '/') != NULL)
+    {
+        /* The FILE parameter is actually a path. */
+        execve(file, argv, envp);
+
+        if (errno == ENOEXEC)
+            script_execute(file, argv, envp);
+
+        /* Oh, oh. `execve' returns. This is bad. */
+        _exit(SPAWN_ERROR);
+    }
+
+    /* We have to search for FILE on the path. */
+    path = getenv("PATH");
+    if (path == NULL)
+    {
+        /*
+          There is no `PATH' in the environment.
+          The default search path is the current directory
+           followed by the path `confstr' returns for `_CS_PATH'.
+        */
+        len = confstr(_CS_PATH, (char *) NULL, 0);
+        path = static_cast<char*>(alloca(1 + len));
+        path[0] = ':';
+        (void) confstr(_CS_PATH, path + 1, len);
+    }
+
+    len = strlen(file) + 1;
+    pathlen = strlen(path);
+    name = static_cast<char*>(alloca(pathlen + len + 1));
+    /* Copy the file name at the top. */
+    name = (char *) memcpy(name + pathlen + 1, file, len);
+    /* And add the slash. */
+    *--name = '/';
+
+    p = path;
+    do
+    {
+        char *startp;
+
+        path = p;
+        p = strchrnul(path, ':');
+
+        if (p == path)
+        {
+            /*
+              Two adjacent colons, or a colon at the beginning or the end
+              of `PATH' means to search the current directory.
+            */
+            startp = name + 1;
+        }
+        else
+            startp = (char *) memcpy(name - (p - path), path, p - path);
+
+        /* Try to execute this name. If it works, execv will not return. */
+        execve(startp, argv, envp);
+
+        if (errno == ENOEXEC)
+            script_execute (startp, argv, envp);
+
+        switch (errno)
+        {
+        case EACCES:
+            /* Record the we got a `Permission denied' error. If we end
+               up finding no executable we can use, we want to diagnose
+               that we did find one but were denied access. */
+            got_eacces = true;
+        case ENOENT:
+        case ESTALE:
+        case ENOTDIR:
+            /* Those errors indicate the file is missing or not executable
+               by us, in which case we want to just try the next path
+               directory. */
+        case ENODEV:
+        case ETIMEDOUT:
+           /* Some strange filesystems like AFS return even
+              stranger error numbers.  They cannot reasonably mean
+              anything else so ignore those, too. */
+           break;
+        default:
+           /* Some other error means we found an executable file, but
+              something went wrong executing it; return the error to our
+              caller. */
+           return -1;
+        }
+    }
+    while (*p++ != '\0');
+
+    /* We tried every element and none of them worked. */
+    if (got_eacces)
+    {
+        /*
+          At least one failure was due to permissions,
+          so report that  error.
+        */
+	errno = EACCES;
+    }
+
+    /* Return with an error. */
+    return -1;
+}
+
+#endif
 
 #define PIPE_READ  0
 #define PIPE_WRITE 1
@@ -211,7 +383,7 @@ process::process (const char* cmd, const char* type, char** env)
 
     if (NULL == env) { env = environ; } // default to global environment
 
-    int pipe_fds[2] = { -1, };
+    int pipe_fds[2];
     if (::pipe(pipe_fds))
     {
         err_ = errno;
@@ -224,7 +396,6 @@ process::process (const char* cmd, const char* type, char** env)
     int const child_end  (parent_end == PIPE_READ ? PIPE_WRITE : PIPE_READ);
     int const close_fd   (parent_end == PIPE_READ ? STDOUT_FD : STDIN_FD);
 
-#ifdef HAVE_EXECVPE
     char* const pargv[4] = { strdup("sh"), strdup("-c"), strdup(str_), NULL };
     if (!(pargv[0] && pargv[1] && pargv[2]))
     {
@@ -232,7 +403,8 @@ process::process (const char* cmd, const char* type, char** env)
         WSREP_ERROR ("Failed to allocate pargv[] array.");
         goto cleanup_pipe;
     }
-#endif
+
+#ifndef _POSIX_SPAWN
 
     pid_ = fork();
 
@@ -247,7 +419,7 @@ process::process (const char* cmd, const char* type, char** env)
     {
       /* Parent */
 
-      io_ = fdopen (pipe_fds[parent_end], type);
+      io_ = fdopen(pipe_fds[parent_end], type);
 
       if (io_)
       {
@@ -314,13 +486,16 @@ process::process (const char* cmd, const char* type, char** env)
       _exit(EXIT_FAILURE);
     }
 
-    /* close child's stdout|stdin depending on what we returning */
-
+    /* Close child's stdout|stdin depending on what we returning.    */
+    /* PXC-502: commented out, because subsequent dup2() call closes */
+    /* close_fd descriptor automatically.                            */
+    /* 
     if (close(close_fd) < 0)
     {
       sql_print_error("close() failed");
       _exit(EXIT_FAILURE);
     }
+    */
 
     /* substitute our pipe descriptor in place of the closed one */
 
@@ -330,23 +505,207 @@ process::process (const char* cmd, const char* type, char** env)
       _exit(EXIT_FAILURE);
     }
 
-#ifdef HAVE_EXECVPE
+    /* Close child and parent pipe descriptors after redirection. */
+
+    if (close(pipe_fds[child_end]) < 0)
+    {
+      sql_perror("close() failed");
+      _exit(EXIT_FAILURE);
+    }
+
+    if (close(pipe_fds[parent_end]) < 0)
+    {
+      sql_perror("close() failed");
+      _exit(EXIT_FAILURE);
+    }
+
     execvpe(pargv[0], pargv, env);
-#else
-    execlp("sh", "sh", "-c", str_, NULL);
-#endif
 
     sql_print_error("execlp() failed");
     _exit(EXIT_FAILURE);
+
+#else // _POSIX_SPAWN is defined:
+
+    posix_spawnattr_t sattr;
+
+    err_ = posix_spawnattr_init(&sattr);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawnattr_init() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_pipe;
+    }
+
+    /*
+      Make the child process a session/group leader. This is required to
+      simplify cleanup procedure for SST process, so that all processes spawned
+      by the SST script could be killed by killing the entire process group:
+    */
+
+    err_ = posix_spawnattr_setpgroup(&sattr, 0);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawnattr_setpgroup() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_attr;
+    }
+
+    /* Reset the process signal mask to unblock signals blocked by the server: */
+
+    sigset_t set;
+
+    err_ = sigemptyset(&set);
+    if (err_)
+    {
+      err_ = errno;
+      WSREP_ERROR ("sigemptyset() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_attr;
+    }
+
+    err_ = posix_spawnattr_setsigmask(&sattr, &set);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawnattr_setsigmask() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_attr;
+    }
+
+    /* Reset all ignored signals to SIG_DFL: */
+
+    int def_flag;
+
+    def_flag = 0;
+
+    for (sig = 1; sig < NSIG; sig++)
+    {
+      if (sigaction(sig, NULL, &sa) == 0)
+      {
+        if (sa.sa_handler == SIG_IGN)
+        {
+          err_ = sigaddset(&set, sig);
+          if (err_)
+          {
+            err_ = errno;
+            WSREP_ERROR ("sigaddset() failed: %d (%s)", err_, strerror(err_));
+            goto cleanup_attr;
+          }
+          def_flag = POSIX_SPAWN_SETSIGDEF;
+        }
+      }
+    }
+
+    if (def_flag)
+    {
+      err_ = posix_spawnattr_setsigdefault(&sattr, &set);
+      if (err_)
+      {
+        WSREP_ERROR ("posix_spawnattr_setsigdefault() failed: %d (%s)", err_, strerror(err_));
+        goto cleanup_attr;
+      }
+    }
+
+    /* Set flags for all modified parameters: */
+
+#ifdef POSIX_SPAWN_USEVFORK
+    def_flag |= POSIX_SPAWN_USEVFORK;
+#endif
+
+    err_ = posix_spawnattr_setflags(&sattr, POSIX_SPAWN_SETPGROUP  |
+                                            POSIX_SPAWN_SETSIGMASK |
+                                            def_flag);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawnattr_setflags() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_attr;
+    }
+
+    /* Substitute our pipe descriptor in place of the stdin or stdout: */
+
+    posix_spawn_file_actions_t sfa;
+
+    err_ = posix_spawn_file_actions_init(&sfa);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_init() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_attr;
+    }
+
+    err_ = posix_spawn_file_actions_adddup2(&sfa, pipe_fds[child_end], close_fd);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_adddup2() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_actions;
+    }
+
+    err_ = posix_spawn_file_actions_addclose(&sfa, pipe_fds[child_end]);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_actions;
+    }
+
+    err_ = posix_spawn_file_actions_addclose(&sfa, pipe_fds[parent_end]);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_addclose() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_actions;
+    }
+
+    /* Launch the child process: */
+
+    err_ = posix_spawnp(&pid_, pargv[0], &sfa, &sattr, pargv, env);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawnp() failed: %d (%s)", err_, strerror(err_));
+      pid_ = 0;
+      goto cleanup_actions;
+    }
+
+    err_ = posix_spawn_file_actions_destroy(&sfa);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawn_file_actions_destroy() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_attr;
+    }
+
+    err_ = posix_spawnattr_destroy(&sattr);
+    if (err_)
+    {
+      WSREP_ERROR ("posix_spawnattr_destroy() failed: %d (%s)", err_, strerror(err_));
+      goto cleanup_pipe;
+    }
+
+    /* We are in the parent process: */
+
+    io_ = fdopen(pipe_fds[parent_end], type);
+
+    if (io_)
+    {
+      pipe_fds[parent_end] = -1; // skip close on cleanup
+    }
+    else
+    {
+      err_ = errno;
+      WSREP_ERROR ("fdopen() failed: %d (%s)", err_, strerror(err_));
+    }
+
+#endif
 
 cleanup_pipe:
     if (pipe_fds[0] >= 0) close (pipe_fds[0]);
     if (pipe_fds[1] >= 0) close (pipe_fds[1]);
 
-#ifdef HAVE_EXECVPE
     free (pargv[0]);
     free (pargv[1]);
     free (pargv[2]);
+
+#ifdef _POSIX_SPAWN
+    return;
+
+cleanup_actions:
+    posix_spawn_file_actions_destroy(&sfa);
+
+cleanup_attr:
+    posix_spawnattr_destroy(&sattr);
+    goto cleanup_pipe;
+
 #endif
 }
 
@@ -414,6 +773,18 @@ process::wait ()
   }
 
   return err_;
+}
+
+void process::terminate ()
+{
+  if (pid_)
+  {
+    if (kill(pid_, SIGTERM))
+    {
+      WSREP_WARN("Unable to terminate process: %s: %d (%s)",
+                 str_, errno, strerror(errno));
+    }
+  }
 }
 
 thd::thd (my_bool won) : init(), ptr(new THD)

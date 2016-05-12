@@ -1529,9 +1529,17 @@ ulong
 innodb_page_size_validate(
 	ulong	page_size)
 {
-	ulong		n;
-
 	DBUG_ENTER("innodb_page_size_validate");
+
+#ifdef WITH_WSREP
+	/* With a 4K page_size, Galera triggers an assert upon restart.
+	 * Until that gets resolved, require using the default page size (16K).
+	*/
+	if (page_size == UNIV_PAGE_SIZE_ORIG) {
+		DBUG_RETURN(UNIV_PAGE_SIZE_SHIFT_ORIG);
+	}
+#else
+	ulong		n;
 
 	for (n = UNIV_PAGE_SIZE_SHIFT_MIN;
 	     n <= UNIV_PAGE_SIZE_SHIFT_MAX;
@@ -1540,7 +1548,7 @@ innodb_page_size_validate(
 			DBUG_RETURN(n);
 		}
 	}
-
+#endif /* WITH_WSREP */
 	DBUG_RETURN(0);
 }
 

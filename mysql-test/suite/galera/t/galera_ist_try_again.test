@@ -102,9 +102,6 @@ CREATE TABLE t3 (f1 INTEGER);
 
 --connection node_2
 
---let $galera_wsrep_recover_server_id=2
---source suite/galera/include/galera_wsrep_recover.inc
-
 --echo Starting server ...
 --source include/start_mysqld.inc
 
@@ -122,6 +119,8 @@ SELECT COUNT(*) = 0 FROM t3;
 
 --connection node_1
 DROP TABLE t1, t2, t3;
+
+SET DEBUG_SYNC='RESET';
 
 #
 # We should count the number of 'Failed to prepare for incremental

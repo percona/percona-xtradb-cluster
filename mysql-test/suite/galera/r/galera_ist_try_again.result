@@ -14,10 +14,8 @@ UPDATE t1 SET f2 = 'd' WHERE f1 > 3;
 CREATE TABLE t2 (f1 INTEGER);
 UPDATE t1 SET f2 = 'e' WHERE f1 > 4;
 CREATE TABLE t3 (f1 INTEGER);
-Performing --wsrep-recover ...
 Starting server ...
 # restart
-Using --wsrep-start-position when starting mysqld ...
 UPDATE t1 SET f2 = 'f' WHERE f1 > 5;
 SELECT * FROM t1;
 f1	f2
@@ -42,3 +40,4 @@ SELECT COUNT(*) = 0 FROM t3;
 COUNT(*) = 0
 1
 DROP TABLE t1, t2, t3;
+SET DEBUG_SYNC='RESET';

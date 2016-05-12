@@ -471,3 +471,4 @@ CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for t
 CALL mtr.add_suppression("Gtid table is not ready to be used..*");
 CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("InnoDB: Cannot open.*");
+CALL mtr.add_suppression("Hostname '[0-9a-zA-Z\.\-]+' does not resolve to '127.0.0.2'.");
