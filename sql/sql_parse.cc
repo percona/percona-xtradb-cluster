@@ -4479,20 +4479,18 @@ end_with_restore_list:
             REFRESH_GRANT            |
             REFRESH_HOSTS            |
             REFRESH_DES_KEY_FILE     |
-    /*
-      Write all flush log statements except
-      FLUSH LOGS
-      FLUSH BINARY LOGS
-      Check reload_acl_and_cache for why.
-    */
-    REFRESH_RELAY_LOG                       |
-    REFRESH_SLOW_LOG                        |
-    REFRESH_GENERAL_LOG                     |
-    REFRESH_ENGINE_LOG                      |
-    REFRESH_ERROR_LOG                       |
-#ifdef HAVE_QUERY_CACHE
+            /*
+              Write all flush log statements except
+              FLUSH LOGS
+              FLUSH BINARY LOGS
+              Check reload_acl_and_cache for why.
+            */
+            REFRESH_RELAY_LOG        |
+            REFRESH_SLOW_LOG         |
+            REFRESH_GENERAL_LOG      |
+            REFRESH_ENGINE_LOG       |
+            REFRESH_ERROR_LOG        |
             REFRESH_QUERY_CACHE_FREE |
-#endif /* HAVE_QUERY_CACHE */
             REFRESH_STATUS           |
             REFRESH_USER_RESOURCES))
     {
