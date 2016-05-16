@@ -3173,10 +3173,8 @@ os_file_create_simple_func(
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
 
-#ifdef WITH_WSREP
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	if (create_mode == OS_FILE_OPEN) {
 
 		if (access_type == OS_FILE_READ_ONLY) {
@@ -3275,9 +3273,7 @@ os_file_create_directory(
 	const char*	pathname,
 	bool		fail_if_exists)
 {
-#ifdef WITH_WSREP
 	WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	int	rcode = mkdir(pathname, 0770);
 
 	if (!(rcode == 0 || (errno == EEXIST && !fail_if_exists))) {
@@ -3473,10 +3469,8 @@ os_file_create_func(
 {
 	bool		on_error_no_exit;
 	bool		on_error_silent;
-#ifdef WITH_WSREP
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 
 	*success = false;
 
@@ -3647,10 +3641,8 @@ os_file_create_simple_no_error_handling_func(
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
 
-#ifdef WITH_WSREP
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
 		WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	*success = false;
 
 	if (create_mode == OS_FILE_OPEN) {
@@ -3717,9 +3709,7 @@ os_file_delete_if_exists_func(
 	const char*	name,
 	bool*		exist)
 {
-#ifdef WITH_WSREP
 	WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	if (exist != NULL) {
 		*exist = true;
 	}
@@ -3746,9 +3736,7 @@ bool
 os_file_delete_func(
 	const char*	name)
 {
-#ifdef WITH_WSREP
 	WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	int	ret = unlink(name);
 
 	if (ret != 0) {
@@ -3784,9 +3772,7 @@ os_file_rename_func(
 	ut_ad(os_file_status(oldpath, &exists, &type));
 	ut_ad(exists);
 #endif /* UNIV_DEBUG */
-#ifdef WITH_WSREP
 	WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 
 	int	ret = rename(oldpath, newpath);
 
@@ -3948,9 +3934,7 @@ os_file_truncate_posix(
 	os_file_t	file,
 	os_offset_t	size)
 {
-#ifdef WITH_WSREP
 	WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	int	res = ftruncate(file, size);
 
 	if (res == -1) {
@@ -3976,9 +3960,7 @@ bool
 os_file_set_eof(
 	FILE*		file)	/*!< in: file to be truncated */
 {
-#ifdef WITH_WSREP
 	WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	return(!ftruncate(fileno(file), ftell(file)));
 }
 
@@ -4176,9 +4158,7 @@ bool
 os_file_flush_func(
 	os_file_t	file)
 {
-#ifdef WITH_WSREP
 	WAIT_ALLOW_WRITES();
-#endif /* WITH_WSREP */
 	++os_n_fsyncs;
 
 	BOOL	ret = FlushFileBuffers(file);
