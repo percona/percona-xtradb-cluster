@@ -1350,8 +1350,20 @@ extern "C" void unireg_abort(int exit_code)
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only diconnect from service */
     wsrep_close_client_connections(FALSE);
-    wsrep_close_threads(current_thd);
+    wsrep_close_threads(NULL);
     wsrep->disconnect(wsrep);
+
+    THD* thd = current_thd;
+    if (thd)
+    {
+      Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+      WSREP_DEBUG("closing aborting applier THD: %u", thd->thread_id());
+      thd->release_resources();
+      thd_manager->remove_thd(thd);
+    
+      delete thd;
+    }
+
     wsrep_wait_appliers_close(NULL);
     WSREP_INFO("Service disconnected.");
 
@@ -6600,15 +6612,6 @@ static void wsrep_close_threads(THD *thd)
 
   Call_wsrep_close_wsrep_threads call_wsrep_close_wsrep_threads;
   thd_manager->do_for_all_thd(&call_wsrep_close_wsrep_threads);
-
-  if (thd)
-  {
-    WSREP_DEBUG("closing aborting applier THD: %u", thd->thread_id());
-    thd->release_resources();
-    thd_manager->remove_thd(thd);
-    
-    delete thd;
-  }
 }
 
 void wsrep_close_applier_threads(int count)
