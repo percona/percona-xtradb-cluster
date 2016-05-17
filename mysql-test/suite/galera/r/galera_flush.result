@@ -5,7 +5,7 @@ FLUSH HOSTS;
 wsrep_last_committed_diff
 1
 SET GLOBAL wsrep_replicate_myisam = TRUE;
-INSERT INTO mysql.user VALUES('localhost','user1',PASSWORD('pass1'), 'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','','N');
+INSERT INTO mysql.user VALUES ('%','user1','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','','','','',0,0,0,0,'mysql_native_password','*22A99BA288DB55E8E230679259740873101CD636','N','2016-04-06 08:53:54',NULL,'N');
 FLUSH PRIVILEGES;
 DELETE FROM mysql.user WHERE user = 'user1';
 SET GLOBAL wsrep_replicate_myisam = FALSE;

@@ -21,9 +21,11 @@ SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_N
 VARIABLE_VALUE = 1
 1
 INSERT INTO t1 VALUES (6);
-GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
+CREATE USER 'sst' IDENTIFIED BY 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SET GLOBAL wsrep_sst_auth = 'sst:sst';
-GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
+CREATE USER 'sst' IDENTIFIED BY 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE = 'Synced'
 1
@@ -76,4 +78,8 @@ SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
 DROP USER sst;
-CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
+CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("`innodb_index_stats` not found");
+CALL mtr.add_suppression("`innodb_table_stats` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table");

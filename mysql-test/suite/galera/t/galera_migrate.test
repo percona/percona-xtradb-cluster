@@ -104,11 +104,13 @@ INSERT INTO t1 VALUES (6);
 
 --connection node_3
 # We need a user with a password for mysqldump SST
-GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
+CREATE USER 'sst' IDENTIFIED BY 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SET GLOBAL wsrep_sst_auth = 'sst:sst';
 
 --connect node_4, 127.0.0.1, root, , test, $NODE_MYPORT_4
-GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
+CREATE USER 'sst' IDENTIFIED BY 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
 
 --disable_query_log
 --eval SET GLOBAL wsrep_sst_method = 'mysqldump';
@@ -118,6 +120,12 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
 --eval SET GLOBAL wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'
 --enable_query_log
 
+--connection node_3
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connect node_4a, 127.0.0.1, root, , test, $NODE_MYPORT_4
+--connection node_4a
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
@@ -153,10 +161,8 @@ RESET SLAVE ALL;
 --connect node_3a, 127.0.0.1, root, , test, $NODE_MYPORT_3
 INSERT INTO t1 VALUES (7);
 
---connect node_4a, 127.0.0.1, root, , test, $NODE_MYPORT_4
-INSERT INTO t1 VALUES (8);
-
 --connection node_4a
+INSERT INTO t1 VALUES (8);
 SELECT COUNT(*) = 8 FROM t1;
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
@@ -193,7 +199,7 @@ SET GLOBAL wsrep_provider_options = '';
 DROP TABLE t1;
 DROP USER sst;
 
---connection node_4
+--connection node_4a
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = 'rsync';
 SET GLOBAL wsrep_provider_options = '';
@@ -201,4 +207,11 @@ SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
 DROP USER sst;
 
-CALL mtr.add_suppression("InnoDB: Error: Table \"mysql\"\\.\"innodb_index_stats\" not found");
+--connection node_3
+CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+
+--connection node_4a
+CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("`innodb_index_stats` not found");
+CALL mtr.add_suppression("`innodb_table_stats` not found");
+CALL mtr.add_suppression("InnoDB: Fetch of persistent statistics requested for table");
