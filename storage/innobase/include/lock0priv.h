@@ -721,12 +721,19 @@ public:
 	@param[in] owns_trx_mutex	true if caller owns the trx_t::mutex
 	@param[in] prdt			Predicate lock (optional)
 	@return new lock instance */
+#ifdef WITH_WSREP
+	lock_t* create(
+		lock_t*  const c_lock,
+		trx_t*		trx,
+		bool		owns_trx_mutex,
+		const lock_prdt_t*
+				prdt = NULL);
+#endif /* WITH_WSREP */
 	lock_t* create(
 		trx_t*		trx,
 		bool		owns_trx_mutex,
 		const lock_prdt_t*
 				prdt = NULL);
-
 	/**
 	Check of the lock is on m_rec_id.
 	@param[in] lock			Lock to compare with

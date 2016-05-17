@@ -440,7 +440,7 @@ static void wsrep_rollback_process(THD *thd)
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 
   sql_print_information("WSREP: rollbacker thread exiting");
-
+  thd->store_globals();
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
 }
