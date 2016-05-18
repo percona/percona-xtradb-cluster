@@ -28,7 +28,7 @@
 
 void    wsrep_ready_set (my_bool x);
 
-ssize_t wsrep_sst_prepare   (void** msg);
+ssize_t wsrep_sst_prepare   (void** msg, THD*  thd);
 wsrep_cb_status wsrep_sst_donate_cb (void* app_ctx,
                                      void* recv_ctx,
                                      const void* msg, size_t msg_len,

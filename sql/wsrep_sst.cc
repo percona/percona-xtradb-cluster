@@ -612,7 +612,7 @@ static ssize_t sst_prepare_mysqldump (const char*  addr_in,
 
 static bool SE_initialized = false;
 
-ssize_t wsrep_sst_prepare (void** msg)
+ssize_t wsrep_sst_prepare (void** msg, THD *thd)
 {
   const ssize_t ip_max= 256;
   char ip_buf[ip_max];
@@ -665,6 +665,7 @@ ssize_t wsrep_sst_prepare (void** msg)
       WSREP_ERROR("Could not prepare state transfer request: "
                   "failed to guess address to accept state transfer at. "
                   "wsrep_sst_receive_address must be set manually.");
+      if (thd) delete thd;
       unireg_abort(1);
     }
   }
@@ -1154,13 +1155,33 @@ void wsrep_SE_init_grab()
   if (mysql_mutex_lock (&LOCK_wsrep_sst_init)) abort();
 }
 
-void wsrep_SE_init_wait()
+void wsrep_SE_init_wait(THD* thd)
 {
-  while (SE_initialized == false)
+  while (SE_initialized == false && thd->killed == THD::NOT_KILLED)
   {
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->current_cond= &COND_wsrep_sst_init;
+    thd->current_mutex= &LOCK_wsrep_sst_init;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+    
     mysql_cond_wait (&COND_wsrep_sst_init, &LOCK_wsrep_sst_init);
+
+    if (thd->killed != THD::NOT_KILLED)
+    {
+      WSREP_DEBUG("SE init waiting canceled");
+      break;
+    }
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->current_cond= NULL;
+    thd->current_mutex= NULL;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
   }
   mysql_mutex_unlock (&LOCK_wsrep_sst_init);
+
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+  thd->current_cond= NULL;
+  thd->current_mutex= NULL;
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
 
 void wsrep_SE_init_done()
