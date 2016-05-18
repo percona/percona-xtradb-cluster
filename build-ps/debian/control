@@ -15,6 +15,7 @@ Build-Depends: libtool (>= 1.4.2-7),
                debhelper (>= 9.0.0),
                fakeroot,
                libaio-dev[linux-any],
+               libwrap0-dev,
                libmecab-dev,
                libncurses5-dev (>= 5.0-6),
                lsb-release,
@@ -285,8 +286,8 @@ Package: percona-xtradb-cluster-test-5.7
 Architecture: any
 Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), percona-xtradb-cluster-server-5.7 (>= ${binary:Version})
 Description: Percona XtraDB Cluster database test suite
- This package includes the Percona XtraDB Cluster test framework that provides 
- a means for verifying that Percona XtraDB Cluster and its client programs 
+ This package includes the Percona XtraDB Cluster test framework that provides
+ a means for verifying that Percona XtraDB Cluster and its client programs
  operate according to expectations.
 
 Package: percona-xtradb-cluster-5.7-dbg

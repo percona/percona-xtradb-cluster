@@ -19,6 +19,7 @@ invoke() {
 }
 
 MYSQL_BOOTSTRAP="/usr/sbin/mysqld --bootstrap --user=mysql --skip-grant-tables"
+MYSQL_INIT="/usr/sbin/mysqld --initialize --user=mysql --datadir=/var/lib/mysql"
 
 test_mysql_access() {
        mysql --no-defaults -u root -h localhost </dev/null >/dev/null 2>&1
@@ -58,6 +59,7 @@ EOF
 # and because changed configuration options should take effect immediately.
 # In case the server wasn't running at all it should be ok if the stop
 # script fails. I can't tell at this point because of the cleaned /var/run.
+$MYSQL_INIT
 set +e; invoke stop; set -e
     
 case "$1" in
@@ -135,14 +137,13 @@ EOF
     db_set percona-xtradb-cluster-server/postrm_remove_database false || true
 
     # To avoid downgrades.
-    touch $mysql_statedir/debian-5.6.flag
+    touch $mysql_statedir/debian-5.7.flag
 
     # initiate databases. Output is not allowed by debconf :-(
     # Debian: beware of the bashisms... 
     # Debian: can safely run on upgrades with existing databases 
     set +e
-    /usr//bin/mysql_install_db --user=mysql --rpm 2>&1 |
-        $ERR_LOGGER
+    $MYSQL_INIT 2>&1 | $ERR_LOGGER
     if [ "$?" != "0" ]; then
       echo "ATTENTION: An error has occured. More info is in the syslog!"
     fi
@@ -265,7 +266,7 @@ echo -e " * Run the following commands to create these functions:\n"
 echo -e "\tmysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo -e "\tmysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
 echo -e "\tmysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmurmur_udf.so'\""
-echo -e "\n * See http://www.percona.com/doc/percona-xtradb-cluster/5.6/management/udf_percona_toolkit.html for more details\n\n"
+echo -e "\n * See http://www.percona.com/doc/percona-xtradb-cluster/5.7/management/udf_percona_toolkit.html for more details\n\n"
 #
 db_stop # in case invoke failes
 

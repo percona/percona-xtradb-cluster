@@ -1,8 +1,8 @@
-percona-xtradb-cluster-5.6 (@@MYSQL_VERSION@@-rel@@PERCONA_VERSION@@) unstable; urgency=low
+percona-xtradb-cluster-5.7 (@@MYSQL_VERSION@@-rel@@PERCONA_VERSION@@) unstable; urgency=low
 
-  * Packaging updates for PXC 5.6.
+  * Packaging updates for PXC 5.7
 
- -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Sun, 15 Feb 2015 08:28:27 +0200
+ -- Alexey Bychko <alexey.bychko@percona.com>  Thu, 17 Mar 2016 19:03:05 +0600
 
 percona-server-5.6 (5.6.22-rel72.0) unstable; urgency=low
 
@@ -13,7 +13,7 @@ percona-server-5.6 (5.6.22-rel72.0) unstable; urgency=low
 percona-server-5.6 (5.6.22-rel71.0) unstable; urgency=low
 
   * init script timeout is too short when resizing logs (bug1328262)
-  * innodb_blocking_buffer_pool_restore cause startup return fail (bug1072538) 
+  * innodb_blocking_buffer_pool_restore cause startup return fail (bug1072538)
   * Set MYSQL_MAINTAINER_MODE=OFF for debug build (bug1408232)
 
  -- Tomislav Plavcic <tomislav.plavcic@percona.com>  Fri, 09 Jan 2015 17:39:39 +0100
@@ -90,9 +90,9 @@ percona-server-5.6 (5.6.16-rel64.0) unstable; urgency=low
  -- George Lorch <george.lorch@percona.com>  Wed, 19 Feb 2014 15:22:30 -0700
 
 percona-xtradb-cluster-5.6 (5.6.15-rel62.0) unstable; urgency=low
- 
+
   * Release bump.
- 
+
  -- Raghavendra Prabhu <raghavendra.prabhu@percona.com>  Thu,  30 Jan 2014 17:00:00 -0300
 
 percona-xtradb-cluster-5.6 (5.6.15-rel62.0) unstable; urgency=low
