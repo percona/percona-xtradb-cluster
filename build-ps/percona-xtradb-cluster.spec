@@ -1380,7 +1380,6 @@ fi
 %attr(755, root, root) %{_bindir}/resolveip
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
-%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 %attr(755, root, root) %{_bindir}/wsrep_sst_rsync
 # Explicit %attr() mode not applicaple to symlink
