@@ -1475,7 +1475,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       else
       {
         mysql_reset_thd_for_next_command(thd);
-        my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+        my_message(ER_LOCK_DEADLOCK, "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction", MYF(0));
         WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         thd->killed               = THD::NOT_KILLED;
@@ -1740,7 +1740,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
     if (thd->wsrep_conflict_state== ABORTED) 
     {
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+      my_message(ER_LOCK_DEADLOCK, "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction", MYF(0));
       WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
@@ -6534,7 +6534,9 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                       thd->thread_id(), is_autocommit, thd->wsrep_retry_counter,
                       thd->variables.wsrep_retry_autocommit,
                       WSREP_QUERY(thd));
-          my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+          my_message(ER_LOCK_DEADLOCK, 
+            "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction",
+            MYF(0));
           thd->killed= THD::NOT_KILLED;
           thd->wsrep_conflict_state= NO_CONFLICT;
           if (thd->wsrep_conflict_state != REPLAYING)
