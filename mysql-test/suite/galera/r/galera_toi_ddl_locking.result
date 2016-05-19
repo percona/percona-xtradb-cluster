@@ -10,7 +10,7 @@ SELECT COUNT(*) = 0 FROM t2;
 COUNT(*) = 0
 1
 INSERT INTO t1 VALUES (1);
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP cancelled the transaction
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t2 VALUES (1);

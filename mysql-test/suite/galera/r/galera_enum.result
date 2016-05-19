@@ -28,7 +28,7 @@ START TRANSACTION;
 UPDATE t1 SET f1 = 'four' where f1 = '';
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP cancelled the transaction
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 'three';
 COUNT(*) = 1
 1
