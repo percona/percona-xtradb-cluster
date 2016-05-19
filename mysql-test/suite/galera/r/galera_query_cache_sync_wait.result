@@ -8,7 +8,7 @@ MAX(id)
 1
 INSERT INTO t1 VALUES (2);
 SELECT MAX(id) FROM t1;
-ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+ERROR HY000: Synchronous wait failed.
 SET GLOBAL DEBUG = "";
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
 FLUSH QUERY CACHE;
@@ -16,7 +16,7 @@ SET SESSION wsrep_sync_wait = 7;
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 INSERT INTO t1 VALUES (3);
 SELECT MAX(id) FROM t1;
-ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+ERROR HY000: Synchronous wait failed.
 SET GLOBAL DEBUG = "";
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
 INSERT INTO t1 VALUES (4);

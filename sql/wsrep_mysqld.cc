@@ -846,9 +846,6 @@ bool wsrep_sync_wait (THD* thd, uint mask)
 
     if (unlikely(WSREP_OK != ret))
     {
-      const char* msg;
-      int err;
-
       // Possibly relevant error codes:
       // ER_CHECKREAD, ER_ERROR_ON_READ, ER_INVALID_DEFAULT, ER_EMPTY_QUERY,
       // ER_FUNCTION_NOT_DEFINED, ER_NOT_ALLOWED_COMMAND, ER_NOT_SUPPORTED_YET,
@@ -857,17 +854,13 @@ bool wsrep_sync_wait (THD* thd, uint mask)
       switch (ret)
       {
       case WSREP_NOT_IMPLEMENTED:
-        msg= "synchronous reads by wsrep backend. "
-             "Please unset wsrep_causal_reads variable.";
-        err= ER_NOT_SUPPORTED_YET;
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0), 
+              "Synchronous reads by the WSREP backend. "
+              "Please unset the wsrep_causal_reads variable.");
         break;
       default:
-        msg= "Synchronous wait failed.";
-        err= ER_LOCK_WAIT_TIMEOUT; // NOTE: the above msg won't be displayed
-                                   //       with ER_LOCK_WAIT_TIMEOUT
+        my_message(ER_LOCK_WAIT_TIMEOUT, "Synchronous wait failed.", MYF(0));
       }
-
-      my_error(err, MYF(0), msg);
 
       return true;
     }
@@ -1281,8 +1274,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     WSREP_WARN("TO isolation failed for: %d, schema: %s, sql: %s. Check wsrep "
                "connection state and retry the query.",
                ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-    my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
-	     "your wsrep connection state and retry the query.");
+    my_message(ER_LOCK_DEADLOCK, "WSREP replication failed. Check "
+	     "your wsrep connection state and retry the query.", MYF(0));
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     return -1;

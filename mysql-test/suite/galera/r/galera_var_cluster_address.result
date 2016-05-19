@@ -1,6 +1,6 @@
 SET GLOBAL wsrep_cluster_address = 'foo://';
 SHOW STATUS;
-ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+ERROR HY000: Synchronous wait failed.
 SET SESSION wsrep_sync_wait=0;
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
 SHOW STATUS LIKE 'wsrep_ready';
