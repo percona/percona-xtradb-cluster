@@ -3389,6 +3389,14 @@ trx_kill_blocking(trx_t* trx)
                           wsrep_thd_trx_seqno(trx->mysql_thd)   <<
                           ", victim: "                          <<
                           wsrep_thd_trx_seqno(victim_trx->mysql_thd);
+                        /* trx_rollback, above, clears victim_trx->id, which we need to
+                           address in replicator cleanup. terrible id swapping follows...
+                        */
+                        trx_id_t save_id = victim_trx->id;
+                        victim_trx->id = id;
+                        wsrep_signal_replicator(victim_trx, trx);
+                        victim_trx->id = save_id;
+
 #endif /* WITH_WSREP */
 		}
 

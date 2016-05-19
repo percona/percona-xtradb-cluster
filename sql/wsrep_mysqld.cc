@@ -1218,9 +1218,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
     wsrep_to_isolation++;
+#ifdef SKIP_INNODB_HP
     /* set priority */
     thd->tx_priority = 1;
-
+#endif
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
@@ -1251,9 +1252,10 @@ static void wsrep_TOI_end(THD *thd) {
   wsrep_status_t ret;
   wsrep_to_isolation--;
 
+#ifdef SKIP_INNODB_HP
   /* set priority back to normal */
   thd->tx_priority = 0;
-
+#endif
   WSREP_DEBUG("TO END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, thd->query().str);
 

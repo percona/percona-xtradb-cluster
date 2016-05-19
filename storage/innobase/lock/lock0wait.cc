@@ -395,12 +395,16 @@ lock_wait_suspend_thread(
 
 	if (lock_wait_timeout < 100000000
 	    && wait_time > (double) lock_wait_timeout
+#ifdef WITH_WSREP
+            && (!wsrep_on(trx->mysql_thd) ||
+                (!wsrep_is_BF_lock_timeout(trx) && trx->error_state != DB_DEADLOCK))
+#endif /* WITH_WSREP */
 	    && !trx_is_high_priority(trx)) {
 
 		trx->error_state = DB_LOCK_WAIT_TIMEOUT;
 
 		MONITOR_INC(MONITOR_TIMEOUT);
-	}
+        }
 
 	if (trx_is_interrupted(trx)) {
 

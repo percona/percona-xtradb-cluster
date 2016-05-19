@@ -2,13 +2,13 @@ SET GLOBAL wsrep_provider_options = 'evs.inactive_timeout=PT100M; evs.suspect_ti
 SET GLOBAL wsrep_provider_options = 'evs.inactive_timeout=PT100M; evs.suspect_timeout=PT1S';
 Suspending node ...
 SET SESSION wsrep_sync_wait = 0;
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
 CREATE TABLE t1 (f1 INTEGER);
 INSERT INTO t1 VALUES (1);
 SET SESSION wsrep_sync_wait = 0;
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
 SELECT COUNT(*) = 1 FROM t1;

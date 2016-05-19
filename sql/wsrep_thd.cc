@@ -105,6 +105,12 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   else
     thd->variables.option_bits&= ~(OPTION_BIN_LOG);
 
+  /*
+    in 5.7, we declare applying to happen as with slave threads
+    this set here is for replaying, when local threads will operate
+    as slave for the duration of replaying
+  */
+  thd->slave_thread = TRUE;
   if (!thd->wsrep_rli)
   {
     thd->wsrep_rli = wsrep_relay_log_init("wsrep_relay");
@@ -143,6 +149,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->wsrep_rli->current_mts_submode = 0;
   delete thd->wsrep_rli;
   thd->wsrep_rli = 0;
+  thd->slave_thread = FALSE;
 }
 
 void wsrep_replay_transaction(THD *thd)
@@ -423,7 +430,7 @@ static void wsrep_rollback_process(THD *thd)
 
   mysql_mutex_unlock(&LOCK_wsrep_rollback);
   sql_print_information("WSREP: rollbacker thread exiting");
-
+  thd->store_globals();
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
 }
