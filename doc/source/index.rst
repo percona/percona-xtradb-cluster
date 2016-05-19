@@ -73,6 +73,9 @@ User's Manual
    manual/restarting_nodes
    manual/failover
    manual/monitoring
+   manual/certification
+   manual/threading_model
+   manual/gcache_record-set_cache_difference
 
 How-tos
 =======
