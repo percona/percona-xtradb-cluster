@@ -626,10 +626,11 @@ typedef struct system_variables
   my_bool wsrep_on;
   my_bool wsrep_causal_reads;
   my_bool wsrep_replicate_myisam;               // enable myisam replication
-  my_bool wsrep_dirty_reads;
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
   ulong wsrep_OSU_method;
+  my_bool wsrep_dirty_reads;
+  ulong wsrep_auto_increment_control;
 #endif
   ulong log_slow_rate_limit;
   ulonglong log_slow_filter;
@@ -2138,9 +2139,6 @@ public:
 
   Global_read_lock()
     : m_state(GRL_NONE),
-#ifdef WITH_WSREP
-      provider_paused(FALSE),
-#endif
       m_mdl_global_shared_lock(NULL),
       m_mdl_blocks_commits_lock(NULL)
   {}
@@ -2172,25 +2170,18 @@ public:
   }
   bool make_global_read_lock_block_commit(THD *thd);
 #ifdef WITH_WSREP
-  bool wsrep_pause(void);
-  wsrep_status_t wsrep_resume(void);
-  bool wsrep_pause_once(bool *already_paused);
+  bool wsrep_pause();
+  wsrep_status_t wsrep_resume(bool ignore_if_resumed= false);
+  bool wsrep_pause_once();
   wsrep_status_t wsrep_resume_once(void);
-  bool provider_resumed() const { return !provider_paused; }
-  void pause_provider(bool val) { provider_paused= val; }
 #endif
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
+
 private:
   volatile static int32 m_active_requests;
   enum_grl_state m_state;
-  /**
-   Set to true when wsrep->pause is invoked and
-   toggled back at wsrep->resume.
-  */
-#ifdef WITH_WSREP
-  bool provider_paused;
-#endif
+
   /**
     In order to acquire the global read lock, the connection must
     acquire shared metadata lock in GLOBAL namespace, to prohibit
@@ -5715,6 +5706,14 @@ public:
   sent by the user (ie: stored procedure).
 */
 #define CF_SKIP_QUESTIONS       (1U << 1)
+#ifdef WITH_WSREP
+/**
+  Do not check that wsrep snapshot is ready before allowing this command
+*/
+#define CF_SKIP_WSREP_CHECK     (1U << 2)
+#else
+#define CF_SKIP_WSREP_CHECK     0
+#endif /* WITH_WSREP */
 
 /**
   Do not check that wsrep snapshot is ready before allowing this command
@@ -5756,5 +5755,21 @@ inline bool add_group_to_list(THD *thd, Item *item, bool asc)
 extern pthread_attr_t *get_connection_attrib(void);
 
 #endif /* MYSQL_SERVER */
+
+/**
+  Create a temporary file.
+
+  @details
+  The temporary file is created in a location specified by the parameter
+  path. if path is null, then it will be created on the location given
+  by the mysql server configuration (--tmpdir option).  The caller
+  does not need to delete the file, it will be deleted automatically.
+
+  @param path	location for creating temporary file
+  @param prefix	prefix for temporary file name
+  @retval -1	error
+  @retval >= 0	a file handle that can be passed to dup or my_close
+*/
+int mysql_tmpfile_path(const char* path, const char* prefix);
 
 #endif /* SQL_CLASS_INCLUDED */

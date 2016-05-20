@@ -78,6 +78,7 @@ bool one_thread_per_connection_end(THD *thd, bool block_pthread);
 void kill_blocked_pthreads();
 void refresh_status(THD *thd);
 bool is_secure_file_path(char *path);
+bool is_mysql_datadir_path(const char *path);
 void dec_connection_count(THD *thd);
 
 // These are needed for unit testing.
@@ -373,7 +374,7 @@ extern PSI_mutex_key
   key_delayed_insert_mutex, key_hash_filo_lock, key_LOCK_active_mi,
   key_LOCK_connection_count, key_LOCK_crypt, key_LOCK_delayed_create,
   key_LOCK_delayed_insert, key_LOCK_delayed_status, key_LOCK_error_log,
-  key_LOCK_stats, key_LOCK_global_user_client_stats,
+  key_LOCK_global_user_client_stats,
   key_LOCK_global_table_stats, key_LOCK_global_index_stats,
   key_LOCK_gdl, key_LOCK_global_system_variables,
   key_LOCK_lock_db, key_LOCK_logger, key_LOCK_manager,
@@ -428,7 +429,8 @@ extern PSI_cond_key key_BINLOG_update_cond,
   key_relay_log_info_sleep_cond, key_cond_slave_parallel_pend_jobs,
   key_cond_slave_parallel_worker,
   key_TABLE_SHARE_cond, key_user_level_lock_cond,
-  key_COND_thread_count, key_COND_thread_cache, key_COND_flush_thread_cache;
+  key_COND_thread_count, key_COND_thread_cache, key_COND_flush_thread_cache,
+  key_COND_connection_count;
 extern PSI_cond_key key_BINLOG_COND_done;
 extern PSI_cond_key key_RELAYLOG_COND_done;
 extern PSI_cond_key key_RELAYLOG_update_cond;
@@ -635,7 +637,7 @@ extern mysql_mutex_t
        LOCK_global_system_variables, LOCK_user_conn, LOCK_log_throttle_qni,
        LOCK_prepared_stmt_count, LOCK_error_messages, LOCK_connection_count,
        LOCK_sql_slave_skip_counter, LOCK_slave_net_timeout,
-       LOCK_stats, LOCK_global_user_client_stats,
+       LOCK_global_user_client_stats,
        LOCK_global_table_stats, LOCK_global_index_stats;
 #ifdef HAVE_OPENSSL
 extern char* des_key_file;

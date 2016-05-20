@@ -1,4 +1,4 @@
-/* Copyright (c) 2006, 2012, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2015, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -234,7 +234,7 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs)
 
 #endif /* WITH_WSREP */
 
-extern "C" bool sqlcom_can_generate_row_events(const THD *thd);
 
+extern "C" bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 
 #endif /* SQL_PARSE_INCLUDED */

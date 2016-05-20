@@ -90,7 +90,7 @@ extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;
 extern my_bool     wsrep_desync;
-extern ulong       wsrep_reject_queries_options;
+extern ulong       wsrep_reject_queries;
 extern my_bool     wsrep_recovery;
 extern my_bool     wsrep_log_conflicts;
 extern ulong       wsrep_mysql_replication_bundle;
@@ -100,7 +100,12 @@ extern my_bool     wsrep_restart_slave_activated;
 extern my_bool     wsrep_slave_FK_checks;
 extern my_bool     wsrep_slave_UK_checks;
 
-enum enum_wsrep_reject_types { WSREP_REJ_NONE, WSREP_REJ_ALL, WSREP_REJ_ALL_KILL };
+enum enum_wsrep_reject_types {
+  WSREP_REJECT_NONE,    /* nothing rejected */
+  WSREP_REJECT_ALL,     /* reject all queries, with UNKNOWN_COMMAND error */
+  WSREP_REJECT_ALL_KILL /* kill existing connections and reject all queries*/
+};
+
 enum enum_wsrep_OSU_method {
     WSREP_OSU_TOI,
     WSREP_OSU_RSU,
@@ -286,9 +291,14 @@ extern mysql_mutex_t LOCK_wsrep_replaying;
 extern mysql_cond_t  COND_wsrep_replaying;
 extern mysql_mutex_t LOCK_wsrep_slave_threads;
 extern mysql_mutex_t LOCK_wsrep_desync;
+
 extern int wsrep_desync_count;
 extern int wsrep_desync_count_manual;
 extern mysql_mutex_t LOCK_wsrep_desync_count;
+
+extern unsigned int wsrep_pause_count;
+extern mysql_mutex_t LOCK_wsrep_pause_count;
+
 extern wsrep_aborting_thd_t wsrep_aborting_thd;
 extern my_bool       wsrep_emulate_bin_log;
 extern int           wsrep_to_isolation;
@@ -311,6 +321,7 @@ extern PSI_cond_key  key_COND_wsrep_replaying;
 extern PSI_mutex_key key_LOCK_wsrep_slave_threads;
 extern PSI_mutex_key key_LOCK_wsrep_desync;
 extern PSI_mutex_key key_LOCK_wsrep_desync_count;
+extern PSI_mutex_key key_LOCK_wsrep_pause_count;
 #endif /* HAVE_PSI_INTERFACE */
 struct TABLE_LIST;
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
@@ -327,5 +338,6 @@ int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len);
 bool wsrep_stmt_rollback_is_safe(THD* thd);
 
 void wsrep_init_sidno(const wsrep_uuid_t&);
-
+bool wsrep_node_is_donor();
+bool wsrep_node_is_synced();
 #endif /* WSREP_MYSQLD_H */

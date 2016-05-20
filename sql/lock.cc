@@ -1052,11 +1052,34 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
   {
     thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
     m_mdl_blocks_commits_lock= NULL;
-  }
 #ifdef WITH_WSREP
-  if (!provider_resumed())
-        wsrep_resume();
+    if (WSREP(thd) || wsrep_node_is_donor())
+    {
+      /* Function will take care of decrementing reference count
+      if it is not the last one to get called. Last one will
+      perform the resume action. */
+      wsrep_resume();
+
+      /* initiate resync. if this is not the last one reference counter
+      is decremented and flow proceed. */
+      mysql_mutex_lock(&LOCK_wsrep_desync_count);
+      assert(wsrep_desync_count > 0);
+      if (--wsrep_desync_count == 0)
+      {
+        int ret = wsrep->resync(wsrep);
+        if (ret != WSREP_OK)
+        {
+          mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+          WSREP_WARN("resync failed %d for FTWRL: db: %s, query: %s", ret,
+                     (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+          DBUG_VOID_RETURN;
+        }
+      }
+      mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+    }
 #endif /* WITH_WSREP */
+  }
+
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
   my_atomic_add32(&Global_read_lock::m_active_requests, -1);
   m_mdl_global_shared_lock= NULL;
@@ -1090,16 +1113,11 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   */
 
 #ifdef WITH_WSREP
-  if (m_mdl_blocks_commits_lock)
+  if (WSREP(thd) && m_mdl_blocks_commits_lock)
   {
     WSREP_DEBUG("GRL was in block commit mode when entering "
 		"make_global_read_lock_block_commit");
-    thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
-    m_mdl_blocks_commits_lock= NULL;
-    wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
-    DBUG_ASSERT(!provider_resumed());
-    wsrep_resume();
-    m_state= GRL_ACQUIRED;
+    DBUG_RETURN(FALSE);
   }
 #endif /* WITH_WSREP */
 
@@ -1116,9 +1134,52 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   m_state= GRL_ACQUIRED_AND_BLOCKS_COMMIT;
 
 #ifdef WITH_WSREP
+  /* Native threads should bail out before wsrep oprations to follow.
+     Donor servicing thread is an exception, it should pause provider but not desync,
+     as it is already desynced in donor state
+  */
+  if (!WSREP(thd) && !wsrep_node_is_donor())
+  {
+    DBUG_RETURN(FALSE);
+  }
+
+  /* if already desynced or donor, avoid double desyncing 
+     if not in PC and synced, desyncing is not possible either
+  */
+  if (wsrep_desync || !wsrep_node_is_synced())
+  {
+    WSREP_DEBUG("desync set upfont, skipping implicit desync for FTWRL: %d",
+                wsrep_desync);
+
+    mysql_mutex_lock(&LOCK_wsrep_desync_count);
+    wsrep_desync_count++;
+    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+  }
+  else
+  {
+    int rcode;
+    WSREP_DEBUG("running implicit desync for node");
+
+    mysql_mutex_lock(&LOCK_wsrep_desync_count);
+    wsrep_desync_count++;
+ 
+    rcode = wsrep->desync(wsrep);
+    if (rcode != WSREP_OK)
+    {
+      wsrep_desync_count--;
+      mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+      WSREP_WARN("FTWRL desync failed %d for schema: %s, query: %s",
+                 rcode, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+      my_message(ER_LOCK_DEADLOCK, "wsrep desync failed for FTWRL", MYF(0));
+      DBUG_RETURN(TRUE);
+    }
+    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+  }
+
   if (!wsrep_pause())
     DBUG_RETURN(TRUE);
-#endif
+#endif /* WITH_WSREP */
+
   DBUG_RETURN(FALSE);
 }
 
@@ -1130,13 +1191,25 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
   @retval True   Provider has been paused.
 */
-bool Global_read_lock::wsrep_pause(void)
+bool Global_read_lock::wsrep_pause()
 {
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
+
+  /* Provider already paused. Avoid re-pausing it.
+  Just increment the count. */
+  if (wsrep_pause_count > 0)
+  {
+     ++wsrep_pause_count;
+     mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+     return(TRUE);
+  }
+
   wsrep_seqno_t ret = wsrep->pause(wsrep);
   if (ret >= 0)
   {
     wsrep_locked_seqno= ret;
-    pause_provider(TRUE);
+    assert(wsrep_pause_count == 0);
+    ++wsrep_pause_count;
   }
   else if (ret != -ENOSYS) /* -ENOSYS - no provider */
   {
@@ -1145,56 +1218,55 @@ bool Global_read_lock::wsrep_pause(void)
     /* m_mdl_blocks_commits_lock is always NULL here */
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
     my_error(ER_LOCK_DEADLOCK, MYF(0));
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
     return FALSE;
   }
+
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
   return TRUE;
 }
 
 /**
-  Pause the galera provider.
+  Resume the galera provider.
   Also set wsrep_locked_seqno to sequence number returned.
 
   @retval False  Failed to pause the provider, wsrep_locked_seqno is reset.
   @retval True   Provider has been paused.
 */
-wsrep_status_t Global_read_lock::wsrep_resume(void)
+wsrep_status_t Global_read_lock::wsrep_resume(bool ignore_if_resumed)
 {
-    wsrep_status_t ret(WSREP_WARNING);
+  wsrep_status_t ret(WSREP_OK);
 
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
+
+  if (ignore_if_resumed && wsrep_pause_count == 0)
+  {
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+    return ret;
+  }
+
+  assert(wsrep_pause_count > 0);
+  if (--wsrep_pause_count == 0)
+  {
     wsrep_locked_seqno= WSREP_SEQNO_UNDEFINED;
     ret = wsrep->resume(wsrep);
 
-    if (!ret)
-    {
-      pause_provider(FALSE);
-    }
-    else
-    {
+    if (ret)
       WSREP_WARN("Failed to resume provider: %d", ret);
-    }
-    return ret;
+  }
+
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+  return ret;
 }
 
-bool Global_read_lock::wsrep_pause_once(bool *already_paused)
+bool Global_read_lock::wsrep_pause_once()
 {
-    if (!provider_paused)
-    {
-      *already_paused= FALSE;
-      if (wsrep_pause())
-      {
-        return TRUE;
-      }
-      return FALSE;
-    }
-    *already_paused= TRUE;
-    return TRUE;
+    return wsrep_pause();
 }
 
 wsrep_status_t Global_read_lock::wsrep_resume_once(void)
 {
-    if (provider_paused)
-      return wsrep_resume();
-    return WSREP_OK;
+  return wsrep_resume(true);
 }
 
 #endif /* WITH_WSREP */

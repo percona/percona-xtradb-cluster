@@ -1,0 +1,75 @@
+call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+SET GLOBAL wsrep_desync=1;
+SET wsrep_OSU_method=RSU;
+SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
+ALTER TABLE t1 ADD COLUMN f2 INTEGER;;
+SET GLOBAL wsrep_desync=0;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'OFF'
+SET DEBUG_SYNC= 'now SIGNAL continue';
+SET GLOBAL wsrep_desync=0;
+SHOW VARIABLES LIKE 'wsrep_desync';
+Variable_name	Value
+wsrep_desync	OFF
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+SHOW VARIABLES LIKE 'wsrep_desync';
+Variable_name	Value
+wsrep_desync	OFF
+SET wsrep_OSU_method=TOI;
+DROP TABLE t1;
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+SET GLOBAL wsrep_desync=1;
+FLUSH TABLE WITH READ LOCK;
+SET GLOBAL wsrep_desync=0;
+ERROR 42000: Variable 'wsrep_desync' can't be set to the value of 'OFF'
+UNLOCK TABLES;
+SET GLOBAL wsrep_desync=0;
+SHOW VARIABLES LIKE 'wsrep_desync';
+Variable_name	Value
+wsrep_desync	OFF
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+SHOW VARIABLES LIKE 'wsrep_desync';
+Variable_name	Value
+wsrep_desync	OFF
+DROP TABLE t1;
+#node-1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+SET GLOBAL wsrep_desync=1;
+SET wsrep_OSU_method=RSU;
+SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
+ALTER TABLE t1 ADD COLUMN f2 INTEGER;;
+#node-1a
+FLUSH TABLE WITH READ LOCK;
+#node-1b
+SET DEBUG_SYNC= 'now SIGNAL continue';
+#node-1
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+#node-1a
+UNLOCK TABLES;
+#node-1
+SET GLOBAL wsrep_desync=0;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+SHOW VARIABLES LIKE 'wsrep_desync';
+Variable_name	Value
+wsrep_desync	OFF
+SET wsrep_OSU_method=TOI;
+DROP TABLE t1;
