@@ -1259,8 +1259,9 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   wsrep_key_arr_t key_arr= {0, 0};
   struct wsrep_buf buff = { buf, buf_len };
+  const char *save_proc_info = NULL;
   if (WSREP(thd))
-      thd_proc_info(thd, "Preparing for TO isolation");
+      save_proc_info = thd_proc_info(thd, "Preparing for TO isolation");
   if (!buf_err                                                                &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       key_arr.keys_len > 0                                                    &&
@@ -1283,6 +1284,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
 	     "your wsrep connection state and retry the query.");
+    if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     return -1;
@@ -1292,8 +1294,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     WSREP_DEBUG("TO isolation skipped for: %d, sql: %s."
 		"Only temporary tables affected.",
 		ret, WSREP_QUERY(thd));
+    if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
     return 1;
   }
+  if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
   return 0;
 }
 
