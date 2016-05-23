@@ -176,7 +176,7 @@ Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          psmisc,
          passwd,
          lsb-base (>= 3.0-10),
-         percona-xtradb-cluster-galera-25,
+         galera-57,
          percona-xtrabackup (>= 2.2.5),
          socat,
         lsof,
@@ -252,7 +252,7 @@ Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          psmisc,
          passwd,
          lsb-base (>= 3.0-10),
-         percona-xtradb-cluster-galera-25,
+         galera-57,
          percona-xtrabackup (>= 2.2.5),
          socat,
         lsof,
@@ -271,16 +271,16 @@ Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries
 Package: percona-xtradb-cluster-57
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), percona-xtradb-cluster-galera-3, ${misc:Depends}
+Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), galera-57, ${misc:Depends}
 Description: Percona XtraDB Cluster with Galera
- This is a meta-package providing PXC57 server, client and galera-3.
+ This is a meta-package providing PXC57 server, client and galera-57.
 
 Package: percona-xtradb-cluster-full-57
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), percona-xtradb-cluster-galera-3, percona-xtradb-cluster-test-5.7 (>= ${binary:Version}), percona-xtradb-cluster-5.7-dbg (>= ${binary:Version}),  percona-xtradb-cluster-garbd-3, percona-xtradb-cluster-galera3-dbg, percona-xtradb-cluster-server-debug-5.7, ${misc:Depends}
+Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), galera-57, percona-xtradb-cluster-test-5.7 (>= ${binary:Version}), percona-xtradb-cluster-5.7-dbg (>= ${binary:Version}),  galera-garbd-57, galera-57-dbg, percona-xtradb-cluster-server-debug-5.7, ${misc:Depends}
 Description: Percona XtraDB Cluster with Galera
- This is a meta-package providing PXC57 server, client, galera-3, test and debug packages.
+ This is a meta-package providing PXC57 server, client, galera-57, test and debug packages.
 
 Package: percona-xtradb-cluster-test-5.7
 Architecture: any
