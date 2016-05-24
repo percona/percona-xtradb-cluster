@@ -1177,6 +1177,10 @@ srv_free(void)
 		mutex_free(&srv_sys->tasks_mutex);
 	}
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
+	os_event_free(srv_allow_writes_event);
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 #ifndef HAVE_ATOMIC_BUILTINS
 	mutex_free(&server_mutex);
 #endif
