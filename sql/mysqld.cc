@@ -7605,10 +7605,7 @@ void handle_connections_sockets()
       thd->security_ctx->set_host((char*) my_localhost);
 
     if (mysql_socket_getfd(sock) == mysql_socket_getfd(extra_ip_sock))
-    {
-      thd->extra_port= 1;
       thd->scheduler= extra_thread_scheduler;
-    }
     create_new_thread(thd);
   }
   DBUG_VOID_RETURN;
