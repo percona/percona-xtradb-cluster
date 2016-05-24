@@ -5362,6 +5362,13 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       }
     }
   }
+
+  /* 
+   * Forcing a new setwd in case the SST mounted the datadir
+   */
+  if (my_setwd(mysql_real_data_home,MYF(MY_WME)) && !opt_help)
+    unireg_abort(1);        /* purecov: inspected */
+
   if (opt_bin_log)
   {
     /*
