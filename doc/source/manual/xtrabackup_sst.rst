@@ -75,9 +75,9 @@ Used to enable and specify SST encryption mode:
 
 * Set ``encrypt=0`` to disable SST encryption. This is the default value.
 
-* Set ``encrypt=1`` to perform symmetric SST encryption based on XtraBackup. For more information, see :ref:`xtrabackup_sst_encryption>`.
+* Set ``encrypt=1`` to perform symmetric SST encryption based on XtraBackup.
 
-* Set ``encrypt=2`` to perform SST encryption based on OpenSSL with ``socat``. Ensure that ``socat`` is built with OpenSSL: ``socat -V | grep OPENSSL``. This is recommended if your nodes are over WAN and security constraints are higher. For more information, see :ref:`socat_openssl_encryption`.
+* Set ``encrypt=2`` to perform SST encryption based on OpenSSL with ``socat``. Ensure that ``socat`` is built with OpenSSL: ``socat -V | grep OPENSSL``. This is recommended if your nodes are over WAN and security constraints are higher.
 
 * Set ``encrypt=3`` to perform SST encryption based on SSL for just the key and certificate files as implemented in `Galera <http://galeracluster.com/documentation-webpages/ssl.html>`_.
 
@@ -94,7 +94,7 @@ Used to enable and specify SST encryption mode:
 
    :Values: AES128, AES192, AES256
 
-Used to specify the SST encryption algorithm. It uses the same values as the ``--encryption`` option for XtraBackup (see `here <http://www.percona.com/doc/percona-xtrabackup/2.3/innobackupex/encrypted_backups_innobackupex.html>`_). The ``encrypt-algo`` option is considered only if :option:`encrypt` is set to ``1``.
+Used to specify the SST encryption algorithm. It uses the same values as the ``--encryption`` option for XtraBackup (see `this document <http://www.percona.com/doc/percona-xtrabackup/2.3/innobackupex/encrypted_backups_innobackupex.html>`_). The ``encrypt-algo`` option is considered only if :option:`encrypt` is set to ``1``.
 
 .. option:: sockopt
 
