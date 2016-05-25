@@ -128,7 +128,13 @@ fi
 
 # end of NIS tolerance zone
 set -e
-
+MYSQLCONFIG=/etc/mysql/my.cnf
+if [ -f ${MYSQLCONFIG} ];
+then
+    cp -f ${MYSQLCONFIG} ${MYSQLCONFIG}.old
+    sed -e '/^key_buffer/s/^/#/g' -i ${MYSQLCONFIG}
+    sed -e '/^myisam-recover/s/^/#/g' -i ${MYSQLCONFIG}
+fi
 # if there's a symlink, let's store where it's pointing, because otherwise
 # it's going to be lost in some situations
 for dir in DATADIR LOGDIR; do
