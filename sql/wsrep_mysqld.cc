@@ -1313,48 +1313,14 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, WSREP_QUERY(thd));
 
-  DEBUG_SYNC(thd,"wsrep_RSU_begin_enter");
-
-  /* RSU is suppose to perform 2 main action.
-  a. desync the node
-  b. pause the provider
-  If any of the action is already performed then avoid repeating it
-  but make sure it is reference incremented to avoid release of resources. */
-
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
-
-  DEBUG_SYNC(thd,"wsrep_RSU_begin_after_lock");
-
-  /* Node is already desynced. */
-  if (wsrep_desync_count)
-  {
-     ++wsrep_desync_count;
-
-     mysql_mutex_lock(&LOCK_wsrep_replaying);
-     wsrep_replaying++;
-     mysql_mutex_unlock(&LOCK_wsrep_replaying);
-
-     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-
-     DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
-     goto rsu_begin_skip_desync;
-  }
-
-  /* Node is not yet desycned. Perform the action now. */
-  assert(wsrep_desync_count == 0);
   ret = wsrep->desync(wsrep);
   if (ret != WSREP_OK)
   {
-     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-     WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
-                ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
-     my_error(ER_LOCK_DEADLOCK, MYF(0));
-     return(ret);
+    WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
+               ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
+    return(ret);
   }
-  else
-    WSREP_DEBUG("RSU desync skipped: %d", wsrep_desync);
-
-  ++wsrep_desync_count;
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying++;
@@ -1368,38 +1334,28 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
-    wsrep_desync_count--;
+
     ret = wsrep->resync(wsrep);
-    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     if (ret != WSREP_OK)
     {
-      ret = wsrep->resync(wsrep);
-      if (ret != WSREP_OK)
-      {
-        WSREP_WARN("resync failed %d for schema: %s, query: %s",
-                   ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
-      }
+      WSREP_WARN("resync failed %d for schema: %s, query: %s",
+                 ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
     }
+
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
   }
 
-  // Commenting this out as FTWRL which is specialized case of RSU
-  // does do it and enter the loop to resume or desync only if
-  // WSREP is on. Which make sense but not sure why it was done
-  // during RSU.
-  // thd->variables.wsrep_on = 0;
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-
-rsu_begin_skip_desync:
-
+  /* FTWRL is another way node can get desync and paused.
+  If FTWRL is active and RSU is then started then existing node-pause
+  is re-used. This semantics/flow need to ensure that if user unlock
+  table then node-pause is not released till RSU is active. */ 
   mysql_mutex_lock(&LOCK_wsrep_pause_count);
 
   /* Node is already paused. */
   if (wsrep_pause_count)
   {
      wsrep_pause_count++;
-     mysql_mutex_unlock(&LOCK_wsrep_pause_count);
      goto rsu_begin_skip_pause;
   }
 
@@ -1409,17 +1365,18 @@ rsu_begin_skip_desync:
   seqno = wsrep->pause(wsrep);
   if (seqno == WSREP_SEQNO_UNDEFINED)
   {
-    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     WSREP_WARN("pause failed %lld for schema: %s, query: %s", (long long)seqno,
                (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
     return(1);
   }
   ++wsrep_pause_count;
 
   WSREP_DEBUG("paused at %lld", (long long)seqno);
-  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
 
 rsu_begin_skip_pause:
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+
   DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
   return 0;
 }
@@ -1432,16 +1389,10 @@ static void wsrep_RSU_end(THD *thd)
                thd->wsrep_exec_mode, WSREP_QUERY(thd));
 
   mysql_mutex_lock(&LOCK_wsrep_pause_count);
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying--;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
-
-  /* It is perfectly fine to have a case where-in pause-references
-  drops to 0 but desync references not yet zerod which suggest
-  explicit desync operation was called out and user is yet to
-  resync it by setting wsrep_desync=off. */
 
   assert(wsrep_pause_count > 0);
   if (--wsrep_pause_count == 0)
@@ -1455,26 +1406,16 @@ static void wsrep_RSU_end(THD *thd)
      }
   }
 
-  assert(wsrep_desync_count > 0);
-  if (--wsrep_desync_count == 0)
+  ret = wsrep->resync(wsrep);
+  if (ret != WSREP_OK)
   {
-     /* No more references left. Finally resync the node. */
-     ret = wsrep->resync(wsrep);
-     if (ret != WSREP_OK)
-     {
-       mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-       WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
-                  (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
-       return;
-     }
-     // Commenting this out as FTWRL which is specialized case of RSU
-     // does do it and enter the loop to resume or desync only if
-     // WSREP is on. Which make sense but not sure why it was done
-     // during RSU.
-     // thd->variables.wsrep_on = 1;
+    WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
+               (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+    return;
   }
 
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+  thd->variables.wsrep_on = 1;
   mysql_mutex_unlock(&LOCK_wsrep_pause_count);
 }
 
@@ -1508,17 +1449,13 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
     return -1;
   }
 
-  mysql_mutex_lock(&LOCK_wsrep_pause_count);
-  if (wsrep_pause_count != 0)
+  if (!thd->global_read_lock.provider_resumed())
   {
-    /* Node is paused. TOI is not allowed on pause node. */
-    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
     WSREP_DEBUG("Aborting TOI: Galera provider paused due to lock: %s %lu",
                 thd->query(), thd->thread_id);
     my_error(ER_CANT_UPDATE_WITH_READLOCK, MYF(0));
     return -1;
   }
-  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
 
   if (wsrep_debug && thd->mdl_context.has_locks())
   {
