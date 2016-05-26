@@ -1359,6 +1359,7 @@ THD::THD(bool enable_plugins)
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
    wsrep_certify_empty_trx(false),
+   wsrep_sst_donor(false),
 #endif /* WITH_WSREP */
    m_parser_state(NULL),
    work_part_info(NULL),
@@ -1884,6 +1885,7 @@ void THD::init(void)
   wsrep_TOI_pre_queries.clear();
   wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
   wsrep_certify_empty_trx= false;
+  wsrep_sst_donor= false;
 #endif /* WITH_WSREP */
   binlog_row_event_extra_data= 0;
 

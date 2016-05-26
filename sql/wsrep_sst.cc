@@ -1088,6 +1088,7 @@ static void* sst_donor_thread (void* a)
 
   wsp::thd thd(FALSE); // we turn off wsrep_on for this THD so that it can
                        // operate with wsrep_ready == OFF
+  thd.ptr->wsrep_sst_donor= true;
 
   // Launch the SST script and save pointer to its process:
 
