@@ -274,7 +274,6 @@ Summary:        A High Availability solution based on Percona Server and Galera
 Group:          Applications/Databases
 Version:        %{mysql_version}
 Release:        %{release}
-
 Distribution:   %{distro_description}
 License:        Copyright (c) 2000, 2010, %{mysql_vendor}.  All rights reserved.  Use is subject to license terms.  Under %{license_type} license as shown in the Description field.
 Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LATEST/source/%{src_dir}.tar.gz
@@ -326,7 +325,7 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  galera-57 percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  galera-57 percona-xtrabackup >= 2.4.3 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -1310,8 +1309,7 @@ fi
 ##############################################################################
 
 # Empty section for metapackage
-# mistake?
-# %files
+%files
 
 # Empty section for metapackage
 %files -n Percona-XtraDB-Cluster-full%{product_suffix}
@@ -1582,6 +1580,10 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu May 26 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
+
+- Returned metapackage build and update PXB dependency
+
 * Mon May 23 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
 
 - Fix dependency names due to naming changes for galera
