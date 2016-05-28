@@ -150,8 +150,7 @@ show status like 'wsrep_desync_count';
 
 --connection node_1b
 --echo #node-1b
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
---source include/wait_condition.inc
+--sleep 2
 show status like 'wsrep_desync_count';
 SET DEBUG_SYNC= 'now SIGNAL continue';
 
