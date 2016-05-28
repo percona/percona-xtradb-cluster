@@ -398,12 +398,17 @@ static void wsrep_synced_cb(void* app_ctx)
     wsrep_restart_slave_activated= FALSE;
 
     channel_map.wrlock();
-    if ((rcode = start_slave_threads(1 /* need mutex */,
-                            0 /* no wait for start*/,
-                            active_mi,
-                       	    SLAVE_SQL)))
+    Master_info *mi= NULL;
+    for (mi_map::iterator it= channel_map.begin(); it!=channel_map.end(); it++)
     {
-      WSREP_WARN("Failed to create slave threads: %d", rcode);
+      mi= it->second;
+      if ((rcode = start_slave_threads(true /* need mutex */,
+                                       false /* no wait for start*/,
+                                       mi,
+                       	               SLAVE_SQL)))
+      {
+        WSREP_WARN("Failed to create slave threads: %d", rcode);
+      }
     }
     channel_map.unlock();
 

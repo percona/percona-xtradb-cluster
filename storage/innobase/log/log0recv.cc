@@ -934,10 +934,10 @@ recv_sys_init(
 	recv_sys->apply_batch_on = FALSE;
 
 	recv_sys->last_block_buf_start = static_cast<byte*>(
-		ut_malloc_nokey(2 * OS_FILE_LOG_BLOCK_SIZE));
+		ut_malloc_nokey(OS_FILE_LOG_BLOCK_SIZE + srv_log_write_ahead_size));
 
 	recv_sys->last_block = static_cast<byte*>(ut_align(
-		recv_sys->last_block_buf_start, OS_FILE_LOG_BLOCK_SIZE));
+		recv_sys->last_block_buf_start, srv_log_write_ahead_size));
 
 	recv_sys->found_corrupt_log = false;
 	recv_sys->found_corrupt_fs = false;
@@ -1553,7 +1553,8 @@ fil_write_encryption_parse(
 
 	if (offset >= UNIV_PAGE_SIZE
 	    || len + offset > UNIV_PAGE_SIZE
-	    || len != ENCRYPTION_INFO_SIZE) {
+	    || (len != ENCRYPTION_INFO_SIZE_V1
+		&& len != ENCRYPTION_INFO_SIZE_V2)) {
 		recv_sys->found_corrupt_log = TRUE;
 		return(NULL);
 	}
@@ -1572,9 +1573,10 @@ fil_write_encryption_parse(
 			<< space_id << " is invalid";
 	}
 
-	ut_ad(len == ENCRYPTION_INFO_SIZE);
+	ut_ad(len == ENCRYPTION_INFO_SIZE_V1
+	      || len == ENCRYPTION_INFO_SIZE_V2);
 
-	ptr += ENCRYPTION_INFO_SIZE;
+	ptr += len;
 
 	if (space == NULL) {
 		if (is_new) {
@@ -3944,7 +3946,7 @@ recv_recovery_from_checkpoint_start(
 	ib_uint64_t	checkpoint_no;
 	lsn_t		contiguous_lsn;
 	byte*		buf;
-	byte		log_hdr_buf[LOG_FILE_HDR_SIZE];
+	byte*		log_hdr_buf;
 	dberr_t		err;
 
 	/* Initialize red-black tree for fast insertions into the
@@ -3986,6 +3988,11 @@ recv_recovery_from_checkpoint_start(
 
 	const page_id_t	page_id(max_cp_group->space_id, 0);
 
+	byte* log_hdr_buf_unalign = static_cast<byte*>(ut_malloc_nokey(
+				LOG_FILE_HDR_SIZE + srv_log_write_ahead_size));
+	log_hdr_buf = static_cast<byte*>(ut_align(
+				log_hdr_buf_unalign, srv_log_write_ahead_size));
+
 	fil_io(IORequestLogRead, true, page_id, univ_page_size, 0,
 	       LOG_FILE_HDR_SIZE, log_hdr_buf, max_cp_group);
 
@@ -3998,6 +4005,7 @@ recv_recovery_from_checkpoint_start(
 			ib::error() << "Cannot restore from mysqlbackup,"
 				" InnoDB running in read-only mode!";
 
+			ut_free(log_hdr_buf_unalign);
 			return(DB_ERROR);
 		}
 
@@ -4023,6 +4031,8 @@ recv_recovery_from_checkpoint_start(
 		       univ_page_size, 0, OS_FILE_LOG_BLOCK_SIZE, log_hdr_buf,
 		       max_cp_group);
 	}
+
+	ut_free(log_hdr_buf_unalign);
 
 	/* Start reading the log groups from the checkpoint lsn up. The
 	variable contiguous_lsn contains an lsn up to which the log is
