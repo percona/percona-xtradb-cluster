@@ -5959,8 +5959,8 @@ static Sys_var_mybool Sys_wsrep_desync (
 static const char *wsrep_reject_queries_names[]= { "NONE", "ALL", "ALL_KILL", NullS };
 static Sys_var_enum Sys_wsrep_reject_queries(
        "wsrep_reject_queries", "Variable to set to reject queries",
-       GLOBAL_VAR(wsrep_reject_queries_options), CMD_LINE(OPT_ARG),
-       wsrep_reject_queries_names, DEFAULT(WSREP_REJ_NONE),
+       GLOBAL_VAR(wsrep_reject_queries), CMD_LINE(OPT_ARG),
+       wsrep_reject_queries_names, DEFAULT(WSREP_REJECT_NONE),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(wsrep_reject_queries_update));
 
@@ -6010,6 +6010,13 @@ static Sys_var_mybool Sys_wsrep_slave_UK_checks(
 static Sys_var_mybool Sys_wsrep_restart_slave(
        "wsrep_restart_slave", "Should MySQL slave be restarted automatically, when node joins back to cluster",
        GLOBAL_VAR(wsrep_restart_slave), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+
+static Sys_var_mybool Sys_wsrep_dirty_reads(
+       "wsrep_dirty_reads",
+       "Allow reads from a node is not in primary component",
+       SESSION_VAR(wsrep_dirty_reads),
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
 #endif /* WITH_WSREP */
 
 static bool fix_host_cache_size(sys_var *, THD *, enum_var_type)
@@ -6342,14 +6349,6 @@ static Sys_var_enum Sys_block_encryption_mode(
   "block_encryption_mode", "mode for AES_ENCRYPT/AES_DECRYPT",
   SESSION_VAR(my_aes_mode), CMD_LINE(REQUIRED_ARG),
   my_aes_opmode_names, DEFAULT(my_aes_128_ecb));
-
-#ifdef WITH_WSREP
-static Sys_var_mybool Sys_wsrep_dirty_reads(
-       "wsrep_dirty_reads",
-       "Allow dirty reads when the node is not ready.",
-       SESSION_VAR(wsrep_dirty_reads),
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
-#endif /* WITH_WSREP */
 
 static bool check_track_session_sys_vars(sys_var *self, THD *thd, set_var *var)
 {

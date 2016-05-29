@@ -711,6 +711,16 @@ my_thread_handle signal_thread_id;
 my_thread_attr_t connection_attrib;
 mysql_mutex_t LOCK_server_started;
 mysql_cond_t COND_server_started;
+mysql_mutex_t LOCK_reset_gtid_table;
+mysql_mutex_t LOCK_compress_gtid_table;
+mysql_cond_t COND_compress_gtid_table;
+#if !defined (EMBEDDED_LIBRARY) && !defined(_WIN32)
+mysql_mutex_t LOCK_socket_listener_active;
+mysql_cond_t COND_socket_listener_active;
+mysql_mutex_t LOCK_start_signal_handler;
+mysql_cond_t COND_start_signal_handler;
+#endif
+mysql_rwlock_t LOCK_consistent_snapshot;
 
 #ifdef WITH_WSREP
 mysql_mutex_t LOCK_wsrep_ready;
@@ -727,21 +737,19 @@ mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 mysql_mutex_t LOCK_wsrep_desync_count;
+mysql_mutex_t LOCK_wsrep_pause_count;
+
 int wsrep_replaying= 0;
 int wsrep_desync_count= 0;
 int wsrep_desync_count_manual= 0;
+
+/* This count is used to track how many times the provider
+was paused. Pause being an implicit operation single count
+to track this should suffice. */
+unsigned int wsrep_pause_count= 0;
+
 static void wsrep_close_threads(THD* thd);
 #endif /* WITH_WSREP */
-mysql_mutex_t LOCK_reset_gtid_table;
-mysql_mutex_t LOCK_compress_gtid_table;
-mysql_cond_t COND_compress_gtid_table;
-#if !defined (EMBEDDED_LIBRARY) && !defined(_WIN32)
-mysql_mutex_t LOCK_socket_listener_active;
-mysql_cond_t COND_socket_listener_active;
-mysql_mutex_t LOCK_start_signal_handler;
-mysql_cond_t COND_start_signal_handler;
-#endif
-mysql_rwlock_t LOCK_consistent_snapshot;
 
 bool mysqld_server_started= false;
 
@@ -1814,6 +1822,7 @@ static void clean_up_mutexes()
   mysql_mutex_destroy(&LOCK_global_user_client_stats);
   mysql_mutex_destroy(&LOCK_global_table_stats);
   mysql_mutex_destroy(&LOCK_global_index_stats);
+  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 #ifdef WITH_WSREP
   (void) mysql_mutex_destroy(&LOCK_wsrep_ready);
   (void) mysql_cond_destroy(&COND_wsrep_ready);
@@ -1828,8 +1837,8 @@ static void clean_up_mutexes()
   (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync_count);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_pause_count);
 #endif /* WITH_WSREP */
-  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 }
 
 
@@ -2395,7 +2404,6 @@ void setup_conn_event_handler_threads()
   mysql_mutex_unlock(&LOCK_handler_count);
   DBUG_VOID_RETURN;
 }
-
 
 /*
   On Windows, we use native SetConsoleCtrlHandler for handle events like Ctrl-C
@@ -3864,6 +3872,8 @@ static int init_thread_environment()
                    &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync_count,
                    &LOCK_wsrep_desync_count, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_pause_count,
+                   &LOCK_wsrep_pause_count, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
   THR_THD_initialized= true;
   THR_MALLOC_initialized= true;
@@ -9583,7 +9593,8 @@ PSI_mutex_key
 PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
   key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
   key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
-  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync, key_LOCK_wsrep_desync_count;
+  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync,
+  key_LOCK_wsrep_desync_count, key_LOCK_wsrep_pause_count;
 #endif /* WITH_WSREP */
 PSI_mutex_key key_RELAYLOG_LOCK_commit;
 PSI_mutex_key key_RELAYLOG_LOCK_commit_queue;
@@ -9700,6 +9711,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync_count, "LOCK_wsrep_desync_count", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_pause_count, "LOCK_wsrep_pause_count", PSI_FLAG_GLOBAL},
 #endif /* WITH_WSREP */
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},

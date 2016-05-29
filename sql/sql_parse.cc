@@ -294,13 +294,15 @@ uint server_command_flags[COM_END+1];
 void init_update_queries(void)
 {
   /* Initialize the server command flags array. */
+#ifdef WITH_WSREP
   memset(server_command_flags, 0, sizeof(server_command_flags));
 
   /* CF_SKIP_WSREP_CHECK: Allow commands marked to skip wsrep check to proceed
   even if node is not wsrep ready. */
   server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN |
+                                                 CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_QUERY]=               CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_FIELD_LIST]=          CF_ALLOW_PROTOCOL_PLUGIN;
@@ -331,6 +333,37 @@ void init_update_queries(void)
                                                  CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_QUIT]=                CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_PROCESS_INFO]=        CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_TIME]=                CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_END]=                 CF_SKIP_WSREP_CHECK;
+
+  /*
+    COM_SET_OPTION are allowed to pass the early COM_xxx filter,
+    they're checked later in mysql_execute_command().
+  */
+  server_command_flags[COM_SET_OPTION]=          CF_SKIP_WSREP_CHECK;
+#else
+  server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_QUERY]=               CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_FIELD_LIST]=          CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_REFRESH]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_SHUTDOWN]=            CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STATISTICS]=          CF_SKIP_QUESTIONS;
+  server_command_flags[COM_PROCESS_KILL]=        CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_PING]=                CF_SKIP_QUESTIONS;
+  server_command_flags[COM_STMT_PREPARE]=        CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_EXECUTE]=        CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_SEND_LONG_DATA]= CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_CLOSE]=          CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_RESET]=          CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_FETCH]=          CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN;
+#endif /* WITH_WSREP */
 
   /* Initialize the sql command flags array. */
   memset(sql_command_flags, 0, sizeof(sql_command_flags));
@@ -882,9 +915,9 @@ void cleanup_items(Item *item)
 }
 
 #ifdef WITH_WSREP
-
 static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
 {
+  bool has_tables = false;
   for (const TABLE_LIST *table= tables; table; table= table->next_global)
   {
     TABLE_CATEGORY c;
@@ -897,12 +930,11 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
     {
       return false;
     }
+    has_tables = true;
   }
-  return true;
+  return has_tables;
 }
-
 #endif /* WITH_WSREP */
-
 #ifndef EMBEDDED_LIBRARY
 
 /**
@@ -1102,7 +1134,8 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow some commands, they are trapped later in execute_command.
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
+    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
+        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
         (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
     ) {
       my_message(ER_UNKNOWN_COM_ERROR,
@@ -3007,14 +3040,16 @@ mysql_execute_command(THD *thd, bool first_level)
 
     /*
      * bail out if DB snapshot has not been installed. We however,
-     * allow SET and SHOW queries
+     * allow SET and SHOW queries and reads from information schema
+     * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        !(wsrep_ready ||
-          (thd->variables.wsrep_dirty_reads &&
-           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0) ||
-          wsrep_tables_accessible_when_detached(all_tables)) &&
-        lex->sql_command != SQLCOM_SET_OPTION &&
+    if (thd->variables.wsrep_on                                            &&
+        !thd->wsrep_applier                                                &&
+        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+        !(thd->variables.wsrep_dirty_reads &&
+          (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
+        !wsrep_tables_accessible_when_detached(all_tables)                 &&
+        lex->sql_command != SQLCOM_SET_OPTION                              &&
         !wsrep_is_show_query(lex->sql_command))
     {
       my_message(ER_UNKNOWN_COM_ERROR,
@@ -4803,9 +4838,6 @@ end_with_restore_list:
 
     if (first_table && lex->type & REFRESH_READ_LOCK)
     {
-#ifdef WITH_WSREP
-      bool already_paused;
-#endif /* WITH_WSREP */
       /*
          Do not allow FLUSH TABLES <table_list> WITH READ LOCK under an active
          LOCK TABLES FOR BACKUP lock.
@@ -4823,18 +4855,17 @@ end_with_restore_list:
         because that is checked in flush_tables_with_read_lock.
 
         We also intend to maintain GRL compatibility,
-        hence check for provider_paused.
+        hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) &&
-          !thd->global_read_lock.wsrep_pause_once(&already_paused))
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
         goto error;
 #endif /* WITH_WSREP */
       if (flush_tables_with_read_lock(thd, all_tables))
 #ifdef WITH_WSREP
       {
-        if (WSREP(thd) && !already_paused)
+        if (WSREP(thd))
           thd->global_read_lock.wsrep_resume_once();
         goto error;
       }
@@ -4846,9 +4877,6 @@ end_with_restore_list:
     }
     else if (first_table && lex->type & REFRESH_FOR_EXPORT)
     {
-#ifdef WITH_WSREP
-      bool already_paused;
-#endif /* WITH_WSREP */
       /*
          Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
          FOR BACKUP lock.
@@ -4866,18 +4894,17 @@ end_with_restore_list:
         because that is checked in flush_tables_for_export.
 
         We also intend to maintain GRL compatibility,
-        hence check for provider_paused.
+        hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) &&
-          !thd->global_read_lock.wsrep_pause_once(&already_paused))
+      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
         goto error;
 #endif /* WITH_WSREP */
       if (flush_tables_for_export(thd, all_tables))
 #ifdef WITH_WSREP
       {
-        if (WSREP(thd) && !already_paused)
+        if (WSREP(thd))
           thd->global_read_lock.wsrep_resume_once();
         goto error;
       }
@@ -6180,20 +6207,18 @@ void THD::reset_for_next_command()
   /*
     Autoinc variables should be adjusted only for locally executed
     transactions. Appliers and replayers are either processing ROW
-    events or get autoinc variable values from Query_log_event.
+    events or get autoinc variable values from Query_log_event and
+    mysql slave may be processing STATEMENT format events, but he should
+    use autoinc values passed in binlog events, not the values forced by
+    the cluster.
   */
-  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE && !thd->slave_thread) {
-    if (wsrep_auto_increment_control)
-    {
-      if (thd->variables.auto_increment_offset !=
-	  global_system_variables.auto_increment_offset)
-	thd->variables.auto_increment_offset=
-	  global_system_variables.auto_increment_offset;
-      if (thd->variables.auto_increment_increment !=
-	  global_system_variables.auto_increment_increment)
-	thd->variables.auto_increment_increment=
-	  global_system_variables.auto_increment_increment;
-    }
+  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE &&
+      !thd->slave_thread && wsrep_auto_increment_control)
+  {
+    thd->variables.auto_increment_offset=
+      global_system_variables.auto_increment_offset;
+    thd->variables.auto_increment_increment=
+      global_system_variables.auto_increment_increment;
   }
 #endif /* WITH_WSREP */
   thd->query_start_usec_used= 0;

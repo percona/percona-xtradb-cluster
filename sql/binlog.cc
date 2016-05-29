@@ -10364,7 +10364,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     }
 #endif
 
-    if (variables.binlog_format != BINLOG_FORMAT_ROW && tables)
+    if (WSREP_BINLOG_FORMAT(variables.binlog_format) != BINLOG_FORMAT_ROW && tables)
     {
       /*
         DML statements that modify a table with an auto_increment column based on
