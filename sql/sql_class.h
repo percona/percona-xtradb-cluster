@@ -1484,7 +1484,6 @@ public:
 #endif /* WITH_WSREP */
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
-
 private:
   volatile static int32 m_active_requests;
   enum_grl_state m_state;
@@ -2144,6 +2143,7 @@ public:
 
   /* Do not set socket timeouts for wait_timeout (used with threadpool) */
   bool skip_wait_timeout;
+
   /** 
     Used by fill_status() to avoid acquiring LOCK_status mutex twice
     when this function is called recursively (e.g. queries 
@@ -3943,7 +3943,7 @@ public:
       tests fail and so force them to propagate the
       lex->binlog_row_based_if_mixed upwards to the caller.
     */
-    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED)&&
+    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED) &&
         (in_sub_stmt == 0))
       set_current_stmt_binlog_format_row();
 
@@ -5820,12 +5820,6 @@ public:
 #else
 #define CF_SKIP_WSREP_CHECK     0
 #endif /* WITH_WSREP */
-
-/**
-  Do not check that wsrep snapshot is ready before allowing this command
-*/
-#define CF_SKIP_WSREP_CHECK     (1U << 2)
-
 /*
   1U << 16 is reserved for Protocol Plugin statements and commands
 */

@@ -3432,7 +3432,7 @@ void Item_func_rand::seed_random(Item *arg)
          tmp= (uint32) arg->val_int();
 #else
   uint32 tmp= (uint32) arg->val_int();
-#endif
+#endif /* WITH_WSREP */
   randominit(rand, (uint32) (tmp*0x10001L+55555555L),
              (uint32) (tmp*0x10000001L));
 }

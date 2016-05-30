@@ -5484,11 +5484,7 @@ ha_innobase::max_supported_key_length() const
 	case 8192:
 		return(1536);
 	default:
-#ifdef WITH_WSREP
 		return(3500);
-#else
-		return(3500);
-#endif /* WITH_WSREP */
 	}
 }
 
@@ -8308,7 +8304,7 @@ ha_innobase::write_row(
 	dberr_t		error;
 #ifdef WITH_WSREP
 	ibool           auto_inc_inserted= FALSE; /* if NULL was inserted */
-#endif
+#endif /* WITH_WSREP */
 	ulint		sql_command;
 	int		error_result = 0;
 	bool		auto_inc_used = false;
@@ -17021,32 +17017,6 @@ ha_innobase::external_lock(
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
-		}
-	}
-
-	/* Check for UPDATEs in read-only mode. */
-	if (srv_read_only_mode
-	    && (thd_sql_command(thd) == SQLCOM_UPDATE
-		|| thd_sql_command(thd) == SQLCOM_INSERT
-		|| thd_sql_command(thd) == SQLCOM_REPLACE
-		|| thd_sql_command(thd) == SQLCOM_DROP_TABLE
-		|| thd_sql_command(thd) == SQLCOM_ALTER_TABLE
-		|| thd_sql_command(thd) == SQLCOM_OPTIMIZE
-		|| (thd_sql_command(thd) == SQLCOM_CREATE_TABLE
-		    && lock_type == F_WRLCK)
-		|| thd_sql_command(thd) == SQLCOM_CREATE_INDEX
-		|| thd_sql_command(thd) == SQLCOM_DROP_INDEX
-		|| thd_sql_command(thd) == SQLCOM_DELETE)) {
-
-		if (thd_sql_command(thd) == SQLCOM_CREATE_TABLE)
-		{
-			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
-				    ER_INNODB_READ_ONLY);
-			DBUG_RETURN(HA_ERR_INNODB_READ_ONLY);
-		} else {
-			ib_senderrf(thd, IB_LOG_LEVEL_WARN,
-				    ER_READ_ONLY_MODE);
-			DBUG_RETURN(HA_ERR_TABLE_READONLY);
 		}
 	}
 

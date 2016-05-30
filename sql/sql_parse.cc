@@ -294,9 +294,9 @@ uint server_command_flags[COM_END+1];
 void init_update_queries(void)
 {
   /* Initialize the server command flags array. */
-#ifdef WITH_WSREP
   memset(server_command_flags, 0, sizeof(server_command_flags));
 
+#ifdef WITH_WSREP
   /* CF_SKIP_WSREP_CHECK: Allow commands marked to skip wsrep check to proceed
   even if node is not wsrep ready. */
   server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN |
@@ -328,7 +328,6 @@ void init_update_queries(void)
   server_command_flags[COM_STMT_RESET]=          CF_SKIP_QUESTIONS |
                                                  CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
-
   server_command_flags[COM_STMT_FETCH]=          CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN |
@@ -961,6 +960,7 @@ bool do_command(THD *thd)
   enum enum_server_command command;
   COM_DATA com_data;
   DBUG_ENTER("do_command");
+
 #ifdef WITH_WSREP
   /* Why do we need to do an explicit rollback if rollback thread can do it ?
   THD is added to rollback thread based on till what point query has executed.
@@ -1407,13 +1407,13 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   DBUG_EXECUTE_IF("crash_dispatch_command_before",
                   { DBUG_PRINT("crash_dispatch_command_before", ("now"));
                     DBUG_ABORT(); });
+
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     if (!thd->in_multi_stmt_transaction_mode())
     {
       thd->wsrep_PA_safe= true;
     }
-
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     thd->wsrep_query_state= QUERY_EXEC;
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
@@ -3208,6 +3208,7 @@ mysql_execute_command(THD *thd, bool first_level)
   {
     system_status_var old_status_var= thd->status_var;
     thd->initial_status_var= &old_status_var;
+
 #ifdef WITH_WSREP
     if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
 #endif /* WITH_WSREP */

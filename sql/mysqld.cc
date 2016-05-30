@@ -2405,6 +2405,7 @@ void setup_conn_event_handler_threads()
   DBUG_VOID_RETURN;
 }
 
+
 /*
   On Windows, we use native SetConsoleCtrlHandler for handle events like Ctrl-C
   with graceful shutdown.
@@ -3286,7 +3287,7 @@ int init_common_variables()
     global_system_variables.auto_increment_increment;
   global_system_variables.saved_auto_increment_offset=
     global_system_variables.auto_increment_offset;
-#endif
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_INTERFACE
   /*
@@ -4749,7 +4750,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     directory does not exist, exists but is empty, exists with InnoDB
     system tablespaces present etc.
   */
-#ifdef WITH_WSREP
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? (PLUGIN_INIT_SKIP_INITIALIZATION |
@@ -4759,7 +4759,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
-#endif /* WITH_WSREP */
 
   Session_tracker session_track_system_variables_check;
   LEX_STRING var_list;

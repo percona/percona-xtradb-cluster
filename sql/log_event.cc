@@ -43,7 +43,7 @@
 #include <mysql/psi/mysql_statement.h>
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-#endif
+#endif /* WITH_WSREP */
 #include "transaction_info.h"
 #include "sql_class.h"
 #include "mysql/psi/mysql_transaction.h"

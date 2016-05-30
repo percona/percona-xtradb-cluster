@@ -3312,7 +3312,7 @@ trx_start_for_ddl_low(
 		transation. */
 		trx->will_lock = 1;
 
-		trx->ddl = true;
+		trx->ddl= true;
 #ifdef WITH_WSREP
 		ut_d(trx->start_file = __FILE__);
 		ut_d(trx->start_line = __LINE__);

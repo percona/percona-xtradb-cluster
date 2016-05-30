@@ -396,7 +396,7 @@ lock_wait_suspend_thread(
 	if (lock_wait_timeout < 100000000
 	    && wait_time > (double) lock_wait_timeout
 #ifndef WITH_WSREP
-	    && trx_is_high_priority(trx)
+	    && !trx_is_high_priority(trx)
 #endif /* WITH_WSREP */
 	) {
 #ifdef WITH_WSREP

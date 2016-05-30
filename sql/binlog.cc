@@ -1313,7 +1313,7 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd)
     // TODO: Flow below avoid creating entry in binlog if binlog is disabled.
     // For Galera replication binlog is must. Check if below code should be
     // avoided with WSREP flow.
-#endif
+#endif /* WITH_WSREP */
 
     if (!opt_bin_log || (thd->slave_thread && !opt_log_slave_updates))
     {
@@ -1720,7 +1720,7 @@ static int binlog_start_consistent_snapshot(handlerton *hton, THD *thd)
 #ifdef WSREP
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
-#endif
+#endif /* WITH_WSREP */
 
   if ((err= thd->binlog_setup_trx_data()))
     DBUG_RETURN(err);
@@ -1749,7 +1749,7 @@ static int binlog_clone_consistent_snapshot(handlerton *hton, THD *thd,
 #ifdef WSREP
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
-#endif
+#endif /* WITH_WSREP */
 
   from_cache_mngr= opt_bin_log ?
     (binlog_cache_mngr *) thd_get_cache_mngr(from_thd) : NULL;
@@ -2414,7 +2414,7 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
   if (!WSREP_EMULATE_BINLOG(thd) && check_write_error(thd))
 #else
   if (check_write_error(thd))
-#endif
+#endif /* WITH_WSREP */
   {
     /*
       "all == true" means that a "rollback statement" triggered the error and
@@ -7122,7 +7122,7 @@ bool MYSQL_BIN_LOG::write_event(Log_event *event_info)
       is_open())
 #else
   if (likely(is_open()))
-#endif
+#endif /* WITH_WSREP */
   {
 #ifdef HAVE_REPLICATION
     /*
@@ -7288,7 +7288,7 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
 		  wsrep_to_isolation);
       DBUG_RETURN(0);
     }
-#endif
+#endif /* WITH_WSREP */
 
   DBUG_ASSERT(!is_relay_log);
   mysql_mutex_assert_owner(&LOCK_log);

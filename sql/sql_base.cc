@@ -4815,6 +4815,7 @@ thr_lock_type read_lock_type_for_table(THD *thd,
     at THD::variables::sql_log_bin member.
   */
   bool log_on= mysql_bin_log.is_open() && thd->variables.sql_log_bin;
+
   /*
     When we do not write to binlog or when we use row based replication,
     it is safe to use a weaker lock.
@@ -9872,7 +9873,7 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
     table_cache_manager.assert_owner_all_and_tdc();
 
 #ifdef WITH_WSREP
-  /* if thd was BF aborted, exclusive locks were canceled */
+  /* if thd was BF aborted, exclusive locks are cancelled */
 #else
   DBUG_ASSERT(remove_type == TDC_RT_REMOVE_UNUSED ||
               thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::TABLE,

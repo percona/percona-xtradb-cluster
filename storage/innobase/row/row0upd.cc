@@ -3016,10 +3016,9 @@ row_upd_clust_step(
 	index = dict_table_get_first_index(node->table);
 
 #ifdef WITH_WSREP
-	ibool foreign = wsrep_row_upd_index_is_foreign(
-		index, thr_get_trx(thr));
+	ibool foreign = wsrep_row_upd_index_is_foreign(index, trx);
 #endif /* WITH_WSREP */
-	referenced = row_upd_index_is_referenced(index, thr_get_trx(thr));
+	referenced = row_upd_index_is_referenced(index, trx);
 
 	pcur = node->pcur;
 
