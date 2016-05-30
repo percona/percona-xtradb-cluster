@@ -591,11 +591,11 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
   bool new_wsrep_desync = var->value->val_bool();
   if (wsrep_desync == new_wsrep_desync) {
     if (new_wsrep_desync) {
-      push_warning (thd, Sql_condition::WARN_LEVEL_WARN,
+      push_warning (thd, Sql_condition::SL_WARNING,
                    ER_WRONG_VALUE_FOR_VAR,
                    "'wsrep_desync' is already ON.");
     } else {
-      push_warning (thd, Sql_condition::WARN_LEVEL_WARN,
+      push_warning (thd, Sql_condition::SL_WARNING,
                    ER_WRONG_VALUE_FOR_VAR,
                    "'wsrep_desync' is already OFF.");
     }
@@ -606,7 +606,7 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
     ret = wsrep->desync (wsrep);
     if (ret != WSREP_OK) {
       WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
-                  (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
       my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query());
       return true;
     }
@@ -614,7 +614,7 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
     ret = wsrep->resync (wsrep);
     if (ret != WSREP_OK) {
       WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
-                  (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
       my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query());
       return true;
     }

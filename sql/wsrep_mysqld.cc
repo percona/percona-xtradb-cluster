@@ -1464,7 +1464,7 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
 
   if (!thd->global_read_lock.provider_resumed())
   {
-    WSREP_DEBUG("Aborting TOI: Galera provider paused due to lock: %s %lu",
+    WSREP_DEBUG("Aborting TOI: Galera provider paused due to lock: %s %u",
                 thd->query().str, thd->thread_id());
     my_error(ER_CANT_UPDATE_WITH_READLOCK, MYF(0));
     return -1;

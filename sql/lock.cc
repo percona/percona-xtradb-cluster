@@ -1199,7 +1199,7 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
       if (ret != WSREP_OK)
       {
         WSREP_WARN("resync failed %d for FTWRL: db: %s, query: %s", ret,
-                   (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+                   (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
        DBUG_VOID_RETURN;
       }
     }
