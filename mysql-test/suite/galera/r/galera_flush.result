@@ -66,3 +66,15 @@ SELECT * FROM t1;
 f1
 100
 DROP TABLE t1;
+#node-1
+call mtr.add_suppression("WSREP: Cannot modify wsrep_provider while node is paused or desynced");
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+FLUSH TABLE t1 WITH READ LOCK;
+SET GLOBAL wsrep_provider=none;
+ERROR 42000: Variable 'wsrep_provider' can't be set to the value of 'none'
+UNLOCK TABLES;
+FLUSH TABLE WITH READ LOCK;
+SET GLOBAL wsrep_provider=none;
+ERROR 42000: Variable 'wsrep_provider' can't be set to the value of 'none'
+UNLOCK TABLES;
+DROP TABLE t1;

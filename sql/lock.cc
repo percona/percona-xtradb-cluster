@@ -1057,14 +1057,16 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
     {
       /* If this is sst_donor then it is resync internally.
       So only resume the cluster. */
-      wsrep_resume();
+      if (provider_paused)
+        wsrep_resume();
     }
     else if (WSREP(thd))
     {
       /* Function will take care of decrementing reference count
       if it is not the last one to get called. Last one will
       perform the resume action. */
-      wsrep_resume();
+      if (provider_paused)
+        wsrep_resume();
 
       int ret = wsrep->resync(wsrep);
       if (ret != WSREP_OK)
@@ -1175,6 +1177,7 @@ bool Global_read_lock::wsrep_pause()
   Just increment the count. */
   if (wsrep_pause_count > 0)
   {
+     provider_paused= true;
      ++wsrep_pause_count;
      mysql_mutex_unlock(&LOCK_wsrep_pause_count);
      return(TRUE);
@@ -1198,6 +1201,7 @@ bool Global_read_lock::wsrep_pause()
     return FALSE;
   }
 
+  provider_paused= true;
   mysql_mutex_unlock(&LOCK_wsrep_pause_count);
   return TRUE;
 }
@@ -1217,6 +1221,7 @@ wsrep_status_t Global_read_lock::wsrep_resume(bool ignore_if_resumed)
 
   if (ignore_if_resumed && wsrep_pause_count == 0)
   {
+    provider_paused= false;
     mysql_mutex_unlock(&LOCK_wsrep_pause_count);
     return ret;
   }
@@ -1231,13 +1236,13 @@ wsrep_status_t Global_read_lock::wsrep_resume(bool ignore_if_resumed)
       WSREP_WARN("Failed to resume provider: %d", ret);
   }
 
+  provider_paused= false;
   mysql_mutex_unlock(&LOCK_wsrep_pause_count);
   return ret;
 }
 
 bool Global_read_lock::wsrep_pause_once()
 {
-    provider_paused= true;
     return wsrep_pause();
 }
 
@@ -1245,7 +1250,6 @@ wsrep_status_t Global_read_lock::wsrep_resume_once(void)
 {
   if (provider_paused)
   {
-    provider_paused= false;
     return wsrep_resume(true);
   }
   return WSREP_OK;
