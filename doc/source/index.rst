@@ -1,32 +1,40 @@
-.. Percona XtraDB Cluster documentation master file, created by
-   sphinx-quickstart on Sat Dec  3 13:59:56 2011.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. _dochome:
 
-==========================================
- Percona XtraDB Cluster 5.6 Documentation
-==========================================
+==============================================
+Percona XtraDB Cluster |version| Documentation
+==============================================
 
-|Percona XtraDB Cluster| is High Availability and Scalability solution for MySQL Users.
+|PXC| is a high-availability solution for MySQL.
+It ensures the highest possible uptime,
+prevents data loss,
+and provides linear scalability for a growing environment.
 
-|Percona XtraDB Cluster| provides:
+Features of |PXC| include:
  
- * Synchronous replication. Transaction either committed on all nodes or none.
+* **Synchronous replication**:
+  Data is written to all nodes simultaneously,
+  or not written at all if it fails even on a single node.
 
- * Multi-master replication. You can write to any node.
+* **Multi-master replication**:
+  Any node can trigger a data update.
 
- * Parallel applying events on slave. Real "parallel replication".
+* **True parallel replication**:
+  Multiple threads on slave performing replication on row level.
 
- * Automatic node provisioning.
+* **Automatic node provisioning**:
+  You simply add a node and it automatically syncs.
 
- * Data consistency. No more unsynchronized slaves.
+* **Data consistency**:
+  No more unsynchronized nodes.
 
-|Percona XtraDB Cluster| is fully compatible with |MySQL| or |Percona Server| in the following meaning:
+|PXC| is fully compatible with `MySQL Server Community Edition <MySQL>`_,
+`Percona Server`_, and `MariaDB`_ in the following sense:
 
- * Data compatibility. |Percona XtraDB Cluster| works with databases created in |MySQL| / |Percona Server|.
+* **Data compatibility**:
+  You can use data created by any MySQL variant.
 
- * Application compatibility. There is no or minimal application changes required to start work with |Percona XtraDB Cluster|.
-
+* **Application compatibility**:
+  There is no or minimal application changes required.
 
 Introduction
 ============
@@ -36,19 +44,16 @@ Introduction
    :glob:
 
    intro
-   limitation
-   errata
 
 Installation
 ============
 
 .. toctree::
-   :maxdepth: 1
-   :glob:
+   :maxdepth: 2
+   :includehidden:
+   :titlesonly:
 
-   installation
-   installation/compiling_xtradb_cluster
-   upgrading_guide_55_56
+   install/index
 
 Features
 ========

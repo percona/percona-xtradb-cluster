@@ -4,7 +4,9 @@
 Compiling and Installing from Source Code
 =========================================
 
-If you want to compile Percona XtraDB Cluster, you can find the source code on GitHub. Before you begin, make sure that the following packages are installed:
+If you want to compile |PXC|, you can find the source code on
+`GitHub <https://github.com/percona/percona-xtradb-cluster>`_.
+Before you begin, make sure that the following packages are installed:
 
 .. list-table::
    :header-rows: 1
@@ -69,29 +71,40 @@ You will likely have all or most of the packages already installed. If you are n
    $ sudo yum install -y git scons gcc gcc-c++ openssl check cmake bison \
    boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel
 
-To compile Percona XtraDB Cluster from source code:
+To compile |PXC| from source code:
 
-1. Clone the Percona XtraDB Cluster repository:
+1. Clone the |PXC| repository:
 
-   .. code-block:: bash
+   .. prompt:: bash
 
-      $ git clone https://github.com/percona/percona-xtradb-cluster.git
+      git clone https://github.com/percona/percona-xtradb-cluster.git
 
-   .. note:: You have to clone the latest repository or update it to the latest state. Old codebase may not be compatible with the build script.
+   .. note:: You have to clone the latest repository
+      or update it to the latest state.
+      Old codebase may not be compatible with the build script.
 
-2. Clone Percona's fork of Galera into the same directory:
+2. Check out the ``5.7-beta`` branch.
 
-   .. code-block:: bash
+3. Clone Percona's fork of Galera into the same directory:
 
-      $ cd percona-xtradb-cluster
-      $ git clone https://github.com/percona/galera percona-xtradb-cluster-galera
+   .. prompt:: bash
 
-   .. note:: The directory for Galera repository must be named ``percona-xtradb-cluster-galera``.
+      cd percona-xtradb-cluster
+      git clone https://github.com/percona/galera percona-xtradb-cluster-galera
 
-3. Run the build script :file:`./build-ps/build-binary.sh`. By default, it will build into the current directory, but you can specify another target output directory. For example, if you want to build into :file:`./pxc-build`, run the following:
+   .. note:: The directory for Galera repository
+      must be named ``percona-xtradb-cluster-galera``.
 
-   .. code-block:: bash
+4. Check out the ``rel-3.14.2`` branch.
 
-      $ mkdir ./pxc-build
-      $ ./build-ps/build-binary.sh ./pxc-build
+3. Run the build script :file:`./build-ps/build-binary.sh`.
+   By default, it will build into the current directory,
+   but you can specify another target output directory.
+   For example, if you want to build into :file:`./pxc-build`,
+   run the following:
+
+   .. prompt:: bash
+
+      mkdir ./pxc-build
+      ./build-ps/build-binary.sh ./pxc-build
 
