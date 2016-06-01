@@ -1448,6 +1448,7 @@ public:
     : m_state(GRL_NONE),
 #ifdef WITH_WSREP
       provider_paused(false),
+      provider_desynced_paused(false),
 #endif
       m_mdl_global_shared_lock(NULL),
       m_mdl_blocks_commits_lock(NULL)
@@ -1497,6 +1498,9 @@ private:
   FLUSH TABLES <table> FOR EXPORT
   and so while unlocking such context provider needs to resumed. */
   bool provider_paused;
+
+  /* Mark this true only when both action are successful. */
+  bool provider_desynced_paused;
 #endif
 
   /**

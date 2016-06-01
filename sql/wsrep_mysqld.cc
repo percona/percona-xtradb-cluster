@@ -1381,6 +1381,10 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     WSREP_WARN("pause failed %lld for schema: %s, query: %s", (long long)seqno,
                (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+
+    /* Pause fail so rollback desync action too. */
+    wsrep->resync(wsrep);
+
     return(1);
   }
   ++wsrep_pause_count;
@@ -1428,7 +1432,6 @@ static void wsrep_RSU_end(THD *thd)
     return;
   }
 
-  thd->variables.wsrep_on = 1;
   mysql_mutex_unlock(&LOCK_wsrep_pause_count);
 }
 
