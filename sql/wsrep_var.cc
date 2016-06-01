@@ -256,22 +256,25 @@ static int wsrep_provider_verify (const char* provider_str)
 @return false if no error encountered with check else return true. */
 bool wsrep_provider_check (sys_var *self, THD* thd, set_var* var)
 {
-  mysql_mutex_lock(&LOCK_wsrep_pause_count);
-  bool node_paused = (wsrep_pause_count == 0) ? false : true;
-  bool desycned = !wsrep_node_is_synced();
-  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
-
-  if (node_paused || desycned)
+  if (WSREP(thd))
   {
-     /* If node is paused or desycned this means node is up-to-data.
-    Pause node hasn't applied all the write-set and desycned node
-     may have sent flow control. Avoid changing wsrep_provider
-     in such critical conditions. */
-     WSREP_WARN("Cannot modify wsrep_provider while node is paused"
-                " or desynced.");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-             var->save_result.string_value.str);
-    return true;
+    mysql_mutex_lock(&LOCK_wsrep_pause_count);
+    bool node_paused = (wsrep_pause_count == 0) ? false : true;
+    bool desynced = !wsrep_node_is_synced();
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+
+    if (node_paused || desynced)
+    {
+      /* If node is paused or desycned this means node is up-to-data.
+      Pause node hasn't applied all the write-set and desycned node
+      may have sent flow control. Avoid changing wsrep_provider
+      in such critical conditions. */
+      WSREP_WARN("Cannot modify wsrep_provider while node is paused"
+                 " or desynced.");
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+               var->save_result.string_value.str);
+      return true;
+    }
   }
 
   char wsrep_provider_buf[FN_REFLEN];
