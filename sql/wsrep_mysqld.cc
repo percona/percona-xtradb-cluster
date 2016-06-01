@@ -1440,6 +1440,18 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
    */
   if (thd->wsrep_exec_mode == REPL_RECV) return 0;
 
+  /* Generally if node enters non-primary state then execution of DDL+DML
+  is blocked on such node but there are some asynchronous pre-register
+  action that can cause invocation of TOI. For example: DROP of event
+  on completion of EVENT tenure is one such asynchronous action which
+  doesn't need to be fired by user and so if node is asynchronous
+  such such action should be blocked at TOI level. */
+  if (!wsrep_ready)
+  {
+    WSREP_DEBUG("WSREP has not yet prepared node for application use");
+    return 0;
+  }
+
   int ret= 0;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 
