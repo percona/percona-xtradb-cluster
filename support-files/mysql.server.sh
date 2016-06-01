@@ -24,6 +24,9 @@
 # Short-Description: start and stop MySQL (Percona XtraDB Cluster)
 # Description: Percona-Server is a SQL database engine with focus on high performance.
 ### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
  
 # Prevent OpenSUSE's init scripts from calling systemd, so that
 # both 'bootstrap' and 'start' are handled entirely within this script
@@ -143,15 +146,15 @@ parse_server_arguments() {
     case "$arg" in
       --basedir=*)  basedir=`echo "$arg" | sed -e 's/^[^=]*=//'`
                     bindir="$basedir/bin"
-		    if test -z "$datadir_set"; then
-		      datadir="$basedir/data"
-		    fi
-		    sbindir="$basedir/sbin"
-		    libexecdir="$basedir/libexec"
+                    if test -z "$datadir_set"; then
+                      datadir="$basedir/data"
+                    fi
+                    sbindir="$basedir/sbin"
+                    libexecdir="$basedir/libexec"
         ;;
       --datadir=*)  datadir=`echo "$arg" | sed -e 's/^[^=]*=//'`
-		    datadir_set=1
-	;;
+                    datadir_set=1
+        ;;
       --pid-file=*|--pid_file=*) mysqld_pid_file_path=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
       --service-startup-timeout=*|--service_startup_timeout=*) service_startup_timeout=`echo "$arg" | sed -e 's/^[^=]*=//'` ;;
     esac
@@ -224,6 +227,17 @@ wait_for_pid () {
   fi
 }
 
+install_validate_password_sql_file () {
+    local dir
+    local initfile
+    dir=/var/lib/mysql
+    initfile="$(mktemp $dir/install-validate-password-plugin.XXXXXX.sql)"
+    chown mysql:mysql "$initfile"
+    echo "INSERT INTO mysql.plugin (name, dl) VALUES ('validate_password', 'validate_password.so');" > "$initfile"
+    echo "SHUTDOWN;" >> "$initfile"
+    echo "$initfile"
+}
+
 # Get arguments from the my.cnf file,
 # the only group, which is read from now on is [mysqld]
 if test -x ./bin/my_print_defaults
@@ -245,7 +259,7 @@ else
     dirs=`sed -e "/$subpat/!d" -e 's//\1/' $conf`
     for d in $dirs
     do
-      d=`echo $d | sed -e 's/[ 	]//g'`
+	d=`echo $d | sed -e 's/[ 	]//g'`
       if test -x "$d/bin/my_print_defaults"
       then
         print_defaults="$d/bin/my_print_defaults"
@@ -339,7 +353,38 @@ case "$mode" in
     if test $ext_status -ne 3;then 
         exit $ext_status
     fi
-
+    if [ ! -d "$datadir/mysql" ] ; then
+        # First, make sure $datadir is there with correct permissions
+        if [ ! -e "$datadir" -a ! -h "$datadir" ]
+        then
+          mkdir -p "$datadir" || exit 1
+        fi
+        chown mysql:mysql "$datadir"
+        chmod 0751 "$datadir"
+        if [ -x /sbin/restorecon ] ; then
+          /sbin/restorecon "$datadir"
+          for dir in /var/lib/mysql-files /var/lib/mysql-keyring ; do
+            if [ -x /usr/sbin/semanage -a -d /var/lib/mysql -a -d $dir ] ; then
+              /usr/sbin/semanage fcontext -a -e /var/lib/mysql $dir >/dev/null 2>&1
+              /sbin/restorecon $dir
+            fi
+          done
+        fi
+        # Now create the database
+        action $"Initializing MySQL database: " /usr/sbin/mysqld --initialize --datadir="$datadir" --user=mysql
+        ret=$?
+        [ $ret -ne 0 ] && exit $ret
+        initfile="$(install_validate_password_sql_file)"
+        action $"Installing validate password plugin: " /usr/sbin/mysqld --datadir="$datadir" --user=mysql --init-file="$initfile"
+        ret=$?
+        rm -f "$initfile"
+        chown -R mysql:mysql "$datadir"
+        [ $ret -ne 0 ] && exit $ret
+        # Generate certs if needed
+        if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${datadir}/server-key.pem" ] ; then
+          /usr/bin/mysql_ssl_rsa_setup --datadir="$datadir" --uid=mysql >/dev/null 2>&1
+        fi
+    fi
     # Start daemon
     if test -e $datadir/sst_in_progress;then 
         echo "Stale sst_in_progress file in datadir"

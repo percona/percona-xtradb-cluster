@@ -79,9 +79,9 @@ case "$1" in
 
 	server_stop
 
-	db_input high percona-xtradb-cluster-server-5.7/remove-data-dir || true
+	db_input high percona-xtradb-cluster-5.7/remove-data-dir || true
 	db_go
-	db_get percona-xtradb-cluster-server-5.7/remove-data-dir && RMDATADIR=${RET}
+	db_get percona-xtradb-cluster-5.7/remove-data-dir && RMDATADIR=${RET}
 	if [ "${RMDATADIR}" = "true" ];
 	then
 		if [ -d ${MYSQLRUN} ] || [ -L ${MYSQLRUN} ];
@@ -102,11 +102,6 @@ case "$1" in
 		if [ -d ${MYSQLFILES} ] || [ -L ${MYSQLFILES} ];
 		then
 			rm -rf ${MYSQLFILES}
-		fi
-
-		if [ -d ${MYSQLKEYRING} ] || [ -L ${MYSQLKEYRING} ];
-		then
-			rm -rf ${MYSQLKEYRING}
 		fi
 
 		if getent passwd mysql >/dev/null;
@@ -146,6 +141,11 @@ case "$1" in
 		if [ -d ${MYSQLFILES} ] || [ -L ${MYSQLFILES} ];
 		then
 			rm -rf ${MYSQLFILES}
+		fi
+
+		if [ -d ${MYSQLKEYRING} ] || [ -L ${MYSQLKEYRING} ];
+		then
+			rm -rf ${MYSQLKEYRING}
 		fi
 
 		if getent passwd mysql >/dev/null;
