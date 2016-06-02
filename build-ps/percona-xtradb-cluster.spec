@@ -594,7 +594,7 @@ mkdir debug
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
 %if 0%{?systemd}
-           -DWITH_SYSTEMD=ON \
+           -DWITH_SYSTEMD=OFF \
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
@@ -630,7 +630,7 @@ mkdir release
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
 %if 0%{?systemd}
-           -DWITH_SYSTEMD=ON \
+           -DWITH_SYSTEMD=OFF \
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
@@ -1289,10 +1289,8 @@ fi
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
 %attr(755, root, root) %{_bindir}/mysql_upgrade
 %attr(755, root, root) %{_bindir}/mysql_plugin
-%if 0%{?systemd} == 0
-%attr(755, root, root) %{_bindir}/mysqld_multi
 %attr(755, root, root) %{_bindir}/mysqld_safe
-%endif
+%attr(755, root, root) %{_bindir}/mysqld_multi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
@@ -1337,13 +1335,10 @@ fi
 %dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
 %dir %attr(755, mysql, mysql) /var/run/mysqld
 %if 0%{?systemd}
-%attr(644, root, root) %{_unitdir}/mysqld.service
 %attr(644, root, root) %{_unitdir}/mysql.service
 %attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql.bootstrap
-%attr(644, root, root) %{_tmpfilesdir}/mysql.conf
 %attr(755, root, root) %{_bindir}/mysql-systemd
-%attr(755, root, root) %{_bindir}/mysqld_pre_systemd
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
