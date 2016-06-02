@@ -145,6 +145,8 @@ Requires:       grep
 Requires:       procps
 Requires:       net-tools
 Requires:       perl-base
+Requires:       lsof
+Requires:       socat
 %if 0%{?commercial}
 Obsoletes:      mysql-commercial-bench < 5.7.8
 Provides:       MySQL-server-advanced = %{version}-%{release}
@@ -628,6 +630,7 @@ fi
 %attr(755, root, root) %{_bindir}/lz4_decompress
 %attr(755, root, root) %{_bindir}/zlib_decompress
 %if 0%{?systemd}
+%attr(755, root, root) %{_bindir}/mysqld_bootstrap
 %attr(755, root, root) %{_bindir}/mysqld_pre_systemd
 %else
 %attr(755, root, root) %{_bindir}/mysqld_multi
@@ -895,6 +898,11 @@ fi
 %endif
 
 %changelog
+* Wed Jun 01 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
+- Add the new "mysqld_bootstrap" script for systemd environments.
+- Add "Requires:" for "lsof" and "socat" to "mysql-wsrep-server",
+  these tools are needed for Galera SST.
+
 * Tue May 31 2016 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Take the original MySQL spec file and convert it for mysql-wsrep:
   - src_base: "mysql" -> "mysql-wsrep"

@@ -52,6 +52,10 @@ LimitNOFILE = 5000
 
 Restart=on-failure
 
+# Dirty hack to prevent fast restart in case of configuration problem.
+# Longer-term fix will be to ensure exit status 1 for "RestartPreventExitStatus=1" below.
+RestartSec=1
+
 RestartPreventExitStatus=1
 
 PrivateTmp=false
