@@ -406,7 +406,7 @@ run_again:
 					dict_table_open_on_name(
 					  foreign->referenced_table_name_lookup,
 					  FALSE, FALSE, DICT_ERR_IGNORE_NONE);
-				opened = TRUE;
+				opened = (foreign->referenced_table) ? TRUE : FALSE;
 			}
 
 			if (foreign->referenced_table) {
@@ -429,7 +429,7 @@ run_again:
 					       ->n_foreign_key_checks_running);
 
 				if (opened == TRUE) {
-					dict_table_close(foreign->referenced_table, TRUE, FALSE);
+					dict_table_close(foreign->referenced_table, FALSE, FALSE);
 					opened = FALSE;
 				}
 			}
