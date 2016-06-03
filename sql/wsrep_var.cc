@@ -609,7 +609,7 @@ bool wsrep_slave_threads_update (sys_var *self, THD* thd, enum_var_type type)
 
 bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
 {
-  bool new_wsrep_desync = var->value->val_bool();
+  bool new_wsrep_desync = var->save_result.ulonglong_value;
   if (wsrep_desync == new_wsrep_desync) {
     if (new_wsrep_desync) {
       push_warning (thd, Sql_condition::SL_WARNING,
