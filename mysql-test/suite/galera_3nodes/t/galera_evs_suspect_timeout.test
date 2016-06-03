@@ -33,7 +33,7 @@ SET GLOBAL wsrep_provider_options = 'evs.inactive_timeout=PT100M; evs.suspect_ti
 --connection node_1
 --source include/wait_until_connected_again.inc
 SET SESSION wsrep_sync_wait = 0;
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --disable_query_log
 --eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_node1';
 --enable_query_log
@@ -44,7 +44,7 @@ INSERT INTO t1 VALUES (1);
 
 --connection node_2
 SET SESSION wsrep_sync_wait = 0;
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --disable_query_log
 --eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_node2';
 --enable_query_log

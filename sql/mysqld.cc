@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -432,6 +432,7 @@ my_bool binlog_gtid_simple_recovery;
 ulong binlog_error_action;
 const char *binlog_error_action_list[]= {"IGNORE_ERROR", "ABORT_SERVER", NullS};
 uint32 gtid_executed_compression_period= 0;
+my_bool opt_log_unsafe_statements;
 
 #ifdef HAVE_INITGROUPS
 volatile sig_atomic_t calling_initgroups= 0; /**< Used in SIGSEGV handler. */
@@ -1149,9 +1150,7 @@ public:
   {
     if (WSREP(thd) && thd->wsrep_applier)
     {
-      // redundant, system thread should not have vio
-      //close_connection(thd);
-
+      WSREP_DEBUG("Closing applier thread %u", thd->thread_id());
       mysql_mutex_lock(&thd->LOCK_thd_data);
       thd->killed= THD::KILL_CONNECTION;
       if (thd->current_cond)
@@ -1213,6 +1212,7 @@ private:
 static void close_connections(void)
 {
   DBUG_ENTER("close_connections");
+  WSREP_DEBUG("close_connections");
   (void) RUN_HOOK(server_state, before_server_shutdown, (NULL));
 
   Per_thread_connection_handler::kill_blocked_pthreads();
@@ -1287,6 +1287,12 @@ static void close_connections(void)
                      thd_manager->get_thd_count()));
   thd_manager->wait_till_no_thd();
 
+  /*
+    Connection threads might take a little while to go down after removing from
+    global thread list. Give it some time.
+  */
+  Connection_handler_manager::wait_till_no_connection();
+
   delete_slave_info_objects();
   DBUG_PRINT("quit",("close_connections thread"));
 
@@ -1340,14 +1346,27 @@ extern "C" void unireg_abort(int exit_code)
 #ifdef WITH_WSREP
   if (wsrep)
   {
+    WSREP_DEBUG("unireg_abort");
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only diconnect from service */
     wsrep_close_client_connections(FALSE);
-    //shutdown_in_progress= 1;
-    THD* thd(0);
+    wsrep_close_threads(NULL);
     wsrep->disconnect(wsrep);
+
+    THD* thd = current_thd;
+    if (thd)
+    {
+      Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+      WSREP_DEBUG("closing aborting applier THD: %u", thd->thread_id());
+      thd->release_resources();
+      thd_manager->remove_thd(thd);
+    
+      delete thd;
+    }
+
+    wsrep_wait_appliers_close(NULL);
     WSREP_INFO("Service disconnected.");
-    wsrep_close_threads(thd); /* this won't close all threads */
+
     sleep(1); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
   }
@@ -1379,7 +1398,6 @@ static void mysqld_exit(int exit_code)
 {
   DBUG_ASSERT(exit_code >= MYSQLD_SUCCESS_EXIT
               && exit_code <= MYSQLD_FAILURE_EXIT);
-  log_syslog_exit();
   mysql_audit_finalize();
 #ifndef EMBEDDED_LIBRARY
   Srv_session::module_deinit();
@@ -1598,6 +1616,7 @@ void clean_up(bool print_message)
   my_free(const_cast<char*>(relay_log_basename));
   my_free(const_cast<char*>(relay_log_index));
 #endif
+  free_list(opt_early_plugin_load_list_ptr);
   free_list(opt_plugin_load_list_ptr);
 
   if (THR_THD_initialized)
@@ -1616,6 +1635,8 @@ void clean_up(bool print_message)
     my_timer_deinitialize();
 
   have_statement_timeout= SHOW_OPTION_DISABLED;
+
+  log_syslog_exit();
 
   /*
     The following lines may never be executed as the main thread may have
@@ -2270,7 +2291,7 @@ static void start_signal_handler()
 
   (void) my_thread_attr_init(&thr_attr);
   (void) pthread_attr_setscope(&thr_attr, PTHREAD_SCOPE_SYSTEM);
-  (void) pthread_attr_setdetachstate(&thr_attr, PTHREAD_CREATE_JOINABLE);
+  (void) my_thread_attr_setdetachstate(&thr_attr, MY_THREAD_CREATE_JOINABLE);
 
   size_t guardize= 0;
   (void) pthread_attr_getguardsize(&thr_attr, &guardize);
@@ -2590,6 +2611,7 @@ SHOW_VAR com_status_vars[]= {
   {"alter_db_upgrade",     (char*) offsetof(STATUS_VAR, com_stat[(uint) SQLCOM_ALTER_DB_UPGRADE]),           SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
   {"alter_event",          (char*) offsetof(STATUS_VAR, com_stat[(uint) SQLCOM_ALTER_EVENT]),                SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
   {"alter_function",       (char*) offsetof(STATUS_VAR, com_stat[(uint) SQLCOM_ALTER_FUNCTION]),             SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
+  {"alter_instance",       (char*) offsetof(STATUS_VAR, com_stat[(uint) SQLCOM_ALTER_INSTANCE]),             SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
   {"alter_procedure",      (char*) offsetof(STATUS_VAR, com_stat[(uint) SQLCOM_ALTER_PROCEDURE]),            SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
   {"alter_server",         (char*) offsetof(STATUS_VAR, com_stat[(uint) SQLCOM_ALTER_SERVER]),               SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
   {"alter_table",          (char*) offsetof(STATUS_VAR, com_stat[(uint) SQLCOM_ALTER_TABLE]),                SHOW_LONG_STATUS, SHOW_SCOPE_ALL},
@@ -3029,6 +3051,17 @@ int init_common_variables()
   if (WSREP_ON && wsrep_check_opts (remaining_argc, remaining_argv))
     return 1;
 #endif /* WITH_WSREP */
+
+#ifndef NO_EMBEDDED_ACCESS_CHECKS
+
+  if (strlen(DEFAULT_EARLY_PLUGIN_LOAD))
+  {
+    i_string *default_early_plugin= new i_string(DEFAULT_EARLY_PLUGIN_LOAD);
+    opt_early_plugin_load_list_ptr->push_back(default_early_plugin);
+  }
+
+#endif /* NO_EMBEDDED_ACCESS_CHECKS */
+
   if (get_options(&remaining_argc, &remaining_argv))
     return 1;
 
@@ -3306,6 +3339,12 @@ int init_common_variables()
   if (my_dboptions_cache_init())
     return 1;
 
+  if (ignore_db_dirs_process_additions())
+  {
+    sql_print_error("An error occurred while storing ignore_db_dirs to a hash.");
+    return 1;
+  }
+
   /* create the data directory if requested */
   if (unlikely(opt_initialize) &&
       initialize_create_data_directory(mysql_real_data_home))
@@ -3368,12 +3407,6 @@ int init_common_variables()
   {
     sql_print_error("An error occurred while building do_table"
                     "and ignore_table rules to hush.");
-    return 1;
-  }
-
-  if (ignore_db_dirs_process_additions())
-  {
-    sql_print_error("An error occurred while storing ignore_db_dirs to a hash.");
     return 1;
   }
 
@@ -3445,8 +3478,8 @@ static int init_thread_environment()
 #endif // !EMBEDDED_LIBRARY
   /* Parameter for threads created for connections */
   (void) my_thread_attr_init(&connection_attrib);
+  my_thread_attr_setdetachstate(&connection_attrib, MY_THREAD_CREATE_DETACHED);
 #ifndef _WIN32
-  pthread_attr_setdetachstate(&connection_attrib, PTHREAD_CREATE_DETACHED);
   pthread_attr_setscope(&connection_attrib, PTHREAD_SCOPE_SYSTEM);
 #endif
 
@@ -4030,7 +4063,6 @@ static int init_server_components()
   enter_cond_hook= thd_enter_cond;
   exit_cond_hook= thd_exit_cond;
   is_killed_hook= (int(*)(const void*))thd_killed;
-
   if (transaction_cache_init())
   {
     sql_print_error("Out of memory");
@@ -6179,6 +6211,12 @@ struct my_option my_long_options[]=
    GET_BOOL, OPT_ARG, 0, 0, 0, 0, 0, 0},
   {"user", 'u', "Run mysqld daemon as user.", 0, 0, 0, GET_STR, REQUIRED_ARG,
    0, 0, 0, 0, 0, 0},
+  {"early-plugin-load", OPT_EARLY_PLUGIN_LOAD,
+   "Optional semicolon-separated list of plugins to load before storage engine "
+   "initialization, where each plugin is identified as name=library, where "
+   "name is the plugin name and library is the plugin library in plugin_dir.",
+   0, 0, 0,
+   GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
   {"plugin-load", OPT_PLUGIN_LOAD,
    "Optional semicolon-separated list of plugins to load, where each plugin is "
    "identified as name=library, where name is the plugin name and library "
@@ -6396,9 +6434,10 @@ extern "C" void *start_wsrep_THD(void *arg)
   thd_manager->add_thd(thd);
   thd_added= true;
 
+#ifdef SKIP_INNODB_HP
   /* set priority */
   thd->thd_tx_priority = 1;
-
+#endif
   THD_CHECK_SENTRY(thd);
 
   processor(thd);
@@ -6430,6 +6469,12 @@ extern "C" void *start_wsrep_THD(void *arg)
     // TODO: lightweight cleanup to get rid of:
     // 'Error in my_thread_global_end(): 2 threads didn't exit'
     // at server shutdown
+
+    if (thd_added)
+    {
+      thd->release_resources();
+      thd_manager->remove_thd(thd);
+    }
   }
 
   /*
@@ -6450,21 +6495,6 @@ extern "C" void *start_wsrep_THD(void *arg)
   return(NULL);
 }
 
-/**/
-#ifdef OUT
-static bool abort_replicated(THD *thd)
-{
-  bool ret_code= false;
-  if (thd->wsrep_query_state== QUERY_COMMITTING)
-  {
-    if (wsrep_debug) WSREP_INFO("aborting replicated trx: %lu", thd->real_id);
-
-    (void)wsrep_abort_thd(thd, thd, TRUE);
-    ret_code= true;
-  }
-  return ret_code;
-}
-#endif /* OUT */
 /**/
 static inline bool is_client_connection(THD *thd)
 {
@@ -6605,8 +6635,13 @@ void wsrep_wait_appliers_close(THD *thd)
   /* Now kill remaining wsrep threads: rollbacker */
   wsrep_close_threads (thd);
   /* and wait for them to die */
-  while (have_wsrep_appliers(thd) > 0)
+  int round=0;
+  while (have_wsrep_appliers(thd) > 0 && round < 5)
   {
+    WSREP_INFO("active appliers remaining");
+    wsrep_close_threads (thd);
+    sleep(1);
+    round++;
   }
 
   /* All wsrep applier threads have now been aborted. However, if this thread
@@ -7815,7 +7850,27 @@ mysqld_get_one_option(int optid,
   case OPT_BINLOG_MAX_FLUSH_QUEUE_TIME:
     push_deprecated_warn_no_replacement(NULL, "--binlog_max_flush_queue_time");
     break;
-#include <sslopt-case.h>
+#if defined(HAVE_OPENSSL) && !defined(EMBEDDED_LIBRARY)
+  case OPT_SSL_KEY:
+  case OPT_SSL_CERT:
+  case OPT_SSL_CA:  
+  case OPT_SSL_CAPATH:
+  case OPT_SSL_CIPHER:
+  case OPT_SSL_CRL:   
+  case OPT_SSL_CRLPATH:
+  case OPT_TLS_VERSION:
+    /*
+      Enable use of SSL if we are using any ssl option.
+      One can disable SSL later by using --skip-ssl or --ssl=0.
+    */
+    opt_use_ssl= true;
+#ifdef HAVE_YASSL
+    /* crl has no effect in yaSSL. */
+    opt_ssl_crl= NULL;
+    opt_ssl_crlpath= NULL;
+#endif /* HAVE_YASSL */   
+    break;
+#endif /* HAVE_OPENSSL */
 #ifndef EMBEDDED_LIBRARY
   case 'V':
     print_version();
@@ -8018,7 +8073,10 @@ mysqld_get_one_option(int optid,
     }
     break;
 
-
+  case OPT_EARLY_PLUGIN_LOAD:
+    free_list(opt_early_plugin_load_list_ptr);
+    opt_early_plugin_load_list_ptr->push_back(new i_string(argument));
+    break;
   case OPT_PLUGIN_LOAD:
     free_list(opt_plugin_load_list_ptr);
     /* fall through */

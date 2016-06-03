@@ -348,7 +348,7 @@ row_ins_clust_index_entry_by_modify(
 	upd_t*		update;
 	dberr_t		err;
 	btr_cur_t*	cursor	= btr_pcur_get_btr_cur(pcur);
-
+	TABLE*		mysql_table = NULL;
 	ut_ad(dict_index_is_clust(cursor->index));
 
 	rec = btr_cur_get_rec(cursor);
@@ -359,10 +359,14 @@ row_ins_clust_index_entry_by_modify(
 	/* Build an update vector containing all the fields to be modified;
 	NOTE that this vector may NOT contain system columns trx_id or
 	roll_ptr */
+	if (thr->prebuilt != NULL) {
+		mysql_table = thr->prebuilt->m_mysql_table;
+		ut_ad(thr->prebuilt->trx == thr_get_trx(thr));
+	}
 
 	update = row_upd_build_difference_binary(
 		cursor->index, entry, rec, NULL, true,
-		thr_get_trx(thr), heap);
+		thr_get_trx(thr), heap, mysql_table);
 	if (mode != BTR_MODIFY_TREE) {
 		ut_ad((mode & ~BTR_ALREADY_S_LATCHED) == BTR_MODIFY_LEAF);
 
@@ -1300,8 +1304,7 @@ row_ins_foreign_check_on_constraint(
 				       clust_index,
 				       FALSE, FALSE);
 	if (err != DB_SUCCESS) {
-		fprintf(stderr, 
-			"WSREP: foreign key append failed: %d\n", err);
+		ib::warn() << "WSREP: foreign key append failed: " << err;
 	} else
 #endif
 	node->new_upd_nodes->push_back(cascade);
@@ -1637,6 +1640,7 @@ row_ins_check_foreign_constraint(
 						check_index, 
 						check_ref, TRUE);
 #endif /* WITH_WSREP */
+
 					goto end_scan;
 				} else if (foreign->type != 0) {
 					/* There is an ON UPDATE or ON DELETE

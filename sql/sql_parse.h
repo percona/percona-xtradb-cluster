@@ -136,6 +136,13 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs)
   if (WSREP(thd) || (thd && thd->wsrep_exec_mode==TOTAL_ORDER))             \
     wsrep_to_isolation_end(thd);
 
+/* Checks if lex->no_write_to_binlog is set for statements that use
+  LOCAL or NO_WRITE_TO_BINLOG
+*/
+#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)                   \
+  if (WSREP(thd) && !thd->lex->no_write_to_binlog                                   \
+         && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto error;
+
 #else
 
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
@@ -143,7 +150,7 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs)
 
 #endif /* WITH_WSREP */
 
-bool sqlcom_can_generate_row_events(const THD *thd);
+bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 
 /**
   Callback function used by kill_one_thread and timer_notify functions

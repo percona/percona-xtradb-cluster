@@ -46,7 +46,7 @@ SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3';
 SET PASSWORD FOR user3 = PASSWORD('foo');
 
 --connection node_1
-SELECT password != '' FROM mysql.user WHERE user = 'user3';
+SELECT authentication_string != '' FROM mysql.user WHERE user = 'user3';
 
 #
 # DROP USER

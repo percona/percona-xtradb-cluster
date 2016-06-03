@@ -240,6 +240,8 @@ innobase_casedn_str(
 
 #ifdef WITH_WSREP
 int
+wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx);
+int
 wsrep_innobase_kill_one_trx(void *thd_ptr,
                             const trx_t *bf_trx, trx_t *victim_trx, ibool signal);
 my_bool wsrep_thd_set_PA_safe(void *thd_ptr, my_bool safe);
@@ -315,6 +317,14 @@ thd_set_lock_wait_time(
 /*===================*/
 	THD*	thd,	/*!< in/out: thread handle */
 	ulint	value);	/*!< in: time waited for the lock */
+
+/** Get status of innodb_tmpdir.
+@param[in]	thd	thread handle, or NULL to query
+			the global innodb_tmpdir.
+@retval NULL if innodb_tmpdir="" */
+const char*
+thd_innodb_tmpdir(
+	THD*	thd);
 
 /**********************************************************************//**
 Get the current setting of the table_cache_size global parameter. We do

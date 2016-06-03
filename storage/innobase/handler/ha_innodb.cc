@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2016, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, Percona Inc.
 Copyright (c) 2012, Facebook Inc.
@@ -48,6 +48,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <sql_show.h>
 #include <sql_table.h>
 #include <sql_tablespace.h>
+#include <sql_thd_internal_api.h>
 #include <my_check_opt.h>
 #include <my_bitmap.h>
 #include <mysql/service_thd_alloc.h>
@@ -110,6 +111,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "dict0priv.h"
+#include "tc_log.h"
 #endif /* WITH_WSREP */
 enum_tx_isolation thd_get_trx_isolation(const THD* thd);
 
@@ -145,9 +147,7 @@ extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
                                          size_t* key_len);
 
 extern handlerton * wsrep_hton;
-#ifdef WITH_WSREP_REFACTOR
 extern TC_LOG* tc_log;
-#endif
 extern void wsrep_cleanup_transaction(THD *thd);
 #endif /* WITH_WSREP */
 
@@ -465,6 +465,7 @@ static PSI_mutex_info all_innodb_mutexes[] = {
 	PSI_KEY(rtr_ssn_mutex),
 	PSI_KEY(trx_sys_mutex),
 	PSI_KEY(zip_pad_mutex),
+	PSI_KEY(master_key_id_mutex),
 };
 # endif /* UNIV_PFS_MUTEX */
 
@@ -582,7 +583,8 @@ ib_cb_t innodb_api_cb[] = {
 	(ib_cb_t) ib_cfg_bk_commit_interval,
 	(ib_cb_t) ib_ut_strerr,
 	(ib_cb_t) ib_cursor_stmt_begin,
-	(ib_cb_t) ib_trx_read_only
+	(ib_cb_t) ib_trx_read_only,
+	(ib_cb_t) ib_is_virtual_table
 };
 
 /******************************************************************//**
@@ -631,6 +633,109 @@ innodb_stopword_table_validate(
 	void*				save,	/*!< out: immediate result
 						for update function */
 	struct st_mysql_value*		value);	/*!< in: incoming string */
+
+/** Validate passed-in "value" is a valid directory name.
+This function is registered as a callback with MySQL.
+@param[in,out]	thd	thread handle
+@param[in]	var	pointer to system variable
+@param[out]	save	immediate result for update
+@param[in]	value	incoming string
+@return 0 for valid name */
+static
+int
+innodb_tmpdir_validate(
+	THD*				thd,
+	struct st_mysql_sys_var*	var,
+	void*				save,
+	struct st_mysql_value*		value)
+{
+
+	char*	alter_tmp_dir;
+	char*	innodb_tmp_dir;
+	char	buff[OS_FILE_MAX_PATH];
+	int	len = sizeof(buff);
+	char	tmp_abs_path[FN_REFLEN + 2];
+
+	ut_ad(save != NULL);
+	ut_ad(value != NULL);
+
+	if (check_global_access(thd, FILE_ACL)) {
+		push_warning_printf(
+			thd, Sql_condition::SL_WARNING,
+			ER_WRONG_ARGUMENTS,
+			"InnoDB: FILE Permissions required");
+		*static_cast<const char**>(save) = NULL;
+		return(1);
+	}
+
+	alter_tmp_dir = (char*) value->val_str(value, buff, &len);
+
+	if (!alter_tmp_dir) {
+		*static_cast<const char**>(save) = alter_tmp_dir;
+		return(0);
+	}
+
+	if (strlen(alter_tmp_dir) > FN_REFLEN) {
+		push_warning_printf(
+			thd, Sql_condition::SL_WARNING,
+			ER_WRONG_ARGUMENTS,
+			"Path length should not exceed %d bytes", FN_REFLEN);
+		*static_cast<const char**>(save) = NULL;
+		return(1);
+	}
+
+	os_normalize_path(alter_tmp_dir);
+	my_realpath(tmp_abs_path, alter_tmp_dir, 0);
+	size_t  tmp_abs_len = strlen(tmp_abs_path);
+
+	if (my_access(tmp_abs_path, F_OK)) {
+
+		push_warning_printf(
+			thd, Sql_condition::SL_WARNING,
+			ER_WRONG_ARGUMENTS,
+			"InnoDB: Path doesn't exist.");
+		*static_cast<const char**>(save) = NULL;
+		return(1);
+	} else if (my_access(tmp_abs_path, R_OK | W_OK)) {
+		push_warning_printf(
+			thd, Sql_condition::SL_WARNING,
+			ER_WRONG_ARGUMENTS,
+			"InnoDB: Server doesn't have permission in "
+			"the given location.");
+		*static_cast<const char**>(save) = NULL;
+		return(1);
+	}
+
+	MY_STAT stat_info_dir;
+
+	if (my_stat(tmp_abs_path, &stat_info_dir, MYF(0))) {
+		if ((stat_info_dir.st_mode & S_IFDIR) != S_IFDIR) {
+
+			push_warning_printf(
+				thd, Sql_condition::SL_WARNING,
+				ER_WRONG_ARGUMENTS,
+				"Given path is not a directory. ");
+			*static_cast<const char**>(save) = NULL;
+			return(1);
+		}
+	}
+
+	if (!is_mysql_datadir_path(tmp_abs_path)) {
+
+		push_warning_printf(
+			thd, Sql_condition::SL_WARNING,
+			ER_WRONG_ARGUMENTS,
+			"InnoDB: Path location should not be same as "
+			"mysql data directory location.");
+		*static_cast<const char**>(save) = NULL;
+		return(1);
+	}
+
+	innodb_tmp_dir = static_cast<char*>(
+		thd_memdup(thd, tmp_abs_path, tmp_abs_len + 1));
+	*static_cast<const char**>(save) = innodb_tmp_dir;
+	return(0);
+}
 
 /******************************************************************//**
 Maps a MySQL trx isolation level code to the InnoDB isolation level code
@@ -709,6 +814,11 @@ static MYSQL_THDVAR_STR(ft_user_stopword_table,
   PLUGIN_VAR_OPCMDARG|PLUGIN_VAR_MEMALLOC,
   "User supplied stopword table name, effective in the session level.",
   innodb_stopword_table_validate, NULL, NULL);
+
+static MYSQL_THDVAR_STR(tmpdir,
+  PLUGIN_VAR_OPCMDARG|PLUGIN_VAR_MEMALLOC,
+  "Directory for temporary non-tablespace files.",
+  innodb_tmpdir_validate, NULL, NULL);
 
 static SHOW_VAR innodb_status_variables[]= {
   {"buffer_pool_dump_status",
@@ -1335,12 +1445,7 @@ thd_trx_arbitrate(THD* requestor, THD* holder)
 
 	ut_a(victim == NULL || victim == requestor || victim == holder);
 #ifdef WITH_WSREP
-        WSREP_DEBUG("victim: %d", wsrep_thd_exec_mode(victim));
-        if (wsrep_thd_is_BF(victim,false))
-        {
-          WSREP_DEBUG("victim is BF");
-        }
-        wsrep_thd_set_conflict_state(victim, true, MUST_ABORT);
+        return (NULL);
 #endif /* WITH_WSREP */
 	return(victim);
 }
@@ -1563,6 +1668,30 @@ thd_set_lock_wait_time(
 	if (thd) {
 		thd_storage_lock_wait(thd, value);
 	}
+}
+
+/** Get the value of innodb_tmpdir.
+@param[in]	thd	thread handle, or NULL to query
+			the global innodb_tmpdir.
+@retval NULL if innodb_tmpdir="" */
+const char*
+thd_innodb_tmpdir(
+	THD*	thd)
+{
+
+#ifdef UNIV_DEBUG
+	trx_t*	trx = thd_to_trx(thd);
+	btrsea_sync_check	check(trx->has_search_latch);
+	ut_ad(!sync_check_iterate(check));
+#endif /* UNIV_DEBUG */
+
+	const char*	tmp_dir = THDVAR(thd, tmpdir);
+
+	if (tmp_dir != NULL && *tmp_dir == '\0') {
+		tmp_dir = NULL;
+	}
+
+	return(tmp_dir);
 }
 
 /** Obtain the private handler of InnoDB session specific data.
@@ -2139,12 +2268,14 @@ innobase_get_lower_case_table_names(void)
 	return(lower_case_table_names);
 }
 
-/*********************************************************************//**
-Creates a temporary file.
+
+/** Creates a temporary file in the location specified by the parameter
+path. If the path is NULL, then it will be created in tmpdir.
+@param[in]	path	location for creating temporary file
 @return temporary file descriptor, or < 0 on error */
 int
-innobase_mysql_tmpfile(void)
-/*========================*/
+innobase_mysql_tmpfile(
+	const char*	path)
 {
 #ifdef WITH_INNODB_DISALLOW_WRITES
 	os_event_wait(srv_allow_writes_event);
@@ -2157,7 +2288,11 @@ innobase_mysql_tmpfile(void)
 		return(-1);
 	);
 
-	fd = mysql_tmpfile("ib");
+	if (path == NULL) {
+		fd = mysql_tmpfile("ib");
+	} else {
+		fd = mysql_tmpfile_path(path, "ib");
+	}
 
 	if (fd >= 0) {
 		/* Copy the file descriptor, so that the additional resources
@@ -2319,6 +2454,57 @@ Compression::validate(const char* algorithm)
 	return(check(algorithm, &compression));
 }
 
+/** Check if the string is "" or "n".
+@param[in]      algorithm       Encryption algorithm to check
+@return true if no algorithm requested */
+bool
+Encryption::is_none(const char* algorithm)
+{
+	/* NULL is the same as NONE */
+	if (algorithm == NULL
+	    || innobase_strcasecmp(algorithm, "n") == 0
+	    || innobase_strcasecmp(algorithm, "") == 0) {
+		return(true);
+	}
+
+	return(false);
+}
+
+/** Check the encryption option and set it
+@param[in]	option		encryption option
+@param[in/out]	encryption	The encryption algorithm
+@return DB_SUCCESS or DB_UNSUPPORTED */
+dberr_t
+Encryption::set_algorithm(
+	const char*	option,
+	Encryption*	encryption)
+{
+	if (is_none(option)) {
+
+		encryption->m_type = NONE;
+
+	} else if (innobase_strcasecmp(option, "y") == 0) {
+
+		encryption->m_type = AES;
+
+	} else {
+		return(DB_UNSUPPORTED);
+	}
+
+	return(DB_SUCCESS);
+}
+
+/** Check for supported ENCRYPT := (Y | N) supported values
+@param[in]	option		Encryption option
+@param[out]	encryption	The encryption algorithm
+@return DB_SUCCESS or DB_UNSUPPORTED */
+dberr_t
+Encryption::validate(const char* option)
+{
+	Encryption	encryption;
+
+	return(encryption.set_algorithm(option, &encryption));
+}
 /*********************************************************************//**
 Compute the next autoinc value.
 
@@ -3092,9 +3278,17 @@ ha_innobase::reset_template(void)
 	ut_ad(m_prebuilt->magic_n == ROW_PREBUILT_ALLOCATED);
 	ut_ad(m_prebuilt->magic_n2 == m_prebuilt->magic_n);
 
+	/* Force table to be freed in close_thread_table(). */
+	DBUG_EXECUTE_IF("free_table_in_fts_query",
+		if (m_prebuilt->in_fts_query) {
+			table->m_needs_reopen = true;
+		}
+	);
+
 	m_prebuilt->keep_other_fields_on_keyread = 0;
 	m_prebuilt->read_just_key = 0;
 	m_prebuilt->in_fts_query = 0;
+
 	/* Reset index condition pushdown state. */
 	if (m_prebuilt->idx_cond) {
 		m_prebuilt->idx_cond = NULL;
@@ -3240,6 +3434,60 @@ static bool innobase_is_supported_system_table(const char *db,
 	return false;
 }
 
+/* mutex protecting the master_key_id */
+ib_mutex_t	master_key_id_mutex;
+
+/** Rotate the encrypted tablespace keys according to master key
+rotation.
+@return false on success, true on failure */
+bool
+innobase_encryption_key_rotation()
+{
+	byte*	master_key = NULL;
+	bool	ret = FALSE;
+
+	/* Require the mutex to block other rotate request. */
+	mutex_enter(&master_key_id_mutex);
+
+	/* Check if keyring loaded and the currently master key
+	can be fetched. */
+	if (Encryption::master_key_id != 0) {
+		Encryption::get_master_key(Encryption::master_key_id,
+					   &master_key);
+		if (master_key == NULL) {
+			mutex_exit(&master_key_id_mutex);
+			my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+			return(true);
+		}
+		my_free(master_key);
+	}
+
+	master_key = NULL;
+
+	/* Generate the new master key. */
+	Encryption::create_master_key(&master_key);
+
+        if (master_key == NULL) {
+		my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+		mutex_exit(&master_key_id_mutex);
+                return(true);
+        }
+
+	ret = !fil_encryption_rotate();
+
+	my_free(master_key);
+
+	/* If rotation failure, return error */
+	if (ret) {
+		my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+	}
+
+	/* Release the mutex. */
+	mutex_exit(&master_key_id_mutex);
+
+	return(ret);
+}
+
 /** Return partitioning flags. */
 static uint innobase_partition_flags()
 {
@@ -3343,6 +3591,9 @@ innobase_init(
 
 	innobase_hton->is_supported_system_table=
 		innobase_is_supported_system_table;
+
+	innobase_hton->rotate_encryption_master_key =
+		innobase_encryption_key_rotation;
 
 	ut_a(DATA_MYSQL_TRUE_VARCHAR == (ulint)MYSQL_TYPE_VARCHAR);
 
@@ -3789,6 +4040,9 @@ innobase_change_buffering_inited_ok:
 
 	err = innobase_start_or_create_for_mysql();
 
+	/* Create mutex to protect encryption master_key_id. */
+	mutex_create(LATCH_ID_MASTER_KEY_ID_MUTEX, &master_key_id_mutex);
+
 	if (srv_buf_pool_size_org != 0) {
 		/* Set the original value back to show in help. */
 		srv_buf_pool_size_org =
@@ -3819,6 +4073,7 @@ innobase_change_buffering_inited_ok:
 	mysql_mutex_init(commit_cond_mutex_key,
 			 &commit_cond_m, MY_MUTEX_INIT_FAST);
 	mysql_cond_init(commit_cond_key, &commit_cond);
+
 	innodb_inited= 1;
 #ifdef MYSQL_DYNAMIC_PLUGIN
 	if (innobase_hton != p) {
@@ -3893,6 +4148,7 @@ innobase_end(
 		hash_table_free(innobase_open_tables);
 		innobase_open_tables = NULL;
 
+		mutex_free(&master_key_id_mutex);
 		if (innobase_shutdown_for_mysql() != DB_SUCCESS) {
 			err = 1;
 		}
@@ -5663,6 +5919,25 @@ ha_innobase::open(
 		is_part = NULL;
 	}
 
+	/* For encrypted table, check if the encryption info in data
+	file can't be retrieved properly, mark it as corrupted. */
+	if (ib_table != NULL
+	    && dict_table_is_encrypted(ib_table)
+	    && ib_table->ibd_file_missing) {
+
+		/* Mark this table as corrupted, so the drop table
+		or force recovery can still use it, but not others. */
+
+		dict_table_close(ib_table, FALSE, FALSE);
+		ib_table = NULL;
+		is_part = NULL;
+
+		free_share(m_share);
+		my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
+
+		DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
+	}
+
 	if (NULL == ib_table) {
 
 		if (is_part) {
@@ -5728,6 +6003,8 @@ ha_innobase::open(
 
 	m_prebuilt->default_rec = table->s->default_values;
 	ut_ad(m_prebuilt->default_rec);
+
+	m_prebuilt->m_mysql_table = table;
 
 	/* Looks like MySQL-3.23 sometimes has primary key number != 0 */
 	m_primary_key = table->s->primary_key;
@@ -6768,19 +7045,17 @@ wsrep_store_key_val_for_row(
 
 			/* Note that we always reserve the maximum possible
 			length of the BLOB prefix in the key value. */
-                        if (wsrep_protocol_version > 1) {
-				if (true_len > buff_space) {
-					fprintf (stderr,
-						 "WSREP: key truncated: %s\n",
-						 wsrep_thd_query(thd));
-					true_len = buff_space;
-				}
-				buff       += true_len;
-				buff_space -= true_len;
-			} else {
-				buff += key_len;
+			ut_a(wsrep_protocol_version > 1);
+			if (true_len > buff_space) {
+				ib::warn() <<
+					"WSREP: key truncated: %s " <<
+					wsrep_thd_query(thd);
+				true_len = buff_space;
 			}
 			memcpy(buff, sorted, true_len);
+			buff       += true_len;
+			buff_space -= true_len;
+
 		} else {
 			/* Here we handle all other data types except the
 			true VARCHAR, BLOB and TEXT. Note that the column
@@ -7636,7 +7911,7 @@ no_commit:
 			/* Unknown situation: do not commit */
 			;
 		} else if (src_table == m_prebuilt->table) {
-#ifdef WITH_WSREP_REFACTOR
+#ifdef WITH_WSREP
 			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
 			    sql_command == SQLCOM_LOAD                      &&
 			    !thd_test_options(
@@ -7666,7 +7941,7 @@ no_commit:
 			/* We will need an IX lock on the destination table. */
 			m_prebuilt->sql_stat_start = TRUE;
 		} else {
-#ifdef WITH_WSREP_REFACTOR
+#ifdef WITH_WSREP
 			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
 			    sql_command == SQLCOM_LOAD                      &&
 			    !thd_test_options(
@@ -9768,6 +10043,7 @@ innobase_fts_create_doc_id_key(
 	dfield_t*	dfield = dtuple_get_nth_field(tuple, 0);
 
 	ut_a(dict_index_get_n_unique(index) == 1);
+
 	dtuple_set_n_fields(tuple, index->n_fields);
 	dict_index_copy_types(tuple, index, index->n_fields);
 
@@ -10078,9 +10354,9 @@ wsrep_append_foreign_key(
 		WSREP_ERROR(
 			"FK key set failed: %d (%lu %lu), index: %s %s, %s",
 			rcode, referenced, shared,
-			(index && index->name)       ? index->name :
+			(index && index->name) ? (const char *)(index->name) :
 				"void index",
-			(index && index->table_name) ? index->table_name :
+			(index && index->table_name) ? (index->table_name) :
 				"void table",
 			wsrep_thd_query(thd));
 		return DB_ERROR;
@@ -10569,12 +10845,13 @@ create_table_info_t::create_table_def()
 		}
 	}
 
+	ut_ad(trx_state_eq(m_trx, TRX_STATE_NOT_STARTED));
+
 	/* Check whether there already exists a FTS_DOC_ID column */
 	if (create_table_check_doc_id_col(m_trx, m_form, &doc_id_col)){
 
 		/* Raise error if the Doc ID column is of wrong type or name */
 		if (doc_id_col == ULINT_UNDEFINED) {
-			trx_commit_for_mysql(m_trx);
 
 			err = DB_ERROR;
 			goto error_ret;
@@ -10679,6 +10956,10 @@ create_table_info_t::create_table_def()
 
 			charset_no = (ulint) field->charset()->number;
 
+			DBUG_EXECUTE_IF("simulate_max_char_col",
+					charset_no = MAX_CHAR_COLL_NUM + 1;
+					);
+
 			if (charset_no > MAX_CHAR_COLL_NUM) {
 				/* in data0type.h we assume that the
 				number fits in one byte in prtype */
@@ -10690,6 +10971,11 @@ create_table_info_t::create_table_def()
 					" Unsupported code %lu.",
 					(ulong) charset_no);
 				mem_heap_free(heap);
+				dict_mem_table_free(table);
+
+				ut_ad(trx_state_eq(
+					m_trx, TRX_STATE_NOT_STARTED));
+
 				DBUG_RETURN(ER_CANT_CREATE_TABLE);
 			}
 		}
@@ -10725,7 +11011,7 @@ create_table_info_t::create_table_def()
 err_col:
 			dict_mem_table_free(table);
 			mem_heap_free(heap);
-			trx_commit_for_mysql(m_trx);
+			ut_ad(trx_state_eq(m_trx, TRX_STATE_NOT_STARTED));
 
 			err = DB_ERROR;
 			goto error_ret;
@@ -10777,6 +11063,8 @@ err_col:
 		fts_add_doc_id_column(table, heap);
 	}
 
+	ut_ad(trx_state_eq(m_trx, TRX_STATE_NOT_STARTED));
+
 	/* If temp table, then we avoid creation of entries in SYSTEM TABLES.
 	Given that temp table lifetime is limited to connection/server lifetime
 	on re-start we don't need to restore temp-table and so no entry is
@@ -10793,7 +11081,14 @@ err_col:
 				"temporary tables");
 
 			err = DB_UNSUPPORTED;
+			dict_mem_table_free(table);
+		} else if (m_create_info->encrypt_type.length > 0
+			   && !Encryption::is_none(
+				   m_create_info->encrypt_type.str)) {
 
+			my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
+			err = DB_UNSUPPORTED;
+			dict_mem_table_free(table);
 		} else {
 
 			/* Get a new table ID */
@@ -10849,6 +11144,7 @@ err_col:
 			algorithm = NULL;
 
 			err = DB_UNSUPPORTED;
+			dict_mem_table_free(table);
 
 		} else if (Compression::validate(algorithm) != DB_SUCCESS
 			   || m_form->s->row_type == ROW_TYPE_COMPRESSED
@@ -10856,6 +11152,37 @@ err_col:
 
 			algorithm = NULL;
                 }
+
+		const char*	encrypt = m_create_info->encrypt_type.str;
+
+		if (!(m_flags2 & DICT_TF2_USE_FILE_PER_TABLE)
+		    && m_create_info->encrypt_type.length > 0
+		    && !Encryption::is_none(encrypt)) {
+
+			my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
+			err = DB_UNSUPPORTED;
+			dict_mem_table_free(table);
+
+		} else if (!Encryption::is_none(encrypt)) {
+			/* Set the encryption flag. */
+			byte*	master_key = NULL;
+			ulint	master_key_id;
+
+			/* Check if keyring is ready. */
+			Encryption::get_master_key(&master_key_id,
+						   &master_key);
+
+			if (master_key == NULL) {
+				my_error(ER_CANNOT_FIND_KEY_IN_KEYRING,
+					 MYF(0));
+				err = DB_UNSUPPORTED;
+				dict_mem_table_free(table);
+			} else {
+				my_free(master_key);
+				DICT_TF2_FLAG_SET(table,
+						  DICT_TF2_ENCRYPTION);
+			}
+		}
 
 		if (err == DB_SUCCESS) {
 			err = row_create_table_for_mysql(
@@ -10876,6 +11203,9 @@ err_col:
 
 			err = DB_SUCCESS;
 		}
+
+		DBUG_EXECUTE_IF("ib_crash_during_create_for_encryption",
+				DBUG_SUICIDE(););
 	}
 
 	mem_heap_free(heap);
@@ -11596,6 +11926,18 @@ create_table_info_t::create_options_are_invalid()
 		}
 	}
 
+	/* Check the encryption option. */
+	if (ret == NULL && m_create_info->encrypt_type.length > 0) {
+		dberr_t		err;
+
+		err = Encryption::validate(m_create_info->encrypt_type.str);
+
+		if (err == DB_UNSUPPORTED) {
+                        my_error(ER_INVALID_ENCRYPTION_OPTION, MYF(0));
+			ret = "ENCRYPTION";
+		}
+	}
+
 	return(ret);
 }
 
@@ -11880,6 +12222,25 @@ index_bad:
 				"InnoDB: Unsupported compression "
 				"algorithm '%s'",
 				compression);
+		}
+
+	} else if (m_create_info->encrypt_type.length > 0) {
+
+		const char*     encryption = m_create_info->encrypt_type.str;
+
+		if (Encryption::validate(encryption) != DB_SUCCESS) {
+			/* Incorrect encryption option */
+                        my_error(ER_INVALID_ENCRYPTION_OPTION, MYF(0));
+			DBUG_RETURN(false);
+		}
+
+		if (m_use_shared_space
+		    || (m_create_info->options & HA_LEX_CREATE_TMP_TABLE)) {
+			if (!Encryption::is_none(encryption)) {
+				/* Can't encrypt shared tablespace */
+				my_error(ER_TABLESPACE_CANNOT_ENCRYPT, MYF(0));
+				DBUG_RETURN(false);
+			}
 		}
 	}
 
@@ -16319,7 +16680,7 @@ struct ShowStatus {
 		Value(const char*	name,
 		      ulint		spins,
 		      uint64_t		waits,
-		      ulint		calls)
+		      uint64_t		calls)
 			:
 			m_name(name),
 			m_spins(spins),
@@ -16336,7 +16697,7 @@ struct ShowStatus {
 		ulint			m_spins;
 
 		/** Waits so far */
-		ulint			m_waits;
+		uint64_t		m_waits;
 
 		/** Number of calls so far */
 		uint64_t		m_calls;
@@ -17135,6 +17496,7 @@ ha_innobase::get_auto_increment(
 			{
 #endif /* WITH_WSREP */
 			current = autoinc - m_prebuilt->autoinc_increment;
+
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
@@ -18296,6 +18658,11 @@ innodb_make_page_dirty(
 		return;
 	}
 
+	if (srv_saved_page_number_debug > space->size) {
+		fil_space_release(space);
+		return;
+	}
+
 	mtr.start();
 	mtr.set_named_space(space);
 
@@ -19185,9 +19552,6 @@ innobase_fts_close_ranking(
 /*=======================*/
 		FT_INFO * fts_hdl)
 {
-	reinterpret_cast<NEW_FT_INFO*>(fts_hdl)->ft_prebuilt->in_fts_query =
-		false;
-
 	fts_result_t*	result;
 
 	result = reinterpret_cast<NEW_FT_INFO*>(fts_hdl)->ft_result;
@@ -19195,7 +19559,6 @@ innobase_fts_close_ranking(
 	fts_query_free_result(result);
 
 	my_free((uchar*) fts_hdl);
-
 
 	return;
 }
@@ -19627,6 +19990,113 @@ wsrep_abort_slave_trx(wsrep_seqno_t bf_seqno, wsrep_seqno_t victim_seqno)
 	abort();
 }
 
+
+/*
+  This function is needed only for canceling thread, which are inside replicator processing
+  commit, when high priority transaction aborts the victim
+ */
+int
+wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx)
+{
+	DBUG_ENTER("wsrep_signal_replicator");
+        THD *bf_thd       = (THD*) bf_trx->mysql_thd;
+	THD *thd          = (THD *) victim_trx->mysql_thd;
+	int64_t bf_seqno  = (bf_thd) ? wsrep_thd_trx_seqno(bf_thd) : 0;
+
+	if (!thd) {
+		DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
+		WSREP_WARN("no THD for trx: %llu", (long long)victim_trx->id);
+		DBUG_RETURN(1);
+	}
+	if (!bf_thd) {
+		DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
+		WSREP_WARN("no BF THD for trx: %llu",
+			   (bf_trx) ? (long long)bf_trx->id : 0);
+		DBUG_RETURN(1);
+	}
+
+	WSREP_LOG_CONFLICT(bf_thd, thd, TRUE);
+
+	WSREP_DEBUG("BF kill (seqno: %lld), victim: (%u) trx: %llu",
+		    (long long)bf_seqno,
+		    wsrep_thd_thread_id(thd),
+		    (long long)victim_trx->id);
+
+	WSREP_DEBUG("Aborting query: %s",
+		  (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+
+	wsrep_thd_LOCK(thd);
+
+	if (wsrep_thd_query_state(thd) == QUERY_EXITING) {
+		WSREP_DEBUG("kill trx EXITING for %llu",
+			    (long long)victim_trx->id);
+		wsrep_thd_UNLOCK(thd);
+		DBUG_RETURN(0);
+	}
+
+	switch (wsrep_thd_conflict_state(thd)) {
+	case NO_CONFLICT:
+		wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
+		break;
+        case MUST_ABORT:
+		WSREP_DEBUG("victim %llu in MUST ABORT state",
+			    (long long)victim_trx->id);
+		break;
+	case ABORTED:
+	case ABORTING: // fall through
+	default:
+		WSREP_DEBUG("victim %llu in state %d",
+			    (long long)victim_trx->id,
+			    wsrep_thd_conflict_state(thd));
+		wsrep_thd_UNLOCK(thd);
+		DBUG_RETURN(0);
+		break;
+	}
+
+	switch (wsrep_thd_query_state(thd)) {
+	case QUERY_COMMITTING:
+		enum wsrep_status rcode;
+
+		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu",
+			    (long long)victim_trx->id);
+
+		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
+			wsrep_abort_slave_trx(bf_seqno,
+					      wsrep_thd_trx_seqno(thd));
+		} else {
+			rcode = wsrep->abort_pre_commit(
+				wsrep, bf_seqno,
+				(wsrep_trx_id_t)victim_trx->id
+			);
+			switch (rcode) {
+			case WSREP_WARNING:
+				WSREP_DEBUG("cancel commit warning: %llu",
+					    (long long)victim_trx->id);
+				wsrep_thd_UNLOCK(thd);
+				DBUG_RETURN(1);
+				break;
+			case WSREP_OK:
+				break;
+			default:
+				WSREP_ERROR(
+					"cancel commit bad exit: %d %llu",
+					rcode,
+					(long long)victim_trx->id);
+				/* unable to interrupt, must abort */
+				/* note: kill_mysql() will block, if we cannot.
+				 * kill the lock holder first.
+				 */
+				abort();
+				break;
+			}
+		}
+		break;
+        default: break;
+        }
+	wsrep_thd_UNLOCK(thd);
+        DBUG_RETURN(0);
+}
+
 int
 wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                             const trx_t * const bf_trx,
@@ -19685,6 +20155,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
         case MUST_ABORT:
 		WSREP_DEBUG("victim %llu in MUST ABORT state",
 			    (long long)victim_trx->id);
+                victim_trx->killed_by = bf_trx->id;
 		wsrep_thd_UNLOCK(thd);
 		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
@@ -19706,6 +20177,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    (long long)victim_trx->id);
+                victim_trx->killed_by = bf_trx->id;
 		wsrep_thd_awake(thd, signal); 
 
 		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
@@ -19757,6 +20229,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
+                        victim_trx->killed_by = bf_trx->id;
 			wsrep_thd_awake(thd, signal); 
 		} else {
 			/* abort currently executing query */
@@ -19764,6 +20237,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                                             wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
+                        victim_trx->killed_by = bf_trx->id;
 			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */
@@ -20471,7 +20945,7 @@ static MYSQL_SYSVAR_LONG(log_buffer_size, innobase_log_buffer_size,
 static MYSQL_SYSVAR_LONGLONG(log_file_size, innobase_log_file_size,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "Size of each log file in a log group.",
-  NULL, NULL, 48*1024*1024L, 1*1024*1024L, LLONG_MAX, 1024*1024L);
+  NULL, NULL, 48*1024*1024L, 4*1024*1024L, LLONG_MAX, 1024*1024L);
 
 static MYSQL_SYSVAR_ULONG(log_files_in_group, srv_n_log_files,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
@@ -20616,12 +21090,12 @@ static MYSQL_SYSVAR_BOOL(use_native_aio, srv_use_native_aio,
   "Use native AIO if supported on this platform.",
   NULL, NULL, TRUE);
 
-#ifdef HAVE_LIBNUMA
+#if defined(HAVE_LIBNUMA) && defined(WITH_NUMA)
 static MYSQL_SYSVAR_BOOL(numa_interleave, srv_numa_interleave,
   PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
   "Use NUMA interleave memory policy to allocate InnoDB buffer pool.",
   NULL, NULL, FALSE);
-#endif // HAVE_LIBNUMA
+#endif /* HAVE_LIBNUMA && WITH_NUMA */
 
 static MYSQL_SYSVAR_BOOL(api_enable_binlog, ib_binlog_enabled,
   PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
@@ -20971,12 +21445,13 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(thread_concurrency),
   MYSQL_SYSVAR(adaptive_max_sleep_delay),
   MYSQL_SYSVAR(thread_sleep_delay),
+  MYSQL_SYSVAR(tmpdir),
   MYSQL_SYSVAR(autoinc_lock_mode),
   MYSQL_SYSVAR(version),
   MYSQL_SYSVAR(use_native_aio),
-#ifdef HAVE_LIBNUMA
+#if defined(HAVE_LIBNUMA) && defined(WITH_NUMA)
   MYSQL_SYSVAR(numa_interleave),
-#endif // HAVE_LIBNUMA
+#endif /* HAVE_LIBNUMA && WITH_NUMA */
   MYSQL_SYSVAR(change_buffering),
   MYSQL_SYSVAR(change_buffer_max_size),
 #if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG
@@ -21273,11 +21748,11 @@ innobase_init_vc_templ(
 @param[in,out]	row		the data row
 @param[in]	col		virtual column
 @param[in]	index		index
-@param[in,out]	my_rec		mysql record to store the data
 @param[in,out]	local_heap	heap memory for processing large data etc.
 @param[in,out]	heap		memory heap that copies the actual index row
 @param[in]	ifield		index field
-@param[in]	in_purge	whether this is called by purge
+@param[in]	thd		MySQL thread handle
+@param[in,out]	mysql_table	mysql table object
 @return the field filled with computed value, or NULL if just want
 to store the value in passed in "my_rec" */
 dfield_t*
@@ -21285,11 +21760,11 @@ innobase_get_computed_value(
 	const dtuple_t*		row,
 	const dict_v_col_t*	col,
 	const dict_index_t*	index,
-	byte*			my_rec,
 	mem_heap_t**		local_heap,
 	mem_heap_t*		heap,
 	const dict_field_t*	ifield,
-	bool			in_purge)
+	THD*			thd,
+	TABLE*			mysql_table)
 {
 	byte		rec_buf1[REC_VERSION_56_MAX_INDEX_COL_LEN];
 	byte		rec_buf2[REC_VERSION_56_MAX_INDEX_COL_LEN];
@@ -21301,6 +21776,7 @@ innobase_get_computed_value(
 	ulint		ret = 0;
 
 	ut_ad(index->table->vc_templ);
+	ut_ad(thd != NULL);
 
 	const mysql_row_templ_t*
 			vctempl =  index->table->vc_templ->vtempl[
@@ -21312,22 +21788,12 @@ innobase_get_computed_value(
 			*local_heap = mem_heap_create(UNIV_PAGE_SIZE);
 		}
 
-		if (!my_rec) {
-			mysql_rec = static_cast<byte*>(mem_heap_alloc(
-				*local_heap, index->table->vc_templ->rec_len));
-		} else {
-			mysql_rec = my_rec;
-		}
-
+		mysql_rec = static_cast<byte*>(mem_heap_alloc(
+			    *local_heap, index->table->vc_templ->rec_len));
 		buf = static_cast<byte*>(mem_heap_alloc(
 				*local_heap, index->table->vc_templ->rec_len));
 	} else {
-		if (!my_rec) {
-			mysql_rec = rec_buf1;
-		} else {
-			mysql_rec = my_rec;
-		}
-
+		mysql_rec = rec_buf1;
 		buf = rec_buf2;
 	}
 
@@ -21382,17 +21848,27 @@ innobase_get_computed_value(
 
 	/* Bitmap for specifying which virtual columns the server
 	should evaluate */
-	MY_BITMAP column_map;
-	my_bitmap_map col_map_storage[bitmap_buffer_size(REC_MAX_N_FIELDS)];
+	MY_BITMAP	column_map;
+	my_bitmap_map	col_map_storage[bitmap_buffer_size(REC_MAX_N_FIELDS)];
+
 	bitmap_init(&column_map, col_map_storage, REC_MAX_N_FIELDS, false);
 
 	/* Specify the column the server should evaluate */
 	bitmap_set_bit(&column_map, col->m_col.ind);
 
-	if (in_purge) {
+	if (mysql_table == NULL) {
 		if (vctempl->type == DATA_BLOB) {
-			ulint   max_len = DICT_MAX_FIELD_LEN_BY_FORMAT(
-				index->table) + 1;
+			ulint	max_len;
+
+			if (vctempl->mysql_col_len - 8 == 1) {
+				/* This is for TINYBLOB only, which needs
+				only 1 byte, other BLOBs won't be affected */
+				max_len = 255;
+			} else {
+				max_len = DICT_MAX_FIELD_LEN_BY_FORMAT(
+						index->table) + 1;
+			}
+
 			byte*   blob_mem = static_cast<byte*>(
 				mem_heap_alloc(heap, max_len));
 
@@ -21402,26 +21878,27 @@ innobase_get_computed_value(
                 }
 
 		ret = handler::my_eval_gcolumn_expr_with_open(
-			current_thd, index->table->vc_templ->db_name.c_str(),
+			thd, index->table->vc_templ->db_name.c_str(),
 			index->table->vc_templ->tb_name.c_str(), &column_map,
 			(uchar *)mysql_rec);
         } else {
 		ret = handler::my_eval_gcolumn_expr(
-			current_thd, index->table->vc_templ->db_name.c_str(),
-			index->table->vc_templ->tb_name.c_str(), &column_map,
+			thd, mysql_table, &column_map,
 			(uchar *)mysql_rec);
 	}
 
 	if (ret != 0) {
+#ifdef INNODB_VIRTUAL_DEBUG
 		ib::warn() << "Compute virtual column values failed ";
 		fputs("InnoDB: Cannot compute value for following record ",
 		      stderr);
 		dtuple_print(stderr, row);
+#endif /* INNODB_VIRTUAL_DEBUG */
 		return(NULL);
 	}
 
 	/* we just want to store the data in passed in MySQL record */
-	if (my_rec || ret != 0) {
+	if (ret != 0) {
 		return(NULL);
 	}
 
