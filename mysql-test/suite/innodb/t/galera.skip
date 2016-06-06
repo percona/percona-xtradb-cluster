@@ -45,3 +45,4 @@ row_format_redundant : WSREP: innodb_read_only is not supported
 optimizer_temporary_table : WSREP: innodb_read_only is not supported
 readonly : WSREP: innodb_read_only is not supported
 log_file_size : WSREP: innodb_read_only is not supported
+log_file_size_1 : WSREP: innodb_read_only is not supported
