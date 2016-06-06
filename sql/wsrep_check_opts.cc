@@ -50,6 +50,7 @@ static struct opt opts[] =
     { "wsrep_cluster_address",   "0" }, // mysqld.cc
     { "locks_unsafe_for_binlog", "0" }, // ha_innodb.cc
     { "autoinc_lock_mode",       "1" }, // ha_innodb.cc
+    { "innodb_read_only",   "0" }, // ha_innodb.cc
     { 0, 0 }
 };
 
@@ -66,7 +67,8 @@ enum
     LOCKED_IN_MEMORY,
     WSREP_CLUSTER_ADDRESS,
     LOCKS_UNSAFE_FOR_BINLOG,
-    AUTOINC_LOCK_MODE
+    AUTOINC_LOCK_MODE,
+    INNODB_READ_ONLY_MODE
 };
 
 
@@ -153,7 +155,6 @@ find_opts (argv_copy& a, struct opt* const opts)
         for (; 0 != opt->name; ++opt)
         {
             if (!strstr(ptr, opt->name)) continue; // try next option
-
             /* 1. try to find value after the '=' */
             opt->value = strchr(ptr, '=') + 1;
 
@@ -366,6 +367,16 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
 
             rcode = EINVAL;
         }
+    }
+
+    bool read_only;
+    err = get_bool (opts[INNODB_READ_ONLY_MODE], &read_only);
+    if (err) { WSREP_ERROR("get_bool error: %s", strerror(err)); return err; }
+    if (read_only)
+    {
+      WSREP_ERROR ("innodb_read_only is not supported (innodb_read_only=%s)",
+                   read_only ? "1" : "0");
+      rcode = EINVAL;
     }
 
     return rcode;

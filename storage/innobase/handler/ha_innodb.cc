@@ -20340,6 +20340,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid)
 {
 	DBUG_ASSERT(hton == innodb_hton_ptr);
+        if (srv_read_only_mode) return 0;
         if (wsrep_is_wsrep_xid(xid)) {
                 mtr_t mtr;
                 mtr_start(&mtr);
