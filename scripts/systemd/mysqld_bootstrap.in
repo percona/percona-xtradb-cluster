@@ -23,8 +23,18 @@
 # However, systemd passes a set of environment variables to the service process
 # it starts, and this set can be modified.
 # Such a modification would be persistent, so it must be undone after use.
+#
+# If other options are set already, make sure to use them, and to restore them.
 
-systemctl set-environment   MYSQLD_OPTS="--wsrep-new-cluster"
-systemctl start             @SYSTEMD_SERVICE_NAME@
-systemctl unset-environment MYSQLD_OPTS
+OLDVAL=$(systemctl show-environment | grep '^MYSQLD_OPTS=')
+
+if [ -z "$OLDVAL" ]; then
+    systemctl set-environment   MYSQLD_OPTS="--wsrep-new-cluster"
+    systemctl start             @SYSTEMD_SERVICE_NAME@
+    systemctl unset-environment MYSQLD_OPTS
+else
+    systemctl set-environment   "$OLDVAL --wsrep-new-cluster"
+    systemctl start             @SYSTEMD_SERVICE_NAME@
+    systemctl set-environment   "$OLDVAL"
+fi
 
