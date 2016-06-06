@@ -949,7 +949,9 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
 if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
-
+/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
+/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
+/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %if 0%{?systemd}
   %systemd_post mysql
 %endif
