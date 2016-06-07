@@ -278,22 +278,64 @@ FLUSH TABLES t1;
 DROP TABLE t1;
 DROP TABLE t2;
 
+
+#-------------------------------------------------------------------------------
 #
-# If FTWRL has paused the node then avoid toggling desync.
+# Try to execute
+# - FLUSH TABLE <table> WITH READ LOCK
+# - FLUSH TABLE <table> WITH READ LOCK
+# - LOCK TABLE <table> WRITE/READ
+# with FTWRL
+
+
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+# desync and pause the cluster.
+FLUSH TABLE WITH READ LOCK;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node-1a
+# will pause the cluster.
+FLUSH TABLE t1 WITH READ LOCK;
+
+--connection node_1
+--echo #node-1
+# will resync the node but will not resume it.
+UNLOCK TABLES;
+SELECT * FROM t1;
+
+--connection node_2
+--echo #node-2
+INSERT INTO t1 values (100);
+
+--connection node_1a
+--echo #node-1a
+UNLOCK TABLES;
+--sleep 4
+SELECT * FROM t1;
+DROP TABLE t1;
+
+
+#-------------------------------------------------------------------------------
+#
+# Trying to set a provider when node is paused
 #
 --connection node_1
-call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
 --echo #node-1
---let $wsrep_desync_saved = `select @@wsrep_desync`
+call mtr.add_suppression("WSREP: Cannot modify wsrep_provider while node is paused or desynced");
 #
-select @@wsrep_desync;
-set global wsrep_desync = 1;
-set global wsrep_desync = 0;
-flush table with read lock;
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+# pause node
+FLUSH TABLE t1 WITH READ LOCK;
 --error ER_WRONG_VALUE_FOR_VAR
-set global wsrep_desync = 1;
+SET GLOBAL wsrep_provider=none;
+UNLOCK TABLES;
+# pause and desync node
+FLUSH TABLE WITH READ LOCK;
 --error ER_WRONG_VALUE_FOR_VAR
-set global wsrep_desync = 0;
-unlock tables;
-set global wsrep_desync = 1;
---eval set global wsrep_desync = $wsrep_desync_saved;
+SET GLOBAL wsrep_provider=none;
+UNLOCK TABLES;
+#
+DROP TABLE t1;

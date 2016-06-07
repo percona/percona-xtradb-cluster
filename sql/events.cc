@@ -1197,7 +1197,7 @@ Events::load_events_from_db(THD *thd)
       NOTE:
       This complete system relies on server-id. Ideally server-id should be
       same for all nodes of galera eco-system but they aren't same.
-      Infact, based on galera use-case it seems like it rcommends to have each
+      Infact, based on galera use-case it seems like it recommends to have each
       node with different server-id.
     */
     if (et->originator != thd->server_id)

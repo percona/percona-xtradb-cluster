@@ -12,11 +12,6 @@
 --source include/have_innodb.inc
 
 # Global Variables
-
---disable_warnings
-SELECT COUNT(*) = 39 FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES WHERE VARIABLE_NAME LIKE 'wsrep_%';
---enable_warnings
-
 --disable_warnings
 SELECT VARIABLE_NAME, VARIABLE_VALUE
 FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES

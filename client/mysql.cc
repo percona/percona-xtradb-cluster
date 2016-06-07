@@ -3495,7 +3495,7 @@ com_help(String *buffer __attribute__((unused)),
 
   put_info("\nFor information about Percona products and services, visit:\n"
            "   http://www.percona.com/\n"
-	   "Percona XtraDB Cluster manual: http://www.percona.com/doc/percona-xtradb-cluster/5.6/\n"
+	   "Percona XtraDB Cluster manual: http://www.percona.com/doc/percona-xtradb-cluster/5.7/\n"
            "For the MySQL Reference Manual: http://dev.mysql.com/\n"
            "To buy Percona support, training, or other products, visit:\n"
            "   https://www.percona.com/\n", INFO_INFO);

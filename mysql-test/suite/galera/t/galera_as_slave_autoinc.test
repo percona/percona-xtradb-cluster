@@ -40,6 +40,14 @@ insert into t1(i) values(null), (null), (null);
 
 select * from t1;
 
+SET SESSION auto_increment_increment=7;
+insert into t1(i) values(null), (null), (null);
+
+SET SESSION auto_increment_offset=5;
+insert into t1(i) values(null), (null), (null);
+
+select * from t1;
+
 show variables like 'binlog_format';
 show variables like '%auto_increment%';
 
@@ -47,7 +55,7 @@ show variables like '%auto_increment%';
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT COUNT(*) = 4 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1;
 --source include/wait_condition.inc
 
 select * from t1;
@@ -73,7 +81,5 @@ STOP SLAVE;
 RESET SLAVE ALL;
 
 --connection node_1
-
 SET GLOBAL binlog_format='ROW';
-
 RESET MASTER;

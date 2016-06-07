@@ -711,6 +711,16 @@ my_thread_handle signal_thread_id;
 my_thread_attr_t connection_attrib;
 mysql_mutex_t LOCK_server_started;
 mysql_cond_t COND_server_started;
+mysql_mutex_t LOCK_reset_gtid_table;
+mysql_mutex_t LOCK_compress_gtid_table;
+mysql_cond_t COND_compress_gtid_table;
+#if !defined (EMBEDDED_LIBRARY) && !defined(_WIN32)
+mysql_mutex_t LOCK_socket_listener_active;
+mysql_cond_t COND_socket_listener_active;
+mysql_mutex_t LOCK_start_signal_handler;
+mysql_cond_t COND_start_signal_handler;
+#endif
+mysql_rwlock_t LOCK_consistent_snapshot;
 
 #ifdef WITH_WSREP
 mysql_mutex_t LOCK_wsrep_ready;
@@ -726,22 +736,17 @@ mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
-mysql_mutex_t LOCK_wsrep_desync_count;
+mysql_mutex_t LOCK_wsrep_pause_count;
+
 int wsrep_replaying= 0;
-int wsrep_desync_count= 0;
-int wsrep_desync_count_manual= 0;
+
+/* This count is used to track how many times the provider
+was paused. Pause being an implicit operation single count
+to track this should suffice. */
+unsigned int wsrep_pause_count= 0;
+
 static void wsrep_close_threads(THD* thd);
 #endif /* WITH_WSREP */
-mysql_mutex_t LOCK_reset_gtid_table;
-mysql_mutex_t LOCK_compress_gtid_table;
-mysql_cond_t COND_compress_gtid_table;
-#if !defined (EMBEDDED_LIBRARY) && !defined(_WIN32)
-mysql_mutex_t LOCK_socket_listener_active;
-mysql_cond_t COND_socket_listener_active;
-mysql_mutex_t LOCK_start_signal_handler;
-mysql_cond_t COND_start_signal_handler;
-#endif
-mysql_rwlock_t LOCK_consistent_snapshot;
 
 bool mysqld_server_started= false;
 
@@ -1814,6 +1819,7 @@ static void clean_up_mutexes()
   mysql_mutex_destroy(&LOCK_global_user_client_stats);
   mysql_mutex_destroy(&LOCK_global_table_stats);
   mysql_mutex_destroy(&LOCK_global_index_stats);
+  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 #ifdef WITH_WSREP
   (void) mysql_mutex_destroy(&LOCK_wsrep_ready);
   (void) mysql_cond_destroy(&COND_wsrep_ready);
@@ -1827,9 +1833,8 @@ static void clean_up_mutexes()
   (void) mysql_cond_destroy(&COND_wsrep_replaying);
   (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync);
-  (void) mysql_mutex_destroy(&LOCK_wsrep_desync_count);
+  (void) mysql_mutex_destroy(&LOCK_wsrep_pause_count);
 #endif /* WITH_WSREP */
-  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 }
 
 
@@ -3278,7 +3283,7 @@ int init_common_variables()
     global_system_variables.auto_increment_increment;
   global_system_variables.saved_auto_increment_offset=
     global_system_variables.auto_increment_offset;
-#endif
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_INTERFACE
   /*
@@ -3403,18 +3408,10 @@ int init_common_variables()
     return 1;
 #endif /* WITH_WSREP */
 
-#ifndef NO_EMBEDDED_ACCESS_CHECKS
-
-  if (strlen(DEFAULT_EARLY_PLUGIN_LOAD))
-  {
-    i_string *default_early_plugin= new i_string(DEFAULT_EARLY_PLUGIN_LOAD);
-    opt_early_plugin_load_list_ptr->push_back(default_early_plugin);
-  }
-
-#endif /* NO_EMBEDDED_ACCESS_CHECKS */
-
   if (get_options(&remaining_argc, &remaining_argv))
     return 1;
+
+  update_parser_max_mem_size();
 
   if (log_syslog_init())
     opt_log_syslog_enable= 0;
@@ -3870,8 +3867,8 @@ static int init_thread_environment()
                    &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync,
                    &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
-  mysql_mutex_init(key_LOCK_wsrep_desync_count,
-                   &LOCK_wsrep_desync_count, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_wsrep_pause_count,
+                   &LOCK_wsrep_pause_count, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
   THR_THD_initialized= true;
   THR_MALLOC_initialized= true;
@@ -4132,6 +4129,7 @@ static int generate_server_uuid()
                     " to allocate the THD.");
     return 1;
   }
+
   thd->thread_stack= (char*) &thd;
   thd->store_globals();
 
@@ -4746,7 +4744,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     directory does not exist, exists but is empty, exists with InnoDB
     system tablespaces present etc.
   */
-#ifdef WITH_WSREP
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? (PLUGIN_INIT_SKIP_INITIALIZATION |
@@ -4756,7 +4753,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
-#endif /* WITH_WSREP */
 
   Session_tracker session_track_system_variables_check;
   LEX_STRING var_list;
@@ -5135,6 +5131,16 @@ static void test_lc_time_sz()
 }
 #endif//DBUG_OFF
 
+/*
+  @brief : Set opt_super_readonly to user supplied value before
+           enabling communication channels to accept user connections
+*/
+
+static void set_super_read_only_post_init()
+{
+  opt_super_readonly= super_read_only;
+}
+
 #ifdef _WIN32
 int win_main(int argc, char **argv)
 #else
@@ -5450,10 +5456,6 @@ int mysqld_main(int argc, char **argv)
   if (init_server_components())
     unireg_abort(MYSQLD_ABORT_EXIT);
 
-  if (mysql_audit_notify(MYSQL_AUDIT_SERVER_STARTUP_STARTUP,
-                         (const char**)argv, argc))
-    unireg_abort(MYSQLD_ABORT_EXIT);
-
   /*
     Each server should have one UUID. We will create it automatically, if it
     does not exist.
@@ -5764,6 +5766,14 @@ int mysqld_main(int argc, char **argv)
       unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+  /*
+    Event must be invoked after error_handler_hook is assigned to
+    my_message_sql, otherwise my_message will not cause the event to abort.
+  */
+  if (mysql_audit_notify(AUDIT_EVENT(MYSQL_AUDIT_SERVER_STARTUP_STARTUP),
+                         (const char **) argv, argc))
+    unireg_abort(MYSQLD_ABORT_EXIT);
+
 #ifdef _WIN32
   create_shutdown_thread();
 #endif
@@ -5796,6 +5806,13 @@ int mysqld_main(int argc, char **argv)
                       opt_ndb_wait_setup);
   }
 #endif
+
+  /*
+    Set opt_super_readonly here because if opt_super_readonly is set
+    in get_option, it will create problem while setting up event scheduler.
+  */
+  set_super_read_only_post_init();
+
   (void) RUN_HOOK(server_state, before_handle_connection, (NULL));
 
   DBUG_PRINT("info", ("Block, listening for incoming connections"));
@@ -8900,6 +8917,8 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
     return 1;
   }
 
+  /* If --super-read-only was specified, set read_only to 1 */
+  read_only= super_read_only ? super_read_only : read_only;
   opt_readonly= read_only;
 
   return 0;
@@ -9567,7 +9586,8 @@ PSI_mutex_key
 PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
   key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
   key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
-  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync, key_LOCK_wsrep_desync_count;
+  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync,
+  key_LOCK_wsrep_pause_count;
 #endif /* WITH_WSREP */
 PSI_mutex_key key_RELAYLOG_LOCK_commit;
 PSI_mutex_key key_RELAYLOG_LOCK_commit_queue;
@@ -9683,7 +9703,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_desync_count, "LOCK_wsrep_desync_count", PSI_FLAG_GLOBAL},
+  { &key_LOCK_wsrep_pause_count, "LOCK_wsrep_pause_count", PSI_FLAG_GLOBAL},
 #endif /* WITH_WSREP */
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},
@@ -10010,6 +10030,7 @@ PSI_stage_info stage_worker_waiting_for_its_turn_to_commit= { 0, "Waiting for pr
 PSI_stage_info stage_worker_waiting_for_commit_parent= { 0, "Waiting for dependent transaction to commit", 0};
 PSI_stage_info stage_suspending= { 0, "Suspending", 0};
 PSI_stage_info stage_starting= { 0, "starting", 0};
+PSI_stage_info stage_waiting_for_no_channel_reference= { 0, "Waiting for no channel reference.", 0};
 PSI_stage_info stage_restoring_secondary_keys= { 0, "restoring secondary keys", 0};
 
 #ifdef HAVE_PSI_INTERFACE
@@ -10121,6 +10142,7 @@ PSI_stage_info *all_server_stages[]=
   & stage_worker_waiting_for_commit_parent,
   & stage_suspending,
   & stage_starting,
+  & stage_waiting_for_no_channel_reference,
   & stage_restoring_secondary_keys
 };
 

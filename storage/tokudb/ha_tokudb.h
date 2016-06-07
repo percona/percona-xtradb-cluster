@@ -710,7 +710,7 @@ private:
     int is_index_unique(bool* is_unique, DB_TXN* txn, DB* db, KEY* key_info, int lock_flags);
     int is_val_unique(bool* is_unique, uchar* record, KEY* key_info, uint dict_index, DB_TXN* txn);
     int do_uniqueness_checks(uchar* record, DB_TXN* txn, THD* thd);
-    void set_main_dict_put_flags(THD* thd, bool opt_eligible, uint32_t* put_flags);
+    void set_main_dict_put_flags(THD* thd, uint32_t* put_flags);
     int insert_row_to_main_dictionary(uchar* record, DBT* pk_key, DBT* pk_val, DB_TXN* txn);
     int insert_rows_to_dictionaries_mult(DBT* pk_key, DBT* pk_val, DB_TXN* txn, THD* thd);
     void test_row_packing(uchar* record, DBT* pk_key, DBT* pk_val);
@@ -903,9 +903,8 @@ public:
 
 #endif
 
-    // ICP introduced in MariaDB 5.5
     Item* idx_cond_push(uint keyno, class Item* idx_cond);
-
+    void cancel_pushed_idx_cond();
 
 #if TOKU_INCLUDE_ALTER_56
  public:
@@ -991,13 +990,13 @@ public:
 
     int fill_range_query_buf(
         bool need_val, 
-        DBT const *key, 
-        DBT  const *row, 
+        DBT const* key,
+        DBT const* row,
         int direction,
         THD* thd,
         uchar* buf,
-        DBT* key_to_compare
-        );
+        DBT* key_to_compare);
+
 #if TOKU_INCLUDE_ROW_TYPE_COMPRESSION
     enum row_type get_row_type() const;
 #endif
@@ -1007,9 +1006,7 @@ private:
     int get_next(uchar* buf, int direction, DBT* key_to_compare, bool do_key_read);
     int read_data_from_range_query_buff(uchar* buf, bool need_val, bool do_key_read);
     // for ICP, only in MariaDB and MySQL 5.6
-#if defined(MARIADB_BASE_VERSION) || (50600 <= MYSQL_VERSION_ID && MYSQL_VERSION_ID <= 50699)
     enum icp_result toku_handler_index_cond_check(Item* pushed_idx_cond);
-#endif
     void invalidate_bulk_fetch();
     void invalidate_icp();
     int delete_all_rows_internal();

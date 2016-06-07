@@ -546,6 +546,8 @@ static HANDLE create_shared_memory(MYSQL *mysql, NET *net,
   }
 
   ReleaseMutex(connect_named_mutex);
+  CloseHandle(connect_named_mutex);
+  connect_named_mutex = NULL;
 
   /* Get number of connection */
   connect_number = uint4korr(handle_connect_map);/*WAX2*/
@@ -655,7 +657,10 @@ err:
   if (error_allow)
   {
     if (connect_named_mutex)
+    {
       ReleaseMutex(connect_named_mutex);
+      CloseHandle(connect_named_mutex);
+    }
 
     if (error_allow == CR_SHARED_MEMORY_EVENT_ERROR)
       set_mysql_extended_error(mysql, error_allow, unknown_sqlstate,
@@ -5199,6 +5204,12 @@ mysql_real_query(MYSQL *mysql, const char *query, ulong length)
                   {
                     mysql->net.last_errno= ER_NET_READ_INTERRUPTED;
                     DBUG_SET("-d,inject_ER_NET_READ_INTERRUPTED");
+                    DBUG_RETURN(1);
+                  });
+  DBUG_EXECUTE_IF("inject_ER_UNKNOWN_SYSTEM_VARIABLE",
+                  {
+                    mysql->net.last_errno= ER_UNKNOWN_SYSTEM_VARIABLE;
+                    DBUG_SET("-d,inject_ER_UNKNOWN_SYSTEM_VARIABLE");
                     DBUG_RETURN(1);
                   });
 

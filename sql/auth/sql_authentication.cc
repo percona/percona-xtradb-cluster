@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1252,12 +1252,17 @@ char *get_56_lenc_string(char **buffer,
 
   *string_length= (size_t)net_field_length_ll((uchar **)buffer);
 
+  DBUG_EXECUTE_IF("sha256_password_scramble_too_long",
+                  *string_length= SIZE_T_MAX;
+  );
+
   size_t len_len= (size_t)(*buffer - begin);
   
-  if (*string_length + len_len > *max_bytes_available)
+  if (*string_length > *max_bytes_available - len_len)
     return NULL;
 
-  *max_bytes_available -= *string_length + len_len;
+  *max_bytes_available -= *string_length;
+  *max_bytes_available -= len_len;
   *buffer += *string_length;
   return (char *)(begin + len_len);
 }
@@ -2447,6 +2452,7 @@ acl_authenticate(THD *thd, enum_server_command command,
         ->valid_connection_count(extra_port_connection))
     {                                         // too many connections
       release_user_connection(thd);
+      sql_print_warning("%s", ER_DEFAULT(ER_CON_COUNT_ERROR));
       my_error(ER_CON_COUNT_ERROR, MYF(0));
       DBUG_RETURN(1);
     }

@@ -15,7 +15,6 @@ Build-Depends: libtool (>= 1.4.2-7),
                debhelper (>= 9.0.0),
                fakeroot,
                libaio-dev[linux-any],
-               libwrap0-dev,
                libmecab-dev,
                libncurses5-dev (>= 5.0-6),
                lsb-release,
@@ -29,6 +28,7 @@ Build-Depends: libtool (>= 1.4.2-7),
                libnuma-dev,
                gcc (>= 4.4),
                g++ (>= 4.4)
+               libwrap0-dev
 Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
@@ -158,8 +158,7 @@ Description: Percona XtraDB Cluster database client binaries
  multi-master replication, parallel applying on slaves, automatic
  node provisioning with primary focus on data consistency.
  .
- This package includes the client binaries and the additional tools
- innotop and mysqlreport.
+ This package includes the client binaries.
 
 Package: percona-xtradb-cluster-server-5.7
 Architecture: any

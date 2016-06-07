@@ -7898,8 +7898,10 @@ DeadlockChecker::search()
 #endif /* WITH_WSREP */
 
 			if (victim_trx == NULL || victim_trx == m_start) {
+
 				return(m_start);
 			}
+
 			return(m_wait_lock->trx);
 
 		} else if (lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {

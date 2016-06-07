@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@
 #include <mysql/psi/mysql_statement.h>
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-#endif
+#endif /* WITH_WSREP */
 #include "transaction_info.h"
 #include "sql_class.h"
 #include "mysql/psi/mysql_transaction.h"
@@ -1862,17 +1862,16 @@ void Log_event::print_header(IO_CACHE* file,
   @param[in] file              IO cache
   @param[in] prt               Pointer to string
   @param[in] length            String length
-  @param[in] esc_all        Whether to escape all characters
 */
 
 static void
-my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length, bool esc_all)
+my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length)
 {
   const uchar *s;
   my_b_printf(file, "'");
   for (s= ptr; length > 0 ; s++, length--)
   {
-    if (*s > 0x1F && !esc_all)
+    if (*s > 0x1F && *s != '\'' && *s != '\\')
       my_b_write(file, s, 1);
     else
     {
@@ -1883,14 +1882,6 @@ my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length, bool esc_all)
   }
   my_b_printf(file, "'");
 }
-
-
-static void
-my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length)
-{
-  my_b_write_quoted(file, ptr, length, false);
-}
-
 
 /**
   Prints a bit string to io cache in format  b'1010'.
@@ -6920,6 +6911,8 @@ bool Xid_log_event::do_commit(THD *thd_arg)
 int Xid_apply_log_event::do_apply_event_worker(Slave_worker *w)
 {
   int error= 0;
+  bool skipped_commit_pos= true;
+
   lex_start(thd);
   mysql_reset_thd_for_next_command(thd);
   Slave_committed_queue *coordinator_gaq= w->c_rli->gaq;
@@ -6943,9 +6936,21 @@ int Xid_apply_log_event::do_apply_event_worker(Slave_worker *w)
   ulong gaq_idx= mts_group_idx;
   Slave_job_group *ptr_group= coordinator_gaq->get_job_group(gaq_idx);
 
-  if ((error= w->commit_positions(this, ptr_group,
-                                  w->c_rli->is_transactional())))
-    goto err;
+  if (!thd->get_transaction()->xid_state()->check_in_xa(false) &&
+      w->is_transactional())
+  {
+    /*
+      Regular (not XA) transaction updates the transactional info table
+      along with the main transaction. Otherwise, the local flag turned
+      and given its value the info table is updated after do_commit.
+      todo: the flag won't be need upon the full xa crash-safety bug76233
+            gets fixed.
+    */
+    skipped_commit_pos= false;
+    if ((error= w->commit_positions(this, ptr_group,
+                                    w->is_transactional())))
+      goto err;
+  }
 
   DBUG_PRINT("mts", ("do_apply group master %s %llu  group relay %s %llu event %s %llu.",
                      w->get_group_master_log_name(),
@@ -6961,7 +6966,13 @@ int Xid_apply_log_event::do_apply_event_worker(Slave_worker *w)
 
   error= do_commit(thd);
   if (error)
-    w->rollback_positions(ptr_group);
+  {
+    if (!skipped_commit_pos)
+      w->rollback_positions(ptr_group);
+  }
+  else if (skipped_commit_pos)
+    error= w->commit_positions(this, ptr_group,
+                               w->is_transactional());
 err:
   return error;
 }
@@ -9473,16 +9484,36 @@ Rows_log_event::decide_row_lookup_algorithm_and_key()
   TABLE *table= this->m_table;
   uint event_type= this->get_general_type_code();
   MY_BITMAP *cols= &this->m_cols;
+  bool delete_update_lookup_condition= false;
   this->m_rows_lookup_algorithm= ROW_LOOKUP_NOT_NEEDED;
   this->m_key_index= MAX_KEY;
   this->m_key_info= NULL;
 
   // row lookup not needed
   if (event_type == binary_log::WRITE_ROWS_EVENT ||
-      ((event_type == binary_log::DELETE_ROWS_EVENT ||
-        event_type == binary_log::UPDATE_ROWS_EVENT) &&
-      get_flags(COMPLETE_ROWS_F) && !m_table->file->rpl_lookup_rows()))
-    DBUG_VOID_RETURN;
+     (delete_update_lookup_condition= ((event_type == binary_log::DELETE_ROWS_EVENT ||
+                                        event_type == binary_log::UPDATE_ROWS_EVENT) &&
+                                      get_flags(COMPLETE_ROWS_F) &&
+                                      !m_table->file->rpl_lookup_rows())))
+  {
+    if (delete_update_lookup_condition &&
+        table->file->ht->db_type == DB_TYPE_TOKUDB &&
+        table->s->primary_key == MAX_KEY)
+    {
+        if (!table->s->rfr_lookup_warning)
+        {
+          sql_print_warning("Slave: read free replication is disabled "
+                            "for tokudb table `%s.%s` "
+                            "as it does not have implicit primary key, "
+                            "continue with rows lookup",
+                            print_slave_db_safe(table->s->db.str),
+                            m_table->s->table_name.str);
+          table->s->rfr_lookup_warning= true;
+        }
+    }
+    else
+      DBUG_VOID_RETURN;
+  }
 
   if (!(slave_rows_search_algorithms_options & SLAVE_ROWS_INDEX_SCAN))
     goto TABLE_OR_INDEX_HASH_SCAN;
@@ -12418,19 +12449,25 @@ Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 #ifdef WSREP_PROC_INFO
   char info[64];
   info[sizeof(info) - 1] = '\0';
-  snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
-           (long long) wsrep_thd_trx_seqno(thd));
-  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
+  const char * save_proc_info = NULL;
+  if (WSREP(thd))
+  {
+    snprintf(info, sizeof(info) - 1, "wsrep: writing rows (%lld)",
+             (long long) wsrep_thd_trx_seqno(thd));
+    save_proc_info = thd_proc_info(thd, info);
+  }
 #else
-  const char* tmp = (WSREP(thd)) ?
-    thd_proc_info(thd,"Write_rows_log_event::write_row()") :  NULL;
+  const char* save_proc_info = (WSREP(thd)) ?
+    thd_proc_info(thd, "wsrep: writing rows") :  NULL;
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
+
   int error= write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
 
 #ifdef WITH_WSREP
-  if (WSREP(thd)) thd_proc_info(thd, tmp);
+  if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
 #endif /* WITH_WSREP */
+
   if (error && !thd->is_error())
   {
     DBUG_ASSERT(0);
@@ -12528,10 +12565,33 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
     if (error)
       return error;
   }
+
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  const char * save_proc_info = NULL;
+  if (WSREP(thd))
+  {
+    snprintf(info, sizeof(info) - 1, "wsrep: deleting rows (%lld)",
+             (long long) wsrep_thd_trx_seqno(thd));
+    save_proc_info = thd_proc_info(thd, info);
+  }
+#else
+  const char* save_proc_info = (WSREP(thd)) ?
+    thd_proc_info(thd, "wsrep: deleting rows") :  NULL;
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
+
   /* m_table->record[0] contains the BI */
   m_table->mark_columns_per_binlog_row_image();
   error= m_table->file->ha_delete_row(m_table->record[0]);
   m_table->default_column_bitmaps();
+
+#ifdef WITH_WSREP
+  if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
+#endif /* WITH_WSREP */
+
   return error;
 }
 
@@ -12683,6 +12743,23 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_DUMP("old record", m_table->record[1], m_table->s->reclength);
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  char info[64];
+  info[sizeof(info) - 1] = '\0';
+  const char * save_proc_info = NULL;
+  if (WSREP(thd))
+  {
+    snprintf(info, sizeof(info) - 1, "wsrep: updating rows (%lld)",
+            (long long) wsrep_thd_trx_seqno(thd));
+    save_proc_info = thd_proc_info(thd, info);
+  }
+#else
+  const char* save_proc_info = (WSREP(thd)) ?
+    thd_proc_info(thd, "wsrep: updating rows") :  NULL;
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
+
   // Temporary fix to find out why it fails [/Matz]
   memcpy(m_table->read_set->bitmap, m_cols.bitmap, (m_table->read_set->n_bits + 7) / 8);
   memcpy(m_table->write_set->bitmap, m_cols_ai.bitmap, (m_table->write_set->n_bits + 7) / 8);
@@ -12692,6 +12769,10 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   if (error == HA_ERR_RECORD_IS_THE_SAME)
     error= 0;
   m_table->default_column_bitmaps();
+
+#ifdef WITH_WSREP
+  if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
+#endif /* WITH_WSREP */
 
   return error;
 }
@@ -13390,22 +13471,39 @@ Transaction_context_log_event(const char *server_uuid_arg,
               Log_event::EVENT_STMT_CACHE, Log_event::EVENT_NORMAL_LOGGING)
 {
   DBUG_ENTER("Transaction_context_log_event::Transaction_context_log_event(THD *, const char *, ulonglong)");
+  server_uuid= NULL;
   sid_map= new Sid_map(NULL);
   snapshot_version= new Gtid_set(sid_map);
+
   global_sid_lock->wrlock();
-  if (snapshot_version->add_gtid_set(gtid_state->get_executed_gtids()) != RETURN_STATUS_OK)
-    server_uuid= NULL;
-  else
-    server_uuid= my_strdup(key_memory_log_event, server_uuid_arg, MYF(MY_WME));
+  /*
+    Copy global_sid_map to a local copy to avoid that all
+    certification operations on top of this snapshot version do
+    require that global_sid_lock is acquired.
+  */
+  enum_return_status return_status= global_sid_map->copy(sid_map);
+  if (return_status != RETURN_STATUS_OK)
+  {
+    global_sid_lock->unlock();
+    goto err;
+  }
+
+  return_status= snapshot_version->add_gtid_set(gtid_state->get_executed_gtids());
+  if (return_status != RETURN_STATUS_OK)
+  {
+    global_sid_lock->unlock();
+    goto err;
+  }
   global_sid_lock->unlock();
+
+  server_uuid= my_strdup(key_memory_log_event, server_uuid_arg, MYF(MY_WME));
+  if (server_uuid == NULL)
+    goto err;
 
   // These two fields are only populated on event decoding.
   // Encoding is done directly from snapshot_version field.
   encoded_snapshot_version= NULL;
   encoded_snapshot_version_length= 0;
-
-  if (server_uuid != NULL)
-    is_valid_param= true;
 
   // Debug sync point for SQL threads.
   DBUG_EXECUTE_IF("debug.wait_after_set_snapshot_version_on_transaction_context_log_event",
@@ -13418,6 +13516,11 @@ Transaction_context_log_event(const char *server_uuid_arg,
                                                        STRING_WITH_LEN(act)));
                   };);
 
+  is_valid_param= true;
+  DBUG_VOID_RETURN;
+
+err:
+  is_valid_param= false;
   DBUG_VOID_RETURN;
 }
 #endif
@@ -13434,9 +13537,6 @@ Transaction_context_log_event(const char *buffer, uint event_len,
   snapshot_version= new Gtid_set(sid_map);
 
   if (server_uuid == NULL || encoded_snapshot_version == NULL)
-    goto err;
-
-  if (read_snapshot_version())
     goto err;
 
   is_valid_param= true;
@@ -13596,6 +13696,13 @@ bool Transaction_context_log_event::read_snapshot_version()
 {
   DBUG_ENTER("Transaction_context_log_event::read_snapshot_version");
   DBUG_ASSERT(snapshot_version->is_empty());
+
+  global_sid_lock->wrlock();
+  enum_return_status return_status= global_sid_map->copy(sid_map);
+  global_sid_lock->unlock();
+  if (return_status != RETURN_STATUS_OK)
+    DBUG_RETURN(true);
+
   DBUG_RETURN(snapshot_version->add_gtid_encoding(encoded_snapshot_version,
                                                   encoded_snapshot_version_length)
                   != RETURN_STATUS_OK);
@@ -13743,27 +13850,37 @@ void View_change_log_event::print(FILE *file,
 
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
 
- int View_change_log_event::do_apply_event(Relay_log_info const *rli)
- {
-   enum_gtid_statement_status state= gtid_pre_statement_checks(thd);
-   if (state == GTID_STATEMENT_SKIP)
-     return 0;
+int View_change_log_event::do_apply_event(Relay_log_info const *rli)
+{
+  enum_gtid_statement_status state= gtid_pre_statement_checks(thd);
+  if (state == GTID_STATEMENT_SKIP)
+    return 0;
 
-   if (state == GTID_STATEMENT_CANCEL ||
-          (state == GTID_STATEMENT_EXECUTE &&
-           gtid_pre_statement_post_implicit_commit_checks(thd)))
-   {
-      uint error= thd->get_stmt_da()->mysql_errno();
-      DBUG_ASSERT(error != 0);
-      rli->report(ERROR_LEVEL, error,
-                  "Error executing View Change event: '%s'",
-                  thd->get_stmt_da()->message_text());
-      thd->is_slave_error= 1;
-      return -1;
-   }
+  if (state == GTID_STATEMENT_CANCEL ||
+         (state == GTID_STATEMENT_EXECUTE &&
+          gtid_pre_statement_post_implicit_commit_checks(thd)))
+  {
+    uint error= thd->get_stmt_da()->mysql_errno();
+    DBUG_ASSERT(error != 0);
+    rli->report(ERROR_LEVEL, error,
+                "Error executing View Change event: '%s'",
+                thd->get_stmt_da()->message_text());
+    thd->is_slave_error= 1;
+    return -1;
+  }
 
-   return mysql_bin_log.write_event(this);
- }
+  if (!opt_bin_log)
+  {
+    return 0;
+  }
+
+  int error= mysql_bin_log.write_event(this);
+  if (error)
+    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR, ER(ER_SLAVE_FATAL_ERROR),
+                "Could not write the VIEW CHANGE event in the binary log.");
+
+  return (error);
+}
 
 int View_change_log_event::do_update_pos(Relay_log_info *rli)
 {

@@ -152,6 +152,9 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->get_protocol_classic()->get_vio();
 
+  // Disable general logging on applier threads
+  thd->variables.option_bits |= OPTION_LOG_OFF;
+  // Enable binlogging if opt_log_slave_updates is set
   if (opt_log_slave_updates)
     thd->variables.option_bits|= OPTION_BIN_LOG;
   else
@@ -195,6 +198,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
 
 void wsrep_replay_transaction(THD *thd)
 {
+  DBUG_ENTER("wsrep_replay_transaction");
   /* checking if BF trx must be replayed */
   if (thd->wsrep_conflict_state== MUST_REPLAY) {
     DBUG_ASSERT(wsrep_thd_trx_seqno(thd));
@@ -202,6 +206,15 @@ void wsrep_replay_transaction(THD *thd)
       if (thd->get_stmt_da()->is_sent())
       {
         WSREP_ERROR("replay issue, thd has reported status already");
+      }
+
+      /* PS reprepare observer should have been removed already
+         open_table() will fail if we have dangling observer here
+       */
+      if (thd->get_reprepare_observer() && wsrep_log_conflicts)
+      {
+        WSREP_WARN("dangling observer in replay transaction: (thr %u %lld %s)",
+                   thd->thread_id(), thd->query_id, thd->query().str);
       }
       thd->get_stmt_da()->reset_diagnostics_area();
 
@@ -227,7 +240,7 @@ void wsrep_replay_transaction(THD *thd)
       MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
       thd->m_statement_psi= NULL;
       thd->m_digest= NULL;
-      thd_proc_info(thd, "wsrep replaying trx");
+      const char *save_proc_info = thd_proc_info(thd, "wsrep: replaying trx");
       WSREP_DEBUG("replay trx: %s %lld",
                   WSREP_QUERY(thd),
                   (long long)wsrep_thd_trx_seqno(thd));
@@ -295,6 +308,8 @@ void wsrep_replay_transaction(THD *thd)
         break;
       }
 
+      thd_proc_info(thd, save_proc_info);
+
       wsrep_cleanup_transaction(thd);
 
       mysql_mutex_lock(&LOCK_wsrep_replaying);
@@ -305,6 +320,7 @@ void wsrep_replay_transaction(THD *thd)
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   }
+  DBUG_VOID_RETURN;
 }
 
 /* Applier/Slave Threads. Controlled using wsrep_slave_threads configuration
@@ -412,10 +428,12 @@ static void wsrep_rollback_process(THD *thd)
   mysql_mutex_lock(&LOCK_wsrep_rollback);
   wsrep_aborting_thd= NULL;
 
+  const char *save_proc_info = thd_proc_info(thd, "wsrep: in rollback thread");
+
   while (thd->killed == THD::NOT_KILLED) {
 
     mysql_mutex_lock(&thd->LOCK_current_cond);
-    thd_proc_info(thd, "wsrep aborter idle");
+    thd_proc_info(thd, "wsrep: aborter idle");
     thd->current_mutex= &LOCK_wsrep_rollback;
     thd->current_cond= &COND_wsrep_rollback;
     mysql_mutex_unlock(&thd->LOCK_current_cond);
@@ -425,7 +443,7 @@ static void wsrep_rollback_process(THD *thd)
     WSREP_DEBUG("WSREP rollback thread wakes for signal");
 
     mysql_mutex_lock(&thd->LOCK_current_cond);
-    thd_proc_info(thd, "wsrep aborter active");
+    thd_proc_info(thd, "wsrep: aborter active");
     thd->current_mutex= 0;
     thd->current_cond= 0;
     mysql_mutex_unlock(&thd->LOCK_current_cond);
@@ -476,8 +494,10 @@ static void wsrep_rollback_process(THD *thd)
   }
 
   mysql_mutex_unlock(&LOCK_wsrep_rollback);
-  sql_print_information("WSREP: rollbacker thread exiting");
 
+  thd_proc_info(thd, save_proc_info);
+
+  sql_print_information("WSREP: rollbacker thread exiting");
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
 }

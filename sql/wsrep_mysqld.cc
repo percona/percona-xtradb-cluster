@@ -398,12 +398,17 @@ static void wsrep_synced_cb(void* app_ctx)
     wsrep_restart_slave_activated= FALSE;
 
     channel_map.wrlock();
-    if ((rcode = start_slave_threads(1 /* need mutex */,
-                            0 /* no wait for start*/,
-                            active_mi,
-                       	    SLAVE_SQL)))
+    Master_info *mi= NULL;
+    for (mi_map::iterator it= channel_map.begin(); it!=channel_map.end(); it++)
     {
-      WSREP_WARN("Failed to create slave threads: %d", rcode);
+      mi= it->second;
+      if ((rcode = start_slave_threads(true /* need mutex */,
+                                       false /* no wait for start*/,
+                                       mi,
+                       	               SLAVE_SQL)))
+      {
+        WSREP_WARN("Failed to create slave threads: %d", rcode);
+      }
     }
     channel_map.unlock();
 
@@ -1254,8 +1259,9 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   wsrep_key_arr_t key_arr= {0, 0};
   struct wsrep_buf buff = { buf, buf_len };
+  const char *save_proc_info = NULL;
   if (WSREP(thd))
-      thd_proc_info(thd, "Preparing for TO isolation");
+      save_proc_info = thd_proc_info(thd, "Preparing for TO isolation");
   if (!buf_err                                                                &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       key_arr.keys_len > 0                                                    &&
@@ -1278,6 +1284,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
 	     "your wsrep connection state and retry the query.");
+    if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     return -1;
@@ -1287,8 +1294,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     WSREP_DEBUG("TO isolation skipped for: %d, sql: %s."
 		"Only temporary tables affected.",
 		ret, WSREP_QUERY(thd));
+    if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
     return 1;
   }
+  if (WSREP(thd)) thd_proc_info(thd, save_proc_info);
   return 0;
 }
 
@@ -1316,35 +1325,20 @@ static void wsrep_TOI_end(THD *thd) {
 static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
 {
   wsrep_status_t ret(WSREP_WARNING);
+  wsrep_seqno_t seqno= WSREP_SEQNO_UNDEFINED;
+
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, WSREP_QUERY(thd));
-
-  DEBUG_SYNC(thd,"wsrep_RSU_begin_enter");
-
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
-
-  DEBUG_SYNC(thd,"wsrep_RSU_begin_after_lock");
-
-  if (wsrep_desync_count++)
-  {
-     mysql_mutex_lock(&LOCK_wsrep_replaying);
-     wsrep_replaying++;
-     mysql_mutex_unlock(&LOCK_wsrep_replaying);
-     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-     DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
-     return 0;
-  }
 
   ret = wsrep->desync(wsrep);
   if (ret != WSREP_OK)
   {
-     wsrep_desync_count--;
-     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-     WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
-                ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-     my_error(ER_LOCK_DEADLOCK, MYF(0));
-     return(ret);
+    WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
+               ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
+    return(ret);
   }
+
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying++;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1357,70 +1351,92 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
-    wsrep_desync_count--;
+
     ret = wsrep->resync(wsrep);
-    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     if (ret != WSREP_OK)
     {
       WSREP_WARN("resync failed %d for schema: %s, query: %s",
                  ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     }
+
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
   }
 
-  wsrep_seqno_t seqno = wsrep->pause(wsrep);
+  /* FTWRL is another way node can get desync and paused.
+  If FTWRL is active and RSU is then started then existing node-pause
+  is re-used. This semantics/flow need to ensure that if user unlock
+  table then node-pause is not released till RSU is active. */ 
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
+
+  /* Node is already paused. */
+  if (wsrep_pause_count)
+  {
+     wsrep_pause_count++;
+     goto rsu_begin_skip_pause;
+  }
+
+  /* Node is not paused perform the action now. */
+  assert(wsrep_pause_count == 0);
+
+  seqno = wsrep->pause(wsrep);
   if (seqno == WSREP_SEQNO_UNDEFINED)
   {
-    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     WSREP_WARN("pause failed %lld for schema: %s, query: %s", (long long)seqno,
                (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+
+    /* Pause fail so rollback desync action too. */
+    wsrep->resync(wsrep);
+
     return(1);
   }
-  thd->global_read_lock.pause_provider(TRUE);
-  thd->variables.wsrep_on = 0;
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+  ++wsrep_pause_count;
 
   WSREP_DEBUG("paused at %lld", (long long)seqno);
 
-  DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
+rsu_begin_skip_pause:
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
 
+  DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
   return 0;
 }
 
 static void wsrep_RSU_end(THD *thd)
 {
-  wsrep_status_t ret(WSREP_WARNING);
+  wsrep_status_t ret(WSREP_OK);
+
   WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, WSREP_QUERY(thd));
 
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
+  mysql_mutex_lock(&LOCK_wsrep_pause_count);
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying--;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
-  if (--wsrep_desync_count == 0)
+  assert(wsrep_pause_count > 0);
+  if (--wsrep_pause_count == 0)
   {
+     /* No more references left. Finally resume the provider. */
      ret = wsrep->resume(wsrep);
      if (ret != WSREP_OK)
      {
        WSREP_WARN("resume failed %d for schema: %s, query: %s", ret,
                   (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
      }
-     thd->global_read_lock.pause_provider(FALSE);
-     ret = wsrep->resync(wsrep);
-     if (ret != WSREP_OK)
-     {
-       mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-       WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
-                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-       return;
-     }
-     thd->variables.wsrep_on = 1;
   }
 
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+  ret = wsrep->resync(wsrep);
+  if (ret != WSREP_OK)
+  {
+    WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
+               (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+    return;
+  }
+
+  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
 }
 
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
@@ -1430,6 +1446,18 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     No isolation for applier or replaying threads.
    */
   if (thd->wsrep_exec_mode == REPL_RECV) return 0;
+
+  /* Generally if node enters non-primary state then execution of DDL+DML
+  is blocked on such node but there are some asynchronous pre-register
+  action that can cause invocation of TOI. For example: DROP of event
+  on completion of EVENT tenure is one such asynchronous action which
+  doesn't need to be fired by user and so if node is asynchronous
+  such such action should be blocked at TOI level. */
+  if (!wsrep_ready)
+  {
+    WSREP_DEBUG("WSREP has not yet prepared node for application use");
+    return 0;
+  }
 
   int ret= 0;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -1609,4 +1637,13 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
   }
   return ret;
+}
+
+bool wsrep_node_is_donor()
+{
+  return (WSREP_ON) ? (local_status.get() == 2) : false;
+}
+bool wsrep_node_is_synced()
+{
+  return (WSREP_ON) ? (local_status.get() == 4) : false;
 }

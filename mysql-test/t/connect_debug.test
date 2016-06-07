@@ -10,6 +10,10 @@ call mtr.add_suppression("Too many connections");
 # Save the initial number of concurrent sessions
 --source include/count_sessions.inc
 
+--disable_query_log
+call mtr.add_suppression("Too many connections");
+--enable_query_log
+
 --echo
 --echo # -- Bug#20201006: Spamming show processlist prevents old connection
 --echo # -- threads from cleaning up.

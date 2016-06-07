@@ -736,6 +736,12 @@ struct TABLE_SHARE
   */ 
   const File_parser *view_def;
 
+  /**
+    True in the case if tokudb read-free-replication is used for the table
+    without explicit pk and corresponding warning was issued to disable
+    repeated warning.
+  */
+  bool rfr_lookup_warning;
 
   /*
     Set share's table cache key and update its db and table name appropriately.
@@ -1283,7 +1289,7 @@ public:
 
   void mark_column_used(THD *thd, Field *field, enum enum_mark_columns mark);
   void mark_columns_used_by_index_no_reset(uint index, MY_BITMAP *map,
-                                           uint key_parts= UINT_MAX);
+                                           uint key_parts= 0);
   void mark_columns_used_by_index(uint index);
   void mark_auto_increment_column(void);
   void mark_columns_needed_for_update(void);
