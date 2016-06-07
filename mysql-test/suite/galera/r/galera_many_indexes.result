@@ -125,5 +125,5 @@ UPDATE t1 SET f1 = REPEAT('e', 767);
 UPDATE t1 SET f1 = REPEAT('f', 767);
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP cancelled the transaction
 DROP TABLE t1;

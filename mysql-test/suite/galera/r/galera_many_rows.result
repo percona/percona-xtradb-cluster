@@ -27,6 +27,6 @@ START TRANSACTION;
 UPDATE t1 SET f2 = 4;
 COMMIT;
 COMMIT;
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP cancelled the transaction
 DROP TABLE t1;
 DROP TABLE ten;
