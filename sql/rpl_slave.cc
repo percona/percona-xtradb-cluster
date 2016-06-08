@@ -1709,6 +1709,10 @@ bool is_network_error(uint errorno)
       errorno == ER_CON_COUNT_ERROR ||
       errorno == ER_SERVER_SHUTDOWN)
     return TRUE;
+#ifdef WITH_WSREP
+  if (errorno == ER_UNKNOWN_COM_ERROR)
+    return TRUE;
+#endif /* WITH_WSREP */
 
   return FALSE;   
 }
