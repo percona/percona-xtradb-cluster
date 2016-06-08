@@ -112,7 +112,39 @@ When this variable is set to ``ON``, debug messages will also be logged to the `
    :dyn: Yes
    :default: OFF
  
-This variable controls whether the node participates in Flow Control. Setting the :variable:`wsrep_desync` to ``ON`` does not automatically mean that a node will be out of sync with the cluster. It will continue to replicate in and out the writesets as usual. The only difference is that flow control will no longer take care of the ``desynced`` node. The result is that if :variable:`wsrep_local_recv_queue` gets higher than maximum allowed, all the other nodes will ignore the replication lag on the node being in ``desync`` mode. Toggling this back will require an IST or an SST depending on how long it was desynchronized. This is similar to cluster de-synchronization, which occurs during RSU TOI. Because of this, it's not a good idea to keep desync set for a long period of time, nor should you desync several nodes at once. Also, you'll need to desync a node before it starts causing flow control for it to have any effect. Node can also be desynchronized with  ``/*! WSREP_DESYNC */`` query comment.
+This variable controls whether the node participates in Flow Control.
+Setting this variable to ``ON`` does not automatically mean
+that a node will be out of sync with the cluster.
+It will continue to replicate the writesets as usual.
+The only difference is that flow control will no longer
+take care of the desynced node.
+The result is that if :variable:`wsrep_local_recv_queue`
+gets higher than maximum allowed,
+all the other nodes will ignore the replication lag on the desynced node.
+Toggling this back to ``OFF`` will require an IST or an SST,
+depending on how long it was desynchronized.
+This is similar to cluster desynchronization,
+which occurs during RSU TOI.
+
+It's not a good idea to keep desync set for a long period of time,
+nor should you desync several nodes at once.
+Also, you'll need to desync a node before it starts
+causing flow control for it to have any effect.
+
+A node can also be desynchronized with  ``/*! WSREP_DESYNC */`` query comment.
+
+The following logic applies to desynced nodes:
+
+* If a node is explicitly desynced,
+  then implicitly desyncing a node using RSU/FTWRL is allowed.
+
+* If a node is implicitly desynced using RSU/FTWRL,
+  then explicitly desyncing a node is blocked
+  until implicit desync is complete.
+
+* If a node is explicitly desynced and then implicitly desycned using RSU/FTWRL, 
+  then any request for another implicit desync is blocked
+  until the former implicit desync is complete.
 
 .. variable:: wsrep_dirty_reads
 
