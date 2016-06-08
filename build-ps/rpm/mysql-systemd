@@ -53,6 +53,9 @@ install_db () {
 
     # If special mysql dir is in place, skip db install 
     [ -d "$datadir/mysql" ] && exit 0
+    if [ -f "$datadir/sst_in_progress" ]; then
+        rm -rf $datadir/*
+    fi
 
     # Create initial db
     /usr/sbin/mysqld --initialize --datadir="$datadir" --user=mysql

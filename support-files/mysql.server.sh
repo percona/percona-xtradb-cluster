@@ -359,6 +359,9 @@ case "$mode" in
         then
           mkdir -p "$datadir" || exit 1
         fi
+        if [ -f "$datadir/sst_in_progress" ]; then
+            rm -rf $datadir/*
+        fi
         chown mysql:mysql "$datadir"
         chmod 0751 "$datadir"
         if [ -x /sbin/restorecon ] ; then
