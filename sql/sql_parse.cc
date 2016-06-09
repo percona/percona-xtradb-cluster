@@ -6064,6 +6064,13 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
       query_logger.general_log_write(thd, COM_QUERY, thd->query().str,
                                      thd->query().length);
     parser_state->m_lip.found_semicolon= NULL;
+
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd))
+    {
+      thd->wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+    }
+#endif /* WITH_WSREP */
   }
 
   DBUG_VOID_RETURN;
