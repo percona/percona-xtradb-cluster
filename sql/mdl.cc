@@ -40,7 +40,8 @@ void sql_print_information(const char *format, ...)
   __attribute__((format(printf, 1, 2)));
 extern bool
 wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
-                          MDL_ticket *ticket);
+                          MDL_ticket *ticket,
+                          const MDL_key *key);
 #endif /* WITH_WSREP */
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_MDL_wait_LOCK_wait_status;
@@ -1971,7 +1972,8 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
       if (granted->get_ctx() != ticket->get_ctx() &&
           granted->is_incompatible_when_granted(ticket->get_type()))
       {
-        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted))
+        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
+                                       &ticket->get_lock()->key))
         {
           WSREP_DEBUG("MDL victim killed at add_ticket");
         }
@@ -2609,7 +2611,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                         wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
             can_grant = true;
           }
-          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
+          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket, &key))
           {
             wsrep_can_grant= FALSE;
             if (wsrep_log_conflicts) 

@@ -245,8 +245,10 @@ void wsrep_replay_transaction(THD *thd)
         wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
         break;
       default:
-        WSREP_ERROR("trx_replay failed for: %d, query: %s",
-                    rcode, thd->query().str);
+        WSREP_ERROR("trx_replay failed for: %d, schema: %s, query: %s",
+                    rcode,
+                    (thd->db().str ? thd->db().str : "(null)"),
+                    thd->query().str ? thd->query().str : "void");
         /* we're now in inconsistent state, must abort */
 	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         unireg_abort(1);
