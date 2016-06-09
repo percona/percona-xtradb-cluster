@@ -79,7 +79,7 @@ void wsrep_register_hton(THD* thd, bool all)
             thd->lex->no_write_to_binlog == 1)
     {
         WSREP_DEBUG("Skipping wsrep_register_hton for LOCAL sql admin command : %s",
-                thd->query());
+                thd->query().str);
         return;
     }
 
