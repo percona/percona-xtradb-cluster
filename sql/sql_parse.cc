@@ -1053,6 +1053,12 @@ bool do_command(THD *thd)
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
 	       "WSREP has not yet prepared node for application use");
       thd->end_statement();
+
+      /* Performance Schema Interface instrumentation end */
+      MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+      thd->m_statement_psi= NULL;
+      thd->m_digest= NULL;
+
       return_value= FALSE;
       goto out;
     }
@@ -1347,7 +1353,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
         WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         thd->killed               = THD::NOT_KILLED;
-        thd->mysys_var->abort     = 0;
         thd->wsrep_conflict_state = NO_CONFLICT;
         thd->wsrep_retry_counter  = 0;
         /*
