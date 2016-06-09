@@ -5,10 +5,10 @@
 =============================================
 
 Percona is glad to announce the release of
-|PXC| 5.7.11-4beta-25.14.2 on May 23, 2016.
+|PXC| 5.7.11-4beta-25.14.2 on June 9, 2016.
 Binaries are available from
 `downloads area
-<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST>`_
+<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57>`_
 or from our :ref:`software repositories <install>`.
 
 .. note:: This release is available only from the testing repository.
@@ -30,5 +30,4 @@ and the following changes:
   It has been replace by ``wsrep_sst_xtrabackup_v2``.
 
 *  The ``wsrep_mysql_replication_bundle`` variable has been removed.
-
 
