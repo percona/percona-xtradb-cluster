@@ -3028,9 +3028,6 @@ mysql_execute_command(THD *thd, bool first_level)
     thd->status_var= old_status_var;
     thd->initial_status_var= NULL;
     mysql_mutex_unlock(&LOCK_status);
-#ifdef WITH_WSREP
-    if (lex->sql_command == SQLCOM_SHOW_STATUS) wsrep_free_status(thd);
-#endif /* WITH_WSREP */
     break;
   }
   case SQLCOM_SHOW_EVENTS:

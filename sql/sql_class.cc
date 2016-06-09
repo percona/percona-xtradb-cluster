@@ -2137,7 +2137,7 @@ void THD::release_resources()
     wsrep_rli->current_mts_submode = 0;
     delete wsrep_rli;
   }
-  if (wsrep_status_vars) wsrep->stats_free(wsrep, wsrep_status_vars);
+  wsrep_free_status(this);
 #endif
 }
 
