@@ -326,7 +326,7 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-3 percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-3 percona-xtrabackup-24 >= 2.4.3 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -595,7 +595,7 @@ mkdir debug
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
 %if 0%{?systemd}
-           -DWITH_SYSTEMD=ON \
+           -DWITH_SYSTEMD=OFF \
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
@@ -631,7 +631,7 @@ mkdir release
            -DWITH_EMBEDDED_SERVER=OFF \
            -DWITH_INNODB_MEMCACHED=ON \
 %if 0%{?systemd}
-           -DWITH_SYSTEMD=ON \
+           -DWITH_SYSTEMD=OFF \
 %endif
            -DENABLE_DTRACE=OFF \
            -DWITH_SSL=system \
@@ -711,8 +711,9 @@ mv $RPM_BUILD_DIR/%{_libdir} $RBR%{_libdir}
 
 # Ensure that needed directories exists
 install -d $RBR%{_sysconfdir}/{logrotate.d,init.d}
+install -d $RBR/var/lib/mysql
 install -d $RBR/var/lib/mysql-files
-install -d $RBR/var/lib/mysql-files
+install -d $RBR/var/lib/mysql-keyring
 install -d $RBR%{_datadir}/mysql-test
 # install -d $RBR%{_datadir}/percona-xtradb-cluster/SELinux/RHEL4
 install -d $RBR%{_includedir}
@@ -720,6 +721,8 @@ install -d $RBR%{_libdir}
 install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
 install -d $RBR%{_libdir}/mysql/plugin
+install -d -m 0755 %{buildroot}/var/run/mysqld
+
 
 (
   cd $MBD/release
@@ -915,58 +918,10 @@ esac
 # OTOH, if there is no such process, it means a crash without a cleanup -
 # is that a reason not to start a new server after upgrade?
 
-STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
-
-if [ -f $STATUS_FILE ]; then
-	echo "Some previous upgrade was not finished:"
-	ls -ld $STATUS_FILE
-	echo "Please check its status, then do"
-	echo "    rm $STATUS_FILE"
-	echo "before repeating the MySQL upgrade."
-	exit 1
-elif [ -n "$SEVERAL_PID_FILES" ] ; then
-	echo "You have more than one PID file:"
-	ls -ld $PID_FILE_PATT
-	echo "Please check which one (if any) corresponds to a running server"
-	echo "and delete all others before repeating the MySQL upgrade."
-	exit 1
-fi
-
 NEW_VERSION=%{mysql_version}-%{release}
 
 # The "pre" section code is also run on a first installation,
 # when there  is no data directory yet. Protect against error messages.
-if [ -d $mysql_datadir ] ; then
-	echo "MySQL RPM upgrade to version $NEW_VERSION"  > $STATUS_FILE
-	echo "'pre' step running at `date`"          >> $STATUS_FILE
-	echo                                         >> $STATUS_FILE
-	fcount=`ls -ltr $mysql_datadir/*.err 2>/dev/null | wc -l`
-	if [ $fcount -gt 0 ] ; then
-	echo "ERR file(s):"                          >> $STATUS_FILE
-		ls -ltr $mysql_datadir/*.err                 >> $STATUS_FILE
-	echo                                         >> $STATUS_FILE
-	echo "Latest 'Version' line in latest file:" >> $STATUS_FILE
-	grep '^Version' `ls -tr $mysql_datadir/*.err 2>/dev/null | tail -1` | \
-		tail -1                              >> $STATUS_FILE
-	echo                                         >> $STATUS_FILE
-	fi
-
-	if [ -n "$SERVER_TO_START" ] ; then
-		# There is only one PID file, race possibility ignored
-		echo "PID file:"                           >> $STATUS_FILE
-		ls -l   $PID_FILE_PATT                     >> $STATUS_FILE
-		cat     $PID_FILE_PATT                     >> $STATUS_FILE
-		echo                                       >> $STATUS_FILE
-		echo "Server process:"                     >> $STATUS_FILE
-		ps -fp `cat $PID_FILE_PATT`                >> $STATUS_FILE
-		echo                                       >> $STATUS_FILE
-		echo "SERVER_TO_START=$SERVER_TO_START"    >> $STATUS_FILE
-	else
-		# Take a note we checked it ...
-		echo "PID file:"                           >> $STATUS_FILE
-		ls -l   $PID_FILE_PATT                     >> $STATUS_FILE 2>&1
-	fi
-fi
 
 # Shut down a previously installed server first
 # Note we *could* make that depend on $SERVER_TO_START, but we rather don't,
@@ -978,15 +933,40 @@ if [ -x %{_sysconfdir}/init.d/mysql ] ; then
         echo "Giving mysqld 5 seconds to exit nicely"
         sleep 5
 fi
+# ----------------------------------------------------------------------
+# Create a MySQL user and group. Do not report any problems if it already
+# exists.
+# ----------------------------------------------------------------------
+groupadd -r %{mysqld_group} 2> /dev/null || true
+useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
+  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+# The user may already exist, make sure it has the proper group nevertheless
+# (BUG#12823)
+usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
+
 
 %post -n Percona-XtraDB-Cluster-server%{product_suffix}
 
 if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
-
+/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
+/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
+/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %if 0%{?systemd}
   %systemd_post mysql
+%endif
+%if 0%{?rhel} < 7
+if [ $1 -eq 1 ]; then
+  cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
+  if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
+    sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
+  fi
+  cnfpid=$(/usr/bin/my_print_defaults mysqld|grep -c pid-file)
+  if [ $cnfpid = 0 -a -f /etc/my.cnf ]; then
+    sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
+  fi
+fi
 %endif
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
@@ -1001,14 +981,12 @@ if [ -z "$mysql_datadir" ]
 then
   mysql_datadir=%{mysqldatadir}
 fi
+# ----------------------------------------------------------------------
+# Change permissions so that the user that will run the MySQL daemon
+# owns all database files.
+# ----------------------------------------------------------------------
+chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
 NEW_VERSION=%{mysql_version}-%{release}
-STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
-
-if [ -f $STATUS_FILE ] ; then
-	SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
-else
-	SERVER_TO_START=''
-fi
 
 if [ $1 -eq 1 ]; then
 
@@ -1016,40 +994,6 @@ if [ $1 -eq 1 ]; then
 # Create data directory if needed, check whether upgrade or install
 # ----------------------------------------------------------------------
 if [ ! -d $mysql_datadir ] ; then mkdir -m 755 $mysql_datadir; fi
-# echo "Analyzed: SERVER_TO_START=$SERVER_TO_START"
-#
-if [ ! -d $mysql_datadir/mysql ]; then
-# ----------------------------------------------------------------------
-# Initiate databases if needed
-# ----------------------------------------------------------------------
-# Does $mysql_datadir/mysql exist? In this case, this is probably an
-# upgrade from a previous version or a reinstall. It's best not to
-# call mysql_install_db in this case since the test db would be
-# possibly recreated (bug #1169522).
-  %{_sbindir}/mysqld --initialize --user=%{mysqld_user} --datadir=$mysql_datadir
-	echo "MySQL RPM installation of version $NEW_VERSION" >> $STATUS_FILE
-else
-# If the directory exists, we may assume it is an upgrade.
-	echo "MySQL RPM upgrade to version $NEW_VERSION" >> $STATUS_FILE
-fi
-
-# ----------------------------------------------------------------------
-# Create a MySQL user and group. Do not report any problems if it already
-# exists.
-# ----------------------------------------------------------------------
-groupadd -r %{mysqld_group} 2> /dev/null || true
-useradd -M -r -d $mysql_datadir -s /bin/bash -c "MySQL server" \
-  -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-# The user may already exist, make sure it has the proper group nevertheless
-# (BUG#12823)
-usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
-
-# ----------------------------------------------------------------------
-# Change permissions so that the user that will run the MySQL daemon
-# owns all database files.
-# ----------------------------------------------------------------------
-chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
-
 fi
 
 %if 0%{?systemd}
@@ -1087,7 +1031,8 @@ chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
 # Fix permissions for the permission database so that only the user
 # can read them.
 # ----------------------------------------------------------------------
-chmod -R og-rw $mysql_datadir/mysql
+#if [ ! -d $mysql_datadir/mysql ] ; then mkdir -m 755 $mysql_datadir/mysql; fi
+#chmod -R og-rw $mysql_datadir/mysql
 
 # ----------------------------------------------------------------------
 # install SELinux files - but don't override existing ones
@@ -1147,15 +1092,6 @@ echo "mysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.s
 echo "mysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmurmur_udf.so'\""
 echo "See  http://www.percona.com/doc/percona-server/5.5/management/udf_percona_toolkit.html for more details"
-
-# Collect an upgrade history ...
-echo "Upgrade/install finished at `date`"        >> $STATUS_FILE
-echo                                             >> $STATUS_FILE
-echo "====="                                     >> $STATUS_FILE
-STATUS_HISTORY=$mysql_datadir/RPM_UPGRADE_HISTORY
-cat $STATUS_FILE >> $STATUS_HISTORY
-mv -f  $STATUS_FILE ${STATUS_FILE}-LAST  # for "triggerpostun"
-
 
 #echo "Thank you for installing the MySQL Community Server! For Production
 #systems, we recommend MySQL Enterprise, which contains enterprise-ready
@@ -1227,16 +1163,6 @@ then
   mysql_datadir=%{mysqldatadir}
 fi
 NEW_VERSION=%{mysql_version}-%{release}
-STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER-LAST  # Note the difference!
-STATUS_HISTORY=$mysql_datadir/RPM_UPGRADE_HISTORY
-
-if [ -f $STATUS_FILE ] ; then
-	SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
-else
-	# This should never happen, but let's be prepared
-	SERVER_TO_START=''
-fi
-echo "Analyzed: SERVER_TO_START=$SERVER_TO_START"
 
 %if 0%{?systemd}
 if [ -x %{_bindir}/systemctl ] ; then
@@ -1310,8 +1236,7 @@ fi
 ##############################################################################
 
 # Empty section for metapackage
-# mistake?
-# %files
+%files
 
 # Empty section for metapackage
 %files -n Percona-XtraDB-Cluster-full%{product_suffix}
@@ -1368,10 +1293,8 @@ fi
 %attr(755, root, root) %{_bindir}/mysql_tzinfo_to_sql
 %attr(755, root, root) %{_bindir}/mysql_upgrade
 %attr(755, root, root) %{_bindir}/mysql_plugin
-%if 0%{?systemd} == 0
-%attr(755, root, root) %{_bindir}/mysqld_multi
 %attr(755, root, root) %{_bindir}/mysqld_safe
-%endif
+%attr(755, root, root) %{_bindir}/mysqld_multi
 %attr(755, root, root) %{_bindir}/mysqldumpslow
 %attr(755, root, root) %{_bindir}/mysqltest
 %attr(755, root, root) %{_bindir}/perror
@@ -1411,15 +1334,15 @@ fi
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/xinetd.d/mysqlchk
-%attr(750, mysql, mysql) %dir /var/lib/mysql-files
+%dir %attr(751, mysql, mysql) /var/lib/mysql
+%dir %attr(750, mysql, mysql) /var/lib/mysql-files
+%dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
+%dir %attr(755, mysql, mysql) /var/run/mysqld
 %if 0%{?systemd}
-%attr(644, root, root) %{_unitdir}/mysqld.service
 %attr(644, root, root) %{_unitdir}/mysql.service
 %attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/sysconfig/mysql.bootstrap
-%attr(644, root, root) %{_tmpfilesdir}/mysql.conf
 %attr(755, root, root) %{_bindir}/mysql-systemd
-%attr(755, root, root) %{_bindir}/mysqld_pre_systemd
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
@@ -1568,6 +1491,7 @@ fi
 %defattr(-, root, root, 0755)
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
+%attr(755, root, root) %{_bindir}/mysqlxtest
 #%attr(755, root, root) %{_bindir}/mysql_client_test_embedded
 #%attr(755, root, root) %{_bindir}/mysqltest_embedded
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test.1*
@@ -1582,6 +1506,14 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu May 26 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
+
+- Returned metapackage build and update PXB dependency
+
+* Mon May 23 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
+
+- Fix dependency names due to naming changes for galera
+
 * Tue May  3 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
 
 - Add compat rpm (BLD-414)
