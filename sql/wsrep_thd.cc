@@ -168,8 +168,8 @@ void wsrep_replay_transaction(THD *thd)
        */
       if (thd->get_reprepare_observer() && wsrep_log_conflicts)
       {
-        WSREP_WARN("dangling observer in replay transaction: (thr %lu %lld %s)",
-                   thd->thread_id, thd->query_id, thd->query());
+        WSREP_WARN("dangling observer in replay transaction: (thr %u %lld %s)",
+                   thd->thread_id(), thd->query_id, thd->query().str);
       }
       thd->get_stmt_da()->reset_diagnostics_area();
 
