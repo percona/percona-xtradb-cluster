@@ -240,7 +240,11 @@ parse_cnf()
 {
     local group=$1
     local var=$2
-    reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2-)
+    # print the default settings for given group using my_print_default.
+    # normalize the variable names specified in cnf file (user can use _ or - for example log-bin or log_bin)
+    # then grep for needed variable
+    # finally get the variable value (if variables has been specified multiple time use the last value only)
+    reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
     if [[ -z $reval ]];then 
         [[ -n $3 ]] && reval=$3
     fi
@@ -670,6 +674,7 @@ then
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
+        usrst=0
         if [[ -z $sst_ver ]];then 
             wsrep_log_error "Upgrade joiner to 5.6.21 or higher for backup locks support"
             wsrep_log_error "The joiner is not supported for this version of donor"
@@ -685,14 +690,14 @@ then
         itmpdir=$(mktemp -d)
         wsrep_log_info "Using $itmpdir as innobackupex temporary directory"
 
-        if [ "$WSREP_SST_OPT_USER" != "(null)" ]; then
+        if [[ -n "${WSREP_SST_OPT_USER:-}" && "$WSREP_SST_OPT_USER" != "(null)" ]]; then
            INNOEXTRA+=" --user=$WSREP_SST_OPT_USER"
+           usrst=1
         fi
 
-        if [ -n "$WSREP_SST_OPT_PSWD" ]; then
-#           INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
-           export MYSQL_PWD="$WSREP_SST_OPT_PSWD"
-        else
+        if [ -n "${WSREP_SST_OPT_PSWD:-}" ]; then
+           INNOEXTRA+=" --password=$WSREP_SST_OPT_PSWD"
+        elif [[ $usrst -eq 1 ]];then
            # Empty password, used for testing, debugging etc.
            INNOEXTRA+=" --password="
         fi
@@ -853,7 +858,8 @@ then
     then
 
         if [[ -d ${DATA}/.sst ]];then
-            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer"
+            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
+            rm -rf ${DATA}/.sst
         fi
         mkdir -p ${DATA}/.sst
         (recv_joiner $DATA/.sst "${stagemsg}-SST" 0 0) &
