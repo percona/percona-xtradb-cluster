@@ -522,10 +522,9 @@ bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
   if (wsrep_desync) {
     ret = wsrep->desync (wsrep);
     if (ret != WSREP_OK) {
-      WSREP_WARN ("SET desync failed %d for %s", ret, thd->query().str);
       WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
                   (thd->db().str ? thd->db().str : "(null)"),
-                  thd->query().str);
+                  WSREP_QUERY(thd));
       my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query().str);
       return true;
     }
@@ -534,7 +533,7 @@ bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
     if (ret != WSREP_OK) {
       WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
                   (thd->db().str ? thd->db().str : "(null)"),
-                  thd->query().str);
+                  WSREP_QUERY(thd));
       my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query().str);
       return true;
     }

@@ -4707,7 +4707,13 @@ compare_errors:
                   (actual_error ?
                    thd->get_stmt_da()->message_text() :
                    "no error"),
+#ifdef WITH_WSREP
+                  actual_error, print_slave_db_safe(db),
+                  (!opt_general_log_raw) && thd->rewritten_query.length()
+                  ? thd->rewritten_query.c_ptr_safe() : query_arg);
+#else
                   actual_error, print_slave_db_safe(db), query_arg);
+#endif /* WITH_WSREP */
       thd->is_slave_error= 1;
     }
     /*
@@ -4751,7 +4757,13 @@ compare_errors:
                     (actual_error ?
                      thd->get_stmt_da()->message_text() :
                      "unexpected success or fatal error"),
+#ifdef WITH_WSREP
+                    print_slave_db_safe(db),
+                      (!opt_general_log_raw) && thd->rewritten_query.length()
+                      ? thd->rewritten_query.c_ptr_safe() : query_arg);
+#else
                     print_slave_db_safe(thd->db().str), query_arg);
+#endif /* WITH_WSREP */
       }
       thd->is_slave_error= 1;
     }

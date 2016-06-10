@@ -36,8 +36,7 @@ int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
 void wsrep_client_rollback(THD *thd)
 {
   WSREP_DEBUG("client rollback due to BF abort for (%u), query: %s",
-              thd->thread_id(), thd->query().str);
-
+              thd->thread_id(), WSREP_QUERY(thd));
   my_atomic_add64(&wsrep_bf_aborts_counter, 1);
 
   thd->wsrep_conflict_state= ABORTING;
@@ -188,7 +187,7 @@ void wsrep_replay_transaction(THD *thd)
       thd->m_digest= NULL;
       thd_proc_info(thd, "wsrep replaying trx");
       WSREP_DEBUG("replay trx: %s %lld",
-                  thd->query().str,
+                  WSREP_QUERY(thd),
                   (long long)wsrep_thd_trx_seqno(thd));
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
@@ -248,7 +247,7 @@ void wsrep_replay_transaction(THD *thd)
         WSREP_ERROR("trx_replay failed for: %d, schema: %s, query: %s",
                     rcode,
                     (thd->db().str ? thd->db().str : "(null)"),
-                    thd->query().str ? thd->query().str : "void");
+                    WSREP_QUERY(thd));
         /* we're now in inconsistent state, must abort */
 	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         unireg_abort(1);

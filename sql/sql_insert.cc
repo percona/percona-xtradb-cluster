@@ -3038,7 +3038,7 @@ bool Query_result_create::send_eof()
       if (thd->wsrep_conflict_state != NO_CONFLICT)
       {
         WSREP_DEBUG("select_create commit failed, thd: %u err: %d %s", 
-                    thd->thread_id(), thd->wsrep_conflict_state, thd->query().str);
+                    thd->thread_id(), thd->wsrep_conflict_state, WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         abort_result_set();
 	return TRUE;

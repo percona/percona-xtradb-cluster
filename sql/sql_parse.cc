@@ -1350,7 +1350,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       else
       {
         my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-        WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
+        WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         thd->killed               = THD::NOT_KILLED;
         thd->wsrep_conflict_state = NO_CONFLICT;
@@ -1614,7 +1614,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     if (thd->wsrep_conflict_state== ABORTED) 
     {
       my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-      WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
+      WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
       goto dispatch_end;
@@ -6987,8 +6987,7 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
             thd->lex->sql_command != SQLCOM_SELECT  &&
            (thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit))
         {
-          WSREP_DEBUG("wsrep retrying AC query: %s",
-                      (thd->query().str) ? thd->query().str : "void");
+          WSREP_DEBUG("wsrep retrying AC query: %s", WSREP_QUERY(thd));
 
           close_thread_tables(thd);
 
@@ -7038,7 +7037,8 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                       (thd->wsrep_conflict_state == ABORTED) ?
                       "BF Aborted" : "cert failure",
                       thd->thread_id(), is_autocommit, thd->wsrep_retry_counter,
-                      thd->variables.wsrep_retry_autocommit, thd->query().str);
+                      thd->variables.wsrep_retry_autocommit,
+                      WSREP_QUERY(thd));
           my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
           thd->killed= THD::NOT_KILLED;
           thd->wsrep_conflict_state= NO_CONFLICT;
