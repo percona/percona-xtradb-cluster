@@ -475,6 +475,10 @@ enum enum_table_category
   TABLE_CATEGORY_GTID=8
 };
 typedef enum enum_table_category TABLE_CATEGORY;
+#ifdef WITH_WSREP
+TABLE_CATEGORY get_table_category(const LEX_STRING &db,
+                                  const LEX_STRING &name);
+#endif /* WITH_WSREP */
 
 extern ulong refresh_version;
 
