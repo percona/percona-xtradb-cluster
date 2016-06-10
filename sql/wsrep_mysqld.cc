@@ -1566,3 +1566,12 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
   }
   return ret;
 }
+
+bool wsrep_node_is_donor()
+{
+  return (WSREP_ON) ? (local_status.get() == 2) : false;
+}
+bool wsrep_node_is_synced()
+{
+  return (WSREP_ON) ? (local_status.get() == 4) : false;
+}
