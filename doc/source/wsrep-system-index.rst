@@ -112,7 +112,39 @@ When this variable is set to ``ON``, debug messages will also be logged to the `
    :dyn: Yes
    :default: OFF
  
-This variable controls whether the node participates in Flow Control. Setting the :variable:`wsrep_desync` to ``ON`` does not automatically mean that a node will be out of sync with the cluster. It will continue to replicate in and out the writesets as usual. The only difference is that flow control will no longer take care of the ``desynced`` node. The result is that if :variable:`wsrep_local_recv_queue` gets higher than maximum allowed, all the other nodes will ignore the replication lag on the node being in ``desync`` mode. Toggling this back will require an IST or an SST depending on how long it was desynchronized. This is similar to cluster de-synchronization, which occurs during RSU TOI. Because of this, it's not a good idea to keep desync set for a long period of time, nor should you desync several nodes at once. Also, you'll need to desync a node before it starts causing flow control for it to have any effect. Node can also be desynchronized with  ``/*! WSREP_DESYNC */`` query comment.
+This variable controls whether the node participates in Flow Control.
+Setting this variable to ``ON`` does not automatically mean
+that a node will be out of sync with the cluster.
+It will continue to replicate the writesets as usual.
+The only difference is that flow control will no longer
+take care of the desynced node.
+The result is that if :variable:`wsrep_local_recv_queue`
+gets higher than maximum allowed,
+all the other nodes will ignore the replication lag on the desynced node.
+Toggling this back to ``OFF`` will require an IST or an SST,
+depending on how long it was desynchronized.
+This is similar to cluster desynchronization,
+which occurs during RSU TOI.
+
+It's not a good idea to keep desync set for a long period of time,
+nor should you desync several nodes at once.
+Also, you'll need to desync a node before it starts
+causing flow control for it to have any effect.
+
+A node can also be desynchronized with  ``/*! WSREP_DESYNC */`` query comment.
+
+The following logic applies to desynced nodes:
+
+* If a node is explicitly desynced,
+  then implicitly desyncing a node using RSU/FTWRL is allowed.
+
+* If a node is implicitly desynced using RSU/FTWRL,
+  then explicitly desyncing a node is blocked
+  until implicit desync is complete.
+
+* If a node is explicitly desynced and then implicitly desycned using RSU/FTWRL, 
+  then any request for another implicit desync is blocked
+  until the former implicit desync is complete.
 
 .. variable:: wsrep_dirty_reads
 
@@ -265,7 +297,9 @@ This variable can be used to select schema upgrade method. Available values are:
 
 * ``TOI``: When the *Total Order Isolation* method is selected, data definition language (DDL) statements are processed in the same order with regards to other transactions in each cluster node. This guarantees data consistency. In case of DDL statements, cluster will have parts of database locked and it will behave like a single server. In some cases (like big ``ALTER TABLE``) this could have impact on cluster's performance and high availability, but it could be fine for quick changes that happen almost instantly (like fast index changes). When DDL statements are processed under TOI, the DDL statement will be replicated up front to the cluster. That is, cluster will assign global transaction ID for the DDL statement before DDL processing begins. Then every node in the cluster has the responsibility to execute the DDL statement in the given slot in the sequence of incoming transactions, and this DDL execution has to happen with high priority. 
 
-* ``RSU``: When the *Rolling Schema Upgrade* method is selected, DDL statements won't be replicated across the cluster, instead it's up to the user to run them on each node separately. The node applying the changes will desynchronize from the cluster briefly, while normal work happens on all the other nodes. When a DDL statement is processed, node will apply delayed replication events. The schema changes **must** be backwards compatible for this method to work, otherwise the node that receives the change will likely break Galera replication. If replication breaks, SST will be triggered when the node tries to join again but the change will be undone. 
+* ``RSU``: When the *Rolling Schema Upgrade* method is selected, DDL statements won't be replicated across the cluster, instead it's up to the user to run them on each node separately. The node applying the changes will desynchronize from the cluster briefly, while normal work happens on all the other nodes. When a DDL statement is processed, node will apply delayed replication events. The schema changes **must** be backwards compatible for this method to work, otherwise the node that receives the change will likely break Galera replication. If replication breaks, SST will be triggered when the node tries to join again but the change will be undone.
+
+For more information, see :variable:`wsrep_desync`.
 
 .. note:: Prior to |Percona XtraDB Cluster| :rn:`5.6.24-25.11`, :variable:`wsrep_OSU_method` was only a global variable. Current behavior is now consistent with |MySQL| behavior for variables that have both global and session scope. This means if you want to change the variable in current session, you need to do it with: ``SET wsrep_OSU_method`` (without the ``GLOBAL`` keyword). Setting the variable with ``SET GLOBAL wsrep_OSU_method`` will change the variable globally but it won't have effect on the current session.
 

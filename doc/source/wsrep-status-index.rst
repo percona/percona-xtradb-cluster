@@ -66,6 +66,15 @@ Average distance between highest and lowest concurrently committed sequence numb
 .. variable:: wsrep_connected
 
 This variable shows if the node is connected to the cluster. If the value is ``OFF``, the node has not yet connected to any of the cluster components. This may be due to misconfiguration. 
+
+.. variable:: wsrep_desync_count
+
+Number of desync operations currently in progress on the node.
+This status variable increments every time a node is desynced from the cluster
+(for example, when :variable:`wsrep_desync` is enabled).
+The node can only sync to the cluster when the value is ``0``,
+meaning that there are no operations running on the node
+that require the node to desync.
  
 .. variable:: wsrep_evs_delayed
 
