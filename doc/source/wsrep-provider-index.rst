@@ -275,6 +275,45 @@ This variable defines the EVS protocol version. Auto eviction is enabled when th
 
 This variable defines the timeout after which past views will be dropped from history.
 
+.. variable:: gcomm.thread_prio
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+
+Set the priority of the ``gcomm`` thread to a higher level
+if |PXC| threads receive little CPU time because of other MySQL threads.
+This should prevent timeouts
+that might lead to nodes dropping from the cluster.
+
+The format for this option is ``<policy>:<priority>``, for example::
+
+ wsrep_provider_options="gcomm.thread_prio=rr:2"
+
+Set the priority to an integer number.
+Set the policy to one of the following values:
+
+* ``other`` means the default time-sharing scheduling in Linux.
+  Threads can run until they are blocked by an I/O request
+  or preempted by higher priorities or superior scheduling designations.
+
+* ``fifo`` means *first-in-first-out* scheduling.
+  Threads always immediately preempt any currently running
+  other, batch or idle threads.
+  They can run until they are either blocked by an I/O request
+  or preempted by a FIFO thread of a higher priority.
+
+* ``rr`` means *round-robin* scheduling.
+  Threads always preempt any currently running other, batch or idle threads.
+  The scheduler allows these threads to run for a fixed period of a time.
+  If the thread is still running when this time period is exceeded,
+  they are stopped and moved to the end of the list,
+  allowing another round-robin thread of the same priority
+  to run in their place.
+  They can otherwise continue to run until they are blocked by an I/O request
+  or are preempted by threads of a higher priority.
+
 .. variable:: gcache.dir
 
    :cli: Yes
@@ -518,6 +557,22 @@ This variable shows which gmcast protocol version is being used.
    :default: value of :variable:`wsrep_node_address`
 
 This variable specifies the address on which the node listens for Incremental State Transfer (|IST|).
+
+.. variable:: ist.recv_bind
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+   :default: value of :variable:`ist.recv_addr`
+
+Defines the address that the node binds on
+for receiving an Incremental State Transfer (IST), for example::
+
+ wsrep_provider_options="ist.recv_bind=192.168.1.1"
+
+This option may be useful if a node runs behind a NAT or in similar cases
+where the public and private addresses differ.
 
 .. variable:: pc.announce_timeout
 
