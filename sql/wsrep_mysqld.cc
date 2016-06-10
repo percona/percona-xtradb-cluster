@@ -1289,7 +1289,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
 {
   wsrep_status_t ret(WSREP_WARNING);
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
-               thd->wsrep_exec_mode, WSREP_QUERY(thd) );
+              thd->wsrep_exec_mode, WSREP_QUERY(thd));
 
   if (!wsrep_desync)
   {
@@ -1315,7 +1315,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     /* no can do, bail out from DDL */
     WSREP_WARN("RSU failed due to pending transactions, schema: %s, query %s",
                (thd->db().str ? thd->db().str : "(null)"),
-               (thd->query().str) ? WSREP_QUERY(thd) : "void");
+               WSREP_QUERY(thd));
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1330,7 +1330,8 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
                    (thd->db().str ? thd->db().str : "(null)"),
                    WSREP_QUERY(thd));
       }
-
+    }
+ 
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
   }
@@ -1340,7 +1341,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
   {
     WSREP_WARN("pause failed %lld for schema: %s, query: %s", (long long)seqno,
                (thd->db().str ? thd->db().str : "(null)"),
-               (thd->query().str) ? WSREP_QUERY(thd) : "void");
+               WSREP_QUERY(thd));
     return(1);
   }
   WSREP_DEBUG("paused at %lld", (long long)seqno);
