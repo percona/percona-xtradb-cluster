@@ -101,7 +101,7 @@ The mechanism is described in detail in `Galera documentation <http://galeraclus
 How would the quorum mechanism handle split brain? 
 ==================================================
 
-It would not. If there is no way to decide on the |primary component|, Percona XtraDB Cluster has no way to resolve a |split brain|. The minimal recommendation is to have 3 nodes. However, it is possibile to allow a node to handle the traffic with the following option: ::
+It would not. If there is no way to decide on the primary component, Percona XtraDB Cluster has no way to resolve a |split brain|. The minimal recommendation is to have 3 nodes. However, it is possibile to allow a node to handle the traffic with the following option: ::
   
   wsrep_provider_options="pc.ignore_sb = yes"
 
