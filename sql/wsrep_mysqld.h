@@ -292,10 +292,6 @@ extern mysql_cond_t  COND_wsrep_replaying;
 extern mysql_mutex_t LOCK_wsrep_slave_threads;
 extern mysql_mutex_t LOCK_wsrep_desync;
 
-extern int wsrep_desync_count;
-extern int wsrep_desync_count_manual;
-extern mysql_mutex_t LOCK_wsrep_desync_count;
-
 extern unsigned int wsrep_pause_count;
 extern mysql_mutex_t LOCK_wsrep_pause_count;
 
@@ -320,7 +316,6 @@ extern PSI_mutex_key key_LOCK_wsrep_replaying;
 extern PSI_cond_key  key_COND_wsrep_replaying;
 extern PSI_mutex_key key_LOCK_wsrep_slave_threads;
 extern PSI_mutex_key key_LOCK_wsrep_desync;
-extern PSI_mutex_key key_LOCK_wsrep_desync_count;
 extern PSI_mutex_key key_LOCK_wsrep_pause_count;
 #endif /* HAVE_PSI_INTERFACE */
 struct TABLE_LIST;

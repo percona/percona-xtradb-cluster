@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1874,17 +1874,16 @@ void Log_event::print_header(IO_CACHE* file,
   @param[in] file              IO cache
   @param[in] prt               Pointer to string
   @param[in] length            String length
-  @param[in] esc_all        Whether to escape all characters
 */
 
 static void
-my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length, bool esc_all)
+my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length)
 {
   const uchar *s;
   my_b_printf(file, "'");
   for (s= ptr; length > 0 ; s++, length--)
   {
-    if (*s > 0x1F && !esc_all)
+    if (*s > 0x1F && *s != '\'' && *s != '\\')
       my_b_write(file, s, 1);
     else
     {
@@ -1895,14 +1894,6 @@ my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length, bool esc_all)
   }
   my_b_printf(file, "'");
 }
-
-
-static void
-my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length)
-{
-  my_b_write_quoted(file, ptr, length, false);
-}
-
 
 /**
   Prints a bit string to io cache in format  b'1010'.
@@ -10093,15 +10084,36 @@ Rows_log_event::decide_row_lookup_algorithm_and_key()
   TABLE *table= this->m_table;
   uint event_type= this->get_general_type_code();
   MY_BITMAP *cols= &this->m_cols;
+  bool delete_update_lookup_condition= false;
   this->m_rows_lookup_algorithm= ROW_LOOKUP_NOT_NEEDED;
   this->m_key_index= MAX_KEY;
   this->m_key_info= NULL;
 
   // row lookup not needed
   if (event_type == WRITE_ROWS_EVENT ||
-     ((event_type == DELETE_ROWS_EVENT || event_type == UPDATE_ROWS_EVENT) &&
-      get_flags(COMPLETE_ROWS_F) && !m_table->file->rpl_lookup_rows()))
-    DBUG_VOID_RETURN;
+     (delete_update_lookup_condition= ((event_type == DELETE_ROWS_EVENT ||
+                                        event_type == UPDATE_ROWS_EVENT) &&
+                                      get_flags(COMPLETE_ROWS_F) &&
+                                      !m_table->file->rpl_lookup_rows())))
+  {
+    if (delete_update_lookup_condition &&
+        table->file->ht->db_type == DB_TYPE_TOKUDB &&
+        table->s->primary_key == MAX_KEY)
+    {
+        if (!table->s->rfr_lookup_warning)
+        {
+          sql_print_warning("Slave: read free replication is disabled "
+                            "for tokudb table `%s.%s` "
+                            "as it does not have implicit primary key, "
+                            "continue with rows lookup",
+                            print_slave_db_safe(table->s->db.str),
+                            m_table->s->table_name.str);
+          table->s->rfr_lookup_warning= true;
+        }
+    }
+    else
+      DBUG_VOID_RETURN;
+  }
 
   if (!(slave_rows_search_algorithms_options & SLAVE_ROWS_INDEX_SCAN))
     goto TABLE_OR_INDEX_HASH_SCAN;
