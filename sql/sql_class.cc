@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1206,6 +1206,7 @@ THD::THD(bool enable_plugins)
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
    wsrep_certify_empty_trx(false),
+   wsrep_sst_donor(false),
 #endif
    m_parser_state(NULL),
 #if defined(ENABLED_DEBUG_SYNC)
@@ -1232,7 +1233,6 @@ THD::THD(bool enable_plugins)
   event_scheduler.data= 0;
   event_scheduler.m_psi= 0;
   skip_wait_timeout= false;
-  extra_port= 0;
   catalog= (char*)"std"; // the only catalog we have for now
   main_security_ctx.init();
   security_ctx= &main_security_ctx;
@@ -1744,6 +1744,7 @@ void THD::init(void)
   wsrep_TOI_pre_queries.clear();
   wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
   wsrep_certify_empty_trx= false;
+  wsrep_sst_donor= false;
 #endif
   binlog_row_event_extra_data= 0;
 
@@ -5680,4 +5681,16 @@ void THD::time_out_user_resource_limits()
   }
 
   DBUG_VOID_RETURN;
+}
+/**
+  Determine if binlogging is disabled for this session
+  @retval 0 if the current statement binlogging is disabled
+  (could be because of binlog closed/binlog option
+  is set to false).
+  @retval 1 if the current statement will be binlogged
+*/
+bool THD::is_current_stmt_binlog_disabled() const
+{
+  return (!(variables.option_bits & OPTION_BIN_LOG) ||
+          !mysql_bin_log.is_open());
 }

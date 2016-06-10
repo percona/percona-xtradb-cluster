@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights
    reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -2139,6 +2139,10 @@ public:
 
   Global_read_lock()
     : m_state(GRL_NONE),
+#ifdef WITH_WSREP
+      provider_paused(false),
+      provider_desynced_paused(false),
+#endif
       m_mdl_global_shared_lock(NULL),
       m_mdl_blocks_commits_lock(NULL)
   {}
@@ -2174,6 +2178,7 @@ public:
   wsrep_status_t wsrep_resume(bool ignore_if_resumed= false);
   bool wsrep_pause_once();
   wsrep_status_t wsrep_resume_once(void);
+  bool provider_resumed() const { return !provider_paused; }
 #endif
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
@@ -2181,6 +2186,16 @@ public:
 private:
   volatile static int32 m_active_requests;
   enum_grl_state m_state;
+
+#ifdef WITH_WSREP
+  /* FLUSH TABLE <table> WITH READ LOCK
+  FLUSH TABLES <table> FOR EXPORT
+  and so while unlocking such context provider needs to resumed. */
+  bool provider_paused;
+
+  /* Mark this true only when both action are successful. */
+  bool provider_desynced_paused;
+#endif
 
   /**
     In order to acquire the global read lock, the connection must
@@ -2596,6 +2611,9 @@ public:
     return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
   }
+
+  bool is_current_stmt_binlog_disabled() const;
+
   /** Tells whether the given optimizer_switch flag is on */
   inline bool optimizer_switch_flag(ulonglong flag) const
   {
@@ -3299,7 +3317,6 @@ public:
 
   /// @todo: slave_thread is completely redundant, we should use 'system_thread' instead /sven
   bool       slave_thread, one_shot_set;
-  bool       extra_port;                        /* If extra connection */
 
   bool	     no_errors;
   uchar      password;
@@ -3495,6 +3512,7 @@ public:
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
   bool                      wsrep_certify_empty_trx;
+  bool                      wsrep_sst_donor;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

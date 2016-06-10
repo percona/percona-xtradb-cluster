@@ -141,8 +141,7 @@ Description: Percona XtraDB Cluster database client binaries
  multi-master replication, parallel applying on slaves, automatic
  node provisioning with primary focus on data consistency.
  .
- This package includes the client binaries and the additional tools
- innotop and mysqlreport.
+ This package includes the client binaries.
 
 Package: percona-xtradb-cluster-server-5.6
 Architecture: any

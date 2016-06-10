@@ -256,6 +256,27 @@ static int wsrep_provider_verify (const char* provider_str)
 @return false if no error encountered with check else return true. */
 bool wsrep_provider_check (sys_var *self, THD* thd, set_var* var)
 {
+  if (WSREP(thd))
+  {
+    mysql_mutex_lock(&LOCK_wsrep_pause_count);
+    bool node_paused = (wsrep_pause_count == 0) ? false : true;
+    bool desynced = !wsrep_node_is_synced();
+    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
+
+    if (node_paused || desynced)
+    {
+      /* If node is paused or desycned this means node is up-to-data.
+      Pause node hasn't applied all the write-set and desycned node
+      may have sent flow control. Avoid changing wsrep_provider
+      in such critical conditions. */
+      WSREP_WARN("Cannot modify wsrep_provider while node is paused"
+                 " or desynced.");
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+               var->save_result.string_value.str);
+      return true;
+    }
+  }
+
   char wsrep_provider_buf[FN_REFLEN];
 
   if ((! var->save_result.string_value.str) ||
@@ -584,112 +605,42 @@ bool wsrep_slave_threads_update (sys_var *self, THD* thd, enum_var_type type)
 
 bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
 {
-  /* Setting desync to on/off signals participation of node in flow control.
-  It doesn't turn-off recieval of write-sets.
-  Node is free to receive and apply write-sets.
-  But if node is already in paused state due to some previous action
-  likely RSU or FTWRL then avoid explict desync till node exit either of these
-  state as they too has done desyncing implicitly. */
   bool new_wsrep_desync = var->save_result.ulonglong_value;
-
-  mysql_mutex_lock(&LOCK_wsrep_pause_count);
-  if (wsrep_pause_count)
-  {
-    WSREP_WARN ("Trying to desync a node that is already paused.");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0),
-             var->var->name.str,
-             new_wsrep_desync ? "ON" : "OFF");
-    mysql_mutex_unlock(&LOCK_wsrep_pause_count);
-    return true;
+  if (wsrep_desync == new_wsrep_desync) {
+    if (new_wsrep_desync) {
+      push_warning (thd, Sql_condition::WARN_LEVEL_WARN,
+                   ER_WRONG_VALUE_FOR_VAR,
+                   "'wsrep_desync' is already ON.");
+    } else {
+      push_warning (thd, Sql_condition::WARN_LEVEL_WARN,
+                   ER_WRONG_VALUE_FOR_VAR,
+                   "'wsrep_desync' is already OFF.");
+    }
+    return false;
   }
-  mysql_mutex_unlock(&LOCK_wsrep_pause_count);
-
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
-  if (new_wsrep_desync)
-  {
-      if (wsrep_desync_count_manual)
-      {
-          WSREP_DEBUG("wsrep_desync is already ON, the counter is increased.");
-      }
+  wsrep_status_t ret(WSREP_WARNING);
+  if (new_wsrep_desync) {
+    ret = wsrep->desync (wsrep);
+    if (ret != WSREP_OK) {
+      WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
+                  (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query());
+      return true;
+    }
+  } else {
+    ret = wsrep->resync (wsrep);
+    if (ret != WSREP_OK) {
+      WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
+                  (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query());
+      return true;
+    }
   }
-  else
-  {
-      if (wsrep_desync_count_manual == 0)
-      {
-          mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-          WSREP_ERROR ("Trying to make wsrep_desync = OFF on "
-                       "the node that is already synchronized.");
-          my_error (ER_WRONG_VALUE_FOR_VAR, MYF(0), 
-                    var->var->name.str, "OFF");
-          return true;
-      }
-      else if (wsrep_desync_count_manual != 1)
-      {
-          WSREP_DEBUG("wsrep_desync still ON, new desync counter = %d.",
-                      (int) (wsrep_desync_count_manual - 1));
-      }
-  }
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-  return 0;
+  return false;
 }
 
 bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
 {
-  wsrep_status_t ret(WSREP_WARNING);
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
-  if (wsrep_desync)
-  {
-      wsrep_desync_count_manual++;
-      if (wsrep_desync_count++ == 0)
-      {
-          ret = wsrep->desync (wsrep);
-          if (ret != WSREP_OK)
-          {
-              wsrep_desync_count--;
-              wsrep_desync_count_manual--;
-              mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-              WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
-                          (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
-              my_error (ER_CANNOT_USER, MYF(0), "'wsrep->desync()'",
-                        thd->query());
-              return true;
-          }
-      }
-  }
-  else
-  {
-      if (wsrep_desync_count_manual)
-      {
-          if (--wsrep_desync_count_manual)
-          {
-              wsrep_desync = 1;
-          }
-          if (--wsrep_desync_count == 0)
-          {
-              ret = wsrep->resync (wsrep);
-              if (ret != WSREP_OK)
-              {
-                  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-                  WSREP_WARN ("SET resync failed %d for schema: %s, query: %s",
-                              ret, (thd->db ? thd->db : "(null)"),
-                              WSREP_QUERY(thd));
-                  my_error (ER_CANNOT_USER, MYF(0), "'wsrep->resync()'",
-                            thd->query());
-                  return true;
-              }
-          }
-      }
-      else
-      {
-          mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-          WSREP_ERROR ("Trying to make wsrep_desync = OFF on "
-                       "the node that is already synchronized.");
-          my_error (ER_CANNOT_USER, MYF(0), "'wsrep_desync_update'",
-                    thd->query());
-          return true;
-      }
-  }
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
   return false;
 }
 

@@ -23,6 +23,7 @@ SELECT * FROM t1;
 SET GLOBAL wsrep_reject_queries = ALL_KILL;
 
 --connection node_1a
+--sleep 5
 --error 2013
 SELECT * FROM t1;
 

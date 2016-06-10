@@ -72,12 +72,10 @@ call mtr.add_suppression("Aborting");
 
 --echo "Restart with wsrep_desync=1"
 --let $start_mysqld_params="--wsrep_desync=1"
---enable_reconnect
---exec echo "restart:$start_mysqld_params" > $_expect_file_name
---disable_reconnect
-# Wait for node failure
---source include/wait_until_disconnected.inc
-
+--exec echo "try:$start_mysqld_params" > $_expect_file_name
+# Sleep to ensure that server exited...
+--sleep 30
+#
 --echo "Restart with default options"
 --let $start_mysqld_params=
 --source include/start_mysqld.inc
