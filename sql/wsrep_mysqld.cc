@@ -1291,16 +1291,21 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, WSREP_QUERY(thd) );
 
-  ret = wsrep->desync(wsrep);
-  if (ret != WSREP_OK)
+  if (!wsrep_desync)
   {
-    WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
+    ret = wsrep->desync(wsrep);
+    if (ret != WSREP_OK)
+    {
+      WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
                ret,
                (thd->db().str ? thd->db().str : "(null)"),
-               (thd->query().str) ? WSREP_QUERY(thd) : "void");
-    my_error(ER_LOCK_DEADLOCK, MYF(0));
-    return(ret);
+               WSREP_QUERY(thd));
+      my_error(ER_LOCK_DEADLOCK, MYF(0));
+      return(ret);
+    }
   }
+  else
+    WSREP_DEBUG("RSU desync skipped: %d", wsrep_desync);
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying++;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1315,14 +1320,17 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
-    ret = wsrep->resync(wsrep);
-    if (ret != WSREP_OK)
+    if (!wsrep_desync)
     {
-      WSREP_WARN("resync failed %d for schema: %s, query: %s",
-               ret,
-               (thd->db().str ? thd->db().str : "(null)"),
-               (thd->query().str) ? WSREP_QUERY(thd) : "void");
-    }
+      ret = wsrep->resync(wsrep);
+      if (ret != WSREP_OK)
+      {
+        WSREP_WARN("resync failed %d for schema: %s, query: %s",
+                   ret,
+                   (thd->db().str ? thd->db().str : "(null)"),
+                   WSREP_QUERY(thd));
+      }
+
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
   }
@@ -1356,17 +1364,22 @@ static void wsrep_RSU_end(THD *thd)
   {
     WSREP_WARN("resume failed %d for schema: %s, query: %s", ret,
                (thd->db().str ? thd->db().str : "(null)"),
-               (thd->query().str) ? WSREP_QUERY(thd) : "void");
+               WSREP_QUERY(thd));
   }
-  ret = wsrep->resync(wsrep);
-  if (ret != WSREP_OK)
+
+  if (!wsrep_desync)
   {
+    ret = wsrep->resync(wsrep);
+    if (ret != WSREP_OK)
+    {
     WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
                (thd->db().str ? thd->db().str : "(null)"),
-               (thd->query().str) ? WSREP_QUERY(thd) : "void");
-
+               WSREP_QUERY(thd));
     return;
-  }
+    }
+   }
+  else
+    WSREP_DEBUG("RSU resync skipped: %d", wsrep_desync);
   thd->variables.wsrep_on = 1;
 }
 
