@@ -192,7 +192,7 @@ static int get_provider_option_value(const char* opts,
 {
   int ret= 1;
   ulong opt_value_tmp;
-  char *opt_value_str, *s, *opts_copy= my_strdup(opts, MYF(MY_WME));
+  char *opt_value_str, *s, *opts_copy= my_strdup(key_memory_wsrep, opts, MYF(MY_WME));
 
   if ((opt_value_str= strstr(opts_copy, opt_name)) == NULL)
     goto end;
