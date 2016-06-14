@@ -20,7 +20,12 @@ wsrep_desync_count	2
 SHOW VARIABLES LIKE 'wsrep_desync';
 Variable_name	Value
 wsrep_desync	OFF
+SET GLOBAL wsrep_provider_options = 'dbug=d,after_synced_cb';
 UNLOCK TABLES;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=after_synced_cb';
 value after RSU:
 SHOW STATUS LIKE 'wsrep_desync_count';
 Variable_name	Value
