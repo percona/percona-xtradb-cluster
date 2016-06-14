@@ -333,9 +333,13 @@ static void wsrep_replication_process(THD *thd)
 
   wsrep_prepare_bf_thd(thd, &shadow);
 
+  /* This should be set as part of trans_begin and not explicitly.
+  Note sure why Galera thought of setting it here but it conflicts
+  as the first BEGIN statement is now intepreted wrongly as statement
+  inside an active transaction. */
   /* From trans_begin() */
-  thd->variables.option_bits|= OPTION_BEGIN;
-  thd->server_status|= SERVER_STATUS_IN_TRANS;
+  //thd->variables.option_bits|= OPTION_BEGIN;
+  //thd->server_status|= SERVER_STATUS_IN_TRANS;
 
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));
