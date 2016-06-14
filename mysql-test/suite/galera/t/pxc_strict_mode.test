@@ -60,6 +60,8 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits using SERIALIZ
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
 
+call mtr.add_suppression("WSREP doesn't support XA transaction");
+
 --connection node_2
 --echo #node-2
 
@@ -1143,6 +1145,34 @@ create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
 select * from tinnodb2;
 drop table tinnodb;
 
+#-------------------------------------------------------------------------------
+#
+# Scenario-8: Checkout XA transaction. XA transaction are not supported by PXC
+# and are completely blocked now ir-respective of pxc-strict-mode.
+#
+--connection node_1
+--echo #node-1
+create table t (i int, j int, primary key pk(i)) engine=innodb;
+--error ER_UNKNOWN_COM_ERROR
+xa start 'testxa';
+insert into t values (1, 2);
+select * from t;
+--error ER_UNKNOWN_COM_ERROR
+xa end 'testxa';
+--error ER_UNKNOWN_COM_ERROR
+xa prepare 'testxa';
+--error ER_UNKNOWN_COM_ERROR
+xa commit 'testxa';
+select * from t;
+--error ER_UNKNOWN_COM_ERROR
+xa start 'testxa2';
+insert into t values (2, 3);
+select * from t;
+--error ER_UNKNOWN_COM_ERROR
+xa end 'testxa2';
+--error ER_UNKNOWN_COM_ERROR
+xa commit 'testxa2' one phase;
+drop table t;
 
 #-------------------------------------------------------------------------------
 #

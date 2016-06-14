@@ -3095,6 +3095,18 @@ mysql_execute_command(THD *thd, bool first_level)
       goto error;
     }
   }
+
+  if (lex->sql_command == SQLCOM_XA_START    ||
+      lex->sql_command == SQLCOM_XA_END      ||
+      lex->sql_command == SQLCOM_XA_PREPARE  ||
+      lex->sql_command == SQLCOM_XA_COMMIT   ||
+      lex->sql_command == SQLCOM_XA_ROLLBACK ||
+      lex->sql_command == SQLCOM_XA_RECOVER)
+  {
+    my_message(ER_UNKNOWN_COM_ERROR,
+               "WSREP doesn't support XA transaction", MYF(0));
+    goto error;
+  }
 #endif /* WITH_WSREP */
 
   DBUG_ASSERT(thd->get_transaction()->cannot_safely_rollback(
