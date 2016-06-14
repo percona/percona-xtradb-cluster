@@ -1,6 +1,8 @@
 #
 # Test Lock table interaction with RSU
 --source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source suite/galera/include/galera_have_debug_sync.inc
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER);
@@ -26,6 +28,10 @@ SET SESSION wsrep_osu_method = RSU;
 --echo value during RSU:
 SHOW STATUS LIKE 'wsrep_desync_count';
 SHOW VARIABLES LIKE 'wsrep_desync';
+
+--let $galera_sync_point = after_synced_cb
+--source include/galera_set_sync_point.inc
+
 UNLOCK TABLES;
 
 --connection node_1a
@@ -34,6 +40,15 @@ UNLOCK TABLES;
 --reap
 
 --connection node_1
+
+# We need to wait for "synced" callback, since the variable
+# wsrep_desync_count shows the actual state of the desync
+# counter, but synchronization takes some time:
+
+--source include/galera_wait_sync_point.inc
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
 --echo value after RSU:
 SHOW STATUS LIKE 'wsrep_desync_count';
 SHOW VARIABLES LIKE 'wsrep_desync';
