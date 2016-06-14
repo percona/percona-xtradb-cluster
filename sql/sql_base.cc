@@ -6025,7 +6025,7 @@ restart:
     }
   }
 
-  if (is_dml_stmt                      &&
+  if (is_dml_stmt                    &&
       tbl->s->primary_key == MAX_KEY &&
       !is_temporary_table(tables))
   {

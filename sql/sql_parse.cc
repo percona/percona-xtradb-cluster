@@ -3637,6 +3637,8 @@ case SQLCOM_PREPARE:
 
     if (select_lex->item_list.elements)		// With select
     {
+
+#ifdef WITH_WSREP
       bool block= false;
       switch(pxc_strict_mode)
       {
@@ -3666,6 +3668,7 @@ case SQLCOM_PREPARE:
         res= 1;
         goto end_with_restore_list;
       }
+#endif /* WITH_WSREP */
 
       Query_result *result;
 
