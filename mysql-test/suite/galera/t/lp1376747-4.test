@@ -28,7 +28,7 @@ INSERT INTO t1 VALUES (2,3);
 SET session wsrep_sync_wait=0;
 SET session wsrep_causal_reads=OFF;
 SHOW CREATE TABLE t1;
-FLUSH TABLES t1 WITH READ LOCK;
+--send FLUSH TABLES t1 WITH READ LOCK;
 
 --connection node_2
 # this will release existing lock but will not resume
@@ -37,6 +37,7 @@ UNLOCK TABLES;
 SHOW CREATE TABLE t1;
 
 --connection node_2a
+--reap
 UNLOCK TABLES;
 --sleep 1
 SHOW CREATE TABLE t1;
