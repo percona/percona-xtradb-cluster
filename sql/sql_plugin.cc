@@ -4300,17 +4300,37 @@ void free_system_variables(struct system_variables *v, bool enable_plugins)
 
 bool Sql_cmd_install_plugin::execute(THD *thd)
 {
-  bool st= mysql_install_plugin(thd, &m_comment, &m_ident);
+  bool st= true;
+
+#ifdef WITH_WSREP
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
+  st= mysql_install_plugin(thd, &m_comment, &m_ident);
   if (!st)
     my_ok(thd);
+
+#ifdef WITH_WSREP
+error:
+#endif /* WITH_WSREP */
   return st;
 }
 
 
 bool Sql_cmd_uninstall_plugin::execute(THD *thd)
 {
-  bool st= mysql_uninstall_plugin(thd, &m_comment);
+  bool st= true;
+
+#ifdef WITH_WSREP
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
+  st= mysql_uninstall_plugin(thd, &m_comment);
   if (!st)
     my_ok(thd);
+
+#ifdef WITH_WSREP
+error:
+#endif /* WITH_WSREP */
   return st;
 }

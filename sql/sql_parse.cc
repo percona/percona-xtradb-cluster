@@ -1377,6 +1377,44 @@ void reset_statement_timer(THD *thd)
   thd->timer= NULL;
 }
 
+#ifdef WITH_WSREP
+/* Function should be called if any non-supported lock/unlock statement
+is executed and if the outcome has to be evaluated based on pxc-strict-mode */
+static bool pxc_strict_mode_lock_check(THD* thd)
+{
+  /* LOCK/UNLOCK TABLE is not supported by galera due as it not compatible
+  with multi-master semantics. */
+  bool block= false;
+
+  switch (pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+  case PXC_STRICT_MODE_MASTER:
+    /* Do nothing */
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+               " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster doesn't recommend use of"
+                  " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  default:
+    block= true;
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+               " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+             "Percona-XtraDB-Cluster prohibits use of"
+             " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    break;
+  }
+
+  return block;
+}
+#endif /* WITH_WSREP */
+
 
 /**
   Perform one connection-level (COM_XXXX) command.
@@ -3587,6 +3625,36 @@ case SQLCOM_PREPARE:
 
     if (select_lex->item_list.elements)		// With select
     {
+      bool block= false;
+      switch(pxc_strict_mode)
+      {
+      case PXC_STRICT_MODE_DISABLED:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                   " CREATE TABLE AS SELECT");
+        push_warning_printf(thd, Sql_condition::SL_WARNING,
+                            ER_UNKNOWN_ERROR,
+                            "Percona-XtraDB-Cluster doesn't recommend use of"
+                            " CREATE TABLE AS SELECT");
+        break;
+      case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_MASTER:
+        block= true;
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+                    " CREATE TABLE AS SELECT");
+        my_message(ER_UNKNOWN_ERROR,
+                   "Percona-XtraDB-Cluster prohibits use of"
+                   " CREATE TABLE AS SELECT", MYF(0));
+        break;
+      }
+
+      if (block)
+      {
+        res= 1;
+        goto end_with_restore_list;
+      }
+
       Query_result *result;
 
       /*
@@ -4282,6 +4350,10 @@ end_with_restore_list:
   {
     List<set_var_base> *lex_var_list= &lex->var_list;
 
+#ifdef WITH_WSREP
+    wsrep_replicate_set_stmt= false;
+#endif /* WITH_WSREP */
+
     if ((check_table_access(thd, SELECT_ACL, all_tables, FALSE, UINT_MAX, FALSE)
          || open_and_lock_tables(thd, all_tables, 0)))
       goto error;
@@ -4299,14 +4371,23 @@ end_with_restore_list:
       goto error;
     }
 
+#ifdef WITH_WSREP
+    if (wsrep_replicate_set_stmt)
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    wsrep_replicate_set_stmt= false;
+#endif /* WITH_WSREP */
+
     break;
   }
 
   case SQLCOM_UNLOCK_TABLES:
   {
 #ifdef WITH_WSREP
-    bool table_lock= false;
+    /* UNLOCK Tables is generic statement and not all lock table variants
+    are blocked (only one with explict table lock are blocked). */
+    bool table_lock= (thd->variables.option_bits & OPTION_TABLE_LOCK);
 #endif /* WITH_WSREP */
+
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4315,9 +4396,6 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
-#ifdef WITH_WSREP
-      table_lock= true;
-#endif /* WITH_WSREP */
       DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
@@ -4372,6 +4450,12 @@ end_with_restore_list:
     break;
 
   case SQLCOM_LOCK_TABLES:
+
+#ifdef WITH_WSREP
+     if (pxc_strict_mode_lock_check(thd))
+       goto error;
+#endif /* WITH_WSREP */
+
     /*
       Do not allow LOCK TABLES under an active LOCK TABLES FOR BACKUP in the
       same connection.
@@ -4839,6 +4923,12 @@ end_with_restore_list:
 
     if (first_table && lex->type & REFRESH_READ_LOCK)
     {
+
+#ifdef WITH_WSREP
+      if (pxc_strict_mode_lock_check(thd))
+        goto error;
+#endif /* WITH_WSREP */
+
       /*
          Do not allow FLUSH TABLES <table_list> WITH READ LOCK under an active
          LOCK TABLES FOR BACKUP lock.
@@ -5700,14 +5790,6 @@ end_with_restore_list:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
   {
-
-#ifdef WITH_WSREP
-    if (lex->sql_command == SQLCOM_INSTALL_PLUGIN ||
-        lex->sql_command == SQLCOM_UNINSTALL_PLUGIN) {
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-    }
-#endif /* WITH_WSREP */
-
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;

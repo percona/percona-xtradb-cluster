@@ -11282,6 +11282,8 @@ ha_innobase::wsrep_append_keys(
 	CREATE TABLE ... SELECT statement will cause a fake_trx_id to set
 	while processing SELECT statement. */
 	if (!key_appended && !wsrep_certify_nonPK) {
+		WSREP_WARN("Table without explict primary key (not-recommended)"
+			   " and certification of nonPK table is OFF too");
 		wsrep_ws_handle_for_trx(
 			wsrep_thd_ws_handle(thd), WSREP_UNDEFINED_TRX_ID);
 	}

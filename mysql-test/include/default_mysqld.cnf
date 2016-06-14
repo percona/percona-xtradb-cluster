@@ -26,6 +26,13 @@ slave-net-timeout=120
 
 log-bin=mysqld-bin
 
+#
+# This is PXC specific setting that we do here in-order to ensure
+# that all the galera test-case get to use it.
+# It is maintainance challange to keep on modifying n different
+# galera.cnf file for this setting
+pxc_strict_mode=DISABLED
+
 # MAINTAINER:
 # the loose- syntax is to make sure the cnf file is also
 # valid when building without the performance schema.

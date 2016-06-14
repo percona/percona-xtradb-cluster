@@ -1121,6 +1121,51 @@ bool mysql_preload_keys(THD* thd, TABLE_LIST* tables)
                                 &handler::preload_keys, 0));
 }
 
+#ifdef WITH_WSREP
+static bool pxc_strict_mode_admin_check(THD* thd, TABLE_LIST* table)
+{
+  bool block= false;
+  char path[FN_REFLEN + 1];
+  enum legacy_db_type db_type;
+  (void) build_table_filename(path, sizeof(path) - 1, table->db,
+                              table->table_name, reg_ext, 0);
+  dd_frm_type(thd, path, &db_type);
+
+  if (db_type != DB_TYPE_INNODB  &&
+      db_type != DB_TYPE_UNKNOWN &&
+      !is_temporary_table(table))
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                 " ADMIN command on table created with"
+                 " non-transactional storage engine");
+      push_warning_printf(thd, Sql_condition::SL_WARNING,
+                          ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of"
+                          " ADMIN command on table created with"
+                          " non-transactional storage engine");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block= true;
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of ADMIN command"
+                  " on table created with non-transactional storage engine");
+      my_message(ER_UNKNOWN_ERROR,
+                 "Percona-XtraDB-Cluster prohibits use of ADMIN command"
+                 " on table created with non-transactional storage engine",
+                 MYF(0));
+      break;
+    }
+  }
+
+  return block;
+}
+#endif /* WITH_WSREP */
 
 bool Sql_cmd_analyze_table::execute(THD *thd)
 {
@@ -1128,6 +1173,11 @@ bool Sql_cmd_analyze_table::execute(THD *thd)
   bool res= TRUE;
   thr_lock_type lock_type = TL_READ_NO_INSERT;
   DBUG_ENTER("Sql_cmd_analyze_table::execute");
+
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table))
+    DBUG_RETURN(res);
+#endif /* WITH_WSREP */
 
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table,
                          FALSE, UINT_MAX, FALSE))
@@ -1160,6 +1210,11 @@ bool Sql_cmd_check_table::execute(THD *thd)
   bool res= TRUE;
   DBUG_ENTER("Sql_cmd_check_table::execute");
 
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table))
+    DBUG_RETURN(res);
+#endif /* WITH_WSREP */
+
   if (check_table_access(thd, SELECT_ACL, first_table,
                          TRUE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
@@ -1182,6 +1237,11 @@ bool Sql_cmd_optimize_table::execute(THD *thd)
   TABLE_LIST *first_table= thd->lex->select_lex->get_table_list();
   bool res= TRUE;
   DBUG_ENTER("Sql_cmd_optimize_table::execute");
+
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table))
+    DBUG_RETURN(res);
+#endif /* WITH_WSREP */
 
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table,
                          FALSE, UINT_MAX, FALSE))
@@ -1214,6 +1274,11 @@ bool Sql_cmd_repair_table::execute(THD *thd)
   TABLE_LIST *first_table= thd->lex->select_lex->get_table_list();
   bool res= TRUE;
   DBUG_ENTER("Sql_cmd_repair_table::execute");
+
+#ifdef WITH_WSREP
+  if (pxc_strict_mode_admin_check(thd, first_table))
+    DBUG_RETURN(res);
+#endif /* WITH_WSREP */
 
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table,
                          FALSE, UINT_MAX, FALSE))

@@ -9304,6 +9304,80 @@ bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
   if (error)
     DBUG_RETURN(true);
 
+#if 0 
+#ifdef WITH_WSREP
+  /* PXC doesn't recommend/allow ALTER operation on table created using
+  non-transactional storage engine (like MyISAM, HEAP/MEMORY, etc....)
+  except ALTER operation to change storage engine to transactional storage
+  engine. (of-course if that is feasible with other constraints)
+  Application only for non-temporary (persistent) tables.
+  Temporarily tables are generally created by some internal workload
+  so we continue to allow them for now as avoid breaking the application.
+  Note: Temporary table are never replicated. */
+  if (table_list->table->s->db_type() != create_info->db_type         &&
+      !is_temporary_table(table_list))
+  {
+     bool safe_ops= false;
+
+     /* Existing table is created with non-transactional storage engine
+     and so switching it to transactional storage engine is allowed.
+     Currently transactional storage engine supported is InnoDB/XtraDB */
+     if ((table_list->table->s->db_type()->db_type != DB_TYPE_INNODB) &&
+         (alter_info->flags & Alter_info::ALTER_OPTIONS)              &&
+         (create_info->used_fields & HA_CREATE_USED_ENGINE)           &&
+         (create_info->db_type->db_type == DB_TYPE_INNODB))
+       safe_ops= true;
+
+     /* Existing table is created with transactional storage engine
+     and switching it to non-transactional storage engine is blocked
+     other operations are allowed. */
+     if ((table_list->table->s->db_type()->db_type == DB_TYPE_INNODB) &&
+         (alter_info->flags & Alter_info::ALTER_OPTIONS)              &&
+         (create_info->used_fields & HA_CREATE_USED_ENGINE)           &&
+         (create_info->db_type->db_type != DB_TYPE_INNODB))
+       safe_ops= false;
+     else if (table_list->table->s->db_type()->db_type == DB_TYPE_INNODB)
+       safe_ops= true; 
+
+    if (!safe_ops)
+    {
+      bool block= false;
+      switch(pxc_strict_mode)
+      {
+      case PXC_STRICT_MODE_DISABLED:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of ALTER"
+                   " on table created with non-transactional storage engine"
+                   " (except switching to transactional engine)");
+        push_warning (thd, Sql_condition::SL_WARNING,
+                      ER_UNKNOWN_ERROR,
+                      "Percona-XtraDB-Cluster doesn't recommend use of ALTER"
+                      " on table created with non-transactional storage engine"
+                      " (except switching to transactional engine)");
+        break;
+      case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_MASTER:
+      default:
+        block= true;
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of ALTER"
+                    " on table created with non-transactional storage engine"
+                    " (except switching to transactional engine)");
+        my_message(ER_UNKNOWN_ERROR,
+                   "Percona-XtraDB-Cluster prohibits use of ALTER"
+                   " on table created with non-transactional storage engine"
+                   " (except switching to transactional engine)",
+                   MYF(0));
+        break;
+      }
+
+      if (block)
+        DBUG_RETURN(true);
+    }
+  }
+#endif /* WITH_WSREP */
+#endif
+
   // Check if ALTER TABLE ... ENGINE is disallowed by the storage engine.
   if (table_list->table->s->db_type() != create_info->db_type &&
       (alter_info->flags & Alter_info::ALTER_OPTIONS) &&

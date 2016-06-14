@@ -341,7 +341,7 @@ read_cnf()
     fi
 
     if [[ $ssyslog -ne -1 ]]; then
-        if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld_safe | tr '_' '-' | grep -q -- "--syslog"; then
+        if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld_safe | tr '_' '-' | grep -q -- "--syslog"; then
             ssyslog=1
         fi
     fi
@@ -574,7 +574,7 @@ check_extra()
     local use_socket=1
     if [[ $uextra -eq 1 ]]; then
         if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--thread-handling=" | grep -q 'pool-of-threads'; then
-            local eport=$(my_print_defaults -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
+            local eport=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld | tr '_' '-' | grep -- "--extra-port=" | cut -d= -f2)
             if [[ -n $eport ]]; then
                 # Xtrabackup works only locally.
                 # Hence, setting host to 127.0.0.1 unconditionally.
