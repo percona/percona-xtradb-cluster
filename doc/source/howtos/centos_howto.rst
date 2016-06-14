@@ -31,7 +31,7 @@ Prerequisites
 Installation
 ------------
 
-Installation information can be found in the :ref:`installation` guide. 
+Installation information can be found in :ref:`yum`.
 
 Configuring the nodes
 ---------------------
