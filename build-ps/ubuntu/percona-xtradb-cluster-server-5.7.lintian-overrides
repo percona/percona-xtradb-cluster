@@ -1,0 +1,15 @@
+percona-xtradb-cluster-server-5.7: possible-bashism-in-maintainer-script postinst:81 'p{("a".."z","A".."Z",0..9)[int(rand(62))]}'
+percona-xtradb-cluster-server-5.7: possible-bashism-in-maintainer-script preinst:33 '${cmd/ */}'
+percona-xtradb-cluster-server-5.7: statically-linked-binary ./usr/bin/mysql_tzinfo_to_sql
+percona-xtradb-cluster-server-5.7: statically-linked-binary ./usr/sbin/mysqld
+
+# we are mysqld, we are going to look like libmysqlclient
+embedded-library 
+
+#to supress false positive
+duplicate-updaterc.d-calls-in-postrm
+
+extra-license-file usr/share/doc/percona-xtradb-cluster-server-5.7/COPYING.gz
+extra-license-file usr/share/doc/percona-xtradb-cluster-server-5.7/COPYING.innodb-deadlock-count-patch
+extra-license-file usr/share/doc/percona-xtradb-cluster-server-5.7/COPYING.show_temp_51
+
