@@ -779,7 +779,9 @@ drop table tinnodb;
 set global general_log = 1;
 --let $general_log_file_saved = `SELECT @@general_log_file`
 set global log_output = 'NONE';
+--disable_query_log
 --eval set global general_log_file = `$restartdir/pxc.strict.mode.log`;
+--enable_query_log
 
 #----------------------------
 #

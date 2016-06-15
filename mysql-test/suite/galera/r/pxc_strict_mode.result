@@ -754,7 +754,6 @@ drop table tinnodb;
 #node-1
 set global general_log = 1;
 set global log_output = 'NONE';
-set global general_log_file = `/opt/projects/codebase/pxc/pxc57/bld/mysql-test/var/tmp/restartdir/pxc.strict.mode.log`;;
 #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;

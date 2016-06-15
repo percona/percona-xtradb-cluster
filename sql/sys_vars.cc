@@ -947,6 +947,19 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
    (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
     var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
 
+  if (WSREP(thd) && stmt_or_mixed && var->type == OPT_GLOBAL)
+  {
+    /* Toggline binlog-format at GLOBAL level to MIXED/STATEMENT
+    is not allowed. pxc-string-mode check will be evaluated
+    only for SESSION level setting. */
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
+                " to STATEMENT/MIXED (anything other than ROW)");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
+             "STATEMENT" : "MIXED");
+    return true;
+  }
+
   /* pxc-strict-mode enforcement. */
   if (WSREP(thd))
   {
@@ -5436,6 +5449,10 @@ static Sys_var_mybool Sys_slow_query_log(
 static bool check_not_empty_set(sys_var *self, THD *thd, set_var *var)
 {
 #ifdef WITH_WSREP
+
+  if (var->save_result.ulonglong_value == 0)
+    return true;
+
   /* Trying to switch off log_output or setting it to FILE is allowed. */
   if (var->save_result.ulonglong_value == LOG_NONE  ||
       var->save_result.ulonglong_value == LOG_FILE)

@@ -3478,9 +3478,8 @@ int init_common_variables()
     }
   }
 
-  /* log_output (recommended value = FILE) */
-  if (wsrep_provider_loaded &&
-      !((log_output_options & LOG_NONE) || (log_output_options & LOG_FILE)))
+  /* log_output (recommended value = FILE/NONE) */
+  if (wsrep_provider_loaded && (log_output_options & LOG_TABLE))
   {
     switch(pxc_strict_mode)
     {

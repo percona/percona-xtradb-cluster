@@ -5978,8 +5978,7 @@ restart:
       thd->lex->sql_command== SQLCOM_LOAD           ||
       thd->lex->sql_command== SQLCOM_DELETE);
 
-  legacy_db_type db_type=
-    ((*start)->table ? (*start)->table->file->ht->db_type : DB_TYPE_UNKNOWN);
+  legacy_db_type db_type= (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
 
   if (db_type != DB_TYPE_INNODB   &&
       db_type != DB_TYPE_UNKNOWN  &&
@@ -6025,8 +6024,8 @@ restart:
     }
   }
 
-  if (is_dml_stmt                    &&
-      tbl->s->primary_key == MAX_KEY &&
+  if (is_dml_stmt                           &&
+      tbl && tbl->s->primary_key == MAX_KEY &&
       !is_temporary_table(tables))
   {
     /* Table doesn't have explicit primary-key defined. */

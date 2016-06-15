@@ -805,15 +805,9 @@ bool pxc_strict_mode_check(sys_var *self, THD* thd, set_var* var)
   /* pxc-strict-mode can be changed only if node is cluster-node. */
   if (!(WSREP(thd)))
   {
-    bool disabling=
-      (var->save_result.ulonglong_value == PXC_STRICT_MODE_DISABLED);
-
-    if (!disabling)
-    {
-      WSREP_ERROR("pxc_strict_mode can be changed only if node is cluster-node");
-      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-               pxc_strict_mode_to_string(var->save_result.ulonglong_value));
-    }
+    WSREP_ERROR("pxc_strict_mode can be changed only if node is cluster-node");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             pxc_strict_mode_to_string(var->save_result.ulonglong_value));
     return true;
   }
 
