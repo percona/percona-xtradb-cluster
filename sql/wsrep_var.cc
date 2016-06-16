@@ -762,11 +762,11 @@ bool wsrep_replicate_myisam_check(sys_var *self, THD* thd, set_var* var)
   case PXC_STRICT_MODE_DISABLED:
     break;
   case PXC_STRICT_MODE_PERMISSIVE:
-    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommends use of MyISAM"
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
                " table replication as it is an experimental feature"); 
     push_warning (thd, Sql_condition::SL_WARNING,
                   ER_WRONG_VALUE_FOR_VAR,
-                  "Percona-XtraDB-Cluster doesn't recommends use of MyISAM"
+                  "Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
                   " table replication as it is an experimental feature");
     break;
   case PXC_STRICT_MODE_ENFORCING:

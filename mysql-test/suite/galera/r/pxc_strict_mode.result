@@ -1,7 +1,7 @@
 #node-1
 #node-1
 set global pxc_strict_mode='DISABLED';
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommends use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML on table .* created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
@@ -32,7 +32,7 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE 
 call mtr.add_suppression("WSREP doesn't support XA transaction");
 #node-2
 set global pxc_strict_mode='DISABLED';
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommends use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML on table");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
@@ -156,7 +156,7 @@ PERMISSIVE
 create table tmyisam (i int, primary key pk(i)) engine=myisam;
 set session wsrep_replicate_myisam=1;
 Warnings:
-Warning	1231	Percona-XtraDB-Cluster doesn't recommends use of MyISAM table replication as it is an experimental feature
+Warning	1231	Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature
 insert into tmyisam values (1), (2);
 Warnings:
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of DML on table created with non-transactional storage engine
@@ -451,7 +451,7 @@ drop table tmyisam;
 #node-1
 set session wsrep_replicate_myisam = 1;
 Warnings:
-Warning	1231	Percona-XtraDB-Cluster doesn't recommends use of MyISAM table replication as it is an experimental feature
+Warning	1231	Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature
 select @@wsrep_replicate_myisam;
 @@wsrep_replicate_myisam
 1

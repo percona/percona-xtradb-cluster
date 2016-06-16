@@ -3443,7 +3443,7 @@ int init_common_variables()
     case PXC_STRICT_MODE_DISABLED:
         break;
     case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommends use of MyISAM"
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
                    " table replication as it is an experimental feature");
         break;
     case PXC_STRICT_MODE_ENFORCING:

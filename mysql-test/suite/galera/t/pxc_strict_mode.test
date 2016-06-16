@@ -14,18 +14,19 @@
 # let's cache the default value first.
 --connection node_1
 --echo #node-1
---let $pxc_strict_mode_saved1 = `SELECT @@pxc_strict_mode`
 --let restartdir= $MYSQLTEST_VARDIR/tmp/restartdir
 --mkdir $restartdir
 
 --connection node_1
 --echo #node-1
---let $pxc_strict_mode_saved2 = `SELECT @@pxc_strict_mode`
+
+# save the mode that mtr is using for running test-case
+--let $pxc_strict_mode_saved1 = `SELECT @@pxc_strict_mode`
 
 # to allow insertion in add_suppression table.
 set global pxc_strict_mode='DISABLED';
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommends use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML on table .* created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
@@ -65,10 +66,13 @@ call mtr.add_suppression("WSREP doesn't support XA transaction");
 --connection node_2
 --echo #node-2
 
+# save the mode that mtr is using for running test-case
+--let $pxc_strict_mode_saved2 = `SELECT @@pxc_strict_mode`
+
 # to allow insertion in add_suppression table.
 set global pxc_strict_mode='DISABLED';
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommends use of MyISAM table replication as it is an experimental feature");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of DML on table");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
