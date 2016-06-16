@@ -17,6 +17,12 @@
 ##############################################################################
 # Some common macro definitions
 ##############################################################################
+%define galera_src_dir percona-xtradb-cluster-galera
+%define galera_docs /usr/share/doc/%{galera_src_dir}
+
+%define galera_src_dir2 percona-xtradb-cluster-garbd-3
+%define galera_docs2 /usr/share/doc/%{galera_src_dir2}
+
 Prefix: %{_prefix}
 Prefix: %{_sysconfdir}
 # NOTE: "vendor" is used in upgrade/downgrade check, so you can't
@@ -45,6 +51,36 @@ Prefix: %{_sysconfdir}
   %define TOKUDB_DEBUG_OFF %{nil}
 %endif
 #
+
+%if 0%{?rhel} < 6
+ %define boost_req boost141-devel
+ %define gcc_req gcc44-c++
+%else
+ %define boost_req boost-devel
+ %define gcc_req gcc-c++
+%endif
+
+%if %{undefined scons_args}
+ %define scons_args %{nil}
+%endif
+
+%if %{undefined galera_version}
+ %define galera_version 3.12
+%endif
+
+%if %{undefined galera_revision}
+ %define galera_revision %{revision}
+%endif
+
+%if %{undefined pxcg_revision}
+ %define pxcg_revision %{revno}
+%endif
+
+%ifarch i686
+ %define scons_arch arch=i686
+%else
+ %define scons_arch %{nil}
+%endif
 
 %define mysqld_user     mysql
 %define mysqld_group    mysql
@@ -165,6 +201,14 @@ Prefix: %{_sysconfdir}
 # ----------------------------------------------------------------------------
 # Distribution support
 # ----------------------------------------------------------------------------
+
+%if 0%{?rhel} > 6
+    %define distro_req           chkconfig nmap
+%else
+    %define distro_req           chkconfig nc
+%endif
+
+
 %if %{undefined distro_specific}
 %define distro_specific 0
 %endif
@@ -175,13 +219,13 @@ Prefix: %{_sysconfdir}
       %define distro_description        Oracle Enterprise Linux 4
       %define distro_releasetag         oel4
       %define distro_buildreq           gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
-      %define distro_requires           chkconfig coreutils grep procps shadow-utils
+      %define distro_requires           chkconfig coreutils grep procps shadow-utils %distro_req
     %else
       %if "%oelver" == "5"
         %define distro_description      Oracle Enterprise Linux 5
         %define distro_releasetag       oel5
         %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
-        %define distro_requires         chkconfig coreutils grep procps shadow-utils
+        %define distro_requires         chkconfig coreutils grep procps shadow-utils %distro_req
       %else
         %{error:Oracle Enterprise Linux %{oelver} is unsupported}
       %endif
@@ -189,19 +233,33 @@ Prefix: %{_sysconfdir}
   %else
     %if %(test -f /etc/redhat-release && echo 1 || echo 0)
       %define rhelver %(rpm -qf --qf '%%{version}\\n' /etc/redhat-release | sed -e 's/^\\([0-9]*\\).*/\\1/g')
-      %if "%rhelver" == "4"
+      %if 0%{?rhel} < 5
         %define distro_description      Red Hat Enterprise Linux 4
         %define distro_releasetag       rhel4
         %define distro_buildreq         gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
-        %define distro_requires         chkconfig coreutils grep procps shadow-utils
+        %define distro_requires         chkconfig coreutils grep procps shadow-utils %distro_req
       %else
-        %if "%rhelver" == "5"
+        %if 0%{?rhel} < 6
           %define distro_description    Red Hat Enterprise Linux 5
           %define distro_releasetag     rhel5
           %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
-          %define distro_requires       chkconfig coreutils grep procps shadow-utils
+          %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
         %else
-          %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
+          %if 0%{?rhel} < 7
+            %define distro_description    Red Hat Enterprise Linux 6
+            %define distro_releasetag     rhel6
+            %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+            %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+          else
+            %if 0%{?rhel} < 7
+              %define distro_description    Red Hat Enterprise Linux 7
+              %define distro_releasetag     rhel7
+              %define distro_buildreq       gcc-c++ gperf ncurses-devel perl readline-devel time zlib-devel libaio-devel bison cmake
+              %define distro_requires       chkconfig coreutils grep procps shadow-utils %distro_req
+            else
+              %{error:Red Hat Enterprise Linux %{rhelver} is unsupported}
+            %endif
+          %endif    
         %endif
       %endif
     %else
@@ -281,12 +339,14 @@ Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LA
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix}
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
+BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
+Conflicts: Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-galera-3
 
 # Think about what you use here since the first step is to
 # run a rm -rf
@@ -313,9 +373,9 @@ This is a meta-package which installs server, client and galera-3.
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
 %if "%rhel" == "5"
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-garbd-3 Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo
 %else
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-garbd-3 Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo
 %endif
 
 %description -n Percona-XtraDB-Cluster-full%{product_suffix}
@@ -326,7 +386,7 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-3 percona-xtrabackup-24 >= 2.4.3 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} percona-xtrabackup-24 >= 2.4.3 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -495,6 +555,28 @@ Conflicts:      Percona-XtraDB-Cluster-shared-56
 This package contains the shared compat libraries for Percona Server %{compatver}-%{percona_compatver} client
 applications.
 %endif
+
+
+%package -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+Summary:	Garbd component of Percona XtraDB Cluster
+Group:		Applications/Databases
+Provides:       garbd3
+Requires:       %{distro_requires}
+%if 0%{?systemd}
+BuildRequires:  systemd
+%endif
+%if 0%{?systemd}
+Requires(post):   systemd
+Requires(preun):  systemd
+Requires(postun): systemd
+%else
+Requires(post):   /sbin/chkconfig
+Requires(preun):  /sbin/chkconfig
+Requires(preun):  /sbin/service
+%endif
+
+%description -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+This package contains the garb binary and init scripts.
 
 ##############################################################################
 %prep
@@ -691,6 +773,15 @@ fi
 mkdir -p "$(dirname $RPM_BUILD_DIR/%{_libdir})"
 mv $RBR%{_libdir} $RPM_BUILD_DIR/%{_libdir}
 
+pushd percona-xtradb-cluster-galera
+%if 0%{?rhel} < 6
+  export CC=gcc44
+  export CXX=g++44
+%endif
+scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd libgalera_smm.so %{scons_arch} %{scons_args}
+popd
+
+
 ##############################################################################
 %install
 
@@ -804,6 +895,54 @@ rm -f $RBR%{_bindir}/ps_tokudb_admin
 rm -rf $RBR%{_sysconfdir}/init.d/mysql
 %endif
 
+
+install -d $RBR%{_sysconfdir}/{init.d,sysconfig}
+install -m 644 $MBD/%{galera_src_dir}/garb/files/garb.cnf \
+    $RBR%{_sysconfdir}/sysconfig/garb
+install -d "$RBR/%{_bindir}"
+install -d "$RBR/%{_libdir}"
+install -d "$RBR/%{_sharedstatedir}/galera"
+
+%if 0%{?systemd}
+install -D -m 644 $MBD/%{galera_src_dir}/garb/files/garb.service \
+    $RBR/%{_unitdir}/garb.service
+install -m 755 $MBD/%{galera_src_dir}/garb/files/garb-systemd \
+    $RBR/%{_bindir}/garb-systemd
+%else
+install -m 755 $MBD/%{galera_src_dir}/garb/files/garb.sh \
+    $RBR%{_sysconfdir}/init.d/garb
+%endif
+
+install -m 755 "$MBD/%{galera_src_dir}/garb/garbd" \
+  "$RBR/%{_bindir}/"
+install -d "$RBR/%{_libdir}/galera3"
+install -m 755 "$MBD/%{galera_src_dir}/libgalera_smm.so" \
+  "$RBR/%{_libdir}/galera3/"
+ln -s "galera3/libgalera_smm.so" "$RBR/%{_libdir}/"
+
+install -d $RBR%{galera_docs}
+install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
+    $RBR%{galera_docs}/COPYING
+install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+    $RBR%{galera_docs}/README
+install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README-MySQL \
+    $RBR%{galera_docs}/README-MySQL
+install -m 644 $MBD/%{galera_src_dir}/asio/LICENSE_1_0.txt    \
+    $RBR%{galera_docs}/LICENSE.asio
+install -m 644 $MBD/%{galera_src_dir}/www.evanjones.ca/LICENSE \
+    $RBR%{galera_docs}/LICENSE.crc32c
+install -m 644 $MBD/%{galera_src_dir}/chromium/LICENSE       \
+    $RBR%{galera_docs}/LICENSE.chromium
+
+install -d $RBR%{galera_docs2}
+install -m 644 $MBD/%{galera_src_dir}/COPYING                     \
+    $RBR%{galera_docs2}/COPYING
+install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
+    $RBR%{galera_docs2}/README
+
+install -d $RBR%{_mandir}/man8
+install -m 644 $MBD/%{galera_src_dir}/man/garbd.8  \
+    $RBR%{_mandir}/man8/garbd.8
 ##############################################################################
 #  Post processing actions, i.e. when installed
 ##############################################################################
@@ -1346,6 +1485,17 @@ fi
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
+%attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
+# This is a symlink
+%attr(0755,root,root) %{_libdir}/libgalera_smm.so
+%attr(0755,root,root) %{_libdir}/galera3/libgalera_smm.so
+%attr(0755,root,root) %dir %{galera_docs}
+%doc %attr(0644,root,root) %{galera_docs}/COPYING
+%doc %attr(0644,root,root) %{galera_docs}/README
+%doc %attr(0644,root,root) %{galera_docs}/README-MySQL
+%doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
+%doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
+%doc %attr(0644,root,root) %{galera_docs}/LICENSE.chromium
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}
@@ -1401,6 +1551,37 @@ fi
 %attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
 %endif
 
+# ----------------------------------------------------------------------------
+%files -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%defattr(-,root,root,-)
+%config(noreplace,missingok) %{_sysconfdir}/sysconfig/garb
+%attr(0755,nobody,nobody) %dir %{_sharedstatedir}/galera
+%if 0%{?systemd}
+    %attr(0644, root, root) %{_unitdir}/garb.service
+    %attr(0755,root,root) %{_bindir}/garb-systemd
+%else
+    %attr(0755,root,root) %{_sysconfdir}/init.d/garb
+%endif
+%attr(0755,root,root) %{_bindir}/garbd
+%doc %attr(0644,root,root) %{galera_docs2}/COPYING
+%doc %attr(0644,root,root) %{galera_docs2}/README
+%doc %attr(644, root, man) %{_mandir}/man8/garbd.8*
+
+%post -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%if 0%{?systemd}
+  %systemd_post garb
+%endif
+
+%preun -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%if 0%{?systemd}
+    %systemd_preun garb
+%endif
+
+%postun -n Percona-XtraDB-Cluster-garbd%{product_suffix}
+%if 0%{?systemd}
+    %systemd_postun_with_restart garb
+%endif
+# ----------------------------------------------------------------------------
 %if 0%{?compatlib}
 %files -n Percona-XtraDB-Cluster-shared-compat%{product_suffix}
 %defattr(-, root, root, -)
@@ -1506,6 +1687,10 @@ fi
 # merging BK trees)
 ##############################################################################
 %changelog
+* Thu Jun 16 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
+
+- Build galera with pxc as galera becomes submodule
+
 * Thu May 26 2016 Evgeniy Patlan <evgeniy.patlan@percona.com>
 
 - Returned metapackage build and update PXB dependency
@@ -2282,3 +2467,4 @@ fi
 - A developers changelog for MySQL is available in the source RPM. And
   there is a history of major user visible changed in the Reference
   Manual.  Only RPM specific changes will be documented here.
+
