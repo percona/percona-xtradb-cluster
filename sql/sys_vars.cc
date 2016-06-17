@@ -940,25 +940,65 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     return true;
 
 #ifdef WITH_WSREP
-  /* Galera does not support STATEMENT or MIXED binlog
-  format currently */
-  if (WSREP(thd) &&
-     (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
-      var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED))
+
+  bool block= false;
+
+  bool stmt_or_mixed=
+   (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
+    var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
+
+  if (WSREP(thd) && stmt_or_mixed && var->type == OPT_GLOBAL)
   {
-    WSREP_DEBUG("PXC does not support binlog format : %s",
-                var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
-                "STATEMENT" : "MIXED");
-    WSREP_DEBUG("This is meant only for simple tasks/tools like checksumming");
-    /* Push also warning, because error message is general */
-     push_warning_printf(thd, Sql_condition::SL_WARNING,
-                        ER_UNKNOWN_ERROR,
-                        "PXC does not support binlog format: %s",
-                        var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
-                        "STATEMENT" : "MIXED");
-    if (var->type == OPT_GLOBAL)
-        return true;
+    /* Toggline binlog-format at GLOBAL level to MIXED/STATEMENT
+    is not allowed. pxc-string-mode check will be evaluated
+    only for SESSION level setting. */
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
+                " to STATEMENT/MIXED (anything other than ROW)");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
+             "STATEMENT" : "MIXED");
+    return true;
   }
+
+  /* pxc-strict-mode enforcement. */
+  if (WSREP(thd))
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+    {
+      if (stmt_or_mixed)
+      {
+        WSREP_WARN("Percona-XtraDB-Cluster recommends setting binlog_format"
+                   " to ROW");
+        push_warning (thd, Sql_condition::SL_WARNING,
+                      ER_WRONG_VALUE_FOR_VAR,
+                      "Percona-XtraDB-Cluster recommends setting binlog_format"
+                      " to ROW");
+      }
+      break;
+    }
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+    {
+      if (stmt_or_mixed)
+      {
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
+                    " to STATEMENT/MIXED (anything other than ROW)");
+        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+                 var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
+                 "STATEMENT" : "MIXED");
+        block= true;
+      }
+    }
+    }
+  }
+
+  if (block)
+    return block;
 #endif /* WITH_WSREP */
 
   if (var->type == OPT_GLOBAL)
@@ -4277,6 +4317,41 @@ static Sys_var_uint Sys_threadpool_max_threads(
 
 static bool check_tx_isolation(sys_var *self, THD *thd, set_var *var)
 {
+#ifdef WITH_WSREP
+    bool block= false;
+
+    enum_tx_isolation new_level=
+      (enum_tx_isolation) var->save_result.ulonglong_value;
+
+    if (new_level == ISO_SERIALIZABLE)
+    {
+      switch(pxc_strict_mode)
+      {
+      case PXC_STRICT_MODE_DISABLED:
+      case PXC_STRICT_MODE_MASTER:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend using"
+                   " SERIALIZABLE isolation mode with multi-node workload");
+        push_warning (thd, Sql_condition::SL_WARNING,
+                      ER_WRONG_VALUE_FOR_VAR,
+                      "Percona-XtraDB-Cluster doesn't recommend using"
+                      " SERIALIZABLE isolation mode with multi-node workload");
+        break;
+      case PXC_STRICT_MODE_ENFORCING:
+        block= true;
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits using SERIALIZABLE"
+                    " isolation mode");
+        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+                 "SERIALIZABLE");
+      }
+    }
+
+    if (block)
+      return block;
+#endif /* WITH_WSREP */
+
+
   if (var->type == OPT_DEFAULT && (thd->in_active_multi_stmt_transaction() ||
                                    thd->in_sub_stmt))
   {
@@ -5373,6 +5448,42 @@ static Sys_var_mybool Sys_slow_query_log(
 
 static bool check_not_empty_set(sys_var *self, THD *thd, set_var *var)
 {
+#ifdef WITH_WSREP
+
+  if (var->save_result.ulonglong_value == 0)
+    return true;
+
+  /* Trying to switch off log_output or setting it to FILE is allowed. */
+  if (var->save_result.ulonglong_value == LOG_NONE  ||
+      var->save_result.ulonglong_value == LOG_FILE)
+    return false;
+  
+  bool block= false;
+  switch(pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster recommends setting log_output to FILE");
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster recommends setting log_output"
+                  " to FILE");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  case PXC_STRICT_MODE_MASTER:
+  default:
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting log_output"
+                " to TABLE (anything other than FILE/NONE)");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value == LOG_TABLE ?
+             "TABLE" : "UNKNOWN");
+    break;
+  }
+
+  return block;
+#endif /* WITH_WSREP */
+
   return var->save_result.ulonglong_value == 0;
 }
 static bool fix_log_output(sys_var *self, THD *thd, enum_var_type type)
@@ -5979,7 +6090,9 @@ static Sys_var_mybool Sys_wsrep_recover_datadir(
 
 static Sys_var_mybool Sys_wsrep_replicate_myisam(
        "wsrep_replicate_myisam", "To enable myisam replication",
-       SESSION_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       SESSION_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG),
+       DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+       ON_CHECK(wsrep_replicate_myisam_check), ON_UPDATE(0));
 
 static Sys_var_mybool Sys_wsrep_log_conflicts(
        "wsrep_log_conflicts", "To log multi-master conflicts",
@@ -6016,6 +6129,14 @@ static Sys_var_mybool Sys_wsrep_dirty_reads(
        "Allow reads from a node is not in primary component",
        SESSION_VAR(wsrep_dirty_reads),
        CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static const char *pxc_strict_modes[]= { "DISABLED", "PERMISSIVE", "ENFORCING", "MASTER", NullS };
+static Sys_var_enum Sys_pxc_strict_mode (
+       "pxc_strict_mode", "PXC strict mode help control behavior of experimental features",
+       GLOBAL_VAR(pxc_strict_mode), CMD_LINE(OPT_ARG),
+       pxc_strict_modes, DEFAULT(PXC_STRICT_MODE_ENFORCING),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(pxc_strict_mode_check),
+       ON_UPDATE(0));
 
 #endif /* WITH_WSREP */
 

@@ -38,6 +38,10 @@ my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
 rpl_sidno wsrep_sidno= -1;
 my_bool wsrep_preordered_opt= FALSE;
 
+/* If set to true the said set statement is replicated across the cluster
+using TOI */
+bool     wsrep_replicate_set_stmt = false;
+
 /*
  * Begin configuration options and their default values
  */
@@ -70,6 +74,10 @@ my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
                                             // restart will be needed
 my_bool wsrep_slave_UK_checks          = 0; // slave thread does UK checks
 my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
+
+/* pxc-strict-mode help control behavior of experimental features like
+myisam table replication, etc... */
+ulong   pxc_strict_mode                = PXC_STRICT_MODE_ENFORCING;
 /*
  * End configuration options
  */
@@ -474,7 +482,7 @@ int wsrep_init()
     }
   }
 
-  if (strlen(wsrep_provider)== 0 ||
+  if (strlen(wsrep_provider) == 0 ||
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified

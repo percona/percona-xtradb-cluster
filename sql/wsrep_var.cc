@@ -745,3 +745,133 @@ void wsrep_free_status (THD* thd)
     thd->wsrep_status_vars = 0;
   }
 }
+
+
+bool wsrep_replicate_myisam_check(sys_var *self, THD* thd, set_var* var)
+{
+  /* Trying to set wsrep_replicate_myisam to off. */
+  if (var->save_result.ulonglong_value == 0)
+    return false;
+
+  /* If pxc-strict-mode >= ENFORCING we don't allow setting
+  wsrep_replicate_myisam to ON. */
+  bool block= false;
+
+  switch(pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
+               " table replication as it is an experimental feature"); 
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
+                  " table replication as it is an experimental feature");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  case PXC_STRICT_MODE_MASTER:
+  default:
+    block= true;
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of MyISAM"
+                " table replication as it is an experimental feature");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value ? "ON" : "OFF");
+    break;
+  }
+
+  return block;
+}
+
+static const char* pxc_strict_mode_to_string(ulong value)
+{
+  switch(value)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+    return "DISABLED";
+  case PXC_STRICT_MODE_PERMISSIVE:
+    return "PERMISSIVE";
+  case PXC_STRICT_MODE_ENFORCING:
+    return "ENFORCING";
+  case PXC_STRICT_MODE_MASTER:
+    return "MASTER";
+  default:
+    return "NULL";
+  }
+}
+
+bool pxc_strict_mode_check(sys_var *self, THD* thd, set_var* var)
+{
+  /* pxc-strict-mode can be changed only if node is cluster-node. */
+  if (!(WSREP(thd)))
+  {
+    WSREP_ERROR("pxc_strict_mode can be changed only if node is cluster-node");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             pxc_strict_mode_to_string(var->save_result.ulonglong_value));
+    return true;
+  }
+
+  bool enforcing_strictness= false;
+  bool block= false;
+
+  if (pxc_strict_mode <= PXC_STRICT_MODE_PERMISSIVE &&
+      var->save_result.ulonglong_value >= PXC_STRICT_MODE_ENFORCING)
+    enforcing_strictness= true;
+
+  if (enforcing_strictness)
+  {
+    /* wsrep_replicate_myisam shouldn't be OFF
+    TODO: Mutex ordering ? */
+    bool replicate_myisam;
+    replicate_myisam= (global_system_variables.wsrep_replicate_myisam ||
+                       thd->variables.wsrep_replicate_myisam);
+
+    bool row_binlog_format;
+    row_binlog_format=
+      (global_system_variables.binlog_format == BINLOG_FORMAT_ROW &&
+       thd->variables.binlog_format == BINLOG_FORMAT_ROW);
+
+    bool safe_log_output;
+    safe_log_output=
+       ((log_output_options & LOG_NONE) || (log_output_options & LOG_FILE));
+
+    bool serializable;
+    serializable= (thd->tx_isolation == ISO_SERIALIZABLE ||
+                   global_system_variables.tx_isolation == ISO_SERIALIZABLE);
+
+    /* replicate_myisam = off
+       row_binlog_format = true (row)
+       safe_log_output = true (none/file)
+       serializable = false */
+    block = !(!replicate_myisam &&
+              row_binlog_format &&
+              safe_log_output   &&
+              !serializable);
+
+    if (replicate_myisam)
+      WSREP_ERROR("Can't change strict-mode with wsrep_replicate_myisam"
+                  " turned ON");
+
+    if (!row_binlog_format)
+      WSREP_ERROR("Can't change strict-mode while binlog format != ROW");
+
+    if (!safe_log_output)
+      WSREP_ERROR("Can't change strict-mode while log_output != NONE/FILE");
+
+    if (serializable)
+      WSREP_ERROR("Can't change strict-mode while isolation level is"
+                  " SERIALIZABLE");
+
+    if (block)
+    {
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+               pxc_strict_mode_to_string(var->save_result.ulonglong_value));
+    }
+  }
+
+  if (!block)
+    wsrep_replicate_set_stmt= true;
+
+  return(block);
+}
+

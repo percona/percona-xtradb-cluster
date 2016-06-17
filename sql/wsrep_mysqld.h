@@ -64,6 +64,8 @@ enum wsrep_consistency_check_mode {
 // Global wsrep parameters
 extern wsrep_t*    wsrep;
 
+extern bool        wsrep_replicate_set_stmt;
+
 // MySQL wsrep options
 extern const char* wsrep_provider;
 extern const char* wsrep_provider_options;
@@ -120,6 +122,14 @@ enum enum_wsrep_sync_wait {
     WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE = 0x4,
     WSREP_SYNC_WAIT_MAX = 0x7
 };
+
+enum enum_pxc_strict_modes {
+    PXC_STRICT_MODE_DISABLED = 0,
+    PXC_STRICT_MODE_PERMISSIVE,
+    PXC_STRICT_MODE_ENFORCING,
+    PXC_STRICT_MODE_MASTER
+};
+extern ulong       pxc_strict_mode;
 
 // MySQL status variables
 extern my_bool     wsrep_connected;

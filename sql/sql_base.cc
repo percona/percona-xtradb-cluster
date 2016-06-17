@@ -5968,27 +5968,117 @@ restart:
     }
 
 #ifdef WITH_WSREP
+   bool is_dml_stmt=
+     (thd->lex->sql_command== SQLCOM_INSERT         ||
+      thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
+      thd->lex->sql_command== SQLCOM_REPLACE        ||
+      thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
+      thd->lex->sql_command== SQLCOM_UPDATE         ||
+      thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
+      thd->lex->sql_command== SQLCOM_LOAD           ||
+      thd->lex->sql_command== SQLCOM_DELETE);
+
+  legacy_db_type db_type= (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
+
+  if (db_type != DB_TYPE_INNODB   &&
+      db_type != DB_TYPE_UNKNOWN  &&
+      is_dml_stmt                 &&
+      !is_temporary_table(tables))
+  {
+    /* Table is not an InnoDB table and workload is trying to make changes
+    to the table. Validate workload based on pxc-strict-mode. */
+
+    bool block= false;
+    switch (pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of DML"
+                 " on table (%s) created with non-transactional storage"
+                 " engine", tbl->s->table_name.str);
+      push_warning_printf(thd, Sql_condition::SL_WARNING,
+                          ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of DML"
+                          " on table created with non-transactional storage"
+                          " engine");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block= true;
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of DML"
+                 " on table (%s) created with non-transactional storage engine",
+                 tbl->s->table_name.str);
+      my_message(ER_UNKNOWN_ERROR,
+                 "Percona-XtraDB-Cluster prohibits use of DML"
+                 " on table created with non-transactional storage engine",
+                 MYF(0));
+      break;
+    }
+
+    if (block)
+    {
+      error= TRUE;
+      goto err;
+    }
+  }
+
+  if (is_dml_stmt                           &&
+      tbl && tbl->s->primary_key == MAX_KEY &&
+      !is_temporary_table(tables))
+  {
+    /* Table doesn't have explicit primary-key defined. */
+
+    bool block= false;
+    switch (pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of DML"
+                 " on table (%s) without an explicit primary key",
+                 tbl->s->table_name.str);
+      push_warning_printf(thd, Sql_condition::SL_WARNING,
+                          ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of DML"
+                          " on table without an explicit primary key");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block= true;
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of DML"
+                  " on table (%s) without an explicit primary key",
+                  tbl->s->table_name.str);
+      my_message(ER_UNKNOWN_ERROR,
+                 "Percona-XtraDB-Cluster prohibits use of DML"
+                 " on table without an explicit primary key",
+                 MYF(0));
+      break;
+    }
+
+    if (block)
+    {
+      error= TRUE;
+      goto err;
+    }
+  }
+
   /* It is not recommended to replicate MyISAM as it lacks rollback feature
   but if user demands then actions are replicated using TOI.
   Following code will kick-start the TOI but this has to be done only once
   per statement.
   Note: kick-start will take-care of creating isolation key for all tables
   involved in the list (provided all of them are MYISAM tables). */
-  if ((thd->lex->sql_command== SQLCOM_INSERT         ||
-       thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
-       thd->lex->sql_command== SQLCOM_REPLACE        ||
-       thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
-       thd->lex->sql_command== SQLCOM_UPDATE         ||
-       thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
-       thd->lex->sql_command== SQLCOM_LOAD           ||
-       thd->lex->sql_command== SQLCOM_DELETE)        &&
+  if (is_dml_stmt                                    &&
       thd->variables.wsrep_replicate_myisam          &&
-      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM &&
+      db_type == DB_TYPE_MYISAM                      &&
       thd->wsrep_exec_mode== LOCAL_STATE)
-    {
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
-    }
- error:
+  {
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
+  }
+error:
 #endif /* WITH_WSREP */
 
     /* Set appropriate TABLE::lock_type. */

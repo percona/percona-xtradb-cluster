@@ -3411,6 +3411,117 @@ int init_common_variables()
   if (get_options(&remaining_argc, &remaining_argv))
     return 1;
 
+#ifdef WITH_WSREP
+
+  /* We could have checked these in wsrep_check_opts but then part of them
+  are dependent on pxc-strict-mode. While we could have parsed value of
+  pxc-strict-mode, validation for valid value would be difficult. */
+  bool wsrep_provider_loaded= !(strlen(wsrep_provider) == 0 ||
+                                !strcmp(wsrep_provider, WSREP_NONE));
+
+  if (wsrep_provider_loaded == false)
+  {
+    /* Node is not a cluster node pxc-strict-mode will be defaulted
+    to DISABLED */
+    WSREP_WARN("Node is not a cluster node. Disabling pxc_strict_mode");
+    pxc_strict_mode= PXC_STRICT_MODE_DISABLED;
+  }
+
+  if (wsrep_provider_loaded && wsrep_desync)
+  {
+    WSREP_ERROR("Can't desync a node even before it is synced with cluster");
+    return 1;
+  }
+
+  /* Validate if server initial settings are pxc-strict-mode compatible.*/
+
+  /* wsrep_replicate_myisam (recommended value = OFF) */
+  if (wsrep_provider_loaded && global_system_variables.wsrep_replicate_myisam)
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+        break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
+                   " table replication as it is an experimental feature");
+        break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of MyISAM"
+                    " table replication as it is an experimental feature");
+        return 1;
+        break;
+    }
+  }
+
+  /* binlog_format (recommended value = ROW) */
+  if (wsrep_provider_loaded &&
+      global_system_variables.binlog_format != BINLOG_FORMAT_ROW)
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+        break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster recommends setting binlog_format"
+                   " to ROW");
+        break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
+                    " to STATEMENT/MIXED (anything other than ROW)");
+        return 1;
+        break;
+    }
+  }
+
+  /* log_output (recommended value = FILE/NONE) */
+  if (wsrep_provider_loaded && (log_output_options & LOG_TABLE))
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+        break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster recommends setting log_output"
+                   " to FILE");
+        break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting log_output"
+                    " to TABLE (anything other than FILE/NONE)");
+        return 1;
+        break;
+    }
+  }
+
+  /* innodb_autoinc_lock_mode (recommended value = Interleaved/2) */
+  if (wsrep_provider_loaded &&
+      !((log_output_options & LOG_NONE) || (log_output_options & LOG_FILE)))
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+        break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster recommends setting"
+                   " innodb_autoinc_lock_mode = Interleaved/2");
+        break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+        WSREP_ERROR("Percona-XtraDB-Cluster requires"
+                    " innodb_autoinc_lock_mode = Interleaved/2");
+        return 1;
+        break;
+    }
+  }
+#endif /* WITH_WSREP */
+
   update_parser_max_mem_size();
 
   if (log_syslog_init())
@@ -4454,14 +4565,6 @@ static int init_server_components()
     sql_print_error("Out of memory");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
-
-#ifdef WITH_WSREP
-  if (WSREP_ON && wsrep_desync)
-  {
-    sql_print_error("Can't desync a node even before it is synced with cluster");
-    unireg_abort(1);
-  }
-#endif /* WITH_WSREP */
 
   /*
     initialize delegates for extension observers, errors have already

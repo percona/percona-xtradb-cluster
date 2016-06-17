@@ -5455,6 +5455,37 @@ longlong Item_func_get_lock::val_int()
   DBUG_ENTER("Item_func_get_lock::val_int");
 
   null_value= TRUE;
+
+#ifdef WITH_WSREP
+  bool block= false;
+
+  switch (pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+  case PXC_STRICT_MODE_MASTER:
+    /* Do nothing */
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+               " GET_LOCK/RELEASE_LOCK");
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster doesn't recommend use of"
+                  " GET_LOCK/RELEASE_LOCK");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  default:
+    block= true;
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+             "Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
+    break;
+  }
+
+  if (block)
+   DBUG_RETURN(0);
+#endif /* WITH_WSREP */
+
   /*
     In slave thread no need to get locks, everything is serialized. Anyway
     there is no way to make GET_LOCK() work on slave like it did on master
@@ -5585,6 +5616,36 @@ longlong Item_func_release_lock::val_int()
   DBUG_ENTER("Item_func_release_lock::val_int");
 
   null_value= TRUE;
+
+#ifdef WITH_WSREP
+  bool block= false;
+
+  switch (pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+  case PXC_STRICT_MODE_MASTER:
+    /* Do nothing */
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+               " GET_LOCK/RELEASE_LOCK");
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster doesn't recommend use of"
+                  " GET_LOCK/RELEASE_LOCK");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  default:
+    block= true;
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+             "Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
+    break;
+  }
+
+  if (block)
+   DBUG_RETURN(0);
+#endif /* WITH_WSREP */
 
   if (check_and_convert_ull_name(name, res))
     DBUG_RETURN(0);
