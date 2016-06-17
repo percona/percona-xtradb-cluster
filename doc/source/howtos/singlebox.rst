@@ -1,135 +1,141 @@
 .. _singe_box:
 
-==========================================
-How to setup 3 node cluster on single box
-==========================================
+==================================================
+How to set up a three-node cluster on a single box
+==================================================
 
-This example shows how to setup 3-node cluster on the single physical box. Assume you installed |Percona XtraDB Cluster| from binary ``.tar.gz`` into directory :: 
+This tutorial describes how to set up a 3-node cluster
+on a single physical box.
 
-/usr/local/Percona-XtraDB-Cluster-5.5.24-23.6.342.Linux.x86_64
+For the purposes of this tutorial, assume the following:
 
-To start the cluster with three nodes, three :file:`my.cnf` mysql configuration files should be created with three separate data directories.
+* The local IP address is ``192.168.2.21``.
+* |PXC| is extracted from binary tarball into
+  :file:`/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64`
 
-For this example we created (see the content of files at the end of document):
+To set up the cluster:
 
- * /etc/my.4000.cnf
- * /etc/my.5000.cnf
- * /etc/my.6000.cnf
+1. Create three MySQL configuration files for the corresponding nodes:
 
-and data directories:
+   * :file:`/etc/my.4000.cnf`
 
- * /data/bench/d1
- * /data/bench/d2
- * /data/bench/d3
+     .. code-block:: none
 
-In this example local IP address is 192.168.2.21
+        [mysqld]
+        port = 4000
+        socket=/tmp/mysql.4000.sock
+        datadir=/data/bench/d1
+        basedir=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64
+        user=mysql
+        log_error=error.log
+        binlog_format=ROW
+        wsrep_cluster_address='gcomm://192.168.2.21:5030,192.168.2.21:6030'
+        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
+        wsrep_sst_receive_address=192.168.2.21:4020
+        wsrep_node_incoming_address=192.168.2.21 
+        wsrep_slave_threads=2
+        wsrep_cluster_name=trimethylxanthine
+        wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:4030;"
+        wsrep_sst_method=rsync
+        wsrep_node_name=node4000
+        innodb_autoinc_lock_mode=2
 
-Then we should be able to start initial node as (from directory :file:`/usr/local/Percona-XtraDB-Cluster-5.6.15-25.3.706.Linux.x86_64`): ::
+   * :file:`/etc/my.5000.cnf`
 
-        bin/mysqld_safe --defaults-file=/etc/my.4000.cnf --wsrep-new-cluster
+     .. code-block:: none
 
-Following output will let out know that node was started successfully: ::
+        [mysqld]
+        port = 5000
+        socket=/tmp/mysql.5000.sock
+        datadir=/data/bench/d2
+        basedir=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64
+        user=mysql
+        log_error=error.log
+        binlog_format=ROW
+        wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:6030'
+        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
+        wsrep_sst_receive_address=192.168.2.21:5020
+        wsrep_node_incoming_address=192.168.2.21 
+        wsrep_slave_threads=2
+        wsrep_cluster_name=trimethylxanthine
+        wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:5030;"
+        wsrep_sst_method=rsync
+        wsrep_node_name=node5000
+        innodb_autoinc_lock_mode=2
 
-        111215 19:01:49 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 0)
-        111215 19:01:49 [Note] WSREP: New cluster view: global state: 4c286ccc-2792-11e1-0800-94bd91e32efa:0, view# 1: Primary, number of nodes: 1, my index: 0, protocol version 1
+   * :file:`/etc/my.6000.cnf`
 
-And you can check used ports: ::
+     .. code-block:: none
+
+        [mysqld]
+        port = 6000
+        socket=/tmp/mysql.6000.sock
+        datadir=/data/bench/d3
+        basedir=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64
+        user=mysql
+        log_error=error.log
+        binlog_format=ROW
+        wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:5030'
+        wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
+        wsrep_sst_receive_address=192.168.2.21:6020
+        wsrep_node_incoming_address=192.168.2.21 
+        wsrep_slave_threads=2
+        wsrep_cluster_name=trimethylxanthine
+        wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:6030;"
+        wsrep_sst_method=rsync
+        wsrep_node_name=node6000
+        innodb_autoinc_lock_mode=2
+
+#. Create three data directories for the nodes:
+
+   * :file:`/data/bench/d1`
+   * :file:`/data/bench/d2`
+   * :file:`/data/bench/d3`
+
+#. Start the first node using the following command
+   (from the |PXC| install directory):
+
+   .. prompt:: bash
+
+      bin/mysqld_safe --defaults-file=/etc/my.4000.cnf --wsrep-new-cluster
+
+   If the node starts correctly, you should see the following output::
+
+    111215 19:01:49 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 0)
+    111215 19:01:49 [Note] WSREP: New cluster view: global state: 4c286ccc-2792-11e1-0800-94bd91e32efa:0, view# 1: Primary, number of nodes: 1, my index: 0, protocol version 1
+
+   To check the ports, run the following command::
         
-        netstat -anp | grep mysqld
+        $ netstat -anp | grep mysqld
         tcp        0      0 192.168.2.21:4030           0.0.0.0:*                   LISTEN      21895/mysqld        
         tcp        0      0 0.0.0.0:4000                0.0.0.0:*                   LISTEN      21895/mysqld 
 
 
-After first node, we start second and third: ::
+#. Start the second and third nodes::
 
-        bin/mysqld_safe --defaults-file=/etc/my.5000.cnf
-        bin/mysqld_safe --defaults-file=/etc/my.6000.cnf
+    bin/mysqld_safe --defaults-file=/etc/my.5000.cnf
+    bin/mysqld_safe --defaults-file=/etc/my.6000.cnf
 
-Successful start will produce the following output: ::
+   If the nodes start and join the cluster successful,
+   you should see the following output::
 
-        111215 19:22:26 [Note] WSREP: Shifting JOINER -> JOINED (TO: 2)
-        111215 19:22:26 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 2)
-        111215 19:22:26 [Note] WSREP: Synchronized with group, ready for connections
+    111215 19:22:26 [Note] WSREP: Shifting JOINER -> JOINED (TO: 2)
+    111215 19:22:26 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 2)
+    111215 19:22:26 [Note] WSREP: Synchronized with group, ready for connections
 
-Cluster size can be checked with the: :: 
+   To check the cluster size, run the following command:: 
 
-        mysql -h127.0.0.1 -P6000 -e "show global status like 'wsrep_cluster_size';"
-        +--------------------+-------+
-        | Variable_name      | Value |
-        +--------------------+-------+
-        | wsrep_cluster_size | 3     |
-        +--------------------+-------+
+    mysql -h127.0.0.1 -P6000 -e "show global status like 'wsrep_cluster_size';"
+    +--------------------+-------+
+    | Variable_name      | Value |
+    +--------------------+-------+
+    | wsrep_cluster_size | 3     |
+    +--------------------+-------+
 
-Now you can connect to any node and create database, which will be automatically propagated to other nodes: ::
+After that you can connect to any node and perform queries,
+which will be automatically synchronized with other nodes.
+For example, to create a database on the second node,
+you can run the following command::
         
-        mysql -h127.0.0.1 -P5000 -e "CREATE DATABASE hello_peter"
+    mysql -h127.0.0.1 -P5000 -e "CREATE DATABASE hello_peter"
 
-Configuration files (/etc/my.4000.cnf): ::
-
-  /etc/my.4000.cnf
-
-  [mysqld]
-  port = 4000
-  socket=/tmp/mysql.4000.sock
-  datadir=/data/bench/d1
-  basedir=/usr/local/Percona-XtraDB-Cluster-5.6.15-25.3.706.Linux.x86_64
-  user=mysql
-  log_error=error.log
-  binlog_format=ROW
-  wsrep_cluster_address='gcomm://192.168.2.21:5030,192.168.2.21:6030'
-  wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.6.15-25.3.706.Linux.x86_64/lib/libgalera_smm.so
-  wsrep_sst_receive_address=192.168.2.21:4020
-  wsrep_node_incoming_address=192.168.2.21 
-  wsrep_slave_threads=2
-  wsrep_cluster_name=trimethylxanthine
-  wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:4030;"
-  wsrep_sst_method=rsync
-  wsrep_node_name=node4000
-  innodb_autoinc_lock_mode=2
-
-
-Configuration files (/etc/my.5000.cnf): ::
-
-  /etc/my.5000.cnf
-
-  [mysqld]
-  port = 5000
-  socket=/tmp/mysql.5000.sock
-  datadir=/data/bench/d2
-  basedir=/usr/local/Percona-XtraDB-Cluster-5.6.15-25.3.706.Linux.x86_64
-  user=mysql
-  log_error=error.log
-  binlog_format=ROW
-  wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:6030'
-  wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.6.15-25.3.706.Linux.x86_64/lib/libgalera_smm.so
-  wsrep_sst_receive_address=192.168.2.21:5020
-  wsrep_node_incoming_address=192.168.2.21 
-  wsrep_slave_threads=2
-  wsrep_cluster_name=trimethylxanthine
-  wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:5030;"
-  wsrep_sst_method=rsync
-  wsrep_node_name=node5000
-  innodb_autoinc_lock_mode=2
-
-Configuration files (/etc/my.6000.cnf): ::
-
-  /etc/my.6000.cnf
-
-  [mysqld]
-  port = 6000
-  socket=/tmp/mysql.6000.sock
-  datadir=/data/bench/d3
-  basedir=/usr/local/Percona-XtraDB-Cluster-5.6.15-25.3.706.Linux.x86_64
-  user=mysql
-  log_error=error.log
-  binlog_format=ROW
-  wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:5030'
-  wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.6.15-25.3.706.Linux.x86_64/lib/libgalera_smm.so
-  wsrep_sst_receive_address=192.168.2.21:6020
-  wsrep_node_incoming_address=192.168.2.21 
-  wsrep_slave_threads=2
-  wsrep_cluster_name=trimethylxanthine
-  wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:6030;"
-  wsrep_sst_method=rsync
-  wsrep_node_name=node6000
-  innodb_autoinc_lock_mode=2

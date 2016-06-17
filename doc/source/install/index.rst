@@ -51,6 +51,9 @@ The following is an example of the :file:`my.cnf` file:
 .. note:: If the SST method is not ``rsync``, specify SST credentials using
    ``wsrep_sst_auth=<user>:<password>``
 
+.. note:: If you enable binary logging by setting ``log-bin=mysql-bin``,
+   you should also provide a unique ``server-id`` for each node.
+
 Installation Guides
 ===================
 
@@ -61,7 +64,7 @@ using the corresponding tool for your system:
 * :ref:`Install using yum <yum>` if you are running Red Hat Enterprise Linux
   or CentOS
 
-.. note:: You can also `download packages <https://www.percona.com/downloads/Percona-XtraDB-Cluster-56/LATEST/>`_ from the Percona website and install them manually using :command:`dpkg` or :command:`rpm`.
+.. note:: You can also `download packages <https://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_ from the Percona website and install them manually using :command:`dpkg` or :command:`rpm`.
 
 If you want to build and run |PXC| from source, see :ref:`compile`.
 

@@ -103,6 +103,8 @@ rst_prolog = '''
 
 .. _`XtraDB`: https://www.percona.com/software/mysql-database/percona-server/xtradb
 
+.. _`Percona XtraBackup`: https://www.percona.com/software/mysql-database/percona-xtrabackup
+
 .. |check|  replace:: ``|[[---CHECK---]]|``
 
 .. |xtrabackup|  replace:: :program:`xtrabackup`

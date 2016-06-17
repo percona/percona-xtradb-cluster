@@ -95,7 +95,7 @@ To compile |PXC| from source code:
    .. note:: The directory for Galera repository
       must be named ``percona-xtradb-cluster-galera``.
 
-4. Check out the ``rel-3.14.2`` branch.
+4. Check out the ``rel-3.16`` branch.
 
 3. Run the build script :file:`./build-ps/build-binary.sh`.
    By default, it will build into the current directory,

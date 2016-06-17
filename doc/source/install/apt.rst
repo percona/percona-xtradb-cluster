@@ -34,7 +34,7 @@ Installing from Repositories
 
       wget https://repo.percona.com/apt/percona-release_0.1-3.$(lsb_release -sc)_all.deb
 
-2. Install the downloaded package with :program:`dpkg`.
+#. Install the downloaded package with :program:`dpkg`.
    To do that, run the following command as root or with :program:`sudo`:
 
    .. prompt:: bash
@@ -45,18 +45,18 @@ Installing from Repositories
    You can check the repository configuration
    in the :file:`/etc/apt/sources.list.d/percona-release.list` file.
 
-3. Enable testing repository.
+#. Enable testing repository.
 
    This is a beta release, which can only be installed from the testing repo.
    For more information, see :ref:`apt-testing-repo`.
 
-4. Update the local cache:
+#. Update the local cache:
 
    .. prompt:: bash
 
       sudo apt-get update
 
-5. Install the server package:
+#. Install the server package:
 
    .. prompt:: bash
 

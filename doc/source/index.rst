@@ -44,6 +44,7 @@ Introduction
    :glob:
 
    intro
+   limitation
 
 Installation
 ============
