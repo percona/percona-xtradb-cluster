@@ -578,8 +578,9 @@ bool Sql_cmd_truncate_table::execute(THD *thd)
                               first_table->table_name, reg_ext, 0);
   dd_frm_type(thd, path, &db_type);
 
-  if (db_type != DB_TYPE_INNODB      &&
-      db_type != DB_TYPE_UNKNOWN     &&
+  if (db_type != DB_TYPE_INNODB             &&
+      db_type != DB_TYPE_UNKNOWN            &&
+      db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
       !is_temporary_table(first_table))
   {
     bool block= false;

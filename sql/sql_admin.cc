@@ -1131,8 +1131,9 @@ static bool pxc_strict_mode_admin_check(THD* thd, TABLE_LIST* table)
                               table->table_name, reg_ext, 0);
   dd_frm_type(thd, path, &db_type);
 
-  if (db_type != DB_TYPE_INNODB  &&
-      db_type != DB_TYPE_UNKNOWN &&
+  if (db_type != DB_TYPE_INNODB             &&
+      db_type != DB_TYPE_UNKNOWN            &&
+      db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
       !is_temporary_table(table))
   {
     switch(pxc_strict_mode)

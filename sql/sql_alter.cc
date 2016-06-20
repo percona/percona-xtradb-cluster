@@ -359,7 +359,8 @@ bool Sql_cmd_alter_table::execute(THD *thd)
          (create_info.used_fields & HA_CREATE_USED_ENGINE)           &&
          (new_db_type != DB_TYPE_INNODB))
        safe_ops= false;
-     else if (existing_db_type == DB_TYPE_INNODB)
+     else if (existing_db_type == DB_TYPE_INNODB ||
+              existing_db_type == DB_TYPE_PERFORMANCE_SCHEMA)
        safe_ops= true; 
 
     if (!safe_ops)

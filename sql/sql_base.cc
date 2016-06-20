@@ -5980,9 +5980,10 @@ restart:
 
   legacy_db_type db_type= (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
 
-  if (db_type != DB_TYPE_INNODB   &&
-      db_type != DB_TYPE_UNKNOWN  &&
-      is_dml_stmt                 &&
+  if (db_type != DB_TYPE_INNODB             &&
+      db_type != DB_TYPE_UNKNOWN            &&
+      db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
+      is_dml_stmt                           &&
       !is_temporary_table(tables))
   {
     /* Table is not an InnoDB table and workload is trying to make changes
@@ -6025,6 +6026,7 @@ restart:
   }
 
   if (is_dml_stmt                           &&
+      db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
       tbl && tbl->s->primary_key == MAX_KEY &&
       !is_temporary_table(tables))
   {
