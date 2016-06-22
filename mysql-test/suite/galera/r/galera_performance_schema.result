@@ -1,0 +1,41 @@
+#node-1
+use performance_schema;
+select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
+count(*)
+57
+#node-2
+use performance_schema;
+select count(*) from setup_instruments where name like '%galera%' or name like '%wsrep%';
+count(*)
+57
+select count(*) = 5 from performance_schema.threads where name like '%galera%' or name like '%wsrep%';
+count(*) = 5
+1
+select count(*) > 0 from performance_schema.file_instances where event_name like '%galera%' or event_name like '%wsrep%';
+count(*) > 0
+1
+#node-1
+use test;
+create table t (i int, primary key pk(i)) engine=innodb;
+insert into t values (1), (2);
+select * from t;
+i
+1
+2
+select count(*) > PREVIOUS_COUNT from performance_schema.events_waits_history where event_name like '%LOCK%wsrep%' or event_name like '%LOCK%galera%';;
+count(*) > PREVIOUS_COUNT
+1
+#node-1
+use test;
+begin;
+insert into t values (3);
+#node-2
+use test;
+insert into t values (3);
+#node-1
+commit;
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+select count(*) > PREVIOUS_COUNT from performance_schema.events_waits_history_long where event_name like '%COND%wsrep%' or event_name like '%COND%galera%';;
+count(*) > PREVIOUS_COUNT
+1
+drop table t;

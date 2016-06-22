@@ -329,6 +329,10 @@ static void wsrep_replication_process(THD *thd)
   int rcode;
   DBUG_ENTER("wsrep_replication_process");
 
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_register_thread(key_THREAD_wsrep_applier);
+#endif /* HAVE_PSI_INTERFACE */
+
   struct wsrep_thd_shadow shadow;
 
   wsrep_prepare_bf_thd(thd, &shadow);
@@ -394,6 +398,11 @@ static void wsrep_replication_process(THD *thd)
                   (tmp->s) ? tmp->s->table_name.str : "void");
   }
   wsrep_return_from_bf_mode(thd, &shadow);
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_delete_thread();
+#endif /* HAVE_PSI_INTERFACE */
+
   DBUG_VOID_RETURN;
 }
 
@@ -426,6 +435,10 @@ void wsrep_create_appliers(long threads)
 static void wsrep_rollback_process(THD *thd)
 {
   DBUG_ENTER("wsrep_rollback_process");
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_register_thread(key_THREAD_wsrep_rollbacker);
+#endif /* HAVE_PSI_INTERFACE */
 
   mysql_mutex_lock(&LOCK_wsrep_rollback);
   wsrep_aborting_thd= NULL;
@@ -495,6 +508,10 @@ static void wsrep_rollback_process(THD *thd)
 
   mysql_mutex_unlock(&LOCK_wsrep_rollback);
   sql_print_information("WSREP: rollbacker thread exiting");
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_delete_thread();
+#endif /* HAVE_PSI_INTERFACE */
 
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
