@@ -4191,20 +4191,6 @@ int init_common_variables()
   */
   global_system_variables.time_zone= my_tz_SYSTEM;
 
-#ifdef WITH_WSREP
-  /*
-    We need to initialize auxiliary variables, that will be
-    further keep the original values of auto-increment options
-    as they set by the user. These variables used to restore
-    user-defined values of the auto-increment options after
-    setting of the wsrep_auto_increment_control to 'OFF'.
-  */
-  global_system_variables.saved_auto_increment_increment=
-    global_system_variables.auto_increment_increment;
-  global_system_variables.saved_auto_increment_offset=
-    global_system_variables.auto_increment_offset;
-#endif
-
 #ifdef HAVE_PSI_INTERFACE
   /*
     Complete the mysql_bin_log initialization.
@@ -4326,6 +4312,21 @@ int init_common_variables()
 #endif /* WITH_WSREP */
   if (get_options(&remaining_argc, &remaining_argv))
     return 1;
+
+#ifdef WITH_WSREP
+  /*
+    We need to initialize auxiliary variables, that will be
+    further keep the original values of auto-increment options
+    as they set by the user. These variables used to restore
+    user-defined values of the auto-increment options after
+    setting of the wsrep_auto_increment_control to 'OFF'.
+  */
+  global_system_variables.saved_auto_increment_increment=
+    global_system_variables.auto_increment_increment;
+  global_system_variables.saved_auto_increment_offset=
+    global_system_variables.auto_increment_offset;
+#endif
+
   set_server_version();
 
   sql_print_information("%s (mysqld %s) starting as process %lu ...",
