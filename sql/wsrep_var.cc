@@ -326,6 +326,14 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   bool wsrep_on_saved= thd->variables.wsrep_on;
   thd->variables.wsrep_on= false;
 
+  /* Ensure we free the stats that are allocated by galera-library.
+  wsrep part doesn't know how to free them shouldn't be attempting it
+  as it not allocated by wsrep part.
+  Before unloading cleanup any stale reference and stats is one of it.
+  Given that thd->variables.wsrep.on is turned-off it is safe to assume
+  that no new stats queries will be allowed during this transition time. */
+  wsrep_free_status(thd);
+
   WSREP_DEBUG("wsrep_provider_update: %s", wsrep_provider);
 
   /* stop replication is heavy operation, and includes closing all client 
@@ -337,6 +345,7 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   */
   mysql_mutex_unlock(&LOCK_global_system_variables);
   wsrep_stop_replication(thd);
+
   /*
     Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
     any potential deadlock.
@@ -687,6 +696,10 @@ static void export_wsrep_status_to_mysql(THD* thd)
 {
   int wsrep_status_len, i;
 
+  /* Avoid freeing the stats immediately on completion of the call
+  instead free them on next invocation as the reference to status
+  is feeded in MySQL show status array. Freeing them on completion
+  will make these references invalid. */
   wsrep_free_status(thd);
 
   thd->wsrep_status_vars = wsrep->stats_get(wsrep);
