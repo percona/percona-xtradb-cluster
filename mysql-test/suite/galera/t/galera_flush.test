@@ -293,8 +293,8 @@ FLUSH TABLE WITH READ LOCK;
 --connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
 --connection node_1a
 --echo #node-1a
-# will pause the cluster.
-FLUSH TABLE t1 WITH READ LOCK;
+# will be blocked in pause operation local monitor
+--send FLUSH TABLE t1 WITH READ LOCK;
 
 --connection node_1
 --echo #node-1
@@ -308,30 +308,8 @@ INSERT INTO t1 values (100);
 
 --connection node_1a
 --echo #node-1a
+--reap
 UNLOCK TABLES;
 --sleep 4
 SELECT * FROM t1;
-DROP TABLE t1;
-
-
-#-------------------------------------------------------------------------------
-#
-# Trying to set a provider when node is paused
-#
---connection node_1
---echo #node-1
-call mtr.add_suppression("WSREP: Cannot modify wsrep_provider while node is paused or desynced");
-#
-CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
-# pause node
-FLUSH TABLE t1 WITH READ LOCK;
---error ER_WRONG_VALUE_FOR_VAR
-SET GLOBAL wsrep_provider=none;
-UNLOCK TABLES;
-# pause and desync node
-FLUSH TABLE WITH READ LOCK;
---error ER_WRONG_VALUE_FOR_VAR
-SET GLOBAL wsrep_provider=none;
-UNLOCK TABLES;
-#
 DROP TABLE t1;
