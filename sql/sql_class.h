@@ -88,6 +88,7 @@ void set_thd_stage_info(void *thd,
                         const char *calling_file,
                         const unsigned int calling_line);
                         
+
 #define THD_STAGE_INFO(thd, stage) \
   (thd)->enter_stage(& stage, NULL, __func__, __FILE__, __LINE__)
 
@@ -101,6 +102,78 @@ struct wsrep_thd_shadow {
   ulong                tx_isolation;
   LEX_CSTRING          db;
 };
+
+namespace wsp {
+
+/* A class that helps to maintain the THD_STAGE_INFO, when nested */
+class ThreadStageInfoGuard
+{
+public:
+  ThreadStageInfoGuard(THD *thd, PSI_stage_info *new_stage,
+                       const char *func, const char *file, unsigned int line)
+  : m_thd(NULL), m_old_stage(), m_func(NULL), m_file(NULL), m_line(0)
+  {
+    enter(thd, new_stage, func, file, line);
+  }
+
+  /* Stores the old stage info and sets the new stage info, use this if unable to use the constructur */
+  void enter(THD *thd, PSI_stage_info *new_stage, const char *func, const char *file, unsigned int line)
+  {
+    if (thd)
+      set_thd_stage_info(thd, new_stage, &m_old_stage, func, file, line);
+    m_thd = thd;
+    m_func = func;
+    m_file = file;
+    m_line = line;
+  }
+
+  /* Updates the current stage info, but does not store the old stage */
+  void update(PSI_stage_info *new_stage, const char *func, const char *file, unsigned int line)
+  {
+    if (m_thd)
+      set_thd_stage_info(m_thd, new_stage, NULL, func, file, line);
+  }
+
+  /* restores the saved old stage */
+  void leave(const char *func, const char *file, unsigned int line)
+  {
+    if (m_thd)
+      set_thd_stage_info(m_thd, &m_old_stage, NULL, func, file, line);
+    m_thd = NULL;
+  }
+
+  ~ThreadStageInfoGuard()
+  {
+    leave(m_func, m_file, m_line);
+  }
+
+private:
+  THD *m_thd;
+  PSI_stage_info m_old_stage;
+  const char *m_func;
+  const char *m_file;
+  int m_line;
+
+  // Non-copyable
+  ThreadStageInfoGuard(const ThreadStageInfoGuard& );
+  const ThreadStageInfoGuard& operator=(const ThreadStageInfoGuard& );
+};
+}
+
+/* Stores the current stage and pushes on the new stage (only if thd is non-NULL). */
+#define THD_STAGE_INFO_GUARD(thd, new_stage) wsp::ThreadStageInfoGuard  threadStageInfoGuard_(thd, new_stage, __func__, __FILE__, __LINE__)
+
+/* Stores the current stage and pushes the new stage (if thd is non-NULL) */
+#define THD_STAGE_INFO_GUARD_ENTER(thd, new_stage) threadStageInfoGuard_.enter(thd, new_stage, __func__, __FILE__, __LINE__)
+
+/* Pushes the new stage info but does not save the current stage info */
+#define THD_STAGE_INFO_GUARD_UPDATE(new_stage) threadStageInfoGuard_.update(new_stage, __func__, __FILE__, __LINE__)
+
+/* Restores the saved old stage */
+#define THD_STAGE_INFO_GUARD_LEAVE() threadStageInfoGuard_.leave(__func__, __FILE__, __LINE__)
+
+
+
 #endif /* WITH_WSREP */
 
 enum enum_delay_key_write { DELAY_KEY_WRITE_NONE, DELAY_KEY_WRITE_ON,

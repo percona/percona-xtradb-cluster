@@ -12445,23 +12445,22 @@ int
 Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
 {
   DBUG_ASSERT(m_table != NULL);
+
 #ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  char info[64];
-  info[sizeof(info) - 1] = '\0';
-  snprintf(info, sizeof(info) - 1, "Write_rows_log_event::write_row(%lld)",
-           (long long) wsrep_thd_trx_seqno(thd));
-  const char* tmp = (WSREP(thd)) ? thd_proc_info(thd, info) : NULL;
-#else
-  const char* tmp = (WSREP(thd)) ?
-    thd_proc_info(thd,"Write_rows_log_event::write_row()") :  NULL;
-#endif /* WSREP_PROC_INFO */
+  THD_STAGE_INFO_GUARD(NULL, NULL);
+  if (WSREP(thd))
+    THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_writing_rows);
 #endif /* WITH_WSREP */
+
   int error= write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
 
 #ifdef WITH_WSREP
-  if (WSREP(thd)) thd_proc_info(thd, tmp);
+#ifdef WSREP_PROC_INFO
+  if (WSREP(thd))
+    WSREP_DEBUG("wsrep: rows written (%lld)", (long long) wsrep_thd_trx_seqno(thd));
+#endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
+
   if (error && !thd->is_error())
   {
     DBUG_ASSERT(0);
@@ -12559,10 +12558,26 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
     if (error)
       return error;
   }
+
+#ifdef WITH_WSREP
+  THD_STAGE_INFO_GUARD(NULL, NULL);
+  if (WSREP(thd))
+    THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_deleting_rows);
+#endif /* WITH_WSREP */
+
   /* m_table->record[0] contains the BI */
   m_table->mark_columns_per_binlog_row_image();
   error= m_table->file->ha_delete_row(m_table->record[0]);
   m_table->default_column_bitmaps();
+
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  if (WSREP(thd))
+    WSREP_DEBUG("wsrep: rows deleted (%lld)", (long long) wsrep_thd_trx_seqno(thd));
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
+
+
   return error;
 }
 
@@ -12714,6 +12729,12 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_DUMP("old record", m_table->record[1], m_table->s->reclength);
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 
+#ifdef WITH_WSREP
+  THD_STAGE_INFO_GUARD(NULL, NULL);
+  if (WSREP(thd))
+    THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_updating_rows);
+#endif /* WITH_WSREP */
+
   // Temporary fix to find out why it fails [/Matz]
   memcpy(m_table->read_set->bitmap, m_cols.bitmap, (m_table->read_set->n_bits + 7) / 8);
   memcpy(m_table->write_set->bitmap, m_cols_ai.bitmap, (m_table->write_set->n_bits + 7) / 8);
@@ -12723,6 +12744,15 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   if (error == HA_ERR_RECORD_IS_THE_SAME)
     error= 0;
   m_table->default_column_bitmaps();
+
+#ifdef WITH_WSREP
+#ifdef WSREP_PROC_INFO
+  if (WSREP(thd))
+    WSREP_DEBUG("wsrep: rows updated (%lld)", (long long) wsrep_thd_trx_seqno(thd));
+#endif /* WSREP_PROC_INFO */
+#endif /* WITH_WSREP */
+
+
 
   return error;
 }
