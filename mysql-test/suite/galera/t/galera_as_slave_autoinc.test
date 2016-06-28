@@ -61,14 +61,37 @@ show variables like '%auto_increment%';
 select * from t1;
 
 show variables like 'binlog_format';
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
+show variables like 'wsrep_auto_increment%';
+--let $node2_offset = `SELECT @@GLOBAL.auto_increment_offset;`
+
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1;
+--source include/wait_condition.inc
 
 select * from t1;
 
 show variables like 'binlog_format';
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
+show variables like 'wsrep_auto_increment%';
+--let $node3_offset = `SELECT @@GLOBAL.auto_increment_offset;`
+
+
+--disable_query_log
+# The values for auto_increment_offset are 1 and 2 (order doesn't matter)
+# should sum to 3
+--eval SELECT $node2_offset + $node3_offset AS total;
+
+# sanity checks
+# The nodes are all positive values (so summing to 3 is only valid for [1,2])
+eval SELECT $node2_offset > 0 AS result;
+eval SELECT $node3_offset > 0 AS result;
+--enable_query_log
+
 
 --connection node_1
 DROP TABLE t1;
