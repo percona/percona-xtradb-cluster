@@ -4938,10 +4938,10 @@ end_with_restore_list:
 
     if (first_table && lex->type & REFRESH_READ_LOCK)
     {
-
 #ifdef WITH_WSREP
       if (pxc_strict_mode_lock_check(thd))
         goto error;
+      bool already_paused;
 #endif /* WITH_WSREP */
 
       /*
@@ -4965,13 +4965,14 @@ end_with_restore_list:
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
+      if (WSREP(thd) &&
+          !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
 #endif /* WITH_WSREP */
       if (flush_tables_with_read_lock(thd, all_tables))
 #ifdef WITH_WSREP
       {
-        if (WSREP(thd))
+        if (WSREP(thd) && !already_paused)
           thd->global_read_lock.wsrep_resume_once();
         goto error;
       }
@@ -4983,6 +4984,9 @@ end_with_restore_list:
     }
     else if (first_table && lex->type & REFRESH_FOR_EXPORT)
     {
+#ifdef WITH_WSREP
+      bool already_paused;
+#endif
       /*
          Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
          FOR BACKUP lock.
@@ -5004,13 +5008,14 @@ end_with_restore_list:
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
-      if (WSREP(thd) && !thd->global_read_lock.wsrep_pause_once())
+      if (WSREP(thd) &&
+          !thd->global_read_lock.wsrep_pause_once(&already_paused))
         goto error;
 #endif /* WITH_WSREP */
       if (flush_tables_for_export(thd, all_tables))
 #ifdef WITH_WSREP
       {
-        if (WSREP(thd))
+        if (WSREP(thd) && !already_paused)
           thd->global_read_lock.wsrep_resume_once();
         goto error;
       }
@@ -6474,6 +6479,25 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
       if (thd->wsrep_conflict_state == ABORTED ||
           thd->wsrep_conflict_state == CERT_FAILURE)
       {
+
+        if (thd->lex->sql_command == SQLCOM_SHOW_CREATE)
+        {
+          /* SHOW CREATE result in opening and locking the table.
+          Even though it is show command it can conflict with DDL
+          action that is treated as a high priority action by Galera
+          and this conflict can cause SHOW_CREATE to fail and retry.
+          While this flow is ok it creates an issue if the SHOW_CREATE
+          table has sent a half-cooked result set to client.
+          Note: most of the show command directly write to wire
+          immediately. In order to closed half-cooked result set before
+          replay mark the previous statement as done. */
+          if (!thd->get_stmt_da()->is_set())
+            my_eof(thd);
+
+          if (thd->get_stmt_da()->is_eof())
+            thd->send_statement_status();
+        }
+
         mysql_reset_thd_for_next_command(thd);
         thd->killed= THD::NOT_KILLED;
         if (is_autocommit                           &&

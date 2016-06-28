@@ -1481,11 +1481,12 @@ public:
   }
   bool make_global_read_lock_block_commit(THD *thd);
 #ifdef WITH_WSREP
-  bool wsrep_pause();
-  wsrep_status_t wsrep_resume(bool ignore_if_resumed= false);
-  bool wsrep_pause_once();
+  bool wsrep_pause(void);
+  wsrep_status_t wsrep_resume(void);
+  bool wsrep_pause_once(bool *already_paused);
   wsrep_status_t wsrep_resume_once(void);
   bool provider_resumed() const { return !provider_paused; }
+  void pause_provider(bool val) { provider_paused= val; }
 #endif /* WITH_WSREP */
   bool is_acquired() const { return m_state != GRL_NONE; }
   void set_explicit_lock_duration(THD *thd);
