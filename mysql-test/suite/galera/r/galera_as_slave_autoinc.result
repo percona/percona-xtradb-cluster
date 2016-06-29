@@ -57,11 +57,15 @@ i	c
 show variables like 'binlog_format';
 Variable_name	Value
 binlog_format	ROW
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
 Variable_name	Value
 auto_increment_increment	2
-auto_increment_offset	1
+show variables like 'wsrep_auto_increment%';
+Variable_name	Value
 wsrep_auto_increment_control	ON
+select @@global.auto_increment_offset in (1,2);
+@@global.auto_increment_offset in (1,2)
+1
 select * from t1;
 i	c
 1	dummy_text
@@ -77,11 +81,15 @@ i	c
 show variables like 'binlog_format';
 Variable_name	Value
 binlog_format	ROW
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
 Variable_name	Value
 auto_increment_increment	2
-auto_increment_offset	2
+show variables like 'wsrep_auto_increment%';
+Variable_name	Value
 wsrep_auto_increment_control	ON
+select @@global.auto_increment_offset in (1,2);
+@@global.auto_increment_offset in (1,2)
+1
 DROP TABLE t1;
 STOP SLAVE;
 RESET SLAVE ALL;

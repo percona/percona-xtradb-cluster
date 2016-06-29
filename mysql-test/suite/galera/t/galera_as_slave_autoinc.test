@@ -61,14 +61,25 @@ show variables like '%auto_increment%';
 select * from t1;
 
 show variables like 'binlog_format';
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
+show variables like 'wsrep_auto_increment%';
+select @@global.auto_increment_offset in (1,2);
+
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1;
+--source include/wait_condition.inc
 
 select * from t1;
 
 show variables like 'binlog_format';
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
+show variables like 'wsrep_auto_increment%';
+select @@global.auto_increment_offset in (1,2);
+
 
 --connection node_1
 DROP TABLE t1;
