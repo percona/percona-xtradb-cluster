@@ -3895,6 +3895,34 @@ innobase_init(
 	}
 #endif /* DBUG_OFF */
 
+#ifdef WITH_WSREP
+	bool wsrep_provider_loaded
+		= !(strlen(wsrep_provider) == 0
+		    || !strcmp(wsrep_provider, WSREP_NONE));
+
+	/* innodb_autoinc_lock_mode (recommended value = Interleaved/2) */
+	if (wsrep_provider_loaded
+	    && innobase_autoinc_lock_mode != AUTOINC_NO_LOCKING)
+	{
+		switch(pxc_strict_mode)
+		{
+		case PXC_STRICT_MODE_DISABLED:
+			break;
+		case PXC_STRICT_MODE_PERMISSIVE:
+			WSREP_WARN("Percona-XtraDB-Cluster recommends setting"
+				   " innodb_autoinc_lock_mode = Interleaved/2");
+			break;
+		case PXC_STRICT_MODE_ENFORCING:
+		case PXC_STRICT_MODE_MASTER:
+		default:
+			WSREP_ERROR("Percona-XtraDB-Cluster requires"
+				    " innodb_autoinc_lock_mode = Interleaved/2");
+			DBUG_RETURN(innobase_init_abort());
+			break;
+		}
+	}
+#endif /* WITH_WSREP */
+
 	/* Check that values don't overflow on 32-bit systems. */
 	if (sizeof(ulint) == 4) {
 		if (innobase_buffer_pool_size > UINT_MAX32) {

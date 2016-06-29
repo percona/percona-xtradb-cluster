@@ -279,6 +279,7 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
        what has been specified on the command line / my.cnf */
     int rcode = 0;
 
+#if 0
     /* PXC/Galera can use Interleaved mode because it enforced ROW based
     replication so make use of better and faster auto-inc locks. */
     if (strcasecmp(opts[WSREP_PROVIDER].value, "none"))
@@ -296,6 +297,7 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
         rcode = EINVAL;
       }
     }
+#endif
 
     bool locked_in_memory;
     err = get_bool (opts[LOCKED_IN_MEMORY], &locked_in_memory);
