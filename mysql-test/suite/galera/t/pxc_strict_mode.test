@@ -1065,18 +1065,7 @@ set session transaction isolation level repeatable read;
 
 #-------------------------------------------------------------------------------
 #
-# Scenario-7: innodb_autoinc_lock_mode=Interleaved/2
-#
---echo # restart with innodb_autoinc_lock_mode=2
---error 1
---exec $MYSQLD --no-defaults --wsrep_provider="libgalera_smm.so" --innodb_autoinc_lock_mode=1 > $restartdir/restart.log 2>&1
---echo "grep --count \"WSREP: Percona-XtraDB-Cluster requires innodb_autoinc_lock_mode"
---exec grep --count "WSREP: Percona-XtraDB-Cluster requires innodb_autoinc_lock_mode" $restartdir/restart.log
---remove_file $restartdir/restart.log
-
-#-------------------------------------------------------------------------------
-#
-# Scenario-8: Test effect of pxc-strict-mode on CTAS
+# Scenario-7: Test effect of pxc-strict-mode on CTAS
 #
 
 #----------------------------
@@ -1179,6 +1168,30 @@ xa end 'testxa2';
 --error ER_UNKNOWN_COM_ERROR
 xa commit 'testxa2' one phase;
 drop table t;
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-8: innodb_autoinc_lock_mode=Interleaved/2
+#
+--connection node_2
+--echo #node-2
+--echo "Shutdown node-2"
+--source include/shutdown_mysqld.inc
+#
+--let $start_mysqld_params="--innodb_autoinc_lock_mode=1 --pxc_strict_mode=ENFORCING --log-error=$restartdir/restart.log"
+--echo "Try restarting node-2 with --innodb_autoinc_lock_mode=1"
+--exec echo "try:$start_mysqld_params" > $_expect_file_name
+--sleep 30
+#
+--echo "grep --count \"WSREP: Percona-XtraDB-Cluster requires innodb_autoinc_lock_mode"
+--exec grep --count "WSREP: Percona-XtraDB-Cluster requires innodb_autoinc_lock_mode" $restartdir/restart.log
+--remove_file $restartdir/restart.log
+#
+--echo "Try restarting node-2 with default options"
+--let $start_mysqld_params=""
+--source include/start_mysqld.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
 
 #-------------------------------------------------------------------------------
 #

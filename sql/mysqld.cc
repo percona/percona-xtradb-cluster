@@ -3477,28 +3477,6 @@ int init_common_variables()
         break;
     }
   }
-
-  /* innodb_autoinc_lock_mode (recommended value = Interleaved/2) */
-  if (wsrep_provider_loaded &&
-      !((log_output_options & LOG_NONE) || (log_output_options & LOG_FILE)))
-  {
-    switch(pxc_strict_mode)
-    {
-    case PXC_STRICT_MODE_DISABLED:
-        break;
-    case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster recommends setting"
-                   " innodb_autoinc_lock_mode = Interleaved/2");
-        break;
-    case PXC_STRICT_MODE_ENFORCING:
-    case PXC_STRICT_MODE_MASTER:
-    default:
-        WSREP_ERROR("Percona-XtraDB-Cluster requires"
-                    " innodb_autoinc_lock_mode = Interleaved/2");
-        return 1;
-        break;
-    }
-  }
 #endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
