@@ -706,6 +706,7 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
                 (!((WSREP_EMULATE_BINLOG(thd) ||  mysql_bin_log.is_open()) 
 		   && thd->variables.sql_log_bin) ||
                  ha_rollback_to_savepoint_can_release_mdl(thd));
+  wsrep_register_hton(thd, TRUE);
 #else
   bool mdl_can_safely_rollback_to_savepoint=
                 (!(mysql_bin_log.is_open() && thd->variables.sql_log_bin) ||
