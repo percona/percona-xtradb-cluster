@@ -52,6 +52,10 @@ Prefix: %{_sysconfdir}
 %endif
 #
 
+# Pass path to mecab lib
+%{?with_mecab: %global mecab_option -DWITH_MECAB=%{with_mecab}}
+%{?with_mecab: %global mecab 1}
+
 %if 0%{?rhel} < 6
  %define boost_req boost141-devel
  %define gcc_req gcc44-c++
@@ -697,6 +701,7 @@ mkdir debug
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
+           %{?mecab_option} \
 	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
@@ -732,6 +737,7 @@ mkdir release
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
+           %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF}
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
@@ -943,6 +949,11 @@ install -m 644 $MBD/%{galera_src_dir}/packages/rpm/README     \
 install -d $RBR%{_mandir}/man8
 install -m 644 $MBD/%{galera_src_dir}/man/garbd.8  \
     $RBR%{_mandir}/man8/garbd.8
+install -d $RBR%{_libdir}/mysql
+%if 0%{?mecab}
+    cp -r $RBR%{_libdir}/mecab $RBR%{_libdir}/mysql
+%endif
+
 ##############################################################################
 #  Post processing actions, i.e. when installed
 ##############################################################################
@@ -1458,6 +1469,13 @@ fi
 %attr(644, root, root) %{_libdir}/mysql/plugin/daemon_example.ini
 %attr(755, root, root) %{_libdir}/mysql/plugin/*.so*
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/*.so*
+
+%if 0%{?mecab}
+%{_libdir}/mysql/mecab
+%{_libdir}/mecab
+%attr(755, root, root) %{_libdir}/mysql/plugin/libpluginmecab.so
+%attr(755, root, root) %{_libdir}/mysql/plugin/debug/libpluginmecab.so
+%endif
 
 %if "%rhel" == "5"
     %attr(755, root, root) %{_datadir}/percona-xtradb-cluster/
