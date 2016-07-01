@@ -1,42 +1,80 @@
 .. _monitoring:
 
-========================
- Monitoring the cluster
-========================
+======================
+Monitoring the cluster
+======================
 
-The important bit about the cluster is that each node should be monitored independently. There is no centralized node, the cluster is the set of active, connected nodes, and each can have a different view of the cluster. Further, many of these variables are relative to the node you query them from: for example, replication sent (from this node) and received (from writes on the rest of the cluster). Having data from all nodes helps tracking down the source of issues (i.e., where are the flow control messages coming from?  Where did that 100MB transaction came from?).
+Each node can have a different view of the cluster.
+There is no centralized node to monitor.
+To track down the source of issues,
+you have to monitor each node independently.
 
-Manually
-========
+Values of many variables depend on the node from which you are querying.
+For example, replication sent from a node
+and writes received by all other nodes.
 
-Manual cluster monitoring can be done with `myq_gadgets <https://github.com/jayjanssen/myq_gadgets/>`_.
+Having data from all nodes can help you understand
+where flow messages are coming from,
+which node sends excessively large transactions,
+and so on.
+
+Manual Monitoring
+=================
+
+Manual cluster monitoring can be performed using
+`myq_tools <https://github.com/jayjanssen/myq_tools/>`_.
 
 Alerting
 ========
 
-Standard |MySQL| alerting should apply here. |Percona XtraDB Cluster| specific alerting should include:
+Besides standard MySQL alerting,
+you should use at least the following triggers specific to |PXC|:
 
- * Cluster state of each node (:variable:`wsrep_cluster_status` != Primary)
- * Node state (:variable:`wsrep_connected`, :variable:`wsrep_ready` != ON)
+ * Cluster state of each node
 
-Other optional alerting could be done on:
+   * :variable:`wsrep_cluster_status` != Primary
 
- * Excessive replication conflicts (high rate of :variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`)
- * Excessive Flow control messages (:variable:`wsrep_flow_control_sent`/ :variable:`wsrep_flow_control_recv`)
- * Large replication queues (:variable:`wsrep_local_recv_queue`).
+ * Node state
+
+   * :variable:`wsrep_connected` != ``ON``
+   * :variable:`wsrep_ready` != ``ON``
+
+For additional alerting, consider the following:
+
+ * Excessive replication conflicts can be identtified using the
+   :variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`
+   variables
+
+ * Excessive flow control messages can be identified using the
+   :variable:`wsrep_flow_control_sent` and :variable:`wsrep_flow_control_recv`
+   variables
+
+ * Large replication queues can be identified using the
+   :variable:`wsrep_local_recv_queue`.
 
 Metrics
 =======
 
-Metrics collection (i.e., long-term graphing) on the cluster should be done on:
+Cluster metrics collection for long-term graphing should be done
+at least for the following:
 
- * Queue sizes (:variable:`wsrep_local_recv_queue`, :variable:`wsrep_local_send_queue`)
- * Flow control (:variable:`wsrep_flow_control_sent`, :variable:`wsrep_flow_control_recv`)
- * Number of transactions in and out of this node (:variable:`wsrep_replicated`, :variable:`wsrep_received`)
- * Number of transactions in and out in bytes (:variable:`wsrep_replicated_bytes`, :variable:`wsrep_received_bytes`)
- * Replication conflicts (:variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`)
+ * Queue sizes:
+   :variable:`wsrep_local_recv_queue` and :variable:`wsrep_local_send_queue`
+
+ * Flow control: 
+   :variable:`wsrep_flow_control_sent` and :variable:`wsrep_flow_control_recv`
+
+ * Number of transactions for a node:
+   :variable:`wsrep_replicated` and :variable:`wsrep_received`
+
+ * Number of transactions in bytes:
+   :variable:`wsrep_replicated_bytes` and :variable:`wsrep_received_bytes`
+
+ * Replication conflicts:
+   :variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`
 
 Other Reading
 =============
 
 * `Realtime stats to pay attention to in PXC and Galera <http://www.mysqlperformanceblog.com/2012/11/26/realtime-stats-to-pay-attention-to-in-percona-xtradb-cluster-and-galera/>`_
+

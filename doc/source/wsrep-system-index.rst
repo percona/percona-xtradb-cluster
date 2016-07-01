@@ -453,7 +453,7 @@ This variable sets up the method for taking the State Snapshot Transfer (SST). A
 
 * ``xtrabackup``: Uses Percona XtraBackup to perform the SST, this method requires :variable:`wsrep_sst_auth` to be set up with <user>:<password> which |XtraBackup| will use on donor. Privileges and permissions needed for running |XtraBackup| can be found `here <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_.
 
-* ``xtrabackup-v2``: This is the same as ``xtrabackup``, except that it uses newer protocol, hence is not compatible. This is the **recommended** option for PXC 5.5.34 and above. For more details, please check :ref:`xtrabackup_sst` and :ref:`errata`. This is also the default SST method. For SST with older nodes (< 5.5.34), use ``xtrabackup`` as the SST method.
+* ``xtrabackup-v2``: This is the same as ``xtrabackup``, except that it uses newer protocol, hence is not compatible. This is the **recommended** option for PXC 5.5.34 and above. For more details, please check :ref:`xtrabackup_sst`. This is also the default SST method. For SST with older nodes (< 5.5.34), use ``xtrabackup`` as the SST method.
 
   .. note:: This method is currently recommended if you have ``innodb-log-group_home-dir/innodb-data-home-dir`` in your config. Refer to :option:`sst-special-dirs` for more information.
 
