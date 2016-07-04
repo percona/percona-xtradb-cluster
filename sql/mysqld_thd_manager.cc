@@ -19,6 +19,9 @@
 #include "mutex_lock.h"              // Mutex_lock
 #include "debug_sync.h"              // DEBUG_SYNC_C
 #include "sql_class.h"               // THD
+#ifdef WITH_WSREP
+#include "wsrep_sst.h"
+#endif /* WITH_WSREP */
 
 #include <functional>
 #include <algorithm>
@@ -125,8 +128,19 @@ Global_THD_manager::Global_THD_manager()
 Global_THD_manager::~Global_THD_manager()
 {
   thread_ids.erase_unique(reserved_thread_id);
+#ifdef WITH_WSREP
+  /* If server is abrupted aborted due to initial configuration
+  issue applier threads are not shutdown.
+  This is not a source of concern as they are not modifying
+  any data-set but good to have activity.
+  Programing it for now would means lot of changes in galera
+  code that assume things will always succeed with SST. */
+  DBUG_ASSERT(thd_list.empty() || !wsrep_is_SE_initialized());
+  DBUG_ASSERT(thread_ids.empty() || !wsrep_is_SE_initialized());
+#else
   DBUG_ASSERT(thd_list.empty());
   DBUG_ASSERT(thread_ids.empty());
+#endif /* WITH_WSREP */
   mysql_mutex_destroy(&LOCK_thd_list);
   mysql_mutex_destroy(&LOCK_thd_remove);
   mysql_mutex_destroy(&LOCK_thread_ids);

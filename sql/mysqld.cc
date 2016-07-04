@@ -735,15 +735,9 @@ mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
-mysql_mutex_t LOCK_wsrep_pause_count;
 
 wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
 int wsrep_replaying= 0;
-
-/* This count is used to track how many times the provider
-was paused. Pause being an implicit operation single count
-to track this should suffice. */
-unsigned int wsrep_pause_count= 0;
 
 static void wsrep_close_threads(THD* thd);
 #endif /* WITH_WSREP */
@@ -1833,7 +1827,6 @@ static void clean_up_mutexes()
   (void) mysql_cond_destroy(&COND_wsrep_replaying);
   (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync);
-  (void) mysql_mutex_destroy(&LOCK_wsrep_pause_count);
 #endif /* WITH_WSREP */
 }
 
@@ -3271,20 +3264,6 @@ int init_common_variables()
   */
   global_system_variables.time_zone= my_tz_SYSTEM;
 
-#ifdef WITH_WSREP
-  /*
-    We need to initialize auxiliary variables, that will be
-    further keep the original values of auto-increment options
-    as they set by the user. These variables used to restore
-    user-defined values of the auto-increment options after
-    setting of the wsrep_auto_increment_control to 'OFF'.
-  */
-  global_system_variables.saved_auto_increment_increment=
-    global_system_variables.auto_increment_increment;
-  global_system_variables.saved_auto_increment_offset=
-    global_system_variables.auto_increment_offset;
-#endif /* WITH_WSREP */
-
 #ifdef HAVE_PSI_INTERFACE
   /*
     Complete the mysql_bin_log initialization.
@@ -3498,28 +3477,20 @@ int init_common_variables()
         break;
     }
   }
+#endif /* WITH_WSREP */
 
-  /* innodb_autoinc_lock_mode (recommended value = Interleaved/2) */
-  if (wsrep_provider_loaded &&
-      !((log_output_options & LOG_NONE) || (log_output_options & LOG_FILE)))
-  {
-    switch(pxc_strict_mode)
-    {
-    case PXC_STRICT_MODE_DISABLED:
-        break;
-    case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster recommends setting"
-                   " innodb_autoinc_lock_mode = Interleaved/2");
-        break;
-    case PXC_STRICT_MODE_ENFORCING:
-    case PXC_STRICT_MODE_MASTER:
-    default:
-        WSREP_ERROR("Percona-XtraDB-Cluster requires"
-                    " innodb_autoinc_lock_mode = Interleaved/2");
-        return 1;
-        break;
-    }
-  }
+#ifdef WITH_WSREP
+  /*
+    We need to initialize auxiliary variables, that will be
+    further keep the original values of auto-increment options
+    as they set by the user. These variables used to restore
+    user-defined values of the auto-increment options after
+    setting of the wsrep_auto_increment_control to 'OFF'.
+  */
+  global_system_variables.saved_auto_increment_increment=
+    global_system_variables.auto_increment_increment;
+  global_system_variables.saved_auto_increment_offset=
+    global_system_variables.auto_increment_offset;
 #endif /* WITH_WSREP */
 
   update_parser_max_mem_size();
@@ -3978,8 +3949,6 @@ static int init_thread_environment()
                    &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync,
                    &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
-  mysql_mutex_init(key_LOCK_wsrep_pause_count,
-                   &LOCK_wsrep_pause_count, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
   THR_THD_initialized= true;
   THR_MALLOC_initialized= true;
@@ -9689,8 +9658,7 @@ PSI_mutex_key
 PSI_mutex_key key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, key_LOCK_wsrep_sst_init,
   key_LOCK_wsrep_rollback, key_LOCK_wsrep_replaying;
 
-PSI_mutex_key key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync,
-  key_LOCK_wsrep_pause_count;
+PSI_mutex_key key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync;
 
 PSI_mutex_key key_LOCK_wsrep_thd;
 PSI_mutex_key key_LOCK_wsrep_sst_thread;
@@ -9807,11 +9775,9 @@ static PSI_mutex_info all_server_mutexes[]=
 
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_pause_count, "LOCK_wsrep_pause_count", PSI_FLAG_GLOBAL},
 
   { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
   { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0},
-
 #endif /* WITH_WSREP */
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},

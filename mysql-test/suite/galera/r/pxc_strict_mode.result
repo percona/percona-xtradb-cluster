@@ -548,7 +548,7 @@ select @@binlog_format;
 MIXED
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 select * from tinnodb;
 i
 #node-2
@@ -608,7 +608,7 @@ select @@binlog_format;
 MIXED
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
-ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 select * from tinnodb;
 i
 #node-2
@@ -997,9 +997,6 @@ i
 2
 drop table tinnodb;
 set session transaction isolation level repeatable read;
-# restart with innodb_autoinc_lock_mode=2
-"grep --count "WSREP: Percona-XtraDB-Cluster requires innodb_autoinc_lock_mode"
-1
 #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
@@ -1099,6 +1096,13 @@ ERROR 08S01: WSREP doesn't support XA transaction
 xa commit 'testxa2' one phase;
 ERROR 08S01: WSREP doesn't support XA transaction
 drop table t;
+#node-2
+"Shutdown node-2"
+"Try restarting node-2 with --innodb_autoinc_lock_mode=1"
+"grep --count "WSREP: Percona-XtraDB-Cluster requires innodb_autoinc_lock_mode"
+1
+"Try restarting node-2 with default options"
+# restart
 #node-1
 set global pxc_strict_mode = DISABLED;;
 #node-2

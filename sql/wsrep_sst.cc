@@ -1355,3 +1355,8 @@ void wsrep_SE_initialized()
 {
   SE_initialized = true;
 }
+
+bool wsrep_is_SE_initialized()
+{
+  return SE_initialized;
+}
