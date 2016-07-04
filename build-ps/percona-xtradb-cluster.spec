@@ -377,9 +377,9 @@ This is a meta-package which installs server, client and galera-3.
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
 %if "%rhel" == "5"
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-garbd%{product_suffix}
 %else
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-garbd%{product_suffix}
 %endif
 
 %description -n Percona-XtraDB-Cluster-full%{product_suffix}

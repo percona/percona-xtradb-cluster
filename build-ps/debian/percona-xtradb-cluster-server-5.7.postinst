@@ -37,10 +37,10 @@ USE mysql;
 UPDATE user SET authentication_string=PASSWORD('${PASSWD}') WHERE user='root';
 EOF
 				PASSWD=""
-				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --no-defaults --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
 				rm -f ${SQL}
 			else
-				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --no-defaults --initialize-insecure=on 2>&1 > /dev/null"
 				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
 				while [ ! -e $(my_print_defaults mysqld | grep pid-file | cut -d= -f2) ]; do sleep 1; done
 				mysql -e "INSTALL PLUGIN auth_socket SONAME 'auth_socket.so'"
