@@ -512,6 +512,7 @@ rm -r $(readlink var) var
 datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1)
 /bin/chmod 0755 "$datadir" >/dev/null 2>&1 || :
 /bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
+/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %systemd_post mysqld.service
 /usr/bin/systemctl enable mysqld >/dev/null 2>&1 || :
 
@@ -636,6 +637,7 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(644, root, root) %{_datadir}/mysql/magic
 %attr(644, root, root) %{_prefix}/lib/tmpfiles.d/mysql.conf
 %attr(644, root, root) %{_unitdir}/mysqld.service
+%attr(644, root, root) %{_unitdir}/mysqld@.service
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %dir %attr(751, mysql, mysql) /var/lib/mysql
 %dir %attr(755, mysql, mysql) /var/run/mysqld
@@ -828,6 +830,10 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
 
 %changelog
+* Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
+- Take Oracle's change to support service "instances" via systemd
+  and other minor fixes from their 5.7.13.
+
 * Mon Jan 4 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.11-1
 - Include mysql-keyring directory
 - Provide keyring_file.so plugin

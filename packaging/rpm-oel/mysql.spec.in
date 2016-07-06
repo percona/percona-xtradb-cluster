@@ -733,10 +733,11 @@ rm -r $(readlink var) var
     -c "MySQL Server" -u 27 mysql >/dev/null 2>&1 || :
 
 %post server-%{series}
-datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p')
+datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1)
 
 /bin/chmod 0751 "$datadir" >/dev/null 2>&1 || :
 /bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
+/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %if 0%{?systemd}
 %systemd_post mysqld.service
 /usr/bin/systemctl enable mysqld >/dev/null 2>&1 || :
@@ -917,6 +918,7 @@ fi
 %attr(644, root, root) %{_datadir}/mysql/wsrep_notify
 %if 0%{?systemd}
 %attr(644, root, root) %{_unitdir}/mysqld.service
+%attr(644, root, root) %{_unitdir}/mysqld@.service
 %attr(644, root, root) %{_prefix}/lib/tmpfiles.d/mysql.conf
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysqld
@@ -1136,6 +1138,10 @@ fi
 # %endif
 
 %changelog
+* Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
+- Take Oracle's change to support service "instances" via systemd
+  and other minor fixes from their 5.7.13.
+
 * Wed Jun 01 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
 - Add the new "mysqld_bootstrap" script for systemd environments.
 - Add "Requires:" for "lsof" and "socat" to "mysql-wsrep-server",
