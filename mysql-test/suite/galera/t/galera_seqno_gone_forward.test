@@ -1,0 +1,57 @@
+#
+# This test is artificially creating a situation where
+# the state of the donor node goes too far and diverged from
+# the state of another node, which joining the cluster, and
+# therefore the joining node unable to initiate the IST state
+# transfer.
+#
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_1
+
+CREATE TABLE t1 (f1 INTEGER);
+INSERT INTO t1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+
+--connection node_2
+
+# Initiate normal shutdown on the node 2:
+
+--echo Shutting down server ...
+--source include/shutdown_mysqld.inc
+
+# Waiting until shutdown on node 2 has been completed:
+
+--connection node_1
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Do some changes on node 1:
+
+CREATE TABLE t2 (f1 INTEGER);
+INSERT INTO t2 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+
+# Simulate shift of the donor seqno:
+
+--let $galera_sync_point = process_state_req_ist
+--source include/galera_set_sync_point.inc
+
+# Restarting the second node:
+
+--connection node_2
+
+--let $start_mysqld_params=
+
+--echo Starting server ...
+--source include/start_mysqld.inc
+
+# Sanity check (node 2 is running now and can perform SQL operators):
+
+SELECT COUNT(*) = 10 FROM t1;
+SELECT COUNT(*) = 10 FROM t2;
+
+--connection node_1
+
+DROP TABLE t1;
+DROP TABLE t2;
