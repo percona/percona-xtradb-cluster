@@ -225,6 +225,7 @@ private:
 };
 #endif
 
-} // namespace wsrep
+} // namespace wsp
+
 
 #endif /* WSREP_UTILS_H */

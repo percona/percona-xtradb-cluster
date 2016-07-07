@@ -13,7 +13,7 @@ SET GLOBAL wsrep_slave_threads = 1;
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 COUNT(*) = 2
 1
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 64;
@@ -24,7 +24,7 @@ COUNT(*) = 1
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 COUNT(*) = @@wsrep_slave_threads + 1
 1
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 1;
@@ -98,7 +98,7 @@ COUNT(*) = 64
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 COUNT(*) = @@wsrep_slave_threads + 1
 1
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep aborter%';
+SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
 COUNT(*) = 1
 1
 SET GLOBAL wsrep_slave_threads = 1;

@@ -1260,8 +1260,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   wsrep_key_arr_t key_arr= {0, 0};
   struct wsrep_buf buff = { buf, buf_len };
-  if (WSREP(thd))
-      thd_proc_info(thd, "Preparing for TO isolation");
+  THD_STAGE_INFO_GUARD(NULL, NULL);
+  if (WSREP(thd)) {
+      THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_preparing_for_TO_isolation);
+  }
   if (!buf_err                                                                &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       key_arr.keys_len > 0                                                    &&
