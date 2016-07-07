@@ -4,6 +4,7 @@
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+--source include/have_debug.inc
 
 # Open a separate connection to be used to run SHOW PROCESSLIST
 --let $galera_connection_name = node_1a
@@ -11,6 +12,9 @@
 --source include/galera_connect.inc
 --connection node_1a
 SET SESSION wsrep_sync_wait = 0;
+
+# Enables some PROCESSLIST thread state to be maintained for testing
+SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_run_wsrep_commit";
 
 --connection node_1
 CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
@@ -27,7 +31,7 @@ SET GLOBAL innodb_disallow_writes=ON;
 --let $internal_tmp_table = `SELECT @@internal_tmp_disk_storage_engine`
 SET GLOBAL internal_tmp_disk_storage_engine = 'MyISAM';
 
-let $wait_condition = SELECT 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO = 'INSERT INTO t1 VALUES (1)' AND State = 'wsrep in pre-commit stage';
+let $wait_condition = SELECT 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO = 'INSERT INTO t1 VALUES (1)' AND State = 'wsrep: in pre-commit stage';
 --source include/wait_condition.inc
 
 --eval SET GLOBAL internal_tmp_disk_storage_engine = $internal_tmp_table
@@ -37,6 +41,8 @@ SET GLOBAL innodb_disallow_writes=OFF;
 --connection node_1
 --reap
 SELECT COUNT(*) = 1 FROM t1;
+
+SET GLOBAL DEBUG = "";
 
 --connection node_2
 SELECT COUNT(*) = 1 FROM t1;

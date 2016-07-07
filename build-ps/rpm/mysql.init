@@ -109,7 +109,7 @@ start(){
 		done
 	    fi
 	    # Now create the database
-	    action $"Initializing MySQL database: " /usr/sbin/mysqld --initialize --datadir="$datadir" --user=mysql
+	    action $"Initializing MySQL database: " /usr/sbin/mysqld --no-defaults --initialize --datadir="$datadir" --user=mysql
 	    ret=$?
 	    [ $ret -ne 0 ] && return $ret
 	    chown -R mysql:mysql "$datadir"

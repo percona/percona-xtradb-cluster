@@ -10121,6 +10121,24 @@ PSI_stage_info stage_starting= { 0, "starting", 0};
 PSI_stage_info stage_waiting_for_no_channel_reference= { 0, "Waiting for no channel reference.", 0};
 PSI_stage_info stage_restoring_secondary_keys= { 0, "restoring secondary keys", 0};
 
+#ifdef WITH_WSREP
+PSI_stage_info stage_wsrep_writing_rows= { 0, "wsrep: writing rows", 0};
+PSI_stage_info stage_wsrep_deleting_rows = { 0, "wsrep: deleting rows", 0};
+PSI_stage_info stage_wsrep_updating_rows = { 0, "wsrep: updating rows", 0};
+PSI_stage_info stage_wsrep_applying_writeset = { 0, "wsrep: applying write set", 0};
+PSI_stage_info stage_wsrep_committing = { 0, "wsrep: committing", 0};
+PSI_stage_info stage_wsrep_rolling_back = { 0, "wsrep: rolling back", 0};
+PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating commit", 0};
+PSI_stage_info stage_wsrep_waiting_on_replaying = { 0, "wsrep: waiting on replaying", 0};
+PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0};
+PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0};
+PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying trx", 0};
+PSI_stage_info stage_wsrep_applier_idle = { 0, "wsrep: applier idle", 0 };
+PSI_stage_info stage_wsrep_in_rollback_thread = { 0, "wsrep: in rollback thread", 0};
+PSI_stage_info stage_wsrep_aborter_idle = { 0, "wsrep: aborter idle", 0};
+PSI_stage_info stage_wsrep_aborter_active = { 0, "wsrep: aborter active", 0};
+#endif /* WITH_WSREP */
+
 #ifdef HAVE_PSI_INTERFACE
 
 PSI_stage_info *all_server_stages[]=
@@ -10233,6 +10251,33 @@ PSI_stage_info *all_server_stages[]=
   & stage_waiting_for_no_channel_reference,
   & stage_restoring_secondary_keys
 };
+
+#ifdef WITH_WSREP
+PSI_stage_info *wsrep_server_stages[]=
+{
+  // log_event
+  & stage_wsrep_writing_rows,
+  & stage_wsrep_deleting_rows,
+  & stage_wsrep_updating_rows,
+  // wsrep_applier
+  & stage_wsrep_applying_writeset,
+  & stage_wsrep_committing,
+  & stage_wsrep_rolling_back,
+  // wsrep_hton
+  & stage_wsrep_replicating_commit,
+  & stage_wsrep_waiting_on_replaying,
+  & stage_wsrep_pre_commit,
+  // wsrep_mysqld
+  & stage_wsrep_preparing_for_TO_isolation,
+  // wsrep_thd
+  & stage_wsrep_replaying_trx,
+  & stage_wsrep_applier_idle,
+  & stage_wsrep_in_rollback_thread,
+  & stage_wsrep_aborter_idle,
+  & stage_wsrep_aborter_active
+};
+
+#endif /* WITH_WSREP */
 
 PSI_socket_key key_socket_tcpip, key_socket_unix, key_socket_client_connection;
 
@@ -10567,6 +10612,12 @@ void init_server_psi_keys(void)
 
   count= array_elements(all_server_memory);
   mysql_memory_register(category, all_server_memory, count);
+
+#ifdef WITH_WSREP
+  const char *wsrep_category= "wsrep";
+  count= array_elements(wsrep_server_stages);
+  mysql_stage_register(wsrep_category, wsrep_server_stages, count);
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
   init_sql_statement_info();

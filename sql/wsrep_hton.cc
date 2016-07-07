@@ -355,6 +355,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   }
 
   DBUG_PRINT("wsrep", ("replicating commit"));
+  THD_STAGE_INFO_GUARD(thd, &stage_wsrep_replicating_commit);
 
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   if (thd->wsrep_conflict_state == MUST_ABORT) {
@@ -377,7 +378,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
     mysql_mutex_lock(&thd->LOCK_current_cond);
-    thd_proc_info(thd, "wsrep waiting on replaying");
+    THD_STAGE_INFO_GUARD_UPDATE(&stage_wsrep_waiting_on_replaying);
     thd->current_mutex= &LOCK_wsrep_replaying;
     thd->current_cond= &COND_wsrep_replaying;
     mysql_mutex_unlock(&thd->LOCK_current_cond);
@@ -411,6 +412,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     mysql_mutex_lock(&LOCK_wsrep_replaying);
   }
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
+  THD_STAGE_INFO_GUARD_LEAVE();
 
   if (thd->wsrep_conflict_state == MUST_ABORT) {
     DBUG_PRINT("wsrep", ("replicate commit fail"));
@@ -473,9 +475,11 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   }
   else if (!rcode)
   {
+    THD_STAGE_INFO_GUARD(NULL, NULL);
     if (WSREP_OK == rcode) {
-      if (WSREP(thd))
-        thd_proc_info(thd, "wsrep in pre-commit stage");
+      if (WSREP(thd)) {
+        THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_pre_commit);
+      }
       rcode = wsrep->pre_commit(wsrep,
                                 (wsrep_conn_id_t)thd->thread_id(),
                                 &thd->wsrep_ws_handle,
@@ -483,6 +487,13 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                                 ((thd->wsrep_PA_safe) ?
                                  0ULL : WSREP_FLAG_PA_UNSAFE),
                                 &thd->wsrep_trx_meta);
+
+      /* Provide this for some galera test cases that check the thread state */
+      if (WSREP(thd)) {
+        THD_STAGE_INFO_GUARD_LEAVE();
+        DBUG_EXECUTE_IF("thd_proc_info.wsrep_run_wsrep_commit",
+                        { thd_proc_info(thd, "wsrep: in pre-commit stage"); };);
+      }
     }
 
     if (rcode == WSREP_TRX_MISSING) {
