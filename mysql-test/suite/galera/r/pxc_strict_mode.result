@@ -30,6 +30,7 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits using SERIALIZ
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
 call mtr.add_suppression("WSREP doesn't support XA transaction");
+set global pxc_strict_mode='ENFORCING';
 #node-2
 set global pxc_strict_mode='DISABLED';
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of MyISAM table replication as it is an experimental feature");
@@ -37,7 +38,13 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine");
+set global pxc_strict_mode='ENFORCING';
 #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -148,6 +155,11 @@ alter table tinnodb engine=memory;
 alter table tinnodb engine=innodb;
 drop table tinnodb;
 #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -290,6 +302,11 @@ set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
 #node-1
 create table tmyisam (i int, primary key pk(i)) engine=myisam;
 insert into tmyisam values (1), (2);
@@ -391,6 +408,11 @@ set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
 #node-1
 set session wsrep_replicate_myisam = 0;
 select @@wsrep_replicate_myisam;
@@ -426,6 +448,11 @@ i
 2
 drop table tmyisam;
 #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -478,6 +505,11 @@ set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
 #node-1
 set session wsrep_replicate_myisam = 0;
 select @@wsrep_replicate_myisam;
@@ -523,6 +555,11 @@ set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
 #node-1
 set session binlog_format = 'STATEMENT';
 select @@binlog_format;
@@ -575,6 +612,11 @@ i
 2
 drop table tinnodb;
 #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -641,6 +683,11 @@ Warning	1231	Percona-XtraDB-Cluster recommends setting binlog_format to ROW
 set global pxc_strict_mode = 'ENFORCING';
 ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'ENFORCING'
 set session binlog_format = 'ROW';
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -682,6 +729,11 @@ set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
 #node-1
 create table tinnodb (i int) engine=innodb;
 create table tmyisam (i int) engine=innodb;
@@ -704,6 +756,11 @@ i
 2
 drop table tinnodb;
 #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -738,6 +795,11 @@ set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
 #node-1
 create table tinnodb (i int) engine=innodb;
 create table tmyisam (i int) engine=innodb;
@@ -755,6 +817,11 @@ drop table tinnodb;
 set global general_log = 1;
 set global log_output = 'NONE';
 #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -783,6 +850,11 @@ select count(*) from mysql.general_log;
 count(*)
 2
 #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -820,6 +892,11 @@ set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
 #node-1
 set global log_output = 'NONE';
 select 1 from dual;
@@ -849,6 +926,11 @@ count(*)
 1
 #node-1
 #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -920,6 +1002,11 @@ set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
 #node-1
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
@@ -967,6 +1054,11 @@ set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
 #node-1
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
@@ -1002,6 +1094,11 @@ set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
 #node-1
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
@@ -1023,6 +1120,11 @@ i
 drop table tinnodb;
 drop table tinnodb2;
 #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
@@ -1050,6 +1152,11 @@ i
 drop table tinnodb;
 drop table tinnodb2;
 #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 @@pxc_strict_mode
