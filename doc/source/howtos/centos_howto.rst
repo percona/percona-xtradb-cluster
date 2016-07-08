@@ -44,48 +44,48 @@ Individual nodes should be configured to be able to bootstrap the cluster.
 For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 
 1. Make sure that the configuration file :file:`/etc/my.cnf`
-   on the first node (``percona1``) contains the following: ::
+   on the first node (``percona1``) contains the following::
 
-    [mysqld]
+      [mysqld]
 
-    datadir=/var/lib/mysql
-    user=mysql
+      datadir=/var/lib/mysql
+      user=mysql
 
-    # Path to Galera library
-    wsrep_provider=/usr/lib64/libgalera_smm.so
+      # Path to Galera library
+      wsrep_provider=/usr/lib64/libgalera_smm.so
 
-    # Cluster connection URL contains the IPs of node#1, node#2 and node#3
-    wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
+      # Cluster connection URL contains the IPs of node#1, node#2 and node#3
+      wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
 
-    # In order for Galera to work correctly binlog format should be ROW
-    binlog_format=ROW
+      # In order for Galera to work correctly binlog format should be ROW
+      binlog_format=ROW
 
-    # MyISAM storage engine has only experimental support
-    default_storage_engine=InnoDB
+      # MyISAM storage engine has only experimental support
+      default_storage_engine=InnoDB
 
-    # This InnoDB autoincrement locking mode is a requirement for Galera
-    innodb_autoinc_lock_mode=2
+      # This InnoDB autoincrement locking mode is a requirement for Galera
+      innodb_autoinc_lock_mode=2
 
-    # Node 1 address
-    wsrep_node_address=192.168.70.71
+      # Node 1 address
+      wsrep_node_address=192.168.70.71
 
-    # SST method
-    wsrep_sst_method=xtrabackup-v2
+      # SST method
+      wsrep_sst_method=xtrabackup-v2
 
-    # Cluster name
-    wsrep_cluster_name=my_centos_cluster
+      # Cluster name
+      wsrep_cluster_name=my_centos_cluster
 
-    # Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cret"
+      # Authentication for SST method
+      wsrep_sst_auth="sstuser:s3cret"
 
-#. Start the first node with the following command: ::
+#. Start the first node with the following command::
 
-    [root@percona1 ~]# /etc/init.d/mysql bootstrap-pxc
+      [root@percona1 ~]# /etc/init.d/mysql bootstrap-pxc
 
    .. note:: In case you're running CentOS 7,
       the bootstrap service should be used instead: ::
 
-       [root@percona1 ~]#  systemctl start mysql@bootstrap.service
+         [root@percona1 ~]#  systemctl start mysql@bootstrap.service
  
    The previous command will start the cluster
    with initial :variable:`wsrep_cluster_address` variable
@@ -141,43 +141,43 @@ Step 3. Configuring the second node
 ===================================
 
 1. Make sure that the onfiguration file :file:`/etc/my.cnf`
-   on the second node (``percona2``) contains the following: ::
+   on the second node (``percona2``) contains the following::
 
-    [mysqld]
+      [mysqld]
 
-    datadir=/var/lib/mysql
-    user=mysql
+      datadir=/var/lib/mysql
+      user=mysql
 
-    # Path to Galera library
-    wsrep_provider=/usr/lib64/libgalera_smm.so
+      # Path to Galera library
+      wsrep_provider=/usr/lib64/libgalera_smm.so
 
-    # Cluster connection URL contains IPs of node#1, node#2 and node#3
-    wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
+      # Cluster connection URL contains IPs of node#1, node#2 and node#3
+      wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
 
-    # In order for Galera to work correctly binlog format should be ROW
-    binlog_format=ROW
+      # In order for Galera to work correctly binlog format should be ROW
+      binlog_format=ROW
 
-    # MyISAM storage engine has only experimental support
-    default_storage_engine=InnoDB
+      # MyISAM storage engine has only experimental support
+      default_storage_engine=InnoDB
 
-    # This InnoDB autoincrement locking mode is a requirement for Galera
-    innodb_autoinc_lock_mode=2
+      # This InnoDB autoincrement locking mode is a requirement for Galera
+      innodb_autoinc_lock_mode=2
 
-    # Node 2 address
-    wsrep_node_address=192.168.70.72
+      # Node 2 address
+      wsrep_node_address=192.168.70.72
 
-    # Cluster name
-    wsrep_cluster_name=my_centos_cluster
+      # Cluster name
+      wsrep_cluster_name=my_centos_cluster
 
-    # SST method
-    wsrep_sst_method=xtrabackup-v2
+      # SST method
+      wsrep_sst_method=xtrabackup-v2
 
-    #Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cret"
+      #Authentication for SST method
+      wsrep_sst_auth="sstuser:s3cret"
  
-#. Start the second node with the following command: ::
+#. Start the second node with the following command::
 
-  [root@percona2 ~]# /etc/init.d/mysql start
+      [root@percona2 ~]# /etc/init.d/mysql start
 
 #. After the server has been started,
    it should receive |SST| automatically.
@@ -214,41 +214,41 @@ Step 4. Configuring the third node
 1. Make sure that the MySQL configuration file :file:`/etc/my.cnf`
    on the third node (``percona3``) contains the following: ::
 
-    [mysqld]
+      [mysqld]
 
-    datadir=/var/lib/mysql
-    user=mysql
+      datadir=/var/lib/mysql
+      user=mysql
 
-    # Path to Galera library
-    wsrep_provider=/usr/lib64/libgalera_smm.so
+      # Path to Galera library
+      wsrep_provider=/usr/lib64/libgalera_smm.so
 
-    # Cluster connection URL contains IPs of node#1, node#2 and node#3
-    wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
+      # Cluster connection URL contains IPs of node#1, node#2 and node#3
+      wsrep_cluster_address=gcomm://192.168.70.71,192.168.70.72,192.168.70.73
 
-    # In order for Galera to work correctly binlog format should be ROW
-    binlog_format=ROW
+      # In order for Galera to work correctly binlog format should be ROW
+      binlog_format=ROW
 
-    # MyISAM storage engine has only experimental support
-    default_storage_engine=InnoDB
+      # MyISAM storage engine has only experimental support
+      default_storage_engine=InnoDB
 
-    # This InnoDB autoincrement locking mode is a requirement for Galera
-    innodb_autoinc_lock_mode=2
+      # This InnoDB autoincrement locking mode is a requirement for Galera
+      innodb_autoinc_lock_mode=2
 
-    # Node #3 address
-    wsrep_node_address=192.168.70.73
+      # Node #3 address
+      wsrep_node_address=192.168.70.73
 
-    # Cluster name
-    wsrep_cluster_name=my_centos_cluster
+      # Cluster name
+      wsrep_cluster_name=my_centos_cluster
 
-    # SST method
-    wsrep_sst_method=xtrabackup-v2
+      # SST method
+      wsrep_sst_method=xtrabackup-v2
 
-    #Authentication for SST method
-    wsrep_sst_auth="sstuser:s3cret"
+      #Authentication for SST method
+      wsrep_sst_auth="sstuser:s3cret"
 
-#. Start the third node with the following command: :: 
+#. Start the third node with the following command:: 
 
-    [root@percona3 ~]# /etc/init.d/mysql start
+      [root@percona3 ~]# /etc/init.d/mysql start
 
 #. After the server has been started,
    it should receive SST automatically.
