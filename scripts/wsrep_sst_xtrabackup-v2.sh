@@ -78,6 +78,7 @@ keyring=""
 keyringsid=""
 keyringbackupopt=""
 keyringapplyopt=""
+XB_DONOR_KEYRING_FILE_PATH=""
 
 tmpopts=""
 itmpdir=""
@@ -272,6 +273,10 @@ get_transfer()
 # user can specify xtrabackup specific settings that will be used during sst
 # process like encryption, etc.....
 # parse such configuration option. (group for xb settings is [sst] in my.cnf
+#
+# 1st param: group : name of the config file section, e.g. mysqld
+# 2nd param: var : name of the variable in the section, e.g. server-id
+# 3rd param: - : default value for the param
 parse_cnf()
 {
     local group=$1
@@ -301,21 +306,35 @@ read_cnf()
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
-    cpat=$(parse_cnf sst cpat '.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    cpat=$(parse_cnf sst cpat '.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*\.keyring$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
 
-    keyring=$(parse_cnf mysqld keyring-file-data "")
+    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+        keyring=$(parse_cnf mysqld${WSREP_SST_OPT_CONF_SUFFIX} keyring-file-data "")
+    fi
+    if [[ -z $keyring ]]; then
+        keyring=$(parse_cnf mysqld keyring-file-data "")
+    fi
     if [[ -z $keyring ]]; then
         keyring=$(parse_cnf sst keyring-file-data "")
     fi
 
-    keyringsid=$(parse_cnf mysqld server-id "")
+    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+        keyringsid=$(parse_cnf mysqld${WSREP_SST_OPT_CONF_SUFFIX} server-id "")
+    fi
+    if [[ -z $keyringsid ]]; then
+        keyringsid=$(parse_cnf mysqld server-id "")
+    fi
     if [[ -z $keyringsid ]]; then
         keyringsid=$(parse_cnf sst server-id "")
+    fi
+    # If we can't find a server-id, assume a default of 0
+    if [[ -z $keyringsid ]]; then
+        keyringsid=0
     fi
 
     # Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html
@@ -432,7 +451,8 @@ sig_joiner_cleanup()
 {
     wsrep_log_error "Removing $XB_GTID_INFO_FILE_PATH file due to signal"
     rm -f "$XB_GTID_INFO_FILE_PATH"
-    rm -f "\${STATDIR}/$XB_DONOR_KEYRING_FILE" || true
+    wsrep_log_error "Removing $XB_DONOR_KEYRING_FILE_PATH file due to signal"
+    rm -f "$XB_DONOR_KEYRING_FILE_PATH" || true
 }
 
 cleanup_joiner()
@@ -451,6 +471,12 @@ cleanup_joiner()
     fi
     if [[ -n ${STATDIR:-} ]]; then
        [[ -d $STATDIR ]] && rm -rf $STATDIR
+    fi
+
+    wsrep_log_info "Removing the .keyring directory"
+    rm -rf "${DATA}/.keyring" || true
+    if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
+        rm -f "${XB_DONOR_KEYRING_FILE_PATH}"
     fi
 
     # Final cleanup
@@ -596,6 +622,15 @@ check_extra()
 
 #
 # JOINER function to recieve data from DONOR.
+#
+# 1st param: dir
+# 2nd param: msg
+# 3rd param: tmt : timeout
+# 4th param: checkf : file check
+#   If this is -1, skip all error checking
+#   If this is 0, do nothing (no additional checks)
+#   If this is 1, check to see if the gtid info file exists
+#   If this is 2, check to see if the keyring file exists
 recv_joiner()
 {
     local dir=$1
@@ -626,6 +661,12 @@ recv_joiner()
     set -e
     popd 1>/dev/null
 
+    if [[ $checkf -eq -1 ]]; then
+        # we don't care about errors (or we expect an error to occur)
+        # just return
+        return
+    fi
+
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "Possible timeout in receving first data from donor in "
                         "gtid/keyring stage"
@@ -647,6 +688,15 @@ recv_joiner()
         wsrep_log_info "$(ls -l ${dir}/*)"
         exit 32
     fi
+
+    if [[ $checkf -eq 2 && ! -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
+        wsrep_log_error "FATAL: xtrabackup could not find '${XB_DONOR_KEYRING_FILE_PATH}'"
+        wsrep_log_error "The joiner is using a keyring file but the donor has not sent"
+        wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
+        wsrep_log_error "both sides are using a keyring file"
+        exit 32
+    fi
+
 }
 
 #
@@ -721,11 +771,12 @@ if [[ ! -x `which $INNOBACKUPEX_BIN` ]]; then
     exit 2
 fi
 
-# Starting with 5.7, the redo log format has changed and so XB-2.4.2 or higher is needed
+# Starting with 5.7, the redo log format has changed and so XB-2.4.3 or higher is needed
 # for performing backup (read SST)
 
 # XB_REQUIRED_VERSION requires at least major.minor version (e.g. 2.4.1 or 3.0)
-XB_REQUIRED_VERSION="2.4.2"
+XB_REQUIRED_VERSION="2.4.3"
+XB_REQUIRED_VERSION_FOR_KEYRING="2.4.4"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
@@ -737,6 +788,8 @@ if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION; then
     wsrep_log_error "The $INNOBACKUPEX_BIN version is $XB_VERSION. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
     exit 2
 fi
+
+wsrep_log_info "The $INNOBACKUPEX_BIN version is $XB_VERSION"
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"
 
@@ -751,6 +804,14 @@ fi
 # read configuration and setup ports for streaming data.
 read_cnf
 setup_ports
+
+# Need this check because this was released before 2.4.4 was released
+if [[ -n $keyring ]]; then
+    if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION_FOR_KEYRING; then
+        wsrep_log_error "The $INNOBACKUPEX_BIN version is $XB_VERSION. Needs xtrabackup-$XB_REQUIRED_VERSION_FOR_KEYRING or higher to perform SST with a keyring"
+        exit 2
+    fi
+fi
 
 if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
     disver="--no-version-check"
@@ -772,7 +833,7 @@ if [[ $ssyslog -eq 1 ]]; then
         wsrep_log_error "logger not in path: $PATH. Ignoring"
     else
 
-        wsrep_log_info "Logging all stderr of SST/Innobackupex to syslog"
+        wsrep_log_info "Logging all stderr of SST/XtraBackup to syslog"
 
         exec 2> >(logger -p daemon.err -t ${ssystag}wsrep-sst-$WSREP_SST_OPT_ROLE)
 
@@ -867,13 +928,25 @@ then
         send_donor $DATA "${stagemsg}-gtid"
 
         if [[ -n $keyring ]]; then
-	   # joiner need to wait to recieve the file.
-           sleep 3
-           cp $keyring $DATA/$XB_DONOR_KEYRING_FILE
-           wsrep_log_info "Streaming donor-keyring file before SST"
-           keyringbackupopt=" --keyring-file-data=$DATA/$XB_DONOR_KEYRING_FILE --server-id=$keyringsid "
-           FILE_TO_STREAM=$XB_DONOR_KEYRING_FILE
-           send_donor $DATA "${stagemsg}-keyring"
+            # Verify that encryption is being used
+            # Do NOT send a keyring file without encryption
+            # Need encrypt >= 2
+            if [[ $encrypt -le 1 ]]; then
+                wsrep_log_error "FATAL: An unencrypted channel is being used."
+                wsrep_log_error "Sending/using a keyring requires an encrypted channel."
+                exit 22
+            fi
+
+            # joiner need to wait to receive the file.
+            sleep 3
+
+            cp $keyring $DATA/$XB_DONOR_KEYRING_FILE
+
+            wsrep_log_info "Streaming donor-keyring file before SST"
+            keyringbackupopt=" --keyring-file-data=${DATA}/${XB_DONOR_KEYRING_FILE} --server-id=$keyringsid "
+            FILE_TO_STREAM=$XB_DONOR_KEYRING_FILE
+            send_donor $DATA "${stagemsg}-keyring"
+
         fi
 
         tcmd="$ttcmd"
@@ -993,9 +1066,34 @@ then
 
     # server-id is already part of backup-my.cnf so avoid appending it.
     # server-id is the id of the node that is acting as donor and not joiner node.
+
+    if [[ -d ${DATA}/.keyring ]]; then
+        rm -rf ${DATA}/.keyring
+    fi
+    mkdir -p ${DATA}/.keyring
+
     if [[ -n $keyring ]]; then
-         recv_joiner $STATDIR "${stagemsg}-keyring" 0 0
-         keyringapplyopt=" --keyring-file-data=$STATDIR/$XB_DONOR_KEYRING_FILE "
+        # joiner needs to wait to receive the file.
+        sleep 3
+
+        XB_DONOR_KEYRING_FILE_PATH="${DATA}/.keyring/${XB_DONOR_KEYRING_FILE}"
+        recv_joiner "${DATA}/.keyring" "${stagemsg}-keyring" 0 2
+        keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
+
+        wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
+    else
+        # There shouldn't be a keyring file, since we do not have a keyring here
+        # This will error out if a keyring file IS found
+        XB_DONOR_KEYRING_FILE_PATH="${DATA}/.keyring/${XB_DONOR_KEYRING_FILE}"
+        recv_joiner "{DATA}/.keyring" "${stagemsg}-keyring" 5 -1
+
+        if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
+            wsrep_log_error "FATAL: xtrabackup found '${XB_DONOR_KEYRING_FILE_PATH}'"
+            wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
+            wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
+            wsrep_log_error "both sides are using a keyring file"
+            exit 32
+        fi
     fi
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
@@ -1042,7 +1140,7 @@ then
         get_proc
 
         if [[ ! -s ${DATA}/xtrabackup_checkpoints ]]; then
-            wsrep_log_error "xtrabackup_checkpoints missing, failed innobackupex/SST on donor"
+            wsrep_log_error "xtrabackup_checkpoints missing, failed xtrabackup/SST on donor"
             exit 2
         fi
 
@@ -1125,6 +1223,13 @@ then
             exit 22
         fi
 
+        # If we have received a keyring file, make a preliminary copy of the keyring
+        # used for the SST so that it doesn't get lost if an error occurs.
+        if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
+            wsrep_log_info "Copying $XB_DONOR_KEYRING_FILE_PATH to $keyring.keyring-sst"
+            mv $XB_DONOR_KEYRING_FILE_PATH $keyring.keyring-sst
+        fi
+
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
         set +e
         rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
@@ -1132,10 +1237,21 @@ then
         wsrep_log_info "Moving the backup to ${TDATA}"
         timeit "Xtrabackup move stage" "$INNOMOVE"
         if [[ $? -eq 0 ]]; then
+
+            # Did we receive a keyring file?
+            if [[ -r "${keyring}.keyring-sst" ]]; then
+                wsrep_log_info "Moving sst keyring into place: moving $keyring.keyring-sst to $keyring"
+                mv $keyring.keyring-sst $keyring
+                wsrep_log_info "Keyring move successful"
+            fi
+
             wsrep_log_info "Move successful, removing ${DATA}"
             rm -rf $DATA
             DATA=${TDATA}
         else
+            if [[ -r "${keyring}.keyring-sst" ]]; then
+                rm -f $keyring.keyring-sst
+            fi
             wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis"
             wsrep_log_error "Check ${DATA}/innobackup.move.log for details"
             exit 22
