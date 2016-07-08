@@ -63,6 +63,8 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE 
 
 call mtr.add_suppression("WSREP doesn't support XA transaction");
 
+set global pxc_strict_mode='ENFORCING';
+
 --connection node_2
 --echo #node-2
 
@@ -78,6 +80,8 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine");
 
+set global pxc_strict_mode='ENFORCING';
+
 #-------------------------------------------------------------------------------
 #
 # Scenario-1: Engine-type
@@ -89,6 +93,11 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 # DISABLED
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 
@@ -185,6 +194,11 @@ drop table tinnodb;
 --echo #node-1
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
 
 #
 # base table in myisam format
@@ -276,6 +290,11 @@ drop table tinnodb;
 # ENFORCING
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 
@@ -395,6 +414,11 @@ drop table tinnodb;
 --echo #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
 
 #
 # wsrep_replicate_myisam = 0
@@ -433,6 +457,11 @@ drop table tmyisam;
 # PERMISSIVE
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 
@@ -476,6 +505,11 @@ drop table tmyisam;
 --error ER_WRONG_VALUE_FOR_VAR
 set global pxc_strict_mode = 'ENFORCING';
 set session wsrep_replicate_myisam = 0;
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 
@@ -538,6 +572,11 @@ drop table tmyisam;
 --echo #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
 
 #
 # binlog_format=STATEMENT
@@ -593,6 +632,11 @@ drop table tinnodb;
 # PERMISSIVE
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 
@@ -654,6 +698,11 @@ set session binlog_format = 'STATEMENT';
 --error ER_WRONG_VALUE_FOR_VAR
 set global pxc_strict_mode = 'ENFORCING';
 set session binlog_format = 'ROW';
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 
@@ -705,6 +754,11 @@ drop table tinnodb;
 --echo #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
 
 #
 --connection node_1
@@ -730,6 +784,11 @@ drop table tinnodb;
 --echo #node-1
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
 
 #
 --connection node_1
@@ -753,6 +812,11 @@ drop table tinnodb;
 # ENFORCING
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 
@@ -794,6 +858,11 @@ set global log_output = 'NONE';
 --echo #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
 
 #
 # log_output=NONE
@@ -826,6 +895,11 @@ select count(*) from mysql.general_log;
 # PERMISSIVE
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
 
@@ -863,6 +937,11 @@ select count(*) from mysql.general_log;
 --error ER_WRONG_VALUE_FOR_VAR
 set global pxc_strict_mode = 'ENFORCING';
 set global log_output = 'FILE';
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 
@@ -922,6 +1001,11 @@ select count(*) from mysql.general_log;
 # DISABLED
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
 
@@ -993,6 +1077,11 @@ drop table tinnodb;
 --echo #node-1
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
 
 #
 # Try to issue different kind of locking statements
@@ -1027,6 +1116,11 @@ drop table tinnodb;
 --error ER_WRONG_VALUE_FOR_VAR
 set global pxc_strict_mode = 'ENFORCING';
 set session transaction isolation level repeatable read;
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 
@@ -1075,6 +1169,11 @@ set session transaction isolation level repeatable read;
 --echo #node-1
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
 
 #
 --connection node_1
@@ -1099,6 +1198,11 @@ drop table tinnodb2;
 --echo #node-1
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
 
 #
 --connection node_1
@@ -1121,6 +1225,11 @@ drop table tinnodb2;
 # ENFORCING
 --connection node_1
 --echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
 

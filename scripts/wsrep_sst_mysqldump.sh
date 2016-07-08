@@ -122,12 +122,15 @@ MYSQL="$MYSQL_CLIENT --defaults-extra-file=$WSREP_SST_OPT_CONF "\
 # this causes an error if logging is enabled
 GENERAL_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@GENERAL_LOG"`
 SLOW_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@SLOW_QUERY_LOG"`
+PXC_STRICT_MODE=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@pxc_strict_mode"`
 $MYSQL -e "$STOP_WSREP SET GLOBAL GENERAL_LOG=OFF"
 $MYSQL -e "$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
+$MYSQL -e "$STOP_WSREP SET GLOBAL pxc_strict_mode=DISABLED"
 
 # commands to restore log settings
 RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
 RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
+RESTORE_PXC_STRICT_MODE="SET GLOBAL pxc_strict_mode='$PXC_STRICT_MODE';"
 
 # reset master for 5.6 to clear GTID_EXECUTED
 RESET_MASTER="RESET MASTER;"
@@ -142,13 +145,15 @@ then
     (echo $STOP_WSREP && echo $RESET_MASTER) | $MYSQL || true
     (echo $STOP_WSREP && $MYSQLDUMP_GENERAL && $MYSQLDUMP_SYS_SCHEMA \
         && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
+        && echo $RESTORE_PXC_STRICT_MODE \
         && echo $SET_START_POSITION \
         || echo "SST failed to complete;") | $MYSQL
 else
     wsrep_log_info "Bypassing state dump."
     echo $SET_START_POSITION | $MYSQL
-    (echo $RESTORE_GENERAL_LOG && \
-        echo $RESTORE_SLOW_QUERY_LOG) | $MYSQL
+    (echo $RESTORE_GENERAL_LOG \
+     && echo $RESTORE_SLOW_QUERY_LOG \
+     && echo $RESTORE_PXC_STRICT_MODE) | $MYSQL
 fi
 wsrep_cleanup_progress_file
 #

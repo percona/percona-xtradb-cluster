@@ -795,7 +795,7 @@ static const char* pxc_strict_mode_to_string(ulong value)
 bool pxc_strict_mode_check(sys_var *self, THD* thd, set_var* var)
 {
   /* pxc-strict-mode can be changed only if node is cluster-node. */
-  if (!(WSREP(thd)))
+  if (!(WSREP_ON))
   {
     WSREP_ERROR("pxc_strict_mode can be changed only if node is cluster-node");
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
