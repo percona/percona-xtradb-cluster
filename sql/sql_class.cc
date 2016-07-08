@@ -2272,10 +2272,13 @@ void THD::release_resources()
   if (current_thd == this)
     restore_globals();
   m_release_resources_done= true;
+
 #ifdef WITH_WSREP
   mysql_mutex_lock(&LOCK_wsrep_thd);
   mysql_mutex_unlock(&LOCK_wsrep_thd);
   mysql_mutex_destroy(&LOCK_wsrep_thd);
+  mysql_cond_destroy(&COND_wsrep_thd);
+
   if (wsrep_rli) delete wsrep_rli;
   wsrep_free_status(this);
 #endif

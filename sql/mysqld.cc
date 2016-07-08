@@ -731,12 +731,12 @@ mysql_mutex_t LOCK_wsrep_sst_init;
 mysql_cond_t  COND_wsrep_sst_init;
 mysql_mutex_t LOCK_wsrep_rollback;
 mysql_cond_t  COND_wsrep_rollback;
-wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
 mysql_mutex_t LOCK_wsrep_replaying;
 mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 
+wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
 int wsrep_replaying= 0;
 
 static void wsrep_close_threads(THD* thd);
@@ -9655,10 +9655,13 @@ PSI_mutex_key
   key_LOCK_log_throttle_qni, key_LOCK_query_plan, key_LOCK_thd_query,
   key_LOCK_cost_const, key_LOCK_current_cond;
 #ifdef WITH_WSREP
-PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
-  key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
-  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
-  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync;
+PSI_mutex_key key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, key_LOCK_wsrep_sst_init,
+  key_LOCK_wsrep_rollback, key_LOCK_wsrep_replaying;
+
+PSI_mutex_key key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync;
+
+PSI_mutex_key key_LOCK_wsrep_thd;
+PSI_mutex_key key_LOCK_wsrep_sst_thread;
 #endif /* WITH_WSREP */
 PSI_mutex_key key_RELAYLOG_LOCK_commit;
 PSI_mutex_key key_RELAYLOG_LOCK_commit_queue;
@@ -9766,14 +9769,15 @@ static PSI_mutex_info all_server_mutexes[]=
 #ifdef WITH_WSREP
   { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_sst_thread, "wsrep_sst_thread", 0},
   { &key_LOCK_wsrep_sst_init, "LOCK_wsrep_sst_init", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_rollback, "LOCK_wsrep_rollback", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
+
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
+
+  { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
+  { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0},
 #endif /* WITH_WSREP */
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},
@@ -9846,9 +9850,11 @@ PSI_cond_key key_BINLOG_update_cond,
   key_TABLE_SHARE_cond, key_user_level_lock_cond;
 
 #ifdef WITH_WSREP
-PSI_cond_key key_COND_wsrep_rollback, key_COND_wsrep_thd, 
-  key_COND_wsrep_replaying, key_COND_wsrep_ready, key_COND_wsrep_sst,
-  key_COND_wsrep_sst_init, key_COND_wsrep_sst_thread;
+PSI_cond_key key_COND_wsrep_ready, key_COND_wsrep_sst, key_COND_wsrep_sst_init,
+  key_COND_wsrep_rollback, key_COND_wsrep_replaying;
+
+PSI_cond_key key_COND_wsrep_thd;
+PSI_cond_key key_COND_wsrep_sst_thread;
 #endif /* WITH_WSREP */
 
 PSI_cond_key key_RELAYLOG_update_cond;
@@ -9905,10 +9911,11 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_ready, "COND_wsrep_ready", PSI_FLAG_GLOBAL},
   { &key_COND_wsrep_sst, "COND_wsrep_sst", PSI_FLAG_GLOBAL},
   { &key_COND_wsrep_sst_init, "COND_wsrep_sst_init", PSI_FLAG_GLOBAL},
-  { &key_COND_wsrep_sst_thread, "wsrep_sst_thread", 0},
   { &key_COND_wsrep_rollback, "COND_wsrep_rollback", PSI_FLAG_GLOBAL},
-  { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0},
   { &key_COND_wsrep_replaying, "COND_wsrep_replaying", PSI_FLAG_GLOBAL},
+
+  { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0},
+  { &key_COND_wsrep_sst_thread, "wsrep_sst_thread", 0},
 #endif /* WITH_WSREP */
   { &key_gtid_ensure_index_cond, "Gtid_state", PSI_FLAG_GLOBAL},
   { &key_COND_compress_gtid_table, "COND_compress_gtid_table", PSI_FLAG_GLOBAL}
@@ -9924,6 +9931,10 @@ PSI_thread_key key_thread_bootstrap, key_thread_handle_manager, key_thread_main,
   key_thread_compress_gtid_table, key_thread_parser_service;
 PSI_thread_key key_thread_daemon_plugin;
 PSI_thread_key key_thread_timer_notifier;
+#ifdef WITH_WSREP
+PSI_thread_key key_THREAD_wsrep_sst_joiner, key_THREAD_wsrep_sst_donor,
+  key_THREAD_wsrep_applier, key_THREAD_wsrep_rollbacker;
+#endif /* WITH_WSREP */
 
 static PSI_thread_info all_server_threads[]=
 {
@@ -9942,6 +9953,13 @@ static PSI_thread_info all_server_threads[]=
   { &key_thread_compress_gtid_table, "compress_gtid_table", PSI_FLAG_GLOBAL},
   { &key_thread_parser_service, "parser_service", PSI_FLAG_GLOBAL},
   { &key_thread_daemon_plugin, "daemon_plugin", PSI_FLAG_GLOBAL}
+#ifdef WITH_WSREP
+  ,
+  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", 0},
+  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_joiner", 0},
+  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", 0},
+  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", 0}
+#endif /* WITH_WSREP */
 };
 
 PSI_file_key key_file_map;

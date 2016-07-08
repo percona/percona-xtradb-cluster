@@ -315,14 +315,20 @@ extern PSI_mutex_key key_LOCK_wsrep_sst;
 extern PSI_cond_key  key_COND_wsrep_sst;
 extern PSI_mutex_key key_LOCK_wsrep_sst_init;
 extern PSI_cond_key  key_COND_wsrep_sst_init;
-extern PSI_mutex_key key_LOCK_wsrep_sst_thread;
-extern PSI_cond_key  key_COND_wsrep_sst_thread;
 extern PSI_mutex_key key_LOCK_wsrep_rollback;
 extern PSI_cond_key  key_COND_wsrep_rollback;
 extern PSI_mutex_key key_LOCK_wsrep_replaying;
 extern PSI_cond_key  key_COND_wsrep_replaying;
 extern PSI_mutex_key key_LOCK_wsrep_slave_threads;
 extern PSI_mutex_key key_LOCK_wsrep_desync;
+
+extern PSI_mutex_key key_LOCK_wsrep_sst_thread;
+extern PSI_cond_key  key_COND_wsrep_sst_thread;
+
+extern PSI_thread_key key_THREAD_wsrep_sst_joiner;
+extern PSI_thread_key key_THREAD_wsrep_sst_donor;
+extern PSI_thread_key key_THREAD_wsrep_applier;
+extern PSI_thread_key key_THREAD_wsrep_rollbacker;
 #endif /* HAVE_PSI_INTERFACE */
 struct TABLE_LIST;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
