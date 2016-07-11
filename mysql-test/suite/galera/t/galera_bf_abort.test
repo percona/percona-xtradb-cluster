@@ -17,6 +17,8 @@ INSERT INTO t1 VALUES (1);
 INSERT INTO t1 VALUES (1);
 
 --connection node_2
+# given some time for insert on node-1 to replicate on node-2
+--sleep 5
 --error ER_LOCK_DEADLOCK
 INSERT INTO t1 VALUES (2);
 
