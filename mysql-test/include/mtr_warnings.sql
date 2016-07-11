@@ -295,6 +295,7 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Table without explict primary key \\(not-recommended\\) and certification of nonPK table is OFF too"),
  ("WSREP: Node is not a cluster node. Disabling pxc_strict_mode"),
  ("WSREP: pxc_strict_mode can be changed only if node is cluster-node"),
+ ("WSREP: evs::proto.*install timer expired"),
 
  /*
    Warning message introduced by wl#7706
