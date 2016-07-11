@@ -5497,7 +5497,19 @@ finish:
     }
   }
 
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  if (thd->wsrep_conflict_state != REPLAYED)
+  {
+#endif /* WITH_WSREP */
   lex->unit->cleanup(true);
+#ifdef WITH_WSREP
+  }
+  else
+    thd->wsrep_conflict_state= NO_CONFLICT;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
+
   /* Free tables */
   THD_STAGE_INFO(thd, stage_closing_tables);
   close_thread_tables(thd);
@@ -6086,7 +6098,6 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
           }
           else
             error= mysql_execute_command(thd, true);
-
           MYSQL_QUERY_EXEC_DONE(error);
 	}
       }

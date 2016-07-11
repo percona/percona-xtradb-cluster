@@ -48,6 +48,7 @@ enum wsrep_conflict_state {
     ABORTED,
     MUST_REPLAY,
     REPLAYING,
+    REPLAYED,
     RETRY_AUTOCOMMIT,
     CERT_FAILURE,
 };
