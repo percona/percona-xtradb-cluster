@@ -62,7 +62,9 @@ select * from t1;
 
 show variables like 'binlog_format';
 show variables like 'auto_increment_increment';
+--disable_warnings
 SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+--enable_warnings
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 
@@ -70,7 +72,9 @@ select * from t1;
 
 show variables like 'binlog_format';
 show variables like 'auto_increment_increment';
+--disable_warnings
 SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+--enable_warnings
 
 --connection node_1
 DROP TABLE t1;
