@@ -1,4 +1,6 @@
 CREATE TABLE t1 (f1 INTEGER);
+SELECT * FROM t1;
+f1
 SET SESSION wsrep_reject_queries = ALL;
 ERROR HY000: Variable 'wsrep_reject_queries' is a GLOBAL variable and should be set with SET GLOBAL
 SET GLOBAL wsrep_reject_queries = ALL;
