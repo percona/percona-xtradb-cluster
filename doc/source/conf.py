@@ -137,7 +137,7 @@ rst_prolog = '''
 
 .. |Percona XtraBackup|  replace:: *Percona XtraBackup*
 
-.. |Percona Server|  replace:: *Percona Server*
+.. |PS|  replace:: *Percona Server*
 
 .. |Percona|  replace:: *Percona*
 
