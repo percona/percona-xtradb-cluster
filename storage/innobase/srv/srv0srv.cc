@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2016, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, 2016, Percona Inc.
 
@@ -646,6 +646,10 @@ struct srv_sys_t{
 	srv_stats_t::ulint_ctr_1_t
 			activity_count;		/*!< For tracking server
 						activity */
+	srv_stats_t::ulint_ctr_1_t
+			ibuf_merge_activity_count;/*!< For tracking change
+						buffer merge activity, a subset
+						of overall server activity */
 };
 
 static srv_sys_t*	srv_sys	= NULL;
@@ -734,12 +738,16 @@ srv_print_master_thread_info(
 /*=========================*/
 	FILE  *file)    /* in: output stream */
 {
-	fprintf(file, "srv_master_thread loops: %lu srv_active,"
-		" %lu srv_shutdown, %lu srv_idle\n",
+	fprintf(file,
+		"srv_master_thread loops: "
+		ULINTPF " srv_active, "
+		ULINTPF " srv_shutdown, "
+		ULINTPF " srv_idle\n",
 		srv_main_active_loops,
 		srv_main_shutdown_loops,
 		srv_main_idle_loops);
-	fprintf(file, "srv_master_thread log flush and writes: %lu\n",
+	fprintf(file,
+		"srv_master_thread log flush and writes: " ULINTPF "\n",
 		srv_log_writes_and_flush);
 }
 
@@ -1468,11 +1476,15 @@ srv_printf_innodb_monitor(
 	fputs("--------------\n"
 	      "ROW OPERATIONS\n"
 	      "--------------\n", file);
-	fprintf(file, "%ld queries inside InnoDB, %lu queries in queue\n",
-		(long) srv_conc_get_active_threads(),
+	fprintf(file,
+		ULINTPF " queries inside InnoDB, "
+		ULINTPF " queries in queue\n",
+		srv_conc_get_active_threads(),
 		srv_conc_get_waiting_threads());
 
-	fprintf(file, "%lu read views open inside InnoDB\n",
+	/* This is a dirty read, without holding trx_sys->mutex. */
+	fprintf(file,
+		ULINTPF " read views open inside InnoDB\n",
 		trx_sys->mvcc->size());
 
 	mutex_enter(&trx_sys->mutex);
@@ -1493,20 +1505,22 @@ srv_printf_innodb_monitor(
 	n_reserved = fil_space_get_n_reserved_extents(0);
 	if (n_reserved > 0) {
 		fprintf(file,
-			"%lu tablespace extents now reserved for"
+			ULINTPF " tablespace extents now reserved for"
 			" B-tree split operations\n",
-			(ulong) n_reserved);
+			n_reserved);
 	}
 
 	fprintf(file,
 		"Process ID=" ULINTPF
-		", Main thread ID=" ULINTPF ", state: %s\n",
+		", Main thread ID=" ULINTPF
+		", state: %s\n",
 		srv_main_thread_process_no,
 		srv_main_thread_id,
 		srv_main_thread_op_info);
 	fprintf(file,
 		"Number of rows inserted " ULINTPF
-		", updated " ULINTPF ", deleted " ULINTPF
+		", updated " ULINTPF
+		", deleted " ULINTPF
 		", read " ULINTPF "\n",
 		(ulint) srv_stats.n_rows_inserted,
 		(ulint) srv_stats.n_rows_updated,
@@ -1559,6 +1573,8 @@ srv_export_innodb_status(void)
 
 	mem_adaptive_hash = 0;
 
+	rw_lock_s_lock(btr_search_latches[0]);
+
 	ut_ad(btr_search_sys->hash_tables);
 
 	for (i = 0; i < btr_ahi_parts; i++) {
@@ -1575,10 +1591,15 @@ srv_export_innodb_status(void)
 		mem_adaptive_hash += ht->n_cells * sizeof(hash_cell_t);
 	}
 
+	rw_lock_s_unlock(btr_search_latches[0]);
+
+	mutex_enter(&dict_sys->mutex);
+
 	mem_dictionary = (dict_sys ? ((dict_sys->table_hash->n_cells
 					+ dict_sys->table_id_hash->n_cells
 				      ) * sizeof(hash_cell_t)
 				+ dict_sys->size) : 0);
+	mutex_exit(&dict_sys->mutex);
 
 	mutex_enter(&srv_innodb_monitor_mutex);
 
@@ -1902,7 +1923,7 @@ exit_func:
 	/* We count the number of threads in os_thread_exit(). A created
 	thread should always use that to exit and not use return() to exit. */
 
-	os_thread_exit(NULL);
+	os_thread_exit();
 
 	OS_THREAD_DUMMY_RETURN;
 }
@@ -2049,7 +2070,7 @@ rescan_idle:
 	/* We count the number of threads in os_thread_exit(). A created
 	thread should always use that to exit and not use return() to exit. */
 
-	os_thread_exit(NULL);
+	os_thread_exit();
 
 	OS_THREAD_DUMMY_RETURN;
 }
@@ -2057,10 +2078,15 @@ rescan_idle:
 /******************************************************************//**
 Increment the server activity count. */
 void
-srv_inc_activity_count(void)
-/*========================*/
+srv_inc_activity_count(
+/*===================*/
+	bool ibuf_merge_activity)	/*!< whether this activity bump
+					is caused by the background
+					change buffer merge */
 {
 	srv_sys->activity_count.inc();
+	if (ibuf_merge_activity)
+		srv_sys->ibuf_merge_activity_count.inc();
 }
 
 /**********************************************************************//**
@@ -2194,7 +2220,7 @@ DECLARE_THREAD(srv_redo_log_follow_thread)(
 	srv_redo_log_thread_started = false; /* Defensive, not required */
 
 	my_thread_end();
-	os_thread_exit(NULL);
+	os_thread_exit();
 
 	OS_THREAD_DUMMY_RETURN;
 }
@@ -2283,15 +2309,48 @@ srv_get_activity_count(void)
 	return(srv_sys->activity_count);
 }
 
+/** Get current server ibuf merge activity count.
+@return ibuf merge activity count */
+static
+ulint
+srv_get_ibuf_merge_activity_count(void)
+{
+	return(srv_sys->ibuf_merge_activity_count);
+}
+
 /*******************************************************************//**
-Check if there has been any activity.
+Check if there has been any activity. Considers background change buffer
+merge as regular server activity unless a non-default
+old_ibuf_merge_activity_count value is passed, in which case the merge will be
+treated as keeping server idle.
 @return FALSE if no change in activity counter. */
 ibool
 srv_check_activity(
 /*===============*/
-	ulint		old_activity_count)	/*!< in: old activity count */
+	ulint		old_activity_count,	/*!< in: old activity count */
+						/*!< old change buffer merge
+						activity count, or
+						ULINT_UNDEFINED */
+	ulint		old_ibuf_merge_activity_count)
 {
-	return(srv_sys->activity_count != old_activity_count);
+	ulint	new_activity_count = srv_sys->activity_count;
+	if (old_ibuf_merge_activity_count == ULINT_UNDEFINED)
+		return(new_activity_count != old_activity_count);
+
+	/* If we care about ibuf merge activity, then the server is considered
+	idle if all activity, if any, was due to ibuf merge. */
+	ulint	new_ibuf_merge_activity_count
+		= srv_sys->ibuf_merge_activity_count;
+
+	ut_ad(new_ibuf_merge_activity_count <= new_activity_count);
+	ut_ad(new_ibuf_merge_activity_count >= old_ibuf_merge_activity_count);
+	ut_ad(new_activity_count >= old_activity_count);
+
+	ulint	ibuf_merge_activity_delta =
+		new_ibuf_merge_activity_count - old_ibuf_merge_activity_count;
+	ulint	activity_delta = new_activity_count - old_activity_count;
+
+	return (activity_delta > ibuf_merge_activity_delta);
 }
 
 /********************************************************************//**
@@ -2694,6 +2753,8 @@ DECLARE_THREAD(srv_master_thread)(
 
 	srv_slot_t*	slot;
 	ulint		old_activity_count = srv_get_activity_count();
+	ulint		old_ibuf_merge_activity_count
+		= srv_get_ibuf_merge_activity_count();
 	ib_time_t	last_print_time;
 
 	ut_ad(!srv_read_only_mode);
@@ -2731,8 +2792,12 @@ loop:
 
 		srv_current_thread_priority = srv_master_thread_priority;
 
-		if (srv_check_activity(old_activity_count)) {
+		if (srv_check_activity(old_activity_count,
+				       old_ibuf_merge_activity_count)) {
+
 			old_activity_count = srv_get_activity_count();
+			old_ibuf_merge_activity_count
+				= srv_get_ibuf_merge_activity_count();
 			srv_master_do_active_tasks();
 		} else {
 			srv_master_do_idle_tasks();
@@ -2764,7 +2829,7 @@ suspend_thread:
 	}
 
 	my_thread_end();
-	os_thread_exit(NULL);
+	os_thread_exit();
 	DBUG_RETURN(0);
 }
 
@@ -2915,7 +2980,7 @@ DECLARE_THREAD(srv_worker_thread)(
         my_thread_end();
 	/* We count the number of threads in os_thread_exit(). A created
 	thread should always use that to exit and not use return() to exit. */
-	os_thread_exit(NULL);
+	os_thread_exit();
 
 	OS_THREAD_DUMMY_RETURN;	/* Not reached, avoid compiler warning */
 }
@@ -3244,7 +3309,7 @@ DECLARE_THREAD(srv_purge_coordinator_thread)(
 	my_thread_end();
 	/* We count the number of threads in os_thread_exit(). A created
 	thread should always use that to exit and not use return() to exit. */
-	os_thread_exit(NULL);
+	os_thread_exit();
 
 	OS_THREAD_DUMMY_RETURN;	/* Not reached, avoid compiler warning */
 }

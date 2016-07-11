@@ -7,12 +7,16 @@ export DH_VERBOSE=1
 export CFLAGS=
 export CXXFLAGS=
 
-PACKAGE=percona-server-5.7
-PS_VERSION_EXTRA = '@@PERCONA_VERSION_EXTRA@@'
-REVISION = '@@REVISION@@'
-COMPILATION_COMMENT_RELEASE = "Percona Server (GPL), Release $(PS_VERSION_EXTRA), Revision $(REVISION)"
-COMPILATION_COMMENT_DEBUG = "Percona Server - Debug (GPL), Release $(PS_VERSION_EXTRA), Revision $(REVISION)"
-TOKUDB_BACKUP_VERSION = "@@TOKUDB_BACKUP_VERSION@@"
+PACKAGE=percona-xtradb-cluster-5.7
+PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
+
+wsrep_version="@@WSREP_VERSION@@"
+percona_server_version="@@PERCONA_VERSION@@"
+revision="@@REVISION@@"
+compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+server_suffix="-57"
+prefix=/usr
 
 TMP=$(CURDIR)/debian/tmp/
 TMPD=$(CURDIR)/debian/tmp-debug/
@@ -31,11 +35,7 @@ DEB_UPSTREAM_VERSION ?= $(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/-[^-]*$$//'
 DEB_UPSTREAM_VERSION_MAJOR_MINOR := $(shell echo $(DEB_UPSTREAM_VERSION) | sed -r -n 's/^([0-9]+\.[0-9]+).*/\1/p')
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-TOKUDB_OPTS_DEFAULT ?= -DWITH_VALGRIND=OFF -DUSE_VALGRIND=OFF -DDEBUG_EXTNAME=OFF -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=$(TOKUDB_BACKUP_VERSION)
-TOKUDB_OPTS_RELEASE ?= $(TOKUDB_OPTS_DEFAULT) -DTOKU_DEBUG_PARANOID=OFF
-TOKUDB_OPTS_DEBUG ?= $(TOKUDB_OPTS_DEFAULT) -DTOKU_DEBUG_PARANOID=ON
-
-EXPORTED_SOURCE_TARBALL = debian/percona-server-source-5.7.tar.gz
+EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.7.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
 DISTRELEASE = $(shell lsb_release -c -s)
@@ -43,6 +43,7 @@ DISTRELEASE = $(shell lsb_release -c -s)
 MYSQL_SRC = $(shell pwd)
 
 builddir = builddir
+galeradir = percona-xtradb-cluster-galera
 builddebug = debug
 
 override_dh_auto_configure:
@@ -70,8 +71,16 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
-		-DCOMPILATION_COMMENT=$(COMPILATION_COMMENT_DEBUG) \
+		-DWITH_READLINE=system \
+		-DWITHOUT_TOKUDB=ON \
+		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
+		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
+		-DINSTALL_LAYOUT=RPM \
+		-DWITH_INNODB_DISALLOW_WRITES=ON \
+		-DWITH_WSREP=ON \
+		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
+		-DINSTALL_PLUGINDIR=lib/mysql/plugin/debug \
 		-DINSTALL_LAYOUT=DEB \
 		-DWITH_EMBEDDED_SERVER=OFF \
 		-DWITH_INNODB_MEMCACHED=ON \
@@ -82,7 +91,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_PAM=ON \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
-		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_DEBUG) ..
+		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
@@ -106,8 +115,16 @@ endif
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
-		-DCOMPILATION_COMMENT=$(COMPILATION_COMMENT_RELEASE) \
+		-DWITH_READLINE=system \
+		-DWITHOUT_TOKUDB=ON \
+		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
+		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
+		-DINSTALL_LAYOUT=RPM \
+		-DWITH_INNODB_DISALLOW_WRITES=ON \
+		-DWITH_WSREP=ON \
+		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
+		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
 		-DINSTALL_LAYOUT=DEB \
 		-DWITH_EMBEDDED_SERVER=OFF \
 		-DWITH_INNODB_MEMCACHED=ON \
@@ -118,22 +135,25 @@ endif
 		-DWITH_PAM=ON \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
-		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_RELEASE) ..
+		-DWITH_EXTRA_CHARSETS=all ..
+
+	cd $(galeradir) &&  scons $(MAKE_JFLAG) psi=1 garb/garbd libgalera_smm.so $(SCONS_ARGS)
 
 	touch $@
 
 override_dh_auto_build:
 	@echo "RULES.$@"
-	
+
 	[ -f $(EXPORTED_SOURCE_TARBALL) ] || tar -zcf $(EXPORTED_SOURCE_TARBALL) \
 	--exclude=debian . \
-	--transform="s,^\./,percona-server-5.7/,"
+	--transform="s,^\./,percona-xtradb-cluster-5.7/,"
 
 ifeq ($(SKIP_DEBUG_BINARY),)
-	cd $(builddebug) && $(MAKE) -j$(NCPU)
+	cd $(builddebug) && $(MAKE) -j$(NCPU)  VERBOSE=1
 endif
 
 	cd $(builddir) && $(MAKE) -j$(NCPU) VERBOSE=1
+	cd $(galeradir) &&  scons $(MAKE_JFLAG) psi=1 garb/garbd libgalera_smm.so $(SCONS_ARGS)
 
 	touch $@
 
@@ -143,23 +163,52 @@ override_dh_auto_install:
 	# complete install first
 	(cd $(builddebug) && $(MAKE) install DESTDIR=$(TMPD)/)
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
+	(cd $(galeradir) && cp -r garb $(TMP)/)
+	(cd $(galeradir) && cp libgalera_smm.so $(TMP)/)
+	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
+
+	# add PXC configuration file my.cnf to mysql-common package
+	#install -g root -o root -m 0644 -D debian/extra/my.cnf $(TMP)/etc/mysql/my.cnf
+
+	# add MySQL Server debug binary and library to package
+	#install -g root -o root -m 0755 debian/extra/server-binary $(TMP)/usr/sbin/mysqld-debug
 
 	# add systemd script
+	mkdir -p $(TMP)/var/lib/mysql-files
+	mkdir -p $(TMP)/var/lib/mysql
+	mkdir -p $(TMP)/var/run/mysql
 	install -m 0755 debian/extra/mysql-systemd-start $(TMP)/usr/share/mysql/
+
+	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
+	cp -rp $(TMP)/usr/lib/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
+
+	# mysql-server
+	mkdir -p $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples
+	mv $(TMP)/usr/share/mysql/*cnf 	    $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples/
+	rm -vf $(TMP)/usr/share/percona-xtradb-cluster/mi_test_all* \
+	       $(TMP)/usr/share/percona-xtradb-cluster/mysql-log-rotate \
+	       $(TMP)/usr/share/percona-xtradb-cluster/mysql.server \
+	       $(TMP)/usr/share/percona-xtradb-cluster/binary-configure
+	nm -n $(builddir)/sql/mysqld |gzip -9 > $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/mysqld.sym.gz
+	# FIXME install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
+	# install -d $(TMP)/etc/mysql
+	# install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
+	# install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
 
 	# install default file for init script timeout params
 	install -d $(TMP)/etc/default
 	install -m 0644 debian/extra/default-mysql $(TMP)/etc/default/mysql
 
 	# install source tarball for source package
-	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-server/`basename $(EXPORTED_SOURCE_TARBALL)`
+	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 override_dh_strip:
-	dh_strip --dbg-package=percona-server-5.7-dbg
+	dh_strip --dbg-package=percona-xtradb-cluster-5.7-dbg
 
 override_dh_installinit:
 	@echo "RULES.$@"
-	dh_systemd_enable --name=mysql
+	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; fi
 	dh_installinit --name=mysql -- defaults 19 21
-	dh_systemd_start --restart-after-upgrade
+	dh_installinit --name=garbd -- defaults 19 21
+	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_start --restart-after-upgrade; fi
 	touch $@

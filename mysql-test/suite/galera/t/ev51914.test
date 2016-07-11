@@ -195,12 +195,11 @@ INSERT INTO t1 VALUES (201), (202), (203);
 
 --connection node_1 
 SELECT * FROM t1;
-SELECT * FROM t2;
+SELECT COUNT(*) FROM t2;
 
 --connection node_2
 SELECT * FROM t1;
-SELECT * FROM t2;
-
+SELECT COUNT(*) FROM t2;
 
 --connection node_1
 DEALLOCATE PREPARE call_p1;

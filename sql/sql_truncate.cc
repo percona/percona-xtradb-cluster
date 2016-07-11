@@ -480,11 +480,10 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
     bool hton_can_recreate;
 
 #ifdef WITH_WSREP
-    if (WSREP(thd) && wsrep_to_isolation_begin(thd, 
-                                                table_ref->db, 
-                                                table_ref->table_name, NULL))
-        DBUG_RETURN(TRUE);
+    error= true;
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
 #endif /* WITH_WSREP */
+
     if (lock_table(thd, table_ref, &hton_can_recreate))
       DBUG_RETURN(TRUE);
 
@@ -552,6 +551,9 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
   if (m_ticket_downgrade)
     m_ticket_downgrade->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
 
+#ifdef WITH_WSREP
+error:
+#endif /* WITH_WSREP */
   DBUG_RETURN(error);
 }
 
@@ -568,6 +570,51 @@ bool Sql_cmd_truncate_table::execute(THD *thd)
   bool res= TRUE;
   TABLE_LIST *first_table= thd->lex->select_lex->table_list.first;
   DBUG_ENTER("Sql_cmd_truncate_table::execute");
+
+#ifdef WITH_WSREP
+  char path[FN_REFLEN + 1];
+  enum legacy_db_type db_type= DB_TYPE_UNKNOWN;
+  (void) build_table_filename(path, sizeof(path) - 1, first_table->db,
+                              first_table->table_name, reg_ext, 0);
+  dd_frm_type(thd, path, &db_type);
+
+  if (db_type != DB_TYPE_INNODB             &&
+      db_type != DB_TYPE_UNKNOWN            &&
+      db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
+      !is_temporary_table(first_table))
+  {
+    bool block= false;
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                 " TRUNCATE on table created with non-transactional"
+                 " storage engine");
+      push_warning_printf(thd, Sql_condition::SL_WARNING,
+                          ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of"
+                          " TRUNCATE on table created with non-transactional"
+                          " storage engine");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block= true;
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of TRUNCATE"
+                 " on table created with non-transactional storage engine");
+      my_message(ER_UNKNOWN_ERROR,
+                 "Percona-XtraDB-Cluster prohibits use of TRUNCATE"
+                 " on table created with non-transactional storage engine",
+                 MYF(0));
+      break;
+    }
+ 
+    if (block)
+      DBUG_RETURN(res);
+  }
+#endif /* WITH_WSREP */
 
   if (check_one_table_access(thd, DROP_ACL, first_table))
     DBUG_RETURN(res);

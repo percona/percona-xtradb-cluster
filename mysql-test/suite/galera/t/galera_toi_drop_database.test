@@ -32,6 +32,7 @@ USE database1;
 --send DROP DATABASE database1;
 
 --connection node_1
+--sleep 30
 --error ER_NO_SUCH_TABLE
 --reap
 

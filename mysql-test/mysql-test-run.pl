@@ -168,7 +168,7 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,"
   ."innodb_fts,innodb_zip,innodb_undo,innodb_stress,perfschema,funcs_1,"
   ."funcs_2,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,"
   ."test_service_sql_api,jp,stress,engines/iuds,engines/funcs,"
-  ."query_response_time,audit_log,scalability_metrics,galera";
+  ."query_response_time,audit_log,scalability_metrics,xplugin,galera";
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -236,7 +236,9 @@ our %gprof_dirs;
 
 our $glob_debugger= 0;
 our $opt_gdb;
+our $opt_lldb;
 our $opt_client_gdb;
+our $opt_client_lldb;
 my $opt_boot_gdb;
 our $opt_dbx;
 our $opt_client_dbx;
@@ -259,6 +261,7 @@ our @opt_experimentals;
 our $experimental_test_cases= [];
 
 my $baseport;
+my $mysqlx_baseport;
 # $opt_build_thread may later be set from $opt_port_base
 my $opt_build_thread= $ENV{'MTR_BUILD_THREAD'} || "auto";
 my $opt_port_base= $ENV{'MTR_PORT_BASE'} || "auto";
@@ -292,6 +295,8 @@ my $opt_retry= 3;
 my $opt_retry_failure= env_or_val(MTR_RETRY_FAILURE => 2);
 my $opt_reorder= 1;
 my $opt_force_restart= 0;
+
+our $opt_suite_opt;
 
 my $opt_strace_client;
 my $opt_strace_server;
@@ -351,6 +356,8 @@ my $opt_max_test_fail= env_or_val(MTR_MAX_TEST_FAIL => 10);
 
 my $opt_parallel= $ENV{MTR_PARALLEL} || 1;
 my $opt_port_group_size = $ENV{MTR_PORT_GROUP_SIZE} || 10;
+
+our $opt_xml_report;
 
 select(STDOUT);
 $| = 1; # Automatically flush STDOUT
@@ -451,6 +458,10 @@ sub main {
   if ($opt_resfile) {
     resfile_init("$opt_vardir/mtr-results.txt");
     print_global_resfile();
+  }
+
+  if ($opt_xml_report) {
+    mtr_xml_init($opt_xml_report);
   }
 
   # --------------------------------------------------------------------------
@@ -1041,6 +1052,7 @@ sub print_global_resfile {
   resfile_global("fast", $opt_fast ? 1 : 0);
   resfile_global("force-restart", $opt_force_restart ? 1 : 0);
   resfile_global("reorder", $opt_reorder ? 1 : 0);
+  resfile_global("suite-opt", $opt_suite_opt);
   resfile_global("sleep", $opt_sleep);
   resfile_global("repeat", $opt_repeat);
   resfile_global("user", $opt_user);
@@ -1051,6 +1063,7 @@ sub print_global_resfile {
   resfile_global("max-connections", $opt_max_connections);
 #  resfile_global("default-myisam", $opt_default_myisam ? 1 : 0);
   resfile_global("product", "MySQL");
+  resfile_global("xml-report", $opt_xml_report);
   # Somewhat hacky code to convert numeric version back to dot notation
   my $v1= int($mysql_version_id / 10000);
   my $v2= int(($mysql_version_id % 10000)/100);
@@ -1134,7 +1147,9 @@ sub command_line_setup {
              'debug-common'             => \$opt_debug_common,
              'debug-server'             => \$opt_debug_server,
              'gdb'                      => \$opt_gdb,
+             'lldb'                     => \$opt_lldb,
              'client-gdb'               => \$opt_client_gdb,
+             'client-lldb'              => \$opt_client_lldb,
              'manual-gdb'               => \$opt_manual_gdb,
              'manual-lldb'              => \$opt_manual_lldb,
 	     'boot-gdb'                 => \$opt_boot_gdb,
@@ -1221,12 +1236,14 @@ sub command_line_setup {
 	     'unit-tests!'              => \$opt_ctest,
 	     'unit-tests-report!'	=> \$opt_ctest_report,
 	     'stress=s'                 => \$opt_stress,
+             'suite-opt=s'              => \$opt_suite_opt,
 
              'help|h'                   => \$opt_usage,
 	     # list-options is internal, not listed in help
 	     'list-options'             => \$opt_list_options,
              'skip-test-list=s'         => \@opt_skip_test_list,
-             'do-test-list=s'           => \$opt_do_test_list
+             'do-test-list=s'           => \$opt_do_test_list,
+            'xml-report=s'          => \$opt_xml_report
            );
 
   GetOptions(%options) or usage("Can't read options");
@@ -1580,6 +1597,13 @@ sub command_line_setup {
       $opt_gdb= undef;
     }
 
+    if ($opt_lldb)
+    {
+      mtr_warning("Silently converting --lldb to --client-lldb in embedded mode");
+      $opt_client_lldb= $opt_lldb;
+      $opt_lldb= undef;
+    }
+
     if ($opt_ddd)
     {
       mtr_warning("Silently converting --ddd to --client-ddd in embedded mode");
@@ -1602,7 +1626,7 @@ sub command_line_setup {
 
     if ( $opt_gdb || $opt_ddd || $opt_manual_gdb || $opt_manual_lldb || 
          $opt_manual_ddd || $opt_manual_debug || $opt_debugger || $opt_dbx || 
-         $opt_manual_dbx)
+         $opt_lldb || $opt_manual_dbx)
     {
       mtr_error("You need to use the client debug options for the",
 		"embedded server. Ex: --client-gdb");
@@ -1629,7 +1653,7 @@ sub command_line_setup {
   # Check debug related options
   # --------------------------------------------------------------------------
   if ( $opt_gdb || $opt_client_gdb || $opt_ddd || $opt_client_ddd ||
-       $opt_manual_gdb || $opt_manual_lldb || $opt_manual_ddd || 
+       $opt_manual_gdb || $opt_lldb || $opt_manual_lldb || $opt_manual_ddd || 
        $opt_manual_debug || $opt_dbx || $opt_client_dbx || $opt_manual_dbx || 
        $opt_debugger || $opt_client_debugger )
   {
@@ -1872,7 +1896,8 @@ sub set_build_thread_ports($) {
 
   # Calculate baseport
   $baseport= $build_thread * $opt_port_group_size + 10000;
-  if ( $baseport < 5001 or $baseport + $opt_port_group_size >= 32767 )
+  $mysqlx_baseport =  $baseport + 9;
+  if ( $baseport < 5001 or $baseport + $opt_port_group_size >= 32767 or $mysqlx_baseport + 9 >= 32767)
   {
     mtr_error("MTR_BUILD_THREAD number results in a port",
               "outside 5001 - 32767",
@@ -1881,7 +1906,6 @@ sub set_build_thread_ports($) {
 
   mtr_report("Using MTR_BUILD_THREAD $build_thread,",
 	     "with reserved ports $baseport..".($baseport+($opt_port_group_size-1)));
-
 }
 
 
@@ -1911,7 +1935,6 @@ sub collect_mysqld_features {
   mtr_add_arg($args, "--basedir=%s", $basedir);
   mtr_add_arg($args, "--datadir=%s", mixed_path($tmpdir));
   mtr_add_arg($args, "--secure-file-priv=\"\"");
-  mtr_add_arg($args, "--early_plugin_load=\"\"");
   mtr_add_arg($args, "--lc-messages-dir=%s", $path_language);
   mtr_add_arg($args, "--skip-grant-tables");
   mtr_add_arg($args, "--verbose");
@@ -2273,6 +2296,32 @@ sub mysql_client_test_arguments(){
   return mtr_args2str($exe, @$args);
 }
 
+sub mysqlxtest_arguments(){
+  my $exe;
+  # mysql_client_test executable may _not_ exist
+  $exe= mtr_exe_maybe_exists(vs_config_dirs('plugin', 'mysqlxtest'),
+                             "$bindir/rapid/plugin/x/mysqlxtest",
+                             "$bindir/rapid/plugin/x/Debug/mysqlxtest",
+                             "$bindir/rapid/plugin/x/Release/mysqlxtest",
+                             "$bindir/bin/mysqlxtest");
+  return "" unless $exe;
+
+  my $args;
+  mtr_init_args(\$args);
+  
+  if ( $opt_valgrind_clients )
+  {
+    valgrind_client_arguments($args, \$exe);
+  }
+  
+  # Let user provide username and password to command.
+  #mtr_add_arg($args, "-u root");
+  #mtr_add_arg($args, "--password=");
+  mtr_add_arg($args, "--port=%d",$mysqlx_baseport);
+
+   return mtr_args2str($exe, @$args);
+ }
+
 sub mysqlpump_arguments ($) {
   my($group_suffix) = @_;
   my $exe= mtr_exe_exists(vs_config_dirs('client/dump','mysqlpump'),
@@ -2348,7 +2397,11 @@ sub read_plugin_defs($)
     $plug_file= "debug/$plug_file" if $running_debug && !$source_dist;
 
     my ($plugin)= find_plugin($plug_file, $plug_loc);
-
+    
+    if (!$plugin) {
+      ($plugin)= find_plugin($plug_file, "rapid/$plug_loc");
+    }
+    
     # Set env. variables that tests may use, set to empty if plugin
     # listed in def. file but not found.
 
@@ -2574,6 +2627,7 @@ sub environment_setup {
   $ENV{'MYSQL_SECURE_INSTALLATION'}=   "$path_client_bindir/mysql_secure_installation";
   $ENV{'MYSQLADMIN'}=                  native_path($exe_mysqladmin);
   $ENV{'MYSQL_CLIENT_TEST'}=           mysql_client_test_arguments();
+  $ENV{'MYSQLXTEST'}=                  mysqlxtest_arguments();
   $ENV{'EXE_MYSQL'}=                   $exe_mysql;
   $ENV{'MYSQL_PLUGIN'}=                $exe_mysql_plugin;
   $ENV{'MYSQL_EMBEDDED'}=              $exe_mysql_embedded;
@@ -2922,7 +2976,7 @@ sub check_ssl_support ($) {
     return;
   }
 
-  if ( ! $mysqld_variables->{'ssl'} )
+  if ( ! ($mysqld_variables->{'ssl'} || $mysqld_variables->{'have_ssl'} ))
   {
     if ( $opt_ssl)
     {
@@ -3794,7 +3848,6 @@ sub mysql_install_db {
   # Do not generate SSL/RSA certificates automatically.
   mtr_add_arg($args, "--loose-auto_generate_certs=OFF");
   mtr_add_arg($args, "--loose-sha256_password_auto_generate_rsa_keys=OFF");
-  mtr_add_arg($args, "--early_plugin_load=\"\"");
 
   # InnoDB arguments that affect file location and sizes may
   # need to be given to the bootstrap process as well as the
@@ -5733,6 +5786,7 @@ sub mysqld_arguments ($$$) {
   {
     mtr_add_arg($args, "%s", "--core-file");
   }
+  mtr_add_arg($args, "--loose-mysqlx-port=%d",$mysqlx_baseport);
 
   return $args;
 }
@@ -5793,7 +5847,7 @@ sub mysqld_start ($$) {
   {
     gdb_arguments(\$args, \$exe, $mysqld->name());
   }
-  elsif ( $opt_manual_lldb )
+  elsif ( $opt_lldb || $opt_manual_lldb )
   {
     lldb_arguments(\$args, \$exe, $mysqld->name());
   }
@@ -6582,6 +6636,10 @@ sub start_mysqltest ($) {
   {
     gdb_arguments(\$args, \$exe, "client");
   }
+  elsif ( $opt_client_lldb )
+  {
+    lldb_arguments(\$args, \$exe, "client");
+  }
   elsif ( $opt_client_ddd )
   {
     ddd_arguments(\$args, \$exe, "client");
@@ -6608,19 +6666,23 @@ sub start_mysqltest ($) {
 }
 
 sub create_debug_statement {
+  my $run = shift;
   my $args= shift;
   my $input= shift;
+  my @params_to_quote = ("--plugin_load=", "--plugin_load_add=");
 
   # Put $args into a single string
   my $str= join(" ", @$$args);
-  my $runline= $input ? "run $str < $input" : "run $str";
+  my $runline= $input ? "$run $str < $input" : "$run $str";
 
-  # add quotes to escape ; in plugin_load option
-  my $pos1 = index($runline, "--plugin_load=");
-  if ( $pos1 != -1 ) {
-    my $pos2 = index($runline, " ",$pos1);
-    substr($runline,$pos1+14,0) = "\"";
-    substr($runline,$pos2+1,0) = "\"";
+  foreach my $param_to_quote (@params_to_quote) {
+    # add quotes to escape ; in plugin_load option
+    my $pos1 = index($runline, $param_to_quote);
+    if ( $pos1 != -1 ) {
+      my $pos2 = index($runline, " ",$pos1);
+      substr($runline,$pos1+length($param_to_quote),0) = "\"";
+      substr($runline,$pos2+1,0) = "\"";
+    }
   }
 
   return $runline;
@@ -6640,7 +6702,7 @@ sub gdb_arguments {
   # Remove the old gdbinit file
   unlink($gdb_init_file);
 
-  my $runline=create_debug_statement($args,$input);
+  my $runline=create_debug_statement("run", $args,$input);
 
   # write init file for mysqld or client
   mtr_tofile($gdb_init_file,
@@ -6684,23 +6746,37 @@ sub lldb_arguments {
   my $exe= shift;
   my $type= shift;
   my $input= shift;
-
-  my $lldb_init_file= "$opt_vardir/tmp/lldbinit.$type";
+ 
+  my $lldb_init_file= "$opt_vardir/tmp/$type.lldbinit";
   unlink($lldb_init_file);
 
-  my $runline=create_debug_statement($args,$input);
+  my $str= join(" ", @$$args);
 
   # write init file for mysqld or client
   mtr_tofile($lldb_init_file,
-	     "b main\n" .
-	     $runline);
+           "process launch --stop-at-entry -- " . $str);
 
+  if ( $opt_manual_lldb )
+  {
     print "\nTo start lldb for $type, type in another window:\n";
     print "cd $glob_mysql_test_dir && lldb -s $lldb_init_file $$exe\n";
 
     # Indicate the exe should not be started
     $$exe= undef;
     return;
+  }
+
+  $$args= [];
+  mtr_add_arg($$args, "-title");
+  mtr_add_arg($$args, "$type");
+  mtr_add_arg($$args, "-e");
+
+  mtr_add_arg($$args, "lldb");
+  mtr_add_arg($$args, "-s");
+  mtr_add_arg($$args, "$lldb_init_file");
+  mtr_add_arg($$args, "$$exe");
+
+  $$exe= "xterm";
 }
 
 #
@@ -6717,7 +6793,7 @@ sub ddd_arguments {
   # Remove the old gdbinit file
   unlink($gdb_init_file);
 
-  my $runline=create_debug_statement($args,$input);
+  my $runline=create_debug_statement("run", $args,$input);
 
   # write init file for mysqld or client
   mtr_tofile($gdb_init_file,
@@ -7180,6 +7256,10 @@ Options that specify ports
                         a build thread id that is unique to current host
   port-group-size=N     Reserve groups of TCP ports of size N for each MTR thread
 
+  mysqlx-port           Specify the port number to be used for mysqlxplugin.
+                        Can be set in environment variable MYSQLXPLUGIN_PORT.
+                        If not specified will create its own ports.
+                        [NOTE]-- will not work for parallel servers.
 
 Options for test case authoring
 
@@ -7209,6 +7289,7 @@ Options for debugging the product
   client-ddd            Start mysqltest client in ddd
   client-debugger=NAME  Start mysqltest in the selected debugger
   client-gdb            Start mysqltest client in gdb
+  client-lldb           Start mysqltest client in lldb
   dbx                   Start the mysqld(s) in dbx
   ddd                   Start the mysqld(s) in ddd
   debug                 Dump trace output for all servers and client programs
@@ -7220,6 +7301,7 @@ Options for debugging the product
                         tracing
   debugger=NAME         Start mysqld in the selected debugger
   gdb                   Start the mysqld(s) in gdb
+  lldb                  Start the mysqld(s) in lldb
   manual-debug          Let user manually start mysqld in debugger, before
                         running test(s)
   manual-gdb            Let user manually start mysqld in gdb, before running
@@ -7228,6 +7310,7 @@ Options for debugging the product
                         test(s)
   manual-dbx            Let user manually start mysqld in dbx, before running
                         test(s)
+  lldb                  Start mysqld(s) in lldb
   manual-lldb           Let user manually start mysqld in lldb, before running 
                         test(s)
   strace-client         Create strace output for mysqltest client, 
@@ -7322,6 +7405,8 @@ Misc options
   unit-tests-report     Include report of every test included in unit tests.
   stress=ARGS           Run stress test, providing options to
                         mysql-stress-test.pl. Options are separated by comma.
+  suite-opt             Run the particular file in the suite as the suite.opt.
+  xml-report=FILE       Generate a XML report file compatible with JUnit.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.

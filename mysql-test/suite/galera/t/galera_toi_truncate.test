@@ -17,7 +17,7 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 
-# Insert 1M rows
+# Insert 100K rows
 --connection node_2
 --send INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;
 
@@ -35,9 +35,8 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SELECT COUNT(*) = 1000000 FROM t1;
 
 --connection node_1
-# we sleep for sometime to allow node_1 to apply write-set event
---sleep 10
-SELECT COUNT(*) = 1000000 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 1000000 FROM t1;
+--source include/wait_condition.inc
 
 DROP TABLE t1;
 
@@ -53,7 +52,7 @@ DROP TABLE t1;
 
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 
-# Insert 1M rows
+# Insert 100K rows
 --connection node_1
 --send INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;
 
@@ -71,9 +70,8 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SELECT COUNT(*) = 1000000 FROM t1;
 
 --connection node_2
-# we sleep for sometime to allow node_1 to apply write-set event
---sleep 10
-SELECT COUNT(*) = 1000000 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 1000000 FROM t1;
+--source include/wait_condition.inc
 
 DROP TABLE t1;
 DROP TABLE ten;

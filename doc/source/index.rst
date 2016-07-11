@@ -44,6 +44,7 @@ Introduction
    :glob:
 
    intro
+   limitation
 
 Installation
 ============
@@ -78,6 +79,9 @@ User's Manual
    manual/restarting_nodes
    manual/failover
    manual/monitoring
+   manual/certification
+   manual/threading_model
+   manual/gcache_record-set_cache_difference
 
 How-tos
 =======
@@ -92,7 +96,6 @@ How-tos
    howtos/3nodesec2
    howtos/haproxy
    howtos/virt_sandbox
-   howtos/bugreport
 
 Reference
 =========

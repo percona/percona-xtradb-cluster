@@ -178,7 +178,16 @@ This variable is used to control whether sole cluster conflicts should be logged
    :dyn: Yes
    :default: 131072 (128K) 
 
-This variable is used to control maximum number of rows each writeset can contain. Anything bigger than the specified value will be rejected.
+**This variable has no effect!**
+
+By design,
+it was supposed to control the maximum number of rows each writeset can contain.
+However, it is hard to predict the number of rows
+because of the writeset size limit enforced by :variable:`wsrep_max_ws_size`.
+
+Codership decided to not implement the limit by rows for now.
+Correct behavior may be implemented in a future release.
+There is a discussion open at https://github.com/codership/mysql-wsrep/issues/257
 
 .. variable:: wsrep_max_ws_size
 

@@ -335,14 +335,14 @@ fi
         cd "percona-xtradb-cluster-galera"
         if grep builtin <<< "$STAG";then
             # No builtin SSL in galera yet.
-            scons $MAKE_JFLAG --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
+            scons $MAKE_JFLAG psi=1 --config=force ssl=0 revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 \
                 garb/garbd libgalera_smm.so
         elif grep static <<< "$STAG";then
             # Disable SSL in galera for now
-            scons $MAKE_JFLAG --config=force static_ssl=1 with_ssl=$GALERA_SSL \
+            scons $MAKE_JFLAG psi=1 --config=force static_ssl=1 with_ssl=$GALERA_SSL \
             revno="$GALERA_REVISION" ${SCONS_ARGS} boost_pool=0 garb/garbd libgalera_smm.so
         else
-            scons $MAKE_JFLAG --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
+            scons $MAKE_JFLAG psi=1 --config=force revno="$GALERA_REVISION" ${SCONS_ARGS} \
                 garb/garbd libgalera_smm.so
         fi
         mkdir -p "$TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin" \

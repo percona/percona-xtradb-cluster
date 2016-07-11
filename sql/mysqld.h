@@ -405,7 +405,7 @@ C_MODE_START
 #ifdef WITH_WSREP
 extern PSI_mutex_key key_LOCK_wsrep_thd;
 extern PSI_cond_key  key_COND_wsrep_thd;
-#endif /* HAVE_WSREP */
+#endif /* WITH_WSREP */
 
 extern PSI_mutex_key key_LOCK_tc;
 
@@ -780,7 +780,27 @@ extern PSI_stage_info stage_worker_waiting_for_its_turn_to_commit;
 extern PSI_stage_info stage_worker_waiting_for_commit_parent;
 extern PSI_stage_info stage_suspending;
 extern PSI_stage_info stage_starting;
+extern PSI_stage_info stage_waiting_for_no_channel_reference;
 extern PSI_stage_info stage_restoring_secondary_keys;
+
+#ifdef WITH_WSREP
+extern PSI_stage_info stage_wsrep_writing_rows;
+extern PSI_stage_info stage_wsrep_deleting_rows;
+extern PSI_stage_info stage_wsrep_updating_rows;
+extern PSI_stage_info stage_wsrep_applying_writeset;
+extern PSI_stage_info stage_wsrep_committing;
+extern PSI_stage_info stage_wsrep_rolling_back;
+extern PSI_stage_info stage_wsrep_replicating_commit;
+extern PSI_stage_info stage_wsrep_waiting_on_replaying;
+extern PSI_stage_info stage_wsrep_pre_commit;
+extern PSI_stage_info stage_wsrep_preparing_for_TO_isolation;
+extern PSI_stage_info stage_wsrep_replaying_trx;
+extern PSI_stage_info stage_wsrep_applier_idle;
+extern PSI_stage_info stage_wsrep_in_rollback_thread;
+extern PSI_stage_info stage_wsrep_aborter_idle;
+extern PSI_stage_info stage_wsrep_aborter_active;
+#endif /* WITH_WSREP */
+
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
 /**
   Statement instrumentation keys (sql).
@@ -985,7 +1005,13 @@ enum enum_query_type
     Change all Item_basic_constant to ? (used by query rewrite to compute
     digest.)  Un-resolved hints will also be printed in this format.
   */
-  QT_NORMALIZED_FORMAT= (1 << 8)
+  QT_NORMALIZED_FORMAT= (1 << 8),
+  /**
+    If an expression is constant, print the expression, not the value
+    it evaluates to. Should be used for error messages, so that they
+    don't reveal values.
+  */
+  QT_NO_DATA_EXPANSION= (1 << 9),
 };
 
 /* query_id */

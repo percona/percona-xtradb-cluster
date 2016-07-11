@@ -711,27 +711,6 @@ my_thread_handle signal_thread_id;
 my_thread_attr_t connection_attrib;
 mysql_mutex_t LOCK_server_started;
 mysql_cond_t COND_server_started;
-
-#ifdef WITH_WSREP
-mysql_mutex_t LOCK_wsrep_ready;
-mysql_cond_t  COND_wsrep_ready;
-mysql_mutex_t LOCK_wsrep_sst;
-mysql_cond_t  COND_wsrep_sst;
-mysql_mutex_t LOCK_wsrep_sst_init;
-mysql_cond_t  COND_wsrep_sst_init;
-mysql_mutex_t LOCK_wsrep_rollback;
-mysql_cond_t  COND_wsrep_rollback;
-wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
-mysql_mutex_t LOCK_wsrep_replaying;
-mysql_cond_t  COND_wsrep_replaying;
-mysql_mutex_t LOCK_wsrep_slave_threads;
-mysql_mutex_t LOCK_wsrep_desync;
-mysql_mutex_t LOCK_wsrep_desync_count;
-int wsrep_replaying= 0;
-int wsrep_desync_count= 0;
-int wsrep_desync_count_manual= 0;
-static void wsrep_close_threads(THD* thd);
-#endif /* WITH_WSREP */
 mysql_mutex_t LOCK_reset_gtid_table;
 mysql_mutex_t LOCK_compress_gtid_table;
 mysql_cond_t COND_compress_gtid_table;
@@ -742,6 +721,26 @@ mysql_mutex_t LOCK_start_signal_handler;
 mysql_cond_t COND_start_signal_handler;
 #endif
 mysql_rwlock_t LOCK_consistent_snapshot;
+
+#ifdef WITH_WSREP
+mysql_mutex_t LOCK_wsrep_ready;
+mysql_cond_t  COND_wsrep_ready;
+mysql_mutex_t LOCK_wsrep_sst;
+mysql_cond_t  COND_wsrep_sst;
+mysql_mutex_t LOCK_wsrep_sst_init;
+mysql_cond_t  COND_wsrep_sst_init;
+mysql_mutex_t LOCK_wsrep_rollback;
+mysql_cond_t  COND_wsrep_rollback;
+mysql_mutex_t LOCK_wsrep_replaying;
+mysql_cond_t  COND_wsrep_replaying;
+mysql_mutex_t LOCK_wsrep_slave_threads;
+mysql_mutex_t LOCK_wsrep_desync;
+
+wsrep_aborting_thd_t wsrep_aborting_thd= NULL;
+int wsrep_replaying= 0;
+
+static void wsrep_close_threads(THD* thd);
+#endif /* WITH_WSREP */
 
 bool mysqld_server_started= false;
 
@@ -1814,6 +1813,7 @@ static void clean_up_mutexes()
   mysql_mutex_destroy(&LOCK_global_user_client_stats);
   mysql_mutex_destroy(&LOCK_global_table_stats);
   mysql_mutex_destroy(&LOCK_global_index_stats);
+  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 #ifdef WITH_WSREP
   (void) mysql_mutex_destroy(&LOCK_wsrep_ready);
   (void) mysql_cond_destroy(&COND_wsrep_ready);
@@ -1827,9 +1827,7 @@ static void clean_up_mutexes()
   (void) mysql_cond_destroy(&COND_wsrep_replaying);
   (void) mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   (void) mysql_mutex_destroy(&LOCK_wsrep_desync);
-  (void) mysql_mutex_destroy(&LOCK_wsrep_desync_count);
 #endif /* WITH_WSREP */
-  mysql_rwlock_destroy(&LOCK_consistent_snapshot);
 }
 
 
@@ -3266,20 +3264,6 @@ int init_common_variables()
   */
   global_system_variables.time_zone= my_tz_SYSTEM;
 
-#ifdef WITH_WSREP
-  /*
-    We need to initialize auxiliary variables, that will be
-    further keep the original values of auto-increment options
-    as they set by the user. These variables used to restore
-    user-defined values of the auto-increment options after
-    setting of the wsrep_auto_increment_control to 'OFF'.
-  */
-  global_system_variables.saved_auto_increment_increment=
-    global_system_variables.auto_increment_increment;
-  global_system_variables.saved_auto_increment_offset=
-    global_system_variables.auto_increment_offset;
-#endif
-
 #ifdef HAVE_PSI_INTERFACE
   /*
     Complete the mysql_bin_log initialization.
@@ -3403,18 +3387,113 @@ int init_common_variables()
     return 1;
 #endif /* WITH_WSREP */
 
-#ifndef NO_EMBEDDED_ACCESS_CHECKS
-
-  if (strlen(DEFAULT_EARLY_PLUGIN_LOAD))
-  {
-    i_string *default_early_plugin= new i_string(DEFAULT_EARLY_PLUGIN_LOAD);
-    opt_early_plugin_load_list_ptr->push_back(default_early_plugin);
-  }
-
-#endif /* NO_EMBEDDED_ACCESS_CHECKS */
-
   if (get_options(&remaining_argc, &remaining_argv))
     return 1;
+
+#ifdef WITH_WSREP
+
+  /* We could have checked these in wsrep_check_opts but then part of them
+  are dependent on pxc-strict-mode. While we could have parsed value of
+  pxc-strict-mode, validation for valid value would be difficult. */
+  bool wsrep_provider_loaded= !(strlen(wsrep_provider) == 0 ||
+                                !strcmp(wsrep_provider, WSREP_NONE));
+
+  if (wsrep_provider_loaded == false)
+  {
+    /* Node is not a cluster node pxc-strict-mode will be defaulted
+    to DISABLED */
+    WSREP_WARN("Node is not a cluster node. Disabling pxc_strict_mode");
+    pxc_strict_mode= PXC_STRICT_MODE_DISABLED;
+  }
+
+  if (wsrep_provider_loaded && wsrep_desync)
+  {
+    WSREP_ERROR("Can't desync a node even before it is synced with cluster");
+    return 1;
+  }
+
+  /* Validate if server initial settings are pxc-strict-mode compatible.*/
+
+  /* wsrep_replicate_myisam (recommended value = OFF) */
+  if (wsrep_provider_loaded && global_system_variables.wsrep_replicate_myisam)
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+        break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
+                   " table replication as it is an experimental feature");
+        break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of MyISAM"
+                    " table replication as it is an experimental feature");
+        return 1;
+        break;
+    }
+  }
+
+  /* binlog_format (recommended value = ROW) */
+  if (wsrep_provider_loaded &&
+      global_system_variables.binlog_format != BINLOG_FORMAT_ROW)
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+        break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster recommends setting binlog_format"
+                   " to ROW");
+        break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
+                    " to STATEMENT/MIXED (anything other than ROW)");
+        return 1;
+        break;
+    }
+  }
+
+  /* log_output (recommended value = FILE/NONE) */
+  if (wsrep_provider_loaded && (log_output_options & LOG_TABLE))
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+        break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster recommends setting log_output"
+                   " to FILE");
+        break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting log_output"
+                    " to TABLE (anything other than FILE/NONE)");
+        return 1;
+        break;
+    }
+  }
+#endif /* WITH_WSREP */
+
+#ifdef WITH_WSREP
+  /*
+    We need to initialize auxiliary variables, that will be
+    further keep the original values of auto-increment options
+    as they set by the user. These variables used to restore
+    user-defined values of the auto-increment options after
+    setting of the wsrep_auto_increment_control to 'OFF'.
+  */
+  global_system_variables.saved_auto_increment_increment=
+    global_system_variables.auto_increment_increment;
+  global_system_variables.saved_auto_increment_offset=
+    global_system_variables.auto_increment_offset;
+#endif /* WITH_WSREP */
+
+  update_parser_max_mem_size();
 
   if (log_syslog_init())
     opt_log_syslog_enable= 0;
@@ -3870,8 +3949,6 @@ static int init_thread_environment()
                    &LOCK_wsrep_slave_threads, MY_MUTEX_INIT_FAST);
   mysql_mutex_init(key_LOCK_wsrep_desync,
                    &LOCK_wsrep_desync, MY_MUTEX_INIT_FAST);
-  mysql_mutex_init(key_LOCK_wsrep_desync_count,
-                   &LOCK_wsrep_desync_count, MY_MUTEX_INIT_FAST);
 #endif /* WITH_WSREP */
   THR_THD_initialized= true;
   THR_MALLOC_initialized= true;
@@ -4132,6 +4209,7 @@ static int generate_server_uuid()
                     " to allocate the THD.");
     return 1;
   }
+
   thd->thread_stack= (char*) &thd;
   thd->store_globals();
 
@@ -4457,14 +4535,6 @@ static int init_server_components()
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
-#ifdef WITH_WSREP
-  if (WSREP_ON && wsrep_desync)
-  {
-    sql_print_error("Can't desync a node even before it is synced with cluster");
-    unireg_abort(1);
-  }
-#endif /* WITH_WSREP */
-
   /*
     initialize delegates for extension observers, errors have already
     been reported in the function
@@ -4746,7 +4816,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     directory does not exist, exists but is empty, exists with InnoDB
     system tablespaces present etc.
   */
-#ifdef WITH_WSREP
   if (plugin_init(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? (PLUGIN_INIT_SKIP_INITIALIZATION |
@@ -4756,7 +4825,6 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
-#endif /* WITH_WSREP */
 
   Session_tracker session_track_system_variables_check;
   LEX_STRING var_list;
@@ -5135,6 +5203,16 @@ static void test_lc_time_sz()
 }
 #endif//DBUG_OFF
 
+/*
+  @brief : Set opt_super_readonly to user supplied value before
+           enabling communication channels to accept user connections
+*/
+
+static void set_super_read_only_post_init()
+{
+  opt_super_readonly= super_read_only;
+}
+
 #ifdef _WIN32
 int win_main(int argc, char **argv)
 #else
@@ -5450,10 +5528,6 @@ int mysqld_main(int argc, char **argv)
   if (init_server_components())
     unireg_abort(MYSQLD_ABORT_EXIT);
 
-  if (mysql_audit_notify(MYSQL_AUDIT_SERVER_STARTUP_STARTUP,
-                         (const char**)argv, argc))
-    unireg_abort(MYSQLD_ABORT_EXIT);
-
   /*
     Each server should have one UUID. We will create it automatically, if it
     does not exist.
@@ -5764,6 +5838,14 @@ int mysqld_main(int argc, char **argv)
       unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+  /*
+    Event must be invoked after error_handler_hook is assigned to
+    my_message_sql, otherwise my_message will not cause the event to abort.
+  */
+  if (mysql_audit_notify(AUDIT_EVENT(MYSQL_AUDIT_SERVER_STARTUP_STARTUP),
+                         (const char **) argv, argc))
+    unireg_abort(MYSQLD_ABORT_EXIT);
+
 #ifdef _WIN32
   create_shutdown_thread();
 #endif
@@ -5796,6 +5878,13 @@ int mysqld_main(int argc, char **argv)
                       opt_ndb_wait_setup);
   }
 #endif
+
+  /*
+    Set opt_super_readonly here because if opt_super_readonly is set
+    in get_option, it will create problem while setting up event scheduler.
+  */
+  set_super_read_only_post_init();
+
   (void) RUN_HOOK(server_state, before_handle_connection, (NULL));
 
   DBUG_PRINT("info", ("Block, listening for incoming connections"));
@@ -8900,6 +8989,8 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
     return 1;
   }
 
+  /* If --super-read-only was specified, set read_only to 1 */
+  read_only= super_read_only ? super_read_only : read_only;
   opt_readonly= read_only;
 
   return 0;
@@ -9564,10 +9655,13 @@ PSI_mutex_key
   key_LOCK_log_throttle_qni, key_LOCK_query_plan, key_LOCK_thd_query,
   key_LOCK_cost_const, key_LOCK_current_cond;
 #ifdef WITH_WSREP
-PSI_mutex_key key_LOCK_wsrep_rollback, key_LOCK_wsrep_thd, 
-  key_LOCK_wsrep_replaying, key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, 
-  key_LOCK_wsrep_sst_thread, key_LOCK_wsrep_sst_init, 
-  key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync, key_LOCK_wsrep_desync_count;
+PSI_mutex_key key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, key_LOCK_wsrep_sst_init,
+  key_LOCK_wsrep_rollback, key_LOCK_wsrep_replaying;
+
+PSI_mutex_key key_LOCK_wsrep_slave_threads, key_LOCK_wsrep_desync;
+
+PSI_mutex_key key_LOCK_wsrep_thd;
+PSI_mutex_key key_LOCK_wsrep_sst_thread;
 #endif /* WITH_WSREP */
 PSI_mutex_key key_RELAYLOG_LOCK_commit;
 PSI_mutex_key key_RELAYLOG_LOCK_commit_queue;
@@ -9675,15 +9769,15 @@ static PSI_mutex_info all_server_mutexes[]=
 #ifdef WITH_WSREP
   { &key_LOCK_wsrep_ready, "LOCK_wsrep_ready", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_sst_thread, "wsrep_sst_thread", 0},
   { &key_LOCK_wsrep_sst_init, "LOCK_wsrep_sst_init", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_sst, "LOCK_wsrep_sst", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_rollback, "LOCK_wsrep_rollback", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
   { &key_LOCK_wsrep_replaying, "LOCK_wsrep_replaying", PSI_FLAG_GLOBAL},
+
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
-  { &key_LOCK_wsrep_desync_count, "LOCK_wsrep_desync_count", PSI_FLAG_GLOBAL},
+
+  { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
+  { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0},
 #endif /* WITH_WSREP */
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},
@@ -9756,9 +9850,11 @@ PSI_cond_key key_BINLOG_update_cond,
   key_TABLE_SHARE_cond, key_user_level_lock_cond;
 
 #ifdef WITH_WSREP
-PSI_cond_key key_COND_wsrep_rollback, key_COND_wsrep_thd, 
-  key_COND_wsrep_replaying, key_COND_wsrep_ready, key_COND_wsrep_sst,
-  key_COND_wsrep_sst_init, key_COND_wsrep_sst_thread;
+PSI_cond_key key_COND_wsrep_ready, key_COND_wsrep_sst, key_COND_wsrep_sst_init,
+  key_COND_wsrep_rollback, key_COND_wsrep_replaying;
+
+PSI_cond_key key_COND_wsrep_thd;
+PSI_cond_key key_COND_wsrep_sst_thread;
 #endif /* WITH_WSREP */
 
 PSI_cond_key key_RELAYLOG_update_cond;
@@ -9815,10 +9911,11 @@ static PSI_cond_info all_server_conds[]=
   { &key_COND_wsrep_ready, "COND_wsrep_ready", PSI_FLAG_GLOBAL},
   { &key_COND_wsrep_sst, "COND_wsrep_sst", PSI_FLAG_GLOBAL},
   { &key_COND_wsrep_sst_init, "COND_wsrep_sst_init", PSI_FLAG_GLOBAL},
-  { &key_COND_wsrep_sst_thread, "wsrep_sst_thread", 0},
   { &key_COND_wsrep_rollback, "COND_wsrep_rollback", PSI_FLAG_GLOBAL},
-  { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0},
   { &key_COND_wsrep_replaying, "COND_wsrep_replaying", PSI_FLAG_GLOBAL},
+
+  { &key_COND_wsrep_thd, "THD::COND_wsrep_thd", 0},
+  { &key_COND_wsrep_sst_thread, "wsrep_sst_thread", 0},
 #endif /* WITH_WSREP */
   { &key_gtid_ensure_index_cond, "Gtid_state", PSI_FLAG_GLOBAL},
   { &key_COND_compress_gtid_table, "COND_compress_gtid_table", PSI_FLAG_GLOBAL}
@@ -9834,6 +9931,10 @@ PSI_thread_key key_thread_bootstrap, key_thread_handle_manager, key_thread_main,
   key_thread_compress_gtid_table, key_thread_parser_service;
 PSI_thread_key key_thread_daemon_plugin;
 PSI_thread_key key_thread_timer_notifier;
+#ifdef WITH_WSREP
+PSI_thread_key key_THREAD_wsrep_sst_joiner, key_THREAD_wsrep_sst_donor,
+  key_THREAD_wsrep_applier, key_THREAD_wsrep_rollbacker;
+#endif /* WITH_WSREP */
 
 static PSI_thread_info all_server_threads[]=
 {
@@ -9852,6 +9953,13 @@ static PSI_thread_info all_server_threads[]=
   { &key_thread_compress_gtid_table, "compress_gtid_table", PSI_FLAG_GLOBAL},
   { &key_thread_parser_service, "parser_service", PSI_FLAG_GLOBAL},
   { &key_thread_daemon_plugin, "daemon_plugin", PSI_FLAG_GLOBAL}
+#ifdef WITH_WSREP
+  ,
+  { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", 0},
+  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_joiner", 0},
+  { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", 0},
+  { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", 0}
+#endif /* WITH_WSREP */
 };
 
 PSI_file_key key_file_map;
@@ -10010,7 +10118,26 @@ PSI_stage_info stage_worker_waiting_for_its_turn_to_commit= { 0, "Waiting for pr
 PSI_stage_info stage_worker_waiting_for_commit_parent= { 0, "Waiting for dependent transaction to commit", 0};
 PSI_stage_info stage_suspending= { 0, "Suspending", 0};
 PSI_stage_info stage_starting= { 0, "starting", 0};
+PSI_stage_info stage_waiting_for_no_channel_reference= { 0, "Waiting for no channel reference.", 0};
 PSI_stage_info stage_restoring_secondary_keys= { 0, "restoring secondary keys", 0};
+
+#ifdef WITH_WSREP
+PSI_stage_info stage_wsrep_writing_rows= { 0, "wsrep: writing rows", 0};
+PSI_stage_info stage_wsrep_deleting_rows = { 0, "wsrep: deleting rows", 0};
+PSI_stage_info stage_wsrep_updating_rows = { 0, "wsrep: updating rows", 0};
+PSI_stage_info stage_wsrep_applying_writeset = { 0, "wsrep: applying write set", 0};
+PSI_stage_info stage_wsrep_committing = { 0, "wsrep: committing", 0};
+PSI_stage_info stage_wsrep_rolling_back = { 0, "wsrep: rolling back", 0};
+PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating commit", 0};
+PSI_stage_info stage_wsrep_waiting_on_replaying = { 0, "wsrep: waiting on replaying", 0};
+PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0};
+PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0};
+PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying trx", 0};
+PSI_stage_info stage_wsrep_applier_idle = { 0, "wsrep: applier idle", 0 };
+PSI_stage_info stage_wsrep_in_rollback_thread = { 0, "wsrep: in rollback thread", 0};
+PSI_stage_info stage_wsrep_aborter_idle = { 0, "wsrep: aborter idle", 0};
+PSI_stage_info stage_wsrep_aborter_active = { 0, "wsrep: aborter active", 0};
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_INTERFACE
 
@@ -10121,8 +10248,36 @@ PSI_stage_info *all_server_stages[]=
   & stage_worker_waiting_for_commit_parent,
   & stage_suspending,
   & stage_starting,
+  & stage_waiting_for_no_channel_reference,
   & stage_restoring_secondary_keys
 };
+
+#ifdef WITH_WSREP
+PSI_stage_info *wsrep_server_stages[]=
+{
+  // log_event
+  & stage_wsrep_writing_rows,
+  & stage_wsrep_deleting_rows,
+  & stage_wsrep_updating_rows,
+  // wsrep_applier
+  & stage_wsrep_applying_writeset,
+  & stage_wsrep_committing,
+  & stage_wsrep_rolling_back,
+  // wsrep_hton
+  & stage_wsrep_replicating_commit,
+  & stage_wsrep_waiting_on_replaying,
+  & stage_wsrep_pre_commit,
+  // wsrep_mysqld
+  & stage_wsrep_preparing_for_TO_isolation,
+  // wsrep_thd
+  & stage_wsrep_replaying_trx,
+  & stage_wsrep_applier_idle,
+  & stage_wsrep_in_rollback_thread,
+  & stage_wsrep_aborter_idle,
+  & stage_wsrep_aborter_active
+};
+
+#endif /* WITH_WSREP */
 
 PSI_socket_key key_socket_tcpip, key_socket_unix, key_socket_client_connection;
 
@@ -10457,6 +10612,12 @@ void init_server_psi_keys(void)
 
   count= array_elements(all_server_memory);
   mysql_memory_register(category, all_server_memory, count);
+
+#ifdef WITH_WSREP
+  const char *wsrep_category= "wsrep";
+  count= array_elements(wsrep_server_stages);
+  mysql_stage_register(wsrep_category, wsrep_server_stages, count);
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
   init_sql_statement_info();

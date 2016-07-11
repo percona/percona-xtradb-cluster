@@ -395,7 +395,7 @@ wsrep_row_upd_check_foreign_constraints(
 					dict_table_open_on_name(
 					  foreign->referenced_table_name_lookup,
 					  FALSE, FALSE, DICT_ERR_IGNORE_NONE);
-				opened = TRUE;
+				opened = (foreign->referenced_table) ? TRUE : FALSE;
 			}
 
 			/* NOTE that if the thread ends up waiting for a lock
@@ -408,7 +408,7 @@ wsrep_row_upd_check_foreign_constraints(
 
 			if (foreign->referenced_table) {
 				if (opened == TRUE) {
-					dict_table_close(foreign->referenced_table, TRUE, FALSE);
+					dict_table_close(foreign->referenced_table, FALSE, FALSE);
 					opened = FALSE;
 				}
 			}
@@ -544,6 +544,13 @@ row_upd_changes_field_size_or_external(
 
 	for (i = 0; i < n_fields; i++) {
 		upd_field = upd_get_nth_field(update, i);
+
+		/* We should ignore virtual field if the index is not
+		a virtual index */
+		if (upd_fld_is_virtual_col(upd_field)
+		    && dict_index_has_virtual(index) != DICT_VIRTUAL) {
+			continue;
+		}
 
 		new_val = &(upd_field->new_val);
 		new_len = dfield_get_len(new_val);
@@ -790,7 +797,13 @@ row_upd_index_write_log(
 
 		len = dfield_get_len(new_val);
 
-		log_ptr += mach_write_compressed(log_ptr, upd_field->field_no);
+		/* If this is a virtual column, mark it using special
+		field_no */
+		ulint	field_no = upd_fld_is_virtual_col(upd_field)
+				   ? REC_MAX_N_FIELDS + upd_field->field_no
+				   : upd_field->field_no;
+
+		log_ptr += mach_write_compressed(log_ptr, field_no);
 		log_ptr += mach_write_compressed(log_ptr, len);
 
 		if (len != UNIV_SQL_NULL) {
@@ -864,6 +877,13 @@ row_upd_index_parse(
 		if (ptr == NULL) {
 
 			return(NULL);
+		}
+
+		/* Check if this is a virtual column, mark the prtype
+		if that is the case */
+		if (field_no >= REC_MAX_N_FIELDS) {
+			new_val->type.prtype |= DATA_VIRTUAL;
+			field_no -= REC_MAX_N_FIELDS;
 		}
 
 		upd_field->field_no = field_no;
@@ -2996,10 +3016,9 @@ row_upd_clust_step(
 	index = dict_table_get_first_index(node->table);
 
 #ifdef WITH_WSREP
-	ibool foreign = wsrep_row_upd_index_is_foreign(
-		index, thr_get_trx(thr));
+	ibool foreign = wsrep_row_upd_index_is_foreign(index, trx);
 #endif /* WITH_WSREP */
-	referenced = row_upd_index_is_referenced(index, thr_get_trx(thr));
+	referenced = row_upd_index_is_referenced(index, trx);
 
 	pcur = node->pcur;
 

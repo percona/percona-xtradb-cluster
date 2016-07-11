@@ -51,6 +51,9 @@ The following is an example of the :file:`my.cnf` file:
 .. note:: If the SST method is not ``rsync``, specify SST credentials using
    ``wsrep_sst_auth=<user>:<password>``
 
+.. note:: If you enable binary logging by setting ``log-bin=mysql-bin``,
+   you should also provide a unique ``server-id`` for each node.
+
 Installation Guides
 ===================
 

@@ -1,31 +1,76 @@
-Multi-Master replication
+.. _multi-master-replication:
+
+========================
+Multi-Master Replication
 ========================
 
-Multi-Master replication stands for the ability to write to any node in the cluster, and not to worry that eventually it will get out-of-sync situation, as it regularly happens with regular MySQL replication if you imprudently write to the wrong server.
-This is a long-waited feature and there has been growing demand for it for the last two years, or even more.
+Multi-master replication means that you can write to any node
+and be sure that the write will be consistent for all nodes in the cluster.
+This is different from regular MySQL replication,
+where you have to apply writes to master to ensure that it will be synced.
 
-With |Percona XtraDB Cluster| you can write to any node, and the Cluster guarantees consistency of writes. That is, the write is either committed on all the nodes or not committed at all.
-For the simplicity, this diagram shows the use of the two-node example, but the same logic is applied with the N nodes:
+With multi-master replication any write is either committed on all nodes
+or not committed at all.
+The following diagram shows how it works for two nodes,
+but the same logic is applied with any number of nodes in the cluster:
 
 .. figure:: ../_static/certificationbasedreplication.png
 
-       *Image source:* `Galera documentation - HOW CERTIFICATION-BASED REPLICATION WORKS <http://galeracluster.com/documentation-webpages/certificationbasedreplication.html#how-certification-based-replication-works>`_
+   *Image source:* `Galera documentation - HOW CERTIFICATION-BASED REPLICATION WORKS <http://galeracluster.com/documentation-webpages/certificationbasedreplication.html#how-certification-based-replication-works>`_
 
-All queries are executed locally on the node, and there is a special handling only on *COMMIT*. When the *COMMIT* is issued, the transaction has to pass certification on all the nodes. If it does not pass, you
-will receive *ERROR* as a response on that query. After that, transaction is applied on the local node.
+All queries are executed locally on the node,
+and there is special handling only on ``COMMIT``.
+When the ``COMMIT`` query is issued,
+the transaction has to pass certification on all nodes.
+If it does not pass, you will receive ``ERROR`` as the response for that query.
+After that, the transaction is applied on the local node.
 
-Response time of *COMMIT* consists of several parts:
- * Network round-trip time,
- * Certification time,
+Response time of ``COMMIT`` includes the following:
+ * Network round-trip time
+ * Certification time
  * Local applying
 
-Please note that applying the transaction on remote nodes does not affect the response time of *COMMIT*,
-as it happens in the background after the response on certification.
+.. note:: Applying the transaction on remote nodes
+   does not affect the response time of ``COMMIT``,
+   because it happens in the background after the response on certification.
 
-The two important consequences of this architecture:
- * First: we can have several appliers working in parallel. This gives us a true parallel replication. Slave can have many parallel threads, and this can be tuned by variable :option:`wsrep_slave_threads`.
- * Second: There might be a small period of time when the slave is out-of-sync from master. This happens because the master may apply event faster than a slave. And if you do read from the slave, you may read the data that has not changed yet. You can see that from the diagram. However, this behavior can be changed by using variable :option:`wsrep_causal_reads=ON`. In this case, the read on the slave will wait until event is applied (this however will increase the response time of the read). This gap between the slave and the master is the reason why this replication is called "virtually synchronous replication", and not real "synchronous replication".
+There are two important consequences of this architecture:
 
-The described behavior of *COMMIT* also has the second serious implication. If you run write transactions to two different nodes, the cluster will use an `optimistic locking model <http://en.wikipedia.org/wiki/Optimistic_concurrency_control>`_. That means a transaction will not check on possible locking conflicts during the individual queries, but rather on the *COMMIT* stage, and you may get *ERROR* response on *COMMIT*. This is mentioned because it is one of the incompatibilities with regular |InnoDB| that you might experience. In InnoDB usually *DEADLOCK* and *LOCK TIMEOUT* errors happen in response on particular query, but not on *COMMIT*. It's good practice to check the error codes after *COMMIT* query, but there are still many applications that do not do that.
+* Several appliers can be used in parallel.
+  This enables truely parallel replication.
+  A slave can have many parallel threads configured
+  using the :option:`wsrep_slave_threads` variable.
 
-If you plan to use Multi-Master capabilities of |XtraDB Cluster| and run write transactions on several nodes, you may need to make sure you handle response on *COMMIT* query.
+* There might be a small period of time when a slave is out of sync.
+  This happens because the master may apply events faster than the slave.
+  And if you do read from the slave,
+  you may read the data that has not changed yet.
+  You can see that from the diagram.
+
+  However, this behavior can be changed
+  by setting the :option:`wsrep_causal_reads=ON` variable.
+  In this case, the read on the slave will wait until the event is applied
+  (this will obviously increase the response time of the read).
+  The gap between the slave and the master is the reason
+  why this replication is called *virtually synchronous replication*,
+  and not *real synchronous replication*.
+
+The described behavior of ``COMMIT`` also has another serious implication.
+If you run write transactions to two different nodes,
+the cluster will use an `optimistic locking model
+<http://en.wikipedia.org/wiki/Optimistic_concurrency_control>`_.
+This means a transaction will not check on possible locking conflicts
+during the individual queries, but rather on the ``COMMIT`` stage,
+and you may get ``ERROR`` response on ``COMMIT``.
+
+This is mentioned because it is one of the incompatibilities
+with regular |InnoDB| that you might experience.
+With InnoDB, ``DEADLOCK`` and ``LOCK TIMEOUT`` errors usually happen
+in response to a particular query, but not on ``COMMIT``.
+It is good practice to check the error codes after a ``COMMIT`` query,
+but there are still many applications that do not do that.
+
+If you plan to use multi-master replication
+and run write transactions on several nodes,
+you may need to make sure you handle the responses on ``COMMIT`` queries.
+

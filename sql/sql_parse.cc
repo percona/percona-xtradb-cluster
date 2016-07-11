@@ -22,6 +22,7 @@
 #include "item_timefunc.h"    // Item_func_unix_timestamp
 #include "log.h"              // query_logger
 #include "log_event.h"        // slave_execute_deferred_events
+#include "mysys_err.h"        // EE_CAPACITY_EXCEEDED
 #include "opt_explain.h"      // mysql_explain_other
 #include "opt_trace.h"        // Opt_trace_start
 #include "partition_info.h"   // partition_info
@@ -295,11 +296,13 @@ void init_update_queries(void)
   /* Initialize the server command flags array. */
   memset(server_command_flags, 0, sizeof(server_command_flags));
 
+#ifdef WITH_WSREP
   /* CF_SKIP_WSREP_CHECK: Allow commands marked to skip wsrep check to proceed
   even if node is not wsrep ready. */
   server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
-  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN |
+                                                 CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_QUERY]=               CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_FIELD_LIST]=          CF_ALLOW_PROTOCOL_PLUGIN;
@@ -325,11 +328,41 @@ void init_update_queries(void)
   server_command_flags[COM_STMT_RESET]=          CF_SKIP_QUESTIONS |
                                                  CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
-
   server_command_flags[COM_STMT_FETCH]=          CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN |
                                                  CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_QUIT]=                CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_PROCESS_INFO]=        CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_TIME]=                CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_END]=                 CF_SKIP_WSREP_CHECK;
+
+  /*
+    COM_SET_OPTION are allowed to pass the early COM_xxx filter,
+    they're checked later in mysql_execute_command().
+  */
+  server_command_flags[COM_SET_OPTION]=          CF_SKIP_WSREP_CHECK;
+#else
+  server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_QUERY]=               CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_FIELD_LIST]=          CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_REFRESH]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_SHUTDOWN]=            CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STATISTICS]=          CF_SKIP_QUESTIONS;
+  server_command_flags[COM_PROCESS_KILL]=        CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_PING]=                CF_SKIP_QUESTIONS;
+  server_command_flags[COM_STMT_PREPARE]=        CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_EXECUTE]=        CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_SEND_LONG_DATA]= CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_CLOSE]=          CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_RESET]=          CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_FETCH]=          CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN;
+#endif /* WITH_WSREP */
 
   /* Initialize the sql command flags array. */
   memset(sql_command_flags, 0, sizeof(sql_command_flags));
@@ -881,9 +914,9 @@ void cleanup_items(Item *item)
 }
 
 #ifdef WITH_WSREP
-
 static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
 {
+  bool has_tables = false;
   for (const TABLE_LIST *table= tables; table; table= table->next_global)
   {
     TABLE_CATEGORY c;
@@ -896,12 +929,11 @@ static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
     {
       return false;
     }
+    has_tables = true;
   }
-  return true;
+  return has_tables;
 }
-
 #endif /* WITH_WSREP */
-
 #ifndef EMBEDDED_LIBRARY
 
 /**
@@ -928,6 +960,7 @@ bool do_command(THD *thd)
   enum enum_server_command command;
   COM_DATA com_data;
   DBUG_ENTER("do_command");
+
 #ifdef WITH_WSREP
   /* Why do we need to do an explicit rollback if rollback thread can do it ?
   THD is added to rollback thread based on till what point query has executed.
@@ -1101,7 +1134,8 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow some commands, they are trapped later in execute_command.
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
+    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
+        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
         (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
     ) {
       my_message(ER_UNKNOWN_COM_ERROR,
@@ -1343,6 +1377,44 @@ void reset_statement_timer(THD *thd)
   thd->timer= NULL;
 }
 
+#ifdef WITH_WSREP
+/* Function should be called if any non-supported lock/unlock statement
+is executed and if the outcome has to be evaluated based on pxc-strict-mode */
+static bool pxc_strict_mode_lock_check(THD* thd)
+{
+  /* LOCK/UNLOCK TABLE is not supported by galera due as it not compatible
+  with multi-master semantics. */
+  bool block= false;
+
+  switch (pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+  case PXC_STRICT_MODE_MASTER:
+    /* Do nothing */
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+               " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster doesn't recommend use of"
+                  " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  default:
+    block= true;
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+               " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+             "Percona-XtraDB-Cluster prohibits use of"
+             " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+    break;
+  }
+
+  return block;
+}
+#endif /* WITH_WSREP */
+
 
 /**
   Perform one connection-level (COM_XXXX) command.
@@ -1373,13 +1445,13 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   DBUG_EXECUTE_IF("crash_dispatch_command_before",
                   { DBUG_PRINT("crash_dispatch_command_before", ("now"));
                     DBUG_ABORT(); });
+
 #ifdef WITH_WSREP
   if (WSREP(thd)) {
     if (!thd->in_multi_stmt_transaction_mode())
     {
       thd->wsrep_PA_safe= true;
     }
-
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     thd->wsrep_query_state= QUERY_EXEC;
     if (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
@@ -1403,7 +1475,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       else
       {
         mysql_reset_thd_for_next_command(thd);
-        my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+        my_message(ER_LOCK_DEADLOCK, "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction", MYF(0));
         WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         thd->killed               = THD::NOT_KILLED;
@@ -1668,7 +1740,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
     if (thd->wsrep_conflict_state== ABORTED) 
     {
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+      my_message(ER_LOCK_DEADLOCK, "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction", MYF(0));
       WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
@@ -2855,9 +2927,6 @@ mysql_execute_command(THD *thd, bool first_level)
         lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT &&
         !rpl_filter->db_ok(thd->db().str))
     {
-      /* we warn the slave SQL thread */
-      my_message(ER_SLAVE_IGNORED_TABLE, ER(ER_SLAVE_IGNORED_TABLE), MYF(0));
-
       binlog_gtid_end_transaction(thd);
       DBUG_RETURN(0);
     }
@@ -3009,20 +3078,34 @@ mysql_execute_command(THD *thd, bool first_level)
 
     /*
      * bail out if DB snapshot has not been installed. We however,
-     * allow SET and SHOW queries
+     * allow SET and SHOW queries and reads from information schema
+     * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        !(wsrep_ready ||
-          (thd->variables.wsrep_dirty_reads &&
-           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0) ||
-          wsrep_tables_accessible_when_detached(all_tables)) &&
-        lex->sql_command != SQLCOM_SET_OPTION &&
+    if (thd->variables.wsrep_on                                            &&
+        !thd->wsrep_applier                                                &&
+        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+        !(thd->variables.wsrep_dirty_reads &&
+          (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
+        !wsrep_tables_accessible_when_detached(all_tables)                 &&
+        lex->sql_command != SQLCOM_SET_OPTION                              &&
         !wsrep_is_show_query(lex->sql_command))
     {
       my_message(ER_UNKNOWN_COM_ERROR,
                  "WSREP has not yet prepared node for application use", MYF(0));
       goto error;
     }
+  }
+
+  if (lex->sql_command == SQLCOM_XA_START    ||
+      lex->sql_command == SQLCOM_XA_END      ||
+      lex->sql_command == SQLCOM_XA_PREPARE  ||
+      lex->sql_command == SQLCOM_XA_COMMIT   ||
+      lex->sql_command == SQLCOM_XA_ROLLBACK ||
+      lex->sql_command == SQLCOM_XA_RECOVER)
+  {
+    my_message(ER_UNKNOWN_COM_ERROR,
+               "WSREP doesn't support XA transaction", MYF(0));
+    goto error;
   }
 #endif /* WITH_WSREP */
 
@@ -3175,6 +3258,7 @@ mysql_execute_command(THD *thd, bool first_level)
   {
     system_status_var old_status_var= thd->status_var;
     thd->initial_status_var= &old_status_var;
+
 #ifdef WITH_WSREP
     if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
 #endif /* WITH_WSREP */
@@ -3229,7 +3313,7 @@ mysql_execute_command(THD *thd, bool first_level)
 #endif /* WITH_WSREP */
   {
     DBUG_EXECUTE_IF("use_attachable_trx",
-                    thd->begin_attachable_transaction(););
+                    thd->begin_attachable_ro_transaction(););
 
     thd->clear_current_query_costs();
 
@@ -3553,6 +3637,39 @@ case SQLCOM_PREPARE:
 
     if (select_lex->item_list.elements)		// With select
     {
+
+#ifdef WITH_WSREP
+      bool block= false;
+      switch(pxc_strict_mode)
+      {
+      case PXC_STRICT_MODE_DISABLED:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                   " CREATE TABLE AS SELECT");
+        push_warning_printf(thd, Sql_condition::SL_WARNING,
+                            ER_UNKNOWN_ERROR,
+                            "Percona-XtraDB-Cluster doesn't recommend use of"
+                            " CREATE TABLE AS SELECT");
+        break;
+      case PXC_STRICT_MODE_ENFORCING:
+      case PXC_STRICT_MODE_MASTER:
+        block= true;
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+                    " CREATE TABLE AS SELECT");
+        my_message(ER_UNKNOWN_ERROR,
+                   "Percona-XtraDB-Cluster prohibits use of"
+                   " CREATE TABLE AS SELECT", MYF(0));
+        break;
+      }
+
+      if (block)
+      {
+        res= 1;
+        goto end_with_restore_list;
+      }
+#endif /* WITH_WSREP */
+
       Query_result *result;
 
       /*
@@ -4264,15 +4381,17 @@ end_with_restore_list:
         my_error(ER_WRONG_ARGUMENTS,MYF(0),"SET");
       goto error;
     }
-
     break;
   }
 
   case SQLCOM_UNLOCK_TABLES:
   {
 #ifdef WITH_WSREP
-    bool table_lock= false;
+    /* UNLOCK Tables is generic statement and not all lock table variants
+    are blocked (only one with explict table lock are blocked). */
+    bool table_lock= (thd->variables.option_bits & OPTION_TABLE_LOCK);
 #endif /* WITH_WSREP */
+
     /*
       It is critical for mysqldump --single-transaction --master-data that
       UNLOCK TABLES does not implicitely commit a connection which has only
@@ -4281,9 +4400,6 @@ end_with_restore_list:
     */
     if (thd->variables.option_bits & OPTION_TABLE_LOCK)
     {
-#ifdef WITH_WSREP
-      table_lock= true;
-#endif /* WITH_WSREP */
       DBUG_ASSERT(!thd->backup_tables_lock.is_acquired());
       /*
         Can we commit safely? If not, return to avoid releasing
@@ -4338,6 +4454,12 @@ end_with_restore_list:
     break;
 
   case SQLCOM_LOCK_TABLES:
+
+#ifdef WITH_WSREP
+     if (pxc_strict_mode_lock_check(thd))
+       goto error;
+#endif /* WITH_WSREP */
+
     /*
       Do not allow LOCK TABLES under an active LOCK TABLES FOR BACKUP in the
       same connection.
@@ -4806,8 +4928,11 @@ end_with_restore_list:
     if (first_table && lex->type & REFRESH_READ_LOCK)
     {
 #ifdef WITH_WSREP
+      if (pxc_strict_mode_lock_check(thd))
+        goto error;
       bool already_paused;
 #endif /* WITH_WSREP */
+
       /*
          Do not allow FLUSH TABLES <table_list> WITH READ LOCK under an active
          LOCK TABLES FOR BACKUP lock.
@@ -4825,7 +4950,7 @@ end_with_restore_list:
         because that is checked in flush_tables_with_read_lock.
 
         We also intend to maintain GRL compatibility,
-        hence check for provider_paused.
+        hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
@@ -4850,7 +4975,7 @@ end_with_restore_list:
     {
 #ifdef WITH_WSREP
       bool already_paused;
-#endif /* WITH_WSREP */
+#endif
       /*
          Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
          FOR BACKUP lock.
@@ -4868,7 +4993,7 @@ end_with_restore_list:
         because that is checked in flush_tables_for_export.
 
         We also intend to maintain GRL compatibility,
-        hence check for provider_paused.
+        hence check for provider paused.
         This is to ensure we don't try pause an already paused provider.
        */
 #ifdef WITH_WSREP
@@ -5674,14 +5799,6 @@ end_with_restore_list:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
   {
-
-#ifdef WITH_WSREP
-    if (lex->sql_command == SQLCOM_INSTALL_PLUGIN ||
-        lex->sql_command == SQLCOM_UNINSTALL_PLUGIN) {
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-    }
-#endif /* WITH_WSREP */
-
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;
@@ -6182,20 +6299,18 @@ void THD::reset_for_next_command()
   /*
     Autoinc variables should be adjusted only for locally executed
     transactions. Appliers and replayers are either processing ROW
-    events or get autoinc variable values from Query_log_event.
+    events or get autoinc variable values from Query_log_event and
+    mysql slave may be processing STATEMENT format events, but he should
+    use autoinc values passed in binlog events, not the values forced by
+    the cluster.
   */
-  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE && !thd->slave_thread) {
-    if (wsrep_auto_increment_control)
-    {
-      if (thd->variables.auto_increment_offset !=
-	  global_system_variables.auto_increment_offset)
-	thd->variables.auto_increment_offset=
-	  global_system_variables.auto_increment_offset;
-      if (thd->variables.auto_increment_increment !=
-	  global_system_variables.auto_increment_increment)
-	thd->variables.auto_increment_increment=
-	  global_system_variables.auto_increment_increment;
-    }
+  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE &&
+      !thd->slave_thread && wsrep_auto_increment_control)
+  {
+    thd->variables.auto_increment_offset=
+      global_system_variables.auto_increment_offset;
+    thd->variables.auto_increment_increment=
+      global_system_variables.auto_increment_increment;
   }
 #endif /* WITH_WSREP */
   thd->query_start_usec_used= 0;
@@ -6353,6 +6468,25 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
       if (thd->wsrep_conflict_state == ABORTED ||
           thd->wsrep_conflict_state == CERT_FAILURE)
       {
+
+        if (thd->lex->sql_command == SQLCOM_SHOW_CREATE)
+        {
+          /* SHOW CREATE result in opening and locking the table.
+          Even though it is show command it can conflict with DDL
+          action that is treated as a high priority action by Galera
+          and this conflict can cause SHOW_CREATE to fail and retry.
+          While this flow is ok it creates an issue if the SHOW_CREATE
+          table has sent a half-cooked result set to client.
+          Note: most of the show command directly write to wire
+          immediately. In order to closed half-cooked result set before
+          replay mark the previous statement as done. */
+          if (!thd->get_stmt_da()->is_set())
+            my_eof(thd);
+
+          if (thd->get_stmt_da()->is_eof())
+            thd->send_statement_status();
+        }
+
         mysql_reset_thd_for_next_command(thd);
         thd->killed= THD::NOT_KILLED;
         if (is_autocommit                           &&
@@ -6413,7 +6547,9 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                       thd->thread_id(), is_autocommit, thd->wsrep_retry_counter,
                       thd->variables.wsrep_retry_autocommit,
                       WSREP_QUERY(thd));
-          my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+          my_message(ER_LOCK_DEADLOCK, 
+            "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction",
+            MYF(0));
           thd->killed= THD::NOT_KILLED;
           thd->wsrep_conflict_state= NO_CONFLICT;
           if (thd->wsrep_conflict_state != REPLAYING)
@@ -8090,6 +8226,42 @@ bool check_host_name(const LEX_CSTRING &str)
 }
 
 
+class Parser_oom_handler : public Internal_error_handler
+{
+public:
+  Parser_oom_handler()
+    : m_has_errors(false), m_is_mem_error(false)
+  {}
+  virtual bool handle_condition(THD *thd,
+                                uint sql_errno,
+                                const char* sqlstate,
+                                Sql_condition::enum_severity_level *level,
+                                const char* msg)
+  {
+    if (*level == Sql_condition::SL_ERROR)
+    {
+      m_has_errors= true;
+      /* Out of memory error is reported only once. Return as handled */
+      if (m_is_mem_error && sql_errno == EE_CAPACITY_EXCEEDED)
+        return true;
+      if (sql_errno == EE_CAPACITY_EXCEEDED)
+      {
+        m_is_mem_error= true;
+        my_error(ER_CAPACITY_EXCEEDED, MYF(0),
+                 static_cast<ulonglong>(thd->variables.parser_max_mem_size),
+                 "parser_max_mem_size",
+                 ER_THD(thd, ER_CAPACITY_EXCEEDED_IN_PARSER));
+        return true;
+      }
+    }
+    return false;
+  }
+private:
+  bool m_has_errors;
+  bool m_is_mem_error;
+};
+
+
 extern int MYSQLparse(class THD *thd); // from sql_yacc.cc
 
 
@@ -8191,10 +8363,20 @@ bool parse_sql(THD *thd,
   Diagnostics_area *parser_da= thd->get_parser_da();
   Diagnostics_area *da=        thd->get_stmt_da();
 
+  Parser_oom_handler poomh;
+  // Note that we may be called recursively here, on INFORMATION_SCHEMA queries.
+
+  set_memroot_max_capacity(thd->mem_root, thd->variables.parser_max_mem_size);
+  set_memroot_error_reporting(thd->mem_root, true);
+  thd->push_internal_handler(&poomh);
+
   thd->push_diagnostics_area(parser_da, false);
 
   bool mysql_parse_status= MYSQLparse(thd) != 0;
 
+  thd->pop_internal_handler();
+  set_memroot_max_capacity(thd->mem_root, 0);
+  set_memroot_error_reporting(thd->mem_root, false);
   /*
     Unwind diagnostics area.
 

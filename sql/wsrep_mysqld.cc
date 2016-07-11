@@ -31,12 +31,22 @@
 #include <rpl_slave.h>
 #include "sql_base.h"		// TEMP_PREFIX 
 #include "rpl_msr.h"           // channel_map
+#ifdef HAVE_PSI_INTERFACE
+#include <vector>
+#include <map>
+#include "pthread.h"
+#include "mysql/psi/mysql_file.h"
+#endif /* HAVE_PSI_INTERFACE */
 
 wsrep_t *wsrep                  = NULL;
 my_bool wsrep_emulate_bin_log   = FALSE; // activating parts of binlog interface
 /* Sidno in global_sid_map corresponding to group uuid */
 rpl_sidno wsrep_sidno= -1;
 my_bool wsrep_preordered_opt= FALSE;
+
+/* If set to true the said set statement is replicated across the cluster
+using TOI */
+bool     wsrep_replicate_set_stmt = false;
 
 /*
  * Begin configuration options and their default values
@@ -70,6 +80,10 @@ my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
                                             // restart will be needed
 my_bool wsrep_slave_UK_checks          = 0; // slave thread does UK checks
 my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
+
+/* pxc-strict-mode help control behavior of experimental features like
+myisam table replication, etc... */
+ulong   pxc_strict_mode                = PXC_STRICT_MODE_ENFORCING;
 /*
  * End configuration options
  */
@@ -113,6 +127,410 @@ long             wsrep_protocol_version = 3;
 // if there was no state gap on receiving first view event.
 static my_bool   wsrep_startup = TRUE;
 
+#ifdef HAVE_PSI_INTERFACE
+
+/* Keys for mutexes and condition variables in galera library space. */
+PSI_mutex_key
+  key_LOCK_galera_cert,
+  key_LOCK_galera_stats,
+  key_LOCK_galera_dummy_gcs,
+  key_LOCK_galera_service_thd,
+  key_LOCK_galera_ist_receiver,
+  key_LOCK_galera_monitor,
+  key_LOCK_galera_sst,
+  key_LOCK_galera_incoming,
+  key_LOCK_galera_saved_state,
+  key_LOCK_galera_trx_handle,
+  key_LOCK_galera_wsdb_trx,
+  key_LOCK_galera_wsdb_conn,
+  key_LOCK_galera_gu_dbug_sync,
+  key_LOCK_galera_profile,
+  key_LOCK_galera_gcache,
+  key_LOCK_galera_protstack,
+  key_LOCK_galera_prodcons,
+  key_LOCK_galera_gu_monitor,
+  key_LOCK_galera_gcommconn,
+  key_LOCK_galera_recvbuf,
+  key_LOCK_galera_mempool;
+
+/* Sequence here should match with tag name sequence specified in wsrep_api.h */
+PSI_mutex_info       all_galera_mutexes[]=
+{
+  { &key_LOCK_galera_cert, "LOCK_galera_cert", 0},
+  { &key_LOCK_galera_stats, "LOCK_galera_stats", 0},
+  { &key_LOCK_galera_dummy_gcs, "LOCK_galera_dummy_gcs", 0},
+  { &key_LOCK_galera_service_thd, "LOCK_galera_service_thd", 0},
+  { &key_LOCK_galera_ist_receiver, "LOCK_galera_ist_receiver", 0},
+  { &key_LOCK_galera_monitor, "LOCK_galera_monitor", 0},
+  { &key_LOCK_galera_sst, "LOCK_galera_sst", 0},
+  { &key_LOCK_galera_incoming, "LOCK_galera_incoming", 0},
+  { &key_LOCK_galera_saved_state, "LOCK_galera_saved_state", 0},
+  { &key_LOCK_galera_trx_handle, "LOCK_galera_trx_handle", 0},
+  { &key_LOCK_galera_wsdb_trx, "LOCK_galera_wsdb", 0},
+  { &key_LOCK_galera_wsdb_conn, "LOCK_galera_wsdb_conn", 0},
+  { &key_LOCK_galera_gu_dbug_sync, "LOCK_galera_gu_dbug_sync", 0},
+  { &key_LOCK_galera_profile, "LOCK_galera_profile", 0},
+  { &key_LOCK_galera_gcache, "LOCK_galera_gcache", 0},
+  { &key_LOCK_galera_protstack, "LOCK_galera_protstack", 0},
+  { &key_LOCK_galera_prodcons, "LOCK_galera_prodcons", 0},
+  { &key_LOCK_galera_gu_monitor, "LOCK_galera_gu_monitor", 0},
+  { &key_LOCK_galera_gcommconn, "LOCK_galera_gcommconn", 0},
+  { &key_LOCK_galera_recvbuf, "LOCK_galera_recvbuf", 0},
+  { &key_LOCK_galera_mempool, "LOCK_galera_mempool", 0}
+};
+
+PSI_cond_key
+  key_COND_galera_dummy_gcs,
+  key_COND_galera_service_thd,
+  key_COND_galera_service_thd_flush,
+  key_COND_galera_ist_receiver,
+  key_COND_galera_ist_consumer,
+  key_COND_galera_monitor_process1,
+  key_COND_galera_monitor_process2,
+  key_COND_galera_monitor,
+  key_COND_galera_sst,
+  key_COND_galera_gu_dbug_sync,
+  key_COND_galera_prodcons,
+  key_COND_galera_gcache,
+  key_COND_galera_gu_monitor,
+  key_COND_galera_recvbuf;
+
+PSI_cond_info       all_galera_condvars[]=
+{
+  { &key_COND_galera_dummy_gcs, "COND_galera_dummy_gcs", 0},
+  { &key_COND_galera_service_thd, "COND_galera_service_thd", 0},
+  { &key_COND_galera_service_thd_flush, "COND_galera_service_thd_flush", 0},
+  { &key_COND_galera_ist_receiver, "COND_galera_ist_receiver", 0},
+  { &key_COND_galera_ist_consumer, "COND_galera_ist_consumer", 0},
+  { &key_COND_galera_monitor_process1, "COND_galera_monitor_process", 0},
+  { &key_COND_galera_monitor_process2, "COND_galera_monitor_process_wait", 0},
+  { &key_COND_galera_monitor, "COND_galera_monitor", 0},
+  { &key_COND_galera_sst, "COND_galera_sst", 0},
+  { &key_COND_galera_gu_dbug_sync, "COND_galera_gu_dbug_sync", 0},
+  { &key_COND_galera_prodcons, "COND_galera_prodcons", 0},
+  { &key_COND_galera_gcache, "COND_galera_gcache", 0},
+  { &key_COND_galera_gu_monitor, "COND_galera_gu_monitor", 0},
+  { &key_COND_galera_recvbuf, "COND_galera_recvbuf", 0}
+};
+
+PSI_thread_key
+  key_THREAD_galera_service_thd,
+  key_THREAD_galera_ist_receiver,
+  key_THREAD_galera_ist_async_sender,
+  key_THREAD_galera_writeset_checksum,
+  key_THREAD_galera_gcache_removefile,
+  key_THREAD_galera_receiver,
+  key_THREAD_galera_gcommconn;
+
+PSI_thread_info       all_galera_threads[]=
+{
+  { &key_THREAD_galera_service_thd, "THREAD_galera_service_thd", 0},
+  { &key_THREAD_galera_ist_receiver, "THREAD_galera_ist_receiver", 0},
+  { &key_THREAD_galera_ist_async_sender, "THREAD_galera_ist_async_sender", 0},
+  { &key_THREAD_galera_writeset_checksum, "THREAD_galera_writeset_checksum", 0},
+  { &key_THREAD_galera_gcache_removefile, "THREAD_galera_gcache_removefile", 0},
+  { &key_THREAD_galera_receiver, "THREAD_galera_receiver", 0},
+  { &key_THREAD_galera_gcommconn, "THREAD_galera_gcommconn", 0}
+};
+
+PSI_file_key
+  key_FILE_galera_recordset,
+  key_FILE_galera_ringbuffer,
+  key_FILE_galera_gcache_page,
+  key_FILE_galera_grastate,
+  key_FILE_galera_gvwstate;
+
+PSI_file_info       all_galera_files[]=
+{
+  { &key_FILE_galera_recordset, "FILE_galera_recordset", 0},
+  { &key_FILE_galera_ringbuffer, "FILE_galera_ringbuffer", 0},
+  { &key_FILE_galera_gcache_page, "FILE_galera_gcache_page", 0},
+  { &key_FILE_galera_grastate, "FILE_galera_grastate", 0},
+  { &key_FILE_galera_gvwstate, "FILE_galera_gvwstate", 0}
+};
+
+/* Vector to cache PSI key and mutex for corresponding galera mutex. */
+typedef std::vector<void*> wsrep_psi_key_vec_t;
+static wsrep_psi_key_vec_t wsrep_psi_key_vec;
+
+/*!
+ * @brief a callback to create PFS instrumented mutex/condition variables
+ *
+ *
+ * @param type          mutex or condition variable
+ * @param ops           add/init or remove/destory mutex/condition variable
+ * @param tag           tag/name of instrument to monitor
+ * @param value         created mutex or condition variable
+ * @param alliedvalue   allied value for supporting operation.
+                        for example: while waiting for cond-var corresponding
+                        mutex is passes through this variable.
+ * @param ts      time to wait for condition.
+ */
+static void wsrep_pfs_instr_cb(
+    wsrep_pfs_instr_type_t        type,
+    wsrep_pfs_instr_ops_t         ops,
+    wsrep_pfs_instr_tag_t         tag,
+    void**                        value __attribute__((unused)),
+    void**                        alliedvalue __attribute__((unused)),
+    const void*                   ts __attribute__((unused)))
+{
+  if (type == WSREP_PFS_INSTR_TYPE_MUTEX)
+  {
+    switch (ops)
+    {
+    case WSREP_PFS_INSTR_OPS_INIT:
+    {
+      PSI_mutex_key* key=
+        reinterpret_cast<PSI_mutex_key*>(wsrep_psi_key_vec[tag]);
+
+      mysql_mutex_t* mutex= NULL;
+      mutex= (mysql_mutex_t*) my_malloc(
+        PSI_NOT_INSTRUMENTED, sizeof(mysql_mutex_t), MYF(0));
+      mysql_mutex_init(*key, mutex, MY_MUTEX_INIT_FAST);
+
+      /* Begin a structure and m_mutex is first element this
+      should hold true. To make this appear therotically good
+      we could use map but that comes at cost of map operation
+      and mutex as STL map are not thread safe. */
+      assert (reinterpret_cast<void*>(mutex) ==
+              reinterpret_cast<void*>(&(mutex->m_mutex)));
+
+      *value= &(mutex->m_mutex);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_DESTROY:
+    {
+      mysql_mutex_t* mutex= reinterpret_cast<mysql_mutex_t*>(*value);
+      assert(mutex != NULL);
+
+      mysql_mutex_destroy(mutex);
+      my_free(mutex);
+      *value= NULL;
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_LOCK:
+    {
+      mysql_mutex_t* mutex= reinterpret_cast<mysql_mutex_t*>(*value);
+      assert(mutex != NULL);
+
+      mysql_mutex_lock(mutex);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_UNLOCK:
+    {
+      mysql_mutex_t* mutex= reinterpret_cast<mysql_mutex_t*>(*value);
+      assert(mutex != NULL);
+
+      mysql_mutex_unlock(mutex);
+
+      break;
+    }
+
+    default:
+      assert(0);
+      break;
+    }
+  }
+  else if (type == WSREP_PFS_INSTR_TYPE_CONDVAR)
+  {
+    switch (ops)
+    {
+    case WSREP_PFS_INSTR_OPS_INIT:
+    {
+      PSI_cond_key* key=
+        reinterpret_cast<PSI_cond_key*>(wsrep_psi_key_vec[tag]);
+
+      mysql_cond_t* cond= NULL;
+      cond= (mysql_cond_t*) my_malloc(
+        PSI_NOT_INSTRUMENTED, sizeof(mysql_cond_t), MYF(0));
+      mysql_cond_init(*key, cond);
+
+      /* Begin a structure and m_cond is first element this
+      should hold true. To make this appear therotically good
+      we could use map but that comes at cost of map operation
+      and mutex as STL map are not thread safe. */
+      assert (reinterpret_cast<void*>(cond) ==
+              reinterpret_cast<void*>(&(cond->m_cond)));
+
+      *value= &(cond->m_cond);
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_DESTROY:
+    {
+      mysql_cond_t* cond= reinterpret_cast<mysql_cond_t*>(*value);
+      assert(cond != NULL);
+
+      mysql_cond_destroy(cond);
+      my_free(cond);
+      *value= NULL;
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_WAIT:
+    {
+      mysql_cond_t* cond= reinterpret_cast<mysql_cond_t*>(*value);
+      mysql_mutex_t* mutex= reinterpret_cast<mysql_mutex_t*>(*alliedvalue);
+      assert(cond != NULL);
+
+      mysql_cond_wait(cond, mutex);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_TIMEDWAIT:
+    {
+      mysql_cond_t* cond= reinterpret_cast<mysql_cond_t*>(*value);
+      mysql_mutex_t* mutex= reinterpret_cast<mysql_mutex_t*>(*alliedvalue);
+      const timespec* wtime = reinterpret_cast<const timespec*>(ts);
+      assert(cond != NULL && mutex != NULL);
+
+      mysql_cond_timedwait(cond, mutex, wtime);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_SIGNAL:
+    {
+      mysql_cond_t* cond= reinterpret_cast<mysql_cond_t*>(*value);
+      assert(cond != NULL);
+
+      mysql_cond_signal(cond);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_BROADCAST:
+    {
+      mysql_cond_t* cond= reinterpret_cast<mysql_cond_t*>(*value);
+      assert(cond != NULL);
+
+      mysql_cond_broadcast(cond);
+
+      break;
+    }
+
+    default:
+      assert(0);
+      break;
+    }
+  }
+  else if (type == WSREP_PFS_INSTR_TYPE_THREAD)
+  {
+    switch (ops)
+    {
+    case WSREP_PFS_INSTR_OPS_INIT:
+    {
+      PSI_thread_key* key=
+        reinterpret_cast<PSI_thread_key*>(wsrep_psi_key_vec[tag]);
+
+      wsrep_pfs_register_thread(*key);
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_DESTROY:
+    {
+      wsrep_pfs_delete_thread();
+      break;
+    }
+
+    default:
+      assert(0);
+      break;
+    }
+  }
+  else if (type == WSREP_PFS_INSTR_TYPE_FILE)
+  {
+    switch(ops)
+    {
+    case WSREP_PFS_INSTR_OPS_CREATE:
+    {
+      PSI_file_key* key=
+        reinterpret_cast<PSI_thread_key*>(wsrep_psi_key_vec[tag]);
+
+      File* fd= reinterpret_cast<File*> (*value);
+      const char* name= reinterpret_cast<const char*> (ts);
+
+      PSI_file_locker_state   state;
+      struct PSI_file_locker* locker = NULL;
+
+      wsrep_register_pfs_file_open_begin(
+                &state, locker, *key, PSI_FILE_CREATE,
+                name, __FILE__, __LINE__);
+
+      wsrep_register_pfs_file_open_end(locker, *fd);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_OPEN:
+    {
+      PSI_file_key* key= 
+        reinterpret_cast<PSI_thread_key*>(wsrep_psi_key_vec[tag]);
+      
+      File* fd= reinterpret_cast<File*> (*value);
+      const char* name= reinterpret_cast<const char*> (ts);
+
+      PSI_file_locker_state   state;
+      struct PSI_file_locker* locker = NULL;
+
+      wsrep_register_pfs_file_open_begin(
+                &state, locker, *key, PSI_FILE_OPEN,
+                name, __FILE__, __LINE__);
+
+      wsrep_register_pfs_file_open_end(locker, *fd);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_CLOSE:
+    {
+      File* fd= reinterpret_cast<File*> (*value);
+
+      PSI_file_locker_state   state;
+      struct PSI_file_locker* locker = NULL;
+
+      wsrep_register_pfs_file_io_begin(
+                &state, locker, *fd, 0, PSI_FILE_CLOSE,
+                __FILE__, __LINE__);
+
+      wsrep_register_pfs_file_io_end(locker, 0);
+
+      break;
+    }
+
+    case WSREP_PFS_INSTR_OPS_DELETE:
+    {
+      PSI_file_key* key=
+        reinterpret_cast<PSI_thread_key*>(wsrep_psi_key_vec[tag]);
+
+      PSI_file_locker_state   state;
+      struct PSI_file_locker* locker = NULL;
+      const char* name= reinterpret_cast<const char*> (ts);
+
+      wsrep_register_pfs_file_close_begin(
+                &state, locker, *key, PSI_FILE_DELETE,
+                name, __FILE__, __LINE__);
+
+      wsrep_register_pfs_file_close_end(locker, 0);
+
+      break;
+    }
+
+    default:
+      assert(0);
+      break;
+    }
+  }
+}
+#endif /* HAVE_PSI_INTERFACE */
 
 static void wsrep_log_cb(wsrep_log_level_t level, const char *msg) {
   switch (level) {
@@ -398,12 +816,17 @@ static void wsrep_synced_cb(void* app_ctx)
     wsrep_restart_slave_activated= FALSE;
 
     channel_map.wrlock();
-    if ((rcode = start_slave_threads(1 /* need mutex */,
-                            0 /* no wait for start*/,
-                            active_mi,
-                       	    SLAVE_SQL)))
+    Master_info *mi= NULL;
+    for (mi_map::iterator it= channel_map.begin(); it!=channel_map.end(); it++)
     {
-      WSREP_WARN("Failed to create slave threads: %d", rcode);
+      mi= it->second;
+      if ((rcode = start_slave_threads(true /* need mutex */,
+                                       false /* no wait for start*/,
+                                       mi,
+                       	               SLAVE_SQL)))
+      {
+        WSREP_WARN("Failed to create slave threads: %d", rcode);
+      }
     }
     channel_map.unlock();
 
@@ -469,7 +892,7 @@ int wsrep_init()
     }
   }
 
-  if (strlen(wsrep_provider)== 0 ||
+  if (strlen(wsrep_provider) == 0 ||
       !strcmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
@@ -617,6 +1040,44 @@ int wsrep_init()
     }
   }
 
+#ifdef HAVE_PSI_INTERFACE
+  if (wsrep_psi_key_vec.empty())
+  {
+    /* Register all galera mutexes. This is one-time activity and so
+    avoid re-doing it if the provider is re-initialized. */
+    const char*    category= "galera";
+    unsigned int   count;
+
+    count= array_elements(all_galera_mutexes);
+    mysql_mutex_register(category, all_galera_mutexes, count);
+
+    for (unsigned int i= 0; i < count; ++i)
+      wsrep_psi_key_vec.push_back(
+        reinterpret_cast<void*>(all_galera_mutexes[i].m_key));
+
+    count= array_elements(all_galera_condvars);
+    mysql_cond_register(category, all_galera_condvars, count);
+
+    for (unsigned int i= 0; i < count; ++i)
+      wsrep_psi_key_vec.push_back(
+        reinterpret_cast<void*>(all_galera_condvars[i].m_key));
+
+    count= array_elements(all_galera_threads);
+    mysql_thread_register(category, all_galera_threads, count);
+
+    for (unsigned int i= 0; i < count; ++i)
+      wsrep_psi_key_vec.push_back(
+        reinterpret_cast<void*>(all_galera_threads[i].m_key));
+
+    count= array_elements(all_galera_files);
+    mysql_file_register(category, all_galera_files, count);
+
+    for (unsigned int i= 0; i < count; ++i)
+      wsrep_psi_key_vec.push_back(
+        reinterpret_cast<void*>(all_galera_files[i].m_key));
+  }
+#endif /* HAVE_PSI_INTERFACE */
+
   struct wsrep_init_args wsrep_args;
 
   struct wsrep_gtid const state_id = { local_uuid, local_seqno };
@@ -638,6 +1099,10 @@ int wsrep_init()
   wsrep_args.unordered_cb    = wsrep_unordered_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
+  wsrep_args.pfs_instr_cb    = NULL;
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_args.pfs_instr_cb    = wsrep_pfs_instr_cb;
+#endif /* HAVE_PSI_INTERFACE */
 
   rcode = wsrep->init(wsrep, &wsrep_args);
 
@@ -841,9 +1306,6 @@ bool wsrep_sync_wait (THD* thd, uint mask)
 
     if (unlikely(WSREP_OK != ret))
     {
-      const char* msg;
-      int err;
-
       // Possibly relevant error codes:
       // ER_CHECKREAD, ER_ERROR_ON_READ, ER_INVALID_DEFAULT, ER_EMPTY_QUERY,
       // ER_FUNCTION_NOT_DEFINED, ER_NOT_ALLOWED_COMMAND, ER_NOT_SUPPORTED_YET,
@@ -852,17 +1314,13 @@ bool wsrep_sync_wait (THD* thd, uint mask)
       switch (ret)
       {
       case WSREP_NOT_IMPLEMENTED:
-        msg= "synchronous reads by wsrep backend. "
-             "Please unset wsrep_causal_reads variable.";
-        err= ER_NOT_SUPPORTED_YET;
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0), 
+              "Synchronous reads by the WSREP backend. "
+              "Please unset the wsrep_causal_reads variable.");
         break;
       default:
-        msg= "Synchronous wait failed.";
-        err= ER_LOCK_WAIT_TIMEOUT; // NOTE: the above msg won't be displayed
-                                   //       with ER_LOCK_WAIT_TIMEOUT
+        my_message(ER_LOCK_WAIT_TIMEOUT, "Synchronous wait failed.", MYF(0));
       }
-
-      my_error(err, MYF(0), msg);
 
       return true;
     }
@@ -1254,8 +1712,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
   wsrep_key_arr_t key_arr= {0, 0};
   struct wsrep_buf buff = { buf, buf_len };
-  if (WSREP(thd))
-      thd_proc_info(thd, "Preparing for TO isolation");
+  THD_STAGE_INFO_GUARD(NULL, NULL);
+  if (WSREP(thd)) {
+      THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_preparing_for_TO_isolation);
+  }
   if (!buf_err                                                                &&
       wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
       key_arr.keys_len > 0                                                    &&
@@ -1276,8 +1736,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     WSREP_WARN("TO isolation failed for: %d, schema: %s, sql: %s. Check wsrep "
                "connection state and retry the query.",
                ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-    my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
-	     "your wsrep connection state and retry the query.");
+    my_message(ER_LOCK_DEADLOCK, "WSREP replication failed due to TO isolation failure. Check "
+	     "your wsrep connection state and retry the query.", MYF(0));
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     return -1;
@@ -1316,35 +1776,20 @@ static void wsrep_TOI_end(THD *thd) {
 static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
 {
   wsrep_status_t ret(WSREP_WARNING);
+  wsrep_seqno_t seqno= WSREP_SEQNO_UNDEFINED;
+
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, WSREP_QUERY(thd));
-
-  DEBUG_SYNC(thd,"wsrep_RSU_begin_enter");
-
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
-
-  DEBUG_SYNC(thd,"wsrep_RSU_begin_after_lock");
-
-  if (wsrep_desync_count++)
-  {
-     mysql_mutex_lock(&LOCK_wsrep_replaying);
-     wsrep_replaying++;
-     mysql_mutex_unlock(&LOCK_wsrep_replaying);
-     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-     DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
-     return 0;
-  }
 
   ret = wsrep->desync(wsrep);
   if (ret != WSREP_OK)
   {
-     wsrep_desync_count--;
-     mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-     WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
-                ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-     my_error(ER_LOCK_DEADLOCK, MYF(0));
-     return(ret);
+    WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
+               ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
+    return(ret);
   }
+
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying++;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1357,70 +1802,64 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     mysql_mutex_lock(&LOCK_wsrep_replaying);
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
-    wsrep_desync_count--;
+
     ret = wsrep->resync(wsrep);
-    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     if (ret != WSREP_OK)
     {
       WSREP_WARN("resync failed %d for schema: %s, query: %s",
                  ret, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     }
+
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
   }
 
-  wsrep_seqno_t seqno = wsrep->pause(wsrep);
+  seqno = wsrep->pause(wsrep);
   if (seqno == WSREP_SEQNO_UNDEFINED)
   {
-    mysql_mutex_unlock(&LOCK_wsrep_desync_count);
     WSREP_WARN("pause failed %lld for schema: %s, query: %s", (long long)seqno,
                (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+
+    /* Pause fail so rollback desync action too. */
+    wsrep->resync(wsrep);
+
     return(1);
   }
-  thd->global_read_lock.pause_provider(TRUE);
-  thd->variables.wsrep_on = 0;
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-
+  thd->global_read_lock.pause_provider(true);
   WSREP_DEBUG("paused at %lld", (long long)seqno);
 
   DEBUG_SYNC(thd,"wsrep_RSU_begin_acquired");
-
   return 0;
 }
 
 static void wsrep_RSU_end(THD *thd)
 {
-  wsrep_status_t ret(WSREP_WARNING);
+  wsrep_status_t ret(WSREP_OK);
+
   WSREP_DEBUG("RSU END: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
                thd->wsrep_exec_mode, WSREP_QUERY(thd));
-
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying--;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
-  if (--wsrep_desync_count == 0)
+  ret = wsrep->resume(wsrep);
+  if (ret != WSREP_OK)
   {
-     ret = wsrep->resume(wsrep);
-     if (ret != WSREP_OK)
-     {
-       WSREP_WARN("resume failed %d for schema: %s, query: %s", ret,
-                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-     }
-     thd->global_read_lock.pause_provider(FALSE);
-     ret = wsrep->resync(wsrep);
-     if (ret != WSREP_OK)
-     {
-       mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-       WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
-                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-       return;
-     }
-     thd->variables.wsrep_on = 1;
+    WSREP_WARN("resume failed %d for schema: %s, query: %s", ret,
+               (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+  }
+  else
+  {
+    thd->global_read_lock.pause_provider(false);
   }
 
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
+  ret = wsrep->resync(wsrep);
+  if (ret != WSREP_OK)
+  {
+    WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
+               (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+  }
 }
 
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
@@ -1430,6 +1869,18 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
     No isolation for applier or replaying threads.
    */
   if (thd->wsrep_exec_mode == REPL_RECV) return 0;
+
+  /* Generally if node enters non-primary state then execution of DDL+DML
+  is blocked on such node but there are some asynchronous pre-register
+  action that can cause invocation of TOI. For example: DROP of event
+  on completion of EVENT tenure is one such asynchronous action which
+  doesn't need to be fired by user and so if node is asynchronous
+  such such action should be blocked at TOI level. */
+  if (!wsrep_ready)
+  {
+    WSREP_DEBUG("WSREP has not yet prepared node for application use");
+    return 0;
+  }
 
   int ret= 0;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
@@ -1609,4 +2060,14 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
   }
   return ret;
+}
+
+bool wsrep_node_is_donor()
+{
+  return (WSREP_ON) ? (local_status.get() == WSREP_MEMBER_DONOR) : false;
+}
+
+bool wsrep_node_is_synced()
+{
+  return (WSREP_ON) ? (local_status.get() == WSREP_MEMBER_SYNCED) : false;
 }

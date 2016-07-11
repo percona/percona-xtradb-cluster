@@ -3204,7 +3204,7 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
   force_slow= true;
 #else
   force_slow= ! unobtrusive_lock_increment || m_needs_thr_lock_abort;
-#endif
+#endif /* WITH_WSREP */
 
   /*
     If "obtrusive" lock is requested we need to "materialize" all fast

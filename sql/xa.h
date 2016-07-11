@@ -282,10 +282,12 @@ public:
     return data;
   }
 
+#ifdef WITH_WSREP
   char* get_mutable_data()
   {
     return data;
   }
+#endif /* WITH_WSREP */
 
   void set_data(const void* v, long l)
   {

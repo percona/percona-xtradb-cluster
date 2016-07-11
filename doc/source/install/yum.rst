@@ -56,12 +56,12 @@ Installing from Percona Repository
          wget http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
          rpm -ivH percona-release-0.1-3.noarch.rpm
 
-2. Enable testing repository.
+#. Enable testing repository.
 
    This is a beta release, which can only be installed from the testing repo.
    For more information, see :ref:`yum-testing-repo`.
 
-3. Check that the packages are available:
+#. Check that the packages are available:
    
    .. prompt:: bash
 
@@ -74,7 +74,7 @@ Installing from Percona Repository
       Percona-XtraDB-Cluster-57.x86_64           1:5.7.11-25.14.2.el7        percona-release-x86_64
       Percona-XtraDB-Cluster-57-debuginfo.x86_64 1:5.7.11-25.14.2.el7        percona-release-x86_64
 
-4. Install the |PXC| packages:
+#. Install the |PXC| packages:
 
    .. prompt:: bash
 

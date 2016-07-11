@@ -5,3 +5,7 @@ galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
 galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
 galera.galera_fk_multitable : check upstream bug http://bugs.mysql.com/bug.php?id=80478.
 galera_split_brain : fails quite often. bug logged to investigate the failure.
+galera_sst_xtrabackup-v2-options : SST Encryption does not work with xtrabackup 2.4.2
+galera_log_output_csv : Upstream bug#80467. MySQL-5.7.11 fails to log queries to slow table even though queries are using table scan.
+galera_sst_xtrabackup-v2_keyring : Requires xtrabackup 2.4.4
+

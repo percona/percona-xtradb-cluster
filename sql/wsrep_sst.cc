@@ -352,21 +352,22 @@ struct sst_thread_arg
   char**          env;
   char*           ret_str;
   int             err;
-  mysql_mutex_t   lock;
-  mysql_cond_t    cond;
+  mysql_mutex_t   LOCK_wsrep_sst_thread;
+  mysql_cond_t    COND_wsrep_sst_thread;
 
   sst_thread_arg (const char* c, char** e)
     : cmd(c), env(e), ret_str(0), err(-1)
   {
-    mysql_mutex_init(key_LOCK_wsrep_sst_thread, &lock, MY_MUTEX_INIT_FAST);
-    mysql_cond_init(key_COND_wsrep_sst_thread, &cond);
+    mysql_mutex_init(key_LOCK_wsrep_sst_thread,
+                     &LOCK_wsrep_sst_thread, MY_MUTEX_INIT_FAST);
+    mysql_cond_init(key_COND_wsrep_sst_thread, &COND_wsrep_sst_thread);
   }
 
   ~sst_thread_arg()
   {
-    mysql_cond_destroy  (&cond);
-    mysql_mutex_unlock  (&lock);
-    mysql_mutex_destroy (&lock);
+    mysql_cond_destroy  (&COND_wsrep_sst_thread);
+    mysql_mutex_unlock  (&LOCK_wsrep_sst_thread);
+    mysql_mutex_destroy (&LOCK_wsrep_sst_thread);
   }
 };
 
@@ -467,6 +468,10 @@ static void* sst_joiner_thread (void* a)
   sst_thread_arg* arg= (sst_thread_arg*) a;
   int err= 1;
 
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_register_thread(key_THREAD_wsrep_sst_joiner);
+#endif /* HAVE_PSI_INTERFACE */
+
   {
     const char magic[] = "ready";
     const size_t magic_len = sizeof(magic) - 1;
@@ -526,15 +531,15 @@ static void* sst_joiner_thread (void* a)
 
     // signal sst_prepare thread with ret code,
     // it will go on sending SST request
-    mysql_mutex_lock   (&arg->lock);
+    mysql_mutex_lock   (&arg->LOCK_wsrep_sst_thread);
     if (!err)
     {
       arg->ret_str = strdup (out + magic_len + 1);
       if (!arg->ret_str) err = ENOMEM;
     }
     arg->err = -err;
-    mysql_cond_signal  (&arg->cond);
-    mysql_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
+    mysql_cond_signal  (&arg->COND_wsrep_sst_thread);
+    mysql_mutex_unlock (&arg->LOCK_wsrep_sst_thread); //! @note arg is unusable after that.
 
     if (err) return NULL; /* lp:808417 - return immediately, don't signal
                            * initializer thread to ensure single thread of
@@ -573,6 +578,10 @@ static void* sst_joiner_thread (void* a)
     // Tell initializer thread that SST is complete
     wsrep_sst_complete (&ret_uuid, ret_seqno, true);
   }
+
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_delete_thread();
+#endif /* HAVE_PSI_INTERFACE */
 
   return NULL;
 }
@@ -662,15 +671,15 @@ static ssize_t sst_prepare_other (const char*  method,
 
   pthread_t tmp;
   sst_thread_arg arg(cmd_str(), env());
-  mysql_mutex_lock (&arg.lock);
-  ret = pthread_create (&tmp, NULL, sst_joiner_thread, &arg);
+  mysql_mutex_lock (&arg.LOCK_wsrep_sst_thread);
+  ret = pthread_create(&tmp, NULL, sst_joiner_thread, &arg);
   if (ret)
   {
     WSREP_ERROR("sst_prepare_other(): pthread_create() failed: %d (%s)",
                 ret, strerror(ret));
     return -ret;
   }
-  mysql_cond_wait (&arg.cond, &arg.lock);
+  mysql_cond_wait (&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
 
   *addr_out= arg.ret_str;
 
@@ -1074,6 +1083,10 @@ static void* sst_donor_thread (void* a)
 {
   sst_thread_arg* arg= (sst_thread_arg*)a;
 
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_register_thread(key_THREAD_wsrep_sst_donor);
+#endif /* HAVE_PSI_INTERFACE */
+
   WSREP_INFO("Running: '%s'", arg->cmd);
 
   int  err= 1;
@@ -1088,6 +1101,7 @@ static void* sst_donor_thread (void* a)
 
   wsp::thd thd(FALSE); // we turn off wsrep_on for this THD so that it can
                        // operate with wsrep_ready == OFF
+  thd.ptr->wsrep_sst_donor= true;
 
   // Launch the SST script and save pointer to its process:
 
@@ -1099,10 +1113,10 @@ static void* sst_donor_thread (void* a)
   err= proc.error();
 
 /* Inform server about SST script startup and release TO isolation */
-  mysql_mutex_lock   (&arg->lock);
+  mysql_mutex_lock   (&arg->LOCK_wsrep_sst_thread);
   arg->err = -err;
-  mysql_cond_signal  (&arg->cond);
-  mysql_mutex_unlock (&arg->lock); //! @note arg is unusable after that.
+  mysql_cond_signal  (&arg->COND_wsrep_sst_thread);
+  mysql_mutex_unlock (&arg->LOCK_wsrep_sst_thread); //! @note arg is unusable after that.
 
   if (proc.pipe() && !err)
   {
@@ -1192,6 +1206,10 @@ skip_clear_pointer:
   wsrep->sst_sent (wsrep, &state_id, -err);
   proc.wait();
 
+#ifdef HAVE_PSI_INTERFACE
+  wsrep_pfs_delete_thread();
+#endif /* HAVE_PSI_INTERFACE */
+
   return NULL;
 }
 
@@ -1253,15 +1271,15 @@ static int sst_donate_other (const char*   method,
 
   pthread_t tmp;
   sst_thread_arg arg(cmd_str(), env);
-  mysql_mutex_lock (&arg.lock);
-  ret = pthread_create (&tmp, NULL, sst_donor_thread, &arg);
+  mysql_mutex_lock (&arg.LOCK_wsrep_sst_thread);
+  ret = pthread_create(&tmp, NULL, sst_donor_thread, &arg);
   if (ret)
   {
     WSREP_ERROR("sst_donate_other(): pthread_create() failed: %d (%s)",
                 ret, strerror(ret));
     return ret;
   }
-  mysql_cond_wait (&arg.cond, &arg.lock);
+  mysql_cond_wait (&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
 
   WSREP_INFO("sst_donor_thread signaled with %d", arg.err);
   return arg.err;
@@ -1336,4 +1354,9 @@ void wsrep_SE_init_done()
 void wsrep_SE_initialized()
 {
   SE_initialized = true;
+}
+
+bool wsrep_is_SE_initialized()
+{
+  return SE_initialized;
 }

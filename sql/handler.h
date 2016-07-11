@@ -4213,13 +4213,11 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv);
 bool ha_rollback_to_savepoint_can_release_mdl(THD *thd);
 int ha_savepoint(THD *thd, SAVEPOINT *sv);
 int ha_release_savepoint(THD *thd, SAVEPOINT *sv);
+
 #ifdef WITH_WSREP
 int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal);
 void ha_wsrep_fake_trx_id(THD *thd);
 #endif /* WITH_WSREP */
-
-/* Build pushed joins in handlers implementing this feature */
-int ha_make_pushed_joins(THD *thd, const AQP::Join_plan* plan);
 
 /* Build pushed joins in handlers implementing this feature */
 int ha_make_pushed_joins(THD *thd, const AQP::Join_plan* plan);
@@ -4266,5 +4264,7 @@ bool ha_notify_exclusive_mdl(THD *thd, const MDL_key *mdl_key,
                              ha_notification_type notification_type);
 bool ha_notify_alter_table(THD *thd, const MDL_key *mdl_key,
                            ha_notification_type notification_type);
+
+int commit_owned_gtids(THD *thd, bool all, bool *need_clear_ptr);
 
 #endif /* HANDLER_INCLUDED */

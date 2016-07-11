@@ -1,9 +1,4 @@
-[submodule "PerconaFT"]
-	path = storage/tokudb/PerconaFT
-	url = https://github.com/percona/PerconaFT.git
-[submodule "Percona-TokuBackup"]
-	path = plugin/tokudb-backup-plugin/Percona-TokuBackup
-	url = https://github.com/percona/Percona-TokuBackup.git
 [submodule "percona-xtradb-cluster-galera"]
 	path = percona-xtradb-cluster-galera
 	url = https://github.com/percona/galera
+	branch = 3.x-5.7

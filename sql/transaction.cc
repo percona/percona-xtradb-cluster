@@ -481,7 +481,7 @@ bool trans_commit_stmt(THD *thd)
     Some code in MYSQL_BIN_LOG::commit and ha_commit_low() is not safe
     for attachable transactions.
   */
-  DBUG_ASSERT(!thd->is_attachable_transaction_active());
+  DBUG_ASSERT(!thd->is_attachable_ro_transaction_active());
 
   thd->get_transaction()->merge_unsafe_rollback_flags();
 
@@ -541,7 +541,7 @@ bool trans_rollback_stmt(THD *thd)
     Some code in MYSQL_BIN_LOG::rollback and ha_rollback_low() is not safe
     for attachable transactions.
   */
-  DBUG_ASSERT(!thd->is_attachable_transaction_active());
+  DBUG_ASSERT(!thd->is_attachable_ro_transaction_active());
 
   thd->get_transaction()->merge_unsafe_rollback_flags();
 
@@ -608,7 +608,7 @@ bool trans_commit_attachable(THD *thd)
   int res= 0;
 
   /* This function only handles attachable transactions. */
-  DBUG_ASSERT(thd->is_attachable_transaction_active());
+  DBUG_ASSERT(thd->is_attachable_ro_transaction_active());
 
   /*
     Since the attachable transaction is AUTOCOMMIT we only need to commit
@@ -786,6 +786,7 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
                 (!((WSREP_EMULATE_BINLOG(thd) ||  mysql_bin_log.is_open()) 
 		   && thd->variables.sql_log_bin) ||
                  ha_rollback_to_savepoint_can_release_mdl(thd));
+  wsrep_register_hton(thd, TRUE);
 #else
   bool mdl_can_safely_rollback_to_savepoint=
                 (!(mysql_bin_log.is_open() && thd->variables.sql_log_bin) ||

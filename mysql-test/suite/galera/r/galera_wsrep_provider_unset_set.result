@@ -33,3 +33,18 @@ SELECT COUNT(*) = 4 FROM t1;
 COUNT(*) = 4
 1
 DROP TABLE t1;
+#node-2
+call mtr.add_suppression("WSREP: gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
+show status like 'wsrep_cluster_size';
+Variable_name	Value
+wsrep_cluster_size	2
+SET GLOBAL wsrep_provider='none';
+show status like 'wsrep_cluster_size';
+Variable_name	Value
+wsrep_cluster_size	0
+show status like 'wsrep_cluster_size';
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+SET GLOBAL wsrep_cluster_address = 'gcomm://127.0.0.1:13001';;
+show status like 'wsrep_cluster_size';
+Variable_name	Value
+wsrep_cluster_size	2

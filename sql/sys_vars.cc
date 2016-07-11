@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -940,25 +940,65 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     return true;
 
 #ifdef WITH_WSREP
-  /* Galera does not support STATEMENT or MIXED binlog
-  format currently */
-  if (WSREP(thd) &&
-     (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
-      var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED))
+
+  bool block= false;
+
+  bool stmt_or_mixed=
+   (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ||
+    var->save_result.ulonglong_value == BINLOG_FORMAT_MIXED);
+
+  if (WSREP(thd) && stmt_or_mixed && var->type == OPT_GLOBAL)
   {
-    WSREP_DEBUG("PXC does not support binlog format : %s",
-                var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
-                "STATEMENT" : "MIXED");
-    WSREP_DEBUG("This is meant only for simple tasks/tools like checksumming");
-    /* Push also warning, because error message is general */
-     push_warning_printf(thd, Sql_condition::SL_WARNING,
-                        ER_UNKNOWN_ERROR,
-                        "PXC does not support binlog format: %s",
-                        var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
-                        "STATEMENT" : "MIXED");
-    if (var->type == OPT_GLOBAL)
-        return true;
+    /* Toggline binlog-format at GLOBAL level to MIXED/STATEMENT
+    is not allowed. pxc-string-mode check will be evaluated
+    only for SESSION level setting. */
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
+                " to STATEMENT/MIXED (anything other than ROW)");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
+             "STATEMENT" : "MIXED");
+    return true;
   }
+
+  /* pxc-strict-mode enforcement. */
+  if (WSREP(thd))
+  {
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+    {
+      if (stmt_or_mixed)
+      {
+        WSREP_WARN("Percona-XtraDB-Cluster recommends setting binlog_format"
+                   " to ROW");
+        push_warning (thd, Sql_condition::SL_WARNING,
+                      ER_WRONG_VALUE_FOR_VAR,
+                      "Percona-XtraDB-Cluster recommends setting binlog_format"
+                      " to ROW");
+      }
+      break;
+    }
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+    {
+      if (stmt_or_mixed)
+      {
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
+                    " to STATEMENT/MIXED (anything other than ROW)");
+        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+                 var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
+                 "STATEMENT" : "MIXED");
+        block= true;
+      }
+    }
+    }
+  }
+
+  if (block)
+    return block;
 #endif /* WITH_WSREP */
 
   if (var->type == OPT_GLOBAL)
@@ -2193,24 +2233,8 @@ static bool fix_syslog(sys_var *self, THD *thd, enum_var_type type)
 
 static bool check_syslog_tag(sys_var *self, THD *THD, set_var *var)
 {
-  bool ret;
-  char *old= opt_log_syslog_tag;
-  opt_log_syslog_tag= (var->value) ? var->save_result.string_value.str : NULL;
-  ret= log_syslog_update_settings();
-  opt_log_syslog_tag= old;
-  return ret;
-}
-
-static bool check_syslog_enable(sys_var *self, THD *THD, set_var *var)
-{
-  my_bool save= opt_log_syslog_enable;
-  opt_log_syslog_enable= var->save_result.ulonglong_value;
-  if (log_syslog_update_settings())
-  {
-    opt_log_syslog_enable= save;
-    return true;
-  }
-  return false;
+  return ((var->value != NULL) &&
+          (strchr(var->save_result.string_value.str, FN_LIBCHAR) != NULL));
 }
 
 static Sys_var_mybool Sys_log_syslog_enable(
@@ -2227,7 +2251,7 @@ static Sys_var_mybool Sys_log_syslog_enable(
        DEFAULT(TRUE),
 #endif
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
-       ON_CHECK(check_syslog_enable), ON_UPDATE(0));
+       ON_CHECK(0), ON_UPDATE(fix_syslog));
 
 
 static Sys_var_charptr Sys_log_syslog_tag(
@@ -2881,8 +2905,83 @@ static Sys_var_ulong Sys_range_optimizer_max_mem_size(
       "does not have any cap on memory. ",
       SESSION_VAR(range_optimizer_max_mem_size),
       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, ULONG_MAX),
-      DEFAULT(1536000),
+      DEFAULT(8388608),
       BLOCK_SIZE(1));
+
+static bool
+limit_parser_max_mem_size(sys_var *self, THD *thd, set_var *var)
+{
+  if (var->type == OPT_GLOBAL)
+    return false;
+  ulonglong val= var->save_result.ulonglong_value;
+  if (val > global_system_variables.parser_max_mem_size)
+  {
+    if (thd->security_context()->check_access(SUPER_ACL))
+      return false;
+    var->save_result.ulonglong_value=
+      global_system_variables.parser_max_mem_size;
+    return throw_bounds_warning(thd, "parser_max_mem_size",
+                                true, // fixed
+                                true, // is_unsigned
+                                val);
+  }
+  return false;
+}
+
+// Similar to what we do for the intptr typedef.
+#if SIZEOF_CHARP == SIZEOF_INT
+static unsigned int max_mem_sz = ~0;
+#elif SIZEOF_CHARP == SIZEOF_LONG
+static unsigned long max_mem_sz = ~0;
+#elif SIZEOF_CHARP == SIZEOF_LONG_LONG
+static unsigned long long max_mem_sz = ~0;
+#endif
+
+/*
+  Need at least 400Kb to get through bootstrap.
+  Need at least 8Mb to get through mtr check testcase, which does
+    SELECT * FROM INFORMATION_SCHEMA.VIEWS
+*/
+static Sys_var_ulonglong Sys_parser_max_mem_size(
+      "parser_max_mem_size",
+      "Maximum amount of memory available to the parser",
+      SESSION_VAR(parser_max_mem_size),
+      CMD_LINE(REQUIRED_ARG),
+      VALID_RANGE(10 * 1000 * 1000, max_mem_sz),
+      DEFAULT(max_mem_sz),
+      BLOCK_SIZE(1),
+      NO_MUTEX_GUARD, NOT_IN_BINLOG,
+      ON_CHECK(limit_parser_max_mem_size),
+      ON_UPDATE(NULL));
+
+/*
+  There is no call on Sys_var_integer::do_check() for 'set xxx=default';
+  The predefined default for parser_max_mem_size is "infinite".
+  Update it in case we have seen option maximum-parser-max-mem-size
+  Also update global_system_variables, so 'SELECT parser_max_mem_size'
+  reports correct data.
+*/
+export void update_parser_max_mem_size()
+{
+  /*
+    As "max_system_variables" table is no longer used because of the
+    custom Percona Server "Expanded Program Option Modifiers",
+    we need to get the value of the specified "--maximum-parser-max-mem-size"
+    option via "getopt_constraint_get_max_value()" call.
+  */
+  const void* max_max_ptr =
+    getopt_constraint_get_max_value("parser_max_mem_size", 0, FALSE);
+  if (max_max_ptr == 0)
+    return;
+  const ulonglong max_max= *(const ulonglong*)max_max_ptr;
+  if (max_max == max_mem_sz)
+    return;
+  // In case parser-max-mem-size is also set:
+  const ulonglong new_val=
+    std::min(max_max, global_system_variables.parser_max_mem_size);
+  Sys_parser_max_mem_size.update_default(new_val);
+  global_system_variables.parser_max_mem_size= new_val;
+}
 
 static const char *optimizer_switch_names[]=
 {
@@ -4218,6 +4317,41 @@ static Sys_var_uint Sys_threadpool_max_threads(
 
 static bool check_tx_isolation(sys_var *self, THD *thd, set_var *var)
 {
+#ifdef WITH_WSREP
+    bool block= false;
+
+    enum_tx_isolation new_level=
+      (enum_tx_isolation) var->save_result.ulonglong_value;
+
+    if (new_level == ISO_SERIALIZABLE)
+    {
+      switch(pxc_strict_mode)
+      {
+      case PXC_STRICT_MODE_DISABLED:
+      case PXC_STRICT_MODE_MASTER:
+        break;
+      case PXC_STRICT_MODE_PERMISSIVE:
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend using"
+                   " SERIALIZABLE isolation mode with multi-node workload");
+        push_warning (thd, Sql_condition::SL_WARNING,
+                      ER_WRONG_VALUE_FOR_VAR,
+                      "Percona-XtraDB-Cluster doesn't recommend using"
+                      " SERIALIZABLE isolation mode with multi-node workload");
+        break;
+      case PXC_STRICT_MODE_ENFORCING:
+        block= true;
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits using SERIALIZABLE"
+                    " isolation mode");
+        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+                 "SERIALIZABLE");
+      }
+    }
+
+    if (block)
+      return block;
+#endif /* WITH_WSREP */
+
+
   if (var->type == OPT_DEFAULT && (thd->in_active_multi_stmt_transaction() ||
                                    thd->in_sub_stmt))
   {
@@ -5314,6 +5448,42 @@ static Sys_var_mybool Sys_slow_query_log(
 
 static bool check_not_empty_set(sys_var *self, THD *thd, set_var *var)
 {
+#ifdef WITH_WSREP
+
+  if (var->save_result.ulonglong_value == 0)
+    return true;
+
+  /* Trying to switch off log_output or setting it to FILE is allowed. */
+  if (var->save_result.ulonglong_value == LOG_NONE  ||
+      var->save_result.ulonglong_value == LOG_FILE)
+    return false;
+  
+  bool block= false;
+  switch(pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster recommends setting log_output to FILE");
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster recommends setting log_output"
+                  " to FILE");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  case PXC_STRICT_MODE_MASTER:
+  default:
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting log_output"
+                " to TABLE (anything other than FILE/NONE)");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value == LOG_TABLE ?
+             "TABLE" : "UNKNOWN");
+    break;
+  }
+
+  return block;
+#endif /* WITH_WSREP */
+
   return var->save_result.ulonglong_value == 0;
 }
 static bool fix_log_output(sys_var *self, THD *thd, enum_var_type type)
@@ -5900,8 +6070,8 @@ static Sys_var_mybool Sys_wsrep_desync (
 static const char *wsrep_reject_queries_names[]= { "NONE", "ALL", "ALL_KILL", NullS };
 static Sys_var_enum Sys_wsrep_reject_queries(
        "wsrep_reject_queries", "Variable to set to reject queries",
-       GLOBAL_VAR(wsrep_reject_queries_options), CMD_LINE(OPT_ARG),
-       wsrep_reject_queries_names, DEFAULT(WSREP_REJ_NONE),
+       GLOBAL_VAR(wsrep_reject_queries), CMD_LINE(OPT_ARG),
+       wsrep_reject_queries_names, DEFAULT(WSREP_REJECT_NONE),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(wsrep_reject_queries_update));
 
@@ -5920,7 +6090,9 @@ static Sys_var_mybool Sys_wsrep_recover_datadir(
 
 static Sys_var_mybool Sys_wsrep_replicate_myisam(
        "wsrep_replicate_myisam", "To enable myisam replication",
-       SESSION_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+       SESSION_VAR(wsrep_replicate_myisam), CMD_LINE(OPT_ARG),
+       DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG,
+       ON_CHECK(wsrep_replicate_myisam_check), ON_UPDATE(0));
 
 static Sys_var_mybool Sys_wsrep_log_conflicts(
        "wsrep_log_conflicts", "To log multi-master conflicts",
@@ -5951,6 +6123,21 @@ static Sys_var_mybool Sys_wsrep_slave_UK_checks(
 static Sys_var_mybool Sys_wsrep_restart_slave(
        "wsrep_restart_slave", "Should MySQL slave be restarted automatically, when node joins back to cluster",
        GLOBAL_VAR(wsrep_restart_slave), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+
+static Sys_var_mybool Sys_wsrep_dirty_reads(
+       "wsrep_dirty_reads",
+       "Allow reads from a node is not in primary component",
+       SESSION_VAR(wsrep_dirty_reads),
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
+static const char *pxc_strict_modes[]= { "DISABLED", "PERMISSIVE", "ENFORCING", "MASTER", NullS };
+static Sys_var_enum Sys_pxc_strict_mode (
+       "pxc_strict_mode", "PXC strict mode help control behavior of experimental features",
+       GLOBAL_VAR(pxc_strict_mode), CMD_LINE(OPT_ARG),
+       pxc_strict_modes, DEFAULT(PXC_STRICT_MODE_ENFORCING),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(pxc_strict_mode_check),
+       ON_UPDATE(0));
+
 #endif /* WITH_WSREP */
 
 static bool fix_host_cache_size(sys_var *, THD *, enum_var_type)
@@ -6283,14 +6470,6 @@ static Sys_var_enum Sys_block_encryption_mode(
   "block_encryption_mode", "mode for AES_ENCRYPT/AES_DECRYPT",
   SESSION_VAR(my_aes_mode), CMD_LINE(REQUIRED_ARG),
   my_aes_opmode_names, DEFAULT(my_aes_128_ecb));
-
-#ifdef WITH_WSREP
-static Sys_var_mybool Sys_wsrep_dirty_reads(
-       "wsrep_dirty_reads",
-       "Allow dirty reads when the node is not ready.",
-       SESSION_VAR(wsrep_dirty_reads),
-       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
-#endif /* WITH_WSREP */
 
 static bool check_track_session_sys_vars(sys_var *self, THD *thd, set_var *var)
 {

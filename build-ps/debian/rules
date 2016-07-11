@@ -43,6 +43,7 @@ DISTRELEASE = $(shell lsb_release -c -s)
 MYSQL_SRC = $(shell pwd)
 
 builddir = builddir
+galeradir = percona-xtradb-cluster-galera
 builddebug = debug
 
 override_dh_auto_configure:
@@ -136,6 +137,8 @@ endif
 		-DWITH_BOOST=libboost \
 		-DWITH_EXTRA_CHARSETS=all ..
 
+	cd $(galeradir) &&  scons $(MAKE_JFLAG) psi=1 garb/garbd libgalera_smm.so $(SCONS_ARGS)
+
 	touch $@
 
 override_dh_auto_build:
@@ -150,6 +153,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 endif
 
 	cd $(builddir) && $(MAKE) -j$(NCPU) VERBOSE=1
+	cd $(galeradir) &&  scons $(MAKE_JFLAG) psi=1 garb/garbd libgalera_smm.so $(SCONS_ARGS)
 
 	touch $@
 
@@ -159,6 +163,9 @@ override_dh_auto_install:
 	# complete install first
 	(cd $(builddebug) && $(MAKE) install DESTDIR=$(TMPD)/)
 	(cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/)
+	(cd $(galeradir) && cp -r garb $(TMP)/)
+	(cd $(galeradir) && cp libgalera_smm.so $(TMP)/)
+	(cd $(galeradir) && cp packages/rpm/README $(TMP)/)
 
 	# add PXC configuration file my.cnf to mysql-common package
 	#install -g root -o root -m 0644 -D debian/extra/my.cnf $(TMP)/etc/mysql/my.cnf
@@ -168,6 +175,8 @@ override_dh_auto_install:
 
 	# add systemd script
 	mkdir -p $(TMP)/var/lib/mysql-files
+	mkdir -p $(TMP)/var/lib/mysql
+	mkdir -p $(TMP)/var/run/mysql
 	install -m 0755 debian/extra/mysql-systemd-start $(TMP)/usr/share/mysql/
 
 	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
@@ -200,5 +209,6 @@ override_dh_installinit:
 	@echo "RULES.$@"
 	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_enable --name=mysql; fi
 	dh_installinit --name=mysql -- defaults 19 21
+	dh_installinit --name=garbd -- defaults 19 21
 	if [ "$(DISTRELEASE)" != "precise" -a "$(DISTRELEASE)" != "trusty" -a "$(DISTRELEASE)" != "wheezy" ]; then dh_systemd_start --restart-after-upgrade; fi
 	touch $@

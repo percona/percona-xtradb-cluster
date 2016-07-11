@@ -18,6 +18,83 @@
 
 #include "sql_class.h"
 
+#include "mysql/psi/mysql_stage.h"
+#include "mysql/psi/psi.h"
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+#define wsrep_pfs_register_thread(key)                      \
+do {                                                        \
+        struct PSI_thread* psi = PSI_THREAD_CALL(new_thread)(key, NULL, 0);\
+        PSI_THREAD_CALL(set_thread_os_id)(psi);             \
+        PSI_THREAD_CALL(set_thread)(psi);                   \
+} while (0)
+
+/* This macro delist the current thread from performance schema */
+#define wsrep_pfs_delete_thread()                           \
+do {                                                        \
+        PSI_THREAD_CALL(delete_current_thread)();           \
+} while (0)
+
+
+# define wsrep_register_pfs_file_open_begin(state, locker, key, op, name,     \
+                                      src_file, src_line)               \
+do {                                                                    \
+        locker = PSI_FILE_CALL(get_thread_file_name_locker)(            \
+                state, key, op, name, &locker);                         \
+        if (locker != NULL) {                                           \
+                PSI_FILE_CALL(start_file_open_wait)(                    \
+                        locker, src_file, src_line);                    \
+        }                                                               \
+} while (0)
+
+# define wsrep_register_pfs_file_open_end(locker, file)                       \
+do {                                                                    \
+        if (locker != NULL) {                                           \
+                PSI_FILE_CALL(end_file_open_wait_and_bind_to_descriptor)(\
+                        locker, file);                                  \
+        }                                                               \
+} while (0)
+
+# define wsrep_register_pfs_file_close_begin(state, locker, key, op, name,    \
+                                      src_file, src_line)               \
+do {                                                                    \
+        locker = PSI_FILE_CALL(get_thread_file_name_locker)(            \
+                state, key, op, name, &locker);                         \
+        if (locker != NULL) {                                           \
+                PSI_FILE_CALL(start_file_close_wait)(                   \
+                        locker, src_file, src_line);                    \
+        }                                                               \
+} while (0)
+
+# define wsrep_register_pfs_file_close_end(locker, result)                    \
+do {                                                                    \
+        if (locker != NULL) {                                           \
+                PSI_FILE_CALL(end_file_close_wait)(                     \
+                        locker, result);                                \
+        }                                                               \
+} while (0)
+
+# define wsrep_register_pfs_file_io_begin(state, locker, file, count, op,     \
+                                    src_file, src_line)                 \
+do {                                                                    \
+        locker = PSI_FILE_CALL(get_thread_file_descriptor_locker)(      \
+                state, file, op);                                       \
+        if (locker != NULL) {                                           \
+                PSI_FILE_CALL(start_file_wait)(                         \
+                        locker, count, src_file, src_line);             \
+        }                                                               \
+} while (0)
+
+# define wsrep_register_pfs_file_io_end(locker, count)                        \
+do {                                                                    \
+        if (locker != NULL) {                                           \
+                PSI_FILE_CALL(end_file_wait)(locker, count);            \
+        }                                                               \
+} while (0)
+
+
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+
 int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff);
 void wsrep_client_rollback(THD *thd);
 void wsrep_replay_transaction(THD *thd);

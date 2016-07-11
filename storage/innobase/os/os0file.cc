@@ -889,7 +889,7 @@ os_alloc_block()
 {
 	size_t		pos;
 	Blocks&		blocks = *block_cache;
-	size_t		i = my_timer_cycles();
+	size_t		i = static_cast<size_t>(my_timer_cycles());
 	const size_t	size = blocks.size();
 
 	for (;;) {
@@ -2908,6 +2908,42 @@ AIO::is_linux_native_aio_supported()
 
 #endif /* LINUX_NATIVE_AIO */
 
+/** For an EINVAL I/O error, prints a diagnostic message if innodb_flush_method
+== ALL_O_DIRECT.
+@param[in]	err	C error code
+@return true if the diagnostic message was printed
+@return false if the diagnostic message does not apply */
+static
+bool
+os_diagnose_all_o_direct_einval(
+	ulint	err)
+{
+	if ((err == EINVAL)
+	    && (srv_unix_file_flush_method == SRV_UNIX_ALL_O_DIRECT)) {
+		ib::info() << "The error might be caused by redo log I/O not "
+			"satisfying innodb_flush_method=ALL_O_DIRECT "
+			"requirements by the underlying file system.";
+		if (srv_log_write_ahead_size
+		    != DEFAULT_SRV_LOG_WRITE_AHEAD_SIZE)
+			ib::info() <<
+				"This might be caused by an incompatible "
+				"non-default innodb_log_write_ahead_size "
+				"value " << srv_log_write_ahead_size;
+		ib::info() <<
+			"Please file a bug at https://bugs.percona.com and "
+			"include this error message, my.cnf settings, ";
+		ib::info() <<
+			"and information about the file system where the redo "
+			"log resides.";
+		ib::info() <<
+			"A possible workaround is to change "
+			"innodb_flush_method value to something else "
+			"than ALL_O_DIRECT.";
+		return(true);
+	}
+	return(false);
+}
+
 /** Retrieves the last error number if an error occurs in a file io function.
 The number should be retrieved before any other OS calls (because they may
 overwrite the error number). If the number is not known to this program,
@@ -2957,7 +2993,7 @@ os_file_get_last_error_low(
 				<< "The error means mysqld does not have"
 				" the access rights to the directory.";
 
-		} else {
+		} else if (!os_diagnose_all_o_direct_einval(err)) {
 			if (strerror(err) != NULL) {
 
 				ib::error()
@@ -5544,6 +5580,11 @@ os_file_pwrite(
 
 	ssize_t	n_bytes = os_file_io(type, file, (void*) buf, n, offset, err);
 
+	DBUG_EXECUTE_IF("xb_simulate_all_o_direct_write_failure",
+			n_bytes = -1;
+			errno = EINVAL;
+			*err = DB_IO_ERROR;);
+
 	(void) os_atomic_decrement_ulint(&os_n_pending_writes, 1);
 	MONITOR_ATOMIC_DEC(MONITOR_OS_PENDING_WRITES);
 
@@ -5596,6 +5637,8 @@ os_file_write_page(
 
 		ib::info() << OPERATING_SYSTEM_ERROR_MSG;
 
+		os_diagnose_all_o_direct_einval(errno);
+
 		os_has_said_disk_full = true;
 	}
 
@@ -5643,6 +5686,10 @@ os_file_pread(
 	MONITOR_ATOMIC_INC(MONITOR_OS_PENDING_READS);
 
 	ssize_t	n_bytes = os_file_io(type, file, buf, n, offset, err);
+
+	DBUG_EXECUTE_IF("xb_simulate_all_o_direct_read_failure",
+			n_bytes = -1;
+			errno = EINVAL;);
 
 	if (UNIV_UNLIKELY(start_time != 0))
 	{
@@ -5919,7 +5966,7 @@ os_file_set_nocache(
 					<< "Failed to set O_DIRECT on file"
 					<< file_name << ";" << operation_name
 					<< ": " << strerror(errno_save) << ", "
-					<< "ccontinuing anyway. O_DIRECT is "
+					<< "continuing anyway. O_DIRECT is "
 					"known to result in 'Invalid argument' "
 					"on Linux on tmpfs, "
 					"see MySQL Bug#26662.";
@@ -8185,7 +8232,7 @@ AIO::print_segment_info(
 				fprintf(file, ", ");
 			}
 
-			fprintf(file, "%lu", *segments);
+			fprintf(file, ULINTPF, *segments);
 		}
 
 		fprintf(file, "] ");
@@ -8289,19 +8336,23 @@ os_aio_print(FILE*	file)
 	time_elapsed = 0.001 + difftime(current_time, os_last_printout);
 
 	fprintf(file,
-		"Pending flushes (fsync) log: %lu; buffer pool: %lu\n"
-		"%lu OS file reads, %lu OS file writes, %lu OS fsyncs\n",
-		(ulong) fil_n_pending_log_flushes,
-		(ulong) fil_n_pending_tablespace_flushes,
-		(ulong) os_n_file_reads,
-		(ulong) os_n_file_writes,
-		(ulong) os_n_fsyncs);
+		"Pending flushes (fsync) log: " ULINTPF "; "
+		"buffer pool: " ULINTPF "\n"
+		ULINTPF " OS file reads, "
+		ULINTPF " OS file writes, "
+		ULINTPF " OS fsyncs\n",
+		fil_n_pending_log_flushes,
+		fil_n_pending_tablespace_flushes,
+		os_n_file_reads,
+		os_n_file_writes,
+		os_n_fsyncs);
 
 	if (os_n_pending_writes != 0 || os_n_pending_reads != 0) {
 		fprintf(file,
-			"%lu pending preads, %lu pending pwrites\n",
-			(ulint) os_n_pending_reads,
-			(ulong) os_n_pending_writes);
+			ULINTPF " pending preads, "
+			ULINTPF " pending pwrites\n",
+			os_n_pending_reads,
+			os_n_pending_writes);
 	}
 
 	if (os_n_file_reads == os_n_file_reads_old) {
@@ -8367,7 +8418,7 @@ AIO::to_file(FILE* file) const
 {
 	acquire();
 
-	fprintf(file, " %lu\n", static_cast<ulint>(m_n_reserved));
+	fprintf(file, " %lu\n", static_cast<ulong>(m_n_reserved));
 
 	for (ulint i = 0; i < m_slots.size(); ++i) {
 
@@ -8740,7 +8791,7 @@ void Encryption::random_value(byte* value)
 	my_rand_buffer(value, ENCRYPTION_KEY_LEN);
 }
 
-/** Create new master key
+/** Create new master key for key rotation.
 @param[in,out]	master_key	master key */
 void
 Encryption::create_master_key(byte** master_key)
@@ -8751,11 +8802,16 @@ Encryption::create_master_key(byte** master_key)
 	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
 	int	ret;
 
+	/* If uuid does not match with current server uuid,
+	set uuid as current server uuid. */
+	if (strcmp(uuid, server_uuid) != 0) {
+		memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
+	}
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
 
 	/* Generate new master key */
-	sprintf(key_name, "%s-%lu-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
-		server_id, master_key_id + 1);
+	sprintf(key_name, "%s-%s-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
+		uuid, master_key_id + 1);
 
 	/* We call key ring API to generate master key here. */
 	ret = my_key_generate(key_name, "AES",
@@ -8782,9 +8838,11 @@ Encryption::create_master_key(byte** master_key)
 
 /** Get master key by key id.
 @param[in]	master_key_id	master key id
+@param[in]	srv_uuid	uuid of server instance
 @param[in,out]	master_key	master key */
 void
 Encryption::get_master_key(ulint master_key_id,
+			   char* srv_uuid,
 			   byte** master_key)
 {
 #ifndef UNIV_INNOCHECKSUM
@@ -8794,21 +8852,30 @@ Encryption::get_master_key(ulint master_key_id,
 	int	ret;
 
 	memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
-	sprintf(key_name, "%s-%lu-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
-		server_id, master_key_id);
+
+	if (srv_uuid != NULL) {
+		sprintf(key_name, "%s-%s-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
+			srv_uuid, master_key_id);
+	} else {
+		/* For compitable with 5.7.11, we need to get master key with
+		server id. */
+		memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+		sprintf(key_name, "%s-%lu-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
+			server_id, master_key_id);
+	}
 
 	/* We call key ring API to get master key here. */
 	ret = my_key_fetch(key_name, &key_type, NULL,
 			   reinterpret_cast<void**>(master_key), &key_len);
 
+	if (key_type) {
+		my_free(key_type);
+	}
+
 	if (ret) {
 		*master_key = NULL;
 		ib::error() << "Encryption can't find master key, please check"
 				" the keyring plugin is loaded.";
-	}
-
-	if (key_type) {
-		my_free(key_type);
 	}
 
 #ifdef UNIV_ENCRYPT_DEBUG
@@ -8822,13 +8889,20 @@ Encryption::get_master_key(ulint master_key_id,
 #endif
 }
 
+/** Current master key id */
 ulint	Encryption::master_key_id = 0;
+
+/** Current uuid of server instance */
+char	Encryption::uuid[ENCRYPTION_SERVER_UUID_LEN + 1] = {0};
 
 /** Get current master key and master key id
 @param[in,out]	master_key_id	master key id
-@param[in,out]	master_key	master key */
+@param[in,out]	master_key	master key
+@param[in,out]	version		encryption information version */
 void
-Encryption::get_master_key(ulint* master_key_id, byte** master_key)
+Encryption::get_master_key(ulint* master_key_id,
+			   byte** master_key,
+			   Encryption::Version*  version)
 {
 #ifndef UNIV_INNOCHECKSUM
 	char*	key_type = NULL;
@@ -8837,13 +8911,18 @@ Encryption::get_master_key(ulint* master_key_id, byte** master_key)
 	int	ret;
 
 	memset(key_name, 0, ENCRYPTION_KEY_LEN);
+	*version = Encryption::ENCRYPTION_VERSION_2;
 
 	if (Encryption::master_key_id == 0) {
 		/* If m_master_key is 0, means there's no encrypted
 		tablespace, we need to generate the first master key,
 		and store it to key ring. */
-		sprintf(key_name, "%s-%lu-1", ENCRYPTION_MASTER_KEY_PRIFIX,
-			server_id);
+		memset(uuid, 0, ENCRYPTION_SERVER_UUID_LEN + 1);
+		memcpy(uuid, server_uuid, ENCRYPTION_SERVER_UUID_LEN);
+
+		/* Prepare the server uuid. */
+		sprintf(key_name, "%s-%s-1", ENCRYPTION_MASTER_KEY_PRIFIX,
+			uuid);
 
 		/* We call key ring API to generate master key here. */
 		ret = my_key_generate(key_name, "AES",
@@ -8868,13 +8947,30 @@ Encryption::get_master_key(ulint* master_key_id, byte** master_key)
 	} else {
 		*master_key_id = Encryption::master_key_id;
 
-		sprintf(key_name, "%s-%lu-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
-			server_id, *master_key_id);
+		sprintf(key_name, "%s-%s-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
+			uuid, *master_key_id);
 
 		/* We call key ring API to get master key here. */
 		ret = my_key_fetch(key_name, &key_type, NULL,
 				   reinterpret_cast<void**>(master_key),
 				   &key_len);
+
+		/* For compitable with 5.7.11, we need to try to get master key with
+		server id when get master key with server uuid failure. */
+		if (ret || *master_key == NULL) {
+			if (key_type) {
+				my_free(key_type);
+			}
+
+			memset(key_name, 0, ENCRYPTION_MASTER_KEY_NAME_MAX_LEN);
+			sprintf(key_name, "%s-%lu-%lu", ENCRYPTION_MASTER_KEY_PRIFIX,
+				server_id, *master_key_id);
+
+			ret = my_key_fetch(key_name, &key_type, NULL,
+					   reinterpret_cast<void**>(master_key),
+					   &key_len);
+			*version = Encryption::ENCRYPTION_VERSION_1;
+		}
 #ifdef UNIV_ENCRYPT_DEBUG
 		if (!ret && *master_key) {
 			fprintf(stderr, "Fetched master key:%lu ",
@@ -8968,10 +9064,10 @@ Encryption::encrypt(
 
 		elen = my_aes_encrypt(
 			src + FIL_PAGE_DATA,
-			static_cast<uLong>(main_len),
+			static_cast<uint32>(main_len),
 			dst + FIL_PAGE_DATA,
 			reinterpret_cast<unsigned char*>(m_key),
-			m_klen,
+			static_cast<uint32>(m_klen),
 			my_aes_256_cbc,
 			reinterpret_cast<unsigned char*>(m_iv),
 			false);
@@ -8989,7 +9085,8 @@ Encryption::encrypt(
 					<< " space id:" << space_id;
 #else
 				fprintf(stderr, " Can't encrypt data of page,"
-					" page no:%lu space id:%lu",
+					" page no:" ULINTPF
+					" space id:" ULINTPF,
 					page_no, space_id);
 #endif /* !UNIV_INNOCHECKSUM */
 			return(src);
@@ -9009,10 +9106,10 @@ Encryption::encrypt(
 
 			elen = my_aes_encrypt(
 				dst + FIL_PAGE_DATA + data_len - remain_len,
-				remain_len,
+				static_cast<uint32>(remain_len),
 				remain_buf,
 				reinterpret_cast<unsigned char*>(m_key),
-				m_klen,
+				static_cast<uint32>(m_klen),
 				my_aes_256_cbc,
 				reinterpret_cast<unsigned char*>(m_iv),
 				false);
@@ -9029,7 +9126,8 @@ Encryption::encrypt(
 					<< " space id:" << space_id;
 #else
 				fprintf(stderr, " Can't encrypt data of page,"
-					" page no:%lu space id:%lu",
+					" page no:" ULINTPF
+					" space id:" ULINTPF,
 					page_no, space_id);
 #endif /* !UNIV_INNOCHECKSUM */
 				*dst_len = src_len;
@@ -9189,9 +9287,11 @@ Encryption::decrypt(
 
 			elen = my_aes_decrypt(
 				remain_buf,
-				remain_len, dst + data_len - remain_len,
+				static_cast<uint32>(remain_len),
+				dst + data_len - remain_len,
 				reinterpret_cast<unsigned char*>(m_key),
-				m_klen, my_aes_256_cbc,
+				static_cast<uint32>(m_klen),
+				my_aes_256_cbc,
 				reinterpret_cast<unsigned char*>(m_iv),
 				false);
 			if (elen == MY_AES_BAD_DATA) {
@@ -9213,10 +9313,11 @@ Encryption::decrypt(
 
 		/* Then decrypt the main data */
 		elen = my_aes_decrypt(
-				dst, main_len,
+				dst,
+				static_cast<uint32>(main_len),
 				ptr,
 				reinterpret_cast<unsigned char*>(m_key),
-				m_klen,
+				static_cast<uint32>(m_klen),
 				my_aes_256_cbc,
 				reinterpret_cast<unsigned char*>(m_iv),
 				false);

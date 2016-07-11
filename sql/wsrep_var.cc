@@ -35,7 +35,7 @@ const  char* wsrep_node_name        = 0;
 const  char* wsrep_node_address     = 0;
 const  char* wsrep_node_incoming_address = 0;
 const  char* wsrep_start_position   = 0;
-ulong   wsrep_reject_queries_options;
+ulong   wsrep_reject_queries;
 
 int wsrep_init_vars()
 {
@@ -305,6 +305,14 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   bool wsrep_on_saved= thd->variables.wsrep_on;
   thd->variables.wsrep_on= false;
 
+  /* Ensure we free the stats that are allocated by galera-library.
+  wsrep part doesn't know how to free them shouldn't be attempting it
+  as it not allocated by wsrep part.
+  Before unloading cleanup any stale reference and stats is one of it.
+  Given that thd->variables.wsrep.on is turned-off it is safe to assume
+  that no new stats queries will be allowed during this transition time. */
+  wsrep_free_status(thd);
+
   WSREP_DEBUG("wsrep_provider_update: %s", wsrep_provider);
 
   /* stop replication is heavy operation, and includes closing all client 
@@ -316,6 +324,7 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   */
   mysql_mutex_unlock(&LOCK_global_system_variables);
   wsrep_stop_replication(thd);
+
   /*
     Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
     any potential deadlock.
@@ -394,22 +403,20 @@ void wsrep_provider_options_init(const char* value)
 
 bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
 {
-    switch (wsrep_reject_queries_options) {
-        case WSREP_REJ_NONE:
-            wsrep_ready_set(TRUE); 
+    switch (wsrep_reject_queries) {
+        case WSREP_REJECT_NONE:
             WSREP_INFO("Allowing client queries due to manual setting");
             break;
-        case WSREP_REJ_ALL:
-            wsrep_ready_set(FALSE);
+        case WSREP_REJECT_ALL:
             WSREP_INFO("Rejecting client queries due to manual setting");
             break;
-        case WSREP_REJ_ALL_KILL:
-            wsrep_ready_set(FALSE);
-            wsrep_close_client_connections(false);
+        case WSREP_REJECT_ALL_KILL:
+            wsrep_close_client_connections(FALSE);
             WSREP_INFO("Rejecting client queries and killing connections due to manual setting");
             break;
         default:
-            WSREP_INFO("Unknown value");
+          WSREP_INFO("Unknown value for wsrep_reject_queries: %lu",
+                     wsrep_reject_queries);
             return true;
     }
     return false;
@@ -590,106 +597,42 @@ bool wsrep_slave_threads_update (sys_var *self, THD* thd, enum_var_type type)
 
 bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
 {
-  /* Setting desync to on/off signals participation of node in flow control.
-  It doesn't turn-off recieval of write-sets.
-  If the node is already in paused state due to some previous action like FTWRL
-  then avoid desync as superset action of pausing the node is already active. */
   bool new_wsrep_desync = var->save_result.ulonglong_value;
-  if (!thd->global_read_lock.provider_resumed())
-  {
-    WSREP_WARN ("Trying to desync a node that is already paused.");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0),
-             var->var->name.str,
-             new_wsrep_desync ? "ON" : "OFF");
-    return true;
+  if (wsrep_desync == new_wsrep_desync) {
+    if (new_wsrep_desync) {
+      push_warning (thd, Sql_condition::SL_WARNING,
+                   ER_WRONG_VALUE_FOR_VAR,
+                   "'wsrep_desync' is already ON.");
+    } else {
+      push_warning (thd, Sql_condition::SL_WARNING,
+                   ER_WRONG_VALUE_FOR_VAR,
+                   "'wsrep_desync' is already OFF.");
+    }
+    return false;
   }
-
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
-  if (new_wsrep_desync)
-  {
-      if (wsrep_desync_count_manual)
-      {
-          WSREP_DEBUG("wsrep_desync is already ON, the counter is increased.");
-      }
+  wsrep_status_t ret(WSREP_WARNING);
+  if (new_wsrep_desync) {
+    ret = wsrep->desync (wsrep);
+    if (ret != WSREP_OK) {
+      WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
+                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query());
+      return true;
+    }
+  } else {
+    ret = wsrep->resync (wsrep);
+    if (ret != WSREP_OK) {
+      WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
+                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query());
+      return true;
+    }
   }
-  else
-  {
-      if (wsrep_desync_count_manual == 0)
-      {
-          mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-          WSREP_ERROR ("Trying to make wsrep_desync = OFF on "
-                       "the node that is already synchronized.");
-          my_error (ER_WRONG_VALUE_FOR_VAR, MYF(0), 
-                    var->var->name.str, "OFF");
-          return true;
-      }
-      else if (wsrep_desync_count_manual != 1)
-      {
-          WSREP_DEBUG("wsrep_desync still ON, new desync counter = %d.",
-                      (int) (wsrep_desync_count_manual - 1));
-      }
-  }
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-  return 0;
+  return false;
 }
 
 bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
 {
-  wsrep_status_t ret(WSREP_WARNING);
-  mysql_mutex_lock(&LOCK_wsrep_desync_count);
-  if (wsrep_desync)
-  {
-      wsrep_desync_count_manual++;
-      if (wsrep_desync_count++ == 0)
-      {
-          ret = wsrep->desync (wsrep);
-          if (ret != WSREP_OK)
-          {
-              wsrep_desync_count--;
-              wsrep_desync_count_manual--;
-              mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-              WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
-                          (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-              my_error (ER_CANNOT_USER, MYF(0), "'wsrep->desync()'",
-                        thd->query());
-              return true;
-          }
-      }
-  }
-  else
-  {
-      if (wsrep_desync_count_manual)
-      {
-          if (--wsrep_desync_count_manual)
-          {
-              wsrep_desync = 1;
-          }
-          if (--wsrep_desync_count == 0)
-          {
-              ret = wsrep->resync (wsrep);
-              if (ret != WSREP_OK)
-              {
-                  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-                  WSREP_WARN ("SET resync failed %d for schema: %s, query: %s",
-                              ret, (thd->db().length ? thd->db().str : "(null)"),
-                              WSREP_QUERY(thd));
-                  my_error (ER_CANNOT_USER, MYF(0), "'wsrep->resync()'",
-                            thd->query());
-                  return true;
-              }
-          }
-      }
-      else
-      {
-          mysql_mutex_unlock(&LOCK_wsrep_desync_count);
-          WSREP_ERROR ("Trying to make wsrep_desync = OFF on "
-                       "the node that is already synchronized.");
-          my_error (ER_CANNOT_USER, MYF(0), "'wsrep_desync_update'",
-                    thd->query());
-          return true;
-      }
-  }
-  mysql_mutex_unlock(&LOCK_wsrep_desync_count);
   return false;
 }
 
@@ -732,6 +675,10 @@ static void export_wsrep_status_to_mysql(THD* thd)
 {
   int wsrep_status_len, i;
 
+  /* Avoid freeing the stats immediately on completion of the call
+  instead free them on next invocation as the reference to status
+  is feeded in MySQL show status array. Freeing them on completion
+  will make these references invalid. */
   wsrep_free_status(thd);
 
   thd->wsrep_status_vars = wsrep->stats_get(wsrep);
@@ -790,3 +737,133 @@ void wsrep_free_status (THD* thd)
     thd->wsrep_status_vars = 0;
   }
 }
+
+
+bool wsrep_replicate_myisam_check(sys_var *self, THD* thd, set_var* var)
+{
+  /* Trying to set wsrep_replicate_myisam to off. */
+  if (var->save_result.ulonglong_value == 0)
+    return false;
+
+  /* If pxc-strict-mode >= ENFORCING we don't allow setting
+  wsrep_replicate_myisam to ON. */
+  bool block= false;
+
+  switch(pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
+               " table replication as it is an experimental feature"); 
+    push_warning (thd, Sql_condition::SL_WARNING,
+                  ER_WRONG_VALUE_FOR_VAR,
+                  "Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
+                  " table replication as it is an experimental feature");
+    break;
+  case PXC_STRICT_MODE_ENFORCING:
+  case PXC_STRICT_MODE_MASTER:
+  default:
+    block= true;
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of MyISAM"
+                " table replication as it is an experimental feature");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             var->save_result.ulonglong_value ? "ON" : "OFF");
+    break;
+  }
+
+  return block;
+}
+
+static const char* pxc_strict_mode_to_string(ulong value)
+{
+  switch(value)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+    return "DISABLED";
+  case PXC_STRICT_MODE_PERMISSIVE:
+    return "PERMISSIVE";
+  case PXC_STRICT_MODE_ENFORCING:
+    return "ENFORCING";
+  case PXC_STRICT_MODE_MASTER:
+    return "MASTER";
+  default:
+    return "NULL";
+  }
+}
+
+bool pxc_strict_mode_check(sys_var *self, THD* thd, set_var* var)
+{
+  /* pxc-strict-mode can be changed only if node is cluster-node. */
+  if (!(WSREP_ON))
+  {
+    WSREP_ERROR("pxc_strict_mode can be changed only if node is cluster-node");
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+             pxc_strict_mode_to_string(var->save_result.ulonglong_value));
+    return true;
+  }
+
+  bool enforcing_strictness= false;
+  bool block= false;
+
+  if (pxc_strict_mode <= PXC_STRICT_MODE_PERMISSIVE &&
+      var->save_result.ulonglong_value >= PXC_STRICT_MODE_ENFORCING)
+    enforcing_strictness= true;
+
+  if (enforcing_strictness)
+  {
+    /* wsrep_replicate_myisam shouldn't be OFF
+    TODO: Mutex ordering ? */
+    bool replicate_myisam;
+    replicate_myisam= (global_system_variables.wsrep_replicate_myisam ||
+                       thd->variables.wsrep_replicate_myisam);
+
+    bool row_binlog_format;
+    row_binlog_format=
+      (global_system_variables.binlog_format == BINLOG_FORMAT_ROW &&
+       thd->variables.binlog_format == BINLOG_FORMAT_ROW);
+
+    bool safe_log_output;
+    safe_log_output=
+       ((log_output_options & LOG_NONE) || (log_output_options & LOG_FILE));
+
+    bool serializable;
+    serializable= (thd->tx_isolation == ISO_SERIALIZABLE ||
+                   global_system_variables.tx_isolation == ISO_SERIALIZABLE);
+
+    /* replicate_myisam = off
+       row_binlog_format = true (row)
+       safe_log_output = true (none/file)
+       serializable = false */
+    block = !(!replicate_myisam &&
+              row_binlog_format &&
+              safe_log_output   &&
+              !serializable);
+
+    if (replicate_myisam)
+      WSREP_ERROR("Can't change strict-mode with wsrep_replicate_myisam"
+                  " turned ON");
+
+    if (!row_binlog_format)
+      WSREP_ERROR("Can't change strict-mode while binlog format != ROW");
+
+    if (!safe_log_output)
+      WSREP_ERROR("Can't change strict-mode while log_output != NONE/FILE");
+
+    if (serializable)
+      WSREP_ERROR("Can't change strict-mode while isolation level is"
+                  " SERIALIZABLE");
+
+    if (block)
+    {
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
+               pxc_strict_mode_to_string(var->save_result.ulonglong_value));
+    }
+  }
+
+  if (!block)
+    wsrep_replicate_set_stmt= true;
+
+  return(block);
+}
+

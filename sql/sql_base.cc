@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -771,7 +771,8 @@ TABLE_SHARE *get_table_share(THD *thd, TABLE_LIST *table_list,
   }
 
 #ifdef HAVE_PSI_TABLE_INTERFACE
-  share->m_psi= PSI_TABLE_CALL(get_table_share)(false, share);
+  share->m_psi=
+     PSI_TABLE_CALL(get_table_share)((share->tmp_table != NO_TMP_TABLE), share);
 #else
   share->m_psi= NULL;
 #endif
@@ -1519,6 +1520,23 @@ close_all_tables_for_name(THD *thd, TABLE_SHARE *share,
   }
 }
 
+/**
+  Performance Schema tables must be accessible independently of the LOCK TABLE
+  mode. These macros handle the special case of P_S tables being used under
+  LOCK TABLE mode.
+*/
+
+/* Check if we are under LOCK TABLE mode and not prelocking. */
+#define UNDER_LTM(thd) \
+  (thd->locked_tables_mode == LTM_LOCK_TABLES || \
+   thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)
+
+/* Check if the table belongs to the P_S, excluding setup and threads tables. */
+#define BELONGS_TO_P_S_UNDER_LTM(thd, tl) \
+   (UNDER_LTM(thd) && \
+    (!strcmp("performance_schema", tl->db) && \
+     strcmp(tl->table_name, "threads") && \
+     strstr(tl->table_name, "setup_") == NULL))
 
 /*
   Close all tables used by the current substatement, or all tables
@@ -1613,6 +1631,35 @@ void close_thread_tables(THD *thd)
 
   if (thd->locked_tables_mode)
   {
+    /* Close P_S tables opened implicilty under LOCK TABLE mode. */
+    if (UNDER_LTM(thd))
+    {
+      for (TABLE **prev= &thd->open_tables; *prev; )
+      {
+        TABLE *table= *prev;
+
+        /* Ignore tables locked explicitly by LOCK TABLE. */
+        if (!table->pos_in_locked_tables)
+        {
+          /* Close P_S tables unless the query is inside of a SP/trigger. */
+          if (!thd->in_sub_stmt &&
+              BELONGS_TO_P_S_UNDER_LTM(thd, table->pos_in_table_list))
+          {
+            if (!table->s->tmp_table)
+            {
+              table->file->ha_index_or_rnd_end();
+              table->set_keyread(FALSE);
+              table->open_by_handler= 0;
+              table->file->ha_external_lock(thd, F_UNLCK);
+              close_thread_table(thd, prev);
+              continue;
+            }
+          }
+
+        }
+        prev= &table->next;
+      }
+    }
 
     /* Ensure we are calling ha_reset() for all used tables */
     mark_used_tables_as_free_for_reuse(thd, thd->open_tables);
@@ -3013,14 +3060,15 @@ bool open_table(THD *thd, TABLE_LIST *table_list, Open_table_context *ot_ctx)
     TODO: move this block into a separate function.
   */
   if (thd->locked_tables_mode &&
-      ! (flags & MYSQL_OPEN_GET_NEW_TABLE))
-  {						// Using table locks
+      !(flags & MYSQL_OPEN_GET_NEW_TABLE) &&
+      !BELONGS_TO_P_S_UNDER_LTM(thd, table_list))
+  {   // Using table locks
     TABLE *best_table= 0;
     int best_distance= INT_MIN;
     for (table=thd->open_tables; table ; table=table->next)
     {
       if (table->s->table_cache_key.length == key_length &&
-	  !memcmp(table->s->table_cache_key.str, key, key_length))
+          !memcmp(table->s->table_cache_key.str, key, key_length))
       {
         if (!my_strcasecmp(system_charset_info, table->alias, alias) &&
             table->query_id != thd->query_id && /* skip tables already used */
@@ -3623,6 +3671,13 @@ table_found:
   }
 
   table->init(thd, table_list);
+
+  /* Request a read lock for implicitly opened P_S tables. */
+  if (BELONGS_TO_P_S_UNDER_LTM(thd, table_list) &&
+      table_list->table->file->get_lock_type() == F_UNLCK)
+  {
+    table_list->table->file->ha_external_lock(thd, F_RDLCK);
+  }
 
   DBUG_RETURN(FALSE);
 
@@ -4760,6 +4815,7 @@ thr_lock_type read_lock_type_for_table(THD *thd,
     at THD::variables::sql_log_bin member.
   */
   bool log_on= mysql_bin_log.is_open() && thd->variables.sql_log_bin;
+
   /*
     When we do not write to binlog or when we use row based replication,
     it is safe to use a weaker lock.
@@ -5912,27 +5968,119 @@ restart:
     }
 
 #ifdef WITH_WSREP
+   bool is_dml_stmt=
+     (thd->lex->sql_command== SQLCOM_INSERT         ||
+      thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
+      thd->lex->sql_command== SQLCOM_REPLACE        ||
+      thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
+      thd->lex->sql_command== SQLCOM_UPDATE         ||
+      thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
+      thd->lex->sql_command== SQLCOM_LOAD           ||
+      thd->lex->sql_command== SQLCOM_DELETE);
+
+  legacy_db_type db_type= (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
+
+  if (db_type != DB_TYPE_INNODB             &&
+      db_type != DB_TYPE_UNKNOWN            &&
+      db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
+      is_dml_stmt                           &&
+      !is_temporary_table(tables))
+  {
+    /* Table is not an InnoDB table and workload is trying to make changes
+    to the table. Validate workload based on pxc-strict-mode. */
+
+    bool block= false;
+    switch (pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of DML"
+                 " on table (%s) created with non-transactional storage"
+                 " engine", tbl->s->table_name.str);
+      push_warning_printf(thd, Sql_condition::SL_WARNING,
+                          ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of DML"
+                          " on table created with non-transactional storage"
+                          " engine");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block= true;
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of DML"
+                 " on table (%s) created with non-transactional storage engine",
+                 tbl->s->table_name.str);
+      my_message(ER_UNKNOWN_ERROR,
+                 "Percona-XtraDB-Cluster prohibits use of DML"
+                 " on table created with non-transactional storage engine",
+                 MYF(0));
+      break;
+    }
+
+    if (block)
+    {
+      error= TRUE;
+      goto err;
+    }
+  }
+
+  if (is_dml_stmt                           &&
+      db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
+      tbl && tbl->s->primary_key == MAX_KEY &&
+      !is_temporary_table(tables))
+  {
+    /* Table doesn't have explicit primary-key defined. */
+
+    bool block= false;
+    switch (pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of DML"
+                 " on table (%s) without an explicit primary key",
+                 tbl->s->table_name.str);
+      push_warning_printf(thd, Sql_condition::SL_WARNING,
+                          ER_UNKNOWN_ERROR,
+                          "Percona-XtraDB-Cluster doesn't recommend use of DML"
+                          " on table without an explicit primary key");
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block= true;
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of DML"
+                  " on table (%s) without an explicit primary key",
+                  tbl->s->table_name.str);
+      my_message(ER_UNKNOWN_ERROR,
+                 "Percona-XtraDB-Cluster prohibits use of DML"
+                 " on table without an explicit primary key",
+                 MYF(0));
+      break;
+    }
+
+    if (block)
+    {
+      error= TRUE;
+      goto err;
+    }
+  }
+
   /* It is not recommended to replicate MyISAM as it lacks rollback feature
   but if user demands then actions are replicated using TOI.
   Following code will kick-start the TOI but this has to be done only once
   per statement.
   Note: kick-start will take-care of creating isolation key for all tables
   involved in the list (provided all of them are MYISAM tables). */
-  if ((thd->lex->sql_command== SQLCOM_INSERT         ||
-       thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
-       thd->lex->sql_command== SQLCOM_REPLACE        ||
-       thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
-       thd->lex->sql_command== SQLCOM_UPDATE         ||
-       thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
-       thd->lex->sql_command== SQLCOM_LOAD           ||
-       thd->lex->sql_command== SQLCOM_DELETE)        &&
+  if (is_dml_stmt                                    &&
       thd->variables.wsrep_replicate_myisam          &&
-      (*start)->table && (*start)->table->file->ht->db_type == DB_TYPE_MYISAM &&
+      db_type == DB_TYPE_MYISAM                      &&
       thd->wsrep_exec_mode== LOCAL_STATE)
-    {
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
-    }
- error:
+  {
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
+  }
+error:
 #endif /* WITH_WSREP */
 
     /* Set appropriate TABLE::lock_type. */
@@ -6458,8 +6606,15 @@ bool open_and_lock_tables(THD *thd, TABLE_LIST *tables, uint flags,
   /*
     open_and_lock_tables() must not be used to open system tables. There must
     be no active attachable transaction when open_and_lock_tables() is called.
+    Exception is made to the read-write attachables with explicitly specified
+    in the assert table.
+    Callers in the read-write case must make sure no side effect to
+    the global transaction state is inflicted when the attachable one
+    will commmit.
   */
-  DBUG_ASSERT(!thd->is_attachable_transaction_active());
+  DBUG_ASSERT(!thd->is_attachable_ro_transaction_active() &&
+              (!thd->is_attachable_rw_transaction_active() ||
+               !strcmp(tables->table_name, "gtid_executed")));
 
   if (open_tables(thd, &tables, &counter, flags, prelocking_strategy))
     goto err;
@@ -9810,7 +9965,7 @@ void tdc_remove_table(THD *thd, enum_tdc_remove_table_type remove_type,
     table_cache_manager.assert_owner_all_and_tdc();
 
 #ifdef WITH_WSREP
-  /* if thd was BF aborted, exclusive locks were canceled */
+  /* if thd was BF aborted, exclusive locks are cancelled */
 #else
   DBUG_ASSERT(remove_type == TDC_RT_REMOVE_UNUSED ||
               thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::TABLE,
@@ -10515,11 +10670,11 @@ bool open_trans_system_tables_for_read(THD *thd, TABLE_LIST *table_list)
 
   DBUG_ENTER("open_trans_system_tables_for_read");
 
-  DBUG_ASSERT(!thd->is_attachable_transaction_active());
+  DBUG_ASSERT(!thd->is_attachable_ro_transaction_active());
 
   // Begin attachable transaction.
 
-  thd->begin_attachable_transaction();
+  thd->begin_attachable_ro_transaction();
 
   // Open tables.
 

@@ -88,4 +88,8 @@ extern bool wsrep_desync_update              UPDATE_ARGS;
 
 extern bool wsrep_reject_queries_update    UPDATE_ARGS;
 
+extern bool wsrep_replicate_myisam_check     CHECK_ARGS;
+
+extern bool pxc_strict_mode_check            CHECK_ARGS;
+
 #endif /* WSREP_VAR_H */

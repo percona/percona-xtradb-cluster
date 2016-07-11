@@ -69,11 +69,6 @@ using std::max;
 static int increment_connection_count(THD* thd, bool use_lock);
 #endif
 
-#ifndef EMBEDDED_LIBRARY
-// Increments connection count for user.
-static int increment_connection_count(THD* thd, bool use_lock);
-#endif
-
 HASH global_user_stats;
 HASH global_client_stats;
 HASH global_thread_stats;
@@ -1475,6 +1470,7 @@ bool thd_prepare_connection(THD *thd, bool extra_port_connection)
 #endif /* WITH_WSREP */
   return FALSE;
 }
+
 
 /**
   Close a connection.
