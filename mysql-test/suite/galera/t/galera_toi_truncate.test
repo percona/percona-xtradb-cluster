@@ -35,9 +35,8 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SELECT COUNT(*) = 1000000 FROM t1;
 
 --connection node_1
-# we sleep for sometime to allow node_1 to apply write-set event
---sleep 10
-SELECT COUNT(*) = 1000000 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 1000000 FROM t1;
+--source include/wait_condition.inc
 
 DROP TABLE t1;
 
@@ -71,9 +70,8 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SELECT COUNT(*) = 1000000 FROM t1;
 
 --connection node_2
-# we sleep for sometime to allow node_1 to apply write-set event
---sleep 10
-SELECT COUNT(*) = 1000000 FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 1000000 FROM t1;
+--source include/wait_condition.inc
 
 DROP TABLE t1;
 DROP TABLE ten;
