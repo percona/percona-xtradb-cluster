@@ -5968,15 +5968,15 @@ restart:
     }
 
 #ifdef WITH_WSREP
-   bool is_dml_stmt=
-     (thd->lex->sql_command== SQLCOM_INSERT         ||
-      thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
-      thd->lex->sql_command== SQLCOM_REPLACE        ||
-      thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
-      thd->lex->sql_command== SQLCOM_UPDATE         ||
-      thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
-      thd->lex->sql_command== SQLCOM_LOAD           ||
-      thd->lex->sql_command== SQLCOM_DELETE);
+  bool is_dml_stmt=
+    (thd->lex->sql_command== SQLCOM_INSERT         ||
+     thd->lex->sql_command== SQLCOM_INSERT_SELECT  ||
+     thd->lex->sql_command== SQLCOM_REPLACE        ||
+     thd->lex->sql_command== SQLCOM_REPLACE_SELECT ||
+     thd->lex->sql_command== SQLCOM_UPDATE         ||
+     thd->lex->sql_command== SQLCOM_UPDATE_MULTI   ||
+     thd->lex->sql_command== SQLCOM_LOAD           ||
+     thd->lex->sql_command== SQLCOM_DELETE);
 
   legacy_db_type db_type= (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
 

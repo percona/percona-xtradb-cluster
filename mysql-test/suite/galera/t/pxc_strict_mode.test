@@ -31,10 +31,12 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend altering table created with transactional storage engine to non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of DML on table .* created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ALTER on table created with non-transactional storage engine");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits altering table created with transactional storage engine to non-transactional storage engine");
 
 call mtr.add_suppression("WSREP: Can't change strict-mode with wsrep_replicate_myisam turned ON");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication as it is an experimental feature");
@@ -79,6 +81,7 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend altering table created with transactional storage engine to non-transactional storage engine");
 
 set global pxc_strict_mode='ENFORCING';
 
