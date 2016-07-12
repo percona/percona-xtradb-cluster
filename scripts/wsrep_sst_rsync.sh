@@ -20,6 +20,8 @@
 
 RSYNC_PID=
 RSYNC_CONF=
+keyring=""
+KEYRING_FILE=
 OS=$(uname)
 [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
 
@@ -30,6 +32,16 @@ export PATH="/usr/sbin:/sbin:$PATH"
 
 wsrep_check_programs rsync
 
+if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+    keyring=$(parse_cnf mysqld${WSREP_SST_OPT_CONF_SUFFIX} keyring-file-data "")
+fi
+if [[ -z $keyring ]]; then
+    keyring=$(parse_cnf mysqld keyring-file-data "")
+fi
+if [[ -z $keyring ]]; then
+    keyring=$(parse_cnf sst keyring-file-data "")
+fi
+
 cleanup_joiner()
 {
     local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
@@ -39,6 +51,7 @@ cleanup_joiner()
     rm -rf "$RSYNC_CONF"
     rm -rf "$MAGIC_FILE"
     rm -rf "$RSYNC_PID"
+    rm -rf "$KEYRING_FILE"
     wsrep_log_info "Joiner cleanup done."
     if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_cleanup_progress_file
@@ -83,6 +96,10 @@ then
     BINLOG_DIRNAME=$(dirname $WSREP_SST_OPT_BINLOG)
     BINLOG_FILENAME=$(basename $WSREP_SST_OPT_BINLOG)
 fi
+
+KEYRING_FILE="$WSREP_SST_OPT_DATA/keyring-sst"
+rm -rf "$KEYRING_FILE"
+
 
 WSREP_LOG_DIR=${WSREP_LOG_DIR:-""}
 # if WSREP_LOG_DIR env. variable is not set, try to get it from my.cnf
@@ -189,6 +206,19 @@ then
         if [ $RC -ne 0 ]; then
             wsrep_log_error "rsync innodb_log_group_home_dir returned code $RC:"
             exit 255 # unknown error
+        fi
+
+        # third, transfer the keyring file (this requires SSL, check for encryption)
+        if [[ -r $keyring ]]; then
+            rsync --owner --group --perms --links --specials \
+                  --ignore-times --inplace --quiet \
+                  $WHOLE_FILE_OPT "$keyring" \
+                  rsync://$WSREP_SST_OPT_ADDR/keyring-sst >&2 || RC=$?
+
+            if [ $RC -ne 0 ]; then
+                wsrep_log_error "rsync keyring returned code $RC:"
+                exit 255 # unknown error
+            fi
         fi
 
         # then, we parallelize the transfer of database directories, use . so that pathconcatenation works
@@ -310,6 +340,31 @@ EOF
         fi
         popd &> /dev/null
     fi
+
+    if [[ -n $keyring ]]; then
+        if [[ -r $KEYRING_FILE ]]; then
+            wsrep_log_info "Moving sst keyring into place: moving $KEYRING_FILE to $keyring"
+            mv $KEYRING_FILE $keyring
+        else
+            # error, missing file
+            wsrep_log_error "FATAL: rsync could not find '${KEYRING_FILE}'"
+            wsrep_log_error "The joiner is using a keyring file but the donor has not sent"
+            wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
+            wsrep_log_error "both sides are using a keyring file"
+            exit 32
+        fi
+    else
+        if [[ -r $KEYRING_FILE ]]; then
+            # error, file should not be here
+            wsrep_log_error "FATAL: rsync found '${KEYRING_FILE}'"
+            wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
+            wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
+            wsrep_log_error "both sides are using a keyring file"
+            rm -rf $KEYRING_FILE
+            exit 32
+        fi
+    fi
+
     if [ -r "$MAGIC_FILE" ]
     then
         cat "$MAGIC_FILE" # output UUID:seqno
