@@ -58,7 +58,7 @@ install_db () {
     fi
 
     # Create initial db
-    /usr/sbin/mysqld --no-defaults --initialize --datadir="$datadir" --user=mysql
+    /usr/sbin/mysqld --initialize --datadir="$datadir" --user=mysql
     exit 0
 }
 

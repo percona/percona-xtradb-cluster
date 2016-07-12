@@ -54,7 +54,7 @@ sanity () {
 
 	if [ ! "$(ls -A ${MYSQLDATA}/mysql)" ];
 	then
-		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --no-defaults --initialize-insecure=on 2>&1 > /dev/null"
+		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
 		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
 		pinger
 		mysql -e "INSTALL PLUGIN auth_socket SONAME 'auth_socket.so'"
