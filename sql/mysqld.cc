@@ -3398,7 +3398,14 @@ int init_common_variables()
   bool wsrep_provider_loaded= !(strlen(wsrep_provider) == 0 ||
                                 !strcmp(wsrep_provider, WSREP_NONE));
 
-  if (wsrep_provider_loaded == false)
+  if (opt_bootstrap)
+  {
+    /* Node is running bootstrap mode pxc-strict-mode = DISABLED. */
+    WSREP_WARN("Node is running in bootstrap/initialize mode."
+               " Disabling pxc_strict_mode checks");
+    pxc_strict_mode= PXC_STRICT_MODE_DISABLED;
+  }
+  else if (wsrep_provider_loaded == false)
   {
     /* Node is not a cluster node pxc-strict-mode will be defaulted
     to DISABLED */
