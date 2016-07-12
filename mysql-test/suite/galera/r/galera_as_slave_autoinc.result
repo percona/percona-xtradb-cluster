@@ -57,11 +57,12 @@ i	c
 show variables like 'binlog_format';
 Variable_name	Value
 binlog_format	ROW
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
 Variable_name	Value
 auto_increment_increment	2
-auto_increment_offset	1
-wsrep_auto_increment_control	ON
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+1
 select * from t1;
 i	c
 1	dummy_text
@@ -77,11 +78,12 @@ i	c
 show variables like 'binlog_format';
 Variable_name	Value
 binlog_format	ROW
-show variables like '%auto_increment%';
+show variables like 'auto_increment_increment';
 Variable_name	Value
 auto_increment_increment	2
-auto_increment_offset	2
-wsrep_auto_increment_control	ON
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+@@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1
+1
 DROP TABLE t1;
 STOP SLAVE;
 RESET SLAVE ALL;
