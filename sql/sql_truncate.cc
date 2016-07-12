@@ -481,7 +481,7 @@ bool Sql_cmd_truncate_table::truncate_table(THD *thd, TABLE_LIST *table_ref)
 
 #ifdef WITH_WSREP
     error= true;
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
+    WSREP_TO_ISOLATION_BEGIN(table_ref->db, table_ref->table_name, NULL);
 #endif /* WITH_WSREP */
 
     if (lock_table(thd, table_ref, &hton_can_recreate))
