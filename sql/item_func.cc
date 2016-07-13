@@ -5467,18 +5467,22 @@ longlong Item_func_get_lock::val_int()
     break;
   case PXC_STRICT_MODE_PERMISSIVE:
     WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
-               " GET_LOCK/RELEASE_LOCK");
-    push_warning (thd, Sql_condition::SL_WARNING,
-                  ER_WRONG_VALUE_FOR_VAR,
-                  "Percona-XtraDB-Cluster doesn't recommend use of"
-                  " GET_LOCK/RELEASE_LOCK");
+               " GET_LOCK with pxc_strict_mode = PERMISSIVE");
+    push_warning_printf(
+      thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+      "Percona-XtraDB-Cluster doesn't recommend use of"
+      " GET_LOCK with pxc_strict_mode = PERMISSIVE");
     break;
   case PXC_STRICT_MODE_ENFORCING:
   default:
     block= true;
-    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
-    my_error(ER_NOT_SUPPORTED_YET, MYF(0),
-             "Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of GET_LOCK"
+                " with pxc_strict_mode = ENFORCING");
+    char message[1024];
+    sprintf(message,
+            "Percona-XtraDB-Cluster prohibits use of GET_LOCK"
+            " with pxc_strict_mode = ENFORCING");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     break;
   }
 
@@ -5628,18 +5632,22 @@ longlong Item_func_release_lock::val_int()
     break;
   case PXC_STRICT_MODE_PERMISSIVE:
     WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
-               " GET_LOCK/RELEASE_LOCK");
-    push_warning (thd, Sql_condition::SL_WARNING,
-                  ER_WRONG_VALUE_FOR_VAR,
-                  "Percona-XtraDB-Cluster doesn't recommend use of"
-                  " GET_LOCK/RELEASE_LOCK");
+               " RELEASE_LOCK with pxc_strict_mode = PERMISSIVE");
+    push_warning_printf(
+      thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+      "Percona-XtraDB-Cluster doesn't recommend use of"
+      " RELEASE_LOCK with pxc_strict_mode = PERMISSIVE");
     break;
   case PXC_STRICT_MODE_ENFORCING:
   default:
     block= true;
-    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
-    my_error(ER_NOT_SUPPORTED_YET, MYF(0),
-             "Percona-XtraDB-Cluster prohibits use of GET_LOCK/RELEASE_LOCK");
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK"
+                " with pxc_strict_mode = ENFORCING");
+    char message[1024];
+    sprintf(message,
+            "Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK"
+            " with pxc_strict_mode = ENFORCING");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     break;
   }
 

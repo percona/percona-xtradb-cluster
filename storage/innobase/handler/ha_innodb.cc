@@ -3909,14 +3909,19 @@ innobase_init(
 		case PXC_STRICT_MODE_DISABLED:
 			break;
 		case PXC_STRICT_MODE_PERMISSIVE:
-			WSREP_WARN("Percona-XtraDB-Cluster recommends setting"
-				   " innodb_autoinc_lock_mode = Interleaved/2");
+			WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend"
+				   " setting innodb_autoinc_lock_mode to"
+				   " TRADITIONAL/CONSECUTIVE"
+				   " with pxc_strict_mode = PERMISSIVE");
 			break;
 		case PXC_STRICT_MODE_ENFORCING:
 		case PXC_STRICT_MODE_MASTER:
 		default:
-			WSREP_ERROR("Percona-XtraDB-Cluster requires"
-				    " innodb_autoinc_lock_mode = Interleaved/2");
+			WSREP_ERROR("Percona-XtraDB-Cluster prohibits"
+				    " setting innodb_autoinc_lock_mode to"
+				    " TRADITIONAL/CONSECUTIVE"
+				    " with pxc_strict_mode = ENFORCING"
+				    " or MASTER");
 			DBUG_RETURN(innobase_init_abort());
 			break;
 		}

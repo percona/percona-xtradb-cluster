@@ -755,20 +755,27 @@ bool wsrep_replicate_myisam_check(sys_var *self, THD* thd, set_var* var)
     break;
   case PXC_STRICT_MODE_PERMISSIVE:
     WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
-               " table replication as it is an experimental feature"); 
-    push_warning (thd, Sql_condition::SL_WARNING,
-                  ER_WRONG_VALUE_FOR_VAR,
-                  "Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
-                  " table replication as it is an experimental feature");
+               " table replication feature"
+               " with pxc_strict_mode = PERMISSIVE");
+    push_warning_printf(
+      thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR, 
+      "Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
+      " table replication feature"
+      " with pxc_strict_mode = PERMISSIVE");
     break;
   case PXC_STRICT_MODE_ENFORCING:
   case PXC_STRICT_MODE_MASTER:
   default:
     block= true;
     WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of MyISAM"
-                " table replication as it is an experimental feature");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-             var->save_result.ulonglong_value ? "ON" : "OFF");
+                " table replication feature"
+                " with pxc_strict_mode = ENFORCING or MASTER");
+    char message[1024];
+    sprintf(message,
+            "Percona-XtraDB-Cluster prohibits use of MyISAM"
+            " table replication feature"
+            " with pxc_strict_mode = ENFORCING or MASTER");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     break;
   }
 
@@ -798,8 +805,11 @@ bool pxc_strict_mode_check(sys_var *self, THD* thd, set_var* var)
   if (!(WSREP_ON))
   {
     WSREP_ERROR("pxc_strict_mode can be changed only if node is cluster-node");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-             pxc_strict_mode_to_string(var->save_result.ulonglong_value));
+
+    char message[1024];
+    sprintf(message,
+            "pxc_strict_mode can be changed only if node is cluster-node");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     return true;
   }
 
@@ -841,23 +851,30 @@ bool pxc_strict_mode_check(sys_var *self, THD* thd, set_var* var)
               !serializable);
 
     if (replicate_myisam)
-      WSREP_ERROR("Can't change strict-mode with wsrep_replicate_myisam"
+      WSREP_ERROR("Can't change pxc_strict_mode with wsrep_replicate_myisam"
                   " turned ON");
 
     if (!row_binlog_format)
-      WSREP_ERROR("Can't change strict-mode while binlog format != ROW");
+      WSREP_ERROR("Can't change pxc_strict_mode while binlog format != ROW");
 
     if (!safe_log_output)
-      WSREP_ERROR("Can't change strict-mode while log_output != NONE/FILE");
+      WSREP_ERROR("Can't change pxc_strict_mode while log_output != NONE/FILE");
 
     if (serializable)
-      WSREP_ERROR("Can't change strict-mode while isolation level is"
+      WSREP_ERROR("Can't change pxc_strict_mode while isolation level is"
                   " SERIALIZABLE");
 
     if (block)
     {
-      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-               pxc_strict_mode_to_string(var->save_result.ulonglong_value));
+      char message[1024];
+      sprintf(message,
+              "Can't change pxc_strict_mode to %s as%s%s%s%s",
+              pxc_strict_mode_to_string(var->save_result.ulonglong_value),
+              (replicate_myisam ? " wsrep_replicate_myisam is ON" : ""), 
+              (!row_binlog_format ? " binlog_format != ROW" : ""),
+              (!safe_log_output ? " log_output != NONE/FILE" : ""),
+              (serializable ? " isolation level is SERIALIZABLE" : ""));
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     }
   }
 
