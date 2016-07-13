@@ -6,10 +6,12 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend altering table created with transactional storage engine to non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of DML on table .* created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ALTER on table created with non-transactional storage engine");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits altering table created with transactional storage engine to non-transactional storage engine");
 call mtr.add_suppression("WSREP: Can't change strict-mode with wsrep_replicate_myisam turned ON");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of MyISAM table replication as it is an experimental feature");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster recommends setting binlog_format to ROW");
@@ -38,6 +40,7 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of TRUNCATE on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command on table created with non-transactional storage engine");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend altering table created with transactional storage engine to non-transactional storage engine");
 set global pxc_strict_mode='ENFORCING';
 #node-1
 set global pxc_strict_mode = 'DISABLED';
@@ -291,7 +294,7 @@ test.tinnodb	analyze	status	OK
 alter table tinnodb add column j int;
 alter table tinnodb engine=myisam;
 Warnings:
-Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine (except switching to transactional engine)
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend altering table created with transactional storage engine to non-transactional storage engine
 alter table tinnodb engine=memory;
 Warnings:
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of ALTER on table created with non-transactional storage engine (except switching to transactional engine)
@@ -398,9 +401,9 @@ Table	Op	Msg_type	Msg_text
 test.tinnodb	analyze	status	OK
 alter table tinnodb add column j int;
 alter table tinnodb engine=myisam;
-ERROR HY000: Percona-XtraDB-Cluster prohibits use of ALTER on table created with non-transactional storage engine (except switching to transactional engine)
+ERROR HY000: Percona-XtraDB-Cluster prohibits altering table created with transactional storage engine to non-transactional storage engine
 alter table tinnodb engine=memory;
-ERROR HY000: Percona-XtraDB-Cluster prohibits use of ALTER on table created with non-transactional storage engine (except switching to transactional engine)
+ERROR HY000: Percona-XtraDB-Cluster prohibits altering table created with transactional storage engine to non-transactional storage engine
 alter table tinnodb engine=innodb;
 drop table tinnodb;
 #node-1
