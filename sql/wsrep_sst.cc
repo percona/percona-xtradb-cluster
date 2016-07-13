@@ -451,6 +451,28 @@ void wsrep_sst_cancel ()
   mysql_mutex_unlock (&LOCK_wsrep_sst);
 }
 
+/*
+  Handling of fatal signals: SIGABRT, SIGTERM, etc.
+*/
+extern "C" void wsrep_handle_fatal_signal (int sig)
+{
+  /*
+    When we launched the SST process, then we need
+    to terminate it before exit from parent process:
+  */
+  if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
+  if (!sst_cancelled)
+  {
+    sst_cancelled=true;
+    if (sst_process)
+    {
+      sst_process->terminate();
+      sst_process = NULL;
+    }
+  }
+  mysql_mutex_unlock (&LOCK_wsrep_sst);
+}
+
 static void* sst_joiner_thread (void* a)
 {
   sst_thread_arg* arg= (sst_thread_arg*) a;
