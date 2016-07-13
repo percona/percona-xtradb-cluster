@@ -3887,7 +3887,9 @@ end_with_restore_list:
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     if (check_one_table_access(thd, INDEX_ACL, all_tables))
       goto error; /* purecov: inspected */
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL)
+#endif /* WITH_WSREP */
     /*
       Currently CREATE INDEX or DROP INDEX cause a full table rebuild
       and thus classify as slow administrative statements just like
@@ -4035,7 +4037,9 @@ end_with_restore_list:
         goto error;
     }
 
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(0, 0, first_table)
+#endif /* WITH_WSREP */
     if (mysql_rename_tables(thd, first_table, 0))
       goto error;
     break;
@@ -4550,7 +4554,9 @@ end_with_restore_list:
 #endif
     if (check_access(thd, CREATE_ACL, lex->name.str, NULL, NULL, 1, 0))
       break;
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
+#endif /* WITH_WSREP */
     res= mysql_create_db(thd,(lower_case_table_names == 2 ? alias :
                               lex->name.str), &create_info, 0);
     break;
@@ -4575,7 +4581,9 @@ end_with_restore_list:
 #endif
     if (check_access(thd, DROP_ACL, lex->name.str, NULL, NULL, 1, 0))
       break;
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(lex->name.str, NULL, NULL)
+#endif /* WITH_WSREP */
     res= mysql_rm_db(thd, to_lex_cstring(lex->name), lex->drop_if_exists, 0);
     break;
   }
@@ -4599,7 +4607,9 @@ end_with_restore_list:
       res= 1;
       break;
     }
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(db->str, NULL, NULL)
+#endif /* WITH_WSREP */
     LEX_CSTRING db_name= {db->str, db->length};
     res= mysql_upgrade_db(thd, db_name);
     if (!res)
@@ -4628,7 +4638,9 @@ end_with_restore_list:
 #endif
     if (check_access(thd, ALTER_ACL, db->str, NULL, NULL, 1, 0))
       break;
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(db->str, NULL, NULL)
+#endif /* WITH_WSREP */
     res= mysql_alter_db(thd, db->str, &create_info);
     break;
   }
@@ -4661,7 +4673,9 @@ end_with_restore_list:
     if (res)
       break;
 
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
     switch (lex->sql_command) {
     case SQLCOM_CREATE_EVENT:
     {
@@ -4713,7 +4727,9 @@ end_with_restore_list:
   }
   case SQLCOM_DROP_EVENT:
   {
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
     LEX_STRING db_lex_str= {const_cast<char*>(lex->spname->m_db.str),
                               lex->spname->m_db.length};
     if (!(res= Events::drop_event(thd,
@@ -4731,7 +4747,11 @@ end_with_restore_list:
     if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, 1, 0))
       break;
 #ifdef HAVE_DLOPEN
+
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
     if (!(res = mysql_create_function(thd, &lex->udf)))
       my_ok(thd);
 #else
@@ -4746,7 +4766,11 @@ end_with_restore_list:
     if (check_access(thd, INSERT_ACL, "mysql", NULL, NULL, 1, 1) &&
         check_global_access(thd,CREATE_USER_ACL))
       break;
+
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
     /* Conditionally writes to binlog */
     HA_CREATE_INFO create_info(lex->create_info);
     if (!(res = mysql_create_user(thd, lex->users_list, create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS)))
@@ -4758,8 +4782,12 @@ end_with_restore_list:
     if (check_access(thd, DELETE_ACL, "mysql", NULL, NULL, 1, 1) &&
         check_global_access(thd,CREATE_USER_ACL))
       break;
-    /* Conditionally writes to binlog */
+
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
+    /* Conditionally writes to binlog */
     if (!(res = mysql_drop_user(thd, lex->users_list, lex->drop_if_exists)))
       my_ok(thd);
     break;
@@ -4768,9 +4796,14 @@ end_with_restore_list:
   {
     if (check_access(thd, UPDATE_ACL, "mysql", NULL, NULL, 1, 1) &&
         check_global_access(thd,CREATE_USER_ACL))
+
       break;
-    /* Conditionally writes to binlog */
+
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
+    /* Conditionally writes to binlog */
     if (!(res= mysql_rename_user(thd, lex->users_list)))
       my_ok(thd);
     break;
@@ -4784,8 +4817,11 @@ end_with_restore_list:
     /* Replicate current user as grantor */
     thd->binlog_invoker();
 
-    /* Conditionally writes to binlog */
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
+    /* Conditionally writes to binlog */
     if (!(res = mysql_revoke_all(thd, lex->users_list)))
       my_ok(thd);
     break;
@@ -4851,8 +4887,12 @@ end_with_restore_list:
         if (check_grant_routine(thd, grants | GRANT_ACL, all_tables,
                                 lex->type == TYPE_ENUM_PROCEDURE, 0))
 	  goto error;
+
+#ifdef WITH_WSREP
+          WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
         /* Conditionally writes to binlog */
-        WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
         res= mysql_routine_grant(thd, all_tables,
                                  lex->type == TYPE_ENUM_PROCEDURE, 
                                  lex->users_list, grants,
@@ -4882,7 +4922,9 @@ end_with_restore_list:
       }
       else
       {
-          WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#ifdef WITH_WSREP
+        WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
         /* Conditionally writes to binlog */
         res = mysql_grant(thd, select_lex->db, lex->users_list, lex->grant,
                           lex->sql_command == SQLCOM_REVOKE,
@@ -5295,7 +5337,10 @@ end_with_restore_list:
     */
     thd->binlog_invoker();
 
+#ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
     if (! (res= sp_create_routine(thd, lex->sphead)))
     {
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
@@ -5514,8 +5559,12 @@ end_with_restore_list:
         follow the restrictions that log-bin-trust-function-creators=0
         already puts on CREATE FUNCTION.
       */
-      /* Conditionally writes to binlog */
+
+#ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
+      /* Conditionally writes to binlog */
       int sp_result= sp_update_routine(thd, sp_type, lex->spname,
                                        &lex->sp_chistics);
       if (thd->killed)
@@ -5587,7 +5636,10 @@ end_with_restore_list:
                                lex->sql_command == SQLCOM_DROP_PROCEDURE,
                                false))
         goto error;
+
+#ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
 
       enum_sp_type sp_type= (lex->sql_command == SQLCOM_DROP_PROCEDURE) ?
                             SP_TYPE_PROCEDURE : SP_TYPE_FUNCTION;
@@ -5720,7 +5772,9 @@ end_with_restore_list:
         Note: SQLCOM_CREATE_VIEW also handles 'ALTER VIEW' commands
         as specified through the thd->lex->create_view_mode flag.
       */
+#ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
       res= mysql_create_view(thd, first_table, thd->lex->create_view_mode);
       break;
     }
@@ -5728,30 +5782,38 @@ end_with_restore_list:
     {
       if (check_table_access(thd, DROP_ACL, all_tables, FALSE, UINT_MAX, FALSE))
         goto error;
-      /* Conditionally writes to binlog. */
+#ifdef WITH_WSREP
       WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+      /* Conditionally writes to binlog. */
       res= mysql_drop_view(thd, first_table, thd->lex->drop_mode);
       break;
     }
   case SQLCOM_CREATE_TRIGGER:
   {
+#ifdef WITH_WSREP
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
     /* Conditionally writes to binlog. */
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
 
     break;
   }
   case SQLCOM_DROP_TRIGGER:
   {
+#ifdef WITH_WSREP
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
     /* Conditionally writes to binlog. */
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
     res= mysql_create_or_drop_trigger(thd, all_tables, 0);
     break;
   }
   case SQLCOM_ALTER_TABLESPACE:
     if (check_global_access(thd, CREATE_TABLESPACE_ACL))
       break;
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#ifdef WITH_WSREP
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
     if (!(res= mysql_alter_tablespace(thd, lex->alter_tablespace_info)))
       my_ok(thd);
     break;
