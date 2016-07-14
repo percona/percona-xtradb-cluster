@@ -5183,6 +5183,13 @@ int mysqld_main(int argc, char **argv)
   my_str_malloc= &my_str_malloc_mysqld;
   my_str_free= &my_str_free_mysqld;
   my_str_realloc= &my_str_realloc_mysqld;
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
 
   error_handler_hook= my_message_sql;
 
@@ -8357,13 +8364,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
   (*argc_ptr)++;
   (*argv_ptr)--;
 
-#ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (wsrep_recovery)
-  {
-    wsrep_recover();
-    unireg_abort(0);
-  }
-#endif /* WITH_WSREP */
   /*
     Options have been parsed. Now some of them need additional special
     handling, like custom value checking, checking of incompatibilites
