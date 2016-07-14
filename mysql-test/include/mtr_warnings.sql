@@ -291,7 +291,7 @@ INSERT INTO global_suppressions VALUES
  ("InnoDB: New log files created, LSN="),
  ("IP address \'127.0.0.2\' could not be resolved: Name or service not known"),
  ("SYNC message from member"),
- ("WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT/MIXED"),
+ ("WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level"),
  ("WSREP: Table without explict primary key \\(not-recommended\\) and certification of nonPK table is OFF too"),
  ("WSREP: Node is not a cluster node. Disabling pxc_strict_mode"),
  ("WSREP: pxc_strict_mode can be changed only if node is cluster-node"),

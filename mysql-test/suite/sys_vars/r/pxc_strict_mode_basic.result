@@ -1,6 +1,6 @@
 # set default value
 set global pxc_strict_mode = default;
-ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'ENFORCING'
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
@@ -9,22 +9,22 @@ set session pxc_strict_mode = default;
 ERROR HY000: Variable 'pxc_strict_mode' is a GLOBAL variable and should be set with SET GLOBAL
 # try setting different valid values.
 set global pxc_strict_mode = 'DISABLED';
-ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'DISABLED'
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
 set global pxc_strict_mode = 'PERMISSIVE';
-ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'PERMISSIVE'
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
 set global pxc_strict_mode = 'ENFORCING';
-ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'ENFORCING'
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
 set global pxc_strict_mode = 'MASTER';
-ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'MASTER'
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
@@ -46,12 +46,12 @@ select @@pxc_strict_mode;
 DISABLED
 # try valid values but in different format
 set global pxc_strict_mode = 1;
-ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'PERMISSIVE'
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED
 set global pxc_strict_mode = 0;
-ERROR 42000: Variable 'pxc_strict_mode' can't be set to the value of 'DISABLED'
+ERROR HY000: pxc_strict_mode can be changed only if node is cluster-node
 select @@pxc_strict_mode;
 @@pxc_strict_mode
 DISABLED

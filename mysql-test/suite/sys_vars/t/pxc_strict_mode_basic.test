@@ -5,7 +5,7 @@
 #--let $pxc_strict_mode_saved = `SELECT @@pxc_strict_mode`
 
 --echo # set default value
---error ER_WRONG_VALUE_FOR_VAR
+--error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = default;
 select @@pxc_strict_mode;
 
@@ -14,16 +14,16 @@ select @@pxc_strict_mode;
 set session pxc_strict_mode = default;
 
 --echo # try setting different valid values.
---error ER_WRONG_VALUE_FOR_VAR
+--error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = 'DISABLED';
 select @@pxc_strict_mode;
---error ER_WRONG_VALUE_FOR_VAR
+--error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = 'PERMISSIVE';
 select @@pxc_strict_mode;
---error ER_WRONG_VALUE_FOR_VAR
+--error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = 'ENFORCING';
 select @@pxc_strict_mode;
---error ER_WRONG_VALUE_FOR_VAR
+--error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = 'MASTER';
 select @@pxc_strict_mode;
 
@@ -39,10 +39,10 @@ set global pxc_strict_mode = JUNK;
 select @@pxc_strict_mode;
 
 --echo # try valid values but in different format
---error ER_WRONG_VALUE_FOR_VAR
+--error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = 1;
 select @@pxc_strict_mode;
---error ER_WRONG_VALUE_FOR_VAR
+--error ER_UNKNOWN_ERROR
 set global pxc_strict_mode = 0;
 select @@pxc_strict_mode;
 
