@@ -5990,31 +5990,42 @@ restart:
     to the table. Validate workload based on pxc-strict-mode. */
 
     bool block= false;
-    switch (pxc_strict_mode)
+
+    switch(pxc_strict_mode)
     {
     case PXC_STRICT_MODE_DISABLED:
       break;
     case PXC_STRICT_MODE_PERMISSIVE:
-      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of DML"
-                 " on table (%s) created with non-transactional storage"
-                 " engine", tbl->s->table_name.str);
-      push_warning_printf(thd, Sql_condition::SL_WARNING,
-                          ER_UNKNOWN_ERROR,
-                          "Percona-XtraDB-Cluster doesn't recommend use of DML"
-                          " on table created with non-transactional storage"
-                          " engine");
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                 " DML command on a table (%s.%s) that resides in"
+                 " non-transactional storage engine"
+                 " with pxc_strict_mode = PERMISSIVE",
+                 tbl->s->db.str, tbl->s->table_name.str);
+      push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+        "Percona-XtraDB-Cluster doesn't recommend use of"
+        " DML command on a table (%s.%s) that resides in"
+        " non-transactional storage engine"
+        " with pxc_strict_mode = PERMISSIVE",
+        tbl->s->db.str, tbl->s->table_name.str);
       break;
     case PXC_STRICT_MODE_ENFORCING:
     case PXC_STRICT_MODE_MASTER:
-    default:
+    default: 
       block= true;
-      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of DML"
-                 " on table (%s) created with non-transactional storage engine",
-                 tbl->s->table_name.str);
-      my_message(ER_UNKNOWN_ERROR,
-                 "Percona-XtraDB-Cluster prohibits use of DML"
-                 " on table created with non-transactional storage engine",
-                 MYF(0));
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+                  " DML command on a table (%s.%s) that resides in"
+                  " non-transactional storage engine"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  tbl->s->db.str, tbl->s->table_name.str);
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits use of"
+              " DML command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              tbl->s->db.str, tbl->s->table_name.str);
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
       break;
     }
 
@@ -6033,30 +6044,42 @@ restart:
     /* Table doesn't have explicit primary-key defined. */
 
     bool block= false;
-    switch (pxc_strict_mode)
+
+    switch(pxc_strict_mode)
     {
     case PXC_STRICT_MODE_DISABLED:
       break;
     case PXC_STRICT_MODE_PERMISSIVE:
-      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of DML"
-                 " on table (%s) without an explicit primary key",
-                 tbl->s->table_name.str);
-      push_warning_printf(thd, Sql_condition::SL_WARNING,
-                          ER_UNKNOWN_ERROR,
-                          "Percona-XtraDB-Cluster doesn't recommend use of DML"
-                          " on table without an explicit primary key");
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                 " DML command on a table (%s.%s) without"
+                 " an explicit primary key"
+                 " with pxc_strict_mode = PERMISSIVE",
+                 tbl->s->db.str, tbl->s->table_name.str);
+      push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+        "Percona-XtraDB-Cluster doesn't recommend use of"
+        " DML command on a table (%s.%s) without"
+        " an explicit primary key"
+        " with pxc_strict_mode = PERMISSIVE",
+        tbl->s->db.str, tbl->s->table_name.str);
       break;
     case PXC_STRICT_MODE_ENFORCING:
     case PXC_STRICT_MODE_MASTER:
-    default:
+    default: 
       block= true;
-      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of DML"
-                  " on table (%s) without an explicit primary key",
-                  tbl->s->table_name.str);
-      my_message(ER_UNKNOWN_ERROR,
-                 "Percona-XtraDB-Cluster prohibits use of DML"
-                 " on table without an explicit primary key",
-                 MYF(0));
+      WSREP_ERROR("Percona-XtraDB-Cluster doesn't recommend use of"
+                  " DML command on a table (%s.%s) without"
+                  " an explicit primary key"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  tbl->s->db.str, tbl->s->table_name.str);
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster doesn't recommend use of"
+              " DML command on a table (%s.%s) without"
+              " an explicit primary key"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              tbl->s->db.str, tbl->s->table_name.str);
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
       break;
     }
 
@@ -6076,7 +6099,7 @@ restart:
   if (is_dml_stmt                                    &&
       thd->variables.wsrep_replicate_myisam          &&
       db_type == DB_TYPE_MYISAM                      &&
-      thd->wsrep_exec_mode== LOCAL_STATE)
+      thd->wsrep_exec_mode == LOCAL_STATE)
   {
     WSREP_TO_ISOLATION_BEGIN(NULL, NULL, (*start));
   }

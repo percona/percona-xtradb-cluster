@@ -584,30 +584,42 @@ bool Sql_cmd_truncate_table::execute(THD *thd)
       !is_temporary_table(first_table))
   {
     bool block= false;
+
     switch(pxc_strict_mode)
     {
     case PXC_STRICT_MODE_DISABLED:
       break;
     case PXC_STRICT_MODE_PERMISSIVE:
       WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
-                 " TRUNCATE on table created with non-transactional"
-                 " storage engine");
-      push_warning_printf(thd, Sql_condition::SL_WARNING,
-                          ER_UNKNOWN_ERROR,
-                          "Percona-XtraDB-Cluster doesn't recommend use of"
-                          " TRUNCATE on table created with non-transactional"
-                          " storage engine");
+                 " TRUNCATE command on a table (%s.%s) that resides in"
+                 " non-transactional storage engine"
+                 " with pxc_strict_mode = PERMISSIVE",
+                 first_table->db, first_table->table_name);
+      push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+        "Percona-XtraDB-Cluster doesn't recommend use of"
+        " TRUNCATE command on a table (%s.%s) that resides in"
+        " non-transactional storage engine"
+        " with pxc_strict_mode = PERMISSIVE",
+        first_table->db, first_table->table_name);
       break;
     case PXC_STRICT_MODE_ENFORCING:
     case PXC_STRICT_MODE_MASTER:
     default:
       block= true;
-      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of TRUNCATE"
-                 " on table created with non-transactional storage engine");
-      my_message(ER_UNKNOWN_ERROR,
-                 "Percona-XtraDB-Cluster prohibits use of TRUNCATE"
-                 " on table created with non-transactional storage engine",
-                 MYF(0));
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+                  " TRUNCATE command on a table (%s.%s) that resides in"
+                  " non-transactional storage engine"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  first_table->db, first_table->table_name);
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits use of"
+              " TRUNCATE command on a table (%s.%s) that resides in"
+              " non-transactional storage engine"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              first_table->db, first_table->table_name);
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
       break;
     }
  

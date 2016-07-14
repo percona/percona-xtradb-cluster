@@ -952,8 +952,8 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     /* Toggline binlog-format at GLOBAL level to MIXED/STATEMENT
     is not allowed. pxc-string-mode check will be evaluated
     only for SESSION level setting. */
-    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
-                " to STATEMENT/MIXED (anything other than ROW)");
+    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting" 
+                " binlog_format to STATEMENT or MIXED at global level");
     my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
              var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
              "STATEMENT" : "MIXED");
@@ -971,12 +971,14 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     {
       if (stmt_or_mixed)
       {
-        WSREP_WARN("Percona-XtraDB-Cluster recommends setting binlog_format"
-                   " to ROW");
-        push_warning (thd, Sql_condition::SL_WARNING,
-                      ER_WRONG_VALUE_FOR_VAR,
-                      "Percona-XtraDB-Cluster recommends setting binlog_format"
-                      " to ROW");
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend setting"
+                   " binlog_format to STATEMENT or MIXED"
+                   " with pxc_strict_mode = PERMISSIVE");
+        push_warning_printf(
+          thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+          "Percona-XtraDB-Cluster doesn't recommend setting"
+          " binlog_format to STATEMENT or MIXED"
+          " with pxc_strict_mode = PERMISSIVE");
       }
       break;
     }
@@ -986,11 +988,15 @@ static bool binlog_format_check(sys_var *self, THD *thd, set_var *var)
     {
       if (stmt_or_mixed)
       {
-        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
-                    " to STATEMENT/MIXED (anything other than ROW)");
-        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-                 var->save_result.ulonglong_value == BINLOG_FORMAT_STMT ?
-                 "STATEMENT" : "MIXED");
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting"
+                    " binlog_format to STATEMENT or MIXED"
+                    " with pxc_strict_mode = ENFORCING or MASTER");
+        char message[1024];
+        sprintf(message,
+                "Percona-XtraDB-Cluster prohibits setting"
+                " binlog_format to STATEMENT or MIXED"
+                " with pxc_strict_mode = ENFORCING or MASTER");
+        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
         block= true;
       }
     }
@@ -4332,18 +4338,23 @@ static bool check_tx_isolation(sys_var *self, THD *thd, set_var *var)
         break;
       case PXC_STRICT_MODE_PERMISSIVE:
         WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend using"
-                   " SERIALIZABLE isolation mode with multi-node workload");
-        push_warning (thd, Sql_condition::SL_WARNING,
-                      ER_WRONG_VALUE_FOR_VAR,
-                      "Percona-XtraDB-Cluster doesn't recommend using"
-                      " SERIALIZABLE isolation mode with multi-node workload");
+                   " SERIALIZABLE isolation with pxc_strict_mode = PERMISSIVE");
+        push_warning_printf(
+          thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+          "Percona-XtraDB-Cluster doesn't recommend using"
+          " SERIALIZABLE isolation with pxc_strict_mode = PERMISSIVE");
         break;
       case PXC_STRICT_MODE_ENFORCING:
         block= true;
-        WSREP_ERROR("Percona-XtraDB-Cluster prohibits using SERIALIZABLE"
-                    " isolation mode");
-        my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-                 "SERIALIZABLE");
+        WSREP_ERROR("Percona-XtraDB-Cluster doesn't recommend using"
+                    " SERIALIZABLE isolation"
+                    " with pxc_strict_mode = ENFORCING");
+        char message[1024];
+        sprintf(message,
+                "Percona-XtraDB-Cluster doesn't recommend using"
+                " SERIALIZABLE isolation"
+                " with pxc_strict_mode = ENFORCING");
+        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
       }
     }
 
@@ -5459,25 +5470,34 @@ static bool check_not_empty_set(sys_var *self, THD *thd, set_var *var)
     return false;
   
   bool block= false;
+
   switch(pxc_strict_mode)
   {
   case PXC_STRICT_MODE_DISABLED:
     break;
   case PXC_STRICT_MODE_PERMISSIVE:
-    WSREP_WARN("Percona-XtraDB-Cluster recommends setting log_output to FILE");
-    push_warning (thd, Sql_condition::SL_WARNING,
-                  ER_WRONG_VALUE_FOR_VAR,
-                  "Percona-XtraDB-Cluster recommends setting log_output"
-                  " to FILE");
+    WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend setting"
+               " log_output to TABLE"
+               " with pxc_strict_mode = PERMISSIVE");
+    push_warning_printf(
+      thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+      "Percona-XtraDB-Cluster doesn't recommend setting"
+      " log_output to TABLE"
+      " with pxc_strict_mode = PERMISSIVE");
     break;
   case PXC_STRICT_MODE_ENFORCING:
   case PXC_STRICT_MODE_MASTER:
   default:
-    WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting log_output"
-                " to TABLE (anything other than FILE/NONE)");
-    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), var->var->name.str,
-             var->save_result.ulonglong_value == LOG_TABLE ?
-             "TABLE" : "UNKNOWN");
+    block= true;
+    WSREP_WARN("Percona-XtraDB-Cluster prohibits setting"
+               " log_output to TABLE"
+               " with pxc_strict_mode = ENFORCING or MASTER");
+    char message[1024];
+    sprintf(message,
+            "Percona-XtraDB-Cluster prohibits setting"
+            " log_output to TABLE"
+            " with pxc_strict_mode = ENFORCING or MASTER");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     break;
   }
 

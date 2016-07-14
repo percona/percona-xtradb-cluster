@@ -3413,12 +3413,6 @@ int init_common_variables()
     pxc_strict_mode= PXC_STRICT_MODE_DISABLED;
   }
 
-  if (wsrep_provider_loaded && wsrep_desync)
-  {
-    WSREP_ERROR("Can't desync a node even before it is synced with cluster");
-    return 1;
-  }
-
   /* Validate if server initial settings are pxc-strict-mode compatible.*/
 
   /* wsrep_replicate_myisam (recommended value = OFF) */
@@ -3430,13 +3424,15 @@ int init_common_variables()
         break;
     case PXC_STRICT_MODE_PERMISSIVE:
         WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of MyISAM"
-                   " table replication as it is an experimental feature");
+                   " table replication feature"
+                   " with pxc_strict_mode = PERMISSIVE");
         break;
     case PXC_STRICT_MODE_ENFORCING:
     case PXC_STRICT_MODE_MASTER:
     default:
         WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of MyISAM"
-                    " table replication as it is an experimental feature");
+                    " table replication feature"
+                    " with pxc_strict_mode = ENFORCING or MASTER");
         return 1;
         break;
     }
@@ -3449,16 +3445,12 @@ int init_common_variables()
     switch(pxc_strict_mode)
     {
     case PXC_STRICT_MODE_DISABLED:
-        break;
     case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster recommends setting binlog_format"
-                   " to ROW");
-        break;
     case PXC_STRICT_MODE_ENFORCING:
     case PXC_STRICT_MODE_MASTER:
     default:
-        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting binlog_format"
-                    " to STATEMENT/MIXED (anything other than ROW)");
+        WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting"
+                    " binlog_format to STATEMENT or MIXED at global level");
         return 1;
         break;
     }
@@ -3472,17 +3464,23 @@ int init_common_variables()
     case PXC_STRICT_MODE_DISABLED:
         break;
     case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster recommends setting log_output"
-                   " to FILE");
+        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend setting log_output"
+                   " to TABLE with pxc_strict_mode = PERMISSIVE");
         break;
     case PXC_STRICT_MODE_ENFORCING:
     case PXC_STRICT_MODE_MASTER:
     default:
         WSREP_ERROR("Percona-XtraDB-Cluster prohibits setting log_output"
-                    " to TABLE (anything other than FILE/NONE)");
+                    " to TABLE with pxc_strict_mode = ENFORCING or MASTER");
         return 1;
         break;
     }
+  }
+
+  if (wsrep_provider_loaded && wsrep_desync)
+  {
+    WSREP_ERROR("Can't desync a node even before it is synced with cluster");
+    return 1;
   }
 #endif /* WITH_WSREP */
 
