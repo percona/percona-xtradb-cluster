@@ -332,7 +332,9 @@ bool Sql_cmd_alter_table::execute(THD *thd)
                               first_table->table_name, reg_ext, 0);
   dd_frm_type(thd, path, &existing_db_type);
 
-  if (!is_temporary_table(first_table))
+  bool is_system_db= (first_table && (strcmp(first_table->db, "mysql") == 0));
+
+  if (!is_temporary_table(first_table) && !is_system_db)
   {
     bool safe_ops= false;
 
