@@ -881,14 +881,6 @@ then
         fi
 
         get_keys
-        if [[ $encrypt -eq 1 ]]; then
-            if [[ -n $ekey ]]; then
-                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key=$ekey "
-            else
-                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile "
-            fi
-        fi
-
         check_extra
 
         ttcmd="$tcmd"
@@ -929,6 +921,7 @@ then
 
         fi
 
+        # Restore the transport commmand to its original state
         tcmd="$ttcmd"
         if [[ -n $progress ]]; then
             get_footprint
@@ -943,8 +936,14 @@ then
 
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT:-4444}"
 
+        # Add compression to the head of the stream (if specified)
         if [[ -n $scomp ]]; then
             tcmd="$scomp | $tcmd"
+        fi
+
+        # Add encryption to the head of the stream (if specified)
+        if [[ $encrypt -eq 1 ]]; then
+            tcmd=" $ecmd | $tcmd "
         fi
 
         set +e
