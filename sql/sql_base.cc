@@ -5978,12 +5978,15 @@ restart:
      thd->lex->sql_command== SQLCOM_LOAD           ||
      thd->lex->sql_command== SQLCOM_DELETE);
 
+  bool is_system_db= (tbl && (strcmp(tbl->s->db.str, "mysql") == 0));
+
   legacy_db_type db_type= (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
 
   if (db_type != DB_TYPE_INNODB             &&
       db_type != DB_TYPE_UNKNOWN            &&
       db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
       is_dml_stmt                           &&
+      !is_system_db                         &&
       !is_temporary_table(tables))
   {
     /* Table is not an InnoDB table and workload is trying to make changes
@@ -6039,6 +6042,7 @@ restart:
   if (is_dml_stmt                           &&
       db_type != DB_TYPE_PERFORMANCE_SCHEMA &&
       tbl && tbl->s->primary_key == MAX_KEY &&
+      !is_system_db                         &&
       !is_temporary_table(tables))
   {
     /* Table doesn't have explicit primary-key defined. */
