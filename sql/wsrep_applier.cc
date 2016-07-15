@@ -335,6 +335,9 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
 
+  /* Check for comments in Relay_log_info::cleanup_context */
+  trans_rollback_stmt(thd);
+
   wsrep_cb_status_t const rcode(trans_rollback(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
