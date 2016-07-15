@@ -649,6 +649,22 @@ if [[ ! -x `which $INNOBACKUPEX_BIN` ]];then
     exit 2
 fi
 
+# check the version, we require XB-2.4 to ensure that we can pass the
+# datadir via the command-line option
+XB_REQUIRED_VERSION="2.4.3"
+
+XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
+if [[ -z $XB_VERSION ]]; then
+    wsrep_log_error "FATAL: Cannot determine the $INNOBACKUPEX_BIN version. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
+    exit 2
+fi
+
+if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION; then
+    wsrep_log_error "FATAL: The $INNOBACKUPEX_BIN version is $XB_VERSION. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
+    exit 2
+fi
+
+
 rm -f "${MAGIC_FILE}"
 
 if [[ ! ${WSREP_SST_OPT_ROLE} == 'joiner' && ! ${WSREP_SST_OPT_ROLE} == 'donor' ]];then 
@@ -740,15 +756,6 @@ then
         fi
 
         get_keys
-        if [[ $encrypt -eq 1 ]];then
-            if [[ -n $ekey ]];then
-                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key=$ekey "
-            else 
-                INNOEXTRA+=" --encrypt=$ealgo --encrypt-key-file=$ekeyfile "
-            fi
-        fi
-
-
         check_extra
 
         wsrep_log_info "Streaming GTID file before SST"
@@ -767,9 +774,9 @@ then
             tcmd=" $scomp | $tcmd "
         fi
 
-
         send_donor $DATA "${stagemsg}-gtid"
 
+        # Restore the transport commmand to its original state
         tcmd="$ttcmd"
         if [[ -n $progress ]];then 
             get_footprint
@@ -784,8 +791,14 @@ then
 
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT:-4444}"
 
-        if [[ -n $scomp ]];then 
+        # Add compression to the head of the stream (if specified)
+        if [[ -n $scomp ]]; then
             tcmd="$scomp | $tcmd"
+        fi
+
+        # Add encryption to the head of the stream (if specified)
+        if [[ $encrypt -eq 1 ]]; then
+            tcmd=" $ecmd | $tcmd "
         fi
 
         set +e
@@ -839,23 +852,7 @@ then
     ib_log_dir=$(parse_cnf mysqld innodb-log-group-home-dir "")
     ib_undo_dir=$(parse_cnf mysqld innodb-undo-directory "")
 
-    # check the version, we require XB-2.4 to ensure that we can pass the
-    # datadir via the command-line option
-    XB_REQUIRED_VERSION="2.4.3"
-
-    XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
-    if [[ -z $XB_VERSION ]]; then
-        wsrep_log_error "FATAL: Cannot determine the $INNOBACKUPEX_BIN version. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
-        exit 2
-    fi
-
-    if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION; then
-        wsrep_log_error "FATAL: The $INNOBACKUPEX_BIN version is $XB_VERSION. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
-        exit 2
-    fi
-
     stagemsg="Joiner-Recv"
-
 
     sencrypted=1
     nthreads=1
