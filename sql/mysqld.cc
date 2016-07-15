@@ -4507,6 +4507,10 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+#ifdef WITH_WSREP
+  if (!wsrep_recovery)
+  {
+#endif /* WITH_WSREP */
   /// @todo: this looks suspicious, revisit this /sven
   enum_gtid_mode gtid_mode= get_gtid_mode(GTID_MODE_LOCK_NONE);
 
@@ -4516,6 +4520,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     sql_print_error("GTID_MODE = ON requires ENFORCE_GTID_CONSISTENCY = ON.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 
   if (opt_bin_log)
   {
@@ -4999,6 +5006,13 @@ int mysqld_main(int argc, char **argv)
                          (const char**)argv, argc))
     unireg_abort(MYSQLD_ABORT_EXIT);
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
   /*
     Each server should have one UUID. We will create it automatically, if it
     does not exist.
@@ -5183,13 +5197,6 @@ int mysqld_main(int argc, char **argv)
   my_str_malloc= &my_str_malloc_mysqld;
   my_str_free= &my_str_free_mysqld;
   my_str_realloc= &my_str_realloc_mysqld;
-#ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (wsrep_recovery)
-  {
-    wsrep_recover();
-    unireg_abort(0);
-  }
-#endif /* WITH_WSREP */
 
   error_handler_hook= my_message_sql;
 
