@@ -51,6 +51,7 @@ struct wsrep_thd_shadow {
   ulong                tx_isolation;
   char                 *db;
   size_t               db_length;
+  time_t               user_time;
 };
 #endif
 class Reprepare_observer;
