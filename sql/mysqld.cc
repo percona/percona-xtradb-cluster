@@ -9781,7 +9781,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_wsrep_slave_threads, "LOCK_wsrep_slave_threads", PSI_FLAG_GLOBAL},
   { &key_LOCK_wsrep_desync, "LOCK_wsrep_desync", PSI_FLAG_GLOBAL},
 
-  { &key_LOCK_wsrep_thd, "THD::LOCK_wsrep_thd", 0},
+  { &key_LOCK_wsrep_thd, "LOCK_wsrep_thd", 0},
   { &key_LOCK_wsrep_sst_thread, "LOCK_wsrep_sst_thread", 0},
 #endif /* WITH_WSREP */
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
