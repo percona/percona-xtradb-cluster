@@ -5805,7 +5805,7 @@ end_with_restore_list:
   case SQLCOM_CREATE_TRIGGER:
   {
 #ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, all_tables)
 #endif /* WITH_WSREP */
     /* Conditionally writes to binlog. */
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
@@ -5815,7 +5815,7 @@ end_with_restore_list:
   case SQLCOM_DROP_TRIGGER:
   {
 #ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 #endif /* WITH_WSREP */
     /* Conditionally writes to binlog. */
     res= mysql_create_or_drop_trigger(thd, all_tables, 0);
