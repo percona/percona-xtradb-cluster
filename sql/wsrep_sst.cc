@@ -1019,7 +1019,7 @@ static int sst_flush_tables(THD* thd)
   if (run_sql_command(thd, "FLUSH TABLES WITH READ LOCK"))
   {
     WSREP_ERROR("Failed to flush and lock tables");
-    err = -1;
+    err = ECANCELED;
   }
   else
   {
