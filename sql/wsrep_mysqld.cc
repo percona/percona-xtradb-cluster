@@ -136,7 +136,13 @@ PSI_mutex_key
   key_LOCK_galera_dummy_gcs,
   key_LOCK_galera_service_thd,
   key_LOCK_galera_ist_receiver,
-  key_LOCK_galera_monitor,
+
+  key_LOCK_galera_local_monitor,
+  key_LOCK_galera_apply_monitor,
+  key_LOCK_galera_commit_monitor,
+  key_LOCK_galera_async_sender_monitor,
+  key_LOCK_galera_ist_receiver_monitor,
+
   key_LOCK_galera_sst,
   key_LOCK_galera_incoming,
   key_LOCK_galera_saved_state,
@@ -148,7 +154,6 @@ PSI_mutex_key
   key_LOCK_galera_gcache,
   key_LOCK_galera_protstack,
   key_LOCK_galera_prodcons,
-  key_LOCK_galera_gu_monitor,
   key_LOCK_galera_gcommconn,
   key_LOCK_galera_recvbuf,
   key_LOCK_galera_mempool;
@@ -161,19 +166,21 @@ PSI_mutex_info       all_galera_mutexes[]=
   { &key_LOCK_galera_dummy_gcs, "LOCK_galera_dummy_gcs", 0},
   { &key_LOCK_galera_service_thd, "LOCK_galera_service_thd", 0},
   { &key_LOCK_galera_ist_receiver, "LOCK_galera_ist_receiver", 0},
-  { &key_LOCK_galera_monitor, "LOCK_galera_monitor", 0},
+  { &key_LOCK_galera_local_monitor, "LOCK_galera_local_monitor", 0},
+  { &key_LOCK_galera_apply_monitor, "LOCK_galera_apply_monitor", 0},
+  { &key_LOCK_galera_commit_monitor, "LOCK_galera_commit_monitor", 0},
+  { &key_LOCK_galera_async_sender_monitor, "LOCK_galera_async_sender_monitor", 0},
+  { &key_LOCK_galera_ist_receiver_monitor, "LOCK_galera_ist_receiver_monitor", 0},
   { &key_LOCK_galera_sst, "LOCK_galera_sst", 0},
   { &key_LOCK_galera_incoming, "LOCK_galera_incoming", 0},
   { &key_LOCK_galera_saved_state, "LOCK_galera_saved_state", 0},
   { &key_LOCK_galera_trx_handle, "LOCK_galera_trx_handle", 0},
   { &key_LOCK_galera_wsdb_trx, "LOCK_galera_wsdb", 0},
   { &key_LOCK_galera_wsdb_conn, "LOCK_galera_wsdb_conn", 0},
-  { &key_LOCK_galera_gu_dbug_sync, "LOCK_galera_gu_dbug_sync", 0},
   { &key_LOCK_galera_profile, "LOCK_galera_profile", 0},
   { &key_LOCK_galera_gcache, "LOCK_galera_gcache", 0},
   { &key_LOCK_galera_protstack, "LOCK_galera_protstack", 0},
   { &key_LOCK_galera_prodcons, "LOCK_galera_prodcons", 0},
-  { &key_LOCK_galera_gu_monitor, "LOCK_galera_gu_monitor", 0},
   { &key_LOCK_galera_gcommconn, "LOCK_galera_gcommconn", 0},
   { &key_LOCK_galera_recvbuf, "LOCK_galera_recvbuf", 0},
   { &key_LOCK_galera_mempool, "LOCK_galera_mempool", 0}
@@ -187,12 +194,17 @@ PSI_cond_key
   key_COND_galera_ist_consumer,
   key_COND_galera_monitor_process1,
   key_COND_galera_monitor_process2,
-  key_COND_galera_monitor,
+
+  key_COND_galera_local_monitor,
+  key_COND_galera_apply_monitor,
+  key_COND_galera_commit_monitor,
+  key_COND_galera_async_sender_monitor,
+  key_COND_galera_ist_receiver_monitor,
+
   key_COND_galera_sst,
   key_COND_galera_gu_dbug_sync,
   key_COND_galera_prodcons,
   key_COND_galera_gcache,
-  key_COND_galera_gu_monitor,
   key_COND_galera_recvbuf;
 
 PSI_cond_info       all_galera_condvars[]=
@@ -202,14 +214,14 @@ PSI_cond_info       all_galera_condvars[]=
   { &key_COND_galera_service_thd_flush, "COND_galera_service_thd_flush", 0},
   { &key_COND_galera_ist_receiver, "COND_galera_ist_receiver", 0},
   { &key_COND_galera_ist_consumer, "COND_galera_ist_consumer", 0},
-  { &key_COND_galera_monitor_process1, "COND_galera_monitor_process", 0},
-  { &key_COND_galera_monitor_process2, "COND_galera_monitor_process_wait", 0},
-  { &key_COND_galera_monitor, "COND_galera_monitor", 0},
+  { &key_COND_galera_local_monitor, "COND_galera_local_monitor", 0},
+  { &key_COND_galera_apply_monitor, "COND_galera_apply_monitor", 0},
+  { &key_COND_galera_commit_monitor, "COND_galera_commit_monitor", 0},
+  { &key_COND_galera_async_sender_monitor, "COND_galera_async_sender_monitor", 0},
+  { &key_COND_galera_ist_receiver_monitor, "COND_galera_ist_receiver_monitor", 0},
   { &key_COND_galera_sst, "COND_galera_sst", 0},
-  { &key_COND_galera_gu_dbug_sync, "COND_galera_gu_dbug_sync", 0},
   { &key_COND_galera_prodcons, "COND_galera_prodcons", 0},
   { &key_COND_galera_gcache, "COND_galera_gcache", 0},
-  { &key_COND_galera_gu_monitor, "COND_galera_gu_monitor", 0},
   { &key_COND_galera_recvbuf, "COND_galera_recvbuf", 0}
 };
 
