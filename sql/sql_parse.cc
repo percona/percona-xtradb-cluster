@@ -6016,7 +6016,7 @@ create_sp_error:
   case SQLCOM_CREATE_TRIGGER:
   {
     /* Conditionally writes to binlog. */
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, all_tables)
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
 
     break;
