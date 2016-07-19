@@ -6,6 +6,12 @@
 --source include/have_innodb.inc
 --source include/have_query_cache.inc
 
+#
+# PXC-267
+#
+SET STATEMENT sort_buffer_size=0,myisam_repair_threads=0 FOR OPTIMIZE TABLE t0;
+
+
 --disable_warnings
 DROP TABLE IF EXISTS t1, t2, x1, x2;
 --enable_warnings

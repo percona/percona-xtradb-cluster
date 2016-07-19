@@ -749,6 +749,9 @@ static plugin_ref intern_plugin_lock(LEX *lex, plugin_ref rc)
   st_plugin_int *pi= plugin_ref_to_int(rc);
   DBUG_ENTER("intern_plugin_lock");
 
+  if (!rc)
+    DBUG_RETURN(NULL);
+
   mysql_mutex_assert_owner(&LOCK_plugin);
 
   if (pi->state & (PLUGIN_IS_READY | PLUGIN_IS_UNINITIALIZED))
