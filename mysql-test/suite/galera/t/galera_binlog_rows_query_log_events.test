@@ -7,7 +7,8 @@
 
 --let $binlog_rows_query_log_events_orig = `SELECT @@binlog_rows_query_log_events`
 
-SET GLOBAL binlog_rows_query_log_events=TRUE;
+SET SESSION binlog_rows_query_log_events=TRUE;
+SELECT @@SESSION.binlog_rows_query_log_events;
 
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
 

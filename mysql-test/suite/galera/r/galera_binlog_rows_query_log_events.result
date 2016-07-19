@@ -1,4 +1,7 @@
-SET GLOBAL binlog_rows_query_log_events=TRUE;
+SET SESSION binlog_rows_query_log_events=TRUE;
+SELECT @@SESSION.binlog_rows_query_log_events;
+@@SESSION.binlog_rows_query_log_events
+1
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 SELECT COUNT(*) = 1 FROM t1;
