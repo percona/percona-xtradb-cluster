@@ -184,7 +184,11 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
       DBUG_RETURN(WSREP_CB_FAILURE);
     }
 
-    delete ev;
+    /* row-query-log-event is generated to log extra information when following
+    configuration is set "binlog_rows_query_log_events". The event is cleared
+    after processing of ROWS_LOG_EVENT. Avoid removing it here. */
+    if (ev->get_type_code() != binary_log::ROWS_QUERY_LOG_EVENT)
+      delete ev;
   }
 
  error:
