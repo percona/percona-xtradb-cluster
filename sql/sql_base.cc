@@ -5978,7 +5978,9 @@ restart:
      thd->lex->sql_command== SQLCOM_LOAD           ||
      thd->lex->sql_command== SQLCOM_DELETE);
 
-  bool is_system_db= (tbl && (strcmp(tbl->s->db.str, "mysql") == 0));
+  bool is_system_db= (tbl &&
+                      ((strcmp(tbl->s->db.str, "mysql") == 0) ||
+                       (strcmp(tbl->s->db.str, "information_schema") == 0)));
 
   legacy_db_type db_type= (tbl ? tbl->file->ht->db_type : DB_TYPE_UNKNOWN);
 

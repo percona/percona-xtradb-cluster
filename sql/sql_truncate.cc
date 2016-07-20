@@ -578,7 +578,9 @@ bool Sql_cmd_truncate_table::execute(THD *thd)
                               first_table->table_name, reg_ext, 0);
   dd_frm_type(thd, path, &db_type);
 
-  bool is_system_db= (first_table && (strcmp(first_table->db, "mysql") == 0));
+  bool is_system_db= (first_table &&
+                      ((strcmp(first_table->db, "mysql") == 0) ||
+                       (strcmp(first_table->db, "information_schema") == 0)));
 
   if (db_type != DB_TYPE_INNODB             &&
       db_type != DB_TYPE_UNKNOWN            &&
