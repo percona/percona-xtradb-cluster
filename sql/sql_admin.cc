@@ -1131,7 +1131,9 @@ static bool pxc_strict_mode_admin_check(THD* thd, TABLE_LIST* table)
                               table->table_name, reg_ext, 0);
   dd_frm_type(thd, path, &db_type);
 
-  bool is_system_db= (table && (strcmp(table->db, "mysql") == 0));
+  bool is_system_db= (table &&
+                      ((strcmp(table->db, "mysql") == 0) ||
+                       (strcmp(table->db, "information_schema") == 0)));
 
   if (db_type != DB_TYPE_INNODB             &&
       db_type != DB_TYPE_UNKNOWN            &&
