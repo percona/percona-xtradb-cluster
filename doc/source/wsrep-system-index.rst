@@ -531,6 +531,48 @@ This variable is used to configure address on which the node expects SST.
 
 This variable contains the ``UUID:seqno`` value. By setting all the nodes to have the same value for this option, cluster can be set up without the state transfer.
 
+.. variable:: wsrep_strict_mode
+
+   :version 5.7: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: ENFORCING or DISABLED
+
+This variable is used to control strict mode,
+which runs validations to ensure proper configuration and operation of |PXC|
+in the most common setups.
+
+Depending on the actual mode you select,
+upon encountering a failed validation,
+the server will either throw an error
+(halting startup or denying the operation),
+or log a warning and continue running as normal.
+The following modes are available:
+
+* ``DISABLED``: Do not perform strict mode validations
+  and run as normal.
+
+* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running
+  as normal.
+
+* ``ENFORCING``: If a validation fails during startup,
+  halt the server and throw an error.
+  If a validation fails during runtime,
+  deny the operation and throw an error.
+
+* ``MASTER``: The same as ``ENFORCING`` except that the validation of
+  :ref:`explicit table locking <explicit-table-locking>` is not performed.
+  This mode can be used with clusters
+  in which write operations are isolated to a single node.
+
+By default, *enforcing* strict mode is enabled,
+except if the node is acting as a standalone server
+or the node is bootstrapping, then strict mode is disabled.
+
+For more information, see :ref:`strict-mode`.
+
 .. variable:: wsrep_sync_wait
 
    :version 5.6.20-25.7: Variable introduced

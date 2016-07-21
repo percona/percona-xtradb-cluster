@@ -59,6 +59,7 @@ Features
 
    features/highavailability
    features/multimaster-replication
+   features/strict-mode
 
 User's Manual
 =============
