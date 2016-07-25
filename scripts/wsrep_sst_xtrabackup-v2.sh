@@ -47,7 +47,6 @@ rlimit=""
 # Initially
 stagemsg="${WSREP_SST_OPT_ROLE}"
 cpat=""
-speciald=1
 ib_home_dir=""
 ib_log_dir=""
 ib_undo_dir=""
@@ -322,7 +321,6 @@ read_cnf()
     fi
     rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use-extra 0)
-    speciald=$(parse_cnf sst sst-special-dirs 1)
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
     impts=$(parse_cnf sst inno-move-opts "")
@@ -330,11 +328,6 @@ read_cnf()
     ssyslog=$(parse_cnf sst sst-syslog 0)
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
-
-    if [[ $speciald -eq 0 ]];then 
-        wsrep_log_error "sst-special-dirs equal to 0 is not supported, falling back to 1"
-        speciald=1
-    fi 
 
     if [[ $ssyslog -ne -1 ]];then 
         if my_print_defaults -c $WSREP_SST_OPT_CONF mysqld_safe | tr '_' '-' | grep -q -- "--syslog";then 
