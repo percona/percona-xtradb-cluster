@@ -69,7 +69,7 @@ Prefix: %{_sysconfdir}
 %endif
 
 %if %{undefined galera_version}
- %define galera_version 3.12
+ %define galera_version 3.16
 %endif
 
 %if %{undefined galera_revision}
