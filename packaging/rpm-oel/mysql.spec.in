@@ -712,6 +712,10 @@ rm -rf %{buildroot}%{_bindir}/mysql_embedded
 rm -f %{buildroot}%{_mandir}/man1/mysql_client_test_embedded.1
 rm -f %{buildroot}%{_mandir}/man1/mysqltest_embedded.1
 %endif
+%if 0%{?systemd}
+rm -f %{buildroot}%{_mandir}/man1/mysqld_multi.1*
+rm -f %{buildroot}%{_mandir}/man1/mysqld_safe.1*
+%endif
 
 %check
 %if 0%{?runselftest}
@@ -796,8 +800,11 @@ fi
 %attr(644, root, root) %{_mandir}/man1/myisamlog.1*
 %attr(644, root, root) %{_mandir}/man1/myisampack.1*
 %attr(644, root, root) %{_mandir}/man8/mysqld.8*
+%if 0%{?systemd}
+%else
 %attr(644, root, root) %{_mandir}/man1/mysqld_multi.1*
 %attr(644, root, root) %{_mandir}/man1/mysqld_safe.1*
+%endif
 %attr(644, root, root) %{_mandir}/man1/mysqldumpslow.1*
 %attr(644, root, root) %{_mandir}/man1/mysql_install_db.1*
 %attr(644, root, root) %{_mandir}/man1/mysql_plugin.1*
@@ -1138,6 +1145,9 @@ fi
 # %endif
 
 %changelog
+* Tue Jul 19 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
+- Minor cleanup: When using systemd, get rid of some man pages.
+
 * Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
 - Take Oracle's change to support service "instances" via systemd
   and other minor fixes from their 5.7.13.
