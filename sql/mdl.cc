@@ -3375,14 +3375,14 @@ void MDL_ticket::wsrep_report(bool debug)
          ((get_type() == MDL_SHARED_NO_READ_WRITE) ? "shared no read write" :
        	 ((get_type() == MDL_EXCLUSIVE)            ? "exclusive"            :
           "UNKNOWN")))))))),
-         (m_lock->key.mdl_namespace()  == MDL_key::GLOBAL) ? "GLOBAL"       :
-         ((m_lock->key.mdl_namespace() == MDL_key::SCHEMA) ? "SCHEMA"       :
-         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "TABLE"        :
-         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "FUNCTION"     :
-         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "PROCEDURE"    :
-         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "TRIGGER"      :
-         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)  ? "EVENT"        :
-         ((m_lock->key.mdl_namespace() == MDL_key::COMMIT) ? "COMMIT"       :
+         (m_lock->key.mdl_namespace()  == MDL_key::GLOBAL)    ? "GLOBAL"       :
+         ((m_lock->key.mdl_namespace() == MDL_key::SCHEMA)    ? "SCHEMA"       :
+         ((m_lock->key.mdl_namespace() == MDL_key::TABLE)     ? "TABLE"        :
+         ((m_lock->key.mdl_namespace() == MDL_key::FUNCTION)  ? "FUNCTION"     :
+         ((m_lock->key.mdl_namespace() == MDL_key::PROCEDURE) ? "PROCEDURE"    :
+         ((m_lock->key.mdl_namespace() == MDL_key::TRIGGER)   ? "TRIGGER"      :
+         ((m_lock->key.mdl_namespace() == MDL_key::EVENT)     ? "EVENT"        :
+         ((m_lock->key.mdl_namespace() == MDL_key::COMMIT)    ? "COMMIT"       :
          (char *)"UNKNOWN"))))))),
          m_lock->key.db_name(),
          m_lock->key.name());
