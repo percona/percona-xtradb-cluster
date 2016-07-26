@@ -744,12 +744,14 @@ if [[ ! -x `which $INNOBACKUPEX_BIN` ]]; then
     exit 2
 fi
 
-# Starting with 5.7, the redo log format has changed and so XB-2.4.3 or higher is needed
-# for performing backup (read SST)
-
 # XB_REQUIRED_VERSION requires at least major.minor version (e.g. 2.4.1 or 3.0)
-XB_REQUIRED_VERSION="2.4.3"
-XB_REQUIRED_VERSION_FOR_KEYRING="2.4.4"
+#
+# 2.4.3 : Starting with 5.7, the redo log format has changed and so XB-2.4.3 or higher is needed
+# for performing backup (read SST)
+#
+# 2.4.4 : needed to support the keyring option
+#
+XB_REQUIRED_VERSION="2.4.4"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
@@ -777,14 +779,6 @@ fi
 # read configuration and setup ports for streaming data.
 read_cnf
 setup_ports
-
-# Need this check because this was released before 2.4.4 was released
-if [[ -n $keyring ]]; then
-    if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION_FOR_KEYRING; then
-        wsrep_log_error "The $INNOBACKUPEX_BIN version is $XB_VERSION. Needs xtrabackup-$XB_REQUIRED_VERSION_FOR_KEYRING or higher to perform SST with a keyring"
-        exit 2
-    fi
-fi
 
 if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
     disver="--no-version-check"
