@@ -70,6 +70,7 @@ configure-stamp:
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DBUILD_CONFIG=mysql_release \
+		-DWITH_SYSTEMD=1 \
 		-DWITH_WSREP=1 \
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
@@ -93,7 +94,6 @@ configure-stamp:
 		-DINSTALL_SCRIPTDIR=bin \
 		-DINSTALL_SUPPORTFILESDIR=share/mysql \
 		-DSYSCONFDIR=/etc/mysql \
-		-DWITH_EMBEDDED_SERVER=ON \
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
@@ -146,21 +146,23 @@ auto_install-stamp:
 	# make install (trailing slash needed for innobase)
 	cd $(builddir) && $(MAKE) install DESTDIR=$(TMP)/
 	install -d -m 0755 -o root -g root $(TMP)/usr/lib/mysql
-	mkdir -p $(TMP)/usr/share/doc/mysql-server-5.7
-	install -m 0644 Docs/README-wsrep $(TMP)/usr/share/doc/mysql-server-5.7
-	nm -n $(BUILDDIR)/sql/mysqld |gzip -n -9 > $(TMP)/usr/share/doc/mysql-server-5.7/mysqld.sym.gz
+	mkdir -p $(TMP)/usr/share/doc/mysql-wsrep-server-5.7
+	install -m 0644 Docs/README-wsrep $(TMP)/usr/share/doc/mysql-wsrep-server-5.7
+	nm -n $(BUILDDIR)/sql/mysqld |gzip -n -9 > $(TMP)/usr/share/doc/mysql-wsrep-server-5.7/mysqld.sym.gz
 	install -m 0644 support-files/wsrep.cnf $(TMP)/usr/share/mysql
-	install -D -m 0755 $(builddir)/support-files/mysql.server $(TMP)/etc/init.d/mysql
+	# Replace SysV init stuff by systemd files
+	# install -D -m 0755 $(builddir)/support-files/mysql.server $(TMP)/etc/init.d/mysql
+	install -m 0755 $(builddir)/scripts/mysqld_bootstrap $(TMP)/usr/bin/
 	# This seems to be the only safe place to fix permissions issues
 	# not handled by dh_fixperms.
 	install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
 	mkdir -p $(TMP)/etc/mysql
 	install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
 	install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
-	install -m 0644 debian/additions/mysql_embedded.1 $(TMP)/usr/share/man/man1
+	# install -m 0644 debian/additions/mysql_embedded.1 $(TMP)/usr/share/man/man1
 	install -m 0644 debian/additions/debian_create_root_user.sql $(TMP)/usr/share/mysql/
 	# These files are incorrectly marked as executable. Upstream bug: http://bugs.mysql.com/bug.php?id=80571
-	chmod 0644 $(TMP)/usr/lib/mysql-test/t/mysqld_safe.sh
+	# chmod 0644 $(TMP)/usr/lib/mysql-test/t/mysqld_safe.sh
 	chmod 0644 $(TMP)/usr/lib/mysql-test/suite/innodb/t/alter_rename_existing.test
 	chmod 0644 $(TMP)/usr/lib/mysql-test/suite/innodb/r/alter_rename_existing.result
 	chmod 0644 $(TMP)/usr/share/mysql/mysql-log-rotate

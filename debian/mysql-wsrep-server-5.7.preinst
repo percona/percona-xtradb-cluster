@@ -39,13 +39,13 @@ pathfind() {
 # do it himself. No database directories should be removed while the server
 # is running! Another mysqld in e.g. a different chroot is fine for us.
 stop_server() {
-    if [ ! -x /etc/init.d/mysql ]; then return; fi
+    # ??? systemctl ???      if [ ! -x /etc/init.d/mysql ]; then return; fi
 
     set +e
     if pathfind invoke-rc.d; then
       cmd="invoke-rc.d mysql stop"
     else
-      cmd="/etc/init.d/mysql stop"
+      cmd="systemctl stop mysqld"
     fi
     $cmd
     errno=$?

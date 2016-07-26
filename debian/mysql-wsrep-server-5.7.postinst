@@ -9,9 +9,6 @@ ${DEBIAN_SCRIPT_TRACE:+ echo "#42#DEBUG# RUNNING $0 $*" 1>&2 }
  
 export PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin
 
-# This command can be used as pipe to syslog. With "-s" it also logs to stderr.
-ERR_LOGGER="logger -p daemon.err -t mysqld_safe -i"
-
 # Runs an arbitrary init sql file supplied in $1. Does not require login access
 run_init_sql() {
   tmpdir=`mktemp -d`
@@ -41,7 +38,7 @@ invoke() {
   if pathfind invoke-rc.d; then
     invoke-rc.d mysql $1
   else
-    /etc/init.d/mysql $1
+    systemctl $1 mysqld
   fi
 }
 
