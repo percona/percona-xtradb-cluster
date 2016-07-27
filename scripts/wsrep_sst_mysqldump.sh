@@ -82,16 +82,20 @@ MYSQLDUMP_GENERAL="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --all-databases --events"
+--skip-comments --flush-privileges --all-databases --events \
+--set-gtid-purged=OFF"
 
 # Neither mysqldump nor mysqlpump dump the sys schema by default. To generate
 # a dump file, name the sys schema explicitly on the command line using either
 # of these commands:
+# while doing partial backup with gtid enabled to avoid emission of
+# gtid for all action use set-gtid-purged=OFF
 MYSQLDUMP_SYS_SCHEMA="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --events --routines --databases sys"
+--skip-comments --flush-privileges --events --routines --set-gtid-purged=OFF \
+--databases sys"
 
 # mysqldump cannot restore CSV tables, fix this issue
 CSV_TABLES_FIX="
