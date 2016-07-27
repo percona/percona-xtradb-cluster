@@ -174,6 +174,8 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
     if (thd->wsrep_conflict_state == MUST_ABORT) {
       WSREP_WARN("RBR event apply failed, rolling back: %lld",
                  (long long) wsrep_thd_trx_seqno(thd));
+      /* Check for comments in Relay_log_info::cleanup_context */
+      trans_rollback_stmt(thd);
       trans_rollback(thd);
       thd->locked_tables_list.unlock_locked_tables(thd);
       /* Release transactional metadata locks. */
