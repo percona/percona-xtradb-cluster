@@ -42,6 +42,10 @@ void wsrep_client_rollback(THD *thd)
 
   thd->wsrep_conflict_state= ABORTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+  /* Check for comments in Relay_log_info::cleanup_context */
+  trans_rollback_stmt(thd);
+
   trans_rollback(thd);
 
   if (thd->locked_tables_mode && thd->lock)
