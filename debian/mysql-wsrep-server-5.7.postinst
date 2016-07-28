@@ -38,7 +38,7 @@ invoke() {
   if pathfind invoke-rc.d; then
     invoke-rc.d mysql $1
   else
-    systemctl $1 mysqld
+    systemctl $1 mysql
   fi
 }
 

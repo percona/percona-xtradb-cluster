@@ -36,7 +36,7 @@ stop_server() {
   if pathfind invoke-rc.d; then
     invoke-rc.d mysql stop
   else
-    systemctl stop mysqld
+    systemctl stop mysql
   fi
   errno=$?
   set -e
