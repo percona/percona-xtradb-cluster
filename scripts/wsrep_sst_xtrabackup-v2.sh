@@ -889,8 +889,8 @@ then
         if [[ -n $keyring ]]; then
             # Verify that encryption is being used
             # Do NOT send a keyring file without encryption
-            # Need encrypt >= 2
-            if [[ $encrypt -le 1 ]]; then
+            # Need encrypt >= 1
+            if [[ $encrypt -le 0 ]]; then
                 wsrep_log_error "FATAL: An unencrypted channel is being used."
                 wsrep_log_error "Sending/using a keyring requires an encrypted channel."
                 exit 22
