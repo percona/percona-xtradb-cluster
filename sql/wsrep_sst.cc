@@ -426,18 +426,29 @@ static wsp::process * sst_process= static_cast<wsp::process*>(NULL);
 
 static bool sst_cancelled= false;
 
-void wsrep_sst_cancel ()
+void wsrep_sst_cancel (bool call_wsrep_cb)
 {
   if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   if (!sst_cancelled)
   {
     sst_cancelled=true;
+    /*
+      When we launched the SST process, then we need
+      to terminate it before exit from the parent (server)
+      process:
+    */
     if (sst_process)
     {
       sst_process->terminate();
       sst_process = NULL;
     }
-    if (sst_awaiting_callback)
+    /*
+      If this is a normal shutdown, then we need to notify
+      the wsrep provider about completion of the SST, to
+      prevent infinite waitng in the wsrep provider after
+      the SST process was canceled:
+    */
+    if (call_wsrep_cb && sst_awaiting_callback)
     {
       WSREP_INFO("Signalling cancellation of the SST request.");
       wsrep_gtid_t const state_id = {
@@ -449,6 +460,23 @@ void wsrep_sst_cancel ()
     }
   }
   mysql_mutex_unlock (&LOCK_wsrep_sst);
+}
+
+/*
+  Handling of fatal signals: SIGABRT, SIGTERM, etc.
+*/
+extern "C" void wsrep_handle_fatal_signal (int sig)
+{
+  wsrep_sst_cancel(false);
+}
+
+/*
+  This callback is invoked in the case of abnormal
+  termination of the wsrep provider:
+*/
+void wsrep_abort_cb (void)
+{
+  wsrep_sst_cancel(false);
 }
 
 static void* sst_joiner_thread (void* a)

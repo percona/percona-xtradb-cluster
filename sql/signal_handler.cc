@@ -20,6 +20,10 @@
 #include "my_stacktrace.h"
 #include "global_threads.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
+
 #ifdef __WIN__
 #include <crtdbg.h>
 #define SIGNAL_FMT "exception 0x%x"
@@ -61,6 +65,14 @@ extern "C" sig_handler handle_fatal_signal(int sig)
   }
 
   segfaulted = 1;
+
+/*
+  The wsrep subsystem has their its own actions
+  which need be performed before exiting:
+*/
+#ifdef WITH_WSREP
+  wsrep_handle_fatal_signal(sig);
+#endif
 
 #ifdef __WIN__
   SYSTEMTIME utc_time;
