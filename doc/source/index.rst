@@ -65,6 +65,7 @@ Features
 
    features/highavailability
    features/multimaster-replication
+   features/pxc-strict-mode
 
 User's Manual
 =============
@@ -94,6 +95,7 @@ How-tos
    howtos/ubuntu_howto
    howtos/singlebox
    howtos/3nodesec2
+   howtos/encrypting-traffic
    howtos/haproxy
    howtos/virt_sandbox
 

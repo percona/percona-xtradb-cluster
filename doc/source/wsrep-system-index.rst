@@ -309,6 +309,56 @@ This variable should contain the path to the Galera library (like :file:`/usr/li
 
 This variable contains settings currently used by Galera library.
 
+.. variable:: pxc_strict_mode
+
+   :version 5.7: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: ENFORCING or DISABLED
+
+This variable is used to control PXC Strict Mode, which runs validations
+to avoid the use of experimental and unsupported features in |PXC|.
+
+Depending on the actual mode you select,
+upon encountering a failed validation,
+the server will either throw an error
+(halting startup or denying the operation),
+or log a warning and continue running as normal.
+The following modes are available:
+
+* ``DISABLED``: Do not perform strict mode validations
+  and run as normal.
+
+* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running
+  as normal.
+
+* ``ENFORCING``: If a validation fails during startup,
+  halt the server and throw an error.
+  If a validation fails during runtime,
+  deny the operation and throw an error.
+
+* ``MASTER``: The same as ``ENFORCING`` except that the validation of
+  :ref:`explicit table locking <explicit-table-locking>` is not performed.
+  This mode can be used with clusters
+  in which write operations are isolated to a single node.
+
+By default, ``pxc_strict_mode`` is set to ``ENFORCING``,
+except if the node is acting as a standalone server
+or the node is bootstrapping, then ``pxc_strict_mode`` defaults to ``DISABLED``.
+
+.. note:: When changing the value of ``pxc_strict_mode``
+   from ``DISABLED`` or ``PERMISSIVE`` to ``ENFORCING`` or ``MASTER``,
+   ensure that the following configuration is used:
+
+   * ``wsrep_replicate_myisam=OFF``
+   * ``binlog_format=ROW``
+   * ``log_output=FILE`` or ``log_output=NONE`` or ``log_output=FILE,NONE``
+   * ``tx_isolation=SERIALIZABLE``
+
+For more information, see :ref:`pxc-strict-mode`.
+
 .. variable:: wsrep_recover
 
    :cli: No
