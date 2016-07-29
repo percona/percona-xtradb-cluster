@@ -387,3 +387,12 @@ For that reason, comsider the following scenarios:
    it will still be encrypted and SST will fail.
    Look at case 3 above for resolution.
 
+Handling Encrypted Tables
+-------------------------
+
+Replicating encrypted data with XtraBackup as SST method
+requires that the keyring is sent over with the tables.
+Percona XtraBackup supports this in version 2.4.4 and later.
+Another requirement is that it must use SSL,
+so the :option:`encrypt` option must be set to either ``2`` or ``3``.
+
