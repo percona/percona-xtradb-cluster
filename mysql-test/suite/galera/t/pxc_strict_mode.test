@@ -386,7 +386,13 @@ drop table tmem;
 --echo #node-1
 create table tinnodb (i int, primary key pk(i)) engine=innodb;
 insert into tinnodb values (1), (2);
+set global pxc_strict_mode='DISABLED';
+create table temp (i int) engine=myisam;
+insert into temp values (10), (20), (30);
+set global pxc_strict_mode='ENFORCING';
+insert into tinnodb select * from temp;
 select * from tinnodb;
+drop table temp;
 #
 --connection node_2
 --echo #node-2
