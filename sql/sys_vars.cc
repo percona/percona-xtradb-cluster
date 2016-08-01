@@ -3736,6 +3736,22 @@ static bool check_not_null_not_empty(sys_var *self, THD *thd, set_var *var)
   if (res && res->is_empty())
     return true;
 
+#ifdef WITH_WSREP
+   if (WSREP(thd) && var->save_result.ulonglong_value == 1)
+   {
+     WSREP_ERROR("Percona-XtraDB-Cluster prohibits enabling"
+                 " slave_preserve_commit_order as it conflicts with galera"
+                 " multi-master commit order semantics");
+     char message[1024];
+     sprintf(message,
+             "Percona-XtraDB-Cluster prohibits enabling"
+             " slave_preserve_commit_order as it conflicts with galera"
+             " multi-master commit order semantics");
+     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+     return true;
+   }
+#endif /* WITH_WSREP */
+
   return false;
 }
 
