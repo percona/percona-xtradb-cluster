@@ -4707,7 +4707,13 @@ compare_errors:
                   (actual_error ?
                    thd->get_stmt_da()->message_text() :
                    "no error"),
+#ifdef WITH_WSREP
+                  actual_error, print_slave_db_safe(db),
+                  (!opt_general_log_raw) && thd->rewritten_query.length()
+                  ? thd->rewritten_query.c_ptr_safe() : query_arg);
+#else
                   actual_error, print_slave_db_safe(db), query_arg);
+#endif /* WITH_WSREP */
       thd->is_slave_error= 1;
     }
     /*
@@ -4751,7 +4757,13 @@ compare_errors:
                     (actual_error ?
                      thd->get_stmt_da()->message_text() :
                      "unexpected success or fatal error"),
+#ifdef WITH_WSREP
+                    print_slave_db_safe(db),
+                      (!opt_general_log_raw) && thd->rewritten_query.length()
+                      ? thd->rewritten_query.c_ptr_safe() : query_arg);
+#else
                     print_slave_db_safe(thd->db().str), query_arg);
+#endif /* WITH_WSREP */
       }
       thd->is_slave_error= 1;
     }
@@ -10733,6 +10745,18 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       const_cast<Relay_log_info*>(rli)->m_table_map.set_table(ptr->table_id, ptr->table);
 
     query_cache.invalidate_locked_for_write(rli->tables_to_lock);
+#ifdef WITH_WSREP
+    /*
+      Moved invalidation right before the call to rows_event_stmt_cleanup(),
+      to avoid query cache being polluted with stale entries,
+    */
+    if (! (WSREP(thd) && (thd->wsrep_exec_mode == REPL_RECV)))
+    {
+#endif /* WITH_WSREP */
+      query_cache.invalidate_locked_for_write(rli->tables_to_lock);
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
   }
 
   TABLE* 
@@ -10975,6 +10999,14 @@ AFTER_MAIN_EXEC_ROW_LOOP:
 
   if (get_flags(STMT_END_F))
   {
+
+#if defined(WITH_WSREP) && defined(HAVE_QUERY_CACHE)
+    if (WSREP(thd) && thd->wsrep_exec_mode == REPL_RECV)
+    {
+      query_cache.invalidate_locked_for_write(rli->tables_to_lock);
+    }
+#endif /* WITH_WSREP && HAVE_QUERY_CACHE */
+
    if((error= rows_event_stmt_cleanup(rli, thd)))
     slave_rows_error_report(ERROR_LEVEL,
                             thd->is_error() ? 0 : error,

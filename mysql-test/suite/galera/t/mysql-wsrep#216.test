@@ -1,0 +1,37 @@
+#
+# Test that sensitive statements such as those containing plaintext passwords
+# do not leak into the logs, expecially under wsrep_debug=ON
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--let $wsrep_debug_orig = `SELECT @@wsrep_debug`
+
+SET GLOBAL wsrep_debug = ON;
+
+CREATE USER u1 IDENTIFIED BY 'plaintext_password';
+
+--error ER_CANNOT_USER
+CREATE USER u1 IDENTIFIED BY 'plaintext_password';
+
+# Check that the plaintext password does not appear in the logs
+--exec grep --count plaintext_password $MYSQLTEST_VARDIR/log/mysqld.1.err || true
+--exec grep --count plaintext_password $MYSQLTEST_VARDIR/log/mysqld.2.err || true
+
+# Check that the obfuscated password appears in the logs
+
+# Four times for the first node, in the various wsrep_debug messages
+--exec grep --count 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D $MYSQLTEST_VARDIR/log/mysqld.1.err
+
+# Once for the second node, in the 'Slave SQL' error
+--exec grep --count 9CAB2BAE176801E82ABA9E55CCCDDBF388E0301D $MYSQLTEST_VARDIR/log/mysqld.2.err
+
+DROP USER u1;
+
+--disable_query_log
+--eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
+--enable_query_log
+
+--connection node_2
+CALL mtr.add_suppression('Operation CREATE USER failed');

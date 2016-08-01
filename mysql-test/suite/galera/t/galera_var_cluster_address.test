@@ -19,7 +19,7 @@ SHOW STATUS;
 
 SET SESSION wsrep_sync_wait=0;
 
---error ER_UNKNOWN_COM_ERROR
+--error 0
 SELECT * FROM performance_schema.global_status;
 
 # Must return 'OFF'
@@ -63,7 +63,7 @@ SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_N
 --connection node_1
 SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
 
---error ER_UNKNOWN_COM_ERROR
+--error 0
 SELECT * FROM performance_schema.global_status;
 
 # Must return 'OFF'

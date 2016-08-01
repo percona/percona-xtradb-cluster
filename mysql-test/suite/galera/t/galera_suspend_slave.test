@@ -24,7 +24,7 @@ CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 	exit(0);
 EOF
 
---error ER_UNKNOWN_COM_ERROR,ER_LOCK_WAIT_TIMEOUT
+--error ER_UNKNOWN_COM_ERROR,ER_LOCK_WAIT_TIMEOUT,ER_LOCK_DEADLOCK
 INSERT INTO t1 VALUES (1);
 
 --echo Resuming node_2 ...
@@ -51,3 +51,7 @@ SELECT COUNT(*) = 1 FROM t1;
 DROP TABLE t1;
 
 CALL mtr.add_suppression("gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");
+
+--connection node_1
+CALL mtr.add_suppression("gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");
+

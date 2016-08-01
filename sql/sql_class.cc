@@ -1460,6 +1460,8 @@ THD::THD(bool enable_plugins)
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_query     = NULL;
   wsrep_TOI_pre_query_len = 0;
+  wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
+  wsrep_affected_rows     = 0;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1845,6 +1847,8 @@ void THD::init(void)
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_query     = NULL;
   wsrep_TOI_pre_query_len = 0;
+  wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
+  wsrep_affected_rows     = 0;
 #endif
   binlog_row_event_extra_data= 0;
 
@@ -2137,7 +2141,7 @@ void THD::release_resources()
     wsrep_rli->current_mts_submode = 0;
     delete wsrep_rli;
   }
-  if (wsrep_status_vars) wsrep->stats_free(wsrep, wsrep_status_vars);
+  wsrep_free_status(this);
 #endif
 }
 
@@ -2537,6 +2541,7 @@ void THD::restore_globals()
 
 void THD::cleanup_after_query()
 {
+
   /*
     Reset rand_used so that detection of calls to rand() will save random 
     seeds if needed by the slave.
@@ -2610,6 +2615,12 @@ void THD::cleanup_after_query()
   if (rli_slave)
     rli_slave->cleanup_after_query();
 #endif
+
+#ifdef WITH_WSREP
+  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+  if (!in_active_multi_stmt_transaction())
+    wsrep_affected_rows= 0;
+#endif /* WITH_WSREP */
 }
 
 LEX_CSTRING *

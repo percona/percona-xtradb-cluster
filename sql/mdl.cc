@@ -32,6 +32,7 @@
 static PSI_memory_key key_memory_MDL_context_acquire_locks;
 
 #ifdef WITH_WSREP
+#include "debug_sync.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 //extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
@@ -40,7 +41,8 @@ void sql_print_information(const char *format, ...)
   __attribute__((format(printf, 1, 2)));
 extern bool
 wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
-                          MDL_ticket *ticket);
+                          MDL_ticket *ticket,
+                          const MDL_key *key);
 #endif /* WITH_WSREP */
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_MDL_wait_LOCK_wait_status;
@@ -1869,7 +1871,16 @@ MDL_wait::timed_wait(MDL_context_owner *owner, struct timespec *abs_timeout,
          wait_result != ETIMEDOUT && wait_result != ETIME)
   {
 #ifdef WITH_WSREP
-    if (wsrep_thd_is_BF(owner->get_thd(), true))
+    // Allow tests to block the applier thread using the DBUG facilities
+    DBUG_EXECUTE_IF("sync.wsrep_before_mdl_wait",
+                 {
+                   const char act[]=
+                     "now "
+                     "wait_for signal.wsrep_before_mdl_wait";
+                   DBUG_ASSERT(!debug_sync_set_action((owner->get_thd()),
+                                                      STRING_WITH_LEN(act)));
+                 };);
+    if (wsrep_thd_is_BF(owner->get_thd(), false))
     {
       wait_result= mysql_cond_wait(&m_COND_wait_status, &m_LOCK_wait_status);
     }
@@ -1971,7 +1982,8 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
       if (granted->get_ctx() != ticket->get_ctx() &&
           granted->is_incompatible_when_granted(ticket->get_type()))
       {
-        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted))
+        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
+                                       &ticket->get_lock()->key))
         {
           WSREP_DEBUG("MDL victim killed at add_ticket");
         }
@@ -2609,7 +2621,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                         wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
             can_grant = true;
           }
-          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
+          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket, &key))
           {
             wsrep_can_grant= FALSE;
             if (wsrep_log_conflicts) 

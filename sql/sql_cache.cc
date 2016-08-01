@@ -1699,6 +1699,11 @@ def_week_frmt: %lu, in_trans: %d, autocommit: %d",
   cache_key= make_cache_key(thd, thd->query(), &flags, &tot_length);
   if (cache_key == NULL)
     goto err_unlock;
+#ifdef WITH_WSREP
+  bool once_more;
+  once_more= true;
+lookup:
+#endif /* WITH_WSREP */
 
   query_block = (Query_cache_block *)  my_hash_search(&queries,
                                                       (uchar*) cache_key,
@@ -1735,6 +1740,32 @@ def_week_frmt: %lu, in_trans: %d, autocommit: %d",
   */
   thd->get_stmt_da()->reset_diagnostics_area();
   thd->get_stmt_da()->reset_condition_info(thd);
+
+#ifdef WITH_WSREP
+  if (once_more && WSREP_CLIENT(thd) && wsrep_must_sync_wait(thd))
+  {
+    unlock();
+    if (wsrep_sync_wait(thd))
+      goto err;
+    if (try_lock(TRUE))
+      goto err;
+    once_more= false;
+    goto lookup;
+  }
+#endif /* WITH_WSREP */
+
+#ifdef WITH_WSREP
+  if (once_more && WSREP_CLIENT(thd) && wsrep_must_sync_wait(thd))
+  {
+    unlock();
+    if (wsrep_sync_wait(thd))
+      goto err;
+    if (try_lock(TRUE))
+      goto err;
+    once_more= false;
+    goto lookup;
+  }
+#endif /* WITH_WSREP */
 
   /* Now lock and test that nothing changed while blocks was unlocked */
   BLOCK_LOCK_RD(query_block);
