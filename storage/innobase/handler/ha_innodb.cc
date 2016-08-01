@@ -3100,6 +3100,7 @@ ha_innobase::ha_innobase(
 	m_prebuilt(),
 	m_prebuilt_ptr(&m_prebuilt),
 	m_user_thd(),
+	m_share(),
 	m_int_table_flags(HA_REC_NOT_IN_SEQ
 			  | HA_NULL_IN_KEY
 			  | HA_CAN_INDEX_BLOBS
@@ -6360,6 +6361,7 @@ ha_innobase::open(
 	normalize_table_name(norm_name, name);
 
 	m_user_thd = NULL;
+	ut_ad(m_share == NULL);
 
 	if (!(m_share = get_share(name))) {
 
@@ -6369,6 +6371,7 @@ ha_innobase::open(
 	if (UNIV_UNLIKELY(m_share->ib_table && m_share->ib_table->is_corrupt &&
 			  srv_pass_corrupt_table <= 1)) {
 		free_share(m_share);
+		m_share = NULL;
 
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 	}
@@ -6432,6 +6435,7 @@ ha_innobase::open(
 			  srv_pass_corrupt_table <= 1)) {
 
 		free_share(m_share);
+		m_share = NULL;
 		DBUG_RETURN(HA_ERR_CRASHED_ON_USAGE);
 	}
 
@@ -6449,6 +6453,7 @@ ha_innobase::open(
 		is_part = NULL;
 
 		free_share(m_share);
+		m_share = NULL;
 		my_error(ER_CANNOT_FIND_KEY_IN_KEYRING, MYF(0));
 
 		DBUG_RETURN(HA_ERR_TABLE_CORRUPT);
@@ -6466,6 +6471,7 @@ ha_innobase::open(
 			" file for the table exists. " << TROUBLESHOOTING_MSG;
 
 		free_share(m_share);
+		m_share = NULL;
 		set_my_errno(ENOENT);
 
 		DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
@@ -6508,6 +6514,7 @@ ha_innobase::open(
 
 	if (!thd_tablespace_op(thd) && no_tablespace) {
 		free_share(m_share);
+		m_share = NULL;
 		set_my_errno(ENOENT);
 
 		dict_table_close(ib_table, FALSE, FALSE);
@@ -6903,6 +6910,7 @@ ha_innobase::close()
 	}
 
 	free_share(m_share);
+	m_share = NULL;
 
 	MONITOR_INC(MONITOR_TABLE_CLOSE);
 
@@ -17775,7 +17783,7 @@ get_share(
 /*======*/
 	const char*	table_name)
 {
-	INNOBASE_SHARE*	share;
+	INNOBASE_SHARE*	share = NULL;
 
 	mysql_mutex_lock(&innobase_share_mutex);
 
