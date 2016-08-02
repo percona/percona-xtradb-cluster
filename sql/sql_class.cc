@@ -3175,13 +3175,6 @@ bool sql_exchange::escaped_given(void)
 bool Query_result_send::send_result_set_metadata(List<Item> &list, uint flags)
 {
   bool res;
-#ifdef WITH_WSREP
-  if (WSREP(thd) && thd->wsrep_retry_query)
-  {
-    WSREP_DEBUG("skipping select metadata");
-    return FALSE;
-  }
-#endif /* WITH_WSREP */
   if (!(res= thd->send_result_metadata(&list, flags)))
     is_result_set_started= 1;
   return res;
