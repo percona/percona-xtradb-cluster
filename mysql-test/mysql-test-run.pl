@@ -164,7 +164,7 @@ our $opt_vs_config = $ENV{'MTR_VS_CONFIG'};
 
 # If you add a new suite, please check TEST_DIRS in Makefile.am.
 #
-my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,innodb_fts,innodb_zip,innodb_undo,perfschema,funcs_1,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,xplugin";
+my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,innodb_fts,innodb_zip,innodb_undo,perfschema,funcs_1,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,test_service_sql_api,xplugin";
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -351,6 +351,8 @@ my $opt_max_test_fail= env_or_val(MTR_MAX_TEST_FAIL => 10);
 
 my $opt_parallel= $ENV{MTR_PARALLEL} || 1;
 my $opt_port_group_size = $ENV{MTR_PORT_GROUP_SIZE} || 10;
+
+our $opt_xml_report;
 
 our $opt_xml_report;
 
@@ -2283,6 +2285,7 @@ sub mysqlxtest_arguments(){
                              "$bindir/rapid/plugin/x/mysqlxtest",
                              "$bindir/rapid/plugin/x/Debug/mysqlxtest",
                              "$bindir/rapid/plugin/x/Release/mysqlxtest",
+                             "$bindir/rapid/plugin/x/RelWithDebInfo/mysqlxtest",
                              "$bindir/bin/mysqlxtest");
   return "" unless $exe;
 
@@ -2739,6 +2742,9 @@ sub environment_setup {
   # Create an environment variable to make it possible
   # to detect that valgrind is being used from test cases
   $ENV{'VALGRIND_TEST'}= $opt_valgrind;
+
+  # Make sure LeakSanitizer exits if leaks are found
+  $ENV{'LSAN_OPTIONS'}= "exitcode=42";
 
   # Add dir of this perl to aid mysqltest in finding perl
   my $perldir= dirname($^X);
@@ -5812,7 +5818,7 @@ sub mysqld_start ($$) {
   {
     ddd_arguments(\$args, \$exe, $mysqld->name());
   }
-  if ( $opt_dbx || $opt_manual_dbx ) {
+  elsif ( $opt_dbx || $opt_manual_dbx ) {
     dbx_arguments(\$args, \$exe, $mysqld->name());
   }
   elsif ( $opt_debugger )

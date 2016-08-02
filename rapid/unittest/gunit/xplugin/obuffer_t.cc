@@ -39,7 +39,11 @@ namespace im
     {
       for (size_t i = 0; i < no_of_pages; i++)
       {
+<<<<<<< HEAD
         page_del.push_back(boost::shared_ptr<Page>(new Page(page_size)));
+=======
+        page_del.push_back(boost::shared_ptr<Page>(new Page(static_cast<uint32_t>(page_size))));
+>>>>>>> mysql-5.7.13
         ob.push_back(page_del.back().get());
       }
     }
@@ -173,7 +177,11 @@ namespace im
           EXPECT_EQ('>', d[0]);
           first++;
         }
+<<<<<<< HEAD
         total += size;
+=======
+        total += static_cast<int>(size);
+>>>>>>> mysql-5.7.13
         if (total == 300000)
         {
           EXPECT_EQ('<', d[size-1]);
