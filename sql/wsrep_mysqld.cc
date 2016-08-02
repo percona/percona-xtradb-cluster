@@ -394,7 +394,7 @@ static void wsrep_synced_cb(void* app_ctx)
   }
   if (wsrep_restart_slave_activated)
   {
-    //int rcode;
+    int rcode;
     WSREP_INFO("MySQL slave restart");
     wsrep_restart_slave_activated= FALSE;
     channel_map.rdlock();
