@@ -276,7 +276,6 @@ my @mysqld_rules=
  { 'ssl-cert' => \&fix_ssl_server_cert },
  { 'ssl-key' => \&fix_ssl_server_key },
  { 'loose-sha256_password_auto_generate_rsa_keys' => "0"},
- { 'early_plugin_load' => "" },
   );
 
 if (IS_WINDOWS)
@@ -498,21 +497,28 @@ sub resolve_at_variable {
   local $_ = $option->value();
   my ($res, $after);
 
-  while (m/(.*?)\@((?:\w+\.)+)(#?[-\w]+)/g) {
-    my ($before, $group_name, $option_name)= ($1, $2, $3);
-    $after = $';
-    chop($group_name);
+  # Split the options value on last .
+  my @parts= split(/\./, $option->value());
+  my $option_name= pop(@parts);
+  my $group_name=  join('.', @parts);
 
-  my $from_group= $config->group($group_name)
-    or croak "There is no group named '$group_name' that ",
-      "can be used to resolve '$option_name' for test '$self->{testname}'";
-
-    my $value= $from_group->value($option_name);
-    $res .= $before.$value;
-  }
-  $res .= $after;
-
-  $config->insert($group->name(), $option->name(), $res)
+  $group_name =~ s/^\@//; # Remove at
+  my $from;
+  
+  if ($group_name =~ "env")
+  {
+    $from = $ENV{$option_name};
+  } 
+  else
+  {
+    my $from_group= $config->group($group_name)
+      or croak "There is no group named '$group_name' that ",
+        "can be used to resolve '$option_name'";
+  
+    $from= $from_group->value($option_name);
+   }
+   
+  $config->insert($group->name(), $option->name(), $from)
 }
 
 
