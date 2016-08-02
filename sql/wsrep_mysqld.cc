@@ -397,7 +397,6 @@ static void wsrep_synced_cb(void* app_ctx)
     //int rcode;
     WSREP_INFO("MySQL slave restart");
     wsrep_restart_slave_activated= FALSE;
-#ifdef OUT
     channel_map.rdlock();
     if ((rcode = start_slave_threads(1 /* need mutex */,
                             0 /* no wait for start*/,
@@ -407,10 +406,6 @@ static void wsrep_synced_cb(void* app_ctx)
       WSREP_WARN("Failed to create slave threads: %d", rcode);
     }
     channel_map.unlock();
-#else
-    /* TODO: record slave restart arguments for restarting purpose */
-    start_slave_cmd(NULL);
-#endif
   }
 }
 

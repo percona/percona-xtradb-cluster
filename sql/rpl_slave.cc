@@ -80,6 +80,9 @@ MY_BITMAP slave_error_mask;
 char slave_skip_error_names[SHOW_VAR_FUNC_BUFF_SIZE];
 
 char* slave_load_tmpdir = 0;
+#ifdef WITH_WSREP
+Master_info *active_mi= 0;
+#endif
 my_bool replicate_same_server_id;
 ulonglong relay_log_space_limit = 0;
 
@@ -412,6 +415,12 @@ int init_slave()
     goto err;
   }
 
+#ifdef WITH_WSREP
+  /*
+     for only wsrep, create active_mi, for async slave restart purpose
+   */
+  active_mi= channel_map.get_default_channel_mi();
+#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
   /* @todo: Print it for all the channels */
   {
