@@ -169,6 +169,11 @@ wsrep_log_error()
     wsrep_log "[ERROR] $*"
 }
 
+wsrep_log_warning()
+{
+    wsrep_log "[WARNING] $*"
+}
+
 wsrep_log_info()
 {
     wsrep_log "[INFO] $*"
