@@ -71,6 +71,7 @@ configure-stamp:
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DBUILD_CONFIG=mysql_release \
 		-DWITH_SYSTEMD=1 \
+		-DSYSTEMD_SERVICE_NAME="mysql" \
 		-DWITH_WSREP=1 \
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
@@ -181,7 +182,7 @@ override_dh_install:
 	dh_apparmor -pmysql-server-5.7 --profile-name=usr.sbin.mysqld
 
 override_dh_systemd_enable:
-	dh_systemd_enable --name=mysql
+	dh_systemd_enable --no-enable --name=mysql
 
 # Start mysql in runlevel 19 before 20 where apache, proftpd etc gets
 # started which might depend on a running database server.
