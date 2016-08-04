@@ -350,7 +350,7 @@ BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_r
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
-Conflicts: Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-galera-3
+Conflicts: Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-galera-3 galera-57
 
 # Think about what you use here since the first step is to
 # run a rm -rf
