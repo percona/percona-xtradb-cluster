@@ -181,6 +181,10 @@ get_keys()
     if [[ -z $ekey ]]; then
         ecmd="xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile"
     else
+        wsrep_log_warning "Using the 'encrypt-key' option causes the encryption key"
+        wsrep_log_warning "to be set via the command-line and is considered insecure."
+        wsrep_log_warning "It is recommended to use the 'encrypt-key-file' option instead."
+
         ecmd="xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey"
     fi
 
