@@ -55,6 +55,8 @@ Installation
    :titlesonly:
 
    install/index
+   install/upgrade_from_5.6
+   install/upgrade_from_5.5
 
 Features
 ========
