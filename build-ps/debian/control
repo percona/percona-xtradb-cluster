@@ -231,7 +231,7 @@ Replaces: mysql-server-5.0,
           mariadb-server-5.5,
           virtual-mysql-server,
           virtual-mysql-server-core,
-          galera, percona-xtradb-cluster-galera-3, percona-xtradb-cluster-galera, percona-galera-3, galera-57, galera-57-3.x
+          galera, percona-xtradb-cluster-galera-3, percona-xtradb-cluster-galera, percona-galera-3, galera-57, galera-57-3.x, percona-xtradb-cluster-galera-3.x
 Description: Percona XtraDB Cluster database server binaries
  Percona XtraDB Cluster is based on the Percona Server database
  server and provides a High Availability solution.
