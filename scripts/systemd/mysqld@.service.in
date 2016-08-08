@@ -1,4 +1,4 @@
-# Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ Group=@MYSQLD_USER@
 
 Type=forking
 
-PIDFile=@SYSTEMD_PID_DIR@/mysqld.pid
+PIDFile=@SYSTEMD_PID_DIR@/mysqld-%i.pid
 
 # Disable service start and stop timeout logic of systemd for mysqld service.
 TimeoutSec=0
@@ -40,13 +40,14 @@ TimeoutSec=0
 PermissionsStartOnly=true
 
 # Needed to create system tables and to check for cluster crash recovery
-ExecStartPre=@bindir@/mysqld_pre_systemd --pre
+ExecStartPre=@bindir@/mysqld_pre_systemd --pre %I
 
 # Start main service
-ExecStart=@libexecdir@/mysqld --daemonize --pid-file=@SYSTEMD_PID_DIR@/mysqld.pid $MYSQLD_OPTS $MYSQLD_RECOVER_START
+ExecStart=@libexecdir@/mysqld --defaults-group-suffix=@%I --daemonize \
+        --pid-file=@SYSTEMD_PID_DIR@/mysqld-%i.pid $MYSQLD_OPTS $MYSQLD_RECOVER_START_%I
 
 # Needed to reset cluster crash recovery
-ExecStartPost=@bindir@/mysqld_pre_systemd --post
+ExecStartPost=@bindir@/mysqld_pre_systemd --post %I
 
 # Use this to switch malloc implementation
 EnvironmentFile=-/etc/sysconfig/mysql

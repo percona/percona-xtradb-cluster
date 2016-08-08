@@ -35,10 +35,11 @@
 
 void wsrep_xid_init(XID* xid, const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 {
+  xid->reset();
+
   xid->set_format_id(1);
   xid->set_gtrid_length( WSREP_XID_GTRID_LEN );
   xid->set_bqual_length(0);
-
   char data[XIDDATASIZE];
 
   memset(data, 0, XIDDATASIZE);

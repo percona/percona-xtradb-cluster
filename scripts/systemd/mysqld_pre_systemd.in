@@ -22,7 +22,9 @@ get_option () {
     local section=$1
     local option=$2
     local default=$3
-    ret=$(@bindir@/my_print_defaults $section | grep '^--'${option}'=' | cut -d= -f2- | tail -n 1)
+    local instance=$4
+    ret=$(@bindir@/my_print_defaults  ${instance:+--defaults-group-suffix=@$instance} $section | \
+	      grep '^--'${option}'=' | cut -d= -f2- | tail -n 1)
     [ -z "$ret" ] && ret=$default
     echo $ret
 }
@@ -43,8 +45,10 @@ install_validate_password_sql_file () {
 
 install_db () {
     # Note: something different than datadir=/var/lib/mysql requires SELinux policy changes (in enforcing mode)
-    datadir=$(get_option mysqld datadir "@MYSQL_DATADIR@")
-    log=$(get_option mysqld log-error /var/log/mysqld.log)
+
+    local instance=$1
+    datadir=$(get_option mysqld datadir "/var/lib/mysql${instance+:-$instance}" $instance)
+    log=$(get_option mysqld log-error "/var/log/mysqld${instance:+-$instance}.log" $instance)
 
     # Restore log, dir, perms and SELinux contexts
 
@@ -66,19 +70,62 @@ install_db () {
     fi
 
     # If special mysql dir is in place, skip db install
-    [ -d "$datadir/mysql" ] && exit 0
+    [ -d "$datadir/mysql" ] && return 0
 
     # Create initial db and install validate_password plugin
     initfile="$(install_validate_password_sql_file)"
-    @libexecdir@/mysqld --initialize --datadir="$datadir" --user=@MYSQLD_USER@ --init-file="$initfile"
+    @libexecdir@/mysqld ${instance:+--defaults-group-suffix=@$instance} --initialize \
+		     --datadir="$datadir" --user=@MYSQLD_USER@ --init-file="$initfile"
     rm -f "$initfile"
 
     # Generate certs if needed
     if [ -x @bindir@/mysql_ssl_rsa_setup -a ! -e "${datadir}/server-key.pem" ] ; then
         @bindir@/mysql_ssl_rsa_setup --datadir="$datadir" --uid=@MYSQLD_USER@ >/dev/null 2>&1
     fi
-    exit 0
+    return 0
 }
-install_db
+
+get_recover_pos () {
+    local instance=$1
+    wsrep_start_position_opt=""
+
+    @libexecdir@/mysqld ${instance:+--defaults-group-suffix=@$instance} \
+                     --datadir="$datadir" --user=@MYSQLD_USER@ --wsrep_recover 2>> $log
+
+    local rp="$(grep 'WSREP: Recovered position:' $log | tail -n 1)"
+    if [ -z "$rp" ]; then
+         local skipped="$(grep WSREP $log | grep 'skipping position recovery')"
+         if [ -z "$skipped" ]; then
+             systemd-cat -t mysql -p err echo "WSREP: Failed to recover position:"
+             exit 1
+         else
+             systemd-cat -t mysql -p info echo "WSREP: Position recovery skipped"
+         fi
+    else
+         local start_pos="$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
+              | sed 's/^[ \t]*//')"
+         systemd-cat -t mysql -p info echo "WSREP: Recovered position $start_pos"
+         wsrep_start_position_opt="--wsrep_start_position=$start_pos"
+    fi
+
+    if [ -n "$start_pos" ]; then
+        systemctl set-environment MYSQLD_RECOVER_START${instance:+_$instance}="$wsrep_start_position_opt"
+    fi
+}
+
+clear_recover_pos () {
+    local instance=$1
+    systemctl unset-environment MYSQLD_RECOVER_START${instance:+_$instance}
+}
+
+if [ "$1" = "--pre" ]; then
+    install_db $2
+    get_recover_pos $2
+elif [ "$1" = "--post" ]; then
+    clear_recover_pos $2
+else
+    systemd-cat -t mysql -p err echo "action parameter '$1' is missing or unknown - ABORT"
+    exit 1
+fi
 
 exit 0
