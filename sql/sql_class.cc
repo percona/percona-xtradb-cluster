@@ -2279,7 +2279,15 @@ void THD::release_resources()
   mysql_mutex_destroy(&LOCK_wsrep_thd);
   mysql_cond_destroy(&COND_wsrep_thd);
 
-  if (wsrep_rli) delete wsrep_rli;
+  if (wsrep_rli)
+  {
+    if (wsrep_rli->current_mts_submode != NULL)
+      delete wsrep_rli->current_mts_submode;
+    delete wsrep_rli;
+    wsrep_rli= NULL;
+    /* rli_slave MySQL counter part which is initialized to wsrep_rli. */
+    rli_slave= NULL;
+  }
   wsrep_free_status(this);
 #endif
 }

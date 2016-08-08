@@ -140,7 +140,11 @@ static const ulint	OS_AIO_MERGE_N_CONSECUTIVE = 64;
 extern bool buf_page_cleaner_is_active;
 
 #ifdef WITH_INNODB_DISALLOW_WRITES
-#define WAIT_ALLOW_WRITES() os_event_wait(srv_allow_writes_event)
+#define WAIT_ALLOW_WRITES() 						\
+	do {								\
+		if (srv_allow_writes_event)				\
+			os_event_wait(srv_allow_writes_event); 		\
+	} while (0)
 #else
 #define WAIT_ALLOW_WRITES() do { } while (0)
 #endif /* WITH_INNODB_DISALLOW_WRITES */

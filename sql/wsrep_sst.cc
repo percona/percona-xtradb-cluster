@@ -1282,6 +1282,7 @@ static int sst_donate_other (const char*   method,
   mysql_cond_wait (&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
 
   WSREP_INFO("sst_donor_thread signaled with %d", arg.err);
+  pthread_detach(tmp);
   return arg.err;
 }
 
