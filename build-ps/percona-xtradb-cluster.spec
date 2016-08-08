@@ -344,7 +344,7 @@ URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix}
-Provides:       mysql-server galera-57
+Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel
 %if 0%{?systemd}
@@ -565,7 +565,7 @@ applications.
 %package -n Percona-XtraDB-Cluster-garbd%{product_suffix}
 Summary:	Garbd component of Percona XtraDB Cluster
 Group:		Applications/Databases
-Provides:       garbd3
+Provides:       garbd3 galera-garbd-57 galera-57-debuginfo
 Requires:       %{distro_requires}
 %if 0%{?systemd}
 BuildRequires:  systemd
@@ -579,6 +579,7 @@ Requires(post):   /sbin/chkconfig
 Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
+Obsoletes:	galera-57-debuginfo galera-garbd-57
 
 %description -n Percona-XtraDB-Cluster-garbd%{product_suffix}
 This package contains the garb binary and init scripts.
