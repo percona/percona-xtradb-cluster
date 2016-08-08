@@ -1,0 +1,29 @@
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_2
+
+# Set wsrep_sync_wait to avoid ER_LOCK_WAIT_TIMEOUT.
+SET SESSION wsrep_sync_wait=0;
+
+SET @@global.wsrep_desync = 'ON';
+
+--let $wsrep_cluster_address_saved = `SELECT @@global.wsrep_cluster_address`
+SET @@global.wsrep_cluster_address = '';
+
+# Must return 'OFF':
+SHOW STATUS LIKE 'wsrep_ready';
+
+# Must return 'Non-primary':
+SHOW STATUS LIKE 'wsrep_cluster_status';
+
+--disable_query_log
+--eval SET @@global.wsrep_cluster_address = '$wsrep_cluster_address_saved'
+--enable_query_log
+--source include/wait_until_connected_again.inc
+
+# Must return 'ON':
+SHOW STATUS LIKE 'wsrep_ready';
+
+# Must return 'Primary':
+SHOW STATUS LIKE 'wsrep_cluster_status';
