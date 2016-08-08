@@ -5,7 +5,7 @@
 =========================================
 
 Percona is glad to announce the release of
-|PXC| 5.7.12-rc1-26.16 on Audust 8, 2016.
+|PXC| 5.7.12-rc1-26.16 on August 8, 2016.
 Binaries are available from the
 `downloads area
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST>`_
@@ -31,7 +31,7 @@ New Features
 Bug Fixes
 =========
 
-* [PXC-233] Fixed error messages.
+* [PXC-333] Fixed error messages.
 
 * [PXC-558] Fixed the failure of SST via ``mysqldump`` with ``gtid_mode=ON``.
 
@@ -46,26 +46,15 @@ Bug Fixes
 
 * [PXC-601] Fixed error when running ``SHOW STATUS`` during group state update.
 
-* [PXC-605] Changed the ``sst_flush_tables()`` function
+* [PXC-605] Corrected the return code of ``sst_flush_tables()`` function
   to return a non-negative error code and thus pass assertion.
 
-* [PXC-613] Fixed memory leak due to stats not freeing
+* [PXC-613] Fixed memory leak and stale pointer due to stats not freeing
   when toggling the :variable:`wsrep_provider` variable.
-
-* [PXC-624] Fixed ``galera_bf_abort`` failures by ensuring
-  that nodes form a cluster.
 
 * [PXC-625] Fixed failure of ``ROLLBACK`` to register ``wsrep_handler``
 
 * [PXC-636] Fixed failure of symmetric encryption during SST.
-
----
-
-* [PXC-630] [PXC-641] [PXC-647] [PXC-617] [PXC-650] very low-level?
-
-* [PXC-587] [PXC-614] [PXC-616] [PXC-632] [PXC-639] [PXC-658] Fixed as part of pxc_strict_mode?
-
-* [PXC-635] Error message fix. Need to mention?
 
 Other Changes
 ==================
@@ -77,21 +66,18 @@ Other Changes
   to reflect what the thread is currently doing.
 
 * [PXC-612] Using XtraBackup as the SST method
-  now requires Percona XtraBackup 2.4.3 or later.
+  now requires Percona XtraBackup 2.4.4 or later.
 
 * [PXC-628] [PXC-651] Improved rollback process to ensure that when a transaction
   is rolled back, any statements open by the transaction are also rolled back.
 
 * [PXC-648] Removed the ``sst_special_dirs`` variable.
 
-* [PXC-659] Disabled switching of ``slave_preserve_commit_order`` to ``ON``.
+* [PXC-659] Disabled switching of ``slave_preserve_commit_order`` to ``ON``
+  when running PXC in cluster mode, as it conflicts with existing
+  multi-master commit ordering resolution algorithm in Galera.
 
 * [PQA-115] Changed the default :file:`my.cnf` configuration.
 
----
-
-* [BLD-464] 455-458, 460, 461 should I mention BLD issues?
-
-* [PXC-267] [PXC-268] Do these change anything for users?
-
+* Other low-level fixes and improvements for better stability.
 
