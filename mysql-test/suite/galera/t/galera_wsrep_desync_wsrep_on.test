@@ -19,6 +19,7 @@ INSERT INTO t1 (f1) SELECT 000000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3
 --connection node_2
 SET GLOBAL wsrep_desync = TRUE;
 SET SESSION wsrep_on = FALSE;
+--SLEEP 5
 
 ALTER TABLE t1 ADD PRIMARY KEY (f1);
 
