@@ -362,7 +362,15 @@ void Table_cache_manager::free_table(THD *thd,
 
 #ifndef DBUG_OFF
       if (remove_type == TDC_RT_REMOVE_ALL)
+#ifndef WITH_WSREP
         DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
+#else
+      {
+        WSREP_DEBUG("ASSERT skipped, thd: %u applier %d mode %d conf %d query %s",
+                    thd->thread_id(), thd->wsrep_applier, thd->wsrep_exec_mode,
+                    thd->wsrep_conflict_state, thd->query().str);
+      }
+#endif
       else if (remove_type == TDC_RT_REMOVE_NOT_OWN ||
                remove_type == TDC_RT_REMOVE_NOT_OWN_KEEP_SHARE)
       {
