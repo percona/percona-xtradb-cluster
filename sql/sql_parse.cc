@@ -5343,10 +5343,13 @@ end_with_restore_list:
         lex->sql_command == SQLCOM_XA_ROLLBACK ||
         lex->sql_command == SQLCOM_XA_RECOVER)
     {
-      WSREP_DEBUG("XA command attempt: %d %s, thd: %u",
-                  lex->sql_command, thd->query().str, thd->thread_id());
-      my_error(ER_NOT_SUPPORTED_YET, MYF(0), "XA with wsrep replication plugin");
-      break;
+      if (WSREP(thd))
+      {
+        WSREP_DEBUG("XA command attempt: %d %s, thd: %u",
+                    lex->sql_command, thd->query().str, thd->thread_id());
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0), "XA with wsrep replication plugin");
+        break;
+      }
     }
 #endif /* WITH_WSREP */
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
