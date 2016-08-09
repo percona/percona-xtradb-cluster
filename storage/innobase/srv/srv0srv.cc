@@ -1149,6 +1149,10 @@ srv_free(void)
 
 	os_event_destroy(srv_buf_resize_event);
 
+#ifdef WITH_INNODB_DISALLOW_WRITES
+	os_event_destroy(srv_allow_writes_event);
+#endif /* WITH_INNODB_DISALLOW_WRITES */
+
 #ifdef UNIV_DEBUG
 	os_event_destroy(srv_master_thread_disabled_event);
 	srv_master_thread_disabled_event = NULL;

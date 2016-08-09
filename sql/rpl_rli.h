@@ -855,7 +855,10 @@ public:
   void cleanup_after_session()
   {
     if (deferred_events)
+    {
       delete deferred_events;
+      deferred_events= NULL;
+    }
   };
    
   /**

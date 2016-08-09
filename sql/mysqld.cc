@@ -6259,8 +6259,12 @@ void* start_wsrep_THD(void *arg)
   {
     close_connection(thd, ER_OUT_OF_RESOURCES);
     thd->release_resources();
-    // TODO: do we need to check for initialized plugin.
-    delete thd;
+    // Note: We can't call THD destructor without crashing
+    // if plugins have not been initialized. However, in most of the
+    // cases this means that pre SE initialization SST failed and
+    // we are going to exit anyway.
+    if (plugins_are_initialized)
+      delete thd;
     return(NULL);
   }
 

@@ -21,6 +21,7 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
 
 # Insert 1M rows
+set session wsrep_sync_wait=0;
 --send INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;
 
 --connection node_1a
