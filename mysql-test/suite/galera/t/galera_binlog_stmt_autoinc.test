@@ -25,15 +25,18 @@ CREATE TABLE t1 (
 
 insert into t1(i) values(null);
 
-select * from t1;
-
 insert into t1(i) values(null), (null), (null);
 
-select * from t1;
+# based on which node start first value of auto-increment will differ so we base
+# the logic to check the values using wsrep_local_index.
+--let $delta = `SELECT 16 + VARIABLE_VALUE*4 as delta FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index'`
+--replace_regex /[1-9][0-9]+/SUM/
+--eval select sum(i) = $delta from t1;
 
 --connection node_2
 
-select * from t1;
+--replace_regex /[1-9][0-9]+/SUM/
+--eval select sum(i) = $delta from t1;
 
 SET GLOBAL wsrep_forced_binlog_format='none';
 
@@ -94,7 +97,11 @@ SET GLOBAL wsrep_auto_increment_control='ON';
 SET SESSION binlog_format='ROW';
 
 show variables like 'binlog_format';
-show variables like '%auto_increment%';
+--disable_warnings
+SELECT @@auto_increment_increment = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size');
+SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
+--enable_warnings
+
 
 ##
 ## Verify the recovery of original user-defined values after
