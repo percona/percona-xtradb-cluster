@@ -20,41 +20,40 @@
 
    .. code-block:: bash
 
-      $ head -c 120 mysqld-bin.000001 > GRA_HEADER
+      $ head -c 123 mysqld-bin.000001 > GRA_HEADER
       $ cat GRA_HEADER > /var/lib/mysql/GRA_1_2-bin.log
       $ cat /var/lib/mysql/GRA_1_2.log >> /var/lib/mysql/GRA_1_2-bin.log
       $ mysqlbinlog -vvv /var/lib/mysql/GRA_1_2-bin.log
 
       /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;
-      /*!40019 SET @@session.max_insert_delayed_threads=0*/;
       /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
       DELIMITER /*!*/;
       # at 4
-      #160805  9:35:35 server id 1  end_log_pos 120     Start: binlog v 4, server v 5.6.30-76.3-56-log created 160805  9:35:35 at startup
+      #160809  16:04:05 server id 3  end_log_pos 123     Start: binlog v 4, server v 5.7.12-5rc1-log created 160809 16:04:05 at startup
       # Warning: this binlog is either in use or was not closed properly.
       ROLLBACK/*!*/;
       BINLOG '
-      512kVw8BAAAAdAAAAHgAAAABAAQANS42LjMwLTc2LjMtNTYtbG9nAAAAAAAAAAAAAAAAAAAAAAAA
-      AAAAAAAAAAAAAAAAAADnXaRXEzgNAAgAEgAEBAQEEgAAXAAEGggAAAAICAgCAAAACgoKGRkAAOfS
-      sRE=
+      nbGpVw8DAAAAdwAAAHsAAAABAAQANS43LjEyLTVyYzEtbG9nAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      AAAAAAAAAAAAAAAAAACdsalXEzgNAAgAEgAEBAQEEgAAXwAEGggAAAAICAgCAAAACgoKKioAEjQA
+      ALfQ8hw=
       '/*!*/;
-      # at 120
-      #160805  9:33:37 server id 0  end_log_pos 79  Query   thread_id=27    exec_time=0 error_code=0
-      use `world`/*!*/;
-      SET TIMESTAMP=1470389617/*!*/;
-      SET @@session.pseudo_thread_id=27/*!*/;
+      # at 123
+      #160809  16:05:49 server id 2  end_log_pos 75     Query    thread_id=11    exec_time=0    error_code=0
+      use `test`/*!*/;
+      SET TIMESTAMP=1470738949/*!*/;
+      SET @@session.pseudo_thread_id=11/*!*/;
       SET @@session.foreign_key_checks=1, @@session.sql_auto_is_null=0, @@session.unique_checks=1, @@session.autocommit=1/*!*/;
-      SET @@session.sql_mode=1073741824/*!*/;
+      SET @@session.sql_mode=1436549152/*!*/;
       SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/*!*/;
-      /*!\C utf8 *//*!*/;
+      /*!\C utf8 ​*//*​!*/;
       SET @@session.character_set_client=33,@@session.collation_connection=33,@@session.collation_server=8/*!*/;
       SET @@session.lc_time_names=0/*!*/;
       SET @@session.collation_database=DEFAULT/*!*/;
-      drop table test
+      drop table t
       /*!*/;
+      SET @@SESSION.GTID_NEXT= 'AUTOMATIC' /* added by mysqlbinlog ​*/ /*​!*/;
       DELIMITER ;
       # End of log file
-      ROLLBACK /* added by mysqlbinlog */;
       /*!50003 SET COMPLETION_TYPE=@OLD_COMPLETION_TYPE*/;
       /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=0*/;
 
