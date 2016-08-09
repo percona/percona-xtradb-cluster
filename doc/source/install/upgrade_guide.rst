@@ -55,7 +55,8 @@ To upgrade the cluster, follow these steps for each node:
         sudo apt-get remove percona-*
         sudo apt-get install percona-xtradb-cluster-57
 
-#. Back up :file:`grastate.dat`.
+#. Back up :file:`grastate.dat`, so that you can restore it
+   if it is corrupted or zeroed out due to network issue, for example.
 
 #. Start the node outside the cluster
    by setting the :variable:`wsrep_provider` variable to ``none``.
@@ -67,8 +68,14 @@ To upgrade the cluster, follow these steps for each node:
 
 #. Open another session and run ``mysql_upgrade``.
 
-#. When the upgrade is done, stop the ``mysqld`` process
-   and start the node as normal:
+#. When the upgrade is done, stop the ``mysqld`` process.
+
+   .. note:: On CentOS, the :file:`my.cnf` configuration file
+      is renamed to :file:`my.cnf.rpmsave`.
+      Make sure to rename it back
+      before joining the upgraded node back to the cluster.
+
+#. Start the node as normal:
 
    .. prompt:: bash
 

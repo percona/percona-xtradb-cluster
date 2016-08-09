@@ -1,4 +1,4 @@
-.. _encrypt-taffic:
+.. _encrypt-traffic:
 
 ======================
 Encrypting PXC Traffic
