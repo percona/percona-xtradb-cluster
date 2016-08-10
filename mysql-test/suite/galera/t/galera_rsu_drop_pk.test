@@ -21,6 +21,10 @@ INSERT INTO t1 (f1) SELECT 000000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3
 --connection node_2
 SET SESSION wsrep_OSU_method = "RSU";
 ALTER TABLE t1 DROP PRIMARY KEY;
+# alter rsu is asynchronous action (this is upstream behavior) and so to be consistent
+# we ensure that post-alter action to get the node back to SYNC state are completed before
+# firing followup events.
+--sleep 5
 SET SESSION wsrep_OSU_method = "TOI";
 
 # Insert even more data after the ALTER has completed
