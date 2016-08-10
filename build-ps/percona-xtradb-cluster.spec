@@ -786,7 +786,8 @@ pushd percona-xtradb-cluster-galera
   export CC=gcc44
   export CXX=g++44
 %endif
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 garb/garbd libgalera_smm.so %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
 popd
 
 
