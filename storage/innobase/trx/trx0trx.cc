@@ -3398,20 +3398,26 @@ trx_kill_blocking(trx_t* trx)
 		trx_mutex_enter(victim_trx);
 
 #ifdef WITH_WSREP
-			ib::info() << "Killed transaction: ID: " << id
-				<< " - " << thr_text;
-                        ib::info() << "WSREP seqnos, BF: "      <<
-                          wsrep_thd_trx_seqno(trx->mysql_thd)   <<
-                          ", victim: "                          <<
-                          wsrep_thd_trx_seqno(victim_trx->mysql_thd);
-                        /* trx_rollback, above, clears victim_trx->id, which we need to
-                           address in replicator cleanup. terrible id swapping follows...
-                        */
-                        trx_id_t save_id = victim_trx->id;
-                        victim_trx->id = id;
-                        wsrep_signal_replicator(victim_trx, trx);
-                        victim_trx->id = save_id;
-
+		char		wsrep_buf[1024];
+		trx_id_t	victim_id(victim_trx->id);
+		ib::info() << "Killed transaction: ID: " <<
+			victim_id
+			<< " in hit list - " <<
+                  thd_security_context(victim_trx->mysql_thd,
+					wsrep_buf, sizeof(wsrep_buf),
+					512);
+                          
+		ib::info() << "WSREP seqnos, BF: "      <<
+			wsrep_thd_trx_seqno(trx->mysql_thd)   <<
+			", victim: "                          <<
+			wsrep_thd_trx_seqno(victim_trx->mysql_thd);
+		/* trx_rollback, above, clears victim_trx->id, which we need to
+                   address in replicator cleanup. terrible id swapping follows..
+		*/
+		trx_id_t save_id = victim_trx->id;
+		victim_trx->id = victim_id;
+		wsrep_signal_replicator(victim_trx, trx);
+		victim_trx->id = save_id;
 #endif /* WITH_WSREP */
 		version++;
 		ut_ad(victim_trx->version == version);
