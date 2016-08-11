@@ -45,13 +45,13 @@
       SET @@session.foreign_key_checks=1, @@session.sql_auto_is_null=0, @@session.unique_checks=1, @@session.autocommit=1/*!*/;
       SET @@session.sql_mode=1436549152/*!*/;
       SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/*!*/;
-      /*!\C utf8 ​*//*​!*/;
+      /*!\C utf8 *//*!*/;
       SET @@session.character_set_client=33,@@session.collation_connection=33,@@session.collation_server=8/*!*/;
       SET @@session.lc_time_names=0/*!*/;
       SET @@session.collation_database=DEFAULT/*!*/;
       drop table t
       /*!*/;
-      SET @@SESSION.GTID_NEXT= 'AUTOMATIC' /* added by mysqlbinlog ​*/ /*​!*/;
+      SET @@SESSION.GTID_NEXT= 'AUTOMATIC' /* added by mysqlbinlog */ /*!*/;
       DELIMITER ;
       # End of log file
       /*!50003 SET COMPLETION_TYPE=@OLD_COMPLETION_TYPE*/;
