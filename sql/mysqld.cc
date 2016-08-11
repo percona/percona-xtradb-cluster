@@ -7811,7 +7811,7 @@ static int mysql_init_variables(void)
   (void) strmake(mysql_home, tmpenv, sizeof(mysql_home)-1);
 #endif
 #ifdef WITH_WSREP
-  if (WSREP_ON && wsrep_init_vars())
+  if (wsrep_init_vars())
     return 1;
 #endif
   return 0;
