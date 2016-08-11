@@ -64,5 +64,6 @@ DROP TABLE t1;
 CREATE EVENT event1 ON SCHEDULE AT '2038-01-01 23:59:59' DO SELECT 1;
 
 --connection node_2
+--replace_column 8 <Created>
 SHOW CREATE EVENT event1;
 DROP EVENT event1;
