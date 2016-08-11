@@ -397,7 +397,6 @@ static void wsrep_synced_cb(void* app_ctx)
     int rcode;
     WSREP_INFO("MySQL slave restart");
     wsrep_restart_slave_activated= FALSE;
-
     channel_map.rdlock();
     if ((rcode = start_slave_threads(1 /* need mutex */,
                             0 /* no wait for start*/,
@@ -1083,12 +1082,6 @@ int wsrep_to_buf_helper(
   }
 #endif
 
-  /*
-    clear db so that log_event will inherit empty db as well,
-     this is needed in slave side for replication db filtering to go right
-  */
-  LEX_CSTRING db = thd->db();
-  thd->reset_db(NULL_CSTR);
   /* if there is prepare query, add event for it */
   if (!ret && thd->wsrep_TOI_pre_query)
   {
@@ -1100,7 +1093,6 @@ int wsrep_to_buf_helper(
 
   /* continue to append the actual query */
   Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
-  thd->reset_db(db);
   if (!ret && ev.write(&tmp_io_cache)) ret= 1;
   if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret= 1;
   close_cached_file(&tmp_io_cache);

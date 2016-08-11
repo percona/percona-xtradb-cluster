@@ -276,7 +276,6 @@ my @mysqld_rules=
  { 'ssl-cert' => \&fix_ssl_server_cert },
  { 'ssl-key' => \&fix_ssl_server_key },
  { 'loose-sha256_password_auto_generate_rsa_keys' => "0"},
- { 'early_plugin_load' => "" },
   );
 
 if (IS_WINDOWS)
@@ -503,15 +502,25 @@ sub resolve_at_variable {
     $after = $';
     chop($group_name);
 
-  my $from_group= $config->group($group_name)
-    or croak "There is no group named '$group_name' that ",
-      "can be used to resolve '$option_name' for test '$self->{testname}'";
+    $group_name =~ s/^\@//; # Remove at
+    my $value;
 
-    my $value= $from_group->value($option_name);
+    if ($group_name =~ "env")
+    {
+      $value = $ENV{$option_name};
+    }
+    else
+    {
+      my $from_group= $config->group($group_name)
+        or croak "There is no group named '$group_name' that ",
+          "can be used to resolve '$option_name'";
+      $value= $from_group->value($option_name);
+    }
+
     $res .= $before.$value;
   }
   $res .= $after;
-
+   
   $config->insert($group->name(), $option->name(), $res)
 }
 

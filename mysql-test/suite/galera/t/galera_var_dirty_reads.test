@@ -35,12 +35,12 @@ SET @@session.wsrep_dirty_reads=ON;
 SELECT * FROM t1;
 SELECT 1 FROM t1;
 
-SELECT i, variable_name, variable_value FROM t1, information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
+SELECT i, variable_name, variable_value FROM t1, performance_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
 
 SET @@session.wsrep_dirty_reads=OFF;
 
 --error ER_UNKNOWN_COM_ERROR
-SELECT i, variable_name, variable_value FROM t1, information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
+SELECT i, variable_name, variable_value FROM t1, performance_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
 
 --error ER_UNKNOWN_COM_ERROR
 SELECT 1;
@@ -48,7 +48,7 @@ SELECT 1;
 --error ER_UNKNOWN_COM_ERROR
 USE information_schema;
 
-SELECT * FROM information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads";
+SELECT * FROM performance_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads";
 
 SELECT COUNT(*) >= 10 FROM performance_schema.events_statements_history;
 

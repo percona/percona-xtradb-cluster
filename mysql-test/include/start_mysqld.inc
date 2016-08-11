@@ -15,7 +15,7 @@ if ($galera_wsrep_start_position == '') {
 
 # We use --exec echo instead of simple "--echo" because
 # replace_result works on --exec
---replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/
+--replace_regex /--wsrep-start-position=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9]*/--wsrep-start-position=<WSREP_START_POSITION>/ /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/
 --exec echo "# $restart_parameters"
 
 # Include this script only after using shutdown_mysqld.inc

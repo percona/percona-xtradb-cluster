@@ -1,10 +1,13 @@
 Setting SST method to mysqldump ...
-GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
-SET GLOBAL wsrep_sst_auth = 'sst:sst';
+CREATE USER 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
+SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
 CREATE USER sslsst;
 GRANT ALL PRIVILEGES ON *.* TO sslsst;
 GRANT USAGE ON *.* TO sslsst REQUIRE SSL;
+Warnings:
+Warning	1287	Using GRANT statement to modify existing user's properties other than privileges is deprecated and will be removed in future release. Use ALTER USER statement for this operation.
 SET GLOBAL wsrep_sst_auth = 'sslsst:';
 Performing State Transfer on a server that has been temporarily disconnected
 CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;

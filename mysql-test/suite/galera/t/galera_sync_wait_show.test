@@ -55,6 +55,7 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TRIGGER tr1 BEFORE INSERT ON t1 FOR EACH ROW SET NEW.f1 = 'a';
 
 --connection node_2
+--replace_column 7 <Created>
 SHOW CREATE TRIGGER tr1;
 DROP TABLE t1;
 
@@ -63,5 +64,6 @@ DROP TABLE t1;
 CREATE EVENT event1 ON SCHEDULE AT '2038-01-01 23:59:59' DO SELECT 1;
 
 --connection node_2
+--replace_column 8 <Created>
 SHOW CREATE EVENT event1;
 DROP EVENT event1;
