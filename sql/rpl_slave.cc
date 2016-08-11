@@ -2209,6 +2209,10 @@ const char *print_slave_db_safe(const char* db)
 
 static bool is_network_error(uint errorno)
 {
+#ifdef WITH_WSREP
+  if (errorno == ER_UNKNOWN_COM_ERROR)
+    return TRUE;
+#endif /* WITH_WSREP */
   return errorno == CR_CONNECTION_ERROR ||
       errorno == CR_CONN_HOST_ERROR ||
       errorno == CR_SERVER_GONE_ERROR ||
