@@ -896,9 +896,12 @@ extern "C" void wsrep_thd_set_query_state(
 extern "C" void wsrep_thd_set_conflict_state(
          THD *thd, bool lock, enum wsrep_conflict_state state)
 {
-  if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  thd->wsrep_conflict_state= state;
-  if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  if (WSREP(thd))
+  {
+    if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    thd->wsrep_conflict_state= state;
+    if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
 }
 
 
