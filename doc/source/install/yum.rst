@@ -38,7 +38,7 @@ Installing from Percona Repository
 
 1. Install the Percona repository package:
    
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo yum install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
 
@@ -51,7 +51,7 @@ Installing from Percona Repository
 
    .. note:: Red Hat Enterprise Linux and CentOS 5 do not support installing packages directly from the remote location. Download the Percona repository package first and install it manually using :program:`rpm`:
 
-      .. prompt:: bash
+      .. code-block:: bash
 
          wget http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
          rpm -ivH percona-release-0.1-3.noarch.rpm
@@ -63,7 +63,7 @@ Installing from Percona Repository
 
 #. Check that the packages are available:
    
-   .. prompt:: bash
+   .. code-block:: bash
 
       yum list | grep Percona-XtraDB-Cluster
 
@@ -76,7 +76,7 @@ Installing from Percona Repository
 
 #. Install the |PXC| packages:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo yum install Percona-XtraDB-Cluster-57
 

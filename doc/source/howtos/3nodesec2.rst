@@ -19,14 +19,14 @@ To set up |PXC|:
 
 #. Create data directories:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       mkdir -p /mnt/data
       mysql_install_db --datadir=/mnt/data --user=mysql
 
 #. Stop the firewall service: 
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       service iptables stop
 
@@ -34,7 +34,7 @@ To set up |PXC|:
       but open ports 3306, 4444, 4567, 4568.
       For example to open port 4567 on 192.168.0.1:
 
-      .. prompt:: bash
+      .. code-block:: bash
 
          iptables -A INPUT -i eth0 -p tcp -m tcp --source 192.168.0.1/24 --dport 4567 -j ACCEPT
 
