@@ -31,7 +31,7 @@ To upgrade the cluster, follow these steps for each node:
 
 #. Stop the ``mysql`` process:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo service mysql stop
 
@@ -62,7 +62,7 @@ To upgrade the cluster, follow these steps for each node:
    by setting the :variable:`wsrep_provider` variable to ``none``.
    For example:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo mysqld --skip-grant-tables --user=mysql --wsrep-provider='none'
 
@@ -77,7 +77,7 @@ To upgrade the cluster, follow these steps for each node:
 
 #. Start the node as normal:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo service mysql start
 

@@ -22,7 +22,7 @@ with application servers.
 
 #. Install HAProxy and ``sysbench`` on the client node:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       yum -y install haproxy sysbench
 
@@ -327,13 +327,13 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
 
 #. Populate the table with data for the benchmark:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3307 --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 prepare
 
 3. Run the benchmark on port 3307:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3307 --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 --num-threads=8 run
 
@@ -348,7 +348,7 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
 
 4. Run the same benchmark on port 3306:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sysbench --test=oltp --db-driver=mysql --mysql-engine-trx=yes --mysql-table-engine=innodb --mysql-host=127.0.0.1 --mysql-port=3306 --mysql-user=sbtest --mysql-password=sbpass --oltp-table-size=10000 --num-threads=8 run
 

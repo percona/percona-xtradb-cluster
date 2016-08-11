@@ -30,14 +30,14 @@ Installing from Repositories
 
 1. Fetch the repository packages from Percona web:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       wget https://repo.percona.com/apt/percona-release_0.1-3.$(lsb_release -sc)_all.deb
 
 #. Install the downloaded package with :program:`dpkg`.
    To do that, run the following command as root or with :program:`sudo`:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo dpkg -i percona-release_0.1-3.$(lsb_release -sc)_all.deb
 
@@ -52,13 +52,13 @@ Installing from Repositories
 
 #. Update the local cache:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo apt-get update
 
 #. Install the server package:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       sudo apt-get install percona-xtradb-cluster-57
 

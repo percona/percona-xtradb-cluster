@@ -75,7 +75,7 @@ To compile |PXC| from source code:
 
 1. Clone the |PXC| repository:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       git clone https://github.com/percona/percona-xtradb-cluster.git
 
@@ -87,7 +87,7 @@ To compile |PXC| from source code:
 
 3. Clone Percona's fork of Galera into the same directory:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       cd percona-xtradb-cluster
       git clone https://github.com/percona/galera percona-xtradb-cluster-galera
@@ -103,7 +103,7 @@ To compile |PXC| from source code:
    For example, if you want to build into :file:`./pxc-build`,
    run the following:
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       mkdir ./pxc-build
       ./build-ps/build-binary.sh ./pxc-build

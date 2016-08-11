@@ -95,7 +95,7 @@ To set up the cluster:
 #. Start the first node using the following command
    (from the |PXC| install directory):
 
-   .. prompt:: bash
+   .. code-block:: bash
 
       bin/mysqld_safe --defaults-file=/etc/my.4000.cnf --wsrep-new-cluster
 
