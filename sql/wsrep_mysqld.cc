@@ -70,11 +70,7 @@ my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
  * End configuration options
  */
 
-static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
-const wsrep_uuid_t* wsrep_cluster_uuid()
-{
-  return &cluster_uuid;
-}
+static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
 static char         cluster_uuid_str[40]= { 0, };
 static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 {
