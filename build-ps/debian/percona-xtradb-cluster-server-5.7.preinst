@@ -46,6 +46,7 @@ case "$1" in
 		MYSQLLOG=/var/log/mysql
 		MYSQLRUN=/var/run/mysqld
 		MYSQLKEYRING=/var/lib/mysql-keyring
+                MYSQLLOGFILE=/var/log/mysqld.log
 
 		if ! getent group mysql >/dev/null;
 		then
@@ -86,6 +87,12 @@ case "$1" in
 			touch ${MYSQLLOG}/error.log
 			chmod 640 ${MYSQLLOG}/error.log
 			chown mysql:adm ${MYSQLLOG}/error.log
+		fi
+                if [ ! -e ${MYSQLLOGFILE} ];
+		then
+			touch ${MYSQLLOGFILE}
+			chmod 640 ${MYSQLLOGFILE}
+			chown mysql:adm ${MYSQLLOGFILE}
 		fi
 
 		if [ ! -d ${MYSQLRUN} -a ! -L ${MYSQLRUN} ];

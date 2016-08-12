@@ -344,13 +344,14 @@ URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
 Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix}
-Provides:       mysql-server
+Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
 Conflicts: Percona-XtraDB-Cluster-galera-2 Percona-XtraDB-Cluster-galera-3
+Obsoletes: galera-57
 
 # Think about what you use here since the first step is to
 # run a rm -rf
@@ -564,7 +565,7 @@ applications.
 %package -n Percona-XtraDB-Cluster-garbd%{product_suffix}
 Summary:	Garbd component of Percona XtraDB Cluster
 Group:		Applications/Databases
-Provides:       garbd3
+Provides:       garbd3 galera-garbd-57 galera-57-debuginfo
 Requires:       %{distro_requires}
 %if 0%{?systemd}
 BuildRequires:  systemd
@@ -578,6 +579,7 @@ Requires(post):   /sbin/chkconfig
 Requires(preun):  /sbin/chkconfig
 Requires(preun):  /sbin/service
 %endif
+Obsoletes:	galera-57-debuginfo galera-garbd-57
 
 %description -n Percona-XtraDB-Cluster-garbd%{product_suffix}
 This package contains the garb binary and init scripts.
@@ -784,7 +786,8 @@ pushd percona-xtradb-cluster-galera
   export CC=gcc44
   export CXX=g++44
 %endif
-scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 garb/garbd libgalera_smm.so %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} psi=1 boost_pool=0 libgalera_smm.so %{scons_arch} %{scons_args}
+scons %{?_smp_mflags}  revno=%{galera_revision} version=%{galera_version} boost_pool=0 garb/garbd %{scons_arch} %{scons_args}
 popd
 
 

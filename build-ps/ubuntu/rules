@@ -136,8 +136,7 @@ endif
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
 		-DWITH_EXTRA_CHARSETS=all ..
-
-	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 garb/garbd libgalera_smm.so $(SCONS_ARGS)
+	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
 
 	touch $@
 
@@ -153,7 +152,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 endif
 
 	cd $(builddir) && $(MAKE) -j$(NCPU) VERBOSE=1
-	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 garb/garbd libgalera_smm.so $(SCONS_ARGS)
+	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
 
 	touch $@
 

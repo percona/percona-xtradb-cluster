@@ -55,6 +55,7 @@ Installation
    :titlesonly:
 
    install/index
+   install/upgrade_guide
 
 Features
 ========
@@ -95,7 +96,7 @@ How-tos
    howtos/ubuntu_howto
    howtos/singlebox
    howtos/3nodesec2
-   howtos/encrypting-traffic
+   howtos/encrypt-traffic
    howtos/haproxy
    howtos/virt_sandbox
 
