@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -46,9 +46,9 @@
   rpl_gtid.h, hence the early forward declaration.
 */
 static void error(const char *format, ...)
-  __attribute__((format(printf, 1, 2)));
+  MY_ATTRIBUTE((format(printf, 1, 2)));
 static void warning(const char *format, ...)
-  __attribute__((format(printf, 1, 2)));
+  MY_ATTRIBUTE((format(printf, 1, 2)));
 
 #include "rpl_gtid.h"
 #include "log_event.h"
@@ -2121,7 +2121,7 @@ static my_time_t convert_str_to_timestamp(const char* str)
 
 
 extern "C" my_bool
-get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
+get_one_option(int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
 	       char *argument)
 {
   bool tty_password=0;
@@ -2260,6 +2260,9 @@ static int parse_args(int *argc, char*** argv)
 */
 static Exit_status safe_connect()
 {
+  /* If we are opening a new connection, close the old one first */
+  if (mysql)
+    mysql_close(mysql);
   mysql= mysql_init(NULL);
 
   if (!mysql)
@@ -2788,6 +2791,7 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
                                        MYF(MY_WME))))
           {
             error("Could not create log file '%s'", log_file_name);
+            reset_temp_buf_and_delete(ev);
             DBUG_RETURN(ERROR_STOP);
           }
           DBUG_EXECUTE_IF("simulate_result_file_write_error_for_FD_event",
@@ -2796,6 +2800,7 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
                         BIN_LOG_HEADER_SIZE, MYF(MY_NABP)))
           {
             error("Could not write into log file '%s'", log_file_name);
+            reset_temp_buf_and_delete(ev);
             DBUG_RETURN(ERROR_STOP);
           }
           /*
@@ -2846,7 +2851,10 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
       File file;
 
       if ((file= load_processor.prepare_new_file_for_old_format(le,fname)) < 0)
+      {
+        reset_temp_buf_and_delete(ev);
         DBUG_RETURN(ERROR_STOP);
+      }
 
       retval= process_event(print_event_info, ev, old_off, logname);
       if (retval != OK_CONTINUE)

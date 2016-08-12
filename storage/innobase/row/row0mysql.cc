@@ -753,6 +753,7 @@ handle_new_error:
 	case DB_FTS_INVALID_DOCID:
 	case DB_INTERRUPTED:
 	case DB_CANT_CREATE_GEOMETRY_OBJECT:
+	case DB_COMPUTE_VALUE_FAILED:
 		DBUG_EXECUTE_IF("row_mysql_crash_if_error", {
 					log_buffer_flush_to_disk();
 					DBUG_SUICIDE(); });
@@ -1794,9 +1795,12 @@ error_exit:
 			}
 
 			/* Difference between Doc IDs are restricted within
-			4 bytes integer. See fts_get_encoded_len() */
+			4 bytes integer. See fts_get_encoded_len(). Consecutive
+			doc_ids difference should not exceed
+			FTS_DOC_ID_MAX_STEP value. */
 
-			if (doc_id - next_doc_id >= FTS_DOC_ID_MAX_STEP) {
+			if (next_doc_id > 1
+			    && doc_id - next_doc_id >= FTS_DOC_ID_MAX_STEP) {
 				 ib::error() << "Doc ID " << doc_id
 					<< " is too big. Its difference with"
 					" largest used Doc ID "
@@ -2602,6 +2606,7 @@ run_again:
 		node->cascade_upd_nodes = cascade_upd_nodes;
 		cascade_upd_nodes->pop_front();
 		thr->fk_cascade_depth++;
+		prebuilt->m_mysql_table = NULL;
 
 		goto run_again;
 	}
@@ -3066,28 +3071,38 @@ err_exit:
 			/* We must delete the link file. */
 			RemoteDatafile::delete_link_file(table->name.m_name);
 
-		} else if (compression != NULL) {
+		} else if (compression != NULL && compression[0] != '\0') {
 
-			ut_ad(!is_shared_tablespace(table->space));
+			ut_ad(!dict_table_in_shared_tablespace(table));
 
 			ut_ad(Compression::validate(compression) == DB_SUCCESS);
 
-			err = fil_set_compression(table->space, compression);
+			err = fil_set_compression(table, compression);
 
-			/* The tablespace must be found and we have already
-			done the check for the system tablespace and the
-			temporary tablespace. Compression must be a valid
-			and supported algorithm. */
+			switch (err) {
+			case DB_SUCCESS:
+				break;
+			case DB_NOT_FOUND:
+			case DB_UNSUPPORTED:
+			case DB_IO_NO_PUNCH_HOLE_FS:
+				/* Return these errors */
+				break;
+			case DB_IO_NO_PUNCH_HOLE_TABLESPACE:
+				/* Page Compression will not be used. */
+				err = DB_SUCCESS;
+				break;
+			default:
+				ut_error;
+			}
 
-			/* However, we can check for file system punch hole
-			support only after creating the tablespace. On Windows
+			/* We can check for file system punch hole support
+                        only after creating the tablespace. On Windows
 			we can query that information but not on Linux. */
-
 			ut_ad(err == DB_SUCCESS
-			      || err == DB_IO_NO_PUNCH_HOLE_FS);
+				|| err == DB_IO_NO_PUNCH_HOLE_FS);
 
-                        /* In non-strict mode we ignore dodgy compression
-                        settings. */
+			/* In non-strict mode we ignore dodgy compression
+			settings. */
 		}
 	}
 
@@ -3117,7 +3132,7 @@ err_exit:
 
 		break;
 
-        case DB_UNSUPPORTED:
+	case DB_UNSUPPORTED:
 	case DB_TOO_MANY_CONCURRENT_TRXS:
 		/* We already have .ibd file here. it should be deleted. */
 
@@ -3615,15 +3630,16 @@ row_add_table_to_background_drop_list(
 	return(TRUE);
 }
 
-/*********************************************************************//**
-Reassigns the table identifier of a table.
+/** Reassigns the table identifier of a table.
+@param[in,out]	table	table
+@param[in,out]	trx	transaction
+@param[out]	new_id	new table id
 @return error code or DB_SUCCESS */
 dberr_t
 row_mysql_table_id_reassign(
-/*========================*/
-	dict_table_t*	table,	/*!< in/out: table */
-	trx_t*		trx,	/*!< in/out: transaction */
-	table_id_t*	new_id)	/*!< out: new table id */
+	dict_table_t*	table,
+	trx_t*		trx,
+	table_id_t*	new_id)
 {
 	dberr_t		err;
 	pars_info_t*	info	= pars_info_create();
@@ -3645,6 +3661,8 @@ row_mysql_table_id_reassign(
 		"UPDATE SYS_COLUMNS SET TABLE_ID = :new_id\n"
 		" WHERE TABLE_ID = :old_id;\n"
 		"UPDATE SYS_INDEXES SET TABLE_ID = :new_id\n"
+		" WHERE TABLE_ID = :old_id;\n"
+		"UPDATE SYS_VIRTUAL SET TABLE_ID = :new_id\n"
 		" WHERE TABLE_ID = :old_id;\n"
 		"END;\n", FALSE, trx);
 
@@ -4917,7 +4935,7 @@ row_mysql_drop_temp_tables(void)
 Drop all foreign keys in a database, see Bug#18942.
 Called at the end of row_drop_database_for_mysql().
 @return error code or DB_SUCCESS */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 drop_all_foreign_keys_in_db(
 /*========================*/
@@ -5130,7 +5148,7 @@ loop:
 Checks if a table name contains the string "/#sql" which denotes temporary
 tables in MySQL.
 @return true if temporary table */
-__attribute__((warn_unused_result))
+MY_ATTRIBUTE((warn_unused_result))
 bool
 row_is_mysql_tmp_table_name(
 /*========================*/
@@ -5144,7 +5162,7 @@ row_is_mysql_tmp_table_name(
 /****************************************************************//**
 Delete a single constraint.
 @return error code or DB_SUCCESS */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_delete_constraint_low(
 /*======================*/
@@ -5167,7 +5185,7 @@ row_delete_constraint_low(
 /****************************************************************//**
 Delete a single constraint.
 @return error code or DB_SUCCESS */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_delete_constraint(
 /*==================*/
@@ -5526,6 +5544,13 @@ end:
 			goto funct_exit;
 		}
 
+		/* In case of copy alter, template db_name and
+		table_name should be renamed only for newly
+		created table. */
+		if (table->vc_templ != NULL && !new_is_tmp) {
+			innobase_rename_vc_templ(table);
+		}
+
 		/* We only want to switch off some of the type checking in
 		an ALTER TABLE...ALGORITHM=COPY, not in a RENAME. */
 		dict_names_t	fk_tables;
@@ -5558,6 +5583,24 @@ end:
 			trx_rollback_to_savepoint(trx, NULL);
 			trx->error_state = DB_SUCCESS;
 		}
+
+		/* Check whether virtual column or stored column affects
+		the foreign key constraint of the table. */
+		if (dict_foreigns_has_s_base_col(
+				table->foreign_set, table)) {
+			err = DB_NO_FK_ON_S_BASE_COL;
+			ut_a(DB_SUCCESS == dict_table_rename_in_cache(
+				table, old_name, FALSE));
+			trx->error_state = DB_SUCCESS;
+			trx_rollback_to_savepoint(trx, NULL);
+			trx->error_state = DB_SUCCESS;
+			goto funct_exit;
+		}
+
+		/* Fill the virtual column set in foreign when
+		the table undergoes copy alter operation. */
+		dict_mem_table_free_foreign_vcol_set(table);
+		dict_mem_table_fill_foreign_vcol_set(table);
 
 		while (!fk_tables.empty()) {
 			dict_load_table(fk_tables.front(), true,

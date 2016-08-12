@@ -386,7 +386,7 @@ void ignore_db_dirs_init()
 
 static uchar *
 db_dirs_hash_get_key(const uchar *data, size_t *len_ret,
-                     my_bool __attribute__((unused)))
+                     my_bool MY_ATTRIBUTE((unused)))
 {
   LEX_STRING *e= (LEX_STRING *) data;
 
@@ -4429,13 +4429,18 @@ int make_temporary_tables_old_format(THD *thd, ST_SCHEMA_TABLE *schema_table)
   @param[in]      table                    I_S table
   @param[in]      tmp_table                temporary table
   @param[in]      db                       database name
+  @param[in]      mem_root                 memory root for allocating cloned
+                                           handlers, must have the lifetime of
+                                           the current thread
 
   @return         Operation status
     @retval       0                        success
     @retval       1                        error
 */
 
-static int store_temporary_table_record(THD *thd, TABLE *table, TABLE *tmp_table, const char *db)
+static int store_temporary_table_record(THD *thd, TABLE *table,
+                                        TABLE *tmp_table, const char *db,
+                                        MEM_ROOT* mem_root)
 {
   CHARSET_INFO *cs= system_charset_info;
   DBUG_ENTER("store_temporary_table_record");
@@ -4474,7 +4479,7 @@ static int store_temporary_table_record(THD *thd, TABLE *table, TABLE *tmp_table
   be in use by other thread.  Do not trash it by invoking handler methods on
   it but rather clone it. */
   if (file) {
-    file= file->clone(tmp_table->s->normalized_path.str, thd->mem_root);
+    file= file->clone(tmp_table->s->normalized_path.str, mem_root);
   }
 
   if (file) {
@@ -4575,7 +4580,8 @@ public:
                  "fill_global_temporary_tables_before_storing_rec");
 
       if (store_temporary_table_record(thd, m_tables->table, tmp,
-                                       m_client_thd->lex->select_lex->db))
+                                       m_client_thd->lex->select_lex->db,
+                                       m_client_thd->mem_root))
         m_failed= true;
 
     }
@@ -4622,7 +4628,8 @@ int fill_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond)
 
   for (tmp=thd->temporary_tables; tmp; tmp=tmp->next) {
     if (store_temporary_table_record(thd, tables->table, tmp,
-                                     thd->lex->select_lex->db)) {
+                                     thd->lex->select_lex->db,
+                                     thd->mem_root)) {
       DBUG_RETURN(1);
     }
   }
@@ -8720,6 +8727,34 @@ bool get_schema_tables_result(JOIN *join,
       else
         table_list->table->file->stats.records= 0;
 
+      /* To be removed after 5.7 */
+      if (is_infoschema_db(table_list->db, table_list->db_length))
+      {
+        static LEX_STRING INNODB_LOCKS= {C_STRING_WITH_LEN("INNODB_LOCKS")};
+        static LEX_STRING INNODB_LOCK_WAITS= {C_STRING_WITH_LEN("INNODB_LOCK_WAITS")};
+
+        if (my_strcasecmp(system_charset_info,
+                          table_list->schema_table_name,
+                          INNODB_LOCKS.str) == 0)
+        {
+          /* Deprecated in 5.7 */
+          push_warning_printf(thd, Sql_condition::SL_WARNING,
+                              ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT,
+                              ER_THD(thd, ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT),
+                              "INFORMATION_SCHEMA.INNODB_LOCKS");
+        }
+        else if (my_strcasecmp(system_charset_info,
+                               table_list->schema_table_name,
+                               INNODB_LOCK_WAITS.str) == 0)
+        {
+          /* Deprecated in 5.7 */
+          push_warning_printf(thd, Sql_condition::SL_WARNING,
+                              ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT,
+                              ER_THD(thd, ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT),
+                              "INFORMATION_SCHEMA.INNODB_LOCK_WAITS");
+        }
+      }
+
       if (do_fill_table(thd, table_list, tab))
       {
         result= 1;
@@ -8925,7 +8960,7 @@ ST_FIELD_INFO events_fields_info[]=
    SKIP_OPEN_TABLE},
   {"EVENT_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Name",
    SKIP_OPEN_TABLE},
-  {"DEFINER", 77, MYSQL_TYPE_STRING, 0, 0, "Definer", SKIP_OPEN_TABLE},
+  {"DEFINER", 93, MYSQL_TYPE_STRING, 0, 0, "Definer", SKIP_OPEN_TABLE},
   {"TIME_ZONE", 64, MYSQL_TYPE_STRING, 0, 0, "Time zone", SKIP_OPEN_TABLE},
   {"EVENT_BODY", 8, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE},
   {"EVENT_DEFINITION", 65535, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE},
@@ -9003,7 +9038,7 @@ ST_FIELD_INFO proc_fields_info[]=
   {"SQL_MODE", 32*256, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE},
   {"ROUTINE_COMMENT", 65535, MYSQL_TYPE_STRING, 0, 0, "Comment",
    SKIP_OPEN_TABLE},
-  {"DEFINER", 77, MYSQL_TYPE_STRING, 0, 0, "Definer", SKIP_OPEN_TABLE},
+  {"DEFINER", 93, MYSQL_TYPE_STRING, 0, 0, "Definer", SKIP_OPEN_TABLE},
   {"CHARACTER_SET_CLIENT", MY_CS_NAME_SIZE, MYSQL_TYPE_STRING, 0, 0,
    "character_set_client", SKIP_OPEN_TABLE},
   {"COLLATION_CONNECTION", MY_CS_NAME_SIZE, MYSQL_TYPE_STRING, 0, 0,
@@ -9048,7 +9083,7 @@ ST_FIELD_INFO view_fields_info[]=
   {"VIEW_DEFINITION", 65535, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FRM_ONLY},
   {"CHECK_OPTION", 8, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FRM_ONLY},
   {"IS_UPDATABLE", 3, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FULL_TABLE},
-  {"DEFINER", 77, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FRM_ONLY},
+  {"DEFINER", 93, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FRM_ONLY},
   {"SECURITY_TYPE", 7, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FRM_ONLY},
   {"CHARACTER_SET_CLIENT", MY_CS_NAME_SIZE, MYSQL_TYPE_STRING, 0, 0, 0,
    OPEN_FRM_ONLY},
@@ -9199,7 +9234,7 @@ ST_FIELD_INFO triggers_fields_info[]=
   */
   {"CREATED", 2, MYSQL_TYPE_DATETIME, 0, 1, "Created", OPEN_FRM_ONLY},
   {"SQL_MODE", 32*256, MYSQL_TYPE_STRING, 0, 0, "sql_mode", OPEN_FRM_ONLY},
-  {"DEFINER", 77, MYSQL_TYPE_STRING, 0, 0, "Definer", OPEN_FRM_ONLY},
+  {"DEFINER", 93, MYSQL_TYPE_STRING, 0, 0, "Definer", OPEN_FRM_ONLY},
   {"CHARACTER_SET_CLIENT", MY_CS_NAME_SIZE, MYSQL_TYPE_STRING, 0, 0,
    "character_set_client", OPEN_FRM_ONLY},
   {"COLLATION_CONNECTION", MY_CS_NAME_SIZE, MYSQL_TYPE_STRING, 0, 0,

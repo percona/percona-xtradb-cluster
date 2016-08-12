@@ -26,6 +26,19 @@ xpl::Sql_data_result::Sql_data_result(Sql_data_context &context)
 }
 
 
+void xpl::Sql_data_result::disable_binlog()
+{
+  // save original value of binary logging
+  query("SET @MYSQLX_OLD_LOG_BIN=@@SQL_LOG_BIN");
+  // disable binary logging
+  query("SET SESSION SQL_LOG_BIN=0;");
+}
+
+void xpl::Sql_data_result::restore_binlog()
+{
+  query("SET SESSION SQL_LOG_BIN=@MYSQLX_OLD_LOG_BIN;");
+}
+
 void xpl::Sql_data_result::query(const std::string &query)
 {
   m_result_set.clear();
@@ -44,17 +57,12 @@ void xpl::Sql_data_result::query(const std::string &query)
 }
 
 
-/*
-NOTE: Commented for coverage. Uncomment when needed.
-
 void xpl::Sql_data_result::get_next_field(long &value)
 {
-  //XXX: type check should be more complex
   Field_value &field_value = validate_field_index_no_null(MYSQL_TYPE_LONGLONG);
 
   value = static_cast<long>(field_value.value.v_long);
 }
-*/
 
 
 void xpl::Sql_data_result::get_next_field(bool &value)
@@ -73,7 +81,7 @@ void xpl::Sql_data_result::get_next_field(std::string &value)
 
   value = "";
   if (field_value && field_value->is_string)
-    value = *field_value->value.v_string;    
+    value = *field_value->value.v_string;
 }
 
 

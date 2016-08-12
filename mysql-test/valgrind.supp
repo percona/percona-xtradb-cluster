@@ -1309,7 +1309,6 @@ g   codership/mysql-wsrep/issues#176
    fun:clone
 }
 
-
 #supress warnings from openssl random generator
 
 {
@@ -1405,7 +1404,7 @@ g   codership/mysql-wsrep/issues#176
    Memcheck:Leak
    match-leak-kinds: reachable
    fun:malloc
-   obj:/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.21
+   ...
    fun:call_init.part.0
    fun:call_init
    fun:_dl_init

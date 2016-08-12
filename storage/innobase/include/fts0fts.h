@@ -99,7 +99,9 @@ those defined in mysql file ft_global.h */
 /** Threshold where our optimize thread automatically kicks in */
 #define FTS_OPTIMIZE_THRESHOLD		10000000
 
-#define FTS_DOC_ID_MAX_STEP		10000
+/** Threshold to avoid exhausting of doc ids. Consecutive doc id difference
+should not exceed FTS_DOC_ID_MAX_STEP */
+#define FTS_DOC_ID_MAX_STEP		65535
 
 /** Maximum possible Fulltext word length */
 #define FTS_MAX_WORD_LEN		HA_FT_MAXBYTELEN
@@ -512,7 +514,7 @@ fts_create_common_tables(
 						index */
 	const char*	name,			/*!< in: table name */
 	bool		skip_doc_id_index)	/*!< in: Skip index on doc id */
-	__attribute__((warn_unused_result));
+	MY_ATTRIBUTE((warn_unused_result));
 /******************************************************************//**
 Wrapper function of fts_create_index_tables_low(), create auxiliary
 tables for an FTS index
@@ -523,7 +525,7 @@ fts_create_index_tables(
 	trx_t*			trx,		/*!< in: transaction handle */
 	const dict_index_t*	index)		/*!< in: the FTS index
 						instance */
-	__attribute__((warn_unused_result));
+	MY_ATTRIBUTE((warn_unused_result));
 /******************************************************************//**
 Creates the column specific ancillary tables needed for supporting an
 FTS index on the given table. row_mysql_lock_data_dictionary must have
@@ -538,7 +540,7 @@ fts_create_index_tables_low(
 						instance */
 	const char*	table_name,		/*!< in: the table name */
 	table_id_t	table_id)		/*!< in: the table id */
-	__attribute__((warn_unused_result));
+	MY_ATTRIBUTE((warn_unused_result));
 /******************************************************************//**
 Add the FTS document id hidden column. */
 void
@@ -566,23 +568,27 @@ dberr_t
 fts_commit(
 /*=======*/
 	trx_t*		trx)			/*!< in: transaction */
-	__attribute__((warn_unused_result));
+	MY_ATTRIBUTE((warn_unused_result));
 
-/*******************************************************************//**
-FTS Query entry point.
+/** FTS Query entry point.
+@param[in]	trx		transaction
+@param[in]	index		fts index to search
+@param[in]	flags		FTS search mode
+@param[in]	query_str	FTS query
+@param[in]	query_len	FTS query string len in bytes
+@param[in,out]	result		result doc ids
+@param[in]	limit		limit value
 @return DB_SUCCESS if successful otherwise error code */
 dberr_t
 fts_query(
-/*======*/
-	trx_t*		trx,			/*!< in: transaction */
-	dict_index_t*	index,			/*!< in: FTS index to search */
-	uint		flags,			/*!< in: FTS search mode */
-	const byte*	query,			/*!< in: FTS query */
-	ulint		query_len,		/*!< in: FTS query string len
-						in bytes */
-	fts_result_t**	result)			/*!< out: query result, to be
-						freed by the caller.*/
-	__attribute__((warn_unused_result));
+	trx_t*		trx,
+	dict_index_t*	index,
+	uint		flags,
+	const byte*	query_str,
+	ulint		query_len,
+	fts_result_t**	result,
+	ulonglong	limit)
+	MY_ATTRIBUTE((warn_unused_result));
 
 /******************************************************************//**
 Retrieve the FTS Relevance Ranking result for doc with doc_id
@@ -722,7 +728,7 @@ fts_drop_index_tables(
 /*==================*/
 	trx_t*		trx,			/*!< in: transaction */
 	dict_index_t*	index)			/*!< in: Index to drop */
-	__attribute__((warn_unused_result));
+	MY_ATTRIBUTE((warn_unused_result));
 
 /******************************************************************//**
 Remove the table from the OPTIMIZER's list. We do wait for
@@ -773,12 +779,11 @@ fts_cache_destroy(
 /*==============*/
 	fts_cache_t*	cache);			/*!< in: cache*/
 
-/*********************************************************************//**
-Clear cache. */
+/** Clear cache.
+@param[in,out]	cache	fts cache */
 void
 fts_cache_clear(
-/*============*/
-	fts_cache_t*	cache);			/*!< in: cache */
+	fts_cache_t*	cache);
 
 /*********************************************************************//**
 Initialize things in cache. */
@@ -818,19 +823,21 @@ fts_drop_index_split_tables(
 /*========================*/
 	trx_t*		trx,			/*!< in: transaction */
 	dict_index_t*	index)			/*!< in: fts instance */
-	__attribute__((warn_unused_result));
+	MY_ATTRIBUTE((warn_unused_result));
 
 /** Run SYNC on the table, i.e., write out data from the cache to the
 FTS auxiliary INDEX table and clear the cache at the end.
 @param[in,out]	table		fts table
 @param[in]	unlock_cache	whether unlock cache when write node
 @param[in]	wait		whether wait for existing sync to finish
+@param[in]      has_dict        whether has dict operation lock
 @return DB_SUCCESS on success, error code on failure. */
 dberr_t
 fts_sync_table(
 	dict_table_t*	table,
 	bool		unlock_cache,
-	bool		wait);
+	bool		wait,
+	bool		has_dict);
 
 /****************************************************************//**
 Free the query graph but check whether dict_sys->mutex is already

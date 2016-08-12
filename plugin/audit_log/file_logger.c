@@ -11,7 +11,7 @@
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
+   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA */
 
 #include <my_global.h>
 #include <mysql/plugin.h>
@@ -334,8 +334,8 @@ int logger_printf(LOGGER_HANDLE *log, const char *fmt, ...)
 void logger_init_mutexes()
 {
 #if defined(HAVE_PSI_INTERFACE) && !defined(FLOGGER_NO_PSI) && !defined(FLOGGER_NO_THREADSAFE)
-  if (PSI_server)
-    PSI_server->register_mutex(PSI_CATEGORY, mutex_list, 1);
+  mysql_mutex_register(AUDIT_LOG_PSI_CATEGORY,
+                       mutex_list, array_elements(mutex_list));
 #endif /*HAVE_PSI_INTERFACE && !FLOGGER_NO_PSI*/
 }
 

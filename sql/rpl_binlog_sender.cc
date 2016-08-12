@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -252,10 +252,10 @@ void Binlog_sender::run()
     reconnect anymore.
   */
   mysql_mutex_lock(&m_thd->LOCK_thd_data);
-  bool was_killed_by_duplicate_slave_uuid= m_thd->duplicate_slave_uuid;
+  bool was_killed_by_duplicate_slave_id= m_thd->duplicate_slave_id;
   mysql_mutex_unlock(&m_thd->LOCK_thd_data);
-  if (was_killed_by_duplicate_slave_uuid)
-    set_fatal_error("A slave with the same server_uuid as this slave "
+  if (was_killed_by_duplicate_slave_id)
+    set_fatal_error("A slave with the same server_uuid/server_id as this slave "
                     "has connected to the master");
 
   if (file > 0)
@@ -1057,7 +1057,6 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
     DBUG_RETURN(1);
 
   event_offset= m_packet.length();
-  *event_ptr= (uchar *)m_packet.ptr() + event_offset;
 
   DBUG_EXECUTE_IF("dump_thread_before_read_event",
                   {
@@ -1074,6 +1073,12 @@ inline int Binlog_sender::read_event(IO_CACHE *log_cache, enum_binlog_checksum_a
     goto read_error;
 
   set_last_pos(my_b_tell(log_cache));
+
+  /*
+    Only set event_ptr after reading the event, as the packed might change
+    size (and also changing its pointer) inside read_log_event().
+  */
+  *event_ptr= (uchar *)m_packet.ptr() + event_offset;
 
   DBUG_PRINT("info",
              ("Read event %s",
@@ -1233,7 +1238,7 @@ inline bool Binlog_sender::grow_packet(size_t extra_size)
     DBUG_RETURN(true);
 
   /* Grow the buffer if needed. */
-  if (needed_buffer_size > cur_buffer_size)
+  if (needed_buffer_size >= cur_buffer_size)
   {
     size_t new_buffer_size;
     if (calc_buffer_size(cur_buffer_size, needed_buffer_size,

@@ -21,32 +21,24 @@
 #ifndef _XPL_DISPATCHER_H_
 #define _XPL_DISPATCHER_H_
 
-#include "mysqlx_connection.pb.h"
-#include "mysqlx_sql.pb.h"
-#include "mysqlx_crud.pb.h"
+#include "ngs_common/protocol_protobuf.h"
 
 #include "ngs/protocol_encoder.h"
 
 namespace xpl
 {
-  class Session;
-  class Crud_command_handler;
-  class Sql_data_context;
-  class Expectation_stack;
-  class Session_options;
+class Session;
+class Crud_command_handler;
+class Sql_data_context;
+class Expectation_stack;
+class Session_options;
 
-  namespace dispatcher
-  {
-    bool dispatch_command(Session &session,
-                          Sql_data_context &da,
-                          ngs::Protocol_encoder &proto,
-                          Crud_command_handler &crudh,
-                          Expectation_stack &expect,
-                          Session_options &options,
-                          ngs::Request &command);
-  };
+namespace dispatcher
+{
+bool dispatch_command(Session &session, Crud_command_handler &crudh, Expectation_stack &expect, ngs::Request &command);
+};
 
-  ngs::Error_code show_warnings_and_send(Sql_data_context &da, ngs::Protocol_encoder &proto);
+ngs::Error_code show_warnings_and_send(Sql_data_context &da, ngs::Protocol_encoder &proto);
 }
 
 #endif

@@ -50,13 +50,20 @@ public:
   std::string message(int value) const;
 };
 
+class ssl_init_error : public boost::system::error_category
+{
+public:
+  const char* name() const BOOST_NOEXCEPT;
+  std::string message(int value) const;
+};
+
 class Mysqlx_sync_connection
 {
 public:
   Mysqlx_sync_connection(const char *ssl_key = NULL,
                          const char *ssl_ca = NULL, const char *ssl_ca_path = NULL,
                          const char *ssl_cert = NULL, const char *ssl_cipher = NULL,
-                         const std::size_t timeout = 0l);
+                         const char *tls_version = NULL, const std::size_t timeout = 0l);
 
   ~Mysqlx_sync_connection();
 
@@ -66,7 +73,7 @@ public:
 
   boost::system::error_code write(const void *data, const std::size_t data_length);
   boost::system::error_code read(void *data, const std::size_t data_length);
-  boost::system::error_code read_with_timeout(void *data, std::size_t &data_length, const std::size_t deadline_miliseconds);
+  boost::system::error_code read_with_timeout(void *data, std::size_t &data_length, const int deadline_milliseconds);
 
   void close();
 
@@ -74,7 +81,8 @@ public:
 
 private:
 
-  boost::system::error_code get_ssl_error(int error_id);
+  static boost::system::error_code get_ssl_error(int error_id);
+  static boost::system::error_code get_ssl_init_error(const int init_error_id);
   static bool is_set(const char *string);
 
   const std::size_t   m_timeout;

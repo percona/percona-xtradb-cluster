@@ -1,4 +1,4 @@
-/* Copyright (c) 2004, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2004, 2016, Oracle and/or its affiliates. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -1212,7 +1212,7 @@ typedef struct st_thd_ndb_share {
 } THD_NDB_SHARE;
 static
 uchar *thd_ndb_share_get_key(THD_NDB_SHARE *thd_ndb_share, size_t *length,
-                            my_bool not_used __attribute__((unused)))
+                            my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length= sizeof(thd_ndb_share->key);
   return (uchar*) &thd_ndb_share->key;
@@ -1517,6 +1517,7 @@ static bool field_type_forces_var_part(enum_field_types type)
   case MYSQL_TYPE_BLOB:
   case MYSQL_TYPE_MEDIUM_BLOB:
   case MYSQL_TYPE_LONG_BLOB:
+  case MYSQL_TYPE_JSON:
   case MYSQL_TYPE_GEOMETRY:
     return FALSE;
   default:
@@ -1967,6 +1968,7 @@ type_supports_default_value(enum_field_types mysql_type)
               mysql_type != MYSQL_TYPE_TINY_BLOB &&
               mysql_type != MYSQL_TYPE_MEDIUM_BLOB &&
               mysql_type != MYSQL_TYPE_LONG_BLOB &&
+              mysql_type != MYSQL_TYPE_JSON &&
               mysql_type != MYSQL_TYPE_GEOMETRY);
 
   return ret;
@@ -9649,6 +9651,30 @@ create_ndb_column(THD *thd,
       col.setPartSize(4 * (NDB_MAX_TUPLE_SIZE_IN_WORDS - /* safty */ 13));
     }
     break;
+
+  // MySQL 5.7 binary-encoded JSON type
+  case MYSQL_TYPE_JSON:
+  {
+    /*
+      JSON columns are just like LONG BLOB columns except for inline size
+      and part size. Inline size is chosen to accommodate a large number
+      of embedded json documents without spilling over to the part table.
+      The tradeoff is that only three JSON columns can be defined in a table
+      due to the large inline size. Part size is chosen to optimize use of
+      pages in the part table. Note that much of the JSON functionality is
+      available by storing JSON documents in VARCHAR columns, including
+      extracting keys from documents to be used as indexes.
+     */
+    const int NDB_JSON_INLINE_SIZE = 4000;
+    const int NDB_JSON_PART_SIZE = 8100;
+
+    col.setType(NDBCOL::Blob);
+    col.setInlineSize(NDB_JSON_INLINE_SIZE);
+    col.setPartSize(NDB_JSON_PART_SIZE);
+    col.setStripeSize(ndb_blob_striping() ? 16 : 0);
+    break;
+  }
+
   // Other types
   case MYSQL_TYPE_ENUM:
     col.setType(NDBCOL::Char);
@@ -10380,6 +10406,7 @@ int ha_ndbcluster::create(const char *name,
     case MYSQL_TYPE_BLOB:    
     case MYSQL_TYPE_MEDIUM_BLOB:   
     case MYSQL_TYPE_LONG_BLOB: 
+    case MYSQL_TYPE_JSON:
     {
       NdbDictionary::Column * column= tab.getColumn(i);
       unsigned size= pk_length + (column->getPartSize()+3)/4 + 7;
@@ -12492,7 +12519,7 @@ int ndbcluster_table_exists_in_engine(handlerton *hton, THD* thd,
 
 
 extern "C" uchar* tables_get_key(const char *entry, size_t *length,
-                                my_bool not_used __attribute__((unused)))
+                                my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length= strlen(entry);
   return (uchar*) entry;
