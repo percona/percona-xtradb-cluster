@@ -1,0 +1,15 @@
+SET SESSION wsrep_sync_wait=0;
+SET @@global.wsrep_desync = 'ON';
+SET @@global.wsrep_cluster_address = '';
+SHOW STATUS LIKE 'wsrep_ready';
+Variable_name	Value
+wsrep_ready	OFF
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	non-Primary
+SHOW STATUS LIKE 'wsrep_ready';
+Variable_name	Value
+wsrep_ready	ON
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	Primary
