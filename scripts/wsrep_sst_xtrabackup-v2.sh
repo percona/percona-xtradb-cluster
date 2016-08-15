@@ -294,12 +294,7 @@ read_cnf()
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
 
-    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        keyring=$(parse_cnf mysqld${WSREP_SST_OPT_CONF_SUFFIX} keyring-file-data "")
-    fi
-    if [[ -z $keyring ]]; then
-        keyring=$(parse_cnf mysqld keyring-file-data "")
-    fi
+    keyring=$(parse_cnf mysqld keyring-file-data "")
     if [[ -z $keyring ]]; then
         keyring=$(parse_cnf sst keyring-file-data "")
     fi
@@ -308,12 +303,7 @@ read_cnf()
         KEYRING_DIR=$(dirname "${keyring}")
     fi
 
-    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        keyringsid=$(parse_cnf mysqld${WSREP_SST_OPT_CONF_SUFFIX} server-id "")
-    fi
-    if [[ -z $keyringsid ]]; then
-        keyringsid=$(parse_cnf mysqld server-id "")
-    fi
+    keyringsid=$(parse_cnf mysqld server-id "")
     if [[ -z $keyringsid ]]; then
         keyringsid=$(parse_cnf sst server-id "")
     fi
