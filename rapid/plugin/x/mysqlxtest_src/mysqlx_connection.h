@@ -32,14 +32,7 @@
 #pragma warning (disable : 4018 4996)
 #endif
 
-#include "mysqlx.pb.h"
-#include "mysqlx_connection.pb.h"
-#include "mysqlx_crud.pb.h"
-#include "mysqlx_datatypes.pb.h"
-#include "mysqlx_expr.pb.h"
-#include "mysqlx_expect.pb.h"
-#include "mysqlx_session.pb.h"
-#include "mysqlx_sql.pb.h"
+#include "ngs_common/protocol_protobuf.h"
 #include <boost/enable_shared_from_this.hpp>
 
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
@@ -73,19 +66,16 @@ namespace mysqlx
   struct Ssl_config
   {
     Ssl_config()
-    {
-      key      = NULL;
-      ca       = NULL;
-      ca_path  = NULL;
-      cert     = NULL;
-      cipher   = NULL;
-    }
+    : key(NULL), ca(NULL), ca_path(NULL),
+      cert(NULL), cipher(NULL), tls_version(NULL)
+    {}
 
     const char *key;
     const char *ca;
     const char *ca_path;
     const char *cert;
     const char *cipher;
+    const char *tls_version;
   };
 
   class MYSQLXTEST_PUBLIC Connection : public boost::enable_shared_from_this<Connection>
@@ -114,7 +104,7 @@ namespace mysqlx
 
     Message *recv_raw(int &mid);
     Message *recv_payload(const int mid, const std::size_t msglen);
-    Message *recv_raw_with_deadline(int &mid, const std::size_t deadline_miliseconds);
+    Message *recv_raw_with_deadline(int &mid, const int deadline_milliseconds);
 
     boost::shared_ptr<Result> recv_result();
 
@@ -157,6 +147,8 @@ namespace mysqlx
     void send_bytes(const std::string &data);
 
     void set_trace_protocol(bool flag) { m_trace_packets = flag; }
+
+    boost::shared_ptr<Result> new_empty_result();
 
   private:
     void perform_close();

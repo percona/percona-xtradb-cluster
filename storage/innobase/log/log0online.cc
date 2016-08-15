@@ -11,8 +11,8 @@ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
-this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-Place, Suite 330, Boston, MA 02111-1307 USA
+this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301, USA
 
 *****************************************************************************/
 
@@ -401,7 +401,7 @@ capacity.
 
 @return true if the missing interval can be tracked or if there's no missing
 data.  */
-__attribute__((warn_unused_result))
+MY_ATTRIBUTE((warn_unused_result))
 static
 bool
 log_online_can_track_missing(
@@ -623,10 +623,11 @@ log_online_read_init(void)
 	log_bmp_sys = static_cast<log_bitmap_struct *>
 		(ut_malloc(sizeof(*log_bmp_sys), mem_key_log_online_sys));
 	log_bmp_sys->read_buf_ptr = static_cast<byte *>
-		(ut_malloc(FOLLOW_SCAN_SIZE + srv_log_write_ahead_size,
+		(ut_malloc(FOLLOW_SCAN_SIZE + MAX_SRV_LOG_WRITE_AHEAD_SIZE,
 			   mem_key_log_online_read_buf));
 	log_bmp_sys->read_buf = static_cast<byte *>
-		(ut_align(log_bmp_sys->read_buf_ptr, srv_log_write_ahead_size));
+		(ut_align(log_bmp_sys->read_buf_ptr,
+			  MAX_SRV_LOG_WRITE_AHEAD_SIZE));
 
 	mutex_create(LATCH_ID_LOG_ONLINE, &log_bmp_sys->mutex);
 
@@ -890,7 +891,7 @@ log_online_parse_redo_log(void)
 /*********************************************************************//**
 Check the log block checksum.
 @return true if the log block checksum is OK, false otherwise.  */
-__attribute__((warn_unused_result))
+MY_ATTRIBUTE((warn_unused_result))
 static
 bool
 log_online_is_valid_log_seg(
@@ -984,7 +985,7 @@ log_online_parse_redo_log_block(
 
 /*********************************************************************//**
 Read and parse one redo log chunk and updates the modified page bitmap. */
-__attribute__((warn_unused_result))
+MY_ATTRIBUTE((warn_unused_result))
 static
 bool
 log_online_follow_log_seg(
@@ -1052,7 +1053,7 @@ log_online_follow_log_seg(
 /*********************************************************************//**
 Read and parse the redo log in a given group in FOLLOW_SCAN_SIZE-sized
 chunks and updates the modified page bitmap. */
-__attribute__((warn_unused_result))
+MY_ATTRIBUTE((warn_unused_result))
 static
 bool
 log_online_follow_log_group(
@@ -1806,20 +1807,20 @@ log_online_purge_changed_page_bitmaps(
 		lsn = LSN_MAX;
 	}
 
-	if (srv_track_changed_pages) {
+	if (srv_redo_log_thread_started) {
 		/* User requests might happen with both enabled and disabled
 		tracking */
 		mutex_enter(&log_bmp_sys->mutex);
 	}
 
 	if (!log_online_setup_bitmap_file_range(&bitmap_files, 0, LSN_MAX)) {
-		if (srv_track_changed_pages) {
+		if (srv_redo_log_thread_started) {
 			mutex_exit(&log_bmp_sys->mutex);
 		}
 		return true;
 	}
 
-	if (srv_track_changed_pages && lsn > log_bmp_sys->end_lsn) {
+	if (srv_redo_log_thread_started && lsn > log_bmp_sys->end_lsn) {
 		/* If we have to delete the current output file, close it
 		first. */
 		os_file_close(log_bmp_sys->out.file);
@@ -1853,7 +1854,7 @@ log_online_purge_changed_page_bitmaps(
 		}
 	}
 
-	if (srv_track_changed_pages) {
+	if (srv_redo_log_thread_started) {
 		if (lsn > log_bmp_sys->end_lsn) {
 			lsn_t	new_file_lsn;
 			if (lsn == LSN_MAX) {
@@ -1864,9 +1865,7 @@ log_online_purge_changed_page_bitmaps(
 				new_file_lsn = log_bmp_sys->end_lsn;
 			}
 			if (!log_online_rotate_bitmap_file(new_file_lsn)) {
-				/* If file create failed, signal the log
-				tracking thread to quit next time it wakes
-				up.  */
+				/* If file create failed, stop log tracking */
 				srv_track_changed_pages = FALSE;
 			}
 		}

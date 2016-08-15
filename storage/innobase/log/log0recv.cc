@@ -934,10 +934,11 @@ recv_sys_init(
 	recv_sys->apply_batch_on = FALSE;
 
 	recv_sys->last_block_buf_start = static_cast<byte*>(
-		ut_malloc_nokey(OS_FILE_LOG_BLOCK_SIZE + srv_log_write_ahead_size));
+		ut_malloc_nokey(OS_FILE_LOG_BLOCK_SIZE
+				+ MAX_SRV_LOG_WRITE_AHEAD_SIZE));
 
 	recv_sys->last_block = static_cast<byte*>(ut_align(
-		recv_sys->last_block_buf_start, srv_log_write_ahead_size));
+		recv_sys->last_block_buf_start, MAX_SRV_LOG_WRITE_AHEAD_SIZE));
 
 	recv_sys->found_corrupt_log = false;
 	recv_sys->found_corrupt_fs = false;
@@ -1089,7 +1090,7 @@ recv_check_log_header_checksum(
 @param[out]	max_group	log group, or NULL
 @param[out]	max_field	LOG_CHECKPOINT_1 or LOG_CHECKPOINT_2
 @return error code or DB_SUCCESS */
-static __attribute__((warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 recv_find_max_checkpoint_0(
 	log_group_t**	max_group,
@@ -1226,7 +1227,7 @@ recv_log_format_0_recover(lsn_t lsn)
 @param[out]	max_group	log group, or NULL
 @param[out]	max_field	LOG_CHECKPOINT_1 or LOG_CHECKPOINT_2
 @return error code or DB_SUCCESS */
-static __attribute__((warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 recv_find_max_checkpoint(
 	log_group_t**	max_group,
@@ -3094,7 +3095,7 @@ hash table to wait merging to file pages.
 @param[in]	apply		whether to apply the records
 @return whether MLOG_CHECKPOINT record was seen the first time,
 or corruption was noticed */
-static __attribute__((warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 bool
 recv_parse_log_recs(
 	lsn_t		checkpoint_lsn,
@@ -3833,7 +3834,7 @@ recv_init_missing_space(dberr_t err, const recv_spaces_t::const_iterator& i)
 
 /** Check if all tablespaces were found for crash recovery.
 @return error code or DB_SUCCESS */
-static __attribute__((warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 recv_init_crash_recovery_spaces(void)
 {
@@ -3989,9 +3990,11 @@ recv_recovery_from_checkpoint_start(
 	const page_id_t	page_id(max_cp_group->space_id, 0);
 
 	byte* log_hdr_buf_unalign = static_cast<byte*>(ut_malloc_nokey(
-				LOG_FILE_HDR_SIZE + srv_log_write_ahead_size));
+				LOG_FILE_HDR_SIZE
+				+ MAX_SRV_LOG_WRITE_AHEAD_SIZE));
 	log_hdr_buf = static_cast<byte*>(ut_align(
-				log_hdr_buf_unalign, srv_log_write_ahead_size));
+				log_hdr_buf_unalign,
+				MAX_SRV_LOG_WRITE_AHEAD_SIZE));
 
 	fil_io(IORequestLogRead, true, page_id, univ_page_size, 0,
 	       LOG_FILE_HDR_SIZE, log_hdr_buf, max_cp_group);

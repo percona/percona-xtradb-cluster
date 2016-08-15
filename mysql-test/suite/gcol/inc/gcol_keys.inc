@@ -386,18 +386,22 @@ CREATE TABLE t1 (f1 int, gc int AS (f1 + 1) STORED PRIMARY KEY);
 INSERT INTO t1(f1) VALUES (1),(2),(0),(9),(3),(4),(8),(7),(5),(6);
 ANALYZE TABLE t1;
 --echo # Should use index
+--sorted_result
 SELECT * FROM t1 WHERE f1 + 1 > 7;
 EXPLAIN SELECT * FROM t1 WHERE f1 + 1 > 7;
 SELECT * FROM information_schema.OPTIMIZER_TRACE;
 
 SELECT * FROM t1 WHERE f1 + 1 = 7;
 EXPLAIN SELECT * FROM t1 WHERE f1 + 1 = 7;
+--sorted_result
 SELECT * FROM t1 WHERE f1 + 1 IN (7,5);
 EXPLAIN SELECT * FROM t1 WHERE f1 + 1 IN(7,5);
+--sorted_result
 SELECT * FROM t1 WHERE f1 + 1 BETWEEN 5 AND 7;
 EXPLAIN SELECT * FROM t1 WHERE f1 + 1 BETWEEN 5 AND 7;
 
 --echo # Check that expression isn't transformed for a disabled key
+--sorted_result
 SELECT * FROM t1 IGNORE KEY FOR JOIN(PRIMARY) WHERE f1 + 1 BETWEEN 5 AND 7;
 EXPLAIN SELECT * FROM t1 IGNORE KEY FOR JOIN(PRIMARY) WHERE f1 + 1 BETWEEN 5 AND 7;
 
@@ -415,6 +419,7 @@ EXPLAIN SELECT f1 + 1, MAX(GC)
   FROM t1 IGNORE KEY FOR GROUP BY(PRIMARY) GROUP BY f1 + 1;
 
 --echo # Shouldn't use index
+--sorted_result
 SELECT * FROM t1 WHERE f1 + 1 > 7.0;
 EXPLAIN SELECT * FROM t1 WHERE f1 + 1 > 7.0;
 
@@ -437,9 +442,11 @@ INSERT INTO t1(f1) VALUES
  (070707),(080808);
 ANALYZE TABLE t1;
 
+--sorted_result
 SELECT * FROM t1 WHERE f1 + 1 > 070707;
 --echo # INT column & index should be picked
 EXPLAIN SELECT * FROM t1 WHERE f1 + 1 > 070707;
+--sorted_result
 SELECT * FROM t1 WHERE f1 + 1 > CAST(070707 AS DATE);
 --echo # DATE column & index should be picked
 EXPLAIN SELECT * FROM t1 WHERE f1 + 1 > CAST(070707 AS DATE);
@@ -732,6 +739,13 @@ SELECT a FROM t WHERE (NOT a) = 1;
 EXPLAIN SELECT a FROM t WHERE (CASE WHEN (a AND b) THEN a ELSE b END) = 1;
 --sorted_result
 SELECT a FROM t WHERE (CASE WHEN (a AND b) THEN a ELSE b END) = 1;
+# The expression must be exactly the same as the generated expression.
+# (b AND a) is not recognized as equivalent to (a AND b).
+EXPLAIN SELECT a, b FROM t WHERE 1 = (b AND a);
+SELECT a, b FROM t WHERE 1 = (b AND a);
+--sorted_result
+EXPLAIN SELECT a, b FROM t WHERE 1 = (b OR a);
+SELECT a, b FROM t WHERE 1 = (b OR a);
 DROP TABLE t;
 
 --echo #
@@ -748,6 +762,7 @@ INSERT INTO employees (data) VALUES('{"id": 2, "name": "Joe"}');
 let $query= SELECT * FROM employees WHERE JSON_EXTRACT(data, '\$.name') = 'Jane';
 ANALYZE TABLE employees;
 --eval EXPLAIN $query
+--sorted_result
 --eval $query
 # The index on name1 should not be used, since it contains
 # double-quoted values which don't match the string literal in the
@@ -755,11 +770,13 @@ ANALYZE TABLE employees;
 ALTER TABLE employees ADD INDEX name_idx1(name1);
 ANALYZE TABLE employees;
 --eval EXPLAIN $query
+--sorted_result
 --eval $query
 # The index on name2 contains unquoted strings and can be used.
 ALTER TABLE employees ADD INDEX name_idx2(name2);
 ANALYZE TABLE employees;
 --eval EXPLAIN $query
+--sorted_result
 --eval $query
 DROP TABLE employees;
 --echo #
@@ -808,4 +825,25 @@ ALTER TABLE c1 drop vc2;
 ALTER TABLE c1 ADD vc4 INT(11);
 DROP TABLE c1;
 } 
+
+--echo #
+--echo # Bug#22810883: ASSERTION FAILED:
+--echo #               !(USED_TABS & (~READ_TABLES & ~FILTER_FOR_TABLE))
+--echo #
+CREATE TABLE t1 (a1 INTEGER GENERATED ALWAYS AS (1 AND 0) STORED,
+                 a2 INTEGER, KEY (a1));
+INSERT INTO t1 VALUES ();
+CREATE TABLE t2 (b INTEGER);
+INSERT INTO t2 VALUES (1);
+ANALYZE TABLE t1, t2;
+--echo # Used to choose the index on a1 and get wrong results.
+--let $query= SELECT * FROM t1 WHERE (a2 AND a2) = 0
+--eval EXPLAIN $query
+--eval $query
+--echo # Used to get assertion or wrong results.
+--let $query= SELECT * FROM t1 STRAIGHT_JOIN t2 ON b WHERE (b AND b) = 1
+--eval EXPLAIN $query
+--eval $query
+DROP TABLE t1, t2;
+
 --echo #

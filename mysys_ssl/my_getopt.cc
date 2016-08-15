@@ -1,4 +1,4 @@
-/* Copyright (c) 2002, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -98,7 +98,7 @@ struct my_option_constraint
 
 static uchar *getopt_constraint_get_name(
                 const struct my_option_constraint *moc,
-                size_t *length, my_bool first __attribute__((unused)))
+                size_t *length, my_bool first MY_ATTRIBUTE((unused)))
 {
   *length= moc->length;
   return (uchar *) moc->name;
@@ -1037,10 +1037,19 @@ static int setval(const struct my_option *opts, const void *value,
        )
       )
   {
-    my_getopt_error_reporter(ERROR_LEVEL,
+    if (strncmp(opts->name, "port", 10) == 0)
+    {
+        my_getopt_error_reporter(WARNING_LEVEL,
+                             "%s: Empty value for '%s' specified. Will throw an error in future versions",
+                             my_progname, opts->name);
+    }
+    else
+    {
+        my_getopt_error_reporter(ERROR_LEVEL,
                              "%s: Empty value for '%s' specified",
                              my_progname, opts->name);
-    return EXIT_ARGUMENT_REQUIRED;
+        return EXIT_ARGUMENT_REQUIRED;
+    }
   }
 
   if (value)
@@ -1619,7 +1628,7 @@ static void init_one_value(const struct my_option *option, void *variable,
 */
 
 static void fini_one_value(const struct my_option *option, void *variable,
-			   longlong value __attribute__ ((unused)))
+			   longlong value MY_ATTRIBUTE ((unused)))
 {
   DBUG_ENTER("fini_one_value");
   switch ((option->var_type & GET_TYPE_MASK)) {

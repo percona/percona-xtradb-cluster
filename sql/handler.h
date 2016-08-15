@@ -824,6 +824,17 @@ struct handlerton
    my_bool (*flush_changed_page_bitmaps)(void);
    my_bool (*purge_changed_page_bitmaps)(ulonglong lsn);
 
+   /**
+      Get the list of foreign keys referencing a specified table
+
+      @param thd        The thread handle
+      @param path       Path to the table
+      @param f_key_list[out]    The list of foreign keys
+
+      @return error code or zero for success
+    */
+   int (*get_parent_fk_list)(THD *thd, const char *path,
+                             List<FOREIGN_KEY_INFO>* f_key_list);
    uint32 flags;                                /* global handler flags */
    /*
       Those handlerton functions below are properly initialized at handler
@@ -3699,7 +3710,7 @@ private:
       @retval    0  Success.
       @retval != 0  Error code.
   */
-  virtual int write_row(uchar *buf __attribute__((unused)))
+  virtual int write_row(uchar *buf MY_ATTRIBUTE((unused)))
   {
     return HA_ERR_WRONG_COMMAND;
   }
@@ -3712,13 +3723,13 @@ private:
     the columns required for the error message are not read, the error
     message will contain garbage.
   */
-  virtual int update_row(const uchar *old_data __attribute__((unused)),
-                         uchar *new_data __attribute__((unused)))
+  virtual int update_row(const uchar *old_data MY_ATTRIBUTE((unused)),
+                         uchar *new_data MY_ATTRIBUTE((unused)))
   {
     return HA_ERR_WRONG_COMMAND;
   }
 
-  virtual int delete_row(const uchar *buf __attribute__((unused)))
+  virtual int delete_row(const uchar *buf MY_ATTRIBUTE((unused)))
   {
     return HA_ERR_WRONG_COMMAND;
   }
@@ -3751,8 +3762,8 @@ private:
     @return  non-0 in case of failure, 0 in case of success.
     When lock_type is F_UNLCK, the return value is ignored.
   */
-  virtual int external_lock(THD *thd __attribute__((unused)),
-                            int lock_type __attribute__((unused)))
+  virtual int external_lock(THD *thd MY_ATTRIBUTE((unused)),
+                            int lock_type MY_ATTRIBUTE((unused)))
   {
     return 0;
   }
@@ -4266,5 +4277,6 @@ bool ha_notify_alter_table(THD *thd, const MDL_key *mdl_key,
                            ha_notification_type notification_type);
 
 int commit_owned_gtids(THD *thd, bool all, bool *need_clear_ptr);
+int commit_owned_gtid_by_partial_command(THD *thd);
 
 #endif /* HANDLER_INCLUDED */

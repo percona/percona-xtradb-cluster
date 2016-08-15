@@ -58,7 +58,7 @@ COUNT(*)
 # If this value differs, also update SYS_FUNCTION_COUNT within ./client/upgrade/program.cc
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_SCHEMA = 'sys' AND ROUTINE_TYPE = 'FUNCTION';
 COUNT(*)
-21
+22
 # If this value differs, also update SYS_TABLE_COUNT within ./client/upgrade/program.cc
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'sys' AND TABLE_TYPE = 'BASE TABLE';
 COUNT(*)
@@ -119,6 +119,11 @@ a
 #
 # Run the server with --initialize-insecure --init-file=haha.sql
 # delete mysqld log
+# delete datadir
+#
+# Bug#22777039 - MYSQLD --INITIALIZE DOES NOT SUPPORT THE KEYRING_FILE_DATA OPTION
+#
+# delete temp keyring file
 # delete datadir
 #
 # Cleanup

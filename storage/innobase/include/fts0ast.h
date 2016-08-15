@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2007, 2014, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2007, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -195,6 +195,13 @@ fts_ast_state_free(
 /*===============*/
 	fts_ast_state_t*state);			/*!< in: state instance
 						to free */
+/** Check only union operation involved in the node
+@param[in]	node	ast node to check
+@return true if the node contains only union else false. */
+bool
+fts_ast_node_check_union(
+	fts_ast_node_t*	node);
+
 /******************************************************************//**
 Traverse the AST - in-order traversal.
 @return DB_SUCCESS if all went well */
@@ -209,7 +216,7 @@ fts_ast_visit(
 						and ignored processing an
 						operator, currently we only
 						ignore FTS_IGNORE operator */
-	__attribute__((nonnull, warn_unused_result));
+	MY_ATTRIBUTE((nonnull, warn_unused_result));
 /*****************************************************************//**
 Process (nested) sub-expression, create a new result set to store the
 sub-expression result by processing nodes under current sub-expression
@@ -221,7 +228,7 @@ fts_ast_visit_sub_exp(
 	fts_ast_node_t*		node,		/*!< in: instance to traverse*/
 	fts_ast_callback	visitor,	/*!< in: callback */
 	void*			arg)		/*!< in: callback arg */
-	__attribute__((nonnull, warn_unused_result));
+	MY_ATTRIBUTE((nonnull, warn_unused_result));
 /********************************************************************
 Create a lex instance.*/
 fts_lexer_t*
@@ -230,7 +237,7 @@ fts_lexer_create(
 	ibool		boolean_mode,		/*!< in: query type */
 	const byte*	query,			/*!< in: query string */
 	ulint		query_len)		/*!< in: query string len */
-	__attribute__((nonnull, malloc, warn_unused_result));
+	MY_ATTRIBUTE((nonnull, malloc, warn_unused_result));
 /********************************************************************
 Free an fts_lexer_t instance.*/
 void
@@ -238,7 +245,7 @@ fts_lexer_free(
 /*===========*/
 	fts_lexer_t*	fts_lexer)		/*!< in: lexer instance to
 						free */
-	__attribute__((nonnull));
+	MY_ATTRIBUTE((nonnull));
 
 /**
 Create an ast string object, with NUL-terminator, so the string

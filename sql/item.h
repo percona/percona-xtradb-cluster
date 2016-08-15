@@ -2045,6 +2045,16 @@ public:
   { return true; }
 
   /**
+    Check if a generated expression depends on DEFAULT function.
+
+    @param arg ignored
+
+    @returns false if the function is not DEFAULT(), otherwise true.
+  */
+  virtual bool check_gcol_depend_default_processor(uchar *arg)
+  { return false; }
+
+  /**
     @brief  update_indexed_column_map
     Update columns map for index.
 
@@ -4325,10 +4335,10 @@ public:
   */
   bool found_in_select_list;
   Item_outer_ref(Name_resolution_context *context_arg,
-                 Item_field *outer_field_arg)
-    :Item_direct_ref(context_arg, 0, outer_field_arg->table_name,
-                     outer_field_arg->field_name),
-    outer_ref(outer_field_arg), in_sum_func(0),
+                 Item_ident *ident_arg)
+    :Item_direct_ref(context_arg, 0, ident_arg->table_name,
+                     ident_arg->field_name),
+    outer_ref(ident_arg), in_sum_func(0),
     found_in_select_list(0)
   {
     ref= &outer_ref;
@@ -4909,6 +4919,9 @@ public:
            (arg && arg->walk(processor, walk, args)) ||
            ((walk & WALK_POSTFIX) && (this->*processor)(args));
   }
+
+  bool check_gcol_depend_default_processor(uchar *arg)
+  { return true; }
 
   Item *transform(Item_transformer transformer, uchar *args);
 };

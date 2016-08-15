@@ -188,6 +188,9 @@ Currently we support native aio on windows and linux */
 my_bool	srv_use_native_aio = TRUE;
 my_bool	srv_numa_interleave = FALSE;
 
+/** Whether the redo log tracking is currently enabled. Note that it is
+possible for the log tracker thread to be running and the tracking to be
+disabled */
 my_bool	srv_track_changed_pages = FALSE;
 
 ulonglong	srv_max_bitmap_file_size = 100 * 1024 * 1024;
@@ -687,6 +690,9 @@ os_event_t	srv_checkpoint_completed_event;
 
 os_event_t	srv_redo_log_tracked_event;
 
+/** Whether the redo log tracker thread has been started. Does not take into
+account whether the tracking is currently enabled (see srv_track_changed_pages
+for that) */
 bool	srv_redo_log_thread_started = false;
 
 #ifdef HAVE_PSI_STAGE_INTERFACE
@@ -1272,8 +1278,9 @@ srv_printf_innodb_monitor(
 	ulong	btr_search_sys_variable;
 	ulint	lock_sys_subtotal;
 	ulint	recv_sys_subtotal;
+	size_t	dict_sys_hash_size;
+	ulint	dict_sys_size;
 
-	ulint	i;
 	trx_t*	trx;
 
 	mutex_enter(&srv_innodb_monitor_mutex);
@@ -1397,25 +1404,9 @@ srv_printf_innodb_monitor(
 
 	/* Calculate AHI constant and variable memory allocations */
 
-	btr_search_sys_constant = 0;
-	btr_search_sys_variable = 0;
-
-	ut_ad(btr_search_sys->hash_tables);
-
-	for (i = 0; i < btr_ahi_parts; i++) {
-		hash_table_t* ht = btr_search_sys->hash_tables[i];
-
-		ut_ad(ht);
-		ut_ad(ht->heap);
-
-		/* Multiple mutexes/heaps are currently never used for adaptive
-		hash index tables. */
-		ut_ad(!ht->n_sync_obj);
-		ut_ad(!ht->heaps);
-
-		btr_search_sys_variable += mem_heap_get_size(ht->heap);
-		btr_search_sys_constant += ht->n_cells * sizeof(hash_cell_t);
-	}
+	btr_search_sys_constant = btr_search_sys_constant_mem;
+	os_rmb;
+	btr_search_sys_variable = btr_search_sys_variable_mem;
 
 	lock_sys_subtotal = 0;
 	if (trx_sys) {
@@ -1434,6 +1425,9 @@ srv_printf_innodb_monitor(
 	recv_sys_subtotal = ((recv_sys && recv_sys->addr_hash)
 			? mem_heap_get_size(recv_sys->heap) : 0);
 
+	dict_sys_hash_size = dict_sys->hash_size;
+	dict_sys_size = dict_sys->size;
+
 	fprintf(file,
 			"Internal hash tables (constant factor + variable factor)\n"
 			"    Adaptive hash index %lu \t(%lu + " ULINTPF ")\n"
@@ -1449,14 +1443,9 @@ srv_printf_innodb_monitor(
 
 			(ulong) (buf_pool_from_array(0)->page_hash->n_cells * sizeof(hash_cell_t)),
 
-			(ulong) (dict_sys ? ((dict_sys->table_hash->n_cells
-						+ dict_sys->table_id_hash->n_cells
-						) * sizeof(hash_cell_t)
-					+ dict_sys->size) : 0),
-			(ulong) (dict_sys ? ((dict_sys->table_hash->n_cells
-							+ dict_sys->table_id_hash->n_cells
-							) * sizeof(hash_cell_t)) : 0),
-			dict_sys ? (dict_sys->size) : 0,
+			(ulong) (dict_sys_hash_size + dict_sys_size),
+			(ulong) (dict_sys_hash_size),
+			(ulong) (dict_sys_size),
 
 			(ulong) (fil_system_hash_cells() * sizeof(hash_cell_t)
 					+ fil_system_hash_nodes()),
@@ -1575,35 +1564,11 @@ srv_export_innodb_status(void)
 	buf_get_total_list_len(&LRU_len, &free_len, &flush_list_len);
 	buf_get_total_list_size_in_bytes(&buf_pools_list_size);
 
-	mem_adaptive_hash = 0;
+	os_rmb;
+	mem_adaptive_hash
+		= btr_search_sys_constant_mem + btr_search_sys_variable_mem;
 
-	rw_lock_s_lock(btr_search_latches[0]);
-
-	ut_ad(btr_search_sys->hash_tables);
-
-	for (i = 0; i < btr_ahi_parts; i++) {
-		hash_table_t*	ht = btr_search_sys->hash_tables[i];
-
-		ut_ad(ht);
-		ut_ad(ht->heap);
-		/* Multiple mutexes/heaps are currently never used for adaptive
-		hash index tables. */
-		ut_ad(!ht->n_sync_obj);
-		ut_ad(!ht->heaps);
-
-		mem_adaptive_hash += mem_heap_get_size(ht->heap);
-		mem_adaptive_hash += ht->n_cells * sizeof(hash_cell_t);
-	}
-
-	rw_lock_s_unlock(btr_search_latches[0]);
-
-	mutex_enter(&dict_sys->mutex);
-
-	mem_dictionary = (dict_sys ? ((dict_sys->table_hash->n_cells
-					+ dict_sys->table_id_hash->n_cells
-				      ) * sizeof(hash_cell_t)
-				+ dict_sys->size) : 0);
-	mutex_exit(&dict_sys->mutex);
+	mem_dictionary = dict_sys->hash_size + dict_sys->size;
 
 	mutex_enter(&srv_innodb_monitor_mutex);
 
@@ -1826,7 +1791,7 @@ extern "C"
 os_thread_ret_t
 DECLARE_THREAD(srv_monitor_thread)(
 /*===============================*/
-	void*	arg __attribute__((unused)))
+	void*	arg MY_ATTRIBUTE((unused)))
 			/*!< in: a dummy parameter required by
 			os_thread_create */
 {
@@ -1940,7 +1905,7 @@ extern "C"
 os_thread_ret_t
 DECLARE_THREAD(srv_error_monitor_thread)(
 /*=====================================*/
-	void*	arg __attribute__((unused)))
+	void*	arg MY_ATTRIBUTE((unused)))
 			/*!< in: a dummy parameter required by
 			os_thread_create */
 {
@@ -2178,7 +2143,7 @@ extern "C"
 os_thread_ret_t
 DECLARE_THREAD(srv_redo_log_follow_thread)(
 /*=======================================*/
-	void*	arg __attribute__((unused)))	/*!< in: a dummy parameter
+	void*	arg MY_ATTRIBUTE((unused)))	/*!< in: a dummy parameter
 						     required by
 						     os_thread_create */
 {
@@ -2200,13 +2165,8 @@ DECLARE_THREAD(srv_redo_log_follow_thread)(
 		os_event_wait(srv_checkpoint_completed_event);
 		os_event_reset(srv_checkpoint_completed_event);
 
-#ifdef UNIV_DEBUG
-		if (!srv_track_changed_pages) {
-			continue;
-		}
-#endif
-
-		if (srv_shutdown_state < SRV_SHUTDOWN_LAST_PHASE) {
+		if (srv_track_changed_pages
+		    && srv_shutdown_state < SRV_SHUTDOWN_LAST_PHASE) {
 			if (!log_online_follow_redo_log()) {
 				/* TODO: sync with I_S log tracking status? */
 				ib::error() << "Log tracking bitmap write "
@@ -2539,7 +2499,7 @@ srv_master_do_active_tasks(void)
 	/* Do an ibuf merge */
 	srv_main_thread_op_info = "doing insert buffer merge";
 	counter_time = ut_time_us(NULL);
-	ibuf_merge_in_background(false, ULINT_UNDEFINED);
+	ibuf_merge_in_background(false);
 	MONITOR_INC_TIME_IN_MICRO_SECS(
 		MONITOR_SRV_IBUF_MERGE_MICROSECOND, counter_time);
 
@@ -2628,7 +2588,7 @@ srv_master_do_idle_tasks(void)
 	/* Do an ibuf merge */
 	counter_time = ut_time_us(NULL);
 	srv_main_thread_op_info = "doing insert buffer merge";
-	ibuf_merge_in_background(true, ULINT_UNDEFINED);
+	ibuf_merge_in_background(true);
 	MONITOR_INC_TIME_IN_MICRO_SECS(
 		MONITOR_SRV_IBUF_MERGE_MICROSECOND, counter_time);
 
@@ -2708,7 +2668,7 @@ srv_master_do_shutdown_tasks(
 
 	/* Do an ibuf merge */
 	srv_main_thread_op_info = "doing insert buffer merge";
-	n_bytes_merged = ibuf_merge_in_background(true, ULINT_UNDEFINED);
+	n_bytes_merged = ibuf_merge_in_background(true);
 
 	/* Flush logs if needed */
 	srv_sync_log_buffer_in_background();
@@ -2748,7 +2708,7 @@ extern "C"
 os_thread_ret_t
 DECLARE_THREAD(srv_master_thread)(
 /*==============================*/
-	void*	arg __attribute__((unused)))
+	void*	arg MY_ATTRIBUTE((unused)))
 			/*!< in: a dummy parameter required by
 			os_thread_create */
 {
@@ -2911,7 +2871,7 @@ extern "C"
 os_thread_ret_t
 DECLARE_THREAD(srv_worker_thread)(
 /*==============================*/
-	void*	arg __attribute__((unused)))	/*!< in: a dummy parameter
+	void*	arg MY_ATTRIBUTE((unused)))	/*!< in: a dummy parameter
 						required by os_thread_create */
 {
 	srv_slot_t*	slot;
@@ -3188,7 +3148,7 @@ extern "C"
 os_thread_ret_t
 DECLARE_THREAD(srv_purge_coordinator_thread)(
 /*=========================================*/
-	void*	arg __attribute__((unused)))	/*!< in: a dummy parameter
+	void*	arg MY_ATTRIBUTE((unused)))	/*!< in: a dummy parameter
 						required by os_thread_create */
 {
 	my_thread_init();

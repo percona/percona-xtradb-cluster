@@ -1,5 +1,5 @@
 /*
-(C) 2012, 2013 Percona LLC and/or its affiliates
+(C) 2012, 2016 Percona LLC and/or its affiliates
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 */
 
 #include "auth_mapping.h"
@@ -70,6 +70,19 @@ static const char *get_token(struct token *token,
     token->token_len= 1;
     token->token_type = tok_eq;
     ++ptr;
+    break;
+  case '"':
+    token->token_len= 0;
+    ++ptr;
+    token->token= ptr;
+    while (*ptr && *ptr != '"')
+    {
+      ++token->token_len;
+      ++ptr;
+    }
+    token->token_type= tok_id;
+    if (*ptr)
+      ++ptr;
     break;
   default:
     token->token_len= 0;
