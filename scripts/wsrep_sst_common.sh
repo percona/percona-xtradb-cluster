@@ -220,6 +220,8 @@ parse_cnf()
 {
     local group=$1
     local var=$2
+    local reval=""
+
     # print the default settings for given group using my_print_default.
     # normalize the variable names specified in cnf file (user can use _ or - for example log-bin or log_bin)
     # then grep for needed variable
