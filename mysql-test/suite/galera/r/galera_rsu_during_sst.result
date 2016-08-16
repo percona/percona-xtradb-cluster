@@ -8,6 +8,7 @@ f1	f2
 Shutting down server ...
 SET GLOBAL wsrep_provider_options = 'dbug=d,sst_sent';
 Starting server ...
+# restart
 SET SESSION wsrep_OSU_method = "RSU";
 CREATE TABLE t2 (f1 INTEGER);
 SET GLOBAL wsrep_provider_options = 'signal=sst_sent';
