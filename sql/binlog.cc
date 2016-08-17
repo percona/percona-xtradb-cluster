@@ -11622,23 +11622,6 @@ int wsrep_thd_binlog_rollback(THD* thd, bool all)
   else
     return ha_rollback_low(thd, all);
 }
-void wsrep_cache_gtid_event(THD* thd, Gtid_log_event *ev)
-//void wsrep_cache_gtid_event(THD* thd, Log_event *ev)
-{
-  if (WSREP_ON && !wsrep_preordered_opt)
-  {
-    WSREP_DEBUG("Preserving MySQL master's GTID");
-    //binlog_cache_data *cache_data= & (binlog_cache_mngr *)thd_get_ha_data(thd, binlog_hton);
-    binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
-
-    DBUG_ASSERT(cache_mngr);
-    bool is_transactional(true);
-    binlog_cache_data *cache_data=
-      cache_mngr->get_binlog_cache_data(is_transactional);
-
-    cache_data->write_event(thd, ev);
-  }
-}
 #endif /* WITH_WSREP */
 
 struct st_mysql_storage_engine binlog_storage_engine=
