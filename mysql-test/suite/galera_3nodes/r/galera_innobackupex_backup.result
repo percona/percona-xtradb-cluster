@@ -5,6 +5,7 @@ COUNT(*) = 10
 1
 Killing server ...
 INSERT INTO t1 VALUES (11),(12),(13),(14),(15),(16),(17),(18),(19),(20);
+# restart
 SELECT COUNT(*) = 20 FROM t1;
 COUNT(*) = 20
 1
