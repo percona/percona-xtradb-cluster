@@ -21,12 +21,18 @@
 
   This function quite the same as MYSQL_BIN_LOG::write_cache(),
   with the exception that here we write in buffer instead of log file.
+
+  @params
+    cache   - IO cahce to read events from
+    buf     - buffer where to write the events, may contain some events
+              at call time, this function appends events in the end
+    buf_len - in input, this tells the position where to append events
+              (0 is in the begin)
+              in output, function sets the actual length of buffer after
+              all appends
  */
 int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
 {
-  *buf= NULL;
-  *buf_len= 0;
-
   my_off_t const saved_pos(my_b_tell(cache));
 
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
@@ -38,7 +44,7 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
   uint length = my_b_bytes_in_cache(cache);
   if (unlikely(0 == length)) length = my_b_fill(cache);
 
-  size_t total_length = 0;
+  size_t total_length = *buf_len;
 
   if (likely(length > 0)) do
   {
@@ -157,6 +163,29 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
     size_t used(0);
 
     uint length(my_b_bytes_in_cache(cache));
+    if (thd->wsrep_gtid_event_buf)
+    {
+      if (thd->wsrep_gtid_event_buf_len < allocated)
+      {
+        memcpy(stack_buf, thd->wsrep_gtid_event_buf, thd->wsrep_gtid_event_buf_len);
+      }
+      else
+      {
+        uchar* tmp = (uchar *)my_realloc(key_memory_wsrep, heap_buf,
+                                         thd->wsrep_gtid_event_buf_len, MYF(0));
+        if (!tmp)
+        {
+          WSREP_ERROR("could not (re)allocate buffer for GTID event: %zu + %lu",
+                      allocated, thd->wsrep_gtid_event_buf_len);
+          err = WSREP_TRX_SIZE_EXCEEDED;
+          goto cleanup;
+        }
+        heap_buf = tmp;
+        buf = heap_buf;
+        allocated = thd->wsrep_gtid_event_buf_len;
+      }
+      total_length += thd->wsrep_gtid_event_buf_len;
+    }
     if (unlikely(0 == length)) length = my_b_fill(cache);
 
     if (likely(length > 0)) do
@@ -218,6 +247,9 @@ cleanup:
     if (unlikely(WSREP_OK != err)) wsrep_dump_rbr_buf(thd, buf, used);
 
     my_free(heap_buf);
+    if (thd->wsrep_gtid_event_buf_len < STACK_SIZE) my_free(thd->wsrep_gtid_event_buf);
+    thd->wsrep_gtid_event_buf     = NULL;
+    thd->wsrep_gtid_event_buf_len = 0;
     return err;
 }
 
@@ -247,6 +279,15 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
     size_t total_length(0);
 
     uint length(my_b_bytes_in_cache(cache));
+    if (thd->wsrep_gtid_event_buf)
+    {
+        if(WSREP_OK != (err=wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
+                                              thd->wsrep_gtid_event_buf,
+                                              thd->wsrep_gtid_event_buf_len)))
+                goto cleanup;
+
+        total_length += thd->wsrep_gtid_event_buf_len;
+    }
     if (unlikely(0 == length)) length = my_b_fill(cache);
 
     if (likely(length > 0)) do
@@ -278,6 +319,10 @@ cleanup:
     {
         WSREP_ERROR("failed to reinitialize io-cache");
     }
+
+    if (thd->wsrep_gtid_event_buf) my_free(thd->wsrep_gtid_event_buf);
+    thd->wsrep_gtid_event_buf_len = 0;
+    thd->wsrep_gtid_event_buf     = NULL;
 
     return err;
 }
