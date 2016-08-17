@@ -12,7 +12,7 @@
 --disable_query_log
 let $counter= 5000;
 if ($VALGRIND_TEST) {
-  let $counter= 10000;
+  let $counter= 30000;
 }
 let $mysql_errno= 9999;
 let $successes= 2;

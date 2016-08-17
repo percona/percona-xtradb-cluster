@@ -1116,12 +1116,9 @@ srv_start_wait_for_purge_to_start()
 	}
 }
 
-/*********************************************************************//**
-Initializes the log tracking subsystem and starts its thread.  */
-static
+/** Initializes the log tracking subsystem and starts its thread.  */
 void
-init_log_online(void)
-/*=================*/
+srv_init_log_online(void)
 {
 	if (UNIV_UNLIKELY(srv_force_recovery > 0 || srv_read_only_mode)) {
 		srv_track_changed_pages = FALSE;
@@ -2158,7 +2155,7 @@ files_checked:
 	if (create_new_db) {
 
 		ut_a(!srv_read_only_mode);
-		init_log_online();
+		srv_init_log_online();
 
 		mtr_start(&mtr);
 
@@ -2281,8 +2278,6 @@ files_checked:
 		err = buf_parallel_dblwr_create();
 		if (err != DB_SUCCESS)
 			return(srv_init_abort(err));
-
-		init_log_online();
 
 		purge_queue = trx_sys_init_at_db_start();
 
