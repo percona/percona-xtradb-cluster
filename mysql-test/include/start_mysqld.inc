@@ -5,12 +5,18 @@ if (!$restart_parameters)
 
 if ($galera_wsrep_start_position != '') {
    --echo Using --wsrep-start-position when starting mysqld ...
-   --let $restart_parameters = "restart:$start_mysqld_params --wsrep-start-position=$galera_wsrep_start_position"
+   --let $restart_parameters = restart:$start_mysqld_params --wsrep-start-position=$galera_wsrep_start_position
    --let $galera_wsrep_start_position = 0
 }
 
 if ($galera_wsrep_start_position == '') {
-   --let $restart_parameters = "restart:$start_mysqld_params"
+   if ($start_mysqld_params == '') {
+      --let $restart_parameters = restart
+   }
+
+   if ($start_mysqld_params != '') {
+      --let $restart_parameters = restart:$start_mysqld_params
+   }
 }
 
 # We use --exec echo instead of simple "--echo" because

@@ -3,11 +3,9 @@ CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
-CREATE USER sslsst;
+CREATE USER sslsst REQUIRE SSL;
 GRANT ALL PRIVILEGES ON *.* TO sslsst;
-GRANT USAGE ON *.* TO sslsst REQUIRE SSL;
-Warnings:
-Warning	1287	Using GRANT statement to modify existing user's properties other than privileges is deprecated and will be removed in future release. Use ALTER USER statement for this operation.
+GRANT USAGE ON *.* TO sslsst;
 SET GLOBAL wsrep_sst_auth = 'sslsst:';
 Performing State Transfer on a server that has been temporarily disconnected
 CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;
@@ -109,3 +107,6 @@ CALL mtr.add_suppression("Native table .* has the wrong structure");
 DROP USER sslsst;
 SET GLOBAL general_log = ON;
 SET GLOBAL slow_query_log = ON;
+CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_index_stats` not found");
+CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_table_stats` not found");
+CALL mtr.add_suppression("Fetch of persistent statistics requested for table");

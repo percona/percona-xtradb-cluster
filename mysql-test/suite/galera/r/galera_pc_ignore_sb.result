@@ -10,3 +10,4 @@ SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABL
 VARIABLE_VALUE = 'ON'
 1
 SET GLOBAL wsrep_cluster_address = '';
+# restart

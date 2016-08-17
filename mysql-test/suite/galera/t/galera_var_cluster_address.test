@@ -20,7 +20,7 @@ SHOW STATUS;
 SET SESSION wsrep_sync_wait=0;
 
 --error 0
-SELECT * FROM performance_schema.global_status;
+SELECT COUNT(*) > 0 FROM performance_schema.global_status;
 
 # Must return 'OFF'
 SHOW STATUS LIKE 'wsrep_ready';
@@ -64,7 +64,7 @@ SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_N
 SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
 
 --error 0
-SELECT * FROM performance_schema.global_status;
+SELECT COUNT(*) > 0 FROM performance_schema.global_status;
 
 # Must return 'OFF'
 SHOW STATUS LIKE 'wsrep_ready';
