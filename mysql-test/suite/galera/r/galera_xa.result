@@ -1,0 +1,2 @@
+XA START 't';
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
