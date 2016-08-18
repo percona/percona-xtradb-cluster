@@ -10,9 +10,9 @@
 --source suite/galera/include/galera_sst_set_mysqldump.inc
 
 --connection node_1
-CREATE USER sslsst;
+CREATE USER sslsst REQUIRE SSL;
 GRANT ALL PRIVILEGES ON *.* TO sslsst;
-GRANT USAGE ON *.* TO sslsst REQUIRE SSL;
+GRANT USAGE ON *.* TO sslsst;
 
 SET GLOBAL wsrep_sst_auth = 'sslsst:';
 
@@ -27,3 +27,8 @@ DROP USER sslsst;
 
 SET GLOBAL general_log = ON;
 SET GLOBAL slow_query_log = ON;
+
+CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_index_stats` not found");
+CALL mtr.add_suppression("InnoDB: Table `mysql`.`innodb_table_stats` not found");
+CALL mtr.add_suppression("Fetch of persistent statistics requested for table");
+

@@ -13,8 +13,6 @@
 
 # Global Variables
 
-SELECT COUNT(*) = 40 FROM performance_schema.global_variables WHERE VARIABLE_NAME LIKE 'wsrep_%';
-
 SELECT UPPER(VARIABLE_NAME), VARIABLE_VALUE
 FROM performance_schema.global_variables
 WHERE VARIABLE_NAME LIKE 'wsrep_%'

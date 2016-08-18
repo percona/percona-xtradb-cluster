@@ -15,7 +15,7 @@ Killing server ...
 SET SESSION wsrep_on = OFF;
 SET SESSION wsrep_sync_wait = 0;
 Performing --wsrep-recover ...
-# restart:
+# restart
 SET SESSION wsrep_on = ON;
 SET SESSION wsrep_sync_wait = 7;
 DROP TABLE t1;
