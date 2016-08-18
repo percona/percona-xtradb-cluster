@@ -5336,6 +5336,23 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
+#ifdef WITH_WSREP
+    if (lex->sql_command == SQLCOM_XA_START    ||
+        lex->sql_command == SQLCOM_XA_END      ||
+        lex->sql_command == SQLCOM_XA_PREPARE  ||
+        lex->sql_command == SQLCOM_XA_COMMIT   ||
+        lex->sql_command == SQLCOM_XA_ROLLBACK ||
+        lex->sql_command == SQLCOM_XA_RECOVER)
+    {
+      if (WSREP(thd))
+      {
+        WSREP_DEBUG("XA command attempt: %d %s, thd: %u",
+                    lex->sql_command, thd->query().str, thd->thread_id());
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0), "XA with wsrep replication plugin");
+        break;
+      }
+    }
+#endif /* WITH_WSREP */
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;
