@@ -133,6 +133,8 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
 
   shadow->db = thd->db();
   thd->reset_db(NULL_CSTR);
+
+  shadow->user_time = thd->user_time;
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -143,6 +145,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->set_active_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
+  thd->user_time              = shadow->user_time;
 
   assert(thd->rli_slave == thd->wsrep_rli);
   thd->rli_slave = NULL;

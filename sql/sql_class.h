@@ -61,6 +61,7 @@ struct wsrep_thd_shadow {
   Vio                  *vio;
   ulong                tx_isolation;
   LEX_CSTRING          db;
+  struct timeval       user_time;
 };
 #endif
 class Reprepare_observer;
