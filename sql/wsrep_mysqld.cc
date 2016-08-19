@@ -1410,8 +1410,11 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
   such such action should be blocked at TOI level. */
   if (!wsrep_ready)
   {
-    WSREP_DEBUG("WSREP has not yet prepared node for application use");
-    return 0;
+    WSREP_DEBUG("WSREP replication failed."
+                " Check your wsrep connection state and retry the query.");
+    my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
+	     "your wsrep connection state and retry the query.");
+    return -1;
   }
 
   int ret= 0;
