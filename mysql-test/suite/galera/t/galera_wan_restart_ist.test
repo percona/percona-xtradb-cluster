@@ -145,4 +145,5 @@ CALL mtr.add_suppression("There are no nodes in the same segment that will ever 
 CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
 
 --connection node_4
+CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
 CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
