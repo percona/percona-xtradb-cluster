@@ -1084,6 +1084,13 @@ int wsrep_to_buf_helper(
   }
 #endif
 
+  /* if MySQL GTID event is set, we have to forward it in wsrep channel */
+  if (!ret && thd->wsrep_gtid_event_buf)
+  {
+    *buf     = (uchar *)thd->wsrep_gtid_event_buf;
+    *buf_len = thd->wsrep_gtid_event_buf_len;
+  }
+
   /* if there is prepare query, add event for it */
   if (!ret && thd->wsrep_TOI_pre_query)
   {
@@ -1097,6 +1104,9 @@ int wsrep_to_buf_helper(
   Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
   if (!ret && ev.write(&tmp_io_cache)) ret= 1;
   if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret= 1;
+
+  thd->wsrep_gtid_event_buf= *buf;
+
   close_cached_file(&tmp_io_cache);
   return ret;
 }
@@ -1232,6 +1242,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     thd->tx_priority = 1;
 #endif
     if (buf) my_free(buf);
+    /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
+    thd->wsrep_gtid_event_buf_len = 0;
+    thd->wsrep_gtid_event_buf     = NULL;
+
     wsrep_keys_free(&key_arr);
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
 		thd->wsrep_exec_mode);
@@ -1246,6 +1260,9 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
 	     "your wsrep connection state and retry the query.");
     if (buf) my_free(buf);
+    /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
+    thd->wsrep_gtid_event_buf_len = 0;
+    thd->wsrep_gtid_event_buf     = NULL;
     wsrep_keys_free(&key_arr);
     return -1;
   }
@@ -1256,6 +1273,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 		ret, WSREP_QUERY(thd));
     return 1;
   }
+
+  if (thd->wsrep_gtid_event_buf) my_free(thd->wsrep_gtid_event_buf);
+  thd->wsrep_gtid_event_buf_len = 0;
+  thd->wsrep_gtid_event_buf     = NULL;
   return 0;
 }
 
