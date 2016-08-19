@@ -6,13 +6,46 @@ INSERT INTO t1 VALUES(1);
 SELECT LENGTH(@@global.gtid_executed) > 1;
 LENGTH(@@global.gtid_executed) > 1
 1
+SHOW BINARY LOGS;
+Log_name	File_size
+mysqld-bin.000001	600
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	123	Previous_gtids	1	154	
+mysqld-bin.000001	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000001	219	Query	1	347	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
+mysqld-bin.000001	347	Gtid	1	412	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000001	412	Query	1	484	BEGIN
+mysqld-bin.000001	484	Table_map	1	529	table_id: # (test.t1)
+mysqld-bin.000001	529	Write_rows	1	569	table_id: # flags: STMT_END_F
+mysqld-bin.000001	569	Xid	1	600	COMMIT /* xid=# */
 gtid_executed_equal
 1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000002' FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000002	123	Previous_gtids	2	154	
+mysqld-bin.000002	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000002	219	Query	1	347	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
+mysqld-bin.000002	347	Gtid	1	412	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000002	412	Query	1	475	BEGIN
+mysqld-bin.000002	475	Table_map	1	520	table_id: # (test.t1)
+mysqld-bin.000002	520	Write_rows	1	560	table_id: # flags: STMT_END_F
+mysqld-bin.000002	560	Xid	1	591	COMMIT /* xid=2 */
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
 gtid_executed_equal
 1
+SHOW BINLOG EVENTS IN 'mysqld-bin.000003' FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000003	123	Previous_gtids	3	154	
+mysqld-bin.000003	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
+mysqld-bin.000003	219	Query	1	347	use `test`; CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB
+mysqld-bin.000003	347	Gtid	1	412	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
+mysqld-bin.000003	412	Query	1	475	BEGIN
+mysqld-bin.000003	475	Table_map	1	520	table_id: # (test.t1)
+mysqld-bin.000003	520	Write_rows	1	560	table_id: # flags: STMT_END_F
+mysqld-bin.000003	560	Xid	1	591	COMMIT /* xid=2 */
 DROP TABLE t1;
 STOP SLAVE;
 RESET SLAVE ALL;
