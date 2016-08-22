@@ -49,6 +49,7 @@ CRYPTO_LIBRARY=''
 GALERA_SSL=''
 SSL_OPT=''
 STAG=${STAG:-}
+DEBUG_EXTRA=''
 
 # tag build with this name.
 TAG='1'
@@ -95,7 +96,7 @@ do
         shift
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
-        DEBUG_EXTNAME='-DDEBUG_EXTNAME=OFF'
+        DEBUG_EXTNAME="-DDEBUG_EXTNAME=OFF"
         SCONS_ARGS+=' debug=1'
         ;;
     -G | --copygalera )
@@ -278,6 +279,15 @@ COMMENT="$COMMENT, Revision $REVISION${BUILD_COMMENT:-}"
 export CC=${CC:-gcc}
 export CXX=${CXX:-g++}
 
+# If gcc >= 4.8 we can use ASAN in debug build but not if valgrind build also
+if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && [[ "${CMAKE_OPTS:-}" != *WITH_VALGRIND=ON* ]]; then
+  GCC_VERSION=$(${CC} -dumpversion)
+  GT_VERSION=$(echo -e "4.8.0\n${GCC_VERSION}" | sort -t. -k1,1nr -k2,2nr -k3,3nr | head -1)
+  if [ "${GT_VERSION}" = "${GCC_VERSION}" ]; then
+    DEBUG_EXTRA="${DEBUG_EXTRA} -DWITH_ASAN=ON"
+  fi
+fi
+
 #
 # TokuDB cmake flags [IGNORED FOR PXC]
 if test -d "$SOURCEDIR/storage/tokudb"
@@ -371,6 +381,7 @@ fi
     if [[ $CMAKE_BUILD_TYPE == 'Debug' ]]; then
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
+            $DEBUG_EXTRA \
             -DDEBUG_EXTNAME=ON \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
