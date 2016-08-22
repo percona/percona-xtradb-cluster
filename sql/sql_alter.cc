@@ -367,7 +367,9 @@ bool Sql_cmd_alter_table::execute(THD *thd)
              existing_db_type == DB_TYPE_PERFORMANCE_SCHEMA)
       safe_ops= true;
 
-    if (!safe_ops && existing_db_type != DB_TYPE_INNODB)
+    if (!safe_ops &&
+        existing_db_type != DB_TYPE_INNODB &&
+        existing_db_type != DB_TYPE_UNKNOWN)
     {
       bool block= false;
 
