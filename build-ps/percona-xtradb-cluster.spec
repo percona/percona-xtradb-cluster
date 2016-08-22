@@ -864,7 +864,7 @@ install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d
 #
 
 install -d $RBR%{_sysconfdir}/ld.so.conf.d
-echo %{_libdir} > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
+echo %{_libdir}/mysql > $RBR%{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Delete the symlinks to the libraries from the libdir. These are created by
 # ldconfig(8) afterwards.
 # rm -f $RBR%{_libdir}/libperconaserverclient.so.20*
