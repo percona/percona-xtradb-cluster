@@ -2010,9 +2010,8 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		return(DB_SUCCESS);
 	}
 
-#endif /* WITH_WSREP */
-
 	ut_ad(lock_get_wait(lock));
+#endif /* WITH_WSREP */
 
 	dberr_t	err = deadlock_check(lock);
 
