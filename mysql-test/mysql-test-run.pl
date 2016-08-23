@@ -3578,7 +3578,7 @@ sub check_wsrep_support() {
 
     # ADD mysql client library path to path so that wsrep_notify_cmd can find mysql
     # client for loading the tables. (Don't assume each machine has mysql install)
-    my ($path) = grep { -f "$_/mysql"; } "$::bindir/scripts", $::path_client_bindir;
+    ($path) = grep { -f "$_/mysql"; } "$::bindir/scripts", $::path_client_bindir;
     mtr_error("No mysql client found") unless $path;
     $ENV{PATH}="$path:$ENV{PATH}";
 
