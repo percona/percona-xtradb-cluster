@@ -1440,7 +1440,13 @@ void trans_register_ha(THD *thd, bool all, handlerton *ht_arg,
 */
 #ifdef HAVE_PSI_TRANSACTION_INTERFACE
   if (thd->m_transaction_psi == NULL &&
-      ht_arg->db_type != DB_TYPE_BINLOG)
+      ht_arg->db_type != DB_TYPE_BINLOG
+#ifdef WITH_WSREP
+      /* Do not register transactions for WSREP engine registration should be
+      done by the base transactional storage engine (InnoDB). */
+      && ht_arg->db_type != DB_TYPE_WSREP
+#endif /* WITH_WSREP */
+     )
   {
     const XID *xid= trn_ctx->xid_state()->get_xid();
     my_bool autocommit= !thd->in_multi_stmt_transaction_mode();
