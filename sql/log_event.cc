@@ -10659,13 +10659,13 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       if (WSREP(thd))
       {
         WSREP_WARN("BF applier failed to open_and_lock_tables: %u, fatal: %d "
-                   "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld)",
+                   "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld) ",
                    thd->get_stmt_da()->mysql_errno(),
                    thd->is_fatal_error,
                    thd->wsrep_exec_mode,
                    thd->wsrep_conflict_state,
                    (long long)wsrep_thd_trx_seqno(thd));
-      } 
+      }
 #endif
       if (thd->is_slave_error || thd->is_fatal_error)
       {
