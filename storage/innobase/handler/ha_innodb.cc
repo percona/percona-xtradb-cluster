@@ -20185,7 +20185,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
         case MUST_ABORT:
 		WSREP_DEBUG("victim %llu in MUST ABORT state",
 			    (long long)victim_trx->id);
-                victim_trx->killed_by = bf_trx->id;
+		{
+			os_thread_id_t	bf_id     = os_thread_get_curr_id();
+			os_thread_id_t	thread_id = victim_trx->killed_by;
+			os_compare_and_swap_thread_id(&victim_trx->killed_by,
+							thread_id, bf_id);
+		}
 		wsrep_thd_UNLOCK(thd);
 		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
@@ -20207,7 +20212,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    (long long)victim_trx->id);
-                victim_trx->killed_by = bf_trx->id;
+		{
+			os_thread_id_t	bf_id     = os_thread_get_curr_id();
+			os_thread_id_t	thread_id = victim_trx->killed_by;
+			os_compare_and_swap_thread_id(&victim_trx->killed_by,
+							thread_id, bf_id);
+		}
 		wsrep_thd_awake(thd, signal); 
 
 		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
@@ -20259,7 +20269,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
-                        victim_trx->killed_by = bf_trx->id;
+			{
+				os_thread_id_t	bf_id     = os_thread_get_curr_id();
+				os_thread_id_t	thread_id = victim_trx->killed_by;
+				os_compare_and_swap_thread_id(&victim_trx->killed_by,
+								thread_id, bf_id);
+			}
 			wsrep_thd_awake(thd, signal); 
 		} else {
 			/* abort currently executing query */
@@ -20267,7 +20282,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                                             wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
-                        victim_trx->killed_by = bf_trx->id;
+			{
+				os_thread_id_t	bf_id     = os_thread_get_curr_id();
+				os_thread_id_t	thread_id = victim_trx->killed_by;
+				os_compare_and_swap_thread_id(&victim_trx->killed_by,
+								thread_id, bf_id);
+			}
 			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */
