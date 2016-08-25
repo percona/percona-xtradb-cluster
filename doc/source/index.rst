@@ -98,6 +98,7 @@ How-tos
    howtos/3nodesec2
    howtos/encrypt-traffic
    howtos/haproxy
+   howtos/proxysql
    howtos/virt_sandbox
 
 Reference
