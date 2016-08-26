@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -670,6 +670,7 @@ int my_load_defaults(const char *conf_file, const char **groups,
                                      &args_used, handle_default_option,
                                      (void *) &ctx, dirs)))
   {
+    delete_dynamic(&args);
     free_root(&alloc,MYF(0));
     DBUG_RETURN(error);
   }
@@ -681,6 +682,7 @@ int my_load_defaults(const char *conf_file, const char **groups,
                                      handle_default_option, (void *) &ctx,
                                      dirs)))
   {
+    delete_dynamic(&args);
     free_root(&alloc,MYF(0));
     DBUG_RETURN(error);
   }
@@ -692,7 +694,10 @@ int my_load_defaults(const char *conf_file, const char **groups,
   */
   if (!(ptr=(char*) alloc_root(&alloc,sizeof(alloc)+
 			       (args.elements + *argc + 1 + args_sep) *sizeof(char*))))
+  {
+    delete_dynamic(&args);
     goto err;
+  }
   res= (char**) (ptr+sizeof(alloc));
 
   /* copy name + found arguments + command line arguments to new array */
@@ -1297,7 +1302,7 @@ static int add_directory(MEM_ROOT *alloc, const char *dir, const char **dirs)
   char buf[FN_REFLEN];
   size_t len;
   char *p;
-  my_bool err __attribute__((unused));
+  my_bool err MY_ATTRIBUTE((unused));
 
   len= normalize_dirname(buf, dir);
   if (!(p= strmake_root(alloc, buf, len)))
