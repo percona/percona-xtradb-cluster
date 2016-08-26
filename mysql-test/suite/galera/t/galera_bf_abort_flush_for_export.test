@@ -24,8 +24,7 @@ SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system use
 UNLOCK TABLES;
 COMMIT;
 SET AUTOCOMMIT=ON;
-# given that extra time for server to replicate before checking.
---sleep 1
+SET SESSION wsrep_sync_wait = 7;
 SELECT COUNT(*) = 1 FROM t1;
 
 --let $wsrep_local_bf_aborts_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_bf_aborts'`
