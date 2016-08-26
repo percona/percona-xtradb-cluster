@@ -90,6 +90,7 @@ struct wsrep_thd_shadow {
   ulong                tx_isolation;
   char                 *db;
   size_t               db_length;
+  struct timeval       user_time;
 };
 #endif
 class Reprepare_observer;
@@ -3516,6 +3517,7 @@ public:
   wsrep_gtid_t              wsrep_sync_wait_gtid;
   bool                      wsrep_certify_empty_trx;
   bool                      wsrep_sst_donor;
+  ulong                     wsrep_affected_rows;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

@@ -43,3 +43,5 @@ innodb-wl5522-debug : Unsafe statement written to the binary log using statement
 innodb_stats_table_flag_auto_recalc : Performs multiple restarts in a row which causes '1047: Unknown command' errors
 innodb-lock-inherit-read_commited :  Cannot execute statement: impossible to write to binary log since BINLOG_FORMAT = STATEMENT
 innodb-index-debug : Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT
+flush-hang : Unsafe statement written to the binary log
+innodb_deadlock_with_autoinc : Test uses autoinc_lock_mode = 0

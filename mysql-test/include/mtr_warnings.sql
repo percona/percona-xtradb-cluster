@@ -281,13 +281,17 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Failed to prepare for incremental state transfer: Local state seqno is undefined:"),
  ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
  ("WSREP: gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)"),
- ("WSREP: Action message in non-primary configuration from member"),
+ ("Action message in non-primary configuration from member"),
  ("InnoDB: Resizing redo log from"),
  ("InnoDB: Starting to delete and rewrite log files"),
  ("InnoDB: New log files created, LSN="),
- ("IP address \'127.0.0.2\' could not be resolved: Name or service not known"),
- ("WSREP: evs::proto.*install timer expired"),
-
+-- WSREP: Send action {0x7f86280147f0, 73, STATE_REQUEST} returned -107 (Transport endpoint is not connected)
+ ("Transport endpoint is not connected"),
+-- "WSREP: Protocol violation. JOIN message sender 1.0 (host-91-221-67-96) is not in state transfer (SYNCED). Message ignored.
+ ("is not in state transfer"),
+ ("JOIN message from member .* in non-primary configuration"),
+ ("install timer expired"),
+ ("Last Applied Action message in non-primary configuration from member"),
  ("THE_LAST_SUPPRESSION")||
 
 

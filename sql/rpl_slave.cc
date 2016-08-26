@@ -1871,6 +1871,10 @@ bool is_network_error(uint errorno)
       errorno == ER_SERVER_SHUTDOWN ||
       errorno == ER_NET_READ_INTERRUPTED)
     return TRUE;
+#ifdef WITH_WSREP
+  if (errorno == ER_UNKNOWN_COM_ERROR)
+    return TRUE;
+#endif /* WITH_WSREP */
 
   return FALSE;   
 }
@@ -4587,7 +4591,6 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
         Hence deferred events wont be deleted here.
         They will be deleted in Deferred_log_events::rewind() funciton.
     */
-    WSREP_DEBUG("apply_event_and_update_pos result: %d", exec_res);
     if (*ptr_ev)
     {
       DBUG_ASSERT(*ptr_ev == ev); // event remains to belong to Coordinator

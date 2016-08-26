@@ -947,7 +947,7 @@ extern "C" void wsrep_thd_set_query_state(
 extern "C" void wsrep_thd_set_conflict_state(
 	THD *thd, enum wsrep_conflict_state state)
 {
-  thd->wsrep_conflict_state= state;
+  if (WSREP(thd)) thd->wsrep_conflict_state= state;
 }
 
 
@@ -1326,7 +1326,8 @@ THD::THD(bool enable_plugins)
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_status_vars       = 0;
   wsrep_mysql_replicated  = 0;
-  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+  wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
+  wsrep_affected_rows     = 0;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1742,9 +1743,10 @@ void THD::init(void)
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_queries.clear();
-  wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
   wsrep_certify_empty_trx= false;
   wsrep_sst_donor= false;
+  wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
+  wsrep_affected_rows     = 0;
 #endif
   binlog_row_event_extra_data= 0;
 
@@ -2574,6 +2576,8 @@ void THD::cleanup_after_query()
 
 #ifdef WITH_WSREP
   wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+  if (!in_active_multi_stmt_transaction())
+    wsrep_affected_rows= 0;
 #endif /* WITH_WSREP */
 }
 
