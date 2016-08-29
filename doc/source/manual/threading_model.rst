@@ -44,7 +44,8 @@ There is only one rollback thread to perform rollbacks in case of conflicts.
 Transactions executed in parallel can conflict and may need to roll back.
 Applier transactions always take priority over local transactions.
 This is natural, as applier transactions have been accepted by the cluster,
-and some of the nodes may have already applied them. Local conflicting transactions still have a window to rollback.
+and some of the nodes may have already applied them. Local conflicting
+transactions still have a window to rollback.
 
 All the transactions that need to be rolled back
 are added to the rollback queue, and the rollback thread is notified.

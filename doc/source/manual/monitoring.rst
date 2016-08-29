@@ -61,7 +61,7 @@ at least for the following:
  * Queue sizes:
    :variable:`wsrep_local_recv_queue` and :variable:`wsrep_local_send_queue`
 
- * Flow control: 
+ * Flow control:
    :variable:`wsrep_flow_control_sent` and :variable:`wsrep_flow_control_recv`
 
  * Number of transactions for a node:

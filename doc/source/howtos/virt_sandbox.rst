@@ -79,7 +79,7 @@ with application servers.
    |SST| is performed by taking a backup using XtraBackup,
    then copying it to the new node with ``netcat``.
    After a successful |SST|, you should see the following in the error log::
-   
+
       120619 13:20:17 [Note] WSREP: State transfer required:
            Group state: 77c9da88-b965-11e1-0800-ea53b7b12451:97
            Local state: 00000000-0000-0000-0000-000000000000:-1
@@ -125,14 +125,14 @@ with application servers.
       120619 13:21:19 [Note] WSREP: Member 0 (ip-10-244-33-92) synced with group.
       120619 13:21:19 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 105)
       120619 13:21:20 [Note] WSREP: Synchronized with group, ready for connections
-   
+
    For debugging information about the |SST|,
    you can check the :file:`sst.err` file and the error log.
-   
+
    After |SST| finishes, you can check the cluster size as follows:
-   
+
    .. code-block:: mysql
-   
+
       mysql> show global status like 'wsrep_cluster_size';
       +--------------------+-------+
       | Variable_name      | Value |
@@ -148,7 +148,7 @@ with application servers.
    You can configure HAProxy to connect and write to all cluster nodes
    or to one node at a time.
    The former method can lead to rollbacks due to conflicting writes
-   when optimistic locking at commit time is triggered, 
+   when optimistic locking at commit time is triggered,
    while the latter method avoids rollbacks.
 
    However, most good applications should be able to handle rollbacks,
@@ -245,7 +245,7 @@ with application servers.
       it will send a response with HTTP code ``200 OK``.
       Otherwise, it sends ``503``.
 
-      To create the ``clustercheck`` user, run the following: 
+      To create the ``clustercheck`` user, run the following:
 
       .. code-block:: mysql
 
@@ -266,11 +266,11 @@ with application servers.
          Content-Type: Content-Type: text/plain
 
       You can use ``xinetd`` to daemonize the script.
-      If `xinetd` is not installed, you can install it with ``yum``:: 
+      If `xinetd` is not installed, you can install it with ``yum``::
 
          # yum -y install xinetd
 
-      The service is configured in :file:`/etc/xinetd.d/mysqlchk`:: 
+      The service is configured in :file:`/etc/xinetd.d/mysqlchk`::
 
          # default: on
          # description: mysqlchk
@@ -359,4 +359,11 @@ This example shows how to do it with ``sysbench`` from the EPEL repository.
    All 8 threads are connected to the ``c1`` server.
    ``c2`` and ``c3`` are acting as backup nodes.
 
-If you are using |HAProxy| for |MySQL| you can break the privilege system’s host part, because |MySQL| will think that the connections are always coming from the load balancer. You can work this around using T-Proxy patches and some `iptables` magic for the backwards connections. However in the setup described in this how-to this is not an issue, since each application server has it's own |HAProxy| instance, each application server connects to 127.0.0.1, so MySQL will see that connections are coming from the application servers. Just like in the normal case.
+If you are using |HAProxy| for |MySQL| you can break the privilege system’s
+host part, because |MySQL| will think that the connections are always coming
+from the load balancer. You can work this around using T-Proxy patches and some
+`iptables` magic for the backwards connections. However in the setup described
+in this how-to this is not an issue, since each application server has it's own
+|HAProxy| instance, each application server connects to 127.0.0.1, so MySQL
+will see that connections are coming from the application servers. Just like in
+the normal case.

@@ -22,21 +22,23 @@ you need to generate and use SSL keys and certificates.
 The following example shows :file:`my.cnf` configuration
 for server nodes and client instances to use SSL:
 
-.. code-block:: none
+.. code-block:: text
 
    [mysqld]
    ssl-ca=ca.pem
    ssl-cert=server-cert.pem
    ssl-key=server-key.pem
-   
+
    [client]
    ssl-ca=ca.pem
    ssl-cert=client-cert.pem
    ssl-key=client-key.pem
 
 For more information, see the relevant sections about SSL certificates
-in `Galera Cluster Documentation <http://galeracluster.com/documentation-webpages/sslcert.html>`_.
-and `MySQL Server Documentation <http://dev.mysql.com/doc/refman/5.7/en/creating-ssl-files-using-openssl.html>`_.
+in `Galera Cluster Documentation
+<http://galeracluster.com/documentation-webpages/sslcert.html>`_.
+and `MySQL Server Documentation
+<http://dev.mysql.com/doc/refman/5.7/en/creating-ssl-files-using-openssl.html>`_.
 
 SST Traffic
 ===========
@@ -51,7 +53,7 @@ When copying encrypted data via SST,
 the keyring must be sent over with the files for decryption.
 Make sure that the following options are set in :file:`my.cnf` on all nodes:
 
-.. code-block:: none
+.. code-block:: text
 
    early-plugin-load=keyring_file.so
    keyring-file-data=/path/to/keyring/file
@@ -118,7 +120,7 @@ Depending on the mode you select, other options will be required.
 
 * To enable built-in XtraBackup encryption, use the following configuration:
 
-  .. code-block:: none
+  .. code-block:: text
 
      [sst]
      encrypt=1
@@ -133,7 +135,7 @@ Depending on the mode you select, other options will be required.
 * To enable SST encryption based on OpenSSL
   with the certificate authority (``tca``) and certificate (``tcert``) files:
 
-  .. code-block:: none
+  .. code-block:: text
 
      [sst]
      encrypt=2
@@ -146,7 +148,7 @@ Depending on the mode you select, other options will be required.
 * To enable SST encryption based on OpenSSL
   with the key (``tkey``) and certificate (``tcert``) files:
 
-  .. code-block:: none
+  .. code-block:: text
 
      [sst]
      encrypt=2
@@ -164,8 +166,8 @@ whenever a transaction is performed on one node,
 it is replicated to all other nodes.
 Service messages ensure that all nodes are synchronized.
 
-All of this traffic is transferred via the same underlying communication channel
-used by Galera (``gcomm``).
+All of this traffic is transferred via the same underlying communication
+channel used by Galera (``gcomm``).
 Securing this channel will ensure that IST traffic, write-set replication,
 and service messages are encypted.
 
@@ -188,7 +190,7 @@ using the following parameters.
 
 To set these parameters, use the :variable:`wsrep_provider_options` variable.
 
-.. code-block:: none
+.. code-block:: text
 
    wsrep_provider_options="socket.ssl=yes;socket.ssl_key=/path/to/server-key.pem;socket.ssl_cert=/path/to/server-cert.pem;socket.ssl_ca=/path/to/cacert.pem"
 
@@ -216,21 +218,21 @@ assumig there are two nodes in the cluster:
 
    Set the :variable:`wsrep_provider_options` variable similar to the following:
 
-   .. code-block:: none
+   .. code-block:: text
 
       wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/path/to/upgrade-ca.pem;socket.ssl_cert=path/to/old-cert.pem;socket.ssl_key=/path/to/old-key.pem
 
 #. Restart Node 2 with the new ``socket.ssl_ca``, ``socket.ssl_cert``,
    and ``socket.ssl_key``.
 
-   .. code-block:: none
+   .. code-block:: text
 
       wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/path/to/upgrade-ca.pem;socket.ssl_cert=/path/to/new-cert.pem;socket.ssl_key=/path/to/new-key.pem
 
 #. Restart Node 1 with the new ``socket.ssl_ca``, ``socket.ssl_cert``,
    and ``socket.ssl_key``.
 
-   .. code-block:: none
+   .. code-block:: text
 
       wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/path/to/upgrade-ca.pem;socket.ssl_cert=/path/to/new-cert.pem;socket.ssl_key=/path/to/new-key.pem
 

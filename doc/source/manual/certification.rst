@@ -98,9 +98,7 @@ Common Situation
 
 The following example shows what happens in a common situation.
 ``act_id`` is incremented and assigned only for totally ordered actions,
-and only in primary state (skip messages while in state exchange).
-
-.. code-block:: none
+and only in primary state (skip messages while in state exchange). ::
 
    rcvd->id = ++group->act_id_;
 
@@ -191,9 +189,7 @@ The applier transaction will always win
 and the local conflicting transaction will be rolled back.
 
 The following example shows what happens
-if one of the nodes has local changes that are not synced with the group:
-
-.. code-block:: none
+if one of the nodes has local changes that are not synced with the group: ::
 
   create (id primary key) -> insert (1), (2), (3), (4);
   node-1: wsrep_on=0; insert (5); wsrep_on=1

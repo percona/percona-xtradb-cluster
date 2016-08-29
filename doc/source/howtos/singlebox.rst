@@ -19,7 +19,7 @@ To set up the cluster:
 
    * :file:`/etc/my.4000.cnf`
 
-     .. code-block:: none
+     .. code-block:: text
 
         [mysqld]
         port = 4000
@@ -32,7 +32,7 @@ To set up the cluster:
         wsrep_cluster_address='gcomm://192.168.2.21:5030,192.168.2.21:6030'
         wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:4020
-        wsrep_node_incoming_address=192.168.2.21 
+        wsrep_node_incoming_address=192.168.2.21
         wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:4030;"
@@ -42,7 +42,7 @@ To set up the cluster:
 
    * :file:`/etc/my.5000.cnf`
 
-     .. code-block:: none
+     .. code-block:: text
 
         [mysqld]
         port = 5000
@@ -55,7 +55,7 @@ To set up the cluster:
         wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:6030'
         wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:5020
-        wsrep_node_incoming_address=192.168.2.21 
+        wsrep_node_incoming_address=192.168.2.21
         wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:5030;"
@@ -65,7 +65,7 @@ To set up the cluster:
 
    * :file:`/etc/my.6000.cnf`
 
-     .. code-block:: none
+     .. code-block:: text
 
         [mysqld]
         port = 6000
@@ -78,7 +78,7 @@ To set up the cluster:
         wsrep_cluster_address='gcomm://192.168.2.21:4030,192.168.2.21:5030'
         wsrep_provider=/usr/local/Percona-XtraDB-Cluster-5.7.11-rel4beta-25.14.2.beta.Linux.x86_64/lib/libgalera_smm.so
         wsrep_sst_receive_address=192.168.2.21:6020
-        wsrep_node_incoming_address=192.168.2.21 
+        wsrep_node_incoming_address=192.168.2.21
         wsrep_slave_threads=2
         wsrep_cluster_name=trimethylxanthine
         wsrep_provider_options = "gmcast.listen_addr=tcp://192.168.2.21:6030;"
@@ -104,12 +104,13 @@ To set up the cluster:
     111215 19:01:49 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 0)
     111215 19:01:49 [Note] WSREP: New cluster view: global state: 4c286ccc-2792-11e1-0800-94bd91e32efa:0, view# 1: Primary, number of nodes: 1, my index: 0, protocol version 1
 
-   To check the ports, run the following command::
-        
-        $ netstat -anp | grep mysqld
-        tcp        0      0 192.168.2.21:4030           0.0.0.0:*                   LISTEN      21895/mysqld        
-        tcp        0      0 0.0.0.0:4000                0.0.0.0:*                   LISTEN      21895/mysqld 
+   To check the ports, run the following command:
 
+   .. code-block:: bash
+
+        $ netstat -anp | grep mysqld
+        tcp        0      0 192.168.2.21:4030           0.0.0.0:*                   LISTEN      21895/mysqld
+        tcp        0      0 0.0.0.0:4000                0.0.0.0:*                   LISTEN      21895/mysqld
 
 #. Start the second and third nodes::
 
@@ -123,7 +124,9 @@ To set up the cluster:
     111215 19:22:26 [Note] WSREP: Shifting JOINED -> SYNCED (TO: 2)
     111215 19:22:26 [Note] WSREP: Synchronized with group, ready for connections
 
-   To check the cluster size, run the following command:: 
+   To check the cluster size, run the following command:
+
+   .. code-block:: mysql
 
     mysql -h127.0.0.1 -P6000 -e "show global status like 'wsrep_cluster_size';"
     +--------------------+-------+
@@ -135,7 +138,9 @@ To set up the cluster:
 After that you can connect to any node and perform queries,
 which will be automatically synchronized with other nodes.
 For example, to create a database on the second node,
-you can run the following command::
-        
+you can run the following command:
+
+  .. code-block: mysql
+
     mysql -h127.0.0.1 -P5000 -e "CREATE DATABASE hello_peter"
 

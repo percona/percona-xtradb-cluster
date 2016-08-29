@@ -1,10 +1,10 @@
 .. _install:
 
 =================================
-Installing Percona XtraDB Cluster 
+Installing Percona XtraDB Cluster
 =================================
 
-|PXC| supports most 64-bit Linux distributions.
+|Percona XtraDB Cluster| supports most 64-bit Linux distributions.
 Percona provides packages for popular DEB-based and RPM-based distributions:
 
 * Debian 7 ("wheezy")
@@ -36,7 +36,7 @@ the default storage engine is InnoDB (MyISAM has only experimental support),
 and set the mode of InnoDB autoincrement locks to ``2``.
 The following is an example of the :file:`my.cnf` file:
 
-.. code-block:: none
+.. code-block:: text
 
    [mysqld]
 

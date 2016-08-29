@@ -11,15 +11,15 @@ you need to define which node contains the most relevant data.
 Other nodes will synchronize to this initial node using |SST|.
 
 The |MySQL| configuration file (:file:`my.cnf`) should contain
-at least the following necessary configuration options: :: 
+at least the following necessary configuration options: ::
 
   [mysqld]
   # Path to Galera library
   wsrep_provider=/usr/lib64/libgalera_smm.so
-  
+
   # Cluster connection URL
   wsrep_cluster_address=gcomm://
-  
+
   # Binlog format (Galera requires it to be ROW)
   binlog_format=ROW
 
@@ -40,10 +40,10 @@ Bootstrapping the cluster involes the following steps:
 
 2. After starting a single-node cluster,
    change the :variable:`wsrep_cluster_address` variable
-   to list all the other nodes in the cluster. For example: :: 
+   to list all the other nodes in the cluster. For example: ::
 
     wsrep_cluster_address=gcomm://192.168.70.2,192.168.70.3,192.168.70.4
- 
+
    Cluster membership is not defined by this setting.
    It is defined by the nodes that join the cluster
    with the proper cluster name configured
@@ -58,26 +58,31 @@ Bootstrapping the cluster involes the following steps:
 3. Once the first node is configured, start other nodes, one at a time.
 
    When bootstrapping, other nodes will most likely be using |SST|,
-   so you should avoid joining multiple nodes at once. 
+   so you should avoid joining multiple nodes at once.
 
 If the cluster has been bootstrapped before,
-to avoid editing the :file:`my.cnf` twice to change the :variable:`wsrep_cluster_address` to ``gcomm://`` and then to other node addresses,
-the initial node can be started with: ::
- 
+to avoid editing the :file:`my.cnf` twice to change the
+:variable:`wsrep_cluster_address` to ``gcomm://`` and then to other node
+addresses, the initial node can be started with:
+
+.. code-block:: bash
+
   /etc/init.d/mysql bootstrap-pxc
 
-.. note:: 
+.. note::
 
-   On CentOS/RHEL 7, the following bootstrap command should be used: :: 
+   On CentOS/RHEL 7, the following bootstrap command should be used:
 
-    systemctl start mysql@bootstrap.service
+   .. code-block:: bash
+
+     systemctl start mysql@bootstrap.service
 
 The above commands will ensure that values in :file:`my.cnf` remain unchanged.
 The next time the node is restarted,
 it won't require updating the configuration file.
 This can be useful when the cluster has been previously set up
 and for some reason all nodes went down
-and the cluster needs to be restored. 
+and the cluster needs to be restored.
 
 Other Reading
 =============

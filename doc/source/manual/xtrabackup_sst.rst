@@ -19,9 +19,6 @@ Percona XtraBackup SST works in two stages:
 
 .. note:: As of |PXC| 5.7, ``xtrabackup-v2`` is the only XtraBackup SST method.
 
-.. note:: It is recommended to use |Percona Xtrabackup| 2.1.x
-   versions for XtraBackup SST.
-
 SST Options
 -----------
 
@@ -41,7 +38,7 @@ under ``[sst]``.
 
 .. option:: streamfmt
 
-     :Values: xbstream, tar  
+     :Values: xbstream, tar
      :Default: xbstream
      :Match: Yes
 
@@ -51,13 +48,13 @@ Certain features are not available with ``tar``, for instance:
 encryption, compression, parallel streaming, streaming incremental backups.
 For more information about the ``xbstream`` format, see `The xbstream Binary
 <https://www.percona.com/doc/percona-xtrabackup/2.4/xbstream/xbstream.html>`_.
-             
+
 .. option:: transferfmt
 
      :Values: socat, nc
      :Default: socat
      :Match: Yes
-     
+
 Used to specify the data transfer format.
 The recommended value is ``transferfmt=socat``,
 because it allows for socket options, such as transfer buffer sizes.
@@ -70,14 +67,14 @@ For more information, see `socat(1)
 
 Used to specify the full path to the certificate authority (CA) file
 for ``socat`` encryption based on OpenSSL.
-                          
+
 .. option:: tcert
 
      :Example: tcert=~/etc/ssl/certs/mycert.pem
 
 Used to specify the full path to the certificate file in PEM format
 for ``socat`` encryption based on OpenSSL.
-    
+
 .. note:: For more information about ``tca`` and ``tcert``,
    see http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html.
    The ``tca`` is essentially the self-signed certificate in that example,
@@ -162,12 +159,12 @@ If this is a FIFO, it needs to exist and be open on reader end before itself,
 otherwise ``wsrep_sst_xtrabackup`` will block indefinitely.
 
 .. note:: Value of 0 is not valid.
-           
+
 .. option:: rebuild
 
-    :Values: 0, 1 
+    :Values: 0, 1
     :Default: 0
-    
+
 Used to enable rebuilding of index on joiner node.
 This is independent of compaction, though compaction enables it.
 Rebuild of indexes may be used as an optimization.
@@ -176,11 +173,11 @@ Rebuild of indexes may be used as an optimization.
 
 .. option:: time
 
-    :Values: 0, 1 
-    :Default: 0   
+    :Values: 0, 1
+    :Default: 0
 
 Enabling this option instruments key stages of backup and restore in SST.
-               
+
 .. option:: rlimit
 
     :Example: rlimit=128k
@@ -217,7 +214,7 @@ in :file:`my.cnf` before you enable this option.
 Used to define the files that need to be deleted in the :term:`datadir`
 before running SST,
 so that the state of the other node can be restored cleanly.
-For example: :: 
+For example: ::
 
   [sst]
   cpat='.*galera\.cache$\|.*sst_in_progress$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*\.xyz$'
@@ -225,21 +222,8 @@ For example: ::
 .. note:: This option can only be used when :variable:`wsrep_sst_method`
    is set to ``xtrabackup-v2`` (which is the default value).
 
-.. option:: sst_special_dirs
-   
-     :Values: 0, 1
-     :Default: 1
-
-This option was introduced in |PXC| :rn:`5.6.15-25.2`
-to enable XtraBackup SST to support :variable:`innodb_data_home_dir`
-and :variable:`innodb_log_home_dir` variables in the configuration file.
-|Percona Xtrabackup| 2.1.6 or later is required for this option to work.
- 
-.. note:: This option can only be used when :variable:`wsrep_sst_method`
-   is set to ``xtrabackup-v2`` (which is the default).
- 
 .. option:: compressor
- 
+
     :Default: not set (disabled)
     :Example: compressor='gzip'
 
@@ -281,7 +265,7 @@ for backup, apply, and move stages.
    because they are for passing innobackupex options.
 
 .. option:: sst-initial-timeout
-   
+
    :Default: 100
    :Unit: seconds
 

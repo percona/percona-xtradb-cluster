@@ -12,7 +12,7 @@ Before you begin, make sure that the following packages are installed:
    :header-rows: 1
    :stub-columns: 1
 
-   * - 
+   * -
      - apt
      - yum
    * - Git
@@ -58,7 +58,9 @@ Before you begin, make sure that the following packages are installed:
      - ``libpam-dev``
      - ``pam-devel``
 
-You will likely have all or most of the packages already installed. If you are not sure, run one of the following commands to install any missing dependencies:
+You will likely have all or most of the packages already installed. If you are
+not sure, run one of the following commands to install any missing
+dependencies:
 
 .. code-block:: bash
 

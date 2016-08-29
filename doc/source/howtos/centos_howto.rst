@@ -8,7 +8,7 @@ This tutorial describes how to install and configure three |PXC| nodes
 on CentOS 6.3 servers, using the packages from Percona repositories.
 
 * Node 1
-  
+
   * Host name: ``percona1``
   * IP address: ``192.168.70.71``
 
@@ -86,7 +86,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       the bootstrap service should be used instead: ::
 
          [root@percona1 ~]#  systemctl start mysql@bootstrap.service
- 
+
    The previous command will start the cluster
    with initial :variable:`wsrep_cluster_address` variable
    set to ``gcomm://``.
@@ -96,7 +96,7 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 #. After the first node has been started,
    cluster status can be checked with the following command:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql> show status like 'wsrep%';
       +----------------------------+--------------------------------------+
@@ -115,18 +115,18 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
       +----------------------------+--------------------------------------+
       40 rows in set (0.01 sec)
 
-   This output shows that the cluster has been successfully bootstrapped. 
+   This output shows that the cluster has been successfully bootstrapped.
 
 .. note:: It is not recommended to leave an empty password
    for the root account. Password can be changed as follows:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql@percona1> UPDATE mysql.user SET password=PASSWORD("Passw0rd") where user='root';
       mysql@percona1> FLUSH PRIVILEGES;
 
 To perform :ref:`state_snapshot_transfer` using |XtraBackup|,
-set up a new user with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_: 
+set up a new user with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_:
 
 .. code-block:: mysql
 
@@ -174,8 +174,10 @@ Step 3. Configuring the second node
 
       #Authentication for SST method
       wsrep_sst_auth="sstuser:s3cret"
- 
-#. Start the second node with the following command::
+
+#. Start the second node with the following command:
+
+.. code-block:: bash
 
       [root@percona2 ~]# /etc/init.d/mysql start
 
@@ -185,9 +187,9 @@ Step 3. Configuring the second node
    In order to connect to the cluster and check the status,
    the root password from the first node should be used.
    Cluster status can be checked on both nodes.
-   The following is an example of status from the second node (``percona2``): 
+   The following is an example of status from the second node (``percona2``):
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql> show status like 'wsrep%';
       +----------------------------+--------------------------------------+
@@ -206,7 +208,7 @@ Step 3. Configuring the second node
       +----------------------------+--------------------------------------+
       40 rows in set (0.01 sec)
 
-   This output shows that the new node has been successfully added to the cluster. 
+   This output shows that the new node has been successfully added to the cluster.
 
 Step 4. Configuring the third node
 ==================================
@@ -246,16 +248,18 @@ Step 4. Configuring the third node
       #Authentication for SST method
       wsrep_sst_auth="sstuser:s3cret"
 
-#. Start the third node with the following command:: 
+#. Start the third node with the following command:
+
+.. code-block:: bash
 
       [root@percona3 ~]# /etc/init.d/mysql start
 
 #. After the server has been started,
    it should receive SST automatically.
    Cluster status can be checked on all three nodes.
-   The following is an example of status from the third node (``percona3``): 
+   The following is an example of status from the third node (``percona3``):
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql> show status like 'wsrep%';
       +----------------------------+--------------------------------------+
@@ -283,16 +287,16 @@ To test replication, lets create a new database on second node,
 create a table for that database on the third node,
 and add some records to the table on the first node.
 
-1. Create a new database on the second node: 
+1. Create a new database on the second node:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql@percona2> CREATE DATABASE percona;
       Query OK, 1 row affected (0.01 sec)
 
-#. Create a table on the third node: 
-  
-   .. code-block:: mysql 
+#. Create a table on the third node:
+
+   .. code-block:: mysql
 
       mysql@percona3> USE percona;
       Database changed
@@ -300,16 +304,16 @@ and add some records to the table on the first node.
       mysql@percona3> CREATE TABLE example (node_id INT PRIMARY KEY, node_name VARCHAR(30));
       Query OK, 0 rows affected (0.05 sec)
 
-#. Insert records on the first node: 
+#. Insert records on the first node:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql@percona1> INSERT INTO percona.example VALUES (1, 'percona1');
       Query OK, 1 row affected (0.02 sec)
 
-#. Retrieve all the rows from that table on the second node: 
+#. Retrieve all the rows from that table on the second node:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql@percona2> SELECT * FROM percona.example;
       +---------+-----------+
@@ -321,4 +325,3 @@ and add some records to the table on the first node.
 
 This simple procedure should ensure that all nodes in the cluster
 are synchronized and working as intended.
-

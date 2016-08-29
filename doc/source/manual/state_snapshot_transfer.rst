@@ -69,10 +69,12 @@ To test if the credentials will work,
 run |innobackupex| on the donor node with the username and password
 specified in the :variable:`wsrep_sst_auth` variable.
 For example, if the value of :variable:`wsrep_sst_auth` is ``root:Passw0rd``,
-the |innobackupex| command should look like this: :: 
+the |innobackupex| command should look like this:
+
+.. code-block:: bash
 
   innobackupex --user=root --password=Passw0rd /tmp/
- 
+
 Detailed information on this method
 is provided in :ref:`xtrabackup_sst` documentation.
 

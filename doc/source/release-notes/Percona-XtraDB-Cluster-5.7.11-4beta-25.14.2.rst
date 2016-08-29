@@ -1,7 +1,7 @@
 .. rn:: 5.7.11-4beta-25.14.2
 
 =============================================
-|Percona XtraDB Cluster| 5.7.11-4beta-25.14.2 
+|Percona XtraDB Cluster| 5.7.11-4beta-25.14.2
 =============================================
 
 Percona is glad to announce the release of
@@ -30,4 +30,3 @@ and the following changes:
   It has been replace by ``wsrep_sst_xtrabackup_v2``.
 
 *  The ``wsrep_mysql_replication_bundle`` variable has been removed.
-

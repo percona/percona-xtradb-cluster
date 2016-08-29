@@ -59,7 +59,7 @@ The following limitations apply to |PXC|:
 
 * InnoDB fake changes feature is not supported.
 
-* ``enforce_storage_engine=InnoDB`` is not compatible with 
+* ``enforce_storage_engine=InnoDB`` is not compatible with
   ``wsrep_replicate_myisam=OFF`` (default).
 
 * The :variable:`binlog_rows_query_log_events` variable is not supported.

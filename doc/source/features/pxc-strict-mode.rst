@@ -79,7 +79,7 @@ and do not rely on operations not supported by |PXC|.
 .. warning:: If an unsupported operation is performed on a node
    with ``pxc_strict_mode`` set to ``DISABLED`` or ``PERMISSIVE``,
    it will not be validated on nodes where it is replicated to,
-   even if the destination node has ``pxc_strict_mode`` set to ``ENFORCING``. 
+   even if the destination node has ``pxc_strict_mode`` set to ``ENFORCING``.
 
 This section describes the purpose and consequences of each validation.
 

@@ -103,7 +103,7 @@ Pinning the Packages
 
 If you want to pin your packages to avoid upgrades,
 create a new file :file:`/etc/apt/preferences.d/00percona.pref`
-and add the following lines to it: :: 
+and add the following lines to it: ::
 
   Package: *
   Pin: release o=Percona Development Team
