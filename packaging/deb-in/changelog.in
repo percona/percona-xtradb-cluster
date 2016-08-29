@@ -1,0 +1,20 @@
+mysql-@DEB_PRODUCTNAME@@DEB_PRODUCTSERIES@ (@DEB_SERVERVERSION@@DEB_PLATFORMRELEASE@) @DEB_CODENAME@; urgency=low
+
+  * change to Oracle's "packaging/deb-in/" approach as present in 5.7.14
+    adapt it to Codership's "mysql-wsrep" needs
+    remove all previous "packaging/deb-CODENAME/" directories
+  * other 5.7.14 packaging and/or Debian/Ubuntu changes may or may not be present
+
+ -- Jörg Brühe <joerg.bruehe@fromdual.com>  Thu, 18 Aug 2016 12:15:42 +0200
+
+mysql-wsrep-5.7 (5.7.11-25.10-1) xenial; urgency=low
+
+  * Replace SysV init files by systemd files
+
+ -- Jörg Brühe <joerg.bruehe@fromdual.com>  Fri, 22 Jul 2016 16:15:42 +0200
+
+mysql-wsrep-5.7 (5.7.10-25.10-1) precise; urgency=low
+
+  * Bump version numbers
+
+ -- Otto Kekäläinen <otto@seravo.fi>  Sat, 19 Mar 2016 00:19:49 +0200
