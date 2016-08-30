@@ -1,0 +1,31 @@
+# Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+TODO: Why /bin/bash for some files and /bin/sh for others (this is also the case in native packaging, so might be a reason)
+TODO: Related to above: Should be POSIX compliant
+TODO: Build with -DWITH_SYSTEMD and related to use inbuilt systemd support (Deb8 and Ubuntu15+)
+TODO: Maybe refactor CMakeLists.txt to remove redundancy
+TODO: Clean up install exception list so --list-missing can be changed to --fail-missing
+
+
+###  WSREP stuff
+TODO: Find a more effective way to configure just "packaging/deb-in/"
+TODO: "control.in" is re-ordered like the one working in 5.7.11, for easier comparison.
+      Re-order it back to Oracle sequence when finished, for easier maintenance.
+TODO: Can we unite systemd files (service definition, pre- and post-scriptlets, maybe more) across platforms?
+      In RedHat etc, we have "scripts/systemd/mysqld.service.in" which is working.
+      Can we use that to replace "packaging/deb-in/mysql-packagesource-server-SERIES.mysql.service.in" ?
+TODO: Check whether it was safe to drop "debian/additions/debian-start*", recover from old sources if not.
+
