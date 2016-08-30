@@ -1482,15 +1482,15 @@ end:
       thd->tx_read_only= false;
 
 #ifdef WITH_WSREP
+      LEX* original_saved_lex= thd->lex;
       if (WSREP(thd)) {
           // sql_print_information("sizeof(LEX) = %d", sizeof(struct LEX));
           // sizeof(LEX) = 4512, so it's relatively safe to allocate it on stack.
           LEX lex;
-          LEX* saved = thd->lex;
           lex.sql_command = SQLCOM_DROP_EVENT;
           thd->lex = &lex;
           WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
-          thd->lex = saved;
+          thd->lex= original_saved_lex;
       }
 #endif
      
@@ -1498,7 +1498,9 @@ end:
 
 #ifdef WITH_WSREP
       WSREP_TO_ISOLATION_END;
-  error:
+error:
+      if (thd->lex != original_saved_lex)
+        thd->lex= original_saved_lex;
 #endif      
       thd->tx_read_only= save_tx_read_only;
       thd->security_ctx->master_access= saved_master_access;
