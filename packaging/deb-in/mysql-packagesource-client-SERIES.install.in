@@ -13,8 +13,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-debian/additions/innotop/innotop usr/bin/
-debian/additions/mysqlreport usr/bin/
+# ??? debian/extra/innotop/innotop usr/bin/
+# ??? debian/extra/mysqlreport usr/bin/
+# binaries
 usr/bin/myisam_ftdump
 usr/bin/mysql
 usr/bin/mysql_config_editor
@@ -26,6 +27,19 @@ usr/bin/mysqlimport
 usr/bin/mysqlpump
 usr/bin/mysqlshow
 usr/bin/mysqlslap
+# man pages
+usr/share/man/man1/myisam_ftdump.1
+usr/share/man/man1/mysql.1
+usr/share/man/man1/mysql_config_editor.1
+usr/share/man/man1/mysqladmin.1
+usr/share/man/man1/mysqlcheck.1
+usr/share/man/man1/mysqldump.1
+usr/share/man/man1/mysqldumpslow.1
+usr/share/man/man1/mysqlimport.1
+usr/share/man/man1/mysqlman.1
+usr/share/man/man1/mysqlpump.1
+usr/share/man/man1/mysqlshow.1
+usr/share/man/man1/mysqlslap.1
 # legal
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/README

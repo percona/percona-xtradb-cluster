@@ -145,11 +145,11 @@ Copyright:
  2013-2014, Otto Kekäläinen <otto@seravo.fi>
 License: GPL-2+
 
-Files: debian/additions/mysqlreport*
+Files: debian/extra/mysqlreport*
 Copyright: 2006-2008, Daniel Nichter <public@codenode.com>
 License: GPL-2+
 
-Files: debian/additions/innotop/*
+Files: debian/extra/innotop/*
 Copyright: 2006, Baron Schwartz <baron at xaprb dot com>
 License: Artistic or GPL-2
 

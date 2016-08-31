@@ -1,3 +1,3 @@
-debian/additions/conf.d etc/mysql/
-debian/additions/configure-symlinks usr/share/mysql-common/
-debian/additions/my.cnf.fallback etc/mysql/
+debian/extra/conf.d etc/mysql/
+debian/extra/configure-symlinks usr/share/mysql-common/
+debian/extra/my.cnf.fallback etc/mysql/

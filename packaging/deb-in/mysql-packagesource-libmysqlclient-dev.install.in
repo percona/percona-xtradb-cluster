@@ -20,8 +20,10 @@ usr/include/mysql/mysql/*.h.pp
 usr/include/mysql/mysql/psi/*.h
 usr/lib/*/libmysqlclient.a
 usr/lib/*/libmysqlclient.so
+usr/lib/*/libmysqlservices.a
 usr/lib/*/pkgconfig/mysqlclient.pc
 usr/share/aclocal/mysql.m4
+usr/share/man/man1/mysql_config.1
 # legal
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-libmysqlclient-dev/@DEB_INSTALL_LICENSEFILE@
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-libmysqlclient-dev/README
