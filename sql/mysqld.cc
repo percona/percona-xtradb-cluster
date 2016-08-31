@@ -1210,7 +1210,9 @@ public:
 class Call_wsrep_close_conn : public Do_THD_Impl
 {
 public:
-  Call_wsrep_close_conn()
+  Call_wsrep_close_conn(bool server_shutdown)
+    :
+    is_server_shutdown(server_shutdown)
   {}
 
   virtual void operator()(THD *tmp)
@@ -1220,9 +1222,17 @@ public:
         !is_replaying_connection(tmp))
     {
       WSREP_INFO("killing local connection: %u", tmp->thread_id());
-      close_connection(tmp, 0);
+
+      /*
+        Do not generate MYSQL_AUDIT_CONNECTION_DISCONNECT event, when closing
+        thread close sessions. Each session will generate DISCONNECT event by
+        itself.
+      */
+      close_connection(tmp, 0, is_server_shutdown, false);
     }
   }
+private:
+  bool is_server_shutdown;
 };
 
 class Set_wsrep_close_threads : public Do_THD_Impl
@@ -1504,7 +1514,7 @@ extern "C" void unireg_abort(int exit_code)
     wsrep_sst_cancel();
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only disconnect from service */
-    wsrep_close_client_connections(false);
+    wsrep_close_client_connections(false, true);
     THD* thd(0);
     wsrep->disconnect(wsrep);
     WSREP_INFO("Service disconnected.");
@@ -6313,7 +6323,7 @@ void* start_wsrep_THD(void *arg)
 
   processor(thd);
 
-  close_connection(thd, 0);
+  close_connection(thd, 0, false, false);
 
   thd->get_protocol_classic()->end_net();
   thd->release_resources();
@@ -6364,7 +6374,7 @@ int wsrep_wait_committing_connections_close(int wait_time)
   return 0;
 }
 
-void wsrep_close_client_connections(bool wait_to_end) 
+void wsrep_close_client_connections(bool wait_to_end, bool server_shutdown)
 {
   Per_thread_connection_handler::kill_blocked_pthreads();
 
@@ -6384,7 +6394,7 @@ void wsrep_close_client_connections(bool wait_to_end)
   sql_print_information("Forcefully disconnecting %d remaining clients",
                         static_cast<int>(thd_manager->get_thd_count()));
 
-  Call_wsrep_close_conn call_wsrep_close_conn;
+  Call_wsrep_close_conn call_wsrep_close_conn(server_shutdown);
   thd_manager->do_for_all_thd(&call_wsrep_close_conn);
 
   if (wsrep_debug)

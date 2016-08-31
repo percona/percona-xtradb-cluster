@@ -191,7 +191,7 @@ extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
 extern "C" int wsrep_thd_retry_counter(THD *thd);
 
 
-extern void wsrep_close_client_connections(bool wait_to_end);
+extern void wsrep_close_client_connections(bool wait_to_end, bool server_shutdown);
 extern int  wsrep_wait_committing_connections_close(int wait_time);
 extern void wsrep_close_applier(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd);

@@ -156,3 +156,25 @@ CALL mtr.add_suppression("gcs connect failed: Connection timed out");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(foo://\\) failed: 7");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(gcomm://192.0.2.1\\) failed: 7");
 CALL mtr.add_suppression("WSREP: Trying to launch slave threads before creating connection at 'gcomm://192.0.2.1'");
+
+
+#-------------------------------------------------------------------------------
+#
+# Re-load wsrep_cluster_address with audit-plugin enabled and active parallel
+# connection. Closing of connection during stop replication shouldn't
+# generate audit-plugin events.
+#
+--connection node_2
+--let $wsrep_cluster_address_orig = `SELECT @@wsrep_cluster_address`
+INSTALL PLUGIN audit_log SONAME 'audit_log.so';
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+show status like 'wsrep_local_state_comment';
+
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
+--source include/wait_until_connected_again.inc
+--source include/galera_wait_ready.inc
+#
+UNINSTALL PLUGIN audit_log;
+show status like 'wsrep_cluster_size';
+

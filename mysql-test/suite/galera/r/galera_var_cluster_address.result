@@ -76,3 +76,14 @@ CALL mtr.add_suppression("gcs connect failed: Connection timed out");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(foo://\\) failed: 7");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(gcomm://192.0.2.1\\) failed: 7");
 CALL mtr.add_suppression("WSREP: Trying to launch slave threads before creating connection at 'gcomm://192.0.2.1'");
+INSTALL PLUGIN audit_log SONAME 'audit_log.so';
+show status like 'wsrep_local_state_comment';
+Variable_name	Value
+wsrep_local_state_comment	Synced
+SET GLOBAL wsrep_cluster_address = 'gcomm://127.0.0.1:13001';;
+UNINSTALL PLUGIN audit_log;
+Warnings:
+Warning	1620	Plugin is busy and will be uninstalled on shutdown
+show status like 'wsrep_cluster_size';
+Variable_name	Value
+wsrep_cluster_size	2
