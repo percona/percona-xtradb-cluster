@@ -17,6 +17,7 @@ f1	f2
 3	c
 Starting server ...
 Starting server ...
+# restart
 SELECT * FROM t1;
 f1	f2
 1	a
@@ -32,6 +33,7 @@ f1	f2
 3	d
 Starting server ...
 Starting server ...
+# restart
 SELECT * FROM t1;
 f1	f2
 1	a
