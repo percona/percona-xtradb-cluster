@@ -20,7 +20,7 @@ and traffic-related settings can all be changed at runtime.
 ProxySQL also support |Percona XtraDB Cluster| node status check using
 scheduler.
 
-.. note:: 
+.. note::
 
   More details on how ProxySQL works can be found in official ProxySQL
   `documentation <https://github.com/sysown/proxysql/tree/master/doc>`_.
@@ -197,7 +197,8 @@ Configuring the backends in ProxySQL is as easy as inserting records into
 ``mysql_servers`` table representing those backends, and specifying the correct
 ``hostgroup_id`` based on their roles:
 
-This example adds three |PXC| nodes to write hostgroups, this means that all three servers will be receiving both write and read traffic:
+This example adds three |PXC| nodes to write hostgroups, this means that all
+three servers will be receiving both write and read traffic:
 
 .. code-block:: mysql
 
@@ -435,7 +436,7 @@ add the same user on one of the nodes:
 Testing the cluster with sysbench
 ---------------------------------
 
-You can install sysbench from Percona repositories by running: 
+You can install sysbench from Percona repositories by running:
 
 .. code-block:: bash
 
@@ -455,7 +456,7 @@ Create the database that will be used for testing:
 
   mysql@pxc1> CREATE DATABASE sbtest;
 
-Populate the table with data for the benchmark: 
+Populate the table with data for the benchmark:
 
 .. code-block:: bash
 

@@ -24,7 +24,7 @@ In a single-node workload, locking is handled in the same way as |InnoDB|.
 In case of write load on several nodes, |PXC| uses `optimistic locking <http://en.wikipedia.org/wiki/Optimistic_concurrency_control>`_
 and the application may receive lock error in response to ``COMMIT`` query.
 
-What if a node crashes and InnoDB recovery rolls back some transactions? 
+What if a node crashes and InnoDB recovery rolls back some transactions?
 ========================================================================
 
 When a node crashes, after restarting,
@@ -34,7 +34,7 @@ it will copy the whole dataset from another node
 How can I check the Galera node health?
 =======================================
 
-To check the health of a Galera node, use the following query: 
+To check the health of a Galera node, use the following query:
 
 .. code-block:: mysql
 
@@ -58,13 +58,13 @@ First set up the ``clustercheck`` user:
 
 .. **
 
-You can then check a node's health by running the ``clustercheck`` script: 
+You can then check a node's health by running the ``clustercheck`` script:
 
 .. code-block:: bash
 
    /usr/bin/clustercheck clustercheck password 0
 
-If the node is running, you should get the following status: :: 
+If the node is running, you should get the following status: ::
 
   HTTP/1.1 200 OK
   Content-Type: text/plain
@@ -73,14 +73,14 @@ If the node is running, you should get the following status: ::
 
   Percona XtraDB Cluster Node is synced.
 
-In case node isn't synced or if it is offline, status will look like: :: 
+In case node isn't synced or if it is offline, status will look like: ::
 
   HTTP/1.1 503 Service Unavailable
   Content-Type: text/plain
   Connection: close
   Content-Length: 44
 
-  Percona XtraDB Cluster Node is not synced. 
+  Percona XtraDB Cluster Node is not synced.
 
 .. note::
 
@@ -101,7 +101,7 @@ There are wsrep variables for maximum row count
 and maximum size of write set
 to make sure that the server does not run out of memory.
 
-Is it possible to have different table structures on the nodes? 
+Is it possible to have different table structures on the nodes?
 ===============================================================
 
 For example, if there are four nodes, with four tables:
@@ -124,9 +124,10 @@ in a new component strictly exceeds half that
 of the preceding Primary Component,
 minus the nodes which left gracefully.
 
-The mechanism is described in detail in `Galera documentation <http://galeracluster.com/documentation-webpages/weightedquorum.html>`_.
+The mechanism is described in detail in `Galera documentation
+<http://galeracluster.com/documentation-webpages/weightedquorum.html>`_.
 
-How would the quorum mechanism handle split brain? 
+How would the quorum mechanism handle split brain?
 ==================================================
 
 The quorum mechanism cannot handle split brain.
@@ -135,14 +136,15 @@ If there is no way to decide on the primary component,
 The minimal recommendation is to have 3 nodes.
 However, it is possibile to allow a node to handle traffic
 with the following option: ::
-  
+
   wsrep_provider_options="pc.ignore_sb = yes"
 
 Why a node stops accepting commands if the other one fails in a 2-node setup?
 =============================================================================
 
 This is expected behavior to prevent |split brain|.
-For more information, see previous question or `Galera documentation <http://galeracluster.com/documentation-webpages/weightedquorum.html>`_.
+For more information, see previous question or `Galera documentation
+<http://galeracluster.com/documentation-webpages/weightedquorum.html>`_.
 
 Is it possible to set up a cluster without state transfer?
 ==========================================================
@@ -180,7 +182,7 @@ You may need to open up to four ports if you are using a firewall:
 
      wsrep_provider_options = "ist.recv_addr=10.11.12.206:7777; "
 
-Is there "async" mode or only "sync" commits are supported? 
+Is there "async" mode or only "sync" commits are supported?
 ===========================================================
 
 |PXC| does not support "async" mode, all commits are synchronous on all nodes.
@@ -199,8 +201,10 @@ you should enable ``log-bin`` and ``log-slave-update`` options.
 Why the init script (/etc/init.d/mysql) does not start?
 =======================================================
 
-Try to disable SELinux with the following command: ::
-  
+Try to disable SELinux with the following command:
+
+.. code-block:: bash
+
   echo 0 > /selinux/enforce
 
 What does "nc: invalid option -- 'd'" in the sst.err log file mean?

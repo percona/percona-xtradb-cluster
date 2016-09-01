@@ -43,14 +43,14 @@ To upgrade the cluster, follow these steps for each node:
 
    * On CentOS or RHEL:
 
-     .. code-block:: none
+     .. code-block:: bash
 
         sudo yum remove 'Percona*'
         sudo yum install Percona-XtraDB-Cluster-57
 
    * On Debian or Ubuntu:
 
-     .. code-block:: none
+     .. code-block:: bash
 
         sudo apt-get remove percona-*
         sudo apt-get install percona-xtradb-cluster-57

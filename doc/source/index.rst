@@ -4,13 +4,13 @@
 Percona XtraDB Cluster |version| Documentation
 ==============================================
 
-|PXC| is a high-availability solution for MySQL.
+|Percona XtraDB Cluster| is a high-availability solution for MySQL.
 It ensures the highest possible uptime,
 prevents data loss,
 and provides linear scalability for a growing environment.
 
-Features of |PXC| include:
- 
+Features of |Percona XtraDB Cluster| include:
+
 * **Synchronous replication**:
   Data is written to all nodes simultaneously,
   or not written at all if it fails even on a single node.
@@ -27,8 +27,10 @@ Features of |PXC| include:
 * **Data consistency**:
   No more unsynchronized nodes.
 
-|PXC| is fully compatible with `MySQL Server Community Edition <MySQL>`_,
-`Percona Server`_, and `MariaDB`_ in the following sense:
+|PXC| is fully compatible with `MySQL Server Community Edition
+<https://www.mysql.com>`_, `Percona Server
+<https://www.percona.com/software/mysql-database/percona-server>`_, and
+`MariaDB <https://www.mariadb.com>`_ in the following sense:
 
 * **Data compatibility**:
   You can use data created by any MySQL variant.

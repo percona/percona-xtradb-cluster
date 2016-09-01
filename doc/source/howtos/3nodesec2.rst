@@ -24,7 +24,7 @@ To set up |PXC|:
       mkdir -p /mnt/data
       mysql_install_db --datadir=/mnt/data --user=mysql
 
-#. Stop the firewall service: 
+#. Stop the firewall service:
 
    .. code-block:: bash
 

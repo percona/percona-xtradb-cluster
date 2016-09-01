@@ -87,14 +87,14 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
 #. Start the first node with the following command: ::
 
     [root@pxc1 ~]# /etc/init.d/mysql bootstrap-pxc
- 
+
    This command will start the first node and bootstrap the cluster.
 
 #. After the first node has been started,
    cluster status can be checked with the following command:
 
-   .. code-block:: mysql 
-   
+   .. code-block:: mysql
+
      mysql> show status like 'wsrep%';
      +----------------------------+--------------------------------------+
      | Variable_name              | Value                                |
@@ -112,10 +112,11 @@ For more information about bootstrapping the cluster, see :ref:`bootstrap`.
      +----------------------------+--------------------------------------+
      40 rows in set (0.01 sec)
 
-  This output shows that the cluster has been successfully bootstrapped. 
+  This output shows that the cluster has been successfully bootstrapped.
 
 To perform :ref:`state_snapshot_transfer` using |XtraBackup|,
-set up a new user with proper `privileges <http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_: 
+set up a new user with proper `privileges
+<http://www.percona.com/doc/percona-xtrabackup/innobackupex/privileges.html#permissions-and-privileges-needed>`_:
 
 .. code-block:: mysql
 
@@ -163,7 +164,7 @@ Step 3. Configuring the second node
 
     #Authentication for SST method
     wsrep_sst_auth="sstuser:s3cretPass"
- 
+
 #. Start the second node with the following command: ::
 
     [root@pxc2 ~]# /etc/init.d/mysql start
@@ -171,10 +172,10 @@ Step 3. Configuring the second node
 #. After the server has been started,
    it should receive |SST| automatically.
    Cluster status can now be checked on both nodes.
-   The following is an example of status from the second node (``pxc2``): 
+   The following is an example of status from the second node (``pxc2``):
 
-   .. code-block:: mysql 
-   
+   .. code-block:: mysql
+
      mysql> show status like 'wsrep%';
      +----------------------------+--------------------------------------+
      | Variable_name              | Value                                |
@@ -192,7 +193,7 @@ Step 3. Configuring the second node
      +----------------------------+--------------------------------------+
      40 rows in set (0.01 sec)
 
-   This output shows that the new node has been successfully added to the cluster. 
+   This output shows that the new node has been successfully added to the cluster.
 
 Step 4. Configuring the third node
 ==================================
@@ -232,17 +233,17 @@ Step 4. Configuring the third node
     #Authentication for SST method
     wsrep_sst_auth="sstuser:s3cretPass"
 
-#. Start the third node with the following command: :: 
+#. Start the third node with the following command: ::
 
     [root@pxc3 ~]# /etc/init.d/mysql start
 
 #. After the server has been started,
    it should receive SST automatically.
    Cluster status can be checked on all nodes.
-   The following is an example of status from the third node (``pxc3``): 
+   The following is an example of status from the third node (``pxc3``):
 
-   .. code-block:: mysql 
-   
+   .. code-block:: mysql
+
      mysql> show status like 'wsrep%';
      +----------------------------+--------------------------------------+
      | Variable_name              | Value                                |
@@ -269,16 +270,16 @@ To test replication, lets create a new database on the second node,
 create a table for that database on the third node,
 and add some records to the table on the first node.
 
-1. Create a new database on the second node: 
+1. Create a new database on the second node:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql@pxc2> CREATE DATABASE percona;
       Query OK, 1 row affected (0.01 sec)
 
-#. Create a table on the third node: 
-  
-   .. code-block:: mysql 
+#. Create a table on the third node:
+
+   .. code-block:: mysql
 
       mysql@pxc3> USE percona;
       Database changed
@@ -286,16 +287,16 @@ and add some records to the table on the first node.
       mysql@pxc3> CREATE TABLE example (node_id INT PRIMARY KEY, node_name VARCHAR(30));
       Query OK, 0 rows affected (0.05 sec)
 
-#. Insert records on the first node: 
+#. Insert records on the first node:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql@pxc1> INSERT INTO percona.example VALUES (1, 'percona1');
       Query OK, 1 row affected (0.02 sec)
 
-#. Retrieve all the rows from that table on the second node: 
+#. Retrieve all the rows from that table on the second node:
 
-   .. code-block:: mysql 
+   .. code-block:: mysql
 
       mysql@pxc2> SELECT * FROM percona.example;
       +---------+-----------+

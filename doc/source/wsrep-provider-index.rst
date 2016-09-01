@@ -4,20 +4,27 @@
 Index of :variable:`wsrep_provider` options
 ===========================================
 
-The following variables can be set and checked in the :variable:`wsrep_provider_options` variable. The value of the variable can be changed in the |MySQL| configuration file, :file:`my.cnf`, or by setting the variable value in the |MySQL| client.
+The following variables can be set and checked in the
+:variable:`wsrep_provider_options` variable. The value of the variable can be
+changed in the |MySQL| configuration file, :file:`my.cnf`, or by setting the
+variable value in the |MySQL| client.
 
-To change the value in :file:`my.cnf`, the following syntax should be used: :: 
+To change the value in :file:`my.cnf`, the following syntax should be used: ::
 
   wsrep_provider_options="variable1=value1;[variable2=value2]"
 
-For example to set the size of the Galera buffer storage to 512 MB, specify the following in :file:`my.cnf`: ::
+For example to set the size of the Galera buffer storage to 512 MB, specify the
+following in :file:`my.cnf`: ::
 
   wsrep_provider_options="gcache.size=512M"
 
-Dynamic variables can be changed from the |MySQL| client using the ``SET GLOBAL`` command. For example, to change the value of the :variable:`pc.ignore_sb`, use the following command: :: 
+Dynamic variables can be changed from the |MySQL| client using the ``SET
+GLOBAL`` command. For example, to change the value of the
+:variable:`pc.ignore_sb`, use the following command:
+
+.. code-block:: mysql
 
   mysql> SET GLOBAL wsrep_provider_options="pc.ignore_sb=true";
-
 
 Index
 =====
@@ -40,7 +47,9 @@ This variable specifies the data directory.
    :dyn: No
    :default: value of :variable:`wsrep_node_address`
 
-This variable sets the value of the node's base IP. This is an IP address on which Galera listens for connections from other nodes. Setting this value incorrectly would stop the node from communicating with other nodes.
+This variable sets the value of the node's base IP. This is an IP address on
+which Galera listens for connections from other nodes. Setting this value
+incorrectly would stop the node from communicating with other nodes.
 
 .. variable:: base_port
 
@@ -50,7 +59,9 @@ This variable sets the value of the node's base IP. This is an IP address on whi
    :dyn: No
    :default: 4567
 
-This variable sets the port on which Galera listens for connections from other nodes. Setting this value incorrectly would stop the node from communicating with other nodes.
+This variable sets the port on which Galera listens for connections from other
+nodes. Setting this value incorrectly would stop the node from communicating
+with other nodes.
 
 .. variable:: cert.log_conflicts
 
@@ -60,10 +71,11 @@ This variable sets the port on which Galera listens for connections from other n
    :dyn: No
    :default: no
 
-This variable is used to specify if the details of the certification failures should be logged.
+This variable is used to specify if the details of the certification failures
+should be logged.
 
 .. variable:: debug
-   
+
    :cli: Yes
    :conf: Yes
    :scope: Global
@@ -73,15 +85,17 @@ This variable is used to specify if the details of the certification failures sh
 When this variable is set to ``yes``, it will enable debugging.
 
 .. variable:: evs.auto_evict
-  
-   :version: Introduced in :rn:`5.6.21-25.8`
+
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: Yes
    :default: 0
 
-Number of entries allowed on delayed list until auto eviction takes place. Setting value to 0 disables auto eviction protocol on the node, though node response times will still be monitored. EVS protocol version (:variable:`evs.version`) ``1`` is required to enable auto eviction.
+Number of entries allowed on delayed list until auto eviction takes place.
+Setting value to ``0`` disables auto eviction protocol on the node, though node
+response times will still be monitored. EVS protocol version
+(:variable:`evs.version`) ``1`` is required to enable auto eviction.
 
 .. variable:: evs.causal_keepalive_period
 
@@ -91,7 +105,8 @@ Number of entries allowed on delayed list until auto eviction takes place. Setti
    :dyn: No
    :default: value of :variable:`evs.keepalive_period`
 
-This variable is used for development purposes and shouldn't be used by regular users. 
+This variable is used for development purposes and shouldn't be used by regular
+users.
 
 .. variable:: evs.debug_log_mask
 
@@ -101,39 +116,41 @@ This variable is used for development purposes and shouldn't be used by regular 
    :dyn: Yes
    :default: 0x1
 
-This variable is used for EVS (Extended Virtual Synchrony) debugging. It can be used only when :variable:`wsrep_debug` is set to ``ON``.
+This variable is used for EVS (Extended Virtual Synchrony) debugging. It can be
+used only when :variable:`wsrep_debug` is set to ``ON``.
 
 .. variable:: evs.delay_margin
 
-   :version: Introduced in :rn:`5.6.21-25.8`
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: Yes
    :default: PT1S
 
-Time period that a node can delay its response from expected until it is added to delayed list. The value must be higher than the highest RTT between nodes.
+Time period that a node can delay its response from expected until it is added
+to delayed list. The value must be higher than the highest RTT between nodes.
 
 .. variable:: evs.delayed_keep_period
 
-   :version: Introduced in :rn:`5.6.21-25.8`
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: Yes
    :default: PT30S
 
-Time period that node is required to remain responsive until one entry is removed from delayed list.
+Time period that node is required to remain responsive until one entry is
+removed from delayed list.
 
 .. variable:: evs.evict
 
-   :version: Introduced in :rn:`5.6.21-25.8`
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: Yes
 
-Manual eviction can be triggered by setting the :variable:`evs.evict` to a certain node value. Setting the :variable:`evs.evict` to an empty string will clear the evict list on the node where it was set.
+Manual eviction can be triggered by setting the :variable:`evs.evict` to a
+certain node value. Setting the :variable:`evs.evict` to an empty string will
+clear the evict list on the node where it was set.
 
 .. variable:: evs.inactive_check_period
 
@@ -153,7 +170,8 @@ This variable defines how often to check for peer inactivity.
    :dyn: No
    :default: PT15S
 
-This variable defines the inactivity limit, once this limit is reached the node will be considered dead.
+This variable defines the inactivity limit, once this limit is reached the node
+will be considered dead.
 
 .. variable:: evs.info_log_mask
 
@@ -173,7 +191,8 @@ This variable is used for controlling the extra EVS info logging.
    :dyn: Yes
    :default: PT7.5S
 
-This variable defines the timeout on waiting for install message acknowledgments.
+This variable defines the timeout on waiting for install message
+acknowledgments.
 
 .. variable:: evs.join_retrans_period
 
@@ -183,17 +202,19 @@ This variable defines the timeout on waiting for install message acknowledgments
    :dyn: No
    :default: PT1S
 
-This variable defines how often to retransmit EVS join messages when forming cluster membership.
+This variable defines how often to retransmit EVS join messages when forming
+cluster membership.
 
-.. variable:: evs.keepalive_period 
+.. variable:: evs.keepalive_period
 
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: PT1S 
+   :default: PT1S
 
-This variable defines how often to emit keepalive beacons (in the absence of any other traffic).
+This variable defines how often to emit keepalive beacons (in the absence of
+any other traffic).
 
 .. variable:: evs.max_install_timeouts
 
@@ -203,7 +224,8 @@ This variable defines how often to emit keepalive beacons (in the absence of any
    :dyn: No
    :default: 1
 
-This variable defines how many membership install rounds to try before giving up (total rounds will be :variable:`evs.max_install_timeouts` + 2).
+This variable defines how many membership install rounds to try before giving
+up (total rounds will be :variable:`evs.max_install_timeouts` + 2).
 
 .. variable:: evs.send_window
 
@@ -213,7 +235,10 @@ This variable defines how many membership install rounds to try before giving up
    :dyn: No
    :default: 4
 
-This variable defines the maximum number of data packets in replication at a time. For WAN setups, the variable can be set to a considerably higher value than default (for example,512). The value must not be less than :variable:`evs.user_send_window`.
+This variable defines the maximum number of data packets in replication at a
+time. For WAN setups, the variable can be set to a considerably higher value
+than default (for example,512). The value must not be less than
+:variable:`evs.user_send_window`.
 
 .. variable:: evs.stats_report_period
 
@@ -221,7 +246,7 @@ This variable defines the maximum number of data packets in replication at a tim
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: PT1M 
+   :default: PT1M
 
 This variable defines the control period of EVS statistics reporting.
 
@@ -233,7 +258,9 @@ This variable defines the control period of EVS statistics reporting.
    :dyn: No
    :default: PT5S
 
-This variable defines the inactivity period after which the node is “suspected” to be dead. If all remaining nodes agree on that, the node will be dropped out of cluster even before :variable:`evs.inactive_timeout` is reached.
+This variable defines the inactivity period after which the node is
+"suspected" to be dead. If all remaining nodes agree on that, the node will be
+dropped out of cluster even before :variable:`evs.inactive_timeout` is reached.
 
 .. variable:: evs.use_aggregate
 
@@ -253,7 +280,9 @@ When this variable is enabled, smaller packets will be aggregated into one.
    :dyn: Yes
    :default: 2
 
-This variable defines the maximum number of data packets in replication at a time. For WAN setups, the variable can be set to a considerably higher value than default (for example, 512).
+This variable defines the maximum number of data packets in replication at a
+time. For WAN setups, the variable can be set to a considerably higher value
+than default (for example, 512).
 
 .. variable:: evs.version
 
@@ -263,7 +292,9 @@ This variable defines the maximum number of data packets in replication at a tim
    :dyn: No
    :default: 0
 
-This variable defines the EVS protocol version. Auto eviction is enabled when this variable is set to ``1``. Default ``0`` is set for backwards compatibility.
+This variable defines the EVS protocol version. Auto eviction is enabled when
+this variable is set to ``1``. Default ``0`` is set for backwards
+compatibility.
 
 .. variable:: evs.view_forget_timeout
 
@@ -273,7 +304,8 @@ This variable defines the EVS protocol version. Auto eviction is enabled when th
    :dyn: No
    :default: P1D
 
-This variable defines the timeout after which past views will be dropped from history.
+This variable defines the timeout after which past views will be dropped from
+history.
 
 .. variable:: gcache.dir
 
@@ -283,18 +315,21 @@ This variable defines the timeout after which past views will be dropped from hi
    :dyn: No
    :default: :term:`datadir`
 
-This variable can be used to define the location of the :file:`galera.cache` file.
+This variable can be used to define the location of the :file:`galera.cache`
+file.
 
 .. variable:: gcache.keep_pages_count
 
-   :version: Implemented in :rn:`5.6.25-25.12`
    :cli: Yes
    :conf: Yes
    :scope: Local, Global
    :dyn: Yes
    :default: 0
 
-This variable is used to limit the number of overflow pages rather than the total memory occupied by all overflow pages. Whenever either this or :variable:`gcache.keep_pages_size` variables are updated at runtime to a non-zero value, cleanup is called on excess overflow pages to delete them.
+This variable is used to limit the number of overflow pages rather than the
+total memory occupied by all overflow pages. Whenever either this or
+:variable:`gcache.keep_pages_size` variables are updated at runtime to a
+non-zero value, cleanup is called on excess overflow pages to delete them.
 
 .. variable:: gcache.keep_pages_size
 
@@ -304,7 +339,8 @@ This variable is used to limit the number of overflow pages rather than the tota
    :dyn: No
    :default: 0
 
-This variable is used to specify total size of the pages in storage to keep for caching purposes. If only page storage is enabled, one page is always present.
+This variable is used to specify total size of the pages in storage to keep for
+caching purposes. If only page storage is enabled, one page is always present.
 
 .. variable:: gcache.mem_size
 
@@ -317,7 +353,8 @@ This variable is used to specify total size of the pages in storage to keep for 
 
 This variable was used to define how much RAM is available for the system.
 
-.. warning:: This variable has been deprecated and shouldn't be used as it could cause a node to crash.
+.. warning:: This variable has been deprecated and shouldn't be used as it
+  could cause a node to crash.
 
 .. variable:: gcache.name
 
@@ -337,7 +374,8 @@ This variable can be used to specify the name of the Galera cache file.
    :dyn: No
    :default: 128M
 
-This variable can be used to specify the size of the page files in the page storage.
+This variable can be used to specify the size of the page files in the page
+storage.
 
 .. variable:: gcache.size
 
@@ -347,7 +385,10 @@ This variable can be used to specify the size of the page files in the page stor
    :dyn: No
    :default: 128M
 
-Size of the transaction cache for Galera replication. This defines the size of the :file:`galera.cache` file which is used as source for |IST|. The bigger the value of this variable, the better are chances that the re-joining node will get IST instead of |SST|.
+Size of the transaction cache for Galera replication. This defines the size of
+the :file:`galera.cache` file which is used as source for |IST|. The bigger the
+value of this variable, the better are chances that the re-joining node will
+get IST instead of |SST|.
 
 .. variable:: gcs.fc_debug
 
@@ -357,7 +398,8 @@ Size of the transaction cache for Galera replication. This defines the size of t
    :dyn: No
    :default: 0
 
-This variable specifies after how many writesets the debug statistics about SST flow control will be posted.
+This variable specifies after how many writesets the debug statistics about SST
+flow control will be posted.
 
 .. variable:: gcs.fc_factor
 
@@ -367,7 +409,9 @@ This variable specifies after how many writesets the debug statistics about SST 
    :dyn: No
    :default: 1
 
-This variable is used for replication flow control. Replication is resumed when the slave queue drops below :variable:`gcs.fc_factor` * :variable:`gcs.fc_limit`.
+This variable is used for replication flow control. Replication is resumed when
+the slave queue drops below :variable:`gcs.fc_factor` *
+:variable:`gcs.fc_limit`.
 
 .. variable:: gcs.fc_limit
 
@@ -377,7 +421,8 @@ This variable is used for replication flow control. Replication is resumed when 
    :dyn: No
    :default: 16
 
-This variable is used for replication flow control. Replication is paused when the slave queue exceeds this limit.
+This variable is used for replication flow control. Replication is paused when
+the slave queue exceeds this limit.
 
 .. variable:: gcs.fc_master_slave
 
@@ -387,7 +432,8 @@ This variable is used for replication flow control. Replication is paused when t
    :dyn: No
    :default: NO
 
-This variable is used to specify if there is only one master node in the cluster.
+This variable is used to specify if there is only one master node in the
+cluster.
 
 .. variable:: gcs.max_packet_size
 
@@ -397,7 +443,8 @@ This variable is used to specify if there is only one master node in the cluster
    :dyn: No
    :default: 64500
 
-This variable is used to specify the writeset size after which they will be fragmented.
+This variable is used to specify the writeset size after which they will be
+fragmented.
 
 .. variable:: gcs.max_throttle
 
@@ -407,8 +454,11 @@ This variable is used to specify the writeset size after which they will be frag
    :dyn: No
    :default: 0.25
 
-This variable specifies how much the replication can be throttled during the state transfer in order to avoid running out of memory. Value can be set to ``0.0`` if stopping replication is acceptable in order to finish state transfer.
- 
+This variable specifies how much the replication can be throttled during the
+state transfer in order to avoid running out of memory. Value can be set to
+``0.0`` if stopping replication is acceptable in order to finish state
+transfer.
+
 .. variable:: gcs.recv_q_hard_limit
 
    :cli: Yes
@@ -417,7 +467,9 @@ This variable specifies how much the replication can be throttled during the sta
    :dyn: No
    :default: 9223372036854775807
 
-This variable specifies the maximum allowed size of the receive queue. This should normally be ``(RAM + swap) / 2``. If this limit is exceeded, Galera will abort the server.
+This variable specifies the maximum allowed size of the receive queue. This
+should normally be ``(RAM + swap) / 2``. If this limit is exceeded, Galera will
+abort the server.
 
 .. variable:: gcs.recv_q_soft_limit
 
@@ -427,7 +479,8 @@ This variable specifies the maximum allowed size of the receive queue. This shou
    :dyn: No
    :default: 0.25
 
-This variable specifies the fraction of the :variable:`gcs.recv_q_hard_limit` after which replication rate will be throttled.
+This variable specifies the fraction of the :variable:`gcs.recv_q_hard_limit`
+after which replication rate will be throttled.
 
 .. variable:: gcs.sync_donor
 
@@ -435,9 +488,11 @@ This variable specifies the fraction of the :variable:`gcs.recv_q_hard_limit` af
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: NO
+   :default: No
 
-This variable controls if the rest of the cluster should be in sync with the donor node. When this variable is set to ``YES``, the whole cluster will be blocked if the donor node is blocked with SST.
+This variable controls if the rest of the cluster should be in sync with the
+donor node. When this variable is set to ``YES``, the whole cluster will be
+blocked if the donor node is blocked with SST.
 
 .. variable:: gmcast.listen_addr
 
@@ -447,7 +502,8 @@ This variable controls if the rest of the cluster should be in sync with the don
    :dyn: No
    :default: tcp://0.0.0.0:4567
 
-This variable defines the address on which the node listens to connections from other nodes in the cluster.
+This variable defines the address on which the node listens to connections from
+other nodes in the cluster.
 
 .. variable:: gmcast.mcast_addr
 
@@ -487,7 +543,8 @@ This variable specifies the connection timeout to initiate message relaying.
    :dyn: No
    :default: 0
 
-This variable specifies the group segment this member should be a part of. Same segment members are treated as equally physically close.
+This variable specifies the group segment this member should be a part of. Same
+segment members are treated as equally physically close.
 
 .. variable:: gmcast.time_wait
 
@@ -497,7 +554,8 @@ This variable specifies the group segment this member should be a part of. Same 
    :dyn: No
    :default: PT5S
 
-This variable specifies the time to wait until allowing peer declared outside of stable view to reconnect.
+This variable specifies the time to wait until allowing peer declared outside
+of stable view to reconnect.
 
 .. variable:: gmcast.version
 
@@ -507,7 +565,7 @@ This variable specifies the time to wait until allowing peer declared outside of
    :dyn: No
    :default: 0
 
-This variable shows which gmcast protocol version is being used. 
+This variable shows which gmcast protocol version is being used.
 
 .. variable:: ist.recv_addr
 
@@ -517,7 +575,8 @@ This variable shows which gmcast protocol version is being used.
    :dyn: No
    :default: value of :variable:`wsrep_node_address`
 
-This variable specifies the address on which the node listens for Incremental State Transfer (|IST|).
+This variable specifies the address on which the node listens for Incremental
+State Transfer (|IST|).
 
 .. variable:: pc.announce_timeout
 
@@ -527,7 +586,8 @@ This variable specifies the address on which the node listens for Incremental St
    :dyn: No
    :default: PT3S
 
-Cluster joining announcements are sent every 1/2 second for this period of time or less if other nodes are discovered.
+Cluster joining announcements are sent every 1/2 second for this period of time
+or less if other nodes are discovered.
 
 .. variable:: pc.checksum
 
@@ -537,7 +597,8 @@ Cluster joining announcements are sent every 1/2 second for this period of time 
    :dyn: No
    :default: true
 
-This variable controls whether replicated messages should be checksummed or not.
+This variable controls whether replicated messages should be checksummed or
+not.
 
 .. variable::  pc.ignore_quorum
 
@@ -547,7 +608,9 @@ This variable controls whether replicated messages should be checksummed or not.
    :dyn: Yes
    :default: false
 
-When this variable is set to ``TRUE``, the node will completely ignore quorum calculations. This should be used with extreme caution even in master-slave setups, because slaves won't automatically reconnect to master in this case.
+When this variable is set to ``TRUE``, the node will completely ignore quorum
+calculations. This should be used with extreme caution even in master-slave
+setups, because slaves won't automatically reconnect to master in this case.
 
 .. variable::  pc.ignore_sb
 
@@ -557,9 +620,12 @@ When this variable is set to ``TRUE``, the node will completely ignore quorum ca
    :dyn: Yes
    :default: false
 
-When this variable is set to ``TRUE``, the node will process updates even in the case of a split brain. This should be used with extreme caution in multi-master setup, but should simplify things in master-slave cluster (especially if only 2 nodes are used).
+When this variable is set to ``TRUE``, the node will process updates even in
+the case of a split brain. This should be used with extreme caution in
+multi-master setup, but should simplify things in master-slave cluster
+(especially if only 2 nodes are used).
 
-.. variable::  pc.linger 
+.. variable::  pc.linger
 
    :cli: Yes
    :conf: Yes
@@ -567,9 +633,10 @@ When this variable is set to ``TRUE``, the node will process updates even in the
    :dyn: No
    :default: PT20S
 
-This variable specifies the period for which the PC protocol waits for EVS termination.
+This variable specifies the period for which the PC protocol waits for EVS
+termination.
 
-.. variable::  pc.npvo 
+.. variable::  pc.npvo
 
    :cli: Yes
    :conf: Yes
@@ -577,7 +644,8 @@ This variable specifies the period for which the PC protocol waits for EVS termi
    :dyn: No
    :default: false
 
-When this variable is set to ``TRUE``, more recent primary components override older ones in case of conflicting primaries.
+When this variable is set to ``TRUE``, more recent primary components override
+older ones in case of conflicting primaries.
 
 .. variable::  pc.recovery
 
@@ -587,7 +655,13 @@ When this variable is set to ``TRUE``, more recent primary components override o
    :dyn: No
    :default: true
 
-When this variable is set to ``true``, the node stores the Primary Component state to disk. The Primary Component can then recover automatically when all nodes that were part of the last saved state re-establish communication with each other. This feature allows automatic recovery from full cluster crashes, such as in the case of a data center power outage. A subsequent graceful full cluster restart will require explicit bootstrapping for a new Primary Component.
+When this variable is set to ``true``, the node stores the Primary Component
+state to disk. The Primary Component can then recover automatically when all
+nodes that were part of the last saved state re-establish communication with
+each other. This feature allows automatic recovery from full cluster crashes,
+such as in the case of a data center power outage. A subsequent graceful full
+cluster restart will require explicit bootstrapping for a new Primary
+Component.
 
 .. variable::  pc.version
 
@@ -607,7 +681,9 @@ This status variable is used to check which PC protocol version is used.
    :dyn: No
    :default: true
 
-When set to ``TRUE``, the node waits for a primary component for the period of time specified in :variable:`pc.wait_prim_timeout`. This is useful to bring up a non-primary component and make it primary with :variable:`pc.bootstrap`.
+When set to ``TRUE``, the node waits for a primary component for the period of
+time specified in :variable:`pc.wait_prim_timeout`. This is useful to bring up
+a non-primary component and make it primary with :variable:`pc.bootstrap`.
 
 .. variable:: pc.wait_prim_timeout
 
@@ -617,9 +693,10 @@ When set to ``TRUE``, the node waits for a primary component for the period of t
    :dyn: No
    :default: PT30S
 
-This variable is used to specify the period of time to wait for a primary component.
+This variable is used to specify the period of time to wait for a primary
+component.
 
-.. variable::  pc.weight 
+.. variable::  pc.weight
 
    :cli: Yes
    :conf: Yes
@@ -627,7 +704,8 @@ This variable is used to specify the period of time to wait for a primary compon
    :dyn: Yes
    :default: 1
 
-This variable specifies the node weight that's going to be used for Weighted Quorum calculations.
+This variable specifies the node weight that's going to be used for Weighted
+Quorum calculations.
 
 .. variable::  protonet.backend
 
@@ -637,7 +715,8 @@ This variable specifies the node weight that's going to be used for Weighted Quo
    :dyn: No
    :default: asio
 
-This variable is used to define which transport backend should be used. Currently only ``ASIO`` is supported.
+This variable is used to define which transport backend should be used.
+Currently only ``ASIO`` is supported.
 
 .. variable::  protonet.version
 
@@ -647,7 +726,8 @@ This variable is used to define which transport backend should be used. Currentl
    :dyn: No
    :default: 0
 
-This status variable is used to check which transport backend protocol version is used.
+This status variable is used to check which transport backend protocol version
+is used.
 
 .. variable::  repl.causal_read_timeout
 
@@ -667,22 +747,27 @@ This variable specifies the causal read timeout.
    :dyn: No
    :default: 3
 
-This variable is used to specify out-of-order committing (which is used to improve parallel applying performance). The following values are available:
+This variable is used to specify out-of-order committing (which is used to
+improve parallel applying performance). The following values are available:
 
- * ``0`` - BYPASS: all commit order monitoring is turned off (useful for measuring performance penalty)
+ * ``0`` - BYPASS: all commit order monitoring is turned off (useful for
+   measuring performance penalty)
  * ``1`` - OOOC: allow out-of-order committing for all transactions
- * ``2`` - LOCAL_OOOC: allow out-of-order committing only for local transactions
- * ``3`` - NO_OOOC: no out-of-order committing is allowed (strict total order committing)
+ * ``2`` - LOCAL_OOOC: allow out-of-order committing only for local
+   transactions
+ * ``3`` - NO_OOOC: no out-of-order committing is allowed (strict total order
+   committing)
 
-.. variable::  repl.key_format 
- 
+.. variable::  repl.key_format
+
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: Yes
    :default: FLAT8
 
-This variable is used to specify the replication key format. The following values are available:
+This variable is used to specify the replication key format. The following
+values are available:
 
  * ``FLAT8`` - short key with higher probability of key match false positives
  * ``FLAT16`` - longer key with lower probability of false positives
@@ -697,9 +782,10 @@ This variable is used to specify the replication key format. The following value
    :dyn: No
    :default: 2147483647
 
-This variable is used to specify the maximum size of a write-set in bytes. This is limited to 2 gygabytes.
+This variable is used to specify the maximum size of a write-set in bytes. This
+is limited to 2 gygabytes.
 
-.. variable::  repl.proto_max 
+.. variable::  repl.proto_max
 
    :cli: Yes
    :conf: Yes
@@ -707,7 +793,8 @@ This variable is used to specify the maximum size of a write-set in bytes. This 
    :dyn: No
    :default: 7
 
-This variable is used to specify the highest communication protocol version to accept in the cluster. Used only for debugging.
+This variable is used to specify the highest communication protocol version to
+accept in the cluster. Used only for debugging.
 
 .. variable::  socket.checksum
 
@@ -717,7 +804,8 @@ This variable is used to specify the highest communication protocol version to a
    :dyn: No
    :default: 2
 
-This variable is used to choose the checksum algorithm for network packets. The following values are available:
+This variable is used to choose the checksum algorithm for network packets. The
+following values are available:
 
  * ``0`` - disable checksum
  * ``1`` - plain ``CRC32`` (used in Galera 2.x)
@@ -740,7 +828,8 @@ This variable is used to specify if SSL encryption should be used.
    :scope: Global
    :dyn: No
 
-This variable is used to specify the path (absolute or relative to working directory) to an SSL certificate (in PEM format).
+This variable is used to specify the path (absolute or relative to working
+directory) to an SSL certificate (in PEM format).
 
 .. variable:: socket.ssl_key
 
@@ -749,7 +838,8 @@ This variable is used to specify the path (absolute or relative to working direc
    :scope: Global
    :dyn: No
 
-This variable is used to specify the path (absolute or relative to working directory) to an SSL private key for the certificate (in PEM format).
+This variable is used to specify the path (absolute or relative to working
+directory) to an SSL private key for the certificate (in PEM format).
 
 .. variable:: socket.ssl_compression
 
@@ -761,13 +851,12 @@ This variable is used to specify the path (absolute or relative to working direc
 
 This variable is used to specify if the SSL compression is to be used.
 
-.. variable:: socket.ssl_cipher	
+.. variable:: socket.ssl_cipher
 
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: No
-   :default: AES128-SHA 
+   :default: AES128-SHA
 
 This variable is used to specify what cypher will be used for encryption.
-

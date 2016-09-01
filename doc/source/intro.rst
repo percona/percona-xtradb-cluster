@@ -50,7 +50,10 @@ Drawbacks:
 Components
 ==========
 
-|PXC| is based on `Percona Server`_ running with the `XtraDB`_ storage engine.
+|PXC| is based on `Percona Server
+<https://www.percona.com/doc/percona-server/5.7/index.html>`_ running with the
+`XtraDB <https://www.percona.com/doc/percona-server/5.7/percona_xtradb.html>`_
+storage engine.
 It uses the `Galera library <https://github.com/percona/galera>`_,
 which is an implementation of the write set replication (wsrep) API
 developed by `Codership Oy <http://www.galeracluster.com/>`_.

@@ -1,7 +1,7 @@
 .. rn:: 5.7.12-26.15
 
 =====================================
-|Percona XtraDB Cluster| 5.7.12-25.16 
+|Percona XtraDB Cluster| 5.7.12-25.16
 =====================================
 
 Percona is glad to announce the release of

@@ -37,7 +37,7 @@ Installing from Percona Repository
 ==================================
 
 1. Install the Percona repository package:
-   
+
    .. code-block:: bash
 
       sudo yum install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
@@ -45,7 +45,7 @@ Installing from Percona Repository
    Confirm installation and you should see the following if successful: ::
 
       Installed:
-        percona-release.noarch 0:0.1-3                                      
+        percona-release.noarch 0:0.1-3
 
       Complete!
 
@@ -62,14 +62,14 @@ Installing from Percona Repository
    For more information, see :ref:`yum-testing-repo`.
 
 #. Check that the packages are available:
-   
+
    .. code-block:: bash
 
       yum list | grep Percona-XtraDB-Cluster
 
    You should see output similar to the following:
 
-   .. code-block:: none
+   .. code-block:: bash
 
       Percona-XtraDB-Cluster-57.x86_64           1:5.7.11-25.14.2.el7        percona-release-x86_64
       Percona-XtraDB-Cluster-57-debuginfo.x86_64 1:5.7.11-25.14.2.el7        percona-release-x86_64

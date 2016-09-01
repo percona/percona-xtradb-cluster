@@ -95,14 +95,6 @@ rst_prolog = '''
 
 .. |PXC|  replace:: Percona XtraDB Cluster
 
-.. _`MariaDB`: https://www.mariadb.com
-
-.. _`MySQL`: https://www.mysql.com
-
-.. _`Percona Server`: https://www.percona.com/software/mysql-database/percona-server
-
-.. _`XtraDB`: https://www.percona.com/software/mysql-database/percona-server/xtradb
-
 .. _`Percona XtraBackup`: https://www.percona.com/software/mysql-database/percona-xtrabackup
 
 .. |check|  replace:: ``|[[---CHECK---]]|``

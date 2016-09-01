@@ -47,14 +47,14 @@ It applies at various levels of your infrastructure,
 depending on how far the cluster is spread out
 to avoid single points of failure. For example:
 
- * A cluster on a single switch should have 3 nodes 
+ * A cluster on a single switch should have 3 nodes
  * A cluster spanning switches should be spread evenly
    across at least 3 switches
  * A cluster spanning networks should span at least 3 networks
  * A cluster spanning data centers should span at least 3 data centers
 
 These rules will prevent split brain situations
-and ensure automatic failover works correctly. 
+and ensure automatic failover works correctly.
 
 Using an arbitrator
 ===================
@@ -79,7 +79,9 @@ In the event of a 2-node cluster
 the failure of one node will cause the other to become non-primary
 and refuse operations.
 However, you can recover the node from non-primary state
-using the following command: :: 
+using the following command:
+
+.. code-block:: mysql
 
   SET GLOBAL wsrep_provider_options='pc.bootstrap=true';
 
@@ -104,7 +106,7 @@ the following high availability features will be available:
   (because of the arbitrator)
 
 * Failure of the primary data center would leave the secondary
-  in a non-primary state. 
+  in a non-primary state.
 
 * If a disaster-recovery failover has been executed,
   you can tell the secondary data center to bootstrap itself
