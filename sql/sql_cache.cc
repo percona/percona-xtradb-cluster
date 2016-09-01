@@ -1754,19 +1754,6 @@ lookup:
   }
 #endif /* WITH_WSREP */
 
-#ifdef WITH_WSREP
-  if (once_more && WSREP_CLIENT(thd) && wsrep_must_sync_wait(thd))
-  {
-    unlock();
-    if (wsrep_sync_wait(thd))
-      goto err;
-    if (try_lock(TRUE))
-      goto err;
-    once_more= false;
-    goto lookup;
-  }
-#endif /* WITH_WSREP */
-
   /* Now lock and test that nothing changed while blocks was unlocked */
   BLOCK_LOCK_RD(query_block);
 
