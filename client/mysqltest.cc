@@ -547,12 +547,12 @@ struct st_replace *glob_replace= 0;
 void replace_strings_append(struct st_replace *rep, DYNAMIC_STRING* ds,
 const char *from, int len);
 
-static void cleanup_and_exit(int exit_code) __attribute__((noreturn));
+static void cleanup_and_exit(int exit_code) MY_ATTRIBUTE((noreturn));
 
 void die(const char *fmt, ...)
-  ATTRIBUTE_FORMAT(printf, 1, 2) __attribute__((noreturn));
+  ATTRIBUTE_FORMAT(printf, 1, 2) MY_ATTRIBUTE((noreturn));
 void abort_not_supported_test(const char *fmt, ...)
-  ATTRIBUTE_FORMAT(printf, 1, 2) __attribute__((noreturn));
+  ATTRIBUTE_FORMAT(printf, 1, 2) MY_ATTRIBUTE((noreturn));
 void verbose_msg(const char *fmt, ...)
   ATTRIBUTE_FORMAT(printf, 1, 2);
 void log_msg(const char *fmt, ...)
@@ -2121,7 +2121,7 @@ static void strip_parentheses(struct st_command *command)
 C_MODE_START
 
 static uchar *get_var_key(const uchar* var, size_t *len,
-                          my_bool __attribute__((unused)) t)
+                          my_bool MY_ATTRIBUTE((unused)) t)
 {
   register char* key;
   key = ((VAR*)var)->name;
@@ -2449,7 +2449,7 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
   init_dynamic_string(&ds_query, 0, (end - query) + 32, 256);
   do_eval(&ds_query, query, end, FALSE);
 
-  if (mysql_real_query(mysql, ds_query.str, ds_query.length)) 
+  if (mysql_real_query(mysql, ds_query.str, ds_query.length) || !(res= mysql_store_result(mysql)))
   {
     handle_error (curr_command, mysql_errno(mysql), mysql_error(mysql),
                   mysql_sqlstate(mysql), &ds_res);
@@ -2459,8 +2459,6 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
     DBUG_VOID_RETURN;
   }
   
-  if (!(res= mysql_store_result(mysql)))
-    die("Query '%s' didn't return a result set", ds_query.str);
   dynstr_free(&ds_query);
 
   if ((row= mysql_fetch_row(res)) && row[0])
@@ -2712,6 +2710,7 @@ void var_set_query_get_value(struct st_command *command, VAR *var)
                   mysql_sqlstate(mysql), &ds_res);
     /* If error was acceptable, return empty string */
     dynstr_free(&ds_query);
+    dynstr_free(&ds_col);
     eval_expr(var, "", 0);
     DBUG_VOID_RETURN;
   }
@@ -4323,7 +4322,7 @@ int do_echo(struct st_command *command)
 }
 
 
-void do_wait_for_slave_to_stop(struct st_command *c __attribute__((unused)))
+void do_wait_for_slave_to_stop(struct st_command *c MY_ATTRIBUTE((unused)))
 {
   static int SLAVE_POLL_INTERVAL= 300000;
   MYSQL* mysql = &cur_con->mysql;
@@ -4944,7 +4943,7 @@ void do_get_errcodes(struct st_command *command)
     /* code to handle variables passed to mysqltest */
      if( *p == '$')
      {
-        const char* fin;
+        const char* fin= NULL;
         VAR *var = var_get(p,&fin,0,0);
         p=var->str_val;
         end=p+var->str_val_len;
@@ -5224,6 +5223,7 @@ void do_close_connection(struct st_command *command)
     {
       vio_delete(con->mysql.net.vio);
       con->mysql.net.vio = 0;
+      end_server(&con->mysql);
     }
   }
 #else
@@ -5726,6 +5726,7 @@ void do_connect(struct st_command *command)
   {
     DBUG_PRINT("info", ("Inserting connection %s in connection pool",
                         ds_connection_name.str));
+    my_free(con_slot->name);
     if (!(con_slot->name= my_strdup(ds_connection_name.str, MYF(MY_WME))))
       die("Out of memory");
     con_slot->name_len= strlen(con_slot->name);
@@ -8421,7 +8422,7 @@ void update_expected_errors(struct st_command* command)
 
 */
 
-void mark_progress(struct st_command* command __attribute__((unused)),
+void mark_progress(struct st_command* command MY_ATTRIBUTE((unused)),
                    int line)
 {
   static ulonglong progress_start= 0; // < Beware
@@ -9468,7 +9469,7 @@ typedef struct st_replace_found {
 
 void replace_strings_append(REPLACE *rep, DYNAMIC_STRING* ds,
                             const char *str,
-                            int len __attribute__((unused)))
+                            int len MY_ATTRIBUTE((unused)))
 {
   reg1 REPLACE *rep_pos;
   reg2 REPLACE_STRING *rep_str;
@@ -9648,6 +9649,7 @@ struct st_replace_regex* init_replace_regex(char* expr)
   return res;
 
 err:
+  delete_dynamic(&res->regex_arr);
   my_free(res);
   die("Error parsing replace_regex \"%s\"", expr);
   return 0;

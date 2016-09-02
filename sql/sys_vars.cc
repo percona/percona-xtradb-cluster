@@ -3213,6 +3213,19 @@ static Sys_var_charptr Sys_ssl_crlpath(
        READ_ONLY GLOBAL_VAR(opt_ssl_crlpath), SSL_OPT(OPT_SSL_CRLPATH),
        IN_FS_CHARSET, DEFAULT(0));
 
+static Sys_var_charptr Sys_tls_version(
+       "tls_version",
+       "TLS version, permitted values are TLSv1, TLSv1.1, and TLSv1.2, "
+       "depending on SSL library support",
+       READ_ONLY GLOBAL_VAR(opt_tls_version), SSL_OPT(OPT_TLS_VERSION),
+       IN_FS_CHARSET,
+#ifdef SSL_OP_NO_TLSv1_2
+       "TLSv1.1,TLSv1.2");
+#elif defined(SSL_OP_NO_TLSv1_1)
+       "TLSv1.1");
+#else
+       "TLSv1");
+#endif
 
 // why ENUM and not BOOL ?
 static const char *updatable_views_with_limit_names[]= {"NO", "YES", 0};
@@ -4242,6 +4255,10 @@ static Sys_var_have Sys_have_statement_timeout(
        "have_statement_timeout", "have_statement_timeout",
        READ_ONLY GLOBAL_VAR(have_statement_timeout), NO_CMD_LINE);
 
+static Sys_var_have Sys_have_tlsv1_2(
+       "have_tlsv1_2", "have_tlsv1_2",
+       READ_ONLY GLOBAL_VAR(have_tlsv1_2), NO_CMD_LINE);
+
 static bool fix_log_state(sys_var *self, THD *thd, enum_var_type type);
 static Sys_var_mybool Sys_general_log(
        "general_log", "Log connections and queries to a table or log file. "
@@ -5019,13 +5036,14 @@ static Sys_var_charptr Sys_wsrep_start_position (
 static Sys_var_ulong Sys_wsrep_max_ws_size (
        "wsrep_max_ws_size", "Max write set size (bytes)",
        GLOBAL_VAR(wsrep_max_ws_size), CMD_LINE(REQUIRED_ARG),
-       /* Upper limit is 65K short of 4G to avoid overlows on 32-bit systems */
-       VALID_RANGE(1024, WSREP_MAX_WS_SIZE), DEFAULT(1073741824UL), BLOCK_SIZE(1));
+       VALID_RANGE(1024, WSREP_MAX_WS_SIZE), DEFAULT(WSREP_MAX_WS_SIZE),
+       BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(wsrep_max_ws_size_update));
 
 static Sys_var_ulong Sys_wsrep_max_ws_rows (
        "wsrep_max_ws_rows", "Max number of rows in write set",
        GLOBAL_VAR(wsrep_max_ws_rows), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1, 1048576), DEFAULT(131072), BLOCK_SIZE(1));
+       VALID_RANGE(0, 1048576), DEFAULT(0), BLOCK_SIZE(1));
 
 static Sys_var_charptr Sys_wsrep_notify_cmd(
        "wsrep_notify_cmd", "",

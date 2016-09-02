@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -199,9 +199,9 @@ BuildRequires: gperf procps time
 %global compatch              mysql-5173-charset-dir.patch
 %endif
 
-# mysql-wsrep-5.5 has libmysqlclient.so.18, as have 5.6 and 5.7; 
+# mysql-wsrep-5.5 has libmysqlclient.so.18, as has 5.6;
 # same as preinstalled mariadb-libs, so we currently need no libs-compat on RHEL 7.
-# This becomes relevant with a MySQL 5.8 (or higher) that has a libmysqlclient.so.19 or higher.
+# This becomes relevant with a MySQL 5.7 (or higher) that has a libmysqlclient.so.20 or higher.
 #
 # %%if 0%%{?rhel} == 7
 # %%global compatver             5.5.45
@@ -330,12 +330,12 @@ Obsoletes:      MySQL-server
 Obsoletes:      MySQL-server-advanced
 %endif
 Obsoletes:      mysql-server < %{version}-%{release}
-Obsoletes:      mysql-server-advanced
+Obsoletes:      mysql-server-advanced mysql-community-server
 Obsoletes:      MySQL-server-classic MySQL-server-community MySQL-server-enterprise
 Obsoletes:      MySQL-server-advanced-gpl MySQL-server-enterprise-gpl
 %if 0%{?rhel}
 # RedHat has /usr/share/mysql/* in a separate package
-Obsoletes:      mysql-common
+Obsoletes:      mysql-common mysql-community-common
 %endif
 Provides:       mysql-server = %{version}-%{release}
 Provides:       mysql-server%{?_isa} = %{version}-%{release}
@@ -381,6 +381,7 @@ Obsoletes:      MySQL-client-advanced
 %endif
 Obsoletes:      mysql < %{version}-%{release}
 Obsoletes:      mysql-advanced < %{version}-%{release}
+Obsoletes:      mysql-community-client
 Obsoletes:      MySQL-client-classic MySQL-client-community MySQL-client-enterprise
 Obsoletes:      MySQL-client-advanced-gpl MySQL-client-enterprise-gpl
 Provides:       mysql = %{version}-%{release} 
@@ -409,10 +410,10 @@ Requires:       MySQL-client perl
 Obsoletes:      MySQL-test-advanced
 %endif
 Obsoletes:      mysql-test < %{version}-%{release}
-Obsoletes:      mysql-test-advanced
+Obsoletes:      mysql-test-advanced mysql-community-test
 Obsoletes:      MySQL-test-classic MySQL-test-community MySQL-test-enterprise
 Obsoletes:      MySQL-test-advanced-gpl MySQL-test-enterprise-gpl
-Obsoletes:      mysql-bench
+Obsoletes:      mysql-bench mysql-community-bench
 Obsoletes:      MySQL-bench
 Provides:       mysql-test = %{version}-%{release}
 Provides:       mysql-test%{?_isa} = %{version}-%{release}
@@ -438,6 +439,7 @@ Obsoletes:      MySQL-devel-advanced
 %endif
 Obsoletes:      mysql-devel < %{version}-%{release}
 Obsoletes:      mysql-embedded-devel mysql-devel-advanced mysql-embedded-devel-advanced
+Obsoletes:      mysql-community-devel
 Obsoletes:      MySQL-devel-classic MySQL-devel-community MySQL-devel-enterprise
 Obsoletes:      MySQL-devel-advanced-gpl MySQL-devel-enterprise-gpl
 Provides:       mysql-devel = %{version}-%{release}
@@ -468,7 +470,7 @@ Obsoletes:      MySQL-shared-pro-gpl-cert
 Obsoletes:      MySQL-shared-classic MySQL-shared-community MySQL-shared-enterprise
 Obsoletes:      MySQL-shared-advanced-gpl MySQL-shared-enterprise-gpl
 # RHEL uses other names:
-Obsoletes:      mysql-libs
+Obsoletes:      mysql-libs mysql-community-libs
 # Necessary on RHEL 7, no harm on other platforms:
 Obsoletes:      mariadb-libs
 
@@ -488,6 +490,7 @@ Obsoletes:      mysql-wsrep-libs-compat%{previous_suffix}
 Provides:       mysql-libs-compat = %{version}
 Provides:       mysql-libs-compat%{?_isa} = %{version}
 Obsoletes:      mysql-libs-compat < %{version}
+Obsoletes:      mysql-community-libs-compat
 Provides:       MySQL-shared-compat%{?_isa} = %{version}
 Obsoletes:      MySQL-shared-compat < %{version}
 
@@ -495,6 +498,7 @@ Obsoletes:      MySQL-shared-compat < %{version}
 # Directly, we replace "libs" only; but RedHat "client" and "server" need files from "libs"
 Provides:       mysql-libs = %{compatver}
 Obsoletes:      mysql-libs < %{version}
+Obsoletes:      mysql-community-libs
 
 %if 0%{?rhel} > 6
 # Dealing with RHEL 7 and upwards (and compatible ...)
@@ -529,7 +533,7 @@ Requires:       MySQL-devel
 Obsoletes:      MySQL-embedded-advanced
 %endif
 Obsoletes:      mysql-embedded < %{version}-%{release}
-Obsoletes:      mysql-embedded-advanced
+Obsoletes:      mysql-embedded-advanced mysql-community-embedded
 Obsoletes:      MySQL-embedded-pro
 Obsoletes:      MySQL-embedded-classic MySQL-embedded-community MySQL-embedded-enterprise
 Obsoletes:      MySQL-embedded-advanced-gpl MySQL-embedded-enterprise-gpl
@@ -1500,6 +1504,11 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Fri Jun 10 2016 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Add missing "obsoletes" directives to handle Oracle's yum repository.
+- Fix comment about SO version of libmysqlclient.so.
+- Modify some changelog dates to match Oracle's (reduce differences).
+
 * Fri Oct 30 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - Combine "plugins.files" and "datadir.files" into one, it seems rpmbuild 4.4
   (used on SLES 11) cannot handle two "-f" directives for one "%%files" section.
@@ -1646,7 +1655,7 @@ echo "====="                                     >> $STATUS_HISTORY
   not in an RPM upgrade.
   This affects both the "mkdir" and the call of "mysql_install_db".
 
-* Thu Feb 10 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
+* Wed Feb 09 2011 Joerg Bruehe <joerg.bruehe@oracle.com>
 
 - Fix bug#56581: If an installation deviates from the default file locations
   ("datadir" and "pid-file"), the mechanism to detect a running server (on upgrade)
@@ -1767,7 +1776,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Fix some problems with the directives around "tcmalloc" (experimental),
   remove erroneous traces of the InnoDB plugin (that is 5.1 only).
 
-* Fri Oct 09 2009 Magnus Blaudd <mvensson@mysql.com>
+* Tue Oct 06 2009 Magnus Blaudd <mvensson@mysql.com>
 
 - Removed mysql_fix_privilege_tables
 
@@ -1964,7 +1973,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - Set $LDFLAGS from $MYSQL_BUILD_LDFLAGS
 
-* Wed Mar 08 2006 Kent Boortz <kent@mysql.com>
+* Tue Mar 07 2006 Kent Boortz <kent@mysql.com>
 
 - Changed product name from "Community Edition" to "Community Server"
 
@@ -2212,7 +2221,7 @@ echo "====="                                     >> $STATUS_HISTORY
 
 - marked /etc/logrotate.d/mysql as a config file (BUG 2156)
 
-* Fri Dec 12 2003 Lenz Grimmer <lenz@mysql.com>
+* Sat Dec 13 2003 Lenz Grimmer <lenz@mysql.com>
 
 - fixed file permissions (BUG 1672)
 
@@ -2354,7 +2363,7 @@ echo "====="                                     >> $STATUS_HISTORY
 - Added separate libmysql_r directory; now both a threaded
   and non-threaded library is shipped.
 
-* Wed Sep 29 1999 David Axmark <davida@mysql.com>
+* Tue Sep 28 1999 David Axmark <davida@mysql.com>
 
 - Added the support-files/my-example.cnf to the docs directory.
 

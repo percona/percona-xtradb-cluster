@@ -2815,6 +2815,10 @@ int handler::ha_open(TABLE *table_arg, const char *name, int mode,
   DBUG_PRINT("info", ("old m_lock_type: %d F_UNLCK %d", m_lock_type, F_UNLCK));
   DBUG_ASSERT(alloc_root_inited(&table->mem_root));
 
+  if (cloned) {
+    DEBUG_SYNC(ha_thd(), "start_handler_ha_open_cloned");
+  }
+
   if ((error=open(name,mode,test_if_locked)))
   {
     if ((error == EACCES || error == EROFS) && mode == O_RDWR &&
@@ -6715,7 +6719,7 @@ end:
 ha_rows DsMrr_impl::dsmrr_info(uint keyno, uint n_ranges, uint rows,
                                uint *bufsz, uint *flags, Cost_estimate *cost)
 {  
-  ha_rows res __attribute__((unused));
+  ha_rows res MY_ATTRIBUTE((unused));
   uint def_flags= *flags;
   uint def_bufsz= *bufsz;
 
@@ -7836,6 +7840,17 @@ int handler::ha_write_row(uchar *buf)
 
   if (unlikely(error= binlog_log_row(table, 0, buf, log_func)))
     DBUG_RETURN(error); /* purecov: inspected */
+#ifdef WITH_WSREP
+  current_thd->wsrep_affected_rows++;
+  if (wsrep_max_ws_rows &&
+      current_thd->wsrep_exec_mode != REPL_RECV &&
+      current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
+  {
+    trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
+    my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
+    DBUG_RETURN(ER_ERROR_DURING_COMMIT);
+  }
+#endif /* WITH_WSREP */
 
   DEBUG_SYNC_C("ha_write_row_end");
   DBUG_RETURN(0);
@@ -7867,6 +7882,17 @@ int handler::ha_update_row(const uchar *old_data, uchar *new_data)
     return error;
   if (unlikely(error= binlog_log_row(table, old_data, new_data, log_func)))
     return error;
+#ifdef WITH_WSREP
+  current_thd->wsrep_affected_rows++;
+  if (wsrep_max_ws_rows &&
+      current_thd->wsrep_exec_mode != REPL_RECV &&
+      current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
+  {
+    trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
+    my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
+    return ER_ERROR_DURING_COMMIT;
+  }
+#endif /* WITH_WSREP */
   return 0;
 }
 
@@ -7895,6 +7921,17 @@ int handler::ha_delete_row(const uchar *buf)
     return error;
   if (unlikely(error= binlog_log_row(table, buf, 0, log_func)))
     return error;
+#ifdef WITH_WSREP
+  current_thd->wsrep_affected_rows++;
+  if (wsrep_max_ws_rows &&
+      current_thd->wsrep_exec_mode != REPL_RECV &&
+      current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
+  {
+    trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
+    my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
+    return ER_ERROR_DURING_COMMIT;
+  }
+#endif /* WITH_WSREP */
   return 0;
 }
 

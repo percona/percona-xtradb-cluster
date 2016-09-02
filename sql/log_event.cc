@@ -1752,7 +1752,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
 
 void Log_event::print_header(IO_CACHE* file,
                              PRINT_EVENT_INFO* print_event_info,
-                             bool is_more __attribute__((unused)))
+                             bool is_more MY_ATTRIBUTE((unused)))
 {
   char llbuff[22];
   my_off_t hexdump_from= print_event_info->hexdump_from;
@@ -2736,7 +2736,7 @@ Slave_worker *Log_event::get_slave_worker(Relay_log_info *rli)
   {
     if (!rli->curr_group_seen_gtid && !rli->curr_group_seen_begin)
     {
-      ulong gaq_idx __attribute__((unused));
+      ulong gaq_idx MY_ATTRIBUTE((unused));
       rli->mts_groups_assigned++;
 
       rli->curr_group_isolated= FALSE;
@@ -4638,32 +4638,9 @@ static bool is_silent_error(THD* thd)
 int Query_log_event::do_apply_event(Relay_log_info const *rli,
                                       const char *query_arg, uint32 q_len_arg)
 {
-  char* query_buf;
-  int query_buf_len;
+  DBUG_ENTER("Query_log_event::do_apply_event");
   int expected_error,actual_error= 0;
   HA_CREATE_INFO db_options;
-  DBUG_ENTER("Query_log_event::do_apply_event");
-
-  /*
-    We must allocate some extra memory for query cache
-    The query buffer layout is:
-       buffer :==
-         <statement>   The input statement(s)
-         '\0'          Terminating null char  (1 byte)
-         <length>      Length of following current database name (size_t)
-         <db_name>     Name of current database
-         <flags>       Flags struct
-  */
-  query_buf_len = q_len_arg + 1 + sizeof(size_t) + thd->db_length
-                  + QUERY_CACHE_FLAGS_SIZE + 1;
-  if ((query_buf= (char *) thd->alloc(query_buf_len)))
-  {
-    memcpy(query_buf, query_arg, q_len_arg);
-    query_buf[q_len_arg]= 0;
-    memcpy(query_buf+q_len_arg+1, (char *) &thd->db_length, sizeof(size_t));
-  }
-  else
-    goto end;
 
   /*
     Colleagues: please never free(thd->catalog) in MySQL. This would
@@ -4746,10 +4723,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   */
   {
     thd->set_time(&when);
-
-    thd->set_query_and_id((char*) query_buf, q_len_arg,
+    thd->set_query_and_id((char*)query_arg, q_len_arg,
                           thd->charset(), next_query_id());
- 
     thd->variables.pseudo_thread_id= thread_id;		// for temp tables
     attach_temp_tables_worker(thd);
     DBUG_PRINT("query",("%s", thd->query()));
@@ -4814,7 +4789,7 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
             result. This should be acceptable now. This is a reminder
             to fix this if any refactoring happens here sometime.
           */
-          thd->set_query((char*) query_buf, q_len_arg, thd->charset());
+          thd->set_query((char*) query_arg, q_len_arg, thd->charset());
         }
       }
       if (time_zone_len)
@@ -11367,9 +11342,6 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
     /*
       When the open and locking succeeded, we check all tables to
       ensure that they still have the correct type.
-
-      We can use a down cast here since we know that every table added
-      to the tables_to_lock is a RPL_TABLE_LIST.
     */
 
     {
@@ -11388,10 +11360,37 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
         NOTE: The base tables are added here are removed when 
               close_thread_tables is called.
        */
-      RPL_TABLE_LIST *ptr= rli->tables_to_lock;
-      for (uint i= 0 ; ptr && (i < rli->tables_to_lock_count);
-           ptr= static_cast<RPL_TABLE_LIST*>(ptr->next_global), i++)
+      TABLE_LIST *table_list_ptr= rli->tables_to_lock;
+      for (uint i=0 ; table_list_ptr && (i < rli->tables_to_lock_count);
+           table_list_ptr= table_list_ptr->next_global, i++)
       {
+        /*
+          Below if condition takes care of skipping base tables that
+          make up the MERGE table (which are added by open_tables()
+          call). They are added next to the merge table in the list.
+          For eg: If RPL_TABLE_LIST is t3->t1->t2 (where t1 and t2
+          are base tables for merge table 't3'), open_tables will modify
+          the list by adding t1 and t2 again immediately after t3 in the
+          list (*not at the end of the list*). New table_to_lock list will
+          look like t3->t1'->t2'->t1->t2 (where t1' and t2' are TABLE_LIST
+          objects added by open_tables() call). There is no flag(or logic) in
+          open_tables() that can skip adding these base tables to the list.
+          So the logic here should take care of skipping them.
+
+          tables_to_lock_count logic will take care of skipping base tables
+          that are added at the end of the list.
+          For eg: If RPL_TABLE_LIST is t1->t2->t3, open_tables will modify
+          the list into t1->t2->t3->t1'->t2'. t1' and t2' will be skipped
+          because tables_to_lock_count logic in this for loop.
+        */
+        if (table_list_ptr->parent_l)
+          continue;
+        /*
+          We can use a down cast here since we know that every table added
+          to the tables_to_lock is a RPL_TABLE_LIST (or child table which is
+          skipped above).
+        */
+        RPL_TABLE_LIST *ptr= static_cast<RPL_TABLE_LIST*>(table_list_ptr);
         DBUG_ASSERT(ptr->m_tabledef_valid);
         TABLE *conv_table;
         /*
@@ -11436,7 +11435,15 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
      */
     TABLE_LIST *ptr= rli->tables_to_lock;
     for (uint i=0 ;  ptr && (i < rli->tables_to_lock_count); ptr= ptr->next_global, i++)
+    {
+      /*
+        Please see comment in above 'for' loop to know the reason
+        for this if condition
+      */
+      if (ptr->parent_l)
+        continue;
       const_cast<Relay_log_info*>(rli)->m_table_map.set_table(ptr->table_id, ptr->table);
+    }
 
 #ifdef HAVE_QUERY_CACHE
 #ifdef WITH_WSREP

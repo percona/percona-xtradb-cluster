@@ -335,7 +335,7 @@ uint get_table_def_key(const TABLE_LIST *table_list, const char **key)
 *****************************************************************************/
 
 extern "C" uchar *table_def_key(const uchar *record, size_t *length,
-                               my_bool not_used __attribute__((unused)))
+                               my_bool not_used MY_ATTRIBUTE((unused)))
 {
   TABLE_SHARE *entry=(TABLE_SHARE*) record;
   *length= entry->table_cache_key.length;
@@ -996,7 +996,6 @@ bool close_cached_tables(THD *thd, TABLE_LIST *tables,
 
   while (found && ! thd->killed)
   {
-    WSREP_DEBUG("close_cached_tables, wait loop");
     TABLE_SHARE *share;
     found= FALSE;
     /*
@@ -4942,7 +4941,7 @@ end:
 }
 
 extern "C" uchar *schema_set_get_key(const uchar *record, size_t *length,
-                                     my_bool not_used __attribute__((unused)))
+                                     my_bool not_used MY_ATTRIBUTE((unused)))
 {
   TABLE_LIST *table=(TABLE_LIST*) record;
   *length= table->db_length;
