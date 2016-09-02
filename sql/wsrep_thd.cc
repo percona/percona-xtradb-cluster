@@ -185,6 +185,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   dummy.str= NULL;
   dummy.length= 0;
   thd->reset_db(dummy);
+  shadow->user_time = thd->user_time;
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -195,6 +196,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->get_protocol_classic()->set_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
+  thd->user_time              = shadow->user_time;
 }
 
 void wsrep_replay_transaction(THD *thd)

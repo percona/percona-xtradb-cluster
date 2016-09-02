@@ -2347,14 +2347,21 @@ const char *print_slave_db_safe(const char* db)
 
 static bool is_network_error(uint errorno)
 {
-  return errorno == CR_CONNECTION_ERROR ||
+  if (errorno == CR_CONNECTION_ERROR ||
       errorno == CR_CONN_HOST_ERROR ||
       errorno == CR_SERVER_GONE_ERROR ||
       errorno == CR_SERVER_LOST ||
       errorno == ER_CON_COUNT_ERROR ||
       errorno == ER_SERVER_SHUTDOWN ||
       errorno == ER_NET_READ_INTERRUPTED ||
-      errorno == ER_NET_WRITE_INTERRUPTED;
+      errorno == ER_NET_WRITE_INTERRUPTED)
+    return TRUE;
+#ifdef WITH_WSREP
+  if (errorno == ER_UNKNOWN_COM_ERROR)
+    return TRUE;
+#endif /* WITH_WSREP */
+
+  return FALSE;   
 }
 
 
@@ -5340,7 +5347,6 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
         Hence deferred events wont be deleted here.
         They will be deleted in Deferred_log_events::rewind() funciton.
     */
-    WSREP_DEBUG("apply_event_and_update_pos result: %d", exec_res);
     if (*ptr_ev)
     {
       DBUG_ASSERT(*ptr_ev == ev); // event remains to belong to Coordinator

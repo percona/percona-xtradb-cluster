@@ -6,7 +6,7 @@ SET @wsrep_max_ws_size_global_saved = @@global.wsrep_max_ws_size;
 # default
 SELECT @@global.wsrep_max_ws_size;
 @@global.wsrep_max_ws_size
-1073741824
+2147483647
 
 # scope
 SELECT @@session.wsrep_max_ws_size;

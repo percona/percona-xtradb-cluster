@@ -101,6 +101,7 @@ struct wsrep_thd_shadow {
   Vio                  *vio;
   ulong                tx_isolation;
   LEX_CSTRING          db;
+  struct timeval       user_time;
 };
 
 namespace wsp {
@@ -3319,6 +3320,7 @@ public:
   void*                     wsrep_apply_format;
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
+  ulong                     wsrep_affected_rows;
   bool                      wsrep_certify_empty_trx;
   bool                      wsrep_sst_donor;
 #endif /* WITH_WSREP */

@@ -18,3 +18,4 @@ wsrep_reject_queries_basic          : TC pending.
 sql_mode_func                       : Differences in result likely due to configuration. Need more investigation.
 innodb_buffer_pool_populate_basic   : is now mapped to use NUMA interleave policies and some of the modes are not supported on some distros.
 innodb_support_xa_func              : XA is not supported by PXC
+wsrep_max_ws_size_basic             : Setting this now also set repl.max_ws_size which is galera internal setting.

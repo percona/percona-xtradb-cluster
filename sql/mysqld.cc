@@ -5063,8 +5063,14 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       if (WSREP_ON)
         tc_log=  &tc_log_dummy;
       else
-#endif /* WITH_WSREP */
+        /*
+         * wsrep hton grows total_ha_2pc count to 2, even in native mysql mode.
+         * Have to force using tc_log_dummy here, as tc_log_mmap segfaults
+         */
+        tc_log=  &tc_log_dummy;
+#else
       tc_log= &tc_log_mmap;
+#endif /* WITH_WSREP */
   }
 
 #ifdef WITH_WSREP
@@ -8300,7 +8306,7 @@ static int mysql_init_variables(void)
   (void) strmake(mysql_home, tmpenv, sizeof(mysql_home)-1);
 #endif
 #ifdef WITH_WSREP
-  if (WSREP_ON && wsrep_init_vars())
+  if (wsrep_init_vars())
     return 1;
 #endif /* WITH_WSREP */
   return 0;

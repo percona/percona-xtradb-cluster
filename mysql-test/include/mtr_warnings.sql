@@ -251,6 +251,16 @@ INSERT INTO global_suppressions VALUES
  ("InnoDB: Failed to set O_DIRECT on "),
 
  /*
+   Warning message introduced by wl#7706
+ */
+ ("CA certificate .* is self signed"),
+
+ /*
+   Warnings related to --secure-file-priv
+ */
+ ("Insecure configuration for --secure-file-priv:*"),
+
+ /*
    Galera suppressions 
  */
  ("WSREP:*down context*"),
@@ -285,27 +295,25 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Failed to prepare for incremental state transfer: Local state seqno is undefined:"),
  ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
  ("WSREP: gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)"),
- ("WSREP: Action message in non-primary configuration from member"),
+
+ ("Action message in non-primary configuration from member"),
  ("InnoDB: Resizing redo log from"),
  ("InnoDB: Starting to delete and rewrite log files"),
  ("InnoDB: New log files created, LSN="),
+-- WSREP: Send action {0x7f86280147f0, 73, STATE_REQUEST} returned -107 (Transport endpoint is not connected)
+ ("Transport endpoint is not connected"),
+-- "WSREP: Protocol violation. JOIN message sender 1.0 (host-91-221-67-96) is not in state transfer (SYNCED). Message ignored.
+ ("is not in state transfer"),
+ ("install timer expired"),
+ ("Last Applied Action message in non-primary configuration from member"),
+
  ("IP address \'127.0.0.2\' could not be resolved: Name or service not known"),
+ ("JOIN message from member .* in non-primary configuration"),
  ("SYNC message from member"),
  ("WSREP: Percona-XtraDB-Cluster prohibits setting binlog_format to STATEMENT or MIXED at global level"),
  ("WSREP: Table without explict primary key \\(not-recommended\\) and certification of nonPK table is OFF too"),
  ("WSREP: Node is not a cluster node. Disabling pxc_strict_mode"),
  ("WSREP: pxc_strict_mode can be changed only if node is cluster-node"),
- ("WSREP: evs::proto.*install timer expired"),
-
- /*
-   Warning message introduced by wl#7706
- */
- ("CA certificate .* is self signed"),
-
- /*
-   Warnings related to --secure-file-priv
- */
- ("Insecure configuration for --secure-file-priv:*"),
 
  ("THE_LAST_SUPPRESSION")||
 
