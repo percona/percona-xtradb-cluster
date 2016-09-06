@@ -20221,6 +20221,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
         case MUST_ABORT:
 		WSREP_DEBUG("victim %llu in MUST ABORT state",
 			    (long long)victim_trx->id);
+		if (victim_trx->state == TRX_STATE_ACTIVE)
 		{
 			os_thread_id_t	bf_id     = os_thread_get_curr_id();
 			os_thread_id_t	thread_id = victim_trx->killed_by;
@@ -20248,6 +20249,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    (long long)victim_trx->id);
+		if (victim_trx->state == TRX_STATE_ACTIVE)
 		{
 			os_thread_id_t	bf_id     = os_thread_get_curr_id();
 			os_thread_id_t	thread_id = victim_trx->killed_by;
@@ -20305,6 +20307,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
+			if (victim_trx->state == TRX_STATE_ACTIVE)
 			{
 				os_thread_id_t	bf_id     = os_thread_get_curr_id();
 				os_thread_id_t	thread_id = victim_trx->killed_by;
@@ -20318,6 +20321,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                                             wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
+			if (victim_trx->state == TRX_STATE_ACTIVE)
 			{
 				os_thread_id_t	bf_id     = os_thread_get_curr_id();
 				os_thread_id_t	thread_id = victim_trx->killed_by;

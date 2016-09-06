@@ -2291,12 +2291,12 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		return(DB_SUCCESS);
 	}
 
-	dberr_t	err = DB_LOCK_WAIT;
 #ifdef WITH_WSREP
-        if (wsrep_thd_is_BF(m_trx->mysql_thd, FALSE) && !lock_get_wait(lock)) {
+	dberr_t err= DB_LOCK_WAIT;
+	if (wsrep_thd_is_BF(m_trx->mysql_thd, FALSE) && !lock_get_wait(lock)) {
 		if (wsrep_debug) ib::info() <<
 			"BF thread got lock granted early, ID " << lock->trx->id;
-          err = DB_SUCCESS;
+		err = DB_SUCCESS;
         } else {
 #endif /* WITH_WSREP */
         ut_ad(lock_get_wait(lock));
@@ -7315,7 +7315,7 @@ lock_trx_handle_wait(
 	dberr_t	err;
 
 #ifdef WITH_WSREP
-        if (trx->killed_by == 0) {
+        if (trx->killed_by == 0 && trx->state == TRX_STATE_ACTIVE) {
 #endif /* WITH_WSREP */
 	lock_mutex_enter();
 
@@ -7335,7 +7335,7 @@ lock_trx_handle_wait(
 	}
 
 #ifdef WITH_WSREP
-        if (trx->killed_by == 0) {
+        if (trx->killed_by == 0 && trx->state == TRX_STATE_ACTIVE) {
 #endif /* WITH_WSREP */
 	lock_mutex_exit();
 
