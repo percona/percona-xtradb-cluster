@@ -6075,14 +6075,14 @@ restart:
     case PXC_STRICT_MODE_MASTER:
     default: 
       block= true;
-      WSREP_ERROR("Percona-XtraDB-Cluster doesn't recommend use of"
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
                   " DML command on a table (%s.%s) without"
                   " an explicit primary key"
                   " with pxc_strict_mode = ENFORCING or MASTER",
                   tbl->s->db.str, tbl->s->table_name.str);
       char message[1024];
       sprintf(message,
-              "Percona-XtraDB-Cluster doesn't recommend use of"
+              "Percona-XtraDB-Cluster prohibits use of"
               " DML command on a table (%s.%s) without"
               " an explicit primary key"
               " with pxc_strict_mode = ENFORCING or MASTER",

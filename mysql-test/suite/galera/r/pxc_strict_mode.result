@@ -819,9 +819,9 @@ ENFORCING
 create table tinnodb (i int) engine=innodb;
 create table tmyisam (i int) engine=innodb;
 insert into tinnodb values (1), (2);
-ERROR HY000: Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tinnodb) without an explicit primary key with pxc_strict_mode = ENFORCING or MASTER
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of DML command on a table (test.tinnodb) without an explicit primary key with pxc_strict_mode = ENFORCING or MASTER
 insert into tmyisam values (1), (2);
-ERROR HY000: Percona-XtraDB-Cluster doesn't recommend use of DML command on a table (test.tmyisam) without an explicit primary key with pxc_strict_mode = ENFORCING or MASTER
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of DML command on a table (test.tmyisam) without an explicit primary key with pxc_strict_mode = ENFORCING or MASTER
 drop table tmyisam;
 #node-2
 #0 rows expected as pxc-strict-mode = ENFORCING and table is without primary key
