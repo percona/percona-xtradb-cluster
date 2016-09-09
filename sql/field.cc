@@ -8726,24 +8726,25 @@ type_conversion_status
 Field_geom::store_internal(const char *from, size_t length,
                            const CHARSET_INFO *cs)
 {
-  DBUG_ASSERT(length > 0);
-
-  // Check that the given WKB
-  // 1. isn't marked as bad geometry data
-  // 2. isn't shorter than empty geometrycollection
-  // 3. is a valid geometry type
-  // 4. is well formed
-  if (from == Geometry::bad_geometry_data.ptr() ||                    // 1
-      length < SRID_SIZE + WKB_HEADER_SIZE + sizeof(uint32) ||        // 2
-      !Geometry::is_valid_geotype(uint4korr(from + SRID_SIZE + 1)) || // 3
-      !Geometry::is_well_formed(from, length,                         // 4
-                                geometry_type_to_wkb_type(geom_type),
-                                Geometry::wkb_ndr))
+  if (length)
   {
-    memset(ptr, 0, Field_blob::pack_length());  
-    my_message(ER_CANT_CREATE_GEOMETRY_OBJECT,
-               ER(ER_CANT_CREATE_GEOMETRY_OBJECT), MYF(0));
-    return TYPE_ERR_BAD_VALUE;
+    // Check that the given WKB
+    // 1. isn't marked as bad geometry data
+    // 2. isn't shorter than empty geometrycollection
+    // 3. is a valid geometry type
+    // 4. is well formed
+    if (from == Geometry::bad_geometry_data.ptr() ||                    // 1
+        length < SRID_SIZE + WKB_HEADER_SIZE + sizeof(uint32) ||        // 2
+        !Geometry::is_valid_geotype(uint4korr(from + SRID_SIZE + 1)) || // 3
+        !Geometry::is_well_formed(from, length,                         // 4
+                                  geometry_type_to_wkb_type(geom_type),
+                                  Geometry::wkb_ndr))
+    {
+      memset(ptr, 0, Field_blob::pack_length());
+      my_message(ER_CANT_CREATE_GEOMETRY_OBJECT,
+                 ER(ER_CANT_CREATE_GEOMETRY_OBJECT), MYF(0));
+      return TYPE_ERR_BAD_VALUE;
+    }
   }
 
   if (table->copy_blobs || length <= MAX_FIELD_WIDTH)
