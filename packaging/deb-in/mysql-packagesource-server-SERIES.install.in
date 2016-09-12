@@ -90,6 +90,8 @@ debian/extra/mysql.cnf  etc/mysql/
 debian/extra/mysqld.cnf /etc/mysql/mysql.conf.d/
 # app armor profile
 @DEB_INSTALL_SERVER_APPARMOR@
+# startup files, depending on mechanism used by distro
+@DEB_FILES_STARTUP@
 # SQL files
 usr/share/mysql/*.sql
 # support files

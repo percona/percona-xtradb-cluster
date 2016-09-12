@@ -82,6 +82,23 @@ SET (DEB_PRODUCTNAME "wsrep")
 SET (DEB_PRODUCTNAMEC "Wsrep")
 SET (DEB_PRODUCTSERIES "-5.7")
 
+# For each startup mechanism, files are constant across distro version
+SET (FILES_STARTUP_SYSTEMD
+"
+usr/bin/mysqld_pre_systemd
+usr/bin/mysqld_bootstrap
+lib/systemd/system/mysql@.service
+lib/systemd/system/mysql.service
+")
+SET (FILES_STARTUP_SYSV
+"
+etc/init.d/mysql
+usr/bin/mysqld_safe
+")
+SET (FILES_STARTUP_UPSTART
+"
+")
+
 # Platform specifics. The differences are generally only distro version
 # and whether or not systemd and/or apparmor are available
 IF (DEB_CODENAME STREQUAL "wheezy")
@@ -97,6 +114,7 @@ IF (DEB_CODENAME STREQUAL "wheezy")
   SET (DEB_INSTALL_SERVER_APPARMOR "")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
   SET (DEB_INIT_APPARMOR "")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
 ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_PLATFORMRELEASE "debian8")
   SET (DEB_CONTROL_BDEPS "dh-systemd")
@@ -113,6 +131,7 @@ ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
   SET (DEB_INIT_APPARMOR "")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSEIF(DEB_CODENAME STREQUAL "precise")
   SET (DEB_PLATFORMRELEASE "ubuntu12.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor")
@@ -128,6 +147,7 @@ ELSEIF(DEB_CODENAME STREQUAL "precise")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
 ELSEIF(DEB_CODENAME STREQUAL "trusty")
   SET (DEB_PLATFORMRELEASE "ubuntu14.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor")
@@ -143,6 +163,7 @@ ELSEIF(DEB_CODENAME STREQUAL "trusty")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
 ELSEIF(DEB_CODENAME STREQUAL "wily")
   SET (DEB_PLATFORMRELEASE "ubuntu15.10")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -161,6 +182,7 @@ ELSEIF(DEB_CODENAME STREQUAL "wily")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_PLATFORMRELEASE "ubuntu16.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -179,6 +201,7 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSE()
   MESSAGE(STATUS
     "Skipping deb packaging on unsupported platform ${DEB_CODENAME}.")
