@@ -20219,8 +20219,8 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
 		break;
         case MUST_ABORT:
-		WSREP_DEBUG("victim %llu in MUST ABORT state",
-			    (long long)victim_trx->id);
+		WSREP_DEBUG("victim %llu in MUST ABORT state, killed_by: %lu",
+			    (long long)victim_trx->id, victim_trx->killed_by);
 		if (victim_trx->state == TRX_STATE_ACTIVE)
 		{
 			os_thread_id_t	bf_id     = os_thread_get_curr_id();
