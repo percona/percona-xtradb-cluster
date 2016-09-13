@@ -445,7 +445,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                   "wsrep status (%d %d %d)",
                   WSREP_QUERY(thd),
                   thd->get_stmt_da()->affected_rows(),
-                  stmt_has_updated_trans_table(thd), thd->variables.sql_log_bin,
+                  stmt_has_updated_trans_table(thd->transaction.stmt.ha_list),
+                  thd->variables.sql_log_bin,
                   thd->wsrep_exec_mode, thd->wsrep_query_state,
                   thd->wsrep_conflict_state);
     }
