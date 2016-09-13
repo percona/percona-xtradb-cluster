@@ -105,7 +105,7 @@ Package: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@
 Architecture: any
 Depends: debianutils (>=1.6),
          mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (>= ${binary:Version}),
-         mysql-@DEB_PRODUCTNAME@-libmysqlclient20 (>= ${binary:Version}),
+         libmysqlclient20 (>= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Provides: virtual-mysql-client,
@@ -146,7 +146,7 @@ Description: MySQL Client
  Oracle. This package contains the standard MySQL clients and
  administration tools.
 
-Package: mysql-@DEB_PRODUCTNAME@-libmysqlclient20
+Package: libmysqlclient20
 Architecture: any
 Section: libs
 Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
@@ -204,10 +204,10 @@ Description: MySQL Common
  Oracle. This package contains common files needed by MySQL client
  library and the MySQL database server.
 
-Package: mysql-@DEB_PRODUCTNAME@-libmysqlclient-dev
+Package: libmysqlclient-dev
 Architecture: any
 Section: libdevel
-Depends: mysql-@DEB_PRODUCTNAME@-libmysqlclient20 (= ${binary:Version}),
+Depends: libmysqlclient20 (= ${binary:Version}),
          zlib1g-dev,
          ${misc:Depends},
          ${shlibs:Depends}
@@ -246,7 +246,7 @@ Package: mysql-@DEB_PRODUCTNAME@-test@DEB_PRODUCTSERIES@
 Architecture: any
 Depends: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}),
          mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@ (= ${binary:Version}),
-         mysql-@DEB_PRODUCTNAME@-libmysqlclient-dev,
+         libmysqlclient-dev,
          python,
          ${misc:Depends},
          ${shlibs:Depends}
