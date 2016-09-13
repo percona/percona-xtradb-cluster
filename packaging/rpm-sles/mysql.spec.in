@@ -577,6 +577,7 @@ mkdir debug
            -DINSTALL_LIBDIR="%{_lib}/mysql" \
            -DINSTALL_PLUGINDIR="%{_lib}/mysql/plugin" \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
+           -DMYSQLX_UNIX_ADDR="/var/run/mysql/mysqlx.sock" \
            -DFEATURE_SET="%{feature_set}" \
 %if 0%{?wsrep_embedded}
            -DWITH_EMBEDDED_SERVER=1 \
@@ -613,6 +614,7 @@ mkdir release
            -DINSTALL_LIBDIR="%{_lib}/mysql" \
            -DINSTALL_PLUGINDIR="%{_lib}/mysql/plugin" \
            -DMYSQL_UNIX_ADDR="%{mysqldatadir}/mysql.sock" \
+           -DMYSQLX_UNIX_ADDR="/var/run/mysql/mysqlx.sock" \
            -DFEATURE_SET="%{feature_set}" \
 %if 0%{?wsrep_embedded}
            -DWITH_EMBEDDED_SERVER=1 \
