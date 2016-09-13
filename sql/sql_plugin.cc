@@ -4195,6 +4195,9 @@ bool Sql_cmd_install_plugin::execute(THD *thd)
 #endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
+#ifndef EMBEDDED_LIBRARY
+  mysql_audit_release(thd);
+#endif
   return st;
 #ifdef WITH_WSREP
  error:
@@ -4214,6 +4217,9 @@ bool Sql_cmd_uninstall_plugin::execute(THD *thd)
 #endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
+#ifndef EMBEDDED_LIBRARY
+  mysql_audit_release(thd);
+#endif
   return st;
 #ifdef WITH_WSREP
  error:
