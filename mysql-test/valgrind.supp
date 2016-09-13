@@ -1330,3 +1330,10 @@ g   codership/mysql-wsrep/issues#176
    fun:_ZL13plugin_dl_addPK19st_mysql_lex_stringi*
    ...
 }
+
+{
+   Spurious dlerror_run errors on main.udf
+   Memcheck:Leak
+   ...
+   fun:dlerror_run
+}
