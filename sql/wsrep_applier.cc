@@ -255,6 +255,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   if (flags & WSREP_FLAG_ISOLATION)
   {
+
     thd->wsrep_apply_toi= true;
     /*
       Don't run in transaction mode with TOI actions.

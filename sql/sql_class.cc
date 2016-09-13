@@ -837,9 +837,12 @@ extern "C" void wsrep_thd_set_query_state(
 extern "C" void wsrep_thd_set_conflict_state(
          THD *thd, bool lock, enum wsrep_conflict_state state)
 {
-  if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  thd->wsrep_conflict_state= state;
-  if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  if (WSREP(thd))
+  {
+    if (lock) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    thd->wsrep_conflict_state= state;
+    if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
 }
 
 
@@ -1282,6 +1285,8 @@ THD::THD(bool enable_plugins)
    wsrep_po_in_trans(FALSE),
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
+   wsrep_gtid_event_buf(NULL),
+   wsrep_gtid_event_buf_len(0),
 #endif
    m_parser_state(NULL),
    work_part_info(NULL),
@@ -1790,6 +1795,8 @@ void THD::init(void)
   wsrep_TOI_pre_query_len = 0;
   wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
   wsrep_affected_rows     = 0;
+  wsrep_gtid_event_buf    = NULL;
+  wsrep_gtid_event_buf_len = 0;
 #endif
   binlog_row_event_extra_data= 0;
 

@@ -61,6 +61,7 @@ struct wsrep_thd_shadow {
   Vio                  *vio;
   ulong                tx_isolation;
   LEX_CSTRING          db;
+  struct timeval       user_time;
 };
 #endif
 class Reprepare_observer;
@@ -2951,6 +2952,8 @@ public:
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
   ulong                     wsrep_affected_rows;
+  void*                     wsrep_gtid_event_buf;
+  ulong                     wsrep_gtid_event_buf_len;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

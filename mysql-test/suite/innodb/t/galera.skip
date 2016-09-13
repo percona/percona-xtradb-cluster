@@ -41,4 +41,11 @@ innodb-table-online : ALTER succeeds as it is given a higher priority
 innodb-index-online-purge : ALTER succeeds as it is given a higher priority
 innodb-wl5522-debug : Unsafe statement written to the binary log using statement format since BINLOG_FORMAT = STATEMENT.
 innodb_stats_table_flag_auto_recalc : Performs multiple restarts in a row which causes '1047: Unknown command' errors
-
+row_format_redundant : WSREP: innodb_read_only is not supported
+optimizer_temporary_table : WSREP: innodb_read_only is not supported
+readonly : WSREP: innodb_read_only is not supported
+log_file_size : WSREP: innodb_read_only is not supported
+log_file_size_1 : WSREP: innodb_read_only is not supported
+xa_recovery : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+flush-hang : Unsafe statement written to the binary log
+innodb_deadlock_with_autoinc : Test uses autoinc_lock_mode = 0

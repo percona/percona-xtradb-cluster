@@ -523,8 +523,17 @@ ELSE()
     CONFIGURE_FILE(systemd/mysqld.tmpfiles.d.in
       ${CMAKE_CURRENT_BINARY_DIR}/mysql.conf ESCAPE_QUOTES @ONLY)
 
+    CONFIGURE_FILE(systemd/mysqld_bootstrap.in
+      ${CMAKE_CURRENT_BINARY_DIR}/mysqld_bootstrap ESCAPE_QUOTES @ONLY)
+
     INSTALL_SCRIPT(
       ${CMAKE_CURRENT_BINARY_DIR}/mysqld_pre_systemd
+      DESTINATION ${INSTALL_BINDIR}
+      COMPONENT Server
+    )
+
+    INSTALL_SCRIPT(
+      ${CMAKE_CURRENT_BINARY_DIR}/mysqld_bootstrap
       DESTINATION ${INSTALL_BINDIR}
       COMPONENT Server
     )

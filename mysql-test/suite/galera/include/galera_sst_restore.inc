@@ -22,7 +22,10 @@ CALL mtr.add_suppression("Can't open and lock time zone table");
 CALL mtr.add_suppression("Can't open and lock privilege tables");
 CALL mtr.add_suppression("Info table is not ready to be used");
 CALL mtr.add_suppression("Native table .* has the wrong structure");
-
+CALL mtr.add_suppression("InnoDB: Table `mysql`\.`innodb_table_stats` not found");
+CALL mtr.add_suppression("Fetch of persistent statistics requested for table `mysql`\.`gtid_executed`");
+CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
+CALL mtr.add_suppression("Gtid table is not ready to be used");
 --disable_query_log
 --eval SET GLOBAL wsrep_sst_method = '$wsrep_sst_method_orig';
 --eval SET GLOBAL wsrep_sst_receive_address = '$wsrep_sst_receive_address_orig';

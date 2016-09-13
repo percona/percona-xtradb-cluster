@@ -1247,7 +1247,6 @@ bool close_cached_tables(THD *thd, TABLE_LIST *tables,
 
   while (found && ! thd->killed)
   {
-    WSREP_DEBUG("close_cached_tables, wait loop");
     TABLE_SHARE *share;
     found= FALSE;
     /*

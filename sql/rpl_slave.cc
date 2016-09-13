@@ -241,7 +241,10 @@ static void set_thd_tx_priority(THD* thd, int priority)
   DBUG_ENTER("set_thd_tx_priority");
   DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
               thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
-  WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d", thd->thd_tx_priority, priority);
+#ifdef WITH_WSREP
+  if (priority > 0)
+    WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d", thd->thd_tx_priority, priority);
+#endif /* WITH_WSREP */
   thd->thd_tx_priority= priority;
   DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread",
   {
@@ -2357,6 +2360,10 @@ const char *print_slave_db_safe(const char* db)
 
 static bool is_network_error(uint errorno)
 {
+#ifdef WITH_WSREP
+  if (errorno == ER_UNKNOWN_COM_ERROR)
+    return TRUE;
+#endif /* WITH_WSREP */
   return errorno == CR_CONNECTION_ERROR ||
       errorno == CR_CONN_HOST_ERROR ||
       errorno == CR_SERVER_GONE_ERROR ||
@@ -5353,7 +5360,6 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
         Hence deferred events wont be deleted here.
         They will be deleted in Deferred_log_events::rewind() funciton.
     */
-    WSREP_DEBUG("apply_event_and_update_pos result: %d", exec_res);
     if (*ptr_ev)
     {
       DBUG_ASSERT(*ptr_ev == ev); // event remains to belong to Coordinator
@@ -5377,6 +5383,38 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
       if (ev->get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT &&
           ev->get_type_code() != binary_log::ROWS_QUERY_LOG_EVENT)
       {
+#ifdef WITH_WSREP
+        if (ev->get_type_code() == binary_log::GTID_LOG_EVENT &&
+            WSREP_ON && !wsrep_preordered_opt)
+        {
+          assert (!thd->wsrep_applier);
+          if (thd->wsrep_gtid_event_buf)
+          {
+            WSREP_WARN("MySQL GTID event pending");
+            my_free((uchar*)thd->wsrep_gtid_event_buf);
+            thd->wsrep_gtid_event_buf     = NULL;
+            thd->wsrep_gtid_event_buf_len = 0;
+          }
+
+          ulong len= thd->wsrep_gtid_event_buf_len=
+            uint4korr(ev->temp_buf + EVENT_LEN_OFFSET);
+          thd->wsrep_gtid_event_buf= (void*)my_realloc(
+              key_memory_wsrep,
+              thd->wsrep_gtid_event_buf,
+              thd->wsrep_gtid_event_buf_len,
+              MYF(0));
+          if (!thd->wsrep_gtid_event_buf)
+          {
+            WSREP_WARN("GTID event allocation for slave failed");
+            thd->wsrep_gtid_event_buf_len= 0;
+          }
+          else
+          {
+            memcpy(thd->wsrep_gtid_event_buf, ev->temp_buf, len);
+            WSREP_DEBUG("realloed %lu", thd->wsrep_gtid_event_buf_len);
+          }
+        }
+#endif /* WITH_WSREP */
         DBUG_PRINT("info", ("Deleting the event after it has been executed"));
         delete ev;
         ev= NULL;

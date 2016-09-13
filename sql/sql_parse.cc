@@ -286,8 +286,27 @@ uint server_command_flags[COM_END+1];
 void init_update_queries(void)
 {
   /* Initialize the server command flags array. */
-#ifdef WITH_WSREP
   memset(server_command_flags, 0, sizeof(server_command_flags));
+  server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_QUERY]=               CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_FIELD_LIST]=          CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_REFRESH]=             CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_SHUTDOWN]=            CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STATISTICS]=          CF_SKIP_QUESTIONS;
+  server_command_flags[COM_PROCESS_KILL]=        CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_PING]=                CF_SKIP_QUESTIONS;
+  server_command_flags[COM_STMT_PREPARE]=        CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_EXECUTE]=        CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_SEND_LONG_DATA]= CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_CLOSE]=          CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_RESET]=          CF_SKIP_QUESTIONS |
+                                                 CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_STMT_FETCH]=          CF_ALLOW_PROTOCOL_PLUGIN;
+  server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN;
+#ifdef WITH_WSREP
   server_command_flags[COM_STATISTICS]=   CF_SKIP_QUESTIONS |
     CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_PING]=         CF_SKIP_QUESTIONS |
@@ -317,26 +336,6 @@ void init_update_queries(void)
   */
   server_command_flags[COM_QUERY]= CF_SKIP_WSREP_CHECK;
   server_command_flags[COM_SET_OPTION]= CF_SKIP_WSREP_CHECK;
-#else
-  server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_QUERY]=               CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_FIELD_LIST]=          CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_REFRESH]=             CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_SHUTDOWN]=            CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_STATISTICS]=          CF_SKIP_QUESTIONS;
-  server_command_flags[COM_PROCESS_KILL]=        CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_PING]=                CF_SKIP_QUESTIONS;
-  server_command_flags[COM_STMT_PREPARE]=        CF_SKIP_QUESTIONS |
-                                                 CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_STMT_EXECUTE]=        CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_STMT_SEND_LONG_DATA]= CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_STMT_CLOSE]=          CF_SKIP_QUESTIONS |
-                                                 CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_STMT_RESET]=          CF_SKIP_QUESTIONS |
-                                                 CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_STMT_FETCH]=          CF_ALLOW_PROTOCOL_PLUGIN;
-  server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN;
 #endif /* WITH_WSREP */
 
   /* Initialize the sql command flags array. */
@@ -5336,6 +5335,23 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
+#ifdef WITH_WSREP
+    if (lex->sql_command == SQLCOM_XA_START    ||
+        lex->sql_command == SQLCOM_XA_END      ||
+        lex->sql_command == SQLCOM_XA_PREPARE  ||
+        lex->sql_command == SQLCOM_XA_COMMIT   ||
+        lex->sql_command == SQLCOM_XA_ROLLBACK ||
+        lex->sql_command == SQLCOM_XA_RECOVER)
+    {
+      if (WSREP(thd))
+      {
+        WSREP_DEBUG("XA command attempt: %d %s, thd: %u",
+                    lex->sql_command, thd->query().str, thd->thread_id());
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0), "XA with wsrep replication plugin");
+        break;
+      }
+    }
+#endif /* WITH_WSREP */
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;

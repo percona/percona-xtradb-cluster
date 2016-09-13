@@ -842,6 +842,10 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
 
 %changelog
+* Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
+- Take Oracle's change to support service "instances" via systemd
+  and other minor fixes from their 5.7.13.
+
 * Mon Apr 04 2016 Georgi Kodinov <georgi.kodinov@oracle.com> - 5.7.13-1
 - Add test_udf_services.so plugin
 - Add keyring_udf.so plugin to server subpackage

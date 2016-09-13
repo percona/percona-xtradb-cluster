@@ -61,7 +61,7 @@ SET SESSION wsrep_sync_wait = 7;
 
 FLUSH STATUS;
 SELECT MAX(id) FROM t1;
-SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
+SELECT VARIABLE_VALUE = 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'Qcache_hits';
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 
 #
@@ -82,7 +82,7 @@ SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
 
 --connection node_2
 --reap
-SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
+SELECT VARIABLE_VALUE = 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'Qcache_hits';
 
 
 --disable_query_log

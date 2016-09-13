@@ -21,10 +21,10 @@ SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_N
 VARIABLE_VALUE = 1
 1
 INSERT INTO t1 VALUES (6);
-CREATE USER 'sst' IDENTIFIED BY 'sst';
+CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
-SET GLOBAL wsrep_sst_auth = 'sst:sst';
-CREATE USER 'sst' IDENTIFIED BY 'sst';
+SET GLOBAL wsrep_sst_auth = 'sst:';
+CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE = 'Synced'
@@ -74,6 +74,7 @@ DROP TABLE t1;
 DROP USER sst;
 SET GLOBAL wsrep_provider = 'none';
 SET GLOBAL wsrep_sst_method = 'rsync';
+SET GLOBAL wsrep_sst_auth = '';
 SET GLOBAL wsrep_provider_options = '';
 SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;

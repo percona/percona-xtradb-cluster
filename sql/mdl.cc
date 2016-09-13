@@ -3190,7 +3190,11 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
     as well for MDL_object_lock::notify_conflicting_locks() to work
     properly.
   */
+#ifdef WITH_WSREP
+  force_slow= true;
+#else
   force_slow= ! unobtrusive_lock_increment || m_needs_thr_lock_abort;
+#endif /* WITH_WSREP */
 
   /*
     If "obtrusive" lock is requested we need to "materialize" all fast

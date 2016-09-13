@@ -8143,9 +8143,26 @@ set_max_autoinc:
 					ulonglong	increment;
 					dberr_t		err;
 
+#ifdef WITH_WSREP
+                                        /* Applier threads which are processing
+                                        ROW events and don't go through server
+                                        level autoinc processing, therefore
+                                        m_prebuilt autoinc values don't get
+                                        properly assigned. Fetch values from
+                                        server side. */
+                                        if (wsrep_on(current_thd) &&
+                                            wsrep_thd_exec_mode(current_thd) == REPL_RECV)
+                                        {
+                                                wsrep_thd_auto_increment_variables(current_thd, &offset, &increment);
+                                        }
+                                        else
+                                        {
+#endif /* WITH_WSREP */
 					offset = m_prebuilt->autoinc_offset;
 					increment = m_prebuilt->autoinc_increment;
-
+#ifdef WITH_WSREP
+                                        }
+#endif /* WITH_WSREP */
 					auto_inc = innobase_next_autoinc(
 						auto_inc,
 						1, increment, offset,
@@ -8845,8 +8862,27 @@ ha_innobase::update_row(
 			ulonglong	offset;
 			ulonglong	increment;
 
+#ifdef WITH_WSREP
+                        /* Applier threads which are processing
+                           ROW events and don't go through server
+                           level autoinc processing, therefore
+                           m_prebuilt autoinc values don't get
+                           properly assigned. Fetch values from
+                           server side. */
+                        if (wsrep_on(current_thd) &&
+                            wsrep_thd_exec_mode(current_thd) == REPL_RECV)
+                        {
+                                wsrep_thd_auto_increment_variables(
+                                    current_thd, &offset, &increment);
+                        }
+                        else
+                        {
+#endif /* WITH_WSREP */
 			offset = m_prebuilt->autoinc_offset;
 			increment = m_prebuilt->autoinc_increment;
+#ifdef WITH_WSREP
+                        }
+#endif /* WITH_WSREP */
 
 			auto_inc = innobase_next_autoinc(
 				auto_inc, 1, increment, offset, col_max_value);
@@ -20282,7 +20318,13 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
         case MUST_ABORT:
 		WSREP_DEBUG("victim %llu in MUST ABORT state",
 			    (long long)victim_trx->id);
-                victim_trx->killed_by = bf_trx->id;
+		if (victim_trx->state == TRX_STATE_ACTIVE)
+		{
+			os_thread_id_t	bf_id     = os_thread_get_curr_id();
+			os_thread_id_t	thread_id = victim_trx->killed_by;
+			os_compare_and_swap_thread_id(&victim_trx->killed_by,
+							thread_id, bf_id);
+		}
 		wsrep_thd_UNLOCK(thd);
 		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
@@ -20304,7 +20346,13 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    (long long)victim_trx->id);
-                victim_trx->killed_by = bf_trx->id;
+		if (victim_trx->state == TRX_STATE_ACTIVE)
+		{
+			os_thread_id_t	bf_id     = os_thread_get_curr_id();
+			os_thread_id_t	thread_id = victim_trx->killed_by;
+			os_compare_and_swap_thread_id(&victim_trx->killed_by,
+							thread_id, bf_id);
+		}
 		wsrep_thd_awake(thd, signal); 
 
 		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
@@ -20356,7 +20404,13 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
-                        victim_trx->killed_by = bf_trx->id;
+			if (victim_trx->state == TRX_STATE_ACTIVE)
+			{
+				os_thread_id_t	bf_id     = os_thread_get_curr_id();
+				os_thread_id_t	thread_id = victim_trx->killed_by;
+				os_compare_and_swap_thread_id(&victim_trx->killed_by,
+								thread_id, bf_id);
+			}
 			wsrep_thd_awake(thd, signal); 
 		} else {
 			/* abort currently executing query */
@@ -20364,7 +20418,13 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
                                             wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
-                        victim_trx->killed_by = bf_trx->id;
+			if (victim_trx->state == TRX_STATE_ACTIVE)
+			{
+				os_thread_id_t	bf_id     = os_thread_get_curr_id();
+				os_thread_id_t	thread_id = victim_trx->killed_by;
+				os_compare_and_swap_thread_id(&victim_trx->killed_by,
+								thread_id, bf_id);
+			}
 			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */
@@ -20467,6 +20527,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 static int innobase_wsrep_set_checkpoint(handlerton* hton, const XID* xid)
 {
 	DBUG_ASSERT(hton == innodb_hton_ptr);
+        if (srv_read_only_mode) return 0;
         if (wsrep_is_wsrep_xid(xid)) {
                 mtr_t mtr;
                 mtr_start(&mtr);

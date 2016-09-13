@@ -216,7 +216,8 @@ INSERT INTO t1 VALUES ('node1_to_be_rollbacked_after');
 INSERT INTO t1 VALUES ('node1_to_be_rollbacked_after');
 Performing --wsrep-recover ...
 Starting server ...
-# restart
+Using --wsrep-start-position when starting mysqld ...
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 VALUES ('node2_committed_after');
@@ -306,7 +307,8 @@ INSERT INTO t1 (f1) VALUES ('node1_to_be_rollbacked_after');
 INSERT INTO t1 (f1) VALUES ('node1_to_be_rollbacked_after');
 Performing --wsrep-recover ...
 Starting server ...
-# restart
+Using --wsrep-start-position when starting mysqld ...
+# restart: --wsrep-start-position=<WSREP_START_POSITION>
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 INSERT INTO t1 (f1) VALUES ('node2_committed_after');

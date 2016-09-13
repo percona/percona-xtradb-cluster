@@ -75,7 +75,7 @@ my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
  * End configuration options
  */
 
-static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
+static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
 static char         cluster_uuid_str[40]= { 0, };
 static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 {
@@ -189,8 +189,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
 
   if (memcmp(&cluster_uuid, &view->state_id.uuid, sizeof(wsrep_uuid_t)))
   {
-    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->state_id.uuid,
-           sizeof(cluster_uuid));
+    memcpy(&cluster_uuid, &view->state_id.uuid, sizeof(cluster_uuid));
 
     wsrep_uuid_print (&cluster_uuid, cluster_uuid_str,
                       sizeof(cluster_uuid_str));
@@ -457,8 +456,7 @@ int wsrep_init()
       WSREP_ERROR("wsrep_load(%s) failed: %s (%d). Reverting to no provider.",
                   wsrep_provider, strerror(rcode), rcode);
       strcpy((char*)wsrep_provider, WSREP_NONE); // damn it's a dirty hack
-      (void) wsrep_init();
-      return rcode;
+      return wsrep_init();
     }
     else /* this is for recursive call above */
     {
@@ -644,6 +642,9 @@ void wsrep_init_startup (bool first)
 
   wsrep_thr_lock_init(wsrep_thd_is_BF, wsrep_abort_thd,
                       wsrep_debug, wsrep_convert_LOCK_to_trx, wsrep_on);
+
+  /* Skip replication start if dummy wsrep provider is loaded */
+  if (!strcmp(wsrep_provider, WSREP_NONE)) return;
 
   /* Skip replication start if no cluster address */
   if (!wsrep_cluster_address || strlen(wsrep_cluster_address) == 0) return;
@@ -1082,6 +1083,13 @@ int wsrep_to_buf_helper(
   }
 #endif
 
+  /* if MySQL GTID event is set, we have to forward it in wsrep channel */
+  if (!ret && thd->wsrep_gtid_event_buf)
+  {
+    *buf     = (uchar *)thd->wsrep_gtid_event_buf;
+    *buf_len = thd->wsrep_gtid_event_buf_len;
+  }
+
   /* if there is prepare query, add event for it */
   if (!ret && thd->wsrep_TOI_pre_query)
   {
@@ -1095,6 +1103,9 @@ int wsrep_to_buf_helper(
   Query_log_event ev(thd, query, query_len, FALSE, FALSE, FALSE, 0);
   if (!ret && ev.write(&tmp_io_cache)) ret= 1;
   if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret= 1;
+
+  thd->wsrep_gtid_event_buf= *buf;
+
   close_cached_file(&tmp_io_cache);
   return ret;
 }
@@ -1230,6 +1241,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     thd->tx_priority = 1;
 #endif
     if (buf) my_free(buf);
+    /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
+    thd->wsrep_gtid_event_buf_len = 0;
+    thd->wsrep_gtid_event_buf     = NULL;
+
     wsrep_keys_free(&key_arr);
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
 		thd->wsrep_exec_mode);
@@ -1244,6 +1259,9 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
 	     "your wsrep connection state and retry the query.");
     if (buf) my_free(buf);
+    /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
+    thd->wsrep_gtid_event_buf_len = 0;
+    thd->wsrep_gtid_event_buf     = NULL;
     wsrep_keys_free(&key_arr);
     return -1;
   }
@@ -1254,6 +1272,10 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 		ret, WSREP_QUERY(thd));
     return 1;
   }
+
+  if (thd->wsrep_gtid_event_buf) my_free(thd->wsrep_gtid_event_buf);
+  thd->wsrep_gtid_event_buf_len = 0;
+  thd->wsrep_gtid_event_buf     = NULL;
   return 0;
 }
 

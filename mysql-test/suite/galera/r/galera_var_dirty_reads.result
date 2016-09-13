@@ -23,19 +23,19 @@ i
 SELECT 1 FROM t1;
 1
 1
-SELECT i, variable_name, variable_value FROM t1, information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
+SELECT i, variable_name, variable_value FROM t1, performance_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
 i	variable_name	variable_value
-1	WSREP_DIRTY_READS	ON
+1	wsrep_dirty_reads	ON
 SET @@session.wsrep_dirty_reads=OFF;
-SELECT i, variable_name, variable_value FROM t1, information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
+SELECT i, variable_name, variable_value FROM t1, performance_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads" AND i = 1;
 ERROR 08S01: WSREP has not yet prepared node for application use
 SELECT 1;
 ERROR 08S01: WSREP has not yet prepared node for application use
 USE information_schema;
 ERROR 08S01: WSREP has not yet prepared node for application use
-SELECT * FROM information_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads";
+SELECT * FROM performance_schema.session_variables WHERE variable_name LIKE "wsrep_dirty_reads";
 VARIABLE_NAME	VARIABLE_VALUE
-WSREP_DIRTY_READS	OFF
+wsrep_dirty_reads	OFF
 SELECT COUNT(*) >= 10 FROM performance_schema.events_statements_history;
 COUNT(*) >= 10
 1

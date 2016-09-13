@@ -4488,8 +4488,14 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       if (WSREP_ON)
         tc_log=  &tc_log_dummy;
       else
-#endif /* WITH_WSREP */
+        /*
+         * wsrep hton grows total_ha_2pc count to 2, even in native mysql mode.
+         * Have to force using tc_log_dummy here, as tc_log_mmap segfaults
+         */
+        tc_log=  &tc_log_dummy;
+#else
       tc_log= &tc_log_mmap;
+#endif /* WITH_WSREP */
   }
 
 #ifdef WITH_WSREP
@@ -4511,6 +4517,10 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
 
+#ifdef WITH_WSREP
+  if (!wsrep_recovery)
+  {
+#endif /* WITH_WSREP */
   /// @todo: this looks suspicious, revisit this /sven
   enum_gtid_mode gtid_mode= get_gtid_mode(GTID_MODE_LOCK_NONE);
 
@@ -4520,6 +4530,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     sql_print_error("GTID_MODE = ON requires ENFORCE_GTID_CONSISTENCY = ON.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 
   if (opt_bin_log)
   {
@@ -5009,6 +5022,13 @@ int mysqld_main(int argc, char **argv)
   if (init_server_components())
     unireg_abort(MYSQLD_ABORT_EXIT);
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
   /*
     Each server should have one UUID. We will create it automatically, if it
     does not exist.
@@ -7823,7 +7843,7 @@ static int mysql_init_variables(void)
   (void) strmake(mysql_home, tmpenv, sizeof(mysql_home)-1);
 #endif
 #ifdef WITH_WSREP
-  if (WSREP_ON && wsrep_init_vars())
+  if (wsrep_init_vars())
     return 1;
 #endif
   return 0;
@@ -8383,13 +8403,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
   (*argc_ptr)++;
   (*argv_ptr)--;
 
-#ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (wsrep_recovery)
-  {
-    wsrep_recover();
-    unireg_abort(0);
-  }
-#endif /* WITH_WSREP */
   /*
     Options have been parsed. Now some of them need additional special
     handling, like custom value checking, checking of incompatibilites

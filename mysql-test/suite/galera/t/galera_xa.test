@@ -1,0 +1,9 @@
+#
+# Test that XA queries are rejected
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+--error ER_NOT_SUPPORTED_YET
+XA START 't';

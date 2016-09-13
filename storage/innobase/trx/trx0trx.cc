@@ -1685,7 +1685,7 @@ trx_write_serialisation_history(
 #ifdef WITH_WSREP
         trx_sysf_t* sys_header = trx_sysf_get(mtr);
         /* Update latest MySQL wsrep XID in trx sys header. */
-        if (wsrep_is_wsrep_xid(&trx->xid))
+        if (wsrep_is_wsrep_xid(trx->xid))
         {
             trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
         }

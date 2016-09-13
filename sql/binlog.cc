@@ -1103,8 +1103,8 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
 #ifdef WITH_WSREP
   if (!cache_mngr->is_binlog_empty()) {
     IO_CACHE* cache= get_trans_log(thd);
-    uchar *buf;
-    size_t len=0;
+    uchar *buf= NULL;
+    size_t len= 0;
     wsrep_write_cache_buf(cache, &buf, &len);
     WSREP_WARN("binlog trx cache not empty (%llu bytes) @ connection close %llu",
                (unsigned long long) len, (unsigned long long) thd->thread_id());
@@ -1421,6 +1421,7 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
     were, we would have to ensure that we're not ending a statement
     inside a stored function.
   */
+
   DBUG_ENTER("binlog_cache_data::flush");
   DBUG_PRINT("debug", ("flags.finalized: %s", YESNO(flags.finalized)));
   int error= 0;

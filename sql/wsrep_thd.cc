@@ -133,6 +133,8 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
 
   shadow->db = thd->db();
   thd->reset_db(NULL_CSTR);
+
+  shadow->user_time = thd->user_time;
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -143,6 +145,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->set_active_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
+  thd->user_time              = shadow->user_time;
 
   assert(thd->rli_slave == thd->wsrep_rli);
   thd->rli_slave = NULL;
@@ -578,4 +581,26 @@ bool wsrep_thd_has_explicit_locks(THD *thd)
 {
   assert(thd);
   return (thd->mdl_context.wsrep_has_explicit_locks());
+}
+
+/*
+  Get auto increment variables for THD. Use global settings for
+  applier threads.
+ */
+extern "C"
+void wsrep_thd_auto_increment_variables(THD* thd,
+                                        unsigned long long* offset,
+                                        unsigned long long* increment)
+{
+  if (thd->wsrep_exec_mode == REPL_RECV &&
+      thd->wsrep_conflict_state != REPLAYING)
+  {
+    *offset= global_system_variables.auto_increment_offset;
+    *increment= global_system_variables.auto_increment_increment;
+  }
+  else
+  {
+    *offset= thd->variables.auto_increment_offset;
+    *increment= thd->variables.auto_increment_increment;
+  }
 }

@@ -1884,9 +1884,9 @@ sub set_build_thread_ports($) {
   $ENV{MTR_BUILD_THREAD}= $build_thread;
 
   # Calculate baseport
-  $baseport= $build_thread * 10 + 10000;
-  $mysqlx_baseport =  $baseport + 9;
-  if ( $baseport < 5001 or $mysqlx_baseport + 9 >= 32767 )
+  $baseport= $build_thread * $opt_port_group_size + 10000;
+  $mysqlx_baseport =  $baseport + ($opt_port_group_size - 1);
+  if ( $baseport < 5001 or $mysqlx_baseport + $opt_port_group_size >= 32767 )
   {
     mtr_error("MTR_BUILD_THREAD number results in a port",
               "outside 5001 - 32767",
@@ -1894,7 +1894,7 @@ sub set_build_thread_ports($) {
   }
 
   mtr_report("Using MTR_BUILD_THREAD $build_thread,",
-	     "with reserved ports $baseport..".($baseport+9));
+	     "with reserved ports $baseport..".($baseport+($opt_port_group_size-1)));
 }
 
 
