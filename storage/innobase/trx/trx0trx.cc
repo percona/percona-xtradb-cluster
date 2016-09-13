@@ -189,7 +189,10 @@ trx_init(
 	os_thread_id_t	thread_id = trx->killed_by;
 
 	os_compare_and_swap_thread_id(&trx->killed_by, thread_id, 0);
-
+#ifdef WITH_WSREP
+	query_id_t	query_id = trx->wsrep_killed_by_query;
+	os_compare_and_swap_thread_id(&trx->wsrep_killed_by_query, query_id, 0);
+#endif /* WITH_WSREP */
 	/* Note: Do not set to 0, the ref count is decremented inside
 	the TrxInInnoDB() destructor. We only need to clear the flags. */
 
@@ -352,6 +355,9 @@ struct TrxFactory {
 		ut_ad(trx->hit_list.empty());
 
 		ut_ad(trx->killed_by == 0);
+#ifdef WITH_WSREP
+		ut_ad(trx->wsrep_killed_by_query == 0);
+#endif /* WITH_WSREP */
 
 		return(true);
 	}
