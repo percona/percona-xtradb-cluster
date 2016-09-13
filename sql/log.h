@@ -24,7 +24,7 @@ class Relay_log_info;
 class Format_description_log_event;
 
 bool trans_has_updated_trans_table(const THD* thd);
-bool stmt_has_updated_trans_table(const THD *thd);
+bool stmt_has_updated_trans_table(Ha_trx_info* ha_list);
 bool use_trans_cache(const THD* thd, bool is_transactional);
 bool ending_trans(THD* thd, const bool all);
 bool ending_single_stmt_trans(THD* thd, const bool all);
@@ -733,6 +733,16 @@ File open_binlog(IO_CACHE *log, const char *log_file_name,
                  const char **errmsg);
 
 char *make_log_name(char *buff, const char *name, const char* log_ext);
+
+/**
+  Check given log name against certain blacklisted names/extensions.
+
+  @param name     Log name to check
+  @param len      Length of log name
+
+  @returns true if name is valid, false otherwise.
+*/
+bool is_valid_log_name(const char *name, size_t len);
 
 extern MYSQL_PLUGIN_IMPORT MYSQL_BIN_LOG mysql_bin_log;
 extern LOGGER logger;
