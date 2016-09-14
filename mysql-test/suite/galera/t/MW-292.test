@@ -47,7 +47,7 @@ UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'System lock';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'init' AND INFO = 'COMMIT';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep in pre-commit stage' AND INFO = 'COMMIT';
 --source include/wait_condition.inc
 
 # Unblock the commit
