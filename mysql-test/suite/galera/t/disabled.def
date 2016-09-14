@@ -6,3 +6,4 @@ galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of acti
 galera_split_brain : fails quite often. bug logged to investigate the failure.
 galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
 galera_var_notify_cmd : fails on digital ocean distro.
+MW-286 : timing issues. Need to work and stablize it.

@@ -292,6 +292,7 @@ INSERT INTO global_suppressions VALUES
  ("JOIN message from member .* in non-primary configuration"),
  ("install timer expired"),
  ("Last Applied Action message in non-primary configuration from member"),
+ ("IP address '127.0.0.2' could not be resolved: Name or service not known"),
  ("THE_LAST_SUPPRESSION")||
 
 
