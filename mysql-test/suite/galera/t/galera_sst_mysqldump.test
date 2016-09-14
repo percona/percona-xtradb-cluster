@@ -7,7 +7,7 @@
 --source suite/galera/include/galera_st_disconnect_slave.inc
 
 # We set the required mysqldump SST options here so that they are used every time the server is restarted during the test
---let $start_mysqld_params = --wsrep_sst_auth=sst: --wsrep_sst_method=mysqldump --wsrep-sst-receive-address=127.0.0.2:$NODE_MYPORT_2 --skip-grant-tables
+--let $restart_parameters = restart: --wsrep_sst_auth=sst: --wsrep_sst_method=mysqldump --wsrep-sst-receive-address=127.0.0.2:$NODE_MYPORT_2 --skip-grant-tables
 
 --source suite/galera/include/galera_st_shutdown_slave.inc
 --source suite/galera/include/galera_st_clean_slave.inc

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # -*- cperl -*-
 
-# Copyright (c) 2004, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2004, 2016, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -540,6 +540,7 @@ sub main {
       $tinfo->{result}= 'MTR_RES_PASSED';
     }
     mtr_report_test($tinfo);
+    mtr_report_test_subunit($tinfo);
     push @$completed, $tinfo;
   }
 
@@ -5996,6 +5997,7 @@ sub start_mysqltest ($) {
     $exe=  "strace";
     mtr_add_arg($args, "-o");
     mtr_add_arg($args, "%s/log/mysqltest.strace", $opt_vardir);
+    mtr_add_arg($args, "-f");
     mtr_add_arg($args, "$exe_mysqltest");
   }
 
@@ -6416,6 +6418,7 @@ sub strace_server_arguments {
 
   mtr_add_arg($args, "-o");
   mtr_add_arg($args, "%s/log/%s.strace", $opt_vardir, $type);
+  mtr_add_arg($args, "-f");
   mtr_add_arg($args, $$exe);
   $$exe= "strace";
 }
@@ -6613,6 +6616,7 @@ sub run_ctest() {
   mark_time_used('test');
   mtr_report_test($tinfo);
   chdir($olddir);
+  mtr_report_test_subunit($tinfo);
   return $tinfo;
 }
 

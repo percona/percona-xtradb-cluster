@@ -115,8 +115,8 @@ char		 *shared_memory_base_name= 0;
 const char 	*def_shared_memory_base_name= default_shared_memory_base_name;
 #endif
 
-static void mysql_close_free_options(MYSQL *mysql);
-static void mysql_close_free(MYSQL *mysql);
+void mysql_close_free_options(MYSQL *mysql);
+void mysql_close_free(MYSQL *mysql);
 static void mysql_prune_stmt_list(MYSQL *mysql);
 
 CHARSET_INFO *default_client_charset_info = &my_charset_latin1;
@@ -3969,7 +3969,7 @@ mysql_select_db(MYSQL *mysql, const char *db)
   If handle is alloced by mysql connect free it.
 *************************************************************************/
 
-static void mysql_close_free_options(MYSQL *mysql)
+void mysql_close_free_options(MYSQL *mysql)
 {
   DBUG_ENTER("mysql_close_free_options");
 
@@ -4005,6 +4005,7 @@ static void mysql_close_free_options(MYSQL *mysql)
   {
     my_free(mysql->options.extension->plugin_dir);
     my_free(mysql->options.extension->default_auth);
+    my_free(mysql->options.extension->server_public_key_path);
     my_hash_free(&mysql->options.extension->connection_attributes);
     my_free(mysql->options.extension);
   }
@@ -4013,18 +4014,24 @@ static void mysql_close_free_options(MYSQL *mysql)
 }
 
 
-static void mysql_close_free(MYSQL *mysql)
+/*
+  Free all memory allocated in a MYSQL handle but preserve
+  current options if any.
+*/
+
+void mysql_close_free(MYSQL *mysql)
 {
   my_free(mysql->host_info);
   my_free(mysql->user);
   my_free(mysql->passwd);
   my_free(mysql->db);
+
 #if defined(EMBEDDED_LIBRARY) || MYSQL_VERSION_ID >= 50100
   my_free(mysql->info_buffer);
   mysql->info_buffer= 0;
 #endif
   /* Clear pointers for better safety */
-  mysql->host_info= mysql->user= mysql->passwd= mysql->db= 0;
+  mysql->host_info= mysql->user= mysql->passwd= mysql->db= mysql->extension= 0;
 }
 
 
@@ -5023,7 +5030,7 @@ ulong STDCALL symver16_mysql_get_server_version(MYSQL *mysql)
 SYM_16(mysql_get_server_version);
 
 
-const char * STDCALL symver16_mysql_get_ssl_cipher(MYSQL *mysql __attribute__((unused)))
+const char * STDCALL symver16_mysql_get_ssl_cipher(MYSQL *mysql MY_ATTRIBUTE((unused)))
 {
   return mysql_get_ssl_cipher(mysql);
 }
@@ -5086,7 +5093,7 @@ int STDCALL symver16_mysql_set_character_set(MYSQL *mysql, const char *cs_name)
 SYM_16(mysql_set_character_set);
 
 
-my_bool STDCALL symver16_mysql_ssl_set(MYSQL *mysql __attribute__((unused)), const char *key __attribute__((unused)), const char *cert __attribute__((unused)), const char *ca __attribute__((unused)), const char *capath __attribute__((unused)), const char *cipher __attribute__((unused)))
+my_bool STDCALL symver16_mysql_ssl_set(MYSQL *mysql MY_ATTRIBUTE((unused)), const char *key MY_ATTRIBUTE((unused)), const char *cert MY_ATTRIBUTE((unused)), const char *ca MY_ATTRIBUTE((unused)), const char *capath MY_ATTRIBUTE((unused)), const char *cipher MY_ATTRIBUTE((unused)))
 {
   return mysql_ssl_set(mysql, key, cert, ca, capath, cipher);
 }
