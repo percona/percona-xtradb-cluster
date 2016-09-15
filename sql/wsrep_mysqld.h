@@ -180,6 +180,7 @@ extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
 extern "C" int wsrep_thd_retry_counter(THD *thd);
 
+extern "C" void wsrep_handle_fatal_signal(int sig);
 
 extern void wsrep_close_client_connections(my_bool wait_to_end);
 extern int  wsrep_wait_committing_connections_close(int wait_time);
