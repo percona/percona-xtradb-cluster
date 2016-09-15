@@ -194,7 +194,7 @@ export PATH
 
 pid_path=$(parse_cnf pid-file "" server mysqld mysqld_safe)
 datadir=$(parse_cnf datadir "" server mysqld mysqld_safe)
-service_startup_timeout=$(parse_cnf service-startup-timeout $service_startup_timeout server mysqld)
+service_startup_timeout=$(parse_cnf service-startup-timeout $service_startup_timeout mysqld_safe)
 
 if [[ -z ${datadir:-} ]];then
     datadir="/var/lib/mysql"
