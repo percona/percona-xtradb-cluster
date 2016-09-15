@@ -1130,6 +1130,7 @@ sub command_line_setup {
              'build-thread|mtr-build-thread=i' => \$opt_build_thread,
              'mysqlx-port=i'                   => \$opt_mysqlx_baseport,
              'port-base|mtr-port-base=i'       => \$opt_port_base,
+             'port-group-size=s'               => \$opt_port_group_size,
 
              # Test case authoring
              'record'                   => \$opt_record,
@@ -1895,13 +1896,13 @@ sub set_build_thread_ports($) {
   $ENV{MTR_BUILD_THREAD}= $build_thread;
 
   # Calculate baseport
-  $baseport= $build_thread * 10 + 10000;
+  $baseport= $build_thread * $opt_port_group_size + 10000;
 
   my $should_generate_value= $opt_mysqlx_baseport eq "auto";
 
-  $mysqlx_baseport= $should_generate_value ? $baseport + 9 : $opt_mysqlx_baseport;
+  $mysqlx_baseport= $should_generate_value ? $baseport + ($opt_port_group_size - 1) : $opt_mysqlx_baseport;
   
-  if ( $baseport < 5001 or $baseport + 9 >= 32767)
+  if ( $baseport < 5001 or $baseport + $opt_port_group_size >= 32767)
   {
     mtr_error("MTR_BUILD_THREAD number results in a port",
               "outside 5001 - 32767",
