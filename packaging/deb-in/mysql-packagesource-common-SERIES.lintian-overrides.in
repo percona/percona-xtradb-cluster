@@ -1,5 +1,3 @@
-#!/bin/sh
-
 # Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -15,13 +13,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-set -e
-
-if [ "$1" = "purge" ]; then
-  update-alternatives --remove my.cnf /etc/mysql/my.cnf.migrated
-  rm -f /etc/mysql/my.cnf.migrated  # created by mysql-common from our obsolete conffile my.cnf
-  rm -f /etc/mysql/my.cnf.old       # created by mariadb-common from our obsolete conffile my.cnf
-  rmdir /etc/mysql 2>/dev/null || true
-fi
-
-#DEBHELPER#
+# Additional license file is needed so overriding this warning
+mysql-common: extra-license-file usr/share/doc/mysql-common/LICENSE.mysql
+mysql-common: extra-license-file usr/share/doc/mysql-common/@DEB_INSTALL_LICENSEFILE@.gz
+mysql-common: copyright-should-refer-to-common-license-file-for-lgpl

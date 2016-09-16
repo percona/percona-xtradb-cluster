@@ -95,12 +95,9 @@ debian/extra/mysqld.cnf /etc/mysql/mysql.conf.d/
 # SQL files
 usr/share/mysql/*.sql
 # support files
-usr/share/mysql/charsets
 # usr/share/mysql/debian-start.inc.sh
 # usr/share/mysql/debian_create_root_user.sql
 usr/share/mysql/dictionary.txt
-usr/share/mysql/docs/INFO_BIN
-usr/share/mysql/docs/INFO_SRC
 # usr/share/mysql/echo_stderr
 usr/share/mysql/fill_help_tables.sql
 usr/share/mysql/innodb_memcached_config.sql

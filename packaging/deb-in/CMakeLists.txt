@@ -218,6 +218,15 @@ FILE(GLOB_RECURSE SOURCEFILES RELATIVE "${DEB_ROOT}" "${DEB_ROOT}/*")
 # Skip the copyright file from the "other" product type
 LIST(REMOVE_ITEM SOURCEFILES "copyright.${DEB_REMOVEPATTERN}")
 LIST(REMOVE_ITEM SOURCEFILES "CMakeLists.txt")
+# Skip Debian magical init files unless needed
+IF(NOT DEB_FILES_STARTUP MATCHES ".*lib/systemd/system/.*")
+  LIST(REMOVE_ITEM SOURCEFILES
+  "mysql-packagesource-server-SERIES.mysql.service.in")
+ENDIF()
+IF(NOT DEB_FILES_STARTUP MATCHES ".*etc/init.d/mysql.*")
+  LIST(REMOVE_ITEM SOURCEFILES
+  "mysql-packagesource-server-SERIES.mysql.init.in")
+ENDIF()
 FOREACH (SOURCEFILE ${SOURCEFILES})
   STRING(REGEX REPLACE "-packagesource-" "-${DEB_PRODUCTNAME}-"
     TMPFILE ${SOURCEFILE})

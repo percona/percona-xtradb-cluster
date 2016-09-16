@@ -30,3 +30,11 @@ TODO: Check everything, especially the pre/post-install/rm scripts,
       and decide whether to follow Debian or Oracle or to create a mix.
 TODO: Clean "packaging/deb-in/CMakeLists.txt" for systemd, SysV init, Upstart, and the mix (Debian!).
 
+###  Other stuff
+Package cut: Comments in RPM spec files say "lz4_decompress" and "zlib_decompress" were added to client RPMs.
+      That's wrong, they are in the server RPMs. Similar for DEB. They are meant for "mysqlpump" rseult files
+      (if compressed), and that tool is in the client packages (both RPM and DEB).
+      Also, placemt differs: RPMs have them in "/usr/bin/", DEBs in "/usr/lib/mysql/" and a patch for MTR
+      so that they will be found.
+      Proposal 1: Make comments come true, move them into client packages.
+      Proposal 2: Put them in "/usr/bin/", delete the patch.

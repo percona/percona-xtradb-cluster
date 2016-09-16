@@ -196,7 +196,7 @@ endif
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-client/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
-	# install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-common/@DEB_INSTALL_LICENSEFILE@
+	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/libmysqlclient20/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/libmysqlclient-dev/@DEB_INSTALL_LICENSEFILE@
 	# install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/libmysqld-dev/@DEB_INSTALL_LICENSEFILE@
@@ -208,7 +208,7 @@ endif
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-client/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/README
-	# install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-common/README
+	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/libmysqlclient20/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/libmysqlclient-dev/README
 	# install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/libmysqld-dev/README
