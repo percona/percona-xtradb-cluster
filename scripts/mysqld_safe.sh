@@ -383,6 +383,7 @@ parse_arguments() {
 # LD_LIBRARY_PATH and stripped from the lib value.
 add_mysqld_ld_preload() {
   lib_to_add="$1"
+  lib_to_add=$(readlink -f $lib_to_add)
   log_notice "Adding '$lib_to_add' to LD_PRELOAD for mysqld"
 
   # Check if the library is in the reduced number of standard system directories
@@ -739,9 +740,9 @@ then
   log_notice "Logging to '$err_log'."
   logging=file
 
-  if [ ! -f "$err_log" ]; then                  # if error log already exists,
-    touch "$err_log"                            # we just append. otherwise,
-    chmod "$fmode" "$err_log"                   # fix the permissions here!
+  if [ ! -f "$err_log" -a ! -h "$err_log" ]; then # if error log already exists,
+    touch "$err_log"                              # we just append. otherwise,
+    chmod "$fmode" "$err_log"                     # fix the permissions here!
   fi
 
 else
@@ -764,7 +765,7 @@ then
     USER_OPTION="--user=$user"
   fi
   # Change the err log to the right user, if it is in use
-  if [ $want_syslog -eq 0 ]; then
+  if [ $want_syslog -eq 0 -a ! -h "$err_log" ]; then
     touch "$err_log"
     chown $user "$err_log"
   fi
@@ -784,9 +785,11 @@ safe_mysql_unix_port=${mysql_unix_port:-${MYSQL_UNIX_PORT:-@MYSQL_UNIX_ADDR@}}
 mysql_unix_port_dir=`dirname $safe_mysql_unix_port`
 if [ ! -d $mysql_unix_port_dir ]
 then
-  mkdir $mysql_unix_port_dir
-  chown $user $mysql_unix_port_dir
-  chmod 755 $mysql_unix_port_dir
+  if [ ! -h $mysql_unix_port_dir ]; then
+    mkdir $mysql_unix_port_dir
+    chown $user $mysql_unix_port_dir
+    chmod 755 $mysql_unix_port_dir
+  fi
 fi
 
 # If the user doesn't specify a binary, we assume name "mysqld"
@@ -903,7 +906,11 @@ then
       exit 1
     fi
   fi
-  rm -f "$pid_file"
+
+  if [ ! -h "$pid_file" ]; then
+    rm -f "$pid_file"
+  fi
+
   if test -f "$pid_file"
   then
     log_error "Fatal error: Can't remove the pid file:
@@ -1046,7 +1053,13 @@ fi
 
 while true
 do
-  rm -f $safe_mysql_unix_port "$pid_file"	# Some extra safety
+  # Some extra safety
+  if [ ! -h "$safe_mysql_unix_port" ]; then
+    rm -f "$safe_mysql_unix_port"
+  fi
+  if [ ! -h "$pid_file" ]; then
+    rm -f "$pid_file"
+  fi
 
   start_time=`date +%M%S`
 
@@ -1087,7 +1100,7 @@ do
     eval_log_error "$cmd $wsrep_start_position_opt --wsrep_cluster_address=$url $nohup_redir"
   fi
 
-  if [ $want_syslog -eq 0 -a ! -f "$err_log" ]; then
+  if [ $want_syslog -eq 0 -a ! -f "$err_log" -a ! -h "$err_log" ]; then
     touch "$err_log"                    # hypothetical: log was renamed but not
     chown $user "$err_log"              # flushed yet. we'd recreate it with
     chmod "$fmode" "$err_log"           # wrong owner next time we log, so set
