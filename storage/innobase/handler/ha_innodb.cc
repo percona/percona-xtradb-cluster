@@ -20224,7 +20224,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			    victim_trx->wsrep_killed_by_query);
 		if (victim_trx->state == TRX_STATE_ACTIVE)
 		{
-			query_id_t bf_id    = wsrep_thd_query_id(thd);
+			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+			if (bf_id == 0) {
+				WSREP_WARN("query ID 0, for query %s",
+					wsrep_thd_query(bf_thd));
+				bf_id = 1;
+			}
 			query_id_t query_id = victim_trx->wsrep_killed_by_query;
 			os_compare_and_swap_thread_id(
 				&victim_trx->wsrep_killed_by_query,
@@ -20253,7 +20258,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			    (long long)victim_trx->id);
 		if (victim_trx->state == TRX_STATE_ACTIVE)
 		{
-			query_id_t bf_id    = wsrep_thd_query_id(thd);
+			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+			if (bf_id == 0) {
+				WSREP_WARN("query ID 0, for query %s",
+					wsrep_thd_query(bf_thd));
+				bf_id = 1;
+			}
 			query_id_t query_id = victim_trx->wsrep_killed_by_query;
 			os_compare_and_swap_thread_id(
 				&victim_trx->wsrep_killed_by_query,
@@ -20313,7 +20323,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 			if (victim_trx->state == TRX_STATE_ACTIVE)
 			{
-				query_id_t bf_id    = wsrep_thd_query_id(thd);
+				query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+				if (bf_id == 0) {
+					WSREP_WARN("query ID 0, for query %s",
+						wsrep_thd_query(bf_thd));
+					bf_id = 1;
+				}
 				query_id_t query_id = victim_trx->wsrep_killed_by_query;
 				os_compare_and_swap_thread_id(
 					&victim_trx->wsrep_killed_by_query,
@@ -20328,7 +20343,12 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				wsrep_thd_thread_id(thd));
 			if (victim_trx->state == TRX_STATE_ACTIVE)
 			{
-				query_id_t bf_id    = wsrep_thd_query_id(thd);
+				query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+				if (bf_id == 0) {
+					WSREP_WARN("query ID 0, for query %s",
+						wsrep_thd_query(bf_thd));
+					bf_id = 1;
+				}
 				query_id_t query_id = victim_trx->wsrep_killed_by_query;
 				os_compare_and_swap_thread_id(
 					&victim_trx->wsrep_killed_by_query,
