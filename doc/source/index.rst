@@ -82,6 +82,7 @@ How-tos
   
    howtos/centos_howto
    howtos/ubuntu_howto
+   howtos/garbd_howto
    howtos/singlebox
    howtos/3nodesec2
    howtos/haproxy
