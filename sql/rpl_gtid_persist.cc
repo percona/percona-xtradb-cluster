@@ -101,6 +101,10 @@ static void init_thd(THD **p_thd)
   thd->system_thread= SYSTEM_THREAD_COMPRESS_GTID_TABLE;
   thd->store_globals();
   thd->set_time();
+#ifdef WITH_WSREP
+  WSREP_DEBUG("SYSTEM_THREAD_COMPRESS_GTID_TABLE declared as non wsrep_on");
+  thd->variables.wsrep_on= 0;
+#endif /* WITH_WSREP */
   DBUG_VOID_RETURN;
 }
 
@@ -126,6 +130,10 @@ THD *Gtid_table_access_context::create_thd()
 {
   THD *thd= System_table_access::create_thd();
   thd->system_thread= SYSTEM_THREAD_COMPRESS_GTID_TABLE;
+#ifdef WITH_WSREP
+  WSREP_DEBUG("SYSTEM_THREAD_COMPRESS_GTID_TABLE declared  as non wsrep_on");
+  thd->variables.wsrep_on= 0;
+#endif /* WITH_WSREP */
   /*
     This is equivalent to a new "statement". For that reason, we call
     both lex_start() and mysql_reset_thd_for_next_command.

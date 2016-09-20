@@ -200,6 +200,10 @@ trx_init(
 
 		trx->in_innodb &= TRX_FORCE_ROLLBACK_MASK;
 	}
+#ifdef WITH_WSREP
+	query_id_t	query_id = trx->wsrep_killed_by_query;
+	os_compare_and_swap_thread_id(&trx->wsrep_killed_by_query, query_id, 0);
+#endif /* WITH_WSREP */
 
 	/* Note: It's possible that this list is not empty if a transaction
 	was interrupted after it collected the victim transactions and before
@@ -358,6 +362,9 @@ struct TrxFactory {
 		ut_ad(trx->hit_list.empty());
 
 		ut_ad(trx->killed_by == 0);
+#ifdef WITH_WSREP
+		ut_ad(trx->wsrep_killed_by_query == 0);
+#endif /* WITH_WSREP */
 
 		return(true);
 	}

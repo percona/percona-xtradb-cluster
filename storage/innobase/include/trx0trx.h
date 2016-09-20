@@ -1024,7 +1024,9 @@ struct trx_t {
 					should not leave InnoDB between the
 					mark and the actual async kill because
 					the running thread can change. */
-
+#ifdef WITH_WSREP
+	query_id_t	wsrep_killed_by_query;
+#endif /* WITH_wSREP */
 	/* These fields are not protected by any mutex. */
 	const char*	op_info;	/*!< English text describing the
 					current operation, or an empty
