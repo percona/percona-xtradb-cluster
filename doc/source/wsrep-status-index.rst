@@ -38,6 +38,10 @@ possibly applied in parallel.
 
 Number of entries in the certification index.
 
+.. variable:: wsrep_cert_interval
+
+Average number of write-sets received while a transaction replicates.
+
 .. variable:: wsrep_cluster_conf_id
 
 Number of cluster membership changes that have taken place.
