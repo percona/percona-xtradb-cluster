@@ -10025,7 +10025,7 @@ static PSI_thread_info all_server_threads[]=
 #ifdef WITH_WSREP
   ,
   { &key_THREAD_wsrep_sst_joiner, "THREAD_wsrep_sst_joiner", 0},
-  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_joiner", 0},
+  { &key_THREAD_wsrep_sst_donor, "THREAD_wsrep_sst_donor", 0},
   { &key_THREAD_wsrep_applier, "THREAD_wsrep_applier", 0},
   { &key_THREAD_wsrep_rollbacker, "THREAD_wsrep_rollbacker", 0}
 #endif /* WITH_WSREP */
