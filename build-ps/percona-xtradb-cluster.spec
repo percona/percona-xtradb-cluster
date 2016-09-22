@@ -1072,10 +1072,26 @@ esac
 # is that a reason not to start a new server after upgrade?
 
 NEW_VERSION=%{mysql_version}-%{release}
-
+STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 # The "pre" section code is also run on a first installation,
 # when there  is no data directory yet. Protect against error messages.
-
+if [ -d $mysql_datadir ] ; then
+    if [ -n "$SERVER_TO_START" ] ; then
+        # There is only one PID file, race possibility ignored
+        echo "PID file:"                           >> $STATUS_FILE
+        ls -l   $PID_FILE_PATT                     >> $STATUS_FILE
+        cat     $PID_FILE_PATT                     >> $STATUS_FILE
+        echo                                       >> $STATUS_FILE
+        echo "Server process:"                     >> $STATUS_FILE
+        ps -fp `cat $PID_FILE_PATT`                >> $STATUS_FILE
+        echo                                       >> $STATUS_FILE
+        echo "SERVER_TO_START=$SERVER_TO_START"    >> $STATUS_FILE
+    else
+        # Take a note we checked it ...
+        echo "PID file:"                           >> $STATUS_FILE
+        ls -l   $PID_FILE_PATT                     >> $STATUS_FILE 2>&1
+    fi
+fi
 # Shut down a previously installed server first
 # Note we *could* make that depend on $SERVER_TO_START, but we rather don't,
 # so a "stop" is attempted even if there is no PID file.
@@ -1140,7 +1156,14 @@ fi
 # ----------------------------------------------------------------------
 chown -R %{mysqld_user}:%{mysqld_group} $mysql_datadir
 NEW_VERSION=%{mysql_version}-%{release}
+STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 
+if [ -f $STATUS_FILE ] ; then
+        SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
+        rm -f $STATUS_FILE
+else
+        SERVER_TO_START=''
+fi
 if [ $1 -eq 1 ]; then
 
 # ----------------------------------------------------------------------
@@ -1222,7 +1245,6 @@ fi
 if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
 fi
-
 # Was the server running before the upgrade? If so, restart the new one.
 if [ "$SERVER_TO_START" = "true" ] ; then
 %if 0%{?systemd}
@@ -1244,7 +1266,7 @@ echo "Run the following commands to create these functions:"
 echo "mysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmurmur_udf.so'\""
-echo "See  http://www.percona.com/doc/percona-server/5.5/management/udf_percona_toolkit.html for more details"
+echo "See  http://www.percona.com/doc/percona-server/5.7/management/udf_percona_toolkit.html for more details"
 
 #echo "Thank you for installing the MySQL Community Server! For Production
 #systems, we recommend MySQL Enterprise, which contains enterprise-ready
@@ -1369,7 +1391,7 @@ if [ $1 -eq 1 ] ; then
 	echo "mysql -e \"INSTALL PLUGIN tokudb_locks SONAME 'ha_tokudb.so';\""
 	echo "mysql -e \"INSTALL PLUGIN tokudb_lock_waits SONAME 'ha_tokudb.so';\""
 	echo ""
-	echo "* See http://www.percona.com/doc/percona-server/5.6/tokudb/tokudb_intro.html for more details"
+	echo "* See http://www.percona.com/doc/percona-server/5.7/tokudb/tokudb_intro.html for more details"
 	echo ""
 fi
 %endif

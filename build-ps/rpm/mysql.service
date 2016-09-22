@@ -41,7 +41,7 @@ TimeoutStopSec=900
 
 # Unsafe for PXC
 # mysqld_safe handles this too.
-Restart=no
+Restart=always
 
 PrivateTmp=false
 
