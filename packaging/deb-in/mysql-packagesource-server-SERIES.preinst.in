@@ -92,8 +92,8 @@ this_version=5.7
 
 # Abort if an NDB cluster is in use.
 if egrep -qi -r '^[^#]*ndb.connectstring|^[[:space:]]*\[[[:space:]]*ndb_mgmd' /etc/mysql/; then
-  db_fset mysql-server/no_upgrade_when_using_ndb seen false || true
-  db_input high mysql-server/no_upgrade_when_using_ndb || true
+  db_fset mysql-@DEB_PRODUCTNAME@-server/no_upgrade_when_using_ndb seen false || true
+  db_input high mysql-@DEB_PRODUCTNAME@-server/no_upgrade_when_using_ndb || true
   db_go
   db_stop
   exit 1
@@ -112,10 +112,10 @@ for i in `ls $DATADIR/debian-*.flag 2>/dev/null`; do
   fi
 done
 if [ "$show_downgrade_warning" = 1 ]; then
-  db_fset mysql-server-$this_version/really_downgrade seen false || true
-  db_input medium mysql-server-$this_version/really_downgrade || true
+  db_fset mysql-@DEB_PRODUCTNAME@-server/really_downgrade seen false || true
+  db_input medium mysql-@DEB_PRODUCTNAME@-server/really_downgrade || true
   db_go
-  db_get mysql-server-$this_version/really_downgrade || true
+  db_get mysql-@DEB_PRODUCTNAME@-server/really_downgrade || true
   if [ "$RET" = "true" ]; then
     rm -f $DATADIR/debian-*.flag
     touch $DATADIR/debian-$this_version.flag

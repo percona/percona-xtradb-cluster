@@ -1,20 +1,20 @@
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/root-pass
+Template: mysql-@DEB_PRODUCTNAME@-server/root-pass
 Type: password
 Description: Enter root password:
  Please provide a strong password that will be set for the root account of your MySQL database.
  Leave it blank to enable password less login using UNIX socket based authentication.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/re-root-pass
+Template: mysql-@DEB_PRODUCTNAME@-server/re-root-pass
 Type: password
 Description: Re-enter root password:
  Now that you have selected a password for the root account, please confirm by typing it again. Do not share the password with anyone.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/root-pass-mismatch
+Template: mysql-@DEB_PRODUCTNAME@-server/root-pass-mismatch
 Type: error
 Description: The two passwords did not match
  Please try again. Make sure you type the exact same password twice.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/remove-data-dir
+Template: mysql-@DEB_PRODUCTNAME@-server/remove-data-dir
 Type: boolean
 Default: false
 Description: Remove data directories ?
@@ -23,7 +23,7 @@ Description: Remove data directories ?
  /var/lib/mysql-keyring.
  It is highly recommended to take data backup before removing the data directories.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/data-dir
+Template: mysql-@DEB_PRODUCTNAME@-server/data-dir
 Type: note
 Description: Data directory found when no MySQL server package is installed
  A data directory '/var/lib/mysql' is present on this system when no MySQL server 
@@ -34,7 +34,7 @@ Description: Data directory found when no MySQL server package is installed
  It is highly recommended to take data backup. If you have not done so, now would be
  the time to take backup in another shell. Once completed, press 'Ok' to continue.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/really_downgrade
+Template: mysql-@DEB_PRODUCTNAME@-server/really_downgrade
 Type: boolean
 Default: false
 _Description: Really proceed with downgrade?
@@ -46,7 +46,7 @@ _Description: Really proceed with downgrade?
  There is no guarantee that the version you're currently installing
  will be able to use the current databases.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/nis_warning
+Template: mysql-@DEB_PRODUCTNAME@-server/nis_warning
 Type: note
 _Description: Important note for NIS/YP users
  Using MySQL under NIS/YP requires a mysql user account to be added on
@@ -59,7 +59,7 @@ _Description: Important note for NIS/YP users
  .
   /var/lib/mysql: drwxr-xr-x   mysql    mysql
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/postrm_remove_databases
+Template: mysql-@DEB_PRODUCTNAME@-server/postrm_remove_databases
 Type: boolean
 Default: false
 _Description: Remove all MySQL databases?
@@ -73,14 +73,14 @@ _Description: Remove all MySQL databases?
  recent version or if a different mysql-server package is already
  using it, the data should be kept.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/start_on_boot
+Template: mysql-@DEB_PRODUCTNAME@-server/start_on_boot
 Type: boolean
 Default: true
 _Description: Start the MySQL server on boot?
  The MySQL server can be launched automatically at boot time or manually
  with the '/etc/init.d/mysql start' command.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/root_password
+Template: mysql-@DEB_PRODUCTNAME@-server/root_password
 Type: password
 _Description: New password for the MySQL "root" user:
  While not mandatory, it is highly recommended that you set a password
@@ -88,16 +88,16 @@ _Description: New password for the MySQL "root" user:
  .
  If this field is left blank, the password will not be changed.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/root_password_again
+Template: mysql-@DEB_PRODUCTNAME@-server/root_password_again
 Type: password
 _Description: Repeat password for the MySQL "root" user:
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/password_mismatch
+Template: mysql-@DEB_PRODUCTNAME@-server/password_mismatch
 Type: error
 _Description: Password input error
  The two passwords you entered were not the same. Please try again.
 
-Template: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/no_upgrade_when_using_ndb
+Template: mysql-@DEB_PRODUCTNAME@-server/no_upgrade_when_using_ndb
 Type: error
 _Description: NDB Cluster seems to be in use
  MySQL-5.7 no longer provides NDB Cluster support. Please migrate to the new
