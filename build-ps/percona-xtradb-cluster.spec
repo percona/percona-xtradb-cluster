@@ -1266,7 +1266,7 @@ echo "Run the following commands to create these functions:"
 echo "mysql -e \"CREATE FUNCTION fnv1a_64 RETURNS INTEGER SONAME 'libfnv1a_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION fnv_64 RETURNS INTEGER SONAME 'libfnv_udf.so'\""
 echo "mysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmurmur_udf.so'\""
-echo "See  http://www.percona.com/doc/percona-server/5.5/management/udf_percona_toolkit.html for more details"
+echo "See  http://www.percona.com/doc/percona-server/5.7/management/udf_percona_toolkit.html for more details"
 
 #echo "Thank you for installing the MySQL Community Server! For Production
 #systems, we recommend MySQL Enterprise, which contains enterprise-ready
@@ -1391,7 +1391,7 @@ if [ $1 -eq 1 ] ; then
 	echo "mysql -e \"INSTALL PLUGIN tokudb_locks SONAME 'ha_tokudb.so';\""
 	echo "mysql -e \"INSTALL PLUGIN tokudb_lock_waits SONAME 'ha_tokudb.so';\""
 	echo ""
-	echo "* See http://www.percona.com/doc/percona-server/5.6/tokudb/tokudb_intro.html for more details"
+	echo "* See http://www.percona.com/doc/percona-server/5.7/tokudb/tokudb_intro.html for more details"
 	echo ""
 fi
 %endif
