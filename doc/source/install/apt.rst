@@ -45,11 +45,6 @@ Installing from Repositories
    You can check the repository configuration
    in the :file:`/etc/apt/sources.list.d/percona-release.list` file.
 
-#. Enable testing repository.
-
-   This is a beta release, which can only be installed from the testing repo.
-   For more information, see :ref:`apt-testing-repo`.
-
 #. Update the local cache:
 
    .. code-block:: bash
