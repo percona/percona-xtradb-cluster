@@ -194,7 +194,7 @@ case "$1" in
       chmod 600 "$initfile"
       chown mysql:mysql "$initfile"
       echo "USE mysql; " >> "$initfile"
-      db_get mysql-@DEB_PRODUCTNAME@-server/root_password && rootpw="$RET"
+      db_get mysql-@DEB_PRODUCTNAME@-server/root-pass && rootpw="$RET"
       if [ ! -z $rootpw ]; then
         echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootpw';" >> "$initfile"
       fi
@@ -270,8 +270,8 @@ if [ "$1" = "configure" ]; then
 fi
 
 # forget we ever saw the password.  don't use reset to keep the seen status
-db_set mysql-@DEB_PRODUCTNAME@-server/root_password ""
-db_set mysql-@DEB_PRODUCTNAME@-server/root_password_again ""
+db_set mysql-@DEB_PRODUCTNAME@-server/root-pass ""
+db_set mysql-@DEB_PRODUCTNAME@-server/re-root-pass ""
 db_stop # in case invoke failes
 
 

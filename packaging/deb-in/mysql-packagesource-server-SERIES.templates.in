@@ -80,23 +80,6 @@ _Description: Start the MySQL server on boot?
  The MySQL server can be launched automatically at boot time or manually
  with the '/etc/init.d/mysql start' command.
 
-Template: mysql-@DEB_PRODUCTNAME@-server/root_password
-Type: password
-_Description: New password for the MySQL "root" user:
- While not mandatory, it is highly recommended that you set a password
- for the MySQL administrative "root" user.
- .
- If this field is left blank, the password will not be changed.
-
-Template: mysql-@DEB_PRODUCTNAME@-server/root_password_again
-Type: password
-_Description: Repeat password for the MySQL "root" user:
-
-Template: mysql-@DEB_PRODUCTNAME@-server/password_mismatch
-Type: error
-_Description: Password input error
- The two passwords you entered were not the same. Please try again.
-
 Template: mysql-@DEB_PRODUCTNAME@-server/no_upgrade_when_using_ndb
 Type: error
 _Description: NDB Cluster seems to be in use
