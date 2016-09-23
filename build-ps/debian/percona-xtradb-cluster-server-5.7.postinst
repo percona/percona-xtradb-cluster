@@ -51,6 +51,7 @@ USE mysql;
 UPDATE user SET plugin='auth_socket' WHERE user='root';
 EOF
 				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
+				rm -f ${SQL}
 			fi
 		fi
 
