@@ -88,13 +88,13 @@ public:
 
   static void expect_get_capability(Mock_ptr mock)
   {
-    EXPECT_CALL(*mock, get(_));
+    EXPECT_CALL(*mock, get_void(_));
   }
 
 
   static void expect_commit(Mock_ptr mock)
   {
-    EXPECT_CALL(*mock, commit());
+    EXPECT_CALL(*mock, commit_void());
   }
 
 
@@ -111,7 +111,11 @@ public:
 
     for(std::size_t i = 0; i < supported_handlers.size();i ++)
     {
+<<<<<<< HEAD
       ASSERT_EQ(NAMES[i], cap->capabilities(i).name());
+=======
+      ASSERT_EQ(NAMES[i], cap->capabilities(static_cast<int>(i)).name());
+>>>>>>> mysql-5.7.13
     }
   }
 

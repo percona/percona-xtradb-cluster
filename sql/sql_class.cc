@@ -235,7 +235,7 @@ THD::Attachable_trx::~Attachable_trx()
 ****************************************************************************/
 
 extern "C" uchar *get_var_key(user_var_entry *entry, size_t *length,
-                              my_bool not_used __attribute__((unused)))
+                              my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length= entry->entry_name.length();
   return (uchar*) entry->entry_name.ptr();
@@ -1310,7 +1310,7 @@ THD::THD(bool enable_plugins)
    m_query_rewrite_plugin_da(false),
    m_query_rewrite_plugin_da_ptr(&m_query_rewrite_plugin_da),
    m_stmt_da(&main_da),
-   duplicate_slave_uuid(false),
+   duplicate_slave_id(false),
    is_a_srv_session_thd(false)
 {
   main_lex.reset();
@@ -1980,6 +1980,14 @@ void THD::cleanup(void)
   my_hash_free(&user_vars);
   mysql_mutex_unlock(&LOCK_thd_data);
 
+  /*
+    When we call drop table for temporary tables, the
+    user_var_events container is not cleared this might
+    cause error if the container was filled before the
+    drop table command is called.
+    So call this before calling close_temporary_tables.
+  */
+  user_var_events.clear();
   close_temporary_tables(this);
   sp_cache_clear(&sp_proc_cache);
   sp_cache_clear(&sp_func_cache);
@@ -3566,7 +3574,7 @@ err:
 ***************************************************************************/
 
 
-int Query_result_dump::prepare(List<Item> &list __attribute__((unused)),
+int Query_result_dump::prepare(List<Item> &list MY_ATTRIBUTE((unused)),
                                SELECT_LEX_UNIT *u)
 {
   unit= u;
@@ -3715,7 +3723,7 @@ C_MODE_START
 
 static uchar *
 get_statement_id_as_hash_key(const uchar *record, size_t *key_length,
-                             my_bool not_used __attribute__((unused)))
+                             my_bool not_used MY_ATTRIBUTE((unused)))
 {
   const Prepared_statement *statement= (const Prepared_statement *) record;
   *key_length= sizeof(statement->id);
@@ -3728,7 +3736,7 @@ static void delete_statement_as_hash_key(void *key)
 }
 
 static uchar *get_stmt_name_hash_key(Prepared_statement *entry, size_t *length,
-                                     my_bool not_used __attribute__((unused)))
+                                     my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length= entry->name().length;
   return reinterpret_cast<uchar *>(const_cast<char *>(entry->name().str));
@@ -4034,7 +4042,7 @@ void THD::end_attachable_transaction()
 extern "C" int thd_killed(const MYSQL_THD thd)
 {
   if (thd == NULL)
-    return current_thd->killed;
+    return current_thd != NULL ? current_thd->killed : 0;
   return thd->killed;
 }
 
@@ -5012,17 +5020,25 @@ void THD::claim_memory_ownership()
 
 bool THD::binlog_applier_need_detach_trx()
 {
+#ifdef HAVE_REPLICATION
   return is_binlog_applier() ? rli_fake->is_native_trx_detached= true : false;
+#else
+  return false;
+#endif
 };
 
 
 bool THD::binlog_applier_has_detached_trx()
 {
+#ifdef HAVE_REPLICATION
   bool rc= is_binlog_applier() && rli_fake->is_native_trx_detached;
 
   if (rc)
     rli_fake->is_native_trx_detached= false;
   return rc;
+#else
+  return false;
+#endif
 }
 /**
   Determine if binlogging is disabled for this session

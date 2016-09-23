@@ -1579,6 +1579,7 @@ ha_check_and_coalesce_trx_read_only(THD *thd, Ha_trx_info *ha_list,
 
 int commit_owned_gtids(THD *thd, bool all, bool *need_clear_owned_gtid_ptr)
 {
+  DBUG_ENTER("commit_owned_gtids(...)");
   int error= 0;
 
   if ((!opt_bin_log || (thd->slave_thread && !opt_log_slave_updates)) &&
@@ -1586,6 +1587,14 @@ int commit_owned_gtids(THD *thd, bool all, bool *need_clear_owned_gtid_ptr)
       !thd->is_operating_gtid_table_implicitly &&
       !thd->is_operating_substatement_implicitly)
   {
+    /*
+      If the binary log is disabled for this thread (either by
+      log_bin=0 or sql_log_bin=0 or by log_slave_updates=0 for a
+      slave thread), then the statement will not be written to
+      the binary log. In this case, we should save its GTID into
+      mysql.gtid_executed table and @@GLOBAL.GTID_EXECUTED as it
+      did when binlog is enabled.
+    */
     if (thd->owned_gtid.sidno > 0)
     {
       error= gtid_state->save(thd);
@@ -1599,7 +1608,43 @@ int commit_owned_gtids(THD *thd, bool all, bool *need_clear_owned_gtid_ptr)
     *need_clear_owned_gtid_ptr= false;
   }
 
-  return error;
+  DBUG_RETURN(error);
+}
+
+
+/**
+  The function is a wrapper of commit_owned_gtids(...). It is invoked
+  at committing a partially failed statement or transaction.
+
+  @param thd  Thread context.
+
+  @retval -1 if error when persisting owned gtid.
+  @retval 0 if succeed to commit owned gtid.
+  @retval 1 if do not meet conditions to commit owned gtid.
+*/
+int commit_owned_gtid_by_partial_command(THD *thd)
+{
+  DBUG_ENTER("commit_owned_gtid_by_partial_command(THD *thd)");
+  bool need_clear_owned_gtid_ptr= false;
+  int ret= 0;
+
+  if (commit_owned_gtids(thd, true, &need_clear_owned_gtid_ptr))
+  {
+    /* Error when saving gtid into mysql.gtid_executed table. */
+    gtid_state->update_on_rollback(thd);
+    ret= -1;
+  }
+  else if (need_clear_owned_gtid_ptr)
+  {
+    gtid_state->update_on_commit(thd);
+    ret= 0;
+  }
+  else
+  {
+    ret= 1;
+  }
+
+  DBUG_RETURN(ret);
 }
 
 
@@ -1740,7 +1785,8 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
       DEBUG_SYNC(thd, "ha_commit_trans_after_acquire_commit_lock");
     }
 
-    if (rw_trans && check_readonly(thd, true))
+    if (rw_trans && stmt_has_updated_trans_table(ha_info)
+        && check_readonly(thd, true))
     {
       ha_rollback_trans(thd, all);
       error= 1;
@@ -6806,7 +6852,7 @@ end:
 ha_rows DsMrr_impl::dsmrr_info(uint keyno, uint n_ranges, uint rows,
                                uint *bufsz, uint *flags, Cost_estimate *cost)
 {
-  ha_rows res __attribute__((unused));
+  ha_rows res MY_ATTRIBUTE((unused));
   uint def_flags= *flags;
   uint def_bufsz= *bufsz;
 
@@ -8343,6 +8389,7 @@ static bool my_eval_gcolumn_expr_helper(THD *thd, TABLE *table,
 {
   DBUG_ENTER("my_eval_gcolumn_expr_helper");
   DBUG_ASSERT(table && table->vfield);
+  DBUG_ASSERT(!thd->is_error());
 
   uchar *old_buf= table->record[0];
   repoint_field_to_record(table, old_buf, record);
@@ -8463,11 +8510,6 @@ bool handler::my_prepare_gcolumn_template(THD *thd,
                                           my_gcolumn_template_callback_t myc,
                                           void* ib_table)
 {
-  /*
-    This is a background thread, so we can re-initialize the main LEX, its
-    current content is not important.
-  */
-  DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_BACKGROUND);
   char path[FN_REFLEN + 1];
   bool was_truncated;
   build_table_filename(path, sizeof(path) - 1 - reg_ext_length,
@@ -8519,7 +8561,6 @@ bool handler::my_eval_gcolumn_expr_with_open(THD *thd,
                                              const MY_BITMAP *const fields,
                                              uchar *record)
 {
-  DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_BACKGROUND);
   bool retval= true;
   lex_start(thd);
 

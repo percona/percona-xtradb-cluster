@@ -62,7 +62,7 @@ IF(HAVE_NO_IGNORED_QUALIFIERS)
 ENDIF()
 
 
-ADD_DEFINITIONS(${GMOCK_CFLAGS} -DBOOST_ALL_NO_LIB -DBOOST_NO_AUTO_PTR -DUSE_MYSQLX_FULL_PROTO)
+ADD_DEFINITIONS(${GMOCK_CFLAGS} -DBOOST_ALL_NO_LIB -DBOOST_NO_AUTO_PTR -DUSE_MYSQLX_FULL_PROTO -DXPLUGIN_UNIT_TESTS)
 
 INCLUDE_DIRECTORIES(SYSTEM
     ${BOOST_INCLUDE_DIR}
@@ -71,7 +71,7 @@ INCLUDE_DIRECTORIES(SYSTEM
     ${LIBEVENT_INCLUDE_DIR}
     ${GMOCK_INCLUDE_DIRS}
     ${GTEST_INCLUDE_DIR}
-    ${CMAKE_BINARY_DIR}/rapid/plugin/x/protobuf
+    ${CMAKE_BINARY_DIR}/rapid/plugin/x/generated/protobuf
 )
 
 INCLUDE_DIRECTORIES(
@@ -85,6 +85,7 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/regex
   ${PROJECT_SOURCE_DIR}/sql
   ${PROJECT_SOURCE_DIR}/include/mysql
+  ${CMAKE_BINARY_DIR}/rapid/plugin/x/generated/
 )
 
 FILE(
@@ -97,13 +98,23 @@ FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/stubs/misc.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/stubs/plugin.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/test_main.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/boost_code.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/mysqlx_pb_wrapper.cc"
   "${PROJECT_SOURCE_DIR}/rapid/plugin/x/src/mysql_function_names.cc"
   "${PROJECT_SOURCE_DIR}/rapid/plugin/x/mysqlxtest_src/mysqlx_row.cc"
 )
 
-ADD_EXECUTABLE(xplugin_unit_tests ${unit_tests_SRC} ${xplugin_SRC} ${protobuf_SRC})
+# boost::shared_ptr depends on scoped_lock
+# Prevent missing symbols scoped_lock() CTOR/DTOR in sasl_authentication_t.cc
+#   boost::atomics::detail::lockpool::scoped_lock::~scoped_lock()
+UNSET(BOOST_LIB_SOURCES)
+IF (CMAKE_CXX_COMPILER_ID STREQUAL "SunPro")
+  SET(BOOST_LIB_SOURCES
+    ${BOOST_SOURCES_DIR}/libs/atomic/src/lockpool.cpp)
+ENDIF()
+
+ADD_EXECUTABLE(xplugin_unit_tests
+  ${unit_tests_SRC} ${xplugin_SRC} ${protobuf_SRC} ${BOOST_LIB_SOURCES}
+)
 
 ADD_DEPENDENCIES(xplugin_unit_tests mysqlxtest)
 

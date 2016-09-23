@@ -62,15 +62,35 @@ IF(NOT SYSTEM_TYPE)
   ENDIF()
 ENDIF()
 
+# Probobuf 2.6.1 on Sparc. Both gcc and Solaris Studio need this.
+IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND
+    SIZEOF_VOIDP EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "sparc")
+  ADD_DEFINITIONS(-DSOLARIS_64BIT_ENABLED)
+ENDIF()
+
 # The default C++ library for SunPro is really old, and not standards compliant.
 # http://www.oracle.com/technetwork/server-storage/solaris10/cmp-stlport-libcstd-142559.html
-# Use stlport rather than Rogue Wave.
+# Use stlport rather than Rogue Wave,
+#   unless otherwise specified on command line.
 IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
   IF(CMAKE_CXX_COMPILER_ID MATCHES "SunPro")
-    IF(SUNPRO_CXX_LIBRARY)
-      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=${SUNPRO_CXX_LIBRARY}")
+    IF(CMAKE_CXX_FLAGS MATCHES "-std=")
+      ADD_DEFINITIONS(-D__MATHERR_RENAME_EXCEPTION)
+      SET(CMAKE_SHARED_LIBRARY_C_FLAGS
+        "${CMAKE_SHARED_LIBRARY_C_FLAGS} -lc")
+      SET(CMAKE_SHARED_LIBRARY_CXX_FLAGS
+        "${CMAKE_SHARED_LIBRARY_CXX_FLAGS} -lstdc++ -lgcc_s -lCrunG3 -lc")
+      SET(QUOTED_CMAKE_CXX_LINK_FLAGS "-lstdc++ -lgcc_s -lCrunG3 -lc")
     ELSE()
-      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=stlport4")
+      IF(SUNPRO_CXX_LIBRARY)
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=${SUNPRO_CXX_LIBRARY}")
+        IF(SUNPRO_CXX_LIBRARY STREQUAL "stdcxx4")
+          ADD_DEFINITIONS(-D__MATHERR_RENAME_EXCEPTION)
+          SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -template=extdef")
+        ENDIF()
+      ELSE()
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=stlport4")
+      ENDIF()
     ENDIF()
   ENDIF()
 ENDIF()
@@ -185,6 +205,7 @@ IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND
   GET_FILENAME_COMPONENT(CXX_REALPATH ${CMAKE_CXX_COMPILER} REALPATH)
 
   # CC -V yields
+  # CC: Studio 12.5 Sun C++ 5.14 SunOS_sparc Dodona 2016/04/04
   # CC: Sun C++ 5.13 SunOS_sparc Beta 2014/03/11
   # CC: Sun C++ 5.11 SunOS_sparc 2010/08/13
 
@@ -199,7 +220,16 @@ IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND
   ENDIF()
 
   STRING(REGEX MATCH "CC: Sun C\\+\\+ 5\\.([0-9]+)" VERSION_STRING ${stderr})
+  IF (NOT CMAKE_MATCH_1 OR CMAKE_MATCH_1 STREQUAL "")
+    STRING(REGEX MATCH "CC: Studio 12\\.5 Sun C\\+\\+ 5\\.([0-9]+)"
+      VERSION_STRING ${stderr})
+  ENDIF()
   SET(CC_MINOR_VERSION ${CMAKE_MATCH_1})
+
+  IF(${CC_MINOR_VERSION} EQUAL 14)
+    MESSAGE(FATAL_ERROR
+      "Please run cmake with -DCMAKE_CXX_FLAGS=-std=c++03 for ${stderr}")
+  ENDIF()
 
   IF(${CC_MINOR_VERSION} EQUAL 13)
     SET(STLPORT_SUFFIX "lib/compilers/stlport4")
@@ -314,9 +344,12 @@ IF(UNIX)
     MY_SEARCH_LIBS(clock_gettime rt LIBRT)
   ENDIF()
   MY_SEARCH_LIBS(timer_create rt LIBRT)
+  MY_SEARCH_LIBS(atomic_thread_fence atomic LIBATOMIC)
 
   SET(CMAKE_REQUIRED_LIBRARIES 
-    ${LIBM} ${LIBNSL} ${LIBBIND} ${LIBCRYPT} ${LIBSOCKET} ${LIBDL} ${CMAKE_THREAD_LIBS_INIT} ${LIBRT})
+    ${LIBM} ${LIBNSL} ${LIBBIND} ${LIBCRYPT} ${LIBSOCKET} ${LIBDL}
+    ${CMAKE_THREAD_LIBS_INIT} ${LIBRT} ${LIBATOMIC}
+  )
   # Need explicit pthread for gcc -fsanitize=address
   IF(CMAKE_C_FLAGS MATCHES "-fsanitize=")
     SET(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} pthread)
@@ -588,6 +621,9 @@ ENDIF()
 
 SET(CMAKE_EXTRA_INCLUDE_FILES)
 
+# Support for tagging symbols with __attribute__((visibility("hidden")))
+MY_CHECK_CXX_COMPILER_FLAG("-fvisibility=hidden" HAVE_VISIBILITY_HIDDEN)
+
 #
 # Code tests
 #
@@ -720,6 +756,33 @@ CHECK_CXX_SOURCE_COMPILES("
   {
     int foo= -10; int bar= 10;
     long long int foo64= -10; long long int bar64= 10;
+    if (!__atomic_fetch_add(&foo, bar, __ATOMIC_SEQ_CST) || foo)
+      return -1;
+    bar= __atomic_exchange_n(&foo, bar, __ATOMIC_SEQ_CST);
+    if (bar || foo != 10)
+      return -1;
+    bar= __atomic_compare_exchange_n(&bar, &foo, 15, 0,
+                                     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    if (bar)
+      return -1;
+    if (!__atomic_fetch_add(&foo64, bar64, __ATOMIC_SEQ_CST) || foo64)
+      return -1;
+    bar64= __atomic_exchange_n(&foo64, bar64, __ATOMIC_SEQ_CST);
+    if (bar64 || foo64 != 10)
+      return -1;
+    bar64= __atomic_compare_exchange_n(&bar64, &foo64, 15, 0,
+                                       __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    if (bar64)
+      return -1;
+    return 0;
+  }"
+  HAVE_GCC_ATOMIC_BUILTINS)
+
+CHECK_CXX_SOURCE_COMPILES("
+  int main()
+  {
+    int foo= -10; int bar= 10;
+    long long int foo64= -10; long long int bar64= 10;
     if (!__sync_fetch_and_add(&foo, bar) || foo)
       return -1;
     bar= __sync_lock_test_and_set(&foo, bar);
@@ -738,7 +801,7 @@ CHECK_CXX_SOURCE_COMPILES("
       return -1;
     return 0;
   }"
-  HAVE_GCC_ATOMIC_BUILTINS)
+  HAVE_GCC_SYNC_BUILTINS)
 
 IF(WITH_VALGRIND)
   SET(VALGRIND_HEADERS "valgrind/memcheck.h;valgrind/valgrind.h")

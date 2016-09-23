@@ -1,5 +1,5 @@
 #ifndef BINLOG_H_INCLUDED
-/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,12 +16,14 @@
 
 #define BINLOG_H_INCLUDED
 
+#include "sql_class.h"
 #include "my_global.h"
 #include "m_string.h"                  // llstr
 #include "binlog_event.h"              // enum_binlog_checksum_alg
 #include "mysqld.h"                    // opt_relay_logname
 #include "tc_log.h"                    // TC_LOG
 #include "atomic_class.h"
+#include "rpl_gtid.h"                  // Gtid_set, Sid_map
 
 class Relay_log_info;
 class Master_info;
@@ -146,7 +148,7 @@ public:
 
     /** Lock for protecting the queue. */
     mysql_mutex_t m_lock;
-  } __attribute__((aligned(CPU_LEVEL1_DCACHE_LINESIZE)));
+  } MY_ATTRIBUTE((aligned(CPU_LEVEL1_DCACHE_LINESIZE)));
 
 public:
   Stage_manager()
@@ -604,14 +606,16 @@ public:
                                       const char **errmsg);
 
   /**
-    Reads the set of all GTIDs in the binary log, and the set of all
-    lost GTIDs in the binary log, and stores each set in respective
-    argument.
+    Reads the set of all GTIDs in the binary/relay log, and the set
+    of all lost GTIDs in the binary log, and stores each set in
+    respective argument.
 
-    @param gtid_set Will be filled with all GTIDs in this binary log.
+    @param gtid_set Will be filled with all GTIDs in this binary/relay
+    log.
     @param lost_groups Will be filled with all GTIDs in the
     Previous_gtids_log_event of the first binary log that has a
-    Previous_gtids_log_event.
+    Previous_gtids_log_event. This is requested to binary logs but not
+    to relay logs.
     @param verify_checksum If true, checksums will be checked.
     @param need_lock If true, LOCK_log, LOCK_index, and
     global_sid_lock->wrlock are acquired; otherwise they are asserted
@@ -918,6 +922,23 @@ public:
   mysql_mutex_t* get_binlog_end_pos_lock() { return &LOCK_binlog_end_pos; }
   void lock_binlog_end_pos() { mysql_mutex_lock(&LOCK_binlog_end_pos); }
   void unlock_binlog_end_pos() { mysql_mutex_unlock(&LOCK_binlog_end_pos); }
+
+  /**
+    Deep copy global_sid_map to @param sid_map and
+    gtid_state->get_executed_gtids() to @param gtid_set
+    Both operations are done under LOCK_commit and global_sid_lock
+    protection.
+
+    @param[out] sid_map  The Sid_map to which global_sid_map will
+                         be copied.
+    @param[out] gtid_set The Gtid_set to which gtid_executed will
+                         be copied.
+
+    @return the operation status
+      @retval 0      OK
+      @retval !=0    Error
+  */
+  int get_gtid_executed(Sid_map *sid_map, Gtid_set *gtid_set);
 };
 
 typedef struct st_load_file_info
@@ -930,7 +951,7 @@ typedef struct st_load_file_info
 extern MYSQL_PLUGIN_IMPORT MYSQL_BIN_LOG mysql_bin_log;
 
 bool trans_has_updated_trans_table(const THD* thd);
-bool stmt_has_updated_trans_table(const THD *thd);
+bool stmt_has_updated_trans_table(Ha_trx_info* ha_list);
 bool ending_trans(THD* thd, const bool all);
 bool ending_single_stmt_trans(THD* thd, const bool all);
 bool trans_cannot_safely_rollback(const THD* thd);

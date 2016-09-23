@@ -16,8 +16,12 @@
 
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
+<<<<<<< HEAD
 #include "mysqlx.pb.h"
 #include "mysqlx_resultset.pb.h"
+=======
+#include "ngs_common/protocol_protobuf.h"
+>>>>>>> mysql-5.7.13
 #include "ngs/protocol/message_builder.h"
 #include "ngs/protocol/metadata_builder.h"
 #include "ngs/protocol/notice_builder.h"

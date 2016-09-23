@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -230,7 +230,7 @@ Does an insert operation by updating a delete-marked existing record
 in the index. This situation can occur if the delete-marked record is
 kept in the index for consistent reads.
 @return DB_SUCCESS or error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_sec_index_entry_by_modify(
 /*==============================*/
@@ -324,7 +324,7 @@ Does an insert operation by delete unmarking and updating a delete marked
 existing record in the index. This situation can occur if the delete marked
 record is kept in the index for consistent reads.
 @return DB_SUCCESS, DB_FAIL, or error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_clust_index_entry_by_modify(
 /*================================*/
@@ -447,7 +447,7 @@ row_ins_cascade_ancestor_updates_table(
 Returns the number of ancestor UPDATE or DELETE nodes of a
 cascaded update/delete node.
 @return number of ancestors */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 ulint
 row_ins_cascade_n_ancestors(
 /*========================*/
@@ -473,7 +473,7 @@ a cascaded update.
 can also be 0 if no foreign key fields changed; the returned value is
 ULINT_UNDEFINED if the column type in the child table is too short to
 fit the new value in the parent table: that means the update fails */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 ulint
 row_ins_cascade_calc_update_vec(
 /*============================*/
@@ -521,7 +521,6 @@ row_ins_cascade_calc_update_vec(
 	update = cascade->update;
 
 	update->info_bits = 0;
-	update->n_fields = foreign->n_fields;
 
 	n_fields_updated = 0;
 
@@ -935,12 +934,124 @@ dberr_t wsrep_append_foreign_key(trx_t *trx,
 				 ibool			shared);
 #endif /* WITH_WSREP */
 
+/** Fill virtual column information in cascade node for the child table.
+@param[out]	cascade		child update node
+@param[in]	rec		clustered rec of child table
+@param[in]	index		clustered index of child table
+@param[in]	node		parent update node
+@param[in]	foreign		foreign key information
+@param[out]	err		error code. */
+static
+void
+row_ins_foreign_fill_virtual(
+	upd_node_t*		cascade,
+	const rec_t*		rec,
+	dict_index_t*		index,
+	upd_node_t*		node,
+	dict_foreign_t*		foreign,
+	dberr_t*		err)
+{
+	row_ext_t*	ext;
+	THD*		thd = current_thd;
+	ulint		offsets_[REC_OFFS_NORMAL_SIZE];
+	rec_offs_init(offsets_);
+	const ulint*	offsets =
+		rec_get_offsets(rec, index, offsets_,
+				ULINT_UNDEFINED, &cascade->heap);
+	mem_heap_t*	v_heap = NULL;
+	upd_t*		update = cascade->update;
+	ulint		n_v_fld = index->table->n_v_def;
+	ulint		n_diff;
+	upd_field_t*	upd_field;
+	dict_vcol_set*	v_cols = foreign->v_cols;
+
+	update->old_vrow = row_build(
+		ROW_COPY_POINTERS, index, rec,
+		offsets, index->table, NULL, NULL,
+		&ext, cascade->heap);
+
+	n_diff = update->n_fields;
+
+	update->n_fields += n_v_fld;
+
+	if (index->table->vc_templ == NULL) {
+		/** This can occur when there is a cascading
+		delete or update after restart. */
+		innobase_init_vc_templ(index->table);
+	}
+
+	for (ulint i = 0; i < n_v_fld; i++) {
+
+		dict_v_col_t*     col = dict_table_get_nth_v_col(
+				index->table, i);
+
+		dict_vcol_set::iterator it = v_cols->find(col);
+
+		if (it == v_cols->end()) {
+			continue;
+		}
+
+		dfield_t*	vfield = innobase_get_computed_value(
+				update->old_vrow, col, index,
+				&v_heap, update->heap, NULL, thd, NULL,
+				NULL, NULL, NULL);
+
+		if (vfield == NULL) {
+			*err = DB_COMPUTE_VALUE_FAILED;
+			goto func_exit;
+		}
+
+		upd_field = upd_get_nth_field(update, n_diff);
+
+		upd_field->old_v_val = static_cast<dfield_t*>(
+				mem_heap_alloc(cascade->heap,
+					sizeof *upd_field->old_v_val));
+
+		dfield_copy(upd_field->old_v_val, vfield);
+
+		upd_field_set_v_field_no(upd_field, i, index);
+
+		if (node->is_delete
+		    ? (foreign->type & DICT_FOREIGN_ON_DELETE_SET_NULL)
+		    : (foreign->type & DICT_FOREIGN_ON_UPDATE_SET_NULL)) {
+
+			dfield_set_null(&upd_field->new_val);
+		}
+
+		if (!node->is_delete
+		    && (foreign->type & DICT_FOREIGN_ON_UPDATE_CASCADE)) {
+
+			dfield_t* new_vfield = innobase_get_computed_value(
+					update->old_vrow, col, index,
+					&v_heap, update->heap, NULL, thd,
+					NULL, NULL, node->update, foreign);
+
+			if (new_vfield == NULL) {
+				*err = DB_COMPUTE_VALUE_FAILED;
+				goto func_exit;
+			}
+
+			dfield_copy(&(upd_field->new_val), new_vfield);
+		}
+
+		n_diff++;
+	}
+
+	update->n_fields = n_diff;
+	*err = DB_SUCCESS;
+
+func_exit:
+	if (v_heap) {
+		mem_heap_free(v_heap);
+	}
+}
+
 /*********************************************************************//**
 Perform referential actions or checks when a parent row is deleted or updated
 and the constraint had an ON DELETE or ON UPDATE condition which was not
 RESTRICT.
 @return DB_SUCCESS, DB_LOCK_WAIT, or error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_foreign_check_on_constraint(
 /*================================*/
@@ -1218,6 +1329,18 @@ row_ins_foreign_check_on_constraint(
 		if (fts_col_affacted) {
 			cascade->fts_doc_id = doc_id;
 		}
+
+		if (foreign->v_cols != NULL
+		    && foreign->v_cols->size() > 0) {
+			row_ins_foreign_fill_virtual(
+				cascade, clust_rec, clust_index,
+				node, foreign, &err);
+
+			if (err != DB_SUCCESS) {
+				goto nonstandard_exit_func;
+			}
+		}
+
 	} else if (table->fts && cascade->is_delete) {
 		/* DICT_FOREIGN_ON_DELETE_CASCADE case */
 		for (i = 0; i < foreign->n_fields; i++) {
@@ -1245,6 +1368,18 @@ row_ins_foreign_check_on_constraint(
 		n_to_update = row_ins_cascade_calc_update_vec(
 			node, foreign, cascade->cascade_heap,
 			trx, &fts_col_affacted, cascade);
+
+
+		if (foreign->v_cols != NULL
+		    && foreign->v_cols->size() > 0) {
+			row_ins_foreign_fill_virtual(
+				cascade, clust_rec, clust_index,
+				node, foreign, &err);
+
+			if (err != DB_SUCCESS) {
+				goto nonstandard_exit_func;
+			}
+		}
 
 		if (n_to_update == ULINT_UNDEFINED) {
 			err = DB_ROW_IS_REFERENCED;
@@ -1772,7 +1907,7 @@ Otherwise does searches to the indexes of referenced tables and
 sets shared locks which lock either the success or the failure of
 a constraint.
 @return DB_SUCCESS or error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_check_foreign_constraints(
 /*==============================*/
@@ -1894,7 +2029,7 @@ Scans a unique non-clustered index at a given index entry to determine
 whether a uniqueness violation has occurred for the key value of the entry.
 Set shared locks on possible duplicate records.
 @return DB_SUCCESS, DB_DUPLICATE_KEY, or DB_LOCK_WAIT */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_scan_sec_index_for_duplicate(
 /*=================================*/
@@ -2038,7 +2173,7 @@ end_scan:
 @retval DB_SUCCESS_LOCKED_REC when rec is an exact match of entry or
 a newer version of entry (the entry should not be inserted)
 @retval DB_DUPLICATE_KEY when entry is a duplicate of rec */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_duplicate_online(
 /*=====================*/
@@ -2077,7 +2212,7 @@ row_ins_duplicate_online(
 @retval DB_SUCCESS_LOCKED_REC when rec is an exact match of entry or
 a newer version of entry (the entry should not be inserted)
 @retval DB_DUPLICATE_KEY when entry is a duplicate of rec */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_duplicate_error_in_clust_online(
 /*====================================*/
@@ -2120,7 +2255,7 @@ for a clustered index!
 record
 @retval DB_SUCCESS_LOCKED_REC if an exact match of the record was found
 in online table rebuild (flags & (BTR_KEEP_SYS_FLAG | BTR_NO_LOCKING_FLAG)) */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_duplicate_error_in_clust(
 /*=============================*/
@@ -2681,7 +2816,7 @@ row_ins_sorted_clust_index_entry(
 @param[in]	check		whether to check
 @param[in]	search_mode	flags
 @return true if the index is to be dropped */
-static __attribute__((warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 bool
 row_ins_sec_mtr_start_and_check_if_aborted(
 	mtr_t*		mtr,
@@ -3445,7 +3580,7 @@ row_ins_index_entry_set_vals(
 Inserts a single index entry to the table.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins_index_entry_step(
 /*=====================*/
@@ -3568,7 +3703,7 @@ row_ins_get_row_from_select(
 Inserts a row to a table.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_ins(
 /*====*/

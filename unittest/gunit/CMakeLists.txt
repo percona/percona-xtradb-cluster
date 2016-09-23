@@ -247,7 +247,7 @@ TARGET_LINK_LIBRARIES(gunit_large
 MESSAGE(STATUS "GTEST_LIBRARIES:${GTEST_LIBRARIES}")
 
 # Add some defines.
-ADD_DEFINITIONS(-DMYSQL_SERVER -DEXTRA_CODE_FOR_UNIT_TESTING)
+ADD_DEFINITIONS(-DMYSQL_SERVER -DHAVE_REPLICATION -DEXTRA_CODE_FOR_UNIT_TESTING)
 ADD_DEFINITIONS(-DERRMSG_DIR="${PROJECT_BINARY_DIR}/sql/share")
 ADD_DEFINITIONS(-DDATA_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -296,7 +296,6 @@ SET(TESTS
   sql_list
   sql_plist
   sql_string
-  stdcxx
   stl_alloc
   strings_skip_trailing
   strings_strnxfrm
@@ -305,6 +304,7 @@ SET(TESTS
   my_timer
   timespec
   my_alloc
+  pump_object_filter
   )
  
 IF (UNIX)
@@ -452,6 +452,10 @@ ENDIF(MERGE_UNITTESTS)
   ENDIF()
   ADD_COMPILE_FLAGS(
     bounded_queue-t.cc
+    COMPILE_FLAGS -I${BOOST_PATCHES_DIR} -I${BOOST_INCLUDE_DIR}
+  )
+  ADD_COMPILE_FLAGS(
+    pump_object_filter-t.cc
     COMPILE_FLAGS -I${BOOST_PATCHES_DIR} -I${BOOST_INCLUDE_DIR}
   )
 

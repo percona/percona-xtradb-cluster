@@ -23,7 +23,7 @@
 #ifdef NGS_STANDALONE
 # include <pthread.h>
 #else
-# if  !defined(MYSQL_DYNAMIC_PLUGIN) && defined(_WIN32)
+# if  !defined(MYSQL_DYNAMIC_PLUGIN) && defined(_WIN32) && !defined(XPLUGIN_UNIT_TESTS)
 #   define MYSQL_DYNAMIC_PLUGIN 1
 # endif
 # include <my_thread.h>
@@ -46,8 +46,7 @@ namespace ngs
   typedef my_start_routine Start_routine_t;
 #endif
 
-  void thread_create(PSI_thread_key key, Thread_t *thread,
-                     const Thread_attr_t *attr,
+  void thread_create(PSI_thread_key key, Thread_t *hread,
                      Start_routine_t func, void *arg);
   int thread_join(Thread_t *thread, void *   *ret);
 
@@ -212,7 +211,7 @@ namespace ngs
 
     Container *container()
     {
-      return m_ref;
+      return &m_ref;
     }
 
   private:
@@ -238,6 +237,17 @@ namespace ngs
       Mutex_lock lock(m_mutex);
 
       return value_to_check == m_value;
+    }
+
+    template<std::size_t NUM_OF_ELEMENTS>
+    bool is(const Variable_type (&expected_value)[NUM_OF_ELEMENTS])
+    {
+      Mutex_lock lock(m_mutex);
+
+      const Variable_type *begin_element = expected_value;
+      const Variable_type *end_element = expected_value + NUM_OF_ELEMENTS;
+
+      return find(begin_element, end_element, m_value);
     }
 
     bool exchange(const Variable_type expected_value, const Variable_type new_value)

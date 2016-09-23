@@ -445,14 +445,16 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
         !binlog_filter->is_on())
     {
       WSREP_DEBUG("empty rbr buffer, query: %s, "
-                 "affected rows: %llu, "
-                 "changed tables: %d, "
-                 "sql_log_bin: %d, "
-                 "wsrep status (%d %d %d)",
+                  "affected rows: %llu, "
+                  "changed tables: %d, "
+                  "sql_log_bin: %d, "
+                  "wsrep status (%d %d %d)",
                   WSREP_QUERY(thd), thd->get_stmt_da()->affected_rows(),
-                 stmt_has_updated_trans_table(thd), thd->variables.sql_log_bin,
-                 thd->wsrep_exec_mode, thd->wsrep_query_state,
-                 thd->wsrep_conflict_state);
+                  stmt_has_updated_trans_table(
+                    thd->get_transaction()->ha_trx_info(Transaction_ctx::STMT)),
+                  thd->variables.sql_log_bin,
+                  thd->wsrep_exec_mode, thd->wsrep_query_state,
+                  thd->wsrep_conflict_state);
     }
     else
     {

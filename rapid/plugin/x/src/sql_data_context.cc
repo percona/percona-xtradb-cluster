@@ -36,13 +36,13 @@
 
 using namespace xpl;
 
-ngs::Error_code Sql_data_context::init(const int client_port, const bool is_tls_activated)
+ngs::Error_code Sql_data_context::init(const int client_port, const ngs::Connection_type type)
 {
   ngs::Error_code error = init();
   if (error)
     return error;
 
-  if ((error = set_connection_type(is_tls_activated)))
+  if ((error = set_connection_type(type)))
     return error;
 
   if (0 != srv_session_info_set_client_port(m_mysql_session, client_port))
@@ -87,7 +87,6 @@ static void kill_completion_handler(void *ctx, unsigned int sql_errno, const cha
 
 bool Sql_data_context::kill()
 {
-  // we have to use COM_KILL in a new session here, because there's no public API for killing sessions
   if (srv_session_server_is_available())
   {
     log_debug("sqlsession init (for kill): %p [%i]", m_mysql_session, m_mysql_session ? srv_session_info_get_session_id(m_mysql_session) : -1);
@@ -108,9 +107,14 @@ bool Sql_data_context::kill()
         else
         {
           COM_DATA data;
-          data.com_kill.id= static_cast<unsigned long>(mysql_session_id());
           Callback_command_delegate deleg;
-          if (!command_service_run_command(session, COM_PROCESS_KILL, &data,
+          Query_string_builder qb;
+          qb.put("KILL ").put(mysql_session_id());
+
+          data.com_query.query = (char*)qb.get().c_str();
+          data.com_query.length = static_cast<unsigned int>(qb.get().length());
+
+          if (!command_service_run_command(session, COM_QUERY, &data,
                                            mysqld::get_charset_utf8mb4_general_ci(), deleg.callbacks(),
                                            deleg.representation(), &deleg))
           {
@@ -129,9 +133,14 @@ bool Sql_data_context::kill()
 }
 
 
-ngs::Error_code Sql_data_context::set_connection_type(const bool is_tls_activated)
+ngs::Error_code Sql_data_context::set_connection_type(const ngs::Connection_type type)
 {
-  if (0 != srv_session_info_set_connection_type(m_mysql_session, (enum_vio_type)(is_tls_activated ? VIO_TYPE_SSL : VIO_TYPE_TCPIP)))
+  enum_vio_type vio_type = ngs::Connection_type_helper::convert_type(type);
+
+  if (NO_VIO_TYPE == vio_type)
+    return ngs::Error(ER_X_SESSION, "Connection type not known. type=%i", (int)type);
+
+  if (0 != srv_session_info_set_connection_type(m_mysql_session, vio_type))
     return ngs::Error_code(ER_X_SESSION, "Could not set session connection type");
 
   return ngs::Error_code();
@@ -182,16 +191,17 @@ void Sql_data_context::switch_to_local_user(const std::string &user)
 
 
 ngs::Error_code Sql_data_context::query_user(const char *user, const char *host, const char *ip,
-                                             On_user_password_hash &hash_verification_cb, ngs::IOptions_session_ptr &options_session)
+                                             On_user_password_hash &hash_verification_cb,
+                                             ngs::IOptions_session_ptr &options_session, const ngs::Connection_type type)
 {
   COM_DATA data;
 
-  User_verification_helper user_verification(hash_verification_cb, m_buffering_delegate.get_field_types(), ip, options_session);
+  User_verification_helper user_verification(hash_verification_cb, m_buffering_delegate.get_field_types(), ip, options_session, type);
 
   std::string query = user_verification.get_sql(user, host);
 
   data.com_query.query = (char*)query.c_str();
-  data.com_query.length = query.length();
+  data.com_query.length = static_cast<unsigned int>(query.length());
 
   log_debug("login query: %s", data.com_query.query);
   if (command_service_run_command(m_mysql_session, COM_QUERY, &data, mysqld::get_charset_utf8mb4_general_ci(),
@@ -226,7 +236,7 @@ ngs::Error_code Sql_data_context::query_user(const char *user, const char *host,
 
 ngs::Error_code Sql_data_context::authenticate(const char *user, const char *host, const char *ip,
                                                const char *db, On_user_password_hash password_hash_cb,
-                                               bool allow_expired_passwords, ngs::IOptions_session_ptr &options_session)
+                                               bool allow_expired_passwords, ngs::IOptions_session_ptr &options_session, const ngs::Connection_type type)
 {
   ngs::Error_code error = switch_to_user(MYSQLXSYS_USER, MYSQLXSYS_HOST, NULL, NULL);
   if (error)
@@ -237,7 +247,7 @@ ngs::Error_code Sql_data_context::authenticate(const char *user, const char *hos
 
   if (!is_acl_disabled())
   {
-    error = query_user(user, host, ip, password_hash_cb, options_session);
+    error = query_user(user, host, ip, password_hash_cb, options_session, type);
   }
 
   if (error.error == ER_MUST_CHANGE_PASSWORD_LOGIN)
@@ -263,7 +273,7 @@ ngs::Error_code Sql_data_context::authenticate(const char *user, const char *hos
       COM_DATA data;
 
       data.com_init_db.db_name = m_db;
-      data.com_init_db.length = strlen(m_db);
+      data.com_init_db.length = static_cast<unsigned long>(strlen(m_db));
 
       m_callback_delegate.reset();
       if (command_service_run_command(m_mysql_session, COM_INIT_DB, &data, mysqld::get_charset_utf8mb4_general_ci(),
@@ -342,25 +352,11 @@ ngs::Error_code Sql_data_context::switch_to_user(const char *username, const cha
 
 ngs::Error_code Sql_data_context::execute_kill_sql_session(uint64_t mysql_session_id)
 {
-  COM_DATA data;
+  Query_string_builder qb;
+  qb.put("KILL ").put(mysql_session_id);
+  Sql_data_context::Result_info r_info;
 
-  data.com_kill.id= static_cast<unsigned long>(mysql_session_id);
-  Callback_command_delegate deleg;
-  if (command_service_run_command(m_mysql_session, COM_PROCESS_KILL, &data,
-                                  mysqld::get_charset_utf8mb4_general_ci(), deleg.callbacks(),
-                                  deleg.representation(), &deleg))
-  {
-    log_debug("Error running process_kill: %s %i", m_last_sql_error.c_str(), m_last_sql_errno);
-    return ngs::Error(m_last_sql_errno, "%s", m_last_sql_error.c_str());
-  }
-
-  if (m_last_sql_errno != 0)
-    log_info("running process_kill: %s %i", m_last_sql_error.c_str(), m_last_sql_errno);
-
-  if (is_killed())
-    throw ngs::Fatal(ER_QUERY_INTERRUPTED, "Query execution was interrupted");
-
-  return ngs::Success();
+  return execute_sql_no_result(qb.get(), r_info);
 }
 
 
@@ -373,7 +369,7 @@ ngs::Error_code Sql_data_context::execute_sql(Command_delegate &deleg,
   COM_DATA data;
 
   data.com_query.query = sql;
-  data.com_query.length = length;
+  data.com_query.length = static_cast<unsigned int>(length);
 
   deleg.reset();
 
@@ -390,7 +386,7 @@ ngs::Error_code Sql_data_context::execute_sql(Command_delegate &deleg,
     // we run a command to check just in case... (some commands are still allowed in expired password mode)
     Callback_command_delegate d;
     data.com_query.query = "select 1";
-    data.com_query.length = strlen(data.com_query.query);
+    data.com_query.length = static_cast<unsigned int>(strlen(data.com_query.query));
     if (false == command_service_run_command(m_mysql_session, COM_QUERY, &data, mysqld::get_charset_utf8mb4_general_ci(),
                                              d.callbacks(), d.representation(), &d) && !d.get_error())
     {

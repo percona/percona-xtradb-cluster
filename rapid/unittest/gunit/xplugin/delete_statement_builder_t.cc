@@ -17,10 +17,16 @@
 
 #include "delete_statement_builder.h"
 #include "expr_generator.h"
+<<<<<<< HEAD
 #include "mysqlx_crud.pb.h"
 
 #include <gtest/gtest.h>
 #include <google/protobuf/text_format.h>
+=======
+#include "ngs_common/protocol_protobuf.h"
+
+#include <gtest/gtest.h>
+>>>>>>> mysql-5.7.13
 
 namespace xpl
 {

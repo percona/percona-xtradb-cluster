@@ -686,6 +686,7 @@ mysql_cond_t COND_server_started;
 mysql_mutex_t LOCK_reset_gtid_table;
 mysql_mutex_t LOCK_compress_gtid_table;
 mysql_cond_t COND_compress_gtid_table;
+mysql_mutex_t LOCK_group_replication_handler;
 #if !defined (EMBEDDED_LIBRARY) && !defined(_WIN32)
 mysql_mutex_t LOCK_socket_listener_active;
 mysql_cond_t COND_socket_listener_active;
@@ -909,7 +910,7 @@ static bool pid_file_created= false;
 static void usage(void);
 static void clean_up_mutexes(void);
 static void create_pid_file();
-static void mysqld_exit(int exit_code) __attribute__((noreturn));
+static void mysqld_exit(int exit_code) MY_ATTRIBUTE((noreturn));
 static void delete_pid_file(myf flags);
 #endif
 
@@ -1011,7 +1012,12 @@ public:
       sql_print_warning(ER_DEFAULT(ER_FORCING_CLOSE),my_progname,
                         closing_thd->thread_id(),
                         (main_sctx_user.length ? main_sctx_user.str : ""));
-      close_connection(closing_thd, 0, is_server_shutdown);
+      /*
+        Do not generate MYSQL_AUDIT_CONNECTION_DISCONNECT event, when closing
+        thread close sessions. Each session will generate DISCONNECT event by
+        itself.
+      */
+      close_connection(closing_thd, 0, is_server_shutdown, false);
     }
 #ifdef WITH_WSREP
     /*
@@ -1275,7 +1281,6 @@ static void close_connections(void)
 
   Call_close_conn call_close_conn(true);
   thd_manager->do_for_all_thd(&call_close_conn);
-
   /*
     All threads have now been aborted. Stop event scheduler thread
     after aborting all client connections, otherwise user may
@@ -2204,7 +2209,7 @@ void my_init_signals()
 #else // !_WIN32
 
 extern "C" {
-static void empty_signal_handler(int sig __attribute__((unused)))
+static void empty_signal_handler(int sig MY_ATTRIBUTE((unused)))
 { }
 }
 
@@ -2330,7 +2335,7 @@ static void start_signal_handler()
 
 /** This thread handles SIGTERM, SIGQUIT and SIGHUP signals. */
 /* ARGSUSED */
-extern "C" void *signal_hand(void *arg __attribute__((unused)))
+extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
 {
   my_thread_init();
 
@@ -2493,7 +2498,8 @@ void my_message_sql(uint error, const char *str, myf MyFlags)
   }
 
 #ifndef EMBEDDED_LIBRARY
-  mysql_audit_general(thd, MYSQL_AUDIT_GENERAL_ERROR, error, str);
+  if (error != ER_STACK_OVERRUN_NEED_MORE)
+    mysql_audit_general(thd, MYSQL_AUDIT_GENERAL_ERROR, error, str);
 #endif
 
   if (thd)
@@ -3306,6 +3312,22 @@ int init_common_variables()
                       "--slow-query-log-file option, log tables are used. "
                       "To enable logging to files use the --log-output=file option.");
 
+  if (opt_general_logname &&
+      !is_valid_log_name(opt_general_logname, strlen(opt_general_logname)))
+  {
+    sql_print_error("Invalid value for --general_log_file: %s",
+                    opt_general_logname);
+    return 1;
+  }
+
+  if (opt_slow_logname &&
+      !is_valid_log_name(opt_slow_logname, strlen(opt_slow_logname)))
+  {
+    sql_print_error("Invalid value for --slow_query_log_file: %s",
+                    opt_slow_logname);
+    return 1;
+  }
+
 #define FIX_LOG_VAR(VAR, ALT)                                   \
   if (!VAR || !*VAR)                                            \
     VAR= ALT;
@@ -3451,6 +3473,8 @@ static int init_thread_environment()
                    &LOCK_compress_gtid_table, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_compress_gtid_table,
                   &COND_compress_gtid_table);
+  mysql_mutex_init(key_LOCK_group_replication_handler,
+                   &LOCK_group_replication_handler, MY_MUTEX_INIT_FAST);
 #ifndef EMBEDDED_LIBRARY
   Events::init_mutexes();
 #if defined(_WIN32)
@@ -3858,7 +3882,7 @@ static int init_server_auto_options()
   /* load_defaults require argv[0] is not null */
   char **argv= &name;
   int argc= 1;
-  if (!check_file_permissions(fname))
+  if (!check_file_permissions(fname, false))
   {
     /*
       Found a world writable file hence removing it as it is dangerous to write
@@ -3887,6 +3911,24 @@ static int init_server_auto_options()
     if (!Uuid::is_valid(uuid))
     {
       sql_print_error("The server_uuid stored in auto.cnf file is not a valid UUID.");
+      goto err;
+    }
+    /*
+      Uuid::is_valid() cannot do strict check on the length as it will be
+      called by GTID::is_valid() as well (GTID = UUID:seq_no). We should
+      explicitly add the *length check* here in this function.
+
+      If UUID length is less than '36' (UUID_LENGTH), that error case would have
+      got caught in above is_valid check. The below check is to make sure that
+      length is not greater than UUID_LENGTH i.e., there are no extra characters
+      (Garbage) at the end of the valid UUID.
+    */
+    if (strlen(uuid) > UUID_LENGTH)
+    {
+      sql_print_error("Garbage characters found at the end of the server_uuid "
+                      "value in auto.cnf file. It should be of length '%d' "
+                      "(UUID_LENGTH). Clear it and restart the server. ",
+                      UUID_LENGTH);
       goto err;
     }
     strcpy(server_uuid, uuid);
@@ -5368,13 +5410,14 @@ int mysqld_main(int argc, char **argv)
   */
   set_super_read_only_post_init();
 
-  (void) RUN_HOOK(server_state, before_handle_connection, (NULL));
-
   DBUG_PRINT("info", ("Block, listening for incoming connections"));
 
   (void)MYSQL_SET_STAGE(0 ,__FILE__, __LINE__);
 
   server_operational_state= SERVER_OPERATING;
+
+  (void) RUN_HOOK(server_state, before_handle_connection, (NULL));
+
 #if defined(_WIN32)
   setup_conn_event_handler_threads();
 #else
@@ -7839,7 +7882,7 @@ static int mysql_init_variables(void)
 
 my_bool
 mysqld_get_one_option(int optid,
-                      const struct my_option *opt __attribute__((unused)),
+                      const struct my_option *opt MY_ATTRIBUTE((unused)),
                       char *argument)
 {
   switch(optid) {
@@ -7855,6 +7898,7 @@ mysqld_get_one_option(int optid,
     break;
   case 'b':
     strmake(mysql_home,argument,sizeof(mysql_home)-1);
+    mysql_home_ptr= mysql_home;
     break;
   case 'C':
     if (default_collation_name == compiled_default_collation_name)
@@ -9247,6 +9291,7 @@ PSI_mutex_key key_mts_gaq_LOCK;
 PSI_mutex_key key_thd_timer_mutex;
 PSI_mutex_key key_LOCK_offline_mode;
 PSI_mutex_key key_LOCK_default_password_lifetime;
+PSI_mutex_key key_LOCK_group_replication_handler;
 
 #ifdef HAVE_REPLICATION
 PSI_mutex_key key_commit_order_manager_mutex;
@@ -9301,9 +9346,9 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_status, "LOCK_status", PSI_FLAG_GLOBAL},
   { &key_LOCK_system_variables_hash, "LOCK_system_variables_hash", PSI_FLAG_GLOBAL},
   { &key_LOCK_table_share, "LOCK_table_share", PSI_FLAG_GLOBAL},
-  { &key_LOCK_thd_data, "THD::LOCK_thd_data", 0},
-  { &key_LOCK_thd_query, "THD::LOCK_thd_query", 0},
-  { &key_LOCK_thd_sysvar, "THD::LOCK_thd_sysvar", 0},
+  { &key_LOCK_thd_data, "THD::LOCK_thd_data", PSI_FLAG_VOLATILITY_SESSION},
+  { &key_LOCK_thd_query, "THD::LOCK_thd_query", PSI_FLAG_VOLATILITY_SESSION},
+  { &key_LOCK_thd_sysvar, "THD::LOCK_thd_sysvar", PSI_FLAG_VOLATILITY_SESSION},
   { &key_LOCK_user_conn, "LOCK_user_conn", PSI_FLAG_GLOBAL},
   { &key_LOCK_uuid_generator, "LOCK_uuid_generator", PSI_FLAG_GLOBAL},
   { &key_LOCK_sql_rand, "LOCK_sql_rand", PSI_FLAG_GLOBAL},
@@ -9327,10 +9372,10 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_error_messages, "LOCK_error_messages", PSI_FLAG_GLOBAL},
   { &key_LOCK_log_throttle_qni, "LOCK_log_throttle_qni", PSI_FLAG_GLOBAL},
   { &key_gtid_ensure_index_mutex, "Gtid_state", PSI_FLAG_GLOBAL},
-  { &key_LOCK_query_plan, "THD::LOCK_query_plan", 0},
+  { &key_LOCK_query_plan, "THD::LOCK_query_plan", PSI_FLAG_VOLATILITY_SESSION},
   { &key_LOCK_cost_const, "Cost_constant_cache::LOCK_cost_const",
     PSI_FLAG_GLOBAL},  
-  { &key_LOCK_current_cond, "THD::LOCK_current_cond", 0},
+  { &key_LOCK_current_cond, "THD::LOCK_current_cond", PSI_FLAG_VOLATILITY_SESSION},
   { &key_mts_temp_table_LOCK, "key_mts_temp_table_LOCK", 0},
   { &key_LOCK_reset_gtid_table, "LOCK_reset_gtid_table", PSI_FLAG_GLOBAL},
   { &key_LOCK_compress_gtid_table, "LOCK_compress_gtid_table", PSI_FLAG_GLOBAL},
@@ -9353,7 +9398,8 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_mutex_slave_worker_hash, "Relay_log_info::slave_worker_hash_lock", 0},
 #endif
   { &key_LOCK_offline_mode, "LOCK_offline_mode", PSI_FLAG_GLOBAL},
-  { &key_LOCK_default_password_lifetime, "LOCK_default_password_lifetime", PSI_FLAG_GLOBAL}
+  { &key_LOCK_default_password_lifetime, "LOCK_default_password_lifetime", PSI_FLAG_GLOBAL},
+  { &key_LOCK_group_replication_handler, "LOCK_group_replication_handler", PSI_FLAG_GLOBAL}
 };
 
 PSI_rwlock_key key_rwlock_LOCK_grant, key_rwlock_LOCK_logger,
@@ -9482,7 +9528,6 @@ static PSI_cond_info all_server_conds[]=
 PSI_thread_key key_thread_bootstrap, key_thread_handle_manager, key_thread_main,
   key_thread_one_connection, key_thread_signal_hand,
   key_thread_compress_gtid_table, key_thread_parser_service;
-PSI_thread_key key_thread_daemon_plugin;
 PSI_thread_key key_thread_timer_notifier;
 
 static PSI_thread_info all_server_threads[]=
@@ -9501,7 +9546,6 @@ static PSI_thread_info all_server_threads[]=
   { &key_thread_signal_hand, "signal_handler", PSI_FLAG_GLOBAL},
   { &key_thread_compress_gtid_table, "compress_gtid_table", PSI_FLAG_GLOBAL},
   { &key_thread_parser_service, "parser_service", PSI_FLAG_GLOBAL},
-  { &key_thread_daemon_plugin, "daemon_plugin", PSI_FLAG_GLOBAL}
 };
 
 PSI_file_key key_file_map;

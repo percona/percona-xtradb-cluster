@@ -5247,7 +5247,7 @@ struct User_level_lock
 /** Extract a hash key from User_level_lock. */
 
 uchar *ull_get_key(const uchar *ptr, size_t *length,
-                   my_bool not_used __attribute__((unused)))
+                   my_bool not_used MY_ATTRIBUTE((unused)))
 {
   const User_level_lock *ull = reinterpret_cast<const User_level_lock*>(ptr);
   const MDL_key *key = ull->ticket->get_key();
@@ -7890,14 +7890,20 @@ bool Item_func_match::fix_fields(THD *thd, Item **ref)
     */
     if (doc_id_field)
       update_table_read_set(doc_id_field);
-    /*
-      Prevent index only accces by non-FTS index if table does not have
-      FTS_DOC_ID column, find_relevance does not work properly without
-      FTS_DOC_ID value. Decision for FTS index about index only access
-      is made later by JOIN::fts_index_access() function.
-    */
     else
+    {
+      /* read_set needs to be updated for MATCH arguments */
+      for (uint i= 0; i < arg_count; i++)
+        update_table_read_set(((Item_field*)args[i])->field);
+      /*
+        Prevent index only accces by non-FTS index if table does not have
+        FTS_DOC_ID column, find_relevance does not work properly without
+        FTS_DOC_ID value. Decision for FTS index about index only access
+        is made later by JOIN::fts_index_access() function.
+      */
       table->covering_keys.clear_all();
+    }
+
   }
   else
   {

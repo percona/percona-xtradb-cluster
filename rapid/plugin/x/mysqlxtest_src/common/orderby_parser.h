@@ -22,8 +22,8 @@
 
 #include <boost/format.hpp>
 #include "expr_parser.h"
-#include "mysqlx_crud.pb.h"
-#include "../compilerutils.h"
+#include "ngs_common/protocol_protobuf.h"
+#include "compilerutils.h"
 
 #include <memory>
 

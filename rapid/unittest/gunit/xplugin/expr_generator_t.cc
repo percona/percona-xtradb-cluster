@@ -14,7 +14,11 @@
  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include "expr_generator.h"
+<<<<<<< HEAD
 #include <google/protobuf/text_format.h>
+=======
+#include "ngs_common/protocol_protobuf.h"
+>>>>>>> mysql-5.7.13
 #include "mysqlx_pb_wrapper.h"
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
@@ -67,7 +71,7 @@ TEST(xpl_expr_generator, literal_octets)
 TEST(xpl_expr_generator, literal_string)
 {
   EXPECT_EQ("'\\\"test1\\\" \t \\'test2\\''",
-            generate_expression(Scalar(new Scalar_String("\"test1\" \t 'test2'")), EMPTY_SCHEMA, DM_TABLE));
+            generate_expression(Scalar(new Scalar::String("\"test1\" \t 'test2'")), EMPTY_SCHEMA, DM_TABLE));
 }
 
 
@@ -976,7 +980,7 @@ TEST(xpl_expr_generator, default_operator)
 
 TEST(xpl_expr_generator, scalar_octets_plain)
 {
-  EXPECT_EQ("'ABC'", generate_expression(Scalar(new Scalar_Octets("ABC", Expression_generator::CT_PLAIN)),
+  EXPECT_EQ("'ABC'", generate_expression(Scalar(new Scalar::Octets("ABC", Expression_generator::CT_PLAIN)),
                                          EMPTY_SCHEMA, DM_TABLE));
 }
 
@@ -984,7 +988,7 @@ TEST(xpl_expr_generator, scalar_octets_plain)
 TEST(xpl_expr_generator, scalar_octets_geometry)
 {
   EXPECT_EQ("ST_GEOMETRYFROMWKB('010')",
-            generate_expression(Scalar(new Scalar_Octets("010", Expression_generator::CT_GEOMETRY)),
+            generate_expression(Scalar(new Scalar::Octets("010", Expression_generator::CT_GEOMETRY)),
                                 EMPTY_SCHEMA, DM_TABLE));
 }
 
@@ -992,7 +996,7 @@ TEST(xpl_expr_generator, scalar_octets_geometry)
 TEST(xpl_expr_generator, scalar_octets_json)
 {
   EXPECT_EQ("CAST('{\\\"a\\\":42}' AS JSON)",
-            generate_expression(Scalar(new Scalar_Octets("{\"a\":42}", Expression_generator::CT_JSON)),
+            generate_expression(Scalar(new Scalar::Octets("{\"a\":42}", Expression_generator::CT_JSON)),
                                 EMPTY_SCHEMA, DM_TABLE));
 }
 
@@ -1000,14 +1004,14 @@ TEST(xpl_expr_generator, scalar_octets_json)
 TEST(xpl_expr_generator, scalar_octets_xml)
 {
   EXPECT_EQ("'<a>bbb</a>'",
-            generate_expression(Scalar(new Scalar_Octets("<a>bbb</a>", Expression_generator::CT_XML)),
+            generate_expression(Scalar(new Scalar::Octets("<a>bbb</a>", Expression_generator::CT_XML)),
                                 EMPTY_SCHEMA, DM_TABLE));
 }
 
 
 TEST(xpl_expr_generator, scalar_octets_unknown)
 {
-  EXPECT_THROW(generate_expression(Scalar(new Scalar_Octets("foo", 666)),
+  EXPECT_THROW(generate_expression(Scalar(new Scalar::Octets("foo", 666)),
                                    EMPTY_SCHEMA, DM_TABLE),
                Expression_generator::Error);
 }

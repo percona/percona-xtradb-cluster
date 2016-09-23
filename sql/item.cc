@@ -238,21 +238,21 @@ bool Item::val_bool()
 */
 String *Item::val_str_ascii(String *str)
 {
-  if (!(collation.collation->state & MY_CS_NONASCII))
-    return val_str(str);
-  
   DBUG_ASSERT(str != &str_value);
   
   uint errors;
   String *res= val_str(&str_value);
   if (!res)
     return 0;
-  
-  if ((null_value= str->copy(res->ptr(), res->length(),
-                             collation.collation, &my_charset_latin1,
-                             &errors)))
-    return 0;
-  
+
+  if (!(res->charset()->state & MY_CS_NONASCII))
+    str= res;
+  else
+  {
+    if ((null_value= str->copy(res->ptr(), res->length(), collation.collation,
+                               &my_charset_latin1, &errors)))
+      return 0;
+  }
   return str;
 }
 
@@ -3715,8 +3715,8 @@ Item *Item_null::safe_charset_converter(const CHARSET_INFO *tocs)
 
 static void
 default_set_param_func(Item_param *param,
-                       uchar **pos __attribute__((unused)),
-                       ulong len __attribute__((unused)))
+                       uchar **pos MY_ATTRIBUTE((unused)),
+                       ulong len MY_ATTRIBUTE((unused)))
 {
   param->set_null();
 }
@@ -5623,6 +5623,28 @@ Item_field::fix_outer_field(THD *thd, Field **from_field, Item **reference)
           prev_subselect_item->used_tables_cache|= ut.used_tables;
           prev_subselect_item->const_item_cache&=
             (*reference)->const_item();
+
+          if (select->group_list.elements && place == CTX_HAVING)
+          {
+            /*
+              If an outer field is resolved in a grouping query block then it
+              is replaced with an Item_outer_ref object. Otherwise an
+              Item_field object is used.
+              The new Item_outer_ref object is saved in the inner_refs_list of
+              the outer query block. Here it is only created. It can be fixed
+              only after the original field has been fixed and this is done
+              in the fix_inner_refs() function.
+            */
+            Item_outer_ref *const rf=
+              new Item_outer_ref(context, down_cast<Item_ident *>(*reference));
+            if (rf == NULL)
+              return -1;
+            thd->change_item_tree(reference, rf);
+            if (select->inner_refs_list.push_back(rf))
+              return -1;
+            rf->in_sum_func= thd->lex->in_sum_func;
+          }
+
           if (thd->lex->in_sum_func &&
               thd->lex->in_sum_func->nest_level >= select->nest_level)
             set_if_bigger(thd->lex->in_sum_func->max_arg_level,
@@ -5981,7 +6003,7 @@ bool Item_field::fix_fields(THD *thd, Item **reference)
   {
     TABLE *table= field->table;
     MY_BITMAP *current_bitmap;
-    MY_BITMAP *other_bitmap __attribute__((unused));
+    MY_BITMAP *other_bitmap MY_ATTRIBUTE((unused));
     if (thd->mark_used_columns == MARK_COLUMNS_READ)
     {
       current_bitmap= table->read_set;
@@ -10956,4 +10978,26 @@ bool Item_ident::is_column_not_in_fd(uchar *arg)
 {
   Group_check *const gc= reinterpret_cast<Group_check *>(arg);
   return gc->do_ident_check(this, 0, Group_check::CHECK_COLUMN);
+}
+
+/**
+   The aim here is to find a real_item() which is of type Item_field.
+*/
+bool Item_ref::repoint_const_outer_ref(uchar *arg)
+{
+  *(pointer_cast<bool*>(arg))= true;
+  return false;
+}
+
+/**
+   If this object is the real_item of an Item_ref, repoint the result_field to
+   field.
+*/
+bool Item_field::repoint_const_outer_ref(uchar *arg)
+{
+  bool *is_outer_ref= pointer_cast<bool*>(arg);
+  if (*is_outer_ref)
+    result_field= field;
+  *is_outer_ref= false;
+  return false;
 }

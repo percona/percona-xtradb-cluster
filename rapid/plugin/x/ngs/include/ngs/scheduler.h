@@ -35,10 +35,10 @@ namespace ngs
   class Scheduler_dynamic
   {
   public:
-    class Monitor
+    class Monitor_interface
     {
     public:
-      virtual ~Monitor() {}
+      virtual ~Monitor_interface() {}
 
       virtual void on_worker_thread_create() = 0;
       virtual void on_worker_thread_destroy() = 0;
@@ -48,21 +48,21 @@ namespace ngs
 
     typedef boost::function<void()> Task;
 
-    Scheduler_dynamic(const char* name);
+    Scheduler_dynamic(const char* name, PSI_thread_key thread_key = PSI_NOT_INSTRUMENTED);
     virtual ~Scheduler_dynamic();
 
     virtual void launch();
-    virtual unsigned int set_num_workers(unsigned int n);
     virtual void stop();
+    virtual unsigned int set_num_workers(unsigned int n);
     void set_idle_worker_timeout(unsigned long long milliseconds);
     bool post(Task* task);
     bool post(const Task& task);
     bool post_and_wait(const Task& task);
 
     virtual bool thread_init() { return true; }
-    virtual void thread_end() {}
+    virtual void thread_end();
 
-    void set_monitor(Monitor *monitor);
+    void set_monitor(Monitor_interface *monitor);
 
     bool is_worker_thread(my_thread_t thread_id);
     bool is_running();
@@ -138,14 +138,15 @@ namespace ngs
       return thread.thread == id;
     }
 
+    bool wait_if_idle_then_delete_worker(ulonglong &thread_waiting_started);
     int32 increase_workers_count();
     int32 decrease_workers_count();
     int32 increase_tasks_count();
     int32 decrease_tasks_count();
 
     const std::string m_name;
-    Mutex m_task_pending_mutex;
-    Cond m_task_pending_cond;
+    Mutex m_worker_pending_mutex;
+    Cond m_worker_pending_cond;
     Mutex m_thread_exit_mutex;
     Cond m_thread_exit_cond;
     Mutex m_post_mutex;
@@ -158,7 +159,8 @@ namespace ngs
     lock_list<Task *> m_tasks;
     lock_list<Thread_t> m_threads;
     lock_list<my_thread_t> m_terminating_workers;
-    boost::scoped_ptr<Monitor> m_monitor;
+    boost::scoped_ptr<Monitor_interface> m_monitor;
+    PSI_thread_key m_thread_key;
   };
 }
 

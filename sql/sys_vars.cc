@@ -59,6 +59,8 @@
 #include "sql_time.h"                    // global_date_format
 #include "table_cache.h"                 // Table_cache_manager
 #include "transaction.h"                 // trans_commit_stmt
+#include "rpl_write_set_handler.h"       // transaction_write_set_hashing_algorithms
+#include "rpl_group_replication.h"       // is_group_replication_running
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
 #include "../storage/perfschema/pfs_server.h"
@@ -1829,6 +1831,17 @@ static Sys_var_mybool Sys_log_bin(
 
 static bool transaction_write_set_check(sys_var *self, THD *thd, set_var *var)
 {
+#ifdef HAVE_REPLICATION
+  // Can't change the algorithm when group replication is enabled.
+  if (is_group_replication_running())
+  {
+    my_message(ER_GROUP_REPLICATION_RUNNING,
+               "The write set algorithm cannot be changed when Group replication"
+               " is running.", MYF(0));
+    return true;
+  }
+#endif
+
   if (var->type == OPT_GLOBAL &&
       global_system_variables.binlog_format != BINLOG_FORMAT_ROW)
   {
@@ -1862,9 +1875,6 @@ static bool transaction_write_set_check(sys_var *self, THD *thd, set_var *var)
   }
   return false;
 }
-
-static const char *transaction_write_set_hashing_algorithms[]=
-       {"OFF", "MURMUR32", 0};
 
 static Sys_var_enum Sys_extract_write_set(
        "transaction_write_set_extraction",
@@ -2055,7 +2065,7 @@ static bool fix_syslog(sys_var *self, THD *thd, enum_var_type type)
 
 static bool check_syslog_tag(sys_var *self, THD *THD, set_var *var)
 {
-  return ((var->value != NULL) &&
+  return ((var->save_result.string_value.str != NULL) &&
           (strchr(var->save_result.string_value.str, FN_LIBCHAR) != NULL));
 }
 
@@ -2543,8 +2553,16 @@ static Sys_var_ulong Sys_net_buffer_length(
 static bool fix_net_read_timeout(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type != OPT_GLOBAL)
+  {
+    // net_buffer_length is a specific property for the classic protocols
+    if (!thd->is_classic_protocol())
+    {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
     my_net_set_read_timeout(thd->get_protocol_classic()->get_net(),
                             thd->variables.net_read_timeout);
+  }
   return false;
 }
 static Sys_var_ulong Sys_net_read_timeout(
@@ -2559,8 +2577,16 @@ static Sys_var_ulong Sys_net_read_timeout(
 static bool fix_net_write_timeout(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type != OPT_GLOBAL)
+  {
+    // net_read_timeout is a specific property for the classic protocols
+    if (!thd->is_classic_protocol())
+    {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
     my_net_set_write_timeout(thd->get_protocol_classic()->get_net(),
                              thd->variables.net_write_timeout);
+  }
   return false;
 }
 static Sys_var_ulong Sys_net_write_timeout(
@@ -2575,8 +2601,16 @@ static Sys_var_ulong Sys_net_write_timeout(
 static bool fix_net_retry_count(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type != OPT_GLOBAL)
+  {
+    // net_write_timeout is a specific property for the classic protocols
+    if (!thd->is_classic_protocol())
+    {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
     thd->get_protocol_classic()->get_net()->retry_count=
       thd->variables.net_retry_count;
+  }
   return false;
 }
 static Sys_var_ulong Sys_net_retry_count(
@@ -2607,8 +2641,8 @@ static Sys_var_mybool Sys_old_alter_table(
        "old_alter_table", "Use old, non-optimized alter table",
        SESSION_VAR(old_alter_table), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
-static bool old_passwords_check(sys_var *self  __attribute__((unused)),
-                                THD *thd  __attribute__((unused)),
+static bool old_passwords_check(sys_var *self  MY_ATTRIBUTE((unused)),
+                                THD *thd  MY_ATTRIBUTE((unused)),
                                 set_var *var)
 {
   push_deprecated_warn_no_replacement(current_thd, "old_passwords");
@@ -4425,6 +4459,7 @@ static bool update_last_insert_id(THD *thd, set_var *var)
   }
   thd->first_successful_insert_id_in_prev_stmt=
     var->save_result.ulonglong_value;
+  thd->substitute_null_with_insert_id= TRUE;
   return false;
 }
 static ulonglong read_last_insert_id(THD *thd)
@@ -4626,6 +4661,14 @@ static bool check_log_path(sys_var *self, THD *thd, set_var *var)
 
   if (!var->save_result.string_value.str)
     return true;
+
+  if (!is_valid_log_name(var->save_result.string_value.str,
+                         var->save_result.string_value.length))
+  {
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0),
+             self->name.str, var->save_result.string_value.str);
+    return true;
+  }
 
   if (var->save_result.string_value.length > FN_REFLEN)
   { // path is too long

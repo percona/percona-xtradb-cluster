@@ -1,0 +1,127 @@
+#
+# Test manipulating wsrep_desync while an RSU operation is in progress
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+--source include/have_debug_sync.inc
+
+call mtr.add_suppression("WSREP: Trying to desync a node that is already paused");
+
+#-------------------------------------------------------------------------------
+#
+# Try to set wsrep_desync to ON/OFF while the RSU is in progress.
+#
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+
+SET GLOBAL wsrep_desync=1;
+SET wsrep_OSU_method=RSU;
+
+SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
+--send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
+--source include/wait_condition.inc
+
+# Can't set to off while the node is already paused by the RSU action above.
+#--error ER_WRONG_VALUE_FOR_VAR
+SET GLOBAL wsrep_desync=0;
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+--connection node_1
+--reap
+
+--connection node_1a
+# Now it is fine as RSU action has completed.
+SET GLOBAL wsrep_desync=0;
+SHOW VARIABLES LIKE 'wsrep_desync';
+
+--connection node_1
+SHOW CREATE TABLE t1;
+SHOW VARIABLES LIKE 'wsrep_desync';
+SET wsrep_OSU_method=TOI;
+
+DROP TABLE t1;
+
+#-------------------------------------------------------------------------------
+#
+# Try to set wsrep_desync to ON/OFF while the FTWRL is in progress.
+#
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+
+SET GLOBAL wsrep_desync=1;
+FLUSH TABLE WITH READ LOCK;
+# Can't set to off while the node is already paused by the RSU action above.
+--error ER_WRONG_VALUE_FOR_VAR
+SET GLOBAL wsrep_desync=0;
+UNLOCK TABLES;
+# Now it is fine as RSU action has completed.
+SET GLOBAL wsrep_desync=0;
+SHOW VARIABLES LIKE 'wsrep_desync';
+
+--connection node_1
+SHOW CREATE TABLE t1;
+SHOW VARIABLES LIKE 'wsrep_desync';
+DROP TABLE t1;
+
+
+#-------------------------------------------------------------------------------
+#
+# Try to see how RSU and FTWRL interfere with each other.
+# note: both are executing same action (desync + pause) so one of the workload
+# shouldn't execute action instead just reference count.
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
+
+SET GLOBAL wsrep_desync=1;
+SET wsrep_OSU_method=RSU;
+
+SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
+--send ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+
+--connection node_1a
+--echo #node-1a
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
+--source include/wait_condition.inc
+
+# this will try to re-pause the provider but given the reference-counting
+# will just increment the counter and return with success.
+FLUSH TABLE WITH READ LOCK;
+
+--connect node_1b, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1b
+--echo #node-1b
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
+--source include/wait_condition.inc
+SET DEBUG_SYNC= 'now SIGNAL continue';
+
+--connection node_1
+--echo #node-1
+--reap
+SHOW CREATE TABLE t1;
+
+--connection node_1a
+--echo #node-1a
+# This unlock table will be resume the provider.
+UNLOCK TABLES;
+
+--connection node_1
+--echo #node-1
+SET GLOBAL wsrep_desync=0;
+SHOW CREATE TABLE t1;
+SHOW VARIABLES LIKE 'wsrep_desync';
+SET wsrep_OSU_method=TOI;
+
+DROP TABLE t1;
+

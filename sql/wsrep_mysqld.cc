@@ -815,8 +815,8 @@ bool wsrep_sync_wait (THD* thd, uint mask)
 {
   if (wsrep_must_sync_wait(thd, mask))
   {
-    WSREP_DEBUG("wsrep_sync_wait: thd->variables.wsrep_sync_wait = %u, mask = %u, SQL: %s",
-                thd->variables.wsrep_sync_wait, mask, WSREP_QUERY(thd));
+    //WSREP_DEBUG("wsrep_sync_wait: thd->variables.wsrep_sync_wait = %u, mask = %u, SQL: %s",
+    //            thd->variables.wsrep_sync_wait, mask, WSREP_QUERY(thd));
     // This allows autocommit SELECTs and a first SELECT after SET AUTOCOMMIT=0
     // TODO: modify to check if thd has locked any rows.
     wsrep_gtid_t  gtid;

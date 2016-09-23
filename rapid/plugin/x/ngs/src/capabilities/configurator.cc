@@ -17,17 +17,9 @@
  * 02110-1301  USA
  */
 
-
-#include "ngs/client.h"
 #include "ngs/capabilities/configurator.h"
 #include "ngs/ngs_error.h"
-
-#ifdef WITH_LOGGER
-#define LOG_DOMAIN "ngs.client"
-#include <logger/logger.h>
-#else
 #include "ngs/log.h"
-#endif
 
 
 namespace ngs
@@ -90,7 +82,7 @@ ngs::Error_code Capabilities_configurator::prepare_set(const ::Mysqlx::Connectio
 
   for(std::size_t index = 0; index < capabilities_size; ++index)
   {
-    const ::Mysqlx::Connection::Capability &c = capabilities.capabilities(index);
+    const ::Mysqlx::Connection::Capability &c = capabilities.capabilities(static_cast<int>(index));
     Capability_handler_ptr handler = get_capabilitie_by_name(c.name());
 
     if (!handler)

@@ -108,7 +108,7 @@ c1	c2
 8	iiiii
 9	jjjjj
 ALTER TABLE t1 ENCRYPTION="N", algorithm=inplace;
-ERROR 0A000: ALGORITHM=INPLACE is not supported. Reason: Invalid encryption option.. Try ALGORITHM=COPY.
+ERROR 0A000: ALGORITHM=INPLACE is not supported. Reason: Cannot alter encryption attribute by inplace algorithm.. Try ALGORITHM=COPY.
 ALTER TABLE t1 TABLESPACE=`innodb_system`;
 ERROR HY000: This tablespace can't be encrypted.
 ALTER TABLE t1 ENCRYPTION="N", algorithm=copy;
@@ -125,6 +125,13 @@ c1	c2
 8	iiiii
 9	jjjjj
 DROP TABLE t1;
+CREATE TABLE t1 (c1 int) ENCRYPTION='N';
+ALTER TABLE t1 ENCRYPTION='P',algorithm=copy;
+ERROR HY000: Invalid encryption option.
+ALTER TABLE t1 ADD KEY k1 (c1) ,algorithm=inplace;
+ALTER TABLE t1 ENCRYPTION='Y',algorithm=inplace;
+ERROR 0A000: ALGORITHM=INPLACE is not supported. Reason: Cannot alter encryption attribute by inplace algorithm.. Try ALGORITHM=COPY.
+drop table t1;
 CREATE TABLE t1(c1 INT PRIMARY KEY) COMPRESSION = "ZLIB" ENCRYPTION = "Y" ENGINE = InnoDB;
 INSERT INTO t1 VALUES(0), (1), (2), (3), (4), (5), (6), (7), (8), (9);
 SHOW CREATE TABLE t1;
@@ -239,5 +246,11 @@ c1	ST_AsText(g)
 7	POINT(7 7)
 8	POINT(8 8)
 9	POINT(9 9)
+DROP TABLE t1;
+SET GLOBAL innodb_file_per_table=OFF;
+CREATE TABLE t1 (c1 int);
+ALTER TABLE t1 COMPRESSION='zlib';
+ALTER TABLE t1 ENCRYPTION='Y',ALGORITHM=COPY;
+ERROR HY000: This tablespace can't be encrypted.
 SET GLOBAL innodb_file_per_table=1;
 DROP TABLE t1;

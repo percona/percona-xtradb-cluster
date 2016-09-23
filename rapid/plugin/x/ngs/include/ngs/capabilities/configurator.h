@@ -24,15 +24,14 @@
 #include <string>
 #include <vector>
 
-#include "mysqlx_connection.pb.h"
+#include "ngs_common/protocol_protobuf.h"
 #include "ngs/capabilities/handler.h"
 #include "ngs/error_code.h"
 
 namespace ngs
 {
 
-
-  class Client;
+  class Client_interface;
 
 
   class Capabilities_configurator

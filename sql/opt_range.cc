@@ -1116,7 +1116,7 @@ static inline void print_tree(String *out,
                               const char *tree_name,
                               SEL_TREE *tree,
                               const RANGE_OPT_PARAM *param,
-                              const bool print_full) __attribute__((unused));
+                              const bool print_full) MY_ATTRIBUTE((unused));
 
 void append_range(String *out,
                   const KEY_PART_INFO *key_parts,
@@ -3370,6 +3370,16 @@ bool prune_partitions(THD *thd, TABLE *table, Item *pprune_cond)
 {
   partition_info *part_info = table->part_info;
   DBUG_ENTER("prune_partitions");
+
+  /*
+    If the prepare stage already have completed pruning successfully,
+    it is no use of running prune_partitions() again on the same condition.
+    Since it will not be able to prune anything more than the previous call
+    from the prepare step.
+  */
+  if (part_info && part_info->is_pruning_completed)
+    DBUG_RETURN(false);
+
   table->all_partitions_pruned_away= false;
 
   if (!part_info)
@@ -3393,15 +3403,6 @@ bool prune_partitions(THD *thd, TABLE *table, Item *pprune_cond)
     table->all_partitions_pruned_away= true;
     DBUG_RETURN(false);
   }
-
-  /*
-    If the prepare stage already have completed pruning successfully,
-    it is no use of running prune_partitions() again on the same condition.
-    Since it will not be able to prune anything more than the previous call
-    from the prepare step.
-  */
-  if (part_info->is_pruning_completed)
-    DBUG_RETURN(false);
 
   PART_PRUNE_PARAM prune_param;
   MEM_ROOT alloc;
@@ -5768,7 +5769,7 @@ static TRP_RANGE *get_key_scans_params(PARAM *param, SEL_TREE *tree,
                                        bool update_tbl_stats,
                                        const Cost_estimate *cost_est)
 {
-  uint idx, best_idx;
+  uint idx, best_idx= 0;
   SEL_ARG *key, *key_to_read= NULL;
   ha_rows best_records= 0;              /* protected by key_to_read */
   uint    best_mrr_flags= 0, best_buf_size= 0;
@@ -13608,9 +13609,16 @@ int QUICK_GROUP_MIN_MAX_SELECT::reset(void)
   }
   if (quick_prefix_select && quick_prefix_select->reset())
     DBUG_RETURN(1);
+
   result= head->file->ha_index_last(record);
-  if (result == HA_ERR_END_OF_FILE)
-    DBUG_RETURN(0);
+  if (result != 0)
+  {
+    if (result == HA_ERR_END_OF_FILE)
+      DBUG_RETURN(0);
+    else
+      DBUG_RETURN(result);
+  }
+
   /* Save the prefix of the last group. */
   key_copy(last_prefix, record, index_info, group_prefix_len);
 

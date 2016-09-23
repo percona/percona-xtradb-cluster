@@ -23,12 +23,12 @@
 #include <boost/shared_ptr.hpp>
 #include <string>
 
-#include "mysqlx_datatypes.pb.h"
+#include "ngs_common/protocol_protobuf.h"
 
 
 namespace ngs
 {
-  class Client;
+  class Client_interface;
 
 
   class Capability_handler

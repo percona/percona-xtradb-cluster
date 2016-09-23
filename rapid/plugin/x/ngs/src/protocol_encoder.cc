@@ -17,25 +17,20 @@
  * 02110-1301  USA
  */
 
-#include <google/protobuf/text_format.h> // has to come before boost includes, because of build issue in Solaris (unqualified map used, which clashes with some other map defined in Solaris headers)
+#include "ngs_common/protocol_protobuf.h" // has to come before boost includes, because of build issue in Solaris (unqualified map used, which clashes with some other map defined in Solaris headers)
+#include "ngs_common/connection_vio.h"
 
 #include "ngs/protocol/buffer.h"
 #include "ngs/protocol/output_buffer.h"
 #include "ngs/protocol/protocol_config.h"
 #include "ngs/protocol_encoder.h"
-
-#include "ngs_common/connection_vio.h"
-
 #include "ngs/protocol_monitor.h"
+#include "ngs/log.h"
 
 #undef ERROR // Needed to avoid conflict with ERROR in mysqlx.pb.h
-#include "mysqlx.pb.h"
-#include "mysqlx_notice.pb.h"
-#include <google/protobuf/io/coded_stream.h>
+#include "ngs_common/protocol_protobuf.h"
 #include <boost/make_shared.hpp>
 
-#define LOG_DOMAIN "ngs.protocol"
-#include "ngs/log.h"
 
 using namespace ngs;
 
@@ -43,7 +38,7 @@ const Pool_config Protocol_encoder::m_default_pool_config = { 0, 5, BUFFER_PAGE_
 
 Protocol_encoder::Protocol_encoder(const boost::shared_ptr<Connection_vio> &socket,
                                    Error_handler ehandler,
-                                   IProtocol_monitor &pmon)
+                                   Protocol_monitor_interface &pmon)
 : m_pool(m_default_pool_config),
   m_socket(socket),
   m_error_handler(ehandler),
@@ -200,7 +195,7 @@ bool Protocol_encoder::send_result_fetch_done_more_results()
 }
 
 
-IProtocol_monitor &Protocol_encoder::get_protocol_monitor()
+Protocol_monitor_interface &Protocol_encoder::get_protocol_monitor()
 {
   return *m_protocol_monitor;
 }
@@ -341,7 +336,7 @@ bool Protocol_encoder::flush_buffer()
   }
   m_buffer->reset();
 
-  m_protocol_monitor->on_send(result);
+  m_protocol_monitor->on_send(static_cast<long>(result));
 
   return true;
 }

@@ -537,8 +537,6 @@ void init_update_queries(void)
   sql_command_flags[SQLCOM_CHANGE_REPLICATION_FILTER]=    CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_SLAVE_START]=        CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_SLAVE_STOP]=         CF_AUTO_COMMIT_TRANS;
-  sql_command_flags[SQLCOM_START_GROUP_REPLICATION]= CF_AUTO_COMMIT_TRANS;
-  sql_command_flags[SQLCOM_STOP_GROUP_REPLICATION]=  CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_ALTER_TABLESPACE]|=  CF_AUTO_COMMIT_TRANS;
 
   /*
@@ -1987,7 +1985,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   {
     STATUS_VAR current_global_status_var;
     ulong uptime;
-    size_t length __attribute__((unused));
+    size_t length MY_ATTRIBUTE((unused));
     ulonglong queries_per_second1000;
     char buff[250];
     size_t buff_len= sizeof(buff);
@@ -3643,6 +3641,25 @@ end_with_restore_list:
     if (check_global_access(thd, SUPER_ACL))
       goto error;
 
+    /*
+      If the client thread has locked tables, a deadlock is possible.
+      Assume that
+      - the client thread does LOCK TABLE t READ.
+      - then the client thread does START GROUP_REPLICATION.
+           -try to make the server in super ready only mode
+           -acquire MDL lock ownership which will be waiting for
+            LOCK on table t to be released.
+      To prevent that, refuse START GROUP_REPLICATION if the
+      client thread has locked tables
+    */
+    if (thd->locked_tables_mode ||
+        thd->in_active_multi_stmt_transaction() || thd->in_sub_stmt)
+    {
+      my_message(ER_LOCK_OR_ACTIVE_TRANSACTION,
+                 ER(ER_LOCK_OR_ACTIVE_TRANSACTION), MYF(0));
+      goto error;
+    }
+
     res= group_replication_start();
 
     //To reduce server dependency, server errors are not used here
@@ -3660,13 +3677,17 @@ end_with_restore_list:
         my_message(ER_GROUP_REPLICATION_APPLIER_INIT_ERROR,
                    ER(ER_GROUP_REPLICATION_APPLIER_INIT_ERROR), MYF(0));
         goto error;
-      case 4: //GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR
+      case 4: //GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR
         my_message(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR,
                    ER(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR), MYF(0));
         goto error;
-      case 5: //GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR
+      case 5: //GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR
         my_message(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR,
                    ER(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR), MYF(0));
+        goto error;
+      case 7: //GROUP_REPLICATION_MAX_GROUP_SIZE
+        my_message(ER_GROUP_REPLICATION_MAX_GROUP_SIZE,
+                   ER(ER_GROUP_REPLICATION_MAX_GROUP_SIZE), MYF(0));
         goto error;
     }
     my_ok(thd);
@@ -3678,6 +3699,19 @@ end_with_restore_list:
   {
     if (check_global_access(thd, SUPER_ACL))
       goto error;
+
+    /*
+      Please see explanation @SQLCOM_SLAVE_STOP case
+      to know the reason for thd->locked_tables_mode in
+      the below if condition.
+    */
+    if (thd->locked_tables_mode ||
+        thd->in_active_multi_stmt_transaction() || thd->in_sub_stmt)
+    {
+      my_message(ER_LOCK_OR_ACTIVE_TRANSACTION,
+                 ER(ER_LOCK_OR_ACTIVE_TRANSACTION), MYF(0));
+      goto error;
+    }
 
     res= group_replication_stop();
     if (res == 1) //GROUP_REPLICATION_CONFIGURATION_ERROR
@@ -5610,9 +5644,9 @@ finish:
   {
     static unsigned long total_leaked_bytes= 0;
     unsigned long leaked= 0;
-    unsigned long dubious __attribute__((unused));
-    unsigned long reachable __attribute__((unused));
-    unsigned long suppressed __attribute__((unused));
+    unsigned long dubious MY_ATTRIBUTE((unused));
+    unsigned long reachable MY_ATTRIBUTE((unused));
+    unsigned long suppressed MY_ATTRIBUTE((unused));
     /*
       We could possibly use VALGRIND_DO_CHANGED_LEAK_CHECK here,
       but that is a fairly new addition to the Valgrind api.
@@ -5725,7 +5759,7 @@ long max_stack_used;
   - Passing to check_stack_overrun() prevents the compiler from removing it.
 */
 bool check_stack_overrun(THD *thd, long margin,
-			 uchar *buf __attribute__((unused)))
+			 uchar *buf MY_ATTRIBUTE((unused)))
 {
   long stack_used;
   DBUG_ASSERT(thd == current_thd);
@@ -5975,7 +6009,7 @@ void mysql_init_multi_delete(LEX *lex)
 
 void mysql_parse(THD *thd, Parser_state *parser_state)
 {
-  int error __attribute__((unused));
+  int error MY_ATTRIBUTE((unused));
   DBUG_ENTER("mysql_parse");
   DBUG_PRINT("mysql_parse", ("query: '%s'", thd->query().str));
 
@@ -6009,12 +6043,18 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
   if (query_cache.send_result_to_client(thd, thd->query()) <= 0)
   {
     LEX *lex= thd->lex;
+    const char *found_semicolon;
 
-    bool err= parse_sql(thd, parser_state, NULL);
+    bool err= thd->get_stmt_da()->is_error();
+
     if (!err)
-      err= invoke_post_parse_rewrite_plugins(thd, false);
+    {
+      err= parse_sql(thd, parser_state, NULL);
+      if (!err)
+        err= invoke_post_parse_rewrite_plugins(thd, false);
 
-    const char *found_semicolon= parser_state->m_lip.found_semicolon;
+      found_semicolon= parser_state->m_lip.found_semicolon;
+    }
 
     if (!err)
     {

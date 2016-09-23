@@ -13,6 +13,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+IF(MSVC)
+  SET(MYSQLX_PROTOBUF_MSVC_DISABLED_WARNINGS "/wd4267 /wd4244")
+ENDIF()
 
 # Standard PROTOBUF_GENERATE_CPP modified to generate both
 # protobuf and protobuf-lite C++ files.
@@ -31,33 +34,33 @@ FUNCTION(MYSQLX_PROTOBUF_GENERATE_CPP SRCS HDRS SRCS_LITE HDRS_LITE)
     GET_FILENAME_COMPONENT(ABS_FIL ${FIL} ABSOLUTE)
     GET_FILENAME_COMPONENT(FIL_WE ${FIL} NAME_WE)
 
-    LIST(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/protobuf/${FIL_WE}.pb.cc")
-    LIST(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/protobuf/${FIL_WE}.pb.h")
+    LIST(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf/${FIL_WE}.pb.cc")
+    LIST(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf/${FIL_WE}.pb.h")
     LIST(APPEND ${SRCS_LITE}
-      "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite/${FIL_WE}.pb.cc")
+      "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite/${FIL_WE}.pb.cc")
     LIST(APPEND ${HDRS_LITE}
-      "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite/${FIL_WE}.pb.h")
+      "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite/${FIL_WE}.pb.h")
 
     ADD_CUSTOM_COMMAND(
-      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/protobuf/${FIL_WE}.pb.cc"
-             "${CMAKE_CURRENT_BINARY_DIR}/protobuf/${FIL_WE}.pb.h"
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf/${FIL_WE}.pb.cc"
+             "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf/${FIL_WE}.pb.h"
       COMMAND ${CMAKE_COMMAND}
-            -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/protobuf"
+            -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf"
       COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
-      ARGS --cpp_out "${CMAKE_CURRENT_BINARY_DIR}/protobuf"
+      ARGS --cpp_out "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf"
            -I "${CMAKE_CURRENT_SOURCE_DIR}/protocol" ${ABS_FIL}
       DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
       COMMENT "Running C++ protocol buffer compiler on ${FIL}"
       VERBATIM)
     
     ADD_CUSTOM_COMMAND(
-      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite/${FIL_WE}.pb.cc"
-             "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite/${FIL_WE}.pb.h"
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite/${FIL_WE}.pb.cc"
+             "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite/${FIL_WE}.pb.h"
       COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
-      ARGS --cpp_out "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite"
-           -I "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite"
-           "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite/${FIL_WE}.proto"
-      DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/protobuf_lite/${FIL_WE}.proto"
+      ARGS --cpp_out "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite"
+           -I "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite"
+           "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite/${FIL_WE}.proto"
+      DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/generated/protobuf_lite/${FIL_WE}.proto"
               ${PROTOBUF_PROTOC_EXECUTABLE} GenLiteProtos
       COMMENT "Running C++ protocol buffer compiler (lite) on ${FIL}"
       VERBATIM)
@@ -66,6 +69,12 @@ FUNCTION(MYSQLX_PROTOBUF_GENERATE_CPP SRCS HDRS SRCS_LITE HDRS_LITE)
   SET_SOURCE_FILES_PROPERTIES(
     ${${SRCS}} ${${HDRS}} ${${SRCS_LITE}} ${${HDRS_LITE}}
     PROPERTIES GENERATED TRUE)
+  
+  IF(MSVC)
+    ADD_COMPILE_FLAGS(${${SRCS}} ${${SRCS_LITE}}
+      COMPILE_FLAGS ${MYSQLX_PROTOBUF_MSVC_DISABLED_WARNINGS})
+  ENDIF()
+  
   SET(${SRCS} ${${SRCS}} PARENT_SCOPE)
   SET(${HDRS} ${${HDRS}} PARENT_SCOPE)
   SET(${SRCS_LITE} ${${SRCS_LITE}} PARENT_SCOPE)
@@ -86,9 +95,15 @@ FUNCTION(MYSQLX_PROTOBUF_GENERATE_CPP_NAMES SRC_NAMES)
   FOREACH(FIL ${ARGN})
     GET_FILENAME_COMPONENT(FIL_WE ${FIL} NAME_WE)
     LIST(APPEND ${SRC_NAMES}
-      "${CMAKE_BINARY_DIR}/rapid/plugin/x/protobuf/${FIL_WE}.pb.cc")
+      "${CMAKE_BINARY_DIR}/rapid/plugin/x/generated/protobuf/${FIL_WE}.pb.cc")
   ENDFOREACH()
   
   SET_SOURCE_FILES_PROPERTIES(${${SRC_NAMES}} PROPERTIES GENERATED TRUE)
+  
+  IF(MSVC)
+    ADD_COMPILE_FLAGS(${${SRC_NAMES}}
+      COMPILE_FLAGS ${MYSQLX_PROTOBUF_MSVC_DISABLED_WARNINGS})
+  ENDIF()
+  
   SET(${SRC_NAMES} ${${SRC_NAMES}} PARENT_SCOPE)
 ENDFUNCTION()

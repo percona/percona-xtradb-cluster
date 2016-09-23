@@ -58,6 +58,9 @@ const LEX_STRING empty_lex_str= {(char *) "", 0};
 
   @note The order of the elements of this array must correspond to
   the order of elements in enum_binlog_stmt_unsafe.
+
+  Todo/fixme Bug#22860121 ER_BINLOG_UNSAFE_* FAMILY OF ERROR CODES IS UNUSED
+    suggests to turn ER_BINLOG_UNSAFE* to private consts/messages.
 */
 const int
 Query_tables_list::binlog_stmt_unsafe_errcode[BINLOG_STMT_UNSAFE_COUNT] =
@@ -1411,6 +1414,11 @@ static int lex_one_token(YYSTYPE *yylval, THD *thd)
       {
         lip->yySkip();
         lip->next_state= MY_LEX_START;
+        if (lip->yyPeek() == '>')
+        {
+          lip->yySkip();
+          return JSON_UNQUOTED_SEPARATOR_SYM;
+        }
         return JSON_SEPARATOR_SYM;
       }
 
@@ -3461,6 +3469,9 @@ void Query_tables_list::reset_query_tables_list(bool init)
   lock_tables_state= LTS_NOT_LOCKED;
   table_count= 0;
   using_match= FALSE;
+
+  /* Check the max size of the enum to control new enum values definitions. */
+  compile_time_assert(BINLOG_STMT_UNSAFE_COUNT <= 32);
 }
 
 
@@ -4035,6 +4046,9 @@ void LEX::first_lists_tables_same()
     TABLE_LIST *next;
     if (query_tables_last == &first_table->next_global)
       query_tables_last= first_table->prev_global;
+
+    if (query_tables_own_last == &first_table->next_global)
+      query_tables_own_last= first_table->prev_global;
 
     if ((next= *first_table->prev_global= first_table->next_global))
       next->prev_global= first_table->prev_global;
@@ -4727,8 +4741,8 @@ void st_lex_master_info::initialize()
   gtid_until_condition= UNTIL_SQL_BEFORE_GTIDS;
   view_id= NULL;
   until_after_gaps= false;
-  ssl= ssl_verify_server_cert= heartbeat_opt= repl_ignore_server_ids_opt= 
-    retry_count_opt= auto_position= LEX_MI_UNCHANGED;
+  ssl= ssl_verify_server_cert= heartbeat_opt= repl_ignore_server_ids_opt=
+    retry_count_opt= auto_position= port_opt= LEX_MI_UNCHANGED;
   ssl_key= ssl_cert= ssl_ca= ssl_capath= ssl_cipher= NULL;
   ssl_crl= ssl_crlpath= NULL;
   tls_version= NULL;

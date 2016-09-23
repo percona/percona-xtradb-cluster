@@ -2872,7 +2872,7 @@ This has to be done either within the same mini-transaction,
 or by invoking ibuf_reset_free_bits() before mtr_commit().
 
 @return pointer to inserted record if succeed, else NULL */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 rec_t*
 btr_cur_insert_if_possible(
 /*=======================*/
@@ -2916,7 +2916,7 @@ btr_cur_insert_if_possible(
 /*************************************************************//**
 For an insert, checks the locks and does the undo logging if desired.
 @return DB_SUCCESS, DB_WAIT_LOCK, DB_FAIL, or error number */
-UNIV_INLINE __attribute__((warn_unused_result, nonnull(2,3,5,6)))
+UNIV_INLINE MY_ATTRIBUTE((warn_unused_result, nonnull(2,3,5,6)))
 dberr_t
 btr_cur_ins_lock_and_undo(
 /*======================*/
@@ -3118,46 +3118,12 @@ btr_cur_optimistic_insert(
 		rec_size = rec_get_converted_size(index, entry, n_ext);
 	}
 
-	if (page_size.is_compressed()) {
-		/* Estimate the free space of an empty compressed page.
-		Subtract one byte for the encoded heap_no in the
-		modification log. */
-		ulint	free_space_zip = page_zip_empty_size(
-			cursor->index->n_fields, page_size.physical());
-		ulint	n_uniq = dict_index_get_n_unique_in_tree(index);
-
-		ut_ad(dict_table_is_comp(index->table));
-
-		if (free_space_zip == 0) {
-too_big:
-			if (big_rec_vec) {
-				dtuple_convert_back_big_rec(
-					index, entry, big_rec_vec);
-			}
-
-			return(DB_TOO_BIG_RECORD);
+	if (page_size.is_compressed() && page_zip_is_too_big(index, entry)) {
+		if (big_rec_vec != NULL) {
+			dtuple_convert_back_big_rec(index, entry, big_rec_vec);
 		}
 
-		/* Subtract one byte for the encoded heap_no in the
-		modification log. */
-		free_space_zip--;
-
-		/* There should be enough room for two node pointer
-		records on an empty non-leaf page.  This prevents
-		infinite page splits. */
-
-		if (entry->n_fields >= n_uniq
-		    && (REC_NODE_PTR_SIZE
-			+ rec_get_converted_size_comp_prefix(
-				index, entry->fields, n_uniq, NULL)
-			/* On a compressed page, there is
-			a two-byte entry in the dense
-			page directory for every record.
-			But there is no record header. */
-			- (REC_N_NEW_EXTRA_BYTES - 2)
-			> free_space_zip / 2)) {
-			goto too_big;
-		}
+		return(DB_TOO_BIG_RECORD);
 	}
 
 	LIMIT_OPTIMISTIC_INSERT_DEBUG(page_get_n_recs(page),
@@ -3515,7 +3481,7 @@ btr_cur_pessimistic_insert(
 /*************************************************************//**
 For an update, checks the locks and does the undo logging.
 @return DB_SUCCESS, DB_WAIT_LOCK, or error number */
-UNIV_INLINE __attribute__((warn_unused_result))
+UNIV_INLINE MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 btr_cur_upd_lock_and_undo(
 /*======================*/
@@ -5087,10 +5053,15 @@ btr_cur_compress_if_useful(
 
 	if (dict_index_is_spatial(cursor->index)) {
 		const page_t*   page = btr_cur_get_page(cursor);
+		const trx_t*	trx = NULL;
+
+		if (cursor->rtr_info->thr != NULL) {
+			trx = thr_get_trx(cursor->rtr_info->thr);
+		}
 
 		/* Check whether page lock prevents the compression */
-		if (!lock_test_prdt_page_lock(
-			page_get_space_id(page), page_get_page_no(page))) {
+		if (!lock_test_prdt_page_lock(trx, page_get_space_id(page),
+					      page_get_page_no(page))) {
 			return(false);
 		}
 	}
