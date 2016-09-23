@@ -131,7 +131,7 @@ set up a new user with proper `privileges <http://www.percona.com/doc/percona-xt
 .. code-block:: mysql
 
    mysql@percona1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 's3cret';
-   mysql@percona1> GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
+   mysql@percona1> GRANT PROCESS, RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
    mysql@percona1> FLUSH PRIVILEGES;
 
 .. note:: MySQL root account can also be used for performing SST,

@@ -121,7 +121,7 @@ set up a new user with proper `privileges
 .. code-block:: mysql
 
    mysql@pxc1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 's3cretPass';
-   mysql@pxc1> GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
+   mysql@pxc1> GRANT PROCESS, RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
    mysql@pxc1> FLUSH PRIVILEGES;
 
 .. note:: MySQL root account can also be used for performing SST,
