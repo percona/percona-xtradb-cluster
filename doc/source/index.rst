@@ -86,6 +86,7 @@ User's Manual
    manual/certification
    manual/threading_model
    manual/gcache_record-set_cache_difference
+   manual/performance_schema_instrumentation
 
 How-tos
 =======
