@@ -118,7 +118,7 @@ In order to perform successful :ref:`state_snapshot_transfer` using |XtraBackup|
 .. code-block:: mysql
 
   mysql@percona1> CREATE USER 'sstuser'@'localhost' IDENTIFIED BY 's3cret';
-  mysql@percona1> GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
+  mysql@percona1> GRANT PROCESS, RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sstuser'@'localhost';
   mysql@percona1> FLUSH PRIVILEGES;
 
 
