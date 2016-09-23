@@ -33,7 +33,7 @@ To upgrade the cluster, follow these steps for each node:
 
    .. code-block:: bash
 
-      sudo service mysql stop
+      $ sudo service mysql stop
 
 #. Remove existing packages and install version 5.7.
    For more information, see :ref:`install`.
@@ -45,18 +45,18 @@ To upgrade the cluster, follow these steps for each node:
 
      .. code-block:: bash
 
-        sudo yum remove 'Percona*'
-        sudo yum install Percona-XtraDB-Cluster-57
+        $ sudo yum remove 'Percona-XtraDB-Cluster-56*'
+        $ sudo yum install Percona-XtraDB-Cluster-57
 
    * On Debian or Ubuntu:
 
      .. code-block:: bash
 
-        sudo apt-get remove percona-*
-        sudo apt-get install percona-xtradb-cluster-57
+        $ sudo apt-get remove percona-xtradb-cluster-56*
+        $ sudo apt-get install percona-xtradb-cluster-57
 
 #. Back up :file:`grastate.dat`, so that you can restore it
-   if it is corrupted or zeroed out due to network issue, for example.
+   if it is corrupted or zeroed out due to network issue.
 
 #. Start the node outside the cluster
    by setting the :variable:`wsrep_provider` variable to ``none``.
@@ -75,11 +75,30 @@ To upgrade the cluster, follow these steps for each node:
       Make sure to rename it back
       before joining the upgraded node back to the cluster.
 
-#. Start the node as normal:
+#. Start the node with :variable:`pxc_strict_mode` variable
+   set to ``PERMISSIVE``.
+   By default, :ref:`pxc-strict-mode` is set to ``ENFORCING``,
+   which will deny any unsupported operations and may halt the server
+   upon encountering a failed validation.
+   In ``PERMISSIVE`` mode it will log warnings and continue running as normal.
 
    .. code-block:: bash
 
-      sudo service mysql start
+      $ sudo mysqld --pxc-strict-mode=PERMISSIVE
+
+#. Check the log for any experimental or unsupported features
+   that might have been encountered.
+
+#. If you fixed all incompatibilities
+   releaved by :ref:`pxc-strict-mode` validations,
+   you can set the :variable:`pxc_strict_mode` variable to ``ENFORCING``::
+
+      mysql> SET pxc_strict_mode=ENFORCING;
+
+   .. note:: It is highly recommended
+      to run with the default ``ENFORCING`` mode
+      and ensure that the workload passes all validations
+      concerning experimental and unsupported features.
 
 #. Repeat this procedure for the next node in the cluster
    until you upgrade all nodes.

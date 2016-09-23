@@ -24,13 +24,18 @@ based on the following:
 
 * `Galera Replicator 3.17 <https://github.com/percona/galera/tree/rel-3.17>`_
 
+For information about the changes
+and new features introduced in Percona Server 5.7,
+see `Changed in Percona Server 5.7 <https://www.percona.com/doc/percona-server/5.7/changed_in_57.html>`_.
+
 New Features
 ============
 
 This is a list of the most important features introduced in |PXC| 5.7
 compared to version 5.6
 
-* ``pxc-strict-mode`` saves your workload from experimental features.
+* :ref:`pxc-strict-mode` saves your workload
+  from experimental and unsupported features.
 
 * Support for monitoring Galera Library instruments
   and other wsrep instruments as part of Performance Schema.
