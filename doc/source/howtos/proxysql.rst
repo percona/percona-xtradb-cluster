@@ -4,141 +4,254 @@
 Load balancing with ProxySQL
 ============================
 
-`ProxySQL <http://www.proxysql.com>`_ is a high performance SQL proxy.
-ProxySQL runs as a daemon watched by a monitor process. The monitoring process
-monitors the daemon and restarts it when it has crashed, in order to minimize
-downtime.
+`ProxySQL <http://www.proxysql.com>`_ is a high-performance SQL proxy.
+ProxySQL runs as a daemon watched by a monitoring process.
+The process monitors the daemon and restarts it in case of a crash
+to minimize downtime.
 
-The daemon accepts incoming traffic from |MySQL| clients and forwards it to
-backend |MySQL| servers.
+The daemon accepts incoming traffic from |MySQL| clients
+and forwards it to backend |MySQL| servers.
 
-The proxy is designed to run for as long as possible without needing to be
-restarted. Most configurations can be done at runtime, through a configuration
-system that responds to SQL-like queries. Runtime parameters, server grouping
-and traffic-related settings can all be changed at runtime.
+The proxy is designed to run continuously without needing to be restarted.
+Most configuration can be done at runtime
+using queries similar to SQL statements.
+These include runtime parameters, server grouping,
+and traffic-related settings.
 
-ProxySQL also support |Percona XtraDB Cluster| node status check using
-scheduler.
+ProxySQL supports |PXC| node status check using scheduler.
 
-.. note::
+.. note:: For more information about ProxySQL, see `ProxySQL documentation
+   <https://github.com/sysown/proxysql/tree/master/doc>`_.
 
-  More details on how ProxySQL works can be found in official ProxySQL
-  `documentation <https://github.com/sysown/proxysql/tree/master/doc>`_.
+Installing ProxySQL
+===================
 
-This tutorial describes how to install and configure ProxySQL with three |PXC|
-nodes, using the packages from Percona repositories.
+ProxySQL is available from the Percona software repositories.
+If that is what you used to :ref:`install PXC <install>`
+or any other Percona software, run the corresponding command:
 
-* Node 1 - 1st PXC node
-
-  * Host name: ``pxc1``
-  * IP address: ``192.168.70.61``
-
-* Node 2 - 2nd PXC node
-
-  * Host name: ``pxc2``
-  * IP address: ``192.168.70.62``
-
-* Node 3 - 3rd PXC node
-
-  * Host name: ``pxc3``
-  * IP address: ``192.168.70.63``
-
-* Node 4 - ProxySQL/Application server
-
-  * Host name: ``proxysql``
-  * IP address: ``192.168.70.64``
-
-Installation
-============
-
-|Percona XtraDB Cluster| 5.7 can be installed and set up by following the
-instructions in the :ref:`ubuntu_howto` or :ref:`centos_howto` manuals.
-
-This will set up first three |PXC| nodes. Node 4 will have ProxySQL installed.
-
-ProxySQL is available from the |Percona| repositories. You can install it by
-running:
+* On Debian or Ubuntu:
 
 .. code-block:: bash
 
-  root@proxysql:~# apt-get install proxysql
+   $ sudo apt-get install proxysql
 
-on Debian/Ubuntu distributions, or:
-
-.. code-block:: bash
-
-  [root@proxysql ~]# yum install proxysql
-
-on CentOS/RHEL distributions.
-
-Configuration
-=============
-
-ProxySQL can be configured either trough the :file:`/etc/proxysql.cnf` file or
-by the admin interface.
-
-The recommended way to configure ProxySQL is by using the admin interface. This
-way you can change the configuration online (without having to restart the
-proxy).
-
-In order to connect to the admin interface, you need the mysql client. This
-means that you'll need to connect to admin interface from nodes that already
-have the mysql client installed (node1, node2, node3) or install the client on
-node4. For this tutorial we'll install the client on node4:
+* On Red Hat Enterprise Linux or CentOS:
 
 .. code-block:: bash
 
-  root@proxysql:~# apt-get install percona-xtradb-cluster-client-5.7
+   $ sudo yum install proxysql
 
-on Debian/Ubuntu or:
+Alternatively, you can download packages from
+https://www.percona.com/downloads/proxysql/.
+
+To start ProxySQL, run the following command:
 
 .. code-block:: bash
 
-  [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-57
+   $ sudo service proxysql start
 
-on CentOS/RHEL distributions.
+.. _default-credentials:
 
-To connect to the admin interface you'll have to use the credentials and
-(interface, port) pair specified in the `global variables
+.. warning:: Do not run ProxySQL with default credentials in production.
+
+   Before starting the ``proxysql`` service,
+   you can change the defaults in the :file:`/etc/proxysql.cnf` file
+   by changing the ``admin_credentials`` variable.
+   For more information, see `Global Variables
+   <https://github.com/sysown/proxysql/blob/master/doc/global_variables.md>`_.
+
+Automatic Configuration
+=======================
+
+The ``proxysql`` package from Percona includes the ``proxysql-admin`` tool
+for configuring |PXC| nodes with ProxySQL::
+
+ Usage: proxysql-admin [ options ]
+
+ Options:
+  --proxysql-user=user_name        User to use when connecting to the ProxySQL service
+  --proxysql-password[=password]   Password to use when connecting to the ProxySQL service
+  --proxysql-port=port_num         Port to use when connecting to the ProxySQL service
+  --proxysql-host=host_name        Hostname to use when connecting to the ProxySQL service
+  --cluster-user=user_name         User to use when connecting to the Percona XTraDB Cluster node
+  --cluster-password[=password]    Password to use when connecting to the Percona XTraDB Cluster node
+  --cluster-port=port_num          Port to use when connecting to the Percona XTraDB Cluster node
+  --cluster-host=host_name         Hostname to use when connecting to the Percona XTraDB Cluster node
+  --enable                         Auto-configure Percona XtraDB Cluster nodes into ProxySQL
+  --disable                        Remove Percona XtraDB Cluster configurations from ProxySQL
+  --galera-check-interval          Interval for monitoring proxysql_galera_checker script (in milliseconds)
+  --mode                           ProxySQL read/write configuration mode, currently it only support 'loadbal' mode
+
+.. note:: Before using the ``proxysql-admin`` tool,
+   ensure that ProxySQL and nodes you want to add are running.
+
+Enabling ProxySQL
+-----------------
+
+Use the ``--enable`` option to do the following:
+
+* Add |PXC| node into the ProxySQL database
+
+* Add the following monitoring scripts into the ProxySQL ``scheduler`` table,
+  if they are not available:
+
+  * ``proxysql_node_monitor`` checks cluster node membership
+    and re-configures ProxySQL if the membership changes
+  * ``proxysql_galera_checker`` checks for desynced nodes
+    and temporarily deactivates them
+
+* Create two new |PXC| users with the ``USAGE`` privilege on the node
+  and add them to ProxySQL configuration, if they are not configured.
+  One user is for monitoring cluster nodes,
+  and the other one is for managing connections.
+
+The following example shows how to add a |PXC| node
+with IP address 10.101.6.1 to ProxySQL. 
+
+.. code-block:: bash
+
+   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin \
+        --proxysql-port=6032 --proxysql-host=127.0.0.1 \
+        --cluster-user=root --cluster-password=root \
+        --cluster-port=3306 --cluster-host=10.101.6.1 \
+        --enable
+
+   Configuring ProxySQL monitoring user..
+   Enter ProxySQL monitoring username: monitor
+   Enter ProxySQL monitoring password: 
+   
+   User monitor@'%' has been added with USAGE privilege
+   
+   Adding the Percona XtraDB Cluster server nodes to ProxySQL
+   
+   Configuring Percona XtraDB Cluster user to connect through ProxySQL
+   Enter Percona XtraDB Cluster user name: proxysql_user
+   Enter Percona XtraDB Cluster user password: 
+   
+   User proxysql_user@'%' has been added with USAGE privilege, please make sure to grant appropriate privileges
+   
+   Percona XtraDB Cluster ProxySQL monitoring daemon started
+   ProxySQL configuration completed!
+
+.. note:: The previous example uses default ProxySQL credentials,
+   host name (in this case localhost) and port number.
+   It is recommended to
+   :ref:`change the default credentials <default-credentials>`
+   before running ProxySQL in production.
+
+.. note:: You must provide superuser credentials
+   for the |PXC| node you are adding.
+
+Disabling ProxySQL
+------------------
+
+Use the ``--disable`` option to do the following:
+
+* Remove |PXC| node from the ProxySQL database
+
+* Stop the ProxySQL monitoring daemon for this node
+
+The following example shows how to disable ProxySQL
+and remove the |PXC| node added in the previous example:
+
+.. code-block:: bash
+
+   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin \
+        --proxysql-port=6032 --proxysql-host=127.0.0.1 \
+        --cluster-user=root --cluster-password=root \
+        --cluster-port=3306 --cluster-host=10.101.6.1 \
+        --disable
+
+   ProxySQL configuration removed! 
+
+Checking ProxySQL Status
+------------------------
+
+Use the ``--status`` option to check the ProxySQL status for a node.
+The following example shows how to check the status of the node
+that was disabled in the previous example:
+
+.. code-block:: bash
+
+   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin \
+        --proxysql-port=6032 --proxysql-host=127.0.0.1 \
+        --cluster-user=root --cluster-password=root \
+        --cluster-port=3306 --cluster-host=10.101.6.1 \
+        --status
+
+   Percona XtraDB Cluster ProxySQL monitoring daemon is not running
+
+Manual Configuration
+====================
+
+This tutorial describes how to configure ProxySQL with three |PXC| nodes.
+
++--------+-----------+---------------+
+| Node   | Host Name | IP address    |
++========+===========+===============+
+| Node 1 | pxc1      | 192.168.70.61 |
++--------+-----------+---------------+
+| Node 2 | pxc2      | 192.168.70.62 |
++--------+-----------+---------------+
+| Node 3 | pxc3      | 192.168.70.63 |
++--------+-----------+---------------+
+| Node 4 | proxysql  | 192.168.70.64 |
++--------+-----------+---------------+
+
+ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file
+or through the admin interface.
+The recommended way to configure ProxySQL is using the admin interface.
+This way you can change the configuration dynamically
+(without having to restart the proxy).
+
+To connect to the ProxySQL admin interface, you need a ``mysql`` client.
+You can either connect to the admin interface from |PXC| nodes
+that already have the ``mysql`` client installed (Node 1, Node 2, Node 3)
+or install the client on Node 4 and connect locally.
+For this tutorial, install |PXC| on Node 4:
+
+* On Debian or Ubuntu:
+
+  .. code-block:: bash
+
+     root@proxysql:~# apt-get install percona-xtradb-cluster-client-5.7
+
+* On Red Hat Enterprise Linux or CentOS:
+
+  .. code-block:: bash
+
+     [root@proxysql ~]# yum install Percona-XtraDB-Cluster-client-57
+
+To connect to the admin interface,
+use the credentials, host name and port specified in the `global variables
 <https://github.com/sysown/proxysql/blob/master/doc/global_variables.md>`_.
 
-You can now start ProxySQL by running:
+.. warning:: Do not use default credentials in production!
+
+The following example shows how to connect to the ProxySQL admin interface
+with default credentials:
 
 .. code-block:: bash
 
-  root@proxysql:~# sudo service proxysql start
+   root@proxysql:~# mysql -uadmin -padmin -h127.0.0.1 -P6032
 
-.. warning::
+   Welcome to the MySQL monitor.  Commands end with ; or \g.
+   Your MySQL connection id is 2
+   Server version: 5.1.30 (ProxySQL Admin Module)
 
-  It's highly recommended not to run ProxySQL with the default credentials in
-  production. Before starting the proxysql service you can change the defaults
-  in the :file:`/etc/proxysql.cnf` file by changing the ``admin_credentials``
-  variable.
+   Copyright (c) 2009-2016 Percona LLC and/or its affiliates
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
-This example shows how to connect with default ``admin/admin`` credentials:
+   Oracle is a registered trademark of Oracle Corporation and/or its
+   affiliates. Other names may be trademarks of their respective
+   owners.
 
-.. code-block:: bash
+   Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-  root@proxysql:~# mysql -uadmin -padmin -h127.0.0.1 -P6032
+   mysql@proxysql>
 
-After successfully connecting you'll see the following output:
-
-.. code-block:: mysql
-
-  Welcome to the MySQL monitor.  Commands end with ; or \g.
-  Your MySQL connection id is 2
-  Server version: 5.1.30 (ProxySQL Admin Module)
-
-  Copyright (c) 2009-2016 Percona LLC and/or its affiliates
-  Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
-
-  Oracle is a registered trademark of Oracle Corporation and/or its
-  affiliates. Other names may be trademarks of their respective
-  owners.
-
-  Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
-
-You can then check to see if all databases tables are available:
+To see the ProxySQL databases and tables use the following commands:
 
 .. code-block:: mysql
 
@@ -172,23 +285,25 @@ You can then check to see if all databases tables are available:
   +--------------------------------------+
   12 rows in set (0.00 sec)
 
-For more information on admin databases and tables please check the `ProxySQL
-Admin Tables Documentation Page
+For more information about admin databases and tables,
+see `Admin Tables
 <https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md>`_
 
 .. note::
 
-  ProxySQL has 3 areas where the configuration reside:
+  ProxySQL has 3 areas where the configuration can reside:
 
-  * Memory (your current working place)
+  * MEMORY (your current working place)
 
-  * Runtime (the production settings)
+  * RUNTIME (the production settings)
 
-  * Disk (durable configuration, saved inside an SQLITE db)
+  * DISK (durable configuration, saved inside an SQLITE db)
 
-  When you change a parameter, you change it in MEMORY area. That is done by
-  design to allow you to test the changes before pushing to production
-  (RUNTIME), or save them to disk.
+  When you change a parameter, you change it in MEMORY area.
+  That is done by design to allow you to test the changes
+  before pushing to production (RUNTIME), or save them to disk.
+
+--- NOT UPDATED BELOW ---
 
 Adding the cluster nodes to ProxySQL
 ------------------------------------
