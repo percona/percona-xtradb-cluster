@@ -83,9 +83,3 @@ it won't require updating the configuration file.
 This can be useful when the cluster has been previously set up
 and for some reason all nodes went down
 and the cluster needs to be restored.
-
-Other Reading
-=============
-
-* `How to start a Percona XtraDB Cluster <http://www.mysqlperformanceblog.com/2013/01/29/how-to-start-a-percona-xtradb-cluster/>`_
-
