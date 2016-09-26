@@ -137,6 +137,8 @@ void wsrep_get_SE_checkpoint(XID& xid)
 
 void wsrep_get_SE_checkpoint(wsrep_uuid_t& uuid, wsrep_seqno_t& seqno)
 {
+  if (!WSREP_ON) return;
+
   uuid= WSREP_UUID_UNDEFINED;
   seqno= WSREP_SEQNO_UNDEFINED;
 

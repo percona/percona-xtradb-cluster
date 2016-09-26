@@ -9265,15 +9265,18 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
   */
   wsrep_uuid_t uuid;
   wsrep_seqno_t seqno;
-  wsrep_get_SE_checkpoint(uuid, seqno);
-  char uuid_str[40];
-  wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
-  WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
-             (long long)seqno);
-  const wsrep_seqno_t last_xid_seqno= seqno;
+  if (WSREP_ON)
+  {
+    wsrep_get_SE_checkpoint(uuid, seqno);
+    char uuid_str[40];
+    wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
+    WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
+               (long long)seqno);
+  }
+  const wsrep_seqno_t last_xid_seqno= (WSREP_ON) ? seqno :
+                                                   WSREP_SEQNO_UNDEFINED;
   wsrep_seqno_t cur_xid_seqno= WSREP_SEQNO_UNDEFINED;
 #endif /* WITH_WSREP */
-
 
   if (! fdle->is_valid() ||
       my_hash_init(&xids, &my_charset_bin, TC_LOG_PAGE_SIZE/3, 0,
