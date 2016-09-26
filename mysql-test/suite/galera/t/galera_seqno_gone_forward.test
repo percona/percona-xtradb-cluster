@@ -1,0 +1,119 @@
+#
+# This test is artificially creating a situation where
+# the state of the donor node goes too far and diverged from
+# the state of another node, which joining the cluster, and
+# therefore the joining node unable to initiate the IST state
+# transfer.
+#
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_1
+
+#
+# We should count the number of 'Failed to prepare for incremental
+# state transfer because the donor seqno had gone forward during IST'
+# error messages in the log file before and after testing. To do this
+# we need to save original log file before testing:
+#
+--let TEST_LOG=$MYSQLTEST_VARDIR/log/mysqld.2.err
+--perl
+   use strict;
+   my $test_log=$ENV{'TEST_LOG'} or die "TEST_LOG not set";
+   my $test_log_copy=$test_log . '.copy';
+   if (-e $test_log_copy) {
+      unlink $test_log_copy;
+   }
+EOF
+--copy_file $TEST_LOG $TEST_LOG.copy
+
+CREATE TABLE t1 (f1 INTEGER);
+INSERT INTO t1 VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
+
+--connection node_2
+
+# Initiate normal shutdown on the node 2:
+
+--echo Shutting down server ...
+--source include/shutdown_mysqld.inc
+
+# Waiting until shutdown on node 2 has been completed:
+
+--connection node_1
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Do some changes on node 1:
+
+CREATE TABLE t2 (f1 INTEGER);
+
+# We need to do a minimum of 128 * <the number of nodes> changes,
+# to perform a good check of the safety_gap heuristic:
+
+--disable_query_log
+--let $count = 384
+while ($count)
+{
+   # Print the last three oparatola to a log file:
+   if ($count == 3) {
+      --enable_query_log
+   }
+   --eval INSERT INTO t2 VALUES ($count)
+   --dec $count
+}
+
+# Simulate shift of the donor seqno:
+
+--let $galera_sync_point = simulate_seqno_shift
+--source include/galera_set_sync_point.inc
+
+# Restarting the second node:
+
+--connection node_2
+
+--echo Starting server ...
+--source include/start_mysqld.inc
+
+--connection node_1
+
+# Waiting until start of node 2:
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Sanity check (node 2 is running now and can perform SQL operators):
+
+--connection node_2
+
+SELECT COUNT(*) = 10 FROM t1;
+SELECT COUNT(*) = 384 FROM t2;
+
+--connection node_1
+
+DROP TABLE t1;
+DROP TABLE t2;
+
+#
+# We should count the number of 'Failed to prepare for incremental
+# state transfer because the donor seqno had gone forward during IST'
+# error messages in the log file during test phase - to print the
+# error message if quantity of such warnings in log file increased
+# at the end of the test:
+#
+--perl
+   use strict;
+   my $test_log=$ENV{'TEST_LOG'} or die "TEST_LOG not set";
+   my $test_log_copy=$test_log . '.copy';
+   open(FILE, $test_log_copy) or die("Unable to open $test_log_copy: $!\n");
+   my $initial=grep(/Failed to prepare for incremental state transfer because the donor seqno had gone forward during IST/gi,<FILE>);
+   close(FILE);
+   open(FILE, $test_log) or die("Unable to open $test_log: $!\n");
+   my $count_warnings=grep(/Failed to prepare for incremental state transfer because the donor seqno had gone forward during IST/gi,<FILE>);
+   close(FILE);
+   if ($count_warnings != $initial) {
+      my $diff=$count_warnings-$initial;
+      print "Failed to prepare for incremental state transfer $diff times.\n";
+   }
+EOF
+--remove_file $TEST_LOG.copy
