@@ -29,7 +29,7 @@ To upgrade the cluster, follow these steps for each node:
 
 1. Make sure that all nodes are synchronized.
 
-#. Stop the ``mysql`` process:
+#. Stop the ``mysql`` service:
 
    .. code-block:: bash
 
@@ -55,6 +55,14 @@ To upgrade the cluster, follow these steps for each node:
         $ sudo apt-get remove percona-xtradb-cluster-56*
         $ sudo apt-get install percona-xtradb-cluster-57
 
+   .. note:: In case of Debian or Ubuntu,
+      the ``mysql`` service starts automatically after install.
+      Stop the service:
+
+      .. code-block:: bash
+
+         $ sudo service mysql stop
+
 #. Back up :file:`grastate.dat`, so that you can restore it
    if it is corrupted or zeroed out due to network issue.
 
@@ -68,7 +76,7 @@ To upgrade the cluster, follow these steps for each node:
 
 #. Open another session and run ``mysql_upgrade``.
 
-#. When the upgrade is done, stop the ``mysqld`` process.
+#. When the upgrade is done, stop ``mysqld``.
 
    .. note:: On CentOS, the :file:`my.cnf` configuration file
       is renamed to :file:`my.cnf.rpmsave`.

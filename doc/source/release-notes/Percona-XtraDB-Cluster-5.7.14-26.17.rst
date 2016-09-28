@@ -20,7 +20,7 @@ or from our :ref:`software repositories <install>`.
 |PXC| 5.7.14-26.17 is the first GA release in the 5.7 series,
 based on the following:
 
-* `Percona Server 5.7.14 <http://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.14.html>`_
+* `Percona Server 5.7.14-8 <http://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.14-8.html>`_
 
 * `Galera Replicator 3.17 <https://github.com/percona/galera/tree/rel-3.17>`_
 
