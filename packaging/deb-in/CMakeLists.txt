@@ -134,7 +134,7 @@ ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
   SET (DEB_SERVICE_SERVER_EXECPOST
-    "ExecStartPre=/usr/share/mysql/mysql-systemd-start post")
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "")
   SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSEIF(DEB_CODENAME STREQUAL "precise")
@@ -189,7 +189,7 @@ ELSEIF(DEB_CODENAME STREQUAL "wily")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
   SET (DEB_SERVICE_SERVER_EXECPOST
-    "ExecStartPre=/usr/share/mysql/mysql-systemd-start post")
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
   SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSEIF(DEB_CODENAME STREQUAL "xenial")
@@ -210,7 +210,7 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
   SET (DEB_SERVICE_SERVER_EXECPOST
-    "ExecStartPre=/usr/share/mysql/mysql-systemd-start post")
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
   SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSE()
