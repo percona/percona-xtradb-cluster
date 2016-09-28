@@ -70,26 +70,34 @@ for configuring |PXC| nodes with ProxySQL::
  Usage: proxysql-admin [ options ]
 
  Options:
-  --proxysql-user=user_name        User to use when connecting to the ProxySQL service
-  --proxysql-password[=password]   Password to use when connecting to the ProxySQL service
-  --proxysql-port=port_num         Port to use when connecting to the ProxySQL service
-  --proxysql-host=host_name        Hostname to use when connecting to the ProxySQL service
-  --cluster-user=user_name         User to use when connecting to the Percona XTraDB Cluster node
-  --cluster-password[=password]    Password to use when connecting to the Percona XTraDB Cluster node
-  --cluster-port=port_num          Port to use when connecting to the Percona XTraDB Cluster node
-  --cluster-host=host_name         Hostname to use when connecting to the Percona XTraDB Cluster node
-  --enable                         Auto-configure Percona XtraDB Cluster nodes into ProxySQL
-  --disable                        Remove Percona XtraDB Cluster configurations from ProxySQL
-  --galera-check-interval          Interval for monitoring proxysql_galera_checker script (in milliseconds)
-  --mode                           ProxySQL read/write configuration mode, currently it only support 'loadbal' mode
+  --config-file                   Override login credentials from command line and read login credentials from config file.
+  --proxysql-user=user_name       User to use when connecting to the ProxySQL service
+  --proxysql-password[=password]  Password to use when connecting to the ProxySQL service
+  --proxysql-port=port_num        Port to use when connecting to the ProxySQL service
+  --proxysql-host=host_name       Hostname to use when connecting to the ProxySQL service
+  --cluster-user=user_name        User to use when connecting to the Percona XtraDB Cluster node
+  --cluster-password[=password]   Password to use when connecting to the Percona XtraDB Cluster node
+  --cluster-port=port_num         Port to use when connecting to the Percona XtraDB Cluster node
+  --cluster-host=host_name        Hostname to use when connecting to the Percona XtraDB Cluster node
+  --monitor-user=user_name        User to use for monitoring Percona XtraDB Cluster nodes through ProxySQL
+  --monitor-password[=password]   Password to for monitoring Percona XtraDB Cluster nodes through ProxySQL
+  --pxc-app-user=user_name        Application user to use when connecting to the Percona XtraDB Cluster node
+  --pxc-app-password[=password]   Application password to use when connecting to the Percona XtraDB Cluster node
+  --enable                        Auto-configure Percona XtraDB Cluster nodes into ProxySQL
+  --disable                       Remove Percona XtraDB Cluster configurations from ProxySQL
+  --galera-check-interval         Interval for monitoring proxysql_galera_checker script(in milliseconds)
+  --mode                          ProxySQL read/write configuration mode, currently it only support 'loadbal' mode
+  --adduser                       Add Percona XtraDB Cluster application user to ProxySQL database
 
-.. note:: Before using the ``proxysql-admin`` tool,
-   ensure that ProxySQL and nodes you want to add are running.
+  .. note:: Before using the ``proxysql-admin`` tool,
+   ensure that ProxySQL and |PXC| nodes you want to add are running.
 
 Enabling ProxySQL
 -----------------
 
-Use the ``--enable`` option to do the following:
+Use the ``--enable`` option to automatically configure a |PXC| node
+into ProxySQL.
+The ``proxysql-admin`` tool will do the following:
 
 * Add |PXC| node into the ProxySQL database
 
@@ -102,12 +110,12 @@ Use the ``--enable`` option to do the following:
     and temporarily deactivates them
 
 * Create two new |PXC| users with the ``USAGE`` privilege on the node
-  and add them to ProxySQL configuration, if they are not configured.
+  and add them to ProxySQL configuration, if they are not already configured.
   One user is for monitoring cluster nodes,
-  and the other one is for managing connections.
+  and the other one is for communicating with the cluster.
 
 The following example shows how to add a |PXC| node
-with IP address 10.101.6.1 to ProxySQL. 
+with IP address 10.101.6.1 to ProxySQL:
 
 .. code-block:: bash
 
@@ -146,7 +154,9 @@ with IP address 10.101.6.1 to ProxySQL.
 Disabling ProxySQL
 ------------------
 
-Use the ``--disable`` option to do the following:
+Use the ``--disable`` option to remove a |PXC| node's configuration
+from ProxySQL.
+The ``proxysql-admin`` tool will do the following:
 
 * Remove |PXC| node from the ProxySQL database
 
@@ -165,22 +175,43 @@ and remove the |PXC| node added in the previous example:
 
    ProxySQL configuration removed! 
 
-Checking ProxySQL Status
-------------------------
+Additional Options
+------------------
 
-Use the ``--status`` option to check the ProxySQL status for a node.
-The following example shows how to check the status of the node
-that was disabled in the previous example:
+The following extra options can be used:
+
+* ``--adduser``
+
+  Add |PXC| application user to ProxySQL database.
+
+* ``--galera-check-interval``
+
+  Set the interval for monitoring ``proxysql_galera_checker`` script
+  (in milliseconds).
+
+* ``--mode``
+
+  Set the read/write mode for |PXC| nodes in ProxySQL database,
+  based on the hostgroup.
+  For now, the only supported mode is ``loadbal``
+  which will be the default for a load balanced set
+  of evenly weighted read/write nodes.
 
 .. code-block:: bash
 
-   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin \
+   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin  \
         --proxysql-port=6032 --proxysql-host=127.0.0.1 \
         --cluster-user=root --cluster-password=root \
-        --cluster-port=3306 --cluster-host=10.101.6.1 \
-        --status
+        --cluster-port=26000 --cluster-host=10.101.6.1 \
+        --galera-check-interval=3000 --adduser
 
-   Percona XtraDB Cluster ProxySQL monitoring daemon is not running
+   Adding Percona XtraDB Cluster application user to ProxySQL database
+   Enter Percona XtraDB Cluster application user name: app_read
+   Enter Percona XtraDB Cluster application user password: 
+
+   Application app_read does not exists in Percona XtraDB Cluster. Would you like to proceed [y/n] ? y
+   
+   Added Percona XtraDB Cluster application user to ProxySQL database!
 
 Manual Configuration
 ====================
@@ -201,8 +232,8 @@ This tutorial describes how to configure ProxySQL with three |PXC| nodes.
 
 ProxySQL can be configured either using the :file:`/etc/proxysql.cnf` file
 or through the admin interface.
-The recommended way to configure ProxySQL is using the admin interface.
-This way you can change the configuration dynamically
+Using the admin interface is preferable,
+because it allows you to change the configuration dynamically
 (without having to restart the proxy).
 
 To connect to the ProxySQL admin interface, you need a ``mysql`` client.
@@ -297,23 +328,27 @@ see `Admin Tables
 
   * RUNTIME (the production settings)
 
-  * DISK (durable configuration, saved inside an SQLITE db)
+  * DISK (durable configuration, saved inside an SQLITE database)
 
   When you change a parameter, you change it in MEMORY area.
   That is done by design to allow you to test the changes
   before pushing to production (RUNTIME), or save them to disk.
 
---- NOT UPDATED BELOW ---
+Adding cluster nodes to ProxySQL
+--------------------------------
 
-Adding the cluster nodes to ProxySQL
-------------------------------------
+To configure the backend |PXC| nodes in ProxySQL,
+insert corresponding records into the ``mysql_servers`` table.
 
-Configuring the backends in ProxySQL is as easy as inserting records into
-``mysql_servers`` table representing those backends, and specifying the correct
-``hostgroup_id`` based on their roles:
+.. note:: ProxySQL uses the concept of *hostgroups* to group cluster nodes.
+   This enables you to balance the load in a cluster by
+   routing different types of traffic to different groups.
+   There are many ways you can configure hostgroups
+   (for example master and slaves, read and write load, etc.)
+   and a every node can be a member of multiple hostgroups.
 
-This example adds three |PXC| nodes to write hostgroups, this means that all
-three servers will be receiving both write and read traffic:
+This example adds three |PXC| nodes to the default hostgroup (``0``),
+which receives both write and read traffic:
 
 .. code-block:: mysql
 
@@ -321,7 +356,7 @@ three servers will be receiving both write and read traffic:
    mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.62',3306);
    mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.63',3306);
 
-To check if servers were added correctly you can run:
+To see the nodes:
 
 .. code-block:: mysql
 
@@ -336,21 +371,21 @@ To check if servers were added correctly you can run:
   +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+
   3 rows in set (0.00 sec)
 
-Monitoring
-----------
+Creating ProxySQL Monitoring User
+---------------------------------
 
-ProxySQL constantly monitors the servers it has configured. To enable this you
-will need to create and configure a user.
+To enable monitoring of |PXC| nodes in ProxySQL,
+create a user with ``USAGE`` privilege on any node in the cluster
+and configure the user in ProxySQL.
 
-To create the user on the cluster add the user on any of the nodes, following
-example adds the user on node2:
+The following example shows how to add a monitoring user on Node 2:
 
 .. code-block:: mysql
 
   mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
   mysql@pxc2> GRANT USAGE ON *.* TO 'proxysql'@'%';
 
-You need to configure the same user on the ProxySQL node:
+The following example shows how to configure this user on the ProxySQL node:
 
 .. code-block:: mysql
 
@@ -359,21 +394,18 @@ You need to configure the same user on the ProxySQL node:
   mysql@proxysql> UPDATE global_variables SET variable_value='ProxySQLPa55'
                 WHERE variable_name='mysql-monitor_password';
 
-At this stage the user is not activated, it's only configured. To load such
-configuration at runtime you need to issue a ``LOAD`` command. Also these
-configuration changes won't persist after ProxySQL is shutdown because they
-re all in-memory. To persist these configuration changes you need to issue the
-correct ``SAVE`` command to save these changes onto on-disk database
-configuration.
-
-Load the user into runtime and save the changes to disk:
+To load this configuration at runtime, issue a ``LOAD`` command.
+To save these changes to disk
+(ensuring that they persist after ProxySQL shuts down),
+issue a ``SAVE`` command.
 
 .. code-block:: mysql
 
   mysql@proxysql> LOAD MYSQL VARIABLES TO RUNTIME;
   mysql@proxysql> SAVE MYSQL VARIABLES TO DISK;
 
-You can now check if monitoring is working correctly:
+To ensure that monitoring is enabled,
+check the monitoring logs:
 
 .. code-block:: mysql
 
@@ -405,103 +437,24 @@ You can now check if monitoring is working correctly:
   +---------------+------+------------------+-------------------+------------+
   6 rows in set (0.00 sec)
 
-With these simple checks you can see that ProxySQL is able to connect and ping
-the servers you added.
+The previous examples show that ProxySQL is able to connect
+and ping the nodes you added.
 
-Now that servers are alive and correctly monitored you can enable them:
+To enable monitoring of these nodes, load them at runtime:
 
 .. code-block:: mysql
 
   mysql@proxysql> LOAD MYSQL SERVERS TO RUNTIME;
 
-Monitoring the PXC nodes
-~~~~~~~~~~~~~~~~~~~~~~~~
+.. _proxysql-client-user:
 
-ProxySQL cannot detect a node which is not in a ``Synced`` state just using the
-default ProxySQL monitoring. To check the |PXC| node status, ProxySQL has
-developed an external :file:`proxysql_galera_checker` script, which
-continuously monitors the |PXC| Node State Changes. You can find this script in
-:file:`/usr/bin/proxysql_galera_checker`.
+Creating ProxySQL Client User
+-----------------------------
 
-This script needs to be loaded with ProxySQL `Scheduler
-<https://github.com/sysown/proxysql/blob/master/doc/scheduler.md>`_
+ProxySQL must have users that can access backend nodes
+to manage connections.
 
-Following command loads the script into Scheduler:
-
-.. code-block:: mysql
-
-  mysql@proxysql> INSERT INTO scheduler(id,interval_ms,filename,arg1,arg2,arg3,arg4)
-    VALUES
-    (1,'10000','/usr/bin/proxysql_galera_checker','127.0.0.1','6032','0',
-    '/var/lib/proxysql/proxysql_galera_checker.log');
-
-At this stage the job is not loaded at the runtime. You'll need to run ``LOAD
-SCHEDULER TO RUNTIME`` command:
-
-.. code-block:: mysql
-
-  mysql@proxysql> LOAD SCHEDULER TO RUNTIME;
-
-You can see in the :table:`runtime_scheduler` table if the script has been
-loaded correctly:
-
-.. code-block:: mysql
-
-  mysql@proxysql> SELECT * FROM runtime_scheduler\G
-  *************************** 1. row ***************************
-           id: 1
-  interval_ms: 10000
-     filename: /usr/bin/proxysql/proxysql_galera_checker
-         arg1: 127.0.0.1
-         arg2: 6032
-         arg3: 0
-         arg4: /var/lib/proxysql/proxysql_galera_checker.log
-         arg5: NULL
-   1 row in set (0.00 sec)
-
-To check the server status you should run:
-
-.. code-block:: mysql
-
-  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
-  +--------------+---------------+------+--------+
-  | hostgroup_id | hostname      | port | status |
-  +--------------+---------------+------+--------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE |
-  | 0            | 192.168.70.62 | 3306 | ONLINE |
-  | 0            | 192.168.70.63 | 3306 | ONLINE |
-  +--------------+---------------+------+--------+
-  3 rows in set (0.00 sec)
-
-.. note::
-
-  Each server can have the following status:
-
-  * ``ONLINE`` - backend server is fully operational.
-
-  * ``SHUNNED`` - backend sever is temporarily taken out of use because of
-    either too many connection errors in a time that was too short, or
-    replication lag exceeded the allowed threshold.
-
-  * ``OFFLINE_SOFT`` - when a server is put into ``OFFLINE_SOFT`` mode, new
-    incoming connections aren't accepted anymore, while the existing
-    connections are kept until they became inactive. In other words,
-    connections are kept in use until the current transaction is completed.
-    This allows to gracefully detach a backend.
-
-  * ``OFFLINE_HARD`` - when a server is put into ``OFFLINE_HARD`` mode, the
-    existing connections are dropped, while new incoming connections aren't
-    accepted either. This is equivalent to deleting the server from a
-    hostgroup, or temporarily taking it out of the hostgroup for maintenance
-    work.
-
-Configuring the user
---------------------
-
-ProxySQL must have users that can access backend server to manage the
-connections.
-
-You can add users by inserting them into ``mysql_users`` table:
+To add a user, insert credentials into ``mysql_users`` table:
 
 .. code-block:: mysql
 
@@ -510,15 +463,15 @@ You can add users by inserting them into ``mysql_users`` table:
 
 .. note::
 
-  ProxySQL currently doesn't encrypt the passwords.
+   ProxySQL currently doesn't encrypt passwords.
 
-For user to become active you'll need to load it into runtime:
+Load the user into runtime space:
 
 .. code-block:: mysql
 
   mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
 
-To confirm that the user has been set up correctly you can try to log in:
+To confirm that the user has been set up correctly, you can try to log in:
 
 .. code-block:: bash
 
@@ -537,8 +490,8 @@ To confirm that the user has been set up correctly you can try to log in:
 
   Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-In order for ProxySQL to have read/write access to the cluster you'll need to
-add the same user on one of the nodes:
+To provide read/write access to the cluster for ProxySQL,
+add this user on one of the |PXC| nodes:
 
 .. code-block:: mysql
 
@@ -548,49 +501,134 @@ add the same user on one of the nodes:
   mysql@pxc3> GRANT ALL ON *.* TO 'sbuser'@'192.168.70.64';
   Query OK, 0 rows affected (0.00 sec)
 
-Testing the cluster with sysbench
----------------------------------
+Adding Galera Support
+---------------------
 
-You can install sysbench from Percona repositories by running:
+Default ProxySQL cannot detect a node which is not in ``Synced`` state.
+To monitor status of |PXC| nodes,
+use the :file:`proxysql_galera_checker` script.
+The script is located here: :file:`/usr/bin/proxysql_galera_checker`.
+
+To use this script, load it into ProxySQL
+`Scheduler <https://github.com/sysown/proxysql/blob/master/doc/scheduler.md>`_.
+
+The following example shows how you can load the script
+for default ProxySQL configuration:
+
+.. code-block:: mysql
+
+  mysql@proxysql> INSERT INTO scheduler(id,interval_ms,filename,arg1,arg2,arg3,arg4)
+    VALUES
+    (1,'10000','/usr/bin/proxysql_galera_checker','127.0.0.1','6032','0',
+    '/var/lib/proxysql/proxysql_galera_checker.log');
+
+To load the scheduler changes into the runtime space:
+
+.. code-block:: mysql
+
+  mysql@proxysql> LOAD SCHEDULER TO RUNTIME;
+
+To make sure that the script has been loaded,
+check the :table:`runtime_scheduler` table:
+
+.. code-block:: mysql
+
+  mysql@proxysql> SELECT * FROM runtime_scheduler\G
+  *************************** 1. row ***************************
+           id: 1
+  interval_ms: 10000
+     filename: /usr/bin/proxysql/proxysql_galera_checker
+         arg1: 127.0.0.1
+         arg2: 6032
+         arg3: 0
+         arg4: /var/lib/proxysql/proxysql_galera_checker.log
+         arg5: NULL
+   1 row in set (0.00 sec)
+
+To check the status of available nodes, run the following command:
+
+.. code-block:: mysql
+
+  mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
+  +--------------+---------------+------+--------+
+  | hostgroup_id | hostname      | port | status |
+  +--------------+---------------+------+--------+
+  | 0            | 192.168.70.61 | 3306 | ONLINE |
+  | 0            | 192.168.70.62 | 3306 | ONLINE |
+  | 0            | 192.168.70.63 | 3306 | ONLINE |
+  +--------------+---------------+------+--------+
+  3 rows in set (0.00 sec)
+
+.. note::
+
+  Each node can have the following status:
+
+  * ``ONLINE``: backend node is fully operational.
+
+  * ``SHUNNED``: backend node is temporarily taken out of use,
+    because either too many connection errors hapenned in a short time,
+    or replication lag exceeded the allowed threshold.
+
+  * ``OFFLINE_SOFT``: new incoming connections aren't accepted,
+    while existing connections are kept until they become inactive.
+    In other words, connections are kept in use
+    until the current transaction is completed.
+    This allows to gracefully detach a backend node.
+
+  * ``OFFLINE_HARD``: existing connections are dropped,
+    and new incoming connections aren't accepted.
+    This is equivalent to deleting the node from a hostgroup,
+    or temporarily taking it out of the hostgroup for maintenance.
+
+Testing Cluster with sysbench
+-----------------------------
+
+You can install ``sysbench`` from Percona software repositories:
+
+* For Debian or Ubuntu:
 
 .. code-block:: bash
 
   root@proxysql:~# apt-get install sysbench
 
-on Debian/Ubuntu distributions, or:
+* For Red Hat Enterprise Linux or CentOS
 
 .. code-block:: bash
 
   [root@proxysql ~]# yum install sysbench
 
-on CentOS/RHEL distributions.
+.. note:: ``sysbench`` requires ProxySQL client user credentials
+   that you creted in :ref:`proxysql-client-user`.
 
-Create the database that will be used for testing:
+1. Create the database that will be used for testing on one of the |PXC| nodes:
 
-.. code-block:: mysql
+   .. code-block:: mysql
 
-  mysql@pxc1> CREATE DATABASE sbtest;
+      mysql@pxc1> CREATE DATABASE sbtest;
 
-Populate the table with data for the benchmark:
+#. Populate the table with data for the benchmark on the ProxySQL node:
 
-.. code-block:: bash
+   .. code-block:: bash
 
-  root@proxysql:~# sysbench --report-interval=5 --num-threads=4 --num-requests=0 \
-  --max-time=20 --test=/usr/share/doc/sysbench/tests/db/oltp.lua --mysql-user='sbuser' \
-  --mysql-password='sbpass' --oltp-table-size=10000 --mysql-host=127.0.0.1 \
-  --mysql-port=6033 prepare
+      root@proxysql:~# sysbench --report-interval=5 --num-threads=4 \
+        --num-requests=0 --max-time=20 \
+        --test=/usr/share/doc/sysbench/tests/db/oltp.lua \
+        --mysql-user='sbuser' --mysql-password='sbpass' \
+        --oltp-table-size=10000 --mysql-host=127.0.0.1 --mysql-port=6033 \
+        prepare
 
-You can now run the benchmark:
+#. Run the benchmark on the ProxySQL node:
 
-.. code-block:: bash
+   .. code-block:: bash
 
-  root@proxysql:~# sysbench --report-interval=5 --num-threads=4 --num-requests=0 \
-  --max-time=20 --test=/usr/share/doc/sysbench/tests/db/oltp.lua --mysql-user='sbuser' \
-  --mysql-password='sbpass' --oltp-table-size=10000 --mysql-host=127.0.0.1 \
-  --mysql-port=6033 run
+      root@proxysql:~# sysbench --report-interval=5 --num-threads=4 \
+        --num-requests=0 --max-time=20 \
+        --test=/usr/share/doc/sysbench/tests/db/oltp.lua \
+        --mysql-user='sbuser' --mysql-password='sbpass' \
+        --oltp-table-size=10000 --mysql-host=127.0.0.1 --mysql-port=6033 \
+        run
 
-ProxySQL is collecting a good set of information while working. The ``stats``
-schema contains the relevant tables, to visualize the list:
+ProxySQL stores collected data in the ``stats`` schema:
 
 .. code-block:: mysql
 
@@ -607,8 +645,7 @@ schema contains the relevant tables, to visualize the list:
   | stats_mysql_global             |
   +--------------------------------+
 
-For example you can see the number of commands that are being run on the
-cluster by running:
+For example, to see the number of commands that run on the cluster:
 
 .. code-block:: mysql
 
@@ -642,10 +679,10 @@ cluster by running:
 Automatic Fail-over
 -------------------
 
-ProxySQL will automatically detect if any of the nodes is not available or not
-synced with the cluster.
+ProxySQL will automatically detect if a node is not available
+or not synced with the cluster.
 
-You can check the status of the nodes by running:
+You can check the status of all available nodes by running:
 
 .. code-block:: mysql
 
@@ -659,13 +696,13 @@ You can check the status of the nodes by running:
   +--------------+---------------+------+--------+
   3 rows in set (0.00 sec)
 
-To see the problem detection we will now shutdown the node3 by running:
+To test problem detection and fail-over mechanism, shut down Node 3:
 
 .. code-block:: bash
 
   root@pxc3:~# service mysql stop
 
-ProxySQL will detect that node is down and update its status to
+ProxySQL will detect that the node is down and update its status to
 ``OFFLINE_SOFT``:
 
 .. code-block:: mysql
@@ -680,13 +717,14 @@ ProxySQL will detect that node is down and update its status to
   +--------------+---------------+------+--------------+
   3 rows in set (0.00 sec)
 
-If you start the node3 again, scrip will detect the change and mark the node as
-``ONLINE``:
+Now start Node 3 again:
 
 .. code-block:: bash
 
   root@pxc3:~# service mysql start
 
+The script will detect the change and mark the node as
+``ONLINE``:
 
 .. code-block:: mysql
 
