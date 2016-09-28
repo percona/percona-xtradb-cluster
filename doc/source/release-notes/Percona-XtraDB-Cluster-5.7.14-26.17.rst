@@ -11,7 +11,7 @@
    Fede, you are missed.
 
 Percona is glad to announce the release of
-|PXC| 5.7.14-26.17 on September 26, 2016.
+|PXC| 5.7.14-26.17 on September 29, 2016.
 Binaries are available from the
 `downloads area
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST>`_
