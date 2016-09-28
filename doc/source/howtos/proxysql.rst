@@ -89,7 +89,7 @@ for configuring |PXC| nodes with ProxySQL::
   --mode                          ProxySQL read/write configuration mode, currently it only support 'loadbal' mode
   --adduser                       Add Percona XtraDB Cluster application user to ProxySQL database
 
-  .. note:: Before using the ``proxysql-admin`` tool,
+.. note:: Before using the ``proxysql-admin`` tool,
    ensure that ProxySQL and |PXC| nodes you want to add are running.
 
 Enabling ProxySQL
