@@ -85,7 +85,7 @@ To compile |PXC| from source code:
       or update it to the latest state.
       Old codebase may not be compatible with the build script.
 
-2. Check out the ``5.7-beta`` branch.
+2. Check out the ``5.7`` branch.
 
 3. Clone Percona's fork of Galera into the same directory:
 
@@ -97,7 +97,7 @@ To compile |PXC| from source code:
    .. note:: The directory for Galera repository
       must be named ``percona-xtradb-cluster-galera``.
 
-4. Check out the ``rel-3.16`` branch.
+4. Check out the ``rel-3.17`` branch.
 
 3. Run the build script :file:`./build-ps/build-binary.sh`.
    By default, it will build into the current directory,
