@@ -60,26 +60,26 @@ compared to version 5.6
 Bug Fixes
 =========
 
-PXC-568: Fixed crash when a local transaction (such as ``EXPLAIN`` or ``SHOW``)
+Fixed crash when a local transaction (such as ``EXPLAIN`` or ``SHOW``)
 is interrupted by a replicated transaction with higher priopiry
 (like ``ALTER`` that changes table structure
 and can thus affect the result of the local transaction).
 
-PXC-665 and 1608680: Fixed DONOR node getting stuck in ``Joined`` state
+Fixed DONOR node getting stuck in ``Joined`` state
 after successful SST.
 
-PXC-672: Fixed error message when altering non-existent table
+Fixed error message when altering non-existent table
 with ``pxc-strict-mode`` enabled.
 
-PXC-673 and 1615089: Fixed path to directory in :file:`percona-xtradb-cluster-shared.conf`.
+Fixed path to directory in :file:`percona-xtradb-cluster-shared.conf`.
 
-PXC-676: Fixed setting of ``seqno`` in :file:`grastate.dat` to ``-1``
+Fixed setting of ``seqno`` in :file:`grastate.dat` to ``-1``
 on clean shutdown.
 
-PXC-680: Fixed failure of asynchronous TOI actions (like ``DROP``)
+Fixed failure of asynchronous TOI actions (like ``DROP``)
 for non-primary nodes.
 
-BLD-475: Fixed replacing of ``my.cnf`` during upgrade from 5.6 to 5.7.
+Fixed replacing of ``my.cnf`` during upgrade from 5.6 to 5.7.
 
 Security Fixes
 ==============
@@ -93,7 +93,7 @@ For more information, see https://www.percona.com/blog/2016/09/12/database-affec
 Other Improvements
 ==================
 
-PXC-654: Added support of |defaults-group-suffix|_ for SST scripts.
+Added support of |defaults-group-suffix|_ for SST scripts.
 
 .. |defaults-group-suffix| replace:: ``defaults-group-suffix``
 .. _defaults-group-suffix: http://dev.mysql.com/doc/refman/5.7/en/option-file-options.html#option_general_defaults-group-suffix
