@@ -20,8 +20,9 @@ run_init_sql() {
 get_recover_pos () {
     wsrep_start_position_opt=""
 
-    LOG=$(mktemp --tmpdir=/var/lib/mysql-files/)
-    /usr/sbin/mysqld --datadir="$datadir" --user=mysql --wsrep_recover 2>> $LOG
+    LOG=$(mktemp --tmpdir=/var/lib/mysql-files/ --suffix=.log)
+    chown mysql.mysql $LOG
+    /usr/sbin/mysqld --user=mysql --wsrep_recover --log-error=$LOG
 
     local rp="$(grep 'WSREP: Recovered position:' $LOG | tail -n 1)"
     if [ -z "$rp" ]; then
