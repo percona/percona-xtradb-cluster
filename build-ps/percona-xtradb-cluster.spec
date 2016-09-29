@@ -316,7 +316,8 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-25 percona-xtrabackup-24 >= 2.4.3 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-25 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+#Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-25 percona-xtrabackup-24 >= 2.4.3 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -906,11 +907,16 @@ if [ -x %{_sysconfdir}/init.d/mysql ] ; then
 fi
 
 %post -n Percona-XtraDB-Cluster-server%{product_suffix}
-
 if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 
+ver=`/bin/rpm -qi percona-xtrabackup | grep Version | awk '{print $3}'`
+if [ $ver = '2.3.5' ]; then
+    /bin/rpm -e --nodeps percona-xtrabackup && /usr/bin/yum -y install percona-xtrabackup-24 &
+else
+    /usr/bin/yum -y install percona-xtrabackup-24 &
+fi
 %if 0%{?systemd}
   %systemd_post mysql
 %endif
