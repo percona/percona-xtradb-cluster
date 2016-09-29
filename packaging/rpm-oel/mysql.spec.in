@@ -196,7 +196,7 @@ Requires:       procps
 Requires:       shadow-utils
 Requires:       net-tools
 Requires:       lsof
-Requires:       socat
+%{?el7:Requires:       socat}
 Requires:       %{name}-client%{?_isa} >= %{min}
 Requires:       %{name}-common%{?_isa} = %{version}-%{release}
 %if 0%{?commercial}
