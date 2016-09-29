@@ -633,7 +633,7 @@ fi
 
 # check the version, we require XB-2.4 to ensure that we can pass the
 # datadir via the command-line option
-XB_REQUIRED_VERSION="2.4.3"
+XB_REQUIRED_VERSION="2.3.5"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
