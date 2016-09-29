@@ -18,8 +18,33 @@ server_stop () {
 		fi
 		if [ "${COUNT}" -gt 15 ];
 		then
-			echo
-			return 1
+                    if [ ! -x /etc/init.d/mysql ]; then return; fi
+
+                    set +e
+                    if [ -x /usr/sbin/invoke-rc.d ]; then
+                        cmd="invoke-rc.d mysql stop"
+                    else
+                        cmd="/etc/init.d/mysql stop"
+                    fi
+                    $cmd
+                    errno=$?
+                    set -e
+
+                    # 0=ok, 100=no init script (fresh install)
+                    if [ "$errno" != 0 ]; then
+                        set +e
+                        cmd="service mysql stop"
+                        $cmd
+                        errno=$?
+                        set -e
+                        if [ "$errno" != 0 ]; then
+                            return 1
+                        else
+                            return 0
+                        fi
+                    else
+                        return 0
+                    fi
 		fi
 		PSCOUNT=$(get_pcount)
 		sleep 1
@@ -88,6 +113,7 @@ case "$1" in
 			chmod 640 ${MYSQLLOG}/error.log
 			chown mysql:adm ${MYSQLLOG}/error.log
 		fi
+
                 if [ ! -e ${MYSQLLOGFILE} ];
 		then
 			touch ${MYSQLLOGFILE}

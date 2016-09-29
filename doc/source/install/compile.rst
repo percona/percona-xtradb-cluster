@@ -57,21 +57,28 @@ Before you begin, make sure that the following packages are installed:
    * - PAM
      - ``libpam-dev``
      - ``pam-devel``
+   * - socat                                                                    
+     - ``socat``
+     - ``socat``
 
 You will likely have all or most of the packages already installed. If you are
 not sure, run one of the following commands to install any missing
 dependencies:
 
+* For Debian or Ubuntu:
+
 .. code-block:: bash
 
    $ sudo apt-get install -y git scons gcc g++ openssl check cmake bison \
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
-   libpam-dev
+   libpam-dev socat
+   
+* For Red Hat Enterprise Linux or CentOS:
 
 .. code-block:: bash
 
    $ sudo yum install -y git scons gcc gcc-c++ openssl check cmake bison \
-   boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel
+   boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel socat
 
 To compile |PXC| from source code:
 
@@ -79,27 +86,21 @@ To compile |PXC| from source code:
 
    .. code-block:: bash
 
-      git clone https://github.com/percona/percona-xtradb-cluster.git
+      $ git clone https://github.com/percona/percona-xtradb-cluster.git
 
    .. note:: You have to clone the latest repository
       or update it to the latest state.
       Old codebase may not be compatible with the build script.
 
-2. Check out the ``5.7-beta`` branch.
+#. Check out the ``5.7`` branch.
 
-3. Clone Percona's fork of Galera into the same directory:
+#. Initialize the submodule:
 
    .. code-block:: bash
 
-      cd percona-xtradb-cluster
-      git clone https://github.com/percona/galera percona-xtradb-cluster-galera
+      $ git submodule init && git submodule update
 
-   .. note:: The directory for Galera repository
-      must be named ``percona-xtradb-cluster-galera``.
-
-4. Check out the ``rel-3.16`` branch.
-
-3. Run the build script :file:`./build-ps/build-binary.sh`.
+#. Run the build script :file:`./build-ps/build-binary.sh`.
    By default, it will build into the current directory,
    but you can specify another target output directory.
    For example, if you want to build into :file:`./pxc-build`,
@@ -107,6 +108,6 @@ To compile |PXC| from source code:
 
    .. code-block:: bash
 
-      mkdir ./pxc-build
-      ./build-ps/build-binary.sh ./pxc-build
+      $ mkdir ./pxc-build
+      $ ./build-ps/build-binary.sh ./pxc-build
 

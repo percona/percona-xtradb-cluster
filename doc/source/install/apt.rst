@@ -32,23 +32,18 @@ Installing from Repositories
 
    .. code-block:: bash
 
-      wget https://repo.percona.com/apt/percona-release_0.1-3.$(lsb_release -sc)_all.deb
+      wget https://repo.percona.com/apt/percona-release_0.1-4.$(lsb_release -sc)_all.deb
 
 #. Install the downloaded package with :program:`dpkg`.
    To do that, run the following command as root or with :program:`sudo`:
 
    .. code-block:: bash
 
-      sudo dpkg -i percona-release_0.1-3.$(lsb_release -sc)_all.deb
+      sudo dpkg -i percona-release_0.1-4.$(lsb_release -sc)_all.deb
 
    Once you install this package, the Percona repositories should be added.
    You can check the repository configuration
    in the :file:`/etc/apt/sources.list.d/percona-release.list` file.
-
-#. Enable testing repository.
-
-   This is a beta release, which can only be installed from the testing repo.
-   For more information, see :ref:`apt-testing-repo`.
 
 #. Update the local cache:
 

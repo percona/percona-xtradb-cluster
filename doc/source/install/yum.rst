@@ -56,11 +56,6 @@ Installing from Percona Repository
          wget http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
          rpm -ivH percona-release-0.1-3.noarch.rpm
 
-#. Enable testing repository.
-
-   This is a beta release, which can only be installed from the testing repo.
-   For more information, see :ref:`yum-testing-repo`.
-
 #. Check that the packages are available:
 
    .. code-block:: bash
