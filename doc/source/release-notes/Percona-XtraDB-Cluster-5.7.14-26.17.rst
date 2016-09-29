@@ -48,7 +48,8 @@ compared to version 5.6
 * Support for monitoring |PXC| nodes using
   `Percona Monitoring and Management <https://www.percona.com/software/database-tools/percona-monitoring-and-management>`_
 
-* More stable and robust operation with MySQL and Percona Server version 5.7.14,
+* More stable and robust operation
+  with MySQL and Percona Server version 5.7.14,
   as well as Galera 3.17 compatibility.
   Includes all upstream bug fixes, improved logging and more.
 

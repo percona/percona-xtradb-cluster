@@ -92,6 +92,39 @@ for configuring |PXC| nodes with ProxySQL::
 .. note:: Before using the ``proxysql-admin`` tool,
    ensure that ProxySQL and |PXC| nodes you want to add are running.
 
+Preparing Configuration File
+----------------------------
+
+It is recommended to provide connection and authentication information
+in the ProxySQL configuration file (:file:`/etc/proxysql-admin.cnf`),
+instead of specifying it on the command line.
+
+By default, the configuration file contains the following::
+
+ #proxysql-admin credentials
+ export PROXYSQL_USERNAME="admin"
+ export PROXYSQL_PASSWORD="admin"
+ export PROXYSQL_HOSTNAME="localhost"
+ export PROXYSQL_PORT="6032"
+ export CLUSTER_USERNAME="admin"
+ export CLUSTER_PASSWORD="admin"
+ export CLUSTER_HOSTNAME="localhost"
+ export CLUSTER_PORT="26000"
+ export MONITOR_USERNAME="monitor"
+ export MONITOR_PASSWORD="monit0r"
+ export PXC_APP_USERNAME="pxc_app_user"
+ export PXC_APP_PASSWORD="passw0rd"
+
+.. note:: It is recommended to
+   :ref:`change default ProxySQL credentials <default-credentials>`
+   before running ProxySQL in production.
+   Make sure that you provide ProxySQL location and credentials
+   in the configuration file.
+
+Provide superuser credentials for one of the |PXC| nodes.
+The ``proxysql-admin`` script will detect
+other nodes in the cluster automatically.
+
 Enabling ProxySQL
 -----------------
 
@@ -115,41 +148,26 @@ The ``proxysql-admin`` tool will do the following:
   and the other one is for communicating with the cluster.
 
 The following example shows how to add a |PXC| node
-with IP address 10.101.6.1 to ProxySQL:
+using the ProxySQL configuration file
+with all necessary connection and authentication information:
 
 .. code-block:: bash
 
-   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin \
-        --proxysql-port=6032 --proxysql-host=127.0.0.1 \
-        --cluster-user=root --cluster-password=root \
-        --cluster-port=3306 --cluster-host=10.101.6.1 \
-        --enable
+   $ proxysql-admin --config-file=/etc/proxysql-admin.cnf --enable
 
    Configuring ProxySQL monitoring user..
-   Enter ProxySQL monitoring username: monitor
-   Enter ProxySQL monitoring password: 
-   
-   User monitor@'%' has been added with USAGE privilege
-   
+   ProxySQL monitoring username as per command line is 'monitor'
+
+   User 'monitor'@'%' has been added with USAGE privilege
+
    Adding the Percona XtraDB Cluster server nodes to ProxySQL
-   
-   Configuring Percona XtraDB Cluster user to connect through ProxySQL
-   Enter Percona XtraDB Cluster user name: proxysql_user
-   Enter Percona XtraDB Cluster user password: 
-   
-   User proxysql_user@'%' has been added with USAGE privilege, please make sure to grant appropriate privileges
-   
-   Percona XtraDB Cluster ProxySQL monitoring daemon started
+
+   Configuring Percona XtraDB Cluster application user to connect through ProxySQL
+   Percona XtraDB Cluster application user name as per command line is 'pxc_app_user'
+
+   Percona XtraDB Cluster application user 'pxc_app_user'@'%' has been added with USAGE privilege, please make sure to grant appropriate privileges
+
    ProxySQL configuration completed!
-
-.. note:: The previous example uses default ProxySQL credentials,
-   host name (in this case localhost) and port number.
-   It is recommended to
-   :ref:`change the default credentials <default-credentials>`
-   before running ProxySQL in production.
-
-.. note:: You must provide superuser credentials
-   for the |PXC| node you are adding.
 
 Disabling ProxySQL
 ------------------
@@ -163,17 +181,12 @@ The ``proxysql-admin`` tool will do the following:
 * Stop the ProxySQL monitoring daemon for this node
 
 The following example shows how to disable ProxySQL
-and remove the |PXC| node added in the previous example:
+and remove the |PXC| node:
 
 .. code-block:: bash
 
-   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin \
-        --proxysql-port=6032 --proxysql-host=127.0.0.1 \
-        --cluster-user=root --cluster-password=root \
-        --cluster-port=3306 --cluster-host=10.101.6.1 \
-        --disable
-
-   ProxySQL configuration removed! 
+   $ proxysql-admin --config-file=/etc/proxysql-admin.cnf --disable
+   ProxySQL configuration removed!
 
 Additional Options
 ------------------
@@ -184,10 +197,24 @@ The following extra options can be used:
 
   Add |PXC| application user to ProxySQL database.
 
+  .. code-block:: bash
+
+     $ proxysql-admin --config-file=/etc/proxysql-admin.cnf --adduser
+
+     Adding Percona XtraDB Cluster application user to ProxySQL database
+     Enter Percona XtraDB Cluster application user name: root
+     Enter Percona XtraDB Cluster application user password:
+     Added Percona XtraDB Cluster application user to ProxySQL database!
+
 * ``--galera-check-interval``
 
   Set the interval for monitoring ``proxysql_galera_checker`` script
-  (in milliseconds).
+  (in milliseconds) when enabling ProxySQL for cluster.
+
+  .. code-block:: bash
+
+     $ proxysql-admin --config-file=/etc/proxysql-admin.cnf \
+        --galera-check-interval=5000 --enable
 
 * ``--mode``
 
@@ -196,22 +223,6 @@ The following extra options can be used:
   For now, the only supported mode is ``loadbal``
   which will be the default for a load balanced set
   of evenly weighted read/write nodes.
-
-.. code-block:: bash
-
-   $ ./proxysql-admin --proxysql-user=admin --proxysql-password=admin  \
-        --proxysql-port=6032 --proxysql-host=127.0.0.1 \
-        --cluster-user=root --cluster-password=root \
-        --cluster-port=26000 --cluster-host=10.101.6.1 \
-        --galera-check-interval=3000 --adduser
-
-   Adding Percona XtraDB Cluster application user to ProxySQL database
-   Enter Percona XtraDB Cluster application user name: app_read
-   Enter Percona XtraDB Cluster application user password: 
-
-   Application app_read does not exists in Percona XtraDB Cluster. Would you like to proceed [y/n] ? y
-   
-   Added Percona XtraDB Cluster application user to ProxySQL database!
 
 Manual Configuration
 ====================
