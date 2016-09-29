@@ -35,7 +35,8 @@ To upgrade the cluster, follow these steps for each node:
 
       $ sudo service mysql stop
 
-#. Remove existing packages and install version 5.7.
+#. Remove existing |PXC| and Percona XtraBackup packages,
+   then install |PXC| version 5.7 packages.
    For more information, see :ref:`install`.
 
    For example, if you have Percona software repositories configured,
@@ -45,23 +46,23 @@ To upgrade the cluster, follow these steps for each node:
 
      .. code-block:: bash
 
-        $ sudo yum remove 'Percona-XtraDB-Cluster-56*'
+        $ sudo yum remove percona-xtrabackup* Percona-XtraDB-Cluster*
         $ sudo yum install Percona-XtraDB-Cluster-57
 
    * On Debian or Ubuntu:
 
      .. code-block:: bash
 
-        $ sudo apt-get remove percona-xtradb-cluster-56*
+        $ sudo apt-get remove percona-xtrabackup* percona-xtradb-cluster*
         $ sudo apt-get install percona-xtradb-cluster-57
 
-   .. note:: In case of Debian or Ubuntu,
-      the ``mysql`` service starts automatically after install.
-      Stop the service:
+#. In case of Debian or Ubuntu,
+   the ``mysql`` service starts automatically after install.
+   Stop the service:
 
-      .. code-block:: bash
+   .. code-block:: bash
 
-         $ sudo service mysql stop
+      $ sudo service mysql stop
 
 #. Back up :file:`grastate.dat`, so that you can restore it
    if it is corrupted or zeroed out due to network issue.
