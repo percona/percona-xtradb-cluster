@@ -57,7 +57,7 @@ Before you begin, make sure that the following packages are installed:
    * - PAM
      - ``libpam-dev``
      - ``pam-devel``
-   * - socat                                                                    
+   * - socat
      - ``socat``
      - ``socat``
 
@@ -72,13 +72,14 @@ dependencies:
    $ sudo apt-get install -y git scons gcc g++ openssl check cmake bison \
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
    libpam-dev socat
-   
+
 * For Red Hat Enterprise Linux or CentOS:
 
 .. code-block:: bash
 
    $ sudo yum install -y git scons gcc gcc-c++ openssl check cmake bison \
-   boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel socat
+   boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel \
+   socat
 
 To compile |PXC| from source code:
 
