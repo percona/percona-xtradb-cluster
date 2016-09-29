@@ -25,11 +25,6 @@
 #include "xpl_session.h"
 #include "sql_data_context.h"
 
-<<<<<<< HEAD
-#include <boost/asio/io_service.hpp>
-
-=======
->>>>>>> mysql-5.7.13
 
 namespace ngs
 {
@@ -195,11 +190,7 @@ class Mock_sql_data_context : public xpl::Sql_data_context
 {
 public:
   Mock_sql_data_context(ngs::Protocol_encoder *p=0)
-<<<<<<< HEAD
-  : xpl::Sql_data_context(*p)
-=======
   : xpl::Sql_data_context(p)
->>>>>>> mysql-5.7.13
   {
   }
 

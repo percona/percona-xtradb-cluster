@@ -16,12 +16,7 @@
 #ifndef _XPL_MYSQLX_PB_WRAPPER_H_
 #define _XPL_MYSQLX_PB_WRAPPER_H_
 
-<<<<<<< HEAD
-#include "mysqlx_expr.pb.h"
-#include "mysqlx_datatypes.pb.h"
-=======
 #include "ngs_common/protocol_protobuf.h"
->>>>>>> mysql-5.7.13
 #include <string>
 
 

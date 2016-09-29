@@ -276,10 +276,6 @@ public:
     EXPECT_CALL(mock_client, server()).WillRepeatedly(ReturnRef(*mock_server));
   }
 
-<<<<<<< HEAD
-  boost::asio::io_service                     io_service;
-=======
->>>>>>> mysql-5.7.13
   boost::shared_ptr<StrictMock<Mock_server> > mock_server;
 
   StrictMock<Mock_connection>        mock_connection;
@@ -347,11 +343,7 @@ TEST_F(CapabilityHanderAuthMechTestSuite, get_returnAuthMethodsFromServer_always
 
   for(std::size_t i = 0; i < names.size(); ++i)
   {
-<<<<<<< HEAD
-    const Any &a = any.array().value(i);
-=======
     const Any &a = any.array().value(static_cast<int>(i));
->>>>>>> mysql-5.7.13
 
     ASSERT_EQ(Any::SCALAR, a.type());
     ASSERT_EQ(Scalar::V_STRING, a.scalar().type());
