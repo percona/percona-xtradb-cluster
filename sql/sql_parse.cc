@@ -2133,6 +2133,7 @@ done:
   if (thd->killed)
     thd->send_kill_message();
   thd->send_statement_status();
+  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
   query_cache.end_of_result(thd);
 #ifdef WITH_WSREP
   }
