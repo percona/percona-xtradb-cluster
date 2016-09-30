@@ -1478,8 +1478,6 @@ create table t (
 select d in(select d from t)from t group by d;
 drop table t;
 
-<<<<<<< HEAD
-=======
 --echo #
 --echo # BUG#23052231 - ASSERTION FAILURE: ROW0MERGE.CC:2100:ADD_AUTOINC
 --echo # < DICT_TABLE_GET_N_USER_COLS
@@ -1507,7 +1505,6 @@ INSERT INTO t values (11, 1, "11", "aa", default, default, default);
 ALTER TABLE t ADD COLUMN nc01128 BIGINT  AUTO_INCREMENT NOT NULL, ADD KEY auto_nc01128(nc01128);
 
 DROP TABLE t;
->>>>>>> mysql-5.7.13
 --source include/wait_until_count_sessions.inc
 
 --echo #

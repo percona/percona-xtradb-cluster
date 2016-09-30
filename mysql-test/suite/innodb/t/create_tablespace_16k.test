@@ -642,8 +642,6 @@ DROP TABLESPACE s_4k;
 DROP TABLESPACE s_8k;
 DROP TABLESPACE s_16k;
 --rmdir $MYSQL_TMP_DIR/test
-<<<<<<< HEAD
-=======
 
 --disable_query_log
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Operating system error number .* in a file operation");
@@ -655,4 +653,3 @@ call mtr.add_suppression("\\[Warning\\] InnoDB: Ignoring tablespace `s_missing` 
 call mtr.add_suppression("\\[ERROR\\] InnoDB: If you are installing InnoDB, remember that you must create directories yourself, InnoDB does not create them.");
 call mtr.add_suppression("\\[ERROR\\] InnoDB: Could not find a valid tablespace file for `s_missing`. Please refer to .* for how to resolve the issue.");
 --enable_query_log
->>>>>>> mysql-5.7.13

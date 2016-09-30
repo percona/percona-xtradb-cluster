@@ -14,11 +14,7 @@
  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA */
 
 #include "expr_generator.h"
-<<<<<<< HEAD
-#include <google/protobuf/text_format.h>
-=======
 #include "ngs_common/protocol_protobuf.h"
->>>>>>> mysql-5.7.13
 #include "mysqlx_pb_wrapper.h"
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>

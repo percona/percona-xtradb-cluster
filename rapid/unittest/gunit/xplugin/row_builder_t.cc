@@ -21,11 +21,7 @@
 #include <limits>
 #include <string>
 #include <set>
-<<<<<<< HEAD
-#include "mysqlx_resultset.pb.h"
-=======
 #include "ngs_common/protocol_protobuf.h"
->>>>>>> mysql-5.7.13
 #include "ngs/protocol/row_builder.h"
 #include "ngs_common/xdatetime.h"
 #include "ngs_common/xdecimal.h"
@@ -54,11 +50,7 @@ static void add_pages(Output_buffer *ob, const size_t no_of_pages, const size_t 
 {
   for (size_t i = 0; i < no_of_pages; i++)
   {
-<<<<<<< HEAD
-    page_del.push_back(boost::shared_ptr<ngs::Page>(new ngs::Page(page_size)));
-=======
     page_del.push_back(boost::shared_ptr<ngs::Page>(new ngs::Page(static_cast<uint32_t>(page_size))));
->>>>>>> mysql-5.7.13
     ngs::Resource<ngs::Page> page(page_del.back().get());
     ob->push_back(page);
   }

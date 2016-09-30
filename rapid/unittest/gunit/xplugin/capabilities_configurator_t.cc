@@ -111,11 +111,7 @@ public:
 
     for(std::size_t i = 0; i < supported_handlers.size();i ++)
     {
-<<<<<<< HEAD
-      ASSERT_EQ(NAMES[i], cap->capabilities(i).name());
-=======
       ASSERT_EQ(NAMES[i], cap->capabilities(static_cast<int>(i)).name());
->>>>>>> mysql-5.7.13
     }
   }
 
