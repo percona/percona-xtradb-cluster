@@ -1,8 +1,8 @@
 .. _ubuntu_howto:
 
-===========================================
-Installing Percona XtraDB Cluster on Ubuntu
-===========================================
+============================================
+Configuring Percona XtraDB Cluster on Ubuntu
+============================================
 
 This tutorial describes how to install and configure three |PXC| nodes
 on Ubuntu 12.04.2 LTS servers, using the packages from Percona repositories.

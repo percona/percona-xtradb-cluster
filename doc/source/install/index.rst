@@ -26,34 +26,6 @@ or used by other software.
 |PXC| does not work with ``SELinux`` and ``AppArmor`` security modules.
 Make sure these modules are disabled.
 
-There are several MySQL configuration options
-that are mandatory for running |PXC|.
-These include the path to the Galera wsrep library,
-connection URL for other nodes in the cluster,
-and method used for state snapshot transfer (SST).
-Make sure that the binlog format is set to ``ROW``,
-the default storage engine is InnoDB (MyISAM has only experimental support),
-and set the mode of InnoDB autoincrement locks to ``2``.
-The following is an example of the :file:`my.cnf` file:
-
-.. code-block:: text
-
-   [mysqld]
-
-   wsrep_provider=/usr/lib64/libgalera_smm.so
-   wsrep_cluster_address=gcomm://10.11.12.206
-   wsrep_slave_threads=8
-   wsrep_sst_method=rsync
-   binlog_format=ROW
-   default_storage_engine=InnoDB
-   innodb_autoinc_lock_mode=2
-
-.. note:: If the SST method is not ``rsync``, specify SST credentials using
-   ``wsrep_sst_auth=<user>:<password>``
-
-.. note:: If you enable binary logging by setting ``log-bin=mysql-bin``,
-   you should also provide a unique ``server-id`` for each node.
-
 Installation Guides
 ===================
 
