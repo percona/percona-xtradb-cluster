@@ -22,7 +22,7 @@ Manual Monitoring
 =================
 
 Manual cluster monitoring can be performed using
-`myq_tools <https://github.com/jayjanssen/myq_tools/>`_.
+`myq-tools <https://github.com/jayjanssen/myq-tools/>`_.
 
 Alerting
 ========

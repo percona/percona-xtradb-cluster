@@ -97,7 +97,7 @@ To set up the cluster:
 
    .. code-block:: bash
 
-      bin/mysqld_safe --defaults-file=/etc/my.4000.cnf --wsrep-new-cluster
+      $ bin/mysqld_safe --defaults-file=/etc/my.4000.cnf --wsrep-new-cluster
 
    If the node starts correctly, you should see the following output::
 
@@ -128,7 +128,7 @@ To set up the cluster:
 
    .. code-block:: mysql
 
-    mysql -h127.0.0.1 -P6000 -e "show global status like 'wsrep_cluster_size';"
+    $ mysql -h127.0.0.1 -P6000 -e "show global status like 'wsrep_cluster_size';"
     +--------------------+-------+
     | Variable_name      | Value |
     +--------------------+-------+
@@ -140,7 +140,7 @@ which will be automatically synchronized with other nodes.
 For example, to create a database on the second node,
 you can run the following command:
 
-  .. code-block: mysql
+.. code-block: mysql
 
-    mysql -h127.0.0.1 -P5000 -e "CREATE DATABASE hello_peter"
+   $ mysql -h127.0.0.1 -P5000 -e "CREATE DATABASE hello_peter"
 
