@@ -1,11 +1,11 @@
 .. _centos_howto:
 
-===========================================
-Installing Percona XtraDB Cluster on CentOS
-===========================================
+============================================
+Configuring Percona XtraDB Cluster on CentOS
+============================================
 
 This tutorial describes how to install and configure three |PXC| nodes
-on CentOS 6.3 servers, using the packages from Percona repositories.
+on CentOS 6.8 servers, using the packages from Percona repositories.
 
 * Node 1
 
@@ -27,7 +27,7 @@ Prerequisites
 
 The procedure described in this tutorial requires the following:
 
-* All three nodes have CentOS 6.3 installed.
+* All three nodes have CentOS 6.8 installed.
 * The firewall on all nodes is configured to allow connecting
   to ports 3306, 4444, 4567 and 4568.
 * SELinux on all nodes is disabled.

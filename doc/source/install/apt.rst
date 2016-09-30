@@ -20,7 +20,7 @@ of the following distributions:
 The packages are available in the official Percona software repositories
 and on the
 `download page <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_.
-It is recommended to intall |PXC| from repositories using :command:`apt`.
+It is recommended to install |PXC| from repositories using :command:`apt`.
 
 .. contents::
    :local:
@@ -67,6 +67,9 @@ Installing from Repositories
       * ``percona-xtradb-cluster-galera-3.x-dbg``
       * ``percona-xtradb-cluster-garbd-3.x-dbg``
       * ``libmysqlclient18``
+
+For more information on how to bootstrap the cluster please check
+:ref:`ubuntu_howto`.
 
 .. _apt-testing-repo:
 

@@ -85,6 +85,9 @@ Installing from Percona Repository
       * ``Percona-XtraDB-Cluster-galera-3-debuginfo``
       * ``Percona-XtraDB-Cluster-shared-57``
 
+For more information on how to bootstrap the cluster please check
+:ref:`centos_howto`.
+
 .. _yum-testing-repo:
 
 Testing and Experimental Repositories
