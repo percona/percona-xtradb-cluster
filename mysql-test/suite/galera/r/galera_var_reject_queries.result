@@ -5,12 +5,11 @@ SET GLOBAL wsrep_reject_queries = ALL;
 SELECT * FROM t1;
 ERROR 08S01: WSREP has not yet prepared node for application use
 SET GLOBAL wsrep_reject_queries = ALL_KILL;
-ERROR HY000: Lost connection to MySQL server during query
 SELECT * FROM t1;
 ERROR HY000: Lost connection to MySQL server during query
 SELECT * FROM t1;
 ERROR 08S01: WSREP has not yet prepared node for application use
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
 INSERT INTO t1 VALUES (1);
