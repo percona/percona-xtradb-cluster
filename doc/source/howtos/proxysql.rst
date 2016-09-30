@@ -276,7 +276,7 @@ with default credentials:
 
 .. code-block:: bash
 
-   root@proxysql:~# mysql -uadmin -padmin -h127.0.0.1 -P6032
+   root@proxysql:~# mysql -u admin -padmin -h 127.0.0.1 -P 6032
 
    Welcome to the MySQL monitor.  Commands end with ; or \g.
    Your MySQL connection id is 2
@@ -486,7 +486,7 @@ To confirm that the user has been set up correctly, you can try to log in:
 
 .. code-block:: bash
 
-  root@proxysql:~# mysql -u sbuser -p sbpass -h 127.0.0.1 -P 6033
+  root@proxysql:~# mysql -u sbuser -psbpass -h 127.0.0.1 -P 6033
 
   Welcome to the MySQL monitor.  Commands end with ; or \g.
   Your MySQL connection id is 1491
