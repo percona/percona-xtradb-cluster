@@ -295,7 +295,7 @@ INSERT INTO global_suppressions VALUES
  ("JOIN message from member .* in non-primary configuration"),
  ("install timer expired"),
  ("Last Applied Action message in non-primary configuration from member"),
- ("InnoDB High Priority being used for slave: 0 -> 0"),
+ ("InnoDB High Priority being used"),
  ("THE_LAST_SUPPRESSION")||
 
 

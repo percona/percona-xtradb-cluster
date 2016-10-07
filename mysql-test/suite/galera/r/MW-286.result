@@ -6,8 +6,24 @@ INSERT INTO t1 (f1) SELECT 100000 + (10000 * a1.f1) + (1000 * a2.f1) + (100 * a3
 SET GLOBAL wsrep_desync = TRUE;
 SET wsrep_on = FALSE;
 ALTER TABLE t1 ADD PRIMARY KEY (f1);
-ERROR 70100: Query execution was interrupted
 SET wsrep_on = TRUE;
 SET GLOBAL wsrep_desync = FALSE;
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+100000
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+200000
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
 DROP TABLE t1;
 DROP TABLE ten;

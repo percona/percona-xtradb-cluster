@@ -10,10 +10,6 @@ if ($galera_wsrep_start_position != '') {
 }
 
 if ($galera_wsrep_start_position == '') {
-   if ($start_mysqld_params == '') {
-      --let $restart_parameters = restart
-   }
-
    if ($start_mysqld_params != '') {
       --let $restart_parameters = restart:$start_mysqld_params
    }
