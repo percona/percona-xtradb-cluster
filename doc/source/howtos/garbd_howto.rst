@@ -99,14 +99,32 @@ up. This example is using cluster information from the :ref:`ubuntu_howto`.
 
 You can now start the *Galera Arbitrator* daemon (``garbd``) by running:
 
+* On Debian or Ubuntu:
+
 .. code-block:: bash
 
   root@server:~# service garbd start
   [ ok ] Starting /usr/bin/garbd: :.
 
-You can additionally check the ``garbd`` status by running:
+* On Red Hat Enterprise Linux or CentOS:
+
+.. code-block:: bash
+
+  root@server:~# service garb start
+  [ ok ] Starting /usr/bin/garbd: :.
+
+You can additionally check the ``arbitrator`` status by running:
+
+* On Debian or Ubuntu:
 
 .. code-block:: bash
 
   root@server:~# service garbd status
+  [ ok ] garb is running.
+
+* On Red Hat Enterprise Linux or CentOS:
+
+.. code-block:: bash
+
+  root@server:~# service garb status
   [ ok ] garb is running.
