@@ -331,11 +331,11 @@ bool reload_acl_and_cache(THD *thd, unsigned long options,
         }
       }
 
-      if (thd && thd->wsrep_applier)
+      if (thd && (thd->wsrep_applier || thd->slave_thread))
       {
         /*
-          In case of applier thread, do not wait for table share(s) to be
-          removed from table definition cache.
+          In case of wsrep-applier/mysql-slave thread, do not wait for table
+          share(s) to be removed from table definition cache.
 
           This is important otherwise it can lead to a deadlock in following
           scenario:
