@@ -130,6 +130,15 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
         delete ev;
         continue;
       }
+      /*
+         gtid_pre_statement_checks will fail on the subsequent statement
+         if the bits below are set. So we don't mark the thd to run in
+         transaction mode yet, and assume there will be such a "BEGIN"
+         log event that will set those appropriately.
+      */
+      thd->variables.option_bits&= ~OPTION_BEGIN;
+      thd->server_status&= ~SERVER_STATUS_IN_TRANS;
+      assert(event== 1);
     }
     default:
       break;
