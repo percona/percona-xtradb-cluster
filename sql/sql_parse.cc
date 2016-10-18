@@ -1231,6 +1231,12 @@ static my_bool deny_updates_if_read_only_option(THD *thd,
   if (user_is_super && (!opt_super_readonly))
     DBUG_RETURN(FALSE);
 
+#ifdef WITH_WSREP
+  /* Allow action for wsrep applier (so called slave thread in galera/pxc) */
+  if (thd->wsrep_applier && user_is_super && opt_super_readonly)
+    DBUG_RETURN(FALSE);
+#endif /* WITH_WSREP */
+
   if (!(sql_command_flags[lex->sql_command] & CF_CHANGES_DATA))
     DBUG_RETURN(FALSE);
 
@@ -4192,6 +4198,9 @@ end_with_restore_list:
         enforce_ro = !(thd->security_ctx->master_access & SUPER_ACL);
       if (opt_readonly &&
 	  enforce_ro &&
+#ifdef WITH_WSREP
+	  !thd->wsrep_applier &&
+#endif /* WITH_WSREP */
 	  some_non_temp_table_to_be_updated(thd, all_tables))
       {
         my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0),

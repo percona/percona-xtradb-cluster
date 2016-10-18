@@ -1520,7 +1520,11 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
     if (rw_trans && stmt_has_updated_trans_table(ha_info) &&
         opt_readonly &&
         enforce_ro &&
+#ifdef WITH_WSREP
+        !thd->slave_thread && !thd->wsrep_applier)
+#else
         !thd->slave_thread)
+#endif /* WITH_WSREP */
     {
       my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0),
                opt_super_readonly ? "--read-only (super)" : "--read-only");
