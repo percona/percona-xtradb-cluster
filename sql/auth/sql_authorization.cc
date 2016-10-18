@@ -522,7 +522,11 @@ bool check_readonly(THD *thd, bool err_if_readonly)
     DBUG_RETURN(FALSE);
 
   /* thread is replication slave, do not prohibit operation: */
+#ifdef WITH_WSREP
+  if (thd->slave_thread || thd->wsrep_applier)
+#else
   if (thd->slave_thread)
+#endif /* WITH_WSREP */
     DBUG_RETURN(FALSE);
 
   /* Permit replication operations. */
