@@ -467,7 +467,11 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
     */
     thd->lex->sql_command= backup.sql_command;
 
+#ifdef WITH_WSREP
+    if (opt_readonly && enforce_ro && !thd->slave_thread && !thd->wsrep_applier)
+#else
     if (opt_readonly && enforce_ro && !thd->slave_thread)
+#endif /* WITH_WSREP */
     {
       my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0),
                opt_super_readonly ? "--read-only (super)" : "--read-only");
