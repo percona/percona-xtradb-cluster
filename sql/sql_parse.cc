@@ -5542,6 +5542,7 @@ create_sp_error:
     if (check_access(thd, UPDATE_ACL, "mysql", NULL, NULL, 1, 1) &&
         check_global_access(thd, CREATE_USER_ACL))
       break;
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
     /* Conditionally writes to binlog */
     if (!(res= mysql_user_password_expire(thd, lex->users_list)))
       my_ok(thd);
