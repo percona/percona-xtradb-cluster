@@ -39,8 +39,8 @@ Why do we need a rollback thread (there is only one rollback thread)?
 * Transactions executed in parallel can conflict and may need to rollback. A
   rollback thread helps achieve this. Applier transactions always take priority
   over local transactions. (This is natural, as applier transactions have been
-  accepted by the cluster, and some of the nodes may have already applied them.
-* Local conflicting transactions still has a window to rollback.)
+  accepted by the cluster, and some of the nodes may have already applied them.)
+* Local conflicting transactions still has a window to rollback.
 
 All the transactions that need to be rolled back are added to the rollback
 queue, and the rollback thread is notified. The rollback thread will then
