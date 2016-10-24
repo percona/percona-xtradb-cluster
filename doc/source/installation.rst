@@ -1,87 +1,54 @@
 .. _installation:
 
-===================================================
- Installing Percona XtraDB Cluster from Binaries
-===================================================
+=================================
+Installing Percona XtraDB Cluster
+=================================
 
-.. toctree::
-   :hidden:
+|Percona XtraDB Cluster| supports most 64-bit Linux distributions.
+Percona provides packages for popular DEB-based and RPM-based distributions:
 
-Ready-to-use binaries are available from the *Percona XtraDB Cluster* `download page <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/>`_, including:
-
- * ``RPM`` packages for *RHEL* 5, *RHEL* 6, and *RHEL* 7
-
- * *Debian* packages
-
- * Generic ``.tar.gz`` packages
-
-Using Percona Software Repositories
-===================================
-
-.. toctree::
-   :maxdepth: 1
-
-   installation/yum_repo
-   installation/apt_repo
-
-|Percona| provides repositories for :program:`yum` (``RPM`` packages for *Red Hat*, *CentOS* and *Amazon Linux AMI*) and :program:`apt` (:file:`.deb` packages for *Ubuntu* and *Debian*) for software such as |Percona Server|, |XtraDB|, |XtraBackup|, and *Percona Toolkit*. This makes it easy to install and update your software and its dependencies through your operating system's package manager.
-
-This is the recommend way of installing where possible.
-Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
-
-``YUM``-Based Systems
----------------------
-
-Once the repository is set up, use the following commands: ::
-
-  $ yum install Percona-XtraDB-Cluster-56
-
-More detailed example of the |Percona XtraDB Cluster| installation and configuration can be seen in :ref:`centos_howto` tutorial.
-
-``DEB``-Based Systems
----------------------
-
-Once the repository is set up, use the following commands: ::
-
-  $ sudo apt-get install percona-xtradb-cluster-56
-
-More detailed example of the |Percona XtraDB Cluster| installation and configuration can be seen in :ref:`ubuntu_howto` tutorial.
+* Debian 7 ("wheezy")
+* Debian 8 ("jessie")
+* Ubuntu 12.04 LTS (Precise Pangolin)
+* Ubuntu 14.04 LTS (Trusty Tahr)
+* Ubuntu 15.10 (Wily Werewolf)
+* Ubuntu 16.04 (Xenial Xerus)
+* Red Hat Enterprise Linux / CentOS 5
+* Red Hat Enterprise Linux / CentOS 6
+* Red Hat Enterprise Linux / CentOS 7
 
 Prerequisites
 =============
 
-In order for |Percona XtraDB Cluster| to work correctly firewall has to be set up to allow connections on the following ports: 3306, 4444, 4567 and 4568. |Percona XtraDB Cluster| currently doesn't work with ``SELinux`` or ``apparmor`` so they should be disabled, otherwise individual nodes won't be able to communicate and form the cluster.
+|PXC| requires the following ports for communication: 3306, 4444, 4567, 4568.
+Make sure that these ports are not blocked by firewall
+or used by other software.
 
-Initial configuration
-=====================
+|PXC| does not work with ``SELinux`` and ``AppArmor`` security modules.
+Make sure these modules are disabled.
 
-In order to start using the |Percona XtraDB Cluster|, following options are needed in the |MySQL| configuration file :file:`my.cnf`: ::
+Installation Guides
+===================
 
-  [mysqld]
-  
-  wsrep_provider — a path to Galera library.
-  wsrep_cluster_address — Cluster connection URL containing the IPs of other nodes in the cluster
-  wsrep_sst_method - method used for the state snapshot transfer 
-  
-  binlog_format=ROW - In order for Galera to work correctly binlog format should be ROW
-  default_storage_engine=InnoDB - MyISAM storage engine has only experimental support
-  innodb_autoinc_lock_mode=2 - This changes how InnoDB autoincrement locks are managed
+It is recommended to install |PXC| from official Percona repositories
+using the corresponding tool for your system:
 
-Additional parameters to specify: ::
+* :ref:`Install using apt <apt-repo>` if you are running Debian or Ubuntu
+* :ref:`Install using yum <yum-repo>` if you are running Red Hat Enterprise
+  Linux or CentOS
 
-  wsrep_sst_auth=user:password   
+.. note::
 
-If any other :ref:`state_snapshot_transfer` method beside the :program:`rsync` is specified in the :variable:`wsrep_sst_method`, credentials for |SST| need to be specified.
+  You can also `download packages
+  <https://www.percona.com/downloads/Percona-XtraDB-Cluster-56>`_ from the
+  Percona website and install them manually using :command:`dpkg` or
+  :command:`rpm`.
 
-Example: ::
+If you want to build and run |PXC| from source, see :ref:`compile`.
 
-  wsrep_provider=/usr/lib64/libgalera_smm.so
-  wsrep_cluster_address=gcomm://10.11.12.206
-  wsrep_slave_threads=8
-  wsrep_sst_method=rsync
-  binlog_format=ROW
-  default_storage_engine=InnoDB
-  innodb_autoinc_lock_mode=2
+.. toctree::
+   :hidden:
 
-Detailed list of variables can be found in :ref:`wsrep_system_index` and :ref:`wsrep_status_index`.
-
+   Install Using apt <installation/apt_repo>
+   Install Using yum <installation/yum_repo>
+   Compile from Source <installation/compile>
