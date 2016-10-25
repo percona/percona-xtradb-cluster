@@ -43,11 +43,12 @@ Installation
 ============
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :glob:
+   :titlesonly:
 
    installation
-   installation/compiling_xtradb_cluster
+   installation/compile
    upgrading_guide_55_56
 
 Features
