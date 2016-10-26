@@ -151,7 +151,7 @@ Depending on the mode you select, other options will be required.
   .. code-block:: text
 
      [sst]
-     encrypt=2
+     encrypt=3
      tcert=/path/to/server.pem
      tkey=/path/to/server.key
 
