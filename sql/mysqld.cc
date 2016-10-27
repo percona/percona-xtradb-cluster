@@ -1915,7 +1915,7 @@ extern "C" void unireg_abort(int exit_code)
   if (wsrep)
   {
     /* Cancel the SST script if it is running: */
-    wsrep_sst_cancel();
+    wsrep_sst_cancel(true);
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only diconnect from service */
     wsrep_close_client_connections(FALSE);
