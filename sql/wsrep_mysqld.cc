@@ -1110,6 +1110,7 @@ int wsrep_init()
   wsrep_args.unordered_cb    = wsrep_unordered_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
+  wsrep_args.abort_cb        = wsrep_abort_cb;
   wsrep_args.pfs_instr_cb    = NULL;
 #ifdef HAVE_PSI_INTERFACE
   wsrep_args.pfs_instr_cb    = wsrep_pfs_instr_cb;

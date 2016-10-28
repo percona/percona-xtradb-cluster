@@ -22,6 +22,10 @@
 #include "mysqld_thd_manager.h"          // Global_THD_manager
 #include "sql_class.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
+
 #ifdef _WIN32
 #include <crtdbg.h>
 #define SIGNAL_FMT "exception 0x%x"
@@ -62,6 +66,14 @@ extern "C" void handle_fatal_signal(int sig)
   }
 
   segfaulted = 1;
+
+/*
+  The wsrep subsystem has their its own actions
+  which need be performed before exiting:
+*/
+#ifdef WITH_WSREP
+  wsrep_handle_fatal_signal(sig);
+#endif
 
 #ifdef _WIN32
   SYSTEMTIME utc_time;
