@@ -35,6 +35,7 @@ wsrep_cb_status wsrep_sst_donate_cb (void* app_ctx,
                                      const wsrep_gtid_t* state_id,
                                      const char* state, size_t state_len,
                                      bool bypass);
+void wsrep_abort_cb (void);
 
 extern wsrep_uuid_t  local_uuid;
 extern wsrep_seqno_t local_seqno;
