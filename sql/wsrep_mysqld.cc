@@ -638,6 +638,7 @@ int wsrep_init()
   wsrep_args.unordered_cb    = wsrep_unordered_cb;
   wsrep_args.sst_donate_cb   = wsrep_sst_donate_cb;
   wsrep_args.synced_cb       = wsrep_synced_cb;
+  wsrep_args.abort_cb        = wsrep_abort_cb;
 
   rcode = wsrep->init(wsrep, &wsrep_args);
 

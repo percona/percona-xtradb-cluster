@@ -454,6 +454,18 @@ typedef void (*wsrep_synced_cb_t) (void* app_ctx);
 
 
 /*!
+ * @brief a callback to signal application that wsrep provider was
+ * terminated abnormally. In this case, the application can perform
+ * the critical steps to clean its state, for example, it can terminate
+ * the child processes associated with the SST.
+ *
+ * This callback is called after wsrep library was terminated
+ * abnormally using abort() call.
+ */
+typedef void (*wsrep_abort_cb_t) (void);
+
+
+/*!
  * Initialization parameters for wsrep provider.
  */
 struct wsrep_init_args
@@ -485,6 +497,10 @@ struct wsrep_init_args
     /* State Snapshot Transfer callbacks */
     wsrep_sst_donate_cb_t sst_donate_cb;   //!< starting to donate
     wsrep_synced_cb_t     synced_cb;       //!< synced with group
+
+    /* Abnormal termination callback: */
+    wsrep_abort_cb_t      abort_cb;        //!< wsrep provider terminated
+                                           //!< abnormally
 };
 
 
@@ -824,8 +840,8 @@ struct wsrep {
    *
    * Whenever a new connection ID is passed to wsrep provider through
    * any of the API calls, a connection context is allocated for this
-   * connection. This call is to explicitly notify provider fo connection
-   * closing.
+   * connection. This call is to explicitly notify provider to close the
+   * connection.
    *
    * @param wsrep       provider handle
    * @param conn_id     connection ID
@@ -974,7 +990,7 @@ struct wsrep {
                                const char* donor_spec);
 
   /*!
-   * @brief Returns an array fo status variables.
+   * @brief Returns an array of status variables.
    *        Array is terminated by Null variable name.
    *
    * @param wsrep provider handle
