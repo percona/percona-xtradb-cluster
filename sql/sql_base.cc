@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -333,7 +333,7 @@ uint get_table_def_key(const TABLE_LIST *table_list, const char **key)
 *****************************************************************************/
 
 extern "C" uchar *table_def_key(const uchar *record, size_t *length,
-                               my_bool not_used __attribute__((unused)))
+                               my_bool not_used MY_ATTRIBUTE((unused)))
 {
   TABLE_SHARE *entry=(TABLE_SHARE*) record;
   *length= entry->table_cache_key.length;
@@ -501,7 +501,7 @@ TABLE_SHARE *get_table_share(THD *thd, TABLE_LIST *table_list,
   if (my_hash_insert(&table_def_cache, (uchar*) share))
   {
     free_table_share(share);
-    DBUG_RETURN(0);				// return error
+    DBUG_RETURN(0);       // return error
   }
   if (open_table_def(thd, share, db_flags))
   {
@@ -509,10 +509,11 @@ TABLE_SHARE *get_table_share(THD *thd, TABLE_LIST *table_list,
     (void) my_hash_delete(&table_def_cache, (uchar*) share);
     DBUG_RETURN(0);
   }
-  share->ref_count++;				// Mark in use
+  share->ref_count++;        // Mark in use
 
 #ifdef HAVE_PSI_TABLE_INTERFACE
-  share->m_psi= PSI_TABLE_CALL(get_table_share)(false, share);
+  share->m_psi=
+     PSI_TABLE_CALL(get_table_share)((share->tmp_table != NO_TMP_TABLE), share);
 #else
   share->m_psi= NULL;
 #endif
@@ -993,7 +994,6 @@ bool close_cached_tables(THD *thd, TABLE_LIST *tables,
 
   while (found && ! thd->killed)
   {
-    WSREP_DEBUG("close_cached_tables, wait loop");
     TABLE_SHARE *share;
     found= FALSE;
     /*
@@ -4868,7 +4868,7 @@ end:
 }
 
 extern "C" uchar *schema_set_get_key(const uchar *record, size_t *length,
-                                     my_bool not_used __attribute__((unused)))
+                                     my_bool not_used MY_ATTRIBUTE((unused)))
 {
   TABLE_LIST *table=(TABLE_LIST*) record;
   *length= table->db_length;
@@ -5481,6 +5481,15 @@ handle_view(THD *thd, Query_tables_list *prelocking_ctx,
                                  &table_list->view->sroutines_list,
                                  table_list->top_table());
   }
+
+  /*
+    If a trigger was defined on one of the associated tables then assign the
+    'trg_event_map' value of the view to the next table in table_list. When a
+    Stored function is invoked, all the associated tables including the tables
+    associated with the trigger are prelocked.
+  */
+  if (table_list->trg_event_map && table_list->next_global)
+    table_list->next_global->trg_event_map= table_list->trg_event_map;
   return FALSE;
 }
 

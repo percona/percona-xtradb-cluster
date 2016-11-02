@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -113,18 +113,18 @@ int yylex(void *yylval, void *yythd);
 <pre>
   yyerrlab1:
   #if defined (__GNUC_MINOR__) && 2093 <= (__GNUC__ * 1000 + __GNUC_MINOR__)
-    __attribute__ ((__unused__))
+    MY_ATTRIBUTE ((__unused__))
   #endif
 </pre>
-  This usage of __attribute__ is illegal, so we remove it.
+  This usage of MY_ATTRIBUTE is illegal, so we remove it.
   See the following references for details:
   http://lists.gnu.org/archive/html/bug-bison/2004-02/msg00014.html
   http://gcc.gnu.org/bugzilla/show_bug.cgi?id=14273
 */
 
 #if defined (__GNUC_MINOR__) && 2093 <= (__GNUC__ * 1000 + __GNUC_MINOR__)
-#undef __attribute__
-#define __attribute__(X)
+#undef MY_ATTRIBUTE
+#define MY_ATTRIBUTE(X)
 #endif
 
 
@@ -2515,6 +2515,11 @@ server_def:
           ident_or_text
           OPTIONS_SYM '(' server_options_list ')'
           {
+            if ($2.length == 0)
+            {
+              my_error(ER_WRONG_VALUE, MYF(0), "server name", "");
+              MYSQL_YYABORT;
+            }
             Lex->server_options.server_name= $2.str;
             Lex->server_options.server_name_length= $2.length;
             Lex->server_options.scheme= $6.str;
@@ -8781,15 +8786,21 @@ select_lock_type:
         | FOR_SYM UPDATE_SYM
           {
             LEX *lex=Lex;
-            lex->current_select->set_lock_for_tables(TL_WRITE);
-            lex->safe_to_cache_query=0;
+            if (!lex->describe)
+            {
+              lex->current_select->set_lock_for_tables(TL_WRITE);
+              lex->safe_to_cache_query=0;
+            }
           }
         | LOCK_SYM IN_SYM SHARE_SYM MODE_SYM
           {
             LEX *lex=Lex;
-            lex->current_select->
-              set_lock_for_tables(TL_READ_WITH_SHARED_LOCKS);
-            lex->safe_to_cache_query=0;
+            if (!lex->describe)
+            {
+              lex->current_select->
+                set_lock_for_tables(TL_READ_WITH_SHARED_LOCKS);
+              lex->safe_to_cache_query=0;
+            }
           }
         ;
 

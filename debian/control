@@ -72,9 +72,6 @@ Description: MySQL 5.6 specific common files, e.g. /etc/mysql/conf.d/my-5.6.cnf
 Package: mysql-wsrep-client-5.6
 Architecture: any
 Depends: debianutils (>=1.6),
-         libdbd-mysql-perl (>= 1.2202),
-         libdbi-perl,
-         libterm-readkey-perl,
          mysql-wsrep-common-5.6,
          mysql-wsrep-libmysqlclient18,
          ${misc:Depends},
@@ -91,6 +88,9 @@ Replaces: mysql-client-5.5,
           mysql-client-core-5.5,
           mysql-client-core-5.6,
           virtual-mysql-client
+Recommends: libdbd-mysql-perl (>= 1.2202),
+            libdbi-perl,
+            libterm-readkey-perl
 Description: MySQL database client binaries
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
  server. SQL (Structured Query Language) is the most popular database query

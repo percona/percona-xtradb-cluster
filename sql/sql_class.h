@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights
    reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -83,6 +83,7 @@ struct wsrep_thd_shadow {
   ulong                tx_isolation;
   char                 *db;
   size_t               db_length;
+  struct timeval       user_time;
 };
 #endif
 class Reprepare_observer;
@@ -1583,6 +1584,8 @@ typedef I_List<Item_change_record> Item_change_list;
 /**
   Type of locked tables mode.
   See comment for THD::locked_tables_mode for complete description.
+  While adding new enum values add them to the getter method for this enum
+  declared below and defined in sql_class.cc as well.
 */
 
 enum enum_locked_tables_mode
@@ -1593,6 +1596,15 @@ enum enum_locked_tables_mode
   LTM_PRELOCKED_UNDER_LOCK_TABLES
 };
 
+#ifndef DBUG_OFF
+/**
+  Getter for the enum enum_locked_tables_mode
+  @param locked_tables_mode enum for types of locked tables mode
+
+  @return The string represantation of that enum value
+*/
+const char * get_locked_tables_mode_name(enum_locked_tables_mode locked_tables_mode);
+#endif
 
 /**
   Class that holds information about tables which were opened and locked
@@ -2364,6 +2376,9 @@ public:
     return (WSREP_BINLOG_FORMAT((ulong)current_stmt_binlog_format) ==
             BINLOG_FORMAT_ROW);
   }
+
+  bool is_current_stmt_binlog_disabled() const;
+
   /** Tells whether the given optimizer_switch flag is on */
   inline bool optimizer_switch_flag(ulonglong flag) const
   {
@@ -3202,6 +3217,7 @@ public:
   void*                     wsrep_apply_format;
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
+  ulong                     wsrep_affected_rows;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
@@ -4211,11 +4227,12 @@ private:
 public:
   /**
     This is only used by master dump threads.
-    When the master receives a new connection from a slave with a UUID that
-    is already connected, it will set this flag TRUE before killing the old
-    slave connection.
+    When the master receives a new connection from a slave with a
+    UUID (for slave versions >= 5.6)/server_id(for slave versions < 5.6)
+    that is already connected, it will set this flag TRUE
+    before killing the old slave connection.
   */
-  bool duplicate_slave_uuid;
+  bool duplicate_slave_id;
 };
 
 

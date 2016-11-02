@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -878,11 +878,11 @@ void Optimize_table_order::best_access_path(
     (1) The found 'ref' access produces more records than a table scan
         (or index scan, or quick select), or 'ref' is more expensive than
         any of them.
-    (2) This doesn't hold: the best way to perform table scan is to to perform
-        'range' access using index IDX, and the best way to perform 'ref' 
-        access is to use the same index IDX, with the same or more key parts.
-        (note: it is not clear how this rule is/should be extended to 
-        index_merge quick selects)
+    (2) The best way to perform table or index scan is to use 'range' access
+        using index IDX. If it is a 'tight range' scan (i.e not a loose index
+        scan' or 'index merge'), then ref access on the same index will
+        perform equal or better if ref access can use the same or more number
+        of key parts.
     (3) See above note about InnoDB.
     (4) NOT ("FORCE INDEX(...)" is used for table and there is 'ref' access
              path, but there is no quick select)
@@ -904,7 +904,9 @@ void Optimize_table_order::best_access_path(
   }
 
   if ((s->quick && best_key && s->quick->index == best_key->key &&      // (2)
-       best_max_key_part >= s->table->quick_key_parts[best_key->key]))  // (2)
+       best_max_key_part >= s->table->quick_key_parts[best_key->key]) &&  // (2)
+      (s->quick->get_type() !=
+       QUICK_SELECT_I::QS_TYPE_GROUP_MIN_MAX))                      // (2)
   {
     trace_access_scan.add_alnum("access_type", "range").
       add_alnum("cause", "heuristic_index_cheaper");
@@ -1514,7 +1516,7 @@ bool Optimize_table_order::greedy_search(table_map remaining_tables)
       join state will not be reverted back to its initial state because we
       don't "pop" tables already present in the partial plan.
     */
-    bool is_interleave_error __attribute__((unused))= 
+    bool is_interleave_error MY_ATTRIBUTE((unused))= 
       check_interleaving_with_nj (best_table);
     /* This has been already checked by best_extension_by_limited_search */
     DBUG_ASSERT(!is_interleave_error);

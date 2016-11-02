@@ -1,7 +1,7 @@
 #ifndef ITEM_GEOFUNC_INCLUDED
 #define ITEM_GEOFUNC_INCLUDED
 
-/* Copyright (c) 2000, 2011, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -186,7 +186,7 @@ public:
       if (args[i]->fixed && args[i]->field_type() != MYSQL_TYPE_GEOMETRY)
       {
         String str;
-        args[i]->print(&str, QT_ORDINARY);
+        args[i]->print(&str, QT_NO_DATA_EXPANSION);
         str.append('\0');
         my_error(ER_ILLEGAL_VALUE_FOR_TYPE, MYF(0), "non geometric",
                  str.ptr());
@@ -519,7 +519,21 @@ class Item_func_distance: public Item_real_func
   Gcalc_function func;
   Gcalc_scan_iterator scan_it;
 public:
-  Item_func_distance(Item *a, Item *b): Item_real_func(a, b) {}
+  Item_func_distance(Item *a, Item *b): Item_real_func(a, b)
+  {
+    /*
+      Distance could be NULL, if either of the operands are
+      not geometries.
+    */
+    maybe_null= true;
+  }
+
+  void fix_length_and_dec()
+  {
+    Item_real_func::fix_length_and_dec();
+    maybe_null= true;
+  }
+
   double val_real();
   const char *func_name() const { return "st_distance"; }
 };

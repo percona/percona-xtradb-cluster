@@ -73,7 +73,7 @@ my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
  * End configuration options
  */
 
-static const wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
+static wsrep_uuid_t cluster_uuid = WSREP_UUID_UNDEFINED;
 static char         cluster_uuid_str[40]= { 0, };
 static const char*  cluster_status_str[WSREP_VIEW_MAX] =
 {
@@ -186,8 +186,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
 
   if (memcmp(&cluster_uuid, &view->state_id.uuid, sizeof(wsrep_uuid_t)))
   {
-    memcpy((wsrep_uuid_t*)&cluster_uuid, &view->state_id.uuid,
-           sizeof(cluster_uuid));
+    memcpy(&cluster_uuid, &view->state_id.uuid, sizeof(cluster_uuid));
 
     wsrep_uuid_print (&cluster_uuid, cluster_uuid_str,
                       sizeof(cluster_uuid_str));
@@ -455,8 +454,7 @@ int wsrep_init()
       WSREP_ERROR("wsrep_load(%s) failed: %s (%d). Reverting to no provider.",
                   wsrep_provider, strerror(rcode), rcode);
       strcpy((char*)wsrep_provider, WSREP_NONE); // damn it's a dirty hack
-      (void) wsrep_init();
-      return rcode;
+      return wsrep_init();
     }
     else /* this is for recursive call above */
     {
@@ -642,6 +640,9 @@ void wsrep_init_startup (bool first)
 
   wsrep_thr_lock_init(wsrep_thd_is_BF, wsrep_abort_thd,
                       wsrep_debug, wsrep_convert_LOCK_to_trx, wsrep_on);
+
+  /* Skip replication start if dummy wsrep provider is loaded */
+  if (!strcmp(wsrep_provider, WSREP_NONE)) return;
 
   /* Skip replication start if no cluster address */
   if (!wsrep_cluster_address || strlen(wsrep_cluster_address) == 0) return;
@@ -1275,19 +1276,15 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   WSREP_DEBUG("RSU BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, WSREP_QUERY(thd));
 
-  if (!wsrep_desync)
+  ret = wsrep->desync(wsrep);
+  if (ret != WSREP_OK)
   {
-    ret = wsrep->desync(wsrep);
-    if (ret != WSREP_OK)
-    {
-      WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
-                 ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
-      my_error(ER_LOCK_DEADLOCK, MYF(0));
-      return(ret);
-    }
+    WSREP_WARN("RSU desync failed %d for schema: %s, query: %s",
+               ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+    my_error(ER_LOCK_DEADLOCK, MYF(0));
+    return(ret);
   }
-  else
-    WSREP_DEBUG("RSU desync skipped: %d", wsrep_desync);
+
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying++;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
@@ -1301,15 +1298,13 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
     wsrep_replaying--;
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
-    if (!wsrep_desync)
+    ret = wsrep->resync(wsrep);
+    if (ret != WSREP_OK)
     {
-      ret = wsrep->resync(wsrep);
-      if (ret != WSREP_OK)
-      {
-        WSREP_WARN("resync failed %d for schema: %s, query: %s",
-                   ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
-      }
+      WSREP_WARN("resync failed %d for schema: %s, query: %s",
+                 ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
     }
+
     my_error(ER_LOCK_DEADLOCK, MYF(0));
     return(1);
   }
@@ -1343,18 +1338,15 @@ static void wsrep_RSU_end(THD *thd)
     WSREP_WARN("resume failed %d for schema: %s, query: %s", ret,
                (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
   }
-  if (!wsrep_desync)
+
+  ret = wsrep->resync(wsrep);
+  if (ret != WSREP_OK)
   {
-    ret = wsrep->resync(wsrep);
-    if (ret != WSREP_OK)
-    {
-      WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
-                 (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
-      return;
-    }
+    WSREP_WARN("resync failed %d for schema: %s, query: %s", ret,
+               (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
+    return;
   }
-  else
-    WSREP_DEBUG("RSU resync skipped: %d", wsrep_desync);
+
   thd->variables.wsrep_on = 1;
 }
 
@@ -1537,4 +1529,13 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
   }
   return ret;
+}
+
+bool wsrep_node_is_donor()
+{
+  return (WSREP_ON) ? (local_status.get() == 2) : false;
+}
+bool wsrep_node_is_synced()
+{
+  return (WSREP_ON) ? (local_status.get() == 4) : false;
 }

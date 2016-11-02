@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -712,7 +712,13 @@ enum enum_query_type
   /// Don't print a database if it's equal to the connection's database
   QT_NO_DEFAULT_DB= (1 << 3),
   /// When printing a derived table, don't print its expression, only alias
-  QT_DERIVED_TABLE_ONLY_ALIAS= (1 << 4)
+  QT_DERIVED_TABLE_ONLY_ALIAS= (1 << 4),
+  /**
+    If an expression is constant, print the expression, not the value
+    it evaluates to. Should be used for error messages, so that they
+    don't reveal values.
+  */
+  QT_NO_DATA_EXPANSION= (1 << 9)
 };
 
 /* query_id */
@@ -720,10 +726,10 @@ typedef int64 query_id_t;
 extern query_id_t global_query_id;
 extern my_atomic_rwlock_t global_query_id_lock;
 
-void unireg_end(void) __attribute__((noreturn));
+void unireg_end(void) MY_ATTRIBUTE((noreturn));
 
 /* increment query_id and return it.  */
-inline __attribute__((warn_unused_result)) query_id_t next_query_id()
+inline MY_ATTRIBUTE((warn_unused_result)) query_id_t next_query_id()
 {
   query_id_t id;
   my_atomic_rwlock_wrlock(&global_query_id_lock);
@@ -736,7 +742,7 @@ inline __attribute__((warn_unused_result)) query_id_t next_query_id()
   TODO: Replace this with an inline function.
  */
 #ifndef EMBEDDED_LIBRARY
-extern "C" void unireg_abort(int exit_code) __attribute__((noreturn));
+extern "C" void unireg_abort(int exit_code) MY_ATTRIBUTE((noreturn));
 #else
 extern "C" void unireg_clear(int exit_code);
 #define unireg_abort(exit_code) do { unireg_clear(exit_code); DBUG_RETURN(exit_code); } while(0)

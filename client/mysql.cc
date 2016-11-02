@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1486,8 +1486,9 @@ sig_handler handle_kill_signal(int sig)
   mysql_options(kill_mysql, MYSQL_OPT_CONNECT_ATTR_RESET, 0);
   mysql_options4(kill_mysql, MYSQL_OPT_CONNECT_ATTR_ADD,
                  "program_name", "mysql");
-  if (!mysql_real_connect(kill_mysql,current_host, current_user, opt_password,
-                          "", opt_mysql_port, opt_mysql_unix_port,0))
+  if (!mysql_connect_ssl_check(kill_mysql, current_host, current_user,
+                               opt_password, "", opt_mysql_port,
+                               opt_mysql_unix_port, 0, opt_ssl_required))
   {
     tee_fprintf(stdout, "%s -- sorry, cannot connect to server to kill query, giving up ...\n", reason);
     goto err;
@@ -1818,7 +1819,7 @@ static void usage(int version)
 
 
 my_bool
-get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
+get_one_option(int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
 	       char *argument)
 {
   switch(optid) {
@@ -2754,8 +2755,8 @@ static void initialize_readline (char *name)
 */
 
 static char **new_mysql_completion(const char *text,
-                                   int start __attribute__((unused)),
-                                   int end __attribute__((unused)))
+                                   int start MY_ATTRIBUTE((unused)),
+                                   int end MY_ATTRIBUTE((unused)))
 {
   if (!status.batch && !quick)
 #if defined(USE_NEW_READLINE_INTERFACE)
@@ -3165,8 +3166,8 @@ static void print_help_item(MYSQL_ROW *cur, int num_name, int num_cat, char *las
 }
 
 
-static int com_server_help(String *buffer __attribute__((unused)),
-			   char *line __attribute__((unused)), char *help_arg)
+static int com_server_help(String *buffer MY_ATTRIBUTE((unused)),
+			   char *line MY_ATTRIBUTE((unused)), char *help_arg)
 {
   MYSQL_ROW cur;
   const char *server_cmd;
@@ -3272,8 +3273,8 @@ err:
 }
 
 static int
-com_help(String *buffer __attribute__((unused)),
-	 char *line __attribute__((unused)))
+com_help(String *buffer MY_ATTRIBUTE((unused)),
+	 char *line MY_ATTRIBUTE((unused)))
 {
   reg1 int i, j;
   char * help_arg= strchr(line,' '), buff[32], *end;
@@ -3312,7 +3313,7 @@ com_help(String *buffer __attribute__((unused)),
 
 	/* ARGSUSED */
 static int
-com_clear(String *buffer,char *line __attribute__((unused)))
+com_clear(String *buffer,char *line MY_ATTRIBUTE((unused)))
 {
 #ifdef HAVE_READLINE
   if (status.add_to_history)
@@ -3324,7 +3325,7 @@ com_clear(String *buffer,char *line __attribute__((unused)))
 
 	/* ARGSUSED */
 static int
-com_charset(String *buffer __attribute__((unused)), char *line)
+com_charset(String *buffer MY_ATTRIBUTE((unused)), char *line)
 {
   char buff[256], *param;
   const CHARSET_INFO *new_cs;
@@ -3356,7 +3357,7 @@ com_charset(String *buffer __attribute__((unused)), char *line)
 
 
 static int
-com_go(String *buffer,char *line __attribute__((unused)))
+com_go(String *buffer,char *line MY_ATTRIBUTE((unused)))
 {
   char		buff[200]; /* about 110 chars used so far */
   char		time_buff[52+3+1]; /* time max + space&parens + NUL */
@@ -4117,8 +4118,8 @@ print_tab_data(MYSQL_RES *result)
 }
 
 static int
-com_tee(String *buffer __attribute__((unused)),
-        char *line __attribute__((unused)))
+com_tee(String *buffer MY_ATTRIBUTE((unused)),
+        char *line MY_ATTRIBUTE((unused)))
 {
   char file_name[FN_REFLEN], *end, *param;
 
@@ -4160,8 +4161,8 @@ com_tee(String *buffer __attribute__((unused)),
 
 
 static int
-com_notee(String *buffer __attribute__((unused)),
-	  char *line __attribute__((unused)))
+com_notee(String *buffer MY_ATTRIBUTE((unused)),
+	  char *line MY_ATTRIBUTE((unused)))
 {
   if (opt_outfile)
     end_tee();
@@ -4175,8 +4176,8 @@ com_notee(String *buffer __attribute__((unused)),
 
 #ifdef USE_POPEN
 static int
-com_pager(String *buffer __attribute__((unused)),
-          char *line __attribute__((unused)))
+com_pager(String *buffer MY_ATTRIBUTE((unused)),
+          char *line MY_ATTRIBUTE((unused)))
 {
   char pager_name[FN_REFLEN], *end, *param;
 
@@ -4219,8 +4220,8 @@ com_pager(String *buffer __attribute__((unused)),
 
 
 static int
-com_nopager(String *buffer __attribute__((unused)),
-	    char *line __attribute__((unused)))
+com_nopager(String *buffer MY_ATTRIBUTE((unused)),
+	    char *line MY_ATTRIBUTE((unused)))
 {
   strmov(pager, "stdout");
   opt_nopager=1;
@@ -4237,7 +4238,7 @@ com_nopager(String *buffer __attribute__((unused)),
 
 #ifdef USE_POPEN
 static int
-com_edit(String *buffer,char *line __attribute__((unused)))
+com_edit(String *buffer,char *line MY_ATTRIBUTE((unused)))
 {
   char	filename[FN_REFLEN],buff[160];
   int	fd,tmp;
@@ -4281,16 +4282,16 @@ err:
 /* If arg is given, exit without errors. This happens on command 'quit' */
 
 static int
-com_quit(String *buffer __attribute__((unused)),
-	 char *line __attribute__((unused)))
+com_quit(String *buffer MY_ATTRIBUTE((unused)),
+	 char *line MY_ATTRIBUTE((unused)))
 {
   status.exit_status=0;
   return 1;
 }
 
 static int
-com_rehash(String *buffer __attribute__((unused)),
-	 char *line __attribute__((unused)))
+com_rehash(String *buffer MY_ATTRIBUTE((unused)),
+	 char *line MY_ATTRIBUTE((unused)))
 {
 #ifdef HAVE_READLINE
   build_completion_hash(1, 0);
@@ -4301,8 +4302,8 @@ com_rehash(String *buffer __attribute__((unused)),
 
 #ifdef USE_POPEN
 static int
-com_shell(String *buffer __attribute__((unused)),
-          char *line __attribute__((unused)))
+com_shell(String *buffer MY_ATTRIBUTE((unused)),
+          char *line MY_ATTRIBUTE((unused)))
 {
   char *shell_cmd;
 
@@ -4329,7 +4330,7 @@ com_shell(String *buffer __attribute__((unused)),
 
 
 static int
-com_print(String *buffer,char *line __attribute__((unused)))
+com_print(String *buffer,char *line MY_ATTRIBUTE((unused)))
 {
   tee_puts("--------------", stdout);
   (void) tee_fputs(buffer->c_ptr(), stdout);
@@ -4394,7 +4395,7 @@ com_connect(String *buffer, char *line)
 }
 
 
-static int com_source(String *buffer __attribute__((unused)),
+static int com_source(String *buffer MY_ATTRIBUTE((unused)),
                       char *line)
 {
   char source_name[FN_REFLEN], *end, *param;
@@ -4449,7 +4450,7 @@ static int com_source(String *buffer __attribute__((unused)),
 
 	/* ARGSUSED */
 static int
-com_delimiter(String *buffer __attribute__((unused)), char *line)
+com_delimiter(String *buffer MY_ATTRIBUTE((unused)), char *line)
 {
   char buff[256], *tmp;
 
@@ -4478,7 +4479,7 @@ com_delimiter(String *buffer __attribute__((unused)), char *line)
 
 	/* ARGSUSED */
 static int
-com_use(String *buffer __attribute__((unused)), char *line)
+com_use(String *buffer MY_ATTRIBUTE((unused)), char *line)
 {
   char *tmp, buff[FN_REFLEN + 1];
   int select_db;
@@ -4623,8 +4624,8 @@ normalize_dbname(const char *line, char *buff, uint buff_size)
 }
 
 static int
-com_warnings(String *buffer __attribute__((unused)),
-   char *line __attribute__((unused)))
+com_warnings(String *buffer MY_ATTRIBUTE((unused)),
+   char *line MY_ATTRIBUTE((unused)))
 {
   show_warnings = 1;
   put_info("Show warnings enabled.",INFO_INFO);
@@ -4632,8 +4633,8 @@ com_warnings(String *buffer __attribute__((unused)),
 }
 
 static int
-com_nowarnings(String *buffer __attribute__((unused)),
-   char *line __attribute__((unused)))
+com_nowarnings(String *buffer MY_ATTRIBUTE((unused)),
+   char *line MY_ATTRIBUTE((unused)))
 {
   show_warnings = 0;
   put_info("Show warnings disabled.",INFO_INFO);
@@ -4815,9 +4816,10 @@ sql_real_connect(char *host,char *database,char *user,char *password,
                  "program_name", "mysql");
   mysql_options(&mysql, MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS, &handle_expired);
 
-  if (!mysql_real_connect(&mysql, host, user, password,
-                          database, opt_mysql_port, opt_mysql_unix_port,
-                          connect_flag | CLIENT_MULTI_STATEMENTS))
+  if (!mysql_connect_ssl_check(&mysql, host, user, password,
+                               database, opt_mysql_port, opt_mysql_unix_port,
+                               connect_flag | CLIENT_MULTI_STATEMENTS,
+                               opt_ssl_required))
   {
     if (!silent ||
 	(mysql_errno(&mysql) != CR_CONN_HOST_ERROR &&
@@ -4912,8 +4914,8 @@ sql_connect(char *host,char *database,char *user,char *password,uint silent)
 
 
 static int
-com_status(String *buffer __attribute__((unused)),
-	   char *line __attribute__((unused)))
+com_status(String *buffer MY_ATTRIBUTE((unused)),
+	   char *line MY_ATTRIBUTE((unused)))
 {
   const char *status_str;
   char buff[40];
@@ -5553,7 +5555,7 @@ static void init_username()
   }
 }
 
-static int com_prompt(String *buffer __attribute__((unused)),
+static int com_prompt(String *buffer MY_ATTRIBUTE((unused)),
                       char *line)
 {
   char *ptr=strchr(line, ' ');

@@ -201,8 +201,10 @@ extern void wsrep_prepend_PATH (const char* path);
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
 
-#define WSREP_ON \
-  (global_system_variables.wsrep_on)
+#define WSREP_ON                         \
+  ((global_system_variables.wsrep_on) && \
+   wsrep_provider                     && \
+   strcmp(wsrep_provider, WSREP_NONE))
 
 #define WSREP(thd) \
   (WSREP_ON && wsrep && (thd && thd->variables.wsrep_on))
@@ -328,5 +330,6 @@ int wsrep_alter_event_query(THD *thd, uchar** buf, size_t* buf_len);
 bool wsrep_stmt_rollback_is_safe(THD* thd);
 
 void wsrep_init_sidno(const wsrep_uuid_t&);
-
+bool wsrep_node_is_donor();
+bool wsrep_node_is_synced();
 #endif /* WSREP_MYSQLD_H */

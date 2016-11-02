@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -452,7 +452,7 @@ int mysql_update(THD *thd,
   /* Update the table->file->stats.records number */
   table->file->info(HA_STATUS_VARIABLE | HA_STATUS_NO_LOCK);
 
-  table->mark_columns_needed_for_update();
+  table->mark_columns_needed_for_update(false/*mark_binlog_columns=false*/);
   select= make_select(table, 0, 0, conds, 0, &error);
 
   { // Enter scope for optimizer trace wrapper
@@ -530,7 +530,7 @@ int mysql_update(THD *thd,
 #ifdef WITH_PARTITION_STORAGE_ENGINE
   used_key_is_modified|= partition_key_modified(table, table->write_set);
 #endif
-
+  table->mark_columns_per_binlog_row_image();
   using_filesort= order && (need_sort||used_key_is_modified);
   if (thd->lex->describe)
   {
@@ -826,7 +826,8 @@ int mysql_update(THD *thd,
             error= 0;
 	}
  	else if (!ignore ||
-                 table->file->is_fatal_error(error, HA_CHECK_DUP_KEY))
+                 table->file->is_fatal_error(error, HA_CHECK_DUP_KEY |
+                                                    HA_CHECK_FK_ERROR))
 	{
           /*
             If (ignore && error is ignorable) we don't have to
@@ -834,13 +835,17 @@ int mysql_update(THD *thd,
           */
           myf flags= 0;
 
-          if (table->file->is_fatal_error(error, HA_CHECK_DUP_KEY))
+          if (table->file->is_fatal_error(error, HA_CHECK_DUP_KEY |
+                                                 HA_CHECK_FK_ERROR))
             flags|= ME_FATALERROR; /* Other handler errors are fatal */
 
 	  table->file->print_error(error,MYF(flags));
 	  error= 1;
 	  break;
 	}
+        else if (ignore && !table->file->is_fatal_error(error,
+                                                        HA_CHECK_FK_ERROR))
+          warn_fk_constraint_violation(thd, table, error);
       }
 
       if (table->triggers &&
@@ -1858,12 +1863,12 @@ multi_update::initialize_tables(JOIN *join)
     {
       if (safe_update_on_fly(thd, join->join_tab, table_ref, all_tables))
       {
-        table->mark_columns_needed_for_update();
+        table->mark_columns_needed_for_update(true/*mark_binlog_columns=true*/);
 	table_to_update= table;			// Update table on the fly
 	continue;
       }
     }
-    table->mark_columns_needed_for_update();
+    table->mark_columns_needed_for_update(true/*mark_binlog_columns=true*/);
 
     /*
       enable uncacheable flag if we update a view with check option
@@ -2077,7 +2082,8 @@ bool multi_update::send_data(List<Item> &not_used_values)
         {
           updated--;
           if (!ignore ||
-              table->file->is_fatal_error(error, HA_CHECK_DUP_KEY))
+              table->file->is_fatal_error(error, HA_CHECK_DUP_KEY |
+                                                 HA_CHECK_FK_ERROR))
           {
             /*
               If (ignore && error == is ignorable) we don't have to
@@ -2085,12 +2091,16 @@ bool multi_update::send_data(List<Item> &not_used_values)
             */
             myf flags= 0;
 
-            if (table->file->is_fatal_error(error, HA_CHECK_DUP_KEY))
+            if (table->file->is_fatal_error(error, HA_CHECK_DUP_KEY |
+                                                   HA_CHECK_FK_ERROR))
               flags|= ME_FATALERROR; /* Other handler errors are fatal */
 
             table->file->print_error(error,MYF(flags));
             DBUG_RETURN(1);
           }
+          else if (ignore && !table->file->is_fatal_error(error,
+                                                          HA_CHECK_FK_ERROR))
+            warn_fk_constraint_violation(thd, table, error);
         }
         else
         {
@@ -2373,8 +2383,12 @@ int multi_update::do_updates()
         else if (local_error == HA_ERR_RECORD_IS_THE_SAME)
           local_error= 0;
         else if (!ignore ||
-                 table->file->is_fatal_error(local_error, HA_CHECK_DUP_KEY))
+                 table->file->is_fatal_error(local_error, HA_CHECK_DUP_KEY |
+                                                          HA_CHECK_FK_ERROR))
           goto err;
+       else if (ignore && !table->file->is_fatal_error(local_error,
+                                                          HA_CHECK_FK_ERROR))
+          warn_fk_constraint_violation(thd, table, local_error);
         else
           local_error= 0;
       }

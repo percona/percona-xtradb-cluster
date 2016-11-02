@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -209,7 +209,7 @@ int mysql_load(THD *thd,sql_exchange *ex,TABLE_LIST *table_list,
   */
   char *tdb= thd->db ? thd->db : db;		// Result is never null
   ulong skip_lines= ex->skip_lines;
-  bool transactional_table __attribute__((unused));
+  bool transactional_table MY_ATTRIBUTE((unused));
   DBUG_ENTER("mysql_load");
 
   /*
@@ -262,6 +262,7 @@ int mysql_load(THD *thd,sql_exchange *ex,TABLE_LIST *table_list,
   {
     DBUG_RETURN(TRUE);
   }
+  THD_STAGE_INFO(thd, stage_executing);
   /*
     Let us emit an error if we are loading data to table which is used
     in subselect in SET clause like we do it for INSERT.
@@ -1412,8 +1413,8 @@ READ_INFO::READ_INFO(File file_par, uint tot_length, const CHARSET_INFO *cs,
   set_if_bigger(length,line_start.length());
   stack=stack_pos=(int*) sql_alloc(sizeof(int)*length);
 
-  if (!(buffer=(uchar*) my_malloc(buff_length+1,MYF(0))))
-    error=1; /* purecov: inspected */
+  if (!(buffer=(uchar*) my_malloc(buff_length+1,MYF(MY_WME))))
+    error= true; /* purecov: inspected */
   else
   {
     end_of_buff=buffer+buff_length;
@@ -1606,37 +1607,50 @@ int READ_INFO::read_field()
 	}
       }
 #ifdef USE_MB
-      if (my_mbcharlen(read_charset, chr) > 1 &&
-          to + my_mbcharlen(read_charset, chr) <= end_of_buff)
-      {
-        uchar* p= to;
-        int ml, i;
-        *to++ = chr;
-
-        ml= my_mbcharlen(read_charset, chr);
-
-        for (i= 1; i < ml; i++) 
+        uint ml= my_mbcharlen(read_charset, chr);
+        if (ml == 0)
         {
-          chr= GET;
-          if (chr == my_b_EOF)
-          {
-            /*
-             Need to back up the bytes already ready from illformed
-             multi-byte char 
-            */
-            to-= i;
-            goto found_eof;
-          }
-          *to++ = chr;
+          *to= '\0';
+          my_error(ER_INVALID_CHARACTER_STRING, MYF(0),
+                   read_charset->csname, buffer);
+          error= true;
+          return 1;
         }
-        if (my_ismbchar(read_charset,
+
+        if (ml > 1 &&
+            to + ml <= end_of_buff)
+        {
+          uchar* p= to;
+          *to++ = chr;
+
+          for (uint i= 1; i < ml; i++)
+          {
+            chr= GET;
+            if (chr == my_b_EOF)
+            {
+              /*
+                Need to back up the bytes already ready from illformed
+                multi-byte char 
+              */
+              to-= i;
+              goto found_eof;
+            }
+            *to++ = chr;
+          }
+          if (my_ismbchar(read_charset,
                         (const char *)p,
                         (const char *)to))
-          continue;
-        for (i= 0; i < ml; i++)
-          PUSH(*--to);
-        chr= GET;
-      }
+            continue;
+          for (uint i= 0; i < ml; i++)
+            PUSH(*--to);
+          chr= GET;
+        }
+        else if (ml > 1)
+        {
+          // Buffer is too small, exit while loop, and reallocate.
+          PUSH(chr);
+          break;
+        }
 #endif
       *to++ = (uchar) chr;
     }
@@ -1885,7 +1899,15 @@ int READ_INFO::read_value(int delim, String *val)
   for (chr= GET; my_tospace(chr) != delim && chr != my_b_EOF;)
   {
 #ifdef USE_MB
-    if (my_mbcharlen(read_charset, chr) > 1)
+    uint ml= my_mbcharlen(read_charset, chr);
+    if (ml == 0)
+    {
+      chr= my_b_EOF;
+      val->length(0);
+      return chr;
+    }
+
+    if (ml > 1)
     {
       DBUG_PRINT("read_xml",("multi byte"));
       int i, ml= my_mbcharlen(read_charset, chr);

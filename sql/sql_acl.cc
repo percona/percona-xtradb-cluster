@@ -1,5 +1,5 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
-
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+sql_authenticate
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; version 2 of the License.
@@ -625,7 +625,7 @@ public:
 
 
 static uchar* acl_entry_get_key(acl_entry *entry, size_t *length,
-                                my_bool not_used __attribute__((unused)))
+                                my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length=(uint) entry->length;
   return (uchar*) entry->key;
@@ -842,7 +842,6 @@ static my_bool acl_load(THD *thd, TABLE_LIST *tables)
                        NULL, 1, 1, FALSE))
     goto end;
   table->use_all_columns();
-  (void) my_init_dynamic_array(&acl_users,sizeof(ACL_USER),50,100);
   
   allow_all_hosts=0;
   while (!(read_record_info.read_record(&read_record_info)))
@@ -1142,7 +1141,6 @@ static my_bool acl_load(THD *thd, TABLE_LIST *tables)
                        NULL, 1, 1, FALSE))
     goto end;
   table->use_all_columns();
-  (void) my_init_dynamic_array(&acl_dbs,sizeof(ACL_DB),50,100);
   while (!(read_record_info.read_record(&read_record_info)))
   {
     /* Reading record in mysql.db */
@@ -1203,8 +1201,6 @@ static my_bool acl_load(THD *thd, TABLE_LIST *tables)
   freeze_size(&acl_dbs);
 
   /* Prepare to read records from the mysql.proxies_priv table */
-  (void) my_init_dynamic_array(&acl_proxy_users, sizeof(ACL_PROXY_USER), 
-                               50, 100);
   if (tables[2].table)
   {
     if (init_read_record(&read_record_info, thd, table= tables[2].table,
@@ -1432,6 +1428,9 @@ my_bool acl_reload(THD *thd)
   old_acl_users= acl_users;
   old_acl_proxy_users= acl_proxy_users;
   old_acl_dbs= acl_dbs;
+  my_init_dynamic_array(&acl_users, sizeof(ACL_USER), 50, 100);
+  my_init_dynamic_array(&acl_dbs, sizeof(ACL_DB), 50, 100);
+  my_init_dynamic_array(&acl_proxy_users, sizeof(ACL_PROXY_USER), 50, 100);
   old_mem= global_acl_memory;
   delete_dynamic(&acl_wild_hosts);
   my_hash_free(&acl_check_hosts);
@@ -1674,7 +1673,7 @@ bool acl_getroot(Security_context *sctx, char *user, char *host,
 }
 
 static uchar* check_get_key(ACL_USER *buff, size_t *length,
-                            my_bool not_used __attribute__((unused)))
+                            my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length=buff->host.get_host_len();
   return (uchar*) buff->host.get_host();
@@ -2873,9 +2872,14 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
       goto end;
     }
 
-    if (!combo->uses_identified_by_clause &&
-        !combo->uses_identified_with_clause &&
-        !combo->uses_identified_by_password_clause)
+    if ((!combo->uses_identified_by_clause &&
+         !combo->uses_identified_with_clause &&
+         !combo->uses_identified_by_password_clause) ||
+        (combo->uses_identified_with_clause &&
+         (!my_strcasecmp(system_charset_info, combo->plugin.str,
+                         native_password_plugin_name.str) ||
+          !my_strcasecmp(system_charset_info, combo->plugin.str,
+                         old_password_plugin_name.str))))
     {
       if (check_password_policy(NULL))
       {
@@ -3644,7 +3648,7 @@ public:
 
 
 static uchar* get_key_column(GRANT_COLUMN *buff, size_t *length,
-			    my_bool not_used __attribute__((unused)))
+			    my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length=buff->key_length;
   return (uchar*) buff->column;
@@ -3837,7 +3841,7 @@ GRANT_TABLE::~GRANT_TABLE()
 
 
 static uchar* get_grant_table(GRANT_NAME *buff, size_t *length,
-			     my_bool not_used __attribute__((unused)))
+			     my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length=buff->key_length;
   return (uchar*) buff->hash_key;
@@ -10241,12 +10245,17 @@ char *get_56_lenc_string(char **buffer,
 
   *string_length= (size_t)net_field_length_ll((uchar **)buffer);
 
+  DBUG_EXECUTE_IF("sha256_password_scramble_too_long",
+                  *string_length= SIZE_T_MAX;
+  );
+
   size_t len_len= (size_t)(*buffer - begin);
   
-  if (*string_length + len_len > *max_bytes_available)
+  if (*string_length > *max_bytes_available - len_len)
     return NULL;
 
-  *max_bytes_available -= *string_length + len_len;
+  *max_bytes_available -= *string_length;
+  *max_bytes_available -= len_len;
   *buffer += *string_length;
   return (char *)(begin + len_len);
 }
@@ -11084,6 +11093,27 @@ server_mpvio_update_thd(THD *thd, MPVIO_EXT *mpvio)
 }
 
 /**
+  Assign priv_user and priv_host fields of the Security_context.
+
+  @param sctx Security context, which priv_user and priv_host fields are
+              updated.
+  @param user Authenticated user data.
+*/
+inline void
+assign_priv_user_host(Security_context *sctx, const ACL_USER *user)
+{
+  if (user->user)
+    strmake(sctx->priv_user, user->user, USERNAME_LENGTH - 1);
+  else
+    *sctx->priv_user= 0;
+
+  if (user->host.get_host())
+    strmake(sctx->priv_host, user->host.get_host(), MAX_HOSTNAME - 1);
+  else
+    *sctx->priv_host= 0;
+}
+
+/**
   Perform the handshake, authorize the client and update thd sctx variables.
 
   @param thd                     thread handle
@@ -11210,6 +11240,9 @@ acl_authenticate(THD *thd, uint com_change_user_pkt_len)
     res= CR_ERROR;
   }
 
+  if (mpvio.can_authenticate())
+    assign_priv_user_host(sctx, acl_user);
+
   if (res > CR_OK && mpvio.status != MPVIO_EXT::SUCCESS)
   {
     Host_errors errors;
@@ -11292,15 +11325,7 @@ acl_authenticate(THD *thd, uint com_change_user_pkt_len)
 #endif
 
     sctx->master_access= acl_user->access;
-    if (acl_user->user)
-      strmake(sctx->priv_user, acl_user->user, USERNAME_LENGTH - 1);
-    else
-      *sctx->priv_user= 0;
-
-    if (acl_user->host.get_host())
-      strmake(sctx->priv_host, acl_user->host.get_host(), MAX_HOSTNAME - 1);
-    else
-      *sctx->priv_host= 0;
+    assign_priv_user_host(sctx, acl_user);
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
     /*

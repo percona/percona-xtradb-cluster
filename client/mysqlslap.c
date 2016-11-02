@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2005, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -369,9 +369,9 @@ int main(int argc, char **argv)
                   (char*) &opt_enable_cleartext_plugin);
   if (!opt_only_print) 
   {
-    if (!(mysql_real_connect(&mysql, host, user, opt_password,
-                             NULL, opt_mysql_port,
-                             opt_mysql_unix_port, connect_flags)))
+    if (!(mysql_connect_ssl_check(&mysql, host, user, opt_password,
+                                  NULL, opt_mysql_port, opt_mysql_unix_port,
+                                  connect_flags, opt_ssl_required)))
     {
       fprintf(stderr,"%s: Error when connecting to server: %s\n",
               my_progname,mysql_error(&mysql));
@@ -736,7 +736,7 @@ static void usage(void)
 
 
 static my_bool
-get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
+get_one_option(int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
                char *argument)
 {
   DBUG_ENTER("get_one_option");

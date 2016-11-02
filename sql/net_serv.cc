@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -191,7 +191,7 @@ my_bool net_realloc(NET *net, size_t length)
 */
 
 void net_clear(NET *net,
-               my_bool check_buffer __attribute__((unused)))
+               my_bool check_buffer MY_ATTRIBUTE((unused)))
 {
   DBUG_ENTER("net_clear");
 
@@ -238,21 +238,19 @@ my_bool net_flush(NET *net)
 */
 
 static my_bool
-net_should_retry(NET *net, uint *retry_count __attribute__((unused)))
+net_should_retry(NET *net, uint *retry_count MY_ATTRIBUTE((unused)))
 {
   my_bool retry;
 
-#if !defined(MYSQL_SERVER) && defined(THREAD_SAFE_CLIENT)
+#ifndef MYSQL_SERVER
   /*
-    In the thread safe client library, interrupted I/O operations
-    are always retried.  Otherwise, its either a timeout or a
-    unrecoverable error.
+    In the  client library, interrupted I/O operations are always retried.
+    Otherwise, it's either a timeout or an unrecoverable error.
   */
   retry= vio_should_retry(net->vio);
 #else
   /*
-    In the non-thread safe client library, or in the server,
-    interrupted I/O operations are retried up to a limit.
+    In the server, interrupted I/O operations are retried up to a limit.
     In this scenario, pthread_kill can be used to wake up
     (interrupt) threads waiting for I/O.
   */
@@ -1047,3 +1045,17 @@ void my_net_set_write_timeout(NET *net, uint timeout)
   DBUG_VOID_RETURN;
 }
 
+#if defined(EXPORT_SYMVER16)
+#ifndef EMBEDDED_LIBRARY
+C_MODE_START
+
+// Hack to provide Fedora symbols
+
+my_bool mysql_net_realloc(NET *net, size_t length)
+{
+  return net_realloc(net, length);
+}
+
+C_MODE_END
+#endif
+#endif  // EXPORT_SYMVER16

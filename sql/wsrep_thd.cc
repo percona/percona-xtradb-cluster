@@ -99,6 +99,9 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->net.vio;
 
+  // Disable general logging on applier threads
+  thd->variables.option_bits |= OPTION_LOG_OFF;
+  // Enable binlogging if opt_log_slave_updates is set
   if (opt_log_slave_updates)
     thd->variables.option_bits|= OPTION_BIN_LOG;
   else
@@ -118,6 +121,8 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->db            = thd->db;
   shadow->db_length     = thd->db_length;
   thd->reset_db(NULL, 0);
+
+  shadow->user_time = thd->user_time;
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -128,10 +133,12 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->net.vio                = shadow->vio;
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db, shadow->db_length);
+  thd->user_time              = shadow->user_time;
 }
 
 void wsrep_replay_transaction(THD *thd)
 {
+  DBUG_ENTER("wsrep_replay_transaction");
   /* checking if BF trx must be replayed */
   if (thd->wsrep_conflict_state== MUST_REPLAY) {
     DBUG_ASSERT(wsrep_thd_trx_seqno(thd));
@@ -139,6 +146,15 @@ void wsrep_replay_transaction(THD *thd)
       if (thd->get_stmt_da()->is_sent())
       {
         WSREP_ERROR("replay issue, thd has reported status already");
+      }
+
+      /* PS reprepare observer should have been removed already
+         open_table() will fail if we have dangling observer here
+       */
+      if (thd->get_reprepare_observer() && wsrep_log_conflicts)
+      {
+        WSREP_WARN("dangling observer in replay transaction: (thr %lu %lld %s)",
+                   thd->thread_id, thd->query_id, thd->query());
       }
       thd->get_stmt_da()->reset_diagnostics_area();
 
@@ -241,6 +257,7 @@ void wsrep_replay_transaction(THD *thd)
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   }
+  DBUG_VOID_RETURN;
 }
 
 static void wsrep_replication_process(THD *thd)

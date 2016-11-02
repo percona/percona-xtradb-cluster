@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights
    reserved.
 
    This program is free software; you can redistribute it and/or modify
@@ -1332,7 +1332,7 @@ static void close_server_sock();
 static void clean_up_mutexes(void);
 static void wait_for_signal_thread_to_end(void);
 static void create_pid_file();
-static void mysqld_exit(int exit_code) __attribute__((noreturn));
+static void mysqld_exit(int exit_code) MY_ATTRIBUTE((noreturn));
 #endif
 static void delete_pid_file(myf flags);
 static void end_ssl();
@@ -1782,7 +1782,7 @@ static void __cdecl kill_server(int sig_ptr)
 
 
 #if defined(USE_ONE_SIGNAL_HAND)
-pthread_handler_t kill_server_thread(void *arg __attribute__((unused)))
+pthread_handler_t kill_server_thread(void *arg MY_ATTRIBUTE((unused)))
 {
   my_thread_init();       // Initialize new thread
   kill_server(0);
@@ -2727,7 +2727,7 @@ void close_connection(THD *thd, uint sql_errno)
 
 /** Called when a thread is aborted. */
 /* ARGSUSED */
-extern "C" sig_handler end_thread_signal(int sig __attribute__((unused)))
+extern "C" sig_handler end_thread_signal(int sig MY_ATTRIBUTE((unused)))
 {
   THD *thd=current_thd;
   my_safe_printf_stderr("end_thread_signal %p", thd);
@@ -2939,7 +2939,7 @@ void kill_blocked_pthreads()
   @todo
     One should have to fix that thr_alarm know about this thread too.
 */
-extern "C" sig_handler abort_thread(int sig __attribute__((unused)))
+extern "C" sig_handler abort_thread(int sig MY_ATTRIBUTE((unused)))
 {
   THD *thd=current_thd;
   DBUG_ENTER("abort_thread");
@@ -3250,7 +3250,7 @@ static void start_signal_handler(void)
 
 /** This threads handles all signals and alarms. */
 /* ARGSUSED */
-pthread_handler_t signal_hand(void *arg __attribute__((unused)))
+pthread_handler_t signal_hand(void *arg MY_ATTRIBUTE((unused)))
 {
   sigset_t set;
   int sig;
@@ -4237,6 +4237,22 @@ int init_common_variables()
   if (!opt_slow_logname || !*opt_slow_logname)
     opt_slow_logname= make_default_log_name(slow_logname_path, "-slow.log");
 
+  if (opt_logname &&
+      !is_valid_log_name(opt_logname, strlen(opt_logname)))
+  {
+    sql_print_error("Invalid value for --general_log_file: %s",
+                    opt_logname);
+    return 1;
+  }
+
+  if (opt_slow_logname &&
+      !is_valid_log_name(opt_slow_logname, strlen(opt_slow_logname)))
+  {
+    sql_print_error("Invalid value for --slow_query_log_file: %s",
+                    opt_slow_logname);
+    return 1;
+  }
+
 #if defined(ENABLED_DEBUG_SYNC)
   /* Initialize the debug sync facility. See debug_sync.cc. */
   if (debug_sync_init())
@@ -4671,7 +4687,7 @@ static int init_server_auto_options()
   /* load_defaults require argv[0] is not null */
   char **argv= &name;
   int argc= 1;
-  if (!check_file_permissions(fname))
+  if (!check_file_permissions(fname, false))
   {
     /*
       Found a world writable file hence removing it as it is dangerous to write
@@ -4700,6 +4716,24 @@ static int init_server_auto_options()
     if (!Uuid::is_valid(uuid))
     {
       sql_print_error("The server_uuid stored in auto.cnf file is not a valid UUID.");
+      goto err;
+    }
+    /*
+      Uuid::is_valid() cannot do strict check on the length as it will be
+      called by GTID::is_valid() as well (GTID = UUID:seq_no). We should
+      explicitly add the *length check* here in this function.
+
+      If UUID length is less than '36' (UUID_LENGTH), that error case would have
+      got caught in above is_valid check. The below check is to make sure that
+      length is not greater than UUID_LENGTH i.e., there are no extra characters
+      (Garbage) at the end of the valid UUID.
+    */
+    if (strlen(uuid) > UUID_LENGTH)
+    {
+      sql_print_error("Garbage characters found at the end of the server_uuid "
+                      "value in auto.cnf file. It should be of length '%d' "
+                      "(UUID_LENGTH). Clear it and restart the server. ",
+                      UUID_LENGTH);
       goto err;
     }
     strcpy(server_uuid, uuid);
@@ -4827,9 +4861,10 @@ static int init_server_components()
 
   proc_info_hook= set_thd_stage_info;
 
-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
   /*
-    Parsing the performance schema command line option may have reported
+    Parsing the performance schema command line option and
+    adjusting the values for options such as "open_files_limit",
+    "max_connections", and "table_cache_size" may have reported
     warnings/information messages.
     Now that the logger is finally available, and redirected
     to the proper file when the --log--error option is used,
@@ -4837,7 +4872,6 @@ static int init_server_components()
   */
   buffered_logs.print();
   buffered_logs.cleanup();
-#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
 
   /*
     Now that the logger is available, redirect character set
@@ -5189,8 +5223,14 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       if (WSREP_ON)
         tc_log=  &tc_log_dummy;
       else
-#endif /* WITH_WSREP */
+        /*
+         * wsrep hton grows total_ha_2pc count to 2, even in native mysql mode.
+         * Have to force using tc_log_dummy here, as tc_log_mmap segfaults
+         */
+        tc_log=  &tc_log_dummy;
+#else
       tc_log= &tc_log_mmap;
+#endif /* WITH_WSREP */
   }
   else
     tc_log= &tc_log_dummy;
@@ -9094,7 +9134,7 @@ static int mysql_init_variables(void)
   (void) strmake(mysql_home, tmpenv, sizeof(mysql_home)-1);
 #endif
 #ifdef WITH_WSREP
-  if (WSREP_ON && wsrep_init_vars())
+  if (wsrep_init_vars())
     return 1;
 #endif
   return 0;
@@ -9102,7 +9142,7 @@ static int mysql_init_variables(void)
 
 my_bool
 mysqld_get_one_option(int optid,
-                      const struct my_option *opt __attribute__((unused)),
+                      const struct my_option *opt MY_ATTRIBUTE((unused)),
                       char *argument)
 {
   switch(optid) {
@@ -9118,6 +9158,7 @@ mysqld_get_one_option(int optid,
     break;
   case 'b':
     strmake(mysql_home,argument,sizeof(mysql_home)-1);
+    mysql_home_ptr= mysql_home;
     break;
   case 'C':
     if (default_collation_name == compiled_default_collation_name)

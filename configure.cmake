@@ -67,17 +67,27 @@ SET(SIGNAL_WITH_VIO_SHUTDOWN 1)
 
 # The default C++ library for SunPro is really old, and not standards compliant.
 # http://www.oracle.com/technetwork/server-storage/solaris10/cmp-stlport-libcstd-142559.html
-# Use stlport rather than Rogue Wave.
+# Use stlport rather than Rogue Wave,
+#   unless otherwise specified on command line.
 IF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
   IF(CMAKE_CXX_COMPILER_ID MATCHES "SunPro")
-    IF(SUNPRO_CXX_LIBRARY)
-      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=${SUNPRO_CXX_LIBRARY}")
-      IF(SUNPRO_CXX_LIBRARY STREQUAL "stdcxx4")
-        ADD_DEFINITIONS(-D__MATHERR_RENAME_EXCEPTION)
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -template=extdef")
-      ENDIF()
+    IF(CMAKE_CXX_FLAGS MATCHES "-std=")
+      ADD_DEFINITIONS(-D__MATHERR_RENAME_EXCEPTION)
+      SET(CMAKE_SHARED_LIBRARY_C_FLAGS
+        "${CMAKE_SHARED_LIBRARY_C_FLAGS} -lc")
+      SET(CMAKE_SHARED_LIBRARY_CXX_FLAGS
+        "${CMAKE_SHARED_LIBRARY_CXX_FLAGS} -lstdc++ -lgcc_s -lCrunG3 -lc")
+      SET(QUOTED_CMAKE_CXX_LINK_FLAGS "-lstdc++ -lgcc_s -lCrunG3 -lc")
     ELSE()
-      SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=stlport4")
+      IF(SUNPRO_CXX_LIBRARY)
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=${SUNPRO_CXX_LIBRARY}")
+        IF(SUNPRO_CXX_LIBRARY STREQUAL "stdcxx4")
+          ADD_DEFINITIONS(-D__MATHERR_RENAME_EXCEPTION)
+          SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -template=extdef")
+        ENDIF()
+      ELSE()
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -library=stlport4")
+      ENDIF()
     ENDIF()
   ENDIF()
 ENDIF()
@@ -143,6 +153,7 @@ IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND
   GET_FILENAME_COMPONENT(CXX_REALPATH ${CMAKE_CXX_COMPILER} REALPATH)
 
   # CC -V yields
+  # CC: Studio 12.5 Sun C++ 5.14 SunOS_sparc Dodona 2016/04/04
   # CC: Sun C++ 5.13 SunOS_sparc Beta 2014/03/11
   # CC: Sun C++ 5.11 SunOS_sparc 2010/08/13
 
@@ -157,9 +168,13 @@ IF(CMAKE_SYSTEM_NAME MATCHES "SunOS" AND
   ENDIF()
 
   STRING(REGEX MATCH "CC: Sun C\\+\\+ 5\\.([0-9]+)" VERSION_STRING ${stderr})
+  IF (NOT CMAKE_MATCH_1 OR CMAKE_MATCH_1 STREQUAL "")
+    STRING(REGEX MATCH "CC: Studio 12\\.5 Sun C\\+\\+ 5\\.([0-9]+)"
+      VERSION_STRING ${stderr})
+  ENDIF()
   SET(CC_MINOR_VERSION ${CMAKE_MATCH_1})
 
-  IF(${CC_MINOR_VERSION} EQUAL 13)
+  IF(${CC_MINOR_VERSION} GREATER 12)
     SET(STLPORT_SUFFIX "lib/compilers/stlport4")
     IF(SIZEOF_VOIDP EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "sparc")
       SET(STLPORT_SUFFIX "lib/compilers/stlport4/sparcv9")

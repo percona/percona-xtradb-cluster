@@ -446,6 +446,13 @@ IF(WITH_UNIT_TESTS)
  ENABLE_TESTING()
 ENDIF()
 
+OPTION(WITH_SYMVER16
+  "Export libmysqlclient_16 and libmysqlclient_18 symbol versions" OFF)
+
+IF(WITH_SYMVER16)
+  ADD_DEFINITIONS(-DEXPORT_SYMVER16)
+ENDIF()
+
 IF(NOT WITHOUT_SERVER)
   SET (MYSQLD_STATIC_PLUGIN_LIBS "" CACHE INTERNAL "")
   # Add storage engines and plugins.
@@ -468,10 +475,6 @@ ADD_SUBDIRECTORY(wsrep)
 ENDIF()
 
 IF(WITH_UNIT_TESTS)
-  ADD_SUBDIRECTORY(unittest)
-  ADD_SUBDIRECTORY(unittest/examples)
-  ADD_SUBDIRECTORY(unittest/mytap)
-  ADD_SUBDIRECTORY(unittest/mytap/t)
   # Visual Studio 11 needs this extra flag in order to compile gmock.
   IF(WIN32)
     ADD_DEFINITIONS( /D _VARIADIC_MAX=10 )
@@ -480,7 +483,10 @@ IF(WITH_UNIT_TESTS)
   IF(HAVE_LLVM_LIBCPP)
     ADD_DEFINITIONS(-DGTEST_USE_OWN_TR1_TUPLE=1)
   ENDIF()
-  ADD_SUBDIRECTORY(unittest/gunit)
+  ADD_SUBDIRECTORY(unittest)
+  ADD_SUBDIRECTORY(unittest/examples)
+  ADD_SUBDIRECTORY(unittest/mytap)
+  ADD_SUBDIRECTORY(unittest/mytap/t)
 ENDIF()
 
 ADD_SUBDIRECTORY(extra)

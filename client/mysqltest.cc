@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -547,12 +547,12 @@ struct st_replace *glob_replace= 0;
 void replace_strings_append(struct st_replace *rep, DYNAMIC_STRING* ds,
 const char *from, int len);
 
-static void cleanup_and_exit(int exit_code) __attribute__((noreturn));
+static void cleanup_and_exit(int exit_code) MY_ATTRIBUTE((noreturn));
 
 void die(const char *fmt, ...)
-  ATTRIBUTE_FORMAT(printf, 1, 2) __attribute__((noreturn));
+  ATTRIBUTE_FORMAT(printf, 1, 2) MY_ATTRIBUTE((noreturn));
 void abort_not_supported_test(const char *fmt, ...)
-  ATTRIBUTE_FORMAT(printf, 1, 2) __attribute__((noreturn));
+  ATTRIBUTE_FORMAT(printf, 1, 2) MY_ATTRIBUTE((noreturn));
 void verbose_msg(const char *fmt, ...)
   ATTRIBUTE_FORMAT(printf, 1, 2);
 void log_msg(const char *fmt, ...)
@@ -2121,7 +2121,7 @@ static void strip_parentheses(struct st_command *command)
 C_MODE_START
 
 static uchar *get_var_key(const uchar* var, size_t *len,
-                          my_bool __attribute__((unused)) t)
+                          my_bool MY_ATTRIBUTE((unused)) t)
 {
   register char* key;
   key = ((VAR*)var)->name;
@@ -2449,7 +2449,7 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
   init_dynamic_string(&ds_query, 0, (end - query) + 32, 256);
   do_eval(&ds_query, query, end, FALSE);
 
-  if (mysql_real_query(mysql, ds_query.str, ds_query.length)) 
+  if (mysql_real_query(mysql, ds_query.str, ds_query.length) || !(res= mysql_store_result(mysql)))
   {
     handle_error (curr_command, mysql_errno(mysql), mysql_error(mysql),
                   mysql_sqlstate(mysql), &ds_res);
@@ -2459,8 +2459,6 @@ void var_query_set(VAR *var, const char *query, const char** query_end)
     DBUG_VOID_RETURN;
   }
   
-  if (!(res= mysql_store_result(mysql)))
-    die("Query '%s' didn't return a result set", ds_query.str);
   dynstr_free(&ds_query);
 
   if ((row= mysql_fetch_row(res)) && row[0])
@@ -4320,7 +4318,7 @@ int do_echo(struct st_command *command)
 }
 
 
-void do_wait_for_slave_to_stop(struct st_command *c __attribute__((unused)))
+void do_wait_for_slave_to_stop(struct st_command *c MY_ATTRIBUTE((unused)))
 {
   static int SLAVE_POLL_INTERVAL= 300000;
   MYSQL* mysql = &cur_con->mysql;
@@ -5315,8 +5313,9 @@ void safe_connect(MYSQL* mysql, const char *name, const char *host,
                  "program_name", "mysqltest");
   mysql_options(mysql, MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS,
                 &can_handle_expired_passwords);
-  while(!mysql_real_connect(mysql, host,user, pass, db, port, sock,
-                            CLIENT_MULTI_STATEMENTS | CLIENT_REMEMBER_OPTIONS))
+  while(!mysql_connect_ssl_check(mysql, host,user, pass, db, port, sock,
+                                 CLIENT_MULTI_STATEMENTS | CLIENT_REMEMBER_OPTIONS,
+                                 opt_ssl_required))
   {
     /*
       Connect failed
@@ -5420,8 +5419,9 @@ int connect_n_handle_errors(struct st_command *command,
   mysql_options4(con, MYSQL_OPT_CONNECT_ATTR_ADD, "program_name", "mysqltest");
   mysql_options(con, MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS,
                 &can_handle_expired_passwords);
-  while (!mysql_real_connect(con, host, user, pass, db, port, sock ? sock: 0,
-                          CLIENT_MULTI_STATEMENTS))
+  while (!mysql_connect_ssl_check(con, host, user, pass, db, port,
+                                  sock ? sock: 0, CLIENT_MULTI_STATEMENTS,
+                                  opt_ssl_required))
   {
     /*
       If we have used up all our connections check whether this
@@ -8392,6 +8392,13 @@ void get_command_type(struct st_command* command)
           "use # if you intended to write a comment");
     }
   }
+  DBUG_VOID_RETURN;
+}
+
+
+void update_expected_errors(struct st_command* command)
+{
+  DBUG_ENTER("update_expected_errors");
 
   /* Set expected error on command */
   memcpy(&command->expected_errors, &saved_expected_errors,
@@ -8409,7 +8416,7 @@ void get_command_type(struct st_command* command)
 
 */
 
-void mark_progress(struct st_command* command __attribute__((unused)),
+void mark_progress(struct st_command* command MY_ATTRIBUTE((unused)),
                    int line)
 {
   static ulonglong progress_start= 0; // < Beware
@@ -8770,6 +8777,9 @@ int main(int argc, char **argv)
     int current_line_inc = 1, processed = 0;
     if (command->type == Q_UNKNOWN || command->type == Q_COMMENT_WITH_COMMAND)
       get_command_type(command);
+
+    if(saved_expected_errors.count > 0)
+      update_expected_errors(command);
 
     if (parsing_disabled &&
         command->type != Q_ENABLE_PARSING &&
@@ -9453,7 +9463,7 @@ typedef struct st_replace_found {
 
 void replace_strings_append(REPLACE *rep, DYNAMIC_STRING* ds,
                             const char *str,
-                            int len __attribute__((unused)))
+                            int len MY_ATTRIBUTE((unused)))
 {
   reg1 REPLACE *rep_pos;
   reg2 REPLACE_STRING *rep_str;

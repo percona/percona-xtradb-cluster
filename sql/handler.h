@@ -2,7 +2,7 @@
 #define HANDLER_INCLUDED
 
 /*
-   Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -369,6 +369,7 @@ static const uint MYSQL_START_TRANS_OPT_READ_WRITE         = 4;
 /* Flags for method is_fatal_error */
 #define HA_CHECK_DUP_KEY 1
 #define HA_CHECK_DUP_UNIQUE 2
+#define HA_CHECK_FK_ERROR 4
 #define HA_CHECK_DUP (HA_CHECK_DUP_KEY + HA_CHECK_DUP_UNIQUE)
 
 enum legacy_db_type
@@ -2153,7 +2154,10 @@ public:
     if (!error ||
         ((flags & HA_CHECK_DUP_KEY) &&
          (error == HA_ERR_FOUND_DUPP_KEY ||
-          error == HA_ERR_FOUND_DUPP_UNIQUE)))
+          error == HA_ERR_FOUND_DUPP_UNIQUE)) ||
+        ((flags & HA_CHECK_FK_ERROR) &&
+         (error == HA_ERR_ROW_IS_REFERENCED ||
+          error == HA_ERR_NO_REFERENCED_ROW)))
       return FALSE;
     return TRUE;
   }
@@ -3069,7 +3073,7 @@ private:
   */
   virtual int rnd_init(bool scan)= 0;
   virtual int rnd_end() { return 0; }
-  virtual int write_row(uchar *buf __attribute__((unused)))
+  virtual int write_row(uchar *buf MY_ATTRIBUTE((unused)))
   {
     return HA_ERR_WRONG_COMMAND;
   }
@@ -3082,13 +3086,13 @@ private:
     the columns required for the error message are not read, the error
     message will contain garbage.
   */
-  virtual int update_row(const uchar *old_data __attribute__((unused)),
-                         uchar *new_data __attribute__((unused)))
+  virtual int update_row(const uchar *old_data MY_ATTRIBUTE((unused)),
+                         uchar *new_data MY_ATTRIBUTE((unused)))
   {
     return HA_ERR_WRONG_COMMAND;
   }
 
-  virtual int delete_row(const uchar *buf __attribute__((unused)))
+  virtual int delete_row(const uchar *buf MY_ATTRIBUTE((unused)))
   {
     return HA_ERR_WRONG_COMMAND;
   }
@@ -3121,8 +3125,8 @@ private:
     @return  non-0 in case of failure, 0 in case of success.
     When lock_type is F_UNLCK, the return value is ignored.
   */
-  virtual int external_lock(THD *thd __attribute__((unused)),
-                            int lock_type __attribute__((unused)))
+  virtual int external_lock(THD *thd MY_ATTRIBUTE((unused)),
+                            int lock_type MY_ATTRIBUTE((unused)))
   {
     return 0;
   }
@@ -3507,5 +3511,6 @@ inline const char *table_case_name(HA_CREATE_INFO *info, const char *name)
 
 void print_keydup_error(TABLE *table, KEY *key, const char *msg, myf errflag);
 void print_keydup_error(TABLE *table, KEY *key, myf errflag);
+void warn_fk_constraint_violation(THD *thd, TABLE *table, int error);
 
 #endif /* HANDLER_INCLUDED */

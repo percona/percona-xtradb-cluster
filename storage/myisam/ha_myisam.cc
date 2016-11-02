@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1089,24 +1089,36 @@ int ha_myisam::repair(THD *thd, MI_CHECK &param, bool do_optimize)
         /* TODO: respect myisam_repair_threads variable */
         my_snprintf(buf, 40, "Repair with %d threads", my_count_bits(key_map));
         thd_proc_info(thd, buf);
+        /*
+          The new file is created with the right stats, so we can skip
+          copying file stats from old to new.
+        */
         error = mi_repair_parallel(&param, file, fixed_name,
-            param.testflag & T_QUICK);
+                                   param.testflag & T_QUICK, TRUE);
         thd_proc_info(thd, "Repair done"); // to reset proc_info, as
                                       // it was pointing to local buffer
       }
       else
       {
         thd_proc_info(thd, "Repair by sorting");
+        /*
+          The new file is created with the right stats, so we can skip
+          copying file stats from old to new.
+        */
         error = mi_repair_by_sort(&param, file, fixed_name,
-            param.testflag & T_QUICK);
+                                  param.testflag & T_QUICK, TRUE);
       }
     }
     else
     {
       thd_proc_info(thd, "Repair with keycache");
       param.testflag &= ~T_REP_BY_SORT;
+      /*
+        The new file is created with the right stats, so we can skip
+        copying file stats from old to new.
+      */
       error=  mi_repair(&param, file, fixed_name,
-			param.testflag & T_QUICK);
+			param.testflag & T_QUICK, TRUE);
     }
 #ifdef HAVE_MMAP
     if (remap)
@@ -1122,7 +1134,11 @@ int ha_myisam::repair(THD *thd, MI_CHECK &param, bool do_optimize)
     {
       optimize_done=1;
       thd_proc_info(thd, "Sorting index");
-      error=mi_sort_index(&param,file,fixed_name);
+      /*
+        The new file is created with the right stats, so we can skip
+        copying file stats from old to new.
+      */
+      error=mi_sort_index(&param,file,fixed_name, TRUE);
     }
     if (!statistics_done && (local_testflag & T_STATISTICS))
     {
@@ -1725,8 +1741,8 @@ int ha_myisam::index_last(uchar *buf)
 }
 
 int ha_myisam::index_next_same(uchar *buf,
-			       const uchar *key __attribute__((unused)),
-			       uint length __attribute__((unused)))
+			       const uchar *key MY_ATTRIBUTE((unused)),
+			       uint length MY_ATTRIBUTE((unused)))
 {
   int error;
   DBUG_ASSERT(inited==INDEX);

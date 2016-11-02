@@ -38,11 +38,14 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *hton,
 */
 void wsrep_cleanup_transaction(THD *thd)
 {
+  if (!WSREP(thd)) return;
+
   if (wsrep_emulate_bin_log) thd_binlog_trx_reset(thd);
   thd->wsrep_ws_handle.trx_id= WSREP_UNDEFINED_TRX_ID;
   thd->wsrep_trx_meta.gtid= WSREP_GTID_UNDEFINED;
   thd->wsrep_trx_meta.depends_on= WSREP_SEQNO_UNDEFINED;
   thd->wsrep_exec_mode= LOCAL_STATE;
+  thd->wsrep_affected_rows= 0;
   return;
 }
 
@@ -111,6 +114,8 @@ void wsrep_register_hton(THD* thd, bool all)
  */
 void wsrep_post_commit(THD* thd, bool all)
 {
+  if (!WSREP(thd)) return;
+
   switch (thd->wsrep_exec_mode)
   {
   case LOCAL_COMMIT:
@@ -440,7 +445,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                   "wsrep status (%d %d %d)",
                   WSREP_QUERY(thd),
                   thd->get_stmt_da()->affected_rows(),
-                  stmt_has_updated_trans_table(thd), thd->variables.sql_log_bin,
+                  stmt_has_updated_trans_table(thd->transaction.stmt.ha_list),
+                  thd->variables.sql_log_bin,
                   thd->wsrep_exec_mode, thd->wsrep_query_state,
                   thd->wsrep_conflict_state);
     }
