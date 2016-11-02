@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -185,6 +185,19 @@ const char *info_slave_worker_fields []=
   recycled.
 */
 const ulong mts_partition_hash_soft_max= 16;
+
+/*
+  index value of some outstanding slots of info_slave_worker_fields
+*/
+enum {
+  LINE_FOR_CHANNEL= 12,
+};
+
+const uint info_slave_worker_table_pk_field_indexes []=
+{
+  LINE_FOR_CHANNEL,
+  0,
+};
 
 Slave_worker::Slave_worker(Relay_log_info *rli
 #ifdef HAVE_PSI_INTERFACE
@@ -673,7 +686,7 @@ void Slave_worker::rollback_positions(Slave_job_group* ptr_g)
 }
 
 extern "C" uchar *get_key(const uchar *record, size_t *length,
-                          my_bool not_used __attribute__((unused)))
+                          my_bool not_used MY_ATTRIBUTE((unused)))
 {
   DBUG_ENTER("get_key");
 
@@ -2669,3 +2682,12 @@ const char* Slave_worker::get_for_channel_str(bool upper_case) const
   return c_rli->get_for_channel_str(upper_case);
 }
 
+const uint* Slave_worker::get_table_pk_field_indexes()
+{
+  return info_slave_worker_table_pk_field_indexes;
+}
+
+uint Slave_worker::get_channel_field_index()
+{
+  return LINE_FOR_CHANNEL;
+}

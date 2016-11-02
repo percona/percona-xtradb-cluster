@@ -38,6 +38,7 @@ const  char* wsrep_node_name        = 0;
 const  char* wsrep_node_address     = 0;
 const  char* wsrep_node_incoming_address = 0;
 const  char* wsrep_start_position   = 0;
+ulong   wsrep_reject_queries;
 
 int wsrep_init_vars()
 {
@@ -185,6 +186,32 @@ void wsrep_start_position_init (const char* val)
   wsrep_set_local_position (val, false);
 }
 
+static int get_provider_option_value(const char* opts,
+                                     const char* opt_name,
+                                     ulong* opt_value)
+{
+  int ret= 1;
+  ulong opt_value_tmp;
+  char *opt_value_str, *s, *opts_copy= my_strdup(key_memory_wsrep, opts, MYF(MY_WME));
+
+  if ((opt_value_str= strstr(opts_copy, opt_name)) == NULL)
+    goto end;
+  opt_value_str= strtok_r(opt_value_str, "=", &s);
+  if (opt_value_str == NULL) goto end;
+  opt_value_str= strtok_r(NULL, ";", &s);
+  if (opt_value_str == NULL) goto end;
+
+  opt_value_tmp= strtoul(opt_value_str, NULL, 10);
+  if (errno == ERANGE) goto end;
+
+  *opt_value= opt_value_tmp;
+  ret= 0;
+
+end:
+  my_free(opts_copy);
+  return ret;
+}
+
 static bool refresh_provider_options()
 {
   WSREP_DEBUG("refresh_provider_options: %s", 
@@ -192,10 +219,11 @@ static bool refresh_provider_options()
   char* opts= wsrep->options_get(wsrep);
   if (opts)
   {
-    if (wsrep_provider_options) my_free((void *)wsrep_provider_options);
-    wsrep_provider_options = (char*)my_memdup(key_memory_wsrep, 
-                                              opts, strlen(opts) + 1, 
-                                              MYF(MY_WME));
+    wsrep_provider_options_init(opts);
+    get_provider_option_value(wsrep_provider_options,
+                              (char*)"repl.max_ws_size",
+                              &wsrep_max_ws_size);
+    free(opts);
   }
   else
   {
@@ -329,6 +357,27 @@ void wsrep_provider_options_init(const char* value)
   if (wsrep_provider_options && wsrep_provider_options != value) 
     my_free((void *)wsrep_provider_options);
   wsrep_provider_options = (value) ? my_strdup(key_memory_wsrep, value, MYF(0)) : NULL;
+}
+
+bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
+{
+    switch (wsrep_reject_queries) {
+        case WSREP_REJECT_NONE:
+            WSREP_INFO("Allowing client queries due to manual setting");
+            break;
+        case WSREP_REJECT_ALL:
+            WSREP_INFO("Rejecting client queries due to manual setting");
+            break;
+        case WSREP_REJECT_ALL_KILL:
+            wsrep_close_client_connections(FALSE);
+            WSREP_INFO("Rejecting client queries and killing connections due to manual setting");
+            break;
+        default:
+          WSREP_INFO("Unknown value for wsrep_reject_queries: %lu",
+                     wsrep_reject_queries);
+            return true;
+    }
+    return false;
 }
 
 static int wsrep_cluster_address_verify (const char* cluster_address_str)
@@ -512,29 +561,49 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
                    ER_WRONG_VALUE_FOR_VAR,
                    "'wsrep_desync' is already OFF.");
     }
+    return false;
   }
-  return 0;
-}
-
-bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
-{
   wsrep_status_t ret(WSREP_WARNING);
-  if (wsrep_desync) {
+  if (new_wsrep_desync) {
     ret = wsrep->desync (wsrep);
     if (ret != WSREP_OK) {
-      WSREP_WARN ("SET desync failed %d for %s", ret, thd->query().str);
+      WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
+                  (thd->db().str ? thd->db().str : "(null)"),
+                  WSREP_QUERY(thd));
       my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query().str);
       return true;
     }
   } else {
     ret = wsrep->resync (wsrep);
     if (ret != WSREP_OK) {
-      WSREP_WARN ("SET resync failed %d for %s", ret, thd->query().str);
+      WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
+                  (thd->db().str ? thd->db().str : "(null)"),
+                  WSREP_QUERY(thd));
       my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query().str);
       return true;
     }
   }
   return false;
+}
+
+bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
+{
+  return false;
+}
+
+bool wsrep_max_ws_size_update (sys_var *self, THD *thd, enum_var_type)
+{
+  char max_ws_size_opt[128];
+  my_snprintf(max_ws_size_opt, sizeof(max_ws_size_opt),
+              "repl.max_ws_size=%d", wsrep_max_ws_size);
+  wsrep_status_t ret= wsrep->options_set(wsrep, max_ws_size_opt);
+  if (ret != WSREP_OK)
+  {
+    WSREP_ERROR("Set options returned %d", ret);
+    refresh_provider_options();
+    return true;
+  }
+  return refresh_provider_options();
 }
 
 /*
@@ -573,6 +642,8 @@ static const int          mysql_status_len  = 512;
 static void export_wsrep_status_to_mysql(THD* thd)
 {
   int wsrep_status_len, i;
+
+  wsrep_free_status(thd);
 
   thd->wsrep_status_vars = wsrep->stats_get(wsrep);
 

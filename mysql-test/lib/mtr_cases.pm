@@ -1,5 +1,5 @@
 # -*- cperl -*-
-# Copyright (c) 2005, 2014, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -289,6 +289,7 @@ sub collect_one_suite($)
       $suitedir= my_find_dir($::basedir,
 			     ["share/mysql-test/suite",
 			      "mysql-test/suite",
+                              "lib/mysql-test/suite",
 			      "internal/mysql-test/suite",
 			      "mysql-test",
 			      # Look in storage engine specific suite dirs
@@ -296,6 +297,8 @@ sub collect_one_suite($)
 			      # Look in plugin specific suite dir
 			      "plugin/$suite/tests",
 			      "internal/plugin/$suite/tests",
+			      "rapid/plugin/$suite/tests",
+			      "rapid/mysql-test/suite",
 			     ],
 			     [$suite, "mtr"], ($suite =~ /^i_/));
       return unless $suitedir;
@@ -380,6 +383,12 @@ sub collect_one_suite($)
 
   # Read suite.opt file
   my $suite_opt_file=  "$testdir/suite.opt";
+
+  if ( $::opt_suite_opt )
+  {
+    $suite_opt_file= "$testdir/$::opt_suite_opt";
+  }
+
   my $suite_opts= [];
   if ( -f $suite_opt_file )
   {
@@ -854,6 +863,14 @@ sub collect_one_test_case {
   {
     $tinfo->{'skip'}= 1;
     return $tinfo;
+  }
+
+  # ----------------------------------------------------------------------
+  # Check for replicaton tests
+  # ----------------------------------------------------------------------
+  if ( $suitedir =~ 'rpl' )
+  {
+    $tinfo->{'rpl_test'}= 1;
   }
 
   # ----------------------------------------------------------------------

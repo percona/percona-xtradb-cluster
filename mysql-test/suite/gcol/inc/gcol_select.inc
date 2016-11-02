@@ -69,10 +69,12 @@ eval explain $s;
 
 --echo # select_type=PRIMARY, type=index,ALL
 let $s = select * from t1 where b in (select c from t3);
+--sorted_result
 eval $s;
 eval explain $s;
 
 --echo # select_type=PRIMARY, type=range,ref
+--sorted_result
 let $s = select * from t1 where c in (select c from t3 where c between -2 and -1);
 eval $s;
 eval explain $s;
@@ -80,11 +82,13 @@ eval explain $s;
 --echo # select_type=UNION, type=system
 --echo # select_type=UNION RESULT, type=<union1,2>
 let $s = select * from t1 union select * from t2;
+--sorted_result
 eval $s;
 eval explain $s;
 
 --echo # select_type=DERIVED, type=system
 let $s = select * from (select a,b,c from t1) as t11;
+--sorted_result
 eval $s;
 eval explain $s;
 
@@ -116,21 +120,25 @@ eval explain $s;
 --echo ###
 --echo # SELECT * FROM tbl_name WHERE <gcol expr>
 let $s = select * from t3 where c >= -2;
+--sorted_result
 eval $s;
 eval explain $s;
 
 --echo # SELECT * FROM tbl_name WHERE <non-gcol expr>
 let $s = select * from t3 where a between 1 and 2;
+--sorted_result
 eval $s;
 eval explain $s;
 
 --echo # SELECT * FROM tbl_name WHERE <non-indexed gcol expr>
 let $s = select * from t3 where b between -2 and -1;
+--sorted_result
 eval $s;
 eval explain $s;
 
 --echo # SELECT * FROM tbl_name WHERE <indexed gcol expr>
 let $s = select * from t3 where c between -2 and -1;
+--sorted_result
 eval $s;
 eval explain $s;
 
@@ -769,6 +777,12 @@ INSERT INTO cc (
 (1, '2008-01-23', '11:14:24.032949', '2004-10-02 20:31:15.022553', 't');
 SET @save_old_sql_mode= @@sql_mode;
 SET sql_mode="";
+
+# Warnings arrive in unpredictable order with NDB and cannot be sorted
+if ($testing_ndb)
+{
+--disable_warnings
+}
 SELECT DISTINCT alias1.col_varchar_key AS field1
 FROM ( cc AS alias1 STRAIGHT_JOIN
       (( cc AS alias2 STRAIGHT_JOIN cc AS alias3 ON
@@ -781,6 +795,10 @@ ORDER BY field1, alias1.col_date_key, field1 ASC, field1 DESC,
         alias1.col_time_key ASC, field1;
 DROP TABLE cc;
 SET sql_mode=@save_old_sql_mode;
+if ($testing_ndb)
+{
+--enable_warnings
+}
 
 --echo #
 --echo # Bug#20797941: WL8149:ASSERTION !TABLE ||
@@ -828,15 +846,19 @@ EXPLAIN SELECT * FROM t2 AS t1 WHERE b NOT IN (SELECT b FROM t1 FORCE INDEX(b));
 DROP TABLE t1;
 }
 
+DROP TABLE t2, t3;
+
 --echo #
 --echo # Bug#21317507:GC: STORED COLUMN REJECTED, BUT VIRTUAL IS ACCEPTED
 --echo #
+# TODO: Figure out appropriate NDB tests here
 let $innodb_engine = `SELECT @@session.default_storage_engine='innodb'`;
+let $myisam_engine = `SELECT @@session.default_storage_engine='MyISAM'`;
 CREATE TABLE t1(a INT);
 INSERT INTO t1 VALUES(2147483647);
 --error 1221
 ALTER TABLE t1 ADD INDEX idx(a), WITH VALIDATION;
-if (!$innodb_engine)
+if ($myisam_engine)
 {
   --echo Should fail and column shouldn't be added
   --error 1264
@@ -880,7 +902,7 @@ DROP TABLE t1;
 CREATE TABLE t1(a INT);
 INSERT INTO t1 VALUES(2147483647);
 ALTER TABLE t1 ADD COLUMN h INT AS (a) VIRTUAL, WITHOUT VALIDATION;
---error 1845
+--error 1845, 1846
 ALTER TABLE t1 CHANGE h i INT AS (a) VIRTUAL, WITH VALIDATION,
   ALGORITHM=INPLACE;
 if ($innodb_engine)
@@ -888,23 +910,23 @@ if ($innodb_engine)
 ALTER TABLE t1 CHANGE h i INT AS (a) VIRTUAL, WITHOUT VALIDATION,
   ALGORITHM=INPLACE;
 }
-if (!$innodb_engine)
+if ($myisam_engine)
 {
 --error 1845
 ALTER TABLE t1 CHANGE h i INT AS (a) VIRTUAL, WITHOUT VALIDATION,
   ALGORITHM=INPLACE;
 }
---error 1845
+--error 1845, 1846
 ALTER TABLE t1 ADD COLUMN b SMALLINT AS (a) VIRTUAL, WITH VALIDATION,
   ALGORITHM=INPLACE, LOCK=NONE;
---error 1845
+--error 1845, 1846
 ALTER TABLE t1 ADD COLUMN c SMALLINT AS (a) VIRTUAL, WITH VALIDATION,
   ALGORITHM=INPLACE, LOCK=SHARED;
---error 1845
+--error 1845, 1846
 ALTER TABLE t1 ADD COLUMN d SMALLINT AS (a) VIRTUAL, WITH VALIDATION,
   ALGORITHM=INPLACE, LOCK=EXCLUSIVE;
 --echo Shouldn't fail on Innodb
-if (!$innodb_engine)
+if ($myisam_engine)
 {
   --error 1845
   ALTER TABLE t1 ADD COLUMN e SMALLINT AS (a) VIRTUAL, WITHOUT VALIDATION,
@@ -986,6 +1008,7 @@ SELECT * FROM t1
 WHERE i1 > 41 AND i1 <= 43;
 
 eval EXPLAIN $query1;
+--sorted_result
 eval $query1;
 
 if ($support_virtual_index)
@@ -1000,6 +1023,7 @@ SELECT * FROM t1
 WHERE v1 > 41 AND v1 <= 43;
 
 eval EXPLAIN $query2;
+--sorted_result
 eval $query2;
 
 DROP TABLE t0, t1;
@@ -1007,3 +1031,211 @@ DROP TABLE t0, t1;
 # Restore defaults
 set optimizer_switch= @optimizer_switch_save;
 set @@read_rnd_buffer_size= @read_rnd_buffer_size_save;
+
+--echo #
+--echo # Bug#21872184 CONDITIONAL JUMP AT JOIN_CACHE::WRITE_RECORD_DATA IN 
+--echo #              SQL_JOIN_BUFFER.CC
+--echo #
+
+--echo #
+--echo # Test 1: Dynamic range scan with one covering index
+--echo #
+
+# This is the original test case which produces the valgrind error when
+# inserting data into the join buffer. The test failure only occurs with
+# InnoDB since it is only InnoDB that currently supports indexes on
+# virtual columns and is the only storage engine that includes the
+# primary key in each secondary key. 
+
+CREATE TABLE t1 (
+  i1 INTEGER NOT NULL,
+  c1 VARCHAR(1) NOT NULL
+);
+
+INSERT INTO t1
+VALUES (10, 'c'), (10, 'i'), (2, 't'), (4, 'g');
+
+CREATE TABLE t2 (
+  i1 INTEGER NOT NULL,
+  c1 VARCHAR(1) NOT NULL
+);
+
+INSERT INTO t2
+VALUES (2, 'k'), (9, 'k'), (7, 'o'), (5, 'n'), (7, 'e');
+
+CREATE TABLE t3 (
+  pk INTEGER NOT NULL,
+  i1 INTEGER,
+  i2_key INTEGER GENERATED ALWAYS AS (i1 + i1) VIRTUAL NOT NULL,
+  PRIMARY KEY (pk)
+);
+
+if ($support_virtual_index)
+{
+--echo # Add a covering index. The reason for this index being covering is that
+--echo # secondary indexes in InnoDB include the primary key.
+ALTER TABLE t3 ADD INDEX v_idx (i2_key);
+}
+
+INSERT INTO t3 (pk, i1)
+VALUES (1, 1), (2, 48), (3, 228), (4, 3), (5, 5),
+       (6, 39), (7, 6), (8, 8), (9, 3);
+
+CREATE TABLE t4 (
+  i1 INTEGER NOT NULL,
+  c1 VARCHAR(1) NOT NULL
+);
+
+INSERT INTO t4 
+VALUES (1, 'j'), (2, 'c'), (0, 'a');
+
+ANALYZE TABLE t1, t2, t3, t4;
+
+# Hint is added to avoid materialization of the subquery
+let query=
+SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
+FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2 
+WHERE ( t3.pk IN 
+  (
+    SELECT /*+ QB_NAME(subq1) */ t4.i1
+    FROM t4
+    WHERE t4.c1 < 'o'
+  )
+) 
+AND t1.i1 <= t3.i2_key;
+
+eval EXPLAIN $query;
+--sorted_result
+eval $query;
+
+--echo #
+--echo # Test 2: Two alternative covering indexes for the range scan
+--echo #
+
+# Adding second covering index
+if ($support_virtual_index)
+{
+ALTER TABLE t3 ADD INDEX v_idx2 (i2_key, i1);
+}
+
+# Hint is added to avoid materialization of the subquery
+let query=
+SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
+FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2 
+WHERE ( t3.pk IN 
+  (
+    SELECT /*+ QB_NAME(subq1) */ t4.i1
+    FROM t4
+    WHERE t4.c1 < 'o'
+  )
+) 
+AND t1.i1 <= t3.i2_key;
+
+eval EXPLAIN $query;
+--sorted_result
+eval $query;
+
+--echo #
+--echo # Test 3: One covering index including the base column for the virtual
+--echo #         column
+--echo #
+
+if ($support_virtual_index)
+{
+--echo # Drop the index with only the virtual column
+ALTER TABLE t3 DROP INDEX v_idx;
+}
+
+# Hint is added to avoid materialization of the subquery
+let query=
+SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
+FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2 
+WHERE ( t3.pk IN 
+  (
+    SELECT /*+ QB_NAME(subq1) */ t4.i1
+    FROM t4
+    WHERE t4.c1 < 'o'
+  )
+) 
+AND t1.i1 <= t3.i2_key;
+
+eval EXPLAIN $query;
+--sorted_result
+eval $query;
+
+--echo #
+--echo # Test 4: One non-covering index
+--echo #
+
+if ($support_virtual_index)
+{
+--echo # Drop the index on two columns, add index on just one virtual column
+ALTER TABLE t3 DROP INDEX v_idx2;
+ALTER TABLE t3 ADD INDEX v_idx (i2_key);
+}
+
+--echo # Add more data to the table so that it will run the dynamic range scan
+--echo # as both table scan and range scan (the purpose of this is to make the
+--echo # table scan more expensive).
+INSERT INTO t3 (pk, i1)
+VALUES (10,1), (11,1), (12,1), (13,1), (14,1),(15,1), (16,1),(17,1), (18,1),
+       (19,1), (20,1), (21,1), (22,1), (23,1), (24,1),(25,1),(26,1),(27,1), 
+       (28,1), (29,1);
+
+--echo # Change the query to read an extra column (t3.i1) making the index
+--echo # non-covering.
+# Hint is added to avoid materialization of the subquery
+let query=
+SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1, t3.i1
+FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2 
+WHERE ( t3.pk IN 
+  (
+    SELECT /*+ QB_NAME(subq1) */ t4.i1
+    FROM t4
+    WHERE t4.c1 < 'o'
+  )
+) 
+AND t1.i1 <= t3.i2_key;
+
+eval EXPLAIN $query;
+--sorted_result
+eval $query;
+
+--echo #
+--echo # Test 5: Test where the added primary key to secondary indexes is
+--echo #         used after it has been included in the join buffer
+--echo #
+
+# This test is only relevant for storage engines that add the primary key
+# to all secondary keys (e.g. InnoDB). For these engines, the fields in the
+# primary key might be included when deciding that a secondary index is
+# covering for the query. This is the case for most of the secondary indexes
+# on t3 in this test. But in the above queries, the subquery is non-dependent
+# and the "t3.pk IN .." will be evaluated after rows for t3 are read. At this
+# time t3.pk is in the record buffer. t3.pk is not used after it has been
+# inserted into the join buffer. To test that t3.pk is actually correctly
+# included in the join buffer we change the subquery to be dependent and
+# only evaluated after the join has been done.
+# The purpose of this test is to ensure that we correctly handle and
+# include primary key fields that are added to a covering secondary index.
+
+# The difference between this query and the query in test 1 is that
+# an extra query condition is added to the subquery.
+# Hint is added to avoid materialization of the subquery
+let query=
+SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
+FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2 
+WHERE ( t3.pk IN 
+  (
+    SELECT /*+ QB_NAME(subq1) */ t4.i1
+    FROM t4
+    WHERE t4.c1 < 'o' and t4.i1 < (t2.i1 + 1)
+  )
+) 
+AND t1.i1 <= t3.i2_key;
+
+eval EXPLAIN $query;
+--sorted_result
+eval $query;
+
+DROP TABLE t1, t2, t3, t4;

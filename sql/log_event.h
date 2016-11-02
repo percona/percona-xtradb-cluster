@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -73,6 +73,9 @@ class String;
 typedef ulonglong sql_mode_t;
 typedef struct st_db_worker_hash_entry db_worker_hash_entry;
 extern "C" MYSQL_PLUGIN_IMPORT char server_version[SERVER_VERSION_LENGTH];
+#if defined(HAVE_REPLICATION) && !defined(MYSQL_CLIENT)
+int ignored_error_code(int err_code);
+#endif
 #define PREFIX_SQL_LOAD "SQL_LOAD-"
 
 /**
@@ -823,7 +826,7 @@ public:
   }
   virtual bool write_data_header(IO_CACHE* file)
   { return 0; }
-  virtual bool write_data_body(IO_CACHE* file __attribute__((unused)))
+  virtual bool write_data_body(IO_CACHE* file MY_ATTRIBUTE((unused)))
   { return 0; }
   inline time_t get_time()
   {
@@ -3332,7 +3335,7 @@ public:
   static bool binlog_row_logging_function(THD *thd, TABLE *table,
                                           bool is_transactional,
                                           const uchar *before_record
-                                          __attribute__((unused)),
+                                          MY_ATTRIBUTE((unused)),
                                           const uchar *after_record)
   {
     return thd->binlog_write_row(table, is_transactional,
@@ -3530,7 +3533,7 @@ public:
                                           bool is_transactional,
                                           const uchar *before_record,
                                           const uchar *after_record
-                                          __attribute__((unused)))
+                                          MY_ATTRIBUTE((unused)))
   {
     return thd->binlog_delete_row(table, is_transactional,
                                   before_record, NULL);
@@ -4186,8 +4189,6 @@ private:
   bool write_data_set(IO_CACHE* file, std::list<const char*> *set);
 #endif
 
-  bool read_snapshot_version();
-
   size_t get_snapshot_version_size();
 
   static int get_data_set_size(std::list<const char*> *set);
@@ -4248,6 +4249,14 @@ public:
     Return a pointer to read-set list.
    */
   std::list<const char*> *get_read_set() { return &read_set; }
+
+  /**
+    Read snapshot version from encoded buffers.
+    Cannot be executed during data read from file (event constructor),
+    since its required locks will collide with the server gtid state
+    initialization procedure.
+   */
+  bool read_snapshot_version();
 
   /**
     Return the transaction snapshot timestamp.

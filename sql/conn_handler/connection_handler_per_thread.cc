@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -239,7 +239,7 @@ extern "C" void *handle_connection(void *arg)
   Connection_handler_manager *handler_manager=
     Connection_handler_manager::get_instance();
   Channel_info* channel_info= static_cast<Channel_info*>(arg);
-  bool pthread_reused __attribute__((unused))= false;
+  bool pthread_reused MY_ATTRIBUTE((unused))= false;
 
   if (my_thread_init())
   {
@@ -297,13 +297,12 @@ extern "C" void *handle_connection(void *arg)
     {
       while (thd_connection_alive(thd))
       {
-        mysql_audit_release(thd);
         if (do_command(thd))
           break;
       }
       end_connection(thd);
     }
-    close_connection(thd);
+    close_connection(thd, 0, false, false);
 
     thd->get_stmt_da()->reset_diagnostics_area();
     thd->release_resources();

@@ -198,6 +198,7 @@ INCLUDE(lz4)
 INCLUDE(libevent)
 INCLUDE(ssl)
 INCLUDE(readline)
+INCLUDE(protobuf)
 INCLUDE(mysql_version)
 INCLUDE(libutils)
 INCLUDE(dtrace)
@@ -207,6 +208,13 @@ INCLUDE(install_layout)
 INCLUDE(mysql_add_executable)
 
 # Handle options
+IF(EXISTS ${CMAKE_SOURCE_DIR}/rapid)
+  OPTION(WITH_RAPID
+    "Build additonal code(plugins) that is located in rapid directory" ON)
+ELSE()
+  OPTION(WITH_RAPID
+    "Build additonal code(plugins) that is located in rapid directory" OFF)
+ENDIF()
 OPTION(DISABLE_SHARED 
  "Don't build shared libraries, compile code as position-dependent" OFF)
 IF(DISABLE_SHARED)
@@ -241,6 +249,8 @@ MACRO (MY_CHECK_C_COMPILER_FLAG FLAG RESULT)
     FAIL_REGEX "unrecognized .*option"
     FAIL_REGEX "ignoring unknown option"
     FAIL_REGEX "[Ww]arning: [Oo]ption"
+    FAIL_REGEX "error: visibility"
+    FAIL_REGEX "warning: visibility"
     )
   SET(CMAKE_REQUIRED_FLAGS "${SAVE_CMAKE_REQUIRED_FLAGS}")
 ENDMACRO()
@@ -255,6 +265,8 @@ MACRO (MY_CHECK_CXX_COMPILER_FLAG FLAG RESULT)
     FAIL_REGEX "unrecognized .*option"
     FAIL_REGEX "ignoring unknown option"
     FAIL_REGEX "[Ww]arning: [Oo]ption"
+    FAIL_REGEX "error: visibility"
+    FAIL_REGEX "warning: visibility"
     )
   SET(CMAKE_REQUIRED_FLAGS "${SAVE_CMAKE_REQUIRED_FLAGS}")
 ENDMACRO()
@@ -481,6 +493,10 @@ MYSQL_CHECK_EDITLINE()
 MYSQL_CHECK_LIBEVENT()
 # Add lz4 library
 MYSQL_CHECK_LZ4()
+# Add protoc and libprotobuf
+IF(NOT WITHOUT_SERVER)
+  MYSQL_CHECK_PROTOBUF()
+ENDIF()
 
 # Check for SYS_thread_selfid system call
 CHECK_C_SOURCE_COMPILES("
@@ -505,6 +521,19 @@ int main(int ac, char **av)
   return (tid != 0 ? 0 : 1);
 }"
 HAVE_SYS_GETTID)
+
+IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  # Check for pthread_setname_np
+  CHECK_C_SOURCE_COMPILES("
+  #include <pthread.h>
+  int main(int ac, char **av)
+  {
+    const char *thread_name= 0;
+    int ret = pthread_setname_np(pthread_self(), thread_name);
+    return ret;
+  }"
+  HAVE_PTHREAD_SETNAME_NP)
+ENDIF()
 
 # Check for pthread_getthreadid_np()
 CHECK_C_SOURCE_COMPILES("
@@ -547,8 +576,6 @@ IF(WITH_UNIT_TESTS)
 ENDIF()
 
 IF(NOT WITHOUT_SERVER)
-  # Set default keyring plugin information
-  SET(KEYRING_PLUGIN_INFO "" CACHE INTERNAL "")
   SET (MYSQLD_STATIC_PLUGIN_LIBS "" CACHE INTERNAL "")
   SET (MYSQLD_STATIC_EMBEDDED_PLUGIN_LIBS "" CACHE INTERNAL "")
   # Add storage engines and plugins.
@@ -573,10 +600,6 @@ ADD_SUBDIRECTORY(wsrep)
 ENDIF()
 
 IF(WITH_UNIT_TESTS)
-  ADD_SUBDIRECTORY(unittest)
-  ADD_SUBDIRECTORY(unittest/examples)
-  ADD_SUBDIRECTORY(unittest/mytap)
-  ADD_SUBDIRECTORY(unittest/mytap/t)
   # Visual Studio 11 needs this extra flag in order to compile gmock.
   IF(WIN32)
     ADD_DEFINITIONS( /D _VARIADIC_MAX=10 )
@@ -585,7 +608,14 @@ IF(WITH_UNIT_TESTS)
   IF(HAVE_LLVM_LIBCPP)
     ADD_DEFINITIONS(-DGTEST_USE_OWN_TR1_TUPLE=1)
   ENDIF()
-  ADD_SUBDIRECTORY(unittest/gunit)
+
+  ADD_SUBDIRECTORY(unittest)
+  ADD_SUBDIRECTORY(unittest/examples)
+  ADD_SUBDIRECTORY(unittest/mytap)
+  ADD_SUBDIRECTORY(unittest/mytap/t)
+  IF(WITH_RAPID AND EXISTS ${CMAKE_SOURCE_DIR}/rapid/unittest/gunit)
+    ADD_SUBDIRECTORY(rapid/unittest/gunit)
+  ENDIF()
 ENDIF()
 
 ADD_SUBDIRECTORY(extra)
@@ -618,10 +648,6 @@ IF(NOT WITHOUT_SERVER)
   IF(EXISTS ${CMAKE_SOURCE_DIR}/internal/CMakeLists.txt)
     ADD_SUBDIRECTORY(internal)
   ENDIF()
-  # Set default value for --early_load_plugin.
-  # KEYRING_PLUGIN_INFO should have been set to appropriate default
-  # by keyring plugin
-  SET(DEFAULT_EARLY_PLUGIN_LOAD "\"${KEYRING_PLUGIN_INFO}\"" CACHE INTERNAL "Default value for --early_plugin_load" FORCE)
   ADD_SUBDIRECTORY(packaging/rpm-oel)
   ADD_SUBDIRECTORY(packaging/rpm-fedora)
   ADD_SUBDIRECTORY(packaging/rpm-sles)

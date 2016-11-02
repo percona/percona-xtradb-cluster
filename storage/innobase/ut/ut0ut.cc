@@ -224,14 +224,14 @@ ut_print_timestamp(
 
 	GetLocalTime(&cal_tm);
 
-	fprintf(file, "%d-%02d-%02d %02d:%02d:%02d %#lx",
+	fprintf(file, "%d-%02d-%02d %02d:%02d:%02d %#llx",
 		(int) cal_tm.wYear,
 		(int) cal_tm.wMonth,
 		(int) cal_tm.wDay,
 		(int) cal_tm.wHour,
 		(int) cal_tm.wMinute,
 		(int) cal_tm.wSecond,
-		thread_id);
+		static_cast<ulonglong>(thread_id));
 #else
 	struct tm* cal_tm_ptr;
 	time_t	   tm;
@@ -402,10 +402,10 @@ ut_print_buf(
 
 	UNIV_MEM_ASSERT_RW(buf, len);
 
-	fprintf(file, " len %lu; hex ", len);
+	fprintf(file, " len " ULINTPF "; hex ", len);
 
 	for (data = (const byte*) buf, i = 0; i < len; i++) {
-		fprintf(file, "%02lx", (ulong)*data++);
+		fprintf(file, "%02lx", static_cast<ulong>(*data++));
 	}
 
 	fputs("; asc ", file);
@@ -823,13 +823,9 @@ ut_strerr(
 		       "transaction");
 	case DB_WRONG_FILE_NAME:
 		return("Invalid Filename");
-	case DB_NO_FK_ON_V_BASE_COL:
+	case DB_NO_FK_ON_S_BASE_COL:
 		return("Cannot add foreign key on the base column "
-		       "of indexed virtual column");
-	case DB_NO_VIRTUAL_INDEX_ON_FK:
-		return("Cannot create index on virtual column whose base "
-		       "column has foreign constraint");
-
+		       "of stored column");
 	case DB_COMPUTE_VALUE_FAILED:
 		return("Compute generated column failed");
 

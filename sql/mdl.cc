@@ -1,4 +1,4 @@
-/* Copyright (c) 2007, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2007, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@
 static PSI_memory_key key_memory_MDL_context_acquire_locks;
 
 #ifdef WITH_WSREP
+#include "debug_sync.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
 //extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
@@ -40,7 +41,8 @@ void sql_print_information(const char *format, ...)
   __attribute__((format(printf, 1, 2)));
 extern bool
 wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
-                          MDL_ticket *ticket);
+                          MDL_ticket *ticket,
+                          const MDL_key *key);
 #endif /* WITH_WSREP */
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_MDL_wait_LOCK_wait_status;
@@ -121,7 +123,7 @@ void MDL_key::init_psi_keys()
 {
   int i;
   int count;
-  PSI_stage_info *info __attribute__((unused));
+  PSI_stage_info *info MY_ATTRIBUTE((unused));
 
   count= array_elements(MDL_key::m_namespace_to_wait_state_name);
   for (i= 0; i<count; i++)
@@ -1064,7 +1066,7 @@ extern "C"
 {
 static uchar *
 mdl_locks_key(const uchar *record, size_t *length,
-              my_bool not_used __attribute__((unused)))
+              my_bool not_used MY_ATTRIBUTE((unused)))
 {
   MDL_lock *lock=(MDL_lock*) record;
   *length= lock->key.length();
@@ -1869,7 +1871,16 @@ MDL_wait::timed_wait(MDL_context_owner *owner, struct timespec *abs_timeout,
          wait_result != ETIMEDOUT && wait_result != ETIME)
   {
 #ifdef WITH_WSREP
-    if (wsrep_thd_is_BF(owner->get_thd(), true))
+    // Allow tests to block the applier thread using the DBUG facilities
+    DBUG_EXECUTE_IF("sync.wsrep_before_mdl_wait",
+                 {
+                   const char act[]=
+                     "now "
+                     "wait_for signal.wsrep_before_mdl_wait";
+                   DBUG_ASSERT(!debug_sync_set_action((owner->get_thd()),
+                                                      STRING_WITH_LEN(act)));
+                 };);
+    if (wsrep_thd_is_BF(owner->get_thd(), false))
     {
       wait_result= mysql_cond_wait(&m_COND_wait_status, &m_LOCK_wait_status);
     }
@@ -1971,7 +1982,8 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
       if (granted->get_ctx() != ticket->get_ctx() &&
           granted->is_incompatible_when_granted(ticket->get_type()))
       {
-        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted))
+        if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
+                                       &ticket->get_lock()->key))
         {
           WSREP_DEBUG("MDL victim killed at add_ticket");
         }
@@ -2609,7 +2621,7 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
                         wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
             can_grant = true;
           }
-          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
+          else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket, &key))
           {
             wsrep_can_grant= FALSE;
             if (wsrep_log_conflicts) 
@@ -3178,7 +3190,11 @@ MDL_context::try_acquire_lock_impl(MDL_request *mdl_request,
     as well for MDL_object_lock::notify_conflicting_locks() to work
     properly.
   */
+#ifdef WITH_WSREP
+  force_slow= true;
+#else
   force_slow= ! unobtrusive_lock_increment || m_needs_thr_lock_abort;
+#endif /* WITH_WSREP */
 
   /*
     If "obtrusive" lock is requested we need to "materialize" all fast

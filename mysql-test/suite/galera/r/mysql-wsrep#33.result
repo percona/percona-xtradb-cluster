@@ -1,6 +1,7 @@
 Setting SST method to mysqldump ...
-GRANT ALL PRIVILEGES ON *.* TO 'sst' IDENTIFIED BY 'sst';
-SET GLOBAL wsrep_sst_auth = 'sst:sst';
+CREATE USER 'sst';
+GRANT ALL PRIVILEGES ON *.* TO 'sst';
+SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
 Performing State Transfer on a server that has been temporarily disconnected
 CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;
@@ -99,5 +100,9 @@ CALL mtr.add_suppression("Can't open and lock time zone table");
 CALL mtr.add_suppression("Can't open and lock privilege tables");
 CALL mtr.add_suppression("Info table is not ready to be used");
 CALL mtr.add_suppression("Native table .* has the wrong structure");
+CALL mtr.add_suppression("InnoDB: Table `mysql`\.`innodb_table_stats` not found");
+CALL mtr.add_suppression("Fetch of persistent statistics requested for table `mysql`\.`gtid_executed`");
+CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
+CALL mtr.add_suppression("Gtid table is not ready to be used");
 SET GLOBAL general_log = ON;
 SET GLOBAL slow_query_log = ON;

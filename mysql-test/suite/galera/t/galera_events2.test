@@ -1,0 +1,42 @@
+#
+# Additional tests around events - perform actual DML inside an event and check that it is replicated properly
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) ENGINE = InnoDB;
+
+--let $event_scheduler_orig = `SELECT @@event_scheduler;`
+SET GLOBAL event_scheduler = ON;
+--connection node_2
+SET GLOBAL event_scheduler = ON;
+
+#
+# Create an event that performs DML and run it
+#
+--connection node_1
+CREATE EVENT event1 ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 1 SECOND ON COMPLETION PRESERVE DO INSERT INTO t1 VALUES (1);
+--let $wait_condition = SELECT LAST_EXECUTED IS NOT NULL FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
+--source include/wait_condition.inc
+SELECT COUNT(*) = 1 FROM t1;
+
+# Node #2 should see the effects from the event that ran on node #1 , but only once
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+
+# It should also report that the event was never executed locally
+SELECT LAST_EXECUTED IS NULL FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
+
+# Cleanup
+
+--connection node_1
+DROP TABLE t1;
+DROP EVENT event1;
+--disable_query_log
+--connection node_1
+--eval SET GLOBAL event_scheduler = $event_scheduler_orig;
+--connection node_2
+--eval SET GLOBAL event_scheduler = $event_scheduler_orig;
+--enable_query_log

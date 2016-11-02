@@ -369,7 +369,7 @@ static bool send_prep_stmt(Prepared_statement *stmt, uint columns)
 }
 #else
 static bool send_prep_stmt(Prepared_statement *stmt,
-                           uint columns __attribute__((unused)))
+                           uint columns MY_ATTRIBUTE((unused)))
 {
   THD *thd= stmt->thd;
 
@@ -3271,14 +3271,19 @@ bool Prepared_statement::prepare(const char *query_str, size_t query_length)
   invoke_pre_parse_rewrite_plugins(thd);
   thd->m_parser_state = NULL;
 
-  error= parse_sql(thd, &parser_state, NULL) ||
-    thd->is_error() ||
-    init_param_array(this);
+  error= thd->is_error();
 
   if (!error)
-  { // We've just created the statement maybe there is a rewrite
-    invoke_post_parse_rewrite_plugins(thd, true);
-    error= init_param_array(this);
+  {
+    error = parse_sql(thd, &parser_state, NULL) ||
+            thd->is_error() ||
+            init_param_array(this);
+
+    if (!error)
+    { // We've just created the statement maybe there is a rewrite
+      invoke_post_parse_rewrite_plugins(thd, true);
+      error = init_param_array(this);
+    }
   }
 
   lex->set_trg_event_type_for_tables();
@@ -3554,7 +3559,9 @@ reexecute:
   thd->push_reprepare_observer(stmt_reprepare_observer);
 
   error= execute(expanded_query, open_cursor) || thd->is_error();
+
 #ifdef WITH_WSREP
+  bool observer_popped = false;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch (thd->wsrep_conflict_state)
   {
@@ -3562,16 +3569,27 @@ reexecute:
     WSREP_DEBUG("PS execute fail for CERT_FAILURE: thd: %u err: %d",
                 thd->thread_id(), thd->get_stmt_da()->mysql_errno() );
     thd->wsrep_conflict_state = NO_CONFLICT;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     break;
 
   case MUST_REPLAY:
+    thd->pop_reprepare_observer();
+    observer_popped= true;
     (void)wsrep_replay_transaction(thd);
-  default: break;
+    thd->wsrep_conflict_state= REPLAYED;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    break;
+  default:
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      break;
   }
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  if (!observer_popped)
+  {
 #endif /* WITH_WSREP */
-
   thd->pop_reprepare_observer();
+#ifdef WITH_WSREP
+  }
+#endif /* WITH_WSREP */
 
   if ((sql_command_flags[lex->sql_command] & CF_REEXECUTION_FRAGILE) &&
       error && !thd->is_fatal_error && !thd->killed &&
@@ -3918,7 +3936,10 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
     // Execute
 
     if (open_cursor)
+    {
+      lex->safe_to_cache_query= 0;
       error= mysql_open_cursor(thd, &result, &cursor);
+    }
     else
     {
       /*
@@ -3988,6 +4009,7 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
   */
   mysql_mutex_lock(&thd->LOCK_thd_data);
   thd->lex= stmt_backup.lex();
+
   mysql_mutex_unlock(&thd->LOCK_thd_data);
 
   thd->stmt_arena= old_stmt_arena;
@@ -4411,7 +4433,7 @@ bool Protocol_local::store(const char *str, size_t length,
 /* Store MYSQL_TIME (in binary format) */
 
 bool Protocol_local::store(MYSQL_TIME *time,
-                           uint precision __attribute__((unused)))
+                           uint precision MY_ATTRIBUTE((unused)))
 {
   return store_column(time, sizeof(MYSQL_TIME));
 }
@@ -4428,7 +4450,7 @@ bool Protocol_local::store_date(MYSQL_TIME *time)
 /** Store MYSQL_TIME (in binary format) */
 
 bool Protocol_local::store_time(MYSQL_TIME *time,
-                                uint precision __attribute__((unused)))
+                                uint precision MY_ATTRIBUTE((unused)))
 {
   return store_column(time, sizeof(MYSQL_TIME));
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -59,6 +59,8 @@
 #include "sql_time.h"                    // global_date_format
 #include "table_cache.h"                 // Table_cache_manager
 #include "transaction.h"                 // trans_commit_stmt
+#include "rpl_write_set_handler.h"       // transaction_write_set_hashing_algorithms
+#include "rpl_group_replication.h"       // is_group_replication_running
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
 #include "../storage/perfschema/pfs_server.h"
@@ -1829,6 +1831,17 @@ static Sys_var_mybool Sys_log_bin(
 
 static bool transaction_write_set_check(sys_var *self, THD *thd, set_var *var)
 {
+#ifdef HAVE_REPLICATION
+  // Can't change the algorithm when group replication is enabled.
+  if (is_group_replication_running())
+  {
+    my_message(ER_GROUP_REPLICATION_RUNNING,
+               "The write set algorithm cannot be changed when Group replication"
+               " is running.", MYF(0));
+    return true;
+  }
+#endif
+
   if (var->type == OPT_GLOBAL &&
       global_system_variables.binlog_format != BINLOG_FORMAT_ROW)
   {
@@ -1862,9 +1875,6 @@ static bool transaction_write_set_check(sys_var *self, THD *thd, set_var *var)
   }
   return false;
 }
-
-static const char *transaction_write_set_hashing_algorithms[]=
-       {"OFF", "MURMUR32", 0};
 
 static Sys_var_enum Sys_extract_write_set(
        "transaction_write_set_extraction",
@@ -2055,24 +2065,8 @@ static bool fix_syslog(sys_var *self, THD *thd, enum_var_type type)
 
 static bool check_syslog_tag(sys_var *self, THD *THD, set_var *var)
 {
-  bool ret;
-  char *old= opt_log_syslog_tag;
-  opt_log_syslog_tag= (var->value) ? var->save_result.string_value.str : NULL;
-  ret= log_syslog_update_settings();
-  opt_log_syslog_tag= old;
-  return ret;
-}
-
-static bool check_syslog_enable(sys_var *self, THD *THD, set_var *var)
-{
-  my_bool save= opt_log_syslog_enable;
-  opt_log_syslog_enable= var->save_result.ulonglong_value;
-  if (log_syslog_update_settings())
-  {
-    opt_log_syslog_enable= save;
-    return true;
-  }
-  return false;
+  return ((var->save_result.string_value.str != NULL) &&
+          (strchr(var->save_result.string_value.str, FN_LIBCHAR) != NULL));
 }
 
 static Sys_var_mybool Sys_log_syslog_enable(
@@ -2089,7 +2083,7 @@ static Sys_var_mybool Sys_log_syslog_enable(
        DEFAULT(TRUE),
 #endif
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
-       ON_CHECK(check_syslog_enable), ON_UPDATE(0));
+       ON_CHECK(0), ON_UPDATE(fix_syslog));
 
 
 static Sys_var_charptr Sys_log_syslog_tag(
@@ -2559,8 +2553,16 @@ static Sys_var_ulong Sys_net_buffer_length(
 static bool fix_net_read_timeout(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type != OPT_GLOBAL)
+  {
+    // net_buffer_length is a specific property for the classic protocols
+    if (!thd->is_classic_protocol())
+    {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
     my_net_set_read_timeout(thd->get_protocol_classic()->get_net(),
                             thd->variables.net_read_timeout);
+  }
   return false;
 }
 static Sys_var_ulong Sys_net_read_timeout(
@@ -2575,8 +2577,16 @@ static Sys_var_ulong Sys_net_read_timeout(
 static bool fix_net_write_timeout(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type != OPT_GLOBAL)
+  {
+    // net_read_timeout is a specific property for the classic protocols
+    if (!thd->is_classic_protocol())
+    {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
     my_net_set_write_timeout(thd->get_protocol_classic()->get_net(),
                              thd->variables.net_write_timeout);
+  }
   return false;
 }
 static Sys_var_ulong Sys_net_write_timeout(
@@ -2591,8 +2601,16 @@ static Sys_var_ulong Sys_net_write_timeout(
 static bool fix_net_retry_count(sys_var *self, THD *thd, enum_var_type type)
 {
   if (type != OPT_GLOBAL)
+  {
+    // net_write_timeout is a specific property for the classic protocols
+    if (!thd->is_classic_protocol())
+    {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
     thd->get_protocol_classic()->get_net()->retry_count=
       thd->variables.net_retry_count;
+  }
   return false;
 }
 static Sys_var_ulong Sys_net_retry_count(
@@ -2623,8 +2641,8 @@ static Sys_var_mybool Sys_old_alter_table(
        "old_alter_table", "Use old, non-optimized alter table",
        SESSION_VAR(old_alter_table), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
-static bool old_passwords_check(sys_var *self  __attribute__((unused)),
-                                THD *thd  __attribute__((unused)),
+static bool old_passwords_check(sys_var *self  MY_ATTRIBUTE((unused)),
+                                THD *thd  MY_ATTRIBUTE((unused)),
                                 set_var *var)
 {
   push_deprecated_warn_no_replacement(current_thd, "old_passwords");
@@ -2685,8 +2703,73 @@ static Sys_var_ulong Sys_range_optimizer_max_mem_size(
       "does not have any cap on memory. ",
       SESSION_VAR(range_optimizer_max_mem_size),
       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, ULONG_MAX),
-      DEFAULT(1536000),
+      DEFAULT(8388608),
       BLOCK_SIZE(1));
+
+static bool
+limit_parser_max_mem_size(sys_var *self, THD *thd, set_var *var)
+{
+  if (var->type == OPT_GLOBAL)
+    return false;
+  ulonglong val= var->save_result.ulonglong_value;
+  if (val > global_system_variables.parser_max_mem_size)
+  {
+    if (thd->security_context()->check_access(SUPER_ACL))
+      return false;
+    var->save_result.ulonglong_value=
+      global_system_variables.parser_max_mem_size;
+    return throw_bounds_warning(thd, "parser_max_mem_size",
+                                true, // fixed
+                                true, // is_unsigned
+                                val);
+  }
+  return false;
+}
+
+// Similar to what we do for the intptr typedef.
+#if SIZEOF_CHARP == SIZEOF_INT
+static unsigned int max_mem_sz = ~0;
+#elif SIZEOF_CHARP == SIZEOF_LONG
+static unsigned long max_mem_sz = ~0;
+#elif SIZEOF_CHARP == SIZEOF_LONG_LONG
+static unsigned long long max_mem_sz = ~0;
+#endif
+
+/*
+  Need at least 400Kb to get through bootstrap.
+  Need at least 8Mb to get through mtr check testcase, which does
+    SELECT * FROM INFORMATION_SCHEMA.VIEWS
+*/
+static Sys_var_ulonglong Sys_parser_max_mem_size(
+      "parser_max_mem_size",
+      "Maximum amount of memory available to the parser",
+      SESSION_VAR(parser_max_mem_size),
+      CMD_LINE(REQUIRED_ARG),
+      VALID_RANGE(10 * 1000 * 1000, max_mem_sz),
+      DEFAULT(max_mem_sz),
+      BLOCK_SIZE(1),
+      NO_MUTEX_GUARD, NOT_IN_BINLOG,
+      ON_CHECK(limit_parser_max_mem_size),
+      ON_UPDATE(NULL));
+
+/*
+  There is no call on Sys_var_integer::do_check() for 'set xxx=default';
+  The predefined default for parser_max_mem_size is "infinite".
+  Update it in case we have seen option maximum-parser-max-mem-size
+  Also update global_system_variables, so 'SELECT parser_max_mem_size'
+  reports correct data.
+*/
+export void update_parser_max_mem_size()
+{
+  const ulonglong max_max= max_system_variables.parser_max_mem_size;
+  if (max_max == max_mem_sz)
+    return;
+  // In case parser-max-mem-size is also set:
+  const ulonglong new_val=
+    std::min(max_max, global_system_variables.parser_max_mem_size);
+  Sys_parser_max_mem_size.update_default(new_val);
+  global_system_variables.parser_max_mem_size= new_val;
+}
 
 static const char *optimizer_switch_names[]=
 {
@@ -4376,6 +4459,7 @@ static bool update_last_insert_id(THD *thd, set_var *var)
   }
   thd->first_successful_insert_id_in_prev_stmt=
     var->save_result.ulonglong_value;
+  thd->substitute_null_with_insert_id= TRUE;
   return false;
 }
 static ulonglong read_last_insert_id(THD *thd)
@@ -4577,6 +4661,14 @@ static bool check_log_path(sys_var *self, THD *thd, set_var *var)
 
   if (!var->save_result.string_value.str)
     return true;
+
+  if (!is_valid_log_name(var->save_result.string_value.str,
+                         var->save_result.string_value.length))
+  {
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0),
+             self->name.str, var->save_result.string_value.str);
+    return true;
+  }
 
   if (var->save_result.string_value.length > FN_REFLEN)
   { // path is too long
@@ -5275,13 +5367,14 @@ static Sys_var_charptr Sys_wsrep_start_position (
 static Sys_var_ulong Sys_wsrep_max_ws_size (
        "wsrep_max_ws_size", "Max write set size (bytes)",
        GLOBAL_VAR(wsrep_max_ws_size), CMD_LINE(REQUIRED_ARG),
-       /* Upper limit is 65K short of 4G to avoid overlows on 32-bit systems */
-       VALID_RANGE(1024, WSREP_MAX_WS_SIZE), DEFAULT(1073741824UL), BLOCK_SIZE(1));
+       VALID_RANGE(1024, WSREP_MAX_WS_SIZE), DEFAULT(WSREP_MAX_WS_SIZE),
+       BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(wsrep_max_ws_size_update));
 
 static Sys_var_ulong Sys_wsrep_max_ws_rows (
        "wsrep_max_ws_rows", "Max number of rows in write set",
        GLOBAL_VAR(wsrep_max_ws_rows), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(1, 1048576), DEFAULT(131072), BLOCK_SIZE(1));
+       VALID_RANGE(0, 1048576), DEFAULT(0), BLOCK_SIZE(1));
 
 static Sys_var_charptr Sys_wsrep_notify_cmd(
        "wsrep_notify_cmd", "",
@@ -5326,6 +5419,14 @@ static Sys_var_mybool Sys_wsrep_desync (
        &PLock_wsrep_desync, NOT_IN_BINLOG,
        ON_CHECK(wsrep_desync_check),
        ON_UPDATE(wsrep_desync_update));
+
+static const char *wsrep_reject_queries_names[]= { "NONE", "ALL", "ALL_KILL", NullS };
+static Sys_var_enum Sys_wsrep_reject_queries(
+       "wsrep_reject_queries", "Variable to set to reject queries",
+       GLOBAL_VAR(wsrep_reject_queries), CMD_LINE(OPT_ARG),
+       wsrep_reject_queries_names, DEFAULT(WSREP_REJECT_NONE),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(wsrep_reject_queries_update));
 
 static Sys_var_enum Sys_wsrep_forced_binlog_format(
        "wsrep_forced_binlog_format", "binlog format to take effect over user's choice",
@@ -5378,6 +5479,13 @@ static Sys_var_mybool Sys_wsrep_slave_UK_checks(
 static Sys_var_mybool Sys_wsrep_restart_slave(
        "wsrep_restart_slave", "Should MySQL slave be restarted automatically, when node joins back to cluster",
        GLOBAL_VAR(wsrep_restart_slave), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+
+static Sys_var_mybool Sys_wsrep_dirty_reads(
+       "wsrep_dirty_reads",
+       "Allow reads from a node is not in primary component",
+       SESSION_VAR(wsrep_dirty_reads),
+       CMD_LINE(OPT_ARG), DEFAULT(FALSE), NO_MUTEX_GUARD, NOT_IN_BINLOG);
+
 #endif /* WITH_WSREP */
 
 static bool fix_host_cache_size(sys_var *, THD *, enum_var_type)

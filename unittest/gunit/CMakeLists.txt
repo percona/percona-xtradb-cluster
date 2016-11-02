@@ -212,9 +212,6 @@ IF (WITH_SSL STREQUAL "bundled")
   ADD_SUBDIRECTORY(yassl)
 ENDIF()
 
-ADD_SUBDIRECTORY(innodb)
-ADD_SUBDIRECTORY(keyring) 
-
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/include
   ${CMAKE_SOURCE_DIR}/libbinlogevents/include
@@ -250,7 +247,7 @@ TARGET_LINK_LIBRARIES(gunit_large
 MESSAGE(STATUS "GTEST_LIBRARIES:${GTEST_LIBRARIES}")
 
 # Add some defines.
-ADD_DEFINITIONS(-DMYSQL_SERVER -DEXTRA_CODE_FOR_UNIT_TESTING)
+ADD_DEFINITIONS(-DMYSQL_SERVER -DHAVE_REPLICATION -DEXTRA_CODE_FOR_UNIT_TESTING)
 ADD_DEFINITIONS(-DERRMSG_DIR="${PROJECT_BINARY_DIR}/sql/share")
 ADD_DEFINITIONS(-DDATA_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -299,7 +296,6 @@ SET(TESTS
   sql_list
   sql_plist
   sql_string
-  stdcxx
   stl_alloc
   strings_skip_trailing
   strings_strnxfrm
@@ -308,6 +304,7 @@ SET(TESTS
   my_timer
   timespec
   my_alloc
+  pump_object_filter
   )
  
 IF (UNIX)
@@ -457,6 +454,10 @@ ENDIF(MERGE_UNITTESTS)
     bounded_queue-t.cc
     COMPILE_FLAGS -I${BOOST_PATCHES_DIR} -I${BOOST_INCLUDE_DIR}
   )
+  ADD_COMPILE_FLAGS(
+    pump_object_filter-t.cc
+    COMPILE_FLAGS -I${BOOST_PATCHES_DIR} -I${BOOST_INCLUDE_DIR}
+  )
 
   FOREACH(test ${SERVER_TESTS})
     SET(SRC_FILES ${test}-t.cc)
@@ -491,3 +492,6 @@ ENDIF(MERGE_UNITTESTS)
 
 ## Most executables depend on libeay32.dll (through mysys_ssl).
 COPY_OPENSSL_DLLS(copy_openssl_gunit)
+
+ADD_SUBDIRECTORY(innodb)
+ADD_SUBDIRECTORY(keyring)

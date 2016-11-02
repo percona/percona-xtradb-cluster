@@ -164,7 +164,7 @@ our $opt_vs_config = $ENV{'MTR_VS_CONFIG'};
 
 # If you add a new suite, please check TEST_DIRS in Makefile.am.
 #
-my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,innodb_fts,innodb_zip,innodb_undo,perfschema,funcs_1,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,test_service_sql_api";
+my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,innodb_fts,innodb_zip,innodb_undo,perfschema,funcs_1,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,test_service_sql_api,json";
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -232,7 +232,9 @@ our %gprof_dirs;
 
 our $glob_debugger= 0;
 our $opt_gdb;
+our $opt_lldb;
 our $opt_client_gdb;
+our $opt_client_lldb;
 my $opt_boot_gdb;
 our $opt_dbx;
 our $opt_client_dbx;
@@ -241,6 +243,7 @@ our $opt_ddd;
 our $opt_client_ddd;
 my $opt_boot_ddd;
 our $opt_manual_gdb;
+our $opt_manual_boot_gdb;
 our $opt_manual_lldb;
 our $opt_manual_dbx;
 our $opt_manual_ddd;
@@ -255,6 +258,9 @@ our @opt_experimentals;
 our $experimental_test_cases= [];
 
 my $baseport;
+my $mysqlx_baseport;
+
+my $opt_mysqlx_baseport = $ENV{'MYSQLXPLUGIN_PORT'} || "auto";
 # $opt_build_thread may later be set from $opt_port_base
 my $opt_build_thread= $ENV{'MTR_BUILD_THREAD'} || "auto";
 my $opt_port_base= $ENV{'MTR_PORT_BASE'} || "auto";
@@ -288,6 +294,8 @@ my $opt_retry= 3;
 my $opt_retry_failure= env_or_val(MTR_RETRY_FAILURE => 2);
 my $opt_reorder= 1;
 my $opt_force_restart= 0;
+
+our $opt_suite_opt;
 
 my $opt_strace_client;
 my $opt_strace_server;
@@ -346,6 +354,10 @@ my $opt_max_test_fail= env_or_val(MTR_MAX_TEST_FAIL => 10);
 
 my $opt_parallel= $ENV{MTR_PARALLEL} || 1;
 my $opt_port_group_size = $ENV{MTR_PORT_GROUP_SIZE} || 10;
+
+our $opt_xml_report;
+
+our $opt_xml_report;
 
 select(STDOUT);
 $| = 1; # Automatically flush STDOUT
@@ -418,17 +430,20 @@ sub main {
     for my $limit (2000, 1500, 1000, 500){
       $opt_parallel-- if ($sys_info->min_bogomips() < $limit);
     }
-    my $max_par= $ENV{MTR_MAX_PARALLEL} || 8;
-    $opt_parallel= $max_par if ($opt_parallel > $max_par);
-    $opt_parallel= $num_tests if ($opt_parallel > $num_tests);
-    $opt_parallel= 1 if (IS_WINDOWS and $sys_info->isvm());
+    if(defined $ENV{MTR_MAX_PARALLEL}) {
+      my $max_par= $ENV{MTR_MAX_PARALLEL};
+      $opt_parallel= $max_par if ($opt_parallel > $max_par);
+    }
     $opt_parallel= 1 if ($opt_parallel < 1);
-    mtr_report("Using parallel: $opt_parallel");
   }
+  # Limit parallel workers to number of tests to avoid idle workers
+  $opt_parallel= $num_tests if ($num_tests > 0 and $opt_parallel > $num_tests);
   $ENV{MTR_PARALLEL} = $opt_parallel;
+  mtr_report("Using parallel: $opt_parallel");
 
-  if ($opt_parallel > 1 && ($opt_start_exit || $opt_stress)) {
-    mtr_warning("Parallel cannot be used with --start-and-exit or --stress\n" .
+  my $is_option_mysqlx_port_set= $opt_mysqlx_baseport ne "auto";
+  if ($opt_parallel > 1 && ($opt_start_exit || $opt_stress || $is_option_mysqlx_port_set)) {
+    mtr_warning("Parallel cannot be used neither with --start-and-exit nor --stress nor --mysqlx_port\n" .
                "Setting parallel to 1");
     $opt_parallel= 1;
   }
@@ -448,6 +463,10 @@ sub main {
     print_global_resfile();
   }
 
+  if ($opt_xml_report) {
+    mtr_xml_init($opt_xml_report);
+  }
+
   # --------------------------------------------------------------------------
   # Read definitions from include/plugin.defs
   #
@@ -456,6 +475,7 @@ sub main {
   # Also read from any plugin local or suite specific plugin.defs
   for (glob "$basedir/plugin/*/tests/mtr/plugin.defs".
             " $basedir/internal/plugin/*/tests/mtr/plugin.defs".
+            " $basedir/rapid/plugin/*/tests/mtr/plugin.defs".
             " suite/*/plugin.defs") {
     read_plugin_defs($_);
   }
@@ -1036,6 +1056,7 @@ sub print_global_resfile {
   resfile_global("fast", $opt_fast ? 1 : 0);
   resfile_global("force-restart", $opt_force_restart ? 1 : 0);
   resfile_global("reorder", $opt_reorder ? 1 : 0);
+  resfile_global("suite-opt", $opt_suite_opt);
   resfile_global("sleep", $opt_sleep);
   resfile_global("repeat", $opt_repeat);
   resfile_global("user", $opt_user);
@@ -1046,6 +1067,7 @@ sub print_global_resfile {
   resfile_global("max-connections", $opt_max_connections);
 #  resfile_global("default-myisam", $opt_default_myisam ? 1 : 0);
   resfile_global("product", "MySQL");
+  resfile_global("xml-report", $opt_xml_report);
   # Somewhat hacky code to convert numeric version back to dot notation
   my $v1= int($mysql_version_id / 10000);
   my $v2= int(($mysql_version_id % 10000)/100);
@@ -1105,9 +1127,10 @@ sub command_line_setup {
 	     'skip-im'                  => \&ignore_option,
 
              # Specify ports
-	     'build-thread|mtr-build-thread=i' => \$opt_build_thread,
-	     'port-base|mtr-port-base=i'       => \$opt_port_base,
-	     'port-group-size=s'        => \$opt_port_group_size,
+             'build-thread|mtr-build-thread=i' => \$opt_build_thread,
+             'mysqlx-port=i'                   => \$opt_mysqlx_baseport,
+             'port-base|mtr-port-base=i'       => \$opt_port_base,
+             'port-group-size=s'               => \$opt_port_group_size,
 
              # Test case authoring
              'record'                   => \$opt_record,
@@ -1129,8 +1152,11 @@ sub command_line_setup {
              'debug-common'             => \$opt_debug_common,
              'debug-server'             => \$opt_debug_server,
              'gdb'                      => \$opt_gdb,
+             'lldb'                     => \$opt_lldb,
              'client-gdb'               => \$opt_client_gdb,
+             'client-lldb'              => \$opt_client_lldb,
              'manual-gdb'               => \$opt_manual_gdb,
+             'manual-boot-gdb'          => \$opt_manual_boot_gdb,
              'manual-lldb'              => \$opt_manual_lldb,
 	     'boot-gdb'                 => \$opt_boot_gdb,
              'manual-debug'             => \$opt_manual_debug,
@@ -1215,12 +1241,14 @@ sub command_line_setup {
 	     'unit-tests!'              => \$opt_ctest,
 	     'unit-tests-report!'	=> \$opt_ctest_report,
 	     'stress=s'                 => \$opt_stress,
+             'suite-opt=s'              => \$opt_suite_opt,
 
              'help|h'                   => \$opt_usage,
 	     # list-options is internal, not listed in help
 	     'list-options'             => \$opt_list_options,
              'skip-test-list=s'         => \@opt_skip_test_list,
-             'do-test-list=s'           => \$opt_do_test_list
+             'do-test-list=s'           => \$opt_do_test_list,
+            'xml-report=s'          => \$opt_xml_report
            );
 
   GetOptions(%options) or usage("Can't read options");
@@ -1574,6 +1602,13 @@ sub command_line_setup {
       $opt_gdb= undef;
     }
 
+    if ($opt_lldb)
+    {
+      mtr_warning("Silently converting --lldb to --client-lldb in embedded mode");
+      $opt_client_lldb= $opt_lldb;
+      $opt_lldb= undef;
+    }
+
     if ($opt_ddd)
     {
       mtr_warning("Silently converting --ddd to --client-ddd in embedded mode");
@@ -1596,7 +1631,7 @@ sub command_line_setup {
 
     if ( $opt_gdb || $opt_ddd || $opt_manual_gdb || $opt_manual_lldb || 
          $opt_manual_ddd || $opt_manual_debug || $opt_debugger || $opt_dbx || 
-         $opt_manual_dbx)
+         $opt_lldb || $opt_manual_dbx || $opt_manual_boot_gdb )
     {
       mtr_error("You need to use the client debug options for the",
 		"embedded server. Ex: --client-gdb");
@@ -1625,7 +1660,7 @@ sub command_line_setup {
   if ( $opt_gdb || $opt_client_gdb || $opt_ddd || $opt_client_ddd || 
        $opt_manual_gdb || $opt_manual_lldb || $opt_manual_ddd || 
        $opt_manual_debug || $opt_dbx || $opt_client_dbx || $opt_manual_dbx || 
-       $opt_debugger || $opt_client_debugger )
+       $opt_debugger || $opt_client_debugger || $opt_manual_boot_gdb )
   {
     # Indicate that we are using debugger
     $glob_debugger= 1;
@@ -1808,7 +1843,6 @@ sub command_line_setup {
   check_debug_support(\%mysqld_variables);
 
   executable_setup();
-
 }
 
 
@@ -1833,9 +1867,13 @@ sub set_build_thread_ports($) {
   if ( lc($opt_build_thread) eq 'auto' ) {
     my $found_free = 0;
     $build_thread = 300;	# Start attempts from here
+
+    my $build_thread_upper = $build_thread + ($opt_parallel > 39
+                             ? $opt_parallel + int($opt_parallel / 4)
+                             : 49);
     while (! $found_free)
     {
-      $build_thread= mtr_get_unique_id($build_thread, 349);
+      $build_thread= mtr_get_unique_id($build_thread, $build_thread_upper);
       if ( !defined $build_thread ) {
         mtr_error("Could not get a unique build thread id");
       }
@@ -1859,7 +1897,12 @@ sub set_build_thread_ports($) {
 
   # Calculate baseport
   $baseport= $build_thread * $opt_port_group_size + 10000;
-  if ( $baseport < 5001 or $baseport + $opt_port_group_size >= 32767 )
+
+  my $should_generate_value= $opt_mysqlx_baseport eq "auto";
+
+  $mysqlx_baseport= $should_generate_value ? $baseport + ($opt_port_group_size - 1) : $opt_mysqlx_baseport;
+  
+  if ( $baseport < 5001 or $baseport + $opt_port_group_size >= 32767)
   {
     mtr_error("MTR_BUILD_THREAD number results in a port",
               "outside 5001 - 32767",
@@ -1868,7 +1911,6 @@ sub set_build_thread_ports($) {
 
   mtr_report("Using MTR_BUILD_THREAD $build_thread,",
 	     "with reserved ports $baseport..".($baseport+($opt_port_group_size-1)));
-
 }
 
 
@@ -1897,7 +1939,6 @@ sub collect_mysqld_features {
   mtr_add_arg($args, "--log-syslog=0");
   mtr_add_arg($args, "--datadir=%s", mixed_path($tmpdir));
   mtr_add_arg($args, "--secure-file-priv=\"\"");
-  mtr_add_arg($args, "--early_plugin_load=\"\"");
   mtr_add_arg($args, "--lc-messages-dir=%s", $path_language);
   mtr_add_arg($args, "--skip-grant-tables");
   mtr_add_arg($args, "--verbose");
@@ -2253,6 +2294,33 @@ sub mysql_client_test_arguments(){
   return mtr_args2str($exe, @$args);
 }
 
+sub mysqlxtest_arguments(){
+  my $exe;
+  # mysql_client_test executable may _not_ exist
+  $exe= mtr_exe_maybe_exists(vs_config_dirs('plugin', 'mysqlxtest'),
+                             "$bindir/rapid/plugin/x/mysqlxtest",
+                             "$bindir/rapid/plugin/x/Debug/mysqlxtest",
+                             "$bindir/rapid/plugin/x/Release/mysqlxtest",
+                             "$bindir/rapid/plugin/x/RelWithDebInfo/mysqlxtest",
+                             "$bindir/bin/mysqlxtest");
+  return "" unless $exe;
+
+  my $args;
+  mtr_init_args(\$args);
+  
+  if ( $opt_valgrind_clients )
+  {
+    valgrind_client_arguments($args, \$exe);
+  }
+  
+  # Let user provide username and password to command.
+  #mtr_add_arg($args, "-u root");
+  #mtr_add_arg($args, "--password=");
+  mtr_add_arg($args, "--port=%d",$mysqlx_baseport);
+
+   return mtr_args2str($exe, @$args);
+ }
+
 sub mysqlpump_arguments ($) {
   my($group_suffix) = @_;
   my $exe= mtr_exe_exists(vs_config_dirs('client/dump','mysqlpump'),
@@ -2328,7 +2396,11 @@ sub read_plugin_defs($)
     $plug_file= "debug/$plug_file" if $running_debug && !$source_dist;
 
     my ($plugin)= find_plugin($plug_file, $plug_loc);
-
+    
+    if (!$plugin) {
+      ($plugin)= find_plugin($plug_file, "rapid/$plug_loc");
+    }
+    
     # Set env. variables that tests may use, set to empty if plugin
     # listed in def. file but not found.
 
@@ -2554,6 +2626,7 @@ sub environment_setup {
   $ENV{'MYSQL_SECURE_INSTALLATION'}=   "$path_client_bindir/mysql_secure_installation";
   $ENV{'MYSQLADMIN'}=                  native_path($exe_mysqladmin);
   $ENV{'MYSQL_CLIENT_TEST'}=           mysql_client_test_arguments();
+  $ENV{'MYSQLXTEST'}=                  mysqlxtest_arguments();
   $ENV{'EXE_MYSQL'}=                   $exe_mysql;
   $ENV{'MYSQL_PLUGIN'}=                $exe_mysql_plugin;
   $ENV{'MYSQL_EMBEDDED'}=              $exe_mysql_embedded;
@@ -2685,6 +2758,9 @@ sub environment_setup {
   # Create an environment variable to make it possible
   # to detect that valgrind is being used from test cases
   $ENV{'VALGRIND_TEST'}= $opt_valgrind;
+
+  # Make sure LeakSanitizer exits if leaks are found
+  $ENV{'LSAN_OPTIONS'}= "exitcode=42";
 
   # Add dir of this perl to aid mysqltest in finding perl
   my $perldir= dirname($^X);
@@ -2902,7 +2978,7 @@ sub check_ssl_support ($) {
     return;
   }
 
-  if ( ! $mysqld_variables->{'ssl'} )
+  if ( ! ($mysqld_variables->{'ssl'} || $mysqld_variables->{'have_ssl'} ))
   {
     if ( $opt_ssl)
     {
@@ -3767,7 +3843,6 @@ sub mysql_install_db {
   # Do not generate SSL/RSA certificates automatically.
   mtr_add_arg($args, "--loose-auto_generate_certs=OFF");
   mtr_add_arg($args, "--loose-sha256_password_auto_generate_rsa_keys=OFF");
-  mtr_add_arg($args, "--early_plugin_load=\"\"");
 
   # InnoDB arguments that affect file location and sizes may
   # need to be given to the bootstrap process as well as the
@@ -3807,7 +3882,7 @@ sub mysql_install_db {
   # ----------------------------------------------------------------------
   my $bootstrap_sql_file= "$opt_vardir/tmp/bootstrap.sql";
 
-  if ($opt_boot_gdb) {
+  if ($opt_boot_gdb || $opt_manual_boot_gdb) {
     gdb_arguments(\$args, \$exe_mysqld_bootstrap, $mysqld->name(),
 		  $bootstrap_sql_file);
   }
@@ -3893,6 +3968,16 @@ sub mysql_install_db {
   # Add procedures for checking server is restored after testcase
   mtr_tofile($bootstrap_sql_file,
              sql_to_bootstrap(mtr_grab_file("include/mtr_check.sql")));
+
+  if ( $opt_manual_boot_gdb )
+  {
+    # The configuration has been set up and user has been prompted for
+    # how to start the servers manually in the requested debugger.
+    # At this time mtr.pl have no knowledge about the server processes
+    # and thus can't wait for them to finish, mtr exits at this point.
+    exit(0);
+  }
+
 
   # Log bootstrap command
   my $path_bootstrap_log= "$opt_vardir/log/bootstrap.log";
@@ -4542,157 +4627,193 @@ sub run_testcase ($) {
   }
 
   my $test= start_mysqltest($tinfo);
-  # Set only when we have to keep waiting after expectedly died server
-  my $keep_waiting_proc = 0;
   my $print_timeout= start_timer($print_freq * 60);
 
+  my @procs;
   while (1)
   {
-    my $proc;
-    if ($keep_waiting_proc)
+    if ($test_timeout > $print_timeout)
     {
-      # Any other process exited?
-      $proc = My::SafeProcess->check_any();
-      if ($proc)
+      my $proc = My::SafeProcess->wait_any_timeout($print_timeout);
+      mtr_verbose("Got $proc");
+      push @procs, $proc;
+      if ( $proc->{timeout} )
       {
-	mtr_verbose ("Found exited process $proc");
-      }
-      else
-      {
-	$proc = $keep_waiting_proc;
-	# Also check if timer has expired, if so cancel waiting
-	if ( has_expired($test_timeout) )
-	{
-	  $keep_waiting_proc = 0;
-	}
+        #print out that the test is still on
+        mtr_print("Test still running: $tinfo->{name}");
+        #reset the timer
+        $print_timeout= start_timer($print_freq * 60);
+        next;
       }
     }
-    if (! $keep_waiting_proc)
+    else
     {
-      if($test_timeout > $print_timeout)
-      {
-         $proc= My::SafeProcess->wait_any_timeout($print_timeout);
-         if ( $proc->{timeout} )
-         {
-            #print out that the test is still on
-            mtr_print("Test still running: $tinfo->{name}");
-            #reset the timer
-            $print_timeout= start_timer($print_freq * 60);
-            next;
-         }
-      }
-      else
-      {
-         $proc= My::SafeProcess->wait_any_timeout($test_timeout);
-      }
-    }
+      my $proc= My::SafeProcess->check_any();
 
-    # Will be restored if we need to keep waiting
-    $keep_waiting_proc = 0;
-
-    unless ( defined $proc )
-    {
-      mtr_error("wait_any failed");
+      if ($proc) {
+        mtr_verbose("Got $proc");
+        push @procs, $proc;
+      } elsif ( has_expired($test_timeout) )
+      {
+        my $timeout= My::SafeProcess->wait_any_timeout($test_timeout);
+        push @procs, $timeout;
+      } else {
+        mtr_milli_sleep(100);
+      }
     }
-    mtr_verbose("Got $proc");
 
     mark_time_used('test');
     # ----------------------------------------------------
     # Was it the test program that exited
     # ----------------------------------------------------
-    if ($proc eq $test)
-    {
-      my $res= $test->exit_status();
 
-      if ($res == 0 and $opt_warnings and check_warnings($tinfo) )
+    foreach my $proc (@procs) {
+      if ($proc eq $test)
       {
-	# Test case suceeded, but it has produced unexpected
-	# warnings, continue in $res == 1
-	$res= 1;
-	resfile_output($tinfo->{'warnings'}) if $opt_resfile;
+        my $res= $test->exit_status();
+
+        if ($res == 0 and $opt_warnings and check_warnings($tinfo) )
+        {
+          # Test case suceeded, but it has produced unexpected
+          # warnings, continue in $res == 1
+          $res= 1;
+          resfile_output($tinfo->{'warnings'}) if $opt_resfile;
+        }
+
+        if ( $res == 0 )
+        {
+          my $check_res;
+          if ( restart_forced_by_test('force_restart') )
+          {
+            stop_all_servers($opt_shutdown_timeout);
+          }
+          elsif ( $opt_check_testcases and
+            $check_res= check_testcase($tinfo, "after"))
+          {
+            if ($check_res == 1) {
+              # Test case had sideeffects, not fatal error, just continue
+              stop_all_servers($opt_shutdown_timeout);
+              mtr_report("Resuming tests...\n");
+              resfile_output($tinfo->{'check'}) if $opt_resfile;
+            }
+            else {
+              # Test case check failed fatally, probably a server crashed
+              report_failure_and_restart($tinfo);
+              return 1;
+            }
+          }
+          mtr_report_test_passed($tinfo);
+        }
+        elsif ( $res == 62 )
+        {
+          # Testcase itself tell us to skip this one
+          $tinfo->{skip_detected_by_test}= 1;
+          # Try to get reason from test log file
+          find_testcase_skipped_reason($tinfo);
+          mtr_report_test_skipped($tinfo);
+          # Restart if skipped due to missing perl, it may have had side effects
+          if ( restart_forced_by_test('force_restart_if_skipped') ||
+            $tinfo->{'comment'} =~ /^perl not found/ )
+          {
+            stop_all_servers($opt_shutdown_timeout);
+          }
+        }
+        elsif ( $res == 65 )
+        {
+          # Testprogram killed by signal
+          $tinfo->{comment}=
+            "testprogram crashed(returned code $res)";
+          report_failure_and_restart($tinfo);
+        }
+        elsif ( $res == 1 )
+        {
+          # Check if the test tool requests that
+          # an analyze script should be run
+          my $analyze= find_analyze_request();
+          if ($analyze){
+            run_on_all($tinfo, "analyze-$analyze");
+          }
+
+          # Wait a bit and see if a server died, if so report that instead
+          mtr_milli_sleep(100);
+          my $srvproc= My::SafeProcess::check_any();
+          if ($srvproc && grep($srvproc eq $_, started(all_servers()))) {
+            $proc= $srvproc;
+            goto SRVDIED;
+          }
+
+          # Test case failure reported by mysqltest
+          report_failure_and_restart($tinfo);
+        }
+        else
+        {
+          # mysqltest failed, probably crashed
+          $tinfo->{comment}=
+            "mysqltest failed with unexpected return code $res\n";
+          report_failure_and_restart($tinfo);
+        }
+
+        # Save info from this testcase run to mysqltest.log
+        if( -f $path_current_testlog)
+        {
+          if ($opt_resfile && $res && $res != 62) {
+            resfile_output_file($path_current_testlog);
+          }
+          mtr_appendfile_to_file($path_current_testlog, $path_testlog);
+          unlink($path_current_testlog);
+        }
+
+        return ($res == 62) ? 0 : $res;
       }
 
-      if ( $res == 0 )
+      # ----------------------------------------------------
+      # Check if it was an expected crash
+      # ----------------------------------------------------
+      my $check_crash = check_expected_crash_and_restart($proc);
+      mtr_verbose("check_expected_crash_and_restart - $check_crash - $proc");
+      if ($check_crash)
       {
-	my $check_res;
-	if ( restart_forced_by_test('force_restart') )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-	elsif ( $opt_check_testcases and
-	     $check_res= check_testcase($tinfo, "after"))
-	{
-	  if ($check_res == 1) {
-	    # Test case had sideeffects, not fatal error, just continue
-	    stop_all_servers($opt_shutdown_timeout);
-	    mtr_report("Resuming tests...\n");
-	    resfile_output($tinfo->{'check'}) if $opt_resfile;
-	  }
-	  else {
-	    # Test case check failed fatally, probably a server crashed
-	    report_failure_and_restart($tinfo);
-	    return 1;
-	  }
-	}
-	mtr_report_test_passed($tinfo);
-      }
-      elsif ( $res == 62 )
-      {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-      }
-      elsif ( $res == 65 )
-      {
-	# Testprogram killed by signal
-	$tinfo->{comment}=
-	  "testprogram crashed(returned code $res)";
-	report_failure_and_restart($tinfo);
-      }
-      elsif ( $res == 1 )
-      {
-	# Check if the test tool requests that
-	# an analyze script should be run
-	my $analyze= find_analyze_request();
-	if ($analyze){
-	  run_on_all($tinfo, "analyze-$analyze");
-	}
+        # Keep waiting if it returned 2, if 1 don't wait or stop waiting.
+        if ($check_crash == 1) {
+          @procs = grep { $_ ne $proc } @procs;
+        }
 
-	# Wait a bit and see if a server died, if so report that instead
-	mtr_milli_sleep(100);
-	my $srvproc= My::SafeProcess::check_any();
-	if ($srvproc && grep($srvproc eq $_, started(all_servers()))) {
-	  $proc= $srvproc;
-	  goto SRVDIED;
-	}
-
-	# Test case failure reported by mysqltest
-	report_failure_and_restart($tinfo);
-      }
-      else
-      {
-	# mysqltest failed, probably crashed
-	$tinfo->{comment}=
-	  "mysqltest failed with unexpected return code $res\n";
-	report_failure_and_restart($tinfo);
+        next;
       }
 
-      # Save info from this testcase run to mysqltest.log
-      if( -f $path_current_testlog)
+    SRVDIED:
+      # ----------------------------------------------------
+      # Stop the test case timer
+      # ----------------------------------------------------
+      $test_timeout= 0;
+
+      # ----------------------------------------------------
+      # Check if it was a server that died
+      # ----------------------------------------------------
+      if ( grep($proc eq $_, started(all_servers())) )
       {
-	if ($opt_resfile && $res && $res != 62) {
-	  resfile_output_file($path_current_testlog);
-	}
-	mtr_appendfile_to_file($path_current_testlog, $path_testlog);
-	unlink($path_current_testlog);
+        # Server failed, probably crashed
+        $tinfo->{comment}=
+          "Server $proc failed during test run" .
+          get_log_from_proc($proc, $tinfo->{name});
+
+        # ----------------------------------------------------
+        # It's not mysqltest that has exited, kill it
+        # ----------------------------------------------------
+        $test->kill();
+
+        report_failure_and_restart($tinfo);
+        return 1;
+      }
+
+      # Try to dump core for mysqltest and all servers
+      foreach my $proc ($test, started(all_servers()))
+      {
+        mtr_print("Trying to dump core for $proc");
+        if ($proc->dump_core())
+        {
+          $proc->wait_one(20);
+        }
       }
 
       # Remove testcase .log file produce in var/log/ to save space since
@@ -4704,86 +4825,36 @@ sub run_testcase ($) {
 	}
       }
 
-      return ($res == 62) ? 0 : $res;
-
-    }
-
-    # ----------------------------------------------------
-    # Check if it was an expected crash
-    # ----------------------------------------------------
-    my $check_crash = check_expected_crash_and_restart($proc);
-    if ($check_crash)
-    {
-      # Keep waiting if it returned 2, if 1 don't wait or stop waiting.
-      $keep_waiting_proc = 0 if $check_crash == 1;
-      $keep_waiting_proc = $proc if $check_crash == 2;
-      next;
-    }
-
-  SRVDIED:
-    # ----------------------------------------------------
-    # Stop the test case timer
-    # ----------------------------------------------------
-    $test_timeout= 0;
-
-    # ----------------------------------------------------
-    # Check if it was a server that died
-    # ----------------------------------------------------
-    if ( grep($proc eq $_, started(all_servers())) )
-    {
-      # Server failed, probably crashed
-      $tinfo->{comment}=
-	"Server $proc failed during test run" .
-	get_log_from_proc($proc, $tinfo->{name});
-
       # ----------------------------------------------------
       # It's not mysqltest that has exited, kill it
       # ----------------------------------------------------
       $test->kill();
 
-      report_failure_and_restart($tinfo);
-      return 1;
-    }
-
-    # Try to dump core for mysqltest and all servers
-    foreach my $proc ($test, started(all_servers()))
-    {
-      mtr_print("Trying to dump core for $proc");
-      if ($proc->dump_core())
+      # ----------------------------------------------------
+      # Check if testcase timer expired
+      # ----------------------------------------------------
+      if ( $proc->{timeout} )
       {
-	$proc->wait_one(20);
+        my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
+        $tinfo->{comment}=
+          "Test case timeout after ".testcase_timeout($tinfo).
+          " seconds\n\n";
+        # Add 20 last executed commands from test case log file
+        if  (-e $log_file_name)
+        {
+          $tinfo->{comment}.=
+            "== $log_file_name == \n".
+	  mtr_lastlinesfromfile($log_file_name, 20)."\n";
+        }
+        $tinfo->{'timeout'}= testcase_timeout($tinfo); # Mark as timeout
+        run_on_all($tinfo, 'analyze-timeout');
+
+        report_failure_and_restart($tinfo);
+        return 1;
       }
+
+      mtr_error("Unhandled process $proc exited");
     }
-
-    # ----------------------------------------------------
-    # It's not mysqltest that has exited, kill it
-    # ----------------------------------------------------
-    $test->kill();
-
-    # ----------------------------------------------------
-    # Check if testcase timer expired
-    # ----------------------------------------------------
-    if ( $proc->{timeout} )
-    {
-      my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
-      $tinfo->{comment}=
-        "Test case timeout after ".testcase_timeout($tinfo).
-	  " seconds\n\n";
-      # Add 20 last executed commands from test case log file
-      if  (-e $log_file_name)
-      {
-        $tinfo->{comment}.=
-	   "== $log_file_name == \n".
-	     mtr_lastlinesfromfile($log_file_name, 20)."\n";
-      }
-      $tinfo->{'timeout'}= testcase_timeout($tinfo); # Mark as timeout
-      run_on_all($tinfo, 'analyze-timeout');
-
-      report_failure_and_restart($tinfo);
-      return 1;
-    }
-
-    mtr_error("Unhandled process $proc exited");
   }
   mtr_error("Should never come here");
 }
@@ -5690,6 +5761,7 @@ sub mysqld_arguments ($$$) {
   {
     mtr_add_arg($args, "%s", "--core-file");
   }
+  mtr_add_arg($args, "--loose-mysqlx-port=%d",$mysqlx_baseport);
 
   return $args;
 }
@@ -5750,7 +5822,7 @@ sub mysqld_start ($$) {
   {
     gdb_arguments(\$args, \$exe, $mysqld->name());
   }
-  elsif ( $opt_manual_lldb )
+  elsif ( $opt_lldb || $opt_manual_lldb )
   {
     lldb_arguments(\$args, \$exe, $mysqld->name());
   }
@@ -5758,7 +5830,7 @@ sub mysqld_start ($$) {
   {
     ddd_arguments(\$args, \$exe, $mysqld->name());
   }
-  if ( $opt_dbx || $opt_manual_dbx ) {
+  elsif ( $opt_dbx || $opt_manual_dbx ) {
     dbx_arguments(\$args, \$exe, $mysqld->name());
   }
   elsif ( $opt_debugger )
@@ -6133,6 +6205,7 @@ sub stop_servers($$) {
     delete $server->{'started_tinfo'};
     delete $server->{'started_opts'};
     delete $server->{'started_cnf'};
+    delete $server->{'restart_opts'};
   }
 }
 
@@ -6400,6 +6473,7 @@ sub start_mysqltest ($) {
     $exe=  "strace";
     mtr_add_arg($args, "-o");
     mtr_add_arg($args, "%s/log/mysqltest.strace", $opt_vardir);
+    mtr_add_arg($args, "-f");
     mtr_add_arg($args, "$exe_mysqltest");
   }
 
@@ -6539,6 +6613,10 @@ sub start_mysqltest ($) {
   {
     gdb_arguments(\$args, \$exe, "client");
   }
+  elsif ( $opt_client_lldb )
+  {
+    lldb_arguments(\$args, \$exe, "client");
+  }
   elsif ( $opt_client_ddd )
   {
     ddd_arguments(\$args, \$exe, "client");
@@ -6604,7 +6682,7 @@ sub gdb_arguments {
 	     "break main\n" .
 	     $runline);
 
-  if ( $opt_manual_gdb )
+  if ( $opt_manual_gdb || $opt_manual_boot_gdb )
   {
      print "\nTo start gdb for $type, type in another window:\n";
      print "gdb -cd $glob_mysql_test_dir -x $gdb_init_file $$exe\n";
@@ -6642,22 +6720,36 @@ sub lldb_arguments {
   my $type= shift;
   my $input= shift;
 
-  my $lldb_init_file= "$opt_vardir/tmp/lldbinit.$type";
+  my $lldb_init_file= "$opt_vardir/tmp/$type.lldbinit";
   unlink($lldb_init_file);
 
-  my $runline=create_debug_statement($args,$input);
+  my $str= join(" ", @$$args);
 
   # write init file for mysqld or client
   mtr_tofile($lldb_init_file,
-	     "b main\n" .
-	     $runline);
+           "process launch --stop-at-entry -- " . $str);
 
+  if ( $opt_manual_lldb )
+  {
     print "\nTo start lldb for $type, type in another window:\n";
     print "cd $glob_mysql_test_dir && lldb -s $lldb_init_file $$exe\n";
 
     # Indicate the exe should not be started
     $$exe= undef;
     return;
+  }
+
+  $$args= [];
+  mtr_add_arg($$args, "-title");
+  mtr_add_arg($$args, "$type");
+  mtr_add_arg($$args, "-e");
+
+  mtr_add_arg($$args, "lldb");
+  mtr_add_arg($$args, "-s");
+  mtr_add_arg($$args, "$lldb_init_file");
+  mtr_add_arg($$args, "$$exe");
+
+  $$exe= "xterm";
 }
 
 #
@@ -6798,6 +6890,7 @@ sub strace_server_arguments {
 
   mtr_add_arg($args, "-o");
   mtr_add_arg($args, "%s/log/%s.strace", $opt_vardir, $type);
+  mtr_add_arg($args, "-f");
   mtr_add_arg($args, $$exe);
   $$exe= "strace";
 }
@@ -7128,8 +7221,10 @@ Options that specify ports
   build-thread=#        Can be set in environment variable MTR_BUILD_THREAD.
                         Set  MTR_BUILD_THREAD="auto" to automatically aquire
                         a build thread id that is unique to current host
-  port-group-size=N     Reserve groups of TCP ports of size N for each MTR thread
-
+  mysqlx-port           Specify the port number to be used for mysqlxplugin.
+                        Can be set in environment variable MYSQLXPLUGIN_PORT.
+                        If not specified will create its own ports.
+                        [NOTE]-- will not work for parallel servers.
 
 Options for test case authoring
 
@@ -7155,10 +7250,13 @@ Options for debugging the product
   boot-dbx              Start bootstrap server in dbx
   boot-ddd              Start bootstrap server in ddd
   boot-gdb              Start bootstrap server in gdb
+  manual-boot-gdb       Let user manually start mysqld in gdb, during
+                        initialize process
   client-dbx            Start mysqltest client in dbx
   client-ddd            Start mysqltest client in ddd
   client-debugger=NAME  Start mysqltest in the selected debugger
   client-gdb            Start mysqltest client in gdb
+  client-lldb           Start mysqltest client in lldb
   dbx                   Start the mysqld(s) in dbx
   ddd                   Start the mysqld(s) in ddd
   debug                 Dump trace output for all servers and client programs
@@ -7170,6 +7268,7 @@ Options for debugging the product
                         tracing
   debugger=NAME         Start mysqld in the selected debugger
   gdb                   Start the mysqld(s) in gdb
+  lldb                  Start the mysqld(s) in lldb
   manual-debug          Let user manually start mysqld in debugger, before
                         running test(s)
   manual-gdb            Let user manually start mysqld in gdb, before running
@@ -7272,6 +7371,8 @@ Misc options
   unit-tests-report     Include report of every test included in unit tests.
   stress=ARGS           Run stress test, providing options to
                         mysql-stress-test.pl. Options are separated by comma.
+  suite-opt             Run the particular file in the suite as the suite.opt.
+  xml-report=FILE       Generate a XML report file compatible with JUnit.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.

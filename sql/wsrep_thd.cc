@@ -36,8 +36,7 @@ int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
 void wsrep_client_rollback(THD *thd)
 {
   WSREP_DEBUG("client rollback due to BF abort for (%u), query: %s",
-              thd->thread_id(), thd->query().str);
-
+              thd->thread_id(), WSREP_QUERY(thd));
   my_atomic_add64(&wsrep_bf_aborts_counter, 1);
 
   thd->wsrep_conflict_state= ABORTING;
@@ -100,6 +99,9 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
   shadow->vio           = thd->active_vio;
 
+  // Disable general logging on applier threads
+  thd->variables.option_bits |= OPTION_LOG_OFF;
+  // Enable binlogging if opt_log_slave_updates is set
   if (opt_log_slave_updates)
     thd->variables.option_bits|= OPTION_BIN_LOG;
   else
@@ -131,6 +133,8 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
 
   shadow->db = thd->db();
   thd->reset_db(NULL_CSTR);
+
+  shadow->user_time = thd->user_time;
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -141,6 +145,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->set_active_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
+  thd->user_time              = shadow->user_time;
 
   assert(thd->rli_slave == thd->wsrep_rli);
   thd->rli_slave = NULL;
@@ -154,6 +159,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
 
 void wsrep_replay_transaction(THD *thd)
 {
+  DBUG_ENTER("wsrep_replay_transaction");
   /* checking if BF trx must be replayed */
   if (thd->wsrep_conflict_state== MUST_REPLAY) {
     DBUG_ASSERT(wsrep_thd_trx_seqno(thd));
@@ -161,6 +167,15 @@ void wsrep_replay_transaction(THD *thd)
       if (thd->get_stmt_da()->is_sent())
       {
         WSREP_ERROR("replay issue, thd has reported status already");
+      }
+
+      /* PS reprepare observer should have been removed already
+         open_table() will fail if we have dangling observer here
+       */
+      if (thd->get_reprepare_observer() && wsrep_log_conflicts)
+      {
+        WSREP_WARN("dangling observer in replay transaction: (thr %u %lld %s)",
+                   thd->thread_id(), thd->query_id, thd->query().str);
       }
       thd->get_stmt_da()->reset_diagnostics_area();
 
@@ -188,7 +203,7 @@ void wsrep_replay_transaction(THD *thd)
       thd->m_digest= NULL;
       thd_proc_info(thd, "wsrep replaying trx");
       WSREP_DEBUG("replay trx: %s %lld",
-                  thd->query().str,
+                  WSREP_QUERY(thd),
                   (long long)wsrep_thd_trx_seqno(thd));
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
@@ -245,8 +260,10 @@ void wsrep_replay_transaction(THD *thd)
         wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
         break;
       default:
-        WSREP_ERROR("trx_replay failed for: %d, query: %s",
-                    rcode, thd->query().str);
+        WSREP_ERROR("trx_replay failed for: %d, schema: %s, query: %s",
+                    rcode,
+                    (thd->db().str ? thd->db().str : "(null)"),
+                    WSREP_QUERY(thd));
         /* we're now in inconsistent state, must abort */
 	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         unireg_abort(1);
@@ -263,6 +280,7 @@ void wsrep_replay_transaction(THD *thd)
       mysql_mutex_unlock(&LOCK_wsrep_replaying);
     }
   }
+  DBUG_VOID_RETURN;
 }
 
 static void wsrep_replication_process(THD *thd)
@@ -563,4 +581,26 @@ bool wsrep_thd_has_explicit_locks(THD *thd)
 {
   assert(thd);
   return (thd->mdl_context.wsrep_has_explicit_locks());
+}
+
+/*
+  Get auto increment variables for THD. Use global settings for
+  applier threads.
+ */
+extern "C"
+void wsrep_thd_auto_increment_variables(THD* thd,
+                                        unsigned long long* offset,
+                                        unsigned long long* increment)
+{
+  if (thd->wsrep_exec_mode == REPL_RECV &&
+      thd->wsrep_conflict_state != REPLAYING)
+  {
+    *offset= global_system_variables.auto_increment_offset;
+    *increment= global_system_variables.auto_increment_increment;
+  }
+  else
+  {
+    *offset= thd->variables.auto_increment_offset;
+    *increment= thd->variables.auto_increment_increment;
+  }
 }

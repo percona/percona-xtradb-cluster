@@ -182,6 +182,9 @@
 #cmakedefine HAVE_U_INT32_T 1
 #cmakedefine HAVE_STRUCT_TIMESPEC
 
+/* Support for tagging symbols with __attribute__((visibility("hidden"))) */
+#cmakedefine HAVE_VISIBILITY_HIDDEN 1
+
 /* Code tests*/
 #cmakedefine STACK_DIRECTION @STACK_DIRECTION@
 #cmakedefine TIME_WITH_SYS_TIME 1
@@ -195,6 +198,7 @@
 #cmakedefine HAVE_BUILTIN_EXPECT 1
 #cmakedefine HAVE_BUILTIN_STPCPY 1
 #cmakedefine HAVE_GCC_ATOMIC_BUILTINS 1
+#cmakedefine HAVE_GCC_SYNC_BUILTINS 1
 #cmakedefine HAVE_VALGRIND
 
 /* IPV6 */
@@ -272,6 +276,7 @@
 #cmakedefine HAVE_NCURSES_H 1
 #cmakedefine USE_LIBEDIT_INTERFACE 1
 #cmakedefine HAVE_HIST_ENTRY 1
+#cmakedefine USE_NEW_EDITLINE_INTERFACE 1
 
 /*
  * Libedit
@@ -362,6 +367,7 @@
 #cmakedefine HAVE_SYS_THREAD_SELFID 1
 #cmakedefine HAVE_SYS_GETTID 1
 #cmakedefine HAVE_PTHREAD_GETTHREADID_NP 1
+#cmakedefine HAVE_PTHREAD_SETNAME_NP 1
 #cmakedefine HAVE_INTEGER_PTHREAD_SELF 1
 
 /* Platform-specific C++ compiler behaviors we rely upon */
@@ -417,7 +423,10 @@
 #define HAVE_FCNTL_H 1
 #define HAVE_GETADDRINFO 1
 #define HAVE_INTTYPES_H 1
+/* libevent's select.c is not Windows compatible */
+#ifndef _WIN32
 #define HAVE_SELECT 1
+#endif
 #define HAVE_SIGNAL_H 1
 #define HAVE_STDARG_H 1
 #define HAVE_STDINT_H 1
@@ -428,6 +437,11 @@
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
 #define SIZEOF_CHAR 1
+
+/*
+ * Needed by libevent
+ */
+#cmakedefine HAVE_SOCKLEN_T 1
 
 /* For --secure-file-priv */
 #cmakedefine DEFAULT_SECURE_FILE_PRIV_DIR @DEFAULT_SECURE_FILE_PRIV_DIR@

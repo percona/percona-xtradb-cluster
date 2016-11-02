@@ -147,6 +147,7 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs)
 
 #define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
 #define WSREP_TO_ISOLATION_END 
+#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)
 
 #endif /* WITH_WSREP */
 

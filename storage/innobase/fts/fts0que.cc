@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2007, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2007, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -153,6 +153,13 @@ struct fts_query_t {
 	bool		multi_exist;	/*!< multiple FTS_EXIST oper */
 
 	st_mysql_ftparser*	parser;	/*!< fts plugin parser */
+
+	/** limit value for the fts query */
+	ulonglong		limit;
+
+	/** number of docs fetched by query. This is to restrict the
+	result with limit value */
+	ulonglong		n_docs;
 };
 
 /** For phrase matching, first we collect the documents and the positions
@@ -327,7 +334,7 @@ fts_expand_query(
 	dict_index_t*	index,		/*!< in: FTS index to search */
 	fts_query_t*	query)		/*!< in: query result, to be freed
 					by the client */
-	__attribute__((nonnull, warn_unused_result));
+	MY_ATTRIBUTE((nonnull, warn_unused_result));
 /*************************************************************//**
 This function finds documents that contain all words in a
 phrase or proximity search. And if proximity search, verify
@@ -1099,7 +1106,7 @@ cont_search:
 /*****************************************************************//**
 Set difference.
 @return DB_SUCCESS if all go well */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_difference(
 /*=================*/
@@ -1195,7 +1202,7 @@ fts_query_difference(
 /*****************************************************************//**
 Intersect the token doc ids with the current set.
 @return DB_SUCCESS if all go well */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_intersect(
 /*================*/
@@ -1377,7 +1384,7 @@ fts_query_cache(
 /*****************************************************************//**
 Set union.
 @return DB_SUCCESS if all go well */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_union(
 /*============*/
@@ -2105,7 +2112,7 @@ fts_query_select(
 Read the rows from the FTS index, that match word and where the
 doc id is between first and last doc id.
 @return DB_SUCCESS if all go well else error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_find_term(
 /*================*/
@@ -2247,7 +2254,7 @@ fts_query_sum(
 /********************************************************************
 Calculate the total documents that contain a particular word (term).
 @return DB_SUCCESS if all go well else error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_total_docs_containing_term(
 /*=================================*/
@@ -2329,7 +2336,7 @@ fts_query_total_docs_containing_term(
 /********************************************************************
 Get the total number of words in a documents.
 @return DB_SUCCESS if all go well else error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_terms_in_document(
 /*========================*/
@@ -2412,7 +2419,7 @@ fts_query_terms_in_document(
 /*****************************************************************//**
 Retrieve the document and match the phrase tokens.
 @return DB_SUCCESS or error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_match_document(
 /*=====================*/
@@ -2455,7 +2462,7 @@ fts_query_match_document(
 This function fetches the original documents and count the
 words in between matching words to see that is in specified distance
 @return DB_SUCCESS if all OK */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 bool
 fts_query_is_in_proximity_range(
 /*============================*/
@@ -2507,7 +2514,7 @@ fts_query_is_in_proximity_range(
 Iterate over the matched document ids and search the for the
 actual phrase in the text.
 @return DB_SUCCESS if all OK */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_search_phrase(
 /*====================*/
@@ -2699,7 +2706,7 @@ fts_query_phrase_split(
 /*****************************************************************//**
 Text/Phrase search.
 @return DB_SUCCESS or error code */
-static __attribute__((warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 fts_query_phrase_search(
 /*====================*/
@@ -2890,7 +2897,7 @@ func_exit:
 /*****************************************************************//**
 Find the word and evaluate.
 @return DB_SUCCESS if all go well */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_query_execute(
 /*==============*/
@@ -3208,6 +3215,11 @@ fts_query_filter_doc_ids(
 	ulint		decoded = 0;
 	ib_rbt_t*	doc_freqs = word_freq->doc_freqs;
 
+	if (query->limit != ULONG_UNDEFINED
+	    && query->n_docs >= query->limit) {
+		return(DB_SUCCESS);
+	}
+
 	/* Decode the ilist and add the doc ids to the query doc_id set. */
 	while (decoded < len) {
 		ulint		freq = 0;
@@ -3295,11 +3307,17 @@ fts_query_filter_doc_ids(
 			/* Add the word to the document's matched RB tree. */
 			fts_query_add_word_to_document(query, doc_id, word);
 		}
+
+		if (query->limit != ULONG_UNDEFINED
+		    && query->limit <= ++query->n_docs) {
+			goto func_exit;
+		}
 	}
 
 	/* Some sanity checks. */
 	ut_a(doc_id == node->last_doc_id);
 
+func_exit:
 	if (query->total_size > fts_result_cache_limit) {
 		return(DB_FTS_EXCEED_RESULT_CACHE_LIMIT);
 	} else {
@@ -3903,19 +3921,26 @@ fts_query_can_optimize(
 	}
 }
 
-/*******************************************************************//**
-FTS Query entry point.
+
+
+/** FTS Query entry point.
+@param[in]	trx		transaction
+@param[in]	index		fts index to search
+@param[in]	flags		FTS search mode
+@param[in]	query_str	FTS query
+@param[in]	query_len	FTS query string len in bytes
+@param[in,out]	result		result doc ids
+@param[in]	limit		limit value
 @return DB_SUCCESS if successful otherwise error code */
 dberr_t
 fts_query(
-/*======*/
-	trx_t*		trx,		/*!< in: transaction */
-	dict_index_t*	index,		/*!< in: The FTS index to search */
-	uint		flags,		/*!< in: FTS search mode */
-	const byte*	query_str,	/*!< in: FTS query */
-	ulint		query_len,	/*!< in: FTS query string len
-					in bytes */
-	fts_result_t**	result)		/*!< in/out: result doc ids */
+	trx_t*		trx,
+	dict_index_t*	index,
+	uint		flags,
+	const byte*	query_str,
+	ulint		query_len,
+	fts_result_t**	result,
+	ulonglong	limit)
 {
 	fts_query_t	query;
 	dberr_t		error = DB_SUCCESS;
@@ -3976,6 +4001,9 @@ fts_query(
 
 	query.total_docs = dict_table_get_n_rows(index->table);
 
+	query.limit = limit;
+
+	query.n_docs = 0;
 #ifdef FTS_DOC_STATS_DEBUG
 	if (ft_enable_diag_print) {
 		error = fts_get_total_word_count(
@@ -4049,6 +4077,19 @@ fts_query(
 
 		DBUG_EXECUTE_IF("fts_instrument_result_cache_limit",
 			        fts_result_cache_limit = 2048;
+		);
+
+		/* Optimisation is allowed for limit value
+		when
+		i)  No ranking involved
+		ii) Only FTS Union operations involved. */
+		if (query.limit != ULONG_UNDEFINED
+		    && !fts_ast_node_check_union(ast)) {
+			query.limit = ULONG_UNDEFINED;
+		}
+
+		DBUG_EXECUTE_IF("fts_union_limit_off",
+			query.limit = ULONG_UNDEFINED;
 		);
 
 		/* Traverse the Abstract Syntax Tree (AST) and execute
@@ -4204,7 +4245,7 @@ words in documents found in the first search pass will be used as
 search arguments to search the document again, thus "expand"
 the search result set.
 @return DB_SUCCESS if success, otherwise the error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 fts_expand_query(
 /*=============*/

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ static my_thread_handle timer_notify_thread;
 */
 
 static void *
-timer_notify_thread_func(void *arg __attribute__((unused)))
+timer_notify_thread_func(void *arg MY_ATTRIBUTE((unused)))
 {
   my_timer_t *timer;
   struct kevent kev;
@@ -71,6 +71,7 @@ timer_notify_thread_func(void *arg __attribute__((unused)))
       break;
   }
 
+  close(kq_fd);
   my_thread_end();
 
   return NULL;
@@ -144,16 +145,11 @@ my_timer_deinitialize(void)
 
   EV_SET(&kev, 0, EVFILT_USER, 0, NOTE_TRIGGER, 0, 0);
 
-  /*
-    kevent might fail here, but timer notifier thread is anyway interrupted on
-    closing queue descriptor "kq_fd".
-  */
-  if (kevent(kq_fd, &kev, 1, NULL, 0, NULL) < -1)
+  if (kevent(kq_fd, &kev, 1, NULL, 0, NULL) < 0)
     my_message_local(ERROR_LEVEL,
                      "Failed to create event to interrupt timer notifier thread"
                      " (errno= %d).", errno);
 
-  close(kq_fd);
   my_thread_join(&timer_notify_thread, NULL);
 }
 

@@ -1,0 +1,8 @@
+!include ../galera_3nodes.cnf
+
+[mysqld.1]
+binlog-do-db=db2
+
+[mysqld.2]
+replicate-do-db=db2
+replicate-wild-do-table=db2.t2B

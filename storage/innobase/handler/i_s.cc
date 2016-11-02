@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2007, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2007, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -3002,14 +3002,25 @@ i_s_fts_deleted_generic_fill(
 		DBUG_RETURN(0);
 	}
 
-	deleted = fts_doc_ids_create();
+	/* Prevent DDL to drop fts aux tables. */
+	rw_lock_s_lock(dict_operation_lock);
 
 	user_table = dict_table_open_on_name(
 		fts_internal_tbl_name, FALSE, FALSE, DICT_ERR_IGNORE_NONE);
 
 	if (!user_table) {
+		rw_lock_s_unlock(dict_operation_lock);
+
+		DBUG_RETURN(0);
+	} else if (!dict_table_has_fts_index(user_table)) {
+		dict_table_close(user_table, FALSE, FALSE);
+
+		rw_lock_s_unlock(dict_operation_lock);
+
 		DBUG_RETURN(0);
 	}
+
+	deleted = fts_doc_ids_create();
 
 	trx = trx_allocate_for_background();
 	trx->op_info = "Select for FTS DELETE TABLE";
@@ -3037,6 +3048,8 @@ i_s_fts_deleted_generic_fill(
 	fts_doc_ids_free(deleted);
 
 	dict_table_close(user_table, FALSE, FALSE);
+
+	rw_lock_s_unlock(dict_operation_lock);
 
 	DBUG_RETURN(0);
 }
@@ -3416,6 +3429,12 @@ i_s_fts_index_cache_fill(
 		fts_internal_tbl_name, FALSE, FALSE, DICT_ERR_IGNORE_NONE);
 
 	if (!user_table) {
+		DBUG_RETURN(0);
+	}
+
+	if (user_table->fts == NULL || user_table->fts->cache == NULL) {
+		dict_table_close(user_table, FALSE, FALSE);
+
 		DBUG_RETURN(0);
 	}
 
@@ -3854,10 +3873,15 @@ i_s_fts_index_table_fill(
 		DBUG_RETURN(0);
 	}
 
+	/* Prevent DDL to drop fts aux tables. */
+	rw_lock_s_lock(dict_operation_lock);
+
 	user_table = dict_table_open_on_name(
 		fts_internal_tbl_name, FALSE, FALSE, DICT_ERR_IGNORE_NONE);
 
 	if (!user_table) {
+		rw_lock_s_unlock(dict_operation_lock);
+
 		DBUG_RETURN(0);
 	}
 
@@ -3869,6 +3893,8 @@ i_s_fts_index_table_fill(
 	}
 
 	dict_table_close(user_table, FALSE, FALSE);
+
+	rw_lock_s_unlock(dict_operation_lock);
 
 	DBUG_RETURN(0);
 }
@@ -4007,15 +4033,24 @@ i_s_fts_config_fill(
 		DBUG_RETURN(0);
 	}
 
+	DEBUG_SYNC_C("i_s_fts_config_fille_check");
+
 	fields = table->field;
+
+	/* Prevent DDL to drop fts aux tables. */
+	rw_lock_s_lock(dict_operation_lock);
 
 	user_table = dict_table_open_on_name(
 		fts_internal_tbl_name, FALSE, FALSE, DICT_ERR_IGNORE_NONE);
 
 	if (!user_table) {
+		rw_lock_s_unlock(dict_operation_lock);
+
 		DBUG_RETURN(0);
 	} else if (!dict_table_has_fts_index(user_table)) {
 		dict_table_close(user_table, FALSE, FALSE);
+
+		rw_lock_s_unlock(dict_operation_lock);
 
 		DBUG_RETURN(0);
 	}
@@ -4071,6 +4106,8 @@ i_s_fts_config_fill(
 	trx_free_for_background(trx);
 
 	dict_table_close(user_table, FALSE, FALSE);
+
+	rw_lock_s_unlock(dict_operation_lock);
 
 	DBUG_RETURN(0);
 }
@@ -8457,7 +8494,17 @@ i_s_dict_fill_sys_tablespaces(
 	OK(field_store_string(fields[SYS_TABLESPACES_SPACE_TYPE],
 			      space_type));
 
-	char*	filename = fil_make_filepath(NULL, name, IBD, false);
+	char*	filepath = NULL;
+	if (FSP_FLAGS_HAS_DATA_DIR(flags)
+	    || FSP_FLAGS_GET_SHARED(flags)) {
+		mutex_enter(&dict_sys->mutex);
+		filepath = dict_get_first_path(space);
+		mutex_exit(&dict_sys->mutex);
+	}
+
+	if (filepath == NULL) {
+		filepath = fil_make_filepath(NULL, name, IBD, false);
+	}
 
 	os_file_stat_t	stat;
 	os_file_size_t	file;
@@ -8465,17 +8512,17 @@ i_s_dict_fill_sys_tablespaces(
 	memset(&file, 0xff, sizeof(file));
 	memset(&stat, 0x0, sizeof(stat));
 
-	if (filename != NULL) {
+	if (filepath != NULL) {
 
-		file = os_file_get_size(filename);
+		file = os_file_get_size(filepath);
 
 		/* Get the file system (or Volume) block size. */
-		dberr_t	err = os_file_get_status(filename, &stat, false, false);
+		dberr_t	err = os_file_get_status(filepath, &stat, false, false);
 
 		switch(err) {
 		case DB_FAIL:
 			ib::warn()
-				<< "File '" << filename << "', failed to get "
+				<< "File '" << filepath << "', failed to get "
 				<< "stats";
 			break;
 
@@ -8485,12 +8532,18 @@ i_s_dict_fill_sys_tablespaces(
 
 		default:
 			ib::error()
-				<< "File '" << filename << "' "
+				<< "File '" << filepath << "' "
 				<< ut_strerr(err);
 			break;
 		}
 
-		ut_free(filename);
+		ut_free(filepath);
+	}
+
+	if (file.m_total_size == static_cast<os_offset_t>(~0)) {
+		stat.block_size = 0;
+		file.m_total_size = 0;
+		file.m_alloc_size = 0;
 	}
 
 	OK(fields[SYS_TABLESPACES_FS_BLOCK_SIZE]->store(stat.block_size, true));

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2001, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2001, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -274,7 +274,7 @@ static void usage(void)
 
 
 static my_bool
-get_one_option(int optid, const struct my_option *opt __attribute__((unused)),
+get_one_option(int optid, const struct my_option *opt MY_ATTRIBUTE((unused)),
 	       char *argument)
 {
   int orig_what_to_do= what_to_do;
@@ -543,6 +543,12 @@ int main(int argc, char **argv)
   if (dbConnect(current_host, current_user, opt_password))
     exit(EX_MYSQLERR);
 
+  // Sun Studio does not work with range constructor from char** to string.
+  vector<string> conv;
+  conv.reserve(argc);
+  for (int i= 0; i < argc; i++)
+    conv.push_back(argv[i]);
+
   mysql_check(sock, what_to_do, opt_alldbs,
                 opt_check_only_changed, opt_extended,
                 opt_databases, opt_fast,
@@ -552,7 +558,7 @@ int main(int argc, char **argv)
                 opt_frm, opt_fix_table_names,
                 opt_fix_db_names, opt_upgrade,
                 opt_write_binlog, verbose,
-                opt_skip_database, vector<string>(argv, argv+argc),
+                opt_skip_database, conv,
                 DBerror);
 
   dbDisconnect(current_host);

@@ -237,7 +237,7 @@ GRANT_INFO::GRANT_INFO()
 /* Get column name from column hash */
 
 static uchar *get_field_name(Field **buff, size_t *length,
-                             my_bool not_used __attribute__((unused)))
+                             my_bool not_used MY_ATTRIBUTE((unused)))
 {
   *length= strlen((*buff)->field_name);
   return (uchar*) (*buff)->field_name;
@@ -273,9 +273,13 @@ char *fn_rext(char *name)
   return name + strlen(name);
 }
 
-
+#ifdef WITH_WSREP
+TABLE_CATEGORY get_table_category(const LEX_STRING &db,
+                                 const LEX_STRING &name)
+#else
 static TABLE_CATEGORY get_table_category(const LEX_STRING &db,
                                          const LEX_STRING &name)
+#endif /* WITH_WSREP */
 {
   DBUG_ASSERT(db.str != NULL);
   DBUG_ASSERT(name.str != NULL);
@@ -2937,6 +2941,10 @@ static bool unpack_gcol_info_from_frm(THD *thd,
   /* Validate the Item tree. */
   status= fix_fields_gcol_func(thd, field);
 
+  // Permanent changes to the item_tree are completed.
+  if (!thd->lex->is_ps_or_view_context_analysis())
+    field->gcol_info->permanent_changes_completed= true;
+
   if (disable_strict_mode)
   {
     thd->pop_internal_handler();
@@ -4661,7 +4669,7 @@ void TABLE::init(THD *thd, TABLE_LIST *tl)
   /* Tables may be reused in a sub statement. */
   DBUG_ASSERT(!file->extra(HA_EXTRA_IS_ATTACHED_CHILDREN));
   
-  bool error __attribute__((unused))= refix_gc_items(thd);
+  bool error MY_ATTRIBUTE((unused))= refix_gc_items(thd);
   DBUG_ASSERT(!error);
 }
 
@@ -4676,6 +4684,29 @@ bool TABLE::refix_gc_items(THD *thd)
       DBUG_ASSERT(vfield->gcol_info && vfield->gcol_info->expr_item);
       if (!vfield->gcol_info->expr_item->fixed)
       {
+        bool res= false;
+        /*
+          The call to fix_fields_gcol_func() may create new item objects in the
+          item tree for the generated column expression. If these are permanent
+          changes to the item tree, the new items must have the same life-span
+          as the ones created during parsing of the generated expression
+          string. We achieve this by temporarily switching to use the TABLE's
+          mem_root if the permanent changes to the item tree haven't been
+          completed (by checking the status of
+          gcol_info->permanent_changes_completed) and this call is not part of
+          context analysis (like prepare or show create table).
+        */
+        Query_arena *backup_stmt_arena_ptr= thd->stmt_arena;
+        Query_arena backup_arena;
+        Query_arena gcol_arena(&vfield->table->mem_root,
+                               Query_arena::STMT_CONVENTIONAL_EXECUTION);
+        if (!vfield->gcol_info->permanent_changes_completed &&
+            !thd->lex->is_ps_or_view_context_analysis())
+        {
+          thd->set_n_backup_active_arena(&gcol_arena, &backup_arena);
+          thd->stmt_arena= &gcol_arena;
+        }
+
         /* 
           Temporarily disable privileges check; already done when first fixed,
           and then based on definer's (owner's) rights: this thread has
@@ -4685,11 +4716,32 @@ bool TABLE::refix_gc_items(THD *thd)
         thd->want_privilege= 0;
 
         if (fix_fields_gcol_func(thd, vfield))
-          return true;
-        
+          res= true;
+
+        if (!vfield->gcol_info->permanent_changes_completed &&
+            !thd->lex->is_ps_or_view_context_analysis())
+        {
+          // Switch back to the original stmt_arena.
+          thd->stmt_arena= backup_stmt_arena_ptr;
+          thd->restore_active_arena(&gcol_arena, &backup_arena);
+
+          // Append the new items to the original item_free_list.
+          Item *item= vfield->gcol_info->item_free_list;
+          while (item->next)
+            item= item->next;
+          item->next= gcol_arena.free_list;
+
+          // Permanent changes to the item_tree are completed.
+          vfield->gcol_info->permanent_changes_completed= true;
+        }
+
         // Restore any privileges check
         thd->want_privilege= sav_want_priv;
         get_fields_in_item_tree= FALSE;
+
+        /* error occurs */
+        if (res)
+          return res;
       }
     }
   }
@@ -6173,9 +6225,26 @@ void TABLE::mark_columns_used_by_index(uint index)
 
 /*
   mark columns used by key, but don't reset other fields
-  @param  index     index number
-  @param  bitmap    bitmap to mark
-  @param  key_parts Number of leading key parts to mark. Default is UINT_MAX.
+
+  The parameter key_parts is used for controlling how many of the
+  key_parts that will be marked in the bitmap. It has the following
+  interpretation:
+
+  = 0:                 Use all regular key parts from the key 
+                       (user_defined_key_parts)
+  >= actual_key_parts: Use all regular and extended columns
+  < actual_key_parts:  Use this exact number of key parts
+ 
+  To use all regular key parts, the caller can use the default value (0).
+  To use all regular and extended key parts, use UINT_MAX. 
+
+  @note The bit map is not cleared by this function. Only bits
+  corresponding to a column used by the index will be set. Bits
+  representing columns not used by the index will not be changed.
+
+  @param index     index number
+  @param bitmap    bitmap to mark
+  @param key_parts number of leading key parts to mark. Default is 0.
 
   @todo consider using actual_key_parts(key_info[index]) instead of
   key_info[index].user_defined_key_parts: if the PK suffix of a secondary
@@ -6186,10 +6255,14 @@ void TABLE::mark_columns_used_by_index_no_reset(uint index,
                                                 MY_BITMAP *bitmap,
                                                 uint key_parts)
 {
+  // If key_parts has the default value, then include user defined key parts
+  if (key_parts == 0)
+    key_parts= key_info[index].user_defined_key_parts;
+  else if (key_parts > key_info[index].actual_key_parts)
+    key_parts= key_info[index].actual_key_parts;
+
   KEY_PART_INFO *key_part= key_info[index].key_part;
-  KEY_PART_INFO *key_part_end=
-    key_part +
-    std::min(key_info[index].user_defined_key_parts, key_parts);
+  KEY_PART_INFO *key_part_end= key_part + key_parts;
   for (;key_part != key_part_end; key_part++)
     bitmap_set_bit(bitmap, key_part->fieldnr-1);
 }
@@ -6307,7 +6380,7 @@ void TABLE::mark_columns_needed_for_delete()
     build a complete row). If this is the case, we mark all not
     updated columns to be read.
 
-    If this is no the case, we do like in the delete case and mark
+    If this is not the case, we do like in the delete case and mark
     if neeed, either the primary key column or all columns to be read.
     (see mark_columns_needed_for_delete() for details)
 
@@ -6315,17 +6388,29 @@ void TABLE::mark_columns_needed_for_delete()
     mark all USED key columns as 'to-be-read'. This allows the engine to
     loop over the given record to find all changed keys and doesn't have to
     retrieve the row again.
-    
+
     Unlike other similar methods, it doesn't mark fields used by triggers,
     that is the responsibility of the caller to do, by using
     Table_trigger_dispatcher::mark_used_fields(TRG_EVENT_UPDATE)!
+
+    Note: Marking additional columns as per binlog_row_image requirements will
+    influence query execution plan. For example in the case of
+    binlog_row_image=FULL the entire read_set and write_set needs to be flagged.
+    This will influence update query to think that 'used key is being modified'
+    and query will create a temporary table to process the update operation.
+    Which will result in performance degradation. Hence callers who don't want
+    their query execution to be influenced as per binlog_row_image requirements
+    can skip marking binlog specific columns here and they should make an
+    explicit call to 'mark_columns_per_binlog_row_image()' function to mark
+    binlog_row_image specific columns.
 */
 
-void TABLE::mark_columns_needed_for_update()
+void TABLE::mark_columns_needed_for_update(bool mark_binlog_columns)
 {
 
   DBUG_ENTER("mark_columns_needed_for_update");
-  mark_columns_per_binlog_row_image();
+  if (mark_binlog_columns)
+    mark_columns_per_binlog_row_image();
   if (file->ha_table_flags() & HA_REQUIRES_KEY_COLUMNS_FOR_DELETE)
   {
     /* Mark all used key columns for read */
@@ -7614,6 +7699,9 @@ bool update_generated_read_fields(uchar *buf, TABLE *table, uint active_index)
     if (!vfield->stored_in_db &&
         bitmap_is_set(table->read_set, vfield->field_index))
     {
+      if (vfield->type() == MYSQL_TYPE_BLOB)
+        (down_cast<Field_blob*>(vfield))->need_to_keep_old_value();
+
       error= vfield->gcol_info->expr_item->save_in_field(vfield, 0);
       DBUG_PRINT("info", ("field '%s' - updated", vfield->field_name));
       if (error && !table->in_use->is_error())

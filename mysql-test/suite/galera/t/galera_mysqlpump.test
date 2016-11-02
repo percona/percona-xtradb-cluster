@@ -16,7 +16,7 @@ CREATE TABLE db2.t2 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO db2.t2 SELECT 1 FROM test.ten AS a1, test.ten AS a2, test.ten AS a3;
 
 # As a single transaction
---exec $MYSQL_PUMP --include-databases=db1,db2 --default-parallelism=0 --single-transaction > $MYSQLTEST_VARDIR/tmp/mysqlpump1.sql
+--exec $MYSQL_PUMP --include-databases=db1,db2 --default-parallelism=1 --single-transaction > $MYSQLTEST_VARDIR/tmp/mysqlpump1.sql
 
 # With locks
 --exec $MYSQL_PUMP --include-databases=db1,db2 --default-parallelism=0 --add-locks > $MYSQLTEST_VARDIR/tmp/mysqlpump2.sql

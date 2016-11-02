@@ -40,15 +40,8 @@ static Log_event* wsrep_read_log_event(
   const char *error= 0;
   Log_event *res=  0;
 
-  if (data_len > wsrep_max_ws_size)
-  {
-    error = "Event too big";
-    goto err;
-  }
-
   res= Log_event::read_log_event(buf, data_len, &error, description_event, 0);
 
-err:
   if (!res)
   {
     DBUG_ASSERT(error != 0);
@@ -137,6 +130,15 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
         delete ev;
         continue;
       }
+      /*
+         gtid_pre_statement_checks will fail on the subsequent statement
+         if the bits below are set. So we don't mark the thd to run in
+         transaction mode yet, and assume there will be such a "BEGIN"
+         log event that will set those appropriately.
+      */
+      thd->variables.option_bits&= ~OPTION_BEGIN;
+      thd->server_status&= ~SERVER_STATUS_IN_TRANS;
+      assert(event== 1);
     }
     default:
       break;
@@ -262,6 +264,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   if (flags & WSREP_FLAG_ISOLATION)
   {
+
     thd->wsrep_apply_toi= true;
     /*
       Don't run in transaction mode with TOI actions.
@@ -297,8 +300,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   return rcode;
 }
 
-static wsrep_cb_status_t wsrep_commit(THD* const thd,
-                                      wsrep_seqno_t const global_seqno)
+static wsrep_cb_status_t wsrep_commit(THD* const thd)
 {
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -323,14 +325,17 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd,
   {
     thd->wsrep_rli->cleanup_context(thd, 0);
     thd->variables.gtid_next.set_automatic();
-    // TODO: mark snapshot with global_seqno.
+    if (thd->wsrep_apply_toi)
+    {
+      wsrep_set_SE_checkpoint(thd->wsrep_trx_meta.gtid.uuid,
+                              thd->wsrep_trx_meta.gtid.seqno);
+    }
   }
 
   return rcode;
 }
 
-static wsrep_cb_status_t wsrep_rollback(THD* const thd,
-                                        wsrep_seqno_t const global_seqno)
+static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 {
 #ifdef WSREP_PROC_INFO
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -369,9 +374,9 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
   wsrep_cb_status_t rcode;
 
   if (commit)
-    rcode = wsrep_commit(thd, meta->gtid.seqno);
+    rcode = wsrep_commit(thd);
   else
-    rcode = wsrep_rollback(thd, meta->gtid.seqno);
+    rcode = wsrep_rollback(thd);
 
   wsrep_set_apply_format(thd, NULL);
   thd->mdl_context.release_transactional_locks();

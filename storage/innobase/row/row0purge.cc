@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1997, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1997, 2016, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -122,7 +122,7 @@ row_purge_reposition_pcur(
 Removes a delete marked clustered index record if possible.
 @retval true if the row was not found, or it was successfully removed
 @retval false if the row was modified after the delete marking */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 bool
 row_purge_remove_clust_if_poss_low(
 /*===============================*/
@@ -205,7 +205,7 @@ marking.
 @retval true if the row was not found, or it was successfully removed
 @retval false the purge needs to be suspended because of running out
 of file space. */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 bool
 row_purge_remove_clust_if_poss(
 /*===========================*/
@@ -277,7 +277,7 @@ row_purge_poss_sec(
 Removes a secondary index entry if possible, by modifying the
 index tree.  Does not try to buffer the delete.
 @return TRUE if success or if not found */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 ibool
 row_purge_remove_sec_if_poss_tree(
 /*==============================*/
@@ -397,7 +397,7 @@ Removes a secondary index entry without modifying the index tree,
 if possible.
 @retval true if success or if not found
 @retval false if row_purge_remove_sec_if_poss_tree() should be invoked */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 bool
 row_purge_remove_sec_if_poss_leaf(
 /*==============================*/
@@ -504,10 +504,18 @@ row_purge_remove_sec_if_poss_leaf(
 
 			if (dict_index_is_spatial(index)) {
 				const page_t*   page;
+				const trx_t*	trx = NULL;
+
+				if (btr_cur->rtr_info != NULL
+				    && btr_cur->rtr_info->thr != NULL) {
+					trx = thr_get_trx(
+						btr_cur->rtr_info->thr);
+				}
 
 				page = btr_cur_get_page(btr_cur);
 
 				if (!lock_test_prdt_page_lock(
+					trx,
 					page_get_space_id(page),
 					page_get_page_no(page))
 				     && page_get_n_recs(page) < 2
@@ -556,7 +564,7 @@ func_exit_no_pcur:
 
 /***********************************************************//**
 Removes a secondary index entry if possible. */
-UNIV_INLINE __attribute__((nonnull(1,2)))
+UNIV_INLINE MY_ATTRIBUTE((nonnull(1,2)))
 void
 row_purge_remove_sec_if_poss(
 /*=========================*/
@@ -622,7 +630,7 @@ Purges a delete marking of a record.
 @retval true if the row was not found, or it was successfully removed
 @retval false the purge needs to be suspended because of
 running out of file space */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 bool
 row_purge_del_mark(
 /*===============*/
@@ -940,7 +948,7 @@ err_exit:
 /***********************************************************//**
 Purges the parsed record.
 @return true if purged, false if skipped */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 bool
 row_purge_record_func(
 /*==================*/
@@ -1006,7 +1014,7 @@ row_purge_record_func(
 Fetches an undo log record and does the purge for the recorded operation.
 If none left, or the current purge completed, returns the control to the
 parent node, which is always a query thread node. */
-static __attribute__((nonnull))
+static MY_ATTRIBUTE((nonnull))
 void
 row_purge(
 /*======*/

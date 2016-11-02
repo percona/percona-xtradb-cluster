@@ -9,3 +9,4 @@ COUNT(*) = 1
 1
 DROP TABLE t1;
 CALL mtr.add_suppression("gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");
+CALL mtr.add_suppression("gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");

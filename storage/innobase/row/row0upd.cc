@@ -213,7 +213,7 @@ NOTE that this function will temporarily commit mtr and lose the
 pcur position!
 
 @return DB_SUCCESS or an error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_upd_check_references_constraints(
 /*=================================*/
@@ -395,7 +395,7 @@ wsrep_row_upd_check_foreign_constraints(
 					dict_table_open_on_name(
 					  foreign->referenced_table_name_lookup,
 					  FALSE, FALSE, DICT_ERR_IGNORE_NONE);
-				opened = TRUE;
+				opened = (foreign->referenced_table) ? TRUE : FALSE;
 			}
 
 			/* NOTE that if the thread ends up waiting for a lock
@@ -408,7 +408,7 @@ wsrep_row_upd_check_foreign_constraints(
 
 			if (foreign->referenced_table) {
 				if (opened == TRUE) {
-					dict_table_close(foreign->referenced_table, TRUE, FALSE);
+					dict_table_close(foreign->referenced_table, FALSE, FALSE);
 					opened = FALSE;
 				}
 			}
@@ -543,6 +543,13 @@ row_upd_changes_field_size_or_external(
 
 	for (i = 0; i < n_fields; i++) {
 		upd_field = upd_get_nth_field(update, i);
+
+		/* We should ignore virtual field if the index is not
+		a virtual index */
+		if (upd_fld_is_virtual_col(upd_field)
+		    && dict_index_has_virtual(index) != DICT_VIRTUAL) {
+			continue;
+		}
 
 		new_val = &(upd_field->new_val);
 		new_len = dfield_get_len(new_val);
@@ -692,7 +699,7 @@ row_upd_write_sys_vals_to_log(
 	roll_ptr_t	roll_ptr,/*!< in: roll ptr of the undo log record */
 	byte*		log_ptr,/*!< pointer to a buffer of size > 20 opened
 				in mlog */
-	mtr_t*		mtr __attribute__((unused))) /*!< in: mtr */
+	mtr_t*		mtr MY_ATTRIBUTE((unused))) /*!< in: mtr */
 {
 	ut_ad(dict_index_is_clust(index));
 	ut_ad(mtr);
@@ -789,7 +796,13 @@ row_upd_index_write_log(
 
 		len = dfield_get_len(new_val);
 
-		log_ptr += mach_write_compressed(log_ptr, upd_field->field_no);
+		/* If this is a virtual column, mark it using special
+		field_no */
+		ulint	field_no = upd_fld_is_virtual_col(upd_field)
+				   ? REC_MAX_N_FIELDS + upd_field->field_no
+				   : upd_field->field_no;
+
+		log_ptr += mach_write_compressed(log_ptr, field_no);
 		log_ptr += mach_write_compressed(log_ptr, len);
 
 		if (len != UNIV_SQL_NULL) {
@@ -863,6 +876,13 @@ row_upd_index_parse(
 		if (ptr == NULL) {
 
 			return(NULL);
+		}
+
+		/* Check if this is a virtual column, mark the prtype
+		if that is the case */
+		if (field_no >= REC_MAX_N_FIELDS) {
+			new_val->type.prtype |= DATA_VIRTUAL;
+			field_no -= REC_MAX_N_FIELDS;
 		}
 
 		upd_field->field_no = field_no;
@@ -1090,7 +1110,8 @@ row_upd_build_difference_binary(
 
 			dfield_t*	vfield = innobase_get_computed_value(
 				update->old_vrow, col, index,
-				&v_heap, heap, NULL, thd, mysql_table);
+				&v_heap, heap, NULL, thd, mysql_table,
+				NULL, NULL, NULL);
 
 			if (!dfield_data_is_binary_equal(
 				dfield, vfield->len,
@@ -1423,7 +1444,16 @@ row_upd_replace_vcol(
 		/* If there is no index on the column, do not bother for
 		value update */
 		if (!col->m_col.ord_part) {
-			continue;
+			dict_index_t*	clust_index
+				= dict_table_get_first_index(table);
+
+			/* Skip the column if there is no online alter
+			table in progress or it is not being indexed
+			in new table */
+			if (!dict_index_is_online_ddl(clust_index)
+			    || !row_log_col_is_indexed(clust_index, col_no)) {
+				continue;
+			}
 		}
 
 		dfield = dtuple_get_nth_v_field(row, col_no);
@@ -2096,7 +2126,8 @@ row_upd_store_v_row(
 					innobase_get_computed_value(
 						node->row, col, index,
 						&heap, node->heap, NULL,
-						thd, mysql_table);
+						thd, mysql_table, NULL,
+						NULL, NULL);
 				}
 			}
 		}
@@ -2198,7 +2229,7 @@ srv_mbr_print(const byte* data)
 Updates a secondary index entry of a row.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_upd_sec_index_entry(
 /*====================*/
@@ -2469,7 +2500,7 @@ Updates the secondary index record if it is changed in the row update or
 deletes it if this is a delete.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_upd_sec_step(
 /*=============*/
@@ -2587,7 +2618,7 @@ fields of the clustered index record change. This should be quite rare in
 database applications.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_upd_clust_rec_by_insert(
 /*========================*/
@@ -2751,7 +2782,7 @@ Updates a clustered index record of a row when the ordering fields do
 not change.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_upd_clust_rec(
 /*==============*/
@@ -2898,7 +2929,7 @@ func_exit:
 /***********************************************************//**
 Delete marks a clustered index record.
 @return DB_SUCCESS if operation successfully completed, else error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_upd_del_mark_clust_rec(
 /*=======================*/
@@ -2987,7 +3018,7 @@ row_upd_del_mark_clust_rec(
 Updates the clustered index record.
 @return DB_SUCCESS if operation successfully completed, DB_LOCK_WAIT
 in case of a lock wait, else error code */
-static __attribute__((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 row_upd_clust_step(
 /*===============*/

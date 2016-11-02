@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2016, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@ INCLUDE_DIRECTORIES(
   ${SSL_INCLUDE_DIRS}
   ${SSL_INTERNAL_INCLUDE_DIRS}
   ${CMAKE_SOURCE_DIR}/sql/backup
+  ${LZ4_INCLUDE_DIR}
 )
 
 # We should generate these separately for libmysqld to avoid
@@ -61,6 +62,7 @@ SET(SQL_EMBEDDED_SOURCES
   libmysqld.c
   ${GEN_SOURCES}
   ${GEN_YACC_SOURCES}
+  ../extra/lz4/xxhash.c
   ../client/get_password.c
   ../libmysql/errmsg.c
   ../libmysql/libmysql.c
@@ -116,6 +118,28 @@ ADD_COMPILE_FLAGS(
   ../sql/spatial.cc
   COMPILE_FLAGS -I${BOOST_PATCHES_DIR} -I${BOOST_INCLUDE_DIR}
 )
+
+ADD_COMPILE_FLAGS(
+  ../extra/lz4/xxhash.c
+  COMPILE_FLAGS -DXXH_NAMESPACE=MY_
+)
+
+# Fixes "C1128: number of sections exceeded object file format limit" in MSVC /MD
+# The flag /bigobj is not added if the build is not /MD
+IF(WIN32 AND CMAKE_SIZEOF_VOID_P MATCHES 8)
+  FOREACH(flag 
+     CMAKE_C_FLAGS_RELEASE    CMAKE_C_FLAGS_RELWITHDEBINFO 
+     CMAKE_C_FLAGS_DEBUG      CMAKE_C_FLAGS_DEBUG_INIT 
+     CMAKE_CXX_FLAGS_RELEASE  CMAKE_CXX_FLAGS_RELWITHDEBINFO
+     CMAKE_CXX_FLAGS_DEBUG    CMAKE_CXX_FLAGS_DEBUG_INIT)
+    
+     STRING(FIND ${${flag}} "/MD" POS)
+     IF(NOT (${POS} MATCHES "-1"))
+       ADD_COMPILE_FLAGS(../sql/item_geofunc_setops.cc COMPILE_FLAGS "/bigobj")
+       BREAK()
+     ENDIF()  
+  ENDFOREACH()
+ENDIF()
 
 # Boost source has unused local typedefs.
 MY_CHECK_CXX_COMPILER_FLAG("-Wno-unused-local-typedefs" HAVE_NO_UNUSED_TYPEDEFS)

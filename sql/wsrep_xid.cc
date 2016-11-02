@@ -35,10 +35,11 @@
 
 void wsrep_xid_init(XID* xid, const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
 {
+  xid->reset();
+
   xid->set_format_id(1);
   xid->set_gtrid_length( WSREP_XID_GTRID_LEN );
   xid->set_bqual_length(0);
-
   char data[XIDDATASIZE];
 
   memset(data, 0, XIDDATASIZE);
@@ -136,6 +137,8 @@ void wsrep_get_SE_checkpoint(XID& xid)
 
 void wsrep_get_SE_checkpoint(wsrep_uuid_t& uuid, wsrep_seqno_t& seqno)
 {
+  if (!WSREP_ON) return;
+
   uuid= WSREP_UUID_UNDEFINED;
   seqno= WSREP_SEQNO_UNDEFINED;
 

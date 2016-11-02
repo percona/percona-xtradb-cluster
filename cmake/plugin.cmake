@@ -1,4 +1,4 @@
-# Copyright (c) 2009, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -122,7 +122,9 @@ MACRO(MYSQL_ADD_PLUGIN)
   # Build either static library or module
   IF (WITH_${plugin} AND NOT ARG_MODULE_ONLY)
     ADD_LIBRARY(${target} STATIC ${SOURCES})
-    SET_TARGET_PROPERTIES(${target} PROPERTIES COMPILE_DEFINITONS "MYSQL_SERVER")
+    SET_TARGET_PROPERTIES(${target}
+      PROPERTIES COMPILE_DEFINITIONS "MYSQL_SERVER")
+
     DTRACE_INSTRUMENT(${target})
     ADD_DEPENDENCIES(${target} GenError ${ARG_DEPENDENCIES})
     IF(WITH_EMBEDDED_SERVER AND NOT ARG_NOT_FOR_EMBEDDED)
@@ -216,6 +218,7 @@ MACRO(MYSQL_ADD_PLUGIN)
     # executable to the linker command line (it would result into link error). 
     # Thus we skip TARGET_LINK_LIBRARIES on Linux, as it would only generate
     # an additional dependency.
+    # Use MYSQL_PLUGIN_IMPORT for static data symbols to be exported.
     IF(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
       TARGET_LINK_LIBRARIES (${target} mysqld ${ARG_LINK_LIBRARIES})
     ENDIF()
@@ -269,7 +272,11 @@ ENDMACRO()
 MACRO(CONFIGURE_PLUGINS)
   FILE(GLOB dirs_storage ${CMAKE_SOURCE_DIR}/storage/*)
   FILE(GLOB dirs_plugin ${CMAKE_SOURCE_DIR}/plugin/*)
-  FOREACH(dir ${dirs_storage} ${dirs_plugin})
+  IF(WITH_RAPID)
+    FILE(GLOB dirs_rapid_plugin ${CMAKE_SOURCE_DIR}/rapid/plugin/*)
+  ENDIF(WITH_RAPID)
+  
+  FOREACH(dir ${dirs_storage} ${dirs_plugin} ${dirs_rapid_plugin})
     IF (EXISTS ${dir}/CMakeLists.txt)
       ADD_SUBDIRECTORY(${dir})
     ENDIF()

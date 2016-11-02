@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1252,12 +1252,17 @@ char *get_56_lenc_string(char **buffer,
 
   *string_length= (size_t)net_field_length_ll((uchar **)buffer);
 
+  DBUG_EXECUTE_IF("sha256_password_scramble_too_long",
+                  *string_length= SIZE_T_MAX;
+  );
+
   size_t len_len= (size_t)(*buffer - begin);
   
-  if (*string_length + len_len > *max_bytes_available)
+  if (*string_length > *max_bytes_available - len_len)
     return NULL;
 
-  *max_bytes_available -= *string_length + len_len;
+  *max_bytes_available -= *string_length;
+  *max_bytes_available -= len_len;
   *buffer += *string_length;
   return (char *)(begin + len_len);
 }
@@ -2024,6 +2029,12 @@ check_password_lifetime(THD *thd, const ACL_USER *acl_user)
       }
     }
   }
+  DBUG_EXECUTE_IF("force_password_interval_expire",
+                  {
+                    if (!acl_user->use_default_password_lifetime &&
+                        acl_user->password_lifetime)
+                      password_time_expired= true;
+                  });
   return password_time_expired;
 }
 
@@ -2068,6 +2079,20 @@ acl_log_connect(const char *user,
       db ? db : (char*) "",
       vio_name_str);
   }
+}
+
+/*
+  Assign priv_user and priv_host fields of the Security_context.
+
+  @param sctx Security context, which priv_user and priv_host fields are
+              updated.
+  @param user Authenticated user data.
+*/
+inline void
+assign_priv_user_host(Security_context *sctx, ACL_USER *user)
+{
+  sctx->assign_priv_user(user->user, user->user ? strlen(user->user) : 0);
+  sctx->assign_priv_host(user->host.get_host(), user->host.get_host_len());
 }
 
 /**
@@ -2196,10 +2221,20 @@ acl_authenticate(THD *thd, enum_server_command command)
     acl_log_connect(mpvio.auth_info.user_name, mpvio.auth_info.host_or_ip,
       mpvio.auth_info.authenticated_as, mpvio.db.str, thd, command);
   }
-  if (!mpvio.can_authenticate() && res == CR_OK)
+  if (res == CR_OK &&
+      (!mpvio.can_authenticate() || thd->is_error()))
   {
     res= CR_ERROR;
   }
+
+  /*
+    Assign account user/host data to the current THD. This information is used
+    when the authentication fails after this point and we call audit api
+    notification event. Client user/host connects to the existing account is
+    easily distinguished from other connects.
+  */
+  if (mpvio.can_authenticate())
+    assign_priv_user_host(sctx, const_cast<ACL_USER *>(acl_user));
 
   if (res > CR_OK && mpvio.status != MPVIO_EXT::SUCCESS)
   {
@@ -2254,6 +2289,9 @@ acl_authenticate(THD *thd, enum_server_command command)
         mpvio.auth_info.authenticated_as, mpvio.db.str, thd, command);
     }
 
+    if (thd->is_error())
+      DBUG_RETURN(1);
+
     if (is_proxy_user)
     {
       ACL_USER *acl_proxy_user;
@@ -2298,11 +2336,7 @@ acl_authenticate(THD *thd, enum_server_command command)
 #endif /* NO_EMBEDDED_ACCESS_CHECKS */
 
     sctx->set_master_access(acl_user->access);
-    sctx->assign_priv_user(acl_user->user, acl_user->user ?
-                                           strlen(acl_user->user) : 0);
-    sctx->assign_priv_host(acl_user->host.get_host(),
-                           acl_user->host.get_host() ?
-                           strlen(acl_user->host.get_host()) : 0);
+    assign_priv_user_host(sctx, const_cast<ACL_USER *>(acl_user));
 
     if (!(sctx->check_access(SUPER_ACL)) && !thd->is_error())
     {
@@ -2594,9 +2628,9 @@ int validate_sha256_password_hash(char* const inbuf, unsigned int buflen)
   return 1;
 }
 
-int set_sha256_salt(const char* password __attribute__((unused)),
-                    unsigned int password_len __attribute__((unused)),
-                    unsigned char* salt __attribute__((unused)),
+int set_sha256_salt(const char* password MY_ATTRIBUTE((unused)),
+                    unsigned int password_len MY_ATTRIBUTE((unused)),
+                    unsigned char* salt MY_ATTRIBUTE((unused)),
                     unsigned char *salt_len)
 {
   *salt_len= 0;

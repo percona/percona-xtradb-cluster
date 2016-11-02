@@ -659,6 +659,8 @@ The following options may be given as the first argument:
  Maximum allowed cumulated size of stored optimizer traces
  --optimizer-trace-offset=# 
  Offset of first optimizer trace to show; see manual
+ --parser-max-mem-size=# 
+ Maximum amount of memory available to the parser
  --performance-schema 
  Enable the performance schema.
  (Defaults to on; use --skip-performance-schema to disable.)
@@ -1251,6 +1253,7 @@ The following options may be given as the first argument:
  DBUG options to provider library
  --wsrep-debug       To enable debug level logging
  --wsrep-desync      To desynchronize the node from the cluster
+ --wsrep-dirty-reads Allow reads from a node is not in primary component
  --wsrep-drupal-282555-workaround 
  To use a workaround forbad autoincrement value
  --wsrep-forced-binlog-format=name 
@@ -1282,6 +1285,8 @@ The following options may be given as the first argument:
  --wsrep-provider-options=name 
  provider specific options
  --wsrep-recover     Recover database state after crash and exit
+ --wsrep-reject-queries[=name] 
+ Variable to set to reject queries
  --wsrep-replicate-myisam 
  To enable myisam replication
  --wsrep-restart-slave 
@@ -1501,6 +1506,7 @@ optimizer-trace-features greedy_search=on,range_optimizer=on,dynamic_range=on,re
 optimizer-trace-limit 1
 optimizer-trace-max-mem-size 16384
 optimizer-trace-offset -1
+parser-max-mem-size 18446744073709551615
 performance-schema TRUE
 performance-schema-accounts-size -1
 performance-schema-consumer-events-stages-current FALSE
@@ -1571,7 +1577,7 @@ query-cache-type OFF
 query-cache-wlock-invalidate FALSE
 query-prealloc-size 8192
 range-alloc-block-size 4096
-range-optimizer-max-mem-size 1536000
+range-optimizer-max-mem-size 8388608
 read-buffer-size 131072
 read-only FALSE
 read-rnd-buffer-size 262144
@@ -1664,12 +1670,13 @@ wsrep-data-home-dir
 wsrep-dbug-option 
 wsrep-debug FALSE
 wsrep-desync FALSE
+wsrep-dirty-reads FALSE
 wsrep-drupal-282555-workaround FALSE
 wsrep-forced-binlog-format NONE
 wsrep-load-data-splitting TRUE
 wsrep-log-conflicts FALSE
-wsrep-max-ws-rows 131072
-wsrep-max-ws-size 1073741824
+wsrep-max-ws-rows 0
+wsrep-max-ws-size 2147483647
 wsrep-mysql-replication-bundle 0
 wsrep-node-address 
 wsrep-node-incoming-address AUTO
@@ -1679,6 +1686,7 @@ wsrep-preordered FALSE
 wsrep-provider none
 wsrep-provider-options 
 wsrep-recover FALSE
+wsrep-reject-queries NONE
 wsrep-replicate-myisam FALSE
 wsrep-restart-slave FALSE
 wsrep-retry-autocommit 1

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -515,6 +515,16 @@ bool check_readonly(THD *thd, bool err_if_readonly)
 
   /* thread is replication slave, do not prohibit operation: */
   if (thd->slave_thread)
+    DBUG_RETURN(FALSE);
+
+  /* Permit replication operations. */
+  enum enum_sql_command sql_command= thd->lex->sql_command;
+  if (sql_command == SQLCOM_SLAVE_START ||
+      sql_command == SQLCOM_SLAVE_STOP ||
+      sql_command == SQLCOM_CHANGE_MASTER ||
+      sql_command == SQLCOM_START_GROUP_REPLICATION ||
+      sql_command == SQLCOM_STOP_GROUP_REPLICATION ||
+      sql_command == SQLCOM_CHANGE_REPLICATION_FILTER)
     DBUG_RETURN(FALSE);
 
   bool is_super = thd->security_context()->check_access(SUPER_ACL);
@@ -1468,8 +1478,7 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
     additional privileges on the slave).
     Before ACLs are changed to execute fully or none at all, when
     some error happens, write an incident if one or more users are
-    granted/revoked successfully (it has a partial execution), a
-    warning if no user is granted/revoked successfully.
+    granted/revoked successfully (it has a partial execution).
   */
   if (result)
   {
@@ -1482,10 +1491,6 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
         mysql_bin_log.write_incident(thd, true /* need_lock_log=true */,
                                      err_msg);
       }
-      else
-        sql_print_warning("Did not write failed '%s' into binary log while "
-                          "storing table level and column level grants in "
-                          "the privilege tables.", thd->query().str);
     }
   }
   else
@@ -1729,8 +1734,7 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
     /*
       Before ACLs are changed to execute fully or none at all, when
       some error happens, write an incident if one or more users are
-      granted/revoked successfully (it has a partial execution), a
-      warning if no user is granted/revoked successfully.
+      granted/revoked successfully (it has a partial execution).
     */
     if (result)
     {
@@ -1743,10 +1747,6 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
           mysql_bin_log.write_incident(thd, true /* need_lock_log=true */,
                                        err_msg);
         }
-        else
-          sql_print_warning("Did not write failed '%s' into binary log while "
-                            "storing routine level grants in the privilege "
-                            "tables.", thd->query().str);
       }
     }
     else
@@ -1999,8 +1999,7 @@ bool mysql_grant(THD *thd, const char *db, List <LEX_USER> &list,
   /*
     Before ACLs are changed to execute fully or none at all, when
     some error happens, write an incident if one or more users are
-    granted/revoked successfully (it has a partial execution), a
-    warning if no user is granted/revoked successfully.
+    granted/revoked successfully (it has a partial execution).
   */
   if (result)
   {
@@ -2013,10 +2012,6 @@ bool mysql_grant(THD *thd, const char *db, List <LEX_USER> &list,
         mysql_bin_log.write_incident(thd, true /* need_lock_log=true */,
                                      err_msg);
       }
-      else
-        sql_print_warning("Did not write failed '%s' into binary log while "
-                          "granting/revoking privileges in databases.",
-                          thd->query().str);
     }
   }
   else
@@ -3460,8 +3455,7 @@ user_end:
   /*
     Before ACLs are changed to execute fully or none at all, when
     some error happens, write an incident if one or more users are
-    revoked successfully (it has a partial execution), a warning
-    if no user is granted/revoked successfully.
+    revoked successfully (it has a partial execution).
   */
   if (result)
   {
@@ -3475,10 +3469,6 @@ user_end:
         mysql_bin_log.write_incident(thd, true /* need_lock_log=true */,
                                      err_msg);
       }
-      else
-        sql_print_warning("Did not write failed '%s' into binary log while "
-                          "revoking all_privileges from a list of users.",
-                          thd->query().str);
     }
   }
   else

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -483,7 +483,7 @@ bool trans_commit_stmt(THD *thd)
     Some code in MYSQL_BIN_LOG::commit and ha_commit_low() is not safe
     for attachable transactions.
   */
-  DBUG_ASSERT(!thd->is_attachable_transaction_active());
+  DBUG_ASSERT(!thd->is_attachable_ro_transaction_active());
 
   thd->get_transaction()->merge_unsafe_rollback_flags();
 
@@ -543,7 +543,7 @@ bool trans_rollback_stmt(THD *thd)
     Some code in MYSQL_BIN_LOG::rollback and ha_rollback_low() is not safe
     for attachable transactions.
   */
-  DBUG_ASSERT(!thd->is_attachable_transaction_active());
+  DBUG_ASSERT(!thd->is_attachable_ro_transaction_active());
 
   thd->get_transaction()->merge_unsafe_rollback_flags();
 
@@ -560,12 +560,11 @@ bool trans_rollback_stmt(THD *thd)
     tc_log->rollback(thd, false);
 
   if (!thd->owned_gtid.is_empty() &&
-      thd->variables.gtid_next.type == GTID_GROUP &&
       !thd->in_active_multi_stmt_transaction())
   {
     /*
-      To a failed single statement transaction with a specified gtid on
-      auto-commit mode, we roll back its owned gtid if it does not modify
+      To a failed single statement transaction on auto-commit mode,
+      we roll back its owned gtid if it does not modify
       non-transational table or commit its owned gtid if it has modified
       non-transactional table when rolling back it if binlog is disabled,
       as we did when binlog is enabled.
@@ -610,7 +609,7 @@ bool trans_commit_attachable(THD *thd)
   int res= 0;
 
   /* This function only handles attachable transactions. */
-  DBUG_ASSERT(thd->is_attachable_transaction_active());
+  DBUG_ASSERT(thd->is_attachable_ro_transaction_active());
 
   /*
     Since the attachable transaction is AUTOCOMMIT we only need to commit

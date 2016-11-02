@@ -14,13 +14,16 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 INCLUDE_DIRECTORIES(${BOOST_PATCHES_DIR} ${BOOST_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 MYSQL_ADD_PLUGIN(keyring_file
-                 keyring_key.cc
+                 common/keyring_key.cc
+                 common/keys_container.cc
+                 common/keyring_impl.cc
                  keyring.cc
-                 keys_container.cc
+                 hash_to_buffer_serializer.cc
                  buffered_file_io.cc
-                 keyring_impl.cc
+                 buffer.cc
                  MODULE_ONLY
                  MODULE_OUTPUT_NAME "keyring_file")
 
@@ -36,10 +39,4 @@ IF(HAVE_DLOPEN)
     SET(DYNLIB_EXTENSION "so")
     SET_TARGET_PROPERTIES(keyring_file
       PROPERTIES LINK_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS}")
-ENDIF()
-
-IF(WIN32)
-  SET(KEYRING_PLUGIN_INFO keyring_file=keyring_file.dll CACHE INTERNAL "")
-ELSE()
-  SET(KEYRING_PLUGIN_INFO keyring_file=keyring_file.so CACHE INTERNAL "")
 ENDIF()

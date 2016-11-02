@@ -3,3 +3,5 @@ galera_kill_nochanges : mysql-wsrep#24 Galera server does not restart properly i
 galera_bf_abort_for_update : mysql-wsrep#26 SELECT FOR UPDATE sometimes allowed to proceed in the face of a concurrent update
 galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
 galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
+galera.galera_as_slave_replication_bundle : GCF-912 feature no longer works in 5.7
+galera_sst_xtrabackup-v2-options : fails in multiple ways, including xtrabackup crash

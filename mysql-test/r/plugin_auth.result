@@ -1,5 +1,4 @@
 CALL mtr.add_suppression("Plugin test_plugin_server reported: 'Wrong password supplied for plug_dest'");
-call mtr.add_suppression("Did not write failed .*");
 SELECT PLUGIN_STATUS, PLUGIN_TYPE, PLUGIN_DESCRIPTION
 FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME='test_plugin_server';
 PLUGIN_STATUS	ACTIVE
@@ -30,7 +29,7 @@ proxies_priv	CREATE TABLE `proxies_priv` (
   `Proxied_host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Proxied_user` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
   `With_grant` tinyint(1) NOT NULL DEFAULT '0',
-  `Grantor` char(77) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Grantor` char(93) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`Host`,`User`,`Proxied_host`,`Proxied_user`),
   KEY `Grantor` (`Grantor`)
@@ -655,7 +654,7 @@ proxies_priv	CREATE TABLE `proxies_priv` (
   `Proxied_host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Proxied_user` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
   `With_grant` tinyint(1) NOT NULL DEFAULT '0',
-  `Grantor` char(77) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Grantor` char(93) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`Host`,`User`,`Proxied_host`,`Proxied_user`),
   KEY `Grantor` (`Grantor`)
@@ -685,7 +684,7 @@ proxies_priv	CREATE TABLE `proxies_priv` (
   `Proxied_host` char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Proxied_user` char(32) COLLATE utf8_bin NOT NULL DEFAULT '',
   `With_grant` tinyint(1) NOT NULL DEFAULT '0',
-  `Grantor` char(77) COLLATE utf8_bin NOT NULL DEFAULT '',
+  `Grantor` char(93) COLLATE utf8_bin NOT NULL DEFAULT '',
   `Timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`Host`,`User`,`Proxied_host`,`Proxied_user`),
   KEY `Grantor` (`Grantor`)

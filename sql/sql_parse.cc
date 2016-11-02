@@ -22,6 +22,7 @@
 #include "item_timefunc.h"    // Item_func_unix_timestamp
 #include "log.h"              // query_logger
 #include "log_event.h"        // slave_execute_deferred_events
+#include "mysys_err.h"        // EE_CAPACITY_EXCEEDED
 #include "opt_explain.h"      // mysql_explain_other
 #include "opt_trace.h"        // Opt_trace_start
 #include "partition_info.h"   // partition_info
@@ -286,7 +287,6 @@ void init_update_queries(void)
 {
   /* Initialize the server command flags array. */
   memset(server_command_flags, 0, sizeof(server_command_flags));
-
   server_command_flags[COM_SLEEP]=               CF_ALLOW_PROTOCOL_PLUGIN;
   server_command_flags[COM_INIT_DB]=             CF_ALLOW_PROTOCOL_PLUGIN;
   server_command_flags[COM_QUERY]=               CF_ALLOW_PROTOCOL_PLUGIN;
@@ -306,6 +306,31 @@ void init_update_queries(void)
                                                  CF_ALLOW_PROTOCOL_PLUGIN;
   server_command_flags[COM_STMT_FETCH]=          CF_ALLOW_PROTOCOL_PLUGIN;
   server_command_flags[COM_END]=                 CF_ALLOW_PROTOCOL_PLUGIN;
+#ifdef WITH_WSREP
+  server_command_flags[COM_STATISTICS]   |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_PING]         |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_PREPARE] |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_EXECUTE] |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_FETCH]   |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_CLOSE]   |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_RESET]   |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_STMT_SEND_LONG_DATA] |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_QUIT]         |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_PROCESS_INFO] |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_PROCESS_KILL] |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_SHUTDOWN]     |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_SLEEP]        |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_TIME]         |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_INIT_DB]      |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_END]          |= CF_SKIP_WSREP_CHECK;
+ 
+  /*
+    COM_QUERY and COM_SET_OPTION are allowed to pass the early COM_xxx filter,
+    they're checked later in mysql_execute_command().
+  */
+  server_command_flags[COM_QUERY]      |= CF_SKIP_WSREP_CHECK;
+  server_command_flags[COM_SET_OPTION] |= CF_SKIP_WSREP_CHECK;
+#endif /* WITH_WSREP */
 
   /* Initialize the sql command flags array. */
   memset(sql_command_flags, 0, sizeof(sql_command_flags));
@@ -506,8 +531,6 @@ void init_update_queries(void)
   sql_command_flags[SQLCOM_CHANGE_REPLICATION_FILTER]=    CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_SLAVE_START]=        CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_SLAVE_STOP]=         CF_AUTO_COMMIT_TRANS;
-  sql_command_flags[SQLCOM_START_GROUP_REPLICATION]= CF_AUTO_COMMIT_TRANS;
-  sql_command_flags[SQLCOM_STOP_GROUP_REPLICATION]=  CF_AUTO_COMMIT_TRANS;
   sql_command_flags[SQLCOM_ALTER_TABLESPACE]|=  CF_AUTO_COMMIT_TRANS;
 
   /*
@@ -856,6 +879,27 @@ void cleanup_items(Item *item)
   DBUG_VOID_RETURN;
 }
 
+#ifdef WITH_WSREP
+static bool wsrep_tables_accessible_when_detached(const TABLE_LIST *tables)
+{
+  bool has_tables = false;
+  for (const TABLE_LIST *table= tables; table; table= table->next_global)
+  {
+    TABLE_CATEGORY c;
+    LEX_STRING     db, tn;
+    lex_string_set(&db, table->db);
+    lex_string_set(&tn, table->table_name);
+    c= get_table_category(db, tn);
+    if (c != TABLE_CATEGORY_INFORMATION &&
+        c != TABLE_CATEGORY_PERFORMANCE)
+    {
+      return false;
+    }
+    has_tables = true;
+  }
+  return has_tables;
+}
+#endif /* WITH_WSREP */
 #ifndef EMBEDDED_LIBRARY
 
 /**
@@ -1036,22 +1080,19 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow queries "SET" and "SHOW", they are trapped later in execute_command
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
-        command != COM_QUERY        &&
-        command != COM_PING         &&
-        command != COM_QUIT         &&
-        command != COM_PROCESS_INFO &&
-        command != COM_PROCESS_KILL &&
-        command != COM_SET_OPTION   &&
-        command != COM_SHUTDOWN     &&
-        command != COM_SLEEP        &&
-        command != COM_STATISTICS   &&
-        command != COM_TIME         &&
-        command != COM_END
+    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
+        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
+        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
     ) {
-      my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
-	       "WSREP has not yet prepared node for application use");
+      my_message(ER_UNKNOWN_COM_ERROR,
+	       "WSREP has not yet prepared node for application use", MYF(0));
       thd->end_statement();
+
+      /* Performance Schema Interface instrumentation end */
+      MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+      thd->m_statement_psi= NULL;
+      thd->m_digest= NULL;
+
       return_value= FALSE;
       goto out;
     }
@@ -1332,18 +1373,29 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
     if (thd->wsrep_conflict_state== ABORTED)
     {
-      my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-      WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-      thd->killed               = THD::NOT_KILLED;
-      thd->wsrep_conflict_state = NO_CONFLICT;
-      thd->wsrep_retry_counter  = 0;
-      /*
-        Increment threads running to compensate dec_thread_running() called
-        after dispatch_end label.
-      */
-      thd_manager->inc_thread_running();
-      goto dispatch_end;
+      if (command == COM_STMT_PREPARE          ||
+          command == COM_STMT_FETCH            ||
+          command == COM_STMT_SEND_LONG_DATA   ||
+          command == COM_STMT_CLOSE
+         )
+      {
+        WSREP_DEBUG("Prepared Statement bail out");
+      }
+      else
+      {
+        my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
+        WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
+        mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+        thd->killed               = THD::NOT_KILLED;
+        thd->wsrep_conflict_state = NO_CONFLICT;
+        thd->wsrep_retry_counter  = 0;
+        /*
+          Increment threads running to compensate dec_thread_running() called
+          after dispatch_end label.
+        */
+        thd_manager->inc_thread_running();
+        goto dispatch_end;
+      }
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
@@ -1596,9 +1648,10 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     if (thd->wsrep_conflict_state== ABORTED) 
     {
       my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
-      WSREP_DEBUG("Deadlock error for: %s", thd->query().str);
+      WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
+      thd->wsrep_conflict_state= NO_CONFLICT;
       goto dispatch_end;
     }
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -1926,7 +1979,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   {
     STATUS_VAR current_global_status_var;
     ulong uptime;
-    size_t length __attribute__((unused));
+    size_t length MY_ATTRIBUTE((unused));
     ulonglong queries_per_second1000;
     char buff[250];
     size_t buff_len= sizeof(buff);
@@ -2074,6 +2127,7 @@ done:
   if (thd->killed)
     thd->send_kill_message();
   thd->send_statement_status();
+  thd->rpl_thd_ctx.session_gtids_ctx().notify_after_response_packet(thd);
   query_cache.end_of_result(thd);
 #ifdef WITH_WSREP
   }
@@ -2845,14 +2899,20 @@ mysql_execute_command(THD *thd, bool first_level)
 
     /*
      * bail out if DB snapshot has not been installed. We however,
-     * allow SET and SHOW queries
+     * allow SET and SHOW queries and reads from information schema
+     * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
-        lex->sql_command != SQLCOM_SET_OPTION &&
+    if (thd->variables.wsrep_on                                            &&
+        !thd->wsrep_applier                                                &&
+        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+        !(thd->variables.wsrep_dirty_reads &&
+          (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
+        !wsrep_tables_accessible_when_detached(all_tables)                 &&
+        lex->sql_command != SQLCOM_SET_OPTION                              &&
         !wsrep_is_show_query(lex->sql_command))
     {
-      my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
-               "WSREP has not yet prepared node for application use");
+      my_message(ER_UNKNOWN_COM_ERROR,
+                 "WSREP has not yet prepared node for application use", MYF(0));
       goto error;
     }
   }
@@ -3010,9 +3070,6 @@ mysql_execute_command(THD *thd, bool first_level)
     thd->status_var= old_status_var;
     thd->initial_status_var= NULL;
     mysql_mutex_unlock(&LOCK_status);
-#ifdef WITH_WSREP
-    if (lex->sql_command == SQLCOM_SHOW_STATUS) wsrep_free_status(thd);
-#endif /* WITH_WSREP */
     break;
   }
   case SQLCOM_SHOW_EVENTS:
@@ -3048,7 +3105,7 @@ mysql_execute_command(THD *thd, bool first_level)
 #endif /* WITH_WSREP */
   {
     DBUG_EXECUTE_IF("use_attachable_trx",
-                    thd->begin_attachable_transaction(););
+                    thd->begin_attachable_ro_transaction(););
 
     thd->clear_current_query_costs();
 
@@ -3579,6 +3636,25 @@ end_with_restore_list:
     if (check_global_access(thd, SUPER_ACL))
       goto error;
 
+    /*
+      If the client thread has locked tables, a deadlock is possible.
+      Assume that
+      - the client thread does LOCK TABLE t READ.
+      - then the client thread does START GROUP_REPLICATION.
+           -try to make the server in super ready only mode
+           -acquire MDL lock ownership which will be waiting for
+            LOCK on table t to be released.
+      To prevent that, refuse START GROUP_REPLICATION if the
+      client thread has locked tables
+    */
+    if (thd->locked_tables_mode ||
+        thd->in_active_multi_stmt_transaction() || thd->in_sub_stmt)
+    {
+      my_message(ER_LOCK_OR_ACTIVE_TRANSACTION,
+                 ER(ER_LOCK_OR_ACTIVE_TRANSACTION), MYF(0));
+      goto error;
+    }
+
     res= group_replication_start();
 
     //To reduce server dependency, server errors are not used here
@@ -3596,13 +3672,17 @@ end_with_restore_list:
         my_message(ER_GROUP_REPLICATION_APPLIER_INIT_ERROR,
                    ER(ER_GROUP_REPLICATION_APPLIER_INIT_ERROR), MYF(0));
         goto error;
-      case 4: //GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR
+      case 4: //GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR
         my_message(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR,
                    ER(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR), MYF(0));
         goto error;
-      case 5: //GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR
+      case 5: //GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR
         my_message(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR,
                    ER(ER_GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR), MYF(0));
+        goto error;
+      case 7: //GROUP_REPLICATION_MAX_GROUP_SIZE
+        my_message(ER_GROUP_REPLICATION_MAX_GROUP_SIZE,
+                   ER(ER_GROUP_REPLICATION_MAX_GROUP_SIZE), MYF(0));
         goto error;
     }
     my_ok(thd);
@@ -3614,6 +3694,19 @@ end_with_restore_list:
   {
     if (check_global_access(thd, SUPER_ACL))
       goto error;
+
+    /*
+      Please see explanation @SQLCOM_SLAVE_STOP case
+      to know the reason for thd->locked_tables_mode in
+      the below if condition.
+    */
+    if (thd->locked_tables_mode ||
+        thd->in_active_multi_stmt_transaction() || thd->in_sub_stmt)
+    {
+      my_message(ER_LOCK_OR_ACTIVE_TRANSACTION,
+                 ER(ER_LOCK_OR_ACTIVE_TRANSACTION), MYF(0));
+      goto error;
+    }
 
     res= group_replication_stop();
     if (res == 1) //GROUP_REPLICATION_CONFIGURATION_ERROR
@@ -4175,6 +4268,9 @@ end_with_restore_list:
   {
     DBUG_EXECUTE_IF("4x_server_emul",
                     my_error(ER_UNKNOWN_ERROR, MYF(0)); goto error;);
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
     if (check_and_convert_db_name(&lex->name, TRUE) != IDENT_NAME_OK)
       break;
     res= mysqld_show_create_db(thd, lex->name.str, &lex->create_info);
@@ -4238,6 +4334,9 @@ end_with_restore_list:
   break;
   case SQLCOM_SHOW_CREATE_EVENT:
   {
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
     LEX_STRING db_lex_str= {const_cast<char*>(lex->spname->m_db.str),
                               lex->spname->m_db.length};
     res= Events::show_create_event(thd, db_lex_str,
@@ -4494,7 +4593,7 @@ end_with_restore_list:
             REFRESH_STATUS           |
             REFRESH_USER_RESOURCES))
     {
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+      WSREP_TO_ISOLATION_BEGIN_WRTCHK(WSREP_MYSQL_DB, NULL, NULL)
     }
 #endif /* WITH_WSREP*/
 
@@ -5122,12 +5221,18 @@ end_with_restore_list:
     }
   case SQLCOM_SHOW_CREATE_PROC:
     {
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (sp_show_create_routine(thd, SP_TYPE_PROCEDURE, lex->spname))
         goto error;
       break;
     }
   case SQLCOM_SHOW_CREATE_FUNC:
     {
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (sp_show_create_routine(thd, SP_TYPE_FUNCTION, lex->spname))
 	goto error;
       break;
@@ -5140,6 +5245,9 @@ end_with_restore_list:
       enum_sp_type sp_type= (lex->sql_command == SQLCOM_SHOW_PROC_CODE) ?
                             SP_TYPE_PROCEDURE : SP_TYPE_FUNCTION;
 
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (sp_cache_routine(thd, sp_type, lex->spname, false, &sp))
         goto error;
       if (!sp || sp->show_routine_code(thd))
@@ -5164,6 +5272,9 @@ end_with_restore_list:
         goto error;
       }
 
+#ifdef WITH_WSREP
+      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
+#endif /* WITH_WSREP */
       if (show_create_trigger(thd, lex->spname))
         goto error; /* Error has been already logged. */
 
@@ -5253,6 +5364,23 @@ end_with_restore_list:
   case SQLCOM_UNINSTALL_PLUGIN:
   case SQLCOM_SHUTDOWN:
   case SQLCOM_ALTER_INSTANCE:
+#ifdef WITH_WSREP
+    if (lex->sql_command == SQLCOM_XA_START    ||
+        lex->sql_command == SQLCOM_XA_END      ||
+        lex->sql_command == SQLCOM_XA_PREPARE  ||
+        lex->sql_command == SQLCOM_XA_COMMIT   ||
+        lex->sql_command == SQLCOM_XA_ROLLBACK ||
+        lex->sql_command == SQLCOM_XA_RECOVER)
+    {
+      if (WSREP(thd))
+      {
+        WSREP_DEBUG("XA command attempt: %d %s, thd: %u",
+                    lex->sql_command, thd->query().str, thd->thread_id());
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0), "XA with wsrep replication plugin");
+        break;
+      }
+    }
+#endif /* WITH_WSREP */
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
     res= lex->m_sql_cmd->execute(thd);
     break;
@@ -5415,7 +5543,19 @@ finish:
     }
   }
 
+#ifdef WITH_WSREP
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+  if (thd->wsrep_conflict_state != REPLAYED)
+  {
+#endif /* WITH_WSREP */
   lex->unit->cleanup(true);
+#ifdef WITH_WSREP
+  }
+  else
+    thd->wsrep_conflict_state= NO_CONFLICT;
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
+
   /* Free tables */
   THD_STAGE_INFO(thd, stage_closing_tables);
   close_thread_tables(thd);
@@ -5499,9 +5639,9 @@ finish:
   {
     static unsigned long total_leaked_bytes= 0;
     unsigned long leaked= 0;
-    unsigned long dubious __attribute__((unused));
-    unsigned long reachable __attribute__((unused));
-    unsigned long suppressed __attribute__((unused));
+    unsigned long dubious MY_ATTRIBUTE((unused));
+    unsigned long reachable MY_ATTRIBUTE((unused));
+    unsigned long suppressed MY_ATTRIBUTE((unused));
     /*
       We could possibly use VALGRIND_DO_CHANGED_LEAK_CHECK here,
       but that is a fairly new addition to the Valgrind api.
@@ -5614,7 +5754,7 @@ long max_stack_used;
   - Passing to check_stack_overrun() prevents the compiler from removing it.
 */
 bool check_stack_overrun(THD *thd, long margin,
-			 uchar *buf __attribute__((unused)))
+			 uchar *buf MY_ATTRIBUTE((unused)))
 {
   long stack_used;
   DBUG_ASSERT(thd == current_thd);
@@ -5726,20 +5866,18 @@ void THD::reset_for_next_command()
   /*
     Autoinc variables should be adjusted only for locally executed
     transactions. Appliers and replayers are either processing ROW
-    events or get autoinc variable values from Query_log_event.
+    events or get autoinc variable values from Query_log_event and
+    mysql slave may be processing STATEMENT format events, but he should
+    use autoinc values passed in binlog events, not the values forced by
+    the cluster.
   */
-  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE) {
-    if (wsrep_auto_increment_control)
-    {
-      if (thd->variables.auto_increment_offset !=
-	  global_system_variables.auto_increment_offset)
-	thd->variables.auto_increment_offset=
-	  global_system_variables.auto_increment_offset;
-      if (thd->variables.auto_increment_increment !=
-	  global_system_variables.auto_increment_increment)
-	thd->variables.auto_increment_increment=
-	  global_system_variables.auto_increment_increment;
-    }
+  if (WSREP(thd) && thd->wsrep_exec_mode == LOCAL_STATE &&
+      !thd->slave_thread && wsrep_auto_increment_control)
+  {
+    thd->variables.auto_increment_offset=
+      global_system_variables.auto_increment_offset;
+    thd->variables.auto_increment_increment=
+      global_system_variables.auto_increment_increment;
   }
 #endif /* WITH_WSREP */
   thd->query_start_usec_used= 0;
@@ -5866,7 +6004,7 @@ void mysql_init_multi_delete(LEX *lex)
 
 void mysql_parse(THD *thd, Parser_state *parser_state)
 {
-  int error __attribute__((unused));
+  int error MY_ATTRIBUTE((unused));
   DBUG_ENTER("mysql_parse");
   DBUG_PRINT("mysql_parse", ("query: '%s'", thd->query().str));
 
@@ -5900,12 +6038,18 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
   if (query_cache.send_result_to_client(thd, thd->query()) <= 0)
   {
     LEX *lex= thd->lex;
+    const char *found_semicolon;
 
-    bool err= parse_sql(thd, parser_state, NULL);
+    bool err= thd->get_stmt_da()->is_error();
+
     if (!err)
-      err= invoke_post_parse_rewrite_plugins(thd, false);
+    {
+      err= parse_sql(thd, parser_state, NULL);
+      if (!err)
+        err= invoke_post_parse_rewrite_plugins(thd, false);
 
-    const char *found_semicolon= parser_state->m_lip.found_semicolon;
+      found_semicolon= parser_state->m_lip.found_semicolon;
+    }
 
     if (!err)
     {
@@ -6006,7 +6150,6 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
           }
           else
             error= mysql_execute_command(thd, true);
-
           MYSQL_QUERY_EXEC_DONE(error);
 	}
       }
@@ -6049,6 +6192,13 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
       query_logger.general_log_write(thd, COM_QUERY, thd->query().str,
                                      thd->query().length);
     parser_state->m_lip.found_semicolon= NULL;
+
+#ifdef WITH_WSREP
+    if (WSREP_CLIENT(thd))
+    {
+      thd->wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
+    }
+#endif /* WITH_WSREP */
   }
 
   DBUG_VOID_RETURN;
@@ -6947,8 +7097,7 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
             thd->lex->sql_command != SQLCOM_SELECT  &&
            (thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit))
         {
-          WSREP_DEBUG("wsrep retrying AC query: %s",
-                      (thd->query().str) ? thd->query().str : "void");
+          WSREP_DEBUG("wsrep retrying AC query: %s", WSREP_QUERY(thd));
 
           close_thread_tables(thd);
 
@@ -6998,7 +7147,8 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                       (thd->wsrep_conflict_state == ABORTED) ?
                       "BF Aborted" : "cert failure",
                       thd->thread_id(), is_autocommit, thd->wsrep_retry_counter,
-                      thd->variables.wsrep_retry_autocommit, thd->query().str);
+                      thd->variables.wsrep_retry_autocommit,
+                      WSREP_QUERY(thd));
           my_error(ER_LOCK_DEADLOCK, MYF(0), "wsrep aborted transaction");
           thd->killed= THD::NOT_KILLED;
           thd->wsrep_conflict_state= NO_CONFLICT;
@@ -7524,6 +7674,42 @@ bool check_host_name(const LEX_CSTRING &str)
 }
 
 
+class Parser_oom_handler : public Internal_error_handler
+{
+public:
+  Parser_oom_handler()
+    : m_has_errors(false), m_is_mem_error(false)
+  {}
+  virtual bool handle_condition(THD *thd,
+                                uint sql_errno,
+                                const char* sqlstate,
+                                Sql_condition::enum_severity_level *level,
+                                const char* msg)
+  {
+    if (*level == Sql_condition::SL_ERROR)
+    {
+      m_has_errors= true;
+      /* Out of memory error is reported only once. Return as handled */
+      if (m_is_mem_error && sql_errno == EE_CAPACITY_EXCEEDED)
+        return true;
+      if (sql_errno == EE_CAPACITY_EXCEEDED)
+      {
+        m_is_mem_error= true;
+        my_error(ER_CAPACITY_EXCEEDED, MYF(0),
+                 static_cast<ulonglong>(thd->variables.parser_max_mem_size),
+                 "parser_max_mem_size",
+                 ER_THD(thd, ER_CAPACITY_EXCEEDED_IN_PARSER));
+        return true;
+      }
+    }
+    return false;
+  }
+private:
+  bool m_has_errors;
+  bool m_is_mem_error;
+};
+
+
 extern int MYSQLparse(class THD *thd); // from sql_yacc.cc
 
 
@@ -7625,10 +7811,20 @@ bool parse_sql(THD *thd,
   Diagnostics_area *parser_da= thd->get_parser_da();
   Diagnostics_area *da=        thd->get_stmt_da();
 
+  Parser_oom_handler poomh;
+  // Note that we may be called recursively here, on INFORMATION_SCHEMA queries.
+
+  set_memroot_max_capacity(thd->mem_root, thd->variables.parser_max_mem_size);
+  set_memroot_error_reporting(thd->mem_root, true);
+  thd->push_internal_handler(&poomh);
+
   thd->push_diagnostics_area(parser_da, false);
 
   bool mysql_parse_status= MYSQLparse(thd) != 0;
 
+  thd->pop_internal_handler();
+  set_memroot_max_capacity(thd->mem_root, 0);
+  set_memroot_error_reporting(thd->mem_root, false);
   /*
     Unwind diagnostics area.
 

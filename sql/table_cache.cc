@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,7 +15,9 @@
 
 #include "table_cache.h"
 #include "sql_test.h" // lock_descriptions[]
-
+#ifdef WITH_WSREP
+#include "wsrep_thd.h" // wsrep_thd_is_BF
+#endif /* WITH_WSREP */
 
 /**
   Container for all table cache instances in the system.
@@ -33,7 +35,7 @@ PSI_mutex_info Table_cache::m_mutex_keys[]= {
 
 extern "C" uchar *table_cache_key(const uchar *record,
                                   size_t *length,
-                                  my_bool not_used __attribute__((unused)))
+                                  my_bool not_used MY_ATTRIBUTE((unused)))
 {
   TABLE_SHARE *share= ((Table_cache_element*)record)->get_share();
   *length= share->table_cache_key.length;
@@ -362,15 +364,46 @@ void Table_cache_manager::free_table(THD *thd,
 
 #ifndef DBUG_OFF
       if (remove_type == TDC_RT_REMOVE_ALL)
+#ifndef WITH_WSREP
         DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
+#else
+      {
+        if (!cache_el[i]->used_tables.is_empty())
+          {
+            WSREP_DEBUG("ASSERT skipped, thd: %u mode %d conf %d query %s",
+                        thd->thread_id(), thd->wsrep_exec_mode,
+                        thd->wsrep_conflict_state, thd->query().str);
+          }
+      }
+#endif
       else if (remove_type == TDC_RT_REMOVE_NOT_OWN ||
                remove_type == TDC_RT_REMOVE_NOT_OWN_KEEP_SHARE)
       {
         Table_cache_element::TABLE_list::Iterator it2(cache_el[i]->used_tables);
         while ((table= it2++))
         {
+#ifdef WITH_WSREP
+          mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+          if (table->in_use != thd &&
+              !(table->in_use->wsrep_conflict_state == MUST_ABORT  ||
+                table->in_use->wsrep_conflict_state == ABORTING    ||
+                table->in_use->wsrep_conflict_state == ABORTED     ||
+                table->in_use->wsrep_conflict_state == MUST_REPLAY ||
+                table->in_use->wsrep_conflict_state == CERT_FAILURE))
+          {
+            mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+            WSREP_DEBUG("ASSERT  BF me %d BF other %d conf %d",
+                        wsrep_thd_is_BF(thd, FALSE),
+                        wsrep_thd_is_BF(table->in_use, FALSE),
+                        table->in_use->wsrep_conflict_state);
+#else
           if (table->in_use != thd)
+#endif /* WITH_WSREP */
             DBUG_ASSERT(0);
+#ifdef WITH_WSREP
+          }
+          mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+#endif /* WITH_WSREP */
         }
       }
 #endif

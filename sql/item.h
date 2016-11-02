@@ -2045,6 +2045,16 @@ public:
   { return true; }
 
   /**
+    Check if a generated expression depends on DEFAULT function.
+
+    @param arg ignored
+
+    @returns false if the function is not DEFAULT(), otherwise true.
+  */
+  virtual bool check_gcol_depend_default_processor(uchar *arg)
+  { return false; }
+
+  /**
     @brief  update_indexed_column_map
     Update columns map for index.
 
@@ -2251,6 +2261,14 @@ public:
     const Type t= type();
     return t == FUNC_ITEM || t == COND_ITEM;
   }
+
+  /**
+    This function applies only to Item_field objects referred to by an Item_ref
+    object that has been marked as a const_item.
+
+    @param arg  Keep track of whether an Item_ref refers to an Item_field.
+  */
+  virtual bool repoint_const_outer_ref(uchar *arg) { return false; }
 private:
   virtual bool subq_opt_away_processor(uchar *arg) { return false; }
 };
@@ -2537,6 +2555,12 @@ public:
   bool send(Protocol *protocol, String *str)
   {
     return value_item->send(protocol, str);
+  }
+
+  virtual bool cache_const_expr_analyzer(uchar **arg)
+  {
+    // Item_name_const always wraps a literal, so there is no need to cache it.
+    return false;
   }
 
 protected:
@@ -2971,7 +2995,9 @@ public:
   { return m_alias_of_expr ||
       // maybe the qualifying table was given an alias ("t1 AS foo"):
       (field ? field->table->alias_name_used : false);
- }
+  }
+
+  bool repoint_const_outer_ref(uchar *arg);
 };
 
 class Item_null :public Item_basic_constant
@@ -3079,10 +3105,6 @@ class Item_param :public Item,
                   private Settable_routine_parameter
 {
   typedef Item super;
-
-  char cnvbuf[MAX_FIELD_WIDTH];
-  String cnvstr;
-  Item *cnvitem;
 
 protected:
   type_conversion_status save_in_field_inner(Field *field, bool no_conversions);
@@ -4177,6 +4199,8 @@ public:
   {
     return (*ref)->created_by_in2exists();
   }
+
+  bool repoint_const_outer_ref(uchar *arg);
 };
 
 
@@ -4323,10 +4347,10 @@ public:
   */
   bool found_in_select_list;
   Item_outer_ref(Name_resolution_context *context_arg,
-                 Item_field *outer_field_arg)
-    :Item_direct_ref(context_arg, 0, outer_field_arg->table_name,
-                     outer_field_arg->field_name),
-    outer_ref(outer_field_arg), in_sum_func(0),
+                 Item_ident *ident_arg)
+    :Item_direct_ref(context_arg, 0, ident_arg->table_name,
+                     ident_arg->field_name),
+    outer_ref(ident_arg), in_sum_func(0),
     found_in_select_list(0)
   {
     ref= &outer_ref;
@@ -4907,6 +4931,9 @@ public:
            (arg && arg->walk(processor, walk, args)) ||
            ((walk & WALK_POSTFIX) && (this->*processor)(args));
   }
+
+  bool check_gcol_depend_default_processor(uchar *arg)
+  { return true; }
 
   Item *transform(Item_transformer transformer, uchar *args);
 };
