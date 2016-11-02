@@ -5474,6 +5474,7 @@ end_with_restore_list:
       goto error;
     }
 
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
     /* Conditionally writes to binlog */
     if (!(res = mysql_alter_user(thd, lex->users_list, lex->drop_if_exists)))
       my_ok(thd);
