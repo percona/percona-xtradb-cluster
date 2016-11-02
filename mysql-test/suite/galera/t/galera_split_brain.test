@@ -20,16 +20,13 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 
 # Reset the master and restart the slave so that post-test checks can run
 
-SET GLOBAL wsrep_cluster_address = '';
---disable_query_log
---eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
---enable_query_log
 
+--connection node_2
 --source include/start_mysqld.inc
 --sleep 5
 --source include/wait_until_connected_again.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --sleep 10

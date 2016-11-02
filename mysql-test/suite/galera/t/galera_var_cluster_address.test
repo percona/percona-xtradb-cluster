@@ -9,8 +9,8 @@
 # Set to invalid value
 # 
 
---connection node_1
---let $wsrep_cluster_address_node1 = `SELECT @@wsrep_cluster_address`
+--connection node_2
+--let $wsrep_cluster_address_node2 = `SELECT @@wsrep_cluster_address`
 SET GLOBAL wsrep_cluster_address = 'foo://';
 
 # With wsrep_sync_wait, this returns an error
@@ -32,9 +32,9 @@ SHOW STATUS LIKE 'wsrep_cluster_status';
 SHOW STATUS LIKE 'wsrep_local_state';
 SHOW STATUS LIKE 'wsrep_local_state_comment';
 
---connection node_2
+--connection node_1
 --sleep 1
-# Node #2 thinks that it is now part of a single-node primary cluster 
+# Node #1 thinks that it is now part of a single-node primary cluster 
 SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 
@@ -42,13 +42,10 @@ SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VA
 # Reset everything as it was
 #
 
---connection node_1
---disable_query_log
---eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node1';
---enable_query_log
-
 --connection node_2
-SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
+--disable_query_log
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node2';
+--enable_query_log
 
 --source include/wait_until_connected_again.inc
 
@@ -60,7 +57,7 @@ SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_N
 # Set to invalid host
 #
 
---connection node_1
+--connection node_2
 SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
 
 --error 0
@@ -80,19 +77,16 @@ SHOW STATUS LIKE 'wsrep_local_state_comment';
 # Reset everything as it was
 #
 
---connection node_1
---disable_query_log
---eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node1';
---enable_query_log
-
 --connection node_2
-SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
---sleep 1
+--disable_query_log
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node2';
+--enable_query_log
 
 --connection node_1
 SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
+--connection node_2
 CALL mtr.add_suppression("Backend not supported: foo");
 CALL mtr.add_suppression("Failed to initialize backend using 'foo");
 CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'foo");
@@ -105,4 +99,3 @@ CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'gcomm://
 CALL mtr.add_suppression("gcs connect failed: Connection timed out");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(foo://\\) failed: 7");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(gcomm://192.0.2.1\\) failed: 7");
-
