@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2015, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2016, Oracle and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -247,6 +247,11 @@ INSERT INTO global_suppressions VALUES
  ("Could not increase number of max_open_files to more than *"),
 
  /*
+  Warnings related to --secure-file-priv
+ */
+ ("Insecure configuration for --secure-file-priv:*"),
+
+ /*
    Galera suppressions 
  */
  ("WSREP:*down context*"),
@@ -292,6 +297,7 @@ INSERT INTO global_suppressions VALUES
  ("JOIN message from member .* in non-primary configuration"),
  ("install timer expired"),
  ("Last Applied Action message in non-primary configuration from member"),
+
  ("THE_LAST_SUPPRESSION")||
 
 
