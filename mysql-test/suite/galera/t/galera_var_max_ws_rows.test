@@ -1,3 +1,5 @@
+#
+#
 --source include/galera_cluster.inc
 
 CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
@@ -152,3 +154,35 @@ INSERT INTO t1 (f2) VALUES (2);
 
 DROP TABLE t1;
 DROP TABLE ten;
+
+
+#
+# Test effect of wsrep_max_ws_rows on temporary table
+# (external or explictly created or internal)
+#
+--let $wsrep_max_ws_rows_orig = `SELECT @@wsrep_max_ws_rows`
+#
+use test;
+create table t (i int, j int, primary key pk(i)) engine=innodb;
+insert into t values (1, 1);
+insert into t values (2, 1);
+insert into t values (3, 2);
+insert into t values (4, 2);
+insert into t values (5, 3);
+insert into t values (6, 3);
+select * from t;
+select j from t group by j;
+set global wsrep_max_ws_rows=2;
+select j from t group by j;
+drop table t;
+#
+use test;
+create temporary table t (i int, primary key pk(i)) engine=innodb;
+select @@wsrep_max_ws_rows;
+insert into t values (1), (2), (3), (4), (5);
+select * from t;
+drop table t;
+
+--disable_query_log
+--eval SET GLOBAL wsrep_max_ws_rows = $wsrep_max_ws_rows_orig
+--enable_query_log
