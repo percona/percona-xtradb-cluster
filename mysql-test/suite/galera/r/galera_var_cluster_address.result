@@ -23,7 +23,6 @@ VARIABLE_VALUE = 1
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 VARIABLE_VALUE = 'Primary'
 1
-SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 VARIABLE_VALUE = 'Primary'
 1
@@ -46,7 +45,6 @@ wsrep_local_state	0
 SHOW STATUS LIKE 'wsrep_local_state_comment';
 Variable_name	Value
 wsrep_local_state_comment	Initialized
-SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 VARIABLE_VALUE = 'Primary'
 1
