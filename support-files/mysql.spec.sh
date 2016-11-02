@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -777,6 +777,7 @@ install -d $RBR%{_includedir}
 install -d $RBR%{_libdir}
 install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
+install -d $RBR/var/lib/mysql-files
 
 mkdir -p $RBR%{_sysconfdir}/my.cnf.d
 
@@ -1379,7 +1380,9 @@ echo "====="                                     >> $STATUS_HISTORY
 
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
-# %%attr(755, root, root) %%{_datadir}/mysql/  ## Contained in "plugins.files", see "%%install" code
+
+%attr(755, root, root) %{_datadir}/mysql/
+%dir %attr(750, mysql, mysql) /var/lib/mysql-files
 
 # ----------------------------------------------------------------------------
 %files -n mysql-wsrep-client%{product_suffix}
@@ -1479,6 +1482,9 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Mon Sep 26 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com>
+- Include mysql-files directory
+
 * Mon Nov 02 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
 - "libmysqlclient.so" is not always recognized to satisfy the "requires"
   of pre-installed applications (notably "postfix" on RedHat-like distros).
