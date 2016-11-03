@@ -2,6 +2,19 @@ CREATE USER user1, user2 IDENTIFIED BY 'password';
 SELECT COUNT(*) = 2 FROM mysql.user WHERE user IN ('user1', 'user2');
 COUNT(*) = 2
 1
+ALTER USER user1 PASSWORD EXPIRE;
+SELECT password_expired = 'Y' FROM mysql.user WHERE user = 'user1';
+password_expired = 'Y'
+1
+SELECT password_expired = 'Y' FROM mysql.user WHERE user = 'user1';
+password_expired = 'Y'
+1
+CREATE USER user10 IDENTIFIED BY 'old_password';
+ALTER USER 'user10' IDENTIFIED BY 'new_password';
+SELECT 1 FROM DUAL;
+1
+1
+DROP USER user10;
 RENAME USER user2 TO user3;
 SELECT COUNT(*) = 0 FROM mysql.user WHERE user = 'user2';
 COUNT(*) = 0
@@ -12,8 +25,8 @@ COUNT(*) = 1
 SET PASSWORD FOR user3 = PASSWORD('foo');
 Warnings:
 Warning	1287	'SET PASSWORD FOR <user> = PASSWORD('<plaintext_password>')' is deprecated and will be removed in a future release. Please use SET PASSWORD FOR <user> = '<plaintext_password>' instead
-SELECT authentication_string != '' FROM mysql.user WHERE user = 'user3';
-authentication_string != ''
+SELECT 1 FROM DUAL;
+1
 1
 DROP USER user1, user3;
 SELECT COUNT(*) = 0 FROM mysql.user WHERE user IN ('user1', 'user2');
