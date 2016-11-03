@@ -26,6 +26,20 @@ SELECT password_expired = 'Y' FROM mysql.user WHERE user = 'user1';
 SELECT password_expired = 'Y' FROM mysql.user WHERE user = 'user1';
 
 #
+# ALTER USER IDENTIFIED BY 
+#
+
+CREATE USER user10 IDENTIFIED BY 'old_password';
+ALTER USER 'user10' IDENTIFIED BY 'new_password';
+
+--connect node_2a, 127.0.0.1, user10, new_password, test, $NODE_MYPORT_1
+--connection node_2a
+SELECT 1 FROM DUAL;
+
+--connection node_1
+DROP USER user10;
+
+#
 # RENAME USER
 #
 
@@ -43,8 +57,9 @@ SELECT COUNT(*) = 1 FROM mysql.user WHERE user = 'user3';
 --connection node_1
 SET PASSWORD FOR user3 = PASSWORD('foo');
 
---connection node_1
-SELECT authentication_string != '' FROM mysql.user WHERE user = 'user3';
+--connect node_2b, 127.0.0.1, user3, foo, test, $NODE_MYPORT_1
+--connection node_2b
+SELECT 1 FROM DUAL;
 
 #
 # DROP USER
