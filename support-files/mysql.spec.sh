@@ -794,6 +794,7 @@ install -d $RBR%{_includedir}
 install -d $RBR%{_libdir}
 install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
+install -d $RBR/var/lib/mysql-files
 
 mkdir -p $RBR%{_sysconfdir}/my.cnf.d
 
@@ -1391,6 +1392,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 # %%attr(755, root, root) %%{_datadir}/mysql/  ## Contained in "plugins.files", see "%%install" code
 %dir %attr(755, mysql, mysql) /var/lib/mysql
+%dir %attr(750, mysql, mysql) /var/lib/mysql-files
 
 # ----------------------------------------------------------------------------
 %files -n mysql-wsrep-client%{product_suffix}
