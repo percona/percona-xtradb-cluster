@@ -2102,8 +2102,8 @@ RecLock::add_to_waitq(const lock_t* wait_for, const lock_prdt_t* prdt)
 		return(DB_SUCCESS);
 	}
 
-#ifdef WITH_WSREP
 	dberr_t err= DB_LOCK_WAIT;
+#ifdef WITH_WSREP
 	if (wsrep_thd_is_BF(m_trx->mysql_thd, FALSE) && !lock_get_wait(lock)) {
 		if (wsrep_debug) ib::info() <<
 			"BF thread got lock granted early, ID " << lock->trx->id;

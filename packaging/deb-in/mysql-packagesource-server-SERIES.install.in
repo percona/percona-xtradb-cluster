@@ -97,7 +97,7 @@ debian/extra/mysqld.cnf /etc/mysql/mysql.conf.d/
 # SQL files
 usr/share/mysql/*.sql
 # support files
-# usr/share/mysql/debian-start.inc.sh
+usr/share/mysql/debian-start.inc.sh
 # usr/share/mysql/debian_create_root_user.sql
 usr/share/mysql/dictionary.txt
 # usr/share/mysql/echo_stderr
