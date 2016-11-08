@@ -51,13 +51,24 @@ pathfind() {
   return 1
 }
 
+# Choose the proper mechanism. Ubuntu 16.04 uses systemd but still provides invoke-rc.d,
+# so the existence of systemd must be checked first.
+invoke() {
+	if pathfind systemctl; then
+		systemctl $1 "@DEB_SYSTEMD_SERVICE_NAME@"
+	elif pathfind invoke-rc.d; then
+		invoke-rc.d mysql $1
+	else
+		/etc/init.d/mysql $1
+	fi
+}
+
 # Try to stop the server in a sane way. If it does not success let the admin
 # do it himself. No database directories should be removed while the server
 # is running! Another mysqld in e.g. a different chroot is fine for us.
 stop_server() {
-    # ??? systemctl ???      if [ ! -x /etc/init.d/mysql ]; then return; fi
-    if type systemctl >& /dev/null ; then  # does it exist?
-      if systemctl list-units -a -t service | fgrep -q mysql ; then
+    if pathfind systemctl; then
+      if systemctl list-units -a -t service | fgrep -q "@DEB_SYSTEMD_SERVICE_NAME@" ; then
         :  # service is known, so stopping it makes sense
       else
         return 0  # we cannot stop what we do not know
@@ -67,12 +78,7 @@ stop_server() {
     fi
 
     set +e
-    if pathfind invoke-rc.d; then
-      cmd="invoke-rc.d mysql stop"
-    else
-      cmd="systemctl stop mysql"
-    fi
-    $cmd
+    invoke stop
     errno=$?
     set -e
    

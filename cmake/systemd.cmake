@@ -47,7 +47,7 @@ MACRO(MYSQL_CHECK_SYSTEMD)
                            Aborting cmake build.")
     ENDIF()
   ELSE()
-    MESSAGE(FATAL_ERROR, "Unable to detect systemd support on build machine,\
+    MESSAGE(FATAL_ERROR, "Unable to detect pkg-config support on build machine,\
                           Aborting cmake build.")
   ENDIF()
 

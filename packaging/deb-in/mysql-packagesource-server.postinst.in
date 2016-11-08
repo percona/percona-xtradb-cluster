@@ -49,13 +49,18 @@ pathfind() {
 	return 1
 }
 
+# Choose the proper mechanism. Ubuntu 16.04 uses systemd but still provides invoke-rc.d,
+# so the existence of systemd must be checked first.
 invoke() {
-	if pathfind invoke-rc.d; then
-		invoke-rc.d mysql
+	if pathfind systemctl; then
+		systemctl $1 "@DEB_SYSTEMD_SERVICE_NAME@"
+	elif pathfind invoke-rc.d; then
+		invoke-rc.d mysql $1
 	else
 		/etc/init.d/mysql $1
 	fi
 }
+
 case "$1" in
 	configure)
 
