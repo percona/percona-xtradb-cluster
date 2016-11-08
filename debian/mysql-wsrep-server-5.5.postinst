@@ -69,6 +69,7 @@ case "$1" in
     mysql_cfgdir=/etc/mysql
     mysql_newlogdir=/var/log/mysql
     mysql_upgradedir=/var/lib/mysql-upgrade
+    mysql_filesdir=/var/lib/mysql-files
 
     # first things first, if the following symlink exists, it is a preserved
     # copy the old data dir from a mysql upgrade that would have otherwise
@@ -108,6 +109,15 @@ EOF
     
     # Ensure the existence and right permissions for the database and
     # log files.
+
+    # MySQL 5.5.53 needs this
+    if [ ! -d ${mysql_filesdir} -a ! -L ${mysql_filesdir} ];
+    then
+        mkdir ${mysql_filesdir}
+        chown mysql:mysql ${mysql_filesdir}
+        chmod 770 ${mysql_filesdir}
+    fi
+
     if [ ! -d "$mysql_statedir"       -a ! -L "$mysql_statedir"       ]; then mkdir "$mysql_statedir"; fi
     if [ ! -d "$mysql_statedir/mysql" -a ! -L "$mysql_statedir/mysql" ]; then mkdir "$mysql_statedir/mysql"; fi
     if [ ! -d "$mysql_newlogdir"      -a ! -L "$mysql_newlogdir"      ]; then mkdir "$mysql_newlogdir"; fi
