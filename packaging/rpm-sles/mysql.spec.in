@@ -20,7 +20,6 @@
 ## This is for "wsrep" == Galera Cluster, no MySQL (NDB) cluster
 ## # Pass --define 'with_cluster 1' to build with cluster support
 ## %{?with_cluster: %global cluster 1}
-%global cluster 0
 
 # By default, a build will include the bundeled "yaSSL" library for SSL.
 %{?with_ssl: %global ssl_option -DWITH_SSL=%{with_ssl}}
@@ -819,7 +818,7 @@ fi
 %endif
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
-%attr(755, root, root) %{_sbindir}/rcmysql
+%{_sbindir}/rcmysql
 
 %attr(755, root, root) %{_bindir}/wsrep_sst_common
 %attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
@@ -1057,8 +1056,8 @@ fi
 %attr(755, root, root) %{_bindir}/mysqltest
 %if 0%{?wsrep_embedded}
 %attr(755, root, root) %{_bindir}/mysqltest_embedded
-%attr(755, root, root) %{_bindir}/mysqlxtest
 %endif
+%attr(755, root, root) %{_bindir}/mysqlxtest
 
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth_test_plugin.so
