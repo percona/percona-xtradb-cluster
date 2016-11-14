@@ -87,6 +87,7 @@ xtmpdir=""
 
 scomp=""
 sdecomp=""
+ssl_dhparams=""
 
 # Required for backup locks. For backup locks it is 1 sent by joiner
 # 5.6.21 PXC and later can't donate to an older joiner
@@ -196,6 +197,31 @@ get_keys()
 }
 
 #
+# If the ssl_dhparams variable is already set, uses that as a source
+# of dh parameters for OpenSSL. Otherwise, looks for dhparams.pem in the
+# datadir, and creates it there if it can't find the file.
+# No input parameters
+#
+check_for_dhparams()
+{
+    if [[ -z "$ssl_dhparams" ]]; then
+        if ! [[ -r "$DATA/dhparams.pem" ]]; then
+            wsrep_check_programs openssl
+            wsrep_log_info "Could not find dhparams file, creating $DATA/dhparams.pem"
+
+            if ! openssl dhparam -out "$DATA/dhparams.pem" 2048 >/dev/null 2>&1
+            then
+                wsrep_log_error "******** FATAL ERROR ********************************* "
+                wsrep_log_error "* Could not create the dhparams.pem file with OpenSSL. "
+                wsrep_log_error "****************************************************** "
+                exit 22
+            fi
+        fi
+        ssl_dhparams="$DATA/dhparams.pem"
+    fi
+}
+
+#
 # Setup stream to transfer. (Alternative: nc or socat)
 get_transfer()
 {
@@ -228,9 +254,32 @@ get_transfer()
             exit 2
         fi
 
-        if [[ $encrypt -eq 2 || $encrypt -eq 3 ]] && ! socat -V | grep -q WITH_OPENSSL; then
-            wsrep_log_info "NOTE: socat is not openssl enabled, falling back to plain transfer"
-            encrypt=-1
+        joiner_extra=""
+        if [[ $encrypt -eq 2 || $encrypt -eq 3 ]]; then
+            if ! socat -V | grep -q WITH_OPENSSL; then
+                wsrep_log_info "NOTE: socat is not openssl enabled, falling back to plain transfer"
+                encrypt=-1
+            fi
+
+            # Determine the socat version
+            SOCAT_VERSION=`socat -V 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
+            if [[ -z "$SOCAT_VERSION" ]]; then
+                wsrep_log_error "******** FATAL ERROR **************** "
+                wsrep_log_error "* Cannot determine the socat version. "
+                wsrep_log_error "************************************* "
+                exit 2
+            fi
+
+            # socat versions < 1.7.3 will have 512-bit dhparams (too small)
+            #       so create 2048-bit dhparams and send that as a parameter
+            #
+            if ! check_for_version "$SOCAT_VERSION" "1.7.3"; then
+                if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
+                    # dhparams check (will create ssl_dhparams if needed)
+                    check_for_dhparams
+                    joiner_extra=",dhparam=$ssl_dhparams"
+                fi
+            fi
         fi
 
         if [[ $encrypt -eq 2 ]]; then
@@ -242,7 +291,7 @@ get_transfer()
             stagemsg+="-OpenSSL-Encrypted-2"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
                 wsrep_log_info "Decrypting with PEM $tpem, CA: $tcert"
-                tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${sockopt} stdio"
+                tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=$tpem,cafile=${tcert}${joiner_extra}${sockopt} stdio"
             else
                 wsrep_log_info "Encrypting with PEM $tpem, CA: $tcert"
                 tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=$tpem,cafile=${tcert}${sockopt}"
@@ -256,7 +305,7 @@ get_transfer()
             stagemsg+="-OpenSSL-Encrypted-3"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
                 wsrep_log_info "Decrypting with certificate $tpem, key $tkey"
-                tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=$tpem,key=${tkey},verify=0${sockopt} stdio"
+                tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=$tpem,key=${tkey},verify=0${joiner_extra}${sockopt} stdio"
             else
                 wsrep_log_info "Encrypting with certificate $tpem, key $tkey"
                 tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=$tpem,key=${tkey},verify=0${sockopt}"
@@ -287,7 +336,7 @@ read_cnf()
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
-    cpat=$(parse_cnf sst cpat '.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*donor-keyring$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
     ealgo=$(parse_cnf xtrabackup encrypt "")
     ekey=$(parse_cnf xtrabackup encrypt-key "")
     ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
