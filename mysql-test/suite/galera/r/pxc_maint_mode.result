@@ -1,0 +1,48 @@
+#node-1
+select @@pxc_maint_mode;
+@@pxc_maint_mode
+DISABLED
+set global pxc_maint_mode = 'DISABLED';
+set session pxc_maint_mode = 'DISALBED';
+ERROR HY000: Variable 'pxc_maint_mode' is a GLOBAL variable and should be set with SET GLOBAL
+set global pxc_maint_mode = 'MAINTENANCE';
+select @@pxc_maint_mode;
+@@pxc_maint_mode
+MAINTENANCE
+set global pxc_maint_mode = 'DISABLED';
+select @@pxc_maint_mode;
+@@pxc_maint_mode
+DISABLED
+set global pxc_maint_mode = 'SHUTDOWN';
+ERROR HY000: Can't change pxc_maint_mode from DISABLED to SHUTDOWN
+select @@pxc_maint_transition_period;
+@@pxc_maint_transition_period
+0
+set global pxc_maint_transition_period=180;
+select @@pxc_maint_transition_period;
+@@pxc_maint_transition_period
+180
+set global pxc_maint_transition_period=3600;
+select @@pxc_maint_transition_period;
+@@pxc_maint_transition_period
+3600
+set global pxc_maint_transition_period=9999;
+Warnings:
+Warning	1292	Truncated incorrect pxc_maint_transition_period value: '9999'
+select @@pxc_maint_transition_period;
+@@pxc_maint_transition_period
+3600
+set global pxc_maint_transition_period=-1;
+Warnings:
+Warning	1292	Truncated incorrect pxc_maint_transition_period value: '-1'
+select @@pxc_maint_transition_period;
+@@pxc_maint_transition_period
+0
+set global pxc_maint_transition_period=default;
+select @@pxc_maint_transition_period;
+@@pxc_maint_transition_period
+30
+set global pxc_maint_transition_period=0;
+select @@pxc_maint_transition_period;
+@@pxc_maint_transition_period
+0
