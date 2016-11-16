@@ -1,8 +1,12 @@
 create table t1 (test_name text);
 create table t2 (variable_name text);
 load data infile "MYSQLTEST_VARDIR/tmp/sys_vars.all_vars.txt" into table t1;
-insert into t2 select variable_name from information_schema.global_variables where variable_name not like 'innodb_disallow_writes';
-insert into t2 select variable_name from information_schema.session_variables where variable_name not like 'innodb_disallow_writes';
+insert into t2 select variable_name from information_schema.global_variables
+where variable_name not like 'innodb_disallow_writes'
+  and   variable_name not like '%pxc_%';
+insert into t2 select variable_name from information_schema.session_variables
+where variable_name not like 'innodb_disallow_writes'
+  and   variable_name not like '%pxc_%';
 update t2 set variable_name= replace(variable_name, "PERFORMANCE_SCHEMA_", "PFS_");
 update t2 set variable_name= replace(variable_name, "_HISTORY_LONG_", "_HL_");
 update t2 set variable_name= replace(variable_name, "_HISTORY_", "_H_");

@@ -131,6 +131,15 @@ enum enum_pxc_strict_modes {
 };
 extern ulong       pxc_strict_mode;
 
+enum enum_pxc_maint_modes {
+    PXC_MAINT_MODE_DISABLED = 0,
+    PXC_MAINT_MODE_SHUTDOWN,
+    PXC_MAINT_MODE_MAINTENANCE,
+};
+extern ulong       pxc_maint_mode;
+extern ulong       pxc_maint_transition_period;
+
+
 // MySQL status variables
 extern my_bool     wsrep_connected;
 extern my_bool     wsrep_ready;

@@ -1,0 +1,44 @@
+
+#
+# Test different options with different variation of pxc-strict-mode.
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+
+#-------------------------------------------------------------------------------
+#
+--connection node_1
+--echo #node-1
+select @@pxc_maint_mode;
+set global pxc_maint_mode = 'DISABLED';
+--error ER_GLOBAL_VARIABLE
+set session pxc_maint_mode = 'DISALBED';
+#
+# setting to and from maintenance is allowed.
+set global pxc_maint_mode = 'MAINTENANCE';
+select @@pxc_maint_mode;
+set global pxc_maint_mode = 'DISABLED';
+select @@pxc_maint_mode;
+#
+# setting to shutdown is blocked
+--error ER_UNKNOWN_ERROR
+set global pxc_maint_mode = 'SHUTDOWN';
+
+
+#
+#
+select @@pxc_maint_transition_period;
+set global pxc_maint_transition_period=180;
+select @@pxc_maint_transition_period;
+set global pxc_maint_transition_period=3600;
+select @@pxc_maint_transition_period;
+set global pxc_maint_transition_period=9999;
+select @@pxc_maint_transition_period;
+set global pxc_maint_transition_period=-1;
+select @@pxc_maint_transition_period;
+set global pxc_maint_transition_period=default;
+select @@pxc_maint_transition_period;
+set global pxc_maint_transition_period=0;
+select @@pxc_maint_transition_period;

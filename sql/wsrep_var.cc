@@ -928,3 +928,67 @@ bool pxc_strict_mode_check(sys_var *self, THD* thd, set_var* var)
   return(block);
 }
 
+
+static const char* pxc_maint_mode_to_string(ulong value)
+{
+  switch(value)
+  {
+  case PXC_MAINT_MODE_DISABLED:
+    return "DISABLED";
+  case PXC_MAINT_MODE_SHUTDOWN:
+    return "SHUTDOWN";
+  case PXC_MAINT_MODE_MAINTENANCE:
+    return "MAINTENANCE";
+  default:
+    return "NULL";
+  }
+}
+
+bool pxc_maint_mode_check(sys_var *self, THD* thd, set_var* var)
+{
+  /* pxc-maint-mode can be changed only if node is cluster-node. */
+  if (!(WSREP_ON))
+  {
+    WSREP_ERROR("pxc_maint_mode can be changed only if node is cluster-node");
+
+    char message[1024];
+    sprintf(message,
+            "pxc_maint_mode can be changed only if node is cluster-node");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    return true;
+  }
+
+  /* Following transitions are allowed.
+  DISABLED -> MAINTENANCE
+  MAINTENANCE -> DISABLED
+  All other combinations are blocked
+  SHUTDOWN can't be set explictly. It is done when user initiate shutdown
+  action. Once the node in shutdown mode toggling is not allowed. */
+
+  bool not_shutdown= (pxc_maint_mode != PXC_MAINT_MODE_SHUTDOWN);
+  bool to_maint=
+    (pxc_maint_mode == PXC_MAINT_MODE_DISABLED &&
+     var->save_result.ulonglong_value == PXC_MAINT_MODE_MAINTENANCE);
+  bool back_from_maint=
+    (pxc_maint_mode == PXC_MAINT_MODE_MAINTENANCE &&
+     var->save_result.ulonglong_value == PXC_MAINT_MODE_DISABLED);
+  bool retain_disable=
+    (pxc_maint_mode == PXC_MAINT_MODE_DISABLED &&
+     var->save_result.ulonglong_value == PXC_MAINT_MODE_DISABLED);
+
+  bool allowed_transition=
+    not_shutdown && (to_maint || back_from_maint || retain_disable);
+
+  if (!allowed_transition)
+  {
+    char message[1024];
+    sprintf(message,
+            "Can't change pxc_maint_mode from %s to %s",
+            pxc_maint_mode_to_string(pxc_maint_mode),
+            pxc_maint_mode_to_string(var->save_result.ulonglong_value));
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    return true;
+  }
+
+  return false;
+}

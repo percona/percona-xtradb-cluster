@@ -32,6 +32,7 @@ log-bin=mysqld-bin
 # It is maintainance challange to keep on modifying n different
 # galera.cnf file for this setting
 pxc_strict_mode=DISABLED
+pxc_maint_transition_period=0
 
 # MAINTAINER:
 # the loose- syntax is to make sure the cnf file is also

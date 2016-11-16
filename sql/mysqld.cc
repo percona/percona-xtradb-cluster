@@ -2712,6 +2712,18 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
     switch (sig) {
     case SIGTERM:
     case SIGQUIT:
+
+#ifdef WITH_WSREP
+      if (WSREP_ON)
+      {
+        pxc_maint_mode= PXC_MAINT_MODE_SHUTDOWN;
+        sql_print_information("Recieved shutdown signal. Will sleep for %lu secs"
+                              " before initiating shutdown. pxc_maint_mode switched"
+                              " to SHUTDOWN", pxc_maint_transition_period);
+        sleep(pxc_maint_transition_period);
+      }
+#endif /* WITH_WSREP */
+
       // Switch to the file log message processing.
       query_logger.set_handlers((log_output_options != LOG_NONE) ?
                                 LOG_FILE : LOG_NONE);

@@ -6218,6 +6218,19 @@ static Sys_var_enum Sys_pxc_strict_mode (
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(pxc_strict_mode_check),
        ON_UPDATE(0));
 
+static const char *pxc_maint_modes[]= { "DISABLED", "SHUTDOWN", "MAINTENANCE", NullS };
+static Sys_var_enum Sys_pxc_maint_mode (
+       "pxc_maint_mode", "ProxySQL assisted PXC maintenance mode",
+       GLOBAL_VAR(pxc_maint_mode), CMD_LINE(OPT_ARG),
+       pxc_maint_modes, DEFAULT(PXC_MAINT_MODE_DISABLED),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(pxc_maint_mode_check),
+       ON_UPDATE(0));
+
+static Sys_var_ulong Sys_pxc_maint_transition_period (
+       "pxc_maint_transition_period", "Period before the shutdown signal is delivered",
+       GLOBAL_VAR(pxc_maint_transition_period), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(0, 3600), DEFAULT(30), BLOCK_SIZE(1));
+
 #endif /* WITH_WSREP */
 
 static bool fix_host_cache_size(sys_var *, THD *, enum_var_type)

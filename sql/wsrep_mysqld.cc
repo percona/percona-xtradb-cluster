@@ -84,6 +84,12 @@ my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
 /* pxc-strict-mode help control behavior of experimental features like
 myisam table replication, etc... */
 ulong   pxc_strict_mode                = PXC_STRICT_MODE_ENFORCING;
+
+/* pxc-maint-mode help put node in maintenance mode so that proxysql
+can stop diverting queries to this node. */
+ulong   pxc_maint_mode                = PXC_MAINT_MODE_DISABLED;
+/* sleep for this period before delivering shutdown signal. */
+ulong   pxc_maint_transition_period   = 30;
 /*
  * End configuration options
  */
