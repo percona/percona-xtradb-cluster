@@ -6224,7 +6224,7 @@ static Sys_var_enum Sys_pxc_maint_mode (
        GLOBAL_VAR(pxc_maint_mode), CMD_LINE(OPT_ARG),
        pxc_maint_modes, DEFAULT(PXC_MAINT_MODE_DISABLED),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(pxc_maint_mode_check),
-       ON_UPDATE(0));
+       ON_UPDATE(pxc_maint_mode_update));
 
 static Sys_var_ulong Sys_pxc_maint_transition_period (
        "pxc_maint_transition_period", "Period before the shutdown signal is delivered",

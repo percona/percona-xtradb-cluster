@@ -95,5 +95,6 @@ extern bool wsrep_replicate_myisam_check     CHECK_ARGS;
 extern bool pxc_strict_mode_check            CHECK_ARGS;
 
 extern bool pxc_maint_mode_check            CHECK_ARGS;
+extern bool pxc_maint_mode_update           UPDATE_ARGS;
 
 #endif /* WSREP_VAR_H */
