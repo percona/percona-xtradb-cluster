@@ -90,6 +90,10 @@ can stop diverting queries to this node. */
 ulong   pxc_maint_mode                = PXC_MAINT_MODE_DISABLED;
 /* sleep for this period before delivering shutdown signal. */
 ulong   pxc_maint_transition_period   = 30;
+
+/* enables PXC SSL auto-config */
+my_bool pxc_encrypt_cluster_traffic   = 0;
+
 /*
  * End configuration options
  */
@@ -1095,6 +1099,37 @@ int wsrep_init()
   }
 #endif /* HAVE_PSI_INTERFACE */
 
+
+  const char* provider_options= wsrep_provider_options;
+  char buffer[4096];
+
+  if (pxc_encrypt_cluster_traffic)
+  {
+    if (opt_ssl_ca == 0 || *opt_ssl_ca == 0 ||
+        opt_ssl_cert == 0 || *opt_ssl_cert == 0 ||
+        opt_ssl_key == 0 || *opt_ssl_key == 0)
+    {
+      WSREP_ERROR("ssl-ca, ssl-cert, and ssl-key must all be defined, unable to configure SSL");
+      rcode = 1;
+      wsrep->free(wsrep);
+      free(wsrep);
+      wsrep = NULL;
+      return rcode;
+    }
+    // Append the SSL options to the end of the provider
+    // options strings (so that it overrides the SSL values
+    // provided by the user).
+    my_snprintf(buffer, sizeof(buffer), "%s%ssocket.ssl_key=%s;socket.ssl_ca=%s;socket.ssl_cert=%s",
+        provider_options ? provider_options : "",
+        (provider_options && *provider_options) ? ";" : "",
+        opt_ssl_key,
+        opt_ssl_ca,
+        opt_ssl_cert
+      );
+    buffer[sizeof(buffer)-1] = 0;
+    provider_options = buffer;
+  }
+
   struct wsrep_init_args wsrep_args;
 
   struct wsrep_gtid const state_id = { local_uuid, local_seqno };
@@ -1103,8 +1138,8 @@ int wsrep_init()
   wsrep_args.node_name       = (wsrep_node_name) ? wsrep_node_name : "";
   wsrep_args.node_address    = node_addr;
   wsrep_args.node_incoming   = inc_addr;
-  wsrep_args.options         = (wsrep_provider_options) ?
-                                wsrep_provider_options : "";
+  wsrep_args.options         = (provider_options) ?
+                                provider_options : "";
   wsrep_args.proto_ver       = wsrep_max_protocol_version;
 
   wsrep_args.state_id        = &state_id;
@@ -1218,7 +1253,7 @@ void wsrep_stop_replication(THD *thd)
 
 /* This one is set to true when --wsrep-new-cluster is found in the command
  * line arguments */
-static my_bool wsrep_new_cluster= FALSE;
+my_bool wsrep_new_cluster= FALSE;
 #define WSREP_NEW_CLUSTER "--wsrep-new-cluster"
 /* Finds and hides --wsrep-new-cluster from the arguments list
  * by moving it to the end of the list and decrementing argument count */

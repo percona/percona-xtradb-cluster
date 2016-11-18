@@ -1,0 +1,14 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+pxc-encrypt-cluster-traffic=ON
+
+wsrep_sst_method=xtrabackup-v2
+wsrep_sst_auth="root:"
+wsrep_debug=ON
+
+#
+# All nodes must use the same key,cert,and ca files
+ssl-key=@ENV.MYSQL_TEST_DIR/std_data/server-key.pem
+ssl-cert=@ENV.MYSQL_TEST_DIR/std_data/server-cert.pem
+ssl-ca=@ENV.MYSQL_TEST_DIR/std_data/cacert.pem
