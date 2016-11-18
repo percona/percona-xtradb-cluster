@@ -1182,6 +1182,9 @@ int gtid_empty_group_log_and_cleanup(THD *thd)
       gtid_before_write_cache(thd, cache_data))
     goto err;
 
+#ifdef WITH_WSREP
+  if (thd->slave_thread) thd->wsrep_replicate_GTID= true;
+#endif /* WITH_WSREP */
   ret= mysql_bin_log.commit(thd, true);
 
 err:
@@ -6625,6 +6628,12 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   */
   if (stuff_logged)
   {
+#ifdef WITH_WSREP
+    if (thd->wsrep_replicate_GTID)
+    {
+      wsrep_replicate_GTID(thd);
+    }
+#endif /* WITH_WSREP */
     if (ordered_commit(thd, all))
       DBUG_RETURN(RESULT_INCONSISTENT);
   }

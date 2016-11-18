@@ -3218,6 +3218,7 @@ public:
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
   ulong                     wsrep_affected_rows;
+  bool                      wsrep_replicate_GTID;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
