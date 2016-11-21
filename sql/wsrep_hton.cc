@@ -322,7 +322,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   int replay_round= 0;
 
   if (thd->get_stmt_da()->is_error()) {
-    WSREP_ERROR("commit issue, error: %d %s",
+    WSREP_DEBUG("commit issue, error: %d %s",
                 thd->get_stmt_da()->mysql_errno(), thd->get_stmt_da()->message_text());
   }
 
@@ -464,7 +464,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     DBUG_RETURN(WSREP_TRX_OK);
   }
 
-  if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
+  if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id &&
+      !thd->wsrep_replicate_GTID)
   {
     WSREP_WARN("SQL statement was ineffective, THD: %u, buf: %lu\n"
                "schema: %s \n"
@@ -585,6 +586,26 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   DBUG_RETURN(WSREP_TRX_OK);
 }
 
+void wsrep_replicate_GTID(THD *thd)
+{
+  if (thd->slave_thread)
+  {
+    WSREP_DEBUG("GTID replication");
+    enum wsrep_trx_status rcode= wsrep_run_wsrep_commit(thd, wsrep_hton, true);
+    if (rcode)
+    {
+      /*
+        TODO: should error here cause stopping of MySQL slave?
+        Slave applying was totally filtered out, and fauílure in replicating
+        GTID event, would cause a hole in GTID history in other cluster nodes
+
+      */
+      WSREP_WARN("GTID replication failed");
+    }
+    wsrep_post_commit(thd, true);
+  }
+  thd->wsrep_replicate_GTID= false;
+}
 
 static int wsrep_hton_init(void *p)
 {
