@@ -255,8 +255,11 @@ get_transfer()
         joiner_extra=""
         if [[ $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -eq 4 ]]; then
             if ! socat -V | grep -q WITH_OPENSSL; then
-                wsrep_log_info "NOTE: socat is not openssl enabled, falling back to plain transfer"
-                encrypt=-1
+                wsrep_log_error "******** FATAL ERROR ****************** "
+                wsrep_log_error "* socat is not openssl enabled.         "
+                wsrep_log_error "* Unable to encrypt SST communications. "
+                wsrep_log_error "*************************************** "
+                exit 2
             fi
 
             # Determine the socat version
