@@ -27,6 +27,7 @@ IF (NOT DEFINED DEB_CODENAME)
 ENDIF()
 # Commercial or community
 IF (DEB_PRODUCT STREQUAL "commercial")
+  message (FATAL_ERROR "mysql-wsrep is GPL only, no commercial builds")
   SET (DEB_COPYRIGHT_UPSTREAMNAME "MySQL Commercial Server ${MYSQL_BASE_VERSION}")
   SET (DEB_PRODUCTNAME "commercial")
   SET (DEB_PRODUCTNAMEC "Commercial")
@@ -73,6 +74,28 @@ ELSE()
   SET (DEB_REMOVEPATTERN "com.in")
 ENDIF()
 
+# mysql-wsrep !
+SET (DEB_PRODUCTNAME "wsrep")
+SET (DEB_PRODUCTNAMEC "Wsrep")
+SET (DEB_PRODUCTSERIES "-5.7")
+
+# For each startup mechanism, files are constant across distro version
+SET (FILES_STARTUP_SYSTEMD
+"
+usr/bin/mysqld_pre_systemd
+usr/bin/mysqld_bootstrap
+lib/systemd/system/mysql@.service
+lib/systemd/system/mysql.service
+")
+SET (FILES_STARTUP_SYSV
+"
+etc/init.d/mysql
+usr/bin/mysqld_safe
+")
+SET (FILES_STARTUP_UPSTART
+"
+")
+
 # Platform specifics. The differences are generally only distro version
 # and whether or not systemd and/or apparmor are available
 IF (DEB_CODENAME STREQUAL "wheezy")
@@ -87,7 +110,9 @@ IF (DEB_CODENAME STREQUAL "wheezy")
   SET (DEB_INSTALL_SERVER_SYSTEMD "")
   SET (DEB_INSTALL_SERVER_APPARMOR "")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
+  SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
 ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_PLATFORMRELEASE "debian8")
   SET (DEB_CONTROL_BDEPS "dh-systemd")
@@ -96,13 +121,17 @@ ELSEIF(DEB_CODENAME STREQUAL "jessie")
     "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
   SET (DEB_RULES_INSTALL_APPARMOR "")
   SET (DEB_RULES_APPARMOR_LOAD "")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
+  SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --no-enable --name=mysql")
   SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
   SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
   SET (DEB_INSTALL_SERVER_APPARMOR "")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_SERVICE_SERVER_EXECPOST
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSEIF(DEB_CODENAME STREQUAL "precise")
   SET (DEB_PLATFORMRELEASE "ubuntu12.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor")
@@ -117,7 +146,9 @@ ELSEIF(DEB_CODENAME STREQUAL "precise")
   SET (DEB_INSTALL_SERVER_SYSTEMD "")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
+  SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
 ELSEIF(DEB_CODENAME STREQUAL "trusty")
   SET (DEB_PLATFORMRELEASE "ubuntu14.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor")
@@ -132,7 +163,9 @@ ELSEIF(DEB_CODENAME STREQUAL "trusty")
   SET (DEB_INSTALL_SERVER_SYSTEMD "")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
+  SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
 ELSEIF(DEB_CODENAME STREQUAL "wily")
   SET (DEB_PLATFORMRELEASE "ubuntu15.10")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -143,13 +176,17 @@ ELSEIF(DEB_CODENAME STREQUAL "wily")
     "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-community-server --profile-name=usr.sbin.mysqld")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
+  SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --no-enable --name=mysql")
   SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
   SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_SERVICE_SERVER_EXECPOST
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_PLATFORMRELEASE "ubuntu16.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -160,13 +197,17 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
     "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
+  SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --no-enable --name=mysql")
   SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
   SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_SERVICE_SERVER_EXECPOST
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSEIF(DEB_CODENAME STREQUAL "yakkety")
   SET (DEB_PLATFORMRELEASE "ubuntu16.10")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -177,13 +218,17 @@ ELSEIF(DEB_CODENAME STREQUAL "yakkety")
     "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
+  SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --no-enable --name=mysql")
   SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
   SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_SERVICE_SERVER_EXECPOST
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
 ELSE()
   MESSAGE(STATUS
     "Skipping deb packaging on unsupported platform ${DEB_CODENAME}.")
@@ -192,21 +237,35 @@ ENDIF()
 
 # All files are configured and copied to the debian/ directory, which is used 
 # by debuild to make the packages
+# 5.7.11 builds out-of-source. Hack: have duplicate debian/
 SET (DEB_ROOT ${CMAKE_SOURCE_DIR}/packaging/deb-in)
 FILE(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/debian)
+FILE(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/debian)
 FILE(GLOB_RECURSE SOURCEFILES RELATIVE "${DEB_ROOT}" "${DEB_ROOT}/*")
 # Skip the copyright file from the "other" product type
 LIST(REMOVE_ITEM SOURCEFILES "copyright.${DEB_REMOVEPATTERN}")
 LIST(REMOVE_ITEM SOURCEFILES "CMakeLists.txt")
+# Skip Debian magical init files unless needed
+IF(NOT DEB_FILES_STARTUP MATCHES ".*lib/systemd/system/.*")
+  LIST(REMOVE_ITEM SOURCEFILES
+  "mysql-packagesource-server-SERIES.mysql.service.in")
+ENDIF()
+IF(NOT DEB_FILES_STARTUP MATCHES ".*etc/init.d/mysql.*")
+  LIST(REMOVE_ITEM SOURCEFILES
+  "mysql-packagesource-server-SERIES.mysql.init.in")
+ENDIF()
 FOREACH (SOURCEFILE ${SOURCEFILES})
   STRING(REGEX REPLACE "-packagesource-" "-${DEB_PRODUCTNAME}-"
     TMPFILE ${SOURCEFILE})
+  STRING(REGEX REPLACE "-SERIES" "${DEB_PRODUCTSERIES}" TMPFILE ${TMPFILE})
   # Strip away the input file endings from the destination filenames
   STRING(REGEX REPLACE ".in$" "" TMPFILE ${TMPFILE})
   STRING(REGEX REPLACE ".gpl$" "" TMPFILE ${TMPFILE})
   STRING(REGEX REPLACE ".com$" "" DESTFILE ${TMPFILE})
   CONFIGURE_FILE("${DEB_ROOT}/${SOURCEFILE}"
     "${CMAKE_BINARY_DIR}/debian/${DESTFILE}" @ONLY)
+  CONFIGURE_FILE("${DEB_ROOT}/${SOURCEFILE}"
+    "${CMAKE_SOURCE_DIR}/debian/${DESTFILE}" @ONLY)
 ENDFOREACH()
 EXECUTE_PROCESS(
   COMMAND chmod +x ${CMAKE_BINARY_DIR}/debian/rules

@@ -1,0 +1,282 @@
+#!/bin/bash
+
+# Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+set -e
+
+. /usr/share/debconf/confmodule
+
+if [ -n "$DEBIAN_SCRIPT_DEBUG" ]; then set -v -x; DEBIAN_SCRIPT_TRACE=1; fi
+${DEBIAN_SCRIPT_TRACE:+ echo "#42#DEBUG# RUNNING $0 $*" 1>&2 }
+ 
+export PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin
+
+# Runs an arbitrary init sql file supplied in $1. Does not require login access
+run_init_sql() {
+	tmpdir=$(mktemp -d)
+	chown mysql:mysql "$tmpdir"
+	mysqld --user=mysql --init-file="$1" --socket="$tmpdir/mysqld.sock" --pid-file="$tmpdir/mysqld.pid" > /dev/null 2>&1
+	result=$?
+	rm -rf "$tmpdir"
+	return $result
+}
+
+# To avoid having hardcoded paths in the script, we do a search on the path, as suggested at:
+# https://www.debian.org/doc/manuals/developers-reference/ch06.en.html#bpp-debian-maint-scripts
+pathfind() {
+	OLDIFS="$IFS"
+	IFS=:
+	for p in $PATH; do
+	  if [ -x "$p/$*" ]; then
+	    IFS="$OLDIFS"
+	    return 0
+	  fi
+	done
+	IFS="$OLDIFS"
+	return 1
+}
+
+# Choose the proper mechanism. Ubuntu 16.04 uses systemd but still provides invoke-rc.d,
+# so the existence of systemd must be checked first.
+invoke() {
+	if pathfind systemctl; then
+		systemctl $1 "@DEB_SYSTEMD_SERVICE_NAME@"
+	elif pathfind invoke-rc.d; then
+		invoke-rc.d mysql $1
+	else
+		/etc/init.d/mysql $1
+	fi
+}
+
+# Check if there is passwordless root login
+test_mysql_access() {
+	mysql --no-defaults -u root -h localhost </dev/null >/dev/null 2>&1
+}
+
+# Check if the debian-sys-maint user can log in
+test_sysmaint_access() {
+	mysql --defaults-file=/etc/mysql/debian.cnf </dev/null >/dev/null 2>&1
+}
+
+# $1 is username, e.g. 'root' $2 is password
+set_mysql_pw() {
+	# These variables are global (POSIX doesn't define local) so prefix them
+	# to avoid any potential collisions.
+	set_mysql_pw_user="$1"
+	set_mysql_pw_pass="$2"
+	set_mysql_pw_passfile=`mktemp --tmpdir=/var/lib/mysql-files/`
+	chown mysql:mysql "$set_mysql_pw_passfile"
+	echo "USE mysql;" >> "$set_mysql_pw_passfile"
+	echo "UPDATE user SET authentication_string=PASSWORD('$set_mysql_pw_pass') WHERE user='$set_mysql_pw_user';" >> "$set_mysql_pw_passfile"
+	echo "FLUSH PRIVILEGES;" >> "$set_mysql_pw_passfile"
+	echo "SHUTDOWN;" >> "$set_mysql_pw_passfile"
+	run_init_sql "$set_mysql_pw_passfile"
+	rm "$set_mysql_pw_passfile"
+}
+
+# This is necessary because mysql_install_db removes the pid file in /var/run
+# and because changed configuration options should take effect immediately.
+# In case the server wasn't running at all it should be ok if the stop
+# script fails. I can't tell at this point because of the cleaned /var/run.
+set +e; invoke stop; set -e
+
+case "$1" in
+	configure)
+	  mysql_datadir=/usr/share/mysql
+	  mysql_statedir=/var/lib/mysql
+	  mysql_rundir=/var/run/mysqld
+	  mysql_logdir=/var/log/mysql
+	  mysql_cfgdir=/etc/mysql
+	  mysql_upgradedir=/var/lib/mysql-upgrade
+	  mysql_filesdir=/var/lib/mysql-files
+	  mysql_keyringdir=/var/lib/mysql-keyring
+
+	  # mysqld gets called during postinst configure, so any
+	  # updates to the AppArmor profile must be loaded first (before the
+	  # dh_apparmor snippet added by debhelper does it properly at the end of
+	  # this script). Otherwise, mysqld cannot for example load
+	  # /etc/mysql/mysqld.conf.d/ on upgrade from 5.5 to 5.6, which was added in
+	  # 5.6 packaging but not present in the AppArmor profile shipped with 5.5
+	  # packaging.
+	  #
+	  # This a workaround. Status is tracked at https://launchpad.net/bugs/1435368
+	  if aa-status --enabled 2>/dev/null; then
+	    # It is common for this to fail because
+	    # /etc/apparmor.d/local/usr.sbin.mysqld doesn't exist (eg. on first
+	    # install). But if this happens, then the workaround is not required,
+	    # so it doesn't matter. If instead it causes a security issue, then
+	    # that doesn't really matter here as dh_apparmor should handle that
+	    # correctly later on.
+	    apparmor_parser -r -T -W /etc/apparmor.d/usr.sbin.mysqld 2>/dev/null || true
+	  fi
+
+	  # New packaging paradigm for my.cnf as of Dec-2014 for sharing mysql
+	  # variants in Ubuntu.
+	  /usr/share/mysql-common/configure-symlinks install mysql "$mysql_cfgdir/mysql.cnf"
+
+	  # Ensure the existence and right permissions for the database and
+	  # log files.
+	  for d in $mysql_statedir $mysql_filesdir $mysql_keyringdir $mysql_logdir
+	  do
+	    if [ ! -d "$d" -a ! -L "$d" ]; then mkdir "$d"; fi
+	    chown -R mysql:mysql $d
+	    chmod 0700 $d
+	  done
+
+	  # When creating an ext3 jounal on an already mounted filesystem like e.g.
+	  # /var/lib/mysql, you get a .journal file that is not modifyable by chown.
+	  # The mysql_datadir must not be writable by the mysql user under any
+	  # circumstances as it contains scripts that are executed by root.
+	  set +e
+	  chown -R 0:0 $mysql_datadir
+	  touch $mysql_logdir/error.log
+	  chown -R mysql:adm $mysql_logdir
+	  chmod 0750 $mysql_logdir
+	  chmod 0640 $mysql_logdir/error.log
+	  set -e
+
+	  # This is important to avoid dataloss when there is a removed
+	  # mysql-server version from Woody lying around which used the same
+	  # data directory and then somewhen gets purged by the admin.
+	  db_set mysql-@DEB_PRODUCTNAME@-server/postrm_remove_database false || true
+
+
+	  ## On every reconfiguration the maintenance user is recreated.
+	  #
+	  # - It is easier to regenerate the password every time but as people
+	  #   use fancy rsync scripts and file alteration monitors, the existing
+	  #   password is used and existing files not touched.
+	  # - The echo is just for readability. ash's buildin has no "-e" so use /bin/echo.
+
+	  # recreate the credentials file if not present or without mysql_upgrade stanza
+	  dc=$mysql_cfgdir/debian.cnf; 
+	  if [ -e "$dc" -a -n "`fgrep mysql_upgrade $dc 2>/dev/null`" ]; then
+	    pass="`sed -n 's/^[     ]*password *= *// p' $dc | head -n 1`"
+	    # Basedir is deprecated. Remove the option if it's in an existing debian.cnf
+	    sed -i '/basedir/d' "$dc"
+	  else
+	    pass=`perl -e 'print map{("a".."z","A".."Z",0..9)[int(rand(62))]}(1..16)'`;
+	    if [ ! -d "$mysql_cfgdir" ]; then install -o 0 -g 0 -m 0755 -d $mysql_cfgdir; fi
+	    umask 066
+	    cat /dev/null > $dc
+	    umask 022
+	    echo "# Automatically generated for Debian scripts. DO NOT TOUCH!" >>$dc
+	    echo "[client]"                                                    >>$dc
+	    echo "host     = localhost"                                        >>$dc
+	    echo "user     = debian-sys-maint"                                 >>$dc
+	    echo "password = $pass"                                            >>$dc
+	    echo "socket   = $mysql_rundir/mysqld.sock"                        >>$dc
+	    echo "[mysql_upgrade]"                                             >>$dc
+	    echo "host     = localhost"                                        >>$dc
+	    echo "user     = debian-sys-maint"                                 >>$dc
+	    echo "password = $pass"                                            >>$dc
+	    echo "socket   = $mysql_rundir/mysqld.sock"                        >>$dc
+	  fi
+	  # If this dir chmod go+w then the admin did it. But this file should not.
+	  chown 0:0 $dc
+	  chmod 0600 $dc
+
+	  # Initiate database. Output is not allowed by debconf :-(
+	  # If database doesn't exist we create it.
+	  if [ ! "$(ls -A "${mysql_statedir}")" ] && [ -d "${mysql_filesdir}" ]; then
+	    existingdatabase=0
+	    initfile=`mktemp --tmpdir=/var/lib/mysql-files/`
+	    touch "$initfile"
+	    chmod 600 "$initfile"
+	    chown mysql:mysql "$initfile"
+	    echo "USE mysql; " >> "$initfile"
+	    db_get mysql-@DEB_PRODUCTNAME@-server/root-pass && rootpw="$RET"
+	    if [ ! -z $rootpw ]; then
+	      echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootpw';" >> "$initfile"
+	    fi
+	    echo "CREATE USER IF NOT EXISTS 'debian-sys-maint'@'localhost' IDENTIFIED BY '$pass';" >> "$initfile"
+	    echo "GRANT ALL ON *.* TO 'debian-sys-maint'@'localhost';" >> "$initfile"
+	    echo "SHUTDOWN;" >> "$initfile"
+	    # mysqld returns an error instead of a warning if CREATE USER IF NOT
+	    # EXISTS fails, so ignore errors as a workaround. See:
+	    # http://bugs.mysql.com/bug.php?id=80636
+	    mysqld --initialize-insecure --user=mysql --init-file="$initfile"> /dev/null 2>&1 || true
+	    rm "$initfile"
+	  else
+	    existingdatabase=1
+	  fi
+
+	  # To avoid downgrades. This has to happen after the database is created, or --initialize will fail
+	  touch $mysql_statedir/debian-5.7.flag
+
+	;;
+
+	abort-upgrade|abort-remove|abort-configure)
+	;;
+
+	*)
+	  echo "postinst called with unknown argument '$1'" 1>&2
+	  exit 1
+	;;
+esac
+
+# The debhelper section is needed to unmask and enable the service
+# in some cases like when upgrading from 5.5
+#DEBHELPER#
+
+if [ "$1" = "configure" ]; then
+	# We want to run mysql_upgrade to cover users upgrading. First we check if
+	# the debian-sys-maint user can log in. If not, we reset its password first.
+	if [ $existingdatabase = 1 ]; then
+	  if ! test_sysmaint_access; then
+	    invoke stop
+	    set_mysql_pw "debian-sys-maint" "$pass"
+	    invoke start
+	  fi
+	  mysql_upgrade --defaults-file=/etc/mysql/debian.cnf
+	fi
+	# Here we check to see if we can connect as root without a password
+	# this should catch upgrades from previous versions where the root
+	# password wasn't set.  If the connection succeeds we install the
+	# auth_socket plugin and enable it for the root user to improve
+	# security.
+	if test_mysql_access; then
+	  # Try to install auth_socket plugin. This throws an error if the plugin is
+	  # already installed, which would end execution of the init sql to stop if
+	  # --init-file was used. Bug: http://bugs.mysql.com/bug.php?id=80642
+	  pluginfile=`mktemp --tmpdir=/var/lib/mysql-files/`
+	  echo "INSTALL PLUGIN auth_socket SONAME 'auth_socket.so';" >> "$pluginfile"
+	  mysql -uroot < "$pluginfile" > /dev/null 2>&1 || true
+	  rm "$pluginfile"
+	  invoke stop
+	  initfile=`mktemp --tmpdir=/var/lib/mysql-files/`
+	  chown mysql:mysql "$initfile"
+	  # If there is no root password set we enable the auth_socket plugin for the root user
+	  echo "USE mysql;"                                                                   >> "$initfile"
+	  echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH 'auth_socket';"                 >> "$initfile"
+	  # Bug: http://bugs.mysql.com/bug.php?id=80632
+	  echo "UPDATE user SET password_expired='N', account_locked='N' WHERE user='root';"  >> "$initfile"
+	  echo "FLUSH PRIVILEGES;"                                                            >> "$initfile"
+	  echo "SHUTDOWN;"                                                                    >> "$initfile"
+	  # The INSTALL PLUGIN line will throw an error if the plugin is already installed
+	  run_init_sql "$initfile"
+	  rm "$initfile"
+	  invoke start
+	fi
+fi
+
+# forget we ever saw the password.  don't use reset to keep the seen status
+db_set mysql-@DEB_PRODUCTNAME@-server/root-pass ""
+db_set mysql-@DEB_PRODUCTNAME@-server/re-root-pass ""
+db_stop # in case invoke failes
+
+
+exit 0

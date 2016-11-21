@@ -15,11 +15,17 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+# Script modified to handle the specific needs of the "wsrep" plugin
+# which enables a MySQL server to act as a node in Galera Cluster.
+# Modifications
+# Copyright (c) 2015, 2016, Codership Oy
+
 # Scripts to run by MySQL systemd service
 #
-# Needed argument: pre
+# Needed argument: pre | post
 #
 # pre mode  :  try to perform sanity check for configuration, log, data
+# post mode :  ping server until answer is received
 
 get_path () {
 	my_print_defaults mysqld | grep "$1" | cut -d= -f2 | tail -n 1
@@ -29,13 +35,48 @@ get_path () {
 run_init_sql() {
 	tmpdir=$(mktemp -d)
 	chown mysql:mysql "$tmpdir"
-	mysqld --user=mysql --init-file="$1" --socket="$tmpdir/mysqld.sock" --pid-file="$tmpdir/mysqld.pid" > /dev/null 2>&1
+	/usr/sbin/mysqld --user=mysql --init-file="$1" --socket="$tmpdir/mysqld.sock" --pid-file="$tmpdir/mysqld.pid" > /dev/null 2>&1
 	result=$?
 	rm -rf "$tmpdir"
 	return $result
 }
 
+get_recover_pos () {
+    wsrep_start_position_opt=""
+
+    LOG=$(mktemp --tmpdir=/var/lib/mysql-files/ --suffix=.log)
+    chown mysql.mysql $LOG
+    /usr/sbin/mysqld --user=mysql --wsrep_recover --log-error=$LOG
+
+    local rp="$(grep 'WSREP: Recovered position:' $LOG | tail -n 1)"
+    if [ -z "$rp" ]; then
+         local skipped="$(grep WSREP $LOG | grep 'skipping position recovery')"
+         if [ -z "$skipped" ]; then
+             systemd-cat -t mysql -p err echo "WSREP: Failed to recover position:"
+             exit 1
+         else
+             systemd-cat -t mysql -p info echo "WSREP: Position recovery skipped"
+         fi
+    else
+         local start_pos="$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
+              | sed 's/^[ \t]*//')"
+         systemd-cat -t mysql -p info echo "WSREP: Recovered position $start_pos"
+         wsrep_start_position_opt="--wsrep_start_position=$start_pos"
+    fi
+    rm -f $LOG
+
+    if [ -n "$start_pos" ]; then
+        systemctl set-environment MYSQLD_RECOVER_START="$wsrep_start_position_opt"
+    fi
+}
+
 sanity () {
+	if [ ! -r /etc/mysql/my.cnf ]; then
+                systemd-cat -t mysql -p err \
+		        echo "MySQL configuration not found at /etc/mysql/my.cnf. Please install one using update-alternatives."
+		exit 1
+	fi
+
 	MYSQLRUN=/var/run/mysqld
 	MYSQLDATA=/var/lib/mysql
 	MYSQLFILES=/var/lib/mysql-files
@@ -76,9 +117,11 @@ INSTALL PLUGIN auth_socket SONAME 'auth_socket.so';
 ALTER USER 'root'@'localhost' IDENTIFIED WITH 'auth_socket';
 SHUTDOWN;
 EOF
-		mysqld --initialize-insecure --user=mysql > /dev/null
+		/usr/sbin/mysqld --initialize-insecure --user=mysql > /dev/null
 		run_init_sql "$SQL"
 		rm -f "$SQL"
+        else
+                get_recover_pos
 	fi
 
 	if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${MYSQLDATA}/server-key.pem" ];
@@ -97,13 +140,30 @@ EOF
 	fi
 
 	@DEB_INIT_APPARMOR@
+}
 
-	if [ ! -r /etc/mysql/my.cnf ]; then
-		echo "MySQL configuration not found at /etc/mysql/my.cnf. Please install one using update-alternatives."
-		exit 1
-	fi
+clear_recover_pos () {
+    systemctl unset-environment MYSQLD_RECOVER_START
+}
+
+pinger () {
+    server_up=false
+    for i in $(seq 1 30); do
+        sleep 1
+        if mysqladmin ping >/dev/null 2>&1; then
+            server_up=true
+            break
+        fi
+    done
+    clear_recover_pos
+    if [ ! $server_up ]; then
+        systemd-cat -t mysql -p err \
+            echo "MySQL server not started"
+        exit 1
+    fi
 }
 
 case $1 in
 	"pre")  sanity ;;
+        "post") pinger ;;
 esac

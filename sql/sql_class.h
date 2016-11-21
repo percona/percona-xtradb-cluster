@@ -51,8 +51,8 @@
 #include <memory>
 #include "mysql/thread_type.h"
 
-#ifdef WITH_WSREP
 #include "log.h"
+#ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 struct wsrep_thd_shadow {
   ulonglong            options;

@@ -25,8 +25,9 @@
 %global mysql_vendor Oracle and/or its affiliates
 %global mysqldatadir /var/lib/mysql
 
-# Pass --define 'with_cluster 1' to build with cluster support
-%{?with_cluster: %global cluster 1}
+## This is for "wsrep" == Galera Cluster, no MySQL (NDB) cluster
+## # Pass --define 'with_cluster 1' to build with cluster support
+## %{?with_cluster: %global cluster 1}
 
 # By default, a build will include the bundeled "yaSSL" library for SSL.
 %{?with_ssl: %global ssl_option -DWITH_SSL=%{with_ssl}}
@@ -73,7 +74,7 @@
 %global compatver             5.6.31
 %global compatlib             18
 %global compatsrc             https://cdn.mysql.com/Downloads/MySQL-5.6/mysql-%{compatver}.tar.gz
-%global compatch              mysql-5625-charset-dir.patch
+%global compatch              mysql-5631-charset-dir.patch
 %endif
 
 # multiarch
@@ -196,9 +197,10 @@ Requires:       procps
 Requires:       shadow-utils
 Requires:       net-tools
 Requires:       lsof
-%{?el7:Requires:       socat}
-Requires:       %{name}-client%{?_isa} >= %{min}
-Requires:       %{name}-common%{?_isa} = %{version}-%{release}
+Requires:       socat
+# ??? %{?el7:Requires:       socat}
+# ??? Requires:       %{name}-client%{?_isa} >= %{min}
+# ??? Requires:       %{name}-common%{?_isa} = %{version}-%{release}
 %if 0%{?commercial}
 Obsoletes:      mysql-commercial-bench < 5.7.8
 Provides:       MySQL-server-advanced%{?_isa} = %{version}-%{release}
@@ -208,10 +210,8 @@ Requires:       mysql-commercial-client%{?_isa} >= %{min}
 Requires:       mysql-commercial-common%{?_isa} >= %{min}
 %else
 Provides:       MySQL-server%{?_isa} = %{version}-%{release}
-Requires:       mysql-wsrep-client-%{series}%{?_isa} = %{version}-%{release}
-Requires:       mysql-wsrep-common-%{series}%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-client%{?_isa} >= %{min}
-Requires:       mysql-community-common%{?_isa} >= %{min}
+Requires:       mysql-wsrep-client-%{series}%{?_isa} >= %{min}
+Requires:       mysql-wsrep-common-%{series}%{?_isa} >= %{min}
 %if 0%{?cluster}
 Provides:       MySQL-Cluster-server-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-Cluster-server-advanced%{?_isa} < %{version}-%{release}
@@ -273,7 +273,7 @@ to run and administer a MySQL server.
 %package        client-%{series}
 Summary:        MySQL database client applications and tools
 Group:          Applications/Databases
-Requires:       %{name}-libs%{?_isa} >= %{min}
+# ??? Requires:       %{name}-libs%{?_isa} >= %{min}
 %if 0%{?commercial}
 Provides:       MySQL-client-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-client-advanced < %{version}-%{release}
@@ -281,8 +281,7 @@ Obsoletes:      mysql-community-client < %{version}-%{release}
 Requires:       mysql-commercial-libs%{?_isa} >= %{min}
 %else
 Provides:       MySQL-client%{?_isa} = %{version}-%{release}
-Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-libs%{?_isa} >= %{min}
+Requires:       mysql-wsrep-libs-%{series}%{?_isa} >= %{min}
 %if 0%{?cluster}
 Provides:       MySQL-Cluster-client-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-Cluster-client-advanced%{?_isa} < %{version}-%{release}
@@ -329,7 +328,7 @@ MySQL database server, and MySQL embedded server.
 %package        test-%{series}
 Summary:        Test suite for the MySQL database server
 Group:          Applications/Databases
-Requires:       %{name}-server%{?_isa} >= %{min}
+# ??? Requires:       %{name}-server%{?_isa} >= %{min}
 %if 0%{?commercial}
 Provides:       MySQL-test-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-test-advanced < %{version}-%{release}
@@ -337,8 +336,7 @@ Obsoletes:      mysql-community-test < %{version}-%{release}
 Requires:       mysql-commercial-server%{?_isa} >= %{min}
 %else
 Provides:       MySQL-test%{?_isa} = %{version}-%{release}
-Requires:       mysql-wsrep-server-%{series}%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-server%{?_isa} >= %{min}
+Requires:       mysql-wsrep-server-%{series}%{?_isa} >= %{min}
 %if 0%{?cluster}
 Provides:       MySQL-Cluster-test-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-Cluster-test-advanced%{?_isa} < %{version}-%{release}
@@ -364,7 +362,7 @@ database server.
 %package        devel-%{series}
 Summary:        Development header files and libraries for MySQL database client applications
 Group:          Applications/Databases
-Requires:       %{name}-libs%{?_isa} >= %{min}
+# ??? Requires:       %{name}-libs%{?_isa} >= %{min}
 %if 0%{?commercial}
 Provides:       MySQL-devel-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-devel-advanced < %{version}-%{release}
@@ -372,8 +370,7 @@ Obsoletes:      mysql-community-devel < %{version}-%{release}
 Requires:       mysql-commercial-libs%{?_isa} >= %{min}
 %else
 Provides:       MySQL-devel%{?_isa} = %{version}-%{release}
-Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-libs%{?_isa} >= %{min}
+Requires:       mysql-wsrep-libs-%{series}%{?_isa} >= %{min}
 %if 0%{?cluster}
 Provides:       MySQL-Cluster-devel-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-Cluster-devel-advanced%{?_isa} < %{version}-%{release}
@@ -400,7 +397,7 @@ to develop MySQL client applications.
 %package        libs-%{series}
 Summary:        Shared libraries for MySQL database client applications
 Group:          Applications/Databases
-Requires:       %{name}-common%{?_isa} >= %{min}
+# ??? Requires:       %{name}-common%{?_isa} >= %{min}
 %if 0%{?commercial}
 Provides:       MySQL-shared-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-shared-advanced < %{version}-%{release}
@@ -408,8 +405,7 @@ Obsoletes:      mysql-community-libs < %{version}-%{release}
 Requires:       mysql-commercial-common%{?_isa} >= %{min}
 %else
 Provides:       MySQL-shared%{?_isa} = %{version}-%{release}
-Requires:       mysql-wsrep-common-%{series}%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-common%{?_isa} >= %{min}
+Requires:       mysql-wsrep-common-%{series}%{?_isa} >= %{min}
 %if 0%{?cluster}
 Provides:       MySQL-Cluster-shared-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-Cluster-shared-advanced < %{version}-%{release}
@@ -440,7 +436,7 @@ Group:          Applications/Databases
 Obsoletes:      mysql-libs-compat < %{version}-%{release}
 Provides:       mysql-libs-compat = %{version}-%{release}
 Provides:       mysql-libs-compat%{?_isa} = %{version}-%{release}
-Requires:       %{name}-libs%{?_isa} >= %{min}
+# ??? Requires:       %{name}-libs%{?_isa} >= %{min}
 %if 0%{?commercial}
 Provides:       MySQL-shared-compat-advanced%{?_isa} = %{version}-%{release}
 Obsoletes:      MySQL-shared-compat-advanced < %{version}-%{release}
@@ -577,16 +573,9 @@ Requires:       mysql-wsrep-client-%{series}%{?_isa} = %{version}-%{release}
 Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
 Requires:       mysql-wsrep-server-%{series}%{?_isa} = %{version}-%{release}
 Requires:       mysql-wsrep-libs-compat-%{series}%{?_isa} = %{version}-%{release}
-Requires:       mysql-community-client%{?_isa} >= %{min}
-Requires:       mysql-community-libs%{?_isa} >= %{min}
-Requires:       mysql-community-libs-compat%{?_isa} >= %{min}
 %endif
 
 %description    %{series}
-Requires:       %{name}-client%{?_isa} >= %{min}
-Requires:       %{name}-libs%{?_isa} >= %{min}
-Requires:       %{name}-libs-compat%{?_isa} >= %{min}
-%description -n mysql
 This package has as sole purpose to require other MySQL packages such
 that upgrades will be more convenient.
 
@@ -915,6 +904,10 @@ rm -f %{buildroot}%{_datadir}/mysql/audit_log_filter_win_install.sql
 rm -f %{buildroot}%{_mandir}/man1/mysql_client_test_embedded.1
 rm -f %{buildroot}%{_mandir}/man1/mysqltest_embedded.1
 %endif
+%if 0%{?systemd}
+rm -f %{buildroot}%{_mandir}/man1/mysqld_multi.1*
+rm -f %{buildroot}%{_mandir}/man1/mysqld_safe.1*
+%endif
 
 %check
 %if 0%{?runselftest}
@@ -1147,12 +1140,11 @@ fi
 %dir %attr(750, mysql, mysql) /var/lib/mysql-files
 %dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
 
-%files common-%{series}
 %if 0%{?cluster}
 %attr(644, root, root) %{_datadir}/mysql/ndb_dist_priv.sql
 %endif
 
-%files common
+%files common-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %{_datadir}/mysql/charsets/
@@ -1207,7 +1199,6 @@ fi
 %attr(644, root, root) %{_mandir}/man1/mysqlslap.1*
 %attr(644, root, root) %{_mandir}/man1/mysql_config_editor.1*
 
-%files devel-%{series}
 %if 0%{?cluster}
 %attr(755, root, root) %{_bindir}/ndb_blob_tool
 %attr(755, root, root) %{_bindir}/ndb_config
@@ -1260,7 +1251,7 @@ fi
 %attr(644, root, root) %{_mandir}/man1/ndbinfo_select_all.1*
 %endif #cluster
 
-%files devel
+%files devel-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
 %attr(644, root, root) %{_mandir}/man1/comp_err.1*
@@ -1307,6 +1298,7 @@ fi
 %attr(755, root, root) %{_bindir}/mysqltest
 %if 0%{?wsrep_embedded}
 %attr(755, root, root) %{_bindir}/mysqltest_embedded
+%endif
 %attr(755, root, root) %{_bindir}/mysqlxtest
 
 %attr(755, root, root) %{_libdir}/mysql/plugin/auth.so
@@ -1468,20 +1460,41 @@ fi
 %endif # cluster
 
 %changelog
+* Wed Nov 02 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.15
+- Merge Oracle's changes of 5.7.11 .. 5.7.14 which brought new dependency definitions,
+  restore date order of changelog entries.
+
+* Tue Jul 19 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
+- Minor cleanup: When using systemd, get rid of some man pages.
+
 * Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
 - Take Oracle's change to support service "instances" via systemd
   and other minor fixes from their 5.7.13.
+
+* Tue Jul 05 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.14-1
+- Updated compatver to 5.6.31
+- Adapt MySQL server 5.7 packaging to MySQL Cluster 7.5
+- Remove mysql_config from client subpackage
 
 * Wed Jun 01 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
 - Add the new "mysqld_bootstrap" script for systemd environments.
 - Add "Requires:" for "lsof" and "socat" to "mysql-wsrep-server",
   these tools are needed for Galera SST.
 
+* Wed May 04 2016 Georgi Kodinov <georgi.kodinov@oracle.com> - 5.7.13-1
+- Add test_udf_services.so plugin
+- Add keyring_udf.so plugin to server subpackage
+
 * Tue May 03 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
 - Change the directory name for the "libs-compat" patches from
   "packaging/libs-compat/" to "packaging/rpm-libs-compat/", like it was in 5.6.
 - Take "INFO_SRC" from the "release/" build tree, in case the build process
   generated it.
+
+* Mon Apr 04 2016 Georgi Kodinov <georgi.kodinov@oracle.com> - 5.7.13-1
+- Updated compatver to 5.6.31
+- Adapt MySQL server 5.7 packaging to MySQL Cluster 7.5
+- Remove mysql_config from client subpackage
 
 * Tue Mar 08 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.10
 - Make the "libs-compat" subpackage stand-alone, drop its "requires"
@@ -1507,15 +1520,6 @@ fi
     and remove "embedded" files and man pages from packaging
   - add "Docs/README-wsrep", "support-files/wsrep_notify" and "Docs/README-wsrep"
     to the "server-wsrep" file list.
-* Mon Apr 04 2016 Georgi Kodinov <georgi.kodinov@oracle.com> - 5.7.13-1
-* Tue Jul 05 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.14-1
-- Updated compatver to 5.6.31
-- Adapt MySQL server 5.7 packaging to MySQL Cluster 7.5
-- Remove mysql_config from client subpackage
-
-* Wed May 04 2016 Georgi Kodinov <georgi.kodinov@oracle.com> - 5.7.13-1
-- Add test_udf_services.so plugin
-- Add keyring_udf.so plugin to server subpackage
 
 * Fri Feb 5 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.12-1
 - Add keyring_okv.so plugin to commercial server subpackage
