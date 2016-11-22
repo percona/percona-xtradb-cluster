@@ -255,6 +255,35 @@ verify_cert_matches_key()
 }
 
 #
+# Checks to see if the file exists
+# If the file does not exist (or cannot be read), issues an error
+# and exits
+#
+# 1st param: file name to be checked (for read access)
+# 2nd param: 1st error message (header)
+# 3rd param: 2nd error message (footer, optional)
+#
+verify_file_exists()
+{
+    local file_path=$1
+    local error_message1=$2
+    local error_message2=$3
+
+    if ! [[ -r "$file_path" ]]; then
+        wsrep_log_error "******** FATAL ERROR ************************* "
+        wsrep_log_error "* $error_message1 "
+        wsrep_log_error "* Could not find/access : $file_path "
+
+        if ! [[ -z "$error_message2" ]]; then
+            wsrep_log_error "* $error_message2 "
+        fi
+
+        wsrep_log_error "********************************************** "
+        exit 22
+    fi
+}
+
+#
 # Setup stream to transfer. (Alternative: nc or socat)
 get_transfer()
 {
@@ -327,13 +356,11 @@ get_transfer()
         if [[ $encrypt -eq 2 ]]; then
             wsrep_log_warning "**** WARNING **** encrypt=2 is deprecated and will be removed in a future release"
             wsrep_log_info "Using openssl based encryption with socat: with crt and ca"
-            if [[ -z "$tcert" || -z "$tca" ]];then
-                wsrep_log_error "******** FATAL ERROR ************************* "
-                wsrep_log_error "* Both certificate and CA files are required.  "
-                wsrep_log_error "* Please specify the tcert and tca options.    "
-                wsrep_log_error "********************************************** "
-                exit 22
-            fi
+
+            verify_file_exists "$tcert" "Both certificate and CA files are required." \
+                                        "Please check the 'tcert' option.           "
+            verify_file_exists "$tca" "Both certificate and CA files are required." \
+                                      "Please check the 'tca' option.             "
 
             stagemsg+="-OpenSSL-Encrypted-2"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
@@ -346,13 +373,12 @@ get_transfer()
         elif [[ $encrypt -eq 3 ]];then
             wsrep_log_warning "**** WARNING **** encrypt=3 is deprecated and will be removed in a future release"
             wsrep_log_info "Using openssl based encryption with socat: with key and crt"
-            if [[ -z "$tcert" || -z "$tkey" ]];then
-                wsrep_log_error "******** FATAL ERROR ************************* "
-                wsrep_log_error "* Both certificate and key files are required. "
-                wsrep_log_error "* Please specify the tcert and tkey options.   "
-                wsrep_log_error "********************************************** "
-                exit 22
-            fi
+
+            verify_file_exists "$tcert" "Both certificate and key files are required." \
+                                        "Please check the 'tcert' option.            "
+            verify_file_exists "$tkey" "Both certificate and key files are required." \
+                                       "Please check the 'tkey' option.             "
+
             stagemsg+="-OpenSSL-Encrypted-3"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
                 wsrep_log_info "Decrypting with CERT: $tcert, KEY: $tkey"
@@ -363,13 +389,13 @@ get_transfer()
             fi
         elif [[ $encrypt -eq 4 ]]; then
             wsrep_log_info "Using openssl based encryption with socat: with key, crt, and ca"
-            if [[ -z "$ssl_cert" || -z "$ssl_key" || -z "$ssl_ca" ]]; then
-                wsrep_log_error "******** FATAL ERROR ************************************** "
-                wsrep_log_error "* The certificate, key, and CA files are all required.      "
-                wsrep_log_error "* Please specify the ssl-cert, ssl-key, and ssl-ca options. "
-                wsrep_log_error "*********************************************************** "
-                exit 22
-            fi
+
+            verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
+                                         "Please check the 'ssl-ca' option.           "
+            verify_file_exists "$ssl_cert" "CA, certificate, and key files are required." \
+                                           "Please check the 'ssl-cert' option.         "
+            verify_file_exists "$ssl_key" "CA, certificate, and key files are required." \
+                                          "Please check the 'ssl-key' option.          "
 
             # Check to see that the key matches the cert
             verify_cert_matches_key $ssl_cert $ssl_key
