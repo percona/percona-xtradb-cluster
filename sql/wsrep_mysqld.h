@@ -138,9 +138,10 @@ enum enum_pxc_maint_modes {
 };
 extern ulong       pxc_maint_mode;
 extern ulong       pxc_maint_transition_period;
-
+extern my_bool     pxc_encrypt_cluster_traffic;
 
 // MySQL status variables
+extern my_bool     wsrep_new_cluster;
 extern my_bool     wsrep_connected;
 extern my_bool     wsrep_ready;
 extern const char* wsrep_cluster_state_uuid;

@@ -4721,6 +4721,31 @@ a file name for --log-bin-index option", opt_binlog_index_name);
 
   if (!wsrep_recovery)
   {
+    // Have to setup the SSL files before going further
+    // code taken from init_ssl()
+    if (pxc_encrypt_cluster_traffic)
+    {
+      ssl_artifacts_status auto_detection_status= auto_detect_ssl();
+      if (auto_detection_status == SSL_ARTIFACTS_AUTO_DETECTED)
+        sql_print_information("Found %s, %s and %s in data directory. "
+                            "Trying to enable SSL support using them.",
+                            DEFAULT_SSL_CA_CERT, DEFAULT_SSL_SERVER_CERT,
+                            DEFAULT_SSL_SERVER_KEY);
+    #ifndef HAVE_YASSL
+      // Generate certs automatically only when bootstrapping
+      // to avoid cases where starting up creates incompatible certs
+      if (wsrep_new_cluster)
+      {
+        if (do_auto_cert_generation(auto_detection_status) == false)
+          unireg_abort(1);
+      }
+      else
+      {
+        WSREP_INFO("Skipping automatic SSL certificate creation, only allowed on bootstrap node.")
+      }
+    #endif
+    }
+
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
     {
       wsrep_provider_init(WSREP_NONE);

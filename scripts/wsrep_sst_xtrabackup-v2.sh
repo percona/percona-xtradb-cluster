@@ -88,6 +88,7 @@ xtmpdir=""
 scomp=""
 sdecomp=""
 ssl_dhparams=""
+pxc_encrypt_cluster_traffic=""
 
 ssl_cert=""
 ssl_ca=""
@@ -394,6 +395,38 @@ get_transfer()
 }
 
 #
+# Converts an input string into a boolean "on", "off"
+# Converts:
+#   "on", "true", "1" -> "on" (case insensitive)
+#   "off", "false", "0" -> "off" (case insensitive)
+# All other values : -> default_value
+#
+# 1st param: input value
+# 2nd param: default value
+normalize_boolean()
+{
+    local input_value=$1
+    local default_value=$2
+    local return_value=$default_value
+
+    if [[ "$input_value" == "1" ]]; then
+        return_value="on"
+    elif [[ "$input_value" =~ ^[Oo][Nn]$ ]]; then
+        return_value="on"
+    elif [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]; then
+        return_value="on"
+    elif [[ "$input_value" == "0" ]]; then
+        return_value="off"
+    elif [[ "$input_value" =~ ^[Oo][Ff][Ff]$ ]]; then
+        return_value="off"
+    elif [[ "$input_value" =~ ^[Ff][Aa][Ll][Ss][Ee]$ ]]; then
+        return_value="off"
+    fi
+
+    echo $return_value
+}
+
+#
 # read the sst specific options.
 read_cnf()
 {
@@ -452,6 +485,9 @@ read_cnf()
     if [[ -z "$ssl_key" ]]; then
         ssl_key=$(parse_cnf mysqld ssl-key "")
     fi
+
+    pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
+    pxc_encrypt_cluster_traffic=$(normalize_boolean "$pxc_encrypt_cluster_traffic" "off")
 
     rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use-extra 0)
@@ -908,6 +944,57 @@ fi
 # read configuration and setup ports for streaming data.
 read_cnf
 setup_ports
+
+#
+# If pxc_encrypt_cluster_traffic is set, do the SSL autoconfig
+# (overriding any values already in the config file)
+if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
+    encrypt=4
+
+    # Look for the [mysqld] files only, not the ones in [sst]
+    ssl_ca=$(parse_cnf mysqld ssl-ca "")
+    ssl_cert=$(parse_cnf mysqld ssl-cert "")
+    ssl_key=$(parse_cnf mysqld ssl-key "")
+
+    # Check that we have all the files
+    # If they have not been explicitly specified, check the datadir
+    if [[ -z "$ssl_ca" ]]; then
+        if [[ -r "$DATA/ca.pem" ]]; then
+            ssl_ca="$DATA/ca.pem"
+        else
+            wsrep_log_error "******** FATAL ERROR ******************************* "
+            wsrep_log_error "* Could not find a CA (Certificate Authority) file.  "
+            wsrep_log_error "* Please specify a CA file with the 'ssl-ca' option. "
+            wsrep_log_error "**************************************************** "
+            return 2
+        fi
+    fi
+    if [[ -z "$ssl_cert" ]]; then
+        if [[ -r "$DATA/server-cert.pem" ]]; then
+            ssl_cert="$DATA/server-cert.pem"
+        else
+            wsrep_log_error "******** FATAL ERROR ****************************************** "
+            wsrep_log_error "* Could not find a certificate file.                            "
+            wsrep_log_error "* Please specify a certificate file with the 'ssl-cert' option. "
+            wsrep_log_error "*************************************************************** "
+            return 2
+        fi
+    fi
+    if [[ -z "$ssl_key" ]]; then
+        if [[ -r "$DATA/server-key.pem" ]]; then
+            ssl_key="$DATA/server-key.pem"
+        else
+            wsrep_log_error "******** FATAL ERROR ********************************* "
+            wsrep_log_error "* Could not find a key file.                           "
+            wsrep_log_error "* Please specify a key file with the 'ssl-key' option. "
+            wsrep_log_error "****************************************************** "
+            return 2
+        fi
+    fi
+
+    wsrep_log_info "pxc_encrypt_cluster_traffic is enabled, using PXC auto-ssl configuration"
+    wsrep_log_info "with encrypt=4  ssl_ca=$ssl_ca  ssl_cert=$ssl_cert  ssl_key=$ssl_key"
+fi
 
 if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
     disver="--no-version-check"

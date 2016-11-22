@@ -54,8 +54,12 @@ using std::min;
 using std::max;
 
 /* max size of log messages (error log, plugins' logging, general log) */
+#ifdef WITH_WSREP
+/* make this bigger to accomodate wsrep_provider_options */
+static const uint MAX_LOG_BUFFER_SIZE= 2048;
+#else
 static const uint MAX_LOG_BUFFER_SIZE= 1024;
-
+#endif
 
 #ifndef _WIN32
 static int   log_syslog_facility= 0;
