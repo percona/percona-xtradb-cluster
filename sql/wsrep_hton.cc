@@ -586,6 +586,7 @@ void wsrep_replicate_GTID(THD *thd)
   if (thd->slave_thread)
   {
     WSREP_DEBUG("GTID replication");
+    DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id);
     enum wsrep_trx_status rcode= wsrep_run_wsrep_commit(thd, wsrep_hton, true);
     if (rcode)
     {

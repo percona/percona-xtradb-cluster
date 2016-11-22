@@ -851,7 +851,17 @@ bool wsrep_sync_wait (THD* thd, uint mask)
   return false;
 }
 
-void wsrep_keys_free(wsrep_key_arr_t* key_arr)
+/*
+ * Helpers to deal with TOI key arrays
+ */
+typedef struct wsrep_key_arr
+{
+    wsrep_key_t* keys;
+    size_t       keys_len;
+} wsrep_key_arr_t;
+
+
+static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 {
     for (size_t i= 0; i < key_arr->keys_len; ++i)
     {
@@ -916,11 +926,11 @@ static bool wsrep_prepare_key_for_isolation(const char* db,
 }
 
 /* Prepare key list from db/table and table_list */
-bool wsrep_prepare_keys_for_isolation(THD*              thd,
-                                      const char*       db,
-                                      const char*       table,
-                                      const TABLE_LIST* table_list,
-                                      wsrep_key_arr_t*  ka)
+static bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                             const char*       db,
+                                             const char*       table,
+                                             const TABLE_LIST* table_list,
+                                             wsrep_key_arr_t*  ka)
 {
     ka->keys= 0;
     ka->keys_len= 0;
