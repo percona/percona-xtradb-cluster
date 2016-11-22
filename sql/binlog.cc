@@ -1304,7 +1304,6 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd)
 #ifdef WITH_WSREP
   if (thd->slave_thread)
   {
-    WSREP_DEBUG("wsrep_replicate_GTID marked");
     thd->wsrep_replicate_GTID= true;
   }
 #endif /* WITH_WSREP */
@@ -8261,7 +8260,6 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
 #ifdef WITH_WSREP
     if (thd->wsrep_replicate_GTID)
     {
-      WSREP_DEBUG("stuff was logged, replication GTID");
       wsrep_replicate_GTID(thd);
     }
 #endif /* WITH_WSREP */
