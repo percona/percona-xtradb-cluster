@@ -12,48 +12,8 @@ my_wsrep_cluster
 SELECT @@session.wsrep_cluster_name;
 ERROR HY000: Variable 'wsrep_cluster_name' is a GLOBAL variable
 SET @@global.wsrep_cluster_name='my_galera_cluster';
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-my_galera_cluster
-
-# valid values
-SET @@global.wsrep_cluster_name='my_quoted_galera_cluster';
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-my_quoted_galera_cluster
-SET @@global.wsrep_cluster_name=my_unquoted_cluster;
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-my_unquoted_cluster
-SET @@global.wsrep_cluster_name=OFF;
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-OFF
-SET @@global.wsrep_cluster_name=default;
+ERROR HY000: Variable 'wsrep_cluster_name' is a read only variable
 SELECT @@global.wsrep_cluster_name;
 @@global.wsrep_cluster_name
 my_wsrep_cluster
-
-# invalid values
-SET @@global.wsrep_cluster_name=NULL;
-ERROR 42000: Variable 'wsrep_cluster_name' can't be set to the value of 'NULL'
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-my_wsrep_cluster
-set @@global.wsrep_cluster_name="1234567890123456789012345678901234567890";
-ERROR 42000: Variable 'wsrep_cluster_name' can't be set to the value of '1234567890123456789012345678901234567890'
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-my_wsrep_cluster
-set @@global.wsrep_cluster_name="12345678901234567890123456789012";
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-12345678901234567890123456789012
-SET @@global.wsrep_cluster_name=default;
-SELECT @@global.wsrep_cluster_name;
-@@global.wsrep_cluster_name
-my_wsrep_cluster
-
-# restore the initial value
-SET @@global.wsrep_cluster_name = @wsrep_cluster_name_global_saved;
 # End of test
