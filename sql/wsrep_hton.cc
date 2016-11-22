@@ -458,8 +458,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     DBUG_RETURN(WSREP_TRX_OK);
   }
 
-  if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id &&
-      !thd->wsrep_replicate_GTID)
+  if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id)
   {
     WSREP_WARN("SQL statement was ineffective, THD: %lu, buf: %zu\n"
                "schema: %s \n"
@@ -587,6 +586,10 @@ void wsrep_replicate_GTID(THD *thd)
   {
     WSREP_DEBUG("GTID replication");
     DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id);
+    (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
+    DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID != thd->wsrep_ws_handle.trx_id);
+    WSREP_DEBUG("slave trx using query ID %lu for replication GTID",
+                thd->wsrep_ws_handle.trx_id);
     enum wsrep_trx_status rcode= wsrep_run_wsrep_commit(thd, wsrep_hton, true);
     if (rcode)
     {
