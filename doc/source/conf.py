@@ -93,9 +93,31 @@ pygments_style = 'sphinx'
 
 rst_prolog = '''
 
-.. |PXC|  replace:: Percona XtraDB Cluster
+.. _Galera: https://github.com/percona/galera
 
-.. _`Percona XtraBackup`: https://www.percona.com/software/mysql-database/percona-xtrabackup
+.. _MariaDB: https://www.mariadb.com/
+
+.. _MySQL: https://www.mysql.com/
+
+.. |PMM| replace:: Percona Monitoring and Management
+
+.. _PMM: https://www.percona.com/software/database-tools/percona-monitoring-and-management
+
+.. _ProxySQL: http://www.proxysql.com/
+
+.. |PS| replace:: Percona Server
+
+.. _PS: https://www.percona.com/software/mysql-database/percona-server
+
+.. |PXB| replace:: Percona XtraBackup
+
+.. _PXB: https://www.percona.com/software/mysql-database/percona-xtrabackup
+
+.. |PXC| replace:: Percona XtraDB Cluster
+
+.. _PXC: https://www.percona.com/software/mysql-database/percona-xtradb-cluster
+
+.. _XtraDB: https://www.percona.com/software/mysql-database/percona-server/xtradb
 
 .. |check|  replace:: ``|[[---CHECK---]]|``
 
@@ -128,8 +150,6 @@ rst_prolog = '''
 .. |XtraBackup|  replace:: *XtraBackup*
 
 .. |Percona XtraBackup|  replace:: *Percona XtraBackup*
-
-.. |PS|  replace:: *Percona Server*
 
 .. |Percona|  replace:: *Percona*
 

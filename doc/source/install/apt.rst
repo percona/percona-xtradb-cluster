@@ -1,8 +1,8 @@
 .. _apt:
 
-=====================================
-Installing |PXC| on Debian and Ubuntu
-=====================================
+====================================
+Installing |PXC| on Debian or Ubuntu
+====================================
 
 Percona provides :file:`.deb` packages for 64-bit versions
 of the following distributions:
@@ -12,36 +12,65 @@ of the following distributions:
 * Ubuntu 12.04 LTS (Precise Pangolin)
 * Ubuntu 14.04 LTS (Trusty Tahr)
 * Ubuntu 15.10 (Wily Werewolf)
-* Ubuntu 16.04 (Xenial Xerus)
+* Ubuntu 16.04 LTS (Xenial Xerus)
 
 .. note:: |PXC| should work on other DEB-based distributions,
    but it is tested only on platforms listed above.
 
-The packages are available in the official Percona software repositories
-and on the
-`download page <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_.
-It is recommended to install |PXC| from repositories using :command:`apt`.
+The packages are available in the official Percona software repository
+and on the `download page
+<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/LATEST/>`_.
+It is recommended to install |PXC| from the official repository
+using :command:`apt`.
 
 .. contents::
    :local:
 
-Installing from Repositories
-============================
+Prerequisites
+=============
 
-1. Fetch the repository packages from Percona web:
+.. note:: You need to have root access on the node
+   where you will be installing |PXC|
+   (either logged in as a user with root privileges
+   or be able to run commands with :command:`sudo`).
+
+.. note:: Make sure that the following ports are not blocked by firewall
+   or used by other software. |PXC| requires them for communication.
+
+   * 3306
+   * 4444
+   * 4567
+   * 4568
+
+.. note:: If you previously had MySQL installed on the server,
+   there might be an `AppArmor <https://help.ubuntu.com/community/AppArmor>`_
+   profile which will prevent |PXC| nodes from communicating with each other.
+   The best solution is to remove the ``apparmor`` package entirely:
 
    .. code-block:: bash
 
-      wget https://repo.percona.com/apt/percona-release_0.1-4.$(lsb_release -sc)_all.deb
+      $ sudo apt-get remove apparmor
 
-#. Install the downloaded package with :program:`dpkg`.
-   To do that, run the following command as root or with :program:`sudo`:
+   If you need to have AppArmor enabled due to security policies
+   or for other reasons,
+   it is possible to disable or extend the MySQL profile.
+
+Installing from Repository
+==========================
+
+1. Fetch the package for configuring Percona software repository:
 
    .. code-block:: bash
 
-      sudo dpkg -i percona-release_0.1-4.$(lsb_release -sc)_all.deb
+      $ wget https://repo.percona.com/apt/percona-release_0.1-4.$(lsb_release -sc)_all.deb
 
-   Once you install this package, the Percona repositories should be added.
+#. Install the downloaded package with :program:`dpkg`:
+
+   .. code-block:: bash
+
+      $ sudo dpkg -i percona-release_0.1-4.$(lsb_release -sc)_all.deb
+
+   Once you install this package, the Percona repository should be added.
    You can check the repository configuration
    in the :file:`/etc/apt/sources.list.d/percona-release.list` file.
 
@@ -49,13 +78,13 @@ Installing from Repositories
 
    .. code-block:: bash
 
-      sudo apt-get update
+      $ sudo apt-get update
 
-#. Install the server package:
+#. Install the |PXC| server package:
 
    .. code-block:: bash
 
-      sudo apt-get install percona-xtradb-cluster-57
+      $ sudo apt-get install percona-xtradb-cluster-57
 
    .. note:: Alternatively, you can install
       the ``percona-xtradb-cluster-full-57`` meta package,
@@ -68,16 +97,27 @@ Installing from Repositories
       * ``percona-xtradb-cluster-garbd-3.x-dbg``
       * ``libmysqlclient18``
 
-For more information on how to bootstrap the cluster please check
-:ref:`ubuntu_howto`.
+   During installation, you will be prompted to provide a password
+   for the ``root`` user on the database node.
+
+#. Stop the ``mysql`` service:
+
+   .. code-block:: bash
+
+      $ sudo service mysql stop
+
+   .. note:: All Debian-based distributions start services
+      as soon as the corresponding package is installed.
+      Before starting a |PXC| node, it needs to be properly configured.
+      For more information, see :ref:`configure`.
 
 .. _apt-testing-repo:
 
 Testing and Experimental Repositories
 -------------------------------------
 
-Percona offers pre-release builds from the testing repo,
-and early-stage development builds from the experimental repo.
+Percona offers pre-release builds from the testing repository,
+and early-stage development builds from the experimental repository.
 To enable them, add either ``testing`` or ``experimental``
 at the end of the Percona repository definition in your repository file
 (by default, :file:`/etc/apt/sources.list.d/percona-release.list`).
@@ -109,4 +149,10 @@ and add the following lines to it: ::
 
 For more information about pinning,
 refer to the official `Debian Wiki <http://wiki.debian.org/AptPreferences>`_.
+
+Next Steps
+==========
+
+After you install |PXC| and stop the ``mysql`` service,
+configure the node according to the procedure described in :ref:`configure`.
 
