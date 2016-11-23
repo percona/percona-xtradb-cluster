@@ -74,8 +74,6 @@ On the third (and following nodes) configuration is similar, with the following 
 
   wsrep_node_name=node3
 
-In this example variable :variable:`wsrep_urls` is being used instead of :variable:`wsrep_cluster_address`. With this configuration, node will first try to reach a cluster on `10.93.46.58:4567` if there is no cluster node, then it will try on `10.93.46.59:4567` and then `10.93.46.60:4567`. If no nodes are up, it will start a new cluster. Variable :variable:`wsrep_urls` goes into the [mysql_safe] section so it's important that the mysql server instance is started with the `/bin/mysql_safe` and not `bin/mysqld`.
-
 6. Start the |Percona XtraDB Cluster|
 
 On the first node: ::
