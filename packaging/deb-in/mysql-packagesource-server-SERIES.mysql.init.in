@@ -94,10 +94,16 @@ mysqld_status () {
 #
 
 case "${1:-''}" in
-  'start')
+  'start'|'bootstrap')
 	sanity_checks;
 	# Start daemon
-	log_daemon_msg "Starting MySQL database server" "mysqld"
+	if [ "$1" = "bootstrap" ]; then
+	    log_daemon_msg "Starting first Galera Cluster node" "mysqld"
+	    BOOTSTRAP='--wsrep-new-cluster'
+	else
+	    log_daemon_msg "Starting MySQL database server" "mysqld"
+	    BOOTSTRAP=''
+	fi
 	if mysqld_status check_alive nowarn; then
 	   log_progress_msg "already running"
 	   log_end_msg 0
@@ -106,7 +112,7 @@ case "${1:-''}" in
 	    test -e /var/run/mysqld || install -m 755 -o mysql -g root -d /var/run/mysqld
 
 	    # Start MySQL! 
-  	    su - mysql -s /bin/sh -c "/usr/bin/mysqld_safe > /dev/null 2>&1 &"
+  	    su - mysql -s /bin/sh -c "/usr/bin/mysqld_safe $BOOTSTRAP > /dev/null 2>&1 &"
 
 	    # 6s was reported in #352070 to be too few when using ndbcluster
 	    # 14s was reported in #736452 to be too few with large installs
@@ -181,7 +187,7 @@ case "${1:-''}" in
   	;;
 
   *)
-	echo "Usage: $SELF start|stop|restart|reload|force-reload|status"
+	echo "Usage: $SELF start|stop|restart|reload|force-reload|status|bootstrap"
 	exit 1
 	;;
 esac
