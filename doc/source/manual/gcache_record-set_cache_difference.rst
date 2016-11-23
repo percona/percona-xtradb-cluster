@@ -18,7 +18,7 @@ append a key for each row that it tries to modify (the key is a unique
 identifier for the row ``{db,table,pk.columns}``). This information is cached
 in out-write-set, which is then sent to the group for certification.
 
-To start with, keys are cached in HeapStore (which has ``page-size=65K`` and
+To start with, keys are cached in HeapStore (which has ``page-size=64K`` and
 ``total-size=4MB``). If the transaction data-size outgrows this limit, then the
 storage is switched from Heap to Page (which has a ``page-size=64MB`` and
 ``total-limit=free-space-on-disk``). All these limits are non-configurable, but
