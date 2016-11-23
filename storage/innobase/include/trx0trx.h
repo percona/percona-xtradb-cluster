@@ -397,7 +397,6 @@ Transaction information may be retrieved without having trx_sys->mutex acquired
 so it may not be completely accurate. The caller must own lock_sys->mutex
 and the trx must have some locks to make sure that it does not escape
 without locking lock_sys->mutex. */
-UNIV_INTERN
 void
 wsrep_trx_print_locking(
 /*==============*/
