@@ -1271,14 +1271,13 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 			is in the queue*/
 		} else if (lock->trx != trx) {
 			if (wsrep_log_conflicts) {
-				mutex_enter(&trx_sys->mutex);
 				if (bf_this)
 					fputs("\n*** Priority TRANSACTION:\n", 
 					      stderr);
 				else
 					fputs("\n*** Victim TRANSACTION:\n", 
 					      stderr);
-				trx_print_latched(stderr, trx, 3000);
+				wsrep_trx_print_locking(stderr, trx, 3000);
 
 				if (bf_other)
 					fputs("\n*** Priority TRANSACTION:\n", 
@@ -1286,9 +1285,8 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 				else
 					fputs("\n*** Victim TRANSACTION:\n", 
 					      stderr);
-				trx_print_latched(stderr, lock->trx, 3000);
+				wsrep_trx_print_locking(stderr, lock->trx, 3000);
 
-				mutex_exit(&trx_sys->mutex);
 				fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n",
 				      stderr);
 
