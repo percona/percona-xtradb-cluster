@@ -8201,8 +8201,9 @@ report_error:
 
 #ifdef WITH_WSREP
 	if (!error_result && wsrep_thd_exec_mode(m_user_thd) == LOCAL_STATE &&
-	    wsrep_on(m_user_thd) && !wsrep_consistency_check(m_user_thd) &&
-	    (sql_command != SQLCOM_LOAD || 
+	    wsrep_on(m_user_thd) && !wsrep_consistency_check(m_user_thd)  &&
+	    (sql_command != SQLCOM_CREATE_TABLE)                          &&
+	    (sql_command != SQLCOM_LOAD ||
 	     thd_binlog_format(m_user_thd) == BINLOG_FORMAT_ROW)) {
 
 		if (wsrep_append_keys(m_user_thd, false, record, NULL)) {
