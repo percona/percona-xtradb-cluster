@@ -6629,9 +6629,11 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   if (stuff_logged)
   {
 #ifdef WITH_WSREP
-    if (thd->wsrep_replicate_GTID)
+    if (thd->wsrep_replicate_GTID &&
+        wsrep_replicate_GTID(thd))
     {
-      wsrep_replicate_GTID(thd);
+      /* GTID replication failed */
+      DBUG_RETURN(RESULT_ABORTED);
     }
 #endif /* WITH_WSREP */
     if (ordered_commit(thd, all))

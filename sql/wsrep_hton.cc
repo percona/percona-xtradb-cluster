@@ -580,7 +580,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   DBUG_RETURN(WSREP_TRX_OK);
 }
 
-void wsrep_replicate_GTID(THD *thd)
+bool wsrep_replicate_GTID(THD *thd)
 {
   if (thd->slave_thread)
   {
@@ -600,10 +600,16 @@ void wsrep_replicate_GTID(THD *thd)
 
       */
       WSREP_WARN("GTID replication failed");
+      wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
+      thd->wsrep_replicate_GTID= false;
+
+      return true;
     }
     wsrep_post_commit(thd, true);
   }
   thd->wsrep_replicate_GTID= false;
+
+  return false;
 }
 
 static int wsrep_hton_init(void *p)
