@@ -298,6 +298,15 @@ get_transfer()
             wsrep_log_error "nc(netcat) not found in path: $PATH"
             exit 2
         fi
+
+        if [[ $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -eq 4 ]]; then
+            wsrep_log_error "******** FATAL ERROR *********************** "
+            wsrep_log_error "* Using SSL encryption (encrypt= 2, 3, or 4) "
+            wsrep_log_error "* is not supported when using nc(netcat).    "
+            wsrep_log_error "******************************************** "
+            exit 22
+        fi
+
         wsrep_log_info "Using netcat as streamer"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
             if nc -h 2>&1 | grep -q ncat; then
