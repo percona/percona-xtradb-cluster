@@ -592,7 +592,7 @@ bool wsrep_replicate_GTID(THD *thd)
   {
     WSREP_DEBUG("GTID replication");
     DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id);
-    (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id());
+    (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
     DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID != thd->wsrep_ws_handle.trx_id);
     WSREP_DEBUG("slave trx using query ID %lu for replication GTID",
                 thd->wsrep_ws_handle.trx_id);
