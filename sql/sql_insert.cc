@@ -3056,10 +3056,13 @@ bool Query_result_create::send_eof()
                     wsrep_thd_query(thd) : "void", rcode);
         return true;
       }
+      /* If commit fails, we should be able to reset the OK status. */
+      thd->get_stmt_da()->set_overwrite_status(true);
 #endif /* WITH_WSREP */
       trans_commit_stmt(thd);
       trans_commit_implicit(thd);
 #ifdef WITH_WSREP
+      thd->get_stmt_da()->set_overwrite_status(false);
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state != NO_CONFLICT)
       {
