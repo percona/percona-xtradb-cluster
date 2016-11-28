@@ -94,7 +94,7 @@ COMMIT;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001';
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
 
 --connection node_3
 
@@ -104,7 +104,7 @@ SHOW BINLOG EVENTS IN 'mysqld-bin.000001';
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001';
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
 
 #
 # Final consistency checks

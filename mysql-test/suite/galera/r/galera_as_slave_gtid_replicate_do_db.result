@@ -32,9 +32,8 @@ START TRANSACTION;
 INSERT INTO test1.t1 (f1) VALUES (333);
 INSERT INTO test2.t1 (f1) VALUES (99999);
 COMMIT;
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001';
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	4	Format_desc	2	120	Server ver: 5.6.34-log, Binlog ver: 4
 mysqld-bin.000001	120	Previous_gtids	2	151	
 mysqld-bin.000001	151	Gtid	1	199	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
 mysqld-bin.000001	199	Query	1	294	CREATE SCHEMA test1
@@ -100,9 +99,8 @@ mysqld-bin.000001	3471	Write_rows	1	3515	table_id: ### flags: STMT_END_F
 mysqld-bin.000001	3515	Xid	1	3546	COMMIT /* xid=### */
 gtid_executed_equal
 1
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001';
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	4	Format_desc	3	120	Server ver: 5.6.34-log, Binlog ver: 4
 mysqld-bin.000001	120	Previous_gtids	3	151	
 mysqld-bin.000001	151	Gtid	1	199	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
 mysqld-bin.000001	199	Query	1	294	CREATE SCHEMA test1
