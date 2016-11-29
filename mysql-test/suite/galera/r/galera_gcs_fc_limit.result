@@ -3,6 +3,17 @@ INSERT INTO t1 VALUES (1);
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 23, 23 ]
+SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=100';
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 141, 141 ]
+SET GLOBAL wsrep_provider_options = 'gcs.fc_factor=0.5';
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+Variable_name	Value
+wsrep_flow_control_interval	[ 71, 141 ]
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=1';
 LOCK TABLE t1 WRITE;
 SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_run_wsrep_commit";

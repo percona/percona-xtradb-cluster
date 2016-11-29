@@ -1,5 +1,6 @@
 #
 # Test that under gcs.fc_limit=1 on the slave, transactions on the master can not commit.
+# Also tests wsrep_flow_control_interval is set properly
 #
 
 --source include/galera_cluster.inc
@@ -14,6 +15,26 @@ SELECT COUNT(*) = 1 FROM t1;
 --sleep 1
 
 --let $wsrep_provider_options_orig = `SELECT @@wsrep_provider_options`
+
+#
+# Test that the wsrep_flow_control interval is set properly
+#
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+
+SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=100';
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+
+SET GLOBAL wsrep_provider_options = 'gcs.fc_factor=0.5';
+SHOW STATUS LIKE 'wsrep_flow_control_interval';
+
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
+--enable_query_log
+
+
+#
+# Test that under gcs.fc_limit=1 on the slave, transactions on the master can not commit.
+#
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=1';
 
 # Block the slave applier thread
