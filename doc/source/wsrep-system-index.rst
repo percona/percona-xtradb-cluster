@@ -403,6 +403,26 @@ This variable should contain the path to the Galera library (like
 
 This variable contains settings currently used by Galera library.
 
+.. variable:: pxc-encrypt-cluster-traffic
+
+   :version 5.7.15: Variable introduced
+   :cli: No
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+   :default: ``OFF``
+
+This variable can be used to enable automatic configuration of SSL encryption.
+When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
+
+Possible values:
+
+* ``OFF``, ``0``, ``false``: Disabled
+
+* ``ON``, ``1``, ``true``: Enabled
+
+For more information, see :ref:`ssl-auto-conf`.
+
 .. variable:: pxc_maint_mode
 
    :version 5.7.15: Variable introduced
