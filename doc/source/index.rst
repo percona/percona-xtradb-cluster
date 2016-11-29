@@ -4,12 +4,11 @@
 Percona XtraDB Cluster |version| Documentation
 ==============================================
 
-|Percona XtraDB Cluster| is a high-availability solution for MySQL.
-It ensures the highest possible uptime,
-prevents data loss,
+|PXC|_ is a database clustering solution for MySQL.
+It ensures high availability, prevents downtime and data loss,
 and provides linear scalability for a growing environment.
 
-Features of |Percona XtraDB Cluster| include:
+Features of |PXC| include:
 
 * **Synchronous replication**:
   Data is written to all nodes simultaneously,
@@ -27,10 +26,8 @@ Features of |Percona XtraDB Cluster| include:
 * **Data consistency**:
   No more unsynchronized nodes.
 
-|PXC| is fully compatible with `MySQL Server Community Edition
-<https://www.mysql.com>`_, `Percona Server
-<https://www.percona.com/software/mysql-database/percona-server>`_, and
-`MariaDB <https://www.mariadb.com>`_ in the following sense:
+|PXC| is fully compatible with `MySQL Server Community Edition <MySQL>`_,
+|PS|_, and MariaDB_ in the following sense:
 
 * **Data compatibility**:
   You can use data created by any MySQL variant.
@@ -48,16 +45,20 @@ Introduction
    intro
    limitation
 
-Installation
-============
+Getting Started
+===============
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :includehidden:
    :titlesonly:
 
+   Overview <overview>
    install/index
-   install/upgrade_guide
+   configure
+   bootstrap
+   add-node
+   verify
 
 Features
 ========
@@ -77,7 +78,6 @@ User's Manual
    :maxdepth: 1
    :glob:
 
-   manual/bootstrap
    manual/state_snapshot_transfer
    manual/xtrabackup_sst
    manual/restarting_nodes
@@ -95,6 +95,7 @@ How-tos
    :maxdepth: 1
    :glob:
 
+   howtos/upgrade_guide
    howtos/centos_howto
    howtos/ubuntu_howto
    howtos/garbd_howto

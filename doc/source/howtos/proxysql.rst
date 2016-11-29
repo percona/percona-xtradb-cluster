@@ -4,7 +4,7 @@
 Load balancing with ProxySQL
 ============================
 
-`ProxySQL <http://www.proxysql.com>`_ is a high-performance SQL proxy.
+ProxySQL_ is a high-performance SQL proxy.
 ProxySQL runs as a daemon watched by a monitoring process.
 The process monitors the daemon and restarts it in case of a crash
 to minimize downtime.

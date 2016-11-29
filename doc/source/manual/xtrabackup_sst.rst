@@ -108,8 +108,9 @@ Used to enable and specify SST encryption mode:
   and security constraints are higher.
 
 * Set ``encrypt=3`` to perform SST encryption based on SSL for just the key
-  and certificate files as implemented in
-  `Galera <http://galeracluster.com/documentation-webpages/ssl.html>`_.
+  and certificate files as implemented in Galera_.
+  For more information,
+  see http://galeracluster.com/documentation-webpages/ssl.html.
 
   The latter has been implemented in
   :rn:`5.5.34-23.7.6` for compatibility with Galera.

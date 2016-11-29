@@ -21,7 +21,7 @@ This information is cached in out-write-set,
 which is then sent to the group for certification.
 
 Keys are cached in HeapStore
-(which has ``page-size=65K`` and ``total-size=4MB``).
+(which has ``page-size=64K`` and ``total-size=4MB``).
 If the transaction data-size outgrows this limit,
 then the storage is switched from Heap to Page
 (which has ``page-size=64MB`` and ``total-limit=free-space-on-disk``).
