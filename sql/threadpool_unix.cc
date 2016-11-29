@@ -437,16 +437,23 @@ inline bool too_many_busy_threads(thread_group_t *thread_group)
 /*
    Checks if a given connection is eligible to enter the high priority queue
    based on its current thread_pool_high_prio_mode value, available high
-   priority tickets and transactional state.
+   priority tickets and transactional state and whether any locks are held.
 */
 
-inline bool connection_is_high_prio(connection_t *c)
+inline bool connection_is_high_prio(const connection_t *c)
 {
   const ulong mode= c->thd->variables.threadpool_high_prio_mode;
 
   return (mode == TP_HIGH_PRIO_MODE_STATEMENTS) ||
-    (mode == TP_HIGH_PRIO_MODE_TRANSACTIONS &&
-     c->tickets > 0 && thd_is_transaction_active(c->thd));
+    (mode == TP_HIGH_PRIO_MODE_TRANSACTIONS && c->tickets > 0 &&
+     (thd_is_transaction_active(c->thd) ||
+      c->thd->variables.option_bits & OPTION_TABLE_LOCK ||
+      c->thd->locked_tables_mode != LTM_NONE ||
+      c->thd->mdl_context.has_locks() ||
+      c->thd->global_read_lock.is_acquired() ||
+      c->thd->backup_tables_lock.is_acquired() ||
+      c->thd->backup_binlog_lock.is_acquired() ||
+      c->thd->ull_hash.records > 0));
 }
 
 } // namespace
@@ -1766,26 +1773,29 @@ A likely cause of pool blocks are clients that lock resources for long time. \
 
 static void print_pool_blocked_message(bool max_threads_reached)
 {
-  ulonglong now;
+  ulonglong now= my_microsecond_getsystime();
   static bool msg_written;
-  
-  now= my_microsecond_getsystime();
+
   if (pool_block_start == 0)
   {
     pool_block_start= now;
-    msg_written = false;
-    return;
+    msg_written= false;
   }
-  
-  if (now > pool_block_start + BLOCK_MSG_DELAY && !msg_written)
+
+  if (!msg_written
+      && ((now > pool_block_start + BLOCK_MSG_DELAY)
+          || (now == pool_block_start)))
   {
     if (max_threads_reached)
       sql_print_error(MAX_THREADS_REACHED_MSG);
     else
       sql_print_error(CREATE_THREAD_ERROR_MSG, my_errno);
-    
-    sql_print_information("Threadpool has been blocked for %u seconds\n",
-      (uint)((now- pool_block_start)/1000000));
+
+    if (now > pool_block_start)
+    {
+      sql_print_information("Threadpool has been blocked for %u seconds\n",
+                            (uint)((now - pool_block_start)/1000000));
+    }
     /* avoid reperated messages for the same blocking situation */
     msg_written= true;
   }

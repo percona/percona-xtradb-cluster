@@ -143,8 +143,6 @@
    Memcheck:Leak
    fun:calloc
    fun:_dlerror_run
-   fun:dlsym
-   fun:__errno_location
 }
 
 
@@ -1130,4 +1128,11 @@ g   codership/mysql-wsrep/issues#176
    fun:_ZL8init_sslv
    fun:_Z11mysqld_mainiPPc
    fun:main
+}
+
+{
+   Spurious dlerror_run errors on main.udf
+   Memcheck:Leak
+   ...
+   fun:dlerror_run
 }
