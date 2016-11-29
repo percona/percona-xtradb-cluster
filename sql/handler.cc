@@ -8217,6 +8217,8 @@ void ha_wsrep_fake_trx_id(THD *thd)
     DBUG_VOID_RETURN;
   }
 
+  (void *)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
+#ifdef OUT
   handlerton *hton= installed_htons[DB_TYPE_INNODB];
   if (hton && hton->wsrep_fake_trx_id)
   {
@@ -8226,7 +8228,7 @@ void ha_wsrep_fake_trx_id(THD *thd)
   {
     WSREP_WARN("cannot get get fake InnoDB transaction ID");
   }
-
+#endif
   DBUG_VOID_RETURN;
 }
 #endif /* WITH_WSREP */
