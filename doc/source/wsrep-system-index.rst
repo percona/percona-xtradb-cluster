@@ -403,6 +403,47 @@ This variable should contain the path to the Galera library (like
 
 This variable contains settings currently used by Galera library.
 
+.. variable:: pxc_maint_mode
+
+   :version 5.7.15: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: ``DISABLED``
+
+This variable is used to control the maintenance mode for taking a node down
+without adjusting settings in ProxySQL.
+The following values are available:
+
+* ``DISABLED``: This is the default state
+  that tells ProxySQL to route traffic to the node as usual.
+
+* ``SHUTDOWN``: This state is set automatically
+  when you initiate node shutdown.
+
+* ``MAINTENANCE``: You can manually change to this state
+  if you need to perform maintenace on a node without shutting it down.
+
+For more information, see :ref:`pxc-maint-mode`.
+
+.. variable:: pxc_maint_transition_period
+
+   :version 5.7.15: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: ``60`` (one minute)
+
+This variable defines the transition period
+when you change :variable:`pxc_maint_mode` to ``SHUTDOWN`` or ``MAINTENANCE``.
+By default, it waits for 60 seconds until running transactions finish
+and then terminates those that are still active.
+You can indcrease the value to accomodate for long-running transactions.
+
+For more information, see :ref:`pxc-maint-mode`.
+
 .. variable:: pxc_strict_mode
 
    :version 5.7: Variable introduced
