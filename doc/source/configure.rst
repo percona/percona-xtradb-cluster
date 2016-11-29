@@ -43,7 +43,7 @@ on the first node::
  pxc_strict_mode=ENFORCING
 
  binlog_format=ROW
- torage_engine=InnoDB
+ defaul_storage_engine=InnoDB
  innodb_autoinc_lock_mode=2
 
 If you are running Red Hat or CentOS,
@@ -64,7 +64,7 @@ on the first node::
  pxc_strict_mode=ENFORCING
 
  binlog_format=ROW
- torage_engine=InnoDB
+ default_storage_engine=InnoDB
  innodb_autoinc_lock_mode=2
 
 Use the same configuration for the second and third nodes,
@@ -167,7 +167,7 @@ Configuration Reference
 .. |default_storage_engine| replace:: ``default_storage_engine``
 .. _default_storage_engine: http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_default_storage_engine
 
-|innodb_autoinc_lock_mode|
+|innodb_autoinc_lock_mode|_
 
   Galera supports only interleaved (``2``) lock mode for InnoDB.
   Setting the traditional (``0``) or consecutive (``1``) lock mode
