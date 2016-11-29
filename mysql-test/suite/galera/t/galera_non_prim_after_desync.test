@@ -1,0 +1,141 @@
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
+
+# Initiate normal shutdown on the node 2:
+
+--connection node_2
+
+--echo Shutting down server ...
+--source include/shutdown_mysqld.inc
+
+# Wait until the shutdown has been completed:
+
+--connection node_1
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Restart node 2 (to ensure that it is not primary component):
+
+--connection node_2
+
+--echo Starting server ...
+--let $start_mysqld_params=
+--source include/start_mysqld.inc
+
+# Wait until node 2 is ready:
+
+--connection node_1
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Set wsrep_sync_wait to avoid ER_LOCK_WAIT_TIMEOUT:
+
+--connection node_2
+
+SET SESSION wsrep_sync_wait=0;
+
+# Use RSU as the Online Schema Upgrade method
+# (to execute DDL statements locally):
+
+SET GLOBAL wsrep_OSU_method='RSU';
+
+# Desynchronize node 2:
+
+SET @@global.wsrep_desync = 1;
+
+# Disconnect node 2 from the cluster:
+
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
+
+# Wait until node 2 will be disconnected:
+
+--connection node_1
+
+SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=true';
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# Increase seqno on the first node:
+
+INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a');
+
+# Wait until node 2 will be non-primary:
+
+--connection node_2
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'non-Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+--source include/wait_condition.inc
+
+# Must return 'OFF':
+
+SHOW STATUS LIKE 'wsrep_ready';
+
+# Must return 'Non-primary':
+
+SHOW STATUS LIKE 'wsrep_cluster_status';
+
+# Reconnect node 2 to the cluster:
+
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=0';
+
+--connection node_1
+
+SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=false';
+
+# Wait until node 2 will be re-connected to the cluster:
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+# Wait until node 2 will see that cluster has primary component:
+
+--connection node_2
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+--source include/wait_condition.inc
+
+# Check the desynchronization counter. Must return '1':
+
+SHOW STATUS LIKE 'wsrep_desync_count';
+
+# Re-synchronize node 2 with the cluster:
+
+SET @@global.wsrep_desync = 0;
+
+--let $wait_condition = SELECT 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready' AND VARIABLE_VALUE = 'ON';
+--source include/wait_condition.inc
+
+# Restore the waiting of synchronization:
+
+SET SESSION wsrep_sync_wait=7;
+
+# Starting the RSU operation - often it causes PXC-594 issue here:
+
+ALTER TABLE t1 ADD f3 VARCHAR(1);
+
+# Must return 'ON':
+
+SHOW STATUS LIKE 'wsrep_ready';
+
+# Must return 'Primary':
+
+SHOW STATUS LIKE 'wsrep_cluster_status';
+
+# Sanity check (node 2 now running and can perform SQL operators):
+
+--connection node_2
+
+SELECT * FROM t1;
+
+# Restore default settings:
+
+SET GLOBAL wsrep_OSU_method='TOI';
+
+--connection node_1
+
+DROP TABLE t1;

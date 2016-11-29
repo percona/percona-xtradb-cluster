@@ -1,0 +1,36 @@
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
+Shutting down server ...
+Starting server ...
+SET SESSION wsrep_sync_wait=0;
+SET GLOBAL wsrep_OSU_method='RSU';
+SET @@global.wsrep_desync = 1;
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
+SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=true';
+INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a');
+SHOW STATUS LIKE 'wsrep_ready';
+Variable_name	Value
+wsrep_ready	OFF
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	non-Primary
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=0';
+SET GLOBAL wsrep_provider_options = 'pc.ignore_sb=false';
+SHOW STATUS LIKE 'wsrep_desync_count';
+Variable_name	Value
+wsrep_desync_count	1
+SET @@global.wsrep_desync = 0;
+SET SESSION wsrep_sync_wait=7;
+ALTER TABLE t1 ADD f3 VARCHAR(1);
+SHOW STATUS LIKE 'wsrep_ready';
+Variable_name	Value
+wsrep_ready	ON
+SHOW STATUS LIKE 'wsrep_cluster_status';
+Variable_name	Value
+wsrep_cluster_status	Primary
+SELECT * FROM t1;
+f1	f2	f3
+1	a	NULL
+2	a	NULL
+3	a	NULL
+SET GLOBAL wsrep_OSU_method='TOI';
+DROP TABLE t1;
