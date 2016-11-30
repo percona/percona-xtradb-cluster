@@ -70,9 +70,20 @@ case "$1" in
     mysql_logdir=/var/log/mysql
     mysql_cfgdir=/etc/mysql
     mysql_upgradedir=/var/lib/mysql-upgrade
+    mysql_filesdir=/var/lib/mysql-files
 
     # Ensure the existence and right permissions for the database and
     # log files.
+
+    # MySQL 5.6.34 needs this
+
+    if [ ! -d ${mysql_filesdir} -a ! -L ${mysql_filesdir} ];
+    then
+        mkdir ${mysql_filesdir}
+        chown mysql:mysql ${mysql_filesdir}
+        chmod 770 ${mysql_filesdir}
+    fi
+
     if [ ! -d "$mysql_statedir"       -a ! -L "$mysql_statedir"       ]; then mkdir "$mysql_statedir"; fi
     if [ ! -d "$mysql_statedir/mysql" -a ! -L "$mysql_statedir/mysql" ]; then mkdir "$mysql_statedir/mysql"; fi
     if [ ! -d "$mysql_logdir"         -a ! -L "$mysql_logdir"         ]; then mkdir "$mysql_logdir"; fi

@@ -7754,14 +7754,27 @@ int binlog_log_row(TABLE* table,
 
 #ifdef WITH_WSREP
   /* only InnoDB tables will be replicated through binlog emulation */
-  if (WSREP_EMULATE_BINLOG(thd)                          && 
-      table->file->ht->db_type != DB_TYPE_INNODB         &&
-      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB && 
-	(((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
-	//	!strcmp(table->file->table_type(), "InnoDB"))
+  if (WSREP_EMULATE_BINLOG(thd) &&
+      table->file->ht->db_type != DB_TYPE_INNODB &&
+      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB &&
+        (((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
   {
-    return 0;
-  } 
+      return 0;
+  }
+
+  /* enforce wsrep_max_ws_rows */
+  if (table->s->tmp_table == NO_TMP_TABLE)
+  {
+    thd->wsrep_affected_rows++;
+    if (wsrep_max_ws_rows &&
+        thd->wsrep_exec_mode != REPL_RECV &&
+        thd->wsrep_affected_rows > wsrep_max_ws_rows)
+    {
+      trans_rollback_stmt(thd) || trans_rollback(thd);
+      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
+      return ER_ERROR_DURING_COMMIT;
+    }
+  }
 #endif /* WITH_WSREP */
   if (check_table_binlog_row_based(thd, table))
   {
@@ -7925,20 +7938,6 @@ int handler::ha_write_row(uchar *buf)
 
   if (unlikely(error= binlog_log_row(table, 0, buf, log_func)))
     DBUG_RETURN(error); /* purecov: inspected */
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      DBUG_RETURN(ER_ERROR_DURING_COMMIT);
-    }
-  }
-#endif /* WITH_WSREP */
 
   if (likely(!is_fake_change_enabled(ha_thd())))
     rows_changed++;
@@ -7974,21 +7973,6 @@ int handler::ha_update_row(const uchar *old_data, uchar *new_data)
   if (unlikely(error= binlog_log_row(table, old_data, new_data, log_func)))
     return error;
 
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      return ER_ERROR_DURING_COMMIT;
-    }
-  }
-#endif /* WITH_WSREP */
-
   if (likely(!is_fake_change_enabled(ha_thd())))
     rows_changed++;
 
@@ -8020,21 +8004,6 @@ int handler::ha_delete_row(const uchar *buf)
     return error;
   if (unlikely(error= binlog_log_row(table, buf, 0, log_func)))
     return error;
-
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      return ER_ERROR_DURING_COMMIT;
-    }
-  }
-#endif /* WITH_WSREP */
 
   if (likely(!is_fake_change_enabled(ha_thd())))
     rows_changed++;
