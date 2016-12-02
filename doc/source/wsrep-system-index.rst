@@ -204,22 +204,22 @@ This variable is used to control whether sole cluster conflicts should be logged
 
 .. variable:: wsrep_max_ws_rows
 
+   :version 5.6.32-25.17: Variable default value changed to ``0`` (no limit)
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: Yes
    :default: 131072 (128K) 
+   :default: ``0``
 
-**This variable has no effect!**
-
-By design,
-it was supposed to control the maximum number of rows each writeset can contain.
-However, it is hard to predict the number of rows
+Prior to |Percona XtraDB Cluster| :rn:`5.6.32-25.17` this variable has no
+effect. By design, it was supposed to control the maximum number of rows
+each writeset can contain. However, it was hard to predict the number of rows
 because of the writeset size limit enforced by :variable:`wsrep_max_ws_size`.
 
-Codership decided to not implement the limit by rows for now.
-Correct behavior may be implemented in a future release.
-There is a discussion open at https://github.com/codership/mysql-wsrep/issues/257
+In |Percona XtraDB Cluster| :rn:`5.6.32-25.17` the variable has been fixed and
+can be used to set the maximum number of rows a transaction can update, delete
+or insert. The new default value is ``0``, meaning no limit.
 
 .. variable:: wsrep_max_ws_size
 
