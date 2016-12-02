@@ -1024,6 +1024,8 @@ typedef I_List<Item_change_record> Item_change_list;
 /**
   Type of locked tables mode.
   See comment for THD::locked_tables_mode for complete description.
+  While adding new enum values add them to the getter method for this enum
+  declared below and defined in sql_class.cc as well.
 */
 
 enum enum_locked_tables_mode
@@ -1034,6 +1036,15 @@ enum enum_locked_tables_mode
   LTM_PRELOCKED_UNDER_LOCK_TABLES
 };
 
+#ifndef DBUG_OFF
+/**
+  Getter for the enum enum_locked_tables_mode
+  @param locked_tables_mode enum for types of locked tables mode
+
+  @return The string represantation of that enum value
+*/
+const char * get_locked_tables_mode_name(enum_locked_tables_mode locked_tables_mode);
+#endif
 
 /**
   Class that holds information about tables which were opened and locked
@@ -1102,10 +1113,6 @@ public:
     XXX Why are internal temporary tables added to this list?
   */
   TABLE *temporary_tables;
-  /**
-     Protects temporary_tables.
-  */
-  mysql_mutex_t LOCK_temporary_tables;
 
   TABLE *derived_tables;
   /*
@@ -1899,6 +1906,11 @@ public:
   mysql_mutex_t LOCK_thd_query;
 
   /**
+    Protects temporary_tables.
+  */
+  mysql_mutex_t LOCK_temporary_tables;
+
+  /**
     Protects THD::variables while being updated. This should be taken inside
     of LOCK_thd_data and outside of LOCK_global_system_variables.
   */
@@ -2222,6 +2234,10 @@ public:
   uint       last_errno;
   /*** The variables above used in slow_extended.patch ***/
 
+  inline void set_slow_log_for_admin_command() {
+	  enable_slow_log= opt_log_slow_admin_statements
+		  && (sp_runtime_ctx ? opt_log_slow_sp_statements : true);
+  }
   /*** Following methods used in slow_extended.patch ***/
   void clear_slow_extended();
 private:

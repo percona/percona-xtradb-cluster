@@ -35,9 +35,6 @@ WITH_JEMALLOC=''
 # script will install it at said location while making file tar.gz.
 COPYGALERA=0
 
-# suffix to add in case of debug build to tar.gz.
-DEBUG_EXTNAME=''
-
 WITH_MECAB_OPTION=''
 
 # build with ssl. configuration related to ssl.
@@ -99,7 +96,6 @@ do
         shift
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
-        DEBUG_EXTNAME="-DDEBUG_EXTNAME=OFF"
         SCONS_ARGS+=' debug=1'
         ;;
     -G | --copygalera )
@@ -398,7 +394,6 @@ fi
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
             $DEBUG_EXTRA \
-            -DDEBUG_EXTNAME=ON \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
             -DENABLE_DTRACE=OFF \
@@ -417,16 +412,15 @@ fi
             -DWITH_INNODB_MEMCACHED=ON \
             -DDOWNLOAD_BOOST=1 \
             -DWITH_BOOST="$TARGETDIR/libboost" \
+            -DWITH_SCALABILITY_METRICS=ON \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1
         (make install) || exit 1
-        cp -v sql/mysqld-debug $TARGETDIR/usr/local/$PRODUCT_FULL_NAME/bin/mysqld
         echo "mysqld in build in debug mode"
     else
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-            $DEBUG_EXTNAME \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
             -DENABLE_DTRACE=OFF \
@@ -444,6 +438,7 @@ fi
             -DWITH_INNODB_MEMCACHED=ON \
             -DDOWNLOAD_BOOST=1 \
             -DWITH_BOOST="$TARGETDIR/libboost" \
+            -DWITH_SCALABILITY_METRICS=ON \
             $WITH_MECAB_OPTION $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         (make $MAKE_JFLAG $QUIET) || exit 1

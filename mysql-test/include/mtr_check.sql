@@ -73,6 +73,9 @@ BEGIN
                                 'wsrep_data_home_dir')
     ORDER BY VARIABLE_NAME;
 
+  SELECT * FROM INFORMATION_SCHEMA.SESSION_VARIABLES
+    WHERE variable_name = 'debug_sync';
+
   -- Dump all databases, there should be none
   -- except those that was created during bootstrap
   -- and the mtr_wsrep_notify schema which is populated by the std_data/wsrep_notify.sh script

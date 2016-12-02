@@ -440,6 +440,7 @@ log_online_track_missing_on_startup(
 					current server startup */
 {
 	ut_ad(last_tracked_lsn != tracking_start_lsn);
+	ut_ad(srv_track_changed_pages);
 
 	ib::warn() << "Last tracked LSN in \'" << log_bmp_sys->out.name
 		   << "\' is " << last_tracked_lsn
@@ -619,6 +620,8 @@ log_online_read_init(void)
 	aligned. */
 	compile_time_assert(MODIFIED_PAGE_BLOCK_BITMAP % 8 == 0);
 	compile_time_assert(MODIFIED_PAGE_BLOCK_BITMAP_LEN % 8 == 0);
+
+	ut_ad(srv_track_changed_pages);
 
 	log_bmp_sys = static_cast<log_bitmap_struct *>
 		(ut_malloc(sizeof(*log_bmp_sys), mem_key_log_online_sys));
@@ -1107,10 +1110,14 @@ log_online_write_bitmap_page(
 {
 	bool	success;
 
+	ut_ad(srv_track_changed_pages);
 	ut_ad(mutex_own(&log_bmp_sys->mutex));
 
 	/* Simulate a write error */
-	DBUG_EXECUTE_IF("bitmap_page_write_error", return false;);
+	DBUG_EXECUTE_IF("bitmap_page_write_error",
+			ib::error() << "simulating bitmap write error in "
+				       "log_online_write_bitmap_page";
+			return false;);
 
 	IORequest io_request(IORequest::WRITE | IORequest::NO_COMPRESSION);
 	success = os_file_write(io_request, log_bmp_sys->out.name,
@@ -1202,7 +1209,9 @@ log_online_write_bitmap(void)
 			rbt_next(log_bmp_sys->modified_pages, bmp_tree_node);
 
 		DBUG_EXECUTE_IF("bitmap_page_2_write_error",
-				DBUG_SET("+d,bitmap_page_write_error"););
+				ut_ad(bmp_tree_node); /* 2nd page must exist */
+				DBUG_SET("+d,bitmap_page_write_error");
+				DBUG_SET("-d,bitmap_page_2_write_error"););
 	}
 
 	rbt_reset(log_bmp_sys->modified_pages);
@@ -1223,14 +1232,10 @@ log_online_follow_redo_log(void)
 	log_group_t*	group;
 	bool		result;
 
-	mutex_enter(&log_bmp_sys->mutex);
-
-	if (!srv_track_changed_pages) {
-		mutex_exit(&log_bmp_sys->mutex);
-		return false;
-	}
-
+	ut_ad(srv_track_changed_pages);
 	ut_ad(!srv_read_only_mode);
+
+	mutex_enter(&log_bmp_sys->mutex);
 
 	/* Grab the LSN of the last checkpoint, we will parse up to it */
 	log_mutex_enter();
@@ -1572,8 +1577,10 @@ log_online_diagnose_bitmap_eof(
 			/* It's a "Warning" here because it's not a fatal error
 			for the whole server */
 			ib::warn() << "Changed page bitmap file \'"
-				   << bitmap_file->name << "\' does not "
-				"contain a complete run at the end.";
+				   << bitmap_file->name << "\', size "
+				   << bitmap_file->size << " bytes, does not "
+				"contain a complete run at the next read "
+				"offset " << bitmap_file->offset;
 			return false;
 		}
 	}

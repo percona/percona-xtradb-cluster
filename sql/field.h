@@ -494,7 +494,7 @@ public:
     : expr_item(0), item_free_list(0),
     field_type(MYSQL_TYPE_LONG),
     stored_in_db(false), num_non_virtual_base_cols(0),
-    m_expr_str_mem_root(NULL)
+    m_expr_str_mem_root(NULL), permanent_changes_completed(false)
   {
     expr_str.str= NULL;
     expr_str.length= 0;
@@ -550,6 +550,13 @@ private:
 
   /// MEM_ROOT which provides memory storage for expr_str.str
   MEM_ROOT *m_expr_str_mem_root;
+
+public:
+  /**
+     Used to make sure permanent changes to the item tree of expr_item are
+     made only once.
+  */
+  bool permanent_changes_completed;
 };
 
 class Proto_field
@@ -1482,7 +1489,7 @@ public:
   longlong convert_decimal2longlong(const my_decimal *val, bool unsigned_flag,
                                     bool *has_overflow);
   /* The max. number of characters */
-  virtual uint32 char_length()
+  virtual uint32 char_length() const
   {
     return field_length / charset()->mbmaxlen;
   }
@@ -3807,7 +3814,7 @@ public:
       memcpy(ptr,length,packlength);
       memcpy(ptr+packlength, &data,sizeof(char*));
     }
-  void set_ptr_offset(my_ptrdiff_t ptr_diff, uint32 length, uchar *data)
+  void set_ptr_offset(my_ptrdiff_t ptr_diff, uint32 length, const uchar *data)
     {
       uchar *ptr_ofs= ADD_TO_PTR(ptr,ptr_diff,uchar*);
       store_length(ptr_ofs, packlength, length);
@@ -3859,7 +3866,7 @@ public:
   bool has_charset(void) const
   { return charset() == &my_charset_bin ? FALSE : TRUE; }
   uint32 max_display_length();
-  uint32 char_length();
+  uint32 char_length() const;
   bool copy_blob_value(MEM_ROOT *mem_root);
   uint is_equal(Create_field *new_field);
   inline bool in_read_set() { return bitmap_is_set(table->read_set, field_index); }
