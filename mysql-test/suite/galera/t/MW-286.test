@@ -27,7 +27,9 @@ ALTER TABLE t1 ADD PRIMARY KEY (f1);
 SET wsrep_on = TRUE;
 SET GLOBAL wsrep_desync = FALSE;
 
-SELECT COUNT(*) FROM t1;
+--let $wait_condition = SELECT COUNT(*) = 200000 FROM t1;
+--source include/wait_condition.inc
+
 SHOW CREATE TABLE t1;
 
 --connection node_1

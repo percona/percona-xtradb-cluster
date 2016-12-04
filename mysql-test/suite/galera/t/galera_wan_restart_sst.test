@@ -137,14 +137,18 @@ SELECT COUNT(*) = 19 FROM t1;
 DROP TABLE t1;
 CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
 CALL mtr.add_suppression("WSREP: gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)");
+CALL mtr.add_suppression("WSREP: SYNC message from member 3 in non-primary configuration");
 
 --connection node_2
 CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("WSREP: SYNC message from member 3 in non-primary configuration");
 
 --connection node_3
 CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
 CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
+CALL mtr.add_suppression("WSREP: SYNC message from member 3 in non-primary configuration");
 
 --connection node_4
 CALL mtr.add_suppression("Action message in non-primary configuration from member 0");
 CALL mtr.add_suppression("There are no nodes in the same segment that will ever be able to become donors, yet there is a suitable donor outside");
+CALL mtr.add_suppression("WSREP: SYNC message from member 3 in non-primary configuration");
