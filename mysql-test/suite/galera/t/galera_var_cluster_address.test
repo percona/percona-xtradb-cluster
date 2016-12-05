@@ -9,8 +9,8 @@
 # Set to invalid value
 # 
 
---connection node_1
---let $wsrep_cluster_address_node1 = `SELECT @@wsrep_cluster_address`
+--connection node_2
+--let $wsrep_cluster_address_node2 = `SELECT @@wsrep_cluster_address`
 SET GLOBAL wsrep_cluster_address = 'foo://';
 
 # With wsrep_sync_wait, this returns an error
@@ -36,10 +36,10 @@ SHOW STATUS LIKE 'wsrep_cluster_status';
 SHOW STATUS LIKE 'wsrep_local_state';
 SHOW STATUS LIKE 'wsrep_local_state_comment';
 
---connection node_2
+--connection node_1
 --sleep 1
-# Node #2 thinks that it is now part of a single-node primary cluster 
 --disable_warnings
+# Node #1 thinks that it is now part of a single-node primary cluster 
 SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 --enable_warnings
@@ -48,13 +48,11 @@ SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VA
 # Reset everything as it was
 #
 
---connection node_1
+--connection node_2
 --disable_query_log
---eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node1';
+--eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node2';
 --enable_query_log
 
---connection node_2
-SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
 --source include/wait_until_connected_again.inc
 
 --connection node_1
@@ -63,86 +61,7 @@ SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VA
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --enable_warnings
 
-#
-# Set to invalid host
-#
-
---connection node_1
-SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
-
-# This should work even with wsrep_ready OFF in PXC
---disable_result_log
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
---enable_result_log
-
-# Must return 'OFF'
-SHOW STATUS LIKE 'wsrep_ready';
-
-# Must return 'Non-primary'
-SHOW STATUS LIKE 'wsrep_cluster_status';
-
-# Must return 0 = 'Initialized'
-SHOW STATUS LIKE 'wsrep_local_state';
-SHOW STATUS LIKE 'wsrep_local_state_comment';
-
-#
-# Reset everything as it was
-#
-
---connection node_1
---disable_query_log
---eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node1';
---enable_query_log
-
 --connection node_2
-SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
---source include/wait_until_connected_again.inc
-
---connection node_1
---disable_warnings
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
---enable_warnings
-
-#
-# Set to an invalid host and change the number of slave threads
-#
-
---connection node_1
---let $wsrep_slave_threads = `SELECT @@wsrep_slave_threads`
-SET GLOBAL wsrep_cluster_address = 'gcomm://192.0.2.1';
-
-# This should work even with wsrep_ready OFF in PXC
---disable_result_log
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
---enable_result_log
-
-# Must return 'OFF'
-SHOW STATUS LIKE 'wsrep_connected';
-
-# Should see a warning message, but not a crash
---eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads + 16;
-
-#
-# Reset everything as it was
-#
-
---connection node_1
---eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads;
---disable_query_log
---eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_node1';
---enable_query_log
-
---connection node_2
-SET GLOBAL wsrep_cluster_address = @@wsrep_cluster_address;
---source include/wait_until_connected_again.inc
-
---connection node_1
---disable_warnings
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
---enable_warnings
-
 CALL mtr.add_suppression("Backend not supported: foo");
 CALL mtr.add_suppression("Failed to initialize backend using 'foo");
 CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'foo");
@@ -151,12 +70,8 @@ CALL mtr.add_suppression("wsrep::connect\\(\\) failed: 7");
 CALL mtr.add_suppression("gcs_caused\\(\\) returned -103 \\(Software caused connection abort\\)");
 CALL mtr.add_suppression("failed to open gcomm backend connection: 110: failed to reach primary view: 110");
 CALL mtr.add_suppression("Failed to open backend connection: -110 \\(Connection timed out\\)");
-CALL mtr.add_suppression("Failed to open channel 'my_wsrep_cluster' at 'gcomm://192\\.0\\.2\\.1': -110 \\(Connection timed out\\)");
 CALL mtr.add_suppression("gcs connect failed: Connection timed out");
 CALL mtr.add_suppression("WSREP: wsrep::connect\\(foo://\\) failed: 7");
-CALL mtr.add_suppression("WSREP: wsrep::connect\\(gcomm://192.0.2.1\\) failed: 7");
-CALL mtr.add_suppression("WSREP: Trying to launch slave threads before creating connection at 'gcomm://192.0.2.1'");
-
 
 #-------------------------------------------------------------------------------
 #
@@ -177,4 +92,3 @@ show status like 'wsrep_local_state_comment';
 #
 UNINSTALL PLUGIN audit_log;
 show status like 'wsrep_cluster_size';
-
