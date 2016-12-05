@@ -3032,6 +3032,15 @@ bool Query_result_create::send_eof()
     if (!table->s->tmp_table)
     {
 #ifdef WITH_WSREP
+      if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID)
+      {
+        (void) wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle,
+                                       thd->wsrep_next_trx_id());
+        WSREP_DEBUG("CTAS NEW KEY");
+      }
+      DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
+      WSREP_DEBUG("CTAS key append for trx: %lu ", thd->wsrep_trx_id());
+
       /*
          append table level exclusive key for CTAS
       */

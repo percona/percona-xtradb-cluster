@@ -2966,6 +2966,44 @@ public:
   ulong                     wsrep_affected_rows;
   void*                     wsrep_gtid_event_buf;
   ulong                     wsrep_gtid_event_buf_len;
+
+  /*
+    Transaction id:
+    * m_next_wsrep_trx_id is assigned on the first query after
+      wsrep_next_trx_id() return WSREP_UNDEFINED_TRX_ID
+    * Each storage engine must assign value of wsrep_next_trx_id()
+      via wsrep_ws_handle_for_trx() when the transaction starts.
+    * Effective transaction id is returned via wsrep_trx_id()
+   */
+
+  /*
+    Return effective transaction id
+   */
+  wsrep_trx_id_t wsrep_trx_id() const
+  {
+    return wsrep_ws_handle.trx_id;
+  }
+
+  /*
+    Set next trx id
+   */
+  void set_wsrep_next_trx_id(query_id_t query_id)
+  {
+    DBUG_ASSERT(wsrep_ws_handle.trx_id == WSREP_UNDEFINED_TRX_ID);
+    m_wsrep_next_trx_id = (wsrep_trx_id_t) query_id;
+  }
+
+  /*
+    Return next trx id
+   */
+  wsrep_trx_id_t wsrep_next_trx_id() const
+  {
+    return m_wsrep_next_trx_id;
+  }
+
+private:
+  wsrep_trx_id_t m_wsrep_next_trx_id; /* cast from query_id_t */
+public:
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

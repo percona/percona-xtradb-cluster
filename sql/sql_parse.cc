@@ -1436,6 +1436,13 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     command= COM_SHUTDOWN;
   }
   thd->set_query_id(next_query_id());
+#ifdef WITH_WSREP
+  if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+  {
+    thd->set_wsrep_next_trx_id(thd->query_id);
+    WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
+  }
+#endif /* WITH_WSREP */
   thd->rewritten_query.mem_free();
   thd_manager->inc_thread_running();
 
@@ -1669,6 +1676,11 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       break;
 
 #ifdef WITH_WSREP
+      if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+      {
+        thd->set_wsrep_next_trx_id(thd->query_id);
+        WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
+      }
     wsrep_mysql_parse(thd, thd->query().str, thd->query().length, &parser_state);
 #else
     mysql_parse(thd, &parser_state);
@@ -2094,6 +2106,17 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   {
     /* wsrep BF abort in query exec phase */
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+    if (thd->wsrep_conflict_state == ABORTED &&
+        !(command == COM_STMT_PREPARE          ||
+          command == COM_STMT_FETCH            ||
+          command == COM_STMT_SEND_LONG_DATA   ||
+          command == COM_STMT_CLOSE
+          ))
+    {
+      my_message(ER_LOCK_DEADLOCK, ER(ER_LOCK_DEADLOCK), MYF(0));
+      wsrep_cleanup_transaction(thd);
+      WSREP_DEBUG("leave");
+    }
     if ((thd->wsrep_conflict_state != REPLAYING) &&
         (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT))
     {
@@ -7078,7 +7101,7 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state == MUST_ABORT) {
         wsrep_client_rollback(thd);
-
+        wsrep_cleanup_transaction(thd);
         WSREP_DEBUG("abort in exec query state, avoiding autocommit");
       }
 
@@ -7141,6 +7164,9 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                                                       com_statement_info[thd->get_command()].m_key,
                                                       thd->db().str, thd->db().length,
                                                       thd->charset(), NULL);
+          DBUG_ASSERT(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
+          thd->set_wsrep_next_trx_id(thd->query_id);
+          WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
         }
         else
         {

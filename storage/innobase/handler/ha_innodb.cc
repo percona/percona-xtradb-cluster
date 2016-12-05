@@ -136,7 +136,7 @@ extern MYSQL_PLUGIN_IMPORT wsrep_aborting_thd_t wsrep_aborting_thd;
 static inline wsrep_ws_handle_t*
 wsrep_ws_handle(THD* thd, const trx_t* trx) {
 	return wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd),
-				       (wsrep_trx_id_t)trx->id);
+				       wsrep_thd_next_trx_id(thd));
 }
 
 extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
@@ -20349,7 +20349,7 @@ wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx)
 		} else {
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
-				(wsrep_trx_id_t)victim_trx->id
+				(wsrep_trx_id_t)wsrep_thd_trx_id(thd)
 			);
 			switch (rcode) {
 			case WSREP_WARNING:
@@ -20448,6 +20448,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		WSREP_DEBUG("victim %llu in MUST ABORT state, killed_by: %lld",
 			    (long long)victim_trx->id,
 			    victim_trx->wsrep_killed_by_query);
+#ifndef OUT
 		if (victim_trx->state == TRX_STATE_ACTIVE)
 		{
 			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
@@ -20464,6 +20465,9 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		wsrep_thd_UNLOCK(thd);
 		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
+#else
+		wsrep_thd_UNLOCK(thd);
+#endif
 		break;
 	case ABORTED:
 	case ABORTING: // fall through
@@ -20501,9 +20505,14 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			wsrep_abort_slave_trx(bf_seqno,
 					      wsrep_thd_trx_seqno(thd));
 		} else {
+                  WSREP_DEBUG("abort_pre trxid %lu next trxid %lu query id %lld",
+                              wsrep_thd_trx_id(thd),
+                              wsrep_thd_next_trx_id(thd),
+                              wsrep_thd_query_id(thd));
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
-				(wsrep_trx_id_t)victim_trx->id
+				(wsrep_trx_id_t)wsrep_thd_trx_id(thd)
+//				(wsrep_trx_id_t)victim_trx->id
 			);
 			
 			switch (rcode) {
