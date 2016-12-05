@@ -2412,13 +2412,15 @@ void THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
       if (!thd_table->needs_reopen())
 #ifdef WITH_WSREP
       {
+#endif /* WITH_WSREP */
 	mysql_lock_abort_for_thread(this, thd_table);
+#ifdef WITH_WSREP
 	if (this && WSREP(this) && wsrep_thd_is_BF((void *)this, FALSE)) 
 	{
 	  wsrep_abort_thd((void *)this, (void *)in_use, FALSE);
 	}
       }
-#endif
+#endif /* WITH_WSREP */
     }
     mysql_mutex_unlock(&in_use->LOCK_thd_data);
   }
