@@ -6230,7 +6230,7 @@ static Sys_var_enum Sys_pxc_maint_mode (
 static Sys_var_ulong Sys_pxc_maint_transition_period (
        "pxc_maint_transition_period", "Period before the shutdown signal is delivered",
        GLOBAL_VAR(pxc_maint_transition_period), CMD_LINE(REQUIRED_ARG),
-       VALID_RANGE(0, 3600), DEFAULT(30), BLOCK_SIZE(1));
+       VALID_RANGE(0, 3600), DEFAULT(10), BLOCK_SIZE(1));
 
 static Sys_var_mybool Sys_pxc_encrypt_cluster_traffic (
     "pxc_encrypt_cluster_traffic", "PXC cluster traffic SSL auto-configuration",
