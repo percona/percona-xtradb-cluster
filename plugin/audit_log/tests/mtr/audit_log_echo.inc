@@ -8,6 +8,10 @@ perl;
   print "===================================================================\n";
   open my $file, $ENV{'log_file'} . '.copy' or die "Can not open log: $!";
   while ($line = <$file>) {
+    if ($line =~ /skip this/) {
+      # skip this
+      next;
+    }
     if ($line =~ /SET NAMES/) {
       # change_user does automatic reconnect and messing up 'SET NAMES' around
       next;
@@ -21,6 +25,14 @@ perl;
       next;
     }
     if ($line =~ /SELECT count\(\*\)=1 FROM t WHERE a=7/) {
+      # skip checking for event shot
+      next;
+    }
+    if ($line =~ /INSERT INTO t VALUES \(7\)/) {
+      # don't show the last statement of the event
+      next;
+    }
+    if ($line =~ /SELECT 600 \* 10/) {
       # skip checking for event shot
       next;
     }

@@ -168,7 +168,7 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,"
   ."innodb_fts,innodb_zip,innodb_undo,innodb_stress,perfschema,funcs_1,"
   ."funcs_2,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,"
   ."test_service_sql_api,jp,stress,engines/iuds,engines/funcs,"
-  ."query_response_time,audit_log,scalability_metrics,json,galera";
+  ."query_response_time,audit_log,json,galera";
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -433,14 +433,16 @@ sub main {
     for my $limit (2000, 1500, 1000, 500){
       $opt_parallel-- if ($sys_info->min_bogomips() < $limit);
     }
-    my $max_par= $ENV{MTR_MAX_PARALLEL} || 8;
-    $opt_parallel= $max_par if ($opt_parallel > $max_par);
-    $opt_parallel= $num_tests if ($opt_parallel > $num_tests);
-    $opt_parallel= 1 if (IS_WINDOWS and $sys_info->isvm());
+    if(defined $ENV{MTR_MAX_PARALLEL}) {
+      my $max_par= $ENV{MTR_MAX_PARALLEL};
+      $opt_parallel= $max_par if ($opt_parallel > $max_par);
+    }
     $opt_parallel= 1 if ($opt_parallel < 1);
-    mtr_report("Using parallel: $opt_parallel");
   }
+  # Limit parallel workers to number of tests to avoid idle workers
+  $opt_parallel= $num_tests if ($num_tests > 0 and $opt_parallel > $num_tests);
   $ENV{MTR_PARALLEL} = $opt_parallel;
+  mtr_report("Using parallel: $opt_parallel");
 
   my $is_option_mysqlx_port_set= $opt_mysqlx_baseport ne "auto";
   if ($opt_parallel > 1 && ($opt_start_exit || $opt_stress || $is_option_mysqlx_port_set)) {
@@ -1875,9 +1877,13 @@ sub set_build_thread_ports($) {
   if ( lc($opt_build_thread) eq 'auto' ) {
     my $found_free = 0;
     $build_thread = 300;	# Start attempts from here
+
+    my $build_thread_upper = $build_thread + ($opt_parallel > 39
+                             ? $opt_parallel + int($opt_parallel / 4)
+                             : 49);
     while (! $found_free)
     {
-      $build_thread= mtr_get_unique_id($build_thread, 349);
+      $build_thread= mtr_get_unique_id($build_thread, $build_thread_upper);
       if ( !defined $build_thread ) {
         mtr_error("Could not get a unique build thread id");
       }
@@ -4645,248 +4651,238 @@ sub run_testcase ($) {
   }
 
   my $test= start_mysqltest($tinfo);
-  # Set only when we have to keep waiting after expectedly died server
-  my $keep_waiting_proc = 0;
   my $print_timeout= start_timer($print_freq * 60);
 
+  my @procs;
   while (1)
   {
-    my $proc;
-    if ($keep_waiting_proc)
+    if ($test_timeout > $print_timeout)
     {
-      # Any other process exited?
-      $proc = My::SafeProcess->check_any();
-      if ($proc)
+      my $proc = My::SafeProcess->wait_any_timeout($print_timeout);
+      mtr_verbose("Got $proc");
+      push @procs, $proc;
+      if ( $proc->{timeout} )
       {
-	mtr_verbose ("Found exited process $proc");
-      }
-      else
-      {
-	$proc = $keep_waiting_proc;
-	# Also check if timer has expired, if so cancel waiting
-	if ( has_expired($test_timeout) )
-	{
-	  $keep_waiting_proc = 0;
-	}
+        #print out that the test is still on
+        mtr_print("Test still running: $tinfo->{name}");
+        #reset the timer
+        $print_timeout= start_timer($print_freq * 60);
+        next;
       }
     }
-    if (! $keep_waiting_proc)
+    else
     {
-      if($test_timeout > $print_timeout)
-      {
-         $proc= My::SafeProcess->wait_any_timeout($print_timeout);
-         if ( $proc->{timeout} )
-         {
-            #print out that the test is still on
-            mtr_print("Test still running: $tinfo->{name}");
-            #reset the timer
-            $print_timeout= start_timer($print_freq * 60);
-            next;
-         }
-      }
-      else
-      {
-         $proc= My::SafeProcess->wait_any_timeout($test_timeout);
-      }
-    }
+      my $proc= My::SafeProcess->check_any();
 
-    # Will be restored if we need to keep waiting
-    $keep_waiting_proc = 0;
-
-    unless ( defined $proc )
-    {
-      mtr_error("wait_any failed");
+      if ($proc) {
+        mtr_verbose("Got $proc");
+        push @procs, $proc;
+      } elsif ( has_expired($test_timeout) )
+      {
+        my $timeout= My::SafeProcess->wait_any_timeout($test_timeout);
+        push @procs, $timeout;
+      } else {
+        mtr_milli_sleep(100);
+      }
     }
-    mtr_verbose("Got $proc");
 
     mark_time_used('test');
     # ----------------------------------------------------
     # Was it the test program that exited
     # ----------------------------------------------------
-    if ($proc eq $test)
-    {
-      my $res= $test->exit_status();
-
-      if ($res == 0 and $opt_warnings and check_warnings($tinfo) )
+    foreach my $proc (@procs) {
+      if ($proc eq $test)
       {
-	# Test case suceeded, but it has produced unexpected
-	# warnings, continue in $res == 1
-	$res= 1;
-	resfile_output($tinfo->{'warnings'}) if $opt_resfile;
-      }
+        my $res= $test->exit_status();
 
-      if ( $res == 0 )
-      {
-	my $check_res;
-	if ( restart_forced_by_test('force_restart') )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
-	elsif ( $opt_check_testcases and
-	     $check_res= check_testcase($tinfo, "after"))
-	{
-	  if ($check_res == 1) {
-	    # Test case had sideeffects, not fatal error, just continue
+        if ($res == 0 and $opt_warnings and check_warnings($tinfo) )
+        {
+	  # Test case suceeded, but it has produced unexpected
+	  # warnings, continue in $res == 1
+	  $res= 1;
+	  resfile_output($tinfo->{'warnings'}) if $opt_resfile;
+        }
+
+        if ( $res == 0 )
+        {
+	  my $check_res;
+	  if ( restart_forced_by_test('force_restart') )
+	  {
 	    stop_all_servers($opt_shutdown_timeout);
-	    mtr_report("Resuming tests...\n");
-	    resfile_output($tinfo->{'check'}) if $opt_resfile;
 	  }
-	  else {
-	    # Test case check failed fatally, probably a server crashed
-	    report_failure_and_restart($tinfo);
-	    return 1;
+	  elsif ( $opt_check_testcases and
+	    $check_res= check_testcase($tinfo, "after"))
+	  {
+	    if ($check_res == 1) {
+	      # Test case had sideeffects, not fatal error, just continue
+	      stop_all_servers($opt_shutdown_timeout);
+	      mtr_report("Resuming tests...\n");
+	      resfile_output($tinfo->{'check'}) if $opt_resfile;
+	    }
+	    else {
+	      # Test case check failed fatally, probably a server crashed
+	      report_failure_and_restart($tinfo);
+	      return 1;
+	    }
 	  }
-	}
-	mtr_report_test_passed($tinfo);
+	  mtr_report_test_passed($tinfo);
+        }
+        elsif ( $res == 62 )
+        {
+	  # Testcase itself tell us to skip this one
+	  $tinfo->{skip_detected_by_test}= 1;
+	  # Try to get reason from test log file
+	  find_testcase_skipped_reason($tinfo);
+ 	  mtr_report_test_skipped($tinfo);
+	  # Restart if skipped due to missing perl, it may have had side effects
+	  if ( restart_forced_by_test('force_restart_if_skipped') ||
+               $tinfo->{'comment'} =~ /^perl not found/ )
+	  {
+	    stop_all_servers($opt_shutdown_timeout);
+	  }
+        }
+        elsif ( $res == 65 )
+        {
+	  # Testprogram killed by signal
+	  $tinfo->{comment}=
+	    "testprogram crashed(returned code $res)";
+	  report_failure_and_restart($tinfo);
+        }
+        elsif ( $res == 1 )
+        {
+	  # Check if the test tool requests that
+	  # an analyze script should be run
+	  my $analyze= find_analyze_request();
+	  if ($analyze){
+	    run_on_all($tinfo, "analyze-$analyze");
+	  }
+
+	  # Wait a bit and see if a server died, if so report that instead
+	  mtr_milli_sleep(100);
+	  my $srvproc= My::SafeProcess::check_any();
+	  if ($srvproc && grep($srvproc eq $_, started(all_servers()))) {
+	    $proc= $srvproc;
+	    goto SRVDIED;
+	  }
+
+          #foreach my $mysqld (mysqlds())
+          #{
+          #  $tinfo->{comment}.=
+          #    "\nServer " . $mysqld->{proc} . " log: ".
+          #    get_log_from_proc($mysqld->{proc}, $tinfo->{name});
+          #}
+
+	  # Test case failure reported by mysqltest
+	  report_failure_and_restart($tinfo);
+        }
+        else
+        {
+	  # mysqltest failed, probably crashed
+	  $tinfo->{comment}=
+	    "mysqltest failed with unexpected return code $res\n";
+	  report_failure_and_restart($tinfo);
+        }
+
+        # Save info from this testcase run to mysqltest.log
+        if( -f $path_current_testlog)
+        {
+	  if ($opt_resfile && $res && $res != 62) {
+	    resfile_output_file($path_current_testlog);
+	  }
+	  mtr_appendfile_to_file($path_current_testlog, $path_testlog);
+	  unlink($path_current_testlog);
+        }
+
+        # Remove testcase .log file produce in var/log/ to save space since
+        # relevant part of logfile has already been appended to master log
+        {
+	  my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
+	  if (-e $log_file_name && ($tinfo->{'result'} ne 'MTR_RES_FAILED')) {
+	    unlink($log_file_name);
+	  }
+        }
+
+        return ($res == 62) ? 0 : $res;
       }
-      elsif ( $res == 62 )
+
+      # ----------------------------------------------------
+      # Check if it was an expected crash
+      # ----------------------------------------------------
+      my $check_crash = check_expected_crash_and_restart($proc);
+      mtr_verbose("check_expected_crash_and_restart - $check_crash - $proc");
+      if ($check_crash)
       {
-	# Testcase itself tell us to skip this one
-	$tinfo->{skip_detected_by_test}= 1;
-	# Try to get reason from test log file
-	find_testcase_skipped_reason($tinfo);
-	mtr_report_test_skipped($tinfo);
-	# Restart if skipped due to missing perl, it may have had side effects
-	if ( restart_forced_by_test('force_restart_if_skipped') ||
-             $tinfo->{'comment'} =~ /^perl not found/ )
-	{
-	  stop_all_servers($opt_shutdown_timeout);
-	}
+        # Keep waiting if it returned 2, if 1 don't wait or stop waiting.
+        if ($check_crash == 1) {
+          @procs = grep { $_ ne $proc } @procs;
+        }
+        next;
       }
-      elsif ( $res == 65 )
+
+    SRVDIED:
+      # ----------------------------------------------------
+      # Stop the test case timer
+      # ----------------------------------------------------
+      $test_timeout= 0;
+
+      # ----------------------------------------------------
+      # Check if it was a server that died
+      # ----------------------------------------------------
+      if ( grep($proc eq $_, started(all_servers())) )
       {
-	# Testprogram killed by signal
-	$tinfo->{comment}=
-	  "testprogram crashed(returned code $res)";
-	report_failure_and_restart($tinfo);
+        # Server failed, probably crashed
+        $tinfo->{comment}=
+	  "Server $proc failed during test run" .
+	  get_log_from_proc($proc, $tinfo->{name});
+
+        # ----------------------------------------------------
+        # It's not mysqltest that has exited, kill it
+        # ----------------------------------------------------
+        $test->kill();
+
+        report_failure_and_restart($tinfo);
+        return 1;
       }
-      elsif ( $res == 1 )
+
+      # Try to dump core for mysqltest and all servers
+      foreach my $proc ($test, started(all_servers()))
       {
-	# Check if the test tool requests that
-	# an analyze script should be run
-	my $analyze= find_analyze_request();
-	if ($analyze){
-	  run_on_all($tinfo, "analyze-$analyze");
-	}
-
-	# Wait a bit and see if a server died, if so report that instead
-	mtr_milli_sleep(100);
-	my $srvproc= My::SafeProcess::check_any();
-	if ($srvproc && grep($srvproc eq $_, started(all_servers()))) {
-	  $proc= $srvproc;
-	  goto SRVDIED;
-	}
-
-	# Test case failure reported by mysqltest
-	report_failure_and_restart($tinfo);
+        mtr_print("Trying to dump core for $proc");
+        if ($proc->dump_core())
+        {
+	  $proc->wait_one(20);
+        }
       }
-      else
-      {
-	# mysqltest failed, probably crashed
-	$tinfo->{comment}=
-	  "mysqltest failed with unexpected return code $res\n";
-	report_failure_and_restart($tinfo);
-      }
-
-      # Save info from this testcase run to mysqltest.log
-      if( -f $path_current_testlog)
-      {
-	if ($opt_resfile && $res && $res != 62) {
-	  resfile_output_file($path_current_testlog);
-	}
-	mtr_appendfile_to_file($path_current_testlog, $path_testlog);
-	unlink($path_current_testlog);
-      }
-
-      # Remove testcase .log file produce in var/log/ to save space since
-      # relevant part of logfile has already been appended to master log
-      {
-	my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
-	if (-e $log_file_name && ($tinfo->{'result'} ne 'MTR_RES_FAILED')) {
-	  unlink($log_file_name);
-	}
-      }
-
-      return ($res == 62) ? 0 : $res;
-
-    }
-
-    # ----------------------------------------------------
-    # Check if it was an expected crash
-    # ----------------------------------------------------
-    my $check_crash = check_expected_crash_and_restart($proc);
-    if ($check_crash)
-    {
-      # Keep waiting if it returned 2, if 1 don't wait or stop waiting.
-      $keep_waiting_proc = 0 if $check_crash == 1;
-      $keep_waiting_proc = $proc if $check_crash == 2;
-      next;
-    }
-
-  SRVDIED:
-    # ----------------------------------------------------
-    # Stop the test case timer
-    # ----------------------------------------------------
-    $test_timeout= 0;
-
-    # ----------------------------------------------------
-    # Check if it was a server that died
-    # ----------------------------------------------------
-    if ( grep($proc eq $_, started(all_servers())) )
-    {
-      # Server failed, probably crashed
-      $tinfo->{comment}=
-	"Server $proc failed during test run" .
-	get_log_from_proc($proc, $tinfo->{name});
 
       # ----------------------------------------------------
       # It's not mysqltest that has exited, kill it
       # ----------------------------------------------------
       $test->kill();
 
-      report_failure_and_restart($tinfo);
-      return 1;
-    }
-
-    # Try to dump core for mysqltest and all servers
-    foreach my $proc ($test, started(all_servers()))
-    {
-      mtr_print("Trying to dump core for $proc");
-      if ($proc->dump_core())
+      # ----------------------------------------------------
+      # Check if testcase timer expired
+      # ----------------------------------------------------
+      if ( $proc->{timeout} )
       {
-	$proc->wait_one(20);
-      }
-    }
-
-    # ----------------------------------------------------
-    # It's not mysqltest that has exited, kill it
-    # ----------------------------------------------------
-    $test->kill();
-
-    # ----------------------------------------------------
-    # Check if testcase timer expired
-    # ----------------------------------------------------
-    if ( $proc->{timeout} )
-    {
-      my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
-      $tinfo->{comment}=
-        "Test case timeout after ".testcase_timeout($tinfo).
+        my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
+        $tinfo->{comment}=
+          "Test case timeout after ".testcase_timeout($tinfo).
 	  " seconds\n\n";
-      # Add 20 last executed commands from test case log file
-      if  (-e $log_file_name)
-      {
-        $tinfo->{comment}.=
-	   "== $log_file_name == \n".
-	     mtr_lastlinesfromfile($log_file_name, 500)."\n";
+        # Add 20 last executed commands from test case log file
+        if  (-e $log_file_name)
+        {
+          $tinfo->{comment}.=
+	    "== $log_file_name == \n".
+	  mtr_lastlinesfromfile($log_file_name, 20)."\n";
+        }
+        $tinfo->{'timeout'}= testcase_timeout($tinfo); # Mark as timeout
+        run_on_all($tinfo, 'analyze-timeout');
+
+        report_failure_and_restart($tinfo);
+        return 1;
       }
-      $tinfo->{'timeout'}= testcase_timeout($tinfo); # Mark as timeout
-      run_on_all($tinfo, 'analyze-timeout');
-
-      report_failure_and_restart($tinfo);
-      return 1;
+      mtr_error("Unhandled process $proc exited");
     }
-
-    mtr_error("Unhandled process $proc exited");
   }
   mtr_error("Should never come here");
 }

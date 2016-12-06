@@ -229,7 +229,7 @@ const char *ha_row_type[] = {
   "", "FIXED", "DYNAMIC", "COMPRESSED", "REDUNDANT", "COMPACT",
   /* Reserved to be "PAGE" in future versions */ "?",
   "TOKUDB_UNCOMPRESSED", "TOKUDB_ZLIB", "TOKUDB_SNAPPY", "TOKUDB_QUICKLZ",
-  "TOKUDB_LZMA", "TOKUDB_FAST", "TOKUDB_SMALL",
+  "TOKUDB_LZMA", "TOKUDB_FAST", "TOKUDB_SMALL", "TOKUDB_DEFAULT",
   "?","?","?"
 };
 
@@ -3182,6 +3182,12 @@ int handler::ha_rnd_next(uchar *buf)
     result= update_generated_read_fields(buf, table);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3216,6 +3222,12 @@ int handler::ha_rnd_pos(uchar *buf, uchar *pos)
     result= update_generated_read_fields(buf, table);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3266,6 +3278,12 @@ int handler::ha_index_read_map(uchar *buf, const uchar *key,
     result= update_generated_read_fields(buf, table, active_index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3289,6 +3307,12 @@ int handler::ha_index_read_last_map(uchar *buf, const uchar *key,
     result= update_generated_read_fields(buf, table, active_index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3318,6 +3342,12 @@ int handler::ha_index_read_idx_map(uchar *buf, uint index, const uchar *key,
     result= update_generated_read_fields(buf, table, index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(index);
+  }
+
   return result;
 }
 
@@ -3352,6 +3382,12 @@ int handler::ha_index_next(uchar * buf)
     result= update_generated_read_fields(buf, table, active_index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3386,6 +3422,12 @@ int handler::ha_index_prev(uchar * buf)
     result= update_generated_read_fields(buf, table, active_index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3420,6 +3462,12 @@ int handler::ha_index_first(uchar * buf)
     result= update_generated_read_fields(buf, table, active_index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3454,6 +3502,12 @@ int handler::ha_index_last(uchar * buf)
     result= update_generated_read_fields(buf, table, active_index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3490,6 +3544,12 @@ int handler::ha_index_next_same(uchar *buf, const uchar *key, uint keylen)
     result= update_generated_read_fields(buf, table, active_index);
     m_update_generated_read_fields= false;
   }
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -8146,8 +8206,22 @@ int binlog_log_row(TABLE* table,
       !(table->file->ht->db_type == DB_TYPE_PARTITION_DB &&
         (((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
   {
-    return 0;
-  } 
+      return 0;
+  }
+
+  /* enforce wsrep_max_ws_rows */
+  if (table->s->tmp_table == NO_TMP_TABLE)
+  {
+    thd->wsrep_affected_rows++;
+    if (wsrep_max_ws_rows &&
+        thd->wsrep_exec_mode != REPL_RECV &&
+        thd->wsrep_affected_rows > wsrep_max_ws_rows)
+    {
+      trans_rollback_stmt(thd) || trans_rollback(thd);
+      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
+      return ER_ERROR_DURING_COMMIT;
+    }
+  }
 #endif /* WITH_WSREP */
   if (check_table_binlog_row_based(thd, table))
   {
@@ -8337,20 +8411,8 @@ int handler::ha_write_row(uchar *buf)
 
   if (unlikely((error= binlog_log_row(table, 0, buf, log_func))))
     DBUG_RETURN(error); /* purecov: inspected */
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      DBUG_RETURN(ER_ERROR_DURING_COMMIT);
-    }
-  }
-#endif /* WITH_WSREP */
+
+  rows_changed++;
 
   DEBUG_SYNC_C("ha_write_row_end");
   DBUG_RETURN(0);
@@ -8391,20 +8453,8 @@ int handler::ha_update_row(const uchar *old_data, uchar *new_data)
     DBUG_RETURN(error);
   if (unlikely((error= binlog_log_row(table, old_data, new_data, log_func))))
     DBUG_RETURN(error);
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      DBUG_RETURN(ER_ERROR_DURING_COMMIT);
-    }
-  }
-#endif /* WITH_WSREP */
+
+  rows_changed++;
   DBUG_RETURN(0);
 }
 
@@ -8438,20 +8488,8 @@ int handler::ha_delete_row(const uchar *buf)
     return error;
   if (unlikely((error= binlog_log_row(table, buf, 0, log_func))))
     return error;
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      return ER_ERROR_DURING_COMMIT;
-    }
-  }
-#endif /* WITH_WSREP */
+
+  rows_changed++;
   return 0;
 }
 

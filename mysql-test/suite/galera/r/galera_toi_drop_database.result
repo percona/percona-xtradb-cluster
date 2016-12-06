@@ -4,13 +4,14 @@ CREATE TABLE ten (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
-set session wsrep_sync_wait=0;
-INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;;
+SET SESSION wsrep_retry_autocommit = 0;
+INSERT INTO t1 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten as a6;;
 USE database1;
-INSERT INTO t2 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;;
+SET SESSION wsrep_retry_autocommit = 0;
+INSERT INTO t2 (f1) SELECT 1 FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten as a6;;
 DROP DATABASE database1;;
-ERROR 42S02: Table 'database1.t1' doesn't exist
-ERROR 42S02: Table 'database1.t2' doesn't exist
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
 SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'database1';
 COUNT(*) = 0
 1

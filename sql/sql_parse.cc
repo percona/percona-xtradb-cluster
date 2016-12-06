@@ -2218,7 +2218,9 @@ done:
 
   THD_STAGE_INFO(thd, stage_cleaning_up);
   if (thd->lex->sql_command == SQLCOM_CREATE_TABLE)
+  {
     DEBUG_SYNC(thd, "dispatch_create_table_command_before_thd_root_free");
+  }
 
   if (thd->killed == THD::KILL_QUERY ||
       thd->killed == THD::KILL_BAD_DATA)
@@ -3221,7 +3223,7 @@ mysql_execute_command(THD *thd, bool first_level)
                                    !thd->stmt_arena->is_conventional());
 
   if (lex->set_statement && !lex->var_list.is_empty()) {
-    per_query_variables_backup= copy_system_variables(&thd->variables,
+    per_query_variables_backup= copy_system_variables(thd,
                                                       thd->m_enable_plugins);
     if ((res= sql_set_variables(thd, &lex->var_list)))
     {
@@ -3886,7 +3888,7 @@ end_with_restore_list:
       and thus classify as slow administrative statements just like
       ALTER TABLE.
     */
-    thd->enable_slow_log= opt_log_slow_admin_statements;
+    thd->set_slow_log_for_admin_command();
 
     memset(&create_info, 0, sizeof(create_info));
     create_info.db_type= 0;

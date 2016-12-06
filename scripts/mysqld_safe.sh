@@ -334,8 +334,17 @@ parse_arguments() {
 	set_malloc_lib "$val"
 	load_jemalloc=0
 	;;
-      --mysqld=*) MYSQLD="$val" ;;
+      --mysqld=*)
+        if [ -z "$pick_args" ]; then
+          log_error "--mysqld option can only be used as command line option, found in config file"
+          exit 1
+        fi
+        MYSQLD="$val" ;;
       --mysqld-version=*)
+        if [ -z "$pick_args" ]; then
+          log_error "--mysqld-version option can only be used as command line option, found in config file"
+          exit 1
+        fi
         if test -n "$val"
         then
           MYSQLD="mysqld-$val"
@@ -448,38 +457,22 @@ mysqld_ld_preload_text() {
   echo "$text"
 }
 
-
-mysql_config=
-get_mysql_config() {
-  if [ -z "$mysql_config" ]; then
-    mysql_config=`echo "$0" | sed 's,/[^/][^/]*$,/mysql_config,'`
-    if [ ! -x "$mysql_config" ]; then
-      log_error "Can not run mysql_config $@ from '$mysql_config'"
-      exit 1
-    fi
-  fi
-
-  "$mysql_config" "$@"
-}
-
-
 # set_malloc_lib LIB
 # - If LIB is empty, do nothing and return
-# - If LIB is 'tcmalloc', look for tcmalloc shared library in /usr/lib
-#   then pkglibdir.  tcmalloc is part of the Google perftools project.
+# - If LIB is 'tcmalloc', look for tcmalloc shared library in $malloc_dirs.
+#   tcmalloc is part of the Google perftools project.
 # - If LIB is an absolute path, assume it is a malloc shared library
 #
 # Put LIB in mysqld_ld_preload, which will be added to LD_PRELOAD when
 # running mysqld.  See ld.so for details.
 set_malloc_lib() {
+  # This list is kept intentionally simple.
+  malloc_dirs="/usr/lib /usr/lib64 /usr/lib/i386-linux-gnu /usr/lib/x86_64-linux-gnu"
   malloc_lib="$1"
 
   if [ "$malloc_lib" = tcmalloc ]; then
-    pkglibdir=`get_mysql_config --variable=pkglibdir`
     malloc_lib=
-    # This list is kept intentionally simple.  Simply set --malloc-lib
-    # to a full path if another location is desired.
-    for libdir in /usr/lib "$pkglibdir" "$pkglibdir/mysql"; do
+    for libdir in $(echo $malloc_dirs); do
       for flavor in _minimal '' _and_profiler _debug; do
         tmp="$libdir/libtcmalloc$flavor.so"
         #log_notice "DEBUG: Checking for malloc lib '$tmp'"
@@ -490,7 +483,7 @@ set_malloc_lib() {
     done
 
     if [ -z "$malloc_lib" ]; then
-      log_error "no shared library for --malloc-lib=tcmalloc found in /usr/lib or $pkglibdir"
+      log_error "no shared library for --malloc-lib=tcmalloc found in $malloc_dirs"
       exit 1
     fi
   fi
@@ -501,9 +494,21 @@ set_malloc_lib() {
   case "$malloc_lib" in
     /*)
       if [ ! -r "$malloc_lib" ]; then
-        log_error "--malloc-lib '$malloc_lib' can not be read and will not be used"
+        log_error "--malloc-lib can not be read and will not be used"
         exit 1
       fi
+
+      # Restrict to a the list in $malloc_dirs above
+      case "$(dirname "$malloc_lib")" in
+        /usr/lib) ;;
+        /usr/lib64) ;;
+        /usr/lib/i386-linux-gnu) ;;
+        /usr/lib/x86_64-linux-gnu) ;;
+        *)
+          log_error "--malloc-lib must be located in one of the directories: $malloc_dirs"
+          exit 1
+          ;;
+      esac
       ;;
     *)
       log_error "--malloc-lib must be an absolute path or 'tcmalloc'; " \
@@ -701,7 +706,9 @@ then
       exit 1
     fi
   fi
-  rm -f "$safe_pid"
+  if [ ! -h "$safe_pid" ]; then
+    rm -f "$safe_pid"
+  fi
   if test -f "$safe_pid"
   then
     log_error "Fatal error: Can't remove the mysqld_safe pid file"
@@ -722,7 +729,9 @@ then
   if [ $? -ne 0 ]
   then
     log_error "--syslog requested, but no 'logger' program found.  Please ensure that 'logger' is in your PATH, or do not specify the --syslog option to mysqld_safe."
-    rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+    if [ ! -h "$safe_pid" ]; then
+      rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+    fi
     exit 1
   fi
 fi
@@ -832,7 +841,9 @@ does not exist or is not executable. Please cd to the mysql installation
 directory and restart this script from there as follows:
 ./bin/mysqld_safe&
 See http://dev.mysql.com/doc/mysql/en/mysqld-safe.html for more information"
-  rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+  if [ ! -h "$safe_pid" ]; then
+    rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+  fi
   exit 1
 fi
 
@@ -931,22 +942,25 @@ then
     if @FIND_PROC@
     then    # The pid contains a mysqld process
       log_error "A mysqld process already exists"
-      rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+      if [ ! -h "$safe_pid" ]; then
+        rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+      fi
       exit 1
     fi
   fi
-
   if [ ! -h "$pid_file" ]; then
-    rm -f "$pid_file"
+      rm -f "$pid_file"
   fi
-
+  
   if test -f "$pid_file"
   then
     log_error "Fatal error: Can't remove the pid file:
 $pid_file
 Please remove it manually and start $0 again;
 mysqld daemon not started"
-    rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+    if [ ! -h "$safe_pid" ]; then
+      rm -f "$safe_pid"                 # Clean Up of mysqld_safe.pid file.
+    fi
     exit 1
   fi
 fi
@@ -1091,8 +1105,9 @@ do
     rm -f "$pid_file"
   fi
   if [ ! -h "$pid_file.shutdown" ]; then
-    rm -f "$pid_file.shutdown"
+     rm -f  "$pid_file.shutdown"
   fi
+
   start_time=`date +%M%S`
 
   # This file is checked for empty directory because 
@@ -1223,9 +1238,12 @@ do
   log_notice "mysqld restarted"
 done
 
-rm -f "$pid_file.shutdown"
+if [ ! -h "$pid_file.shutdown" ]; then
+  rm -f "$pid_file.shutdown"
+fi
 
 log_notice "mysqld from pid file $pid_file ended"
 
-rm -f "$safe_pid"                       # Some Extra Safety. File is deleted
-                                        # once the mysqld process ends.
+if [ ! -h "$safe_pid" ]; then
+  rm -f "$safe_pid"                       # Some Extra Safety. File is deleted
+fi                                        # once the mysqld process ends.

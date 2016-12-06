@@ -10,3 +10,4 @@ galera_sst_xtrabackup-v2_keyring : Requires xtrabackup 2.4.4
 galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
 galera_var_notify_cmd : fails on digital ocean distro.
 MW-286 : timing issues. Need to work and stablize it.
+galera_gcache_recover_manytrx : timing issue that causes it to fail intermittently.

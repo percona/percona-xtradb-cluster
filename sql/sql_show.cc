@@ -4562,6 +4562,17 @@ public:
   virtual void operator()(THD* thd)
   {
     mysql_mutex_lock(&thd->LOCK_temporary_tables);
+
+#ifndef DBUG_OFF
+    const char* tmp_proc_info= thd->proc_info;
+    if (tmp_proc_info &&
+        !strncmp(tmp_proc_info,
+                 STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables"))) {
+      DEBUG_SYNC(m_client_thd,
+                 "fill_global_temporary_tables_thd_item_at_tables_debug_sync");
+    }
+#endif
+
     for (TABLE* tmp= thd->temporary_tables; tmp; tmp= tmp->next)
     {
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
@@ -5574,6 +5585,9 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
         break;
       case ROW_TYPE_TOKU_SMALL:
         tmp_buff= "tokudb_small";
+        break;
+      case ROW_TYPE_TOKU_DEFAULT:
+        tmp_buff= "tokudb_default";
         break;
       }
 
