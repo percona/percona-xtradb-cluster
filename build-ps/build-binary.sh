@@ -28,15 +28,13 @@ QUIET=''
 # link jemalloc (needed for tokudb). For now pxc doesn't build tokudb
 # if in future pxc supports tokudb we will need it.
 WITH_JEMALLOC=''
+DEBUG_EXTRA=''
 
 # Galera can be build locally as part of the script if the directory is placed
 # at said location. Alternatively, skip building galera instead just copy
 # the pre-build binary/so file to TARGETDIR (target-directory specified) and this
 # script will install it at said location while making file tar.gz.
 COPYGALERA=0
-
-# suffix to add in case of debug build to tar.gz.
-DEBUG_EXTNAME=''
 
 # build with ssl. configuration related to ssl.
 WITH_SSL='/usr'
@@ -47,7 +45,6 @@ CRYPTO_LIBRARY=''
 GALERA_SSL=''
 SSL_OPT=''
 STAG=${STAG:-}
-DEBUG_EXTRA=''
 # tag build with this name.
 TAG=''
 
@@ -97,7 +94,7 @@ do
         shift
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
-        DEBUG_EXTNAME="-DDEBUG_EXTNAME=OFF"
+        DEBUG_EXTRA="-DDEBUG_EXTNAME=OFF"
         SCONS_ARGS+=' debug=1'
         ;;
     -G | --copygalera )
@@ -290,30 +287,18 @@ if [[ $ENABLE_ASAN -eq 1 ]]; then
 fi
 
 #
-# TokuDB cmake flags [IGNORED FOR PXC]
-if test -d "$SOURCEDIR/storage/tokudb"
-then
-    CMAKE_OPTS="${CMAKE_OPTS:-} -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=${TOKUDB_BACKUP_VERSION}"
-
-    if test "x$CMAKE_BUILD_TYPE" != "xDebug"
-    then
-        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=OFF"
-    else
-        CMAKE_OPTS="${CMAKE_OPTS:-} -DTOKU_DEBUG_PARANOID=ON"
-    fi
-
-    if [[ $CMAKE_OPTS == *WITH_VALGRIND=ON* ]]
-    then
-        CMAKE_OPTS="${CMAKE_OPTS:-} -DUSE_VALGRIND=ON"
-    fi
-fi
-
-#
 
 COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
+
+export DEBIAN_VERSION="$(lsb_release -sc)"
+echo $DEBIAN_VERSION
+if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && [[ "$DEBIAN_VERSION" == "yakkety" ]]; then
+    export CFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value"
+    export CXXFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value"
+fi
 
 #
 # Test jemalloc directory
@@ -383,7 +368,6 @@ fi
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=Debug \
             $DEBUG_EXTRA \
-            -DDEBUG_EXTNAME=ON \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
             -DENABLE_DTRACE=OFF \
@@ -400,6 +384,7 @@ fi
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
+            -DWITH_SCALABILITY_METRICS=ON \
             $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         make $MAKE_JFLAG $QUIET
@@ -409,7 +394,7 @@ fi
     else
         cmake ../../ ${CMAKE_OPTS:-} -DBUILD_CONFIG=mysql_release \
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-RelWithDebInfo} \
-            $DEBUG_EXTNAME \
+            $DEBUG_EXTRA \
             -DWITH_EMBEDDED_SERVER=OFF \
             -DFEATURE_SET=community \
             -DENABLE_DTRACE=OFF \
@@ -425,6 +410,7 @@ fi
             -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
+            -DWITH_SCALABILITY_METRICS=ON \
             $OPENSSL_INCLUDE $OPENSSL_LIBRARY $CRYPTO_LIBRARY
 
         make $MAKE_JFLAG $QUIET

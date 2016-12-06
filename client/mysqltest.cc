@@ -4790,7 +4790,7 @@ static int my_kill(int pid, int sig)
 
 void do_shutdown_server(struct st_command *command)
 {
-  long timeout=60;
+  long timeout=90;
   int pid;
   DYNAMIC_STRING ds_pidfile_name;
   MYSQL* mysql = &cur_con->mysql;
@@ -4859,10 +4859,10 @@ void do_shutdown_server(struct st_command *command)
   DBUG_PRINT("info", ("Killing server, pid: %d", pid));
   if (orig_timeout != 0)
   {
-    log_msg("shutdown_server timeout %ld exceeded, SIGKILL sent to the server",
+    log_msg("shutdown_server timeout %ld exceeded, SIGABRT sent to the server",
             orig_timeout);
   }
-  (void)my_kill(pid, 9);
+  (void)my_kill(pid, (orig_timeout != 0) ? SIGABRT : SIGKILL);
 
   DBUG_VOID_RETURN;
 

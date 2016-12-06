@@ -99,7 +99,7 @@ const char *ha_row_type[] = {
   "", "FIXED", "DYNAMIC", "COMPRESSED", "REDUNDANT", "COMPACT",
   /* Reserved to be "PAGE" in future versions */ "?",
   "TOKUDB_UNCOMPRESSED", "TOKUDB_ZLIB", "TOKUDB_SNAPPY", "TOKUDB_QUICKLZ",
-  "TOKUDB_LZMA", "TOKUDB_FAST", "TOKUDB_SMALL",
+  "TOKUDB_LZMA", "TOKUDB_FAST", "TOKUDB_SMALL", "TOKUDB_DEFAULT",
   "?","?","?"
 };
 
@@ -3014,6 +3014,12 @@ int handler::ha_rnd_next(uchar *buf)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, MAX_KEY, 0,
     { result= rnd_next(buf); })
+
+  if (likely(!result))
+  {
+    update_index_stats(MAX_KEY);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3040,6 +3046,12 @@ int handler::ha_rnd_pos(uchar *buf, uchar *pos)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, MAX_KEY, 0,
     { result= rnd_pos(buf, pos); })
+
+  if (likely(!result))
+  {
+    update_index_stats(MAX_KEY);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3079,6 +3091,12 @@ int handler::ha_index_read_map(uchar *buf, const uchar *key,
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_read_map(buf, key, keypart_map, find_flag); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3093,6 +3111,12 @@ int handler::ha_index_read_last_map(uchar *buf, const uchar *key,
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_read_last_map(buf, key, keypart_map); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3114,6 +3138,11 @@ int handler::ha_index_read_idx_map(uchar *buf, uint index, const uchar *key,
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, index, 0,
     { result= index_read_idx_map(buf, index, key, keypart_map, find_flag); })
+
+  if (likely(!result))
+  {
+    update_index_stats(index);
+  }
   return result;
 }
 
@@ -3139,6 +3168,12 @@ int handler::ha_index_next(uchar * buf)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_next(buf); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3164,6 +3199,12 @@ int handler::ha_index_prev(uchar * buf)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_prev(buf); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   DBUG_RETURN(result);
 }
 
@@ -3188,6 +3229,12 @@ int handler::ha_index_first(uchar * buf)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_first(buf); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   return result;
 }
 
@@ -3212,6 +3259,12 @@ int handler::ha_index_last(uchar * buf)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_last(buf); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   return result;
 }
 
@@ -3238,6 +3291,12 @@ int handler::ha_index_next_same(uchar *buf, const uchar *key, uint keylen)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_next_same(buf, key, keylen); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   return result;
 }
 
@@ -3266,6 +3325,12 @@ int handler::ha_index_read(uchar *buf, const uchar *key, uint key_len,
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_read(buf, key, key_len, find_flag); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   return result;
 }
 
@@ -3292,6 +3357,12 @@ int handler::ha_index_read_last(uchar *buf, const uchar *key, uint key_len)
 
   MYSQL_TABLE_IO_WAIT(m_psi, PSI_TABLE_FETCH_ROW, active_index, 0,
     { result= index_read_last(buf, key, key_len); })
+
+  if (likely(!result))
+  {
+    update_index_stats(active_index);
+  }
+
   return result;
 }
 
@@ -5170,6 +5241,7 @@ void handler::update_global_index_stats()
 int ha_create_table(THD *thd, const char *path,
                     const char *db, const char *table_name,
                     HA_CREATE_INFO *create_info,
+                    const List<Create_field> *create_fields,
                     bool update_create_info,
                     bool is_temp_table)
 {
@@ -5206,6 +5278,15 @@ int ha_create_table(THD *thd, const char *path,
 
   if (update_create_info)
     update_create_info_from_table(create_info, &table);
+
+  /*
+  Updating field definitions in 'table' with zip_dict_name values
+  from 'create_fields'
+  */
+  if (create_fields != 0)
+  {
+    table.update_compressed_columns_info(*create_fields);
+  }
 
   name= get_canonical_filename(table.file, share.path.str, name_buff);
 
@@ -7673,14 +7754,27 @@ int binlog_log_row(TABLE* table,
 
 #ifdef WITH_WSREP
   /* only InnoDB tables will be replicated through binlog emulation */
-  if (WSREP_EMULATE_BINLOG(thd)                          && 
-      table->file->ht->db_type != DB_TYPE_INNODB         &&
-      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB && 
-	(((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
-	//	!strcmp(table->file->table_type(), "InnoDB"))
+  if (WSREP_EMULATE_BINLOG(thd) &&
+      table->file->ht->db_type != DB_TYPE_INNODB &&
+      !(table->file->ht->db_type == DB_TYPE_PARTITION_DB &&
+        (((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
   {
-    return 0;
-  } 
+      return 0;
+  }
+
+  /* enforce wsrep_max_ws_rows */
+  if (table->s->tmp_table == NO_TMP_TABLE)
+  {
+    thd->wsrep_affected_rows++;
+    if (wsrep_max_ws_rows &&
+        thd->wsrep_exec_mode != REPL_RECV &&
+        thd->wsrep_affected_rows > wsrep_max_ws_rows)
+    {
+      trans_rollback_stmt(thd) || trans_rollback(thd);
+      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
+      return ER_ERROR_DURING_COMMIT;
+    }
+  }
 #endif /* WITH_WSREP */
   if (check_table_binlog_row_based(thd, table))
   {
@@ -7844,20 +7938,9 @@ int handler::ha_write_row(uchar *buf)
 
   if (unlikely(error= binlog_log_row(table, 0, buf, log_func)))
     DBUG_RETURN(error); /* purecov: inspected */
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      DBUG_RETURN(ER_ERROR_DURING_COMMIT);
-    }
-  }
-#endif /* WITH_WSREP */
+
+  if (likely(!is_fake_change_enabled(ha_thd())))
+    rows_changed++;
 
   DEBUG_SYNC_C("ha_write_row_end");
   DBUG_RETURN(0);
@@ -7889,20 +7972,10 @@ int handler::ha_update_row(const uchar *old_data, uchar *new_data)
     return error;
   if (unlikely(error= binlog_log_row(table, old_data, new_data, log_func)))
     return error;
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      return ER_ERROR_DURING_COMMIT;
-    }
-  }
-#endif /* WITH_WSREP */
+
+  if (likely(!is_fake_change_enabled(ha_thd())))
+    rows_changed++;
+
   return 0;
 }
 
@@ -7931,20 +8004,10 @@ int handler::ha_delete_row(const uchar *buf)
     return error;
   if (unlikely(error= binlog_log_row(table, buf, 0, log_func)))
     return error;
-#ifdef WITH_WSREP
-  if (table->s->tmp_table == NO_TMP_TABLE)
-  {
-    current_thd->wsrep_affected_rows++;
-    if (wsrep_max_ws_rows &&
-        current_thd->wsrep_exec_mode != REPL_RECV &&
-        current_thd->wsrep_affected_rows > wsrep_max_ws_rows)
-    {
-      trans_rollback_stmt(current_thd) || trans_rollback(current_thd);
-      my_message(ER_ERROR_DURING_COMMIT, "wsrep_max_ws_rows exceeded", MYF(0));
-      return ER_ERROR_DURING_COMMIT;
-    }
-  }
-#endif /* WITH_WSREP */
+
+  if (likely(!is_fake_change_enabled(ha_thd())))
+    rows_changed++;
+
   return 0;
 }
 

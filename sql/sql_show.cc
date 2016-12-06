@@ -56,6 +56,7 @@
 #include "sql_tmp_table.h" // Tmp tables
 #include "sql_optimizer.h" // JOIN
 #include "global_threads.h"
+#include "my_default.h"
 
 #include <algorithm>
 using std::max;
@@ -1544,6 +1545,18 @@ int store_create_info(THD *thd, TABLE_LIST *table_list, String *packet,
     case COLUMN_FORMAT_TYPE_DYNAMIC:
       packet->append(STRING_WITH_LEN(" /*!50606 COLUMN_FORMAT DYNAMIC */"));
       break;
+    case COLUMN_FORMAT_TYPE_COMPRESSED:
+      packet->append(STRING_WITH_LEN(" /*!"
+        STRINGIFY_ARG(FIRST_SUPPORTED_COMPRESSED_COLUMNS_VERSION)
+        " COLUMN_FORMAT COMPRESSED"));
+      if (field->has_associated_compression_dictionary())
+      {
+        packet->append(STRING_WITH_LEN(" WITH COMPRESSION_DICTIONARY "));
+        append_identifier(thd, packet, field->zip_dict_name.str,
+                          field->zip_dict_name.length);
+      }
+      packet->append(STRING_WITH_LEN(" */"));
+      break;
     default:
       DBUG_ASSERT(0);
       break;
@@ -2216,7 +2229,10 @@ void mysqld_list_processes(THD *thd,const char *user, bool verbose)
     else
       protocol->store(command_name[thd_info->command].str, system_charset_info);
     if (thd_info->start_time)
-      protocol->store_long ((longlong) (now - thd_info->start_time));
+    {
+      protocol->store_long ((thd_info->start_time > now) ? 0
+        : (longlong) (now - thd_info->start_time));
+    }
     else
       protocol->store_null();
     protocol->store(thd_info->state_info, system_charset_info);
@@ -4253,6 +4269,17 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
  
   while (it != end && (thd_item=*(it++))) {
     mysql_mutex_lock(&thd_item->LOCK_temporary_tables);
+
+#ifndef DBUG_OFF
+    const char* tmp_proc_info= thd_item->proc_info;
+    if (tmp_proc_info &&
+        !strncmp(tmp_proc_info,
+                 STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables"))) {
+      DEBUG_SYNC(thd,
+                 "fill_global_temporary_tables_thd_item_at_tables_debug_sync");
+    }
+#endif
+
     for (tmp=thd_item->temporary_tables; tmp; tmp=tmp->next) {
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
@@ -5179,6 +5206,9 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
         break;
       case ROW_TYPE_TOKU_SMALL:
         tmp_buff= "tokudb_small";
+        break;
+      case ROW_TYPE_TOKU_DEFAULT:
+        tmp_buff= "tokudb_default";
         break;
       }
 

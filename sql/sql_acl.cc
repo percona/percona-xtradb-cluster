@@ -6747,11 +6747,11 @@ bool mysql_show_grants(THD *thd,LEX_USER *lex_user)
       global.append(STRING_WITH_LEN(" IDENTIFIED BY PASSWORD"));
       if ((thd->security_ctx->master_access & SUPER_ACL) == SUPER_ACL)
       {
-      char passwd_buff[SCRAMBLED_PASSWORD_CHAR_LENGTH+1];
-      if (acl_user->salt_len == SCRAMBLE_LENGTH)
-        make_password_from_salt(passwd_buff, acl_user->salt);
-      else
-        make_password_from_salt_323(passwd_buff, (ulong *) acl_user->salt);
+        char passwd_buff[SCRAMBLED_PASSWORD_CHAR_LENGTH+1];
+        if (acl_user->salt_len == SCRAMBLE_LENGTH)
+          make_password_from_salt(passwd_buff, acl_user->salt);
+        else
+          make_password_from_salt_323(passwd_buff, (ulong *) acl_user->salt);
 
         global.append(" \'");
         global.append(passwd_buff);
