@@ -90,6 +90,7 @@ How-tos
    howtos/garbd_howto
    howtos/singlebox
    howtos/3nodesec2
+   howtos/encrypt-traffic
    howtos/haproxy
    howtos/virt_sandbox
    howtos/bugreport
