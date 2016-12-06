@@ -47,9 +47,10 @@ This variable contains :term:`UUID` state of the cluster. When this value is the
 .. variable:: wsrep_cluster_status
 
 Status of the cluster component. Possible values are:
-  * ``Primary``
-  * ``Non-Primary``
-  * ``Disconnected``
+  * ``Primary`` - Node has a quorum,
+  * ``Non-Primary`` - Node has lost a quorum (for example 2 out 4 nodes get
+    partitioned and see each other but don't have a quorum),
+  * ``Disconnected`` - Node is unable to connect to other nodes/cluster.
 
 .. variable:: wsrep_commit_oooe
   
