@@ -59,14 +59,21 @@ more information about the ``xbstream`` format, see `The xbstream Binary
 
 .. option:: transferfmt
 
-     :Values: socat, nc
-     :Default: socat
+     :Values: ``socat``, ``nc``
+     :Default: ``socat``
      :Match: Yes
 
-Used to specify the data transfer format. The recommended value is
-``transferfmt=socat`` because it allows for socket options, such as transfer
-buffer sizes. For more information, see `socat(1)
+Used to specify the data transfer format.
+The recommended value is the deafult ``transferfmt=socat``
+because it allows for socket options,
+such as transfer buffer sizes.
+For more information, see `socat(1)
 <http://www.dest-unreach.org/socat/doc/socat.html>`_.
+
+.. note:: Using ``transferfmt=nc`` does not support
+   any of the SSL-based encryption methods
+   (values ``2``, ``3``, and ``4`` for the :option:`encrypt` option).
+   Only ``encrypt=1`` is supported.
 
 .. option:: tca
 
