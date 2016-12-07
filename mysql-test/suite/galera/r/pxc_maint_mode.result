@@ -41,7 +41,7 @@ select @@pxc_maint_transition_period;
 set global pxc_maint_transition_period=default;
 select @@pxc_maint_transition_period;
 @@pxc_maint_transition_period
-30
+10
 set global pxc_maint_transition_period=0;
 select @@pxc_maint_transition_period;
 @@pxc_maint_transition_period
