@@ -174,6 +174,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->reset_db(NULL, 0);
 
   shadow->user_time = thd->user_time;
+  shadow->row_count_func= thd->get_row_count_func();
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -185,6 +186,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db, shadow->db_length);
   thd->user_time              = shadow->user_time;
+  thd->set_row_count_func(shadow->row_count_func);
 }
 
 void wsrep_replay_transaction(THD *thd)
@@ -207,6 +209,25 @@ void wsrep_replay_transaction(THD *thd)
         WSREP_WARN("dangling observer in replay transaction: (thr %lu %lld %s)",
                    thd->thread_id, thd->query_id, thd->query());
       }
+
+      struct da_shadow
+      {
+          enum Diagnostics_area::enum_diagnostics_status status;
+          ulonglong affected_rows;
+          ulonglong last_insert_id;
+          char message[MYSQL_ERRMSG_SIZE];
+      };
+      struct da_shadow da_status;
+      da_status.status= thd->get_stmt_da()->status();
+      if (da_status.status == Diagnostics_area::DA_OK)
+      {
+        da_status.affected_rows= thd->get_stmt_da()->affected_rows();
+        da_status.last_insert_id= thd->get_stmt_da()->last_insert_id();
+        strmake(da_status.message,
+                thd->get_stmt_da()->message(),
+                sizeof(da_status.message)-1);
+      }
+
       thd->get_stmt_da()->reset_diagnostics_area();
 
       thd->wsrep_conflict_state= REPLAYING;
@@ -273,7 +294,17 @@ void wsrep_replay_transaction(THD *thd)
         }
         else
         {
-          my_ok(thd);
+          if (da_status.status == Diagnostics_area::DA_OK)
+          {
+            my_ok(thd,
+                  da_status.affected_rows,
+                  da_status.last_insert_id,
+                  da_status.message);
+          }
+          else
+          {
+            my_ok(thd);
+          }
         }
         break;
       case WSREP_TRX_FAIL:
