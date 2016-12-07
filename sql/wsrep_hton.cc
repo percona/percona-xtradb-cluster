@@ -428,8 +428,22 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  cache = get_trans_log(thd);
   rcode = 0;
+  cache = get_trans_log(thd, false);
+  if (cache) {
+    thd->binlog_flush_pending_rows_event(false);
+    rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
+    if (WSREP_OK != rcode) {
+      WSREP_ERROR("rbr write fail from stmt cache, data_len: %zu, %d", data_len, rcode);
+      DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
+    }
+    if (data_len > 0)
+    {
+      WSREP_DEBUG("Got %lu bytes from stmt cache", data_len);
+    }
+  }
+
+  cache = get_trans_log(thd, true);
   if (cache) {
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);

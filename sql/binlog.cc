@@ -1102,7 +1102,7 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
 #ifdef WITH_WSREP
   if (!cache_mngr->is_binlog_empty()) {
-    IO_CACHE* cache= get_trans_log(thd);
+    IO_CACHE* cache= get_trans_log(thd, true);
     uchar *buf= NULL;
     size_t len= 0;
     wsrep_write_cache_buf(cache, &buf, &len);
@@ -11717,12 +11717,12 @@ int THD::binlog_query(THD::enum_binlog_query_type qtype, const char *query_arg,
 
 #endif /* !defined(MYSQL_CLIENT) */
 #ifdef WITH_WSREP
-IO_CACHE * get_trans_log(THD * thd)
+IO_CACHE * get_trans_log(THD * thd, bool transaction)
 {
   binlog_cache_mngr *const cache_mngr= thd_get_cache_mngr(thd);
   if (cache_mngr)
   {
-    return cache_mngr->get_binlog_cache_log(true);
+    return cache_mngr->get_binlog_cache_log(transaction);
   }
   else
   {
