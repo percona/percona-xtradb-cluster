@@ -108,8 +108,8 @@ Used to specify the full path to the certificate file in PEM format for
 
 .. option:: encrypt
 
-    :Values: 0, 1, 2, 3, 4
-    :Default: 0
+    :Values: ``0``, ``1``, ``2``, ``3``, ``4``
+    :Default: ``0``
     :Match: Yes
 
 Used to enable and specify SST encryption mode:
@@ -152,9 +152,11 @@ Used to enable and specify SST encryption mode:
   ssl-cert=server-cert.pem
   ssl-key=server-key.pem
 
+For more information, see :ref:`encrypt-traffic`.
+
 .. option:: encrypt-algo
 
-   :Values: AES128, AES192, AES256
+   :Values: ``AES128``, ``AES192``, ``AES256``
 
 Used to specify the SST encryption algorithm. It uses the same values as the
 ``--encryption`` option for |Percona XtraBackup| (see `this document
@@ -171,12 +173,12 @@ whitelist clients. For more information about socket options, see
 
 .. note::
 
-  You can also enable SSL based compression with :option:`sockopt`. This can
-  be used in place of the Percona XtraBackup ``compress`` option.
+   You can also enable SSL based compression with :option:`sockopt`. This can
+   be used in place of the Percona XtraBackup ``compress`` option.
 
 .. option:: progress
 
-    :Values: 1, path/to/file
+   :Values: ``1`` or path to file
 
 Used to specify where to write SST progress. If set to ``1``, it writes to
 MySQL ``stderr``. Alternatively, you can specify the full path to a file. If
@@ -185,12 +187,12 @@ otherwise ``wsrep_sst_xtrabackup`` will block indefinitely.
 
 .. note::
 
-  Value of 0 is not valid.
+   Value of ``0`` is not valid.
 
 .. option:: rebuild
 
-    :Values: 0, 1
-    :Default: 0
+    :Values: ``0``, ``1``
+    :Default: ``0``
 
 Used to enable rebuilding of index on joiner node. Set to ``1`` to enable.
 This is independent of compaction, though compaction enables it. Rebuild of
@@ -202,14 +204,14 @@ indexes may be used as an optimization.
 
 .. option:: time
 
-    :Values: 0, 1
-    :Default: 0
+    :Values: ``0``, ``1``
+    :Default: ``0``
 
 Enabling this option instruments key stages of backup and restore in SST.
 
 .. option:: rlimit
 
-    :Example: rlimit=128k
+    :Example: ``rlimit=128k``
 
 Used to set a ratelimit in bytes. Add a suffix (k, m, g, t) to specify other
 units. For example, ``128k`` is 128 kilobytes. Refer to `pv(1)
@@ -223,16 +225,16 @@ units. For example, ``128k`` is 128 kilobytes. Refer to `pv(1)
 
 .. option:: incremental
 
-    :Values: 0, 1
-    :Default: 0
+    :Values: ``0``, ``1``
+    :Default: ``0``
 
 Used to supersede IST on joiner node. Requires manual setup and is not
 supported currently.
 
 .. option:: use_extra
 
-    :Values: 0, 1
-    :Default: 0
+    :Values: ``0``, ``1``
+    :Default: ``0``
 
 
 Used to force SST to use the thread pool's `extra_port
@@ -256,8 +258,8 @@ example: ::
 
 .. option:: sst_special_dirs
 
-     :Values: 0, 1
-     :Default: 1
+     :Values: ``0``, ``1``
+     :Default: ``1``
 
 This option was introduced in |Percona XtraDB Cluster| :rn:`5.6.15-25.2` to
 enable XtraBackup SST to support :variable:`innodb_data_home_dir` and
@@ -274,12 +276,12 @@ variable has been removed and deprecated in |Percona XtraDB Cluster|
 .. option:: compressor
 
     :Default: not set (disabled)
-    :Example: compressor='gzip'
+    :Example: ``compressor=gzip``
 
 .. option:: decompressor
 
     :Default: not set (disabled)
-    :Example: decompressor='gzip -dc'
+    :Example: ``decompressor='gzip -dc'``
 
 Two previous options enable stream-based compression/decompression. When these
 options are set, compression/decompression is performed on stream, in contrast
@@ -315,7 +317,7 @@ apply, and move stages.
 
 .. option:: sst-initial-timeout
 
-   :Default: 100
+   :Default: ``100``
    :Unit: seconds
 
 This option is used to configure initial timeout (in seconds) to receive the

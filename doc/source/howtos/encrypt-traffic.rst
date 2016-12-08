@@ -214,7 +214,16 @@ Depending on the mode you select, other options will be required.
 
       openssl req -new -x509 -nodes -days 3600 -key ca-key.pem -out ca.pem -subj “/CN=my_cluster_name”
 
-.. note:: Percona XtraBackup supports keyring transfer in version 2.4.4 and later.
+.. note:: Percona XtraBackup supports keyring transfer
+   in version 2.4.4 and later.
+
+.. note:: SSL clients require DH parameters to be at least 1024 bits.
+   However, versions of ``socat`` earlier than 1.7.3 use 512-bit parameters.
+   If a :file:`dhparams.pem` file of required length is not found during SST
+   in the data directory,
+   it is generated with 2048 bits, which can take several minutes.
+   To avoid this delay, create the :file:`dhparams.pem` file manually
+   and place it in the data directory before joining the node to the cluster.
 
 IST Traffic, Write-Set Replication, and Service Messages
 ========================================================
@@ -232,7 +241,7 @@ and service messages are encypted.
 
 To enable SSL for all internal node processes,
 define the paths to the key, certificate and certificate authority files
-using the following parameters.
+using the following parameters:
 
 * |socket.ssl_key|_
 * |socket.ssl_cert|_
