@@ -429,8 +429,10 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
   rcode = 0;
-  cache = get_trans_log(thd, false);
-  if (cache) {
+  if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) &&
+      (cache = get_trans_log(thd, false)))
+  {
+    WSREP_DEBUG("Reading from stmt cache");
     thd->binlog_flush_pending_rows_event(false);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
     if (WSREP_OK != rcode) {
