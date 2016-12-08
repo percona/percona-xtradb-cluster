@@ -62,6 +62,7 @@ struct wsrep_thd_shadow {
   ulong                tx_isolation;
   LEX_CSTRING          db;
   struct timeval       user_time;
+  longlong             row_count_func;
 };
 #endif
 class Reprepare_observer;
