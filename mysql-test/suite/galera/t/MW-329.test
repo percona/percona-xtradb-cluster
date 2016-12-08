@@ -12,7 +12,7 @@ INSERT INTO t1 (f1) VALUES (1),(65535);
 # Clear the wsrep_local_replays counter
 
 FLUSH STATUS;
-SELECT VARIABLE_VALUE = 0 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays';
+SELECT VARIABLE_VALUE = 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
 
 #
 # Run concurrent INSERTs 
@@ -61,7 +61,7 @@ while ($count)
 # Confirm that some transaction replays occurred
 #
 
-SELECT VARIABLE_VALUE > 0 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_replays';
+SELECT VARIABLE_VALUE > 0 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_replays';
 
 #
 # Terminate the stored procedure
