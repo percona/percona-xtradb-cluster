@@ -43,7 +43,7 @@ on the first node::
  pxc_strict_mode=ENFORCING
 
  binlog_format=ROW
- defaul_storage_engine=InnoDB
+ default_storage_engine=InnoDB
  innodb_autoinc_lock_mode=2
 
 If you are running Red Hat or CentOS,
