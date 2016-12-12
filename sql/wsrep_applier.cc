@@ -310,6 +310,14 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
   thd_proc_info(thd, "committing");
 #endif /* WSREP_PROC_INFO */
 
+  if (!thd->get_transaction()->is_empty(Transaction_ctx::STMT))
+  {
+    WSREP_INFO("Applier statement commit needed");
+    if (trans_commit_stmt(thd))
+    {
+      WSREP_WARN("Applier statement rollback failed");
+    }
+  }
   wsrep_cb_status_t const rcode(trans_commit(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
@@ -345,6 +353,14 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
   thd_proc_info(thd, "rolling back");
 #endif /* WSREP_PROC_INFO */
 
+  if (!thd->get_transaction()->is_empty(Transaction_ctx::STMT))
+  {
+    WSREP_DEBUG("statement rollback needed");
+    if (trans_rollback_stmt(thd))
+    {
+      WSREP_WARN("Applier statement rollback failed");
+    }
+  }
   wsrep_cb_status_t const rcode(trans_rollback(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
