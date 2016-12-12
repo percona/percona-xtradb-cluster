@@ -7507,7 +7507,7 @@ extern "C" void *handle_slave_sql(void *arg)
     if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
     {
       thd->set_wsrep_next_trx_id(thd->query_id);
-      WSREP_DEBUG("assigned new next for slave,  trx id: %lu", thd->wsrep_next_trx_id());
+      WSREP_DEBUG("assigned new next trx ID for slave,  trx id: %lu", thd->wsrep_next_trx_id());
     }
 #endif /* WITH_WSREP */
 
