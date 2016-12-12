@@ -102,6 +102,11 @@ sub fix_port {
   return $self->{PORT}++;
 }
 
+sub fix_x_port {
+  my ($self, $config, $group_name, $group)= @_;
+  return $self->{ARGS}->{mysqlxbaseport}++;
+}
+
 sub fix_host {
   my ($self)= @_;
   'localhost'
@@ -269,6 +274,7 @@ my @mysqld_rules=
  { '#ist_port' => \&fix_port },
  { '#sst_port' => \&fix_port },
  { 'socket' => \&fix_socket },
+ { 'loose-mysqlx-port' => \&fix_x_port },
  { 'loose-mysqlx-socket' => \&fix_x_socket },
  { '#log-error' => \&fix_log_error },
  { 'general-log' => 1 },
