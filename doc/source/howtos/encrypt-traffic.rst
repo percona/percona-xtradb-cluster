@@ -343,7 +343,7 @@ Other modes are deprecated and will be overriden
 if automatic configuration of SSL encryption is enabled.
 If any of the files are missing, a fatal error is generated.
 
-The following settings are applied or overridden::
+The following settings are applied (and overridden if necessary)::
 
  [mysqld]
  wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
