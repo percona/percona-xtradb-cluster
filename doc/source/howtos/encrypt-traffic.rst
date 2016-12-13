@@ -234,7 +234,9 @@ Depending on the mode you select, other options will be required.
    in the data directory,
    it is generated with 2048 bits, which can take several minutes.
    To avoid this delay, create the :file:`dhparams.pem` file manually
-   and place it in the data directory before joining the node to the cluster.
+   and place it in the data directory before joining the node to the cluster::
+
+    openssl dhparam -out dhparams.pem 2048
 
 Securing IST Traffic, Write-Set Replication, and Service Messages
 =================================================================
