@@ -15,10 +15,8 @@
 
 TODO: Why /bin/bash for some files and /bin/sh for others (this is also the case in native packaging, so might be a reason)
 TODO: Related to above: Should be POSIX compliant
-TODO: Build with -DWITH_SYSTEMD and related to use inbuilt systemd support (Deb8 and Ubuntu15+)
 TODO: Maybe refactor CMakeLists.txt to remove redundancy
 TODO: Clean up install exception list so --list-missing can be changed to --fail-missing
-
 
 ###  WSREP stuff
 TODO: Find a more efficient way to configure just "packaging/deb-in/"
@@ -29,12 +27,17 @@ TODO: Check whether it was safe to drop "debian/additions/debian-start*", recove
 TODO: Check everything, especially the pre/post-install/rm scripts,
       and decide whether to follow Debian or Oracle or to create a mix.
 TODO: Clean "packaging/deb-in/CMakeLists.txt" for systemd, SysV init, Upstart, and the mix (Debian!).
+TODO; Check package naming on Debian/Ubuntu, change on Dec 13 removed revision from version string
+      and so we lost the platform string in the package file name :-(
+TODO: Introduce "WITH_SYSV" as a build option, so that we can build packages with both SysV and Systemd
+      startup support, as fits Debian (which delivers both).
+TODO: Decide about Upstart, either implement support for it or remove the references.
 
 ###  Other stuff
 Package cut: Comments in RPM spec files say "lz4_decompress" and "zlib_decompress" were added to client RPMs.
-      That's wrong, they are in the server RPMs. Similar for DEB. They are meant for "mysqlpump" rseult files
+      That's wrong, they are in the server RPMs. Similar for DEB. They are meant for "mysqlpump" result files
       (if compressed), and that tool is in the client packages (both RPM and DEB).
-      Also, placemt differs: RPMs have them in "/usr/bin/", DEBs in "/usr/lib/mysql/" and a patch for MTR
+      Also, placement differs: RPMs have them in "/usr/bin/", DEBs in "/usr/lib/mysql/" and a patch for MTR
       so that they will be found.
       Proposal 1: Make comments come true, move them into client packages.
       Proposal 2: Put them in "/usr/bin/", delete the patch.

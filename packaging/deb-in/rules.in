@@ -15,9 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-ifeq (@DEB_SYSTEMD_SERVICE_NAME@,)
-	# empty name = no systemd
-else
+ifneq (,$(findstring SYSTEMD,@DEB_STARTUP@))
 CMAKE_SYSTEMD_OPTIONS := -DWITH_SYSTEMD=1 -DSYSTEMD_SERVICE_NAME="@DEB_SYSTEMD_SERVICE_NAME@"
 endif
 
@@ -87,10 +85,11 @@ override_dh_auto_install:
 	# install -g root -o root -m 0755 debian/extra/*.so debian/tmp/usr/lib/mysql/plugin/debug
 	# install -g root -o root -m 0755 debian/extra/daemon_example.ini debian/tmp/usr/lib/mysql/plugin/debug
 	install -m 0644 support-files/wsrep.cnf debian/tmp/usr/share/mysql
-	# SysV init stuff, or Systemd files ? Assume one only
-ifeq (@DEB_SYSTEMD_SERVICE_NAME@,)
+	# SysV init stuff, or Systemd files ? On Debian 8, we need both!
+ifneq (,$(findstring SYSV,@DEB_STARTUP@))
 	install -D -m 0755 support-files/mysql.server debian/tmp/etc/init.d/mysql
-else
+endif
+ifneq (,$(findstring SYSTEMD,@DEB_STARTUP@))
 	install -m 0755 scripts/mysqld_bootstrap debian/tmp/usr/bin/
 endif
 	# This seems to be the only safe place to fix permissions issues
@@ -163,4 +162,7 @@ override_dh_install:
 		-Xusr/share/mysql/docs/mysql.info \
 		-Xusr/share/mysql/docs/INSTALL-BINARY \
 		-Xusr/share/man/man1/mysqlman.1
+ifneq (,@DEB_RULES_APPARMOR_LOAD@)
+	# non-empty command = apparmor is handled
 	dh_apparmor -pmysql-server@DEB_PRODUCTSERIES@ --profile-name=usr.sbin.mysqld
+endif

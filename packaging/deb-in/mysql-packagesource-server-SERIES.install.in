@@ -17,7 +17,7 @@
 debian/extra/mysql.cnf etc/mysql/
 # debian/extra/mysql.conf.d etc/mysql/
 # debian/extra/source_mysql-5.7.py usr/share/apport/package-hooks/
-etc/apparmor.d/usr.sbin.mysqld
+@DEB_INSTALL_SERVER_APPARMOR@
 etc/mysql/debian-start
 # binaries
 usr/bin/innochecksum

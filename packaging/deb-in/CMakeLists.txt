@@ -94,12 +94,15 @@ usr/bin/mysqld_safe
 ")
 SET (FILES_STARTUP_UPSTART
 "
+Not Yet Implememted: Upstart File List
 ")
 
 # Platform specifics. The differences are generally only distro version
-# and whether or not systemd and/or apparmor are available
+# and whether or not Systemd and/or apparmor are available
 IF (DEB_CODENAME STREQUAL "wheezy")
   SET (DEB_PLATFORMRELEASE "debian7")
+  # Following the Oracle example, we package for Debian 7
+  # using only SysV init and no Apparmor.
   SET (DEB_CONTROL_BDEPS "")
   SET (DEB_INSTALL_SOURCE_XZ "")
   SET (DEB_RULES_INSTALL_SYSTEMD "")
@@ -112,9 +115,11 @@ IF (DEB_CODENAME STREQUAL "wheezy")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
   SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "")
-  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
+  SET (DEB_STARTUP "SYSV")
 ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_PLATFORMRELEASE "debian8")
+  # Improving on Oracle, we would prefer to package for Debian 8
+  # using both SysV init and Systemd, but still no Apparmor.
   SET (DEB_CONTROL_BDEPS "dh-systemd")
   SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
   SET (DEB_RULES_INSTALL_SYSTEMD
@@ -131,7 +136,11 @@ ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_SERVICE_SERVER_EXECPOST
     "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "")
-  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
+  # Debian 8 comes with both SysV init and Systemd,
+  # but "scripts/CMakeLists.txt" enforces an either-or.
+  # SET (DEB_STARTUP "SYSV SYSTEMD")
+  # For now, we go with Systemd only.
+  SET (DEB_STARTUP "SYSTEMD")
 ELSEIF(DEB_CODENAME STREQUAL "precise")
   SET (DEB_PLATFORMRELEASE "ubuntu12.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor")
@@ -148,7 +157,7 @@ ELSEIF(DEB_CODENAME STREQUAL "precise")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
   SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
-  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
+  SET (DEB_STARTUP "SYSV")
 ELSEIF(DEB_CODENAME STREQUAL "trusty")
   SET (DEB_PLATFORMRELEASE "ubuntu14.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor")
@@ -165,7 +174,7 @@ ELSEIF(DEB_CODENAME STREQUAL "trusty")
   SET (DEB_SERVICE_SERVER_EXECPRE "")
   SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
-  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
+  SET (DEB_STARTUP "SYSV")
 ELSEIF(DEB_CODENAME STREQUAL "wily")
   SET (DEB_PLATFORMRELEASE "ubuntu15.10")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -186,7 +195,7 @@ ELSEIF(DEB_CODENAME STREQUAL "wily")
   SET (DEB_SERVICE_SERVER_EXECPOST
     "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/init/apparmor-profile-load usr.sbin.mysqld")
-  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
+  SET (DEB_STARTUP "SYSTEMD")
 ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_PLATFORMRELEASE "ubuntu16.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -207,7 +216,7 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_SERVICE_SERVER_EXECPOST
     "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
+  SET (DEB_STARTUP "SYSTEMD")
 ELSEIF(DEB_CODENAME STREQUAL "yakkety")
   SET (DEB_PLATFORMRELEASE "ubuntu16.10")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -228,7 +237,7 @@ ELSEIF(DEB_CODENAME STREQUAL "yakkety")
   SET (DEB_SERVICE_SERVER_EXECPOST
     "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSTEMD})
+  SET (DEB_STARTUP "SYSTEMD")
 ELSE()
   MESSAGE(STATUS
     "Skipping deb packaging on unsupported platform ${DEB_CODENAME}.")
@@ -245,14 +254,21 @@ FILE(GLOB_RECURSE SOURCEFILES RELATIVE "${DEB_ROOT}" "${DEB_ROOT}/*")
 # Skip the copyright file from the "other" product type
 LIST(REMOVE_ITEM SOURCEFILES "copyright.${DEB_REMOVEPATTERN}")
 LIST(REMOVE_ITEM SOURCEFILES "CMakeLists.txt")
-# Skip Debian magical init files unless needed
-IF(NOT DEB_FILES_STARTUP MATCHES ".*lib/systemd/system/.*")
-  LIST(REMOVE_ITEM SOURCEFILES
-  "mysql-packagesource-server-SERIES.mysql.service.in")
-ENDIF()
-IF(NOT DEB_FILES_STARTUP MATCHES ".*etc/init.d/mysql.*")
+# Combine the list of all startup files to be included,
+# skip Debian magical init files unless needed
+IF(DEB_STARTUP MATCHES ".*SYSV.*")
+  SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
+ELSE()
   LIST(REMOVE_ITEM SOURCEFILES
   "mysql-packagesource-server-SERIES.mysql.init.in")
+ENDIF()
+IF(DEB_STARTUP MATCHES ".*SYSTEMD.*")
+  SET (DEB_FILES_STARTUP
+    ${DEB_FILES_STARTUP}
+    ${FILES_STARTUP_SYSTEMD})
+ELSE()
+  LIST(REMOVE_ITEM SOURCEFILES
+  "mysql-packagesource-server-SERIES.mysql.service.in")
 ENDIF()
 FOREACH (SOURCEFILE ${SOURCEFILES})
   STRING(REGEX REPLACE "-packagesource-" "-${DEB_PRODUCTNAME}-"
