@@ -751,14 +751,13 @@ The script will detect the change and mark the node as
 
 .. _pxc-maint-mode:
 
-Maintenance Mode
-================
+Assisted Maintenance Mode
+=========================
 
 Usually, to take a node down for maintenance, you need to identify that node,
 update its status in ProxySQL to ``OFFLINE_SOFT``,
 wait for ProxySQL to divert traffic from this node,
 and then initiate the shutdown or perform maintenance tasks.
-
 |PXC| includes a special *maintenance mode* for nodes
 that enables you to take a node down without adjusting ProxySQL manually.
 The mode is controlled using the :variable:`pxc_maint_mode` variable,
@@ -775,8 +774,7 @@ which is monitored by ProxySQL and can be set to one of the following values:
 
   When you initiate node shutdown, |PXC| does not send the signal immediately.
   Intead, it changes the state to ``pxc_maint_mode=SHUTDOWN``
-  and waits for a predefined period (60 seconds by default),
-  until existing transactions finish.
+  and waits for a predefined period (10 seconds by default).
   When ProxySQL detects that the mode is set to ``SHUTDOWN``,
   it changes the status of this node to ``OFFLINE_SOFT``,
   which stops creation of new connections for the node.
@@ -793,12 +791,10 @@ which is monitored by ProxySQL and can be set to one of the following values:
 
   To do this, manually set ``pxc_maint_mode=MAINTENANCE``.
   Control is not returned to the user for a predefined period
-  (60 seconds by default), until existing transactions finish.
-  When ProxySQL detects that the mode is set to ``SHUTDOWN``,
+  (10 seconds by default).
+  When ProxySQL detects that the mode is set to ``MAINTENANCE``,
   it stops routing traffic to the node.
-  Once control is returned,
-  any long-running transactions that are still active are aborted,
-  and you can perform maintenance activity.
+  Once control is returned, you can perform maintenance activity.
 
   .. note:: Any data changes will still be replicated across the cluster.
 
@@ -812,8 +808,7 @@ If the period is long enough for all transactions to finish,
 there should hardly be any disruption in cluster workload.
 
 .. note:: During the transition period,
-   the node continues to receive existing write-set replication traffic
-   and avoids openning new connections for transactions,
+   the node continues to receive existing write-set replication traffic,
+   ProxySQL avoids openning new connections and starting transactions,
    but the user can still open conenctions to monitor status.
-
 
