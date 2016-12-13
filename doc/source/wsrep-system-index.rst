@@ -330,18 +330,14 @@ logged. When enabled, details of conflicting |InnoDB| lock will be logged.
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: 131072 (128K)
+   :default: ``0`` (no limit)
 
-**This variable has no effect!**
+This variable is used to control the maximum number of rows
+each writeset can contain.
 
-By design,
-it was supposed to control the maximum number of rows each writeset can
-contain. However, it is hard to predict the number of rows
-because of the writeset size limit enforced by :variable:`wsrep_max_ws_size`.
-
-Codership decided to not implement the limit by rows for now.
-Correct behavior may be implemented in a future release.
-There is a discussion open at https://github.com/codership/mysql-wsrep/issues/257
+By default, there is no limit for maximum number of rows in a writeset.
+The maximum allowed value is ``1073741824``,
+which is equal to 2^30 or 1024 * 1024 * 1024.
 
 .. variable:: wsrep_max_ws_size
 
@@ -349,10 +345,12 @@ There is a discussion open at https://github.com/codership/mysql-wsrep/issues/25
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: 1073741824 (1G)
+   :default: ``1073741824`` (2 GB)
 
-This variable is used to control maximum writeset size (in bytes). Anything
-bigger than the specified value will be rejected.
+This variable is used to control maximum writeset size (in bytes).
+Anything bigger than the specified value will be rejected.
+
+You can set it to any value between ``1024`` and the default ``1073741824``.
 
 .. variable:: wsrep_mysql_replication_bundle
 
