@@ -43,6 +43,42 @@ This method uses :program:`rsync` to copy files from donor to the joining node. 
 
 Script used for this method can be found in :file:`/usr/bin/wsrep_sst_rsync` and it's provided with the |Percona XtraDB Cluster| binary packages.
 
+SST for tables with tablespaces that are not in the data directory
+==================================================================
+
+For example:
+
+.. code-block:: sql
+
+   CREATE TABLE t1 (c1 INT PRIMARY KEY) DATA DIRECTORY = '/alternative/directory';
+
+The result depends on the SST method:
+
+* SST using ``rsync``
+
+  SST will report success, however the table's data will not be copied over,
+  since ``rsync`` just copies the files.
+  You will not be able to access the table on the joiner node:
+
+  .. code-block:: sql
+
+     mysql> select * from t1;
+     ERROR 1812 (HY000): Tablespace is missing for table `sbtest`.`t1`.
+
+* SST using ``mysqldump``
+
+  Works as expected.
+  If the file does not exist, it will be created.
+  Otherwise it will attempt to use the file
+  (if the file doesn't have the expected format, an error is returned).
+
+* SST using Percona XtraBackup
+
+  XtraBackup will restore the table to the same location on the joiner node.
+  If the target directory does not exist, it will be created.
+  If the target file already exists, an error will be returned,
+  because XtraBackup cannot clear tablespaces not in the data directory.
+
 Other Reading
 =============
 
