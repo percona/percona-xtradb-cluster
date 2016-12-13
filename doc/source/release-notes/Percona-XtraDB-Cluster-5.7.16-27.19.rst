@@ -126,3 +126,8 @@ Fixed Bugs
   (:option:`encrypt` set to ``2``, ``3`` or ``4``),
   instead of silently switching to unencrypted mode.
 
+* PXC-739 Fixed faulty switch case that caused cluster to stall
+  when the :variable:`repl.commit_order` variable was set to ``2``
+  (``LOCAL_OOOC`` mode that should allow out-of-order committing
+  for local transactions).
+
