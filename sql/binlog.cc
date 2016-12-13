@@ -1302,7 +1302,7 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd)
       DBUG_ASSERT(!qinfo.is_using_immediate_logging());
 
 #ifdef WITH_WSREP
-  if (thd->slave_thread)
+  if (thd->slave_thread && !thd->wsrep_applier)
   {
     thd->wsrep_replicate_GTID= true;
   }
