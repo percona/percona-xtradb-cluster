@@ -24,6 +24,8 @@
 */
 
 #include "myisamdef.h"
+#include <string.h>
+#include <errno.h>
 
 /* Enough for comparing if number is zero */
 static char zero_string[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -92,7 +94,30 @@ my_bool mi_dynmap_file(MI_INFO *info, my_off_t size)
     DBUG_RETURN(1);
   }
 #if defined(HAVE_MADVISE)
-  madvise((char*) info->s->file_map, size, MADV_RANDOM);
+#if defined(MADV_DONTFORK)
+  if (madvise((char*) info->s->file_map, size, MADV_RANDOM |
+                                               MADV_DONTFORK))
+  {
+    const int err = errno;
+    DBUG_PRINT("warning", ("Failed to set MADV_RANDOM | MADV_DONTFORK on "
+                           "mapped file: %d (%s)", err, strerror(err)));
+  }
+#else
+  if (madvise((char*) info->s->file_map, size, MADV_RANDOM))
+  {
+    const int err = errno;
+    DBUG_PRINT("warning", ("Failed to set MADV_RANDOM on "
+                           "mapped file: %d (%s)", err, strerror(err)));
+  }
+#endif
+#endif
+#if ! defined(MADV_DONTFORK) && defined(__FreeBSD__)
+  if (minherit((char*) info->s->file_map, size, INHERIT_NONE))
+  {
+    const int err = errno;
+    DBUG_PRINT("warning", ("Failed to set INHERIT_NONE on "
+                           "mapped file: %d (%s)", err, strerror(err)));
+  }
 #endif
   info->s->mmaped_length= size;
   info->s->file_read= mi_mmap_pread;

@@ -182,15 +182,22 @@ skip:
 	}
 #endif
 
-#if defined(WITH_WSREP) && defined(UNIV_LINUX)
+#if defined(WITH_WSREP)
 	/* Do not make the pages from this block available to the child after a
 	fork(). This is required to speed up process spawning for Galera SST. */
-
+#if defined(MADV_DONTFORK)
 	if (madvise(ptr, size, MADV_DONTFORK)) {
 		fprintf(stderr, "InnoDB: Warning: madvise(MADV_DONTFORK) is "
 			"not supported by the kernel. Spawning SST processes "
 			"can be slow.\n");
 	}
+#elif defined(__FreeBSD__)
+	if (minherit(ptr, size, INHERIT_NONE)) {
+		fprintf(stderr, "InnoDB: Warning: minherit(INHERIT_NONE) is "
+			"not supported by the kernel. Spawning SST processes "
+			"can be slow.\n");
+	}
+#endif
 #endif
 	return(ptr);
 }
