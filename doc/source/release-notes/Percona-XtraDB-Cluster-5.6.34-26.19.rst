@@ -54,7 +54,8 @@ Fixed Bugs
 
 * PXC-701 Added ``init.ok`` to the list of files that do not get removed during SST.
 
-* PXC-703 Fixed error with ASIO library when building Galera.
+* PXC-703 Fixed error with ASIO library not acknowledging an ``EPOLLIN`` event
+  when building Galera.
 
 * PXC-707 Fixed stalling of DML workload on slave node
   caused by ``FLUSH TABLE`` executed on master.

@@ -49,17 +49,6 @@ and receives data from an existing node (DONOR).
 
 For more information, see :ref:`state_snapshot_transfer`.
 
-When copying encrypted data via SST,
-the keyring must be sent over with the files for decryption.
-Make sure that the following options are set in :file:`my.cnf` on all nodes:
-
-.. code-block:: text
-
-   keyring-file-data=/path/to/keyring/file
-
-.. warning:: The cluster will not work if keyring configuration across nodes
-   is different.
-
 The following SST methods are available:
 ``rsync``, ``mysqldump``, and ``xtrabackup``.
 
@@ -235,10 +224,12 @@ Depending on the mode you select, other options will be required:
    in the data directory,
    it is generated with 2048 bits, which can take several minutes.
    To avoid this delay, create the :file:`dhparams.pem` file manually
-   and place it in the data directory before joining the node to the cluster.
+   and place it in the data directory before joining the node to the cluster::
 
-IST Traffic, Write-Set Replication, and Service Messages
-========================================================
+    openssl dhparam -out dhparams.pem 2048
+
+Securing IST Traffic, Write-Set Replication, and Service Messages
+=================================================================
 
 IST refers to transferring only missing transactions from DONOR to JOINER node.
 Write-set replication is the main workload in |PXC|

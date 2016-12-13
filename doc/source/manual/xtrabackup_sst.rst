@@ -17,16 +17,13 @@ Percona XtraBackup SST works in two stages:
 
   * In case of |IST|, it proceeds as before.
 
-.. note::
+.. note:: To maintain compatibility with |Percona XtraDB Cluster|
+   older than 5.5.33-23.7.6, use ``xtrabackup`` as SST method.
+   For newer versions, ``xtrabackup-v2`` is recommended
+   and also the default SST method.
 
-  To maintain compatibility with |Percona XtraDB Cluster| older than
-  5.5.33-23.7.6, use ``xtrabackup`` as SST method. For newer versions,
-  ``xtrabackup-v2`` is recommended and also the default SST method.
-
-.. note::
-
-  |Percona Xtrabackup| 2.3.x and later is strongly recommended for
-  XtraBackup SST.
+.. note:: |Percona Xtrabackup| 2.3.x and later is strongly recommended
+   for XtraBackup SST.
 
 SST Options
 -----------
@@ -34,7 +31,7 @@ SST Options
 The following options specific to |SST| can be used in :file:`my.cnf` under
 ``[sst]``.
 
-.. note::
+.. note:: Considerations:
 
    * Non-integer options which have no default value are disabled if not set.
 
@@ -89,9 +86,7 @@ Used to specify the full path to the certificate authority (CA) file for
 Used to specify the full path to the certificate file in PEM format for
 ``socat`` encryption based on OpenSSL.
 
-.. note::
-
-  For more information about ``tca`` and ``tcert``, refer to
+.. note:: For more information about ``tca`` and ``tcert``, refer to
   http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html. The ``tca``
   is essentially the self-signed certificate in that example, and ``tcert`` is
   the PEM file generated after concatenation of the key and the certificate
@@ -100,9 +95,7 @@ Used to specify the full path to the certificate file in PEM format for
   testing you can also download certificates from `Github
   <https://github.com/percona/percona-xtradb-cluster/tree/5.6/percona-xtradb-cluster-tests/certs>`_.
 
-.. note::
-
-  Irrespective of what is shown in the example, you can use the same
+.. note:: Irrespective of what is shown in the example, you can use the same
   :file:`.crt` and :file:`.pem` files on all nodes and it will work, since
   there is no server-client paradigm here but a cluster with homogeneous nodes.
 
@@ -185,10 +178,8 @@ begin with a comma. You can use the ``tcpwrap`` option to blacklist or
 whitelist clients. For more information about socket options, see
 `socat (1) <http://www.dest-unreach.org/socat/doc/socat.html>`_.
 
-.. note::
-
-   You can also enable SSL based compression with :option:`sockopt`. This can
-   be used in place of the Percona XtraBackup ``compress`` option.
+.. note:: You can also enable SSL based compression with :option:`sockopt`.
+   This can be used in place of the Percona XtraBackup ``compress`` option.
 
 .. option:: progress
 
@@ -199,9 +190,7 @@ MySQL ``stderr``. Alternatively, you can specify the full path to a file. If
 this is a FIFO, it needs to exist and be open on reader end before itself,
 otherwise ``wsrep_sst_xtrabackup`` will block indefinitely.
 
-.. note::
-
-   Value of ``0`` is not valid.
+.. note:: Value of ``0`` is not valid.
 
 .. option:: rebuild
 
@@ -212,9 +201,7 @@ Used to enable rebuilding of index on joiner node. Set to ``1`` to enable.
 This is independent of compaction, though compaction enables it. Rebuild of
 indexes may be used as an optimization.
 
-.. note::
-
-   Bug :bug:`1192834` affects this option.
+.. note:: Bug :bug:`1192834` affects this option.
 
 .. option:: time
 
@@ -231,11 +218,10 @@ Used to set a ratelimit in bytes. Add a suffix (k, m, g, t) to specify other
 units. For example, ``128k`` is 128 kilobytes. Refer to `pv(1)
 <http://linux.die.net/man/1/pv>`_ for details.
 
-.. note::
-
-  Rate is limited on donor node. The rationale behind this is to not allow SST
-  to saturate the donor's regular cluster operations or to limit the rate for
-  other purposes.
+.. note:: Rate is limited on donor node.
+   The rationale behind this is to not allow SST
+   to saturate the donor's regular cluster operations
+   or to limit the rate for other purposes.
 
 .. option:: incremental
 
@@ -265,18 +251,8 @@ example: ::
   [sst]
   cpat='.*galera\.cache$\|.*sst_in_progress$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$\|.*\.xyz$'
 
-.. note::
-
-  This option can only be used when :variable:`wsrep_sst_method` is set to
-  ``xtrabackup-v2``.
-
-.. option:: sst_special_dirs
-
-     :Values: ``0``, ``1``
-     :Default: ``1``
-
-This option has been removed and deprecated
-in |Percona XtraDB Cluster| :rn:`5.6.22-25.8`.
+.. note:: This option can only be used when :variable:`wsrep_sst_method`
+   is set to ``xtrabackup-v2``.
 
 .. option:: compressor
 
@@ -314,11 +290,9 @@ will be wasting CPU cycles).
 This group of options can be used to pass innobackupex options for backup,
 apply, and move stages.
 
-.. note::
-
-  Although these options are related to XtraBackup SST, they cannot be
-  specified in :file:`my.cnf`, because they are for passing innobackupex
-  options.
+.. note:: Although these options are related to XtraBackup SST,
+   they cannot be specified in :file:`my.cnf`,
+   because they are for passing innobackupex options.
 
 .. option:: sst-initial-timeout
 
@@ -335,18 +309,19 @@ donor node. The default should be sufficient, however, it is configurable, so
 you can set it appropriately for your cluster. To disable initial SST timeout,
 set ``sst-initial-timeout=0``.
 
-.. note::
-
-  If you are using :variable:`wsrep_sst_donor`, and you want the joiner node to
-  strictly wait for donors listed in the variable and not fall back (that is,
-  without a terminating comma at the end), **and** there is a possibility of
-  **all** nodes in that variable to be unavailable, disable initial SST timeout
-  or set it to a higher value (maximum threshold that you want the joiner node
-  to wait). You can also disable this option (or set it to a higher value) if
-  you believe all other nodes in the cluster can potentially become unavailable
-  at any point in time (mostly in small clusters) or there is a high network
-  latency / network disturbance (which can cause donor selection to take longer
-  than 100 seconds).
+.. note:: If you are using :variable:`wsrep_sst_donor`
+   and you want the joiner node to strictly wait for donors
+   listed in the variable and not fall back
+   (that is, without a terminating comma at the end),
+   **and** there is a possibility of **all** nodes in that variable
+   to be unavailable, disable initial SST timeout or set it to a higher value
+   (maximum threshold that you want the joiner node to wait).
+   You can also disable this option (or set it to a higher value)
+   if you believe all other nodes in the cluster
+   can potentially become unavailable at any point in time
+   (mostly in small clusters) or there is a high network latency
+   or network disturbance
+   (which can cause donor selection to take longer than 100 seconds).
 
 XtraBackup SST Dependencies
 ---------------------------
@@ -407,16 +382,16 @@ following scenarios:
      OpenSSL-based for SST with ``encrypt=2``), then don't provide any
      |Percona XtraBackup| encryption options in :file:`my.cnf`.
 
-.. note::
+.. note:: The :option:`encrypt` option under ``[sst]`` is different
+   from the one under ``[xtrabackup]``.
+   The former is for disabling/changing encryption mode,
+   while the latter is to provide an encryption algorithm.
+   To disambiguate, if you need to provide the latter under ``[sst]``
+   (for example, in cases 1 and 2 above),
+   it should be specified as :option:`encrypt-algo`.
 
-  The :option:`encrypt` option under ``[sst]`` is different from the one under
-  ``[xtrabackup]``. The former is for disabling/changing encryption mode, while
-  the latter is to provide an encryption algorithm. To disambiguate, if you
-  need to provide the latter under ``[sst]`` (for example, in cases 1 and 2
-  above), it should be specified as :option:`encrypt-algo`.
+.. warning:: An implication of the above is that
+   if you specify any of the |Percona XtraBackup| encryption options,
+   and ``encrypt=0`` under ``[sst]``, it will still be encrypted
+   and SST will fail. Look at case 3 above for resolution.
 
-.. warning::
-
-  An implication of the above is that if you specify any of the |Percona
-  XtraBackup| encryption options, and ``encrypt=0`` under ``[sst]``, it will
-  still be encrypted and SST will fail. Look at case 3 above for resolution.
