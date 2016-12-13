@@ -1,5 +1,6 @@
-mysql-@DEB_PRODUCTNAME@@DEB_PRODUCTSERIES@ (@DEB_SERVERVERSION@@DEB_PLATFORMRELEASE@) @DEB_CODENAME@; urgency=low
+mysql-@DEB_PRODUCTNAME@@DEB_PRODUCTSERIES@ (@VERSION@) @DEB_CODENAME@; urgency=low
 
+  * This build is for @DEB_PLATFORMRELEASE@
   * Integrate the provisional 5.7.11 changes for Ubuntu 16.04 "Xenial Xerus"
     ("packaging/deb-in/" from Oracle's 5.7.14,
     adapted to Codership's "mysql-wsrep" needs,
@@ -8,7 +9,7 @@ mysql-@DEB_PRODUCTNAME@@DEB_PRODUCTSERIES@ (@DEB_SERVERVERSION@@DEB_PLATFORMRELE
 
  -- Jörg Brühe <joerg.bruehe@fromdual.com>  Tue, 01 Nov 2016 09:45:42 +0100
 
-mysql-@DEB_PRODUCTNAME@ (@DEB_SERVERVERSION@@DEB_PLATFORMRELEASE@) @DEB_CODENAME@; urgency=low
+mysql-@DEB_PRODUCTNAME@ (@VERSION@) @DEB_CODENAME@; urgency=low
 
   [ Akhil Mohan ]
   * new upstream release
