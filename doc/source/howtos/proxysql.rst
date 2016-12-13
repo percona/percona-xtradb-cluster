@@ -807,8 +807,10 @@ to accomodate for long-running transactions.
 If the period is long enough for all transactions to finish,
 there should hardly be any disruption in cluster workload.
 
-.. note:: During the transition period,
-   the node continues to receive existing write-set replication traffic,
-   ProxySQL avoids openning new connections and starting transactions,
-   but the user can still open conenctions to monitor status.
+During the transition period,
+the node continues to receive existing write-set replication traffic,
+ProxySQL avoids openning new connections and starting transactions,
+but the user can still open conenctions to monitor status.
 
+.. note:: If you increase the transition period,
+   the packaging script may determine it as a server stall.
