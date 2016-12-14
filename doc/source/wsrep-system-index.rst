@@ -4,6 +4,119 @@
 Index of wsrep system variables
 ===============================
 
+.. variable:: pxc-encrypt-cluster-traffic
+
+   :version 5.7.16: Variable introduced
+   :cli: No
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+   :default: ``OFF``
+
+This variable can be used to enable automatic configuration of SSL encryption.
+When disabled, you need to configure SSL manually to encrypt |PXC| traffic.
+
+Possible values:
+
+* ``OFF``, ``0``, ``false``: Disabled
+
+* ``ON``, ``1``, ``true``: Enabled
+
+For more information, see :ref:`ssl-auto-conf`.
+
+.. variable:: pxc_maint_mode
+
+   :version 5.7.16: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: ``DISABLED``
+
+This variable is used to control the maintenance mode for taking a node down
+without adjusting settings in ProxySQL.
+The following values are available:
+
+* ``DISABLED``: This is the default state
+  that tells ProxySQL to route traffic to the node as usual.
+
+* ``SHUTDOWN``: This state is set automatically
+  when you initiate node shutdown.
+
+* ``MAINTENANCE``: You can manually change to this state
+  if you need to perform maintenace on a node without shutting it down.
+
+For more information, see :ref:`pxc-maint-mode`.
+
+.. variable:: pxc_maint_transition_period
+
+   :version 5.7.16: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: ``10`` (ten seconds)
+
+This variable defines the transition period
+when you change :variable:`pxc_maint_mode` to ``SHUTDOWN`` or ``MAINTENANCE``.
+By default, the period is set to 10 seconds,
+which should be enough for most transactions to finish.
+You can increase the value to accomodate for longer-running transactions.
+
+For more information, see :ref:`pxc-maint-mode`.
+
+.. variable:: pxc_strict_mode
+
+   :version 5.7: Variable introduced
+   :cli: Yes
+   :conf: Yes
+   :scope: Global, Session
+   :dyn: Yes
+   :default: ENFORCING or DISABLED
+
+This variable is used to control PXC Strict Mode, which runs validations
+to avoid the use of experimental and unsupported features in |PXC|.
+
+Depending on the actual mode you select,
+upon encountering a failed validation,
+the server will either throw an error
+(halting startup or denying the operation),
+or log a warning and continue running as normal.
+The following modes are available:
+
+* ``DISABLED``: Do not perform strict mode validations
+  and run as normal.
+
+* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running
+  as normal.
+
+* ``ENFORCING``: If a validation fails during startup,
+  halt the server and throw an error.
+  If a validation fails during runtime,
+  deny the operation and throw an error.
+
+* ``MASTER``: The same as ``ENFORCING`` except that the validation of
+  :ref:`explicit table locking <explicit-table-locking>` is not performed.
+  This mode can be used with clusters
+  in which write operations are isolated to a single node.
+
+By default, :variable:`pxc_strict_mode` is set to ``ENFORCING``,
+except if the node is acting as a standalone server
+or the node is bootstrapping, then :variable:`pxc_strict_mode` defaults to
+``DISABLED``.
+
+.. note:: When changing the value of ``pxc_strict_mode``
+   from ``DISABLED`` or ``PERMISSIVE`` to ``ENFORCING`` or ``MASTER``,
+   ensure that the following configuration is used:
+
+   * ``wsrep_replicate_myisam=OFF``
+   * ``binlog_format=ROW``
+   * ``log_output=FILE`` or ``log_output=NONE`` or ``log_output=FILE,NONE``
+   * ``tx_isolation=SERIALIZABLE``
+
+For more information, see :ref:`pxc-strict-mode`.
+
+
 .. variable:: wsrep_auto_increment_control
 
    :cli: Yes
@@ -217,18 +330,14 @@ logged. When enabled, details of conflicting |InnoDB| lock will be logged.
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: 131072 (128K)
+   :default: ``0`` (no limit)
 
-**This variable has no effect!**
+This variable is used to control the maximum number of rows
+each writeset can contain.
 
-By design,
-it was supposed to control the maximum number of rows each writeset can
-contain. However, it is hard to predict the number of rows
-because of the writeset size limit enforced by :variable:`wsrep_max_ws_size`.
-
-Codership decided to not implement the limit by rows for now.
-Correct behavior may be implemented in a future release.
-There is a discussion open at https://github.com/codership/mysql-wsrep/issues/257
+By default, there is no limit for maximum number of rows in a writeset.
+The maximum allowed value is ``1073741824``,
+which is equal to 2^30 or 1024 * 1024 * 1024.
 
 .. variable:: wsrep_max_ws_size
 
@@ -236,10 +345,12 @@ There is a discussion open at https://github.com/codership/mysql-wsrep/issues/25
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: 1073741824 (1G)
+   :default: ``1073741824`` (2 GB)
 
-This variable is used to control maximum writeset size (in bytes). Anything
-bigger than the specified value will be rejected.
+This variable is used to control maximum writeset size (in bytes).
+Anything bigger than the specified value will be rejected.
+
+You can set it to any value between ``1024`` and the default ``1073741824``.
 
 .. variable:: wsrep_mysql_replication_bundle
 
@@ -402,57 +513,6 @@ This variable should contain the path to the Galera library (like
    :dyn: No
 
 This variable contains settings currently used by Galera library.
-
-.. variable:: pxc_strict_mode
-
-   :version 5.7: Variable introduced
-   :cli: Yes
-   :conf: Yes
-   :scope: Global, Session
-   :dyn: Yes
-   :default: ENFORCING or DISABLED
-
-This variable is used to control PXC Strict Mode, which runs validations
-to avoid the use of experimental and unsupported features in |PXC|.
-
-Depending on the actual mode you select,
-upon encountering a failed validation,
-the server will either throw an error
-(halting startup or denying the operation),
-or log a warning and continue running as normal.
-The following modes are available:
-
-* ``DISABLED``: Do not perform strict mode validations
-  and run as normal.
-
-* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running
-  as normal.
-
-* ``ENFORCING``: If a validation fails during startup,
-  halt the server and throw an error.
-  If a validation fails during runtime,
-  deny the operation and throw an error.
-
-* ``MASTER``: The same as ``ENFORCING`` except that the validation of
-  :ref:`explicit table locking <explicit-table-locking>` is not performed.
-  This mode can be used with clusters
-  in which write operations are isolated to a single node.
-
-By default, :variable:`pxc_strict_mode` is set to ``ENFORCING``,
-except if the node is acting as a standalone server
-or the node is bootstrapping, then :variable:`pxc_strict_mode` defaults to
-``DISABLED``.
-
-.. note:: When changing the value of ``pxc_strict_mode``
-   from ``DISABLED`` or ``PERMISSIVE`` to ``ENFORCING`` or ``MASTER``,
-   ensure that the following configuration is used:
-
-   * ``wsrep_replicate_myisam=OFF``
-   * ``binlog_format=ROW``
-   * ``log_output=FILE`` or ``log_output=NONE`` or ``log_output=FILE,NONE``
-   * ``tx_isolation=SERIALIZABLE``
-
-For more information, see :ref:`pxc-strict-mode`.
 
 .. variable:: wsrep_recover
 
