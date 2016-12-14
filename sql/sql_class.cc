@@ -1494,8 +1494,15 @@ Sql_condition* THD::raise_condition(uint sql_errno,
       thd->lex->current_select == 0 if lex structure is not inited
       (not query command (COM_QUERY))
     */
+#ifdef WITH_WSREP
+    if (lex->current_select &&
+        lex->current_select->no_error && !is_fatal_error &&
+        (!(wsrep_conflict_state == ABORTED ||
+           wsrep_conflict_state == MUST_ABORT)))
+#else
     if (lex->current_select &&
         lex->current_select->no_error && !is_fatal_error)
+#endif
     {
       DBUG_PRINT("error",
                  ("Error converted to warning: current_select: no_error %d  "

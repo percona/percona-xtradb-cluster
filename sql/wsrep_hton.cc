@@ -515,7 +515,10 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
       set to NO_CONFLICT and commit proceeds as usual.
     */
     if (thd->wsrep_conflict_state == MUST_ABORT)
-        thd->wsrep_conflict_state= NO_CONFLICT;
+    {
+      thd->killed= THD::NOT_KILLED;
+      thd->wsrep_conflict_state= NO_CONFLICT;
+    }
 
     if (thd->wsrep_conflict_state != NO_CONFLICT)
     {
