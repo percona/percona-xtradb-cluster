@@ -37,7 +37,11 @@ static const TABLE_FIELD_TYPE field_types[]=
   },
   {
     { C_STRING_WITH_LEN("VARIABLE_VALUE") },
+#ifdef WITH_WSREP
+    { C_STRING_WITH_LEN("varchar(2048)") },
+#else
     { C_STRING_WITH_LEN("varchar(1024)") },
+#endif /* WITH_WSREP */
     { NULL, 0}
   }
 };
