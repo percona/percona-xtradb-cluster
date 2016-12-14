@@ -8,7 +8,7 @@ Percona is glad to announce the release of
 |Percona XtraDB Cluster| 5.7.16-27.19 on December 15, 2016.
 Binaries are available from the `downloads section
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/>`_
-or from our :ref:`software repositories <installation>`.
+or from our :ref:`software repositories <install>`.
 
 Percona XtraDB Cluster 5.7.16-27.19 is now the current release,
 based on the following:
