@@ -7,6 +7,9 @@ wsrep_cert_bucket_count	*
 SHOW GLOBAL STATUS LIKE 'wsrep_gcache_pool_size';
 Variable_name	Value
 wsrep_gcache_pool_size	*
+SELECT * FROM INFORMATION_SCHEMA.WSREP_STATS WHERE VARIABLE_NAME = 'wsrep_gcache_actual_pool_size';
+VARIABLE_NAME	VARIABLE_VALUE
+wsrep_gcache_actual_pool_size	*
 CREATE TABLE ten (f1 INTEGER);
 INSERT INTO ten VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
 SET GLOBAL wsrep_provider_options="gcache.keep_pages_count=16;gcache.keep_pages_size=128M;gcache.page_size=4096;gcache.mem_size=4096";
@@ -21,6 +24,9 @@ wsrep_cert_bucket_count	*
 SHOW GLOBAL STATUS LIKE 'wsrep_gcache_pool_size';
 Variable_name	Value
 wsrep_gcache_pool_size	*
+SELECT * FROM INFORMATION_SCHEMA.WSREP_STATS WHERE VARIABLE_NAME = 'wsrep_gcache_actual_pool_size';
+VARIABLE_NAME	VARIABLE_VALUE
+wsrep_gcache_actual_pool_size	*
 SELECT COUNT(*) FROM t1;
 COUNT(*)
 1000
@@ -37,6 +43,9 @@ wsrep_cert_bucket_count	*
 SHOW GLOBAL STATUS LIKE 'wsrep_gcache_pool_size';
 Variable_name	Value
 wsrep_gcache_pool_size	*
+SELECT * FROM INFORMATION_SCHEMA.WSREP_STATS WHERE VARIABLE_NAME = 'wsrep_gcache_actual_pool_size';
+VARIABLE_NAME	VARIABLE_VALUE
+wsrep_gcache_actual_pool_size	*
 SELECT COUNT(*) FROM t2;
 COUNT(*)
 1000

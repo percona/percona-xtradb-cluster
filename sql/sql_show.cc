@@ -7392,6 +7392,39 @@ int fill_status(THD *thd, TABLE_LIST *tables, Item *cond)
   DBUG_RETURN(res);
 }
 
+static SHOW_VAR ext_status_vars[]= {
+#ifdef WITH_WSREP
+  {"wsrep", (char*) &wsrep_show_status_ext, SHOW_FUNC},
+#endif
+  {NullS, NullS, SHOW_LONG}
+};
+
+int fill_status_ext(THD *thd, TABLE_LIST *tables, Item *cond)
+{
+  DBUG_ENTER("fill_status_ext");
+  LEX *lex= thd->lex;
+  const char *wild= lex->wild ? lex->wild->ptr() : NullS;
+  int res;
+  STATUS_VAR *tmp1;
+  enum enum_var_type option_type;
+  bool upper_case_names= false;
+
+  option_type= OPT_SESSION;
+  tmp1= &thd->status_var;
+
+  /*
+    Avoid recursive acquisition of LOCK_status in cases when WHERE clause
+    represented by "cond" contains subquery on I_S.SESSION/GLOBAL_STATUS.
+  */
+  if (thd->fill_status_recursion_level++ == 0)
+    mysql_mutex_lock(&LOCK_status);
+  res= show_status_array(thd, wild, ext_status_vars,
+                         option_type, tmp1, "", tables->table,
+                         upper_case_names, cond);
+  if (thd->fill_status_recursion_level-- == 1)
+    mysql_mutex_unlock(&LOCK_status);
+  DBUG_RETURN(res);
+}
 
 /*
   Fill and store records into I_S.referential_constraints table
@@ -9159,6 +9192,8 @@ ST_SCHEMA_TABLE schema_tables[]=
   {"VIEWS", view_fields_info, create_schema_table, 
    get_all_tables, 0, get_schema_views_record, 1, 2, 0,
    OPEN_VIEW_ONLY|OPTIMIZE_I_S_TABLE},
+  {"WSREP_STATS", variables_fields_info, create_schema_table,
+   fill_status_ext, make_old_format, 0, 0, -1, 0, 0},
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 

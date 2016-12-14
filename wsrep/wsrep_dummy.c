@@ -284,6 +284,16 @@ static struct wsrep_stats_var* dummy_stats_get (wsrep_t* w)
     return dummy_stats;
 }
 
+static struct wsrep_stats_var dummy_stats_ext[] = {
+    { NULL, WSREP_VAR_STRING, { 0 } }
+};
+
+static struct wsrep_stats_var* dummy_stats_ext_get (wsrep_t* w)
+{
+    WSREP_DBUG_ENTER(w);
+    return dummy_stats_ext;
+}
+
 static void dummy_stats_free (
     wsrep_t* w,
     struct wsrep_stats_var* stats __attribute__((unused)))
@@ -373,6 +383,7 @@ static wsrep_t dummy_iface = {
     &dummy_sst_received,
     &dummy_snapshot,
     &dummy_stats_get,
+    &dummy_stats_ext_get,
     &dummy_stats_free,
     &dummy_stats_reset,
     &dummy_pause,

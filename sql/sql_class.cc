@@ -1325,6 +1325,7 @@ THD::THD(bool enable_plugins)
   wsrep_retry_command     = COM_CONNECT;
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_status_vars       = 0;
+  wsrep_ext_status_vars   = 0;
   wsrep_mysql_replicated  = 0;
   wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
   wsrep_affected_rows     = 0;

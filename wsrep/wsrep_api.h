@@ -999,6 +999,15 @@ struct wsrep {
     struct wsrep_stats_var* (*stats_get) (wsrep_t* wsrep);
 
   /*!
+   * @brief Returns an array of extended status variables.
+   *        Array is terminated by Null variable name.
+   *
+   * @param wsrep provider handle
+   * @return array of struct wsrep_status_var.
+   */
+    struct wsrep_stats_var* (*stats_ext_get) (wsrep_t* wsrep);
+
+  /*!
    * @brief Release resources that might be associated with the array.
    *
    * @param wsrep     provider handle.

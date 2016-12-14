@@ -726,7 +726,8 @@ enum enum_schema_tables
   SCH_USER_PRIVILEGES,
   SCH_USER_STATS,
   SCH_VARIABLES,
-  SCH_VIEWS
+  SCH_VIEWS,
+  SCH_WSREP_STATS
 };
 
 struct TABLE_SHARE;

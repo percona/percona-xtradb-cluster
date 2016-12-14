@@ -3517,6 +3517,7 @@ public:
   enum wsrep_consistency_check_mode 
                             wsrep_consistency_check;
   wsrep_stats_var*          wsrep_status_vars;
+  wsrep_stats_var*          wsrep_ext_status_vars;
   int                       wsrep_mysql_replicated;
 
   /* query to apply before actual TOI query. Needed in case of

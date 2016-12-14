@@ -135,6 +135,7 @@ extern const char* wsrep_provider_version;
 extern const char* wsrep_provider_vendor;
 
 int  wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
+int  wsrep_show_status_ext(THD *thd, SHOW_VAR *var, char *buff);
 void wsrep_free_status(THD *thd);
 
 /* Filters out --wsrep-new-cluster oprtion from argv[]
