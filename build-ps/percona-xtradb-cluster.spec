@@ -647,6 +647,7 @@ install -d $RBR%{_libdir}
 install -d $RBR%{_mandir}
 install -d $RBR%{_sbindir}
 install -d $RBR%{_libdir}/mysql/plugin
+install -d -m 0750 $RBR/var/lib/mysql-files
 
 (
   cd $MBD/release
@@ -1354,6 +1355,7 @@ fi
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysql
 %endif
+%dir %attr(750, mysql, mysql) /var/lib/mysql-files
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}

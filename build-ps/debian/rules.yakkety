@@ -3,12 +3,8 @@
 export DH_VERBOSE=1
 export DEB_BUILD_HARDENING=1
 
-PACKAGE=percona-server-5.6
-PS_VERSION_EXTRA = '@@PERCONA_VERSION_EXTRA@@'
-REVISION = '@@REVISION@@'
-COMPILATION_COMMENT_RELEASE = "Percona Server (GPL), Release $(PS_VERSION_EXTRA), Revision $(REVISION)"
-COMPILATION_COMMENT_DEBUG = "Percona Server - Debug (GPL), Release $(PS_VERSION_EXTRA), Revision $(REVISION)"
-TOKUDB_BACKUP_VERSION = "@@TOKUDB_BACKUP_VERSION@@"
+PACKAGE=percona-xtradb-cluster-5.6
+PS_VERSION_EXTRA = $(shell echo "Percona XtraDB Cluster (GPL), $(DEBVERSION)")
 
 TMP=$(CURDIR)/debian/tmp/
 TMPD=$(CURDIR)/debian/tmp-debug/
@@ -30,13 +26,17 @@ DEB_UPSTREAM_VERSION ?= $(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/-[^-]*$$//'
 DEB_UPSTREAM_VERSION_MAJOR_MINOR := $(shell echo $(DEB_UPSTREAM_VERSION) | sed -r -n 's/^([0-9]+\.[0-9]+).*/\1/p')
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-TOKUDB_OPTS_DEFAULT ?= -DWITH_VALGRIND=OFF -DUSE_VALGRIND=OFF -DDEBUG_EXTNAME=OFF -DBUILD_TESTING=OFF -DUSE_GTAGS=OFF -DUSE_CTAGS=OFF -DUSE_ETAGS=OFF -DUSE_CSCOPE=OFF -DTOKUDB_BACKUP_PLUGIN_VERSION=$(TOKUDB_BACKUP_VERSION)
-TOKUDB_OPTS_RELEASE ?= $(TOKUDB_OPTS_DEFAULT) -DTOKU_DEBUG_PARANOID=OFF
-TOKUDB_OPTS_DEBUG ?= $(TOKUDB_OPTS_DEFAULT) -DTOKU_DEBUG_PARANOID=ON
-
-EXPORTED_SOURCE_TARBALL = debian/percona-server-source-5.6.tar.gz
+EXPORTED_SOURCE_TARBALL = debian/percona-xtradb-cluster-source-5.6.tar.gz
 
 DISTRIBUTION = $(shell lsb_release -i -s)
+
+wsrep_version="@@WSREP_VERSION@@"
+percona_server_version="@@PERCONA_VERSION@@"
+revision="@@REVISION@@"
+compilation_comment_debug="Percona XtraDB Cluster - Debug (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+compilation_comment_release="Percona XtraDB Cluster (GPL), Release rel$(percona_server_version), Revision $(revision), WSREP version $(wsrep_version)"
+server_suffix="-56"
+prefix=/usr
 
 MYSQL_SRC = $(shell pwd)
 
@@ -76,17 +76,21 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 	    	CFLAGS=$${MYSQL_BUILD_CFLAGS:-"-g -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value"} \
 	    	CXX=$${MYSQL_BUILD_CXX:-g++} \
 	    	CXXFLAGS=$${MYSQL_BUILD_CXXFLAGS:-"-g -felide-constructors -fexceptions -fno-rtti -fno-strict-aliasing -Wno-error=deprecated-declarations -Wno-error=nonnull-compare"} \
-	    cmake -DBUILD_CONFIG=mysql_release \
-		\
-		-DCMAKE_INSTALL_PREFIX=/usr \
+		cmake -DCMAKE_INSTALL_PREFIX=/usr \
+		-DBUILD_CONFIG=mysql_release \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=Debug \
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
-		-DCOMPILATION_COMMENT=$(COMPILATION_COMMENT_DEBUG) \
+		-DWITH_READLINE=system \
+		-DWITHOUT_TOKUDB=ON \
+		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
+		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DINSTALL_LAYOUT=RPM \
+		-DWITH_INNODB_DISALLOW_WRITES=ON \
+		-DWITH_WSREP=ON \
 		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
 		-DINSTALL_PLUGINDIR=lib/mysql/plugin/debug \
 		-DWITH_EMBEDDED_SERVER=OFF \
@@ -95,7 +99,7 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
 		-DWITH_PAM=ON \
-                -DWITHOUT_ROCKSDB=1 \
+                -DWITH_ROCKSDB=0 \
                 -DWITH_SCALABILITY_METRICS=ON \
 		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_DEBUG) ..'
 endif
@@ -103,20 +107,24 @@ endif
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
 	sh -c  'PATH=$${MYSQL_BUILD_PATH:-"/bin:/usr/bin"} \
 	    	CC=$${MYSQL_BUILD_CC:-gcc} \
-	    	CFLAGS=$${MYSQL_BUILD_CFLAGS:-"-O2 -g -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value"} \
+	    	CFLAGS=$${MYSQL_BUILD_CFLAGS:-"-O3 -g -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value"} \
 	    	CXX=$${MYSQL_BUILD_CXX:-g++} \
-	    	CXXFLAGS=$${MYSQL_BUILD_CXXFLAGS:-"-O3 -g -felide-constructors -fexceptions -fno-rtti -fno-strict-aliasing -Wno-error=deprecated-declarations -Wno-error=nonnull-compare"} \
-	    cmake -DBUILD_CONFIG=mysql_release \
-		\
-		-DCMAKE_INSTALL_PREFIX=/usr \
+	    	CXXFLAGS=$${MYSQL_BUILD_CXXFLAGS:-"-O3 -g -felide-constructors -fno-rtti -fno-strict-aliasing -Wno-error=deprecated-declarations -Wno-error=nonnull-compare"} \
+	    cmake -DCMAKE_INSTALL_PREFIX=/usr \
+		-DBUILD_CONFIG=mysql_release \
 		-DMYSQL_UNIX_ADDR=/var/run/mysqld/mysqld.sock \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
-		-DCOMPILATION_COMMENT=$(COMPILATION_COMMENT_RELEASE) \
+		-DWITH_READLINE=system \
+		-DWITHOUT_TOKUDB=ON \
+		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
+		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
 		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DINSTALL_LAYOUT=RPM \
+		-DWITH_INNODB_DISALLOW_WRITES=ON \
+		-DWITH_WSREP=ON \
 		-DINSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
 		-DINSTALL_PLUGINDIR=lib/mysql/plugin \
 		-DWITH_EMBEDDED_SERVER=OFF \
@@ -125,8 +133,8 @@ endif
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
 		-DWITH_PAM=ON \
-		-DWITHOUT_ROCKSDB=1 \
-		-DWITH_SCALABILITY_METRICS=ON \
+                -DWITH_ROCKSDB=0 \
+                -DWITH_SCALABILITY_METRICS=ON \
 		-DWITH_EXTRA_CHARSETS=all $(TOKUDB_OPTS_RELEASE) ..'
 	touch $@
 
@@ -140,10 +148,10 @@ build-stamp: configure
 	
 	[ -f $(EXPORTED_SOURCE_TARBALL) ] || tar -zcf $(EXPORTED_SOURCE_TARBALL) \
 	--exclude=debian . \
-	--transform="s,^\./,percona-server-5.6/,"
+	--transform="s,^\./,percona-xtradb-cluster-5.6/,"
 
 ifeq ($(SKIP_DEBUG_BINARY),)
-	cd $(builddebug) && $(MAKE) -j$(NCPU)
+	cd $(builddebug) && $(MAKE) -j$(NCPU)  VERBOSE=1
 endif
 
 	cd $(builddir) && $(MAKE) -j$(NCPU) VERBOSE=1
@@ -205,12 +213,12 @@ install: build
 		| xargs --no-run-if-empty chrpath -d; \
 	set -e
 
-	# libperconaserverclient: move shared libraries (but not the rest like libheap.a & co)
+	# libmysqlclient: move shared libraries (but not the rest like libheap.a & co)
 	# libmysqlclient_r is now a symlink to libmysqlclient. But it is
 	# created wrong by the cmake build system and points at
 	# libmysqlclient.so instead of the corresponding versioned lib.
-	for i in `ls $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/libperconaserverclient.so*` ; do \
-		rlib=`basename $$i | sed -e 's/libperconaserverclient\./libperconaserverclient_r./'` ;\
+	for i in `ls $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/libmysqlclient.so*` ; do \
+		rlib=`basename $$i | sed -e 's/libmysqlclient\./libmysqlclient_r./'` ;\
 		ln -sf `basename $$i` $(TMP)/usr/lib/$(DEB_HOST_MULTIARCH)/$$rlib ;\
 	done
 
@@ -218,7 +226,7 @@ install: build
 	#cp $(BUILDDIR)/include/my_config.h $(TMP)/usr/include/mysql/
 	#cp include/my_dir.h $(TMP)/usr/include/mysql/
 	# install libmysqld built with -FPIC
-	install -d -m 0755 -o root -g root $(TMP)/usr/lib/percona-server
+	install -d -m 0755 -o root -g root $(TMP)/usr/lib/percona-xtradb-cluster
 	#install -m 0644 -o root -g root $(BUILDDIR_PIC)/libmysqld/libmysqld.a $(TMP)/usr/lib/mysql/libmysqld_pic.a
 	# mysql_config won't report the -fPIC, so give libmysqld-pic users a way to get their flags
 	#install -m 0755 -o root -g root $(BUILDDIR_PIC)/scripts/mysql_config $(TMP)/usr/bin/mysql_config_pic
@@ -232,14 +240,17 @@ install: build
 	#FIXME install -m 0755 debian/additions/innotop/innotop $(TMP)/usr/bin/
 	#FIXME install -m 0644 debian/additions/innotop/innotop.1 $(TMP)/usr/share/man/man1/
 
+	mkdir -p $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
+	cp -rp $(TMP)/usr/share/mysql-test/* $(TMP)/usr/lib/percona-xtradb-cluster-testsuite
+
 	# mysql-server
-	mkdir -p $(TMP)/usr/share/doc/percona-server-5.6/examples
-	mv $(TMP)/usr/share/mysql/*cnf 	    $(TMP)/usr/share/doc/percona-server-5.6/examples/
-	rm -vf $(TMP)/usr/share/mysql/mi_test_all* \
-	       $(TMP)/usr/share/mysql/mysql-log-rotate \
-	       $(TMP)/usr/share/mysql/mysql.server \
-	       $(TMP)/usr/share/mysql/binary-configure
-	nm -n $(builddir)/sql/mysqld |gzip -9 > $(TMP)/usr/share/doc/percona-server-5.6/mysqld.sym.gz
+	mkdir -p $(TMP)/usr/share/doc/percona-xtradb-cluster-5.6/examples
+	mv $(TMP)/usr/share/mysql/*cnf 	    $(TMP)/usr/share/doc/percona-xtradb-cluster-5.6/examples/
+	rm -vf $(TMP)/usr/share/percona-xtradb-cluster/mi_test_all* \
+	       $(TMP)/usr/share/percona-xtradb-cluster/mysql-log-rotate \
+	       $(TMP)/usr/share/percona-xtradb-cluster/mysql.server \
+	       $(TMP)/usr/share/percona-xtradb-cluster/binary-configure
+	nm -n $(builddir)/sql/mysqld |gzip -9 > $(TMP)/usr/share/doc/percona-xtradb-cluster-5.6/mysqld.sym.gz
 	# FIXME install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
 	install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
 	install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
@@ -252,7 +263,7 @@ install: build
 	# install Apport hook
 	# FIXME install -D -m 644 debian/mysql-server-5.6.py $(TMP)/usr/share/apport/package-hooks/source_mysql-5.6.py
 
-	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-server/`basename $(EXPORTED_SOURCE_TARBALL)`
+	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 	dh_movefiles
 
@@ -300,7 +311,7 @@ binary-arch: build install
 	dh_installinfo -a
 	dh_installlogcheck -a
 	dh_installchangelogs -a
-	dh_strip -a --dbg-package=percona-server-5.6-dbg
+	dh_strip -a --dbg-package=percona-xtradb-cluster-5.6-dbg 
 	dh_lintian
 	dh_link -a	# .so muss nach .so.1.2.3 installier werden!
 	dh_compress -a
