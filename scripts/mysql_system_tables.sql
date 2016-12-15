@@ -2456,7 +2456,9 @@ DROP PREPARE stmt;
 
 SET @cmd="CREATE TABLE performance_schema.global_variables("
   "VARIABLE_NAME VARCHAR(64) not null,"
-  "VARIABLE_VALUE VARCHAR(1024)"
+--  "VARIABLE_VALUE VARCHAR(1024)"
+-- WITH_WSREP:
+  "VARIABLE_VALUE VARCHAR(2048)"
   ")ENGINE=PERFORMANCE_SCHEMA;";
 
 SET @str = IF(@have_pfs = 1, @cmd, 'SET @dummy = 0');
