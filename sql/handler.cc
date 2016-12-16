@@ -1793,8 +1793,19 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
       goto end;
     }
 
+#ifdef WITH_WSREP
+    if ((!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1)) ||
+        (WSREP(thd) && thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+         !trans_has_updated_trans_table(thd)))
+    {
+      WSREP_DEBUG("handler prepare for CTAS");
+#else
     if (!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1))
+#endif /* WITH_WSREP */
       error= tc_log->prepare(thd, all);
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
   }
   /*
     The state of XA transaction is changed to Prepared, intermediately.

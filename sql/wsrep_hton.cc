@@ -197,7 +197,8 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
 
   if ((all ||
       !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
-      (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)))
+      (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)) ||
+      thd->lex->sql_command == SQLCOM_CREATE_TABLE) // CTAS with empty table
   {
     DBUG_RETURN (wsrep_run_wsrep_commit(thd, hton, all));
   }
@@ -430,6 +431,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
   rcode = 0;
   if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) &&
+      !thd->wsrep_applier                            &&
       (cache = get_trans_log(thd, false)))
   {
     WSREP_DEBUG("Reading from stmt cache");
