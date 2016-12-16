@@ -105,6 +105,14 @@ The format of the output is ``<min>/<avg>/<max>/<std_dev>/<sample_size>``.
 
 Internal EVS protocol state.
 
+.. variable:: wsrep_flow_control_interval
+
+This variable shows the lower and upper limits for Galera flow control.
+The upper limit is the maximum allowed number of requests in the queue.
+If the queue reaches the upper limit, new requests are denied.
+As existing requests get processed, the queue decreases,
+and once it reaches the lower limit, new requests will be allowed again.
+
 .. variable:: wsrep_flow_control_paused
 
 Time since the last status query that was paused due to flow control.
