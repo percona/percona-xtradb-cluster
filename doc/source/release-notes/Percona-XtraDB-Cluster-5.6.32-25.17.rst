@@ -5,9 +5,10 @@ Percona XtraDB Cluster 5.6.32-25.17
 ===================================
 
 Percona is glad to announce the release of
-|Percona XtraDB Cluster| 5.6.32-25.17 on June 10, 2016.
+|Percona XtraDB Cluster| 5.6.32-25.17 on October 4, 2016.
 Binaries are available from the
-`downloads section <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/release-5.6.30-25.16/>`_
+`downloads section
+<https://www.percona.com/downloads/Percona-XtraDB-Cluster-56/Percona-XtraDB-Cluster-5.6.32-25.17>`_
 or from our :ref:`software repositories <installation>`.
 
 Percona XtraDB Cluster 5.6.32-25.17 is now the current release,
@@ -22,7 +23,7 @@ based on the following:
 All Percona software is open-source and free.
 Details of this release can be found in the
 `5.6.32-25.17 milestone on Launchpad
-<https://launchpad.net/percona-xtradb-cluster/+milestone/5.6.30-25.16>`_.
+<https://launchpad.net/percona-xtradb-cluster/+milestone/5.6.32-25.17>`_.
 
 For more information about relevant Codership releases, see `this announcement
 <http://galeracluster.com/2016/08/announcing-galera-cluster-5-5-50-and-5-6-31-with-galera-3-17/>`_.
