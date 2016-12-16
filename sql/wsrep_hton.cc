@@ -196,7 +196,8 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
 
   if ((all ||
       !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
-      (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)))
+      (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)) ||
+      thd->lex->sql_command == SQLCOM_CREATE_TABLE) // CTAS with empty table
   {
     DBUG_RETURN (wsrep_run_wsrep_commit(thd, hton, all));
   }
@@ -427,8 +428,20 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  cache = get_trans_log(thd);
   rcode = 0;
+  if (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+      !thd->wsrep_applier &&
+      (cache = get_trans_log(thd, false)))
+  {
+    thd->binlog_flush_pending_rows_event(false);
+    rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
+    if (WSREP_OK != rcode) {
+      WSREP_ERROR("rbr write from stmt cache fail, data_len: %zu, %d", data_len, rcode);
+      DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
+    }
+ }
+
+  cache = get_trans_log(thd, true);
   if (cache) {
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
