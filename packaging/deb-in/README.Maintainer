@@ -27,11 +27,12 @@ TODO: Check whether it was safe to drop "debian/additions/debian-start*", recove
 TODO: Check everything, especially the pre/post-install/rm scripts,
       and decide whether to follow Debian or Oracle or to create a mix.
 TODO: Clean "packaging/deb-in/CMakeLists.txt" for systemd, SysV init, Upstart, and the mix (Debian!).
-TODO; Check package naming on Debian/Ubuntu, change on Dec 13 removed revision from version string
-      and so we lost the platform string in the package file name :-(
 TODO: Introduce "WITH_SYSV" as a build option, so that we can build packages with both SysV and Systemd
       startup support, as fits Debian (which delivers both).
 TODO: Decide about Upstart, either implement support for it or remove the references.
+TODO; Check package naming on Debian/Ubuntu:
+      We now have platform as part of version in the file name (separator '~')
+      because a dash '-' would start a revision which Debian tools don't affect in a "native" package.
 
 ###  Other stuff
 Package cut: Comments in RPM spec files say "lz4_decompress" and "zlib_decompress" were added to client RPMs.
