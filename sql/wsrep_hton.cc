@@ -195,8 +195,8 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
   DBUG_ASSERT(thd->wsrep_exec_mode == LOCAL_STATE);
   DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
 
-  if ((all ||
-       (!thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
+  if (all ||
+      (!thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)  &&
        (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd))) ||
       (thd->lex->sql_command == SQLCOM_CREATE_TABLE)) // CTAS with empty table
   {
