@@ -7944,6 +7944,7 @@ no_commit:
 
 				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
 				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
 			}
 #endif /* WITH_WSREP */
 			/* Source table is not in InnoDB format:
@@ -7973,6 +7974,7 @@ no_commit:
 				}
 				if (tc_log->commit(m_user_thd, 1))  DBUG_RETURN(1);
 				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
 			}
 #endif /* WITH_WSREP */
 			/* Ensure that there are no other table locks than

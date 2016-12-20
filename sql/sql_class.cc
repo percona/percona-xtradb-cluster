@@ -931,6 +931,13 @@ extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd)
 {
   return thd->wsrep_next_trx_id();
 }
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd)
+{
+  if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID)
+  {
+    thd->set_wsrep_next_trx_id(thd->query_id);
+  }
+}
 extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd)
 {
   return thd->wsrep_trx_id();
