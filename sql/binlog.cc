@@ -1811,7 +1811,12 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
 {
   DBUG_ENTER("binlog_rollback");
   int error= 0;
+#ifdef WITH_WSREP
+  if (thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT &&
+      thd->wsrep_conflict_state != ABORTING)
+#else
   if (thd->lex->sql_command == SQLCOM_ROLLBACK_TO_SAVEPOINT)
+#endif /* WITH_WSREP */
     error= mysql_bin_log.rollback(thd, all);
   DBUG_RETURN(error);
 }
@@ -2084,7 +2089,16 @@ int MYSQL_BIN_LOG::rollback(THD *thd, bool all)
       goto end;
     cache_mngr= thd_get_cache_mngr(thd);
   }
+#ifdef WITH_WSREP
+  /*
+    BF aborted THD may have dandling sql_command set to SQLCOM_ROLLBACK_TO_SAVEPOINT,
+    don't care about it, as we have to BF abort this one
+   */
+  else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT ||
+    thd->wsrep_conflict_state == ABORTING)
+#else
   else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT)
+#endif /* WITH_WSREP */
     if ((error= ha_rollback_low(thd, all)))
       goto end;
 
