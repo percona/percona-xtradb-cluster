@@ -507,9 +507,9 @@ my_bool wsrep_thd_is_BF(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
-	      (thd->wsrep_exec_mode == TOTAL_ORDER));
+              (thd->wsrep_exec_mode == TOTAL_ORDER));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   return status;
@@ -523,10 +523,10 @@ my_bool wsrep_thd_is_BF_or_commit(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
-	      (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
-	      (thd->wsrep_exec_mode == LOCAL_COMMIT));
+              (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
+              (thd->wsrep_exec_mode == LOCAL_COMMIT));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   return status;
