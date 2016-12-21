@@ -175,11 +175,14 @@ extern "C" time_t wsrep_thd_query_start(THD *thd);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 extern "C" int64_t wsrep_thd_trx_seqno(THD *thd);
 extern "C" query_id_t wsrep_thd_query_id(THD *thd);
+extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd);
+extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd);
 extern "C" const char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
 extern "C" int wsrep_thd_retry_counter(THD *thd);
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd);
 
 extern "C" void wsrep_thd_auto_increment_variables(THD*,
                                                    unsigned long long *offset,
@@ -343,4 +346,16 @@ bool wsrep_stmt_rollback_is_safe(THD* thd);
 void wsrep_init_sidno(const wsrep_uuid_t&);
 bool wsrep_node_is_donor();
 bool wsrep_node_is_synced();
+
+typedef struct wsrep_key_arr
+{
+    wsrep_key_t* keys;
+    size_t       keys_len;
+} wsrep_key_arr_t;
+bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                      const char*       db,
+                                      const char*       table,
+                                      const TABLE_LIST* table_list,
+                                      wsrep_key_arr_t*  ka);
+void wsrep_keys_free(wsrep_key_arr_t* key_arr);
 #endif /* WSREP_MYSQLD_H */

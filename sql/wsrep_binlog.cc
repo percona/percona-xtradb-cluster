@@ -276,7 +276,7 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
 
     int err(WSREP_OK);
 
-    size_t total_length(0);
+    size_t total_length(*len);
 
     uint length(my_b_bytes_in_cache(cache));
     if (thd->wsrep_gtid_event_buf)

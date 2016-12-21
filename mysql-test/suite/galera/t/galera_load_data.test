@@ -1,0 +1,125 @@
+#
+# Tests for LOAD DATA
+# rather than Galera's own implementation
+#
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+#
+# Empty LOAD DATA
+#
+
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_load_data_empty.csv") or die;
+close FILE;
+EOF
+
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+
+RESET MASTER;
+
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--disable_query_log
+--eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_empty.csv" INTO TABLE t1;
+--enable_query_log
+
+--let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+# Expect no advancement in the commit counter
+
+--disable_query_log
+--eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_correct;
+--enable_query_log
+
+# Expect no recorded output
+
+SHOW BINLOG EVENTS FROM 123;
+
+#
+# One line loaded, so less than the wsrep-load-data-splitting value
+#
+
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_load_data_one.csv") or die;
+print FILE "1\n";
+close FILE;
+EOF
+
+--connection node_1
+RESET MASTER;
+
+--connection node_2
+RESET MASTER;
+
+--connection node_1
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--disable_query_log
+--eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_one.csv" INTO TABLE t1;
+--enable_query_log
+
+--let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+# Expect one transaction
+
+--disable_query_log
+--eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_correct
+--enable_query_log
+
+--connection node_1
+SELECT COUNT(*) = 1 FROM t1;
+
+--connection node_2
+SELECT COUNT(*) = 1 FROM t1;
+
+# Expect one binlog entry, identical on both nodes
+
+--connection node_1
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS FROM 123;
+
+--connection node_2
+--replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
+SHOW BINLOG EVENTS FROM 123;
+
+--connection node_1
+TRUNCATE TABLE t1;
+
+#
+# Error during loading
+#
+
+--perl
+open(FILE, ">", "$ENV{'MYSQLTEST_VARDIR'}/tmp/galera_load_data_duplicate.csv") or die;
+print FILE "1\n";
+print FILE "1\n";
+close FILE;
+EOF
+
+RESET MASTER;
+
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--disable_query_log
+--error ER_DUP_ENTRY
+--eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_duplicate.csv" INTO TABLE t1;
+--enable_query_log
+
+--let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+# Expect no advancement in the commit counter
+
+--disable_query_log
+--eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_correct;
+--enable_query_log
+
+# Expect no recorded output
+
+SELECT COUNT(*) = 0 FROM t1;
+
+SHOW BINLOG EVENTS FROM 123;
+
+--connection node_1
+DROP TABLE t1;

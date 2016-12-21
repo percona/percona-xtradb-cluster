@@ -927,6 +927,21 @@ extern "C" query_id_t wsrep_thd_query_id(THD *thd)
 {
   return thd->query_id;
 }
+extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd)
+{
+  return thd->wsrep_next_trx_id();
+}
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd)
+{
+  if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID)
+  {
+    thd->set_wsrep_next_trx_id(thd->query_id);
+  }
+}
+extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd)
+{
+  return thd->wsrep_trx_id();
+}
 extern "C" const char *wsrep_thd_query(THD *thd) 
 {
   return (thd) ? thd->query().str : NULL;
@@ -1409,6 +1424,7 @@ THD::THD(bool enable_plugins)
   wsrep_TOI_pre_query_len = 0;
   wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
   wsrep_affected_rows     = 0;
+  m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1800,6 +1816,7 @@ void THD::init(void)
   wsrep_affected_rows     = 0;
   wsrep_gtid_event_buf    = NULL;
   wsrep_gtid_event_buf_len = 0;
+  m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
 #endif
   binlog_row_event_extra_data= 0;
 
