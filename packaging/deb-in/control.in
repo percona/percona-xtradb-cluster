@@ -44,7 +44,7 @@ Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version})
          socat,
          ${misc:Depends},
          ${shlibs:Depends}
-Breaks: mysql-common (<< 5.7.14)
+Breaks: mysql-common (<< 5.7.17)
 Conflicts: mysql,
  mysql-server-5.0, mysql-server-core-5.0,
  mysql-server-5.1, mysql-server-core-5.1,
@@ -59,7 +59,7 @@ Replaces: mysql,
  mysql-server-5.6, mysql-server-core-5.6,
  mysql-server-5.7, mysql-server-core-5.7,
  mysql-@DEB_NOTPRODUCTNAME@-server,
- mysql-common (<< 5.7.14)
+ mysql-common (<< 5.7.17)
 Provides: virtual-mysql-server,
           virtual-mysql-server-core
 Description: MySQL Server
@@ -87,8 +87,8 @@ Architecture: any
 Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
-Breaks: libmysqlclient-dev (<< 5.7.14),
-        mysql-common (<< 5.7.14)
+Breaks: libmysqlclient-dev (<< 5.7.17),
+        mysql-common (<< 5.7.17)
 Conflicts: mysql,
  mysql-client-5.0, mysql-client-core-5.0,
  mysql-client-5.1, mysql-client-core-5.1,
@@ -103,8 +103,8 @@ Replaces: mysql,
  mysql-client-5.6, mysql-client-core-5.6,
  mysql-client-5.7, mysql-client-core-5.7,
  mysql-@DEB_NOTPRODUCTNAME@-client,
- mysql-common (<< 5.7.14),
- libmysqlclient-dev (<< 5.7.14)
+ mysql-common (<< 5.7.17),
+ libmysqlclient-dev (<< 5.7.17)
 Provides: virtual-mysql-client,
           virtual-mysql-client-core
 Description: MySQL Client
@@ -144,13 +144,13 @@ Conflicts: mysql,
  mysql-server-5.7, mysql-server-core-5.7,
  mysql-client-5.7, mysql-client-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- mysql-common (<< 5.7.14)
+ mysql-common (<< 5.7.17)
 Replaces: mysql,
           mysql-server-5.5, mysql-server-core-5.5, libmysqlclient-dev,
  mysql-server-5.6, mysql-server-core-5.6,
  mysql-server-5.7, mysql-server-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- mysql-common (<< 5.7.14)
+ mysql-common (<< 5.7.17)
 Provides: mysql-common
 Description: MySQL Common
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
@@ -204,8 +204,8 @@ Depends: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version})
          python,
          ${misc:Depends},
          ${shlibs:Depends}
-Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.7.14),
-        mysql-@DEB_PRODUCTNAME@-client (<< 5.7.14)
+Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.7.17),
+        mysql-@DEB_PRODUCTNAME@-client (<< 5.7.17)
 Conflicts: mysql,
  mysql-testsuite-5.0, mysql-testsuite-5.1, mysql-testsuite-5.5,
  mysql-testsuite-5.6, mysql-testsuite-5.7, mysql-@DEB_NOTPRODUCTNAME@-test
