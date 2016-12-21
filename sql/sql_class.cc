@@ -899,11 +899,11 @@ extern "C" wsrep_ws_handle_t* wsrep_thd_ws_handle(THD *thd)
   return &thd->wsrep_ws_handle;
 }
 
-extern "C"void wsrep_thd_LOCK(THD *thd)
+extern "C" void wsrep_thd_LOCK(THD *thd)
 {
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 }
-extern "C"void wsrep_thd_UNLOCK(THD *thd)
+extern "C" void wsrep_thd_UNLOCK(THD *thd)
 {
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 }
@@ -2413,12 +2413,12 @@ void THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
 #ifdef WITH_WSREP
       {
 #endif /* WITH_WSREP */
-	mysql_lock_abort_for_thread(this, thd_table);
+        mysql_lock_abort_for_thread(this, thd_table);
 #ifdef WITH_WSREP
-	if (this && WSREP(this) && wsrep_thd_is_BF((void *)this, FALSE)) 
-	{
-	  wsrep_abort_thd((void *)this, (void *)in_use, FALSE);
-	}
+        if (WSREP_NNULL(this) && wsrep_thd_is_BF((void *)this, FALSE))
+        {
+          wsrep_abort_thd((void *)this, (void *)in_use, FALSE);
+        }
       }
 #endif /* WITH_WSREP */
     }
