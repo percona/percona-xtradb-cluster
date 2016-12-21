@@ -43,12 +43,12 @@ MACRO(MYSQL_CHECK_SYSTEMD)
       ENDIF()
       MESSAGE(STATUS "SYSTEMD_TMPFILES_DIR ${SYSTEMD_TMPFILES_DIR}")
     ELSE()
-      MESSAGE(FATAL_ERROR "Unable to detect systemd support on build machine,\
-                           Aborting cmake build.")
+      MESSAGE(FATAL_ERROR
+          "Unable to detect systemd support on build machine, Aborting cmake build.")
     ENDIF()
   ELSE()
-    MESSAGE(FATAL_ERROR, "Unable to detect pkg-config support on build machine,\
-                          Aborting cmake build.")
+    MESSAGE(FATAL_ERROR
+        "Unable to detect pkg-config support on build machine, Aborting cmake build.")
   ENDIF()
 
   IF("${SYSTEMD_SERVICE_NAME}" STREQUAL "")

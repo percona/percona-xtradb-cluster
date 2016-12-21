@@ -68,7 +68,7 @@ invoke() {
 # is running! Another mysqld in e.g. a different chroot is fine for us.
 stop_server() {
     if pathfind systemctl; then
-      if systemctl list-units -a -t service | fgrep -q "@DEB_SYSTEMD_SERVICE_NAME@" ; then
+      if systemctl list-unit-files -t service | fgrep -q "@DEB_SYSTEMD_SERVICE_NAME@" ; then
         :  # service is known, so stopping it makes sense
       else
         return 0  # we cannot stop what we do not know
