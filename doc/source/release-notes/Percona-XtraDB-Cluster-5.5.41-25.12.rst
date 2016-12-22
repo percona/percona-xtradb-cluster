@@ -1,19 +1,18 @@
-.. rn:: 5.5.41-25.11.1
+.. rn:: 5.5.41-25.12
 
-=======================================
-|Percona XtraDB Cluster| 5.5.41-25.11.1
-=======================================
+=====================================
+|Percona XtraDB Cluster| 5.5.41-25.12
+=====================================
 
 Percona is glad to announce the release of |Percona XtraDB Cluster| on
 September 22nd, 2016. Binaries are available from `downloads area
-<http://www.percona.com/downloads/Percona-XtraDB-Cluster/5.5.41-25.11.1/>`_
+<https://www.percona.com/downloads/Percona-XtraDB-Cluster/Percona-XtraDB-Cluster-5.5.41-25.12>`_
 or from our :doc:`software repositories </installation>`.
 
 Based on `Percona Server 5.5.41-37.0
 <http://www.percona.com/doc/percona-server/5.5/release-notes/Percona-Server-5.5.41-37.0.html>`_
 including all the bug fixes in it, Galera Replicator 2.11 and on wsrep API
-25.11, |Percona XtraDB Cluster| `5.5.41-25.11.1i
-<https://launchpad.net/percona-xtradb-cluster/+milestone/5.5.41-25.11>`_ is
+25.11, |Percona XtraDB Cluster| 5.5.41-25.12 is
 now the current stable release. All of |Percona|'s software is open-source and
 free.
 
