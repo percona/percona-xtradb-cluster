@@ -1,5 +1,5 @@
 #
-# The Percona Server 5.7 configuration file.
+# The Percona XtraDB Cluster 5.7 configuration file.
 #
 #
 # * IMPORTANT: Additional settings that can override those from this file!
@@ -7,5 +7,5 @@
 #   Please make any edits and changes to the appropriate sectional files
 #   included below.
 #
-!includedir /etc/my.cnf.d/
-!includedir /etc/percona-server.conf.d/
+!includedir /etc/mysql/conf.d/
+!includedir /etc/mysql/percona-xtradb-cluster.conf.d/
