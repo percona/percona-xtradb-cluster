@@ -522,7 +522,8 @@ Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
 %if "%rhel" > "6"
-Obsoletes:      mariadb-libs >= 5.5.37
+Provides:       mariadb-libs >= 5.5.37
+#Obsoletes:      mariadb-libs >= 5.5.37
 %endif
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
@@ -842,16 +843,25 @@ install -d -m 0755 %{buildroot}/var/run/mysqld
 
 # Install logrotate and autostart
 install -m 644 $MBD/release/support-files/mysql-log-rotate $RBR%{_sysconfdir}/logrotate.d/mysql
+install -d %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d
+install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.cnf
+install -D -m 0644 $MBD/build-ps/rpm/mysqld.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
+install -D -m 0644 $MBD/build-ps/rpm/mysqld_safe.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
+
+%if 0%{?rhel} > 6
+install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/my.cnf
+%endif
+install -d %{buildroot}%{_sysconfdir}/my.cnf.d
 %if 0%{?systemd}
 install -D -m 0755 $MBD/build-ps/rpm/mysql-systemd $RBR%{_bindir}/mysql-systemd
 install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
-install -D -m 0644 $MBD/build-ps/rpm/my.cnf $RBR%{_sysconfdir}/my.cnf
-install -d $RBR%{_sysconfdir}/my.cnf.d
 %else
 install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
+#install -D -m 0755 $MBD/build-ps/rpm/mysql.init %{buildroot}%{_sysconfdir}/init.d/mysql
 %endif
+
 
 #
 %{__rm} -f $RBR/%{_prefix}/README
@@ -1125,8 +1135,22 @@ fi
 %if 0%{?systemd}
   %systemd_post mysql
 %endif
-%if 0%{?rhel} < 7
-if [ $1 -eq 1 ]; then
+MYCNF_PACKAGE=$(rpm -qi `rpm -qf /etc/my.cnf` | grep Name | awk '{print $3}')
+if [ $MYCNF_PACKAGE = 'mariadb-libs' -o $MYCNF_PACKAGE = 'mysql-libs' ]
+then
+  rm -f /etc/my.cnf
+fi
+if [ ! -f /etc/my.cnf ]
+then
+  update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
+else
+  echo " -------------"
+  echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
+  echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
+  echo "   *  Once it is done please execute the following commands:"
+  echo " rm -rf /etc/my.cnf"
+  echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
+  echo " -------------"
   cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
   if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
     sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
@@ -1136,7 +1160,18 @@ if [ $1 -eq 1 ]; then
     sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
   fi
 fi
-%endif
+#%if 0%{?rhel} < 7
+#if [ $1 -eq 1 ]; then
+#  cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
+#  if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
+#    sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
+#  fi
+#  cnfpid=$(/usr/bin/my_print_defaults mysqld|grep -c pid-file)
+#  if [ $cnfpid = 0 -a -f /etc/my.cnf ]; then
+#    sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
+#  fi
+#fi
+#%endif
 
 # ATTENTION: Parts of this are duplicated in the "triggerpostun" !
 
@@ -1539,6 +1574,15 @@ fi
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.asio
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.crc32c
 %doc %attr(0644,root,root) %{galera_docs}/LICENSE.chromium
+%dir %{_sysconfdir}/my.cnf.d
+%dir %{_sysconfdir}/percona-xtradb-cluster.conf.d
+%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.cnf
+%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
+%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
+%if 0%{?rhel} > 6
+%config(noreplace) %{_sysconfdir}/my.cnf
+%endif
+
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-client%{product_suffix}
@@ -1589,10 +1633,10 @@ fi
 %{_sysconfdir}/ld.so.conf.d/percona-xtradb-cluster-shared-%{version}-%{_arch}.conf
 # Shared libraries (omit for architectures that don't support them)
 %{_libdir}/libperconaserver*.so*
-%if 0%{?systemd}
-%{_sysconfdir}/my.cnf.d
-%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
-%endif
+#%if 0%{?systemd}
+#%{_sysconfdir}/my.cnf.d
+#%attr(644, root, root) %config(noreplace) %{_sysconfdir}/my.cnf
+#%endif
 
 # ----------------------------------------------------------------------------
 %files -n Percona-XtraDB-Cluster-garbd%{product_suffix}
