@@ -8114,7 +8114,7 @@ no_commit:
 				    !thd_test_options(current_thd, 
 						      OPTION_NOT_AUTOCOMMIT | 
 						      OPTION_BEGIN)) {
-					WSREP_DEBUG(
+					WSREP_WARN(
 					    "retrying insert: %s",
 					    (*wsrep_thd_query(current_thd)) ? 
 						wsrep_thd_query(current_thd) : 
@@ -20502,7 +20502,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
 		break;
         case MUST_ABORT:
-		WSREP_DEBUG("victim %llu in MUST ABORT state, killed_by: %lld",
+		WSREP_WARN("victim %llu in MUST ABORT state, killed_by: %lld",
 			    (long long)victim_trx->id,
 			    victim_trx->wsrep_killed_by_query);
 #ifndef OUT
@@ -20633,7 +20633,8 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
-			if (victim_trx->state == TRX_STATE_ACTIVE)
+			if (victim_trx->state == TRX_STATE_ACTIVE ||
+                            true)
 			{
 				query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
 				if (bf_id == 0) {
@@ -20645,7 +20646,8 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				os_compare_and_swap_thread_id(
 					&victim_trx->wsrep_killed_by_query,
 					query_id, bf_id);
-			}
+                                ib::info() << "victim killed by now " << bf_id << " was " << query_id;
+			} else ib::info() << "victim not active " << victim_trx->state;
 			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */
@@ -20738,7 +20740,7 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 
  		DBUG_RETURN(rcode);
 	} else {
-		WSREP_DEBUG("victim does not have transaction");
+		WSREP_WARN("victim does not have transaction");
 		wsrep_thd_set_conflict_state(victim_thd, true, MUST_ABORT);
 		wsrep_thd_awake(victim_thd, signal); 
 	}
