@@ -847,6 +847,7 @@ install -d %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d
 install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.cnf
 install -D -m 0644 $MBD/build-ps/rpm/mysqld.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
 install -D -m 0644 $MBD/build-ps/rpm/mysqld_safe.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
+install -D -m 0644 $MBD/build-ps/rpm/wsrep.cnf %{buildroot}%{_sysconfdir}/percona-xtradb-cluster.conf.d/wsrep.cnf
 
 %if 0%{?rhel} > 6
 install -D -m 0644 $MBD/build-ps/rpm/percona-xtradb-cluster.cnf %{buildroot}%{_sysconfdir}/my.cnf
@@ -1576,6 +1577,7 @@ fi
 %dir %{_sysconfdir}/percona-xtradb-cluster.conf.d
 %config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.cnf
 %config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld.cnf
+%config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/wsrep.cnf
 %config(noreplace) %{_sysconfdir}/percona-xtradb-cluster.conf.d/mysqld_safe.cnf
 %if 0%{?rhel} > 6
 %config(noreplace) %{_sysconfdir}/my.cnf
