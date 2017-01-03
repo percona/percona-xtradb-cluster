@@ -109,11 +109,16 @@ By default, the configuration file contains the following::
  export CLUSTER_USERNAME="admin"
  export CLUSTER_PASSWORD="admin"
  export CLUSTER_HOSTNAME="localhost"
- export CLUSTER_PORT="26000"
+ export CLUSTER_PORT="16000"
  export MONITOR_USERNAME="monitor"
  export MONITOR_PASSWORD="monit0r"
- export PXC_APP_USERNAME="pxc_app_user"
- export PXC_APP_PASSWORD="passw0rd"
+ export PXC_APP_WRITE_USERNAME="pxc_write"
+ export PXC_APP_WRITE_PASSWORD="passw0rd"
+ export PXC_APP_READ_USERNAME="pxc_read"
+ export PXC_APP_READ_PASSWORD="passw0rd"
+ export WRITE_HOSTGROUP_ID="10"
+ export READ_HOSTGROUP_ID="11"
+ export RW_MODE="loadbal"
 
 .. note:: It is recommended to
    :ref:`change default ProxySQL credentials <default-credentials>`
