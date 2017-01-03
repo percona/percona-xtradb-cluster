@@ -1217,9 +1217,7 @@ fi
 # for the other run levels exist(ed) before the upgrade?
 # use chkconfig on Enterprise Linux and newer SuSE releases
 %if 0%{?systemd}
-
-# Do NOTHING for PXC
-
+  %systemd_post mysql
 %else
 if [ -x /sbin/chkconfig ] ; then
         /sbin/chkconfig --add mysql
