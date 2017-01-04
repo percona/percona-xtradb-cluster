@@ -1474,15 +1474,15 @@ fi
 - Merge Oracle's changes of 5.7.11 .. 5.7.14 which brought new dependency definitions,
   restore date order of changelog entries.
 
+* Tue Sep 13 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.16-1
+- Add connection_control.so to server subpackage
+
 * Tue Jul 19 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
 - Minor cleanup: When using systemd, get rid of some man pages.
 
 * Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
 - Take Oracle's change to support service "instances" via systemd
   and other minor fixes from their 5.7.13.
-
-* Tue Sep 13 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.16-1
-- Add connection_control.so to server subpackage
 
 * Tue Jul 05 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.14-1
 - Updated compatver to 5.6.31
