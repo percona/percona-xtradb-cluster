@@ -75,14 +75,6 @@ void wsrep_register_hton(THD* thd, bool all)
 {
   if (!WSREP(thd)) return;
 
-  /* skip wsrep replication if client does not want to replicate */
-  if (!thd->variables.sql_log_bin)
-  {
-    WSREP_DEBUG("sql_log_bin OFF, skipping wsrep replication THD %u %s",
-                thd->thread_id(), thd->query().str);
-    return;
-  }
-  
   if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
     if (thd->wsrep_exec_mode == LOCAL_STATE      &&
