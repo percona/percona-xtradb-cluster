@@ -1531,7 +1531,8 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
     }
     else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE)
     {
-      WSREP_DEBUG("DROP caused BF abort");
+      WSREP_DEBUG("DROP caused BF abort conf: %d",
+                  granted_thd->wsrep_conflict_state);
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);

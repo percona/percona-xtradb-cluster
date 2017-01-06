@@ -20498,34 +20498,29 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 	}
 
 	switch (wsrep_thd_conflict_state(thd)) {
-	case NO_CONFLICT: 
+	case NO_CONFLICT:
 		wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
 		break;
         case MUST_ABORT:
+	{
 		WSREP_DEBUG("victim %llu in MUST ABORT state, killed_by: %lld",
 			    (long long)victim_trx->id,
 			    victim_trx->wsrep_killed_by_query);
-#ifndef OUT
-		if (victim_trx->state == TRX_STATE_ACTIVE)
-		{
-			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-			if (bf_id == 0) {
-				WSREP_WARN("query ID 0, for query %s",
-					wsrep_thd_query(bf_thd));
-				bf_id = 1;
-			}
-			query_id_t query_id = victim_trx->wsrep_killed_by_query;
-			os_compare_and_swap_thread_id(
-				&victim_trx->wsrep_killed_by_query,
-				query_id, bf_id);
+		query_id_t bf_id = wsrep_thd_query_id(bf_thd);
+		if (bf_id == 0) {
+			WSREP_WARN("BF abortee's query ID 0, for query %s",
+				wsrep_thd_query(bf_thd));
+			bf_id = 1;
 		}
+		query_id_t query_id = victim_trx->wsrep_killed_by_query;
+		os_compare_and_swap_thread_id(
+			&victim_trx->wsrep_killed_by_query,
+			query_id, bf_id);
+
 		wsrep_thd_UNLOCK(thd);
 		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
-#else
-		wsrep_thd_UNLOCK(thd);
-#endif
-		break;
+	}
 	case ABORTED:
 	case ABORTING: // fall through
 	default:
@@ -20539,37 +20534,34 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 	switch (wsrep_thd_query_state(thd)) {
 	case QUERY_COMMITTING:
+	{
 		enum wsrep_status rcode;
 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    (long long)victim_trx->id);
-		if (victim_trx->state == TRX_STATE_ACTIVE)
-		{
-			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-			if (bf_id == 0) {
-				WSREP_WARN("query ID 0, for query %s",
-					wsrep_thd_query(bf_thd));
-				bf_id = 1;
-			}
-			query_id_t query_id = victim_trx->wsrep_killed_by_query;
-			os_compare_and_swap_thread_id(
-				&victim_trx->wsrep_killed_by_query,
-				query_id, bf_id);
+		query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+		if (bf_id == 0) {
+			WSREP_WARN("BF abortee's query ID 0, for query %s",
+				wsrep_thd_query(bf_thd));
+			bf_id = 1;
 		}
+		query_id_t query_id = victim_trx->wsrep_killed_by_query;
+		os_compare_and_swap_thread_id(
+			&victim_trx->wsrep_killed_by_query,
+			query_id, bf_id);
 		wsrep_thd_awake(thd, signal); 
 
 		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
 			wsrep_abort_slave_trx(bf_seqno,
 					      wsrep_thd_trx_seqno(thd));
 		} else {
-                  WSREP_DEBUG("abort_pre trxid %lu next trxid %lu query id %lld",
+			WSREP_DEBUG("abort_pre trxid %lu next trxid %lu query id %lld",
                               wsrep_thd_trx_id(thd),
                               wsrep_thd_next_trx_id(thd),
                               wsrep_thd_query_id(thd));
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
 				(wsrep_trx_id_t)wsrep_thd_trx_id(thd)
-//				(wsrep_trx_id_t)victim_trx->id
 			);
 			
 			switch (rcode) {
@@ -20595,6 +20587,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			}
 		}
 		break;
+	}
 	case QUERY_EXEC:
 		/* it is possible that victim trx is itself waiting for some 
 		 * other lock. We need to cancel this waiting
@@ -20609,23 +20602,21 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			lock_t*  wait_lock = victim_trx->lock.wait_lock;
 			if (wait_lock) {
 				WSREP_DEBUG("canceling wait lock");
-				victim_trx->lock.was_chosen_as_deadlock_victim= TRUE;
+				victim_trx->lock.was_chosen_as_deadlock_victim=
+					TRUE;
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
-			if (victim_trx->state == TRX_STATE_ACTIVE)
-			{
-				query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-				if (bf_id == 0) {
-					WSREP_WARN("query ID 0, for query %s",
-						wsrep_thd_query(bf_thd));
-					bf_id = 1;
-				}
-				query_id_t query_id = victim_trx->wsrep_killed_by_query;
-				os_compare_and_swap_thread_id(
-					&victim_trx->wsrep_killed_by_query,
-					query_id, bf_id);
+			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+			if (bf_id == 0) {
+				WSREP_WARN("query ID 0, for query %s",
+					wsrep_thd_query(bf_thd));
+				bf_id = 1;
 			}
+			query_id_t query_id = victim_trx->wsrep_killed_by_query;
+			os_compare_and_swap_thread_id(
+				&victim_trx->wsrep_killed_by_query,
+				query_id, bf_id);
 			wsrep_thd_awake(thd, signal); 
 		} else {
 			/* abort currently executing query */
@@ -20633,19 +20624,17 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
-			if (victim_trx->state == TRX_STATE_ACTIVE)
-			{
-				query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-				if (bf_id == 0) {
-					WSREP_WARN("query ID 0, for query %s",
-						wsrep_thd_query(bf_thd));
-					bf_id = 1;
-				}
-				query_id_t query_id = victim_trx->wsrep_killed_by_query;
-				os_compare_and_swap_thread_id(
-					&victim_trx->wsrep_killed_by_query,
-					query_id, bf_id);
+
+			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+			if (bf_id == 0) {
+				WSREP_WARN("BF abortee's query ID 0, for: %s",
+					wsrep_thd_query(bf_thd));
+				bf_id = 1;
 			}
+			query_id_t query_id = victim_trx->wsrep_killed_by_query;
+			os_compare_and_swap_thread_id(
+				&victim_trx->wsrep_killed_by_query,
+				query_id, bf_id);
 			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */

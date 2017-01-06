@@ -7357,7 +7357,7 @@ lock_trx_handle_wait(
 	dberr_t	err;
 
 #ifdef WITH_WSREP
-        if (trx->wsrep_killed_by_query == 0 && trx->state == TRX_STATE_ACTIVE) {
+        if (trx->wsrep_killed_by_query == 0) {
 #endif /* WITH_WSREP */
 	lock_mutex_enter();
 
@@ -7377,7 +7377,7 @@ lock_trx_handle_wait(
 	}
 
 #ifdef WITH_WSREP
-        if (trx->wsrep_killed_by_query == 0 && trx->state == TRX_STATE_ACTIVE) {
+        if (trx->wsrep_killed_by_query == 0) {
 #endif /* WITH_WSREP */
 	lock_mutex_exit();
 
