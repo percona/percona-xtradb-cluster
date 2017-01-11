@@ -536,7 +536,11 @@ void System_variable::init(THD *target_thd, const SHOW_VAR *show_var,
   value= get_one_variable_ext(current_thread, target_thd, show_var, query_scope, show_var_type,
                               NULL, &m_charset, m_value_str, &m_value_length);
 
+#ifdef WITH_WSREP
+  m_value_length= MY_MIN(m_value_length, ((SHOW_VAR_FUNC_BUFF_SIZE > 2048) ? SHOW_VAR_FUNC_BUFF_SIZE : 2048));
+#else
   m_value_length= MY_MIN(m_value_length, SHOW_VAR_FUNC_BUFF_SIZE);
+#endif /* WITH_WSREP */
 
   /* Returned value may reference a string other than m_value_str. */
   if (value != m_value_str)
@@ -1234,12 +1238,10 @@ void Status_variable::init(const SHOW_VAR *show_var, STATUS_VAR *status_vars, en
   m_type= show_var->type;
   m_scope= show_var->scope;
 
-  const CHARSET_INFO *charset= system_charset_info;
-
   /* Get the value of the status variable. */
   const char *value;
   value= get_one_variable(current_thd, show_var, query_scope, m_type,
-                          status_vars, &charset, m_value_str, &m_value_length);
+                          status_vars, &m_charset, m_value_str, &m_value_length);
   m_value_length= MY_MIN(m_value_length, SHOW_VAR_FUNC_BUFF_SIZE);
 
   /* Returned value may reference a string other than m_value_str. */

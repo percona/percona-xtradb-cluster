@@ -136,7 +136,7 @@ extern MYSQL_PLUGIN_IMPORT wsrep_aborting_thd_t wsrep_aborting_thd;
 static inline wsrep_ws_handle_t*
 wsrep_ws_handle(THD* thd, const trx_t* trx) {
 	return wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd),
-				       (wsrep_trx_id_t)trx->id);
+				       wsrep_thd_next_trx_id(thd));
 }
 
 extern bool wsrep_prepare_key_for_innodb(const uchar *cache_key,
@@ -3445,6 +3445,11 @@ innobase_encryption_key_rotation()
 {
 	byte*	master_key = NULL;
 	bool	ret = FALSE;
+
+	if (srv_read_only_mode) {
+		my_error(ER_INNODB_READ_ONLY, MYF(0));
+		return(true);
+	}
 
 	/* Require the mutex to block other rotate request. */
 	mutex_enter(&master_key_id_mutex);
@@ -7944,6 +7949,7 @@ no_commit:
 
 				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
 				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
 			}
 #endif /* WITH_WSREP */
 			/* Source table is not in InnoDB format:
@@ -7973,6 +7979,7 @@ no_commit:
 				}
 				if (tc_log->commit(m_user_thd, 1))  DBUG_RETURN(1);
 				wsrep_post_commit(m_user_thd, TRUE);
+				wsrep_thd_set_next_trx_id(m_user_thd);
 			}
 #endif /* WITH_WSREP */
 			/* Ensure that there are no other table locks than
@@ -8201,8 +8208,9 @@ report_error:
 
 #ifdef WITH_WSREP
 	if (!error_result && wsrep_thd_exec_mode(m_user_thd) == LOCAL_STATE &&
-	    wsrep_on(m_user_thd) && !wsrep_consistency_check(m_user_thd) &&
-	    (sql_command != SQLCOM_LOAD || 
+	    wsrep_on(m_user_thd) && !wsrep_consistency_check(m_user_thd)  &&
+	    (sql_command != SQLCOM_CREATE_TABLE)                          &&
+	    (sql_command != SQLCOM_LOAD ||
 	     thd_binlog_format(m_user_thd) == BINLOG_FORMAT_ROW)) {
 
 		if (wsrep_append_keys(m_user_thd, false, record, NULL)) {
@@ -9023,7 +9031,10 @@ ha_innobase::delete_all_rows()
 	if (!dict_table_is_intrinsic(m_prebuilt->table)
 	    && trx_in_innodb.is_aborted()) {
 
-		DBUG_RETURN(innobase_rollback(ht, m_user_thd, false));
+		innobase_rollback(ht, m_user_thd, false);
+
+		DBUG_RETURN(convert_error_code_to_mysql(
+			DB_FORCED_ABORT, 0, m_user_thd));
 	}
 
 	dberr_t	error = row_delete_all_rows(m_prebuilt->table);
@@ -9834,14 +9845,7 @@ ha_innobase::rnd_init(
 	bool	scan)	/*!< in: true if table/index scan FALSE otherwise */
 {
 	TrxInInnoDB	trx_in_innodb(m_prebuilt->trx);
-
-	if (!dict_table_is_intrinsic(m_prebuilt->table)
-	    && trx_in_innodb.is_aborted()) {
-
-		return(innobase_rollback(ht, m_user_thd, false));
-	}
-
-	int	err;
+	int		err;
 
 	/* Store the active index value so that we can restore the original
 	value after a scan */
@@ -15908,6 +15912,28 @@ get_foreign_key_info(
 		thd, f_key_info.update_method, ptr,
 		static_cast<unsigned int>(len), 1);
 
+	/* Load referenced table to update FK referenced key name. */
+	if (foreign->referenced_table == NULL) {
+
+		dict_table_t*	ref_table;
+
+		ut_ad(mutex_own(&dict_sys->mutex));
+		ref_table = dict_table_open_on_name(
+			foreign->referenced_table_name_lookup,
+			TRUE, FALSE, DICT_ERR_IGNORE_NONE);
+
+		if (ref_table == NULL) {
+
+			ib::info() << "Foreign Key referenced table "
+				   << foreign->referenced_table_name
+				   << " not found for foreign table "
+				   << foreign->foreign_table_name;
+		} else {
+
+			dict_table_close(ref_table, TRUE, FALSE);
+		}
+	}
+
 	if (foreign->referenced_index
 	    && foreign->referenced_index->name != NULL) {
 		referenced_key_name = thd_make_lex_string(
@@ -17669,6 +17695,37 @@ ha_innobase::get_auto_increment(
 	ulonglong	col_max_value =
 		table->next_number_field->get_max_int_value();
 
+	/** The following logic is needed to avoid duplicate key error
+	for autoincrement column.
+
+	(1) InnoDB gives the current autoincrement value with respect
+	to increment and offset value.
+
+	(2) Basically it does compute_next_insert_id() logic inside InnoDB
+	to avoid the current auto increment value changed by handler layer.
+
+	(3) It is restricted only for insert operations. */
+
+	if (increment > 1 && thd_sql_command(m_user_thd) != SQLCOM_ALTER_TABLE
+	    && autoinc < col_max_value) {
+
+		ulonglong	prev_auto_inc = autoinc;
+
+		autoinc = ((autoinc - 1) + increment - offset)/ increment;
+
+		autoinc = autoinc * increment + offset;
+
+		/* If autoinc exceeds the col_max_value then reset
+		to old autoinc value. Because in case of non-strict
+		sql mode, boundary value is not considered as error. */
+
+		if (autoinc >= col_max_value) {
+			autoinc = prev_auto_inc;
+		}
+
+		ut_ad(autoinc > 0);
+	}
+
 	/* Called for the first time ? */
 	if (trx->n_autoinc_rows == 0) {
 
@@ -18037,7 +18094,8 @@ innobase_xa_prepare(
 
 	TrxInInnoDB	trx_in_innodb(trx);
 
-	if (trx_in_innodb.is_aborted()) {
+	if (trx_in_innodb.is_aborted() ||
+	    DBUG_EVALUATE_IF("simulate_xa_failure_prepare_in_engine", 1, 0)) {
 
 		innobase_rollback(hton, thd, prepare_trx);
 
@@ -20348,7 +20406,7 @@ wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx)
 		} else {
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
-				(wsrep_trx_id_t)victim_trx->id
+				(wsrep_trx_id_t)wsrep_thd_trx_id(thd)
 			);
 			switch (rcode) {
 			case WSREP_WARNING:
@@ -20440,30 +20498,29 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 	}
 
 	switch (wsrep_thd_conflict_state(thd)) {
-	case NO_CONFLICT: 
+	case NO_CONFLICT:
 		wsrep_thd_set_conflict_state(thd, false, MUST_ABORT);
 		break;
         case MUST_ABORT:
+	{
 		WSREP_DEBUG("victim %llu in MUST ABORT state, killed_by: %lld",
 			    (long long)victim_trx->id,
 			    victim_trx->wsrep_killed_by_query);
-		if (victim_trx->state == TRX_STATE_ACTIVE)
-		{
-			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-			if (bf_id == 0) {
-				WSREP_WARN("query ID 0, for query %s",
-					wsrep_thd_query(bf_thd));
-				bf_id = 1;
-			}
-			query_id_t query_id = victim_trx->wsrep_killed_by_query;
-			os_compare_and_swap_thread_id(
-				&victim_trx->wsrep_killed_by_query,
-				query_id, bf_id);
+		query_id_t bf_id = wsrep_thd_query_id(bf_thd);
+		if (bf_id == 0) {
+			WSREP_WARN("BF abortee's query ID 0, for query %s",
+				wsrep_thd_query(bf_thd));
+			bf_id = 1;
 		}
+		query_id_t query_id = victim_trx->wsrep_killed_by_query;
+		os_compare_and_swap_thread_id(
+			&victim_trx->wsrep_killed_by_query,
+			query_id, bf_id);
+
 		wsrep_thd_UNLOCK(thd);
 		wsrep_thd_awake(thd, signal);
 		DBUG_RETURN(0);
-		break;
+	}
 	case ABORTED:
 	case ABORTING: // fall through
 	default:
@@ -20477,32 +20534,34 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 	switch (wsrep_thd_query_state(thd)) {
 	case QUERY_COMMITTING:
+	{
 		enum wsrep_status rcode;
 
 		WSREP_DEBUG("kill trx QUERY_COMMITTING for %llu", 
 			    (long long)victim_trx->id);
-		if (victim_trx->state == TRX_STATE_ACTIVE)
-		{
-			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-			if (bf_id == 0) {
-				WSREP_WARN("query ID 0, for query %s",
-					wsrep_thd_query(bf_thd));
-				bf_id = 1;
-			}
-			query_id_t query_id = victim_trx->wsrep_killed_by_query;
-			os_compare_and_swap_thread_id(
-				&victim_trx->wsrep_killed_by_query,
-				query_id, bf_id);
+		query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+		if (bf_id == 0) {
+			WSREP_WARN("BF abortee's query ID 0, for query %s",
+				wsrep_thd_query(bf_thd));
+			bf_id = 1;
 		}
+		query_id_t query_id = victim_trx->wsrep_killed_by_query;
+		os_compare_and_swap_thread_id(
+			&victim_trx->wsrep_killed_by_query,
+			query_id, bf_id);
 		wsrep_thd_awake(thd, signal); 
 
 		if (wsrep_thd_exec_mode(thd) == REPL_RECV) {
 			wsrep_abort_slave_trx(bf_seqno,
 					      wsrep_thd_trx_seqno(thd));
 		} else {
+			WSREP_DEBUG("abort_pre trxid %lu next trxid %lu query id %lld",
+                              wsrep_thd_trx_id(thd),
+                              wsrep_thd_next_trx_id(thd),
+                              wsrep_thd_query_id(thd));
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
-				(wsrep_trx_id_t)victim_trx->id
+				(wsrep_trx_id_t)wsrep_thd_trx_id(thd)
 			);
 			
 			switch (rcode) {
@@ -20528,6 +20587,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			}
 		}
 		break;
+	}
 	case QUERY_EXEC:
 		/* it is possible that victim trx is itself waiting for some 
 		 * other lock. We need to cancel this waiting
@@ -20542,23 +20602,21 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			lock_t*  wait_lock = victim_trx->lock.wait_lock;
 			if (wait_lock) {
 				WSREP_DEBUG("canceling wait lock");
-				victim_trx->lock.was_chosen_as_deadlock_victim= TRUE;
+				victim_trx->lock.was_chosen_as_deadlock_victim=
+					TRUE;
 				lock_cancel_waiting_and_release(wait_lock);
 			}
 
-			if (victim_trx->state == TRX_STATE_ACTIVE)
-			{
-				query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-				if (bf_id == 0) {
-					WSREP_WARN("query ID 0, for query %s",
-						wsrep_thd_query(bf_thd));
-					bf_id = 1;
-				}
-				query_id_t query_id = victim_trx->wsrep_killed_by_query;
-				os_compare_and_swap_thread_id(
-					&victim_trx->wsrep_killed_by_query,
-					query_id, bf_id);
+			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+			if (bf_id == 0) {
+				WSREP_WARN("query ID 0, for query %s",
+					wsrep_thd_query(bf_thd));
+				bf_id = 1;
 			}
+			query_id_t query_id = victim_trx->wsrep_killed_by_query;
+			os_compare_and_swap_thread_id(
+				&victim_trx->wsrep_killed_by_query,
+				query_id, bf_id);
 			wsrep_thd_awake(thd, signal); 
 		} else {
 			/* abort currently executing query */
@@ -20566,19 +20624,17 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 				wsrep_thd_thread_id(thd)));
 			WSREP_DEBUG("kill query for: %u",
 				wsrep_thd_thread_id(thd));
-			if (victim_trx->state == TRX_STATE_ACTIVE)
-			{
-				query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
-				if (bf_id == 0) {
-					WSREP_WARN("query ID 0, for query %s",
-						wsrep_thd_query(bf_thd));
-					bf_id = 1;
-				}
-				query_id_t query_id = victim_trx->wsrep_killed_by_query;
-				os_compare_and_swap_thread_id(
-					&victim_trx->wsrep_killed_by_query,
-					query_id, bf_id);
+
+			query_id_t bf_id    = wsrep_thd_query_id(bf_thd);
+			if (bf_id == 0) {
+				WSREP_WARN("BF abortee's query ID 0, for: %s",
+					wsrep_thd_query(bf_thd));
+				bf_id = 1;
 			}
+			query_id_t query_id = victim_trx->wsrep_killed_by_query;
+			os_compare_and_swap_thread_id(
+				&victim_trx->wsrep_killed_by_query,
+				query_id, bf_id);
 			wsrep_thd_awake(thd, signal); 
 
 			/* for BF thd, we need to prevent him from committing */
@@ -20763,6 +20819,12 @@ static MYSQL_SYSVAR_BOOL(doublewrite, innobase_use_doublewrite,
   "Enable InnoDB doublewrite buffer (enabled by default)."
   " Disable with --skip-innodb-doublewrite.",
   NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_BOOL(stats_include_delete_marked,
+  srv_stats_include_delete_marked,
+  PLUGIN_VAR_OPCMDARG,
+  "Include delete marked records when calculating persistent statistics",
+  NULL, NULL, FALSE);
 
 static MYSQL_SYSVAR_ULONG(io_capacity, srv_io_capacity,
   PLUGIN_VAR_RQCMDARG,
@@ -21439,12 +21501,12 @@ static MYSQL_SYSVAR_BOOL(use_native_aio, srv_use_native_aio,
   "Use native AIO if supported on this platform.",
   NULL, NULL, TRUE);
 
-#if defined(HAVE_LIBNUMA) && defined(WITH_NUMA)
+#ifdef HAVE_LIBNUMA
 static MYSQL_SYSVAR_BOOL(numa_interleave, srv_numa_interleave,
   PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
   "Use NUMA interleave memory policy to allocate InnoDB buffer pool.",
   NULL, NULL, FALSE);
-#endif /* HAVE_LIBNUMA && WITH_NUMA */
+#endif /* HAVE_LIBNUMA */
 
 static MYSQL_SYSVAR_BOOL(api_enable_binlog, ib_binlog_enabled,
   PLUGIN_VAR_NOCMDARG | PLUGIN_VAR_READONLY,
@@ -21718,6 +21780,7 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(temp_data_file_path),
   MYSQL_SYSVAR(data_home_dir),
   MYSQL_SYSVAR(doublewrite),
+  MYSQL_SYSVAR(stats_include_delete_marked),
   MYSQL_SYSVAR(api_enable_binlog),
   MYSQL_SYSVAR(api_enable_mdl),
   MYSQL_SYSVAR(api_disable_rowlock),
@@ -21799,9 +21862,9 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(autoinc_lock_mode),
   MYSQL_SYSVAR(version),
   MYSQL_SYSVAR(use_native_aio),
-#if defined(HAVE_LIBNUMA) && defined(WITH_NUMA)
+#ifdef HAVE_LIBNUMA
   MYSQL_SYSVAR(numa_interleave),
-#endif /* HAVE_LIBNUMA && WITH_NUMA */
+#endif /* HAVE_LIBNUMA */
   MYSQL_SYSVAR(change_buffering),
   MYSQL_SYSVAR(change_buffer_max_size),
 #if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG

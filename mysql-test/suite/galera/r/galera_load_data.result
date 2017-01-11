@@ -1,0 +1,45 @@
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+RESET MASTER;
+wsrep_last_committed_correct
+1
+SHOW BINLOG EVENTS FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+0.000001	123	Previous_gtids	1	154	
+RESET MASTER;
+RESET MASTER;
+wsrep_last_committed_correct
+1
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1;
+COUNT(*) = 1
+1
+SHOW BINLOG EVENTS FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+0.000001	123	Previous_gtids	1	154	
+0.000001	154	Anonymous_Gtid	1	219	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+0.000001	219	Query	1	296	BEGIN
+0.000001	296	Table_map	1	341	table_id: ### (test.t1)
+0.000001	341	Write_rows	1	381	table_id: ### flags: STMT_END_F
+0.000001	381	Xid	1	412	COMMIT /* xid=### */
+SHOW BINLOG EVENTS FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+0.000001	123	Previous_gtids	2	154	
+0.000001	154	Anonymous_Gtid	1	219	SET @@SESSION.GTID_NEXT= 'ANONYMOUS'
+0.000001	219	Query	1	287	BEGIN
+0.000001	287	Table_map	1	332	table_id: ### (test.t1)
+0.000001	332	Write_rows	1	372	table_id: ### flags: STMT_END_F
+0.000001	372	Xid	1	403	COMMIT /* xid=### */
+TRUNCATE TABLE t1;
+RESET MASTER;
+ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
+wsrep_last_committed_correct
+1
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
+1
+SHOW BINLOG EVENTS FROM 123;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+0.000001	123	Previous_gtids	1	154	
+DROP TABLE t1;

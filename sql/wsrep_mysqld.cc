@@ -853,17 +853,7 @@ bool wsrep_sync_wait (THD* thd, uint mask)
   return false;
 }
 
-/*
- * Helpers to deal with TOI key arrays
- */
-typedef struct wsrep_key_arr
-{
-    wsrep_key_t* keys;
-    size_t       keys_len;
-} wsrep_key_arr_t;
-
-
-static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
+void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 {
     for (size_t i= 0; i < key_arr->keys_len; ++i)
     {
@@ -928,11 +918,11 @@ static bool wsrep_prepare_key_for_isolation(const char* db,
 }
 
 /* Prepare key list from db/table and table_list */
-static bool wsrep_prepare_keys_for_isolation(THD*              thd,
-                                             const char*       db,
-                                             const char*       table,
-                                             const TABLE_LIST* table_list,
-                                             wsrep_key_arr_t*  ka)
+bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                      const char*       db,
+                                      const char*       table,
+                                      const TABLE_LIST* table_list,
+                                      wsrep_key_arr_t*  ka)
 {
     ka->keys= 0;
     ka->keys_len= 0;
@@ -1247,7 +1237,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
     wsrep_keys_free(&key_arr);
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
-		thd->wsrep_exec_mode);
+                thd->wsrep_exec_mode);
   }
   else if (key_arr.keys_len > 0) {
     /* jump to error handler in mysql_execute_command() */
@@ -1257,7 +1247,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                (thd->db().str ? thd->db().str : "(null)"),
                (thd->query().str) ? WSREP_QUERY(thd) : "void");
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
-	     "your wsrep connection state and retry the query.");
+             "your wsrep connection state and retry the query.");
     if (buf) my_free(buf);
     /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
     thd->wsrep_gtid_event_buf_len = 0;
@@ -1268,8 +1258,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   else {
     /* non replicated DDL, affecting temporary tables only */
     WSREP_DEBUG("TO isolation skipped for: %d, sql: %s."
-		"Only temporary tables affected.",
-		ret, WSREP_QUERY(thd));
+                "Only temporary tables affected.",
+                ret, WSREP_QUERY(thd));
     return 1;
   }
 
@@ -1541,7 +1531,8 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
     }
     else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE)
     {
-      WSREP_DEBUG("DROP caused BF abort");
+      WSREP_DEBUG("DROP caused BF abort conf: %d",
+                  granted_thd->wsrep_conflict_state);
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);

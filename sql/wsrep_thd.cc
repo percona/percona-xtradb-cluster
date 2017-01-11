@@ -135,6 +135,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->reset_db(NULL_CSTR);
 
   shadow->user_time = thd->user_time;
+  shadow->row_count_func= thd->get_row_count_func();
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -155,6 +156,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   delete thd->wsrep_rli;
   thd->wsrep_rli = 0;
   thd->slave_thread = FALSE;
+  thd->set_row_count_func(shadow->row_count_func);
 }
 
 void wsrep_replay_transaction(THD *thd)
@@ -177,6 +179,25 @@ void wsrep_replay_transaction(THD *thd)
         WSREP_WARN("dangling observer in replay transaction: (thr %u %lld %s)",
                    thd->thread_id(), thd->query_id, thd->query().str);
       }
+
+      struct da_shadow
+      {
+          enum Diagnostics_area::enum_diagnostics_status status;
+          ulonglong affected_rows;
+          ulonglong last_insert_id;
+          char message[MYSQL_ERRMSG_SIZE];
+      };
+      struct da_shadow da_status;
+      da_status.status= thd->get_stmt_da()->status();
+      if (da_status.status == Diagnostics_area::DA_OK)
+      {
+        da_status.affected_rows= thd->get_stmt_da()->affected_rows();
+        da_status.last_insert_id= thd->get_stmt_da()->last_insert_id();
+        strmake(da_status.message,
+                thd->get_stmt_da()->message_text(),
+                sizeof(da_status.message)-1);
+      }
+
       thd->get_stmt_da()->reset_diagnostics_area();
 
       thd->wsrep_conflict_state= REPLAYING;
@@ -243,7 +264,17 @@ void wsrep_replay_transaction(THD *thd)
         }
         else
         {
-          my_ok(thd);
+          if (da_status.status == Diagnostics_area::DA_OK)
+          {
+            my_ok(thd,
+                  da_status.affected_rows,
+                  da_status.last_insert_id,
+                  da_status.message);
+          }
+          else
+          {
+            my_ok(thd);
+          }
         }
         break;
       case WSREP_TRX_FAIL:
@@ -506,9 +537,9 @@ my_bool wsrep_thd_is_BF(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
-	      (thd->wsrep_exec_mode == TOTAL_ORDER));
+              (thd->wsrep_exec_mode == TOTAL_ORDER));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   return status;
@@ -522,10 +553,10 @@ my_bool wsrep_thd_is_BF_or_commit(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
-	      (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
-	      (thd->wsrep_exec_mode == LOCAL_COMMIT));
+              (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
+              (thd->wsrep_exec_mode == LOCAL_COMMIT));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   return status;

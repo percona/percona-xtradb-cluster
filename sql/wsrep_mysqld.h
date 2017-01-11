@@ -175,11 +175,14 @@ extern "C" time_t wsrep_thd_query_start(THD *thd);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 extern "C" int64_t wsrep_thd_trx_seqno(THD *thd);
 extern "C" query_id_t wsrep_thd_query_id(THD *thd);
+extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd);
+extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd);
 extern "C" const char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
 extern "C" int wsrep_thd_retry_counter(THD *thd);
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd);
 
 extern "C" void wsrep_thd_auto_increment_variables(THD*,
                                                    unsigned long long *offset,
@@ -209,11 +212,19 @@ extern wsrep_seqno_t wsrep_locked_seqno;
    wsrep_provider                     && \
    strcmp(wsrep_provider, WSREP_NONE))
 
+/* use xxxxxx_NNULL macros when thd pointer is guaranteed to be non-null to
+ * avoid compiler warnings (GCC 6 and later) */
+#define WSREP_NNULL(thd) \
+  (WSREP_ON && wsrep && thd->variables.wsrep_on)
+
 #define WSREP(thd) \
-  (WSREP_ON && wsrep && (thd && thd->variables.wsrep_on))
+  (thd && WSREP_NNULL(thd))
 
 #define WSREP_CLIENT(thd) \
-    (WSREP(thd) && thd->wsrep_client_thread)
+  (WSREP(thd) && thd->wsrep_client_thread)
+
+#define WSREP_EMULATE_BINLOG_NNULL(thd) \
+  (WSREP_NNULL(thd) && wsrep_emulate_bin_log)
 
 #define WSREP_EMULATE_BINLOG(thd) \
   (WSREP(thd) && wsrep_emulate_bin_log)
@@ -337,4 +348,15 @@ bool wsrep_node_is_donor();
 bool wsrep_node_is_synced();
 bool wsrep_replicate_GTID(THD* thd);
 
+typedef struct wsrep_key_arr
+{
+    wsrep_key_t* keys;
+    size_t       keys_len;
+} wsrep_key_arr_t;
+bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                      const char*       db,
+                                      const char*       table,
+                                      const TABLE_LIST* table_list,
+                                      wsrep_key_arr_t*  ka);
+void wsrep_keys_free(wsrep_key_arr_t* key_arr);
 #endif /* WSREP_MYSQLD_H */

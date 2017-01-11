@@ -599,8 +599,8 @@ extern "C" void wsrep_thd_set_conflict_state(
 
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 
-extern "C"void wsrep_thd_LOCK(THD *thd);
-extern "C"void wsrep_thd_UNLOCK(THD *thd);
+extern "C" void wsrep_thd_LOCK(THD *thd);
+extern "C" void wsrep_thd_UNLOCK(THD *thd);
 extern "C" uint32 wsrep_thd_wsrep_rand(THD *thd);
 extern "C" time_t wsrep_thd_query_start(THD *thd);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
@@ -609,6 +609,7 @@ extern "C" query_id_t wsrep_thd_query_id(THD *thd);
 extern "C" const char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
 #endif
 #endif

@@ -398,7 +398,7 @@ case "$mode" in
     *)
       # usage
       basename=`basename "$0"`
-      echo "Usage: $basename  {start|stop|restart|reload|force-reload|status}  [ MySQL server options ]"
+      echo "Usage: $basename  {start|stop|restart|reload|force-reload|status|bootstrap}  [ MySQL server options ]"
       exit 1
     ;;
 esac

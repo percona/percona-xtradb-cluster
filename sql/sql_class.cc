@@ -71,7 +71,7 @@ using std::max;
   The following is used to initialise Table_ident with a internal
   table name
 */
-char internal_table_name[2]= "*";
+char internal_table_name[2]= "";
 char empty_c_string[1]= {0};    /* used for not defined db */
 
 LEX_STRING EMPTY_STR= { (char *) "", 0 };
@@ -899,11 +899,11 @@ extern "C" wsrep_ws_handle_t* wsrep_thd_ws_handle(THD *thd)
   return &thd->wsrep_ws_handle;
 }
 
-extern "C"void wsrep_thd_LOCK(THD *thd)
+extern "C" void wsrep_thd_LOCK(THD *thd)
 {
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
 }
-extern "C"void wsrep_thd_UNLOCK(THD *thd)
+extern "C" void wsrep_thd_UNLOCK(THD *thd)
 {
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 }
@@ -926,6 +926,21 @@ extern "C" wsrep_seqno_t wsrep_thd_trx_seqno(THD *thd)
 extern "C" query_id_t wsrep_thd_query_id(THD *thd) 
 {
   return thd->query_id;
+}
+extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd)
+{
+  return thd->wsrep_next_trx_id();
+}
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd)
+{
+  if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID)
+  {
+    thd->set_wsrep_next_trx_id(thd->query_id);
+  }
+}
+extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd)
+{
+  return thd->wsrep_trx_id();
 }
 extern "C" const char *wsrep_thd_query(THD *thd) 
 {
@@ -1242,6 +1257,7 @@ THD::THD(bool enable_plugins)
    initial_status_var(NULL),
    status_var_aggregated(false),
    query_plan(this),
+   m_current_stage_key(0),
    current_mutex(NULL),
    current_cond(NULL),
    in_sub_stmt(0),
@@ -1409,6 +1425,7 @@ THD::THD(bool enable_plugins)
   wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
   wsrep_affected_rows     = 0;
   wsrep_replicate_GTID    = false;
+  m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1625,7 +1642,8 @@ struct timeval THD::query_start_timeval_trunc(uint decimals)
 Sql_condition* THD::raise_condition(uint sql_errno,
                                     const char* sqlstate,
                                     Sql_condition::enum_severity_level level,
-                                    const char* msg)
+                                    const char* msg,
+                                    bool use_condition_handler)
 {
   DBUG_ENTER("THD::raise_condition");
 
@@ -1641,7 +1659,8 @@ Sql_condition* THD::raise_condition(uint sql_errno,
   if (sqlstate == NULL)
    sqlstate= mysql_errno_to_sqlstate(sql_errno);
 
-  if (handle_condition(sql_errno, sqlstate, &level, msg))
+  if (use_condition_handler &&
+      handle_condition(sql_errno, sqlstate, &level, msg))
     DBUG_RETURN(NULL);
 
   if (level == Sql_condition::SL_NOTE || level == Sql_condition::SL_WARNING)
@@ -1799,6 +1818,7 @@ void THD::init(void)
   wsrep_replicate_GTID    = false;
   wsrep_gtid_event_buf    = NULL;
   wsrep_gtid_event_buf_len = 0;
+  m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
 #endif
   binlog_row_event_extra_data= 0;
 
@@ -2414,13 +2434,15 @@ void THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
       if (!thd_table->needs_reopen())
 #ifdef WITH_WSREP
       {
-	mysql_lock_abort_for_thread(this, thd_table);
-	if (this && WSREP(this) && wsrep_thd_is_BF((void *)this, FALSE)) 
-	{
-	  wsrep_abort_thd((void *)this, (void *)in_use, FALSE);
-	}
+#endif /* WITH_WSREP */
+        mysql_lock_abort_for_thread(this, thd_table);
+#ifdef WITH_WSREP
+        if (WSREP_NNULL(this) && wsrep_thd_is_BF((void *)this, FALSE))
+        {
+          wsrep_abort_thd((void *)this, (void *)in_use, FALSE);
+        }
       }
-#endif
+#endif /* WITH_WSREP */
     }
     mysql_mutex_unlock(&in_use->LOCK_thd_data);
   }
@@ -5020,28 +5042,32 @@ void THD::claim_memory_ownership()
 }
 
 
-bool THD::binlog_applier_need_detach_trx()
+void THD::rpl_detach_engine_ha_data()
 {
 #ifdef HAVE_REPLICATION
-  return is_binlog_applier() ? rli_fake->is_native_trx_detached= true : false;
-#else
-  return false;
+  Relay_log_info *rli=
+    is_binlog_applier() ? rli_fake : (slave_thread ? rli_slave : NULL);
+
+  DBUG_ASSERT(!rli_fake  || !rli_fake-> is_engine_ha_data_detached);
+  DBUG_ASSERT(!rli_slave || !rli_slave->is_engine_ha_data_detached);
+
+  if (rli)
+    rli->detach_engine_ha_data(this);
 #endif
 };
 
 
-bool THD::binlog_applier_has_detached_trx()
+bool THD::rpl_unflag_detached_engine_ha_data()
 {
 #ifdef HAVE_REPLICATION
-  bool rc= is_binlog_applier() && rli_fake->is_native_trx_detached;
-
-  if (rc)
-    rli_fake->is_native_trx_detached= false;
-  return rc;
+  Relay_log_info *rli=
+    is_binlog_applier() ? rli_fake : (slave_thread ? rli_slave : NULL);
+  return rli ? rli->unflag_detached_engine_ha_data() : false;
 #else
   return false;
 #endif
 }
+
 /**
   Determine if binlogging is disabled for this session
   @retval 0 if the current statement binlogging is disabled

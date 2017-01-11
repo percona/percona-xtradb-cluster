@@ -39,10 +39,11 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *hton,
 void wsrep_cleanup_transaction(THD *thd)
 {
   if (!WSREP(thd)) return;
-
+  WSREP_DEBUG("wsrep_cleanup_transaction %s", thd->query().str);
   if (wsrep_emulate_bin_log) thd_binlog_trx_reset(thd);
   thd->wsrep_ws_handle.trx_id= WSREP_UNDEFINED_TRX_ID;
   thd->wsrep_trx_meta.gtid= WSREP_GTID_UNDEFINED;
+  thd->set_wsrep_next_trx_id(WSREP_UNDEFINED_TRX_ID);
   thd->wsrep_trx_meta.depends_on= WSREP_SEQNO_UNDEFINED;
   thd->wsrep_exec_mode= LOCAL_STATE;
   thd->wsrep_affected_rows= 0;
@@ -194,9 +195,10 @@ static int wsrep_prepare(handlerton *hton, THD *thd, bool all)
   DBUG_ASSERT(thd->wsrep_exec_mode == LOCAL_STATE);
   DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno == WSREP_SEQNO_UNDEFINED);
 
-  if ((all ||
-      !thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)) &&
-      (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd)))
+  if (all ||
+      (!thd_test_options(thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN)  &&
+       (thd->variables.wsrep_on && !wsrep_trans_cache_is_empty(thd))) ||
+      (thd->lex->sql_command == SQLCOM_CREATE_TABLE)) // CTAS with empty table
   {
     DBUG_RETURN (wsrep_run_wsrep_commit(thd, hton, all));
   }
@@ -427,8 +429,25 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  cache = get_trans_log(thd);
   rcode = 0;
+  if ((thd->lex->sql_command == SQLCOM_CREATE_TABLE) &&
+      !thd->wsrep_applier                            &&
+      (cache = get_trans_log(thd, false)))
+  {
+    WSREP_DEBUG("Reading from stmt cache");
+    thd->binlog_flush_pending_rows_event(false);
+    rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
+    if (WSREP_OK != rcode) {
+      WSREP_ERROR("rbr write fail from stmt cache, data_len: %zu, %d", data_len, rcode);
+      DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
+    }
+    if (data_len > 0)
+    {
+      WSREP_DEBUG("Got %lu bytes from stmt cache", data_len);
+    }
+  }
+
+  cache = get_trans_log(thd, true);
   if (cache) {
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
@@ -521,7 +540,10 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
       set to NO_CONFLICT and commit proceeds as usual.
     */
     if (thd->wsrep_conflict_state == MUST_ABORT)
-        thd->wsrep_conflict_state= NO_CONFLICT;
+    {
+      thd->killed= THD::NOT_KILLED;
+      thd->wsrep_conflict_state= NO_CONFLICT;
+    }
 
     if (thd->wsrep_conflict_state != NO_CONFLICT)
     {

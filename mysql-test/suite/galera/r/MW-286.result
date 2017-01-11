@@ -8,9 +8,6 @@ SET wsrep_on = FALSE;
 ALTER TABLE t1 ADD PRIMARY KEY (f1);
 SET wsrep_on = TRUE;
 SET GLOBAL wsrep_desync = FALSE;
-SELECT COUNT(*) FROM t1;
-COUNT(*)
-100000
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
