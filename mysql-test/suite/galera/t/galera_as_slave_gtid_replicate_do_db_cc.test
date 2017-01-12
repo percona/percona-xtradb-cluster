@@ -119,7 +119,7 @@ START SLAVE;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 
 --error 1049
 USE test2;
@@ -135,7 +135,7 @@ USE test2;
 
 --replace_result $effective_uuid <effective_uuid>
 --replace_regex /xid=[0-9]+/xid=###/ /table_id: [0-9]+/table_id: ###/
-SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 
 #
 # Cleanup
@@ -159,8 +159,8 @@ DROP SCHEMA test2;
 STOP SLAVE;
 RESET SLAVE ALL;
 CALL mtr.add_suppression("GTID replication failed");
-CALL mtr.add_suppression("Slave SQL: Error in Xid_log_event: Commit could not be completed");
-CALL mtr.add_suppression("Slave SQL: Node has dropped from cluster, Error_code: 1047");
+CALL mtr.add_suppression("Slave SQL for channel '': Error in Xid_log_event: Commit could not be completed, 'Deadlock found when trying to get lock; try restarting transaction', Error_code: 1213");
+CALL mtr.add_suppression("Slave SQL for channel '': Node has dropped from cluster, Error_code: 1047");
 CALL mtr.add_suppression("TO isolation failed for");
 CALL mtr.add_suppression("Slave SQL: Error 'Deadlock found when trying to get lock; try restarting transaction' on query");
 CALL mtr.add_suppression("Slave SQL: Error 'WSREP has not yet prepared node for application use' on query");
