@@ -1,0 +1,2 @@
+galera_slave_options_do : GCF-1019 5.7 regression: replication filtering options do not work as they do in 5.6
+galera_slave_options_ignore : GCF-1019 5.7 regression: replication filtering options do not work as they do in 5.6
