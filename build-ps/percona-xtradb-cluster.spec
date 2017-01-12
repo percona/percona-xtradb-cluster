@@ -1130,9 +1130,12 @@ usermod -g %{mysqld_group} %{mysqld_user} 2> /dev/null || true
 if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
-/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
-/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
-/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
+if [ ! -e /var/log/mysqld.log ]; then
+    /bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
+fi
+#/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
+#/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
+#/bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %if 0%{?systemd}
   %systemd_post mysql
 %endif
