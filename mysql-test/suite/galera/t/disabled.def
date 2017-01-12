@@ -6,4 +6,4 @@ galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.
 galera.galera_as_slave_replication_bundle : GCF-912 feature no longer works in 5.7
 galera_sst_xtrabackup-v2-options : fails in multiple ways, including xtrabackup crash
 mysql-wsrep#216 : GCF-1021 5.7 Regression: obfuscated passwords not consistent in error logs
-
+galera_flush_local : MW-340 5.7: Assertion `thd->ha_data[wsrep_hton->slot].ha_info[all].is_trx_read_write()' failed
