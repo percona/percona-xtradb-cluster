@@ -1183,7 +1183,7 @@ int gtid_empty_group_log_and_cleanup(THD *thd)
     goto err;
 
 #ifdef WITH_WSREP
-  if (thd->slave_thread) thd->wsrep_replicate_GTID= true;
+  if (WSREP_ON && thd->slave_thread) thd->wsrep_replicate_GTID= true;
 #endif /* WITH_WSREP */
   ret= mysql_bin_log.commit(thd, true);
 
@@ -6639,7 +6639,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   if (stuff_logged)
   {
 #ifdef WITH_WSREP
-    if (thd->wsrep_replicate_GTID &&
+    if (WSREP_ON && thd->wsrep_replicate_GTID &&
         wsrep_replicate_GTID(thd))
     {
       /* GTID replication failed */
