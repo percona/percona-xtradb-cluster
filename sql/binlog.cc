@@ -1333,6 +1333,12 @@ int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd)
                             FALSE, TRUE, 0, TRUE);
       DBUG_ASSERT(!qinfo.is_using_immediate_logging());
 
+#ifdef WITH_WSREP
+  if (thd->slave_thread && !thd->wsrep_applier)
+  {
+    thd->wsrep_replicate_GTID= true;
+  }
+#endif /* WITH_WSREP */
       /*
         Write BEGIN event and then commit (which will generate commit
         event and Gtid_log_event)
@@ -8321,6 +8327,14 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   */
   if (stuff_logged)
   {
+#ifdef WITH_WSREP
+    if (thd->wsrep_replicate_GTID &&
+        wsrep_replicate_GTID(thd))
+    {
+      /* GTID replication failed */
+      DBUG_RETURN(RESULT_ABORTED);
+    }
+#endif /* WITH_WSREP */
     if (RUN_HOOK(transaction,
                  before_commit,
                  (thd, all,

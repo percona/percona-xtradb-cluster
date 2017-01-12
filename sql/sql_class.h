@@ -2977,6 +2977,7 @@ public:
   ulong                     wsrep_affected_rows;
   void*                     wsrep_gtid_event_buf;
   ulong                     wsrep_gtid_event_buf_len;
+  bool                      wsrep_replicate_GTID;
 
   /*
     Transaction id:

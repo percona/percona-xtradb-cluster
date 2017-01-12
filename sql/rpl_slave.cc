@@ -5412,7 +5412,6 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
           else
           {
             memcpy(thd->wsrep_gtid_event_buf, ev->temp_buf, len);
-            WSREP_DEBUG("realloed %lu", thd->wsrep_gtid_event_buf_len);
           }
         }
 #endif /* WITH_WSREP */
