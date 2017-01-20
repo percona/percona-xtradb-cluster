@@ -11,9 +11,9 @@ use test;
 create table t (i int, c char(10), primary key pk(i)) engine=innodb;
 insert into t values (1, 'aaaaaa'), (2, 'bbbbbb'), (3, 'cccccc'),
 (4, 'dddddd'), (5, 'eeeeee');
-select right(@@global.gtid_executed, 3);
-right(@@global.gtid_executed, 3)
-1-2
+select locate(':1-2', @@global.gtid_executed);
+locate(':1-2', @@global.gtid_executed)
+VALID_POS
 select * from t;
 i	c
 1	aaaaaa
@@ -78,9 +78,9 @@ i	c
 3	cccccc
 4	zzzzzz
 50	pppppp
-select right(@@global.gtid_executed, 3);
-right(@@global.gtid_executed, 3)
-1-5
+select locate(':1-5', @@global.gtid_executed);
+locate(':1-5', @@global.gtid_executed)
+VALID_POS
 #node-2 (galera-cluster-node acting as slave to an independent master)
 select * from t;
 i	c
@@ -120,9 +120,9 @@ i	c
 4	zzzzzz
 50	pppppp
 100	k2
-select right(@@global.gtid_executed, 3);
-right(@@global.gtid_executed, 3)
-1-7
+select locate(':1-7', @@global.gtid_executed);
+locate(':1-7', @@global.gtid_executed)
+VALID_POS
 #node-3 (galera-cluster-node-2 that act as master to independent slave)
 select * from t;
 i	c

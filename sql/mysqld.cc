@@ -10242,6 +10242,7 @@ PSI_stage_info stage_wsrep_committing = { 0, "wsrep: committing", 0};
 PSI_stage_info stage_wsrep_rolling_back = { 0, "wsrep: rolling back", 0};
 PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating commit", 0};
 PSI_stage_info stage_wsrep_waiting_on_replaying = { 0, "wsrep: waiting on replaying", 0};
+PSI_stage_info stage_wsrep_replicate = { 0, "wsrep: in replicate stage", 0};
 PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0};
 PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0};
 PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying trx", 0};
@@ -10378,6 +10379,7 @@ PSI_stage_info *wsrep_server_stages[]=
   // wsrep_hton
   & stage_wsrep_replicating_commit,
   & stage_wsrep_waiting_on_replaying,
+  & stage_wsrep_replicate,
   & stage_wsrep_pre_commit,
   // wsrep_mysqld
   & stage_wsrep_preparing_for_TO_isolation,

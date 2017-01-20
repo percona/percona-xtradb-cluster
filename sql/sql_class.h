@@ -3339,6 +3339,7 @@ public:
   ulong                     wsrep_affected_rows;
   bool                      wsrep_certify_empty_trx;
   bool                      wsrep_sst_donor;
+  bool                      wsrep_void_applier_trx;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

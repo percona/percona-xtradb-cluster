@@ -31,6 +31,7 @@ SET GLOBAL innodb_disallow_writes=ON;
 --let $internal_tmp_table = `SELECT @@internal_tmp_disk_storage_engine`
 SET GLOBAL internal_tmp_disk_storage_engine = 'MyISAM';
 
+--sleep 2
 let $wait_condition = SELECT 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO = 'INSERT INTO t1 VALUES (1)' AND State = 'wsrep: in pre-commit stage';
 --source include/wait_condition.inc
 

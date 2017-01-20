@@ -354,12 +354,16 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 }
 
 wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
+                                  const void*             trx_handle,
                                   uint32_t      const     flags,
                                   const wsrep_trx_meta_t* meta,
                                   wsrep_bool_t* const     exit,
                                   bool          const     commit)
 {
   THD* const thd((THD*)ctx);
+
+  if (trx_handle && thd->wsrep_conflict_state != REPLAYING)
+    thd->wsrep_ws_handle.opaque= const_cast<void*>(trx_handle);
 
   assert(meta->gtid.seqno == wsrep_thd_trx_seqno(thd));
 
