@@ -237,6 +237,10 @@ case "$command" in
   force-reload)
     restart
     ;;
+  bootstrap)
+    extra_opts="${extra_opts} --wsrep-new-cluster"
+    start
+    ;;
   *)
     echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
     exit 2
