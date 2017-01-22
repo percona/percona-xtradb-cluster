@@ -75,12 +75,19 @@ void wsrep_register_hton(THD* thd, bool all)
 {
   if (!WSREP(thd)) return;
 
-  /* only LOCAL_STATE processors may replicate */
-  if (thd->wsrep_exec_mode != LOCAL_STATE) return;
+  /* only LOCAL_STATE processors may replicate.
+     For filtered mysql replication we may end up here in LOCAL_COMMIT state
+     this can happen after GTID event replication for filtered event
 
+  */
+  if (thd->wsrep_exec_mode == LOCAL_COMMIT)
+  {
+    return;
+  }
   if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
-    if ((thd_sql_command(thd) == SQLCOM_OPTIMIZE ||
+    if (thd->wsrep_exec_mode == LOCAL_STATE       &&
+        (thd_sql_command(thd) == SQLCOM_OPTIMIZE  ||
          thd_sql_command(thd) == SQLCOM_ANALYZE   ||
          thd_sql_command(thd) == SQLCOM_REPAIR)   &&
         thd->lex->no_write_to_binlog == 1)
@@ -107,7 +114,8 @@ void wsrep_register_hton(THD* thd, bool all)
            * replicated unless we declare wsrep hton as read/write here
            */
           if (ha_info->is_trx_read_write() ||
-              thd->lex->sql_command == SQLCOM_CREATE_TABLE)
+              (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+               thd->wsrep_exec_mode == LOCAL_STATE))
           {
             thd->ha_data[wsrep_hton->slot].ha_info[all].set_trx_read_write();
           }
