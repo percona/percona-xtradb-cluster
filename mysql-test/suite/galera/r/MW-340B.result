@@ -1,0 +1,4 @@
+create table t (i int) engine=innodb;
+set autocommit = 0;
+create table t1 engine=innodb as select * from t;
+DROP TABLE t, t1;

@@ -75,13 +75,22 @@ void wsrep_register_hton(THD* thd, bool all)
 {
   if (!WSREP(thd)) return;
 
+  /* only LOCAL_STATE processors may replicate.
+     For filtered mysql replication we may end up here in LOCAL_COMMIT state
+     this can happen after GTID event replication for filtered event
+
+  */
+  if (thd->wsrep_exec_mode == LOCAL_COMMIT)
+  {
+    return;
+  }
   if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
-    if (thd->wsrep_exec_mode == LOCAL_STATE      &&
-        (thd_sql_command(thd) == SQLCOM_OPTIMIZE ||
-        thd_sql_command(thd) == SQLCOM_ANALYZE   ||
-        thd_sql_command(thd) == SQLCOM_REPAIR)   &&
-            thd->lex->no_write_to_binlog == 1)
+    if (thd->wsrep_exec_mode == LOCAL_STATE       &&
+        (thd_sql_command(thd) == SQLCOM_OPTIMIZE  ||
+         thd_sql_command(thd) == SQLCOM_ANALYZE   ||
+         thd_sql_command(thd) == SQLCOM_REPAIR)   &&
+        thd->lex->no_write_to_binlog == 1)
     {
         WSREP_DEBUG("Skipping wsrep_register_hton for LOCAL sql admin command : %s",
                     WSREP_QUERY(thd));
