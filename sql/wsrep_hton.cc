@@ -602,10 +602,11 @@ bool wsrep_replicate_GTID(THD *thd)
         GTID event, would cause a hole in GTID history in other cluster nodes
 
       */
-      WSREP_WARN("GTID replication failed");
+      WSREP_INFO("GTID replication failed: %d", rcode);
       wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
       thd->wsrep_replicate_GTID= false;
-
+      my_message(ER_ERROR_DURING_COMMIT,
+                 "WSREP GTID replication was interrupted", MYF(0));
       return true;
     }
     wsrep_post_commit(thd, true);
