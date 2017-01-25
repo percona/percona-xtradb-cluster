@@ -2,12 +2,6 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
---connection node_1
-call mtr.add_suppression("Difficult to find free blocks in the buffer pool.*");
-
---connection node_2
-call mtr.add_suppression("Difficult to find free blocks in the buffer pool.*");
-
 #
 # This test forces 1K tables with a PK to participate in a single transaction
 #
