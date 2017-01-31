@@ -6911,6 +6911,19 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
     }
 
 #ifdef WITH_WSREP
+    /* Action below will log an empty group of GTID.
+    This is done when the real action fails to generate any meaningful result on
+    executing slave.
+    Let's understand with an example:
+    * Topology master <-> slave
+    * Some action is performed on slave which put it out-of-sync from master.
+    * Master then execute same action. Slave may choose to ignore error arising
+      from execution of these actions using slave_skip_errors configuration but
+      the GTID sequence increment still need to register on slave to keep it in
+      sync with master. So a dummy trx of this form is created. Galera
+      eco-system too will capture this dummy trx and will execute it for
+      internal replication to keep GTID sequence consistent across
+      the cluster. */
     if (WSREP_ON && thd->wsrep_replicate_GTID &&
         wsrep_replicate_GTID(thd))
     {
@@ -7514,12 +7527,6 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
       cache_mngr->stmt_cache.reset();
     }
     DBUG_RETURN(rcode);
-  }
-
-  if (thd->wsrep_certify_empty_trx)
-  {
-    wsrep_run_wsrep_commit(thd, wsrep_hton, true);
-    wsrep_post_commit(thd, true);
   }
 #endif /* WITH_WSREP */
 

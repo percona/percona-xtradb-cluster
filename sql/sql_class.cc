@@ -1210,7 +1210,6 @@ THD::THD(bool enable_plugins)
    wsrep_po_in_trans(FALSE),
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
-   wsrep_certify_empty_trx(false),
    wsrep_sst_donor(false),
 #endif
    m_parser_state(NULL),
@@ -1756,7 +1755,6 @@ void THD::init(void)
   wsrep_consistency_check = NO_CONSISTENCY_CHECK;
   wsrep_mysql_replicated  = 0;
   wsrep_TOI_pre_queries.clear();
-  wsrep_certify_empty_trx= false;
   wsrep_sst_donor= false;
   wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
   wsrep_affected_rows     = 0;
