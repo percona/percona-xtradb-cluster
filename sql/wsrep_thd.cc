@@ -36,8 +36,8 @@ int wsrep_show_bf_aborts (THD *thd, SHOW_VAR *var, char *buff)
 /* must have (&thd->LOCK_wsrep_thd) */
 void wsrep_client_rollback(THD *thd)
 {
-  WSREP_DEBUG("client rollback due to BF abort for (%ld), query: %s",
-              thd->thread_id, WSREP_QUERY(thd));
+  WSREP_DEBUG("client rollback due to BF abort for (%ld %lld), query: %s",
+              thd->thread_id, thd->query_id, WSREP_QUERY(thd));
 
   my_atomic_add64(&wsrep_bf_aborts_counter, 1);
 
@@ -47,7 +47,11 @@ void wsrep_client_rollback(THD *thd)
   /* Check for comments in Relay_log_info::cleanup_context */
   trans_rollback_stmt(thd);
 
-  trans_rollback(thd);
+  if (trans_rollback(thd))
+  {
+    WSREP_WARN("client rollback failed for: %lu %lld, conf: %d",
+               thd->thread_id, thd->query_id, thd->wsrep_conflict_state);
+  }
 
   if (thd->locked_tables_mode && thd->lock)
   {
@@ -93,61 +97,6 @@ static Relay_log_info* wsrep_relay_log_init(const char* log_fname)
       new Format_description_log_event(BINLOG_VERSION));
 
   return (rli);
-
-#ifdef REMOVED
-  Rpl_info_handler* handler_src= NULL;
-  Rpl_info_handler* handler_dest= NULL;
-  ulong *key_info_idx= NULL;
-  const char *msg= "Failed to allocate memory for the relay log info "
-                   "structure";
-
-  DBUG_ENTER("Rpl_info_factory::create_rli");
-
-  if (!(rli= new Relay_log_info(false
-#ifdef HAVE_PSI_INTERFACE
-                                ,&key_relay_log_info_run_lock,
-                                &key_relay_log_info_data_lock,
-                                &key_relay_log_info_sleep_lock,
-                                &key_relay_log_info_data_cond,
-                                &key_relay_log_info_start_cond,
-                                &key_relay_log_info_stop_cond,
-                                &key_relay_log_info_sleep_cond
-#endif /* HAVE_PSI_INTERFACE */
-                               )))
-    goto err;
-
-  if (!(key_info_idx= new ulong[NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR]))
-     goto err;
-  key_info_idx[0]= server_id;
-  rli->set_idx_info(key_info_idx, NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR);
-
-  if(Rpl_info_factory::init_rli_repositories(rli, rli_option, &handler_src,
-                                             &handler_dest, &msg))
-    goto err;
-
-  if (Rpl_info_factory::decide_repository(rli, rli_option, &handler_src,
-                                          &handler_dest, &msg))
-    goto err;
-
-  DBUG_RETURN(rli);
-err:
-  delete handler_src;
-  delete handler_dest;
-  delete []key_info_idx;
-  if (rli)
-  {
-    /*
-      The handler was previously deleted so we need to remove
-      any reference to it.
-    */
-    rli->set_idx_info(NULL, 0);
-    rli->set_rpl_info_handler(NULL);
-    rli->set_rpl_info_type(INVALID_INFO_REPOSITORY);
-    delete rli;
-  }
-  WSREP_ERROR("Error creating relay log info: %s.", msg);
-  DBUG_RETURN(NULL);
-#endif /* REMOVED */
 }
 
 static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -181,6 +130,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->reset_db(NULL, 0);
 
   shadow->user_time = thd->user_time;
+  shadow->row_count_func= thd->get_row_count_func();
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -192,6 +142,7 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db, shadow->db_length);
   thd->user_time              = shadow->user_time;
+  thd->set_row_count_func(shadow->row_count_func);
 }
 
 void wsrep_replay_transaction(THD *thd)
@@ -214,6 +165,25 @@ void wsrep_replay_transaction(THD *thd)
         WSREP_WARN("dangling observer in replay transaction: (thr %lu %lld %s)",
                    thd->thread_id, thd->query_id, thd->query());
       }
+
+      struct da_shadow
+      {
+          enum Diagnostics_area::enum_diagnostics_status status;
+          ulonglong affected_rows;
+          ulonglong last_insert_id;
+          char message[MYSQL_ERRMSG_SIZE];
+      };
+      struct da_shadow da_status;
+      da_status.status= thd->get_stmt_da()->status();
+      if (da_status.status == Diagnostics_area::DA_OK)
+      {
+        da_status.affected_rows= thd->get_stmt_da()->affected_rows();
+        da_status.last_insert_id= thd->get_stmt_da()->last_insert_id();
+        strmake(da_status.message,
+                thd->get_stmt_da()->message(),
+                sizeof(da_status.message)-1);
+      }
+
       thd->get_stmt_da()->reset_diagnostics_area();
 
       thd->wsrep_conflict_state= REPLAYING;
@@ -280,7 +250,17 @@ void wsrep_replay_transaction(THD *thd)
         }
         else
         {
-          my_ok(thd);
+          if (da_status.status == Diagnostics_area::DA_OK)
+          {
+            my_ok(thd,
+                  da_status.affected_rows,
+                  da_status.last_insert_id,
+                  da_status.message);
+          }
+          else
+          {
+            my_ok(thd);
+          }
         }
         break;
       case WSREP_TRX_FAIL:
@@ -470,6 +450,11 @@ static void wsrep_rollback_process(THD *thd)
       aborting->store_globals();
 
       mysql_mutex_lock(&aborting->LOCK_wsrep_thd);
+
+      /* prepare THD for rollback processing */
+      mysql_reset_thd_for_next_command(aborting);
+      aborting->lex->sql_command= SQLCOM_ROLLBACK;
+
       wsrep_client_rollback(aborting);
       WSREP_DEBUG("WSREP rollbacker aborted thd: (%lu %llu)",
                   aborting->thread_id, (long long)aborting->real_id);
@@ -528,9 +513,9 @@ my_bool wsrep_thd_is_BF(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
-	      (thd->wsrep_exec_mode == TOTAL_ORDER));
+              (thd->wsrep_exec_mode == TOTAL_ORDER));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   return status;
@@ -544,10 +529,10 @@ my_bool wsrep_thd_is_BF_or_commit(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
-	      (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
-	      (thd->wsrep_exec_mode == LOCAL_COMMIT));
+              (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
+              (thd->wsrep_exec_mode == LOCAL_COMMIT));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
   return status;

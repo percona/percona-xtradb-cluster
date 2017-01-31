@@ -642,21 +642,26 @@ void THD::enter_stage(const PSI_stage_info *new_stage,
 
 extern "C"
 void thd_enter_cond(MYSQL_THD thd, mysql_cond_t *cond, mysql_mutex_t *mutex,
-                    const PSI_stage_info *stage, PSI_stage_info *old_stage)
+                    const PSI_stage_info *stage, PSI_stage_info *old_stage,
+                    const char *src_function, const char *src_file,
+                    int src_line)
 {
   if (!thd)
     thd= current_thd;
 
-  return thd->ENTER_COND(cond, mutex, stage, old_stage);
+  return thd->enter_cond(cond, mutex, stage, old_stage,
+                         src_function, src_file, src_line);
 }
 
 extern "C"
-void thd_exit_cond(MYSQL_THD thd, const PSI_stage_info *stage)
+void thd_exit_cond(MYSQL_THD thd, const PSI_stage_info *stage,
+                   const char *src_function, const char *src_file,
+		   int src_line)
 {
   if (!thd)
     thd= current_thd;
 
-  thd->EXIT_COND(stage);
+  thd->exit_cond(stage, src_function, src_file, src_line);
   return;
 }
 
@@ -1328,6 +1333,7 @@ THD::THD(bool enable_plugins)
   wsrep_mysql_replicated  = 0;
   wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
   wsrep_affected_rows     = 0;
+  wsrep_replicate_GTID    = false;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1611,8 +1617,15 @@ Sql_condition* THD::raise_condition(uint sql_errno,
       thd->lex->current_select == 0 if lex structure is not inited
       (not query command (COM_QUERY))
     */
+#ifdef WITH_WSREP
+    if (lex->current_select &&
+        lex->current_select->no_error && !is_fatal_error &&
+        (!(wsrep_conflict_state == ABORTED ||
+           wsrep_conflict_state == MUST_ABORT)))
+#else
     if (lex->current_select &&
         lex->current_select->no_error && !is_fatal_error)
+#endif
     {
       DBUG_PRINT("error",
                  ("Error converted to warning: current_select: no_error %d  "
@@ -1747,6 +1760,7 @@ void THD::init(void)
   wsrep_sst_donor= false;
   wsrep_sync_wait_gtid    = WSREP_GTID_UNDEFINED;
   wsrep_affected_rows     = 0;
+  wsrep_replicate_GTID    = false;
 #endif
   binlog_row_event_extra_data= 0;
 
@@ -2403,13 +2417,13 @@ bool THD::notify_shared_lock(MDL_context_owner *ctx_in_use,
       if (!thd_table->needs_reopen())
 #ifdef WITH_WSREP
       {
-	signalled|= mysql_lock_abort_for_thread(this, thd_table);
-	if (this && WSREP(this) && wsrep_thd_is_BF((void *)this, FALSE)) 
-	{
-	  WSREP_DEBUG("remove_table_from_cache: %llu",
-		      (unsigned long long) this->real_id);
-	  wsrep_abort_thd((void *)this, (void *)in_use, FALSE);
-	}
+        signalled|= mysql_lock_abort_for_thread(this, thd_table);
+        if (WSREP_NNULL(this) && wsrep_thd_is_BF((void *)this, FALSE))
+        {
+          WSREP_DEBUG("remove_table_from_cache: %llu",
+                      (unsigned long long) this->real_id);
+          wsrep_abort_thd((void *)this, (void *)in_use, FALSE);
+        }
       }
 #else
         signalled|= mysql_lock_abort_for_thread(this, thd_table);

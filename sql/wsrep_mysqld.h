@@ -206,11 +206,19 @@ extern wsrep_seqno_t wsrep_locked_seqno;
    wsrep_provider                     && \
    strcmp(wsrep_provider, WSREP_NONE))
 
+/* use xxxxxx_NNULL macros when thd pointer is guaranteed to be non-null to
+ * avoid compiler warnings (GCC 6 and later) */
+#define WSREP_NNULL(thd) \
+  (WSREP_ON && wsrep && thd->variables.wsrep_on)
+
 #define WSREP(thd) \
-  (WSREP_ON && wsrep && (thd && thd->variables.wsrep_on))
+  (thd && WSREP_NNULL(thd))
 
 #define WSREP_CLIENT(thd) \
-    (WSREP(thd) && thd->wsrep_client_thread)
+  (WSREP(thd) && thd->wsrep_client_thread)
+
+#define WSREP_EMULATE_BINLOG_NNULL(thd) \
+  (WSREP_NNULL(thd) && wsrep_emulate_bin_log)
 
 #define WSREP_EMULATE_BINLOG(thd) \
   (WSREP(thd) && wsrep_emulate_bin_log)
@@ -334,4 +342,6 @@ bool wsrep_stmt_rollback_is_safe(THD* thd);
 void wsrep_init_sidno(const wsrep_uuid_t&);
 bool wsrep_node_is_donor();
 bool wsrep_node_is_synced();
+bool wsrep_replicate_GTID(THD* thd);
+
 #endif /* WSREP_MYSQLD_H */

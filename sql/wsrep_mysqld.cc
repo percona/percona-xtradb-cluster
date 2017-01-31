@@ -1263,7 +1263,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
-		thd->wsrep_exec_mode);
+                thd->wsrep_exec_mode);
   }
   else if (key_arr.keys_len > 0) {
     /* jump to error handler in mysql_execute_command() */
@@ -1271,7 +1271,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
                "connection state and retry the query.",
                ret, (thd->db ? thd->db : "(null)"), WSREP_QUERY(thd));
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
-	     "your wsrep connection state and retry the query.");
+             "your wsrep connection state and retry the query.");
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
     return -1;
@@ -1279,8 +1279,8 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   else {
     /* non replicated DDL, affecting temporary tables only */
     WSREP_DEBUG("TO isolation skipped for: %d, sql: %s."
-		"Only temporary tables affected.",
-		ret, WSREP_QUERY(thd));
+                "Only temporary tables affected.",
+                ret, WSREP_QUERY(thd));
     return 1;
   }
   return 0;

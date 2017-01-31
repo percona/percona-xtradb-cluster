@@ -316,7 +316,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   int replay_round= 0;
 
   if (thd->get_stmt_da()->is_error()) {
-    WSREP_ERROR("commit issue, error: %d %s",
+    WSREP_DEBUG("commit issue, error: %d %s",
                 thd->get_stmt_da()->sql_errno(), thd->get_stmt_da()->message());
   }
 
@@ -519,7 +519,10 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
       set to NO_CONFLICT and commit proceeds as usual.
     */
     if (thd->wsrep_conflict_state == MUST_ABORT)
-        thd->wsrep_conflict_state= NO_CONFLICT;
+    {
+      thd->killed= THD::NOT_KILLED;
+      thd->wsrep_conflict_state= NO_CONFLICT;
+    }
 
     if (thd->wsrep_conflict_state != NO_CONFLICT)
     {
@@ -584,6 +587,38 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   DBUG_RETURN(WSREP_TRX_OK);
 }
 
+bool wsrep_replicate_GTID(THD *thd)
+{
+  if (thd->slave_thread)
+  {
+    WSREP_DEBUG("GTID replication");
+    DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id);
+    (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
+    DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID != thd->wsrep_ws_handle.trx_id);
+    WSREP_DEBUG("slave trx using query ID %lu for replication GTID",
+                thd->wsrep_ws_handle.trx_id);
+    enum wsrep_trx_status rcode= wsrep_run_wsrep_commit(thd, wsrep_hton, true);
+    if (rcode)
+    {
+      /*
+        TODO: should error here cause stopping of MySQL slave?
+        Slave applying was totally filtered out, and fauílure in replicating
+        GTID event, would cause a hole in GTID history in other cluster nodes
+
+      */
+      WSREP_INFO("GTID replication failed: %d", rcode);
+      wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
+      thd->wsrep_replicate_GTID= false;
+      my_message(ER_ERROR_DURING_COMMIT,
+                 "WSREP GTID replication was interrupted", MYF(0));
+      return true;
+    }
+    wsrep_post_commit(thd, true);
+  }
+  thd->wsrep_replicate_GTID= false;
+
+  return false;
+}
 
 static int wsrep_hton_init(void *p)
 {

@@ -76,7 +76,17 @@ void set_thd_stage_info(void *thd,
                         const char *calling_func,
                         const char *calling_file,
                         const unsigned int calling_line);
-                        
+extern "C"
+void thd_enter_cond(MYSQL_THD thd, mysql_cond_t *cond, mysql_mutex_t *mutex,
+                    const PSI_stage_info *stage, PSI_stage_info *old_stage,
+                    const char *src_function, const char *src_file,
+                    int src_line);
+
+extern "C"
+void thd_exit_cond(MYSQL_THD thd, const PSI_stage_info *stage,
+                   const char *src_function, const char *src_file,
+                   int src_line);
+
 #define THD_STAGE_INFO(thd, stage) \
   (thd)->enter_stage(& stage, NULL, __func__, __FILE__, __LINE__)
 
@@ -91,6 +101,7 @@ struct wsrep_thd_shadow {
   char                 *db;
   size_t               db_length;
   struct timeval       user_time;
+  longlong             row_count_func;
 };
 #endif
 class Reprepare_observer;
@@ -1673,7 +1684,7 @@ typedef I_List<Item_change_record> Item_change_list;
   Type of locked tables mode.
   See comment for THD::locked_tables_mode for complete description.
   While adding new enum values add them to the getter method for this enum
-  declared below and defined in sql_class.cc as well.
+  declared below and defined in binlog.cc as well.
 */
 
 enum enum_locked_tables_mode
@@ -3534,6 +3545,7 @@ public:
   bool                      wsrep_certify_empty_trx;
   bool                      wsrep_sst_donor;
   ulong                     wsrep_affected_rows;
+  bool                      wsrep_replicate_GTID;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
