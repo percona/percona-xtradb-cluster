@@ -118,9 +118,6 @@ static const size_t	MAX_BLOCKS = 128;
 /** Block buffer size */
 #define BUFFER_BLOCK_SIZE ((ulint)(UNIV_PAGE_SIZE * 1.3))
 
-/** Max disk sector size */
-static const ulint	MAX_SECTOR_SIZE = 4096;
-
 /** Disk sector size of aligning write buffer for DIRECT_IO */
 static ulint	os_io_ptr_align = UNIV_SECTOR_SIZE;
 
@@ -3712,7 +3709,12 @@ os_file_create_func(
 	} else if (!srv_read_only_mode
 		   && *success
 		   && srv_unix_file_flush_method == SRV_UNIX_ALL_O_DIRECT) {
-		os_file_set_nocache(file, name, mode_str);
+		/* Do fsync() on log and parallel doublewrite files
+		when setting O_DIRECT fails.
+		See log_io_complete() and buf_dblwr_flush_buffered_writes() */
+		if (!os_file_set_nocache(file, name, mode_str)) {
+			srv_unix_file_flush_method = SRV_UNIX_O_DIRECT;
+		}
 	}
 
 #ifdef USE_FILE_LOCK
@@ -4174,7 +4176,7 @@ SyncFileIO::execute(Slot* slot)
 
 	}
 
-	return(ret ? slot->n_bytes : -1);
+	return(ret ? static_cast<ssize_t>(slot->n_bytes) : -1);
 }
 
 /** Check if the file system supports sparse files.
@@ -5976,8 +5978,9 @@ os_file_handle_error_no_exit(
 @param[in]	fd		file descriptor to alter
 @param[in]	file_name	file name, used in the diagnostic message
 @param[in]	name		"open" or "create"; used in the diagnostic
-				message */
-void
+				message
+@return true if operation is success and false */
+bool
 os_file_set_nocache(
 	int		fd		MY_ATTRIBUTE((unused)),
 	const char*	file_name	MY_ATTRIBUTE((unused)),
@@ -5993,6 +5996,7 @@ os_file_set_nocache(
 			<< file_name << ": " << operation_name
 			<< strerror(errno_save) << ","
 			" continuing anyway.";
+		return false;
 	}
 #elif defined(O_DIRECT)
 	if (fcntl(fd, F_SETFL, O_DIRECT) == -1) {
@@ -6024,8 +6028,10 @@ short_warning:
 				<< " : " << strerror(errno_save)
 				<< " continuing anyway.";
 		}
+		return false;
 	}
 #endif /* defined(UNIV_SOLARIS) && defined(DIRECTIO_ON) */
+	return true;
 }
 
 /** Write the specified number of zeros to a newly created file.
@@ -6744,6 +6750,10 @@ AIO::shutdown()
 }
 
 #if !defined(NO_FALLOCATE) && defined(UNIV_LINUX)
+
+/** Max disk sector size */
+static const ulint	MAX_SECTOR_SIZE = 4096;
+
 /**
 Try and get the FusionIO sector size. */
 void
@@ -9443,14 +9453,16 @@ Encryption::decrypt(
 	}
 
 	default:
+		if (!type.is_dblwr_recover()) {
 #if !defined(UNIV_INNOCHECKSUM)
-		ib::error()
-			<< "Encryption algorithm support missing: "
-			<< Encryption::to_string(m_type);
+			ib::error()
+				<< "Encryption algorithm support missing: "
+				<< Encryption::to_string(m_type);
 #else
-		fprintf(stderr, "Encryption algorithm support missing: %s\n",
-			Encryption::to_string(m_type));
+			fprintf(stderr, "Encryption algorithm support missing: %s\n",
+				Encryption::to_string(m_type));
 #endif /* !UNIV_INNOCHECKSUM */
+		}
 
 		if (block != NULL) {
 			os_free_block(block);

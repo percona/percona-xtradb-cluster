@@ -213,7 +213,7 @@ NOTE that this function will temporarily commit mtr and lose the
 pcur position!
 
 @return DB_SUCCESS or an error code */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 row_upd_check_references_constraints(
 /*=================================*/
@@ -996,6 +996,7 @@ the equal ordering fields. NOTE: we compare the fields as binary strings!
 @param[in]	heap		memory heap from which allocated
 @param[in]	mysql_table	NULL, or mysql table object when
 				user thread invokes dml
+@param[in]	prebuilt	compress_heap must be taken from here
 @return own: update vector of differing fields, excluding roll ptr and
 trx id */
 upd_t*
@@ -1007,7 +1008,8 @@ row_upd_build_difference_binary(
 	bool		no_sys,
 	trx_t*		trx,
 	mem_heap_t*	heap,
-	TABLE*		mysql_table)
+	TABLE*		mysql_table,
+	row_prebuilt_t*	prebuilt)
 {
 	upd_field_t*	upd_field;
 	dfield_t*	dfield;
@@ -1112,7 +1114,7 @@ row_upd_build_difference_binary(
 			dfield_t*	vfield = innobase_get_computed_value(
 				update->old_vrow, col, index,
 				&v_heap, heap, NULL, thd, mysql_table,
-				NULL, NULL, NULL);
+				NULL, NULL, NULL, prebuilt);
 
 			if (!dfield_data_is_binary_equal(
 				dfield, vfield->len,
@@ -2063,17 +2065,21 @@ row_upd_eval_new_vals(
 @param[in,out]	node		row update node
 @param[in]	update		an update vector if it is update
 @param[in]	thd		mysql thread handle
-@param[in,out]	mysql_table	mysql table object */
+@param[in,out]	prebuilt	NULL, or a prebuilt object: used to extract
+				mysql table object when user thread invokes
+				dml and for compress heap */
 static
 void
 row_upd_store_v_row(
 	upd_node_t*	node,
 	const upd_t*	update,
 	THD*		thd,
-	TABLE*		mysql_table)
+	row_prebuilt_t*	prebuilt)
 {
 	mem_heap_t*	heap = NULL;
 	dict_index_t*	index = dict_table_get_first_index(node->table);
+	TABLE*		mysql_table =
+		prebuilt ? prebuilt->m_mysql_table : NULL;
 
 	for (ulint col_no = 0; col_no < dict_table_get_n_v_cols(node->table);
 	     col_no++) {
@@ -2128,7 +2134,7 @@ row_upd_store_v_row(
 						node->row, col, index,
 						&heap, node->heap, NULL,
 						thd, mysql_table, NULL,
-						NULL, NULL);
+						NULL, NULL, prebuilt);
 				}
 			}
 		}
@@ -2142,13 +2148,14 @@ row_upd_store_v_row(
 /** Stores to the heap the row on which the node->pcur is positioned.
 @param[in]	node		row update node
 @param[in]	thd		mysql thread handle
-@param[in,out]	mysql_table	NULL, or mysql table object when
-				user thread invokes dml */
+@param[in,out]	prebuilt	NULL, or a prebuilt object: used to extract
+				mysql table object when user thread invokes
+				dml and for compress heap */
 void
 row_upd_store_row(
 	upd_node_t*	node,
 	THD*		thd,
-	TABLE*		mysql_table)
+	row_prebuilt_t*	prebuilt)
 {
 	dict_index_t*	clust_index;
 	rec_t*		rec;
@@ -2189,7 +2196,7 @@ row_upd_store_row(
 
 	if (node->table->n_v_cols) {
 		row_upd_store_v_row(node, node->is_delete ? NULL : node->update,
-				    thd, mysql_table);
+				    thd, prebuilt);
 	}
 
 	if (node->is_delete) {
@@ -2230,7 +2237,7 @@ srv_mbr_print(const byte* data)
 Updates a secondary index entry of a row.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 row_upd_sec_index_entry(
 /*====================*/
@@ -2497,7 +2504,7 @@ Updates the secondary index record if it is changed in the row update or
 deletes it if this is a delete.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 row_upd_sec_step(
 /*=============*/
@@ -2615,7 +2622,7 @@ fields of the clustered index record change. This should be quite rare in
 database applications.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 row_upd_clust_rec_by_insert(
 /*========================*/
@@ -2773,7 +2780,7 @@ Updates a clustered index record of a row when the ordering fields do
 not change.
 @return DB_SUCCESS if operation successfully completed, else error
 code or DB_LOCK_WAIT */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 row_upd_clust_rec(
 /*==============*/
@@ -2920,7 +2927,7 @@ func_exit:
 /***********************************************************//**
 Delete marks a clustered index record.
 @return DB_SUCCESS if operation successfully completed, else error code */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 row_upd_del_mark_clust_rec(
 /*=======================*/
@@ -2952,8 +2959,7 @@ row_upd_del_mark_clust_rec(
 	/* Store row because we have to build also the secondary index
 	entries */
 
-	row_upd_store_row(node, thr_get_trx(thr)->mysql_thd,
-			  thr->prebuilt ? thr->prebuilt->m_mysql_table : NULL);
+	row_upd_store_row(node, thr_get_trx(thr)->mysql_thd, thr->prebuilt);
 
 	/* Mark the clustered index record deleted; we do not have to check
 	locks, because we assume that we have an x-lock on the record */
@@ -3003,7 +3009,7 @@ row_upd_del_mark_clust_rec(
 Updates the clustered index record.
 @return DB_SUCCESS if operation successfully completed, DB_LOCK_WAIT
 in case of a lock wait, else error code */
-static MY_ATTRIBUTE((nonnull, warn_unused_result))
+static MY_ATTRIBUTE((warn_unused_result))
 dberr_t
 row_upd_clust_step(
 /*===============*/
@@ -3166,8 +3172,7 @@ row_upd_clust_step(
 		goto exit_func;
 	}
 
-	row_upd_store_row(node, trx->mysql_thd,
-			  thr->prebuilt ? thr->prebuilt->m_mysql_table : NULL);
+	row_upd_store_row(node, trx->mysql_thd, thr->prebuilt);
 
 	if (row_upd_changes_ord_field_binary(index, node->update, thr,
 					     node->row, node->ext)) {

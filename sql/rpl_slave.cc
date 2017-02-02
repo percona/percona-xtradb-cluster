@@ -2519,7 +2519,9 @@ static int get_master_uuid(MYSQL *mysql, Master_info *mi)
 
   DBUG_EXECUTE_IF("dbug.before_get_MASTER_UUID",
                   {
-                    const char act[]= "now wait_for signal.get_master_uuid";
+                    const char act[]
+                        = "now signal in_get_master_version_and_clock "
+                        "wait_for signal.get_master_uuid";
                     DBUG_ASSERT(opt_debug_sync_timeout > 0);
                     DBUG_ASSERT(!debug_sync_set_action(current_thd,
                                                        STRING_WITH_LEN(act)));
@@ -2784,7 +2786,7 @@ static int get_master_version_and_clock(MYSQL* mysql, Master_info* mi)
   DBUG_EXECUTE_IF("dbug.before_get_UNIX_TIMESTAMP",
                   {
                     const char act[]=
-                      "now "
+                      "now signal in_get_master_version_and_clock "
                       "wait_for signal.get_unix_timestamp";
                     DBUG_ASSERT(opt_debug_sync_timeout > 0);
                     DBUG_ASSERT(!debug_sync_set_action(current_thd,
@@ -2843,7 +2845,7 @@ static int get_master_version_and_clock(MYSQL* mysql, Master_info* mi)
   DBUG_EXECUTE_IF("dbug.before_get_SERVER_ID",
                   {
                     const char act[]=
-                      "now "
+                      "now signal in_get_master_version_and_clock "
                       "wait_for signal.get_server_id";
                     DBUG_ASSERT(opt_debug_sync_timeout > 0);
                     DBUG_ASSERT(!debug_sync_set_action(current_thd, 

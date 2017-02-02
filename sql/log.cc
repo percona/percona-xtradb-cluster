@@ -59,7 +59,7 @@ using std::max;
 static const uint MAX_LOG_BUFFER_SIZE= 2048;
 #else
 static const uint MAX_LOG_BUFFER_SIZE= 1024;
-#endif
+#endif /* WITH_WSREP */
 
 #ifndef _WIN32
 static int   log_syslog_facility= 0;

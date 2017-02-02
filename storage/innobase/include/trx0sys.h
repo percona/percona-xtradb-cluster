@@ -281,7 +281,6 @@ trx_sys_update_mysql_binlog_offset(
         trx_sysf_t*     sys_header, /*!< in: trx sys header */
 #endif /* WITH_WSREP */
 	mtr_t*		mtr);	/*!< in: mtr */
-
 /*****************************************************************//**
 Prints to stderr the MySQL binlog offset info in the trx system header if
 the magic number shows it valid. */

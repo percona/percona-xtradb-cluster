@@ -229,6 +229,7 @@ bool Strict_error_handler::handle_condition(THD *thd,
   case ER_CUT_VALUE_GROUP_CONCAT:
   case ER_DATETIME_FUNCTION_OVERFLOW:
   case ER_WARN_TOO_FEW_RECORDS:
+  case ER_WARN_TOO_MANY_RECORDS:
   case ER_INVALID_ARGUMENT_FOR_LOGARITHM:
   case ER_NUMERIC_JSON_VALUE_OUT_OF_RANGE:
   case ER_INVALID_JSON_VALUE_FOR_CAST:
@@ -1846,6 +1847,8 @@ bool close_temporary_tables(THD *thd)
     }
 
     thd->temporary_tables= 0;
+    mysql_mutex_unlock(&thd->LOCK_temporary_tables);
+
 #ifdef HAVE_REPLICATION
     if (thd->slave_thread)
     {
@@ -1853,7 +1856,6 @@ bool close_temporary_tables(THD *thd)
       thd->rli_slave->get_c_rli()->channel_open_temp_tables.atomic_add(-slave_closed_temp_tables);
     }
 #endif
-    mysql_mutex_unlock(&thd->LOCK_temporary_tables);
 
     DBUG_RETURN(FALSE);
   }
@@ -1888,12 +1890,11 @@ bool close_temporary_tables(THD *thd)
   memcpy(buf_trans, stub, stub_len);
   memcpy(buf_non_trans, stub, stub_len);
 
-  mysql_mutex_lock(&thd->LOCK_temporary_tables);
-
   /*
     Insertion sort of temp tables by pseudo_thread_id to build ordered list
     of sublists of equal pseudo_thread_id
   */
+  mysql_mutex_lock(&thd->LOCK_temporary_tables);
 
   for (prev_table= thd->temporary_tables, table= prev_table->next;
        table;
@@ -1938,7 +1939,7 @@ bool close_temporary_tables(THD *thd)
   /* scan sorted tmps to generate sequence of DROP */
   for (table= thd->temporary_tables; table; table= next)
   {
-    if (is_user_table(table))
+    if (is_user_table(table) && table->should_binlog_drop_if_temp())
     {
       bool save_thread_specific_used= thd->thread_specific_used;
       my_thread_id save_pseudo_thread_id= thd->variables.pseudo_thread_id;
@@ -1959,7 +1960,11 @@ bool close_temporary_tables(THD *thd)
            table= next)
       {
         /* Separate transactional from non-transactional temp tables */
-        if (table->s->tmp_table == TRANSACTIONAL_TMP_TABLE)
+        if (!table->should_binlog_drop_if_temp())
+        {
+          /* Nothing, do not binlog this one */
+        }
+        else if (table->s->tmp_table == TRANSACTIONAL_TMP_TABLE)
         {
           found_trans_table= true;
           /*
@@ -2066,10 +2071,12 @@ bool close_temporary_tables(THD *thd)
       slave_closed_temp_tables++;
     }
   }
+  thd->temporary_tables=0;
+  mysql_mutex_unlock(&thd->LOCK_temporary_tables);
+
   if (!was_quote_show)
     thd->variables.option_bits&= ~OPTION_QUOTE_SHOW_CREATE; /* restore option */
 
-  thd->temporary_tables=0;
 #ifdef HAVE_REPLICATION
   if (thd->slave_thread)
   {
@@ -2077,8 +2084,6 @@ bool close_temporary_tables(THD *thd)
     thd->rli_slave->get_c_rli()->channel_open_temp_tables.atomic_add(-slave_closed_temp_tables);
   }
 #endif
-
-  mysql_mutex_unlock(&thd->LOCK_temporary_tables);
 
   DBUG_RETURN(error);
 }
@@ -7132,6 +7137,8 @@ TABLE *open_table_uncached(THD *thd, const char *path, const char *db,
 
   if (add_to_temporary_tables_list)
   {
+    tmp_table->set_binlog_drop_if_temp(!thd->is_current_stmt_binlog_disabled()
+                                 && !thd->is_current_stmt_binlog_format_row());
     /* growing temp list at the head */
     mysql_mutex_lock(&thd->LOCK_temporary_tables);
     tmp_table->next= thd->temporary_tables;
@@ -10103,6 +10110,11 @@ bool init_ftfuncs(THD *thd, SELECT_LEX *select_lex)
 
 
 bool is_equal(const LEX_STRING *a, const LEX_STRING *b)
+{
+  return a->length == b->length && !strncmp(a->str, b->str, a->length);
+}
+
+bool is_equal(const LEX_CSTRING *a, const LEX_CSTRING *b)
 {
   return a->length == b->length && !strncmp(a->str, b->str, a->length);
 }

@@ -186,9 +186,11 @@ lock_tables_check(THD *thd, TABLE **tables, size_t count, uint flags)
 
     /*
       Prevent modifications to base tables if READ_ONLY is activated.
-      In any case, read only does not apply to temporary tables.
+      In any case, read only does not apply to temporary tables and
+      performance_schema tables.
     */
-    if (!(flags & MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY) && !t->s->tmp_table)
+    if (!(flags & MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY) && !t->s->tmp_table &&
+        !is_perfschema_db(t->s->db.str, t->s->db.length))
     {
       if (t->reginfo.lock_type >= TL_WRITE_ALLOW_WRITE &&
         check_readonly(thd, true))
@@ -1206,7 +1208,6 @@ void Global_read_lock::unlock_global_read_lock(THD *thd)
     }
 #endif /* WITH_WSREP */
   }
-
   thd->mdl_context.release_lock(m_mdl_global_shared_lock);
   my_atomic_add32(&Global_read_lock::m_active_requests, -1);
   m_mdl_global_shared_lock= NULL;

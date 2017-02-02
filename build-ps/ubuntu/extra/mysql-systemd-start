@@ -8,7 +8,7 @@
 # post mode :  ping server until answer is received
 
 get_path () {
-	my_print_defaults mysqld | grep ${1} | cut -d= -f2
+	my_print_defaults mysqld | grep ${1} | cut -d= -f2 | tail -n 1
 }
 
 pinger () {
@@ -27,7 +27,7 @@ sanity () {
         fi
 	MYSQLFILES=/var/lib/mysql-files
 	MYSQLLOG=/var/log/mysql
-        MYSQLKEYRING=/var/lib/mysql-keyring
+	MYSQLKEYRING=/var/lib/mysql-keyring
 
 	if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
 	then

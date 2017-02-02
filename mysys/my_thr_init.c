@@ -232,15 +232,10 @@ void my_thread_global_end()
         are killed when we enter here.
       */
       if (THR_thread_count)
-      {
         /* purecov: begin inspected */
         my_message_local(ERROR_LEVEL, "Error in my_thread_global_end(): "
                          "%d threads didn't exit", THR_thread_count);
         /* purecov: end */
-//#ifdef WITH_WSREP
-//        assert(0);
-//#endif /* WITH_WSREP */
-      }
 #endif
       all_threads_killed= FALSE;
       break;

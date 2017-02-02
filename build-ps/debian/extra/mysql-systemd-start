@@ -8,7 +8,7 @@
 # post mode :  ping server until answer is received
 
 get_path () {
-	my_print_defaults mysqld | grep ${1} | cut -d= -f2
+	my_print_defaults mysqld | grep ${1} | cut -d= -f2 | tail -n 1
 }
 
 pinger () {
@@ -17,6 +17,16 @@ pinger () {
 		mysqladmin ping >/dev/null 2>&1 && break
 	done
 }
+
+#TOKUDB specific
+#fix_thp_setting() {
+#	THP_SETTING=$(my_print_defaults mysqld_safe | grep thp-setting | cut -d= -f2 | tail -n 1)
+#	if [ ! -z "${THP_SETTING}" ]; then
+#		# Set whatever option is specified in config file
+#		echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/defrag
+#		echo "${THP_SETTING}" > /sys/kernel/mm/transparent_hugepage/enabled
+#	fi
+#}
 
 sanity () {
 	MYSQLRUN=/var/run/mysqld
@@ -27,7 +37,7 @@ sanity () {
         fi
 	MYSQLFILES=/var/lib/mysql-files
 	MYSQLLOG=/var/log/mysql
-        MYSQLKEYRING=/var/lib/mysql-keyring
+	MYSQLKEYRING=/var/lib/mysql-keyring
 
 	if [ ! -d ${MYSQLDATA} -a ! -L ${MYSQLDATA} ];
 	then
@@ -79,6 +89,9 @@ sanity () {
 		echo "Percona XtraDB Cluster configuration not found at /etc/mysql/my.cnf. Please install one using update-alternatives."
 		exit 1
 	fi
+
+	# Needed because of TokuDB
+	#fix_thp_setting
 }
 
 case $1 in
