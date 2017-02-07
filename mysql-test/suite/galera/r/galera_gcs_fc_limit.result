@@ -3,6 +3,7 @@ INSERT INTO t1 VALUES (1);
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
+SET @@global.wsrep_causal_reads = 'OFF';
 SHOW STATUS LIKE 'wsrep_flow_control_interval';
 Variable_name	Value
 wsrep_flow_control_interval	[ 23, 23 ]
@@ -14,15 +15,24 @@ SET GLOBAL wsrep_provider_options = 'gcs.fc_factor=0.5';
 SHOW STATUS LIKE 'wsrep_flow_control_interval';
 Variable_name	Value
 wsrep_flow_control_interval	[ 71, 141 ]
+SHOW STATUS LIKE 'wsrep_flow_control_status';
+Variable_name	Value
+wsrep_flow_control_status	OFF
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=1';
 LOCK TABLE t1 WRITE;
 INSERT INTO t1 VALUES (2);
 INSERT INTO t1 VALUES (3);
 INSERT INTO t1 VALUES (4);
 INSERT INTO t1 VALUES (5);
+SHOW STATUS LIKE 'wsrep_flow_control_status';
+Variable_name	Value
+wsrep_flow_control_status	ON
 UNLOCK TABLES;
 INSERT INTO t1 VALUES (6);
 SELECT COUNT(*) = 6 FROM t1;
 COUNT(*) = 6
 1
+SHOW STATUS LIKE 'wsrep_flow_control_status';
+Variable_name	Value
+wsrep_flow_control_status	OFF
 DROP TABLE t1;
