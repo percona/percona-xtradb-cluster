@@ -171,6 +171,12 @@ public:
       }
     }
 
+#ifdef WITH_WSREP
+    if (mysql_query(this->m_mysql_connection, "SET wsrep_on=0") != 0)
+    {
+      return this->print_error(1, "Cannot setup server wsrep variables.");
+    }
+#endif /* WITH_WSREP */
     if (mysql_query(this->m_mysql_connection, "USE mysql") != 0)
     {
       return this->print_error(1, "Cannot select database.");

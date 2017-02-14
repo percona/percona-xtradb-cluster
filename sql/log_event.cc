@@ -48,6 +48,9 @@
 #include "sql_class.h"
 #include "mysql/psi/mysql_transaction.h"
 #include "sql_plugin.h" // plugin_foreach
+#if WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 #define window_size Log_throttle::LOG_THROTTLE_WINDOW_SIZE
 Error_log_throttle
 slave_ignored_err_throttle(window_size,
@@ -4715,21 +4718,16 @@ compare_errors:
         !ignored_error_code(actual_error) &&
         !ignored_error_code(expected_error))
     {
-#ifdef WITH_WSREP
       rli->report(ERROR_LEVEL, ER_INCONSISTENT_ERROR, ER(ER_INCONSISTENT_ERROR),
                   ER_THD(thd, expected_error), expected_error,
                   (actual_error ?
                    thd->get_stmt_da()->message_text() :
                    "no error"),
+#ifdef WITH_WSREP
                   actual_error, print_slave_db_safe(db),
                   (!opt_general_log_raw) && thd->rewritten_query.length()
                   ? thd->rewritten_query.c_ptr_safe() : query_arg);
 #else
-      rli->report(ERROR_LEVEL, ER_INCONSISTENT_ERROR, ER(ER_INCONSISTENT_ERROR),
-                  ER_THD(thd, expected_error), expected_error,
-                  (actual_error ?
-                   thd->get_stmt_da()->message_text() :
-                   "no error"),
                   actual_error, print_slave_db_safe(db), query_arg);
 #endif /* WITH_WSREP */
       thd->is_slave_error= 1;
@@ -4776,9 +4774,9 @@ compare_errors:
                      thd->get_stmt_da()->message_text() :
                      "unexpected success or fatal error"),
 #ifdef WITH_WSREP
-                      print_slave_db_safe(thd->db().str),
-                  (!opt_general_log_raw) && thd->rewritten_query.length()
-                  ? thd->rewritten_query.c_ptr_safe() : query_arg);
+                    print_slave_db_safe(db),
+                      (!opt_general_log_raw) && thd->rewritten_query.length()
+                      ? thd->rewritten_query.c_ptr_safe() : query_arg);
 #else
                     print_slave_db_safe(thd->db().str), query_arg);
 #endif /* WITH_WSREP */
@@ -6806,6 +6804,9 @@ bool slave_execute_deferred_events(THD *thd)
 {
   bool res= false;
   Relay_log_info *rli= thd->rli_slave;
+#ifdef WITH_WSREP
+  if (thd->wsrep_applier) rli = thd->wsrep_rli;
+#endif /* WITH_WSREP */
 
   DBUG_ASSERT(rli && (!rli->deferred_events_collecting || rli->deferred_events));
 
@@ -10744,13 +10745,13 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       if (WSREP(thd))
       {
         WSREP_WARN("BF applier failed to open_and_lock_tables: %u, fatal: %d "
-                   "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld)",
+                   "wsrep = (exec_mode: %d conflict_state: %d seqno: %lld) ",
                    thd->get_stmt_da()->mysql_errno(),
                    thd->is_fatal_error,
                    thd->wsrep_exec_mode,
                    thd->wsrep_conflict_state,
                    (long long)wsrep_thd_trx_seqno(thd));
-      } 
+      }
 #endif /* WITH_WSREP */
       if (thd->is_slave_error || thd->is_fatal_error)
       {
@@ -12869,8 +12870,6 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
     WSREP_DEBUG("wsrep: rows updated (%lld)", (long long) wsrep_thd_trx_seqno(thd));
 #endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
-
-
 
   return error;
 }

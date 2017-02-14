@@ -373,17 +373,17 @@ OPTION(OPTIMIZER_TRACE "Support tracing of Optimizer" ON)
 # Options related to client-side protocol tracing
 #
 
+OPTION(WITH_CLIENT_PROTOCOL_TRACING
+  "Support for client-side protocol tracing plugins" ON)
+OPTION(WITH_TEST_TRACE_PLUGIN
+  "Have a built-in test protocol trace plugin in libmysql (requires WITH_CLIENT_PROTOCOL_TRACING option)" OFF)
+
 OPTION(WITH_INNODB_DISALLOW_WRITES "InnoDB freeze writes patch from Google" ${WITH_WSREP})
 IF (WITH_INNODB_DISALLOW_WRITES)
   MESSAGE(STATUS "INNODB_DISALLOW_WRITES")
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INNODB_DISALLOW_WRITES")
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWITH_INNODB_DISALLOW_WRITES")
 ENDIF()
-
-OPTION(WITH_CLIENT_PROTOCOL_TRACING
-  "Support for client-side protocol tracing plugins" ON)
-OPTION(WITH_TEST_TRACE_PLUGIN
-  "Have a built-in test protocol trace plugin in libmysql (requires WITH_CLIENT_PROTOCOL_TRACING option)" OFF)
 
 # Sanity checks for protocol tracing options
 
@@ -700,7 +700,7 @@ ENDIF()
 ADD_SUBDIRECTORY(packaging/WiX)
 ADD_SUBDIRECTORY(packaging/solaris)
 
-IF(UNIX)
+IF(UNIX AND NOT WITH_WSREP)
   INSTALL(FILES Docs/mysql.info DESTINATION ${INSTALL_INFODIR} OPTIONAL COMPONENT Info)
 ENDIF()
 #

@@ -14,6 +14,10 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "sql_alter.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#include "sql_parse.h"
+#endif /* WITH_WSREP */
 
 #include "auth_common.h"                     // check_access
 #include "sql_table.h"                       // mysql_alter_table,

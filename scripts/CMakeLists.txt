@@ -456,6 +456,16 @@ ELSE()
       ${WSREP_BINARIES}
       )
   ENDIF()
+  IF(WITH_WSREP)
+    SET(BIN_SCRIPTS
+      ${BIN_SCRIPTS}
+      wsrep_sst_common
+      wsrep_sst_mysqldump
+      wsrep_sst_rsync
+      wsrep_sst_xtrabackup
+      wsrep_sst_xtrabackup-v2
+    )
+  ENDIF()
 
   SET(PKGCONFIG_FILE ${LIBMYSQL_OS_OUTPUT_NAME}.pc)
   STRING(REGEX REPLACE "/mysql$" "" PKGCONFIG_DIR "${INSTALL_LIBDIR}")
@@ -533,8 +543,17 @@ ELSE()
     CONFIGURE_FILE(systemd/mysqld.tmpfiles.d.in
       ${CMAKE_CURRENT_BINARY_DIR}/mysql.conf ESCAPE_QUOTES @ONLY)
 
+    CONFIGURE_FILE(systemd/mysqld_bootstrap.in
+      ${CMAKE_CURRENT_BINARY_DIR}/mysqld_bootstrap ESCAPE_QUOTES @ONLY)
+
     INSTALL_SCRIPT(
       ${CMAKE_CURRENT_BINARY_DIR}/mysqld_pre_systemd
+      DESTINATION ${INSTALL_BINDIR}
+      COMPONENT Server
+    )
+
+    INSTALL_SCRIPT(
+      ${CMAKE_CURRENT_BINARY_DIR}/mysqld_bootstrap
       DESTINATION ${INSTALL_BINDIR}
       COMPONENT Server
     )

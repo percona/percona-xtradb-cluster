@@ -4439,13 +4439,13 @@ void free_system_variables(struct system_variables *v, bool enable_plugins)
 
 bool Sql_cmd_install_plugin::execute(THD *thd)
 {
-  bool st= true;
-
 #ifdef WITH_WSREP
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
+  bool st;
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
   st= mysql_install_plugin(thd, &m_comment, &m_ident);
+#else
+  bool st= mysql_install_plugin(thd, &m_comment, &m_ident);
+#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
 #ifndef EMBEDDED_LIBRARY
@@ -4460,13 +4460,13 @@ error:
 
 bool Sql_cmd_uninstall_plugin::execute(THD *thd)
 {
-  bool st= true;
-
 #ifdef WITH_WSREP
+  bool st;
   WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
   st= mysql_uninstall_plugin(thd, &m_comment);
+#else
+  bool st= mysql_uninstall_plugin(thd, &m_comment);
+#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
 #ifndef EMBEDDED_LIBRARY

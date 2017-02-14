@@ -1,0 +1,36 @@
+#
+# MW-317 - CREATE TABLE AS SELECT for empty source table
+#
+
+--source include/galera_cluster.inc
+
+--connection node_1
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+INSERT INTO t1 values (1);
+
+--connection node_2
+# Make sure the CREATE TABLE statement is replicated before continuing
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1
+--source include/wait_condition.inc
+
+--connection node_1
+CREATE TABLE t2 ENGINE=InnoDB AS SELECT * from t1;
+
+--connection node_2
+# Make sure the CTAS statement is replicated before continuing
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t2
+--source include/wait_condition.inc
+
+--connection node_1
+DROP TABLE t2;
+TRUNCATE t1;
+CREATE TABLE t2 ENGINE=InnoDB AS SELECT * from t1;
+
+--connection node_2
+# Make sure the CTAS statement is replicated before continuing
+--let $wait_condition = SELECT COUNT(*) = 0 FROM t2
+--source include/wait_condition.inc
+
+--connection node_1
+DROP TABLE t1;
+DROP TABLE t2;

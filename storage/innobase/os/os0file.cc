@@ -3596,6 +3596,9 @@ os_file_create_func(
 	bool		on_error_no_exit;
 	bool		on_error_silent;
 
+	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
+		WAIT_ALLOW_WRITES();
+
 	*success = false;
 
 	DBUG_EXECUTE_IF(
@@ -3607,9 +3610,6 @@ os_file_create_func(
 
 	int		create_flag;
 	const char*	mode_str	= NULL;
-
-	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW)
-		WAIT_ALLOW_WRITES();
 
 	on_error_no_exit = create_mode & OS_FILE_ON_ERROR_NO_EXIT
 		? true : false;
@@ -3846,6 +3846,7 @@ os_file_delete_if_exists_func(
 	const char*	name,
 	bool*		exist)
 {
+	WAIT_ALLOW_WRITES();
 	if (exist != NULL) {
 		*exist = true;
 	}
@@ -3909,6 +3910,7 @@ os_file_rename_func(
 	ut_ad(os_file_status(oldpath, &exists, &type));
 	ut_ad(exists);
 #endif /* UNIV_DEBUG */
+	WAIT_ALLOW_WRITES();
 
 	WAIT_ALLOW_WRITES();
 	int	ret = rename(oldpath, newpath);
@@ -4071,6 +4073,7 @@ os_file_truncate_posix(
 	os_file_t	file,
 	os_offset_t	size)
 {
+	WAIT_ALLOW_WRITES();
 	int	res = ftruncate(file, size);
 
 	if (res == -1) {
@@ -4292,6 +4295,7 @@ bool
 os_file_flush_func(
 	os_file_t	file)
 {
+	WAIT_ALLOW_WRITES();
 	++os_n_fsyncs;
 
 	BOOL	ret = FlushFileBuffers(file);
@@ -5655,6 +5659,7 @@ os_file_write_page(
 	ut_ad(type.validate());
 	ut_ad(n > 0);
 
+	WAIT_ALLOW_WRITES();
 	ssize_t	n_bytes = os_file_pwrite(type, file, buf, n, offset, &err);
 
 	if ((ulint) n_bytes != n && !os_has_said_disk_full) {

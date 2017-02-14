@@ -142,7 +142,7 @@ RESET_MASTER="RESET MASTER;"
 
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
-# commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
+    # commented out from dump command for 5.6: && echo $CSV_TABLES_FIX \
     # error is ignored because joiner binlog might be disabled.
     # and if joiner binlog is disabled, 'RESET MASTER' returns error
     # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER

@@ -174,7 +174,11 @@ Rpl_filter::db_ok(const char* db)
     Since the filtering criteria is not equal to "NULL" the statement should
     be logged into binlog.
   */
+#ifdef WITH_WSREP
+  if (!db || strlen(db) == 0)
+#else
   if (!db)
+#endif /* WITH_WSREP */
     DBUG_RETURN(1);
 
   if (!do_db.is_empty()) // if the do's are not empty

@@ -125,22 +125,33 @@ Global_THD_manager::Global_THD_manager()
 }
 
 
+#ifdef WITH_WSREP
+class Print_conn : public Do_THD_Impl
+{
+public:
+  Print_conn() { }
+
+  virtual void operator()(THD *thd)
+  {
+    WSREP_INFO("THD %u applier %d exec_mode %d killed %d",
+               thd->thread_id(), thd->wsrep_applier, thd->wsrep_exec_mode,
+               thd->killed);
+  }
+};
+#endif /* WITH_WSREP */
+
 Global_THD_manager::~Global_THD_manager()
 {
   thread_ids.erase_unique(reserved_thread_id);
 #ifdef WITH_WSREP
-  /* If server is abrupted aborted due to initial configuration
-  issue applier threads are not shutdown.
-  This is not a source of concern as they are not modifying
-  any data-set but good to have activity.
-  Programing it for now would means lot of changes in galera
-  code that assume things will always succeed with SST. */
-  DBUG_ASSERT(thd_list.empty() || !wsrep_is_SE_initialized());
-  DBUG_ASSERT(thread_ids.empty() || !wsrep_is_SE_initialized());
-#else
+  if (!(thd_list.empty()))
+  {
+    Print_conn print_conn;
+    do_for_all_thd(&print_conn);
+  }
+#endif /* WITH_WSREP */
   DBUG_ASSERT(thd_list.empty());
   DBUG_ASSERT(thread_ids.empty());
-#endif /* WITH_WSREP */
   mysql_mutex_destroy(&LOCK_thd_list);
   mysql_mutex_destroy(&LOCK_thd_remove);
   mysql_mutex_destroy(&LOCK_thread_ids);
@@ -254,30 +265,6 @@ void Global_THD_manager::wait_till_no_thd()
   }
   mysql_mutex_unlock(&LOCK_thd_list);
 }
-
-#ifdef WITH_WSREP
-void Global_THD_manager::wait_till_wsrep_thd_eq(Do_THD_Impl* func,
-                                                int threshold_count)
-{
-  Do_THD doit(func);
-
-  mysql_mutex_lock(&LOCK_thd_list);
-  while (true)
-  {
-    func->reset();
-
-    std::for_each(thd_list.begin(), thd_list.end(), doit);
-
-    /* Check if the exit condition is true based on evaluator execution. */
-    if (func->done(threshold_count))
-      break;
-
-    mysql_cond_wait(&COND_thd_list, &LOCK_thd_list);
-    DBUG_PRINT("quit", ("One thread died (count=%u)", get_thd_count()));
-  }
-  mysql_mutex_unlock(&LOCK_thd_list);
-}
-#endif /* WITH_WSREP */
 
 
 void Global_THD_manager::do_for_all_thd_copy(Do_THD_Impl *func)

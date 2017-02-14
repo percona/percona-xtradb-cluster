@@ -319,16 +319,6 @@ extern "C" void *handle_connection(void *arg)
     thd->get_stmt_da()->reset_diagnostics_area();
     thd->release_resources();
 
-#ifdef WITH_WSREP
-    bool avoid_pthread_reuse= false;
-    if (WSREP(thd) && thd->wsrep_applier)
-    {
-      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", thd->thread_id());
-      avoid_pthread_reuse= true;
-      pthread_reused= false;
-    }
-#endif /* WITH_WSREP */
-
     // Clean up errors now, before possibly waiting for a new connection.
     ERR_remove_state(0);
 
@@ -345,15 +335,22 @@ extern "C" void *handle_connection(void *arg)
 
     delete thd;
 
-#ifdef WITH_WSREP
-    if (avoid_pthread_reuse)
-      break;
-#endif /* WITH_WSREP */
-
     if (abort_loop) // Server is shutting down so end the pthread.
       break;
 
+#ifdef WITH_WSREP
+    if (WSREP(thd) && thd->wsrep_applier)
+    {
+      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", thd->thread_id());
+      channel_info = NULL;
+    }
+    else
+    {
+#endif /* WITH_WSREP */
     channel_info= Per_thread_connection_handler::block_until_new_connection();
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
     if (channel_info == NULL)
       break;
     pthread_reused= true;

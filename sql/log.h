@@ -965,4 +965,16 @@ bool log_syslog_find_facility(char *f, SYSLOG_FACILITY *rsf);
 bool log_syslog_init();
 void log_syslog_exit();
 
+#ifdef WITH_WSREP
+IO_CACHE* wsrep_get_trans_log(THD * thd, bool transaction);
+bool wsrep_trans_cache_is_empty(THD *thd);
+void wsrep_thd_binlog_flush_pending_rows_event(THD *thd, bool stmt_end);
+void wsrep_thd_binlog_trx_reset(THD * thd);
+
+#define WSREP_BINLOG_FORMAT(my_format)                         \
+   ((wsrep_forced_binlog_format != BINLOG_FORMAT_UNSPEC) ?     \
+   wsrep_forced_binlog_format : my_format)
+#else
+#define WSREP_BINLOG_FORMAT(my_format) my_format
+#endif /* WITH_WSREP */
 #endif /* LOG_H */

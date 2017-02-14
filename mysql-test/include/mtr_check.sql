@@ -112,16 +112,16 @@ BEGIN
          COLLATION_CONNECTION, DATABASE_COLLATION
     FROM INFORMATION_SCHEMA.TRIGGERS
    WHERE TRIGGER_NAME NOT IN ('gs_insert', 'ts_insert');
-  -- Dump all created procedures, only those in the sys schema should exist
+  -- Dump all created procedures
   -- do not select the CREATED or LAST_ALTERED columns however, as tests like mysqldump.test / mysql_ugprade.test update this
   SELECT SPECIFIC_NAME,ROUTINE_CATALOG,ROUTINE_SCHEMA,ROUTINE_NAME,ROUTINE_TYPE,DATA_TYPE,CHARACTER_MAXIMUM_LENGTH,
          CHARACTER_OCTET_LENGTH,NUMERIC_PRECISION,NUMERIC_SCALE,DATETIME_PRECISION,CHARACTER_SET_NAME,COLLATION_NAME,
          DTD_IDENTIFIER,ROUTINE_BODY,ROUTINE_DEFINITION,EXTERNAL_NAME,EXTERNAL_LANGUAGE,PARAMETER_STYLE,
          IS_DETERMINISTIC,SQL_DATA_ACCESS,SQL_PATH,SECURITY_TYPE,SQL_MODE,ROUTINE_COMMENT,DEFINER,
          CHARACTER_SET_CLIENT,COLLATION_CONNECTION,DATABASE_COLLATION
-    FROM INFORMATION_SCHEMA.ROUTINES;
-  -- Dump all views, only those in the sys schema should exist
-  SELECT * FROM INFORMATION_SCHEMA.VIEWS;
+    FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_SCHEMA != 'sys';
+  -- Dump all views, except those in the sys schema, which can change slightly on restart (e.g. SECURITY_TYPE = 'NONE' -> 'NO')
+  SELECT * FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA != 'sys';
 
   -- Dump all created compression dictionaries if InnoDB is enabled
   IF ((SELECT COUNT(*) FROM information_schema.engines

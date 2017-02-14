@@ -1,13 +1,6 @@
 galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
-pxc-421 : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
-galera_bf_abort_for_update : mysql-wsrep#26 SELECT FOR UPDATE sometimes allowed to proceed in the face of a concurrent update
 galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
-galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
-galera.galera_fk_multitable : check upstream bug http://bugs.mysql.com/bug.php?id=80478.
-galera_split_brain : fails quite often. bug logged to investigate the failure.
-galera_log_output_csv : Upstream bug#80467. MySQL-5.7.11 fails to log queries to slow table even though queries are using table scan.
-galera_sst_xtrabackup-v2_keyring : Requires xtrabackup 2.4.4
-galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
-galera_var_notify_cmd : fails on digital ocean distro.
-MW-286 : timing issues. Need to work and stablize it.
+galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
+galera.galera_as_slave_replication_bundle : GCF-912 feature no longer works in 5.7
+galera.galera_sst_xtrabackup-v2_keyring : Cannot find the said keyring plugin.
 galera_gcache_recover_manytrx : timing issue that causes it to fail intermittently.

@@ -29,6 +29,9 @@
 #include "table_trigger_dispatcher.h" // Table_trigger_dispatcher
 #include "binlog.h"
 #include "sp_head.h"                  // sp_name
+#ifdef WITH_WSREP
+#include "sql_parse.h"                  // create_default_definer
+#endif /* WITH_WSREP */
 
 #include "mysql/psi/mysql_sp.h"
 

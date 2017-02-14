@@ -36,8 +36,10 @@ static PSI_memory_key key_memory_MDL_context_acquire_locks;
 #include "debug_sync.h"
 #include "wsrep_mysqld.h"
 #include "wsrep_thd.h"
-extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
-extern "C" const char *wsrep_thd_query(THD *thd);
+//extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
+//extern "C" char *wsrep_thd_query(THD *thd);
+void sql_print_information(const char *format, ...)
+  __attribute__((format(printf, 1, 2)));
 extern bool
 wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
                           MDL_ticket *ticket,
@@ -2581,7 +2583,6 @@ const MDL_lock::MDL_lock_strategy MDL_lock::m_object_lock_strategy =
   &MDL_lock::object_lock_needs_connection_check
 };
 
-
 /**
   Check if request for the metadata lock can be satisfied given its
   current state.
@@ -2701,6 +2702,39 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         The above means that conflicting granted "fast path" lock cannot
         belong to us and our request cannot be satisfied.
       */
+#ifdef WITH_WSREP
+      if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),false) &&
+          key.mdl_namespace() == MDL_key::GLOBAL)
+      {
+            WSREP_DEBUG("global lock granted over unobstrusive locks, for BF: %u %s",
+                        wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
+                        wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
+            can_grant = true;
+      }
+#ifdef WITH_WSREP_TODO
+      /* victim unobstrusive lock holder is hard to find.
+         Skipping here to allow high priority thread to continue,
+         it will have earlier seqno and victims will die at certification stage
+       */
+      else if (!wsrep_grant_mdl_exception(requestor_ctx, ticket))
+      {
+        wsrep_can_grant= FALSE;
+        if (wsrep_log_conflicts)
+        {
+          MDL_lock * lock = ticket->get_lock();
+          WSREP_INFO(
+                     "MDL conflict db=%s table=%s ticket=%d solved by %s",
+                     lock->key.db_name(), lock->key.name(), ticket->get_type(), "abort"
+                     );
+        }
+      }
+#endif /* WITH_WSREP_TODO */
+      else if (WSREP(requestor_ctx->wsrep_get_thd()))
+      {
+        WSREP_DEBUG("granting MDL for BF thread over unobstrusive locks");
+        can_grant= TRUE;
+      }
+#endif /* WITH_WSREP */
     }
   }
 #ifdef WITH_WSREP

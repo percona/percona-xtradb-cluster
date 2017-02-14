@@ -166,7 +166,7 @@ static bool sst_auth_real_set (const char* value)
 
   if (value)
   {
-    v= my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0));
+    v= my_strdup(key_memory_wsrep, value, MYF(0));
   }
   else                                          // its NULL
   {
@@ -184,7 +184,7 @@ static bool sst_auth_real_set (const char* value)
     if (strlen(sst_auth_real))
     {
       if (wsrep_sst_auth) { my_free((void*) wsrep_sst_auth); }
-      wsrep_sst_auth= my_strdup(PSI_NOT_INSTRUMENTED, WSREP_SST_AUTH_MASK, MYF(0));
+      wsrep_sst_auth= my_strdup(key_memory_wsrep, WSREP_SST_AUTH_MASK, MYF(0));
     }
     return 0;
   }
@@ -419,12 +419,12 @@ static int generate_binlog_opt_val(char** ret)
   {
     assert(opt_bin_logname);
     *ret= strcmp(opt_bin_logname, "0") ?
-        my_strdup(PSI_NOT_INSTRUMENTED, opt_bin_logname, MYF(0)) :
-        my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(0));
+        my_strdup(key_memory_wsrep, opt_bin_logname, MYF(0)) :
+        my_strdup(key_memory_wsrep, "", MYF(0));
   }
   else
   {
-    *ret= my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(0));
+    *ret= my_strdup(key_memory_wsrep, "", MYF(0));
   }
   if (!*ret) return -ENOMEM;
   return 0;
@@ -765,7 +765,7 @@ static ssize_t sst_prepare_mysqldump (const char*  addr_in,
 
 static bool SE_initialized = false;
 
-ssize_t wsrep_sst_prepare (void** msg)
+ssize_t wsrep_sst_prepare (void** msg, THD* thd)
 {
   const ssize_t ip_max= 256;
   char ip_buf[ip_max];
@@ -818,6 +818,7 @@ ssize_t wsrep_sst_prepare (void** msg)
       WSREP_ERROR("Could not prepare state transfer request: "
                   "failed to guess address to accept state transfer at. "
                   "wsrep_sst_receive_address must be set manually.");
+      if (thd) delete thd;
       unireg_abort(1);
     }
   }
@@ -939,7 +940,7 @@ static void sst_reject_queries(my_bool close_conn)
 {
     wsrep_ready_set (FALSE); // this will be resotred when donor becomes synced
     WSREP_INFO("Rejecting client queries for the duration of SST.");
-    if (TRUE == close_conn) wsrep_close_client_connections(false, false);
+    if (TRUE == close_conn) wsrep_close_client_connections(FALSE);
 }
 
 static int sst_donate_mysqldump (const char*         addr,
@@ -1339,6 +1340,17 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
     return WSREP_CB_FAILURE;
   }
 
+  /* Wait for wsrep-SE to initialize that also signals
+  completion of init_server_component which is important before we initiate
+  any meangiful action especially DONOR action from this node. */
+  while (!wsrep_is_SE_initialized())
+  {
+    sleep(1);
+    THD* applier_thd= static_cast<THD*>(recv_ctx);
+    if (applier_thd->killed == THD::KILL_CONNECTION)
+      return WSREP_CB_FAILURE;
+  }
+
   int ret;
   if ((ret= sst_append_auth_env(env, sst_auth_real)))
   {
@@ -1365,13 +1377,33 @@ void wsrep_SE_init_grab()
   if (mysql_mutex_lock (&LOCK_wsrep_sst_init)) abort();
 }
 
-void wsrep_SE_init_wait()
+void wsrep_SE_init_wait(THD* thd)
 {
-  while (SE_initialized == false)
+  while (SE_initialized == false && thd->killed == THD::NOT_KILLED)
   {
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->current_cond= &COND_wsrep_sst_init;
+    thd->current_mutex= &LOCK_wsrep_sst_init;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+    
     mysql_cond_wait (&COND_wsrep_sst_init, &LOCK_wsrep_sst_init);
+
+    if (thd->killed != THD::NOT_KILLED)
+    {
+      WSREP_DEBUG("SE init waiting canceled");
+      break;
+    }
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    thd->current_cond= NULL;
+    thd->current_mutex= NULL;
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
   }
   mysql_mutex_unlock (&LOCK_wsrep_sst_init);
+
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+  thd->current_cond= NULL;
+  thd->current_mutex= NULL;
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
 }
 
 void wsrep_SE_init_done()

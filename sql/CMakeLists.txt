@@ -13,6 +13,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+
 IF(WITH_WSREP)
  SET(WSREP_INCLUDES ${CMAKE_SOURCE_DIR}/wsrep)
 ENDIF()
@@ -472,7 +473,6 @@ ADD_CONVENIENCE_LIBRARY(sqlgunitlib ${SQL_GUNIT_LIB_SOURCE})
 ADD_DEPENDENCIES(sqlgunitlib GenError)
 
 ######################### GUnit Lib #################################
-
 
 IF(WIN32)
   SET(MYSQLD_SOURCE main.cc nt_servc.cc nt_servc.h message.rc)

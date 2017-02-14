@@ -145,7 +145,11 @@ public:
 public:
   const char *m_name;
   size_t m_name_length;
+#ifdef WITH_WSREP
+  char m_value_str[((SHOW_VAR_FUNC_BUFF_SIZE > 2048) ? SHOW_VAR_FUNC_BUFF_SIZE : 2048) + 1];
+#else
   char m_value_str[SHOW_VAR_FUNC_BUFF_SIZE+1];
+#endif /* WITH_WSREP */
   size_t m_value_length;
   enum_mysql_show_type m_type;
   int m_scope;

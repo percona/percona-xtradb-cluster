@@ -37,9 +37,14 @@ void wsrep_xid_init(XID* xid, const wsrep_uuid_t& uuid, wsrep_seqno_t seqno)
   xid->set_format_id(1);
   xid->set_gtrid_length(WSREP_XID_GTRID_LEN);
   xid->set_bqual_length(0);
-  memcpy(xid->get_mutable_data(), WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
-  memcpy(xid->get_mutable_data() + WSREP_XID_UUID_OFFSET,  &uuid,  sizeof(wsrep_uuid_t));
-  memcpy(xid->get_mutable_data() + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));
+  char data[XIDDATASIZE];
+
+  memset(data, 0, XIDDATASIZE);
+  memcpy(data, WSREP_XID_PREFIX, WSREP_XID_PREFIX_LEN);
+  memcpy(data + WSREP_XID_UUID_OFFSET,  &uuid,  sizeof(wsrep_uuid_t));
+  memcpy(data + WSREP_XID_SEQNO_OFFSET, &seqno, sizeof(wsrep_seqno_t));
+
+  xid->set_data(data, XIDDATASIZE);
 }
 
 int wsrep_is_wsrep_xid(const void* xid_ptr)
@@ -129,6 +134,8 @@ void wsrep_get_SE_checkpoint(XID& xid)
 
 void wsrep_get_SE_checkpoint(wsrep_uuid_t& uuid, wsrep_seqno_t& seqno)
 {
+  if (!WSREP_ON) return;
+
   uuid= WSREP_UUID_UNDEFINED;
   seqno= WSREP_SEQNO_UNDEFINED;
 

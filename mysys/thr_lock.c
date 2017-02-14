@@ -616,7 +616,7 @@ wsrep_break_lock(
     data->next=wait_queue->data;
     data->prev=&wait_queue->data;
     wait_queue->data=data;
-    data->cond= owner->suspend;
+    data->cond=owner->suspend;
 
     locks_immediate++;
     return TRUE;

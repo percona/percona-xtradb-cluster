@@ -20,6 +20,9 @@ CREATE TABLE t1 (f1 VARCHAR(128)) ENGINE=InnoDB;
 --source include/kill_galera.inc
 
 --connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+#
 # We create a 128Mb (or so) transaction that is larger than gcache. The size of the gcache is not adjustable dynamically
 INSERT INTO t1 SELECT REPEAT('a', 128) FROM ten AS a1, ten AS a2, ten AS a3, ten AS a4, ten AS a5, ten AS a6;
 
@@ -32,9 +35,7 @@ INSERT INTO t1 SELECT REPEAT('a', 128) FROM ten AS a1, ten AS a2, ten AS a3, ten
 --connection node_2a
 
 SELECT COUNT(*) = 1000000 FROM t1;
---disable_warnings
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
---enable_warnings
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
 --connection node_1
 --disable_query_log

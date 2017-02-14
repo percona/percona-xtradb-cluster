@@ -273,11 +273,13 @@ char *fn_rext(char *name)
   return name + strlen(name);
 }
 
-#ifndef WITH_WSREP
-static
-#endif /* !WITH_WSREP */
+#ifdef WITH_WSREP
 TABLE_CATEGORY get_table_category(const LEX_STRING &db,
-                                  const LEX_STRING &name)
+                                 const LEX_STRING &name)
+#else
+static TABLE_CATEGORY get_table_category(const LEX_STRING &db,
+                                         const LEX_STRING &name)
+#endif /* WITH_WSREP */
 {
   DBUG_ASSERT(db.str != NULL);
   DBUG_ASSERT(name.str != NULL);

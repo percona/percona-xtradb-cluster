@@ -198,13 +198,6 @@ sub fix_log_slow_queries {
   return "$dir/mysqld-slow.log";
 }
 
-sub fix_secure_file_priv {
-  my ($self)= @_;
-  my $vardir= $self->{ARGS}->{vardir};
-  # By default, prevent the started mysqld to access files outside of vardir
-  return $vardir;
-}
-
 sub fix_std_data {
   my ($self, $config, $group_name, $group)= @_;
   my $testdir= $self->get_testdir($group);
@@ -527,11 +520,21 @@ sub resolve_at_variable {
     $after = $';
     chop($group_name);
 
-  my $from_group= $config->group($group_name)
-    or croak "There is no group named '$group_name' that ",
-      "can be used to resolve '$option_name' for test '$self->{testname}'";
+    $group_name =~ s/^\@//; # Remove at
+    my $value;
 
-    my $value= $from_group->value($option_name);
+    if ($group_name =~ "env")
+    {
+      $value = $ENV{$option_name};
+    }
+    else
+    {
+      my $from_group= $config->group($group_name)
+        or croak "There is no group named '$group_name' that ",
+          "can be used to resolve '$option_name'";
+      $value= $from_group->value($option_name);
+    }
+
     $res .= $before.$value;
   }
   $res .= $after;

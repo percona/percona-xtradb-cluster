@@ -5,7 +5,6 @@
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
---source include/have_debug.inc
 
 --let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
 
@@ -15,9 +14,6 @@ CREATE TABLE t2 (id INT) ENGINE=InnoDB;
 --connection node_2
 SET GLOBAL wsrep_slave_threads = 2;
 LOCK TABLE t1 WRITE;
-
-# Enables some PROCESSLIST thread state to be maintained for testing
-SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_commit";
 
 --connection node_1
 INSERT INTO t1 VALUES (1);
@@ -51,11 +47,8 @@ UNLOCK TABLES;
 
 SET SESSION wsrep_sync_wait = 7;
 
-SELECT COUNT(*) = 10 FROM t1;
-SELECT COUNT(*) = 10 FROM t2;
-SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: committed%';
-
-SET GLOBAL DEBUG = "";
+SELECT COUNT(*) = 6 FROM t1;
+SELECT COUNT(*) = 6 FROM t2;
 
 --eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
 

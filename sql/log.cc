@@ -49,6 +49,9 @@
 #else
 #include <syslog.h>
 #endif
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 
 using std::min;
 using std::max;

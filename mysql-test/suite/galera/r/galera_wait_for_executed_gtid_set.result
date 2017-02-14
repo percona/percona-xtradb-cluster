@@ -1,0 +1,13 @@
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+INSERT INTO t1 VALUES (1);
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+WAIT_FOR_EXECUTED_GTID_SET_EXPECTED
+1
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+WAIT_FOR_EXECUTED_GTID_SET_EXPECTED
+1
+DROP TABLE t1;

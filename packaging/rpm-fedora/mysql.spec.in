@@ -840,6 +840,16 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
 
 %changelog
+<<<<<<< HEAD
+=======
+* Tue Sep 13 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.16-1
+- Add connection_control.so to server subpackage
+
+* Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
+- Take Oracle's change to support service "instances" via systemd
+  and other minor fixes from their 5.7.13.
+
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 * Tue Jul 05 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.14-1
 - Updated compatver to 5.6.31
 - Remove mysql_config from client subpackage

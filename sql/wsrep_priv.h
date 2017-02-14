@@ -28,7 +28,7 @@
 
 void    wsrep_ready_set (my_bool x);
 
-ssize_t wsrep_sst_prepare   (void** msg);
+ssize_t wsrep_sst_prepare   (void** msg, THD*  thd);
 wsrep_cb_status wsrep_sst_donate_cb (void* app_ctx,
                                      void* recv_ctx,
                                      const void* msg, size_t msg_len,
@@ -42,7 +42,7 @@ extern wsrep_seqno_t local_seqno;
 
 // a helper function
 void wsrep_sst_received(wsrep_t*, const wsrep_uuid_t&, wsrep_seqno_t,
-                               const void*, size_t);
+                        const void*, size_t);
 /*! SST thread signals init thread about sst completion */
 void wsrep_sst_complete(const wsrep_uuid_t*, wsrep_seqno_t, bool);
 

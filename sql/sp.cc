@@ -2873,7 +2873,7 @@ int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len)
                      saved_mode))
   {
     WSREP_WARN("SP create string failed: schema: %s, query: %s",
-               (thd->db().length ? thd->db().str : "(null)"), thd->query().str);
+               (thd->db().str ? thd->db().str : "(null)"),thd->query().str);
     return 1;
   }
   return wsrep_to_buf_helper(thd, log_query.ptr(), log_query.length(), buf, buf_len);

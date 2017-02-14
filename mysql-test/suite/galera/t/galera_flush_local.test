@@ -42,7 +42,7 @@ INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 
 
 --connection node_2
---let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH LOCAL DES_KEY_FILE;
@@ -87,7 +87,7 @@ REPAIR LOCAL TABLE x1, x2;
 --connection node_2
 --disable_query_log
 --disable_warnings
---eval SELECT VARIABLE_VALUE = $wsrep_last_committed_before AS wsrep_last_committed_diff FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--eval SELECT VARIABLE_VALUE = $wsrep_last_committed_before AS wsrep_last_committed_diff FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
 --enable_warnings
 --enable_query_log
 
@@ -122,7 +122,7 @@ INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 
 
 --connection node_2
---let $wsrep_last_committed_before2 = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--let $wsrep_last_committed_before2 = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 set wsrep_on=0;
@@ -166,10 +166,10 @@ OPTIMIZE TABLE t1, t2;
 REPAIR TABLE x1, x2;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before2 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed';
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before2 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 9 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed';
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 9 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed';
 --source include/wait_condition.inc
 
 

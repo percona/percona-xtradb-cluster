@@ -20,7 +20,7 @@ INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a'), (4, 'a'), (5, 'a'),(6, 'a');
 UPDATE t1 SET f2 = 'b' WHERE f1 > 1;
 
 # Wait until node #1 has left
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 UPDATE t1 SET f2 = 'c' WHERE f1 > 2;
@@ -47,7 +47,7 @@ SET SESSION wsrep_sync_wait = 0;
 --eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
 --enable_query_log
 
-# We can not use a wait_condition on SELECT * FROM INFORMATION_SCHEMA.GLOBAL_STATUS as such queries are blocked during IST
+# We can not use a wait_condition on SELECT * FROM performance_schema.global_status as such queries are blocked during IST
 # so we perform a simple sleep and SHOW instead
 
 --sleep 5
@@ -77,7 +77,7 @@ EOF
 
 --connection node_1
 --source include/wait_until_connected_again.inc
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 # Perform DML and DDL while node #2 is down
@@ -92,7 +92,7 @@ CREATE TABLE t3 (f1 INTEGER);
 --echo Starting server ...
 --source include/start_mysqld.inc
 
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
 --connection node_1

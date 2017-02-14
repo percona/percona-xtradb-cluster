@@ -530,6 +530,7 @@ public:
     (void) mysql_sock_set_nonblocking(listener_socket);
 #endif
 
+// TODO: PXC....is this needed ?
 #if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
   (void) fcntl(mysql_socket_getfd(listener_socket), F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */
@@ -950,6 +951,7 @@ Channel_info* Mysqld_socket_listener::listen_for_connection_event()
     return NULL;
   }
 
+// TODO: PXC .... is this needed ?
 #if defined(WITH_WSREP) && defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
     (void) fcntl(mysql_socket_getfd(connect_sock), F_SETFD, FD_CLOEXEC);
 #endif /* WITH_WSREP */

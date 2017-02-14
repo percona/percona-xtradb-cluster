@@ -1,4 +1,4 @@
-#!/bin/sh -eu
+#!/bin/sh -eux
 
 # This is a simple example of wsrep notification script (wsrep_notify_cmd).
 # It will create 'wsrep' schema and two tables in it: 'membeship' and 'status'

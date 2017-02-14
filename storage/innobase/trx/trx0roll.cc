@@ -38,9 +38,6 @@ Created 3/26/1996 Heikki Tuuri
 #include "que0que.h"
 #include "read0read.h"
 #include "row0mysql.h"
-#ifdef WITH_WSREP
-#include "ha_prototypes.h"
-#endif /* WITH_WSREP */
 #include "row0undo.h"
 #include "srv0mon.h"
 #include "srv0start.h"
@@ -50,6 +47,9 @@ Created 3/26/1996 Heikki Tuuri
 #include "trx0trx.h"
 #include "trx0undo.h"
 #include "usr0sess.h"
+#ifdef WITH_WSREP
+#include "ha_prototypes.h"
+#endif /* WITH_WSREP */
 
 /** This many pages must be undone before a truncate is tried within
 rollback */

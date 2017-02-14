@@ -1270,24 +1270,24 @@ drop table tinnodb;
 --connection node_1
 --echo #node-1
 create table t (i int, j int, primary key pk(i)) engine=innodb;
---error ER_UNKNOWN_COM_ERROR
+--error ER_NOT_SUPPORTED_YET
 xa start 'testxa';
 insert into t values (1, 2);
 select * from t;
---error ER_UNKNOWN_COM_ERROR
+--error ER_NOT_SUPPORTED_YET
 xa end 'testxa';
---error ER_UNKNOWN_COM_ERROR
+--error ER_NOT_SUPPORTED_YET
 xa prepare 'testxa';
---error ER_UNKNOWN_COM_ERROR
+--error ER_NOT_SUPPORTED_YET
 xa commit 'testxa';
 select * from t;
---error ER_UNKNOWN_COM_ERROR
+--error ER_NOT_SUPPORTED_YET
 xa start 'testxa2';
 insert into t values (2, 3);
 select * from t;
---error ER_UNKNOWN_COM_ERROR
+--error ER_NOT_SUPPORTED_YET
 xa end 'testxa2';
---error ER_UNKNOWN_COM_ERROR
+--error ER_NOT_SUPPORTED_YET
 xa commit 'testxa2' one phase;
 drop table t;
 

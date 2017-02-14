@@ -39,11 +39,11 @@ Created 3/26/1996 Heikki Tuuri
 #include "ut0lst.h"
 #include "read0types.h"
 #include "page0types.h"
+#include "ut0mutex.h"
+#include "trx0trx.h"
 #ifdef WITH_WSREP
 #include "trx0xa.h"
 #endif /* WITH_WSREP */
-#include "ut0mutex.h"
-#include "trx0trx.h"
 
 typedef UT_LIST_BASE_NODE_T(trx_t) trx_ut_list_t;
 

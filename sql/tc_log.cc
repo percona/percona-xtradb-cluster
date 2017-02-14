@@ -25,9 +25,13 @@
 #include "mysql/psi/mysql_file.h"
 
 #ifdef WITH_WSREP
+/*
+  Wrappers to MYSQL_BIN_LOG commit()/rollback() when wsrep_emulate_bin_log
+  is on.
+ */
 TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all);
 int wsrep_thd_binlog_rollback(THD * thd, bool all);
-#endif /* WITH _WSREP */
+#endif /* WITH_WSREP */
 
 TC_LOG::enum_result TC_LOG_DUMMY::commit(THD *thd, bool all)
 {

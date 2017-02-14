@@ -26,12 +26,10 @@ SET SESSION wsrep_sync_wait = 0;
 --remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
 
 --connection node_1
---let $restart_parameters="restart:"
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 --source include/start_mysqld.inc
 --source include/wait_until_connected_again.inc
 
 --connection node_2
---let $restart_parameters="restart:"
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.2.expect
 --source include/start_mysqld.inc

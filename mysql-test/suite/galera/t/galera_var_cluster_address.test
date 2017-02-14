@@ -19,12 +19,8 @@ SHOW STATUS;
 
 SET SESSION wsrep_sync_wait=0;
 
-# This should work even with wsrep_ready OFF in PXC
---disable_result_log
-# OFF to avoid variability among debug and release builds
-# We are only interested in non-error result.
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
---enable_result_log
+--error 0
+SELECT COUNT(*) > 0 FROM performance_schema.global_status;
 
 # Must return 'OFF'
 SHOW STATUS LIKE 'wsrep_ready';
@@ -38,11 +34,9 @@ SHOW STATUS LIKE 'wsrep_local_state_comment';
 
 --connection node_1
 --sleep 1
---disable_warnings
 # Node #1 thinks that it is now part of a single-node primary cluster 
-SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
---enable_warnings
+SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 
 #
 # Reset everything as it was
@@ -56,10 +50,8 @@ SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VA
 --source include/wait_until_connected_again.inc
 
 --connection node_1
---disable_warnings
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
---enable_warnings
+SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
 --connection node_2
 CALL mtr.add_suppression("Backend not supported: foo");

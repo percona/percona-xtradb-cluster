@@ -1,0 +1,50 @@
+#
+# Test the WAIT_FOR_EXECUTED_GTID_SET() function
+#
+
+--source include/have_log_bin.inc
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+--connection node_1
+CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
+
+# Block the applier on node #2
+
+--connection node_2
+--let $galera_sync_point = apply_monitor_slave_enter_sync
+--source include/galera_set_sync_point.inc
+
+--connection node_1
+INSERT INTO t1 VALUES (1);
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+
+# Wait until applier has blocked
+--source include/galera_wait_sync_point.inc
+
+#  WAIT_FOR_EXECUTED_GTID_SET() should block, time out and return 1
+
+--connection node_1
+--let $gtid_executed_node_1 = `SELECT @@global.gtid_executed`
+
+--connection node_2
+--disable_query_log
+--eval SELECT WAIT_FOR_EXECUTED_GTID_SET('$gtid_executed_node_1', 1) = 1 AS WAIT_FOR_EXECUTED_GTID_SET_EXPECTED;
+--enable_query_log
+
+
+# Unblock applier
+
+--source include/galera_clear_sync_point.inc
+--source include/galera_signal_sync_point.inc
+
+# WAIT_FOR_EXECUTED_GTID_SET() should now succeed
+
+--disable_query_log
+--eval SELECT WAIT_FOR_EXECUTED_GTID_SET('$gtid_executed_node_1', 100) = 0 AS WAIT_FOR_EXECUTED_GTID_SET_EXPECTED;
+--enable_query_log
+
+--connection node_1
+DROP TABLE t1;

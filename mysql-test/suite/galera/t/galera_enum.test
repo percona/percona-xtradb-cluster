@@ -53,6 +53,7 @@ COMMIT;
 
 --connection node_2
 --error ER_LOCK_DEADLOCK
+#--error ER_ERROR_DURING_ROLLBACK,ER_LOCK_DEADLOCK
 COMMIT;
 
 --connection node_1

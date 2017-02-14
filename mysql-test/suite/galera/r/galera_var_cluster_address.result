@@ -1,8 +1,10 @@
 SET GLOBAL wsrep_cluster_address = 'foo://';
 SHOW STATUS;
-ERROR HY000: Synchronous wait failed.
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 SET SESSION wsrep_sync_wait=0;
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS;
+SELECT COUNT(*) > 0 FROM performance_schema.global_status;
+COUNT(*) > 0
+1
 SHOW STATUS LIKE 'wsrep_ready';
 Variable_name	Value
 wsrep_ready	OFF
@@ -15,16 +17,16 @@ wsrep_local_state	0
 SHOW STATUS LIKE 'wsrep_local_state_comment';
 Variable_name	Value
 wsrep_local_state_comment	Initialized
-SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 1
 1
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 VARIABLE_VALUE = 'Primary'
 1
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 VARIABLE_VALUE = 'Primary'
 1
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
 CALL mtr.add_suppression("Backend not supported: foo");

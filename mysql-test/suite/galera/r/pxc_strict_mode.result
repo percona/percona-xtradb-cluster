@@ -1192,31 +1192,31 @@ drop table tinnodb;
 #node-1
 create table t (i int, j int, primary key pk(i)) engine=innodb;
 xa start 'testxa';
-ERROR 08S01: WSREP doesn't support XA transaction
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 insert into t values (1, 2);
 select * from t;
 i	j
 1	2
 xa end 'testxa';
-ERROR 08S01: WSREP doesn't support XA transaction
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 xa prepare 'testxa';
-ERROR 08S01: WSREP doesn't support XA transaction
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 xa commit 'testxa';
-ERROR 08S01: WSREP doesn't support XA transaction
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 select * from t;
 i	j
 1	2
 xa start 'testxa2';
-ERROR 08S01: WSREP doesn't support XA transaction
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 insert into t values (2, 3);
 select * from t;
 i	j
 1	2
 2	3
 xa end 'testxa2';
-ERROR 08S01: WSREP doesn't support XA transaction
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 xa commit 'testxa2' one phase;
-ERROR 08S01: WSREP doesn't support XA transaction
+ERROR 42000: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 drop table t;
 #node-2
 "Shutdown node-2"
@@ -1224,7 +1224,7 @@ drop table t;
 "grep --count "WSREP: Percona-XtraDB-Cluster prohibits setting innodb_autoinc_lock_mode to"
 1
 "Try restarting node-2 with default options"
-# restart
+# restart:
 #node-1
 set global pxc_strict_mode = DISABLED;;
 #node-2

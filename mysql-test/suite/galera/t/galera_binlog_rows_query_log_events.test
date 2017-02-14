@@ -8,7 +8,7 @@
 --let $binlog_rows_query_log_events_orig = `SELECT @@binlog_rows_query_log_events`
 
 SET SESSION binlog_rows_query_log_events=TRUE;
-SELECT @@SESSION.binlog_rows_query_log_events;
+SELECT @@binlog_rows_query_log_events;
 
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
 
@@ -24,6 +24,4 @@ UPDATE t1 SET f1 = 2 WHERE f1 = 1;
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2;
 
 --connection node_1
---eval SET GLOBAL binlog_rows_query_log_events = $binlog_rows_query_log_events_orig
-
 DROP TABLE t1;

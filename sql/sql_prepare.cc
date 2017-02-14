@@ -3877,8 +3877,8 @@ reexecute:
 
   error= execute(expanded_query, open_cursor) || thd->is_error();
 
-  thd->pop_reprepare_observer();
 #ifdef WITH_WSREP
+  bool observer_popped = false;
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch (thd->wsrep_conflict_state)
   {
@@ -3886,14 +3886,26 @@ reexecute:
     WSREP_DEBUG("PS execute fail for CERT_FAILURE: thd: %u err: %d",
                 thd->thread_id(), thd->get_stmt_da()->mysql_errno() );
     thd->wsrep_conflict_state = NO_CONFLICT;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     break;
 
   case MUST_REPLAY:
+    thd->pop_reprepare_observer();
+    observer_popped= true;
     (void)wsrep_replay_transaction(thd);
-
-  default: break;
+    thd->wsrep_conflict_state= REPLAYED;
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    break;
+  default:
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+      break;
   }
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  if (!observer_popped)
+  {
+#endif /* WITH_WSREP */
+  thd->pop_reprepare_observer();
+#ifdef WITH_WSREP
+  }
 #endif /* WITH_WSREP */
 
   if ((sql_command_flags[lex->sql_command] & CF_REEXECUTION_FRAGILE) &&

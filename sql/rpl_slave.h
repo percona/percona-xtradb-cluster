@@ -409,6 +409,10 @@ extern "C" void *handle_slave_sql(void *arg);
 bool net_request_file(NET* net, const char* fname);
 
 extern bool volatile abort_loop;
+#ifdef WITH_WSREP
+/* keep the pointer to async replication master */
+extern Master_info *active_mi;      /* active_mi  for multi-master */
+#endif /* WITH_WSREP */
 extern LIST master_list;
 extern my_bool replicate_same_server_id;
 

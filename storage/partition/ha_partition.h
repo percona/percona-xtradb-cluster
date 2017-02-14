@@ -1170,6 +1170,9 @@ public:
     return (HA_PARTITION_FUNCTION_SUPPORTED |
             HA_FAST_CHANGE_PARTITION);
   }
+#ifdef WITH_WSREP
+  bool wsrep_is_innodb() { return m_innodb; }
+#endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP
     virtual int wsrep_db_type() const;

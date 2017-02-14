@@ -50,6 +50,7 @@ static struct opt opts[] =
     { "wsrep_cluster_address",   "0" }, // mysqld.cc
     { "locks_unsafe_for_binlog", "0" }, // ha_innodb.cc
     { "autoinc_lock_mode",       "2" }, // ha_innodb.cc
+    { "innodb_read_only",   "0" }, // ha_innodb.cc
     { 0, 0 }
 };
 
@@ -66,7 +67,8 @@ enum
     LOCKED_IN_MEMORY,
     WSREP_CLUSTER_ADDRESS,
     LOCKS_UNSAFE_FOR_BINLOG,
-    AUTOINC_LOCK_MODE
+    AUTOINC_LOCK_MODE,
+    INNODB_READ_ONLY_MODE
 };
 
 
@@ -275,29 +277,36 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
         return err;
     }
 
-    /* At this point we have updated default values in our option list to
-       what has been specified on the command line / my.cnf */
     int rcode = 0;
 
+    /* At this point we have updated default values in our option list to
+       what has been specified on the command line / my.cnf */
 #if 0
-    /* PXC/Galera can use Interleaved mode because it enforced ROW based
-    replication so make use of better and faster auto-inc locks. */
-    if (strcasecmp(opts[WSREP_PROVIDER].value, "none"))
-    {
-      long long autoinc_lock_mode;
-      err = get_long_long (opts[AUTOINC_LOCK_MODE], &autoinc_lock_mode, 10);
-      if (err) return err;
+    long long slave_threads;
+    err = get_long_long (opts[WSREP_SLAVE_THREADS], &slave_threads, 10);
+    if (err) return err;
 
-      if (autoinc_lock_mode != 2)
-      {
-        // TODO: Findout why this was enabled initially only for
-        // multiple-slave-thread
-        WSREP_ERROR("Percona-XtraDB-Cluster requires"
-                    " innodb_autoinc_lock_mode = Interleaved/2");
-        rcode = EINVAL;
-      }
+    int rcode = 0;
+
+    if (slave_threads > 1)
+        /* Need to check AUTOINC_LOCK_MODE and LOCKS_UNSAFE_FOR_BINLOG */
+    {
+        long long autoinc_lock_mode;
+        err = get_long_long (opts[AUTOINC_LOCK_MODE], &autoinc_lock_mode, 10);
+        if (err) return err;
+
+        bool locks_unsafe_for_binlog;
+        err = get_bool (opts[LOCKS_UNSAFE_FOR_BINLOG],&locks_unsafe_for_binlog);
+        if (err) return err;
+
+        if (autoinc_lock_mode != 2)
+        {
+            WSREP_ERROR ("Parallel applying (wsrep_slave_threads > 1) requires"
+                         " innodb_autoinc_lock_mode = 2.");
+            rcode = EINVAL;
+        }
     }
-#endif
+#endif /* 0 */
 
     bool locked_in_memory;
     err = get_bool (opts[LOCKED_IN_MEMORY], &locked_in_memory);
@@ -350,6 +359,28 @@ check_opts (int const argc, const char* const argv[], struct opt opts[])
                          opts[WSREP_SST_RECEIVE_ADDRESS].value);
 //            rcode = EINVAL;
         }
+    }
+
+    if (strcasecmp(opts[WSREP_PROVIDER].value, "none"))
+    {
+        if (strcasecmp(opts[BINLOG_FORMAT].value, "ROW"))
+        {
+            WSREP_ERROR ("Only binlog_format = 'ROW' is currently supported. "
+                         "Configured value: '%s'. Please adjust your "
+                         "configuration.", opts[BINLOG_FORMAT].value);
+
+            rcode = EINVAL;
+        }
+    }
+
+    bool read_only;
+    err = get_bool (opts[INNODB_READ_ONLY_MODE], &read_only);
+    if (err) { WSREP_ERROR("get_bool error: %s", strerror(err)); return err; }
+    if (read_only)
+    {
+      WSREP_ERROR ("innodb_read_only is not supported (innodb_read_only=%s)",
+                   read_only ? "1" : "0");
+      rcode = EINVAL;
     }
 
     return rcode;

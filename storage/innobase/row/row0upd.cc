@@ -2416,39 +2416,25 @@ row_upd_sec_index_entry(
 		row_ins_sec_index_entry() below */
 		if (!rec_get_deleted_flag(
 			    rec, dict_table_is_comp(index->table))) {
+#ifdef WITH_WSREP
+			que_node_t *parent = que_node_get_parent(node);
+#endif /* WITH_WSREP */
 			err = btr_cur_del_mark_set_sec_rec(
 				flags, btr_cur, TRUE, thr, &mtr);
 			if (err != DB_SUCCESS) {
 				break;
 			}
-		}
-
-		ut_ad(err == DB_SUCCESS);
-
-		if (referenced) {
-
-			ulint*	offsets;
-
-			offsets = rec_get_offsets(
-				rec, index, NULL, ULINT_UNDEFINED,
-				&heap);
-
-			/* NOTE that the following call loses
-			the position of pcur ! */
-			err = row_upd_check_references_constraints(
-				node, &pcur, index->table,
-				index, offsets, thr, &mtr);
-		}
-
 #ifdef WITH_WSREP
-		que_node_t *parent = que_node_get_parent(node);
-		if (err == DB_SUCCESS
-		    && !referenced
-		    && !(parent != NULL
-			 && que_node_get_type(parent) == QUE_NODE_UPDATE)
-		    && foreign) {
-
-				ulint*  offsets =
+			if (err == DB_SUCCESS && !referenced                  &&
+			    !(parent && que_node_get_type(parent) ==
+				QUE_NODE_UPDATE                               &&
+			      (std::find(((upd_node_t*)parent)->cascade_upd_nodes->begin(),
+                                         ((upd_node_t*)parent)->cascade_upd_nodes->end(),
+                                         node) ==
+                               ((upd_node_t*)parent)->cascade_upd_nodes->end()))  &&
+                            foreign
+                        ) {
+				ulint*	offsets =
 					rec_get_offsets(
 						rec, index, NULL, ULINT_UNDEFINED,
 						&heap);
@@ -2472,6 +2458,24 @@ row_upd_sec_index_entry(
 				}
 			}
 #endif /* WITH_WSREP */
+		}
+
+		ut_ad(err == DB_SUCCESS);
+
+		if (referenced) {
+
+			ulint*	offsets;
+
+			offsets = rec_get_offsets(
+				rec, index, NULL, ULINT_UNDEFINED,
+				&heap);
+
+			/* NOTE that the following call loses
+			the position of pcur ! */
+			err = row_upd_check_references_constraints(
+				node, &pcur, index->table,
+				index, offsets, thr, &mtr);
+		}
 		break;
 	}
 
@@ -2647,6 +2651,9 @@ row_upd_clust_rec_by_insert(
 	rec_t*		rec;
 	ulint*		offsets			= NULL;
 
+#ifdef WITH_WSREP
+	que_node_t *parent = que_node_get_parent(node);
+#endif /* WITH_WSREP */
 	ut_ad(node);
 	ut_ad(dict_index_is_clust(index));
 
@@ -2734,9 +2741,12 @@ check_fk:
 			}
 		}
 #ifdef WITH_WSREP
-		que_node_t *parent = que_node_get_parent(node);
 		if (!referenced                                              &&
-		    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE) &&
+		    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE &&
+                      (std::find(((upd_node_t*)parent)->cascade_upd_nodes->begin(),
+                                 ((upd_node_t*)parent)->cascade_upd_nodes->end(),
+                                 node) ==
+                       ((upd_node_t*)parent)->cascade_upd_nodes->end()))       &&
 		    foreign
 		) {
 			err = wsrep_row_upd_check_foreign_constraints(
@@ -2948,6 +2958,9 @@ row_upd_del_mark_clust_rec(
 	btr_pcur_t*	pcur;
 	btr_cur_t*	btr_cur;
 	dberr_t		err;
+#ifdef WITH_WSREP
+	que_node_t *parent = que_node_get_parent(node);
+#endif /* WITH_WSREP */
 
 	ut_ad(node);
 	ut_ad(dict_index_is_clust(index));
@@ -2974,9 +2987,12 @@ row_upd_del_mark_clust_rec(
 			node, pcur, index->table, index, offsets, thr, mtr);
 	}
 #ifdef WITH_WSREP
-	que_node_t *parent = que_node_get_parent(node);
 	if (err == DB_SUCCESS && !referenced                         &&
-	    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE) &&
+	    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE &&
+              (std::find(((upd_node_t*)parent)->cascade_upd_nodes->begin(),
+                         ((upd_node_t*)parent)->cascade_upd_nodes->end(),
+                         node) ==
+               ((upd_node_t*)parent)->cascade_upd_nodes->end()))       &&
 	    thr_get_trx(thr)                                         &&
 	    foreign
 	) {
@@ -3139,9 +3155,10 @@ row_upd_clust_step(
 	/* NOTE: the following function calls will also commit mtr */
 
 	if (node->is_delete) {
+
 		err = row_upd_del_mark_clust_rec(
 #ifdef WITH_WSREP
-			flags, node, index, offsets, thr, referenced, foreign, &mtr);
+                        flags, node, index, offsets, thr, referenced, foreign, &mtr);
 #else
 			flags, node, index, offsets, thr, referenced, &mtr);
 #endif /* WITH_WSREP */
@@ -3190,7 +3207,7 @@ row_upd_clust_step(
 
 		err = row_upd_clust_rec_by_insert(
 #ifdef WITH_WSREP
-			flags, node, index, thr, referenced, foreign, &mtr);
+                        flags, node, index, thr, referenced, foreign, &mtr);
 #else
 			flags, node, index, thr, referenced, &mtr);
 #endif /* WITH_WSREP */

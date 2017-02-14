@@ -58,6 +58,20 @@ using std::vector;
 
 #include "query_strip_comments.h"
 
+#include "log.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+struct wsrep_thd_shadow {
+  ulonglong            options;
+  uint                 server_status;
+  enum wsrep_exec_mode wsrep_exec_mode;
+  Vio                  *vio;
+  ulong                tx_isolation;
+  LEX_CSTRING          db;
+  struct timeval       user_time;
+  longlong             row_count_func;
+};
+#endif
 class Reprepare_observer;
 class sp_cache;
 class Rows_log_event;
@@ -103,17 +117,6 @@ void thd_exit_cond(void *opaque_thd, const PSI_stage_info *stage,
   (thd)->enter_stage(& stage, NULL, __func__, __FILE__, __LINE__)
 
 #ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-struct wsrep_thd_shadow {
-  ulonglong            options;
-  uint                 server_status;
-  enum wsrep_exec_mode wsrep_exec_mode;
-  Vio                  *vio;
-  ulong                tx_isolation;
-  LEX_CSTRING          db;
-  struct timeval       user_time;
-};
-
 namespace wsp {
 
 /* A class that helps to maintain the THD_STAGE_INFO, when nested */
@@ -169,7 +172,7 @@ private:
   ThreadStageInfoGuard(const ThreadStageInfoGuard& );
   const ThreadStageInfoGuard& operator=(const ThreadStageInfoGuard& );
 };
-}
+} /* namespace wsp */
 
 /* Stores the current stage and pushes on the new stage (only if thd is non-NULL). */
 #define THD_STAGE_INFO_GUARD(thd, new_stage) wsp::ThreadStageInfoGuard  threadStageInfoGuard_(thd, new_stage, __func__, __FILE__, __LINE__)
@@ -693,16 +696,6 @@ typedef struct system_variables
   double    query_exec_time_double;
   ulong     query_exec_id;
 #endif
-#ifdef WITH_WSREP
-  my_bool wsrep_on;
-  my_bool wsrep_causal_reads;
-  my_bool wsrep_replicate_myisam;               // enable myisam replication
-  uint wsrep_sync_wait;
-  ulong wsrep_retry_autocommit;
-  ulong wsrep_OSU_method;
-  my_bool wsrep_dirty_reads;
-  ulong wsrep_auto_increment_control;
-#endif /* WITH_WSREP */
   ulong log_slow_rate_limit;
   ulonglong log_slow_filter;
   ulonglong log_slow_verbosity;
@@ -713,6 +706,17 @@ typedef struct system_variables
   ulong      innodb_lock_que_wait_timer;
   ulong      innodb_innodb_que_wait_timer;
   ulong      innodb_page_access;
+
+#ifdef WITH_WSREP
+  my_bool wsrep_on;
+  my_bool wsrep_causal_reads;
+  my_bool wsrep_replicate_myisam;               // enable myisam replication
+  uint wsrep_sync_wait;
+  ulong wsrep_retry_autocommit;
+  ulong wsrep_OSU_method;
+  ulong wsrep_auto_increment_control;
+  my_bool wsrep_dirty_reads;
+#endif /* WITH_WSREP */
 
   double long_query_time_double;
 
@@ -1123,7 +1127,6 @@ public:
     XXX Why are internal temporary tables added to this list?
   */
   TABLE *temporary_tables;
-
   TABLE *derived_tables;
   /*
     During a MySQL session, one can lock tables in two modes: automatic
@@ -3358,8 +3361,48 @@ public:
   bool                      wsrep_apply_toi; /* applier processing in TOI */
   wsrep_gtid_t              wsrep_sync_wait_gtid;
   ulong                     wsrep_affected_rows;
-  bool                      wsrep_certify_empty_trx;
   bool                      wsrep_sst_donor;
+  void*                     wsrep_gtid_event_buf;
+  ulong                     wsrep_gtid_event_buf_len;
+  bool                      wsrep_replicate_GTID;
+
+  /*
+    Transaction id:
+    * m_next_wsrep_trx_id is assigned on the first query after
+      wsrep_next_trx_id() return WSREP_UNDEFINED_TRX_ID
+    * Each storage engine must assign value of wsrep_next_trx_id()
+      via wsrep_ws_handle_for_trx() when the transaction starts.
+    * Effective transaction id is returned via wsrep_trx_id()
+   */
+
+  /*
+    Return effective transaction id
+   */
+  wsrep_trx_id_t wsrep_trx_id() const
+  {
+    return wsrep_ws_handle.trx_id;
+  }
+
+  /*
+    Set next trx id
+   */
+  void set_wsrep_next_trx_id(query_id_t query_id)
+  {
+    DBUG_ASSERT(wsrep_ws_handle.trx_id == WSREP_UNDEFINED_TRX_ID);
+    m_wsrep_next_trx_id = (wsrep_trx_id_t) query_id;
+  }
+
+  /*
+    Return next trx id
+   */
+  wsrep_trx_id_t wsrep_next_trx_id() const
+  {
+    return m_wsrep_next_trx_id;
+  }
+
+private:
+  wsrep_trx_id_t m_wsrep_next_trx_id; /* cast from query_id_t */
+public:
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
@@ -4077,7 +4120,7 @@ public:
       tests fail and so force them to propagate the
       lex->binlog_row_based_if_mixed upwards to the caller.
     */
-    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED) &&
+    if ((WSREP_BINLOG_FORMAT(variables.binlog_format) == BINLOG_FORMAT_MIXED)&&
         (in_sub_stmt == 0))
       set_current_stmt_binlog_format_row();
 
@@ -4752,6 +4795,12 @@ public:
 #endif
     query_id= new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
+    if (wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+    {
+      set_wsrep_next_trx_id(query_id);
+      WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
+                  wsrep_next_trx_id());
+    }
   }
 
   /**
@@ -5955,6 +6004,7 @@ public:
 #else
 #define CF_SKIP_WSREP_CHECK     0
 #endif /* WITH_WSREP */
+
 /*
   1U << 16 is reserved for Protocol Plugin statements and commands
 */

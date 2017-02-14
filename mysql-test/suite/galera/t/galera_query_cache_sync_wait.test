@@ -1,3 +1,5 @@
+
+#
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 --source include/have_debug_sync.inc
@@ -61,9 +63,7 @@ SET SESSION wsrep_sync_wait = 7;
 
 FLUSH STATUS;
 SELECT MAX(id) FROM t1;
---disable_warnings
-SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
---enable_warnings
+SELECT VARIABLE_VALUE = 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'Qcache_hits';
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 
 #
@@ -84,13 +84,10 @@ SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
 
 --connection node_2
 --reap
---disable_warnings
-SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'Qcache_hits';
---enable_warnings
+SELECT VARIABLE_VALUE = 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'Qcache_hits';
 
 SET DEBUG_SYNC='RESET';
 
 --disable_query_log
 --eval SET GLOBAL wsrep_provider_options = "$wsrep_provider_options_orig"
 DROP TABLE t1;
-

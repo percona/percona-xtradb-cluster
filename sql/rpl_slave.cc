@@ -24,6 +24,9 @@
   replication slave.
 */
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif
 #ifdef HAVE_REPLICATION
 #include "rpl_slave.h"
 
@@ -80,6 +83,9 @@ MY_BITMAP slave_error_mask;
 char slave_skip_error_names[SHOW_VAR_FUNC_BUFF_SIZE];
 
 char* slave_load_tmpdir = 0;
+#ifdef WITH_WSREP
+Master_info *active_mi= 0;
+#endif
 my_bool replicate_same_server_id;
 ulonglong relay_log_space_limit = 0;
 
@@ -238,7 +244,10 @@ static void set_thd_tx_priority(THD* thd, int priority)
   DBUG_ENTER("set_thd_tx_priority");
   DBUG_ASSERT(thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
               thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
-
+#ifdef WITH_WSREP
+  if (priority > 0)
+    WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d", thd->thd_tx_priority, priority);
+#endif /* WITH_WSREP */
   thd->thd_tx_priority= priority;
   DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread",
   {
@@ -412,6 +421,12 @@ int init_slave()
     goto err;
   }
 
+#ifdef WITH_WSREP
+  /*
+     for only wsrep, create active_mi, for async slave restart purpose
+   */
+  active_mi= channel_map.get_default_channel_mi();
+#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
   /* @todo: Print it for all the channels */
   {
@@ -673,6 +688,17 @@ bool start_slave_cmd(THD *thd)
     my_message(ER_SLAVE_CONFIGURATION, ER(ER_SLAVE_CONFIGURATION), MYF(0));
     goto err;
   }
+#ifdef WITH_WSREP
+  if (WSREP_ON && !opt_log_slave_updates)
+  {
+    /*
+       bad configuration, mysql replication would not be forwarded to wsrep cluster
+       which would lead to immediate inconsistency
+    */
+    my_message(ER_SLAVE_CONFIGURATION, "bad configuration no log_slave_updates defined, slave would not replicate further to wsrep cluster", MYF(0));
+    goto err;
+  }
+#endif /* WITH_WSREP */
 
 
   if (!lex->mi.for_channel)
@@ -2004,6 +2030,18 @@ bool start_slave_threads(bool need_lock_slave, bool wait_for_start,
              mi->get_for_channel_str());
     DBUG_RETURN(true);
   }
+#ifdef WITH_WSREP
+  if (WSREP_ON && !opt_log_slave_updates)
+  {
+    /*
+       bad configuration, mysql replication would not be forwarded to wsrep cluster
+       which would lead to immediate inconsistency
+    */
+    WSREP_WARN("Cannot start MySQL slave, when log_slave_updates is not set");
+    my_error(ER_SLAVE_CONFIGURATION, MYF(0), "bad configuration no log_slave_updates defined, slave would not replicate further to wsrep cluster");
+    DBUG_RETURN(true);
+  }
+#endif /* WITH_WSREP */
 
   if (need_lock_slave)
   {
@@ -2347,21 +2385,18 @@ const char *print_slave_db_safe(const char* db)
 
 static bool is_network_error(uint errorno)
 {
-  if (errorno == CR_CONNECTION_ERROR ||
+#ifdef WITH_WSREP
+  if (errorno == ER_UNKNOWN_COM_ERROR)
+    return TRUE;
+#endif /* WITH_WSREP */
+  return errorno == CR_CONNECTION_ERROR ||
       errorno == CR_CONN_HOST_ERROR ||
       errorno == CR_SERVER_GONE_ERROR ||
       errorno == CR_SERVER_LOST ||
       errorno == ER_CON_COUNT_ERROR ||
       errorno == ER_SERVER_SHUTDOWN ||
       errorno == ER_NET_READ_INTERRUPTED ||
-      errorno == ER_NET_WRITE_INTERRUPTED)
-    return TRUE;
-#ifdef WITH_WSREP
-  if (errorno == ER_UNKNOWN_COM_ERROR)
-    return TRUE;
-#endif /* WITH_WSREP */
-
-  return FALSE;   
+      errorno == ER_NET_WRITE_INTERRUPTED;
 }
 
 
@@ -4733,10 +4768,10 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
 #endif
 #ifdef WITH_WSREP
   if (wsrep_preordered_opt && WSREP_ON &&
-      (ev->get_type_code() == binary_log::QUERY_EVENT ||
-       ev->get_type_code() == binary_log::XID_EVENT ||
-       ev->get_type_code() == binary_log::TABLE_MAP_EVENT ||
-       ev->get_type_code() == binary_log::WRITE_ROWS_EVENT ||
+      (ev->get_type_code() == binary_log::QUERY_EVENT       ||
+       ev->get_type_code() == binary_log::XID_EVENT         ||
+       ev->get_type_code() == binary_log::TABLE_MAP_EVENT   ||
+       ev->get_type_code() == binary_log::WRITE_ROWS_EVENT  ||
        ev->get_type_code() == binary_log::UPDATE_ROWS_EVENT ||
        ev->get_type_code() == binary_log::DELETE_ROWS_EVENT ||
        ev->get_type_code() == binary_log::GTID_LOG_EVENT))
@@ -5372,6 +5407,37 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
       if (ev->get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT &&
           ev->get_type_code() != binary_log::ROWS_QUERY_LOG_EVENT)
       {
+#ifdef WITH_WSREP
+        if (ev->get_type_code() == binary_log::GTID_LOG_EVENT &&
+            WSREP_ON && !wsrep_preordered_opt)
+        {
+          assert (!thd->wsrep_applier);
+          if (thd->wsrep_gtid_event_buf)
+          {
+            WSREP_WARN("MySQL GTID event pending");
+            my_free((uchar*)thd->wsrep_gtid_event_buf);
+            thd->wsrep_gtid_event_buf     = NULL;
+            thd->wsrep_gtid_event_buf_len = 0;
+          }
+
+          ulong len= thd->wsrep_gtid_event_buf_len=
+            uint4korr(ev->temp_buf + EVENT_LEN_OFFSET);
+          thd->wsrep_gtid_event_buf= (void*)my_realloc(
+              key_memory_wsrep,
+              thd->wsrep_gtid_event_buf,
+              thd->wsrep_gtid_event_buf_len,
+              MYF(0));
+          if (!thd->wsrep_gtid_event_buf)
+          {
+            WSREP_WARN("GTID event allocation for slave failed");
+            thd->wsrep_gtid_event_buf_len= 0;
+          }
+          else
+          {
+            memcpy(thd->wsrep_gtid_event_buf, ev->temp_buf, len);
+          }
+        }
+#endif /* WITH_WSREP */
         DBUG_PRINT("info", ("Deleting the event after it has been executed"));
         delete ev;
         ev= NULL;
@@ -7722,6 +7788,7 @@ llstr(rli->get_group_master_log_pos(), llbuff));
     to NULL.
   */
   delete thd;
+
 #ifdef WITH_WSREP
   /* if slave stopped due to node going non primary, we set global flag to
      trigger automatic restart of slave when node joins back to cluster
@@ -7747,7 +7814,7 @@ llstr(rli->get_group_master_log_pos(), llbuff));
   }
 #endif /* WITH_WSREP */
 
- /*
+/*
   Note: the order of the broadcast and unlock calls below (first broadcast, then unlock)
   is important. Otherwise a killer_thread can execute between the calls and
   delete the mi structure leading to a crash! (see BUG#25306 for details)

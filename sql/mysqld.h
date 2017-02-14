@@ -402,11 +402,6 @@ static inline int my_thread_set_THR_THD(THD *thd)
 
 C_MODE_START
 
-#ifdef WITH_WSREP
-extern PSI_mutex_key key_LOCK_wsrep_thd;
-extern PSI_cond_key  key_COND_wsrep_thd;
-#endif /* WITH_WSREP */
-
 extern PSI_mutex_key key_LOCK_tc;
 
 #ifdef HAVE_OPENSSL
@@ -473,6 +468,11 @@ extern PSI_mutex_key key_LOCK_group_replication_handler;
 extern PSI_mutex_key key_commit_order_manager_mutex;
 extern PSI_mutex_key key_mutex_slave_worker_hash;
 #endif
+#ifdef WITH_WSREP
+extern PSI_mutex_key key_LOCK_wsrep_thd;
+extern PSI_cond_key  key_COND_wsrep_thd;
+extern PSI_thread_key key_thread_handle_wsrep;
+#endif /* WITH_WSREP */
 
 extern PSI_rwlock_key key_rwlock_LOCK_grant, key_rwlock_LOCK_logger,
   key_rwlock_LOCK_sys_init_connect, key_rwlock_LOCK_sys_init_slave,
@@ -660,6 +660,9 @@ extern PSI_memory_key key_memory_Quick_ranges;
 extern PSI_memory_key key_memory_File_query_log_name;
 extern PSI_memory_key key_memory_Table_trigger_dispatcher;
 extern PSI_memory_key key_memory_show_slave_status_io_gtid_set;
+#ifdef WITH_WSREP
+extern PSI_memory_key key_memory_wsrep;
+#endif /* WITH_WSREP */
 extern PSI_memory_key key_memory_write_set_extraction;
 extern PSI_memory_key key_memory_thd_timer;
 extern PSI_memory_key key_memory_THD_Session_tracker;
@@ -1061,7 +1064,7 @@ static inline THD *_current_thd(void)
 #define ER(X)         ER_THD(current_thd,X)
 
 #ifdef WITH_WSREP
-void* start_wsrep_THD(void*);
+extern "C" void *start_wsrep_THD(void*);
 #endif /* WITH_WSREP */
 
 #endif /* MYSQLD_INCLUDED */

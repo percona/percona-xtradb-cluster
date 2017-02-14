@@ -1,0 +1,82 @@
+##
+## Tests the parallel application of single-row auto-increment insert transactions
+## in multiple connections against multiple masters
+##
+
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+--source include/big_test.inc
+
+CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY) Engine=InnoDB;
+
+
+DELIMITER |;
+CREATE PROCEDURE do_inserts()
+BEGIN
+	DECLARE x INT;
+	SET x = 1;
+	WHILE x <= 500 DO
+		INSERT INTO t1 VALUES (NULL);
+		COMMIT;
+		SET x = x + 1;
+	END WHILE;
+END|
+DELIMITER ;|
+
+--connect c1, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connect c2, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connect c3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--connect c4, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connect c5, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connect c6, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--connect c7, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connect c8, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connect c9, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--connect c10, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connect c11, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connect c12, 127.0.0.1, root, , test, $NODE_MYPORT_3
+
+--connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+
+--let $count = 12
+while ($count)
+{
+  --connection c$count
+  --send CALL do_inserts();
+  --dec $count
+}
+
+--let $count = 12
+while ($count)
+{
+  --connection c$count
+  --reap
+  --dec $count
+}
+
+--connection node_1
+SELECT COUNT(*) = 6000 FROM t1;
+SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
+SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'committed%';
+
+# Check against runaway auto-increment numbers
+SELECT MAX(f1) < 15000 FROM t1;
+SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+
+--connection node_2
+SELECT COUNT(*) = 6000 FROM t1;
+SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
+SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'committed%';
+SELECT MAX(f1) < 15000 FROM t1;
+SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+
+--connection node_3
+SELECT COUNT(*) = 6000 FROM t1;
+SELECT COUNT(DISTINCT f1) = 6000 FROM t1;
+SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'committed%';
+SELECT MAX(f1) < 15000 FROM t1;
+SELECT AUTO_INCREMENT < 15000 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+
+--connection default
+DROP TABLE t1;
+DROP PROCEDURE do_inserts;

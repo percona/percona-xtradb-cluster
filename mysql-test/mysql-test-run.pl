@@ -1146,6 +1146,7 @@ sub command_line_setup {
              'build-thread|mtr-build-thread=i' => \$opt_build_thread,
              'mysqlx-port=i'                   => \$opt_mysqlx_baseport,
              'port-base|mtr-port-base=i'       => \$opt_port_base,
+             'port-group-size=s'               => \$opt_port_group_size,
 
              # Test case authoring
              'record'                   => \$opt_record,
@@ -3195,7 +3196,6 @@ sub check_ndbcluster_support ($) {
       # which is the default case
       return;
     }
-
     if ($opt_skip_ndbcluster)
     {
       # Compiled with ndbcluster but ndbcluster skipped
@@ -4774,6 +4774,7 @@ sub run_testcase ($) {
     # ----------------------------------------------------
     # Was it the test program that exited
     # ----------------------------------------------------
+
     foreach my $proc (@procs) {
       if ($proc eq $test)
       {
@@ -4781,109 +4782,93 @@ sub run_testcase ($) {
 
         if ($res == 0 and $opt_warnings and check_warnings($tinfo) )
         {
-	  # Test case suceeded, but it has produced unexpected
-	  # warnings, continue in $res == 1
-	  $res= 1;
-	  resfile_output($tinfo->{'warnings'}) if $opt_resfile;
+          # Test case suceeded, but it has produced unexpected
+          # warnings, continue in $res == 1
+          $res= 1;
+          resfile_output($tinfo->{'warnings'}) if $opt_resfile;
         }
 
         if ( $res == 0 )
         {
-	  my $check_res;
-	  if ( restart_forced_by_test('force_restart') )
-	  {
-	    stop_all_servers($opt_shutdown_timeout);
-	  }
-	  elsif ( $opt_check_testcases and
-	    $check_res= check_testcase($tinfo, "after"))
-	  {
-	    if ($check_res == 1) {
-	      # Test case had sideeffects, not fatal error, just continue
-	      stop_all_servers($opt_shutdown_timeout);
-	      mtr_report("Resuming tests...\n");
-	      resfile_output($tinfo->{'check'}) if $opt_resfile;
-	    }
-	    else {
-	      # Test case check failed fatally, probably a server crashed
-	      report_failure_and_restart($tinfo);
-	      return 1;
-	    }
-	  }
-	  mtr_report_test_passed($tinfo);
+          my $check_res;
+          if ( restart_forced_by_test('force_restart') )
+          {
+            stop_all_servers($opt_shutdown_timeout);
+          }
+          elsif ( $opt_check_testcases and
+            $check_res= check_testcase($tinfo, "after"))
+          {
+            if ($check_res == 1) {
+              # Test case had sideeffects, not fatal error, just continue
+              stop_all_servers($opt_shutdown_timeout);
+              mtr_report("Resuming tests...\n");
+              resfile_output($tinfo->{'check'}) if $opt_resfile;
+            }
+            else {
+              # Test case check failed fatally, probably a server crashed
+              report_failure_and_restart($tinfo);
+              return 1;
+            }
+          }
+          mtr_report_test_passed($tinfo);
         }
         elsif ( $res == 62 )
         {
-	  # Testcase itself tell us to skip this one
-	  $tinfo->{skip_detected_by_test}= 1;
-	  # Try to get reason from test log file
-	  find_testcase_skipped_reason($tinfo);
- 	  mtr_report_test_skipped($tinfo);
-	  # Restart if skipped due to missing perl, it may have had side effects
-	  if ( restart_forced_by_test('force_restart_if_skipped') ||
-               $tinfo->{'comment'} =~ /^perl not found/ )
-	  {
-	    stop_all_servers($opt_shutdown_timeout);
-	  }
+          # Testcase itself tell us to skip this one
+          $tinfo->{skip_detected_by_test}= 1;
+          # Try to get reason from test log file
+          find_testcase_skipped_reason($tinfo);
+          mtr_report_test_skipped($tinfo);
+          # Restart if skipped due to missing perl, it may have had side effects
+          if ( restart_forced_by_test('force_restart_if_skipped') ||
+            $tinfo->{'comment'} =~ /^perl not found/ )
+          {
+            stop_all_servers($opt_shutdown_timeout);
+          }
         }
         elsif ( $res == 65 )
         {
-	  # Testprogram killed by signal
-	  $tinfo->{comment}=
-	    "testprogram crashed(returned code $res)";
-	  report_failure_and_restart($tinfo);
+          # Testprogram killed by signal
+          $tinfo->{comment}=
+            "testprogram crashed(returned code $res)";
+          report_failure_and_restart($tinfo);
         }
         elsif ( $res == 1 )
         {
-	  # Check if the test tool requests that
-	  # an analyze script should be run
-	  my $analyze= find_analyze_request();
-	  if ($analyze){
-	    run_on_all($tinfo, "analyze-$analyze");
-	  }
+          # Check if the test tool requests that
+          # an analyze script should be run
+          my $analyze= find_analyze_request();
+          if ($analyze){
+            run_on_all($tinfo, "analyze-$analyze");
+          }
 
-	  # Wait a bit and see if a server died, if so report that instead
-	  mtr_milli_sleep(100);
-	  my $srvproc= My::SafeProcess::check_any();
-	  if ($srvproc && grep($srvproc eq $_, started(all_servers()))) {
-	    $proc= $srvproc;
-	    goto SRVDIED;
-	  }
+          # Wait a bit and see if a server died, if so report that instead
+          mtr_milli_sleep(100);
+          my $srvproc= My::SafeProcess::check_any();
+          if ($srvproc && grep($srvproc eq $_, started(all_servers()))) {
+            $proc= $srvproc;
+            goto SRVDIED;
+          }
 
-          #foreach my $mysqld (mysqlds())
-          #{
-          #  $tinfo->{comment}.=
-          #    "\nServer " . $mysqld->{proc} . " log: ".
-          #    get_log_from_proc($mysqld->{proc}, $tinfo->{name});
-          #}
-
-	  # Test case failure reported by mysqltest
-	  report_failure_and_restart($tinfo);
+          # Test case failure reported by mysqltest
+          report_failure_and_restart($tinfo);
         }
         else
         {
-	  # mysqltest failed, probably crashed
-	  $tinfo->{comment}=
-	    "mysqltest failed with unexpected return code $res\n";
-	  report_failure_and_restart($tinfo);
+          # mysqltest failed, probably crashed
+          $tinfo->{comment}=
+            "mysqltest failed with unexpected return code $res\n";
+          report_failure_and_restart($tinfo);
         }
 
         # Save info from this testcase run to mysqltest.log
         if( -f $path_current_testlog)
         {
-	  if ($opt_resfile && $res && $res != 62) {
-	    resfile_output_file($path_current_testlog);
-	  }
-	  mtr_appendfile_to_file($path_current_testlog, $path_testlog);
-	  unlink($path_current_testlog);
-        }
-
-        # Remove testcase .log file produce in var/log/ to save space since
-        # relevant part of logfile has already been appended to master log
-        {
-	  my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
-	  if (-e $log_file_name && ($tinfo->{'result'} ne 'MTR_RES_FAILED')) {
-	    unlink($log_file_name);
-	  }
+          if ($opt_resfile && $res && $res != 62) {
+            resfile_output_file($path_current_testlog);
+          }
+          mtr_appendfile_to_file($path_current_testlog, $path_testlog);
+          unlink($path_current_testlog);
         }
 
         return ($res == 62) ? 0 : $res;
@@ -4900,6 +4885,7 @@ sub run_testcase ($) {
         if ($check_crash == 1) {
           @procs = grep { $_ ne $proc } @procs;
         }
+
         next;
       }
 
@@ -4916,8 +4902,8 @@ sub run_testcase ($) {
       {
         # Server failed, probably crashed
         $tinfo->{comment}=
-	  "Server $proc failed during test run" .
-	  get_log_from_proc($proc, $tinfo->{name});
+          "Server $proc failed during test run" .
+          get_log_from_proc($proc, $tinfo->{name});
 
         # ----------------------------------------------------
         # It's not mysqltest that has exited, kill it
@@ -4926,6 +4912,16 @@ sub run_testcase ($) {
 
         report_failure_and_restart($tinfo);
         return 1;
+      }
+
+      # Try to dump core for mysqltest and all servers
+      foreach my $proc ($test, started(all_servers()))
+      {
+        mtr_print("Trying to dump core for $proc");
+        if ($proc->dump_core())
+        {
+          $proc->wait_one(20);
+        }
       }
 
       # Try to dump core for mysqltest and all servers
@@ -4951,12 +4947,12 @@ sub run_testcase ($) {
         my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
         $tinfo->{comment}=
           "Test case timeout after ".testcase_timeout($tinfo).
-	  " seconds\n\n";
+          " seconds\n\n";
         # Add 20 last executed commands from test case log file
         if  (-e $log_file_name)
         {
           $tinfo->{comment}.=
-	    "== $log_file_name == \n".
+            "== $log_file_name == \n".
 	  mtr_lastlinesfromfile($log_file_name, 20)."\n";
         }
         $tinfo->{'timeout'}= testcase_timeout($tinfo); # Mark as timeout
@@ -4965,6 +4961,7 @@ sub run_testcase ($) {
         report_failure_and_restart($tinfo);
         return 1;
       }
+
       mtr_error("Unhandled process $proc exited");
     }
   }

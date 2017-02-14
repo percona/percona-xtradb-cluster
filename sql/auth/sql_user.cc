@@ -654,7 +654,6 @@ bool change_password(THD *thd, const char *host, const char *user,
   }
 #endif /* WITH_WSREP */
 
-
   tables.init_one_table("mysql", 5, "user", 4, "user", TL_WRITE);
 
 #ifdef HAVE_REPLICATION

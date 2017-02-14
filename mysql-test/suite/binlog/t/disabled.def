@@ -11,3 +11,4 @@
 ##############################################################################
 
 binlog_index : codership/mysql-wsrep##71 Regression: Duplicate "file was not purged because it is the active log file" warning
+binlog_max_flush_queue_time_warn : BUG#21503595 2015-09-07 Arun Disabled since this leads to failure

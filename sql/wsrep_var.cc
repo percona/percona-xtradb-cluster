@@ -27,6 +27,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+#define WSREP_START_POSITION_ZERO "00000000-0000-0000-0000-000000000000:-1"
+#define WSREP_CLUSTER_NAME "my_wsrep_cluster"
+
 const  char* wsrep_provider         = 0;
 const  char* wsrep_provider_options = 0;
 const  char* wsrep_cluster_address  = 0;
@@ -39,18 +42,14 @@ ulong   wsrep_reject_queries;
 
 int wsrep_init_vars()
 {
-  wsrep_provider        = my_strdup(PSI_NOT_INSTRUMENTED,
-                                    WSREP_NONE, MYF(MY_WME));
-  wsrep_provider_options= my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
-  wsrep_cluster_address = my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
-  wsrep_cluster_name    = my_strdup(PSI_NOT_INSTRUMENTED,
-                                    WSREP_CLUSTER_NAME, MYF(MY_WME));
-  wsrep_node_name       = my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
-  wsrep_node_address    = my_strdup(PSI_NOT_INSTRUMENTED, "", MYF(MY_WME));
-  wsrep_node_incoming_address= my_strdup(PSI_NOT_INSTRUMENTED,
-                                         WSREP_NODE_INCOMING_AUTO, MYF(MY_WME));
-  wsrep_start_position  = my_strdup(PSI_NOT_INSTRUMENTED,
-                                    WSREP_START_POSITION_ZERO, MYF(MY_WME));
+  wsrep_provider        = my_strdup(key_memory_wsrep, WSREP_NONE, MYF(MY_WME));
+  wsrep_provider_options= my_strdup(key_memory_wsrep, "", MYF(MY_WME));
+  wsrep_cluster_address = my_strdup(key_memory_wsrep, "", MYF(MY_WME));
+  wsrep_cluster_name    = my_strdup(key_memory_wsrep, WSREP_CLUSTER_NAME, MYF(MY_WME));
+  wsrep_node_name       = my_strdup(key_memory_wsrep, "", MYF(MY_WME));
+  wsrep_node_address    = my_strdup(key_memory_wsrep, "", MYF(MY_WME));
+  wsrep_node_incoming_address= my_strdup(key_memory_wsrep, WSREP_NODE_INCOMING_AUTO, MYF(MY_WME));
+  wsrep_start_position  = my_strdup(key_memory_wsrep, WSREP_START_POSITION_ZERO, MYF(MY_WME));
 
   global_system_variables.binlog_format=BINLOG_FORMAT_ROW;
   return 0;
@@ -220,8 +219,7 @@ static int get_provider_option_value(const char* opts,
 {
   int ret= 1;
   ulong opt_value_tmp;
-  char *opt_value_str, *s, *opts_copy=
-    my_strdup(PSI_NOT_INSTRUMENTED, opts, MYF(MY_WME));
+  char *opt_value_str, *s, *opts_copy= my_strdup(key_memory_wsrep, opts, MYF(MY_WME));
 
   if ((opt_value_str= strstr(opts_copy, opt_name)) == NULL)
     goto end;
@@ -397,7 +395,7 @@ void wsrep_provider_init (const char* value)
   }
 
   if (wsrep_provider) my_free((void *)wsrep_provider);
-  wsrep_provider = my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0));
+  wsrep_provider = my_strdup(key_memory_wsrep, value, MYF(0));
 }
 
 bool wsrep_provider_options_check (sys_var *self, THD* thd, set_var* var)
@@ -427,7 +425,7 @@ void wsrep_provider_options_init(const char* value)
 {
   if (wsrep_provider_options && wsrep_provider_options != value)
     my_free((void *)wsrep_provider_options);
-  wsrep_provider_options = (value) ? my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0)) : NULL;
+  wsrep_provider_options = (value) ? my_strdup(key_memory_wsrep, value, MYF(0)) : NULL;
 }
 
 bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
@@ -440,7 +438,7 @@ bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
             WSREP_INFO("Rejecting client queries due to manual setting");
             break;
         case WSREP_REJECT_ALL_KILL:
-            wsrep_close_client_connections(false, false);
+            wsrep_close_client_connections(FALSE);
             WSREP_INFO("Rejecting client queries and killing connections due to manual setting");
             break;
         default:
@@ -600,7 +598,7 @@ void wsrep_node_address_init (const char* value)
   if (wsrep_node_address && strcmp(wsrep_node_address, value))
     my_free ((void*)wsrep_node_address);
 
-  wsrep_node_address = (value) ? my_strdup(PSI_NOT_INSTRUMENTED, value, MYF(0)) : NULL;
+  wsrep_node_address = (value) ? my_strdup(key_memory_wsrep, value, MYF(0)) : NULL;
 }
 
 bool wsrep_slave_threads_check (sys_var *self, THD* thd, set_var* var)
@@ -644,16 +642,18 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
     ret = wsrep->desync (wsrep);
     if (ret != WSREP_OK) {
       WSREP_WARN ("SET desync failed %d for schema: %s, query: %s", ret,
-                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-      my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query());
+                  (thd->db().str ? thd->db().str : "(null)"),
+                  WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'desync'", thd->query().str);
       return true;
     }
   } else {
     ret = wsrep->resync (wsrep);
     if (ret != WSREP_OK) {
       WSREP_WARN ("SET resync failed %d for schema: %s, query: %s", ret,
-                  (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
-      my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query());
+                  (thd->db().str ? thd->db().str : "(null)"),
+                  WSREP_QUERY(thd));
+      my_error (ER_CANNOT_USER, MYF(0), "'resync'", thd->query().str);
       return true;
     }
   }
@@ -686,22 +686,20 @@ bool wsrep_max_ws_size_update (sys_var *self, THD *thd, enum_var_type)
 static inline void
 wsrep_assign_to_mysql (SHOW_VAR* mysql, wsrep_stats_var* wsrep)
 {
+  mysql->scope = SHOW_SCOPE_ALL;
   mysql->name = wsrep->name;
   switch (wsrep->type) {
   case WSREP_VAR_INT64:
     mysql->value = (char*) &wsrep->value._int64;
     mysql->type  = SHOW_LONGLONG;
-    mysql->scope = SHOW_SCOPE_GLOBAL;
     break;
   case WSREP_VAR_STRING:
     mysql->value = (char*) &wsrep->value._string;
     mysql->type  = SHOW_CHAR_PTR;
-    mysql->scope = SHOW_SCOPE_GLOBAL;
     break;
   case WSREP_VAR_DOUBLE:
     mysql->value = (char*) &wsrep->value._double;
     mysql->type  = SHOW_DOUBLE;
-    mysql->scope = SHOW_SCOPE_GLOBAL;
     break;
   }
 }
@@ -762,7 +760,6 @@ static void export_wsrep_status_to_mysql(THD* thd)
   mysql_status_vars[wsrep_status_len].name  = NullS;
   mysql_status_vars[wsrep_status_len].value = NullS;
   mysql_status_vars[wsrep_status_len].type  = SHOW_LONG;
-  mysql_status_vars[wsrep_status_len].scope = SHOW_SCOPE_GLOBAL;
 }
 
 int wsrep_show_status (THD *thd, SHOW_VAR *var, char *buff)

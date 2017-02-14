@@ -18,6 +18,9 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 --source include/kill_galera.inc
 
 --connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+#
 INSERT INTO t1 VALUES (1);
 
 --connection node_2
@@ -29,9 +32,7 @@ INSERT INTO t1 VALUES (1);
 --connection node_2a
 
 SELECT COUNT(*) = 1 FROM t1;
---disable_warnings
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
---enable_warnings
+SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
 --connection node_1
 --disable_query_log

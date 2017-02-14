@@ -50,6 +50,7 @@ enum wsrep_conflict_state {
     ABORTED,
     MUST_REPLAY,
     REPLAYING,
+    REPLAYED,
     RETRY_AUTOCOMMIT,
     CERT_FAILURE,
 };
@@ -141,7 +142,6 @@ extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
 
 // MySQL status variables
-extern my_bool     wsrep_new_cluster;
 extern my_bool     wsrep_connected;
 extern my_bool     wsrep_ready;
 extern const char* wsrep_cluster_state_uuid;
@@ -183,7 +183,7 @@ extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode);
 extern "C" void wsrep_thd_set_query_state(
         THD *thd, enum wsrep_query_state state);
 extern "C" void wsrep_thd_set_conflict_state(
-        THD *thd, enum wsrep_conflict_state state);
+        THD *thd, bool lock, enum wsrep_conflict_state state);
 
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 
@@ -194,6 +194,8 @@ extern "C" time_t wsrep_thd_query_start(THD *thd);
 extern "C" my_thread_id wsrep_thd_thread_id(THD *thd);
 extern "C" int64_t wsrep_thd_trx_seqno(THD *thd);
 extern "C" query_id_t wsrep_thd_query_id(THD *thd);
+extern "C" wsrep_trx_id_t wsrep_thd_next_trx_id(THD *thd);
+extern "C" wsrep_trx_id_t wsrep_thd_trx_id(THD *thd);
 extern "C" const char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
@@ -202,7 +204,13 @@ extern "C" int wsrep_thd_retry_counter(THD *thd);
 
 extern "C" void wsrep_handle_fatal_signal(int sig);
 
-extern void wsrep_close_client_connections(bool wait_to_end, bool server_shutdown);
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd);
+
+extern "C" void wsrep_thd_auto_increment_variables(THD*,
+                                                   unsigned long long *offset,
+                                                   unsigned long long *increment);
+
+extern void wsrep_close_client_connections(my_bool wait_to_end);
 extern int  wsrep_wait_committing_connections_close(int wait_time);
 extern void wsrep_close_applier(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd);
@@ -226,11 +234,19 @@ extern wsrep_seqno_t wsrep_locked_seqno;
    wsrep_provider                     && \
    strcmp(wsrep_provider, WSREP_NONE))
 
+/* use xxxxxx_NNULL macros when thd pointer is guaranteed to be non-null to
+ * avoid compiler warnings (GCC 6 and later) */
+#define WSREP_NNULL(thd) \
+  (WSREP_ON && wsrep && thd->variables.wsrep_on)
+
 #define WSREP(thd) \
-  (WSREP_ON && wsrep && (thd && thd->variables.wsrep_on))
+  (thd && WSREP_NNULL(thd))
 
 #define WSREP_CLIENT(thd) \
-    (WSREP(thd) && thd->wsrep_client_thread)
+  (WSREP(thd) && thd->wsrep_client_thread)
+
+#define WSREP_EMULATE_BINLOG_NNULL(thd) \
+  (WSREP_NNULL(thd) && wsrep_emulate_bin_log)
 
 #define WSREP_EMULATE_BINLOG(thd) \
   (WSREP(thd) && wsrep_emulate_bin_log)
@@ -240,7 +256,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_LOG(fun, ...)                                       \
     {                                                             \
         char msg[1024] = {'\0'};                                  \
-        snprintf(msg, sizeof(msg) - 1, ##__VA_ARGS__);            \
+        snprintf(msg, sizeof(msg) - 1, ## __VA_ARGS__);           \
         fun("WSREP: %s", msg);                                    \
     }
 
@@ -253,7 +269,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_LOG_CONFLICT_THD(thd, role)                                      \
     WSREP_LOG(sql_print_information, 	                                       \
       "%s: \n "       	                                                       \
-      "  THD: %u, mode: %s, state: %s, conflict: %s, seqno: %lld\n "          \
+      "  THD: %u, mode: %s, state: %s, conflict: %s, seqno: %lld\n "           \
       "  SQL: %s",							       \
       role, wsrep_thd_thread_id(thd), wsrep_thd_exec_mode_str(thd),            \
       wsrep_thd_query_state_str(thd),                                          \
@@ -271,9 +287,9 @@ extern wsrep_seqno_t wsrep_locked_seqno;
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread");       \
   }
 
-#define WSREP_QUERY(thd)					\
-  (((!opt_general_log_raw) && thd->rewritten_query.length())	\
-   ? (thd->rewritten_query.c_ptr_safe()) : (thd->query().str))
+#define WSREP_QUERY(thd)                                \
+  ((!opt_general_log_raw) && thd->rewritten_query.length()      \
+   ? thd->rewritten_query.c_ptr_safe() : thd->query().str)
 
 extern void wsrep_ready_wait();
 
@@ -328,6 +344,8 @@ extern PSI_mutex_key key_LOCK_wsrep_sst;
 extern PSI_cond_key  key_COND_wsrep_sst;
 extern PSI_mutex_key key_LOCK_wsrep_sst_init;
 extern PSI_cond_key  key_COND_wsrep_sst_init;
+extern PSI_mutex_key key_LOCK_wsrep_sst_thread;
+extern PSI_cond_key  key_COND_wsrep_sst_thread;
 extern PSI_mutex_key key_LOCK_wsrep_rollback;
 extern PSI_cond_key  key_COND_wsrep_rollback;
 extern PSI_mutex_key key_LOCK_wsrep_replaying;
@@ -360,4 +378,17 @@ bool wsrep_stmt_rollback_is_safe(THD* thd);
 void wsrep_init_sidno(const wsrep_uuid_t&);
 bool wsrep_node_is_donor();
 bool wsrep_node_is_synced();
+bool wsrep_replicate_GTID(THD* thd);
+
+typedef struct wsrep_key_arr
+{
+    wsrep_key_t* keys;
+    size_t       keys_len;
+} wsrep_key_arr_t;
+bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                      const char*       db,
+                                      const char*       table,
+                                      const TABLE_LIST* table_list,
+                                      wsrep_key_arr_t*  ka);
+void wsrep_keys_free(wsrep_key_arr_t* key_arr);
 #endif /* WSREP_MYSQLD_H */

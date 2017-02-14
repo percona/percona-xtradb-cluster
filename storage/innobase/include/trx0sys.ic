@@ -422,6 +422,7 @@ trx_sys_get_new_trx_id()
 {
 #ifndef WITH_WSREP
 	/* wsrep_fake_trx_id  violates this assert */
+ 	// ut_ad(mutex_own(&trx_sys->mutex));
 	ut_ad(trx_sys_mutex_own());
 #endif /* !WITH_WSREP */
 

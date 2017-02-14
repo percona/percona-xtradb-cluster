@@ -176,15 +176,17 @@ bool trans_begin(THD *thd, uint flags)
       tst->set_read_flags(thd, TX_READ_WRITE);
   }
 
+  DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
+    DBUG_ASSERT(thd->tx_priority==0);
+    WSREP_WARN("InnoDB High Priority being used: %d -> %d", thd->tx_priority, 1);
+    thd->tx_priority= 1;
+  });
+
 #ifdef WITH_WSREP
   thd->wsrep_PA_safe= true;
   if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd))
     DBUG_RETURN(TRUE);
 #endif /* WITH_WSREP */
-  DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
-    DBUG_ASSERT(thd->tx_priority==0);
-    thd->tx_priority= 1;
-  });
 
   thd->variables.option_bits|= OPTION_BEGIN;
   thd->server_status|= SERVER_STATUS_IN_TRANS;
@@ -271,9 +273,6 @@ bool trans_commit(THD *thd)
   thd->server_status&= ~SERVER_STATUS_IN_TRANS;
   thd->variables.option_bits&= ~OPTION_BEGIN;
   thd->get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
-#ifdef WITH_WSREP
-  wsrep_post_commit(thd, TRUE);
-#endif /* WITH_WSREP */
   thd->lex->start_transaction_opt= 0;
 
   /* The transaction should be marked as complete in P_S. */
@@ -281,6 +280,9 @@ bool trans_commit(THD *thd)
 
   thd->tx_priority= 0;
 
+#ifdef WITH_WSREP
+  wsrep_post_commit(thd, TRUE);
+#endif /* WITH_WSREP */
   trans_track_end_trx(thd);
 
   DBUG_RETURN(MY_TEST(res));

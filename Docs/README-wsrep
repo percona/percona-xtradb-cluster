@@ -448,7 +448,7 @@ wsrep_sst_donor=
    the DDL processing is complete, the node applies delayed replication events
    and synchronizes back with the cluster.
    The DDL can then be executed cluster-wide by running the same DDL statement
-   for each node in turn.  When this rolling schema upgrade proceeds, part of
+   for each node in turn. When this rolling schema upgrade proceeds, part of
    the cluster will have old schema structure and part of the cluster will have
    new schema structure.
 

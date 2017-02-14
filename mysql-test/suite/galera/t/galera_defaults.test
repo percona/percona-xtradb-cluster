@@ -12,9 +12,8 @@
 --source include/have_innodb.inc
 
 # Global Variables
---disable_warnings
-SELECT VARIABLE_NAME, VARIABLE_VALUE
-FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES
+SELECT UPPER(VARIABLE_NAME), VARIABLE_VALUE
+FROM performance_schema.global_variables
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME NOT IN (
 	'WSREP_PROVIDER_OPTIONS',
@@ -27,7 +26,6 @@ AND VARIABLE_NAME NOT IN (
 	'WSREP_START_POSITION'
 )
 ORDER BY VARIABLE_NAME;
---enable_warnings
 
 # wsrep_provider_options
 #
@@ -53,13 +51,11 @@ EOF
 
 # Global Status
 
---disable_warnings
-SELECT COUNT(*) FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+SELECT COUNT(*) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters';
 
-SELECT VARIABLE_NAME FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+SELECT UPPER(VARIABLE_NAME) FROM performance_schema.global_status
 WHERE VARIABLE_NAME LIKE 'wsrep_%'
 AND VARIABLE_NAME != 'wsrep_debug_sync_waiters'
 ORDER BY VARIABLE_NAME;
---enable_warnings

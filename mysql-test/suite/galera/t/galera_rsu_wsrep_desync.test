@@ -174,4 +174,3 @@ SET wsrep_OSU_method=TOI;
 DROP TABLE t1;
 SHOW VARIABLES LIKE 'wsrep_desync';
 show status like 'wsrep_desync_count';
-

@@ -649,7 +649,11 @@ public:
 private:
   void make_row(const CHARSET_INFO *cs, const char* str, size_t length);
 
+#ifdef WITH_WSREP
+  char m_str[2048];
+#else
   char m_str[1024];
+#endif /* WITH_WSREP */
   uint m_length;
   const CHARSET_INFO *m_charset;
 };

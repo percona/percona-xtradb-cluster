@@ -5,7 +5,10 @@
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+<<<<<<< HEAD
 --source include/have_debug.inc
+=======
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 
 --let $galera_connection_name = node_3
 --let $galera_server_number = 3
@@ -18,9 +21,12 @@ INSERT INTO t1 VALUES (1);
 --let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
 SET GLOBAL wsrep_slave_threads = 2;
 
+<<<<<<< HEAD
 # Enables some PROCESSLIST thread state to be maintained for testing
 SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_commit";
 
+=======
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 --connection node_1
 --send UPDATE t1 SET f1 = f1 + 10;
 
@@ -35,9 +41,13 @@ SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_commit";
 
 --connection node_3
 SELECT f1 = 111 FROM t1;
+<<<<<<< HEAD
 SELECT COUNT(*) IN (1, 2) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: committed%';
 
 SET GLOBAL DEBUG = "";
+=======
+SELECT COUNT(*) IN (1, 2) FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%committed%';
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 
 --eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
 

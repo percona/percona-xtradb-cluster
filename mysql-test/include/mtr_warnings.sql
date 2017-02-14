@@ -394,7 +394,7 @@ BEGIN
     -- as it causes the custom suppressions on the other
     -- nodes to be deleted as well
     SET wsrep_on = 0;
-  TRUNCATE test_suppressions;
+    TRUNCATE test_suppressions;
     SET wsrep_on = 1;
   ELSE 
     TRUNCATE test_suppressions;

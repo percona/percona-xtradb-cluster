@@ -270,6 +270,7 @@ ut_list_insert(
 	++list.count;
 }
 
+#ifdef WITH_WSREP
 /*******************************************************************//**
 Inserts a ELEM2 after ELEM1 in a list.
 @param list the base node
@@ -308,6 +309,7 @@ ut_list_insert2(
 
 	++list.count;
 }
+#endif /* WITH_WSREP */
 
 /*******************************************************************//**
 Inserts a ELEM2 after ELEM1 in a list.

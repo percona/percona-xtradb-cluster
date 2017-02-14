@@ -38,6 +38,9 @@ Created 5/30/1994 Heikki Tuuri
 #endif /* WITH_WSREP */
 #include "gis0geo.h"
 #include "trx0sys.h"
+#ifdef WITH_WSREP
+#include <ha_prototypes.h>
+#endif /* WITH_WSREP */
 #include "mach0data.h"
 
 /*			PHYSICAL RECORD (OLD STYLE)
@@ -2319,6 +2322,18 @@ rec_get_trx_id(
 # endif /* UNIV_DEBUG */
 #endif /* !UNIV_HOTBACKUP */
 
+
+/** Mark the nth field as externally stored.
+@param[in]	offsets		array returned by rec_get_offsets()
+@param[in]	n		nth field */
+void
+rec_offs_make_nth_extern(
+	ulint*		offsets,
+	const ulint	n)
+{
+	ut_ad(!rec_offs_nth_sql_null(offsets, n));
+	rec_offs_base(offsets)[1 + n] |= REC_OFFS_EXTERNAL;
+}
 #ifdef WITH_WSREP
 dberr_t
 wsrep_rec_get_foreign_key(
@@ -2450,14 +2465,3 @@ wsrep_rec_get_foreign_key(
 }
 #endif /* WITH_WSREP */
 
-/** Mark the nth field as externally stored.
-@param[in]	offsets		array returned by rec_get_offsets()
-@param[in]	n		nth field */
-void
-rec_offs_make_nth_extern(
-	ulint*		offsets,
-	const ulint	n)
-{
-	ut_ad(!rec_offs_nth_sql_null(offsets, n));
-	rec_offs_base(offsets)[1 + n] |= REC_OFFS_EXTERNAL;
-}

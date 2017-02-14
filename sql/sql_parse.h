@@ -127,6 +127,30 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs)
 {
   return (cs->mbminlen == 1);
 }
+#ifdef WITH_WSREP
+
+#define WSREP_MYSQL_DB (char *)"mysql"
+#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto error;
+
+#define WSREP_TO_ISOLATION_END                                              \
+  if (WSREP(thd) || (thd && thd->wsrep_exec_mode==TOTAL_ORDER))             \
+    wsrep_to_isolation_end(thd);
+
+/* Checks if lex->no_write_to_binlog is set for statements that use
+  LOCAL or NO_WRITE_TO_BINLOG
+*/
+#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)                   \
+  if (WSREP(thd) && !thd->lex->no_write_to_binlog                                   \
+         && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto error;
+
+#else
+
+#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
+#define WSREP_TO_ISOLATION_END 
+#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)
+
+#endif /* WITH_WSREP */
 
 bool sqlcom_can_generate_row_events(enum enum_sql_command command);
 
@@ -157,31 +181,6 @@ private:
   ulong m_id;
   bool  m_daemon_allowed;
 };
-
-#ifdef WITH_WSREP
-
-#define WSREP_MYSQL_DB (char *)"mysql"
-#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)                   \
-  if (WSREP(thd) && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto error;
-
-#define WSREP_TO_ISOLATION_END                                              \
-  if (WSREP(thd) || (thd && thd->wsrep_exec_mode==TOTAL_ORDER))             \
-    wsrep_to_isolation_end(thd);
-
-/* Checks if lex->no_write_to_binlog is set for statements that use
-  LOCAL or NO_WRITE_TO_BINLOG
-*/
-#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)                   \
-  if (WSREP(thd) && !thd->lex->no_write_to_binlog                                   \
-         && wsrep_to_isolation_begin(thd, db_, table_, table_list_)) goto error;
-
-#else
-
-#define WSREP_TO_ISOLATION_BEGIN(db_, table_, table_list_)
-#define WSREP_TO_ISOLATION_END 
-#define WSREP_TO_ISOLATION_BEGIN_WRTCHK(db_, table_, table_list_)
-
-#endif /* WITH_WSREP */
 
 #ifdef HAVE_REPLICATION
 bool all_tables_not_ok(THD *thd, TABLE_LIST *tables);

@@ -239,6 +239,9 @@ innobase_casedn_str(
 	char*	a);	/*!< in/out: string to put in lower case */
 
 #if defined(WITH_WSREP) && !defined(UNIV_INNOCHECKSUM)
+
+int wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx);
+
 int wsrep_innobase_kill_one_trx(
 	void*		thd_ptr,
 	const trx_t*	bf_trx,

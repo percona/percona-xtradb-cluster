@@ -66,6 +66,9 @@
 
 #include "pfs_file_provider.h"
 #include "mysql/psi/mysql_file.h"
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 
 /**
   This handler is used for the statements which support IGNORE keyword.

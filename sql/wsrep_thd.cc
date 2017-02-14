@@ -37,7 +37,6 @@ void wsrep_client_rollback(THD *thd)
 {
   WSREP_DEBUG("client rollback due to BF abort for (%u), query: %s",
               thd->thread_id(), WSREP_QUERY(thd));
-
   my_atomic_add64(&wsrep_bf_aborts_counter, 1);
 
   thd->wsrep_conflict_state= ABORTING;
@@ -87,66 +86,17 @@ static Relay_log_info* wsrep_relay_log_init(const char* log_fname)
 {
   uint rli_option = INFO_REPOSITORY_DUMMY;
   Relay_log_info *rli= NULL;
-  rli = Rpl_info_factory::create_rli(rli_option, false, (const char*)"", true);
+  rli = Rpl_info_factory::create_rli(rli_option, false, "wsrep", true);
+  if (!rli)
+  {
+    WSREP_ERROR("Failed to create RLI for wsrep thread, aborting");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
   rli->set_rli_description_event(
       new Format_description_log_event(BINLOG_VERSION));
 
+  rli->current_mts_submode= new Mts_submode_wsrep();
   return (rli);
-
-#ifdef REMOVED
-  Rpl_info_handler* handler_src= NULL;
-  Rpl_info_handler* handler_dest= NULL;
-  ulong *key_info_idx= NULL;
-  const char *msg= "Failed to allocate memory for the relay log info "
-                   "structure";
-
-  DBUG_ENTER("Rpl_info_factory::create_rli");
-
-  if (!(rli= new Relay_log_info(false
-#ifdef HAVE_PSI_INTERFACE
-                                ,&key_relay_log_info_run_lock,
-                                &key_relay_log_info_data_lock,
-                                &key_relay_log_info_sleep_lock,
-                                &key_relay_log_info_data_cond,
-                                &key_relay_log_info_start_cond,
-                                &key_relay_log_info_stop_cond,
-                                &key_relay_log_info_sleep_cond
-#endif /* HAVE_PSI_INTERFACE */
-                               )))
-    goto err;
-
-  if (!(key_info_idx= new ulong[NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR]))
-     goto err;
-  key_info_idx[0]= server_id;
-  rli->set_idx_info(key_info_idx, NUMBER_OF_FIELDS_TO_IDENTIFY_COORDINATOR);
-
-  if(Rpl_info_factory::init_rli_repositories(rli, rli_option, &handler_src,
-                                             &handler_dest, &msg))
-    goto err;
-
-  if (Rpl_info_factory::decide_repository(rli, rli_option, &handler_src,
-                                          &handler_dest, &msg))
-    goto err;
-
-  DBUG_RETURN(rli);
-err:
-  delete handler_src;
-  delete handler_dest;
-  delete []key_info_idx;
-  if (rli)
-  {
-    /*
-      The handler was previously deleted so we need to remove
-      any reference to it.
-    */
-    rli->set_idx_info(NULL, 0);
-    rli->set_rpl_info_handler(NULL);
-    rli->set_rpl_info_type(INVALID_INFO_REPOSITORY);
-    delete rli;
-  }
-  WSREP_ERROR("Error creating relay log info: %s.", msg);
-  DBUG_RETURN(NULL);
-#endif /* REMOVED */
 }
 
 static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -154,7 +104,7 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   shadow->options       = thd->variables.option_bits;
   shadow->server_status = thd->server_status;
   shadow->wsrep_exec_mode = thd->wsrep_exec_mode;
-  shadow->vio           = thd->get_protocol_classic()->get_vio();
+  shadow->vio           = thd->active_vio;
 
   // Disable general logging on applier threads
   thd->variables.option_bits |= OPTION_LOG_OFF;
@@ -164,28 +114,38 @@ static void wsrep_prepare_bf_thd(THD *thd, struct wsrep_thd_shadow* shadow)
   else
     thd->variables.option_bits&= ~(OPTION_BIN_LOG);
 
-  if (!thd->wsrep_rli) thd->wsrep_rli= wsrep_relay_log_init("wsrep_relay");
-  thd->wsrep_rli->info_thd = thd;
-  thd->init_for_queries(thd->wsrep_rli);
+#ifdef GALERA
+  /*
+    in 5.7, we declare applying to happen as with slave threads
+    this set here is for replaying, when local threads will operate
+    as slave for the duration of replaying
+  */
+  thd->slave_thread = TRUE;
+#endif /* GALERA */
 
-  thd->wsrep_rli->current_mts_submode= new Mts_submode_database();
+  if (!thd->wsrep_rli)
+  {
+    thd->wsrep_rli = wsrep_relay_log_init("wsrep_relay");
+    assert(!thd->rli_slave);
+    thd->rli_slave = thd->wsrep_rli;
+    thd->wsrep_rli->info_thd= thd;
+    thd->init_for_queries(thd->wsrep_rli);
+  }
+  thd->wsrep_rli->info_thd = thd;
 
   thd->wsrep_exec_mode= REPL_RECV;
-  thd->get_protocol_classic()->set_vio(NULL);
+  thd->set_active_vio(0);
   thd->clear_error();
 
   shadow->tx_isolation        = thd->variables.tx_isolation;
   thd->variables.tx_isolation = ISO_READ_COMMITTED;
   thd->tx_isolation           = ISO_READ_COMMITTED;
 
-  // intended shallow copy.
-  shadow->db            = thd->db();
+  shadow->db = thd->db();
+  thd->reset_db(NULL_CSTR);
 
-  LEX_CSTRING  dummy;
-  dummy.str= NULL;
-  dummy.length= 0;
-  thd->reset_db(dummy);
   shadow->user_time = thd->user_time;
+  shadow->row_count_func= thd->get_row_count_func();
 }
 
 static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
@@ -193,10 +153,22 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->variables.option_bits  = shadow->options;
   thd->server_status          = shadow->server_status;
   thd->wsrep_exec_mode        = shadow->wsrep_exec_mode;
-  thd->get_protocol_classic()->set_vio(shadow->vio);
+  thd->set_active_vio(shadow->vio);
   thd->variables.tx_isolation = shadow->tx_isolation;
   thd->reset_db(shadow->db);
   thd->user_time              = shadow->user_time;
+
+  assert(thd->rli_slave == thd->wsrep_rli);
+  thd->rli_slave = NULL;
+
+  delete thd->wsrep_rli->current_mts_submode;
+  thd->wsrep_rli->current_mts_submode = 0;
+  delete thd->wsrep_rli;
+  thd->wsrep_rli = 0;
+#ifdef GALERA
+  thd->slave_thread = FALSE;
+#endif /* GALERA */
+  thd->set_row_count_func(shadow->row_count_func);
 }
 
 void wsrep_replay_transaction(THD *thd)
@@ -219,6 +191,25 @@ void wsrep_replay_transaction(THD *thd)
         WSREP_WARN("dangling observer in replay transaction: (thr %u %lld %s)",
                    thd->thread_id(), thd->query_id, thd->query().str);
       }
+
+      struct da_shadow
+      {
+          enum Diagnostics_area::enum_diagnostics_status status;
+          ulonglong affected_rows;
+          ulonglong last_insert_id;
+          char message[MYSQL_ERRMSG_SIZE];
+      };
+      struct da_shadow da_status;
+      da_status.status= thd->get_stmt_da()->status();
+      if (da_status.status == Diagnostics_area::DA_OK)
+      {
+        da_status.affected_rows= thd->get_stmt_da()->affected_rows();
+        da_status.last_insert_id= thd->get_stmt_da()->last_insert_id();
+        strmake(da_status.message,
+                thd->get_stmt_da()->message_text(),
+                sizeof(da_status.message)-1);
+      }
+
       thd->get_stmt_da()->reset_diagnostics_area();
 
       thd->wsrep_conflict_state= REPLAYING;
@@ -285,7 +276,17 @@ void wsrep_replay_transaction(THD *thd)
         }
         else
         {
-          my_ok(thd);
+          if (da_status.status == Diagnostics_area::DA_OK)
+          {
+            my_ok(thd,
+                  da_status.affected_rows,
+                  da_status.last_insert_id,
+                  da_status.message);
+          }
+          else
+          {
+            my_ok(thd);
+          }
         }
         break;
       case WSREP_TRX_FAIL:
@@ -303,7 +304,8 @@ void wsrep_replay_transaction(THD *thd)
         break;
       default:
         WSREP_ERROR("trx_replay failed for: %d, schema: %s, query: %s",
-                    rcode, (thd->db().length ? thd->db().str : "(null)"),
+                    rcode,
+                    (thd->db().str ? thd->db().str : "(null)"),
                     WSREP_QUERY(thd));
         /* we're now in inconsistent state, must abort */
 	mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -346,8 +348,8 @@ static void wsrep_replication_process(THD *thd)
   as the first BEGIN statement is now intepreted wrongly as statement
   inside an active transaction. */
   /* From trans_begin() */
-  //thd->variables.option_bits|= OPTION_BEGIN;
-  //thd->server_status|= SERVER_STATUS_IN_TRANS;
+  thd->variables.option_bits|= OPTION_BEGIN;
+  thd->server_status|= SERVER_STATUS_IN_TRANS;
 
   rcode = wsrep->recv(wsrep, (void *)thd);
   DBUG_PRINT("wsrep",("wsrep_repl returned: %d", rcode));
@@ -389,17 +391,15 @@ static void wsrep_replication_process(THD *thd)
     break;
   }
 
-  thd_lock_thread_count(thd);
   wsrep_close_applier(thd);
-  thd_unlock_thread_count(thd);
 
   TABLE *tmp;
   while ((tmp = thd->temporary_tables))
   {
     WSREP_WARN("Applier %u, has temporary tables at exit: %s.%s",
-                  thd->thread_id(), 
-                  (tmp->s) ? tmp->s->db.str : "void",
-                  (tmp->s) ? tmp->s->table_name.str : "void");
+               thd->thread_id(), 
+               (tmp->s) ? tmp->s->db.str : "void",
+               (tmp->s) ? tmp->s->table_name.str : "void");
   }
   wsrep_return_from_bf_mode(thd, &shadow);
 
@@ -420,8 +420,9 @@ void wsrep_create_appliers(long threads)
     if (wsrep_cluster_address && strlen(wsrep_cluster_address) &&
         wsrep_provider && strcasecmp(wsrep_provider, "none"))
     {
-      WSREP_WARN("Trying to launch slave threads before creating "
+      WSREP_ERROR("Trying to launch slave threads before creating "
                   "connection at '%s'", wsrep_cluster_address);
+      assert(0);
     }
     return;
   }
@@ -459,6 +460,11 @@ static void wsrep_rollback_process(THD *thd)
 
     mysql_cond_wait(&COND_wsrep_rollback,&LOCK_wsrep_rollback);
 
+    if (thd->killed != THD::NOT_KILLED)
+    {
+      WSREP_DEBUG("rollbacker thread canceled");
+      break;
+    }
     WSREP_DEBUG("WSREP rollback thread wakes for signal");
 
     mysql_mutex_lock(&thd->LOCK_current_cond);
@@ -513,12 +519,19 @@ static void wsrep_rollback_process(THD *thd)
   }
 
   mysql_mutex_unlock(&LOCK_wsrep_rollback);
-  sql_print_information("WSREP: rollbacker thread exiting");
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_delete_thread();
 #endif /* HAVE_PSI_INTERFACE */
 
+  mysql_mutex_lock(&thd->LOCK_thd_data);
+  thd_proc_info(thd, "wsrep aborter shutting down");
+  thd->current_mutex= 0;
+  thd->current_cond=  0;
+  mysql_mutex_unlock(&thd->LOCK_thd_data);
+
+  sql_print_information("WSREP: rollbacker thread exiting");
+  thd->store_globals();
   DBUG_PRINT("wsrep",("wsrep rollbacker thread exiting"));
   DBUG_VOID_RETURN;
 }
@@ -565,7 +578,7 @@ my_bool wsrep_thd_is_BF(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
 	      (thd->wsrep_exec_mode == TOTAL_ORDER));
     if (sync) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -581,7 +594,7 @@ my_bool wsrep_thd_is_BF_or_commit(void *thd_ptr, my_bool sync)
   {
     THD* thd = (THD*)thd_ptr;
     if (sync) mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-    
+
     status = ((thd->wsrep_exec_mode == REPL_RECV)    ||
 	      (thd->wsrep_exec_mode == TOTAL_ORDER)  ||
 	      (thd->wsrep_exec_mode == LOCAL_COMMIT));
@@ -613,7 +626,7 @@ int wsrep_abort_thd(void *bf_thd_ptr, void *victim_thd_ptr, my_bool signal)
 
   if ( (WSREP(bf_thd) ||
          ( (WSREP_ON || bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU) &&
-           bf_thd->wsrep_exec_mode == TOTAL_ORDER) )               &&
+           bf_thd->wsrep_exec_mode == TOTAL_ORDER) )                         &&
        victim_thd)
   {
     WSREP_DEBUG("wsrep_abort_thd, by: %llu, victim: %llu", (bf_thd) ?
@@ -640,4 +653,26 @@ bool wsrep_thd_has_explicit_locks(THD *thd)
 {
   assert(thd);
   return (thd->mdl_context.wsrep_has_explicit_locks());
+}
+
+/*
+  Get auto increment variables for THD. Use global settings for
+  applier threads.
+ */
+extern "C"
+void wsrep_thd_auto_increment_variables(THD* thd,
+                                        unsigned long long* offset,
+                                        unsigned long long* increment)
+{
+  if (thd->wsrep_exec_mode == REPL_RECV &&
+      thd->wsrep_conflict_state != REPLAYING)
+  {
+    *offset= global_system_variables.auto_increment_offset;
+    *increment= global_system_variables.auto_increment_increment;
+  }
+  else
+  {
+    *offset= thd->variables.auto_increment_offset;
+    *increment= thd->variables.auto_increment_increment;
+  }
 }

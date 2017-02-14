@@ -6186,7 +6186,11 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
 err:
   DBUG_RETURN(res);
 #ifdef WITH_WSREP
- error:
+error:
+  for (uint i = 0; i < thd->wsrep_TOI_pre_queries.size(); ++i)
+    delete thd->wsrep_TOI_pre_queries[i];
+  thd->wsrep_TOI_pre_queries.clear();
+  THD::wsrep_queries().swap(thd->wsrep_TOI_pre_queries);
   DBUG_RETURN(TRUE);
 #endif /* WITH_WSREP */
 }

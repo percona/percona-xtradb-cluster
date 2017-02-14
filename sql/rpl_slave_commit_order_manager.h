@@ -128,6 +128,9 @@ private:
 
 inline bool has_commit_order_manager(THD *thd)
 {
+#ifdef WITH_WSREP
+  if (WSREP(thd)) return false;
+#endif /* WITH_WSREP */
   return is_mts_worker(thd) &&
     thd->rli_slave->get_commit_order_manager() != NULL;
 }

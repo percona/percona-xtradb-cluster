@@ -18,15 +18,25 @@ INSERT INTO db2.t2A VALUES (2);
 INSERT INTO db2.t2B VALUES (3);
 
 --connection node_2
+<<<<<<< HEAD
 SELECT COUNT(*) = 0 FROM db1.t1;
 SELECT COUNT(*) = 0 FROM db2.t2A;
+=======
+#SELECT COUNT(*) = 0 FROM db1.t1;
+#SELECT COUNT(*) = 0 FROM db2.t2A;
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 SELECT COUNT(*) = 1 FROM db2.t2B;
 
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 --connection node_3
+<<<<<<< HEAD
 SELECT COUNT(*) = 0 FROM db1.t1;
 SELECT COUNT(*) = 1 FROM db2.t2A;
+=======
+#SELECT COUNT(*) = 0 FROM db1.t1;
+#SELECT COUNT(*) = 1 FROM db2.t2A;
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 SELECT COUNT(*) = 1 FROM db2.t2B;
 
 --connection node_1

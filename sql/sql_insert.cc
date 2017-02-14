@@ -40,6 +40,9 @@
 #include "sql_resolver.h"             // validate_gc_assignment
 #include "partition_info.h"           // partition_info
 #include "probes_mysql.h"             // MYSQL_INSERT_START
+#ifdef WITH_WSREP
+#include "sql_parse.h"                // WSREP_TO_ISOLATION
+#endif /* WITH_WSREP */
 
 static bool check_view_insertability(THD *thd, TABLE_LIST *view,
                                      const TABLE_LIST *insert_table_ref);
@@ -2966,41 +2969,9 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
 
 #ifdef WITH_WSREP
   if (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())
-  {
-    DEBUG_SYNC(thd, "create_select_before_write_create_event");
-    int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
-
-    /* Note: For wsrep we make the call transactional and so
-    is_trans = true and direct = false.
-
-    Why ?
-
-    * This is execution of CTAS query. Starting from 5.7 MySQL
-    has changed the approach to write the binlog as immediate action
-    and not a normal action that happens during commit/rollback.
-
-    * With that difference wsrep flow fails to understand if binlogging
-    was done for the said query and so wsrep flow is not invoked even
-    though bin-logging was done.
-
-    * Making CTAS transactional will ensure that binlogging uses
-    NORMAL logging approach so during commit WSREP flow can be
-    activated.
-
-    There are multiple solutions to solve this issue but for now
-    we will try to be complaint with 5.6 behavior for now. */
-
-    result= thd->binlog_query(THD::STMT_QUERY_TYPE,
-                              query.ptr(), query.length(),
-                              /* is_trans */ true,
-                              /* direct */ false,
-                              /* suppress_use */ FALSE,
-                              errcode);
-    DEBUG_SYNC(thd, "create_select_after_write_create_event");
-  }
-  ha_wsrep_fake_trx_id(thd);
 #else
   if (mysql_bin_log.is_open())
+#endif /* WITH_WSREP */
   {
     DEBUG_SYNC(thd, "create_select_before_write_create_event");
     int errcode= query_error_code(thd, thd->killed == THD::NOT_KILLED);
@@ -3012,7 +2983,9 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
                               errcode);
     DEBUG_SYNC(thd, "create_select_after_write_create_event");
   }
-#endif /* WITH_WSREP */
+#ifdef WITH_WSREP
+  ha_wsrep_fake_trx_id(thd);
+#endif
   DBUG_RETURN(result);
 }
 
@@ -3078,25 +3051,51 @@ bool Query_result_create::send_eof()
     if (!table->s->tmp_table)
     {
 #ifdef WITH_WSREP
-#ifndef DBUG_OFF
+      if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID)
+      {
+        (void) wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle,
+                                       thd->wsrep_next_trx_id());
+        WSREP_DEBUG("CTAS NEW KEY");
+      }
+      DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
+      WSREP_DEBUG("CTAS key append for trx: %lu ", thd->wsrep_trx_id());
+
+      /*
+         append table level exclusive key for CTAS
+      */
+      wsrep_key_arr_t key_arr= {0, 0};
+      wsrep_prepare_keys_for_isolation(thd,
+                                       create_table->db,
+                                       create_table->table_name,
+                                       table_list,
+                                       &key_arr);
+      int rcode = wsrep->append_key(
+                                wsrep,
+                                &thd->wsrep_ws_handle,
+                                key_arr.keys, //&wkey,
+                                key_arr.keys_len,
+                                WSREP_KEY_EXCLUSIVE,
+                                false);
+      wsrep_keys_free(&key_arr);
+      if (rcode) {
+        DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+        WSREP_ERROR("Appending table key for CTAS failed: %s, %d",
+                    (wsrep_thd_query(thd)) ?
+                    wsrep_thd_query(thd) : "void", rcode);
+        return true;
+      }
+      /* If commit fails, we should be able to reset the OK status. */
       thd->get_stmt_da()->set_overwrite_status(true);
-#endif
 #endif /* WITH_WSREP */
       trans_commit_stmt(thd);
       trans_commit_implicit(thd);
 #ifdef WITH_WSREP
-#ifndef DBUG_OFF
       thd->get_stmt_da()->set_overwrite_status(false);
-#endif
-#endif /* WITH_WSREP */
-
-#ifdef WITH_WSREP
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state != NO_CONFLICT)
       {
         WSREP_DEBUG("select_create commit failed, thd: %u err: %d %s", 
-                    thd->thread_id(), thd->wsrep_conflict_state,
-                    WSREP_QUERY(thd));
+                    thd->thread_id(), thd->wsrep_conflict_state, WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         abort_result_set();
 	return TRUE;
@@ -3235,6 +3234,14 @@ bool Sql_cmd_insert_select::execute(THD *thd)
   Query_result_insert *sel_result;
   if (insert_precheck(thd, all_tables))
     return true;
+#ifdef WITH_WSREP
+    if (thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED)
+    {
+      thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
+      WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL);
+    }
+
+#endif
   /*
     INSERT...SELECT...ON DUPLICATE KEY UPDATE/REPLACE SELECT/
     INSERT...IGNORE...SELECT can be unsafe, unless ORDER BY PRIMARY KEY
@@ -3310,6 +3317,10 @@ bool Sql_cmd_insert_select::execute(THD *thd)
       thd->first_successful_insert_id_in_prev_stmt;
 
   return res;
+#ifdef WITH_WSREP
+ error:
+  return true;
+#endif /* WITH_WSREP */
 }
 
 

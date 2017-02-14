@@ -42,4 +42,3 @@ SET GLOBAL wsrep_OSU_method = "TOI";
 DROP TABLE t1;
 
 SET DEBUG_SYNC='RESET';
-

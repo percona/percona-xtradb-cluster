@@ -130,22 +130,44 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
         delete ev;
         continue;
       }
+      /*
+         gtid_pre_statement_checks will fail on the subsequent statement
+         if the bits below are set. So we don't mark the thd to run in
+         transaction mode yet, and assume there will be such a "BEGIN"
+         log event that will set those appropriately.
+      */
+      thd->variables.option_bits&= ~OPTION_BEGIN;
+      thd->server_status&= ~SERVER_STATUS_IN_TRANS;
+      assert(event == 1);
     }
     default:
       break;
     }
 
     thd->server_id = ev->server_id; // use the original server id for logging
+    thd->unmasked_server_id = ev->common_header->unmasked_server_id;
     thd->set_time();                // time the query
-
-    Transaction_ctx *trn_ctx= thd->get_transaction();
-    wsrep_xid_init(trn_ctx->xid_state()->get_xid(),
+    wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                    thd->wsrep_trx_meta.gtid.uuid,
                    thd->wsrep_trx_meta.gtid.seqno);
-    thd->lex->set_current_select(0);
+    thd->lex->set_current_select(NULL);
     if (!ev->common_header->when.tv_sec)
       my_micro_time_to_timeval(my_micro_time(), &ev->common_header->when);
-    ev->thd = thd;
+    ev->thd = thd; // because up to this point, ev->thd == 0
+
+    set_timespec_nsec(&thd->wsrep_rli->ts_exec[0], 0);
+    thd->wsrep_rli->stats_read_time += diff_timespec(&thd->wsrep_rli->ts_exec[0],
+                                                     &thd->wsrep_rli->ts_exec[1]);
+
+    /* MySQL slave "Sleeps if needed, and unlocks rli->data_lock."
+     * at this point. But this does not apply for wsrep, we just do the unlock part
+     * of sql_delay_event()
+     *
+     * if (sql_delay_event(ev, thd, rli))
+     */
+    //mysql_mutex_assert_owner(&rli->data_lock);
+    //mysql_mutex_unlock(&rli->data_lock);
+
     exec_res = ev->apply_event(thd->wsrep_rli);
     DBUG_PRINT("info", ("exec_event result: %d", exec_res));
 
@@ -159,6 +181,12 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
       delete ev;
       goto error;
     }
+
+    set_timespec_nsec(&thd->wsrep_rli->ts_exec[1], 0);
+    thd->wsrep_rli->stats_exec_time += diff_timespec(&thd->wsrep_rli->ts_exec[1],
+                                          &thd->wsrep_rli->ts_exec[0]);
+
+    DBUG_PRINT("info", ("wsrep apply_event error = %d", exec_res));
     event++;
 
     if (thd->wsrep_conflict_state!= NO_CONFLICT &&
@@ -274,9 +302,9 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   while ((tmp = thd->temporary_tables))
   {
     WSREP_DEBUG("Applier %u, has temporary tables: %s.%s",
-                  thd->thread_id(), 
-                  (tmp->s) ? tmp->s->db.str : "void",
-                  (tmp->s) ? tmp->s->table_name.str : "void");
+                thd->thread_id(), 
+                (tmp->s) ? tmp->s->db.str : "void",
+                (tmp->s) ? tmp->s->table_name.str : "void");
       close_temporary_table(thd, tmp, 1, 1);    
   }
 
@@ -406,13 +434,9 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
 
   if (*exit == false && thd->wsrep_applier)
   {
-    /* This should be set as part of trans_begin and not explicitly.
-    Note sure why Galera thought of setting it here but it conflicts
-    as the first BEGIN statement is now intepreted wrongly as statement
-    inside an active transaction. */
-    /* From trans_begin() */
-    // thd->variables.option_bits|= OPTION_BEGIN;
-    //thd->server_status|= SERVER_STATUS_IN_TRANS;
+    /* From trans_begin(). Also check the comment at line:134 when/why these bits are unset. */
+    thd->variables.option_bits|= OPTION_BEGIN;
+    thd->server_status|= SERVER_STATUS_IN_TRANS;
     thd->wsrep_apply_toi= false;
   }
 

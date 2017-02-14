@@ -608,7 +608,7 @@ extern "C" void wsrep_thd_set_exec_mode(THD *thd, enum wsrep_exec_mode mode);
 extern "C" void wsrep_thd_set_query_state(
 	THD *thd, enum wsrep_query_state state);
 extern "C" void wsrep_thd_set_conflict_state(
-	THD *thd, enum wsrep_conflict_state state);
+        THD *thd, bool lock, enum wsrep_conflict_state state);
 
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 
@@ -622,6 +622,7 @@ extern "C" query_id_t wsrep_thd_query_id(THD *thd);
 extern "C" const char * wsrep_thd_query(THD *thd);
 extern "C" query_id_t wsrep_thd_wsrep_last_query_id(THD *thd);
 extern "C" void wsrep_thd_set_wsrep_last_query_id(THD *thd, query_id_t id);
+extern "C" void wsrep_thd_set_next_trx_id(THD *thd);
 extern "C" void wsrep_thd_awake(THD *thd, my_bool signal);
 #endif /* WITH_WSREP */
 struct trx_t;

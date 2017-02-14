@@ -4,4 +4,8 @@
 binlog-do-db=db2
 
 [mysqld.2]
+<<<<<<< HEAD
+=======
+replicate-do-db=db2
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 replicate-wild-do-table=db2.t2B

@@ -50,11 +50,11 @@ Created 5/7/1996 Heikki Tuuri
 #include "pars0pars.h"
 
 #include <set>
-
 #ifdef WITH_WSREP
 extern my_bool wsrep_debug;
 extern my_bool wsrep_log_conflicts;
-#endif /* WITH_WSREP */
+#include <wsrep_mysqld.h>
+#endif
 
 /* Flag to enable/disable deadlock detector. */
 my_bool	innobase_deadlock_detect = TRUE;
@@ -884,7 +884,7 @@ lock_rec_has_to_wait(
 
 			if (wsrep_debug) {
 				fprintf(stderr, 
-					"BF-BF lock conflict, locking: %lu \n",
+					"BF-BF lock conflict, locking: %lu\n",
 					for_locking);
 				lock_rec_print(stderr, lock2);
 			}
@@ -897,34 +897,34 @@ lock_rec_has_to_wait(
 				if (for_locking || wsrep_debug) {
 					/* exclusive lock conflicts are not
 					   accepted */
-					fprintf(stderr, 
-						"BF-BF X lock conflict," 
-						"mode: %lu supremum: %s\n", 
-						type_mode,
-						lock_is_on_supremum
-						? "true" : "false");
-					fprintf(stderr, 
-						"conflicts states: my %d locked %d\n", 
-						wsrep_thd_conflict_state(trx->mysql_thd, FALSE), 
-						wsrep_thd_conflict_state(lock2->trx->mysql_thd, FALSE) );
-					lock_rec_print(stderr, lock2);
-					if (for_locking) return FALSE;
-					//abort();
+                                  ib::info() <<	"BF-BF X lock conflict," <<
+                                    "mode: " << type_mode << " supremum: " <<
+                                    lock_is_on_supremum;
+                                  ib::info() << "conflicts states: my: " <<
+                                    wsrep_thd_conflict_state(trx->mysql_thd, FALSE) <<
+                                    " locked: " << 
+                                    wsrep_thd_conflict_state(lock2->trx->mysql_thd, FALSE);
+                                  lock_rec_print(stderr, lock2);
+                                  if (for_locking) return FALSE;
+                                  //abort();
 				}
 			} else {
 				/* if lock2->index->n_uniq <= 
 				   lock2->index->n_user_defined_cols
 				   operation is on uniq index
 				*/
-				if (wsrep_debug) fprintf(stderr,
-					"BF conflict, modes: %lu %lu, "
-					"idx: %s-%s n_uniq %u n_user %u\n",
-					type_mode, (ulint) lock2->type_mode,
-					lock2->index->name(), 
-					lock2->index->table_name,
-					lock2->index->n_uniq, 
-					lock2->index->n_user_defined_cols);
-				return FALSE;
+                          if (wsrep_debug) ib::info() <<
+                                             "BF conflict, modes: " <<
+                                             type_mode << " and " << lock2->type_mode <<
+                                             "idx: " <<
+                                             lock2->index->name << 
+                                             " - " <<
+                                             lock2->index->table_name <<
+                                             "n_uniq " <<
+                                             lock2->index->n_uniq << 
+                                             " n_user " <<
+                                             lock2->index->n_user_defined_cols;
+                          return FALSE;
 			}
 		}
 #endif /* WITH_WSREP */
@@ -1281,7 +1281,7 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 				else
 					fputs("\n*** Victim TRANSACTION:\n", 
 					      stderr);
-				trx_print_latched(stderr, trx, 3000);
+				wsrep_trx_print_locking(stderr, trx, 3000);
 
 				if (bf_other)
 					fputs("\n*** Priority TRANSACTION:\n", 
@@ -1289,7 +1289,7 @@ wsrep_kill_victim(const trx_t * const trx, const lock_t *lock) {
 				else
 					fputs("\n*** Victim TRANSACTION:\n", 
 					      stderr);
-				trx_print_latched(stderr, lock->trx, 3000);
+				wsrep_trx_print_locking(stderr, lock->trx, 3000);
 
 				fputs("*** WAITING FOR THIS LOCK TO BE GRANTED:\n",
 				      stderr);
@@ -1494,16 +1494,16 @@ lock_number_of_tables_locked(
 	return(n_tables);
 }
 
-
+/*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
 #ifdef WITH_WSREP
 static
 void
 wsrep_print_wait_locks(
-/*===================*/
+/*============*/
 	lock_t*		c_lock) /* conflicting lock to print */
 {
 	if (wsrep_debug &&  c_lock->trx->lock.wait_lock != c_lock) {
-		fprintf(stderr, "WSREP: c_lock != wait lock\n");
+		ib::info() << "WSREP: c_lock != wait lock";
 		if (lock_get_type_low(c_lock) & LOCK_TABLE)
 			lock_table_print(stderr, c_lock);
 		else
@@ -1516,8 +1516,6 @@ wsrep_print_wait_locks(
 	}
 }
 #endif /* WITH_WSREP */
-
-/*============== RECORD LOCK CREATION AND QUEUE MANAGEMENT =============*/
 
 /**
 Check of the lock is on m_rec_id.
@@ -1728,14 +1726,14 @@ RecLock::lock_add(
 			   does not matter if wait_lock was released above
 			 */
 			if (c_lock->trx->lock.wait_lock == c_lock) {
+                                if (wsrep_debug) ib::info() <<
+                                        "victim trx waits for some other lock than c_lock";
 				lock_reset_lock_and_trx_wait(lock);
 			}
 			trx_mutex_exit(c_lock->trx);
 
-			if (wsrep_debug) fprintf(
-				stderr,
-				"WSREP: c_lock canceled %llu\n",
-				(ulonglong) c_lock->trx->id);
+                        if (wsrep_debug)
+                                ib::info() << "WSREP: c_lock canceled " << c_lock->trx->id;
 
 			/* have to bail out here to avoid lock_set_lock... */
 			return;
@@ -2468,7 +2466,6 @@ lock_grant(
 	ut_ad(lock_mutex_own());
 
 	lock_reset_lock_and_trx_wait(lock);
-
 	trx_mutex_enter(lock->trx);
 
 	if (lock_get_mode(lock) == LOCK_AUTO_INC) {
@@ -4041,6 +4038,9 @@ lock_table_create(
 		if (c_lock && wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
         		ut_list_insert2(
 				table->locks, c_lock, lock, TableLockGetNode());
+			if (wsrep_debug)
+				ib::info() << "table lock BF conflict for " <<
+				c_lock->trx->id;
         	} else {
 			ut_list_append(table->locks, lock, TableLockGetNode());
         	}
@@ -4355,8 +4355,8 @@ lock_table_other_has_incompatible(
 
 #ifdef WITH_WSREP
 			if (wsrep_on(trx->mysql_thd)) {
-				if (wsrep_debug)
-					fprintf(stderr, "WSREP: table lock abort");
+				if (wsrep_debug) 
+					ib::info() << "WSREP: table lock abort";
 				trx_mutex_enter(lock->trx);
 				wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
 				trx_mutex_exit(lock->trx);
@@ -7268,9 +7268,15 @@ lock_trx_handle_wait(
 {
 	dberr_t	err;
 
+#ifdef WITH_WSREP
+        if (trx->wsrep_killed_by_query == 0) {
+#endif /* WITH_WSREP */
 	lock_mutex_enter();
 
 	trx_mutex_enter(trx);
+#ifdef WITH_WSREP
+        }
+#endif /* WITH_WSREP */
 
 	if (trx->lock.was_chosen_as_deadlock_victim) {
 		err = DB_DEADLOCK;
@@ -7282,9 +7288,15 @@ lock_trx_handle_wait(
 		err = DB_SUCCESS;
 	}
 
+#ifdef WITH_WSREP
+        if (trx->wsrep_killed_by_query == 0) {
+#endif /* WITH_WSREP */
 	lock_mutex_exit();
 
 	trx_mutex_exit(trx);
+#ifdef WITH_WSREP
+        }
+#endif /* WITH_WSREP */
 
 	return(err);
 }

@@ -1552,7 +1552,6 @@ int ha_prepare(THD *thd)
 err:
     gtid_state_commit_or_rollback(thd, need_clear_owned_gtid, !gtid_error);
   }
-
   DBUG_RETURN(error);
 }
 
@@ -1848,8 +1847,18 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
       goto end;
     }
 
+#ifdef WITH_WSREP
+    if ((!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1)) ||
+        (WSREP(thd) && thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+         !trans_has_updated_trans_table(thd)))
+    {
+#else
     if (!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1))
+#endif /* WITH_WSREP */
       error= tc_log->prepare(thd, all);
+#ifdef WITH_WSREP
+    }
+#endif /* WITH_WSREP */
   }
   /*
     The state of XA transaction is changed to Prepared, intermediately.
@@ -2003,6 +2012,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
 #ifdef WITH_WSREP
   if (WSREP(thd)) thd_proc_info(thd, tmp_info);
 #endif /* WITH_WSREP */
+
   /*
     When the transaction has been committed, we clear the commit_low
     flag. This allow other parts of the system to check if commit_low
@@ -2057,6 +2067,16 @@ int ha_rollback_low(THD *thd, bool all)
       handlerton *ht= ha_info->ht();
       if ((err= ht->rollback(ht, thd, all)))
       { // cannot happen
+#ifdef WITH_WSREP
+        WSREP_INFO("rollback failed for ht: %d, conf: %d SQL %s",
+                   ht->db_type, thd->wsrep_conflict_state, thd->query().str);
+        Diagnostics_area *da= thd->get_stmt_da();
+        if (da)
+        {
+          WSREP_INFO("stmt DA %d %s",
+                     da->status(), (da->is_error()) ? da->message_text() : "void");
+        }
+#endif /* WITH_WSREP */
         my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err);
         error= 1;
       }
@@ -5368,9 +5388,11 @@ int ha_enable_transaction(THD *thd, bool on)
   int error=0;
   DBUG_ENTER("ha_enable_transaction");
   DBUG_PRINT("enter", ("on: %d", (int) on));
+
 #ifdef WITH_WSREP
   if (thd->wsrep_applier) DBUG_RETURN(0);
-#endif
+#endif /* WITH_WSREP */
+
   if ((thd->get_transaction()->m_flags.enabled= on))
   {
     /*
@@ -8295,10 +8317,10 @@ int binlog_log_row(TABLE* table,
 #ifdef WITH_WSREP
   /* only InnoDB tables will be replicated through binlog emulation
   Partition table using InnoDB as native engine should also be considered. */
-  if (WSREP_EMULATE_BINLOG(thd)                          && 
-      table->file->ht->db_type != DB_TYPE_INNODB         &&
+  if (WSREP_EMULATE_BINLOG(thd) &&
+      table->file->ht->db_type != DB_TYPE_INNODB &&
       !(table->file->ht->db_type == DB_TYPE_PARTITION_DB &&
-        (((ha_partition*)(table->file))->wsrep_db_type() == DB_TYPE_INNODB)))
+        (((Partition_handler*)(table->file))->wsrep_is_innodb())))
   {
       return 0;
   }
@@ -8317,6 +8339,7 @@ int binlog_log_row(TABLE* table,
     }
   }
 #endif /* WITH_WSREP */
+
   if (check_table_binlog_row_based(thd, table))
   {
     if (thd->variables.transaction_write_set_extraction != HASH_ALGORITHM_OFF)
@@ -8669,6 +8692,56 @@ void handler::unlock_shared_ha_data()
   if (table_share->tmp_table == NO_TMP_TABLE)
     mysql_mutex_unlock(&table_share->LOCK_ha_data);
 }
+#ifdef WITH_WSREP
+/**
+  @details
+  This function makes the storage engine to force the victim transaction
+  to abort. Currently, only innodb has this functionality, but any SE
+  implementing the wsrep API should provide this service to support
+  multi-master operation.
+
+  @param bf_thd       brute force THD asking for the abort
+  @param victim_thd   victim THD to be aborted
+
+  @return
+    always 0
+*/
+
+int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
+{
+  DBUG_ENTER("ha_wsrep_abort_transaction");
+  if (!WSREP(bf_thd) &&  
+      !(bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU &&
+        bf_thd->wsrep_exec_mode == TOTAL_ORDER)) {
+    DBUG_RETURN(0);
+  }
+
+  handlerton *hton= installed_htons[DB_TYPE_INNODB];
+  if (hton && hton->wsrep_abort_transaction)
+  {
+    hton->wsrep_abort_transaction(hton, bf_thd, victim_thd, signal);
+  } 
+  else 
+  {
+    WSREP_WARN("cannot abort InnoDB transaction");
+  }
+
+  DBUG_RETURN(0);
+}
+
+void ha_wsrep_fake_trx_id(THD *thd)
+{
+  DBUG_ENTER("ha_wsrep_fake_trx_id");
+  if (!WSREP(thd)) 
+  {
+    DBUG_VOID_RETURN;
+  }
+
+  (void *)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
+
+  DBUG_VOID_RETURN;
+}
+#endif /* WITH_WSREP */
 
 
 /**
@@ -8781,65 +8854,6 @@ static void copy_blob_data(const TABLE *table,
     }
   }
 }
-
-#ifdef WITH_WSREP
-/**
-  @details
-  This function makes the storage engine to force the victim transaction
-  to abort. Currently, only innodb has this functionality, but any SE
-  implementing the wsrep API should provide this service to support
-  multi-master operation.
-
-  @param bf_thd       brute force THD asking for the abort
-  @param victim_thd   victim THD to be aborted
-
-  @return
-    always 0
-*/
-
-int ha_wsrep_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
-{
-  DBUG_ENTER("ha_wsrep_abort_transaction");
-  if (!WSREP(bf_thd) &&  
-      !(bf_thd->variables.wsrep_OSU_method == WSREP_OSU_RSU &&
-        bf_thd->wsrep_exec_mode == TOTAL_ORDER)) {
-    DBUG_RETURN(0);
-  }
-
-  handlerton *hton= installed_htons[DB_TYPE_INNODB];
-  if (hton && hton->wsrep_abort_transaction)
-  {
-    hton->wsrep_abort_transaction(hton, bf_thd, victim_thd, signal);
-  } 
-  else 
-  {
-    WSREP_WARN("cannot abort InnoDB transaction");
-  }
-
-  DBUG_RETURN(0);
-}
-
-void ha_wsrep_fake_trx_id(THD *thd)
-{
-  DBUG_ENTER("ha_wsrep_fake_trx_id");
-  if (!WSREP(thd)) 
-  {
-    DBUG_VOID_RETURN;
-  }
-
-  handlerton *hton= installed_htons[DB_TYPE_INNODB];
-  if (hton && hton->wsrep_fake_trx_id)
-  {
-    hton->wsrep_fake_trx_id(hton, thd);
-  } 
-  else 
-  {
-    WSREP_WARN("cannot get get fake InnoDB transaction ID");
-  }
-
-  DBUG_VOID_RETURN;
-}
-#endif /* WITH_WSREP */
 
 bool handler::is_using_prohibited_gap_locks(TABLE* table,
                                             bool using_full_primary_key) const

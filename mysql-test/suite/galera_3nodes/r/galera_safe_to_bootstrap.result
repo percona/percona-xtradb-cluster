@@ -8,6 +8,10 @@ include/assert_grep.inc [grastate.dat does not have 'safe_to_bootstrap: 0']
 include/assert_grep.inc [grastate.dat does not have 'safe_to_bootstrap: 0']
 include/assert_grep.inc [grastate.dat does not have 'safe_to_bootstrap: 0']
 include/assert_grep.inc [grastate.dat does not have 'safe_to_bootstrap: 1']
+<<<<<<< HEAD
+=======
+# restart
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 include/assert_grep.inc [grastate.dat does not have 'safe_to_bootstrap: 0']
 include/assert_grep.inc [grastate.dat does not have 'safe_to_bootstrap: 0']
 include/assert_grep.inc [grastate.dat does not have 'safe_to_bootstrap: 0']
@@ -16,6 +20,12 @@ Killing server ...
 safe_to_bootstrap: 1
 safe_to_bootstrap: 0
 safe_to_bootstrap: 0
+<<<<<<< HEAD
+=======
+# restart
+# restart
+# restart
+>>>>>>> cs-tag-wsrep_5.7.17-25.11
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
 SHOW CREATE TABLE t1;
