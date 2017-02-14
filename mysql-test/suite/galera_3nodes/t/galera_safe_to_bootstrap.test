@@ -30,11 +30,7 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 --source include/shutdown_mysqld.inc
 
 --connection node_1
-<<<<<<< HEAD
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-=======
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 --source include/wait_condition.inc
 
 # Still, all grastate.dat files should have safe_to_boostrap: 0
@@ -57,11 +53,7 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 --source include/shutdown_mysqld.inc
 
 --connection node_1
-<<<<<<< HEAD
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-=======
 --let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 --source include/wait_condition.inc
 
 # Now, nodes 2,3 should have safe_to_boostrap: 0
@@ -87,11 +79,7 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 --source include/start_mysqld.inc
 
 --connection node_1
-<<<<<<< HEAD
---let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-=======
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 --source include/wait_condition.inc
 
 # All nodes should be back to 'safe_to_bootstrap: 0'
@@ -117,11 +105,7 @@ CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 
 --connection node_1
 SET SESSION wsrep_on = OFF;
-<<<<<<< HEAD
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-=======
 --let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 --source include/wait_condition.inc
 
 --source include/kill_galera.inc
@@ -166,11 +150,7 @@ SET SESSION wsrep_on = OFF;
 --let $_expect_file_name= $MYSQLTEST_VARDIR/tmp/mysqld.3.expect
 --source include/start_mysqld.inc
 
-<<<<<<< HEAD
---let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-=======
 --let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 --source include/wait_condition.inc
 
 --connection node_2

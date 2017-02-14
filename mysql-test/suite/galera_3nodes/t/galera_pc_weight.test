@@ -55,16 +55,6 @@ SHOW STATUS LIKE 'wsrep_local_state_comment';
 
 # For Node #1, we expect a primary component of size 1
 
-<<<<<<< HEAD
---let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
---source include/wait_condition.inc
-
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_connected';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state';
-SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
-=======
 --let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
@@ -73,7 +63,6 @@ SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABL
 SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
 SELECT VARIABLE_VALUE = 4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state';
 SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 
 SET GLOBAL wsrep_provider_options = 'pc.weight=1';
 
@@ -99,30 +88,6 @@ SET SESSION wsrep_sync_wait=0;
 
 --connection node_1
 --source include/wait_until_connected_again.inc
-<<<<<<< HEAD
-SELECT VARIABLE_VALUE = 3 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_connected';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state';
-SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
-
---connection node_2
-SELECT VARIABLE_VALUE = 3 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_connected';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state';
-SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
-
---connection node_3
-SELECT VARIABLE_VALUE = 3 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_connected';
-SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state';
-SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
-=======
 SELECT VARIABLE_VALUE = 3 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 SELECT VARIABLE_VALUE = 'Primary' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_status';
 SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_connected';
@@ -145,7 +110,6 @@ SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABL
 SELECT VARIABLE_VALUE = 'ON' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_ready';
 SELECT VARIABLE_VALUE = 4 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state';
 SELECT VARIABLE_VALUE = 'Synced' FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 
 --connection node_1
 

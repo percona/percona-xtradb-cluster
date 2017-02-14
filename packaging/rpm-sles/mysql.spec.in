@@ -576,14 +576,11 @@ mkdir debug
 %if 0%{?wsrep_embedded}
            -DWITH_EMBEDDED_SERVER=1 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
-<<<<<<< HEAD
-=======
 %endif
            -DWITH_WSREP=1 \
            -DWSREP_VERSION="%{wsrep_version}" \
            -DWSREP_REVISION="%{wsrep_revision}" \
            -DWITH_NUMA=ON \
->>>>>>> cs-tag-wsrep_5.7.17-25.11
            %{?ssl_option} \
            %{?mecab_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_debug}" \
@@ -617,14 +614,11 @@ mkdir release
 %if 0%{?wsrep_embedded}
            -DWITH_EMBEDDED_SERVER=1 \
            -DWITH_EMBEDDED_SHARED_LIBRARY=1 \
-<<<<<<< HEAD
-=======
 %endif
            -DWITH_WSREP=1 \
            -DWSREP_VERSION="%{wsrep_version}" \
            -DWSREP_REVISION="%{wsrep_revision}" \
            -DWITH_NUMA=ON \
->>>>>>> cs-tag-wsrep_5.7.17-25.11
            %{?ssl_option} \
            %{?mecab_option} \
            -DCOMPILATION_COMMENT="%{compilation_comment_release}" \
@@ -1211,8 +1205,6 @@ fi
 %endif # cluster
 
 %changelog
-<<<<<<< HEAD
-=======
 * Wed Nov 02 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.15
 - Merge Oracle's changes of 5.7.11 .. 5.7.14 which brought new dependency definitions,
   restore date order of changelog entries.
@@ -1224,7 +1216,6 @@ fi
 * Tue Sep 13 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.16-1
 - Add connection_control.so to server subpackage
 
->>>>>>> cs-tag-wsrep_5.7.17-25.11
 * Fri Jun 03 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.14-1
 - Adapt MySQL server 5.7 packaging to MySQL Cluster 7.5
 
