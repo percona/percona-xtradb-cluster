@@ -462,7 +462,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     }
     if (data_len > 0)
     {
-      WSREP_DEBUG("Got %lu bytes from stmt cache", data_len);
+      WSREP_DEBUG("Got %lu bytes from stmt cache", (long unsigned int) data_len);
     }
   }
 
@@ -509,7 +509,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                "schema: %s \n"
 	       "QUERY: %s\n"
 	       " => Skipping replication",
-	       thd->thread_id(), data_len,
+	       thd->thread_id(), (long unsigned int) data_len,
                (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     rcode = WSREP_TRX_FAIL;
   }
@@ -649,7 +649,7 @@ bool wsrep_replicate_GTID(THD *thd)
     (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
     DBUG_ASSERT (WSREP_UNDEFINED_TRX_ID != thd->wsrep_ws_handle.trx_id);
     WSREP_DEBUG("slave trx using query ID %lu for replication GTID",
-                thd->wsrep_ws_handle.trx_id);
+                (long unsigned int) thd->wsrep_ws_handle.trx_id);
 
     enum wsrep_trx_status rcode= wsrep_run_wsrep_commit(thd, wsrep_hton, true);
     if (rcode)

@@ -4,15 +4,12 @@ VARIABLE_VALUE = 'Synced'
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
-# restart:--wsrep-cluster-address=gcomm://127.0.0.1:<PORT> --wsrep_provider_options=base_port=13001;<SOCKET_PATH>;
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
-# restart:--wsrep_provider_options=base_port=13005;<SOCKET_PATH>;
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1
-# restart:--wsrep-cluster-address=gcomm://127.0.0.1:<PORT> --wsrep_provider_options=base_port=13001;<SOCKET_PATH>;
 SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 VARIABLE_VALUE = 2
 1

@@ -675,7 +675,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
           WSREP_INFO("closing client connections for "
                      "protocol change %ld -> %d",
                      wsrep_protocol_version, view->proto_ver);
-          wsrep_close_client_connections(TRUE);
+          wsrep_close_client_connections(TRUE, false);
           wsrep_protocol_version= view->proto_ver;
           wsrep_ready_set(wsrep_ready_saved);
       }
@@ -703,7 +703,7 @@ wsrep_view_handler_cb (void*                    app_ctx,
     if (!wsrep_before_SE())
     {
         WSREP_DEBUG("[debug]: closing client connections for PRIM");
-        wsrep_close_client_connections(TRUE);
+        wsrep_close_client_connections(TRUE, false);
     }
 
     ssize_t const req_len= wsrep_sst_prepare (sst_req, thd);
@@ -1237,7 +1237,7 @@ void wsrep_stop_replication(THD *thd)
 
   wsrep_connected= FALSE;
 
-  wsrep_close_client_connections(TRUE);
+  wsrep_close_client_connections(TRUE, false);
 
   /* wait until appliers have stopped */
   wsrep_wait_appliers_close(thd);
@@ -1247,7 +1247,7 @@ void wsrep_stop_replication(THD *thd)
 
 /* This one is set to true when --wsrep-new-cluster is found in the command
  * line arguments */
-static my_bool wsrep_new_cluster= FALSE;
+my_bool wsrep_new_cluster= FALSE;
 #define WSREP_NEW_CLUSTER "--wsrep-new-cluster"
 /* Finds and hides --wsrep-new-cluster from the arguments list
  * by moving it to the end of the list and decrementing argument count */

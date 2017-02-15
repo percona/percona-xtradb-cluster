@@ -1160,7 +1160,9 @@ public:
 class Call_wsrep_close_client_conn : public Do_THD_Impl
 {
 public:
-  Call_wsrep_close_client_conn()
+  Call_wsrep_close_client_conn(bool server_shutdown)
+    :
+    is_server_shutdown(server_shutdown)
   {}
 
   virtual void operator()(THD *closing_thd)
@@ -1173,9 +1175,17 @@ public:
       sql_print_warning(ER_DEFAULT(ER_FORCING_CLOSE),my_progname,
                         closing_thd->thread_id(),
                         (main_sctx_user.length ? main_sctx_user.str : ""));
-      close_connection(closing_thd);
+      /*
+        Do not generate MYSQL_AUDIT_CONNECTION_DISCONNECT event, when closing
+        thread close sessions. Each session will generate DISCONNECT event by
+        itself.
+      */
+      close_connection(closing_thd, 0, is_server_shutdown, false);
     }
   }
+
+private:
+  bool is_server_shutdown;
 };
 
 /**
@@ -1395,7 +1405,7 @@ extern "C" void unireg_abort(int exit_code)
 
     /* This is an abort situation, we cannot expect to gracefully close all
      * wsrep threads here, we can only diconnect from service */
-    wsrep_close_client_connections(FALSE);
+    wsrep_close_client_connections(FALSE, true);
     wsrep_close_threads(NULL);
     wsrep->disconnect(wsrep);
 
@@ -7126,7 +7136,7 @@ extern "C" void *start_wsrep_THD(void *arg)
   thd->set_catalog(NULL_CSTR);
   thd->reset_query();
   thd->reset_db(NULL_CSTR);
-  close_connection(thd, 0);
+  close_connection(thd, 0, false, false);
 
   thd->temporary_tables = 0; // remove tempation from destructor to close them
 
@@ -7258,7 +7268,7 @@ int wsrep_wait_committing_connections_close(int wait_time)
   return 0;
 }
 
-void wsrep_close_client_connections(my_bool wait_to_end) 
+void wsrep_close_client_connections(my_bool wait_to_end, bool server_shutdown)
 {
 
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
@@ -7271,7 +7281,7 @@ void wsrep_close_client_connections(my_bool wait_to_end)
   sql_print_information("Giving %d client threads a chance to die gracefully",
                         static_cast<int>(thd_manager->get_thd_count()));
 
-  Call_wsrep_close_client_conn call_wsrep_close_client_conn;
+  Call_wsrep_close_client_conn call_wsrep_close_client_conn(server_shutdown);
   thd_manager->do_for_all_thd(&call_wsrep_close_client_conn);
 
   if (thd_manager->get_thd_count() > 0)

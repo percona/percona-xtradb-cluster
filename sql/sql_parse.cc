@@ -1587,7 +1587,8 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
   {
     thd->set_wsrep_next_trx_id(thd->query_id);
-    WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
+    WSREP_DEBUG("assigned new next trx id: %lu",
+                (long unsigned int) thd->wsrep_next_trx_id());
   }
 #endif /* WITH_WSREP */
   thd->rewritten_query.mem_free();
@@ -1826,7 +1827,8 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
       {
         thd->set_wsrep_next_trx_id(thd->query_id);
-        WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
+        WSREP_DEBUG("assigned new next trx id: %lu",
+                    (long unsigned int) thd->wsrep_next_trx_id());
       }
     wsrep_mysql_parse(thd, thd->query().str, thd->query().length, &parser_state);
 #else
@@ -7957,7 +7959,8 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                                                       thd->charset(), NULL);
           DBUG_ASSERT(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
           thd->set_wsrep_next_trx_id(thd->query_id);
-          WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
+          WSREP_DEBUG("assigned new next trx id: %lu",
+                      (long unsigned int) thd->wsrep_next_trx_id());
         }
         else
         {

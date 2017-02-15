@@ -22039,8 +22039,8 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 					      wsrep_thd_trx_seqno(thd));
 		} else {
 			WSREP_DEBUG("abort_pre trxid %lu next trxid %lu query id %lld",
-                              wsrep_thd_trx_id(thd),
-                              wsrep_thd_next_trx_id(thd),
+                              (long unsigned int) wsrep_thd_trx_id(thd),
+                              (long unsigned int) wsrep_thd_next_trx_id(thd),
                               wsrep_thd_query_id(thd));
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,

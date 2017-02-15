@@ -3058,7 +3058,8 @@ bool Query_result_create::send_eof()
         WSREP_DEBUG("CTAS NEW KEY");
       }
       DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
-      WSREP_DEBUG("CTAS key append for trx: %lu ", thd->wsrep_trx_id());
+      WSREP_DEBUG("CTAS key append for trx: %lu ",
+                  (long unsigned int) thd->wsrep_trx_id());
 
       /*
          append table level exclusive key for CTAS

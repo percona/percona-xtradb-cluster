@@ -70,6 +70,11 @@ private:
   Find_THD_Impl *m_impl;
 };
 
+Do_THD_Impl::Do_THD_Impl()
+{
+  /* Empty constructor */
+}
+
 
 #ifdef HAVE_PSI_INTERFACE
 static PSI_mutex_key key_LOCK_thd_list;

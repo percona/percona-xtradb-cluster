@@ -78,6 +78,7 @@ INSTALL PLUGIN audit_log SONAME 'audit_log.so';
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
 show status like 'wsrep_local_state_comment';
 
+--replace_regex /127\.0\.0\.1:[0-9]{1,5}/127.0.0.1:<PORT>/
 --eval SET GLOBAL wsrep_cluster_address = '$wsrep_cluster_address_orig';
 --source include/wait_until_connected_again.inc
 --source include/galera_wait_ready.inc

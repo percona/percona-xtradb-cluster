@@ -142,6 +142,7 @@ extern ulong       pxc_maint_transition_period;
 extern my_bool     pxc_encrypt_cluster_traffic;
 
 // MySQL status variables
+extern my_bool     wsrep_new_cluster;
 extern my_bool     wsrep_connected;
 extern my_bool     wsrep_ready;
 extern const char* wsrep_cluster_state_uuid;
@@ -210,7 +211,7 @@ extern "C" void wsrep_thd_auto_increment_variables(THD*,
                                                    unsigned long long *offset,
                                                    unsigned long long *increment);
 
-extern void wsrep_close_client_connections(my_bool wait_to_end);
+extern void wsrep_close_client_connections(my_bool wait_to_end, bool server_shtudown);
 extern int  wsrep_wait_committing_connections_close(int wait_time);
 extern void wsrep_close_applier(THD *thd);
 extern void wsrep_wait_appliers_close(THD *thd);

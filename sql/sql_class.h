@@ -4797,7 +4797,7 @@ public:
     {
       set_wsrep_next_trx_id(query_id);
       WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
-                  wsrep_next_trx_id());
+                  (long unsigned int) wsrep_next_trx_id());
     }
   }
 

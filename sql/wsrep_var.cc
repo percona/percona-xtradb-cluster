@@ -438,7 +438,7 @@ bool wsrep_reject_queries_update(sys_var *self, THD* thd, enum_var_type type)
             WSREP_INFO("Rejecting client queries due to manual setting");
             break;
         case WSREP_REJECT_ALL_KILL:
-            wsrep_close_client_connections(FALSE);
+            wsrep_close_client_connections(FALSE, false);
             WSREP_INFO("Rejecting client queries and killing connections due to manual setting");
             break;
         default:

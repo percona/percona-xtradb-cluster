@@ -43,7 +43,7 @@ INSTALL PLUGIN audit_log SONAME 'audit_log.so';
 show status like 'wsrep_local_state_comment';
 Variable_name	Value
 wsrep_local_state_comment	Synced
-SET GLOBAL wsrep_cluster_address = 'gcomm://127.0.0.1:13001';;
+SET GLOBAL wsrep_cluster_address = 'gcomm://127.0.0.1:<PORT>';;
 UNINSTALL PLUGIN audit_log;
 Warnings:
 Warning	1620	Plugin is busy and will be uninstalled on shutdown

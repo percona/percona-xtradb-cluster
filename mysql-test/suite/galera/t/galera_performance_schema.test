@@ -44,7 +44,8 @@ select * from t;
 # cond-variables
 --connection node_1
 --echo #node-1
---let $condvar = `select count(*) from performance_schema.events_waits_history_long where event_name like '%COND%wsrep%' or event_name like '%COND%galera%'`
+truncate performance_schema.events_waits_current;
+--let $condvar = `select count(*) from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%'`
 use test;
 begin;
 insert into t values (3);
@@ -60,5 +61,5 @@ insert into t values (3);
 --error ER_LOCK_DEADLOCK
 commit;
 --replace_regex /[1-9][0-9]+/PREVIOUS_COUNT/
---eval select count(*) > $condvar from performance_schema.events_waits_history_long where event_name like '%COND%wsrep%' or event_name like '%COND%galera%';
+--eval select count(*) > $condvar from performance_schema.events_waits_current where event_name like '%COND_wsrep_rollback%';
 drop table t;
