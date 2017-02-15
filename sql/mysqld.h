@@ -790,13 +790,23 @@ extern PSI_stage_info stage_restoring_secondary_keys;
 extern PSI_stage_info stage_wsrep_writing_rows;
 extern PSI_stage_info stage_wsrep_deleting_rows;
 extern PSI_stage_info stage_wsrep_updating_rows;
+
 extern PSI_stage_info stage_wsrep_applying_writeset;
+extern PSI_stage_info stage_wsrep_applied_writeset;
+
 extern PSI_stage_info stage_wsrep_committing;
+extern PSI_stage_info stage_wsrep_committed;
+
 extern PSI_stage_info stage_wsrep_rolling_back;
+extern PSI_stage_info stage_wsrep_rolled_back;
+
 extern PSI_stage_info stage_wsrep_replicating_commit;
 extern PSI_stage_info stage_wsrep_waiting_on_replaying;
 extern PSI_stage_info stage_wsrep_pre_commit;
+
 extern PSI_stage_info stage_wsrep_preparing_for_TO_isolation;
+extern PSI_stage_info stage_wsrep_completed_TO_isolation;
+
 extern PSI_stage_info stage_wsrep_replaying_trx;
 extern PSI_stage_info stage_wsrep_applier_idle;
 extern PSI_stage_info stage_wsrep_in_rollback_thread;

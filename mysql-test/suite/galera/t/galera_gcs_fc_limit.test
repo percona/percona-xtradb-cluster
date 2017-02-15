@@ -42,9 +42,6 @@ LOCK TABLE t1 WRITE;
 
 --connection node_1
 
-# Enables some PROCESSLIST thread state to be maintained for testing
-SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_run_wsrep_commit";
-
 INSERT INTO t1 VALUES (2);
 INSERT INTO t1 VALUES (3);
 INSERT INTO t1 VALUES (4);
@@ -58,7 +55,7 @@ INSERT INTO t1 VALUES (5);
 --let $galera_server_number = 1
 --source include/galera_connect.inc
 --connection node_1a
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep: in pre-commit stage' AND INFO = 'INSERT INTO t1 VALUES (5)';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating pre-commit for write set%' AND INFO = 'INSERT INTO t1 VALUES (5)';
 --source include/wait_condition.inc
 
 --connection node_2
@@ -79,6 +76,3 @@ SELECT COUNT(*) = 6 FROM t1;
 --enable_query_log
 
 DROP TABLE t1;
-
---connection node_1
-SET GLOBAL DEBUG = "";

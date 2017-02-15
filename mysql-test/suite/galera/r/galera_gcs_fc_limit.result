@@ -16,7 +16,6 @@ Variable_name	Value
 wsrep_flow_control_interval	[ 71, 141 ]
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=1';
 LOCK TABLE t1 WRITE;
-SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_run_wsrep_commit";
 INSERT INTO t1 VALUES (2);
 INSERT INTO t1 VALUES (3);
 INSERT INTO t1 VALUES (4);
@@ -27,4 +26,3 @@ SELECT COUNT(*) = 6 FROM t1;
 COUNT(*) = 6
 1
 DROP TABLE t1;
-SET GLOBAL DEBUG = "";

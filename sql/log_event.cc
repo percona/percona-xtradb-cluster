@@ -12548,19 +12548,17 @@ Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_ASSERT(m_table != NULL);
 
 #ifdef WITH_WSREP
-  THD_STAGE_INFO_GUARD(NULL, NULL);
   if (WSREP(thd))
-    THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_writing_rows);
+  {
+    THD_STAGE_INFO(thd, stage_wsrep_writing_rows);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+             "wsrep: writing row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+  }
 #endif /* WITH_WSREP */
 
   int error= write_row(rli, rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT);
-
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: rows written (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
 
   if (error && !thd->is_error())
   {
@@ -12672,23 +12670,20 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   }
 
 #ifdef WITH_WSREP
-  THD_STAGE_INFO_GUARD(NULL, NULL);
   if (WSREP(thd))
-    THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_deleting_rows);
+  {
+    THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+             "wsrep: deleting row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+  }
 #endif /* WITH_WSREP */
 
   /* m_table->record[0] contains the BI */
   m_table->mark_columns_per_binlog_row_image();
   error= m_table->file->ha_delete_row(m_table->record[0]);
   m_table->default_column_bitmaps();
-
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: rows deleted (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
-
 
   return error;
 }
@@ -12853,9 +12848,14 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 
 #ifdef WITH_WSREP
-  THD_STAGE_INFO_GUARD(NULL, NULL);
   if (WSREP(thd))
-    THD_STAGE_INFO_GUARD_ENTER(thd, &stage_wsrep_updating_rows);
+  {
+    THD_STAGE_INFO(thd, stage_wsrep_updating_rows);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+             "wsrep: updating row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+  }
 #endif /* WITH_WSREP */
 
   m_table->mark_columns_per_binlog_row_image();
@@ -12863,13 +12863,6 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   if (error == HA_ERR_RECORD_IS_THE_SAME)
     error= 0;
   m_table->default_column_bitmaps();
-
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: rows updated (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
 
   return error;
 }

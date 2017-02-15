@@ -7,7 +7,6 @@
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
---source include/have_debug.inc
 
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
@@ -16,9 +15,6 @@ CREATE TABLE t2 (id INT PRIMARY KEY) ENGINE=InnoDB;
 
 --let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
 --let $wsrep_sync_wait_orig = `SELECT @@wsrep_sync_wait`
-
-# Enables some PROCESSLIST thread state to be maintained for testing
-SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_apply_cb,thd_proc_info.wsrep_commit";
 
 SET GLOBAL wsrep_slave_threads = 2;
 LOCK TABLE t1 READ;
@@ -34,10 +30,14 @@ INSERT INTO t2 VALUES (1);
 --let $galera_server_number = 2
 --source include/galera_connect.inc
 --connection node_2a
---sleep 1
 SET SESSION wsrep_sync_wait=0;
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: applied write set%';
-SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE '%Waiting for table metadata lock%';
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'Waiting for table metadata lock%';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: applied write-set%';
+--source include/wait_condition.inc
+
 SELECT COUNT(*) = 0 FROM t1;
 SELECT COUNT(*) = 0 FROM t2;
 
@@ -49,8 +49,6 @@ UNLOCK TABLES;
 SELECT COUNT(*) = 1 FROM t1;
 SELECT COUNT(*) = 1 FROM t2;
 SELECT COUNT(*) = 2  FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: committed%';
-
-SET GLOBAL DEBUG = "";
 
 --eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
 DROP TABLE t1;

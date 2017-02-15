@@ -234,10 +234,17 @@ void wsrep_replay_transaction(THD *thd)
       MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
       thd->m_statement_psi= NULL;
       thd->m_digest= NULL;
-      THD_STAGE_INFO_GUARD(thd, &stage_wsrep_replaying_trx);
+
+      THD_STAGE_INFO(thd, stage_wsrep_replaying_trx);
+      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+               "wsrep: replaying write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+      WSREP_DEBUG("%s", thd->wsrep_info);
+      thd_proc_info(thd, thd->wsrep_info);
+
       WSREP_DEBUG("replay trx: %s %lld",
                   WSREP_QUERY(thd),
                   (long long)wsrep_thd_trx_seqno(thd));
+
       struct wsrep_thd_shadow shadow;
       wsrep_prepare_bf_thd(thd, &shadow);
 
@@ -333,7 +340,8 @@ static void wsrep_replication_process(THD *thd)
 {
   int rcode;
   DBUG_ENTER("wsrep_replication_process");
-  THD_STAGE_INFO_GUARD(thd, &stage_wsrep_applier_idle);
+
+  THD_STAGE_INFO(thd, stage_wsrep_applier_idle);
 
 #ifdef HAVE_PSI_INTERFACE
   wsrep_pfs_register_thread(key_THREAD_wsrep_applier);
@@ -448,12 +456,13 @@ static void wsrep_rollback_process(THD *thd)
   mysql_mutex_lock(&LOCK_wsrep_rollback);
   wsrep_aborting_thd= NULL;
 
-  THD_STAGE_INFO_GUARD(thd, &stage_wsrep_in_rollback_thread);
+  THD_STAGE_INFO(thd, stage_wsrep_in_rollback_thread);
 
   while (thd->killed == THD::NOT_KILLED) {
 
+    THD_STAGE_INFO(thd, stage_wsrep_aborter_idle);
+
     mysql_mutex_lock(&thd->LOCK_current_cond);
-    THD_STAGE_INFO_GUARD_UPDATE(&stage_wsrep_aborter_idle);
     thd->current_mutex= &LOCK_wsrep_rollback;
     thd->current_cond= &COND_wsrep_rollback;
     mysql_mutex_unlock(&thd->LOCK_current_cond);
@@ -467,8 +476,9 @@ static void wsrep_rollback_process(THD *thd)
     }
     WSREP_DEBUG("WSREP rollback thread wakes for signal");
 
+    THD_STAGE_INFO(thd, stage_wsrep_aborter_active);
+
     mysql_mutex_lock(&thd->LOCK_current_cond);
-    THD_STAGE_INFO_GUARD_UPDATE(&stage_wsrep_aborter_active);
     thd->current_mutex= 0;
     thd->current_cond= 0;
     mysql_mutex_unlock(&thd->LOCK_current_cond);

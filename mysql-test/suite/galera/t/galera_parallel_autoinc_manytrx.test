@@ -4,7 +4,6 @@
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
---source include/have_debug.inc
 --source include/big_test.inc
 
 # Create a second connection to node1 so that we can run transactions concurrently
@@ -20,9 +19,6 @@ CREATE TABLE t1 (f1 INTEGER AUTO_INCREMENT PRIMARY KEY, f2 INTEGER) Engine=InnoD
 --connection node_2
 --let $wsrep_slave_threads_orig = `SELECT @@wsrep_slave_threads`
 SET GLOBAL wsrep_slave_threads = 4;
-
-# Enables some PROCESSLIST thread state to be maintained for testing
-SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_commit";
 
 --connection node_1
 --let $count = 1000
@@ -47,8 +43,6 @@ while ($count)
 SELECT COUNT(*) = 20000 FROM t1;
 SELECT COUNT(DISTINCT f1) = 20000 FROM t1;
 SELECT COUNT(*) = 4 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE 'wsrep: committed%';
-
-SET GLOBAL DEBUG = "";
 
 --disable_query_log
 --eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;

@@ -186,8 +186,6 @@ private:
 /* Restores the saved old stage */
 #define THD_STAGE_INFO_GUARD_LEAVE() threadStageInfoGuard_.leave(__func__, __FILE__, __LINE__)
 
-
-
 #endif /* WITH_WSREP */
 
 enum enum_delay_key_write { DELAY_KEY_WRITE_NONE, DELAY_KEY_WRITE_ON,

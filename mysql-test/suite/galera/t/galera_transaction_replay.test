@@ -16,8 +16,6 @@ INSERT INTO t1 VALUES (1, 'a');
 INSERT INTO t1 VALUES (2, 'a');
 
 --connection node_1
-# Enables some PROCESSLIST thread state to be maintained for testing
-SET GLOBAL DEBUG = "d,thd_proc_info.wsrep_run_wsrep_commit";
 
 SET AUTOCOMMIT=ON;
 START TRANSACTION;
@@ -48,7 +46,7 @@ UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'System lock';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep: in pre-commit stage' AND INFO = 'COMMIT';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating pre-commit for write set%' AND INFO = 'COMMIT';
 --source include/wait_condition.inc
 
 # Unblock the commit
@@ -105,10 +103,10 @@ insert into t1 values (3, 'a');
 
 # Wait for both transactions to be blocked
 --connection node_1a
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'wsrep: in pre-commit stage';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating pre-commit for write set%';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: writing rows%';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: writing row%';
 --source include/wait_condition.inc
 
 # Unblock the commit
@@ -131,11 +129,6 @@ select * from t1;
 --echo #node_1
 deallocate prepare stmt1;
 drop table t1;
-
-SET GLOBAL DEBUG = "";
-
-SET DEBUG_SYNC='RESET';
-
 
 #echo "# test for PS replaying"
 #
@@ -169,7 +162,7 @@ INSERT INTO t1 VALUES(2,2);
 
 # Wait until applying begins in node_1
 --connection node_1a
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: writing rows%';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: writing row%';
 --source include/wait_condition.inc
 
 # Unblock the PS commit

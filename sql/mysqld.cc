@@ -10369,18 +10369,30 @@ PSI_stage_info stage_restoring_secondary_keys= { 0, "restoring secondary keys", 
 PSI_stage_info stage_wsrep_writing_rows= { 0, "wsrep: writing rows", 0};
 PSI_stage_info stage_wsrep_deleting_rows = { 0, "wsrep: deleting rows", 0};
 PSI_stage_info stage_wsrep_updating_rows = { 0, "wsrep: updating rows", 0};
+
 PSI_stage_info stage_wsrep_applying_writeset = { 0, "wsrep: applying write set", 0};
+PSI_stage_info stage_wsrep_applied_writeset = { 0, "wsrep: applied write set", 0};
+
 PSI_stage_info stage_wsrep_committing = { 0, "wsrep: committing", 0};
+PSI_stage_info stage_wsrep_committed = { 0, "wsrep: committed", 0};
+
 PSI_stage_info stage_wsrep_rolling_back = { 0, "wsrep: rolling back", 0};
+PSI_stage_info stage_wsrep_rolled_back = { 0, "wsrep: rolled back", 0};
+
 PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating commit", 0};
 PSI_stage_info stage_wsrep_waiting_on_replaying = { 0, "wsrep: waiting on replaying", 0};
 PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0};
+
 PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0};
+PSI_stage_info stage_wsrep_completed_TO_isolation = { 0, "wsrep: completed TO isolation", 0};
+
 PSI_stage_info stage_wsrep_replaying_trx = { 0, "wsrep: replaying trx", 0};
+
 PSI_stage_info stage_wsrep_applier_idle = { 0, "wsrep: applier idle", 0 };
 PSI_stage_info stage_wsrep_in_rollback_thread = { 0, "wsrep: in rollback thread", 0};
 PSI_stage_info stage_wsrep_aborter_idle = { 0, "wsrep: aborter idle", 0};
 PSI_stage_info stage_wsrep_aborter_active = { 0, "wsrep: aborter active", 0};
+
 #endif /* WITH_WSREP */
 
 #ifdef HAVE_PSI_INTERFACE
@@ -10503,16 +10515,26 @@ PSI_stage_info *wsrep_server_stages[]=
   & stage_wsrep_writing_rows,
   & stage_wsrep_deleting_rows,
   & stage_wsrep_updating_rows,
+
   // wsrep_applier
   & stage_wsrep_applying_writeset,
+  & stage_wsrep_applied_writeset,
+
   & stage_wsrep_committing,
+  & stage_wsrep_committed,
+
   & stage_wsrep_rolling_back,
+  & stage_wsrep_rolled_back,
+
   // wsrep_hton
   & stage_wsrep_replicating_commit,
   & stage_wsrep_waiting_on_replaying,
   & stage_wsrep_pre_commit,
+
   // wsrep_mysqld
   & stage_wsrep_preparing_for_TO_isolation,
+  & stage_wsrep_completed_TO_isolation,
+
   // wsrep_thd
   & stage_wsrep_replaying_trx,
   & stage_wsrep_applier_idle,

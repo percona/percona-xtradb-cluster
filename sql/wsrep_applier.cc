@@ -248,15 +248,11 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   thd->wsrep_trx_meta = *meta;
 
-  THD_STAGE_INFO_GUARD(thd, &stage_wsrep_applying_writeset);
-
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: applying write set (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
-
+  THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "wsrep: applying write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   /* tune FK and UK checking policy */
   if (wsrep_slave_UK_checks == FALSE) 
@@ -280,18 +276,11 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   }
   wsrep_cb_status_t rcode(wsrep_apply_events(thd, buf, buf_len));
 
-  THD_STAGE_INFO_GUARD_LEAVE();
-
-  /* Provide this for some galera test cases that check the thread state */
-  DBUG_EXECUTE_IF("thd_proc_info.wsrep_apply_cb",
-                  { thd_proc_info(thd, "wsrep: applied write set"); };);
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: applied write set (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
-
+  THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "wsrep: applied write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   if (WSREP_CB_SUCCESS != rcode)
   {
@@ -313,30 +302,20 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
 static wsrep_cb_status_t wsrep_commit(THD* const thd)
 {
-  THD_STAGE_INFO_GUARD(thd, &stage_wsrep_committing);
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: committing (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
-
+  THD_STAGE_INFO(thd, stage_wsrep_committing);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "wsrep: committing write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   wsrep_cb_status_t const rcode(trans_commit(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
-  THD_STAGE_INFO_GUARD_LEAVE();
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: committed (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
-
-
-  /* Provide this for some galera test cases that check the thread state */
-  DBUG_EXECUTE_IF("thd_proc_info.wsrep_commit",
-                  { thd_proc_info(thd, "wsrep: committed"); };);
+  THD_STAGE_INFO(thd, stage_wsrep_committed);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "wsrep: committed write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   if (WSREP_CB_SUCCESS == rcode)
   {
@@ -354,13 +333,11 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
 
 static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 {
-  THD_STAGE_INFO_GUARD(thd, &stage_wsrep_rolling_back);
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: rolling back (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
+  THD_STAGE_INFO(thd, stage_wsrep_rolling_back);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "wsrep: rolling back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   /* Check for comments in Relay_log_info::cleanup_context */
   trans_rollback_stmt(thd);
@@ -368,12 +345,11 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
   wsrep_cb_status_t const rcode(trans_rollback(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
-#ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
-  if (WSREP(thd))
-    WSREP_DEBUG("wsrep: rolled back (%lld)", (long long) wsrep_thd_trx_seqno(thd));
-#endif /* WSREP_PROC_INFO */
-#endif /* WITH_WSREP */
+  THD_STAGE_INFO(thd, stage_wsrep_rolled_back);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+           "wsrep: rolled back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   thd->wsrep_rli->cleanup_context(thd, 0);
   thd->variables.gtid_next.set_automatic();
