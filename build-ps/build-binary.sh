@@ -95,7 +95,7 @@ do
         CMAKE_BUILD_TYPE='Debug'
         BUILD_COMMENT="${BUILD_COMMENT:-}-debug"
         DEBUG_EXTRA="-DDEBUG_EXTNAME=ON"
-        SCONS_ARGS+=' debug=1'
+        SCONS_ARGS+=' debug=0'
         ;;
     -G | --copygalera )
         shift
