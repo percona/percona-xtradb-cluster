@@ -152,8 +152,11 @@ enum_return_status Group_cache::generate_automatic_gno(THD *thd)
             Replace sidno with wsrep_sidno
             if transaction went through wsrep commit
           */
-          if (WSREP(thd) && thd->wsrep_trx_meta.gtid.seqno != -1)
+          if (WSREP(thd) && thd->wsrep_trx_meta.gtid.seqno != -1 &&
+              !thd->wsrep_skip_wsrep_GTID)
           {
+            WSREP_DEBUG("using wsrep_sidno, seqno %lu %s",
+                        thd->wsrep_trx_meta.gtid.seqno,  thd->query());
             automatic_gtid.sidno= wsrep_sidno;
           }
           else
