@@ -695,6 +695,7 @@ int my_load_defaults(const char *conf_file, const char **groups,
       DBUG_RETURN(error);
     }
   }
+
   /*
     Here error contains <> 0 only if we have a fully specified conf_file
     or a forced default file

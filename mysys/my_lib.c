@@ -24,7 +24,6 @@
 # include <dirent.h>
 # endif
 
-
 /*
   We are assuming that directory we are reading is either has less than 
   100 files and so can be read in one initial chunk or has more than 1000

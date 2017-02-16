@@ -101,13 +101,6 @@
 
 #define LF_PINBOX_MAX_PINS 65536
 
-/*
-  When allocation on stack happens leave this
-  amount of stack memory for further functions
-  call.
-*/
-#define LF_PINBOX_EXTRA_STACK_SPACE  8192
-
 static void _lf_pinbox_real_free(LF_PINS *pins);
 
 /*

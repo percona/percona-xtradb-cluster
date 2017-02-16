@@ -1138,4 +1138,12 @@ wsrep_srv_conc_cancel_wait(
 			thread */
 #endif /* WITH_WSREP */
 
+#ifndef DBUG_OFF
+/** false before InnoDB monitor has been printed at least once, true
+afterwards */
+extern bool	srv_debug_monitor_printed;
+#else
+#define	srv_debug_monitor_printed	false
+#endif
+
 #endif
