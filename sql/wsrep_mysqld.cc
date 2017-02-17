@@ -1281,6 +1281,8 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
     WSREP_DEBUG("TO isolation skipped for: %d, sql: %s."
                 "Only temporary tables affected.",
                 ret, WSREP_QUERY(thd));
+    if (buf) my_free(buf);
+    wsrep_keys_free(&key_arr);
     return 1;
   }
   return 0;
