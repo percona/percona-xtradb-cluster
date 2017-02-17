@@ -13,7 +13,7 @@ set +e
 echo "Killing existing mysqld"
 killall -9 mysqld
 killall -9 garbd
-sleep 10
+sleep 1
 set -e
 
 #-------------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fi
 cd $WORKDIR
 mkdir ${BUILD_NUMBER}
 cd ${BUILD_NUMBER}
-mv $WORKDIR/Percona-XtraDB-Cluster*.gz .
+#mv $WORKDIR/Percona-XtraDB-Cluster*.gz .
 BUILDDIR=`pwd`
 
 echo "Workdir: $WORKDIR"
@@ -137,17 +137,17 @@ if [[ $SST_METHOD == "xtrabackup" ]];then
    SST_METHOD="xtrabackup-v2"
 fi
 
-if [[ $SST_METHOD == "xtrabackup-v2" ]];then
-    mv $WORKDIR/percona-xtrabackup*.gz .
-    XB_TAR=`ls -1ct percona-xtrabackup*.tar.gz | head -n1`
-    tar -xf $XB_TAR
-    XB_BASE=`echo $XB_TAR | sed 's/.tar.gz//g'`
-    export PATH="$BUILDDIR/$XB_BASE/bin:$PATH"
-fi
+#if [[ $SST_METHOD == "xtrabackup-v2" ]];then
+#    mv $WORKDIR/percona-xtrabackup*.gz .
+#    XB_TAR=`ls -1ct percona-xtrabackup*.tar.gz | head -n1`
+#    tar -xf $XB_TAR
+#    XB_BASE=`echo $XB_TAR | sed 's/.tar.gz//g'`
+#    export PATH="$BUILDDIR/$XB_BASE/bin:$PATH"
+#fi
 
-PXC_TAR=`ls -1ct Percona-XtraDB-Cluster*.tar.gz | head -n1`
-PXC_BASE="$(tar tf $PXC_TAR | head -1 | tr -d '/')"
-tar -xf $PXC_TAR
+#PXC_TAR=`ls -1ct Percona-XtraDB-Cluster*.tar.gz | head -n1`
+#PXC_BASE="$(tar tf $PXC_TAR | head -1 | tr -d '/')"
+#tar -xf $PXC_TAR
 
 #-------------------------------------------------------------------------------
 #
@@ -259,7 +259,8 @@ cleanup()
         --db-driver=mysql --mysql-socket=$socket cleanup 2>&1 | tee $logfile || exit 1;
 }
 
-MYSQL_BASEDIR="$BUILDDIR/$PXC_BASE"
+MYSQL_BASEDIR="$BUILDDIR/../../../../"
+echo "MySQL base-dir $MYSQL_BASEDIR"
 export MYSQL_VARDIR="$BUILDDIR/mysqlvardir"
 mkdir -p $MYSQL_VARDIR
 echo "MySQL data-dir $MYSQL_VARDIR"
@@ -314,14 +315,31 @@ start_node_1()
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
 	--log-error=$BUILDDIR/logs/node1.err \
+	--pxc_maint_transition_period=0 \
 	--socket=/tmp/n1.sock --log-output=none \
 	--port=$RBASE1 --server-id=1 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node1.err 2>&1 &
 
   echo "Waiting for node-1 to start ...."
   NODE1PID=$!
+  while true ; do
+    sleep 1
 
-  sleep 10
+    if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node1.err ; then
+     break
+    fi
+
+    if egrep -qi "gcomm: closed" $BUILDDIR/logs/node1.err; then
+       echo "Failed to start node-1"
+       exit 1
+    fi
+
+    if [ "${NODE1PID}" == "" ]; then
+      echoit "Error! server not started.. Terminating!"
+      egrep -i "ERROR|ASSERTION" $BUILDDIR/logs/node1.err
+      exit 1
+    fi
+  done
 
   echo "Node-1 started"
   set -e
@@ -345,6 +363,7 @@ start_node_2()
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
 	--log-error=$BUILDDIR/logs/node2.err \
+	--pxc_maint_transition_period=0 \
 	--socket=/tmp/n2.sock --log-output=none \
 	--port=$RBASE2 --server-id=2 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node2.err 2>&1 &
@@ -352,7 +371,7 @@ start_node_2()
   echo "Waiting for node-2 to start ...."
   NODE2PID=$!
   while true ; do
-    sleep 10
+    sleep 1
 
     if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node2.err ; then
      break
@@ -360,8 +379,8 @@ start_node_2()
 
     if egrep -qi "gcomm: closed" $BUILDDIR/logs/node2.err; then
        echo "Failed to start node-2"
-       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
        $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
        exit 1
     fi
 
@@ -394,6 +413,7 @@ start_node_3()
 	--core-file --loose-new --sql-mode=no_engine_substitution \
 	--loose-innodb --secure-file-priv= --loose-innodb-status-file=1 \
 	--log-error=$BUILDDIR/logs/node3.err \
+	--pxc_maint_transition_period=0 \
 	--socket=/tmp/n3.sock --log-output=none \
 	--port=$RBASE3 --server-id=3 --wsrep_slave_threads=$SLAVE_THREADS \
 	--core-file > $BUILDDIR/logs/node3.err 2>&1 &
@@ -403,7 +423,7 @@ start_node_3()
   NODE3PID=$!
   while true ; do
 
-    sleep 10
+    sleep 1
 
     if egrep -qi  "Synchronized with group, ready for connections" $BUILDDIR/logs/node3.err ; then
      break
@@ -411,8 +431,8 @@ start_node_3()
 
     if egrep -qi "gcomm: closed" $BUILDDIR/logs/node3.err; then
        echo "Failed to start node-3"
-       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
        $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+       $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
        exit 1
     fi
 
@@ -560,9 +580,9 @@ sysbench_run()
   #ddl_workload /tmp/n1.sock $BUILDDIR/logs/sysbench_ddl.txt
   cleanup /tmp/n3.sock $BUILDDIR/logs/sysbench_cleanup.txt
 
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
-  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
   $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n3.sock -u root shutdown
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n2.sock -u root shutdown
+  $MYSQL_BASEDIR/bin/mysqladmin --socket=/tmp/n1.sock -u root shutdown
 }
 
 #-------------------------------------------------------------------------------
