@@ -1607,6 +1607,11 @@ int wsrep_to_buf_helper(
 #endif
 
   /* if MySQL GTID event is set, we have to forward it in wsrep channel */
+
+  /* Instead of allocating and copying over the gtid event from gtid event
+  buffer buf is made to point to gtid event.
+  Unfortunately gtid event is only long enough to hold gtid event and so
+  append action below will cause realloc to happen. */
   if (!ret && thd->wsrep_gtid_event_buf)
   {
     *buf     = (uchar *)thd->wsrep_gtid_event_buf;
@@ -1627,7 +1632,11 @@ int wsrep_to_buf_helper(
   if (!ret && ev.write(&tmp_io_cache)) ret= 1;
   if (!ret && wsrep_write_cache_buf(&tmp_io_cache, buf, buf_len)) ret= 1;
 
+  /* Re-assigning so that the buf can be freed using gtid event buffer.
+  Even if gtid event buffer is not allocated we still re-assign as free
+  logic can then only rely on freeing of gtid event buffer. */
   thd->wsrep_gtid_event_buf= *buf;
+  thd->wsrep_gtid_event_buf_len= *buf_len;
 
   close_cached_file(&tmp_io_cache);
   return ret;
@@ -1772,16 +1781,18 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   {
     thd->wsrep_exec_mode= TOTAL_ORDER;
     wsrep_to_isolation++;
+
 #ifdef SKIP_INNODB_HP
     /* set priority */
     thd->tx_priority = 1;
 #endif
+
     if (buf) my_free(buf);
     /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
     thd->wsrep_gtid_event_buf_len = 0;
     thd->wsrep_gtid_event_buf     = NULL;
-
     wsrep_keys_free(&key_arr);
+
     WSREP_DEBUG("TO BEGIN: %lld, %d",(long long)wsrep_thd_trx_seqno(thd),
                 thd->wsrep_exec_mode);
 
@@ -1800,11 +1811,13 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                (thd->query().str) ? WSREP_QUERY(thd) : "void");
     my_error(ER_LOCK_DEADLOCK, MYF(0), "WSREP replication failed. Check "
              "your wsrep connection state and retry the query.");
+
     if (buf) my_free(buf);
     /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
     thd->wsrep_gtid_event_buf_len = 0;
     thd->wsrep_gtid_event_buf     = NULL;
     wsrep_keys_free(&key_arr);
+
     return -1;
   }
   else {
@@ -1812,6 +1825,13 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     WSREP_DEBUG("TO isolation skipped for: %d, sql: %s."
                 "Only temporary tables affected.",
                 ret, WSREP_QUERY(thd));
+
+    if (buf) my_free(buf);
+    /* thd->wsrep_gtid_event_buf was free'ed above, just set to NULL */
+    thd->wsrep_gtid_event_buf_len = 0;
+    thd->wsrep_gtid_event_buf     = NULL;
+    wsrep_keys_free(&key_arr);
+
     return 1;
   }
 
