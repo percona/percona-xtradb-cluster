@@ -4100,26 +4100,7 @@ end_with_restore_list:
       if (check_table_access(thd, DROP_ACL, all_tables, FALSE, UINT_MAX, FALSE))
 	goto error;				/* purecov: inspected */
     }
-#ifdef WITH_WSREP
-    bool has_tmp_tables= false;
-    for (TABLE_LIST *table= all_tables; table; table= table->next_global)
-    {
-      if (lex->drop_temporary  || find_temporary_table(thd, table))
-      {
-        has_tmp_tables= true;
-        break;
-      }
-    }
-    if (has_tmp_tables)
-    {
-      wsrep_replicate_drop_query(thd, first_table, lex->drop_if_exists,
-                                 lex->drop_temporary, false);
-    }
-    else
-    {
-      WSREP_TO_ISOLATION_BEGIN(NULL, NULL, all_tables);
-    }
-#endif /* WITH_WSREP */
+    WSREP_TO_ISOLATION_BEGIN(NULL, NULL, all_tables);
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->drop_if_exists,
 			lex->drop_temporary);
