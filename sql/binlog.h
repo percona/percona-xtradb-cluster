@@ -113,7 +113,12 @@ public:
       @retval true The queue was empty before this operation.
       @retval false The queue was non-empty before this operation.
     */
+    /** Append a linked list of threads to the queue */
+#ifdef WITH_WSREP
+    bool append(THD *first, bool interim_commit=false);
+#else
     bool append(THD *first);
+#endif /* WITH_WSREP */
 
     /**
        Fetch the entire queue for a stage.

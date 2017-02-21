@@ -685,3 +685,15 @@ void wsrep_thd_auto_increment_variables(THD* thd,
     *increment= thd->variables.auto_increment_increment;
   }
 }
+
+bool wsrep_safe_to_persist_xid(THD* thd)
+{
+  /* Rollback of transaction too also invoke persist of XID.
+  Avoid persisting XID in this use-case. */
+  bool safe_to_persist_xid= false;
+  if (thd->wsrep_conflict_state == NO_CONFLICT      ||
+      thd->wsrep_conflict_state == REPLAYING        ||
+      thd->wsrep_conflict_state == RETRY_AUTOCOMMIT)
+    safe_to_persist_xid= true;
+  return(safe_to_persist_xid);
+}

@@ -1,4 +1,4 @@
 [submodule "percona-xtradb-cluster-galera"]
 	path = percona-xtradb-cluster-galera
-	url = https://github.com/percona/galera
-	branch = 3.x-5.7
+	url = https://github.com/percona/pxc-galera-perf
+	branch = perf-fix-57

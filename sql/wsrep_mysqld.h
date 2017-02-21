@@ -303,9 +303,14 @@ enum wsrep_trx_status {
 
 extern enum wsrep_trx_status
 wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
+
+extern enum wsrep_trx_status wsrep_replicate(THD *thd);
+extern enum wsrep_trx_status wsrep_pre_commit(THD *thd);
+
 class Ha_trx_info;
 struct THD_TRANS;
 void wsrep_register_hton(THD* thd, bool all);
+void wsrep_interim_commit(THD* thd);
 void wsrep_post_commit(THD* thd, bool all);
 void wsrep_brute_force_killer(THD *thd);
 int  wsrep_hire_brute_force_killer(THD *thd, uint64_t trx_id);

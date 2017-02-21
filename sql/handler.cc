@@ -2488,6 +2488,60 @@ int ha_prepare_low(THD *thd, bool all)
     DBUG_EXECUTE_IF("crash_commit_after_prepare", DBUG_SUICIDE(););
   }
 
+#ifdef WITH_WSREP
+  /* Original pre-commit hook is now split into 2 parts:
+  * replicate: this will replicate write-set on group channel there-by
+    assigning the global_seqno to replicate.
+  * pre-commit: this will mark start of execution by entering apply/commit
+    monitor (critical section)
+  Second part should be done only after the trx_prepare is called (for InnoDB)
+  as that will flush the REDO log there-by allowing REDO log flush to be carried
+  out in parallel.
+
+  Q. Then why not execute both the action post trx_prepare ?
+  A. trx_prepare will persist REDO log for the given transaction including
+     the assigned XID. XID for the transaction is updated to WSREP XID
+     only after the replication action executes and so replicate needs to
+     be done before calling trx_prepare but we want to avoid entering
+     critical section (pre-commit) as that will take away parallelism possible
+     with trx_prepare. */
+  if (error == 0                                               &&
+      thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED  &&
+      thd->wsrep_exec_mode == LOCAL_STATE)
+  {
+    int err;
+    err= wsrep_pre_commit(thd);
+
+    if (err)
+    {
+      error= 1;
+      switch (err)
+      {
+      case WSREP_TRX_SIZE_EXCEEDED:
+        /* give user size exeeded erro from wsrep_api.h */
+        my_error(ER_ERROR_DURING_COMMIT, MYF(0), WSREP_SIZE_EXCEEDED);
+        break;
+      case WSREP_TRX_CERT_FAIL:
+      case WSREP_TRX_ERROR:
+        /* avoid sending error, if we need to replay */
+        if (thd->wsrep_conflict_state!= MUST_REPLAY)
+          my_error(ER_LOCK_DEADLOCK, MYF(0), err);
+        break;
+      }
+    }
+  }
+  else if (error == 0                                               &&
+           thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED  &&
+           thd->wsrep_exec_mode == REPL_RECV)
+  {
+    /* Pre-commit hook will start commit ordering. */
+    if (thd->wsrep_ws_handle.opaque &&
+        thd->wsrep_conflict_state != REPLAYING)
+      wsrep->applier_pre_commit(wsrep, thd->wsrep_ws_handle.opaque);
+  }
+
+#endif /* WITH_WSREP */
+
   DBUG_RETURN(error);
 }
 

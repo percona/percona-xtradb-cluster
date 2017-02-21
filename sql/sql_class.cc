@@ -1382,6 +1382,7 @@ THD::THD(bool enable_plugins)
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
    wsrep_sst_donor(false),
+   wsrep_void_applier_trx(true),
    wsrep_gtid_event_buf(NULL),
    wsrep_gtid_event_buf_len(0),
 #endif /* WITH_WSREP */
@@ -1919,6 +1920,7 @@ void THD::init(void)
   wsrep_gtid_event_buf_len = 0;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
   wsrep_sst_donor= false;
+  wsrep_void_applier_trx  = true;
 #endif /* WITH_WSREP */
   binlog_row_event_extra_data= 0;
 
