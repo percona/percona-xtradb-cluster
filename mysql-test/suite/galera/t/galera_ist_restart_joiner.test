@@ -14,6 +14,10 @@ INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a'), (4, 'a'), (5, 'a'),(6, 'a');
 
 # Disconnect node #2
 --connection node_2
+
+# Test for 'wsrep_ist_receive_status' status variable
+SHOW STATUS LIKE 'wsrep_ist_%';
+
 --source suite/galera/include/galera_unload_provider.inc
 
 --connection node_1
@@ -51,6 +55,10 @@ SET SESSION wsrep_sync_wait = 0;
 # so we perform a simple sleep and SHOW instead
 
 --sleep 5
+
+# Test for 'wsrep_ist_receive_status' status variable
+SHOW STATUS LIKE 'wsrep_ist_%';
+
 SHOW STATUS LIKE 'wsrep_debug_sync_waiters';
 
 --connection node_1
@@ -94,6 +102,9 @@ CREATE TABLE t3 (f1 INTEGER);
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
+
+# Test for 'wsrep_ist_receive_status' status variable
+SHOW STATUS LIKE 'wsrep_ist_%';
 
 --connection node_1
 UPDATE t1 SET f2 = 'f' WHERE f1 > 5;
