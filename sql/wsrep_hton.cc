@@ -725,10 +725,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
                 thd->get_stmt_da()->mysql_errno(), thd->get_stmt_da()->message_text());
   }
 
-  DBUG_ENTER("wsrep_run_wsrep_commit");
-#ifdef WITH_WSREP
+  DBUG_ENTER("wsrep_replicate");
   DEBUG_SYNC(thd, "wsrep_before_replication");
-#endif /* WITH_WSREP */
 
   if (thd->slave_thread && !opt_log_slave_updates) DBUG_RETURN(WSREP_TRX_OK);
 
@@ -1037,7 +1035,7 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
 {
   int rcode;
 
-  DBUG_ENTER("wsrep_pre_commit_hook");
+  DBUG_ENTER("wsrep_pre_commit");
 
   DBUG_ASSERT(thd->wsrep_query_state == QUERY_COMMITTING);
 
@@ -1097,6 +1095,7 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
     thd->wsrep_exec_mode= LOCAL_COMMIT;
     DBUG_PRINT("wsrep", ("pre-commit success"));
     break;
+
   case WSREP_PRECOMMIT_ABORT:
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     DBUG_RETURN(WSREP_TRX_CERT_FAIL);
@@ -1105,7 +1104,7 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
   case WSREP_BF_ABORT:
     // TODO: this condition will not-hold as the replicate_hook has updated
     // the said field.
-    DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
+    // DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
 
   case WSREP_TRX_FAIL:
     WSREP_DEBUG("pre-commit failed for reason: %d %u %s",
