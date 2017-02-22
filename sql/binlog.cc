@@ -4009,26 +4009,10 @@ bool MYSQL_BIN_LOG::reset_logs(THD* thd)
   }
   else
   {
-#ifdef WITH_WSREP
-    /* initialize GTID sequence only once
-     * RESET MASTER tries to re-initialize here, but for wsrep, we have to
-     * maintain original seqeunce
-     -*/
-    if (wsrep_sidno == -1)
-    {
-      WSREP_DEBUG("Initializing GTID state");
-#endif /* WITH_WSREP */
     gtid_state->clear();
     // don't clear global_sid_map because it's used by the relay log too
     if (gtid_state->init() != 0)
       goto err;
-#ifdef WITH_WSREP
-    }
-    else
-    {
-      WSREP_DEBUG("Skipping GTID state init because of wsrep GTID map");
-    }
-#endif /* WITH_WSREP */
   }
 #endif
 
