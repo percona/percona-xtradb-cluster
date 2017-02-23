@@ -3737,41 +3737,47 @@ case SQLCOM_PREPARE:
     {
 
 #ifdef WITH_WSREP
-      bool block= false;
+      bool is_temporary_table=
+        (lex->create_info.options & HA_LEX_CREATE_TMP_TABLE);
 
-      switch(pxc_strict_mode)
+      if (!is_temporary_table)
       {
-      case PXC_STRICT_MODE_DISABLED:
-        break;
-      case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
-                   " CREATE TABLE AS SELECT"
-                   " with pxc_strict_mode = PERMISSIVE");
-        push_warning_printf(thd, Sql_condition::SL_WARNING,
-                            ER_UNKNOWN_ERROR,
-                            "Percona-XtraDB-Cluster doesn't recommend use of"
-                            " CREATE TABLE AS SELECT"
-                            " with pxc_strict_mode = PERMISSIVE");
-        break;
-      case PXC_STRICT_MODE_ENFORCING:
-      case PXC_STRICT_MODE_MASTER:
-        block= true;
-        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
-                    " CREATE TABLE AS SELECT"
-                    " with pxc_strict_mode = ENFORCING or MASTER");
-        char message[1024];
-        sprintf(message,
-                "Percona-XtraDB-Cluster prohibits use of"
-                " CREATE TABLE AS SELECT"
-                " with pxc_strict_mode = ENFORCING or MASTER");
-        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-        break;
-      }
+        bool block= false;
 
-      if (block)
-      {
-        res= 1;
-        goto end_with_restore_list;
+        switch(pxc_strict_mode)
+        {
+        case PXC_STRICT_MODE_DISABLED:
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                     " CREATE TABLE AS SELECT"
+                     " with pxc_strict_mode = PERMISSIVE");
+          push_warning_printf(thd, Sql_condition::SL_WARNING,
+                              ER_UNKNOWN_ERROR,
+                              "Percona-XtraDB-Cluster doesn't recommend use of"
+                              " CREATE TABLE AS SELECT"
+                              " with pxc_strict_mode = PERMISSIVE");
+          break;
+        case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_MASTER:
+          block= true;
+          WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+                      " CREATE TABLE AS SELECT"
+                      " with pxc_strict_mode = ENFORCING or MASTER");
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits use of"
+                  " CREATE TABLE AS SELECT"
+                  " with pxc_strict_mode = ENFORCING or MASTER");
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          break;
+        }
+
+        if (block)
+        {
+          res= 1;
+          goto end_with_restore_list;
+        }
       }
 #endif /* WITH_WSREP */
 

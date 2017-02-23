@@ -1255,6 +1255,9 @@ insert into tinnodb values (1), (2);
 select * from tinnodb;
 --error ER_UNKNOWN_ERROR
 create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
+create temporary table tmp (i int, primary key pk(i)) as (select * from tinnodb);
+select * from tmp;
+drop table tmp;
 #
 --connection node_2
 --echo #node-2
