@@ -1185,6 +1185,12 @@ i
 2
 create table tinnodb2 (i int, primary key pk(i)) as (select * from tinnodb);
 ERROR HY000: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT with pxc_strict_mode = ENFORCING or MASTER
+create temporary table tmp (i int, primary key pk(i)) as (select * from tinnodb);
+select * from tmp;
+i
+1
+2
+drop table tmp;
 #node-2
 select * from tinnodb2;
 ERROR 42S02: Table 'test.tinnodb2' doesn't exist
