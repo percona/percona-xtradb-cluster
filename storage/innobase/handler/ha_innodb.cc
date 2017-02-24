@@ -9009,6 +9009,7 @@ report_error:
 	if (!error_result
 	    && wsrep_thd_exec_mode(m_user_thd) == LOCAL_STATE
 	    && wsrep_on(m_user_thd)
+	    && (sql_command != SQLCOM_CREATE_TABLE)
 	    && !wsrep_consistency_check(m_user_thd)
 	    && (thd_binlog_format(m_user_thd) == BINLOG_FORMAT_ROW
 		|| (thd_binlog_format(m_user_thd) == BINLOG_FORMAT_STMT

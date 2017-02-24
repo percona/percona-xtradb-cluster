@@ -60,6 +60,8 @@ select * from t;
 
 --connection node_4
 --echo #node-4 (independent slave replicating from galera-node-2)
+--let $wait_condition = SELECT COUNT(*) = 5 from t
+--source include/wait_condition.inc
 select * from t;
 
 
