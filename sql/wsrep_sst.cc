@@ -362,9 +362,7 @@ static int generate_binlog_opt_val(char** ret)
   if (opt_bin_log && gtid_mode > 0)
   {
     assert(opt_bin_logname);
-    *ret= strcmp(opt_bin_logname, "0") ?
-      my_strdup(key_memory_wsrep, opt_bin_logname, MYF(0)) : 
-      my_strdup(key_memory_wsrep, "", MYF(0));
+    *ret=  my_strdup(key_memory_wsrep, opt_bin_logname, MYF(0));
   }
   else
   {
