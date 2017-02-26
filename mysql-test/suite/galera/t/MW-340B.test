@@ -1,0 +1,11 @@
+#
+# MW-340 5.7: Assertion `thd->ha_data[wsrep_hton->slot].ha_info[all].is_trx_read_write()' failed with CTAS
+#
+
+--source include/galera_cluster.inc
+
+create table t (i int) engine=innodb;
+set autocommit = 0;
+create table t1 engine=innodb as select * from t;
+
+DROP TABLE t, t1;

@@ -75,13 +75,22 @@ void wsrep_register_hton(THD* thd, bool all)
 {
   if (!WSREP(thd)) return;
 
+  /* only LOCAL_STATE processors may replicate.
+     For filtered mysql replication we may end up here in LOCAL_COMMIT state
+     this can happen after GTID event replication for filtered event
+
+  */
+  if (thd->wsrep_exec_mode == LOCAL_COMMIT)
+  {
+    return;
+  }
   if (thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
-    if (thd->wsrep_exec_mode == LOCAL_STATE      &&
-        (thd_sql_command(thd) == SQLCOM_OPTIMIZE ||
-        thd_sql_command(thd) == SQLCOM_ANALYZE   ||
-        thd_sql_command(thd) == SQLCOM_REPAIR)   &&
-            thd->lex->no_write_to_binlog == 1)
+    if (thd->wsrep_exec_mode == LOCAL_STATE       &&
+        (thd_sql_command(thd) == SQLCOM_OPTIMIZE  ||
+         thd_sql_command(thd) == SQLCOM_ANALYZE   ||
+         thd_sql_command(thd) == SQLCOM_REPAIR)   &&
+        thd->lex->no_write_to_binlog == 1)
     {
         WSREP_DEBUG("Skipping wsrep_register_hton for LOCAL sql admin command : %s",
                     WSREP_QUERY(thd));
@@ -628,10 +637,10 @@ bool wsrep_replicate_GTID(THD *thd)
         GTID event, would cause a hole in GTID history in other cluster nodes
 
       */
-      WSREP_WARN("GTID replication failed");
+      WSREP_INFO("GTID replication failed: %d", rcode);
       wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
       thd->wsrep_replicate_GTID= false;
-
+      my_message(ER_ERROR_DURING_COMMIT, "WSREP GTID replication was interrupted", MYF(0));
       return true;
     }
     wsrep_post_commit(thd, true);
