@@ -3055,10 +3055,10 @@ bool Query_result_create::send_eof()
       {
         (void) wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle,
                                        thd->wsrep_next_trx_id());
-        WSREP_DEBUG("CTAS NEW KEY");
+        WSREP_DEBUG("Assiging trx-id for processing CTAS");
       }
       DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
-      WSREP_DEBUG("CTAS key append for trx: %lu ",
+      WSREP_DEBUG("Initiating append_key for CTAS with trx-id (%lu)",
                   (long unsigned int) thd->wsrep_trx_id());
 
       /*
@@ -3095,8 +3095,10 @@ bool Query_result_create::send_eof()
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state != NO_CONFLICT)
       {
-        WSREP_DEBUG("select_create commit failed, thd: %u err: %d %s", 
-                    thd->thread_id(), thd->wsrep_conflict_state, WSREP_QUERY(thd));
+        WSREP_DEBUG("select_create commit failed, thd: %u err: %s %s", 
+                    thd->thread_id(),
+                    wsrep_get_conflict_state(thd->wsrep_conflict_state),
+                    WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         abort_result_set();
 	return TRUE;

@@ -193,7 +193,7 @@ void wsrep_set_local_position(const char* const value, bool const sst)
 
 bool wsrep_start_position_update (sys_var *self, THD* thd, enum_var_type type)
 {
-  WSREP_INFO ("wsrep_start_position var submitted: '%s'",
+  WSREP_INFO ("Updating wsrep_start_position to: '%s'",
               wsrep_start_position);
   // since this value passed wsrep_start_position_check, don't check anything
   // here
@@ -340,7 +340,7 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
   that no new stats queries will be allowed during this transition time. */
   wsrep_free_status(thd);
 
-  WSREP_DEBUG("wsrep_provider_update: %s", wsrep_provider);
+  WSREP_DEBUG("Updating wsrep_provider to: %s", wsrep_provider);
 
   /* stop replication is heavy operation, and includes closing all client 
      connections. Closing clients may need to get LOCK_global_system_variables

@@ -64,7 +64,7 @@ DROP TABLE ten;
 
 --connection node_2
 
-call mtr.add_suppression("Can't desync a node even before it is synced with cluster");
+call mtr.add_suppression("Can't desync a non-synced node.*");
 call mtr.add_suppression("Aborting");
 
 --echo #node-2
@@ -84,6 +84,6 @@ call mtr.add_suppression("Aborting");
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
---echo "grep --count \"Can't desync a node even before it is synced with cluster\""
---exec grep --count "Can't desync a node even before it is synced with cluster" $MYSQLTEST_VARDIR/log/mysqld.2.err
+--echo "grep --count \"Can't desync a non-synced node\""
+--exec grep --count "Can't desync a non-synced node" $MYSQLTEST_VARDIR/log/mysqld.2.err
 

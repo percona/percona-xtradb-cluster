@@ -35,6 +35,8 @@ enum wsrep_exec_mode {
     LOCAL_COMMIT
 };
 
+const char* wsrep_get_exec_mode(wsrep_exec_mode state);
+
 enum wsrep_query_state {
     QUERY_IDLE,
     QUERY_EXEC,
@@ -42,6 +44,8 @@ enum wsrep_query_state {
     QUERY_EXITING,
     QUERY_ROLLINGBACK,
 };
+
+const char* wsrep_get_query_state(wsrep_query_state state);
 
 enum wsrep_conflict_state {
     NO_CONFLICT,
@@ -55,12 +59,15 @@ enum wsrep_conflict_state {
     CERT_FAILURE,
 };
 
+const char* wsrep_get_conflict_state(wsrep_conflict_state state);
+
 enum wsrep_consistency_check_mode {
     NO_CONSISTENCY_CHECK,
     CONSISTENCY_CHECK_DECLARED,
     CONSISTENCY_CHECK_RUNNING,
 };
 
+const char* wsrep_get_wsrep_status(wsrep_status status);
 
 // Global wsrep parameters
 extern wsrep_t*    wsrep;
@@ -281,6 +288,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_LOG_CONFLICT(bf_thd, victim_thd, bf_abort)		       \
   if (wsrep_debug || wsrep_log_conflicts)				       \
   {                                                                            \
+    WSREP_LOG(sql_print_information, "--------- CONFLICT DETECTED --------");  \
     WSREP_LOG(sql_print_information, "cluster conflict due to %s for threads:",\
       (bf_abort) ? "high priority abort" : "certification failure"             \
     );                                                                         \

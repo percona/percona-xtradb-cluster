@@ -991,7 +991,7 @@ wsrep_trx_order_before(void *thd1, void *thd2)
                     (long long)wsrep_thd_trx_seqno((THD*)thd2));
         return 1;
     }
-    WSREP_DEBUG("waiting for BF, trx order: %lld %lld\n",
+    WSREP_DEBUG("Waiting for BF, trx order: %lld %lld\n",
                 (long long)wsrep_thd_trx_seqno((THD*)thd1),
                 (long long)wsrep_thd_trx_seqno((THD*)thd2));
     return 0;
@@ -3230,7 +3230,9 @@ bool Query_result_send::send_result_set_metadata(List<Item> &list, uint flags)
 #ifdef WITH_WSREP
   if (WSREP(thd) && thd->wsrep_retry_query)
   {
-    WSREP_DEBUG("skipping select metadata");
+    /* Metadata is already send during first try that failed so avoid
+    resending it. Just plan to send the result. */
+    WSREP_DEBUG("Skip resending metadata if query is being re-tried");
     return FALSE;
   }
 #endif /* WITH_WSREP */

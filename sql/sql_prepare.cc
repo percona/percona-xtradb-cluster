@@ -3883,7 +3883,8 @@ reexecute:
   switch (thd->wsrep_conflict_state)
   {
   case CERT_FAILURE:
-    WSREP_DEBUG("PS execute fail for CERT_FAILURE: thd: %u err: %d",
+    WSREP_DEBUG("Prepare Statement execution fail with Certification Failure"
+                " thd: %u err: %d",
                 thd->thread_id(), thd->get_stmt_da()->mysql_errno() );
     thd->wsrep_conflict_state = NO_CONFLICT;
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -3896,6 +3897,7 @@ reexecute:
     thd->wsrep_conflict_state= REPLAYED;
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     break;
+
   default:
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       break;

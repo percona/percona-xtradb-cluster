@@ -153,7 +153,7 @@ then
         && echo $SET_START_POSITION \
         || echo "SST failed to complete;") | $MYSQL
 else
-    wsrep_log_info "Bypassing state dump."
+    wsrep_log_info "Bypassing state dump (SST)."
     echo $SET_START_POSITION | $MYSQL
     (echo $RESTORE_GENERAL_LOG \
      && echo $RESTORE_SLOW_QUERY_LOG \

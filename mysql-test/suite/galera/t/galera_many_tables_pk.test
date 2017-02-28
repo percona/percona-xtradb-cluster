@@ -37,7 +37,7 @@ START TRANSACTION;
 while ($count)
 {
   --disable_query_log
-  --let $ddl_var = `SELECT CONCAT("INSERT INTO t", $count, " VALUES (DEFAULT)")`
+  --let $ddl_var = `SELECT CONCAT("INSERT INTO t", $count, " VALUES (1)")`
   --eval $ddl_var
   --enable_query_log
   --dec $count
@@ -90,9 +90,14 @@ UPDATE t1000 SET f1 = 3;
 --connection node_1
 COMMIT;
 
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+--let $wait_condition = SELECT SUM(f1) = 2 FROM t1000
+--source include/wait_condition.inc
+
 --connection node_2
---error ER_LOCK_DEADLOCK
 #--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
+--error ER_LOCK_DEADLOCK
 COMMIT;
 
 DROP SCHEMA test;

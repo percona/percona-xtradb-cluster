@@ -5912,7 +5912,7 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
     if (create_info->options & HA_LEX_CREATE_TMP_TABLE)
     {
       /* CREATE TEMPORARY TABLE LIKE must be skipped from replication */
-      WSREP_DEBUG("CREATE TEMPORARY TABLE LIKE... skipped replication\n %s", 
+      WSREP_DEBUG("Skipping replication for CREATE TEMPORARY TABLE LIKE.... %s",
                   WSREP_QUERY(thd));
     } 
     else if (!is_tmp_table)
@@ -5936,7 +5936,8 @@ bool mysql_create_like_table(THD* thd, TABLE_LIST* table, TABLE_LIST* src_table,
       String* query = thd->wsrep_TOI_pre_queries.back();
       query->length(0);
       (void)  store_create_info(thd, &tbl, query, NULL, TRUE);
-      WSREP_DEBUG("TMP TABLE: %s", query->ptr());
+      WSREP_DEBUG("Initiating creation of temporary table to satisfy"
+                  " CREATE TABLE LIKE : %s", query->ptr());
 
       WSREP_TO_ISOLATION_BEGIN(table->db, table->table_name, NULL);
 

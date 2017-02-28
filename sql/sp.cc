@@ -2872,7 +2872,7 @@ int wsrep_create_sp(THD *thd, uchar** buf, size_t* buf_len)
                      thd->lex->definer->host,
                      saved_mode))
   {
-    WSREP_WARN("SP create string failed: schema: %s, query: %s",
+    WSREP_WARN("Store Procedure create string failed: schema: %s, query: %s",
                (thd->db().str ? thd->db().str : "(null)"),thd->query().str);
     return 1;
   }

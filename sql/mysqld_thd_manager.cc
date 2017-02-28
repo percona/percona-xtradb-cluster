@@ -138,9 +138,11 @@ public:
 
   virtual void operator()(THD *thd)
   {
-    WSREP_INFO("THD %u applier %d exec_mode %d killed %d",
-               thd->thread_id(), thd->wsrep_applier, thd->wsrep_exec_mode,
-               thd->killed);
+    WSREP_INFO("THD %u applier %s exec_mode %s killed %s",
+               thd->thread_id(),
+               thd->wsrep_applier ? "true" : "false",
+               wsrep_get_exec_mode(thd->wsrep_exec_mode),
+               thd->killed ? "true" : "false");
   }
 };
 #endif /* WITH_WSREP */
