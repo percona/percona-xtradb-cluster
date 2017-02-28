@@ -542,6 +542,24 @@ read_cnf()
             ssyslog=1
         fi
     fi
+
+    # Pull out the buffer pool size to be used by PXB
+    # and set it in use-memory (if not specified in inno-apply-opts)
+    #
+    # Is the use-memory option already specified in inno-apply-opts?
+    if ! [[ "$iapts" =~ --use-memory= ]]; then
+        bufferpoolsize=$(parse_cnf xtrabackup use-memory "")
+        if [[ -z "$bufferpoolsize" ]]; then
+            bufferpoolsize=$(parse_cnf mysqld innodb-buffer-pool-size "")
+        fi
+        if [[ -z "$bufferpoolsize" ]]; then
+            bufferpoolsize=$(parse_cnf mysqld innodb_buffer_pool_size "")
+        fi
+        if [[ -n "$bufferpoolsize" ]]; then
+            iapts="$iapts --use-memory=$bufferpoolsize"
+        fi
+    fi
+
 }
 
 #
