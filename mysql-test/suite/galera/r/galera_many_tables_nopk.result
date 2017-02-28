@@ -1,3 +1,5 @@
+call mtr.add_suppression(" InnoDB: Warning: difficult to find free blocks in.*");
+call mtr.add_suppression(" InnoDB: Warning: difficult to find free blocks in.*");
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 COMMIT;
