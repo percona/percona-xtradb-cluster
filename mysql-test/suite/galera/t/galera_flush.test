@@ -42,6 +42,10 @@ SET SESSION wsrep_replicate_myisam = TRUE;
 CREATE USER 'user1'@'localhost' IDENTIFIED BY 'pass1';
 FLUSH PRIVILEGES;
 
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE User = "user1"
+--source include/wait_condition.inc
+
 --connect node_2a, 127.0.0.1, user1, pass1, test, $NODE_MYPORT_2
 
 --connection node_1

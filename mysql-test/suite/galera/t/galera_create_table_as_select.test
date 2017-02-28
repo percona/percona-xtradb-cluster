@@ -23,6 +23,8 @@ CREATE TABLE t1 AS SELECT * FROM t2;
 CREATE TABLE t1 AS SELECT 1 FROM DUAL;
 
 --connection node_2
+let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1";
+--source include/wait_condition.inc
 SELECT COUNT(*) = 1 FROM t1;
 
 --connection node_1
@@ -34,6 +36,8 @@ CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t1 AS SELECT * FROM t2;
 
 --connection node_2
+let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1";
+--source include/wait_condition.inc
 SELECT COUNT(*) = 0 FROM t1;
 
 --connection node_1
@@ -47,6 +51,8 @@ CREATE TABLE t1 AS SELECT * FROM t2;
 SELECT COUNT(*) = 5 FROM t1;
 
 --connection node_2
+let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1";
+--source include/wait_condition.inc
 SELECT COUNT(*) = 5 FROM t1;
 
 --connection node_1
@@ -60,6 +66,8 @@ INSERT INTO t2 VALUES (1),(2),(3),(4),(5);
 CREATE TABLE t1 AS SELECT MAX(f1) AS f1 FROM t2;
 
 --connection node_2
+let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1";
+--source include/wait_condition.inc
 SELECT COUNT(*) = 1 FROM t1;
 SELECT f1 = 5 FROM t1;
 
@@ -81,6 +89,8 @@ CALL sp1();
 SELECT COUNT(*) = 5 FROM t1;
 
 --connection node_2
+let $wait_condition= SELECT COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1";
+--source include/wait_condition.inc
 SELECT COUNT(*) = 5 FROM t1;
 
 --connection node_1

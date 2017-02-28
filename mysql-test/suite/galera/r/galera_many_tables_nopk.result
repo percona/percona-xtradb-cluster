@@ -1,3 +1,5 @@
+call mtr.add_suppression("Difficult to find free blocks in the buffer pool.*");
+call mtr.add_suppression("Difficult to find free blocks in the buffer pool.*");
 SET AUTOCOMMIT=OFF;
 START TRANSACTION;
 COMMIT;
