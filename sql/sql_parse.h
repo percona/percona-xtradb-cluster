@@ -210,7 +210,6 @@ inline bool is_supported_parser_charset(const CHARSET_INFO *cs)
 {
   return (cs->mbminlen == 1);
 }
-
 #ifdef WITH_WSREP
 
 #define WSREP_MYSQL_DB (char *)"mysql"
