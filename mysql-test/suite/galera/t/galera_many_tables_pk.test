@@ -2,6 +2,12 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
+--connection node_1
+call mtr.add_suppression(" InnoDB: Warning: difficult to find free blocks in.*");
+
+--connection node_2
+call mtr.add_suppression(" InnoDB: Warning: difficult to find free blocks in.*");
+
 #
 # This test forces 100 tables with a PK to participate in a single transaction
 #
