@@ -22,6 +22,8 @@ SET SESSION wsrep_sync_wait = 0;
 
 INSERT INTO t1 VALUES (2);
 
+--sleep 5
+
 --source include/kill_galera.inc
 
 --sleep 1
