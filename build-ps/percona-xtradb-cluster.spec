@@ -271,7 +271,10 @@ Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LA
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-galera-3
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 %if 0%{?systemd}
@@ -303,9 +306,24 @@ This is a meta-package which installs server, client and galera-3.
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
 %if "%rhel" == "5"
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-garbd-3 Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-galera-3
+Requires:	Percona-XtraDB-Cluster-garbd-3
+Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-galera-3-debuginfo = %{version}-%{release}
 %else
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-galera-3 Percona-XtraDB-Cluster-garbd-3 Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-galera-3-debuginfo
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-devel%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-galera-3
+Requires:	Percona-XtraDB-Cluster-garbd-3
+Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-galera-3-debuginfo
 %endif
 
 %description -n Percona-XtraDB-Cluster-full%{product_suffix}
@@ -316,7 +334,11 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix}  Percona-XtraDB-Cluster-galera-25 percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-galera-3
+Requires:	percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
