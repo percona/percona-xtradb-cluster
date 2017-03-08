@@ -103,11 +103,12 @@ extern my_bool     wsrep_slave_UK_checks;
 enum enum_wsrep_OSU_method { WSREP_OSU_TOI, WSREP_OSU_RSU };
 enum enum_wsrep_sync_wait {
     WSREP_SYNC_WAIT_NONE = 0x0,
-    // show, select, begin
+    // select, begin
     WSREP_SYNC_WAIT_BEFORE_READ = 0x1,
     WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE = 0x2,
     WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE = 0x4,
-    WSREP_SYNC_WAIT_MAX = 0x7
+    WSREP_SYNC_WAIT_BEFORE_SHOW = 0x8,
+    WSREP_SYNC_WAIT_MAX = 0xF
 };
 
 // MySQL status variables
