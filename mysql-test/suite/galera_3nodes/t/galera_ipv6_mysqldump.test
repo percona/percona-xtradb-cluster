@@ -2,7 +2,10 @@
 --source include/have_ipv6.inc
 
 --connection node_1
+--disable_warnings
+CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
+--enable_warnings
 
 --let $wsrep_sst_auth_orig = `SELECT @@wsrep_sst_auth`
 SET GLOBAL wsrep_sst_auth = 'sst:';
