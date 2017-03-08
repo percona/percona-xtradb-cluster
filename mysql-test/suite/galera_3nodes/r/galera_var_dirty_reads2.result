@@ -24,7 +24,7 @@ PREPARE stmt_update FROM 'UPDATE t1 SET f1 = f1 + f1';
 SET GLOBAL wsrep_dirty_reads = 1;
 SET GLOBAL wsrep_sync_wait = 0;
 SET GLOBAL wsrep_dirty_reads = 0;
-SET GLOBAL wsrep_sync_wait = 7;
+SET GLOBAL wsrep_sync_wait = 15;
 SET SESSION wsrep_dirty_reads = 1;
 INSERT INTO t1 SELECT * FROM t1;
 ERROR 08S01: WSREP has not yet prepared node for application use
