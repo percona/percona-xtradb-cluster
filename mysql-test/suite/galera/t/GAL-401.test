@@ -31,6 +31,8 @@ SET GLOBAL wsrep_provider_options = 'gmcast.isolate=0';
 --source include/wait_condition.inc
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
+--source include/wait_condition.inc
 
 # Must return 0:
 SHOW STATUS LIKE 'wsrep_desync_count';
