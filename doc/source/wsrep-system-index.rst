@@ -297,7 +297,9 @@ This variable is used to set the `notification command <http://galeracluster.com
    :dyn: Yes
    :default: ON
 
-This variable is used to enable/disable wsrep replication. When set to ``OFF``, server will stop replication and behave like standalone |MySQL| server.
+This variable can be used to disable wsrep replication
+from the current session to the rest of the cluster
+without the node leaving the cluster.
 
 .. variable:: wsrep_OSU_method
 
