@@ -17,14 +17,21 @@ This may not be desirable depending on application's use and assumptions of auto
 
 .. variable:: wsrep_causal_reads
 
-   :version 5.6.20-25.7: Variable deprecated by :variable:`wsrep_sync_wait`
+   :version 5.6.20-25.7: Variable deprecated
    :cli: Yes
    :conf: Yes
    :scope: Global, Session
    :dyn: Yes
    :default: OFF
 
-In some cases, master may apply event faster than a slave, which can cause master and slave to become out of sync for a brief moment. When this variable is set to ``ON``, slave will wait until that event is applied before doing any other queries. Enabling this variable will also result in larger latencies.
+In some cases, master may apply events faster than a slave,
+which can cause master and slave to become out of sync for a brief moment.
+When this variable is set to ``ON``, the slave will wait
+until that event is applied before doing any other queries.
+Enabling this variable will also result in larger latencies.
+
+.. note:: This variable was deprecated because enabling it
+   is the equivalent of setting :variable:`wsrep_sync_wait` to ``1``.
 
 .. variable:: wsrep_certify_nonPK
 
@@ -535,16 +542,29 @@ This variable contains the ``UUID:seqno`` value. By setting all the nodes to hav
    :version 5.6.20-25.7: Variable introduced
    :cli: Yes
    :conf: Yes
-   :scope: Global, Session
+   :scope: Session
    :dyn: Yes
 
-This variable is used to control causality checks on some SQL statements, such as ``SELECT``, ``BEGIN``/``END``, ``SHOW STATUS``, but not on some autocommit SQL statements ``UPDATE`` and ``INSERT``. Causality check is determined by bitmask: 
+This variable is used to control causality checks on certain statements.
+Checks ensure that the statement is executed on a node
+that is fully synced with the cluster.
 
- * ``1`` Indicates check on ``READ`` statements, including ``SELECT``, ``SHOW``, ``BEGIN``/``START TRANSACTION``.
+The type of statements to undergo checks
+is determined by bitmask:
 
- * ``2`` Indicates check on ``UPDATE`` and ``DELETE`` statements.
+* ``0``: Do not run causality checks for any statements.
+  This is the default.
 
- * ``4`` Indicates check on ``INSERT`` and ``REPLACE`` statements
+* ``1``: Perform checks for ``READ`` statements,
+  including ``SELECT``, ``SHOW``, and ``BEGIN`` or ``START TRANSACTION``.
 
-This variable replaced the :variable:`wsrep_causal_reads` variable. Setting :variable:`wsrep_sync_wait` to ``1`` is the equivalent of setting :variable:`wsrep_causal_reads` to ``ON``.
+* ``2``: Perform checks for ``UPDATE`` and ``DELETE`` statements.
+
+* ``3``: Perform checks for ``READ``, ``UPDATE``,
+  and ``DELETE`` statements.
+
+* ``4``: Perform checks for ``INSERT`` and ``REPLACE`` statements.
+
+.. note:: Setting :variable:`wsrep_sync_wait` to ``1`` is the equivalent
+   of setting :variable:`wsrep_causal_reads` to ``ON``.
 
