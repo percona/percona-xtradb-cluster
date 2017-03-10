@@ -5,7 +5,8 @@ wsrep_provider=/usr/lib64/galera3/libgalera_smm.so
 # Cluster connection URL contains IPs of nodes
 #If no IP is found, this implies that a new cluster needs to be created,
 #in order to do that you need to bootstrap this node
-wsrep_cluster_address=gcomm://
+
+#wsrep_cluster_address=gcomm://
 
 # In order for Galera to work correctly binlog format should be ROW
 binlog_format=ROW
