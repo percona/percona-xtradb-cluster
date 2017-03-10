@@ -26,6 +26,9 @@ SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
 --connection node_1a
 SET SESSION wsrep_sync_wait = 0;
 
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: alter_table_before_open_tables'
+--source include/wait_condition.inc
+
 # Allowed
 SELECT COUNT(*) = 0 FROM t1;
 

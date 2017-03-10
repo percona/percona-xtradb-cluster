@@ -4,3 +4,4 @@ galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.
 galera.galera_as_slave_replication_bundle : GCF-912 feature no longer works in 5.7
 galera.galera_sst_xtrabackup-v2_keyring : Cannot find the said keyring plugin.
 galera_gcache_recover_manytrx : timing issue that causes it to fail intermittently.
+galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
