@@ -489,7 +489,10 @@ This variable contains the name (:variable:`wsrep_node_name`) of the preferred d
    :dyn: Yes
    :default: OFF
 
-When this variable is enabled, SST donor node will not accept incoming queries, instead it will reject queries with ``UNKNOWN COMMAND`` error code. This can be used to signal load-balancer that the node isn't available.
+This variable can be used to reject blocking client sessions on a node
+serving as a donor during a blocking state transfer method.
+Queries will return the ``UNKNOWN COMMAND`` error code.
+This can be used to signal load-balancer that the node isn't available.
 
 .. variable:: wsrep_sst_method
 
