@@ -130,6 +130,8 @@ case "$1" in
 
 		set +e
 
+	else
+	    server_stop
 	fi
 
 	;;

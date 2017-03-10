@@ -9,6 +9,12 @@ case "$1" in
     # the update-alternatives facility, fall back to creating a symlink
     if [ ! -f /etc/mysql/my.cnf -o -L /etc/mysql/my.cnf ]
     then
+      if [ -x /usr/sbin/invoke-rc.d ]; then
+        cmd="invoke-rc.d mysql stop"
+      else
+        cmd="/etc/init.d/mysql stop"
+      fi
+      $cmd
       update-alternatives --install /etc/mysql/my.cnf my.cnf "/etc/mysql/percona-xtradb-cluster.cnf" 200
     else
       echo " -------------"
