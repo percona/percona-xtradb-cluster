@@ -426,14 +426,16 @@ changes.
 
 .. variable:: wsrep_on
 
+   :version 5.6.27-25.13: Variable available only in session scope
    :cli: No
    :conf: No
    :scope: Session
    :dyn: Yes
    :default: ON
 
-This variable is used to enable/disable wsrep replication. When set to ``OFF``,
-server will stop replication and behave like standalone |MySQL| server.
+This variable can be used to disable wsrep replication
+from the current session to the rest of the cluster
+without the node leaving the cluster.
 
 .. variable:: wsrep_OSU_method
 
