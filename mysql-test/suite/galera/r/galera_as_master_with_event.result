@@ -1,5 +1,5 @@
 use test;
-CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=13000;;
+CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=<PORT>;;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -40,7 +40,7 @@ select count(*) from mysql.t;
 count(*)
 NUMBER_OF_ROWS
 STOP SLAVE;
-CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=13004;;
+CHANGE MASTER TO  MASTER_HOST='127.0.0.1', MASTER_PORT=<PORT>;;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.

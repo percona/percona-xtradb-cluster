@@ -3399,6 +3399,11 @@ public:
   }
 
 private:
+  /* Imagine this be a query-id that is assigned to all statements
+  including non-replicating statement like SELECT/SET.
+
+  For data-changing DML statement wsrep_ws_handle trx_id is set
+  to real-transaction-id. */
   wsrep_trx_id_t m_wsrep_next_trx_id; /* cast from query_id_t */
 public:
 #endif /* WITH_WSREP */

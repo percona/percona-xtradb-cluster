@@ -89,7 +89,8 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
   if (thd->killed == THD::KILL_CONNECTION &&
       thd->wsrep_conflict_state != REPLAYING)
   {
-    WSREP_INFO("applier has been aborted, skipping apply_rbr: %lld",
+    WSREP_INFO("Applier aborted. Skipping apply event while processing"
+               " write-set: %lld",
                (long long) wsrep_thd_trx_seqno(thd));
     DBUG_RETURN(WSREP_CB_FAILURE);
   }
@@ -100,8 +101,9 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
     thd->wsrep_conflict_state= NO_CONFLICT;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
-  if (!buf_len) WSREP_DEBUG("empty rbr buffer to apply: %lld",
-                            (long long) wsrep_thd_trx_seqno(thd));
+  if (!buf_len)
+    WSREP_DEBUG("Empty apply event found while processing write-set: %lld",
+                (long long) wsrep_thd_trx_seqno(thd));
 
   while(buf_len)
   {
@@ -111,7 +113,7 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
 
     if (!ev)
     {
-      WSREP_ERROR("applier could not read binlog event, seqno: %lld, len: %zu",
+      WSREP_ERROR("Applier could not read binlog event, seqno: %lld, len: %zu",
                   (long long)wsrep_thd_trx_seqno(thd), buf_len);
       rcode= 1;
       goto error;
@@ -191,8 +193,9 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
 
     if (thd->wsrep_conflict_state!= NO_CONFLICT &&
         thd->wsrep_conflict_state!= REPLAYING)
-      WSREP_WARN("conflict state after RBR event applying: %d, %lld",
-                 thd->wsrep_query_state, (long long)wsrep_thd_trx_seqno(thd));
+      WSREP_WARN("conflict state after RBR event applying: %s, %lld",
+                 wsrep_get_query_state(thd->wsrep_query_state),
+                 (long long)wsrep_thd_trx_seqno(thd));
 
     if (thd->wsrep_conflict_state == MUST_ABORT) {
       WSREP_WARN("RBR event apply failed, rolling back: %lld",
@@ -222,7 +225,8 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
   assert(thd->wsrep_exec_mode== REPL_RECV);
 
   if (thd->killed == THD::KILL_CONNECTION)
-    WSREP_INFO("applier aborted: %lld", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_INFO("applier aborted while processing write-set: %lld",
+               (long long)wsrep_thd_trx_seqno(thd));
 
   if (rcode) DBUG_RETURN(WSREP_CB_FAILURE);
   DBUG_RETURN(WSREP_CB_SUCCESS);
@@ -294,7 +298,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
                 thd->thread_id(), 
                 (tmp->s) ? tmp->s->db.str : "void",
                 (tmp->s) ? tmp->s->table_name.str : "void");
-      close_temporary_table(thd, tmp, 1, 1);    
+    close_temporary_table(thd, tmp, 1, 1);    
   }
 
   return rcode;
@@ -402,7 +406,8 @@ wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
     if (wsrep_slave_count_change < 0)
     {
       wsrep_slave_count_change++;
-      WSREP_DEBUG("Closing applier thread, to close %d", abs(wsrep_slave_count_change));
+      WSREP_DEBUG("Closing applier thread(s). Yet to close %d",
+                  abs(wsrep_slave_count_change));
       *exit = true;
     }
     mysql_mutex_unlock(&LOCK_wsrep_slave_threads);

@@ -1132,8 +1132,8 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     uchar *buf;
     size_t len=0;
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog trx cache not empty (%llu bytes) @ connection close %llu",
-               (unsigned long long) len, (unsigned long long) thd->thread_id());
+    WSREP_WARN("binlog trx cache not empty (%zu bytes) @ connection close %u",
+               len, thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
     cache = cache_mngr->get_binlog_cache_log(false);
@@ -12235,7 +12235,7 @@ IO_CACHE * wsrep_get_trans_log(THD * thd, bool transaction)
   }
   else
   {
-    WSREP_DEBUG("binlog cache not initialized, conn :%u", thd->thread_id());
+    WSREP_DEBUG("binlog cache not initialized for thd: %u", thd->thread_id());
     return NULL;
   }
 }

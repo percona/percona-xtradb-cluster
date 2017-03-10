@@ -16,6 +16,11 @@ INSERT INTO t1 VALUES (1);
 --connection node_1
 INSERT INTO t1 VALUES (1);
 
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1
+--source include/wait_condition.inc
+
 --connection node_2
 --error ER_LOCK_DEADLOCK
 SELECT * FROM t1 FOR UPDATE;

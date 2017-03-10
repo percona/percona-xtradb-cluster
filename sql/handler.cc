@@ -2068,8 +2068,10 @@ int ha_rollback_low(THD *thd, bool all)
       if ((err= ht->rollback(ht, thd, all)))
       { // cannot happen
 #ifdef WITH_WSREP
-        WSREP_INFO("rollback failed for ht: %d, conf: %d SQL %s",
-                   ht->db_type, thd->wsrep_conflict_state, thd->query().str);
+        WSREP_INFO("rollback failed for handlerton: %d, conflict-state: %s SQL %s",
+                   ht->db_type,
+                   wsrep_get_conflict_state(thd->wsrep_conflict_state),
+                   thd->query().str);
         Diagnostics_area *da= thd->get_stmt_da();
         if (da)
         {

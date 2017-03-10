@@ -246,7 +246,8 @@ static void set_thd_tx_priority(THD* thd, int priority)
               thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER);
 #ifdef WITH_WSREP
   if (priority > 0)
-    WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d", thd->thd_tx_priority, priority);
+    WSREP_WARN("InnoDB High Priority being used for slave: %d -> %d",
+               thd->thd_tx_priority, priority);
 #endif /* WITH_WSREP */
   thd->thd_tx_priority= priority;
   DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread",
@@ -2038,7 +2039,9 @@ bool start_slave_threads(bool need_lock_slave, bool wait_for_start,
        which would lead to immediate inconsistency
     */
     WSREP_WARN("Cannot start MySQL slave, when log_slave_updates is not set");
-    my_error(ER_SLAVE_CONFIGURATION, MYF(0), "bad configuration no log_slave_updates defined, slave would not replicate further to wsrep cluster");
+    my_error(ER_SLAVE_CONFIGURATION, MYF(0),
+             "bad configuration no log_slave_updates defined, slave would not"
+             " replicate further to wsrep cluster");
     DBUG_RETURN(true);
   }
 #endif /* WITH_WSREP */
@@ -4831,7 +4834,7 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
       if ((err= wsrep->preordered_commit(wsrep, &thd->wsrep_po_handle,
                                          &source, flags, 1, true)) != WSREP_OK)
       {
-        WSREP_ERROR("failed to commit preordered event: %d", err);
+        WSREP_ERROR("Failed to commit preordered event: %d", err);
         DBUG_RETURN(SLAVE_APPLY_EVENT_AND_UPDATE_POS_APPLY_ERROR);
       }
     }
@@ -4857,8 +4860,8 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
 #ifdef WITH_WSREP
     if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT)
     {
-      WSREP_DEBUG("SQL apply failed, res %d conflict state: %d",
-                 exec_res, thd->wsrep_conflict_state);
+      WSREP_DEBUG("Apply Event failed (Reason: %d, Conflict-State: %s)",
+                 exec_res, wsrep_get_conflict_state(thd->wsrep_conflict_state));
       rli->abort_slave = 1;
       rli->report(ERROR_LEVEL, ER_UNKNOWN_COM_ERROR,
                   "Node has dropped from cluster");
@@ -5414,7 +5417,8 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
           assert (!thd->wsrep_applier);
           if (thd->wsrep_gtid_event_buf)
           {
-            WSREP_WARN("MySQL GTID event pending");
+            WSREP_WARN("Pending to replicate MySQL GTID event"
+                       " (probably a stale event). Discarding it now.");
             my_free((uchar*)thd->wsrep_gtid_event_buf);
             thd->wsrep_gtid_event_buf     = NULL;
             thd->wsrep_gtid_event_buf_len = 0;
@@ -7324,7 +7328,7 @@ extern "C" void *handle_slave_sql(void *arg)
   my_thread_init();
   DBUG_ENTER("handle_slave_sql");
 #ifdef WITH_WSREP
- wsrep_restart_point:
+wsrep_restart_point:
 #endif /* WITH_WSREP */
 
   DBUG_ASSERT(rli->inited);
@@ -7797,18 +7801,18 @@ llstr(rli->get_group_master_log_pos(), llbuff));
   {
     if (wsrep_ready)
     {
-      WSREP_INFO("Slave error due to node temporarily non-primary"
+      WSREP_INFO("Slave error due to node temporarily went non-primary"
                  "SQL slave will continue");
       wsrep_node_dropped= FALSE;
       mysql_mutex_unlock(&rli->run_lock);
-      WSREP_DEBUG("wsrep_conflict_state now: %d", thd->wsrep_conflict_state);
-      WSREP_INFO("slave restart: %d", thd->wsrep_conflict_state);
+      WSREP_INFO("Restarting Slave (conflict-state: %s)",
+                 wsrep_get_conflict_state(thd->wsrep_conflict_state));
       thd->wsrep_conflict_state = NO_CONFLICT;
       goto wsrep_restart_point;
     } else {
       WSREP_INFO("Slave error due to node going non-primary");
-      WSREP_INFO("wsrep_restart_slave was set and therefore slave will be "
-                 "automatically restarted when node joins back to cluster");
+      WSREP_INFO("wsrep_restart_slave is set. Slave will automatically"
+                 " restart when node joins back the cluster");
       wsrep_restart_slave_activated= TRUE;
     }
   }

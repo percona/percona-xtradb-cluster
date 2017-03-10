@@ -227,7 +227,7 @@ static bool            sst_needed   = false;
 
 void wsrep_sst_grab ()
 {
-  WSREP_INFO("wsrep_sst_grab()");
+  WSREP_INFO("Preparing to initiate SST/IST");
   if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   sst_complete = false;
   mysql_mutex_unlock (&LOCK_wsrep_sst);
@@ -241,7 +241,7 @@ bool wsrep_sst_wait ()
   if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
   while (!sst_complete)
   {
-    WSREP_INFO("Waiting for SST to complete.");
+    WSREP_INFO("Waiting for SST/IST to complete.");
     mysql_cond_wait (&COND_wsrep_sst, &LOCK_wsrep_sst);
   }
 
@@ -315,8 +315,8 @@ void wsrep_sst_received (wsrep_t*            const wsrep,
     }
     else if (local_seqno > seqno)
     {
-        WSREP_WARN("SST postion is in the past: %lld, current: %lld. "
-                   "Can't continue.",
+        WSREP_WARN("SST postion is in the past: %lld."
+                   " Current position: %lld. Can't continue.",
                    (long long)seqno, (long long)local_seqno);
         unireg_abort(1);
     }
@@ -341,7 +341,7 @@ void wsrep_sst_continue ()
 {
   if (sst_needed)
   {
-    WSREP_INFO("Signalling provider to continue.");
+    WSREP_INFO("Signalling provider to continue on SST completion.");
     wsrep_sst_received (wsrep, local_uuid, local_seqno, NULL, 0);
   }
 }
@@ -506,7 +506,7 @@ static void* sst_joiner_thread (void* a)
     const size_t out_len = 512;
     char out[out_len];
 
-    WSREP_INFO("Running: '%s'", arg->cmd);
+    WSREP_INFO("Initiating SST/IST transfer on JOINER side (%s)", arg->cmd);
 
     // Launch the SST script and save pointer to its process:
 
@@ -589,7 +589,8 @@ static void* sst_joiner_thread (void* a)
       {
         err= proc.error();
         char errbuf[MYSYS_STRERROR_SIZE];
-        WSREP_ERROR("SST script aborted with error %d (%s)", err, my_strerror(errbuf, sizeof(errbuf), err));
+        WSREP_ERROR("SST script aborted with error %d (%s)",
+                    err, my_strerror(errbuf, sizeof(errbuf), err));
       }
     }
     else
@@ -868,7 +869,7 @@ ssize_t wsrep_sst_prepare (void** msg, THD* thd)
     char* const addr_ptr(method_ptr + method_len + 1);
     strcpy (addr_ptr, addr_out);
 
-    WSREP_INFO ("Prepared SST request: %s|%s", method_ptr, addr_ptr);
+    WSREP_INFO ("Prepared SST/IST request: %s|%s", method_ptr, addr_ptr);
 
     if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
     sst_awaiting_callback = true;
@@ -1063,7 +1064,7 @@ static int sst_flush_tables(THD* thd)
   }
   else
   {
-    WSREP_INFO("Tables flushed.");
+    WSREP_INFO("Table flushing completed.");
     const char base_name[]= "tables_flushed";
     ssize_t const full_len= strlen(mysql_real_data_home) + strlen(base_name)+2;
     char *real_name= static_cast<char *>(alloca(full_len));
@@ -1116,7 +1117,7 @@ static void* sst_donor_thread (void* a)
   wsrep_pfs_register_thread(key_THREAD_wsrep_sst_donor);
 #endif /* HAVE_PSI_INTERFACE */
 
-  WSREP_INFO("Running: '%s'", arg->cmd);
+  WSREP_INFO("Initiating SST/IST transfer on DONOR side (%s)", arg->cmd);
 
   int  err= 1;
   bool locked= false;
@@ -1193,10 +1194,12 @@ wait_signal:
     {
       if (mysql_mutex_lock (&LOCK_wsrep_sst)) abort();
       // Print error message if SST is not cancelled:
+#if 0
       if (!sst_cancelled)
       {
          WSREP_ERROR("Failed to read from: %s", proc.cmd());
       }
+#endif
       // Clear the pointer to SST process:
       sst_process = NULL;
       mysql_mutex_unlock (&LOCK_wsrep_sst);
@@ -1310,7 +1313,7 @@ static int sst_donate_other (const char*   method,
   }
   mysql_cond_wait (&arg.COND_wsrep_sst_thread, &arg.LOCK_wsrep_sst_thread);
 
-  WSREP_INFO("sst_donor_thread signaled with %d", arg.err);
+  WSREP_INFO("DONOR thread signaled with %d", arg.err);
   pthread_detach(tmp);
   return arg.err;
 }

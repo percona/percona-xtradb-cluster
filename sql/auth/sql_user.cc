@@ -823,7 +823,7 @@ end:
 
 #ifdef WITH_WSREP
 error:
-  WSREP_ERROR("Replication of SET PASSWORD failed: %s", buff);
+  WSREP_ERROR("Fail to replicate SET PASSWORD (%s)", buff);
   DBUG_RETURN(result);
 #endif /* WITH_WSREP */
 }

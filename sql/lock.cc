@@ -1274,7 +1274,7 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
   else if (WSREP(thd) && !provider_desynced_paused)
   {
     int rcode;
-    WSREP_DEBUG("running implicit desync for node");
+    WSREP_DEBUG("Running implicit desync for node from FTWRL");
     rcode = wsrep->desync(wsrep);
     if (rcode != WSREP_OK)
     {
@@ -1343,7 +1343,7 @@ wsrep_status_t Global_read_lock::wsrep_resume()
 
   if (ret != WSREP_OK)
   {
-    WSREP_WARN("Failed to resume provider: %d", ret);
+    WSREP_WARN("failed to resume provider: %d", ret);
   }
   else
   {
