@@ -332,6 +332,12 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Node is not a cluster node. Disabling pxc_strict_mode"),
  ("WSREP: pxc_strict_mode can be changed only if node is cluster-node"),
 
+/*
+   These warnings come up often when the test servers are under load.
+*/
+ ("Difficult to find free blocks in the buffer pool.*"),
+
+
  /*
    We do have offline members on some Group Replication tests, XCom
    will throw warnings when trying to connect to them.
