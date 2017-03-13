@@ -3952,7 +3952,6 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_REPLACE:
-    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
 #ifndef DBUG_OFF
     if (mysql_bin_log.is_open())
     {
