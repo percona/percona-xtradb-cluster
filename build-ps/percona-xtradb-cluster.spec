@@ -1147,11 +1147,7 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 if [ ! -e /var/log/mysqld.log ]; then
-%if 0%{?rhel} > 6
-    /bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
-%else
     /usr/bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
-%fi
 fi
 #/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
 #/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
