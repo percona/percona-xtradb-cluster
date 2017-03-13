@@ -875,8 +875,8 @@ install -D -m 0644 $MBD/build-ps/rpm/mysql.service $RBR%{_unitdir}/mysql.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql@.service $RBR%{_unitdir}/mysql@.service
 install -D -m 0644 $MBD/build-ps/rpm/mysql.bootstrap $RBR%{_sysconfdir}/sysconfig/mysql.bootstrap
 %else
-#install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
-install -D -m 0755 $MBD/build-ps/rpm/mysql.init %{buildroot}%{_sysconfdir}/init.d/mysql
+install -m 755 $MBD/release/support-files/mysql.server $RBR%{_sysconfdir}/init.d/mysql
+#install -D -m 0755 $MBD/build-ps/rpm/mysql.init %{buildroot}%{_sysconfdir}/init.d/mysql
 %endif
 
 
@@ -1147,7 +1147,7 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 if [ ! -e /var/log/mysqld.log ]; then
-    /bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
+    /usr/bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
 fi
 #/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
 #/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
@@ -1158,7 +1158,11 @@ fi
 MYCNF_PACKAGE=$(rpm -qi `rpm -qf /etc/my.cnf` | grep Name | awk '{print $3}')
 if [ $MYCNF_PACKAGE = 'mariadb-libs' -o $MYCNF_PACKAGE = 'mysql-libs' ]
 then
-  rm -f /etc/my.cnf
+  MODIFICATION=$(rpm --verify --nomtime $MYCNF_PACKAGE | grep /etc/my.cnf | awk '{print $1}')
+  if [ "${MODIFICATION}" == "" ]
+  then
+    rm -f /etc/my.cnf
+  fi
 fi
 if [ ! -f /etc/my.cnf ]
 then
