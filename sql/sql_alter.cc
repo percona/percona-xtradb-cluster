@@ -515,6 +515,47 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd)
   /* first table of first SELECT_LEX */
   TABLE_LIST *table_list= select_lex->get_table_list();
 
+  /* Disable DISCARD/IMPORT TABLESPACE as this command
+  will execute on single node and can introduce data
+  in-consistency in cluster. */
+  bool block= false;
+  switch(pxc_strict_mode)
+  {
+  case PXC_STRICT_MODE_DISABLED:
+    break;
+  case PXC_STRICT_MODE_PERMISSIVE:
+     WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend"
+                " DISCARD/IMPORT of tablespace as it can introduce"
+                " data in-consistency (if not done in tandem on all nodes)"
+                " with pxc_strict_mode = PERMISSIVE");
+     push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+        "Percona-XtraDB-Cluster doesn't recommend"
+        " DISCARD/IMPORT of tablespace as it can introduce"
+        " data in-consistency (if not done in tandem on all nodes)"
+        " with pxc_strict_mode = PERMISSIVE");
+      break;
+  case PXC_STRICT_MODE_ENFORCING:
+  case PXC_STRICT_MODE_MASTER:
+  default:
+     block= true;
+     WSREP_ERROR("Percona-XtraDB-Cluster doesn't recommend"
+                 " DISCARD/IMPORT of tablespace as it can introduce"
+                 " data in-consistency (if not done in tandem on all nodes)"
+                 " with pxc_strict_mode = ENFORCING or MASTER");
+     char message[1024];
+     sprintf(message,
+             "Percona-XtraDB-Cluster prohibits"
+             " DISCARD/IMPORT of tablespace as it can introduce"
+             " data in-consistency (if not done in tandem on all nodes)"
+             " with pxc_strict_mode = ENFORCING or MASTER");
+     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+     break;
+  }
+
+  if (block)
+    return true;
+
   if (check_access(thd, ALTER_ACL, table_list->db,
                    &table_list->grant.privilege,
                    &table_list->grant.m_internal,
