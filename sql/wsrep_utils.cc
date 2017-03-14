@@ -113,7 +113,7 @@ env::ctor_common(char** e)
             if (!env_[i])
             {
                 errno_ = errno;
-                WSREP_ERROR("Failed to allocate env. var: %s", e[i]);
+                WSREP_ERROR("Failed to allocate environment variable: %s", e[i]);
                 return true;
             }
         }
@@ -124,7 +124,7 @@ env::ctor_common(char** e)
     else
     {
         errno_ = errno;
-        WSREP_ERROR("Failed to allocate env. var vector of length: %zu", len_);
+        WSREP_ERROR("Failed to allocate environment variable vector of length: %zu", len_);
         return true;
     }
 }

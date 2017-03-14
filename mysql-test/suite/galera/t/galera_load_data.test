@@ -17,6 +17,12 @@ EOF
 
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+RESET MASTER;
+
+--connection node_1
 RESET MASTER;
 
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
@@ -56,6 +62,10 @@ RESET MASTER;
 --connection node_1
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
+--connection node_2
+--let $wsrep_last_committed_before_2 = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+
+--connection node_1
 --disable_query_log
 --eval LOAD DATA INFILE "$MYSQLTEST_VARDIR/tmp/galera_load_data_one.csv" INTO TABLE t1;
 --enable_query_log
@@ -67,6 +77,11 @@ RESET MASTER;
 --disable_query_log
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_correct
 --enable_query_log
+
+--connection node_2
+# Expect one transaction
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before_2 + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed';
+--source include/wait_condition.inc
 
 --connection node_1
 SELECT COUNT(*) = 1 FROM t1;

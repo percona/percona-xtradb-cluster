@@ -102,7 +102,9 @@ static void init_thd(THD **p_thd)
   thd->store_globals();
   thd->set_time();
 #ifdef WITH_WSREP
-  WSREP_DEBUG("SYSTEM_THREAD_COMPRESS_GTID_TABLE declared as non wsrep_on");
+  /* Set wsrep-on=0 for compressed GTID table thread as it would write
+  rows that we don't want to replicate. */
+  WSREP_DEBUG("Compress GTID table thread will run with wsrep_on=0/false");
   thd->variables.wsrep_on= 0;
 #endif /* WITH_WSREP */
   DBUG_VOID_RETURN;

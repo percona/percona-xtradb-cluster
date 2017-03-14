@@ -38,7 +38,7 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
 
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
   {
-    WSREP_ERROR("failed to initialize io-cache");
+    WSREP_ERROR("Failed to initialize io-cache");
     return ER_ERROR_ON_WRITE;
   }
 
@@ -58,7 +58,7 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
       */
       if (total_length > wsrep_max_ws_size)
       {
-          WSREP_WARN("transaction size limit (%lu) exceeded: %zu",
+          WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
                      wsrep_max_ws_size, total_length);
           goto error;
       }
@@ -66,8 +66,10 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
       uchar* tmp = (uchar *)my_realloc(key_memory_wsrep, *buf, total_length, MYF(0));
       if (!tmp)
       {
-          WSREP_ERROR("could not (re)allocate buffer: %zu + %u",
-                      *buf_len, length);
+          WSREP_ERROR("Fail to allocate/reallocate memory to hold"
+                      " write-set for replication."
+                      " Existing Size: %zu, Requested Size: %lu",
+                      *buf_len, (long unsigned) total_length);
           goto error;
       }
       *buf = tmp;
@@ -79,13 +81,13 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
 
   if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
   {
-    WSREP_WARN("failed to initialize io-cache");
+    WSREP_WARN("Failed to initialize io-cache");
     goto cleanup;
   }
 
   if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
   {
-    WSREP_ERROR("failed to initialize io-cache");
+    WSREP_ERROR("Failed to initialize io-cache");
     goto cleanup;
   }
 
@@ -94,7 +96,7 @@ int wsrep_write_cache_buf(IO_CACHE *cache, uchar **buf, size_t *buf_len)
 error:
   if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
   {
-    WSREP_WARN("failed to initialize io-cache");
+    WSREP_WARN("Failed to initialize io-cache");
   }
 cleanup:
   my_free(*buf);
@@ -150,7 +152,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
 
     if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
     {
-        WSREP_ERROR("failed to initialize io-cache");
+        WSREP_ERROR("Failed to initialize io-cache");
         return ER_ERROR_ON_WRITE;
     }
 
@@ -181,7 +183,8 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
                                          thd->wsrep_gtid_event_buf_len, MYF(0));
         if (!tmp)
         {
-          WSREP_ERROR("could not (re)allocate buffer for GTID event: %zu + %lu",
+          WSREP_ERROR("Failed to allocate/reallocate buffer to hold GTID event"
+                      " Existing Size: %zu, Requested Size: %lu",
                       allocated, thd->wsrep_gtid_event_buf_len);
           err = WSREP_TRX_SIZE_EXCEEDED;
           goto cleanup;
@@ -209,7 +212,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
         */
         if (unlikely(total_length > wsrep_max_ws_size))
         {
-            WSREP_WARN("transaction size limit (%lu) exceeded: %zu",
+            WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
                        wsrep_max_ws_size, total_length);
 	    err = WSREP_TRX_SIZE_EXCEEDED;
             goto cleanup;
@@ -221,8 +224,10 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
             uchar* tmp = (uchar *)my_realloc(key_memory_wsrep, heap_buf, new_size, MYF(0));
             if (!tmp)
             {
-                WSREP_ERROR("could not (re)allocate buffer: %zu + %u",
-                            allocated, length);
+                WSREP_ERROR("Failed to allocate/reallocate memory to hold"
+                            " write-set for replication."
+                            " Existing Size: %zu, Requested Size: %lu",
+                            allocated, (long unsigned) new_size);
                 err = WSREP_TRX_SIZE_EXCEEDED;
                 goto cleanup;
             }
@@ -251,7 +256,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
 cleanup:
     if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
     {
-        WSREP_ERROR("failed to reinitialize io-cache");
+        WSREP_ERROR("Failed to reinitialize io-cache");
     }
 
     if (unlikely(WSREP_OK != err)) wsrep_dump_rbr_buf(thd, buf, used);
@@ -280,7 +285,7 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
 
     if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
     {
-      WSREP_ERROR("failed to initialize io-cache");
+      WSREP_ERROR("Failed to initialize io-cache");
       return WSREP_TRX_ERROR;
     }
 
@@ -309,7 +314,7 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
         */
         if (unlikely(total_length > wsrep_max_ws_size))
         {
-            WSREP_WARN("transaction size limit (%lu) exceeded: %zu",
+            WSREP_WARN("Transaction/Write-set size limit (%lu) exceeded: %zu",
                        wsrep_max_ws_size, total_length);
             err = WSREP_TRX_SIZE_EXCEEDED;
             goto cleanup;
@@ -327,7 +332,7 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
 cleanup:
     if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
     {
-        WSREP_ERROR("failed to reinitialize io-cache");
+        WSREP_ERROR("Failed to reinitialize io-cache");
     }
 
     if (thd->wsrep_gtid_event_buf) my_free(thd->wsrep_gtid_event_buf);
@@ -398,7 +403,7 @@ void wsrep_dump_rbr_direct(THD* thd, IO_CACHE* cache)
   my_off_t const saved_pos(my_b_tell(cache));
   if (reinit_io_cache(cache, READ_CACHE, 0, 0, 0))
   {
-    WSREP_ERROR("failed to initialize io-cache");
+    WSREP_ERROR("Failed to initialize io-cache");
     return ;
   }
   // open file
@@ -431,7 +436,7 @@ cleanup:
   // init back
   if (reinit_io_cache(cache, WRITE_CACHE, saved_pos, 0, 0))
   {
-    WSREP_ERROR("failed to reinitialize io-cache");
+    WSREP_ERROR("Failed to reinitialize io-cache");
   }
   // close file
   if (of) fclose(of);

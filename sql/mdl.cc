@@ -2020,7 +2020,8 @@ void MDL_lock::Ticket_list::add_ticket(MDL_ticket *ticket)
         if (!wsrep_grant_mdl_exception(ticket->get_ctx(), granted,
                                        &ticket->get_lock()->key))
         {
-          WSREP_DEBUG("MDL victim killed at add_ticket");
+          WSREP_DEBUG("Adding of MDL ticket failed (at add_ticket)"
+                      " as initiating thread (victim) got killed");
         }
       }
     }
@@ -2651,7 +2652,8 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
             if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),false) &&
                 key.mdl_namespace() == MDL_key::GLOBAL)
             {
-              WSREP_DEBUG("global lock granted for BF: %u %s",
+              WSREP_DEBUG("Global lock granted to applier/TOI action processor:"
+                          " %u %s",
                           wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
                           wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
               can_grant = true;
@@ -2663,8 +2665,9 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
 	      {
 	        MDL_lock * lock = ticket->get_lock();
 	        WSREP_INFO(
-                  "MDL conflict db=%s table=%s ticket=%d solved by %s",
-                  lock->key.db_name(), lock->key.name(), ticket->get_type(), "abort"
+                  "MDL conflict db=%s table=%s ticket=%s solved by %s",
+                  lock->key.db_name(), lock->key.name(),
+                  ticket->get_type_string(), "abort"
        	        );
               }
             }
@@ -2706,7 +2709,8 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
       if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()),false) &&
           key.mdl_namespace() == MDL_key::GLOBAL)
       {
-            WSREP_DEBUG("global lock granted over unobstrusive locks, for BF: %u %s",
+            WSREP_DEBUG("Global lock granted to applier/TOI action processor"
+                          " (over unobstrusive locks): %u %s",
                         wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
                         wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
             can_grant = true;
@@ -2723,15 +2727,16 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
         {
           MDL_lock * lock = ticket->get_lock();
           WSREP_INFO(
-                     "MDL conflict db=%s table=%s ticket=%d solved by %s",
-                     lock->key.db_name(), lock->key.name(), ticket->get_type(), "abort"
+                     "MDL conflict db=%s table=%s ticket=%s solved by %s",
+                     lock->key.db_name(), lock->key.name(),
+                     ticket->get_type_string(), "abort"
                      );
         }
       }
 #endif /* WITH_WSREP_TODO */
       else if (WSREP(requestor_ctx->wsrep_get_thd()))
       {
-        WSREP_DEBUG("granting MDL for BF thread over unobstrusive locks");
+        WSREP_DEBUG("Granting MDL to applier/TOI action processor over unobstrusive locks");
         can_grant= TRUE;
       }
 #endif /* WITH_WSREP */
@@ -2743,7 +2748,8 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
     if (wsrep_thd_is_BF((void *)(requestor_ctx->wsrep_get_thd()), false) &&
 	key.mdl_namespace() == MDL_key::GLOBAL)
     {
-      WSREP_DEBUG("global lock granted for BF (waiting queue): %u %s",
+      WSREP_DEBUG("Global lock granted to applier/TOI action processor"
+                  " (waiting queue): %u %s",
 		  wsrep_thd_thread_id(requestor_ctx->wsrep_get_thd()), 
 		  wsrep_thd_query(requestor_ctx->wsrep_get_thd()));
       can_grant = true;

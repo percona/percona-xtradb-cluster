@@ -1499,8 +1499,11 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       else
       {
         mysql_reset_thd_for_next_command(thd);
-        my_message(ER_LOCK_DEADLOCK, "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction", MYF(0));
-        WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
+        my_message(ER_LOCK_DEADLOCK,
+                   "WSREP detected deadlock/conflict and aborted the"
+                   " transaction. Try restarting the transaction", MYF(0));
+        WSREP_DEBUG("WSREP detected deadlock/conflict for SQL: %s",
+                    WSREP_QUERY(thd));
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
         thd->killed               = THD::NOT_KILLED;
         thd->wsrep_conflict_state = NO_CONFLICT;
@@ -1587,7 +1590,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
   if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
   {
     thd->set_wsrep_next_trx_id(thd->query_id);
-    WSREP_DEBUG("assigned new next trx id: %lu",
+    WSREP_DEBUG("Assigned next trx id: %lu",
                 (long unsigned int) thd->wsrep_next_trx_id());
   }
 #endif /* WITH_WSREP */
@@ -1802,8 +1805,11 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
     if (thd->wsrep_conflict_state== ABORTED) 
     {
-      my_message(ER_LOCK_DEADLOCK, "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction", MYF(0));
-      WSREP_DEBUG("Deadlock error for: %s", WSREP_QUERY(thd));
+      my_message(ER_LOCK_DEADLOCK,
+                 "WSREP detected deadlock/conflict and aborted the"
+                 " transaction. Try restarting the transaction", MYF(0));
+      WSREP_DEBUG("WSREP detected deadlock/conflict for SQL: %s",
+                   WSREP_QUERY(thd));
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
       thd->killed= THD::NOT_KILLED;
       thd->wsrep_conflict_state= NO_CONFLICT;
@@ -1824,12 +1830,12 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       break;
 
 #ifdef WITH_WSREP
-      if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
-      {
-        thd->set_wsrep_next_trx_id(thd->query_id);
-        WSREP_DEBUG("assigned new next trx id: %lu",
-                    (long unsigned int) thd->wsrep_next_trx_id());
-      }
+    if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+    {
+      thd->set_wsrep_next_trx_id(thd->query_id);
+      WSREP_DEBUG("Assigned new next trx id: %lu",
+                  (long unsigned int) thd->wsrep_next_trx_id());
+    }
     wsrep_mysql_parse(thd, thd->query().str, thd->query().length, &parser_state);
 #else
     mysql_parse(thd, &parser_state);
@@ -3237,7 +3243,8 @@ mysql_execute_command(THD *thd, bool first_level)
     {
       thd->mdl_context.release_transactional_locks();
 #ifdef WITH_WSREP
-      WSREP_DEBUG("implicit commit failed, MDL released: %u", thd->thread_id());
+      WSREP_DEBUG("Transaction implicit commit failed"
+                  " MDL released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       goto error;
     }
@@ -3737,41 +3744,47 @@ case SQLCOM_PREPARE:
     {
 
 #ifdef WITH_WSREP
-      bool block= false;
+      bool is_temporary_table=
+        (lex->create_info.options & HA_LEX_CREATE_TMP_TABLE);
 
-      switch(pxc_strict_mode)
+      if (!is_temporary_table)
       {
-      case PXC_STRICT_MODE_DISABLED:
-        break;
-      case PXC_STRICT_MODE_PERMISSIVE:
-        WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
-                   " CREATE TABLE AS SELECT"
-                   " with pxc_strict_mode = PERMISSIVE");
-        push_warning_printf(thd, Sql_condition::SL_WARNING,
-                            ER_UNKNOWN_ERROR,
-                            "Percona-XtraDB-Cluster doesn't recommend use of"
-                            " CREATE TABLE AS SELECT"
-                            " with pxc_strict_mode = PERMISSIVE");
-        break;
-      case PXC_STRICT_MODE_ENFORCING:
-      case PXC_STRICT_MODE_MASTER:
-        block= true;
-        WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
-                    " CREATE TABLE AS SELECT"
-                    " with pxc_strict_mode = ENFORCING or MASTER");
-        char message[1024];
-        sprintf(message,
-                "Percona-XtraDB-Cluster prohibits use of"
-                " CREATE TABLE AS SELECT"
-                " with pxc_strict_mode = ENFORCING or MASTER");
-        my_message(ER_UNKNOWN_ERROR, message, MYF(0));
-        break;
-      }
+        bool block= false;
 
-      if (block)
-      {
-        res= 1;
-        goto end_with_restore_list;
+        switch(pxc_strict_mode)
+        {
+        case PXC_STRICT_MODE_DISABLED:
+          break;
+        case PXC_STRICT_MODE_PERMISSIVE:
+          WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                     " CREATE TABLE AS SELECT"
+                     " with pxc_strict_mode = PERMISSIVE");
+          push_warning_printf(thd, Sql_condition::SL_WARNING,
+                              ER_UNKNOWN_ERROR,
+                              "Percona-XtraDB-Cluster doesn't recommend use of"
+                              " CREATE TABLE AS SELECT"
+                              " with pxc_strict_mode = PERMISSIVE");
+          break;
+        case PXC_STRICT_MODE_ENFORCING:
+        case PXC_STRICT_MODE_MASTER:
+          block= true;
+          WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+                      " CREATE TABLE AS SELECT"
+                      " with pxc_strict_mode = ENFORCING or MASTER");
+          char message[1024];
+          sprintf(message,
+                  "Percona-XtraDB-Cluster prohibits use of"
+                  " CREATE TABLE AS SELECT"
+                  " with pxc_strict_mode = ENFORCING or MASTER");
+          my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+          break;
+        }
+
+        if (block)
+        {
+          res= 1;
+          goto end_with_restore_list;
+        }
       }
 #endif /* WITH_WSREP */
 
@@ -5373,7 +5386,7 @@ end_with_restore_list:
     {
       thd->mdl_context.release_transactional_locks();
 #ifdef WITH_WSREP
-      WSREP_DEBUG("COMMIT failed, MDL released: %u", thd->thread_id());
+      WSREP_DEBUG("COMMIT command failed, MDL released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       goto error;
     }
@@ -5422,7 +5435,7 @@ end_with_restore_list:
     {
       thd->mdl_context.release_transactional_locks();
 #ifdef WITH_WSREP
-      WSREP_DEBUG("rollback failed, MDL released: %u", thd->thread_id());
+      WSREP_DEBUG("ROLLBACK failed, MDL released: %u", thd->thread_id());
 #endif /* WITH_WSREP */
       goto error;
     }
@@ -6045,7 +6058,7 @@ end_with_restore_list:
     {
       if (WSREP(thd))
       {
-        WSREP_DEBUG("XA command attempt: %d %s, thd: %u",
+        WSREP_DEBUG("XA command attempted: %d %s, thd: %u",
                     lex->sql_command, thd->query().str, thd->thread_id());
         my_error(ER_NOT_SUPPORTED_YET, MYF(0), "XA with wsrep replication plugin");
         break;
@@ -7914,7 +7927,7 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
             thd->lex->sql_command != SQLCOM_SELECT  &&
            (thd->wsrep_retry_counter < thd->variables.wsrep_retry_autocommit))
         {
-          WSREP_DEBUG("wsrep retrying AC query: %s", WSREP_QUERY(thd));
+          WSREP_DEBUG("Retrying auto-commit query (on abort): %s", WSREP_QUERY(thd));
 
           close_thread_tables(thd);
 
@@ -7958,21 +7971,22 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
                                                       thd->db().str, thd->db().length,
                                                       thd->charset(), NULL);
           DBUG_ASSERT(thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID);
+
           thd->set_wsrep_next_trx_id(thd->query_id);
-          WSREP_DEBUG("assigned new next trx id: %lu",
+          WSREP_DEBUG("Assigned new trx id to retry auto-commit query: %lu",
                       (long unsigned int) thd->wsrep_next_trx_id());
         }
         else
         {
           WSREP_DEBUG("%s, thd: %u is_AC: %d, retry: %lu - %lu SQL: %s",
                       (thd->wsrep_conflict_state == ABORTED) ?
-                      "BF Aborted" : "cert failure",
+                      "Brute-Force Abort" : "Certification Failure",
                       thd->thread_id(), is_autocommit, thd->wsrep_retry_counter,
                       thd->variables.wsrep_retry_autocommit,
                       WSREP_QUERY(thd));
           my_message(ER_LOCK_DEADLOCK, 
-            "WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction",
-            MYF(0));
+                     "WSREP detected deadlock/conflict and aborted the"
+                     " transaction. Try restarting the transaction", MYF(0));
           thd->killed= THD::NOT_KILLED;
           thd->wsrep_conflict_state= NO_CONFLICT;
           if (thd->wsrep_conflict_state != REPLAYING)
@@ -7989,9 +8003,9 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
 
   if (thd->wsrep_retry_query)
   {
-    WSREP_DEBUG("releasing retry_query: "
-                "conf %d sent %d kill %d  errno %d SQL %s",
-                thd->wsrep_conflict_state,
+    WSREP_DEBUG("Release retry query buffer"
+                " conflict-state %s sent %d kill %d errno %d SQL %s",
+                wsrep_get_conflict_state(thd->wsrep_conflict_state),
                 thd->get_stmt_da()->is_sent(),
                 thd->killed,
                 thd->get_stmt_da()->is_error() ? 

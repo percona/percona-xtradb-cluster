@@ -29,6 +29,7 @@ OS=$(uname)
 export PATH="/usr/sbin:/sbin:$PATH"
 
 . $(dirname $0)/wsrep_sst_common
+WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-log-debug "")
 
 wsrep_check_programs rsync
 
@@ -40,14 +41,14 @@ fi
 cleanup_joiner()
 {
     local PID=$(cat "$RSYNC_PID" 2>/dev/null || echo 0)
-    wsrep_log_info "Joiner cleanup. rsync PID: $PID"
+    wsrep_log_debug "Joiner cleanup. rsync PID: $PID"
     [ "0" != "$PID" ] && kill $PID && sleep 0.5 && kill -9 $PID >/dev/null 2>&1 \
     || :
     rm -rf "$RSYNC_CONF"
     rm -rf "$MAGIC_FILE"
     rm -rf "$RSYNC_PID"
     rm -rf "$KEYRING_FILE"
-    wsrep_log_info "Joiner cleanup done."
+    wsrep_log_debug "Joiner cleanup done."
     if [ "${WSREP_SST_OPT_ROLE}" = "joiner" ];then
         wsrep_cleanup_progress_file
     fi
@@ -71,7 +72,9 @@ check_pid_and_port()
         grep -w '^rsync[[:space:]]\+'"$rsync_pid" 2>/dev/null)
 
     if [ -n "$port_info" -a -z "$is_rsync" ]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "rsync daemon port '$rsync_port' has been taken"
+        wsrep_log_error "****************************************************** "
         exit 16 # EBUSY
     fi
     check_pid $pid_file && \
@@ -165,12 +168,13 @@ then
             done
             if ! [ -z "$binlog_files" ]
             then
-                wsrep_log_info "Preparing binlog files for transfer:"
-                tar -cvf $BINLOG_TAR_FILE $binlog_files >&2
+                wsrep_log_debug "Preparing binlog files for transfer:"
+                tar -cf $BINLOG_TAR_FILE $binlog_files >&2
             fi
             popd &> /dev/null
         fi
 
+        wsrep_log_info "Starting rsync of data-dir............"
         # first, the normal directories, so that we can detect incompatible protocol
         RC=0
         rsync --owner --group --perms --links --specials \
@@ -179,7 +183,9 @@ then
               rsync://$WSREP_SST_OPT_ADDR >&2 || RC=$?
 
         if [ "$RC" -ne 0 ]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "rsync returned code $RC:"
+            wsrep_log_error "****************************************************** "
 
             case $RC in
             12) RC=71  # EPROTO
@@ -202,7 +208,9 @@ then
               rsync://$WSREP_SST_OPT_ADDR-log_dir >&2 || RC=$?
 
         if [ $RC -ne 0 ]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "rsync innodb_log_group_home_dir returned code $RC:"
+            wsrep_log_error "****************************************************** "
             exit 255 # unknown error
         fi
 
@@ -214,7 +222,9 @@ then
                   rsync://$WSREP_SST_OPT_ADDR/keyring-sst >&2 || RC=$?
 
             if [ $RC -ne 0 ]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "rsync keyring returned code $RC:"
+                wsrep_log_error "****************************************************** "
                 exit 255 # unknown error
             fi
         fi
@@ -235,12 +245,15 @@ then
         popd >/dev/null
 
         if [ $RC -ne 0 ]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "find/rsync returned code $RC:"
+            wsrep_log_error "****************************************************** "
             exit 255 # unknown error
         fi
+        wsrep_log_info "...............rsync completed"
 
     else # BYPASS
-        wsrep_log_info "Bypassing state dump."
+        wsrep_log_info "Bypassing state dump (SST)."
         STATE="$WSREP_SST_OPT_GTID"
     fi
 
@@ -264,7 +277,9 @@ then
 
     if check_pid $RSYNC_PID
     then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "rsync daemon already running."
+        wsrep_log_error "****************************************************** "
         exit 114 # EALREADY
     fi
     rm -rf "$RSYNC_PID"
@@ -297,6 +312,7 @@ EOF
 #    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
 
     # listen at all interfaces (for firewalled setups)
+    wsrep_log_info "Waiting for data-dir through rsync................"
     rsync --daemon --no-detach --port $RSYNC_PORT --config "$RSYNC_CONF" &
     RSYNC_REAL_PID=$!
 
@@ -316,8 +332,9 @@ EOF
 
     if ! ps -p $MYSQLD_PID >/dev/null
     then
-        wsrep_log_error \
-        "Parent mysqld process (PID:$MYSQLD_PID) terminated unexpectedly."
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Parent mysqld process (PID:$MYSQLD_PID) terminated unexpectedly."
+        wsrep_log_error "****************************************************** "
         exit 32
     fi
 
@@ -328,9 +345,9 @@ EOF
         if [ -f $BINLOG_TAR_FILE ]
         then
             # Clean up old binlog files first
-            rm -f ${BINLOG_FILENAME}.*
-            wsrep_log_info "Extracting binlog files:"
-            tar -xvf $BINLOG_TAR_FILE >&2
+            rm -f ${BINLOG_FILENAME}.* 2> /dev/null
+            wsrep_log_debug "Extracting binlog files:"
+            tar -xf $BINLOG_TAR_FILE >&2
             for ii in $(ls -1 ${BINLOG_FILENAME}.*)
             do
                 echo ${BINLOG_DIRNAME}/${ii} >> ${BINLOG_FILENAME}.index
@@ -345,19 +362,23 @@ EOF
             mv $KEYRING_FILE $keyring
         else
             # error, missing file
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "FATAL: rsync could not find '${KEYRING_FILE}'"
             wsrep_log_error "The joiner is using a keyring file but the donor has not sent"
             wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
             wsrep_log_error "both sides are using a keyring file"
+            wsrep_log_error "****************************************************** "
             exit 32
         fi
     else
         if [[ -r $KEYRING_FILE ]]; then
             # error, file should not be here
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "FATAL: rsync found '${KEYRING_FILE}'"
             wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
             wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
             wsrep_log_error "both sides are using a keyring file"
+            wsrep_log_error "****************************************************** "
             rm -rf $KEYRING_FILE
             exit 32
         fi
@@ -371,9 +392,12 @@ EOF
         echo "rsync process ended without creating '$MAGIC_FILE'"
     fi
     wsrep_cleanup_progress_file
+    wsrep_log_info "..............rsync completed"
 #    cleanup_joiner
 else
+    wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Unrecognized role: '$WSREP_SST_OPT_ROLE'"
+    wsrep_log_error "****************************************************** "
     exit 22 # EINVAL
 fi
 

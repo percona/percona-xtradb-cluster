@@ -25,6 +25,7 @@
 # related to role/username/password/etc...
 #
 . $(dirname $0)/wsrep_sst_common
+WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-log-debug "")
 
 #-------------------------------------------------------------------------------
 #
@@ -136,15 +137,15 @@ timeit()
 
     if [[ $ttime -eq 1 ]]; then
         x1=$(date +%s)
-        wsrep_log_info "Evaluating $cmd"
+        wsrep_log_debug "Evaluating $cmd"
         eval "$cmd"
         extcode=$?
         x2=$(date +%s)
         took=$(( x2-x1 ))
-        wsrep_log_info "NOTE: $stage took $took seconds"
+        wsrep_log_debug "NOTE: $stage took $took seconds"
         totime=$(( totime+took ))
     else
-        wsrep_log_info "Evaluating $cmd"
+        wsrep_log_debug "Evaluating $cmd"
         eval "$cmd"
         extcode=$?
     fi
@@ -160,28 +161,33 @@ get_keys()
         return
     fi
 
+    # TODO: it seems like encrypt=1/2/3/4 was not provided
     if [[ $encrypt -eq 0 ]]; then
         if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF xtrabackup | grep -q encrypt; then
-            wsrep_log_error "Unexpected option combination. SST may fail. Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html "
+            wsrep_log_warning "Encryption configuration mis-match. SST may fail. Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html for more details."
         fi
         return
     fi
 
     if [[ $sfmt == 'tar' ]]; then
-        wsrep_log_info "NOTE: Xtrabackup-based encryption - encrypt=1 - cannot be enabled with tar format"
+        wsrep_log_error "NOTE: Xtrabackup-based encryption - encrypt=1 - cannot be enabled with tar format"
         encrypt=-1
         return
     fi
 
-    wsrep_log_info "Xtrabackup based encryption enabled in my.cnf - Supported only from Xtrabackup 2.1.4"
+    wsrep_log_debug "Xtrabackup based encryption enabled in my.cnf"
 
     if [[ -z $ealgo ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "FATAL: Encryption algorithm empty from my.cnf, bailing out"
+        wsrep_log_error "****************************************************** "
         exit 3
     fi
 
     if [[ -z $ekey && ! -r $ekeyfile ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "FATAL: Either key or keyfile must be readable"
+        wsrep_log_error "****************************************************** "
         exit 3
     fi
 
@@ -217,7 +223,7 @@ check_for_dhparams()
 
             if ! openssl dhparam -out "$DATA/dhparams.pem" 2048 >/dev/null 2>&1
             then
-                wsrep_log_error "******** FATAL ERROR ********************************* "
+                wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "* Could not create the dhparams.pem file with OpenSSL. "
                 wsrep_log_error "****************************************************** "
                 exit 22
@@ -246,12 +252,38 @@ verify_cert_matches_key()
     # they should match (otherwise we can't create an SSL connection)
     if ! diff <(openssl x509 -in "$cert_path" -pubkey -noout) <(openssl rsa -in "$key_path" -pubout 2>/dev/null) >/dev/null 2>&1
     then
-        wsrep_log_error "******** FATAL ERROR ************************* "
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "* The certifcate and private key do not match. "
         wsrep_log_error "* Please check your certificate and key files. "
-        wsrep_log_error "********************************************** "
+        wsrep_log_error "****************************************************** "
         exit 22
     fi
+}
+
+#
+# verifies that the CA file verifies the certificate
+# doing this here lets us generate better error messages
+#
+# 1st param: path to the CA file
+# 2nd param: path to the cert
+#
+verify_ca_matches_cert()
+{
+    local ca_path=$1
+    local cert_path=$2
+
+    wsrep_check_programs openssl
+
+    if ! openssl verify -verbose -CAfile "$ca_path" "$cert_path" >/dev/null  2>&1
+    then
+        wsrep_log_error "******** FATAL ERROR ****************************************** "
+        wsrep_log_error "* The certifcate and CA (certificate authority) do not match.   "
+        wsrep_log_error "* It does not appear that the certificate was issued by the CA. "
+        wsrep_log_error "* Please check your certificate and CA files.                   "
+        wsrep_log_error "*************************************************************** "
+        exit 22
+    fi
+
 }
 
 #
@@ -270,7 +302,7 @@ verify_file_exists()
     local error_message2=$3
 
     if ! [[ -r "$file_path" ]]; then
-        wsrep_log_error "******** FATAL ERROR ************************* "
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "* $error_message1 "
         wsrep_log_error "* Could not find/access : $file_path "
 
@@ -278,7 +310,7 @@ verify_file_exists()
             wsrep_log_error "* $error_message2 "
         fi
 
-        wsrep_log_error "********************************************** "
+        wsrep_log_error "****************************************************** "
         exit 22
     fi
 }
@@ -295,19 +327,21 @@ get_transfer()
 
     if [[ $tfmt == 'nc' ]]; then
         if [[ ! -x `which nc` ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "nc(netcat) not found in path: $PATH"
+            wsrep_log_error "****************************************************** "
             exit 2
         fi
 
         if [[ $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -eq 4 ]]; then
-            wsrep_log_error "******** FATAL ERROR *********************** "
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "* Using SSL encryption (encrypt= 2, 3, or 4) "
             wsrep_log_error "* is not supported when using nc(netcat).    "
-            wsrep_log_error "******************************************** "
+            wsrep_log_error "****************************************************** "
             exit 22
         fi
 
-        wsrep_log_info "Using netcat as streamer"
+        wsrep_log_debug "Using netcat as streamer"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
             if nc -h 2>&1 | grep -q ncat; then
                 tcmd="nc -l ${TSST_PORT}"
@@ -319,9 +353,11 @@ get_transfer()
         fi
     else
         tfmt='socat'
-        wsrep_log_info "Using socat as streamer"
+        wsrep_log_debug "Using socat as streamer"
         if [[ ! -x `which socat` ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "socat not found in path: $PATH"
+            wsrep_log_error "****************************************************** "
             exit 2
         fi
 
@@ -329,19 +365,19 @@ get_transfer()
         joiner_extra=""
         if [[ $encrypt -eq 2 || $encrypt -eq 3 || $encrypt -eq 4 ]]; then
             if ! socat -V | grep -q WITH_OPENSSL; then
-                wsrep_log_error "******** FATAL ERROR ****************** "
+                wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "* socat is not openssl enabled.         "
                 wsrep_log_error "* Unable to encrypt SST communications. "
-                wsrep_log_error "*************************************** "
+                wsrep_log_error "****************************************************** "
                 exit 2
             fi
 
             # Determine the socat version
             SOCAT_VERSION=`socat -V 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
             if [[ -z "$SOCAT_VERSION" ]]; then
-                wsrep_log_error "******** FATAL ERROR **************** "
+                wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "* Cannot determine the socat version. "
-                wsrep_log_error "************************************* "
+                wsrep_log_error "****************************************************** "
                 exit 2
             fi
 
@@ -364,40 +400,42 @@ get_transfer()
 
         if [[ $encrypt -eq 2 ]]; then
             wsrep_log_warning "**** WARNING **** encrypt=2 is deprecated and will be removed in a future release"
-            wsrep_log_info "Using openssl based encryption with socat: with crt and ca"
+            wsrep_log_debug "Using openssl based encryption with socat: with crt and ca"
 
             verify_file_exists "$tcert" "Both certificate and CA files are required." \
                                         "Please check the 'tcert' option.           "
             verify_file_exists "$tca" "Both certificate and CA files are required." \
                                       "Please check the 'tca' option.             "
+            verify_ca_matches_cert $tca $tcert
 
             stagemsg+="-OpenSSL-Encrypted-2"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-                wsrep_log_info "Decrypting with CERT: $tcert, CA: $tca"
+                wsrep_log_debug "Decrypting with CERT: $tcert, CA: $tca"
                 tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=${tcert},cafile=${tca}${joiner_extra}${sockopt} stdio"
             else
-                wsrep_log_info "Encrypting with CERT: $tcert, CA: $tca"
+                wsrep_log_debug "Encrypting with CERT: $tcert, CA: $tca"
                 tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${tcert},cafile=${tca}${donor_extra}${sockopt}"
             fi
         elif [[ $encrypt -eq 3 ]];then
             wsrep_log_warning "**** WARNING **** encrypt=3 is deprecated and will be removed in a future release"
-            wsrep_log_info "Using openssl based encryption with socat: with key and crt"
+            wsrep_log_debug "Using openssl based encryption with socat: with key and crt"
 
             verify_file_exists "$tcert" "Both certificate and key files are required." \
                                         "Please check the 'tcert' option.            "
             verify_file_exists "$tkey" "Both certificate and key files are required." \
                                        "Please check the 'tkey' option.             "
+            verify_cert_matches_key $tcert $tkey
 
             stagemsg+="-OpenSSL-Encrypted-3"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
-                wsrep_log_info "Decrypting with CERT: $tcert, KEY: $tkey"
+                wsrep_log_debug "Decrypting with CERT: $tcert, KEY: $tkey"
                 tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=${tcert},key=${tkey},verify=0${joiner_extra}${sockopt} stdio"
             else
-                wsrep_log_info "Encrypting with CERT: $tcert, KEY: $tkey"
+                wsrep_log_debug "Encrypting with CERT: $tcert, KEY: $tkey"
                 tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${tcert},key=${tkey},verify=0${sockopt}"
             fi
         elif [[ $encrypt -eq 4 ]]; then
-            wsrep_log_info "Using openssl based encryption with socat: with key, crt, and ca"
+            wsrep_log_debug "Using openssl based encryption with socat: with key, crt, and ca"
 
             verify_file_exists "$ssl_ca" "CA, certificate, and key files are required." \
                                          "Please check the 'ssl-ca' option.           "
@@ -406,15 +444,15 @@ get_transfer()
             verify_file_exists "$ssl_key" "CA, certificate, and key files are required." \
                                           "Please check the 'ssl-key' option.          "
 
-            # Check to see that the key matches the cert
             verify_cert_matches_key $ssl_cert $ssl_key
+            verify_ca_matches_cert $ssl_ca $ssl_cert
 
             stagemsg+="-OpenSSL-Encrypted-4"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-                wsrep_log_info "Decrypting with CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
+                wsrep_log_debug "Decrypting with CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
                 tcmd="socat -u openssl-listen:${TSST_PORT},reuseaddr,cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${joiner_extra}${sockopt} stdio"
             else
-                wsrep_log_info "Encrypting with CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
+                wsrep_log_debug "Encrypting with CERT: $ssl_cert, KEY: $ssl_key, CA: $ssl_ca"
                 tcmd="socat -u stdio openssl-connect:${REMOTEIP}:${TSST_PORT},cert=${ssl_cert},key=${ssl_key},cafile=${ssl_ca},verify=1${donor_extra}${sockopt}"
             fi
 
@@ -542,6 +580,24 @@ read_cnf()
             ssyslog=1
         fi
     fi
+
+    # Pull out the buffer pool size to be used by PXB
+    # and set it in use-memory (if not specified in inno-apply-opts)
+    #
+    # Is the use-memory option already specified in inno-apply-opts?
+    if ! [[ "$iapts" =~ --use-memory= ]]; then
+        bufferpoolsize=$(parse_cnf xtrabackup use-memory "")
+        if [[ -z "$bufferpoolsize" ]]; then
+            bufferpoolsize=$(parse_cnf mysqld innodb-buffer-pool-size "")
+        fi
+        if [[ -z "$bufferpoolsize" ]]; then
+            bufferpoolsize=$(parse_cnf mysqld innodb_buffer_pool_size "")
+        fi
+        if [[ -n "$bufferpoolsize" ]]; then
+            iapts="$iapts --use-memory=$bufferpoolsize"
+        fi
+    fi
+
 }
 
 #
@@ -587,7 +643,7 @@ adjust_progress()
     fi
 
     if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "donor" ]]; then
-        wsrep_log_info "Rate-limiting SST to $rlimit"
+        wsrep_log_debug "Rate-limiting SST to $rlimit"
         pcmd+=" -L \$rlimit"
     fi
 }
@@ -597,7 +653,7 @@ adjust_progress()
 get_stream()
 {
     if [[ $sfmt == 'xbstream' ]]; then
-        wsrep_log_info "Streaming with xbstream"
+        wsrep_log_debug "Streaming with xbstream"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
             strmcmd="xbstream -x"
         else
@@ -605,7 +661,7 @@ get_stream()
         fi
     else
         sfmt="tar"
-        wsrep_log_info "Streaming with tar"
+        wsrep_log_debug "Streaming with tar"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
             strmcmd="tar xfi - "
         else
@@ -628,9 +684,9 @@ get_proc()
 sig_joiner_cleanup()
 {
     wsrep_log_error "Removing $XB_GTID_INFO_FILE_PATH file due to signal"
-    rm -f "$XB_GTID_INFO_FILE_PATH"
+    rm -f "$XB_GTID_INFO_FILE_PATH" 2> /dev/null
     wsrep_log_error "Removing $XB_DONOR_KEYRING_FILE_PATH file due to signal"
-    rm -f "$XB_DONOR_KEYRING_FILE_PATH" || true
+    rm -f "$XB_DONOR_KEYRING_FILE_PATH" 2> /dev/null || true
 }
 
 cleanup_joiner()
@@ -640,11 +696,11 @@ cleanup_joiner()
     if [[ $estatus -ne 0 ]]; then
         wsrep_log_error "Cleanup after exit with status:$estatus"
     elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]; then
-        wsrep_log_info "Removing the sst_in_progress file"
+        wsrep_log_debug "Removing the sst_in_progress file"
         wsrep_cleanup_progress_file
     fi
     if [[ -n $progress && -p $progress ]]; then
-        wsrep_log_info "Cleaning up fifo file $progress"
+        wsrep_log_debug "Cleaning up fifo file $progress"
         rm $progress
     fi
     if [[ -n ${STATDIR:-} ]]; then
@@ -698,11 +754,11 @@ cleanup_donor()
     rm -f ${DATA}/${IST_FILE} || true
 
     if [[ -n $progress && -p $progress ]]; then
-        wsrep_log_info "Cleaning up fifo file $progress"
+        wsrep_log_debug "Cleaning up fifo file $progress"
         rm -f $progress || true
     fi
 
-    wsrep_log_info "Cleaning up temporary directories"
+    wsrep_log_debug "Cleaning up temporary directories"
 
     if [[ -n $xtmpdir ]]; then
        [[ -d $xtmpdir ]] &&  rm -rf $xtmpdir || true
@@ -736,7 +792,7 @@ kill_xtrabackup()
 {
     local PID=$(cat $XTRABACKUP_PID)
     [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
-    wsrep_log_info "Removing xtrabackup pid file $XTRABACKUP_PID"
+    wsrep_log_debug "Removing xtrabackup pid file $XTRABACKUP_PID"
     rm -f "$XTRABACKUP_PID" || true
 }
 
@@ -780,7 +836,7 @@ check_extra()
             if [[ -n $eport ]]; then
                 # Xtrabackup works only locally.
                 # Hence, setting host to 127.0.0.1 unconditionally.
-                wsrep_log_info "SST through extra_port $eport"
+                wsrep_log_debug "SST through extra_port $eport"
                 INNOEXTRA+=" --host=127.0.0.1 --port=$eport "
                 use_socket=0
             else
@@ -788,7 +844,7 @@ check_extra()
                 exit 1
             fi
         else
-            wsrep_log_info "Thread pool not set, ignore the option use_extra"
+            wsrep_log_warning "Thread pool not set, ignore the option use_extra"
         fi
     fi
     if [[ $use_socket -eq 1 ]] && [[ -n "${WSREP_SST_OPT_SOCKET}" ]]; then
@@ -807,7 +863,7 @@ check_extra()
 #   If this is 0, do nothing (no additional checks)
 #   If this is 1, check to see if the gtid info file exists
 #   If this is 2, check to see if the keyring file exists
-recv_joiner()
+recv_data_from_donor_to_joiner()
 {
     local dir=$1
     local msg=$2
@@ -844,32 +900,40 @@ recv_joiner()
     fi
 
     if [[ ${RC[0]} -eq 124 ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Possible timeout in receving first data from donor in "
                         "gtid/keyring stage"
+        wsrep_log_error "****************************************************** "
         exit 32
     fi
 
     for ecode in "${RC[@]}";do
         if [[ $ecode -ne 0 ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Error while getting data from donor node: " \
                             "exit codes: ${RC[@]}"
+            wsrep_log_error "****************************************************** "
             exit 32
         fi
     done
 
     if [[ $checkf -eq 1 && ! -r "${XB_GTID_INFO_FILE_PATH}" ]]; then
         # this message should cause joiner to abort
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "xtrabackup process ended without creating '${XB_GTID_INFO_FILE_PATH}'"
-        wsrep_log_info "Contents of datadir"
-        wsrep_log_info "$(ls -l ${dir}/*)"
+        wsrep_log_error "****************************************************** "
+        wsrep_log_debug "Contents of datadir"
+        wsrep_log_debug "$(ls -l ${dir}/*)"
         exit 32
     fi
 
     if [[ $checkf -eq 2 && ! -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "FATAL: xtrabackup could not find '${XB_DONOR_KEYRING_FILE_PATH}'"
         wsrep_log_error "The joiner is using a keyring file but the donor has not sent"
         wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
         wsrep_log_error "both sides are using a keyring file"
+        wsrep_log_error "****************************************************** "
         exit 32
     fi
 
@@ -877,7 +941,7 @@ recv_joiner()
 
 #
 # Process to send data from DONOR to JOINER
-send_donor()
+send_data_from_donor_to_joiner()
 {
     local dir=$1
     local msg=$2
@@ -891,8 +955,10 @@ send_donor()
 
     for ecode in "${RC[@]}";do
         if [[ $ecode -ne 0 ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Error while sending data to joiner node: " \
                             "exit codes: ${RC[@]}"
+            wsrep_log_error "****************************************************** "
             exit 32
         fi
     done
@@ -943,7 +1009,9 @@ check_for_version()
 #
 # Validation check for xtrabackup binary.
 if [[ ! -x `which $INNOBACKUPEX_BIN` ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "$INNOBACKUPEX_BIN not in path: $PATH"
+    wsrep_log_error "****************************************************** "
     exit 2
 fi
 
@@ -958,23 +1026,29 @@ XB_REQUIRED_VERSION="2.4.4"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Cannot determine the $INNOBACKUPEX_BIN version. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
+    wsrep_log_error "****************************************************** "
     exit 2
 fi
 
 if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "The $INNOBACKUPEX_BIN version is $XB_VERSION. Needs xtrabackup-$XB_REQUIRED_VERSION or higher to perform SST"
+    wsrep_log_error "****************************************************** "
     exit 2
 fi
 
-wsrep_log_info "The $INNOBACKUPEX_BIN version is $XB_VERSION"
+wsrep_log_debug "The $INNOBACKUPEX_BIN version is $XB_VERSION"
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"
 
 #
 # establish roles. Either it should be JOINER or DONOR.
 if [[ ! ${WSREP_SST_OPT_ROLE} == 'joiner' && ! ${WSREP_SST_OPT_ROLE} == 'donor' ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
     wsrep_log_error "Invalid role ${WSREP_SST_OPT_ROLE}"
+    wsrep_log_error "****************************************************** "
     exit 22
 fi
 
@@ -1000,7 +1074,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
         if [[ -r "$DATA/ca.pem" ]]; then
             ssl_ca="$DATA/ca.pem"
         else
-            wsrep_log_error "******** FATAL ERROR ******************************* "
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "* Could not find a CA (Certificate Authority) file.  "
             wsrep_log_error "* Please specify a CA file with the 'ssl-ca' option. "
             wsrep_log_error "**************************************************** "
@@ -1011,10 +1085,10 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
         if [[ -r "$DATA/server-cert.pem" ]]; then
             ssl_cert="$DATA/server-cert.pem"
         else
-            wsrep_log_error "******** FATAL ERROR ****************************************** "
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "* Could not find a certificate file.                            "
             wsrep_log_error "* Please specify a certificate file with the 'ssl-cert' option. "
-            wsrep_log_error "*************************************************************** "
+            wsrep_log_error "****************************************************** "
             return 2
         fi
     fi
@@ -1022,7 +1096,7 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
         if [[ -r "$DATA/server-key.pem" ]]; then
             ssl_key="$DATA/server-key.pem"
         else
-            wsrep_log_error "******** FATAL ERROR ********************************* "
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "* Could not find a key file.                           "
             wsrep_log_error "* Please specify a key file with the 'ssl-key' option. "
             wsrep_log_error "****************************************************** "
@@ -1030,8 +1104,8 @@ if [[ "$pxc_encrypt_cluster_traffic" == "on" ]]; then
         fi
     fi
 
-    wsrep_log_info "pxc_encrypt_cluster_traffic is enabled, using PXC auto-ssl configuration"
-    wsrep_log_info "with encrypt=4  ssl_ca=$ssl_ca  ssl_cert=$ssl_cert  ssl_key=$ssl_key"
+    wsrep_log_debug "pxc_encrypt_cluster_traffic is enabled, using PXC auto-ssl configuration"
+    wsrep_log_debug "with encrypt=4  ssl_ca=$ssl_ca  ssl_cert=$ssl_cert  ssl_key=$ssl_key"
 fi
 
 if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; then
@@ -1039,7 +1113,7 @@ if ${INNOBACKUPEX_BIN} /tmp --help 2>/dev/null | grep -q -- '--version-check'; t
 fi
 
 if [[ ${FORCE_FTWRL:-0} -eq 1 ]]; then
-    wsrep_log_info "Forcing FTWRL due to environment variable FORCE_FTWRL equal to $FORCE_FTWRL"
+    wsrep_log_warning "Forcing FTWRL due to environment variable FORCE_FTWRL equal to $FORCE_FTWRL"
     iopts+=" --no-backup-locks "
 fi
 
@@ -1095,8 +1169,10 @@ then
     then
         usrst=0
         if [[ -z $sst_ver ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "Upgrade joiner to 5.6.21 or higher for backup locks support"
             wsrep_log_error "The joiner is not supported for this version of donor"
+            wsrep_log_error "****************************************************** "
             exit 93
         fi
 
@@ -1138,15 +1214,17 @@ then
         wsrep_log_info "Streaming GTID file before SST"
         echo "${WSREP_SST_OPT_GTID}" > "${XB_GTID_INFO_FILE_PATH}"
         FILE_TO_STREAM=$XB_GTID_INFO_FILE
-        send_donor $DATA "${stagemsg}-gtid"
+        send_data_from_donor_to_joiner $DATA "${stagemsg}-gtid"
 
         if [[ -n $keyring ]]; then
             # Verify that encryption is being used
             # Do NOT send a keyring file without encryption
             # Need encrypt >= 1
             if [[ $encrypt -le 0 ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "FATAL: An unencrypted channel is being used."
                 wsrep_log_error "Sending/using a keyring requires an encrypted channel."
+                wsrep_log_error "****************************************************** "
                 exit 22
             fi
 
@@ -1158,7 +1236,7 @@ then
             wsrep_log_info "Streaming donor-keyring file before SST"
             keyringbackupopt=" --keyring-file-data=${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE} --server-id=$keyringsid "
             FILE_TO_STREAM=$XB_DONOR_KEYRING_FILE
-            send_donor "${KEYRING_DIR}" "${stagemsg}-keyring"
+            send_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring"
 
         fi
 
@@ -1172,7 +1250,7 @@ then
             tcmd="$pcmd | $tcmd"
         fi
 
-        wsrep_log_info "Sleeping before data transfer for SST"
+        wsrep_log_debug "Sleeping before data transfer for SST"
         sleep 10
 
         wsrep_log_info "Streaming the backup to joiner at ${REMOTEIP} ${SST_PORT:-4444}"
@@ -1192,11 +1270,18 @@ then
         set -e
 
         if [ ${RC[0]} -ne 0 ]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "${INNOBACKUPEX_BIN} finished with error: ${RC[0]}. " \
                             "Check ${DATA}/innobackup.backup.log"
+            echo "--------------- innobackup.backup.log (START) --------------------" >&2
+            cat ${DATA}/innobackup.backup.log >&2
+            echo "--------------- innobackup.backup.log (END) ----------------------" >&2
+            wsrep_log_error "****************************************************** "
             exit 22
         elif [[ ${RC[$(( ${#RC[@]}-1 ))]} -eq 1 ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "$tcmd finished with error: ${RC[1]}"
+            wsrep_log_error "****************************************************** "
             exit 22
         fi
 
@@ -1205,7 +1290,7 @@ then
 
     else # BYPASS FOR IST
 
-        wsrep_log_info "Bypassing the SST for IST"
+        wsrep_log_info "Bypassing SST. Can work it through IST"
         echo "continue" # now server can resume updating data
         echo "${WSREP_SST_OPT_GTID}" > "${XB_GTID_INFO_FILE_PATH}"
         echo "1" > "${DATA}/${IST_FILE}"
@@ -1223,17 +1308,17 @@ then
         strmcmd+=" \${IST_FILE}"
 
 	FILE_TO_STREAM=$XB_GTID_INFO_FILE
-        send_donor $DATA "${stagemsg}-IST"
+        send_data_from_donor_to_joiner $DATA "${stagemsg}-IST"
 
     fi
 
     echo "done ${WSREP_SST_OPT_GTID}"
-    wsrep_log_info "Total time on donor: $totime seconds"
+    wsrep_log_debug "Total time on donor: $totime seconds"
 
 elif [ "${WSREP_SST_OPT_ROLE}" = "joiner" ]
 then
 
-    [[ -e $SST_PROGRESS_FILE ]] && wsrep_log_info "Stale sst_in_progress file: $SST_PROGRESS_FILE"
+    [[ -e $SST_PROGRESS_FILE ]] && wsrep_log_warning "Found a stale sst_in_progress file: $SST_PROGRESS_FILE"
     [[ -n $SST_PROGRESS_FILE ]] && touch $SST_PROGRESS_FILE
 
     ib_home_dir=$(parse_cnf mysqld innodb-data-home-dir "")
@@ -1285,7 +1370,7 @@ then
 
     STATDIR=$(mktemp -d)
     XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
-    recv_joiner $STATDIR "${stagemsg}-gtid" $stimeout 1
+    recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-gtid" $stimeout 1
 
     # server-id is already part of backup-my.cnf so avoid appending it.
     # server-id is the id of the node that is acting as donor and not joiner node.
@@ -1295,7 +1380,7 @@ then
         sleep 3
 
         XB_DONOR_KEYRING_FILE_PATH="${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
-        recv_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 0 2
+        recv_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 0 2
         keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
 
         wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
@@ -1303,20 +1388,24 @@ then
         # There shouldn't be a keyring file, since we do not have a keyring here
         # This will error out if a keyring file IS found
         XB_DONOR_KEYRING_FILE_PATH="${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
-        recv_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 5 -1
+        recv_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 5 -1
 
         if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
             wsrep_log_error "FATAL: xtrabackup found '${XB_DONOR_KEYRING_FILE_PATH}'"
             wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
             wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
             wsrep_log_error "both sides are using a keyring file"
+            wsrep_log_error "****************************************************** "
             exit 32
         fi
     fi
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly."
+        wsrep_log_error "****************************************************** "
         exit 32
     fi
 
@@ -1327,11 +1416,11 @@ then
             rm -rf ${DATA}/.sst
         fi
         mkdir -p ${DATA}/.sst
-        (recv_joiner $DATA/.sst "${stagemsg}-SST" 0 0) &
+        (recv_data_from_donor_to_joiner $DATA/.sst "${stagemsg}-SST" 0 0) &
         jpid=$!
-        wsrep_log_info "Proceeding with SST"
+        wsrep_log_info "Proceeding with SST........."
 
-        wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
+        wsrep_log_debug "Cleaning the existing datadir and innodb-data/log directories"
         # Avoid emitting the find command output to log file. It just fill the
         # with ever increasing number of files and achieve nothing.
         find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
@@ -1342,7 +1431,7 @@ then
             binlog_file=$(basename $tempdir)
             if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]]; then
                 pattern="$binlog_dir/$binlog_file\.[0-9]+$"
-                wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
+                wsrep_log_debug "Cleaning the binlog directory $binlog_dir as well"
                 find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
                 rm $binlog_dir/*.index || true
             fi
@@ -1352,13 +1441,15 @@ then
         DATA="${DATA}/.sst"
 
         XB_GTID_INFO_FILE_PATH="${DATA}/${XB_GTID_INFO_FILE}"
-        wsrep_log_info "Waiting for SST streaming to complete!"
+        wsrep_log_info "............Waiting for SST streaming to complete!"
         wait $jpid
 
         get_proc
 
         if [[ ! -s ${DATA}/xtrabackup_checkpoints ]]; then
-            wsrep_log_error "xtrabackup_checkpoints missing, failed xtrabackup/SST on donor"
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "xtrabackup_checkpoints missing. xtrabackup/SST failed on DONOR. Check DONOR log"
+            wsrep_log_error "****************************************************** "
             exit 2
         fi
 
@@ -1370,7 +1461,7 @@ then
 
         if [[ $rebuild -eq 1 ]]; then
             nthreads=$(parse_cnf xtrabackup rebuild-threads $nproc)
-            wsrep_log_info "Rebuilding during prepare with $nthreads threads"
+            wsrep_log_debug "Rebuilding during prepare with $nthreads threads"
             rebuildcmd="--rebuild-indexes --rebuild-threads=$nthreads"
         fi
 
@@ -1379,7 +1470,9 @@ then
             wsrep_log_info "Compressed qpress files found"
 
             if [[ ! -x `which qpress` ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "qpress not found in path: $PATH"
+                wsrep_log_error "****************************************************** "
                 exit 22
             fi
 
@@ -1400,18 +1493,22 @@ then
 
 
             # Decompress the qpress files
-            wsrep_log_info "Decompression with $nproc threads"
+            wsrep_log_debug "Decompression with $nproc threads"
             timeit "Joiner-Decompression" "find ${DATA} -type f -name '*.qp' -printf '%p\n%h\n' | $dcmd"
             extcode=$?
 
             if [[ $extcode -eq 0 ]]; then
-                wsrep_log_info "Removing qpress files after decompression"
+                wsrep_log_debug "Removing qpress files after decompression"
                 find ${DATA} -type f -name '*.qp' -delete
                 if [[ $? -ne 0 ]]; then
+                    wsrep_log_error "******************* FATAL ERROR ********************** "
                     wsrep_log_error "Something went wrong with deletion of qpress files. Investigate"
+                    wsrep_log_error "****************************************************** "
                 fi
             else
+                wsrep_log_error "******************* FATAL ERROR ********************** "
                 wsrep_log_error "Decompression failed. Exit code: $extcode"
+                wsrep_log_error "****************************************************** "
                 exit 22
             fi
         fi
@@ -1425,7 +1522,7 @@ then
             mv $DATA/${BINLOG_FILENAME}.* $BINLOG_DIRNAME/ 2>/dev/null || true
 
             pushd $BINLOG_DIRNAME &>/dev/null
-            for bfiles in $(ls -1 ${BINLOG_FILENAME}.*);do
+            for bfiles in $(ls -1 ${BINLOG_FILENAME}.* 2>/dev/null);do
                 echo ${BINLOG_DIRNAME}/${bfiles} >> ${BINLOG_FILENAME}.index
             done
             popd &> /dev/null
@@ -1437,13 +1534,19 @@ then
 
         if [ $? -ne 0 ];
         then
-            wsrep_log_error "${INNOBACKUPEX_BIN} apply finished with errors. Check ${DATA}/innobackup.prepare.log"
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "${INNOBACKUPEX_BIN} apply finished with errors." \
+                            "Check ${DATA}/innobackup.prepare.log"
+            echo "--------------- innobackup.prepare.log (START) --------------------" >&2
+            cat ${DATA}/innobackup.prepare.log >&2
+            echo "--------------- innobackup.prepare.log (END) --------------------" >&2
+            wsrep_log_error "****************************************************** "
             exit 22
         fi
 
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
         set +e
-        rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
+        rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log 2> /dev/null
         set -e
         wsrep_log_info "Moving the backup to ${TDATA}"
         timeit "Xtrabackup move stage" "$INNOMOVE"
@@ -1453,18 +1556,23 @@ then
             if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
                 wsrep_log_info "Moving sst keyring into place: moving $XB_DONOR_KEYRING_FILE_PATH to $keyring"
                 mv "${XB_DONOR_KEYRING_FILE_PATH}" $keyring
-                wsrep_log_info "Keyring move successful"
+                wsrep_log_debug "Keyring move successful"
             fi
 
-            wsrep_log_info "Move successful, removing ${DATA}"
+            wsrep_log_debug "Move successful, removing ${DATA}"
             rm -rf $DATA
             DATA=${TDATA}
         else
             if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
                 rm -f "${XB_DONOR_KEYRING_FILE_PATH}"
             fi
-            wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis"
-            wsrep_log_error "Check ${DATA}/innobackup.move.log for details"
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis" \
+                            "Check ${DATA}/innobackup.move.log for details"
+            echo "--------------- innobackup.move.log (START) --------------------" >&2
+            cat ${DATA}/innobackup.move.log >&2
+            echo "--------------- innobackup.move.log (END) --------------------" >&2
+            wsrep_log_error "****************************************************** "
             exit 22
         fi
 
@@ -1473,12 +1581,14 @@ then
     fi
 
     if [[ ! -r ${XB_GTID_INFO_FILE_PATH} ]]; then
+        wsrep_log_error "******************* FATAL ERROR ********************** "
         wsrep_log_error "SST magic file ${XB_GTID_INFO_FILE_PATH} not found/readable"
+        wsrep_log_error "****************************************************** "
         exit 2
     fi
     wsrep_log_info "Galera co-ords from recovery: $(cat ${XB_GTID_INFO_FILE_PATH})"
     cat "${XB_GTID_INFO_FILE_PATH}" # output UUID:seqno
-    wsrep_log_info "Total time on joiner: $totime seconds"
+    wsrep_log_debug "Total time on joiner: $totime seconds"
 fi
 
 exit 0

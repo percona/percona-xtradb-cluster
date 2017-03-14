@@ -663,6 +663,38 @@ public:
 public:
 #ifdef WITH_WSREP
   void wsrep_report(bool debug);
+
+  const char* get_type_string()
+  {
+    switch(m_type)
+    {
+    case MDL_INTENTION_EXCLUSIVE:
+      return "MDL_INTENTION_EXCLUSIVE";
+    case MDL_SHARED:
+      return "MDL_SHARED";
+    case MDL_SHARED_HIGH_PRIO:
+      return "MDL_SHARED_HIGH_PRIO";
+    case MDL_SHARED_READ:
+      return "MDL_SHARED_READ";
+    case MDL_SHARED_WRITE:
+      return "MDL_SHARED_WRITE";
+    case MDL_SHARED_WRITE_LOW_PRIO:
+      return "MDL_SHARED_WRITE_LOW_PRIO";
+    case MDL_SHARED_UPGRADABLE:
+      return "MDL_SHARED_UPGRADABLE";
+    case MDL_SHARED_READ_ONLY:
+      return "MDL_SHARED_READ_ONLY";
+    case MDL_SHARED_NO_WRITE:
+      return "MDL_SHARED_NO_WRITE";
+    case MDL_SHARED_NO_READ_WRITE:
+      return "MDL_SHARED_NO_READ_WRITE";
+    case MDL_EXCLUSIVE:
+      return "MDL_EXCLUSIVE";
+    case MDL_TYPE_END:
+      return "NULL";
+    }
+    return "NULL";
+  }
 #endif /* WITH_WSREP */
   bool has_pending_conflicting_lock() const;
 

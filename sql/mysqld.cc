@@ -1264,7 +1264,7 @@ private:
 static void close_connections(void)
 {
   DBUG_ENTER("close_connections");
-  WSREP_DEBUG("close_connections");
+  WSREP_DEBUG("Closing connection (close_connections)");
   (void) RUN_HOOK(server_state, before_server_shutdown, (NULL));
 
   Per_thread_connection_handler::kill_blocked_pthreads();
@@ -1398,7 +1398,7 @@ extern "C" void unireg_abort(int exit_code)
 #ifdef WITH_WSREP
   if (wsrep)
   {
-    WSREP_DEBUG("unireg_abort");
+    WSREP_DEBUG("Initiating abort (unireg_abort)");
 
     /* Cancel the SST script if it is running: */
     wsrep_sst_cancel(true);
@@ -1413,7 +1413,7 @@ extern "C" void unireg_abort(int exit_code)
     if (thd)
     {
       Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
-      WSREP_DEBUG("closing aborting applier THD: %u", thd->thread_id());
+      WSREP_DEBUG("Closing aborting applier THD: %u", thd->thread_id());
       thd->release_resources();
       thd_manager->remove_thd(thd);
     
@@ -2638,9 +2638,9 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
       if (WSREP_ON)
       {
         pxc_maint_mode= PXC_MAINT_MODE_SHUTDOWN;
-        sql_print_information("Recieved shutdown signal. Will sleep for %lu secs"
-                              " before initiating shutdown. pxc_maint_mode switched"
-                              " to SHUTDOWN", pxc_maint_transition_period);
+        WSREP_INFO("Recieved shutdown signal. Will sleep for %lu secs"
+                   " before initiating shutdown. pxc_maint_mode switched"
+                   " to SHUTDOWN", pxc_maint_transition_period);
         sleep(pxc_maint_transition_period);
       }
 #endif /* WITH_WSREP */
@@ -3449,7 +3449,8 @@ int init_common_variables()
 
   if (wsrep_provider_loaded && wsrep_desync)
   {
-    WSREP_ERROR("Can't desync a node even before it is synced with cluster");
+    WSREP_ERROR("Can't desync a non-synced node."
+                " (Node is yet not SYNCED with cluster)");
     return 1;
   }
 #endif /* WITH_WSREP */
@@ -4675,7 +4676,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
                             "Trying to enable SSL support using them.",
                             DEFAULT_SSL_CA_CERT, DEFAULT_SSL_SERVER_CERT,
                             DEFAULT_SSL_SERVER_KEY);
-    #ifndef HAVE_YASSL
+#ifndef HAVE_YASSL
       // Generate certs automatically only when bootstrapping
       // to avoid cases where starting up creates incompatible certs
       if (wsrep_new_cluster)
@@ -4685,9 +4686,10 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       }
       else
       {
-        WSREP_INFO("Skipping automatic SSL certificate creation, only allowed on bootstrap node.")
+        WSREP_INFO("Skipping automatic SSL certificate generation"
+                   " (enabled only in bootstrap mode)");
       }
-    #endif
+#endif
     }
 
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
@@ -7076,7 +7078,7 @@ extern "C" void *start_wsrep_THD(void *arg)
   Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
   if (my_thread_init())
   {
-    WSREP_ERROR("Could not initialize thread");
+    WSREP_ERROR("Failed to initialize wsrep-thread context");
     return(NULL);
   }
 
@@ -7257,7 +7259,7 @@ int wsrep_wait_committing_connections_close(int wait_time)
 
   while (have_committing_connections() && wait_time > 0)
   {
-    WSREP_DEBUG("wait for committing transaction to close: %d", wait_time);
+    WSREP_DEBUG("Waiting (%d micro-secs) for committing transaction to close....", wait_time);
     my_sleep(sleep_time);
     wait_time -= sleep_time;
   }
@@ -7291,7 +7293,7 @@ void wsrep_close_client_connections(my_bool wait_to_end, bool server_shutdown)
 
 void wsrep_close_applier(THD *thd)
 {
-  WSREP_DEBUG("closing applier %u", thd->thread_id());
+  WSREP_DEBUG("Closing applier %u", thd->thread_id());
   wsrep_close_thread(thd);
 }
 
@@ -7327,7 +7329,7 @@ void wsrep_wait_appliers_close(THD *thd)
   int round=0;
   while (have_wsrep_appliers(thd) > 0 && round < 5)
   {
-    WSREP_INFO("active appliers remaining");
+    WSREP_INFO("Waiting for active wsrep applier to exit");
     wsrep_close_threads (thd);
     sleep(1);
     round++;
@@ -7342,7 +7344,7 @@ void wsrep_kill_mysql(THD *thd)
 {
   if (mysqld_server_started)
   {
-    WSREP_INFO("starting shutdown");
+    WSREP_INFO("Starting Shutdown");
     kill_mysql();
   }
   else
@@ -9144,7 +9146,10 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
 
 #ifdef WITH_WSREP
   if (global_system_variables.wsrep_causal_reads) {
-      WSREP_WARN("option --wsrep-causal-reads is deprecated");
+
+      WSREP_WARN("Option --wsrep-causal-reads is deprecated."
+                 " Please start using --wsrep-sync-wait.");
+
       if (!(global_system_variables.wsrep_sync_wait &
             WSREP_SYNC_WAIT_BEFORE_READ)) {
           WSREP_WARN("--wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=%u. "

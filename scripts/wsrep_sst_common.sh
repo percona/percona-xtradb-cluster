@@ -25,6 +25,7 @@ WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
+WSREP_LOG_DEBUG=0
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -161,7 +162,7 @@ wsrep_log()
     # echo everything to stderr so that it gets into common error log
     # deliberately made to look different from the rest of the log
     local readonly tst="$(date +%Y%m%d\ %H:%M:%S.%N | cut -b -21)"
-    echo "WSREP_SST: $* ($tst)" >&2
+    echo -e "\t$tst WSREP_SST: $*" >&2
 }
 
 wsrep_log_error()
@@ -177,6 +178,13 @@ wsrep_log_warning()
 wsrep_log_info()
 {
     wsrep_log "[INFO] $*"
+}
+
+wsrep_log_debug()
+{
+    if [[ -n "$WSREP_LOG_DEBUG" ]]; then
+        wsrep_log "[DEBUG] $*"
+    fi
 }
 
 wsrep_cleanup_progress_file()

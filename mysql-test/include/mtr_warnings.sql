@@ -283,12 +283,15 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: --wsrep-causal-reads=ON takes precedence over --wsrep-sync-wait=0"),
  ("WSREP: Could not open saved state file for reading: "),
  ("WSREP: Could not open state file for reading: "),
+ ("WSREP: No persistent state found. Bootstraping with default state"),
+ ("WSREP: Fail to access the file.*gvwstate.*error.*No such file or directory.*"),
  ("WSREP: access file\\(.*gvwstate\\.dat\\) failed\\(No such file or directory\\)"),
  ("WSREP: Gap in state sequence\\. Need state transfer\\."),
  ("WSREP: Failed to prepare for incremental state transfer: Local state UUID \\(00000000-0000-0000-0000-000000000000\\) does not match group state UUID"),
  ("WSREP: No existing UUID has been found, so we assume that this is the first time that this server has been started\\. Generating a new UUID: "),
  ("WSREP: last inactive check more than"),
  ("WSREP: binlog cache not empty \\(0 bytes\\) at connection close"),
+ ("WSREP: SQL statement.*was not replicated.*"),
  ("WSREP: SQL statement was ineffective"),
  ("WSREP: Refusing exit for the last slave thread"),
  ("WSREP: Quorum: No node with complete state"),
@@ -296,6 +299,7 @@ INSERT INTO global_suppressions VALUES
  ("Slave SQL: Error 'Duplicate entry"),
  ("Query apply warning:"),
  ("WSREP: Ignoring error for TO isolated action:"),
+ ("WSREP: Initial position was provided by configuration or SST.*"),
  ("WSREP: Initial position was provided by configuration or SST, avoiding override"),
  ("Warning: Using a password on the command line interface can be insecure"),
  ("InnoDB: Error: Table \"mysql\"\\.\"innodb_table_stats\" not found"),
@@ -327,6 +331,12 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: Table without explict primary key \\(not-recommended\\) and certification of nonPK table is OFF too"),
  ("WSREP: Node is not a cluster node. Disabling pxc_strict_mode"),
  ("WSREP: pxc_strict_mode can be changed only if node is cluster-node"),
+
+/*
+   These warnings come up often when the test servers are under load.
+*/
+ ("Difficult to find free blocks in the buffer pool.*"),
+
 
  /*
    We do have offline members on some Group Replication tests, XCom
