@@ -261,6 +261,32 @@ verify_cert_matches_key()
 }
 
 #
+# verifies that the CA file verifies the certificate
+# doing this here lets us generate better error messages
+#
+# 1st param: path to the CA file
+# 2nd param: path to the cert
+#
+verify_ca_matches_cert()
+{
+    local ca_path=$1
+    local cert_path=$2
+
+    wsrep_check_programs openssl
+
+    if ! openssl verify -verbose -CAfile "$ca_path" "$cert_path" >/dev/null  2>&1
+    then
+        wsrep_log_error "******** FATAL ERROR ****************************************** "
+        wsrep_log_error "* The certifcate and CA (certificate authority) do not match.   "
+        wsrep_log_error "* It does not appear that the certificate was issued by the CA. "
+        wsrep_log_error "* Please check your certificate and CA files.                   "
+        wsrep_log_error "*************************************************************** "
+        exit 22
+    fi
+
+}
+
+#
 # Checks to see if the file exists
 # If the file does not exist (or cannot be read), issues an error
 # and exits
@@ -380,6 +406,7 @@ get_transfer()
                                         "Please check the 'tcert' option.           "
             verify_file_exists "$tca" "Both certificate and CA files are required." \
                                       "Please check the 'tca' option.             "
+            verify_ca_matches_cert $tca $tcert
 
             stagemsg+="-OpenSSL-Encrypted-2"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
@@ -397,6 +424,7 @@ get_transfer()
                                         "Please check the 'tcert' option.            "
             verify_file_exists "$tkey" "Both certificate and key files are required." \
                                        "Please check the 'tkey' option.             "
+            verify_cert_matches_key $tcert $tkey
 
             stagemsg+="-OpenSSL-Encrypted-3"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
@@ -416,8 +444,8 @@ get_transfer()
             verify_file_exists "$ssl_key" "CA, certificate, and key files are required." \
                                           "Please check the 'ssl-key' option.          "
 
-            # Check to see that the key matches the cert
             verify_cert_matches_key $ssl_cert $ssl_key
+            verify_ca_matches_cert $ssl_ca $ssl_cert
 
             stagemsg+="-OpenSSL-Encrypted-4"
             if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
