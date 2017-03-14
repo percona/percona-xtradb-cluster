@@ -62,7 +62,7 @@ SET GLOBAL wsrep_sync_wait = 0;
 --error 0
 --exec $MYSQL_DUMP -u root -S $NODE_MYSOCK_2 test >/dev/null
 SET GLOBAL wsrep_dirty_reads = 0;
-SET GLOBAL wsrep_sync_wait = 7;
+SET GLOBAL wsrep_sync_wait = 15;
 
 # Those statements should fail
 
