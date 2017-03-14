@@ -403,7 +403,7 @@ This variable specifies after how many writesets the debug statistics about SST 
    :cli: Yes
    :conf: Yes
    :scope: Global
-   :dyn: No
+   :dyn: Yes
    :default: 1
 
 This variable is used for replication flow control. Replication is resumed when the slave queue drops below :variable:`gcs.fc_factor` * :variable:`gcs.fc_limit`.
@@ -413,7 +413,7 @@ This variable is used for replication flow control. Replication is resumed when 
    :cli: Yes
    :conf: Yes
    :scope: Global
-   :dyn: No
+   :dyn: Yes
    :default: 16
 
 This variable is used for replication flow control. Replication is paused when the slave queue exceeds this limit.
