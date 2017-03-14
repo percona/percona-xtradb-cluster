@@ -4742,6 +4742,7 @@ end_with_restore_list:
   case SQLCOM_SHOW_CREATE_USER:
   {
     LEX_USER *show_user= get_current_user(thd, lex->grant_user);
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
     if (!(strcmp(thd->security_context()->priv_user().str, show_user->user.str) ||
          my_strcasecmp(system_charset_info, show_user->host.str,
                               thd->security_context()->priv_host().str)) ||
