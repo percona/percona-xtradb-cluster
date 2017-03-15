@@ -95,7 +95,6 @@ Section: database
 Architecture: any
 Pre-depends: debconf (>= 0.2.17), ${misc:Pre-Depends}
 Multi-Arch: foreign
-Provides: mysql-common
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)
  Percona XtraDB Cluster is based on the Percona Server database
