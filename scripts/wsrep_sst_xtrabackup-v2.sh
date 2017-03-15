@@ -42,7 +42,6 @@ nproc=1
 ecode=0
 ssyslog=""
 ssystag=""
-XTRABACKUP_PID=""
 SST_PORT=""
 REMOTEIP=""
 tca=""
@@ -69,7 +68,7 @@ rebuildcmd=""
 payload=0
 pvformat="-F '%N => Rate:%r Avg:%a Elapsed:%t %e Bytes: %b %p' "
 pvopts="-f  -i 10 -N $WSREP_SST_OPT_ROLE "
-STATDIR=""
+
 uextra=0
 disver=""
 
@@ -82,9 +81,15 @@ XB_DONOR_KEYRING_FILE="donor-keyring"
 XB_DONOR_KEYRING_FILE_PATH=""
 KEYRING_DIR=""
 
-tmpopts=""
+# Root directory for temporary files. This directory (and everything in it)
+# will be removed upon exit.
+tmpdirbase=""
+
+# tmpdir used as target-dir for xtrabackup by the donor
 itmpdir=""
-xtmpdir=""
+
+# tmpdir used by the joiner
+STATDIR=""
 
 scomp=""
 sdecomp=""
@@ -703,8 +708,8 @@ cleanup_joiner()
         wsrep_log_debug "Cleaning up fifo file $progress"
         rm $progress
     fi
-    if [[ -n ${STATDIR:-} ]]; then
-       [[ -d $STATDIR ]] && rm -rf $STATDIR
+    if [[ -n "${tmpdirbase}" ]]; then
+        [[ -d "${tmpdirbase}" ]] && rm -rf "${tmpdirbase}" || true
     fi
 
     if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
@@ -743,14 +748,6 @@ cleanup_donor()
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
 
-    if [[ -n ${XTRABACKUP_PID:-} ]]; then
-        if check_pid $XTRABACKUP_PID
-        then
-            wsrep_log_error "xtrabackup process is still running. Killing... "
-            kill_xtrabackup
-        fi
-
-    fi
     rm -f ${DATA}/${IST_FILE} || true
 
     if [[ -n $progress && -p $progress ]]; then
@@ -760,12 +757,8 @@ cleanup_donor()
 
     wsrep_log_debug "Cleaning up temporary directories"
 
-    if [[ -n $xtmpdir ]]; then
-       [[ -d $xtmpdir ]] &&  rm -rf $xtmpdir || true
-    fi
-
-    if [[ -n $itmpdir ]]; then
-       [[ -d $itmpdir ]] &&  rm -rf $itmpdir || true
+    if [[ -n "${tmpdirbase}" ]]; then
+        [[ -d "${tmpdirbase}" ]] && rm -rf "${tmpdirbase}" || true
     fi
 
     # Final cleanup
@@ -786,14 +779,6 @@ cleanup_donor()
     rm -rf "${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}" || true
 
     exit $estatus
-}
-
-kill_xtrabackup()
-{
-    local PID=$(cat $XTRABACKUP_PID)
-    [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
-    wsrep_log_debug "Removing xtrabackup pid file $XTRABACKUP_PID"
-    rm -f "$XTRABACKUP_PID" || true
 }
 
 setup_ports()
@@ -1000,6 +985,49 @@ check_for_version()
     fi
 }
 
+#
+# Initiailizes the tmpdir
+# Reads the info from the config file and creates the tmpdir as needed.
+#
+# Sets the $tmpdirbase variable to the root of the temporary directory
+# to be used by SST. This directory will be removed upon exiting the script.
+#
+initialize_tmpdir()
+{
+    local tmpdir_path=""
+
+    tmpdir_path=$(parse_cnf sst tmpdir "")
+    if [[ -z "${tmpdir_path}" ]]; then
+        tmpdir_path=$(parse_cnf xtrabackup tmpdir "")
+    fi
+    if [[ -z "${tmpdir_path}" ]]; then
+        tmpdir_path=$(parse_cnf mysqld tmpdir "")
+    fi
+    if [[ -n "${tmpdir_path}" ]]; then
+        if [[ ! -d "${tmpdir_path}" ]]; then
+            wsrep_log_error "Cannot find the directory, ${tmpdir_path}, the tmpdir must exist before startup."
+            exit 2
+        fi
+        if [[ ! -r "${tmpdir_path}" ]]; then
+            wsrep_log_error "The temporary directory, ${tmpdir_path}, is not readable.  Please check the directory permissions."
+            exit 22
+        fi
+        if [[ ! -w "${tmpdir_path}" ]]; then
+            wsrep_log_error "The temporary directory, ${tmpdir_path}, is not writable.  Please check the directory permissions."
+            exit 22
+        fi
+    fi
+
+    if [[ -z "${tmpdir_path}" ]]; then
+        tmpdir_path=$(mktemp -dt pxc_sst_XXXXXXXX)
+    else
+        tmpdir_path=$(mktemp -p "${tmpdir_path}" -dt pxc_sst_XXXXXXXX)
+    fi
+
+    # This directory (and everything in it), will be removed upon exit
+    tmpdirbase=$tmpdir_path
+}
+
 
 #-------------------------------------------------------------------------------
 #
@@ -1144,12 +1172,12 @@ if [[ $ssyslog -eq 1 ]]; then
 
         INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --prepare --binlog-info=ON \$rebuildcmd \$keyringapplyopt --target-dir=\${DATA} 2>&1  | logger -p daemon.err -t ${ssystag}innobackupex-apply "
         INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --datadir=\${TDATA} $disver $impts  --move-back --binlog-info=ON --force-non-empty-directories --target-dir=\${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
-        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$tmpopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info  --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
+        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info  --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
     fi
 else
     INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --prepare --binlog-info=ON \$rebuildcmd \$keyringapplyopt --target-dir=\${DATA} &>\${DATA}/innobackup.prepare.log"
     INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} --datadir=\${TDATA} $disver $impts  --move-back --binlog-info=ON --force-non-empty-directories --target-dir=\${DATA} &>\${DATA}/innobackup.move.log"
-    INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \$tmpopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
+    INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
 fi
 
 #
@@ -1176,14 +1204,10 @@ then
             exit 93
         fi
 
-        if [[ -z $(parse_cnf mysqld tmpdir "") && -z $(parse_cnf xtrabackup tmpdir "") ]]; then
-            xtmpdir=$(mktemp -d)
-            tmpopts=" --tmpdir=$xtmpdir "
-            wsrep_log_info "Using $xtmpdir as xtrabackup temporary directory"
-        fi
+        initialize_tmpdir
 
-        itmpdir=$(mktemp -d)
-        wsrep_log_info "Using $itmpdir as innobackupex temporary directory"
+        # main temp directory for xtrabackup (target-dir)
+        itmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_xb_XXXXXXXX)
 
         if [[ -n "${WSREP_SST_OPT_USER:-}" && "$WSREP_SST_OPT_USER" != "(null)" ]]; then
            INNOEXTRA+=" --user=$WSREP_SST_OPT_USER"
@@ -1285,9 +1309,6 @@ then
             exit 22
         fi
 
-        # innobackupex implicitly writes PID to fixed location in $xtmpdir
-        XTRABACKUP_PID="$xtmpdir/xtrabackup_pid"
-
     else # BYPASS FOR IST
 
         wsrep_log_info "Bypassing SST. Can work it through IST"
@@ -1368,7 +1389,9 @@ then
             strmcmd=" $sdecomp | $strmcmd"
     fi
 
-    STATDIR=$(mktemp -d)
+    initialize_tmpdir
+
+    STATDIR=$(mktemp -p "${tmpdirbase}" -dt joiner_XXXXXXXX)
     XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
     recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-gtid" $stimeout 1
 
