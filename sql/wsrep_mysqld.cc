@@ -2294,6 +2294,8 @@ const char* wsrep_get_wsrep_status(wsrep_status status)
     return "WSREP_NODE_FAIL";
   case WSREP_FATAL:
     return "WSREP_FATAL";
+  case WSREP_PRECOMMIT_ABORT:
+    return "WSREP_PRECOMMIT_ABORT";
   case WSREP_NOT_IMPLEMENTED:
     return "NULL";
   }
