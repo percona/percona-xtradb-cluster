@@ -117,6 +117,32 @@ if [ -z ${THREADS} ]; then
   exit 1;
 fi
 
+sysbench_cmd(){
+  TEST_TYPE="$1"
+  DB="$2"
+  if [ "$($SYSBENCH --version | cut -d ' ' -f2 | grep -oe '[0-9]\.[0-9]')" == "0.5" ]; then
+    if [ "$TEST_TYPE" == "load_data" ];then
+      SYSBENCH_OPTIONS="--test=$LUASCRIPTS/parallel_prepare.lua --oltp-auto-inc=off --mysql-engine-trx=yes --mysql-table-engine=innodb --oltp-table-size=$TABLESIZE --oltp_tables_count=$NUMBEROFTABLES --mysql-db=$DB --mysql-user=root  --num-threads=$THREADS --db-driver=mysql"
+    elif [ "$TEST_TYPE" == "oltp" ];then
+      SYSBENCH_OPTIONS="--test=$LUASCRIPTS/oltp.lua --oltp-auto-inc=off --mysql-table-engine=innodb --init-rng=on --oltp_index_updates=10 --oltp_non_index_updates=10 --oltp_distinct_ranges=15 --oltp_order_ranges=15 --oltp-table-size=$TABLESIZE --oltp_tables_count=$NUMBEROFTABLES --max-time=$howlong --report-interval=1 --max-requests=0 --mysql-db=$DB --mysql-user=root  --num-threads=$THREADS --db-driver=mysql"
+    elif [ "$TEST_TYPE" == "clean" ];then
+      SYSBENCH_OPTIONS="--test=$LUASCRIPTS/parallel_prepare.lua --oltp_tables_count=$NUMBEROFTABLES --mysql-db=$DB --mysql-user=root --db-driver=mysql"
+    fi
+  elif [ "$($SYSBENCH --version | cut -d ' ' -f2 | grep -oe '[0-9]\.[0-9]')" == "1.0" ]; then
+    LUASCRIPTS="/usr/share/sysbench"
+    if [ "$TEST_TYPE" == "load_data" ];then
+      SYSBENCH_OPTIONS="$LUASCRIPTS/oltp_insert.lua --auto_inc=off --mysql_storage_engine=innodb --table-size=$TABLESIZE --tables=$NUMBEROFTABLES --mysql-db=$DB --mysql-user=root  --threads=$THREADS --db-driver=mysql"
+    elif [ "$TEST_TYPE" == "oltp" ];then
+      SYSBENCH_OPTIONS="$LUASCRIPTS/oltp_read_write.lua --auto_inc=off --mysql_storage_engine=innodb --index_updates=10 --non_index_updates=10 --distinct_ranges=15 --order_ranges=15 --table-size=$TABLESIZE --tables=$NUMBEROFTABLES --mysql-db=$DB --mysql-user=root  --threads=$THREADS --time=$howlong --report-interval=1 --events=0 --db-driver=mysql --db-ps-mode=disable"
+    elif [ "$TEST_TYPE" == "clean" ];then
+      SYSBENCH_OPTIONS="$LUASCRIPTS/oltp_insert.lua --tables=$NUMBEROFTABLES --mysql-db=$DB --mysql-user=root --db-driver=mysql"
+    fi
+  else
+    echo "Please check sysbench version, currently supported versions : 0.5, 1.0.x"
+    exit 1
+  fi
+}
+
 cd $WORKDIR
 mkdir ${BUILD_NUMBER}
 cd ${BUILD_NUMBER}
@@ -169,13 +195,8 @@ prepare() {
     local logfile=$2
 
     echo "Sysbench Run: Prepare stage"
-    $SYSBENCH --test=$LUASCRIPTS/parallel_prepare.lua --report-interval=10 \
-              --oltp-auto-inc=off --mysql-engine-trx=yes \
-              --mysql-table-engine=innodb \
-              --oltp_table_size=$TABLESIZE --oltp_tables_count=$NUMBEROFTABLES \
-              --mysql-db=test --mysql-user=root  --num-threads=$THREADS \
-              --db-driver=mysql --mysql-socket=$socket \
-              prepare 2>&1 | tee $logfile || exit 1;
+    sysbench_cmd load_data test
+    $SYSBENCH $SYSBENCH_OPTIONS --mysql-socket=$socket prepare 2>&1 | tee $logfile || exit 1;
     echo "Seed data created"
 }
 
@@ -203,16 +224,8 @@ rw_workload() {
     local howlong=$3
 
     echo "Sysbench Run: OLTP RW testing"
-    $SYSBENCH --mysql-table-engine=innodb --num-threads=$THREADS \
-              --report-interval=10 --oltp-auto-inc=off \
-              --max-time=$howlong --max-requests=0 \
-              --test=$LUASCRIPTS/oltp.lua \
-              --init-rng=on --oltp_index_updates=10 \
-              --oltp_non_index_updates=10 --oltp_distinct_ranges=15 \
-              --oltp_order_ranges=15 --oltp_tables_count=$NUMBEROFTABLES \
-              --oltp_table_size=$TABLESIZE \
-              --mysql-db=test --mysql-user=root --db-driver=mysql \
-              --mysql-socket=$socket run  2>&1 | tee $logfile || exit 1;
+    sysbench_cmd oltp test
+    $SYSBENCH $SYSBENCH_OPTIONS --mysql-socket=$socket run  2>&1 | tee $logfile || exit 1;
 }
 
 # DDL workload
@@ -254,9 +267,8 @@ cleanup()
     local logfile=$2
 
     echo "Sysbench Run: Cleanup"
-    $SYSBENCH --test=$LUASCRIPTS/parallel_prepare.lua  \
-        --oltp_tables_count=$NUMBEROFTABLES --mysql-db=test --mysql-user=root  \
-        --db-driver=mysql --mysql-socket=$socket cleanup 2>&1 | tee $logfile || exit 1;
+    sysbench_cmd clean test
+    $SYSBENCH $SYSBENCH_OPTIONS --mysql-socket=$socket cleanup 2>&1 | tee $logfile || exit 1;
 }
 
 MYSQL_BASEDIR="$BUILDDIR/../../../../"
