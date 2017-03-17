@@ -3230,6 +3230,7 @@ public:
   wsrep_gtid_t              wsrep_sync_wait_gtid;
   ulong                     wsrep_affected_rows;
   bool                      wsrep_replicate_GTID;
+  bool                      wsrep_skip_wsrep_GTID;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
