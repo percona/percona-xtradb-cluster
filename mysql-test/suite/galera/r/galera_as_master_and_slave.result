@@ -134,7 +134,7 @@ select locate(':1-7', @@global.gtid_executed);
 locate(':1-7', @@global.gtid_executed)
 VALID_POS
 #node-1 (independent master)
-drop table t;
+DROP TABLE t;
 #node-2 (galera-cluster-node acting as slave to an independent master)
 STOP SLAVE;
 RESET SLAVE ALL;

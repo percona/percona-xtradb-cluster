@@ -52,17 +52,36 @@ select * from t;
 # ensure remaining nodes has the needed data.
 --connection node_2
 --echo #node-2 (galera-cluster-node acting as slave to an independent master)
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t;
+--source include/wait_condition.inc
+
 select * from t;
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 --connection node_3
 --echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t;
+--source include/wait_condition.inc
+
 select * from t;
 
 --connection node_4
 --echo #node-4 (independent slave replicating from galera-node-2)
---let $wait_condition = SELECT COUNT(*) = 5 from t
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'test' AND TABLE_NAME = 't'
 --source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 5 FROM t;
+--source include/wait_condition.inc
+
 select * from t;
 
 
@@ -79,11 +98,12 @@ update t set c = 'pppppp', i = 50 where i = 5;
 select * from t;
 --replace_regex /[1-9][0-9]+/VALID_POS/
 select locate(':1-3', @@global.gtid_executed);
-# replication lag
-sleep 1;
 
 --connection node_4
 --echo #node-4 (independent slave replicating from galera-node-2)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t WHERE i = 50
+--source include/wait_condition.inc
+
 select * from t;
 --replace_regex /[1-9][0-9]+/VALID_POS/
 select locate(':1-3', @@global.gtid_executed);
@@ -137,6 +157,8 @@ select locate(':1-7', @@global.gtid_executed);
 
 --connection node_3
 --echo #node-3 (galera-cluster-node-2 that act as master to independent slave)
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t WHERE i = 100
+--source include/wait_condition.inc
 select * from t;
 --replace_regex /[1-9][0-9]+/VALID_POS/
 select locate(':1-7', @@global.gtid_executed);
@@ -146,12 +168,12 @@ select locate(':1-7', @@global.gtid_executed);
 #
 --connection node_1
 --echo #node-1 (independent master)
-drop table t;
-# replication lag
---sleep 1
+DROP TABLE t;
 
 --connection node_2
 --echo #node-2 (galera-cluster-node acting as slave to an independent master)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't'
+--source include/wait_condition.inc
 STOP SLAVE;
 RESET SLAVE ALL;
 
@@ -161,6 +183,8 @@ RESET MASTER;
 
 --connection node_4
 --echo #node-4 (independent slave replicating from galera-node-2)
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't'
+--source include/wait_condition.inc
 STOP SLAVE;
 RESET SLAVE ALL;
 

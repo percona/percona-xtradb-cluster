@@ -48,7 +48,7 @@ while ($count)
 
 --disable_query_log
 --eval SELECT $successes > 0 AS have_successes
---eval SELECT $deadlocks > 0 AS have_deadlocks
+--eval SELECT $successes + $deadlocks = 100 AS have_deadlocks
 --enable_query_log
 
 
