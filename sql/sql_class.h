@@ -2978,6 +2978,7 @@ public:
   void*                     wsrep_gtid_event_buf;
   ulong                     wsrep_gtid_event_buf_len;
   bool                      wsrep_replicate_GTID;
+  bool                      wsrep_skip_wsrep_GTID;
 
   /*
     Transaction id:
