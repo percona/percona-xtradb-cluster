@@ -51,7 +51,7 @@ override_dh_auto_configure:
 
 ifeq ($(SKIP_DEBUG_BINARY),)
 	( test -d $(builddebug) || mkdir $(builddebug) ) && cd $(builddebug) && \
-	    cmake -DBUILD_CONFIG=mysql_release \
+		cmake -DBUILD_CONFIG=mysql_release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
 		-DINSTALL_DOCDIR=share/mysql/docs \
 		-DINSTALL_DOCREADMEDIR=share/mysql \
@@ -71,11 +71,12 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
+		-DWITH_SCALABILITY_METRICS=ON \
+		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DWITH_READLINE=system \
 		-DWITHOUT_TOKUDB=ON \
 		-DCOMPILATION_COMMENT=$(compilation_comment_debug) \
 		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
-		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DINSTALL_LAYOUT=RPM \
 		-DWITH_INNODB_DISALLOW_WRITES=ON \
 		-DWITH_WSREP=ON \
@@ -88,16 +89,15 @@ ifeq ($(SKIP_DEBUG_BINARY),)
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
-		-DWITH_SCALABILITY_METRICS=ON \
 		-DWITH_PAM=ON \
-                -DWITH_ROCKSDB=0 \
+		-DWITH_ROCKSDB=0 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
 		-DWITH_EXTRA_CHARSETS=all ..
 endif
 
 	( test -d $(builddir) || mkdir $(builddir) ) && cd $(builddir) && \
-	    cmake -DBUILD_CONFIG=mysql_release \
+		cmake -DBUILD_CONFIG=mysql_release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
 		-DINSTALL_DOCDIR=share/mysql/docs \
 		-DINSTALL_DOCREADMEDIR=share/mysql \
@@ -117,11 +117,12 @@ endif
 		-DWITH_LIBWRAP=ON \
 		-DWITH_ZLIB=system \
 		-DWITH_SSL=system \
+		-DWITH_SCALABILITY_METRICS=ON \
+		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DWITH_READLINE=system \
 		-DWITHOUT_TOKUDB=ON \
 		-DCOMPILATION_COMMENT=$(compilation_comment_release) \
 		-DMYSQL_SERVER_SUFFIX=$(server_suffix) \
-		-DSYSTEM_TYPE="debian-linux-gnu" \
 		-DINSTALL_LAYOUT=RPM \
 		-DWITH_INNODB_DISALLOW_WRITES=ON \
 		-DWITH_WSREP=ON \
@@ -134,12 +135,12 @@ endif
 		-DWITH_ARCHIVE_STORAGE_ENGINE=ON \
 		-DWITH_BLACKHOLE_STORAGE_ENGINE=ON \
 		-DWITH_FEDERATED_STORAGE_ENGINE=ON \
-		-DWITH_SCALABILITY_METRICS=ON \
 		-DWITH_PAM=ON \
-                -DWITH_ROCKSDB=0 \
+		-DWITH_ROCKSDB=0 \
 		-DDOWNLOAD_BOOST=1 \
 		-DWITH_BOOST=libboost \
 		-DWITH_EXTRA_CHARSETS=all ..
+
 	cd $(galeradir) &&  scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) psi=1 libgalera_smm.so $(SCONS_ARGS) && scons $(MAKE_JFLAG) revno=$(GALERA_REVNO) garb/garbd $(SCONS_ARGS)
 
 	touch $@
@@ -187,16 +188,22 @@ override_dh_auto_install:
 
 	# mysql-server
 	mkdir -p $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples
-	mv $(TMP)/usr/share/mysql/*cnf 	    $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples/
+	mv $(TMP)/usr/share/mysql/*cnf      $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples/
 	rm -vf $(TMP)/usr/share/percona-xtradb-cluster/mi_test_all* \
-	       $(TMP)/usr/share/percona-xtradb-cluster/mysql-log-rotate \
-	       $(TMP)/usr/share/percona-xtradb-cluster/mysql.server \
-	       $(TMP)/usr/share/percona-xtradb-cluster/binary-configure
+		$(TMP)/usr/share/percona-xtradb-cluster/mysql-log-rotate \
+		$(TMP)/usr/share/percona-xtradb-cluster/mysql.server \
+		$(TMP)/usr/share/percona-xtradb-cluster/binary-configure
 	nm -n $(builddir)/sql/mysqld |gzip -9 > $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/mysqld.sym.gz
 	# FIXME install -m 0755 debian/additions/echo_stderr $(TMP)/usr/share/mysql/
 	# install -d $(TMP)/etc/mysql
 	# install -m 0755 debian/additions/debian-start $(TMP)/etc/mysql/
 	# install -m 0755 debian/additions/debian-start.inc.sh $(TMP)/usr/share/mysql/
+
+	install -d $(TMP)/usr/lib/debug/usr/bin
+	objcopy --only-keep-debug $(TMP)garb/garbd $(TMP)/usr/lib/debug/usr/bin/garbd
+	chmod 644 $(TMP)/usr/lib/debug/usr/bin/garbd
+	strip --remove-section=.comment --remove-section=.note $(TMP)garb/garbd
+	objcopy --add-gnu-debuglink $(TMP)/usr/lib/debug/usr/bin/garbd $(TMP)garb/garbd
 
 	# install default file for init script timeout params
 	install -d $(TMP)/etc/default
@@ -206,7 +213,7 @@ override_dh_auto_install:
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
 override_dh_strip:
-	dh_strip --dbg-package=percona-xtradb-cluster-5.7-dbg
+	dh_strip --dbg-package=percona-xtradb-cluster-5.7-dbg 
 
 override_dh_installinit:
 	@echo "RULES.$@"

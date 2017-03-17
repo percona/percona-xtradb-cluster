@@ -69,7 +69,7 @@ Prefix: %{_sysconfdir}
 %endif
 
 %if %{undefined galera_version}
- %define galera_version 3.19
+ %define galera_version 3.20
 %endif
 
 %if %{undefined galera_revision}
@@ -343,7 +343,9 @@ Source:         http://www.percona.com/redir/downloads/Percona-XtraDB-Cluster/LA
 URL:            http://www.percona.com/
 Packager:       Percona MySQL Development Team <mysqldev@percona.com>
 Vendor:         %{percona_server_vendor}
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix}
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel
@@ -378,9 +380,20 @@ This is a meta-package which installs server, client and galera-3.
 Summary:        Percona XtraDB Cluster - full package
 Group:          Applications/Databases
 %if "%rhel" == "5"
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-garbd%{product_suffix}
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-garbd%{product_suffix} = %{version}-%{release}
 %else
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-server%{product_suffix} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-devel%{product_suffix} Percona-XtraDB-Cluster-test%{product_suffix} Percona-XtraDB-Cluster%{product_suffix}-debuginfo Percona-XtraDB-Cluster-garbd%{product_suffix}
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-devel%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-garbd%{product_suffix} = %{version}-%{release}
 %endif
 
 %description -n Percona-XtraDB-Cluster-full%{product_suffix}
@@ -391,8 +404,11 @@ Cluster 56 packages including the debuginfo. Recommended.
 %package -n Percona-XtraDB-Cluster-server%{product_suffix}
 Summary:        Percona XtraDB Cluster - server package
 Group:          Applications/Databases
-Requires:       %{distro_requires} Percona-XtraDB-Cluster-client%{product_suffix} Percona-XtraDB-Cluster-shared%{product_suffix} percona-xtrabackup-24 >= 2.4.4 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
-Requires:       perl(Data::Dumper)
+Requires:       %{distro_requires}
+Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
+Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
+Requires:	percona-xtrabackup-24 >= 2.4.4 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:       perl(Data::Dumper) which
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
@@ -522,8 +538,8 @@ Group:          Applications/Databases
 Provides:       mysql-shared >= %{mysql_version} mysql-libs >= %{mysql_version}
 Conflicts:      Percona-Server-shared-56
 %if "%rhel" > "6"
-Provides:       mariadb-libs >= 5.5.37
-#Obsoletes:      mariadb-libs >= 5.5.37
+#Provides:       mariadb-libs >= 5.5.37
+Obsoletes:      mariadb-libs >= 5.5.37
 %endif
 
 %description -n Percona-XtraDB-Cluster-shared%{product_suffix}
@@ -1131,7 +1147,7 @@ if [ X${PERCONA_DEBUG} == X1 ]; then
         set -x
 fi
 if [ ! -e /var/log/mysqld.log ]; then
-    /bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
+    /usr/bin/install -o %{mysqld_user} -g %{mysqld_group} /dev/null /var/log/mysqld.log
 fi
 #/bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
 #/bin/chmod 0640 /var/log/mysqld.log >/dev/null 2>&1 || :
@@ -1142,7 +1158,11 @@ fi
 MYCNF_PACKAGE=$(rpm -qi `rpm -qf /etc/my.cnf` | grep Name | awk '{print $3}')
 if [ $MYCNF_PACKAGE = 'mariadb-libs' -o $MYCNF_PACKAGE = 'mysql-libs' ]
 then
-  rm -f /etc/my.cnf
+  MODIFICATION=$(rpm --verify --nomtime $MYCNF_PACKAGE | grep /etc/my.cnf | awk '{print $1}')
+  if [ "${MODIFICATION}" == "" ]
+  then
+    rm -f /etc/my.cnf
+  fi
 fi
 if [ ! -f /etc/my.cnf ]
 then
@@ -1465,7 +1485,7 @@ fi
 %doc Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
 
-%doc %attr(644, root, root) %{_infodir}/mysql.info*
+#%doc %attr(644, root, root) %{_infodir}/mysql.info*
 %doc %attr(644, root, man) %{_mandir}/man1/innochecksum.1*
 %doc %attr(644, root, man) %{_mandir}/man1/my_print_defaults.1*
 %doc %attr(644, root, man) %{_mandir}/man1/myisam_ftdump.1*
@@ -1492,6 +1512,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
 %doc %attr(644, root, root) %{_mandir}/man1/mysql_ssl_rsa_setup.1*
 
+%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum

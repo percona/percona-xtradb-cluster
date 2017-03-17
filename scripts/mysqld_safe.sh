@@ -333,10 +333,10 @@ parse_arguments() {
     # the parameter after "=", or the whole $arg if no match
     val=`echo "$arg" | sed -e 's;^--[^=]*=;;'`
     # what's before "=", or the whole $arg if no match
-    optname=`echo "$arg" | sed -e 's/^\(--[^=]*\)=.*$/\1/'`
+    optname=`echo "$arg" | sed -e 's;^\(--[^=]*\)=.*$;\1;'`
     # replace "_" by "-" ; mysqld_safe must accept "_" like mysqld does.
     optname_subst=`echo "$optname" | sed 's/_/-/g'`
-    arg=`echo $arg | sed "s/^$optname/$optname_subst/"`
+    arg=`echo $arg | sed "s;^$optname;$optname_subst;"`
     case "$arg" in
       # these get passed explicitly to mysqld
       --basedir=*) MY_BASEDIR_VERSION="$val" ;;
@@ -890,8 +890,13 @@ safe_mysql_unix_port=${mysql_unix_port:-${MYSQL_UNIX_PORT:-@MYSQL_UNIX_ADDR@}}
 mysql_unix_port_dir=`dirname $safe_mysql_unix_port`
 if [ ! -d $mysql_unix_port_dir ]
 then
-  log_error "Directory '$mysql_unix_port_dir' for UNIX socket file don't exists."
-  exit 1
+  if [ ! -h $mysql_unix_port_dir ];
+  then
+    install -d -m 0755 -o $user $mysql_unix_port_dir
+  else
+    log_error "Directory '$mysql_unix_port_dir' for UNIX socket file don't exists."
+    exit 1
+  fi
 fi
 
 # If the user doesn't specify a binary, we assume name "mysqld"

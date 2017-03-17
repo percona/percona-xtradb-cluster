@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#DEBHELPER#
+
+set -e
+case "$1" in
+    configure)
+	invoke-rc.d garbd stop || exit $?
+	sed -i "s/exit 0/exit 1/" /etc/init.d/garbd
+	;;
+    esac
+exit 0
