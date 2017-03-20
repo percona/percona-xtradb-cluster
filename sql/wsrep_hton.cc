@@ -523,6 +523,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     DBUG_RETURN(WSREP_TRX_CERT_FAIL);
   }
 
+  WSREP_DEBUG("switching query state from %s to QUERY_COMMITTING", wsrep_get_query_state(thd->wsrep_query_state));
   thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
@@ -616,7 +617,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                  WSREP_QUERY(thd));
       rcode = WSREP_TRX_FAIL;
     } else if (rcode == WSREP_BF_ABORT) {
-      WSREP_DEBUG("thd %u seqno %lld BF aborted by provider, will replay",
+      WSREP_DEBUG("THD: %u, seqno %lld was BF aborted by provider, will replay",
                   thd->thread_id(), (long long)thd->wsrep_trx_meta.gtid.seqno);
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       thd->wsrep_conflict_state = MUST_REPLAY;
@@ -666,6 +667,12 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                      thd->wsrep_trx_meta.gtid.uuid,
                      thd->wsrep_trx_meta.gtid.seqno);
     }
+
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+            "wsrep: write set replicated (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+
     DBUG_PRINT("wsrep", ("replicating commit success"));
     break;
 

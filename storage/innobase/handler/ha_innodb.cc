@@ -21831,10 +21831,10 @@ wsrep_signal_replicator(trx_t *victim_trx, trx_t *bf_trx)
 
 	WSREP_LOG_CONFLICT(bf_thd, thd, TRUE);
 
-        WSREP_DEBUG("BF thread %u aborting Victim thread %u"
-                    " processing transaction (%llu) with write-set: %lld",
-                    wsrep_thd_thread_id(bf_thd), wsrep_thd_thread_id(thd),
-                    (long long)victim_trx->id, (long long) bf_seqno);
+	WSREP_DEBUG("BF thread %u (with write-set: %lld)"
+		    " aborting Victim thread %u with transaction (%llu)",
+		    wsrep_thd_thread_id(bf_thd), (long long) bf_seqno,
+		    wsrep_thd_thread_id(thd), (long long)victim_trx->id);
 
 	WSREP_DEBUG("Aborting query: %s",
 		    (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
@@ -21941,22 +21941,22 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 
 	if (!thd) {
 		DBUG_PRINT("wsrep", ("no thd for conflicting lock"));
-		WSREP_WARN("no THD for trx: %llu", (long long)victim_trx->id);
+		WSREP_WARN("no THD for victim trx: %llu", (long long)victim_trx->id);
 		DBUG_RETURN(1);
 	}
 	if (!bf_thd) {
 		DBUG_PRINT("wsrep", ("no BF thd for conflicting lock"));
-		WSREP_WARN("no BF THD for trx: %llu",
+		WSREP_WARN("no THD for BF trx: %llu",
 			   (bf_trx) ? (long long)bf_trx->id : 0);
 		DBUG_RETURN(1);
 	}
 
 	WSREP_LOG_CONFLICT(bf_thd, thd, TRUE);
 
-        WSREP_DEBUG("BF thread %u aborting Victim thread %u"
-                    " processing transaction (%llu) with write-set: %lld",
-                    wsrep_thd_thread_id(bf_thd), wsrep_thd_thread_id(thd),
-                    (long long)victim_trx->id, (long long) bf_seqno);
+        WSREP_DEBUG("BF thread %u (with write-set: %lld)"
+                    " aborting Victim thread %u with transaction (%llu)",
+                    wsrep_thd_thread_id(bf_thd), (long long) bf_seqno,
+                    wsrep_thd_thread_id(thd), (long long)victim_trx->id);
 
 	WSREP_DEBUG("Aborting query: %s", 
 		    (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
@@ -21979,7 +21979,7 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		DBUG_RETURN(0);
 	}
 	if(wsrep_thd_exec_mode(thd) != LOCAL_STATE) {
-		WSREP_DEBUG("withdraw for BF trx: %llu, state: %s",
+		WSREP_DEBUG("victim trx: %llu, state: %s",
 			(long long)victim_trx->id,
 			wsrep_get_conflict_state(
 				wsrep_thd_conflict_state(thd)));
@@ -22046,7 +22046,9 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 			wsrep_abort_slave_trx(bf_seqno,
 					      wsrep_thd_trx_seqno(thd));
 		} else {
-			WSREP_DEBUG("abort_pre trxid %lu next trxid %lu query id %lld",
+			WSREP_DEBUG("Abort transaction in pre-commit state"
+                                    " bearing trx-id: %lu, next-trx-id: %lu"
+                                    " query-id: %lld",
                               (long unsigned int) wsrep_thd_trx_id(thd),
                               (long unsigned int) wsrep_thd_next_trx_id(thd),
                               wsrep_thd_query_id(thd));

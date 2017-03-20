@@ -276,9 +276,9 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 
 #define WSREP_LOG_CONFLICT_THD(thd, role)                                      \
     WSREP_LOG(sql_print_information, 	                                       \
-      "%s: \n "       	                                                       \
+      "%s: \n "     	                                                       \
       "  THD: %u, mode: %s, state: %s, conflict: %s, seqno: %lld\n "           \
-      "  SQL: %s",							       \
+      "  SQL: %s\n",							       \
       role, wsrep_thd_thread_id(thd), wsrep_thd_exec_mode_str(thd),            \
       wsrep_thd_query_state_str(thd),                                          \
       wsrep_thd_conflict_state_str(thd), (long long)wsrep_thd_trx_seqno(thd),  \
@@ -289,7 +289,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   if (wsrep_debug || wsrep_log_conflicts)				       \
   {                                                                            \
     WSREP_LOG(sql_print_information, "--------- CONFLICT DETECTED --------");  \
-    WSREP_LOG(sql_print_information, "cluster conflict due to %s for threads:",\
+    WSREP_LOG(sql_print_information, "cluster conflict due to %s for threads:\n",\
       (bf_abort) ? "high priority abort" : "certification failure"             \
     );                                                                         \
     if (bf_thd)     WSREP_LOG_CONFLICT_THD(bf_thd, "Winning thread");          \

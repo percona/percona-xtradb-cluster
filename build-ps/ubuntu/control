@@ -93,7 +93,7 @@ Description: Percona XtraDB Cluster database development files
 Package: percona-xtradb-cluster-common-5.7
 Section: database
 Architecture: any
-Pre-depends: debconf (>= 0.2.17), ${misc:Pre-Depends}
+Pre-depends: debconf (>= 0.2.17), mysql-common, ${misc:Pre-Depends}
 Multi-Arch: foreign
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Percona XtraDB Cluster database common files (e.g. /etc/mysql/my.cnf)
@@ -282,7 +282,7 @@ Description: Percona XtraDB Cluster with Galera
 Package: percona-xtradb-cluster-full-57
 Section: database
 Architecture: any
-Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), percona-xtradb-cluster-test-5.7 (>= ${binary:Version}), percona-xtradb-cluster-5.7-dbg (>= ${binary:Version}),  percona-xtradb-cluster-server-debug-5.7, percona-xtradb-cluster-garbd-5.7, ${misc:Depends}
+Depends: percona-xtradb-cluster-server-5.7 (>= ${binary:Version}), percona-xtradb-cluster-client-5.7 (>= ${binary:Version}), percona-xtradb-cluster-test-5.7 (>= ${binary:Version}), percona-xtradb-cluster-5.7-dbg (>= ${binary:Version}),  percona-xtradb-cluster-server-debug-5.7, percona-xtradb-cluster-garbd-5.7 (>= ${binary:Version}), ${misc:Depends}, percona-xtradb-cluster-garbd-debug-5.7 (>= ${binary:Version})
 Description: Percona XtraDB Cluster with Galera
  This is a meta-package providing PXC57 server, client, test and debug packages.
 
@@ -321,3 +321,12 @@ Replaces: percona-galera-arbitrator-3, galera-garbd-57-3.x
 Depends: ${shlibs:Depends}, ${misc:Depends}, netcat-openbsd
 Description: Garbd components of Percona XtraDB Cluster
  This package contains the garbd of Percona XtraDB Cluster.
+
+Package: percona-xtradb-cluster-garbd-debug-5.7
+Architecture: any
+Section: debug
+Conflicts: percona-galera-arbitrator-3-dbg
+Replaces: percona-galera-arbitrator-3-dbg
+Depends: percona-xtradb-cluster-garbd-5.7 (= ${binary:Version}), ${misc:Depends}
+Description: Debugging package for Percona XtraDB Cluster Garbd.
+

@@ -2113,16 +2113,22 @@ void wsrep_to_isolation_end(THD *thd)
 
 #define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)             \
     WSREP_##severity(                                                          \
-      "%s\n"                                                                   \
+      "%s\n\n"                                                                 \
       "schema:  %.*s\n"                                                        \
-      "request: (%u \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)\n"       \
-      "granted: (%u \tseqno %lld \twsrep (%d, %d, %d) cmd %d %d \t%s)",        \
+      "request: (thd-tid:%u \tseqno:%lld \texec-mode:%s, query-state:%s,"      \
+                 " conflict-state:%s)\n          cmd-code:%d %d \tquery:%s)\n\n"\
+      "granted: (thd-tid:%u \tseqno:%lld \texec-mode:%s, query-state:%s,"      \
+                 " conflict-state:%s)\n          cmd-code:%d %d \tquery:%s)\n",\
       msg, schema_len, schema,                                                 \
       req->thread_id(), (long long)wsrep_thd_trx_seqno(req),                   \
-      req->wsrep_exec_mode, req->wsrep_query_state, req->wsrep_conflict_state, \
+      wsrep_get_exec_mode(req->wsrep_exec_mode),                               \
+      wsrep_get_query_state(req->wsrep_query_state),                           \
+      wsrep_get_conflict_state(req->wsrep_conflict_state),                     \
       req->get_command(), req->lex->sql_command, req->query().str,             \
       gra->thread_id(), (long long)wsrep_thd_trx_seqno(gra),                   \
-      gra->wsrep_exec_mode, gra->wsrep_query_state, gra->wsrep_conflict_state, \
+      wsrep_get_exec_mode(gra->wsrep_exec_mode),                               \
+      wsrep_get_query_state(gra->wsrep_query_state),                           \
+      wsrep_get_conflict_state(gra->wsrep_conflict_state),                     \
       gra->get_command(), gra->lex->sql_command, gra->query().str);
 
 bool
@@ -2144,7 +2150,8 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
       request_thd->wsrep_exec_mode == REPL_RECV)
   {
     mysql_mutex_unlock(&request_thd->LOCK_wsrep_thd);
-    WSREP_MDL_LOG(DEBUG, "MDL conflict ", schema, schema_len,
+
+    WSREP_MDL_LOG(DEBUG, "---------- MDL conflict --------", schema, schema_len,
                   request_thd, granted_thd);
     ticket->wsrep_report(wsrep_debug);
 
@@ -2152,8 +2159,7 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
     if (granted_thd->wsrep_exec_mode == TOTAL_ORDER ||
         granted_thd->wsrep_exec_mode == REPL_RECV)
     {
-      WSREP_MDL_LOG(INFO, "MDL BF-BF conflict", schema, schema_len,
-                    request_thd, granted_thd);
+      WSREP_DEBUG("MDL BF-BF Conflict");
       ticket->wsrep_report(true);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       ret = TRUE;
@@ -2186,8 +2192,7 @@ wsrep_grant_mdl_exception(const MDL_context *requestor_ctx,
     }
     else
     {
-      WSREP_MDL_LOG(DEBUG, "MDL conflict-> BF abort", schema, schema_len,
-                    request_thd, granted_thd);
+      WSREP_DEBUG("MDL conflict -> BF abort");
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);
