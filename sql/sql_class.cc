@@ -1553,9 +1553,7 @@ THD::THD(bool enable_plugins)
 #ifdef WITH_WSREP
   lock_info.mysql_thd= (void *)this;
   lock_info.in_lock_tables= false;
-#ifdef WSREP_PROC_INFO
   wsrep_info[sizeof(wsrep_info) - 1] = '\0'; /* make sure it is 0-terminated */
-#endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
 
   m_internal_handler= NULL;
