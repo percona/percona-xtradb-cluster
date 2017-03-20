@@ -448,7 +448,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
   THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: replicating commit (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: replicating commit (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -523,7 +524,6 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     DBUG_RETURN(WSREP_TRX_CERT_FAIL);
   }
 
-  WSREP_DEBUG("switching query state from %s to QUERY_COMMITTING", wsrep_get_query_state(thd->wsrep_query_state));
   thd->wsrep_query_state = QUERY_COMMITTING;
   mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
@@ -594,11 +594,15 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   {
     if (WSREP_OK == rcode) {
 
-      THD_STAGE_INFO(thd, stage_wsrep_pre_commit);
-      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-              "wsrep: initiating pre-commit for write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
-      WSREP_DEBUG("%s", thd->wsrep_info);
-      thd_proc_info(thd, thd->wsrep_info);
+      if (wsrep_debug)
+      {
+        THD_STAGE_INFO(thd, stage_wsrep_pre_commit);
+        snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+                 "wsrep: initiating pre-commit for write set (%lld)",
+                 (long long)wsrep_thd_trx_seqno(thd));
+        WSREP_DEBUG("%s", thd->wsrep_info);
+        thd_proc_info(thd, thd->wsrep_info);
+      }
 
       rcode = wsrep->replicate_pre_commit(wsrep,
                                 (wsrep_conn_id_t)thd->thread_id(),
@@ -668,8 +672,9 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
                      thd->wsrep_trx_meta.gtid.seqno);
     }
 
+    THD_STAGE_INFO(thd, stage_wsrep_pre_commit_cert_passed);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-            "wsrep: write set replicated (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+             "wsrep: pre-commit/certification passed (%lld)", (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
 
@@ -747,8 +752,9 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
 
     mysql_mutex_lock(&thd->LOCK_wsrep_thd);
     if (thd->wsrep_conflict_state == MUST_ABORT) {
-      if (wsrep_debug)
-        WSREP_INFO("WSREP: must abort for BF");
+
+      WSREP_DEBUG("WSREP: must abort for BF");
+
       DBUG_PRINT("wsrep", ("BF apply commit fail"));
       thd->wsrep_conflict_state = NO_CONFLICT;
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -852,16 +858,18 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
       !thd->wsrep_applier                            &&
       (cache = wsrep_get_trans_log(thd, false)))
   {
-    WSREP_DEBUG("Reading from stmt cache");
+    WSREP_DEBUG("Processing CTAS....reading from stmt cache");
     thd->binlog_flush_pending_rows_event(false);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
     if (WSREP_OK != rcode) {
-      WSREP_ERROR("rbr write fail from stmt cache, data_len: %zu, %d", data_len, rcode);
+      WSREP_ERROR("Failed to create write-set from binlog for CTAS"
+                  " data_len: %zu, %d", data_len, rcode);
       DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
     }
     if (data_len > 0)
     {
-      WSREP_DEBUG("Got %lu bytes from stmt cache", (long unsigned int) data_len);
+      WSREP_DEBUG("Processed %lu bytes from stmt cache",
+                  (long unsigned int) data_len);
     }
   }
 
@@ -870,7 +878,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
     thd->binlog_flush_pending_rows_event(true);
     rcode = wsrep_write_cache(wsrep, thd, cache, &data_len);
     if (WSREP_OK != rcode) {
-      WSREP_ERROR("rbr write fail, data_len: %zu, %d", data_len, rcode);
+      WSREP_ERROR("Failed to create write-set from binlog"
+                  " data_len: %zu, %d", data_len, rcode);
       DBUG_RETURN(WSREP_TRX_SIZE_EXCEEDED);
     }
   }
@@ -904,23 +913,23 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
   if (WSREP_UNDEFINED_TRX_ID == thd->wsrep_ws_handle.trx_id &&
       !thd->wsrep_replicate_GTID)
   {
-    WSREP_WARN("SQL statement was ineffective, THD: %u, buf: %lu\n"
-               "schema: %s \n"
-	       "QUERY: %s\n"
-	       " => Skipping replication",
-	       thd->thread_id(), (long unsigned int) data_len,
-               (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
+    WSREP_WARN("SQL statement (%s) was not replicated (thd: %u)",
+               WSREP_QUERY(thd), thd->thread_id());
     rcode = WSREP_TRX_FAIL;
   }
   else if (!rcode)
   {
     if (WSREP_OK == rcode) {
 
-      THD_STAGE_INFO(thd, stage_wsrep_replicate);
-      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-              "wsrep: initiating replication for write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
-      WSREP_DEBUG("%s", thd->wsrep_info);
-      thd_proc_info(thd, thd->wsrep_info);
+      if (wsrep_debug)
+      {
+        THD_STAGE_INFO(thd, stage_wsrep_replicate);
+        snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+                 "wsrep: initiating replication for write set (%lld)",
+                 (long long)wsrep_thd_trx_seqno(thd));
+        WSREP_DEBUG("%s", thd->wsrep_info);
+        thd_proc_info(thd, thd->wsrep_info);
+      }
 
       rcode = wsrep->replicate(wsrep,
                                (wsrep_conn_id_t)thd->thread_id(),
@@ -933,12 +942,13 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
     }
 
     if (rcode == WSREP_TRX_MISSING) {
-      WSREP_WARN("Transaction missing in provider, thd: %u, schema: %s, SQL: %s",
+      WSREP_WARN("Unable to locate transaction handle in provider"
+                 " thd: %u, schema: %s, SQL: %s",
                  thd->thread_id(), (thd->db().str ? thd->db().str : "(null)"),
                  WSREP_QUERY(thd));
       rcode = WSREP_TRX_FAIL;
     } else if (rcode == WSREP_BF_ABORT) {
-      WSREP_DEBUG("thd %u seqno %lld BF aborted by provider, will replay",
+      WSREP_DEBUG("THD: %u, seqno %lld was BF aborted by provider, will replay",
                   thd->thread_id(), (long long)thd->wsrep_trx_meta.gtid.seqno);
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       thd->wsrep_conflict_state = MUST_REPLAY;
@@ -974,10 +984,10 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
 
     if (thd->wsrep_conflict_state != NO_CONFLICT)
     {
-      WSREP_WARN("thd %u seqno %lld: conflict state %d after post commit",
+      WSREP_WARN("thd %u seqno %lld: conflict state %s after post commit",
                  thd->thread_id(),
                  (long long)thd->wsrep_trx_meta.gtid.seqno,
-                 thd->wsrep_conflict_state);
+                 wsrep_get_conflict_state(thd->wsrep_conflict_state));
     }
 
     /* We avoid updating the wsrep_exec_mode to LOCAL_COMMIT till we are done
@@ -991,6 +1001,17 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
                      thd->wsrep_trx_meta.gtid.uuid,
                      thd->wsrep_trx_meta.gtid.seqno);
     }
+
+    if (wsrep_debug)
+    {
+      THD_STAGE_INFO(thd, stage_wsrep_write_set_replicated);
+      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+               "wsrep: write set replicated (%lld)",
+               (long long)wsrep_thd_trx_seqno(thd));
+      WSREP_DEBUG("%s", thd->wsrep_info);
+      thd_proc_info(thd, thd->wsrep_info);
+    }
+
     DBUG_PRINT("wsrep", ("replicating commit success"));
     break;
 
@@ -998,7 +1019,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
     DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
 
   case WSREP_TRX_FAIL:
-    WSREP_DEBUG("commit failed for reason: %d %u %s", rcode, thd->thread_id(),
+    WSREP_DEBUG("commit action failed for reason: %s THD: %u Query: %s",
+                wsrep_get_wsrep_status((wsrep_status) rcode), thd->thread_id(),
                 WSREP_QUERY(thd));
     DBUG_PRINT("wsrep", ("replicating commit fail"));
 
@@ -1009,7 +1031,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
     }
     else
     {
-      WSREP_DEBUG("conflict state: %d", thd->wsrep_conflict_state);
+      WSREP_DEBUG("conflict state: %s",
+                  wsrep_get_conflict_state(thd->wsrep_conflict_state));
       if (thd->wsrep_conflict_state == NO_CONFLICT)
       {
         thd->wsrep_conflict_state = CERT_FAILURE;
@@ -1067,10 +1090,10 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
                             &thd->wsrep_trx_meta);
 
   if (rcode == WSREP_TRX_MISSING) {
-     WSREP_WARN("Transaction missing in provider thd: %u schema: %s SQL: %s",
-                thd->thread_id(),
-                ((thd->db().length != 0) ? thd->db().str : "(null)"),
-                WSREP_QUERY(thd));
+      WSREP_WARN("Unable to locate transaction handle in provider"
+                 " thd: %u, schema: %s, SQL: %s",
+                 thd->thread_id(), (thd->db().str ? thd->db().str : "(null)"),
+                 WSREP_QUERY(thd));
     rcode = WSREP_TRX_FAIL;
   } else if (rcode == WSREP_BF_ABORT) {
     WSREP_DEBUG("thd %u seqno %lld BF aborted by provider, will replay",
@@ -1100,12 +1123,22 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
 
     if (thd->wsrep_conflict_state != NO_CONFLICT)
     {
-      WSREP_WARN("thd %u seqno %lld: conflict state %d after post commit",
+      WSREP_WARN("thd %u seqno %lld: conflict state %s after post commit",
                  thd->thread_id(),
                  (long long)thd->wsrep_trx_meta.gtid.seqno,
-                 thd->wsrep_conflict_state);
+                 wsrep_get_conflict_state(thd->wsrep_conflict_state));
     }
     thd->wsrep_exec_mode= LOCAL_COMMIT;
+
+    if (wsrep_debug)
+    {
+      THD_STAGE_INFO(thd, stage_wsrep_pre_commit_cert_passed);
+      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+               "wsrep: pre-commit/certification passed (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+      WSREP_DEBUG("%s", thd->wsrep_info);
+      thd_proc_info(thd, thd->wsrep_info);
+    }
+
     DBUG_PRINT("wsrep", ("pre-commit success"));
     break;
 
@@ -1115,13 +1148,20 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
     break;
 
   case WSREP_BF_ABORT:
+    {
+      wsrep_trx_meta_t meta;
+      meta.gtid= WSREP_GTID_UNDEFINED;
+      wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
+                     meta.gtid.uuid, meta.gtid.seqno);
+    }
     // TODO: this condition will not-hold as the replicate_hook has updated
     // the said field.
     // DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
 
   case WSREP_TRX_FAIL:
-    WSREP_DEBUG("pre-commit failed for reason: %d %u %s",
-                rcode, thd->thread_id(), WSREP_QUERY(thd));
+    WSREP_DEBUG("pre-commit action failed for reason: %s THD: %u Query: %s",
+                wsrep_get_wsrep_status((wsrep_status) rcode), thd->thread_id(),
+                WSREP_QUERY(thd));
     DBUG_PRINT("wsrep", ("pre-commit fail"));
 
     thd->wsrep_query_state= QUERY_EXEC;
@@ -1131,7 +1171,8 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
     }
     else
     {
-      WSREP_DEBUG("conflict state: %d", thd->wsrep_conflict_state);
+      WSREP_DEBUG("conflict state: %s",
+                  wsrep_get_conflict_state(thd->wsrep_conflict_state));
       if (thd->wsrep_conflict_state == NO_CONFLICT)
       {
         thd->wsrep_conflict_state = CERT_FAILURE;

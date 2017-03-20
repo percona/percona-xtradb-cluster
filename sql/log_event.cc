@@ -12548,7 +12548,7 @@ Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_ASSERT(m_table != NULL);
 
 #ifdef WITH_WSREP
-  if (WSREP(thd))
+  if (WSREP(thd) && wsrep_debug)
   {
     THD_STAGE_INFO(thd, stage_wsrep_writing_rows);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -12670,7 +12670,7 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd))
+  if (WSREP(thd) && wsrep_debug)
   {
     THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
@@ -12848,7 +12848,7 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 
 #ifdef WITH_WSREP
-  if (WSREP(thd))
+  if (WSREP(thd) && wsrep_debug)
   {
     THD_STAGE_INFO(thd, stage_wsrep_updating_rows);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,

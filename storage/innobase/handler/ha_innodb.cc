@@ -4748,17 +4748,13 @@ innobase_commit_low(
 	THD* thd = (THD*)trx->mysql_thd;
 	const char* tmp = 0;
 	if (wsrep_on((void*)thd)) {
-#ifdef WSREP_PROC_INFO
 		char info[64];
 		info[sizeof(info) - 1] = '\0';
 		snprintf(info, sizeof(info) - 1,
-			 "innobase_commit_low():trx_commit_for_mysql(%lld)",
+			 "innobase_commit_low (%lld)",
 			 (long long) wsrep_thd_trx_seqno(thd));
-		tmp = thd_proc_info(thd, info);
-
-#else
-		tmp = thd_proc_info(thd, "innobase_commit_low()");
-#endif /* WSREP_PROC_INFO */
+		wsrep_set_thd_proc_info(thd, info);
+		thd_proc_info(thd, wsrep_get_thd_proc_info(thd));
 	}
 #endif /* WITH_WSREP */
 	if (trx_is_started(trx)) {
@@ -4766,9 +4762,6 @@ innobase_commit_low(
 		trx_commit_for_mysql(trx);
 	}
 	trx->will_lock = 0;
-#ifdef WITH_WSREP
-	if (wsrep_on((void*)thd)) { thd_proc_info(thd, tmp); }
-#endif /* WITH_WSREP */
 }
 
 /*****************************************************************//**

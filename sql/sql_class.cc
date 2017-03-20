@@ -1007,6 +1007,19 @@ wsrep_trx_is_aborting(void *thd_ptr)
 	}
 	return 0;
 }
+
+extern "C" void
+wsrep_set_thd_proc_info(THD* thd, const char* str)
+{
+  thd->wsrep_info[sizeof(thd->wsrep_info) - 1] = '\0';
+  strncpy(thd->wsrep_info, str, (sizeof(thd->wsrep_info) - 1));
+}
+
+extern "C" const char*
+wsrep_get_thd_proc_info(THD* thd)
+{
+  return (thd->wsrep_info);
+}
 #endif /* WITH_WSREP */
 
 /**
@@ -1554,9 +1567,7 @@ THD::THD(bool enable_plugins)
 #ifdef WITH_WSREP
   lock_info.mysql_thd= (void *)this;
   lock_info.in_lock_tables= false;
-#ifdef WSREP_PROC_INFO
   wsrep_info[sizeof(wsrep_info) - 1] = '\0'; /* make sure it is 0-terminated */
-#endif /* WSREP_PROC_INFO */
 #endif /* WITH_WSREP */
 
   m_internal_handler= NULL;

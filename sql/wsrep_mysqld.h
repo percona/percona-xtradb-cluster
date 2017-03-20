@@ -214,6 +214,9 @@ extern "C" void wsrep_handle_fatal_signal(int sig);
 
 extern "C" void wsrep_thd_set_next_trx_id(THD *thd);
 
+extern "C" void wsrep_set_thd_proc_info(THD* thd, const char* str);
+extern "C" const char* wsrep_get_thd_proc_info(THD* thd);
+
 extern "C" void wsrep_thd_auto_increment_variables(THD*,
                                                    unsigned long long *offset,
                                                    unsigned long long *increment);

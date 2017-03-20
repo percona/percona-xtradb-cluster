@@ -3333,9 +3333,8 @@ public:
   Relay_log_info*           wsrep_rli;
   bool                      wsrep_converted_lock_session;
   wsrep_ws_handle_t         wsrep_ws_handle;
-#ifdef WSREP_PROC_INFO
-  char                      wsrep_info[128]; /* string for dynamic proc info */
-#endif /* WSREP_PROC_INFO */
+  /* PROCESSLIST_STATE is declared as VARCHAR(64) so limit the buffer */
+  char                      wsrep_info[64]; /* string for dynamic proc info */
   ulong                     wsrep_retry_counter; // of autocommit
   bool                      wsrep_PA_safe;
   char*                     wsrep_retry_query;

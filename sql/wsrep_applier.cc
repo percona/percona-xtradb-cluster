@@ -280,11 +280,14 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   }
   wsrep_cb_status_t rcode(wsrep_apply_events(thd, buf, buf_len));
 
-  THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: applied write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
+  if (wsrep_debug)
+  {
+    THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+             "wsrep: applied write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+  }
 
   if (WSREP_CB_SUCCESS != rcode)
   {
@@ -315,11 +318,14 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
   wsrep_cb_status_t const rcode(trans_commit(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
-  THD_STAGE_INFO(thd, stage_wsrep_committed);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: committed write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
+  if (wsrep_debug)
+  {
+    THD_STAGE_INFO(thd, stage_wsrep_committed);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+             "wsrep: committed write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+  }
 
   if (WSREP_CB_SUCCESS == rcode)
   {
@@ -349,11 +355,14 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
   wsrep_cb_status_t const rcode(trans_rollback(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
-  THD_STAGE_INFO(thd, stage_wsrep_rolled_back);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: rolled back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
-  WSREP_DEBUG("%s", thd->wsrep_info);
-  thd_proc_info(thd, thd->wsrep_info);
+  if (wsrep_debug)
+  {
+    THD_STAGE_INFO(thd, stage_wsrep_rolled_back);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+             "wsrep: rolled back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
+  }
 
   thd->wsrep_rli->cleanup_context(thd, 0);
   thd->variables.gtid_next.set_automatic();
