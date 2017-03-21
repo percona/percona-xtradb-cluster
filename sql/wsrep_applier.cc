@@ -253,7 +253,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   thd->wsrep_trx_meta = *meta;
 
   THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: applying write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
@@ -281,8 +281,10 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   wsrep_cb_status_t rcode(wsrep_apply_events(thd, buf, buf_len));
 
   THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: applied write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: %s write set (%lld)",
+           rcode == WSREP_CB_SUCCESS ? "applied" : "failed to apply",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -307,7 +309,7 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 static wsrep_cb_status_t wsrep_commit(THD* const thd)
 {
   THD_STAGE_INFO(thd, stage_wsrep_committing);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: committing write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
@@ -316,8 +318,10 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
   THD_STAGE_INFO(thd, stage_wsrep_committed);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: committed write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: %s write set (%lld)",
+           (rcode == WSREP_CB_SUCCESS ? "committed" : "failed to commit"),
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -338,7 +342,7 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
 static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 {
   THD_STAGE_INFO(thd, stage_wsrep_rolling_back);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: rolling back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
@@ -350,8 +354,10 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
   THD_STAGE_INFO(thd, stage_wsrep_rolled_back);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: rolled back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: %s write set (%lld)",
+           rcode == WSREP_CB_SUCCESS ? "rolled back" : "failed to rollback",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
