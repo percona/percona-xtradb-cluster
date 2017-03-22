@@ -333,15 +333,22 @@ extern "C" void *handle_connection(void *arg)
     PSI_THREAD_CALL(delete_current_thread)();
 #endif /* HAVE_PSI_THREAD_INTERFACE */
 
+#ifdef WITH_WSREP
+    bool is_applier= (WSREP(thd) && thd->wsrep_applier);
+    my_thread_id tid= thd->thread_id();
+#endif /* WITH_WSREP */
+
     delete thd;
+    thd= NULL;
 
     if (abort_loop) // Server is shutting down so end the pthread.
       break;
 
+    channel_info= NULL;
 #ifdef WITH_WSREP
-    if (WSREP(thd) && thd->wsrep_applier)
+    if (is_applier)
     {
-      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", thd->thread_id());
+      WSREP_DEBUG("avoiding thread re-use for applier, thd: %u", tid);
       channel_info = NULL;
     }
     else
