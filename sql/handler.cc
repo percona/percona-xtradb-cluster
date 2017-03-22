@@ -1958,13 +1958,9 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
 
   DBUG_ENTER("ha_commit_low");
 #ifdef WITH_WSREP
-#ifdef WSREP_PROC_INFO
   char info[64]= { 0, };
-  snprintf (info, sizeof(info) - 1, "ha_commit_one_phase(%lld)",
+  snprintf (info, sizeof(info) - 1, "ha_commit_low (%lld)",
             (long long)wsrep_thd_trx_seqno(thd));
-#else
-  const char info[]="ha_commit_one_phase()";
-#endif /* WSREP_PROC_INFO */
   char* tmp_info= NULL;
   if (WSREP(thd)) tmp_info= (char *)thd_proc_info(thd, info);
 #endif /* WITH_WSREP */
