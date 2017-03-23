@@ -39,10 +39,12 @@ show status like 'wsrep_desync_count';
 Variable_name	Value
 wsrep_desync_count	2
 SET GLOBAL wsrep_desync=0;
+ERROR HY000: Explictly desync/resync of already desynced/paused node is prohibited
 show status like 'wsrep_desync_count';
 Variable_name	Value
-wsrep_desync_count	1
+wsrep_desync_count	2
 UNLOCK TABLES;
+SET GLOBAL wsrep_desync=0;
 show status like 'wsrep_desync_count';
 Variable_name	Value
 wsrep_desync_count	0

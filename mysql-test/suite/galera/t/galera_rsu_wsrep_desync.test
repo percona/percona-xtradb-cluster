@@ -50,10 +50,11 @@ SET GLOBAL wsrep_desync=1;
 show status like 'wsrep_desync_count';
 FLUSH TABLE WITH READ LOCK;
 show status like 'wsrep_desync_count';
-# this shouldn't resync the cluster as flush table is still active.
+--error ER_UNKNOWN_ERROR
 SET GLOBAL wsrep_desync=0;
 show status like 'wsrep_desync_count';
 UNLOCK TABLES;
+SET GLOBAL wsrep_desync=0;
 show status like 'wsrep_desync_count';
 DROP TABLE t1;
 
