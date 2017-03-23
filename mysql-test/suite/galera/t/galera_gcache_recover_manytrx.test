@@ -193,7 +193,7 @@ DROP PROCEDURE insert_1k;
 DROP PROCEDURE insert_1m;
 
 --connection node_1
-CALL mtr.add_suppression("conflict state 7 after post commit");
+CALL mtr.add_suppression("conflict state RETRY_AUTOCOMMIT after post commit");
 
 # Warning happens when the cluster is started for the first time
 CALL mtr.add_suppression("Skipped GCache ring buffer recovery");

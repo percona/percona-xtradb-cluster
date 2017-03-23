@@ -59,7 +59,7 @@ cpat=""
 ib_home_dir=""
 ib_log_dir=""
 ib_undo_dir=""
-sfmt="tar"
+sfmt=""
 strmcmd=""
 tfmt=""
 tcmd=""
@@ -403,6 +403,11 @@ get_transfer()
             fi
         fi
 
+        # prepend a comma if it's not already there
+        if [[ -n "${sockopt}" ]] && [[ "${sockopt}" != ","* ]]; then
+            sockopt=",${sockopt}"
+        fi
+
         if [[ $encrypt -eq 2 ]]; then
             wsrep_log_warning "**** WARNING **** encrypt=2 is deprecated and will be removed in a future release"
             wsrep_log_debug "Using openssl based encryption with socat: with crt and ca"
@@ -601,6 +606,11 @@ read_cnf()
         if [[ -n "$bufferpoolsize" ]]; then
             iapts="$iapts --use-memory=$bufferpoolsize"
         fi
+    fi
+
+    # Setup # of threads (if not already specified)
+    if ! [[ "$iopts" =~ --parallel= ]]; then
+        iopts+=" --parallel=4"
     fi
 
 }

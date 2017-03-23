@@ -100,7 +100,7 @@ DROP PROCEDURE insert_transaction;
 DROP PROCEDURE update_simple;
 DROP PROCEDURE insert_1k;
 DROP PROCEDURE insert_1m;
-CALL mtr.add_suppression("conflict state 7 after post commit");
+CALL mtr.add_suppression("conflict state RETRY_AUTOCOMMIT after post commit");
 CALL mtr.add_suppression("Skipped GCache ring buffer recovery");
 include/assert_grep.inc [async IST sender starting to serve]
 CALL mtr.add_suppression("Skipped GCache ring buffer recovery");

@@ -1814,7 +1814,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
                 wsrep_get_exec_mode(thd->wsrep_exec_mode));
 
     THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: initiating TOI for write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
@@ -1869,7 +1869,7 @@ static void wsrep_TOI_end(THD *thd)
 #endif
 
   THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: completed TOI write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);

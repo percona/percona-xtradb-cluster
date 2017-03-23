@@ -374,7 +374,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   }
 
   THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
-  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: replicating commit (%lld)", (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
@@ -400,7 +400,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 
     THD_STAGE_INFO(thd, stage_wsrep_waiting_on_replaying);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
              "wsrep: waiting to replay write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
@@ -522,7 +522,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     if (WSREP_OK == rcode) {
 
       THD_STAGE_INFO(thd, stage_wsrep_pre_commit);
-      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
               "wsrep: initiating pre-commit for write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
       WSREP_DEBUG("%s", thd->wsrep_info);
       thd_proc_info(thd, thd->wsrep_info);
