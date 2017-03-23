@@ -451,6 +451,28 @@ This package contains files needed for developing applications using
 the embedded version of the MySQL server.
 %endif
 
+# %if 0%{?rhel} == 5
+%package        %{series}
+Summary:        Convenience package for easy upgrades of MySQL package set
+Group:          Applications/Databases
+%if 0%{?commercial}
+Requires:       mysql-commercial-client%{?_isa} >= %{min}
+Requires:       mysql-commercial-libs%{?_isa} >= %{min}
+%else
+Requires:       mysql-wsrep-client-%{series}%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-libs-%{series}%{?_isa} = %{version}-%{release}
+Requires:       mysql-wsrep-server-%{series}%{?_isa} = %{version}-%{release}
+%endif
+
+%description    %{series}
+This package has as sole purpose to require other MySQL packages such
+that upgrades will be more convenient.
+
+Technical background: this is done to reflect the fact that mysql
+package has been split into several subpackages.
+# %endif
+
+
 %if 0%{?cluster}
 %package        management-server
 Summary:        MySQL Cluster Management Server Daemon
@@ -632,7 +654,6 @@ MBD=$RPM_BUILD_DIR/%{src_dir}
 
 # Ensure that needed directories exists
 install -d -m 0751 %{buildroot}/var/lib/mysql
-install -d -m 0755 %{buildroot}/var/run/mysql
 install -d -m 0750 %{buildroot}/var/log/mysql
 install -d -m 0750 %{buildroot}/var/lib/mysql-files
 install -d -m 0750 %{buildroot}/var/lib/mysql-keyring
@@ -709,7 +730,7 @@ rm -r $(readlink var) var
 %service_add_pre mysql.service
 %endif
 
-%post server
+%post server-%{series}
 datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1)
 /bin/chmod 0751 "$datadir"
 /bin/touch /var/log/mysql/mysqld.log
@@ -873,6 +894,7 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/libpluginmecab.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/libpluginmecab.so
 %endif
+%dir %attr(644, root, root) %{_datadir}/mysql
 %if 0%{?commercial}
 %attr(755, root, root) %{_libdir}/mysql/plugin/audit_log.so
 %attr(644, root, root) %{_datadir}/mysql/audit_log_filter_linux_install.sql
@@ -912,7 +934,6 @@ fi
 %endif
 %attr(644, root, root) %config(noreplace,missingok) %{_sysconfdir}/logrotate.d/mysql
 %dir %attr(751, mysql, mysql) /var/lib/mysql
-%dir %attr(755, mysql, mysql) /var/run/mysql
 %dir %attr(750, mysql, mysql) /var/log/mysql
 %dir %attr(750, mysql, mysql) /var/lib/mysql-files
 %dir %attr(750, mysql, mysql) /var/lib/mysql-keyring
@@ -924,6 +945,7 @@ fi
 %files common-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
+%dir %attr(644, root, root) %{_datadir}/mysql
 %{_datadir}/mysql/charsets/
 %{_datadir}/mysql/errmsg-utf8.txt
 %{_datadir}/mysql/bulgarian/
@@ -1152,6 +1174,12 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
 %endif
 
+# %if 0%{?rhel} == 5
+%files %{series}
+%defattr(-, root, root, -)
+%doc %{?license_files_server}
+# %endif
+
 %if 0%{?cluster}
 %files management-server
 %defattr(-, root, root, -)
@@ -1211,12 +1239,12 @@ fi
 - Merge Oracle's changes of 5.7.11 .. 5.7.14 which brought new dependency definitions,
   restore date order of changelog entries.
 
+* Tue Sep 13 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.16-1
+- Add connection_control.so to server subpackage
+
 * Wed Jul 06 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.11
 - Take Oracle's change to support service "instances" via systemd
   and other minor fixes from their 5.7.13.
-
-* Tue Sep 13 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.16-1
-- Add connection_control.so to server subpackage
 
 * Fri Jun 03 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.14-1
 - Adapt MySQL server 5.7 packaging to MySQL Cluster 7.5
