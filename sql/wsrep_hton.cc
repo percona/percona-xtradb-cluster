@@ -475,7 +475,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
     THD_STAGE_INFO(thd, stage_wsrep_waiting_on_replaying);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: waiting to replay write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+             "wsrep: waiting to replay write set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
 
@@ -674,7 +675,8 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
 
     THD_STAGE_INFO(thd, stage_wsrep_pre_commit_cert_passed);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: pre-commit/certification passed (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+             "wsrep: pre-commit/certification passed (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
 
@@ -776,7 +778,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
 
   THD_STAGE_INFO(thd, stage_wsrep_replicating_commit);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: replicating commit (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: replicating commit (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -802,7 +805,8 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
 
     THD_STAGE_INFO(thd, stage_wsrep_waiting_on_replaying);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: waiting to replay write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+             "wsrep: waiting to replay write set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
 
@@ -921,15 +925,12 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
   {
     if (WSREP_OK == rcode) {
 
-      if (wsrep_debug)
-      {
-        THD_STAGE_INFO(thd, stage_wsrep_replicate);
-        snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-                 "wsrep: initiating replication for write set (%lld)",
-                 (long long)wsrep_thd_trx_seqno(thd));
-        WSREP_DEBUG("%s", thd->wsrep_info);
-        thd_proc_info(thd, thd->wsrep_info);
-      }
+      THD_STAGE_INFO(thd, stage_wsrep_replicate);
+      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+               "wsrep: initiating replication for write set (%lld)",
+               (long long)wsrep_thd_trx_seqno(thd));
+      WSREP_DEBUG("%s", thd->wsrep_info);
+      thd_proc_info(thd, thd->wsrep_info);
 
       rcode = wsrep->replicate(wsrep,
                                (wsrep_conn_id_t)thd->thread_id(),
@@ -1002,15 +1003,12 @@ enum wsrep_trx_status wsrep_replicate(THD *thd)
                      thd->wsrep_trx_meta.gtid.seqno);
     }
 
-    if (wsrep_debug)
-    {
-      THD_STAGE_INFO(thd, stage_wsrep_write_set_replicated);
-      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-               "wsrep: write set replicated (%lld)",
-               (long long)wsrep_thd_trx_seqno(thd));
-      WSREP_DEBUG("%s", thd->wsrep_info);
-      thd_proc_info(thd, thd->wsrep_info);
-    }
+    THD_STAGE_INFO(thd, stage_wsrep_write_set_replicated);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
+             "wsrep: write set replicated (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
 
     DBUG_PRINT("wsrep", ("replicating commit success"));
     break;
@@ -1077,7 +1075,8 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
 
   THD_STAGE_INFO(thd, stage_wsrep_pre_commit);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-           "wsrep: initiating pre-commit for write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: initiating pre-commit for write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -1130,21 +1129,14 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
     }
     thd->wsrep_exec_mode= LOCAL_COMMIT;
 
-    if (wsrep_debug)
-    {
-      THD_STAGE_INFO(thd, stage_wsrep_pre_commit_cert_passed);
-      snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-               "wsrep: pre-commit/certification passed (%lld)", (long long)wsrep_thd_trx_seqno(thd));
-      WSREP_DEBUG("%s", thd->wsrep_info);
-      thd_proc_info(thd, thd->wsrep_info);
-    }
+    THD_STAGE_INFO(thd, stage_wsrep_pre_commit_cert_passed);
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: pre-commit/certification passed (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
+    WSREP_DEBUG("%s", thd->wsrep_info);
+    thd_proc_info(thd, thd->wsrep_info);
 
     DBUG_PRINT("wsrep", ("pre-commit success"));
-    break;
-
-  case WSREP_PRECOMMIT_ABORT:
-    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-    DBUG_RETURN(WSREP_TRX_CERT_FAIL);
     break;
 
   case WSREP_BF_ABORT:
@@ -1153,11 +1145,10 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
       meta.gtid= WSREP_GTID_UNDEFINED;
       wsrep_xid_init(thd->get_transaction()->xid_state()->get_xid(),
                      meta.gtid.uuid, meta.gtid.seqno);
+      DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
     }
-    // TODO: this condition will not-hold as the replicate_hook has updated
-    // the said field.
-    // DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
 
+  case WSREP_PRECOMMIT_ABORT:
   case WSREP_TRX_FAIL:
     WSREP_DEBUG("pre-commit action failed for reason: %s THD: %u Query: %s",
                 wsrep_get_wsrep_status((wsrep_status) rcode), thd->thread_id(),

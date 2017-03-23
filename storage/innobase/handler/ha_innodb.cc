@@ -4764,7 +4764,6 @@ innobase_commit_low(
 {
 #ifdef WITH_WSREP
 	THD* thd = (THD*)trx->mysql_thd;
-	const char* tmp = 0;
 	if (wsrep_on((void*)thd)) {
 		char info[64];
 		info[sizeof(info) - 1] = '\0';

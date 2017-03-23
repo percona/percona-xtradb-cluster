@@ -12563,11 +12563,12 @@ Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_ASSERT(m_table != NULL);
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_debug)
+  if (WSREP(thd))
   {
     THD_STAGE_INFO(thd, stage_wsrep_writing_rows);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: writing row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: writing row for write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
   }
@@ -12685,11 +12686,12 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   }
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_debug)
+  if (WSREP(thd))
   {
     THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: deleting row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: deleting row for write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
   }
@@ -12863,11 +12865,12 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   DBUG_DUMP("new values", m_table->record[0], m_table->s->reclength);
 
 #ifdef WITH_WSREP
-  if (WSREP(thd) && wsrep_debug)
+  if (WSREP(thd))
   {
     THD_STAGE_INFO(thd, stage_wsrep_updating_rows);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: updating row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: updating row for write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
   }

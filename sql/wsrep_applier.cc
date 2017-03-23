@@ -254,7 +254,8 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: applying write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: applying write-set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -280,16 +281,13 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
   }
   wsrep_cb_status_t rcode(wsrep_apply_events(thd, buf, buf_len));
 
-  if (wsrep_debug)
-  {
-    THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: %s write set (%lld)",
-             rcode == WSREP_CB_SUCCESS ? "applied" : "failed to apply",
-             (long long)wsrep_thd_trx_seqno(thd));
-    WSREP_DEBUG("%s", thd->wsrep_info);
-    thd_proc_info(thd, thd->wsrep_info);
-  }
+  THD_STAGE_INFO(thd, stage_wsrep_applied_writeset);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: %s write set (%lld)",
+           rcode == WSREP_CB_SUCCESS ? "applied" : "failed to apply",
+           (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   if (WSREP_CB_SUCCESS != rcode)
   {
@@ -313,23 +311,21 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
 {
   THD_STAGE_INFO(thd, stage_wsrep_committing);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: committing write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: committing write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
   wsrep_cb_status_t const rcode(trans_commit(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
-  if (wsrep_debug)
-  {
-    THD_STAGE_INFO(thd, stage_wsrep_committed);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: %s write set (%lld)",
-             (rcode == WSREP_CB_SUCCESS ? "committed" : "failed to commit"),
-             (long long)wsrep_thd_trx_seqno(thd));
-    WSREP_DEBUG("%s", thd->wsrep_info);
-    thd_proc_info(thd, thd->wsrep_info);
-  }
+  THD_STAGE_INFO(thd, stage_wsrep_committed);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: %s write set (%lld)",
+           (rcode == WSREP_CB_SUCCESS ? "committed" : "failed to commit"),
+            (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   if (WSREP_CB_SUCCESS == rcode)
   {
@@ -349,7 +345,8 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 {
   THD_STAGE_INFO(thd, stage_wsrep_rolling_back);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: rolling back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: rolling back write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -359,16 +356,13 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
   wsrep_cb_status_t const rcode(trans_rollback(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
-  if (wsrep_debug)
-  {
-    THD_STAGE_INFO(thd, stage_wsrep_rolled_back);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: %s write set (%lld)",
-             rcode == WSREP_CB_SUCCESS ? "rolled back" : "failed to rollback",
-             (long long)wsrep_thd_trx_seqno(thd));
-    WSREP_DEBUG("%s", thd->wsrep_info);
-    thd_proc_info(thd, thd->wsrep_info);
-  }
+  THD_STAGE_INFO(thd, stage_wsrep_rolled_back);
+  snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+           "wsrep: %s write set (%lld)",
+           rcode == WSREP_CB_SUCCESS ? "rolled back" : "failed to rollback",
+           (long long)wsrep_thd_trx_seqno(thd));
+  WSREP_DEBUG("%s", thd->wsrep_info);
+  thd_proc_info(thd, thd->wsrep_info);
 
   thd->wsrep_rli->cleanup_context(thd, 0);
   thd->variables.gtid_next.set_automatic();

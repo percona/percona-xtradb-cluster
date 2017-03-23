@@ -1957,6 +1957,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
   Ha_trx_info *ha_info= trn_ctx->ha_trx_info(trx_scope), *ha_info_next;
 
   DBUG_ENTER("ha_commit_low");
+#if 0
 #ifdef WITH_WSREP
   if (WSREP(thd))
   {
@@ -1966,6 +1967,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
     thd_proc_info(thd, thd->wsrep_info);
   }
 #endif /* WITH_WSREP */
+#endif
 
   if (ha_info)
   {
