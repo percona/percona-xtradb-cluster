@@ -42,7 +42,8 @@ use test;
 create table t (i int, c char(10), primary key pk(i)) engine=innodb;
 insert into t values (1, 'aaaaaa'), (2, 'bbbbbb'), (3, 'cccccc'),
                      (4, 'dddddd'), (5, 'eeeeee');
-select right(@@global.gtid_executed, 3);
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-2', @@global.gtid_executed);
 select * from t;
 # replication lag
 --sleep 1
@@ -117,7 +118,8 @@ delete from t where i = 2;
 update t set c = 'zzzzzz' where i = 4;
 update t set c = 'pppppp', i = 50 where i = 5;
 select * from t;
-select right(@@global.gtid_executed, 3);
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-5', @@global.gtid_executed);
 # replication lag
 sleep 1;
 
@@ -148,7 +150,10 @@ select locate(':1-5', @@global.gtid_executed);
 update t set c = 'kkkkk' where i = 1;
 update t set c = 'k2', i = 100 where i = 1;
 select * from t;
-select right(@@global.gtid_executed, 3);
+--replace_regex /[1-9][0-9]+/VALID_POS/
+select locate(':1-7', @@global.gtid_executed);
+# replication lag
+--sleep 1
 
 --connection node_3
 --echo #node-3 (galera-cluster-node-2 that act as master to independent slave)

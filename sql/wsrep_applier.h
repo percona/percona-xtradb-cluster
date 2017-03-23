@@ -26,6 +26,7 @@ wsrep_cb_status_t wsrep_apply_cb(void *ctx,
                                  const wsrep_trx_meta_t* meta);
 
 wsrep_cb_status_t wsrep_commit_cb(void *ctx,
+                                  const void* trx_handle,
                                   uint32_t flags,
                                   const wsrep_trx_meta_t* meta,
                                   wsrep_bool_t* exit,

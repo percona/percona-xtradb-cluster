@@ -243,7 +243,8 @@ void wsrep_replay_transaction(THD *thd)
 
       THD_STAGE_INFO(thd, stage_wsrep_replaying_trx);
       snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-               "wsrep: replaying write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+               "wsrep: replaying write set (%lld)",
+               (long long)wsrep_thd_trx_seqno(thd));
       WSREP_DEBUG("%s", thd->wsrep_info);
       thd_proc_info(thd, thd->wsrep_info);
 
@@ -696,4 +697,16 @@ void wsrep_thd_auto_increment_variables(THD* thd,
     *offset= thd->variables.auto_increment_offset;
     *increment= thd->variables.auto_increment_increment;
   }
+}
+
+bool wsrep_safe_to_persist_xid(THD* thd)
+{
+  /* Rollback of transaction too also invoke persist of XID.
+  Avoid persisting XID in this use-case. */
+  bool safe_to_persist_xid= false;
+  if (thd->wsrep_conflict_state == NO_CONFLICT      ||
+      thd->wsrep_conflict_state == REPLAYING        ||
+      thd->wsrep_conflict_state == RETRY_AUTOCOMMIT)
+    safe_to_persist_xid= true;
+  return(safe_to_persist_xid);
 }
