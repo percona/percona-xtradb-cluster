@@ -637,6 +637,22 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
     }
     return false;
   }
+
+  /* Setting desync to on/off signals participation of node in flow control.
+  It doesn't turn-off recieval of write-sets.
+  If the node is already in paused state due to some previous action like FTWRL
+  then avoid desync as superset action of pausing the node is already active. */
+
+  if (!thd->global_read_lock.provider_resumed())
+  {
+    char message[1024];
+    sprintf(message,
+            "Explictly desync/resync of already desynced/paused node"
+            " is prohibited");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    return true;
+  }
+
   wsrep_status_t ret(WSREP_WARNING);
   if (new_wsrep_desync) {
     ret = wsrep->desync (wsrep);
