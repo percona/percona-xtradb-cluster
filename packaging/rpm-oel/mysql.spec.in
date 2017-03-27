@@ -1140,8 +1140,8 @@ fi
 %attr(644, root, root) %{_datadir}/mysql/magic
 %attr(644, root, root) %{_datadir}/mysql/wsrep_notify
 %if 0%{?systemd}
-%attr(644, root, root) %{_unitdir}/mysqld.service
-%attr(644, root, root) %{_unitdir}/mysqld@.service
+%attr(644, root, root) %{_unitdir}/mysql.service
+%attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %{_prefix}/lib/tmpfiles.d/mysql.conf
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysqld
