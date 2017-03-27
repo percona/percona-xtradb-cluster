@@ -236,13 +236,9 @@ Provides:       mysql-server%{?_isa} = %{version}-%{release}
 Provides:       mysql-compat-server = %{version}-%{release}
 Provides:       mysql-compat-server%{?_isa} = %{version}-%{release}
 %if 0%{?systemd}
-Requires(post):   systemd
-Requires(preun):  systemd
-Requires(postun): systemd
+%{?systemd_requires}
 %else
-Requires(post):   /sbin/chkconfig
-Requires(preun):  /sbin/chkconfig
-Requires(preun):  /sbin/service
+PreReq:         insserv
 %endif
 
 %description    server-%{series}
@@ -932,6 +928,9 @@ rm -r $(readlink var) var
 /usr/sbin/groupadd -g 27 -o -r mysql >/dev/null 2>&1 || :
 /usr/sbin/useradd -M %{!?el5:-N} -g mysql -o -r -d /var/lib/mysql -s /bin/false \
     -c "MySQL Server" -u 27 mysql >/dev/null 2>&1 || :
+%if 0%{?systemd}
+%service_add_pre mysql.service
+%endif
 
 %post server-%{series}
 datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1)
@@ -940,28 +939,30 @@ datadir=$(/usr/bin/my_print_defaults server mysqld | grep '^--datadir=' | sed -n
 /bin/touch /var/log/mysqld.log >/dev/null 2>&1 || :
 /bin/chown mysql:mysql /var/log/mysqld.log >/dev/null 2>&1 || :
 %if 0%{?systemd}
-%systemd_post mysqld.service
-/usr/bin/systemctl enable mysqld >/dev/null 2>&1 || :
+
+%service_add_post mysql.service
+/usr/bin/systemd-tmpfiles --create %{_tmpfilesdir}/mysql.conf >/dev/null 2>&1 || :
+/usr/bin/systemctl enable mysql.service >/dev/null 2>&1 || :
 %else
-/sbin/chkconfig --add mysqld
+/sbin/insserv /etc/init.d/mysql
 %endif
 
 %preun server-%{series}
 %if 0%{?systemd}
-%systemd_preun mysqld.service
+%service_del_preun mysql.service
 %else
-if [ "$1" = 0 ]; then
-    /sbin/service mysqld stop >/dev/null 2>&1 || :
-    /sbin/chkconfig --del mysqld
+if [ $1 -eq 0 ]; then
+    /usr/sbin/rcmysql stop >/dev/null 2>&1 || :
+    /sbin/insserv /etc/init.d
 fi
 %endif
 
 %postun server-%{series}
 %if 0%{?systemd}
-%systemd_postun_with_restart mysqld.service
+%service_del_postun mysql.service
 %else
 if [ $1 -ge 1 ]; then
-    /sbin/service mysqld condrestart >/dev/null 2>&1 || :
+  /usr/sbin/rcmysql condrestart >/dev/null 2>&1 || :
 fi
 %endif
 
@@ -1135,8 +1136,8 @@ fi
 %attr(644, root, root) %{_datadir}/mysql/magic
 %attr(644, root, root) %{_datadir}/mysql/wsrep_notify
 %if 0%{?systemd}
-%attr(644, root, root) %{_unitdir}/mysqld.service
-%attr(644, root, root) %{_unitdir}/mysqld@.service
+%attr(644, root, root) %{_unitdir}/mysql.service
+%attr(644, root, root) %{_unitdir}/mysql@.service
 %attr(644, root, root) %{_prefix}/lib/tmpfiles.d/mysql.conf
 %else
 %attr(755, root, root) %{_sysconfdir}/init.d/mysqld
