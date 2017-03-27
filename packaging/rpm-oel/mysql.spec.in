@@ -236,13 +236,9 @@ Provides:       mysql-server%{?_isa} = %{version}-%{release}
 Provides:       mysql-compat-server = %{version}-%{release}
 Provides:       mysql-compat-server%{?_isa} = %{version}-%{release}
 %if 0%{?systemd}
-Requires(post):   systemd
-Requires(preun):  systemd
-Requires(postun): systemd
+%{?systemd_requires}
 %else
-Requires(post):   /sbin/chkconfig
-Requires(preun):  /sbin/chkconfig
-Requires(preun):  /sbin/service
+PreReq:         insserv
 %endif
 
 %description    server-%{series}
