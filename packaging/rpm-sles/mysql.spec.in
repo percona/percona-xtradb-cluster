@@ -780,6 +780,7 @@ fi
 %doc release/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
 %doc release/support-files/my-default.cnf
+%dir %attr(755, root, root) %{_datadir}/mysql
 %attr(644, root, root) %{_mandir}/man1/innochecksum.1*
 %attr(644, root, root) %{_mandir}/man1/my_print_defaults.1*
 %attr(644, root, root) %{_mandir}/man1/myisam_ftdump.1*
@@ -894,7 +895,6 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/libpluginmecab.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/libpluginmecab.so
 %endif
-%dir %attr(644, root, root) %{_datadir}/mysql
 %if 0%{?commercial}
 %attr(755, root, root) %{_libdir}/mysql/plugin/audit_log.so
 %attr(644, root, root) %{_datadir}/mysql/audit_log_filter_linux_install.sql
@@ -945,7 +945,7 @@ fi
 %files common-%{series}
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
-%dir %attr(644, root, root) %{_datadir}/mysql
+%dir %attr(755, root, root) %{_datadir}/mysql
 %{_datadir}/mysql/charsets/
 %{_datadir}/mysql/errmsg-utf8.txt
 %{_datadir}/mysql/bulgarian/
