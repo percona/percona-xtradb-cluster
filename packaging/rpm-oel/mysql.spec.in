@@ -893,7 +893,7 @@ install -p -m 0755 %{SOURCE5} %{buildroot}/%{_bindir}/mysql_config
 rm -rf %{buildroot}%{_infodir}/mysql.info*
 rm -rf %{buildroot}%{_datadir}/mysql/mysql.server
 rm -rf %{buildroot}%{_datadir}/mysql/mysqld_multi.server
-rm -f %{buildroot}%{_datadir}/mysql/win_install_firewall.sql 
+rm -f %{buildroot}%{_datadir}/mysql/win_install_firewall.sql
 rm -rf %{buildroot}%{_bindir}/mysql_embedded
 rm -f %{buildroot}%{_datadir}/mysql/audit_log_filter_win_install.sql
 
@@ -904,6 +904,10 @@ rm -f %{buildroot}%{_datadir}/mysql/audit_log_filter_win_install.sql
 %else
 rm -f %{buildroot}%{_mandir}/man1/mysql_client_test_embedded.1
 rm -f %{buildroot}%{_mandir}/man1/mysqltest_embedded.1
+%endif
+%if 0%{?systemd}
+rm -f %{buildroot}%{_mandir}/man1/mysqld_multi.1*
+rm -f %{buildroot}%{_mandir}/man1/mysqld_safe.1*
 %endif
 %check
 %if 0%{?runselftest}
