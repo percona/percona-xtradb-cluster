@@ -167,7 +167,7 @@ USE test2;
 ERROR 42000: Unknown database 'test2'
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	120	Previous_gtids	4	151	
+mysqld-bin.000001	120	Previous_gtids	3	151	
 mysqld-bin.000001	151	Gtid	1	199	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
 mysqld-bin.000001	199	Query	1	294	CREATE SCHEMA test1
 mysqld-bin.000001	294	Gtid	1	342	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'
