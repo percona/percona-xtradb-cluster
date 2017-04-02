@@ -1046,6 +1046,9 @@ fi
 %if 0%{?systemd}
 %attr(755, root, root) %{_bindir}/mysqld_bootstrap
 %attr(755, root, root) %{_bindir}/mysqld_pre_systemd
+%else
+%attr(755, root, root) %{_bindir}/mysqld_safe
+%attr(755, root, root) %{_bindir}/mysqld_multi
 %endif
 %attr(755, root, root) %{_sbindir}/mysqld
 %attr(755, root, root) %{_sbindir}/mysqld-debug
