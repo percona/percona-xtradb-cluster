@@ -240,8 +240,13 @@ check_running()
     if [[ -s $pid_path ]];then
 	    mysql_pid=$(cat $pid_path)
 	    if [[ -n ${mysql_pid:-} ]]  && kill -0 $mysql_pid 2>/dev/null;then
-		log_warning_msg "Another instance of mysqld running on $mysql_pid, exiting.."
-		exit 1
+                mysql_existed_pid=$(ps wwaux | grep mysql | grep "wsrep-provider" | awk '{print $2}')
+                if [[ ${mysql_pid} == ${mysql_existed_pid} ]]; then
+                    log_warning_msg "PXC is in bootstrap mode.  To switch to normal operation, first stop the mysql@bootstrap.service then start the mysql service"
+                else
+                    log_warning_msg "Another instance of mysqld running on $mysql_pid, exiting.."
+                fi
+                exit 1
 	    fi
     fi
 }
