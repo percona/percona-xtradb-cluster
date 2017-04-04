@@ -1512,7 +1512,7 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/zlib_decompress.1*
 %doc %attr(644, root, root) %{_mandir}/man1/mysql_ssl_rsa_setup.1*
 
-%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
+#%attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup
 %attr(755, root, root) %{_bindir}/clustercheck
 %attr(755, root, root) %{_bindir}/pyclustercheck
 %attr(755, root, root) %{_bindir}/innochecksum
