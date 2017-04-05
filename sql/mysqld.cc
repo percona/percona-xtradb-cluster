@@ -2638,7 +2638,7 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
       if (WSREP_ON)
       {
         pxc_maint_mode= PXC_MAINT_MODE_SHUTDOWN;
-        WSREP_INFO("Recieved shutdown signal. Will sleep for %lu secs"
+        WSREP_INFO("Received shutdown signal. Will sleep for %lu secs"
                    " before initiating shutdown. pxc_maint_mode switched"
                    " to SHUTDOWN", pxc_maint_transition_period);
         sleep(pxc_maint_transition_period);
