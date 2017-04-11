@@ -395,3 +395,26 @@ following scenarios:
    and ``encrypt=0`` under ``[sst]``, it will still be encrypted
    and SST will fail. Look at case 3 above for resolution.
 
+Memory Allocation
+-----------------
+
+The amount of memory for XtraBackup
+is defined by the ``--use-memory`` option.
+You can pass it using the :option:`inno-apply-opts` option
+under ``[sst]`` as follows::
+
+ [sst]
+ inno-apply-opts="--use-memory=500M"
+
+If it is not specified,
+the ``use-memory`` option under ``[xtrabackup]`` will be used::
+
+ [xtrabackup]
+ use-memory=32M
+
+If neither of the above are specified,
+the size of the InnoDB memory buffer will be used::
+
+ [mysqld]
+ innodb_buffer_pool_size=24M
+
