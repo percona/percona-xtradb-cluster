@@ -146,14 +146,26 @@ if :option:`encrypt` is set to ``1``.
 
 .. option:: sockopt
 
-Used to specify key/value pairs of socket options, separated by commas.
-Must begin with a comma.
-You can use the ``tcpwrap`` option to blacklist or whitelist clients.
-For more information about socket options,
-see `socat (1) <http://www.dest-unreach.org/socat/doc/socat.html>`_.
+   :Version: Before 5.6.35 the value must begin with a comma
 
-.. note:: You can also enable SSL-based compression with :option:`sockopt`.
-   This can be used in place of the XtraBackup ``compress`` option.
+Used to specify key/value pairs of socket options, separated by commas,
+for example::
+
+ [sst]
+ sockopt="retry=2,interval=2"
+
+.. note:: Before |PXC| version 5.6.35,
+   the value must begin with a comma, for example::
+
+    [sst]
+    sockopt=",cipher=AES128"
+
+You can use the ``tcpwrap`` option to blacklist or whitelist clients.
+For more information about socket options, see
+`socat (1) <http://www.dest-unreach.org/socat/doc/socat.html>`_.
+
+.. note:: You can also enable SSL based compression with :option:`sockopt`.
+   This can be used instead of the Percona XtraBackup ``compress`` option.
 
 .. option:: progress
 
