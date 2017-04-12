@@ -11,8 +11,8 @@ of the following distributions:
 * Debian 8 ("jessie")
 * Ubuntu 12.04 LTS (Precise Pangolin)
 * Ubuntu 14.04 LTS (Trusty Tahr)
-* Ubuntu 15.10 (Wily Werewolf)
 * Ubuntu 16.04 LTS (Xenial Xerus)
+* Ubuntu 16.10 (Yakkety Yak)
 
 .. note:: |PXC| should work on other DEB-based distributions,
    but it is tested only on platforms listed above.
