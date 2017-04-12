@@ -153,11 +153,11 @@ Used to enable and specify SST encryption mode:
 
   Considering that you have all three necessary files::
 
-  [sst]
-  encrypt=4
-  ssl-ca=ca.pem
-  ssl-cert=server-cert.pem
-  ssl-key=server-key.pem
+   [sst]
+   encrypt=4
+   ssl-ca=ca.pem
+   ssl-cert=server-cert.pem
+   ssl-key=server-key.pem
 
 For more information, see :ref:`encrypt-traffic`.
 
