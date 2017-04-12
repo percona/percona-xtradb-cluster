@@ -150,6 +150,12 @@ node. You will need to know this value when using manual eviction feature.
 
 Shows the comma-separated list of incoming node addresses in the cluster.
 
+.. variable:: wsrep_ist_receive_status
+
+Displays the progress of IST for joiner node.
+If IST is not running, the value is blank.
+If IST is running, the value is the percentage of transfer completed.
+
 .. variable:: wsrep_last_committed
 
 Sequence number of the last committed transaction.
