@@ -129,6 +129,12 @@ Number of ``FC_PAUSE`` events received since the last status query.
 
 Number of ``FC_PAUSE`` events sent since the last status query.
 
+.. variable:: wsrep_flow_control_status
+
+This variable shows whether or not a node has flow control enabled
+for normal traffic.
+It does not indicate the status of flow control during SST.
+
 .. variable:: wsrep_gcache_pool_size
 
 This variable shows the size of the page pool and dynamic memory allocated for
