@@ -368,6 +368,39 @@ the following happens:
 
  At runtime, any CTAS operation is denied and an error is logged.
 
+.. note:: CTAS operations for temporary tables are permitted
+   even in strict mode.
+
+Discarding and Importing Tablespaces
+------------------------------------
+
+``DISCARD TABLESPACE`` and ``IMPORT TABLESPACE``
+are not replicated using TOI.
+This can lead to data inconsistency if executed on only one node.
+
+Depending on the strict mode selected,
+the following happens:
+
+``DISABLED``
+
+ At startup, no validation is performed.
+
+ At runtime, all operations are permitted.
+
+``PERMISSIVE``
+
+ At startup, no validation is perfromed.
+
+ At runtime, all operations are permitted,
+ but a warning is logged when you discard or import a tablespace.
+
+``ENFORCING``
+
+ At startup, no validation is performed.
+
+ At runtime, discarding or importing a tablespace is denied
+ and an error is logged.
+
 .. rubric:: References
 
 .. target-notes::
