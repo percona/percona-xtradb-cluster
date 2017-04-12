@@ -122,7 +122,7 @@ Used to enable and specify SST encryption mode:
 
 * Set ``encrypt=3`` to perform SST encryption based on SSL for just the key
   and certificate files as implemented in
-  `Galera <http://galeracluster.com/documentation-webpages/ssl.html>`_
+  `Galeracluster <http://galeracluster.com/documentation-webpages/ssl.html>`_
 
   It does not provide certificate validation.
   In order to work correctly,
@@ -139,11 +139,11 @@ Used to enable and specify SST encryption mode:
 
   Considering that you have all three necessary files::
 
-  [sst]
-  encrypt=4
-  ssl-ca=ca.pem
-  ssl-cert=server-cert.pem
-  ssl-key=server-key.pem
+   [sst]
+   encrypt=4
+   ssl-ca=ca.pem
+   ssl-cert=server-cert.pem
+   ssl-key=server-key.pem
 
 .. note:: All encryption modes can only be used
    when :variable:`wsrep_sst_method` is set to ``xtrabackup-v2``

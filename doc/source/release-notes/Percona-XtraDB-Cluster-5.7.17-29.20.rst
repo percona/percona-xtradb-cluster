@@ -27,6 +27,11 @@ Details of this release can be found in the
 Fixed Bugs
 ==========
 
+* PXC-686: Updated semantics for gcache page cleanup
+  to trigger when either :option:`gcache.keep_pages_size`
+  or :option:`gcache.keep_pages_count` exceeds the limit,
+  instead of both at the same time.
+
 * PXC-692: Improved SST and IST log messages
   for better readability and unification.
 
@@ -42,8 +47,17 @@ Fixed Bugs
   and ``IMPORT TABLESPACE`` in :ref:`pxc-strict-mode`
   to prevent data inconsistency.
 
+* PXC-755: Added support for passing the XtraBackup buffer pool size
+  with the ``use-memory`` option under ``[xtrabackup]``
+  and the ``innodb_buffer_pool_size`` option under ``[mysqld]``
+  when the ``--use-memory`` option is not passed
+  with the ``inno-apply-opts`` option under ``[sst]``.
+
 * PXC-759: Added the :variable:`wsrep_flow_control_status` variable
   to indicate if node is in flow control (paused).
+
+* PXC-760 Fixed gcache page cleanup not triggering
+  when limits are exceeded.
 
 * :jirabug:`PXC-766`: Added the :variable:`wsrep_ist_receive_status` variable
   to show progress during an IST.
@@ -52,10 +66,26 @@ Fixed Bugs
   with temporary tables (``CREATE TEMPORARY TABLE ... AS SELECT``)
   in :ref:`pxc-strict-mode`.
 
+* :jirabug:`PXC-782`: Updated ``xtrabackup-v2`` script
+  to use the :option:`tmpdir` option
+  (if it is set under ``[sst]``, ``[xtrabackup]`` or ``[mysqld]``,
+  in that order).
+
 * :jirabug:`PXC-783`: Improved the wsrep stage framework.
+
+* :jirabug:`PXC-784`: Fixed the ``pc.recovery`` procedure to abort
+  if the :file:`gvwstate.dat` file is empty or invalid,
+  and fall back to normal joining process.
+
+* :jirabug:`PXC-794`: Updated the :option:`sockopt` option
+  to include a comma at the beginning if it is not set by the user.
 
 * :jirabug:`PXC-795`: Set ``--parallel=4`` as default option
   for ``wsrep_sst_xtrabackup-v2`` to run four threads with XtraBackup.
+
+* :jirabug:`PXC-797`: Blocked :option:`wsrep_desync` toggling
+  while node is paused
+  to avoid halting the cluster when running ``FLUSH TABLES WITH READ LOCK``.
 
 * :jirabug:`PXC-805`: Inherited upstream fix
   to avoid using deprecated variables,
@@ -66,4 +96,6 @@ Fixed Bugs
 
 * Fixed ``mysqladmin shutdown`` to correctly stop the server
   on systems using ``systemd``.
+
+* Fixed several minor packaging and dependency issues.
 
