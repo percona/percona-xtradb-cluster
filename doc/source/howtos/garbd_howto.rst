@@ -5,18 +5,20 @@ Setting up Galera Arbitrator
 ============================
 
 `Galera Arbitrator
-<http://galeracluster.com/documentation-webpages/arbitrator.html>` is a member
-of the |Percona XtraDB Cluster| which is used for voting in
-case you have a small number of servers (usually two) and don't want to add any
-more resources. For example arbitrator can be set up on existing application
-server or on load balancer.
+<http://galeracluster.com/documentation-webpages/arbitrator.html>`
+is a member of |Percona XtraDB Cluster| that is used for voting
+in case you have a small number of servers (usually two)
+and don't want to add any more resources.
+For example, arbitrator can be set up on existing application server
+or on load balancer.
 
-Galera Arbitrator is a member of the cluster which participates in the voting,
-but not in the actual replication (although it receives the same data as other
-nodes).
+Galera Arbitrator is a member of the cluster that participates in the voting,
+but not in actual replication
+(although it receives the same data as other nodes).
+Also, it is not included in flow control calculations.
 
-This document will show how to add Galera Arbitrator node to a already set up
-cluster.
+This document will show how to add Galera Arbitrator node
+to an existing cluster.
 
 .. note::
 
