@@ -301,6 +301,22 @@ To disable initial SST timeout, set ``sst-initial-timeout=0``.
    or there is a high network latency or network disturbance
    (which can cause donor selection to take longer than 100 seconds).
 
+.. option:: tmpdir
+
+   :Default: Empty
+   :Example: /path/to/tmp/dir
+
+This option specifies the location for storing the temporary file
+where the transaction log is stored
+before streaming or copying it to a remote host.
+
+The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
+
+* ``[sst]`` is the primary location (others are ignored)
+* ``[xtrabackup]`` is the secondary location
+  (if not specified under ``[sst]``)
+* ``[mysqld]`` is used if it is not specified in either of the above
+
 XtraBackup SST Dependencies
 ---------------------------
 
