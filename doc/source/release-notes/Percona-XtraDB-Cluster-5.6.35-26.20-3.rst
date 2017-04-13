@@ -34,18 +34,18 @@ Changes
 Fixed Bugs
 ==========
 
-* PXC-686: Updated semantics for gcache page cleanup
+* Updated semantics for gcache page cleanup
   to trigger when either :option:`gcache.keep_pages_size`
   or :option:`gcache.keep_pages_count` exceeds the limit,
   instead of both at the same time.
 
-* PXC-755: Added support for passing the XtraBackup buffer pool size
+* Added support for passing the XtraBackup buffer pool size
   with the ``use-memory`` option under ``[xtrabackup]``
   and the ``innodb_buffer_pool_size`` option under ``[mysqld]``
   when the ``--use-memory`` option is not passed
   with the ``inno-apply-opts`` option under ``[sst]``.
 
-* PXC-760 Fixed gcache page cleanup not triggering
+* Fixed gcache page cleanup not triggering
   when limits are exceeded.
 
 * :jirabug:`PXC-782`: Updated ``xtrabackup-v2`` script
@@ -56,6 +56,7 @@ Fixed Bugs
 * :jirabug:`PXC-784`: Fixed the ``pc.recovery`` procedure to abort
   if the :file:`gvwstate.dat` file is empty or invalid,
   and fall back to normal joining process.
+  For more information, see :bug:`1669333`.
 
 * :jirabug:`PXC-794`: Updated the :option:`sockopt` option
   to include a comma at the beginning if it is not set by the user.
@@ -63,6 +64,7 @@ Fixed Bugs
 * :jirabug:`PXC-797`: Blocked :option:`wsrep_desync` toggling
   while node is paused
   to avoid halting the cluster when running ``FLUSH TABLES WITH READ LOCK``.
+  For more information, see :bug:`1370532`.
 
 * Fixed several packaging and dependency issues.
 

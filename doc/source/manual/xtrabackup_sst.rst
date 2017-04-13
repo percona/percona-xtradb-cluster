@@ -173,15 +173,16 @@ The ``encrypt-algo`` option is considered only if :option:`encrypt` is set to
 
 .. option:: sockopt
 
-   :Version: Before 5.6.35 the value must begin with a comma
-
 Used to specify key/value pairs of socket options, separated by commas,
 for example::
 
  [sst]
- sockopt="retry=2,interval=2"
+ sockopt="retry=2,interval=3"
 
-.. note:: Before |PXC| version 5.6.35,
+The previous example causes socat to try to connect three times
+(initial attempt and two retries with a 3-second interval between attempts).
+
+.. note:: For versions of |PXC| before 5.6.35-26.20-3,
    the value must begin with a comma, for example::
 
     [sst]
@@ -257,7 +258,7 @@ Make sure that thread pool is enabled and the ``extra_port`` option is set in
 
 .. option:: cpat
 
-Used to define the files that need to be deleted in the :term:`datadir` before
+Used to define the files that need to be retained in the :term:`datadir` before
 running SST, so that the state of the other node can be restored cleanly. For
 example: ::
 
@@ -338,6 +339,7 @@ set ``sst-initial-timeout=0``.
 
 .. option:: tmpdir
 
+   :Version: Introduced in 5.6.35-26.20-3
    :Default: Empty
    :Example: /path/to/tmp/dir
 
