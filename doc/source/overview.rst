@@ -55,11 +55,13 @@ with links to details for every step:
    is performed automatically, it is a good idea to ensure
    that changes on one node actually replicate to other nodes.
 
-ProxySQL
-========
+ProxySQL for High Availability
+==============================
 
-Consider installing ProxySQL_ on client nodes to improve performance
-of the cluster without any changes to the applications that generate queries.
+Consider installing ProxySQL_ on client nodes for efficient workload management
+across the cluster without any changes to the applications
+that generate queries.
+This is the recommended high-availability solution for |PXC|.
 
 For more information, see :ref:`load_balancing_with_proxysql`.
 

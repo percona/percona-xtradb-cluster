@@ -45,3 +45,18 @@ and adding some records to the table on the first node.
       +---------+-----------+
       1 row in set (0.00 sec)
 
+Next Steps
+==========
+
+* Consider installing ProxySQL_ on client nodes
+  for efficient workload management
+  across the cluster without any changes
+  to the applications that generate queries.
+  This is the recommended high-availability solution for |PXC|.
+
+  For more information, see :ref:`load_balancing_with_proxysql`.
+
+* |PMM|_ is the best choice for managing and monitoring |PXC| performance.
+  It provides visibility for the cluster
+  and enables efficient troubleshooting.
+
