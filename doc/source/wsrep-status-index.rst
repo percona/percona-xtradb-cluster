@@ -131,8 +131,9 @@ Number of ``FC_PAUSE`` events sent since the last status query.
 
 .. variable:: wsrep_flow_control_status
 
-This variable shows whether or not a node has flow control enabled
-for normal traffic.
+   :Version: Introduced in 5.7.17-29.20
+
+This variable shows whether a node has flow control enabled for normal traffic.
 It does not indicate the status of flow control during SST.
 
 .. variable:: wsrep_gcache_pool_size
@@ -151,6 +152,8 @@ node. You will need to know this value when using manual eviction feature.
 Shows the comma-separated list of incoming node addresses in the cluster.
 
 .. variable:: wsrep_ist_receive_status
+
+   :Version: Introduced in 5.7.17-29.20
 
 Displays the progress of IST for joiner node.
 If IST is not running, the value is blank.

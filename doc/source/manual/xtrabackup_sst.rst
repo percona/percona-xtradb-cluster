@@ -172,7 +172,7 @@ for example::
 The previous example causes socat to try to connect three times
 (initial attempt and two retries with a 3-second interval between attempts).
 
-.. note:: Before |PXC| version 5.6.35,
+.. note:: For versions of |PXC| before 5.7.17-29.20,
    the value must begin with a comma, for example::
 
     [sst]
@@ -243,7 +243,7 @@ in :file:`my.cnf` before you enable this option.
     :Default: ``'.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$'``
 
 Used to define the files
-that need to be deleted in the :term:`datadir` before running SST,
+that need to be retained in the :term:`datadir` before running SST,
 so that the state of the other node can be restored cleanly.
 For example: ::
 
@@ -328,6 +328,7 @@ To disable initial SST timeout, set ``sst-initial-timeout=0``.
 
 .. option:: tmpdir
 
+   :Version: Introduced in 5.7.17-29.20
    :Default: Empty
    :Example: /path/to/tmp/dir
 
@@ -359,7 +360,7 @@ introduced by ``wsrep_sst_xtrabackup-v2``
 * ``openbsd-netcat`` or ``socat`` for transfer.
   ``socat`` is a direct dependency of |PXC| and it is the default.
 
-* ``xbstream`` (default) or ``tar`` for streaming.
+* ``xbstream`` or ``tar`` for streaming. ``xbstream`` is the default.
 
 * ``pv`` is required for :option:`progress` and :option:`rlimit`.
 

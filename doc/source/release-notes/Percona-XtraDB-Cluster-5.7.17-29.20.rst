@@ -24,47 +24,55 @@ Details of this release can be found in the
 `5.7.17-29.20 milestone on Launchpad
 <https://launchpad.net/percona-xtradb-cluster/+milestone/5.7.17-29.20>`_.
 
+Performance Improvements
+========================
+
+This release was focused on performance
+and scaling capability with increasing workload threads.
+Tests show up to 10 times increase in performance.
+
 Fixed Bugs
 ==========
 
-* PXC-686: Updated semantics for gcache page cleanup
+* Improved parallelism for better scaling with multiple threads.
+
+* Updated semantics for gcache page cleanup
   to trigger when either :option:`gcache.keep_pages_size`
   or :option:`gcache.keep_pages_count` exceeds the limit,
   instead of both at the same time.
 
-* PXC-692: Improved SST and IST log messages
+* Improved SST and IST log messages
   for better readability and unification.
 
-* PXC-694: Excluded the ``garbd`` node from flow control calculations.
+* Excluded the ``garbd`` node from flow control calculations.
 
-* PXC-725: Added extra checks to verify that SSL files
+* Added extra checks to verify that SSL files
   (certificate, certificate authority, and key)
-  are compatible before openning connection.
+  are compatible before opening connection.
 
-* PXC-727: Improved parallelism for better scaling with multiple threads.
-
-* PXC-754: Added validations for ``DISCARD TABLESPACE``
+* Added validations for ``DISCARD TABLESPACE``
   and ``IMPORT TABLESPACE`` in :ref:`pxc-strict-mode`
   to prevent data inconsistency.
 
-* PXC-755: Added support for passing the XtraBackup buffer pool size
+* Added support for passing the XtraBackup buffer pool size
   with the ``use-memory`` option under ``[xtrabackup]``
   and the ``innodb_buffer_pool_size`` option under ``[mysqld]``
   when the ``--use-memory`` option is not passed
   with the ``inno-apply-opts`` option under ``[sst]``.
 
-* PXC-759: Added the :variable:`wsrep_flow_control_status` variable
+* Added the :variable:`wsrep_flow_control_status` variable
   to indicate if node is in flow control (paused).
 
-* PXC-760 Fixed gcache page cleanup not triggering
+* Fixed gcache page cleanup not triggering
   when limits are exceeded.
 
 * :jirabug:`PXC-766`: Added the :variable:`wsrep_ist_receive_status` variable
   to show progress during an IST.
 
-* PXC-768: Allowed ``CREATE TABLE ... AS SELECT`` (CTAS) statements
+* Allowed ``CREATE TABLE ... AS SELECT`` (CTAS) statements
   with temporary tables (``CREATE TEMPORARY TABLE ... AS SELECT``)
   in :ref:`pxc-strict-mode`.
+  For more information, see :bug:`1666899`.
 
 * :jirabug:`PXC-782`: Updated ``xtrabackup-v2`` script
   to use the :option:`tmpdir` option
@@ -76,6 +84,7 @@ Fixed Bugs
 * :jirabug:`PXC-784`: Fixed the ``pc.recovery`` procedure to abort
   if the :file:`gvwstate.dat` file is empty or invalid,
   and fall back to normal joining process.
+  For more information, see :bug:`1669333`.
 
 * :jirabug:`PXC-794`: Updated the :option:`sockopt` option
   to include a comma at the beginning if it is not set by the user.
@@ -86,10 +95,18 @@ Fixed Bugs
 * :jirabug:`PXC-797`: Blocked :option:`wsrep_desync` toggling
   while node is paused
   to avoid halting the cluster when running ``FLUSH TABLES WITH READ LOCK``.
+  For more information, see :bug:`1370532`.
 
 * :jirabug:`PXC-805`: Inherited upstream fix
   to avoid using deprecated variables,
   such as ``INFORMATION_SCHEMA.SESSION_VARIABLE``.
+  For more information, see :bug:`1676401`.
+
+* :jirabug:`PXC-811`: Changed default values for the following variables:
+
+  * ``fc_limit`` from ``16`` to ``100``
+  * ``send_window`` from ``4`` to ``10``
+  * ``user_send_window`` from ``2`` to ``4``
 
 * Moved wsrep settings into a separate configuration file
   (:file:`/etc/my.cnf.d/wsrep.cnf`).
