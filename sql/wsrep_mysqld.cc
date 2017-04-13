@@ -730,6 +730,16 @@ void wsrep_stop_replication(THD *thd)
   /* wait until appliers have stopped */
   wsrep_wait_appliers_close(thd);
 
+  /* After disconnecting the node from the cluster and closing all */
+  /* client connections we need to reset the desynchronization counter: */
+
+  wsrep_desync = 0;
+
+  /* We do not have a distinct status for this situation, */
+  /* but WSREP_MEMBER_JOINER is most suitable for this: */
+
+  local_status.set(WSREP_MEMBER_JOINER);
+
   return;
 }
 
