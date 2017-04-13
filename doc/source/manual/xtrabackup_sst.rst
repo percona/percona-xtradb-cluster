@@ -153,11 +153,11 @@ Used to enable and specify SST encryption mode:
 
   Considering that you have all three necessary files::
 
-  [sst]
-  encrypt=4
-  ssl-ca=ca.pem
-  ssl-cert=server-cert.pem
-  ssl-key=server-key.pem
+   [sst]
+   encrypt=4
+   ssl-ca=ca.pem
+   ssl-cert=server-cert.pem
+   ssl-key=server-key.pem
 
 For more information, see :ref:`encrypt-traffic`.
 
@@ -173,13 +173,27 @@ The ``encrypt-algo`` option is considered only if :option:`encrypt` is set to
 
 .. option:: sockopt
 
-Used to specify key/value pairs of socket options, separated by commas. Must
-begin with a comma. You can use the ``tcpwrap`` option to blacklist or
-whitelist clients. For more information about socket options, see
+Used to specify key/value pairs of socket options, separated by commas,
+for example::
+
+ [sst]
+ sockopt="retry=2,interval=3"
+
+The previous example causes socat to try to connect three times
+(initial attempt and two retries with a 3-second interval between attempts).
+
+.. note:: For versions of |PXC| before 5.6.35-26.20-3,
+   the value must begin with a comma, for example::
+
+    [sst]
+    sockopt=",cipher=AES128"
+
+You can use the ``tcpwrap`` option to blacklist or whitelist clients.
+For more information about socket options, see
 `socat (1) <http://www.dest-unreach.org/socat/doc/socat.html>`_.
 
 .. note:: You can also enable SSL based compression with :option:`sockopt`.
-   This can be used in place of the Percona XtraBackup ``compress`` option.
+   This can be used instead of the Percona XtraBackup ``compress`` option.
 
 .. option:: progress
 
@@ -244,7 +258,7 @@ Make sure that thread pool is enabled and the ``extra_port`` option is set in
 
 .. option:: cpat
 
-Used to define the files that need to be deleted in the :term:`datadir` before
+Used to define the files that need to be retained in the :term:`datadir` before
 running SST, so that the state of the other node can be restored cleanly. For
 example: ::
 
@@ -323,6 +337,23 @@ set ``sst-initial-timeout=0``.
    or network disturbance
    (which can cause donor selection to take longer than 100 seconds).
 
+.. option:: tmpdir
+
+   :Version: Introduced in 5.6.35-26.20-3
+   :Default: Empty
+   :Example: /path/to/tmp/dir
+
+This option specifies the location for storing the temporary file
+where the transaction log is stored
+before streaming or copying it to a remote host.
+
+The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
+
+* ``[sst]`` is the primary location (others are ignored)
+* ``[xtrabackup]`` is the secondary location
+  (if not specified under ``[sst]``)
+* ``[mysqld]`` is used if it is not specified in either of the above
+
 XtraBackup SST Dependencies
 ---------------------------
 
@@ -394,4 +425,27 @@ following scenarios:
    if you specify any of the |Percona XtraBackup| encryption options,
    and ``encrypt=0`` under ``[sst]``, it will still be encrypted
    and SST will fail. Look at case 3 above for resolution.
+
+Memory Allocation
+-----------------
+
+The amount of memory for XtraBackup
+is defined by the ``--use-memory`` option.
+You can pass it using the :option:`inno-apply-opts` option
+under ``[sst]`` as follows::
+
+ [sst]
+ inno-apply-opts="--use-memory=500M"
+
+If it is not specified,
+the ``use-memory`` option under ``[xtrabackup]`` will be used::
+
+ [xtrabackup]
+ use-memory=32M
+
+If neither of the above are specified,
+the size of the InnoDB memory buffer will be used::
+
+ [mysqld]
+ innodb_buffer_pool_size=24M
 
