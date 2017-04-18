@@ -787,7 +787,6 @@ fi
 %doc %{src_dir}/Docs/README-wsrep*
 %doc release/Docs/INFO_SRC*
 %doc release/Docs/INFO_BIN*
-%doc release/support-files/my-default.cnf
 %dir %attr(755, root, root) %{_datadir}/mysql
 %attr(644, root, root) %{_mandir}/man1/innochecksum.1*
 %attr(644, root, root) %{_mandir}/man1/my_print_defaults.1*

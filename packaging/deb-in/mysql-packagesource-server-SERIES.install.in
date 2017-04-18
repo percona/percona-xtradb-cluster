@@ -104,7 +104,6 @@ usr/share/mysql/fill_help_tables.sql
 usr/share/mysql/innodb_memcached_config.sql
 usr/share/mysql/install_rewriter.sql
 usr/share/mysql/magic
-usr/share/mysql/my-default.cnf
 usr/share/mysql/mysql-log-rotate
 usr/share/mysql/mysql_security_commands.sql
 usr/share/mysql/mysql_sys_schema.sql
