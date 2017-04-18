@@ -5,7 +5,7 @@ Percona XtraDB Cluster 5.6.35-26.20-3
 =====================================
 
 Percona is glad to announce the release of
-|Percona XtraDB Cluster| 5.6.35-26.20-3 on April 13, 2017.
+|Percona XtraDB Cluster| 5.6.35-26.20-3 on April 19, 2017.
 Binaries are available from the `downloads section
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/>`_
 or from our :ref:`software repositories <installation>`.
@@ -24,12 +24,15 @@ Details of this release can be found in the
 `5.6.35-26.20-3 milestone on Launchpad
 <https://launchpad.net/percona-xtradb-cluster/+milestone/5.6.35-26.20-3>`_.
 
-Changes
-=======
+.. note:: Due to end of life,
+   Percona will stop producing packages for the following distributions
+   after July 31, 2017:
 
-* As of this release,
-  |PXC| no longer supports RedHat 5 derivatives,
-  including CentOS 5.
+   * Red Hat Enterprise Linux 5 (Tikanga)
+   * Ubuntu 12.04 LTS (Precise Pangolin)
+
+   You are strongly advised to upgrade to latest stable versions
+   if you want to continue using Percona software.
 
 Fixed Bugs
 ==========

@@ -13,8 +13,18 @@ Percona provides packages for popular DEB-based and RPM-based distributions:
 * Ubuntu 14.04 LTS (Trusty Tahr)
 * Ubuntu 16.04 LTS (Xenial Xerus)
 * Ubuntu 16.10 (Yakkety Yak)
+* Red Hat Enterprise Linux / CentOS 5
 * Red Hat Enterprise Linux / CentOS 6
 * Red Hat Enterprise Linux / CentOS 7
+
+.. note:: CentOS 5 includes ``openssl-0.9.8``
+   that doesn't support TLS 1.1/1.2,
+   which is a requirement as of Galera 3.19.
+   This means PXC 5.6.34 and later versions
+   do not support SSL encryption on CentOS 5.
+
+   We recommend upgrading from CentOS 5 anyway,
+   because it already reached EOL on March 31, 2017.
 
 Prerequisites
 =============
