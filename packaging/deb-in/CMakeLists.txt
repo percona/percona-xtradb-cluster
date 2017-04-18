@@ -316,6 +316,7 @@ IF(DEB_STARTUP MATCHES ".*SYSTEMD.*")
 ELSE()
   LIST(REMOVE_ITEM SOURCEFILES
   "mysql-packagesource-server-SERIES.mysql.service.in")
+ENDIF()
 # Don't install systemd file on systems without systemd
 IF(DEB_INSTALL_SERVER_SYSTEMD STREQUAL "")
 	LIST(REMOVE_ITEM SOURCEFILES "mysql-packagesource-server.mysql.service.in")
