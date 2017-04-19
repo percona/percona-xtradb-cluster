@@ -20,9 +20,6 @@ based on the following:
 * wsrep API version 29
 
 All Percona software is open-source and free.
-Details of this release can be found in the
-`5.7.17-29.20 milestone on Launchpad
-<https://launchpad.net/percona-xtradb-cluster/+milestone/5.7.17-29.20>`_.
 
 Performance Improvements
 ========================
