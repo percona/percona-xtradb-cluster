@@ -4225,6 +4225,15 @@ innobase_create_zip_dict(
 		case DB_DUPLICATE_KEY:
 			result = HA_CREATE_ZIP_DICT_ALREADY_EXISTS;
 			break;
+		case DB_OUT_OF_MEMORY:
+			result = HA_CREATE_ZIP_DICT_OUT_OF_MEMORY;
+			break;
+		case DB_OUT_OF_FILE_SPACE:
+			result = HA_CREATE_ZIP_DICT_OUT_OF_FILE_SPACE;
+			break;
+		case DB_TOO_MANY_CONCURRENT_TRXS:
+			result = HA_CREATE_ZIP_DICT_TOO_MANY_CONCURRENT_TRXS;
+			break;
 		default:
 			ut_ad(0);
 			result = HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
@@ -4260,6 +4269,15 @@ innobase_drop_zip_dict(
 			break;
 		case DB_ROW_IS_REFERENCED:
 			result = HA_DROP_ZIP_DICT_IS_REFERENCED;
+			break;
+		case DB_OUT_OF_MEMORY:
+			result = HA_DROP_ZIP_DICT_OUT_OF_MEMORY;
+			break;
+		case DB_OUT_OF_FILE_SPACE:
+			result = HA_DROP_ZIP_DICT_OUT_OF_FILE_SPACE;
+			break;
+		case DB_TOO_MANY_CONCURRENT_TRXS:
+			result = HA_DROP_ZIP_DICT_TOO_MANY_CONCURRENT_TRXS;
 			break;
 		default:
 			ut_ad(0);
@@ -16556,16 +16574,21 @@ and SYS_ZIP_DICT_COLS for all columns marked with
 COLUMN_FORMAT_TYPE_COMPRESSED flag and updates
 zip_dict_name / zip_dict_data for those which have associated
 compression dictionaries.
+
+@param part_name Full table name (including partition part).
+		 Must be non-NULL only if called from ha_partition.
 */
 UNIV_INTERN
 void
-ha_innobase::update_field_defs_with_zip_dict_info()
+ha_innobase::update_field_defs_with_zip_dict_info(const char *part_name)
 {
 	DBUG_ENTER("update_field_defs_with_zip_dict_info");
 	ut_ad(!mutex_own(&dict_sys->mutex));
 
 	char norm_name[FN_REFLEN];
-	normalize_table_name(norm_name, table_share->normalized_path.str);
+	normalize_table_name(norm_name,
+		part_name != 0 ? part_name :
+			table_share->normalized_path.str);
 
 	dict_table_t* ib_table = dict_table_open_on_name(
 		norm_name, FALSE, FALSE, DICT_ERR_IGNORE_NONE);
@@ -17942,15 +17965,17 @@ innodb_buffer_pool_evict_uncompressed(void)
 			ut_ad(block->page.in_LRU_list);
 
 			mutex_enter(&block->mutex);
-			if (!buf_LRU_free_page(&block->page, false)) {
-				mutex_exit(&block->mutex);
-				all_evicted = false;
-			} else {
-				mutex_exit(&block->mutex);
-				mutex_enter(&buf_pool->LRU_list_mutex);
-			}
+			all_evicted = buf_LRU_free_page(&block->page, false);
+			mutex_exit(&block->mutex);
 
-			block = prev_block;
+			if (all_evicted) {
+
+				mutex_enter(&buf_pool->LRU_list_mutex);
+				block = UT_LIST_GET_LAST(buf_pool->unzip_LRU);
+			} else {
+
+				block = prev_block;
+			}
 		}
 
 		mutex_exit(&buf_pool->LRU_list_mutex);

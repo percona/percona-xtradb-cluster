@@ -31,6 +31,7 @@ Prefix: %{_sysconfdir}
 %define percona_server_version @@PERCONA_VERSION@@
 %define revision @@REVISION@@
 %define distribution  rhel%{redhatversion}
+%define galera_version @@GALERA_VERSION@@
 
 #
 %bcond_with tokudb
@@ -274,7 +275,7 @@ Vendor:         %{percona_server_vendor}
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
-Requires:	Percona-XtraDB-Cluster-galera-3 = 3.20
+Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
 Provides:       mysql-server
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
 %if 0%{?systemd}
@@ -309,21 +310,21 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
-Requires:	Percona-XtraDB-Cluster-galera-3 = 3.20
-Requires:	Percona-XtraDB-Cluster-garbd-3 = 3.20
+Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
+Requires:	Percona-XtraDB-Cluster-garbd-3 = %{galera_version}
 Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = 1:%{mysql_version}-%{release}
-Requires:	Percona-XtraDB-Cluster-galera-3-debuginfo = 3.20
+Requires:	Percona-XtraDB-Cluster-galera-3-debuginfo = %{galera_version}
 %else
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-devel%{product_suffix} = 1:%{mysql_version}-%{release}
-Requires:	Percona-XtraDB-Cluster-galera-3 = 3.20
-Requires:	Percona-XtraDB-Cluster-garbd-3 = 3.20
+Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
+Requires:	Percona-XtraDB-Cluster-garbd-3 = %{galera_version}
 Requires:	Percona-XtraDB-Cluster-test%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster%{product_suffix}-debuginfo = 1:%{mysql_version}-%{release}
-Requires:	Percona-XtraDB-Cluster-galera-3-debuginfo = 3.20
+Requires:	Percona-XtraDB-Cluster-galera-3-debuginfo = %{galera_version}
 %endif
 
 %description -n Percona-XtraDB-Cluster-full%{product_suffix}
@@ -337,7 +338,7 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = 1:%{mysql_version}-%{release}
-Requires:	Percona-XtraDB-Cluster-galera-3 = 3.20
+Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
 Requires:	percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}

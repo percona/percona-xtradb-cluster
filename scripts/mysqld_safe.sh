@@ -250,7 +250,7 @@ wsrep_recover_position() {
   # If sequence number is not equal to -1, wsrep-recover co-ordinates aren't used.
   # lp:1112724
   # So, directly pass whatever is obtained from grastate.dat
-  if [ $seqno -ne -1 ];then 
+  if [ ! -z $seqno ] && [ $seqno -ne -1 ]; then
     log_notice "Skipping wsrep-recover for $uuid:$seqno pair"
     log_notice "Assigning $uuid:$seqno to wsrep_start_position"
     wsrep_start_position_opt="--wsrep_start_position=$uuid:$seqno"
@@ -662,7 +662,7 @@ append_arg_to_args () {
 args=
 
 SET_USER=2
-parse_arguments `$print_defaults $defaults --loose-verbose mysqld server`
+parse_arguments `$print_defaults $defaults --loose-verbose mysqld server | sed 's/\s//g'`
 if test $SET_USER -eq 2
 then
   SET_USER=0
@@ -816,7 +816,7 @@ if [ $logging = "file" -o $logging = "both" ]; then
         ;;
       # We can't create $err_log and don't know if mysqld can; error out
       *)
-        log_error "error: log-error set to '$err_log', however file don't exists. Create writable for user '$user'."
+        log_error "error: log-error set to '$err_log', however file does not exist. Create writable for user '$user'."
         exit 1
         ;;
     esac
@@ -850,7 +850,7 @@ then
   then
     install -d -m 0755 -o $user $mysql_unix_port_dir
   else
-    log_error "Directory '$mysql_unix_port_dir' for UNIX socket file don't exists."
+    log_error "Directory '$mysql_unix_port_dir' for UNIX socket file does not exist."
     exit 1
   fi
 fi
