@@ -35,7 +35,7 @@ SET SESSION wsrep_sync_wait=0;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'Waiting for table metadata lock%';
 --source include/wait_condition.inc
 
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: applied write set%';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: committing write set%';
 --source include/wait_condition.inc
 
 SELECT COUNT(*) = 0 FROM t1;
@@ -48,7 +48,8 @@ UNLOCK TABLES;
 --eval SET SESSION wsrep_sync_wait = $wsrep_sync_wait_orig;
 SELECT COUNT(*) = 1 FROM t1;
 SELECT COUNT(*) = 1 FROM t2;
-SELECT COUNT(*) = 2  FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: committed%';
+--let $wait_condition = SELECT COUNT(*) = 2  FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: committed%';
+--source include/wait_condition.inc
 
 --eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig;
 DROP TABLE t1;

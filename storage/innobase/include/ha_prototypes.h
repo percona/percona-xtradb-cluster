@@ -275,6 +275,7 @@ int wsrep_on(void* thd_ptr);
 
 int wsrep_is_wsrep_xid(const void*);
 
+bool wsrep_safe_to_persist_xid(THD* thd);
 #endif /* WITH_WSREP && !UNIV_INNOCHECKSUM */
 
 /**********************************************************************//**

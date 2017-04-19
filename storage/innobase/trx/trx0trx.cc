@@ -62,6 +62,10 @@ Created 3/26/1996 Heikki Tuuri
 #endif /* WITH_WSREP */
 static const ulint MAX_DETAILED_ERROR_LEN = 256;
 
+#ifdef WITH_WSREP
+#include <wsrep_mysqld.h>
+#endif /* WITH_WSREP */
+
 /** Set of table_id */
 typedef std::set<
 	table_id_t,
@@ -126,6 +130,8 @@ trx_init(
 	/* This is called at the end of commit, do not reset the
 	trx_t::state here to NOT_STARTED. The FORCED_ROLLBACK
 	status is required for asynchronous handling. */
+
+	trx->id_saved = trx->id;
 
 	trx->id = 0;
 
@@ -1750,8 +1756,11 @@ trx_write_serialisation_history(
 
 #ifdef WITH_WSREP
         sys_header = trx_sysf_get(mtr);
-        /* Update latest MySQL wsrep XID in trx sys header. */
-        if (wsrep_is_wsrep_xid(trx->xid))
+	/* Update latest MySQL wsrep XID in trx sys header.
+	If given transaction is marked for replay then avoid updating
+	the xid while the trx is being rolled back. */
+        if (wsrep_is_wsrep_xid(trx->xid)
+	    && wsrep_safe_to_persist_xid(trx->mysql_thd))
         {
             trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
         }
@@ -2616,6 +2625,51 @@ trx_commit_complete_for_mysql(
 
 		return;
 	}
+
+#ifdef WITH_WSREP
+	/* Mark completion of transaction in PXC/Galera world.
+
+	Generally this is done once all the SE units commits is complete
+	but currently PXC support only InnoDB SE and so we are marking it
+	complete as part of this step.
+
+	But is it safe to mark it complete before the flush is done ?
+	- There are 2 uses-cases to consider here:
+	a. If log_bin is enabled then group commit protocol of MySQL
+	   will disable active flushing of redo log. Instead will rely
+	   on binlog for recovery.
+	b. If log_bin is disabled then MySQL protocol will rely on
+	   active flushing of redo log before it declares transaction
+	   is committed.
+	We just need to handle latter case.
+
+	But in this case too major work of modifying needed structure
+	(that is committing transaction in memory is already taken care off).
+	What is pending is only flush of REDO log.
+	This means even if flow leaves CommitMonitor there it will not
+	affect commit ordering. (Reason why CommitMonitor are present).
+
+	Let's understand this using an example.
+
+	Say trx-1 and trx-2 both are initiated and trx-1 is first to replicate
+	followed by trx-2. trx-2 waits in commit monitor while trx-1 proceed.
+
+	trx-1 commits successfully and reaches this point where-in it just
+	need to flush the REDO log. (Note: real data changes are already
+	FLUSHED as part of trx_prepare so what is pending to FLUSH is update
+	undo log state and sys_header modification that persist WSREPXID).
+	Say trx-1 now leaves the CommitMonitor and now is waiting to
+	initiate the flush action.
+
+	trx-2 proceeds and complete the commit action, leaves commit monitor
+	and finally is trying to flush the REDO log before trx-1 is going to do
+	it. This is perfectly okay as trx-2 will ensure FLUSH of complete
+	REDO log (including REDO log for trx-1).
+
+	trx-1 then try to flush redo log but return without any work todo.*/
+
+	wsrep_post_commit(trx->mysql_thd, true /* don't care */);
+#endif /* WITH_WSREP */
 
 	trx_flush_log_if_needed(trx->commit_lsn, trx);
 

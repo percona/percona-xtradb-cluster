@@ -801,8 +801,11 @@ extern PSI_stage_info stage_wsrep_rolling_back;
 extern PSI_stage_info stage_wsrep_rolled_back;
 
 extern PSI_stage_info stage_wsrep_replicating_commit;
+extern PSI_stage_info stage_wsrep_write_set_replicated;
 extern PSI_stage_info stage_wsrep_waiting_on_replaying;
+extern PSI_stage_info stage_wsrep_replicate;
 extern PSI_stage_info stage_wsrep_pre_commit;
+extern PSI_stage_info stage_wsrep_pre_commit_cert_passed;
 
 extern PSI_stage_info stage_wsrep_preparing_for_TO_isolation;
 extern PSI_stage_info stage_wsrep_completed_TO_isolation;

@@ -6,7 +6,7 @@ COUNT(*) = 1
 SET @@global.wsrep_causal_reads = 'OFF';
 SHOW STATUS LIKE 'wsrep_flow_control_interval';
 Variable_name	Value
-wsrep_flow_control_interval	[ 23, 23 ]
+wsrep_flow_control_interval	[ 141, 141 ]
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=100';
 SHOW STATUS LIKE 'wsrep_flow_control_interval';
 Variable_name	Value

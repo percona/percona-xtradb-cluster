@@ -326,10 +326,16 @@ file.
    :dyn: Yes
    :default: 0
 
-This variable is used to limit the number of overflow pages rather than the
-total memory occupied by all overflow pages. Whenever either this or
-:variable:`gcache.keep_pages_size` variables are updated at runtime to a
-non-zero value, cleanup is called on excess overflow pages to delete them.
+This variable is used to limit the number of overflow pages
+rather than the total memory occupied by all overflow pages.
+Whenever ``gcache.keep_pages_count`` is set to a non-zero value,
+excess overflow pages will be deleted
+(starting from the oldest to the newest).
+
+Whenever either the ``gcache.keep_pages_count``
+or the :variable:`gcache.keep_pages_size` variable
+is updated at runtime to a non-zero value,
+cleanup is called on excess overflow pages to delete them.
 
 .. variable:: gcache.keep_pages_size
 
@@ -339,8 +345,18 @@ non-zero value, cleanup is called on excess overflow pages to delete them.
    :dyn: No
    :default: 0
 
-This variable is used to specify total size of the pages in storage to keep for
-caching purposes. If only page storage is enabled, one page is always present.
+
+This variable is used to limit the total size of overflow pages
+rather than the count of all overflow pages.
+Whenever ``gcache.keep_pages_size`` is set to a non-zero value,
+excess overflow pages will be deleted
+(starting from the oldest to the newest)
+until the total size is below the specified value.
+
+Whenever either the :variable:`gcache.keep_pages_count`
+or the ``gcache.keep_pages_size`` variable
+is updated at runtime to a non-zero value,
+cleanup is called on excess overflow pages to delete them.
 
 .. variable:: gcache.mem_size
 

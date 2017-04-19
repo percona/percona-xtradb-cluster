@@ -126,7 +126,9 @@ static my_bool  verbose= 0, opt_no_create_info= 0, opt_no_data= 0,
                 opt_secure_auth= TRUE,
                 opt_compressed_columns= 0,
                 opt_compressed_columns_with_dictionaries= 0,
-                opt_drop_compression_dictionary= 1;
+                opt_drop_compression_dictionary= 1,
+                opt_order_by_primary_desc= 0;
+
 static my_bool insert_pat_inited= 0, debug_info_flag= 0, debug_check_flag= 0;
 static ulong opt_max_allowed_packet, opt_net_buffer_length;
 static MYSQL mysql_connection,*mysql=0;
@@ -478,6 +480,9 @@ static struct my_option my_long_options[] =
   {"order-by-primary", OPT_ORDER_BY_PRIMARY,
    "Sorts each table's rows by primary key, or first unique key, if such a key exists.  Useful when dumping a MyISAM table to be loaded into an InnoDB table, but will make the dump itself take considerably longer.",
    &opt_order_by_primary, &opt_order_by_primary, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"order-by-primary-desc", OPT_ORDER_BY_PRIMARY_DESC,
+   "Taking backup ORDER BY primary key DESC.",
+   &opt_order_by_primary_desc, &opt_order_by_primary_desc, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
   {"password", 'p',
    "Password to use when connecting to server. If password is not given it's solicited on the tty.",
    0, 0, 0, GET_PASSWORD, OPT_ARG, 0, 0, 0, 0, 0, 0},
@@ -627,7 +632,7 @@ static int dump_databases(char **);
 static int dump_all_databases();
 static char *quote_name(const char *name, char *buff, my_bool force);
 char check_if_ignore_table(const char *table_name, char *table_type);
-static char *primary_key_fields(const char *table_name);
+static char *primary_key_fields(const char *table_name, const my_bool desc);
 static my_bool get_view_structure(char *table, char* db);
 static my_bool dump_all_views_in_db(char *database);
 static int dump_all_tablespaces();
@@ -782,6 +787,35 @@ static void write_header(FILE *sql_file, char *db_name)
             "/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;\n",
             path?"":"NO_AUTO_VALUE_ON_ZERO",compatible_mode_normal_str[0]==0?"":",",
             compatible_mode_normal_str);
+
+    // This is specifically to allow MyRocks to bulk load a dump faster
+    // We have no interest in anything earlier than 5.7 and 17 being the
+    // current release. 5.7.8 and after can only use P_S for session_variables
+    // and never I_S. So we first check that P_S is present and the
+    // session_variables table exists. If no, we simply skip the optimization
+    // assuming that MyRocks isn't present either. If it is, ohh well, bulk
+    // loader will not be invoked.
+    fprintf(sql_file,
+            "/*!50717 SET @rocksdb_bulk_load_var_name='rocksdb_bulk_load' */;\n"
+            "/*!50717 SELECT COUNT(*) INTO @rocksdb_has_p_s_session_variables"
+            " FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA ="
+            " 'performance_schema' AND TABLE_NAME = 'session_variables'"
+            " */;\n"
+            "/*!50717 SET @rocksdb_get_is_supported = IF"
+            " (@rocksdb_has_p_s_session_variables, 'SELECT COUNT(*) INTO"
+            " @rocksdb_is_supported FROM performance_schema.session_variables"
+            " WHERE VARIABLE_NAME=?', 'SELECT 0') */;\n"
+            "/*!50717 PREPARE s FROM @rocksdb_get_is_supported */;\n"
+            "/*!50717 EXECUTE s USING @rocksdb_bulk_load_var_name */;\n"
+            "/*!50717 DEALLOCATE PREPARE s */;\n"
+            "/*!50717 SET @rocksdb_enable_bulk_load = IF"
+            " (@rocksdb_is_supported, 'SET SESSION rocksdb_bulk_load = 1',"
+            " 'SET @rocksdb_dummy_bulk_load = 0') */;\n"
+            "/*!50717 PREPARE s FROM @rocksdb_enable_bulk_load */;\n"
+            "/*!50717 EXECUTE s */;\n"
+            "/*!50717 DEALLOCATE PREPARE s */;\n");
+
+
     check_io(sql_file);
   }
 } /* write_header */
@@ -796,6 +830,15 @@ static void write_footer(FILE *sql_file)
   }
   else if (!opt_compact)
   {
+    fprintf(sql_file,
+            "/*!50112 SET @disable_bulk_load = IF (@is_rocksdb_supported,"
+            " 'SET SESSION rocksdb_bulk_load = @old_rocksdb_bulk_load',"
+            " 'SET @dummy_rocksdb_bulk_load = 0') */;\n"
+            "/*!50112 PREPARE s FROM @disable_bulk_load */;\n"
+            "/*!50112 EXECUTE s */;\n"
+            "/*!50112 DEALLOCATE PREPARE s */;\n");
+
+
     if (opt_tz_utc)
       fprintf(sql_file,"/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n");
 
@@ -3402,8 +3445,9 @@ static uint get_table_structure(char *table, char *db, char *table_type,
   if (opt_innodb_optimize_keys && !strcmp(table_type, "InnoDB"))
     has_pk= has_primary_key(table);
 
-  if (opt_order_by_primary)
-    order_by= primary_key_fields(result_table);
+  if (opt_order_by_primary || opt_order_by_primary_desc)
+    order_by= primary_key_fields(result_table,
+                                 opt_order_by_primary_desc ? TRUE : FALSE);
 
   if (!opt_xml && !mysql_query_with_error_report(mysql, 0, query_buff))
   {
@@ -6328,7 +6372,7 @@ char check_if_ignore_table(const char *table_name, char *table_type)
     the table unsorted, rather than exit without dumping the data.
 */
 
-static char *primary_key_fields(const char *table_name)
+static char *primary_key_fields(const char *table_name, const my_bool desc)
 {
   MYSQL_RES  *res= NULL;
   MYSQL_ROW  row;
@@ -6338,6 +6382,7 @@ static char *primary_key_fields(const char *table_name)
   char *result= 0;
   char buff[NAME_LEN * 2 + 3];
   char *quoted_field;
+  static const char *desc_index= " DESC";
 
   my_snprintf(show_keys_buff, sizeof(show_keys_buff),
               "SHOW KEYS FROM %s", table_name);
@@ -6364,6 +6409,10 @@ static char *primary_key_fields(const char *table_name)
     {
       quoted_field= quote_name(row[4], buff, 0);
       result_length+= strlen(quoted_field) + 1; /* + 1 for ',' or \0 */
+      if (desc)
+      {
+        result_length+= strlen(desc_index);
+      }
     } while ((row= mysql_fetch_row(res)) && atoi(row[3]) > 1);
   }
 
@@ -6386,7 +6435,11 @@ static char *primary_key_fields(const char *table_name)
     while ((row= mysql_fetch_row(res)) && atoi(row[3]) > 1)
     {
       quoted_field= quote_name(row[4], buff, 0);
-      end= strxmov(end, ",", quoted_field, NullS);
+      end= strxmov(end, desc ? " DESC," : ",", quoted_field, NullS);
+    }
+    if (desc)
+    {
+      end= my_stpmov(end, " DESC");
     }
   }
 
@@ -6837,6 +6890,43 @@ static void dynstr_realloc_checked(DYNAMIC_STRING *str, size_t additional_size)
     die(EX_MYSQLERR, DYNAMIC_STR_ERROR_MSG);
 }
 
+static my_bool has_session_variables_like(MYSQL *mysql_con, const char *var_name)
+{
+  MYSQL_RES  *res;
+  MYSQL_ROW  row;
+  char       *val= 0;
+  char       buf[32], query[256];
+  my_bool    has_var= FALSE;
+  my_bool    has_table= FALSE;
+
+  my_snprintf(query, sizeof(query), "SELECT COUNT(*) FROM"
+              " INFORMATION_SCHEMA.TABLES WHERE table_schema ="
+              " 'performance_schema' AND table_name = 'session_variables'");
+  if (mysql_query_with_error_report(mysql_con, &res, query))
+    return FALSE;
+
+  row = mysql_fetch_row(res);
+  val = row ? (char*)row[0] : NULL;
+  has_table = val && strcmp(val, "0") != 0;
+  mysql_free_result(res);
+
+  if (has_table)
+  {
+    my_snprintf(query, sizeof(query), "SELECT COUNT(*) FROM"
+                " performance_schema.session_variables WHERE VARIABLE_NAME LIKE"
+                " %s", quote_for_like(var_name, buf));
+    if (mysql_query_with_error_report(mysql_con, &res, query))
+      return FALSE;
+
+    row = mysql_fetch_row(res);
+    val = row ? (char*)row[0] : NULL;
+    has_var = val && strcmp(val, "0") != 0;
+    mysql_free_result(res);
+  }
+
+  return has_var;
+}
+
 /**
    Check if the server supports LOCK TABLES FOR BACKUP.
 
@@ -6965,6 +7055,10 @@ int main(int argc, char **argv)
     if (get_bin_log_name(mysql, bin_log_name, sizeof(bin_log_name)))
       goto err;
   }
+
+  if (has_session_variables_like(mysql, "rocksdb_skip_fill_cache"))
+    mysql_query_with_error_report(mysql, 0,
+                                  "SET SESSION rocksdb_skip_fill_cache=1");
 
   if (opt_single_transaction && start_transaction(mysql))
     goto err;

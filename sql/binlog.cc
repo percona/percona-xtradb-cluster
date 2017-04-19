@@ -106,6 +106,11 @@ static int binlog_xa_rollback(handlerton *hton,  XID *xid);
 
 static void exec_binlog_error_action_abort(const char* err_string);
 
+// The last published global binlog position
+static char binlog_global_snapshot_file[FN_REFLEN];
+static ulonglong binlog_global_snapshot_position;
+
+// Binlog position variables for SHOW STATUS
 static char binlog_snapshot_file[FN_REFLEN];
 static ulonglong binlog_snapshot_position;
 
@@ -1969,7 +1974,11 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
 
 
 bool
+#ifdef WITH_WSREP
+Stage_manager::Mutex_queue::append(THD *first, bool interim_commit)
+#else
 Stage_manager::Mutex_queue::append(THD *first)
+#endif /* WITH_WSREP */
 {
   DBUG_ENTER("Stage_manager::Mutex_queue::append");
   lock();
@@ -1978,6 +1987,10 @@ Stage_manager::Mutex_queue::append(THD *first)
                        (ulonglong) m_first, (ulonglong) &m_first,
                        (ulonglong) m_last));
   int32 count= 1;
+#ifdef WITH_WSREP
+  THD* thd_to_append= first;
+#endif /* WITH_WSREP */
+
   bool empty= (m_first == NULL);
   *m_last= first;
   DBUG_PRINT("info", ("m_first: 0x%llx, &m_first: 0x%llx, m_last: 0x%llx",
@@ -2002,6 +2015,45 @@ Stage_manager::Mutex_queue::append(THD *first)
                         (ulonglong) m_last));
   DBUG_ASSERT(m_first || m_last == &m_first);
   DBUG_PRINT("return", ("empty: %s", YESNO(empty)));
+#ifdef WITH_WSREP
+  /* What is interim_commit ?
+  - Galera/PXC enforces ordering based on replication order (order in which
+    transaction write-sets are replicated to group channel).
+  - This is enforced using CommitMonitor.
+  - CommitMonitor is grabbed during transaction prepare stage and released
+    once transaction is committed. This enforces that transaction are committed
+    in order of their global_seqno_.
+  - Interim commit optimization help us to release commit monitor before
+    real-commit happens. This is possible only when MySQL enforces
+    binlog-order-commits. With binlog-order-commits MySQL ensures that
+    the transaction goes through FLUSH->SYNC->COMMIT stages only in
+    said order and so adding the transaction thread to FLUSH STAGE
+    ensures commit ordering will be enforced there-by allowing us to
+    release commit ordering monitor earlier.
+  - This optimization is not enabled if MySQL has disabled binlog-order-commits.
+    (In this case we rely on PXC ordering).
+
+  Append to FLUSH QUEUE and interim commit should be an atomic action for reason
+  mentioned below.
+
+  Group Commit has leader and follower concept.
+  Follower add themselves to the queue and leader is responsible for completing
+  action on behalf of follower.
+  Say a use-case where-in follower is appended to queue but not yet
+  interim_committed and leader get the slot to execute the action.
+
+  It is quite possible that leader may end-up running post_commit action
+  even before follower execute interim_commit. This could be allowed but what if
+  leader is schedule to run post_commit and in meantime follower execute the
+  interim_commit where-in it will create a redundant action execution.
+  (This is redundant action is error in normal flow and not feasible to allow
+   exception in such case).
+
+  In order to rule out this race we ensure that FLUSH QUEUE addition and interim
+  commit are executed as atomic action. */
+  if (interim_commit)
+    wsrep_interim_commit(thd_to_append);
+#endif /* WITH_WSREP */
   unlock();
   DBUG_RETURN(empty);
 }
@@ -2043,7 +2095,11 @@ Stage_manager::enroll_for(StageID stage, THD *thd, mysql_mutex_t *stage_mutex)
   // If the queue was empty: we're the leader for this batch
   DBUG_PRINT("debug", ("Enqueue 0x%llx to queue for stage %d",
                        (ulonglong) thd, stage));
+#ifdef WITH_WSREP
+  bool leader= m_queue[stage].append(thd, (stage == FLUSH_STAGE));
+#else
   bool leader= m_queue[stage].append(thd);
+#endif /* WITH_WSREP */
 
 #ifdef HAVE_REPLICATION
   if (stage == FLUSH_STAGE && has_commit_order_manager(thd))
@@ -7450,6 +7506,7 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
   {
     error= new_file_without_locking(NULL);
     *check_purge= true;
+    publish_coordinates_for_global_status();
   }
   DBUG_RETURN(error);
 }
@@ -9439,6 +9496,8 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
     handle_binlog_flush_or_sync_error(thd, false /* need_lock_log */);
   }
 
+  publish_coordinates_for_global_status();
+
   DEBUG_SYNC(thd, "bgc_after_flush_stage_before_sync_stage");
 
   /*
@@ -9765,41 +9824,25 @@ err1:
 */
 static void set_binlog_snapshot_file(const char *src)
 {
+  mysql_mutex_assert_owner(&LOCK_status);
+
   int dir_len = dirname_length(src);
   strmake(binlog_snapshot_file, src + dir_len,
           sizeof(binlog_snapshot_file) - 1);
 }
 
-/*
-  Copy out current values of status variables, for SHOW STATUS or
-  information_schema.global_status.
 
-  This is called only under LOCK_status, so we can fill in a static array.
-*/
-void MYSQL_BIN_LOG::set_status_variables(THD *thd)
+/** Copy the current binlog coordinates to the variables used for the
+not-in-consistent-snapshot case of SHOW STATUS */
+void MYSQL_BIN_LOG::publish_coordinates_for_global_status(void) const
 {
-  binlog_cache_mngr *cache_mngr;
+  mysql_mutex_assert_owner(&LOCK_log);
 
-  if (thd && opt_bin_log)
-    cache_mngr= (binlog_cache_mngr*) thd_get_ha_data(thd, binlog_hton);
-  else
-    cache_mngr= 0;
-
-  bool have_snapshot= (cache_mngr &&
-                       cache_mngr->binlog_info.log_file_name[0] != '\0');
-  mysql_mutex_lock(&LOCK_log);
-  if (!have_snapshot)
-  {
-    set_binlog_snapshot_file(log_file_name);
-    binlog_snapshot_position= my_b_tell(&log_file);
-  }
-  mysql_mutex_unlock(&LOCK_log);
-
-  if (have_snapshot)
-  {
-    set_binlog_snapshot_file(cache_mngr->binlog_info.log_file_name);
-    binlog_snapshot_position= cache_mngr->binlog_info.pos;
-  }
+  mysql_mutex_lock(&LOCK_status);
+  strcpy(binlog_global_snapshot_file, log_file_name);
+  binlog_global_snapshot_position=
+      my_b_inited(&log_file) ? my_b_tell(&log_file) : 0;
+  mysql_mutex_unlock(&LOCK_status);
 }
 
 
@@ -12301,8 +12344,26 @@ int wsrep_thd_binlog_rollback(THD* thd, bool all)
 
 static int show_binlog_vars(THD *thd, SHOW_VAR *var, char *buff)
 {
-  if (mysql_bin_log.is_open())
-    mysql_bin_log.set_status_variables(thd);
+  mysql_mutex_assert_owner(&LOCK_status);
+
+  const binlog_cache_mngr *cache_mngr
+    = (thd && opt_bin_log)
+    ? static_cast<binlog_cache_mngr *>(thd_get_ha_data(thd, binlog_hton))
+    : NULL;
+
+  const bool have_snapshot= (cache_mngr &&
+                       cache_mngr->binlog_info.log_file_name[0] != '\0');
+
+  if (have_snapshot)
+  {
+    set_binlog_snapshot_file(cache_mngr->binlog_info.log_file_name);
+    binlog_snapshot_position= cache_mngr->binlog_info.pos;
+  }
+  else if (mysql_bin_log.is_open())
+  {
+    set_binlog_snapshot_file(binlog_global_snapshot_file);
+    binlog_snapshot_position= binlog_global_snapshot_position;
+  }
   else
   {
     binlog_snapshot_file[0]= '\0';

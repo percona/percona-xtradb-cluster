@@ -75,6 +75,10 @@ PSI_memory_key key_memory_log_event;
 PSI_memory_key key_memory_Incident_log_event_message;
 PSI_memory_key key_memory_Rows_query_log_event_rows_query;
 
+#ifndef EMBEDDED_LIBRARY
+#include "sql_connect.h" //update_global_user_stats
+#endif
+
 using std::min;
 using std::max;
 
@@ -11082,6 +11086,9 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
 
       error= (this->*do_apply_row_ptr)(rli);
 
+      if (!error)
+        thd->updated_row_count++;
+
       if (handle_idempotent_and_ignored_errors(rli, &error))
         break;
 
@@ -11089,6 +11096,14 @@ int Rows_log_event::do_apply_event(Relay_log_info const *rli)
       do_post_row_operations(rli, error);
 
     } while (!error && (m_curr_row != m_rows_end));
+
+    if (unlikely(opt_userstat))
+    {
+      thd->update_stats(false);
+#ifndef EMBEDDED_LIBRARY
+      update_global_user_stats(thd, true, time(NULL));
+#endif
+    }
 
 AFTER_MAIN_EXEC_ROW_LOOP:
 
@@ -12551,8 +12566,9 @@ Write_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   if (WSREP(thd))
   {
     THD_STAGE_INFO(thd, stage_wsrep_writing_rows);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: writing row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: writing row for write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
   }
@@ -12673,8 +12689,9 @@ int Delete_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   if (WSREP(thd))
   {
     THD_STAGE_INFO(thd, stage_wsrep_deleting_rows);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: deleting row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: deleting row for write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
   }
@@ -12851,8 +12868,9 @@ Update_rows_log_event::do_exec_row(const Relay_log_info *const rli)
   if (WSREP(thd))
   {
     THD_STAGE_INFO(thd, stage_wsrep_updating_rows);
-    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info) - 1,
-             "wsrep: updating row for write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+    snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
+             "wsrep: updating row for write-set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
   }

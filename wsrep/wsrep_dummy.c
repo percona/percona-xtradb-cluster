@@ -115,6 +115,17 @@ static wsrep_status_t dummy_recv(wsrep_t* w,
     return WSREP_OK;
 }
 
+static wsrep_status_t dummy_replicate(
+    wsrep_t* w,
+    const wsrep_conn_id_t   conn_id    __attribute__((unused)),
+    wsrep_ws_handle_t*      ws_handle  __attribute__((unused)),
+    uint32_t                flags      __attribute__((unused)),
+    wsrep_trx_meta_t*       meta       __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
 static wsrep_status_t dummy_pre_commit(
     wsrep_t* w,
     const wsrep_conn_id_t   conn_id    __attribute__((unused)),
@@ -126,9 +137,52 @@ static wsrep_status_t dummy_pre_commit(
     return WSREP_OK;
 }
 
+static wsrep_status_t dummy_replicate_pre_commit(
+    wsrep_t* w,
+    const wsrep_conn_id_t   conn_id    __attribute__((unused)),
+    wsrep_ws_handle_t*      ws_handle  __attribute__((unused)),
+    uint32_t                flags      __attribute__((unused)),
+    wsrep_trx_meta_t*       meta       __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_interim_commit(
+    wsrep_t* w,
+    wsrep_ws_handle_t*  ws_handle  __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
 static wsrep_status_t dummy_post_commit(
     wsrep_t* w,
     wsrep_ws_handle_t*  ws_handle  __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_applier_pre_commit(
+    wsrep_t* w,
+    void*    trx_handle    __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_applier_interim_commit(
+    wsrep_t* w,
+    void*    trx_handle    __attribute__((unused)))
+{
+    WSREP_DBUG_ENTER(w);
+    return WSREP_OK;
+}
+
+static wsrep_status_t dummy_applier_post_commit(
+    wsrep_t* w,
+    void*    trx_handle    __attribute__((unused)))
 {
     WSREP_DBUG_ENTER(w);
     return WSREP_OK;
@@ -356,8 +410,14 @@ static wsrep_t dummy_iface = {
     &dummy_connect,
     &dummy_disconnect,
     &dummy_recv,
+    &dummy_replicate,
     &dummy_pre_commit,
+    &dummy_replicate_pre_commit,
+    &dummy_interim_commit,
     &dummy_post_commit,
+    &dummy_applier_pre_commit,
+    &dummy_applier_interim_commit,
+    &dummy_applier_post_commit,
     &dummy_post_rollback,
     &dummy_replay_trx,
     &dummy_abort_pre_commit,

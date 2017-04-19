@@ -1007,6 +1007,19 @@ wsrep_trx_is_aborting(void *thd_ptr)
 	}
 	return 0;
 }
+
+extern "C" void
+wsrep_set_thd_proc_info(THD* thd, const char* str)
+{
+  thd->wsrep_info[sizeof(thd->wsrep_info) - 1] = '\0';
+  strncpy(thd->wsrep_info, str, (sizeof(thd->wsrep_info) - 1));
+}
+
+extern "C" const char*
+wsrep_get_thd_proc_info(THD* thd)
+{
+  return (thd->wsrep_info);
+}
 #endif /* WITH_WSREP */
 
 /**
@@ -1382,6 +1395,7 @@ THD::THD(bool enable_plugins)
    wsrep_apply_format(0),
    wsrep_apply_toi(false),
    wsrep_sst_donor(false),
+   wsrep_void_applier_trx(true),
    wsrep_gtid_event_buf(NULL),
    wsrep_gtid_event_buf_len(0),
 #endif /* WITH_WSREP */
@@ -1917,6 +1931,7 @@ void THD::init(void)
   wsrep_gtid_event_buf_len = 0;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
   wsrep_sst_donor= false;
+  wsrep_void_applier_trx  = true;
 #endif /* WITH_WSREP */
   binlog_row_event_extra_data= 0;
 
@@ -4730,7 +4745,8 @@ void THD::clear_slow_extended()
   tmp_tables_disk_used=         0;
   tmp_tables_size=              0;
   innodb_was_used=              false;
-  innodb_trx_id=                0;
+  if (!(server_status & SERVER_STATUS_IN_TRANS))
+    innodb_trx_id=                0;
   innodb_io_reads=              0;
   innodb_io_read=               0;
   innodb_io_reads_wait_timer=   0;
@@ -4886,6 +4902,7 @@ void THD::inc_status_created_tmp_disk_tables()
 void THD::inc_status_created_tmp_tables()
 {
   status_var.created_tmp_tables++;
+  query_plan_flags|= QPLAN_TMP_TABLE;
 #ifdef HAVE_PSI_STATEMENT_INTERFACE
   PSI_STATEMENT_CALL(inc_statement_created_tmp_tables)(m_statement_psi, 1);
 #endif

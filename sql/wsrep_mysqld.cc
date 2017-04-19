@@ -1815,7 +1815,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
 
     THD_STAGE_INFO(thd, stage_wsrep_preparing_for_TO_isolation);
     snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-             "wsrep: initiating TOI for write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+             "wsrep: initiating TOI for write set (%lld)",
+             (long long)wsrep_thd_trx_seqno(thd));
     WSREP_DEBUG("%s", thd->wsrep_info);
     thd_proc_info(thd, thd->wsrep_info);
   }
@@ -1870,7 +1871,8 @@ static void wsrep_TOI_end(THD *thd)
 
   THD_STAGE_INFO(thd, stage_wsrep_completed_TO_isolation);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: completed TOI write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: completed TOI write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -2299,6 +2301,8 @@ const char* wsrep_get_wsrep_status(wsrep_status status)
     return "WSREP_NODE_FAIL";
   case WSREP_FATAL:
     return "WSREP_FATAL";
+  case WSREP_PRECOMMIT_ABORT:
+    return "WSREP_PRECOMMIT_ABORT";
   case WSREP_NOT_IMPLEMENTED:
     return "NULL";
   }

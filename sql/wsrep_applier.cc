@@ -254,7 +254,8 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
 
   THD_STAGE_INFO(thd, stage_wsrep_applying_writeset);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: applying write-set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: applying write-set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -310,7 +311,8 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
 {
   THD_STAGE_INFO(thd, stage_wsrep_committing);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: committing write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: committing write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -321,7 +323,7 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
            "wsrep: %s write set (%lld)",
            (rcode == WSREP_CB_SUCCESS ? "committed" : "failed to commit"),
-           (long long)wsrep_thd_trx_seqno(thd));
+            (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -343,7 +345,8 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 {
   THD_STAGE_INFO(thd, stage_wsrep_rolling_back);
   snprintf(thd->wsrep_info, sizeof(thd->wsrep_info),
-           "wsrep: rolling back write set (%lld)", (long long)wsrep_thd_trx_seqno(thd));
+           "wsrep: rolling back write set (%lld)",
+           (long long)wsrep_thd_trx_seqno(thd));
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
@@ -368,12 +371,21 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
 }
 
 wsrep_cb_status_t wsrep_commit_cb(void*         const     ctx,
+                                  const void*             trx_handle,
                                   uint32_t      const     flags,
                                   const wsrep_trx_meta_t* meta,
                                   wsrep_bool_t* const     exit,
                                   bool          const     commit)
 {
   THD* const thd((THD*)ctx);
+
+  /* Applier transaction delays entering CommitMonitor so
+  cache the needed params that can aid entering CommitMonitor
+  post prepare stage.
+  Replay of local transaction uses the same path as applying of
+  transaction but CommitMonitor protocol is different for it. */
+  if (trx_handle && thd->wsrep_conflict_state != REPLAYING)
+    thd->wsrep_ws_handle.opaque= const_cast<void*>(trx_handle);
 
   assert(meta->gtid.seqno == wsrep_thd_trx_seqno(thd));
 

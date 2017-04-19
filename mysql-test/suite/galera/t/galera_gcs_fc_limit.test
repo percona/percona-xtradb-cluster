@@ -63,7 +63,7 @@ INSERT INTO t1 VALUES (5);
 --let $galera_server_number = 1
 --source include/galera_connect.inc
 --connection node_1a
---let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating pre-commit for write set%' AND INFO = 'INSERT INTO t1 VALUES (5)';
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE LIKE 'wsrep: initiating replication for write set%' AND INFO = 'INSERT INTO t1 VALUES (5)';
 --source include/wait_condition.inc
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2

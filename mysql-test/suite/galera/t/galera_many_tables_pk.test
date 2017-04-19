@@ -88,6 +88,7 @@ START TRANSACTION;
 UPDATE t1000 SET f1 = 3;
 
 --connection node_1
+--sleep 2
 COMMIT;
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2

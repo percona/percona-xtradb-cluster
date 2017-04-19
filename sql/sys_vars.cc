@@ -1331,12 +1331,27 @@ static Sys_var_mybool Sys_binlog_rows_query(
        SESSION_VAR(binlog_rows_query_log_events),
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
+static bool binlog_order_commits_check(sys_var *self, THD *thd, set_var *var)
+{
+  if (WSREP(thd))
+  {
+    char message[1024];
+    sprintf(message,
+            "Can't change binlog_order_commits while operating in"
+            " cluster mode");
+    my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+    return true;
+  }
+  return false;
+}
+
 static Sys_var_mybool Sys_binlog_order_commits(
        "binlog_order_commits",
        "Issue internal commit calls in the same order as transactions are"
        " written to the binary log. Default is to order commits.",
        GLOBAL_VAR(opt_binlog_order_commits),
-       CMD_LINE(OPT_ARG), DEFAULT(TRUE));
+       CMD_LINE(OPT_ARG), DEFAULT(TRUE), NO_MUTEX_GUARD,
+       NOT_IN_BINLOG, ON_CHECK(binlog_order_commits_check), ON_UPDATE(0));
 
 static Sys_var_ulong Sys_bulk_insert_buff_size(
        "bulk_insert_buffer_size", "Size of tree cache used in bulk "

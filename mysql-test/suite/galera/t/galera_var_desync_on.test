@@ -38,12 +38,12 @@ SET SESSION wsrep_sync_wait = 0;
 # No updates have arrived after the FLUSH TABLES
 SELECT COUNT(*) = 1 FROM t1;
 
-# Resync the slave
-SET GLOBAL wsrep_desync = FALSE;
 --disable_query_log
 --eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';
 --enable_query_log
 UNLOCK TABLES;
+# Resync the slave
+SET GLOBAL wsrep_desync = FALSE;
 
 SET SESSION wsrep_sync_wait = 1;
 # The slave is now fully caught up

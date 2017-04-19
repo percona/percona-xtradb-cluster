@@ -126,7 +126,7 @@ To set up the cluster:
 
    To check the cluster size, run the following command:
 
-   .. code-block:: mysql
+   .. code-block:: bash
 
     $ mysql -h127.0.0.1 -P6000 -e "show global status like 'wsrep_cluster_size';"
     +--------------------+-------+

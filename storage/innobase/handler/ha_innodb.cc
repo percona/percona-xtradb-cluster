@@ -4694,6 +4694,15 @@ innobase_create_zip_dict(
 		case DB_DUPLICATE_KEY:
 			result = HA_CREATE_ZIP_DICT_ALREADY_EXISTS;
 			break;
+		case DB_OUT_OF_MEMORY:
+			result = HA_CREATE_ZIP_DICT_OUT_OF_MEMORY;
+			break;
+		case DB_OUT_OF_FILE_SPACE:
+			result = HA_CREATE_ZIP_DICT_OUT_OF_FILE_SPACE;
+			break;
+		case DB_TOO_MANY_CONCURRENT_TRXS:
+			result = HA_CREATE_ZIP_DICT_TOO_MANY_CONCURRENT_TRXS;
+			break;
 		default:
 			ut_ad(0);
 			result = HA_CREATE_ZIP_DICT_UNKNOWN_ERROR;
@@ -4730,6 +4739,15 @@ innobase_drop_zip_dict(
 		case DB_ROW_IS_REFERENCED:
 			result = HA_DROP_ZIP_DICT_IS_REFERENCED;
 			break;
+		case DB_OUT_OF_MEMORY:
+			result = HA_DROP_ZIP_DICT_OUT_OF_MEMORY;
+			break;
+		case DB_OUT_OF_FILE_SPACE:
+			result = HA_DROP_ZIP_DICT_OUT_OF_FILE_SPACE;
+			break;
+		case DB_TOO_MANY_CONCURRENT_TRXS:
+			result = HA_DROP_ZIP_DICT_TOO_MANY_CONCURRENT_TRXS;
+			break;
 		default:
 			ut_ad(0);
 			result = HA_DROP_ZIP_DICT_UNKNOWN_ERROR;
@@ -4746,14 +4764,14 @@ innobase_commit_low(
 {
 #ifdef WITH_WSREP
 	THD* thd = (THD*)trx->mysql_thd;
-	const char* tmp = 0;
 	if (wsrep_on((void*)thd)) {
 		char info[64];
 		info[sizeof(info) - 1] = '\0';
 		snprintf(info, sizeof(info) - 1,
 			 "innobase_commit_low (%lld)",
 			 (long long) wsrep_thd_trx_seqno(thd));
-		tmp = thd_proc_info(thd, info);
+		wsrep_set_thd_proc_info(thd, info);
+		thd_proc_info(thd, wsrep_get_thd_proc_info(thd));
 	}
 #endif /* WITH_WSREP */
 	if (trx_is_started(trx)) {
@@ -4761,9 +4779,6 @@ innobase_commit_low(
 		trx_commit_for_mysql(trx);
 	}
 	trx->will_lock = 0;
-#ifdef WITH_WSREP
-	if (wsrep_on((void*)thd)) { thd_proc_info(thd, tmp); }
-#endif /* WITH_WSREP */
 }
 
 /*****************************************************************//**
@@ -17852,7 +17867,7 @@ ha_innobase::external_lock(
 
 		if (UNIV_UNLIKELY(trx->take_stats)) {
 			increment_thd_innodb_stats(thd,
-						   (unsigned long long) trx->id,
+						   static_cast<unsigned long long>(trx->id ? trx->id : trx->id_saved),
 						   trx->io_reads,
 						   trx->io_read,
 						   trx->io_reads_wait_timer,
@@ -17860,6 +17875,7 @@ ha_innobase::external_lock(
 						   trx->innodb_que_wait_timer,
 						   trx->distinct_page_access);
 
+			trx->id_saved = 0;
 			trx->io_reads = 0;
 			trx->io_read = 0;
 			trx->io_reads_wait_timer = 0;
@@ -19412,11 +19428,16 @@ and SYS_ZIP_DICT_COLS for all columns marked with
 COLUMN_FORMAT_TYPE_COMPRESSED flag and updates
 zip_dict_name / zip_dict_data for those which have associated
 compression dictionaries.
-@param thd Thread handle, used to determine whether it is necessary
-to lock dict_sys mutex
+
+@param	thd		Thread handle, used to determine whether it is
+			necessary to lock dict_sys mutex
+@param	part_name	Full table name (including partition part).
+			Must be non-NULL only if called from
+			ha_partition.
 */
 void
-ha_innobase::update_field_defs_with_zip_dict_info(THD* thd)
+ha_innobase::update_field_defs_with_zip_dict_info(THD* thd,
+	const char *part_name)
 {
 	DBUG_ENTER("update_field_defs_with_zip_dict_info");
 
@@ -19424,7 +19445,9 @@ ha_innobase::update_field_defs_with_zip_dict_info(THD* thd)
 	innodb_session_t* innodb_session = thd_to_innodb_session(thd);
 	bool dict_locked = innodb_session->is_dict_mutex_locked();
 
-	normalize_table_name(norm_name, table_share->normalized_path.str);
+	normalize_table_name(norm_name,
+		part_name != 0 ? part_name :
+			table_share->normalized_path.str);
 
 	DBUG_EXECUTE_IF("ib_purge_virtual_index_callback",
 		dict_locked = false; );
@@ -20838,17 +20861,17 @@ innodb_buffer_pool_evict_uncompressed(void)
 			ut_ad(block->page.in_LRU_list);
 
 			mutex_enter(&block->mutex);
+			all_evicted = buf_LRU_free_page(&block->page, false);
 
-			if (!buf_LRU_free_page(&block->page, false)) {
-
-				mutex_exit(&block->mutex);
-				all_evicted = false;
-			} else {
+			if (all_evicted) {
 
 				mutex_enter(&buf_pool->LRU_list_mutex);
-			}
+				block = UT_LIST_GET_LAST(buf_pool->unzip_LRU);
+			} else {
 
-			block = prev_block;
+				mutex_exit(&block->mutex);
+				block = prev_block;
+			}
 		}
 
 		mutex_exit(&buf_pool->LRU_list_mutex);

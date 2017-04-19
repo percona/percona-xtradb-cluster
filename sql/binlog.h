@@ -113,7 +113,12 @@ public:
       @retval true The queue was empty before this operation.
       @retval false The queue was non-empty before this operation.
     */
+    /** Append a linked list of threads to the queue */
+#ifdef WITH_WSREP
+    bool append(THD *first, bool interim_commit=false);
+#else
     bool append(THD *first);
+#endif /* WITH_WSREP */
 
     /**
        Fetch the entire queue for a stage.
@@ -943,7 +948,6 @@ public:
   mysql_mutex_t* get_binlog_end_pos_lock() { return &LOCK_binlog_end_pos; }
   void lock_binlog_end_pos() { mysql_mutex_lock(&LOCK_binlog_end_pos); }
   void unlock_binlog_end_pos() { mysql_mutex_unlock(&LOCK_binlog_end_pos); }
-  void set_status_variables(THD *thd);
 
   /**
     Deep copy global_sid_map to @param sid_map and
@@ -961,6 +965,8 @@ public:
       @retval !=0    Error
   */
   int get_gtid_executed(Sid_map *sid_map, Gtid_set *gtid_set);
+private:
+  void publish_coordinates_for_global_status(void) const;
 };
 
 typedef struct st_load_file_info

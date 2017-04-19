@@ -214,6 +214,9 @@ extern "C" void wsrep_handle_fatal_signal(int sig);
 
 extern "C" void wsrep_thd_set_next_trx_id(THD *thd);
 
+extern "C" void wsrep_set_thd_proc_info(THD* thd, const char* str);
+extern "C" const char* wsrep_get_thd_proc_info(THD* thd);
+
 extern "C" void wsrep_thd_auto_increment_variables(THD*,
                                                    unsigned long long *offset,
                                                    unsigned long long *increment);
@@ -311,9 +314,14 @@ enum wsrep_trx_status {
 
 extern enum wsrep_trx_status
 wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all);
+
+extern enum wsrep_trx_status wsrep_replicate(THD *thd);
+extern enum wsrep_trx_status wsrep_pre_commit(THD *thd);
+
 class Ha_trx_info;
 struct THD_TRANS;
 void wsrep_register_hton(THD* thd, bool all);
+void wsrep_interim_commit(THD* thd);
 void wsrep_post_commit(THD* thd, bool all);
 void wsrep_brute_force_killer(THD *thd);
 int  wsrep_hire_brute_force_killer(THD *thd, uint64_t trx_id);

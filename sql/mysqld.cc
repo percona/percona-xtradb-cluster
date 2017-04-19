@@ -2638,7 +2638,7 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
       if (WSREP_ON)
       {
         pxc_maint_mode= PXC_MAINT_MODE_SHUTDOWN;
-        WSREP_INFO("Recieved shutdown signal. Will sleep for %lu secs"
+        WSREP_INFO("Received shutdown signal. Will sleep for %lu secs"
                    " before initiating shutdown. pxc_maint_mode switched"
                    " to SHUTDOWN", pxc_maint_transition_period);
         sleep(pxc_maint_transition_period);
@@ -5496,6 +5496,22 @@ int mysqld_main(int argc, char **argv)
 
   my_init_signals();
 
+#ifndef EMBEDDED_LIBRARY
+  // Move connection handler initialization after the signal handling has been
+  // set up. Percona Server threadpool constructor is heavy, and creates a
+  // timer thread. If done before my_init_signals(), this thread will have
+  // the default signal mask, breaking SIGTERM etc. handing.
+  // This is not a problem with upstream loadable thread scheduler plugins, as
+  // its constructor is light and actual initialization is done later.
+  // This bit should be reverted once Percona Server threadpool becomes a
+  // plugin.
+  if (Connection_handler_manager::init())
+  {
+    sql_print_error("Could not allocate memory for connection handling");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+#endif
+
   size_t guardize= 0;
 #ifndef _WIN32
   int retval= pthread_attr_getguardsize(&connection_attrib, &guardize);
@@ -7113,6 +7129,7 @@ extern "C" void *start_wsrep_THD(void *arg)
   /* handle_one_connection() again... */
   //thd->version= refresh_version;
   thd->proc_info= 0;
+  memset(thd->wsrep_info, 0, sizeof(thd->wsrep_info));
   thd->set_command(COM_SLEEP);
   thd->init_for_queries();
 
@@ -9235,13 +9252,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
                                   &global_datetime_format))
     return 1;
 
-#ifndef EMBEDDED_LIBRARY
-  if (Connection_handler_manager::init())
-  {
-    sql_print_error("Could not allocate memory for connection handling");
-    return 1;
-  }
-#endif
   if (Global_THD_manager::create_instance())
   {
     sql_print_error("Could not allocate memory for thread handling");
@@ -10395,8 +10405,11 @@ PSI_stage_info stage_wsrep_rolling_back = { 0, "wsrep: rolling back", 0};
 PSI_stage_info stage_wsrep_rolled_back = { 0, "wsrep: rolled back", 0};
 
 PSI_stage_info stage_wsrep_replicating_commit = { 0, "wsrep: replicating commit", 0};
+PSI_stage_info stage_wsrep_write_set_replicated= { 0, "wsrep: write-set replicated", 0};
 PSI_stage_info stage_wsrep_waiting_on_replaying = { 0, "wsrep: waiting on replaying", 0};
+PSI_stage_info stage_wsrep_replicate = { 0, "wsrep: in replicate stage", 0};
 PSI_stage_info stage_wsrep_pre_commit = { 0, "wsrep: in pre-commit stage", 0};
+PSI_stage_info stage_wsrep_pre_commit_cert_passed = { 0, "wsrep: pre-commit/certification passed", 0};
 
 PSI_stage_info stage_wsrep_preparing_for_TO_isolation = { 0, "wsrep: preparing for TO isolation", 0};
 PSI_stage_info stage_wsrep_completed_TO_isolation = { 0, "wsrep: completed TO isolation", 0};
@@ -10543,8 +10556,11 @@ PSI_stage_info *wsrep_server_stages[]=
 
   // wsrep_hton
   & stage_wsrep_replicating_commit,
+  & stage_wsrep_write_set_replicated,
   & stage_wsrep_waiting_on_replaying,
+  & stage_wsrep_replicate,
   & stage_wsrep_pre_commit,
+  & stage_wsrep_pre_commit_cert_passed,
 
   // wsrep_mysqld
   & stage_wsrep_preparing_for_TO_isolation,

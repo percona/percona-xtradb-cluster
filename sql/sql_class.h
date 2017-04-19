@@ -3359,6 +3359,7 @@ public:
   wsrep_gtid_t              wsrep_sync_wait_gtid;
   ulong                     wsrep_affected_rows;
   bool                      wsrep_sst_donor;
+  bool                      wsrep_void_applier_trx;
   void*                     wsrep_gtid_event_buf;
   ulong                     wsrep_gtid_event_buf_len;
   bool                      wsrep_replicate_GTID;

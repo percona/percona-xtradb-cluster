@@ -262,7 +262,7 @@ The following extra options can be used:
   
    To check the configuration you can run:
 
-   .. code-block:: mysql
+   .. code-block:: text
 
      mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
      +--------------+-----------+-------+--------+---------+
@@ -292,7 +292,7 @@ The following extra options can be used:
 
      mysql --user=proxysql_user --password=*****  --host=127.0.0.1 --port=6033 --protocol=tcp 
 
-   .. code-block:: mysql
+   .. code-block:: text
 
      mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
      +--------------+-----------+-------+--------+-----------+
@@ -422,7 +422,7 @@ with default credentials:
 
 To see the ProxySQL databases and tables use the following commands:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SHOW DATABASES;
   +-----+---------+-------------------------------+
@@ -435,7 +435,7 @@ To see the ProxySQL databases and tables use the following commands:
   +-----+---------+-------------------------------+
   4 rows in set (0.00 sec)
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SHOW TABLES;
   +--------------------------------------+
@@ -490,7 +490,7 @@ insert corresponding records into the ``mysql_servers`` table.
 This example adds three |PXC| nodes to the default hostgroup (``0``),
 which receives both write and read traffic:
 
-.. code-block:: mysql
+.. code-block:: text
 
    mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.61',3306);
    mysql@proxysql> INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (0,'192.168.70.62',3306);
@@ -498,7 +498,7 @@ which receives both write and read traffic:
 
 To see the nodes:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT * FROM mysql_servers;
 
@@ -520,14 +520,14 @@ and configure the user in ProxySQL.
 
 The following example shows how to add a monitoring user on Node 2:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@pxc2> CREATE USER 'proxysql'@'%' IDENTIFIED BY 'ProxySQLPa55';
   mysql@pxc2> GRANT USAGE ON *.* TO 'proxysql'@'%';
 
 The following example shows how to configure this user on the ProxySQL node:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> UPDATE global_variables SET variable_value='proxysql'
                 WHERE variable_name='mysql-monitor_username';
@@ -539,7 +539,7 @@ To save these changes to disk
 (ensuring that they persist after ProxySQL shuts down),
 issue a ``SAVE`` command.
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> LOAD MYSQL VARIABLES TO RUNTIME;
   mysql@proxysql> SAVE MYSQL VARIABLES TO DISK;
@@ -547,7 +547,7 @@ issue a ``SAVE`` command.
 To ensure that monitoring is enabled,
 check the monitoring logs:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start DESC LIMIT 6;
   +---------------+------+------------------+----------------------+---------------+
@@ -562,7 +562,7 @@ check the monitoring logs:
   +---------------+------+------------------+----------------------+---------------+
   6 rows in set (0.00 sec)
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start DESC LIMIT 6;
   +---------------+------+------------------+-------------------+------------+
@@ -582,7 +582,7 @@ and ping the nodes you added.
 
 To enable monitoring of these nodes, load them at runtime:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> LOAD MYSQL SERVERS TO RUNTIME;
 
@@ -596,7 +596,7 @@ to manage connections.
 
 To add a user, insert credentials into ``mysql_users`` table:
 
-.. code-block:: mysql
+.. code-block:: text
 
    mysql@proxysql> INSERT INTO mysql_users (username,password) VALUES ('sbuser','sbpass');
    Query OK, 1 row affected (0.00 sec)
@@ -607,7 +607,7 @@ To add a user, insert credentials into ``mysql_users`` table:
 
 Load the user into runtime space:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
 
@@ -633,7 +633,7 @@ To confirm that the user has been set up correctly, you can try to log in:
 To provide read/write access to the cluster for ProxySQL,
 add this user on one of the |PXC| nodes:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@pxc3> CREATE USER 'sbuser'@'192.168.70.64' IDENTIFIED BY 'sbpass';
   Query OK, 0 rows affected (0.01 sec)
@@ -655,7 +655,7 @@ To use this script, load it into ProxySQL
 The following example shows how you can load the script
 for default ProxySQL configuration:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> INSERT INTO scheduler(id,interval_ms,filename,arg1,arg2,arg3,arg4)
     VALUES
@@ -664,14 +664,14 @@ for default ProxySQL configuration:
 
 To load the scheduler changes into the runtime space:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> LOAD SCHEDULER TO RUNTIME;
 
 To make sure that the script has been loaded,
 check the :table:`runtime_scheduler` table:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT * FROM runtime_scheduler\G
   *************************** 1. row ***************************
@@ -687,7 +687,7 @@ check the :table:`runtime_scheduler` table:
 
 To check the status of available nodes, run the following command:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
   +--------------+---------------+------+--------+
@@ -742,7 +742,7 @@ You can install ``sysbench`` from Percona software repositories:
 
 1. Create the database that will be used for testing on one of the |PXC| nodes:
 
-   .. code-block:: mysql
+   .. code-block:: text
 
      mysql@pxc1> CREATE DATABASE sbtest;
 
@@ -770,7 +770,7 @@ You can install ``sysbench`` from Percona software repositories:
 
 ProxySQL stores collected data in the ``stats`` schema:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SHOW TABLES FROM stats;
   +--------------------------------+
@@ -787,7 +787,7 @@ ProxySQL stores collected data in the ``stats`` schema:
 
 For example, to see the number of commands that run on the cluster:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT * FROM stats_mysql_commands_counters;
   +-------------------+---------------+-----------+-----------+-----------+---------+---------+----------+----------+-----------+-----------+--------+--------+---------+----------+
@@ -824,7 +824,7 @@ or not synced with the cluster.
 
 You can check the status of all available nodes by running:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
   +--------------+---------------+------+--------+
@@ -845,7 +845,7 @@ To test problem detection and fail-over mechanism, shut down Node 3:
 ProxySQL will detect that the node is down and update its status to
 ``OFFLINE_SOFT``:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
   +--------------+---------------+------+--------------+
@@ -866,7 +866,7 @@ Now start Node 3 again:
 The script will detect the change and mark the node as
 ``ONLINE``:
 
-.. code-block:: mysql
+.. code-block:: text
 
   mysql@proxysql> SELECT hostgroup_id,hostname,port,status FROM mysql_servers;
   +--------------+---------------+------+--------+
