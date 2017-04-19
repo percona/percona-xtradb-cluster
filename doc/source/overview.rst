@@ -55,15 +55,13 @@ with links to details for every step:
    is performed automatically, it is a good idea to ensure
    that changes on one node actually replicate to other nodes.
 
-ProxySQL for High Availability
-==============================
+#. :ref:`Install ProxySQL <load_balancing_with_proxysql>`.
 
-Consider installing ProxySQL_ on client nodes for efficient workload management
-across the cluster without any changes to the applications
-that generate queries.
-This is the recommended high-availability solution for |PXC|.
-
-For more information, see :ref:`load_balancing_with_proxysql`.
+   To complete the deployment of the cluster,
+   a high-availability proxy is required.
+   We recommend installing ProxySQL_ on client nodes
+   for efficient workload management across the cluster
+   without any changes to the applications that generate queries.
 
 Percona Monitoring and Management
 =================================
