@@ -49,3 +49,29 @@ log_file_size_1 : WSREP: innodb_read_only is not supported
 xa_recovery : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 flush-hang : Unsafe statement written to the binary log
 innodb_deadlock_with_autoinc : Test uses autoinc_lock_mode = 0
+update_time : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+alter_kill : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb-index-debug : OPTIMIZE takes precedence over INSERT
+innodb-alter-debug-wl6554 : ALTER takes precedence over INSERT
+bulk_create_index_online : ALTER takes precedence over INSERT
+high_prio_trx_1 : query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+high_prio_trx_3 :  query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+high_prio_trx_4 :  query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+high_prio_trx_7 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+high_prio_trx_debug : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+high_prio_trx_fk : query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
+innodb-ac-non-locking-select : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb-read-view : Test hangs
+innodb-wl6742 : Result content mismatch, MW-374
+innodb_bug59641 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb_wl6915 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+innodb_wl6915_debug : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+partition : Wrong handler commit counter value
+virtual_debug : 1213: Deadlock found when trying to get lock; try restarting transaction
+xa_recovery_debug : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
+table_encrypt_kill : Server fails to restart
+virtual_debug_purge : 1213: Deadlock found when trying to get lock; try restarting transaction
+create_tablespace_replication : Starts two servers, gcomm bind fails on second
+high_prio_trx_rpl : Starts two servers, gcomm bind fails on second
+innodb-import-partition-rpl : Starts two servers, gcomm bind fails on second
+innodb_bulk_create_index_replication : Starts two servers, gcomm bind fails on second
