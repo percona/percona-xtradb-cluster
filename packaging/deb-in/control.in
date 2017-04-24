@@ -155,7 +155,8 @@ Conflicts: mysql,
  mysql-server-5.7, mysql-server-core-5.7,
  mysql-client-5.7, mysql-client-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- mysql-common (<< 5.7.17)
+ mysql-common (<< 5.7.17), mysql-@DEB_PRODUCTNAME@-common (<< 5.7.17),
+ mysql-@DEB_PRODUCTNAME@-common-5.6, mysql-@DEB_PRODUCTNAME@-common-5.5
 Replaces: mysql,
           mysql-server-5.5, mysql-server-core-5.5, libmysqlclient-dev,
  mysql-server-5.6, mysql-server-core-5.6,
