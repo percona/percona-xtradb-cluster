@@ -45,6 +45,9 @@ shutdown_server;
 # Call script that will poll the server waiting for it to be back online again
 --source include/wait_until_connected_again.inc
 
+# Wait for wsrep
+--source include/wait_wsrep_ready.inc
+
 # Turn off reconnect again
 --disable_reconnect
 

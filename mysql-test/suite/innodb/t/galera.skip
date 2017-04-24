@@ -62,7 +62,6 @@ high_prio_trx_debug : 1235: This version of MySQL doesn't yet support 'XA with w
 high_prio_trx_fk : query 'COMMIT' failed with wrong errno 1213: 'Deadlock found when trying to get lock; try restarting transaction', instead of 1180
 innodb-ac-non-locking-select : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 innodb-read-view : Test hangs
-innodb-wl6742 : Result content mismatch, MW-374
 innodb_bug59641 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 innodb_wl6915 : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
 innodb_wl6915_debug : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'
@@ -75,3 +74,5 @@ create_tablespace_replication : Starts two servers, gcomm bind fails on second
 high_prio_trx_rpl : Starts two servers, gcomm bind fails on second
 innodb-import-partition-rpl : Starts two servers, gcomm bind fails on second
 innodb_bulk_create_index_replication : Starts two servers, gcomm bind fails on second
+innodb-isolation : InnoDB returns different results if binlog is enabled or wsrep provider is loaded
+innodb-truncate-debug : Concurrent DDL with sync points from different connections not compatible with TOI
