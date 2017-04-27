@@ -5860,8 +5860,9 @@ report_error:
 						   user_thd);
 #ifdef WITH_WSREP
 	if (!error_result && wsrep_thd_exec_mode(user_thd) == LOCAL_STATE &&
-	    wsrep_on(user_thd) && !wsrep_consistency_check(user_thd) &&
-	    (sql_command != SQLCOM_LOAD || 
+	    wsrep_on(user_thd) && !wsrep_consistency_check(user_thd)      &&
+	    (sql_command != SQLCOM_CREATE_TABLE)                          &&
+	    (sql_command != SQLCOM_LOAD ||
 	     thd_binlog_format(user_thd) == BINLOG_FORMAT_ROW)) {
 
 		if (wsrep_append_keys(user_thd, false, record, NULL)) {
@@ -12555,8 +12556,10 @@ wsrep_innobase_kill_one_trx(void *bf_thd_ptr, trx_t *bf_trx, trx_t *victim_trx, 
  		    wsrep_thd_thread_id(thd),
 		    victim_trx->id);
 
-	WSREP_DEBUG("Aborting query: %s", 
-		  (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+	WSREP_DEBUG("Aborting query: %s conf %d trx: %lu",
+		    (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void",
+		    wsrep_thd_conflict_state(thd),
+		    wsrep_thd_ws_handle(thd)->trx_id);
 
 	wsrep_thd_LOCK(thd);
 
@@ -12608,9 +12611,8 @@ wsrep_innobase_kill_one_trx(void *bf_thd_ptr, trx_t *bf_trx, trx_t *victim_trx, 
 		} else {
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
-				(wsrep_trx_id_t)victim_trx->id
+				(wsrep_trx_id_t)wsrep_thd_ws_handle(thd)->trx_id
 			);
-			
 			switch (rcode) {
 			case WSREP_WARNING:
 				WSREP_DEBUG("cancel commit warning: %llu",
@@ -12733,9 +12735,10 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 	DBUG_ENTER("wsrep_innobase_abort_thd");
 	trx_t* victim_trx = thd_to_trx(victim_thd);
 	trx_t* bf_trx     = (bf_thd) ? thd_to_trx(bf_thd) : NULL;
-	WSREP_DEBUG("abort transaction: BF: %s victim: %s", 
+	WSREP_DEBUG("abort transaction: BF: %s victim: %s victim conf: %d",
 		    wsrep_thd_query(bf_thd),
-		    wsrep_thd_query(victim_thd));
+		    wsrep_thd_query(victim_thd),
+		    wsrep_thd_conflict_state(victim_thd));
 
 	if (victim_trx)
 	{
@@ -12787,6 +12790,7 @@ wsrep_fake_trx_id(
 	mutex_enter(&kernel_mutex);
 	trx_id_t trx_id = trx_sys_get_new_trx_id();
 	mutex_exit(&kernel_mutex);
+	WSREP_DEBUG("innodb fake trx id: %lu thd: %s", trx_id, wsrep_thd_query(thd));
 
 	(void *)wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd), trx_id);
 }
