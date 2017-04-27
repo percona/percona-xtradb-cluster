@@ -316,8 +316,8 @@ Description: Percona XtraDB Cluster 5.7 source
 Package: percona-xtradb-cluster-garbd-5.7
 Architecture: any
 Provides: garbd-3, garbd3
-Conflicts: garbd-2, percona-xtradb-cluster-garbd-2.x, garbd2, percona-galera-arbitrator-3
-Replaces: percona-galera-arbitrator-3, galera-garbd-57-3.x
+Conflicts: garbd-2, percona-xtradb-cluster-garbd-2.x, garbd2, percona-galera-arbitrator-3, percona-xtradb-cluster-garbd-3.x
+Replaces: percona-galera-arbitrator-3, galera-garbd-57-3.x, percona-xtradb-cluster-garbd-3.x
 Depends: ${shlibs:Depends}, ${misc:Depends}, netcat-openbsd
 Description: Garbd components of Percona XtraDB Cluster
  This package contains the garbd of Percona XtraDB Cluster.
