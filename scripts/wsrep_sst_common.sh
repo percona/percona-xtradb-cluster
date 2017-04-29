@@ -99,6 +99,44 @@ readonly WSREP_SST_OPT_BYPASS
 readonly WSREP_SST_OPT_BINLOG
 readonly WSREP_SST_OPT_CONF_SUFFIX
 
+
+#
+# user can specify xtrabackup specific settings that will be used during sst
+# process like encryption, etc.....
+# parse such configuration option. (group for xb settings is [sst] in my.cnf
+#
+# 1st param: group : name of the config file section, e.g. mysqld
+# 2nd param: var : name of the variable in the section, e.g. server-id
+# 3rd param: - : default value for the param
+parse_cnf()
+{
+    local group=$1
+    local var=$2
+    local reval=""
+
+    # print the default settings for given group using my_print_default.
+    # normalize the variable names specified in cnf file (user can use _ or - for example log-bin or log_bin)
+    # then grep for needed variable
+    # finally get the variable value (if variables has been specified multiple time use the last value only)
+
+    # look in group+suffix
+    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+    fi
+
+    # look in group
+    if [[ -z $reval ]]; then
+        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+    fi
+
+    # use default if we haven't found a value
+    if [[ -z $reval ]]; then
+        [[ -n $3 ]] && reval=$3
+    fi
+    echo $reval
+}
+
+
 # try to use my_print_defaults, mysql and mysqldump that come with the sources
 # (for MTR suite)
 SCRIPTS_DIR="$(cd $(dirname "$0"); pwd -P)"
@@ -157,11 +195,26 @@ else
     SST_PROGRESS_FILE=""
 fi
 
+# Determine the timezone to use for error logging
+LOGGING_TZ=$(parse_cnf mysqld log-timestamps "")
+if [ -z "$LOGGING_TZ" ]; then
+    LOGGING_TZ=$(parse_cnf mysqld log_timestamps "")
+fi
+if [ -z "$LOGGING_TZ" ]; then
+    LOGGING_TZ="UTC"
+fi
+# Set the options to the 'date' command based on the timezone
+if [[ "$LOGGING_TZ" == "SYSTEM" ]]; then
+    LOG_DATE_COMMAND="+%Y-%m-%dT%H:%M:%S.%6N%:z"
+else
+    LOG_DATE_COMMAND="-u +%Y-%m-%dT%H:%M:%S.%6NZ"
+fi
+
 wsrep_log()
 {
     # echo everything to stderr so that it gets into common error log
     # deliberately made to look different from the rest of the log
-    local readonly tst="$(date +%Y%m%d\ %H:%M:%S.%N | cut -b -21)"
+    local readonly tst="$(date $LOG_DATE_COMMAND)"
     echo -e "\t$tst WSREP_SST: $*" >&2
 }
 
@@ -216,38 +269,3 @@ wsrep_check_programs()
     return $ret
 }
 
-#
-# user can specify xtrabackup specific settings that will be used during sst
-# process like encryption, etc.....
-# parse such configuration option. (group for xb settings is [sst] in my.cnf
-#
-# 1st param: group : name of the config file section, e.g. mysqld
-# 2nd param: var : name of the variable in the section, e.g. server-id
-# 3rd param: - : default value for the param
-parse_cnf()
-{
-    local group=$1
-    local var=$2
-    local reval=""
-
-    # print the default settings for given group using my_print_default.
-    # normalize the variable names specified in cnf file (user can use _ or - for example log-bin or log_bin)
-    # then grep for needed variable
-    # finally get the variable value (if variables has been specified multiple time use the last value only)
-
-    # look in group+suffix
-    if [[ -n $WSREP_SST_OPT_CONF_SUFFIX ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF "${group}${WSREP_SST_OPT_CONF_SUFFIX}" | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
-    fi
-
-    # look in group
-    if [[ -z $reval ]]; then
-        reval=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
-    fi
-
-    # use default if we haven't found a value
-    if [[ -z $reval ]]; then
-        [[ -n $3 ]] && reval=$3
-    fi
-    echo $reval
-}
