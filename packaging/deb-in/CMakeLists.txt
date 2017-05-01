@@ -326,4 +326,27 @@ ENDFOREACH()
 EXECUTE_PROCESS(
   COMMAND chmod +x ${CMAKE_BINARY_DIR}/debian/rules
 )
+IF(DEB_PRODUCTNAME STREQUAL "wsrep")
+FILE(APPEND "${CMAKE_BINARY_DIR}/debian/control" "
+Package: mysql-common
+Architecture: any
+Pre-depends: debconf (>= 0.2.17),
+             \${misc:Pre-Depends}
+Multi-Arch: foreign
+Depends: \${misc:Depends},
+         \${shlibs:Depends},
+         mysql-wsrep-common-5.6
+Description: MySQL Common
+ The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
+ and robust SQL (Structured Query Language) database server. MySQL Server
+ is intended for mission-critical, heavy-load production systems as well
+ as for embedding into mass-deployed software. MySQL is a trademark of
+ Oracle. This package contains common files needed by MySQL client
+ library and the MySQL database server.
+ This package is a dummy replacement for the case when using mysql WSREP
+ implementation to satisfy dependencies of other packages
+ like libmysqlclient18
+")
+ENDIF()
+
 
