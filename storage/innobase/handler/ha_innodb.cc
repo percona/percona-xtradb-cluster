@@ -11627,7 +11627,8 @@ ha_innobase::wsrep_append_keys(
 
 			/* !hasPK == table with no PK, 
                            must append all non-unique keys */
-			if (!hasPK || key_info->flags & HA_NOSAME ||
+			if ((!hasPK && wsrep_certify_nonPK) ||
+				key_info->flags & HA_NOSAME ||
 			    ((tab && wsrep_is_FK_index(tab, idx)) ||
 			     (!tab && referenced_by_foreign_key()))) {
 
