@@ -160,7 +160,7 @@ wsrep_log()
 {
     # echo everything to stderr so that it gets into common error log
     # deliberately made to look different from the rest of the log
-    local readonly tst="$(date +%Y%m%d\ %H:%M:%S.%N | cut -b -21)"
+    local readonly tst="$(date +%Y-%m-%d\ %H:%M:%S)"
     echo "WSREP_SST: $* ($tst)" >&2
 }
 
