@@ -8,13 +8,17 @@ SHOW STATUS LIKE 'wsrep_flow_control_interval';
 Variable_name	Value
 wsrep_flow_control_interval	[ 141, 141 ]
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=100';
-SHOW STATUS LIKE 'wsrep_flow_control_interval';
+SHOW STATUS LIKE 'wsrep_flow_control_interval%';
 Variable_name	Value
 wsrep_flow_control_interval	[ 141, 141 ]
+wsrep_flow_control_interval_low	141
+wsrep_flow_control_interval_high	141
 SET GLOBAL wsrep_provider_options = 'gcs.fc_factor=0.5';
-SHOW STATUS LIKE 'wsrep_flow_control_interval';
+SHOW STATUS LIKE 'wsrep_flow_control_interval%';
 Variable_name	Value
 wsrep_flow_control_interval	[ 71, 141 ]
+wsrep_flow_control_interval_low	71
+wsrep_flow_control_interval_high	141
 SHOW STATUS LIKE 'wsrep_flow_control_status';
 Variable_name	Value
 wsrep_flow_control_status	OFF
