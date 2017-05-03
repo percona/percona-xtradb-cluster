@@ -5410,38 +5410,6 @@ static int exec_relay_log_event(THD* thd, Relay_log_info* rli)
       if (ev->get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT &&
           ev->get_type_code() != binary_log::ROWS_QUERY_LOG_EVENT)
       {
-#ifdef WITH_WSREP
-        if (ev->get_type_code() == binary_log::GTID_LOG_EVENT &&
-            WSREP_ON && !wsrep_preordered_opt)
-        {
-          assert (!thd->wsrep_applier);
-          if (thd->wsrep_gtid_event_buf)
-          {
-            WSREP_WARN("Pending to replicate MySQL GTID event"
-                       " (probably a stale event). Discarding it now.");
-            my_free((uchar*)thd->wsrep_gtid_event_buf);
-            thd->wsrep_gtid_event_buf     = NULL;
-            thd->wsrep_gtid_event_buf_len = 0;
-          }
-
-          ulong len= thd->wsrep_gtid_event_buf_len=
-            uint4korr(ev->temp_buf + EVENT_LEN_OFFSET);
-          thd->wsrep_gtid_event_buf= (void*)my_realloc(
-              key_memory_wsrep,
-              thd->wsrep_gtid_event_buf,
-              thd->wsrep_gtid_event_buf_len,
-              MYF(0));
-          if (!thd->wsrep_gtid_event_buf)
-          {
-            WSREP_WARN("GTID event allocation for slave failed");
-            thd->wsrep_gtid_event_buf_len= 0;
-          }
-          else
-          {
-            memcpy(thd->wsrep_gtid_event_buf, ev->temp_buf, len);
-          }
-        }
-#endif /* WITH_WSREP */
         DBUG_PRINT("info", ("Deleting the event after it has been executed"));
         delete ev;
         ev= NULL;

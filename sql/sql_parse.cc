@@ -4529,6 +4529,10 @@ end_with_restore_list:
   {
     List<set_var_base> *lex_var_list= &lex->var_list;
 
+#ifdef WITH_WSREP
+    ulong cached_pxc_maint_mode= pxc_maint_mode;
+#endif /* WITH_WSREP */
+
     if ((check_table_access(thd, SELECT_ACL, all_tables, FALSE, UINT_MAX, FALSE)
          || open_and_lock_tables(thd, all_tables, 0)))
       goto error;
@@ -4545,6 +4549,16 @@ end_with_restore_list:
         my_error(ER_WRONG_ARGUMENTS,MYF(0),"SET");
       goto error;
     }
+
+#ifdef WITH_WSREP
+    if (cached_pxc_maint_mode != pxc_maint_mode
+        && pxc_maint_mode == PXC_MAINT_MODE_MAINTENANCE)
+    {
+      WSREP_INFO ("Sleep for %lu secs while switching to maintenance mode",
+                  pxc_maint_transition_period);
+      sleep(pxc_maint_transition_period);
+    }
+#endif /* WITH_WSREP */
 
     break;
   }
