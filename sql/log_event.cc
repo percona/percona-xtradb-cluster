@@ -13353,6 +13353,44 @@ bool Gtid_log_event::write_data_header(IO_CACHE *file)
 #endif // MYSQL_SERVER
 
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
+
+#ifdef WITH_WSREP
+/* Starting 5.7 gtid event is not logged to binary log and so this event
+needs to be captured so that PXC can append it as part of write-set. */
+static void wsrep_capture_gtid_event(THD* thd, Gtid_log_event* ev)
+{
+  /* GTID events are also processed by applier but avoid capturing
+  them then. GTID events are captured only as part of async slave
+  replication. */
+  if (WSREP_ON && !wsrep_preordered_opt && !thd->wsrep_applier)
+  {
+    if (thd->wsrep_gtid_event_buf)
+    {
+      WSREP_WARN("Pending to replicate MySQL GTID event"
+                 " (probably a stale event). Discarding it now.");
+      my_free((uchar*)thd->wsrep_gtid_event_buf);
+      thd->wsrep_gtid_event_buf     = NULL;
+      thd->wsrep_gtid_event_buf_len = 0;
+    }
+
+    ulong len= thd->wsrep_gtid_event_buf_len=
+      uint4korr(ev->temp_buf + EVENT_LEN_OFFSET);
+
+    thd->wsrep_gtid_event_buf= (void*)my_realloc(
+      key_memory_wsrep, thd->wsrep_gtid_event_buf,
+      thd->wsrep_gtid_event_buf_len, MYF(0));
+
+    if (!thd->wsrep_gtid_event_buf)
+    {
+      WSREP_WARN("GTID event allocation for slave failed");
+      thd->wsrep_gtid_event_buf_len= 0;
+    }
+    else
+      memcpy(thd->wsrep_gtid_event_buf, ev->temp_buf, len);
+  }
+}
+#endif /* WITH_WSREP */
+
 int Gtid_log_event::do_apply_event(Relay_log_info const *rli)
 {
   DBUG_ENTER("Gtid_log_event::do_apply_event");
@@ -13413,6 +13451,10 @@ int Gtid_log_event::do_apply_event(Relay_log_info const *rli)
     DBUG_RETURN(1);
 
   thd->set_currently_executing_gtid_for_slave_thread();
+
+#ifdef WITH_WSREP
+  wsrep_capture_gtid_event(thd, this);
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(0);
 }

@@ -1008,12 +1008,5 @@ bool pxc_maint_mode_check(sys_var *self, THD* thd, set_var* var)
 
 bool pxc_maint_mode_update(sys_var *self, THD* thd, enum_var_type type)
 {
-   if (pxc_maint_mode == PXC_MAINT_MODE_MAINTENANCE)
-   {
-     WSREP_INFO ("Sleep for %lu secs while switching to maintenance mode",
-                  pxc_maint_transition_period);
-     sleep(pxc_maint_transition_period);
-   }
-
    return false;
 }

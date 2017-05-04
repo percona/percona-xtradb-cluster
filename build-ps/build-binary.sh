@@ -302,7 +302,7 @@ export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 export DEBIAN_VERSION="$(lsb_release -sc)"
 echo $DEBIAN_VERSION
-if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && [[ "$DEBIAN_VERSION" == "yakkety" ]]; then
+if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && ([[ "$DEBIAN_VERSION" == "yakkety" ]] || [[ "$DEBIAN_VERSION" == "zesty" ]]); then
     export CFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
     export CXXFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
 fi
