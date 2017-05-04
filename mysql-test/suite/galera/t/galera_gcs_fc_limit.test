@@ -27,10 +27,10 @@ SELECT COUNT(*) = 1 FROM t1;
 SHOW STATUS LIKE 'wsrep_flow_control_interval';
 
 SET GLOBAL wsrep_provider_options = 'gcs.fc_limit=100';
-SHOW STATUS LIKE 'wsrep_flow_control_interval';
+SHOW STATUS LIKE 'wsrep_flow_control_interval%';
 
 SET GLOBAL wsrep_provider_options = 'gcs.fc_factor=0.5';
-SHOW STATUS LIKE 'wsrep_flow_control_interval';
+SHOW STATUS LIKE 'wsrep_flow_control_interval%';
 
 --disable_query_log
 --eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig';

@@ -3,6 +3,9 @@ INSERT INTO t1 VALUES (1, 'a'), (2, 'a'), (3, 'a'), (4, 'a'), (5, 'a'),(6, 'a');
 SHOW STATUS LIKE 'wsrep_ist_%';
 Variable_name	Value
 wsrep_ist_receive_status	
+wsrep_ist_receive_seqno_start	0
+wsrep_ist_receive_seqno_current	0
+wsrep_ist_receive_seqno_end	0
 Unloading wsrep provider ...
 SET GLOBAL wsrep_provider = 'none';
 UPDATE t1 SET f2 = 'b' WHERE f1 > 1;
@@ -13,6 +16,9 @@ Loading wsrep_provider ...
 SHOW STATUS LIKE 'wsrep_ist_%';
 Variable_name	Value
 wsrep_ist_receive_status	100% complete, received seqno 4 of 3-4
+wsrep_ist_receive_seqno_start	3
+wsrep_ist_receive_seqno_current	4
+wsrep_ist_receive_seqno_end	4
 SHOW STATUS LIKE 'wsrep_debug_sync_waiters';
 Variable_name	Value
 wsrep_debug_sync_waiters	recv_IST_after_apply_trx
@@ -27,6 +33,9 @@ Using --wsrep-start-position when starting mysqld ...
 SHOW STATUS LIKE 'wsrep_ist_%';
 Variable_name	Value
 wsrep_ist_receive_status	
+wsrep_ist_receive_seqno_start	0
+wsrep_ist_receive_seqno_current	0
+wsrep_ist_receive_seqno_end	0
 UPDATE t1 SET f2 = 'f' WHERE f1 > 5;
 SELECT * FROM t1;
 f1	f2
