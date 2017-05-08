@@ -526,10 +526,6 @@ read_cnf()
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
-    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
-    ealgo=$(parse_cnf xtrabackup encrypt "")
-    ekey=$(parse_cnf xtrabackup encrypt-key "")
-    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
 
@@ -552,6 +548,9 @@ read_cnf()
     fi
 
     # Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html
+    ealgo=$(parse_cnf xtrabackup encrypt "")
+    ekey=$(parse_cnf xtrabackup encrypt-key "")
+    ekeyfile=$(parse_cnf xtrabackup encrypt-key-file "")
     if [[ -z $ealgo ]]; then
         ealgo=$(parse_cnf sst encrypt-algo "")
         ekey=$(parse_cnf sst encrypt-key "")
@@ -611,6 +610,27 @@ read_cnf()
     # Setup # of threads (if not already specified)
     if ! [[ "$iopts" =~ --parallel= ]]; then
         iopts+=" --parallel=4"
+    fi
+
+    # Buildup the list of files to keep in the datadir
+    # (These files will not be REMOVED on the joiner node)
+    cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
+
+    # Keep the donor's keyring file
+    cpat+="\|.*/${XB_DONOR_KEYRING_FILE}$"
+
+    # Keep the KEYRING_DIR if it is a subdir of the datadir
+    # Normalize the datadir for comparison
+    local readonly DATA_TEMP=$(dirname "$DATA/xxx")
+    if [[ -n "$KEYRING_DIR" && "$KEYRING_DIR" != "$DATA_TEMP" && "$KEYRING_DIR/" =~ $DATA ]]; then
+
+        # Add the path to each subdirectory, this will ensure that
+        # the path to the keyring is kept
+        local CURRENT_DIR=$(dirname "$KEYRING_DIR/xx")
+        while [[ $CURRENT_DIR != "." && $CURRENT_DIR != "/" && $CURRENT_DIR != $DATA_TEMP ]]; do
+            cpat+="\|${CURRENT_DIR}$"
+            CURRENT_DIR=$(dirname "$CURRENT_DIR")
+        done
     fi
 
 }
@@ -1411,6 +1431,16 @@ then
     if [[ -n $keyring ]]; then
         # joiner needs to wait to receive the file.
         sleep 3
+
+        # Ensure that the destination directory exists and is R/W by us
+        if [[ ! -d "$KEYRING_DIR" || ! -r "$KEYRING_DIR" || ! -w "$KEYRING_DIR" ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "FATAL: Cannot acccess the keyring directory"
+            wsrep_log_error "  $KEYRING_DIR"
+            wsrep_log_error "It must already exist and be readable/writeable by MySQL"
+            wsrep_log_error "****************************************************** "
+            exit 22
+        fi
 
         XB_DONOR_KEYRING_FILE_PATH="${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
         recv_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 0 2
