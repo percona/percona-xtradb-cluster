@@ -1,0 +1,13 @@
+RESET MASTER;
+ERROR 42000: RESET MASTER not allowed when node is in cluster
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+DROP TABLE t1;
+SET GLOBAL WSREP_ON=OFF;
+RESET MASTER;
+SET GLOBAL WSREP_ON=ON;
+SHOW BINARY LOGS;
+Log_name	File_size
+mysqld-bin.000001	151
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+mysqld-bin.000001	120	Previous_gtids	1	151	

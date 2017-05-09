@@ -1,0 +1,28 @@
+#
+# MW-362 RESET MASTER initializes GTID sequence only in master node
+#
+
+--source include/galera_cluster.inc
+--source include/have_binlog_format_row.inc
+
+# Running RESET MASTER on a live cluster results in an error
+
+--error 1148
+RESET MASTER;
+
+# But is allowed if WSREP_ON=OFF;
+
+# Put some events in binary log
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+DROP TABLE t1;
+
+SET GLOBAL WSREP_ON=OFF;
+--error 0
+RESET MASTER;
+SET GLOBAL WSREP_ON=ON;
+
+# The CREATE above is no longer in the binlog
+
+SHOW BINARY LOGS;
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 120;
+

@@ -2161,7 +2161,17 @@ int reset_master(THD* thd)
                ER(ER_FLUSH_MASTER_BINLOG_CLOSED), MYF(ME_BELL+ME_WAITTANG));
     return 1;
   }
-
+#ifdef WITH_WSREP
+  if (WSREP_ON && gtid_mode > 0)
+  {
+    /* RESET MASTER will initialize GTID sequence, and that would happen locally
+       in this node, so better reject it
+    */
+    my_message(ER_NOT_ALLOWED_COMMAND,
+               "RESET MASTER not allowed when node is in cluster", MYF(0));
+    return 1;
+  }
+#endif
   if (mysql_bin_log.reset_logs(thd))
     return 1;
   (void) RUN_HOOK(binlog_transmit, after_reset_master, (thd, 0 /* flags */));
