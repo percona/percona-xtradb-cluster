@@ -25,7 +25,7 @@ WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
-WSREP_LOG_DEBUG=0
+WSREP_LOG_DEBUG=""
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -136,6 +136,38 @@ parse_cnf()
     echo $reval
 }
 
+#
+# Converts an input string into a boolean "on", "off"
+# Converts:
+#   "on", "true", "1" -> "on" (case insensitive)
+#   "off", "false", "0" -> "off" (case insensitive)
+# All other values : -> default_value
+#
+# 1st param: input value
+# 2nd param: default value
+normalize_boolean()
+{
+    local input_value=$1
+    local default_value=$2
+    local return_value=$default_value
+
+    if [[ "$input_value" == "1" ]]; then
+        return_value="on"
+    elif [[ "$input_value" =~ ^[Oo][Nn]$ ]]; then
+        return_value="on"
+    elif [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]; then
+        return_value="on"
+    elif [[ "$input_value" == "0" ]]; then
+        return_value="off"
+    elif [[ "$input_value" =~ ^[Oo][Ff][Ff]$ ]]; then
+        return_value="off"
+    elif [[ "$input_value" =~ ^[Ff][Aa][Ll][Ss][Ee]$ ]]; then
+        return_value="off"
+    fi
+
+    echo $return_value
+}
+
 
 # try to use my_print_defaults, mysql and mysqldump that come with the sources
 # (for MTR suite)
@@ -194,6 +226,23 @@ then
 else
     SST_PROGRESS_FILE=""
 fi
+
+
+WSREP_LOG_DEBUG=$(parse_cnf sst wsrep_debug "")
+if [ -z "$WSREP_LOG_DEBUG" ]; then
+    WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-debug "")
+fi
+if [ -z "$WSREP_LOG_DEBUG" ]; then
+    WSREP_LOG_DEBUG=$(parse_cnf mysqld wsrep_debug "")
+fi
+if [ -z "$WSREP_LOG_DEBUG" ]; then
+    WSREP_LOG_DEBUG=$(parse_cnf mysqld wsrep-debug "")
+fi
+WSREP_LOG_DEBUG=$(normalize_boolean "$WSREP_LOG_DEBUG" "off")
+if [[ "$WSREP_LOG_DEBUG" == "off" ]]; then
+    WSREP_LOG_DEBUG=""
+fi
+
 
 # Determine the timezone to use for error logging
 LOGGING_TZ=$(parse_cnf mysqld log-timestamps "")
