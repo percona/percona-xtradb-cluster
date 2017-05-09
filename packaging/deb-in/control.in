@@ -34,8 +34,7 @@ Description: MySQL Server meta package depending on latest version
 
 Package: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@
 Architecture: any
-Pre-depends: adduser,
-             debconf (>= 0.2.17)
+Pre-depends: debconf (>= 0.2.17), adduser
 Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
          mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}),
          perl,
@@ -44,24 +43,30 @@ Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version})
          socat,
          ${misc:Depends},
          ${shlibs:Depends}
-Breaks: mysql-common (<< 5.7.17)
+Breaks: mysql-common (<< 5.7.17), mysql-@DEB_PRODUCTNAME@-client (<< 5.7)
 Conflicts: mysql,
  mysql-server-5.0, mysql-server-core-5.0,
  mysql-server-5.1, mysql-server-core-5.1,
  mysql-server-5.5, mysql-server-core-5.5,
  mysql-server-5.6, mysql-server-core-5.6,
  mysql-server-5.7, mysql-server-core-5.7,
- mysql-@DEB_NOTPRODUCTNAME@-server
+ mysql-@DEB_NOTPRODUCTNAME@-server,
+ @DEB_CONTROL_SERVER_CONFLICT_NDB@,
+ mariadb-server-5.5, mariadb-server-core-5.5,
+ mariadb-server-10.0, mariadb-server-core-10.0,
+ mariadb-server-10.1, mariadb-server-core-10.1,
+ mariadb-server-10.2, mariadb-server-core-10.2
 Replaces: mysql,
  mysql-server-5.0, mysql-server-core-5.0,
  mysql-server-5.1, mysql-server-core-5.1,
  mysql-server-5.5, mysql-server-core-5.5,
  mysql-server-5.6, mysql-server-core-5.6,
  mysql-server-5.7, mysql-server-core-5.7,
+ mysql-@DEB_PRODUCTNAME@-client (<< 5.7),
  mysql-@DEB_NOTPRODUCTNAME@-server,
+ @DEB_CONTROL_SERVER_CONFLICT_NDB@,
  mysql-common (<< 5.7.17)
-Provides: virtual-mysql-server,
-          virtual-mysql-server-core
+Provides: virtual-mysql-server, virtual-mysql-server-core
 Description: MySQL Server
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -95,7 +100,12 @@ Conflicts: mysql,
  mysql-client-5.5, mysql-client-core-5.5,
  mysql-client-5.6, mysql-client-core-5.6,
  mysql-client-5.7, mysql-client-core-5.7,
- mysql-@DEB_NOTPRODUCTNAME@-client
+ mysql-@DEB_NOTPRODUCTNAME@-client,
+ @DEB_CONTROL_CLIENT_CONFLICT_NDB@,
+ mariadb-client-5.5, mariadb-client-core-5.5,
+ mariadb-client-10.0, mariadb-client-core-10.0,
+ mariadb-client-10.1, mariadb-client-core-10.1,
+ mariadb-client-10.2, mariadb-client-core-10.2
 Replaces: mysql,
  mysql-client-5.0, mysql-client-core-5.0,
  mysql-client-5.1, mysql-client-core-5.1,
@@ -103,6 +113,7 @@ Replaces: mysql,
  mysql-client-5.6, mysql-client-core-5.6,
  mysql-client-5.7, mysql-client-core-5.7,
  mysql-@DEB_NOTPRODUCTNAME@-client,
+ @DEB_CONTROL_CLIENT_CONFLICT_NDB@,
  mysql-common (<< 5.7.17),
  libmysqlclient-dev (<< 5.7.17)
 Provides: virtual-mysql-client,
@@ -144,7 +155,8 @@ Conflicts: mysql,
  mysql-server-5.7, mysql-server-core-5.7,
  mysql-client-5.7, mysql-client-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- mysql-common (<< 5.7.17)
+ mysql-common (<< 5.7.17), mysql-@DEB_PRODUCTNAME@-common (<< 5.7.17),
+ mysql-@DEB_PRODUCTNAME@-common-5.6, mysql-@DEB_PRODUCTNAME@-common-5.5
 Replaces: mysql,
           mysql-server-5.5, mysql-server-core-5.5, libmysqlclient-dev,
  mysql-server-5.6, mysql-server-core-5.6,
@@ -208,7 +220,8 @@ Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.7.17),
         mysql-@DEB_PRODUCTNAME@-client (<< 5.7.17)
 Conflicts: mysql,
  mysql-testsuite-5.0, mysql-testsuite-5.1, mysql-testsuite-5.5,
- mysql-testsuite-5.6, mysql-testsuite-5.7, mysql-@DEB_NOTPRODUCTNAME@-test
+ mysql-testsuite-5.6, mysql-testsuite-5.7, mysql-@DEB_NOTPRODUCTNAME@-test,
+ mariadb-test, mariadb-test-data
 Description: MySQL Test Run MTR - The MySQL testsuite
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -227,3 +240,5 @@ Description: MySQL source
  is intended for mission-critical, heavy-load production systems as well
  as for embedding into mass-deployed software. MySQL is a trademark of
  Oracle.
+
+@DEB_NDB_CONTROL_EXTRAS@
