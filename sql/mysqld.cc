@@ -866,9 +866,7 @@ bool mysqld_embedded=0;
 bool mysqld_embedded=1;
 #endif
 
-#ifndef EMBEDDED_LIBRARY
 static my_bool plugins_are_initialized= FALSE;
-#endif
 
 #ifndef DBUG_OFF
 static const char* default_dbug_option;
@@ -1219,7 +1217,9 @@ private:
 static void close_connections(void)
 {
   DBUG_ENTER("close_connections");
+#ifdef WITH_WSREP
   WSREP_DEBUG("close_connections");
+#endif /* WITH_WSREP */
   (void) RUN_HOOK(server_state, before_server_shutdown, (NULL));
 
   Per_thread_connection_handler::kill_blocked_pthreads();
@@ -6438,17 +6438,6 @@ static int show_thread_id_count(THD *thd, SHOW_VAR *var, char *buff)
                             get_thread_id());
   return 0;
 }
-#ifndef EMBEDDED_LIBRARY
-static int show_aborted_connects(THD *thd, SHOW_VAR *var, char *buff)
-{
-  var->type= SHOW_LONG;
-  var->value= buff;
-  long *value= reinterpret_cast<long*>(buff);
-  *value= static_cast<long>(Connection_handler_manager::get_instance()->
-                            aborted_connects());
-  return 0;
-}
-
 #ifdef WITH_WSREP
 /*
   like init_slave_thread(), rpl_slave.cc
@@ -6792,6 +6781,17 @@ void wsrep_kill_mysql(THD *thd)
   }
 }
 #endif /* WITH_WSREP */
+
+#ifndef EMBEDDED_LIBRARY
+static int show_aborted_connects(THD *thd, SHOW_VAR *var, char *buff)
+{
+  var->type= SHOW_LONG;
+  var->value= buff;
+  long *value= reinterpret_cast<long*>(buff);
+  *value= static_cast<long>(Connection_handler_manager::get_instance()->
+                            aborted_connects());
+  return 0;
+}
 
 static int show_connection_errors_max_connection(THD *thd, SHOW_VAR *var,
                                                  char *buff)

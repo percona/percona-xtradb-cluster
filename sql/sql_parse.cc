@@ -3154,10 +3154,12 @@ mysql_execute_command(THD *thd, bool first_level)
   case SQLCOM_SHOW_PROFILE:
   case SQLCOM_SELECT:
   {
+#ifdef WITH_WSREP
     if (lex->sql_command == SQLCOM_SELECT)
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ)
     else
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW)
+#endif /* WITH_WSREP */
     DBUG_EXECUTE_IF("use_attachable_trx",
                     thd->begin_attachable_ro_transaction(););
 
