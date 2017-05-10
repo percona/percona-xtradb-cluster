@@ -1925,7 +1925,8 @@ extern "C" void unireg_abort(int exit_code)
     wsrep->disconnect(wsrep);
     WSREP_INFO("Service disconnected.");
     wsrep_close_threads(thd); /* this won't close all threads */
-    sleep(1); /* so give some time to exit for those which can */
+    WSREP_INFO("Waiting to close threads......");
+    sleep(5); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
   }
 #endif // WITH_WSREP
