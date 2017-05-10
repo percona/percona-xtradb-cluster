@@ -1,15 +1,29 @@
-Source: mysql-@DEB_PRODUCTNAME@
-Maintainer: MySQL Release Engineering <mysql-build@oss.oracle.com>
+Source: mysql-@DEB_PRODUCTNAME@@DEB_PRODUCTSERIES@
+Maintainer: Codership Oy <info@codership.com>
 Section: database
 Priority: optional
 Standards-Version: 3.9.6
-Homepage: http://www.mysql.com/
-Build-Depends: debhelper (>= 9.0.0), libaio-dev[linux-any], libncurses5-dev (>= 5.0-6), perl, zlib1g-dev (>= 1:1.1.3-5), po-debconf, psmisc, bison, lsb-release, cmake, fakeroot, libnuma-dev, @DEB_CONTROL_BDEPS@
+Homepage: http://galeracluster.com/
+Build-Depends: bison,
+               cmake,
+               debhelper (>= 9.0.0),
+               fakeroot,
+               libaio-dev[linux-any],
+               libmecab-dev,
+               libncurses5-dev (>= 5.0-6),
+               libnuma-dev,
+               lsb-release,
+               perl,
+               po-debconf,
+               psmisc,
+               zlib1g-dev (>= 1:1.1.3-5),
+               @DEB_CONTROL_BDEPS@
 
 
 Package: mysql-server
 Architecture: any
-Depends: mysql-@DEB_PRODUCTNAME@-server (= ${binary:Version}), ${misc:Depends}
+Depends: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         ${misc:Depends}
 Description: MySQL Server meta package depending on latest version
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -18,19 +32,25 @@ Description: MySQL Server meta package depending on latest version
  Oracle. This is a meta package that depends on the latest mysql server
  package available in the repository.
 
-Package: mysql-@DEB_PRODUCTNAME@-server
+Package: mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@
 Architecture: any
 Pre-depends: debconf (>= 0.2.17), adduser
-Depends: mysql-common (>= ${binary:Version}), mysql-client (= ${binary:Version}), perl, psmisc,
- ${shlibs:Depends}, ${misc:Depends}
-Breaks: mysql-common (<< 5.6.36)
+Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         perl,
+         psmisc,
+         rsync,
+         socat,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Breaks: mysql-common (<< 5.6.35), mysql-@DEB_PRODUCTNAME@-client (<< 5.6)
 Conflicts: mysql,
  mysql-server-5.0, mysql-server-core-5.0,
  mysql-server-5.1, mysql-server-core-5.1,
  mysql-server-5.5, mysql-server-core-5.5,
  mysql-server-5.6, mysql-server-core-5.6,
- mysql-server-5.7, mysql-server-core-5.7,
  mysql-@DEB_NOTPRODUCTNAME@-server,
+ @DEB_CONTROL_SERVER_CONFLICT_NDB@,
  mariadb-server-5.5, mariadb-server-core-5.5,
  mariadb-server-10.0, mariadb-server-core-10.0,
  mariadb-server-10.1, mariadb-server-core-10.1,
@@ -40,9 +60,10 @@ Replaces: mysql,
  mysql-server-5.1, mysql-server-core-5.1,
  mysql-server-5.5, mysql-server-core-5.5,
  mysql-server-5.6, mysql-server-core-5.6,
- mysql-server-5.7, mysql-server-core-5.7,
+ mysql-@DEB_PRODUCTNAME@-client (<< 5.6),
  mysql-@DEB_NOTPRODUCTNAME@-server,
- mysql-common (<< 5.6.36)
+ @DEB_CONTROL_SERVER_CONFLICT_NDB@,
+ mysql-common (<< 5.6.35)
 Provides: virtual-mysql-server, virtual-mysql-server-core
 Description: MySQL Server
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
@@ -54,7 +75,8 @@ Description: MySQL Server
 
 Package: mysql-client
 Architecture: any
-Depends: mysql-@DEB_PRODUCTNAME@-client (= ${binary:Version}), ${misc:Depends}
+Depends: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         ${misc:Depends}
 Description: MySQL Client meta package depending on latest version
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -63,18 +85,20 @@ Description: MySQL Client meta package depending on latest version
  Oracle. This is a meta package that depends on the latest mysql client
  package available in the repository.
 
-Package: mysql-@DEB_PRODUCTNAME@-client
+Package: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@
 Architecture: any
-Depends: mysql-common (>= ${binary:Version}),
- ${shlibs:Depends}, ${misc:Depends}
-Breaks: mysql-common (<< 5.6.36), libmysqlclient-dev (<< 5.6.36)
+Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
+Breaks: libmysqlclient-dev (<< 5.6.35),
+        mysql-common (<< 5.6.35)
 Conflicts: mysql,
  mysql-client-5.0, mysql-client-core-5.0,
  mysql-client-5.1, mysql-client-core-5.1,
  mysql-client-5.5, mysql-client-core-5.5,
  mysql-client-5.6, mysql-client-core-5.6,
- mysql-client-5.7, mysql-client-core-5.7,
  mysql-@DEB_NOTPRODUCTNAME@-client,
+ @DEB_CONTROL_CLIENT_CONFLICT_NDB@,
  mariadb-client-5.5, mariadb-client-core-5.5,
  mariadb-client-10.0, mariadb-client-core-10.0,
  mariadb-client-10.1, mariadb-client-core-10.1,
@@ -84,11 +108,12 @@ Replaces: mysql,
  mysql-client-5.1, mysql-client-core-5.1,
  mysql-client-5.5, mysql-client-core-5.5,
  mysql-client-5.6, mysql-client-core-5.6,
- mysql-client-5.7, mysql-client-core-5.7,
  mysql-@DEB_NOTPRODUCTNAME@-client,
- mysql-common (<< 5.6.36),
- libmysqlclient-dev (<< 5.6.36)
-Provides: virtual-mysql-client, virtual-mysql-client-core
+ @DEB_CONTROL_CLIENT_CONFLICT_NDB@,
+ mysql-common (<< 5.6.35),
+ libmysqlclient-dev (<< 5.6.35)
+Provides: virtual-mysql-client,
+          virtual-mysql-client-core
 Description: MySQL Client
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -102,8 +127,9 @@ Architecture: any
 Section: libs
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
-Depends: mysql-common (>= ${binary:Version}),
- ${shlibs:Depends}, ${misc:Depends}
+Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: MySQL shared client libraries
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -112,22 +138,26 @@ Description: MySQL shared client libraries
  Oracle. This package contains the shared libraries for MySQL client
  applications.
 
-Package: mysql-common
+Package: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@
 Architecture: any
-Pre-depends: debconf (>= 0.2.17), ${misc:Pre-Depends}
+Pre-depends: debconf (>= 0.2.17),
+             ${misc:Pre-Depends}
 Multi-Arch: foreign
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Conflicts: mysql, mysql-server-5.6, mysql-server-core-5.6,
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
+Conflicts: mysql,
+           mysql-server-5.6, mysql-server-core-5.6,
  mysql-client-5.6, mysql-client-core-5.6,
  mysql-server-5.7, mysql-server-core-5.7,
  mysql-client-5.7, mysql-client-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- mysql-common (<< 5.6.36)
-Replaces: mysql, mysql-server-5.5, mysql-server-core-5.5, libmysqlclient-dev,
+ mysql-common (<< 5.6.35), mysql-@DEB_PRODUCTNAME@-common (<< 5.6.35),
+ mysql-@DEB_PRODUCTNAME@-common-5.6, mysql-@DEB_PRODUCTNAME@-common-5.5
+Replaces: mysql,
+          mysql-server-5.5, mysql-server-core-5.5, libmysqlclient-dev,
  mysql-server-5.6, mysql-server-core-5.6,
- mysql-server-5.7, mysql-server-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- mysql-common (<< 5.6.36)
+ mysql-common (<< 5.6.35)
 Provides: mysql-common
 Description: MySQL Common
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
@@ -135,14 +165,14 @@ Description: MySQL Common
  is intended for mission-critical, heavy-load production systems as well
  as for embedding into mass-deployed software. MySQL is a trademark of
  Oracle. This package contains common files needed by MySQL client
- library, MySQL database server, and MySQL embedded server.
+ library and the MySQL database server.
 
 Package: libmysqlclient-dev
 Architecture: any
 Section: libdevel
 Depends: libmysqlclient18 (= ${binary:Version}),
- ${shlibs:Depends}, ${misc:Depends}
-Replaces: mysql-client-5.6, mysql-client-core-5.6,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: MySQL development headers
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -151,21 +181,17 @@ Description: MySQL development headers
  Oracle. This package contains the development header files necessary
  to develop MySQL client applications.
 
-Package: libmysqld-dev
+Package: mysql-@DEB_PRODUCTNAME@@DEB_PRODUCTSERIES@
 Architecture: any
-Section: libdevel
-Depends: libmysqlclient-dev (= ${binary:Version}),
- ${shlibs:Depends}, ${misc:Depends}
-Description: MySQL embedded server library
- The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
- and robust SQL (Structured Query Language) database server. MySQL Server
- is intended for mission-critical, heavy-load production systems as well
- as for embedding into mass-deployed software. MySQL is a trademark of
- Oracle. This package contains the MySQL server as an embedded library.
+Depends: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         ${misc:Depends}
+Description: Metapackage that installs mysql-wsrep client and server packages.
 
 Package: mysql-testsuite
 Architecture: any
-Depends: mysql-@DEB_PRODUCTNAME@-test (= ${binary:Version}), ${misc:Depends}
+Depends: mysql-@DEB_PRODUCTNAME@-test@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         ${misc:Depends}
 Description: MySQL Testsuite meta package depending on latest version
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -174,16 +200,19 @@ Description: MySQL Testsuite meta package depending on latest version
  Oracle. This is a meta package that depends on the latest mysql test
  package available in the repository.
 
-Package: mysql-@DEB_PRODUCTNAME@-test
+Package: mysql-@DEB_PRODUCTNAME@-test@DEB_PRODUCTSERIES@
 Architecture: any
-Depends: mysql-@DEB_PRODUCTNAME@-server (= ${binary:Version}),
- mysql-@DEB_PRODUCTNAME@-client (= ${binary:Version}), python,
- libmysqlclient-dev, ${shlibs:Depends}, ${misc:Depends}
-Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.6.36),
- mysql-@DEB_PRODUCTNAME@-client (<< 5.6.36)
+Depends: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+         libmysqlclient-dev,
+         python,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.6.35),
+        mysql-@DEB_PRODUCTNAME@-client (<< 5.6.35)
 Conflicts: mysql,
  mysql-testsuite-5.0, mysql-testsuite-5.1, mysql-testsuite-5.5,
- mysql-testsuite-5.6, mysql-testsuite-5.7, mysql-@DEB_NOTPRODUCTNAME@-test,
+ mysql-testsuite-5.6, mysql-@DEB_NOTPRODUCTNAME@-test,
  mariadb-test, mariadb-test-data
 Description: MySQL Test Run MTR - The MySQL testsuite
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
@@ -193,24 +222,15 @@ Description: MySQL Test Run MTR - The MySQL testsuite
  Oracle. This package contains the MySQL regression test suite for MySQL
  database server.
 
-Package: mysql-@DEB_PRODUCTNAME@-bench
+Package: mysql-@DEB_PRODUCTNAME@-source@DEB_PRODUCTSERIES@
 Architecture: any
-Depends: mysql-@DEB_PRODUCTNAME@-server (= ${binary:Version}),
- ${shlibs:Depends}, ${misc:Depends}
-Conflicts: mysql, mysql-@DEB_NOTPRODUCTNAME@-bench
-Description: MySQL Bench
- The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
- and robust SQL (Structured Query Language) database server. MySQL Server
- is intended for mission-critical, heavy-load production systems as well
- as for embedding into mass-deployed software. MySQL is a trademark of
- Oracle.
-
-Package: mysql-@DEB_PRODUCTNAME@-source
-Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
 Description: MySQL source
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
  is intended for mission-critical, heavy-load production systems as well
  as for embedding into mass-deployed software. MySQL is a trademark of
  Oracle.
+
+@DEB_NDB_CONTROL_EXTRAS@

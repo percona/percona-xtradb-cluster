@@ -20,18 +20,22 @@
 take_upstart_job_backup () {
 	if [ -e "/etc/init/mysql.conf" ] && [ -d "/var/lib/mysql" ];
 	then
-				mysql_install_db --user=mysql > /dev/null
 		mv /etc/init/mysql.conf /var/lib/mysql/.mysql.conf.backup
 	fi
 }
 
+# Choose the proper mechanism. Ubuntu 16.04 uses systemd but still provides invoke-rc.d,
+# so the existence of systemd must be checked first.
 invoke() {
-	if pathfind invoke-rc.d; then
-		invoke-rc.d mysql
+	if pathfind systemctl; then
+		systemctl $1 "@DEB_SYSTEMD_SERVICE_NAME@"
+	elif pathfind invoke-rc.d; then
+		invoke-rc.d mysql $1
 	else
 		/etc/init.d/mysql $1
 	fi
 }
+
 case "$1" in
 	configure)
 
@@ -63,13 +67,19 @@ case "$1" in
 				PASSWD=$(printf %q "${PASSWD}")
 				cat << EOF > ${SQL}
 USE mysql;
-UPDATE user SET password=PASSWORD('${PASSWD}') WHERE user='root';
-DELETE FROM user WHERE user='';
-FLUSH PRIVILEGES;
+ALTER user 'root'@'localhost' IDENTIFIED BY '${PASSWD}';
+SHUTDOWN;
 EOF
 				PASSWD=""
+			else
+				cat << EOF > ${SQL}
+USE mysql;
+INSTALL PLUGIN auth_socket SONAME 'auth_socket.so';
+ALTER USER 'root'@'localhost' IDENTIFIED WITH 'auth_socket';
+SHUTDOWN;
+EOF
 			fi
-			mysql_install_db --user=mysql > /dev/null
+			mysqld --initialize-insecure --user=mysql > /dev/null
 			run_init_sql "$SQL"
 			rm -f "$SQL"
 		fi

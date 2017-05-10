@@ -13,17 +13,17 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-usr/bin/mysql_config
-usr/include/mysql/*.h
-usr/include/mysql/mysql/*.h
-usr/include/mysql/mysql/*.h.pp
-usr/include/mysql/mysql/psi/*.h
-usr/lib/*/libmysqlclient.a
-usr/lib/*/libmysqlclient.so
-usr/lib/*/libmysqlservices.a
-usr/lib/*/pkgconfig/mysqlclient.pc
-usr/share/aclocal/mysql.m4
-usr/share/man/man1/mysql_config.1
+# configuration file and script
+debian/extra/conf.d  etc/mysql/
+debian/extra/configure-symlinks usr/share/mysql-common/
+debian/extra/my.cnf.fallback etc/mysql/
+
+usr/share/mysql/docs/ChangeLog
+usr/share/mysql/docs/INFO_SRC
+usr/share/mysql/docs/INFO_BIN
+# charsets
+usr/share/mysql/charsets/*.xml
+usr/share/mysql/charsets/README
 # legal
-usr/share/doc/libmysqlclient-dev/@DEB_INSTALL_LICENSEFILE@
-usr/share/doc/libmysqlclient-dev/README
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/README

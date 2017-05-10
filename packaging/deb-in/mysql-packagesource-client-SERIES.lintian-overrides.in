@@ -13,3 +13,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
+# Additional license file is needed so overriding this warning
+mysql-@DEB_PRODUCTNAME@-client: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-client/LICENSE.mysql
+mysql-@DEB_PRODUCTNAME@-client: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-clienti/@DEB_INSTALL_LICENSEFILE@.gz
+mysql-@DEB_PRODUCTNAME@-client: copyright-should-refer-to-common-license-file-for-lgpl
+# Due to static linking this cannot be avoided and hence being overridden
+mysql-@DEB_PRODUCTNAME@-client: embedded-library
