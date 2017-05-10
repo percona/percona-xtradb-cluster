@@ -49,6 +49,10 @@ public:
   Do_THD_Impl();
   virtual ~Do_THD_Impl() {}
   virtual void operator()(THD*) = 0;
+#ifdef WITH_WSREP
+  virtual void reset() {}
+  virtual bool done(int) { return(true); }
+#endif /* WITH_WSREP */
 };
 
 
@@ -216,6 +220,15 @@ public:
     get_thd_count to become zero.
   */
   void wait_till_no_thd();
+
+#ifdef WITH_WSREP
+  /**
+    Waits until total wsrep thd count fails below the set threshold.
+    wsrep thd to considered is filtered using func functor.
+  */
+  void wait_till_wsrep_thd_eq(Do_THD_Impl* func, int threshold_count);
+#endif /* WITH_WSREP */
+
 
   /**
     This function calls func() for all thds in thd list after

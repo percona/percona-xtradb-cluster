@@ -80,6 +80,7 @@ SET GLOBAL wsrep_sst_receive_address = 'AUTO';
 DROP TABLE t1;
 DROP USER sst;
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
 CALL mtr.add_suppression("`innodb_index_stats` not found");
 CALL mtr.add_suppression("`innodb_table_stats` not found");
