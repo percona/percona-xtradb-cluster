@@ -712,6 +712,10 @@ trx_disconnect_prepared(trx_t*	trx)
 void
 trx_free_for_mysql(trx_t*	trx)
 {
+#ifdef WITH_WSREP
+	/* for sanity, this may not have been cleared yet */
+	trx->wsrep_killed_by_query = 0;
+#endif /* WITH_WSREP */
 	trx_disconnect_plain(trx);
 	trx_free_for_background(trx);
 }
