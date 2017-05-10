@@ -1423,7 +1423,8 @@ extern "C" void unireg_abort(int exit_code)
     wsrep_wait_appliers_close(NULL);
     WSREP_INFO("Service disconnected.");
 
-    sleep(3); /* so give some time to exit for those which can */
+    WSREP_INFO("Waiting to close threads......");
+    sleep(5); /* so give some time to exit for those which can */
     WSREP_INFO("Some threads may fail to exit.");
   }
 #endif // WITH_WSREP
