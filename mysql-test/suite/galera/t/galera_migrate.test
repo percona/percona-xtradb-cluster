@@ -212,6 +212,7 @@ DROP USER sst;
 
 --connection node_3
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("WSREP: Pending to replicate MySQL GTID event.*");
 
 --connection node_4a
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");

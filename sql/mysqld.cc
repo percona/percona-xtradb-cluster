@@ -1200,7 +1200,7 @@ public:
 
   virtual void operator()(THD *thd)
   {
-    if (WSREP(thd) && thd->wsrep_applier)
+    if (thd->wsrep_applier)
     {
       WSREP_DEBUG("Closing applier thread %u", thd->thread_id());
       mysql_mutex_lock(&thd->LOCK_thd_data);
@@ -1258,6 +1258,33 @@ public:
 private:
   enum wsrep_thd_type m_type;
   bool is_server_shutdown;
+};
+
+class Count_wsrep_applier_threads : public Do_THD_Impl
+{
+public:
+  Count_wsrep_applier_threads()
+    : m_count()
+  {}
+
+  void reset()
+  {
+    m_count= 0;
+  }
+
+  bool done(int threshold_count)
+  {
+    return(m_count <= threshold_count);
+  }
+
+  virtual void operator()(THD* killing_thd)
+  {
+    if (killing_thd->wsrep_applier)
+      m_count++;
+  }
+
+private:
+  int  m_count;
 };
 #endif /* WITH_WSREP */
 
@@ -7232,7 +7259,7 @@ static inline bool is_committing_connection(THD *thd)
   return ret;
 }
 
-
+#if 0
 /*
    returns the number of wsrep appliers running.
    However, the caller (thd parameter) is not taken in account
@@ -7246,6 +7273,7 @@ static int have_wsrep_appliers(THD *thd)
   if (tmp) return true;
   return false;
 }
+#endif
 
 static void wsrep_close_thread(THD *thd)
 {
@@ -7334,24 +7362,28 @@ void wsrep_close_applier_threads(int count)
 
 void wsrep_wait_appliers_close(THD *thd)
 {
-  /* Wait for wsrep appliers to gracefully exit */
-  while (have_wsrep_appliers(thd) > 1)
-  // 1 is for rollbacker thread which needs to be killed explicitly.
-  // This gotta be fixed in a more elegant manner if we gonna have arbitrary
-  // number of non-applier wsrep threads.
-  {
-  }
+  WSREP_INFO("Waiting for active wsrep applier to exit");
+
+  /* Wait for wsrep-applier to gracefully exit.
+  There are 2 types of applier: replication thread and rollback threads.
+
+  wsrep disconnect will cause recv function to return there-by causing
+  applier thread to gracefully exit.
+
+  Rollback thread is waiting on condition variable and so it will not
+  gracefully exit at this stage. This means we will have to mark
+  it expliclty below.
+
+  Leaving behind the 1 count for rollback thread */
+
+  Global_THD_manager *thd_manager= Global_THD_manager::get_instance();
+  Count_wsrep_applier_threads count_wsrep_applier_threads;
+  thd_manager->wait_till_wsrep_thd_eq(&count_wsrep_applier_threads, 1);
+
   /* Now kill remaining wsrep threads: rollbacker */
   wsrep_close_threads (thd);
-  /* and wait for them to die */
-  int round=0;
-  while (have_wsrep_appliers(thd) > 0 && round < 5)
-  {
-    WSREP_INFO("Waiting for active wsrep applier to exit");
-    wsrep_close_threads (thd);
-    sleep(1);
-    round++;
-  }
+
+  thd_manager->wait_till_wsrep_thd_eq(&count_wsrep_applier_threads, 0);
 
   /* All wsrep applier threads have now been aborted. However, if this thread
      is also applier, we are still running...
