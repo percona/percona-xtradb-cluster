@@ -16,6 +16,7 @@ Build-Depends: bison,
                perl,
                po-debconf,
                psmisc,
+               quilt,
                zlib1g-dev (>= 1:1.1.3-5),
                @DEB_CONTROL_BDEPS@
 

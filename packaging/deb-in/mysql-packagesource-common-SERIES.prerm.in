@@ -3,6 +3,7 @@ set -e
 
 if [ "$1" = "remove" ]; then
   update-alternatives --remove my.cnf /etc/mysql/my.cnf.fallback
+  update-alternatives --remove my.cnf /etc/mysql/my.cnf.migrated
 fi
 
 #DEBHELPER#

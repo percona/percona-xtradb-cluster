@@ -89,14 +89,6 @@ SET (DEB_PRODUCTNAME "wsrep")
 SET (DEB_PRODUCTNAMEC "Wsrep")
 SET (DEB_PRODUCTSERIES "-5.6")
 
-# For each startup mechanism, files are constant across distro version
-SET (FILES_STARTUP_SYSTEMD
-"
-usr/bin/mysqld_pre_systemd
-usr/bin/mysqld_bootstrap
-lib/systemd/system/mysql@.service
-lib/systemd/system/mysql.service
-")
 SET (FILES_STARTUP_SYSV
 "
 etc/init.d/mysql
@@ -132,39 +124,33 @@ ELSEIF(DEB_CODENAME STREQUAL "jessie")
   # using both SysV init and Systemd, but still no Apparmor.
   SET (DEB_CONTROL_BDEPS "dh-systemd")
   SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
-  SET (DEB_RULES_INSTALL_SYSTEMD
-    "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
+  SET (DEB_RULES_INSTALL_SYSTEMD  "")
   SET (DEB_RULES_INSTALL_APPARMOR "")
   SET (DEB_RULES_APPARMOR_LOAD "")
-  SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --no-enable --name=mysql")
-  SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
-  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
+  SET (DEB_SYSTEMD_SERVICE_NAME "")
+  SET (DEB_RULES_SYSTEMD_ENABLE "")
+  SET (DEB_RULES_SYSTEMD_START "")
+  SET (DEB_INSTALL_SERVER_SYSTEMD "")
   SET (DEB_INSTALL_SERVER_APPARMOR "")
-  SET (DEB_SERVICE_SERVER_EXECPRE
-    "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
-  SET (DEB_SERVICE_SERVER_EXECPOST
-    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
+  SET (DEB_SERVICE_SERVER_EXECPRE "")
+  SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "")
   # Debian 8 comes with both SysV init and Systemd,
   # but "scripts/CMakeLists.txt" enforces an either-or.
-  # SET (DEB_STARTUP "SYSV SYSTEMD")
+  SET (DEB_STARTUP "SYSV SYSTEMD")
   # For now, we go with Systemd only.
-  SET (DEB_STARTUP "SYSTEMD")
 ELSEIF(DEB_CODENAME STREQUAL "stretch")
   SET (DEB_PLATFORMRELEASE "debian9")
   SET (DEB_CONTROL_BDEPS "dh-systemd")
   SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
-  SET (DEB_RULES_INSTALL_SYSTEMD
-    "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
+  SET (DEB_RULES_INSTALL_SYSTEMD "")
   SET (DEB_RULES_INSTALL_APPARMOR "")
   SET (DEB_RULES_APPARMOR_LOAD "")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
-  SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
-  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
+  SET (DEB_RULES_SYSTEMD_ENABLE "")
+  SET (DEB_RULES_SYSTEMD_START "")
+  SET (DEB_INSTALL_SERVER_SYSTEMD "")
   SET (DEB_INSTALL_SERVER_APPARMOR "")
-  SET (DEB_SERVICE_SERVER_EXECPRE
-    "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_SERVICE_SERVER_EXECPRE "")
   SET (DEB_INIT_APPARMOR "")
 ELSEIF(DEB_CODENAME STREQUAL "precise")
   SET (DEB_PLATFORMRELEASE "ubuntu12.04")
@@ -225,21 +211,18 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_PLATFORMRELEASE "ubuntu16.04")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
   SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
-  SET (DEB_RULES_INSTALL_SYSTEMD
-    "install -m 0755 debian/extra/mysql-systemd-start debian/tmp/usr/share/mysql/")
+  SET (DEB_RULES_INSTALL_SYSTEMD "")
   SET (DEB_RULES_INSTALL_APPARMOR
     "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server --profile-name=usr.sbin.mysqld")
-  SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --no-enable --name=mysql")
-  SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
-  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
+  SET (DEB_SYSTEMD_SERVICE_NAME "")
+  SET (DEB_RULES_SYSTEMD_ENABLE "")
+  SET (DEB_RULES_SYSTEMD_START "")
+  SET (DEB_INSTALL_SERVER_SYSTEMD "")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
-  SET (DEB_SERVICE_SERVER_EXECPRE
-    "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
-  SET (DEB_SERVICE_SERVER_EXECPOST
-    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
+  SET (DEB_SERVICE_SERVER_EXECPRE  "")
+  SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
   SET (DEB_STARTUP "SYSTEMD")
 ELSEIF(DEB_CODENAME STREQUAL "yakkety")

@@ -14,6 +14,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 # Additional license file is needed so overriding this warning
-mysql-@DEB_PRODUCTNAME@-server: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-server/LICENSE.mysql
-mysql-@DEB_PRODUCTNAME@-server: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-server/@DEB_INSTALL_LICENSEFILE@.gz
-mysql-@DEB_PRODUCTNAME@-server: copyright-should-refer-to-common-license-file-for-lgpl
+mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/LICENSE.mysql
+mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@.gz
+mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@: copyright-should-refer-to-common-license-file-for-lgpl
+mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@: embedded-library
+

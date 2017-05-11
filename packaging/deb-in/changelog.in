@@ -5,7 +5,8 @@ mysql-@DEB_PRODUCTNAME@@DEB_PRODUCTSERIES@ (@DEB_SERVERVERSION@@DEB_PLATFORMRELE
     ("packaging/deb-in/" from Oracle's 5.7.14,
     adapted to Codership's "mysql-wsrep" needs,
     SysV init files replaced by systemd files)
-    with 5.7.15, to support both 16.04 LTS "Xenial Xerus" and 14.04 LTS "Trusty Tahr".
+    with 5.7.15, to support both 16.04 LTS "Xenial Xerus" and 14.04 LTS
+    "Trusty Tahr".
   * Update to 5.6.36 upstream release
 
  -- Jörg Brühe <joerg.bruehe@fromdual.com>  Tue, 01 Nov 2016 09:45:42 +0100

@@ -83,12 +83,12 @@ override_dh_auto_install:
 	# add debug plugin libraries to package
 	install -m 0644 support-files/wsrep.cnf debian/tmp/usr/share/mysql
 	# SysV init stuff, or Systemd files ? On Debian 8, we need both!
-ifneq (,$(findstring SYSV,@DEB_STARTUP@))
-	install -D -m 0755 support-files/mysql.server debian/tmp/etc/init.d/mysql
-endif
-ifneq (,$(findstring SYSTEMD,@DEB_STARTUP@))
-	install -m 0755 scripts/mysqld_bootstrap debian/tmp/usr/bin/
-endif
+#ifneq (,$(findstring SYSV,@DEB_STARTUP@))
+#	install -D -m 0755 support-files/mysql.server debian/tmp/etc/init.d/mysql
+#endif
+#ifneq (,$(findstring SYSTEMD,@DEB_STARTUP@))
+#	install -m 0755 scripts/mysqld_bootstrap debian/tmp/usr/bin/
+#endif
 	# This seems to be the only safe place to fix permissions issues
 	# not handled by dh_fixperms.
 	# install -m 0755 debian/additions/echo_stderr debian/tmp/usr/share/mysql/
@@ -110,7 +110,7 @@ endif
 	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/mysql-client
 	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@
 	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@
-	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/libmysqlclient20
+	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/libmysqlclient18
 	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/libmysqlclient-dev
 	# install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/libmysqld-dev
 	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/mysql-testsuite
@@ -123,7 +123,7 @@ endif
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-client/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
-	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/libmysqlclient20/@DEB_INSTALL_LICENSEFILE@
+	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/libmysqlclient18/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/libmysqlclient-dev/@DEB_INSTALL_LICENSEFILE@
 	# install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/libmysqld-dev/@DEB_INSTALL_LICENSEFILE@
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ debian/tmp/usr/share/doc/mysql-testsuite/@DEB_INSTALL_LICENSEFILE@
@@ -137,7 +137,7 @@ endif
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-client/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/README
-	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/libmysqlclient20/README
+	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/libmysqlclient18/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/libmysqlclient-dev/README
 	# install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/libmysqld-dev/README
 	install -g root -o root -m 0644 debian/tmp/usr/share/mysql/README debian/tmp/usr/share/doc/mysql-testsuite/README
@@ -154,7 +154,7 @@ override_dh_installinit:
 	@echo "RULES.$@"
 	@DEB_RULES_APPARMOR_LOAD@
 	@DEB_RULES_SYSTEMD_ENABLE@
-	dh_installinit --no-start --name=mysql -- defaults 19 21
+	dh_installinit --name=mysql -- defaults 19 21
 	@DEB_RULES_SYSTEMD_START@
 	touch $@
 
