@@ -341,8 +341,7 @@ This variable is used to control the maximum number of rows
 each writeset can contain.
 
 By default, there is no limit for maximum number of rows in a writeset.
-The maximum allowed value is ``1073741824``,
-which is equal to 2^30 or 1024 * 1024 * 1024.
+The maximum allowed value is ``1048576``.
 
 .. variable:: wsrep_max_ws_size
 
@@ -350,12 +349,12 @@ which is equal to 2^30 or 1024 * 1024 * 1024.
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: ``1073741824`` (2 GB)
+   :default: ``2147483647`` (2 GB)
 
 This variable is used to control maximum writeset size (in bytes).
 Anything bigger than the specified value will be rejected.
 
-You can set it to any value between ``1024`` and the default ``1073741824``.
+You can set it to any value between ``1024`` and the default ``2147483647``.
 
 .. variable:: wsrep_mysql_replication_bundle
 
