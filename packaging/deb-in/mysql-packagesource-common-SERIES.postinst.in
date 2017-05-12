@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-# Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,40 +17,9 @@
 
 set -e
 
-#DEBHELPER#
-
-# This code needs to go after the debhelper snippets so that it runs after
-# dpkg-maintscript-helper rm_conffile on /etc/mysql/my.cnf. As a one off, if
-# my.cnf.dpkg-bak exists after this stage then we rename it to
-# /etc/mysql/my.cnf.migrated, add an explanatory note to the top and add it is
-# a high priority alternative so it gets used in favour of any other my.cnf
-# shipped by variants. The /etc/mysql/my.cnf.migrated file will not be owned by
-# any package (just like /etc/mysql/my.cnf.dpkg-bak would have been) but we
-# rename it since it will be in active use, the user may not expect a .dpkg-bak
-# file to be in use and we do not want to surprise the user.
-
 if [ "$1" = "configure" ]; then
-    # Low priority fallback for client use when no server is installed.
-    update-alternatives --install /etc/mysql/my.cnf my.cnf /etc/mysql/my.cnf.fallback 100
+	# Low priority fallback for client use when no server is installed.
+	update-alternatives --install /etc/mysql/my.cnf my.cnf /etc/mysql/my.cnf.fallback 100
 fi
 
-if [ "$1" = "configure" -a -f /etc/mysql/my.cnf.dpkg-bak ] && dpkg --compare-versions "$2" le "5.6.19-1~exp1ubuntu2~"; then
-    echo "Moving /etc/mysql/my.cnf.dpkg-bak to /etc/mysql/my.cnf.migrated"
-    cat - /etc/mysql/my.cnf.dpkg-bak <<EOT > /etc/mysql/my.cnf.migrated
-# This file has been automatically moved from your previous
-# /etc/mysql/my.cnf, with just this comment added at the top, to maintain MySQL
-# operation using your previously customised configuration.
-
-# To switch to the new packaging configuration for automated management of
-# /etc/mysql/my.cnf across multiple variants:
-#
-# 1. Move your customisations from this file to /etc/mysql/conf.d/ and
-#    to /etc/mysql/<variant>.conf.d/ as appropriate.
-# 2. Run "update-alternatives --remove my.cnf /etc/mysql/my.cnf.migrated"
-# 3. Remove the file /etc/mysql/my.cnf.migrated
-
-EOT
-    rm /etc/mysql/my.cnf.dpkg-bak
-    echo "Using your previous configuration through /etc/mysql/my.cnf.migrated"
-    update-alternatives --install /etc/mysql/my.cnf my.cnf /etc/mysql/my.cnf.migrated 300
-fi
+#DEBHELPER#

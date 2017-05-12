@@ -84,7 +84,7 @@ override_dh_auto_install:
 	install -m 0644 support-files/wsrep.cnf debian/tmp/usr/share/mysql
 	# SysV init stuff, or Systemd files ? On Debian 8, we need both!
 #ifneq (,$(findstring SYSV,@DEB_STARTUP@))
-#	install -D -m 0755 support-files/mysql.server debian/tmp/etc/init.d/mysql
+	install -D -m 0755 support-files/mysql.server debian/tmp/etc/init.d/mysql
 #endif
 #ifneq (,$(findstring SYSTEMD,@DEB_STARTUP@))
 #	install -m 0755 scripts/mysqld_bootstrap debian/tmp/usr/bin/
@@ -103,7 +103,7 @@ override_dh_auto_install:
 	# add apparmor profile
 	@DEB_RULES_INSTALL_APPARMOR@
 	# add systemd script
-	@DEB_RULES_INSTALL_SYSTEMD@
+	#@DEB_RULES_INSTALL_SYSTEMD@
 	# add directory for legal docs
 	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/mysql-server
 	install -g root -o root -m 0755 -d debian/tmp/usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@

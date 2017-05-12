@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
 #
@@ -18,9 +18,8 @@
 set -e
 
 if [ "$1" = "purge" ]; then
-  rm -f /etc/mysql/my.cnf.migrated  # created by mysql-common from our obsolete conffile my.cnf
-  rm -f /etc/mysql/my.cnf.old       # created by mariadb-common from our obsolete conffile my.cnf
-  rmdir /etc/mysql 2>/dev/null || true
+	rmdir /etc/mysql 2>/dev/null || true
+	update-alternatives --remove-all my.cnf
 fi
 
 #DEBHELPER#

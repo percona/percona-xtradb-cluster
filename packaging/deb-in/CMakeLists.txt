@@ -122,7 +122,7 @@ ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_PLATFORMRELEASE "debian8")
   # Improving on Oracle, we would prefer to package for Debian 8
   # using both SysV init and Systemd, but still no Apparmor.
-  SET (DEB_CONTROL_BDEPS "dh-systemd")
+  SET (DEB_CONTROL_BDEPS "")
   SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
   SET (DEB_RULES_INSTALL_SYSTEMD  "")
   SET (DEB_RULES_INSTALL_APPARMOR "")
@@ -137,11 +137,11 @@ ELSEIF(DEB_CODENAME STREQUAL "jessie")
   SET (DEB_INIT_APPARMOR "")
   # Debian 8 comes with both SysV init and Systemd,
   # but "scripts/CMakeLists.txt" enforces an either-or.
-  SET (DEB_STARTUP "SYSV SYSTEMD")
+  SET (DEB_STARTUP "SYSV")
   # For now, we go with Systemd only.
 ELSEIF(DEB_CODENAME STREQUAL "stretch")
   SET (DEB_PLATFORMRELEASE "debian9")
-  SET (DEB_CONTROL_BDEPS "dh-systemd")
+  SET (DEB_CONTROL_BDEPS "")
   SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
   SET (DEB_RULES_INSTALL_SYSTEMD "")
   SET (DEB_RULES_INSTALL_APPARMOR "")
@@ -209,7 +209,7 @@ ELSEIF(DEB_CODENAME STREQUAL "wily")
   SET (DEB_STARTUP "SYSTEMD")
 ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_PLATFORMRELEASE "ubuntu16.04")
-  SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
+  SET (DEB_CONTROL_BDEPS "dh-apparmor")
   SET (DEB_INSTALL_SOURCE_XZ "../*.tar.xz usr/src/mysql/")
   SET (DEB_RULES_INSTALL_SYSTEMD "")
   SET (DEB_RULES_INSTALL_APPARMOR
@@ -224,7 +224,7 @@ ELSEIF(DEB_CODENAME STREQUAL "xenial")
   SET (DEB_SERVICE_SERVER_EXECPRE  "")
   SET (DEB_SERVICE_SERVER_EXECPOST "")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
-  SET (DEB_STARTUP "SYSTEMD")
+  SET (DEB_STARTUP "SYSV")
 ELSEIF(DEB_CODENAME STREQUAL "yakkety")
   SET (DEB_PLATFORMRELEASE "ubuntu16.10")
   SET (DEB_CONTROL_BDEPS "dh-apparmor, dh-systemd (>=1.5)")
@@ -322,27 +322,4 @@ ENDFOREACH()
 EXECUTE_PROCESS(
   COMMAND chmod +x ${CMAKE_BINARY_DIR}/debian/rules
 )
-IF(DEB_PRODUCTNAME STREQUAL "wsrep")
-FILE(APPEND "${CMAKE_BINARY_DIR}/debian/control" "
-Package: mysql-common
-Architecture: any
-Pre-depends: debconf (>= 0.2.17),
-             \${misc:Pre-Depends}
-Multi-Arch: foreign
-Depends: \${misc:Depends},
-         \${shlibs:Depends},
-         mysql-wsrep-common-5.6
-Description: MySQL Common
- The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
- and robust SQL (Structured Query Language) database server. MySQL Server
- is intended for mission-critical, heavy-load production systems as well
- as for embedding into mass-deployed software. MySQL is a trademark of
- Oracle. This package contains common files needed by MySQL client
- library and the MySQL database server.
- This package is a dummy replacement for the case when using mysql WSREP
- implementation to satisfy dependencies of other packages
- like libmysqlclient18
-")
-ENDIF()
-
 

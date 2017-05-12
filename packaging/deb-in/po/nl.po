@@ -1,0 +1,219 @@
+# Dutch mysql-dfsg-5.6 po-debconf translation,
+# Copyright (C) 2006 THE PACKAGE'S COPYRIGHT HOLDER
+#
+# Vincent Zweije <zweije@xs4all.nl>, 2006.
+# Eric Spreen <erispre@gmail.com, 2010.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: mysql-5.6 5.6.6-1\n"
+"Report-Msgid-Bugs-To: mysql-wsrep-5.6@packages.debian.org\n"
+"POT-Creation-Date: 2014-11-23 01:05+0200\n"
+"PO-Revision-Date: 2012-05-23 10:26+0200\n"
+"Last-Translator: Jeroen Schot <schot@a-eskwadraat.nl>\n"
+"Language-Team: Debian l10n Dutch <debian-l10n-dutch@lists.debian.org>\n"
+"Language: nl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:2001
+msgid "Really proceed with downgrade?"
+msgstr "Wilt u echt een oude versie herstellen?"
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:2001
+msgid "A file named /var/lib/mysql/debian-*.flag exists on this system."
+msgstr ""
+"Er bestaat een bestand genaamd /var/lib/mysql/debian-*.flag op dit systeem."
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:2001
+msgid ""
+"Such a file is an indication that a mysql-server package with a higher "
+"version has been installed previously."
+msgstr ""
+"Zulk een bestand geeft aan dat er eerder een pakket mysql-server met een "
+"hogere versie is geÃ¯nstalleerd."
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:2001
+msgid ""
+"There is no guarantee that the version you're currently installing will be "
+"able to use the current databases."
+msgstr ""
+"Er is geen garantie dat de versie die u op dit moment installeert de huidige "
+"databases kan gebruiken."
+
+#. Type: note
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:3001
+msgid "Important note for NIS/YP users"
+msgstr "Belangrijke opmerking voor gebruikers van NIS/YP"
+
+#. Type: note
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:3001
+msgid ""
+"Using MySQL under NIS/YP requires a mysql user account to be added on the "
+"local system with:"
+msgstr ""
+"Het gebruik van MySQL onder NIS/YP vereist dat een MySQL gebruikersaccount "
+"wordt toegevoegd aan het lokale systeem met:"
+
+#. Type: note
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:3001
+msgid ""
+"You should also check the permissions and ownership of the /var/lib/mysql "
+"directory:"
+msgstr ""
+"U dient ook de permissies en eigenaren van de map /var/lib/mysql te "
+"controleren:"
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:4001
+msgid "Remove all MySQL databases?"
+msgstr "Wilt u alle MySQL-databases verwijderen?"
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:4001
+msgid ""
+"The /var/lib/mysql directory which contains the MySQL databases is about to "
+"be removed."
+msgstr ""
+"De map /var/lib/mysql die de MySQL-databases bevat staat op het punt om "
+"verwijderd te worden."
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:4001
+msgid ""
+"If you're removing the MySQL package in order to later install a more recent "
+"version or if a different mysql-server package is already using it, the data "
+"should be kept."
+msgstr ""
+"Als u het MySQL-pakket verwijdert om later een meer recente versie te "
+"installeren of als een ander mysql-server pakket het al gebruikt, zou de "
+"data behouden moeten worden."
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:5001
+msgid "Start the MySQL server on boot?"
+msgstr "Moet MySQL starten als de computer start?"
+
+#. Type: boolean
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:5001
+msgid ""
+"The MySQL server can be launched automatically at boot time or manually with "
+"the '/etc/init.d/mysql start' command."
+msgstr ""
+"De MySQL-server kan automatisch worden gestart bij het starten van de "
+"computer of slechts wanneer u '/etc/init.d/mysql start' handmatig uitvoert."
+
+#. Type: password
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:6001
+msgid "New password for the MySQL \"root\" user:"
+msgstr "Nieuw wachtwoord voor de MySQL \"root\"-gebruiker:"
+
+#. Type: password
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:6001
+msgid ""
+"While not mandatory, it is highly recommended that you set a password for "
+"the MySQL administrative \"root\" user."
+msgstr ""
+"Hoewel niet verplicht, wordt het sterk aangeraden een wachtwoord in te "
+"stellen voor de administratieve MySQL \"root\"-gebruiker."
+
+#. Type: password
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:6001
+msgid "If this field is left blank, the password will not be changed."
+msgstr ""
+"Als dit veld leeg wordt gelaten, zal het wachtwoord niet worden veranderd."
+
+#. Type: password
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:7001
+msgid "Repeat password for the MySQL \"root\" user:"
+msgstr "Herhaal het wachtwoord voor de MySQL \"root\"-gebruiker:"
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:8001
+msgid "Unable to set password for the MySQL \"root\" user"
+msgstr "Kan het wachtwoord voor de MySQL \"root\"-gebruiker niet instellen"
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:8001
+msgid ""
+"An error occurred while setting the password for the MySQL administrative "
+"user. This may have happened because the account already has a password, or "
+"because of a communication problem with the MySQL server."
+msgstr ""
+"Er is een fout opgetreden bij het instellen van het wachtwoord voor de MySQL "
+"administratieve gebruiker. Dat kan komen doordat de gebruiker al een "
+"wachtwoord heeft, of omdat er een probleem was bij het communiceren met de "
+"MySQL-server."
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:8001
+msgid "You should check the account's password after the package installation."
+msgstr ""
+"U zou het wachtwoord van het account moeten controleren nadat het pakket is "
+"geÃ¯nstalleerd."
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:8001
+msgid ""
+"Please read the /usr/share/doc/mysql-server-5.6/README.Debian file for more "
+"information."
+msgstr ""
+"Leest u het bestand /usr/share/doc/mysql-server-5.6/README.Debian voor meer "
+"informatie."
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:9001
+msgid "Password input error"
+msgstr "Fout bij invoer wachtwoord"
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:9001
+msgid "The two passwords you entered were not the same. Please try again."
+msgstr ""
+"De twee wachtwoorden die u hebt ingevoerd zijn niet gelijk. Probeert u het "
+"opnieuw."
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:10001
+msgid "NDB Cluster seems to be in use"
+msgstr "De NDB-cluster lijkt in gebruik te zijn"
+
+#. Type: error
+#. Description
+#: ../mysql-wsrep-server-5.6.templates:10001
+msgid ""
+"MySQL-5.6 no longer provides NDB Cluster support. Please migrate to the new "
+"mysql-cluster-server package and remove all lines starting with \"ndb\" from "
+"all config files below /etc/mysql/."
+msgstr ""
+"MySQL-5.6 biedt niet langer ondersteuning voor NDB Cluster. Migreer naar het "
+"nieuwe pakket mysql-cluster en verwijder alle regels die beginnen met \"ndb"
+"\" van alle configuratiebestanden onder /etc/mysql/."

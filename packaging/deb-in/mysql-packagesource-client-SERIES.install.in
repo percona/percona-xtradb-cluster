@@ -1,6 +1,6 @@
 # this executable reprsent the embedded mysql server client
-debian/additions/innotop/innotop usr/bin/
-debian/additions/mysqlreport usr/bin/
+debian/extra/innotop/innotop usr/bin/
+debian/extra/mysqlreport usr/bin/
 usr/bin/myisam_ftdump
 usr/bin/mysql
 usr/bin/mysql_config_editor

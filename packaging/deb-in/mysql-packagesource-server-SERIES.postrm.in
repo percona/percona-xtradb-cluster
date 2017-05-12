@@ -15,105 +15,157 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-set -e
-
-# It is possible that Debconf has already been removed, too.
-if [ -f /usr/share/debconf/confmodule ]; then
-  . /usr/share/debconf/confmodule
+if [ "$1" = purge ] && [ -e /usr/share/debconf/confmodule ];
+then
+. /usr/share/debconf/confmodule
 fi
 
-if [ -n "$DEBIAN_SCRIPT_DEBUG" ]; then set -v -x; DEBIAN_SCRIPT_TRACE=1; fi
-${DEBIAN_SCRIPT_TRACE:+ echo "#42#DEBUG# RUNNING $0 $*" 1>&2 }
-
-mysql_cfgdir=/etc/mysql
-MYADMIN="/usr/bin/mysqladmin --defaults-file=/etc/mysql/debian.cnf"
-
-# To avoid having hardcoded paths in the script, we do a search on the path, as suggested at:
-# https://www.debian.org/doc/manuals/developers-reference/ch06.en.html#bpp-debian-maint-scripts
-pathfind() {
-  OLDIFS="$IFS"
-  IFS=:
-  for p in $PATH; do
-    if [ -x "$p/$*" ]; then
-      IFS="$OLDIFS"
-      return 0
-    fi
-  done
-  IFS="$OLDIFS"
-  return 1
-}
-
-# Choose the proper mechanism. Ubuntu 16.04 uses systemd but still provides invoke-rc.d,
-# so the existence of systemd must be checked first.
-invoke() {
-	if pathfind systemctl; then
-		systemctl $1 "@DEB_SYSTEMD_SERVICE_NAME@"
-	elif pathfind invoke-rc.d; then
-		invoke-rc.d mysql $1
-	else
-		/etc/init.d/mysql $1
+place_upstart_job_back () {
+	if [ -e "/var/lib/mysql/.mysql.conf.backup" ];
+	then
+		mv /var/lib/mysql/.mysql.conf.backup /etc/init/mysql.conf
 	fi
 }
 
-# Try to stop the server in a sane way. If it does not success let the admin
-# do it himself. No database directories should be removed while the server
-# is running!
-stop_server() {
-  set +e
-  invoke stop
-  errno=$?
-  set -e
+get_pcount () {
+	PSCOUNT=$(ps -ef | grep "/usr/sbin/mysqld" | wc -l)
+	echo "${PSCOUNT}"
+}
 
-  if [ "$?" != 0 ]; then
-    echo "Trying to stop the MySQL server resulted in exitcode $?." 1>&2
-    echo "Stop it yourself and try again!" 1>&2
-    exit 1
-  fi
+server_stop () {
+	PSCOUNT=$(get_pcount)
+	COUNT=0
+	while :; do
+		COUNT=$(( COUNT+1 ))
+		echo -n .
+		if [ "${PSCOUNT}" -eq 1 ];
+		then
+			echo
+			break
+		fi
+		if [ "${COUNT}" -gt 15 ];
+		then
+			echo
+			return 1
+		fi
+		PSCOUNT=$(get_pcount)
+		sleep 1
+	done
+	return 0
 }
 
 case "$1" in
-  purge|remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
-    if [ -n "`$MYADMIN ping 2>/dev/null`" ]; then
-      stop_server
-      sleep 2
-    fi
-  ;;
-  *)
-    echo "postrm called with unknown argument '$1'" 1>&2
-    exit 1
-  ;;
+	remove)
+
+	set -e
+
+	place_upstart_job_back
+	update-alternatives --remove my.cnf "/etc/mysql/mysql.cnf"
+
+	set +e
+
+	;;
+
+	purge)
+
+	set -e
+
+	place_upstart_job_back
+
+	MYSQLDATA=/var/lib/mysql
+	MYSQLFILES=/var/lib/mysql-files
+	MYSQLKEYRING=/var/lib/mysql-keyring
+	MYSQLLOG=/var/log/mysql
+	MYSQLRUN=/var/run/mysqld
+
+	server_stop
+
+	db_input high mysql-@DEB_PRODUCTNAME@-server/remove-data-dir || true
+	db_go
+	db_get mysql-@DEB_PRODUCTNAME@-server/remove-data-dir && RMDATADIR=${RET}
+	if [ "${RMDATADIR}" = "true" ];
+	then
+		if [ -d ${MYSQLRUN} ] || [ -L ${MYSQLRUN} ];
+		then
+			rm -rf ${MYSQLRUN}
+		fi
+
+		if [ -d ${MYSQLLOG} ] || [ -L ${MYSQLLOG} ];
+		then
+			rm -rf ${MYSQLLOG}
+		fi
+
+		if [ -d ${MYSQLDATA} ] || [ -L ${MYSQLDATA} ];
+		then
+			rm -rf ${MYSQLDATA}
+		fi
+
+		if [ -d ${MYSQLFILES} ] || [ -L ${MYSQLFILES} ];
+		then
+			rm -rf ${MYSQLFILES}
+		fi
+
+		if [ -d ${MYSQLKEYRING} ] || [ -L ${MYSQLKEYRING} ];
+		then
+			rm -rf ${MYSQLKEYRING}
+		fi
+
+		if getent passwd mysql >/dev/null;
+		then
+			userdel mysql
+		fi
+	fi
+
+	set +e
+	;;
+
+	abort-install)
+
+	set -e
+
+	place_upstart_job_back
+
+	if [ -x "/etc/init.d/mysql" ];
+	then
+		invoke-rc.d mysql start || exit $?
+	else
+	        if [ -d ${MYSQLRUN} ] || [ -L ${MYSQLRUN} ];
+		then
+			rm -rf ${MYSQLRUN}
+		fi
+
+		if [ -d ${MYSQLLOG} ] || [ -L ${MYSQLLOG} ];
+		then
+			rm -rf ${MYSQLLOG}
+		fi
+
+		if [ -d ${MYSQLDATA} ] || [ -L ${MYSQLDATA} ];
+		then
+			rm -rf ${MYSQLDATA}
+		fi
+
+		if [ -d ${MYSQLFILES} ] || [ -L ${MYSQLFILES} ];
+		then
+			rm -rf ${MYSQLFILES}
+		fi
+
+		if getent passwd mysql >/dev/null;
+		then
+			userdel mysql
+		fi
+	fi
+
+	set +e
+	;;
+
+	upgrade|abort-upgrade)
+
+	;;
+
+	*)
+	exit 1
+	;;
 esac
-
-# New packaging paradigm for my.cnf as of Dec-2014 for sharing mysql
-# variants in Ubuntu.
-case "$1" in
-  remove|disappear)
-    [ -x /usr/share/mysql-common/configure-symlinks ] && /usr/share/mysql-common/configure-symlinks remove mysql "$mysql_cfgdir/mysql.cnf"
-  ;;
-esac
-
-#
-# - Do NOT purge logs or data if another mysql-sever* package is installed (#307473)
-# - Remove the mysql user only after all his owned files are purged.
-#   
-if [ "$1" = "purge" -a ! \( -x /usr/sbin/mysqld -o -L /usr/sbin/mysqld \) ]; then
-  # we remove the mysql user only after all his owned files are purged
-  rm -f /var/log/mysql.{log,err}{,.0,.[1234567].gz}
-  rm -rf /var/log/mysql
-
-  db_input high mysql-@DEB_PRODUCTNAME@-server/postrm_remove_databases || true
-  db_go || true
-  db_get mysql-@DEB_PRODUCTNAME@-server/postrm_remove_databases || true
-  if [ "$RET" = "true" ]; then
-    # never remove the debian.cnf when the databases are still existing
-    # else we ran into big trouble on the next install!
-    rm -f /etc/mysql/debian.cnf
-    rm -rf /var/lib/mysql
-    rm -rf /var/lib/mysql-files
-    rm -rf /var/lib/mysql-keyring
-    userdel mysql || true
-  fi
-fi
 
 #DEBHELPER#
 
