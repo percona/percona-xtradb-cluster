@@ -37,6 +37,9 @@ ELSE()
   SET (DEB_CONTROL_SERVER_CONFLICT_NDB "mysql-cluster-community-server, mysql-cluster-commercial-server")
   SET (DEB_CONTROL_CLIENT_CONFLICT_NDB "mysql-cluster-community-client, mysql-cluster-commercial-client")
 ENDIF()
+
+SET (DEB_BASE_VERSION "${DEB_BASE_VERSION}+wsrep${WSREP_VERSION}")
+
 # Commercial or community
 IF (DEB_PRODUCT STREQUAL "commercial")
   message (FATAL_ERROR "mysql-wsrep is GPL only, no commercial builds")
