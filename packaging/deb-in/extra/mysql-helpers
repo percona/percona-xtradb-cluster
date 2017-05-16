@@ -62,48 +62,11 @@ get_running () {
 	fi
 }
 
-get_path () {
-	my_print_defaults mysqld | grep "$1" | cut -d= -f2 | tail -n 1
-}
-
-get_recover_pos () {
-    wsrep_start_position_opt=""
-
-    LOG=$(mktemp --tmpdir=/var/lib/mysql-files/ --suffix=.log)
-    chown mysql.mysql $LOG
-    /usr/sbin/mysqld --user=mysql --wsrep_recover --log-error=$LOG
-
-    local rp="$(grep 'WSREP: Recovered position:' $LOG | tail -n 1)"
-    if [ -z "$rp" ]; then
-         local skipped="$(grep WSREP $LOG | grep 'skipping position recovery')"
-         if [ -z "$skipped" ]; then
-             systemd-cat -t mysql -p err echo "WSREP: Failed to recover position:"
-             exit 1
-         else
-             systemd-cat -t mysql -p info echo "WSREP: Position recovery skipped"
-         fi
-    else
-         local start_pos="$(echo $rp | sed 's/.*WSREP\:\ Recovered\ position://' \
-              | sed 's/^[ \t]*//')"
-         systemd-cat -t mysql -p info echo "WSREP: Recovered position $start_pos"
-         wsrep_start_position_opt="--wsrep_start_position=$start_pos"
-    fi
-    rm -f $LOG
-
-    if [ -n "$start_pos" ]; then
-        systemctl set-environment MYSQLD_RECOVER_START="$wsrep_start_position_opt"
-    fi
-}
-
-clear_recover_pos () {
-    systemctl unset-environment MYSQLD_RECOVER_START
-}
-
 # Runs an arbitrary init sql file supplied in $1. Does not require login access
 run_init_sql() {
 	tmpdir=$(mktemp -d)
 	chown mysql:mysql "$tmpdir"
-	/usr/sbin/mysqld --user=mysql --init-file="$1" --socket="$tmpdir/mysqld.sock" --pid-file="$tmpdir/mysqld.pid" > /dev/null 2>&1
+	mysqld --bootstrap --user=mysql --socket="$tmpdir/mysqld.sock" --pid-file="$tmpdir/mysqld.pid" > /dev/null 2>&1 < "$1"
 	result=$?
 	rm -rf "$tmpdir"
 	return $result
@@ -178,19 +141,7 @@ verify_database() {
 	MYSQLFILES=$(get_mysql_option mysqld secure-file-priv "/var/lib/mysql-files")
 
 	if [ ! -d "${MYSQLDATA}/mysql" ] && [ -d "${MYSQLFILES}" ]; then
-		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure > /dev/null"
-		SQL=$(mktemp -u ${MYSQLFILES}/XXXXXXXXXX)
-		install /dev/null -m0600 -omysql -gmysql "${SQL}"
-		cat << EOF > ${SQL}
-USE mysql;
-INSTALL PLUGIN auth_socket SONAME 'auth_socket.so';
-ALTER USER 'root'@'localhost' IDENTIFIED WITH 'auth_socket';
-SHUTDOWN;
-EOF
-		run_init_sql "$SQL"
-		rm -f "$SQL"
-        else
-                get_recover_pos
+		su - mysql -s /bin/bash -c "mysql_install_db --user=mysql > /dev/null"
 	fi
 
 	if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${MYSQLDATA}/server-key.pem" ]; then

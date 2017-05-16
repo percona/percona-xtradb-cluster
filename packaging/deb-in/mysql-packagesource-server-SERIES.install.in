@@ -14,7 +14,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
 # debian/extra/mysql-systemd-start usr/share/mysql/
-debian/extra/mysql.cnf etc/mysql/
+#debian/extra/mysql.cnf etc/mysql/
 # debian/extra/mysql.conf.d etc/mysql/
 # debian/extra/source_mysql-5.7.py usr/share/apport/package-hooks/
 @DEB_INSTALL_SERVER_APPARMOR@
@@ -74,6 +74,7 @@ usr/share/man/man1/resolveip.1
 usr/share/man/man1/resolve_stack_dump.1
 usr/share/man/man8/mysqld.8
 # confguration files
+usr/share/mysql/my-default.cnf
 debian/extra/mysql.cnf  etc/mysql/
 debian/extra/mysqld.cnf /etc/mysql/mysql.conf.d/
 # app armor profile

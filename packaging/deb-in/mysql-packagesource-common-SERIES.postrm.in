@@ -19,7 +19,6 @@ set -e
 
 if [ "$1" = "purge" ]; then
 	rmdir /etc/mysql 2>/dev/null || true
-	update-alternatives --remove-all my.cnf
 fi
 
 #DEBHELPER#

@@ -150,11 +150,19 @@ override_dh_auto_install:
 override_dh_installlogrotate-arch:
 	dh_installlogrotate --name mysql-server
 
+ifneq (,$(findstring SYSTEMD,@DEB_STARTUP@))
+#use upstream init to bypass systemd for 5.6.36 release
+INSTALLINITOPTS=""
+else
+INSTALLINITOPTS="--onlyscripts"
+endif
+
 override_dh_installinit:
 	@echo "RULES.$@"
 	@DEB_RULES_APPARMOR_LOAD@
 	@DEB_RULES_SYSTEMD_ENABLE@
-	dh_installinit --name=mysql -- defaults 19 21
+
+	dh_installinit $(INSTALLINITOPTS) --name=mysql -- defaults 19 21
 	@DEB_RULES_SYSTEMD_START@
 	touch $@
 
