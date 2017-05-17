@@ -128,7 +128,7 @@ Architecture: any
 Section: libs
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
-Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: MySQL shared client libraries
