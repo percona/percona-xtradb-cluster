@@ -335,7 +335,7 @@ Pre-depends: debconf (>= 0.2.17),
 Multi-Arch: foreign
 Depends: \${misc:Depends},
          \${shlibs:Depends},
-         mysql-wsrep-common-5.6
+         mysql-wsrep-common
 Description: MySQL Common
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -345,7 +345,7 @@ Description: MySQL Common
  library and the MySQL database server.
  This package is a dummy replacement for the case when using mysql WSREP
  implementation to satisfy dependencies of other packages
- like libmysqlclient18
+ like libmysqlclient18. It depends on any mysql-wsrep-common
 ")
 ENDIF()
 
