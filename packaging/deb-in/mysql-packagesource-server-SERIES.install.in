@@ -21,16 +21,22 @@
 etc/mysql/debian-start
 # binaries
 usr/bin/innochecksum
+usr/bin/msql2mysql
+usr/bin/mysqlhotcopy
+usr/bin/mysql_convert_table_format
 usr/bin/myisamchk
 usr/bin/myisamlog
 usr/bin/myisampack
 usr/bin/my_print_defaults
+usr/bin/mysqld_multi
 usr/scripts/mysql_install_db usr/bin/
 usr/bin/mysql_plugin
 usr/bin/mysql_secure_installation
+usr/bin/mysql_setpermission
 usr/bin/mysql_tzinfo_to_sql
 usr/bin/mysql_upgrade
 usr/bin/mysqlbinlog
+usr/bin/mysql_zap
 usr/bin/perror
 usr/bin/replace
 usr/bin/resolveip
@@ -43,6 +49,7 @@ usr/bin/wsrep_sst_xtrabackup-v2
 # plugins
 usr/lib/mysql/plugin/adt_null.so
 usr/lib/mysql/plugin/auth_socket.so
+usr/lib/mysql/plugin/connection_control.so
 usr/lib/mysql/plugin/innodb_engine.so
 usr/lib/mysql/plugin/libmemcached.so
 usr/lib/mysql/plugin/mypluglib.so
@@ -107,3 +114,4 @@ usr/share/mysql/errmsg-utf8.txt
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/README
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/@DEB_WSREP_README@

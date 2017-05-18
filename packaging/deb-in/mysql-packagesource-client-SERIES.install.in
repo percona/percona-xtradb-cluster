@@ -16,3 +16,6 @@ usr/bin/mysqldumpslow
 usr/bin/mysqlimport
 usr/bin/mysqlshow
 usr/bin/mysqlslap
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/README
