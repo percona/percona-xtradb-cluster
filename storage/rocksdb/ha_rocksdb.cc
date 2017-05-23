@@ -3308,6 +3308,17 @@ static int rocksdb_init_func(void *const p) {
     DBUG_RETURN(HA_EXIT_FAILURE);
   }
 
+  for (const auto &cf_handle : cf_manager.get_all_cf()) {
+    uint flags;
+    if (!dict_manager.get_cf_flags(cf_handle->GetID(), &flags)) {
+      const std::unique_ptr<rocksdb::WriteBatch> wb = dict_manager.begin();
+      rocksdb::WriteBatch *const batch = wb.get();
+      dict_manager.add_cf_flags(batch, cf_handle->GetID(), 0);
+      dict_manager.commit(batch);
+    }
+  }
+
+
   Rdb_sst_info::init(rdb);
 
   /*
@@ -3748,7 +3759,6 @@ bool ha_rocksdb::init_with_fields() {
 void ha_rocksdb::convert_record_to_storage_format(
     const rocksdb::Slice &pk_packed_slice,
     Rdb_string_writer *const pk_unpack_info, rocksdb::Slice *const packed_rec) {
-  DBUG_ASSERT_IMP(m_maybe_unpack_info, pk_unpack_info);
   m_storage_record.length(0);
 
   /* All NULL bits are initially 0 */

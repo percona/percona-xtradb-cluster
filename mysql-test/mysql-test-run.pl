@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # -*- cperl -*-
 
-# Copyright (c) 2004, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2004, 2017, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -100,6 +100,8 @@ use mtr_results;
 use IO::Socket::INET;
 use IO::Select;
 use Subunit;
+
+push @INC, ".";
 
 require "lib/mtr_process.pl";
 require "lib/mtr_io.pl";
@@ -4219,6 +4221,14 @@ sub resfile_report_test ($) {
   resfile_test_info("start_time", isotime time);
 }
 
+sub error_logs_to_comment {
+  my $tinfo= shift;
+  foreach my $mysqld (mysqlds())
+  {
+    $tinfo->{comment}.= "\nServer " . $mysqld->{proc} . " log: ".
+      get_log_from_proc($mysqld->{proc}, $tinfo->{name});
+  }
+}
 
 #
 # Run a single test case
@@ -4502,13 +4512,6 @@ sub run_testcase ($) {
 	    $proc= $srvproc;
 	    goto SRVDIED;
 	  }
-
-          #foreach my $mysqld (mysqlds())
-          #{
-          #  $tinfo->{comment}.=
-          #    "\nServer " . $mysqld->{proc} . " log: ".
-          #    get_log_from_proc($mysqld->{proc}, $tinfo->{name});
-          #}
 
 	  # Test case failure reported by mysqltest
 	  report_failure_and_restart($tinfo);
@@ -5807,16 +5810,14 @@ sub start_servers($) {
     my $mysqld_basedir= $mysqld->value('basedir');
     if ( $basedir eq $mysqld_basedir )
     {
-      if (! $opt_start_dirty)	# If dirty, keep possibly grown system db
+      if (!$opt_start_dirty)	# If dirty, keep possibly grown system db
       {
-	# Copy datadir from installed system db
-	for my $path ( "$opt_vardir", "$opt_vardir/..") {
-	  my $install_db= "$path/install.db";
-	  copytree($install_db, $datadir)
-	    if -d $install_db;
-	}
-	mtr_error("Failed to copy system db to '$datadir'")
-	  unless -d $datadir;
+        # Copy datadir from installed system db
+        my $path= ($opt_parallel == 1) ? "$opt_vardir" : "$opt_vardir/..";
+        my $install_db= "$path/install.db";
+        copytree($install_db, $datadir) if -d $install_db;
+        mtr_error("Failed to copy system db to '$datadir'")
+          unless -d $datadir;
       }
     }
     else

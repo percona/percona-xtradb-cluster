@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2017, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, Percona Inc.
 Copyright (c) 2012, Facebook Inc.
@@ -733,6 +733,32 @@ innobase_is_fake_change(
 	THD*		thd);	/*!< in: MySQL thread handle of the user for
 				  whom the transaction is being committed */
 
+/** Empty free list algorithm.
+Checks if buffer pool is big enough to enable backoff algorithm.
+InnoDB empty free list algorithm backoff requires free pages
+from LRU for the best performance.
+buf_LRU_buf_pool_running_out cancels query if 1/4 of
+buffer pool belongs to LRU or freelist.
+At the same time buf_flush_LRU_list_batch
+keeps up to BUF_LRU_MIN_LEN in LRU.
+In order to avoid deadlock baclkoff requires buffer pool
+to be at least 4*BUF_LRU_MIN_LEN,
+but flush peformance is bad because of trashing
+and additional BUF_LRU_MIN_LEN pages are requested.
+@param[in]	algorithm	desired algorithm from srv_empty_free_list_t
+@return	true if it's possible to enable backoff. */
+static inline
+bool
+innodb_empty_free_list_algorithm_allowed(
+	srv_empty_free_list_t	algorithm)
+{
+	long long buf_pool_pages = srv_buf_pool_size / srv_page_size
+				/ srv_buf_pool_instances;
+
+	return(buf_pool_pages >= BUF_LRU_MIN_LEN * (4 + 1)
+			|| algorithm != SRV_EMPTY_FREE_LIST_BACKOFF);
+}
+
 /** Get the list of foreign keys referencing a specified table
 table.
 @param thd		The thread handle
@@ -996,6 +1022,10 @@ static SHOW_VAR innodb_status_variables[]= {
   (char*) &export_vars.innodb_x_lock_spin_rounds,	  SHOW_LONGLONG},
   {"x_lock_spin_waits",
   (char*) &export_vars.innodb_x_lock_spin_waits,	  SHOW_LONGLONG},
+  {"secondary_index_triggered_cluster_reads",
+  (char*) &export_vars.innodb_sec_rec_cluster_reads,	  SHOW_LONG},
+  {"secondary_index_triggered_cluster_reads_avoided",
+  (char*) &export_vars.innodb_sec_rec_cluster_reads_avoided, SHOW_LONG},
   {NullS, NullS, SHOW_LONG}
 };
 
@@ -1409,28 +1439,6 @@ innobase_drop_zip_dict(
 	const char*	name,	/*!< in: zip dictionary name */
 	ulint*		name_len);
 				/*!< in/out: zip dictionary name length */
-
-/*************************************************************//**
-Checks if buffer pool is big enough to enable backoff algorithm.
-InnoDB empty free list algorithm backoff requires free pages
-from LRU for the best performance.
-buf_LRU_buf_pool_running_out cancels query if 1/4 of 
-buffer pool belongs to LRU or freelist.
-At the same time buf_flush_LRU_list_batch
-keeps up to BUF_LRU_MIN_LEN in LRU.
-In order to avoid deadlock baclkoff requires buffer pool
-to be at least 4*BUF_LRU_MIN_LEN,
-but flush peformance is bad because of trashing
-and additional BUF_LRU_MIN_LEN pages are requested.
-@return	true if it's possible to enable backoff. */
-static
-bool
-innodb_empty_free_list_algorithm_backoff_allowed(
-	srv_empty_free_list_t
-			algorithm,		/*!< in: desired algorithm
-						from srv_empty_free_list_t */
-	long long	buf_pool_pages);	/*!< in: total number
-						of pages inside buffer pool */
 
 /*************************************************************//**
 Removes old archived transaction log files.
@@ -3487,7 +3495,8 @@ innobase_init(
 	innobase_hton->flush_logs = innobase_flush_logs;
 	innobase_hton->show_status = innobase_show_status;
 	innobase_hton->flags = HTON_SUPPORTS_EXTENDED_KEYS |
-		HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_FOREIGN_KEYS;
+		HTON_SUPPORTS_ONLINE_BACKUPS | HTON_SUPPORTS_FOREIGN_KEYS |
+		HTON_SUPPORTS_COMPRESSED_COLUMNS;
 
 	innobase_hton->release_temporary_latches =
 		innobase_release_temporary_latches;
@@ -3962,10 +3971,9 @@ innobase_change_buffering_inited_ok:
 	innobase_commit_concurrency_init_default();
 
 	/* Do not enable backoff algorithm for small buffer pool. */
-	if (!innodb_empty_free_list_algorithm_backoff_allowed(
+	if (!innodb_empty_free_list_algorithm_allowed(
 			static_cast<srv_empty_free_list_t>(
-				srv_empty_free_list_algorithm),
-			innobase_buffer_pool_size / srv_page_size)) {
+				srv_empty_free_list_algorithm))) {
 		sql_print_information(
 				"InnoDB: innodb_empty_free_list_algorithm "
 				"has been changed to legacy "
@@ -4207,7 +4215,7 @@ innobase_create_zip_dict(
 	if (UNIV_UNLIKELY(high_level_read_only)) {
 		DBUG_RETURN(HA_CREATE_ZIP_DICT_READ_ONLY);
 	}
-
+	
 	if (UNIV_UNLIKELY(*name_len > ZIP_DICT_MAX_NAME_LENGTH)) {
 		*name_len = ZIP_DICT_MAX_NAME_LENGTH;
 		DBUG_RETURN(HA_CREATE_ZIP_DICT_NAME_TOO_LONG);
@@ -6133,6 +6141,8 @@ table_opened:
 	prebuilt->default_rec = table->s->default_values;
 	ut_ad(prebuilt->default_rec);
 
+	prebuilt->mysql_handler = this;
+
 	/* Looks like MySQL-3.23 sometimes has primary key number != 0 */
 	primary_key = table->s->primary_key;
 	key_used_on_scan = primary_key;
@@ -7695,9 +7705,31 @@ build_template_field(
 	ut_a(templ->clust_rec_field_no != ULINT_UNDEFINED);
 
 	if (dict_index_is_clust(index)) {
+		templ->rec_field_is_prefix = false;
 		templ->rec_field_no = templ->clust_rec_field_no;
+		templ->rec_prefix_field_no = ULINT_UNDEFINED;
 	} else {
-		templ->rec_field_no = dict_index_get_nth_col_pos(index, i);
+		/* If we're in a secondary index, keep track of the original
+		index position even if this is just a prefix index; we will use
+		this later to avoid a cluster index lookup in some cases.*/
+
+		templ->rec_field_no = dict_index_get_nth_col_pos(index, i,
+						&templ->rec_prefix_field_no);
+		templ->rec_field_is_prefix
+			= (templ->rec_field_no == ULINT_UNDEFINED)
+			  && (templ->rec_prefix_field_no != ULINT_UNDEFINED);
+#ifdef UNIV_DEBUG
+		if (templ->rec_prefix_field_no != ULINT_UNDEFINED)
+		{
+			const dict_field_t* field = dict_index_get_nth_field(
+				index,
+				templ->rec_prefix_field_no);
+			ut_ad(templ->rec_field_is_prefix
+			      == (field->prefix_len != 0));
+		} else {
+			ut_ad(!templ->rec_field_is_prefix);
+		}
+#endif
 	}
 
 	if (field->real_maybe_null()) {
@@ -7887,7 +7919,8 @@ ha_innobase::build_template(
 				} else {
 					templ->icp_rec_field_no
 						= dict_index_get_nth_col_pos(
-							prebuilt->index, i);
+							prebuilt->index, i,
+							NULL);
 				}
 
 				if (dict_index_is_clust(prebuilt->index)) {
@@ -7917,7 +7950,7 @@ ha_innobase::build_template(
 
 				templ->icp_rec_field_no
 					= dict_index_get_nth_col_or_prefix_pos(
-						prebuilt->index, i, TRUE);
+						prebuilt->index, i, TRUE, NULL);
 				ut_ad(templ->icp_rec_field_no
 				      != ULINT_UNDEFINED);
 
@@ -12513,7 +12546,8 @@ ha_innobase::delete_table(
 	extension, in contrast to ::create */
 	normalize_table_name(norm_name, name);
 
-	if (srv_read_only_mode) {
+	if (srv_read_only_mode
+	    || srv_force_recovery >= SRV_FORCE_NO_UNDO_LOG_SCAN) {
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
 	} else if (row_is_magic_monitor_table(norm_name)
 		   && check_global_access(thd, PROCESS_ACL)) {
@@ -18779,32 +18813,6 @@ innodb_status_output_update(
 }
 
 /*************************************************************//**
-Empty free list algorithm.
-Checks if buffer pool is big enough to enable backoff algorithm.
-InnoDB empty free list algorithm backoff requires free pages
-from LRU for the best performance.
-buf_LRU_buf_pool_running_out cancels query if 1/4 of 
-buffer pool belongs to LRU or freelist.
-At the same time buf_flush_LRU_list_batch
-keeps up to BUF_LRU_MIN_LEN in LRU.
-In order to avoid deadlock baclkoff requires buffer pool
-to be at least 4*BUF_LRU_MIN_LEN,
-but flush peformance is bad because of trashing
-and additional BUF_LRU_MIN_LEN pages are requested.
-@return	true if it's possible to enable backoff. */
-static
-bool
-innodb_empty_free_list_algorithm_backoff_allowed(
-	srv_empty_free_list_t	algorithm,	/*!< in: desired algorithm
-						from srv_empty_free_list_t */
-	long long		buf_pool_pages)	/*!< in: total number
-						of pages inside buffer pool */
-{
-	return(buf_pool_pages >= BUF_LRU_MIN_LEN * (4 + 1)
-			|| algorithm != SRV_EMPTY_FREE_LIST_BACKOFF);
-}
-
-/*************************************************************//**
 Empty free list algorithm. This function is registered as
 a callback with MySQL. 
 @return	0 for valid algorithm */
@@ -18845,13 +18853,11 @@ innodb_srv_empty_free_list_algorithm_validate(
 		return(1);
 
 	algorithm = static_cast<srv_empty_free_list_t>(algo);
-	if (!innodb_empty_free_list_algorithm_backoff_allowed(
-				algorithm,
-				innobase_buffer_pool_size / srv_page_size)) {
+	if (!innodb_empty_free_list_algorithm_allowed(algorithm)) {
 		sql_print_warning(
 				"InnoDB: innodb_empty_free_list_algorithm "
 				"= 'backoff' requires at least"
-				" 20MB buffer pool.\n");
+				" 20MB buffer pool instances.\n");
 		return(1);
 	}
 
