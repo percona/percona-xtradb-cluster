@@ -38,7 +38,7 @@ ELSE()
   SET (DEB_CONTROL_CLIENT_CONFLICT_NDB "mysql-cluster-community-client, mysql-cluster-commercial-client")
 ENDIF()
 
-SET (DEB_BASE_VERSION "${DEB_BASE_VERSION}+wsrep${WSREP_VERSION}")
+SET (DEB_BASE_VERSION "${DEB_BASE_VERSION}-${WSREP_VERSION}")
 
 # Commercial or community
 IF (DEB_PRODUCT STREQUAL "commercial")
