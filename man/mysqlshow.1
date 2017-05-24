@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: \fBmysqlshow\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 02/01/2016
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 03/17/2017
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQLSHOW\FR" "1" "02/01/2016" "MySQL 5\&.7" "MySQL Database System"
+.TH "\FBMYSQLSHOW\FR" "1" "03/17/2017" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -27,12 +27,6 @@
 .\" -----------------------------------------------------------------
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
-.\" mysqlshow
-.\" databases: displaying
-.\" displaying: database information
-.\" tables: displaying
-.\" columns: displaying
-.\" showing: database information
 .SH "NAME"
 mysqlshow \- display database, table, and column information
 .SH "SYNOPSIS"
@@ -48,7 +42,7 @@ client can be used to quickly see which databases exist, their tables, or a tabl
 provides a command\-line interface to several SQL
 SHOW
 statements\&. See
-Section\ \&13.7.5, \(lqSHOW Syntax\(rq\&. The same information can be obtained by using those statements directly\&. For example, you can issue them from the
+Section\ \&14.7.5, \(lqSHOW Syntax\(rq\&. The same information can be obtained by using those statements directly\&. For example, you can issue them from the
 \fBmysql\fR
 client program\&.
 .PP
@@ -101,23 +95,23 @@ If no column is given, all matching columns and column types in the table are sh
 .PP
 The output displays only the names of those databases, tables, or columns for which you have some privileges\&.
 .PP
-If the last argument contains shell or SQL wildcard characters (\(lq*\(rq,
-\(lq?\(rq,
-\(lq%\(rq, or
-\(lq_\(rq), only those names that are matched by the wildcard are shown\&. If a database name contains any underscores, those should be escaped with a backslash (some Unix shells require two) to get a list of the proper tables or columns\&.
-\(lq*\(rq
+If the last argument contains shell or SQL wildcard characters (*,
+?,
+%, or
+_), only those names that are matched by the wildcard are shown\&. If a database name contains any underscores, those should be escaped with a backslash (some Unix shells require two) to get a list of the proper tables or columns\&.
+*
 and
-\(lq?\(rq
+?
 characters are converted into SQL
-\(lq%\(rq
+%
 and
-\(lq_\(rq
+_
 wildcard characters\&. This might cause some confusion when you try to display the columns for a table with a
-\(lq_\(rq
+_
 in the name, because in this case,
 \fBmysqlshow\fR
 shows you only the table names that match the pattern\&. This is easily fixed by adding an extra
-\(lq%\(rq
+%
 last on the command line as a separate argument\&.
 .PP
 \fBmysqlshow\fR
@@ -126,7 +120,7 @@ supports the following options, which can be specified on the command line or in
 and
 [client]
 groups of an option file\&. For information about option files used by MySQL programs, see
-Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
+Section\ \&5.2.6, \(lqUsing Option Files\(rq\&.
 .sp
 .RS 4
 .ie n \{\
@@ -136,8 +130,6 @@ Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: help option
-.\" help option: mysqlshow
 \fB\-\-help\fR,
 \fB\-?\fR
 .sp
@@ -152,8 +144,6 @@ Display a help message and exit\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: bind-address option
-.\" bind-address option: mysqlshow
 \fB\-\-bind\-address=\fR\fB\fIip_address\fR\fR
 .sp
 On a computer having multiple network interfaces, use this option to select which interface to use for connecting to the MySQL server\&.
@@ -167,12 +157,10 @@ On a computer having multiple network interfaces, use this option to select whic
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: character-sets-dir option
-.\" character-sets-dir option: mysqlshow
 \fB\-\-character\-sets\-dir=\fR\fB\fIdir_name\fR\fR
 .sp
 The directory where character sets are installed\&. See
-Section\ \&10.5, \(lqCharacter Set Configuration\(rq\&.
+Section\ \&11.5, \(lqCharacter Set Configuration\(rq\&.
 .RE
 .sp
 .RS 4
@@ -183,8 +171,6 @@ Section\ \&10.5, \(lqCharacter Set Configuration\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: compress option
-.\" compress option: mysqlshow
 \fB\-\-compress\fR,
 \fB\-C\fR
 .sp
@@ -199,8 +185,6 @@ Compress all information sent between the client and the server if both support 
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: count option
-.\" count option: mysqlshow
 \fB\-\-count\fR
 .sp
 Show the number of rows per table\&. This can be slow for non\-MyISAM
@@ -215,8 +199,6 @@ tables\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: debug option
-.\" debug option: mysqlshow
 \fB\-\-debug[=\fR\fB\fIdebug_options\fR\fR\fB]\fR,
 \fB\-# [\fR\fB\fIdebug_options\fR\fR\fB]\fR
 .sp
@@ -235,8 +217,6 @@ d:t:o\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: debug-check option
-.\" debug-check option: mysqlshow
 \fB\-\-debug\-check\fR
 .sp
 Print some debugging information when the program exits\&.
@@ -250,8 +230,6 @@ Print some debugging information when the program exits\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: debug-info option
-.\" debug-info option: mysqlshow
 \fB\-\-debug\-info\fR
 .sp
 Print debugging information and memory and CPU usage statistics when the program exits\&.
@@ -265,14 +243,12 @@ Print debugging information and memory and CPU usage statistics when the program
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: default-character-set option
-.\" default-character-set option: mysqlshow
 \fB\-\-default\-character\-set=\fR\fB\fIcharset_name\fR\fR
 .sp
 Use
 \fIcharset_name\fR
 as the default character set\&. See
-Section\ \&10.5, \(lqCharacter Set Configuration\(rq\&.
+Section\ \&11.5, \(lqCharacter Set Configuration\(rq\&.
 .RE
 .sp
 .RS 4
@@ -283,12 +259,10 @@ Section\ \&10.5, \(lqCharacter Set Configuration\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: default-auth option
-.\" default-auth option: mysqlshow
 \fB\-\-default\-auth=\fR\fB\fIplugin\fR\fR
 .sp
 A hint about the client\-side authentication plugin to use\&. See
-Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
+Section\ \&7.3.8, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -299,8 +273,6 @@ Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: defaults-extra-file option
-.\" defaults-extra-file option: mysqlshow
 \fB\-\-defaults\-extra\-file=\fR\fB\fIfile_name\fR\fR
 .sp
 Read this option file after the global option file but (on Unix) before the user option file\&. If the file does not exist or is otherwise inaccessible, an error occurs\&.
@@ -316,13 +288,15 @@ is interpreted relative to the current directory if given as a relative path nam
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: defaults-file option
-.\" defaults-file option: mysqlshow
 \fB\-\-defaults\-file=\fR\fB\fIfile_name\fR\fR
 .sp
 Use only the given option file\&. If the file does not exist or is otherwise inaccessible, an error occurs\&.
 \fIfile_name\fR
 is interpreted relative to the current directory if given as a relative path name rather than a full path name\&.
+.sp
+Exception: Even with
+\fB\-\-defaults\-file\fR, client programs read
+\&.mylogin\&.cnf\&.
 .RE
 .sp
 .RS 4
@@ -333,8 +307,6 @@ is interpreted relative to the current directory if given as a relative path nam
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: defaults-group-suffix option
-.\" defaults-group-suffix option: mysqlshow
 \fB\-\-defaults\-group\-suffix=\fR\fB\fIstr\fR\fR
 .sp
 Read not only the usual option groups, but also groups with the usual names and a suffix of
@@ -363,14 +335,12 @@ groups\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: enable-cleartext-plugin option
-.\" enable-cleartext-plugin option: mysqlshow
 \fB\-\-enable\-cleartext\-plugin\fR
 .sp
 Enable the
 mysql_clear_password
 cleartext authentication plugin\&. (See
-Section\ \&6.3.9.8, \(lqThe Cleartext Client-Side Authentication Plugin\(rq\&.)
+Section\ \&7.5.1.8, \(lqThe Cleartext Client-Side Authentication Plugin\(rq\&.)
 .sp
 This option was added in MySQL 5\&.7\&.10\&.
 .RE
@@ -383,8 +353,6 @@ This option was added in MySQL 5\&.7\&.10\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: host option
-.\" host option: mysqlshow
 \fB\-\-host=\fR\fB\fIhost_name\fR\fR,
 \fB\-h \fR\fB\fIhost_name\fR\fR
 .sp
@@ -399,8 +367,6 @@ Connect to the MySQL server on the given host\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: keys option
-.\" keys option: mysqlshow
 \fB\-\-keys\fR,
 \fB\-k\fR
 .sp
@@ -415,8 +381,6 @@ Show table indexes\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: login-path option
-.\" login-path option: mysqlshow
 \fB\-\-login\-path=\fR\fB\fIname\fR\fR
 .sp
 Read options from the named login path in the
@@ -437,8 +401,6 @@ utility\&. See
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: no-defaults option
-.\" no-defaults option: mysqlshow
 \fB\-\-no\-defaults\fR
 .sp
 Do not read any option files\&. If program startup fails due to reading unknown options from an option file,
@@ -464,8 +426,6 @@ utility\&. See
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: password option
-.\" password option: mysqlshow
 \fB\-\-password[=\fR\fB\fIpassword\fR\fR\fB]\fR,
 \fB\-p[\fR\fB\fIpassword\fR\fR\fB]\fR
 .sp
@@ -482,7 +442,7 @@ option on the command line,
 prompts for one\&.
 .sp
 Specifying a password on the command line should be considered insecure\&. See
-Section\ \&6.1.2.1, \(lqEnd-User Guidelines for Password Security\(rq\&. You can use an option file to avoid giving the password on the command line\&.
+Section\ \&7.1.2.1, \(lqEnd-User Guidelines for Password Security\(rq\&. You can use an option file to avoid giving the password on the command line\&.
 .RE
 .sp
 .RS 4
@@ -493,8 +453,6 @@ Section\ \&6.1.2.1, \(lqEnd-User Guidelines for Password Security\(rq\&. You can
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: pipe option
-.\" pipe option: mysqlshow
 \fB\-\-pipe\fR,
 \fB\-W\fR
 .sp
@@ -509,8 +467,6 @@ On Windows, connect to the server using a named pipe\&. This option applies only
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: plugin-dir option
-.\" plugin-dir option: mysqlshow
 \fB\-\-plugin\-dir=\fR\fB\fIdir_name\fR\fR
 .sp
 The directory in which to look for plugins\&. Specify this option if the
@@ -518,7 +474,7 @@ The directory in which to look for plugins\&. Specify this option if the
 option is used to specify an authentication plugin but
 \fBmysqlshow\fR
 does not find it\&. See
-Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
+Section\ \&7.3.8, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -529,8 +485,6 @@ Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: port option
-.\" port option: mysqlshow
 \fB\-\-port=\fR\fB\fIport_num\fR\fR,
 \fB\-P \fR\fB\fIport_num\fR\fR
 .sp
@@ -545,8 +499,6 @@ The TCP/IP port number to use for the connection\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: print-defaults option
-.\" print-defaults option: mysqlshow
 \fB\-\-print\-defaults\fR
 .sp
 Print the program name and all options that it gets from option files\&.
@@ -560,12 +512,10 @@ Print the program name and all options that it gets from option files\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: protocol option
-.\" protocol option: mysqlshow
 \fB\-\-protocol={TCP|SOCKET|PIPE|MEMORY}\fR
 .sp
 The connection protocol to use for connecting to the server\&. It is useful when the other connection parameters normally would cause a protocol to be used other than the one you want\&. For details on the permissible values, see
-Section\ \&4.2.2, \(lqConnecting to the MySQL Server\(rq\&.
+Section\ \&5.2.2, \(lqConnecting to the MySQL Server\(rq\&.
 .RE
 .sp
 .RS 4
@@ -576,8 +526,6 @@ Section\ \&4.2.2, \(lqConnecting to the MySQL Server\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: secure-auth option
-.\" secure-auth option: mysqlshow
 \fB\-\-secure\-auth\fR
 .sp
 Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&. This option was added in MySQL 5\&.7\&.4\&.
@@ -597,7 +545,7 @@ As of MySQL 5\&.7\&.5, this option is deprecated and will be removed in a future
 .ps -1
 .br
 Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them is removed in MySQL 5\&.7\&.5\&. For account upgrade instructions, see
-Section\ \&6.3.9.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
+Section\ \&7.5.1.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
 .sp .5v
 .RE
 .RE
@@ -610,8 +558,6 @@ Section\ \&6.3.9.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mys
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: shared-memory-base-name option
-.\" shared-memory-base-name option: mysqlshow
 \fB\-\-shared\-memory\-base\-name=\fR\fB\fIname\fR\fR
 .sp
 On Windows, the shared\-memory name to use, for connections made using shared memory to a local server\&. The default value is
@@ -630,8 +576,6 @@ option to enable shared\-memory connections\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: show-table-type option
-.\" show-table-type option: mysqlshow
 \fB\-\-show\-table\-type\fR,
 \fB\-t\fR
 .sp
@@ -650,8 +594,6 @@ VIEW\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: socket option
-.\" socket option: mysqlshow
 \fB\-\-socket=\fR\fB\fIpath\fR\fR,
 \fB\-S \fR\fB\fIpath\fR\fR
 .sp
@@ -667,14 +609,12 @@ localhost, the Unix socket file to use, or, on Windows, the name of the named pi
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: SSL options
-.\" SSL options: mysqlshow
 \fB\-\-ssl*\fR
 .sp
 Options that begin with
 \fB\-\-ssl\fR
 specify whether to connect to the server using SSL and indicate where to find SSL keys and certificates\&. See
-Section\ \&6.3.12.5, \(lqCommand Options for Secure Connections\(rq\&.
+Section\ \&7.4.5, \(lqCommand Options for Secure Connections\(rq\&.
 .RE
 .sp
 .RS 4
@@ -685,8 +625,6 @@ Section\ \&6.3.12.5, \(lqCommand Options for Secure Connections\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: status option
-.\" status option: mysqlshow
 \fB\-\-status\fR,
 \fB\-i\fR
 .sp
@@ -701,12 +639,10 @@ Display extra information about each table\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: tls-version option
-.\" tls-version option: mysqlshow
 \fB\-\-tls\-version=\fR\fB\fIprotocol_list\fR\fR
 .sp
 The protocols permitted by the client for encrypted connections\&. The value is a comma\-separated list containing one or more protocol names\&. The protocols that can be named for this option depend on the SSL library used to compile MySQL\&. For details, see
-Section\ \&6.3.12.3, \(lqSecure Connection Protocols and Ciphers\(rq\&.
+Section\ \&7.4.3, \(lqSecure Connection Protocols and Ciphers\(rq\&.
 .sp
 This option was added in MySQL 5\&.7\&.10\&.
 .RE
@@ -719,8 +655,6 @@ This option was added in MySQL 5\&.7\&.10\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: user option
-.\" user option: mysqlshow
 \fB\-\-user=\fR\fB\fIuser_name\fR\fR,
 \fB\-u \fR\fB\fIuser_name\fR\fR
 .sp
@@ -735,8 +669,6 @@ The MySQL user name to use when connecting to the server\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: verbose option
-.\" verbose option: mysqlshow
 \fB\-\-verbose\fR,
 \fB\-v\fR
 .sp
@@ -751,8 +683,6 @@ Verbose mode\&. Print more information about what the program does\&. This optio
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqlshow: version option
-.\" version option: mysqlshow
 \fB\-\-version\fR,
 \fB\-V\fR
 .sp
@@ -761,7 +691,7 @@ Display version information and exit\&.
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2017, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP

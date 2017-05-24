@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: \fBmysql_client_test\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 02/01/2016
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 03/14/2017
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL
 .\"  Language: English
 .\"
-.TH "\FBMYSQL_CLIENT_TEST" "1" "02/01/2016" "MySQL" "MySQL Database System"
+.TH "\FBMYSQL_CLIENT_TEST" "1" "03/14/2017" "MySQL" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -27,8 +27,6 @@
 .\" -----------------------------------------------------------------
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
-.\" mysql_client_test
-.\" mysql_client_test_embedded
 .SH "NAME"
 mysql_client_test \- test client API
 .br
@@ -45,8 +43,11 @@ The
 program is used for testing aspects of the MySQL client API that cannot be tested using
 \fBmysqltest\fR
 and its test language\&.
+\fBmysql_client_test\fR
+is run as part of the test suite\&.
+.PP
 \fBmysql_client_test_embedded\fR
-is similar but used for testing the embedded server\&. Both programs are run as part of the test suite\&.
+is similar but is used for testing the embedded server\&. This program is available only prior to MySQL 8\&.0\&.
 .PP
 The source code for the programs can be found in in
 tests/mysql_client_test\&.c
@@ -68,8 +69,6 @@ supports the following options:
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: help option
-.\" help option: mysql_client_test
 \fB\-\-help\fR,
 \fB\-?\fR
 .sp
@@ -85,8 +84,6 @@ Display a help message and exit\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-basedir=\fR\fB\fIdir_name\fR\fR,
-.\" mysql_client_test: basedir option
-.\" basedir option: mysql_client_test
 \fB\-b \fR\fB\fIdir_name\fR\fR
 .sp
 The base directory for the tests\&.
@@ -101,8 +98,6 @@ The base directory for the tests\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-count=\fR\fB\fIcount\fR\fR,
-.\" mysql_client_test: count option
-.\" count option: mysql_client_test
 \fB\-t \fR\fB\fIcount\fR\fR
 .sp
 The number of times to execute the tests\&.
@@ -116,8 +111,6 @@ The number of times to execute the tests\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: database option
-.\" database option: mysql_client_test
 \fB\-\-database=\fR\fB\fIdb_name\fR\fR,
 \fB\-D \fR\fB\fIdb_name\fR\fR
 .sp
@@ -132,8 +125,6 @@ The database to use\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: debug option
-.\" debug option: mysql_client_test
 \fB\-\-debug[=\fR\fB\fIdebug_options\fR\fR\fB]\fR,
 \fB\-#[\fR\fB\fIdebug_options\fR\fR\fB]\fR
 .sp
@@ -152,8 +143,6 @@ value is
 .IP \(bu 2.3
 .\}
 \fB\-\-getopt\-ll\-test=\fR\fB\fIoption\fR\fR,
-.\" mysql_client_test: getopt-ll-test option
-.\" getopt-ll-test option: mysql_client_test
 \fB\-g \fR\fB\fIoption\fR\fR
 .sp
 Option to use for testing bugs in the
@@ -169,8 +158,6 @@ library\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: host option
-.\" host option: mysql_client_test
 \fB\-\-host=\fR\fB\fIhost_name\fR\fR,
 \fB\-h \fR\fB\fIhost_name\fR\fR
 .sp
@@ -185,8 +172,6 @@ Connect to the MySQL server on the given host\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: password option
-.\" password option: mysql_client_test
 \fB\-\-password[=\fR\fB\fIpassword\fR\fR\fB]\fR,
 \fB\-p[\fR\fB\fIpassword\fR\fR\fB]\fR
 .sp
@@ -195,8 +180,6 @@ The password to use when connecting to the server\&. If you use the short option
 have a space between the option and the password\&. If you omit the
 \fIpassword\fR
 value following the
-.\" mysql_client_test: password option
-.\" password option: mysql_client_test
 \fB\-\-password\fR
 or
 \fB\-p\fR
@@ -211,8 +194,6 @@ option on the command line, you are prompted for one\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: port option
-.\" port option: mysql_client_test
 \fB\-\-port=\fR\fB\fIport_num\fR\fR,
 \fB\-P \fR\fB\fIport_num\fR\fR
 .sp
@@ -228,8 +209,6 @@ The TCP/IP port number to use for the connection\&.
 .IP \(bu 2.3
 .\}
 \fB\-\-server\-arg=\fR\fB\fIarg\fR\fR,
-.\" mysql_client_test: server-arg option
-.\" server-arg option: mysql_client_test
 \fB\-A \fR\fB\fIarg\fR\fR
 .sp
 Argument to send to the embedded server\&.
@@ -257,8 +236,6 @@ Show all test names\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: silent option
-.\" silent option: mysql_client_test
 \fB\-\-silent\fR,
 \fB\-s\fR
 .sp
@@ -273,8 +250,6 @@ Be more silent\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: socket option
-.\" socket option: mysql_client_test
 \fB\-\-socket=\fR\fB\fIpath\fR\fR,
 \fB\-S \fR\fB\fIpath\fR\fR
 .sp
@@ -308,8 +283,6 @@ may optionally behave in a different way than if called manually, for example by
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysql_client_test: user option
-.\" user option: mysql_client_test
 \fB\-\-user=\fR\fB\fIuser_name\fR\fR,
 \fB\-u \fR\fB\fIuser_name\fR\fR
 .sp
@@ -325,8 +298,6 @@ The MySQL user name to use when connecting to the server\&.
 .IP \(bu 2.3
 .\}
 \fB\-v \fR\fB\fIdir_name\fR\fR,
-.\" mysql_client_test: vardir option
-.\" vardir option: mysql_client_test
 \fB\-\-vardir=\fR\fB\fIdir_name\fR\fR
 .sp
 The data directory for tests\&. The default is
@@ -335,7 +306,7 @@ mysql\-test/var\&.
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 2006, 2016, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 2006, 2017, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP

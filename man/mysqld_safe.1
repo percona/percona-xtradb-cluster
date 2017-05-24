@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: \fBmysqld_safe\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 02/01/2016
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 03/17/2017
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQLD_SAFE\FR" "1" "02/01/2016" "MySQL 5\&.7" "MySQL Database System"
+.TH "\FBMYSQLD_SAFE\FR" "1" "03/17/2017" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -27,9 +27,6 @@
 .\" -----------------------------------------------------------------
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
-.\" mysqld_safe
-.\" tools: mysqld_safe
-.\" scripts
 .SH "NAME"
 mysqld_safe \- MySQL server startup script
 .SH "SYNOPSIS"
@@ -80,7 +77,7 @@ Many of the options to
 \fBmysqld_safe\fR
 are the same as the options to
 \fBmysqld\fR\&. See
-Section\ \&5.1.3, \(lqServer Command Options\(rq\&.
+Section\ \&6.1.4, \(lqServer Command Options\(rq\&.
 .PP
 Options unknown to
 \fBmysqld_safe\fR
@@ -89,7 +86,7 @@ are passed to
 if they are specified on the command line, but ignored if they are specified in the
 [mysqld_safe]
 group of an option file\&. See
-Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
+Section\ \&5.2.6, \(lqUsing Option Files\(rq\&.
 .PP
 \fBmysqld_safe\fR
 reads all options from the
@@ -124,7 +121,7 @@ sections, but to be current you should rename such sections to
 .PP
 \fBmysqld_safe\fR
 accepts options on the command line and in option files, as described in the following table\&. For information about option files used by MySQL programs, see
-Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
+Section\ \&5.2.6, \(lqUsing Option Files\(rq\&.
 .sp
 .RS 4
 .ie n \{\
@@ -134,8 +131,6 @@ Section\ \&4.2.6, \(lqUsing Option Files\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: help option
-.\" help option: mysqld_safe
 \fB\-\-help\fR
 .sp
 Display a help message and exit\&.
@@ -149,8 +144,6 @@ Display a help message and exit\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: basedir option
-.\" basedir option: mysqld_safe
 \fB\-\-basedir=\fR\fB\fIdir_name\fR\fR
 .sp
 The path to the MySQL installation directory\&.
@@ -164,8 +157,6 @@ The path to the MySQL installation directory\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: core-file-size option
-.\" core-file-size option: mysqld_safe
 \fB\-\-core\-file\-size=\fR\fB\fIsize\fR\fR
 .sp
 The size of the core file that
@@ -182,8 +173,6 @@ should be able to create\&. The option value is passed to
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: datadir option
-.\" datadir option: mysqld_safe
 \fB\-\-datadir=\fR\fB\fIdir_name\fR\fR
 .sp
 The path to the data directory\&.
@@ -197,11 +186,14 @@ The path to the data directory\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: defaults-extra-file option
-.\" defaults-extra-file option: mysqld_safe
 \fB\-\-defaults\-extra\-file=\fR\fB\fIfile_name\fR\fR
 .sp
-The name of an option file to be read in addition to the usual option files\&. This must be the first option on the command line if it is used\&. If the file does not exist or is otherwise inaccessible, the server will exit with an error\&.
+Read this option file in addition to the usual option files\&. If the file does not exist or is otherwise inaccessible, the server will exit with an error\&.
+\fIfile_name\fR
+is interpreted relative to the current directory if given as a relative path name rather than a full path name\&. This must be the first option on the command line if it is used\&.
+.sp
+For additional information about this option, see
+Section\ \&5.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -212,11 +204,14 @@ The name of an option file to be read in addition to the usual option files\&. T
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: defaults-file option
-.\" defaults-file option: mysqld_safe
 \fB\-\-defaults\-file=\fR\fB\fIfile_name\fR\fR
 .sp
-The name of an option file to be read instead of the usual option files\&. This must be the first option on the command line if it is used\&.
+Use only the given option file\&. If the file does not exist or is otherwise inaccessible, the server will exit with an error\&.
+\fIfile_name\fR
+is interpreted relative to the current directory if given as a relative path name rather than a full path name\&. This must be the first option on the command line if it is used\&.
+.sp
+For additional information about this option, see
+Section\ \&5.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -227,13 +222,15 @@ The name of an option file to be read instead of the usual option files\&. This 
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: ledir option
-.\" ledir option: mysqld_safe
 \fB\-\-ledir=\fR\fB\fIdir_name\fR\fR
 .sp
 If
 \fBmysqld_safe\fR
 cannot find the server, use this option to indicate the path name to the directory where the server is located\&.
+.sp
+As of MySQL 5\&.7\&.17, this option is accepted only on the command line, not in option files\&. On platforms that use systemd, the value can be specified in the value of
+MYSQLD_OPTS\&. See
+Section\ \&2.5.10, \(lqManaging MySQL Server with systemd\(rq\&.
 .RE
 .sp
 .RS 4
@@ -244,12 +241,10 @@ cannot find the server, use this option to indicate the path name to the directo
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: log-error option
-.\" log-error option: mysqld_safe
 \fB\-\-log\-error=\fR\fB\fIfile_name\fR\fR
 .sp
 Write the error log to the given file\&. See
-Section\ \&5.2.2, \(lqThe Error Log\(rq\&.
+Section\ \&6.4.2, \(lqThe Error Log\(rq\&.
 .RE
 .sp
 .RS 4
@@ -260,8 +255,6 @@ Section\ \&5.2.2, \(lqThe Error Log\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: mysqld-safe-log-timestamps option
-.\" mysqld-safe-log-timestamps option: mysqld_safe
 \fB\-\-mysqld\-safe\-log\-timestamps\fR
 .sp
 This option controls the format for timestamps in log output produced by
@@ -348,17 +341,33 @@ This option was added in MySQL 5\&.7\&.11\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: malloc-lib option
-.\" mysqld option: malloc-lib
 \fB\-\-malloc\-lib=[\fR\fB\fIlib_name\fR\fR\fB]\fR
-.\" memory allocation library
-.\" tcmalloc: memory allocation library
 The name of the library to use for memory allocation instead of the system
 malloc()
-library\&. Any library can be used by specifying its path name, but there is a shortcut form to enable use of the
+library\&. As of MySQL 5\&.7\&.15, the option value must be one of the directories
+/usr/lib,
+/usr/lib64,
+/usr/lib/i386\-linux\-gnu, or
+/usr/lib/x86_64\-linux\-gnu\&. Prior to MySQL 5\&.7\&.15, any library can be used by specifying its path name, but there is a shortcut form to enable use of the
 tcmalloc
 library that is shipped with binary MySQL distributions for Linux in MySQL 5\&.7\&. It is possible that the shortcut form will not work under certain configurations, in which case you should specify a path name instead\&.
+.if n \{\
 .sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+As of MySQL 5\&.7\&.13, MySQL distributions no longer include a
+tcmalloc
+library\&.
+.sp .5v
+.RE
 The
 \fB\-\-malloc\-lib\fR
 option works by modifying the
@@ -506,8 +515,6 @@ malloc\-lib=/opt/lib/libtcmalloc_minimal\&.so
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: mysqld option
-.\" mysqld option: mysqld_safe
 \fB\-\-mysqld=\fR\fB\fIprog_name\fR\fR
 .sp
 The name of the server program (in the
@@ -517,6 +524,10 @@ directory) that you want to start\&. This option is needed if you use the MySQL 
 cannot find the server, use the
 \fB\-\-ledir\fR
 option to indicate the path name to the directory where the server is located\&.
+.sp
+As of MySQL 5\&.7\&.15, this option is accepted only on the command line, not in option files\&. On platforms that use systemd, the value can be specified in the value of
+MYSQLD_OPTS\&. See
+Section\ \&2.5.10, \(lqManaging MySQL Server with systemd\(rq\&.
 .RE
 .sp
 .RS 4
@@ -527,8 +538,6 @@ option to indicate the path name to the directory where the server is located\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: mysqld-version option
-.\" mysqld-version option: mysqld_safe
 \fB\-\-mysqld\-version=\fR\fB\fIsuffix\fR\fR
 .sp
 This option is similar to the
@@ -550,6 +559,10 @@ uses
 in the
 ledir
 directory\&.
+.sp
+As of MySQL 5\&.7\&.15, this option is accepted only on the command line, not in option files\&. On platforms that use systemd, the value can be specified in the value of
+MYSQLD_OPTS\&. See
+Section\ \&2.5.10, \(lqManaging MySQL Server with systemd\(rq\&.
 .RE
 .sp
 .RS 4
@@ -560,8 +573,6 @@ directory\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: nice option
-.\" nice option: mysqld_safe
 \fB\-\-nice=\fR\fB\fIpriority\fR\fR
 .sp
 Use the
@@ -577,11 +588,14 @@ program to set the server\*(Aqs scheduling priority to the given value\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: no-defaults option
-.\" no-defaults option: mysqld_safe
 \fB\-\-no\-defaults\fR
 .sp
-Do not read any option files\&. This must be the first option on the command line if it is used\&.
+Do not read any option files\&. If program startup fails due to reading unknown options from an option file,
+\fB\-\-no\-defaults\fR
+can be used to prevent them from being read\&. This must be the first option on the command line if it is used\&.
+.sp
+For additional information about this option, see
+Section\ \&5.2.7, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
 .RE
 .sp
 .RS 4
@@ -592,8 +606,6 @@ Do not read any option files\&. This must be the first option on the command lin
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: open-files-limit option
-.\" open-files-limit option: mysqld_safe
 \fB\-\-open\-files\-limit=\fR\fB\fIcount\fR\fR
 .sp
 The number of files that
@@ -629,17 +641,17 @@ for this to function properly\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: pid-file option
-.\" pid-file option: mysqld_safe
 \fB\-\-pid\-file=\fR\fB\fIfile_name\fR\fR
 .sp
-The path name of the process ID file\&.
+The path name that
+\fBmysqld\fR
+should use for its process ID file\&.
 .sp
-In MySQL 5\&.7\&.2 and later,
+From MySQL 5\&.7\&.2 to 5\&.7\&.17,
 \fBmysqld_safe\fR
-creates a PID file named
+has its own process ID file, which is always named
 mysqld_safe\&.pid
-in the MySQL data directory when starting up (Bug #16776528)\&.
+and located in the MySQL data directory\&.
 .RE
 .sp
 .RS 4
@@ -650,8 +662,6 @@ in the MySQL data directory when starting up (Bug #16776528)\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: plugin-dir option
-.\" plugin-dir option: mysqld_safe
 \fB\-\-plugin\-dir=\fR\fB\fIdir_name\fR\fR
 .sp
 The path name of the plugin directory\&.
@@ -665,9 +675,6 @@ The path name of the plugin directory\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: port option
-.\" port option: mysqld_safe
-.\" TCP/IP
 \fB\-\-port=\fR\fB\fIport_num\fR\fR
 .sp
 The port number that the server should use when listening for TCP/IP connections\&. The port number must be 1024 or higher unless the server is started by the
@@ -683,8 +690,6 @@ system user\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: skip-kill-mysqld option
-.\" skip-kill-mysqld option: mysqld_safe
 \fB\-\-skip\-kill\-mysqld\fR
 .sp
 Do not try to kill stray
@@ -700,8 +705,6 @@ processes at startup\&. This option works only on Linux\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: socket option
-.\" socket option: mysqld_safe
 \fB\-\-socket=\fR\fB\fIpath\fR\fR
 .sp
 The Unix socket file that the server should use when listening for local connections\&.
@@ -715,10 +718,6 @@ The Unix socket file that the server should use when listening for local connect
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: syslog option
-.\" syslog option: mysqld_safe
-.\" mysqld_safe: skip-syslog option
-.\" skip-syslog option: mysqld_safe
 \fB\-\-syslog\fR,
 \fB\-\-skip\-syslog\fR
 .sp
@@ -745,7 +744,7 @@ log_syslog
 system variable instead\&. To control the facility, use the server
 log_syslog_facility
 system variable\&. See
-Section\ \&5.2.2, \(lqThe Error Log\(rq\&.
+Section\ \&6.4.2, \(lqThe Error Log\(rq\&.
 .RE
 .sp
 .RS 4
@@ -756,8 +755,6 @@ Section\ \&5.2.2, \(lqThe Error Log\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: syslog-tag option
-.\" syslog-tag option: mysqld_safe
 \fB\-\-syslog\-tag=\fR\fB\fItag\fR\fR
 .sp
 For logging to
@@ -779,7 +776,7 @@ Using this option to control
 logging is deprecated as of MySQL 5\&.7\&.5\&. Use the server
 log_syslog_tag
 system variable instead\&. See
-Section\ \&5.2.2, \(lqThe Error Log\(rq\&.
+Section\ \&6.4.2, \(lqThe Error Log\(rq\&.
 .RE
 .sp
 .RS 4
@@ -790,8 +787,6 @@ Section\ \&5.2.2, \(lqThe Error Log\(rq\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: timezone option
-.\" timezone option: mysqld_safe
 \fB\-\-timezone=\fR\fB\fItimezone\fR\fR
 .sp
 Set the
@@ -807,8 +802,6 @@ time zone environment variable to the given option value\&. Consult your operati
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqld_safe: user option
-.\" user option: mysqld_safe
 \fB\-\-user={\fR\fB\fIuser_name\fR\fR\fB|\fR\fB\fIuser_id\fR\fR\fB}\fR
 .sp
 Run the
@@ -1017,13 +1010,13 @@ logging from
 is deprecated as of MySQL 5\&.7\&.5\&. Use the server\*(Aqs native
 syslog
 support instead\&. For more information, see
-Section\ \&5.2.2, \(lqThe Error Log\(rq\&.
+Section\ \&6.4.2, \(lqThe Error Log\(rq\&.
 .sp .5v
 .RE
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2017, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP

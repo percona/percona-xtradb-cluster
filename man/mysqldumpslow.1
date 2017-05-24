@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: \fBmysqldumpslow\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 02/01/2016
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 03/17/2017
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQLDUMPSLOW\FR" "1" "02/01/2016" "MySQL 5\&.7" "MySQL Database System"
+.TH "\FBMYSQLDUMPSLOW\FR" "1" "03/17/2017" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -27,7 +27,6 @@
 .\" -----------------------------------------------------------------
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
-.\" mysqldumpslow
 .SH "NAME"
 mysqldumpslow \- Summarize slow query log files
 .SH "SYNOPSIS"
@@ -36,7 +35,7 @@ mysqldumpslow \- Summarize slow query log files
 .SH "DESCRIPTION"
 .PP
 The MySQL slow query log contains information about queries that take a long time to execute (see
-Section\ \&5.2.5, \(lqThe Slow Query Log\(rq)\&.
+Section\ \&6.4.5, \(lqThe Slow Query Log\(rq)\&.
 \fBmysqldumpslow\fR
 parses MySQL slow query log files and prints a summary of their contents\&.
 .PP
@@ -79,8 +78,6 @@ supports the following options\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqldumpslow: help option
-.\" help option: mysqldumpslow
 \fB\-\-help\fR
 .sp
 Display a help message and exit\&.
@@ -110,8 +107,6 @@ and strings to
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqldumpslow: debug option
-.\" debug option: mysqldumpslow
 \fB\-\-debug\fR,
 \fB\-d\fR
 .sp
@@ -294,8 +289,6 @@ queries in the output\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-.\" mysqldumpslow: verbose option
-.\" verbose option: mysqldumpslow
 \fB\-\-verbose\fR,
 \fB\-v\fR
 .sp
@@ -323,7 +316,7 @@ Count: 3  Time=2\&.13s (6s)  Lock=0\&.00s (0s)  Rows=0\&.0 (0), root[root]@local
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2017, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP
