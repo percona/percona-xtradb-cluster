@@ -2,12 +2,12 @@
 .\"     Title: \fBmysqldump\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 08/25/2016
+.\"      Date: 03/17/2017
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.6
 .\"  Language: English
 .\"
-.TH "\FBMYSQLDUMP\FR" "1" "08/25/2016" "MySQL 5\&.6" "MySQL Database System"
+.TH "\FBMYSQLDUMP\FR" "1" "03/17/2017" "MySQL 5\&.6" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -277,7 +277,7 @@ shell> \fBmysqldump [options] > dump\&.sql\fR
 .\}
 .PP
 However, UTF\-16 is not permitted as a connection character set (see
-Section\ \&10.1.5, \(lqConnection Character Sets and Collations\(rq), so the dump file will not load correctly\&. To work around this issue, use the
+Section\ \&10.1.4, \(lqConnection Character Sets and Collations\(rq), so the dump file will not load correctly\&. To work around this issue, use the
 \fB\-\-result\-file\fR
 option, which creates the output in ASCII format:
 .sp
@@ -752,6 +752,10 @@ is interpreted relative to the current directory if given as a relative path nam
 Use only the given option file\&. If the file does not exist or is otherwise inaccessible, an error occurs\&.
 \fIfile_name\fR
 is interpreted relative to the current directory if given as a relative path name rather than a full path name\&.
+.sp
+Exception: Even with
+\fB\-\-defaults\-file\fR, client programs read
+\&.mylogin\&.cnf\&.
 .RE
 .sp
 .RS 4
@@ -1559,7 +1563,7 @@ maxdb,
 no_key_options,
 no_table_options, or
 no_field_options\&. To use several values, separate them by commas\&. These values have the same meaning as the corresponding options for setting the server SQL mode\&. See
-Section\ \&5.1.7, \(lqServer SQL Modes\(rq\&.
+Section\ \&5.1.8, \(lqServer SQL Modes\(rq\&.
 .sp
 This option does not guarantee compatibility with other servers\&. It only enables those SQL mode values that are currently available for making dump output more compatible\&. For example,
 \fB\-\-compatible=oracle\fR
@@ -1673,11 +1677,11 @@ Section\ \&13.2.6, \(lqLOAD DATA INFILE Syntax\(rq\&.
 \fB\-Q\fR
 .sp
 Quote identifiers (such as database, table, and column names) within
-\(lq`\(rq
+`
 characters\&. If the
 ANSI_QUOTES
 SQL mode is enabled, identifiers are quoted within
-\(lq"\(rq
+"
 characters\&. This option is enabled by default\&. It can be disabled with
 \fB\-\-skip\-quote\-names\fR, but this option should be given after any option such as
 \fB\-\-compatible\fR
@@ -1699,9 +1703,9 @@ that may enable
 Direct output to the named file\&. The result file is created and its previous contents overwritten, even if an error occurs while generating the dump\&.
 .sp
 This option should be used on Windows to prevent newline
-\(lq\en\(rq
+\en
 characters from being converted to
-\(lq\er\en\(rq
+\er\en
 carriage return/newline sequences\&.
 .RE
 .sp
@@ -1946,6 +1950,16 @@ CREATE DATABASE
 and
 USE
 statements are included in the output before each new database\&.
+.sp
+This option may be used to dump the
+INFORMATION_SCHEMA
+and
+performace_schema
+databases, which normally are not dumped even with the
+\fB\-\-all\-databases\fR
+option\&. (Also use the
+\fB\-\-skip\-lock\-tables\fR
+option\&.)
 .RE
 .sp
 .RS 4
@@ -2017,7 +2031,7 @@ statement for the table (for example, to create an empty copy of the table by lo
 \fB\-\-routines\fR,
 \fB\-R\fR
 .sp
-Include stored routines (procedures and functions) for the dumped databases in the output\&. Use of this option requires the
+Include stored routines (procedures and functions) for the dumped databases in the output\&. This option requires the
 SELECT
 privilege for the
 mysql\&.proc
@@ -2279,7 +2293,7 @@ LOCK TABLES
 and
 UNLOCK TABLES
 statements\&. This results in faster inserts when the dump file is reloaded\&. See
-Section\ \&8.2.2.1, \(lqSpeed of INSERT Statements\(rq\&.
+Section\ \&8.2.4.1, \(lqOptimizing INSERT Statements\(rq\&.
 .RE
 .sp
 .RS 4
@@ -2301,7 +2315,8 @@ option, the logs are flushed
 \fIfor each database dumped\fR\&. The exception is when using
 \fB\-\-lock\-all\-tables\fR,
 \fB\-\-master\-data\fR, or
-\fB\-\-single\-transaction\fR: In this case, the logs are flushed only once, corresponding to the moment that all tables are locked\&. If you want your dump and the log flush to happen at exactly the same moment, you should use
+\fB\-\-single\-transaction\fR: In this case, the logs are flushed only once, corresponding to the moment that all tables are locked by
+FLUSH TABLES WITH READ LOCK\&. If you want your dump and the log flush to happen at exactly the same moment, you should use
 \fB\-\-flush\-logs\fR
 together with
 \fB\-\-lock\-all\-tables\fR,
@@ -2737,7 +2752,7 @@ for a workaround\&.
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2017, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP
