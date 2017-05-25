@@ -188,7 +188,6 @@ override_dh_auto_install:
 
 	# mysql-server
 	mkdir -p $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples
-	mv $(TMP)/usr/share/mysql/*cnf      $(TMP)/usr/share/doc/percona-xtradb-cluster-5.7/examples/
 	rm -vf $(TMP)/usr/share/percona-xtradb-cluster/mi_test_all* \
 		$(TMP)/usr/share/percona-xtradb-cluster/mysql-log-rotate \
 		$(TMP)/usr/share/percona-xtradb-cluster/mysql.server \
