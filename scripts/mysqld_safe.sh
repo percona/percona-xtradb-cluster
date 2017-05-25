@@ -82,9 +82,12 @@ EOF
         fi
         cat <<EOF
 Usage: $0 [OPTIONS]
+ The following options may be given as the first argument:
   --no-defaults              Don't read the system defaults file
   --defaults-file=FILE       Use the specified defaults file
   --defaults-extra-file=FILE Also use defaults from the specified file
+
+ Other options:
   --ledir=DIRECTORY          Look for mysqld in the specified directory
   --open-files-limit=LIMIT   Limit the number of open files
   --core-file-size=LIMIT     Limit core files to the specified size
@@ -103,6 +106,7 @@ Usage: $0 [OPTIONS]
                              starting the server
   --numa-interleave          Run mysqld with its memory interleaved
                              on all NUMA nodes
+${thp_usage}
 
 All other options are passed to the mysqld program.
 
@@ -324,7 +328,12 @@ parse_arguments() {
     case "$arg" in
       # these get passed explicitly to mysqld
       --basedir=*) MY_BASEDIR_VERSION="$val" ;;
-      --datadir=*) DATADIR="$val" ;;
+      --datadir=*)
+        case $val in
+          /) DATADIR=$val ;;
+          *) DATADIR="`echo $val | sed 's;/*$;;'`" ;;
+        esac
+        ;;
       --pid-file=*) pid_file="$val" ;;
       --plugin-dir=*) PLUGIN_DIR="$val" ;;
       --user=*) user="$val"; SET_USER=1 ;;
@@ -412,10 +421,11 @@ add_mysqld_ld_preload() {
   lib_to_add="$1"
   lib_to_add=$(readlink -f $lib_to_add)
   log_notice "Adding '$lib_to_add' to LD_PRELOAD for mysqld"
+  real_basedir=$(readlink -f ${MY_BASEDIR_VERSION})
 
   # Check if the library is in the reduced number of standard system directories
   case "$lib_to_add" in
-    /usr/lib64/* | /usr/lib/* | ${MY_BASEDIR_VERSION}/lib/*)
+    /usr/lib64/* | /usr/lib/* | ${MY_BASEDIR_VERSION}/lib/* | ${real_basedir}/lib/*)
       ;;
     *)
       log_error "ld_preload libraries can only be loaded from system directories (/usr/lib64, /usr/lib, ${MY_BASEDIR_VERSION}/lib)"
@@ -784,7 +794,7 @@ fi
 logdir=`dirname "$err_log"`
 # Change the err log to the right user, if possible and it is in use
 if [ $logging = "file" -o $logging = "both" ]; then
-  if [ ! -f "$err_log" -a ! -h "$err_log" ]; then
+  if [ ! -e "$err_log" -a ! -h "$err_log" ]; then
     if test -w / -o "$USER" = "root"; then
       case $logdir in
         /var/log)
@@ -804,7 +814,7 @@ if [ $logging = "file" -o $logging = "both" ]; then
     fi
   fi
 
-  if [ -f "$err_log" ]; then        # Log to err_log file
+  if [ -f "$err_log" -o -p "$err_log" ]; then        # Log to err_log file
     log_notice "Logging to '$err_log'."
   elif [ "x$user" = "xroot" ]; then # running as root, mysqld can create log file; continue
     echo "Logging to '$err_log'." >&2
