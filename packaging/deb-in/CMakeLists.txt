@@ -348,6 +348,7 @@ Description: MySQL Common
  implementation to satisfy dependencies of other packages
  like libmysqlclient18. It depends on any mysql-wsrep-common
 ")
+SET(@COMMON_WSREP_CONFLICTS@ "mysql-common (>> ${VERSION})")
 ENDIF()
 
 
