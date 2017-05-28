@@ -159,7 +159,7 @@ Replaces: mysql,
           mysql-server-5.5, mysql-server-core-5.5, libmysqlclient-dev,
  mysql-server-5.6, mysql-server-core-5.6,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- @COMMON_WSREP_CONFLICTS@, mysql-common (<< ${binary:Version})
+ @COMMON_WSREP_CONFLICTS@, mysql-common
 Provides: mysql-common, mysql-@DEB_PRODUCTNAME@-common
 Description: MySQL Common
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,

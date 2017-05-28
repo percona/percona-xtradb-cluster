@@ -287,7 +287,7 @@ LIST(REMOVE_ITEM SOURCEFILES "CMakeLists.txt")
 # Combine the list of all startup files to be included,
 # skip Debian magical init files unless needed
 IF(DEB_PRODUCTNAME STREQUAL "wsrep")
-    SET(COMMON_WSREP_CONFLICTS "mysql-common (>> ${VERSION})")
+    SET(COMMON_WSREP_CONFLICTS "mysql-common (>= 5.7)")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.install.in")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.dirs.in")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.postinst.in")
