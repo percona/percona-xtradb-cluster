@@ -287,6 +287,7 @@ LIST(REMOVE_ITEM SOURCEFILES "CMakeLists.txt")
 # Combine the list of all startup files to be included,
 # skip Debian magical init files unless needed
 IF(DEB_PRODUCTNAME STREQUAL "wsrep")
+    SET(COMMON_WSREP_CONFLICTS "mysql-common (>> ${VERSION})")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.install.in")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.dirs.in")
     LIST(REMOVE_ITEM SOURCEFILES "mysql-common.postinst.in")
@@ -348,7 +349,4 @@ Description: MySQL Common
  implementation to satisfy dependencies of other packages
  like libmysqlclient18. It depends on any mysql-wsrep-common
 ")
-SET(@COMMON_WSREP_CONFLICTS@ "mysql-common (>> ${VERSION})")
 ENDIF()
-
-
