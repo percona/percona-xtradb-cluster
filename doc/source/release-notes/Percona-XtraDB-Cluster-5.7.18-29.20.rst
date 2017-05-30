@@ -13,7 +13,7 @@ or from our :ref:`software repositories <install>`.
 Percona XtraDB Cluster 5.7.18-29.20 is now the current release,
 based on the following:
 
-* `Percona Server 5.7.18-14 <http://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.18-14.html>`_
+* `Percona Server 5.7.18-15 <http://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.18-15.html>`_
 
 * Galera Replication library 3.20
 
@@ -54,7 +54,7 @@ Fixed Bugs
 * :jirabug:`PXC-820`: Enabled querying of :variable:`pxc_maint_mode`
   by another client during the transition period.
 
-* :jirabug:`PXC-823`: Fixed SST script to gracefully shut down JOINER node
+* :jirabug:`PXC-823`: Fixed SST flow to gracefully shut down JOINER node
   if SST fails because DONOR leaves the cluster due to network failure.
   This ensures that the DONOR is then able to recover to synced state
   when network connectivity is restored
