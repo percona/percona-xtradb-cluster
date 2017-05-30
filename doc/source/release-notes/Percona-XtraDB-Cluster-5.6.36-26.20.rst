@@ -36,7 +36,7 @@ Fixed Bugs
 
 * :jirabug:`PXC-813`: Fixed SST script to use UTC time format.
 
-* :jirabug:`PXC-823`: Fixed SST script to gracefully shut down JOINER node
+* :jirabug:`PXC-823`: Fixed SST flow to gracefully shut down JOINER node
   if SST fails because DONOR leaves the cluster due to network failure.
   This ensures that the DONOR is then able to recover to synced state
   when network connectivity is restored
