@@ -151,6 +151,7 @@ table_replication_applier_status.h
 table_replication_applier_status_by_coordinator.h
 table_replication_applier_status_by_worker.h
 table_replication_group_member_stats.h
+table_pxc_cluster_view.h
 cursor_by_account.cc
 cursor_by_host.cc
 cursor_by_thread.cc
@@ -267,6 +268,7 @@ table_replication_applier_status.cc
 table_replication_applier_status_by_coordinator.cc
 table_replication_applier_status_by_worker.cc
 table_replication_group_member_stats.cc
+table_pxc_cluster_view.cc
 )
 
 MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES} STORAGE_ENGINE MANDATORY STATIC_ONLY NOT_FOR_EMBEDDED)
