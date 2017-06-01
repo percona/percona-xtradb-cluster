@@ -8,7 +8,7 @@ print_message() {
     echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
     echo "   *  Once it is done please execute the following commands:"
     echo " rm -rf /etc/mysql/my.cnf"
-    echo " update-alternatives --install /etc/mysql/my.cnf my.cnf \"/etc/mysql/percona-server.cnf\" 200"
+    echo " update-alternatives --install /etc/mysql/my.cnf my.cnf \"/etc/mysql/percona-xtradb-cluster.cnf\" 200"
     echo " -------------"
 }
 
