@@ -37,6 +37,9 @@ ELSE()
   SET (DEB_CONTROL_SERVER_CONFLICT_NDB "mysql-cluster-community-server, mysql-cluster-commercial-server")
   SET (DEB_CONTROL_CLIENT_CONFLICT_NDB "mysql-cluster-community-client, mysql-cluster-commercial-client")
 ENDIF()
+
+SET (DEB_BASE_VERSION "${DEB_BASE_VERSION}-${WSREP_VERSION}")
+
 # Commercial or community
 IF (DEB_PRODUCT STREQUAL "commercial")
   message (FATAL_ERROR "mysql-wsrep is GPL only, no commercial builds")
@@ -303,6 +306,12 @@ LIST(REMOVE_ITEM SOURCEFILES "copyright.${DEB_REMOVEPATTERN}")
 LIST(REMOVE_ITEM SOURCEFILES "CMakeLists.txt")
 # Combine the list of all startup files to be included,
 # skip Debian magical init files unless needed
+IF(DEB_PRODUCTNAME STREQUAL "wsrep")
+    LIST(REMOVE_ITEM SOURCEFILES "mysql-common.install.in")
+    LIST(REMOVE_ITEM SOURCEFILES "mysql-common.dirs.in")
+    LIST(REMOVE_ITEM SOURCEFILES "mysql-common.postinst.in")
+    LIST(REMOVE_ITEM SOURCEFILES "mysql-common.postrm.in")
+ENDIF()
 IF(DEB_STARTUP MATCHES ".*SYSV.*")
   SET (DEB_FILES_STARTUP ${FILES_STARTUP_SYSV})
 ELSE()
@@ -321,6 +330,7 @@ ENDIF()
 IF(DEB_INSTALL_SERVER_SYSTEMD STREQUAL "")
 	LIST(REMOVE_ITEM SOURCEFILES "mysql-packagesource-server.mysql.service.in")
 ENDIF()
+
 FOREACH (SOURCEFILE ${SOURCEFILES})
   STRING(REGEX REPLACE "-packagesource-" "-${DEB_PRODUCTNAME}-"
     TMPFILE ${SOURCEFILE})
@@ -337,4 +347,27 @@ ENDFOREACH()
 EXECUTE_PROCESS(
   COMMAND chmod +x ${CMAKE_BINARY_DIR}/debian/rules
 )
+IF(DEB_PRODUCTNAME STREQUAL "wsrep")
+FILE(APPEND "${CMAKE_BINARY_DIR}/debian/control" "
+Package: mysql-common
+Architecture: any
+Pre-depends: debconf (>= 0.2.17),
+             \${misc:Pre-Depends}
+Multi-Arch: foreign
+Depends: \${misc:Depends},
+         \${shlibs:Depends},
+         mysql-wsrep-common-5.7
+Description: MySQL Common
+ The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
+ and robust SQL (Structured Query Language) database server. MySQL Server
+ is intended for mission-critical, heavy-load production systems as well
+ as for embedding into mass-deployed software. MySQL is a trademark of
+ Oracle. This package contains common files needed by MySQL client
+ library and the MySQL database server.
+ This package is a dummy replacement for the case when using mysql WSREP
+ implementation to satisfy dependencies of other packages
+ like libmysqlclient18
+")
+ENDIF()
+
 

@@ -131,7 +131,7 @@ Architecture: any
 Section: libs
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
-Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version}),
+Depends: mysql-@DEB_PRODUCTNAME@-common,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: MySQL shared client libraries
@@ -155,7 +155,7 @@ Conflicts: mysql,
  mysql-server-5.7, mysql-server-core-5.7,
  mysql-client-5.7, mysql-client-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
- mysql-common (<< 5.7.17), mysql-@DEB_PRODUCTNAME@-common (<< 5.7.17),
+ mysql-@DEB_PRODUCTNAME@-common (<< 5.7.17),
  mysql-@DEB_PRODUCTNAME@-common-5.6, mysql-@DEB_PRODUCTNAME@-common-5.5
 Replaces: mysql,
           mysql-server-5.5, mysql-server-core-5.5, libmysqlclient-dev,
@@ -163,7 +163,7 @@ Replaces: mysql,
  mysql-server-5.7, mysql-server-core-5.7,
  mariadb-server-5.5, percona-xtradb-cluster-common-5.5,
  mysql-common (<< 5.7.17)
-Provides: mysql-common
+Provides: mysql-common, mysql-@DEB_PRODUCTNAME@-common
 Description: MySQL Common
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
@@ -178,9 +178,6 @@ Section: libdevel
 Depends: libmysqlclient20 (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
-Replaces: mysql-client-5.6,
-          mysql-client-core-5.6,
- mysql-client-5.7, mysql-client-core-5.7
 Description: MySQL development headers
  The MySQL(TM) software delivers a very fast, multi-threaded, multi-user,
  and robust SQL (Structured Query Language) database server. MySQL Server
