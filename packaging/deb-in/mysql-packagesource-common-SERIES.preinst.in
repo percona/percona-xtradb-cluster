@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "install" ] || [ "$1" = "upgrade" ]; then
+    if dpkg --compare-versions "$2" lt-nl "5.6.25-3~" ; then
+
+        # revert fallback my.cnf symlink setup performed by mariadb-common
+        # from 10.0.17-1~exp2 upto 10.0.20-2
+        if [ -L /etc/mysql/my.cnf ] && [ -f /etc/mysql/my.cnf.old ]; then
+            if [ "$(readlink /etc/mysql/my.cnf)" = "mariadb.cnf" ]; then
+                echo "Reverting my.cnf -> mariadb.cnf symlink setup by mariadb-common"
+                rm /etc/mysql/my.cnf
+                mv /etc/mysql/my.cnf.old /etc/mysql/my.cnf
+            fi
+        fi
+
+        # recover from mysql-common 5.6.25-2 turning this symlinked
+        # mariadb.cnf into my.cnf.migrated
+        if [ -f /etc/mysql/my.cnf.migrated ]; then
+            if [ "$(md5sum /etc/mysql/my.cnf.migrated | awk '{ print $1 }')" = "4720bbc1a03252fbb9eb83b55f0b6e10" ]; then
+                # unmodified mariadb.cnf with the migration header prepended
+                # by mysql-common.postinst
+                echo "Removing incorrect /etc/mysql/my.cnf.migrated that was actually mariadb.cnf"
+                rm /etc/mysql/my.cnf.migrated
+                if [ -f /etc/mysql/my.cnf.old ]; then
+                    echo "Renaming (possibly unmodified) /etc/mysql/my.cnf.old to /etc/mysql/my.cnf.migrated"
+                    mv /etc/mysql/my.cnf.old /etc/mysql/my.cnf.migrated
+                else
+                    update-alternatives --remove my.cnf /etc/mysql/my.cnf.migrated
+                fi
+            fi
+        fi
+
+    fi
+fi
+
+#DEBHELPER#

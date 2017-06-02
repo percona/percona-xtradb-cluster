@@ -13,8 +13,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-usr/lib/*/libmysqlclient.so.18*
-usr/lib/*/libmysqlclient_r.so.18*
-# legal
-usr/share/doc/libmysqlclient18/@DEB_INSTALL_LICENSEFILE@
-usr/share/doc/libmysqlclient18/README
+# Additional license file is needed so overriding this warning
+mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/LICENSE.mysql
+mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@: extra-license-file usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@.gz
+mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@: copyright-should-refer-to-common-license-file-for-lgpl
