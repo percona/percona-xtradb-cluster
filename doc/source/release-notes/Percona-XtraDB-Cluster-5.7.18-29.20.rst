@@ -10,6 +10,10 @@ Binaries are available from the `downloads section
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/>`_
 or from our :ref:`software repositories <install>`.
 
+.. note:: Due to new package dependency,
+   Ubuntu/Debian users should use ``apt-get dist-upgrade``
+   or ``apt-get install percona-xtradb-cluster-57`` to upgrade.
+
 Percona XtraDB Cluster 5.7.18-29.20 is now the current release,
 based on the following:
 
