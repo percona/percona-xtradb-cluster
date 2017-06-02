@@ -7021,9 +7021,13 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli)
     thd->backup_binlog_lock.release_protection(thd);
 
     if (rli->is_parallel_exec())
+    {
+      bool real_event= server_id && !is_artificial_event();
+      time_t ts= when.tv_sec + static_cast<time_t>(exec_time);
       rli->reset_notified_checkpoint(0,
-                                     server_id ? when.tv_sec + (time_t) exec_time : 0,
+                                     real_event ? &ts : NULL,
                                      true/*need_data_lock=true*/);
+    }
 
     /*
       Reset thd->variables.option_bits and sql_mode etc, because this could be the signal of

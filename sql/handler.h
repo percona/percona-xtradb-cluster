@@ -34,6 +34,7 @@
 #include <my_compare.h>
 #include <ft_global.h>
 #include <keycache.h>
+#include "xa.h"
 
 class Alter_info;
 
@@ -504,13 +505,6 @@ struct st_system_tablename
 };
 
 
-typedef ulonglong my_xid; // this line is the same as in log_event.h
-#define MYSQL_XID_PREFIX "MySQLXid"
-#define MYSQL_XID_PREFIX_LEN 8 // must be a multiple of 8
-#define MYSQL_XID_OFFSET (MYSQL_XID_PREFIX_LEN+sizeof(server_id))
-#define MYSQL_XID_GTRID_LEN (MYSQL_XID_OFFSET+sizeof(my_xid))
-
-#define XIDDATASIZE MYSQL_XIDDATASIZE
 #define MAXGTRIDSIZE 64
 #define MAXBQUALSIZE 64
 
@@ -521,78 +515,6 @@ namespace AQP {
   class Join_plan;
 };
 
-/**
-  struct xid_t is binary compatible with the XID structure as
-  in the X/Open CAE Specification, Distributed Transaction Processing:
-  The XA Specification, X/Open Company Ltd., 1991.
-  http://www.opengroup.org/bookstore/catalog/c193.htm
-
-  @see MYSQL_XID in mysql/plugin.h
-*/
-struct xid_t {
-  long formatID;
-  long gtrid_length;
-  long bqual_length;
-  char data[XIDDATASIZE];  // not \0-terminated !
-
-  xid_t() {}                                /* Remove gcc warning */  
-  bool eq(struct xid_t *xid)
-  { return eq(xid->gtrid_length, xid->bqual_length, xid->data); }
-  bool eq(long g, long b, const char *d)
-  { return g == gtrid_length && b == bqual_length && !memcmp(d, data, g+b); }
-  void set(struct xid_t *xid)
-  { memcpy(this, xid, xid->length()); }
-  void set(long f, const char *g, long gl, const char *b, long bl)
-  {
-    formatID= f;
-    memcpy(data, g, gtrid_length= gl);
-    memcpy(data+gl, b, bqual_length= bl);
-  }
-  void set(ulonglong xid)
-  {
-    my_xid tmp;
-    formatID= 1;
-    set(MYSQL_XID_PREFIX_LEN, 0, MYSQL_XID_PREFIX);
-    memcpy(data+MYSQL_XID_PREFIX_LEN, &server_id, sizeof(server_id));
-    tmp= xid;
-    memcpy(data+MYSQL_XID_OFFSET, &tmp, sizeof(tmp));
-    gtrid_length=MYSQL_XID_GTRID_LEN;
-  }
-  void set(long g, long b, const char *d)
-  {
-    formatID= 1;
-    gtrid_length= g;
-    bqual_length= b;
-    memcpy(data, d, g+b);
-  }
-  bool is_null() { return formatID == -1; }
-  void null() { formatID= -1; }
-  my_xid quick_get_my_xid()
-  {
-    my_xid tmp;
-    memcpy(&tmp, data+MYSQL_XID_OFFSET, sizeof(tmp));
-    return tmp;
-  }
-  my_xid get_my_xid()
-  {
-    return gtrid_length == MYSQL_XID_GTRID_LEN && bqual_length == 0 &&
-           !memcmp(data, MYSQL_XID_PREFIX, MYSQL_XID_PREFIX_LEN) ?
-           quick_get_my_xid() : 0;
-  }
-  uint length()
-  {
-    return sizeof(formatID)+sizeof(gtrid_length)+sizeof(bqual_length)+
-           gtrid_length+bqual_length;
-  }
-  uchar *key()
-  {
-    return (uchar *)&gtrid_length;
-  }
-  uint key_length()
-  {
-    return sizeof(gtrid_length)+sizeof(bqual_length)+gtrid_length+bqual_length;
-  }
-};
 typedef struct xid_t XID;
 
 /* for recover() handlerton call */
@@ -813,6 +735,7 @@ enum handler_create_zip_dict_result
   HA_CREATE_ZIP_DICT_NAME_TOO_LONG,  /*!< zip dict name is too long */
   HA_CREATE_ZIP_DICT_DATA_TOO_LONG,  /*!< zip dict data is too long */
   HA_CREATE_ZIP_DICT_READ_ONLY,      /*!< cannot create in read-only mode */
+  HA_CREATE_ZIP_DICT_FAKE_CHANGES,   /*!< fake changes enabled */
   HA_CREATE_ZIP_DICT_OUT_OF_MEMORY,  /*!< out of memory */
   HA_CREATE_ZIP_DICT_OUT_OF_FILE_SPACE,
                                      /*!< out of disk space */
@@ -830,6 +753,7 @@ enum handler_drop_zip_dict_result
                                         exist */
   HA_DROP_ZIP_DICT_IS_REFERENCED,  /*!< zip dict is in use */
   HA_DROP_ZIP_DICT_READ_ONLY,      /*!< cannot drop in read-only mode */
+  HA_DROP_ZIP_DICT_FAKE_CHANGES,   /*!< fake changes enabled */
   HA_DROP_ZIP_DICT_OUT_OF_MEMORY,  /*!< out of memory */
   HA_DROP_ZIP_DICT_OUT_OF_FILE_SPACE,
                                    /*!< out of disk space */
@@ -1125,6 +1049,11 @@ struct handlerton
   Engine supports secondary clustered keys.
 */
 #define HTON_SUPPORTS_CLUSTERED_KEYS (1 << 13)
+
+/**
+  Engine supports compressed columns.
+*/
+#define HTON_SUPPORTS_COMPRESSED_COLUMNS (1 << 14)
 
 enum enum_tx_isolation { ISO_READ_UNCOMMITTED, ISO_READ_COMMITTED,
 			 ISO_REPEATABLE_READ, ISO_SERIALIZABLE};
@@ -2490,6 +2419,7 @@ public:
                      enum_range_scan_direction direction);
   int compare_key(key_range *range);
   int compare_key_icp(const key_range *range) const;
+  int compare_key_in_buffer(const uchar *buf) const;
   virtual int ft_init() { return HA_ERR_WRONG_COMMAND; }
   void ft_end() { ft_handler=NULL; }
   virtual FT_INFO *ft_init_ext(uint flags, uint inx,String *key)

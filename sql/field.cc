@@ -8115,7 +8115,7 @@ void Field_blob::make_sort_key(uchar *to,uint length)
   uchar *blob;
   uint blob_length=get_length();
 
-  if (!blob_length)
+  if (!blob_length && field_charset->pad_char == 0)
     memset(to, 0, length);
   else
   {
@@ -8128,19 +8128,20 @@ void Field_blob::make_sort_key(uchar *to,uint length)
       */
       length-= packlength;
       pos= to+length;
+      uint key_length= MY_MIN(blob_length, length);
 
       switch (packlength) {
       case 1:
-        *pos= (char) blob_length;
+        *pos= (char) key_length;
         break;
       case 2:
-        mi_int2store(pos, blob_length);
+        mi_int2store(pos, key_length);
         break;
       case 3:
-        mi_int3store(pos, blob_length);
+        mi_int3store(pos, key_length);
         break;
       case 4:
-        mi_int4store(pos, blob_length);
+        mi_int4store(pos, key_length);
         break;
       }
     }
@@ -10656,4 +10657,11 @@ Field_temporal::set_datetime_warning(Sql_condition::enum_warning_level level,
   if (thd->really_abort_on_warning() ||
       set_warning(level, code, cut_increment))
     make_truncated_value_warning(thd, level, val, ts_type, field_name);
+}
+
+bool Field::is_part_of_actual_key(THD *thd, uint cur_index)
+{
+  return thd->optimizer_switch_flag(OPTIMIZER_SWITCH_USE_INDEX_EXTENSIONS) ?
+    part_of_key.is_set(cur_index) :
+    part_of_key_not_extended.is_set(cur_index);
 }
