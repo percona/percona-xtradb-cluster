@@ -44,17 +44,6 @@ Fixed Bugs
   in asynchronous replication.
   For more information, see :bug:`1681831`.
 
-* :jirabug:`PXC-819`: Added five new status variables
-  to expose required values from :variable:`wsrep_ist_receive_status`
-  and :variable:`wsrep_flow_control_interval` as numbers,
-  rather than strings that need to be parsed:
-
-  * ``wsrep_flow_control_interval_low``
-  * ``wsrep_flow_control_interval_high``
-  * ``wsrep_ist_receive_seqno_start``
-  * ``wsrep_ist_receive_seqno_current``
-  * ``wsrep_ist_receive_seqno_end``
-
 * :jirabug:`PXC-820`: Enabled querying of :variable:`pxc_maint_mode`
   by another client during the transition period.
 
@@ -67,3 +56,17 @@ Fixed Bugs
 * :jirabug:`PXC-824`: Fixed graceful shutdown of |PXC| node
   to wait until applier thread finishes.
 
+Other Improvements
+==================
+
+* :jirabug:`PXC-819`: Added five new status variables
+  to expose required values from :variable:`wsrep_ist_receive_status`
+  and :variable:`wsrep_flow_control_interval` as numbers,
+  rather than strings that need to be parsed:
+
+  * ``wsrep_flow_control_interval_low``
+  * ``wsrep_flow_control_interval_high``
+  * ``wsrep_ist_receive_seqno_start``
+  * ``wsrep_ist_receive_seqno_current``
+  * ``wsrep_ist_receive_seqno_end``
+  
