@@ -66,7 +66,7 @@ Package: mysql-wsrep-common-5.5
 Architecture: all
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Multi-Arch: foreign
-Provides: mysql-common
+Provides: mysql-common, mysql-wsrep-common
 Replaces: mysql-common
 Description: MySQL database common files, e.g. /etc/mysql/my.cnf
  MySQL is a fast, stable and true multi-user, multi-threaded SQL database
