@@ -77,7 +77,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :dyn: Yes
    :default: ``ENFORCING`` or ``DISABLED``
 
-Controls :ref:`pxc-strict-mode``, which runs validations
+Controls :ref:`pxc-strict-mode`, which runs validations
 to avoid the use of experimental and unsupported features in |PXC|.
 
 Depending on the actual mode you select,
@@ -247,7 +247,7 @@ Enabling this variable can also result in having huge writesets.
    :scope: Global
    :dyn: No
    :default: ``/var/lib/mysql``
-   (or whatever path is specified by :term:`datadir`)
+             (or whatever path is specified by :term:`datadir`)
 
 Specifies the path to the directory where the wsrep provider stores its files
 (such as :file:`grastate.dat`).
@@ -434,7 +434,7 @@ You can set it to any value between ``1024`` and the default ``2147483647``.
    :scope: Global
    :dyn: No
    :default: IP of the first network interface (``eth0``)
-   and default port (``4567``)
+             and default port (``4567``)
 
 Specifies the network address of the node.
 By default, this variable is set to the IP address
