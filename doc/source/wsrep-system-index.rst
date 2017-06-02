@@ -5,7 +5,7 @@ Index of wsrep system variables
 ===============================
 
 |PXC| introduces a number of MySQL system variables
-related to write set replication.
+related to write-set replication.
 
 .. variable:: pxc_encrypt_cluster_traffic
 
@@ -47,7 +47,7 @@ The following values are available:
   when you initiate node shutdown.
 
 * ``MAINTENANCE``: You can manually change to this state
-  if you need to perform maintenace on a node without shutting it down.
+  if you need to perform maintenance on a node without shutting it down.
 
 For more information, see :ref:`pxc-maint-mode`.
 
@@ -64,7 +64,7 @@ Defines the transition period
 when you change :variable:`pxc_maint_mode` to ``SHUTDOWN`` or ``MAINTENANCE``.
 By default, the period is set to 10 seconds,
 which should be enough for most transactions to finish.
-You can increase the value to accomodate for longer-running transactions.
+You can increase the value to accommodate for longer-running transactions.
 
 For more information, see :ref:`pxc-maint-mode`.
 
@@ -90,7 +90,7 @@ The following modes are available:
 * ``DISABLED``: Do not perform strict mode validations
   and run as normal.
 
-* ``PERMISSIVE``: If a vaidation fails, log a warning and continue running
+* ``PERMISSIVE``: If a validation fails, log a warning and continue running
   as normal.
 
 * ``ENFORCING``: If a validation fails during startup,
@@ -153,7 +153,7 @@ It can be disabled in master-slave clusters.
    :dyn: Yes
    :default: ``OFF``
 
-In some cases, master may apply events faster than a slave,
+In some cases, the master may apply events faster than a slave,
 which can cause master and slave to become out of sync for a brief moment.
 When this variable is set to ``ON``, the slave will wait
 until that event is applied before doing any other queries.
@@ -238,7 +238,7 @@ into ``BEGIN/COMMIT`` statements.
 It is not the same as support for locking sessions,
 but it does prevent the database from ending up
 in a logically inconsistent state.
-Enabling this variable can also result in having huge writesets.
+Enabling this variable can also result in having huge write-sets.
 
 .. variable:: wsrep_data_home_dir
 
@@ -275,7 +275,7 @@ This variable can be used when trying to diagnose problems
 or when submitting a bug.
 
 .. note:: Do not enable debugging in production environments,
-   bacause it logs authentication info (that is, passwords).
+   because it logs authentication info (that is, passwords).
 
 .. variable:: wsrep_desync
 
@@ -316,7 +316,7 @@ for a long period of time or for several nodes at once.
    :default: ``OFF``
 
 Defines whether the node accepts read queries when in a non-operational state,
-that is, when it loses connetion to the Primary Component.
+that is, when it loses connection to the Primary Component.
 By default, this variable is disabled and the node rejects all queries,
 because there is no way to tell if the data is correct.
 
@@ -409,9 +409,9 @@ that produced the conflict.
    :dyn: Yes
    :default: ``0`` (no limit)
 
-Defines the maximum number of rows each writeset can contain.
+Defines the maximum number of rows each write-set can contain.
 
-By default, there is no limit for the maximum number of rows in a writeset.
+By default, there is no limit for the maximum number of rows in a write-set.
 The maximum allowed value is ``1048576``.
 
 .. variable:: wsrep_max_ws_size
@@ -422,7 +422,7 @@ The maximum allowed value is ``1048576``.
    :dyn: Yes
    :default: ``2147483647`` (2 GB)
 
-Defines the maximum writeset size (in bytes).
+Defines the maximum write-set size (in bytes).
 Anything bigger than the specified value will be rejected.
 
 You can set it to any value between ``1024`` and the default ``2147483647``.
@@ -533,14 +533,14 @@ and the node continues to communicate with other nodes.
 
 Defines the method for Online Schema Upgrade
 that the node uses to replicate DDL statements.
-The followinf methods are available:
+The following methods are available:
 
 * ``TOI``: When the *Total Order Isolation* method is selected,
   data definition language (DDL) statements are processed in the same order
   with regards to other transactions in each node.
   This guarantees data consistency.
 
-  In case of DDL statements,
+  In the case of DDL statements,
   the cluster will have parts of the database locked
   and it will behave like a single server.
   In some cases (like big ``ALTER TABLE``)
@@ -559,7 +559,7 @@ The followinf methods are available:
 
 * ``RSU``: When the *Rolling Schema Upgrade* method is selected,
   DDL statements won't be replicated across the cluster.
-  Instead it's up to the user to run them on each node separately.
+  Instead, it's up to the user to run them on each node separately.
 
   The node applying the changes will desynchronize from the cluster briefly,
   while normal work happens on all the other nodes.
@@ -567,7 +567,7 @@ The followinf methods are available:
   the node will apply delayed replication events.
 
   The schema changes must be backwards compatible for this method to work,
-  otherwise the node that receives the change
+  otherwise, the node that receives the change
   will likely break Galera replication.
   If replication breaks, SST will be triggered
   when the node tries to join again but the change will be undone.
@@ -651,14 +651,14 @@ If the GTID is found, it will be assigned as the initial position for server.
 
 Defines whether the node should reject queries from clients.
 Rejecting queries can be useful during upgrades,
-when you want to keep the node up and apply write sets
+when you want to keep the node up and apply write-sets
 without accepting queries.
 
 When a query is rejected, the following error is returned::
 
  Error 1047: Unknown command
 
-The following values are avaiable:
+The following values are available:
 
 * ``NONE``: Accept all queries from clients (default)
 
@@ -711,7 +711,7 @@ the whole DDL statement is not put under TOI.
   * ``CREATE TABLE AS SELECT`` (CTAS) statements use non-TOI replication
     and are replicated only if there is involvement of InnoDB table
     that needs transactions
-    (in case of MyISAM table, CTAS statement will skip replication).
+    (in case of MyISAM table, CTAS statements will not be replicated).
 
 .. variable:: wsrep_restart_slave
 
@@ -735,7 +735,7 @@ while the node is in non-primary state.
    :dyn: No
    :default: ``1``
 
-Specifies the number of times autocommitted transactions will be retried
+Specifies the number of times autocommit transactions will be retried
 in the cluster if it encounters certification errors.
 In case there is a conflict, it should be safe for the cluster node
 to simply retry the statement without returning an error to the client,
@@ -745,7 +745,7 @@ This can be useful to help an application using autocommit
 to avoid deadlock errors that can be triggered by replication conflicts.
 
 If this variable is set to ``0``,
-autocommitted transactions won't be retried.
+autocommit transactions won't be retried.
 
 .. variable:: wsrep_slave_FK_checks
 
@@ -776,7 +776,7 @@ You can increase/decrease it at any time.
 .. note:: When you decrease the number of threads,
    it won't kill the threads immediately,
    but stop them after they are done applying current transaction
-   (the effect with increase is immediate though).
+   (the effect with an increase is immediate though).
 
 If any replication consistency problems are encountered,
 it's recommended to set this back to ``1`` to see if that resolves the issue.
@@ -845,7 +845,7 @@ If you remove the trailing comma from the previous example,
 then the joining node will consider *only* ``node1`` and ``node2``.
 
 .. note:: By default, the joiner node does not wait for more than 100 seconds
-   to receive the first packet from donor.
+   to receive the first packet from a donor.
    This is implemented via the :option:`sst-initial-timeout` option.
    If you set the list of preferred donors without a terminating comma
    or believe that all nodes in the cluster can often be unavailable for SST
@@ -903,7 +903,7 @@ Available values are:
   This method requires superuser credentials for the donor node
   to be specified in the :variable:`wsrep_sst_auth` variable.
 
-  .. note:: This mehotd is not recommended
+  .. note:: This method is not recommended
      unless it is required for specific reasons.
      Also, it is not compatible with ``bind_address`` set to ``127.0.0.1``
      or ``localhost``, and will cause startup to fail in this case.
@@ -917,7 +917,7 @@ Available values are:
 * ``skip``: Use this to skip SST.
   This can be used when initially starting the cluster
   and manually restoring the same data to all nodes.
-  It shouldn't be used permanently,
+  It shouldn't be used permanently
   because it could lead to data inconsistency across the nodes.
 
 .. note:: Only ``xtrabackup-v2`` and ``rsync`` provide support
