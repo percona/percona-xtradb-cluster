@@ -1,0 +1,16 @@
+!include ../galera_2nodes.cnf
+
+[mysqld]
+wsrep_sst_method=xtrabackup-v2
+wsrep_sst_auth="root:"
+gtid-mode=ON
+enforce-gtid-consistency=1
+log-slave-updates
+binlog-format=ROW
+
+[mysqld.1]
+log-bin=pxc1
+
+[mysqld.2]
+log-bin=@ENV.MYSQLTEST_VARDIR/mysqld.2/pxc2-binlog
+
