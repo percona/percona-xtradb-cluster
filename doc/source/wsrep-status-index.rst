@@ -113,6 +113,14 @@ If the queue reaches the upper limit, new requests are denied.
 As existing requests get processed, the queue decreases,
 and once it reaches the lower limit, new requests will be allowed again.
 
+.. variable:: wsrep_flow_control_interval_high
+
+Shows the upper limit for flow control to trigger.
+
+.. variable:: wsrep_flow_control_interval_low
+
+Shows the lower limit for flow control to stop.
+
 .. variable:: wsrep_flow_control_paused
 
 Time since the last status query that was paused due to flow control.
@@ -158,6 +166,18 @@ Shows the comma-separated list of incoming node addresses in the cluster.
 Displays the progress of IST for joiner node.
 If IST is not running, the value is blank.
 If IST is running, the value is the percentage of transfer completed.
+
+.. variable:: wsrep_ist_receive_seqno_end
+
+The sequence number of the last transaction in IST.
+
+.. variable:: wsrep_ist_receive_seqno_current
+
+The sequence number of the current transaction in IST.
+
+.. variable:: wsrep_ist_receive_seqno_start
+
+The sequence number of the first transaction in IST.
 
 .. variable:: wsrep_last_committed
 
