@@ -1481,7 +1481,6 @@ fi
 %endif
 %doc release/Docs/INFO_SRC
 %doc release/Docs/INFO_BIN
-%doc release/support-files/my-*.cnf
 %doc Docs/README-wsrep
 %doc release/support-files/wsrep.cnf
 

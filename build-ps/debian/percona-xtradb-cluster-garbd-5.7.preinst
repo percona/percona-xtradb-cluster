@@ -10,7 +10,3 @@ if [ ! -d "/var/lib/galera" ]; then
     chown nobody:nogroup /var/lib/galera
   fi
 fi
-
-if [ -f "/etc/init.d/garbd" ]; then
-  sed -i "s/exit 1/exit 0/" /etc/init.d/garbd
-fi
