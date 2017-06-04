@@ -162,7 +162,7 @@ override_dh_installinit:
 	@DEB_RULES_APPARMOR_LOAD@
 	@DEB_RULES_SYSTEMD_ENABLE@
 
-	dh_installinit $(INSTALLINITOPTS) --name=mysql -- defaults 19 21
+	dh_installinit $(INSTALLINITOPTS) -pmysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@ --name=mysql -- defaults 19 21
 	@DEB_RULES_SYSTEMD_START@
 	touch $@
 
