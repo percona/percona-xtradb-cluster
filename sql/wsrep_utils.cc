@@ -29,6 +29,7 @@
 #include <spawn.h>    // posix_spawn()
 #include <unistd.h>   // pipe()
 #include <errno.h>    // errno
+#include <signal.h>   // sigemptyset(), sigaddset()
 #include <string.h>   // strerror()
 #include <sys/wait.h> // waitpid()
 #include <sys/types.h>
@@ -238,7 +239,8 @@ process::process (const char* cmd, const char* type, char** env)
     }
 
     /* make sure that no signlas are masked in child process */
-    sigset_t sigmask_empty; sigemptyset(&sigmask_empty);
+    sigset_t sigmask_empty;
+    sigemptyset(&sigmask_empty);
     err_ = posix_spawnattr_setsigmask(&attr, &sigmask_empty);
     if (err_)
     {

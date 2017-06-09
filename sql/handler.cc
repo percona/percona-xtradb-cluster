@@ -8314,7 +8314,7 @@ void ha_wsrep_fake_trx_id(THD *thd)
     DBUG_VOID_RETURN;
   }
 
-  (void *)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
+  (void)wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle, thd->query_id);
 
   DBUG_VOID_RETURN;
 }

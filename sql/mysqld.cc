@@ -6614,35 +6614,6 @@ extern "C" void *start_wsrep_THD(void *arg)
   return(NULL);
 }
 
-/**/
-static inline bool is_client_connection(THD *thd)
-{
-  return (thd->wsrep_client_thread && thd->variables.wsrep_on);
-}
-
-static inline bool is_replaying_connection(THD *thd)
-{
-  bool ret;
-
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  ret=  (thd->wsrep_conflict_state == REPLAYING) ? true : false;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-  return ret;
-}
-
-static inline bool is_committing_connection(THD *thd)
-{
-  bool ret;
-
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-  ret=  (thd->wsrep_query_state == QUERY_COMMITTING) ? true : false;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-
-  return ret;
-}
-
-
 /*
    returns the number of wsrep appliers running.
    However, the caller (thd parameter) is not taken in account

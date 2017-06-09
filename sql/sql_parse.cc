@@ -1042,7 +1042,7 @@ bool do_command(THD *thd)
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state == MUST_ABORT)
       {
-        DBUG_PRINT("wsrep",("aborted for wsrep rollback: %lu", thd->real_id));
+        DBUG_PRINT("wsrep",("aborted for wsrep rollback: %p", thd->real_id));
         wsrep_client_rollback(thd);
       }
       mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
