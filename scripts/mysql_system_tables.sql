@@ -2336,6 +2336,23 @@ EXECUTE stmt;
 DROP PREPARE stmt;
 
 --
+-- TABLE pxc_cluster_view
+--
+
+SET @cmd="CREATE TABLE performance_schema.pxc_cluster_view("
+  "HOST_NAME CHAR(64) collate utf8_general_ci not null,"
+  "UUID CHAR(36) collate utf8_bin not null,"
+  "STATUS CHAR(64) collate utf8_bin not null,"
+  "LOCAL_INDEX INTEGER not null,"
+  "SEGMENT INTEGER not null"
+  ") ENGINE=PERFORMANCE_SCHEMA;";
+
+SET @str = IF(@have_pfs = 1, @cmd, 'SET @dummy = 0');
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DROP PREPARE stmt;
+
+--
 -- TABLE SESSION_CONNECT_ATTRS
 --
 
