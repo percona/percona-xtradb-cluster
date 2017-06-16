@@ -96,7 +96,15 @@ INNOBACKUPEX_BIN=innobackupex
 DATA="${WSREP_SST_OPT_DATA}"
 INFO_FILE="xtrabackup_galera_info"
 IST_FILE="xtrabackup_ist"
+
+# This is the full path to the galera GTID info
+# This is emitted by XtraBackup (for SST) or passed to us (for IST)
 MAGIC_FILE="${DATA}/${INFO_FILE}"
+
+# Used to send a file containing info about the SST
+# Extend this if you want to send additional information
+# from the donor to the joiner
+SST_INFO_FILE="sst_info"
 
 # Setting the path for ss and ip
 export PATH="/usr/sbin:/sbin:$PATH"
@@ -524,6 +532,12 @@ read_cnf()
 
 }
 
+#
+# Fills in strmcmd, which holds the command used for streaming
+#
+# Note:
+#   This code creates a command that uses FILE_TO_STREAM
+#
 get_stream()
 {
     if [[ $sfmt == 'xbstream' ]];then 
@@ -531,7 +545,7 @@ get_stream()
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             strmcmd="xbstream -x"
         else
-            strmcmd="xbstream -c \${INFO_FILE}"
+            strmcmd="xbstream -c \${FILE_TO_STREAM}"
         fi
     else
         sfmt="tar"
@@ -539,7 +553,7 @@ get_stream()
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             strmcmd="tar xfi - "
         else
-            strmcmd="tar cf - \${INFO_FILE} "
+            strmcmd="tar cf - \${FILE_TO_STREAM} "
         fi
 
     fi
@@ -743,9 +757,21 @@ recv_joiner()
         wsrep_log_info "$(ls -l ${dir}/*)"
         exit 32
     fi
+
+    if [[ $checkf -eq 100 && ! -r "${dir}/${FILE_TO_RECEIVE}" ]]; then
+        wsrep_log_error "Did not receive expected file from donor: '${FILE_TO_RECEIVE}'"
+        exit 32
+    fi
 }
 
 
+#
+# Send data from the donor to the joiner
+#
+# Parameters:
+#   1 : dir - the base directory (paths are based on this)
+#   2 : msg - descriptive message
+#
 send_donor()
 {
     local dir=$1
@@ -848,6 +874,41 @@ initialize_tmpdir()
 }
 
 
+#
+# Parses the passed in config file and returns the option in the
+# specified group.
+#
+# 1st param: source_path : path the the source file
+# 2nd param: group : name of the config file section, e.g. mysqld
+# 3rd param: var : name of the variable in the section, e.g. server-id
+# 4th param: - : default value for the param
+#
+parse_sst_info()
+{
+    local source_path=$1
+    local group=$2
+    local var=$3
+    local reval=""
+
+    # print the default settings for given group using my_print_default.
+    # normalize the variable names specified in cnf file (user can use _ or -
+    # for example log-bin or log_bin) then grep for needed variable
+    # finally get the variable value (if variables has been specified
+    # multiple time use the last value only)
+
+    reval=$($MY_PRINT_DEFAULTS -c "$source_path" $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+
+    # use default if we haven't found a value
+    if [[ -z $reval ]]; then
+        [[ -n $4 ]] && reval=$4
+    fi
+
+    echo $reval
+}
+
+
+
+
 if [[ ! -x `which $INNOBACKUPEX_BIN` ]];then 
     wsrep_log_error "innobackupex not in path: $PATH"
     exit 2
@@ -929,6 +990,24 @@ if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
     trap cleanup_donor EXIT
 
+    initialize_tmpdir
+
+    # main temp directory for SST (non-XB) related files
+    donor_tmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_tmp_XXXXXXXX)
+
+    # Create the SST info file
+    # This file contains SST information that is passed from the
+    # donor to the joiner.
+    #
+    # Add more parameters to the file here as needed
+    # This file has the same format as a cnf file.
+    #
+    sst_info_file_path="${donor_tmpdir}/${SST_INFO_FILE}"
+    echo "[sst]" > "$sst_info_file_path"
+    echo "galera-gtid=$WSREP_SST_OPT_GTID" >> "$sst_info_file_path"
+    echo "binlog-name=$(basename "$WSREP_SST_OPT_BINLOG")" >> "$sst_info_file_path"
+
+
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
     then
         usrst=0
@@ -937,8 +1016,6 @@ then
             wsrep_log_error "The joiner is not supported for this version of donor"
             exit 93
         fi
-
-        initialize_tmpdir
 
         # main temp directory for xtrabackup (target-dir)
         itmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_xb_XXXXXXXX)
@@ -958,10 +1035,6 @@ then
         get_keys
         check_extra
 
-        wsrep_log_info "Streaming GTID file before SST"
-
-        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
-
         ttcmd="$tcmd"
 
         if [[ $encrypt -eq 1 ]];then
@@ -974,7 +1047,11 @@ then
             tcmd=" $scomp | $tcmd "
         fi
 
-        send_donor $DATA "${stagemsg}-gtid"
+        # Before the real SST,send the sst-info
+        wsrep_log_info "Streaming SST meta-info file before SST"
+
+        FILE_TO_STREAM=$SST_INFO_FILE
+        send_donor "$donor_tmpdir" "${stagemsg}-sst-info"
 
         # Restore the transport commmand to its original state
         tcmd="$ttcmd"
@@ -1018,8 +1095,7 @@ then
 
         wsrep_log_info "Bypassing the SST for IST"
         echo "continue" # now server can resume updating data
-        echo "${WSREP_SST_OPT_GTID}" > "${MAGIC_FILE}"
-        echo "1" > "${DATA}/${IST_FILE}"
+        echo "1" > "${donor_tmpdir}/${IST_FILE}"
         get_keys
         if [[ $encrypt -eq 1 ]];then
             if [[ -n $scomp ]];then 
@@ -1032,7 +1108,8 @@ then
         fi
         strmcmd+=" \${IST_FILE}"
 
-        send_donor $DATA "${stagemsg}-IST"
+        FILE_TO_STREAM=$SST_INFO_FILE
+        send_donor "$donor_tmpdir" "${stagemsg}-IST"
 
     fi
 
@@ -1089,11 +1166,18 @@ then
     fi
 
     initialize_tmpdir
-
     STATDIR=$(mktemp -p "${tmpdirbase}" -dt joiner_XXXXXXXX)
-    MAGIC_FILE="${STATDIR}/${INFO_FILE}"
-    recv_joiner $STATDIR  "${stagemsg}-gtid" $stimeout 1
 
+    sst_file_info_path="${STATDIR}/${SST_INFO_FILE}"
+
+    FILE_TO_RECEIVE="$SST_INFO_FILE"
+    recv_joiner $STATDIR "${stagemsg}-sst-info" $stimeout 100
+
+    # Extract information from the sst-info file that was just received
+    MAGIC_FILE="${STATDIR}/${INFO_FILE}"
+    echo $(parse_sst_info "$sst_file_info_path" sst galera-gtid "") > "$MAGIC_FILE"
+
+    DONOR_BINLOGNAME=$(parse_sst_info "$sst_file_info_path" sst binlog-name "")
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
@@ -1117,15 +1201,17 @@ then
         wsrep_log_info "Cleaning the existing datadir and innodb-data/log directories"
         find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>&2 \+
 
+        # Clean the binlog dir (if it's explicitly specified)
+        # By default it'll be in the datadir
         tempdir=$(parse_cnf mysqld log-bin "")
-        if [[ -n ${tempdir:-} ]];then
-            binlog_dir=$(dirname $tempdir)
-            binlog_file=$(basename $tempdir)
-            if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]];then
+        if  [[ -n "$tempdir" ]]; then
+            binlog_dir=$(dirname "$tempdir")
+            binlog_file=$(basename "$tempdir")
+            if [[ -n ${binlog_dir:-} && "$binlog_dir" != '.' && "$binlog_dir" != "$DATA" ]];then
                 pattern="$binlog_dir/$binlog_file\.[0-9]+$"
                 wsrep_log_info "Cleaning the binlog directory $binlog_dir as well"
                 find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
-                rm $binlog_dir/*.index || true
+                rm -f $binlog_dir/*.index || true
             fi
         fi
 
@@ -1201,17 +1287,30 @@ then
         fi
 
 
-        if  [[ ! -z $WSREP_SST_OPT_BINLOG ]];then
+        if  [[ -n "$WSREP_SST_OPT_BINLOG" && -n "$DONOR_BINLOGNAME" ]]; then
 
-            BINLOG_DIRNAME=$(dirname $WSREP_SST_OPT_BINLOG)
-            BINLOG_FILENAME=$(basename $WSREP_SST_OPT_BINLOG)
+            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
+            binlog_file=$(basename "$WSREP_SST_OPT_BINLOG")
+            donor_binlog_file=$DONOR_BINLOGNAME
+
+            # rename the donor binlog to the name of the binlogs on the joiner
+            if [[ "$binlog_file" != "$donor_binlog_file" ]]; then
+                pushd "$DATA" &>/dev/null
+                for f in $donor_binlog_file.*; do
+                    if [[ ! -e "$f" ]]; then continue; fi
+                    f_new=$(echo $f | sed "s/$donor_binlog_file/$binlog_file/")
+                    mv "$f" "$f_new" 2>/dev/null || true
+                done
+                popd &> /dev/null
+            fi
 
             # To avoid comparing data directory and BINLOG_DIRNAME 
-            mv $DATA/${BINLOG_FILENAME}.* $BINLOG_DIRNAME/ 2>/dev/null || true
+            mv $DATA/${binlog_file}.* "$binlog_dir"/ 2>/dev/null || true
 
-            pushd $BINLOG_DIRNAME &>/dev/null
-            for bfiles in $(ls -1 ${BINLOG_FILENAME}.*);do
-                echo ${BINLOG_DIRNAME}/${bfiles} >> ${BINLOG_FILENAME}.index
+            pushd "$binlog_dir" &>/dev/null
+            for bfiles in $binlog_file.*; do
+                if [[ ! -e "$bfiles" ]]; then continue; fi
+                echo ${binlog_dir}/${bfiles} >> ${binlog_file}.index
             done
             popd &> /dev/null
 
