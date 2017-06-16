@@ -892,10 +892,6 @@ Available values are:
   This is the **recommended** and default method for |PXC|.
   For more information, see :ref:`xtrabackup_sst`.
 
-  .. note:: If you have ``innodb_data_home_dir`` and ``innodb_log_home_dir``
-     variables in the configuration file,
-     set the :option:`sst-special-dirs` option under ``[sst]``.
-
 * ``rsync``: Uses ``rsync`` to perform SST.
   This method doesn't use the :variable:`wsrep_sst_auth` variable.
 
@@ -968,14 +964,22 @@ is determined by bitmask:
 * ``0``: Do not run causality checks for any statements.
   This is the default.
 
-* ``1``: Perform checks for ``READ`` statements,
-  including ``SELECT``, ``SHOW``, and ``BEGIN`` or ``START TRANSACTION``.
+* ``1``: Perform checks for ``READ`` statements
+  (including ``SELECT``, ``SHOW``, and ``BEGIN`` or ``START TRANSACTION``).
 
 * ``2``: Perform checks for ``UPDATE`` and ``DELETE`` statements.
 
 * ``3``: Perform checks for ``READ``, ``UPDATE``, and ``DELETE`` statements.
 
 * ``4``: Perform checks for ``INSERT`` and ``REPLACE`` statements.
+
+* ``5``: Perform checks for ``READ``, ``INSERT``, and ``REPLACE`` statements.
+
+* ``6``: Perform checks for ``UPDATE``, ``DELETE``, ``INSERT``,
+  and ``REPLACE`` statements.
+
+* ``7``: Perform checks for ``READ``, ``UPDATE``, ``DELETE``, ``INSERT``,
+  and ``REPLACE`` statements.
 
 .. note:: Setting :variable:`wsrep_sync_wait` to ``1`` is the equivalent
    of setting the deprecated :variable:`wsrep_causal_reads` to ``ON``.
