@@ -1,0 +1,21 @@
+SET GLOBAL wsrep_provider_options="pc.weight=1";
+SET GLOBAL wsrep_provider_options="pc.weight=0";
+SELECT 1;
+1
+1
+CREATE TABLE t1 (
+id INT NOT NULL AUTO_INCREMENT,
+text VARCHAR(10) DEFAULT NULL,
+PRIMARY KEY (id)
+);
+INSERT INTO t1(text) VALUES('aaaaa');
+INSERT INTO t1(text) VALUES('bbbbb');
+Restarting node 2 ...
+# restart
+select * from t1;
+id	text
+1	aaaaa
+2	bbbbb
+gtid_executed_equal
+1
+drop table t1;

@@ -123,6 +123,12 @@ XB_GTID_INFO_FILE="xtrabackup_galera_info"
 XB_GTID_INFO_FILE_PATH="${DATA}/${XB_GTID_INFO_FILE}"
 IST_FILE="xtrabackup_ist"
 
+# Used to send a file containing info about the SST
+# Extend this if you want to send additional information
+# from the donor to the joiner
+SST_INFO_FILE="sst_info"
+
+# Setting the path for ss and ip
 # ss: is utility to investigate socket, ip for network routes.
 export PATH="/usr/sbin:/sbin:$PATH"
 
@@ -627,7 +633,7 @@ read_cnf()
         # Add the path to each subdirectory, this will ensure that
         # the path to the keyring is kept
         local CURRENT_DIR=$(dirname "$KEYRING_DIR/xx")
-        while [[ $CURRENT_DIR != "." && $CURRENT_DIR != "/" && $CURRENT_DIR != $DATA_TEMP ]]; do
+        while [[ $CURRENT_DIR != "." && $CURRENT_DIR != "/" && $CURRENT_DIR != "$DATA_TEMP" ]]; do
             cpat+="\|${CURRENT_DIR}$"
             CURRENT_DIR=$(dirname "$CURRENT_DIR")
         done
@@ -684,7 +690,11 @@ adjust_progress()
 }
 
 #
-# data is stream from donor to joiner using xbstream program.
+# Fills in strmcmd, which holds the command used for streaming
+#
+# Note:
+#   This code creates a command that uses FILE_TO_STREAM
+#
 get_stream()
 {
     if [[ $sfmt == 'xbstream' ]]; then
@@ -952,10 +962,20 @@ recv_data_from_donor_to_joiner()
         exit 32
     fi
 
+    if [[ $checkf -eq 100 && ! -r "${dir}/${FILE_TO_RECEIVE}" ]]; then
+        wsrep_log_error "Did not receive expected file from donor: '${FILE_TO_RECEIVE}'"
+        exit 32
+    fi
+
 }
 
 #
 # Process to send data from DONOR to JOINER
+#
+# Parameters:
+#   1 : dir - the base directory (paths are based on this)
+#   2 : msg - descriptive message
+#
 send_data_from_donor_to_joiner()
 {
     local dir=$1
@@ -1058,6 +1078,38 @@ initialize_tmpdir()
     tmpdirbase=$tmpdir_path
 }
 
+
+#
+# Parses the passed in config file and returns the option in the
+# specified group.
+#
+# 1st param: source_path : path the the source file
+# 2nd param: group : name of the config file section, e.g. mysqld
+# 3rd param: var : name of the variable in the section, e.g. server-id
+# 4th param: - : default value for the param
+#
+parse_sst_info()
+{
+    local source_path=$1
+    local group=$2
+    local var=$3
+    local reval=""
+
+    # print the default settings for given group using my_print_default.
+    # normalize the variable names specified in cnf file (user can use _ or -
+    # for example log-bin or log_bin) then grep for needed variable
+    # finally get the variable value (if variables has been specified
+    # multiple time use the last value only)
+
+    reval=$($MY_PRINT_DEFAULTS -c "$source_path" $group | awk -F= '{if ($1 ~ /_/) { gsub(/_/,"-",$1); print $1"="$2 } else { print $0 }}' | grep -- "--$var=" | cut -d= -f2- | tail -1)
+
+    # use default if we haven't found a value
+    if [[ -z $reval ]]; then
+        [[ -n $4 ]] && reval=$4
+    fi
+
+    echo $reval
+}
 
 #-------------------------------------------------------------------------------
 #
@@ -1221,6 +1273,23 @@ then
     # signal handler for cleanup-based-exit.
     trap cleanup_donor EXIT
 
+    initialize_tmpdir
+
+    # main temp directory for SST (non-XB) related files
+    donor_tmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_tmp_XXXXXXXX)
+
+    # Create the SST info file
+    # This file contains SST information that is passed from the
+    # donor to the joiner.
+    #
+    # Add more parameters to the file here as needed
+    # This file has the same format as a cnf file.
+    #
+    sst_info_file_path="${donor_tmpdir}/${SST_INFO_FILE}"
+    echo "[sst]" > "$sst_info_file_path"
+    echo "galera-gtid=$WSREP_SST_OPT_GTID" >> "$sst_info_file_path"
+    echo "binlog-name=$(basename "$WSREP_SST_OPT_BINLOG")" >> "$sst_info_file_path"
+
     #
     # SST is not needed. IST would suffice. By-pass SST.
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
@@ -1233,8 +1302,6 @@ then
             wsrep_log_error "****************************************************** "
             exit 93
         fi
-
-        initialize_tmpdir
 
         # main temp directory for xtrabackup (target-dir)
         itmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_xb_XXXXXXXX)
@@ -1265,10 +1332,11 @@ then
             tcmd=" $scomp | $tcmd "
         fi
 
-        wsrep_log_info "Streaming GTID file before SST"
-        echo "${WSREP_SST_OPT_GTID}" > "${XB_GTID_INFO_FILE_PATH}"
-        FILE_TO_STREAM=$XB_GTID_INFO_FILE
-        send_data_from_donor_to_joiner $DATA "${stagemsg}-gtid"
+        # Before the real SST,send the sst-info
+        wsrep_log_debug "Streaming SST meta-info file before SST"
+
+        FILE_TO_STREAM=$SST_INFO_FILE
+        send_data_from_donor_to_joiner "$donor_tmpdir" "${stagemsg}-sst-info"
 
         if [[ -n $keyring ]]; then
             # Verify that encryption is being used
@@ -1343,9 +1411,7 @@ then
 
         wsrep_log_info "Bypassing SST. Can work it through IST"
         echo "continue" # now server can resume updating data
-        echo "${WSREP_SST_OPT_GTID}" > "${XB_GTID_INFO_FILE_PATH}"
-        echo "1" > "${DATA}/${IST_FILE}"
-
+        echo "1" > "${donor_tmpdir}/${IST_FILE}"
         get_keys
         if [[ $encrypt -eq 1 ]]; then
             if [[ -n $scomp ]]; then
@@ -1358,8 +1424,8 @@ then
         fi
         strmcmd+=" \${IST_FILE}"
 
-	FILE_TO_STREAM=$XB_GTID_INFO_FILE
-        send_data_from_donor_to_joiner $DATA "${stagemsg}-IST"
+        FILE_TO_STREAM=$SST_INFO_FILE
+        send_data_from_donor_to_joiner "$donor_tmpdir" "${stagemsg}-IST"
 
     fi
 
@@ -1420,10 +1486,17 @@ then
     fi
 
     initialize_tmpdir
-
     STATDIR=$(mktemp -p "${tmpdirbase}" -dt joiner_XXXXXXXX)
+    sst_file_info_path="${STATDIR}/${SST_INFO_FILE}"
+
+    FILE_TO_RECEIVE="$SST_INFO_FILE"
+    recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-sst-info" $stimeout 100
+
+    # Extract information from the sst-info file that was just received
     XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
-    recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-gtid" $stimeout 1
+    parse_sst_info "$sst_file_info_path" sst galera-gtid "" > "$XB_GTID_INFO_FILE_PATH"
+
+    DONOR_BINLOGNAME=$(parse_sst_info "$sst_file_info_path" sst binlog-name "")
 
     # server-id is already part of backup-my.cnf so avoid appending it.
     # server-id is the id of the node that is acting as donor and not joiner node.
@@ -1488,15 +1561,17 @@ then
         # with ever increasing number of files and achieve nothing.
         find $ib_home_dir $ib_log_dir $ib_undo_dir $DATA -mindepth 1  -regex $cpat  -prune  -o -exec rm -rfv {} 1>/dev/null \+
 
+        # Clean the binlog dir (if it's explicitly specified)
+        # By default it'll be in the datadir
         tempdir=$(parse_cnf mysqld log-bin "")
-        if [[ -n ${tempdir:-} ]]; then
-            binlog_dir=$(dirname $tempdir)
-            binlog_file=$(basename $tempdir)
-            if [[ -n ${binlog_dir:-} && $binlog_dir != '.' && $binlog_dir != $DATA ]]; then
+        if [[ -n "$tempdir" ]]; then
+            binlog_dir=$(dirname "$tempdir")
+            binlog_file=$(basename "$tempdir")
+            if [[ -n ${binlog_dir:-} && "$binlog_dir" != '.' && "$binlog_dir" != "$DATA" ]];then
                 pattern="$binlog_dir/$binlog_file\.[0-9]+$"
                 wsrep_log_debug "Cleaning the binlog directory $binlog_dir as well"
-                find $binlog_dir -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
-                rm $binlog_dir/*.index || true
+                find "$binlog_dir" -maxdepth 1 -type f -regex $pattern -exec rm -fv {} 1>&2 \+ || true
+                rm -f $binlog_dir/*.index || true
             fi
         fi
 
@@ -1540,7 +1615,7 @@ then
             fi
 
             if [[ -n $progress ]] && pv --help | grep -q 'line-mode'; then
-                count=$(find ${DATA} -type f -name '*.qp' | wc -l)
+                count=$(find "${DATA}" -type f -name '*.qp' | wc -l)
                 count=$(( count*2 ))
                 if pv --help | grep -q FORMAT; then
                     pvopts="-f -s $count -l -N Decompression -F '%N => Rate:%r Elapsed:%t %e Progress: [%b/$count]'"
@@ -1562,7 +1637,7 @@ then
 
             if [[ $extcode -eq 0 ]]; then
                 wsrep_log_debug "Removing qpress files after decompression"
-                find ${DATA} -type f -name '*.qp' -delete
+                find "${DATA}" -type f -name '*.qp' -delete
                 if [[ $? -ne 0 ]]; then
                     wsrep_log_error "******************* FATAL ERROR ********************** "
                     wsrep_log_error "Something went wrong with deletion of qpress files. Investigate"
@@ -1576,17 +1651,30 @@ then
             fi
         fi
 
-        if  [[ ! -z $WSREP_SST_OPT_BINLOG ]]; then
+        if  [[ -n "$WSREP_SST_OPT_BINLOG" && -n "$DONOR_BINLOGNAME" ]]; then
 
-            BINLOG_DIRNAME=$(dirname $WSREP_SST_OPT_BINLOG)
-            BINLOG_FILENAME=$(basename $WSREP_SST_OPT_BINLOG)
+            binlog_dir=$(dirname "$WSREP_SST_OPT_BINLOG")
+            binlog_file=$(basename "$WSREP_SST_OPT_BINLOG")
+            donor_binlog_file=$DONOR_BINLOGNAME
 
-            # To avoid comparing data directory and BINLOG_DIRNAME
-            mv $DATA/${BINLOG_FILENAME}.* $BINLOG_DIRNAME/ 2>/dev/null || true
+            # rename the donor binlog to the name of the binlogs on the joiner
+            if [[ "$binlog_file" != "$donor_binlog_file" ]]; then
+                pushd "$DATA" &>/dev/null
+                for f in $donor_binlog_file.*; do
+                    if [[ ! -e "$f" ]]; then continue; fi
+                    f_new=$(echo $f | sed "s/$donor_binlog_file/$binlog_file/")
+                    mv "$f" "$f_new" 2>/dev/null || true
+                done
+                popd &> /dev/null
+            fi
 
-            pushd $BINLOG_DIRNAME &>/dev/null
-            for bfiles in $(ls -1 ${BINLOG_FILENAME}.* 2>/dev/null);do
-                echo ${BINLOG_DIRNAME}/${bfiles} >> ${BINLOG_FILENAME}.index
+            # To avoid comparing data directory and BINLOG_DIRNAME 
+            mv $DATA/${binlog_file}.* "$binlog_dir"/ 2>/dev/null || true
+
+            pushd "$binlog_dir" &>/dev/null
+            for bfiles in $binlog_file.*; do
+                if [[ ! -e "$bfiles" ]]; then continue; fi
+                echo "${binlog_dir}/${bfiles}" >> "${binlog_file}.index"
             done
             popd &> /dev/null
 
@@ -1601,7 +1689,7 @@ then
             wsrep_log_error "${INNOBACKUPEX_BIN} apply finished with errors." \
                             "Check ${DATA}/innobackup.prepare.log"
             echo "--------------- innobackup.prepare.log (START) --------------------" >&2
-            cat ${DATA}/innobackup.prepare.log >&2
+            cat "${DATA}/innobackup.prepare.log" >&2
             echo "--------------- innobackup.prepare.log (END) --------------------" >&2
             wsrep_log_error "****************************************************** "
             exit 22
@@ -1609,7 +1697,7 @@ then
 
         XB_GTID_INFO_FILE_PATH="${TDATA}/${XB_GTID_INFO_FILE}"
         set +e
-        rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log 2> /dev/null
+        rm "$TDATA/innobackup.prepare.log" "$TDATA/innobackup.move.log" 2> /dev/null
         set -e
         wsrep_log_info "Moving the backup to ${TDATA}"
         timeit "Xtrabackup move stage" "$INNOMOVE"
@@ -1618,12 +1706,12 @@ then
             # Did we receive a keyring file?
             if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
                 wsrep_log_info "Moving sst keyring into place: moving $XB_DONOR_KEYRING_FILE_PATH to $keyring"
-                mv "${XB_DONOR_KEYRING_FILE_PATH}" $keyring
+                mv "${XB_DONOR_KEYRING_FILE_PATH}" "$keyring"
                 wsrep_log_debug "Keyring move successful"
             fi
 
             wsrep_log_debug "Move successful, removing ${DATA}"
-            rm -rf $DATA
+            rm -rf "$DATA"
             DATA=${TDATA}
         else
             if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
@@ -1633,7 +1721,7 @@ then
             wsrep_log_error "Move failed, keeping ${DATA} for further diagnosis" \
                             "Check ${DATA}/innobackup.move.log for details"
             echo "--------------- innobackup.move.log (START) --------------------" >&2
-            cat ${DATA}/innobackup.move.log >&2
+            cat "${DATA}/innobackup.move.log" >&2
             echo "--------------- innobackup.move.log (END) --------------------" >&2
             wsrep_log_error "****************************************************** "
             exit 22
@@ -1649,7 +1737,7 @@ then
         wsrep_log_error "****************************************************** "
         exit 2
     fi
-    wsrep_log_info "Galera co-ords from recovery: $(cat ${XB_GTID_INFO_FILE_PATH})"
+    wsrep_log_info "Galera co-ords from recovery: $(cat "${XB_GTID_INFO_FILE_PATH}")"
     cat "${XB_GTID_INFO_FILE_PATH}" # output UUID:seqno
     wsrep_log_debug "Total time on joiner: $totime seconds"
 fi
