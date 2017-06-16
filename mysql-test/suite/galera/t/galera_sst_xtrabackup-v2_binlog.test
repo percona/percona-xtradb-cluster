@@ -1,0 +1,97 @@
+#
+# This test looks into doing an SST with nodes that have differing binlog names.
+#
+# The initial SST happens on startup, so we can't test it there (since there
+# are no transactions, so we have to shutdown node 2, do some transactions, and
+# then start it up and force an SST).
+#
+--source include/big_test.inc
+--source include/have_gtid.inc
+--source include/have_binlog_format_row.inc
+--source include/galera_cluster.inc
+--source include/have_innodb.inc
+
+# Force a restart at the end of the test
+--source include/force_restart.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+#
+# Set this up so that node 1 stays PRIMARY, no split-brain
+#
+--connection node_1
+--let $wsrep_provider_options_orig1 = `SELECT @@global.wsrep_provider_options`
+SET GLOBAL wsrep_provider_options="pc.weight=1";
+
+--connection node_2
+--let $wsrep_provider_options_orig2 = `SELECT @@global.wsrep_provider_options`
+SET GLOBAL wsrep_provider_options="pc.weight=0";
+
+--connection node_1
+SELECT 1;
+
+
+#
+# Shutdown node 2, to get it out of sync with node 1
+#
+--connection node_2
+--source include/shutdown_mysqld.inc
+
+# Wait until the node is confirmed as being down
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+# Remove the grastate.dat file to force an SST
+--remove_file $MYSQLTEST_VARDIR/mysqld.2/data/grastate.dat
+
+#
+# Perform some transactions so that there are some GTIDs in the
+# gtid_executed table
+#
+CREATE TABLE t1 (
+  id INT NOT NULL AUTO_INCREMENT,
+  text VARCHAR(10) DEFAULT NULL,
+  PRIMARY KEY (id)
+);
+
+INSERT INTO t1(text) VALUES('aaaaa');
+INSERT INTO t1(text) VALUES('bbbbb');
+
+--let $gtid_executed_node1 = `SELECT @@global.gtid_executed;`
+
+# Restart the server
+--connection node_2
+--echo Restarting node 2 ...
+--source include/start_mysqld.inc
+
+--connection node_1
+--source include/wait_until_connected_again.inc
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--connection node_2
+--source include/wait_until_connected_again.inc
+select * from t1;
+
+--disable_query_log
+--eval SELECT '$gtid_executed_node1' = @@global.gtid_executed AS gtid_executed_equal;
+--enable_query_log
+
+#
+# Restore state back to the original
+#
+--connection node_2
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig2';
+--enable_query_log
+
+--connection node_1
+--disable_query_log
+--eval SET GLOBAL wsrep_provider_options = '$wsrep_provider_options_orig1';
+--enable_query_log
+
+drop table t1;
+
+
