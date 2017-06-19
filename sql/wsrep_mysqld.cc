@@ -962,6 +962,18 @@ int wsrep_init()
     return rcode;
   }
 
+  if (strlen (wsrep_node_name) > WSREP_HOSTNAME_LENGTH)
+  {
+    rcode = 1;
+    WSREP_ERROR("wsrep_node_name too long (%zu)", strlen(wsrep_node_name));
+    WSREP_ERROR("Failed to initialize wsrep_provider (reason:%d)."
+                " Must shutdown", rcode);
+    wsrep->free(wsrep);
+    free(wsrep);
+    wsrep = NULL;
+    return rcode;
+  }
+
   if (!wsrep_data_home_dir || strlen(wsrep_data_home_dir) == 0)
     wsrep_data_home_dir = mysql_real_data_home;
 

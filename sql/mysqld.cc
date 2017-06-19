@@ -3317,7 +3317,9 @@ int init_common_variables()
   if (0 == wsrep_node_name || 0 == wsrep_node_name[0])
   {
     my_free((void *)wsrep_node_name);
-    wsrep_node_name= my_strdup(key_memory_wsrep, glob_hostname, MYF(MY_WME));
+    /* hostname on linux is bounded by HOST_NAME_MAX (64 bytes). */
+    wsrep_node_name= my_strndup(
+        key_memory_wsrep, glob_hostname, WSREP_HOSTNAME_LENGTH, MYF(MY_WME));
   }
 #endif /* WITH_WSREP */
   strmake(pidfile_name, default_logfile_name, sizeof(pidfile_name)-5);
