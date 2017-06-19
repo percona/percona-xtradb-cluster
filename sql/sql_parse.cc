@@ -833,7 +833,7 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow queries "SET" and "SHOW", they are trapped later in execute_command
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
+    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready_get() &&
         command != COM_QUERY        &&
         command != COM_PING         &&
         command != COM_QUIT         &&
@@ -847,7 +847,7 @@ bool do_command(THD *thd)
         command != COM_END
     ) {
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
-	       "WSREP has not yet prepared node for application use");
+               "WSREP has not yet prepared node for application use");
       thd->protocol->end_statement();
       return_value= FALSE;
       goto out;
@@ -864,7 +864,7 @@ bool do_command(THD *thd)
     while (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       return_value= dispatch_command(command, thd, thd->wsrep_retry_query,
-				     thd->wsrep_retry_query_len);
+                                     thd->wsrep_retry_query_len);
     }
   }
   if (thd->wsrep_retry_query && thd->wsrep_conflict_state != REPLAYING)
@@ -2352,7 +2352,7 @@ mysql_execute_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow SET and SHOW queries
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready &&
+    if (thd->variables.wsrep_on && !thd->wsrep_applier && !wsrep_ready_get() &&
         lex->sql_command != SQLCOM_SET_OPTION &&
         !wsrep_is_show_query(lex->sql_command))
     {
@@ -2370,7 +2370,7 @@ mysql_execute_command(THD *thd)
       {
 #endif /* DIRTY_HACK */
       my_error(ER_UNKNOWN_COM_ERROR, MYF(0),
-	       "WSREP has not yet prepared node for application use");
+               "WSREP has not yet prepared node for application use");
       goto error;
 #if DIRTY_HACK
       }
