@@ -1138,11 +1138,11 @@ bool do_command(THD *thd)
      * allow queries "SET" and "SHOW", they are trapped later in execute_command
      */
     if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
+        (!wsrep_ready_get() || wsrep_reject_queries != WSREP_REJECT_NONE) &&
         (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
     ) {
       my_message(ER_UNKNOWN_COM_ERROR,
-	       "WSREP has not yet prepared node for application use", MYF(0));
+                 "WSREP has not yet prepared node for application use", MYF(0));
       thd->protocol->end_statement();
 
       /* Performance Schema Interface instrumentation end */
@@ -1167,7 +1167,7 @@ bool do_command(THD *thd)
     while (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       return_value= dispatch_command(command, thd, thd->wsrep_retry_query,
-				     thd->wsrep_retry_query_len);
+                                     thd->wsrep_retry_query_len);
     }
   }
   if (thd->wsrep_retry_query && thd->wsrep_conflict_state != REPLAYING)
@@ -2869,7 +2869,7 @@ mysql_execute_command(THD *thd)
      */
     if (thd->variables.wsrep_on                                            &&
         !thd->wsrep_applier                                                &&
-        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+        !(wsrep_ready_get() && wsrep_reject_queries == WSREP_REJECT_NONE)  &&
         !(thd->variables.wsrep_dirty_reads &&
           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
         !wsrep_tables_accessible_when_detached(all_tables)                 &&
