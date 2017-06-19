@@ -7584,7 +7584,7 @@ SHOW_VAR status_vars[]= {
 #endif
 #ifdef WITH_WSREP
   {"wsrep_connected",          (char*) &wsrep_connected,         SHOW_BOOL, SHOW_SCOPE_GLOBAL},
-  {"wsrep_ready",              (char*) &wsrep_ready,             SHOW_BOOL, SHOW_SCOPE_GLOBAL},
+  {"wsrep_ready",              (char*) &wsrep_show_ready,        SHOW_FUNC, SHOW_SCOPE_GLOBAL},
   {"wsrep_cluster_state_uuid", (char*) &wsrep_cluster_state_uuid,SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},
   {"wsrep_cluster_conf_id",    (char*) &wsrep_cluster_conf_id,   SHOW_LONGLONG, SHOW_SCOPE_GLOBAL},
   {"wsrep_cluster_status",     (char*) &wsrep_cluster_status,    SHOW_CHAR_PTR, SHOW_SCOPE_GLOBAL},

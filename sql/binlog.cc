@@ -11868,7 +11868,8 @@ TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) && wsrep_ready)
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+      wsrep_ready_get())
     return mysql_bin_log.commit(thd, all);
   else
     return (ha_commit_low(thd, all) ?
@@ -11881,7 +11882,8 @@ int wsrep_thd_binlog_rollback(THD* thd, bool all)
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) && wsrep_ready)
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+      wsrep_ready_get())
     return mysql_bin_log.rollback(thd, all);
   else
     return ha_rollback_low(thd, all);
