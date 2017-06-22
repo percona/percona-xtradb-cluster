@@ -31,6 +31,7 @@ SHOW TABLE STATUS;
 SHOW TABLES;
 SHOW TRIGGERS;
 SHOW GLOBAL VARIABLES LIKE 'foo_bar';
+SHOW CREATE USER 'root';
 SHOW WARNINGS;
 SET GLOBAL debug = "-d,sync.wsrep_apply_cb";
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
