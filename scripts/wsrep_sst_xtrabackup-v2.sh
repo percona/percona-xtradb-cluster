@@ -25,7 +25,6 @@
 # related to role/username/password/etc...
 #
 . $(dirname $0)/wsrep_sst_common
-WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-log-debug "")
 
 #-------------------------------------------------------------------------------
 #
@@ -37,6 +36,10 @@ ealgo=""
 ekey=""
 ekeyfile=""
 encrypt=0
+ieopts=""
+xbstreameopts=""
+xbstreameopts_sst=""
+xbstreameopts_other=""
 
 nproc=1
 ecode=0
@@ -53,6 +56,7 @@ ttime=0
 totime=0
 lsn=""
 ecmd=""
+ecmd_other=""
 rlimit=""
 stagemsg="${WSREP_SST_OPT_ROLE}"
 cpat=""
@@ -99,6 +103,10 @@ pxc_encrypt_cluster_traffic=""
 ssl_cert=""
 ssl_ca=""
 ssl_key=""
+
+# thread options
+backup_threads=-1
+encrypt_threads=-1
 
 # Required for backup locks
 # For backup locks it is 1 sent by joiner
@@ -164,10 +172,14 @@ timeit()
 }
 
 #
-# get encryption keys.
+# Configures the commands for encrypt=1
+# Sets up the parameters (algo/keys) for XB-based encryption
+# If the version of PXB is >= 2.4.7, changes the XB parameters
+# If the version of PXB is < 2.4.7, use xbcrypt instead
+#
 get_keys()
 {
-    # $encrypt -eq 1 is for internal purposes only
+    # $encrypt -eq -1 is for internal purposes only
     if [[ $encrypt -ge 2 || $encrypt -eq -1 ]]; then
         return
     fi
@@ -181,9 +193,11 @@ get_keys()
     fi
 
     if [[ $sfmt == 'tar' ]]; then
-        wsrep_log_error "NOTE: Xtrabackup-based encryption - encrypt=1 - cannot be enabled with tar format"
-        encrypt=-1
-        return
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "* Xtrabackup-based encryption (encrypt = 1) cannot be  "
+        wsrep_log_error "* enabled with the tar format.                         "
+        wsrep_log_error "****************************************************** "
+        exit 22
     fi
 
     wsrep_log_debug "Xtrabackup based encryption enabled in my.cnf"
@@ -202,18 +216,53 @@ get_keys()
         exit 3
     fi
 
-    if [[ -z $ekey ]]; then
-        ecmd="xbcrypt --encrypt-algo=$ealgo --encrypt-key-file=$ekeyfile"
-    else
+    if [[ -n "$ekey" ]]; then
         wsrep_log_warning "Using the 'encrypt-key' option causes the encryption key"
         wsrep_log_warning "to be set via the command-line and is considered insecure."
         wsrep_log_warning "It is recommended to use the 'encrypt-key-file' option instead."
-
-        ecmd="xbcrypt --encrypt-algo=$ealgo --encrypt-key=$ekey"
     fi
 
+    local readonly encrypt_opts=""
+    if [[ -z $ekey ]]; then
+        encrypt_opts=" --encrypt-key-file=$ekeyfile "
+    else
+        encrypt_opts=" --encrypt-key=$ekey "
+    fi
+
+    # Setup the command for all non-SST transfers
+    # Encryption is done by xbcrypt for all other (non-SST) transfers
+    #
+    ecmd_other="xbcrypt --encrypt-algo=$ealgo $encrypt_opts "
     if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]]; then
-        ecmd+=" -d"
+        # Decryption is done by xbcrypt for all other (non-SST) transfers
+        ecmd_other+=" -d"
+    fi
+
+    #
+    # PXB version >= 2.4.7 added encryption support directly in PXB
+    #
+    if check_for_version $XB_VERSION "2.4.7"; then
+        # ensure that ecmd is clear because SST encryption
+        # goes through xtrabackup, not a separate program
+        ecmd=""
+
+        if [[ "$WSREP_SST_OPT_ROLE" == "joiner" ]]; then
+            # Decryption is done by xbstream for SST
+            xbstreameopts_sst=" --decrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
+            xbstreameopts_other=""
+            ieopts=""
+        else
+            # Encryption is done by xtrabackup for SST
+            xbstreameopts_sst=""
+            xbstreameopts_other=""
+            ieopts=" --encrypt=$ealgo $encrypt_opts --encrypt-threads=$encrypt_threads "
+        fi
+    else
+        #
+        # For older versions, use xbcrypt for SST encryption/decryption
+        # (same as for non-SST transfers)
+        #
+        ecmd=$ecmd_other
     fi
 
     stagemsg+="-XB-Encrypted"
@@ -487,38 +536,6 @@ get_transfer()
 }
 
 #
-# Converts an input string into a boolean "on", "off"
-# Converts:
-#   "on", "true", "1" -> "on" (case insensitive)
-#   "off", "false", "0" -> "off" (case insensitive)
-# All other values : -> default_value
-#
-# 1st param: input value
-# 2nd param: default value
-normalize_boolean()
-{
-    local input_value=$1
-    local default_value=$2
-    local return_value=$default_value
-
-    if [[ "$input_value" == "1" ]]; then
-        return_value="on"
-    elif [[ "$input_value" =~ ^[Oo][Nn]$ ]]; then
-        return_value="on"
-    elif [[ "$input_value" =~ ^[Tt][Rr][Uu][Ee]$ ]]; then
-        return_value="on"
-    elif [[ "$input_value" == "0" ]]; then
-        return_value="off"
-    elif [[ "$input_value" =~ ^[Oo][Ff][Ff]$ ]]; then
-        return_value="off"
-    elif [[ "$input_value" =~ ^[Ff][Aa][Ll][Ss][Ee]$ ]]; then
-        return_value="off"
-    fi
-
-    echo $return_value
-}
-
-#
 # read the sst specific options.
 read_cnf()
 {
@@ -590,6 +607,23 @@ read_cnf()
     ssystag=$(parse_cnf mysqld_safe syslog-tag "${SST_SYSLOG_TAG:-}")
     ssystag+="-"
 
+    # thread options
+    encrypt_threads=$(parse_cnf sst encrypt-threads -1)
+    if [[ $encrypt_threads -eq -1 ]]; then
+        encrypt_threads=$(parse_cnf sst encrypt_threads -1)
+    fi
+    if [[ $encrypt_threads -le 0 ]]; then
+        encrypt_threads=4
+    fi
+
+    backup_threads=$(parse_cnf sst backup-threads -1)
+    if [[ $backup_threads -eq -1 ]]; then
+        backup_threads=$(parse_cnf sst backup_threads -1)
+    fi
+    if [[ $backup_threads -le 0 ]]; then
+        backup_threads=4
+    fi
+
     if [[ $ssyslog -ne -1 ]]; then
         if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF mysqld_safe | tr '_' '-' | grep -q -- "--syslog"; then
             ssyslog=1
@@ -614,8 +648,8 @@ read_cnf()
     fi
 
     # Setup # of threads (if not already specified)
-    if ! [[ "$iopts" =~ --parallel= ]]; then
-        iopts+=" --parallel=4"
+    if [[ ! "$iopts" =~ --parallel= ]]; then
+        iopts+=" --parallel=$backup_threads"
     fi
 
     # Buildup the list of files to keep in the datadir
@@ -705,9 +739,9 @@ get_stream()
     if [[ $sfmt == 'xbstream' ]]; then
         wsrep_log_debug "Streaming with xbstream"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
-            strmcmd="xbstream -x"
+            strmcmd="xbstream \$xbstreameopts -x"
         else
-            strmcmd="xbstream -c \${FILE_TO_STREAM}"
+            strmcmd="xbstream \$xbstreameopts -c \${FILE_TO_STREAM}"
         fi
     else
         sfmt="tar"
@@ -1259,12 +1293,12 @@ if [[ $ssyslog -eq 1 ]]; then
 
         INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --prepare --binlog-info=ON \$rebuildcmd \$keyringapplyopt --target-dir=\${DATA} 2>&1  | logger -p daemon.err -t ${ssystag}innobackupex-apply "
         INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} --datadir=\${TDATA} $disver $impts  --move-back --binlog-info=ON --force-non-empty-directories --target-dir=\${DATA} 2>&1 | logger -p daemon.err -t ${ssystag}innobackupex-move "
-        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info  --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
+        INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF} $disver $iopts \$ieopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info  --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2> >(logger -p daemon.err -t ${ssystag}innobackupex-backup)"
     fi
 else
     INNOAPPLY="${INNOBACKUPEX_BIN} $disver $iapts --prepare --binlog-info=ON \$rebuildcmd \$keyringapplyopt --target-dir=\${DATA} &>\${DATA}/innobackup.prepare.log"
     INNOMOVE="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} --datadir=\${TDATA} $disver $impts  --move-back --binlog-info=ON --force-non-empty-directories --target-dir=\${DATA} &>\${DATA}/innobackup.move.log"
-    INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
+    INNOBACKUP="${INNOBACKUPEX_BIN} --defaults-file=${WSREP_SST_OPT_CONF}  --defaults-group=mysqld${WSREP_SST_OPT_CONF_SUFFIX} $disver $iopts \$ieopts \$INNOEXTRA \$keyringbackupopt --backup --galera-info --binlog-info=ON --stream=\$sfmt --target-dir=\$itmpdir 2>\${DATA}/innobackup.backup.log"
 fi
 
 #
@@ -1327,14 +1361,17 @@ then
         check_extra
 
         ttcmd="$tcmd"
-        if [[ $encrypt -eq 1 ]]; then
-            if [[ -n $scomp ]]; then
-                tcmd=" \$ecmd | $scomp | $tcmd "
-            else
-                tcmd=" \$ecmd | $tcmd "
-            fi
-        elif [[ -n $scomp ]]; then
+
+        # Add compression to the head of the stream (if specified)
+        if [[ -n "$scomp" ]]; then
             tcmd=" $scomp | $tcmd "
+        fi
+        # Add encryption to the head of the stream (if specified)
+        if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
+            tcmd=" \$ecmd_other | $tcmd "
+        fi
+        if [[ $encrypt -eq 1 ]]; then
+            xbstreameopts=$xbstreameopts_other
         fi
 
         # Before the real SST,send the sst-info
@@ -1386,10 +1423,12 @@ then
         if [[ -n $scomp ]]; then
             tcmd="$scomp | $tcmd"
         fi
-
         # Add encryption to the head of the stream (if specified)
-        if [[ $encrypt -eq 1 ]]; then
+        if [[ $encrypt -eq 1 && -n "$ecmd" ]]; then
             tcmd=" \$ecmd | $tcmd "
+        fi
+        if [[ $encrypt -eq 1 ]]; then
+            xbstreameopts=$xbstreameopts_sst
         fi
 
         set +e
@@ -1418,20 +1457,22 @@ then
         echo "continue" # now server can resume updating data
         echo "1" > "${donor_tmpdir}/${IST_FILE}"
         get_keys
-        if [[ $encrypt -eq 1 ]]; then
-            if [[ -n $scomp ]]; then
-                tcmd=" \$ecmd | $scomp | $tcmd "
-            else
-                tcmd=" \$ecmd | $tcmd "
-            fi
-        elif [[ -n $scomp ]]; then
+        # Add compression to the head of the stream (if specified)
+        if [[ -n "$scomp" ]]; then
             tcmd=" $scomp | $tcmd "
         fi
+        # Add encryption to the head of the stream (if specified)
+        if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
+            tcmd=" \$ecmd_other | $tcmd "
+        fi
+        if [[ $encrypt -eq 1 ]]; then
+            xbstreameopts=$xbstreameopts_other
+        fi
+
         strmcmd+=" \${IST_FILE}"
 
         FILE_TO_STREAM=$SST_INFO_FILE
         send_data_from_donor_to_joiner "$donor_tmpdir" "${stagemsg}-IST"
-
     fi
 
     echo "done ${WSREP_SST_OPT_GTID}"
@@ -1449,7 +1490,6 @@ then
 
     stagemsg="Joiner-Recv"
 
-    sencrypted=1
     nthreads=1
 
     MODULE="xtrabackup_sst"
@@ -1480,14 +1520,14 @@ then
     fi
 
     get_keys
-    if [[ $encrypt -eq 1 && $sencrypted -eq 1 ]]; then
-        if [[ -n $sdecomp ]]; then
-            strmcmd=" $sdecomp | \$ecmd | $strmcmd"
-        else
-            strmcmd=" \$ecmd | $strmcmd"
-        fi
-    elif [[ -n $sdecomp ]]; then
-            strmcmd=" $sdecomp | $strmcmd"
+    if [[ $encrypt -eq 1 && -n "$ecmd_other" ]]; then
+        strmcmd=" \$ecmd_other | $strmcmd"
+    fi
+    if [[ -n $sdecomp ]]; then
+        strmcmd=" $sdecomp | $strmcmd"
+    fi
+    if [[ $encrypt -eq 1 ]]; then
+        xbstreameopts=$xbstreameopts_other
     fi
 
     initialize_tmpdir
@@ -1552,6 +1592,17 @@ then
 
     if [ ! -r "${STATDIR}/${IST_FILE}" ]
     then
+        get_stream
+        if [[ $encrypt -eq 1 && -n "$ecmd" ]]; then
+            strmcmd=" \$ecmd | $strmcmd"
+        fi
+        if [[ -n $sdecomp ]]; then
+            strmcmd=" $sdecomp | $strmcmd"
+        fi
+        if [[ $encrypt -eq 1 ]]; then
+            xbstreameopts=$xbstreameopts_sst
+        fi
+
         if [[ -d ${DATA}/.sst ]]; then
             wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
             rm -rf ${DATA}/.sst
