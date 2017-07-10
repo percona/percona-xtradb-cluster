@@ -42,7 +42,7 @@ USE mysql;
 UPDATE user SET authentication_string=PASSWORD('${PASSWD}') WHERE user='root';
 EOF
 				PASSWD=""
-				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld -datadir=${MYSQLDATA} --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
 				rm -f ${SQL}
 			else
 				SQL=/var/lib/mysql-files/SQL
@@ -55,7 +55,7 @@ INSTALL PLUGIN auth_socket SONAME 'auth_socket.so';
 USE mysql;
 UPDATE user SET plugin='auth_socket' WHERE user='root';
 EOF
-				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
+				su - mysql -s /bin/bash -c "/usr/sbin/mysqld --datadir=${MYSQLDATA} --initialize-insecure=on --init-file=${SQL} 2>&1 > /dev/null"
 				rm -f ${SQL}
 			fi
 		fi
