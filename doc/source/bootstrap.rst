@@ -75,4 +75,7 @@ The credentials must match those specified when :ref:`configure`.
 For more information, see `Privileges for Percona XtraBackup
 <https://www.percona.com/doc/percona-xtrabackup/2.4/using_xtrabackup/privileges.html>`_.
 
+Next Steps
+==========
+
 After initializing the cluster, you can :ref:`add other nodes <add-node>`.

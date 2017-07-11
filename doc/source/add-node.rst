@@ -27,6 +27,9 @@ This requires the following:
 
   For more information, see :ref:`bootstrap`.
 
+Starting the Second Node
+========================
+
 Start the second node using the following command:
 
 .. code-block:: bash
@@ -69,6 +72,9 @@ and you can proceed to add the next node.
    it means that SST hasn't finished.
    Do not add new nodes until all others are in ``Synced`` state.
 
+Starting the Third Node
+=======================
+
 To add the third node, start it as usual:
 
 .. code-block:: bash
@@ -100,6 +106,9 @@ Previous output shows that the new node
 has been successfully added to the cluster.
 Cluster size is now 3 nodes, it is the primary component,
 and it is fully connected and ready to receive write-set replication.
+
+Next Steps
+==========
 
 When you add all nodes to the cluster,
 you can :ref:`verify replication <verify>`

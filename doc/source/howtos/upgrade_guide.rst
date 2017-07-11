@@ -77,37 +77,41 @@ To upgrade the cluster, follow these steps for each node:
 
 #. Open another session and run ``mysql_upgrade``.
 
-#. When the upgrade is done, stop ``mysqld``.
+#. When the upgrade is done, stop the ``mysql`` service:
+
+   .. code-block:: bash
+
+      $ sudo service mysql stop
 
    .. note:: On CentOS, the :file:`my.cnf` configuration file
       is renamed to :file:`my.cnf.rpmsave`.
       Make sure to rename it back
       before joining the upgraded node back to the cluster.
 
-#. Start the node with :variable:`pxc_strict_mode` variable
-   set to ``PERMISSIVE``.
-   By default, :ref:`pxc-strict-mode` is set to ``ENFORCING``,
-   which will deny any unsupported operations and may halt the server
-   upon encountering a failed validation.
-   In ``PERMISSIVE`` mode it will log warnings and continue running as normal.
+#. Now you can join the upgraded node back to the cluster.
 
-   .. code-block:: bash
+   In most cases, starting the ``mysql`` service
+   should run the node with your previous configuration::
 
-      $ sudo mysqld --pxc-strict-mode=PERMISSIVE
+    $ sudo service mysql start
 
-#. Check the log for any experimental or unsupported features
-   that might have been encountered.
+   For more information, see :ref:`add-node`.
 
-#. If you fixed all incompatibilities
-   releaved by :ref:`pxc-strict-mode` validations,
-   you can set the :variable:`pxc_strict_mode` variable to ``ENFORCING``::
+   .. note:: As of version 5.7,
+      |PXC| runs with :ref:`pxc-strict-mode` enabled by default.
+      This will deny any unsupported operations and may halt the server
+      upon encountering a failed validation.
 
-      mysql> SET pxc_strict_mode=ENFORCING;
+      If you are not sure, it is recommended to first start the node
+      with the :variable:`pxc_strict_mode` variable set to ``PERMISSIVE``::
 
-   .. note:: It is highly recommended
-      to run with the default ``ENFORCING`` mode
-      and ensure that the workload passes all validations
-      concerning experimental and unsupported features.
+       $ sudo mysqld --pxc-strict-mode=PERMISSIVE
+
+      After you check the log for any experimental or unsupported features
+      and fix any encountered incompatibilities,
+      you can set the variable back to ``ENFORCING`` at run time::
+
+       mysql> SET pxc_strict_mode=ENFORCING;
 
 #. Repeat this procedure for the next node in the cluster
    until you upgrade all nodes.
