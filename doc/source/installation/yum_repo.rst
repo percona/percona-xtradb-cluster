@@ -1,48 +1,64 @@
 .. _yum-repo:
 
-===========================================
- Percona :program:`yum` Repository
-===========================================
+===================================
+Installing |PXC| on RHEL and CentOS
+===================================
 
-The |Percona| :program:`yum` repository supports popular *RPM*-based operating systems, including the *Amazon Linux AMI*.
+Percona provides :file:`.rpm` packages for 64-bit versions
+of the following distributions:
 
-The easiest way to install the *Percona Yum* repository is to install an *RPM* that configures :program:`yum` and installs the `Percona GPG key <https://www.percona.com/downloads/RPM-GPG-KEY-percona>`_. Installation can also be done manually.
+* Red Hat Enterprise Linux and CentOS 5
+* Red Hat Enterprise Linux and CentOS 6
+* Red Hat Enterprise Linux and CentOS 7
 
-Automatic Installation
-=======================
+.. note::
+  |PXC| should work on other RPM-based distributions
+  (such as Oracle Linux and Amazon Linux AMI),
+  but it is tested only on platforms listed above.
 
-Execute the following command as a ``root`` user: ::
+The packages are available in the official Percona software repositories
+and on the
+`download page <http://www.percona.com/downloads/Percona-XtraDB-Cluster-56/LATEST/>`_.
+It is recommended to install |PXC| from repositories using :command:`yum`.
 
-  $ yum install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
+Installing from Repositories
+============================
 
-You should see some output such as the following: ::
+Make sure to remove existing |PXC| 5.5 packages
+and any |Percona Server| packages before proceeding.
 
-  Retrieving http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
-  Preparing...                ########################################### [100%]
-     1:percona-release        ########################################### [100%]
+1. Configure Percona repositories as described in
+   `Percona Software Repositories Documentation
+   <https://www.percona.com/doc/percona-repo-config/index.html>`_.
 
-Install XtraDB Cluster
-=======================
+#. Install the required |PXC| package using :command:`yum`.
+   For example, to install the base package, run the following:
+  
+   .. code-block:: bash
 
-Make sure to remove existing PXC-5.5 and PS-5.5/5.6 packages before proceeding.
+      sudo yum install Percona-XtraDB-Cluster-56
 
-Following command will install Cluster packages: ::
+   .. note:: Alternatively, you can install
+      the ``Percona-XtraDB-Cluster-full-56`` meta package,
+      which contains the following additional packages:
 
-  $ yum install Percona-XtraDB-Cluster-56
+      * ``Percona-XtraDB-Cluster-devel-56``
+      * ``Percona-XtraDB-Cluster-test-56``
+      * ``Percona-XtraDB-Cluster-debuginfo-56``
+      * ``Percona-XtraDB-Cluster-galera-3-debuginfo``
+      * ``Percona-XtraDB-Cluster-shared-56``
 
-Instead of ``Percona-XtraDB-Cluster-56`` you can install ``Percona-XtraDB-Cluster-full-56`` meta-package which will install ``Percona-XtraDB-Cluster-devel-56``, ``Percona-XtraDB-Cluster-test-56``, ``Percona-XtraDB-Cluster-debuginfo-56``, ``Percona-XtraDB-Cluster-galera-3-debuginfo``, and ``Percona-XtraDB-Cluster-shared-56`` packages in addition.
+For more information on how to bootstrap the cluster please check
+:ref:`ubuntu_howto`.
 
 .. warning:: 
 
-   In order to sucessfully install |Percona XtraDB Cluster| ``socat`` package will need to be installed first. ``socat`` package can be installed from the `EPEL <https://fedoraproject.org/wiki/EPEL>`_ repositories.
+   |PXC| requires the ``socat`` package,
+   which can be installed from the
+   `EPEL <https://fedoraproject.org/wiki/EPEL>`_ repositories.
 
+In CentOS, ``mysql-libs`` conflicts
+with the ``Percona-XtraDB-Cluster-server-56`` package.
+To avoid this, remove the ``mysql-libs`` package before installing |PXC|.
+The ``Percona-Server-shared-56`` provides that dependency if required.
 
-Percona `yum` Testing repository
-=================================
-
-Percona offers pre-release builds from the testing repository. To subscribe to the testing repository, you'll need to enable the testing repository in :file:`/etc/yum.repos.d/percona-release.repo`. **NOTE:** You'll need to install the Percona repository first if this hasn't been done already.
-
-Resolving package conflicts
-===========================
-
-In CentOS ``mysql-libs`` conflicts with ``Percona-XtraDB-Cluster-server-56.x86_64`` package. To avoid this you need to remove the ``mysql-libs`` package before installing |Percona XtraDB Cluster|. Package ``Percona-Server-shared-51.x86_64`` provides that dependency during installation if required.
