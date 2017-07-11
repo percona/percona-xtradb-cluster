@@ -18,9 +18,6 @@ and on the `download page
 It is recommended to intall |PXC| from the official repository
 using :command:`yum`.
 
-.. contents::
-   :local:
-
 Prerequisites
 =============
 
@@ -52,28 +49,9 @@ Prerequisites
 Installing from Percona Repository
 ==================================
 
-1. Install the Percona repository package:
-
-   .. code-block:: bash
-
-      $ sudo yum install http://www.percona.com/downloads/percona-release/redhat/0.1-4/percona-release-0.1-4.noarch.rpm
-
-   You should see the following if successful::
-
-      Installed:
-        percona-release.noarch 0:0.1-4
-
-      Complete!
-
-#. Check that the packages are available:
-
-   .. code-block:: bash
-
-      $ sudo yum list | grep Percona-XtraDB-Cluster-57
-
-      Percona-XtraDB-Cluster-57.x86_64           5.7.14-26.17.1.el7          percona-release-x86_64
-      Percona-XtraDB-Cluster-57-debuginfo.x86_64 5.7.14-26.17.1.el7          percona-release-x86_64
-
+1. Configure Percona repositories as described in
+   `Percona Software Repositories Documentation
+   <https://www.percona.com/doc/percona-repo-config/index.html>`_.
 
 #. Install the |PXC| packages:
 
@@ -125,36 +103,6 @@ Installing from Percona Repository
    .. code-block:: bash
 
       $ sudo service mysql stop
-
-.. _yum-testing-repo:
-
-Testing and Experimental Repositories
--------------------------------------
-
-Percona offers pre-release builds from the testing repository,
-and early-stage development builds from the experimental repository.
-You can enable either one in the Percona repository
-configuration file :file:`/etc/yum.repos.d/percona-release.repo`.
-There are three sections in this file,
-for configuring corresponding repositories:
-
-* stable release
-* testing
-* experimental
-
-The latter two repositories are disabled by default.
-
-If you want to install the latest testing builds,
-set ``enabled=1`` for the following entries: ::
-
-  [percona-testing-$basearch]
-  [percona-testing-noarch]
-
-If you want to install the latest experimental builds,
-set ``enabled=1`` for the following entries: ::
-
-  [percona-experimental-$basearch]
-  [percona-experimental-noarch]
 
 Next Steps
 ==========
