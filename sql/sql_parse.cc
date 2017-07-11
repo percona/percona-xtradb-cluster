@@ -3353,9 +3353,7 @@ mysql_execute_command(THD *thd)
   {
     system_status_var old_status_var= thd->status_var;
     thd->initial_status_var= &old_status_var;
-#ifdef WITH_WSREP
-    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
     if (!(res= select_precheck(thd, lex, all_tables, first_table)))
       res= execute_sqlcom_select(thd, all_tables);
 
@@ -3388,23 +3386,19 @@ mysql_execute_command(THD *thd)
   case SQLCOM_SHOW_PLUGINS:
   case SQLCOM_SHOW_FIELDS:
   case SQLCOM_SHOW_KEYS:
-#ifndef WITH_WSREP
   case SQLCOM_SHOW_VARIABLES:
   case SQLCOM_SHOW_CHARSETS:
   case SQLCOM_SHOW_COLLATIONS:
   case SQLCOM_SHOW_STORAGE_ENGINES:
   case SQLCOM_SHOW_PROFILE:
-#endif /* WITH_WSREP */
   case SQLCOM_SELECT:
-#ifdef WITH_WSREP
-    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-  case SQLCOM_SHOW_VARIABLES:
-  case SQLCOM_SHOW_CHARSETS:
-  case SQLCOM_SHOW_COLLATIONS:
-  case SQLCOM_SHOW_STORAGE_ENGINES:
-  case SQLCOM_SHOW_PROFILE:
-#endif /* WITH_WSREP */
   {
+#ifdef WITH_WSREP
+      if (lex->sql_command == SQLCOM_SELECT)
+        WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ)
+      else
+        WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW)
+#endif /* WITH_WSREP */
     thd->status_var.last_query_cost= 0.0;
     thd->status_var.last_query_partial_plans= 0;
 
@@ -3599,6 +3593,7 @@ case SQLCOM_PREPARE:
   }
   case SQLCOM_SHOW_BINLOG_EVENTS:
   {
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
     if (check_global_access(thd, REPL_SLAVE_ACL))
       goto error;
     res = mysql_show_binlog_events(thd);
@@ -4086,6 +4081,7 @@ end_with_restore_list:
     {
       if (check_global_access(thd, SUPER_ACL | REPL_CLIENT_ACL))
 	goto error;
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       res = show_binlogs(thd);
       break;
     }
@@ -4099,9 +4095,7 @@ end_with_restore_list:
     goto error;
 #else
     {
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
 
      /*
         Access check:
@@ -4165,9 +4159,7 @@ end_with_restore_list:
   case SQLCOM_CHECKSUM:
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
-#ifdef WITH_WSREP
-    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_READ);
 
     if (check_table_access(thd, SELECT_ACL, all_tables,
                            FALSE, UINT_MAX, FALSE))
@@ -4177,11 +4169,8 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_UPDATE:
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) &&
-          wsrep_sync_wait(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
-#endif /* WITH_WSREP */      
   {
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE);
     ha_rows found= 0, updated= 0;
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     if (update_precheck(thd, all_tables))
@@ -4220,10 +4209,7 @@ end_with_restore_list:
     /* if we switched from normal update, rights are checked */
     if (up_result != 2)
     {
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) &&
-          wsrep_sync_wait(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
-#endif /* WITH_WSREP */
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE);
       if ((res= multi_update_precheck(thd, all_tables)))
         break;
     }
@@ -4300,10 +4286,6 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_REPLACE:
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) &&
-          wsrep_sync_wait(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE)) goto error;
-#endif /* WITH_WSREP */
 #ifndef DBUG_OFF
     if (mysql_bin_log.is_open())
     {
@@ -4338,11 +4320,8 @@ end_with_restore_list:
     }
 #endif
   case SQLCOM_INSERT:
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) &&
-          wsrep_sync_wait(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE)) goto error;
-#endif /* WITH_WSREP */      
   {
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
 
     /*
@@ -4388,11 +4367,8 @@ end_with_restore_list:
   }
   case SQLCOM_REPLACE_SELECT:
   case SQLCOM_INSERT_SELECT:
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) &&
-          wsrep_sync_wait(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE)) goto error;
-#endif /* WITH_WSREP */      
   {
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
     select_insert *sel_result;
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     if ((res= insert_precheck(thd, all_tables)))
@@ -4490,11 +4466,8 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_DELETE:
-#ifdef WITH_WSREP
-    if (WSREP_CLIENT(thd) && 
-        wsrep_sync_wait(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
-#endif /* WITH_WSREP */
   {
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE);
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     if ((res= delete_precheck(thd, all_tables)))
       break;
@@ -4509,11 +4482,8 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_DELETE_MULTI:
-#ifdef WITH_WSREP
-    if (WSREP_CLIENT(thd) && 
-        wsrep_sync_wait(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE)) goto error;
-#endif /* WITH_WSREP */
   {
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_UPDATE_DELETE);
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     TABLE_LIST *aux_tables= thd->lex->auxiliary_table_list.first;
     uint del_table_count;
@@ -4580,51 +4550,6 @@ end_with_restore_list:
 	goto error;				/* purecov: inspected */
     }
 #ifdef WITH_WSREP
-   /* DROP TABLE <table> drops the table from database.
-   DROP TABLE is valid even if table is temporary but given that temporary
-   tables are not replicated it doesn't make sense to drop temporary table.
-   (CREATE TEMPORARY TABLE is blocked as temporary tables are localized to
-    the connection that created it which in replication case would be applier
-    thread. No user-thread will be able to access it.)
-
-   Check if table is temporary if found skip it.
-
-   Exception: drop table <non-temporary> <temporary>;
-   This involves mix of temporary and non-temporary table.
-   Algorithm will identify such case create a fake temporary table and
-   that will allow mix statement to succeed. */
-
-   bool involves_temporary = false;
-   bool involves_non_temporary = false;
-
-   /* Check for mix of temp/non-temp only if drop statement is confusing.
-   DROP TEMPORARY is meant only for TEMPORARY so skip check in this case. */
-   for (TABLE_LIST *table= all_tables;
-        table && !lex->drop_temporary;
-        table= table->next_global)
-   {
-     if (find_temporary_table(thd, table))
-       involves_temporary = true;
-     else
-       involves_non_temporary = true;
-   }
-
-  /* We take a 2 pass approach because:
-  1. We don't know involvement of mix till we are done with complete list scan
-  2. logic to find is less costly than logic to create and append query. */
-   for (TABLE_LIST *table= all_tables;
-        table && (involves_non_temporary && involves_temporary);
-        table= table->next_global)
-   {
-     if (find_temporary_table(thd, table))
-     {
-       thd->wsrep_TOI_pre_queries.push_back(new String());
-       String* query = thd->wsrep_TOI_pre_queries.back();
-       query->length(0);
-       (void) store_create_info(thd, table, query, NULL, TRUE);
-     }
-   }
-
    for (TABLE_LIST *table= all_tables; table; table= table->next_global)
    {
      if (!lex->drop_temporary                       &&
@@ -4635,11 +4560,6 @@ end_with_restore_list:
        break;
      }
    }
-
-   for (uint i = 0; i < thd->wsrep_TOI_pre_queries.size(); ++i)
-     delete thd->wsrep_TOI_pre_queries[i];
-   thd->wsrep_TOI_pre_queries.clear();
-   THD::wsrep_queries().swap(thd->wsrep_TOI_pre_queries);
 #endif /* WITH_WSREP */
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->drop_if_exists,
@@ -5013,9 +4933,7 @@ end_with_restore_list:
   {
     DBUG_EXECUTE_IF("4x_server_emul",
                     my_error(ER_UNKNOWN_ERROR, MYF(0)); goto error;);
-#ifdef WITH_WSREP
-    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
     if (check_and_convert_db_name(&lex->name, TRUE) != IDENT_NAME_OK)
       break;
     res= mysqld_show_create_db(thd, lex->name.str, &lex->create_info);
@@ -5069,9 +4987,7 @@ end_with_restore_list:
   /* lex->unit.cleanup() is called outside, no need to call it here */
   break;
   case SQLCOM_SHOW_CREATE_EVENT:
-#ifdef WITH_WSREP
-    if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+    WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
     res= Events::show_create_event(thd, lex->spname->m_db,
                                    lex->spname->m_name);
     break;
@@ -5469,6 +5385,7 @@ end_with_restore_list:
     if (!strcmp(thd->security_ctx->priv_user, grant_user->user.str) ||
         !check_access(thd, SELECT_ACL, "mysql", NULL, NULL, 1, 0))
     {
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       res = mysql_show_grants(thd, grant_user);
     }
     break;
@@ -6027,18 +5944,14 @@ create_sp_error:
     }
   case SQLCOM_SHOW_CREATE_PROC:
     {
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       if (sp_show_create_routine(thd, SP_TYPE_PROCEDURE, lex->spname))
         goto error;
       break;
     }
   case SQLCOM_SHOW_CREATE_FUNC:
     {
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       if (sp_show_create_routine(thd, SP_TYPE_FUNCTION, lex->spname))
 	goto error;
       break;
@@ -6051,9 +5964,7 @@ create_sp_error:
       enum_sp_type sp_type= (lex->sql_command == SQLCOM_SHOW_PROC_CODE) ?
                             SP_TYPE_PROCEDURE : SP_TYPE_FUNCTION;
 
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       if (sp_cache_routine(thd, sp_type, lex->spname, false, &sp))
         goto error;
       if (!sp || sp->show_routine_code(thd))
@@ -6078,9 +5989,7 @@ create_sp_error:
         goto error;
       }
 
-#ifdef WITH_WSREP
-      if (WSREP_CLIENT(thd) && wsrep_sync_wait(thd)) goto error;
-#endif /* WITH_WSREP */
+      WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_SHOW);
       if (show_create_trigger(thd, lex->spname))
         goto error; /* Error has been already logged. */
 

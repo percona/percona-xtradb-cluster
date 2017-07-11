@@ -31,6 +31,7 @@ nproc=1
 ecode=0
 ssyslog=""
 ssystag=""
+XTRABACKUP_PID=""
 SST_PORT=""
 REMOTEIP=""
 tca=""
@@ -286,12 +287,13 @@ get_transfer()
         wsrep_log_info "Using netcat as streamer"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             if nc -h 2>&1 | grep -q ncat; then
-                tcmd="nc -l ${TSST_PORT}"
+                tcmd="nc $sockopt -l ${TSST_PORT}"
             else 
-                tcmd="nc -dl ${TSST_PORT}"
+                tcmd="nc $sockopt -dl ${TSST_PORT}"
             fi
         else
-            tcmd="nc ${REMOTEIP} ${TSST_PORT}"
+            # netcat doesn't understand [] around IPv6 address
+            tcmd="nc ${REMOTEIP//[\[\]]/} ${TSST_PORT}"
         fi
     else
         tfmt='socat'
@@ -628,6 +630,14 @@ cleanup_donor()
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
 
+    if [[ -n ${XTRABACKUP_PID:-} ]];then
+        if check_pid $XTRABACKUP_PID
+        then
+            wsrep_log_error "xtrabackup process is still running. Killing... "
+            kill_xtrabackup
+        fi
+
+    fi
     rm -f ${DATA}/${IST_FILE} || true
 
     if [[ -n $progress && -p $progress ]];then 
@@ -660,31 +670,41 @@ cleanup_donor()
 
 }
 
+kill_xtrabackup()
+{
+    local PID=$(cat $XTRABACKUP_PID)
+    [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
+    wsrep_log_info "Removing xtrabackup pid file $XTRABACKUP_PID"
+    rm -f "$XTRABACKUP_PID" || true
+}
+
 setup_ports()
 {
     if [[ "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
-        SST_PORT=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $2 }')
-        REMOTEIP=$(echo $WSREP_SST_OPT_ADDR | awk -F ':' '{ print $1 }')
-        lsn=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $4 }')
-        sst_ver=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $5 }')
+        SST_PORT=$WSREP_SST_OPT_PORT
+        REMOTEIP=$WSREP_SST_OPT_HOST
+        lsn=$(echo $WSREP_SST_OPT_PATH | awk -F '[/]' '{ print $2 }')
+        sst_ver=$(echo $WSREP_SST_OPT_PATH | awk -F '[/]' '{ print $3 }')
     else
-        SST_PORT=$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $2 }')
+        SST_PORT=$WSREP_SST_OPT_PORT
     fi
 }
 
-# waits ~10 seconds for nc to open the port and then reports ready
+# waits ~1 minute for nc/socat to open the port and then reports ready
 # (regardless of timeout)
 wait_for_listen()
 {
-    local PORT=$1
-    local ADDR=$2
+    local HOST=$1
+    local PORT=$2
     local MODULE=$3
-    for i in {1..50}
+
+    for i in {1..300}
     do
         ss -p state listening "( sport = :$PORT )" | grep -qE 'socat|nc' && break
         sleep 0.2
     done
-    echo "ready ${ADDR}/${MODULE}//$sst_ver"
+
+    echo "ready ${HOST}:${PORT}/${MODULE}//$sst_ver"
 }
 
 check_extra()
@@ -1096,6 +1116,10 @@ then
           exit 22
         fi
 
+        # innobackupex implicitly writes PID to fixed location in $xtmpdir
+        XTRABACKUP_PID="$tmpdirbase/xtrabackup_pid"
+
+
     else # BYPASS FOR IST
 
         wsrep_log_info "Bypassing the SST for IST"
@@ -1142,14 +1166,7 @@ then
     # May need xtrabackup_checkpoints later on
     rm -f ${DATA}/xtrabackup_binary ${DATA}/xtrabackup_galera_info  ${DATA}/xtrabackup_logfile
 
-    ADDR=${WSREP_SST_OPT_ADDR}
-    if [ -z "${SST_PORT}" ]
-    then
-        SST_PORT=4444
-        ADDR="$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $1 }'):${SST_PORT}"
-    fi
-
-    wait_for_listen ${SST_PORT} ${ADDR} ${MODULE} &
+    wait_for_listen ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT

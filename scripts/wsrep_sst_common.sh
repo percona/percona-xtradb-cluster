@@ -30,6 +30,22 @@ while [ $# -gt 0 ]; do
 case "$1" in
     '--address')
         readonly WSREP_SST_OPT_ADDR="$2"
+        #
+        # Break address string into host:port/path parts
+        #
+        if echo $WSREP_SST_OPT_ADDR | grep -qe '^\[.*\]'
+        then
+            # IPv6 notation
+            readonly WSREP_SST_OPT_HOST=${WSREP_SST_OPT_ADDR/\]*/\]}
+            readonly WSREP_SST_OPT_HOST_UNESCAPED=$(echo $WSREP_SST_OPT_HOST | \
+                 cut -d '[' -f 2 | cut -d ']' -f 1)
+        else
+            # "traditional" notation
+            readonly WSREP_SST_OPT_HOST=${WSREP_SST_OPT_ADDR%%[:/]*}
+        fi
+        readonly WSREP_SST_OPT_PORT=$(echo $WSREP_SST_OPT_ADDR | \
+                cut -d ']' -f 2 | cut -s -d ':' -f 2 | cut -d '/' -f 1)
+        readonly WSREP_SST_OPT_PATH=${WSREP_SST_OPT_ADDR#*/}
         shift
         ;;
     '--bypass')

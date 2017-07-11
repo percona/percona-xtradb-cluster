@@ -1,0 +1,21 @@
+# this executable reprsent the embedded mysql server client
+debian/extra/innotop/innotop usr/bin/
+debian/extra/mysqlreport usr/bin/
+usr/bin/myisam_ftdump
+usr/bin/mysql
+usr/bin/mysql_config_editor
+usr/bin/mysql_find_rows
+usr/bin/mysql_fix_extensions
+usr/bin/mysql_waitpid
+usr/bin/mysqlaccess
+usr/bin/mysqladmin
+usr/bin/mysqlbug
+usr/bin/mysqlcheck
+usr/bin/mysqldump
+usr/bin/mysqldumpslow
+usr/bin/mysqlimport
+usr/bin/mysqlshow
+usr/bin/mysqlslap
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
+usr/share/doc/mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@/README

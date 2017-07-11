@@ -3571,6 +3571,10 @@ public:
   bool                      wsrep_sst_donor;
   ulong                     wsrep_affected_rows;
   bool                      wsrep_replicate_GTID;
+  /* DROP TEMPORARY TABLE is not replicated. Avoid logging this with
+  Galera GTID. */
+  bool                      wsrep_skip_wsrep_GTID;
+
 #endif /* WITH_WSREP */
   /**
     Internal parser state.

@@ -9,7 +9,7 @@ wsrep_provider=@ENV.WSREP_PROVIDER
 # enforce read-committed characteristics across the cluster
 
 wsrep_causal_reads=ON
-wsrep_sync_wait = 7
+wsrep_sync_wait = 15
 
 # Required for Galera
 innodb_autoinc_lock_mode=2

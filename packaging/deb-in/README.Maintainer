@@ -15,6 +15,30 @@
 
 TODO: Why /bin/bash for some files and /bin/sh for others (this is also the case in native packaging, so might be a reason)
 TODO: Related to above: Should be POSIX compliant
-TODO: Build with -DWITH_SYSTEMD and related to use inbuilt systemd support (Deb8 and Ubuntu15+)
 TODO: Maybe refactor CMakeLists.txt to remove redundancy
 TODO: Clean up install exception list so --list-missing can be changed to --fail-missing
+
+###  WSREP stuff
+TODO: Find a more efficient way to configure just "packaging/deb-in/"
+TODO: Can we unite systemd files (service definition, pre- and post-scriptlets, maybe more) across platforms?
+      In RedHat etc, we have "scripts/systemd/mysqld.service.in" which is working.
+      Can we use that to replace "packaging/deb-in/mysql-packagesource-server-SERIES.mysql.service.in" ?
+TODO: Check whether it was safe to drop "debian/additions/debian-start*", recover from old sources if not.
+TODO: Check everything, especially the pre/post-install/rm scripts,
+      and decide whether to follow Debian or Oracle or to create a mix.
+TODO: Clean "packaging/deb-in/CMakeLists.txt" for systemd, SysV init, Upstart, and the mix (Debian!).
+TODO: Introduce "WITH_SYSV" as a build option, so that we can build packages with both SysV and Systemd
+      startup support, as fits Debian (which delivers both).
+TODO: Decide about Upstart, either implement support for it or remove the references.
+TODO; Check package naming on Debian/Ubuntu:
+      We now have platform as part of version in the file name (separator '~')
+      because a dash '-' would start a revision which Debian tools don't affect in a "native" package.
+
+###  Other stuff
+Package cut: Comments in RPM spec files say "lz4_decompress" and "zlib_decompress" were added to client RPMs.
+      That's wrong, they are in the server RPMs. Similar for DEB. They are meant for "mysqlpump" result files
+      (if compressed), and that tool is in the client packages (both RPM and DEB).
+      Also, placement differs: RPMs have them in "/usr/bin/", DEBs in "/usr/lib/mysql/" and a patch for MTR
+      so that they will be found.
+      Proposal 1: Make comments come true, move them into client packages.
+      Proposal 2: Put them in "/usr/bin/", delete the patch.

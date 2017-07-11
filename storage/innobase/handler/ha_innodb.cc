@@ -8526,6 +8526,8 @@ report_error:
 	   to fail as thd_binlog_format() will then return != ROW.
 	   In order to take care of this situation we ORed that condition
 	   with db_type
+        g. Added condition to avoid appending keys if statement is CTAS.
+           key is appended as part of select_create::send_eof.
 	TODO: We allow replication even if binlog-format = STATEMENT.
 	This is needed by pt-table-checksum. Now it is not a good idea
 	to open this hook for pt-table-checksum but it exist like this for
@@ -18923,8 +18925,10 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
  		    (long long)wsrep_thd_thread_id(thd),
 		    (long long)victim_trx->id);
 
-	WSREP_DEBUG("Aborting query: %s", 
-		  (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
+	WSREP_DEBUG("Aborting query: %s conf %d trx: %llu",
+		    (thd && wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void",
+		    wsrep_thd_conflict_state(thd),
+		    (unsigned long long) wsrep_thd_ws_handle(thd)->trx_id);
 
 	wsrep_thd_LOCK(thd);
         DBUG_EXECUTE_IF("sync.wsrep_after_BF_victim_lock",
@@ -18985,9 +18989,8 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		} else {
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
-				(wsrep_trx_id_t)victim_trx->id
+				(wsrep_trx_id_t)wsrep_thd_ws_handle(thd)->trx_id
 			);
-			
 			switch (rcode) {
 			case WSREP_WARNING:
 				WSREP_DEBUG("cancel commit warning: %llu",
@@ -19110,9 +19113,10 @@ wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 	DBUG_ENTER("wsrep_innobase_abort_thd");
 	trx_t* victim_trx = thd_to_trx(victim_thd);
 	trx_t* bf_trx     = (bf_thd) ? thd_to_trx(bf_thd) : NULL;
-	WSREP_DEBUG("abort transaction: BF: %s victim: %s", 
+	WSREP_DEBUG("abort transaction: BF: %s victim: %s victim conf: %d",
 		    wsrep_thd_query(bf_thd),
-		    wsrep_thd_query(victim_thd));
+		    wsrep_thd_query(victim_thd),
+		    wsrep_thd_conflict_state(victim_thd));
 
 	if (victim_trx)
 	{
@@ -19164,8 +19168,12 @@ wsrep_fake_trx_id(
 	handlerton	*hton,
 	THD		*thd)	/*!< in: user thread handle */
 {
+	mutex_enter(&trx_sys->mutex);
 	trx_id_t trx_id = trx_sys_get_new_trx_id();
-
+	mutex_exit(&trx_sys->mutex);
+	WSREP_DEBUG("innodb fake trx id: %llu thd: %s",
+			(unsigned long long) trx_id,
+			wsrep_thd_query(thd));
 	(void *)wsrep_ws_handle_for_trx(wsrep_thd_ws_handle(thd), trx_id);
 }
 
