@@ -27,6 +27,7 @@ local_ip()
 
     [ "$1" = "127.0.0.1" ]      && return 0
     [ "$1" = "localhost" ]      && return 0
+    [ "$1" = "[::1]" ]          && return 0
     [ "$1" = "$(hostname -s)" ] && return 0
     [ "$1" = "$(hostname -f)" ] && return 0
     [ "$1" = "$(hostname -d)" ] && return 0
@@ -118,8 +119,8 @@ DROP PREPARE stmt;"
 SET_START_POSITION="SET GLOBAL wsrep_start_position='$WSREP_SST_OPT_GTID';"
 
 MYSQL="$MYSQL_CLIENT --defaults-extra-file=$WSREP_SST_OPT_CONF "\
-"$AUTH -h$WSREP_SST_OPT_HOST -P$WSREP_SST_OPT_PORT "\
-"--disable-reconnect --connect_timeout=10"
+"$AUTH -h${WSREP_SST_OPT_HOST_UNESCAPED:-$WSREP_SST_OPT_HOST} "\
+"-P$WSREP_SST_OPT_PORT --disable-reconnect --connect_timeout=10"
 
 # need to disable logging when loading the dump
 # reason is that dump contains ALTER TABLE for log tables, and

@@ -30,7 +30,7 @@ SET SESSION wsrep_sync_wait = 0;
 --connection node_1
 UNLOCK TABLES;
 
-SET SESSION wsrep_sync_wait = 7;
+SET SESSION wsrep_sync_wait = 15;
 SELECT COUNT(*) = 2 FROM t1;
 
 DROP TABLE t1;

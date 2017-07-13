@@ -66,6 +66,11 @@ check_pid_and_port()
     local rsync_pid=$2
     local rsync_port=$3
 
+    if ! which lsof > /dev/null; then
+        wsrep_log_error "lsof tool not found in PATH! Make sure you have it installed."
+        exit 2 # ENOENT
+    fi
+
     local port_info=$(lsof -i :$rsync_port -Pn 2>/dev/null | \
         grep "(LISTEN)")
     local is_rsync=$(echo $port_info | \
@@ -236,7 +241,8 @@ then
         [ "$OS" == "Linux" ] && count=$(grep -c processor /proc/cpuinfo)
         [ "$OS" == "Darwin" -o "$OS" == "FreeBSD" ] && count=$(sysctl -n hw.ncpu)
 
-        find . -maxdepth 1 -mindepth 1 -type d -print0 | xargs -I{} -0 -P $count \
+        find . -maxdepth 1 -mindepth 1 -type d -not -name "lost+found" \
+             -print0 | xargs -I{} -0 -P $count \
              rsync --owner --group --perms --links --specials \
              --ignore-times --inplace --recursive --delete --quiet \
              $WHOLE_FILE_OPT --exclude '*/ib_logfile*' "$WSREP_SST_OPT_DATA"/{}/ \
@@ -284,25 +290,24 @@ then
     fi
     rm -rf "$RSYNC_PID"
 
-    ADDR=$WSREP_SST_OPT_ADDR
-    RSYNC_PORT=$(echo $ADDR | awk -F ':' '{ print $2 }')
-    if [ -z "$RSYNC_PORT" ]
-    then
-        RSYNC_PORT=4444
-        ADDR="$(echo $ADDR | awk -F ':' '{ print $1 }'):$RSYNC_PORT"
-    fi
-
     trap "exit 32" HUP PIPE
     trap "exit 3"  INT TERM ABRT
     trap cleanup_joiner EXIT
 
     RSYNC_CONF="$WSREP_SST_OPT_DATA/$MODULE.conf"
 
+    if [ -n "${MYSQL_TMP_DIR:-}" ] ; then
+        SILENT="log file = $MYSQL_TMP_DIR/rsyncd.log"
+    else
+        SILENT=""
+    fi
+
 cat << EOF > "$RSYNC_CONF"
 pid file = $RSYNC_PID
 use chroot = no
 read only = no
 timeout = 300
+$SILENT
 [$MODULE]
     path = $WSREP_SST_OPT_DATA
 [$MODULE-log_dir]
@@ -313,6 +318,7 @@ EOF
 
     # listen at all interfaces (for firewalled setups)
     wsrep_log_info "Waiting for data-dir through rsync................"
+    readonly RSYNC_PORT=${WSREP_SST_OPT_PORT:-4444}
     rsync --daemon --no-detach --port $RSYNC_PORT --config "$RSYNC_CONF" &
     RSYNC_REAL_PID=$!
 
@@ -321,7 +327,7 @@ EOF
         sleep 0.2
     done
 
-    echo "ready $ADDR/$MODULE"
+    echo "ready $WSREP_SST_OPT_HOST:$RSYNC_PORT/$MODULE"
 
     # wait for SST to complete by monitoring magic file
     while [ ! -r "$MAGIC_FILE" ] && check_pid "$RSYNC_PID" && \

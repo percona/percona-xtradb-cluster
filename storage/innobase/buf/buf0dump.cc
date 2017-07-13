@@ -43,6 +43,9 @@ Created April 08, 2011 Vasil Dimov
 #include "ut0byte.h"
 
 #include <algorithm>
+#ifdef WITH_WSREP
+extern my_bool wsrep_recovery;
+#endif /* WITH_WSREP */
 
 enum status_severity {
 	STATUS_VERBOSE,
@@ -774,7 +777,13 @@ DECLARE_THREAD(buf_dump_thread)(
 	buf_load_status(STATUS_VERBOSE, "Loading of buffer pool not started");
 
 	if (srv_buffer_pool_load_at_startup) {
+#ifdef WITH_WSREP
+		if (!wsrep_recovery) {
+#endif /* WITH_WSREP */
 		buf_load();
+#ifdef WITH_WSREP
+		}
+#endif /* WITH_WSREP */
 	}
 
 	while (!SHUTTING_DOWN()) {
@@ -795,8 +804,14 @@ DECLARE_THREAD(buf_dump_thread)(
 	}
 
 	if (srv_buffer_pool_dump_at_shutdown && srv_fast_shutdown != 2) {
+#ifdef WITH_WSREP
+		if (!wsrep_recovery) {
+#endif /* WITH_WSREP */
 		buf_dump(FALSE /* ignore shutdown down flag,
 		keep going even if we are in a shutdown state */);
+#ifdef WITH_WSREP
+		}
+#endif /* WITH_WSREP */
 	}
 
 	srv_buf_dump_thread_active = FALSE;

@@ -68,6 +68,8 @@ get_option () {
 datadir=$(get_option datadir "/var/lib/mysql" mysqld)
 socket=$(get_option  socket "$datadir/mysql.sock" mysqld)
 pidfile=$(get_option pid-file "/var/run/mysql/mysqld.pid" mysqld mysqld_safe)
+piddir=$( dirname $pidfile )
+mkdir -p ${piddir} && chown mysql:mysql ${piddir}
 
 install_validate_password_sql_file () {
     local dir

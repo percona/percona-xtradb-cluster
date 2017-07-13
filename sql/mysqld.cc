@@ -899,9 +899,7 @@ bool mysqld_embedded=0;
 bool mysqld_embedded=1;
 #endif
 
-#ifndef EMBEDDED_LIBRARY
 static my_bool plugins_are_initialized= FALSE;
-#endif
 
 #ifndef DBUG_OFF
 static const char* default_dbug_option;
@@ -1291,7 +1289,9 @@ private:
 static void close_connections(void)
 {
   DBUG_ENTER("close_connections");
+#ifdef WITH_WSREP
   WSREP_DEBUG("Closing connection (close_connections)");
+#endif /* WITH_WSREP */
   (void) RUN_HOOK(server_state, before_server_shutdown, (NULL));
 
   Per_thread_connection_handler::kill_blocked_pthreads();
@@ -7278,7 +7278,7 @@ static int have_wsrep_appliers(THD *thd)
   if (tmp) return true;
   return false;
 }
-#endif
+#endif /* 0 */
 
 static void wsrep_close_thread(THD *thd)
 {

@@ -17,5 +17,5 @@ SET SESSION wsrep_sync_wait = 0;
 Performing --wsrep-recover ...
 # restart
 SET SESSION wsrep_on = ON;
-SET SESSION wsrep_sync_wait = 7;
+SET SESSION wsrep_sync_wait = 15;
 DROP TABLE t1;

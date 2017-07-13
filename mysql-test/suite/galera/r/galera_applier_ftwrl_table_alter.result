@@ -9,7 +9,7 @@ SELECT 1 FROM DUAL;
 1
 1
 UNLOCK TABLES;
-SET SESSION wsrep_sync_wait = 7;
+SET SESSION wsrep_sync_wait = 15;
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (

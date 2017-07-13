@@ -1519,6 +1519,7 @@ end:
           // sizeof(LEX) = 4512, so it's relatively safe to allocate it on stack.
           LEX lex;
           lex.sql_command = SQLCOM_DROP_EVENT;
+          lex.select_lex = NULL;
           thd->lex = &lex;
           WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
           thd->lex= original_saved_lex;

@@ -1,6 +1,10 @@
 RESET MASTER;
+SET SESSION wsrep_on=OFF;
 RESET MASTER;
+SET SESSION wsrep_on=ON;
+SET SESSION wsrep_on=OFF;
 RESET MASTER;
+SET SESSION wsrep_on=ON;
 START SLAVE USER='root';
 Warnings:
 Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
@@ -167,7 +171,7 @@ USE test2;
 ERROR 42000: Unknown database 'test2'
 SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 123;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
-mysqld-bin.000001	123	Previous_gtids	4	154	
+mysqld-bin.000001	123	Previous_gtids	3	154	
 mysqld-bin.000001	154	Gtid	1	219	SET @@SESSION.GTID_NEXT= '<effective_uuid>:1'
 mysqld-bin.000001	219	Query	1	314	CREATE SCHEMA test1
 mysqld-bin.000001	314	Gtid	1	379	SET @@SESSION.GTID_NEXT= '<effective_uuid>:2'

@@ -29,6 +29,7 @@ CALL mtr.add_suppression("Fetch of persistent statistics requested for table `my
 CALL mtr.add_suppression("Failed to open optimizer cost constant tables");
 CALL mtr.add_suppression("Gtid table is not ready to be used");
 CALL mtr.add_suppression("Read non-wsrep XID from storage engines");
+CALL mtr.add_suppression("ib_buffer_pool' for reading: No such file or directory");
 
 --disable_query_log
 --eval SET GLOBAL wsrep_sst_method = '$wsrep_sst_method_orig';
