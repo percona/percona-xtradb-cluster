@@ -75,6 +75,9 @@ To upgrade the cluster, follow these steps for each node:
 
       sudo mysqld --skip-grant-tables --user=mysql --wsrep-provider='none'
 
+   .. note:: As of |PXC| 5.7.6, the ``--skip-grant-tables`` option
+      is not required.
+
 #. Open another session and run ``mysql_upgrade``.
 
 #. When the upgrade is done, stop the ``mysqld`` process.
