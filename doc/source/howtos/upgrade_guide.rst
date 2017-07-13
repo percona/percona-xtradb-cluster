@@ -77,11 +77,9 @@ To upgrade the cluster, follow these steps for each node:
 
 #. Open another session and run ``mysql_upgrade``.
 
-#. When the upgrade is done, stop the ``mysql`` service:
-
-   .. code-block:: bash
-
-      $ sudo service mysql stop
+#. When the upgrade is done, stop the ``mysqld`` process.
+   You can either run ``sudo kill`` on the ``mysqld`` process ID,
+   or ``sudo mysqladmin shutdown`` with the MySQL root user credentials.
 
    .. note:: On CentOS, the :file:`my.cnf` configuration file
       is renamed to :file:`my.cnf.rpmsave`.
