@@ -90,6 +90,7 @@ for configuring |PXC| nodes with ProxySQL::
   --mode                             ProxySQL read/write configuration mode, currently supporting: 'loadbal' and 'singlewrite' (the default) modes
   --write-node                       Writer node to accept write statments. This option is supported only when using --mode=singlewrite
   --adduser                          Adds the Percona XtraDB Cluster application user to the ProxySQL database
+  --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL (deletes ProxySQL users not in MySQL)
   --version, -v                      Print version info
 
 .. note:: Before using the ``proxysql-admin`` tool,
@@ -227,6 +228,14 @@ The following extra options can be used:
      Enter Percona XtraDB Cluster application user name: root
      Enter Percona XtraDB Cluster application user password:
      Added Percona XtraDB Cluster application user to ProxySQL database!
+
+* ``--syncusers``
+
+  Sync user accounts currently configured in |PXC| to ProxySQL database
+  except users with no password and the ``admin`` user.
+
+  .. note:: This option also deletes users
+     that are not in |PXC| from ProxySQL database.
 
 * ``--galera-check-interval``
 
