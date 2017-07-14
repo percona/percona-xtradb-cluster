@@ -142,13 +142,12 @@ The ``proxysql-admin`` tool will do the following:
 
 * Add |PXC| node into the ProxySQL database
 
-* Add the following monitoring scripts into the ProxySQL ``scheduler`` table,
-  if they are not available:
-
-  * ``proxysql_node_monitor`` checks cluster node membership
-    and re-configures ProxySQL if the membership changes
-  * ``proxysql_galera_checker`` checks for desynced nodes
-    and temporarily deactivates them
+* Add the ``proxysql_galera_checker`` monitoring script
+  into the ProxySQL ``scheduler`` table if it is not available.
+  This script checks for desynced nodes and temporarily deactivates them.
+  It also calls the ``proxysql_node_monitor`` script,
+  which checks cluster node membership
+  and re-configures ProxySQL if the membership changes.
 
 * Create two new |PXC| users with the ``USAGE`` privilege on the node
   and add them to ProxySQL configuration, if they are not already configured.
