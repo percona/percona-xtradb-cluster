@@ -605,11 +605,13 @@ To add a user, insert credentials into ``mysql_users`` table:
 
    ProxySQL currently doesn't encrypt passwords.
 
-Load the user into runtime space:
+Load the user into runtime space and save these changes to disk
+(ensuring that they persist after ProxySQL shuts down):
 
 .. code-block:: text
 
   mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
+  mysql@proxysql> SAVE MYSQL VARIABLES TO DISK;
 
 To confirm that the user has been set up correctly, you can try to log in:
 
