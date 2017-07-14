@@ -548,9 +548,9 @@ check the monitoring logs:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start DESC LIMIT 6;
+  mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
   +---------------+------+------------------+----------------------+---------------+
-  | hostname      | port | time_start       | connect_success_time | connect_error |
+  | hostname      | port | time_start_us    | connect_success_time | connect_error |
   +---------------+------+------------------+----------------------+---------------+
   | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
   | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
@@ -563,9 +563,9 @@ check the monitoring logs:
 
 .. code-block:: text
 
-  mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start DESC LIMIT 6;
+  mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
   +---------------+------+------------------+-------------------+------------+
-  | hostname      | port | time_start       | ping_success_time | ping_error |
+  | hostname      | port | time_start_us    | ping_success_time | ping_error |
   +---------------+------+------------------+-------------------+------------+
   | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
   | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
