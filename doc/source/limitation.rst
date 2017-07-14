@@ -64,14 +64,6 @@ The following limitations apply to |PXC|:
 
 * The :variable:`binlog_rows_query_log_events` variable is not supported.
 
-* Backup locks used during SST or with XtraBackup can crash.
-  On donor, either use ``inno-backup-opts='--no-backup-locks'``
-  under ``[sst]`` in :file:`my.cnf` or set ``FORCE_FTWRL=1``
-  in :file:`/etc/sysconfig/mysql`
-  (or :file:`/etc/sysconfig/mysql.%i` for corresponding unit/service)
-  for CentOS/RHEL or :file:`/etc/default/mysql` in Debian/Ubuntu.
-  You can also use ``rsync`` as an alternate SST method.
-
 * When running |PXC| in cluster mode,
   avoid ``ALTER TABLE ... IMPORT/EXPORT`` workloads.
   It can lead to node inconsistency if not executed in sync on all nodes.
