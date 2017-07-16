@@ -719,6 +719,7 @@ mkdir debug
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
+           -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            %{?mecab_option} \
 	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON}
@@ -756,6 +757,7 @@ mkdir release
            -DWITH_PAM=1 \
            -DWITH_INNODB_MEMCACHED=1 \
            -DWITH_ZLIB=system \
+           -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF}
