@@ -667,10 +667,43 @@ for default ProxySQL configuration:
 
 .. code-block:: text
 
-  mysql@proxysql> INSERT INTO scheduler(id,interval_ms,filename,arg1,arg2,arg3,arg4)
-    VALUES
-    (1,'10000','/usr/bin/proxysql_galera_checker','127.0.0.1','6032','0',
+  mysql@proxysql> INSERT INTO scheduler(id,active,interval_ms,filename,arg1,arg2,arg3,arg4,arg5)
+    VALUES (1,'1','10000','/usr/bin/proxysql_galera_checker','0','-1','0','1',
     '/var/lib/proxysql/proxysql_galera_checker.log');
+
+This Scheduler script accepts the following arguments:
+
+.. list-table::
+   :widths: 15 25 20 40
+   :header-rows: 1
+
+   * - Argument
+     - Name
+     - Required
+     - Description
+   * - ``arg1``
+     - ``HOSTGROUP WRITERS``
+     - YES
+     - The ID of the hostgroup with nodes that will server writes.
+   * - ``arg2``
+     - ``HOSTGROUP READERS``
+     - NO
+     - The ID of the hostgroup with nodes that will server reads.
+   * - ``arg3``
+     - ``NUMBER WRITERS``
+     - NO
+     - Maximum number of the node from the writer hostgroup
+       that can be marked ``ONLINE``.
+       If set to ``0``, all nodes can be marked ``ONLINE``.
+   * - ``arg4``
+     - ``WRITERS ARE READERS``
+     - NO
+     - If set to ``1`` (default), ``ONLINE`` nodes in the writer hostgroup
+       will prefer not to be ``ONLINE`` in the reader ``hostgroup``.
+   * - ``arg5``
+     - ``LOG FILE``
+     - NO
+     - File where node state checks and changes are logged to (verbose).
 
 To load the scheduler changes into the runtime space:
 
