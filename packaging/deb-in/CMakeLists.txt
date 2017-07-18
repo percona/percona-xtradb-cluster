@@ -49,7 +49,9 @@ IF (DEB_PRODUCT STREQUAL "commercial")
   SET (DEB_NOTPRODUCTNAME "${DEB_BASE_PRODUCT}community")
   SET (DEB_LICENSENAME "Advanced")
   SET (DEB_INSTALL_LICENSEFILE "LICENSE.mysql")
-  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial.1")
+  SET (DEB_SERVERVERSION "${VERSION}+commercial-1")
+  SET (DEB_PLUGIN_SETPERMISSION "")
+  SET (DEB_MAN_SETPERMISSION "")
   # List of plugins that are only in commercial packages
   # Plugins that are in both community and commercial should NOT be added here
   SET (DEB_INCLUDE_BINARIES_EXTRA
@@ -85,6 +87,8 @@ ELSE()
   SET (DEB_INSTALL_LICENSEFILE "COPYING")
   SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+1")
   SET (DEB_REMOVEPATTERN "com.in")
+  SET (DEB_PLUGIN_SETPERMISSION "usr/bin/mysql_setpermission")
+  SET (DEB_MAN_SETPERMISSION "usr/share/man/man1/mysql_setpermission.1")
 ENDIF()
 
 # mysql-wsrep !
