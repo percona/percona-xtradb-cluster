@@ -39,8 +39,8 @@ sanity () {
 	fi
 
 # Make sure database and required directories exist
-	verify_ready
-	verify_database
+	verify_ready $1
+	verify_database $1
 
 	@DEB_INIT_APPARMOR@
 }
@@ -63,6 +63,10 @@ pinger () {
 }
 
 case $1 in
+<<<<<<< HEAD
 	"pre")  sanity ;;
         "post") pinger ;;
+=======
+	"pre")  sanity $2 ;;
+>>>>>>> mysql-5.7.19
 esac
