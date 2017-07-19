@@ -154,12 +154,7 @@ override_dh_installinit:
 	@echo "RULES.$@"
 	@DEB_RULES_APPARMOR_LOAD@
 	@DEB_RULES_SYSTEMD_ENABLE@
-<<<<<<< HEAD
 	dh_installinit --no-start --name=mysql -- defaults 19 21
-=======
-	dh_installinit --name=mysql -- defaults 19 21
-	dh_installinit --name=mysql@ -- disable
->>>>>>> mysql-5.7.19
 	@DEB_RULES_SYSTEMD_START@
 	touch $@
 
@@ -172,14 +167,9 @@ override_dh_install:
 		-Xusr/share/mysql/@DEB_INSTALL_LICENSEFILE@ \
 		-Xusr/share/mysql/README \
 		-Xusr/share/mysql/docs/mysql.info \
-<<<<<<< HEAD
 		-Xusr/share/mysql/docs/INSTALL-BINARY \
 		-Xusr/share/man/man1/mysqlman.1
 ifneq (,@DEB_RULES_APPARMOR_LOAD@)
 	# non-empty command = apparmor is handled
 	dh_apparmor -pmysql-server@DEB_PRODUCTSERIES@ --profile-name=usr.sbin.mysqld
 endif
-=======
-		-Xusr/share/man/man1/mysqlman.1 \
-		-X.h.pp
->>>>>>> mysql-5.7.19

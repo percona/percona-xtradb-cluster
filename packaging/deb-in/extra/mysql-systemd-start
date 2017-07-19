@@ -63,10 +63,6 @@ pinger () {
 }
 
 case $1 in
-<<<<<<< HEAD
 	"pre")  sanity ;;
         "post") pinger ;;
-=======
-	"pre")  sanity $2 ;;
->>>>>>> mysql-5.7.19
 esac

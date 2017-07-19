@@ -1493,14 +1493,9 @@ fi
 %endif # cluster
 
 %changelog
-<<<<<<< HEAD
 * Wed Nov 02 2016 Joerg Bruehe <joerg.bruehe@fromdual.com> - 5.7.15
 - Merge Oracle's changes of 5.7.11 .. 5.7.14 which brought new dependency definitions,
   restore date order of changelog entries.
-=======
-* Fri May 26 2017 Harin Vadodaria <harin.vadodaria@oracle.com> - 5.7.19-1
-- Add keyring_aws.so plugin to commercial server subpackage
->>>>>>> mysql-5.7.19
 
 * Tue Sep 13 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com> - 5.7.16-1
 - Add connection_control.so to server subpackage
