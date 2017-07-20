@@ -167,20 +167,21 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
 
     uint length(my_b_bytes_in_cache(cache));
 
-    /* Start 5.7 MySQL server will write GTID directly to binlog file.
-    This means GTID event is not present in the case if GTID is set explictly.
-    We have cached the said GTID event which is then written before filling up
-    the cache with the real-data-change event. */
+    /* If galera node is acting as independent slave then GTID event that is
+    captured during processing of relay log should be cached and appended to
+    replicating write-set to ensure all the nodes of cluster are using
+    GTID sequence. */
     if (thd->wsrep_gtid_event_buf)
     {
-      if (thd->wsrep_gtid_event_buf_len < allocated)
+      if (thd->wsrep_gtid_event_buf_len < (allocated - used))
       {
-        memcpy(stack_buf, thd->wsrep_gtid_event_buf, thd->wsrep_gtid_event_buf_len);
+        memcpy(buf, thd->wsrep_gtid_event_buf, thd->wsrep_gtid_event_buf_len);
       }
       else
       {
         uchar* tmp = (uchar *)my_realloc(key_memory_wsrep, heap_buf,
-                                         thd->wsrep_gtid_event_buf_len, MYF(0));
+                                         thd->wsrep_gtid_event_buf_len + used,
+                                         MYF(0));
         if (!tmp)
         {
           WSREP_ERROR("Failed to allocate/reallocate buffer to hold GTID event"
@@ -190,13 +191,34 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
           goto cleanup;
         }
         heap_buf = tmp;
+        /* Copy over existing buffer content. */
+        memcpy(heap_buf, buf, used);
+
         buf = heap_buf;
-        allocated = thd->wsrep_gtid_event_buf_len;
+        buf += used;
+        allocated = thd->wsrep_gtid_event_buf_len + used;
 
         memcpy(buf, thd->wsrep_gtid_event_buf, thd->wsrep_gtid_event_buf_len);
       }
       total_length += thd->wsrep_gtid_event_buf_len;
       used = total_length;
+    }
+    else if (thd->variables.gtid_next.type != AUTOMATIC_GROUP)
+    {
+      /* Starting 5.7, MySQL delays appending GTID to binlog.
+      It is done at commit time. pre-commit hook doesn't have the GTID
+      information. If user has set explict GTID using gtid_next=UUID:seqno
+      then such event should be appended to write-set. */
+      Gtid_log_event gtid_event(thd, true, 0, 0);
+      uchar gtid_buf[Gtid_log_event::MAX_EVENT_LENGTH];
+      uint32 gtid_len = gtid_event.write_to_memory(gtid_buf);
+
+      assert(Gtid_log_event::MAX_EVENT_LENGTH < STACK_SIZE);
+
+      memcpy(buf, gtid_buf, gtid_len);
+      used += gtid_len;
+      total_length += gtid_len;
+      buf += gtid_len;
     }
 
     if (unlikely(0 == length)) length = my_b_fill(cache);
@@ -292,17 +314,33 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
     int err(WSREP_OK);
 
     size_t total_length(*len);
-
     uint length(my_b_bytes_in_cache(cache));
+
     if (thd->wsrep_gtid_event_buf)
     {
-        if(WSREP_OK != (err=wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
-                                              thd->wsrep_gtid_event_buf,
-                                              thd->wsrep_gtid_event_buf_len)))
-                goto cleanup;
-
-        total_length += thd->wsrep_gtid_event_buf_len;
+      if (WSREP_OK != (err=wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
+                                             thd->wsrep_gtid_event_buf,
+                                             thd->wsrep_gtid_event_buf_len)))
+        goto cleanup;
+      total_length += thd->wsrep_gtid_event_buf_len;
     }
+    else if (total_length == 0 && thd->variables.gtid_next.type != AUTOMATIC_GROUP)
+    {
+      /* Starting 5.7, MySQL delays appending GTID to binlog. It is done at
+      commit time. pre-commit hook doesn't have the GTID information.
+      If user has set explict GTID using gtid_next=UUID:seqno then such event
+      should be appended to write-set. */
+      Gtid_log_event gtid_event(thd, true, 0, 0);
+      uchar gtid_buf[Gtid_log_event::MAX_EVENT_LENGTH];
+      uint32 gtid_len = gtid_event.write_to_memory(gtid_buf);
+
+      if (WSREP_OK != (err=wsrep_append_data(wsrep, &thd->wsrep_ws_handle,
+                                            gtid_buf, gtid_len)))
+        goto cleanup;
+
+      total_length += gtid_len;
+    }
+
     if (unlikely(0 == length)) length = my_b_fill(cache);
 
     if (likely(length > 0)) do
