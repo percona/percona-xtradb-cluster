@@ -12,7 +12,7 @@ After=network.target syslog.target
 
 [Install]
 WantedBy=multi-user.target
-Alias=mysql.service
+Alias=mysqld.service
 
 [Service]
 # Needed to create system tables etc.
