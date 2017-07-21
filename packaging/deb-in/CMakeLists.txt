@@ -49,7 +49,7 @@ IF (DEB_PRODUCT STREQUAL "commercial")
   SET (DEB_NOTPRODUCTNAME "${DEB_BASE_PRODUCT}community")
   SET (DEB_LICENSENAME "Advanced")
   SET (DEB_INSTALL_LICENSEFILE "LICENSE.mysql")
-  SET (DEB_SERVERVERSION "${VERSION}+commercial-1")
+  SET (DEB_SERVERVERSION "${DEB_BASE_VERSION}+commercial.1")
   SET (DEB_PLUGIN_SETPERMISSION "")
   SET (DEB_MAN_SETPERMISSION "")
   # List of plugins that are only in commercial packages
