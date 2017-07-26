@@ -31,13 +31,13 @@ nproc=1
 ecode=0
 ssyslog=""
 ssystag=""
-XTRABACKUP_PID=""
 SST_PORT=""
 REMOTEIP=""
 tca=""
 tcert=""
 tkey=""
 sockopt=""
+ncsockopt=""
 progress=""
 ttime=0
 totime=0
@@ -287,9 +287,9 @@ get_transfer()
         wsrep_log_info "Using netcat as streamer"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]];then
             if nc -h 2>&1 | grep -q ncat; then
-                tcmd="nc $sockopt -l ${TSST_PORT}"
+                tcmd="nc $ncsockopt -l ${TSST_PORT}"
             else 
-                tcmd="nc $sockopt -dl ${TSST_PORT}"
+                tcmd="nc $ncsockopt -dl ${TSST_PORT}"
             fi
         else
             # netcat doesn't understand [] around IPv6 address
@@ -467,6 +467,7 @@ read_cnf()
     tkey=$(parse_cnf sst tkey "")
     encrypt=$(parse_cnf sst encrypt 0)
     sockopt=$(parse_cnf sst sockopt "")
+    ncsockopt=$(parse_cnf sst ncsockopt "")
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
@@ -616,12 +617,6 @@ cleanup_joiner()
     exit $estatus
 }
 
-check_pid()
-{
-    local pid_file="$1"
-    [ -r "$pid_file" ] && ps -p $(cat "$pid_file") >/dev/null 2>&1
-}
-
 cleanup_donor()
 {
     # Since this is invoked just after exit NNN
@@ -630,14 +625,6 @@ cleanup_donor()
         wsrep_log_error "Cleanup after exit with status:$estatus"
     fi
 
-    if [[ -n ${XTRABACKUP_PID:-} ]];then
-        if check_pid $XTRABACKUP_PID
-        then
-            wsrep_log_error "xtrabackup process is still running. Killing... "
-            kill_xtrabackup
-        fi
-
-    fi
     rm -f ${DATA}/${IST_FILE} || true
 
     if [[ -n $progress && -p $progress ]];then 
@@ -668,14 +655,6 @@ cleanup_donor()
 
     exit $estatus
 
-}
-
-kill_xtrabackup()
-{
-    local PID=$(cat $XTRABACKUP_PID)
-    [ -n "$PID" -a "0" != "$PID" ] && kill $PID && (kill $PID && kill -9 $PID) || :
-    wsrep_log_info "Removing xtrabackup pid file $XTRABACKUP_PID"
-    rm -f "$XTRABACKUP_PID" || true
 }
 
 setup_ports()
@@ -1115,10 +1094,6 @@ then
           wsrep_log_error "$tcmd finished with error: ${RC[1]}"
           exit 22
         fi
-
-        # innobackupex implicitly writes PID to fixed location in $xtmpdir
-        XTRABACKUP_PID="$tmpdirbase/xtrabackup_pid"
-
 
     else # BYPASS FOR IST
 
