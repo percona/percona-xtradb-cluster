@@ -90,6 +90,7 @@ for configuring |PXC| nodes with ProxySQL::
   --mode                             ProxySQL read/write configuration mode, currently supporting: 'loadbal' and 'singlewrite' (the default) modes
   --write-node                       Writer node to accept write statments. This option is supported only when using --mode=singlewrite
   --adduser                          Adds the Percona XtraDB Cluster application user to the ProxySQL database
+  --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL (deletes ProxySQL users not in MySQL)
   --version, -v                      Print version info
 
 .. note:: Before using the ``proxysql-admin`` tool,
@@ -142,13 +143,12 @@ The ``proxysql-admin`` tool will do the following:
 
 * Add |PXC| node into the ProxySQL database
 
-* Add the following monitoring scripts into the ProxySQL ``scheduler`` table,
-  if they are not available:
-
-  * ``proxysql_node_monitor`` checks cluster node membership
-    and re-configures ProxySQL if the membership changes
-  * ``proxysql_galera_checker`` checks for desynced nodes
-    and temporarily deactivates them
+* Add the ``proxysql_galera_checker`` monitoring script
+  into the ProxySQL ``scheduler`` table if it is not available.
+  This script checks for desynced nodes and temporarily deactivates them.
+  It also calls the ``proxysql_node_monitor`` script,
+  which checks cluster node membership
+  and re-configures ProxySQL if the membership changes.
 
 * Create two new |PXC| users with the ``USAGE`` privilege on the node
   and add them to ProxySQL configuration, if they are not already configured.
@@ -228,6 +228,14 @@ The following extra options can be used:
      Enter Percona XtraDB Cluster application user name: root
      Enter Percona XtraDB Cluster application user password:
      Added Percona XtraDB Cluster application user to ProxySQL database!
+
+* ``--syncusers``
+
+  Sync user accounts currently configured in |PXC| to ProxySQL database
+  except users with no password and the ``admin`` user.
+
+  .. note:: This option also deletes users
+     that are not in |PXC| from ProxySQL database.
 
 * ``--galera-check-interval``
 
@@ -502,13 +510,13 @@ To see the nodes:
 
   mysql@proxysql> SELECT * FROM mysql_servers;
 
-  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+
-  | hostgroup_id | hostname      | port | status | weight | compression | max_connections | max_replication_lag | use_ssl | max_latency_ms |
-  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+
-  | 0            | 192.168.70.61 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |
-  | 0            | 192.168.70.62 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |
-  | 0            | 192.168.70.63 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |
-  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+
+  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
+  | hostgroup_id | hostname      | port | status | weight | compression | max_connections | max_replication_lag | use_ssl | max_latency_ms | comment |
+  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
+  | 0            | 192.168.70.61 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.62 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  | 0            | 192.168.70.63 | 3306 | ONLINE | 1      | 0           | 1000            | 0                   | 0       | 0              |         |
+  +--------------+---------------+------+--------+--------+-------------+-----------------+---------------------+---------+----------------+---------+
   3 rows in set (0.00 sec)
 
 Creating ProxySQL Monitoring User
@@ -549,9 +557,9 @@ check the monitoring logs:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start DESC LIMIT 6;
+  mysql@proxysql> SELECT * FROM monitor.mysql_server_connect_log ORDER BY time_start_us DESC LIMIT 6;
   +---------------+------+------------------+----------------------+---------------+
-  | hostname      | port | time_start       | connect_success_time | connect_error |
+  | hostname      | port | time_start_us    | connect_success_time | connect_error |
   +---------------+------+------------------+----------------------+---------------+
   | 192.168.70.61 | 3306 | 1469635762434625 | 1695                 | NULL          |
   | 192.168.70.62 | 3306 | 1469635762434625 | 1779                 | NULL          |
@@ -564,9 +572,9 @@ check the monitoring logs:
 
 .. code-block:: text
 
-  mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start DESC LIMIT 6;
+  mysql> SELECT * FROM monitor.mysql_server_ping_log ORDER BY time_start_us DESC LIMIT 6;
   +---------------+------+------------------+-------------------+------------+
-  | hostname      | port | time_start       | ping_success_time | ping_error |
+  | hostname      | port | time_start_us    | ping_success_time | ping_error |
   +---------------+------+------------------+-------------------+------------+
   | 192.168.70.61 | 3306 | 1469635762416190 | 948               | NULL       |
   | 192.168.70.62 | 3306 | 1469635762416190 | 803               | NULL       |
@@ -605,11 +613,13 @@ To add a user, insert credentials into ``mysql_users`` table:
 
    ProxySQL currently doesn't encrypt passwords.
 
-Load the user into runtime space:
+Load the user into runtime space and save these changes to disk
+(ensuring that they persist after ProxySQL shuts down):
 
 .. code-block:: text
 
   mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
+  mysql@proxysql> SAVE MYSQL VARIABLES TO DISK;
 
 To confirm that the user has been set up correctly, you can try to log in:
 
@@ -657,10 +667,43 @@ for default ProxySQL configuration:
 
 .. code-block:: text
 
-  mysql@proxysql> INSERT INTO scheduler(id,interval_ms,filename,arg1,arg2,arg3,arg4)
-    VALUES
-    (1,'10000','/usr/bin/proxysql_galera_checker','127.0.0.1','6032','0',
+  mysql@proxysql> INSERT INTO scheduler(id,active,interval_ms,filename,arg1,arg2,arg3,arg4,arg5)
+    VALUES (1,'1','10000','/usr/bin/proxysql_galera_checker','0','-1','0','1',
     '/var/lib/proxysql/proxysql_galera_checker.log');
+
+This Scheduler script accepts the following arguments:
+
+.. list-table::
+   :widths: 15 25 20 40
+   :header-rows: 1
+
+   * - Argument
+     - Name
+     - Required
+     - Description
+   * - ``arg1``
+     - ``HOSTGROUP WRITERS``
+     - YES
+     - The ID of the hostgroup with nodes that will server writes.
+   * - ``arg2``
+     - ``HOSTGROUP READERS``
+     - NO
+     - The ID of the hostgroup with nodes that will server reads.
+   * - ``arg3``
+     - ``NUMBER WRITERS``
+     - NO
+     - Maximum number of the node from the writer hostgroup
+       that can be marked ``ONLINE``.
+       If set to ``0``, all nodes can be marked ``ONLINE``.
+   * - ``arg4``
+     - ``WRITERS ARE READERS``
+     - NO
+     - If set to ``1`` (default), ``ONLINE`` nodes in the writer hostgroup
+       will prefer not to be ``ONLINE`` in the reader ``hostgroup``.
+   * - ``arg5``
+     - ``LOG FILE``
+     - NO
+     - File where node state checks and changes are logged to (verbose).
 
 To load the scheduler changes into the runtime space:
 

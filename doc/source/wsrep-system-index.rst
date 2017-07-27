@@ -32,7 +32,7 @@ For more information, see :ref:`ssl-auto-conf`.
    :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-mode``
    :conf: Yes
-   :scope: Global, Session
+   :scope: Global
    :dyn: Yes
    :default: ``DISABLED``
 
@@ -56,7 +56,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :version 5.7.16: Variable introduced
    :cli: ``--pxc-maint-transition-period``
    :conf: Yes
-   :scope: Global, Session
+   :scope: Global
    :dyn: Yes
    :default: ``10`` (ten seconds)
 
@@ -73,7 +73,7 @@ For more information, see :ref:`pxc-maint-mode`.
    :version 5.7: Variable introduced
    :cli: ``--pxc-strict-mode``
    :conf: Yes
-   :scope: Global, Session
+   :scope: Global
    :dyn: Yes
    :default: ``ENFORCING`` or ``DISABLED``
 
