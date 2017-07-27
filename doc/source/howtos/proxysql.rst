@@ -619,7 +619,7 @@ Load the user into runtime space and save these changes to disk
 .. code-block:: text
 
   mysql@proxysql> LOAD MYSQL USERS TO RUNTIME;
-  mysql@proxysql> SAVE MYSQL VARIABLES TO DISK;
+  mysql@proxysql> SAVE MYSQL USERS TO DISK;
 
 To confirm that the user has been set up correctly, you can try to log in:
 
