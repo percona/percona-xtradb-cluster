@@ -1,0 +1,14 @@
+debian/extra/innotop/innotop.1
+debian/extra/mysqlreport.1
+debian/tmp/usr/share/man/man1/mysqlman.1
+debian/tmp/usr/share/man/man1/myisam_ftdump.1
+debian/tmp/usr/share/man/man1/mysql.1
+debian/tmp/usr/share/man/man1/mysql_config_editor.1
+debian/tmp/usr/share/man/man1/mysqladmin.1
+debian/tmp/usr/share/man/man1/mysqlcheck.1
+debian/tmp/usr/share/man/man1/mysqldump.1
+debian/tmp/usr/share/man/man1/mysqldumpslow.1
+debian/tmp/usr/share/man/man1/mysqlimport.1
+debian/tmp/usr/share/man/man1/mysqlman.1
+debian/tmp/usr/share/man/man1/mysqlshow.1
+debian/tmp/usr/share/man/man1/mysqlslap.1

@@ -361,7 +361,17 @@ void Table_cache_manager::free_table(THD *thd,
 
 #ifndef DBUG_OFF
       if (remove_type == TDC_RT_REMOVE_ALL)
+#ifdef WITH_WSREP
+      {
+        /* following assert may cause false posivive fire for CTAS */
+        if (thd->lex->sql_command != SQLCOM_CREATE_TABLE)
+        {
+#endif /* WITH_WSREP */
         DBUG_ASSERT(cache_el[i]->used_tables.is_empty());
+#ifdef WITH_WSREP
+        }
+      }
+#endif /* WITH_WSREP */
       else if (remove_type == TDC_RT_REMOVE_NOT_OWN ||
                remove_type == TDC_RT_REMOVE_NOT_OWN_KEEP_SHARE)
       {

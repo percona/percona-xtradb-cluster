@@ -2,7 +2,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   the Free Software Foundation; version 2 of the License.x1
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -17,6 +17,7 @@
 #include <sql_class.h>
 #include <sql_parse.h>
 #include "debug_sync.h"
+#include <sql_base.h> /* find_temporary_table() */
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
 #include "wsrep_sst.h"
@@ -561,27 +562,17 @@ int wsrep_init()
       size_t const node_addr_len= strlen(node_addr);
       if (node_addr_len > 0)
       {
-        const char* const colon= strrchr(node_addr, ':');
-        if (strchr(node_addr, ':') == colon) // 1 or 0 ':'
+        size_t const ip_len= wsrep_host_len(node_addr, node_addr_len);
+        if (ip_len + 7 /* :55555\0 */ < inc_addr_max)
         {
-          size_t const ip_len= colon ? colon - node_addr : node_addr_len;
-          if (ip_len + 7 /* :55555\0 */ < inc_addr_max)
-          {
-            memcpy (inc_addr, node_addr, ip_len);
-            snprintf(inc_addr + ip_len, inc_addr_max - ip_len, ":%u",
-                     (int)mysqld_port);
-          }
-          else
-          {
-            WSREP_WARN("Guessing address for incoming client connections: "
-                       "address too long.");
-            inc_addr[0]= '\0';
-          }
+          memcpy (inc_addr, node_addr, ip_len);
+          snprintf(inc_addr + ip_len, inc_addr_max - ip_len, ":%u",
+                   (int)mysqld_port);
         }
         else
         {
           WSREP_WARN("Guessing address for incoming client connections: "
-                     "too many colons :) .");
+                     "address too long.");
           inc_addr[0]= '\0';
         }
       }
@@ -874,17 +865,7 @@ bool wsrep_sync_wait (THD* thd, uint mask)
   return false;
 }
 
-/*
- * Helpers to deal with TOI key arrays
- */
-typedef struct wsrep_key_arr
-{
-    wsrep_key_t* keys;
-    size_t       keys_len;
-} wsrep_key_arr_t;
-
-
-static void wsrep_keys_free(wsrep_key_arr_t* key_arr)
+void wsrep_keys_free(wsrep_key_arr_t* key_arr)
 {
     for (size_t i= 0; i < key_arr->keys_len; ++i)
     {
@@ -949,90 +930,72 @@ static bool wsrep_prepare_key_for_isolation(const char* db,
 }
 
 /* Prepare key list from db/table and table_list */
-static bool wsrep_prepare_keys_for_isolation(THD*              thd,
-                                             const char*       db,
-                                             const char*       table,
-                                             const TABLE_LIST* table_list,
-                                             wsrep_key_arr_t*  ka)
+bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                      const char*       db,
+                                      const char*       table,
+                                      const TABLE_LIST* table_list,
+                                      wsrep_key_arr_t*  ka)
 {
-    ka->keys= 0;
-    ka->keys_len= 0;
+  ka->keys= 0;
+  ka->keys_len= 0;
 
-    extern TABLE* find_temporary_table(THD*, const TABLE_LIST*);
-
-    if (db || table)
+  if (db || table)
+  {
+    if (!(ka->keys= (wsrep_key_t*)my_malloc(sizeof(wsrep_key_t), MYF(0))))
     {
-        TABLE_LIST tmp_table;
-	MDL_request mdl_request;
-
-        memset(&tmp_table, 0, sizeof(tmp_table));
-        tmp_table.table_name= (char*)table;
-        tmp_table.db= (char*)db;
-	tmp_table.mdl_request.init(MDL_key::GLOBAL, (db) ? db :  "",
-				   (table) ? table : "",
-				   MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
-
-        if (!table || !find_temporary_table(thd, &tmp_table))
-        {
-            if (!(ka->keys= (wsrep_key_t*)my_malloc(sizeof(wsrep_key_t), MYF(0))))
-            {
-                WSREP_ERROR("Can't allocate memory for key_array");
-                goto err;
-            }
-            ka->keys_len= 1;
-            if (!(ka->keys[0].key_parts= (wsrep_buf_t*)
-                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
-            {
-                WSREP_ERROR("Can't allocate memory for key_parts");
-                goto err;
-            }
-            ka->keys[0].key_parts_num= 2;
-            if (!wsrep_prepare_key_for_isolation(
-                    db, table,
-                    (wsrep_buf_t*)ka->keys[0].key_parts,
-                    &ka->keys[0].key_parts_num))
-            {
-                WSREP_ERROR("Preparing keys for isolation failed");
-                goto err;
-            }
-        }
+      WSREP_ERROR("Can't allocate memory for key_array");
+      goto err;
     }
-
-    for (const TABLE_LIST* table= table_list; table; table= table->next_global)
+    ka->keys_len= 1;
+    if (!(ka->keys[0].key_parts= (wsrep_buf_t*)
+          my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
     {
-        if (!find_temporary_table(thd, table))
-        {
-            wsrep_key_t* tmp;
-            tmp= (wsrep_key_t*)my_realloc(
-                ka->keys, (ka->keys_len + 1) * sizeof(wsrep_key_t), MYF(0));
-            if (!tmp)
-            {
-                WSREP_ERROR("Can't allocate memory for key_array");
-                goto err;
-            }
-            ka->keys= tmp;
-            if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*)
-                  my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
-            {
-                WSREP_ERROR("Can't allocate memory for key_parts");
-                goto err;
-            }
-            ka->keys[ka->keys_len].key_parts_num= 2;
-            ++ka->keys_len;
-            if (!wsrep_prepare_key_for_isolation(
-                    table->db, table->table_name,
-                    (wsrep_buf_t*)ka->keys[ka->keys_len - 1].key_parts,
-                    &ka->keys[ka->keys_len - 1].key_parts_num))
-            {
-                WSREP_ERROR("Preparing keys for isolation failed");
-                goto err;
-            }
-        }
+      WSREP_ERROR("Can't allocate memory for key_parts");
+      goto err;
     }
-    return true;
+    ka->keys[0].key_parts_num= 2;
+    if (!wsrep_prepare_key_for_isolation(
+                                         db, table,
+                                         (wsrep_buf_t*)ka->keys[0].key_parts,
+                                         &ka->keys[0].key_parts_num))
+    {
+      WSREP_ERROR("Preparing keys for isolation failed (1)");
+      goto err;
+    }
+  }
+
+  for (const TABLE_LIST* table= table_list; table; table= table->next_global)
+  {
+    wsrep_key_t* tmp;
+    tmp= (wsrep_key_t*)my_realloc(ka->keys,
+                                  (ka->keys_len + 1) * sizeof(wsrep_key_t),
+                                  MYF(0));
+    if (!tmp)
+    {
+      WSREP_ERROR("Can't allocate memory for key_array");
+      goto err;
+    }
+    ka->keys= tmp;
+    if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*)
+          my_malloc(sizeof(wsrep_buf_t)*2, MYF(0))))
+    {
+      WSREP_ERROR("Can't allocate memory for key_parts");
+      goto err;
+    }
+    ka->keys[ka->keys_len].key_parts_num= 2;
+    ++ka->keys_len;
+    if (!wsrep_prepare_key_for_isolation(table->db, table->table_name,
+                                         (wsrep_buf_t*)ka->keys[ka->keys_len - 1].key_parts,
+                                         &ka->keys[ka->keys_len - 1].key_parts_num))
+    {
+      WSREP_ERROR("Preparing keys for isolation failed (2)");
+      goto err;
+    }
+  }
+    return 0;
 err:
     wsrep_keys_free(ka);
-    return false;
+    return 1;
 }
 
 
@@ -1196,6 +1159,149 @@ create_view_query(THD *thd, uchar** buf, size_t* buf_len)
 }
 
 /*
+  Rewrite DROP TABLE for TOI. Temporary tables are eliminated from
+  the query as they are visible only to client connection.
+
+  TODO: See comments for sql_base.cc:drop_temporary_table() and refine
+  the function to deal with transactional locked tables.
+ */
+static int wsrep_drop_table_query(THD* thd, uchar** buf, size_t* buf_len)
+{
+
+  LEX* lex= thd->lex;
+  SELECT_LEX* select_lex= &lex->select_lex;
+  TABLE_LIST* first_table= select_lex->table_list.first;
+  String buff;
+
+  DBUG_ASSERT(!lex->drop_temporary);
+
+  bool found_temp_table= false;
+  for (TABLE_LIST* table= first_table; table; table= table->next_global)
+  {
+    if (find_temporary_table(thd, table->db, table->table_name))
+    {
+      found_temp_table= true;
+      break;
+    }
+  }
+
+  if (found_temp_table)
+  {
+    buff.append("DROP TABLE ");
+    if (lex->drop_if_exists)
+      buff.append("IF EXISTS ");
+
+    for (TABLE_LIST* table= first_table; table; table= table->next_global)
+    {
+      if (!find_temporary_table(thd, table->db, table->table_name))
+      {
+        append_identifier(thd, &buff, table->db, strlen(table->db),
+                          system_charset_info, thd->charset());
+        buff.append(".");
+        append_identifier(thd, &buff, table->table_name,
+                          strlen(table->table_name),
+                          system_charset_info, thd->charset());
+        buff.append(",");
+      }
+    }
+
+    /* Chop the last comma */
+    buff.chop();
+    buff.append(" /* generated by wsrep */");
+
+    WSREP_DEBUG("Rewrote '%s' as '%s'", thd->query(), buff.ptr());
+
+    return wsrep_to_buf_helper(thd, buff.ptr(), buff.length(), buf, buf_len);
+  }
+  else
+  {
+    return wsrep_to_buf_helper(thd, thd->query(), thd->query_length(),
+                               buf, buf_len);
+  }
+}
+
+/*
+  Decide if statement should run in TOI.
+
+  Look if table or table_list contain temporary tables. If the
+  statement affects only temporary tables,   statement should not run
+  in TOI. If the table list contains mix of regular and temporary tables
+  (DROP TABLE, OPTIMIZE, ANALYZE), statement should be run in TOI but
+  should be rewritten at later time for replication to contain only
+  non-temporary tables.
+ */
+static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
+                                 const TABLE_LIST *table_list)
+{
+  DBUG_ASSERT(!table || db);
+  DBUG_ASSERT(table_list || db);
+
+  LEX* lex= thd->lex;
+  SELECT_LEX* select_lex= &lex->select_lex;
+  TABLE_LIST* first_table= select_lex->table_list.first;
+
+  switch (lex->sql_command)
+  {
+  case SQLCOM_CREATE_TABLE:
+    DBUG_ASSERT(!table_list);
+    if (thd->lex->create_info.options & HA_LEX_CREATE_TMP_TABLE)
+    {
+      return false;
+    }
+    return true;
+
+  case SQLCOM_CREATE_VIEW:
+
+    DBUG_ASSERT(!table_list);
+    DBUG_ASSERT(first_table); /* First table is view name */
+    /*
+      If any of the remaining tables refer to temporary table error
+      is returned to client, so TOI can be skipped
+    */
+    for (TABLE_LIST* it= first_table->next_global; it; it= it->next_global)
+    {
+      if (find_temporary_table(thd, it))
+      {
+        return false;
+      }
+    }
+    return true;
+
+  case SQLCOM_CREATE_TRIGGER:
+
+#if 0
+    /* Trigger statement is invoked with table_list with length = 1 */
+    DBUG_ASSERT(!table_list);
+#endif
+    DBUG_ASSERT(first_table);
+
+    if (find_temporary_table(thd, first_table))
+    {
+      return false;
+    }
+    return true;
+
+  default:
+    if (table && !find_temporary_table(thd, db, table))
+    {
+      return true;
+    }
+
+    if (table_list)
+    {
+      for (TABLE_LIST* table= first_table; table; table= table->next_global)
+      {
+        if (!find_temporary_table(thd, table->db, table->table_name))
+        {
+          return true;
+        }
+      }
+    }
+    return !(table || table_list);
+  }
+}
+
+/*
   returns: 
    0: statement was replicated as TOI
    1: TOI replication was skipped
@@ -1208,6 +1314,12 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   uchar* buf(0);
   size_t buf_len(0);
   int buf_err;
+
+  if (wsrep_can_run_in_toi(thd, db_, table_, table_list) == false)
+  {
+    WSREP_DEBUG("No TOI for %s", WSREP_QUERY(thd));
+    return 1;
+  }
 
   WSREP_DEBUG("TO BEGIN: %lld, %d : %s", (long long)wsrep_thd_trx_seqno(thd),
               thd->wsrep_exec_mode, WSREP_QUERY(thd));
@@ -1229,9 +1341,12 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   case SQLCOM_ALTER_EVENT:
     buf_err= wsrep_alter_event_query(thd, &buf, &buf_len);
     break;
+  case SQLCOM_DROP_TABLE:
+    buf_err= wsrep_drop_table_query(thd, &buf, &buf_len);
+    break;
   default:
-    buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(), &buf,
-                                 &buf_len);
+    buf_err= wsrep_to_buf_helper(thd, thd->query(), thd->query_length(),
+                                 &buf, &buf_len);
     break;
   }
 
@@ -1250,9 +1365,9 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   struct wsrep_buf buff = { buf, buf_len };
   if (WSREP(thd))
       thd_proc_info(thd, "Preparing for TO isolation");
-  if (!buf_err                                                                &&
-      wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
-      key_arr.keys_len > 0                                                    &&
+  if (!buf_err                                                                  &&
+      !wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr) &&
+      key_arr.keys_len > 0                                                      &&
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, thd->thread_id,
 						 key_arr.keys, key_arr.keys_len,
 						 &buff, 1,
@@ -1473,9 +1588,12 @@ int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
   if (thd->variables.wsrep_on && thd->wsrep_exec_mode==LOCAL_STATE)
   {
     switch (thd->variables.wsrep_OSU_method) {
-    case WSREP_OSU_TOI: ret =  wsrep_TOI_begin(thd, db_, table_,
-                                               table_list); break;
-    case WSREP_OSU_RSU: ret =  wsrep_RSU_begin(thd, db_, table_); break;
+    case WSREP_OSU_TOI:
+      ret =  wsrep_TOI_begin(thd, db_, table_, table_list);
+      break;
+    case WSREP_OSU_RSU:
+      ret =  wsrep_RSU_begin(thd, db_, table_);
+      break;
     default:
       WSREP_ERROR("Unsupported OSU method: %lu",
                   thd->variables.wsrep_OSU_method);
@@ -1570,7 +1688,7 @@ wsrep_grant_mdl_exception(MDL_context *requestor_ctx,
     }
     else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE)
     {
-      WSREP_DEBUG("DROP caused BF abort");
+      WSREP_DEBUG("DROP caused BF abort, conf %d", granted_thd->wsrep_conflict_state);
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_wsrep_thd);
       wsrep_abort_thd((void*)request_thd, (void*)granted_thd, 1);

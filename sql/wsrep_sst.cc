@@ -407,8 +407,7 @@ static int generate_binlog_opt_val(char** ret)
   if (opt_bin_log && gtid_mode > 0)
   {
     assert(opt_bin_logname);
-    *ret= strcmp(opt_bin_logname, "0") ?
-        my_strdup(opt_bin_logname, MYF(0)) : my_strdup("", MYF(0));
+    *ret= my_strdup(opt_bin_logname, MYF(0));
   }
   else
   {
@@ -766,18 +765,19 @@ ssize_t wsrep_sst_prepare (void** msg)
 
   // Figure out SST address. Common for all SST methods
   if (wsrep_sst_receive_address &&
-    strcmp (wsrep_sst_receive_address, WSREP_SST_ADDRESS_AUTO))
+      strcmp (wsrep_sst_receive_address, WSREP_SST_ADDRESS_AUTO))
   {
     addr_in= wsrep_sst_receive_address;
   }
   else if (wsrep_node_address && strlen(wsrep_node_address))
   {
-    const char* const colon= strchr (wsrep_node_address, ':');
-    if (colon)
+    size_t const addr_len= strlen(wsrep_node_address);
+    size_t const host_len= wsrep_host_len(wsrep_node_address, addr_len);
+
+    if (host_len < addr_len)
     {
-      ptrdiff_t const len= colon - wsrep_node_address;
-      strncpy (ip_buf, wsrep_node_address, len);
-      ip_buf[len]= '\0';
+      strncpy (ip_buf, wsrep_node_address, host_len);
+      ip_buf[host_len]= '\0';
       addr_in= ip_buf;
     }
     else
@@ -929,25 +929,6 @@ static int sst_donate_mysqldump (const char*         addr,
                                  bool                bypass,
                                  char**              env) // carries auth info
 {
-  size_t host_len;
-  const char* port = strchr (addr, ':');
-
-  if (port)
-  {
-    port += 1;
-    host_len = port - addr;
-  }
-  else
-  {
-    port = "";
-    host_len = strlen (addr) + 1;
-  }
-
-  char *host= static_cast<char *>(alloca(host_len));
-
-  strncpy (host, addr, host_len - 1);
-  host[host_len - 1] = '\0';
-
   int const cmd_len= 4096;
   wsp::string  cmd_str(cmd_len);
 
@@ -962,14 +943,13 @@ static int sst_donate_mysqldump (const char*         addr,
 
   int ret= snprintf (cmd_str(), cmd_len,
                      "wsrep_sst_mysqldump "
-                     WSREP_SST_OPT_HOST" '%s' "
-                     WSREP_SST_OPT_PORT" '%s' "
+                     WSREP_SST_OPT_ADDR" '%s' "
                      WSREP_SST_OPT_LPORT" '%u' "
                      WSREP_SST_OPT_SOCKET" '%s' "
                      WSREP_SST_OPT_CONF" '%s' "
                      WSREP_SST_OPT_GTID" '%s:%lld'"
                      "%s",
-                     host, port, mysqld_port, mysqld_unix_port,
+                     addr, mysqld_port, mysqld_unix_port,
                      wsrep_defaults_file, uuid_str,
                      (long long)seqno, bypass ? " " WSREP_SST_OPT_BYPASS : "");
 
@@ -986,7 +966,6 @@ static int sst_donate_mysqldump (const char*         addr,
   wsrep_gtid_t const state_id = { *uuid, (ret ? WSREP_SEQNO_UNDEFINED : seqno)};
 
   wsrep->sst_sent (wsrep, &state_id, ret);
-
 
   return ret;
 }

@@ -1674,9 +1674,11 @@ int ha_rollback_low(THD *thd, bool all)
       { // cannot happen
         my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err);
         error= 1;
+#ifdef WITH_WSREP
         WSREP_WARN("handlerton rollback failed, thd %lu %lld conf %d SQL %s",
                    thd->thread_id, thd->query_id, thd->wsrep_conflict_state,
                    thd->query());
+#endif /* WITH_WSREP */
       }
       status_var_increment(thd->status_var.ha_rollback_count);
       ha_info_next= ha_info->next();
@@ -8258,6 +8260,12 @@ void ha_wsrep_fake_trx_id(THD *thd)
     DBUG_VOID_RETURN;
   }
 
+  if (thd->wsrep_ws_handle.trx_id != WSREP_UNDEFINED_TRX_ID)
+  {
+    WSREP_DEBUG("fake trx id skipped: %llu",
+                (unsigned long long) thd->wsrep_ws_handle.trx_id);
+    DBUG_VOID_RETURN;
+  }
   handlerton *hton= installed_htons[DB_TYPE_INNODB];
   if (hton && hton->wsrep_fake_trx_id)
   {
