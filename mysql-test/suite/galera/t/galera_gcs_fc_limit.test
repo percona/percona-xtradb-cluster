@@ -51,8 +51,11 @@ LOCK TABLE t1 WRITE;
 --connection node_1
 
 INSERT INTO t1 VALUES (2);
+--sleep 2
 INSERT INTO t1 VALUES (3);
+--sleep 2
 INSERT INTO t1 VALUES (4);
+--sleep 2
 
 # This query will hang because flow control will kick in
 --send
@@ -68,6 +71,7 @@ INSERT INTO t1 VALUES (5);
 
 --connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
 --connection node_2a
+set session wsrep_sync_wait=0;
 # Look at the flow control status, should be 'ON'
 SHOW STATUS LIKE 'wsrep_flow_control_status';
 

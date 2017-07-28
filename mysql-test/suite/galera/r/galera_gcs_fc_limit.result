@@ -28,6 +28,7 @@ INSERT INTO t1 VALUES (2);
 INSERT INTO t1 VALUES (3);
 INSERT INTO t1 VALUES (4);
 INSERT INTO t1 VALUES (5);
+set session wsrep_sync_wait=0;
 SHOW STATUS LIKE 'wsrep_flow_control_status';
 Variable_name	Value
 wsrep_flow_control_status	ON

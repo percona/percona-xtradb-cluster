@@ -8,3 +8,4 @@ galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in 
 MW-286 : Fails due to timing issue. Parallel transaction should be running while ALTER is fired.
 MW-329 : Hangs. Needs investigation.
 galera_gcache_recover : Failing under load. bug logged for investigation
+MW-360 : drop temporary table is bin logged (PS issue)

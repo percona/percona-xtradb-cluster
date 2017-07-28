@@ -3376,6 +3376,7 @@ public:
   void*                     wsrep_gtid_event_buf;
   ulong                     wsrep_gtid_event_buf_len;
   bool                      wsrep_replicate_GTID;
+  bool                      wsrep_skip_wsrep_GTID;
 
   /*
     Transaction id:
@@ -4811,12 +4812,14 @@ public:
 #endif
     query_id= new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
+#ifdef WITH_WSREP
     if (wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
     {
       set_wsrep_next_trx_id(query_id);
       WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
                   (long unsigned int) wsrep_next_trx_id());
     }
+#endif /* WITH_WSREP */
   }
 
   /**

@@ -51,6 +51,7 @@ tca=""
 tcert=""
 tkey=""
 sockopt=""
+ncsockopt=""
 progress=""
 ttime=0
 totime=0
@@ -404,12 +405,13 @@ get_transfer()
         wsrep_log_debug "Using netcat as streamer"
         if [[ "$WSREP_SST_OPT_ROLE"  == "joiner" ]]; then
             if nc -h 2>&1 | grep -q ncat; then
-                tcmd="nc -l ${TSST_PORT}"
-            else
-                tcmd="nc -dl ${TSST_PORT}"
+                tcmd="nc $ncsockopt -l ${TSST_PORT}"
+            else 
+                tcmd="nc $ncsockopt -dl ${TSST_PORT}"
             fi
         else
-            tcmd="nc ${REMOTEIP} ${TSST_PORT}"
+            # netcat doesn't understand [] around IPv6 address
+            tcmd="nc ${REMOTEIP//[\[\]]/} ${TSST_PORT}"
         fi
     else
         tfmt='socat'
@@ -546,6 +548,7 @@ read_cnf()
     tkey=$(parse_cnf sst tkey "")
     encrypt=$(parse_cnf sst encrypt 0)
     sockopt=$(parse_cnf sst sockopt "")
+    ncsockopt=$(parse_cnf sst ncsockopt "")
     progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
@@ -813,12 +816,6 @@ cleanup_joiner()
     exit $estatus
 }
 
-check_pid()
-{
-    local pid_file="$1"
-    [ -r "$pid_file" ] && ps -p $(cat "$pid_file") >/dev/null 2>&1
-}
-
 cleanup_donor()
 {
     # Since this is invoked just after exit NNN
@@ -858,34 +855,36 @@ cleanup_donor()
     rm -rf "${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}" || true
 
     exit $estatus
+
 }
 
 setup_ports()
 {
-    if [[ "$WSREP_SST_OPT_ROLE"  == "donor" ]]; then
-        SST_PORT=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $2 }')
-        REMOTEIP=$(echo $WSREP_SST_OPT_ADDR | awk -F ':' '{ print $1 }')
-        lsn=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $4 }')
-        sst_ver=$(echo $WSREP_SST_OPT_ADDR | awk -F '[:/]' '{ print $5 }')
+    if [[ "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
+        SST_PORT=$WSREP_SST_OPT_PORT
+        REMOTEIP=$WSREP_SST_OPT_HOST
+        lsn=$(echo $WSREP_SST_OPT_PATH | awk -F '[/]' '{ print $2 }')
+        sst_ver=$(echo $WSREP_SST_OPT_PATH | awk -F '[/]' '{ print $3 }')
     else
-        SST_PORT=$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $2 }')
+        SST_PORT=$WSREP_SST_OPT_PORT
     fi
 }
 
-#
-# waits ~10 seconds for nc to open the port and then reports ready
+# waits ~1 minute for nc/socat to open the port and then reports ready
 # (regardless of timeout)
 wait_for_listen()
 {
-    local PORT=$1
-    local ADDR=$2
+    local HOST=$1
+    local PORT=$2
     local MODULE=$3
-    for i in {1..50}
+
+    for i in {1..300}
     do
         ss -p state listening "( sport = :$PORT )" | grep -qE 'socat|nc' && break
         sleep 0.2
     done
-    echo "ready ${ADDR}/${MODULE}//$sst_ver"
+
+    echo "ready ${HOST}:${PORT}/${MODULE}//$sst_ver"
 }
 
 #
@@ -1502,14 +1501,7 @@ then
         rm -f "${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
     fi
 
-    ADDR=${WSREP_SST_OPT_ADDR}
-    if [ -z "${SST_PORT}" ]
-    then
-        SST_PORT=4444
-        ADDR="$(echo ${WSREP_SST_OPT_ADDR} | awk -F ':' '{ print $1 }'):${SST_PORT}"
-    fi
-
-    wait_for_listen ${SST_PORT} ${ADDR} ${MODULE} &
+    wait_for_listen ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT

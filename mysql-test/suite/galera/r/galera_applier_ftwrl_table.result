@@ -5,7 +5,7 @@ INSERT INTO t1 VALUES (1);
 INSERT INTO t1 VALUES (2);
 SET SESSION wsrep_sync_wait = 0;
 UNLOCK TABLES;
-SET SESSION wsrep_sync_wait = 7;
+SET SESSION wsrep_sync_wait = 15;
 SELECT COUNT(*) = 2 FROM t1;
 COUNT(*) = 2
 1

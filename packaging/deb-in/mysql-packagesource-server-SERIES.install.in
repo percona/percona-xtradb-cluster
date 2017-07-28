@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -87,7 +87,6 @@ usr/share/man/man1/resolve_stack_dump.1
 usr/share/man/man1/zlib_decompress.1
 usr/share/man/man8/mysqld.8
 # confguration files
-usr/share/mysql/my-default.cnf
 debian/extra/mysql.cnf  etc/mysql/
 debian/extra/mysqld.cnf /etc/mysql/mysql.conf.d/
 # app armor profile
@@ -105,7 +104,6 @@ usr/share/mysql/fill_help_tables.sql
 usr/share/mysql/innodb_memcached_config.sql
 usr/share/mysql/install_rewriter.sql
 usr/share/mysql/magic
-usr/share/mysql/my-default.cnf
 usr/share/mysql/mysql-log-rotate
 usr/share/mysql/mysql_security_commands.sql
 usr/share/mysql/mysql_sys_schema.sql
@@ -115,6 +113,7 @@ usr/share/mysql/mysql_test_data_timezone.sql
 usr/share/mysql/uninstall_rewriter.sql
 usr/share/mysql/wsrep.cnf
 usr/share/mysql/wsrep_notify
+usr/share/mysql/mysql-helpers
 # localized error msgs
 usr/share/mysql/*/errmsg.sys
 usr/share/mysql/errmsg-utf8.txt

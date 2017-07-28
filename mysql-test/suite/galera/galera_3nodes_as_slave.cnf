@@ -22,7 +22,7 @@ wsrep_provider_options='base_port=@mysqld.2.#galera_port;evs.install_timeout = P
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
-wsrep_sync_wait = 7
+wsrep_sync_wait = 15
 
 wsrep_node_address=127.0.0.1
 wsrep_sst_receive_address=127.0.0.1:@mysqld.2.#sst_port
@@ -40,7 +40,7 @@ wsrep_provider_options='base_port=@mysqld.3.#galera_port;evs.install_timeout = P
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
-wsrep_sync_wait = 7
+wsrep_sync_wait = 15
 
 wsrep_node_address=127.0.0.1
 wsrep_sst_receive_address=127.0.0.1:@mysqld.3.#sst_port
@@ -58,7 +58,7 @@ wsrep_provider_options='base_port=@mysqld.4.#galera_port;evs.install_timeout = P
 
 # enforce read-committed characteristics across the cluster
 wsrep_causal_reads=ON
-wsrep_sync_wait = 7
+wsrep_sync_wait = 15
 
 wsrep_node_address=127.0.0.1
 wsrep_sst_receive_address=127.0.0.1:@mysqld.4.#sst_port
@@ -79,8 +79,8 @@ NODE_MYSOCK_2= @mysqld.2.socket
 NODE_MYPORT_3= @mysqld.3.port
 NODE_MYSOCK_3= @mysqld.3.socket
 
-NODE_MYPORT_3= @mysqld.4.port
-NODE_MYSOCK_3= @mysqld.4.socket
+NODE_MYPORT_4= @mysqld.4.port
+NODE_MYSOCK_4= @mysqld.4.socket
 
 NODE_GALERAPORT_2= @mysqld.2.#galera_port
 NODE_GALERAPORT_3= @mysqld.3.#galera_port
