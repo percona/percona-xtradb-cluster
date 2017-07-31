@@ -1,12 +1,24 @@
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SET SESSION sql_log_bin = 0;
+CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
+CREATE USER 'demo'@'localhost' IDENTIFIED BY 's3kr3t';
 SET SESSION sql_log_bin = 1;
 INSERT INTO t1 VALUES (2);
+SELECT @@global.gtid_executed;
+@@global.gtid_executed
+
+CALL mtr.add_suppression("Slave SQL: Error 'Unknown table 'test.t2'' on query");
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
 1
 SELECT COUNT(*) = 0 FROM t1 WHERE f1 = 1;
 COUNT(*) = 0
 1
+SHOW TABLES;
+Tables_in_test
+t1
+DROP USER 'demo'@'localhost';
+ERROR HY000: Operation DROP USER failed for 'demo'@'localhost'
 DROP TABLE t1;
+DROP TABLE t2;
