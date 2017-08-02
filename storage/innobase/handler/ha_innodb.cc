@@ -8823,6 +8823,7 @@ no_commit:
 			;
 		} else if (src_table == m_prebuilt->table) {
 #ifdef WITH_WSREP
+			bool set_next_trx_id = false;
 			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
 			    sql_command == SQLCOM_LOAD                      &&
 			    !thd_test_options(
@@ -8840,7 +8841,8 @@ no_commit:
 
 				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
 				wsrep_post_commit(m_user_thd, TRUE);
-				wsrep_thd_set_next_trx_id(m_user_thd);
+				// wsrep_thd_set_next_trx_id(m_user_thd);
+				set_next_trx_id = true;
 			}
 #endif /* WITH_WSREP */
 			/* Source table is not in InnoDB format:
@@ -8848,12 +8850,18 @@ no_commit:
 
 			/* Altering to InnoDB format */
 			innobase_commit(ht, m_user_thd, 1);
+#ifdef WITH_WSREP
+			if (set_next_trx_id) {
+				wsrep_thd_set_next_trx_id(m_user_thd);
+			}
+#endif /* WITH_WSREP */
 			/* Note that this transaction is still active. */
 			trx_register_for_2pc(m_prebuilt->trx);
 			/* We will need an IX lock on the destination table. */
 			m_prebuilt->sql_stat_start = TRUE;
 		} else {
 #ifdef WITH_WSREP
+			bool set_next_trx_id = false;
 			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
 			    sql_command == SQLCOM_LOAD                      &&
 			    !thd_test_options(
@@ -8870,7 +8878,8 @@ no_commit:
 				}
 				if (tc_log->commit(m_user_thd, 1))  DBUG_RETURN(1);
 				wsrep_post_commit(m_user_thd, TRUE);
-				wsrep_thd_set_next_trx_id(m_user_thd);
+				// wsrep_thd_set_next_trx_id(m_user_thd);
+				set_next_trx_id = true;
 			}
 #endif /* WITH_WSREP */
 			/* Ensure that there are no other table locks than
@@ -8884,6 +8893,11 @@ no_commit:
 			/* Commit the transaction.  This will release the table
 			locks, so they have to be acquired again. */
 			innobase_commit(ht, m_user_thd, 1);
+#ifdef WITH_WSREP
+			if (set_next_trx_id) {
+				wsrep_thd_set_next_trx_id(m_user_thd);
+			}
+#endif /* WITH_WSREP */
 			/* Note that this transaction is still active. */
 			trx_register_for_2pc(m_prebuilt->trx);
 			/* Re-acquire the table lock on the source table. */
