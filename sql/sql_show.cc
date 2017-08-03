@@ -2944,6 +2944,11 @@ const char* get_one_variable_ext(THD *running_thd, THD *target_thd,
       value_charset= system_charset_info;
       break;
 
+    case SHOW_SIGNED_LONGLONG:
+      end= longlong10_to_str(*(longlong*) value, buff, -10);
+      value_charset= system_charset_info;
+      break;
+
     case SHOW_HA_ROWS:
       end= longlong10_to_str((longlong) *(ha_rows*) value, buff, 10);
       value_charset= system_charset_info;
@@ -2961,6 +2966,11 @@ const char* get_one_variable_ext(THD *running_thd, THD *target_thd,
 
     case SHOW_INT:
       end= int10_to_str((long) *(uint32*) value, buff, 10);
+      value_charset= system_charset_info;
+      break;
+
+    case SHOW_SIGNED_INT:
+      end= int10_to_str((long) *(uint32*) value, buff, -10);
       value_charset= system_charset_info;
       break;
 
@@ -3240,6 +3250,7 @@ int fill_schema_user_stats(THD* thd, TABLE_LIST* tables, Item* cond)
   if (check_global_access(thd, SUPER_ACL | PROCESS_ACL))
           DBUG_RETURN(1);
 
+  refresh_concurrent_conn_stats();
   // Iterates through all the global stats and sends them to the client.
   // Pattern matching on the client IP is supported.
 
@@ -3279,6 +3290,7 @@ int fill_schema_client_stats(THD* thd, TABLE_LIST* tables, Item* cond)
   if (check_global_access(thd, SUPER_ACL | PROCESS_ACL))
           DBUG_RETURN(1);
 
+  refresh_concurrent_conn_stats();
   // Iterates through all the global stats and sends them to the client.
   // Pattern matching on the client IP is supported.
 
