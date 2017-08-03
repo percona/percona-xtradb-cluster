@@ -634,7 +634,6 @@ typedef struct system_variables
 #ifndef DBUG_OFF
   ulonglong query_exec_time;
   double    query_exec_time_double;
-  ulong     query_exec_id;
 #endif
 #ifdef WITH_WSREP
   my_bool wsrep_on;
@@ -3484,7 +3483,6 @@ public:
   ulonglong diff_access_denied_errors;
   // Number of queries that return 0 rows
   ulonglong diff_empty_queries;
-  ulonglong diff_disconnects;
 
   // Per account query delay in miliseconds. When not 0, sleep this number of
   // milliseconds before every SQL command.
