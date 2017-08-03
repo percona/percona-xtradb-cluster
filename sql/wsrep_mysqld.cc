@@ -24,6 +24,7 @@
 #include "wsrep_var.h"
 #include "wsrep_binlog.h"
 #include "wsrep_applier.h"
+#include <binlog.h>
 #include "wsrep_xid.h"
 #include <cstdio>
 #include <cstdlib>
@@ -1799,6 +1800,10 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
 {
   DBUG_ASSERT(!table || db);
   DBUG_ASSERT(table_list || db);
+
+  /* Only if binlog is enabled and user try to set sql_log_bin=0. */
+  if (mysql_bin_log.is_open() && !(thd->variables.option_bits & OPTION_BIN_LOG))
+    return false;
 
   LEX* lex= thd->lex;
   SELECT_LEX* select_lex= lex->select_lex;
