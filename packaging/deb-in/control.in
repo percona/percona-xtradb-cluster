@@ -46,6 +46,11 @@ Depends: mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@ (= ${binary:Version})
          ${shlibs:Depends}
 Breaks: mysql-common (<< 5.6.35), mysql-@DEB_PRODUCTNAME@-client (<< 5.6)
 Conflicts: mysql,
+ mysql-client-5.0, mysql-client-core-5.0,
+ mysql-client-5.1, mysql-client-core-5.1,
+ mysql-client-5.5, mysql-client-core-5.5,
+ mysql-client-5.6, mysql-client-core-5.6,
+ mysql-client-5.7, mysql-client-core-5.7,
  mysql-server-5.0, mysql-server-core-5.0,
  mysql-server-5.1, mysql-server-core-5.1,
  mysql-server-5.5, mysql-server-core-5.5,
@@ -103,7 +108,11 @@ Conflicts: mysql,
  mariadb-client-5.5, mariadb-client-core-5.5,
  mariadb-client-10.0, mariadb-client-core-10.0,
  mariadb-client-10.1, mariadb-client-core-10.1,
- mariadb-client-10.2, mariadb-client-core-10.2
+ mariadb-client-10.2, mariadb-client-core-10.2,
+ mariadb-server-5.5, mariadb-server-core-5.5,
+ mariadb-server-10.0, mariadb-server-core-10.0,
+ mariadb-server-10.1, mariadb-server-core-10.1,
+ mariadb-server-10.2, mariadb-server-core-10.2
 Replaces: mysql,
  mysql-client-5.0, mysql-client-core-5.0,
  mysql-client-5.1, mysql-client-core-5.1,
