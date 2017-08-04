@@ -23,6 +23,9 @@
 #include "sql_base.h"                       // open_and_lock_tables
 #include "log.h"
 #include "partitioning/partition_handler.h" // Partition_handler
+#ifdef WITH_WSREP
+#include "sql_parse.h" // WSREP_TO_ISOLATION_BEGIN_WRTCHK
+#endif /* WITH_WSREP */
 
 
 bool Sql_cmd_alter_table_exchange_partition::execute(THD *thd)
