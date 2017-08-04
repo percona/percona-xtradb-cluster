@@ -1276,7 +1276,11 @@ bool Global_read_lock::make_global_read_lock_block_commit(THD *thd)
     int rcode;
     WSREP_DEBUG("Running implicit desync for node from FTWRL");
     rcode = wsrep->desync(wsrep);
-    if (rcode != WSREP_OK)
+    if (rcode == WSREP_TRX_FAIL && strcmp(wsrep_cluster_status, "Primary") != 0)
+    {
+      WSREP_DEBUG("desync failed while non-Primary, ignoring failure");
+    }
+    else if (rcode != WSREP_OK)
     {
       WSREP_WARN("FTWRL desync failed %d for schema: %s, query: %s",
                  rcode, (thd->db().length ? thd->db().str : "(null)"), WSREP_QUERY(thd));
