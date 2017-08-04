@@ -16,7 +16,9 @@ Killing server ...
 safe_to_bootstrap: 1
 safe_to_bootstrap: 0
 safe_to_bootstrap: 0
+CALL mtr.add_suppression("WSREP: moving position backwards: [0-9]+ -> 0");
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
+CALL mtr.add_suppression("WSREP: moving position backwards: [0-9]+ -> 0");
 CALL mtr.add_suppression("Failed to prepare for incremental state transfer");
 SHOW CREATE TABLE t1;
 Table	Create Table
