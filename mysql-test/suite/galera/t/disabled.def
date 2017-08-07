@@ -9,3 +9,4 @@ MW-286 : Fails due to timing issue. Parallel transaction should be running while
 MW-329 : Hangs. Needs investigation.
 galera_gcache_recover : Failing under load. bug logged for investigation
 MW-360 : drop temporary table is bin logged (PS issue)
+galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
