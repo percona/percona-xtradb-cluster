@@ -34,6 +34,8 @@ SET GLOBAL wsrep_provider_options='gmcast.isolate=0';
 --source include/wait_for_slave_to_start.inc
 
 --connection node_1
+--source include/galera_wait_ready.inc
+
 INSERT INTO t1 VALUES (1);
 
 --connection node_3

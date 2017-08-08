@@ -42,6 +42,9 @@ DELIMITER ;|
 while ($count)
 {
   --connection c$count
+  --let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.proc WHERE name = 'do_inserts';
+  --source include/wait_condition.inc
+
   --send CALL do_inserts();
   --dec $count
 }
