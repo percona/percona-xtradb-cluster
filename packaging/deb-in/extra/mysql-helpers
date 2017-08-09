@@ -111,11 +111,12 @@ run_init_sql() {
 
 # Verify that everything the server needs to run is set up
 verify_ready() {
-
-		MYSQLDATA=$(get_mysql_option mysqld datadir "/var/lib/mysql")
-		MYSQLFILES=$(get_mysql_option mysqld secure-file-priv "/var/lib/mysql-files")
-		MYSQLKEYRING=$(dirname $(get_mysql_option mysqld keyring-file-data "/var/lib/mysql-keyring/keyring"))
-		MYSQLLOG=$(dirname $(get_mysql_option mysqld log-error "/var/log/mysql/error.log"))
+		# For multi-instance support with the mysql@ service
+		INSTANCE="mysqld${1}"
+		MYSQLDATA=$(get_mysql_option ${INSTANCE} datadir "/var/lib/mysql")
+		MYSQLFILES=$(get_mysql_option ${INSTANCE} secure-file-priv "/var/lib/mysql-files")
+		MYSQLKEYRING=$(dirname $(get_mysql_option ${INSTANCE} keyring-file-data "/var/lib/mysql-keyring/keyring"))
+		MYSQLLOG=$(dirname $(get_mysql_option ${INSTANCE} log-error "/var/log/mysql/error.log"))
 		MYSQLRUN=/var/run/mysqld
 
 		if ! getent group mysql >/dev/null; then
@@ -174,8 +175,10 @@ verify_ready() {
 
 # Verify the database exists and is ssl ready
 verify_database() {
-	MYSQLDATA=$(get_mysql_option mysqld datadir "/var/lib/mysql")
-	MYSQLFILES=$(get_mysql_option mysqld secure-file-priv "/var/lib/mysql-files")
+	# For multi-instance support with the mysql@ service
+	INSTANCE="mysqld${1}"
+	MYSQLDATA=$(get_mysql_option ${INSTANCE} datadir "/var/lib/mysql")
+	MYSQLFILES=$(get_mysql_option ${INSTANCE} secure-file-priv "/var/lib/mysql-files")
 
 	if [ ! -d "${MYSQLDATA}/mysql" ] && [ -d "${MYSQLFILES}" ]; then
 		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure > /dev/null"
@@ -187,7 +190,7 @@ INSTALL PLUGIN auth_socket SONAME 'auth_socket.so';
 ALTER USER 'root'@'localhost' IDENTIFIED WITH 'auth_socket';
 SHUTDOWN;
 EOF
-		run_init_sql "$SQL"
+		run_init_sql "$SQL" "$1"
 		rm -f "$SQL"
         else
                 get_recover_pos
