@@ -64,6 +64,7 @@ usr/lib/mysql/plugin/validate_password.so
 usr/lib/mysql/plugin/version_token.so
 @DEB_INSTALL_SERVER_PLUGINS@
 # server
+usr/bin/mysqld_multi
 usr/sbin/mysqld
 # man pages
 usr/share/man/man1/innochecksum.1
