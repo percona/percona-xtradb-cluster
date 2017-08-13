@@ -122,7 +122,6 @@ usr/share/mysql/mysql-helpers
 usr/share/mysql/*/errmsg.sys
 usr/share/mysql/errmsg-utf8.txt
 @DEB_INSTALL_SERVER_SYSTEMD@
-usr/lib/tmpfiles.d/mysql.conf
 # legal
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/
 usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
