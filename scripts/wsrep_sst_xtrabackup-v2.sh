@@ -821,7 +821,7 @@ normalize_version()
 # Compares two version strings
 # The first parameter is the version to be checked
 # The second parameter is the minimum version required
-# Returns 1 (failure) if $1 >= $2, 0 (success) otherwise
+# Returns 0 (success) if $1 >= $2, 1 (failure) otherwise
 check_for_version()
 {
     local local_version_str="$( normalize_version $1 )"
@@ -933,6 +933,8 @@ if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION; then
     exit 2
 fi
 
+# Get our MySQL version
+MYSQL_VERSION=$($(dirname $0)/mysqld --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1)
 
 rm -f "${MAGIC_FILE}"
 
@@ -1015,6 +1017,7 @@ then
     echo "[sst]" > "$sst_info_file_path"
     echo "galera-gtid=$WSREP_SST_OPT_GTID" >> "$sst_info_file_path"
     echo "binlog-name=$(basename "$WSREP_SST_OPT_BINLOG")" >> "$sst_info_file_path"
+    echo "mysql-version=$MYSQL_VERSION" >> "$sst_info_file_path"
 
 
     if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
@@ -1180,6 +1183,33 @@ then
     echo $(parse_sst_info "$sst_file_info_path" sst galera-gtid "") > "$MAGIC_FILE"
 
     DONOR_BINLOGNAME=$(parse_sst_info "$sst_file_info_path" sst binlog-name "")
+    DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
+
+    if [[ -n "$DONOR_MYSQL_VERSION" ]]; then
+        local_version_str=""
+        donor_version_str=""
+
+        # Truncate the version numbers (we want the major.minor version like "5.6", not "5.6.35-...")
+        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+
+        # Is this node's pxc version < donor's pxc version?
+        if ! check_for_version $local_version_str $donor_version_str; then
+            wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
+            wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
+            wsrep_log_error "Upgrade this node before joining the cluster."
+            exit 2
+        fi
+
+        # Is the donor's pxc version < this node's pxc version?
+        if ! check_for_version $donor_version_str $local_version_str; then
+            wsrep_log_warning "WARNING: PXC is receiving an SST from a node with a lower version."
+            wsrep_log_warning "This node's PXC version is $local_version_str. The donor's PXC version is $donor_version_str."
+            wsrep_log_warning "Run mysql_upgrade in non-cluster (standalone mode) to upgrade."
+            wsrep_log_warning "Check the upgrade process here:"
+            wsrep_log_warning "    https://www.percona.com/doc/percona-xtradb-cluster/LATEST/howtos/upgrade_guide.html"
+        fi
+    fi
 
     if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
     then
