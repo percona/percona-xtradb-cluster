@@ -837,15 +837,25 @@ following values are available:
 
 This variable is used to specify if SSL encryption should be used.
 
-.. variable::  socket.ssl_cert
+.. variable:: socket.ssl_ca
 
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: No
 
-This variable is used to specify the path (absolute or relative to working
-directory) to an SSL certificate (in PEM format).
+This variable is used to specify the path
+to the Certificate Authority (CA) certificate file.
+
+.. variable:: socket.ssl_cert
+
+   :cli: Yes
+   :conf: Yes
+   :scope: Global
+   :dyn: No
+
+This variable is used to specify the path
+to the server's certificate file (in PEM format).
 
 .. variable:: socket.ssl_key
 
@@ -854,8 +864,8 @@ directory) to an SSL certificate (in PEM format).
    :scope: Global
    :dyn: No
 
-This variable is used to specify the path (absolute or relative to working
-directory) to an SSL private key for the certificate (in PEM format).
+This variable is used to specify the path
+to the server's private key file (in PEM format).
 
 .. variable:: socket.ssl_compression
 
