@@ -65,6 +65,11 @@ show variables like 'auto_increment_increment';
 SELECT @@auto_increment_offset = (SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_index') + 1;
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 10 FROM t1;
+--source include/wait_condition.inc
 
 select * from t1;
 

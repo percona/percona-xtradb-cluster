@@ -17,11 +17,13 @@ INSERT INTO t1 VALUES (1);
 --connection node_1
 --sleep 0.5
 SET GLOBAL wsrep_slave_threads = 10;
---sleep 0.5
+--let $wait_condition = SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+--source include/wait_condition.inc
 SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
 SET GLOBAL wsrep_slave_threads = 20;
---sleep 0.5
+--let $wait_condition = SELECT COUNT(*) = 21 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+--source include/wait_condition.inc
 SELECT COUNT(*) = 21 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
 
@@ -57,7 +59,8 @@ INSERT INTO t1 VALUES (19);
 INSERT INTO t1 VALUES (20);
 
 --connection node_1
---sleep 0.5
+--let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+--source include/wait_condition.inc
 SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 
 SET GLOBAL wsrep_slave_threads = 1;
