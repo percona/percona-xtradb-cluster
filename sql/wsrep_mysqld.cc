@@ -651,7 +651,8 @@ wsrep_view_handler_cb (void*                    app_ctx,
              wsrep_cluster_size, wsrep_local_index, view->proto_ver);
 
   /* Proceed further only if view is PRIMARY */
-  if (WSREP_VIEW_PRIMARY != view->status) {
+  if (WSREP_VIEW_PRIMARY != view->status)
+  {
     wsrep_ready_set(FALSE);
     new_status= WSREP_MEMBER_UNDEFINED;
     /* Always record local_uuid and local_seqno in non-prim since this
@@ -663,6 +664,8 @@ wsrep_view_handler_cb (void*                    app_ctx,
     // local_seqno= view->first - 1;
     goto out;
   }
+
+  wsrep_ready_set(TRUE);
 
   switch (view->proto_ver)
   {
@@ -788,7 +791,7 @@ out:
 
 void wsrep_ready_set (my_bool x)
 {
-  WSREP_DEBUG("Setting wsrep_ready to %s", (x ? "true" : "false"));
+  WSREP_INFO("Setting wsrep_ready to %s", (x ? "true" : "false"));
   if (mysql_mutex_lock (&LOCK_wsrep_ready)) abort();
   if (wsrep_ready != x)
   {
@@ -818,6 +821,7 @@ static void wsrep_synced_cb(void* app_ctx)
   if (mysql_mutex_lock (&LOCK_wsrep_ready)) abort();
   if (!wsrep_ready)
   {
+    WSREP_INFO("This node is synced, setting wsrep_ready to true");
     wsrep_ready= TRUE;
     mysql_cond_signal (&COND_wsrep_ready);
     signal_main= true;
