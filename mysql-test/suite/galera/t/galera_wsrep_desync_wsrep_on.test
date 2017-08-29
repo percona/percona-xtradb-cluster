@@ -84,6 +84,10 @@ call mtr.add_suppression("Aborting");
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
 
---echo "grep --count \"Can't desync a node even before it is synced with cluster\""
---exec grep --count "Can't desync a node even before it is synced with cluster" $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_text = Can't desync a node even before it is synced with cluster
+--let $assert_select = Can't desync a node even before it is synced with cluster
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
 

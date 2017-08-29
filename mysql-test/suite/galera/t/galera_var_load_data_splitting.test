@@ -1,6 +1,7 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 --source include/big_test.inc
+--source include/force_restart.inc
 
 --let $wsrep_load_data_splitting_orig = `SELECT @@wsrep_load_data_splitting`
 
@@ -33,6 +34,13 @@ SELECT COUNT(*) = 95000 FROM t1;
 
 # LOAD-ing 95K rows causes 10 commits to be registered
 --disable_query_log
+
+--let $wsrep_last_committed_total = `SELECT $wsrep_last_committed_before + 10`
+if ($wsrep_last_committed_after != $wsrep_last_committed_total)
+{
+	--echo "before:$wsrep_last_committed_before after:$wsrep_last_committed_after expected:$wsrep_last_committed_total"
+}
+
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 10 AS wsrep_last_committed_diff;
 --enable_query_log
 
