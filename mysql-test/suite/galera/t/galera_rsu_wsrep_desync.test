@@ -154,7 +154,10 @@ SET DEBUG_SYNC= 'now SIGNAL continue';
 SHOW CREATE TABLE t1;
 
 --disable_query_log
-SHOW VARIABLES LIKE 'wsrep_desync';
+# The actual value of wsrep_desync is dependent on the timing
+# between the 'ALTER TABLE' and the 'SET GLOBAL wsrep_desync=1'
+# call.  So we don't check the value here since it could be ON/OFF.
+#SHOW VARIABLES LIKE 'wsrep_desync';
 show status like 'wsrep_desync_count';
 --enable_query_log
 
@@ -200,7 +203,10 @@ show status like 'wsrep_desync_count';
 UNLOCK TABLES;
 
 --disable_query_log
-SHOW VARIABLES LIKE 'wsrep_desync';
+# The actual value of wsrep_desync is dependent on the timing
+# between the 'UNLOCK TABLES' and the 'SET GLOBAL wsrep_desync=1'
+# call.  So we don't check the value here since it could be ON/OFF.
+#SHOW VARIABLES LIKE 'wsrep_desync';
 show status like 'wsrep_desync_count';
 --enable_query_log
 

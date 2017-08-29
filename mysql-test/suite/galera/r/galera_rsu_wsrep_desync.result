@@ -89,8 +89,6 @@ t1	CREATE TABLE `t1` (
   `f2` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 Variable_name	Value
-wsrep_desync	ON
-Variable_name	Value
 wsrep_desync_count	1
 SET GLOBAL wsrep_desync=0;
 Variable_name	Value
@@ -112,8 +110,6 @@ wsrep_desync	OFF
 Variable_name	Value
 wsrep_desync_count	2
 UNLOCK TABLES;
-Variable_name	Value
-wsrep_desync	ON
 Variable_name	Value
 wsrep_desync_count	1
 SET GLOBAL wsrep_desync=0;
