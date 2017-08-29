@@ -339,7 +339,7 @@ Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
-Requires:	percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:	percona-xtrabackup-24 >= 2.4.3 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
