@@ -796,7 +796,7 @@ void wsrep_ready_set (my_bool x)
   if (wsrep_ready != x)
   {
     wsrep_ready= x;
-    mysql_cond_signal (&COND_wsrep_ready);
+    mysql_cond_broadcast (&COND_wsrep_ready);
   }
   mysql_mutex_unlock (&LOCK_wsrep_ready);
 }
@@ -823,7 +823,7 @@ static void wsrep_synced_cb(void* app_ctx)
   {
     WSREP_INFO("This node is synced, setting wsrep_ready to true");
     wsrep_ready= TRUE;
-    mysql_cond_signal (&COND_wsrep_ready);
+    mysql_cond_broadcast (&COND_wsrep_ready);
     signal_main= true;
 
   }
