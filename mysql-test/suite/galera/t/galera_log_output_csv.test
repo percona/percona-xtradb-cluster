@@ -5,6 +5,15 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
+--connection node_1
+TRUNCATE TABLE mysql.general_log;
+TRUNCATE TABLE mysql.slow_log;
+
+--connection node_2
+TRUNCATE TABLE mysql.general_log;
+TRUNCATE TABLE mysql.slow_log;
+
+--connection node_1
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 

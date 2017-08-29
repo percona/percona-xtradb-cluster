@@ -25,7 +25,8 @@ CREATE DATABASE db;
 
 if ($galera_wsrep_start_position != $expected_position)
 {
-  die(Expected position: $expected_position, found $galera_wsrep_start_position);
+  --echo "Expected position: $expected_position, found $galera_wsrep_start_position"
+  die(The expected position does not match the wsrep_recover position);
 }
 
 #
@@ -41,7 +42,8 @@ if ($galera_wsrep_start_position != $expected_position)
 # This should give the same result as before, it should ignore the use of this special value
 if ($galera_wsrep_start_position != $expected_position)
 {
-  die(Expected position: $expected_position, found $galera_wsrep_start_position);
+  --echo "Expected position: $expected_position, found $galera_wsrep_start_position"
+  die(The expected position does not match the wsrep_recover position);
 }
 
 --echo Restarting server ...

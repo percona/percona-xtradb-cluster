@@ -3,6 +3,7 @@
 #
 
 --source include/galera_cluster.inc
+--source include/force_restart.inc
 
 CREATE TABLE t1 (f1 INTEGER, f2 CHAR(20) DEFAULT 'abc') ENGINE=InnoDB;
 
@@ -40,7 +41,7 @@ DELIMITER ;|
 #
 
 --connection node_2
---let $count = 10
+--let $count = 20
 while ($count)
 {
 	--let $signature = `SELECT LEFT(MD5(RAND()), 10)`
