@@ -980,7 +980,7 @@ static int sst_donate_mysqldump (const char*         addr,
     return (ret < 0 ? ret : -EMSGSIZE);
   }
 
-  WSREP_DEBUG("Running: '%s'", cmd_str());
+  WSREP_INFO("Initiating SST/IST transfer on DONOR side (%s)", cmd_str());
 
   ret= sst_run_shell (cmd_str(), env, 3);
 

@@ -209,7 +209,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
       It is done at commit time. pre-commit hook doesn't have the GTID
       information. If user has set explict GTID using gtid_next=UUID:seqno
       then such event should be appended to write-set. */
-      Gtid_log_event gtid_event(thd, true, 0, 0);
+      Gtid_log_event gtid_event(thd, true, 0, 0, false);
       uchar gtid_buf[Gtid_log_event::MAX_EVENT_LENGTH];
       uint32 gtid_len = gtid_event.write_to_memory(gtid_buf);
 
@@ -330,7 +330,7 @@ static int wsrep_write_cache_inc(wsrep_t*  const wsrep,
       commit time. pre-commit hook doesn't have the GTID information.
       If user has set explict GTID using gtid_next=UUID:seqno then such event
       should be appended to write-set. */
-      Gtid_log_event gtid_event(thd, true, 0, 0);
+      Gtid_log_event gtid_event(thd, true, 0, 0, false);
       uchar gtid_buf[Gtid_log_event::MAX_EVENT_LENGTH];
       uint32 gtid_len = gtid_event.write_to_memory(gtid_buf);
 
