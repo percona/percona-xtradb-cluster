@@ -600,6 +600,8 @@ read_cnf()
     pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
     pxc_encrypt_cluster_traffic=$(normalize_boolean "$pxc_encrypt_cluster_traffic" "off")
 
+    ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
+
     rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use-extra 0)
     iopts=$(parse_cnf sst inno-backup-opts "")
