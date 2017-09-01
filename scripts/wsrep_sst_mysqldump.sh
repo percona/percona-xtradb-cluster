@@ -83,38 +83,13 @@ MYSQLDUMP_GENERAL="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
 --add-drop-database --add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --all-databases --events \
---set-gtid-purged=OFF"
+--skip-comments --flush-privileges --all-databases --events"
 
-# Neither mysqldump nor mysqlpump dump the sys schema by default. To generate
-# a dump file, name the sys schema explicitly on the command line using either
-# of these commands:
-# while doing partial backup with gtid enabled to avoid emission of
-# gtid for all action use set-gtid-purged=OFF
-MYSQLDUMP_SYS_SCHEMA="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
+MYSQLDUMP_GTID_EXECUTED="$MYSQLDUMP --defaults-extra-file=$WSREP_SST_OPT_CONF \
 $AUTH -S$WSREP_SST_OPT_SOCKET \
---add-drop-database --add-drop-table --skip-add-locks --create-options \
+--add-drop-table --skip-add-locks --create-options \
 --disable-keys --extended-insert --skip-lock-tables --quick --set-charset \
---skip-comments --flush-privileges --events --routines --set-gtid-purged=OFF \
---databases sys"
-
-# mysqldump cannot restore CSV tables, fix this issue
-CSV_TABLES_FIX="
-set sql_mode='';
-
-USE mysql;
-
-SET @str = IF (@@have_csv = 'YES', 'CREATE TABLE IF NOT EXISTS general_log (event_time TIMESTAMP NOT NULL, user_host MEDIUMTEXT NOT NULL, thread_id INTEGER NOT NULL, server_id INTEGER UNSIGNED NOT NULL, command_type VARCHAR(64) NOT NULL,argument MEDIUMTEXT NOT NULL) engine=CSV CHARACTER SET utf8 comment=\"General log\"', 'SET @dummy = 0');
-
-PREPARE stmt FROM @str;
-EXECUTE stmt;
-DROP PREPARE stmt;
-
-SET @str = IF (@@have_csv = 'YES', 'CREATE TABLE IF NOT EXISTS slow_log (start_time TIMESTAMP NOT NULL, user_host MEDIUMTEXT NOT NULL, query_time TIME NOT NULL, lock_time TIME NOT NULL, rows_sent INTEGER NOT NULL, rows_examined INTEGER NOT NULL, db VARCHAR(512) NOT NULL, last_insert_id INTEGER NOT NULL, insert_id INTEGER NOT NULL, server_id INTEGER UNSIGNED NOT NULL, sql_text MEDIUMTEXT NOT NULL) engine=CSV CHARACTER SET utf8 comment=\"Slow log\"', 'SET @dummy = 0');
-
-PREPARE stmt FROM @str;
-EXECUTE stmt;
-DROP PREPARE stmt;"
+--skip-comments --flush-privileges mysql gtid_executed --set-gtid-purged=OFF"
 
 SET_START_POSITION="SET GLOBAL wsrep_start_position='$WSREP_SST_OPT_GTID';"
 
@@ -128,6 +103,7 @@ MYSQL="$MYSQL_CLIENT --defaults-extra-file=$WSREP_SST_OPT_CONF "\
 GENERAL_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@GENERAL_LOG"`
 SLOW_LOG_OPT=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@SLOW_QUERY_LOG"`
 PXC_STRICT_MODE=`$MYSQL --skip-column-names -e "$STOP_WSREP SELECT @@pxc_strict_mode"`
+
 $MYSQL -e "$STOP_WSREP SET GLOBAL GENERAL_LOG=OFF"
 $MYSQL -e "$STOP_WSREP SET GLOBAL SLOW_QUERY_LOG=OFF"
 $MYSQL -e "$STOP_WSREP SET GLOBAL pxc_strict_mode=DISABLED"
@@ -137,9 +113,10 @@ RESTORE_GENERAL_LOG="SET GLOBAL GENERAL_LOG=$GENERAL_LOG_OPT;"
 RESTORE_SLOW_QUERY_LOG="SET GLOBAL SLOW_QUERY_LOG=$SLOW_LOG_OPT;"
 RESTORE_PXC_STRICT_MODE="SET GLOBAL pxc_strict_mode='$PXC_STRICT_MODE';"
 
+TURNOFF_SQL_LOG_BIN="SET SESSION sql_log_bin=0;"
+
 # reset master for 5.6 to clear GTID_EXECUTED
 RESET_MASTER="RESET MASTER;"
-
 
 if [ $WSREP_SST_OPT_BYPASS -eq 0 ]
 then
@@ -148,11 +125,18 @@ then
     # and if joiner binlog is disabled, 'RESET MASTER' returns error
     # ERROR 1186 (HY000) at line 2: Binlog closed, cannot RESET MASTER
     (echo $STOP_WSREP && echo $RESET_MASTER) | $MYSQL || true
-    (echo $STOP_WSREP && $MYSQLDUMP_GENERAL && $MYSQLDUMP_SYS_SCHEMA \
-        && echo $RESTORE_GENERAL_LOG && echo $RESTORE_SLOW_QUERY_LOG \
+
+    (echo $STOP_WSREP \
+        && $MYSQLDUMP_GENERAL \
+        && echo $RESTORE_GENERAL_LOG \
+        && echo $RESTORE_SLOW_QUERY_LOG \
         && echo $RESTORE_PXC_STRICT_MODE \
         && echo $SET_START_POSITION \
         || echo "SST failed to complete;") | $MYSQL
+    (echo $STOP_WSREP \
+        && echo $TURNOFF_SQL_LOG_BIN \
+        && $MYSQLDUMP_GTID_EXECUTED \
+        || echo "SST failed to complete;") | $MYSQL -D mysql
 else
     wsrep_log_info "Bypassing state dump (SST)."
     echo $SET_START_POSITION | $MYSQL

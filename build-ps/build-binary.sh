@@ -302,7 +302,7 @@ export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
 export DEBIAN_VERSION="$(lsb_release -sc)"
 echo $DEBIAN_VERSION
-if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && ([[ "$DEBIAN_VERSION" == "yakkety" ]] || [[ "$DEBIAN_VERSION" == "zesty" ]]); then
+if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && ([[ "$DEBIAN_VERSION" == "yakkety" ]] || [[ "$DEBIAN_VERSION" == "zesty" ]] || [[ "$DEBIAN_VERSION" == "stretch" ]]); then
     export CFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
     export CXXFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
 fi
@@ -393,6 +393,7 @@ fi
             -DWITH_UNIT_TESTS=0 \
             -DWITH_READLINE=system \
             -DWITHOUT_TOKUDB=ON \
+            -DWITHOUT_ROCKSDB=ON \
             -DWITH_DEBUG=ON \
             -DCOMPILATION_COMMENT="$COMMENT - UNIV_DEBUG ON" \
             -DWITH_PAM=ON \
@@ -421,6 +422,7 @@ fi
             -DWITH_UNIT_TESTS=0 \
             -DWITH_READLINE=system \
             -DWITHOUT_TOKUDB=ON \
+            -DWITHOUT_ROCKSDB=ON \
             -DCOMPILATION_COMMENT="$COMMENT" \
             -DWITH_PAM=ON \
             -DWITH_INNODB_MEMCACHED=ON \
