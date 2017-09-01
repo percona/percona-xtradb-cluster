@@ -9,6 +9,7 @@ wsrep_debug=ON
 encrypt=3
 tkey=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem
 tcert=@ENV.MYSQL_TEST_DIR/std_data/galera-cert.pem
+ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 
 [mysqld.1]
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=1;pc.ignore_sb=true'

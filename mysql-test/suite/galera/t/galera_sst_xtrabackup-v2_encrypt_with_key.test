@@ -3,7 +3,6 @@
 # Initial SST happens via xtrabackup, so there is not much to do in the body of the test
 #
 
---source include/big_test.inc
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 

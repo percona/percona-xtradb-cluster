@@ -12,3 +12,6 @@ wsrep_debug=ON
 ssl-key=@ENV.MYSQL_TEST_DIR/std_data/server-key.pem
 ssl-cert=@ENV.MYSQL_TEST_DIR/std_data/server-cert.pem
 ssl-ca=@ENV.MYSQL_TEST_DIR/std_data/cacert.pem
+
+[SST]
+ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
