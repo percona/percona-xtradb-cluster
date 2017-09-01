@@ -122,6 +122,7 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 --eval SET GLOBAL wsrep_sst_receive_address = '127.0.0.1:$NODE_MYPORT_4';
 --eval SET GLOBAL wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'
 --enable_query_log
+--sleep 60
 
 --connection node_3
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_cluster_size';
