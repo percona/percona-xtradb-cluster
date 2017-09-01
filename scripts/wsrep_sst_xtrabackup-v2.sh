@@ -500,6 +500,8 @@ read_cnf()
         ssl_key=$(parse_cnf mysqld ssl-key "")
     fi
 
+    ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
+
     rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use-extra 0)
     iopts=$(parse_cnf sst inno-backup-opts "")
