@@ -64,6 +64,12 @@ Prefix: %{_sysconfdir}
  %define gcc_req gcc-c++
 %endif
 
+%if 0%{?rocksdb}
+  %global ROCKSDB_FLAGS -DWITH_ROCKSDB=1
+%else
+  %global ROCKSDB_FLAGS -DWITH_ROCKSDB=0
+%endif
+
 %if %{undefined scons_args}
  %define scons_args %{nil}
 %endif
@@ -348,7 +354,7 @@ Requires:	Percona-XtraDB-Cluster-server%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Provides:       mysql-server galera-57 galera-57-debuginfo
 BuildRequires:  %{distro_buildreq} pam-devel openssl-devel numactl-devel
-BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel
+BuildRequires:  scons check-devel glibc-devel %{gcc_req} openssl-devel %{boost_req} check-devel openldap-devel
 %if 0%{?systemd}
 BuildRequires:  systemd
 %endif
@@ -722,7 +728,7 @@ mkdir debug
            -DWITH_SCALABILITY_METRICS=ON \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
            %{?mecab_option} \
-	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON}
+	   -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_ON} %{ROCKSDB_FLAGS}
   echo BEGIN_DEBUG_CONFIG ; egrep '^#define' include/config.h ; echo END_DEBUG_CONFIG
   make %{?_smp_mflags}
 )
@@ -760,7 +766,7 @@ mkdir release
            -DWITH_SCALABILITY_METRICS=ON \
            %{?mecab_option} \
            -DMYSQL_SERVER_SUFFIX="%{server_suffix}" \
-           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF}
+           -DWITH_PAM=ON  %{TOKUDB_FLAGS} %{TOKUDB_DEBUG_OFF} %{ROCKSDB_FLAGS}
   echo BEGIN_NORMAL_CONFIG ; egrep '^#define' include/config.h ; echo END_NORMAL_CONFIG
   make %{?_smp_mflags}
 )
@@ -928,6 +934,7 @@ install -m 644 "%{malloc_lib_source}" \
 # files' warning.
 rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
 rm -f $RBR%{_bindir}/ps_tokudb_admin
+rm -f $RBR%{_bindir}/ps-admin
 
 %if 0%{?systemd}
 rm -rf $RBR%{_sysconfdir}/init.d/mysql
@@ -1539,6 +1546,7 @@ fi
 %attr(755, root, root) %{_bindir}/wsrep_sst_mysqldump
 %attr(755, root, root) %{_bindir}/wsrep_sst_xtrabackup-v2
 %attr(755, root, root) %{_bindir}/wsrep_sst_rsync
+%attr(755, root, root) %{_bindir}/ps_mysqld_helper
 # Explicit %attr() mode not applicaple to symlink
 %{_bindir}/wsrep_sst_rsync_wan
 %attr(755, root, root) %{_bindir}/lz4_decompress

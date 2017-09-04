@@ -210,7 +210,6 @@ override_dh_auto_install:
         # Add helper functions for maintainer scripts
 	install -m 0644 debian/extra/mysql-helpers debian/tmp/usr/share/mysql/
 
-
 	# install source tarball for source package
 	install -D -m 0644 $(EXPORTED_SOURCE_TARBALL) $(TMP)/usr/src/percona-xtradb-cluster/`basename $(EXPORTED_SOURCE_TARBALL)`
 
