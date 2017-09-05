@@ -16,7 +16,6 @@ usr/bin/mysqld_multi
 usr/bin/mysqld_safe
 usr/bin/mysqltest
 usr/bin/perror
-usr/bin/mysqld_pre_systemd
 usr/bin/replace
 usr/bin/resolve_stack_dump
 usr/bin/resolveip
