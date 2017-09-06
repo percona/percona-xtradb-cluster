@@ -84,12 +84,16 @@ SET GLOBAL wsrep_cluster_address='gcomm://';
 INSERT INTO t1 VALUES (5);
 
 --connection node_3
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+--source include/wait_condition.inc
+
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 --let $wait_condition = SELECT COUNT(*) = 5 FROM t1;
---source include/wait_condition.inc
-
---let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
 
 SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
@@ -116,17 +120,33 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 --eval SET GLOBAL wsrep_provider='$WSREP_PROVIDER'
 --eval SET GLOBAL wsrep_provider_options='base_port=$NODE_GALERAPORT_4'
 --eval SET GLOBAL wsrep_sst_receive_address = '127.0.0.2:$NODE_MYPORT_4';
+
+# Changing wsrep_cluster_address will cause the client connection to be shutdown
+# Depending on timing, it may trigger 2013 (CR_SERVER_LOST) on the client side
+--error 0,2013
 --eval SET GLOBAL wsrep_cluster_address='gcomm://127.0.0.1:$NODE_GALERAPORT_3'
+
 --enable_query_log
 
---sleep 360
+--sleep 60
+
+--connection node_3
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--source include/wait_condition.inc
+
+--connect node_4a, 127.0.0.1, root, , test, $NODE_MYPORT_4
+--connection node_4a
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Synced' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+--source include/wait_condition.inc
+
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT COUNT(*) = 6 FROM t1;
---source include/wait_condition.inc
-
---let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';
 --source include/wait_condition.inc
 
 SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
@@ -154,10 +174,8 @@ RESET SLAVE ALL;
 --connect node_3a, 127.0.0.1, root, , test, $NODE_MYPORT_3
 INSERT INTO t1 VALUES (7);
 
---connect node_4a, 127.0.0.1, root, , test, $NODE_MYPORT_4
-INSERT INTO t1 VALUES (8);
-
 --connection node_4a
+INSERT INTO t1 VALUES (8);
 SELECT COUNT(*) = 8 FROM t1;
 
 --let $wait_condition = SELECT VARIABLE_VALUE = 'ON' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_ready';

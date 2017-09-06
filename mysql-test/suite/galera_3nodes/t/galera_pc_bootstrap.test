@@ -22,12 +22,12 @@ SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
 --sleep 10
 
 # Node #2 should be non-primary
+--connection node_2
 SET SESSION wsrep_sync_wait = 0;
 --let $wait_condition = SELECT variable_value = 'non-Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE variable_name = 'wsrep_cluster_status';
 --source include/wait_condition.inc
 
 # Signal node #2 to bootstrap
---connection node_2
 SET GLOBAL wsrep_provider_options = 'pc.bootstrap=1';
 
 # Wait until node becomes available for queries again
