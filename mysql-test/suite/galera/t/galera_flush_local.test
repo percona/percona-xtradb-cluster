@@ -170,7 +170,8 @@ REPAIR TABLE x1, x2;
 --source include/wait_condition.inc
 
 --let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 9 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed';
---source include/wait_condition.inc
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 9 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--source include/wait_condition_with_debug.inc
 
 
 SELECT COUNT(*) = 10 FROM t1;

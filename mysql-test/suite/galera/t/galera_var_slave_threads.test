@@ -38,6 +38,9 @@ INSERT INTO t1 VALUES (1);
 --connection node_2
 SELECT COUNT(*) = 1 FROM t1;
 
+# Wait until we know that all threads have been started in MySQL
+--let $wait_condition = SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user'
+--source include/wait_condition.inc
 SELECT COUNT(*) = @@wsrep_slave_threads + 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
 SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user' AND STATE LIKE '%wsrep: aborter%';
 

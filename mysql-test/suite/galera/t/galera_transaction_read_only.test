@@ -26,6 +26,10 @@ COMMIT;
 --sleep 1
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
+if ($wsrep_last_committed_before != $wsrep_last_committed_after)
+{
+	--echo "wsrep_last_committed_before:$wsrep_last_committed_before  wsrep_last_committed_after:$wsrep_last_committed_after"
+}
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
 --enable_query_log
 
@@ -43,6 +47,10 @@ COMMIT;
 --sleep 1
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
+if ($wsrep_last_committed_before != $wsrep_last_committed_after)
+{
+	--echo "wsrep_last_committed_before:$wsrep_last_committed_before  wsrep_last_committed_after:$wsrep_last_committed_after"
+}
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
 --enable_query_log
 
@@ -57,6 +65,10 @@ COMMIT;
 --sleep 1
 --let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --disable_query_log
+if ($wsrep_last_committed_before != $wsrep_last_committed_after)
+{
+	--echo "wsrep_last_committed_before:$wsrep_last_committed_before  wsrep_last_committed_after:$wsrep_last_committed_after"
+}
 --eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before AS wsrep_last_committed_diff;
 --enable_query_log
 

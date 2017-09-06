@@ -38,5 +38,4 @@ call mtr.add_suppression("Aborting");
 "Restart with wsrep_desync=1"
 "Restart with default options"
 # restart
-"grep --count "Can't desync a non-synced node""
-1
+include/assert_grep.inc [Can't desync a non-synced node]
