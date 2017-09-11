@@ -15,6 +15,9 @@ DROP TABLE IF EXISTS t1, t2;
 # The following FLUSH statements should be replicated
 #
 
+#
+# Test: FLUSH DES_KEY_FILE
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -27,6 +30,9 @@ FLUSH DES_KEY_FILE;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH HOSTS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -39,6 +45,9 @@ FLUSH HOSTS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH PRIVILEGES
+#
 --connection node_1
 SET SESSION wsrep_replicate_myisam = TRUE;
 INSERT INTO mysql.user VALUES('localhost','user1',PASSWORD('pass1'), 'Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','Y','','','','',0,0,0,0,'mysql_native_password','','N');
@@ -56,6 +65,9 @@ SET SESSION wsrep_replicate_myisam = FALSE;
 FLUSH PRIVILEGES;
 
 
+#
+# Test: FLUSH QUERY_CACHE
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -68,6 +80,9 @@ FLUSH QUERY CACHE;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH STATUS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -80,6 +95,9 @@ FLUSH STATUS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH USER_RESOURCES
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -92,6 +110,9 @@ FLUSH USER_RESOURCES;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH TABLES
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -104,10 +125,15 @@ FLUSH TABLES;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH TABLES
+#
 --connection node_1
 CREATE TABLE t2 (f1 INTEGER);
 
 --connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
+--source include/wait_condition.inc
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
@@ -119,6 +145,9 @@ FLUSH TABLES t2;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH ERROR_LOGS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -131,6 +160,9 @@ FLUSH ERROR LOGS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH SLOW_LOGS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -143,6 +175,9 @@ FLUSH SLOW LOGS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH GENERAL_LOGS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -155,6 +190,9 @@ FLUSH GENERAL LOGS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH ENGINE_LOGS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -167,6 +205,9 @@ FLUSH ENGINE LOGS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH RELAY_LOGS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -179,6 +220,12 @@ FLUSH RELAY LOGS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH CLIENT_STATISTICS
+#       FLUSH INDEX_STATISTICS
+#       FLUSH TABLE_STATISTICS
+#       FLUSH USER_STATISTICS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -194,6 +241,9 @@ FLUSH USER_STATISTICS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH THREAD_STATISTICS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -206,6 +256,9 @@ FLUSH THREAD_STATISTICS;
 --source include/wait_condition_with_debug.inc
 
 
+#
+# Test: FLUSH CHANGED_PAGE_BITMAPS
+#
 --connection node_2
 --let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
@@ -245,6 +298,11 @@ RESET QUERY CACHE;
 --connection node_2
 --sleep 5
 --disable_query_log
+--let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+if ($wsrep_last_committed_before != $wsrep_last_committed_after)
+{
+	--echo "before:$wsrep_last_committed_before after:$wsrep_last_committed_after expected:$wsrep_last_committed_before"
+}
 --eval SELECT VARIABLE_VALUE = $wsrep_last_committed_before AS wsrep_last_committed_diff FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'
 --enable_query_log
 
