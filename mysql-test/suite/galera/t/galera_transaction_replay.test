@@ -99,6 +99,11 @@ set session wsrep_sync_wait = 0;
 # Issue a conflicting update on node #2
 --connection node_2
 --echo #node_2
+
+# Wait for the first transaction to be applied
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1 WHERE c = 'b';
+--source include/wait_condition.inc
+
 insert into t1 values (3, 'a');
 
 # Wait for both transactions to be blocked

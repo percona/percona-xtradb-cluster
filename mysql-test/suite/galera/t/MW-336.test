@@ -10,6 +10,11 @@ CREATE TABLE t1 (f1 INTEGER) Engine=InnoDB;
 
 --connection node_1
 SET GLOBAL wsrep_slave_threads = 10;
+
+# ensure that the threads have actually started running
+--let $wait_condition = SELECT COUNT(*) = 11 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE USER = 'system user';
+--source include/wait_condition.inc
+
 SET GLOBAL wsrep_slave_threads = 1;
 
 --connection node_2

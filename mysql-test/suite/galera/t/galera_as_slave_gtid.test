@@ -39,7 +39,14 @@ SELECT LENGTH(@@global.gtid_executed) > 1;
 --eval SELECT '$gtid_executed_node1' = @@global.gtid_executed AS gtid_executed_equal;
 --enable_query_log
 
+
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM t1;
+--source include/wait_condition.inc
+
 SELECT COUNT(*) = 1 FROM t1;
 
 --disable_query_log
