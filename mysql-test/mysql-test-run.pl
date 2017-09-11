@@ -4175,20 +4175,60 @@ sub run_query {
 }
 
 
-sub sleep_until_returns_true($$$) {
-  my ($tinfo, $mysqld, $query)= @_;
+sub run_query_output {
+  my ($mysqld, $query, $outfile)= @_;
 
-  my $timeout = $opt_start_timeout;
+  my $args;
+  mtr_init_args(\$args);
+  mtr_add_arg($args, "--defaults-file=%s", $path_config_file);
+  mtr_add_arg($args, "--defaults-group-suffix=%s", $mysqld->after('mysqld'));
+
+  mtr_add_arg($args, "-s");
+  mtr_add_arg($args, "-e %s", $query);
+
+  my $res= My::SafeProcess->run
+    (
+     name          => "run_query_output -> ".$mysqld->name(),
+     path          => $exe_mysql,
+     args          => \$args,
+     output        => $outfile,
+     error         => $outfile
+    );
+
+  return $res
+}
+
+
+sub wait_wsrep_ready($$) {
+  my ($tinfo, $mysqld)= @_;
+
   my $sleeptime= 100; # Milliseconds
-  my $loops= ($timeout * 1000) / $sleeptime;
+  my $loops= ($opt_start_timeout * 1000) / $sleeptime;
 
-  for ( my $loop= 1; $loop <= $loops; $loop++ ) {
-    my $query_result = run_query($tinfo, $mysqld, $query);
-    if (run_query($tinfo, $mysqld, $query) == 1) {
+  my $name= $mysqld->name();
+  my $outfile= "$opt_vardir/tmp/$name.wsrep_ready";
+  my $query= "SELECT VARIABLE_VALUE
+              FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+              WHERE VARIABLE_NAME = 'wsrep_ready'";
+
+  for (my $loop= 1; $loop <= $loops; $loop++)
+  {
+    if (run_query_output($mysqld, $query, $outfile) != 0)
+    {
+      $tinfo->{logfile}= "WSREP error while trying to determine node state";
+      return 1;
+    }
+
+    if (mtr_grab_file($outfile) =~ /^ON/)
+    {
+      unlink($outfile);
       return 0;
     }
+
+    mtr_milli_sleep($sleeptime);
   }
-  
+
+  $tinfo->{logfile}= "WSREP did not transition to state READY";
   return 1;
 }
 
@@ -6528,10 +6568,11 @@ sub start_servers($) {
       return 1;
     }
 
-    if (have_wsrep()) {
-      if(sleep_until_returns_true($tinfo, $mysqld, 'SELECT @@wsrep_ready')) {
-         $tinfo->{logfile}= "WSREP did not transition to state READY";
-         return 1;
+    if (have_wsrep())
+    {
+      if (wait_wsrep_ready($tinfo, $mysqld))
+      {
+        return 1;
       }
     }
   }
