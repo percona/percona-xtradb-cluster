@@ -50,6 +50,13 @@ then
   fi
 fi
 
+if [ -f /usr/bin/xtrabackup-23 ]; then
+  echo ' You have percona-xtrabackup-23 installed.'
+  echo ' As it is recommended to use percona-xtrabackup-24 instead of percona-xtrabackup-23'
+  echo '   with Percona-XtraDB-Cluster-57 percona-xtrabackup-24 will be enabled.'
+  update-alternatives --set xtrabackup /usr/bin/xtrabackup-24
+fi
+
 case "$1" in
 	configure)
 

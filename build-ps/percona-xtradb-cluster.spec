@@ -413,7 +413,9 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
-Requires:	percona-xtrabackup-24 >= 2.4.4 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires(pre):	percona-xtrabackup-24 >= 2.4.4
+Requires(post):	percona-xtrabackup-24 >= 2.4.4
+Requires:	socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -1306,6 +1308,13 @@ if [ -f /etc/redhat-release ] \
   echo '       make load'
   echo
   echo
+fi
+
+if [ -f /usr/bin/xtrabackup-23 ]; then
+  echo ' You have percona-xtrabackup-23 installed.'
+  echo ' As it is recommended to use percona-xtrabackup-24 instead of percona-xtrabackup-23'
+  echo '   with Percona-XtraDB-Cluster-57 percona-xtrabackup-24 will be enabled.'
+  update-alternatives --set xtrabackup /usr/bin/xtrabackup-24
 fi
 
 if [ -x sbin/restorecon ] ; then
