@@ -148,6 +148,7 @@ Architecture: any
 Suggests: tinyca, netcat-openbsd, pv, qpress
 Pre-Depends: percona-xtradb-cluster-common-5.6 (>= ${source:Version}),
              adduser (>= 3.4.0),
+             percona-xtrabackup (>= 2.2.5),
              debconf
 Depends: percona-xtradb-cluster-client-5.6 (>= ${source:Version}),
          libdbi-perl,
@@ -159,7 +160,6 @@ Depends: percona-xtradb-cluster-client-5.6 (>= ${source:Version}),
          passwd,
          lsb-base (>= 3.0-10),
          percona-xtradb-cluster-galera-3 (= @@GALERA_VERSION@@),
-         percona-xtrabackup (>= 2.2.5),
          socat,
         lsof,
          rsync,

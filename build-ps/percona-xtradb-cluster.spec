@@ -339,7 +339,9 @@ Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = 1:%{mysql_version}-%{release}
 Requires:	Percona-XtraDB-Cluster-galera-3 = %{galera_version}
-Requires:	percona-xtrabackup >= 2.2.5 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires(pre):  percona-xtrabackup >= 2.2.5
+Requires(post): percona-xtrabackup >= 2.2.5
+Requires:	socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper)
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -1080,6 +1082,13 @@ fi
 
 if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
+fi
+
+if [ -f /usr/bin/xtrabackup-24 ]; then
+  echo ' You have percona-xtrabackup-24 installed.'
+  echo ' As it is recommended to use percona-xtrabackup instead of percona-xtrabackup-24'
+  echo '   with Percona-XtraDB-Cluster-56 percona-xtrabackup will be enabled.'
+  update-alternatives --set xtrabackup /usr/bin/xtrabackup-23
 fi
 
 # Was the server running before the upgrade? If so, restart the new one.
