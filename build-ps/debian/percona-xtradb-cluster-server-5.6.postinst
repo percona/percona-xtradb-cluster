@@ -18,6 +18,13 @@ invoke() {
   fi
 }
 
+if [ -f /usr/bin/xtrabackup-24 ]; then
+  echo ' You have percona-xtrabackup-24 installed.'
+  echo ' As it is recommended to use percona-xtrabackup instead of percona-xtrabackup-24'
+  echo '   with Percona-XtraDB-Cluster-56 percona-xtrabackup will be enabled.'
+  update-alternatives --set xtrabackup /usr/bin/xtrabackup-23
+fi
+
 MYSQL_BOOTSTRAP="/usr/sbin/mysqld --bootstrap --user=mysql --skip-grant-tables --skip-log-bin"
 
 test_mysql_access() {
