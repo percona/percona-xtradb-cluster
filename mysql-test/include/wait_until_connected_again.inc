@@ -3,7 +3,7 @@
 # server has been restored or timeout occurs
 --disable_result_log
 --disable_query_log
-let $counter= 5000;
+let $counter= 500;
 if ($VALGRIND_TEST) {
   let $counter= 3000;
 }
@@ -14,8 +14,11 @@ while ($mysql_errno)
   # Strangely enough, the server might return "Too many connections"
   # while being shutdown, thus 1040 is an "allowed" error
   # See BUG#36228
-  --error 0,1040,1205,1053,2002,2003,2006,2013,1045,ER_SECURE_TRANSPORT_REQUIRED
-  show session status;
+
+  # WSREP: allow error 1205, as SHOW STATUS may fail if
+  #        wsrep_sync_wait is enabled
+  --error 0,1040,1053,1205,2002,2003,2006,2013,1045,ER_SECURE_TRANSPORT_REQUIRED
+  show status;
   if ($mysql_errno == 1045){
     let mysql_errno=0;
   }
@@ -31,3 +34,9 @@ while ($mysql_errno)
 }
 --enable_query_log
 --enable_result_log
+
+# WSREP: SHOW STATUS queries are allowed even if wsrep
+#        is not ready. Make sure wsrep is ready before
+#        returning from this script
+
+--source include/wait_wsrep_ready.inc
