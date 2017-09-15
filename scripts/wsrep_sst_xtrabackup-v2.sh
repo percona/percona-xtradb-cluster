@@ -924,6 +924,7 @@ check_extra()
 # 2nd param: msg
 # 3rd param: tmt : timeout
 # 4th param: checkf : file check
+#   If this is -2, skip the file checks (but still check the return code)
 #   If this is -1, skip all error checking
 #   If this is 0, do nothing (no additional checks)
 #   If this is 1, check to see if the gtid info file exists
@@ -982,6 +983,11 @@ recv_data_from_donor_to_joiner()
         fi
     done
 
+    if [[ $checkf -eq -2 ]]; then
+        # no file checking
+        return
+    fi
+
     if [[ $checkf -eq 1 && ! -r "${XB_GTID_INFO_FILE_PATH}" ]]; then
         # this message should cause joiner to abort
         wsrep_log_error "******************* FATAL ERROR ********************** "
@@ -1001,12 +1007,6 @@ recv_data_from_donor_to_joiner()
         wsrep_log_error "****************************************************** "
         exit 32
     fi
-
-    if [[ $checkf -eq 100 && ! -r "${dir}/${FILE_TO_RECEIVE}" ]]; then
-        wsrep_log_error "Did not receive expected file from donor: '${FILE_TO_RECEIVE}'"
-        exit 32
-    fi
-
 }
 
 #
@@ -1544,15 +1544,36 @@ then
     STATDIR=$(mktemp -p "${tmpdirbase}" -dt joiner_XXXXXXXX)
     sst_file_info_path="${STATDIR}/${SST_INFO_FILE}"
 
-    FILE_TO_RECEIVE="$SST_INFO_FILE"
-    recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-sst-info" $stimeout 100
+    recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-sst-info" $stimeout -2
 
-    # Extract information from the sst-info file that was just received
-    XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
-    parse_sst_info "$sst_file_info_path" sst galera-gtid "" > "$XB_GTID_INFO_FILE_PATH"
+    #
+    # Determine which file was received, the GTID or the SST_INFO
+    #
+    if [[ -r "${STATDIR}/${SST_INFO_FILE}" ]]; then
+        #
+        # Extract information from the sst-info file that was just received
+        #
+        XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
+        parse_sst_info "$sst_file_info_path" sst galera-gtid "" > "$XB_GTID_INFO_FILE_PATH"
 
-    DONOR_BINLOGNAME=$(parse_sst_info "$sst_file_info_path" sst binlog-name "")
-    DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
+        DONOR_BINLOGNAME=$(parse_sst_info "$sst_file_info_path" sst binlog-name "")
+        DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
+
+    elif [[ -r "${STATDIR}/${XB_GTID_INFO_FILE}" ]]; then
+        #
+        # For compatibility, we have received the gtid file
+        #
+        XB_GTID_INFO_FILE_PATH="${STATDIR}/${XB_GTID_INFO_FILE}"
+
+        DONOR_BINLOGNAME=""
+        DONOR_MYSQL_VERSION=""
+
+    else
+        wsrep_log_error "******************* FATAL ERROR ********************** "
+        wsrep_log_error "Did not receive expected file from donor: '${SST_INFO_FILE}' or '${XB_GTID_INFO_FILE}'"
+        wsrep_log_error "****************************************************** "
+        exit 32
+    fi
 
     if [[ -n "$DONOR_MYSQL_VERSION" ]]; then
         local_version_str=""
