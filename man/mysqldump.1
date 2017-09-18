@@ -2,12 +2,12 @@
 .\"     Title: \fBmysqldump\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 04/27/2017
+.\"      Date: 06/03/2017
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.5
 .\"  Language: English
 .\"
-.TH "\FBMYSQLDUMP\FR" "1" "04/27/2017" "MySQL 5\&.5" "MySQL Database System"
+.TH "\FBMYSQLDUMP\FR" "1" "06/03/2017" "MySQL 5\&.5" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1194,7 +1194,7 @@ prints the error message, but it also writes an SQL comment containing the view 
 Enable the
 mysql_clear_password
 cleartext authentication plugin\&. (See
-Section\ \&6.5.1.5, \(lqThe Cleartext Client-Side Authentication Plugin\(rq\&.)
+Section\ \&6.5.1.3, \(lqClient-Side Cleartext Pluggable Authentication\(rq\&.)
 .sp
 This option was added in MySQL 5\&.5\&.47\&.
 .RE
@@ -2147,9 +2147,9 @@ This option should be used only when
 \fBmysqldump\fR
 is run on the same machine as the
 \fBmysqld\fR
-server\&. Because the server creates files
+server\&. Because the server creates
 *\&.txt
-file in the directory that you specify, the directory must be writable by the server and the MySQL account that you use must have the
+files in the directory that you specify, the directory must be writable by the server and the MySQL account that you use must have the
 FILE
 privilege\&. Because
 \fBmysqldump\fR
