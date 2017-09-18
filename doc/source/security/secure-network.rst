@@ -24,7 +24,7 @@ By default, |PXC| nodes use the following ports:
   and :term:`SST` (State Snapshot Transfer) via ``mysqldump``.
 
 * 4444 is used for :term:`SST` via ``rsync``
-  and :ref:`Percona XtraBackup <xtrabackup-sst>`.
+  and :ref:`Percona XtraBackup <xtrabackup_sst>`.
 
 * 4567 is used for write-set replication traffic (over TCP)
   and multicast replication (over TCP and UDP).
