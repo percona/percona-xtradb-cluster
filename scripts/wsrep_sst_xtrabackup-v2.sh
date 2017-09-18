@@ -763,11 +763,6 @@ recv_joiner()
         wsrep_log_info "$(ls -l ${dir}/*)"
         exit 32
     fi
-
-    if [[ $checkf -eq 100 && ! -r "${dir}/${FILE_TO_RECEIVE}" ]]; then
-        wsrep_log_error "Did not receive expected file from donor: '${FILE_TO_RECEIVE}'"
-        exit 32
-    fi
 }
 
 
@@ -1177,15 +1172,34 @@ then
 
     sst_file_info_path="${STATDIR}/${SST_INFO_FILE}"
 
-    FILE_TO_RECEIVE="$SST_INFO_FILE"
-    recv_joiner $STATDIR "${stagemsg}-sst-info" $stimeout 100
+    recv_joiner $STATDIR "${stagemsg}-sst-info" $stimeout -1
 
-    # Extract information from the sst-info file that was just received
-    MAGIC_FILE="${STATDIR}/${INFO_FILE}"
-    echo $(parse_sst_info "$sst_file_info_path" sst galera-gtid "") > "$MAGIC_FILE"
+    #
+    # Determine which file was received, the GTID or the SST_INFO
+    #
+    if [[ -r "${STATDIR}/${SST_INFO_FILE}" ]]; then
+        #
+        # Extract information from the sst-info file that was just received
+        #
+        MAGIC_FILE="${STATDIR}/${INFO_FILE}"
+        echo $(parse_sst_info "$sst_file_info_path" sst galera-gtid "") > "$MAGIC_FILE"
 
-    DONOR_BINLOGNAME=$(parse_sst_info "$sst_file_info_path" sst binlog-name "")
-    DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
+        DONOR_BINLOGNAME=$(parse_sst_info "$sst_file_info_path" sst binlog-name "")
+        DONOR_MYSQL_VERSION=$(parse_sst_info "$sst_file_info_path" sst mysql-version "")
+
+    elif [[ -r "${STATDIR}/${INFO_FILE}" ]]; then
+        #
+        # For compatibility, we have received the gtid file
+        #
+        MAGIC_FILE="${STATDIR}/${INFO_FILE}"
+
+        DONOR_BINLOGNAME=""
+        DONOR_MYSQL_VERSION=""
+
+    else
+        wsrep_log_error "Did not receive expected file from donor: '${SST_INFO_FILE}' or '${INFO_FILE}'"
+        exit 32
+    fi
 
     if [[ -n "$DONOR_MYSQL_VERSION" ]]; then
         local_version_str=""
