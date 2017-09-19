@@ -65,33 +65,42 @@ Automatic Configuration
 =======================
 
 The ``proxysql`` package from Percona includes the ``proxysql-admin`` tool
-for configuring |PXC| nodes with ProxySQL::
+for configuring |PXC| nodes with ProxySQL.
+
+.. note:: The ``proxysql-admin`` tool can only be used
+   for *initial* ProxySQL configuration.
+
+To view usage information, run ``proxysql-admin`` without any options::
 
  Usage: proxysql-admin [ options ]
 
  Options:
-  --config-file                      Read login credentials from a configuration file (overrides any login credentials specified on the command line)
-  --quick-demo                       Setup a quick demo with no authentication
-  --proxysql-username=user_name      Username for connecting to the ProxySQL service
-  --proxysql-password[=password]     Password for connecting to the ProxySQL service
-  --proxysql-port=port_num           Port Nr. for connecting to the ProxySQL service
-  --proxysql-hostname=host_name      Hostname for connecting to the ProxySQL service
-  --cluster-username=user_name       Username for connecting to the Percona XtraDB Cluster node
-  --cluster-password[=password]      Password for connecting to the Percona XtraDB Cluster node
-  --cluster-port=port_num            Port Nr. for connecting to the Percona XtraDB Cluster node
-  --cluster-hostname=host_name       Hostname for connecting to the Percona XtraDB Cluster node
-  --cluster-app-username=user_name   Application username for connecting to the Percona XtraDB Cluster node
-  --cluster-app-password[=password]  Application password for connecting to the Percona XtraDB Cluster node
-  --monitor-username=user_name       Username for monitoring Percona XtraDB Cluster nodes through ProxySQL
-  --monitor-password[=password]      Password for monitoring Percona XtraDB Cluster nodes through ProxySQL
-  --enable, -e                       Auto-configure Percona XtraDB Cluster nodes into ProxySQL
-  --disable, -d                      Remove any Percona XtraDB Cluster configurations from ProxySQL
-  --node-check-interval              Interval for monitoring node checker script (in milliseconds)
-  --mode                             ProxySQL read/write configuration mode, currently supporting: 'loadbal' and 'singlewrite' (the default) modes
-  --write-node                       Writer node to accept write statments. This option is supported only when using --mode=singlewrite
-  --adduser                          Adds the Percona XtraDB Cluster application user to the ProxySQL database
-  --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL (deletes ProxySQL users not in MySQL)
-  --version, -v                      Print version info
+   --config-file                      Read login credentials from a configuration file (overrides any login credentials specified on the command line)
+   --quick-demo                       Setup a quick demo with no authentication
+   --proxysql-username=user_name      Username for connecting to the ProxySQL service
+   --proxysql-password[=password]     Password for connecting to the ProxySQL service
+   --proxysql-port=port_num           Port Nr. for connecting to the ProxySQL service
+   --proxysql-hostname=host_name      Hostname for connecting to the ProxySQL service
+   --cluster-username=user_name       Username for connecting to the Percona XtraDB Cluster node
+   --cluster-password[=password]      Password for connecting to the Percona XtraDB Cluster node
+   --cluster-port=port_num            Port Nr. for connecting to the Percona XtraDB Cluster node
+   --cluster-hostname=host_name       Hostname for connecting to the Percona XtraDB Cluster node
+   --cluster-app-username=user_name   Application username for connecting to the Percona XtraDB Cluster node
+   --cluster-app-password[=password]  Application password for connecting to the Percona XtraDB Cluster node
+   --monitor-username=user_name       Username for monitoring Percona XtraDB Cluster nodes through ProxySQL
+   --monitor-password[=password]      Password for monitoring Percona XtraDB Cluster nodes through ProxySQL
+   --enable, -e                       Auto-configure Percona XtraDB Cluster nodes into ProxySQL
+   --disable, -d                      Remove any Percona XtraDB Cluster configurations from ProxySQL
+   --node-check-interval=3000         Interval for monitoring node checker script (in milliseconds)
+   --mode=[loadbal|singlewrite]       ProxySQL read/write configuration mode, currently supporting: 'loadbal' and 'singlewrite' (the default) modes
+   --write-node=host_name:port        Writer node to accept write statments. This option is supported only when using --mode=singlewrite
+                                      Can accept comma delimited list with the first listed being the highest priority.
+   --include-slaves=host_name:port    Add specified slave node(s) to ProxySQL, these nodes will go into the reader hostgroup and will only be put into
+                                      the writer hostgroup if all cluster nodes are down.  Slaves must be read only.  Can accept comma delimited list.
+                                      If this is used make sure 'read_only=1' is in the slave's my.cnf
+   --adduser                          Adds the Percona XtraDB Cluster application user to the ProxySQL database
+   --syncusers                        Sync user accounts currently configured in MySQL to ProxySQL (deletes ProxySQL users not in MySQL)
+   --version, -v                      Print version info
 
 .. note:: Before using the ``proxysql-admin`` tool,
    ensure that ProxySQL and |PXC| nodes you want to add are running. For
@@ -251,68 +260,87 @@ The following extra options can be used:
 
   Set the read/write mode for |PXC| nodes in ProxySQL database,
   based on the hostgroup.
-  Supported modes are ``loadbal`` and ``singlewrite``. ``singlewrite`` is the
-  default mode, and it will accept writes only one single node (based on the
-  info you provide in ``--write-node``). Remaining nodes will accept read
-  statements. The ``loadbal`` mode on the other hand is a load balanced set of
-  evenly weighted read/write nodes.
+  Supported modes are ``loadbal`` and ``singlewrite``.
 
-  * ``singlewrite`` mode setup:
+  * ``singlewrite`` is the default mode,
+    it will accept writes only on one single node
+    (based on the info you provide in ``--write-node``).
+    Remaining nodes will accept only read statements.
 
-   .. code-block:: bash
+    Use the ``--write-node`` option to control priority for hosts
+    to be the writer at any given time.
+    When used, it creates a configuration file,
+    which is by default ``/var/lib/proxysql/host_priority.conf``
+    (configurable in ``proxysql-admin.cnf``).
+    Servers can be separated by commas, for example::
+
+     10.0.0.51:3306, 10.0.0.52:3306
+
+    In the previous example, ``10.0.0.51:3306`` will be in the writer hostgroup
+    if it is ONLINE.
+    If it is OFFLINE, then ``10.0.0.52:3306`` will go into the writer hostgroup.
+    And if that node also goes down, then one of the remaining nodes
+    will be randomly chosen for the writer hostgroup.
+    The configuration file is deleted when ``--disable`` is used.
+
+    ``singlewrite`` mode setup:
+
+    .. code-block:: bash
  
-     $ sudo grep "MODE" /etc/proxysql-admin.cnf
-     export MODE="singlewrite"
-     $ sudo proxysql-admin --config-file=/etc/proxysql-admin.cnf --write-node=127.0.0.1:25000 --enable
-     ProxySQL read/write configuration mode is singlewrite
-     [..]
-     ProxySQL configuration completed!
+       $ sudo grep "MODE" /etc/proxysql-admin.cnf
+       export MODE="singlewrite"
+       $ sudo proxysql-admin --config-file=/etc/proxysql-admin.cnf --write-node=127.0.0.1:25000 --enable
+       ProxySQL read/write configuration mode is singlewrite
+       [..]
+       ProxySQL configuration completed!
   
-   To check the configuration you can run:
+    To check the configuration you can run:
 
-   .. code-block:: text
+    .. code-block:: text
 
-     mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
-     +--------------+-----------+-------+--------+---------+
-     | hostgroup_id | hostname  | port  | status | comment |
-     +--------------+-----------+-------+--------+---------+
-     | 11           | 127.0.0.1 | 25400 | ONLINE | READ    |
-     | 10           | 127.0.0.1 | 25000 | ONLINE | WRITE   |
-     | 11           | 127.0.0.1 | 25100 | ONLINE | READ    |
-     | 11           | 127.0.0.1 | 25200 | ONLINE | READ    |
-     | 11           | 127.0.0.1 | 25300 | ONLINE | READ    |
-     +--------------+-----------+-------+--------+---------+
-     5 rows in set (0.00 sec)
+       mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
+       +--------------+-----------+-------+--------+---------+
+       | hostgroup_id | hostname  | port  | status | comment |
+       +--------------+-----------+-------+--------+---------+
+       | 11           | 127.0.0.1 | 25400 | ONLINE | READ    |
+       | 10           | 127.0.0.1 | 25000 | ONLINE | WRITE   |
+       | 11           | 127.0.0.1 | 25100 | ONLINE | READ    |
+       | 11           | 127.0.0.1 | 25200 | ONLINE | READ    |
+       | 11           | 127.0.0.1 | 25300 | ONLINE | READ    |
+       +--------------+-----------+-------+--------+---------+
+       5 rows in set (0.00 sec)
 
-  * ``loadbal`` mode setup:
+  * The ``loadbal`` mode uses a set of evenly weighted read/write nodes.
 
-   .. code-block:: bash
+    ``loadbal`` mode setup:
 
-     $ sudo proxysql-admin --config-file=/etc/proxysql-admin.cnf --mode=loadbal --enable
+    .. code-block:: bash
 
-     This script will assist with configuring ProxySQL (currently only Percona XtraDB cluster in combination with ProxySQL is supported)
+       $ sudo proxysql-admin --config-file=/etc/proxysql-admin.cnf --mode=loadbal --enable
 
-     ProxySQL read/write configuration mode is loadbal
-     [..]
-     ProxySQL has been successfully configured to use with Percona XtraDB Cluster
+       This script will assist with configuring ProxySQL (currently only Percona XtraDB cluster in combination with ProxySQL is supported)
 
-     You can use the following login credentials to connect your application through ProxySQL
+       ProxySQL read/write configuration mode is loadbal
+       [..]
+       ProxySQL has been successfully configured to use with Percona XtraDB Cluster
 
-     mysql --user=proxysql_user --password=*****  --host=127.0.0.1 --port=6033 --protocol=tcp 
+       You can use the following login credentials to connect your application through ProxySQL
 
-   .. code-block:: text
+       mysql --user=proxysql_user --password=*****  --host=127.0.0.1 --port=6033 --protocol=tcp 
 
-     mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
-     +--------------+-----------+-------+--------+-----------+
-     | hostgroup_id | hostname  | port  | status | comment   |
-     +--------------+-----------+-------+--------+-----------+
-     | 10           | 127.0.0.1 | 25400 | ONLINE | READWRITE |
-     | 10           | 127.0.0.1 | 25000 | ONLINE | READWRITE |
-     | 10           | 127.0.0.1 | 25100 | ONLINE | READWRITE |
-     | 10           | 127.0.0.1 | 25200 | ONLINE | READWRITE |
-     | 10           | 127.0.0.1 | 25300 | ONLINE | READWRITE |
-     +--------------+-----------+-------+--------+-----------+
-     5 rows in set (0.01 sec)
+    .. code-block:: text
+
+       mysql> SELECT hostgroup_id,hostname,port,status,comment FROM mysql_servers;
+       +--------------+-----------+-------+--------+-----------+
+       | hostgroup_id | hostname  | port  | status | comment   |
+       +--------------+-----------+-------+--------+-----------+
+       | 10           | 127.0.0.1 | 25400 | ONLINE | READWRITE |
+       | 10           | 127.0.0.1 | 25000 | ONLINE | READWRITE |
+       | 10           | 127.0.0.1 | 25100 | ONLINE | READWRITE |
+       | 10           | 127.0.0.1 | 25200 | ONLINE | READWRITE |
+       | 10           | 127.0.0.1 | 25300 | ONLINE | READWRITE |
+       +--------------+-----------+-------+--------+-----------+
+       5 rows in set (0.01 sec)
 
 * ``--quick-demo``
 
