@@ -343,6 +343,43 @@ The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
   (if not specified under ``[sst]``)
 * ``[mysqld]`` is used if it is not specified in either of the above
 
+.. option:: wsrep_debug
+
+   :Version: Introduced in 5.7.19-29.22
+   :Default: ``OFF``
+
+Specifies whether additional debugging output for the database server error log
+should be enabled.
+Disabled by default.
+
+This option can be set in the following :file:`my.cnf` groups:
+
+* Under ``[mysqld]`` it enables debug logging for ``mysqld`` and the SST script
+* Under ``[sst]`` it enables debug logging for the SST script only
+
+.. option:: encrypt_threads
+
+   :Version: Introduced in 5.7.19-29.22
+   :Default: ``4``
+
+Specifies the number of threads that XtraBackup should use for encrypting data
+(when ``encrypt=1``).
+The value is passed using the ``--encrypt-threads`` option in XtraBackup.
+
+This option affects only SST with XtraBackup
+and should be specified under the ``[sst]`` group.
+
+.. option:: backup_threads
+
+   :Version: Introduced in 5.7.19-29.22
+   :Default: ``4``
+
+Specifies the number of threads that XtraBackup should use to create backups.
+See the ``--parallel`` option in XtraBackup.
+
+This option affects only SST with XtraBackup
+and should be specified under the ``[sst]`` group.
+
 XtraBackup SST Dependencies
 ---------------------------
 

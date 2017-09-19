@@ -41,13 +41,13 @@ New Features
 
 * :jirabug:`PXC-803`: Added support for new features in |PXB| 2.4.7:
 
-  * ``wsrep_debug`` enables debug logging
+  * :option:`wsrep_debug` enables debug logging
 
-  * ``encrypt-threads`` specifies the number of threads
+  * :option:`encrypt_threads` specifies the number of threads
     that XtraBackup should use for encrypting data (when ``encrypt=1``).
     This value is passed using the ``--encrypt-threads`` option in XtraBackup.
 
-  * ``backup-threads`` specifies the number of threads
+  * :option:`backup-threads` specifies the number of threads
     that XtraBackup should use to create backups.
     See the ``--parallel`` option in XtraBackup.
 
