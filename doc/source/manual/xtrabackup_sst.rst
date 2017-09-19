@@ -348,10 +348,7 @@ The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
   (if not specified under ``[sst]``)
 * ``[mysqld]`` is used if it is not specified in either of the above
 
-.. option:: wsrep_debug
-
-   :Version: Introduced in 5.7.19-29.22
-   :Default: ``OFF``
+:variable:`wsrep_debug`
 
 Specifies whether additional debugging output for the database server error log
 should be enabled.

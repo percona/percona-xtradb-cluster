@@ -47,7 +47,7 @@ New Features
     that XtraBackup should use for encrypting data (when ``encrypt=1``).
     This value is passed using the ``--encrypt-threads`` option in XtraBackup.
 
-  * :option:`backup-threads` specifies the number of threads
+  * :option:`backup_threads` specifies the number of threads
     that XtraBackup should use to create backups.
     See the ``--parallel`` option in XtraBackup.
 

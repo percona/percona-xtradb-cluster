@@ -116,22 +116,35 @@ instead of specifying it on the command line.
 
 By default, the configuration file contains the following::
 
- #proxysql-admin credentials
+ # proxysql admin interface credentials.
  export PROXYSQL_USERNAME="admin"
  export PROXYSQL_PASSWORD="admin"
  export PROXYSQL_HOSTNAME="localhost"
  export PROXYSQL_PORT="6032"
+ 
+ # PXC admin credentials for connecting to pxc-cluster-node.
  export CLUSTER_USERNAME="admin"
  export CLUSTER_PASSWORD="admin"
  export CLUSTER_HOSTNAME="localhost"
  export CLUSTER_PORT="3306"
+ 
+ # proxysql monitoring user. proxysql admin script will create this user in pxc to monitor pxc-nodes.
  export MONITOR_USERNAME="monitor"
  export MONITOR_PASSWORD="monit0r"
+ 
+ # Application user to connect to pxc-node through proxysql
  export CLUSTER_APP_USERNAME="proxysql_user"
  export CLUSTER_APP_PASSWORD="passw0rd"
+ 
+ # ProxySQL read/write hostgroup 
  export WRITE_HOSTGROUP_ID="10"
  export READ_HOSTGROUP_ID="11"
+ 
+ # ProxySQL read/write configuration mode.
  export MODE="singlewrite"
+ 
+ # ProxySQL Cluster Node Priority File
+ export HOST_PRIORITY_FILE="/var/lib/proxysql/host_priority.conf"
 
 .. note:: It is recommended to
    :ref:`change default ProxySQL credentials <default-credentials>`
@@ -174,32 +187,39 @@ with all necessary connection and authentication information:
 .. code-block:: bash
 
    $ proxysql-admin --config-file=/etc/proxysql-admin.cnf --enable
-
+   
    This script will assist with configuring ProxySQL (currently only Percona XtraDB cluster in combination with ProxySQL is supported)
-
+   
    ProxySQL read/write configuration mode is singlewrite
-
+   
    Configuring ProxySQL monitoring user..
    ProxySQL monitor username as per command line/config-file is monitor
-
+   
    User 'monitor'@'127.%' has been added with USAGE privilege
-
+   
    Configuring the Percona XtraDB Cluster application user to connect through ProxySQL
    Percona XtraDB Cluster application username as per command line/config-file is proxysql_user
-
+   
    Percona XtraDB Cluster application user 'proxysql_user'@'127.%' has been added with the USAGE privilege, please make sure to the grant appropriate privileges
-
+   
    Adding the Percona XtraDB Cluster server nodes to ProxySQL
-
-   You have not given the writer node info through the command line or in the config-file. Please enter the writer-node info (eg : 127.0.0.1:3306): 127.0.0.1:25000
-
+   
+   Configuring singlewrite mode with the following nodes designated as priority order:
+   
+   Write node info
+   +-----------+--------------+-------+---------+---------+
+   | hostname | hostgroup_id | port | weight | comment |
+   +-----------+--------------+-------+---------+---------+
+   | 127.0.0.1 | 10 | 25000 | 1000000 | WRITE |
+   +-----------+--------------+-------+---------+---------+
+   
    ProxySQL configuration completed!
-
+   
    ProxySQL has been successfully configured to use with Percona XtraDB Cluster
-
+   
    You can use the following login credentials to connect your application through ProxySQL
-
-   mysql --user=proxysql_user --password=*****  --host=127.0.0.1 --port=6033 --protocol=tcp 
+   
+   mysql --user=proxysql_user -p --host=localhost --port=6033 --protocol=tcp
 
 Disabling ProxySQL
 ------------------

@@ -274,6 +274,11 @@ By default, it is disabled.
 This variable can be used when trying to diagnose problems
 or when submitting a bug.
 
+You can set ``wsrep_debug`` in the following :file:`my.cnf` groups:
+
+* Under ``[mysqld]`` it enables debug logging for ``mysqld`` and the SST script
+* Under ``[sst]`` it enables debug logging for the SST script only
+
 .. note:: Do not enable debugging in production environments,
    because it logs authentication info (that is, passwords).
 
