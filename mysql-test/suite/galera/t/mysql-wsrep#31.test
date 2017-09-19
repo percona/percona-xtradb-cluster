@@ -15,7 +15,7 @@ CREATE DATABASE db;
 --source include/wait_condition.inc
 
 --let $expected_position_uuid = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_uuid'`
---let $expected_position_seqno = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--let $expected_position_seqno = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_last_applied'`
 
 --let $expected_position = $expected_position_uuid:$expected_position_seqno
 

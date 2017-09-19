@@ -1,0 +1,108 @@
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
+SET AUTOCOMMIT=ON;
+#
+# DML test (local)
+#
+# Node 1 : before insert
+applied = committed
+1
+# Node 1 : block the commit, perform the insert
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.interim_commit.after_commit_leave';
+INSERT INTO t1 VALUES (1, 'a');;
+# Node 1a : wait until the commit is blocked
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+# Node 1 : after insert (but stuck in commit)
+applied+1 = committed
+1
+# Node 1a : unblock the commit
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.interim_commit.after_commit_leave';
+SELECT * FROM t1;
+f1	f2
+1	a
+# Node 1 : after insert (after commit)
+applied = committed
+1
+#
+# DML test (remote)
+#
+# Node 2 : before insert
+applied = committed
+1
+# Node 2 : block the commit
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.applier_interim_commit.after_commit_leave';
+# Node 1 : perform the insert
+INSERT INTO t1 VALUES (2, 'b');
+# Node 2a : wait until the commit is blocked
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+# Node 2a : after insert (but stuck in commit)
+applied+1 = committed
+1
+# Node 2a : unblock the commit
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.applier_interim_commit.after_commit_leave';
+SELECT * FROM t1;
+f1	f2
+1	a
+2	b
+# Node 2 : after insert (after commit)
+applied = committed
+1
+#
+# DDL test (local)
+#
+# Node 1 : before alter
+applied = committed
+1
+# Node 1 : block the commit, perform the alter
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.to_isolation_end.after_commit_leave';
+ALTER TABLE t1 ADD COLUMN f3 LONGBLOB;;
+# Node 1a : wait until the commit is blocked
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+# Node 1 : after alter (but stuck in commit)
+applied+1 = committed
+1
+# Node 1a : unblock the commit
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.to_isolation_end.after_commit_leave';
+SELECT * FROM t1;
+f1	f2	f3
+1	a	NULL
+2	b	NULL
+# Node 1 : after alter (after commit)
+applied = committed
+1
+#
+# DDL test (remote)
+#
+# Node 2 : before alter
+applied = committed
+1
+# Node 2 : block the commit
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.apply_trx.after_commit_leave';
+# Node 1 : perform the alter
+ALTER TABLE t1 ADD COLUMN f4 LONGBLOB;
+# Node 2a : wait until the commit is blocked
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+# Node 2a : after insert (but stuck in commit)
+applied+1 = committed
+1
+# Node 2a : unblock the commit
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.apply_trx.after_commit_leave';
+SELECT * FROM t1;
+f1	f2	f3	f4
+1	a	NULL	NULL
+2	b	NULL	NULL
+# Node 2 : after alter (after commit)
+applied = committed
+1
+DROP TABLE t1;

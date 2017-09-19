@@ -38,7 +38,7 @@ INSERT INTO t1 VALUES (13);
 
 --echo Shutting down server ...
 --source include/shutdown_mysqld.inc
---sleep 5
+--sleep 10
 
 --connection node_1
 INSERT INTO t1 VALUES (11);
@@ -65,7 +65,7 @@ INSERT INTO t1 VALUES (22);
 
 --echo Shutting down server ...
 --source include/shutdown_mysqld.inc
---sleep 5
+--sleep 10
 
 --connection node_1
 INSERT INTO t1 VALUES (21);
@@ -92,7 +92,7 @@ INSERT INTO t1 VALUES (34);
 
 --echo Shutting down server ...
 --source include/shutdown_mysqld.inc
---sleep 5
+--sleep 10
 
 --connection node_1
 INSERT INTO t1 VALUES (31);
