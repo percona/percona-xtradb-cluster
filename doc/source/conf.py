@@ -120,6 +120,8 @@ rst_prolog = '''
 
 .. |LSN|  replace:: :term:`LSN`
 
+.. |PXB| replace:: Percona XtraBackup
+
 .. |XtraBackup|  replace:: *XtraBackup*
 
 .. |Percona XtraBackup|  replace:: *Percona XtraBackup*
