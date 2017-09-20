@@ -55,9 +55,12 @@ using the corresponding tool for your system:
 
 If you want to build and run |PXC| from source, see :ref:`compile`.
 
+If you want to run |PXC| using Docker, see :ref:`docker`.
+
 .. toctree::
    :hidden:
 
    Install Using apt <installation/apt_repo>
    Install Using yum <installation/yum_repo>
    Compile from Source <installation/compile>
+   Run in a Docker container <installation/docker>

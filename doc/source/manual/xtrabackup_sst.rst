@@ -195,6 +195,11 @@ For more information about socket options, see
 .. note:: You can also enable SSL based compression with :option:`sockopt`.
    This can be used instead of the Percona XtraBackup ``compress`` option.
 
+.. option:: ncsockopt
+
+Used to specify socket options for the ``netcat`` transfer format
+(``transferfmt=nc``).
+
 .. option:: progress
 
    :Values: ``1`` or path to file
@@ -356,6 +361,17 @@ The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
 
 XtraBackup SST Dependencies
 ---------------------------
+
+Although any current version of |PXB| *may* be compatible
+with any current version of |PXC|,
+there are certain differences that may break compatibility.
+As a result, starting from |PXC| 5.6
+every version is tested against a specific |PXB| version only:
+
+* |PXC| 5.6 requires |PXB| 2.3
+* |PXC| 5.7 requires |PXB| 2.4
+
+Other combinations are not guaranteed to work.
 
 The following are optional dependencies of |Percona XtraDB Cluster| introduced
 by :file:`wsrep_sst_xtrabackup` (except for obvious and direct dependencies):
