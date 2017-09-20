@@ -195,6 +195,11 @@ For more information about socket options, see
 .. note:: You can also enable SSL based compression with :option:`sockopt`.
    This can be used instead of the Percona XtraBackup ``compress`` option.
 
+.. option:: ncsockopt
+
+Used to specify socket options for the ``netcat`` transfer format
+(``transferfmt=nc``).
+
 .. option:: progress
 
    :Values: ``1`` or path to file
