@@ -12,9 +12,9 @@ Group=mysql
 Type=forking
 TimeoutSec=0
 PermissionsStartOnly=true
-ExecStartPre=/usr/share/mysql/mysql-systemd-start pre
-ExecStart=/usr/sbin/mysqld --daemonize --pid-file=/var/run/mysqld/mysqld.pid $MYSQLD_OPTS $MYSQLD_RECOVER_START
-ExecStartPost=/usr/share/mysql/mysql-systemd-start post
+ExecStart=/etc/init.d/mysql start
+ExecStop=/etc/init.d/mysql stop
+ExecReload=/etc/init.d/mysql reload
 EnvironmentFile=-/etc/sysconfig/mysql
 LimitNOFILE = 5000
 Restart=on-failure
