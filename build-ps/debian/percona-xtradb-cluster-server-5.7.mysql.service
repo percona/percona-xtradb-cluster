@@ -12,6 +12,7 @@ Group=mysql
 Type=forking
 TimeoutSec=0
 PermissionsStartOnly=true
+ExecStartPre=/usr/share/mysql/mysql-systemd-start pre
 ExecStart=/etc/init.d/mysql start
 ExecStop=/etc/init.d/mysql stop
 ExecReload=/etc/init.d/mysql reload
