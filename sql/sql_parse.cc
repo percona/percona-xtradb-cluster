@@ -1132,15 +1132,16 @@ bool do_command(THD *thd)
                      command_name[command].str));
 
 #ifdef WITH_WSREP
-  if (WSREP(thd)) {
+  if (WSREP(thd))
+  {
     /*
      * bail out if DB snapshot has not been installed. We however,
      * allow queries "SET" and "SHOW", they are trapped later in execute_command
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
+    if (!thd->wsrep_applier &&
         (!wsrep_ready_get() || wsrep_reject_queries != WSREP_REJECT_NONE) &&
-        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
-    ) {
+        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0)
+    {
       my_message(ER_UNKNOWN_COM_ERROR,
                  "WSREP has not yet prepared node for application use", MYF(0));
       thd->protocol->end_statement();
@@ -2842,7 +2843,8 @@ mysql_execute_command(THD *thd)
   Opt_trace_object trace_command(&thd->opt_trace);
   Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
 #ifdef WITH_WSREP
-  if (WSREP(thd)) {
+  if (WSREP(thd))
+  {
     /*
       change LOCK TABLE WRITE to transaction
     */
@@ -2871,8 +2873,7 @@ mysql_execute_command(THD *thd)
      * allow SET and SHOW queries and reads from information schema
      * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on                                            &&
-        !thd->wsrep_applier                                                &&
+    if (!thd->wsrep_applier                                                &&
         !(wsrep_ready_get() && wsrep_reject_queries == WSREP_REJECT_NONE)  &&
         !(thd->variables.wsrep_dirty_reads &&
           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
