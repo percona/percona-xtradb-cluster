@@ -1022,6 +1022,12 @@ fi
 # of our RPMs in the same version family.
 
 installed=`rpm -qf $(which mysqld 2>/dev/null) 2> /dev/null`
+version=`rpm -q --queryformat='%{VERSION}' "$installed" 2>&1`
+need_version='5.7.19'
+UPDATE_REQUIRES='false'
+if [[ $version < $need_version ]]; then
+  UPDATE_REQUIRES='true'
+fi
 if [ $? -eq 0 -a -n "$installed" ]; then
   vendor=`rpm -q --queryformat='%{VENDOR}' "$installed" 2>&1`
   version=`rpm -q --queryformat='%{VERSION}' "$installed" 2>&1`
@@ -1122,8 +1128,10 @@ if [ -d $mysql_datadir ] ; then
         ps -fp `cat $PID_FILE_PATT`                >> $STATUS_FILE
         echo                                       >> $STATUS_FILE
         echo "SERVER_TO_START=$SERVER_TO_START"    >> $STATUS_FILE
+	echo "UPDATE_REQUIRES=$UPDATE_REQUIRES"    >> $STATUS_FILE
     else
         # Take a note we checked it ...
+	echo "UPDATE_REQUIRES=$UPDATE_REQUIRES"    >> $STATUS_FILE
         echo "PID file:"                           >> $STATUS_FILE
         ls -l   $PID_FILE_PATT                     >> $STATUS_FILE 2>&1
     fi
@@ -1228,9 +1236,11 @@ STATUS_FILE=$mysql_datadir/RPM_UPGRADE_MARKER
 
 if [ -f $STATUS_FILE ] ; then
         SERVER_TO_START=`grep '^SERVER_TO_START=' $STATUS_FILE | cut -c17-`
+        UPDATE_REQUIRES=`grep '^UPDATE_REQUIRES=' $STATUS_FILE | cut -c17-`
         rm -f $STATUS_FILE
 else
         SERVER_TO_START=''
+        UPDATE_REQUIRES=''
 fi
 if [ $1 -eq 1 ]; then
 
@@ -1310,6 +1320,22 @@ fi
 
 if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
+fi
+if [ "$UPDATE_REQUIRES" = "true" ] ; then
+cat >/usr/share/mysql/pxc_cluster_view.sql << EOL
+CREATE TABLE IF NOT EXISTS performance_schema.pxc_cluster_view(
+  HOST_NAME CHAR(64) collate utf8_general_ci not null,
+  UUID CHAR(36) collate utf8_bin not null,
+  STATUS CHAR(64) collate utf8_bin not null,
+  LOCAL_INDEX INTEGER not null,
+  SEGMENT INTEGER not null
+) ENGINE=PERFORMANCE_SCHEMA;
+EOL
+echo "\n\n * Please execute the following operations to get the full cluster updated:"
+echo "\t - Upgrade each node to current PXC version (5.7.19+)"
+echo "\t\t mysql -uroot -p < /usr/share/mysql/pxc_cluster_view.sql"
+echo "\t - Restart each cluster node, one node at a time:"
+echo "\t\t service mysql restart\n\n"
 fi
 # Was the server running before the upgrade? If so, restart the new one.
 if [ "$SERVER_TO_START" = "true" ] ; then
