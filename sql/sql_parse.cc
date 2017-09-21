@@ -1472,13 +1472,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
   }
   thd->set_query_id(next_query_id());
-#ifdef WITH_WSREP
-  if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
-  {
-    thd->set_wsrep_next_trx_id(thd->query_id);
-    WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
-  }
-#endif /* WITH_WSREP */
   thd->rewritten_query.mem_free();
   thd_manager->inc_thread_running();
 
@@ -1712,11 +1705,11 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       break;
 
 #ifdef WITH_WSREP
-      if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
-      {
-        thd->set_wsrep_next_trx_id(thd->query_id);
-        WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
-      }
+    if (WSREP(thd) && thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+    {
+      thd->set_wsrep_next_trx_id(thd->query_id);
+      WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
+    }
     wsrep_mysql_parse(thd, thd->query().str, thd->query().length, &parser_state);
 #else
     mysql_parse(thd, &parser_state);
