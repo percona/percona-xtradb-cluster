@@ -24,6 +24,8 @@ for manual installation:
 
 If you want to build |PXC| from source, see :ref:`compile`.
 
+If you want to run |PXC| using Docker, see :ref:`docker`.
+
 .. toctree::
    :hidden:
 
@@ -31,4 +33,5 @@ If you want to build |PXC| from source, see :ref:`compile`.
    Install on Red Hat or CentOS <yum>
    Install from Binary Tarball <tarball>
    Compile from Source <compile>
+   Run in a Docker container <docker>
 
