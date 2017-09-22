@@ -155,15 +155,6 @@ case "$1" in
 	currentver=$(dpkg -l | grep percona-xtradb-cluster-server-5.7 | awk '{print $3}' | awk -F'-' '{print $1}')
 	requiredver="5.7.19"
 	if [[ $currentver < $requiredver ]]; then
-cat >/usr/share/mysql/pxc_cluster_view.sql << EOL
-CREATE TABLE IF NOT EXISTS performance_schema.pxc_cluster_view(
-  HOST_NAME CHAR(64) collate utf8_general_ci not null,
-  UUID CHAR(36) collate utf8_bin not null,
-  STATUS CHAR(64) collate utf8_bin not null,
-  LOCAL_INDEX INTEGER not null,
-  SEGMENT INTEGER not null
-) ENGINE=PERFORMANCE_SCHEMA;
-EOL
 	  echo -e "\n\n * Please execute the following operations to get the full cluster updated:"
 	  echo -e "\t - Upgrade each node to current PXC version (5.7.19+)"
 	  echo -e "\t\t mysql -uroot -p < /usr/share/mysql/pxc_cluster_view.sql"

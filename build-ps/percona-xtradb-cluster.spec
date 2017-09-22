@@ -1322,20 +1322,11 @@ if [ -x sbin/restorecon ] ; then
   sbin/restorecon -R var/lib/mysql
 fi
 if [ "$UPDATE_REQUIRES" = "true" ] ; then
-cat >/usr/share/mysql/pxc_cluster_view.sql << EOL
-CREATE TABLE IF NOT EXISTS performance_schema.pxc_cluster_view(
-  HOST_NAME CHAR(64) collate utf8_general_ci not null,
-  UUID CHAR(36) collate utf8_bin not null,
-  STATUS CHAR(64) collate utf8_bin not null,
-  LOCAL_INDEX INTEGER not null,
-  SEGMENT INTEGER not null
-) ENGINE=PERFORMANCE_SCHEMA;
-EOL
-echo "\n\n * Please execute the following operations to get the full cluster updated:"
-echo "\t - Upgrade each node to current PXC version (5.7.19+)"
-echo "\t\t mysql -uroot -p < /usr/share/mysql/pxc_cluster_view.sql"
-echo "\t - Restart each cluster node, one node at a time:"
-echo "\t\t service mysql restart\n\n"
+echo " * Please execute the following operations to get the full cluster updated:"
+echo " - Upgrade each node to current PXC version (5.7.19+)"
+echo "       mysql -uroot -p < /usr/share/percona-xtradb-cluster/pxc_cluster_view.sql"
+echo " - Restart each cluster node, one node at a time:"
+echo "       service mysql restart"
 fi
 # Was the server running before the upgrade? If so, restart the new one.
 if [ "$SERVER_TO_START" = "true" ] ; then
