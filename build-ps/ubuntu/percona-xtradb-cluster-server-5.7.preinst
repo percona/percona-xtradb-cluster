@@ -6,6 +6,10 @@ get_pcount () {
 }
 
 server_stop () {
+        bootstrapped=$(ps wwaux | grep mysql | grep wsrep-new-cluster | wc -l)
+        if [ $bootstrapped != 0 ]; then
+            echo 1 > /tmp/bootstrapped
+        fi
 	PSCOUNT=$(get_pcount)
 	COUNT=0
 	while :; do
