@@ -185,6 +185,11 @@ For more information about socket options, see
 .. note:: You can also enable SSL based compression with :option:`sockopt`.
    This can be used instead of the Percona XtraBackup ``compress`` option.
 
+.. option:: ncsockopt
+
+Used to specify socket options for the ``netcat`` transfer format
+(``transferfmt=nc``).
+
 .. option:: progress
 
     :Values: 1, path/to/file
@@ -343,8 +348,53 @@ The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
   (if not specified under ``[sst]``)
 * ``[mysqld]`` is used if it is not specified in either of the above
 
+:variable:`wsrep_debug`
+
+Specifies whether additional debugging output for the database server error log
+should be enabled.
+Disabled by default.
+
+This option can be set in the following :file:`my.cnf` groups:
+
+* Under ``[mysqld]`` it enables debug logging for ``mysqld`` and the SST script
+* Under ``[sst]`` it enables debug logging for the SST script only
+
+.. option:: encrypt_threads
+
+   :Version: Introduced in 5.7.19-29.22
+   :Default: ``4``
+
+Specifies the number of threads that XtraBackup should use for encrypting data
+(when ``encrypt=1``).
+The value is passed using the ``--encrypt-threads`` option in XtraBackup.
+
+This option affects only SST with XtraBackup
+and should be specified under the ``[sst]`` group.
+
+.. option:: backup_threads
+
+   :Version: Introduced in 5.7.19-29.22
+   :Default: ``4``
+
+Specifies the number of threads that XtraBackup should use to create backups.
+See the ``--parallel`` option in XtraBackup.
+
+This option affects only SST with XtraBackup
+and should be specified under the ``[sst]`` group.
+
 XtraBackup SST Dependencies
 ---------------------------
+
+Although any current version of |PXB| *may* be compatible
+with any current version of |PXC|,
+there are certain differences that may break compatibility.
+As a result, starting from |PXC| 5.6
+every version is tested against a specific |PXB| version only:
+
+* |PXC| 5.6 requires |PXB| 2.3
+* |PXC| 5.7 requires |PXB| 2.4
+
+Other combinations are not guaranteed to work.
 
 The following are optional dependencies of Percona XtraDB Cluster
 introduced by ``wsrep_sst_xtrabackup-v2``
