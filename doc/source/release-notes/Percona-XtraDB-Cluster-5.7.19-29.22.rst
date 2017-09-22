@@ -21,6 +21,18 @@ based on the following:
 
 All Percona software is open-source and free.
 
+Upgrade Instructions
+====================
+
+After you upgrade each node to |PXC| 5.7.19-29.22,
+run the following command on one of the nodes::
+
+ $ mysql -uroot -p < /usr/share/mysql/pxc_cluster_view.sql
+
+Then restart all nodes, one at a time::
+
+ $ sudo service mysql restart
+
 New Features
 ============
 
