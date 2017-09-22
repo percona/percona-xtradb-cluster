@@ -5,7 +5,7 @@ Percona XtraDB Cluster 5.7.19-29.22
 ===================================
 
 Percona is glad to announce the release of
-Percona XtraDB Cluster 5.7.19-29.22 on September 20, 2017.
+Percona XtraDB Cluster 5.7.19-29.22 on September 22, 2017.
 Binaries are available from the `downloads section
 <http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/>`_
 or from our :ref:`software repositories <install>`.
@@ -13,7 +13,7 @@ or from our :ref:`software repositories <install>`.
 Percona XtraDB Cluster 5.7.19-29.22 is now the current release,
 based on the following:
 
-* `Percona Server 5.7.19-17 <http://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.18-15.html>`_
+* `Percona Server 5.7.19-17 <http://www.percona.com/doc/percona-server/5.7/release-notes/Percona-Server-5.7.19-17.html>`_
 
 * Galera Replication library 3.22
 
