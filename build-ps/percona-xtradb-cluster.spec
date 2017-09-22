@@ -1261,6 +1261,7 @@ fi
 # use chkconfig on Enterprise Linux and newer SuSE releases
 %if 0%{?systemd}
   %systemd_post mysql
+  /usr/bin/systemctl enable mysql >/dev/null 2>&1 || :
 %else
 if [ -x /sbin/chkconfig ] ; then
         /sbin/chkconfig --add mysql
