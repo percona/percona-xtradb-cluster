@@ -22,9 +22,9 @@ server_stop () {
 
                     set +e
                     if [ -x /usr/sbin/invoke-rc.d ]; then
-                        cmd="invoke-rc.d mysql stop"
+                        cmd="/etc/init.d/mysql bootstrap-stop"
                     else
-                        cmd="/etc/init.d/mysql stop"
+                        cmd="/etc/init.d/mysql bootstrap-stop"
                     fi
                     $cmd
                     errno=$?
