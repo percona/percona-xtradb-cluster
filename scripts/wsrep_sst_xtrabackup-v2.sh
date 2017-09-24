@@ -1109,9 +1109,9 @@ initialize_tmpdir()
     fi
 
     if [[ -z "${tmpdir_path}" ]]; then
-        tmpdir_path=$(mktemp -dt pxc_sst_XXXXXXXX)
+        tmpdir_path=$(mktemp -dt pxc_sst_XXXX)
     else
-        tmpdir_path=$(mktemp -p "${tmpdir_path}" -dt pxc_sst_XXXXXXXX)
+        tmpdir_path=$(mktemp -p "${tmpdir_path}" -dt pxc_sst_XXXX)
     fi
 
     # This directory (and everything in it), will be removed upon exit
@@ -1331,7 +1331,7 @@ then
     initialize_tmpdir
 
     # main temp directory for SST (non-XB) related files
-    donor_tmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_tmp_XXXXXXXX)
+    donor_tmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_tmp_XXXX)
 
     # Create the SST info file
     # This file contains SST information that is passed from the
@@ -1360,7 +1360,7 @@ then
         fi
 
         # main temp directory for xtrabackup (target-dir)
-        itmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_xb_XXXXXXXX)
+        itmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_xb_XXXX)
 
         if [[ -n "${WSREP_SST_OPT_USER:-}" && "$WSREP_SST_OPT_USER" != "(null)" ]]; then
            INNOEXTRA+=" --user=$WSREP_SST_OPT_USER"
@@ -1541,7 +1541,7 @@ then
     fi
 
     initialize_tmpdir
-    STATDIR=$(mktemp -p "${tmpdirbase}" -dt joiner_XXXXXXXX)
+    STATDIR=$(mktemp -p "${tmpdirbase}" -dt joiner_XXXX)
     sst_file_info_path="${STATDIR}/${SST_INFO_FILE}"
 
     recv_data_from_donor_to_joiner $STATDIR "${stagemsg}-sst-info" $stimeout -2
@@ -1663,12 +1663,20 @@ then
             xbstreameopts=$xbstreameopts_sst
         fi
 
-        if [[ -d ${DATA}/.sst ]]; then
-            wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
-            rm -rf ${DATA}/.sst
+        # For compatibility, if the tmpdir is not specified, then use
+        # the datadir to hold the .sst directory
+        if [[ -z "$(parse_cnf sst tmpdir "")" ]]; then
+            if [[ -d ${DATA}/.sst ]]; then
+                wsrep_log_info "WARNING: Stale temporary SST directory: ${DATA}/.sst from previous state transfer. Removing"
+                rm -rf ${DATA}/.sst
+            fi
+            mkdir -p ${DATA}/.sst
+            JOINER_SST_DIR=$DATA/.sst
+        else
+            JOINER_SST_DIR=$(mktemp -p "${tmpdirbase}" -dt sst_XXXX)
         fi
-        mkdir -p ${DATA}/.sst
-        (recv_data_from_donor_to_joiner $DATA/.sst "${stagemsg}-SST" 0 0) &
+
+        (recv_data_from_donor_to_joiner "$JOINER_SST_DIR" "${stagemsg}-SST" 0 0) &
         jpid=$!
         wsrep_log_info "Proceeding with SST........."
 
@@ -1691,8 +1699,8 @@ then
             fi
         fi
 
-        TDATA=${DATA}
-        DATA="${DATA}/.sst"
+        TDATA=$DATA
+        DATA=$JOINER_SST_DIR
 
         XB_GTID_INFO_FILE_PATH="${DATA}/${XB_GTID_INFO_FILE}"
         wsrep_log_info "............Waiting for SST streaming to complete!"

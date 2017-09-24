@@ -56,8 +56,11 @@ SELECT * FROM t1;
 
 --echo # Node 1 : after insert (after commit)
 --disable_query_log
---let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --let $wsrep_last_committed = query_get_value(SHOW STATUS LIKE 'wsrep_last_committed', Value, 1)
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed FROM performance_schema.global_status where VARIABLE_NAME = 'wsrep_last_applied'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE FROM performance_schema.global_status where VARIABLE_NAME IN ('wsrep_last_committed', 'wsrep_last_applied')
+--source include/wait_condition_with_debug.inc
+--let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --eval SELECT $wsrep_last_applied = $wsrep_last_committed AS 'applied = committed';
 --enable_query_log
 
@@ -111,8 +114,11 @@ SELECT * FROM t1;
 
 --echo # Node 2 : after insert (after commit)
 --disable_query_log
---let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --let $wsrep_last_committed = query_get_value(SHOW STATUS LIKE 'wsrep_last_committed', Value, 1)
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed FROM performance_schema.global_status where VARIABLE_NAME = 'wsrep_last_applied'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE FROM performance_schema.global_status where VARIABLE_NAME IN ('wsrep_last_committed', 'wsrep_last_applied')
+--source include/wait_condition_with_debug.inc
+--let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --eval SELECT $wsrep_last_applied = $wsrep_last_committed AS 'applied = committed';
 --enable_query_log
 
@@ -164,8 +170,11 @@ SELECT * FROM t1;
 
 --echo # Node 1 : after alter (after commit)
 --disable_query_log
---let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --let $wsrep_last_committed = query_get_value(SHOW STATUS LIKE 'wsrep_last_committed', Value, 1)
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed FROM performance_schema.global_status where VARIABLE_NAME = 'wsrep_last_applied'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE FROM performance_schema.global_status where VARIABLE_NAME IN ('wsrep_last_committed', 'wsrep_last_applied')
+--source include/wait_condition_with_debug.inc
+--let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --eval SELECT $wsrep_last_applied = $wsrep_last_committed AS 'applied = committed';
 --enable_query_log
 
@@ -219,8 +228,11 @@ SELECT * FROM t1;
 
 --echo # Node 2 : after alter (after commit)
 --disable_query_log
---let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --let $wsrep_last_committed = query_get_value(SHOW STATUS LIKE 'wsrep_last_committed', Value, 1)
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed FROM performance_schema.global_status where VARIABLE_NAME = 'wsrep_last_applied'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE FROM performance_schema.global_status where VARIABLE_NAME IN ('wsrep_last_committed', 'wsrep_last_applied')
+--source include/wait_condition_with_debug.inc
+--let $wsrep_last_applied = query_get_value(SHOW STATUS LIKE 'wsrep_last_applied', Value, 1)
 --eval SELECT $wsrep_last_applied = $wsrep_last_committed AS 'applied = committed';
 --enable_query_log
 
