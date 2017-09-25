@@ -4791,11 +4791,10 @@ sub run_testcase ($) {
   my @procs;
   while (1)
   {
-    if ($test_timeout > $print_timeout)
+    if (!@procs && $test_timeout > $print_timeout)
     {
       my $proc = My::SafeProcess->wait_any_timeout($print_timeout);
       mtr_verbose("Got $proc");
-      push @procs, $proc;
       if ( $proc->{timeout} )
       {
         #print out that the test is still on
@@ -4803,6 +4802,10 @@ sub run_testcase ($) {
         #reset the timer
         $print_timeout= start_timer($print_freq * 60);
         next;
+      }
+      else
+      {
+        push @procs, $proc;
       }
     }
     else
