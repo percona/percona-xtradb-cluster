@@ -29,30 +29,30 @@ with all nodes running |PXC| 5.6 in separate containers on one host:
 #. Bootstrap the cluster (create the first node)::
 
     docker run -d \
-      -e MYSQL_ROOT_PASSWORD=root
-      -e CLUSTER_NAME=cluster1
-      --name=node1
-      --net=pxc-network
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e CLUSTER_NAME=cluster1 \
+      --name=node1 \
+      --net=pxc-network \
       percona/percona-xtradb-cluster:5.6
 
 #. Join the second node::
 
     docker run -d \
-      -e MYSQL_ROOT_PASSWORD=root
-      -e CLUSTER_NAME=cluster1
-      -e CLUSTER_JOIN=node1
-      --name=node2
-      --net=pxc-network
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e CLUSTER_NAME=cluster1 \
+      -e CLUSTER_JOIN=node1 \
+      --name=node2 \
+      --net=pxc-network \
       percona/percona-xtradb-cluster:5.6
 
 #. Join the third node::
 
     docker run -d \
-      -e MYSQL_ROOT_PASSWORD=root
-      -e CLUSTER_NAME=cluster1
-      -e CLUSTER_JOIN=node1
-      --name=node3
-      --net=pxc-network
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e CLUSTER_NAME=cluster1 \
+      -e CLUSTER_JOIN=node1 \
+      --name=node3 \
+      --net=pxc-network \
       percona/percona-xtradb-cluster:5.6
 
 To ensure that the cluster is running:
