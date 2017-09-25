@@ -20,7 +20,7 @@ For more information about using Docker, see the `Docker Docs`_.
 
 The following procedure describes how to set up a simple 3-node cluster
 for evaluation and testing purposes,
-with all nodes running |PXC| 5.6 in separate containers on one host:
+with all nodes running |PXC| 5.7 in separate containers on one host:
 
 1. Create a Docker network::
 
@@ -29,41 +29,41 @@ with all nodes running |PXC| 5.6 in separate containers on one host:
 #. Bootstrap the cluster (create the first node)::
 
     docker run -d \
-      -e MYSQL_ROOT_PASSWORD=root
-      -e CLUSTER_NAME=cluster1
-      --name=node1
-      --net=pxc-network
-      percona/percona-xtradb-cluster:5.6
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e CLUSTER_NAME=cluster1 \
+      --name=node1 \
+      --net=pxc-network \
+      percona/percona-xtradb-cluster:5.7
 
 #. Join the second node::
 
     docker run -d \
-      -e MYSQL_ROOT_PASSWORD=root
-      -e CLUSTER_NAME=cluster1
-      -e CLUSTER_JOIN=node1
-      --name=node2
-      --net=pxc-network
-      percona/percona-xtradb-cluster:5.6
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e CLUSTER_NAME=cluster1 \
+      -e CLUSTER_JOIN=node1 \
+      --name=node2 \
+      --net=pxc-network \
+      percona/percona-xtradb-cluster:5.7
 
 #. Join the third node::
 
     docker run -d \
-      -e MYSQL_ROOT_PASSWORD=root
-      -e CLUSTER_NAME=cluster1
-      -e CLUSTER_JOIN=node1
-      --name=node3
-      --net=pxc-network
-      percona/percona-xtradb-cluster:5.6
+      -e MYSQL_ROOT_PASSWORD=root \
+      -e CLUSTER_NAME=cluster1 \
+      -e CLUSTER_JOIN=node1 \
+      --name=node3 \
+      --net=pxc-network \
+      percona/percona-xtradb-cluster:5.7
 
 To ensure that the cluster is running:
 
 1. Access the MySQL client. For example, on the first node::
 
     $ sudo docker exec -it node1 /usr/bin/mysql -uroot -proot
-    Warning: Using a password on the command line interface can be insecure.
+    mysql: [Warning] Using a password on the command line interface can be insecure.
     Welcome to the MySQL monitor.  Commands end with ; or \g.
-    Your MySQL connection id is 4
-    Server version: 5.6.37-82.2-56 Percona XtraDB Cluster (GPL), Release rel82.2, Revision f3ba0dd, WSREP version 26.21, wsrep_26.21
+    Your MySQL connection id is 12
+    Server version: 5.7.19-17-57-log Percona XtraDB Cluster (GPL), Release rel17, Revision c10027a, WSREP version 29.22, wsrep_29.22
     
     Copyright (c) 2009-2017 Percona LLC and/or its affiliates
     Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
