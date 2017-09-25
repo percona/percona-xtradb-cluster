@@ -12,7 +12,7 @@ INSERT INTO t1 VALUES (1, 10);
 # Test updating the PK
 
 --connection node_1
---let $wsrep_local_bf_aborts_before = `SELECT variable_value FROM information_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'`
+--let $wsrep_local_bf_aborts_before = `SELECT variable_value FROM performance_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'`
 BEGIN;
 SELECT * FROM t1 FOR UPDATE;
 
@@ -28,13 +28,13 @@ UPDATE t1 SET f1 = 2;
 COMMIT;
 
 --disable_query_log
---eval SELECT variable_value - $wsrep_local_bf_aborts_before AS wsrep_local_bf_aborts_diff FROM information_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'
+--eval SELECT variable_value - $wsrep_local_bf_aborts_before AS wsrep_local_bf_aborts_diff FROM performance_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'
 --enable_query_log
 
 # Test updating non-indexed column
 
 --connection node_1
---let $wsrep_local_bf_aborts_before = `SELECT variable_value FROM information_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'`
+--let $wsrep_local_bf_aborts_before = `SELECT variable_value FROM performance_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'`
 BEGIN;
 SELECT * FROM t1 FOR UPDATE;
 
@@ -50,7 +50,7 @@ UPDATE t1 SET f2 = 20;
 COMMIT;
 
 --disable_query_log
---eval SELECT variable_value - $wsrep_local_bf_aborts_before AS wsrep_local_bf_aborts_diff FROM information_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'
+--eval SELECT variable_value - $wsrep_local_bf_aborts_before AS wsrep_local_bf_aborts_diff FROM performance_schema.global_status WHERE variable_name = 'wsrep_local_bf_aborts'
 --enable_query_log
 
 DROP TABLE t1;
