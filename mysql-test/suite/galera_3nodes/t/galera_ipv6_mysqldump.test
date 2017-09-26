@@ -1,5 +1,6 @@
 --source include/galera_cluster.inc
 --source include/have_ipv6.inc
+--source include/force_restart.inc
 
 --connection node_1
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
