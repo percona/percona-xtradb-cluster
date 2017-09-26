@@ -140,7 +140,7 @@ which will be automatically synchronized with other nodes.
 For example, to create a database on the second node,
 you can run the following command:
 
-.. code-block: mysql
+.. code-block:: bash
 
    $ mysql -h127.0.0.1 -P5000 -e "CREATE DATABASE hello_peter"
 
