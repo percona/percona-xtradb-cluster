@@ -1,14 +1,14 @@
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
 RESET MASTER;
 RESET MASTER;
-wsrep_last_committed_correct
+wsrep_last_applied_correct
 1
 SHOW BINLOG EVENTS FROM 123;
 Log_name	Pos	Event_type	Server_id	End_log_pos	Info
 mysqld-bin.000001	123	Previous_gtids	1	154	
 RESET MASTER;
 RESET MASTER;
-wsrep_last_committed_correct
+wsrep_last_applied_correct
 1
 SELECT COUNT(*) = 1 FROM t1;
 COUNT(*) = 1
@@ -35,7 +35,7 @@ mysqld-bin.000001	372	Xid	1	403	COMMIT /* xid=### */
 TRUNCATE TABLE t1;
 RESET MASTER;
 ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
-wsrep_last_committed_correct
+wsrep_last_applied_correct
 1
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0

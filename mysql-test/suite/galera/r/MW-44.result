@@ -1,5 +1,4 @@
 TRUNCATE TABLE mysql.general_log;
-TRUNCATE TABLE mysql.general_log;
 SET SESSION wsrep_osu_method=TOI;
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 SET SESSION wsrep_osu_method=RSU;

@@ -1,6 +1,6 @@
 #
 # Test the wsrep_replication_bundle variable. We expect that multiple async replication events
-# will be grouped together and thus a smaller number of wsrep_last_committed transactions will
+# will be grouped together and thus a smaller number of wsrep_last_applied transactions will
 # be reported.
 #
 

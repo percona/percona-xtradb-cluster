@@ -63,7 +63,7 @@ REPAIR LOCAL TABLE x1, x2;
 Table	Op	Msg_type	Msg_text
 test.x1	repair	status	OK
 test.x2	repair	status	OK
-wsrep_last_committed_diff
+wsrep_last_applied_diff
 1
 SELECT COUNT(*) = 10 FROM t1;
 COUNT(*) = 10

@@ -29,7 +29,6 @@ OS=$(uname)
 export PATH="/usr/sbin:/sbin:$PATH"
 
 . $(dirname $0)/wsrep_sst_common
-WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-log-debug "")
 
 wsrep_check_programs rsync
 
