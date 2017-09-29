@@ -2466,12 +2466,19 @@ row_upd_sec_index_entry(
 							   << " table " << index->table->name;
 					}
 					break;
+				case DB_LOCK_WAIT:
+					err = DB_LOCK_WAIT_TIMEOUT;
+					break;
 				default:
 					ib::error() <<  "WSREP: referenced FK check fail: " << ut_strerr(err)
 						    << " index " << index->name
 						    << " table " << index->table->name;
 					break;
 				}
+			}
+
+			if (err != DB_SUCCESS) {
+				break;
 			}
 #endif /* WITH_WSREP */
 		}
