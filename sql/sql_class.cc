@@ -2122,6 +2122,10 @@ void THD::release_resources()
     delete wsrep_rli->current_mts_submode;
     wsrep_rli->current_mts_submode = 0;
     delete wsrep_rli;
+    if (rli_slave == wsrep_rli) {
+      rli_slave = NULL;
+    }
+    wsrep_rli = NULL;
   }
   wsrep_free_status(this);
 #endif
