@@ -1705,11 +1705,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       break;
 
 #ifdef WITH_WSREP
-    if (WSREP(thd) && thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
-    {
-      thd->set_wsrep_next_trx_id(thd->query_id);
-      WSREP_DEBUG("assigned new next trx id: %lu", thd->wsrep_next_trx_id());
-    }
     wsrep_mysql_parse(thd, thd->query().str, thd->query().length, &parser_state);
 #else
     mysql_parse(thd, &parser_state);
