@@ -1984,6 +1984,7 @@ static bool mysql_install_plugin(THD *thd, const LEX_STRING *name,
   if (!opt_noacl &&
       check_table_access(thd, INSERT_ACL, &tables, false, 1, false))
     DBUG_RETURN(true);
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table = open_ltable(thd, &tables, TL_WRITE,
@@ -2083,6 +2084,9 @@ err:
   mysql_mutex_unlock(&LOCK_plugin);
   trans_rollback_stmt(thd);
   close_mysql_tables(thd);
+#ifdef WITH_WSREP
+ error:
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(true);
 }
@@ -2103,6 +2107,7 @@ static bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
   if (!opt_noacl &&
       check_table_access(thd, DELETE_ACL, &tables, false, 1, false))
     DBUG_RETURN(true);
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
@@ -2263,6 +2268,9 @@ err:
   trans_rollback_stmt(thd);
   close_mysql_tables(thd);
 
+#ifdef WITH_WSREP
+ error:
+#endif /* WITH_WSREP */
   DBUG_RETURN(true);
 }
 
@@ -4241,43 +4249,23 @@ int unlock_plugin_data()
 
 bool Sql_cmd_install_plugin::execute(THD *thd)
 {
-#ifdef WITH_WSREP
-  bool st;
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
-  st= mysql_install_plugin(thd, &m_comment, &m_ident);
-#else
   bool st= mysql_install_plugin(thd, &m_comment, &m_ident);
-#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
 #ifndef EMBEDDED_LIBRARY
   mysql_audit_release(thd);
 #endif
   return st;
-#ifdef WITH_WSREP
- error:
-  return true;
-#endif /* WITH_WSREP */
 }
 
 
 bool Sql_cmd_uninstall_plugin::execute(THD *thd)
 {
-#ifdef WITH_WSREP
-  bool st;
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-  st= mysql_uninstall_plugin(thd, &m_comment);
-#else
   bool st= mysql_uninstall_plugin(thd, &m_comment);
-#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
 #ifndef EMBEDDED_LIBRARY
   mysql_audit_release(thd);
 #endif
   return st;
-#ifdef WITH_WSREP
- error:
-  return true;
-#endif /* WITH_WSREP */
 }

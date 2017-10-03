@@ -327,6 +327,7 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
 
   if (check_access(thd, EVENT_ACL, parse_data->dbname.str, NULL, NULL, 0, 0))
     DBUG_RETURN(TRUE);
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 
   if (lock_object_name(thd, MDL_key::EVENT,
                        parse_data->dbname.str, parse_data->name.str))
@@ -395,7 +396,7 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
         thd->add_to_binlog_accessed_dbs(parse_data->dbname.str);
         /*
           If the definer is not set or set to CURRENT_USER, the value of CURRENT_USER
-          will be written into the binary log as the definer for the SQL thread.
+          will be written int the binary log as the definer for the SQL thread.
         */
         ret= write_bin_log(thd, TRUE, log_query.c_ptr(), log_query.length());
       }
@@ -408,6 +409,10 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
   thd->variables.binlog_format= save_binlog_format;
 
   DBUG_RETURN(ret);
+#ifdef WITH_WSREP
+ error:
+  DBUG_RETURN(true);
+#endif /* WITH_WSREP */
 }
 
 
@@ -449,6 +454,7 @@ Events::update_event(THD *thd, Event_parse_data *parse_data,
 
   if (check_access(thd, EVENT_ACL, parse_data->dbname.str, NULL, NULL, 0, 0))
     DBUG_RETURN(TRUE);
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 
   if (lock_object_name(thd, MDL_key::EVENT,
                        parse_data->dbname.str, parse_data->name.str))
@@ -547,6 +553,10 @@ Events::update_event(THD *thd, Event_parse_data *parse_data,
   thd->variables.binlog_format= save_binlog_format;
 
   DBUG_RETURN(ret);
+#ifdef WITH_WSREP
+ error:
+  DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 }
 
 
@@ -585,6 +595,7 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
 
   if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
     DBUG_RETURN(TRUE);
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 
   if (lock_object_name(thd, MDL_key::EVENT,
                        dbname.str, name.str))
@@ -606,6 +617,10 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
 #endif 
   }
   DBUG_RETURN(ret);
+#ifdef WITH_WSREP
+ error:
+  DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 }
 
 
