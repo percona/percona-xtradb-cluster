@@ -338,6 +338,8 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
     DBUG_RETURN(TRUE);
   }
 
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+
   if (parse_data->do_not_create)
     DBUG_RETURN(FALSE);
   /* 
@@ -401,6 +403,7 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
       }
     }
   }
+error:
   /* Restore the state of binlog format */
   DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
@@ -496,6 +499,8 @@ Events::update_event(THD *thd, Event_parse_data *parse_data,
     }
   }
 
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+
   /* 
     Turn off row binlogging of this statement and use statement-based 
     so that all supporting tables are updated for UPDATE EVENT command.
@@ -540,6 +545,7 @@ Events::update_event(THD *thd, Event_parse_data *parse_data,
       }
     }
   }
+error:
   /* Restore the state of binlog format */
   DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
@@ -547,6 +553,30 @@ Events::update_event(THD *thd, Event_parse_data *parse_data,
   thd->variables.binlog_format= save_binlog_format;
 
   DBUG_RETURN(ret);
+}
+
+
+/**
+  Does the access checking for dropping an event.
+
+  @param[in,out]  thd        THD
+  @param[in]      dbname     Event's schema
+
+  @retval  FALSE  OK
+  @retval  TRUE   Error (reported)
+*/
+bool
+Events::drop_event_precheck(THD *thd, LEX_STRING dbname)
+{
+  DBUG_ENTER("Events::drop_event_precheck");
+
+  if (check_if_system_tables_error())
+    DBUG_RETURN(TRUE);
+
+  if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
+    DBUG_RETURN(TRUE);
+
+  DBUG_RETURN(FALSE);
 }
 
 
@@ -570,6 +600,9 @@ Events::update_event(THD *thd, Event_parse_data *parse_data,
   and COMMIT/ROLLBACK is not allowed in stored functions and
   triggers.
 
+  @note Call Events::drop_event_precheck before calling this to
+  perform access checks.
+
   @retval  FALSE  OK
   @retval  TRUE   Error (reported)
 */
@@ -579,12 +612,6 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
 {
   int ret;
   DBUG_ENTER("Events::drop_event");
-
-  if (check_if_system_tables_error())
-    DBUG_RETURN(TRUE);
-
-  if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
-    DBUG_RETURN(TRUE);
 
   if (lock_object_name(thd, MDL_key::EVENT,
                        dbname.str, name.str))

@@ -68,9 +68,9 @@ CREATE TRIGGER d1_t1 BEFORE DELETE ON t1 FOR EACH ROW SAVEPOINT s;
 DELETE FROM t1;
 DROP TRIGGER d1_t1;
 
-CREATE TRIGGER d1_t1 AFTER DELETE ON t1 FOR EACH ROW SAVEPOINT s;
+CREATE TRIGGER d2_t1 AFTER DELETE ON t1 FOR EACH ROW SAVEPOINT s;
 DELETE FROM t1;
-DROP TRIGGER d1_t1;
+DROP TRIGGER d2_t1;
 
 --echo SAVEPOINT in a compound statement in a trigger should be forbidden
 --delimiter |
@@ -183,6 +183,9 @@ COMMIT;
 DROP TRIGGER i6_t1;
 
 --connection node_2
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_NAME in ('i6_t1');
+--source include/wait_condition.inc
+
 delimiter |;
 create trigger t1 before insert on t1 for each row
 begin
