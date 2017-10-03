@@ -2022,6 +2022,10 @@ static bool mysql_install_plugin(THD *thd, const LEX_STRING *name,
       check_table_access(thd, INSERT_ACL, &tables, false, 1, false))
     DBUG_RETURN(true);
 
+#ifdef WITH_WSREP
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif
+
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table = open_ltable(thd, &tables, TL_WRITE,
                              MYSQL_LOCK_IGNORE_TIMEOUT)))
@@ -2122,6 +2126,7 @@ deinit:
   tmp->state= PLUGIN_IS_DELETED;
   reap_needed= true;
   reap_plugins();
+error:
 err:
   mysql_mutex_unlock(&LOCK_plugin);
   trans_rollback_stmt(thd);
@@ -2146,6 +2151,10 @@ static bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
   if (!opt_noacl &&
       check_table_access(thd, DELETE_ACL, &tables, false, 1, false))
     DBUG_RETURN(true);
+
+#ifdef WITH_WSREP
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif
 
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
@@ -2302,6 +2311,8 @@ static bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
   close_mysql_tables(thd);
 
   DBUG_RETURN(error);
+
+error:
 err:
   trans_rollback_stmt(thd);
   close_mysql_tables(thd);
@@ -4449,41 +4460,23 @@ void free_system_variables(struct system_variables *v, bool enable_plugins)
 
 bool Sql_cmd_install_plugin::execute(THD *thd)
 {
-#ifdef WITH_WSREP
-  bool st;
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
-  st= mysql_install_plugin(thd, &m_comment, &m_ident);
-#else
   bool st= mysql_install_plugin(thd, &m_comment, &m_ident);
-#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
 #ifndef EMBEDDED_LIBRARY
   mysql_audit_release(thd);
 #endif
-#ifdef WITH_WSREP
-error:
-#endif /* WITH_WSREP */
   return st;
 }
 
 
 bool Sql_cmd_uninstall_plugin::execute(THD *thd)
 {
-#ifdef WITH_WSREP
-  bool st;
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-  st= mysql_uninstall_plugin(thd, &m_comment);
-#else
   bool st= mysql_uninstall_plugin(thd, &m_comment);
-#endif /* WITH_WSREP */
   if (!st)
     my_ok(thd);
 #ifndef EMBEDDED_LIBRARY
   mysql_audit_release(thd);
 #endif
-#ifdef WITH_WSREP
-error:
-#endif /* WITH_WSREP */
   return st;
 }

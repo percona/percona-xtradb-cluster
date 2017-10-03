@@ -118,6 +118,9 @@ public:
                LEX_STRING *new_dbname, LEX_STRING *new_name);
 
   static bool
+  drop_event_precheck(THD *thd, LEX_STRING dbname);
+
+  static bool
   drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists);
 
   static void

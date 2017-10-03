@@ -4812,14 +4812,12 @@ end_with_restore_list:
     if (res)
       break;
 
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
     switch (lex->sql_command) {
     case SQLCOM_CREATE_EVENT:
     {
       bool if_not_exists= (lex->create_info.options &
                            HA_LEX_CREATE_IF_NOT_EXISTS);
+      /* WSREP_TO_ISOLATION_BEGIN is inside of Events::create_event */
       res= Events::create_event(thd, lex->event_parse_data, if_not_exists);
       break;
     }
@@ -4832,6 +4830,7 @@ end_with_restore_list:
         db_lex_str.length= lex->spname->m_db.length;
       }
 
+      /* WSREP_TO_ISOLATION_BEGIN is inside of Events::update_event */
       res= Events::update_event(thd, lex->event_parse_data,
                                 lex->spname ? &db_lex_str : NULL,
                                 lex->spname ? &lex->spname->m_name : NULL);
@@ -4864,11 +4863,14 @@ end_with_restore_list:
   }
   case SQLCOM_DROP_EVENT:
   {
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
     LEX_STRING db_lex_str= {const_cast<char*>(lex->spname->m_db.str),
                               lex->spname->m_db.length};
+    res= Events::drop_event_precheck(thd, db_lex_str);
+    if (res)
+      break;
+
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+
     if (!(res= Events::drop_event(thd,
                                   db_lex_str, lex->spname->m_name,
                                   lex->drop_if_exists)))
@@ -5902,9 +5904,7 @@ end_with_restore_list:
         Note: SQLCOM_CREATE_VIEW also handles 'ALTER VIEW' commands
         as specified through the thd->lex->create_view_mode flag.
       */
-#ifdef WITH_WSREP
-      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
+      /* WSREP_TO_ISOLATION_BEGIN is inside of Events::drop_event */
       res= mysql_create_view(thd, first_table, thd->lex->create_view_mode);
       break;
     }
@@ -5921,20 +5921,16 @@ end_with_restore_list:
     }
   case SQLCOM_CREATE_TRIGGER:
   {
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, all_tables)
-#endif /* WITH_WSREP */
     /* Conditionally writes to binlog. */
+    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_create_or_drop_trigger */
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
 
     break;
   }
   case SQLCOM_DROP_TRIGGER:
   {
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
     /* Conditionally writes to binlog. */
+    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_create_or_drop_trigger */
     res= mysql_create_or_drop_trigger(thd, all_tables, 0);
     break;
   }
