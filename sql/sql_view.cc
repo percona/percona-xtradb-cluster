@@ -433,6 +433,9 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
     goto err;
 
   lex->link_first_table_back(view, link_to_local);
+
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+
   view->open_type= OT_BASE_ONLY;
 
   /*
@@ -748,6 +751,7 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   lex->link_first_table_back(view, link_to_local);
   DBUG_RETURN(0);
 
+error:
 err:
   THD_STAGE_INFO(thd, stage_end);
   lex->link_first_table_back(view, link_to_local);

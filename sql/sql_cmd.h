@@ -105,6 +105,10 @@ enum enum_sql_command {
   /*
     When a command is added here, be sure it's also added in mysqld.cc
     in "struct show_var_st status_vars[]= {" ...
+
+    Also for PXC, if the command is replicated to other nodes as a
+    DDL (no-writeset replication), add a testcase to
+    galera_wsrep_ddl_access_checking.test
   */
   /* This should be the last !!! */
   SQLCOM_END

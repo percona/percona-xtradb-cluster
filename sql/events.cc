@@ -306,7 +306,7 @@ bool
 Events::create_event(THD *thd, Event_parse_data *parse_data,
                      bool if_not_exists)
 {
-  bool ret;
+  bool ret= TRUE;
   bool save_binlog_row_based, event_already_exists;
   ulong save_binlog_format= thd->variables.binlog_format;
   DBUG_ENTER("Events::create_event");
@@ -333,6 +333,8 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
     my_error(ER_BAD_DB_ERROR, MYF(0), parse_data->dbname.str);
     DBUG_RETURN(TRUE);
   }
+
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 
   if (parse_data->do_not_create)
     DBUG_RETURN(FALSE);
@@ -412,6 +414,7 @@ err:
     thd->set_current_stmt_binlog_format_row();
   thd->variables.binlog_format= save_binlog_format;
 
+error:
   DBUG_RETURN(ret);
 }
 
@@ -439,7 +442,7 @@ bool
 Events::update_event(THD *thd, Event_parse_data *parse_data,
                      LEX_STRING *new_dbname, LEX_STRING *new_name)
 {
-  int ret;
+  int ret= TRUE;
   bool save_binlog_row_based;
   ulong save_binlog_format= thd->variables.binlog_format;
   Event_queue_element *new_element;
@@ -483,6 +486,8 @@ Events::update_event(THD *thd, Event_parse_data *parse_data,
       DBUG_RETURN(TRUE);
     }
   }
+
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
 
   /* 
     Turn off row binlogging of this statement and use statement-based 
@@ -539,9 +544,33 @@ err:
     thd->set_current_stmt_binlog_format_row();
   thd->variables.binlog_format= save_binlog_format;
 
+error:
   DBUG_RETURN(ret);
 }
 
+
+/**
+  Does the access checking for dropping an event.
+
+  @param[in,out]  thd        THD
+  @param[in]      dbname     Event's schema
+
+  @retval  FALSE  OK
+  @retval  TRUE   Error (reported)
+*/
+bool
+Events::drop_event_precheck(THD *thd, LEX_STRING dbname)
+{
+  DBUG_ENTER("Events::drop_event_precheck");
+
+  if (check_if_system_tables_error())
+    DBUG_RETURN(TRUE);
+
+  if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
+    DBUG_RETURN(TRUE);
+
+  DBUG_RETURN(FALSE);
+}
 
 /**
   Drops an event
@@ -563,6 +592,9 @@ err:
   and COMMIT/ROLLBACK is not allowed in stored functions and
   triggers.
 
+  @note Call Events::drop_event_precheck before calling this to
+  perform access checks.
+
   @retval  FALSE  OK
   @retval  TRUE   Error (reported)
 */
@@ -570,15 +602,9 @@ err:
 bool
 Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
 {
-  int ret;
+  int ret= TRUE;
   bool save_binlog_row_based;
   DBUG_ENTER("Events::drop_event");
-
-  if (check_if_system_tables_error())
-    DBUG_RETURN(TRUE);
-
-  if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
-    DBUG_RETURN(TRUE);
 
   /*
     Turn off row binlogging of this statement and use statement-based so
@@ -601,10 +627,12 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
     thd->add_to_binlog_accessed_dbs(dbname.str);
     ret= write_bin_log(thd, TRUE, thd->query(), thd->query_length());
   }
+
   /* Restore the state of binlog format */
   DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
+
   DBUG_RETURN(ret);
 }
 

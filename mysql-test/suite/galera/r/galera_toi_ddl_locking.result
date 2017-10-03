@@ -1,7 +1,8 @@
 CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
 CREATE TABLE t2 (f1 INTEGER) ENGINE=InnoDB;
-SET DEBUG_SYNC = 'alter_table_before_open_tables WAIT_FOR continue';
+SET DEBUG_SYNC = 'alter_table_before_open_tables SIGNAL parked WAIT_FOR continue';
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;;
+SET DEBUG_SYNC = "now WAIT_FOR parked";
 SET SESSION wsrep_sync_wait = 0;
 SELECT COUNT(*) = 0 FROM t1;
 COUNT(*) = 0
