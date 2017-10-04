@@ -396,7 +396,7 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
         thd->add_to_binlog_accessed_dbs(parse_data->dbname.str);
         /*
           If the definer is not set or set to CURRENT_USER, the value of CURRENT_USER
-          will be written int the binary log as the definer for the SQL thread.
+          will be written into the binary log as the definer for the SQL thread.
         */
         ret= write_bin_log(thd, TRUE, log_query.c_ptr(), log_query.length());
       }
