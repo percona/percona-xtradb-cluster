@@ -454,6 +454,9 @@ int wsrep_init()
   wsrep_ready_set(FALSE);
   assert(wsrep_provider);
 
+  // Reset global settings
+  wsrep_incremental_data_collection= FALSE;
+
   wsrep_init_position();
 
   if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != WSREP_OK)
