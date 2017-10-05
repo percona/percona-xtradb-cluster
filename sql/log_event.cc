@@ -13622,8 +13622,8 @@ bool Gtid_log_event::write_data_header(IO_CACHE *file)
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)
 
 #ifdef WITH_WSREP
-/* Starting 5.7 gtid event is not logged to binary log and so this event
-needs to be captured so that PXC can append it as part of write-set. */
+/* Capture GTID event if PXC node is acting as ASYNC-SLAVE.
+This GTID event is appended as part of write-set creation in wsrep_replicate */
 static void wsrep_capture_gtid_event(THD* thd, Gtid_log_event* ev)
 {
   /* GTID events are also processed by applier but avoid capturing

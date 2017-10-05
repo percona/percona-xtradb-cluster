@@ -123,7 +123,9 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
     case binary_log::FORMAT_DESCRIPTION_EVENT:
       wsrep_set_apply_format(thd, (Format_description_log_event*)ev);
       continue;
+    /* If gtid_mode=OFF then async master-slave will generate ANONYMOUS GTID. */
     case binary_log::GTID_LOG_EVENT:
+    case binary_log::ANONYMOUS_GTID_LOG_EVENT:
     {
       Gtid_log_event* gev= (Gtid_log_event*)ev;
       if (gev->get_gno() == 0)
