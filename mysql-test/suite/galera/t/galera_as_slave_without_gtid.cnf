@@ -1,0 +1,11 @@
+!include ../galera_2nodes_as_slave.cnf
+
+[mysqld]
+gtid-mode=OFF
+log-bin=mysqld-bin
+enforce-gtid-consistency=OFF
+binlog-format=ROW
+log-slave-updates=0
+
+[mysqld.2]
+log-slave-updates
