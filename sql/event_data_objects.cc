@@ -1498,17 +1498,17 @@ end:
          SQLCOMM_DROP_EVENT, we will switch sql_command for the duration
          of DDL replication only.
       */
-      enum_sql_command sql_command_save= SQLCOM_END;
-      if (WSREP(thd))
+      const enum_sql_command sql_command_save= thd->lex->sql_command;
+      const bool sql_command_set= WSREP(thd);
+      if (sql_command_set)
       {
-        sql_command_save= thd->lex->sql_command;
         thd->lex->sql_command = SQLCOM_DROP_EVENT;
       }
 #endif
      
       ret= Events::drop_event(thd, dbname, name, FALSE);
 #ifdef WITH_WSREP
-      if (WSREP(thd))
+      if (sql_command_set)
       {
         WSREP_TO_ISOLATION_END;
         thd->lex->sql_command = sql_command_save;
