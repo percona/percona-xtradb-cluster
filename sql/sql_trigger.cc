@@ -314,11 +314,11 @@ end:
     my_ok(thd);
   }
 
+  DBUG_RETURN(result);
 #ifdef WITH_WSREP
  error:
   DBUG_RETURN(true);
 #endif /* WITH_WSREP */
-  DBUG_RETURN(result);
 }
 
 
