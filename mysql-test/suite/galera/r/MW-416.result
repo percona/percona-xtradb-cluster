@@ -1,8 +1,5 @@
 CREATE USER 'userMW416'@'localhost';
 GRANT SELECT, INSERT, UPDATE ON test.* TO 'userMW416'@'localhost';
-SHOW GLOBAL STATUS LIKE 'wsrep_replicated';
-Variable_name	Value
-wsrep_replicated	2
 ALTER DATABASE db CHARACTER SET = utf8;
 ERROR 42000: Access denied for user 'userMW416'@'localhost' to database 'db'
 ALTER EVENT ev1 RENAME TO ev2;
@@ -112,6 +109,5 @@ mysql
 performance_schema
 sys
 test
-SHOW GLOBAL STATUS LIKE 'wsrep_replicated';
-Variable_name	Value
-wsrep_replicated	3
+wsrep_replicated_after_diff
+1
