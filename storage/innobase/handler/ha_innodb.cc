@@ -1767,10 +1767,6 @@ innobase_srv_conc_enter_innodb(
 	}
 
 	trx_t*	trx	= prebuilt->trx;
-#ifdef WITH_WSREP
-	if (wsrep_on(trx->mysql_thd) && 
-	    wsrep_thd_is_BF(trx->mysql_thd, FALSE)) return;
-#endif /* WITH_WSREP */
 	if (srv_thread_concurrency) {
 		if (trx->n_tickets_to_enter_innodb > 0) {
 
