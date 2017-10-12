@@ -967,8 +967,7 @@ recv_data_from_donor_to_joiner()
 
     if [[ ${RC[0]} -eq 124 ]]; then
         wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Possible timeout in receving first data from donor in "
-                        "gtid/keyring stage"
+        wsrep_log_error "Possible timeout in receving first data from donor in gtid/keyring stage"
         wsrep_log_error "****************************************************** "
         exit 32
     fi
