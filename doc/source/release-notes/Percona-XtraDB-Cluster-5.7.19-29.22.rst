@@ -129,3 +129,10 @@ Fixed Bugs
   (``wsrep_sst_xtrabackup-v2``) to use the ``ssl-dhparams`` value
   from the configuration file.
  
+.. note:: As part of fix for :jirabug:`PXC-827`,
+   version communication was added to the SST protocol.
+   As a result, newer version of PXC (as of 5.7.19 and later)
+   cannot act as donor when joining an older version PXC node (prior to 5.7.19).
+   It will work fine vice versa:
+   old node can act as donor when joining nodes with new version.
+
