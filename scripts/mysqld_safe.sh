@@ -219,7 +219,7 @@ eval_log_error () {
   #echo "Running mysqld: [$cmd]"
   eval "$cmd"
   ret=$?
-  if [ $ret > 0 ]; then
+  if [ $ret -gt 0 ]; then
     exit $ret
   fi
 }
