@@ -2272,6 +2272,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       my_message(ER_LOCK_DEADLOCK, ER(ER_LOCK_DEADLOCK), MYF(0));
       wsrep_cleanup_transaction(thd);
       WSREP_DEBUG("leave");
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     }
     if ((thd->wsrep_conflict_state != REPLAYING) &&
         (thd->wsrep_conflict_state != RETRY_AUTOCOMMIT))
@@ -6205,13 +6206,22 @@ finish:
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   if (thd->wsrep_conflict_state != REPLAYED)
   {
+  /* Hold this lock only for duration of wsrep_conflict_state state check.
+  Release it before entering unit-cleanup. Unit-cleanup will cause
+  external_unlock at InnoDB level that will need transaction lock.
+  This could conflict if this thread has conflicting lock with
+  other high-priority thread that needs transaction lock and
+  LOCK_wsrep_thd too. */
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
   lex->unit->cleanup(true);
 #ifdef WITH_WSREP
   }
   else
+  {
     thd->wsrep_conflict_state= NO_CONFLICT;
-  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+  }
 #endif /* WITH_WSREP */
 
   /* Free tables */
