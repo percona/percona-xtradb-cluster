@@ -616,6 +616,7 @@ extern "C" void wsrep_thd_set_query_state(
 	THD *thd, enum wsrep_query_state state);
 extern "C" void wsrep_thd_set_conflict_state(
         THD *thd, bool lock, enum wsrep_conflict_state state);
+extern "C" void wsrep_thd_mark_split_trx(THD* thd, bool mini_trx);
 
 extern "C" void wsrep_thd_set_trx_to_replay(THD *thd, uint64 trx_id);
 

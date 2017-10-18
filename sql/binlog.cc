@@ -9888,7 +9888,11 @@ commit_stage:
    */
   if (DBUG_EVALUATE_IF("force_rotate", 1, 0) ||
       (do_rotate && thd->commit_error == THD::CE_NONE &&
-       !is_rotating_caused_by_incident))
+       !is_rotating_caused_by_incident
+#ifdef WITH_WSREP
+       && !thd->wsrep_split_trx
+#endif /* WITH_WSREP */
+      ))
   {
     /*
       Do not force the rotate as several consecutive groups may

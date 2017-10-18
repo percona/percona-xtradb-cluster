@@ -852,7 +852,10 @@ extern "C" void wsrep_thd_set_conflict_state(
     if (lock) mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
   }
 }
-
+extern "C" void wsrep_thd_mark_split_trx(THD *thd, bool split_trx)
+{
+  thd->wsrep_split_trx= split_trx;
+}
 
 extern "C" enum wsrep_exec_mode wsrep_thd_exec_mode(THD *thd)
 {
@@ -1533,6 +1536,7 @@ THD::THD(bool enable_plugins)
   wsrep_affected_rows     = 0;
   wsrep_replicate_GTID    = false;
   wsrep_skip_wsrep_GTID   = false;
+  wsrep_split_trx         = false;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
 #endif /* WITH_WSREP */
   /* Call to init() below requires fully initialized Open_tables_state. */
@@ -1929,6 +1933,7 @@ void THD::init(void)
   wsrep_affected_rows     = 0;
   wsrep_replicate_GTID    = false;
   wsrep_skip_wsrep_GTID   = false;
+  wsrep_split_trx         = false;
   wsrep_gtid_event_buf    = NULL;
   wsrep_gtid_event_buf_len = 0;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
