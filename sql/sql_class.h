@@ -3384,6 +3384,21 @@ public:
   bool                      wsrep_replicate_GTID;
   bool                      wsrep_skip_wsrep_GTID;
 
+  /* This field is set when wsrep try to do an intermediate special
+  commit while processing LOAD DATA INFILE statement by breaking it
+  into 10K rows mini transactions.
+
+  If this variable is set then binlog rotation is not performed
+  while mini transaction try to commit. Why ?
+  a. From logical perspective LDI is still a single transaction
+  b. rotation will cause unregistration of binlog/innodb handler.
+     On resuming the flow binlog handler is re-register but innodb
+     isn't this eventually causes replication of last chunk (< 10K)
+     rows to skip. Infact, this is logical issue that exist in
+     MySQL/InnoDB world but it just work for them as InnoDB
+     then commit the said transaction as part of external_lock(UNLOCK). */
+  bool                      wsrep_split_trx;
+
   /*
     Transaction id:
     * m_next_wsrep_trx_id is assigned on the first query after
