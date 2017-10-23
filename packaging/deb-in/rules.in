@@ -28,7 +28,11 @@ export CXXFLAGS=
 
 override_dh_auto_configure:
 	@echo "RULES.$@"
-	cmake . \
+
+	@DEB_RULES_DEBUG_CMAKE@
+
+	mkdir release && cd release && \
+	cmake .. \
 		-DBUILD_CONFIG=mysql_release \
 		$(CMAKE_SYSTEMD_OPTIONS) \
 		-DWITH_WSREP=1 \
@@ -55,10 +59,13 @@ override_dh_auto_configure:
 		-DINSTALL_LAYOUT=DEB \
 		-DDEB_PRODUCT=@DEB_PRODUCT@ \
 		@DEB_CMAKE_EXTRAS@
+
 	touch $@
 
 override_dh_auto_build:
 	@echo "RULES.$@"
+	@DEB_RULES_DEBUG_MAKE@
+	cd release && \
 	$(MAKE) -j8 VERBOSE=1
 	touch $@
 
@@ -70,17 +77,13 @@ override_dh_auto_install:
 
 	@echo "RULES.$@"
 	# complete install first
-	$(MAKE) install DESTDIR=debian/tmp
+	cd release && \
+	$(MAKE) install DESTDIR=../debian/tmp
+	@DEB_RULES_DEBUG_EXTRA@
 	# remove all redundant files
-	rm debian/tmp/usr/lib/mysql-test/cmake_install.cmake
-	rm debian/tmp/usr/lib/mysql-test/CTestTestfile.cmake
-	rm debian/tmp/usr/lib/mysql-test/Makefile
+	rm debian/tmp/usr/lib/*/*_r*
 	# add missing man pages
 	# install -g root -o root -m 0644 debian/extra/mysql_embedded.1 debian/tmp/usr/share/man/man1
-	# add MySQL Server debug binary and library to package
-	# install -g root -o root -m 0755 debian/extra/server-binary debian/tmp/usr/sbin/mysqld-debug
-	# install -g root -o root -m 0755 debian/extra/embedded-server debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/libmysqld-debug.a
-	# add debug plugin libraries to package
 	install -m 0644 support-files/wsrep.cnf debian/tmp/usr/share/mysql
 	# SysV init stuff, or Systemd files ? On Debian 8, we need both!
 #ifneq (,$(findstring SYSV,@DEB_STARTUP@))

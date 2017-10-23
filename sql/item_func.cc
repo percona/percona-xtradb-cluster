@@ -6188,7 +6188,17 @@ void Item_func_get_system_var::cleanup()
 }
 
 
-void Item_func_match::init_search(bool no_order)
+/**
+  Initialize searching within full-text index.
+
+  @param thd      Thread handler
+  @param no_order Flag to indicate whether it is GROUP BY
+                  clause without ORDER BY.
+
+  @returns false if success, true if error
+*/
+
+bool Item_func_match::init_search(THD *thd, bool no_order)
 {
   DBUG_ENTER("Item_func_match::init_search");
 
@@ -6197,7 +6207,7 @@ void Item_func_match::init_search(bool no_order)
     with fix_field
   */
   if (!fixed)
-    DBUG_VOID_RETURN;
+    DBUG_RETURN(false);
 
   /* Check if init_search() has been called before */
   if (ft_handler)
@@ -6210,16 +6220,19 @@ void Item_func_match::init_search(bool no_order)
     */
     if (join_key)
       table->file->ft_handler= ft_handler;
-    DBUG_VOID_RETURN;
+    DBUG_RETURN(false);
   }
 
   if (key == NO_SUCH_KEY)
   {
     List<Item> fields;
-    fields.push_back(new Item_string(" ",1, cmp_collation.collation));
+    if (fields.push_back(new Item_string(" ",1, cmp_collation.collation)))
+      DBUG_RETURN(true);
     for (uint i=1; i < arg_count; i++)
       fields.push_back(args[i]);
     concat_ws=new Item_func_concat_ws(fields);
+    if (concat_ws == NULL)
+       DBUG_RETURN(true);
     /*
       Above function used only to get value and do not need fix_fields for it:
       Item_string - basic constant
@@ -6232,10 +6245,11 @@ void Item_func_match::init_search(bool no_order)
   if (master)
   {
     join_key=master->join_key=join_key|master->join_key;
-    master->init_search(no_order);
+    if (master->init_search(thd, no_order))
+      DBUG_RETURN(true);
     ft_handler=master->ft_handler;
     join_key=master->join_key;
-    DBUG_VOID_RETURN;
+    DBUG_RETURN(false);
   }
 
   String *ft_tmp= 0;
@@ -6258,11 +6272,13 @@ void Item_func_match::init_search(bool no_order)
   if (join_key && !no_order)
     flags|=FT_SORTED;
   ft_handler=table->file->ft_init_ext(flags, key, ft_tmp);
+  if (thd->is_error())
+    DBUG_RETURN(true);
 
   if (join_key)
     table->file->ft_handler=ft_handler;
 
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(false);
 }
 
 /**
@@ -7089,8 +7105,6 @@ Item_func_sp::fix_fields(THD *thd, Item **ref)
 
   /* These is reset/set by Item_func::fix_fields. */
   with_stored_program= true;
-  if (!m_sp->m_chistics->detistic || !tables_locked_cache)
-    const_item_cache= false;
 
   if (res)
     DBUG_RETURN(res);
@@ -7127,9 +7141,6 @@ Item_func_sp::fix_fields(THD *thd, Item **ref)
 void Item_func_sp::update_used_tables()
 {
   Item_func::update_used_tables();
-
-  if (!m_sp->m_chistics->detistic)
-    const_item_cache= false;
 
   /* This is reset by Item_func::update_used_tables(). */
   with_stored_program= true;
