@@ -11,6 +11,8 @@ ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 SET GLOBAL DEBUG = "";
 SET DEBUG_SYNC = "now SIGNAL signal.wsrep_apply_cb";
 FLUSH QUERY CACHE;
+Warnings:
+Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
 SET GLOBAL DEBUG = "d,sync.wsrep_apply_cb";
 INSERT INTO t1 VALUES (3);
 SELECT MAX(id) FROM t1;

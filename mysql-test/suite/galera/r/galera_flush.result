@@ -11,6 +11,8 @@ DELETE FROM mysql.user WHERE user = 'user1';
 SET GLOBAL wsrep_replicate_myisam = FALSE;
 FLUSH PRIVILEGES;
 FLUSH QUERY CACHE;
+Warnings:
+Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
 wsrep_last_committed_diff
 1
 FLUSH STATUS;

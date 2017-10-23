@@ -11,6 +11,8 @@ INSERT INTO x2 (f2) VALUES (1), (2), (3), (4), (5), (6), (7), (8), (9), (10);
 FLUSH LOCAL DES_KEY_FILE;
 FLUSH LOCAL HOSTS;
 FLUSH LOCAL QUERY CACHE;
+Warnings:
+Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
 FLUSH LOCAL STATUS;
 FLUSH LOCAL PRIVILEGES;
 FLUSH LOCAL USER_RESOURCES;
@@ -79,6 +81,8 @@ set wsrep_on=0;
 FLUSH DES_KEY_FILE;
 FLUSH HOSTS;
 FLUSH QUERY CACHE;
+Warnings:
+Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
 FLUSH STATUS;
 FLUSH PRIVILEGES;
 FLUSH USER_RESOURCES;
