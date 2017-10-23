@@ -40,6 +40,15 @@ ENDIF()
 
 SET (DEB_BASE_VERSION "${DEB_BASE_VERSION}-${WSREP_VERSION}")
 
+# Timestamp for use in debian/changelog
+IF (NOT DEFINED DEB_CHANGELOG_TIMESTAMP)
+  execute_process(
+    COMMAND date --rfc-2822
+    OUTPUT_VARIABLE DEB_CHANGELOG_TIMESTAMP
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  SET (DEB_CHANGELOG_TIMESTAMP ${DEB_CHANGELOG_TIMESTAMP} CACHE STRING "")
+ENDIF()
 # Commercial or community
 IF (DEB_PRODUCT STREQUAL "commercial")
   message (FATAL_ERROR "mysql-wsrep is GPL only, no commercial builds")
@@ -73,6 +82,10 @@ usr/lib/mysql/plugin/keyring_okv.so
 usr/lib/mysql/plugin/openssl_udf.so
 usr/lib/mysql/plugin/thread_pool.so
 usr/lib/mysql/plugin/firewall.so
+")
+  # Add debug versions of commercial plugins, if enabled
+  IF (DEFINED DEB_WITH_DEBUG)
+    SET (DEB_INSTALL_SERVER_PLUGINS "${DEB_INSTALL_SERVER_PLUGINS}
 usr/lib/mysql/plugin/debug/audit_log.so
 usr/lib/mysql/plugin/debug/authentication_pam.so
 usr/lib/mysql/plugin/debug/authentication_ldap_sasl.so
@@ -82,6 +95,8 @@ usr/lib/mysql/plugin/debug/openssl_udf.so
 usr/lib/mysql/plugin/debug/thread_pool.so
 usr/lib/mysql/plugin/debug/firewall.so
 ")
+  ENDIF()
+
   IF (DEB_AWS_SDK)
     SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_AWS_SDK=${DEB_AWS_SDK} -DDEB_AWS_SDK=${DEB_AWS_SDK}")
     SET (DEB_INCLUDE_BINARIES_EXTRA "${DEB_INCLUDE_BINARIES_EXTRA}
@@ -89,9 +104,14 @@ debian/extra/keyring_aws-plugin
 ")
     SET (DEB_INSTALL_SERVER_PLUGINS "${DEB_INSTALL_SERVER_PLUGINS}
 usr/lib/mysql/plugin/keyring_aws.so
+")
+    IF (DEFINED DEB_WITH_DEBUG)
+      SET (DEB_INSTALL_SERVER_PLUGINS "${DEB_INSTALL_SERVER_PLUGINS}
 usr/lib/mysql/plugin/debug/keyring_aws.so
 ")
+    ENDIF()
   ENDIF()
+
   IF (WITH_CURL)
     SET (DEB_CMAKE_EXTRAS "${DEB_CMAKE_EXTRAS} -DWITH_CURL=${WITH_CURL}")
   ENDIF()
@@ -321,6 +341,9 @@ ENDIF()
 
 IF (DEFINED WITH_NDBCLUSTER_STORAGE_ENGINE)
   INCLUDE(deb_ndb.cmake)
+ENDIF()
+if (DEFINED DEB_WITH_DEBUG)
+  INCLUDE(deb_debug.cmake)
 ENDIF()
 # All files are configured and copied to the debian/ directory, which is used 
 # by debuild to make the packages

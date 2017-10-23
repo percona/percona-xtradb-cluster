@@ -1794,13 +1794,14 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
       release_mdl= true;
 
       DEBUG_SYNC(thd, "ha_commit_trans_after_acquire_commit_lock");
+    }
 
-      if (stmt_has_updated_trans_table(ha_info) && check_readonly(thd, true))
-      {
-        ha_rollback_trans(thd, all);
-        error= 1;
-        goto end;
-      }
+    if (rw_trans && stmt_has_updated_trans_table(ha_info)
+        && check_readonly(thd, true))
+    {
+      ha_rollback_trans(thd, all);
+      error= 1;
+      goto end;
     }
 
 #ifdef WITH_WSREP
