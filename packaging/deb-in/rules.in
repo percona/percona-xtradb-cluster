@@ -28,11 +28,7 @@ export CXXFLAGS=
 
 override_dh_auto_configure:
 	@echo "RULES.$@"
-
-	@DEB_RULES_DEBUG_CMAKE@
-
-	mkdir release && cd release && \
-	cmake .. \
+	cmake . \
 		-DBUILD_CONFIG=mysql_release \
 		$(CMAKE_SYSTEMD_OPTIONS) \
 		-DWITH_WSREP=1 \
@@ -59,13 +55,10 @@ override_dh_auto_configure:
 		-DINSTALL_LAYOUT=DEB \
 		-DDEB_PRODUCT=@DEB_PRODUCT@ \
 		@DEB_CMAKE_EXTRAS@
-
 	touch $@
 
 override_dh_auto_build:
 	@echo "RULES.$@"
-	@DEB_RULES_DEBUG_MAKE@
-	cd release && \
 	$(MAKE) -j8 VERBOSE=1
 	touch $@
 
@@ -77,9 +70,11 @@ override_dh_auto_install:
 
 	@echo "RULES.$@"
 	# complete install first
-	cd release && \
-	$(MAKE) install DESTDIR=../debian/tmp
-	@DEB_RULES_DEBUG_EXTRA@
+	$(MAKE) install DESTDIR=debian/tmp
+	# remove all redundant files
+	rm debian/tmp/usr/lib/mysql-test/cmake_install.cmake
+	rm debian/tmp/usr/lib/mysql-test/CTestTestfile.cmake
+	rm debian/tmp/usr/lib/mysql-test/Makefile
 	# add missing man pages
 	# install -g root -o root -m 0644 debian/extra/mysql_embedded.1 debian/tmp/usr/share/man/man1
 	# add MySQL Server debug binary and library to package
