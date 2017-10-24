@@ -83,7 +83,6 @@ usr/share/man/man1/replace.1
 usr/share/man/man1/resolveip.1
 usr/share/man/man1/resolve_stack_dump.1
 usr/share/man/man8/mysqld.8
-@DEB_INSTALL_DEBUG_SERVER@
 # confguration files
 usr/share/mysql/my-default.cnf
 debian/extra/mysql.cnf  etc/mysql/
