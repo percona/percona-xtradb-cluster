@@ -8863,6 +8863,38 @@ no_commit:
 			m_prebuilt->sql_stat_start = TRUE;
 		} else {
 
+#ifdef WITH_WSREP
+			/* PXC-LDI will hit this case if the partition table
+			is being loaded. */
+			bool set_next_trx_id = false;
+
+			if (wsrep_on(m_user_thd) && wsrep_load_data_splitting &&
+			    sql_command == SQLCOM_LOAD                      &&
+			    !thd_test_options(
+				m_user_thd, OPTION_NOT_AUTOCOMMIT | OPTION_BEGIN))
+			{
+				WSREP_DEBUG("Forcing split of large transaction"
+					    " for LOAD DATA INFILE: %s",
+					    wsrep_thd_query(m_user_thd));
+
+				switch (wsrep_run_wsrep_commit(m_user_thd, wsrep_hton, 1))
+				{
+				case WSREP_TRX_OK:
+				  break;
+				case WSREP_TRX_SIZE_EXCEEDED:
+				case WSREP_TRX_CERT_FAIL:
+				case WSREP_TRX_ERROR:
+				  DBUG_RETURN(1);
+				}
+
+				wsrep_thd_mark_split_trx(m_user_thd, true);
+				if (tc_log->commit(m_user_thd, 1)) DBUG_RETURN(1);
+				wsrep_post_commit(m_user_thd, TRUE);
+				// wsrep_thd_set_next_trx_id(m_user_thd);
+				set_next_trx_id = true;
+			}
+#endif /* WITH_WSREP */
+
 			/* LDI case doesn't qualify this. This case is only
 			applicable when an intermediate table is being created
 			and so src_table != m_prebuilt->table. */
@@ -8877,6 +8909,18 @@ no_commit:
 			/* Commit the transaction.  This will release the table
 			locks, so they have to be acquired again. */
 			innobase_commit(ht, m_user_thd, 1);
+
+#ifdef WITH_WSREP
+			/* Start new transaction after existing mini-transaction
+			is committed in all respect. Starting it early will
+			cause last bucket of left over rows (< 10K) to get
+			processed without active transaction (with log-bin=0).*/
+			if (set_next_trx_id) {
+				wsrep_thd_mark_split_trx(m_user_thd, false);
+				wsrep_thd_set_next_trx_id(m_user_thd);
+			}
+#endif /* WITH_WSREP */
+
 			/* Note that this transaction is still active. */
 			trx_register_for_2pc(m_prebuilt->trx);
 			/* Re-acquire the table lock on the source table. */
