@@ -1844,7 +1844,10 @@ void THD::release_resources()
   mysql_mutex_unlock(&LOCK_wsrep_thd);
   mysql_mutex_destroy(&LOCK_wsrep_thd);
   mysql_cond_destroy(&COND_wsrep_thd);
-  if (wsrep_rli) delete wsrep_rli;
+  if (wsrep_rli != NULL) {
+    delete wsrep_rli;
+    wsrep_rli = NULL;
+  }
   wsrep_free_status(this);
 #endif
 }
