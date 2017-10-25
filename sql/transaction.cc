@@ -786,7 +786,11 @@ bool trans_rollback_to_savepoint(THD *thd, LEX_STRING name)
                 (!((WSREP_EMULATE_BINLOG(thd) ||  mysql_bin_log.is_open()) 
 		   && thd->variables.sql_log_bin) ||
                  ha_rollback_to_savepoint_can_release_mdl(thd));
-  wsrep_register_hton(thd, TRUE);
+  /* No need to register wsrep plugin while rolling back to savepoint.
+  There is no action for wsrep plugin for savepoint rollback.
+  Action is associated with binlog to clearup/truncate till said point
+  and innodb.
+  wsrep_register_hton(thd, TRUE); */
 #else
   bool mdl_can_safely_rollback_to_savepoint=
                 (!(mysql_bin_log.is_open() && thd->variables.sql_log_bin) ||
