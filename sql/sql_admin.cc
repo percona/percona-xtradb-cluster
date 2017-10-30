@@ -1256,6 +1256,10 @@ bool Sql_cmd_analyze_table::execute(THD *thd)
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table,
                          FALSE, UINT_MAX, FALSE))
     goto error;
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
+                  { sql_print_information("In Sql_cmd_analyze_table::execute()");});
+
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
   thd->set_slow_log_for_admin_command();
   res= mysql_admin_table(thd, first_table, &thd->lex->check_opt,
@@ -1292,6 +1296,10 @@ bool Sql_cmd_check_table::execute(THD *thd)
   if (check_table_access(thd, SELECT_ACL, first_table,
                          TRUE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
+                  { sql_print_information("In Sql_cmd_check_table::execute()");});
+
   thd->enable_slow_log= opt_log_slow_admin_statements;
 
   res= mysql_admin_table(thd, first_table, &thd->lex->check_opt, "check",
@@ -1320,6 +1328,10 @@ bool Sql_cmd_optimize_table::execute(THD *thd)
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table,
                          FALSE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
+                  { sql_print_information("In Sql_cmd_optimize_table::execute()");});
+
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
   thd->set_slow_log_for_admin_command();
   res= (specialflag & SPECIAL_NO_NEW_FUNC) ?
@@ -1357,6 +1369,10 @@ bool Sql_cmd_repair_table::execute(THD *thd)
   if (check_table_access(thd, SELECT_ACL | INSERT_ACL, first_table,
                          FALSE, UINT_MAX, FALSE))
     goto error; /* purecov: inspected */
+
+  DBUG_EXECUTE_IF("sql_cmd.before_toi_begin.log_command",
+                  { sql_print_information("In Sql_cmd_repair_table::execute()");});
+
   WSREP_TO_ISOLATION_BEGIN_WRTCHK(NULL, NULL, first_table);
   thd->set_slow_log_for_admin_command();
   res= mysql_admin_table(thd, first_table, &thd->lex->check_opt, "repair",

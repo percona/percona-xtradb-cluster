@@ -8,11 +8,7 @@ DEFINER= 'root@localhost'	ORIGINATOR = 1	STATUS = 'SLAVESIDE_DISABLED'	EVENT_TYP
 1	1	1	1	1
 SET GLOBAL event_scheduler = ON;
 CREATE EVENT event2 ON SCHEDULE AT CURRENT_TIMESTAMP ON COMPLETION NOT PRESERVE DO SELECT 1;
-SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event2';
-COUNT(*) = 0
-1
+include/assert.inc [Event2 should be cleared from the system]
 DROP EVENT event1;
-SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
-COUNT(*) = 0
-1
+include/assert.inc [Event1 should be cleared from the system]
 SET GLOBAL event_scheduler = OFF;;

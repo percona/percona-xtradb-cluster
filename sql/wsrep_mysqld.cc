@@ -1863,7 +1863,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
       return true;
     }
 
-    if (table_list)
+    if (table_list && first_table)
     {
       for (TABLE_LIST* table= first_table; table; table= table->next_global)
       {
@@ -1873,7 +1873,7 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
         }
       }
     }
-    return !(table || table_list);
+    return !(table || (table_list && first_table));
   }
 }
 

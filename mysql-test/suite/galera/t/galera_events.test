@@ -35,7 +35,10 @@ CREATE EVENT event2 ON SCHEDULE AT CURRENT_TIMESTAMP ON COMPLETION NOT PRESERVE 
 --sleep 1
 
 --connection node_1
-SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event2';
+--let $assert_text = Event2 should be cleared from the system
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = "event2"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.EVENTS
+--source include/assert.inc
 
 #
 # DROP EVENT causes event to be dropped everywhere
@@ -45,7 +48,10 @@ SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event2';
 DROP EVENT event1;
 
 --connection node_2
-SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = 'event1';
+--let $assert_text = Event1 should be cleared from the system
+--let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.EVENTS WHERE EVENT_NAME = "event1"
+--let $assert_debug = SELECT * FROM INFORMATION_SCHEMA.EVENTS
+--source include/assert.inc
 
 # Cleanup
 
