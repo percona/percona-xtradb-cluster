@@ -207,6 +207,60 @@ static bool check_insert_fields(THD *thd, TABLE_LIST *table_list,
   if (table->vfield)
     table->mark_generated_columns(false);
 
+#ifdef WITH_WSREP
+
+  if (table_list->is_view() &&
+      lex->insert_table_leaf->table->s->primary_key == MAX_KEY)
+  {
+    bool block= false;
+
+    switch(pxc_strict_mode)
+    {
+    case PXC_STRICT_MODE_DISABLED:
+      break;
+    case PXC_STRICT_MODE_PERMISSIVE:
+      WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
+                 " INSERT on a view (%s.%s) that writes to a table"
+                 " with no explicit primary key"
+                 " with pxc_strict_mode = PERMISSIVE",
+                 table_list->view_db.str, table_list->view_name.str);
+      push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+        "Percona-XtraDB-Cluster doesn't recommend use of"
+        " INSERT on a view (%s.%s) that writes to a table"
+        " with no explicit primary key"
+        " with pxc_strict_mode = PERMISSIVE",
+        table_list->view_db.str, table_list->view_name.str);
+      break;
+    case PXC_STRICT_MODE_ENFORCING:
+    case PXC_STRICT_MODE_MASTER:
+    default:
+      block= true;
+      WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
+                  " INSERT on a view (%s.%s) that writes to a table"
+                  " with no explicit primary key"
+                  " with pxc_strict_mode = ENFORCING or MASTER",
+                  table_list->view_db.str, table_list->view_name.str);
+      char message[1024];
+      sprintf(message,
+              "Percona-XtraDB-Cluster prohibits use of"
+              " INSERT on a view (%s.%s) that writes to a table"
+              " with no explicit primary key"
+              " with pxc_strict_mode = ENFORCING or MASTER",
+              table_list->view_db.str, table_list->view_name.str);
+      my_message(ER_UNKNOWN_ERROR, message, MYF(0));
+      break;
+    }
+
+    if (block)
+    {
+      return true;
+    }
+  }
+
+#endif /* WITH_WSREP */
+
+
   if (check_key_in_view(thd, table_list, lex->insert_table_leaf) ||
       (table_list->is_view() &&
        check_view_insertability(thd, table_list, lex->insert_table_leaf)))

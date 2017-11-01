@@ -26,11 +26,13 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of INSERT");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of DML command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ADMIN command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ALTER command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits changing storage engine of a table");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of INSERT");
 call mtr.add_suppression("WSREP doesn't support XA transaction");
 set global pxc_strict_mode='ENFORCING';
 #node-2
@@ -1231,6 +1233,96 @@ drop table t;
 1
 "Try restarting node-2 with default options"
 # restart:
+#node-1
+CREATE TABLE tbl_w_pk(id INT PRIMARY KEY) engine=innodb;
+CREATE TABLE tbl_wo_pk(id INT) engine=innodb;
+CREATE VIEW  view_w_pk AS SELECT * FROM tbl_w_pk;
+CREATE VIEW  view_wo_pk AS SELECT * FROM tbl_wo_pk;
+INSERT INTO tbl_w_pk VALUES (1), (2);
+SELECT * FROM tbl_w_pk;
+id
+1
+2
+SELECT * FROM tbl_wo_pk;
+id
+#node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+DISABLED
+#node-1
+INSERT INTO view_w_pk VALUES(3);
+SELECT * FROM view_w_pk;
+id
+1
+2
+3
+INSERT INTO view_wo_pk VALUES (3);
+SELECT * FROM view_wo_pk;
+id
+3
+#node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+PERMISSIVE
+#node-1
+INSERT INTO view_w_pk VALUES(4);
+SELECT * FROM view_w_pk;
+id
+1
+2
+3
+4
+INSERT INTO view_wo_pk VALUES (4);
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of INSERT on a view (test.view_wo_pk) that writes to a table with no explicit primary key with pxc_strict_mode = PERMISSIVE
+SELECT * FROM view_wo_pk;
+id
+3
+4
+include/assert_grep.inc [pxc_strict_mode issued warning about no primary keys]
+#node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+@@pxc_strict_mode
+ENFORCING
+#node-1
+INSERT INTO view_w_pk VALUES(5);
+SELECT * FROM view_w_pk;
+id
+1
+2
+3
+4
+5
+INSERT INTO view_wo_pk VALUES (5);
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of INSERT on a view (test.view_wo_pk) that writes to a table with no explicit primary key with pxc_strict_mode = ENFORCING or MASTER
+SELECT * FROM view_wo_pk;
+id
+3
+4
+include/assert_grep.inc [pxc_strict_mode issued error about no primary keys]
+#node-1
+DROP VIEW view_wo_pk;
+DROP VIEW view_w_pk;
+DROP TABLE tbl_wo_pk;
+DROP TABLE tbl_w_pk;
 #node-1
 set global pxc_strict_mode = DISABLED;;
 #node-2

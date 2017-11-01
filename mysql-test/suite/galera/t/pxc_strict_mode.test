@@ -59,12 +59,14 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ADMIN command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of ALTER command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend changing storage engine of a table ");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of INSERT");
 
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of DML command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of TRUNCATE command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ADMIN command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of ALTER command");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits changing storage engine of a table");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of INSERT");
 
 
 call mtr.add_suppression("WSREP doesn't support XA transaction");
@@ -1318,6 +1320,116 @@ drop table t;
 --source include/start_mysqld.inc
 --let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
 --source include/wait_condition.inc
+
+#-------------------------------------------------------------------------------
+#
+# Scenario-9: Test effect of pxc-strict-mode on view with underlying table
+#             without explicit primary key
+#
+
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE tbl_w_pk(id INT PRIMARY KEY) engine=innodb;
+CREATE TABLE tbl_wo_pk(id INT) engine=innodb;
+
+CREATE VIEW  view_w_pk AS SELECT * FROM tbl_w_pk;
+CREATE VIEW  view_wo_pk AS SELECT * FROM tbl_wo_pk;
+
+INSERT INTO tbl_w_pk VALUES (1), (2);
+
+SELECT * FROM tbl_w_pk;
+SELECT * FROM tbl_wo_pk;
+
+#----------------------------
+#
+# DISABLED
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'DISABLED';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+INSERT INTO view_w_pk VALUES(3);
+SELECT * FROM view_w_pk;
+
+INSERT INTO view_wo_pk VALUES (3);
+SELECT * FROM view_wo_pk;
+
+#----------------------------
+#
+# PERMISSIVE
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'PERMISSIVE';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+INSERT INTO view_w_pk VALUES(4);
+SELECT * FROM view_w_pk;
+
+INSERT INTO view_wo_pk VALUES (4);
+SELECT * FROM view_wo_pk;
+
+--let $assert_text = pxc_strict_mode issued warning about no primary keys
+--let $assert_select = no explicit primary key with pxc_strict_mode = PERMISSIVE
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+#----------------------------
+#
+# ENFORCING
+--connection node_1
+--echo #node-1
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+#
+--connection node_2
+--echo #node-2
+set global pxc_strict_mode = 'ENFORCING';
+select @@pxc_strict_mode;
+
+#
+--connection node_1
+--echo #node-1
+INSERT INTO view_w_pk VALUES(5);
+SELECT * FROM view_w_pk;
+
+--error ER_UNKNOWN_ERROR
+INSERT INTO view_wo_pk VALUES (5);
+SELECT * FROM view_wo_pk;
+
+--let $assert_text = pxc_strict_mode issued error about no primary keys
+--let $assert_select = no explicit primary key with pxc_strict_mode = ENFORCING
+--let $assert_count = 1
+--let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+--let $assert_only_after = CURRENT_TEST
+--source include/assert_grep.inc
+
+#
+--connection node_1
+--echo #node-1
+DROP VIEW view_wo_pk;
+DROP VIEW view_w_pk;
+DROP TABLE tbl_wo_pk;
+DROP TABLE tbl_w_pk;
+
 
 #-------------------------------------------------------------------------------
 #
