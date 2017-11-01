@@ -157,7 +157,7 @@ timeit()
 
     if [[ $ttime -eq 1 ]]; then
         x1=$(date +%s)
-        wsrep_log_debug "Evaluating $cmd"
+        wsrep_log_debug "Evaluating (@ $stage) $cmd"
         eval "$cmd"
         extcode=$?
         x2=$(date +%s)
@@ -165,7 +165,7 @@ timeit()
         wsrep_log_debug "NOTE: $stage took $took seconds"
         totime=$(( totime+took ))
     else
-        wsrep_log_debug "Evaluating $cmd"
+        wsrep_log_debug "Evaluating (@ $stage) $cmd"
         eval "$cmd"
         extcode=$?
     fi
@@ -1574,83 +1574,83 @@ then
         exit 32
     fi
 
-    if [[ -n "$DONOR_MYSQL_VERSION" ]]; then
-        local_version_str=""
-        donor_version_str=""
+    if [ ! -r "${STATDIR}/${IST_FILE}" ]
+    then
+        if [[ -n "$DONOR_MYSQL_VERSION" ]]; then
+            local_version_str=""
+            donor_version_str=""
 
-        # Truncate the version numbers (we want the major.minor version like "5.6", not "5.6.35-...")
-        local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
-        donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+            # Truncate the version numbers (we want the major.minor version like "5.6", not "5.6.35-...")
+            local_version_str=$(expr match "$MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
+            donor_version_str=$(expr match "$DONOR_MYSQL_VERSION" '\([0-9]\+\.[0-9]\+\)')
 
-        # Is this node's pxc version < donor's pxc version?
-        if ! check_for_version $local_version_str $donor_version_str; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
-            wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
-            wsrep_log_error "Upgrade this node before joining the cluster."
-            wsrep_log_error "****************************************************** "
-            exit 2
+            # Is this node's pxc version < donor's pxc version?
+            if ! check_for_version $local_version_str $donor_version_str; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "FATAL: PXC is receiving an SST from a node with a higher version."
+                wsrep_log_error "This node's PXC version is $local_version_str.  The donor's PXC version is $donor_version_str."
+                wsrep_log_error "Upgrade this node before joining the cluster."
+                wsrep_log_error "****************************************************** "
+                exit 2
+            fi
+
+            # Is the donor's pxc version < this node's pxc version?
+            if ! check_for_version $donor_version_str $local_version_str; then
+                wsrep_log_warning "WARNING: PXC is receiving an SST from a node with a lower version."
+                wsrep_log_warning "This node's PXC version is $local_version_str. The donor's PXC version is $donor_version_str."
+                wsrep_log_warning "Run mysql_upgrade in non-cluster (standalone mode) to upgrade."
+                wsrep_log_warning "Check the upgrade process here:"
+                wsrep_log_warning "    https://www.percona.com/doc/percona-xtradb-cluster/LATEST/howtos/upgrade_guide.html"
+            fi
         fi
 
-        # Is the donor's pxc version < this node's pxc version?
-        if ! check_for_version $donor_version_str $local_version_str; then
-            wsrep_log_warning "WARNING: PXC is receiving an SST from a node with a lower version."
-            wsrep_log_warning "This node's PXC version is $local_version_str. The donor's PXC version is $donor_version_str."
-            wsrep_log_warning "Run mysql_upgrade in non-cluster (standalone mode) to upgrade."
-            wsrep_log_warning "Check the upgrade process here:"
-            wsrep_log_warning "    https://www.percona.com/doc/percona-xtradb-cluster/LATEST/howtos/upgrade_guide.html"
+        # server-id is already part of backup-my.cnf so avoid appending it.
+        # server-id is the id of the node that is acting as donor and not joiner node.
+
+        if [[ -n $keyring ]]; then
+            # joiner needs to wait to receive the file.
+            sleep 3
+
+            # Ensure that the destination directory exists and is R/W by us
+            if [[ ! -d "$KEYRING_DIR" || ! -r "$KEYRING_DIR" || ! -w "$KEYRING_DIR" ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "FATAL: Cannot acccess the keyring directory"
+                wsrep_log_error "  $KEYRING_DIR"
+                wsrep_log_error "It must already exist and be readable/writeable by MySQL"
+                wsrep_log_error "****************************************************** "
+                exit 22
+            fi
+
+            XB_DONOR_KEYRING_FILE_PATH="${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
+            recv_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 0 2
+            keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
+
+            wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
+        else
+            # There shouldn't be a keyring file, since we do not have a keyring here
+            # This will error out if a keyring file IS found
+            XB_DONOR_KEYRING_FILE_PATH="${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
+            recv_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 5 -1
+
+            if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "FATAL: xtrabackup found '${XB_DONOR_KEYRING_FILE_PATH}'"
+                wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
+                wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
+                wsrep_log_error "both sides are using a keyring file"
+                wsrep_log_error "****************************************************** "
+                exit 32
+            fi
         fi
-    fi
 
-    # server-id is already part of backup-my.cnf so avoid appending it.
-    # server-id is the id of the node that is acting as donor and not joiner node.
-
-    if [[ -n $keyring ]]; then
-        # joiner needs to wait to receive the file.
-        sleep 3
-
-        # Ensure that the destination directory exists and is R/W by us
-        if [[ ! -d "$KEYRING_DIR" || ! -r "$KEYRING_DIR" || ! -w "$KEYRING_DIR" ]]; then
+        if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
+        then
             wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: Cannot acccess the keyring directory"
-            wsrep_log_error "  $KEYRING_DIR"
-            wsrep_log_error "It must already exist and be readable/writeable by MySQL"
-            wsrep_log_error "****************************************************** "
-            exit 22
-        fi
-
-        XB_DONOR_KEYRING_FILE_PATH="${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
-        recv_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 0 2
-        keyringapplyopt=" --keyring-file-data=$XB_DONOR_KEYRING_FILE_PATH "
-
-        wsrep_log_info "donor keyring received at: '${XB_DONOR_KEYRING_FILE_PATH}'"
-    else
-        # There shouldn't be a keyring file, since we do not have a keyring here
-        # This will error out if a keyring file IS found
-        XB_DONOR_KEYRING_FILE_PATH="${KEYRING_DIR}/${XB_DONOR_KEYRING_FILE}"
-        recv_data_from_donor_to_joiner "${KEYRING_DIR}" "${stagemsg}-keyring" 5 -1
-
-        if [[ -r "${XB_DONOR_KEYRING_FILE_PATH}" ]]; then
-            wsrep_log_error "******************* FATAL ERROR ********************** "
-            wsrep_log_error "FATAL: xtrabackup found '${XB_DONOR_KEYRING_FILE_PATH}'"
-            wsrep_log_error "The joiner is not using a keyring file but the donor has sent"
-            wsrep_log_error "a keyring file.  Please check your configuration to ensure that"
-            wsrep_log_error "both sides are using a keyring file"
+            wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly."
             wsrep_log_error "****************************************************** "
             exit 32
         fi
-    fi
 
-    if ! ps -p ${WSREP_SST_OPT_PARENT} &>/dev/null
-    then
-        wsrep_log_error "******************* FATAL ERROR ********************** "
-        wsrep_log_error "Parent mysqld process (PID:${WSREP_SST_OPT_PARENT}) terminated unexpectedly."
-        wsrep_log_error "****************************************************** "
-        exit 32
-    fi
-
-    if [ ! -r "${STATDIR}/${IST_FILE}" ]
-    then
         get_stream
         if [[ $encrypt -eq 1 && -n "$ecmd" ]]; then
             strmcmd=" \$ecmd | $strmcmd"
