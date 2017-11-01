@@ -113,7 +113,7 @@ INSERT INTO counter(count) VALUES(8);;
 # connection node_1
 include/assert.inc [Database testdbother still does not exist on node 1]
 # connection node_2
-include/assert.inc [Database testdbother still does not exist on node 1]
+include/assert.inc [Database testdbother still does not exist on node 2]
 #
 # SQLCOM_DROP_DB access test
 #
@@ -218,34 +218,12 @@ include/assert_grep.inc [OPTIMIZE TABLE did not execute on node 1]
 # connection node_2
 include/assert_grep.inc [OPTIMIZE TABLE did not execute on node 2]
 #
-# SQLCOM_CHECK access test
-#
-# connection node_1
-CREATE DATABASE testdb_notouch;
-USE testdb_notouch;
-CREATE TABLE notouch(id INT PRIMARY KEY AUTO_INCREMENT, f2 CHAR(16));
-CREATE TABLE a1(id INT PRIMARY KEY);
-GRANT SELECT ON testdb_notouch.a1 TO 'testme'@'%';
-USE testdb;
-# connection node_testme
-USE testdb_notouch;
-CHECK TABLE notouch;
-ERROR 42000: SELECT command denied to user 'testme'@'localhost' for table 'notouch'
-USE testdb;
-INSERT INTO counter(count) VALUES(15);;
-# connection node_1
-include/assert_grep.inc [CHECK TABLE did not execute on node 1]
-# connection node_2
-include/assert_grep.inc [CHECK TABLE did not execute on node 2]
-# connection node_1
-DROP DATABASE testdb_notouch;
-#
 # SQLCOM_ANALYZE access test
 #
 # connection node_testme
 ANALYZE TABLE t1;
 ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 't1'
-INSERT INTO counter(count) VALUES(16);;
+INSERT INTO counter(count) VALUES(15);;
 # connection node_1
 include/assert_grep.inc [ANALYZE TABLE did not execute on node 1]
 # connection node_2
@@ -256,7 +234,7 @@ include/assert_grep.inc [ANALYZE TABLE did not execute on node 2]
 # connection node_testme
 RENAME TABLE t1 to t2;
 ERROR 42000: DROP, ALTER command denied to user 'testme'@'localhost' for table 't1'
-INSERT INTO counter(count) VALUES(17);;
+INSERT INTO counter(count) VALUES(16);;
 # connection node_1
 include/assert.inc [Table t1 was not renamed on node 1]
 # connection node_2
@@ -267,7 +245,7 @@ include/assert.inc [Table t1 was not renamed on node 2]
 # connection node_testme
 CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
 ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
-INSERT INTO counter(count) VALUES(18);;
+INSERT INTO counter(count) VALUES(17);;
 # connection node_1
 include/assert.inc [User foo was not created on node 1]
 # connection node_2
@@ -278,7 +256,7 @@ include/assert.inc [User foo was not created on node 2]
 # connection node_testme
 DROP USER 'testother'@'%';
 ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
-INSERT INTO counter(count) VALUES(19);;
+INSERT INTO counter(count) VALUES(18);;
 # connection node_1
 include/assert.inc [User testother still exists on node 1]
 # connection node_2
@@ -289,7 +267,7 @@ include/assert.inc [User testother still exists on node 2]
 # connection node_testme
 RENAME USER 'testother'@'%' TO 'testwho'@'%';
 ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
-INSERT INTO counter(count) VALUES(20);;
+INSERT INTO counter(count) VALUES(19);;
 # connection node_1
 include/assert.inc [User testother still exists on node 1]
 # connection node_2
@@ -313,7 +291,7 @@ GRANT SELECT ON `testdb`.`t1` TO 'testother'@'%'
 # connection node_testme
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'testother'@'%';
 ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
-INSERT INTO counter(count) VALUES(21);;
+INSERT INTO counter(count) VALUES(20);;
 # connection node_1
 SHOW GRANTS FOR 'testother';
 Grants for testother@%
@@ -332,7 +310,7 @@ CREATE PROCEDURE hellop (OUT ver_param VARCHAR(64), INOUT incr_param INT)
 BEGIN
 END;
 ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
-INSERT INTO counter(count) VALUES(22);;
+INSERT INTO counter(count) VALUES(21);;
 # connection node_1
 include/assert.inc [The hellop procedure should not exist on node 1]
 # connection node_2
@@ -343,7 +321,7 @@ include/assert.inc [The hellop function should not exist on node 2]
 # connection node_testme
 CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello, ',s,'!');
 ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
-INSERT INTO counter(count) VALUES(23);;
+INSERT INTO counter(count) VALUES(22);;
 # connection node_1
 include/assert.inc [The hello function should not exist on node 1]
 # connection node_2
@@ -362,7 +340,7 @@ include/assert.inc [The hellop procedure should exist on node 2]
 # connection node_testme
 DROP PROCEDURE hellop;
 ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellop'
-INSERT INTO counter(count) VALUES(24);;
+INSERT INTO counter(count) VALUES(23);;
 # connection node_1
 include/assert.inc [The hellop procedure should still exist on node 1]
 # connection node_2
@@ -386,7 +364,7 @@ hellop	DEFINER
 # connection node_testme
 ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellop'
-INSERT INTO counter(count) VALUES(25);;
+INSERT INTO counter(count) VALUES(24);;
 # connection node_1
 include/assert.inc [The hellop procedure should still use the definer on node 1]
 # connection node_2
@@ -408,7 +386,7 @@ hellof	DEFINER
 # connection node_testme
 ALTER FUNCTION hellof SQL SECURITY INVOKER;
 ERROR 42000: alter routine command denied to user 'testme'@'%' for routine 'testdb.hellof'
-INSERT INTO counter(count) VALUES(26);;
+INSERT INTO counter(count) VALUES(25);;
 # connection node_1
 include/assert.inc [The hellof function should still use the definer on node 1]
 # connection node_2
@@ -421,7 +399,7 @@ DROP FUNCTION hellof;
 # connection node_testme
 CREATE VIEW testview AS SELECT * FROM t1;
 ERROR 42000: CREATE VIEW command denied to user 'testme'@'localhost' for table 'testview'
-INSERT INTO counter(count) VALUES(27);;
+INSERT INTO counter(count) VALUES(26);;
 # connection node_1
 include/assert.inc [The testview VIEW should not exist on node 1]
 # connection node_2
@@ -438,7 +416,7 @@ include/assert.inc [The helloview VIEW should exist on node 2]
 # connection node_testme
 DROP VIEW helloview;
 ERROR 42000: DROP command denied to user 'testme'@'localhost' for table 'helloview'
-INSERT INTO counter(count) VALUES(28);;
+INSERT INTO counter(count) VALUES(27);;
 # connection node_1
 include/assert.inc [The helloview VIEW should still exist on node 1]
 # connection node_2
@@ -451,7 +429,7 @@ DROP VIEW helloview;
 # connection node_testme
 CREATE TRIGGER testtrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
 ERROR 42000: TRIGGER command denied to user 'testme'@'localhost' for table 't1'
-INSERT INTO counter(count) VALUES(29);;
+INSERT INTO counter(count) VALUES(28);;
 # connection node_1
 include/assert.inc [The testtrigger TRIGGER should not exist on node 1]
 # connection node_2
@@ -468,9 +446,9 @@ include/assert.inc [The hellotrigger TRIGGER should exist on node 2]
 # connection node_testme
 DROP TRIGGER hellotrigger;
 ERROR 42000: TRIGGER command denied to user 'testme'@'localhost' for table 't1'
-INSERT INTO counter(count) VALUES(30);;
+INSERT INTO counter(count) VALUES(29);;
 # connection node_1
-include/assert.inc [The hellotrigger TRIGGER should still exist on node 2]
+include/assert.inc [The hellotrigger TRIGGER should still exist on node 1]
 # connection node_2
 include/assert.inc [The hellotrigger TRIGGER should still exist on node 2]
 # connection node_1
@@ -481,7 +459,7 @@ DROP TRIGGER hellotrigger;
 # connection node_testme
 INSTALL PLUGIN audit_log SONAME "audit_log.so";
 ERROR 42000: INSERT command denied to user 'testme'@'localhost' for table 'plugin'
-INSERT INTO counter(count) VALUES(31);;
+INSERT INTO counter(count) VALUES(30);;
 # connection node_1
 include/assert.inc [The audit_log PLUGIN should not be installed on node 1]
 # connection node_2
@@ -496,7 +474,7 @@ include/assert.inc [The audit_log PLUGIN should be installed on node 1]
 # connection node_testme
 UNINSTALL PLUGIN audit_log;
 ERROR 42000: DELETE command denied to user 'testme'@'localhost' for table 'plugin'
-INSERT INTO counter(count) VALUES(32);;
+INSERT INTO counter(count) VALUES(31);;
 # connection node_1
 include/assert.inc [The audit_log PLUGIN should still be installed on node 1]
 # connection node_2
@@ -513,7 +491,7 @@ CREATE EVENT testevent
 ON SCHEDULE EVERY 1 HOUR
 DO INSERT INTO t1(f2) VALUES(3);
 ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
-INSERT INTO counter(count) VALUES(33);;
+INSERT INTO counter(count) VALUES(32);;
 # connection node_1
 include/assert.inc [The testevent EVENT should not exist on node 1]
 # connection node_2
@@ -532,7 +510,7 @@ include/assert.inc [The helloevent EVENT should exist on node 2]
 # connection node_testme
 ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
-INSERT INTO counter(count) VALUES(34);;
+INSERT INTO counter(count) VALUES(33);;
 # connection node_1
 include/assert.inc [The helloevent EVENT should still exist on node 1]
 # connection node_2
@@ -543,7 +521,7 @@ include/assert.inc [The helloevent EVENT should still exist on node 2]
 # connection node_testme
 DROP EVENT helloevent;
 ERROR 42000: Access denied for user 'testme'@'%' to database 'testdb'
-INSERT INTO counter(count) VALUES(35);;
+INSERT INTO counter(count) VALUES(34);;
 # connection node_1
 include/assert.inc [The helloevent EVENT should still exist on node 1]
 # connection node_2
@@ -554,7 +532,7 @@ include/assert.inc [The helloevent EVENT should still exist on node 2]
 # connection node_testme
 ALTER USER 'testother'@'%' PASSWORD EXPIRE;
 ERROR 42000: Access denied; you need (at least one of) the CREATE USER privilege(s) for this operation
-INSERT INTO counter(count) VALUES(36);;
+INSERT INTO counter(count) VALUES(35);;
 # connection node_1
 include/assert.inc [User testother should be unexpired on node 1]
 # connection node_2

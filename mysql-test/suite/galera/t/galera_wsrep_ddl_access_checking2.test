@@ -1,6 +1,9 @@
 #
 # Test access checks for DDL
-# Test that DDL statements are not replicated if the access checks fail.
+#
+# This is the complement of galera_wsrep_ddl_access_checking.test
+# This tests that if the user has the appropriate privileges, the statement
+# will succeed and will be replicated.
 #
 #
 # The following commands are not tested since they are not replicated.
@@ -185,10 +188,19 @@ use testdb;
 --echo # SQLCOM_CREATE_TABLE access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT CREATE ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE TABLE t2(id INT PRIMARY KEY AUTO_INCREMENT);
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -198,8 +210,8 @@ CREATE TABLE t2(id INT PRIMARY KEY AUTO_INCREMENT);
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Table t2 should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME="t2"
+--let $assert_text = Table t2 should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME="t2"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -207,9 +219,18 @@ CREATE TABLE t2(id INT PRIMARY KEY AUTO_INCREMENT);
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Table t2 should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME="t2"
+--let $assert_text = Table t2 should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME="t2"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE CREATE ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+DROP TABLE t2;
 
 
 #
@@ -221,11 +242,247 @@ CREATE TABLE t2(id INT PRIMARY KEY AUTO_INCREMENT);
 --echo # SQLCOM_CREATE_INDEX access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT INDEX ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE INDEX index_t1_f2 ON t1(f2);
+
+--eval INSERT INTO counter(count) VALUES($test_id);
+
+--echo # connection node_1
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Index t1_f2 should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE table_schema="testdb" AND table_name="t1" AND index_name != "PRIMARY"
+--let $assert_debug = SHOW INDEX FROM testdb.t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Index t1_f2 should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE table_schema="testdb" AND table_name="t1" AND index_name != "PRIMARY"
+--source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE INDEX ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+DROP INDEX index_t1_f2 ON t1;
+
+
+#
+# SQLCOM_ALTER_TABLE
+#
+--inc $test_id
+
+--echo #
+--echo # SQLCOM_ALTER_TABLE access test
+--echo #
+
+--echo # connection node_1
+--connection node_1
+GRANT ALTER ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
+ALTER TABLE t1 ADD COLUMN f3 LONGBLOB;
+
+--eval INSERT INTO counter(count) VALUES($test_id);
+
+--echo # connection node_1
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Column f3 on table t1 should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.columns WHERE table_schema="testdb" AND table_name="t1" AND column_name = "f3"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Column f3 on table t1 should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.columns WHERE table_schema="testdb" AND table_name="t1" AND column_name = "f3"
+--source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE ALTER ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+ALTER TABLE t1 DROP COLUMN f3;
+
+
+#
+# SQLCOM_TRUNCATE
+#
+--inc $test_id
+
+--echo #
+--echo # SQLCOM_TRUNCATE access test
+--echo #
+
+--echo # connection node_1
+--connection node_1
+GRANT DROP ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
+TRUNCATE TABLE t1;
+
+--eval INSERT INTO counter(count) VALUES($test_id);
+
+--echo # connection node_1
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Table t1 was truncated on node 1
+--let $assert_cond = COUNT(*) = 0 FROM t1
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Table t1 was truncated on node 2
+--let $assert_cond = COUNT(*) = 0 FROM t1
+--source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE DROP ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+INSERT INTO t1(f2) VALUES(1);
+
+
+#
+# SQLCOM_DROP_TABLE
+#
+--inc $test_id
+
+--echo #
+--echo # SQLCOM_DROP_TABLE access test
+--echo #
+
+--echo # connection node_1
+--connection node_1
+GRANT DROP ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
+DROP TABLE t1;
+
+--eval INSERT INTO counter(count) VALUES($test_id);
+
+--echo # connection node_1
+--connection node_1
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Table t1 was dropped on node 1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE table_name = "t1"
+--source include/assert.inc
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
+--source include/wait_condition.inc
+
+--let $assert_text = Table t1 was dropped on node 2
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE table_name = "t1"
+--source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE DROP ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+CREATE TABLE t1(id INT PRIMARY KEY AUTO_INCREMENT, f2 CHAR(64));
+INSERT INTO t1(f2) VALUES(1);
+
+
+#
+# SQLCOM_DROP_INDEX
+#
+--inc $test_id
+
+--echo #
+--echo # SQLCOM_DROP_INDEX access test
+--echo #
+
+--echo # connection node_1
+--connection node_1
+CREATE INDEX t1_f2 ON t1(f2);
+
+--let $assert_text = Index t1_f2 should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE table_schema="testdb" AND table_name="t1" AND index_name != "PRIMARY"
+--let $assert_debug = SHOW INDEX FROM testdb.t1
+--source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+GRANT INDEX ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
+DROP INDEX t1_f2 ON t1;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -248,165 +505,12 @@ CREATE INDEX index_t1_f2 ON t1(f2);
 --let $assert_cond = COUNT(*) = 0 FROM information_schema.statistics WHERE table_schema="testdb" AND table_name="t1" AND index_name != "PRIMARY"
 --source include/assert.inc
 
-
-#
-# SQLCOM_ALTER_TABLE
-#
---inc $test_id
-
---echo #
---echo # SQLCOM_ALTER_TABLE access test
---echo #
-
---echo # connection node_testme
---connection node_testme
-
---error ER_TABLEACCESS_DENIED_ERROR
-ALTER TABLE t1 ADD COLUMN f3 LONGBLOB;
-
---eval INSERT INTO counter(count) VALUES($test_id);
-
 --echo # connection node_1
 --connection node_1
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Column f3 on table t1 should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.columns WHERE table_schema="testdb" AND table_name="t1" AND column_name = "f3"
---source include/assert.inc
-
---echo # connection node_2
---connection node_2
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Column f3 on table t1 should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.columns WHERE table_schema="testdb" AND table_name="t1" AND column_name = "f3"
---source include/assert.inc
-
-
-#
-# SQLCOM_TRUNCATE
-#
---inc $test_id
-
---echo #
---echo # SQLCOM_TRUNCATE access test
---echo #
-
---echo # connection node_testme
---connection node_testme
-
---error ER_TABLEACCESS_DENIED_ERROR
-TRUNCATE TABLE t1;
-
---eval INSERT INTO counter(count) VALUES($test_id);
-
---echo # connection node_1
---connection node_1
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Table t1 was not truncated on node 1
---let $assert_cond = COUNT(*) = 1 FROM t1
---source include/assert.inc
-
---echo # connection node_2
---connection node_2
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Table t1 was not truncated on node 2
---let $assert_cond = COUNT(*) = 1 FROM t1
---source include/assert.inc
-
-
-#
-# SQLCOM_DROP_TABLE
-#
---inc $test_id
-
---echo #
---echo # SQLCOM_DROP_TABLE access test
---echo #
-
---echo # connection node_testme
---connection node_testme
-
---error ER_TABLEACCESS_DENIED_ERROR
-DROP TABLE t1;
-
---eval INSERT INTO counter(count) VALUES($test_id);
-
---echo # connection node_1
---connection node_1
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Table t1 was not dropped on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1"
---source include/assert.inc
-
---echo # connection node_2
---connection node_2
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Table t1 was not dropped on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1"
---source include/assert.inc
-
-
-#
-# SQLCOM_DROP_INDEX
-#
---inc $test_id
-
---echo #
---echo # SQLCOM_DROP_INDEX access test
---echo #
-
---echo # connection node_1
---connection node_1
-CREATE INDEX t1_f2 ON t1(f2);
-
---let $assert_text = Index t1_f2 should exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE table_schema="testdb" AND table_name="t1" AND index_name != "PRIMARY"
---let $assert_debug = SHOW INDEX FROM testdb.t1
---source include/assert.inc
-
---echo # connection node_testme
---connection node_testme
-
---error ER_TABLEACCESS_DENIED_ERROR
-DROP INDEX t1_f2 ON t1;
-
---eval INSERT INTO counter(count) VALUES($test_id);
-
---echo # connection node_1
---connection node_1
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Index t1_f2 should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE table_schema="testdb" AND table_name="t1" AND index_name != "PRIMARY"
---let $assert_debug = SHOW INDEX FROM testdb.t1
---source include/assert.inc
-
---echo # connection node_2
---connection node_2
---let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
---source include/wait_condition.inc
-
---let $assert_text = Index t1_f2 should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.statistics WHERE table_schema="testdb" AND table_name="t1" AND index_name != "PRIMARY"
---source include/assert.inc
-
-# test cleanup
-#
---echo # connection node_1
---connection node_1
-DROP INDEX t1_f2 ON t1;
+REVOKE INDEX ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -418,10 +522,19 @@ DROP INDEX t1_f2 ON t1;
 --echo # SQLCOM_GRANT access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT GRANT OPTION ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_DBACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 GRANT SELECT ON testdb.* TO 'testother'@'%';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -442,6 +555,13 @@ SHOW GRANTS FOR 'testother';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testother';
 
+--echo # connection node_1
+--connection node_1
+REVOKE GRANT OPTION ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
 
 #
 # SQLCOM_CREATE_DB
@@ -459,7 +579,19 @@ SHOW GRANTS FOR 'testother';
 --let $assert_cond = COUNT(*) = 0 FROM information_schema.schemata WHERE schema_name="testdbother"
 --source include/assert.inc
 
---error ER_DBACCESS_DENIED_ERROR
+--echo # connection node_1
+--connection node_1
+GRANT CREATE ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE DATABASE testdbother;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -469,8 +601,8 @@ CREATE DATABASE testdbother;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Database testdbother still does not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.schemata WHERE schema_name="testdbother"
+--let $assert_text = Database testdbother should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.schemata WHERE schema_name="testdbother"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -478,9 +610,18 @@ CREATE DATABASE testdbother;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Database testdbother still does not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.schemata WHERE schema_name="testdbother"
+--let $assert_text = Database testdbother should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.schemata WHERE schema_name="testdbother"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE CREATE ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+DROP DATABASE testdbother;
 
 
 #
@@ -492,15 +633,29 @@ CREATE DATABASE testdbother;
 --echo # SQLCOM_DROP_DB access test
 --echo #
 
+--echo # connection node_1
+--connection node_1
+CREATE DATABASE testdbother;
+
+--echo # connection node_2
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM information_schema.schemata WHERE schema_name="testdbother";
+--source include/wait_condition.inc
+
+--echo # connection node_1
+--connection node_1
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+GRANT DROP ON *.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
+
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---let $assert_text = Database testdb exists on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.schemata WHERE schema_name="testdb"
---source include/assert.inc
-
---error ER_DBACCESS_DENIED_ERROR
-DROP DATABASE testdb;
+DROP DATABASE testdbother;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -509,8 +664,8 @@ DROP DATABASE testdb;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Database testdb still exists on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.schemata WHERE schema_name="testdb"
+--let $assert_text = Database testdbother should not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.schemata WHERE schema_name="testdbother"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -518,9 +673,16 @@ DROP DATABASE testdb;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Database testdb still exists on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.schemata WHERE schema_name="testdb"
+--let $assert_text = Database testdbother shoutl not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.schemata WHERE schema_name="testdbother"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE DROP ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -532,13 +694,23 @@ DROP DATABASE testdb;
 --echo # SQLCOM_ALTER_DB access test
 --echo #
 
+--echo # connection node_1
+--connection node_1
+GRANT ALTER ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+CREATE DATABASE testdbother;
+SHOW CREATE DATABASE testdbother;
+
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
-SHOW CREATE DATABASE testdb;
-
---error ER_DBACCESS_DENIED_ERROR
-ALTER DATABASE testdb CHARACTER SET latin7;
+--connection node_testme
+ALTER DATABASE testdbother CHARACTER SET latin7;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -547,14 +719,23 @@ ALTER DATABASE testdb CHARACTER SET latin7;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
-SHOW CREATE DATABASE testdb;
+SHOW CREATE DATABASE testdbother;
 
 --echo # connection node_2
 --connection node_2
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
-SHOW CREATE DATABASE testdb;
+SHOW CREATE DATABASE testdbother;
+
+--echo # connection node_1
+--connection node_1
+DROP DATABASE testdbother;
+
+REVOKE ALTER ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -566,10 +747,20 @@ SHOW CREATE DATABASE testdb;
 --echo # SQLCOM_REPAIR access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+# testme already has SELECT access
+GRANT INSERT ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 REPAIR TABLE t1;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -579,9 +770,9 @@ REPAIR TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = REPAIR TABLE did not execute on node 1
+--let $assert_text = REPAIR TABLE did execute on node 1
 --let $assert_select = Sql_cmd_repair_table::execute
---let $assert_count = 0
+--let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
@@ -591,12 +782,19 @@ REPAIR TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = REPAIR TABLE did not execute on node 2
+--let $assert_text = REPAIR TABLE did execute on node 2
 --let $assert_select = Sql_cmd_repair_table::execute
---let $assert_count = 0
+--let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE INSERT ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -626,11 +824,19 @@ CREATE FUNCTION hello2 (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT
 --let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
 --source include/assert.inc
 
+--echo # connection node_1
+--connection node_1
+GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_PROCACCESS_DENIED_ERROR
 DROP FUNCTION hello2;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -640,8 +846,8 @@ DROP FUNCTION hello2;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hello2 function should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_text = The hello2 function should not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello2"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -649,15 +855,18 @@ DROP FUNCTION hello2;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hello2 function should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello2"
+--let $assert_text = The hello2 function should not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello2"
 --source include/assert.inc
 
 # cleanup
 #
 --echo # connection node_1
 --connection node_1
-DROP FUNCTION hello2;
+REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -686,11 +895,19 @@ SHOW GRANTS FOR 'testother';
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
 SHOW GRANTS FOR 'testother';
 
+--echo # connection node_1
+--connection node_1
+GRANT GRANT OPTION ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_TABLEACCESS_DENIED_ERROR
 REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -715,7 +932,10 @@ SHOW GRANTS FOR 'testother';
 #
 --echo # connection node_1
 --connection node_1
-REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
+REVOKE GRANT OPTION ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -727,10 +947,20 @@ REVOKE SELECT ON testdb.t1 FROM 'testother'@'%';
 --echo # SQLCOM_OPTIMIZE access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+# testme already has SELECT access
+GRANT INSERT ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 OPTIMIZE TABLE t1;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -740,9 +970,9 @@ OPTIMIZE TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = OPTIMIZE TABLE did not execute on node 1
+--let $assert_text = OPTIMIZE TABLE did execute on node 1
 --let $assert_select = Sql_cmd_optimize_table::execute
---let $assert_count = 0
+--let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
@@ -752,12 +982,19 @@ OPTIMIZE TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = OPTIMIZE TABLE did not execute on node 2
+--let $assert_text = OPTIMIZE TABLE did execute on node 2
 --let $assert_select = Sql_cmd_optimize_table::execute
---let $assert_count = 0
+--let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE INSERT ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -769,10 +1006,20 @@ OPTIMIZE TABLE t1;
 --echo # SQLCOM_ANALYZE access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+# testme already has SELECT access
+GRANT INSERT ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 ANALYZE TABLE t1;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -782,9 +1029,9 @@ ANALYZE TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = ANALYZE TABLE did not execute on node 1
+--let $assert_text = ANALYZE TABLE did execute on node 1
 --let $assert_select = Sql_cmd_analyze_table::execute
---let $assert_count = 0
+--let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
@@ -794,12 +1041,19 @@ ANALYZE TABLE t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = ANALYZE TABLE did not execute on node 2
+--let $assert_text = ANALYZE TABLE did execute on node 2
 --let $assert_select = Sql_cmd_analyze_table::execute
---let $assert_count = 0
+--let $assert_count = 1
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.2.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE INSERT ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -810,10 +1064,20 @@ ANALYZE TABLE t1;
 --echo #
 --echo # SQLCOM_RENAME_TABLE access test
 --echo #
---echo # connection node_testme
---connection node_testme
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_1
+--connection node_1
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+GRANT ALTER,DROP,CREATE,INSERT ON testdb.* TO 'testme'@'%';
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 RENAME TABLE t1 to t2;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -823,8 +1087,8 @@ RENAME TABLE t1 to t2;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Table t1 was not renamed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1"
+--let $assert_text = Table t1 was renamed on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t2"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -832,9 +1096,18 @@ RENAME TABLE t1 to t2;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = Table t1 was not renamed on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t1"
+--let $assert_text = Table t1 was renamed on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_name = "t2"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+RENAME TABLE t2 to t1;
+
+REVOKE ALTER,DROP,CREATE,INSERT ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -845,10 +1118,20 @@ RENAME TABLE t1 to t2;
 --echo #
 --echo # SQLCOM_CREATE_USER access test
 --echo #
---echo # connection node_testme
---connection node_testme
 
---error ER_SPECIFIC_ACCESS_DENIED_ERROR
+--echo # connection node_1
+--connection node_1
+GRANT CREATE USER ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -858,8 +1141,8 @@ CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User foo was not created on node 1
---let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "foo"
+--let $assert_text = User foo was created on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -867,9 +1150,18 @@ CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User foo was not created on node 2
---let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "foo"
+--let $assert_text = User foo was created on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "foo"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+DROP USER foo;
+
+REVOKE CREATE USER ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -880,11 +1172,28 @@ CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
 --echo #
 --echo # SQLCOM_DROP_USER access test
 --echo #
---echo # connection node_testme
---connection node_testme
 
---error ER_SPECIFIC_ACCESS_DENIED_ERROR
-DROP USER 'testother'@'%';
+--connection node_1
+CREATE USER 'testdbother'@'%' IDENTIFIED BY 'secret2';
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE user = "testdbother";
+--source include/wait_condition.inc
+
+--echo # connection node_1
+--connection node_1
+GRANT CREATE USER ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
+DROP USER 'testdbother'@'%';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -893,8 +1202,8 @@ DROP USER 'testother'@'%';
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User testother still exists on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother"
+--let $assert_text = User testdbother does not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "testdbother"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -902,9 +1211,16 @@ DROP USER 'testother'@'%';
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User testother still exists on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother"
+--let $assert_text = User testdbother does not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "testdbother"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE CREATE USER ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -915,10 +1231,20 @@ DROP USER 'testother'@'%';
 --echo #
 --echo # SQLCOM_RENAME_USER access test
 --echo #
---echo # connection node_testme
---connection node_testme
 
---error ER_SPECIFIC_ACCESS_DENIED_ERROR
+--echo # connection node_1
+--connection node_1
+GRANT CREATE USER ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 RENAME USER 'testother'@'%' TO 'testwho'@'%';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -928,8 +1254,12 @@ RENAME USER 'testother'@'%' TO 'testwho'@'%';
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User testother still exists on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother"
+--let $assert_text = User testother does not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "testother"
+--source include/assert.inc
+
+--let $assert_text = User testwho exists on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testwho"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -937,9 +1267,23 @@ RENAME USER 'testother'@'%' TO 'testwho'@'%';
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User testother still exists on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother"
+--let $assert_text = User testother does not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM mysql.user WHERE user = "testother"
 --source include/assert.inc
+
+--let $assert_text = User testwho exists on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testwho"
+--source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+RENAME USER 'testwho'@'%' TO 'testother'@'%';
+
+REVOKE CREATE USER ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
 
 #
 # SQLCOM_REVOKE_ALL
@@ -954,25 +1298,30 @@ RENAME USER 'testother'@'%' TO 'testwho'@'%';
 #
 --echo # connection node_1
 --connection node_1
-GRANT SELECT ON testdb.t1 TO 'testother'@'%';
+CREATE USER 'foo'@'%' IDENTIFIED BY 'secret';
+GRANT SELECT ON testdb.t1 TO 'foo'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'foo';
 FLUSH PRIVILEGES;
+
+--connection node_2
+--let $wait_condition = SELECT COUNT(*) = 1 FROM mysql.user WHERE User = 'foo';
+--source include/wait_condition.inc
 
 --echo # connection node_1
 --connection node_1
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
-SHOW GRANTS FOR 'testother';
-
---echo # connection node_2
---connection node_2
---replace_regex /\*[0-9A-Z]+/<SECRET>/
-SHOW GRANTS FOR 'testother';
-
+SHOW GRANTS FOR 'testme';
+GRANT CREATE USER ON *.* TO 'testme'@'%';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_SPECIFIC_ACCESS_DENIED_ERROR
-REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'testother'@'%';
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'foo'@'%';
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -982,7 +1331,7 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'testother'@'%';
 --source include/wait_condition.inc
 
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
-SHOW GRANTS FOR 'testother';
+SHOW GRANTS FOR 'foo';
 
 --echo # connection node_2
 --connection node_2
@@ -990,7 +1339,16 @@ SHOW GRANTS FOR 'testother';
 --source include/wait_condition.inc
 
 --replace_regex /\*[0-9A-Z]+/<SECRET>/
-SHOW GRANTS FOR 'testother';
+SHOW GRANTS FOR 'foo';
+
+--echo # connection node_1
+--connection node_1
+DROP USER foo;
+
+REVOKE CREATE USER ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1002,10 +1360,19 @@ SHOW GRANTS FOR 'testother';
 --echo # SQLCOM_CREATE_PROCEDURE access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_DBACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE PROCEDURE hellop (OUT ver_param VARCHAR(64), INOUT incr_param INT)
 BEGIN
 END;
@@ -1017,8 +1384,8 @@ END;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop procedure should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
+--let $assert_text = The hellop procedure should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1026,9 +1393,18 @@ END;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop function should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
+--let $assert_text = The hellop function should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+DROP PROCEDURE hellop;
+
+REVOKE CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1040,10 +1416,19 @@ END;
 --echo # SQLCOM_CREATE_SPFUNCTION access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_DBACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT('Hello, ',s,'!');
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1053,8 +1438,8 @@ CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT(
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hello function should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello"
+--let $assert_text = The hello function should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1062,9 +1447,18 @@ CREATE FUNCTION hello (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT(
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hello function should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hello"
+--let $assert_text = The hello function should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hello"
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+DROP FUNCTION hello;
+
+REVOKE CREATE ROUTINE,EXECUTE,ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1096,11 +1490,19 @@ END;
 --let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
 --source include/assert.inc
 
+--echo # connection node_1
+--connection node_1
+GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_PROCACCESS_DENIED_ERROR
 DROP PROCEDURE hellop;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1110,8 +1512,8 @@ DROP PROCEDURE hellop;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop procedure should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_text = The hellop procedure should not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1119,15 +1521,17 @@ DROP PROCEDURE hellop;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop procedure should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.proc WHERE name="hellop"
+--let $assert_text = The hellop procedure should not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM mysql.proc WHERE name="hellop"
 --source include/assert.inc
 
 # cleanup
 #
---echo # connection node_1
 --connection node_1
-DROP PROCEDURE hellop;
+REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1161,10 +1565,19 @@ END;
 
 SELECT name, security_type FROM mysql.proc WHERE name = "hellop";
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_PROCACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1174,8 +1587,8 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop procedure should still use the definer on node 1
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellop";
+--let $assert_text = The hellop procedure should use the invoker on node 1
+--let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellop";
 --let $assert_debug = SELECT * FROM mysql.proc WHERE name = "hellop";
 --source include/assert.inc
 
@@ -1184,8 +1597,8 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellop procedure should still use the definer on node 2
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellop";
+--let $assert_text = The hellop procedure should use the invoker on node 2
+--let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellop";
 --source include/assert.inc
 
 # cleanup
@@ -1193,6 +1606,12 @@ ALTER PROCEDURE hellop SQL SECURITY INVOKER;
 --echo # connection node_1
 --connection node_1
 DROP PROCEDURE hellop;
+
+--connection node_1
+REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1224,10 +1643,19 @@ CREATE FUNCTION hellof (s CHAR(20)) RETURNS CHAR(50) DETERMINISTIC RETURN CONCAT
 
 SELECT name, security_type FROM mysql.proc WHERE name = "hellof";
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT ALTER ROUTINE ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_PROCACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 ALTER FUNCTION hellof SQL SECURITY INVOKER;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1237,8 +1665,8 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellof function should still use the definer on node 1
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellof";
+--let $assert_text = The hellof function should use the invoker on node 1
+--let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellof";
 --let $assert_debug = SELECT * FROM mysql.proc WHERE name = "hellof";
 --source include/assert.inc
 
@@ -1247,8 +1675,8 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellof function should still use the definer on node 2
---let $assert_cond = security_type = "definer" FROM mysql.proc WHERE name = "hellof";
+--let $assert_text = The hellof function should use the invoker on node 2
+--let $assert_cond = security_type = "invoker" FROM mysql.proc WHERE name = "hellof";
 --source include/assert.inc
 
 # cleanup
@@ -1256,6 +1684,12 @@ ALTER FUNCTION hellof SQL SECURITY INVOKER;
 --echo # connection node_1
 --connection node_1
 DROP FUNCTION hellof;
+
+--connection node_1
+REVOKE ALTER ROUTINE ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1267,10 +1701,19 @@ DROP FUNCTION hellof;
 --echo # SQLCOM_CREATE_VIEW access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT CREATE VIEW ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE VIEW testview AS SELECT * FROM t1;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1280,8 +1723,8 @@ CREATE VIEW testview AS SELECT * FROM t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The testview VIEW should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "testview";
+--let $assert_text = The testview VIEW should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "testview";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1289,9 +1732,17 @@ CREATE VIEW testview AS SELECT * FROM t1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The testview VIEW should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "testview";
+--let $assert_text = The testview VIEW should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "testview";
 --source include/assert.inc
+
+--connection node_1
+DROP VIEW testview;
+
+REVOKE CREATE VIEW ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1326,11 +1777,19 @@ CREATE VIEW helloview AS SELECT * FROM t1;
 --let $assert_debug = SELECT * FROM information_schema.tables WHERE table_type = "VIEW";
 --source include/assert.inc
 
+--echo # connection node_1
+--connection node_1
+GRANT DROP ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_TABLEACCESS_DENIED_ERROR
 DROP VIEW helloview;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1340,8 +1799,8 @@ DROP VIEW helloview;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The helloview VIEW should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "helloview";
+--let $assert_text = The helloview VIEW should not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "helloview";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1349,15 +1808,18 @@ DROP VIEW helloview;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The helloview VIEW should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "helloview";
+--let $assert_text = The helloview VIEW should not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.tables WHERE table_type = "VIEW" and table_name = "helloview";
 --source include/assert.inc
 
 # cleanup
 #
 --echo # connection node_1
 --connection node_1
-DROP VIEW helloview;
+REVOKE DROP ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1369,10 +1831,19 @@ DROP VIEW helloview;
 --echo # SQLCOM_CREATE_TRIGGER access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT TRIGGER ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE TRIGGER testtrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1382,8 +1853,8 @@ CREATE TRIGGER testtrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The testtrigger TRIGGER should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.triggers WHERE trigger_name = "testtrigger" AND event_object_table = "t1";
+--let $assert_text = The testtrigger TRIGGER should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.triggers WHERE trigger_name = "testtrigger" AND event_object_table = "t1";
 --let $assert_debug = SELECT * FROM information_schema.triggers;
 --source include/assert.inc
 
@@ -1392,9 +1863,18 @@ CREATE TRIGGER testtrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The testtrigger TRIGGER should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.triggers WHERE trigger_name = "testtrigger" AND event_object_table = "t1";
+--let $assert_text = The testtrigger TRIGGER should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.triggers WHERE trigger_name = "testtrigger" AND event_object_table = "t1";
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+DROP TRIGGER testtrigger;
+
+REVOKE TRIGGER ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1424,11 +1904,19 @@ CREATE TRIGGER hellotrigger BEFORE INSERT ON t1 FOR EACH ROW SET @sum = @sum + 1
 --let $assert_cond = COUNT(*) = 1 FROM information_schema.triggers WHERE trigger_name = "hellotrigger" AND event_object_table = "t1";
 --source include/assert.inc
 
+--echo # connection node_1
+--connection node_1
+GRANT TRIGGER ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_TABLEACCESS_DENIED_ERROR
 DROP TRIGGER hellotrigger;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1438,8 +1926,8 @@ DROP TRIGGER hellotrigger;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellotrigger TRIGGER should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.triggers WHERE trigger_name = "hellotrigger" AND event_object_table = "t1";
+--let $assert_text = The hellotrigger TRIGGER should not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.triggers WHERE trigger_name = "hellotrigger" AND event_object_table = "t1";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1447,15 +1935,18 @@ DROP TRIGGER hellotrigger;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The hellotrigger TRIGGER should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.triggers WHERE trigger_name = "hellotrigger" AND event_object_table = "t1";
+--let $assert_text = The hellotrigger TRIGGER should not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.triggers WHERE trigger_name = "hellotrigger" AND event_object_table = "t1";
 --source include/assert.inc
 
 # cleanup
 #
 --echo # connection node_1
 --connection node_1
-DROP TRIGGER hellotrigger;
+REVOKE TRIGGER ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1467,10 +1958,19 @@ DROP TRIGGER hellotrigger;
 --echo # SQLCOM_INSTALL_PLUGIN access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT INSERT ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_TABLEACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 INSTALL PLUGIN audit_log SONAME "audit_log.so";
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1480,8 +1980,8 @@ INSTALL PLUGIN audit_log SONAME "audit_log.so";
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should not be installed on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "audit_log";
+--let $assert_text = The audit_log PLUGIN should be installed on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1489,9 +1989,20 @@ INSTALL PLUGIN audit_log SONAME "audit_log.so";
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should not be installed on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "audit_log";
+--let $assert_text = The audit_log PLUGIN should be installed on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+--disable_warnings
+UNINSTALL PLUGIN audit_log;
+--enable_warnings
+
+REVOKE INSERT ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1507,24 +2018,37 @@ INSTALL PLUGIN audit_log SONAME "audit_log.so";
 #
 --echo # connection node_1
 --connection node_1
-INSTALL PLUGIN audit_log SONAME "audit_log.so";
+--disable_warnings
+--error 0,1125
+INSTALL PLUGIN null_audit SONAME "adt_null.so";
+--enable_warnings
 
---let $assert_text = The audit_log PLUGIN should be installed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The null_audit PLUGIN should be installed on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
 --let $assert_debug = SELECT plugin_name, plugin_status FROM information_schema.plugins;
 --source include/assert.inc
 
 --echo # connection node_2
 --connection node_2
---let $assert_text = The audit_log PLUGIN should be installed on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The null_audit PLUGIN should be installed on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
 
+--echo # connection node_1
+--connection node_1
+GRANT DELETE ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_TABLEACCESS_DENIED_ERROR
-UNINSTALL PLUGIN audit_log;
+--disable_warnings
+UNINSTALL PLUGIN null_audit;
+--enable_warnings
 
 --eval INSERT INTO counter(count) VALUES($test_id);
 
@@ -1533,8 +2057,8 @@ UNINSTALL PLUGIN audit_log;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should still be installed on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The null_audit PLUGIN should not be installed on node 1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1542,16 +2066,18 @@ UNINSTALL PLUGIN audit_log;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The audit_log PLUGIN should still be installed on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.plugins WHERE plugin_name = "audit_log" AND plugin_status = "ACTIVE";
+--let $assert_text = The null_audit PLUGIN should not be installed on node 2
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.plugins WHERE plugin_name = "null_audit" AND plugin_status = "ACTIVE";
 --source include/assert.inc
-
 
 # Test cleanup
 #
 --echo # connection node_1
 --connection node_1
-UNINSTALL plugin audit_log;
+REVOKE DELETE ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1563,10 +2089,19 @@ UNINSTALL plugin audit_log;
 --echo # SQLCOM_CREATE_EVENT access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT EVENT ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_DBACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 CREATE EVENT testevent
   ON SCHEDULE EVERY 1 HOUR
   DO INSERT INTO t1(f2) VALUES(3);
@@ -1578,8 +2113,8 @@ CREATE EVENT testevent
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The testevent EVENT should not exist on node 1
---let $assert_cond = COUNT(*) = 0 FROM information_schema.events WHERE event_name = "testevent";
+--let $assert_text = The testevent EVENT should exist on node 1
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "testevent";
 --let $assert_debug = SELECT * FROM information_schema.events;
 --source include/assert.inc
 
@@ -1588,9 +2123,18 @@ CREATE EVENT testevent
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The testevent EVENT should not exist on node 2
---let $assert_cond = COUNT(*) = 0 FROM information_schema.events WHERE event_name = "testevent";
+--let $assert_text = The testevent EVENT should exist on node 2
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "testevent";
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+DROP EVENT testevent;
+
+REVOKE EVENT ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1622,11 +2166,19 @@ CREATE EVENT helloevent
 --let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value = 1;
 --source include/assert.inc
 
+--echo # connection node_1
+--connection node_1
+GRANT EVENT ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
 --connection node_testme
+use testdb;
 
---error ER_DBACCESS_DENIED_ERROR
 ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1637,7 +2189,8 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --source include/wait_condition.inc
 
 --let $assert_text = The helloevent EVENT should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value = 1;
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "%2 3%";
+--let $assert_debug = SHOW EVENTS;
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1646,12 +2199,18 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --source include/wait_condition.inc
 
 --let $assert_text = The helloevent EVENT should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value = 1;
+--let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent" AND interval_value LIKE "%2 3%";
 --source include/assert.inc
 
 # No cleanup
 # Have the follwing test case use the same event
 #
+--echo # connection node_1
+--connection node_1
+REVOKE EVENT ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1663,10 +2222,19 @@ ALTER EVENT helloevent ON SCHEDULE EVERY '2:3' DAY_HOUR;
 --echo # SQLCOM_DROP_EVENT access test
 --echo #
 
---echo # connection node_testme
---connection node_testme
+--echo # connection node_1
+--connection node_1
+GRANT EVENT ON testdb.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
---error ER_DBACCESS_DENIED_ERROR
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 DROP EVENT helloevent;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1676,8 +2244,8 @@ DROP EVENT helloevent;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The helloevent EVENT should still exist on node 1
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent";
+--let $assert_text = The helloevent EVENT should not exist on node 1
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.events WHERE event_name = "helloevent";
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1685,9 +2253,16 @@ DROP EVENT helloevent;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = The helloevent EVENT should still exist on node 2
---let $assert_cond = COUNT(*) = 1 FROM information_schema.events WHERE event_name = "helloevent";
+--let $assert_text = The helloevent EVENT should not exist on node 2
+--let $assert_cond = COUNT(*) = 0 FROM information_schema.events WHERE event_name = "helloevent";
 --source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+REVOKE EVENT ON testdb.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 
 #
@@ -1702,10 +2277,26 @@ DROP EVENT helloevent;
 --echo #
 --echo # SQLCOM_ALTER_USER access test
 --echo #
---echo # connection node_testme
---connection node_testme
 
---error ER_SPECIFIC_ACCESS_DENIED_ERROR
+--echo # connection node_1
+--connection node_1
+--let $assert_text = User testother should not be expired on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother" AND password_expired = "N"
+--source include/assert.inc
+
+--echo # connection node_1
+--connection node_1
+GRANT CREATE USER ON *.* TO 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
+
+--echo # connection node_testme
+--disconnect node_testme
+--connect node_testme, 127.0.0.1, testme, secret,, $NODE_MYPORT_1
+--connection node_testme
+use testdb;
+
 ALTER USER 'testother'@'%' PASSWORD EXPIRE;
 
 --eval INSERT INTO counter(count) VALUES($test_id);
@@ -1715,8 +2306,8 @@ ALTER USER 'testother'@'%' PASSWORD EXPIRE;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User testother should be unexpired on node 1
---let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother" AND password_expired = "N"
+--let $assert_text = User testother should be expired on node 1
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother" AND password_expired = "Y"
 --source include/assert.inc
 
 --echo # connection node_2
@@ -1724,11 +2315,17 @@ ALTER USER 'testother'@'%' PASSWORD EXPIRE;
 --let $wait_condition = SELECT COUNT(*) = $test_id FROM counter;
 --source include/wait_condition.inc
 
---let $assert_text = User testother should be unlocked on node 2
---let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother" AND password_expired = "N"
+--let $assert_text = User testother should be expired on node 2
+--let $assert_cond = COUNT(*) = 1 FROM mysql.user WHERE user = "testother" AND password_expired = "Y"
 --source include/assert.inc
 
 
+--echo # connection node_1
+--connection node_1
+REVOKE CREATE USER ON *.* FROM 'testme'@'%';
+--replace_regex /\*[0-9A-Z]+/<SECRET>/
+SHOW GRANTS FOR 'testme';
+FLUSH PRIVILEGES;
 
 --echo #
 --echo # cleanup
