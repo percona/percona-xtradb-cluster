@@ -904,13 +904,21 @@ int wsrep_init()
 
   if ((rcode= wsrep_load(wsrep_provider, &wsrep, wsrep_log_cb)) != WSREP_OK)
   {
-    if (strcasecmp(wsrep_provider, WSREP_NONE))
+    if (strlen(wsrep_provider) == 0)
     {
-      WSREP_ERROR("Failed to load wsrep_provider (%s). Error: %s (code: %d)."
-                  " Reverting to no provider.",
+      WSREP_ERROR("wsrep_load() failed to load the provider('%s'): %s (%d). Reverting to no provider.",
                   wsrep_provider, strerror(rcode), rcode);
-      strcpy((char*)wsrep_provider, WSREP_NONE); // damn it's a dirty hack
+
+      if (wsrep_provider) my_free((void *)wsrep_provider);
+      wsrep_provider = my_strdup(key_memory_wsrep, WSREP_NONE, MYF(0)); // damn it's a dirty hack
+
       return wsrep_init();
+    }
+    else if (strcasecmp(wsrep_provider, WSREP_NONE))
+    {
+      WSREP_ERROR("wsrep_load() failed to load the provider('%s'): %s (%d). Need to abort.",
+                  wsrep_provider, strerror(rcode), rcode);
+      unireg_abort(1);
     }
     else /* this is for recursive call above */
     {
