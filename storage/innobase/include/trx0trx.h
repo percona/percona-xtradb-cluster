@@ -1073,6 +1073,16 @@ struct trx_t{
 #ifdef WITH_WSREP
 	os_event_t	wsrep_event;	/* event waited for in srv_conc_slot */
 #endif /* WITH_WSREP */
+
+#ifdef WITH_WSREP
+	/* During recovery, prepare state transaction may be committed
+	or rollback. If a transaction is committed then xid of such
+	transaction should be persisted to sys_header under wsrep-xid
+	section to record successful commit-recovery of the said
+	transaction. */
+	XID*		wsrep_recover_xid;
+#endif /* WITH_WSREP */
+
 };
 
 /* Transaction isolation levels (trx->isolation_level) */

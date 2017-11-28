@@ -16497,6 +16497,7 @@ innobase_commit_by_xid(
 	DBUG_ASSERT(hton == innodb_hton_ptr);
 
 	trx = trx_get_trx_by_xid(xid);
+	trx->wsrep_recover_xid = xid;
 
 	if (trx) {
 		innobase_commit_low(trx);
