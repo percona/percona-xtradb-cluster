@@ -1326,6 +1326,15 @@ struct trx_t {
 #endif /* WITH_WSREP */
 	bool		take_stats;
 	ulint		magic_n;
+
+#ifdef WITH_WSREP
+	/* During recovery, prepare state transaction may be committed
+	or rollback. If a transaction is committed then xid of such
+	transaction should be persisted to sys_header under wsrep-xid
+	section to record successful commit-recovery of the said
+	transaction. */
+	XID*		wsrep_recover_xid;
+#endif /* WITH_WSREP */
 };
 
 /**

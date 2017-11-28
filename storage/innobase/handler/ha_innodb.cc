@@ -19502,6 +19502,7 @@ innobase_commit_by_xid(
 
 	if (trx != NULL) {
 		TrxInInnoDB	trx_in_innodb(trx);
+		trx->wsrep_recover_xid = xid;
 
 		innobase_commit_low(trx);
                 ut_ad(trx->mysql_thd == NULL);
