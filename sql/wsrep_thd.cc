@@ -458,7 +458,11 @@ static void wsrep_rollback_process(THD *thd)
       wsrep_client_rollback(aborting);
       WSREP_DEBUG("WSREP rollbacker aborted thd: (%lu %llu)",
                   aborting->thread_id, (long long)aborting->real_id);
+
       mysql_mutex_unlock(&aborting->LOCK_wsrep_thd);
+
+      /* Clear the thread state, since the rollback thread is done with it */
+      aborting->restore_globals();
 
       mysql_mutex_lock(&LOCK_wsrep_rollback);
     }
