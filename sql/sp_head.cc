@@ -790,6 +790,8 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
 #ifdef WITH_WSREP
     if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
     {
+      if (thd->query_id == 0)
+        thd->set_query_id(next_query_id());
       thd->set_wsrep_next_trx_id(thd->query_id);
       WSREP_DEBUG("Assigned new next trx-id (%lu) to Store-Procedure execution",
                   (long unsigned int) thd->wsrep_next_trx_id());
