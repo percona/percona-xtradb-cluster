@@ -509,6 +509,7 @@ trx_create_low()
 
 #ifdef WITH_WSREP
 	trx->wsrep_event = NULL;
+	trx->wsrep_recover_xid = NULL;
 #endif /* WITH_WSREP */
 
 	return(trx);
@@ -1762,6 +1763,8 @@ trx_write_serialisation_history(
 	MONITOR_INC(MONITOR_TRX_COMMIT_UNDO);
 
 #ifdef WITH_WSREP
+	DBUG_EXECUTE_IF("crash_before_trx_commit_in_memory",
+			{ sleep(3); DBUG_SUICIDE(); });
         sys_header = trx_sysf_get(mtr);
 	/* Update latest MySQL wsrep XID in trx sys header.
 	If given transaction is marked for replay then avoid updating
@@ -1771,6 +1774,12 @@ trx_write_serialisation_history(
         {
             trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
         }
+	else if (trx->wsrep_recover_xid)
+	{
+		trx_sys_update_wsrep_checkpoint(
+				trx->wsrep_recover_xid, sys_header, mtr);
+		trx->wsrep_recover_xid = NULL;
+	}
 #endif /* WITH_WSREP */
 
 	/* Update the latest MySQL binlog name and offset info

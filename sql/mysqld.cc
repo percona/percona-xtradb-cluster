@@ -5140,7 +5140,19 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   }
 #endif /* WITH_WSREP */
 
+#ifdef WITH_WSREP
+  /* Don't spawn a new binlog file during wsrep-recovery. Why ?
+  - Recovery flow is only going to read existing wsrep saved co-ordinate
+    from sys_header. No other action is performed that needs binlogging.
+
+  - Existing server flow looks at last binlog to set gtid_executed if server
+    was shutdown abruptly. Newly create binlog will not have any such
+    information and so restart post wsrep_recover will result in gtid_executed
+    to be empty. */
+  if (opt_bin_log && !wsrep_recovery)
+#else
   if (opt_bin_log)
+#endif /* WITH_WSREP */
   {
     /*
       Configures what object is used by the current log to store processed
