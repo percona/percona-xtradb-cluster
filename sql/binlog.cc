@@ -7854,18 +7854,40 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
 
 #ifdef WITH_WSREP
   /*
-    Read current wsrep position from storage engines to have consistent
-    end position for binlog scan.
+    If binlog is enabled then SE will persist redo at following stages:
+    - during prepare
+    - during binlog write
+    - during innodb-commit
+    3rd stage (fsync) can be skipped as transaction can be recovered
+    from binlog.
+
+    During 3rd stage, commit co-ordinates are also recorded in sysheader
+    under wsrep placeholder. These co-ordinates are then used to stop
+    binlog scan (in addition to get recovery position in case of node-crash).
+
+    Since fsync of 3rd stage is delayed (as transaction can be recovered
+    using binlog) it is possible that even though transaction is reported
+    as success to end-user said co-ordinates are not persisted to disk.
+
+    On restart, a prepare state transaction could be recovered and committed
+    but since wsrep co-ordinates are not persisted a successfully committed
+    transaction recovery is skipped causing data inconsistency from end-user
+    application perspective.
+
+    This behavior is now changed to let recovery proceed independent of
+    wsrep co-ordinates and wsrep co-ordinates are updated to reflect
+    the recovery committed transaction.
   */
-  wsrep_uuid_t uuid;
-  wsrep_seqno_t seqno;
-  wsrep_get_SE_checkpoint(uuid, seqno);
-  char uuid_str[40];
-  wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
-  WSREP_INFO("Binlog recovery, found wsrep position %s:%lld", uuid_str,
-             (long long)seqno);
-  const wsrep_seqno_t last_xid_seqno= seqno;
-  wsrep_seqno_t cur_xid_seqno=WSREP_SEQNO_UNDEFINED;
+  if (WSREP_ON)
+  {
+    wsrep_uuid_t uuid;
+    wsrep_seqno_t seqno;
+    wsrep_get_SE_checkpoint(uuid, seqno);
+    char uuid_str[40];
+    wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
+    WSREP_INFO("Before binlog recovery (wsrep position %s:%lld)", uuid_str,
+               (long long)seqno);
+  }
 #endif /* WITH_WSREP */
 
 
@@ -7878,10 +7900,6 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
          && ev->is_valid()
-#ifdef WITH_WSREP
-         && (last_xid_seqno == WSREP_SEQNO_UNDEFINED ||
-             last_xid_seqno != cur_xid_seqno)
-#endif
       )
   {
     if (ev->get_type_code() == QUERY_EVENT &&
@@ -7903,9 +7921,6 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
                                       sizeof(xev->xid));
       if (!x || my_hash_insert(&xids, x))
         goto err2;
-#ifdef WITH_WSREP
-      cur_xid_seqno= xev->xid;
-#endif /* WITH_WSREP */
     }
 
     /*
@@ -7950,13 +7965,21 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
     delete ev;
   }
 
-#ifdef WITH_WSREP
-  WSREP_INFO("Binlog recovery scan stopped at Xid event %lld",
-             (long long)cur_xid_seqno);
-#endif /* WITH_WSREP */
-
   if (ha_recover(&xids))
     goto err2;
+
+#ifdef WITH_WSREP
+  if (WSREP_ON)
+  {
+    wsrep_uuid_t uuid;
+    wsrep_seqno_t seqno;
+    wsrep_get_SE_checkpoint(uuid, seqno);
+    char uuid_str[40];
+    wsrep_uuid_print(&uuid, uuid_str, sizeof(uuid_str));
+    WSREP_INFO("After binlog recovery (wsrep position %s:%lld)", uuid_str,
+               (long long)seqno);
+  }
+#endif /* WITH_WSREP */
 
   free_root(&mem_root, MYF(0));
   my_hash_free(&xids);

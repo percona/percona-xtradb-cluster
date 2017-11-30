@@ -5692,7 +5692,19 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     unireg_abort(1);
   }
 
+#ifdef WITH_WSREP
+  /* Don't spawn a new binlog file during wsrep-recovery. Why ?
+  - Recovery flow is only going to read existing wsrep saved co-ordinate
+    from sys_header. No other action is performed that needs binlogging.
+
+  - Existing server flow looks at last binlog to set gtid_executed if server
+    was shutdown abruptly. Newly created binlog will not have any such
+    information and so restart post wsrep_recover will result in gtid_executed
+    to be empty. */
+  if (opt_bin_log && !wsrep_recovery)
+#else
   if (opt_bin_log)
+#endif /* WITH_WSREP */
   {
     /*
       Configures what object is used by the current log to store processed
@@ -6576,6 +6588,15 @@ int mysqld_main(int argc, char **argv)
   if (init_server_components())
     unireg_abort(1);
 
+#ifdef WITH_WSREP /* WSREP AFTER SE */
+  if (wsrep_recovery)
+  {
+    select_thread_in_use= 0;
+    wsrep_recover();
+    unireg_abort(0);
+  }
+#endif /* WITH_WSREP */
+
   /*
     Each server should have one UUID. We will create it automatically, if it
     does not exist.
@@ -6669,14 +6690,6 @@ int mysqld_main(int argc, char **argv)
   my_str_free= &my_str_free_mysqld;
   my_str_realloc= &my_str_realloc_mysqld;
 
-#ifdef WITH_WSREP /* WSREP AFTER SE */
-  if (wsrep_recovery)
-  {
-    select_thread_in_use= 0;
-    wsrep_recover();
-    unireg_abort(0);
-  }
-#endif /* WITH_WSREP */
   /*
     init signals & alarm
     After this we can't quit by a simple unireg_abort
