@@ -764,7 +764,8 @@ JOIN::optimize()
 
   /* Perform FULLTEXT search before all regular searches */
   if (!(select_options & SELECT_DESCRIBE) &&
-      !select_lex->materialized_table_count && select_lex->has_ft_funcs())
+      !select_lex->materialized_table_count &&
+      select_lex->has_ft_funcs())
   {
     if (init_ftfuncs(thd, select_lex, order))
       DBUG_RETURN(1);
@@ -3042,7 +3043,7 @@ bool JOIN::update_equalities_for_sjm()
         uint fieldno= 0;
         while ((old= it++))
         {
-          if (old->real_item()->eq(keyuse->val, false))
+          if (old->real_item()->eq(keyuse->val->real_item(), false))
           {
             /*
               Replace the expression selected from the subquery with the
@@ -9413,7 +9414,8 @@ void JOIN::optimize_fts_query()
         if (fts_item->eq(fts_result, true))
           break;
       }
-      // Fall-through when not an equivalent MATCH expression
+      // fallthrough
+      // when not an equivalent MATCH expression
     default:
       covering= false;
     }

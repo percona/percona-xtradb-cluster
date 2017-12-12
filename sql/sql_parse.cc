@@ -2231,6 +2231,7 @@ done:
   thd->reset_query();
   thd->set_command(COM_SLEEP);
   thd->proc_info= 0;
+  thd->lex->sql_command= SQLCOM_END;
 
   /* Performance Schema Interface instrumentation, end */
   MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
@@ -3484,6 +3485,7 @@ case SQLCOM_PREPARE:
       break;
     }
   }
+  // fallthrough
   case SQLCOM_PURGE_BEFORE:
   {
     Item *it;
@@ -4205,8 +4207,8 @@ end_with_restore_list:
     /* mysql_update return 2 if we need to switch to multi-update */
     if (up_result != 2)
       break;
-    /* Fall through */
   }
+  // fallthrough
   case SQLCOM_UPDATE_MULTI:
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
@@ -4323,6 +4325,7 @@ end_with_restore_list:
       DBUG_PRINT("debug", ("Just after generate_incident()"));
     }
 #endif
+    // fallthrough
   case SQLCOM_INSERT:
   {
     WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
@@ -5196,6 +5199,7 @@ end_with_restore_list:
       initialize this variable because RESET shares the same code as FLUSH
     */
     lex->no_write_to_binlog= 1;
+    // fallthrough
   case SQLCOM_FLUSH:
   {
     int write_to_binlog;
