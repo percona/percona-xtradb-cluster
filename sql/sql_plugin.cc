@@ -1898,8 +1898,7 @@ bool mysql_install_plugin(THD *thd, const LEX_STRING *name, const LEX_STRING *dl
   tables.init_one_table("mysql", 5, "plugin", 6, "plugin", TL_WRITE);
   if (check_table_access(thd, INSERT_ACL, &tables, FALSE, 1, FALSE))
     DBUG_RETURN(TRUE);
-
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
 
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table = open_ltable(thd, &tables, TL_WRITE,
@@ -1992,9 +1991,11 @@ deinit:
   tmp->state= PLUGIN_IS_DELETED;
   reap_needed= true;
   reap_plugins();
-error:
 err:
   mysql_mutex_unlock(&LOCK_plugin);
+#ifdef WITH_WSREP
+ error:
+#endif /* WITH_WSREP */
   DBUG_RETURN(TRUE);
 }
 
@@ -2016,8 +2017,7 @@ bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
 
   if (check_table_access(thd, DELETE_ACL, &tables, FALSE, 1, FALSE))
     DBUG_RETURN(TRUE);
-
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
 
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
@@ -2153,9 +2153,11 @@ bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
     }
   }
   DBUG_RETURN(FALSE);
-error:
 err:
   mysql_mutex_unlock(&LOCK_plugin);
+#ifdef WITH_WSREP
+ error:
+#endif /* WITH_WSREP */
   DBUG_RETURN(TRUE);
 }
 

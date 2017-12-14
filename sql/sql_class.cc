@@ -2052,7 +2052,11 @@ void THD::release_resources()
   mysql_mutex_lock(&LOCK_wsrep_thd);
   mysql_mutex_unlock(&LOCK_wsrep_thd);
   mysql_mutex_destroy(&LOCK_wsrep_thd);
-  if (wsrep_rli) delete wsrep_rli;
+  mysql_cond_destroy(&COND_wsrep_thd);
+  if (wsrep_rli != NULL) {
+    delete wsrep_rli;
+    wsrep_rli = NULL;
+  }
   wsrep_free_status(this);
 #endif
 }
@@ -4870,6 +4874,10 @@ extern "C" int thd_non_transactional_update(const MYSQL_THD thd)
 extern "C" int thd_binlog_format(const MYSQL_THD thd)
 {
 #ifdef WITH_WSREP
+  /* Even though binlog is disabled and emulation is enabled it is possible
+  that MySQL flow may have turned off log bin by setting option_bits.
+  So blindly returning the binlog format without checking for
+  option_bits is not a good idea. */
   if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
       (thd->variables.option_bits & OPTION_BIN_LOG))
 #else

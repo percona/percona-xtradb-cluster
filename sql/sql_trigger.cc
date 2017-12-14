@@ -597,7 +597,6 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
   */
   sp_cache_invalidate();
 
-error:
 end:
   if (!result)
   {
@@ -622,6 +621,10 @@ end:
     my_ok(thd);
 
   DBUG_RETURN(result);
+#ifdef WITH_WSREP
+ error:
+  DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 }
 
 

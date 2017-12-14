@@ -335,10 +335,11 @@ Events::create_event(THD *thd, Event_parse_data *parse_data,
     DBUG_RETURN(TRUE);
   }
 
-  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL);
 
   if (parse_data->do_not_create)
     DBUG_RETURN(FALSE);
+
   /* 
     Turn off row binlogging of this statement and use statement-based 
     so that all supporting tables are updated for CREATE EVENT command.
@@ -415,8 +416,11 @@ err:
     thd->set_current_stmt_binlog_format_row();
   thd->variables.binlog_format= save_binlog_format;
 
-error:
   DBUG_RETURN(ret);
+#ifdef WITH_WSREP
+ error:
+  DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 }
 
 
@@ -545,32 +549,11 @@ err:
     thd->set_current_stmt_binlog_format_row();
   thd->variables.binlog_format= save_binlog_format;
 
-error:
   DBUG_RETURN(ret);
-}
-
-
-/**
-  Does the access checking for dropping an event.
-
-  @param[in,out]  thd        THD
-  @param[in]      dbname     Event's schema
-
-  @retval  FALSE  OK
-  @retval  TRUE   Error (reported)
-*/
-bool
-Events::drop_event_precheck(THD *thd, LEX_STRING dbname)
-{
-  DBUG_ENTER("Events::drop_event_precheck");
-
-  if (check_if_system_tables_error())
-    DBUG_RETURN(TRUE);
-
-  if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
-    DBUG_RETURN(TRUE);
-
-  DBUG_RETURN(FALSE);
+#ifdef WITH_WSREP
+ error:
+  DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 }
 
 /**
@@ -607,6 +590,13 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
   bool save_binlog_row_based;
   DBUG_ENTER("Events::drop_event");
 
+  if (check_if_system_tables_error())
+    DBUG_RETURN(TRUE);
+
+  if (check_access(thd, EVENT_ACL, dbname.str, NULL, NULL, 0, 0))
+    DBUG_RETURN(TRUE);
+  WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+
   /*
     Turn off row binlogging of this statement and use statement-based so
     that all supporting tables are updated for DROP EVENT command.
@@ -635,6 +625,10 @@ Events::drop_event(THD *thd, LEX_STRING dbname, LEX_STRING name, bool if_exists)
     thd->set_current_stmt_binlog_format_row();
 
   DBUG_RETURN(ret);
+#ifdef WITH_WSREP
+ error:
+  DBUG_RETURN(TRUE);
+#endif /* WITH_WSREP */
 }
 
 
