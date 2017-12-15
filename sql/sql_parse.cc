@@ -2347,6 +2347,7 @@ done:
   thd->reset_query();
   thd->set_command(COM_SLEEP);
   thd->proc_info= 0;
+  thd->lex->sql_command= SQLCOM_END;
 
   /* Performance Schema Interface instrumentation, end */
   MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
@@ -3484,6 +3485,7 @@ case SQLCOM_PREPARE:
       break;
     }
   }
+  // fallthrough
   case SQLCOM_PURGE_BEFORE:
   {
     Item *it;
@@ -4388,6 +4390,7 @@ end_with_restore_list:
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->drop_if_exists,
 			lex->drop_temporary);
+    DEBUG_SYNC(thd, "after_mysql_rm_table");
     /* when dropping temporary tables if @@session_track_state_change is ON then
        send the boolean tracker in the OK packet */
     if(!res && lex->drop_temporary)
@@ -5093,6 +5096,7 @@ end_with_restore_list:
       initialize this variable because RESET shares the same code as FLUSH
     */
     lex->no_write_to_binlog= 1;
+    // fallthrough
   case SQLCOM_FLUSH:
   {
     int write_to_binlog;
@@ -6596,6 +6600,8 @@ void THD::reset_for_next_command()
   thd->want_privilege= ~NO_ACCESS;
 
   thd->gtid_executed_warning_issued= false;
+
+  thd->reset_skip_readonly_check();
 
   DBUG_PRINT("debug",
              ("is_current_stmt_binlog_format_row(): %d",
