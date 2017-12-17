@@ -107,6 +107,9 @@ BEGIN
 
   SHOW STATUS LIKE 'slave_open_temp_tables';
 
+  -- Show open connections/transactions in wsrep provider
+  SHOW STATUS LIKE 'wsrep_open%';
+
   -- Checksum system tables to make sure they have been properly
   -- restored after test
   checksum table

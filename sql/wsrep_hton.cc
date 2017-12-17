@@ -149,7 +149,7 @@ void wsrep_post_commit(THD* thd, bool all)
          wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle))
      {
          WSREP_WARN("post_rollback fail: %llu %d",
-                    (long long)thd->thread_id, thd->stmt_da->status());
+                    (long long)thd->thread_id, thd->get_stmt_da()->status());
      }
      wsrep_cleanup_transaction(thd);
      break;
