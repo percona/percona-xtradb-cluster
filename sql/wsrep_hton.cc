@@ -1151,6 +1151,7 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
                      meta.gtid.uuid, meta.gtid.seqno);
       DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
     }
+    //fallthrough
 
   case WSREP_PRECOMMIT_ABORT:
   case WSREP_TRX_FAIL:

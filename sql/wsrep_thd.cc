@@ -393,6 +393,7 @@ static void wsrep_replication_process(THD *thd)
     /* these suggests a bug in provider code */
     WSREP_WARN("bad return from recv() call: %d", rcode);
     /* fall through to node shutdown */
+    // fallthrough
   case WSREP_FATAL:
     /* Cluster connectivity is lost.
      *
