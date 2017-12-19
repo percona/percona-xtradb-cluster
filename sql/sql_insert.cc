@@ -3111,59 +3111,65 @@ bool Query_result_create::send_eof()
     if (!table->s->tmp_table)
     {
 #ifdef WITH_WSREP
-      if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID)
+      if (WSREP(thd))
       {
-        (void) wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle,
-                                       thd->wsrep_next_trx_id());
-        WSREP_DEBUG("Assiging trx-id for processing CTAS");
+        if (thd->wsrep_trx_id() == WSREP_UNDEFINED_TRX_ID)
+        {
+          (void) wsrep_ws_handle_for_trx(&thd->wsrep_ws_handle,
+                                         thd->wsrep_next_trx_id());
+          WSREP_DEBUG("Assiging trx-id for processing CTAS");
+        }
+        DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
+        WSREP_DEBUG("Initiating append_key for CTAS with trx-id (%lu)",
+                    (long unsigned int) thd->wsrep_trx_id());
+      
+        /*
+           append table level exclusive key for CTAS
+        */
+        wsrep_key_arr_t key_arr= {0, 0};
+        wsrep_prepare_keys_for_isolation(thd,
+                                         create_table->db,
+                                         create_table->table_name,
+                                         table_list,
+                                         &key_arr);
+        int rcode = wsrep->append_key(
+                                  wsrep,
+                                  &thd->wsrep_ws_handle,
+                                  key_arr.keys, //&wkey,
+                                  key_arr.keys_len,
+                                  WSREP_KEY_EXCLUSIVE,
+                                  false);
+        wsrep_keys_free(&key_arr);
+        if (rcode) {
+          DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
+          WSREP_ERROR("Appending table key for CTAS failed: %s, %d",
+                      (wsrep_thd_query(thd)) ?
+                      wsrep_thd_query(thd) : "void", rcode);
+          return true;
+        }
+        /* If commit fails, we should be able to reset the OK status. */
+        thd->get_stmt_da()->set_overwrite_status(true);
       }
-      DBUG_ASSERT(thd->wsrep_trx_id() != WSREP_UNDEFINED_TRX_ID);
-      WSREP_DEBUG("Initiating append_key for CTAS with trx-id (%lu)",
-                  (long unsigned int) thd->wsrep_trx_id());
-
-      /*
-         append table level exclusive key for CTAS
-      */
-      wsrep_key_arr_t key_arr= {0, 0};
-      wsrep_prepare_keys_for_isolation(thd,
-                                       create_table->db,
-                                       create_table->table_name,
-                                       table_list,
-                                       &key_arr);
-      int rcode = wsrep->append_key(
-                                wsrep,
-                                &thd->wsrep_ws_handle,
-                                key_arr.keys, //&wkey,
-                                key_arr.keys_len,
-                                WSREP_KEY_EXCLUSIVE,
-                                false);
-      wsrep_keys_free(&key_arr);
-      if (rcode) {
-        DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
-        WSREP_ERROR("Appending table key for CTAS failed: %s, %d",
-                    (wsrep_thd_query(thd)) ?
-                    wsrep_thd_query(thd) : "void", rcode);
-        return true;
-      }
-      /* If commit fails, we should be able to reset the OK status. */
-      thd->get_stmt_da()->set_overwrite_status(true);
 #endif /* WITH_WSREP */
       trans_commit_stmt(thd);
       trans_commit_implicit(thd);
 #ifdef WITH_WSREP
-      thd->get_stmt_da()->set_overwrite_status(false);
-      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-      if (thd->wsrep_conflict_state != NO_CONFLICT)
+      if (WSREP(thd))
       {
-        WSREP_DEBUG("select_create commit failed, thd: %u err: %s %s", 
-                    thd->thread_id(),
-                    wsrep_get_conflict_state(thd->wsrep_conflict_state),
-                    WSREP_QUERY(thd));
+        thd->get_stmt_da()->set_overwrite_status(false);
+        mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+        if (thd->wsrep_conflict_state != NO_CONFLICT)
+        {
+          WSREP_DEBUG("select_create commit failed, thd: %u err: %s %s", 
+                      thd->thread_id(),
+                      wsrep_get_conflict_state(thd->wsrep_conflict_state),
+                      WSREP_QUERY(thd));
+          mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+          abort_result_set();
+	  return TRUE;
+        }
         mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
-        abort_result_set();
-	return TRUE;
       }
-      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
 #endif /* WITH_WSREP */
     }
 
@@ -3297,14 +3303,15 @@ bool Sql_cmd_insert_select::execute(THD *thd)
   Query_result_insert *sel_result;
   if (insert_precheck(thd, all_tables))
     return true;
+
 #ifdef WITH_WSREP
     if (thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED)
     {
       thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
       WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL);
     }
+#endif /* WITH_WSREP */
 
-#endif
   /*
     INSERT...SELECT...ON DUPLICATE KEY UPDATE/REPLACE SELECT/
     INSERT...IGNORE...SELECT can be unsafe, unless ORDER BY PRIMARY KEY

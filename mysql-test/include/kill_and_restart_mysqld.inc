@@ -12,5 +12,4 @@ if (!$restart_parameters)
 --source include/wait_until_disconnected.inc
 --enable_reconnect
 --source include/wait_until_connected_again.inc
---source include/wait_wsrep_ready.inc
 --disable_reconnect

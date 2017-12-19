@@ -1116,12 +1116,12 @@ bool do_command(THD *thd)
      * bail out if DB snapshot has not been installed. We however,
      * allow queries "SET" and "SHOW", they are trapped later in execute_command
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
-        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
-    ) {
+    if (!thd->wsrep_applier &&
+        (!wsrep_ready_get() || wsrep_reject_queries != WSREP_REJECT_NONE) &&
+        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0)
+    {
       my_message(ER_UNKNOWN_COM_ERROR,
-	       "WSREP has not yet prepared node for application use", MYF(0));
+                 "WSREP has not yet prepared node for application use", MYF(0));
       thd->end_statement();
 
       /* Performance Schema Interface instrumentation end */
@@ -1139,31 +1139,6 @@ bool do_command(THD *thd)
              thd->get_protocol_classic()->get_raw_packet(), command));
   if (thd->get_protocol_classic()->bad_packet)
     DBUG_ASSERT(0);                // Should be caught earlier
-
-#ifdef WITH_WSREP
-  if (WSREP(thd)) {
-    /*
-     * bail out if DB snapshot has not been installed. We however,
-     * allow some commands, they are trapped later in execute_command.
-     */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
-        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
-    ) {
-      my_message(ER_UNKNOWN_COM_ERROR,
-	         "WSREP has not yet prepared node for application use", MYF(0));
-      thd->send_statement_status();
-
-      /* Performance Schema Interface instrumentation end */
-      MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
-      thd->m_statement_psi= NULL;
-      thd->m_digest= NULL;
-
-      return_value= FALSE;
-      goto out;
-    }
-  }
-#endif /* WITH_WSREP */
 
   // Reclaim some memory
   thd->get_protocol_classic()->get_packet()->shrink(
@@ -1585,14 +1560,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     }
   }
   thd->set_query_id(next_query_id());
-#ifdef WITH_WSREP
-  if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
-  {
-    thd->set_wsrep_next_trx_id(thd->query_id);
-    WSREP_DEBUG("Assigned next trx id: %lu",
-                (long unsigned int) thd->wsrep_next_trx_id());
-  }
-#endif /* WITH_WSREP */
   thd->rewritten_query.mem_free();
   thd_manager->inc_thread_running();
 
@@ -1829,12 +1796,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
       break;
 
 #ifdef WITH_WSREP
-    if (thd->wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
-    {
-      thd->set_wsrep_next_trx_id(thd->query_id);
-      WSREP_DEBUG("Assigned new next trx id: %lu",
-                  (long unsigned int) thd->wsrep_next_trx_id());
-    }
     wsrep_mysql_parse(thd, thd->query().str, thd->query().length, &parser_state);
 #else
     mysql_parse(thd, &parser_state);
@@ -3185,9 +3146,8 @@ mysql_execute_command(THD *thd, bool first_level)
      * allow SET and SHOW queries and reads from information schema
      * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on                                            &&
-        !thd->wsrep_applier                                                &&
-        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+    if (!thd->wsrep_applier                                                &&
+        !(wsrep_ready_get() && wsrep_reject_queries == WSREP_REJECT_NONE)  &&
         !(thd->variables.wsrep_dirty_reads &&
           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
         !wsrep_tables_accessible_when_detached(all_tables)                 &&
@@ -4291,14 +4251,6 @@ end_with_restore_list:
   {
 #ifdef WITH_WSREP
       WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
-
-      if ((lex->sql_command == SQLCOM_REPLACE_SELECT ||
-           lex->sql_command == SQLCOM_INSERT_SELECT) &&
-          thd->wsrep_consistency_check == CONSISTENCY_CHECK_DECLARED)
-      {
-        thd->wsrep_consistency_check = CONSISTENCY_CHECK_RUNNING;
-        WSREP_TO_ISOLATION_BEGIN(first_table->db, first_table->table_name, NULL);
-      }
 #endif /* WITH_WSREP */      
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
     DBUG_ASSERT(lex->m_sql_cmd != NULL);
@@ -4752,10 +4704,10 @@ end_with_restore_list:
       res= 1;
       break;
     }
+    LEX_CSTRING db_name= {db->str, db->length};
 #ifdef WITH_WSREP
     WSREP_TO_ISOLATION_BEGIN(db->str, NULL, NULL)
 #endif /* WITH_WSREP */
-    LEX_CSTRING db_name= {db->str, db->length};
     res= mysql_upgrade_db(thd, db_name);
     if (!res)
       my_ok(thd);
@@ -4821,7 +4773,6 @@ end_with_restore_list:
     {
       bool if_not_exists= (lex->create_info.options &
                            HA_LEX_CREATE_IF_NOT_EXISTS);
-      /* WSREP_TO_ISOLATION_BEGIN is inside of Events::create_event */
       res= Events::create_event(thd, lex->event_parse_data, if_not_exists);
       break;
     }
@@ -4834,7 +4785,6 @@ end_with_restore_list:
         db_lex_str.length= lex->spname->m_db.length;
       }
 
-      /* WSREP_TO_ISOLATION_BEGIN is inside of Events::update_event */
       res= Events::update_event(thd, lex->event_parse_data,
                                 lex->spname ? &db_lex_str : NULL,
                                 lex->spname ? &lex->spname->m_name : NULL);
@@ -4869,12 +4819,6 @@ end_with_restore_list:
   {
     LEX_STRING db_lex_str= {const_cast<char*>(lex->spname->m_db.str),
                               lex->spname->m_db.length};
-    res= Events::drop_event_precheck(thd, db_lex_str);
-    if (res)
-      break;
-
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-
     if (!(res= Events::drop_event(thd,
                                   db_lex_str, lex->spname->m_name,
                                   lex->drop_if_exists)))
@@ -5048,7 +4992,9 @@ end_with_restore_list:
                         all_tables, FALSE, UINT_MAX, FALSE))
 	  goto error;
         /* Conditionally writes to binlog */
+#ifdef WITH_WSREP
         WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
         res= mysql_table_grant(thd, all_tables, lex->users_list,
 			       lex->columns, lex->grant,
 			       lex->sql_command == SQLCOM_REVOKE);
@@ -5909,7 +5855,6 @@ end_with_restore_list:
         Note: SQLCOM_CREATE_VIEW also handles 'ALTER VIEW' commands
         as specified through the thd->lex->create_view_mode flag.
       */
-      /* WSREP_TO_ISOLATION_BEGIN is inside of Events::drop_event */
       res= mysql_create_view(thd, first_table, thd->lex->create_view_mode);
       break;
     }
@@ -5927,7 +5872,6 @@ end_with_restore_list:
   case SQLCOM_CREATE_TRIGGER:
   {
     /* Conditionally writes to binlog. */
-    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_create_or_drop_trigger */
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
 
     break;
@@ -5935,7 +5879,6 @@ end_with_restore_list:
   case SQLCOM_DROP_TRIGGER:
   {
     /* Conditionally writes to binlog. */
-    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_create_or_drop_trigger */
     res= mysql_create_or_drop_trigger(thd, all_tables, 0);
     break;
   }
@@ -6187,6 +6130,24 @@ finish:
       thd->send_kill_message();
     if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
       trans_rollback_stmt(thd);
+#ifdef WITH_WSREP
+    else if (thd->sp_runtime_ctx &&
+             (thd->wsrep_conflict_state == MUST_ABORT ||
+              thd->wsrep_conflict_state == CERT_FAILURE))
+    {
+      /*
+        The error was cleared, but THD was aborted by wsrep and
+        wsrep_conflict_state is still set accordingly. This
+        situation is expected if we are running a stored procedure
+        that declares a handler that catches ER_LOCK_DEADLOCK error.
+        In which case the error may have been cleared in method
+        sp_rcontext::handle_sql_condition().
+      */
+      trans_rollback_stmt(thd);
+      thd->wsrep_conflict_state= NO_CONFLICT;
+      thd->killed= THD::NOT_KILLED;
+    }
+#endif /* WITH_WSREP */
     else
     {
       /* If commit fails, we should be able to reset the OK status. */

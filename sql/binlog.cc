@@ -43,8 +43,6 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_xid.h"
-#include "wsrep_binlog.h"
-extern handlerton* wsrep_hton;
 #endif /* WITH_WSREP */
 
 using std::max;
@@ -1208,6 +1206,10 @@ static int binlog_init(void *p)
   return 0;
 }
 
+#ifdef WITH_WSREP
+#include "wsrep_binlog.h"
+#endif /* WITH_WSREP */
+
 static int binlog_deinit(void *p)
 {
   /* Using binlog as TC after the binlog has been unloaded, won't work */
@@ -1229,14 +1231,14 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     uchar *buf;
     size_t len=0;
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog trx cache not empty (%zu bytes) @ connection close %u",
-               len, thd->thread_id());
+    WSREP_WARN("binlog trx cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
     cache = cache_mngr->get_binlog_cache_log(false);
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog stmt cache not empty (%zu bytes) @ connection close %u",
-               len, thd->thread_id());
+    WSREP_WARN("binlog stmt cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
@@ -1592,6 +1594,7 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
     were, we would have to ensure that we're not ending a statement
     inside a stored function.
   */
+
   DBUG_ENTER("binlog_cache_data::flush");
   DBUG_PRINT("debug", ("flags.finalized: %s", YESNO(flags.finalized)));
   int error= 0;
@@ -3740,6 +3743,7 @@ bool generate_new_log_name(char *new_name, ulong *new_ext,
   }
   return false;
 }
+
 
 /**
   @todo
@@ -12581,7 +12585,7 @@ IO_CACHE * wsrep_get_trans_log(THD * thd, bool transaction)
   }
   else
   {
-    WSREP_DEBUG("binlog cache not initialized for thd: %u", thd->thread_id());
+    WSREP_DEBUG("binlog cache not initialized, conn :%u", thd->thread_id());
     return NULL;
   }
 }
@@ -12625,7 +12629,8 @@ TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) && wsrep_ready)
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+      wsrep_ready_get())
     return mysql_bin_log.commit(thd, all);
   else
     return (ha_commit_low(thd, all) ?
@@ -12638,7 +12643,8 @@ int wsrep_thd_binlog_rollback(THD* thd, bool all)
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) && wsrep_ready)
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+      wsrep_ready_get())
     return mysql_bin_log.rollback(thd, all);
   else
     return ha_rollback_low(thd, all);

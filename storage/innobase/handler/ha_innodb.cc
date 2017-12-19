@@ -8928,11 +8928,6 @@ no_commit:
 				set_next_trx_id = true;
 			}
 #endif /* WITH_WSREP */
-
-			/* LDI case doesn't qualify this. This case is only
-			applicable when an intermediate table is being created
-			and so src_table != m_prebuilt->table. */
-
 			/* Ensure that there are no other table locks than
 			LOCK_IX and LOCK_AUTO_INC on the destination table. */
 			if (!lock_is_table_exclusive(m_prebuilt->table,
@@ -11725,7 +11720,6 @@ wsrep_is_FK_index(dict_table_t* table,
 
 int
 ha_innobase::wsrep_append_keys(
-/*===========================*/
 	THD 		*thd,
 	bool		shared,
 	const uchar*	record0,	/* in: row in MySQL format */
@@ -11741,7 +11735,7 @@ ha_innobase::wsrep_append_keys(
 	    && thd_sql_command(thd) != SQLCOM_CREATE_TABLE) {
 
 		WSREP_DEBUG("Skip appending keys to write-set for"
-			" temporary-tables DML (THD: %u tmp: %d SQL: %s)", 
+			" temporary-tables DML (THD: %u tmp: %d SQL: %s)",
 			wsrep_thd_thread_id(thd), table_share->tmp_table,
 			(wsrep_thd_query(thd)) ? wsrep_thd_query(thd) : "void");
 		DBUG_RETURN(0);
@@ -11754,18 +11748,18 @@ ha_innobase::wsrep_append_keys(
 		ibool    is_null;
 
 		len = wsrep_store_key_val_for_row(
-			thd, table, 0, key, WSREP_MAX_SUPPORTED_KEY_LENGTH, 
+			thd, table, 0, key, WSREP_MAX_SUPPORTED_KEY_LENGTH,
 			record0, &is_null, m_prebuilt);
 
 		if (!is_null) {
 			rcode = wsrep_append_key(
-				thd, trx, table_share, table, keyval, 
+				thd, trx, table_share, table, keyval,
 				len, shared);
 			if (rcode) DBUG_RETURN(rcode);
 		}
 		else
 		{
-			WSREP_DEBUG("Skip appending NULL key (proto 0): %s", 
+			WSREP_DEBUG("Skip appending NULL key (proto 0): %s",
 				    wsrep_thd_query(thd));
 		}
 	} else {
@@ -11797,7 +11791,7 @@ ha_innobase::wsrep_append_keys(
 
 			if (!tab) {
 				WSREP_WARN("MySQL-InnoDB key mismatch %s %s",
-					   table->s->table_name.str, 
+					   table->s->table_name.str,
 					   key_info->name);
 			}
 
@@ -11809,12 +11803,12 @@ ha_innobase::wsrep_append_keys(
 			     (!tab && referenced_by_foreign_key()))) {
 
 				len = wsrep_store_key_val_for_row(
-					thd, table, i, key0, 
-					WSREP_MAX_SUPPORTED_KEY_LENGTH, 
+					thd, table, i, key0,
+					WSREP_MAX_SUPPORTED_KEY_LENGTH,
 					record0, &is_null, m_prebuilt);
 				if (!is_null) {
 					rcode = wsrep_append_key(
-						thd, trx, table_share, table, 
+						thd, trx, table_share, table,
 						keyval0, len+1, shared);
 					if (rcode) DBUG_RETURN(rcode);
 
@@ -11828,13 +11822,13 @@ ha_innobase::wsrep_append_keys(
 				}
 				if (record1) {
 					len = wsrep_store_key_val_for_row(
-						thd, table, i, key1, 
+						thd, table, i, key1,
 						WSREP_MAX_SUPPORTED_KEY_LENGTH,
 						record1, &is_null, m_prebuilt);
 					if (!is_null && memcmp(key0, key1, len)) {
 						rcode = wsrep_append_key(
-							thd, trx, table_share, 
-							table, 
+							thd, trx, table_share,
+							table,
 							keyval1, len+1, shared);
 						if (rcode) DBUG_RETURN(rcode);
 					}
@@ -11849,8 +11843,8 @@ ha_innobase::wsrep_append_keys(
 		int rcode;
 
 		wsrep_calc_row_hash(digest, record0, table, m_prebuilt, thd);
-		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
-					      (const char*) digest, 16, 
+		if ((rcode = wsrep_append_key(thd, trx, table_share, table,
+					      (const char*) digest, 16,
 					      shared))) {
 			DBUG_RETURN(rcode);
 		}
@@ -11858,9 +11852,9 @@ ha_innobase::wsrep_append_keys(
 		if (record1) {
 			wsrep_calc_row_hash(
 				digest, record1, table, m_prebuilt, thd);
-			if ((rcode = wsrep_append_key(thd, trx, table_share, 
+			if ((rcode = wsrep_append_key(thd, trx, table_share,
 						      table,
-						      (const char*) digest, 
+						      (const char*) digest,
 						      16, shared))) {
 				DBUG_RETURN(rcode);
 			}

@@ -1,6 +1,8 @@
 CREATE TABLE t1 (id INT PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO t1 VALUES (1);
 RESET QUERY CACHE;
+Warnings:
+Warning	1681	'RESET QUERY CACHE' is deprecated and will be removed in a future release.
 FLUSH STATUS;
 SELECT COUNT(*) FROM t1;
 COUNT(*)

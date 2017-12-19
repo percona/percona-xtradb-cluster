@@ -42,10 +42,10 @@ extern void wsrep_sst_continue();
 /*! Cancel the SST script if it is running */
 extern void wsrep_sst_cancel(bool call_wsrep_cb);
 
-extern void wsrep_SE_init_grab();   /*! grab init critical section */
+extern void wsrep_SE_init_grab();          /*! grab init critical section */
 extern void wsrep_SE_init_wait(THD* thd);  /*! wait for SE init to complete */
-extern void wsrep_SE_init_done();   /*! signal that SE init is complte */
-extern void wsrep_SE_initialized(); /*! mark SE initialization complete */
+extern void wsrep_SE_init_done();          /*! signal that SE init is complte */
+extern void wsrep_SE_initialized();        /*! mark SE initialization complete */
 extern bool wsrep_is_SE_initialized();
 
 #endif /* WSREP_SST_H */

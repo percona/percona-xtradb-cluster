@@ -20,6 +20,7 @@ FLUSH STATUS;
 #
 # 1. Cache works
 #
+
 SELECT COUNT(*) FROM t1;
 SELECT VARIABLE_VALUE = 1 FROM performance_schema.global_status WHERE VARIABLE_NAME = 'Qcache_queries_in_cache';
 

@@ -203,7 +203,9 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
     goto end;
   }
 
+#ifdef WITH_WSREP
   WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, tables)
+#endif /* WITH_WSREP */
 
   /* We also don't allow creation of triggers on views. */
   tables->required_type= FRMTYPE_TABLE;
@@ -288,7 +290,9 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
   */
   sp_cache_invalidate();
 
+#ifdef WITH_WSREP
 error:
+#endif /* WITH_WSREP */
 end:
   if (!result)
   {

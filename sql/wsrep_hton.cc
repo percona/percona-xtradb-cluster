@@ -1110,6 +1110,9 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
   }
 
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+  DEBUG_SYNC(thd, "wsrep_after_replication");
+
   switch(rcode) {
   case 0:
     /*

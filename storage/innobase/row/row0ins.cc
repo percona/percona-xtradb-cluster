@@ -1441,8 +1441,7 @@ row_ins_foreign_check_on_constraint(
 					foreign,
 					clust_rec,
 					clust_index,
-					FALSE,
-					(node) ? TRUE : FALSE);
+					FALSE, FALSE);
 	if (err != DB_SUCCESS) {
 		ib::warn() << "WSREP: foreign key append failed: " << err;
 	} else

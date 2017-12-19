@@ -97,8 +97,7 @@ COMMIT;
 --source include/wait_condition.inc
 
 --connection node_2
-#--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
---error ER_LOCK_DEADLOCK
+--error ER_LOCK_DEADLOCK,ER_ERROR_DURING_ROLLBACK
 COMMIT;
 
 DROP SCHEMA test;

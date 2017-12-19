@@ -173,7 +173,7 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,"
   ."innodb_fts,innodb_zip,innodb_undo,innodb_stress,perfschema,funcs_1,"
   ."funcs_2,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,"
   ."test_service_sql_api,jp,stress,engines/iuds,engines/funcs,"
-  ."group_replication,x,galera"
+  ."group_replication,x,galera,"
   ."query_response_time,audit_log,json,connection_control,"
   ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
   ."tokudb.rpl,tokudb.perfschema,"
@@ -4245,21 +4245,62 @@ sub run_query {
 }
 
 
-sub sleep_until_returns_true($$$) {
-  my ($tinfo, $mysqld, $query)= @_;
+sub run_query_output {
+  my ($mysqld, $query, $outfile)= @_;
 
-  my $timeout = $opt_start_timeout;
+  my $args;
+  mtr_init_args(\$args);
+  mtr_add_arg($args, "--defaults-file=%s", $path_config_file);
+  mtr_add_arg($args, "--defaults-group-suffix=%s", $mysqld->after('mysqld'));
+
+  mtr_add_arg($args, "--silent");
+  mtr_add_arg($args, "--execute=%s", $query);
+
+  my $res= My::SafeProcess->run
+    (
+     name          => "run_query_output -> ".$mysqld->name(),
+     path          => $exe_mysql,
+     args          => \$args,
+     output        => $outfile,
+     error         => $outfile
+    );
+
+  return $res
+}
+
+
+sub wait_wsrep_ready($$) {
+  my ($tinfo, $mysqld)= @_;
+
   my $sleeptime= 100; # Milliseconds
-  my $loops= ($timeout * 1000) / $sleeptime;
+  my $loops= ($opt_start_timeout * 1000) / $sleeptime;
 
-  for ( my $loop= 1; $loop <= $loops; $loop++ ) {
-    my $query_result = run_query($tinfo, $mysqld, $query);
-    if (run_query($tinfo, $mysqld, $query) == 1) {
+  my $name= $mysqld->name();
+  my $outfile= "$opt_vardir/tmp/$name.wsrep_ready";
+  my $query= "SET SESSION wsrep_sync_wait = 0;
+              SELECT VARIABLE_VALUE
+              FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+              WHERE VARIABLE_NAME = 'wsrep_ready'";
+
+  for (my $loop= 1; $loop <= $loops; $loop++)
+  {
+    if (run_query_output($mysqld, $query, $outfile) != 0)
+    {
+      $tinfo->{logfile}= "WSREP error while trying to determine node state";
       return 0;
     }
+
+    if (mtr_grab_file($outfile) =~ /^ON/)
+    {
+      unlink($outfile);
+      return 1;
+    }
+
+    mtr_milli_sleep($sleeptime);
   }
-  
-  return 1;
+
+  $tinfo->{logfile}= "WSREP did not transition to state READY";
+  return 0;
 }
 
 
@@ -4828,11 +4869,10 @@ sub run_testcase ($) {
   my @procs;
   while (1)
   {
-    if ($test_timeout > $print_timeout)
+    if (!@procs && $test_timeout > $print_timeout)
     {
       my $proc = My::SafeProcess->wait_any_timeout($print_timeout);
       mtr_verbose("Got $proc");
-      push @procs, $proc;
       if ( $proc->{timeout} )
       {
         #print out that the test is still on
@@ -4840,6 +4880,10 @@ sub run_testcase ($) {
         #reset the timer
         $print_timeout= start_timer($print_freq * 60);
         next;
+      }
+      else
+      {
+        push @procs, $proc;
       }
     }
     else
@@ -5020,6 +5064,15 @@ sub run_testcase ($) {
         {
 	  $proc->wait_one(20);
         }
+      }
+
+      # Remove testcase .log file produce in var/log/ to save space since
+      # relevant part of logfile has already been appended to master log
+      {
+	my $log_file_name= $opt_vardir."/log/".$tinfo->{shortname}.".log";
+	if (-e $log_file_name && ($tinfo->{'result'} ne 'MTR_RES_FAILED')) {
+	  unlink($log_file_name);
+	}
       }
 
       # ----------------------------------------------------
@@ -6623,11 +6676,9 @@ sub start_servers($) {
       return 1;
     }
 
-    if (have_wsrep()) {
-      if(sleep_until_returns_true($tinfo, $mysqld, 'SELECT @@wsrep_ready')) {
-         $tinfo->{logfile}= "WSREP did not transition to state READY";
-         return 1;
-      }
+    if (have_wsrep() && !wait_wsrep_ready($tinfo, $mysqld))
+    {
+      return 1;
     }
   }
 

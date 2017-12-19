@@ -2027,7 +2027,7 @@ static bool mysql_install_plugin(THD *thd, const LEX_STRING *name,
 
 #ifdef WITH_WSREP
   WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif
+#endif /* WITH_WSREP */
 
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table = open_ltable(thd, &tables, TL_WRITE,
@@ -2129,11 +2129,13 @@ deinit:
   tmp->state= PLUGIN_IS_DELETED;
   reap_needed= true;
   reap_plugins();
-error:
 err:
   mysql_mutex_unlock(&LOCK_plugin);
   trans_rollback_stmt(thd);
   close_mysql_tables(thd);
+#ifdef WITH_WSREP
+ error:
+#endif /* WITH_WSREP */
 
   DBUG_RETURN(true);
 }
@@ -2157,7 +2159,7 @@ static bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
 
 #ifdef WITH_WSREP
   WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif
+#endif /* WITH_WSREP */
 
   /* need to open before acquiring LOCK_plugin or it will deadlock */
   if (! (table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
@@ -2328,11 +2330,13 @@ static bool mysql_uninstall_plugin(THD *thd, const LEX_STRING *name)
 
   DBUG_RETURN(error);
 
-error:
 err:
   trans_rollback_stmt(thd);
   close_mysql_tables(thd);
 
+#ifdef WITH_WSREP
+ error:
+#endif /* WITH_WSREP */
   DBUG_RETURN(true);
 }
 
