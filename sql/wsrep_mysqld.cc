@@ -1427,6 +1427,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
                 ret, WSREP_QUERY(thd));
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
+    wsrep_cleanup_transaction(thd);
     return 1;
   }
   return 0;
