@@ -30,16 +30,6 @@ sanity () {
                 install -d -m 0750 -o mysql -g mysql ${MYSQLDATA}/mysql
 	fi
 
-	if [ ! "$(ls -A ${MYSQLDATA}/mysql)" ];
-	then
-		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --initialize-insecure=on 2>&1 > /dev/null"
-		su - mysql -s /bin/bash -c "/usr/sbin/mysqld --log_error_verbosity=2 2>&1 > /dev/null &"
-		pinger
-		mysql -e "INSTALL PLUGIN auth_socket SONAME 'auth_socket.so'"
-		mysql -e "USE mysql; UPDATE user SET plugin='auth_socket' WHERE user='root'"
-		mysqladmin shutdown
-	fi
-
 	if [ -x /usr/bin/mysql_ssl_rsa_setup -a ! -e "${MYSQLDATA}/server-key.pem" ];
 	then
 		/usr/bin/mysql_ssl_rsa_setup --datadir="${MYSQLDATA}" --uid=mysql >/dev/null 2>&1
