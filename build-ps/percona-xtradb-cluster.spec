@@ -414,7 +414,7 @@ Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
 Requires:	percona-xtrabackup-24 >= 2.4.4 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
-Requires:       perl(Data::Dumper) which
+Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
