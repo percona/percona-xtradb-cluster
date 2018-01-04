@@ -2025,7 +2025,7 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
     thd->wsrep_gtid_event_buf_len = 0;
     thd->wsrep_gtid_event_buf     = NULL;
     wsrep_keys_free(&key_arr);
-
+    wsrep_cleanup_transaction(thd);
     return 1;
   }
 
