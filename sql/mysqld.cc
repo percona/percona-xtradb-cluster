@@ -781,7 +781,9 @@ mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 int wsrep_replaying= 0;
+ulong  wsrep_running_threads = 0; // # of currently running wsrep threads
 static void wsrep_close_threads(THD* thd);
+int mysqld_server_initialized= 0;
 #endif /* WITH_WSREP */
 int mysqld_server_started= 0;
 
@@ -1756,7 +1758,11 @@ static void __cdecl kill_server(int sig_ptr)
   }
 #endif
 #ifdef WITH_WSREP
-  if (WSREP_ON) wsrep_stop_replication(NULL);
+  /* Stop wsrep threads in case they are running. */
+  if (wsrep_running_threads > 0)
+  {
+    wsrep_stop_replication(NULL);
+  }
 #endif
 
   close_connections();
@@ -5000,6 +5006,10 @@ a file name for --log-bin-index option", opt_binlog_index_name);
         after SST has happened
      */
   }
+  
+  /* It's now safe to use thread specific memory */
+  mysqld_server_initialized= 1;
+
   if (!wsrep_recovery)
   {
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
@@ -5360,8 +5370,6 @@ static void create_shutdown_thread()
 #endif /* EMBEDDED_LIBRARY */
 
 #ifdef WITH_WSREP
-typedef void (*wsrep_thd_processor_fun)(THD *);
-
 pthread_handler_t start_wsrep_THD(void *arg)
 {
   THD *thd;
@@ -5434,6 +5442,11 @@ pthread_handler_t start_wsrep_THD(void *arg)
   thd->set_time();
   thd->init_for_queries();
 
+  mysql_mutex_lock(&LOCK_thread_count);
+  wsrep_running_threads++;
+  mysql_cond_broadcast(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
+  
   mysql_mutex_lock(&LOCK_connection_count);
   ++connection_count;
   mysql_mutex_unlock(&LOCK_connection_count);
@@ -5441,6 +5454,12 @@ pthread_handler_t start_wsrep_THD(void *arg)
   processor(thd);
 
   close_connection(thd, 0, 1);
+
+  mysql_mutex_lock(&LOCK_thread_count);
+  wsrep_running_threads--;
+  WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
+  mysql_cond_broadcast(&COND_thread_count);
+  mysql_mutex_unlock(&LOCK_thread_count);
 
   // Note: We can't call THD destructor without crashing
   // if plugins have not been initialized. However, in most of the
@@ -5909,6 +5928,7 @@ int mysqld_main(int argc, char **argv)
   }
 #endif
 #ifdef WITH_WSREP
+  mysqld_server_initialized= 0;
   wsrep_filter_new_cluster (&argc, argv);
 #endif /* WITH_WSREP */
 
