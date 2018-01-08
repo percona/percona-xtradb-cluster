@@ -1344,6 +1344,7 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
   size_t buf_len(0);
   int buf_err;
 
+  thd->wsrep_skip_wsrep_hton= true;
   if (wsrep_can_run_in_toi(thd, db_, table_, table_list) == false)
   {
     WSREP_DEBUG("No TOI for %s", WSREP_QUERY(thd));
@@ -1428,7 +1429,6 @@ static int wsrep_TOI_begin(THD *thd, char *db_, char *table_,
                 ret, WSREP_QUERY(thd));
     if (buf) my_free(buf);
     wsrep_keys_free(&key_arr);
-    wsrep_cleanup_transaction(thd);
     return 1;
   }
   return 0;
@@ -1660,6 +1660,9 @@ void wsrep_to_isolation_end(THD *thd)
     }
     wsrep_cleanup_transaction(thd);
   }
+
+  if (thd->wsrep_skip_wsrep_hton)
+    wsrep_cleanup_transaction(thd);
 }
 
 #define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)             \

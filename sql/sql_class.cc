@@ -1334,6 +1334,7 @@ THD::THD(bool enable_plugins)
   wsrep_affected_rows     = 0;
   wsrep_replicate_GTID    = false;
   wsrep_skip_wsrep_GTID   = false;
+  wsrep_skip_wsrep_hton   = false;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1761,6 +1762,7 @@ void THD::init(void)
   wsrep_affected_rows     = 0;
   wsrep_replicate_GTID    = false;
   wsrep_skip_wsrep_GTID   = false;
+  wsrep_skip_wsrep_hton   = false;
 #endif
   binlog_row_event_extra_data= 0;
 

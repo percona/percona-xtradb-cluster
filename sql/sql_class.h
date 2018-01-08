@@ -3591,6 +3591,11 @@ public:
   Galera GTID. */
   bool                      wsrep_skip_wsrep_GTID;
 
+  /* DDL statement. skip registering wsrep_hton handler.
+  This is normally blocked by checking wsrep_exec_state != TOTAL_ORDER
+  but if sql_log_bin = 0 then the state is not set and DDL should is expected
+  not be replicated. This variable helps identify situation like these. */
+  bool                      wsrep_skip_wsrep_hton;
 #endif /* WITH_WSREP */
   /**
     Internal parser state.
