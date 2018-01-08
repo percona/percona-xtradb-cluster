@@ -138,8 +138,6 @@ while ($count)
 }
 
 --connection node_1
---eval SET GLOBAL wsrep_slave_threads = $wsrep_slave_threads_orig
-
 # Generate 64 replication events, to help node 2 to purge excessive applier threads
 --let $count = 64
 while ($count)

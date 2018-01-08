@@ -537,7 +537,7 @@ void wsrep_node_address_init (const char* value)
 
 static void wsrep_slave_count_change_update ()
 {
-  // wsrep_running-threads = appliers threads + 1 rollbacker thread
+  // wsrep_running_threads = appliers threads + 1 rollbacker thread
   wsrep_slave_count_change = (wsrep_slave_threads - wsrep_running_threads + 1);
 }
 

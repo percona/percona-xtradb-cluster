@@ -781,7 +781,7 @@ mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 int wsrep_replaying= 0;
-ulong  wsrep_running_threads = 0; // # of currently running wsrep threads
+ulong wsrep_running_threads = 0; // # of currently running wsrep threads
 static void wsrep_close_threads(THD* thd);
 int mysqld_server_initialized= 0;
 #endif /* WITH_WSREP */

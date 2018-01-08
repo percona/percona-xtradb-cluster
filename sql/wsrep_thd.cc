@@ -369,9 +369,10 @@ static bool create_wsrep_THD(wsrep_thd_processor_fun processor)
   bool res= pthread_create(&unused, &connection_attrib, start_wsrep_THD,
                            (void*)processor);
   /*
-    if starting a thread on server startup, wait until the this thread's THD
+    if starting a thread on server startup, wait until this thread's THD
     is fully initialized (otherwise a THD initialization code might
     try to access a partially initialized server data structure - MDEV-8208).
+    (https://jira.mariadb.org/browse/MDEV-8208)
   */
   if (!mysqld_server_initialized)
     while (old_wsrep_running_threads == wsrep_running_threads)
