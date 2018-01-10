@@ -88,6 +88,7 @@ mysql_data_dir=$(mysqld_get_param datadir)
 
 pid_file=$(mysqld_get_param pid-file)
 
+socket=$(mysqld_get_param socket)
 if test -z "$pid_file"
 then
     pid_file="$mysql_data_dir/$(hostname).pid"
@@ -118,8 +119,7 @@ mysqld_status () {
 
     ping_alive=1
     ps_alive=0
-    
-    if ! mysqladmin ping &>/dev/null;then
+    if ! $(mysqladmin --no-defaults --socket="$socket" --user=UNKNOWN_MYSQL_USER ping &>/dev/null) ;then
         ping_alive=0
     fi
     
