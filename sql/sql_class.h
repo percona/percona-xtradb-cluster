@@ -3410,6 +3410,12 @@ public:
   bool                      wsrep_replicate_GTID;
   bool                      wsrep_skip_wsrep_GTID;
 
+  /* DDL statement. skip registering wsrep_hton handler.
+  This is normally blocked by checking wsrep_exec_state != TOTAL_ORDER
+  but if sql_log_bin = 0 then the state is not set and DDL should is expected
+  not be replicated. This variable helps identify situation like these. */
+  bool                      wsrep_skip_wsrep_hton;
+
   /* This field is set when wsrep try to do an intermediate special
   commit while processing LOAD DATA INFILE statement by breaking it
   into 10K rows mini transactions.

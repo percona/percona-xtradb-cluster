@@ -50,6 +50,7 @@ void wsrep_cleanup_transaction(THD *thd)
   thd->wsrep_affected_rows= 0;
   thd->wsrep_void_applier_trx= true;
   thd->wsrep_skip_wsrep_GTID= false;
+  thd->wsrep_skip_wsrep_hton= false;
   return;
 }
 
@@ -77,6 +78,15 @@ handlerton *wsrep_hton;
 void wsrep_register_hton(THD* thd, bool all)
 {
   if (!WSREP(thd)) return;
+
+  /* Skip wsrep-hton handler registration.
+  This happens in case like following:
+  - DDL is executed with sql_log_bin = 0 where-in ddl replication is skipped
+    so the exec_mode != TOTAL_ORDER but as thumb rule hton should get registered
+    for DDL/TOI statement.
+  */
+  if (WSREP(thd) && thd->wsrep_skip_wsrep_hton)
+    return;
 
   /* only LOCAL_STATE processors may replicate.
      For filtered mysql replication we may end up here in LOCAL_COMMIT state
