@@ -2292,7 +2292,7 @@ void wsrep_to_isolation_end(THD *thd)
   }
 
   if (thd->wsrep_skip_wsrep_hton)
-    wsrep_cleanup_transaction(thd);
+    thd->wsrep_skip_wsrep_hton= false;
 }
 
 #define WSREP_MDL_LOG(severity, msg, schema, schema_len, req, gra)             \
