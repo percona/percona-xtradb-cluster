@@ -22,14 +22,14 @@ DROP TABLE IF EXISTS t1, t2;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN  ('t1', 't2');
 --source include/wait_condition.inc
 
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH DES_KEY_FILE;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -37,14 +37,14 @@ FLUSH DES_KEY_FILE;
 # Test: FLUSH HOSTS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH HOSTS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -72,29 +72,30 @@ FLUSH PRIVILEGES;
 # Test: FLUSH QUERY_CACHE
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
-
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 --connection node_1
 FLUSH QUERY CACHE;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
---source include/wait_condition_with_debug.inc
+--sleep 2
+--let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+--disable_query_log
+--eval SELECT $wsrep_last_committed_after = $wsrep_last_committed_before + 1 AS wsrep_last_committed_diff;
+--enable_query_log
 
 
 #
 # Test: FLUSH STATUS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH STATUS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -102,14 +103,14 @@ FLUSH STATUS;
 # Test: FLUSH USER_RESOURCES
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH USER_RESOURCES;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -117,14 +118,14 @@ FLUSH USER_RESOURCES;
 # Test: FLUSH TABLES
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH TABLES;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -138,14 +139,14 @@ CREATE TABLE t2 (f1 INTEGER);
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't2';
 --source include/wait_condition.inc
 
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH TABLES t2;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -153,14 +154,14 @@ FLUSH TABLES t2;
 # Test: FLUSH ERROR_LOGS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH ERROR LOGS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -168,14 +169,14 @@ FLUSH ERROR LOGS;
 # Test: FLUSH SLOW_LOGS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH SLOW LOGS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -183,14 +184,14 @@ FLUSH SLOW LOGS;
 # Test: FLUSH GENERAL_LOGS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH GENERAL LOGS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -198,14 +199,14 @@ FLUSH GENERAL LOGS;
 # Test: FLUSH ENGINE_LOGS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH ENGINE LOGS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -213,14 +214,14 @@ FLUSH ENGINE LOGS;
 # Test: FLUSH RELAY_LOGS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH RELAY LOGS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -231,7 +232,7 @@ FLUSH RELAY LOGS;
 #       FLUSH USER_STATISTICS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH CLIENT_STATISTICS;
@@ -240,8 +241,8 @@ FLUSH TABLE_STATISTICS;
 FLUSH USER_STATISTICS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 4 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 4 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 4 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 4 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 --source include/wait_condition.inc
 
@@ -250,14 +251,14 @@ FLUSH USER_STATISTICS;
 # Test: FLUSH THREAD_STATISTICS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH THREAD_STATISTICS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -265,14 +266,14 @@ FLUSH THREAD_STATISTICS;
 # Test: FLUSH CHANGED_PAGE_BITMAPS
 #
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH CHANGED_PAGE_BITMAPS;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
@@ -288,11 +289,11 @@ CREATE TABLE t1 (f1 INTEGER);
 --source include/wait_condition.inc
 
 # In addition, wait until we have seen the create table
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 2 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 2 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 2 FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 2 as EXPECTED_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 FLUSH LOGS;
@@ -309,13 +310,13 @@ RESET QUERY CACHE;
 --connection node_2
 --sleep 5
 --disable_query_log
---let $wsrep_last_applied_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_applied'`
-if ($wsrep_last_applied_before != $wsrep_last_applied_after)
+--let $wsrep_last_committed_after = `SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.SESSION_STATUS WHERE VARIABLE_NAME = 'wsrep_last_committed'`
+if ($wsrep_last_committed_before != $wsrep_last_committed_after)
 {
-	--echo "before:$wsrep_last_applied_before after:$wsrep_last_applied_after expected:$wsrep_last_applied_before"
+	--echo "before:$wsrep_last_committed_before after:$wsrep_last_committed_after expected:$wsrep_last_committed_before"
 }
 --disable_warnings
---eval SELECT VARIABLE_VALUE = $wsrep_last_applied_before AS wsrep_last_applied_diff FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
+--eval SELECT VARIABLE_VALUE = $wsrep_last_committed_before AS wsrep_last_committed_diff FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
 --enable_warnings
 --enable_query_log
 
@@ -326,7 +327,7 @@ if ($wsrep_last_applied_before != $wsrep_last_applied_after)
 
 
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 LOCK TABLES t1 WRITE;
@@ -334,13 +335,13 @@ FLUSH TABLES t1;
 UNLOCK TABLES;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 
 --connection node_2
---let $wsrep_last_applied_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'`
+--let $wsrep_last_committed_before = `SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'`
 
 --connection node_1
 LOCK TABLES t1 READ;
@@ -353,7 +354,7 @@ UNLOCK TABLES;
 --sleep 1
 --disable_query_log
 --disable_warnings
---eval SELECT VARIABLE_VALUE = $wsrep_last_applied_before AS wsrep_last_applied_diff FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
+--eval SELECT VARIABLE_VALUE = $wsrep_last_committed_before AS wsrep_last_committed_diff FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
 --enable_warnings
 --enable_query_log
 
@@ -361,8 +362,8 @@ UNLOCK TABLES;
 FLUSH TABLES t1;
 
 --connection node_2
---let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_applied_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_applied'
---let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_applied_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_applied')
+--let $wait_condition = SELECT VARIABLE_VALUE = $wsrep_last_committed_before + 1 FROM performance_schema.session_status WHERE VARIABLE_NAME = 'wsrep_last_committed'
+--let $wait_condition_on_error_output = SELECT VARIABLE_NAME, VARIABLE_VALUE, $wsrep_last_committed_before + 1 as EXPECTED_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME IN ('wsrep_last_committed')
 --source include/wait_condition_with_debug.inc
 
 

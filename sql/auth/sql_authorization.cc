@@ -503,11 +503,14 @@ bool check_readonly(THD *thd, bool err_if_readonly)
   if (!opt_readonly)
     DBUG_RETURN(FALSE);
 
-  /* thread is replication slave, do not prohibit operation: */
+  /*
+    Thread is replication slave or skip_read_only check is enabled for the
+    command, do not prohibit operation.
+  */
 #ifdef WITH_WSREP
-  if (thd->slave_thread || thd->wsrep_applier)
+  if (thd->slave_thread || thd->wsrep_applier || thd->is_cmd_skip_readonly())
 #else
-  if (thd->slave_thread)
+  if (thd->slave_thread || thd->is_cmd_skip_readonly())
 #endif /* WITH_WSREP */
     DBUG_RETURN(FALSE);
 

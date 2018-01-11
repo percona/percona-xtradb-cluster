@@ -166,7 +166,8 @@ override_dh_install:
 		-Xusr/share/mysql/README \
 		-Xusr/share/mysql/docs/mysql.info \
 		-Xusr/share/mysql/docs/INSTALL-BINARY \
-		-Xusr/share/man/man1/mysqlman.1
+		-Xusr/share/man/man1/mysqlman.1 \
+		-Xusr/bin/mysqld_multi
 ifneq (,@DEB_RULES_APPARMOR_LOAD@)
 	# non-empty command = apparmor is handled
 	dh_apparmor -pmysql-server@DEB_PRODUCTSERIES@ --profile-name=usr.sbin.mysqld

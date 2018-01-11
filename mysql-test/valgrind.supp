@@ -153,6 +153,8 @@
    Memcheck:Leak
    fun:calloc
    fun:_dlerror_run
+   fun:dlsym
+   fun:__errno_location
 }
 
 
@@ -798,15 +800,6 @@
    fun:buf_buddy_free_low
    fun:buf_buddy_free
 }
-{
-   zlib longest_match false positive
-   Memcheck:Cond
-   fun:longest_match
-   fun:deflate_slow
-   fun:deflate
-   fun:compress
-   fun:my_compress_alloc
-}
 
 #
 # NDB packfrm vs deflate
@@ -1292,7 +1285,7 @@ g   codership/mysql-wsrep/issues#176
    Memcheck:Leak
    match-leak-kinds: reachable
    fun:malloc
-   ...
+   obj:/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.21
    fun:call_init.part.0
    fun:call_init
    fun:_dl_init

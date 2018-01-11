@@ -1,5 +1,0 @@
-mysql-wsrep-5.6 (5.6.30-25.15-1) UNRELEASED; urgency=low
-
-  * Bump version numbers
-
- -- Otto Kekäläinen <otto@seravo.fi>  Wed, 22 Jun 2016 11:58:20 +0300

@@ -43,8 +43,6 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_xid.h"
-#include "wsrep_binlog.h"
-extern handlerton* wsrep_hton;
 #endif /* WITH_WSREP */
 
 using std::max;
@@ -1208,6 +1206,10 @@ static int binlog_init(void *p)
   return 0;
 }
 
+#ifdef WITH_WSREP
+#include "wsrep_binlog.h"
+#endif /* WITH_WSREP */
+
 static int binlog_deinit(void *p)
 {
   /* Using binlog as TC after the binlog has been unloaded, won't work */
@@ -1229,14 +1231,14 @@ static int binlog_close_connection(handlerton *hton, THD *thd)
     uchar *buf;
     size_t len=0;
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog trx cache not empty (%zu bytes) @ connection close %u",
-               len, thd->thread_id());
+    WSREP_WARN("binlog trx cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
 
     cache = cache_mngr->get_binlog_cache_log(false);
     wsrep_write_cache_buf(cache, &buf, &len);
-    WSREP_WARN("binlog stmt cache not empty (%zu bytes) @ connection close %u",
-               len, thd->thread_id());
+    WSREP_WARN("binlog stmt cache not empty (%llu bytes) @ connection close %llu",
+               (unsigned long long) len, (unsigned long long) thd->thread_id());
     if (len > 0) wsrep_dump_rbr_buf(thd, buf, len);
   }
 #endif /* WITH_WSREP */
@@ -1592,6 +1594,7 @@ binlog_cache_data::flush(THD *thd, my_off_t *bytes_written, bool *wrote_xid)
     were, we would have to ensure that we're not ending a statement
     inside a stored function.
   */
+
   DBUG_ENTER("binlog_cache_data::flush");
   DBUG_PRINT("debug", ("flags.finalized: %s", YESNO(flags.finalized)));
   int error= 0;
@@ -3741,6 +3744,7 @@ bool generate_new_log_name(char *new_name, ulong *new_ext,
   return false;
 }
 
+
 /**
   @todo
   The following should be using fn_format();  We just need to
@@ -4479,6 +4483,7 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
       DBUG_ASSERT(prev_gtids == NULL ? true : all_gtids != NULL ||
                                               first_gtid != NULL);
     }
+    // fallthrough
     default:
       // if we found any other event type without finding a
       // previous_gtids_log_event, then the rest of this binlog
@@ -6792,17 +6797,6 @@ int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time, bool auto_purge)
 
   while (!(log_is_active= is_active(log_info.log_file_name)))
   {
-    if ((no_of_threads_locking_log= log_in_use(log_info.log_file_name)))
-    {
-      if (!auto_purge)
-      {
-        log_is_in_use= true;
-        strcpy(copy_log_in_use, log_info.log_file_name);
-      }
-      break;
-    }
-    no_of_log_files_purged++;
-
     if (!mysql_file_stat(m_key_file_log,
                          log_info.log_file_name, &stat_area, MYF(0)))
     {
@@ -6837,15 +6831,28 @@ int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time, bool auto_purge)
         goto err;
       }
     }
-    else
+    /* check if the binary log file is older than the purge_time
+       if yes check if it is in use, if not in use then add
+       it in the list of binary log files to be purged.
+    */
+    else if (stat_area.st_mtime < purge_time)
     {
-      if (stat_area.st_mtime < purge_time) 
-        strmake(to_log, 
-                log_info.log_file_name, 
-                sizeof(log_info.log_file_name) - 1);
-      else
+      if ((no_of_threads_locking_log= log_in_use(log_info.log_file_name)))
+      {
+        if (!auto_purge)
+        {
+          log_is_in_use= true;
+          strcpy(copy_log_in_use, log_info.log_file_name);
+        }
         break;
+      }
+      strmake(to_log,
+              log_info.log_file_name,
+              sizeof(log_info.log_file_name) - 1);
+      no_of_log_files_purged++;
     }
+    else
+      break;
     if (find_next_log(&log_info, false/*need_lock_index=false*/))
       break;
   }
@@ -7001,7 +7008,7 @@ int MYSQL_BIN_LOG::new_file_impl(bool need_lock_log, Format_description_log_even
 {
   int error= 0;
   bool close_on_error= false;
-  char new_name[FN_REFLEN], *new_name_ptr, *old_name, *file_to_open;
+  char new_name[FN_REFLEN], *new_name_ptr= NULL, *old_name, *file_to_open;
 
   DBUG_ENTER("MYSQL_BIN_LOG::new_file_impl");
   if (!is_open())
@@ -7716,6 +7723,12 @@ int MYSQL_BIN_LOG::rotate_and_purge(THD* thd, bool force_rotate)
   DBUG_ENTER("MYSQL_BIN_LOG::rotate_and_purge");
   bool check_purge= false;
 
+  /*
+    FLUSH BINARY LOGS command should ignore 'read-only' and 'super_read_only'
+    options so that it can update 'mysql.gtid_executed' replication repository
+    table.
+  */
+  thd->set_skip_readonly_check();
   /*
     Wait for handlerton to insert any pending information into the binlog.
     For e.g. ha_ndbcluster which updates the binlog asynchronously this is
@@ -9770,6 +9783,9 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
     Shall introduce a delay only if it is going to do sync
     in this ongoing SYNC stage. The "+1" used below in the
     if condition is to count the ongoing sync stage.
+    When sync_binlog=0 (where we never do sync in BGC group),
+    it is considered as a special case and delay will be executed
+    for every group just like how it is done when sync_binlog= 1.
   */
   if (!flush_error && (sync_counter + 1 >= get_sync_period()))
     stage_manager.wait_count_or_timeout(opt_binlog_group_commit_sync_no_delay_count,
@@ -11146,6 +11162,11 @@ int THD::decide_logging_format(TABLE_LIST *tables)
     else if (multi_access_engine && flags_access_some_set & HA_HAS_OWN_BINLOGGING)
       lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_MULTIPLE_ENGINES_AND_SELF_LOGGING_ENGINE);
 
+    /* XA is unsafe for statements */
+    if (is_write &&
+        !get_transaction()->xid_state()->has_state(XID_STATE::XA_NOTR))
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_XA);
+
     /* both statement-only and row-only engines involved */
     if ((flags_write_all_set & (HA_BINLOG_STMT_CAPABLE | HA_BINLOG_ROW_CAPABLE)) == 0)
     {
@@ -11419,7 +11440,7 @@ int THD::decide_logging_format(TABLE_LIST *tables)
   @retval false Error was generated.
   @retval true No error was generated (possibly a warning was generated).
 */
-static bool handle_gtid_consistency_violation(THD *thd, int error_code)
+bool handle_gtid_consistency_violation(THD *thd, int error_code)
 {
   DBUG_ENTER("handle_gtid_consistency_violation");
 
@@ -11542,17 +11563,19 @@ bool THD::is_ddl_gtid_compatible()
     DBUG_RETURN(ret);
   }
   else if ((lex->sql_command == SQLCOM_CREATE_TABLE &&
-            (lex->create_info.options & HA_LEX_CREATE_TMP_TABLE) != 0) ||
-           (lex->sql_command == SQLCOM_DROP_TABLE && lex->drop_temporary))
+            (lex->create_info.options & HA_LEX_CREATE_TMP_TABLE) != 0))
   {
     /*
-      [CREATE|DROP] TEMPORARY TABLE is unsafe to execute
-      inside a transaction because the table will stay and the
-      transaction will be written to the slave's binary log with the
-      GTID even if the transaction is rolled back.
-      This includes the execution inside Functions and Triggers.
+      In statement binary log format, CREATE TEMPORARY TABLE is unsafe
+      to execute inside a transaction because the table will stay and the
+      transaction will be written to the slave's binary log with the GTID even
+      if the transaction is rolled back. This includes the execution inside
+      functions and triggers.
+      The same considerations apply for DROP TEMPORARY TABLE too, this is
+      checked in mysql_rm_table instead.
     */
-    if (in_multi_stmt_transaction_mode() || in_sub_stmt)
+    if ((in_multi_stmt_transaction_mode() || in_sub_stmt)
+        && variables.binlog_format == BINLOG_FORMAT_STMT)
     {
       bool ret= handle_gtid_consistency_violation(
         this, ER_GTID_UNSAFE_CREATE_DROP_TEMPORARY_TABLE_IN_TRANSACTION);
@@ -12562,7 +12585,7 @@ IO_CACHE * wsrep_get_trans_log(THD * thd, bool transaction)
   }
   else
   {
-    WSREP_DEBUG("binlog cache not initialized for thd: %u", thd->thread_id());
+    WSREP_DEBUG("binlog cache not initialized, conn :%u", thd->thread_id());
     return NULL;
   }
 }
@@ -12606,7 +12629,8 @@ TC_LOG::enum_result wsrep_thd_binlog_commit(THD* thd, bool all)
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) && wsrep_ready)
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+      wsrep_ready_get())
     return mysql_bin_log.commit(thd, all);
   else
     return (ha_commit_low(thd, all) ?
@@ -12619,7 +12643,8 @@ int wsrep_thd_binlog_rollback(THD* thd, bool all)
      - applier and replayer can skip binlog commit
      - also if node is not joined, replication must be skipped
    */
-  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) && wsrep_ready)
+  if (WSREP_EMULATE_BINLOG(thd) && (thd->wsrep_exec_mode != REPL_RECV) &&
+      wsrep_ready_get())
     return mysql_bin_log.rollback(thd, all);
   else
     return ha_rollback_low(thd, all);

@@ -28,7 +28,12 @@ INSERT INTO ten VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY AUTO_INCREMENT, f2 INTEGER) ENGINE=InnoDB;
 
 --disable_query_log
-INSERT INTO t1 (f2) SELECT 1 from ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+--let $count = 100
+while ($count)
+{
+  --eval INSERT INTO t1 (f2) SELECT 1 FROM ten AS a1, ten AS a2;
+  --dec $count
+}
 --enable_query_log
 
 #
@@ -40,8 +45,13 @@ INSERT INTO t1 (f2) SELECT 1 from ten AS a1, ten AS a2, ten AS a3, ten AS a4;
 --let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
 --source include/wait_condition.inc
 
+--let $count = 100
 --disable_query_log
-INSERT INTO t1 (f2) SELECT 1 from ten AS a1, ten AS a2, ten AS a3, ten AS a4;
+while ($count)
+{
+  --eval INSERT INTO t1 (f2) SELECT 1 FROM ten AS a1, ten AS a2;
+  --dec $count
+}
 --enable_query_log
 
 #
@@ -55,10 +65,7 @@ SELECT COUNT(DISTINCT f1) = 2 * 100 * 10 * 10 FROM t1;
 
 --connect node_3, 127.0.0.1, root, , test, $NODE_MYPORT_3
 --connection node_3
-
---let $wait_condition = SELECT COUNT(*) = 2 * 100 * 10 * 10 FROM t1;
---source include/wait_condition.inc
-
+SELECT COUNT(*) = 2 * 100 * 10 * 10 FROM t1;
 SELECT COUNT(DISTINCT f1) = 2 * 100 * 10 * 10 FROM t1;
 
 #
@@ -71,6 +78,9 @@ DROP TABLE ten;
 
 --connection node_2
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 't1';
+--source include/wait_condition.inc
+
+--let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ten';
 --source include/wait_condition.inc
 
 STOP SLAVE;

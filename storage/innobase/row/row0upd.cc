@@ -2450,15 +2450,11 @@ row_upd_sec_index_entry(
 #ifdef WITH_WSREP
 			if (wsrep_on(trx->mysql_thd)                          &&
 			    !wsrep_thd_is_BF(trx->mysql_thd, FALSE)           &&
-			    err == DB_SUCCESS && !referenced                  &&
-			    !(parent && que_node_get_type(parent) ==
-				QUE_NODE_UPDATE                               &&
-			      (std::find(((upd_node_t*)parent)->cascade_upd_nodes->begin(),
-                                         ((upd_node_t*)parent)->cascade_upd_nodes->end(),
-                                         node) ==
-                               ((upd_node_t*)parent)->cascade_upd_nodes->end()))  &&
-                            foreign
-                        ) {
+			    err == DB_SUCCESS && !referenced && foreign       &&
+			    (!parent || (que_node_get_type(parent) !=
+			    QUE_NODE_UPDATE)                     ||
+			    ((upd_node_t*)parent)->cascade_upd_nodes->empty())
+			) {
 				ulint*	offsets =
 					rec_get_offsets(
 						rec, index, NULL, ULINT_UNDEFINED,
@@ -2472,15 +2468,25 @@ row_upd_sec_index_entry(
 					err = DB_SUCCESS;
 					break;
 				case DB_DEADLOCK:
-					if (wsrep_debug) fprintf (stderr, 
-						"WSREP: sec index FK check fail for deadlock");
+					if (wsrep_debug) {
+						ib::warn() << "WSREP: sec index FK check fail for deadlock"
+							   << " index " << index->name
+							   << " table " << index->table->name;
+					}
+					break;
+				case DB_LOCK_WAIT:
+					err = DB_LOCK_WAIT_TIMEOUT;
 					break;
 				default:
-					fprintf (stderr, 
-						 "WSREP: referenced FK check fail: %d", 
-						 (int)err);
+					ib::error() <<  "WSREP: referenced FK check fail: " << ut_strerr(err)
+						    << " index " << index->name
+						    << " table " << index->table->name;
 					break;
 				}
+			}
+
+			if (err != DB_SUCCESS) {
+				break;
 			}
 #endif /* WITH_WSREP */
 		}
@@ -2766,13 +2772,9 @@ check_fk:
 			}
 		}
 #ifdef WITH_WSREP
-		if (!referenced                                              &&
-		    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE &&
-                      (std::find(((upd_node_t*)parent)->cascade_upd_nodes->begin(),
-                                 ((upd_node_t*)parent)->cascade_upd_nodes->end(),
-                                 node) ==
-                       ((upd_node_t*)parent)->cascade_upd_nodes->end()))       &&
-		    foreign
+		else if (wsrep_on(trx->mysql_thd) && foreign                        &&
+			 (!parent || (que_node_get_type(parent) != QUE_NODE_UPDATE) ||
+			 ((upd_node_t*)parent)->cascade_upd_nodes->empty())
 		) {
 			err = wsrep_row_upd_check_foreign_constraints(
 				node, pcur, table, index, offsets, thr, mtr);
@@ -2782,13 +2784,16 @@ check_fk:
 				err = DB_SUCCESS;
 				break;
 			case DB_DEADLOCK:
-				if (wsrep_debug) fprintf (stderr, 
-					"WSREP: insert FK check fail for deadlock");
+				if (wsrep_debug) {
+					ib::warn() << "WSREP: insert FK check fail for deadlock"
+						   << " index " << index->name
+						   << " table " << index->table->name;
+				}
 				break;
 			default:
-				fprintf (stderr, 
-					"WSREP: referenced FK check fail: %d", 
-					 (int)err);
+				ib::error() <<  "WSREP: referenced FK check fail: " << ut_strerr(err)
+					    << " index " << index->name
+					    << " table " << index->table->name;
 				break;
 			}
 			if (err != DB_SUCCESS) {
@@ -2985,6 +2990,7 @@ row_upd_del_mark_clust_rec(
 	dberr_t		err;
 #ifdef WITH_WSREP
 	que_node_t *parent = que_node_get_parent(node);
+	trx_t* trx = thr_get_trx(thr);
 #endif /* WITH_WSREP */
 
 	ut_ad(node);
@@ -3012,14 +3018,9 @@ row_upd_del_mark_clust_rec(
 			node, pcur, index->table, index, offsets, thr, mtr);
 	}
 #ifdef WITH_WSREP
-	if (err == DB_SUCCESS && !referenced                         &&
-	    !(parent && que_node_get_type(parent) == QUE_NODE_UPDATE &&
-              (std::find(((upd_node_t*)parent)->cascade_upd_nodes->begin(),
-                         ((upd_node_t*)parent)->cascade_upd_nodes->end(),
-                         node) ==
-               ((upd_node_t*)parent)->cascade_upd_nodes->end()))       &&
-	    thr_get_trx(thr)                                         &&
-	    foreign
+	else if (trx && wsrep_on(trx->mysql_thd)  &&  err == DB_SUCCESS  &&
+	    (!parent || (que_node_get_type(parent) != QUE_NODE_UPDATE) ||
+	    ((upd_node_t*)parent)->cascade_upd_nodes->empty())
 	) {
 		err = wsrep_row_upd_check_foreign_constraints(
 			node, pcur, index->table, index, offsets, thr, mtr);
@@ -3029,13 +3030,16 @@ row_upd_del_mark_clust_rec(
 			err = DB_SUCCESS;
 			break;
 		case DB_DEADLOCK:
-			if (wsrep_debug) fprintf (stderr, 
-				"WSREP: clust rec FK check fail for deadlock");
+			if (wsrep_debug) {
+				ib::warn() << "WSREP: clust rec  FK check fail for deadlock"
+					   << " index " << index->name
+					   << " table " << index->table->name;
+			}
 			break;
 		default:
-			fprintf (stderr, 
-				"WSREP: clust rec referenced FK check fail: %d", 
-				 (int)err);
+			ib::error() <<  "WSREP: referenced FK check fail: " << ut_strerr(err)
+				    << " index " << index->name
+				    << " table " << index->table->name;
 			break;
 		}
 	}
@@ -3073,10 +3077,11 @@ row_upd_clust_step(
 
 	index = dict_table_get_first_index(node->table);
 
-#ifdef WITH_WSREP
-	ibool foreign = wsrep_row_upd_index_is_foreign(index, trx);
-#endif /* WITH_WSREP */
 	referenced = row_upd_index_is_referenced(index, trx);
+#ifdef WITH_WSREP
+	ibool foreign = wsrep_row_upd_index_is_foreign(
+		index, thr_get_trx(thr));
+#endif /* WITH_WSREP */
 
 	pcur = node->pcur;
 

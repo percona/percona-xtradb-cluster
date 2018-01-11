@@ -1,4 +1,4 @@
--- Copyright (c) 2008, 2016, Oracle and/or its affiliates. All rights reserved.
+-- Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -311,16 +311,19 @@ INSERT INTO global_suppressions VALUES
  ("WSREP: no nodes coming from prim view, prim not possible"),
  ("WSREP: Failed to prepare for incremental state transfer: Local state seqno is undefined:"),
  ("WSREP: gcs_caused\\(\\) returned -107 \\(Transport endpoint is not connected\\)"),
+ ("WSREP: gcs_caused\\(\\) returned -57 \\(Socket is not connected\\)"),
  ("WSREP: gcs_caused\\(\\) returned -1 \\(Operation not permitted\\)"),
-
  ("Action message in non-primary configuration from member"),
+ ("SYNC message from member"),
  ("InnoDB: Resizing redo log from"),
  ("InnoDB: Starting to delete and rewrite log files"),
  ("InnoDB: New log files created, LSN="),
 -- WSREP: Send action {0x7f86280147f0, 73, STATE_REQUEST} returned -107 (Transport endpoint is not connected)
  ("Transport endpoint is not connected"),
+ ("Socket is not connected"),
 -- "WSREP: Protocol violation. JOIN message sender 1.0 (host-91-221-67-96) is not in state transfer (SYNCED). Message ignored.
  ("is not in state transfer"),
+ ("JOIN message from member .* in non-primary configuration"),
  ("install timer expired"),
  ("Last Applied Action message in non-primary configuration from member"),
 
@@ -337,6 +340,11 @@ INSERT INTO global_suppressions VALUES
 */
  ("Difficult to find free blocks in the buffer pool.*"),
 
+ ("InnoDB High Priority being used"),
+  /*
+   On slow runs (valgrind) the message may be sent twice.
+  */
+ ("The member with address .* has already sent the stable set. Therefore discarding the second message."),
 
  /*
    We do have offline members on some Group Replication tests, XCom
@@ -352,6 +360,11 @@ INSERT INTO global_suppressions VALUES
  ("\\[GCS\\] Error pushing message into group communication engine."),
  ("\\[GCS\\] Message cannot be sent because the member does not belong to a group."),
  ("Slave SQL for channel 'group_replication_recovery': ... The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state.*"),
+ ("Member with address .* has become unreachable."),
+ ("This server is not able to reach a majority of members in the group.*"),
+ ("Member with address .* is reachable again."),
+ ("The member has resumed contact with a majority of the members in the group.*"),
+ ("Members removed from the group.*"),
 
  ("THE_LAST_SUPPRESSION")||
 

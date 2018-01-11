@@ -1,12 +1,10 @@
-galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
-galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
-galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
-galera.galera_as_slave_replication_bundle : GCF-912 feature no longer works in 5.7
-galera.galera_sst_xtrabackup-v2_keyring : Cannot find the said keyring plugin.
-galera_gcache_recover_manytrx : timing issue that causes it to fail intermittently.
-galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
 MW-286 : Fails due to timing issue. Parallel transaction should be running while ALTER is fired.
-MW-329 : Hangs. Needs investigation.
-galera_gcache_recover : Failing under load. bug logged for investigation
 MW-360 : drop temporary table is bin logged (PS issue)
+galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
+galera.galera_as_slave_replication_bundle : GCF-912 feature no longer works in 5.7
+galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
+galera.galera_sst_xtrabackup-v2_keyring : Cannot find the said keyring plugin.
+galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
 galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
+galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+galera_garbd : Failing to find the garbd binary after new minimal image change.

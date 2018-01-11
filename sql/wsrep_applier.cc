@@ -249,7 +249,8 @@ wsrep_cb_status_t wsrep_apply_cb(void* const             ctx,
                  {
                    const char act[]=
                      "now "
-                     "wait_for signal.wsrep_apply_cb";
+                     "SIGNAL sync.wsrep_apply_cb_reached "
+                     "WAIT_FOR signal.wsrep_apply_cb";
                    DBUG_ASSERT(!debug_sync_set_action(thd,
                                                       STRING_WITH_LEN(act)));
                  };);
@@ -320,6 +321,14 @@ static wsrep_cb_status_t wsrep_commit(THD* const thd)
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
+  if (!thd->get_transaction()->is_empty(Transaction_ctx::STMT))
+  {
+    WSREP_INFO("Applier statement commit needed");
+    if (trans_commit_stmt(thd))
+    {
+      WSREP_WARN("Applier statement commit failed");
+    }
+  }
   wsrep_cb_status_t const rcode(trans_commit(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 
@@ -354,9 +363,14 @@ static wsrep_cb_status_t wsrep_rollback(THD* const thd)
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
-  /* Check for comments in Relay_log_info::cleanup_context */
-  trans_rollback_stmt(thd);
-
+  if (!thd->get_transaction()->is_empty(Transaction_ctx::STMT))
+  {
+    WSREP_INFO("Applier statement rollback needed");
+    if (trans_rollback_stmt(thd))
+    {
+      WSREP_WARN("Applier statement rollback failed");
+    }
+  }
   wsrep_cb_status_t const rcode(trans_rollback(thd) ?
                                 WSREP_CB_FAILURE : WSREP_CB_SUCCESS);
 

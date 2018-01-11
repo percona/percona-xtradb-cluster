@@ -57,6 +57,7 @@ using std::vector;
 #include "mysql/thread_type.h"
 
 #include "query_strip_comments.h"
+#include "sql_thd_internal_api.h"
 
 #include "log.h"
 #ifdef WITH_WSREP
@@ -632,6 +633,7 @@ typedef struct system_variables
   ulong completion_type;
   ulong query_cache_type;
   ulong tx_isolation;
+  ulong transaction_isolation;
   ulong updatable_views_with_limit;
   uint max_user_connections;
   ulong my_aes_mode;
@@ -647,6 +649,7 @@ typedef struct system_variables
     Default transaction access mode. READ ONLY (true) or READ WRITE (false).
   */
   my_bool tx_read_only;
+  my_bool transaction_read_only;
   my_bool low_priority_updates;
   my_bool new_mode;
   my_bool query_cache_wlock_invalidate;
@@ -821,6 +824,8 @@ typedef struct system_status_var
   double last_query_cost;
   ulonglong last_query_partial_plans;
 
+  /** fragmentation statistics */
+  fragmentation_stats_t fragmentation_stats;
 } STATUS_VAR;
 
 /*
@@ -2426,6 +2431,11 @@ public:
   struct st_thd_timer_info *timer_cache;
 
 private:
+  /*
+    Indicates that the command which is under execution should ignore the
+    'read_only' and 'super_read_only' options.
+  */
+  bool skip_readonly_check;
   /**
     Indicate if the current statement should be discarded
     instead of written to the binlog.
@@ -2488,6 +2498,22 @@ private:
   NET     net;                          // client connection descriptor
   String  packet;                       // dynamic buffer for network I/O
 public:
+  void set_skip_readonly_check()
+  {
+    skip_readonly_check= true;
+  }
+
+  bool is_cmd_skip_readonly()
+  {
+    return skip_readonly_check;
+  }
+
+  void reset_skip_readonly_check()
+  {
+    if (skip_readonly_check)
+      skip_readonly_check= false;
+  }
+
   void issue_unsafe_warnings();
 
   uint get_binlog_table_maps() const {
@@ -3383,6 +3409,12 @@ public:
   ulong                     wsrep_gtid_event_buf_len;
   bool                      wsrep_replicate_GTID;
   bool                      wsrep_skip_wsrep_GTID;
+
+  /* DDL statement. skip registering wsrep_hton handler.
+  This is normally blocked by checking wsrep_exec_state != TOTAL_ORDER
+  but if sql_log_bin = 0 then the state is not set and DDL should is expected
+  not be replicated. This variable helps identify situation like these. */
+  bool                      wsrep_skip_wsrep_hton;
 
   /* This field is set when wsrep try to do an intermediate special
   commit while processing LOAD DATA INFILE statement by breaking it
@@ -4827,7 +4859,7 @@ public:
     query_id= new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
 #ifdef WITH_WSREP
-    if (wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+    if (WSREP(this) && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
     {
       set_wsrep_next_trx_id(query_id);
       WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
@@ -5588,8 +5620,11 @@ public:
 
   Temp_table_param()
     :copy_field(NULL), copy_field_end(NULL),
+     group_buff(NULL),
+     items_to_copy(NULL),
      recinfo(NULL), start_recinfo(NULL),
      keyinfo(NULL),
+     end_write_records(0),
      field_count(0), func_count(0), sum_func_count(0), hidden_field_count(0),
      group_parts(0), group_length(0), group_null_parts(0),
      quick_group(1),
