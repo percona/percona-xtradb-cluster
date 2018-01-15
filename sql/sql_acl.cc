@@ -2938,18 +2938,6 @@ bool change_password(THD *thd, const char *host, const char *user,
 
   if (check_change_password(thd, host, user, new_password, new_password_len))
     DBUG_RETURN(1);
-#ifdef WITH_WSREP
-  if (WSREP(thd) && !thd->wsrep_applier)
-  {
-      query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
-			    user ? user : "",
-			    host ? host : "",
-			    new_password);
-    thd->set_query_inner(buff, query_length, system_charset_info);
-
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, (char*)"user", NULL);
-  }
-#endif /* WITH_WSREP */
 
   tables.init_one_table("mysql", 5, "user", 4, "user", TL_WRITE);
 
@@ -2970,6 +2958,25 @@ bool change_password(THD *thd, const char *host, const char *user,
       DBUG_RETURN(0);
   }
 #endif
+
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && !thd->wsrep_applier)
+  {
+      query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
+          user ? user : "",
+          host ? host : "",
+          new_password);
+    thd->set_query_inner(buff, query_length, system_charset_info);
+
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, (char*)"user", NULL);
+  }
+#endif /* WITH_WSREP */
+
   if (!(table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
     DBUG_RETURN(1);
 
@@ -5317,6 +5324,22 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
   }
 #endif
 
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      /* Restore the state of binlog format */
+      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      if (save_binlog_row_based)
+        thd->set_current_stmt_binlog_format_row();
+      DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
+
   /* 
     The lock api is depending on the thd->lex variable which needs to be
     re-initialized.
@@ -5599,6 +5622,22 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
     }
   }
 #endif
+
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      /* Restore the state of binlog format */
+      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      if (save_binlog_row_based)
+        thd->set_current_stmt_binlog_format_row();
+      DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
 
   if (open_and_lock_tables(thd, tables, FALSE, MYSQL_LOCK_IGNORE_TIMEOUT))
   {						// Should never happen
@@ -5886,6 +5925,22 @@ bool mysql_grant(THD *thd, const char *db, List <LEX_USER> &list,
     }
   }
 #endif
+
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      /* Restore the state of binlog format */
+      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      if (save_binlog_row_based)
+        thd->set_current_stmt_binlog_format_row();
+      DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
 
   if (open_and_lock_tables(thd, tables, FALSE, MYSQL_LOCK_IGNORE_TIMEOUT))
   {						// This should never happen
@@ -7766,6 +7821,25 @@ open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables)
   }
 #endif
 
+#ifdef WITH_WSREP
+  /* Do NOT call for DROP PROCEDURE or DROP FUNCTION, these calls
+     are responsible for calling WSREP_TO_ISOLATION_BEGIN() themselves.
+   */
+  if (thd->lex->sql_command != SQLCOM_DROP_PROCEDURE &&
+      thd->lex->sql_command != SQLCOM_DROP_FUNCTION)
+  {
+    /*
+       Perform the TOI after the replication filter check to avoid
+       replicating commands that won't be applied locally (due to a filter).
+       WSREP_TO_ISOLATION_BEGIN
+    */
+    if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+    {
+        DBUG_RETURN(-1);
+    }
+  }
+#endif /* WITH_WSREP */
+
   if (open_and_lock_tables(thd, tables, FALSE, MYSQL_LOCK_IGNORE_TIMEOUT))
   {						// This should never happen
     DBUG_RETURN(-1);
@@ -8938,6 +9012,19 @@ bool mysql_user_password_expire(THD *thd, List <LEX_USER> &list)
       DBUG_RETURN(false);
   }
 #endif
+
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      DBUG_RETURN(true);
+  }
+#endif
+
   if (!(table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
     DBUG_RETURN(true);
 
