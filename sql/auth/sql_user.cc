@@ -679,19 +679,6 @@ bool change_password(THD *thd, const char *host, const char *user,
   if (check_change_password(thd, host, user, new_password, new_password_len))
     DBUG_RETURN(1);
 
-#ifdef WITH_WSREP
-  if (WSREP(thd) && !thd->wsrep_applier)
-  {
-    query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
-			    user ? user : "",
-			    host ? host : "",
-			    new_password);
-    //thd->set_query(buff, query_length, system_charset_info);
-    thd->set_query(buff, query_length);
-
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, (char*)"user", NULL);
-  }
-#endif /* WITH_WSREP */
   tables.init_one_table("mysql", 5, "user", 4, "user", TL_WRITE);
 
 #ifdef HAVE_REPLICATION
@@ -711,6 +698,21 @@ bool change_password(THD *thd, const char *host, const char *user,
       DBUG_RETURN(0);
   }
 #endif
+
+#ifdef WITH_WSREP
+  if (WSREP(thd) && !thd->wsrep_applier)
+  {
+    query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%-.120s'",
+          user ? user : "",
+          host ? host : "",
+          new_password);
+    //thd->set_query(buff, query_length, system_charset_info);
+    thd->set_query(buff, query_length);
+
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, (char*)"user", NULL);
+  }
+#endif /* WITH_WSREP */
+
   if (!(table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
     DBUG_RETURN(1);
 
@@ -1889,6 +1891,19 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
       DBUG_RETURN(false);
   }
 #endif
+
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      DBUG_RETURN(true);
+  }
+#endif
+
   if (!(table= open_ltable(thd, &tables, TL_WRITE, MYSQL_LOCK_IGNORE_TIMEOUT)))
     DBUG_RETURN(true);
 

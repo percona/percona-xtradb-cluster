@@ -2173,6 +2173,25 @@ int open_grant_tables(THD *thd, TABLE_LIST *tables, bool *transactional_tables)
   }
 #endif
 
+#ifdef WITH_WSREP
+  /* Do NOT call for DROP PROCEDURE or DROP FUNCTION, these calls
+     are responsible for calling WSREP_TO_ISOLATION_BEGIN() themselves.
+   */
+  if (thd->lex->sql_command != SQLCOM_DROP_PROCEDURE &&
+      thd->lex->sql_command != SQLCOM_DROP_FUNCTION)
+  {
+    /*
+       Perform the TOI after the replication filter check to avoid
+       replicating commands that won't be applied locally (due to a filter).
+       WSREP_TO_ISOLATION_BEGIN
+    */
+    if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+    {
+        DBUG_RETURN(-1);
+    }
+  }
+#endif /* WITH_WSREP */
+
   if (open_and_lock_tables(thd, tables, MYSQL_LOCK_IGNORE_TIMEOUT))
   {                                             // This should never happen
     DBUG_RETURN(-1);

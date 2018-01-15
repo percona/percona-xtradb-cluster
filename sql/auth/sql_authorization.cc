@@ -1281,6 +1281,22 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
   }
 #endif /* HAVE_REPLICATION */
 
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      /* Restore the state of binlog format */
+      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      if (save_binlog_row_based)
+        thd->set_current_stmt_binlog_format_row();
+      DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
+
   /* 
     The lock api is depending on the thd->lex variable which needs to be
     re-initialized.
@@ -1614,6 +1630,22 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
   }
 #endif /* HAVE_REPLICATION */
 
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      /* Restore the state of binlog format */
+      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      if (save_binlog_row_based)
+        thd->set_current_stmt_binlog_format_row();
+      DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
+
   if (open_and_lock_tables(thd, tables, MYSQL_LOCK_IGNORE_TIMEOUT))
   {                                             // Should never happen
     /* Restore the state of binlog format */
@@ -1868,6 +1900,22 @@ bool mysql_grant(THD *thd, const char *db, List <LEX_USER> &list,
     }
   }
 #endif /*HAVE_REPLICATION */
+
+#ifdef WITH_WSREP
+  /*
+    Perform the TOI after the replication filter check to avoid
+    replicating commands that won't be applied locally (due to a filter).
+    WSREP_TO_ISOLATION_BEGIN
+  */
+  if (WSREP(thd) && wsrep_to_isolation_begin(thd, WSREP_MYSQL_DB, NULL, NULL))
+  {
+      /* Restore the state of binlog format */
+      DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+      if (save_binlog_row_based)
+        thd->set_current_stmt_binlog_format_row();
+      DBUG_RETURN(TRUE);
+  }
+#endif /* WITH_WSREP */
 
   if (open_and_lock_tables(thd, tables, MYSQL_LOCK_IGNORE_TIMEOUT))
   {                                     // This should never happen
