@@ -126,6 +126,10 @@ declare -a RC
 INNOBACKUPEX_BIN=xtrabackup
 DATA="${WSREP_SST_OPT_DATA}"
 
+MYSQLD_BIN=mysqld
+MYSQLD_UPGRADE=mysql_upgrade
+MYSQLD_ADMIN=mysqladmin
+
 # These files carry some important information in form of GTID of the data
 # that is being backed up.
 XB_GTID_INFO_FILE="xtrabackup_galera_info"
@@ -599,6 +603,9 @@ read_cnf()
 
     pxc_encrypt_cluster_traffic=$(parse_cnf mysqld pxc-encrypt-cluster-traffic "")
     pxc_encrypt_cluster_traffic=$(normalize_boolean "$pxc_encrypt_cluster_traffic" "off")
+
+    auto_upgrade=$(parse_cnf sst auto-upgrade "")
+    auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
 
     ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
 
@@ -1593,15 +1600,6 @@ then
                 wsrep_log_error "****************************************************** "
                 exit 2
             fi
-
-            # Is the donor's pxc version < this node's pxc version?
-            if ! check_for_version $donor_version_str $local_version_str; then
-                wsrep_log_warning "WARNING: PXC is receiving an SST from a node with a lower version."
-                wsrep_log_warning "This node's PXC version is $local_version_str. The donor's PXC version is $donor_version_str."
-                wsrep_log_warning "Run mysql_upgrade in non-cluster (standalone mode) to upgrade."
-                wsrep_log_warning "Check the upgrade process here:"
-                wsrep_log_warning "    https://www.percona.com/doc/percona-xtradb-cluster/LATEST/howtos/upgrade_guide.html"
-            fi
         fi
 
         # server-id is already part of backup-my.cnf so avoid appending it.
@@ -1822,6 +1820,108 @@ then
         set +e
         rm "$TDATA/innobackup.prepare.log" "$TDATA/innobackup.move.log" 2> /dev/null
         set -e
+
+        #-----------------------------------------------------------------------
+        # start mysql-upgrade execution.
+        #-----------------------------------------------------------------------
+        if [[ "$auto_upgrade" == "on" ]]; then
+            wsrep_log_info "Running mysql-upgrade..........."
+            set +e
+
+            # validation check to ensure that the auth param are specified.
+            if [[ -z "$WSREP_SST_OPT_USER" ]]; then
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "Authentication params missing. Check wsrep_sst_auth"
+                wsrep_log_error "****************************************************** "
+                exit 3
+            fi
+
+            #-----------------------------------------------------------------------
+            # start server in standalone mode with the my.cnf configuration
+            # for upgrade purpose using the data-directory that was just SST from
+            # the DONOR node.
+            UPGRADE_SOCKET="/tmp/upgrade.${WSREP_SST_OPT_PORT:-4444}.sock"
+            $MYSQLD_BIN --defaults-file=${WSREP_SST_OPT_CONF} \
+                --defaults-group-suffix=mysqld${WSREP_SST_OPT_CONF_SUFFIX} \
+                --skip-networking --auto_generate_certs=OFF --socket=$UPGRADE_SOCKET \
+                --datadir=$DATA --wsrep_provider=none &> \
+                /tmp/upgrade_start.${WSREP_SST_OPT_PORT:-4444}.out &
+            mysql_pid=$!
+
+            #-----------------------------------------------------------------------
+            # wait for the mysql to come up
+            TIMEOUT_THROLD=300
+            TIMEOUT=$TIMEOUT_THROLD
+            sleep 5
+            while [ true ]; do
+                $MYSQLD_ADMIN ping --socket=$UPGRADE_SOCKET &> /dev/null
+                errcode=$?
+                if [ $errcode -eq 0 ]; then
+                    break;
+                fi
+
+                if [ $TIMEOUT -eq $TIMEOUT_THROLD ]; then
+                    wsrep_log_info "Waiting for server instance to start....." \
+                                   " This may take some time"
+                fi
+
+                sleep 1
+                ((TIMEOUT--))
+                if [ $TIMEOUT -eq 0 ]; then
+                     kill -9 $mysql_pid
+                     wsrep_log_error "******************* FATAL ERROR ********************** "
+                     wsrep_log_error "Failed to start mysql server to execute mysql-upgrade."
+                     wsrep_log_error "Check the param and retry"
+                     wsrep_log_error "****************************************************** "
+                     exit 3
+                fi
+            done
+
+            #-----------------------------------------------------------------------
+            # run mysql-upgrade
+            $MYSQLD_UPGRADE --force --socket=$UPGRADE_SOCKET \
+                --user=$WSREP_SST_OPT_USER --password=$WSREP_SST_OPT_PSWD \
+                &> /tmp/upgrade.${WSREP_SST_OPT_PORT:-4444}.out
+            errcode=$?
+            if [ $errcode -ne 0 ]; then
+                kill -9 $mysql_pid
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "Failed to execute mysql-upgrade. Check the param and retry"
+                wsrep_log_error "****************************************************** "
+                exit 3
+            fi
+
+            #-----------------------------------------------------------------------
+            # shutdown mysql instance started.
+            $MYSQLD_ADMIN shutdown --socket=$UPGRADE_SOCKET \
+                --user=$WSREP_SST_OPT_USER --password=$WSREP_SST_OPT_PSWD \
+                &> /tmp/upgrade_shut.${WSREP_SST_OPT_PORT:-4444}.out
+            errcode=$?
+            if [ $errcode -ne 0 ]; then
+                kill -9 $mysql_pid
+                wsrep_log_error "******************* FATAL ERROR ********************** "
+                wsrep_log_error "Failed to shutdown mysql instance started for upgrade."
+                wsrep_log_error "Check the param and retry"
+                wsrep_log_error "****************************************************** "
+                exit 3
+            fi
+
+            sleep 5
+
+            #-----------------------------------------------------------------------
+            # cleanup
+            rm -rf $DATA/*.pem || true
+            rm -rf $DATA/auto.cnf || true
+            rm -rf /tmp/upgrade_start.${WSREP_SST_OPT_PORT:-4444}.out
+            rm -rf /tmp/upgrade.${WSREP_SST_OPT_PORT:-4444}.out
+            rm -rf /tmp/upgrade_shut.${WSREP_SST_OPT_PORT:-4444}.out
+
+            set -e
+            wsrep_log_info "...........upgrade done"
+        else
+            wsrep_log_info "auto-upgrade disabled by configuration"
+        fi
+
         wsrep_log_info "Moving the backup to ${TDATA}"
         timeit "Xtrabackup move stage" "$INNOMOVE"
         if [[ $? -eq 0 ]]; then

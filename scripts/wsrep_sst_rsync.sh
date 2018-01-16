@@ -30,12 +30,19 @@ export PATH="/usr/sbin:/sbin:$PATH"
 
 . $(dirname $0)/wsrep_sst_common
 
+MYSQLD_BIN=mysqld
+MYSQLD_UPGRADE=mysql_upgrade
+MYSQLD_ADMIN=mysqladmin
+
 wsrep_check_programs rsync
 
 keyring=$(parse_cnf mysqld keyring-file-data "")
 if [[ -z $keyring ]]; then
     keyring=$(parse_cnf sst keyring-file-data "")
 fi
+
+auto_upgrade=$(parse_cnf sst auto-upgrade "")
+auto_upgrade=$(normalize_boolean "$auto_upgrade" "on")
 
 cleanup_joiner()
 {
@@ -301,16 +308,17 @@ then
         SILENT=""
     fi
 
+# script
 cat << EOF > "$RSYNC_CONF"
-pid file = $RSYNC_PID
-use chroot = no
-read only = no
-timeout = 300
-$SILENT
-[$MODULE]
-    path = $WSREP_SST_OPT_DATA
-[$MODULE-log_dir]
-    path = $WSREP_LOG_DIR
+    pid file = $RSYNC_PID
+    use chroot = no
+    read only = no
+    timeout = 300
+    $SILENT
+    [$MODULE]
+        path = $WSREP_SST_OPT_DATA
+    [$MODULE-log_dir]
+        path = $WSREP_LOG_DIR
 EOF
 
 #    rm -rf "$DATA"/ib_logfile* # we don't want old logs around
@@ -398,6 +406,104 @@ EOF
     fi
     wsrep_cleanup_progress_file
     wsrep_log_info "..............rsync completed"
+
+    #-----------------------------------------------------------------------
+    # start mysql-upgrade execution.
+    #-----------------------------------------------------------------------
+    if [[ "$auto_upgrade" == "on" ]]; then
+        wsrep_log_info "Running mysql-upgrade..........."
+        set +e
+
+        # validation check to ensure that the auth param are specified.
+        if [[ -z "$WSREP_SST_OPT_USER" ]]; then
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Authentication params missing. Check wsrep_sst_auth"
+            wsrep_log_error "****************************************************** "
+            exit 3
+        fi
+
+        #-----------------------------------------------------------------------
+        # start server in standalone mode with the my.cnf configuration
+        # for upgrade purpose using the data-directory that was just SST from
+        # the DONOR node.
+        UPGRADE_SOCKET="/tmp/upgrade.$RSYNC_PORT.sock"
+        $MYSQLD_BIN --defaults-file=${WSREP_SST_OPT_CONF} \
+            --defaults-group-suffix=mysqld${WSREP_SST_OPT_CONF_SUFFIX} \
+            --skip-networking --auto_generate_certs=OFF --socket=$UPGRADE_SOCKET \
+            --datadir=$WSREP_SST_OPT_DATA --wsrep_provider=none \
+            &> /tmp/upgrade_start.$RSYNC_PORT.out &
+        mysql_pid=$!
+
+        #-----------------------------------------------------------------------
+        # wait for the mysql to come up
+        TIMEOUT_THROLD=300
+        TIMEOUT=$TIMEOUT_THROLD
+        sleep 5
+        while [ true ]; do
+            $MYSQLD_ADMIN ping --socket=$UPGRADE_SOCKET &> /dev/null
+            errcode=$?
+            if [ $errcode -eq 0 ]; then
+                break;
+            fi
+
+            if [ $TIMEOUT -eq $TIMEOUT_THROLD ]; then
+                 wsrep_log_info "Waiting for server instance to start....." \
+                                " This may take some time"
+            fi
+
+            sleep 1
+            ((TIMEOUT--))
+            if [ $TIMEOUT -eq 0 ]; then
+                 kill -9 $mysql_pid
+                 wsrep_log_error "******************* FATAL ERROR ********************** "
+                 wsrep_log_error "Failed to start mysql server to execute mysql-upgrade."
+                 wsrep_log_error "Check the param and retry"
+                 wsrep_log_error "****************************************************** "
+                 exit 3
+            fi
+        done
+
+        #-----------------------------------------------------------------------
+        # run mysql-upgrade
+        $MYSQLD_UPGRADE --force --socket=$UPGRADE_SOCKET \
+            --user=$WSREP_SST_OPT_USER --password=$WSREP_SST_OPT_PSWD \
+            &> /tmp/upgrade.$RSYNC_PORT.out
+        errcode=$?
+        if [ $errcode -ne 0 ]; then
+            kill -9 $mysql_pid
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Failed to execute mysql-upgrade. Check the param and retry"
+            wsrep_log_error "****************************************************** "
+            exit 3
+        fi
+
+        #-----------------------------------------------------------------------
+        # shutdown mysql instance started.
+        $MYSQLD_ADMIN shutdown --socket=$UPGRADE_SOCKET --user=$WSREP_SST_OPT_USER \
+                --password=$WSREP_SST_OPT_PSWD &> /tmp/upgrade_shut.$RSYNC_PORT.out
+        errcode=$?
+        if [ $errcode -ne 0 ]; then
+            kill -9 $mysql_pid
+            wsrep_log_error "******************* FATAL ERROR ********************** "
+            wsrep_log_error "Failed to shutdown mysql instance started for upgrade."
+            wsrep_log_error "Check the param and retry"
+            wsrep_log_error "****************************************************** "
+            exit 3
+        fi
+
+        sleep 5
+
+        #-----------------------------------------------------------------------
+        # cleanup
+        rm -rf /tmp/upgrade_start.$RSYNC_PORT.out
+        rm -rf /tmp/upgrade.$RSYNC_PORT.out
+        rm -rf /tmp/upgrade_shut.$RSYNC_PORT.out
+
+        set -e
+        wsrep_log_info "...........upgrade done"
+    else
+        wsrep_log_info "auto-upgrade disabled by configuration"
+    fi
 #    cleanup_joiner
 else
     wsrep_log_error "******************* FATAL ERROR ********************** "
