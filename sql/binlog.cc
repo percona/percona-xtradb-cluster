@@ -1784,6 +1784,8 @@ inline int do_binlog_xa_commit_rollback(THD *thd, XID *xid, bool commit)
     return 0;
   if (!xid_state->is_binlogged())
     return 0; // nothing was really logged at prepare
+  if (thd->is_error() && DBUG_EVALUATE_IF("simulate_xa_rm_error", 0, 1))
+    return 0; // don't binlog if there are some errors.
 
   DBUG_ASSERT(!xid->is_null() ||
               !(thd->variables.option_bits & OPTION_BIN_LOG));
@@ -4298,6 +4300,7 @@ read_gtids_from_binlog(const char *filename, Gtid_set *all_gtids,
       DBUG_ASSERT(prev_gtids == NULL ? true : all_gtids != NULL ||
                                               first_gtid != NULL);
     }
+    // Fall through.
     default:
       // if we found any other event type without finding a
       // previous_gtids_log_event, then the rest of this binlog
@@ -8399,9 +8402,10 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
                wsrep_xid_seqno(  (*trn_ctx->xid_state()->get_xid()) ) :
                trn_ctx->xid_state()->get_xid()->get_my_xid());
 #else
- my_xid xid= trn_ctx->xid_state()->get_xid()->get_my_xid();
+  my_xid xid= trn_ctx->xid_state()->get_xid()->get_my_xid();
 #endif /* WITH_WSREP */
-  bool stuff_logged= false;
+  bool stmt_stuff_logged= false;
+  bool trx_stuff_logged= false;
   bool skip_commit= is_loggable_xa_prepare(thd);
 
   DBUG_PRINT("enter", ("thd: 0x%llx, all: %s, xid: %llu, cache_mngr: 0x%llx",
@@ -8458,11 +8462,37 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
   {
     /* The Commit phase of the XA two phase logging. */
 
+    bool one_phase= get_xa_opt(thd) == XA_ONE_PHASE;
     DBUG_ASSERT(all);
-    DBUG_ASSERT(!skip_commit || get_xa_opt(thd) == XA_ONE_PHASE);
+    DBUG_ASSERT(!skip_commit || one_phase);
 
+    int err= 0;
     XID_STATE *xs= thd->get_transaction()->xid_state();
+    /*
+      XA COMMIT ONE PHASE statement which has not gone through the binary log
+      prepare phase, has to end the active XA transaction with appropriate XA
+      END followed by XA COMMIT ONE PHASE.
 
+      The state of XA transaction is changed to PREPARED after the prepare
+      phase, intermediately in ha_commit_trans code for the interest of
+      binlogger. Hence check that the XA COMMIT ONE PHASE is set to 'PREPARE'
+      and it has not already been written to binary log. For such transaction
+      write the appropriate XA END statement.
+    */
+    if (!(is_loggable_xa_prepare(thd))
+        && one_phase
+        && !(xs->is_binlogged())
+        && !cache_mngr->trx_cache.is_binlog_empty())
+    {
+      XA_prepare_log_event end_evt(thd, xs->get_xid(), one_phase);
+      err= cache_mngr->trx_cache.finalize(thd, &end_evt, xs);
+      if (err)
+      {
+        DBUG_RETURN(RESULT_ABORTED);
+      }
+      trx_stuff_logged= true;
+      thd->get_transaction()->xid_state()->set_binlogged();
+    }
     if (DBUG_EVALUATE_IF("simulate_xa_commit_log_failure", true,
                          do_binlog_xa_commit_rollback(thd, xs->get_xid(),
                                                       true)))
@@ -8487,7 +8517,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
     trn_ctx->store_commit_parent(max_committed_transaction.get_timestamp());
     if (cache_mngr->stmt_cache.finalize(thd))
       DBUG_RETURN(RESULT_ABORTED);
-    stuff_logged= true;
+    stmt_stuff_logged= true;
   }
 
   /*
@@ -8497,7 +8527,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
     Otherwise, we accumulate the changes.
   */
   if (!cache_mngr->trx_cache.is_binlog_empty() &&
-      ending_trans(thd, all))
+      ending_trans(thd, all) && !trx_stuff_logged)
   {
     const bool real_trans=
       (all || !trn_ctx->is_active(Transaction_ctx::SESSION));
@@ -8548,7 +8578,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
       if (cache_mngr->trx_cache.finalize(thd, &end_evt))
         DBUG_RETURN(RESULT_ABORTED);
     }
-    stuff_logged= true;
+    trx_stuff_logged= true;
   }
 
   /*
@@ -8567,7 +8597,7 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
     to the binary log so we have to report this as a "bad" failure
     (failed to commit, but logged something).
   */
-  if (stuff_logged)
+  if (stmt_stuff_logged || trx_stuff_logged)
   {
 #ifdef WITH_WSREP
     if (WSREP_ON && thd->wsrep_replicate_GTID &&
@@ -9617,6 +9647,7 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
     is partially written to the binlog.
   */
   bool in_transaction= FALSE;
+  int memory_page_size= my_getpagesize();
 
 #ifdef WITH_WSREP
   /*
@@ -9639,13 +9670,13 @@ int MYSQL_BIN_LOG::recover(IO_CACHE *log, Format_description_log_event *fdle,
 #endif /* WITH_WSREP */
 
   if (! fdle->is_valid() ||
-      my_hash_init(&xids, &my_charset_bin, TC_LOG_PAGE_SIZE/3, 0,
-                   sizeof(my_xid), 0, 0, MYF(0),
+      my_hash_init(&xids, &my_charset_bin, memory_page_size/3, 0,
+                   sizeof(my_xid), 0, 0, 0,
                    key_memory_binlog_recover_exec))
     goto err1;
 
   init_alloc_root(key_memory_binlog_recover_exec,
-                  &mem_root, TC_LOG_PAGE_SIZE, TC_LOG_PAGE_SIZE);
+                  &mem_root, memory_page_size, memory_page_size);
 
   while ((ev= Log_event::read_log_event(log, 0, fdle, TRUE))
          && ev->is_valid()

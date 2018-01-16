@@ -29,6 +29,7 @@
 #include "tztime.h"
 #include "crypt_genhash_impl.h"         /* CRYPT_MAX_PASSWORD_SIZE */
 #include "sql_user_table.h"
+#include <set>
 
 #ifndef DBUG_OFF
 #define HASH_STRING_WITH_QUOTE \
@@ -402,6 +403,7 @@ err:
   @param what_to_set  User attributes
   @param is_privileged_user     Whether caller has CREATE_USER_ACL
                                 or UPDATE_ACL over mysql.*
+  @param cmd          Command information
 
   @retval 0 ok
   @retval 1 ERROR;
@@ -410,7 +412,8 @@ err:
 bool set_and_validate_user_attributes(THD *thd,
                                       LEX_USER *Str,
                                       ulong &what_to_set,
-                                      bool is_privileged_user)
+                                      bool is_privileged_user,
+                                      const char * cmd)
 {
   bool user_exists= false;
   ACL_USER *acl_user;
@@ -579,6 +582,17 @@ bool set_and_validate_user_attributes(THD *thd,
                                              inbuflen))
     {
       plugin_unlock(0, plugin);
+
+      /*
+        generate_authentication_string may return error status
+        without setting actual error.
+      */
+      if (!thd->is_error())
+      {
+        String error_user;
+        append_user(thd, &error_user, Str, FALSE, FALSE);
+        my_error(ER_CANNOT_USER, MYF(0), cmd, error_user.c_ptr_safe());
+      }
       return(1);
     }
     if (buflen)
@@ -780,7 +794,8 @@ bool change_password(THD *thd, const char *host, const char *user,
       thd->slave_thread)
     combo->uses_identified_by_clause= false;
     
-  if (set_and_validate_user_attributes(thd, combo, what_to_set, true))
+  if (set_and_validate_user_attributes(thd, combo, what_to_set,
+                                       true, "SET PASSWORD"))
   {
     result= 1;
     mysql_mutex_unlock(&acl_cache->lock);
@@ -1388,7 +1403,7 @@ bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists)
   ulong what_to_update= 0;
   bool is_anonymous_user= false;
   bool rollback_whole_statement= false;
-  std::set<LEX_USER *> users_not_to_log;
+  std::set<LEX_USER *> extra_users;
   DBUG_ENTER("mysql_create_user");
 
   /*
@@ -1425,7 +1440,8 @@ bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists)
       result= TRUE;
       continue;
     }
-    if (set_and_validate_user_attributes(thd, user_name, what_to_update, true))
+    if (set_and_validate_user_attributes(thd, user_name, what_to_update,
+                                         true, "CREATE USER"))
     {
       result= TRUE;
       continue;
@@ -1463,12 +1479,12 @@ bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists)
                             warn_user.c_ptr_safe());
         try
         {
-          users_not_to_log.insert(tmp_user_name);
+          extra_users.insert(user_name);
         }
         catch (...) {}
         continue;
       }
-     else
+      else
       {
         append_user(thd, &wrong_users, user_name, wrong_users.length() > 0,
                     false);
@@ -1490,12 +1506,11 @@ bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists)
       my_error(ER_CANNOT_USER, MYF(0), "CREATE USER", wrong_users.c_ptr_safe());
   }
 
-  if (some_users_created ||
-      (if_not_exists && users_not_to_log.size() < list.elements))
+  if (some_users_created || if_not_exists)
   {
     String *rlb= &thd->rewritten_query;
     rlb->mem_free();
-    mysql_rewrite_create_alter_user(thd, rlb, &users_not_to_log);
+    mysql_rewrite_create_alter_user(thd, rlb, &extra_users);
 
     int ret= commit_owned_gtid_by_partial_command(thd);
 
@@ -1817,7 +1832,7 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
   bool save_binlog_row_based;
   bool is_privileged_user= false;
   bool rollback_whole_statement= false;
-  std::set<LEX_USER *> users_not_to_log;
+  std::set<LEX_USER *> extra_users;
   Acl_table_intact table_intact;
 
   DBUG_ENTER("mysql_alter_user");
@@ -1886,60 +1901,33 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
       continue;
     }
 
-    /* look up the user */
-    if (!(acl_user= find_acl_user(user_from->host.str,
-                                   user_from->user.str, TRUE)))
-    {
-      if (if_exists)
-      {
-        String warn_user;
-        append_user(thd, &warn_user, user_from, FALSE, FALSE);
-        push_warning_printf(thd, Sql_condition::SL_NOTE,
-          ER_USER_DOES_NOT_EXIST,
-          ER_THD(thd, ER_USER_DOES_NOT_EXIST),
-          warn_user.c_ptr_safe());
-        try
-        {
-          users_not_to_log.insert(tmp_user_from);
-        }
-        catch (...) {}
-      }
-      else
-      {
-        result= TRUE;
-        append_user(thd, &wrong_users, user_from, wrong_users.length() > 0,
-          false);
-      }
-
-      continue;
-    }
-
     if (user_from && user_from->plugin.str)
       optimize_plugin_compare_by_pointer(&user_from->plugin);
 
     /* copy password expire attributes to individual lex user */
     user_from->alter_status= thd->lex->alter_password;
 
+    if (set_and_validate_user_attributes(thd, user_from, what_to_alter,
+                                         is_privileged_user, "ALTER USER"))
+    {
+      result= true;
+      continue;
+    }
+
     /*
       Check if the user's authentication method supports expiration only
       if PASSWORD EXPIRE attribute is specified
     */
     if (user_from->alter_status.update_password_expired_column &&
-        !auth_plugin_supports_expiration(acl_user->plugin.str))
+        !auth_plugin_supports_expiration(user_from->plugin.str))
     {
       result= true;
       append_user(thd, &wrong_users, user_from, wrong_users.length() > 0,
                   false);
       continue;
     }
-    if (set_and_validate_user_attributes(thd, user_from, what_to_alter,
-                                         is_privileged_user))
-    {
-      result= true;
-      continue;
-    }
 
-    if (!acl_user->user && 
+    if (!strcmp(user_from->user.str, "") &&
         (what_to_alter & PASSWORD_EXPIRE_ATTR) &&
         user_from->alter_status.update_password_expired_column)
     {
@@ -1947,6 +1935,34 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
       is_anonymous_user = true;
       append_user(thd, &wrong_users, user_from, wrong_users.length() > 0,
         false);
+      continue;
+    }
+
+    /* look up the user */
+    if (!(acl_user= find_acl_user(user_from->host.str,
+                                  user_from->user.str, TRUE)))
+    {
+      if (if_exists)
+      {
+        String warn_user;
+        append_user(thd, &warn_user, user_from, FALSE, FALSE);
+        push_warning_printf(thd, Sql_condition::SL_NOTE,
+                            ER_USER_DOES_NOT_EXIST,
+                            ER_THD(thd, ER_USER_DOES_NOT_EXIST),
+                            warn_user.c_ptr_safe());
+        try
+        {
+          extra_users.insert(user_from);
+        }
+        catch (...) {}
+      }
+      else
+      {
+        result= TRUE;
+        append_user(thd, &wrong_users, user_from, wrong_users.length() > 0,
+                    false);
+      }
+
       continue;
     }
 
@@ -1981,13 +1997,12 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
       my_error(ER_CANNOT_USER, MYF(0), "ALTER USER", wrong_users.c_ptr_safe());
   }
 
-  if (some_user_altered ||
-      (if_exists && users_not_to_log.size() < list.elements))
+  if (some_user_altered || if_exists)
   {
     /* do query rewrite for ALTER USER */
     String *rlb= &thd->rewritten_query;
     rlb->mem_free();
-    mysql_rewrite_create_alter_user(thd, rlb, &users_not_to_log);
+    mysql_rewrite_create_alter_user(thd, rlb, &extra_users);
 
     int ret= commit_owned_gtid_by_partial_command(thd);
     if (ret == 1)
@@ -1995,6 +2010,7 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
                               thd->rewritten_query.c_ptr_safe(),
                               thd->rewritten_query.length(),
                               table->file->has_transactions()) != 0);
+
     else if (ret == -1)
       result|= -1;
   }

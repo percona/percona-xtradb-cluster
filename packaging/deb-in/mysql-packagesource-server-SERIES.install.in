@@ -74,7 +74,6 @@ usr/share/man/man1/myisamchk.1
 usr/share/man/man1/myisamlog.1
 usr/share/man/man1/myisampack.1
 usr/share/man/man1/my_print_defaults.1
-usr/share/man/man1/mysql-stress-test.pl.1
 usr/share/man/man1/mysql_install_db.1
 usr/share/man/man1/mysqld_multi.1
 usr/share/man/man1/mysqld_safe.1
@@ -124,6 +123,5 @@ usr/share/mysql/*/errmsg.sys
 usr/share/mysql/errmsg-utf8.txt
 @DEB_INSTALL_SERVER_SYSTEMD@
 # legal
-usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/
-usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
-usr/share/doc/mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@/README
+usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ usr/share/doc/mysql-@DEB_PRODUCTNAME@-server/
+usr/share/mysql/README usr/share/doc/mysql-@DEB_PRODUCTNAME@-server/
