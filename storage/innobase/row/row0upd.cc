@@ -2250,6 +2250,18 @@ srv_mbr_print(const byte* data)
 }
 
 
+#ifdef WITH_WSREP
+static inline
+bool
+row_upd_parent_has_cascade(
+	const que_node_t* parent)
+{
+	return(parent != NULL &&
+	       que_node_get_type(parent) == QUE_NODE_UPDATE &&
+	       ((const upd_node_t*) parent)->cascade_node != NULL);
+}
+#endif /* WITH_WSREP */
+
 /***********************************************************//**
 Updates a secondary index entry of a row.
 @return DB_SUCCESS if operation successfully completed, else error
@@ -2445,9 +2457,7 @@ row_upd_sec_index_entry(
 			if (wsrep_on(trx->mysql_thd)                          &&
 			    !wsrep_thd_is_BF(trx->mysql_thd, FALSE)           &&
 			    err == DB_SUCCESS && !referenced && foreign       &&
-			    (!parent || (que_node_get_type(parent) !=
-			    QUE_NODE_UPDATE)                     ||
-			    ((upd_node_t*)parent)->cascade_upd_nodes->empty())
+			    !row_upd_parent_has_cascade(parent)
 			) {
 				ulint*	offsets =
 					rec_get_offsets(
@@ -2767,8 +2777,7 @@ check_fk:
 		}
 #ifdef WITH_WSREP
 		else if (wsrep_on(trx->mysql_thd) && foreign                        &&
-			 (!parent || (que_node_get_type(parent) != QUE_NODE_UPDATE) ||
-			 ((upd_node_t*)parent)->cascade_upd_nodes->empty())
+			 !row_upd_parent_has_cascade(parent)
 		) {
 			err = wsrep_row_upd_check_foreign_constraints(
 				node, pcur, table, index, offsets, thr, mtr);
@@ -3014,8 +3023,7 @@ row_upd_del_mark_clust_rec(
 	}
 #ifdef WITH_WSREP
 	else if (trx && wsrep_on(trx->mysql_thd)  &&  err == DB_SUCCESS  &&
-	    (!parent || (que_node_get_type(parent) != QUE_NODE_UPDATE) ||
-	    ((upd_node_t*)parent)->cascade_upd_nodes->empty())
+		 !row_upd_parent_has_cascade(parent)
 	) {
 		err = wsrep_row_upd_check_foreign_constraints(
 			node, pcur, index->table, index, offsets, thr, mtr);
