@@ -1,4 +1,4 @@
-# Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -844,7 +844,13 @@ install -m 644 "%{malloc_lib_source}" \
 
 # Remove man pages we explicitly do not want to package, avoids 'unpackaged
 # files' warning.
-# This has become obsolete:  rm -f $RBR%%{_mandir}/man1/make_win_bin_dist.1*
+# This has become obsolete:  rm -f $RBR%{_mandir}/man1/make_win_bin_dist.1*
+rm -f $RBR%{_mandir}/man1/mysql-stress-test.pl.1
+rm -f $RBR%{_mandir}/man1/mysql-test-run.pl.1
+rm -f $RBR%{_mandir}/man1/mysql_client_test.1
+rm -f $RBR%{_mandir}/man1/mysql_client_test_embedded.1
+rm -f $RBR%{_mandir}/man1/mysqltest.1
+rm -f $RBR%{_mandir}/man1/mysqltest_embedded.1
 
 %check
 
@@ -1324,7 +1330,6 @@ echo "====="                                     >> $STATUS_HISTORY
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlhotcopy.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlman.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqltest.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_zap.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlbug.1*
@@ -1470,11 +1475,8 @@ echo "====="                                     >> $STATUS_HISTORY
 %defattr(-, root, root, 0755)
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql-stress-test.pl.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql-test-run.pl.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test_embedded.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqltest_embedded.1*
+%attr(755, root, root) %{_bindir}/mysql_client_test_embedded
+%attr(755, root, root) %{_bindir}/mysqltest_embedded
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file
@@ -1482,6 +1484,9 @@ echo "====="                                     >> $STATUS_HISTORY
 # merging BK trees)
 ##############################################################################
 %changelog
+* Tue Oct 31 2017 Bjorn Munch <bjorn.munch@oracle.com>
+- Remove obsoleted mysqltest man pages
+
 * Mon Sep 26 2016 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com>
 - Include mysql-files directory
 
