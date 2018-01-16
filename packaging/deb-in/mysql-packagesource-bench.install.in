@@ -1,4 +1,4 @@
-# Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,18 +13,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-usr/bin/mysql_config
-usr/include/mysql/*.h
-usr/include/mysql/mysql/*.h
-usr/include/mysql/mysql/*.h.pp
-usr/include/mysql/mysql/psi/*.h
-usr/lib/*/libmysqlclient.a
-usr/lib/*/libmysqlclient_r.a
-usr/lib/*/libmysqlclient.so
-usr/lib/*/libmysqlclient_r.so
-usr/lib/*/libmysqlservices.a
-usr/share/aclocal/mysql.m4
-usr/share/man/man1/mysql_config.1
+usr/lib/mysql/sql-bench/*
 # legal
-usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ usr/share/doc/libmysqlclient-dev/
-usr/share/mysql/README usr/share/doc/libmysqlclient-dev/
+usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ usr/share/doc/mysql-@DEB_PRODUCTNAME@-bench/
+usr/share/mysql/README usr/share/doc/mysql-@DEB_PRODUCTNAME@-bench/

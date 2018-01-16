@@ -13,18 +13,23 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-usr/bin/mysql_config
-usr/include/mysql/*.h
-usr/include/mysql/mysql/*.h
-usr/include/mysql/mysql/*.h.pp
-usr/include/mysql/mysql/psi/*.h
-usr/lib/*/libmysqlclient.a
-usr/lib/*/libmysqlclient_r.a
-usr/lib/*/libmysqlclient.so
-usr/lib/*/libmysqlclient_r.so
-usr/lib/*/libmysqlservices.a
-usr/share/aclocal/mysql.m4
-usr/share/man/man1/mysql_config.1
+# binaries
+usr/bin/mysql_client_test
+usr/bin/mysql_client_test_embedded
+usr/bin/mysqltest
+usr/bin/mysqltest_embedded
+# plugins
+usr/lib/mysql/plugin/auth.so
+usr/lib/mysql/plugin/auth_test_plugin.so
+usr/lib/mysql/plugin/daemon_example.ini
+usr/lib/mysql/plugin/libdaemon_example.so
+usr/lib/mysql/plugin/qa_auth_client.so
+usr/lib/mysql/plugin/qa_auth_interface.so
+usr/lib/mysql/plugin/qa_auth_server.so
+usr/lib/mysql/plugin/test_udf_services.so
+@DEB_INSTALL_DEBUG_TEST_PLUGINS@
+# test suite
+usr/lib/mysql-test/*
 # legal
-usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ usr/share/doc/libmysqlclient-dev/
-usr/share/mysql/README usr/share/doc/libmysqlclient-dev/
+usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ usr/share/doc/mysql-@DEB_PRODUCTNAME@-test/
+usr/share/mysql/README usr/share/doc/mysql-@DEB_PRODUCTNAME@-test/
