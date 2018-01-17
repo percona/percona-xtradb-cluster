@@ -179,6 +179,12 @@ The sequence number of the current transaction in IST.
 
 The sequence number of the first transaction in IST.
 
+.. variable:: wsrep_last_applied
+
+   :Version: Introduced in :rn:`5.7.20-29.24`
+
+Sequence number of the last applied transaction.
+
 .. variable:: wsrep_last_committed
 
 Sequence number of the last committed transaction.
