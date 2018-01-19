@@ -1191,6 +1191,8 @@ fi
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/qa_auth_server.so
 %attr(755, root, root) %{_libdir}/mysql/plugin/debug/test_security_context.so
 
+
+%if 0%{?wsrep_embedded}
 %files embedded
 %defattr(-, root, root, -)
 %doc %{?license_files_server}
@@ -1204,6 +1206,7 @@ fi
 %attr(644, root, root) %{_libdir}/mysql/libmysqld.a
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
+%endif
 %endif
 
 # %if 0%{?rhel} == 5
