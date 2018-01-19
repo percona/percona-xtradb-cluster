@@ -1207,7 +1207,6 @@ fi
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
 %attr(755, root, root) %{_libdir}/mysql/libmysqld.so
 %endif
-%endif
 
 # %if 0%{?rhel} == 5
 %files %{series}
