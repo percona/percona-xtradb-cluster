@@ -1324,7 +1324,7 @@ fi
 if [ "$UPDATE_REQUIRES" = "true" ] ; then
 echo " * Please execute the following operations to get the full cluster updated:"
 echo " - Upgrade each node to current PXC version (5.7.19+)"
-echo "       mysql -uroot -p < /usr/share/percona-xtradb-cluster/pxc_cluster_view.sql"
+echo "       mysql_upgrade -uroot -p --force"
 echo " - Restart each cluster node, one node at a time:"
 echo "       service mysql restart"
 fi
