@@ -158,7 +158,7 @@ case "$1" in
 	if [[ $currentver < $requiredver ]]; then
 	  echo -e "\n\n * Please execute the following operations to get the full cluster updated:"
 	  echo -e "\t - Upgrade each node to current PXC version (5.7.19+)"
-	  echo -e "\t\t mysql -uroot -p < /usr/share/mysql/pxc_cluster_view.sql"
+	  echo -e "\t\t mysql_upgrade -uroot -p --force"
 	  echo -e "\t - Restart each cluster node, one node at a time:"
 	  echo -e "\t\t service mysql restart\n\n"
         fi
