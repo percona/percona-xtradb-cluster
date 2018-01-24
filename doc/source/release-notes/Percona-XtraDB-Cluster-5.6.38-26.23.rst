@@ -27,7 +27,7 @@ Fixed Bugs
 ==========
 
 * :jirabug:`PXC-889`: Fixed an issue where a node with an invalid value for
-  :variable:wsrep_provider was allowed to start up and operate in standalone
+  :variable:`wsrep_provider` was allowed to start up and operate in standalone
   mode, which could lead to data inconsistency. The node will now abort in
   this case. Bug fixed :bug:`1728774`
 
@@ -35,7 +35,7 @@ Fixed Bugs
   leaving the cluster, thus allowing pending nodes to re-evaluate the quorum.
   Bug fixed :bug:`1704404`
 
-* :jirabug:`PXC-875`: Fixed an issue where toggling :variable:wsrep_provider
+* :jirabug:`PXC-875`: Fixed an issue where toggling :variable:`wsrep_provider`
   off and on failed to reset some internal variables and resulted in PXC
   logging an "Unsupported protocol downgrade" warning. Bug fixed
   :bug:`1379204`
