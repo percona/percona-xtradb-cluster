@@ -338,8 +338,14 @@ To disable initial SST timeout, set ``sst-initial-timeout=0``.
    :Example: /path/to/tmp/dir
 
 This option specifies the location for storing the temporary file
-where the transaction log is stored
+on a donor node where the transaction log is stored
 before streaming or copying it to a remote host.
+
+.. Note:: Starting from |PXC| :rn:`5.7.20-29.24` this option can be used on
+   joiner node also, to specify non-default location to receive
+   temporary SST files. This location must be large enough to hold the
+   contents of the entire database. If tmpdir is empty then default
+   location datadir/.sst will be used.
 
 The ``tmpdir`` option can be set in the following :file:`my.cnf` groups:
 
