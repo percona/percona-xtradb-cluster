@@ -31,9 +31,9 @@ Fixed Bugs
   mode, which could lead to data inconsistency. The node will now abort in
   this case. Bug fixed :bug:`1728774`
 
-* Ensured that a node, because of data inconsistency, isolates itself before
-  leaving the cluster, thus allowing pending nodes to re-evaluate the quorum.
-  Bug fixed :bug:`1704404`
+* :jirabug:`PXC-850`: ensured that a node, because of data inconsistency,
+  isolates itself before leaving the cluster, thus allowing pending nodes
+  to re-evaluate the quorum. Bug fixed :bug:`1704404`
 
 * :jirabug:`PXC-875`: Fixed an issue where toggling :variable:`wsrep_provider`
   off and on failed to reset some internal variables and resulted in PXC
@@ -48,14 +48,14 @@ Fixed Bugs
   an error in projecting gcache free size when configured to recover on
   restart.
 
-* Fixed transaction loss after recovery by
+* :jirabug:`PXC-895`: fixed transaction loss after recovery by
   avoiding interruption of the binlog recovery based on wsrep saved position.
   Bug fixed :bug:`1734113`
 
-* Fixed empty gtid_executed variable after recovering
-  the position of a node with ``--wsrep_recover``.
+* :jirabug:`PXC-897`: fixed empty :variable:`gtid_executed` variable after
+  recovering the position of a node with ``--wsrep_recover``.
 
-* Fixed certification failure in the case of a node
+* :jirabug:`PXC-906`: fixed certification failure in the case of a node
   restarting at the same time when frequent ``TRUNCATE TABLE`` commands and
   DML writes occur simultaneously on other nodes. Bug fixed :bug:`1737731`
 
