@@ -16,7 +16,6 @@ INSERT INTO t1 VALUES (1, 'a');
 INSERT INTO t1 VALUES (2, 'a');
 
 --connection node_1
-
 SET AUTOCOMMIT=ON;
 START TRANSACTION;
 

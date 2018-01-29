@@ -8,6 +8,10 @@ DELETE FROM mysql.user WHERE user = 'user1';
 SET SESSION wsrep_replicate_myisam = FALSE;
 FLUSH PRIVILEGES;
 FLUSH QUERY CACHE;
+Warnings:
+Warning	1681	'FLUSH QUERY CACHE' is deprecated and will be removed in a future release.
+wsrep_last_committed_diff
+1
 FLUSH STATUS;
 FLUSH USER_RESOURCES;
 FLUSH TABLES;
@@ -35,7 +39,9 @@ FLUSH TABLES t1 FOR EXPORT;
 UNLOCK TABLES;
 RESET CHANGED_PAGE_BITMAPS;
 RESET QUERY CACHE;
-wsrep_last_applied_diff
+Warnings:
+Warning	1681	'RESET QUERY CACHE' is deprecated and will be removed in a future release.
+wsrep_last_committed_diff
 1
 LOCK TABLES t1 WRITE;
 FLUSH TABLES t1;
@@ -44,7 +50,7 @@ LOCK TABLES t1 READ;
 FLUSH TABLES t1;
 ERROR HY000: Table 't1' was locked with a READ lock and can't be updated
 UNLOCK TABLES;
-wsrep_last_applied_diff
+wsrep_last_committed_diff
 1
 FLUSH TABLES t1;
 DROP TABLE t1;

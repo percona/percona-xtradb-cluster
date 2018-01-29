@@ -78,6 +78,15 @@ void wsrep_register_hton(THD* thd, bool all)
 {
   if (!WSREP(thd)) return;
 
+  /* Skip wsrep-hton handler registration.
+  This happens in case like following:
+  - DDL is executed with sql_log_bin = 0 where-in ddl replication is skipped
+    so the exec_mode != TOTAL_ORDER but as thumb rule hton should get registered
+    for DDL/TOI statement.
+  */
+  if (WSREP(thd) && thd->wsrep_skip_wsrep_hton)
+    return;
+
   /* only LOCAL_STATE processors may replicate.
      For filtered mysql replication we may end up here in LOCAL_COMMIT state
      this can happen after GTID event replication for filtered event
@@ -1110,6 +1119,9 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
   }
 
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+  DEBUG_SYNC(thd, "wsrep_after_replication");
+
   switch(rcode) {
   case 0:
     /*
@@ -1148,6 +1160,7 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
                      meta.gtid.uuid, meta.gtid.seqno);
       DBUG_ASSERT(thd->wsrep_trx_meta.gtid.seqno != WSREP_SEQNO_UNDEFINED);
     }
+    //fallthrough
 
   case WSREP_PRECOMMIT_ABORT:
   case WSREP_TRX_FAIL:

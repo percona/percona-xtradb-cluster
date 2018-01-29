@@ -164,6 +164,7 @@ extern const char* wsrep_provider_version;
 extern const char* wsrep_provider_vendor;
 
 int  wsrep_show_status(THD *thd, SHOW_VAR *var, char *buff);
+int  wsrep_show_ready(THD *thd, SHOW_VAR *var, char *buff);
 void wsrep_free_status(THD *thd);
 
 /* Filters out --wsrep-new-cluster oprtion from argv[]
@@ -305,6 +306,7 @@ extern wsrep_seqno_t wsrep_locked_seqno;
   ((!opt_general_log_raw) && thd->rewritten_query.length()      \
    ? thd->rewritten_query.c_ptr_safe() : thd->query().str)
 
+extern my_bool wsrep_ready_get();
 extern void wsrep_ready_wait();
 
 enum wsrep_trx_status {

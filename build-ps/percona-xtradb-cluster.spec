@@ -75,7 +75,7 @@ Prefix: %{_sysconfdir}
 %endif
 
 %if %{undefined galera_version}
- %define galera_version 3.22
+ %define galera_version 3.24
 %endif
 
 %if %{undefined galera_revision}
@@ -414,7 +414,7 @@ Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
 Requires:	percona-xtrabackup-24 >= 2.4.4 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
-Requires:       perl(Data::Dumper) which
+Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
 Requires(preun):  systemd
@@ -1261,7 +1261,6 @@ fi
 # use chkconfig on Enterprise Linux and newer SuSE releases
 %if 0%{?systemd}
   %systemd_post mysql
-  /usr/bin/systemctl enable mysql >/dev/null 2>&1 || :
 %else
 if [ -x /sbin/chkconfig ] ; then
         /sbin/chkconfig --add mysql

@@ -1,2 +1,0 @@
-debian/additions/my.cnf etc/mysql/
-debian/additions/my5.6.cnf etc/mysql/conf.d/

@@ -1,3 +1,0 @@
-debian/tmp/usr/share/mysql/wsrep.cnf
-debian/tmp/usr/share/mysql/magic
-debian/tmp/usr/lib/mysql/plugin/daemon_example.ini

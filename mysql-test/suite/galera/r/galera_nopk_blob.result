@@ -22,6 +22,6 @@ START TRANSACTION;
 UPDATE t2 SET f1 = 'xyz' WHERE f1 IS NULL;
 COMMIT;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+Got one of the listed errors
 DROP TABLE t1;
 DROP TABLE t2;

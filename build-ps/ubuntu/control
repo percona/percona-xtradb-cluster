@@ -40,17 +40,6 @@ Standards-Version: 7.0.0
 Homepage: http://www.percona.com/software/percona-xtradb-cluster/
 Vcs-Git: https://github.com/percona/percona-xtradb-cluster
 
-Package: percona-server-rocksdb-5.7
-Section: database
-Architecture: any
-Depends: percona-server-server-5.7 (= ${binary:Version})
-Description: MyRocks storage engine plugin for Percona Server
- .
- MyRocks is a storage engine for Percona Server which incorporates RocksDB
- library optimized for fast storage and space efficiency.
- .
- This package includes the MyRocks/RocksDB plugin library.
-
 Package: libperconaserverclient20
 Architecture: any
 Section: libs
@@ -180,7 +169,7 @@ Description: Percona XtraDB Cluster database client binaries
 
 Package: percona-xtradb-cluster-server-5.7
 Architecture: any
-Suggests: tinyca, netcat-openbsd, pv, qpress
+Suggests: tinyca, netcat-openbsd, pv 
 Pre-Depends: percona-xtradb-cluster-common-5.7 (= ${binary:Version}),
              adduser,
              debconf (>= 0.2.17)
@@ -197,6 +186,7 @@ Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          socat,
         lsof,
          rsync,
+         qpress,
          iproute
 Provides: mysql-server,
           virtual-mysql-server, virtual-mysql-server-core,
@@ -256,7 +246,7 @@ Description: Percona XtraDB Cluster database server binaries
 
 Package: percona-xtradb-cluster-server-debug-5.7
 Architecture: any
-Suggests: tinyca, netcat-openbsd, pv, qpress
+Suggests: tinyca, netcat-openbsd, pv
 Pre-Depends: percona-xtradb-cluster-common-5.7 (>= ${binary:Version}),
              adduser (>= 3.4.0),
              debconf
@@ -273,6 +263,7 @@ Depends: percona-xtradb-cluster-client-5.7 (>= ${binary:Version}),
          socat,
         lsof,
          rsync,
+         qpress,
          iproute
 Provides: mysql-server-debug
 Description: Percona XtraDB Cluster database server UNIV_DEBUG binaries

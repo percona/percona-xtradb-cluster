@@ -2,7 +2,7 @@
 
 . /usr/share/debconf/confmodule
 
-MYSQLDATA=$(my_print_defaults server mysqld | grep '^--datadir=' | sed -n 's/--datadir=//p' | tail -n 1)
+MYSQLDATA=$(my_print_defaults mysqld | grep datadir | cut -d= -f2)
 if [ -z "$MYSQLDATA" ];
 then
     MYSQLDATA=/var/lib/mysql
@@ -15,40 +15,6 @@ take_upstart_job_backup () {
 		mv /etc/init/mysql.conf $MYSQLDATA/.mysql.conf.backup
 	fi
 }
-
-check_exit_status() {
-        errcode=$1
-        if [ $errcode > 0 ];
-        then
-                exit $errcode
-        fi
-}
-
-MY_BASEDIR_VERSION=$(my_print_defaults --loose-verbose mysqld server | grep basedir | awk -F'=' '{print $2}')
-TOKUDB=$(dpkg -l | grep -c 'percona-server-tokudb-5.7')
-if [ $TOKUDB = 1 ]
-then
-  path=$(dpkg-query -L `dpkg -l | grep libjemalloc | awk '{print $2}'` | grep libjemalloc.so.1)
-  if [ ! -z $path ]
-  then
-    dir=$(dirname $(readlink -f $path))
-    for dir in "${MY_BASEDIR_VERSION}/lib/mysql" "/usr/lib64" "/usr/lib/x86_64-linux-gnu" "/usr/lib"; do
-      if [ -r "$dir/libjemalloc.so.1" ]; then
-        preload_exists=$(grep -c "LD_PRELOAD" /etc/default/mysql)
-        thp_exists=$(grep -c "THP_SETTING" /etc/default/mysql)
-        if [ $preload_exists = 0 ]
-        then
-            echo "LD_PRELOAD=$dir/libjemalloc.so.1" >> /etc/default/mysql
-        fi
-        if [ $thp_exists = 0 ]
-        then
-            echo "THP_SETTING=never" >> /etc/default/mysql
-        fi
-        break
-      fi
-    done
-  fi
-fi
 
 case "$1" in
 	configure)
@@ -123,22 +89,6 @@ echo -e "\tmysql -e \"CREATE FUNCTION murmur_hash RETURNS INTEGER SONAME 'libmur
 echo -e "\n * See http://www.percona.com/doc/percona-server/5.7/management/udf_percona_toolkit.html for more details\n\n"
 #
 
-deb-systemd-helper unmask mysql.service >/dev/null || true
-
-if deb-systemd-helper --quiet was-enabled mysql.service; then
-        deb-systemd-helper enable mysql.service >/dev/null || true
-else
-        deb-systemd-helper update-state mysql.service >/dev/null || true
-fi
-if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
-        if [ -x "/etc/init.d/mysql" ]; then
-                update-rc.d mysql defaults 19 21 >/dev/null
-                if [ -e /tmp/bootstrapped ]; then
-                    /etc/init.d/mysql bootstrap-pxc
-                else
-                    invoke-rc.d mysql start || exit $?
-                fi
-        fi
-fi
+#DEBHELPER#
 
 exit 0

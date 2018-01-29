@@ -125,5 +125,5 @@ UPDATE t1 SET f1 = REPEAT('e', 767);
 UPDATE t1 SET f1 = REPEAT('f', 767);
 COMMIT;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+Got one of the listed errors
 DROP TABLE t1;

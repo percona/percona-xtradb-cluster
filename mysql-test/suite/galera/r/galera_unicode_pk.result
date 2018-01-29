@@ -13,7 +13,7 @@ START TRANSACTION;
 UPDATE t1 SET f1 = 'текст3';
 COMMIT;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+Got one of the listed errors
 SELECT f1 = 'текст2' FROM t1;
 f1 = 'текст2'
 1
@@ -26,6 +26,6 @@ START TRANSACTION;
 INSERT INTO t1 VALUES ('текст4');
 COMMIT;
 COMMIT;
-ERROR 40001: WSREP detected deadlock/conflict and aborted the transaction. Try restarting the transaction
+Got one of the listed errors
 COMMIT;
 DROP TABLE t1;

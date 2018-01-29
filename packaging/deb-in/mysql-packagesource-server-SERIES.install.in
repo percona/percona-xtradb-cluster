@@ -46,6 +46,8 @@ usr/bin/zlib_decompress usr/lib/mysql/
 # plugins
 usr/lib/mysql/plugin/adt_null.so
 usr/lib/mysql/plugin/auth_socket.so
+usr/lib/mysql/plugin/group_replication.so
+usr/lib/mysql/plugin/connection_control.so
 usr/lib/mysql/plugin/innodb_engine.so
 usr/lib/mysql/plugin/keyring_file.so
 usr/lib/mysql/plugin/keyring_udf.so
@@ -62,6 +64,7 @@ usr/lib/mysql/plugin/validate_password.so
 usr/lib/mysql/plugin/version_token.so
 @DEB_INSTALL_SERVER_PLUGINS@
 # server
+# usr/bin/mysqld_multi
 usr/sbin/mysqld
 # man pages
 usr/share/man/man1/innochecksum.1
@@ -74,6 +77,8 @@ usr/share/man/man1/my_print_defaults.1
 usr/share/man/man1/mysql.server.1
 usr/share/man/man1/mysql-stress-test.pl.1
 usr/share/man/man1/mysql_install_db.1
+usr/share/man/man1/mysqld_multi.1
+usr/share/man/man1/mysqld_safe.1
 usr/share/man/man1/mysql_plugin.1
 usr/share/man/man1/mysql_secure_installation.1
 usr/share/man/man1/mysql_ssl_rsa_setup.1
@@ -110,6 +115,7 @@ usr/share/mysql/mysql_sys_schema.sql
 usr/share/mysql/mysql_system_tables.sql
 usr/share/mysql/mysql_system_tables_data.sql
 usr/share/mysql/mysql_test_data_timezone.sql
+usr/share/mysql/mysqld_multi.server
 usr/share/mysql/uninstall_rewriter.sql
 usr/share/mysql/wsrep.cnf
 usr/share/mysql/wsrep_notify

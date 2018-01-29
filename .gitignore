@@ -37,6 +37,7 @@
 *.sbr
 *.so
 *.so.*
+*.spec
 *.user
 *.vcproj
 *.vcproj.cmake

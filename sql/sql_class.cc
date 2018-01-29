@@ -1357,6 +1357,7 @@ THD::THD(bool enable_plugins)
    fill_variables_recursion_level(0),
    order_deterministic(false),
    binlog_row_event_extra_data(NULL),
+   skip_readonly_check(false),
    binlog_unsafe_warning_flags(0),
    binlog_table_maps(0),
    binlog_accessed_db_names(NULL),
@@ -1538,6 +1539,7 @@ THD::THD(bool enable_plugins)
   wsrep_skip_wsrep_GTID   = false;
   wsrep_split_trx         = false;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
+  wsrep_skip_wsrep_hton   = false;
 #endif /* WITH_WSREP */
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1939,6 +1941,7 @@ void THD::init(void)
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
   wsrep_sst_donor= false;
   wsrep_void_applier_trx  = true;
+  wsrep_skip_wsrep_hton   = false;
 #endif /* WITH_WSREP */
   binlog_row_event_extra_data= 0;
 
@@ -4412,6 +4415,16 @@ extern "C" void thd_set_kill_status(const MYSQL_THD thd)
 extern "C" unsigned long thd_get_thread_id(const MYSQL_THD thd)
 {
   return((unsigned long)thd->thread_id());
+}
+
+/**
+  Return the query id of a thread
+  @param thd user thread
+  @return query id
+*/
+extern "C" int64_t thd_get_query_id(const MYSQL_THD thd)
+{
+  return(thd->query_id);
 }
 
 /**
