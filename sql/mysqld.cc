@@ -9319,7 +9319,7 @@ SHOW_VAR status_vars[]= {
 #endif
 #ifdef WITH_WSREP
   {"wsrep_connected",          (char*) &wsrep_connected,         SHOW_BOOL},
-  {"wsrep_ready",              (char*) &wsrep_ready,             SHOW_BOOL},
+  {"wsrep_ready",              (char*) &wsrep_show_ready,        SHOW_FUNC},
   {"wsrep_cluster_state_uuid", (char*) &wsrep_cluster_state_uuid,SHOW_CHAR_PTR},
   {"wsrep_cluster_conf_id",    (char*) &wsrep_cluster_conf_id,   SHOW_LONGLONG},
   {"wsrep_cluster_status",     (char*) &wsrep_cluster_status,    SHOW_CHAR_PTR},
@@ -9718,7 +9718,7 @@ mysqld_get_one_option(int optid,
     break;
   case 'L':
     WARN_DEPRECATED(NULL, "--language/-l", "'--lc-messages-dir'");
-    /* Note:  fall-through */
+    // fallthrough
   case OPT_LC_MESSAGES_DIRECTORY:
     strmake(lc_messages_dir, argument, sizeof(lc_messages_dir)-1);
     lc_messages_dir_ptr= lc_messages_dir;

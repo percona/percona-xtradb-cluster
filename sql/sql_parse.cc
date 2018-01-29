@@ -1155,17 +1155,18 @@ bool do_command(THD *thd)
                      command_name[command].str));
 
 #ifdef WITH_WSREP
-  if (WSREP(thd)) {
+  if (WSREP(thd))
+  {
     /*
      * bail out if DB snapshot has not been installed. We however,
      * allow some commands, they are trapped later in execute_command.
      */
-    if (thd->variables.wsrep_on && !thd->wsrep_applier &&
-        (!wsrep_ready || wsrep_reject_queries != WSREP_REJECT_NONE) &&
-        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0
-    ) {
+    if (!thd->wsrep_applier &&
+        (!wsrep_ready_get() || wsrep_reject_queries != WSREP_REJECT_NONE) &&
+        (server_command_flags[command] & CF_SKIP_WSREP_CHECK) == 0)
+    {
       my_message(ER_UNKNOWN_COM_ERROR,
-	       "WSREP has not yet prepared node for application use", MYF(0));
+                 "WSREP has not yet prepared node for application use", MYF(0));
       thd->protocol->end_statement();
 
       /* Performance Schema Interface instrumentation end */
@@ -1190,7 +1191,7 @@ bool do_command(THD *thd)
     while (thd->wsrep_conflict_state== RETRY_AUTOCOMMIT)
     {
       return_value= dispatch_command(command, thd, thd->wsrep_retry_query,
-				     thd->wsrep_retry_query_len);
+                                     thd->wsrep_retry_query_len);
     }
   }
   if (thd->wsrep_retry_query && thd->wsrep_conflict_state != REPLAYING)
@@ -2231,6 +2232,7 @@ done:
   thd->reset_query();
   thd->set_command(COM_SLEEP);
   thd->proc_info= 0;
+  thd->lex->sql_command= SQLCOM_END;
 
   /* Performance Schema Interface instrumentation, end */
   MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
@@ -3195,7 +3197,8 @@ mysql_execute_command(THD *thd)
   Opt_trace_object trace_command(&thd->opt_trace);
   Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
 #ifdef WITH_WSREP
-  if (WSREP(thd)) {
+  if (WSREP(thd))
+  {
     /*
       change LOCK TABLE WRITE to transaction
     */
@@ -3224,9 +3227,8 @@ mysql_execute_command(THD *thd)
      * allow SET and SHOW queries and reads from information schema
      * and dirty reads (if configured)
      */
-    if (thd->variables.wsrep_on                                            &&
-        !thd->wsrep_applier                                                &&
-        !(wsrep_ready && wsrep_reject_queries == WSREP_REJECT_NONE)        &&
+    if (!thd->wsrep_applier                                                &&
+        !(wsrep_ready_get() && wsrep_reject_queries == WSREP_REJECT_NONE)  &&
         !(thd->variables.wsrep_dirty_reads &&
           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
         !wsrep_tables_accessible_when_detached(all_tables)                 &&
@@ -3484,6 +3486,7 @@ case SQLCOM_PREPARE:
       break;
     }
   }
+  // fallthrough
   case SQLCOM_PURGE_BEFORE:
   {
     Item *it;
@@ -4205,8 +4208,8 @@ end_with_restore_list:
     /* mysql_update return 2 if we need to switch to multi-update */
     if (up_result != 2)
       break;
-    /* Fall through */
   }
+  // fallthrough
   case SQLCOM_UPDATE_MULTI:
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
@@ -4323,6 +4326,7 @@ end_with_restore_list:
       DBUG_PRINT("debug", ("Just after generate_incident()"));
     }
 #endif
+    // fallthrough
   case SQLCOM_INSERT:
   {
     WSREP_SYNC_WAIT(thd, WSREP_SYNC_WAIT_BEFORE_INSERT_REPLACE);
@@ -4997,11 +5001,6 @@ end_with_restore_list:
                                    lex->spname->m_name);
     break;
   case SQLCOM_DROP_EVENT:
-    if (Events::drop_event_precheck(thd, lex->spname->m_db))
-      break;
-
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-
     if (!(res= Events::drop_event(thd,
                                   lex->spname->m_db, lex->spname->m_name,
                                   lex->drop_if_exists)))
@@ -5196,6 +5195,7 @@ end_with_restore_list:
       initialize this variable because RESET shares the same code as FLUSH
     */
     lex->no_write_to_binlog= 1;
+    // fallthrough
   case SQLCOM_FLUSH:
   {
     int write_to_binlog;
@@ -6010,7 +6010,6 @@ create_sp_error:
         Note: SQLCOM_CREATE_VIEW also handles 'ALTER VIEW' commands
         as specified through the thd->lex->create_view_mode flag.
       */
-      /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_create_view */
       res= mysql_create_view(thd, first_table, thd->lex->create_view_mode);
       break;
     }
@@ -6026,7 +6025,6 @@ create_sp_error:
   case SQLCOM_CREATE_TRIGGER:
   {
     /* Conditionally writes to binlog. */
-    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_create_or_drop_trigger */
     res= mysql_create_or_drop_trigger(thd, all_tables, 1);
 
     break;
@@ -6034,7 +6032,6 @@ create_sp_error:
   case SQLCOM_DROP_TRIGGER:
   {
     /* Conditionally writes to binlog. */
-    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_create_or_drop_trigger */
     res= mysql_create_or_drop_trigger(thd, all_tables, 0);
     break;
   }
@@ -6099,14 +6096,11 @@ create_sp_error:
       my_ok(thd);
     break;
   case SQLCOM_INSTALL_PLUGIN:
-    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_install_plugin */
     if (! (res= mysql_install_plugin(thd, &thd->lex->comment,
                                      &thd->lex->ident)))
       my_ok(thd);
     break;
   case SQLCOM_UNINSTALL_PLUGIN:
-    /* WSREP_TO_ISOLATION_BEGIN is inside of mysql_uninstall_plugin */
-
     if (! (res= mysql_uninstall_plugin(thd, &thd->lex->comment)))
       my_ok(thd);
     break;
@@ -6262,6 +6256,24 @@ finish:
       thd->send_kill_message();
     if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
       trans_rollback_stmt(thd);
+#ifdef WITH_WSREP
+    else if (thd->sp_runtime_ctx &&
+             (thd->wsrep_conflict_state == MUST_ABORT ||
+              thd->wsrep_conflict_state == CERT_FAILURE))
+    {
+      /*
+        The error was cleared, but THD was aborted by wsrep and
+        wsrep_conflict_state is still set accordingly. This
+        situation is expected if we are running a stored procedure
+        that declares a handler that catches ER_LOCK_DEADLOCK error.
+        In which case the error may have been cleared in method
+        sp_rcontext::handle_sql_condition().
+      */
+      trans_rollback_stmt(thd);
+      thd->wsrep_conflict_state= NO_CONFLICT;
+      thd->killed= THD::NOT_KILLED;
+    }
+#endif /* WITH_WSREP */
     else
     {
       /* If commit fails, we should be able to reset the OK status. */

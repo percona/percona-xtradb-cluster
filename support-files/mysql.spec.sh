@@ -471,8 +471,10 @@ Obsoletes:      MySQL-shared-classic MySQL-shared-community MySQL-shared-enterpr
 Obsoletes:      MySQL-shared-advanced-gpl MySQL-shared-enterprise-gpl
 # RHEL uses other names:
 Obsoletes:      mysql-libs mysql-community-libs
+Provides:      mysql-libs mysql-community-libs
 # Necessary on RHEL 7, no harm on other platforms:
-Obsoletes:      mariadb-libs
+Provides:      mariadb-libs
+Obsoletes:     mariadb-libs
 
 %description -n mysql-wsrep-shared%{product_suffix}
 This package contains the shared libraries (*.so*) which certain languages

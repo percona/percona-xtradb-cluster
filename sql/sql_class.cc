@@ -1334,6 +1334,7 @@ THD::THD(bool enable_plugins)
   wsrep_affected_rows     = 0;
   wsrep_replicate_GTID    = false;
   wsrep_skip_wsrep_GTID   = false;
+  wsrep_skip_wsrep_hton   = false;
 #endif
   /* Call to init() below requires fully initialized Open_tables_state. */
   reset_open_tables_state();
@@ -1761,6 +1762,7 @@ void THD::init(void)
   wsrep_affected_rows     = 0;
   wsrep_replicate_GTID    = false;
   wsrep_skip_wsrep_GTID   = false;
+  wsrep_skip_wsrep_hton   = false;
 #endif
   binlog_row_event_extra_data= 0;
 
@@ -2052,7 +2054,11 @@ void THD::release_resources()
   mysql_mutex_lock(&LOCK_wsrep_thd);
   mysql_mutex_unlock(&LOCK_wsrep_thd);
   mysql_mutex_destroy(&LOCK_wsrep_thd);
-  if (wsrep_rli) delete wsrep_rli;
+  mysql_cond_destroy(&COND_wsrep_thd);
+  if (wsrep_rli != NULL) {
+    delete wsrep_rli;
+    wsrep_rli = NULL;
+  }
   wsrep_free_status(this);
 #endif
 }
@@ -4803,6 +4809,16 @@ extern "C" unsigned long thd_get_thread_id(const MYSQL_THD thd)
 }
 
 /**
+  Return the query id of a thread
+  @param thd user thread
+  @return query id
+*/
+extern "C" int64_t thd_get_query_id(const MYSQL_THD thd)
+{
+  return(thd->query_id);
+}
+
+/**
   Check if batching is allowed for the thread
   @param thd  user thread
   @retval 1 batching allowed
@@ -4860,6 +4876,10 @@ extern "C" int thd_non_transactional_update(const MYSQL_THD thd)
 extern "C" int thd_binlog_format(const MYSQL_THD thd)
 {
 #ifdef WITH_WSREP
+  /* Even though binlog is disabled and emulation is enabled it is possible
+  that MySQL flow may have turned off log bin by setting option_bits.
+  So blindly returning the binlog format without checking for
+  option_bits is not a good idea. */
   if (((WSREP(thd) && wsrep_emulate_bin_log) || mysql_bin_log.is_open()) &&
       (thd->variables.option_bits & OPTION_BIN_LOG))
 #else
@@ -5707,4 +5727,53 @@ bool THD::is_current_stmt_binlog_disabled() const
 {
   return (!(variables.option_bits & OPTION_BIN_LOG) ||
           !mysql_bin_log.is_open());
+}
+
+/** Gets page fragmentation statistics. Assigns zeros to stats if thd is
+NULL.
+@param[in]  thd   the calling thread
+@param[out] stats a pointer to fragmentation statistics to fill */
+void thd_get_fragmentation_stats(const THD *thd,
+                                 fragmentation_stats_t* stats)
+{
+  DBUG_ASSERT(stats != NULL);
+  if (likely(thd != NULL))
+  {
+    stats->scan_pages_contiguous=
+      thd->status_var.fragmentation_stats.scan_pages_contiguous;
+    stats->scan_pages_disjointed=
+      thd->status_var.fragmentation_stats.scan_pages_disjointed;
+    stats->scan_pages_total_seek_distance=
+      thd->status_var.fragmentation_stats.scan_pages_total_seek_distance;
+    stats->scan_data_size=
+      thd->status_var.fragmentation_stats.scan_data_size;
+    stats->scan_deleted_recs_size=
+      thd->status_var.fragmentation_stats.scan_deleted_recs_size;
+  }
+  else
+  {
+    memset(stats, 0, sizeof(*stats));
+  }
+}
+
+/** Adds page scan statistics. Does nothing if thd is NULL.
+@param[in] thd   the calling thread
+@param[in] stats a pointer to fragmentation statistics to add */
+void thd_add_fragmentation_stats(THD *thd,
+                                 const fragmentation_stats_t* stats)
+{
+  DBUG_ASSERT(stats != NULL);
+  if (likely(thd != NULL))
+  {
+    thd->status_var.fragmentation_stats.scan_pages_contiguous+=
+      stats->scan_pages_contiguous;
+    thd->status_var.fragmentation_stats.scan_pages_disjointed+=
+      stats->scan_pages_disjointed;
+    thd->status_var.fragmentation_stats.scan_pages_total_seek_distance+=
+      stats->scan_pages_total_seek_distance;
+    thd->status_var.fragmentation_stats.scan_data_size+=
+      stats->scan_data_size;
+    thd->status_var.fragmentation_stats.scan_deleted_recs_size+=
+      stats->scan_deleted_recs_size;
+  }
 }

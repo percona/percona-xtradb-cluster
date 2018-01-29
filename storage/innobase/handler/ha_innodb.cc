@@ -1026,6 +1026,24 @@ static SHOW_VAR innodb_status_variables[]= {
   (char*) &export_vars.innodb_sec_rec_cluster_reads,	  SHOW_LONG},
   {"secondary_index_triggered_cluster_reads_avoided",
   (char*) &export_vars.innodb_sec_rec_cluster_reads_avoided, SHOW_LONG},
+  {"buffered_aio_submitted",
+  (char*) &export_vars.innodb_buffered_aio_submitted,	  SHOW_LONG},
+
+  {"scan_pages_contiguous",
+  (char*) &export_vars.innodb_fragmentation_stats.scan_pages_contiguous,
+  SHOW_LONG},
+  {"scan_pages_disjointed",
+  (char*) &export_vars.innodb_fragmentation_stats.scan_pages_disjointed,
+  SHOW_LONG},
+  {"scan_pages_total_seek_distance",
+  (char*) &export_vars.innodb_fragmentation_stats.scan_pages_total_seek_distance,
+  SHOW_LONG},
+  {"scan_data_size",
+  (char*) &export_vars.innodb_fragmentation_stats.scan_data_size,
+  SHOW_LONG},
+  {"scan_deleted_recs_size",
+  (char*) &export_vars.innodb_fragmentation_stats.scan_deleted_recs_size,
+  SHOW_LONG},
   {NullS, NullS, SHOW_LONG}
 };
 
@@ -1888,8 +1906,8 @@ innobase_release_temporary_latches(
 }
 
 #ifdef WITH_WSREP
-static int 
-wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd, 
+static int
+wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 			my_bool signal);
 static void
 wsrep_fake_trx_id(handlerton* hton, THD *thd);
@@ -2888,7 +2906,7 @@ ha_innobase::ha_innobase(
 		  HA_BINLOG_ROW_CAPABLE |
 		  HA_CAN_GEOMETRY | HA_PARTIAL_COLUMN_READ |
 		  HA_TABLE_SCAN_ON_INDEX | HA_CAN_FULLTEXT |
-		  HA_CAN_FULLTEXT_EXT | HA_CAN_EXPORT),
+		  HA_CAN_FULLTEXT_EXT | HA_CAN_EXPORT | HA_ONLINE_ANALYZE),
 	start_of_scan(0),
 	num_write_row(0)
 {}
@@ -6395,7 +6413,6 @@ get_field_offset(
 UNIV_INTERN
 int
 wsrep_innobase_mysql_sort(
-/*===============*/
 					/* out: str contains sort string */
 	int		mysql_type,	/* in: MySQL type */
 	uint		charset_number,	/* in: number of the charset */
@@ -7026,7 +7043,7 @@ wsrep_store_key_val_for_row(
 {
 	KEY*		key_info	= table->key_info + keynr;
 	KEY_PART_INFO*	key_part	= key_info->key_part;
-	KEY_PART_INFO*	end		= 
+	KEY_PART_INFO*	end		=
 		key_part + key_info->user_defined_key_parts;
 	char*		buff_start	= buff;
 	enum_field_types mysql_type;
@@ -7045,7 +7062,7 @@ wsrep_store_key_val_for_row(
 
 		if (key_part->null_bit) {
 			if (buff_space > 0) {
-				if (record[key_part->null_offset] 
+				if (record[key_part->null_offset]
 				    & key_part->null_bit) {
 					*buff = 1;
 					part_is_null = TRUE;
@@ -8096,7 +8113,8 @@ ha_innobase::innobase_lock_autoinc(void)
 				break;
 			}
 		}
-		/* Fall through to old style locking. */
+		// fallthrough
+		// to old style locking.
 
 	case AUTOINC_OLD_STYLE_LOCKING:
 		DBUG_EXECUTE_IF("die_if_autoinc_old_lock_style_used",
@@ -8580,7 +8598,6 @@ func_exit:
 static
 int
 wsrep_calc_row_hash(
-/*================*/
 	byte*		digest,		/*!< in/out: md5 sum */
 	const uchar*	row,		/*!< in: row in MySQL format */
 	TABLE*		table,		/*!< in: table in MySQL data
@@ -10430,18 +10447,17 @@ wsrep_dict_foreign_find_index(
 extern
 dberr_t
 wsrep_append_foreign_key(
-/*===========================*/
 	trx_t*		trx,		/*!< in: trx */
 	dict_foreign_t*	foreign,	/*!< in: foreign key constraint */
-	const rec_t*	rec,		/*!<in: clustered index record */
-	dict_index_t*	index,		/*!<in: clustered index */
-	ibool		referenced,	/*!<in: is check for referenced table */
-	ibool		shared)		/*!<in: is shared access */
+	const rec_t*	rec,		/*!< in: clustered index record */
+	dict_index_t*	index,		/*!< in: clustered index */
+	ibool		referenced,	/*!< in: is check for referenced table */
+	ibool		shared)		/*!< in: is shared access */
 {
-	THD*    thd   		= (THD*)trx->mysql_thd;
-	int rcode 		= 0;
-	char    cache_key[513] 	= {'\0'};
-	int   cache_key_len;
+	THD* thd = (THD*)trx->mysql_thd;
+	int rcode = 0;
+	char cache_key[513] = {'\0'};
+	int cache_key_len;
 	bool const copy = true;
 	ut_a(trx);
 
@@ -10479,7 +10495,7 @@ wsrep_append_foreign_key(
 					wsrep_dict_foreign_find_index(
 						foreign->referenced_table, NULL,
 						foreign->referenced_col_names,
-						foreign->n_fields, 
+						foreign->n_fields,
 						foreign->foreign_index,
 						TRUE, FALSE);
 			}
@@ -10496,14 +10512,14 @@ wsrep_append_foreign_key(
 						foreign->foreign_table, NULL,
 						foreign->foreign_col_names,
 						foreign->n_fields,
-						foreign->referenced_index, 
+						foreign->referenced_index,
 						TRUE, FALSE);
 			}
 		}
 		mutex_exit(&(dict_sys->mutex));
 	}
 
-	if ( !((referenced) ?
+	if (!((referenced) ?
 		foreign->referenced_table : foreign->foreign_table))
 	{
 		WSREP_WARN("FK: %s missing in query: %s",
@@ -10604,7 +10620,6 @@ wsrep_append_foreign_key(
 
 static int
 wsrep_append_key(
-/*==================*/
 	THD		*thd,
 	trx_t 		*trx,
 	TABLE_SHARE 	*table_share,
@@ -10695,12 +10710,12 @@ ha_innobase::wsrep_append_keys(
 	bool key_appended = false;
 	trx_t *trx = thd_to_trx(thd);
 
-	if (table_share && table_share->tmp_table  != NO_TMP_TABLE &&
-	        thd->lex->sql_command != SQLCOM_CREATE_TABLE) {
-		WSREP_DEBUG("skipping tmp table DML: THD: %lu tmp: %d SQL: %s", 
+        if (table_share && table_share->tmp_table  != NO_TMP_TABLE &&
+               thd->lex->sql_command != SQLCOM_CREATE_TABLE) {
+		WSREP_DEBUG("skipping tmp table DML: THD: %lu tmp: %d SQL: %s",
 			    wsrep_thd_thread_id(thd),
 			    table_share->tmp_table,
-			    (wsrep_thd_query(thd)) ? 
+			    (wsrep_thd_query(thd)) ?
 			    wsrep_thd_query(thd) : "void");
 		DBUG_RETURN(0);
 	}
@@ -10717,13 +10732,13 @@ ha_innobase::wsrep_append_keys(
 
 		if (!is_null) {
 			rcode = wsrep_append_key(
-				thd, trx, table_share, table, keyval, 
+				thd, trx, table_share, table, keyval,
 				len, shared);
 			if (rcode) DBUG_RETURN(rcode);
 		}
 		else
 		{
-			WSREP_DEBUG("NULL key skipped (proto 0): %s", 
+			WSREP_DEBUG("NULL key skipped (proto 0): %s",
 				    wsrep_thd_query(thd));
 		}
 	} else {
@@ -10755,7 +10770,7 @@ ha_innobase::wsrep_append_keys(
 
 			if (!tab) {
 				WSREP_WARN("MySQL-InnoDB key mismatch %s %s",
-					   table->s->table_name.str, 
+					   table->s->table_name.str,
 					   key_info->name);
 			}
 
@@ -10767,12 +10782,12 @@ ha_innobase::wsrep_append_keys(
 			     (!tab && referenced_by_foreign_key()))) {
 
 				len = wsrep_store_key_val_for_row(
-					thd, table, i, key0, 
-					WSREP_MAX_SUPPORTED_KEY_LENGTH, 
+					thd, table, i, key0,
+					WSREP_MAX_SUPPORTED_KEY_LENGTH,
 					record0, &is_null, prebuilt);
 				if (!is_null) {
 					rcode = wsrep_append_key(
-						thd, trx, table_share, table, 
+						thd, trx, table_share, table,
 						keyval0, len+1, shared);
 					if (rcode) DBUG_RETURN(rcode);
 
@@ -10781,18 +10796,18 @@ ha_innobase::wsrep_append_keys(
 				}
 				else
 				{
-					WSREP_DEBUG("NULL key skipped: %s", 
+					WSREP_DEBUG("NULL key skipped: %s",
 						    wsrep_thd_query(thd));
 				}
 				if (record1) {
 					len = wsrep_store_key_val_for_row(
-						thd, table, i, key1, 
+						thd, table, i, key1,
 						WSREP_MAX_SUPPORTED_KEY_LENGTH,
 						record1, &is_null, prebuilt);
 					if (!is_null && memcmp(key0, key1, len)) {
 						rcode = wsrep_append_key(
-							thd, trx, table_share, 
-							table, 
+							thd, trx, table_share,
+							table,
 							keyval1, len+1, shared);
 						if (rcode) DBUG_RETURN(rcode);
 					}
@@ -10807,8 +10822,8 @@ ha_innobase::wsrep_append_keys(
 		int rcode;
 
 		wsrep_calc_row_hash(digest, record0, table, prebuilt, thd);
-		if ((rcode = wsrep_append_key(thd, trx, table_share, table, 
-					      (const char*) digest, 16, 
+		if ((rcode = wsrep_append_key(thd, trx, table_share, table,
+					      (const char*) digest, 16,
 					      shared))) {
 			DBUG_RETURN(rcode);
 		}
@@ -10816,9 +10831,9 @@ ha_innobase::wsrep_append_keys(
 		if (record1) {
 			wsrep_calc_row_hash(
 				digest, record1, table, prebuilt, thd);
-			if ((rcode = wsrep_append_key(thd, trx, table_share, 
+			if ((rcode = wsrep_append_key(thd, trx, table_share,
 						      table,
-						      (const char*) digest, 
+						      (const char*) digest,
 						      16, shared))) {
 				DBUG_RETURN(rcode);
 			}
@@ -11513,7 +11528,8 @@ create_options_are_invalid(
 	case ROW_TYPE_DYNAMIC:
 		CHECK_ERROR_ROW_TYPE_NEEDS_FILE_PER_TABLE(use_tablespace);
 		CHECK_ERROR_ROW_TYPE_NEEDS_GT_ANTELOPE;
-		/* fall through since dynamic also shuns KBS */
+		// fallthrough
+		// since dynamic also shuns KBS
 	case ROW_TYPE_COMPACT:
 	case ROW_TYPE_REDUNDANT:
 		if (kbs_specified) {
@@ -11901,7 +11917,8 @@ index_bad:
 			break;
 		}
 		zip_allowed = FALSE;
-		/* fall through to set row_format = COMPACT */
+		// fallthrough
+		// to set row_format = COMPACT
 	case ROW_TYPE_NOT_USED:
 	case ROW_TYPE_FIXED:
 	case ROW_TYPE_PAGE:
@@ -11910,9 +11927,11 @@ index_bad:
 			thd, Sql_condition::WARN_LEVEL_WARN,
 			ER_ILLEGAL_HA_CREATE_OPTION,
 			"InnoDB: assuming ROW_FORMAT=COMPACT.");
+		// fallthrough
 	case ROW_TYPE_DEFAULT:
 		/* If we fell through, set row format to Compact. */
 		row_format = ROW_TYPE_COMPACT;
+		// fallthrough
 	case ROW_TYPE_COMPACT:
 		break;
 	}
@@ -18788,7 +18807,7 @@ buffer_pool_load_now(
 	const void*			save)	/*!< in: immediate result from
 						check function */
 {
-	if (*(my_bool*) save) {
+	if (*(my_bool*) save && !srv_read_only_mode) {
 		buf_load_start();
 	}
 }
@@ -19125,11 +19144,11 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		break;
 	}
 	wsrep_thd_UNLOCK(thd);
-     
+
 	DBUG_RETURN(0);
 }
-static int 
-wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd, 
+static int
+wsrep_abort_transaction(handlerton* hton, THD *bf_thd, THD *victim_thd,
 			my_bool signal)
 {
 	DBUG_ENTER("wsrep_innobase_abort_thd");
@@ -19186,7 +19205,6 @@ static int innobase_wsrep_get_checkpoint(handlerton* hton, XID* xid)
 
 static void
 wsrep_fake_trx_id(
-/*==================*/
 	handlerton	*hton,
 	THD		*thd)	/*!< in: user thread handle */
 {
@@ -20241,6 +20259,13 @@ static MYSQL_SYSVAR_BOOL(print_all_deadlocks, srv_print_all_deadlocks,
   "Print all deadlocks to MySQL error log (off by default)",
   NULL, NULL, FALSE);
 
+static MYSQL_SYSVAR_BOOL(
+  print_lock_wait_timeout_info,
+  srv_print_lock_wait_timeout_info,
+  PLUGIN_VAR_OPCMDARG,
+  "Print lock wait timeout info to MySQL error log (off by default)",
+  NULL, NULL, FALSE);
+
 static MYSQL_SYSVAR_ULONG(compression_failure_threshold_pct,
   zip_failure_threshold_pct, PLUGIN_VAR_OPCMDARG,
   "If the compression failure rate of a table is greater than this number"
@@ -20509,6 +20534,7 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(foreground_preflush),
   MYSQL_SYSVAR(empty_free_list_algorithm),
   MYSQL_SYSVAR(print_all_deadlocks),
+  MYSQL_SYSVAR(print_lock_wait_timeout_info),
   MYSQL_SYSVAR(cmp_per_index_enabled),
   MYSQL_SYSVAR(undo_logs),
   MYSQL_SYSVAR(rollback_segments),

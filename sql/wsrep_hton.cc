@@ -73,6 +73,15 @@ handlerton *wsrep_hton;
 */
 void wsrep_register_hton(THD* thd, bool all)
 {
+  /* Skip wsrep-hton handler registration.
+  This happens in case like following:
+  - DDL is executed with sql_log_bin = 0 where-in ddl replication is skipped
+    so the exec_mode != TOTAL_ORDER but as thumb rule hton should get registered
+    for DDL/TOI statement.
+  */
+  if (WSREP(thd) && thd->wsrep_skip_wsrep_hton)
+    return;
+
   if (WSREP(thd) && thd->wsrep_exec_mode != TOTAL_ORDER && !thd->wsrep_apply_toi)
   {
     if (thd->wsrep_exec_mode == LOCAL_STATE      &&
@@ -321,9 +330,7 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   }
 
   DBUG_ENTER("wsrep_run_wsrep_commit");
-#ifdef WITH_WSREP
   DEBUG_SYNC(thd, "wsrep_before_replication");
-#endif /* WITH_WSREP */
 
   if (thd->slave_thread && !opt_log_slave_updates) DBUG_RETURN(WSREP_TRX_OK);
 
@@ -510,6 +517,9 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
   }
 
   mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+  DEBUG_SYNC(thd, "wsrep_after_replication");
+
   switch(rcode) {
   case 0:
     /*

@@ -3010,7 +3010,7 @@ bool change_password(THD *thd, const char *host, const char *user,
 
   mysql_mutex_assert_owner(&acl_cache->lock);
   table->use_all_columns();
-  DBUG_ASSERT(host != '\0');
+  DBUG_ASSERT(host != NULL);
   table->field[MYSQL_USER_FIELD_HOST]->store(host, strlen(host),
                                              system_charset_info);
   table->field[MYSQL_USER_FIELD_USER]->store(user, strlen(user),
@@ -3460,7 +3460,7 @@ update_user_table(THD *thd, TABLE *table,
   if (!is_user_table_positioned)
   {
     table->use_all_columns();
-    DBUG_ASSERT(host != '\0');
+    DBUG_ASSERT(host != NULL);
     table->field[MYSQL_USER_FIELD_HOST]->store(host, (uint) strlen(host),
 					       system_charset_info);
     table->field[MYSQL_USER_FIELD_USER]->store(user, (uint) strlen(user),
@@ -3609,7 +3609,7 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
   }
 
   table->use_all_columns();
-  DBUG_ASSERT(combo->host.str != '\0');
+  DBUG_ASSERT(combo->host.str != NULL);
   table->field[MYSQL_USER_FIELD_HOST]->store(combo->host.str,combo->host.length,
                                              system_charset_info);
   table->field[MYSQL_USER_FIELD_USER]->store(combo->user.str,combo->user.length,
@@ -3700,7 +3700,7 @@ static int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
 
     old_row_exists = 0;
     restore_record(table,s->default_values);
-    DBUG_ASSERT(combo->host.str != '\0');
+    DBUG_ASSERT(combo->host.str != NULL);
     table->field[MYSQL_USER_FIELD_HOST]->store(combo->host.str,combo->host.length,
                                                system_charset_info);
     table->field[MYSQL_USER_FIELD_USER]->store(combo->user.str,combo->user.length,
@@ -11670,6 +11670,10 @@ static int server_mpvio_write_packet(MYSQL_PLUGIN_VIO *param,
   It transparently extracts the client plugin data, if embedded into
   a client authentication handshake packet, and handles plugin negotiation
   with the client, if necessary.
+
+  RETURN
+    -1          Protocol failure
+    >= 0        Success and also the packet length
 */
 static int server_mpvio_read_packet(MYSQL_PLUGIN_VIO *param, uchar **buf)
 {
@@ -12640,7 +12644,13 @@ private:
         filesize= ftell(key_file);
         fseek(key_file, 0, SEEK_SET);
         *key_text_buffer= new char[filesize+1];
-        (void) fread(*key_text_buffer, filesize, 1, key_file);
+        const size_t read_size = fread(*key_text_buffer, filesize, 1, key_file);
+        if (read_size != 1)
+        {
+          delete[] key_text_buffer;
+          key_text_buffer= NULL;
+          return true;
+        }
         (*key_text_buffer)[filesize]= '\0';
       }
       fclose(key_file);
@@ -12891,8 +12901,12 @@ http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Proto
   /*
     If first packet is a 0 byte then the client isn't sending any password
     else the client will send a password.
+
+    The original intention was that the password is a string[NUL] but this
+    never got enforced properly so now we have to accept that an empty packet
+    is a blank password, thus the check for pkt_len == 0 has to be made too.
   */
-  if (pkt_len == 1 && *pkt == 0)
+  if ((pkt_len == 0 || pkt_len == 1) && *pkt == 0)
   {
     info->password_used= PASSWORD_USED_NO;
     /*
