@@ -22310,10 +22310,11 @@ wsrep_innobase_kill_one_trx(void * const bf_thd_ptr,
 		} else {
 			WSREP_DEBUG("Abort transaction in pre-commit state"
                                     " bearing trx-id: %lu, next-trx-id: %lu"
-                                    " query-id: %lld",
+                                    " query-id: %lld (seqno: %lld)",
                               (long unsigned int) wsrep_thd_trx_id(thd),
                               (long unsigned int) wsrep_thd_next_trx_id(thd),
-                              wsrep_thd_query_id(thd));
+                              wsrep_thd_query_id(thd),
+                              (long long)wsrep_thd_trx_seqno(thd));
 			rcode = wsrep->abort_pre_commit(
 				wsrep, bf_seqno,
 				(wsrep_trx_id_t)wsrep_thd_trx_id(thd)
