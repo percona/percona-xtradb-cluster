@@ -381,6 +381,23 @@ static void wsrep_replication_process(THD *thd)
   DBUG_VOID_RETURN;
 }
 
+static bool create_wsrep_THD(wsrep_thd_processor_fun processor)
+{
+  my_thread_handle hThread;
+  bool res= mysql_thread_create(
+                            key_thread_handle_wsrep, 
+                            &hThread, &connection_attrib,
+                            start_wsrep_THD, (void*)processor);
+#ifdef WITH_WSREP_OUT
+  /*
+    MariaDB bug https://jira.mariadb.org/browse/MDEV-8208 has not been observed
+    in this server version. However, if it surfaces, the server startup must be 
+    should be delayed here until wsrep_running_threads count ascends
+  */
+#endif /* WITH_WSREP_OUT */
+  return res;
+}
+
 void wsrep_create_appliers(long threads)
 {
   if (!wsrep_connected)
@@ -397,13 +414,8 @@ void wsrep_create_appliers(long threads)
   }
 
   long wsrep_threads=0;
-  //  pthread_t hThread;
-  my_thread_handle hThread;
   while (wsrep_threads++ < threads) {
-    if (mysql_thread_create(
-                            key_thread_handle_wsrep, 
-                            &hThread, &connection_attrib,
-                            start_wsrep_THD, (void*)wsrep_replication_process))
+    if (create_wsrep_THD(wsrep_replication_process))
       WSREP_WARN("Can't create thread to manage wsrep replication");
   }
 }
@@ -498,11 +510,8 @@ void wsrep_create_rollbacker()
 {
   if (wsrep_provider && strcasecmp(wsrep_provider, "none"))
   {
-    //pthread_t hThread;
-    my_thread_handle hThread;
     /* create rollbacker */
-    if (mysql_thread_create( key_thread_handle_wsrep, &hThread, &connection_attrib,
-                             start_wsrep_THD, (void*)wsrep_rollback_process))
+    if (create_wsrep_THD(wsrep_rollback_process))
       WSREP_WARN("Can't create thread to manage wsrep rollback");
   }
 }

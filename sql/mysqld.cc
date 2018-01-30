@@ -721,7 +721,9 @@ mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 int wsrep_replaying= 0;
+ulong wsrep_running_threads = 0; // # of currently running wsrep threads
 static void wsrep_close_threads(THD* thd);
+int mysqld_server_initialized= 0;
 #endif /* WITH_WSREP */
 
 bool mysqld_server_started= false;
@@ -2431,7 +2433,11 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
         mysql_mutex_unlock(&LOCK_socket_listener_active);
 
 #ifdef WITH_WSREP
-        if (WSREP_ON) wsrep_stop_replication(NULL);
+        /* Stop wsrep threads in case they are running. */
+        if (wsrep_running_threads > 0)
+        {
+          wsrep_stop_replication(NULL);
+        }
 #endif
         close_connections();
 #ifdef WITH_WSREP
@@ -4210,6 +4216,9 @@ will be ignored as the --log-bin option is not defined.");
       - SST may modify binlog index file, so it must be opened
         after SST has happened
      */
+  /* It's now safe to use thread specific memory */
+  mysqld_server_initialized= 1;
+  
   if (!wsrep_recovery)
   {
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
@@ -6660,6 +6669,7 @@ extern "C" void *start_wsrep_THD(void *arg)
   /* Set applier thread InnoDB priority */
   //set_thd_tx_priority(thd, rli->get_thd_tx_priority());
 
+  /* wsrep_running_threads counter is managed in thd_manager */
   thd_manager->add_thd(thd);
   thd_added= true;
 
