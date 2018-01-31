@@ -25,5 +25,5 @@ usr/share/mysql/docs/INFO_BIN
 usr/share/mysql/charsets/*.xml
 usr/share/mysql/charsets/README
 # legal
-usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/@DEB_INSTALL_LICENSEFILE@
-usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/README
+usr/share/mysql/@DEB_INSTALL_LICENSEFILE@ usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/
+usr/share/mysql/README usr/share/doc/mysql-@DEB_PRODUCTNAME@-common@DEB_PRODUCTSERIES@/
