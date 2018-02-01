@@ -175,13 +175,15 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
     {
       if (thd->wsrep_gtid_event_buf_len < (allocated - used))
       {
-        memcpy(buf, thd->wsrep_gtid_event_buf, thd->wsrep_gtid_event_buf_len);
+        memcpy(buf + used,
+               thd->wsrep_gtid_event_buf,
+               thd->wsrep_gtid_event_buf_len);
       }
       else
       {
+        size_t const new_size(heap_size(thd->wsrep_gtid_event_buf_len + used));
         uchar* tmp = (uchar *)my_realloc(key_memory_wsrep, heap_buf,
-                                         thd->wsrep_gtid_event_buf_len + used,
-                                         MYF(0));
+                                         new_size, MYF(0));
         if (!tmp)
         {
           WSREP_ERROR("Failed to allocate/reallocate buffer to hold GTID event"
@@ -190,16 +192,18 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
           err = WSREP_TRX_SIZE_EXCEEDED;
           goto cleanup;
         }
-        heap_buf = tmp;
+
         /* Copy over existing buffer content. */
+        heap_buf = tmp;
         memcpy(heap_buf, buf, used);
-
         buf = heap_buf;
-        buf += used;
-        allocated = thd->wsrep_gtid_event_buf_len + used;
+        allocated = new_size;
 
-        memcpy(buf, thd->wsrep_gtid_event_buf, thd->wsrep_gtid_event_buf_len);
+        memcpy(buf + used,
+               thd->wsrep_gtid_event_buf,
+               thd->wsrep_gtid_event_buf_len);
       }
+
       total_length += thd->wsrep_gtid_event_buf_len;
       used = total_length;
     }
@@ -215,10 +219,9 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
 
       assert(Gtid_log_event::MAX_EVENT_LENGTH < STACK_SIZE);
 
-      memcpy(buf, gtid_buf, gtid_len);
+      memcpy(buf + used, gtid_buf, gtid_len);
       used += gtid_len;
       total_length += gtid_len;
-      buf += gtid_len;
     }
 
     if (unlikely(0 == length)) length = my_b_fill(cache);
@@ -259,10 +262,7 @@ static int wsrep_write_cache_once(wsrep_t*  const wsrep,
             allocated = new_size;
 
             if (used <= STACK_SIZE && used > 0) // there's data in stack_buf
-            {
-                DBUG_ASSERT(buf == stack_buf);
                 memcpy(heap_buf, stack_buf, used);
-            }
         }
 
         memcpy(buf + used, cache->read_pos, length);
