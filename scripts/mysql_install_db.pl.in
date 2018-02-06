@@ -905,7 +905,7 @@ if ( open(PIPE, "| $mysqld_install_cmd_line") )
              "  cd mysql-test ; perl mysql-test-run.pl");
     }
     report($opt,
-           "Please report any problems with Percona XtraDB Cluster 5.6 at https://bugs.launchpad.net/percona-xtradb-cluster/+filebug",
+           "Please report any problems with Percona XtraDB Cluster 5.6 at https://jira.percona.com/projects/PXC/issues",
            "",
            "The latest information about Percona XtraDB Cluster 5.6 is available on the web at",
            "",
@@ -973,7 +973,7 @@ else
         "Another information source is the MySQL email archive.",
         "",
         "Please check all of the above before submitting a bug report at",
-        "  https://bugs.launchpad.net/percona-xtradb-cluster/+filebug")
+        "  https://jira.percona.com/projects/PXC/issues")
 }
 
 ##############################################################################
