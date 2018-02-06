@@ -112,7 +112,7 @@ extern "C" void handle_fatal_signal(int sig)
     "As this is a crash and something is definitely wrong, the information\n"
     "collection process might fail.\n"
     "Please help us make Percona XtraDB Cluster better by reporting any\n"
-    "bugs at https://bugs.launchpad.net/percona-xtradb-cluster\n\n");
+    "bugs at https://jira.percona.com/projects/PXC/issues\n\n");
 
   my_safe_printf_stderr("key_buffer_size=%lu\n",
                         (ulong) dflt_key_cache->key_cache_mem_size);
