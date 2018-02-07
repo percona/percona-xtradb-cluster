@@ -3350,6 +3350,12 @@ sub have_wsrep() {
   return defined $wsrep_on
 }
 
+sub wsrep_is_bootstrap_server($) {
+  my $mysqld= shift;
+  return $mysqld->if_exist('wsrep_cluster_address') &&
+    ($mysqld->value('wsrep_cluster_address') eq "gcomm://" ||
+     $mysqld->value('wsrep_cluster_address') eq "'gcomm://'");
+}
 
 sub check_wsrep_support() {
   if (have_wsrep())
@@ -5871,6 +5877,17 @@ sub start_servers($) {
       sleep_until_file_created("$datadir/auto.cnf", $opt_start_timeout,
                                $mysqld->{'proc'});
 
+      # If wsrep is on, we need to wait until the first
+      # server starts and bootstraps the cluster before
+      # starting other servers.
+      if (have_wsrep() && wsrep_is_bootstrap_server($mysqld))
+      {
+        mtr_verbose("Wsrep: waiting for first server to bootstrap cluster");
+        if (!wait_wsrep_ready($tinfo, $mysqld))
+        {
+          return 1;
+        }
+      }
     }
 
   }
