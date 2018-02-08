@@ -5880,7 +5880,7 @@ sub start_servers($) {
       # starting other servers.
       if (have_wsrep() && wsrep_is_bootstrap_server($mysqld))
       {
-        mtr_verbose("Wsrep: waiting for first server to bootstrap cluster");
+        mtr_verbose("WSREP waiting for first server to bootstrap cluster");
         if (!wait_wsrep_ready($tinfo, $mysqld))
         {
           return 1;
