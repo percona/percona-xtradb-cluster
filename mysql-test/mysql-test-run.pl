@@ -4220,16 +4220,14 @@ sub wait_wsrep_ready($$) {
 
   for (my $loop= 1; $loop <= $loops; $loop++)
   {
-    if (run_query_output($mysqld, $query, $outfile) != 0)
-    {
-      $tinfo->{logfile}= "WSREP error while trying to determine node state";
-      return 0;
-    }
 
-    if (mtr_grab_file($outfile) =~ /^ON/)
+    if (run_query_output($mysqld, $query, $outfile) == 0)
     {
-      unlink($outfile);
-      return 1;
+      if (mtr_grab_file($outfile) =~ /^ON/)
+      {
+        unlink($outfile);
+        return 1;
+      }
     }
 
     mtr_milli_sleep($sleeptime);
@@ -6542,7 +6540,7 @@ sub start_servers($) {
       # starting other servers.
       if (have_wsrep() && wsrep_is_bootstrap_server($mysqld))
       {
-        mtr_verbose("Wsrep: waiting for first server to bootstrap cluster");
+        mtr_verbose("WSREP waiting for first server to bootstrap cluster");
         if (!wait_wsrep_ready($tinfo, $mysqld))
         {
           return 1;
