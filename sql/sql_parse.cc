@@ -4854,10 +4854,7 @@ end_with_restore_list:
         check_global_access(thd,CREATE_USER_ACL))
       break;
 
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
+    /* WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL) called in mysql_create_user */
     /* Conditionally writes to binlog */
     HA_CREATE_INFO create_info(lex->create_info);
     if (!(res = mysql_create_user(thd, lex->users_list, create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS)))
@@ -4869,12 +4866,9 @@ end_with_restore_list:
     if (check_access(thd, DELETE_ACL, "mysql", NULL, NULL, 1, 1) &&
         check_global_access(thd,CREATE_USER_ACL))
       break;
-
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
+ 
     /* Conditionally writes to binlog */
+    /* WSREP_TO_ISOLATION_BEGIN() called in mysql_drop_user */
     if (!(res = mysql_drop_user(thd, lex->users_list, lex->drop_if_exists)))
       my_ok(thd);
     break;
@@ -4885,11 +4879,8 @@ end_with_restore_list:
         check_global_access(thd,CREATE_USER_ACL))
       break;
 
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
     /* Conditionally writes to binlog */
+    /* WSREP_TO_ISOLATION_BEGIN() called in mysql_rename_user */
     if (!(res= mysql_rename_user(thd, lex->users_list)))
       my_ok(thd);
     break;
@@ -4903,11 +4894,8 @@ end_with_restore_list:
     /* Replicate current user as grantor */
     thd->binlog_invoker();
 
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
     /* Conditionally writes to binlog */
+    /* WSREP_TO_ISOLATION_BEGIN() called in mysql_revoke_all */
     if (!(res = mysql_revoke_all(thd, lex->users_list)))
       my_ok(thd);
     break;
@@ -4974,11 +4962,8 @@ end_with_restore_list:
                                 lex->type == TYPE_ENUM_PROCEDURE, 0))
 	  goto error;
 
-#ifdef WITH_WSREP
-          WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
         /* Conditionally writes to binlog */
+        /* WSREP_TO_ISOLATION_BEGIN() called in mysql_routine_grant */
         res= mysql_routine_grant(thd, all_tables,
                                  lex->type == TYPE_ENUM_PROCEDURE, 
                                  lex->users_list, grants,
@@ -4992,9 +4977,7 @@ end_with_restore_list:
                         all_tables, FALSE, UINT_MAX, FALSE))
 	  goto error;
         /* Conditionally writes to binlog */
-#ifdef WITH_WSREP
-        WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
+        /* WSREP_TO_ISOLATION_BEGIN() called in mysql_table_grant */
         res= mysql_table_grant(thd, all_tables, lex->users_list,
 			       lex->columns, lex->grant,
 			       lex->sql_command == SQLCOM_REVOKE);
@@ -5010,9 +4993,7 @@ end_with_restore_list:
       }
       else
       {
-#ifdef WITH_WSREP
-        WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
+        /* WSREP_TO_ISOLATION_BEGIN() called in mysql_grant */
         /* Conditionally writes to binlog */
         res = mysql_grant(thd, select_lex->db, lex->users_list, lex->grant,
                           lex->sql_command == SQLCOM_REVOKE,
@@ -6046,10 +6027,7 @@ end_with_restore_list:
       goto error;
     }
 
-#ifdef WITH_WSREP
-    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
-#endif /* WITH_WSREP */
-
+    /* WSREP_TO_ISOLATION_BEGIN() called inside mysql_alter_user */
     /* Conditionally writes to binlog */
     if (!(res = mysql_alter_user(thd, lex->users_list, lex->drop_if_exists)))
       my_ok(thd);
