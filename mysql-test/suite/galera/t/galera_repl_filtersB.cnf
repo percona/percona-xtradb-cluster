@@ -1,0 +1,11 @@
+!include ../galera_2nodes_as_slave.cnf
+
+[mysqld]
+replicate-wild-do-table=db.%
+
+[mysqld.2]
+replicate-wild-do-table=db1.%
+
+[mysqld.3]
+replicate-wild-do-table=db1.%
+
