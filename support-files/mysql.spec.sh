@@ -1215,6 +1215,7 @@ echo "====="                                     >> $STATUS_HISTORY
 %endif
 %attr(-, root, root) %{_datadir}/mysql-test
 %attr(755, root, root) %{_bindir}/mysql_client_test
+<<<<<<< HEAD
 %attr(755, root, root) %{_bindir}/mysql_client_test_embedded
 %attr(755, root, root) %{_bindir}/mysqltest_embedded
 
@@ -1227,6 +1228,8 @@ echo "====="                                     >> $STATUS_HISTORY
 %attr(755, root, root) %{_bindir}/mysql_embedded
 %attr(644, root, root) %{_libdir}/mysql/libmysqld.a
 %attr(644, root, root) %{_libdir}/mysql/libmysqld-debug.a
+=======
+>>>>>>> tag-wsrep_5.6.39-25.22
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file
@@ -1236,6 +1239,42 @@ echo "====="                                     >> $STATUS_HISTORY
 %changelog
 * Tue Oct 31 2017 Bjorn Munch <bjorn.munch@oracle.com>
 - Remove obsoleted mysqltest man pages
+<<<<<<< HEAD
+=======
+
+* Fri Jun 10 2016 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Add missing "obsoletes" directives to handle Oracle's yum repository.
+- Fix comment about SO version of libmysqlclient.so.
+- Modify some changelog dates to match Oracle's (reduce differences).
+
+* Fri Oct 30 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Combine "plugins.files" and "datadir.files" into one, it seems rpmbuild 4.4
+  (used on SLES 11) cannot handle two "-f" directives for one "%%files" section.
+  This solves issue Github-223.
+- Introduce a macro "previous_suffix" and set it to "-5.5", so that installing a
+  "mysql-wsrep-*-5.6" package will "obsolete" the corresponding "mysql-wsrep-*-5.5"
+  package. This solves issue Github-224.
+- Fix dependency: There is no "libopenssl1-devel", just "libopenssl-devel".
+
+* Tue Oct 27 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Add the spec file changes coded in mysql-wsrep 5.5 to create "libs-compat",
+  visible and documented (Sep 11 - 17) in the 5.5 spec file.
+
+* Thu Jan 29 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Add a meta-package "mysql-wsrep" that requires both "server" and "client".
+- Fix the fall-back definition of "dist", it must start with a period.
+
+* Mon Jan 26 2015 Joerg Bruehe <joerg.bruehe@fromdual.com>
+- Allow "rpmlint", but suppress "post-build-checks" (fail on SuSE 12 + 13).
+- Improve handling of undefined "%%{dist}".
+- Fix wrong changelog dates, to get rid of warnings about "bogus date".
+- Escape percent signs in changelog, to get rid of "rpmlint" warnings.
+
+* Tue Jan 20 2015 Teemu Ollakka <teemu.ollakka@galeracluster.com>
+
+- Reworked to build wsrep patched packages exclusively
+- OBS compatible
+>>>>>>> tag-wsrep_5.6.39-25.22
 
 * Mon Oct 06 2014 Balasubramanian Kandasamy <balasubramanian.kandasamy@oracle.com>
 - Add license info in each subpackage

@@ -308,6 +308,9 @@ extern struct my_option my_long_early_options[];
 int handle_early_options();
 void adjust_related_options(ulong *requested_open_files);
 extern int mysqld_server_started;
+#ifdef WITH_WSREP
+extern int mysqld_server_initialized;
+#endif /* WITH_WSREP */
 extern "C" MYSQL_PLUGIN_IMPORT int orig_argc;
 extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;
 extern pthread_attr_t connection_attrib;
@@ -856,6 +859,7 @@ extern const char *MY_BIND_ALL_ADDRESSES;
 
 #ifdef WITH_WSREP
 #include "my_pthread.h"
+typedef void (*wsrep_thd_processor_fun)(THD *);
 pthread_handler_t start_wsrep_THD(void*);
 #endif /* WITH_WSREP */
 
