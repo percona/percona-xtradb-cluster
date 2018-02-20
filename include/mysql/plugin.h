@@ -57,7 +57,13 @@ typedef void * MYSQL_PLUGIN;
 
 #ifndef MYSQL_ABI_CHECK
 #include <mysql/services.h>
-#endif
+#ifndef __WIN__
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS    /* Enable C99 printf format macros */
+#endif /* !__STDC_FORMAT_MACROS */
+#include <inttypes.h>
+#endif /* !__WIN__ */
+#endif /* !MYSQL_ABI_CHECK */
 
 #define MYSQL_XIDDATASIZE 128
 /**
@@ -777,6 +783,14 @@ void thd_set_ha_data(MYSQL_THD thd, const struct handlerton *hton,
 int thd_command(const MYSQL_THD thd);
 long long thd_start_time(const MYSQL_THD thd);
 void thd_kill(unsigned long id);
+
+/**
+  Check whether ft_query_extra_word_chars server variable is enabled for the
+  current session
+
+  @return ft_query_extra_word_chars value
+*/
+int thd_get_ft_query_extra_word_chars(void);
 
 #ifdef __cplusplus
 }

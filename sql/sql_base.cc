@@ -2071,6 +2071,7 @@ bool close_temporary_tables(THD *thd)
     else
     {
       next= table->next;
+      mysql_lock_remove(thd, thd->lock, table);
       close_temporary(table, 1, 1);
       slave_closed_temp_tables++;
     }

@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <mysql/plugin_keyring.h>
+#include <boost/scope_exit.hpp>
 #include "vault_keys_container.h"
 #include "mock_logger.h"
 #include "vault_io.h"
@@ -11,6 +12,8 @@
 #include "generate_credential_file.h"
 #include "test_utils.h"
 #include "vault_mount.h"
+
+boost::movelib::unique_ptr<keyring::IKeys_container> keys(NULL);
 
 #ifdef HAVE_PSI_INTERFACE
 namespace keyring
@@ -33,7 +36,6 @@ namespace keyring__vault_keys_container_unittest
   using ::testing::WithArgs;
   using ::testing::Invoke;
 
-  CURL *curl = NULL;
   static std::string uuid = generate_uuid();
   static std::string credential_file_url = "./keyring_vault.conf";
   ILogger *logger;
@@ -50,7 +52,7 @@ namespace keyring__vault_keys_container_unittest
       sample_key = new Vault_key((uuid+"Roberts_key").c_str(), "AES", "Robert", sample_key_data.c_str(), sample_key_data.length());
 
       vault_keys_container = new Vault_keys_container(logger);
-      vault_curl = new Vault_curl(logger, curl);
+      vault_curl = new Vault_curl(logger, 0);
       vault_parser = new Vault_parser(logger);
     }
     virtual void TearDown()
@@ -101,9 +103,8 @@ namespace keyring__vault_keys_container_unittest
     myfile.close();
 
     IKeyring_io *vault_io = new Vault_io(logger, vault_curl, vault_parser);
-
     EXPECT_CALL(*(reinterpret_cast<Mock_logger*>(logger)),
-      log(MY_ERROR_LEVEL, StrEq("Could not read secret_mount_point from the configuration file.")));
+      log(MY_ERROR_LEVEL, StrEq("Empty file with credentials.")));
     EXPECT_TRUE(vault_keys_container->init(vault_io, "empty_credential.conf"));
     delete sample_key; // unused in this test
 
@@ -310,6 +311,7 @@ namespace keyring__vault_keys_container_unittest
     MOCK_METHOD0(get_serializer, ISerializer*());
     MOCK_METHOD1(get_serialized_object, my_bool(ISerialized_object **serialized_object));
     MOCK_METHOD0(has_next_serialized_object, my_bool());
+    MOCK_METHOD1(set_curl_timeout, void(uint timeout));
   };
 
   class Mock_serialized_object : public ISerialized_object
@@ -788,14 +790,21 @@ int main(int argc, char **argv)
 
   //create unique secret mount point for this test suite
   curl_global_init(CURL_GLOBAL_DEFAULT);
-  keyring__vault_keys_container_unittest::curl = curl_easy_init();
-  if (keyring__vault_keys_container_unittest::curl == NULL)
+  CURL *curl = curl_easy_init();
+  if (curl == NULL)
   {
     std::cout << "Could not initialize CURL session" << std::endl;
+    curl_global_cleanup();
     return 1; 
   }
+  BOOST_SCOPE_EXIT(&curl)
+  {
+    curl_easy_cleanup(curl);
+    curl_global_cleanup();
+  } BOOST_SCOPE_EXIT_END
+
   keyring__vault_keys_container_unittest::logger = new keyring::Mock_logger();
-  keyring::Vault_mount vault_mount(keyring__vault_keys_container_unittest::curl, keyring__vault_keys_container_unittest::logger);
+  keyring::Vault_mount vault_mount(curl, keyring__vault_keys_container_unittest::logger);
 
   if (generate_credential_file(keyring__vault_keys_container_unittest::credential_file_url, CORRECT, keyring__vault_keys_container_unittest::uuid))
   {
@@ -820,8 +829,6 @@ int main(int argc, char **argv)
   {
     std::cout << "Could not unmount secret backend" << std::endl;
   }
-  curl_easy_cleanup(keyring__vault_keys_container_unittest::curl);
-  curl_global_cleanup();
   delete keyring__vault_keys_container_unittest::logger;
 
   my_testing::teardown_server_for_unit_tests();

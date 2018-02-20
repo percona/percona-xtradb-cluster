@@ -1190,6 +1190,13 @@ g   codership/mysql-wsrep/issues#176
    fun:clone
 }
 
+{
+   lzma encoder prepare bug
+   Memcheck:Cond
+   fun:lz_encoder_prepare
+   fun:lzma_lz_encoder_init
+}
+
 #supress warnings from openssl random generator
 
 {

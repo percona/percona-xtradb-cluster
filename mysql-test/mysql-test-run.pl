@@ -169,7 +169,8 @@ our $opt_vs_config = $ENV{'MTR_VS_CONFIG'};
 
 # If you add a new suite, please check TEST_DIRS in Makefile.am.
 #
-my $DEFAULT_SUITES= "main,sys_vars,binlog,federated,gis,rpl,innodb,innodb_gis,"
+my $DEFAULT_SUITES= "main,sys_vars,binlog,binlog_encryption,rpl_encryption,"
+  ."federated,gis,rpl,innodb,innodb_gis,"
   ."innodb_fts,innodb_zip,innodb_undo,innodb_stress,perfschema,funcs_1,"
   ."funcs_2,opt_trace,parts,auth_sec,query_rewrite_plugins,gcol,sysschema,"
   ."test_service_sql_api,jp,stress,engines/iuds,engines/funcs,"
@@ -386,9 +387,9 @@ main();
 sub is_core_dump {
   my $core_path= shift;
   my $core_name= basename($core_path);
-  # Name beginning with core, not ending in .gz, not belonging to Boost,
-  # or ending with .dmp on Windows
-  return (($core_name =~ /^core/ and $core_name !~ /\.gz$/
+  # Name beginning with core, not ending in .gz, .c, nor .log, not belonging to
+  # Boost, or ending with .dmp on Windows
+  return (($core_name =~ /^core/ and $core_name !~ /\.gz$|\.c$|\.log$/
            and $core_path !~ /\/boost_/)
           or (IS_WINDOWS and $core_name =~ /\.dmp$/));
 }

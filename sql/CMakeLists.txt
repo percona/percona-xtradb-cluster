@@ -30,6 +30,7 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_BINARY_DIR}/sql
   ${WSREP_INCLUDES}
   ${LZ4_INCLUDE_DIR}
+  SYSTEM ${BOOST_INCLUDE_DIR}
 )
 
 SET(CONF_SOURCES
@@ -123,7 +124,9 @@ SET(SQL_SHARED_SOURCES
   lock.cc
   locking_service.cc
   log.cc
+  event_crypt.cc
   mdl.cc
+  migrate_keyring.cc
   my_decimal.cc
   net_serv.cc
   opt_costconstantcache.cc
@@ -252,6 +255,7 @@ SET(SQL_SHARED_SOURCES
   uniques.cc
   unireg.cc
   xa.cc
+  binlog_crypt_data.cc
 )
 
 IF(WIN32)
@@ -289,6 +293,7 @@ SET(SQL_SOURCE
   ../libmysql/errmsg.c
   ../sql-common/client.c
   ../sql-common/client_plugin.c
+  ../sql-common/get_password.c
   ../sql-common/my_time.c
   ../sql-common/my_user.c 
   ../sql-common/pack.c
@@ -375,6 +380,14 @@ IF(HAVE_NO_UNUSED_TYPEDEFS)
   )
 ENDIF()
 
+# Segfault in boost::geometry code at high optimization levels
+IF(CMAKE_CXX_COMPILER_ID MATCHES "SunPro")
+  STRING(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKEBT)
+  IF(CMAKEBT MATCHES "^REL")
+    ADD_COMPILE_FLAGS(item_geofunc_buffer.cc COMPILE_FLAGS "-xO2")
+  ENDIF()
+ENDIF()
+
 # Boost source has misleading indentation
 MY_CHECK_CXX_COMPILER_FLAG("-Wmisleading-indentation"
                            HAVE_MISLEADING_INDENTATION)
@@ -433,7 +446,8 @@ SET (BINLOG_SOURCE rpl_gtid_misc.cc
                    rpl_gtid_mutex_cond_array.cc rpl_gtid_persist.cc
                    log_event.cc log_event_old.cc binlog.cc sql_binlog.cc
                    rpl_filter.cc rpl_record.cc rpl_record_old.cc
-                   rpl_utility.cc rpl_injector.cc rpl_table_access.cc)
+                   rpl_utility.cc rpl_injector.cc rpl_table_access.cc event_crypt.cc
+                   binlog_crypt_data.cc)
 ADD_CONVENIENCE_LIBRARY(binlog ${BINLOG_SOURCE})
 TARGET_LINK_LIBRARIES(binlog binlogevents_static)
 
@@ -479,7 +493,8 @@ ELSE()
   SET(MYSQLD_SOURCE main.cc ${DTRACE_PROBES_ALL})
 ENDIF()
 
-MYSQL_ADD_EXECUTABLE(mysqld ${MYSQLD_SOURCE} DESTINATION ${INSTALL_SBINDIR} COMPONENT Server)
+MYSQL_ADD_EXECUTABLE(mysqld
+  ${MYSQLD_SOURCE} DESTINATION ${INSTALL_SBINDIR} COMPONENT Server)
 
 OPTION(DEBUG_EXTNAME "Build server as mysqld-debug (debug builds only)" OFF)
 MARK_AS_ADVANCED(DEBUG_EXTNAME)
@@ -506,28 +521,30 @@ IF(NOT WITHOUT_DYNAMIC_PLUGINS)
     SET_TARGET_PROPERTIES(mysqld PROPERTIES LINK_FLAGS "${mysqld_link_flags} -Wl,--export-all-symbols")
   ENDIF()
   IF(MSVC)
-    # Set module definition file. Also use non-incremental linker, 
-    # incremental appears to crash from time to time,if used with /DEF option
-    SET_TARGET_PROPERTIES(mysqld PROPERTIES LINK_FLAGS "${mysqld_link_flags} /DEF:mysqld.def /INCREMENTAL:NO")
+    # Set module definition file.
+    # Also use non-incremental linker, incremental appears to crash from
+    # time to time,if used with /DEF option
+    SET_TARGET_PROPERTIES(mysqld PROPERTIES LINK_FLAGS
+      "${mysqld_link_flags} /DEF:${CMAKE_CURRENT_BINARY_DIR}/mysqld.def /INCREMENTAL:NO")
 
-    FOREACH (CORELIB sql binlog slave mysys mysys_ssl dbug regex strings
-        vio binlogevents_static)
-      GET_TARGET_PROPERTY(LOC ${CORELIB} LOCATION)
-      IF (NOT LOC)
-        GET_TARGET_PROPERTY(LOC ${CORELIB} IMPORTED_LOCATION)
-      ENDIF()
-
-
-      FILE(TO_NATIVE_PATH ${LOC} LOC)
-      SET (LIB_LOCATIONS ${LIB_LOCATIONS} ${LOC}) 
-    ENDFOREACH (CORELIB ${MYSQLD_CORE_LIBS})
     SET(_PLATFORM x86)
     IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
       SET(_PLATFORM  x64)
     ENDIF()
     ADD_CUSTOM_COMMAND(TARGET mysqld PRE_LINK
       COMMAND echo ${_PLATFORM} && cscript ARGS //nologo ${PROJECT_SOURCE_DIR}/win/create_def_file.js
-                  ${_PLATFORM}  ${LIB_LOCATIONS} > mysqld.def 
+      ${_PLATFORM}
+      "$<TARGET_FILE:binlog>"
+      "$<TARGET_FILE:binlogevents_static>"
+      "$<TARGET_FILE:dbug>"
+      "$<TARGET_FILE:mysys>"
+      "$<TARGET_FILE:mysys_ssl>"
+      "$<TARGET_FILE:regex>"
+      "$<TARGET_FILE:slave>"
+      "$<TARGET_FILE:sql>"
+      "$<TARGET_FILE:strings>"
+      "$<TARGET_FILE:vio>"
+      > mysqld.def
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     ADD_DEPENDENCIES(sql GenError)
   ENDIF()

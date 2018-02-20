@@ -1352,7 +1352,8 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
     }
 
     if (set_and_validate_user_attributes(thd, Str, what_to_set,
-                                         is_privileged_user))
+                                         is_privileged_user,
+                                         revoke_grant?"REVOKE":"GRANT"))
     {
       result= TRUE;
       continue;
@@ -1683,7 +1684,8 @@ bool mysql_routine_grant(THD *thd, TABLE_LIST *table_list, bool is_proc,
     }
 
     if (set_and_validate_user_attributes(thd, Str, what_to_set,
-                                         is_privileged_user))
+                                         is_privileged_user,
+                                         revoke_grant?"REVOKE":"GRANT"))
     {
       result= TRUE;
       continue;
@@ -1958,7 +1960,8 @@ bool mysql_grant(THD *thd, const char *db, List <LEX_USER> &list,
     }
 
     if (set_and_validate_user_attributes(thd, Str, what_to_set,
-                                         is_privileged_user))
+                                         is_privileged_user,
+                                         revoke_grant?"REVOKE":"GRANT"))
     {
       result= TRUE;
       continue;

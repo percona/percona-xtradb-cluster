@@ -18,10 +18,10 @@ namespace keyring
 class Vault_curl : public IVault_curl, private boost::noncopyable
 {
 public:
-  Vault_curl(ILogger *logger, CURL *curl)
+  Vault_curl(ILogger *logger, uint timeout)
     : logger(logger)
-    , curl(curl)
     , list(NULL)
+    , timeout(timeout)
   {}
 
   ~Vault_curl()
@@ -35,10 +35,14 @@ public:
   virtual bool write_key(const Vault_key &key, Secure_string *response);
   virtual bool read_key(const Vault_key &key, Secure_string *response);
   virtual bool delete_key(const Vault_key &key, Secure_string *response);
+  virtual void set_timeout(uint timeout)
+  {
+    this->timeout = timeout; 
+  }
 
 private:
 
-  bool reset_curl_session();
+  bool setup_curl_session(CURL *curl);
   std::string get_error_from_curl(CURLcode curl_code);
   bool encode_key_signature(const Vault_key &key, Secure_string *encoded_key_signature);
   bool get_key_url(const Vault_key &key, Secure_string *key_url);
@@ -46,11 +50,11 @@ private:
   ILogger *logger;
   Secure_string token_header;
   Secure_string vault_url;
-  CURL *curl;
   char curl_errbuf[CURL_ERROR_SIZE]; //error from CURL
   Secure_ostringstream read_data_ss;
   struct curl_slist *list;
   Secure_string vault_ca;
+  uint timeout;
 };
 
 } //namespace keyring

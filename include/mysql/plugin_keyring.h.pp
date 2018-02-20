@@ -129,6 +129,7 @@ void thd_set_ha_data(void* thd, const struct handlerton *hton,
 int thd_command(const void* thd);
 long long thd_start_time(const void* thd);
 void thd_kill(unsigned long id);
+int thd_get_ft_query_extra_word_chars(void);
 struct st_mysql_keyring
 {
   int interface_version;
@@ -139,4 +140,7 @@ struct st_mysql_keyring
   my_bool (*mysql_key_remove)(const char *key_id, const char *user_id);
   my_bool (*mysql_key_generate)(const char *key_id, const char *key_type,
                                 const char *user_id, size_t key_len);
+  void (*mysql_key_iterator_init)(void** key_iterator);
+  void (*mysql_key_iterator_deinit)(void* key_iterator);
+  bool (*mysql_key_iterator_get_key)(void* key_iterator, char *key_id, char *user_id);
 };
