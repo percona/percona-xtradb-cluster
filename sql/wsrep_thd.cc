@@ -351,10 +351,6 @@ static void wsrep_replication_process(THD *thd)
 
   THD_STAGE_INFO(thd, stage_wsrep_applier_idle);
 
-#ifdef HAVE_PSI_INTERFACE
-  wsrep_pfs_register_thread(key_THREAD_wsrep_applier);
-#endif /* HAVE_PSI_INTERFACE */
-
   struct wsrep_thd_shadow shadow;
 
   wsrep_prepare_bf_thd(thd, &shadow);
@@ -420,11 +416,24 @@ static void wsrep_replication_process(THD *thd)
   }
   wsrep_return_from_bf_mode(thd, &shadow);
 
-#ifdef HAVE_PSI_INTERFACE
-  wsrep_pfs_delete_thread();
-#endif /* HAVE_PSI_INTERFACE */
-
   DBUG_VOID_RETURN;
+}
+
+static bool create_wsrep_THD(PSI_thread_key key, wsrep_thd_processor_fun processor)
+{
+  my_thread_handle hThread;
+  bool res= mysql_thread_create(
+                            key, 
+                            &hThread, &connection_attrib,
+                            start_wsrep_THD, (void*)processor);
+#ifdef WITH_WSREP_OUT
+  /*
+    MariaDB bug https://jira.mariadb.org/browse/MDEV-8208 has not been observed
+    in this server version. However, if it surfaces, the server startup must be 
+    should be delayed here until wsrep_running_threads count ascends
+  */
+#endif /* WITH_WSREP_OUT */
+  return res;
 }
 
 /* Create applier threads based on configuration.
@@ -444,22 +453,15 @@ void wsrep_create_appliers(long threads)
   }
 
   long wsrep_threads=0;
-  pthread_t hThread;
   while (wsrep_threads++ < threads) {
-    if (pthread_create(
-      &hThread, &connection_attrib,
-      start_wsrep_THD, (void*)wsrep_replication_process))
-      WSREP_WARN("Failed to create wsrep applier/slave thread");
+    if (create_wsrep_THD(key_THREAD_wsrep_applier, wsrep_replication_process))
+      WSREP_WARN("Can't create thread to manage wsrep replication");
   }
 }
 
 static void wsrep_rollback_process(THD *thd)
 {
   DBUG_ENTER("wsrep_rollback_process");
-
-#ifdef HAVE_PSI_INTERFACE
-  wsrep_pfs_register_thread(key_THREAD_wsrep_rollbacker);
-#endif /* HAVE_PSI_INTERFACE */
 
   mysql_mutex_lock(&LOCK_wsrep_rollback);
   wsrep_aborting_thd= NULL;
@@ -545,10 +547,6 @@ static void wsrep_rollback_process(THD *thd)
 
   mysql_mutex_unlock(&LOCK_wsrep_rollback);
 
-#ifdef HAVE_PSI_INTERFACE
-  wsrep_pfs_delete_thread();
-#endif /* HAVE_PSI_INTERFACE */
-
   mysql_mutex_lock(&thd->LOCK_thd_data);
   thd_proc_info(thd, "wsrep aborter shutting down");
   thd->current_mutex= 0;
@@ -565,10 +563,8 @@ void wsrep_create_rollbacker()
 {
   if (wsrep_provider && strcasecmp(wsrep_provider, "none"))
   {
-    pthread_t hThread;
     /* create rollbacker */
-    if (pthread_create( &hThread, &connection_attrib,
-                        start_wsrep_THD, (void*)wsrep_rollback_process))
+    if (create_wsrep_THD(key_THREAD_wsrep_rollbacker, wsrep_rollback_process))
       WSREP_WARN("Failed to create wsrep rollback/aborter thread");
   }
 }

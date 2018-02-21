@@ -318,6 +318,9 @@ extern const char *load_default_groups[];
 extern struct my_option my_long_options[];
 extern struct my_option my_long_early_options[];
 extern bool mysqld_server_started;
+#ifdef WITH_WSREP
+extern int mysqld_server_initialized;
+#endif /* WITH_WSREP */
 extern "C" MYSQL_PLUGIN_IMPORT int orig_argc;
 extern "C" MYSQL_PLUGIN_IMPORT char **orig_argv;
 extern my_thread_attr_t connection_attrib;
@@ -1107,6 +1110,7 @@ static inline THD *_current_thd(void)
 
 #ifdef WITH_WSREP
 extern "C" void *start_wsrep_THD(void*);
+typedef void (*wsrep_thd_processor_fun)(THD *);
 #endif /* WITH_WSREP */
 
 #endif /* MYSQLD_INCLUDED */

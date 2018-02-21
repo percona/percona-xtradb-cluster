@@ -756,7 +756,9 @@ mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 int wsrep_replaying= 0;
+ulong wsrep_running_threads = 0; // # of currently running wsrep threads
 static void wsrep_close_threads(THD* thd);
+int mysqld_server_initialized= 0;
 #endif /* WITH_WSREP */
 
 bool mysqld_server_started= false;
@@ -1811,7 +1813,7 @@ static void clean_up_mutexes()
   mysql_cond_destroy(&COND_wsrep_replaying);
   mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   mysql_mutex_destroy(&LOCK_wsrep_desync);
-#endif
+#endif /* WITH_WSREP */
 }
 
 
@@ -2725,9 +2727,12 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
         mysql_mutex_unlock(&LOCK_socket_listener_active);
 
 #ifdef WITH_WSREP
-        if (WSREP_ON) wsrep_stop_replication(NULL);
+        /* Stop wsrep threads in case they are running. */
+        if (wsrep_running_threads > 0)
+        {
+          wsrep_stop_replication(NULL);
+        }
 #endif /* WITH_WSREP */
-
         close_connections();
 
 #ifdef WITH_WSREP
@@ -4656,6 +4661,7 @@ will be ignored as the --log-bin option is not defined.");
   }
 #endif
 
+  
   if (opt_bin_log)
   {
     /* Reports an error and aborts, if the --log-bin's path
@@ -4703,6 +4709,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       opt_bin_logname=my_strdup(key_memory_opt_bin_logname,
                                 buf, MYF(0));
     }
+  }
 
 #ifdef WITH_WSREP /* WSREP BEFORE SE */
     /*
@@ -4712,7 +4719,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       - SST may modify binlog index file, so it must be opened
         after SST has happened
      */
-  }
+
+  /* It's now safe to use thread specific memory */
+  mysqld_server_initialized= 1;
 
   if (gtid_server_init())
   {
@@ -4738,7 +4747,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       if (wsrep_new_cluster)
       {
         if (do_auto_cert_generation(auto_detection_status) == false)
-          unireg_abort(1);
+          unireg_abort(MYSQLD_ABORT_EXIT);
       }
       else
       {
@@ -4751,7 +4760,8 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
     {
       wsrep_provider_init(WSREP_NONE);
-      if (wsrep_init()) unireg_abort(1);
+      if (wsrep_init())
+        unireg_abort(MYSQLD_ABORT_EXIT);
     }
     else // full wsrep initialization
     {
@@ -4788,7 +4798,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
    * Forcing a new setwd in case the SST mounted the datadir
    */
   if (my_setwd(mysql_real_data_home,MYF(MY_WME)) && !opt_help)
-    unireg_abort(1);        /* purecov: inspected */
+    unireg_abort(MYSQLD_ABORT_EXIT);
 
   if (opt_bin_log)
   {
@@ -4804,10 +4814,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
         mysql_bin_log.open_index_file(opt_binlog_index_name, opt_bin_logname,
                                       TRUE))
     {
-      unireg_abort(1);
+      unireg_abort(MYSQLD_ABORT_EXIT);
     }
+  }
 #else
-
+  if (opt_bin_log)
+  {
     /*
       Skip opening the index file if we start with --help. This is necessary
       to avoid creating the file in an otherwise empty datadir, which will
@@ -4817,8 +4829,8 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     {
       unireg_abort(MYSQLD_ABORT_EXIT);
     }
-#endif /* WITH_WSREP */
   }
+#endif /* WITH_WSREP */
 
   if (opt_bin_log)
   {
@@ -4928,7 +4940,8 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     system tablespaces present etc.
   */
 #ifdef WITH_WSREP
-/* innodb plugin initializes in following plugin_init() */
+/* innodb plugin initializes in the following
+   plugin_register_dynamic_and_init_all() */
 #endif
   if (plugin_register_dynamic_and_init_all(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
@@ -7317,6 +7330,7 @@ extern "C" void *start_wsrep_THD(void *arg)
   /* Set applier thread InnoDB priority */
   //set_thd_tx_priority(thd, rli->get_thd_tx_priority());
 
+  /* wsrep_running_threads counter is managed in thd_manager */
   thd_manager->add_thd(thd);
   thd_added= true;
 
