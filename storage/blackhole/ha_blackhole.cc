@@ -31,7 +31,7 @@ static inline bool is_slave_applier(const THD &thd)
 static inline bool pretend_for_slave(const THD &thd)
 {
   return is_slave_applier(thd) &&
-    (thd.rli_slave->rows_query_ev || thd.query() == NULL);
+    ((thd.rli_slave && thd.rli_slave->rows_query_ev) || thd.query() == NULL);
 }
 
 /* Static declarations for handlerton */
