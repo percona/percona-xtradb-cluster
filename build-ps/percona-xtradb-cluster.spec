@@ -1021,6 +1021,8 @@ fi
 %if 0%{?systemd}
 
 # Do NOTHING for PXC
+    %systemd_post mysql
+    /usr/bin/systemctl enable mysql >/dev/null 2>&1 || :
 
 %else
 if [ -x /sbin/chkconfig ] ; then

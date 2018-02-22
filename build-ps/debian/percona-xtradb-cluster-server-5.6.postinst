@@ -11,6 +11,14 @@ export PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin
 ERR_LOGGER="logger -p daemon.err -t mysqld_safe -i"
 
 invoke() {
+  BOOTSTRAPPED=0
+  BOOTSTRAPPED=$(grep -c "BOOTSTRAPPED" /etc/default/mysql)
+  if [ $BOOTSTRAPPED = 0 ]; then
+    echo "BOOTSTRAPPED=1" >> /etc/default/mysql
+  fi
+  if which systemctl > /dev/null; then
+    systemctl daemon-reload
+  fi
   if [ -x /usr/sbin/invoke-rc.d ]; then
     invoke-rc.d mysql $1
   else
@@ -19,7 +27,6 @@ invoke() {
 }
 
 MYSQL_BOOTSTRAP="/usr/sbin/mysqld --bootstrap --user=mysql --skip-grant-tables --skip-log-bin"
-
 test_mysql_access() {
        mysql --no-defaults -u root -h localhost </dev/null >/dev/null 2>&1
 }
@@ -275,6 +282,13 @@ echo -e "\n * See http://www.percona.com/doc/percona-xtradb-cluster/5.6/manageme
 #
 db_stop # in case invoke failes
 
-#DEBHELPER#
-
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
+        if [ -x "/etc/init.d/mysql" ]; then
+                update-rc.d mysql defaults 19 21 >/dev/null
+        fi
+        if [ -x "/etc/init.d/mysql" ] || [ -e "/etc/init/mysql.conf" ]; then
+                invoke-rc.d mysql restart || exit $?
+        fi
+fi
+invoke-rc.d mysql restart || exit $?
 exit 0

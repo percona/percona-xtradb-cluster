@@ -163,7 +163,12 @@ case "${1:-''}" in
 	    if [[ -r $pid_file ]];then 
                 log_warning_msg "Stale PID file found: $pid_file with $(cat $pid_file)"
             fi
-  	    "${PERCONA_PREFIX}"/bin/mysqld_safe > /dev/null 2>&1 &
+            BOOTSTRAPPED=0
+            BOOTSTRAPPED=$(grep "BOOTSTRAPPED" /etc/default/mysql | awk -F'=' '{print $2}')
+            if [ $BOOTSTRAPPED = 1 ]; then
+                $SELF bootstrap-pxc
+            fi
+ 	    "${PERCONA_PREFIX}"/bin/mysqld_safe > /dev/null 2>&1 &
   	    safe_pid=$!
             avoid_race_condition="by checking again"
 
@@ -219,6 +224,11 @@ case "${1:-''}" in
 	# at least for cron, we can rely on it here, too. (although we have 
 	# to specify it explicit as e.g. sudo environments points to the normal
 	# users home and not /root)
+        BOOTSTRAPPED=0
+        BOOTSTRAPPED=$(grep -c "BOOTSTRAPPED" /etc/default/mysql)
+        if [ $BOOTSTRAPPED = 0 ]; then
+            echo "BOOTSTRAPPED=1" >> /etc/default/mysql
+        fi
 	log_daemon_msg "Stopping MySQL (Percona XtraDB Cluster)" "mysqld"
 	if ! mysqld_status check_dead nowarn; then
 	  set +e
@@ -297,6 +307,11 @@ case "${1:-''}" in
 	   log_progress_msg "already running"
 	   log_end_msg 0
 	else
+            BOOTSTRAPPED=0
+            BOOTSTRAPPED=$(grep -c "BOOTSTRAPPED" /etc/default/mysql)
+            if [ $BOOTSTRAPPED = 0 ]; then
+                echo "BOOTSTRAPPED=1" >> /etc/default/mysql
+            fi
 	    if [[ -r $pid_file ]];then 
                 log_warning_msg "Stale PID file found: $pid_file with $(cat $pid_file)"
             fi
