@@ -293,7 +293,9 @@ void
 trx_sys_update_wsrep_checkpoint(
         const XID*      xid,         /*!< in: WSREP XID */
         trx_sysf_t*     sys_header,  /*!< in: sys_header */
-        mtr_t*          mtr);        /*!< in: mtr       */
+        mtr_t*          mtr,         /*!< in: mtr       */
+        bool            recovery = false);
+                                     /*!< in: running recovery */
 
 void
 /** Read WSREP checkpoint XID from sys header. */
