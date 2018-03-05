@@ -32,23 +32,23 @@ Fixed Bugs
   made it possible to abort local transactions without further
   re-evaluation in case of a lock conflict.
 
-* :jirabug:`PXC-2051`: General code improvement was made in the GTID
-  event handling, when events are captured as a part of the slave
-  replication and appended to the galera replicated write-set.
-  This fixed :jirabug:`PXC-2041` (starting async slave on a single
-  node |PXC| led to a crash) and :jirabug:`PXC-2058` (binlog-based
-  master-slave replication broke the cluster) caused by the
-  incorrect handling in the GTID append logic.
-
 * :jirabug:`PXC-2054` Redo optimized DDL operations (like sorted index
   build) were not blocked in case of a running backup process, leading
   to the SST fail. To fix this, ``--lock-ddl`` option blocks now
   all DDL during the |xtrabackup| backup stage.
 
-* :jirabug:`PXC-2066`: An issue caused by noncoincidence in the order
-  of recovered transaction and the global seqno assigned to the
-  transaction was fixed ensuring that the updated recovery wsrep
-  coordinates are persisted.
+* General code improvement was made in the GTID event handling,
+  when events are captured as a part of the slave replication and
+  appended to the galera replicated write-set. This fixed
+  :jirabug:`PXC-2041` (starting async slave on a single node
+  |PXC| led to a crash) and :jirabug:`PXC-2058` (binlog-based
+  master-slave replication broke the cluster) caused by the
+  incorrect handling in the GTID append logic.
+
+* An issue caused by noncoincidence between the order of recovered
+  transaction and the global seqno assigned to the transaction was
+  fixed ensuring that the updated recovery wsrep coordinates are
+  persisted.
 
 * :jirabug:`PXC-904`: Replication filters were not working with
   account management statements like ``CREATE USER`` in case of
