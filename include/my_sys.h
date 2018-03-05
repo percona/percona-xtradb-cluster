@@ -149,6 +149,8 @@ C_MODE_START
 #define GETDATE_HHMMSSTIME	4
 #define GETDATE_GMT		8
 #define GETDATE_FIXEDLENGTH	16
+#define GETDATE_T_DELIMITER 32
+#define GETDATE_SHORT_DATE_FULL_YEAR 64
 
 	/* defines when allocating data */
 extern void *my_multi_malloc(PSI_memory_key key, myf flags, ...);
@@ -578,6 +580,9 @@ extern size_t my_fwrite(FILE *stream,const uchar *Buffer,size_t Count,
 		      myf MyFlags);
 extern my_off_t my_fseek(FILE *stream,my_off_t pos,int whence,myf MyFlags);
 extern my_off_t my_ftell(FILE *stream,myf MyFlags);
+#if !defined(HAVE_MEMSET_S)
+void memset_s(void *dest, size_t dest_max, int c, size_t n);
+#endif
 
 /* implemented in my_syslog.c */
 

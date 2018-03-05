@@ -85,8 +85,10 @@ std::map<std::string, std::string> map_mysqlbinlog_rewrite_db;
 */
 inline void reset_temp_buf_and_delete(Log_event *ev)
 {
+  char *event_buf= ev->temp_buf;
   ev->temp_buf= NULL;
   delete ev;
+  my_free(event_buf);
 }
 
 static bool
@@ -1197,14 +1199,16 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
   IO_CACHE *const head= &print_event_info->head_cache;
 
   /*
-    Format events are not concerned by --offset and such, we always need to
-    read them to be able to process the wanted events.
+    Format and Start encryptions events are not concerned by --offset and such,
+    we always need to read them to be able to process the wanted events.
   */
   if (((rec_count >= offset) &&
        ((my_time_t) (ev->common_header->when.tv_sec) >= start_datetime)) ||
-      (ev_type == binary_log::FORMAT_DESCRIPTION_EVENT))
+      (ev_type == binary_log::FORMAT_DESCRIPTION_EVENT) ||
+      (ev_type == binary_log::START_ENCRYPTION_EVENT))
   {
-    if (ev_type != binary_log::FORMAT_DESCRIPTION_EVENT)
+    if (ev_type != binary_log::FORMAT_DESCRIPTION_EVENT &&
+        ev_type != binary_log::START_ENCRYPTION_EVENT)
     {
       /*
         We have found an event after start_datetime, from now on print
@@ -1315,8 +1319,6 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
       if (head->error == -1)
         goto err;
       break;
-      
-      destroy_evt= TRUE;
     }
     // fallthrough
           
@@ -1466,17 +1468,7 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
 
       if (head->error == -1)
         goto err;
-      if (opt_remote_proto == BINLOG_LOCAL)
-      {
-        ev->free_temp_buf(); // free memory allocated in dump_local_log_entries
-      }
-      else
-      {
-        /*
-          disassociate but not free dump_remote_log_entries time memory
-        */
-        ev->temp_buf= 0;
-      }
+      ev->free_temp_buf();
       /*
         We don't want this event to be deleted now, so let's hide it (I
         (Guilhem) should later see if this triggers a non-serious Valgrind
@@ -1542,7 +1534,7 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
         goto end;
       }
     }
-    // fallthrough
+    // Fall through.
     case binary_log::ROWS_QUERY_LOG_EVENT:
     case binary_log::WRITE_ROWS_EVENT:
     case binary_log::DELETE_ROWS_EVENT:
@@ -1699,6 +1691,14 @@ Exit_status process_event(PRINT_EVENT_INFO *print_event_info, Log_event *ev,
         goto err;
       break;
     }
+    case binary_log::START_ENCRYPTION_EVENT:
+    {
+      glob_description_event->start_decryption(static_cast<Start_encryption_log_event*>(ev));
+      ev->print(result_file, print_event_info);
+      if (head->error == -1)
+        goto err;
+      break;
+    }
     case binary_log::PREVIOUS_GTIDS_LOG_EVENT:
       if (one_database && !opt_skip_gtids)
         warning("The option --database has been used. It may filter "
@@ -1724,14 +1724,9 @@ err:
   retval= ERROR_STOP;
 end:
   rec_count++;
-  /*
-    Destroy the log_event object. If reading from a remote host,
-    set the temp_buf to NULL so that memory isn't freed twice.
-  */
+  /* Destroy the log_event object. */
   if (ev)
   {
-    if (opt_remote_proto != BINLOG_LOCAL)
-      ev->temp_buf= 0;
     if (destroy_evt) /* destroy it later if not set (ignored table map) */
       delete ev;
   }
@@ -2704,11 +2699,18 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
     */
     if (type == binary_log::HEARTBEAT_LOG_EVENT)
       continue;
-    event_buf= (char *) net->read_pos + 1;
     event_len= len - 1;
+    if (!(event_buf = (char*) my_malloc(key_memory_log_event,
+                                        event_len+1, MYF(0))))
+    {
+      error("Out of memory.");
+      DBUG_RETURN(ERROR_STOP);
+    }
+    memcpy(event_buf, net->buff + 1, event_len);
     if (rewrite_db_filter(&event_buf, &event_len, glob_description_event))
     {
       error("Got a fatal error while applying rewrite db filter.");
+      my_free(event_buf);
       DBUG_RETURN(ERROR_STOP);
     }
 
@@ -2721,13 +2723,10 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
                                           opt_verify_binlog_checksum)))
       {
         error("Could not construct log event object: %s", error_msg);
+        my_free(event_buf);
         DBUG_RETURN(ERROR_STOP);
       }
-      /*
-        If reading from a remote host, ensure the temp_buf for the
-        Log_event class is pointing to the incoming stream.
-      */
-      ev->register_temp_buf((char *) net->read_pos + 1);
+      ev->register_temp_buf(event_buf);
     }
     if (raw_mode || (type != binary_log::LOAD_EVENT))
     {
@@ -2788,6 +2787,7 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
          */
           old_off= start_position_mot;
           len= 1; // fake Rotate, so don't increment old_off
+          event_len= 0;
         }
       }
       else if (type == binary_log::FORMAT_DESCRIPTION_EVENT)
@@ -2801,7 +2801,10 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
         */
         // fake event when not in raw mode, don't increment old_off
         if ((old_off != BIN_LOG_HEADER_SIZE) && (!raw_mode))
+        {
           len= 1;
+          event_len= 0;
+        }
         if (raw_mode)
         {
           if (result_file && (result_file != stdout))
@@ -2846,13 +2849,16 @@ static Exit_status dump_remote_log_entries(PRINT_EVENT_INFO *print_event_info,
       {
         DBUG_EXECUTE_IF("simulate_result_file_write_error",
                         DBUG_SET("+d,simulate_fwrite_error"););
-        if (my_fwrite(result_file, net->read_pos + 1 , len - 1, MYF(MY_NABP)))
+        if (my_fwrite(result_file, (const uchar*)event_buf, event_len,
+                      MYF(MY_NABP)))
         {
           error("Could not write into log file '%s'", log_file_name);
           retval= ERROR_STOP;
         }
         if (ev)
           reset_temp_buf_and_delete(ev);
+        else
+          my_free(event_buf);
 
         /* Flush result_file after every event */
         fflush(result_file);
@@ -3515,6 +3521,7 @@ int main(int argc, char** argv)
 
 #include "decimal.c"
 #include "my_decimal.cc"
+#include "event_crypt.cc"
 #include "log_event.cc"
 #include "log_event_old.cc"
 #include "rpl_utility.cc"
@@ -3523,3 +3530,4 @@ int main(int argc, char** argv)
 #include "rpl_gtid_set.cc"
 #include "rpl_gtid_specification.cc"
 #include "rpl_tblmap.cc"
+#include "binlog_crypt_data.cc"

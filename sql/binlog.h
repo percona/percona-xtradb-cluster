@@ -24,6 +24,8 @@
 #include "tc_log.h"                    // TC_LOG
 #include "atomic_class.h"
 #include "rpl_gtid.h"                  // Gtid_set, Sid_map
+#include "rpl_constants.h"
+#include "binlog_crypt_data.h"
 
 class Relay_log_info;
 class Master_info;
@@ -157,7 +159,12 @@ public:
 
     /** Lock for protecting the queue. */
     mysql_mutex_t m_lock;
-  } MY_ATTRIBUTE((aligned(CPU_LEVEL1_DCACHE_LINESIZE)));
+    /*
+      This attribute did not have the desired effect, at least not according
+      to -fsanitize=undefined with gcc 5.2.1
+      Also: it fails to compile with gcc 7.2
+     */
+  }; // MY_ATTRIBUTE((aligned(CPU_LEVEL1_DCACHE_LINESIZE)));
 
 public:
   Stage_manager()
@@ -442,6 +449,9 @@ class MYSQL_BIN_LOG: public TC_LOG
   uint open_count;				// For replication
   int readers_count;
 
+  /* binlog encryption data */
+  Binlog_crypt_data crypto;
+
   /* pointer to the sync period variable, for binlog this will be
      sync_binlog_period, for relay log this will be
      sync_relay_log_period
@@ -473,6 +483,8 @@ class MYSQL_BIN_LOG: public TC_LOG
   {
     return *sync_period_ptr;
   }
+
+  int write_to_file(Log_event* event);
 
   int write_to_file(IO_CACHE *cache);
   /*
@@ -863,7 +875,7 @@ public:
   bool is_query_in_union(THD *thd, query_id_t query_id_param);
 
 #ifdef HAVE_REPLICATION
-  bool append_buffer(const char* buf, uint len, Master_info *mi);
+  bool append_buffer(uchar* buf, size_t len, Master_info *mi);
   bool append_event(Log_event* ev, Master_info *mi);
 private:
   bool after_append_to_relay_log(Master_info *mi);
@@ -971,6 +983,11 @@ public:
     True while rotating binlog, which is caused by logging Incident_log_event.
   */
   bool is_rotating_caused_by_incident;
+
+  Binlog_crypt_data* get_crypto_data()
+  {
+    return &crypto;
+  }
 private:
   void publish_coordinates_for_global_status(void) const;
 };

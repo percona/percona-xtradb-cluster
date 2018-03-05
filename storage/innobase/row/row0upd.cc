@@ -317,9 +317,17 @@ row_upd_check_references_constraints(
 			But the counter on the table protects 'foreign' from
 			being dropped while the check is running. */
 
+
+                        if (foreign_table) {
+				os_atomic_increment_ulint(&foreign_table->n_foreign_key_checks_running, 1);
+			}
+
 			err = row_ins_check_foreign_constraint(
 				FALSE, foreign, table, entry, thr);
 
+                        if (foreign_table) {
+				os_atomic_decrement_ulint(&foreign_table->n_foreign_key_checks_running, 1);
+			}
 			if (ref_table != NULL) {
 				dict_table_close(ref_table, FALSE, FALSE);
 			}
@@ -340,11 +348,6 @@ func_exit:
 	mem_heap_free(heap);
 
 	DEBUG_SYNC_C("foreign_constraint_check_for_update_done");
-
-	DBUG_EXECUTE_IF("row_upd_cascade_lock_wait_err",
-		err = DB_LOCK_WAIT;
-		DBUG_SET("-d,row_upd_cascade_lock_wait_err"););
-
 	DBUG_RETURN(err);
 }
 
@@ -2141,7 +2144,6 @@ row_upd_store_v_row(
 						cascade update. And virtual
 						column can't be affected,
 						so it is Ok to set it to NULL */
-						ut_ad(!node->cascade_top);
 						dfield_set_null(dfield);
 					} else {
 						dfield_t*       vfield
@@ -2255,6 +2257,18 @@ srv_mbr_print(const byte* data)
 		<< ", " << d << "\n";
 }
 
+
+#ifdef WITH_WSREP
+static inline
+bool
+row_upd_parent_has_cascade(
+	const que_node_t* parent)
+{
+	return(parent != NULL &&
+	       que_node_get_type(parent) == QUE_NODE_UPDATE &&
+	       ((const upd_node_t*) parent)->cascade_node != NULL);
+}
+#endif /* WITH_WSREP */
 
 /***********************************************************//**
 Updates a secondary index entry of a row.
@@ -2451,9 +2465,7 @@ row_upd_sec_index_entry(
 			if (wsrep_on(trx->mysql_thd)                          &&
 			    !wsrep_thd_is_BF(trx->mysql_thd, FALSE)           &&
 			    err == DB_SUCCESS && !referenced && foreign       &&
-			    (!parent || (que_node_get_type(parent) !=
-			    QUE_NODE_UPDATE)                     ||
-			    ((upd_node_t*)parent)->cascade_upd_nodes->empty())
+			    !row_upd_parent_has_cascade(parent)
 			) {
 				ulint*	offsets =
 					rec_get_offsets(
@@ -2773,8 +2785,7 @@ check_fk:
 		}
 #ifdef WITH_WSREP
 		else if (wsrep_on(trx->mysql_thd) && foreign                        &&
-			 (!parent || (que_node_get_type(parent) != QUE_NODE_UPDATE) ||
-			 ((upd_node_t*)parent)->cascade_upd_nodes->empty())
+			 !row_upd_parent_has_cascade(parent)
 		) {
 			err = wsrep_row_upd_check_foreign_constraints(
 				node, pcur, table, index, offsets, thr, mtr);
@@ -3019,8 +3030,7 @@ row_upd_del_mark_clust_rec(
 	}
 #ifdef WITH_WSREP
 	else if (trx && wsrep_on(trx->mysql_thd)  &&  err == DB_SUCCESS  &&
-	    (!parent || (que_node_get_type(parent) != QUE_NODE_UPDATE) ||
-	    ((upd_node_t*)parent)->cascade_upd_nodes->empty())
+		 !row_upd_parent_has_cascade(parent)
 	) {
 		err = wsrep_row_upd_check_foreign_constraints(
 			node, pcur, index->table, index, offsets, thr, mtr);
@@ -3486,60 +3496,4 @@ error_handling:
 	DBUG_RETURN(thr);
 }
 
-#ifndef DBUG_OFF
-
-/** Ensure that the member cascade_upd_nodes has only one update node
-for each of the tables.  This is useful for testing purposes. */
-void upd_node_t::check_cascade_only_once()
-{
-	DBUG_ENTER("upd_node_t::check_cascade_only_once");
-
-	dbug_trace();
-
-	for (upd_cascade_t::const_iterator i = cascade_upd_nodes->begin();
-	     i != cascade_upd_nodes->end(); ++i) {
-
-		const upd_node_t*	update_node = *i;
-		std::string	table_name(update_node->table->name.m_name);
-		ulint	count = 0;
-
-		for (upd_cascade_t::const_iterator j
-			= cascade_upd_nodes->begin();
-		     j != cascade_upd_nodes->end(); ++j) {
-
-			const upd_node_t*	node = *j;
-
-			if (table_name == node->table->name.m_name) {
-				DBUG_ASSERT(count++ == 0);
-			}
-		}
-	}
-
-	DBUG_VOID_RETURN;
-}
-
-/** Print information about this object into the trace log file. */
-void upd_node_t::dbug_trace()
-{
-	DBUG_ENTER("upd_node_t::dbug_trace");
-
-	for (upd_cascade_t::const_iterator i = cascade_upd_nodes->begin();
-	     i != cascade_upd_nodes->end(); ++i) {
-
-		const upd_node_t*	update_node = *i;
-		DBUG_LOG("upd_node_t", "cascade_upd_nodes: Cascade to table: "
-			 << update_node->table->name);
-	}
-
-	for (upd_cascade_t::const_iterator j = new_upd_nodes->begin();
-	     j != new_upd_nodes->end(); ++j) {
-
-		const upd_node_t*	update_node = *j;
-		DBUG_LOG("upd_node_t", "new_upd_nodes: Cascade to table: "
-			 << update_node->table->name);
-	}
-
-	DBUG_VOID_RETURN;
-}
-#endif /* !DBUG_OFF */
 #endif /* !UNIV_HOTBACKUP */

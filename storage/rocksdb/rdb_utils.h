@@ -246,32 +246,40 @@ inline void rdb_check_mutex_call_result(const char *function_name,
 
 void rdb_log_status_error(const rocksdb::Status &s, const char *msg = nullptr);
 
+// return true if the marker file exists which indicates that the corruption
+// has been detected
+bool rdb_check_rocksdb_corruption();
+
+// stores a marker file in the data directory so that after restart server
+// is still aware that rocksdb data is corrupted
+void rdb_persist_corruption_marker();
+
 /*
   Helper functions to parse strings.
 */
 
 const char *rdb_skip_spaces(const struct charset_info_st *const cs,
                             const char *str)
-    MY_ATTRIBUTE((__nonnull__, __warn_unused_result__));
+    MY_ATTRIBUTE((__warn_unused_result__));
 
 bool rdb_compare_strings_ic(const char *const str1, const char *const str2)
-    MY_ATTRIBUTE((__nonnull__, __warn_unused_result__));
+    MY_ATTRIBUTE((__warn_unused_result__));
 
 const char *rdb_find_in_string(const char *str, const char *pattern,
                                bool *const succeeded)
-    MY_ATTRIBUTE((__nonnull__, __warn_unused_result__));
+    MY_ATTRIBUTE((__warn_unused_result__));
 
 const char *rdb_check_next_token(const struct charset_info_st *const cs,
                                  const char *str, const char *const pattern,
                                  bool *const succeeded)
-    MY_ATTRIBUTE((__nonnull__, __warn_unused_result__));
+    MY_ATTRIBUTE((__warn_unused_result__));
 
 const char *rdb_parse_id(const struct charset_info_st *const cs,
                          const char *str, std::string *const id)
-    MY_ATTRIBUTE((__nonnull__(1, 2), __warn_unused_result__));
+    MY_ATTRIBUTE((__warn_unused_result__));
 
 const char *rdb_skip_id(const struct charset_info_st *const cs, const char *str)
-    MY_ATTRIBUTE((__nonnull__, __warn_unused_result__));
+    MY_ATTRIBUTE((__warn_unused_result__));
 
 const std::vector<std::string> parse_into_tokens(const std::string& s,
                                                  const char delim);
@@ -281,8 +289,7 @@ const std::vector<std::string> parse_into_tokens(const std::string& s,
 */
 
 std::string rdb_hexdump(const char *data, const std::size_t data_len,
-                        const std::size_t maxsize = 0)
-    MY_ATTRIBUTE((__nonnull__));
+                        const std::size_t maxsize = 0);
 
 /*
   Helper function to see if a database exists

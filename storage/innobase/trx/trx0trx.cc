@@ -1777,7 +1777,7 @@ trx_write_serialisation_history(
 	else if (trx->wsrep_recover_xid)
 	{
 		trx_sys_update_wsrep_checkpoint(
-				trx->wsrep_recover_xid, sys_header, mtr);
+				trx->wsrep_recover_xid, sys_header, mtr, true);
 		trx->wsrep_recover_xid = NULL;
 	}
 #endif /* WITH_WSREP */

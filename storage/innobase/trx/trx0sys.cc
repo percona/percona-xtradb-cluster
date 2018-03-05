@@ -316,7 +316,6 @@ trx_sys_print_mysql_binlog_offset(void)
 
 #ifdef WITH_WSREP
 
-#ifdef UNIV_DEBUG
 static long long trx_sys_cur_xid_seqno = -1;
 static unsigned char trx_sys_cur_xid_uuid[16];
 
@@ -334,16 +333,18 @@ void read_wsrep_xid_uuid(const XID* xid, unsigned char* buf)
     memcpy(buf, xid->get_data() + 8, 16);
 }
 
-#endif /* UNIV_DEBUG */
 
 void
 trx_sys_update_wsrep_checkpoint(
         const XID*      xid,        /*!< in: transaction XID */
         trx_sysf_t*     sys_header, /*!< in: sys_header */
-        mtr_t*          mtr)        /*!< in: mtr */
+        mtr_t*          mtr,        /*!< in: mtr */
+        bool            recovery)   /*!< in: running recovery */
 {
 
-#ifdef UNIV_DEBUG
+#ifndef UNIV_DEBUG
+        if (recovery)
+#endif /* !UNIV_DEBUG */
         {
             /* Check that seqno is monotonically increasing */
             unsigned char xid_uuid[16];
@@ -351,16 +352,37 @@ trx_sys_update_wsrep_checkpoint(
             read_wsrep_xid_uuid(xid, xid_uuid);
             if (!memcmp(xid_uuid, trx_sys_cur_xid_uuid, 8))
             {
-                ut_ad(xid_seqno > trx_sys_cur_xid_seqno);
-                trx_sys_cur_xid_seqno = xid_seqno;
+                if (recovery)
+                {
+                    /* When recovery happens prepare transactions
+                    are revived based on undo-log entries in InnoDB.
+                    This order may not match with the commit order
+                    logged to binlog.
+                    Sequence matching is not needed for MySQL
+                    as standalone. Aim is to just ensure that all
+                    prepare stage transaction are marked as committed.
+                    But in PXC the commit order of recover transaction
+                    should be same as it would be if transaction are running
+                    normally or we need to ensure that only the latest seen
+                    xid is updated and persisted as wsrep recover position
+                    co-ordinates. */
+                    if (xid_seqno > trx_sys_cur_xid_seqno)
+                        trx_sys_cur_xid_seqno = xid_seqno;
+                    else
+                        return;
+                }
+                else
+                {
+                    ut_ad(xid_seqno > trx_sys_cur_xid_seqno);
+                    trx_sys_cur_xid_seqno = xid_seqno;
+                }
             }
             else
             {
                 memcpy(trx_sys_cur_xid_uuid, xid_uuid, 16);
+                trx_sys_cur_xid_seqno = xid_seqno;
             }
-            trx_sys_cur_xid_seqno = xid_seqno;
         }
-#endif /* UNIV_DEBUG */
 
         ut_ad(xid && mtr && sys_header);
         ut_a(xid->get_format_id() == -1 || wsrep_is_wsrep_xid(xid));

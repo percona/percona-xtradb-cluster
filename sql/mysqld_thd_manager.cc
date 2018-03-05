@@ -198,6 +198,13 @@ void Global_THD_manager::add_thd(THD *thd)
   {
     ++global_thd_count;
   }
+#ifdef WITH_WSREP
+  if (WSREP_ON && thd->wsrep_applier)
+  {
+    wsrep_running_threads++;
+    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
+  }
+#endif /* WITH_WSREP */
   // Adding the same THD twice is an error.
   DBUG_ASSERT(insert_result.second);
   mysql_mutex_unlock(&LOCK_thd_list);
@@ -225,6 +232,13 @@ void Global_THD_manager::remove_thd(THD *thd)
     --global_thd_count;
   // Removing a THD that was never added is an error.
   DBUG_ASSERT(1 == num_erased);
+#ifdef WITH_WSREP
+  if (WSREP_ON && thd->wsrep_applier)
+  {
+    wsrep_running_threads--;
+    WSREP_DEBUG("wsrep running threads now: %lu", wsrep_running_threads);
+  }
+#endif /* WITH_WSREP */
   mysql_mutex_unlock(&LOCK_thd_remove);
   mysql_cond_broadcast(&COND_thd_list);
   mysql_mutex_unlock(&LOCK_thd_list);

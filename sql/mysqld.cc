@@ -127,6 +127,7 @@
 #include <mysql/psi/mysql_memory.h>
 #include <mysql/psi/mysql_statement.h>
 
+#include "migrate_keyring.h"            // Migrate_keyring
 #include "mysql_com_server.h"
 #include "keycaches.h"
 #include "../storage/myisam/ha_myisam.h"
@@ -330,10 +331,20 @@ bool opt_endinfo, using_udf_functions;
 my_bool locked_in_memory;
 bool opt_using_transactions;
 bool volatile abort_loop;
+ulong opt_tc_log_size;
+
 static enum_server_operational_state server_operational_state= SERVER_BOOTING;
 ulong log_warnings;
 bool  opt_log_syslog_enable;
 char *opt_log_syslog_tag= NULL;
+char *opt_keyring_migration_user= NULL;
+char *opt_keyring_migration_host= NULL;
+char *opt_keyring_migration_password= NULL;
+char *opt_keyring_migration_socket= NULL;
+char *opt_keyring_migration_source= NULL;
+char *opt_keyring_migration_destination= NULL;
+ulong opt_keyring_migration_port= 0;
+bool migrate_connect_options= 0;
 #ifndef _WIN32
 bool  opt_log_syslog_include_pid;
 char *opt_log_syslog_facility;
@@ -364,7 +375,7 @@ ulong slow_start_timeout;
 
 my_bool opt_bootstrap= 0;
 my_bool opt_initialize= 0;
-my_bool opt_disable_partition_check= FALSE;
+my_bool opt_disable_partition_check= TRUE;
 my_bool opt_skip_slave_start = 0; ///< If set, slave is not autostarted
 my_bool opt_reckless_slave = 0;
 my_bool opt_enable_named_pipe= 0;
@@ -508,6 +519,7 @@ bool thread_cache_size_specified= false;
 bool host_cache_size_specified= false;
 bool table_definition_cache_specified= false;
 ulong locked_account_connection_count= 0;
+bool opt_keyring_operations= TRUE;
 
 ulonglong denied_connections= 0;
 
@@ -608,7 +620,9 @@ Time_zone *default_tz;
 char *mysql_data_home= const_cast<char*>(".");
 const char *mysql_real_data_home_ptr= mysql_real_data_home;
 char server_version[SERVER_VERSION_LENGTH];
+char server_version_suffix[SERVER_VERSION_LENGTH];
 char *mysqld_unix_port, *opt_mysql_tmpdir;
+my_bool encrypt_binlog;
 
 /** name of reference on left expression in rewritten IN subquery */
 const char *in_left_expr_name= "<left expr>";
@@ -742,10 +756,18 @@ mysql_cond_t  COND_wsrep_replaying;
 mysql_mutex_t LOCK_wsrep_slave_threads;
 mysql_mutex_t LOCK_wsrep_desync;
 int wsrep_replaying= 0;
+ulong wsrep_running_threads = 0; // # of currently running wsrep threads
 static void wsrep_close_threads(THD* thd);
+int mysqld_server_initialized= 0;
 #endif /* WITH_WSREP */
 
 bool mysqld_server_started= false;
+
+/*
+  The below lock protects access to global server variable
+  keyring_operations.
+*/
+mysql_mutex_t LOCK_keyring_operations;
 
 File_parser_dummy_hook file_parser_dummy_hook;
 
@@ -1773,6 +1795,7 @@ static void clean_up_mutexes()
   mysql_cond_destroy(&COND_start_signal_handler);
   mysql_mutex_destroy(&LOCK_start_signal_handler);
 #endif
+  mysql_mutex_destroy(&LOCK_keyring_operations);
   mysql_mutex_destroy(&LOCK_global_user_client_stats);
   mysql_mutex_destroy(&LOCK_global_table_stats);
   mysql_mutex_destroy(&LOCK_global_index_stats);
@@ -1790,7 +1813,7 @@ static void clean_up_mutexes()
   mysql_cond_destroy(&COND_wsrep_replaying);
   mysql_mutex_destroy(&LOCK_wsrep_slave_threads);
   mysql_mutex_destroy(&LOCK_wsrep_desync);
-#endif
+#endif /* WITH_WSREP */
 }
 
 
@@ -2704,9 +2727,12 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
         mysql_mutex_unlock(&LOCK_socket_listener_active);
 
 #ifdef WITH_WSREP
-        if (WSREP_ON) wsrep_stop_replication(NULL);
+        /* Stop wsrep threads in case they are running. */
+        if (wsrep_running_threads > 0)
+        {
+          wsrep_stop_replication(NULL);
+        }
 #endif /* WITH_WSREP */
-
         close_connections();
 
 #ifdef WITH_WSREP
@@ -3641,6 +3667,7 @@ int init_common_variables()
   if (init_errmessage())  /* Read error messages from file */
     return 1;
   init_client_errs();
+
   mysql_client_plugin_init();
   if (item_create_init())
     return 1;
@@ -3904,6 +3931,8 @@ static int init_thread_environment()
   mysql_cond_init(key_COND_manager, &COND_manager);
   mysql_mutex_init(key_LOCK_server_started,
                    &LOCK_server_started, MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(key_LOCK_keyring_operations,
+                   &LOCK_keyring_operations, MY_MUTEX_INIT_FAST);
   mysql_cond_init(key_COND_server_started, &COND_server_started);
   mysql_mutex_init(key_LOCK_reset_gtid_table,
                    &LOCK_reset_gtid_table, MY_MUTEX_INIT_FAST);
@@ -4632,6 +4661,7 @@ will be ignored as the --log-bin option is not defined.");
   }
 #endif
 
+  
   if (opt_bin_log)
   {
     /* Reports an error and aborts, if the --log-bin's path
@@ -4679,6 +4709,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       opt_bin_logname=my_strdup(key_memory_opt_bin_logname,
                                 buf, MYF(0));
     }
+  }
 
 #ifdef WITH_WSREP /* WSREP BEFORE SE */
     /*
@@ -4688,7 +4719,9 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       - SST may modify binlog index file, so it must be opened
         after SST has happened
      */
-  }
+
+  /* It's now safe to use thread specific memory */
+  mysqld_server_initialized= 1;
 
   if (gtid_server_init())
   {
@@ -4714,7 +4747,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
       if (wsrep_new_cluster)
       {
         if (do_auto_cert_generation(auto_detection_status) == false)
-          unireg_abort(1);
+          unireg_abort(MYSQLD_ABORT_EXIT);
       }
       else
       {
@@ -4727,7 +4760,8 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     if (opt_bootstrap) // bootsrap option given - disable wsrep functionality
     {
       wsrep_provider_init(WSREP_NONE);
-      if (wsrep_init()) unireg_abort(1);
+      if (wsrep_init())
+        unireg_abort(MYSQLD_ABORT_EXIT);
     }
     else // full wsrep initialization
     {
@@ -4764,7 +4798,7 @@ a file name for --log-bin-index option", opt_binlog_index_name);
    * Forcing a new setwd in case the SST mounted the datadir
    */
   if (my_setwd(mysql_real_data_home,MYF(MY_WME)) && !opt_help)
-    unireg_abort(1);        /* purecov: inspected */
+    unireg_abort(MYSQLD_ABORT_EXIT);
 
   if (opt_bin_log)
   {
@@ -4780,10 +4814,12 @@ a file name for --log-bin-index option", opt_binlog_index_name);
         mysql_bin_log.open_index_file(opt_binlog_index_name, opt_bin_logname,
                                       TRUE))
     {
-      unireg_abort(1);
+      unireg_abort(MYSQLD_ABORT_EXIT);
     }
+  }
 #else
-
+  if (opt_bin_log)
+  {
     /*
       Skip opening the index file if we start with --help. This is necessary
       to avoid creating the file in an otherwise empty datadir, which will
@@ -4793,8 +4829,8 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     {
       unireg_abort(MYSQLD_ABORT_EXIT);
     }
-#endif /* WITH_WSREP */
   }
+#endif /* WITH_WSREP */
 
   if (opt_bin_log)
   {
@@ -4881,6 +4917,21 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   */
   tc_log= &tc_log_dummy;
 
+  /*Load early plugins */
+  if (plugin_register_early_plugins(&remaining_argc, remaining_argv,
+                                    opt_help ?
+                                      PLUGIN_INIT_SKIP_INITIALIZATION : 0))
+  {
+    sql_print_error("Failed to initialize early plugins.");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+  /* Load builtin plugins, initialize MyISAM, CSV and InnoDB */
+  if (plugin_register_builtin_and_init_core_se(&remaining_argc,
+                                               remaining_argv))
+  {
+    sql_print_error("Failed to initialize builtin plugins.");
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
   /*
     Skip reading the plugin table when starting with --help in order
     to also skip initializing InnoDB. This provides a simpler and more
@@ -4889,14 +4940,15 @@ a file name for --log-bin-index option", opt_binlog_index_name);
     system tablespaces present etc.
   */
 #ifdef WITH_WSREP
-/* innodb plugin initializes in following plugin_init() */
+/* innodb plugin initializes in the following
+   plugin_register_dynamic_and_init_all() */
 #endif
-  if (plugin_init(&remaining_argc, remaining_argv,
+  if (plugin_register_dynamic_and_init_all(&remaining_argc, remaining_argv,
                   (opt_noacl ? PLUGIN_INIT_SKIP_PLUGIN_TABLE : 0) |
                   (opt_help ? (PLUGIN_INIT_SKIP_INITIALIZATION |
                                PLUGIN_INIT_SKIP_PLUGIN_TABLE) : 0)))
   {
-    sql_print_error("Failed to initialize plugins.");
+    sql_print_error("Failed to initialize dynamic plugins.");
     unireg_abort(MYSQLD_ABORT_EXIT);
   }
   plugins_are_initialized= TRUE;  /* Don't separate from init function */
@@ -5121,6 +5173,21 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   if (ha_recover(0))
   {
     unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (encrypt_binlog)
+  { 
+    if (!opt_master_verify_checksum ||
+        binlog_checksum_options == binary_log::BINLOG_CHECKSUM_ALG_OFF ||
+        binlog_checksum_options == binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
+    {
+      sql_print_error("BINLOG_ENCRYPTION requires MASTER_VERIFY_CHECKSUM = ON and "
+                      "BINLOG_CHECKSUM to be turned ON.");
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+    if (!opt_bin_log)
+      sql_print_information("binlog and relay log encryption enabled without binary logging being enabled. "
+                            "If relay logs are in use, they will be encrypted.");
   }
 
 #ifdef WITH_WSREP
@@ -5435,6 +5502,8 @@ int mysqld_main(int argc, char **argv)
   sys_var_init();
   ulong requested_open_files;
   adjust_related_options(&requested_open_files);
+  // moved signal initialization here so that PFS thread inherited signal mask
+  my_init_signals();
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
   if (ho_error == 0)
@@ -5538,8 +5607,6 @@ int mysqld_main(int argc, char **argv)
   if (init_common_variables())
     unireg_abort(MYSQLD_ABORT_EXIT);        // Will do exit
 
-  my_init_signals();
-
 #ifndef EMBEDDED_LIBRARY
   // Move connection handler initialization after the signal handling has been
   // set up. Percona Server threadpool constructor is heavy, and creates a
@@ -5598,15 +5665,6 @@ int mysqld_main(int argc, char **argv)
   srand(static_cast<uint>(time(NULL)));
 #endif
 
-  /*
-    We have enough space for fiddling with the argv, continue
-  */
-  if (my_setwd(mysql_real_data_home,MYF(MY_WME)) && !opt_help)
-  {
-    sql_print_error("failed to set datadir to %s", mysql_real_data_home);
-    unireg_abort(MYSQLD_ABORT_EXIT);        /* purecov: inspected */
-  }
-
 #ifndef _WIN32
   if ((user_info= check_user(mysqld_user)))
   {
@@ -5650,6 +5708,56 @@ int mysqld_main(int argc, char **argv)
       set_user(mysqld_user, user_info);
   }
 #endif // !_WIN32
+
+  /*
+   initiate key migration if any one of the migration specific
+   options are provided.
+  */
+  if (opt_keyring_migration_source ||
+      opt_keyring_migration_destination ||
+      migrate_connect_options)
+  {
+    Migrate_keyring mk;
+    if (mk.init(remaining_argc, remaining_argv,
+                opt_keyring_migration_source,
+                opt_keyring_migration_destination,
+                opt_keyring_migration_user,
+                opt_keyring_migration_host,
+                opt_keyring_migration_password,
+                opt_keyring_migration_socket,
+                opt_keyring_migration_port))
+    {
+      sql_print_error(ER_DEFAULT(ER_KEYRING_MIGRATION_STATUS),
+                      "failed");
+      log_error_dest= "stderr";
+      flush_error_log_messages();
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+
+    if (mk.execute())
+    {
+      sql_print_error(ER_DEFAULT(ER_KEYRING_MIGRATION_STATUS),
+                      "failed");
+      log_error_dest= "stderr";
+      flush_error_log_messages();
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+
+    sql_print_information(ER_DEFAULT(ER_KEYRING_MIGRATION_STATUS),
+                          "successfull");
+    log_error_dest= "stderr";
+    flush_error_log_messages();
+    unireg_abort(MYSQLD_SUCCESS_EXIT);
+  }
+
+  /*
+   We have enough space for fiddling with the argv, continue
+  */
+  if (my_setwd(mysql_real_data_home,MYF(MY_WME)) && !opt_help)
+  {
+    sql_print_error("failed to set datadir to %s", mysql_real_data_home);
+    unireg_abort(MYSQLD_ABORT_EXIT);        /* purecov: inspected */
+  }
 
   //If the binlog is enabled, one needs to provide a server-id
   if (opt_bin_log && !(server_id_supplied) )
@@ -5821,6 +5929,11 @@ int mysqld_main(int argc, char **argv)
 
     (prev_gtids_ev.common_footer)->checksum_alg=
       static_cast<enum_binlog_checksum_alg>(binlog_checksum_options);
+
+    Binlog_crypt_data *crypto_data= mysql_bin_log.get_crypto_data();
+
+    if (crypto_data->is_enabled())
+      prev_gtids_ev.event_encrypter.enable_encryption(crypto_data);
 
     if (prev_gtids_ev.write(mysql_bin_log.get_log_file()))
       unireg_abort(MYSQLD_ABORT_EXIT);
@@ -6043,8 +6156,7 @@ int mysqld_main(int argc, char **argv)
       sql_print_information(
               "Executing 'SELECT * FROM INFORMATION_SCHEMA.TABLES;' "
               "to get a list of tables using the deprecated partition "
-              "engine. You may use the startup option "
-              "'--disable-partition-engine-check' to skip this check. ");
+              "engine.");
 
       sql_print_information("Beginning of list of non-natively partitioned tables");
       (void) bootstrap_single_query(
@@ -6601,8 +6713,39 @@ struct my_option my_long_early_options[]=
   {"disable-partition-engine-check", 0,
    "Skip the check for non-natively partitioned tables during bootstrap. "
    "This option is deprecated along with the partition engine.",
-   &opt_disable_partition_check, &opt_disable_partition_check, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0,
-   0, 0},
+   &opt_disable_partition_check, &opt_disable_partition_check, 0, GET_BOOL,
+   NO_ARG, TRUE, 0, 0, 0, 0, 0},
+  {"keyring-migration-source", OPT_KEYRING_MIGRATION_SOURCE,
+   "Keyring plugin from where the keys needs to "
+   "be migrated to. This option must be specified along with "
+   "--keyring-migration-destination.",
+   &opt_keyring_migration_source, &opt_keyring_migration_source,
+   0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-destination", OPT_KEYRING_MIGRATION_DESTINATION,
+   "Keyring plugin to which the keys are "
+   "migrated to. This option must be specified along with "
+   "--keyring-migration-source.",
+   &opt_keyring_migration_destination, &opt_keyring_migration_destination,
+   0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-user", OPT_KEYRING_MIGRATION_USER,
+   "User to login to server.",
+   &opt_keyring_migration_user, &opt_keyring_migration_user,
+   0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-host", OPT_KEYRING_MIGRATION_HOST, "Connect to host.",
+   &opt_keyring_migration_host, &opt_keyring_migration_host,
+   0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-password", OPT_KEYRING_MIGRATION_PASSWORD,
+   "Password to use when connecting to server during keyring migration. "
+   "If password value is not specified then it will be asked from the tty.",
+   0, 0, 0, GET_PASSWORD, OPT_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-socket", OPT_KEYRING_MIGRATION_SOCKET,
+   "The socket file to use for connection.",
+   &opt_keyring_migration_socket, &opt_keyring_migration_socket,
+   0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"keyring-migration-port", OPT_KEYRING_MIGRATION_PORT,
+   "Port number to use for connection.",
+   &opt_keyring_migration_port, &opt_keyring_migration_port,
+   0, GET_ULONG, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
   { 0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -6773,8 +6916,9 @@ struct my_option my_long_options[]=
    REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
   {"log-tc-size", 0, "Size of transaction coordinator log.",
    &opt_tc_log_size, &opt_tc_log_size, 0, GET_ULONG,
-   REQUIRED_ARG, TC_LOG_MIN_SIZE, TC_LOG_MIN_SIZE, ULONG_MAX, 0,
-   TC_LOG_PAGE_SIZE, 0},
+   REQUIRED_ARG, TC_LOG_MIN_PAGES * my_getpagesize(),
+   TC_LOG_MIN_PAGES * my_getpagesize(), ULONG_MAX, 0,
+   my_getpagesize(), 0},
   {"master-info-file", 0,
    "The location and name of the file that remembers the master and where "
    "the I/O replication thread is in the master's binlogs.",
@@ -7186,6 +7330,7 @@ extern "C" void *start_wsrep_THD(void *arg)
   /* Set applier thread InnoDB priority */
   //set_thd_tx_priority(thd, rli->get_thd_tx_priority());
 
+  /* wsrep_running_threads counter is managed in thd_manager */
   thd_manager->add_thd(thd);
   thd_added= true;
 
@@ -9004,6 +9149,26 @@ pfs_error:
   case OPT_SHOW_OLD_TEMPORALS:
     push_deprecated_warn_no_replacement(NULL, "show_old_temporals");
     break;
+  case OPT_KEYRING_MIGRATION_PASSWORD:
+    if (argument)
+    {
+      char *start= argument;
+      opt_keyring_migration_password= my_strdup(PSI_NOT_INSTRUMENTED,
+        argument, MYF(MY_FAE));
+      while (*argument) *argument++= 'x';
+      if (*start)
+       start[1]= 0;
+    }
+    else
+      opt_keyring_migration_password= get_tty_password(NullS);
+    migrate_connect_options= 1;
+    break;
+  case OPT_KEYRING_MIGRATION_USER:
+  case OPT_KEYRING_MIGRATION_HOST:
+  case OPT_KEYRING_MIGRATION_SOCKET:
+  case OPT_KEYRING_MIGRATION_PORT:
+    migrate_connect_options= 1;
+    break;
   case OPT_ENFORCE_GTID_CONSISTENCY:
   {
     const char *wrong_value=
@@ -9359,6 +9524,9 @@ static void set_server_version(void)
       static_cast<int>(sizeof("-asan")))
     end= my_stpcpy(end, "-asan");
 #endif
+
+  DBUG_ASSERT(end < server_version + SERVER_VERSION_LENGTH);
+  my_stpcpy(server_version_suffix, server_version + strlen(MYSQL_SERVER_VERSION));
 }
 
 
@@ -9985,7 +10153,8 @@ PSI_mutex_key
   key_structure_guard_mutex, key_TABLE_SHARE_LOCK_ha_data,
   key_LOCK_error_messages,
   key_LOCK_log_throttle_qni, key_LOCK_query_plan, key_LOCK_thd_query,
-  key_LOCK_cost_const, key_LOCK_current_cond;
+  key_LOCK_cost_const, key_LOCK_current_cond,
+  key_LOCK_keyring_operations;
 #ifdef WITH_WSREP
 PSI_mutex_key key_LOCK_wsrep_ready, key_LOCK_wsrep_sst, key_LOCK_wsrep_sst_init,
   key_LOCK_wsrep_rollback, key_LOCK_wsrep_replaying;
@@ -10067,6 +10236,7 @@ static PSI_mutex_info all_server_mutexes[]=
   { &key_LOCK_sql_slave_skip_counter, "LOCK_sql_slave_skip_counter", PSI_FLAG_GLOBAL},
   { &key_LOCK_slave_net_timeout, "LOCK_slave_net_timeout", PSI_FLAG_GLOBAL},
   { &key_LOCK_server_started, "LOCK_server_started", PSI_FLAG_GLOBAL},
+  { &key_LOCK_keyring_operations, "LOCK_keyring_operations", PSI_FLAG_GLOBAL},
 #if !defined(EMBEDDED_LIBRARY) && !defined(_WIN32)
   { &key_LOCK_socket_listener_active, "LOCK_socket_listener_active", PSI_FLAG_GLOBAL},
   { &key_LOCK_start_signal_handler, "LOCK_start_signal_handler", PSI_FLAG_GLOBAL},

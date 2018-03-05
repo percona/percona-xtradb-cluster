@@ -23,6 +23,7 @@ SET(
     KEYRING_FILE_SOURCES
     common/keyring_key.cc
     common/keys_container.cc
+    common/keys_iterator.cc
     common/keyring_impl.cc
     keyring.cc
     hash_to_buffer_serializer.cc
@@ -48,6 +49,12 @@ IF(HAVE_DLOPEN)
     SET(DYNLIB_EXTENSION "so")
     SET_TARGET_PROPERTIES(keyring_file
       PROPERTIES LINK_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS}")
+ENDIF()
+
+# We limit symbols exported on Linux to only those required by server.
+IF(LINK_FLAG_NO_UNDEFINED)
+  GET_PROPERTY(keyring_file_link_flags TARGET keyring_file PROPERTY LINK_FLAGS)
+  SET_PROPERTY(TARGET keyring_file PROPERTY LINK_FLAGS "${keyring_file_link_flags} -Wl,--version-script=${CMAKE_SOURCE_DIR}/plugin/keyring/keyring_file.version")
 ENDIF()
 
 # Boost source has unused local typedefs.
