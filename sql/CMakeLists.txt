@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2017, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,10 +27,12 @@ INCLUDE_DIRECTORIES(
   ${WSREP_INCLUDES}
 )
 
+SET(CONF_SOURCES
+  ${CMAKE_CURRENT_BINARY_DIR}/sql_builtin.cc
+)
 SET(GEN_SOURCES
   ${CMAKE_CURRENT_BINARY_DIR}/sql_yacc.h 
   ${CMAKE_CURRENT_BINARY_DIR}/sql_yacc.cc
-  ${CMAKE_CURRENT_BINARY_DIR}/sql_builtin.cc
   ${CMAKE_CURRENT_BINARY_DIR}/lex_hash.h 
 )
 SET(GEN_DIGEST_SOURCES
@@ -38,6 +40,7 @@ SET(GEN_DIGEST_SOURCES
 )
 
 SET_SOURCE_FILES_PROPERTIES(${GEN_SOURCES}
+                            ${CONF_SOURCES}
                             ${GEN_DIGEST_SOURCES}
                             PROPERTIES GENERATED 1)
 
@@ -221,6 +224,7 @@ ENDIF()
 SET(SQL_SOURCE
   ${WSREP_SOURCES}
   ${GEN_SOURCES}
+  ${CONF_SOURCES}
   ${GEN_DIGEST_SOURCES}
   ${MYSYS_LIBWRAP_SOURCE}
   ${SQL_SHARED_SOURCES}

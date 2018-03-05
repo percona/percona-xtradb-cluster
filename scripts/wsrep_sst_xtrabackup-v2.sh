@@ -90,7 +90,7 @@ sst_ver=1
 if which pv &>/dev/null && pv --help | grep -q FORMAT;then 
     pvopts+=$pvformat
 fi
-pcmd="pv $pvopts"
+pcmd=""
 declare -a RC
 
 INNOBACKUPEX_BIN=innobackupex
@@ -271,7 +271,7 @@ get_transfer()
     fi
 
     if [[ $tfmt == 'nc' ]];then
-        if [[ ! -x `which nc` ]];then 
+        if [[ ! -x `which nc` ]];then
             wsrep_log_error "nc(netcat) not found in path: $PATH"
             exit 2
         fi
@@ -417,6 +417,9 @@ get_transfer()
 
 get_footprint()
 {
+    if [[ -z "$pcmd" ]]; then
+        return
+    fi
     pushd $WSREP_SST_OPT_DATA 1>/dev/null
     payload=$(find . -regex '.*\.ibd$\|.*\.MYI$\|.*\.MYD$\|.*ibdata1$' -type f -print0 | xargs -0 du --block-size=1 -c | awk 'END { print $1 }')
     if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF xtrabackup | grep -q -- "--compress";then 
@@ -431,16 +434,9 @@ get_footprint()
 
 adjust_progress()
 {
-
-    if [[ ! -x `which pv` ]];then 
-        wsrep_log_error "pv not found in path: $PATH"
-        wsrep_log_error "Disabling all progress/rate-limiting"
-        pcmd=""
-        rlimit=""
-        progress=""
+    if [[ -z "$pcmd" ]]; then
         return
     fi
-
     if [[ -n $progress && $progress != '1' ]];then 
         if [[ -e $progress ]];then 
             pcmd+=" 2>>$progress"
@@ -448,8 +444,8 @@ adjust_progress()
             pcmd+=" 2>$progress"
         fi
     elif [[ -z $progress && -n $rlimit  ]];then 
-            # When rlimit is non-zero
-            pcmd="pv -q"
+        # When rlimit is non-zero
+        pcmd="pv -q"
     fi 
 
     if [[ -n $rlimit && "$WSREP_SST_OPT_ROLE"  == "donor" ]];then
@@ -468,7 +464,6 @@ read_cnf()
     encrypt=$(parse_cnf sst encrypt 0)
     sockopt=$(parse_cnf sst sockopt "")
     ncsockopt=$(parse_cnf sst ncsockopt "")
-    progress=$(parse_cnf sst progress "")
     rebuild=$(parse_cnf sst rebuild 0)
     ttime=$(parse_cnf sst time 0)
     cpat=$(parse_cnf sst cpat '.*\.pem$\|.*init\.ok$\|.*galera\.cache$\|.*sst_in_progress$\|.*\.sst$\|.*gvwstate\.dat$\|.*grastate\.dat$\|.*\.err$\|.*\.log$\|.*RPM_UPGRADE_MARKER$\|.*RPM_UPGRADE_HISTORY$')
@@ -478,6 +473,20 @@ read_cnf()
     scomp=$(parse_cnf sst compressor "")
     sdecomp=$(parse_cnf sst decompressor "")
 
+    # If pv is not in the PATH, then disable the 'progress'
+    # and 'rlimit' options
+    progress=$(parse_cnf sst progress "")
+    rlimit=$(parse_cnf sst rlimit "")
+    if [[ -n "$progress" ]] || [[ -n "$rlimit" ]]; then
+        pcmd="pv $pvopts"
+        if [[ ! -x `which pv` ]]; then
+            wsrep_log_error "pv not found in path: $PATH"
+            wsrep_log_error "Disabling all progress/rate-limiting"
+            pcmd=""
+            rlimit=""
+            progress=""
+        fi
+    fi
 
     # Refer to http://www.percona.com/doc/percona-xtradb-cluster/manual/xtrabackup_sst.html 
     if [[ -z $ealgo ]];then
@@ -502,7 +511,6 @@ read_cnf()
 
     ssl_dhparams=$(parse_cnf sst ssl-dhparams "")
 
-    rlimit=$(parse_cnf sst rlimit "")
     uextra=$(parse_cnf sst use-extra 0)
     iopts=$(parse_cnf sst inno-backup-opts "")
     iapts=$(parse_cnf sst inno-apply-opts "")
@@ -1069,11 +1077,12 @@ then
 
         # Restore the transport commmand to its original state
         tcmd="$ttcmd"
-        if [[ -n $progress ]];then 
+        if [[ -n "$progress" ]];then
             get_footprint
-            tcmd="$pcmd | $tcmd"
-        elif [[ -n $rlimit ]];then 
+        elif [[ -n "$rlimit" ]];then
             adjust_progress
+        fi
+        if [[ -n "$pcmd" ]]; then
             tcmd="$pcmd | $tcmd"
         fi
 
@@ -1314,6 +1323,7 @@ then
                 else 
                     pvopts="-f -s $count -l -N Decompression"
                 fi
+
                 pcmd="pv $pvopts"
                 adjust_progress
                 dcmd="$pcmd | xargs -n 2 qpress -T${nproc}d"
@@ -1381,7 +1391,7 @@ then
 
         MAGIC_FILE="${TDATA}/${INFO_FILE}"
         set +e
-        rm $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
+        rm -f $TDATA/innobackup.prepare.log $TDATA/innobackup.move.log
         set -e
         wsrep_log_info "Moving the backup to ${TDATA}"
         timeit "Xtrabackup move stage" "$INNOMOVE"
