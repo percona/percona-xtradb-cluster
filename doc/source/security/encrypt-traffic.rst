@@ -4,27 +4,98 @@
 Encrypting PXC Traffic
 ======================
 
-|PXC| supports encryption for all traffic involved in cluster operation.
-This includes traffic between client applications and cluster nodes,
+There are two kinds of traffic in |PXC|: client-server traffic (the one between
+client applications and cluster nodes), and replication traffic, which includes
 :term:`SST`, :term:`IST`, write-set replication, and various service messages.
+|PXC| supports encryption for all types of traffic. Replication traffic
+encryption can be configured either in automatic or in manual mode. Both modes
+are considered in the following sections, and additional section covers manual
+configuration for client-server traffic encryption - the one which is now
+enabled in MySQL by default and can be used by a client.
 
 .. contents::
    :local:
    :depth: 1
 
+.. _ssl-auto-conf:
+
+SSL Automatic Configuration
+===========================
+
+Automatic configuration needs two steps to be done:
+
+1. :ref:`creating-certs`
+2. :ref:`enabling_encrypt-cluster-traffic`
+
+.. _creating-certs:
+
+Creating Certificates
+---------------------
+
+Automatic configuration of the SSL encryption needs key and certificate files.
+Starting from the version 5.7, |MySQL| generates default key and certificate
+files and places them in data directory. These auto-generated files are
+suitable for automatic SSL configuration, but you should use the same key and
+certificate files on all nodes. Also you can override auto-generated files with
+manually created ones, as covered by the :ref:`generate-keys-certs` section.
+
+Necessary key and certificate files are first searched at the ``ssl-ca``,
+``ssl-cert``, and ``ssl-key`` options under ``[mysqld]``. If these options are
+not set, it then looks in the data directory for :file:`ca.pem`,
+:file:`server-cert.pem`, and :file:`server-key.pem` files.
+
+.. note:: The ``[sst]`` section is not searched.
+
+If all three files are found, they are used to configure encryption with
+``encrypt=4`` mode (as explained in :ref:`xtrabackup` subsection), which
+enables encryption of the SST, IST, and replication traffic). If any of the
+files are missing, a fatal error is generated.
+
+.. _enabling_encrypt-cluster-traffic:
+
+Enabling :variable:`pxc-encrypt-cluster-traffic`
+------------------------------------------------
+
+|PXC| includes the :variable:`pxc-encrypt-cluster-traffic` variable that
+enables automatic configuration of SSL encryption there-by encrypting
+:term:`SST`, :term:`IST`, and replication traffic.
+
+This variable cannot be changed on the command line during runtime. To
+enable automatic configuration of SSL encryption, set
+``pxc-encrypt-cluster-traffic=ON`` in the the ``[mysqld]`` section of the
+:file:`my.cnf` file, and restart the cluster. Otherwise it is disabled,
+meaning that you need to configure SSL manually to have encrypted SST
+and IST traffic, and internal communication.
+
+.. note:: Setting ``pxc-encrypt-cluster-traffic=ON`` has effect of applying
+          the following settings in :file:`my.cnf` configuration file::
+
+           [mysqld]
+           wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
+
+           [sst]
+           encrypt=4
+           ssl-key=server-key.pem
+           ssl-ca=ca.pem
+           ssl-cert=server-cert.pem
+
+          For :variable:`wsrep_provider_options`, only the mentioned options are affected
+          (``socket.ssl_key``, ``socket,ssl_cert``, and ``socket.ssl_ca``),
+          the rest are not modified.
+
 .. _generate-keys-certs:
 
-Generating Keys and Certificates
-================================
+Generating Keys and Certificates Manually
+=========================================
 
-To encrypt |PXC| traffic, you must generate the following sets of files:
+As mentioned above, |MySQL| generates default key and certificate
+files and places them in data directory. If user wants to override these
+certificates, the following new sets of files can be generated:
 
 * *Certificate Authority (CA) key and certificate*
   to sign the server and client certificates.
-
 * *Server key and certificate*
   to secure database server activity and write-set replication traffic.
-
 * *Client key and certificate*
   to secure client communication traffic.
 
@@ -134,12 +205,15 @@ The following files are required:
   These files are required only if the node should act as a MySQL client.
   For example, if you are planning to perform SST using ``mysqldump``.
 
+.. note:: :ref:`upgrade-certs` subsection covers the details on upgrading
+   certificates, if necessary.
+
 .. _enable-encryption:
 
-Enabling Encryption
-===================
+Enabling Encryption Manually
+============================
 
-To enable encryption, you need to specify the location
+To enable encryption manually, you need to specify the location
 of the required key and certificate files in the |PXC| configuration.
 If you do not have the necessary files, see :ref:`generate-keys-certs`.
 
@@ -164,8 +238,8 @@ There are three aspects of |PXC| operation, where you can enable encryption:
 
 .. _encrypt-client-server:
 
-Encrypting Database Traffic
----------------------------
+Encrypting Client-Server Communication
+--------------------------------------
 
 |PXC| uses the underlying MySQL encryption mechanism
 to secure communication between client applications and cluster nodes.
@@ -200,10 +274,9 @@ Replication traffic refers to the following:
   is copying only missing transactions from DONOR to JOINER node.
 * Service messages ensure that all nodes are synchronized.
 
-All of this traffic is transferred
-via the same underlying communication channel (``gcomm``).
-Securing this channel will ensure that IST traffic, write-set replication,
-and service messages are encypted.
+All this traffic is transferred via the same underlying communication channel
+(``gcomm``). Securing this channel will ensure that :term:`IST` traffic,
+write-set replication, and service messages are encrypted.
 
 To enable encryption for all these processes,
 define the paths to the key, certificate and certificate authority files
@@ -220,6 +293,8 @@ in the configuration file::
 
 .. note:: You must use the same key and certificate files on all nodes,
    preferably those used for :ref:`encrypt-client-server`.
+
+.. _upgrade-certs:
 
 Upgrading Certificates
 **********************
@@ -268,20 +343,66 @@ and receives data from an existing node (DONOR).
 
 For more information, see :ref:`state_snapshot_transfer`.
 
-When copying encrypted data via SST,
-the keyring must be sent over with the files for decryption.
-Make sure that the following options are set in :file:`my.cnf` on all nodes:
+.. note:: If ``keyring_file`` plugin is used, then SST encryption is mandatory:
+          when copying encrypted data via SST, the keyring must be sent over
+          with the files for decryption. In this case following options are to
+          be set in :file:`my.cnf` on all nodes:
 
-.. code-block:: text
+          .. code-block:: text
 
-   early-plugin-load=keyring_file.so
-   keyring-file-data=/path/to/keyring/file
+             early-plugin-load=keyring_file.so
+             keyring-file-data=/path/to/keyring/file
 
-.. warning:: The cluster will not work
-   if keyring configuration across nodes is different.
+          The cluster will not work if keyring configuration across nodes is
+          different.
 
 The following SST methods are available:
-``rsync``, ``mysqldump``, and ``xtrabackup``.
+``xtrabackup``, ``rsync``, and ``mysqldump``.
+
+.. _xtrabackup:
+
+xtrabackup
+**********
+
+This is the default SST method (the :variable:`wsrep_sst_method` is set
+to ``xtrabackup-v2``), which uses |PXB|_ to perform non-blocking transfer
+of files. For more information, see :ref:`xtrabackup_sst`.
+
+Encryption mode for this method is selected using the :option:`encrypt` option:
+
+* ``encrypt=0`` is the default value, meaning that encryption is disabled.
+
+* ``encrypt=1``, ``encrypt=2``, and ``encrypt=3`` have been deprecated.
+
+* ``encrypt=4`` enables encryption based on key and certificate files
+  generated with OpenSSL.
+  For more information, see :ref:`generate-keys-certs`.
+
+  To enable encryption for SST using XtraBackup,
+  specify the location of the keys and certificate files
+  in the each node's configuration under ``[sst]``:
+
+  .. code-block:: text
+
+     [sst]
+     encrypt=4
+     ssl-ca=/etc/mysql/certs/ca.pem
+     ssl-cert=/etc/mysql/certs/server-cert.pem
+     ssl-key=/etc/mysql/certs/server-key.pem
+
+.. note:: SSL clients require DH parameters to be at least 1024 bits,
+   due to the `logjam vulnerability
+   <https://en.wikipedia.org/wiki/Logjam_(computer_security)>`_.
+   However, versions of ``socat`` earlier than 1.7.3 use 512-bit parameters.
+   If a :file:`dhparams.pem` file of required length
+   is not found during SST in the data directory,
+   it is generated with 2048 bits, which can take several minutes.
+   To avoid this delay, create the :file:`dhparams.pem` file manually
+   and place it in the data directory before joining the node to the cluster::
+
+    openssl dhparam -out /path/to/datadir/dhparams.pem 2048
+
+   For more information, see `this blog post <https://www.percona.com/blog/2017/04/23/percona-xtradb-cluster-dh-key-too-small-error-during-an-sst-using-ssl/>`_.
 
 rsync
 *****
@@ -361,93 +482,4 @@ in a running cluster:
 If you do everything correctly,
 ``mysqldump`` will connect to DONOR with the SST user,
 generate a dump file, and import it to JOINER node.
-
-xtrabackup
-----------
-
-This is the default SST method
-(the :variable:`wsrep_sst_method` is set to ``xtrabackup-v2``),
-which uses |PXB|_ to perform non-blocking transfer of files.
-For more information, see :ref:`xtrabackup_sst`.
-
-Encryption mode for this method is selected using the :option:`encrypt` option:
-
-* ``encrypt=0`` is the default value, meaning that encryption is disabled.
-
-* ``encrypt=1``, ``encrypt=2``, and ``encrypt=3`` have been deprecated.
-
-* ``encrypt=4`` enables encryption based on key and certificate files
-  generated with OpenSSL.
-  For more informations, see :ref:`generate-keys-certs`.
-
-  To enable encryption for SST using XtraBackup,
-  specify the location of the keys and certificate files
-  in the each node's configuration under ``[sst]``:
-
-  .. code-block:: text
-
-     [sst]
-     encrypt=4
-     ssl-ca=/etc/mysql/certs/ca.pem
-     ssl-cert=/etc/mysql/certs/server-cert.pem
-     ssl-key=/etc/mysql/certs/server-key.pem
-
-.. note:: SSL clients require DH parameters to be at least 1024 bits,
-   due to the `logjam vulnearability
-   <https://en.wikipedia.org/wiki/Logjam_(computer_security)>`_.
-   However, versions of ``socat`` earlier than 1.7.3 use 512-bit parameters.
-   If a :file:`dhparams.pem` file of required length
-   is not found during SST in the data directory,
-   it is generated with 2048 bits, which can take several minutes.
-   To avoid this delay, create the :file:`dhparams.pem` file manually
-   and place it in the data directory before joining the node to the cluster::
-
-    openssl dhparam -out /path/to/datadir/dhparams.pem 2048
-
-   For more information, see `this blog post <https://www.percona.com/blog/2017/04/23/percona-xtradb-cluster-dh-key-too-small-error-during-an-sst-using-ssl/>`_.
-
-.. _ssl-auto-conf:
-
-SSL Automatic Configuration
-===========================
-
-|PXC| includes the :variable:`pxc-encrypt-cluster-traffic` variable
-that enables automatic configuration of SSL encrytion.
-By default, it is disabled, meaning that you need to configure SSL manually
-if you want to encrypt SST and IST traffic, and internal communication.
-
-This variable cannot be changed on the command line during runtime.
-To enable automatic configuration of SSL encryption,
-set ``pxc-encrypt-cluster-traffic=ON`` in the :file:`my.cnf` file
-and restart the cluster.
-
-When you enable automatic configuration of SSL encryption,
-it looks for necessary key and certificate files in
-the ``ssl-ca``, ``ssl-cert``, and ``ssl-key`` options under ``[mysqld]``.
-If these options are not set, it then looks in the data directory for
-:file:`ca.pem`, :file:`server-cert.pem`, and :file:`server-key.pem` files.
-
-.. note:: The ``[sst]`` section is not searched.
-
-If all three files are found,
-they are used to configure encryption for SST
-using XtraBackup with ``encrypt=4``.
-Other modes are deprecated and will be overriden
-if automatic configuration of SSL encryption is enabled.
-If any of the files are missing, a fatal error is generated.
-
-The following settings are applied (and overridden if necessary)::
-
- [mysqld]
- wsrep_provider_options=”socket.ssl_key=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem”
-
- [sst]
- encrypt=4
- ssl-key=server-key.pem
- ssl-ca=ca.pem
- ssl-cert=server-cert.pem
-
-For :variable:`wsrep_provider_options`, only the mentioned options are affected
-(``socket.ssl_key``, ``socket,ssl_cert``, and ``socket.ssl_ca``),
-the rest are not modified.
 
