@@ -124,14 +124,30 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
   if (!trust_function_creators                                && 
       (WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open())  &&
       !(thd->security_context()->check_access(SUPER_ACL)))
+  {
+    /*
+      If WSREP is enabled, then we are ALWAYS doing binlog
+      replication of some sort, and we always require the SUPER
+      privilege (or trust_function_creators).
+      So there is no need to mention anything about the binlog.
+    */
+    if (WSREP(thd))
+      my_message(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER,
+                "You do not have the SUPER privilege"
+                " (you *might* want to use the less safe log_bin_trust_function_creators variable)",
+                MYF(0));
+    else
+      my_error(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER, MYF(0));
+    DBUG_RETURN(TRUE);
+  }
 #else
   if (!trust_function_creators && mysql_bin_log.is_open() &&
       !(thd->security_context()->check_access(SUPER_ACL)))
-#endif /* WITH_WSREP */
   {
     my_error(ER_BINLOG_CREATE_ROUTINE_NEED_SUPER, MYF(0));
     DBUG_RETURN(TRUE);
   }
+#endif /* WITH_WSREP */
 
   if (!create)
   {
