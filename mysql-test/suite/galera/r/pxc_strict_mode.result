@@ -5,8 +5,8 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of RELEASE_LOCK");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of GET_LOCK");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend setting binlog_format to STATEMENT or MIXED");
@@ -971,6 +971,8 @@ release_lock('a')
 1
 flush table tinnodb with read lock;
 unlock tables;
+flush table tinnodb for export;
+unlock tables;
 set session transaction isolation level serializable;
 flush table with read lock;
 unlock tables;
@@ -1005,6 +1007,8 @@ select release_lock('a');
 release_lock('a')
 1
 flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
 unlock tables;
 set session transaction isolation level serializable;
 flush table with read lock;
@@ -1053,6 +1057,10 @@ flush table tinnodb with read lock;
 Warnings:
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = PERMISSIVE
 unlock tables;
+flush table tinnodb for export;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = PERMISSIVE
+unlock tables;
 set session transaction isolation level serializable;
 Warnings:
 Warning	1105	Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation with pxc_strict_mode = PERMISSIVE
@@ -1084,17 +1092,20 @@ i
 1
 2
 lock table tinnodb read;
-ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = ENFORCING
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
 unlock tables;
 lock table tinnodb write;
-ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = ENFORCING
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
 unlock tables;
 select get_lock('a', 10);
 ERROR HY000: Percona-XtraDB-Cluster prohibits use of GET_LOCK with pxc_strict_mode = ENFORCING
 select release_lock('a');
 ERROR HY000: Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK with pxc_strict_mode = ENFORCING
 flush table tinnodb with read lock;
-ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK with pxc_strict_mode = ENFORCING
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
+unlock tables;
+flush table tinnodb for export;
+ERROR HY000: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT with pxc_strict_mode = ENFORCING
 unlock tables;
 set session transaction isolation level serializable;
 ERROR HY000: Percona-XtraDB-Cluster doesn't recommend using SERIALIZABLE isolation with pxc_strict_mode = ENFORCING

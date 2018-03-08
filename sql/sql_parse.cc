@@ -1385,7 +1385,7 @@ static bool pxc_strict_mode_lock_check(THD* thd)
     break;
   case PXC_STRICT_MODE_PERMISSIVE:
     WSREP_WARN("Percona-XtraDB-Cluster doesn't recommend use of"
-               " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK"
+               " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT"
                " with pxc_strict_mode = PERMISSIVE");
     push_warning_printf(
         thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
@@ -1397,12 +1397,12 @@ static bool pxc_strict_mode_lock_check(THD* thd)
   default:
     block= true;
     WSREP_ERROR("Percona-XtraDB-Cluster prohibits use of"
-                " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK"
+                " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT"
                 " with pxc_strict_mode = ENFORCING");
     char message[1024];
     sprintf(message,
             "Percona-XtraDB-Cluster prohibits use of"
-            " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK"
+            " LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT"
             " with pxc_strict_mode = ENFORCING");
     my_message(ER_UNKNOWN_ERROR, message, MYF(0));
     break;
@@ -5081,9 +5081,13 @@ end_with_restore_list:
     }
     else if (first_table && lex->type & REFRESH_FOR_EXPORT)
     {
+
 #ifdef WITH_WSREP
+      if (pxc_strict_mode_lock_check(thd))
+        goto error;
       bool already_paused;
-#endif
+#endif /* WITH_WSREP */
+
       /*
          Do not allow FLUSH TABLES ... FOR EXPORT under an active LOCK TABLES
          FOR BACKUP lock.
