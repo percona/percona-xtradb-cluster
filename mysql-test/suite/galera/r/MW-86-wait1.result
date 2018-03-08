@@ -35,6 +35,29 @@ SET GLOBAL debug = "-d,sync.wsrep_apply_cb";
 SET SESSION debug_sync = "now SIGNAL signal.wsrep_apply_cb";
 SET SESSION wsrep_sync_wait = default;
 DROP TABLE t_wait1;
+SET GLOBAL wsrep_provider_options = 'repl.causal_read_timeout=PT0.5S';
+# Node 1
+CREATE TABLE t1(id INT PRIMARY KEY);
+# Node 2 : block at the point right after we have left the commit monitor
+SET GLOBAL wsrep_provider_options = 'dbug=d,sync.applier_interim_commit.after_commit_leave';
+# Node 1 : Perform the insert. This will succeed on node1 but will block on node2
+INSERT INTO t1 VALUES(1);
+# Node 2 : Wait for the commit point
+SET SESSION wsrep_sync_wait = 0;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET SESSION wsrep_sync_wait = 1;
+# Node 2 : try a SELECT, this should timeout
+SELECT COUNT(*) FROM t1;
+ERROR HY000: Lock wait timeout exceeded; try restarting transaction
+# Node 2 : Unblock the commit point
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=sync.applier_interim_commit.after_commit_leave';
+SELECT COUNT(*) FROM t1;
+COUNT(*)
+1
+SET SESSION wsrep_sync_wait = default;
+DROP TABLE t1;
 SELECT @@debug_sync;
 @@debug_sync
 ON - signals: ''
