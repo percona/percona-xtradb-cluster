@@ -32,8 +32,8 @@ call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of GET_LOCK");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of RELEASE_LOCK");
 
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
-call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
+call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of LOCK TABLE/FLUSH TABLE <table> WITH READ LOCK/FOR EXPORT");
 
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster doesn't recommend use of CREATE TABLE AS SELECT");
 call mtr.add_suppression("WSREP: Percona-XtraDB-Cluster prohibits use of CREATE TABLE AS SELECT");
@@ -1042,6 +1042,8 @@ select get_lock('a', 10);
 select release_lock('a');
 flush table tinnodb with read lock;
 unlock tables;
+flush table tinnodb for export;
+unlock tables;
 set session transaction isolation level serializable;
 #
 # they should continue to work ir-respective of mode.
@@ -1077,6 +1079,8 @@ unlock tables;
 select get_lock('a', 10);
 select release_lock('a');
 flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
 unlock tables;
 set session transaction isolation level serializable;
 #
@@ -1115,6 +1119,8 @@ unlock tables;
 select get_lock('a', 10);
 select release_lock('a');
 flush table tinnodb with read lock;
+unlock tables;
+flush table tinnodb for export;
 unlock tables;
 set session transaction isolation level serializable;
 #
@@ -1161,6 +1167,9 @@ select get_lock('a', 10);
 select release_lock('a');
 --error ER_UNKNOWN_ERROR
 flush table tinnodb with read lock;
+unlock tables;
+--error ER_UNKNOWN_ERROR
+flush table tinnodb for export;
 unlock tables;
 --error ER_UNKNOWN_ERROR
 set session transaction isolation level serializable;
