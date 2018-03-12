@@ -31,6 +31,18 @@ CREATE TABLE t2 ENGINE=InnoDB AS SELECT * from t1;
 --let $wait_condition = SELECT COUNT(*) = 0 FROM t2
 --source include/wait_condition.inc
 
+#
+# PXC-2073 : Call CTAS on node_2 with an empty source table
+#
+--connection node_2
+CREATE TABLE t3 ENGINE=InnoDB AS SELECT * FROM t1;
+
+--connection node_1
+# Make sure the CTAS statement is replicated before continuing
+--let $wait_condition = SELECT COUNT(*) = 0 FROM t3
+--source include/wait_condition.inc
+
 --connection node_1
 DROP TABLE t1;
 DROP TABLE t2;
+DROP TABLE t3;
