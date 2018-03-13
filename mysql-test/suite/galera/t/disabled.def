@@ -6,6 +6,6 @@ galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.
 galera.galera_sst_xtrabackup-v2_keyring : Cannot find the said keyring plugin.
 galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
 galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of action is causing an issue.
-galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+#galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
 galera_garbd : Failing to find the garbd binary after new minimal image change.
 galera_gcache_recover_manytrx : timing issue that causes it to fail intermittently.
