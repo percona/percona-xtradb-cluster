@@ -3910,7 +3910,21 @@ reexecute:
     thd->pop_reprepare_observer();
     observer_popped= true;
     (void)wsrep_replay_transaction(thd);
-    thd->wsrep_conflict_state= REPLAYED;
+    // This extra state was added as a workaround fix to help skip
+    // lex->unit->cleanup. While writing this commit-message, commenting
+    // the said conflict_state doesn't cause galera_transaction_replay
+    // test-case to fail which was suppose to fail and so the fix was
+    // added.
+    // Why it is wrong to set the conflict_state at this point ?
+    // As part of replay transaction flow, conflict_state is already reset
+    // to NO_CONFLICT on completion. Resetting it to replay will not cause
+    // it to clear-up if prepare statement is executed through COM_STMT_EXECUTE
+    // mysql direct api call.
+    // Of-course the block of COM_STMT_EXECUTE can reset it as it is being done
+    // by mysql_execute_command block but this vary logic of setting REPLAYED
+    // state is questionable. Leaving the original code block as is for now
+    // just commenting the existing conflict_state setting.
+    // thd->wsrep_conflict_state= REPLAYED;
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
     break;
 
