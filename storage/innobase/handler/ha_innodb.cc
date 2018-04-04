@@ -8771,6 +8771,7 @@ ha_innobase::write_row(
 #endif
 
 	DBUG_ENTER("ha_innobase::write_row");
+	DEBUG_SYNC(m_user_thd, "ha_innobase_write_row");
 
 	if (dict_table_is_intrinsic(m_prebuilt->table)) {
 		DBUG_RETURN(intrinsic_table_write_row(record));
@@ -9795,6 +9796,7 @@ ha_innobase::update_row(
 	trx_t*		trx = thd_to_trx(m_user_thd);
 
 	DBUG_ENTER("ha_innobase::update_row");
+	DEBUG_SYNC(m_user_thd, "ha_innobase_update_row");
 
 	ut_a(m_prebuilt->trx == trx);
 

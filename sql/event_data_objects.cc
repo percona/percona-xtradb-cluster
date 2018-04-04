@@ -33,6 +33,8 @@
 
 #include "mysql/psi/mysql_sp.h"
 
+#include "wsrep_thd.h"
+
 /**
   @addtogroup Event_Scheduler
   @{
@@ -1446,6 +1448,26 @@ Event_job_data::execute(THD *thd, bool drop)
       There is no pre-locking and therefore there should be no
       tables open and locked left after execute_procedure.
     */
+
+#ifdef WITH_WSREP
+    /*
+      If the thread has been killed, rollback the operation
+      properly (for WSREP).
+    */
+    if (WSREP(thd))
+    {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      if (thd->wsrep_conflict_state == MUST_ABORT)
+      {
+        wsrep_client_rollback(thd);
+        wsrep_cleanup_transaction(thd);
+
+        WSREP_DEBUG("abort the event in exec query state, avoiding autocommit");
+      }
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    }
+#endif /* WITH_WSREP */
+
   }
 
 end:
