@@ -8211,6 +8211,8 @@ ha_innobase::write_row(
 
 	DBUG_ENTER("ha_innobase::write_row");
 
+	DEBUG_SYNC(user_thd, "ha_innobase_write_row");
+
 	if (high_level_read_only) {
 		ib_senderrf(ha_thd(), IB_LOG_LEVEL_WARN, ER_READ_ONLY_MODE);
 		DBUG_RETURN(HA_ERR_TABLE_READONLY);
@@ -8978,6 +8980,8 @@ ha_innobase::update_row(
 	trx_t*		trx = thd_to_trx(user_thd);
 
 	DBUG_ENTER("ha_innobase::update_row");
+
+	DEBUG_SYNC(user_thd, "ha_innobase_update_row");
 
 	ut_a(prebuilt->trx == trx);
 
