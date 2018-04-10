@@ -37,3 +37,23 @@ SELECT COUNT(*) FROM t1;
 COUNT(*)
 95000
 DROP TABLE t1;
+#node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+SELECT COUNT(*) = 95000 FROM t1;
+COUNT(*) = 95000
+1
+TRUNCATE TABLE t1;
+set global wsrep_max_ws_rows=100;
+ERROR HY000: wsrep_max_ws_rows exceeded
+set session wsrep_on=0;
+SELECT COUNT(*) = 95000 FROM t1;
+COUNT(*) = 95000
+1
+set session wsrep_on=1;
+#node-2
+SELECT COUNT(*) = 0 FROM t1;
+COUNT(*) = 0
+1
+#node-1
+set global wsrep_max_ws_rows = 0;;
+DROP TABLE t1;

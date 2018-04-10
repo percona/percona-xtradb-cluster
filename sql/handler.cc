@@ -8449,7 +8449,7 @@ int binlog_log_row(TABLE* table,
   }
 
   /* enforce wsrep_max_ws_rows */
-  if (table->s->tmp_table == NO_TMP_TABLE)
+  if (WSREP(thd) && table->s->tmp_table == NO_TMP_TABLE)
   {
     thd->wsrep_affected_rows++;
     if (wsrep_max_ws_rows &&

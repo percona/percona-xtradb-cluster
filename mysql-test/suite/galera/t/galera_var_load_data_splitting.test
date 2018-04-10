@@ -79,3 +79,43 @@ SELECT COUNT(*) FROM t1;
 --echo #node-2
 SELECT COUNT(*) FROM t1;
 DROP TABLE t1;
+
+
+#
+# testing load of data with wsrep-on=off
+#
+--connection node_1
+--echo #node-1
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=InnoDB;
+--disable_query_log
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+SELECT COUNT(*) = 95000 FROM t1;
+
+#
+TRUNCATE TABLE t1;
+--let $wsrep_max_ws_rows_saved = `SELECT @@wsrep_max_ws_rows`
+set global wsrep_max_ws_rows=100;
+--disable_query_log
+--error ER_ERROR_DURING_COMMIT
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+
+#
+set session wsrep_on=0;
+--disable_query_log
+--eval LOAD DATA INFILE '$MYSQLTEST_VARDIR/tmp/galera_var_load_data_splitting.csv' INTO TABLE t1;
+--enable_query_log
+SELECT COUNT(*) = 95000 FROM t1;
+set session wsrep_on=1;
+
+#
+--connection node_2
+--echo #node-2
+SELECT COUNT(*) = 0 FROM t1;
+
+#
+--connection node_1
+--echo #node-1
+--eval set global wsrep_max_ws_rows = $wsrep_max_ws_rows_saved;
+DROP TABLE t1;
