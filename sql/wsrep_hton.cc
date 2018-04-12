@@ -516,10 +516,9 @@ wsrep_run_wsrep_commit(THD *thd, handlerton *hton, bool all)
     DBUG_RETURN(WSREP_TRX_ERROR);
   }
 
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-
   DEBUG_SYNC(thd, "wsrep_after_replication");
 
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch(rcode) {
   case 0:
     /*
