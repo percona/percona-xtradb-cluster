@@ -1118,10 +1118,9 @@ enum wsrep_trx_status wsrep_pre_commit(THD *thd)
     mysql_mutex_unlock(&LOCK_wsrep_replaying);
   }
 
-  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
-
   DEBUG_SYNC(thd, "wsrep_after_replication");
 
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
   switch(rcode) {
   case 0:
     /*
