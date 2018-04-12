@@ -2088,7 +2088,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
                " for schema: %s, query: %s",
                ret, (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     my_error(ER_LOCK_DEADLOCK, MYF(0));
-    return(ret);
+    return(-1);
   }
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
@@ -2113,7 +2113,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     }
 
     my_error(ER_LOCK_DEADLOCK, MYF(0));
-    return(1);
+    return(-1);
   }
 
   seqno = wsrep->pause(wsrep);
@@ -2125,7 +2125,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     /* Pause fail so rollback desync action too. */
     wsrep->resync(wsrep);
 
-    return(1);
+    return(-1);
   }
   thd->global_read_lock.pause_provider(true);
   WSREP_DEBUG("Provider paused for RSU processing at seqno: %lld",
