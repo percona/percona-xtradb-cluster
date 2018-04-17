@@ -3015,6 +3015,15 @@ public:
   */
   virtual bool has_gap_locks() const { return false; }
 
+  /**
+    Query storage engine to see if it can support handling specific replication
+    method in its current configuration.
+  */
+  virtual bool rpl_can_handle_stm_event() const
+  {
+    return true;
+  }
+
 protected:
   static bool is_using_full_key(key_part_map keypart_map, uint actual_key_parts);
   bool is_using_full_unique_key(uint active_index,
@@ -3167,7 +3176,16 @@ public:
       insert_id_for_cur_row;
   }
 
+  /*
+     This function allows the storage engine to adust the create_info before
+     the frm is written based on it.
+     This can be used for example to modify the create statement based on a
+     storage engine specific setting.
+   */
+  virtual void adjust_create_info_for_frm(HA_CREATE_INFO *create_info) {}
+
   virtual void update_create_info(HA_CREATE_INFO *create_info) {}
+
   int check_old_types();
   virtual int assign_to_keycache(THD* thd, HA_CHECK_OPT* check_opt)
   { return HA_ADMIN_NOT_IMPLEMENTED; }
@@ -3762,7 +3780,70 @@ protected:
 public:
  /* End of On-line/in-place ALTER TABLE interface. */
 
+  /**
+    @brief Offload an update to the storage engine. See handler::fast_update()
+    for details.
+  */
+  MY_NODISCARD int ha_fast_update(THD *thd,
+                                  List<Item> &update_fields,
+                                  List<Item> &update_values,
+                                  Item *conds);
 
+  /**
+    @brief Offload an upsert to the storage engine. See handler::upsert()
+    for details.
+  */
+  MY_NODISCARD int ha_upsert(THD *thd,
+                             List<Item> &update_fields,
+                             List<Item> &update_values);
+private:
+  /**
+    Offload an update to the storage engine implementation.
+
+    @param    thd              The thread handle.
+    @param    update_fields    The list of fields to update.
+    @param    update_values    The list of new values for the fields
+                               in update_fields.
+    @param    conds            Conditions tree.
+
+    @retval   0                if the storage engine handled the update.
+    @retval   ENOTSUP          if the storage engine can not handle the
+                               update and the slow update code path should
+                               continue executing the update.
+
+    @return an error if the update should be terminated.
+
+    @note HA_READ_BEFORE_WRITE_REMOVAL flag doesn not fit there because
+    handler::ha_update_row(...) does not accept conditions.
+  */
+  MY_NODISCARD virtual int fast_update(THD *thd,
+                                       List<Item> &update_fields,
+                                       List<Item> &update_values,
+                                       Item *conds)
+  { return ENOTSUP; }
+
+  /**
+    Offload an upsert to the storage engine implementation. Expects the row
+    to be stored in record[0].
+
+    @param    thd              The thread handle.
+    @param    update_fields    The list of fields to update.
+    @param    update_values    The list of new values for the fields
+                               in update_fields.
+
+    @retval   0                if the storage engine handled the upsert.
+    @retval   ENOTSUP          if the storage engine can not handle the upsert
+                               and the slow insert code path should continue
+                               executing the insert.
+
+    @return an error if the insert should be terminated.
+  */
+  MY_NODISCARD virtual int upsert(THD *thd,
+                                  List<Item> &update_fields,
+                                  List<Item> &update_values)
+  { return ENOTSUP; }
+
+public:
   /**
     use_hidden_primary_key() is called in case of an update/delete when
     (table_flags() and HA_PRIMARY_KEY_REQUIRED_FOR_DELETE) is defined

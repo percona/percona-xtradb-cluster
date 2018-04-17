@@ -141,6 +141,18 @@ struct srv_stats_t {
 
 	/** Number of buffered aio requests submitted */
 	ulint_ctr_64_t		n_aio_submitted;
+
+	/* Number of merge blocks encrypted */
+	ulint_ctr_64_t          n_merge_blocks_encrypted;
+
+	/* Number of merge blocks decrypted */
+	ulint_ctr_64_t          n_merge_blocks_decrypted;
+
+	/* Number of row log blocks encrypted */
+	ulint_ctr_64_t          n_rowlog_blocks_encrypted;
+
+	/* Number of row log blocks decrypted */
+	ulint_ctr_64_t          n_rowlog_blocks_decrypted;
 };
 
 extern const char*	srv_main_thread_op_info;
@@ -287,6 +299,9 @@ extern my_bool	srv_undo_log_truncate;
 
 /** UNDO logs not redo logged, these logs reside in the temp tablespace.*/
 extern const ulong	srv_tmp_undo_logs;
+
+/** Enable or disable encryption of temporary tablespace.*/
+extern my_bool	srv_tmp_tablespace_encrypt;
 
 
 /** Whether the redo log tracking is currently enabled. Note that it is
@@ -511,12 +526,17 @@ extern my_bool	srv_purge_view_update_only_debug;
 
 /** Value of MySQL global used to disable master thread. */
 extern my_bool	srv_master_thread_disabled_debug;
+/** Pause master thread in the middle of enabling of temporary tablespace
+encryption */
+extern ulint	srv_master_encrypt_debug;
 #endif /* UNIV_DEBUG */
 
 extern ulint	srv_fatal_semaphore_wait_threshold;
 #define SRV_SEMAPHORE_WAIT_EXTENSION	7200
 extern ulint	srv_dml_needed_delay;
 extern lint	srv_kill_idle_transaction;
+
+extern my_bool	srv_encrypt_online_alter_logs;
 
 #define SRV_MAX_N_IO_THREADS	130
 
@@ -571,6 +591,8 @@ extern my_bool srv_print_all_deadlocks;
 extern my_bool srv_print_lock_wait_timeout_info;
 
 extern my_bool	srv_cmp_per_index_enabled;
+
+extern ulong srv_encrypt_tables;
 
 /** Number of times secondary index lookup triggered cluster lookup */
 extern ulint	srv_sec_rec_cluster_reads;
@@ -1100,6 +1122,11 @@ struct export_var_t{
 						index lookups when freeing
 						file pages */
 #endif /* UNIV_DEBUG */
+	ib_uint64_t innodb_n_merge_blocks_encrypted;/*!< Number of merge blocks encrypted */
+	ib_uint64_t innodb_n_merge_blocks_decrypted;/*!< Number of merge blocks decrypted */
+	ib_uint64_t innodb_n_rowlog_blocks_encrypted;/*!< Number of row log blocks encrypted */
+	ib_uint64_t innodb_n_rowlog_blocks_decrypted;/*!< Number of row log blocks decrypted */
+
 	ulint innodb_sec_rec_cluster_reads;	/*!< srv_sec_rec_cluster_reads */
 	ulint innodb_sec_rec_cluster_reads_avoided; /*!< srv_sec_rec_cluster_reads_avoided */
 

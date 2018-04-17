@@ -48,6 +48,10 @@ Also, all variables can exist in one or both of the following scopes:
      - Yes
      - No
      - Global
+   * - :variable:`rocksdb_allow_to_start_after_corruption`
+     - Yes
+     - No
+     - Global
    * - :variable:`rocksdb_allow_mmap_reads`
      - Yes
      - No
@@ -90,7 +94,7 @@ Also, all variables can exist in one or both of the following scopes:
      - Global
    * - :variable:`rocksdb_bytes_per_sync`
      - Yes
-     - No
+     - Yes
      - Global
    * - :variable:`rocksdb_cache_index_and_filter_blocks`
      - Yes
@@ -460,6 +464,10 @@ Also, all variables can exist in one or both of the following scopes:
      - Yes
      - Yes
      - Global, Session
+   * - :variable:`rocksdb_two_write_queues`
+     - Yes
+     - No
+     - Global
    * - :variable:`rocksdb_trace_sst_api`
      - Yes
      - Yes
@@ -498,7 +506,7 @@ Also, all variables can exist in one or both of the following scopes:
      - Global, Session
    * - :variable:`rocksdb_wal_bytes_per_sync`
      - Yes
-     - No
+     - Yes
      - Global
    * - :variable:`rocksdb_wal_dir`
      - Yes
@@ -576,6 +584,24 @@ Enabled by default.
 
 Specifies whether to allow multiple writers to update memtables in parallel.
 Disabled by default.
+
+.. variable:: rocksdb_allow_to_start_after_corruption
+
+  :version 5.7.21-20: Implemented
+  :cli: ``--rocksdb_allow_to_start_after_corruption``
+  :dyn: No
+  :scope: Global
+  :vartype: Boolean
+  :default: ``OFF``
+
+Specifies whether to allow server to restart once MyRocks reported data
+corruption. Disabled by default. 
+
+Once corruption is detected server writes marker file (named
+ROCKSDB_CORRUPTED) in the data directory and aborts. If marker file exists,
+then mysqld exits on startup with an error message. The restart failure will
+continue until the problem is solved or until mysqld is started with this
+variable turned on in the command line.
 
 .. note:: Not all memtables support concurrent writes.
 
@@ -741,8 +767,9 @@ Allowed range is from ``1`` to ``1073741824``.
 .. variable:: rocksdb_bytes_per_sync
 
   :version 5.7.19-17: Implemented
+  :version 5.7.21-20: Changed to dynamic
   :cli: ``--rocksdb-bytes-per-sync``
-  :dyn: No
+  :dyn: Yes
   :scope: Global
   :vartype: Numeric
   :default: ``0``
@@ -915,7 +942,9 @@ Allowed range is up to ``2000000`` (two million).
   :default: ``ON``
 
 When enabled this variable allows/encourages threads that are using
-two-phase commit to ``prepare`` in parallel.
+two-phase commit to ``prepare`` in parallel. Variable has been
+deprecated in the |Percona Server| 5.7.21-20, as it has been
+renamed in upstream to :variable:`rocksdb_two_write_queues`.
 
 .. variable:: rocksdb_create_checkpoint
 
@@ -1233,6 +1262,7 @@ Possible values:
 .. variable:: rocksdb_flush_memtable_on_analyze
 
   :version 5.7.19-17: Implemented
+  :version 5.7.21-20: Variable removed
   :cli: ``--rocksdb-flush-memtable-on-analyze``
   :dyn: Yes
   :scope: Global, Session
@@ -2074,6 +2104,18 @@ Specifies whether to generate trace output in the log
 for each call to ``SstFileWriter``.
 Disabled by default.
 
+.. variable:: rocksdb_two_write_queues
+
+  :version 5.7.21-20: Implemented
+  :cli: ``--rocksdb-two_write_queues``
+  :dyn: No
+  :scope: Global
+  :vartype: Boolean
+  :default: ``ON``
+
+When enabled this variable allows/encourages threads that are using
+two-phase commit to ``prepare`` in parallel.
+
 .. variable:: rocksdb_unsafe_for_binlog
 
   :version 5.7.19-17: Implemented
@@ -2183,8 +2225,9 @@ Disabled by default.
 .. variable:: rocksdb_wal_bytes_per_sync
 
   :version 5.7.19-17: Implemented
+  :version 5.7.21-20: Changed to dynamic
   :cli: ``--rocksdb-wal-bytes-per-sync``
-  :dyn: No
+  :dyn: Yes
   :scope: Global
   :vartype: Numeric
   :default: ``0``
