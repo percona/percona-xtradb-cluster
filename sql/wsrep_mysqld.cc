@@ -71,6 +71,10 @@ my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
                                             // restart will be needed
 my_bool wsrep_slave_UK_checks          = 0; // slave thread does UK checks
 my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
+ulong   wsrep_RSU_commit_timeout       = 5000; // wait for x micr-secs
+                                               // to allow active connection to
+                                               // commit before starting RSU.
+
 /*
  * End configuration options
  */
