@@ -262,7 +262,7 @@ INSERT INTO global_suppressions VALUES
  ("Insecure configuration for --secure-file-priv:*"),
 
  /*
-   Galera suppressions 
+   Galera suppressions
  */
  ("WSREP:*down context*"),
  ("WSREP: Failed to send state UUID:*"),
@@ -311,7 +311,14 @@ INSERT INTO global_suppressions VALUES
  ("install timer expired"),
  ("Last Applied Action message in non-primary configuration from member"),
  ("InnoDB High Priority being used"),
-  /*
+
+ /*
+   Bug#26585560, warning related to --pid-file
+ */
+ ("Insecure configuration for --pid-file:*"),
+ ("Few location(s) are inaccessible while checking PID filepath"),
+
+ /*
    On slow runs (valgrind) the message may be sent twice.
   */
  ("The member with address .* has already sent the stable set. Therefore discarding the second message."),

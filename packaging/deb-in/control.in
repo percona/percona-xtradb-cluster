@@ -9,9 +9,12 @@ Build-Depends: bison,
                debhelper (>= 9.0.0),
                fakeroot,
                libaio-dev[linux-any],
+               libjson-perl,
+               libldap2-dev,
                libmecab-dev,
                libncurses5-dev (>= 5.0-6),
                libnuma-dev,
+               libsasl2-dev,
                lsb-release,
                perl,
                po-debconf,
@@ -225,14 +228,11 @@ Description: MySQL Testsuite meta package depending on latest version
 
 Package: mysql-@DEB_PRODUCTNAME@-test@DEB_PRODUCTSERIES@
 Architecture: any
-Depends: mysql-@DEB_PRODUCTNAME@-client@DEB_PRODUCTSERIES@ (= ${binary:Version}),
-         mysql-@DEB_PRODUCTNAME@-server@DEB_PRODUCTSERIES@ (= ${binary:Version}),
-         libmysqlclient-dev,
-         python,
-         ${misc:Depends},
-         ${shlibs:Depends}
-Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.7.17),
-        mysql-@DEB_PRODUCTNAME@-client (<< 5.7.17)
+Depends: mysql-@DEB_PRODUCTNAME@-server (= ${binary:Version}),
+ mysql-@DEB_PRODUCTNAME@-client (= ${binary:Version}), python,
+ libmysqlclient-dev, libjson-perl, ${shlibs:Depends}, ${misc:Depends}
+Breaks: mysql-@DEB_PRODUCTNAME@-server (<< 5.7.14),
+ mysql-@DEB_PRODUCTNAME@-client (<< 5.7.14)
 Conflicts: mysql,
  mysql-testsuite-5.0, mysql-testsuite-5.1, mysql-testsuite-5.5,
  mysql-testsuite-5.6, mysql-testsuite-5.7, mysql-@DEB_NOTPRODUCTNAME@-test,
