@@ -714,6 +714,7 @@ typedef struct system_variables
   uint wsrep_sync_wait;
   ulong wsrep_retry_autocommit;
   ulong wsrep_OSU_method;
+  ulong wsrep_RSU_commit_timeout;
   ulong wsrep_auto_increment_control;
   my_bool wsrep_dirty_reads;
 #endif /* WITH_WSREP */

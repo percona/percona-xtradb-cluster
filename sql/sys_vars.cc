@@ -6320,6 +6320,15 @@ static Sys_var_enum Sys_wsrep_OSU_method(
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
        ON_UPDATE(0));
 
+static Sys_var_ulong Sys_wsrep_RSU_commit_timeout(
+       "wsrep_RSU_commit_timeout", "Wait for wsrep_RSU_commit_timeout (in micro-seconds) to allow active connection to complete COMMIT action before starting RSU",
+       GLOBAL_VAR(wsrep_RSU_commit_timeout), CMD_LINE(OPT_ARG),
+       VALID_RANGE(5000, (LONG_TIMEOUT * 1000000)),
+       DEFAULT(5000),
+       BLOCK_SIZE(1),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(0));
+
 static PolyLock_mutex PLock_wsrep_desync(&LOCK_wsrep_desync);
 static Sys_var_mybool Sys_wsrep_desync (
        "wsrep_desync", "To desynchronize the node from the cluster",
