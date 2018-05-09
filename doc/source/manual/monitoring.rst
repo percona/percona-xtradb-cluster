@@ -36,6 +36,25 @@ Metrics collection (i.e., long-term graphing) on the cluster should be done on:
  * Number of transactions in and out in bytes (:variable:`wsrep_replicated_bytes`, :variable:`wsrep_received_bytes`)
  * Replication conflicts (:variable:`wsrep_local_cert_failures` and :variable:`wsrep_local_bf_aborts`)
 
+Using |PMM|
+===========
+
+`Percona Monitoring and Management <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ includes two dashboards to monitor PXC: 
+
+1. `PXC/Galera Cluster Overview <https://pmmdemo.percona.com/graph/dashboard/db/pxc-galera-cluster-overview?orgId=1>`_:
+
+.. image:: pmm.pxc-galera-cluster-overview.png
+
+2. `PXC/Galera Graphs <https://pmmdemo.percona.com/graph/dashboard/db/pxc-galera-graphs?orgId=1>`_:
+
+.. image:: pmm.pxc-galera-graphs.png
+
+These dashboards are available from the menu:
+
+.. image:: pmm.menu.ha.png
+
+Please refer to the `official documentation <https://www.percona.com/doc/percona-monitoring-and-management/index.html>`_ for details on |PMM| installation and setup.
+
 Other Reading
 =============
 
