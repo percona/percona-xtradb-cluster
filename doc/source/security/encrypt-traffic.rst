@@ -6,8 +6,11 @@ Encrypting PXC Traffic
 
 There are two kinds of traffic in |PXC|:
 
-1. Client-Server traffic (the one between client applications and cluster nodes)
-2. Replication traffic that includes :term:`SST`, :term:`IST`, write-set replication, and various service messages
+1. Client-Server traffic (the one between client applications and cluster
+   nodes),
+
+2. Replication traffic, that includes :term:`SST`, :term:`IST`, write-set
+   replication, and various service messages.
 
 |PXC| supports encryption for all types of traffic. Replication traffic
 encryption can be configured either in automatic or in manual mode.
@@ -23,6 +26,7 @@ Encrypting Client-Server Communication
 
 |PXC| uses the underlying MySQL encryption mechanism
 to secure communication between client applications and cluster nodes.
+
 Specify the following settings in the :file:`my.cnf` configuration file
 for each node::
 
@@ -36,15 +40,14 @@ for each node::
  ssl-cert=/etc/mysql/certs/client-cert.pem
  ssl-key=/etc/mysql/certs/client-key.pem
 
-After you restart the node,
-it will use these files for encrypting communication with clients.
-MySQL clients require only the second part of the configuration
+After restart the node will use these files to encrypt communication with
+clients. MySQL clients require only the second part of the configuration
 to communicate with cluster nodes.
 
 Starting from the version 5.7, |MySQL| generates default key and certificate
 files and places them in data directory. You can either use them or generate
-new certificates. For generation of new certificate please refer to following
-section :ref:`generate-keys-certs`.
+new certificates. For generation of new certificate please refer to
+:ref:`generate-keys-certs` section.
 
 .. _encrypt-replication-traffic:
 
@@ -52,18 +55,18 @@ Encrypting Replication Traffic
 ------------------------------
 
 Replication traffic refers to the inter-node traffic which includes
-:term:`SST` traffic, :term:`IST` traffic, and replication traffic
+:term:`SST` traffic, :term:`IST` traffic, and replication traffic.
 
-Each of these traffic is transferred via different channel and so to completely
-secure the replication traffic it is important to configure secure channel for
-all 3 variants.
+Traffic of each type is transferred via different channel, and so it is
+important to configure secure channels for all 3 variants to completely
+secure the replication traffic.
 
-Starting 5.7, PXC now supports a single configuration option that can help
-secure complete replication traffic often referred as Automatic Configuration.
-User can also choose to ignore this and configure security of each channel by
-specifying independent parameters.
+Starting from 5.7, PXC supports a single configuration option which helps to
+secure complete replication traffic, and is often referred as Automatic 
+Configuration. User can also ignore this and configure security of
+each channel by specifying independent parameters.
 
-Section below will help cover this aspect.
+Section below will help, covering this aspect.
 
 .. _ssl-auto-conf:
 
@@ -82,8 +85,8 @@ enables automatic configuration of SSL encryption there-by encrypting
 This variable is not dynamic and so cannot be changed on runtime. To
 enable automatic configuration of SSL encryption, set
 ``pxc-encrypt-cluster-traffic=ON`` in the the ``[mysqld]`` section of the
-:file:`my.cnf` file, and restart the cluster. (default is disabled there-by
-using non-secured channel for replication).
+:file:`my.cnf` file, and restart the cluster (by default it is disabled 
+there-by using non-secured channel for replication).
 
 .. note:: Setting ``pxc-encrypt-cluster-traffic=ON`` has effect of applying
           the following settings in :file:`my.cnf` configuration file::
@@ -97,9 +100,9 @@ using non-secured channel for replication).
            ssl-ca=ca.pem
            ssl-cert=server-cert.pem
 
-          For :variable:`wsrep_provider_options`, only the mentioned options are affected
-          (``socket.ssl_key``, ``socket,ssl_cert``, and ``socket.ssl_ca``),
-          the rest are not modified.
+          For :variable:`wsrep_provider_options`, only the mentioned options
+          are affected (``socket.ssl_key``, ``socket,ssl_cert``, and
+          ``socket.ssl_ca``), the rest is not modified.
 
 Automatic configuration of the SSL encryption needs key and certificate files.
 Starting from the version 5.7, |MySQL| generates default key and certificate
@@ -116,20 +119,20 @@ not set, it then looks in the data directory for :file:`ca.pem`,
 .. note:: The ``[sst]`` section is not searched.
 
 If all three files are found, they are used to configure encryption.
-If any of the files are missing, a fatal error is generated.
+If any of the files is missing, a fatal error is generated.
 
 .. _ssl-manual-conf:
 
 SSL Manually Configuration
 ==========================
 
-If user want to enable encryption for specific channel only or
-use different certificates or other mix-match then user can opt for
-manual configuration. This helps provide more flexibility to end-user.
+If user wants to enable encryption for specific channel only or
+use different certificates or other mix-match, then user can opt for
+manual configuration. This helps to provide more flexibility to end-users.
 
-To enable encryption manually, user need to specify the location
-of the required key and certificate files in the |PXC| configuration.
-If you do not have the necessary files, see :ref:`generate-keys-certs`.
+To enable encryption manually, the location of the required key and certificate
+files shoud be specified in the |PXC| configuration. If you do not have the
+necessary files, see :ref:`generate-keys-certs`.
 
 .. note:: Encryption settings are not dynamic.
    To enable it on a running cluster, you need to restart the entire cluster.
@@ -142,7 +145,6 @@ There are three aspects of |PXC| operation, where you can enable encryption:
   from one cluster node (donor) to the joining node (joiner).
 
 * :ref:`encrypt-replication`
-* :ref:`encrypt-IST`
 
   This refers to all internal |PXC| communication,
   such as, write-set replication, :term:`IST`, and various service messages.
@@ -307,17 +309,17 @@ Encrypting Replication/IST Traffic
 
 Replication traffic refers to the following:
 
-* Write-set replication is the main workload of |PXC|
+* Write-set replication which is the main workload of |PXC|
   (replicating transactions that execute on one node to all other nodes).
-* Incremental State Transfer (:term:`IST`)
+* Incremental State Transfer (:term:`IST`) which
   is copying only missing transactions from DONOR to JOINER node.
-* Service messages ensure that all nodes are synchronized.
+* Service messages which ensure that all nodes are synchronized.
 
 All this traffic is transferred via the same underlying communication channel
 (``gcomm``). Securing this channel will ensure that :term:`IST` traffic,
 write-set replication, and service messages are encrypted.
-(For IST, a separate channel is setup using the same configuration parameters
-so 2 section are being described together).
+(For IST, a separate channel is to be configured using the same configuration
+parameters, so 2 sections are described together).
 
 To enable encryption for all these processes,
 define the paths to the key, certificate and certificate authority files
@@ -465,7 +467,7 @@ The following files are required:
 .. _upgrade-certs:
 
 Upgrading Certificates
-**********************
+----------------------
 
 The following procedure shows how to upgrade certificates
 used for securing replication traffic when there are two nodes in the cluster.
@@ -499,4 +501,3 @@ used for securing replication traffic when there are two nodes in the cluster.
    as in the previous step.
 
 #. You can remove the old certificate files.
-
