@@ -4856,13 +4856,19 @@ public:
     Assign a new value to thd->query_id.
     Protected with the LOCK_thd_data mutex.
   */
-  void set_query_id(query_id_t new_query_id)
+  void set_query_id(query_id_t new_query_id
+#ifdef WITH_WSREP
+                  , bool update_wsrep_id= true
+#endif /* WITH_WSREP */
+  )
   {
     mysql_mutex_lock(&LOCK_thd_data);
     query_id= new_query_id;
     mysql_mutex_unlock(&LOCK_thd_data);
 #ifdef WITH_WSREP
-    if (WSREP(this) && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID)
+    if (WSREP(this)
+        && wsrep_next_trx_id() == WSREP_UNDEFINED_TRX_ID
+        && update_wsrep_id)
     {
       set_wsrep_next_trx_id(query_id);
       WSREP_DEBUG("set_query_id(), assigned new next trx id: %lu",
