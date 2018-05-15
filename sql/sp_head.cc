@@ -862,7 +862,15 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
   DBUG_ASSERT(thd->change_list.is_empty());
   old_change_list.move_elements_to(&thd->change_list);
   thd->lex= old_lex;
-  thd->set_query_id(old_query_id);
+
+#ifdef WITH_WSREP
+  /* Avoid updating wsrep_next_trx_id on completion of Store-Proc.
+     It should be updated only before the real action. */
+  thd->set_query_id(old_query_id, false);
+#else
+   thd->set_query_id(old_query_id);
+#endif /* WITH_WSREP */
+
   DBUG_ASSERT(!thd->derived_tables);
   thd->derived_tables= old_derived_tables;
   thd->variables.sql_mode= save_sql_mode;

@@ -6111,7 +6111,8 @@ finish:
 #ifdef WITH_WSREP
     else if (thd->sp_runtime_ctx &&
              (thd->wsrep_conflict_state == MUST_ABORT ||
-              thd->wsrep_conflict_state == CERT_FAILURE))
+              thd->wsrep_conflict_state == CERT_FAILURE ||
+              thd->wsrep_conflict_state == ABORTED))
     {
       /*
         The error was cleared, but THD was aborted by wsrep and
