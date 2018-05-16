@@ -1,7 +1,24 @@
-galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
-galera_kill_nochanges : mysql-wsrep#24 Galera server does not restart properly if killed
-galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
-galera.galera_fk_multitable : fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
-galera.galera_as_slave_replication_bundle : GCF-912 feature no longer works in 5.7
-galera_sst_xtrabackup-v2-options : fails in multiple ways, including xtrabackup crash
-mysql-wsrep#216 : GCF-1021 5.7 Regression: obfuscated passwords not consistent in error logs
+##############################################################################
+#
+#  List the test cases that are to be disabled temporarily.
+#
+#  Separate the test case name and the comment with ':'.
+#
+#    <testcasename> : BUG#<xxxx> <date disabled> <disabler> <comment>
+#
+#  Do not use any TAB characters for whitespace.
+#
+##############################################################################
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+MW-286 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera#500 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_as_slave_replication_bundle : GCF-912 0000-00-00 CODERSHIP feature no longer works in 5.7
+galera_defaults : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_fk_multitable : Bug#80821 0000-00-00 CODERSHIP fails due to Oracle bug http://bugs.mysql.com/bug.php?id=80821
+galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
+galera_sst_xtrabackup-v2-options : N/A 0000-00-00 CODERSHIP fails in multiple ways, including xtrabackup crash
+galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
+galera_var_wsrep_recover : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_wan_restart_ist : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_wsrep_provider_unset_set : lp1379204 0000-00-00 CODERSHIP 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+mysql-wsrep#216 : GCF-1021 0000-00-00 CODERSHIP 5.7 Regression: obfuscated passwords not consistent in error logs
