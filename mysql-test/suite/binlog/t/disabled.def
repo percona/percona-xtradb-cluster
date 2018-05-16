@@ -9,5 +9,9 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+binlog_drop_if_exists : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+# Codership disabled tests end here
 binlog_truncate_innodb	: BUG#11764459 2010-10-20 anitha Originally disabled due to BUG#42643. Product bug fixed, but test changes needed
 binlog_spurious_ddl_errors : BUG#11761680 2013-01-18 astha Fixed on mysql-5.6 and trunk
