@@ -1,4 +1,21 @@
-galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
-galera_kill_nochanges : mysql-wsrep#24 Galera server does not restart properly if killed
-galera_toi_ddl_fk_insert : qa#39 galera_toi_ddl_fk_insert fails sporadically
-galera_sst_xtrabackup-v2-options : SST Encryption does not work with xtrabackup 2.4.2
+##############################################################################
+#
+#  List the test cases that are to be disabled temporarily.
+#
+#  Separate the test case name and the comment with ':'.
+#
+#    <testcasename> : BUG#<xxxx> <date disabled> <disabler> <comment>
+#
+#  Do not use any TAB characters for whitespace.
+#
+##############################################################################
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+galera_defaults : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_gcache_recover_full_gcache : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_gcache_recover_manytrx : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
+galera_sst_xtrabackup-v2-options : N/A 0000-00-00 CODERSHIP SST Encryption does not work with xtrabackup 2.4.2
+galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
+galera_var_innodb_disallow_writes : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+galera_wsrep_provider_unset_set : lp1379204 0000-00-00 CODERSHIP 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
+lp1376747-4 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330

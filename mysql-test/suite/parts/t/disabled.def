@@ -9,6 +9,10 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+partition_debug : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+# Codership disabled tests end here
 
 partition_max_parts_hash_innodb : Bug#17719504 2013-11-01 Horst PARTITION_MAX_PARTS ARE FAILING SPORADICLY.
 partition_max_parts_inv_innodb : Bug#17719504 2013-11-01 Horst PARTITION_MAX_PARTS ARE FAILING SPORADICLY.
