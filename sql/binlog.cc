@@ -9096,8 +9096,47 @@ TC_LOG::enum_result MYSQL_BIN_LOG::commit(THD *thd, bool all)
       const ulong timeout= thd->variables.lock_wait_timeout;
 
       DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+
+#ifndef WITH_WSREP
       if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
                                                      timeout))
+#else
+      bool lock;
+      while (true)
+      {
+        lock= thd->backup_binlog_lock.acquire_protection(
+                thd, MDL_EXPLICIT, timeout);
+
+        /* A local running thread that is commit state may get killed
+           by background replicating thread.
+
+           kill is null and void as local commit thread is already
+           in commit state and thus has needed locks, certification approval
+           and commit monitor.
+
+           While all locks are taken way before transaction enter commit state
+           backup binlog protection is obtain before the real commit start.
+
+           While waiting for backup binlog lock, if local-commit thread is
+           killed, backup binlog protection flow exits with KILLED
+           return code without acquiring the protection.
+
+           Check for the said state and re-try for protection.
+        */
+        if (lock
+            && thd->wsrep_conflict_state == MUST_ABORT
+            && thd->wsrep_exec_mode == LOCAL_COMMIT)
+        {
+          WSREP_DEBUG("Local Commit backup binlog protection interrupted by"
+                      " a background replicating thread action. Retrying");
+          continue;
+        }
+
+        break;
+      }
+
+      if (lock)
+#endif /* WITH_WSREP */
       {
         cache_mngr->stmt_cache.reset();
         cache_mngr->trx_cache.reset();
