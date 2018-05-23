@@ -132,7 +132,7 @@ bool Alter_table_statement::execute(THD *thd)
                             select_lex->order_list.elements,
                             select_lex->order_list.first,
                             lex->ignore);
-
+  DBUG_RETURN(result);
 #ifdef WITH_WSREP
 error:
   {
@@ -140,5 +140,4 @@ error:
     DBUG_RETURN(TRUE);
   }
 #endif /* WITH_WSREP */
-  DBUG_RETURN(result);
 }
