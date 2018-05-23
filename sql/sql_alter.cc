@@ -324,9 +324,10 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   if ((!thd->is_current_stmt_binlog_format_row() ||
        !find_temporary_table(thd, first_table)))
     {
-      WSREP_TO_ISOLATION_BEGIN(((lex->name.str) ? select_lex->db : NULL),
-			       ((lex->name.str) ? lex->name.str : NULL),
-			       first_table);
+      WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? select_lex->db : NULL),
+                                     ((lex->name.str) ? lex->name.str : NULL),
+                                     first_table,
+                                     &alter_info);
     }
 #endif /* WITH_WSREP */
   result= mysql_alter_table(thd, select_lex->db, lex->name.str,
@@ -339,7 +340,7 @@ bool Sql_cmd_alter_table::execute(THD *thd)
 
   DBUG_RETURN(result);
 #ifdef WITH_WSREP
- error:
+error:
   {
     WSREP_WARN("ALTER TABLE isolation failure");
     DBUG_RETURN(TRUE);
