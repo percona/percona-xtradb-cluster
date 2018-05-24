@@ -12,7 +12,6 @@
 # Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
 galera_defaults : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 galera_gcache_recover_full_gcache : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
-galera_gcache_recover_manytrx : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 galera_kill_nochanges : mysql-wsrep#24 0000-00-00 CODERSHIP Galera server does not restart properly if killed
 galera_sst_xtrabackup-v2-options : N/A 0000-00-00 CODERSHIP SST Encryption does not work with xtrabackup 2.4.2
 galera_toi_ddl_fk_insert : qa#39 0000-00-00 CODERSHIP galera_toi_ddl_fk_insert fails sporadically
