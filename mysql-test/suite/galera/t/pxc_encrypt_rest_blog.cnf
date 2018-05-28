@@ -3,11 +3,13 @@
 [mysqld]
 wsrep_sst_method=xtrabackup-v2
 wsrep_sst_auth="root:"
-wsrep_debug=ON
 pxc-encrypt-cluster-traffic=ON
 encrypt_binlog=ON
 master_verify_checksum=ON
 binlog_checksum=CRC32
+
+[xtrabackup]
+xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
 
 [mysqld.1]
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'
