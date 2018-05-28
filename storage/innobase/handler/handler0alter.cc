@@ -556,11 +556,11 @@ ha_innobase::check_if_supported_inplace_alter(
 
 	/* We don't support change encryption attribute with
 	inplace algorithm. */
-	char*	old_encryption = this->table->s->encrypt_type.str;
+	const bool currently_encrypted =
+		m_prebuilt->table->flags2 & DICT_TF2_ENCRYPTION;
 	char*	new_encryption = altered_table->s->encrypt_type.str;
 
-	if (Encryption::is_none(old_encryption)
-	    != Encryption::is_none(new_encryption)) {
+	if (currently_encrypted == Encryption::is_none(new_encryption)) {
 		ha_alter_info->unsupported_reason =
 			innobase_get_err_msg(
 				ER_UNSUPPORTED_ALTER_ENCRYPTION_INPLACE);
@@ -5428,6 +5428,7 @@ ha_innobase::prepare_inplace_alter_table(
 	bool		add_fts_idx		= false;
 	dict_s_col_list*s_cols			= NULL;
 	mem_heap_t*	s_heap			= NULL;
+	ulint		encrypt_flag		= 0;
 
 	DBUG_ENTER("prepare_inplace_alter_table");
 	DBUG_ASSERT(!ha_alter_info->handler_ctx);
@@ -5603,6 +5604,31 @@ check_if_ok_to_rename:
 
 	if (!info.innobase_table_flags()) {
 		goto err_exit_no_heap;
+	}
+
+	/* create_table_info_t::innobase_table_flags does not set encryption
+	flags. There are places where it is done afterwards, there are places
+	where it isn't done. We need to inspect all code paths and check if
+	encryption flag can be set in one place. */
+	if (!Encryption::is_none(
+		ha_alter_info->create_info->encrypt_type.str)) {
+
+		/* Set the encryption flag. */
+		byte*			master_key = NULL;
+		ulint			master_key_id;
+		Encryption::Version	version;
+
+		/* Check if keyring is ready. */
+		Encryption::get_master_key(&master_key_id,
+					   &master_key,
+					   &version);
+
+		if (master_key == NULL) {
+			goto err_exit_no_heap;
+		} else {
+			my_free(master_key);
+			encrypt_flag = DICT_TF2_ENCRYPTION;
+		}
 	}
 
 	max_col_len = DICT_MAX_FIELD_LEN_BY_FORMAT_FLAG(info.flags());
@@ -6118,7 +6144,7 @@ found_col:
 	DBUG_RETURN(prepare_inplace_alter_table_dict(
 			    ha_alter_info, altered_table, table,
 			    table_share->table_name.str,
-			    info.flags(), info.flags2(),
+			    info.flags(), info.flags2() | encrypt_flag,
 			    fts_doc_col_no, add_fts_doc_id,
 			    add_fts_doc_id_idx, m_prebuilt));
 }

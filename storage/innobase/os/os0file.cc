@@ -3197,9 +3197,7 @@ os_file_get_last_error_low(
 		}
 		break;
 	case EINTR:
-		if (srv_use_native_aio) {
-			return(OS_FILE_AIO_INTERRUPTED);
-		}
+		return(OS_FILE_AIO_INTERRUPTED);
 		break;
 	case EACCES:
 		return(OS_FILE_ACCESS_VIOLATION);
@@ -3463,15 +3461,10 @@ os_file_create_simple_func(
 		if (file.m_file == -1) {
 			*success = false;
 
-			if (errno == EINTR) {
-				/* Handle signal interruptions correctly */
-				retry = true;
-			} else {
-				retry = os_file_handle_error(
-					name,
-					create_mode == OS_FILE_OPEN
-					? "open" : "create");
-			}
+			retry = os_file_handle_error(
+				name,
+				create_mode == OS_FILE_OPEN
+				? "open" : "create");
 		} else {
 			*success = true;
 			retry = false;
@@ -9688,6 +9681,48 @@ Encryption::decrypt(
 
 	return(DB_SUCCESS);
 }
+
+#ifndef UNIV_INNOCHECKSUM
+
+/** Default master key for bootstrap */
+static const char ENCRYPTION_DEFAULT_MASTER_KEY[] = "DefaultMasterKey";
+
+/** Check if keyring plugin loaded. */
+bool Encryption::check_keyring()
+{
+	char	key_name[ENCRYPTION_MASTER_KEY_NAME_MAX_LEN];
+	memset(key_name, 0, ENCRYPTION_KEY_LEN);
+	strcpy(key_name, ENCRYPTION_DEFAULT_MASTER_KEY);
+
+	/* We call key ring API to generate master key here. */
+	int	my_ret = my_key_generate(key_name, "AES",
+					 NULL, ENCRYPTION_KEY_LEN);
+
+	/* We call key ring API to get master key here. */
+	if (my_ret != 0) {
+		char*	key_type = NULL;
+		char*	master_key = NULL;
+		size_t	key_len;
+		my_ret = my_key_fetch(key_name, &key_type, NULL,
+				      reinterpret_cast<void**>(&master_key),
+				      &key_len);
+
+		my_free(key_type);
+		my_free(master_key);
+	}
+
+	if (my_ret) {
+		ib::error() << "keyring error: please check that a"
+			       " keyring plugin is loaded.";
+	} else {
+		my_key_remove(key_name, NULL);
+		return(true);
+	}
+
+	return(false);
+}
+
+#endif
 
 /** Normalizes a directory path for the current OS:
 On Windows, we convert '/' to '\', else we convert '\' to '/'.

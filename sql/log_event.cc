@@ -1536,6 +1536,25 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
   DBUG_PRINT("info", ("binlog_version: %d", description_event->binlog_version));
   DBUG_DUMP("data", (unsigned char*) buf, event_len);
 
+#ifdef MYSQL_CLIENT
+    static bool was_start_encryption_event = false;
+    if (was_start_encryption_event)
+    {
+      // We know that binlog is encrypted (as we read Start_encryption event) and we know that
+      // client applications cannot decrypt encrypted binlogs as they have no access to
+      // keyring. Thus we return Unknown_event for all encrypted events when force is used
+      // and close mysqlbinlog when no force.
+      if (!force_opt)
+      {
+        *error= "No point in reading encrypted binlog - quitting. "
+                "Start mysqlbinlog with --force if you want to attempt "
+                "to read encrypted binlog without decryption.";
+        DBUG_RETURN(0);
+      }
+      DBUG_RETURN(new Unknown_log_event);
+    }
+#endif
+
   /* Check the integrity */
   if (event_len < EVENT_LEN_OFFSET ||
       event_len != uint4korr(buf+EVENT_LEN_OFFSET))
@@ -1772,6 +1791,9 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
       break;
     case binary_log::START_ENCRYPTION_EVENT:
       ev = new Start_encryption_log_event(buf, event_len, description_event);
+#ifdef MYSQL_CLIENT
+      was_start_encryption_event= true;
+#endif
       break;
     case binary_log::ROWS_QUERY_LOG_EVENT:
       ev= new Rows_query_log_event(buf, event_len, description_event);
@@ -4850,6 +4872,32 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
           goto end;
         }
 
+        if (sqlcom_can_generate_row_events(thd->lex->sql_command) &&
+            thd->get_row_count_func() > 0) {
+          for (TABLE_LIST* tbl= thd->lex->query_tables; tbl;
+               tbl= tbl->next_global) {
+            if (!tbl->is_placeholder() && tbl->table->file) {
+              if (!tbl->table->file->rpl_can_handle_stm_event()) {
+                String message;
+                message.append("Masters binlog format is not ROW and storage "
+                               "engine can not handle non-ROW events at this "
+                               "time. Table: '");
+                message.append(tbl->get_db_name());
+                message.append(".");
+                message.append(tbl->get_table_name());
+                message.append("' Query: '");
+                message.append(thd->query().str);
+                message.append("'");
+                rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                            ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                            message.c_ptr());
+                thd->is_slave_error= true;
+                goto end;
+              }
+            }
+          }
+        }
+
         /* Finalize server status flags after executing a statement. */
         thd->update_server_status();
         log_slow_statement(thd);
@@ -5613,6 +5661,21 @@ Format_description_log_event(const char* buf, uint event_len,
                   post_header_len[binary_log::UPDATE_ROWS_EVENT_V1-1]=
                   post_header_len[binary_log::DELETE_ROWS_EVENT_V1-1]= 6;);
   reset_crypto();
+}
+
+bool Format_description_log_event::start_decryption(Start_encryption_log_event* sele)
+{
+  DBUG_ASSERT(!crypto_data.is_enabled());
+
+  if (!sele->is_valid())
+    return true;
+  if (crypto_data.init(sele->crypto_scheme, sele->key_version, sele->nonce))
+  {
+    sql_print_error("Failed to fetch percona_binlog key (version %u) from keyring and thus "
+                     "failed to initialize binlog encryption.", sele->key_version);
+    return true;
+  }
+  return false;
 }
 
 #ifndef MYSQL_CLIENT
@@ -7700,7 +7763,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
   else
   {
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       double real_val;
       float8get(&real_val, val);
       if (!(buf= (char*) my_malloc(key_memory_log_event,
@@ -7710,7 +7773,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
       event_len+= my_gcvt(real_val, MY_GCVT_ARG_DOUBLE, MY_GCVT_MAX_FIELD_WIDTH,
                           buf + val_offset, NULL);
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       if (!(buf= (char*) my_malloc(key_memory_log_event,
                                    val_offset + 22, MYF(MY_WME))))
         return 1;
@@ -7718,7 +7781,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
                                    ((flags & User_var_log_event::UNSIGNED_F) ? 
                                     10 : -10))-buf;
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       if (!(buf= (char*) my_malloc(key_memory_log_event,
                                    val_offset + DECIMAL_MAX_STR_LENGTH + 1,
@@ -7732,7 +7795,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
       event_len= str.length() + val_offset;
       break;
     } 
-    case STRING_RESULT:
+    case STRING_TYPE:
       /* 15 is for 'COLLATE' and other chars */
       buf= (char*) my_malloc(key_memory_log_event,
                              event_len+val_len*2+1+2*MY_CS_NAME_SIZE+15,
@@ -7753,7 +7816,7 @@ int User_var_log_event::pack_info(Protocol* protocol)
         event_len= p-buf;
       }
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       return 1;
@@ -7807,14 +7870,14 @@ bool User_var_log_event::write(IO_CACHE* file)
     int4store(buf1 + 2, charset_number);
 
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       float8store(buf2, *(double*) val);
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       int8store(buf2, *(longlong*) val);
       unsigned_len= 1;
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       my_decimal *dec= (my_decimal *)val;
       dec->sanity_check();
@@ -7824,10 +7887,10 @@ bool User_var_log_event::write(IO_CACHE* file)
       val_len= decimal_bin_size(buf2[0], buf2[1]) + 2;
       break;
     }
-    case STRING_RESULT:
+    case STRING_TYPE:
       pos= (uchar*) val;
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       return 0;
@@ -7882,20 +7945,20 @@ void User_var_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
   else
   {
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       double real_val;
       char real_buf[FMT_G_BUFSIZE(14)];
       float8get(&real_val, val);
       sprintf(real_buf, "%.14g", real_val);
       my_b_printf(head, ":=%s%s\n", real_buf, print_event_info->delimiter);
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       char int_buf[22];
       longlong10_to_str(uint8korr(val), int_buf, 
                         ((flags & User_var_log_event::UNSIGNED_F) ? 10 : -10));
       my_b_printf(head, ":=%s%s\n", int_buf, print_event_info->delimiter);
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       char str_buf[200];
       int str_len= sizeof(str_buf) - 1;
@@ -7912,7 +7975,7 @@ void User_var_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
       my_b_printf(head, ":=%s%s\n", str_buf, print_event_info->delimiter);
       break;
     }
-    case STRING_RESULT:
+    case STRING_TYPE:
     {
       /*
         Let's express the string in hex. That's the most robust way. If we
@@ -7955,7 +8018,7 @@ void User_var_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
       my_free(hex_str);
     }
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       return;
@@ -8007,19 +8070,19 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
   else
   {
     switch (type) {
-    case REAL_RESULT:
+    case REAL_TYPE:
       float8get(&real_val, val);
       it= new Item_float(real_val, 0);
       val= (char*) &real_val;		// Pointer to value in native format
       val_len= 8;
       break;
-    case INT_RESULT:
+    case INT_TYPE:
       int_val= (longlong) uint8korr(val);
       it= new Item_int(int_val);
       val= (char*) &int_val;		// Pointer to value in native format
       val_len= 8;
       break;
-    case DECIMAL_RESULT:
+    case DECIMAL_TYPE:
     {
       Item_decimal *dec= new Item_decimal((uchar*) val+2, val[0], val[1]);
       it= dec;
@@ -8027,10 +8090,10 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
       val_len= sizeof(my_decimal);
       break;
     }
-    case STRING_RESULT:
+    case STRING_TYPE:
       it= new Item_string(val, val_len, charset);
       break;
-    case ROW_RESULT:
+    case ROW_TYPE:
     default:
       DBUG_ASSERT(1);
       DBUG_RETURN(0);

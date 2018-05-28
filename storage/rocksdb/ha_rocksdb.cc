@@ -434,6 +434,7 @@ static void rocksdb_set_wal_bytes_per_sync(THD *thd,
 //////////////////////////////////////////////////////////////////////////////
 static constexpr ulong RDB_MAX_LOCK_WAIT_SECONDS = 1024 * 1024 * 1024;
 static constexpr ulong RDB_MAX_ROW_LOCKS = 1024 * 1024 * 1024;
+static constexpr ulong RDB_DEFAULT_ROW_LOCKS = 1024 * 1024;
 static constexpr ulong RDB_DEFAULT_BULK_LOAD_SIZE = 1000;
 static constexpr ulong RDB_MAX_BULK_LOAD_SIZE = 1024 * 1024 * 1024;
 static constexpr size_t RDB_DEFAULT_MERGE_BUF_SIZE = 64 * 1024 * 1024;
@@ -667,6 +668,11 @@ static MYSQL_THDVAR_STR(
     "on the slave (i.e. not lookup a row during replication)",
     nullptr, nullptr, "");
 
+static MYSQL_SYSVAR_BOOL(
+    rpl_skip_tx_api, rpl_skip_tx_api_var, PLUGIN_VAR_RQCMDARG,
+    "Use write batches for replication thread instead of tx api", nullptr,
+    nullptr, FALSE);
+
 static MYSQL_THDVAR_BOOL(skip_bloom_filter_on_read, PLUGIN_VAR_RQCMDARG,
                          "Skip using bloom filter for reads", nullptr, nullptr,
                          FALSE);
@@ -674,7 +680,7 @@ static MYSQL_THDVAR_BOOL(skip_bloom_filter_on_read, PLUGIN_VAR_RQCMDARG,
 static MYSQL_THDVAR_ULONG(max_row_locks, PLUGIN_VAR_RQCMDARG,
                           "Maximum number of locks a transaction can have",
                           nullptr, nullptr,
-                          /*default*/ RDB_MAX_ROW_LOCKS,
+                          /*default*/ RDB_DEFAULT_ROW_LOCKS,
                           /*min*/ 1,
                           /*max*/ RDB_MAX_ROW_LOCKS, 0);
 
@@ -1484,6 +1490,7 @@ static struct st_mysql_sys_var *rocksdb_system_variables[] = {
     MYSQL_SYSVAR(trace_sst_api),
     MYSQL_SYSVAR(commit_in_the_middle),
     MYSQL_SYSVAR(read_free_rpl_tables),
+    MYSQL_SYSVAR(rpl_skip_tx_api),
     MYSQL_SYSVAR(bulk_load_size),
     MYSQL_SYSVAR(merge_buf_size),
     MYSQL_SYSVAR(enable_bulk_load_api),
@@ -4677,6 +4684,10 @@ bool ha_rocksdb::init_with_fields() {
   cached_table_flags = table_flags();
 
   DBUG_RETURN(false); /* Ok */
+}
+
+bool ha_rocksdb::rpl_can_handle_stm_event() const {
+  return !(rpl_skip_tx_api_var && !super_read_only);
 }
 
 /*
