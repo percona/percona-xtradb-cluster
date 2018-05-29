@@ -41,6 +41,7 @@ Created 9/30/1995 Heikki Tuuri
 #if defined(WITH_WSREP) && defined(UNIV_LINUX)
 #include <sys/mman.h>		/* madvise() */
 #endif
+#include "ha_prototypes.h"
 
 /* FreeBSD for example has only MAP_ANON, Linux has MAP_ANONYMOUS and
 MAP_ANON but MAP_ANON is marked as deprecated */
@@ -50,6 +51,13 @@ MAP_ANON but MAP_ANON is marked as deprecated */
 #define OS_MAP_ANON	MAP_ANON
 #endif
 
+/* Linux's MAP_POPULATE */
+#if defined(MAP_POPULATE)
+#define OS_MAP_POPULATE	MAP_POPULATE
+#else
+#define OS_MAP_POPULATE	0
+#endif
+
 UNIV_INTERN ibool os_use_large_pages;
 /* Large page size. This may be a boot-time option on some platforms */
 UNIV_INTERN ulint os_large_page_size;
@@ -57,6 +65,25 @@ UNIV_INTERN ulint os_large_page_size;
 #ifdef WITH_WSREP
 extern my_bool wsrep_recovery;
 #endif /* WITH_WSREP */
+
+/****************************************************************//**
+Retrieve and compare operating system release.
+@return	TRUE if the OS release is equal to, or later than release. */
+UNIV_INTERN
+bool
+os_compare_release(
+/*===============*/
+	const char*	release		/*!< in: OS release */
+	MY_ATTRIBUTE((unused)))
+{
+#if defined(UNIV_LINUX) && defined(_GNU_SOURCE)
+	struct utsname name;
+	return uname(&name) == 0 && strverscmp(name.release, release) >= 0;
+#else
+	return false;
+#endif
+}
+
 /****************************************************************//**
 Converts the current process id to a number. It is not guaranteed that the
 number is unique. In Linux returns the 'process number' of the current
@@ -82,7 +109,8 @@ UNIV_INTERN
 void*
 os_mem_alloc_large(
 /*===============*/
-	ulint*	n)			/*!< in/out: number of bytes */
+	ulint*	n,			/*!< in/out: number of bytes */
+	bool	populate)		/*!< in: virtual page preallocation */
 {
 	void*	ptr;
 	ulint	size;
@@ -168,12 +196,13 @@ skip:
 	ut_ad(ut_is_2pow(size));
 	size = *n = ut_2pow_round(*n + (size - 1), size);
 	ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
-		   MAP_PRIVATE | OS_MAP_ANON, -1, 0);
-	if (UNIV_UNLIKELY(ptr == (void*) -1)) {
+		   MAP_PRIVATE | OS_MAP_ANON |
+		   (populate ? OS_MAP_POPULATE : 0), -1, 0);
+	if (UNIV_UNLIKELY(ptr == MAP_FAILED)) {
 		fprintf(stderr, "InnoDB: mmap(%lu bytes) failed;"
 			" errno %lu\n",
 			(ulong) size, (ulong) errno);
-		ptr = NULL;
+		return NULL;
 	} else {
 		os_fast_mutex_lock(&ut_list_mutex);
 		ut_total_allocated_memory += size;
@@ -192,6 +221,25 @@ skip:
 			"can be slow.\n");
 	}
 #endif
+
+#if OS_MAP_ANON && OS_MAP_POPULATE
+	/* MAP_POPULATE is only supported for private mappings
+	since Linux 2.6.23. */
+	populate = populate && !os_compare_release("2.6.23");
+
+	if (populate) {
+		ib_logf(IB_LOG_LEVEL_WARN, "InnoDB: Warning: mmap(MAP_POPULATE) "
+			"is not supported for private mappings. "
+			"Forcing preallocation by faulting in pages.\n");
+	}
+#endif
+
+	/* Initialize the entire buffer to force the allocation
+	of physical memory page frames. */
+	if (populate) {
+		memset(ptr, '\0', size);
+	}
+
 	return(ptr);
 }
 

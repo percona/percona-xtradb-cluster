@@ -99,7 +99,7 @@ static bool write_delayed(THD *thd, TABLE *table, LEX_STRING query, bool log_on,
 
 static void end_delayed_insert(THD *thd);
 pthread_handler_t handle_delayed_insert(void *arg);
-static void unlink_blobs(register TABLE *table);
+static void unlink_blobs(TABLE *table);
 #endif
 static bool check_view_insertability(THD *thd, TABLE_LIST *view);
 
@@ -1093,7 +1093,13 @@ bool mysql_insert(THD *thd,TABLE_LIST *table_list,
     }
     else
 #endif
-      error= write_record(thd, table, &info, &update);
+    {
+      error= table->file->ha_upsert(thd,
+                                    update_fields,
+                                    update_values);
+      if (error == ENOTSUP)
+        error= write_record(thd, table, &info, &update);
+    }
     if (error)
       break;
     thd->get_stmt_da()->inc_current_row_for_warning();
@@ -2275,7 +2281,7 @@ public:
     thd.variables.lock_wait_timeout= LONG_TIMEOUT;
 
     memset(&thd.net, 0, sizeof(thd.net));           // Safety
-    memset(&table_list, 0, sizeof(table_list));     // Safety
+    memset(static_cast<void*>(&table_list), 0, sizeof(table_list));   // Safety
     thd.system_thread= SYSTEM_THREAD_DELAYED_INSERT;
     thd.security_ctx->host_or_ip= "";
     mysql_mutex_init(key_delayed_insert_mutex, &mutex, MY_MUTEX_INIT_FAST);
@@ -3165,7 +3171,7 @@ pthread_handler_t handle_delayed_insert(void *arg)
 
 /* Remove pointers from temporary fields to allocated values */
 
-static void unlink_blobs(register TABLE *table)
+static void unlink_blobs(TABLE *table)
 {
   for (Field **ptr=table->field ; *ptr ; ptr++)
   {
@@ -3176,7 +3182,7 @@ static void unlink_blobs(register TABLE *table)
 
 /* Free blobs stored in current row */
 
-static void free_delayed_insert_blobs(register TABLE *table)
+static void free_delayed_insert_blobs(TABLE *table)
 {
   for (Field **ptr=table->field ; *ptr ; ptr++)
   {
@@ -4419,7 +4425,7 @@ select_create::binlog_show_create_table(TABLE **tables, uint count)
   int result;
   TABLE_LIST tmp_table_list;
 
-  memset(&tmp_table_list, 0, sizeof(tmp_table_list));
+  memset(static_cast<void*>(&tmp_table_list), 0, sizeof(tmp_table_list));
   tmp_table_list.table = *tables;
   query.length(0);      // Have to zero it since constructor doesn't
 
