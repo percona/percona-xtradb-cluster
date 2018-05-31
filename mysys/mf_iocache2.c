@@ -1,4 +1,6 @@
 /* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2018, Percona and/or its affiliates. All rights reserved.
+   Copyright (c) 2010, 2017, MariaDB
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -198,9 +200,15 @@ void my_b_seek(IO_CACHE *info,my_off_t pos)
 
 size_t my_b_fill(IO_CACHE *info)
 {
-  my_off_t pos_in_file=(info->pos_in_file+
-			(size_t) (info->read_end - info->buffer));
+  my_off_t pos_in_file;
   size_t diff_length, length, max_length;
+
+  if (info->myflags & MY_ENCRYPT)
+  {
+    DBUG_ASSERT(info->read_pos == info->read_end);
+    return _my_b_read(info, 0, 0) ? 0 : info->read_end - info->read_pos;
+  }
+  pos_in_file= info->pos_in_file + (size_t) (info->read_end - info->buffer);
 
   if (info->seek_not_done)
   {					/* File touched, do seek */
@@ -236,6 +244,20 @@ size_t my_b_fill(IO_CACHE *info)
   return length;
 }
 
+int my_b_pread(IO_CACHE *info, uchar *Buffer, size_t Count, my_off_t pos)
+{
+  if (info->myflags & MY_ENCRYPT)
+  {
+    my_b_seek(info, pos);
+    return my_b_read(info, Buffer, Count);
+  }
+
+  /* backward compatibility behavior. XXX remove it? */
+  if (mysql_file_pread(info->file, Buffer, Count, pos,
+                       info->myflags | MY_NABP))
+    return info->error= -1;
+  return 0;
+}
 
 /*
   Read a string ended by '\n' into a buffer of 'max_length' size.
@@ -460,7 +482,7 @@ process_flags:
           memset(buffz, '0', minimum_width - length2);
         else
           memset(buffz, ' ', minimum_width - length2);
-        if (my_b_write(info, buffz, minimum_width - length2))
+        if (my_b_write(info, (uchar*)buffz, minimum_width - length2))
         {
           goto err;
         }

@@ -501,10 +501,11 @@ typedef struct st_table_field_def
 class Table_check_intact
 {
 protected:
+  bool has_keys;
   virtual void report_error(uint code, const char *fmt, ...)= 0;
 
 public:
-  Table_check_intact() {}
+  Table_check_intact() : has_keys(FALSE) {}
   virtual ~Table_check_intact() {}
 
   /** Checks whether a table is intact. */
@@ -1796,7 +1797,7 @@ struct TABLE_LIST
                              enum thr_lock_type lock_type_arg,
                              enum enum_mdl_type mdl_type_arg)
   {
-    memset(this, 0, sizeof(*this));
+    memset(static_cast<void*>(this), 0, sizeof(*this));
     m_map= 1;
     db= (char*) db_name_arg;
     db_length= db_length_arg;

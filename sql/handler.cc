@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1503,6 +1503,7 @@ int ha_prepare(THD *thd)
     {
       int err;
       handlerton *ht= ha_info->ht();
+      DBUG_ASSERT(!thd->status_var_aggregated);
       thd->status_var.ha_prepare_count++;
       if (ht->prepare)
       {
@@ -1993,6 +1994,7 @@ int ha_commit_low(THD *thd, bool all, bool run_after_commit)
         my_error(ER_ERROR_DURING_COMMIT, MYF(0), err);
         error=1;
       }
+      DBUG_ASSERT(!thd->status_var_aggregated);
       thd->status_var.ha_commit_count++;
       ha_info_next= ha_info->next();
       if (restore_backup_ha_data)
@@ -2078,6 +2080,7 @@ int ha_rollback_low(THD *thd, bool all)
         my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err);
         error= 1;
       }
+      DBUG_ASSERT(!thd->status_var_aggregated);
       thd->status_var.ha_rollback_count++;
       ha_info_next= ha_info->next();
       if (restore_backup_ha_data)
@@ -2260,6 +2263,7 @@ int ha_commit_attachable(THD *thd)
         DBUG_ASSERT(false);
         error= 1;
       }
+      DBUG_ASSERT(!thd->status_var_aggregated);
       thd->status_var.ha_commit_count++;
       ha_info_next= ha_info->next();
 
@@ -2392,6 +2396,7 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv)
       my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err);
       error=1;
     }
+    DBUG_ASSERT(!thd->status_var_aggregated);
     thd->status_var.ha_savepoint_rollback_count++;
     if (ht->prepare == 0)
       trn_ctx->set_no_2pc(trx_scope, true);
@@ -2411,6 +2416,7 @@ int ha_rollback_to_savepoint(THD *thd, SAVEPOINT *sv)
       my_error(ER_ERROR_DURING_ROLLBACK, MYF(0), err);
       error=1;
     }
+    DBUG_ASSERT(!thd->status_var_aggregated);
     thd->status_var.ha_rollback_count++;
     ha_info_next= ha_info->next();
     ha_info->reset(); /* keep it conveniently zero-filled */
@@ -2481,6 +2487,7 @@ int ha_prepare_low(THD *thd, bool all)
         }
 #endif
       }
+      DBUG_ASSERT(!thd->status_var_aggregated);
       thd->status_var.ha_prepare_count++;
     }
     DBUG_EXECUTE_IF("crash_commit_after_prepare", DBUG_SUICIDE(););
@@ -2575,6 +2582,7 @@ int ha_savepoint(THD *thd, SAVEPOINT *sv)
       my_error(ER_GET_ERRNO, MYF(0), err);
       error=1;
     }
+    DBUG_ASSERT(!thd->status_var_aggregated);
     thd->status_var.ha_savepoint_count++;
   }
   /*
@@ -2894,8 +2902,8 @@ int ha_delete_table(THD *thd, handlerton *table_type, const char *path,
   TABLE_SHARE dummy_share;
   DBUG_ENTER("ha_delete_table");
 
-  memset(&dummy_table, 0, sizeof(dummy_table));
-  memset(&dummy_share, 0, sizeof(dummy_share));
+  memset(static_cast<void*>(&dummy_table), 0, sizeof(dummy_table));
+  memset(static_cast<void*>(&dummy_share), 0, sizeof(dummy_share));
   dummy_table.s= &dummy_share;
 
   /* DB_TYPE_UNKNOWN is used in ALTER TABLE when renaming only .frm files */
@@ -2991,6 +2999,7 @@ err:
 
 void handler::ha_statistic_increment(ulonglong SSV::*offset) const
 {
+  DBUG_ASSERT(!table->in_use->status_var_aggregated);
   (table->in_use->status_var.*offset)++;
 }
 
@@ -5744,7 +5753,7 @@ int ha_create_table_from_engine(THD* thd, const char *db, const char *name)
   DBUG_ENTER("ha_create_table_from_engine");
   DBUG_PRINT("enter", ("name '%s'.'%s'", db, name));
 
-  memset(&create_info, 0, sizeof(create_info));
+  memset(static_cast<void*>(&create_info), 0, sizeof(create_info));
   if ((error= ha_discover(thd, db, name, &frmblob, &frmlen)))
   {
     /* Table could not be discovered and thus not created */
@@ -6160,7 +6169,10 @@ int ha_discover(THD *thd, const char *db, const char *name,
     error= 0;
 
   if (!error)
+  {
+    DBUG_ASSERT(!thd->status_var_aggregated);
     thd->status_var.ha_discover_count++;
+  }
   DBUG_RETURN(error);
 }
 
@@ -7072,7 +7084,10 @@ int DsMrr_impl::dsmrr_init(handler *h_arg, RANGE_SEQ_IF *seq_funcs,
   is_mrr_assoc= !MY_TEST(mode & HA_MRR_NO_ASSOCIATION);
 
   if (is_mrr_assoc)
+  {
+    DBUG_ASSERT(!thd->status_var_aggregated);
     table->in_use->status_var.ha_multi_range_read_init_count++;
+  }
  
   rowids_buf_end= buf->buffer_end;
   elem_size= h->ref_length + (int)is_mrr_assoc * sizeof(void*);
@@ -8467,7 +8482,6 @@ int binlog_log_row(TABLE* table,
   {
     if (thd->variables.transaction_write_set_extraction != HASH_ALGORITHM_OFF)
     {
-      bitmap_set_all(table->read_set);
       if (before_record && after_record)
       {
         size_t length= table->s->reclength;

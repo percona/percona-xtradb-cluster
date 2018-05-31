@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2011, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2011, 2018, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -407,7 +407,7 @@ row_log_block_allocate(
 		);
 
 		log_buf.block = ut_allocator<byte>(mem_key_row_log_buf)
-			.allocate_large(srv_sort_buf_size, &log_buf.block_pfx);
+			.allocate_large(srv_sort_buf_size, &log_buf.block_pfx, false);
 
 		if (log_buf.block == NULL) {
 			DBUG_RETURN(false);
@@ -2842,6 +2842,11 @@ row_log_table_apply_op(
 		if (num_v) {
 			ulint		o_v_size = 0;
 			ulint		n_v_size = 0;
+
+			if (next_mrec + 2 > mrec_end) {
+				return(NULL);
+			}
+
 			n_v_size = mach_read_from_2(next_mrec);
 			next_mrec += n_v_size;
 			if (next_mrec > mrec_end) {
@@ -3210,7 +3215,15 @@ all_done:
 
 	while (!trx_is_interrupted(trx)) {
 		mrec = next_mrec;
-		ut_ad(mrec < mrec_end);
+		ut_ad(mrec <= mrec_end);
+
+		if (mrec == mrec_end) {
+			/* We are at the end of the log.
+			   Mark the replay all_done. */
+			if (has_index_lock) {
+				goto all_done;
+			}
+		}
 
 		if (!has_index_lock) {
 			/* We are applying operations from a different
@@ -3425,8 +3438,8 @@ row_log_allocate(
 
 	if (log_tmp_is_encrypted()) {
 		ulint size = srv_sort_buf_size;
-		log->crypt_head = static_cast<byte *>(os_mem_alloc_large(&size));
-		log->crypt_tail = static_cast<byte *>(os_mem_alloc_large(&size));
+		log->crypt_head = static_cast<byte *>(os_mem_alloc_large(&size, false));
+		log->crypt_tail = static_cast<byte *>(os_mem_alloc_large(&size, false));
 
 		if (!log->crypt_head || !log->crypt_tail) {
 			row_log_free(log);

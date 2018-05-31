@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2018, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, Google Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
@@ -1484,7 +1484,8 @@ buf_chunk_init(
 /*===========*/
 	buf_pool_t*	buf_pool,	/*!< in: buffer pool instance */
 	buf_chunk_t*	chunk,		/*!< out: chunk of buffers */
-	ulint		mem_size)	/*!< in: requested size in bytes */
+	ulint		mem_size,	/*!< in: requested size in bytes */
+	bool		populate)	/*!< in: virtual page preallocation */
 {
 	buf_block_t*	block;
 	byte*		frame;
@@ -1502,7 +1503,8 @@ buf_chunk_init(
 	DBUG_EXECUTE_IF("ib_buf_chunk_init_fails", return(NULL););
 
 	chunk->mem = buf_pool->allocator.allocate_large(mem_size,
-							&chunk->mem_pfx);
+							&chunk->mem_pfx,
+							populate);
 
 	if (UNIV_UNLIKELY(chunk->mem == NULL)) {
 
@@ -1725,6 +1727,7 @@ buf_pool_init_instance(
 /*===================*/
 	buf_pool_t*	buf_pool,	/*!< in: buffer pool instance */
 	ulint		buf_pool_size,	/*!< in: size in bytes */
+	bool		populate,	/*!< in: virtual page preallocation */
 	ulint		instance_no)	/*!< in: id of the instance */
 {
 	ulint		i;
@@ -1776,7 +1779,7 @@ buf_pool_init_instance(
 		chunk = buf_pool->chunks;
 
 		do {
-			if (!buf_chunk_init(buf_pool, chunk, chunk_size)) {
+			if (!buf_chunk_init(buf_pool, chunk, chunk_size, populate)) {
 				while (--chunk >= buf_pool->chunks) {
 					buf_block_t*	block = chunk->blocks;
 
@@ -1944,6 +1947,7 @@ dberr_t
 buf_pool_init(
 /*==========*/
 	ulint	total_size,	/*!< in: size of the total pool in bytes */
+	bool	populate,	/*!< in: virtual page preallocation */
 	ulint	n_instances)	/*!< in: number of instances */
 {
 	ulint		i;
@@ -1967,7 +1971,7 @@ buf_pool_init(
 	for (i = 0; i < n_instances; i++) {
 		buf_pool_t*	ptr	= &buf_pool_ptr[i];
 
-		if (buf_pool_init_instance(ptr, size, i) != DB_SUCCESS) {
+		if (buf_pool_init_instance(ptr, size, populate, i) != DB_SUCCESS) {
 
 			/* Free all the instances created so far. */
 			buf_pool_free(i);
@@ -2038,8 +2042,10 @@ buf_page_realloc(
 	if (buf_page_can_relocate(&block->page)) {
 		mutex_enter(&new_block->mutex);
 
-		memcpy(new_block->frame, block->frame, UNIV_PAGE_SIZE);
-		memcpy(&new_block->page, &block->page, sizeof block->page);
+		memcpy(static_cast<void*>(new_block->frame), block->frame,
+		       UNIV_PAGE_SIZE);
+		memcpy(static_cast<void*>(&new_block->page), &block->page,
+		       sizeof block->page);
 
 		/* relocate LRU list */
 		ut_ad(block->page.in_LRU_list);
@@ -2832,6 +2838,9 @@ withdraw_retry:
 					= buf_pool->n_chunks;
 				warning = true;
 				buf_pool->chunks_old = NULL;
+				for (ulint j = 0; j < buf_pool->n_chunks_new; j++) {
+					buf_pool_register_chunk(&(buf_pool->chunks[j]));
+				}
 				goto calc_buf_pool_size;
 			}
 
@@ -2862,7 +2871,8 @@ withdraw_retry:
 			while (chunk < echunk) {
 				ulong	unit = srv_buf_pool_chunk_unit;
 
-				if (!buf_chunk_init(buf_pool, chunk, unit)) {
+				if (!buf_chunk_init(buf_pool, chunk, unit,
+				                    static_cast<bool>(srv_numa_interleave))) {
 
 					ib::error() << "buffer pool " << i
 						<< " : failed to allocate"
@@ -3163,7 +3173,7 @@ buf_relocate(
 	}
 #endif /* UNIV_DEBUG */
 
-	memcpy(dpage, bpage, sizeof *dpage);
+	memcpy(static_cast<void*>(dpage), bpage, sizeof *dpage);
 
 	/* Important that we adjust the hazard pointer before
 	removing bpage from LRU list. */

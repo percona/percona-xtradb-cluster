@@ -1630,11 +1630,12 @@ Finally, ``-1`` means no limit, i.e. an infinite number of file handles.
 .. variable:: rocksdb_max_row_locks
 
   :version 5.7.19-17: Implemented
+  :version 5.7.21-21: Default value has changed from ``1073741824`` to ``1048576``
   :cli: ``--rocksdb-max-row-locks``
   :dyn: Yes
   :scope: Global, Session
   :vartype: Numeric
-  :default: ``1073741824``
+  :default: ``1048576``
 
 Specifies the limit on the maximum number of row locks a transaction can have
 before it fails.
@@ -1913,6 +1914,7 @@ Resets MyRocks internal statistics dynamically
 
   :version 5.7.19-17: Implemented
   :version 5.7.20-19: Variable removed
+  :version 5.7.21-21: Re-implemented
   :cli: ``--rocksdb-rpl-skip-tx-api``
   :dyn: No
   :scope: Global
@@ -1921,7 +1923,11 @@ Resets MyRocks internal statistics dynamically
 
 Specifies whether write batches should be used for replication thread
 instead of the transaction API.
-Disabled by default.
+Disabled by default. 
+
+There are two conditions which are necessary to
+use it: row replication format and slave
+operating in super read only mode.
 
 .. variable:: rocksdb_seconds_between_stat_computes
 

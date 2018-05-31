@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2017 Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2018 Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -463,6 +463,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, YYLTYPE **c, ulong *yystacksize);
    Comments for TOKENS.
    For each token, please include in the same line a comment that contains
    the following tags:
+   SQL-2015-R : Reserved keyword as per SQL-2015 draft
    SQL-2003-R : Reserved keyword as per SQL-2003
    SQL-2003-N : Non Reserved keyword as per SQL-2003
    SQL-1999-R : Reserved keyword as per SQL-1999
@@ -1143,6 +1144,12 @@ bool my_yyoverflow(short **a, YYSTYPE **b, YYLTYPE **c, ulong *yystacksize);
 %token  YEAR_MONTH_SYM
 %token  YEAR_SYM                      /* SQL-2003-R */
 %token  ZEROFILL
+
+/*
+   Tokens from MySQL 8.0
+*/
+%token  JSON_OBJECTAGG                /* SQL-2015-R */
+%token  JSON_ARRAYAGG                 /* SQL-2015-R */
 
 /*
   Resolve column attribute ambiguity -- force precedence of "UNIQUE KEY" against
@@ -2290,7 +2297,8 @@ create:
             lex->alter_info.reset();
             lex->col_list.empty();
             lex->change=NullS;
-            memset(&lex->create_info, 0, sizeof(lex->create_info));
+            memset(static_cast<void*>(&lex->create_info), 0,
+                   sizeof(lex->create_info));
             lex->create_info.options=$2 | $4;
             lex->create_info.default_table_charset= NULL;
             lex->name.str= 0;
@@ -6678,7 +6686,12 @@ type:
           {
             Lex->dec= const_cast<char *>($2);
             if (YYTHD->variables.sql_mode & MODE_MAXDB)
+            {
+              push_warning(current_thd, Sql_condition::SL_WARNING,
+                  WARN_DEPRECATED_MAXDB_SQL_MODE_FOR_TIMESTAMP,
+                  ER_THD(YYTHD, WARN_DEPRECATED_MAXDB_SQL_MODE_FOR_TIMESTAMP));
               $$=MYSQL_TYPE_DATETIME2;
+            }
             else
             {
               /*
@@ -7648,7 +7661,8 @@ alter:
             lex->select_lex->init_order();
             lex->select_lex->db=
                     const_cast<char*>((lex->select_lex->table_list.first)->db);
-            memset(&lex->create_info, 0, sizeof(lex->create_info));
+            memset(static_cast<void*>(&lex->create_info), 0,
+                   sizeof(lex->create_info));
             lex->create_info.db_type= 0;
             lex->create_info.default_table_charset= NULL;
             lex->create_info.row_type= ROW_TYPE_NOT_USED;
@@ -10221,6 +10235,14 @@ sum_expr:
           {
             $$= NEW_PTN Item_sum_or(@$, $3);
           }
+        | JSON_ARRAYAGG '(' in_sum_expr ')'
+          {
+            $$= NEW_PTN Item_sum_json_array(@$, $3);
+          }
+        | JSON_OBJECTAGG '(' in_sum_expr ',' in_sum_expr ')'
+          {
+            $$= NEW_PTN Item_sum_json_object(@$, $3, $5);
+          }
         | BIT_XOR  '(' in_sum_expr ')'
           {
             $$= NEW_PTN Item_sum_xor(@$, $3);
@@ -11963,7 +11985,8 @@ show:
           SHOW
           {
             LEX *lex=Lex;
-            memset(&lex->create_info, 0, sizeof(lex->create_info));
+            memset(static_cast<void*>(&lex->create_info), 0,
+                   sizeof(lex->create_info));
           }
           show_param
         ;

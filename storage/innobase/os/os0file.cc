@@ -1,6 +1,6 @@
 /***********************************************************************
 
-Copyright (c) 1995, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2018, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2009, 2016, Percona Inc.
 
 Portions of this file contain modifications contributed and copyrighted
@@ -2121,6 +2121,8 @@ os_file_compress_page(
 		old_compressed_len = ut_calc_align(
 			old_compressed_len + FIL_PAGE_DATA,
 			type.block_size());
+	} else {
+		old_compressed_len = *n;
 	}
 
 	byte*	compressed_page;
@@ -2761,6 +2763,8 @@ AIO::os_aio_dispatch_read_array_submit_low(
 	if (acquire_mutex)
 		array->acquire();
 	/* Submit aio requests buffered on all segments. */
+	ut_ad(array->m_pending);
+	ut_ad(array->m_count);
 	for (ulint i = 0; i < array->m_n_segments; i++) {
 		const int	count = array->m_count[i];
 		int	offset = 0;
@@ -2852,9 +2856,11 @@ AIO::linux_dispatch(Slot* slot, bool should_buffer)
 		in the pending array consecutively as they come.
 		m_count[i] records the number of buffered aio requests
 		in the ith segment.*/
+		ut_ad(m_count);
 		ulint&	count = m_count[io_ctx_index];
 		ut_ad(count != slots_per_segment);
 		ulint	n = io_ctx_index * slots_per_segment + count;
+		ut_ad(m_pending);
 		m_pending[n] = iocb;
 		++count;
 		if (count == slots_per_segment) {
@@ -6603,6 +6609,8 @@ AIO::AIO(
 # ifdef LINUX_NATIVE_AIO
 	,m_aio_ctx(),
 	m_events(m_slots.size())
+	,m_pending(NULL)
+	,m_count(NULL)
 # elif defined(_WIN32)
 	,m_handles()
 # endif /* LINUX_NATIVE_AIO */
@@ -6615,7 +6623,8 @@ AIO::AIO(
 	m_not_full = os_event_create("aio_not_full");
 	m_is_empty = os_event_create("aio_is_empty");
 
-	memset(&m_slots[0], 0x0, sizeof(m_slots[0]) * m_slots.size());
+	memset(static_cast<void*>(&m_slots[0]), 0x0,
+	       sizeof(m_slots[0]) * m_slots.size());
 #ifdef LINUX_NATIVE_AIO
 	memset(&m_events[0], 0x0, sizeof(m_events[0]) * m_events.size());
 #endif /* LINUX_NATIVE_AIO */
@@ -6784,10 +6793,14 @@ AIO::~AIO()
 		m_events.clear();
 		ut_free(m_aio_ctx);
 #ifdef UNIV_DEBUG
-		for (size_t idx = 0; idx < m_slots.size(); ++idx)
-			ut_ad(m_pending[idx] == NULL);
-		for (size_t idx = 0; idx < m_n_segments; ++idx)
-			ut_ad(m_count[idx] == 0);
+		if (m_pending) {
+			for (size_t idx = 0; idx < m_slots.size(); ++idx)
+				ut_ad(m_pending[idx] == NULL);
+		}
+		if (m_count) {
+			for (size_t idx = 0; idx < m_n_segments; ++idx)
+				ut_ad(m_count[idx] == 0);
+		}
 #endif
 		ut_free(m_pending);
 		ut_free(m_count);
@@ -7332,7 +7345,7 @@ AIO::reserve_slot(
 #else
 		slot->len = static_cast<ulint>(compressed_len);
 #endif /* _WIN32 */
-		slot->skip_punch_hole = type.punch_hole();
+		slot->skip_punch_hole = !type.punch_hole();
 
 		acquire();
 	}
