@@ -931,8 +931,20 @@ wait_for_listen()
 
     for i in {1..300}
     do
-        ss -p state listening "( sport = :$PORT )" | grep -qE 'socat|nc' && break
         sleep 0.2
+        # List only our (mysql user) processes to avoid triggering SELinux
+        for cmd in $(ps -u $(id -u) -o pid,comm | sed 's/^\s*//g' | tr ' ' '|' | grep -E 'socat|nc')
+        do
+            pid=$(echo $cmd | cut -d'|' -f1)
+            ls -l /proc/$pid/fd > /tmp/socat_fd
+            cat /proc/$pid/net/tcp > /tmp/socat_tcp
+            # List the sockets of the pid
+            sockets=$(ls -l /proc/$pid/fd | grep socket | cut -d'[' -f2 | cut -d ']' -f1 | tr '\n' '|')
+            if [[ -n $sockets ]]; then
+                # Is one of these sockets listening on the SST port? If so, we need to break from 2 loops
+                grep -E "${sockets:0:-1}" /proc/$pid/net/tcp | grep "00000000:$(printf '%X' $PORT)" > /dev/null && break 2
+            fi
+        done
     done
 
     echo "ready ${HOST}:${PORT}/${MODULE}//$sst_ver"
