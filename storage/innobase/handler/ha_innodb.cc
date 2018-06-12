@@ -102,6 +102,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifdef WITH_WSREP
 #include "dict0priv.h"
+#include "key.h"     // key_copy, key_unpack, key_cmp_if_same, key_cmp
 #endif /* WITH_WSREP */
 enum_tx_isolation thd_get_trx_isolation(const THD* thd);
 
@@ -8399,6 +8400,11 @@ no_commit:
 		build_template(true);
 	}
 
+	/* debug sync point has a special significance given the location
+	where-in auto-inc value is generated but row insert action is not yet
+	started. */
+	DEBUG_SYNC(user_thd, "pxc_autoinc_val_generated");
+
 	innobase_srv_conc_enter_innodb(prebuilt->trx);
 
 	error = row_insert_for_mysql((byte*) record, prebuilt);
@@ -8450,12 +8456,32 @@ no_commit:
 			/* workaround for LP bug #355000, retrying the insert */
 			case SQLCOM_INSERT:
 
-				WSREP_DEBUG("DUPKEY error for autoinc\n"
-				      "THD %ld, value %llu, off %llu inc %llu",
-				      wsrep_thd_thread_id(current_thd),
-				      auto_inc,
-				      prebuilt->autoinc_offset,
-				      prebuilt->autoinc_increment);
+				{
+				const dict_index_t*     err_index=
+					trx_get_error_info(prebuilt->trx);
+				WSREP_DEBUG("Found duplicate value for"
+					" table (%s) - key (%s)"
+					" THD %lu, Auto-Inc-Value: %llu"
+					" Offset: %llu, Increment: %llu",
+					prebuilt->table->name,
+					(err_index ? err_index->name : "UNKNOWN"),
+					wsrep_thd_thread_id(current_thd),
+					auto_inc,
+					prebuilt->autoinc_offset,
+					prebuilt->autoinc_increment);
+
+				int mysql_key =
+					get_dup_key(HA_ERR_FOUND_DUPP_KEY);
+				KEY* key =
+					(mysql_key < 0 || mysql_key == MAX_KEY)
+					? NULL : &table->key_info[mysql_key];
+
+				char key_buff[MAX_KEY_LENGTH];
+				String str(key_buff, sizeof(key_buff),
+					   system_charset_info);
+				key_unpack(&str, table, key);
+				WSREP_DEBUG("Duplicate value: %s", str.c_ptr());
+				}
 
 				if (wsrep_on(current_thd)                     &&
 				    auto_inc_inserted                         &&
@@ -8506,10 +8532,22 @@ set_max_autoinc:
 					offset = prebuilt->autoinc_offset;
 					increment = prebuilt->autoinc_increment;
 
+#ifdef WITH_WSREP
+					ulonglong prev_auto_inc = auto_inc;
+#endif /* WITH_WSREP */
+
 					auto_inc = innobase_next_autoinc(
 						auto_inc,
 						1, increment, offset,
 						col_max_value);
+
+#ifdef WITH_WSREP
+					WSREP_DEBUG("Generating new auto-inc"
+						" next-value (Current: %llu,"
+						" New: %llu)",
+						prev_auto_inc, auto_inc);
+#endif /* WITH_WSREP */
+
 
 					err = innobase_set_max_autoinc(
 						auto_inc);
@@ -16033,21 +16071,35 @@ ha_innobase::get_auto_increment(
 		if (prebuilt->autoinc_increment > increment) {
 
 #ifdef WITH_WSREP
-			WSREP_DEBUG("autoinc decrease: %llu -> %llu\n"
-				    "THD: %ld, current: %llu, autoinc: %llu", 
-				    prebuilt->autoinc_increment,
-				    increment,
+			WSREP_DEBUG("Refresh change in auto-inc configuration"
+				    " from (off: %llu -> %llu)"
+				    " and (inc: %llu -> %llu)."
+				    " Re-align auto increment"
+				    " value for table (%s)"
+				    " THD: %lu, current: %llu, autoinc: %llu",
+				    prebuilt->autoinc_offset, offset,
+				    prebuilt->autoinc_increment, increment,
+				    prebuilt->table->name,
 				    wsrep_thd_thread_id(ha_thd()),
 				    current, autoinc);
 			if (!wsrep_on(ha_thd()))
 			{
 #endif /* WITH_WSREP */
+
+			/* MySQL flow will construct last_inserted_id but PXC
+			can't do so because any values in that range are
+			potentially unsafe as they were reserved for other node
+			and if other node has used them it will result in
+			conflict. So PXC skip this readjustment logic
+			and re-calibration too as there is no change in
+			current autoinc value. */
 			current = autoinc - prebuilt->autoinc_increment;
+
+			current = innobase_next_autoinc(
+				current, 1, increment, 1, col_max_value);
 #ifdef WITH_WSREP
 			}
 #endif /* WITH_WSREP */
-			current = innobase_next_autoinc(
-				current, 1, increment, 1, col_max_value);
 
 			dict_table_autoinc_initialize(prebuilt->table, current);
 
