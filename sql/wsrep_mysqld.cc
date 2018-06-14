@@ -771,6 +771,13 @@ wsrep_view_handler_cb (void*                    app_ctx,
 
   if (wsrep_auto_increment_control)
   {
+    WSREP_INFO("Auto Increment Offset/Increment re-align with cluster"
+                " membership change (Offset: %lu -> %lu)"
+                " (Increment: %lu -> %lu)",
+                global_system_variables.auto_increment_offset,
+                (long unsigned) view->my_idx + 1,
+                global_system_variables.auto_increment_increment,
+                (long unsigned) view->memb_num);
     global_system_variables.auto_increment_offset= view->my_idx + 1;
     global_system_variables.auto_increment_increment= view->memb_num;
   }
