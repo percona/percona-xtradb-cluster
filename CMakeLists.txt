@@ -469,10 +469,18 @@ IF(NOT CMAKE_BUILD_TYPE
 ENDIF()
 
 # Add safemutex for debug configurations
-FOREACH(LANG C CXX)
-  SET(CMAKE_${LANG}_FLAGS_DEBUG
-    "${CMAKE_${LANG}_FLAGS_DEBUG} -DSAFE_MUTEX")
-ENDFOREACH()
+# PS-enabled SAFE_MUTEX (starting from 5.7.22) but PXC can't enable it.
+# PXC in 5.7 introduced PFS for some of the instruments that in galera
+# library but not for all since tracking of them is big overhead
+# with multiple layer callback involved.
+# SAFE_MUTEX should be enabled for all instrument or none.
+# Since PXC cause is mix-match latter become true for PXC.
+IF(NOT WITH_INNODB_MEMCACHED)
+    FOREACH(LANG C CXX)
+        SET(CMAKE_${LANG}_FLAGS_DEBUG
+        "${CMAKE_${LANG}_FLAGS_DEBUG} -DSAFE_MUTEX")
+    ENDFOREACH()
+ENDIF()
 
 
 # Set commonly used variables
