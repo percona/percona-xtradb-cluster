@@ -53,6 +53,10 @@ Created 4/20/1996 Heikki Tuuri
 #include "fts0types.h"
 #include "m_string.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_api.h"
+#endif /* WITH_WSREP */
+
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
 is enough space in the redo log before for that operation. This is
@@ -926,7 +930,7 @@ dberr_t wsrep_append_foreign_key(trx_t *trx,
 				 const rec_t*		clust_rec,
 				 dict_index_t*		clust_index,
 				 ibool			referenced,
-				 ibool			shared);
+				 wsrep_key_type		key_type);
 #endif /* WITH_WSREP */
 
 /*********************************************************************//**
@@ -1285,7 +1289,7 @@ row_ins_foreign_check_on_constraint(
 					foreign,
 					clust_rec,
 					clust_index,
-					FALSE, FALSE);
+					FALSE, WSREP_KEY_EXCLUSIVE);
 	if (err != DB_SUCCESS) {
 		fprintf(stderr, 
 			"WSREP: foreign key append failed: %d\n", err);
@@ -1633,7 +1637,9 @@ run_again:
 						rec,
 						check_index,
 						check_ref,
-						(upd_node) ? TRUE : FALSE);
+						upd_node != NULL
+							? WSREP_KEY_SHARED
+							: WSREP_KEY_EXCLUSIVE);
 #endif /* WITH_WSREP */
 					goto end_scan;
 				} else if (foreign->type != 0) {
