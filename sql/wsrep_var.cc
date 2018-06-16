@@ -350,7 +350,7 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
      there can be several concurrent clients changing wsrep_provider
   */
   mysql_mutex_unlock(&LOCK_global_system_variables);
-  wsrep_stop_replication(thd);
+  wsrep_stop_replication(thd, false);
 
   /*
     Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
@@ -492,7 +492,7 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
      there can be several concurrent clients changing wsrep_provider
   */
   mysql_mutex_unlock(&LOCK_global_system_variables);
-  wsrep_stop_replication(thd);
+  wsrep_stop_replication(thd, false);
   /*
     Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
     any potential deadlock.
