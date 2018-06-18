@@ -4,6 +4,8 @@ GRANT ALL ON *.* TO 'sst'@'localhost';
 FLUSH PRIVILEGES;
 SET GLOBAL wsrep_sst_auth = 'sst:';
 SET GLOBAL wsrep_sst_method = 'mysqldump';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated SST through mysqldump. Percona-XtraDB-Cluster recommends using xtrabackup. Please switch to use xtrabackup or rsync.
 Performing State Transfer on a server that has been shut down cleanly and restarted
 CREATE TABLE t1 (f1 CHAR(255)) ENGINE=InnoDB;
 SET AUTOCOMMIT=OFF;

@@ -1,5 +1,9 @@
 SET GLOBAL wsrep_forced_binlog_format='STATEMENT';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
 SET GLOBAL wsrep_forced_binlog_format='STATEMENT';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
 CREATE TABLE t1 (
 i int(11) NOT NULL AUTO_INCREMENT,
 c char(32) DEFAULT 'dummy_text',
@@ -14,7 +18,11 @@ select sum(i) = SUM from t1;;
 sum(i) = SUM
 1
 SET GLOBAL wsrep_forced_binlog_format='none';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
 SET GLOBAL wsrep_forced_binlog_format='none';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated wsrep_forced_binlog_format
 drop table t1;
 SET SESSION binlog_format='STATEMENT';
 show variables like 'binlog_format';

@@ -3521,6 +3521,14 @@ int init_common_variables()
                 " (Node is yet not SYNCED with cluster)");
     return 1;
   }
+
+  const char* WSREP_SST_MYSQLDUMP= "mysqldump";
+  if (wsrep_provider_loaded && !strcmp (WSREP_SST_MYSQLDUMP, wsrep_sst_method))
+  {
+    WSREP_WARN("Percona-XtraDB-Cluster has deprecated SST through mysqldump."
+               " Percona-XtraDB-Cluster recommends using xtrabackup."
+               " Please switch to use xtrabackup or rsync.");
+  }
 #endif /* WITH_WSREP */
 
 #ifdef WITH_WSREP

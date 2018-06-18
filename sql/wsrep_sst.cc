@@ -88,6 +88,18 @@ bool wsrep_sst_method_check (sys_var *self, THD* thd, set_var* var)
     return true;
   }
 
+  if (!strcmp (var->save_result.string_value.str, WSREP_SST_MYSQLDUMP))
+  {
+    WSREP_WARN("Percona-XtraDB-Cluster has deprecated SST through mysqldump."
+               " Percona-XtraDB-Cluster recommends using xtrabackup."
+               " Please switch to use xtrabackup or rsync.");
+    push_warning_printf(
+      thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+      "Percona-XtraDB-Cluster has deprecated SST through mysqldump."
+      " Percona-XtraDB-Cluster recommends using xtrabackup."
+      " Please switch to use xtrabackup or rsync.");
+  }
+
   return false;
 }
 
@@ -1341,6 +1353,9 @@ wsrep_cb_status_t wsrep_sst_donate_cb (void* app_ctx, void* recv_ctx,
 
   if (!strcmp (WSREP_SST_MYSQLDUMP, method))
   {
+    WSREP_WARN("Percona-XtraDB-Cluster has deprecated SST through mysqldump."
+               " Percona-XtraDB-Cluster recommends using xtrabackup."
+               " Please switch to use xtrabackup or rsync.");
     ret = sst_donate_mysqldump(data, &current_gtid->uuid, uuid_str,
                                current_gtid->seqno, bypass, env());
   }
