@@ -13,9 +13,11 @@ https://www.percona.com/downloads/Percona-XtraDB-Cluster-57
 There are multiple tarballs in the **Linux - Generic** section
 depending on the *OpenSSL* library available in your distribution:
 
-* ``ssl100``: for all supported Debian and Ubuntu versions
+* ``ssl100``: for Debian prior to 9 and Ubuntu prior to 14.04 versions
 
-* ``ssl101``: for supported Red Hat Enterprise Linux derivatives
+* ``ssl101``: for CentOS 6 and CentOS 7
+
+* ``ssl102``: for Debian 9 and Ubuntu versions starting from 14.04
 
 For example, you can use ``curl`` as follows::
 
