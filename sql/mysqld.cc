@@ -2732,7 +2732,7 @@ extern "C" void *signal_hand(void *arg MY_ATTRIBUTE((unused)))
         /* Stop wsrep threads in case they are running. */
         if (wsrep_running_threads > 0)
         {
-          wsrep_stop_replication(NULL);
+          wsrep_stop_replication(NULL, true);
         }
 #endif /* WITH_WSREP */
         close_connections();
@@ -7395,7 +7395,9 @@ extern "C" void *start_wsrep_THD(void *arg)
 
     THD_CHECK_SENTRY(thd);
     if (thd_added)
+    {
       thd_manager->remove_thd(thd);
+    }
   }
   else
   {

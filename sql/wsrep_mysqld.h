@@ -234,7 +234,7 @@ extern void wsrep_close_applier_threads(int count);
 extern void wsrep_kill_mysql(THD *thd);
 
 /* new defines */
-extern void wsrep_stop_replication(THD *thd);
+extern void wsrep_stop_replication(THD *thd, bool is_server_shutdown);
 extern bool wsrep_start_replication();
 extern bool wsrep_must_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
 extern bool wsrep_sync_wait (THD* thd, uint mask = WSREP_SYNC_WAIT_BEFORE_READ);
