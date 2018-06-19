@@ -15,6 +15,7 @@ rpl_innodb_info_tbl_slave_tmp_tbl_mismatch : Issue#330 2018-05-16 CODERSHIP http
 rpl_relay_log_recovery_positions : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 rpl_seconds_behind_master : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 rpl_semi_sync_ack_thread : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+rpl_semi_sync_after_sync : Issue#330 2018-06-19 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 # Codership disabled tests end here
 
 rpl_row_create_table      : Bug#11759274 2010-02-27 andrei failed different way than earlier with bug#45576
