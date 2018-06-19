@@ -115,7 +115,11 @@ static int keyring_init(MYSQL_PLUGIN plugin_info)
         " can be created in the specified location. "
         "The keyring_file will stay unusable until correct path to the keyring file "
         "gets provided");
+#ifdef WITH_WSREP
+      return TRUE;
+#else
       return FALSE;
+#endif /* WITH_WSREP */
     }
     is_keys_container_initialized = TRUE;
     return FALSE;
