@@ -563,7 +563,7 @@ static uchar *pack_screens(List<Create_field> &create_fields,
                            uint *info_length, uint *screens,
                            bool small_file)
 {
-  reg1 uint i;
+  uint i;
   uint row,start_row,end_row,fields_on_screen;
   uint length,cols;
   uchar *info,*pos,*start_screen;
@@ -911,7 +911,7 @@ static uint get_interval_id(uint *int_count,List<Create_field> &create_fields,
 static bool pack_fields(File file, List<Create_field> &create_fields,
                         ulong data_offset)
 {
-  reg2 uint i;
+  uint i;
   uint int_count, comment_length=0;
   uchar buff[MAX_FIELD_WIDTH];
   Create_field *field;
@@ -1094,8 +1094,8 @@ static bool make_empty_rec(THD *thd, File file,
   DBUG_ENTER("make_empty_rec");
 
   /* We need a table to generate columns for default values */
-  memset(&table, 0, sizeof(table));
-  memset(&share, 0, sizeof(share));
+  memset(static_cast<void*>(&table), 0, sizeof(table));
+  memset(static_cast<void*>(&share), 0, sizeof(share));
   table.s= &share;
 
   if (!(buff=(uchar*) my_malloc((size_t) reclength,MYF(MY_WME | MY_ZEROFILL))))
