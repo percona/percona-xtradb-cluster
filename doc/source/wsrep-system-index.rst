@@ -752,6 +752,32 @@ to avoid deadlock errors that can be triggered by replication conflicts.
 If this variable is set to ``0``,
 autocommit transactions won't be retried.
 
+.. variable:: wsrep_RSU_commit_timeout
+
+   :cli: ``--wsrep-RSU-commit-timeout``
+   :conf: Yes
+   :scope: Global
+   :dyn: Yes
+   :default: ``5000``
+   :range:  From ``5000`` (5 millisecons) to ``31536000000000`` (365 days)
+
+Specifies the timeout in microseconds to allow active connection to complete
+COMMIT action before starting RSU.
+
+While running RSU it is expected that user has isolated the node and there is
+no active traffic executing on the node. RSU has a check to ensure this, and
+waits for any active connection in ``COMMIT`` state before starting RSU.
+
+By default this check has timeout of 5 millisecons, but in some cases
+COMMIT is taking longer. This variable sets the timeout, and has allowed values
+from the range of (5 millisecons, 365 days). The value is to be set in
+microseconds. Unit of variable is in micro-secs so set accordingly.
+
+.. note:: RSU operation will not auto-stop node from receiving active traffic.
+   So there could be a continuous flow of active traffic while RSU continues to
+   wait, and that can result in RSU starvation. User is expected to block
+   active RSU traffic while performing operation.
+
 .. variable:: wsrep_slave_FK_checks
 
    :cli: ``--wsrep-slave-FK-checks``
