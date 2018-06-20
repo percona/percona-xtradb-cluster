@@ -1223,7 +1223,10 @@ fi
 # 2.4.11: XB now has its own keyring plugin complied and added support for vault plugin
 #         in addition to existing keyring_file plugin.
 #
-XB_REQUIRED_VERSION="2.4.11"
+# 2.4.12: XB fixed bugs like keyring is empty + move-back stage now uses params from
+#         my.cnf.
+
+XB_REQUIRED_VERSION="2.4.12"
 
 XB_VERSION=`$INNOBACKUPEX_BIN --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1`
 if [[ -z $XB_VERSION ]]; then
