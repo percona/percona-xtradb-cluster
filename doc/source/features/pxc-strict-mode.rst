@@ -58,7 +58,7 @@ or the ``--pxc-strict-mode`` option during ``mysqld`` startup.
    For example, to set PXC Strict Mode to ``PERMISSIVE``,
    run the following command::
 
-      mysql> SET pxc_strict_mode=PERMISSIVE;
+      mysql> SET GLOBAL pxc_strict_mode=PERMISSIVE;
 
 .. note::
 
