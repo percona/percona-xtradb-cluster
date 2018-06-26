@@ -431,14 +431,19 @@ the slave queue drops below :variable:`gcs.fc_factor` *
 
 .. variable:: gcs.fc_limit
 
+   :version: :rn:`5.7.17-29.20`: Default value changed from ``16`` to ``100`` 
    :cli: Yes
    :conf: Yes
    :scope: Global
    :dyn: Yes
-   :default: 16
+   :default: 100
 
 This variable is used for replication flow control. Replication is paused when
-the slave queue exceeds this limit.
+the slave queue exceeds this limit. In the default operation mode, flow control
+limit is dynamically recalculated based on the amount of nodes in the
+cluster, but this recalculation can be turned off with use of the
+:variable:`gcs.fc_master_slave` variable to make manual setting of the :variable:`gcs.fc_limit` having an effect  (e.g. for configurations
+when writing is done to a single node in |PXC|).
 
 .. variable:: gcs.fc_master_slave
 
@@ -449,7 +454,8 @@ the slave queue exceeds this limit.
    :default: NO
 
 This variable is used to specify if there is only one master node in the
-cluster.
+cluster. It affects whether flow control limit is recalculated dynamically
+(when ``NO``) or not (when ``YES``).
 
 .. variable:: gcs.max_packet_size
 
