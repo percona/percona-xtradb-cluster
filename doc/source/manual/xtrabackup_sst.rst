@@ -442,6 +442,13 @@ following scenarios:
    and ``encrypt=0`` under ``[sst]``, it will still be encrypted
    and SST will fail. Look at case 3 above for resolution.
 
+.. warning:: It is insecure to use the ``encrypt-key`` option when performing
+   an SST with xtrabackup-v2 and encrypt=1 (using 
+   ``wsrep_sst_method='xtrabackup-v2'`` under ``[mysqld]`` and ``encrypt=1``
+   under ``[sst]``) since the key will appear on the command line, and will be
+   visible via ``ps``. Therefore it is strongly recommended to place the key
+   into a file and use the ``encrypt-key-file`` option.
+
 Memory Allocation
 -----------------
 
