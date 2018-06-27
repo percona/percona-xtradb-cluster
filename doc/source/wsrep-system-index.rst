@@ -352,6 +352,7 @@ when inserting the ``DEFAULT`` value into an ``AUTO_INCREMENT`` column.
 
 .. variable:: wsrep_forced_binlog_format
 
+   :version 5.7.22-29.26: Variable deprecated
    :cli: ``--wsrep-forced-binlog-format``
    :conf: Yes
    :scope: Global
@@ -930,8 +931,8 @@ Available values are:
   This method requires superuser credentials for the donor node
   to be specified in the :variable:`wsrep_sst_auth` variable.
 
-  .. note:: This method is not recommended
-     unless it is required for specific reasons.
+  .. note:: This method is deprecated as of :rn:`5.7.22-29.26`
+     and not recommended unless it is required for specific reasons.
      Also, it is not compatible with ``bind_address`` set to ``127.0.0.1``
      or ``localhost``, and will cause startup to fail in this case.
 
