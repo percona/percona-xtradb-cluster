@@ -20,7 +20,6 @@
 
 RSYNC_PID=
 RSYNC_CONF=
-keyring=""
 KEYRING_FILE=
 OS=$(uname)
 [ "$OS" == "Darwin" ] && export -n LD_LIBRARY_PATH
@@ -32,9 +31,28 @@ export PATH="/usr/sbin:/sbin:$PATH"
 
 wsrep_check_programs rsync
 
-keyring=$(parse_cnf mysqld keyring-file-data "")
-if [[ -z $keyring ]]; then
-    keyring=$(parse_cnf sst keyring-file-data "")
+keyring_plugin=0
+keyring_file_data=""
+keyring_vault_config=""
+
+keyring_file_data=$(parse_cnf mysqld keyring-file-data "")
+keyring_vault_config=$(parse_cnf mysqld keyring-vault-config "")
+if [[ -n $keyring_file_data || -n $keyring_vault_config ]]; then
+     keyring_plugin=1
+fi
+
+if [[ -n $keyring_vault_config ]]; then
+    wsrep_log_error "******************* FATAL ERROR ********************** "
+    wsrep_log_error "SST using rsync with vault plugin is not supported." \
+                    " Percona recommends using SST with xtrabackup for" \
+                    " data-at-rest encryption (using keyring)."
+    wsrep_log_error "****************************************************** "
+    exit 255 # unknown
+fi
+
+if [[ $keyring_plugin -eq 1 ]]; then
+    wsrep_log_warning "Percona doesn't recommend using data-at-rest encryption" \
+                      " (using keyring) with rsync. Please use SST with xtrabackup."
 fi
 
 cleanup_joiner()
@@ -131,7 +149,7 @@ fi
 
 # New filter - exclude everything except dirs (schemas) and innodb files
 FILTER=(-f '- /lost+found' -f '- /.fseventsd' -f '- /.Trashes'
-        -f '+ /wsrep_sst_binlog.tar' -f '+ /ib_lru_dump' -f '+ /ibdata*' -f '+ /*/' -f '- /*')
+        -f '+ /wsrep_sst_binlog.tar' -f '+ /ib_lru_dump' -f '+ /*.ibd' -f '+ /ibdata*' -f '+ /*/' -f '- /*')
 
 if [ "$WSREP_SST_OPT_ROLE" = "donor" ]
 then
@@ -219,10 +237,10 @@ then
         fi
 
         # third, transfer the keyring file (this requires SSL, check for encryption)
-        if [[ -r $keyring ]]; then
+        if [[ -r $keyring_file_data ]]; then
             rsync --owner --group --perms --links --specials \
                   --ignore-times --inplace --quiet \
-                  $WHOLE_FILE_OPT "$keyring" \
+                  $WHOLE_FILE_OPT "$keyring_file_data" \
                   rsync://$WSREP_SST_OPT_ADDR/keyring-sst >&2 || RC=$?
 
             if [ $RC -ne 0 ]; then
@@ -361,10 +379,10 @@ EOF
         popd &> /dev/null
     fi
 
-    if [[ -n $keyring ]]; then
+    if [[ -n $keyring_file_data ]]; then
         if [[ -r $KEYRING_FILE ]]; then
-            wsrep_log_info "Moving sst keyring into place: moving $KEYRING_FILE to $keyring"
-            mv $KEYRING_FILE $keyring
+            wsrep_log_info "Moving sst keyring into place: moving $KEYRING_FILE to $keyring_file_data"
+            mv $KEYRING_FILE $keyring_file_data
         else
             # error, missing file
             wsrep_log_error "******************* FATAL ERROR ********************** "
