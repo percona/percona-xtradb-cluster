@@ -154,6 +154,7 @@ Reference
    :glob:
 
    release-notes/release-notes_index
+   management/data_at_rest_encryption
    wsrep-status-index
    wsrep-system-index
    wsrep-provider-index
