@@ -13,7 +13,7 @@ How do I report bugs?
 =====================
 
 All bugs can be reported on
-`Launchpad <https://bugs.launchpad.net/percona-xtradb-cluster/+filebug>`_.
+`JIRA <https://jira.percona.com/projects/PXC/issues>`_.
 Please submit ``error.log`` files from **all** the nodes.
 
 How do I solve locking issues like auto-increment?
