@@ -131,7 +131,10 @@ Stage III [Optional]
     # Remove it from cnf even though it was turned off at runtime in Step #11.
     read_only=ON
 
- 
+.. note::
+    Making this stage without cluster downtime can be achieved by removing the
+    config options and restarting node-by-node.
+
 Following is the upgrade process on Ubuntu 12.04 (precise)
 ==========================================================
 
@@ -235,3 +238,7 @@ Stage III [Optional]
 
     # Remove it from cnf even though it was turned off at runtime in Step #8.
     read_only=ON
+
+.. note::
+    Making this stage without cluster downtime can be achieved by removing the
+    config options and restarting node-by-node.

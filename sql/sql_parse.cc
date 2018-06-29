@@ -3983,7 +3983,7 @@ end_with_restore_list:
     */
     thd->set_slow_log_for_admin_command();
 
-    memset(&create_info, 0, sizeof(create_info));
+    memset(static_cast<void*>(&create_info), 0, sizeof(create_info));
     create_info.db_type= 0;
     create_info.row_type= ROW_TYPE_NOT_USED;
     create_info.default_table_charset= thd->variables.collation_database;
@@ -8090,7 +8090,7 @@ bool add_field_to_list(THD *thd, LEX_STRING *field_name, enum_field_types type,
                        List<String> *interval_list, const CHARSET_INFO *cs,
 		       uint uint_geom_type, const LEX_CSTRING *zip_dict)
 {
-  register Create_field *new_field;
+  Create_field *new_field;
   LEX  *lex= thd->lex;
   uint8 datetime_precision= decimals ? atoi(decimals) : 0;
   DBUG_ENTER("add_field_to_list");
@@ -8243,7 +8243,7 @@ TABLE_LIST *st_select_lex::add_table_to_list(THD *thd,
                                              List<String> *partition_names,
                                              LEX_STRING *option)
 {
-  register TABLE_LIST *ptr;
+  TABLE_LIST *ptr;
   TABLE_LIST *previous_table_ref; /* The table preceding the current one. */
   char *alias_str;
   LEX *lex= thd->lex;
