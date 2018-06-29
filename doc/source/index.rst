@@ -128,6 +128,7 @@ User's Manual
    manual/threading_model
    manual/gcache_record-set_cache_difference
    manual/performance_schema_instrumentation
+   management/data_at_rest_encryption
 
 How-tos
 =======
@@ -154,7 +155,6 @@ Reference
    :glob:
 
    release-notes/release-notes_index
-   management/data_at_rest_encryption
    wsrep-status-index
    wsrep-system-index
    wsrep-provider-index
