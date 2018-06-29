@@ -32,7 +32,7 @@ InnoDB tablespace encryption
 User should create a table that has its own dedicated tablespace, making this
 tablespace encrypted by specifying the appropriate option.
 
-|Percona Server| starting from :rn:`5.7.21-20` is extending support for
+Percona Server starting from :rn:`5.7.21-20` is extending support for
 encrypting `other tablespaces <https://www.percona.com/doc/percona-server/LATEST/management/data_at_rest_encryption.html>`_ too.
 
 |PXC| already supported data-at-rest encryption starting from ``5.7``.
@@ -48,7 +48,7 @@ DDL statements are replicated in PXC cluster, thus creating encrypted table or
 tablespace on all the nodes of the cluster.
 
 This feature requires a keyring plugin to be loaded before it can be used.
-Currently |Percona Server| (and in turn |PXC|) supports 2 types of keyring
+Currently Percona Server (and in turn |PXC|) supports 2 types of keyring
 plugin: ``keyring_file`` and ``keyring_vault``.
 
 Configuring PXC to use keyring_file plugin
@@ -271,11 +271,11 @@ configured to use |PXC| 5.7.22, user can switch one node at a time to use
 Temporary file encryption
 =========================
 
-|Percona Server| 5.7.22 added support for encrypting temporary file storage
+Percona Server 5.7.22 added support for encrypting temporary file storage
 enabled using ``encrypt-tmp-files``. This storage or files are local to the
 node and has no direct effect on |PXC| replication. |PXC| recommends enabling
 it on all the nodes of the cluster, though that is not mandatory. Parameter to
-enable this option is same as in |Percona Server|:
+enable this option is same as in Percona Server:
 
 .. code-block:: text
 
