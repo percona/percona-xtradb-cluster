@@ -413,7 +413,7 @@ Group:          Applications/Databases
 Requires:       %{distro_requires}
 Requires:	Percona-XtraDB-Cluster-client%{product_suffix} = %{version}-%{release}
 Requires:	Percona-XtraDB-Cluster-shared%{product_suffix} = %{version}-%{release}
-Requires:	percona-xtrabackup-24 >= 2.4.4 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
+Requires:	percona-xtrabackup-24 >= 2.4.12 socat rsync iproute perl-DBI perl-DBD-MySQL lsof
 Requires:       perl(Data::Dumper) which qpress
 %if 0%{?systemd}
 Requires(post):   systemd
@@ -1172,33 +1172,67 @@ fi
 %if 0%{?systemd}
   %systemd_post mysql
 %endif
-MYCNF_PACKAGE=$(rpm -qi `rpm -qf /etc/my.cnf` | grep Name | awk '{print $3}')
-if [ $MYCNF_PACKAGE = 'mariadb-libs' -o $MYCNF_PACKAGE = 'mysql-libs' ]
-then
-  MODIFICATION=$(rpm --verify --nomtime $MYCNF_PACKAGE | grep /etc/my.cnf | awk '{print $1}')
-  if [ "${MODIFICATION}" == "" ]
-  then
-    rm -f /etc/my.cnf
-  fi
+
+%if 0%{?rhel} > 6
+  MYCNF_PACKAGE="mariadb-libs"
+%else
+  MYCNF_PACKAGE="mysql-libs"
+%endif
+
+if [ -e /etc/my.cnf ]; then
+  MYCNF_PACKAGE=$(rpm -qi `rpm -qf /etc/my.cnf` | grep -m 1 Name | awk '{print $3}')
 fi
-if [ ! -f /etc/my.cnf ]
-then
+if [ "$MYCNF_PACKAGE" == "mariadb-libs" -o "$MYCNF_PACKAGE" == "mysql-libs" -o "$MYCNF_PACKAGE" == "Percona-Server-server-57" -o "$MYCNF_PACKAGE" == "Percona-XtraDB-Cluster-server-57" ]; then
+  MODIFIED=$(rpm -Va "$MYCNF_PACKAGE" | grep '/etc/my.cnf' | awk '{print $1}' | grep -c 5)
+  if [ "$MODIFIED" == 1 ]; then
+      cp /etc/my.cnf /etc/my.cnf.old
+  fi
+else
+  cp /etc/my.cnf /etc/my.cnf.old
+fi
+if [ ! -f /etc/my.cnf ]; then
+  rm -rf /etc/my.cnf
+  for file in $(alternatives --display my.cnf | grep priority | awk '{print $1}'); do
+    alternatives --remove my.cnf $file
+  done
   update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
 else
-  echo " -------------"
-  echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
-  echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
-  echo "   *  Once it is done please execute the following commands:"
-  echo " rm -rf /etc/my.cnf"
-  echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
-  echo " -------------"
-  cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
-  if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
-    sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
-  fi
-  cnfpid=$(/usr/bin/my_print_defaults mysqld|grep -c pid-file)
-  if [ $cnfpid = 0 -a -f /etc/my.cnf ]; then
-    sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
+  if [ "$MYCNF_PACKAGE" == "Percona-XtraDB-Cluster-server-57" -o "$MYCNF_PACKAGE" == "Percona-Server-server-57" ]; then
+      real_file=$(readlink -f /etc/my.cnf)
+      if [ -L /etc/my.cnf ] && [ "x${real_file}" == "x/etc/percona-server.cnf" ]; then
+          rm -rf /etc/my.cnf
+          update-alternatives --remove my.cnf /etc/percona-server.cnf
+          update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
+      fi
+      if [ -L /etc/my.cnf ] && [ "x${real_file}" == "x/etc/percona-xtradb-cluster.cnf" ]; then
+          rm -rf /etc/my.cnf
+          update-alternatives --remove my.cnf /etc/percona-xtradb-cluster.cnf
+          update-alternatives --install /etc/my.cnf my.cnf "/etc/percona-xtradb-cluster.cnf" 200
+      else
+          echo " -------------"
+          echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
+          echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
+          echo "   *  Once it is done please execute the following commands:"
+          echo " rm -rf /etc/my.cnf"
+          echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
+          echo " -------------"
+      fi
+  else
+          echo " -------------"
+          echo "   *  The suggested mysql options and settings are in /etc/percona-xtradb-cluster.conf.d/mysqld.cnf"
+          echo "   *  If you want to use mysqld.cnf as default configuration file please make backup of /etc/my.cnf"
+          echo "   *  Once it is done please execute the following commands:"
+          echo " rm -rf /etc/my.cnf"
+          echo " update-alternatives --install /etc/my.cnf my.cnf \"/etc/percona-xtradb-cluster.cnf\" 200"
+          echo " -------------"
+          cnflog=$(/usr/bin/my_print_defaults mysqld|grep -c log-error)
+          if [ $cnflog = 0 -a -f /etc/my.cnf ]; then
+              sed -i "/^\[mysqld\]$/a log-error=/var/log/mysqld.log" /etc/my.cnf
+          fi
+          cnfpid=$(/usr/bin/my_print_defaults mysqld|grep -c pid-file)
+          if [ $cnfpid = 0 -a -f /etc/my.cnf ]; then
+              sed -i "/^\[mysqld\]$/a pid-file=/var/run/mysqld/mysqld.pid" /etc/my.cnf
+          fi
   fi
 fi
 #%if 0%{?rhel} < 7
@@ -1526,7 +1560,6 @@ fi
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_upgrade.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysqlman.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql.server.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqltest.1*
 %doc %attr(644, root, man) %{_mandir}/man1/mysql_tzinfo_to_sql.1*
 %doc %attr(644, root, man) %{_mandir}/man1/perror.1*
 %doc %attr(644, root, man) %{_mandir}/man1/replace.1*
@@ -1813,11 +1846,6 @@ fi
 %attr(755, root, root) %{_bindir}/mysqlxtest
 #%attr(755, root, root) %{_bindir}/mysql_client_test_embedded
 #%attr(755, root, root) %{_bindir}/mysqltest_embedded
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql-stress-test.pl.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql-test-run.pl.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysql_client_test_embedded.1*
-%doc %attr(644, root, man) %{_mandir}/man1/mysqltest_embedded.1*
 
 ##############################################################################
 # The spec file changelog only includes changes made to the spec file

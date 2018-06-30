@@ -1,5 +1,7 @@
 /*
-   Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2018, Percona and/or its affiliates. All rights reserved.
+   Copyright (c) 2009, 2016, MariaDB
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1569,7 +1571,7 @@ Log_event* Log_event::read_log_event(const char* buf, uint event_len,
     DBUG_RETURN(NULL); // general sanity check - will fail on a partial read
   }
 
-  uint event_type= static_cast<const uchar>(buf[EVENT_TYPE_OFFSET]);
+  uint event_type= static_cast<uchar>(buf[EVENT_TYPE_OFFSET]);
   // all following START events in the current file are without checksum
   if (event_type == binary_log::START_EVENT_V3)
     (const_cast<Format_description_log_event*>(description_event))->
@@ -1897,6 +1899,7 @@ void Log_event::print_header(IO_CACHE* file,
                              PRINT_EVENT_INFO* print_event_info,
                              bool is_more MY_ATTRIBUTE((unused)))
 {
+  MY_ATTRIBUTE((unused)) int write_res;
   char llbuff[22];
   my_off_t hexdump_from= print_event_info->hexdump_from;
   DBUG_ENTER("Log_event::print_header");
@@ -1948,7 +1951,8 @@ void Log_event::print_header(IO_CACHE* file,
                     ptr[7], ptr[8], ptr[9], ptr[10], ptr[11], ptr[12], ptr[13],
                     ptr[14], ptr[15], ptr[16], ptr[17], ptr[18]);
       DBUG_ASSERT(static_cast<size_t>(bytes_written) < sizeof(emit_buf));
-      my_b_write(file, (uchar*) emit_buf, bytes_written);
+      write_res= my_b_write(file, (uchar*) emit_buf, bytes_written);
+      DBUG_ASSERT(write_res == 0);
       ptr += LOG_EVENT_MINIMAL_HEADER_LEN;
       hexdump_from += LOG_EVENT_MINIMAL_HEADER_LEN;
     }
@@ -1978,7 +1982,8 @@ void Log_event::print_header(IO_CACHE* file,
                       (unsigned long) (hexdump_from + (i & 0xfffffff0)),
                       hex_string, char_string);
         DBUG_ASSERT(static_cast<size_t>(bytes_written) < sizeof(emit_buf));
-	my_b_write(file, (uchar*) emit_buf, bytes_written);
+        write_res= my_b_write(file, (uchar*) emit_buf, bytes_written);
+        DBUG_ASSERT(write_res == 0);
 	hex_string[0]= 0;
 	char_string[0]= 0;
 	c= char_string;
@@ -1999,13 +2004,15 @@ void Log_event::print_header(IO_CACHE* file,
                     (unsigned long) (hexdump_from + (i & 0xfffffff0)),
                     hex_string, char_string);
       DBUG_ASSERT(static_cast<size_t>(bytes_written) < sizeof(emit_buf));
-      my_b_write(file, (uchar*) emit_buf, bytes_written);
+      write_res= my_b_write(file, (uchar*) emit_buf, bytes_written);
+      DBUG_ASSERT(write_res == 0);
     }
     /*
       need a # to prefix the rest of printouts for example those of
       Rows_log_event::print_helper().
     */
-    my_b_write(file, reinterpret_cast<const uchar*>("# "), 2);
+    write_res= my_b_write(file, reinterpret_cast<const uchar*>("# "), 2);
+    DBUG_ASSERT(write_res == 0);
   }
   DBUG_VOID_RETURN;
 }
@@ -2023,17 +2030,22 @@ void Log_event::print_header(IO_CACHE* file,
 static void
 my_b_write_quoted(IO_CACHE *file, const uchar *ptr, uint length)
 {
+  MY_ATTRIBUTE((unused)) int write_res;
   const uchar *s;
   my_b_printf(file, "'");
   for (s= ptr; length > 0 ; s++, length--)
   {
     if (*s > 0x1F && *s != '\'' && *s != '\\')
-      my_b_write(file, s, 1);
+    {
+      write_res= my_b_write(file, s, 1);
+      DBUG_ASSERT(write_res == 0);
+    }
     else
     {
       uchar hex[10];
       size_t len= my_snprintf((char*) hex, sizeof(hex), "%s%02x", "\\x", *s);
-      my_b_write(file, hex, len);
+      write_res = my_b_write(file, hex, len);
+      DBUG_ASSERT(write_res == 0);
     }
   }
   my_b_printf(file, "'");
@@ -2054,7 +2066,9 @@ my_b_write_bit(IO_CACHE *file, const uchar *ptr, uint nbits)
   for (bitnum= skip_bits ; bitnum < nbits8; bitnum++)
   {
     int is_set= (ptr[(bitnum) / 8] >> (7 - bitnum % 8))  & 0x01;
-    my_b_write(file, (const uchar*) (is_set ? "1" : "0"), 1);
+    MY_ATTRIBUTE((unused)) int write_res=
+      my_b_write(file, (const uchar*) (is_set ? "1" : "0"), 1);
+    DBUG_ASSERT(write_res == 0);
   }
   my_b_printf(file, "'");
 }
@@ -2282,7 +2296,8 @@ log_event_print_value(IO_CACHE *file, const uchar *ptr,
       struct timeval tm;
       my_timestamp_from_binary(&tm, ptr, meta);
       int buflen= my_timeval_to_str(&tm, buf, meta);
-      my_b_write(file, buf, buflen);
+      if (my_b_write(file, reinterpret_cast<const uchar*>(buf), buflen))
+        return 0;
       return my_timestamp_binary_length(meta);
     }
 
@@ -4292,7 +4307,7 @@ Query_log_event::Query_log_event(const char* buf, uint event_len,
   if (!(fill_data_buf(data_buf, buf_len)))
     DBUG_VOID_RETURN;
 
-  if(query != 0)
+  if (query != 0 && q_len > 0)
     is_valid_param= true;
 
   /**
@@ -4373,7 +4388,9 @@ void Query_log_event::print_query_header(IO_CACHE* file,
   end= my_stpcpy(end, print_event_info->delimiter);
   *end++='\n';
   DBUG_ASSERT(end < buff + sizeof(buff));
-  my_b_write(file, (uchar*) buff, (uint) (end-buff));
+  MY_ATTRIBUTE((unused)) int write_res=
+    my_b_write(file, (uchar*) buff, (uint) (end-buff));
+  DBUG_ASSERT(write_res == 0);
   if ((!print_event_info->thread_id_printed ||
        ((common_header->flags & LOG_EVENT_THREAD_SPECIFIC_F) &&
         thread_id != print_event_info->thread_id)))
@@ -4522,7 +4539,9 @@ void Query_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
   DBUG_EXECUTE_IF ("simulate_file_write_error",
                    {head->write_pos= head->write_end- 500;});
   print_query_header(head, print_event_info);
-  my_b_write(head, (uchar*) query, q_len);
+  MY_ATTRIBUTE((unused)) int write_res=
+    my_b_write(head, (uchar*)query, q_len);
+  DBUG_ASSERT(write_res == 0);
   my_b_printf(head, "\n%s\n", print_event_info->delimiter);
 }
 #endif /* MYSQL_CLIENT */
@@ -4617,7 +4636,8 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   int expected_error,actual_error= 0;
   HA_CREATE_INFO db_options;
 
-  DBUG_PRINT("info", ("query=%s", query));
+  DBUG_PRINT("info", ("query=%s, q_len_arg=%lu",
+                      query, static_cast<unsigned long>(q_len_arg)));
 
   /*
     Colleagues: please never free(thd->catalog) in MySQL. This would
@@ -4634,6 +4654,25 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
   }
   else
     thd->set_catalog(EMPTY_CSTR);
+
+  size_t valid_len;
+  bool len_error;
+  bool is_invalid_db_name= validate_string(system_charset_info, db, db_len,
+                                           &valid_len, &len_error);
+
+  DBUG_PRINT("debug",("is_invalid_db_name= %s, valid_len=%zu, len_error=%s",
+                      is_invalid_db_name ? "true" : "false",
+                      valid_len,
+                      len_error ? "true" : "false"));
+
+  if (is_invalid_db_name || len_error)
+  {
+    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                "Invalid database name in Query event.");
+    thd->is_slave_error= true;
+    goto end;
+  }
 
   set_thd_db(thd, db, db_len);
 
@@ -4743,6 +4782,18 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
             goto compare_errors;
           }
           thd->update_charset(); // for the charset change to take effect
+          /*
+            We cannot ask for parsing a statement using a character set
+            without state_maps (parser internal data).
+          */
+          if (!thd->variables.character_set_client->state_maps)
+          {
+            rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                        ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                        "character_set cannot be parsed");
+            thd->is_slave_error= true;
+            goto end;
+          }
           /*
             Reset thd->query_string.cs to the newly set value.
             Note, there is a small flaw here. For a very short time frame
@@ -5505,7 +5556,13 @@ int Start_log_event_v3::do_apply_event(Relay_log_info const *rli)
     */
     break;
   default:
-    /* this case is impossible */
+    /*
+      This case is not expected. It can be either an event corruption or an
+      unsupported binary log version.
+    */
+    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                "Binlog version not supported");
     DBUG_RETURN(1);
   }
   DBUG_RETURN(error);
@@ -6687,7 +6744,11 @@ void Rotate_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
   print_header(head, print_event_info, FALSE);
   my_b_printf(head, "\tRotate to ");
   if (new_log_ident)
-    my_b_write(head, (uchar*) new_log_ident, (uint)ident_len);
+  {
+    MY_ATTRIBUTE((unused)) int write_res=
+      my_b_write(head, (uchar*) new_log_ident, (uint)ident_len);
+    DBUG_ASSERT(write_res == 0);
+  }
   my_b_printf(head, "  pos: %s\n", llstr(pos, buf));
 }
 #endif /* MYSQL_CLIENT */
@@ -6887,10 +6948,12 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli)
     if (rli->is_parallel_exec())
     {
       bool real_event= server_id && !is_artificial_event();
-      time_t ts= common_header->when.tv_sec + static_cast<time_t>(exec_time);
       rli->reset_notified_checkpoint(0,
-                                     real_event ? &ts : NULL,
-                                     true/*need_data_lock=true*/);
+                                     real_event ?
+                                     common_header->when.tv_sec +
+                                     (time_t) exec_time : 0,
+                                     true/*need_data_lock=true*/,
+                                     real_event? true : false);
     }
 
     /*
@@ -7936,7 +7999,9 @@ void User_var_log_event::print(FILE* file, PRINT_EVENT_INFO* print_event_info)
   quoted_len= my_strmov_quoted_identifier((char *) quoted_id,
                                           (const char *) name_id);
   quoted_id[quoted_len]= '\0';
-  my_b_write(head, (uchar*) quoted_id, quoted_len);
+  MY_ATTRIBUTE((unused)) int write_res=
+    my_b_write(head, (uchar*) quoted_id, quoted_len);
+  DBUG_ASSERT(write_res == 0);
 
   if (is_null)
   {
@@ -8053,7 +8118,12 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
   }
 
   if (!(charset= get_charset(charset_number, MYF(MY_WME))))
+  {
+    rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                "Invalid character set for User var event");
     DBUG_RETURN(1);
+  }
   double real_val;
   longlong int_val;
 
@@ -8071,12 +8141,26 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
   {
     switch (type) {
     case REAL_TYPE:
+      if (val_len != 8)
+      {
+        rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                    ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                    "Invalid variable length at User var event");
+        DBUG_RETURN(1);
+      }
       float8get(&real_val, val);
       it= new Item_float(real_val, 0);
       val= (char*) &real_val;		// Pointer to value in native format
       val_len= 8;
       break;
     case INT_TYPE:
+      if (val_len != 8)
+      {
+        rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                    ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                    "Invalid variable length at User var event");
+        DBUG_RETURN(1);
+      }
       int_val= (longlong) uint8korr(val);
       it= new Item_int(int_val);
       val= (char*) &int_val;		// Pointer to value in native format
@@ -8084,6 +8168,13 @@ int User_var_log_event::do_apply_event(Relay_log_info const *rli)
       break;
     case DECIMAL_TYPE:
     {
+      if (val_len < 3)
+      {
+        rli->report(ERROR_LEVEL, ER_SLAVE_FATAL_ERROR,
+                    ER_THD(thd, ER_SLAVE_FATAL_ERROR),
+                    "Invalid variable length at User var event");
+        DBUG_RETURN(1);
+      }
       Item_decimal *dec= new Item_decimal((uchar*) val+2, val[0], val[1]);
       it= dec;
       val= (char *)dec->val_decimal(NULL);
@@ -9117,6 +9208,7 @@ void Execute_load_query_log_event::print(FILE* file,
                                          PRINT_EVENT_INFO* print_event_info,
                                          const char *local_fname)
 {
+  MY_ATTRIBUTE((unused)) int write_res;
   IO_CACHE *const head= &print_event_info->head_cache;
 
   print_query_header(head, print_event_info);
@@ -9130,19 +9222,22 @@ void Execute_load_query_log_event::print(FILE* file,
 
   if (local_fname)
   {
-    my_b_write(head, (uchar*) query, fn_pos_start);
+    write_res= my_b_write(head, (uchar*) query, fn_pos_start);
+    DBUG_ASSERT(write_res == 0);
     my_b_printf(head, " LOCAL INFILE ");
     pretty_print_str(head, local_fname, strlen(local_fname));
 
     if (dup_handling == binary_log::LOAD_DUP_REPLACE)
       my_b_printf(head, " REPLACE");
     my_b_printf(head, " INTO");
-    my_b_write(head, (uchar*) query + fn_pos_end, q_len-fn_pos_end);
+    write_res= my_b_write(head, (uchar*) query + fn_pos_end, q_len-fn_pos_end);
+    DBUG_ASSERT(write_res == 0);
     my_b_printf(head, "\n%s\n", print_event_info->delimiter);
   }
   else
   {
-    my_b_write(head, (uchar*) query, q_len);
+    write_res= my_b_write(head, (uchar*) query, q_len);
+    DBUG_ASSERT(write_res == 0);
     my_b_printf(head, "\n%s\n", print_event_info->delimiter);
   }
 
@@ -10265,7 +10360,13 @@ void Rows_log_event::do_post_row_operations(Relay_log_info const *rli, int error
 
   if (!m_curr_row_end && !error)
   {
+    const uchar *previous_m_curr_row= m_curr_row;
     error= unpack_current_row(rli, &m_cols);
+
+    if (!error && previous_m_curr_row == m_curr_row)
+    {
+      error= 1;
+    }
   }
 
   // at this moment m_curr_row_end should be set
@@ -12761,6 +12862,22 @@ Write_rows_log_event::write_row(const Relay_log_info *const rli,
   if ((error= unpack_current_row(rli, &m_cols)))
     DBUG_RETURN(error);
 
+  /*
+    When m_curr_row == m_curr_row_end, it means a row that contains nothing,
+    so all the pointers shall be pointing to the same address, or else
+    we have corrupt data and shall throw the error.
+  */
+  DBUG_PRINT("debug",("m_rows_buf= %p, m_rows_cur= %p, m_rows_end= %p",
+                      m_rows_buf, m_rows_cur, m_rows_end));
+  DBUG_PRINT("debug",("m_curr_row= %p, m_curr_row_end= %p",
+                      m_curr_row, m_curr_row_end));
+  if (m_curr_row == m_curr_row_end &&
+      !((m_rows_buf == m_rows_cur) && (m_rows_cur == m_rows_end)))
+  {
+    my_error(ER_SLAVE_CORRUPT_EVENT, MYF(0));
+    DBUG_RETURN(ER_SLAVE_CORRUPT_EVENT);
+  }
+
   if (m_curr_row == m_rows_buf)
   {
     /* this is the first row to be inserted, we estimate the rows with
@@ -13532,6 +13649,7 @@ Rows_query_log_event::Rows_query_log_event(const char *buf, uint event_len,
     Ignorable_log_event(buf, descr_event),
     binary_log::Rows_query_event(buf, event_len, descr_event)
 {
+  is_valid_param= (m_rows_query != NULL);
 }
 
 #ifndef MYSQL_CLIENT
@@ -14225,9 +14343,11 @@ err:
 Transaction_context_log_event::~Transaction_context_log_event()
 {
   DBUG_ENTER("Transaction_context_log_event::~Transaction_context_log_event");
-  my_free((void*)server_uuid);
+  if (server_uuid)
+    my_free((void*)server_uuid);
   server_uuid= NULL;
-  my_free((void*) encoded_snapshot_version);
+  if (encoded_snapshot_version)
+    my_free((void*) encoded_snapshot_version);
   encoded_snapshot_version= NULL;
   delete snapshot_version;
   delete sid_map;

@@ -22,6 +22,8 @@ SELECT @@global.wsrep_sst_method;
 @@global.wsrep_sst_method
 rsync
 SET @@global.wsrep_sst_method=mysqldump;
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated SST through mysqldump. Percona-XtraDB-Cluster recommends using xtrabackup. Please switch to use xtrabackup or rsync.
 SELECT @@global.wsrep_sst_method;
 @@global.wsrep_sst_method
 mysqldump

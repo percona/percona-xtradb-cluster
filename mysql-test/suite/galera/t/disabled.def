@@ -9,3 +9,4 @@ galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of acti
 #galera_wsrep_provider_unset_set : lp1379204 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
 galera_garbd : Failing to find the garbd binary after new minimal image change.
 galera_gcache_recover_manytrx : timing issue that causes it to fail intermittently.
+pxc_encrypt_rest_blog : Currently PXC doesn't support binlog encryption

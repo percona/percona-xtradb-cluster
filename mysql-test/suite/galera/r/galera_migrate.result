@@ -26,6 +26,8 @@ GRANT ALL PRIVILEGES ON *.* TO 'sst';
 SET GLOBAL wsrep_sst_auth = 'sst:';
 CREATE USER 'sst';
 GRANT ALL PRIVILEGES ON *.* TO 'sst';
+Warnings:
+Warning	1105	Percona-XtraDB-Cluster has deprecated SST through mysqldump. Percona-XtraDB-Cluster recommends using xtrabackup. Please switch to use xtrabackup or rsync.
 SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
 VARIABLE_VALUE
 Synced

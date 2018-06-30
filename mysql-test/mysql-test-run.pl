@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # -*- cperl -*-
 
-# Copyright (c) 2004, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -179,7 +179,7 @@ my $DEFAULT_SUITES= "main,sys_vars,binlog,binlog_encryption,rpl_encryption,"
   ."tokudb.add_index,tokudb.alter_table,tokudb,tokudb.bugs,tokudb.parts,"
   ."tokudb.rpl,tokudb.perfschema,"
   ."rocksdb,rocksdb.rpl,rocksdb.sys_vars,"
-  ."keyring_vault";
+  ."keyring_vault,audit_null";
 my $opt_suites;
 
 our $opt_verbose= 0;  # Verbose output, enable with --verbose
@@ -729,13 +729,16 @@ sub run_test_server ($$$) {
 	      mtr_report(" - skipping '$worker_savedir/'");
 	      rmtree($worker_savedir);
 	    }
-	    else {
-	      rename($worker_savedir, $savedir);
-              #look for the test.log file and put in savedir
-	      my $logf= "$result->{shortname}" . ".log";
-              my $logfilepath= dirname($worker_savedir); 
-              move($logfilepath . "/" . $logf, $savedir);
-	      mtr_report(" - the logfile can be found in '$savedir/$logf'");
+            else
+            {
+              rename($worker_savedir, $savedir) if $worker_savedir ne $savedir;
+
+              # Look for the test log file and put that in savedir location
+              my $logfile= "$result->{shortname}" . ".log";
+              my $logfilepath= dirname($worker_savedir) . "/" . $logfile;
+              move($logfilepath, $savedir);
+              mtr_report(" - the logfile can be found in '$savedir/$logfile'");
+
 	      # Move any core files from e.g. mysqltest
 	      foreach my $coref (glob("core*"), glob("*.dmp"))
 	      {
@@ -801,21 +804,17 @@ sub run_test_server ($$$) {
 	    # too many times already
 	    my $tname= $result->{name};
 	    my $failures= $result->{failures};
-	    if ($opt_retry > 1 and $failures >= $opt_retry_failure){
+	    if ($opt_retry > 1 and $failures >= $opt_retry_failure)
+            {
 	      mtr_report("\nTest $tname has failed $failures times,",
 			 "no more retries!\n");
 	    }
-	    else {
+	    else
+            {
 	      mtr_report("\nRetrying test $tname, ".
 			 "attempt($retries/$opt_retry)...\n");
-              #saving the log file as filename.failed in case of retry
-              if ( $result->is_failed() ) {
-                my $worker_logdir= $result->{savedir};
-                my $log_file_name=dirname($worker_logdir)."/".$result->{shortname}.".log";
-                rename $log_file_name,$log_file_name.".failed";
-              }
 	      delete($result->{result});
-	      $result->{retries}= $retries+1;
+	      $result->{retries}= $retries + 1;
 	      $result->write_test($sock, 'TESTCASE');
 	      next;
 	    }
@@ -2663,6 +2662,7 @@ sub environment_setup {
   $ENV{'DEFAULT_MASTER_PORT'}= $mysqld_variables{'port'};
   $ENV{'MYSQL_TMP_DIR'}=      $opt_tmpdir;
   $ENV{'MYSQLTEST_VARDIR'}=   $opt_vardir;
+  $ENV{'MYSQL_TEST_DIR_ABS'}= getcwd();
   $ENV{'MYSQL_BINDIR'}=       "$bindir";
   $ENV{'MYSQL_SHAREDIR'}=     $path_language;
   $ENV{'MYSQL_CHARSETSDIR'}=  $path_charsetsdir;
@@ -2831,6 +2831,17 @@ sub environment_setup {
            "$path_client_bindir/sst_dump",
            "$basedir/storage/rocksdb/sst_dump");
   $ENV{'MYSQL_SST_DUMP'}= native_path($exe_sst_dump);
+
+  # ----------------------------------------------------
+  # tokuft_dump
+  # ----------------------------------------------------
+  my $exe_tokuftdump=
+    mtr_exe_maybe_exists(
+           vs_config_dirs('storage/tokudb/PerconaFT/tools', 'tokuftdump'),
+           "$path_client_bindir/tokuftdump",
+           "$basedir/storage/tokudb/PerconaFT/tools/tokuftdump");
+  $ENV{'MYSQL_TOKUFTDUMP'}= native_path($exe_tokuftdump);
+
 
   # ----------------------------------------------------
   # Setup env so childs can execute myisampack and myisamchk
@@ -5564,7 +5575,7 @@ sub check_warnings ($) {
 	  return $result;
 	}
 	# Wait for next process to exit
-	next;
+	next if not $result;
       }
       else
       {

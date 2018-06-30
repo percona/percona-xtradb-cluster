@@ -350,7 +350,7 @@ bool wsrep_provider_update (sys_var *self, THD* thd, enum_var_type type)
      there can be several concurrent clients changing wsrep_provider
   */
   mysql_mutex_unlock(&LOCK_global_system_variables);
-  wsrep_stop_replication(thd);
+  wsrep_stop_replication(thd, false);
 
   /*
     Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
@@ -492,7 +492,7 @@ bool wsrep_cluster_address_update (sys_var *self, THD* thd, enum_var_type type)
      there can be several concurrent clients changing wsrep_provider
   */
   mysql_mutex_unlock(&LOCK_global_system_variables);
-  wsrep_stop_replication(thd);
+  wsrep_stop_replication(thd, false);
   /*
     Unlock and lock LOCK_wsrep_slave_threads to maintain lock order & avoid
     any potential deadlock.
@@ -675,6 +675,19 @@ bool wsrep_desync_check (sys_var *self, THD* thd, set_var* var)
 
 bool wsrep_desync_update (sys_var *self, THD* thd, enum_var_type type)
 {
+  return false;
+}
+
+bool wsrep_forced_binlog_format_check (sys_var *self, THD* thd, set_var* var)
+{
+  {
+    WSREP_WARN("Percona-XtraDB-Cluster has deprecated"
+               " wsrep_forced_binlog_format");
+    push_warning_printf(
+      thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+      "Percona-XtraDB-Cluster has deprecated"
+      " wsrep_forced_binlog_format");
+  }
   return false;
 }
 

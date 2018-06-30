@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -396,7 +396,7 @@ TABLE_SHARE *alloc_table_share(TABLE_LIST *table_list, const char *key,
                        table_cache_instances * sizeof(*cache_element_array),
                        NULL))
   {
-    memset(share, 0, sizeof(*share));
+    memset(static_cast<void*>(share), 0, sizeof(*share));
 
     share->set_table_cache_key(key_buff, key, key_length);
 
@@ -462,7 +462,7 @@ void init_tmp_table_share(THD *thd, TABLE_SHARE *share, const char *key,
   DBUG_ENTER("init_tmp_table_share");
   DBUG_PRINT("enter", ("table: '%s'.'%s'", key, table_name));
 
-  memset(share, 0, sizeof(*share));
+  memset(static_cast<void*>(share), 0, sizeof(*share));
   init_sql_alloc(key_memory_table_share,
                  &share->mem_root, TABLE_ALLOC_BLOCK_SIZE, 0);
   share->table_category=         TABLE_CATEGORY_TEMPORARY;
@@ -3172,7 +3172,7 @@ int open_table_from_share(THD *thd, TABLE_SHARE *share, const char *alias,
                       share->table_name.str, (long) outparam));
 
   error= 1;
-  memset(outparam, 0, sizeof(*outparam));
+  memset(static_cast<void*>(outparam), 0, sizeof(*outparam));
   outparam->in_use= thd;
   outparam->s= share;
   outparam->db_stat= db_stat;
@@ -4424,7 +4424,7 @@ Table_check_intact::check(TABLE *table, const TABLE_FIELD_DEF *table_def)
 
   /* Whether the table definition has already been validated. */
   if (table->s->table_field_def_cache == table_def)
-    DBUG_RETURN(FALSE);
+    goto end;
 
   if (table->s->fields != table_def->count)
   {
@@ -4541,6 +4541,15 @@ Table_check_intact::check(TABLE *table, const TABLE_FIELD_DEF *table_def)
 
   if (! error)
     table->s->table_field_def_cache= table_def;
+
+end:
+
+  if (has_keys && !error && !table->key_info)
+  {
+    my_error(ER_MISSING_KEY, MYF(0), table->s->db.str,
+             table->s->table_name.str);
+    error= TRUE;
+  }
 
   DBUG_RETURN(error);
 }
@@ -5001,7 +5010,8 @@ TABLE_LIST *TABLE_LIST::new_nested_join(MEM_ROOT *allocator,
   if (join_nest == NULL)
     return NULL;
 
-  memset(join_nest, 0, ALIGN_SIZE(sizeof(TABLE_LIST)) + sizeof(NESTED_JOIN));
+  memset(static_cast<void*>(join_nest), 0,
+         ALIGN_SIZE(sizeof(TABLE_LIST)) + sizeof(NESTED_JOIN));
   join_nest->nested_join=
     (NESTED_JOIN *) ((uchar *)join_nest + ALIGN_SIZE(sizeof(TABLE_LIST)));
 
@@ -7934,7 +7944,7 @@ bool update_generated_read_fields(uchar *buf, TABLE *table, uint active_index)
     if (!vfield->stored_in_db &&
         bitmap_is_set(table->read_set, vfield->field_index))
     {
-      if (vfield->type() == MYSQL_TYPE_BLOB)
+      if ((vfield->flags & BLOB_FLAG) != 0)
       {
         (down_cast<Field_blob*>(vfield))->keep_old_value();
         (down_cast<Field_blob*>(vfield))->set_keep_old_value(true);
@@ -8008,11 +8018,11 @@ bool update_generated_write_fields(const MY_BITMAP *bitmap, TABLE *table)
     if (bitmap_is_set(bitmap, vfield->field_index))
     {
       /*
-        For a virtual generated column of blob type, we have to keep
+        For a virtual generated column based on the blob type, we have to keep
         the current blob value since this might be needed by the
         storage engine during updates.
       */
-      if (vfield->type() == MYSQL_TYPE_BLOB && vfield->is_virtual_gcol())
+      if ((vfield->flags & BLOB_FLAG) != 0 && vfield->is_virtual_gcol())
       {
         (down_cast<Field_blob*>(vfield))->keep_old_value();
         (down_cast<Field_blob*>(vfield))->set_keep_old_value(true);

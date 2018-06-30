@@ -1270,7 +1270,7 @@ void wsrep_recover()
 }
 
 
-void wsrep_stop_replication(THD *thd)
+void wsrep_stop_replication(THD *thd, bool is_server_shutdown)
 {
   WSREP_INFO("Stop replication");
   if (!wsrep)
@@ -1285,7 +1285,12 @@ void wsrep_stop_replication(THD *thd)
 
   wsrep_connected= FALSE;
 
-  wsrep_close_client_connections(TRUE, false);
+  /*
+   * On shutdown, let the normal mysqld shutdown code close the client
+   * connections.  See signal_hand() in mysqld.cc.
+  */
+  if (!is_server_shutdown)
+    wsrep_close_client_connections(TRUE, false);
 
   /* wait until appliers have stopped */
   wsrep_wait_appliers_close(thd);

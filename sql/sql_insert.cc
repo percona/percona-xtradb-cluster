@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1971,7 +1971,6 @@ ok_or_after_trg_err:
     thd->get_transaction()->mark_modified_non_trans_table(
       Transaction_ctx::STMT);
   free_root(&mem_root, MYF(0));
-  thd->lex->clear_values_map();
   DBUG_RETURN(trg_error);
 
 err:
@@ -1991,7 +1990,6 @@ before_trg_err:
     my_safe_afree(key, table->s->max_unique_length, MAX_KEY_LENGTH);
   table->column_bitmaps_set(save_read_set, save_write_set);
   free_root(&mem_root, MYF(0));
-  thd->lex->clear_values_map();
   DBUG_RETURN(1);
 }
 
@@ -3025,7 +3023,7 @@ int Query_result_create::binlog_show_create_table(TABLE **tables, uint count)
   int result;
   TABLE_LIST tmp_table_list;
 
-  memset(&tmp_table_list, 0, sizeof(tmp_table_list));
+  memset(static_cast<void*>(&tmp_table_list), 0, sizeof(tmp_table_list));
   tmp_table_list.table = *tables;
   query.length(0);      // Have to zero it since constructor doesn't
 
@@ -3289,6 +3287,8 @@ bool Sql_cmd_insert::execute(THD *thd)
                     DBUG_ASSERT(!debug_sync_set_action(current_thd,
                                                        STRING_WITH_LEN(act)));
                   };);
+
+  thd->lex->clear_values_map();
   DEBUG_SYNC(thd, "after_mysql_insert");
   return res;
 }
@@ -3392,6 +3392,7 @@ bool Sql_cmd_insert_select::execute(THD *thd)
     thd->first_successful_insert_id_in_cur_stmt=
       thd->first_successful_insert_id_in_prev_stmt;
 
+  thd->lex->clear_values_map();
   return res;
 #ifdef WITH_WSREP
  error:
