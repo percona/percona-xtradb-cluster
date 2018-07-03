@@ -55,6 +55,9 @@ Created 4/20/1996 Heikki Tuuri
 #include "m_string.h"
 #include "gis0geo.h"
 
+#ifdef WITH_WSREP
+extern my_bool wsrep_debug;
+#endif /* WITH_WSREP */
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
 is enough space in the redo log before for that operation. This is
@@ -1884,7 +1887,23 @@ do_possible_lock_wait:
 		trx_kill_blocking(trx);
 
 		lock_wait_suspend_thread(thr);
+#ifdef WITH_WSREP
+		ut_ad(!trx_mutex_own(trx));
+		switch (trx->error_state) {
+		case DB_DEADLOCK:
+			if (wsrep_debug) {
+				ib::info() <<
+				"WSREP: innodb trx state changed during wait "
+				<< " trx: " << trx->id << " with error_state: "
+				<< trx->error_state << " err: " << err ;
+			}
+			err = trx->error_state;
+			break;
+		default:
+			break;
+		}
 
+#endif /* WITH_WSREP */
 		thr->lock_state = QUE_THR_LOCK_NOLOCK;
 
 		DBUG_PRINT("to_be_dropped",
@@ -1892,7 +1911,15 @@ do_possible_lock_wait:
 		if (check_table->to_be_dropped) {
 			/* The table is being dropped. We shall timeout
 			this operation */
+#ifdef WITH_WSREP
+			trx_mutex_enter(trx);
+			if (trx->error_state != DB_DEADLOCK)
+#else
 			err = DB_LOCK_WAIT_TIMEOUT;
+#endif /* WITH_WSREP */
+#ifdef WITH_WSREP
+			trx_mutex_exit(trx);
+#endif /* WITH_WSREP */
 
 			goto exit_func;
 		}
