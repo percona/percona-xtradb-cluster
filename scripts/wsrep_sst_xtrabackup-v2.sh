@@ -878,9 +878,9 @@ initialize_tmpdir()
     fi
 
     if [[ -z "${tmpdir_path}" ]]; then
-        tmpdir_path=$(mktemp -dt pxc_sst_XXXXXXXX)
+        tmpdir_path=$(mktemp --tmpdir --directory pxc_sst_XXXX)
     else
-        tmpdir_path=$(mktemp -p "${tmpdir_path}" -dt pxc_sst_XXXXXXXX)
+        tmpdir_path=$(mktemp --tmpdir="${tmpdir_path}" --directory pxc_sst_XXXX)
     fi
 
     # This directory (and everything in it), will be removed upon exit
@@ -1014,7 +1014,7 @@ then
     initialize_tmpdir
 
     # main temp directory for SST (non-XB) related files
-    donor_tmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_tmp_XXXXXXXX)
+    donor_tmpdir=$(mktemp --tmpdir="${tmpdirbase}" --directory donor_tmp_XXXX)
 
     # Create the SST info file
     # This file contains SST information that is passed from the
@@ -1040,7 +1040,7 @@ then
         fi
 
         # main temp directory for xtrabackup (target-dir)
-        itmpdir=$(mktemp -p "${tmpdirbase}" -dt donor_xb_XXXXXXXX)
+        itmpdir=$(mktemp --tmpdir="${tmpdirbase}" --directory donor_xb_XXXX)
 
         if [[ -n "${WSREP_SST_OPT_USER:-}" && "$WSREP_SST_OPT_USER" != "(null)" ]]; then
            INNOEXTRA+=" --user=$WSREP_SST_OPT_USER"
@@ -1182,7 +1182,7 @@ then
     fi
 
     initialize_tmpdir
-    STATDIR=$(mktemp -p "${tmpdirbase}" -dt joiner_XXXXXXXX)
+    STATDIR=$(mktemp --tmpdir="${tmpdirbase}" --directory joiner_XXXX)
 
     sst_file_info_path="${STATDIR}/${SST_INFO_FILE}"
 
