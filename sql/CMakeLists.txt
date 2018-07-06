@@ -13,10 +13,6 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 
-IF(WITH_WSREP)
- SET(WSREP_INCLUDES ${CMAKE_SOURCE_DIR}/wsrep)
-ENDIF()
-
 INCLUDE_DIRECTORIES(
 ${CMAKE_SOURCE_DIR}/include 
 ${CMAKE_SOURCE_DIR}/sql 
@@ -24,7 +20,6 @@ ${CMAKE_SOURCE_DIR}/regex
 ${ZLIB_INCLUDE_DIR}
 ${SSL_INCLUDE_DIRS}
 ${CMAKE_BINARY_DIR}/sql
-${WSREP_INCLUDES}
 )
 
 SET(CONF_SOURCES

@@ -19,8 +19,8 @@
 #ifndef WSREP_PRIV_H
 #define WSREP_PRIV_H
 
+#include "wsrep_api.h"
 #include "wsrep_mysqld.h"
-#include "../wsrep/wsrep_api.h"
 
 #include <log.h>
 #include <pthread.h>

@@ -19,6 +19,9 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include
                     ${CMAKE_SOURCE_DIR}/extra/yassl/include
                     ${CMAKE_SOURCE_DIR}/unittest/mytap)
 
+IF(WITH_WSREP)
+  INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/wsrep/src)
+ENDIF()
 
 MACRO (MY_ADD_TEST name)
   ADD_EXECUTABLE(${name}-t ${name}-t.c)
