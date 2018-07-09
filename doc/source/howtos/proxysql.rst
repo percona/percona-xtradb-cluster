@@ -715,43 +715,53 @@ for default ProxySQL configuration:
 
 .. code-block:: text
 
-  mysql@proxysql> INSERT INTO scheduler(id,active,interval_ms,filename,arg1,arg2,arg3,arg4,arg5)
-    VALUES (1,'1','10000','/usr/bin/proxysql_galera_checker','0','-1','0','1',
-    '/var/lib/proxysql/proxysql_galera_checker.log');
+  INSERT INTO scheduler (active,interval_ms,filename,arg1,comment)
+    VALUES (1,10000,'/usr/bin/proxysql_galera_checker','--config-file=/etc/proxysql-admin.cnf
+    --write-hg=10 --read-hg=11 --writer-count=1 --mode=singlewrite 
+    --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
+    --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log','cluster_one');
 
-This Scheduler script accepts the following arguments:
+This Scheduler script accepts the following options in the ``arg1`` argument:
 
 .. list-table::
    :widths: 15 25 20 40
    :header-rows: 1
 
-   * - Argument
+   * - Option
      - Name
      - Required
      - Description
-   * - ``arg1``
+   * - ``--config-file``
+     - Configuration File
+     - Yes
+     - Specify ``proxysql-admin`` configuration file.
+   * - ``--write-hg``
      - ``HOSTGROUP WRITERS``
-     - YES
-     - The ID of the hostgroup with nodes that will server writes.
-   * - ``arg2``
+     - No
+     - Specify ProxySQL write hostgroup.
+   * - ``--read-hg``
      - ``HOSTGROUP READERS``
-     - NO
-     - The ID of the hostgroup with nodes that will server reads.
-   * - ``arg3``
+     - No
+     - Specify ProxySQL read hostgroup.
+   * - ``--writer-count``
      - ``NUMBER WRITERS``
-     - NO
-     - Maximum number of the node from the writer hostgroup
-       that can be marked ``ONLINE``.
-       If set to ``0``, all nodes can be marked ``ONLINE``.
-   * - ``arg4``
-     - ``WRITERS ARE READERS``
-     - NO
-     - If set to ``1`` (default), ``ONLINE`` nodes in the writer hostgroup
-       will prefer not to be ``ONLINE`` in the reader ``hostgroup``.
-   * - ``arg5``
+     - No
+     - Specify write nodes count. ``0`` for loadbal mode and ``1`` for
+       singlewrite mode.
+   * - ``--mode``
+     - ``MODE``
+     - No
+     - Specify ProxySQL read/write configuration mode.
+   * - ``--priority``
+     - ``WRITER PRIORITY``
+     - No
+     - Specify write nodes priority.
+   * - ``--log``
      - ``LOG FILE``
-     - NO
-     - File where node state checks and changes are logged to (verbose).
+     - No
+     - Specify ``proxysql_galera_checker`` log file.
+
+.. note:: Specify cluster name in `comment` column.
 
 To load the scheduler changes into the runtime space:
 
@@ -764,17 +774,22 @@ check the :table:`runtime_scheduler` table:
 
 .. code-block:: text
 
-  mysql@proxysql> SELECT * FROM runtime_scheduler\G
+  mysql@proxysql> SELECT * FROM scheduler\G
   *************************** 1. row ***************************
            id: 1
+       active: 1
   interval_ms: 10000
-     filename: /usr/bin/proxysql/proxysql_galera_checker
-         arg1: 127.0.0.1
-         arg2: 6032
-         arg3: 0
-         arg4: /var/lib/proxysql/proxysql_galera_checker.log
+     filename: /bin/proxysql_galera_checker
+         arg1: --config-file=/etc/proxysql-admin.cnf --write-hg=10 --read-hg=11 
+               --writer-count=1 --mode=singlewrite 
+               --priority=192.168.100.20:3306,192.168.100.40:3306,192.168.100.10:3306,192.168.100.30:3306 
+               --log=/var/lib/proxysql/cluster_one_proxysql_galera_check.log
+         arg2: NULL
+         arg3: NULL
+         arg4: NULL
          arg5: NULL
-   1 row in set (0.00 sec)
+      comment: cluster_one
+  1 row in set (0.00 sec)
 
 To check the status of available nodes, run the following command:
 
