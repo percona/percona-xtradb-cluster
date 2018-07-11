@@ -60,6 +60,9 @@ Before you begin, make sure that the following packages are installed:
    * - socat
      - ``socat``
      - ``socat``
+   * - curl
+     - ``libcurl-dev``
+     - ``libcurl-devel``
 
 You will likely have all or most of the packages already installed. If you are
 not sure, run one of the following commands to install any missing
@@ -71,7 +74,7 @@ dependencies:
 
    $ sudo apt-get install -y git scons gcc g++ openssl check cmake bison \
    libboost-all-dev libasio-dev libaio-dev libncurses5-dev libreadline-dev \
-   libpam-dev socat
+   libpam-dev socat libcurl-dev
 
 * For Red Hat Enterprise Linux or CentOS:
 
@@ -79,7 +82,7 @@ dependencies:
 
    $ sudo yum install -y git scons gcc gcc-c++ openssl check cmake bison \
    boost-devel asio-devel libaio-devel ncurses-devel readline-devel pam-devel \
-   socat
+   socat libcurl-devel
 
 To compile |PXC| from source code:
 
