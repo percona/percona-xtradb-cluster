@@ -371,7 +371,8 @@ every version is tested against a specific |PXB| version only:
 * |PXC| 5.6 requires |PXB| 2.3
 * |PXC| 5.7 requires |PXB| 2.4
 
-Other combinations are not guaranteed to work.
+Compatibility of other combinations is not guaranteed, and using the
+incompatible version of |PXB| will remove the cluster.
 
 The following are optional dependencies of |Percona XtraDB Cluster| introduced
 by :file:`wsrep_sst_xtrabackup` (except for obvious and direct dependencies):
