@@ -28,7 +28,7 @@ ENDIF()
 
 # Obtain wsrep API version
 EXECUTE_PROCESS(
-  COMMAND sh -c "grep WSREP_INTERFACE_VERSION ${MySQL_SOURCE_DIR}/wsrep/wsrep_api.h | cut -d '\"' -f 2"
+  COMMAND sh -c "grep WSREP_INTERFACE_VERSION ${MySQL_SOURCE_DIR}/wsrep/src/wsrep_api.h | cut -d '\"' -f 2"
   OUTPUT_VARIABLE WSREP_API_VERSION
   RESULT_VARIABLE RESULT
 )

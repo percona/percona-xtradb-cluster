@@ -17,10 +17,10 @@
 #define WSREP_MYSQLD_H
 
 #include "mysqld.h"
+#include "wsrep_api.h"
 typedef struct st_mysql_show_var SHOW_VAR;
 #include <sql_priv.h>
 #include "rpl_gtid.h"
-#include "../wsrep/wsrep_api.h"
 
 #define WSREP_UNDEFINED_TRX_ID ULONGLONG_MAX
 
