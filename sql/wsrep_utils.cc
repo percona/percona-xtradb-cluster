@@ -97,6 +97,17 @@ wsrep_prepend_PATH (const char* path)
                  "State snapshot transfer may not be working.");
 }
 
+/**
+ * This is a wrapper around the WSREP_ON macro.  This allows this check
+ * to be called from plugins.
+ */
+extern "C" bool
+wsrep_is_wsrep_on(void)
+{
+  return WSREP_ON;
+}
+
+
 namespace wsp
 {
 
