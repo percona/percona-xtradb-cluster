@@ -201,6 +201,10 @@ extern int  wsrep_check_opts (int argc, char* const* argv);
 extern void wsrep_prepend_PATH (const char* path);
 /* some inline functions are defined in wsrep_mysqld_inl.h */
 
+/* Provide a wrapper of the WSREP_ON macro for plugins to use */
+extern "C" bool wsrep_is_wsrep_on(void);
+
+
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
 
