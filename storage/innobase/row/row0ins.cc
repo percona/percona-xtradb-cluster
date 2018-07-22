@@ -56,7 +56,7 @@ Created 4/20/1996 Heikki Tuuri
 #include "gis0geo.h"
 
 #ifdef WITH_WSREP
-extern my_bool wsrep_debug;
+#include "wsrep_mysqld.h"
 #endif /* WITH_WSREP */
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
@@ -1895,7 +1895,7 @@ do_possible_lock_wait:
 				ib::info() <<
 				"WSREP: innodb trx state changed during wait "
 				<< " trx: " << trx->id << " with error_state: "
-				<< trx->error_state << " err: " << err ;
+				<< trx->error_state << " err: " << err;
 			}
 			err = trx->error_state;
 			break;
@@ -1911,15 +1911,7 @@ do_possible_lock_wait:
 		if (check_table->to_be_dropped) {
 			/* The table is being dropped. We shall timeout
 			this operation */
-#ifdef WITH_WSREP
-			trx_mutex_enter(trx);
-			if (trx->error_state != DB_DEADLOCK)
-#else
 			err = DB_LOCK_WAIT_TIMEOUT;
-#endif /* WITH_WSREP */
-#ifdef WITH_WSREP
-			trx_mutex_exit(trx);
-#endif /* WITH_WSREP */
 
 			goto exit_func;
 		}
