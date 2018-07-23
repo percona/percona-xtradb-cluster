@@ -19,3 +19,10 @@ or software upgrades is rather simple from the cluster's perspective.  
    that prevents MySQL from loading, Galera will drop the node's state
    and force an SST for that node.
 
+.. note:: If MySQL fails for any reason, it will not remove its PID file (which
+   is by design deleted only on clean shutdown). Obviously server will not
+   restart if existing PID file is present. So in case of encountered MySQL
+   failure for any reason with the relevant records in log, PID file should be
+   removed manually.
+
+
