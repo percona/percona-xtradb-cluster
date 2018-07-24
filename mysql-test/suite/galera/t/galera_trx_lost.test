@@ -50,6 +50,27 @@ insert into t1 values (4);
 --source include/wait_condition.inc
 --source include/galera_wait_ready.inc
 
+#
+# continue with same table but this time insert some rows with wsrep_on=off
+# these transaction will be committed with mysql xid and not wsrep xid.
+set session wsrep_on=0;
+set debug="+d,crash_before_trx_commit_in_memory";
+--error 2013
+insert into t1 values (40);
+
+--connection node_1
+--echo #node-1
+--echo #waiting to restart node-1
+--sleep 3
+
+--let $restart_parameters="restart:"
+--let $_expect_file_name = $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
+--source include/start_mysqld.inc
+
+--let $wait_condition = SELECT VARIABLE_VALUE = 1 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+--source include/galera_wait_ready.inc
+
 select * from t1;
 drop table t1;
 

@@ -1774,12 +1774,13 @@ trx_write_serialisation_history(
         {
             trx_sys_update_wsrep_checkpoint(trx->xid, sys_header, mtr);
         }
-	else if (trx->wsrep_recover_xid)
+	else if (trx->wsrep_recover_xid
+		 && wsrep_is_wsrep_xid(trx->wsrep_recover_xid))
 	{
 		trx_sys_update_wsrep_checkpoint(
 				trx->wsrep_recover_xid, sys_header, mtr, true);
-		trx->wsrep_recover_xid = NULL;
 	}
+	trx->wsrep_recover_xid = NULL;
 #endif /* WITH_WSREP */
 
 	/* Update the latest MySQL binlog name and offset info
