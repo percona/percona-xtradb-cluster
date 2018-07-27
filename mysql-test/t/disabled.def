@@ -13,6 +13,7 @@
 # Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
 partition_pruning : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 range_icp : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+range_none : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 xa_prepared_binlog_off : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
 # Codership disabled tests end here
 read_many_rows_innodb    : Bug#11748886 2010-11-15 mattiasj report already exists
