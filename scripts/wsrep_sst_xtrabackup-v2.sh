@@ -944,7 +944,11 @@ if ! check_for_version $XB_VERSION $XB_REQUIRED_VERSION; then
 fi
 
 # Get our MySQL version
-MYSQL_VERSION=$($(dirname $0)/mysqld --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1)
+MYSQL_VERSION=$WSREP_SST_OPT_VERSION
+if [[ -z $MYSQL_VERSION ]]; then
+    wsrep_log_error "FATAL: Cannot determine the mysqld server version"
+    exit 2
+fi
 
 rm -f "${MAGIC_FILE}"
 
