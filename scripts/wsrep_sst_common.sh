@@ -25,6 +25,7 @@ WSREP_SST_OPT_DATA=""
 WSREP_SST_OPT_AUTH=${WSREP_SST_OPT_AUTH:-}
 WSREP_SST_OPT_USER=${WSREP_SST_OPT_USER:-}
 WSREP_SST_OPT_PSWD=${WSREP_SST_OPT_PSWD:-}
+WSREP_SST_OPT_VERSION=""
 
 while [ $# -gt 0 ]; do
 case "$1" in
@@ -93,6 +94,10 @@ case "$1" in
         ;;
     '--user')
         WSREP_SST_OPT_USER="$2"
+        shift
+        ;;
+    '--mysqld-version')
+        readonly WSREP_SST_OPT_VERSION="$2"
         shift
         ;;
     '--gtid')
