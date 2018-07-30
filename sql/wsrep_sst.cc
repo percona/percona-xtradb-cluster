@@ -17,6 +17,7 @@
 #include <sql_class.h>
 #include <sql_parse.h>
 #include <sql_reload.h>
+#include <mysql_version.h>
 #include "debug_sync.h"
 #include "wsrep_priv.h"
 #include "wsrep_thd.h"
@@ -44,6 +45,7 @@ extern const char wsrep_defaults_group_suffix[];
 #define WSREP_SST_OPT_CONF_SUFFIX "--defaults-group-suffix"
 #define WSREP_SST_OPT_PARENT   "--parent"
 #define WSREP_SST_OPT_BINLOG   "--binlog"
+#define WSREP_SST_OPT_VERSION  "--mysqld-version"
 
 // mysqldump-specific options
 #define WSREP_SST_OPT_USER     "--user"
@@ -682,11 +684,13 @@ static ssize_t sst_prepare_other (const char*  method,
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
                  WSREP_SST_OPT_CONF_SUFFIX" '%s' "
-                 WSREP_SST_OPT_PARENT" '%d'"
+                 WSREP_SST_OPT_PARENT" '%d' "
+                 WSREP_SST_OPT_VERSION" '%s' "
                  " %s '%s' ",
                  method, addr_in, mysql_real_data_home,
                  wsrep_defaults_file, wsrep_defaults_group_suffix,
-                 (int)getpid(), binlog_opt, binlog_opt_val);
+                 (int)getpid(), MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                 binlog_opt, binlog_opt_val);
   my_free(binlog_opt_val);
 
   if (ret < 0 || ret >= cmd_len)
@@ -980,11 +984,14 @@ static int sst_donate_mysqldump (const char*         addr,
                      WSREP_SST_OPT_LPORT" '%u' "
                      WSREP_SST_OPT_SOCKET" '%s' "
                      WSREP_SST_OPT_CONF" '%s' "
-                     WSREP_SST_OPT_GTID" '%s:%lld'"
+                     WSREP_SST_OPT_GTID" '%s:%lld' "
+                     WSREP_SST_OPT_VERSION" '%s' "
                      "%s",
                      addr, mysqld_port, mysqld_unix_port,
                      wsrep_defaults_file, uuid_str,
-                     (long long)seqno, bypass ? " " WSREP_SST_OPT_BYPASS : "");
+                     (long long)seqno,
+                     MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
+                     bypass ? " " WSREP_SST_OPT_BYPASS : "");
 
   if (ret < 0 || ret >= cmd_len)
   {
@@ -1273,11 +1280,13 @@ static int sst_donate_other (const char*   method,
                  WSREP_SST_OPT_DATA" '%s' "
                  WSREP_SST_OPT_CONF" '%s' "
                  WSREP_SST_OPT_CONF_SUFFIX" '%s' "
+                 WSREP_SST_OPT_VERSION" '%s' "
                  " %s '%s' "
-                 WSREP_SST_OPT_GTID" '%s:%lld'"
+                 WSREP_SST_OPT_GTID" '%s:%lld' "
                  "%s",
                  method, addr, mysqld_unix_port, mysql_real_data_home,
                  wsrep_defaults_file, wsrep_defaults_group_suffix,
+                 MYSQL_SERVER_VERSION MYSQL_SERVER_SUFFIX_DEF,
                  binlog_opt, binlog_opt_val,
                  uuid, (long long) seqno,
                  bypass ? " " WSREP_SST_OPT_BYPASS : "");

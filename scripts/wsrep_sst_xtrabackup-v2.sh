@@ -1254,7 +1254,11 @@ fi
 wsrep_log_debug "The $INNOBACKUPEX_BIN version is $XB_VERSION"
 
 # Get our MySQL version
-MYSQL_VERSION=$($(dirname $0)/mysqld --version 2>&1 | grep -oe '[0-9]\.[0-9][\.0-9]*' | head -n1)
+MYSQL_VERSION=$WSREP_SST_OPT_VERSION
+if [[ -z $MYSQL_VERSION ]]; then
+    wsrep_log_error "FATAL: Cannot determine the mysqld server version"
+    exit 2
+fi
 
 rm -f "${XB_GTID_INFO_FILE_PATH}"
 
