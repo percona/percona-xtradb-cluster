@@ -576,9 +576,9 @@ read_cnf()
 
     # if wsrep_node_address is not set raise a warning
     wsrep_node_address=$(parse_cnf mysqld wsrep_node_address "")
-    wsrep_sst_recieve_address=$(parse_cnf mysqld wsrep_sst_recieve_address "")
-    if [[ -z $wsrep_node_address && -z $wsrep_sst_recieve_address ]]; then
-        wsrep_log_warning "wsrep_node_address or wsrep_sst_recieve_address not set." \
+    wsrep_sst_receive_address=$(parse_cnf mysqld wsrep_sst_receive_address "")
+    if [[ -z $wsrep_node_address && -z $wsrep_sst_receive_address ]]; then
+        wsrep_log_warning "wsrep_node_address or wsrep_sst_receive_address not set." \
                           "Consider setting them if SST fails."
     fi
 
