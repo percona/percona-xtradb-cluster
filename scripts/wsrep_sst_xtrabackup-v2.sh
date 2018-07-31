@@ -929,21 +929,143 @@ setup_ports()
     fi
 }
 
+# Returns a list of parent pids, until we reach pid=1 or any process
+# that starts with 'mysql'.  The list is returned as a string
+# separated by spaces.
+#
+# Parameter 1: the child pid
+#
+# This function will stop going up the parent process chain
+# when a process starting with 'mysql' is found.
+#
+function get_parent_pids()
+{
+    local mypid=$1
+    local list_of_pids=" "
+
+    while [[ $mypid -ne 1 ]]; do
+        local ps_out=$(ps -h -o ppid= -o comm $mypid 2>/dev/null)
+        if [[ $? -ne 0 || -z $ps_out ]]; then
+            break
+        fi
+        list_of_pids+="$mypid "
+
+        # If we reach a process that starts with mysql, exit
+        # such as mysqld, mysqld-debug, mysqld-safe
+        if [[ $(echo $ps_out | awk '{ print $2 }') =~ ^mysql ]]; then
+            break
+        fi
+
+        mypid=$(echo $ps_out | awk '{ print $1 }')
+    done
+
+    if [[ $list_of_pids = " " ]]; then
+        list_of_pids=""
+    fi
+    echo "$list_of_pids"
+}
+
 # waits ~1 minute for nc/socat to open the port and then reports ready
 # (regardless of timeout)
+#
+# Assumptions:
+#   1. The socat/nc processes do not launch subprocesses to handle
+#      the connections.  Note that socat can be configured to do so.
+#   2. socat is not bound to a specific interface/address, so the
+#      IP portion of the local address is all zeros (0000...000).
+#
+# Parameter 1: the pid of the wsrep_sst_xtrabackup-v2 process. We are looking
+#              for the socat process that was started by this script.
+# Parameter 2: the IP address of the SST host
+# Parameter 3: the Port of the SST host
+# Parameter 4: a descriptive name for what we are doing at this point
+#
 wait_for_listen()
 {
-    local HOST=$1
-    local PORT=$2
-    local MODULE=$3
+    local parentpid=$1
+    local host=$2
+    local port=$3
+    local module=$4
+
+    # Get the index for the 'local_address' column in /proc/xxxx/net/tcp
+    # We expect this to be the same for IPv4 (net/tcp) and IPv6 (net/tcp6)
+    local ip_index=0
+    local header
+    read -ra header <<< $(head -n 1 /proc/$$/net/tcp)
+    for i in "${!header[@]}"; do
+        if [[ ${header[$i]} = "local_address" ]]; then
+            # Add one to the index since arrays are 0-based
+            # but awk is 1-based
+            ip_index=$(( i + 1 ))
+            break
+        fi
+    done
+    if [[ $ip_index -eq 0 ]]; then
+        wsrep_log_error "******** FATAL ERROR *********************** "
+        wsrep_log_error "* Unexpected /proc/xx/net/tcp layout: cannot find local_address"
+        wsrep_log_error "******************************************** "
+        exit 1
+    fi
+
+    local port_in_hex
+    port_in_hex=$(printf "%04X" $port)
+
+    local user_id
+    user_id=$(id -u)
 
     for i in {1..300}
     do
-        ss -p state listening "( sport = :$PORT )" | grep -qE 'socat|nc' && break
+        # List all socat/nc processes started by the user of this script
+        # Then look for processes that have the script pid as a parent prcoess
+        # somewhere in the process tree
+
+        # List only socat/nc processes started by this user to avoid triggering SELinux
+        for pid in $(ps -u $user_id -o pid,comm | grep -E 'socat|nc' | awk '{ printf $1 " " }')
+        do
+            if [[ -z $pid || $pid = " " ]]; then
+                continue
+            fi
+
+            # Now get the processtree for this pid
+            # If the parentpid is NOT in the process tree, then ignore
+            if ! echo $(get_parent_pids $pid) | grep -q " $parentpid "; then
+                continue
+            fi
+
+            # get the sockets for the pid
+            # Note: may not need to get the list of sockets, is it ok to
+            # just look at the list of local addresses in tcp?
+            local sockets
+            sockets=$(ls -l /proc/$pid/fd | grep socket | cut -d'[' -f2 | cut -d ']' -f1 | tr '\n' '|')
+
+            # remove the trailing '|'
+            sockets=${sockets%|}
+
+            if [[ -n $sockets ]]; then
+                # For the network addresses, we expect to be listening
+                # on all interfaces, thus the address should be
+                # 00..000:PORT (all zeros for the IP address).
+
+                # Checking IPv4
+                if grep -E "\s(${sockets})\s" /proc/$pid/net/tcp |
+                        awk "{print \$${ip_index}}" |
+                        grep -q "^00*:${port_in_hex}$"; then
+                    break 2
+                fi
+
+                # Also check IPv6
+                if grep -E "\s(${sockets})\s" /proc/$pid/net/tcp6 |
+                        awk "{print \$${ip_index}}" |
+                        grep -q "^00*:${port_in_hex}$"; then
+                    break 2
+                fi
+            fi
+        done
+
         sleep 0.2
     done
 
-    echo "ready ${HOST}:${PORT}/${MODULE}//$sst_ver"
+    echo "ready ${host}:${port}/${module}//$sst_ver"
 }
 
 #
@@ -1579,7 +1701,9 @@ then
         rm -f "${KEYRING_FILE_DIR}/${XB_DONOR_KEYRING_FILE}"
     fi
 
-    wait_for_listen ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
+    # Note: this is started as a background process
+    # So it has to wait for processes that are started by THIS process
+    wait_for_listen $$ ${WSREP_SST_OPT_HOST} ${WSREP_SST_OPT_PORT:-4444} ${MODULE} &
 
     trap sig_joiner_cleanup HUP PIPE INT TERM
     trap cleanup_joiner EXIT
