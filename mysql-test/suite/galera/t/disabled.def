@@ -10,3 +10,5 @@ galera_toi_ddl_online : fails randomly with "deadlock error" as sequence of acti
 galera_garbd : Failing to find the garbd binary after new minimal image change.
 galera_gcache_recover_manytrx : timing issue that causes it to fail intermittently.
 pxc_encrypt_rest_blog : Currently PXC doesn't support binlog encryption
+pxc_encrypt_rest_gt_vault : Vault server availability is unreliable
+pxc_encrypt_rest_fpt_vault : Vault server availability is unreliable

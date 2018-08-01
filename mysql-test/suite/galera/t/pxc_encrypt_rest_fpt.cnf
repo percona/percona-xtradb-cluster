@@ -8,6 +8,9 @@ pxc-encrypt-cluster-traffic=ON
 [xtrabackup]
 xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
 
+[sst]
+ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
+
 [mysqld.1]
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;pc.ignore_sb=true'
 early_plugin_load=@ENV.KEYRING_PLUGIN
