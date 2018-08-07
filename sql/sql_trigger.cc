@@ -511,6 +511,11 @@ bool mysql_create_or_drop_trigger(THD *thd, TABLE_LIST *tables, bool create)
       result= FALSE;
       /* Still, we need to log the query ... */
       stmt_query.append(thd->query(), thd->query_length());
+#ifdef WITH_WSREP
+      /* Table doesn't exist but query is still being logged
+      so replicate a query with NULL construct. */
+      WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, tables)
+#endif /* WITH_WSREP */
       goto end;
     }
   }

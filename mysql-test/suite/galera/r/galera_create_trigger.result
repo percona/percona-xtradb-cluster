@@ -40,3 +40,15 @@ DROP TABLE definer_user;
 DROP TABLE definer_root;
 DROP TABLE definer_default;
 DROP USER 'user1';
+select locate(':1-18', @@global.gtid_executed);
+locate(':1-18', @@global.gtid_executed)
+37
+DROP TRIGGER IF EXISTS non_existing_trigger;
+Warnings:
+Note	1360	Trigger does not exist
+select locate(':1-19', @@global.gtid_executed);
+locate(':1-19', @@global.gtid_executed)
+37
+select locate(':1-19', @@global.gtid_executed);
+locate(':1-19', @@global.gtid_executed)
+37
