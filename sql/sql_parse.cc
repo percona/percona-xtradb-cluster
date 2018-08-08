@@ -3148,6 +3148,7 @@ mysql_execute_command(THD *thd, bool first_level)
           (sql_command_flags[lex->sql_command] & CF_CHANGES_DATA) == 0)    &&
         !wsrep_tables_accessible_when_detached(all_tables)                 &&
         lex->sql_command != SQLCOM_SET_OPTION                              &&
+        lex->sql_command != SQLCOM_SHUTDOWN                                &&
         !wsrep_is_show_query(lex->sql_command))
     {
       my_message(ER_UNKNOWN_COM_ERROR,
