@@ -41,8 +41,10 @@ DROP TABLE definer_default;
 
 DROP USER 'user1';
 
+--connection node_1
+select locate(':1-18', @@global.gtid_executed);
+DROP TRIGGER IF EXISTS non_existing_trigger;
+select locate(':1-19', @@global.gtid_executed);
 
-
-
-
-
+--connection node_2
+select locate(':1-19', @@global.gtid_executed);
