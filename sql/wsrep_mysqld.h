@@ -59,6 +59,10 @@ enum wsrep_consistency_check_mode {
     CONSISTENCY_CHECK_RUNNING,
 };
 
+enum enum_wsrep_certification_rules {
+    WSREP_CERTIFICATION_RULES_STRICT,
+    WSREP_CERTIFICATION_RULES_OPTIMIZED
+};
 
 // Global wsrep parameters
 extern wsrep_t*    wsrep;
@@ -86,6 +90,7 @@ extern ulong       wsrep_max_ws_size;
 extern ulong       wsrep_max_ws_rows;
 extern const char* wsrep_notify_cmd;
 extern my_bool     wsrep_certify_nonPK;
+extern ulong       wsrep_certification_rules;
 extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;

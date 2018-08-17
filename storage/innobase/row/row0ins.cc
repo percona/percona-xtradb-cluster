@@ -934,7 +934,7 @@ dberr_t wsrep_append_foreign_key(trx_t *trx,
 				 const rec_t*		clust_rec,
 				 dict_index_t*		clust_index,
 				 ibool			referenced,
-				 ibool			shared);
+				 wsrep_key_type		key_type);
 #endif /* WITH_WSREP */
 
 /** Fill virtual column information in cascade node for the child table.
@@ -1426,7 +1426,7 @@ row_ins_foreign_check_on_constraint(
 					foreign,
 					clust_rec,
 					clust_index,
-					FALSE, FALSE);
+					FALSE, WSREP_KEY_EXCLUSIVE);
 	if (err != DB_SUCCESS) {
 		ib::warn() << "WSREP: foreign key append failed: " << err;
 	} else
@@ -1774,13 +1774,26 @@ row_ins_check_foreign_constraint(
 				if (check_ref) {
 					err = DB_SUCCESS;
 #ifdef WITH_WSREP
+					wsrep_key_type key_type = WSREP_KEY_EXCLUSIVE;
+					if (upd_node != NULL) {
+						key_type = WSREP_KEY_SHARED;
+					} else {
+						switch (wsrep_certification_rules) {
+						case WSREP_CERTIFICATION_RULES_STRICT:
+							key_type = WSREP_KEY_EXCLUSIVE;
+							break;
+						case WSREP_CERTIFICATION_RULES_OPTIMIZED:
+							key_type = WSREP_KEY_SEMI;
+							break;
+						}
+					}
 					err = wsrep_append_foreign_key(
 						thr_get_trx(thr),
 						foreign,
 						rec,
 						check_index,
 						check_ref,
-						(upd_node) ? TRUE : FALSE);
+						key_type);
 #endif /* WITH_WSREP */
 
 					goto end_scan;
