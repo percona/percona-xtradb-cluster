@@ -4597,6 +4597,11 @@ end_with_restore_list:
     break;
   case SQLCOM_CREATE_COMPRESSION_DICTIONARY:
   {
+
+#ifdef WITH_WSREP
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
     if (lex->default_value->fixed == 0)
       lex->default_value->fix_fields(thd, 0);
     String dict_data;
@@ -4615,6 +4620,11 @@ end_with_restore_list:
   }
   case SQLCOM_DROP_COMPRESSION_DICTIONARY:
   {
+
+#ifdef WITH_WSREP
+    WSREP_TO_ISOLATION_BEGIN(WSREP_MYSQL_DB, NULL, NULL)
+#endif /* WITH_WSREP */
+
     if ((res= mysql_drop_zip_dict(thd, lex->ident.str, lex->ident.length,
                                   lex->drop_if_exists)) == 0)
       my_ok(thd);
