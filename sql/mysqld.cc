@@ -6747,7 +6747,9 @@ extern "C" void *start_wsrep_THD(void *arg)
   delete thd;
 
   my_thread_end();
-  ERR_remove_state(0);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  ERR_remove_thread_state(0);
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
   my_thread_exit(0);
 
   return(NULL);
