@@ -3448,6 +3448,9 @@ public:
   bool                      wsrep_replicate_GTID;
   bool                      wsrep_skip_wsrep_GTID;
 
+  /* DDL statement can fail in which case SE checkpoint shouldn't get updated. */
+  bool                      wsrep_skip_SE_checkpoint;
+
   /* DDL statement. skip registering wsrep_hton handler.
   This is normally blocked by checking wsrep_exec_state != TOTAL_ORDER
   but if sql_log_bin = 0 then the state is not set and DDL should is expected

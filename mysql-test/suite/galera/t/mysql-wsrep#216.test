@@ -47,7 +47,7 @@ DROP USER u1;
 # Five times for the first node, in the various wsrep_debug messages
 --let $assert_text = 'mysql_native_password' AS '<secret>'
 --let $assert_select = 'mysql_native_password' AS '<secret>'
---let $assert_count = 5
+--let $assert_count = 6
 --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
 --let $assert_only_after = CURRENT_TEST
 --source include/assert_grep.inc

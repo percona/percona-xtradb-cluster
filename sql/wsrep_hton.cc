@@ -50,6 +50,7 @@ void wsrep_cleanup_transaction(THD *thd)
   thd->wsrep_affected_rows= 0;
   thd->wsrep_void_applier_trx= true;
   thd->wsrep_skip_wsrep_GTID= false;
+  thd->wsrep_skip_SE_checkpoint= false;
   return;
 }
 
