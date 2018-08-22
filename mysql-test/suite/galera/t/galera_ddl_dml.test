@@ -6,6 +6,8 @@
 
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
 
 
 #-------------------------------------------------------------------------------
@@ -91,6 +93,42 @@ drop compression_dictionary numbers;
 --echo #node-2
 --echo # ensure dictionary drop is replicated
 select * from information_schema.xtradb_zip_dict where name like '%number%';
+
+#-------------------------------------------------------------------------------
+#
+# 1. DDL/DML statement and their replication
+#
+--connection node_2
+--echo #node-2
+call mtr.add_suppression("Can't create database");
+
+
+--connection node_1
+--echo #node-1
+#
+--let $wsrep_debug_orig = `SELECT @@wsrep_debug`
+set global wsrep_debug=1;
+#
+create table t (i int, primary key pk(i)) engine=innodb;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+--send insert into t values (1);
+
+--connect node_1a, 127.0.0.1, root, , test, $NODE_MYPORT_1
+--connection node_1a
+--echo #node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+--error ER_DB_CREATE_EXISTS
+create database test;
+SET DEBUG_SYNC = "now SIGNAL continue1";
+
+--connection node_1
+--echo #node-1
+--reap
+select * from t;
+--eval SET GLOBAL wsrep_debug = $wsrep_debug_orig
+drop table t;
 
 #-------------------------------------------------------------------------------
 #

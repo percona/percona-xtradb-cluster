@@ -10016,6 +10016,8 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
     DBUG_RETURN(finish_commit(thd));
   }
 
+  DEBUG_SYNC(thd, "pxc_in_commit_flush_stage");
+
   THD *wait_queue= NULL, *final_queue= NULL;
   mysql_mutex_t *leave_mutex_before_commit_stage= NULL;
   my_off_t flush_end_pos= 0;

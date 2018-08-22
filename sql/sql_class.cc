@@ -1553,6 +1553,7 @@ THD::THD(bool enable_plugins)
   wsrep_skip_wsrep_GTID   = false;
   wsrep_split_trx         = false;
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
+  wsrep_skip_SE_checkpoint = false;
   wsrep_skip_wsrep_hton   = false;
 #endif /* WITH_WSREP */
   /* Call to init() below requires fully initialized Open_tables_state. */
@@ -1955,6 +1956,7 @@ void THD::init(void)
   m_wsrep_next_trx_id     = WSREP_UNDEFINED_TRX_ID;
   wsrep_sst_donor= false;
   wsrep_void_applier_trx  = true;
+  wsrep_skip_SE_checkpoint = false;
   wsrep_skip_wsrep_hton   = false;
 #endif /* WITH_WSREP */
   binlog_row_event_extra_data= 0;

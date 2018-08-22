@@ -2075,8 +2075,14 @@ static void wsrep_TOI_end(THD *thd)
   WSREP_DEBUG("%s", thd->wsrep_info);
   thd_proc_info(thd, thd->wsrep_info);
 
-  wsrep_set_SE_checkpoint(thd->wsrep_trx_meta.gtid.uuid,
-                          thd->wsrep_trx_meta.gtid.seqno);
+  if (!thd->wsrep_skip_SE_checkpoint) {
+    wsrep_set_SE_checkpoint(thd->wsrep_trx_meta.gtid.uuid,
+                            thd->wsrep_trx_meta.gtid.seqno);
+  } else {
+    WSREP_DEBUG("Skip SE checkpoint due to TOI statement (%s) failure (%lld)",
+                WSREP_QUERY(thd),
+                (long long)wsrep_thd_trx_seqno(thd));
+  }
   
   if (WSREP_OK == (ret = wsrep->to_execute_end(wsrep, (ulong)thd->thread_id()))) {
     WSREP_DEBUG("Completed query (%s) replication with write-set (%lld) and"

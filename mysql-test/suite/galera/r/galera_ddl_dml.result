@@ -76,4 +76,24 @@ drop compression_dictionary numbers;
 # ensure dictionary drop is replicated
 select * from information_schema.xtradb_zip_dict where name like '%number%';
 id	name	zip_dict
+#node-2
+call mtr.add_suppression("Can't create database");
+#node-1
+set global wsrep_debug=1;
+create table t (i int, primary key pk(i)) engine=innodb;
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "pxc_in_commit_flush_stage SIGNAL entered1 WAIT_FOR continue1";
+insert into t values (1);;
+#node-1a
+SET SESSION wsrep_sync_wait = 0;
+SET DEBUG_SYNC = "now WAIT_FOR entered1";
+create database test;
+ERROR HY000: Can't create database 'test'; database exists
+SET DEBUG_SYNC = "now SIGNAL continue1";
+#node-1
+select * from t;
+i
+1
+SET GLOBAL wsrep_debug = 0;
+drop table t;
 set @@wsrep_replicate_myisam = 0;;
