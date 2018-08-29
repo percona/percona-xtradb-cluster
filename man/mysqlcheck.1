@@ -2,12 +2,12 @@
 .\"     Title: \fBmysqlcheck\fR
 .\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 06/22/2017
+.\"      Date: 06/07/2018
 .\"    Manual: MySQL Database System
 .\"    Source: MySQL 5.7
 .\"  Language: English
 .\"
-.TH "\FBMYSQLCHECK\FR" "1" "06/22/2017" "MySQL 5\&.7" "MySQL Database System"
+.TH "\FBMYSQLCHECK\FR" "1" "06/07/2018" "MySQL 5\&.7" "MySQL Database System"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -58,16 +58,9 @@ because that program invokes
 to check all tables and repair them if necessary\&.)
 .PP
 \fBmysqlcheck\fR
-is similar in function to
-\fBmyisamchk\fR, but works differently\&. The main operational difference is that
-\fBmysqlcheck\fR
 must be used when the
 \fBmysqld\fR
-server is running, whereas
-\fBmyisamchk\fR
-should be used when it is not\&. The benefit of using
-\fBmysqlcheck\fR
-is that you do not have to stop the server to perform table maintenance\&.
+server is running, which means that you do not have to stop the server to perform table maintenance\&.
 .PP
 \fBmysqlcheck\fR
 uses the SQL statements
@@ -78,15 +71,9 @@ OPTIMIZE TABLE
 in a convenient way for the user\&. It determines which statements to use for the operation you want to perform, and then sends the statements to the server to be executed\&. For details about which storage engines each statement works with, see the descriptions for those statements in
 Section\ \&13.7.2, \(lqTable Maintenance Statements\(rq\&.
 .PP
-The
-MyISAM
-storage engine supports all four maintenance operations, so
-\fBmysqlcheck\fR
-can be used to perform any of them on
-MyISAM
-tables\&. Other storage engines do not necessarily support all operations\&. In such cases, an error message is displayed\&. For example, if
+All storage engines do not necessarily support all four maintenance operations\&. In such cases, an error message is displayed\&. For example, if
 test\&.t
-is a
+is an
 MEMORY
 table, an attempt to check it produces this result:
 .sp
@@ -179,17 +166,17 @@ l l.
 T{
 \fBmysqlrepair\fR
 T}:T{
-The default option is \fB\-\-repair\fR
+The default option is \fB--repair\fR
 T}
 T{
 \fBmysqlanalyze\fR
 T}:T{
-The default option is \fB\-\-analyze\fR
+The default option is \fB--analyze\fR
 T}
 T{
 \fBmysqloptimize\fR
 T}:T{
-The default option is \fB\-\-optimize\fR
+The default option is \fB--optimize\fR
 T}
 .TE
 .sp 1
@@ -303,7 +290,7 @@ On a computer having multiple network interfaces, use this option to select whic
 \fB\-\-character\-sets\-dir=\fR\fB\fIdir_name\fR\fR
 .sp
 The directory where character sets are installed\&. See
-Section\ \&10.5, \(lqCharacter Set Configuration\(rq\&.
+Section\ \&10.14, \(lqCharacter Set Configuration\(rq\&.
 .RE
 .sp
 .RS 4
@@ -442,7 +429,7 @@ Print debugging information and memory and CPU usage statistics when the program
 Use
 \fIcharset_name\fR
 as the default character set\&. See
-Section\ \&10.5, \(lqCharacter Set Configuration\(rq\&.
+Section\ \&10.14, \(lqCharacter Set Configuration\(rq\&.
 .RE
 .sp
 .RS 4
@@ -534,7 +521,7 @@ If you are using this option to repair tables, it runs an extended repair that m
 \fB\-\-default\-auth=\fR\fB\fIplugin\fR\fR
 .sp
 A hint about the client\-side authentication plugin to use\&. See
-Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
+Section\ \&6.3.9, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -550,7 +537,7 @@ Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
 Enable the
 mysql_clear_password
 cleartext authentication plugin\&. (See
-Section\ \&6.5.1.5, \(lqClient-Side Cleartext Pluggable Authentication\(rq\&.)
+Section\ \&6.5.1.6, \(lqClient-Side Cleartext Pluggable Authentication\(rq\&.)
 .sp
 This option was added in MySQL 5\&.7\&.10\&.
 .RE
@@ -611,6 +598,35 @@ This option is deprecated in MySQL 5\&.7\&.6 and will be removed in a future ver
 \fB\-f\fR
 .sp
 Continue even if an SQL error occurs\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-get\-server\-public\-key\fR
+.sp
+Request from the server the public key required for RSA key pair\-based password exchange\&. This option applies to clients that that authenticate with the
+caching_sha2_password
+authentication plugin\&. For that plugin, the server does not send the public key unless requested\&. This option is ignored for accounts that do not authenticate with that plugin\&. It is also ignored if RSA\-based password exchange is not used, as is the case when the client connects to the server using a secure connection\&.
+.sp
+If
+\fB\-\-server\-public\-key\-path=\fR\fB\fIfile_name\fR\fR
+is given and specifies a valid public key file, it takes precedence over
+\fB\-\-get\-server\-public\-key\fR\&.
+.sp
+For information about the
+caching_sha2_password
+plugin, see
+Section\ \&6.5.1.5, \(lqCaching SHA-2 Pluggable Authentication\(rq\&.
+.sp
+The
+\fB\-\-get\-server\-public\-key\fR
+option was added in MySQL 5\&.7\&.23\&.
 .RE
 .sp
 .RS 4
@@ -758,7 +774,7 @@ The directory in which to look for plugins\&. Specify this option if the
 option is used to specify an authentication plugin but
 \fBmysqlcheck\fR
 does not find it\&. See
-Section\ \&6.3.8, \(lqPluggable Authentication\(rq\&.
+Section\ \&6.3.9, \(lqPluggable Authentication\(rq\&.
 .RE
 .sp
 .RS 4
@@ -842,7 +858,7 @@ Perform a repair that can fix almost anything except unique keys that are not un
 .\}
 \fB\-\-secure\-auth\fR
 .sp
-Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&. This option was added in MySQL 5\&.7\&.4\&.
+Do not send passwords to the server in old (pre\-4\&.1) format\&. This prevents connections except for servers that use the newer password format\&.
 .sp
 As of MySQL 5\&.7\&.5, this option is deprecated and will be removed in a future MySQL release\&. It is always enabled and attempting to disable it (\fB\-\-skip\-secure\-auth\fR,
 \fB\-\-secure\-auth=0\fR) produces an error\&. Before MySQL 5\&.7\&.5, this option is enabled by default but can be disabled\&.
@@ -858,7 +874,7 @@ As of MySQL 5\&.7\&.5, this option is deprecated and will be removed in a future
 \fBNote\fR
 .ps -1
 .br
-Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them is removed in MySQL 5\&.7\&.5\&. For account upgrade instructions, see
+Passwords that use the pre\-4\&.1 hashing method are less secure than passwords that use the native password hashing method and should be avoided\&. Pre\-4\&.1 passwords are deprecated and support for them was removed in MySQL 5\&.7\&.5\&. For account upgrade instructions, see
 Section\ \&6.5.1.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin\(rq\&.
 .sp .5v
 .RE
@@ -872,10 +888,47 @@ Section\ \&6.5.1.3, \(lqMigrating Away from Pre-4.1 Password Hashing and the mys
 .sp -1
 .IP \(bu 2.3
 .\}
+\fB\-\-server\-public\-key\-path=\fR\fB\fIfile_name\fR\fR
+.sp
+The path name to a file containing a client\-side copy of the public key required by the server for RSA key pair\-based password exchange\&. The file must be in PEM format\&. This option applies to clients that authenticate with the
+sha256_password
+or
+caching_sha2_password
+authentication plugin\&. This option is ignored for accounts that do not authenticate with one of those plugins\&. It is also ignored if RSA\-based password exchange is not used, as is the case when the client connects to the server using a secure connection\&.
+.sp
+If
+\fB\-\-server\-public\-key\-path=\fR\fB\fIfile_name\fR\fR
+is given and specifies a valid public key file, it takes precedence over
+\fB\-\-get\-server\-public\-key\fR\&.
+.sp
+For
+sha256_password, this option applies only if MySQL was built using OpenSSL\&.
+.sp
+For information about the
+sha256_password
+and
+caching_sha2_password
+plugins, see
+Section\ \&6.5.1.4, \(lqSHA-256 Pluggable Authentication\(rq, and
+Section\ \&6.5.1.5, \(lqCaching SHA-2 Pluggable Authentication\(rq\&.
+.sp
+The
+\fB\-\-server\-public\-key\-path\fR
+option was added in MySQL 5\&.7\&.23\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
 \fB\-\-shared\-memory\-base\-name=\fR\fB\fIname\fR\fR
 .sp
 On Windows, the shared\-memory name to use, for connections made using shared memory to a local server\&. The default value is
-MYSQL\&. The shared\-memory name is case sensitive\&.
+MYSQL\&. The shared\-memory name is case\-sensitive\&.
 .sp
 The server must be started with the
 \fB\-\-shared\-memory\fR
@@ -906,7 +959,7 @@ Silent mode\&. Print only error messages\&.
 .\}
 \fB\-\-skip\-database=\fR\fB\fIdb_name\fR\fR
 .sp
-Do not include the named database (case sensitive) in the operations performed by
+Do not include the named database (case\-sensitive) in the operations performed by
 \fBmysqlcheck\fR\&.
 .RE
 .sp
@@ -938,7 +991,7 @@ localhost, the Unix socket file to use, or, on Windows, the name of the named pi
 Options that begin with
 \fB\-\-ssl\fR
 specify whether to connect to the server using SSL and indicate where to find SSL keys and certificates\&. See
-Section\ \&6.4.5, \(lqCommand Options for Secure Connections\(rq\&.
+Section\ \&6.4.2, \(lqCommand Options for Encrypted Connections\(rq\&.
 .RE
 .sp
 .RS 4
@@ -969,7 +1022,7 @@ option\&. All name arguments following the option are regarded as table names\&.
 \fB\-\-tls\-version=\fR\fB\fIprotocol_list\fR\fR
 .sp
 The protocols permitted by the client for encrypted connections\&. The value is a comma\-separated list containing one or more protocol names\&. The protocols that can be named for this option depend on the SSL library used to compile MySQL\&. For details, see
-Section\ \&6.4.3, \(lqSecure Connection Protocols and Ciphers\(rq\&.
+Section\ \&6.4.6, \(lqEncrypted Connection Protocols and Ciphers\(rq\&.
 .sp
 This option was added in MySQL 5\&.7\&.10\&.
 .RE
@@ -1062,7 +1115,7 @@ when these statements should not be sent to replication slaves or run when using
 .SH "COPYRIGHT"
 .br
 .PP
-Copyright \(co 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright \(co 1997, 2018, Oracle and/or its affiliates. All rights reserved.
 .PP
 This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
 .PP
