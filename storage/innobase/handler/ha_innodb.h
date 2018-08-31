@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2018, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -92,7 +92,7 @@ public:
 
 	uint max_supported_key_length() const;
 
-	uint max_supported_key_part_length() const;
+	uint max_supported_key_part_length(HA_CREATE_INFO *create_info) const;
 
 	const key_map* keys_to_use_for_scanning();
 
@@ -852,6 +852,13 @@ public:
 		char*           norm_name,
 		const char*     name,
 		ibool           set_lower_case);
+
+	/** If encryption is requested, check for master key availability
+	and set the encryption flag in table flags
+	@param[in,out]	table	table object
+	@return on success DB_SUCCESS else DB_UNSPPORTED on failure */
+
+	dberr_t	enable_encryption(dict_table_t*	table);
 
 private:
 	/** Parses the table name into normal name and either temp path or

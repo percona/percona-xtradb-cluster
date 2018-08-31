@@ -7768,6 +7768,9 @@ ER_AUDIT_LOG_HOST_NAME_INVALID_CHARACTER
 WARN_DEPRECATED_MAXDB_SQL_MODE_FOR_TIMESTAMP
   eng "With the MAXDB SQL mode enabled, TIMESTAMP is identical with DATETIME. The MAXDB SQL mode is deprecated and will be removed in a future release. Please disable the MAXDB SQL mode and use DATETIME instead."
 
+ER_XA_REPLICATION_FILTERS
+  eng "The use of replication filters with XA transactions is not supported, and can lead to an undefined state in the replication slave."
+
 ER_COMPRESSED_COLUMN_USED_AS_KEY
   eng "Compressed column '%-.192s' is not allowed in the key list"
 
@@ -7844,12 +7847,6 @@ ER_SK_POPULATE_DURING_ALTER
 
 ER_CF_DIFFERENT
   eng "Column family ('%s') flag (%d) is different from an existing flag (%d). Assign a new CF flag, or do not change existing CF flag."
-
-ER_RDB_STATUS_GENERAL
-  eng "Status error %d received from RocksDB: %s"
-
-ER_RDB_STATUS_MSG
-  eng "%s, Status error %d received from RocksDB: %s"
 
 ER_RDB_TTL_UNSUPPORTED
   eng "TTL support is currently disabled when table has a hidden PK."
