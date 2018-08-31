@@ -792,7 +792,7 @@ public:
 	}
 
 	/** @return true if the page write should not be encrypted */
-	bool is_encryption_disabled() const MY_NODISCARD
+	MY_NODISCARD bool is_encryption_disabled() const
 	{
 		return((m_type & NO_ENCRYPTION) != 0);
 	}
