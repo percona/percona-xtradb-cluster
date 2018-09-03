@@ -7456,7 +7456,8 @@ extern "C" void *start_wsrep_THD(void *arg)
   delete thd;
 
   my_thread_end();
-  ERR_remove_state(0);
+  // deprecated in openssl
+  // ERR_remove_state(0);
   my_thread_exit(0);
 
   return(NULL);
