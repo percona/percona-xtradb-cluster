@@ -300,13 +300,6 @@ export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
 
-export DEBIAN_VERSION="$(lsb_release -sc)"
-echo $DEBIAN_VERSION
-if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && ([[ "$DEBIAN_VERSION" == "yakkety" ]] || [[ "$DEBIAN_VERSION" == "zesty" ]] || [[ "$DEBIAN_VERSION" == "stretch" ]] || [[ "$DEBIAN_VERSION" == "artful" ]] || [[ "$DEBIAN_VERSION" == "bionic" ]]); then
-    export CFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
-    export CXXFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
-fi
-
 #
 # Test jemalloc directory
 if test "x$WITH_JEMALLOC" != "x"
