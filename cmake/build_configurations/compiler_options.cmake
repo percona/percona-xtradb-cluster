@@ -24,6 +24,8 @@ ENDIF()
 IF(SIZEOF_VOIDP EQUAL 8)
   SET(64BIT 1)
 ENDIF()
+
+SET(CMAKE_CXX_STANDARD 98)
  
 # Compiler options
 IF(UNIX)  
@@ -67,9 +69,11 @@ IF(UNIX)
     # GCC 6 has C++14 as default, set it explicitly to the old default.
     EXECUTE_PROCESS(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                     OUTPUT_VARIABLE GXX_VERSION)
-    IF(GXX_VERSION VERSION_EQUAL 6.0 OR GXX_VERSION VERSION_GREATER 6.0)
-      SET(COMMON_CXX_FLAGS             "${COMMON_CXX_FLAGS} -std=gnu++03 -std=gnu++11")
-    ENDIF()
+    # Oracle uses gcc version check logic to append gnu++03. PS uses
+    # cmake logic as it works with clang too.
+    #IF(GXX_VERSION VERSION_EQUAL 6.0 OR GXX_VERSION VERSION_GREATER 6.0)
+    #  SET(COMMON_CXX_FLAGS             "${COMMON_CXX_FLAGS} -std=gnu++03 -std=gnu++11")
+    #ENDIF()
     # Disable inline optimizations for valgrind testing to avoid false positives
     IF(WITH_VALGRIND)
       SET(COMMON_CXX_FLAGS             "-fno-inline ${COMMON_CXX_FLAGS}")
