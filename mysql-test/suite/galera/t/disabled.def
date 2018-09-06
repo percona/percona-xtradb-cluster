@@ -17,3 +17,5 @@ galera_var_innodb_disallow_writes : Issue#330 2018-05-16 CODERSHIP https://githu
 galera_wsrep_provider_unset_set : lp1379204 0000-00-00 CODERSHIP 'Unsupported protocol downgrade: incremental data collection disabled. Expect abort.'
 galera_restart_on_unknown_option : when node-2 is shutdown with unknown option, shutdown completes still it is killed by test framework
 MW-360 : drop temporary table is bin logged (PS issue)
+MW-286 : timing issues. Need to work and stablize it.
+galera_as_slave_preordered : Intermittent failure (duplicate entry) observed in mtr.
