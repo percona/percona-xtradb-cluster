@@ -9,3 +9,9 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+innodb_bug-13628249 : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+monitor : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+innodb_file_limit_check : BUG#89208 2018-05-31 VasilDimov https://bugs.mysql.com/bug.php?id=89208
+# Codership disabled tests end here

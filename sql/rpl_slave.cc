@@ -4095,6 +4095,10 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
       DBUG_RETURN(SLAVE_APPLY_EVENT_AND_UPDATE_POS_OK);
 
     exec_res= ev->apply_event(rli);
+    DBUG_EXECUTE_IF("simulate_stop_when_mts_in_group",
+                    if (rli->mts_group_status == Relay_log_info::MTS_IN_GROUP
+                        && rli->curr_group_seen_begin)
+		    DBUG_SET("+d,stop_when_mts_in_group"););
 
 #ifdef WITH_WSREP
     if (exec_res && thd->wsrep_conflict_state != NO_CONFLICT)
@@ -4106,11 +4110,6 @@ apply_event_and_update_pos(Log_event** ptr_ev, THD* thd, Relay_log_info* rli)
                   "Node has dropped from cluster");
     }
 #endif
-
-    DBUG_EXECUTE_IF("simulate_stop_when_mts_in_group",
-                    if (rli->mts_group_status == Relay_log_info::MTS_IN_GROUP
-                        && rli->curr_group_seen_begin)
-		    DBUG_SET("+d,stop_when_mts_in_group"););
 
     if (!exec_res && (ev->worker != rli))
     {

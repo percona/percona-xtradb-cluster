@@ -2141,6 +2141,9 @@ int ha_partition::copy_partitions(ulonglong * const copied,
         /* Copy record to new handler */
         (*copied)++;
         tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+        reenable_wsrep(thd);
+#endif
         result= m_new_file[new_part]->ha_write_row(m_rec0);
         reenable_binlog(thd);
         if (result)
@@ -4121,6 +4124,9 @@ int ha_partition::write_row(uchar * buf)
   start_part_bulk_insert(thd, part_id);
 
   tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif
   error= m_file[part_id]->ha_write_row(buf);
   if (have_auto_increment && !table->s->next_number_keypart)
     set_auto_increment_if_higher(table->next_number_field);
@@ -4215,6 +4221,9 @@ int ha_partition::update_row(const uchar *old_data, uchar *new_data)
   {
     DBUG_PRINT("info", ("Update in partition %d", new_part_id));
     tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+    reenable_wsrep(thd);
+#endif
     error= m_file[new_part_id]->ha_update_row(old_data, new_data);
     reenable_binlog(thd);
     goto exit;
@@ -4236,6 +4245,9 @@ int ha_partition::update_row(const uchar *old_data, uchar *new_data)
     DBUG_PRINT("info", ("Update from partition %d to partition %d",
 			old_part_id, new_part_id));
     tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+    reenable_wsrep(thd);
+#endif
     error= m_file[new_part_id]->ha_write_row(new_data);
     reenable_binlog(thd);
     table->next_number_field= saved_next_number_field;
@@ -4243,6 +4255,9 @@ int ha_partition::update_row(const uchar *old_data, uchar *new_data)
       goto exit;
 
     tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+    reenable_wsrep(thd);
+#endif
     error= m_file[old_part_id]->ha_delete_row(old_data);
     reenable_binlog(thd);
     if (error)
@@ -4358,6 +4373,9 @@ int ha_partition::delete_row(const uchar *buf)
 
   m_last_part= part_id;
   tmp_disable_binlog(thd);
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif
   error= m_file[part_id]->ha_delete_row(buf);
   reenable_binlog(thd);
   DBUG_RETURN(error);
