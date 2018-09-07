@@ -22,6 +22,27 @@ WAIT_FOR go_ahead';
 connect (con1,localhost,root,,);
 connection con1;
 SET DEBUG_SYNC = 'now WAIT_FOR start_create';
+# If the Galera library is loaded then the INSERT below is aborted:
+# 2018-07-31 18:10:18 53686 [Note] WSREP: TO BEGIN: -1, 0 : CREATE UNIQUE INDEX idx ON parent(b)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: TO BEGIN: 5, 2
+# 2018-07-31 18:10:18 53686 [Note] WSREP: commit failed for reason: 3 5 INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: conflict state: 0
+# 2018-07-31 18:10:18 53686 [Note] WSREP: cluster conflict due to certification failure for threads:
+# 2018-07-31 18:10:18 53686 [Note] WSREP: Victim thread:
+#    THD: 5, mode: local, state: executing, conflict: cert failure, seqno: 6
+#    SQL: INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: cleanup transaction for LOCAL_STATE: INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: wsrep retrying AC query: INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: commit failed for reason: 3 5 INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: conflict state: 0
+# 2018-07-31 18:10:18 53686 [Note] WSREP: cluster conflict due to certification failure for threads:
+# 2018-07-31 18:10:18 53686 [Note] WSREP: Victim thread:
+#    THD: 5, mode: local, state: executing, conflict: cert failure, seqno: 7
+#    SQL: INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: cleanup transaction for LOCAL_STATE: INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: cert failure, thd: 5 is_AC: 1, retry: 1 - 1 SQL: INSERT INTO parent VALUES(4, 2)
+# 2018-07-31 18:10:18 53686 [Note] WSREP: releasing retry_query: conf 0 sent 0 kill 0  errno 1213 SQL INSERT INTO parent VALUES(4, 2)
+--error 0,ER_LOCK_DEADLOCK
 INSERT INTO parent VALUES(4, 2);
 SET DEBUG_SYNC = 'now SIGNAL go_ahead';
 
