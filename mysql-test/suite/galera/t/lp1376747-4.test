@@ -48,7 +48,8 @@ SHOW CREATE TABLE t1;
 --connection node_2a
 --reap
 UNLOCK TABLES;
---sleep 2
+
+SET SESSION wsrep_sync_wait = DEFAULT;
 SHOW CREATE TABLE t1;
 SELECT * from t1;
 

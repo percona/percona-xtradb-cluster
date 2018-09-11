@@ -10,3 +10,7 @@
 #
 ##############################################################################
 sync_block : percona disabled because the test is fundamentally unstable https://bugs.launchpad.net/percona-server/+bug/1662163
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+fulltext_table_evict : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+# Codership disabled tests end here

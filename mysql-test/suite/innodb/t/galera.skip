@@ -76,3 +76,4 @@ innodb-import-partition-rpl : Starts two servers, gcomm bind fails on second
 innodb_bulk_create_index_replication : Starts two servers, gcomm bind fails on second
 innodb-isolation : InnoDB returns different results if binlog is enabled or wsrep provider is loaded
 innodb-truncate-debug : Concurrent DDL with sync points from different connections not compatible with TOI
+xa_prepare_lock_release : 1235: This version of MySQL doesn't yet support 'XA with wsrep replication plugin'

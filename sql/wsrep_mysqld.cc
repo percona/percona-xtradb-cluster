@@ -71,6 +71,7 @@ ulong   wsrep_max_ws_size              = 1073741824UL;//max ws (RBR buffer) size
 ulong   wsrep_max_ws_rows              = 65536; // max number of rows in ws
 int     wsrep_to_isolation             = 0; // # of active TO isolation threads
 my_bool wsrep_certify_nonPK            = 1; // certify, even when no primary key
+ulong   wsrep_certification_rules      = WSREP_CERTIFICATION_RULES_STRICT;
 long    wsrep_max_protocol_version     = 3; // maximum protocol version to use
 ulong   wsrep_forced_binlog_format     = BINLOG_FORMAT_UNSPEC;
 my_bool wsrep_recovery                 = 0; // recovery
@@ -1466,49 +1467,108 @@ static bool wsrep_prepare_key_for_isolation(const char* db,
                                             wsrep_buf_t* key,
                                             size_t* key_len)
 {
-    if (*key_len < 2) return false;
+  if (*key_len < 2) return false;
 
-    switch (wsrep_protocol_version)
+  switch (wsrep_protocol_version)
+  {
+  case 0:
+    *key_len= 0;
+    break;
+  case 1:
+  case 2:
+  case 3:
+  {
+    *key_len= 0;
+    if (db)
     {
-    case 0:
-        *key_len= 0;
-        break;
-    case 1:
-    case 2:
-    case 3:
-    {
-        *key_len= 0;
-        if (db)
-        {
-            // sql_print_information("%s.%s", db, table);
-            if (db)
-            {
-                key[*key_len].ptr= db;
-                key[*key_len].len= strlen(db);
-                ++(*key_len);
-                if (table)
-                {
-                    key[*key_len].ptr= table;
-                    key[*key_len].len= strlen(table);
-                    ++(*key_len);
-                }
-            }
-        }
-        break;
+      // sql_print_information("%s.%s", db, table);
+      key[*key_len].ptr= db;
+      key[*key_len].len= strlen(db);
+      ++(*key_len);
+      if (table)
+      {
+        key[*key_len].ptr= table;
+        key[*key_len].len= strlen(table);
+        ++(*key_len);
+      }
     }
-    default:
-        return false;
-    }
-
-    return true;
+    break;
+  }
+  default:
+    return false;
+  }
+  return true;
 }
 
-/* Prepare key list from db/table and table_list */
-bool wsrep_prepare_keys_for_isolation(THD*              thd,
-                                      const char*       db,
-                                      const char*       table,
-                                      const TABLE_LIST* table_list,
-                                      wsrep_key_arr_t*  ka)
+
+static bool wsrep_prepare_key_for_isolation(const char* db,
+                                            const char* table,
+                                            wsrep_key_arr_t* ka)
+{
+  wsrep_key_t* tmp;
+  tmp= (wsrep_key_t*)my_realloc(key_memory_wsrep,
+                                ka->keys,
+                                (ka->keys_len + 1) * sizeof(wsrep_key_t),
+                                MYF(0));
+  if (!tmp)
+  {
+    WSREP_ERROR("Can't allocate memory for key_array");
+    return false;
+  }
+  ka->keys= tmp;
+  if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*)
+        my_malloc(key_memory_wsrep, sizeof(wsrep_buf_t)*2, MYF(0))))
+  {
+    WSREP_ERROR("Can't allocate memory for key_parts");
+    return false;
+  }
+  ka->keys[ka->keys_len].key_parts_num= 2;
+  ++ka->keys_len;
+  if (!wsrep_prepare_key_for_isolation(db, table,
+                                       (wsrep_buf_t*)ka->keys[ka->keys_len - 1].key_parts,
+                                       &ka->keys[ka->keys_len - 1].key_parts_num))
+  {
+    WSREP_ERROR("Preparing keys for isolation failed");
+    return false;
+  }
+
+  return true;
+}
+
+
+static bool wsrep_prepare_keys_for_alter_add_fk(const char* child_table_db,
+                                                Alter_info* alter_info,
+                                                wsrep_key_arr_t* ka)
+{
+  Key *key;
+  List_iterator<Key> key_iterator(alter_info->key_list);
+  while ((key= key_iterator++))
+  {
+    if (key->type == KEYTYPE_FOREIGN)
+    {
+      Foreign_key *fk_key= (Foreign_key *)key;
+      const char *db_name= fk_key->ref_db.str;
+      const char *table_name= fk_key->ref_table.str;
+      if (!db_name)
+      {
+        db_name= child_table_db;
+      }
+      if (!wsrep_prepare_key_for_isolation(db_name, table_name, ka))
+      {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+
+static bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                             const char*       db,
+                                             const char*       table,
+                                             const TABLE_LIST* table_list,
+                                             Alter_info*       alter_info,
+                                             wsrep_key_arr_t*  ka)
 {
   ka->keys= 0;
   ka->keys_len= 0;
@@ -1524,62 +1584,38 @@ bool wsrep_prepare_keys_for_isolation(THD*              thd,
                      (table) ? table : "",
                      MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
 
-    if (!(ka->keys= (wsrep_key_t*)my_malloc(key_memory_wsrep, sizeof(wsrep_key_t), MYF(0))))
-    {
-      WSREP_ERROR("Can't allocate memory for key_array");
+    if (!wsrep_prepare_key_for_isolation(db, table, ka))
       goto err;
-    }
-    ka->keys_len= 1;
-    if (!(ka->keys[0].key_parts= (wsrep_buf_t*)
-          my_malloc(key_memory_wsrep, sizeof(wsrep_buf_t)*2, MYF(0))))
-    {
-      WSREP_ERROR("Can't allocate memory for key_parts");
-      goto err;
-    }
-    ka->keys[0].key_parts_num= 2;
-    if (!wsrep_prepare_key_for_isolation(
-                                         db, table,
-                                         (wsrep_buf_t*)ka->keys[0].key_parts,
-                                         &ka->keys[0].key_parts_num))
-    {
-      WSREP_ERROR("Preparing keys for isolation failed");
-      goto err;
-    }
   }
 
   for (const TABLE_LIST* table= table_list; table; table= table->next_global)
   {
-    wsrep_key_t* tmp;
-    tmp= (wsrep_key_t*)my_realloc(key_memory_wsrep, ka->keys,
-                                  (ka->keys_len + 1) * sizeof(wsrep_key_t),
-                                  MYF(0));
-    if (!tmp)
-    {
-      WSREP_ERROR("Can't allocate memory for key_array");
+    if (!wsrep_prepare_key_for_isolation(table->db, table->table_name, ka))
       goto err;
-    }
-    ka->keys= tmp;
-    if (!(ka->keys[ka->keys_len].key_parts= (wsrep_buf_t*)
-          my_malloc(key_memory_wsrep, sizeof(wsrep_buf_t)*2, MYF(0))))
-    {
-      WSREP_ERROR("Can't allocate memory for key_parts");
-      goto err;
-    }
-    ka->keys[ka->keys_len].key_parts_num= 2;
-    ++ka->keys_len;
-    if (!wsrep_prepare_key_for_isolation(table->db, table->table_name,
-                                         (wsrep_buf_t*)ka->keys[ka->keys_len - 1].key_parts,
-                                         &ka->keys[ka->keys_len - 1].key_parts_num))
-    {
-      WSREP_ERROR("Preparing keys for isolation failed (2)");
-      goto err;
-    }
   }
-  return 0;
+
+  if (alter_info && (alter_info->flags & Alter_info::ADD_FOREIGN_KEY))
+  {
+    if (!wsrep_prepare_keys_for_alter_add_fk(table_list->db, alter_info, ka))
+      goto err;
+  }
+
+  return false;
 
 err:
-    wsrep_keys_free(ka);
-    return 1;
+  wsrep_keys_free(ka);
+  return true;
+}
+
+
+/* Prepare key list from db/table and table_list */
+bool wsrep_prepare_keys_for_isolation(THD*              thd,
+                                      const char*       db,
+                                      const char*       table,
+                                      const TABLE_LIST* table_list,
+                                      wsrep_key_arr_t*  ka)
+{
+  return wsrep_prepare_keys_for_isolation(thd, db, table, table_list, NULL, ka);
 }
 
 
@@ -1923,8 +1959,10 @@ static bool wsrep_can_run_in_toi(THD *thd, const char *db, const char *table,
    1: TOI replication was skipped
   -1: TOI replication failed 
  */
+
 static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
-                           const TABLE_LIST* table_list)
+                           const TABLE_LIST* table_list,
+                           Alter_info* alter_info)
 {
   wsrep_status_t ret(WSREP_WARNING);
   uchar* buf(0);
@@ -1986,7 +2024,8 @@ static int wsrep_TOI_begin(THD *thd, const char *db_, const char *table_,
   struct wsrep_buf buff = { buf, buf_len };
 
   if (!buf_err                                                                &&
-      !wsrep_prepare_keys_for_isolation(thd, db_, table_, table_list, &key_arr)&&
+      !wsrep_prepare_keys_for_isolation(thd, db_, table_,
+                                        table_list, alter_info, &key_arr)     &&
       key_arr.keys_len > 0                                                    &&
       WSREP_OK == (ret = wsrep->to_execute_start(wsrep, (ulong)thd->thread_id(),
                                                  key_arr.keys, key_arr.keys_len,
@@ -2201,8 +2240,10 @@ static void wsrep_RSU_end(THD *thd)
               wsrep_get_exec_mode(thd->wsrep_exec_mode));
 }
 
+
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
-                             const TABLE_LIST* table_list)
+                             const TABLE_LIST* table_list,
+                             Alter_info* alter_info)
 {
   /*
     No isolation for applier or replaying threads.
@@ -2279,10 +2320,10 @@ int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
   {
     switch (thd->variables.wsrep_OSU_method) {
     case WSREP_OSU_TOI:
-      ret = wsrep_TOI_begin(thd, db_, table_, table_list);
+      ret= wsrep_TOI_begin(thd, db_, table_, table_list, alter_info);
       break;
     case WSREP_OSU_RSU:
-      ret = wsrep_RSU_begin(thd, db_, table_);
+      ret= wsrep_RSU_begin(thd, db_, table_);
       break;
     default:
       WSREP_ERROR("Unsupported OSU method: %lu",
