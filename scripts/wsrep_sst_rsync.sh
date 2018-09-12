@@ -123,6 +123,7 @@ FILTER=(-f '- /lost+found'
         -f '+ /ib_lru_dump'
         -f '+ /ibdata*'
         -f '+ /undo*'
+        -f '+ /*.ibd'
         -f '+ /*/'
         -f '- /*')
 
