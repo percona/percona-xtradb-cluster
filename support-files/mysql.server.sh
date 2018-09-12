@@ -35,6 +35,7 @@ SYSTEMD_NO_WRAP=1
 
 # Prevent Debian's init scripts from calling systemctl
 
+SYSTEMCTL_SKIP_REDIRECT=true
 _SYSTEMCTL_SKIP_REDIRECT=true
  
 # If you install MySQL on some other places than @prefix@, then you

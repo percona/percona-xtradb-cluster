@@ -213,6 +213,19 @@ void wsrep_post_commit(THD* thd, bool all)
      */
      WSREP_DEBUG("Cleaning up wsrep-transaction for local query: %s",
                  WSREP_QUERY(thd));
+     /*
+       Run post-rollback hook to clean up in the case if
+       some keys were populated for the transaction in provider
+       but during commit time there was no write set to replicate.
+       This may happen when client sets the SAVEPOINT and immediately
+       rolls back to savepoint after first operation. 
+      */
+     if (all && thd->wsrep_conflict_state != MUST_REPLAY &&
+         wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle))
+     {
+         WSREP_WARN("post_rollback fail: %llu %d",
+                    (long long)thd->thread_id(), thd->get_stmt_da()->status());
+     }
      wsrep_cleanup_transaction(thd);
      break;
    }

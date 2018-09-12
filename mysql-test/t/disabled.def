@@ -9,6 +9,13 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+partition_pruning : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+range_icp : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+range_none : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+xa_prepared_binlog_off : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+# Codership disabled tests end here
 read_many_rows_innodb    : Bug#11748886 2010-11-15 mattiasj report already exists
 archive-big              : Bug#11817185 2011-03-10 Anitha Disabled since this leads to timeout on Solaris Sparc
 ds_mrr-big @solaris      : Bug#14168107 2012-04-03 Hemant disabled new test added by Olav Sandstå,since this leads to timeout on Solaris on slow sparc servers
