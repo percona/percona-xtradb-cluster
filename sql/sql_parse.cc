@@ -1303,6 +1303,10 @@ static inline bool is_timer_applicable_to_statement(THD *thd)
 
 
 #ifdef WITH_WSREP
+
+#if 0
+Always return TRUE
+
 static my_bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables)
 {
   int opt_readonly_saved = opt_readonly;
@@ -1312,6 +1316,8 @@ static my_bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables)
   ulong master_access= thd->security_context()->master_access();
   thd->security_context()->set_master_access(master_access & ~SUPER_ACL);
 
+  /* Since opt_readonly is set to 0/OFF deny_updates_if_read_only_option
+  will always return FALSE there-by setting ret = TRUE */
   my_bool ret = !deny_updates_if_read_only_option(thd, all_tables);
 
   opt_readonly = opt_readonly_saved;
@@ -1320,6 +1326,7 @@ static my_bool wsrep_read_only_option(THD *thd, TABLE_LIST *all_tables)
 
   return ret;
 }
+#endif /* 0 */
 
 static void wsrep_copy_query(THD *thd)
 {
@@ -7772,8 +7779,45 @@ static void wsrep_mysql_parse(THD *thd, const char *rawbuf, uint length,
   bool is_autocommit=
     !thd->in_multi_stmt_transaction_mode()                  &&
     thd->wsrep_conflict_state == NO_CONFLICT                &&
-    !thd->wsrep_applier                                     &&
-    wsrep_read_only_option(thd, thd->lex->query_tables);
+    !thd->wsrep_applier;
+
+#if 0
+    /* wsrep_read_only_option returns:
+    true: if statement is harmless (not updating relevant tables in read-only
+          mode
+    false: if statement is updating table in read-only mode and should be
+          denied.
+
+    Decision to deny is not influenced by the said function. There is a separate
+    call for the same. This call, just set, if the statement should be marked
+    as retry-autocommit-stmt-on-abort.
+
+    Let's say user has set read_only=1 then the statement that would otherwise
+    qualify for retry-autocommit-stmt-on-abort will not be marked
+    if return value of wsrep_read_only_option is considered in evaluation.
+
+    This simply suggest that since the statement is marked as read-only,
+    there is no point in retrying statement as it is bound to fail.
+
+    But retry logic will kick in only if local transaction is ABORTED but for
+    local transaction to ABORT, it has to pass the MySQL flow read-only check.
+    If user has set read_only=1 then local transaction get rejected at early
+    stage so the use-case to set its state as ABORTED will never occur.
+
+    -------
+
+    This is probably the original reason why the wsrep_read_only_option
+    was introduced. Over period of time functionality changed but semantics
+    of wsrep_read_only_option was not updated.
+    Function now return TRUE always ir-respective of the value of read-only.
+    In light of this is better to disable this function that would also
+    avoid race condition since the wsrep_read_only_option is trying to fiddle
+    around with opt_readonly.
+    -------
+
+    && wsrep_read_only_option(thd, thd->lex->query_tables);
+    */
+#endif /* 0 */
 
   do
   {
