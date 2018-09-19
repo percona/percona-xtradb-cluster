@@ -16,8 +16,8 @@
 #ifndef WSREP_XID_H
 #define WSREP_XID_H
 
-#include "../wsrep/wsrep_api.h"
 #include "handler.h" // XID typedef
+#include "wsrep_api.h"
 
 void wsrep_xid_init(xid_t*, const wsrep_uuid_t&, wsrep_seqno_t);
 int wsrep_is_wsrep_xid(const void* xid);

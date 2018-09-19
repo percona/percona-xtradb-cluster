@@ -115,6 +115,7 @@ enum_tx_isolation thd_get_trx_isolation(const THD* thd);
 # endif /* MYSQL_PLUGIN_IMPORT */
 #ifdef WITH_WSREP
 #include "../storage/innobase/include/ut0byte.h"
+#include "wsrep_api.h"
 #include <wsrep_mysqld.h>
 #include <my_md5.h>
 extern my_bool wsrep_certify_nonPK;
@@ -3204,10 +3205,10 @@ innobase_convert_identifier(
 	const char*	s	= id;
 	int		q;
 
-	if (file_id) {
+	char nz[MAX_TABLE_NAME_LEN + 1];
+	char nz2[MAX_TABLE_NAME_LEN + 1];
 
-		char nz[MAX_TABLE_NAME_LEN + 1];
-		char nz2[MAX_TABLE_NAME_LEN + 1];
+	if (file_id) {
 
 		/* Decode the table name.  The MySQL function expects
 		a NUL-terminated string.  The input and output strings
@@ -3394,6 +3395,7 @@ ha_innobase::reset_template(void)
 	prebuilt->keep_other_fields_on_keyread = 0;
 	prebuilt->read_just_key = 0;
 	prebuilt->in_fts_query = 0;
+	prebuilt->end_range = false;
 	/* Reset index condition pushdown state. */
 	if (prebuilt->idx_cond) {
 		prebuilt->idx_cond = NULL;
@@ -8610,7 +8612,8 @@ report_error:
 		    && sql_command != SQLCOM_LOAD)
 	        || table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
 
-		if (wsrep_append_keys(user_thd, false, record, NULL)) {
+		if (wsrep_append_keys(user_thd, WSREP_KEY_EXCLUSIVE, record,
+				      NULL)) {
  			DBUG_PRINT("wsrep", ("row key failed"));
  			error_result = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -9171,7 +9174,8 @@ func_exit:
 
 		DBUG_PRINT("wsrep", ("update row key"));
 
-		if (wsrep_append_keys(user_thd, false, old_row, new_row)) {
+		if (wsrep_append_keys(user_thd, WSREP_KEY_EXCLUSIVE, old_row,
+				      new_row)) {
 			DBUG_PRINT("wsrep", ("row key failed"));
 			err = HA_ERR_INTERNAL_ERROR;
 			goto wsrep_error;
@@ -9264,7 +9268,8 @@ ha_innobase::delete_row(
 		|| thd_binlog_format(user_thd) == BINLOG_FORMAT_STMT
 	        || table->file->ht->db_type == DB_TYPE_PARTITION_DB)) {
 
-		if (wsrep_append_keys(user_thd, false, record, NULL)) {
+		if (wsrep_append_keys(user_thd, WSREP_KEY_EXCLUSIVE, record,
+				      NULL)) {
 			DBUG_PRINT("wsrep", ("delete fail"));
 			error = DB_ERROR;
 			goto wsrep_error;
@@ -10494,6 +10499,21 @@ wsrep_dict_foreign_find_index(
 	ibool		check_charsets,
 	ulint		check_null);
 
+inline
+const char*
+wsrep_key_type_to_str(wsrep_key_type type)
+{
+	switch (type) {
+	case WSREP_KEY_SHARED:
+		return "shared";
+	case WSREP_KEY_SEMI:
+		return "semi";
+	case WSREP_KEY_EXCLUSIVE:
+		return "exclusive";
+	};
+	return "unknown";
+}
+
 extern
 dberr_t
 wsrep_append_foreign_key(
@@ -10502,7 +10522,8 @@ wsrep_append_foreign_key(
 	const rec_t*	rec,		/*!< in: clustered index record */
 	dict_index_t*	index,		/*!< in: clustered index */
 	ibool		referenced,	/*!< in: is check for referenced table */
-	ibool		shared)		/*!< in: is shared access */
+	wsrep_key_type	key_type)	/*!< in: access type of this key
+					(shared, exclusive, semi...) */
 {
 	THD* thd = (THD*)trx->mysql_thd;
 	int rcode = 0;
@@ -10602,8 +10623,8 @@ wsrep_append_foreign_key(
 		wsrep_protocol_version > 1);
 	if (rcode != DB_SUCCESS) {
 		WSREP_ERROR(
-			"FK key set failed: %d (%lu %lu), index: %s %s, %s",
-			rcode, referenced, shared,
+			"FK key set failed: %d (%lu %s), index: %s %s, %s",
+			rcode, referenced, wsrep_key_type_to_str(key_type),
 			(index && index->name)       ? index->name :
 				"void index",
 			(index && index->table_name) ? index->table_name :
@@ -10622,7 +10643,7 @@ wsrep_append_foreign_key(
 #ifdef WSREP_DEBUG_PRINT
 	ulint j;
 	fprintf(stderr, "FK parent key, table: %s %s len: %lu ",
-		cache_key, (shared) ? "shared" : "exclusive", len+1);
+		cache_key, wsrep_key_type_to_str(key_type), len+1);
 	for (j=0; j<len+1; j++) {
 		fprintf(stderr, " %hhX, ", key[j]);
 	}
@@ -10655,7 +10676,7 @@ wsrep_append_foreign_key(
 		wsrep_ws_handle(thd, trx),
 		&wkey,
 		1,
-		shared ? WSREP_KEY_SHARED : WSREP_KEY_EXCLUSIVE,
+		key_type,
 		copy);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
@@ -10676,7 +10697,8 @@ wsrep_append_key(
 	TABLE 		*table,
 	const char*	key,
 	uint16_t        key_len,
-	bool            shared
+	wsrep_key_type	key_type	/*!< in: access type of this key
+					(shared, exclusive, semi...) */
 )
 {
 	DBUG_ENTER("wsrep_append_key");
@@ -10684,8 +10706,8 @@ wsrep_append_key(
 #ifdef WSREP_DEBUG_PRINT
         if (wsrep_debug) {
 	fprintf(stderr, "%s conn %ld, trx %llu, keylen %d, table %s\n SQL: %s ",
-                    (shared) ? "Shared" : "Exclusive",
-                    wsrep_thd_thread_id(thd), (long long)trx->id, key_len,
+		wsrep_key_type_to_str(key_type),
+		wsrep_thd_thread_id(thd), (long long)trx->id, key_len,
 		table_share->table_name.str, wsrep_thd_query(thd));
             for (int i=0; i<key_len; i++) {
                     fprintf(stderr, "%hhX, ", key[i]);
@@ -10712,7 +10734,7 @@ wsrep_append_key(
 				wsrep_ws_handle(thd, trx),
 				&wkey,
 				1,
-				shared ? WSREP_KEY_SHARED : WSREP_KEY_EXCLUSIVE,
+				key_type,
 				copy);
 	if (rcode) {
 		DBUG_PRINT("wsrep", ("row key failed: %d", rcode));
@@ -10750,7 +10772,8 @@ int
 ha_innobase::wsrep_append_keys(
 /*===========================*/
 	THD 		*thd,
-	bool		shared,
+	wsrep_key_type	key_type,	/*!< in: access type of this key
+					(shared, exclusive, semi...) */
 	const uchar*	record0,	/* in: row in MySQL format */
 	const uchar*	record1)	/* in: row in MySQL format */
 {
@@ -10783,7 +10806,7 @@ ha_innobase::wsrep_append_keys(
 		if (!is_null) {
 			rcode = wsrep_append_key(
 				thd, trx, table_share, table, keyval,
-				len, shared);
+				len, key_type);
 			if (rcode) DBUG_RETURN(rcode);
 		}
 		else
@@ -10838,10 +10861,11 @@ ha_innobase::wsrep_append_keys(
 				if (!is_null) {
 					rcode = wsrep_append_key(
 						thd, trx, table_share, table,
-						keyval0, len+1, shared);
+						keyval0, len+1, key_type);
 					if (rcode) DBUG_RETURN(rcode);
 
-					if (key_info->flags & HA_NOSAME || shared)
+					if (key_info->flags & HA_NOSAME ||
+					    key_type == WSREP_KEY_SHARED)
 						key_appended = true;
 				}
 				else
@@ -10858,7 +10882,7 @@ ha_innobase::wsrep_append_keys(
 						rcode = wsrep_append_key(
 							thd, trx, table_share,
 							table,
-							keyval1, len+1, shared);
+							keyval1, len+1, key_type);
 						if (rcode) DBUG_RETURN(rcode);
 					}
 				}
@@ -10874,7 +10898,7 @@ ha_innobase::wsrep_append_keys(
 		wsrep_calc_row_hash(digest, record0, table, prebuilt, thd);
 		if ((rcode = wsrep_append_key(thd, trx, table_share, table,
 					      (const char*) digest, 16,
-					      shared))) {
+					      key_type))) {
 			DBUG_RETURN(rcode);
 		}
 
@@ -10884,7 +10908,7 @@ ha_innobase::wsrep_append_keys(
 			if ((rcode = wsrep_append_key(thd, trx, table_share,
 						      table,
 						      (const char*) digest,
-						      16, shared))) {
+						      16, key_type))) {
 				DBUG_RETURN(rcode);
 			}
 		}
@@ -12816,6 +12840,7 @@ static MY_ATTRIBUTE((nonnull, warn_unused_result))
 dberr_t
 innobase_rename_table(
 /*==================*/
+	THD*            thd,    /*!< Connection thread handle */
 	trx_t*		trx,	/*!< in: transaction */
 	const char*	from,	/*!< in: old name of the table */
 	const char*	to)	/*!< in: new name of the table */
@@ -12840,6 +12865,37 @@ innobase_rename_table(
 	no deadlocks can occur then in these operations. */
 
 	row_mysql_lock_data_dictionary(trx);
+
+	dict_table_t*   table                   = NULL;
+        table = dict_table_open_on_name(norm_from, TRUE, FALSE,
+                                        DICT_ERR_IGNORE_NONE);
+
+        /* Since DICT_BG_YIELD has sleep for 250 milliseconds,
+	Convert lock_wait_timeout unit from second to 250 milliseconds */
+        long int lock_wait_timeout = thd_lock_wait_timeout(thd) * 4;
+        if (table != NULL) {
+                for (dict_index_t* index = dict_table_get_first_index(table);
+                     index != NULL;
+                     index = dict_table_get_next_index(index)) {
+
+                        if (index->type & DICT_FTS) {
+                                /* Found */
+                                while (index->index_fts_syncing
+                                        && !trx_is_interrupted(trx)
+                                        && (lock_wait_timeout--) > 0) {
+                                        DICT_BG_YIELD(trx);
+                                }
+                        }
+                }
+                dict_table_close(table, TRUE, FALSE);
+        }
+
+        /* FTS sync is in progress. We shall timeout this operation */
+        if (lock_wait_timeout < 0) {
+                error = DB_LOCK_WAIT_TIMEOUT;
+                row_mysql_unlock_data_dictionary(trx);
+                DBUG_RETURN(error);
+        }
 
 	/* Transaction must be flagged as a locking transaction or it hasn't
 	been started yet. */
@@ -12955,7 +13011,7 @@ ha_innobase::rename_table(
 	++trx->will_lock;
 	trx_set_dict_operation(trx, TRX_DICT_OP_INDEX);
 
-	error = innobase_rename_table(trx, from, to);
+	error = innobase_rename_table(thd, trx, from, to);
 
 	DEBUG_SYNC(thd, "after_innobase_rename_table");
 
@@ -13000,6 +13056,12 @@ ha_innobase::rename_table(
 
 		error = DB_ERROR;
 	}
+
+	else if (error == DB_LOCK_WAIT_TIMEOUT) {
+                my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0), to);
+
+                error = DB_LOCK_WAIT;
+        }
 
 	DBUG_RETURN(convert_error_code_to_mysql(error, 0, NULL));
 }

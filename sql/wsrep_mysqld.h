@@ -17,10 +17,10 @@
 #define WSREP_MYSQLD_H
 
 #include "mysqld.h"
+#include "wsrep_api.h"
 typedef struct st_mysql_show_var SHOW_VAR;
 #include <sql_priv.h>
 #include "rpl_gtid.h"
-#include "../wsrep/wsrep_api.h"
 
 #define WSREP_UNDEFINED_TRX_ID ULONGLONG_MAX
 
@@ -59,6 +59,10 @@ enum wsrep_consistency_check_mode {
     CONSISTENCY_CHECK_RUNNING,
 };
 
+enum enum_wsrep_certification_rules {
+    WSREP_CERTIFICATION_RULES_STRICT,
+    WSREP_CERTIFICATION_RULES_OPTIMIZED
+};
 
 // Global wsrep parameters
 extern wsrep_t*    wsrep;
@@ -86,6 +90,7 @@ extern ulong       wsrep_max_ws_size;
 extern ulong       wsrep_max_ws_rows;
 extern const char* wsrep_notify_cmd;
 extern my_bool     wsrep_certify_nonPK;
+extern ulong       wsrep_certification_rules;
 extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;
@@ -334,8 +339,10 @@ extern PSI_mutex_key key_LOCK_wsrep_slave_threads;
 extern PSI_mutex_key key_LOCK_wsrep_desync;
 #endif /* HAVE_PSI_INTERFACE */
 struct TABLE_LIST;
+class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, char *db_, char *table_,
-                             const TABLE_LIST* table_list);
+                             const TABLE_LIST* table_list,
+                             Alter_info* alter_info = NULL);
 void wsrep_to_isolation_end(THD *thd);
 void wsrep_cleanup_transaction(THD *thd);
 int wsrep_to_buf_helper(

@@ -2482,6 +2482,11 @@ static bool check_read_only(sys_var *self, THD *thd, set_var *var)
     my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
     return true;
   }
+  if (opt_gtid_deployment_step)
+  {
+    my_error(ER_GTID_DEPLOYMENT_STEP_ACTIVE, MYF(0));
+    return true;
+  }
   return false;
 }
 static bool fix_read_only(sys_var *self, THD *thd, enum_var_type type)
@@ -5101,6 +5106,19 @@ static Sys_var_mybool Sys_wsrep_certify_nonPK(
        GLOBAL_VAR(wsrep_certify_nonPK), 
        CMD_LINE(OPT_ARG), DEFAULT(TRUE));
 
+static const char *wsrep_certification_rules_names[]= { "strict", "optimized", NullS };
+static Sys_var_enum Sys_wsrep_certification_rules(
+       "wsrep_certification_rules",
+       "Certification rules to use in the cluster. Possible values are: "
+       "\"strict\": stricter rules that could result in more certification "
+       "failures. "
+       "\"optimized\": relaxed rules that allow more concurrency and "
+       "cause less certification failures.",
+       GLOBAL_VAR(wsrep_certification_rules), CMD_LINE(REQUIRED_ARG),
+       wsrep_certification_rules_names, DEFAULT(WSREP_CERTIFICATION_RULES_STRICT),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(0));
+
 static Sys_var_mybool Sys_wsrep_causal_reads(
        "wsrep_causal_reads", "(DEPRECATED) setting this variable is equivalent to setting wsrep_sync_wait READ flag",
        SESSION_VAR(wsrep_causal_reads), 
@@ -5633,10 +5651,8 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   bool result= true;
   bool own_lock= false;
 
-  if (gtid_deployment_step == FALSE ||
-      gtid_deployment_step == opt_gtid_deployment_step)
+  if (gtid_deployment_step == opt_gtid_deployment_step)
   {
-    opt_gtid_deployment_step= gtid_deployment_step;
     DBUG_RETURN(false);
   }
 
@@ -5652,12 +5668,19 @@ static bool fix_gtid_deployment_step(sys_var *self, THD *thd, enum_var_type type
   if ((result= thd->global_read_lock.make_global_read_lock_block_commit(thd)))
     goto end_with_read_lock;
 
-  /*
-   Change the opt_deployment_step system variable,
-   safe because the lock is held
-  */
   opt_gtid_deployment_step= new_gtid_deployment_step;
   result= false;
+
+  if (opt_gtid_deployment_step)
+  {
+    opt_super_readonly= opt_gtid_deployment_step;
+    opt_readonly= opt_gtid_deployment_step;
+  }
+  else
+  {
+    opt_super_readonly= super_read_only;
+    opt_readonly= read_only;
+  }
 
  end_with_read_lock:
   /* Release the lock */

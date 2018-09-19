@@ -1,0 +1,49 @@
+#
+--source include/have_wsrep.inc
+
+--echo #
+--echo # wsrep_certification_rules
+--echo #
+
+--echo # save the initial value
+SET @wsrep_certification_rules_global_saved = @@global.wsrep_certification_rules;
+
+--echo # default
+SELECT @@global.wsrep_certification_rules;
+
+--echo
+--echo # scope
+--error ER_INCORRECT_GLOBAL_LOCAL_VAR
+SELECT @@session.wsrep_certification_rules;
+
+--echo
+--echo # valid values
+SET @@global.wsrep_certification_rules='strict';
+SELECT @@global.wsrep_certification_rules;
+SET @@global.wsrep_certification_rules='optimized';
+SELECT @@global.wsrep_certification_rules;
+SET @@global.wsrep_certification_rules='optimized';
+SELECT @@global.wsrep_certification_rules;
+SET @@global.wsrep_certification_rules=default;
+SELECT @@global.wsrep_certification_rules;
+# numeric value
+SET @@global.wsrep_certification_rules=1;
+SELECT @@global.wsrep_certification_rules;
+
+--echo
+--echo # invalid values
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.wsrep_certification_rules=4;
+SELECT @@global.wsrep_certification_rules;
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.wsrep_certification_rules=NULL;
+SELECT @@global.wsrep_certification_rules;
+--error ER_WRONG_VALUE_FOR_VAR
+SET @@global.wsrep_certification_rules='junk';
+SELECT @@global.wsrep_certification_rules;
+
+--echo
+--echo # restore the initial value
+SET @@global.wsrep_certification_rules = @wsrep_certification_rules_global_saved;
+
+--echo # End of test

@@ -4704,11 +4704,29 @@ my_eof(THD *thd)
   thd->get_stmt_da()->set_eof_status(thd);
 }
 
-#define tmp_disable_binlog(A)       \
-  {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
-  (A)->variables.option_bits&= ~OPTION_BIN_LOG
+#ifdef WITH_WSREP
 
-#define reenable_binlog(A)   (A)->variables.option_bits= tmp_disable_binlog__save_options;}
+  #define tmp_disable_binlog(A)                                               \
+    {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits;  \
+    my_bool tmp_disable_binlog__save_wsrep_on= (A)->variables.wsrep_on;       \
+    (A)->variables.wsrep_on= 0;                                               \
+    (A)->variables.option_bits&= ~OPTION_BIN_LOG
+  
+  #define reenable_binlog(A)                                                  \
+    (A)->variables.wsrep_on= tmp_disable_binlog__save_wsrep_on;               \
+    (A)->variables.option_bits= tmp_disable_binlog__save_options;}
+
+  #define reenable_wsrep(A)    (A)->variables.wsrep_on= tmp_disable_binlog__save_wsrep_on;
+
+#else
+
+  #define tmp_disable_binlog(A)       \
+    {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
+    (A)->variables.option_bits&= ~OPTION_BIN_LOG
+
+  #define reenable_binlog(A)   (A)->variables.option_bits= tmp_disable_binlog__save_options;}
+
+#endif
 
 
 LEX_STRING *
