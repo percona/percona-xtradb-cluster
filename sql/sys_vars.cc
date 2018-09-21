@@ -6258,7 +6258,7 @@ static Sys_var_mybool Sys_wsrep_debug(
        GLOBAL_VAR(wsrep_debug), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_mybool Sys_wsrep_convert_LOCK_to_trx(
-       "wsrep_convert_LOCK_to_trx", "To convert locking sessions "
+       "wsrep_convert_LOCK_to_trx", "To convert locking sessions (deprecated)"
        "into transactions",
        GLOBAL_VAR(wsrep_convert_LOCK_to_trx), 
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
