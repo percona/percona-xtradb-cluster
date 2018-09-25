@@ -1,4 +1,4 @@
-.. _docker:
+.. _pxc.docker-container.running:
 
 ===================================
 Running |PXC| in a Docker Container
