@@ -154,6 +154,10 @@
 #include "item_strfunc.h"               // Item_func_uuid
 #include "handler.h"
 
+#if defined(HAVE_OPENSSL) && !defined(HAVE_YASSL)
+#include <openssl/crypto.h>
+#endif
+
 #ifndef EMBEDDED_LIBRARY
 #include "srv_session.h"
 #endif
@@ -345,6 +349,7 @@ char *opt_keyring_migration_source= NULL;
 char *opt_keyring_migration_destination= NULL;
 ulong opt_keyring_migration_port= 0;
 bool migrate_connect_options= 0;
+uint test_flags= 0;
 #ifndef _WIN32
 bool  opt_log_syslog_include_pid;
 char *opt_log_syslog_facility;
@@ -462,7 +467,7 @@ volatile sig_atomic_t calling_initgroups= 0; /**< Used in SIGSEGV handler. */
 #endif
 const char *timestamp_type_names[]= {"UTC", "SYSTEM", NullS};
 ulong opt_log_timestamps;
-uint mysqld_port, test_flags, select_errors, dropping_tables, ha_open_options;
+uint mysqld_port, select_errors, dropping_tables, ha_open_options;
 uint mysqld_extra_port;
 uint mysqld_port_timeout;
 ulong delay_key_write_options;
@@ -3326,7 +3331,7 @@ int init_common_variables()
   /* TODO: remove this when my_time_t is 64 bit compatible */
   if (!IS_TIME_T_VALID_FOR_TIMESTAMP(server_start_time))
   {
-    sql_print_error("This MySQL server doesn't support dates later then 2038");
+    sql_print_error("This MySQL server doesn't support dates later than 2038");
     return 1;
   }
 
@@ -4169,8 +4174,21 @@ int warn_self_signed_ca()
 static int init_ssl()
 {
 #ifdef HAVE_OPENSSL
-#if !defined(HAVE_YASSL) && (OPENSSL_VERSION_NUMBER < 0x10100000L)
+#ifndef HAVE_YASSL
+  int fips_mode= FIPS_mode();
+  if (fips_mode != 0)
+  {
+    /* FIPS is enabled, Log warning and Disable it now */
+    sql_print_warning(
+        "Percona XtraDB Cluster cannot operate under OpenSSL FIPS mode."
+        " Disabling FIPS.");
+    FIPS_mode_set(0);
+  }
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   CRYPTO_malloc_init();
+#else /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+  OPENSSL_malloc_init();
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
 #endif
   ssl_start();
 #ifndef EMBEDDED_LIBRARY
@@ -4197,8 +4215,8 @@ static int init_ssl()
                                           opt_ssl_crl, opt_ssl_crlpath, ssl_ctx_flags);
     DBUG_PRINT("info",("ssl_acceptor_fd: 0x%lx", (long) ssl_acceptor_fd));
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-    ERR_remove_state(0);
-#endif
+    ERR_remove_thread_state(0);
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
     if (!ssl_acceptor_fd)
     {
       /*
@@ -4329,8 +4347,8 @@ static int generate_server_uuid()
 
   strncpy(server_uuid, uuid.c_ptr(), sizeof(server_uuid));
   DBUG_EXECUTE_IF("server_uuid_deterministic",
-                  strncpy(server_uuid, "00000000-1111-0000-1111-000000000000",
-                          sizeof(server_uuid)););
+                  memcpy(server_uuid, "00000000-1111-0000-1111-000000000000",
+                         UUID_LENGTH););
   server_uuid[UUID_LENGTH]= '\0';
   return 0;
 }
@@ -5284,6 +5302,10 @@ a file name for --log-bin-index option", opt_binlog_index_name);
   {
     mysql_bin_log.purge_logs_maximum_number(max_binlog_files);
   }
+  if (opt_bin_log && binlog_space_limit)
+  {
+    mysql_bin_log.purge_logs_by_size(true);
+  }
 #endif
 
   if (opt_myisam_log)
@@ -6032,6 +6054,8 @@ int mysqld_main(int argc, char **argv)
       grant_init(opt_noacl))
   {
     abort_loop= true;
+    sql_print_error("Fatal error: Failed to initialize ACL/grant/time zones "
+                    "structures or failed to remove temporary table files.");
 
     delete_pid_file(MYF(MY_WME));
 
@@ -6593,6 +6617,13 @@ int handle_early_options()
       }
       opt_bootstrap= TRUE;
     }
+
+    if (opt_debugging)
+    {
+      /* Allow break with SIGINT, no core or stack trace */
+      test_flags|= TEST_SIGINT | TEST_NO_STACKTRACE;
+      test_flags&= ~TEST_CORE_ON_SIGNAL;
+    }
   }
 
   // Swap with an empty vector, i.e. delete elements and free allocated space.
@@ -6779,6 +6810,16 @@ struct my_option my_long_early_options[]=
    "Port number to use for connection.",
    &opt_keyring_migration_port, &opt_keyring_migration_port,
    0, GET_ULONG, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+  {"core-file", OPT_WANT_CORE,
+   "Write core on errors.",
+   0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0},
+  {"skip-stack-trace", OPT_SKIP_STACK_TRACE,
+   "Don't print a stack trace on failure.", 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0,
+   0, 0, 0, 0},
+  {"gdb", 0,
+   "Set up signals usable for debugging.",
+   &opt_debugging, &opt_debugging,
+   0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
   { 0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -6852,8 +6893,6 @@ struct my_option my_long_options[]=
   {"console", OPT_CONSOLE, "Write error output on screen; don't remove the console window on windows.",
    &opt_console, &opt_console, 0, GET_BOOL, NO_ARG, 0, 0, 0,
    0, 0, 0},
-  {"core-file", OPT_WANT_CORE, "Write core on errors.", 0, 0, 0, GET_NO_ARG,
-   NO_ARG, 0, 0, 0, 0, 0, 0},
   /* default-storage-engine should have "MyISAM" as def_value. Instead
      of initializing it here it is done in init_common_variables() due
      to a compiler bug in Sun Studio compiler. */
@@ -6889,10 +6928,6 @@ struct my_option my_long_options[]=
    0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
   /* We must always support the next option to make scripts like mysqltest
      easier to do */
-  {"gdb", 0,
-   "Set up signals usable for debugging.",
-   &opt_debugging, &opt_debugging,
-   0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
 #if defined(HAVE_LINUX_LARGE_PAGES) || defined (HAVE_SOLARIS_LARGE_PAGES)
   {"super-large-pages", 0, "Enable support for super large pages.",
    &opt_super_large_pages, &opt_super_large_pages, 0,
@@ -7048,9 +7083,6 @@ struct my_option my_long_options[]=
   {"skip-slave-start", 0,
    "If set, slave is not autostarted.", &opt_skip_slave_start,
    &opt_skip_slave_start, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-  {"skip-stack-trace", OPT_SKIP_STACK_TRACE,
-   "Don't print a stack trace on failure.", 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0,
-   0, 0, 0, 0},
 #if defined(_WIN32) && !defined(EMBEDDED_LIBRARY)
   {"slow-start-timeout", 0,
    "Maximum number of milliseconds that the service control manager should wait "
@@ -7424,7 +7456,9 @@ extern "C" void *start_wsrep_THD(void *arg)
   delete thd;
 
   my_thread_end();
-  ERR_remove_state(0);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  ERR_remove_thread_state(0);
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
   my_thread_exit(0);
 
   return(NULL);
@@ -8609,7 +8643,7 @@ static int mysql_init_variables(void)
   kill_in_progress= 0;
   cleanup_done= 0;
   server_id_supplied= false;
-  test_flags= select_errors= dropping_tables= ha_open_options=0;
+  select_errors= dropping_tables= ha_open_options=0;
   slave_open_temp_tables.atomic_set(0);
   opt_endinfo= using_udf_functions= 0;
   opt_using_transactions= 0;
@@ -9477,12 +9511,6 @@ static int get_options(int *argc_ptr, char ***argv_ptr)
   if (!my_enable_symlinks)
     have_symlink= SHOW_OPTION_DISABLED;
 
-  if (opt_debugging)
-  {
-    /* Allow break with SIGINT, no core or stack trace */
-    test_flags|= TEST_SIGINT | TEST_NO_STACKTRACE;
-    test_flags&= ~TEST_CORE_ON_SIGNAL;
-  }
   /* Set global MyISAM variables from delay_key_write_options */
   fix_delay_key_write(0, 0, OPT_GLOBAL);
 

@@ -100,6 +100,8 @@ INSERT INTO global_suppressions VALUES
  ("Forcing close of thread"),
 
  ("innodb-page-size has been changed"),
+ ("Percona Server cannot operate under OpenSSL FIPS mode"),
+ ("Percona XtraDB Cluster cannot operate under OpenSSL FIPS mode"),
 
  /*
    Due to timing issues, it might be that this warning
@@ -280,7 +282,28 @@ INSERT INTO global_suppressions VALUES
  ("The member with address .* has already sent the stable set. Therefore discarding the second message."),
 
  /*
-   Galera suppressions 
+   We do have offline members on some Group Replication tests, XCom
+   will throw warnings when trying to connect to them.
+ */
+ ("Connection to socket .* failed with error .*.*"),
+ ("select - Timeout! Cancelling connection..."),
+ ("connect - Error connecting .*"),
+ ("\\[GCS\\] The member is already leaving or joining a group."),
+ ("\\[GCS\\] The member is leaving a group without being on one."),
+ ("\\[GCS\\] Processing new view on handler without a valid group configuration."),
+ ("\\[GCS\\] Error on opening a connection to localhost:.* on local port: .*."),
+ ("\\[GCS\\] Error pushing message into group communication engine."),
+ ("\\[GCS\\] Message cannot be sent because the member does not belong to a group."),
+ ("\\[GCS\\] Automatically adding IPv4 localhost address to the whitelist. It is mandatory that it is added."),
+ ("Slave SQL for channel 'group_replication_recovery': ... The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state.*"),
+ ("Member with address .* has become unreachable."),
+ ("This server is not able to reach a majority of members in the group.*"),
+ ("Member with address .* is reachable again."),
+ ("The member has resumed contact with a majority of the members in the group.*"),
+ ("Members removed from the group.*"),
+
+ /*
+   Galera suppressions
  */
  ("WSREP:*down context*"),
  ("WSREP: Failed to send state UUID:*"),
@@ -347,31 +370,6 @@ INSERT INTO global_suppressions VALUES
  ("Difficult to find free blocks in the buffer pool.*"),
 
  ("InnoDB High Priority being used"),
-  /*
-   On slow runs (valgrind) the message may be sent twice.
-  */
- ("The member with address .* has already sent the stable set. Therefore discarding the second message."),
-
- /*
-   We do have offline members on some Group Replication tests, XCom
-   will throw warnings when trying to connect to them.
- */
- ("Connection to socket .* failed with error .*.*"),
- ("select - Timeout! Cancelling connection..."),
- ("connect - Error connecting .*"),
- ("\\[GCS\\] The member is already leaving or joining a group."),
- ("\\[GCS\\] The member is leaving a group without being on one."),
- ("\\[GCS\\] Processing new view on handler without a valid group configuration."),
- ("\\[GCS\\] Error on opening a connection to localhost:.* on local port: .*."),
- ("\\[GCS\\] Error pushing message into group communication engine."),
- ("\\[GCS\\] Message cannot be sent because the member does not belong to a group."),
- ("\\[GCS\\] Automatically adding IPv4 localhost address to the whitelist. It is mandatory that it is added."),
- ("Slave SQL for channel 'group_replication_recovery': ... The slave coordinator and worker threads are stopped, possibly leaving data in inconsistent state.*"),
- ("Member with address .* has become unreachable."),
- ("This server is not able to reach a majority of members in the group.*"),
- ("Member with address .* is reachable again."),
- ("The member has resumed contact with a majority of the members in the group.*"),
- ("Members removed from the group.*"),
 
  ("THE_LAST_SUPPRESSION")||
 

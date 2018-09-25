@@ -249,7 +249,7 @@ PS_VERSION="$MYSQL_VERSION-$PERCONA_SERVER_EXTENSION"
 
 # Note: WSREP_INTERFACE_VERSION act as compatibility check between wsrep-plugin
 # and galera plugin so we include it as part of our component.
-WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
+WSREP_VERSION="$(grep WSREP_INTERFACE_VERSION wsrep/src/wsrep_api.h | cut -d '"' -f2).$(grep 'SET(WSREP_PATCH_VERSION'  "cmake/wsrep.cmake" | cut -d '"' -f2)"
 
 if [[ $COPYGALERA -eq 0 ]];then
     #GALERA_REVISION="$(cd "$SOURCEDIR/percona-xtradb-cluster-galera"; test -r GALERA-REVISION && cat GALERA-REVISION)"
@@ -299,13 +299,6 @@ COMMON_FLAGS="-DPERCONA_INNODB_VERSION=$PERCONA_SERVER_EXTENSION"
 export CFLAGS=" $COMMON_FLAGS -static-libgcc $MACHINE_SPECS_CFLAGS ${CFLAGS:-}"
 export CXXFLAGS=" $COMMON_FLAGS $MACHINE_SPECS_CFLAGS ${CXXFLAGS:-}"
 export MAKE_JFLAG="${MAKE_JFLAG:--j$PROCESSORS}"
-
-export DEBIAN_VERSION="$(lsb_release -sc)"
-echo $DEBIAN_VERSION
-if [[ "$CMAKE_BUILD_TYPE" == "Debug" ]] && ([[ "$DEBIAN_VERSION" == "yakkety" ]] || [[ "$DEBIAN_VERSION" == "zesty" ]] || [[ "$DEBIAN_VERSION" == "stretch" ]] || [[ "$DEBIAN_VERSION" == "artful" ]] || [[ "$DEBIAN_VERSION" == "bionic" ]]); then
-    export CFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
-    export CXXFLAGS=" $CFLAGS -fno-strict-aliasing -Wno-unused-parameter -Wno-sign-compare -Wno-error=deprecated-declarations -Wno-error=nonnull-compare -Wno-error=shift-negative-value -Wno-error=misleading-indentation -Wno-error=literal-suffix -Wno-error=virtual-move-assign"
-fi
 
 #
 # Test jemalloc directory

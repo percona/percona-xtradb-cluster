@@ -17,11 +17,10 @@
 #define WSREP_MYSQLD_H
 
 #include "mysqld.h"
-#include "log.h"
+#include "wsrep_api.h"
 typedef struct st_mysql_show_var SHOW_VAR;
 #include "query_options.h"
 #include "rpl_gtid.h"
-#include "../wsrep/wsrep_api.h"
 
 #define WSREP_UNDEFINED_TRX_ID ULLONG_MAX
 
@@ -69,6 +68,11 @@ enum wsrep_consistency_check_mode {
 
 const char* wsrep_get_wsrep_status(wsrep_status status);
 
+enum enum_wsrep_certification_rules {
+    WSREP_CERTIFICATION_RULES_STRICT,
+    WSREP_CERTIFICATION_RULES_OPTIMIZED
+};
+
 // Global wsrep parameters
 extern wsrep_t*    wsrep;
 
@@ -97,6 +101,7 @@ extern ulong       wsrep_max_ws_size;
 extern ulong       wsrep_max_ws_rows;
 extern const char* wsrep_notify_cmd;
 extern my_bool     wsrep_certify_nonPK;
+extern ulong       wsrep_certification_rules;
 extern long        wsrep_max_protocol_version;
 extern long        wsrep_protocol_version;
 extern ulong       wsrep_forced_binlog_format;
@@ -257,10 +262,10 @@ extern wsrep_seqno_t wsrep_locked_seqno;
 /* use xxxxxx_NNULL macros when thd pointer is guaranteed to be non-null to
  * avoid compiler warnings (GCC 6 and later) */
 #define WSREP_NNULL(thd) \
-  (WSREP_ON && wsrep && thd->variables.wsrep_on)
+  (WSREP_ON && (wsrep != NULL) && thd->variables.wsrep_on)
 
 #define WSREP(thd) \
-  (thd && WSREP_NNULL(thd))
+  ((thd != NULL) && WSREP_NNULL(thd))
 
 #define WSREP_CLIENT(thd) \
   (WSREP(thd) && thd->wsrep_client_thread)
@@ -389,8 +394,10 @@ extern PSI_thread_key key_THREAD_wsrep_applier;
 extern PSI_thread_key key_THREAD_wsrep_rollbacker;
 #endif /* HAVE_PSI_INTERFACE */
 struct TABLE_LIST;
+class Alter_info;
 int wsrep_to_isolation_begin(THD *thd, const char *db_, const char *table_,
-                             const TABLE_LIST* table_list);
+                             const TABLE_LIST* table_list,
+                             Alter_info* alter_info = NULL);
 void wsrep_to_isolation_end(THD *thd);
 void wsrep_cleanup_transaction(THD *thd);
 int wsrep_to_buf_helper(

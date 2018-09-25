@@ -1099,24 +1099,31 @@ void thd_inc_row_count(THD *thd)
   thd->get_stmt_da()->inc_current_row_for_condition();
 }
 
-extern "C"
-void increment_thd_innodb_stats(THD* thd,
-                                unsigned long long trx_id,
-                                long io_reads,
-                                long long  io_read,
-                                long      io_reads_wait_timer,
-                                long      lock_que_wait_timer,
-                                long      que_wait_timer,
-                                long      page_access)
+extern "C" void thd_report_innodb_stat(THD *thd, unsigned long long trx_id,
+                                       enum mysql_trx_stat_type type,
+                                       unsigned long long       value)
 {
-  thd->innodb_was_used=               true;
-  thd->innodb_trx_id=                 trx_id;
-  thd->innodb_io_reads+=              io_reads;
-  thd->innodb_io_read+=               io_read;
-  thd->innodb_io_reads_wait_timer+=   io_reads_wait_timer;
-  thd->innodb_lock_que_wait_timer+=   lock_que_wait_timer;
-  thd->innodb_innodb_que_wait_timer+= que_wait_timer;
-  thd->innodb_page_access+=           page_access;
+  thd->mark_innodb_used(trx_id);
+  switch (type)
+  {
+    case MYSQL_TRX_STAT_IO_READ_BYTES:
+      DBUG_ASSERT(value > 0);
+      thd->innodb_io_read+= value;
+      thd->innodb_io_reads++;
+      break;
+    case MYSQL_TRX_STAT_IO_READ_WAIT_USECS:
+      thd->innodb_io_reads_wait_timer+= value;
+      break;
+    case MYSQL_TRX_STAT_LOCK_WAIT_USECS:
+      thd->innodb_lock_que_wait_timer+= value;
+      break;
+    case MYSQL_TRX_STAT_INNODB_QUEUE_WAIT_USECS:
+      thd->innodb_innodb_que_wait_timer+= value;
+      break;
+    case MYSQL_TRX_STAT_ACCESS_PAGE_ID:
+      thd->access_distinct_page(value);
+      break;
+  }
 }
 
 extern "C"
@@ -2887,6 +2894,7 @@ void THD::cleanup_after_query()
   if (rli_slave)
     rli_slave->cleanup_after_query();
 #endif
+  approx_distinct_pages.clear();
 
 #ifdef WITH_WSREP
   wsrep_sync_wait_gtid= WSREP_GTID_UNDEFINED;
@@ -4803,6 +4811,7 @@ void THD::clear_slow_extended()
   innodb_io_reads_wait_timer=   0;
   innodb_lock_que_wait_timer=   0;
   innodb_innodb_que_wait_timer= 0;
+  approx_distinct_pages.clear();
   innodb_page_access=           0;
   query_plan_flags=             QPLAN_NONE;
   query_plan_fsort_passes=      0;
@@ -5527,6 +5536,18 @@ void THD::rpl_detach_engine_ha_data()
 #endif
 };
 
+void THD::rpl_reattach_engine_ha_data()
+{
+#ifdef HAVE_REPLICATION
+  Relay_log_info *rli =
+      is_binlog_applier() ? rli_fake : (slave_thread ? rli_slave : NULL);
+
+  DBUG_ASSERT(!rli_fake || !rli_fake->is_engine_ha_data_detached);
+  DBUG_ASSERT(!rli_slave || !rli_slave->is_engine_ha_data_detached);
+
+  if (rli) rli->reattach_engine_ha_data(this);
+#endif
+}
 
 bool THD::rpl_unflag_detached_engine_ha_data()
 {

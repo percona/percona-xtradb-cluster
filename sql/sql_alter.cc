@@ -324,7 +324,7 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   {
     // Rename of table
     TABLE_LIST tmp_table;
-    memset(static_cast<void*>(&tmp_table), 0, sizeof(tmp_table));
+
     tmp_table.table_name= lex->name.str;
     tmp_table.db= select_lex->db;
     tmp_table.grant.privilege= priv;
@@ -508,9 +508,10 @@ bool Sql_cmd_alter_table::execute(THD *thd)
   if ((!thd->is_current_stmt_binlog_format_row() ||
        !find_temporary_table(thd, first_table)))
     {
-      WSREP_TO_ISOLATION_BEGIN(((lex->name.str) ? select_lex->db : NULL),
-			       ((lex->name.str) ? lex->name.str : NULL),
-			       first_table);
+      WSREP_TO_ISOLATION_BEGIN_ALTER(((lex->name.str) ? select_lex->db : NULL),
+                                     ((lex->name.str) ? lex->name.str : NULL),
+                                     first_table,
+                                     &alter_info);
     }
 #endif /* WITH_WSREP */
 

@@ -5,6 +5,9 @@ wsrep_sst_method=xtrabackup-v2
 wsrep_sst_auth="root:"
 wsrep_debug=ON
 
+[xtrabackup]
+xtrabackup-plugin-dir=@ENV.XB_PLUGIN_DIR
+
 [sst]
 encrypt=3
 tkey=@ENV.MYSQL_TEST_DIR/std_data/galera-key.pem
@@ -14,11 +17,11 @@ ssl-dhparams=@ENV.MYSQL_TEST_DIR/std_data/dhparams.pem
 [mysqld.1]
 wsrep_provider_options='base_port=@mysqld.1.#galera_port;gcache.size=1;pc.ignore_sb=true'
 early_plugin_load=@ENV.KEYRING_PLUGIN
-keyring_file_data=@ENV.MYSQL_TEST_DIR/tmp/keyring.1
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.1/keyring.1
 server_id=1
 
 [mysqld.2]
 wsrep_provider_options='base_port=@mysqld.2.#galera_port;gcache.size=1;pc.ignore_sb=true'
 early_plugin_load=@ENV.KEYRING_PLUGIN
-keyring_file_data=@ENV.MYSQL_TEST_DIR/tmp/keyring.2
+keyring_file_data=@ENV.MYSQL_TMP_DIR/mysqld.2/keyring.2
 server_id=2
