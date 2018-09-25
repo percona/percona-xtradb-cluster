@@ -97,6 +97,10 @@ rst_prolog = '''
 
 .. _MySQL: https://www.mysql.com/
 
+.. |Percona Server| replace:: Percona Server
+
+.. |TokuDB| replace:: TokuDB
+
 .. |PMM| replace:: Percona Monitoring and Management
 
 .. _PMM: https://www.percona.com/software/database-tools/percona-monitoring-and-management
@@ -164,6 +168,8 @@ rst_prolog = '''
 '''
 
 extlinks = {
+  'psbug': ('https://jira.percona.com/browse/PS-%s', '#'),
+  'tdbbug': ('https://jira.percona.com/browse/TDB-%s', '#'),
   'bug': ('https://bugs.launchpad.net/percona-xtradb-cluster/+bug/%s', '#'),
   'mysqlbug': ('http://bugs.mysql.com/bug.php?id=%s', '#'),
   'githubbug': ('https://github.com/codership/galera/issues/%s', '#'),

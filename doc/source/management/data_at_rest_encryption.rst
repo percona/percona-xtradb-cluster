@@ -39,7 +39,7 @@ encrypting `other tablespaces <https://www.percona.com/doc/percona-server/LATEST
 File-per-tablespace and General tablespace encryption are table/tablespace
 specific features and are enabled on object level through DDL:
 
-.. code-block:: mysql
+.. code-block:: guess
 
    CREATE TABLE t1 (c1 INT, PRIMARY KEY pk(c1)) ENCRYPTION=’Y’;
    CREATE TABLESPACE foo ADD DATAFILE 'foo.ibd' ENCRYPTION='Y';
@@ -93,7 +93,7 @@ Usage
 *****
 
 Prior to |PXC| :rn:`5.7.22-29.26` DONOR node had to send keyring to JOINER,
-because |xtabackup| backs up encrypted tablespaces in encrypted fashion and in
+because |xtrabackup| backs up encrypted tablespaces in encrypted fashion and in
 order for JOINER to read these encrypted tablespaces it needs the same
 encryption key that was used for its encryption on DONOR. This restriction has
 been relaxed in |PXC| 5.7.22 and now |xtrabackup| re-encrypts the data using
