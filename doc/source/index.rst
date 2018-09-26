@@ -112,8 +112,8 @@ PXC Security
    security/secure-network
    security/encrypt-traffic
 
-User's Manual
-=============
+User\'s Manual
+================================================================================
 
 .. toctree::
    :maxdepth: 1
@@ -129,6 +129,17 @@ User's Manual
    manual/gcache_record-set_cache_difference
    manual/performance_schema_instrumentation
    management/data_at_rest_encryption
+
+Flexibility
+================================================================================
+
+.. toctree::
+   :maxdepth: 1
+   
+   flexibility/binlogging_replication_improvements
+   flexibility/innodb_fts_improvements
+   diagnostics/innodb_fragmentation_count
+   performance/aio_page_requests
 
 How-tos
 =======
