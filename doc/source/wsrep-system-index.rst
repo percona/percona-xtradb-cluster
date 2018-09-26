@@ -223,6 +223,7 @@ Specifies the name of the cluster and should be identical on all nodes.
 
 .. variable:: wsrep_convert_lock_to_trx
 
+   :version 5.7.23-31.31: Variable deprecated
    :cli: ``--wsrep-convert-lock-to-trx``
    :conf: Yes
    :scope: Global
