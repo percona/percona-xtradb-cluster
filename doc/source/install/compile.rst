@@ -102,7 +102,8 @@ To compile |PXC| from source code:
 
    .. code-block:: bash
 
-      $ git submodule init && git submodule update
+      $ cd percona-xtradb-cluster-galera
+      $ git submodule init wsrep/src && git submodule update wsrep/src
 
 #. Run the build script :file:`./build-ps/build-binary.sh`.
    By default, it will build into the current directory,
