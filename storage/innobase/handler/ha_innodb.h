@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2000, 2018, Oracle and/or its affiliates. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -17,6 +17,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 
 /* The InnoDB handler: the interface between MySQL and InnoDB. */
+
+#ifdef WITH_WSREP
+#include <wsrep_mysqld.h>
+#endif /* WITH_WSREP */
 
 /** "GEN_CLUST_INDEX" is the name reserved for InnoDB default
 system clustered index when there is no primary key. */
@@ -92,7 +96,7 @@ public:
 
 	uint max_supported_key_length() const;
 
-	uint max_supported_key_part_length() const;
+	uint max_supported_key_part_length(HA_CREATE_INFO *create_info) const;
 
 	const key_map* keys_to_use_for_scanning();
 
@@ -438,7 +442,7 @@ public:
 	/* @} */
 
 #ifdef WITH_WSREP
-	int wsrep_append_keys(THD *thd, bool shared,
+	int wsrep_append_keys(THD *thd, wsrep_key_type key_type,
 				  const uchar* record0, const uchar* record1);
 #endif /* WITH_WSREP */
 
@@ -852,6 +856,13 @@ public:
 		char*           norm_name,
 		const char*     name,
 		ibool           set_lower_case);
+
+	/** If encryption is requested, check for master key availability
+	and set the encryption flag in table flags
+	@param[in,out]	table	table object
+	@return on success DB_SUCCESS else DB_UNSPPORTED on failure */
+
+	dberr_t	enable_encryption(dict_table_t*	table);
 
 private:
 	/** Parses the table name into normal name and either temp path or

@@ -55,6 +55,9 @@ Created 4/20/1996 Heikki Tuuri
 #include "m_string.h"
 #include "gis0geo.h"
 
+#ifdef WITH_WSREP
+#include "wsrep_mysqld.h"
+#endif /* WITH_WSREP */
 /*************************************************************************
 IMPORTANT NOTE: Any operation that generates redo MUST check that there
 is enough space in the redo log before for that operation. This is
@@ -932,7 +935,7 @@ dberr_t wsrep_append_foreign_key(trx_t *trx,
 				 const rec_t*		clust_rec,
 				 dict_index_t*		clust_index,
 				 ibool			referenced,
-				 ibool			shared);
+				 wsrep_key_type		key_type);
 #endif /* WITH_WSREP */
 
 /** Fill virtual column information in cascade node for the child table.
@@ -1427,7 +1430,7 @@ row_ins_foreign_check_on_constraint(
 					foreign,
 					clust_rec,
 					clust_index,
-					FALSE, FALSE);
+					FALSE, WSREP_KEY_EXCLUSIVE);
 	if (err != DB_SUCCESS) {
 		ib::warn() << "WSREP: foreign key append failed: " << err;
 	} else
@@ -1644,7 +1647,8 @@ row_ins_check_foreign_constraint(
 
 	if (check_table == NULL
 	    || check_table->ibd_file_missing
-	    || check_index == NULL) {
+	    || check_index == NULL
+	    || fil_space_is_being_truncated(check_table->space)) {
 
 		if (!srv_read_only_mode && check_ref) {
 			FILE*	ef = dict_foreign_err_file;
@@ -1666,7 +1670,8 @@ row_ins_check_foreign_constraint(
 			ut_print_name(ef, trx,
 				      foreign->referenced_table_name);
 			fputs("\nor its .ibd file does"
-			      " not currently exist!\n", ef);
+			      " not currently exist!, or"
+			      " is undergoing truncate!\n", ef);
 			mutex_exit(&dict_foreign_err_mutex);
 
 			err = DB_NO_REFERENCED_ROW;
@@ -1780,13 +1785,26 @@ row_ins_check_foreign_constraint(
 					err = DB_SUCCESS;
 
 #ifdef WITH_WSREP
+					wsrep_key_type key_type = WSREP_KEY_EXCLUSIVE;
+					if (upd_node != NULL) {
+						key_type = WSREP_KEY_SHARED;
+					} else {
+						switch (wsrep_certification_rules) {
+						case WSREP_CERTIFICATION_RULES_STRICT:
+							key_type = WSREP_KEY_EXCLUSIVE;
+							break;
+						case WSREP_CERTIFICATION_RULES_OPTIMIZED:
+							key_type = WSREP_KEY_SEMI;
+							break;
+						}
+					}
 					err = wsrep_append_foreign_key(
 						thr_get_trx(thr),
 						foreign,
 						rec,
 						check_index,
 						check_ref,
-						(upd_node) ? TRUE : FALSE);
+						key_type);
 #endif /* WITH_WSREP */
 
 					goto end_scan;
@@ -1896,7 +1914,23 @@ do_possible_lock_wait:
 		trx_kill_blocking(trx);
 
 		lock_wait_suspend_thread(thr);
+#ifdef WITH_WSREP
+		ut_ad(!trx_mutex_own(trx));
+		switch (trx->error_state) {
+		case DB_DEADLOCK:
+			if (wsrep_debug) {
+				ib::info() <<
+				"WSREP: innodb trx state changed during wait "
+				<< " trx: " << trx->id << " with error_state: "
+				<< trx->error_state << " err: " << err;
+			}
+			err = trx->error_state;
+			break;
+		default:
+			break;
+		}
 
+#endif /* WITH_WSREP */
 		thr->lock_state = QUE_THR_LOCK_NOLOCK;
 
 		DBUG_PRINT("to_be_dropped",
@@ -1916,6 +1950,7 @@ exit_func:
 		mem_heap_free(heap);
 	}
 
+	DEBUG_SYNC_C("finished_scanning_index");
 	DBUG_RETURN(err);
 }
 

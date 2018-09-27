@@ -1,4 +1,4 @@
-/* Copyright (c) 2002, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -3315,7 +3315,16 @@ void subselect_indexsubquery_engine::copy_ref_key(bool *require_scan,
         - neither can it be outer, because this case is
         separately managed in subselect_hash_sj_engine::exec().
       */
-      DBUG_ASSERT(engine_type() != HASH_SJ_ENGINE);
+      if (engine_type() == HASH_SJ_ENGINE)
+      {
+        // See Bug#86975 . In 8.0 there is no problem.
+        my_printf_error(ER_UNKNOWN_ERROR,
+                        "Error when materializing subquery; "
+                        "please use \"SET OPTIMIZER_SWITCH="
+                        "'MATERIALIZATION=OFF'\".", MYF(0));
+        *convert_error= true;
+        DBUG_VOID_RETURN;
+      }
 
       const bool *cond_guard= tab->ref().cond_guards[part_no];
 
@@ -4013,19 +4022,15 @@ void subselect_hash_sj_engine::cleanup()
 {
   DBUG_ENTER("subselect_hash_sj_engine::cleanup");
   is_materialized= false;
-  if (result != NULL)
-    result->cleanup(); /* Resets the temp table as well. */
+  result->cleanup(); /* Resets the temp table as well. */
   THD * const thd= item->unit->thd;
   DEBUG_SYNC(thd, "before_index_end_in_subselect");
-  if (tab != NULL)
-  {
-    TABLE *const table= tab->table();
-    if (table->file->inited)
-      table->file->ha_index_end();  // Close the scan over the index
-    free_tmp_table(thd, table);
-    // Note that tab->qep_cleanup() is not called
-    tab= NULL;
-  }
+  TABLE *const table= tab->table();
+  if (table->file->inited)
+    table->file->ha_index_end();  // Close the scan over the index
+  free_tmp_table(thd, table);
+  // Note that tab->qep_cleanup() is not called
+  tab= NULL;
   materialize_engine->cleanup();
   DBUG_VOID_RETURN;
 }

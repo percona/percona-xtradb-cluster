@@ -265,6 +265,7 @@ our $opt_manual_ddd;
 our $opt_manual_debug;
 our $opt_debugger;
 our $opt_client_debugger;
+our $opt_gterm;
 
 my $config; # The currently running config
 my $current_config_name; # The currently running config file template
@@ -1209,6 +1210,8 @@ sub command_line_setup {
              'debug-common'             => \$opt_debug_common,
              'debug-server'             => \$opt_debug_server,
              'gdb'                      => \$opt_gdb,
+             # For using gnome-terminal when using --gdb option
+             'gterm'                    => \$opt_gterm,
              'lldb'                     => \$opt_lldb,
              'client-gdb'               => \$opt_client_gdb,
              'client-lldb'              => \$opt_client_lldb,
@@ -2542,17 +2545,20 @@ sub read_plugin_defs($)
       if ($plug_names) {
 	my $lib_name= basename($plugin);
 	my $load_var= "--plugin_load=";
+	my $early_load_var="--early-plugin_load=";
 	my $load_add_var= "--plugin_load_add=";
 	my $load_var_with_path = "--plugin_load=";
 	my $load_add_var_with_path = "--plugin_load_add=";
 	my $semi= '';
 	foreach my $plug_name (split (',', $plug_names)) {
 	  $load_var .= $semi . "$plug_name=$lib_name";
+	  $early_load_var .= $semi . "$plug_name=$lib_name";
 	  $load_add_var .= $semi . "$plug_name=$lib_name";
 	  $load_var_with_path .= $semi . "$plug_name=$plug_dir/$lib_name";
 	  $load_add_var_with_path .= $semi . "$plug_name=$plug_dir/$lib_name";
 	  $semi= ';';
 	}
+	$ENV{$plug_var.'_EARLY_LOAD'}=$early_load_var;
 	$ENV{$plug_var.'_LOAD'}= $load_var;
 	$ENV{$plug_var.'_LOAD_ADD'}= $load_add_var;
 	$ENV{$plug_var.'_LOAD_PATH'}= $load_var_with_path;
@@ -3724,6 +3730,12 @@ sub have_wsrep() {
   return defined $wsrep_on
 }
 
+sub wsrep_is_bootstrap_server($) {
+  my $mysqld= shift;
+  return $mysqld->if_exist('wsrep_cluster_address') &&
+    ($mysqld->value('wsrep_cluster_address') eq "gcomm://" ||
+     $mysqld->value('wsrep_cluster_address') eq "'gcomm://'");
+}
 
 sub check_wsrep_support() {
   if (have_wsrep())
@@ -4296,13 +4308,8 @@ sub wait_wsrep_ready($$) {
 
   for (my $loop= 1; $loop <= $loops; $loop++)
   {
-    if (run_query_output($mysqld, $query, $outfile) != 0)
-    {
-      $tinfo->{logfile}= "WSREP error while trying to determine node state";
-      return 0;
-    }
-
-    if (mtr_grab_file($outfile) =~ /^ON/)
+    if (run_query_output($mysqld, $query, $outfile) == 0 &&
+        mtr_grab_file($outfile) =~ /^ON/)
     {
       unlink($outfile);
       return 1;
@@ -6643,6 +6650,22 @@ sub start_servers($) {
       # Save this test case information, so next can examine it
       $mysqld->{'started_tinfo'}= $tinfo;
 
+      # Wait until server's uuid is generated. This avoids that master and
+      # slave generate the same UUID sporadically.
+      sleep_until_file_created("$datadir/auto.cnf", $opt_start_timeout,
+                               $mysqld->{'proc'});
+
+      # If wsrep is on, we need to wait until the first
+      # server starts and bootstraps the cluster before
+      # starting other servers.
+      if (have_wsrep() && wsrep_is_bootstrap_server($mysqld))
+      {
+        mtr_verbose("WSREP waiting for first server to bootstrap cluster");
+        if (!wait_wsrep_ready($tinfo, $mysqld))
+        {
+          return 1;
+        }
+      }
     }
 
   }
@@ -7008,9 +7031,18 @@ sub gdb_arguments {
   }
 
   $$args= [];
-  mtr_add_arg($$args, "-title");
-  mtr_add_arg($$args, "$type");
-  mtr_add_arg($$args, "-e");
+
+
+  if ($opt_gterm) {
+    mtr_add_arg($$args, "--title");
+    mtr_add_arg($$args, "$type");
+    mtr_add_arg($$args, "--wait");
+    mtr_add_arg($$args, "--");
+  } else {
+    mtr_add_arg($$args, "-title");
+    mtr_add_arg($$args, "$type");
+    mtr_add_arg($$args, "-e");
+  }
 
   if ( $exe_libtool )
   {
@@ -7023,7 +7055,11 @@ sub gdb_arguments {
   mtr_add_arg($$args, "$gdb_init_file");
   mtr_add_arg($$args, "$$exe");
 
-  $$exe= "xterm";
+  if ($opt_gterm) {
+    $$exe= "gnome-terminal";
+  } else {
+    $$exe= "xterm";
+  }
 }
 
  #

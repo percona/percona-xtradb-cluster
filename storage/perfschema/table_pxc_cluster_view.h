@@ -29,7 +29,7 @@
 #include "table_helper.h"
 #include "pfs_variable.h"
 #include "pfs_buffer_container.h"
-#include "../wsrep/wsrep_api.h"
+#include "wsrep_api.h"
 
 /**
   @addtogroup Performance_schema_tables

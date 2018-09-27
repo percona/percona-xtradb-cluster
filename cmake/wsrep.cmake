@@ -17,7 +17,7 @@
 # so WSREP_VERSION is produced regardless
 
 # Set the patch version
-SET(WSREP_PATCH_VERSION "26")
+SET(WSREP_PATCH_VERSION "31")
 # PXC needs this because it still support execvpe approach for forking
 # while initiating SST.
 INCLUDE(CheckFunctionExists)
@@ -32,7 +32,7 @@ ENDIF()
 
 # Obtain wsrep API version
 EXECUTE_PROCESS(
-  COMMAND sh -c "grep WSREP_INTERFACE_VERSION ${MySQL_SOURCE_DIR}/wsrep/wsrep_api.h | cut -d '\"' -f 2"
+  COMMAND sh -c "grep WSREP_INTERFACE_VERSION ${MySQL_SOURCE_DIR}/wsrep/src/wsrep_api.h | cut -d '\"' -f 2"
   OUTPUT_VARIABLE WSREP_API_VERSION
   RESULT_VARIABLE RESULT
 )

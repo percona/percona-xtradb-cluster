@@ -1809,13 +1809,22 @@ static Sys_var_ulong Sys_expire_logs_days(
        GLOBAL_VAR(expire_logs_days),
        CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 99), DEFAULT(0), BLOCK_SIZE(1));
 
+static Sys_var_ulonglong Sys_binlog_space_limit(
+       "binlog_space_limit", "Maximum space to use for all binary logs. "
+       "Default is 0, this feature is disabled.",
+       READ_ONLY GLOBAL_VAR(binlog_space_limit), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(0, ULONG_MAX), DEFAULT(0), BLOCK_SIZE(1));
+
 static Sys_var_ulong Sys_max_binlog_files(
        "max_binlog_files",
        "Maximum number of binlog files. Used with --max-binlog-size this can "
        "be used to limit the total amount of disk space used for the binlog. "
-       "Default is 0, don't limit.",
+       "Default is 0, don't limit. "
+       "This variable is deprecated and will be removed in a future release.",
        GLOBAL_VAR(max_binlog_files),
-       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 102400), DEFAULT(0), BLOCK_SIZE(1));
+       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 102400), DEFAULT(0),
+       BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(0), DEPRECATED(""));
 
 static Sys_var_ulong Sys_max_slowlog_size(
        "max_slowlog_size",
@@ -6249,7 +6258,7 @@ static Sys_var_mybool Sys_wsrep_debug(
        GLOBAL_VAR(wsrep_debug), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
 
 static Sys_var_mybool Sys_wsrep_convert_LOCK_to_trx(
-       "wsrep_convert_LOCK_to_trx", "To convert locking sessions "
+       "wsrep_convert_LOCK_to_trx", "To convert locking sessions (deprecated)"
        "into transactions",
        GLOBAL_VAR(wsrep_convert_LOCK_to_trx), 
        CMD_LINE(OPT_ARG), DEFAULT(FALSE));
@@ -6390,6 +6399,19 @@ static Sys_var_mybool Sys_wsrep_certify_nonPK(
        "wsrep_certify_nonPK", "Certify tables with no primary key",
        GLOBAL_VAR(wsrep_certify_nonPK), 
        CMD_LINE(OPT_ARG), DEFAULT(TRUE));
+
+static const char *wsrep_certification_rules_names[]= { "strict", "optimized", NullS };
+static Sys_var_enum Sys_wsrep_certification_rules(
+       "wsrep_certification_rules",
+       "Certification rules to use in the cluster. Possible values are: "
+       "\"strict\": stricter rules that could result in more certification "
+       "failures. "
+       "\"optimized\": relaxed rules that allow more concurrency and "
+       "cause less certification failures.",
+       GLOBAL_VAR(wsrep_certification_rules), CMD_LINE(REQUIRED_ARG),
+       wsrep_certification_rules_names, DEFAULT(WSREP_CERTIFICATION_RULES_STRICT),
+       NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(0));
 
 static Sys_var_mybool Sys_wsrep_causal_reads(
        "wsrep_causal_reads", "(DEPRECATED) setting this variable is equivalent to setting wsrep_sync_wait READ flag",

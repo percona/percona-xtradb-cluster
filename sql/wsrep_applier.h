@@ -16,7 +16,7 @@
 #ifndef WSREP_APPLIER_H
 #define WSREP_APPLIER_H
 
-#include "../wsrep/wsrep_api.h"
+#include "wsrep_api.h"
 
 /* wsrep callback prototypes */
 

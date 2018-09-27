@@ -9,4 +9,10 @@
 #  Do not use any TAB characters for whitespace.
 #
 ##############################################################################
+# Codership disabled tests begin here
+# Tests that have disabler=CODERSHIP will be forcefully run with "./mtr --enable-disabled" by Jenkins
+global_read_lock : Issue#79 2018-07-26 CODERSHIP https://github.com/codership/mysql-wsrep/issues/79
+memory_aggregate_no_a : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+start_server_low_index : Issue#330 2018-05-16 CODERSHIP https://github.com/codership/mysql-wsrep/issues/330
+# Codership disabled tests end here
 # perfschema.pfs_ccccccc                   : Bug#nnnnnnnn 2014-09-10 Anitha Frequent failures on PB2

@@ -15,4 +15,17 @@ select * from e1;
 id	text
 1	aaaaa
 2	bbbbb
+#shutting down node-2
+#node-1
+INSERT INTO e1(text) VALUES('aaaaa2');
+INSERT INTO e1(text) VALUES('bbbbb2');
+#restarting node-2
+# restart
+select * from e1;
+id	text
+1	aaaaa
+2	bbbbb
+3	aaaaa2
+4	bbbbb2
+#node-1
 drop table e1;

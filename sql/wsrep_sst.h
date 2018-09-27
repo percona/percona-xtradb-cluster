@@ -23,7 +23,7 @@
 typedef struct st_mysql_show_var SHOW_VAR;
 #include "query_options.h"
 #include "rpl_gtid.h"
-#include "../wsrep/wsrep_api.h"
+#include "wsrep_api.h"
 
 
 /* system variables */

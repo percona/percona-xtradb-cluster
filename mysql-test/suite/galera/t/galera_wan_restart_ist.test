@@ -38,7 +38,6 @@ INSERT INTO t1 VALUES (13);
 
 --echo Shutting down server ...
 --source include/shutdown_mysqld.inc
---sleep 10
 
 --connection node_1
 INSERT INTO t1 VALUES (11);
@@ -51,8 +50,6 @@ INSERT INTO t1 VALUES (14);
 
 --connection node_3
 --source include/start_mysqld.inc
---sleep 5
---source include/wait_until_connected_again.inc
 
 INSERT INTO t1 VALUES (131);
 
@@ -65,7 +62,6 @@ INSERT INTO t1 VALUES (22);
 
 --echo Shutting down server ...
 --source include/shutdown_mysqld.inc
---sleep 10
 
 --connection node_1
 INSERT INTO t1 VALUES (21);
@@ -78,8 +74,6 @@ INSERT INTO t1 VALUES (24);
 
 --connection node_2
 --source include/start_mysqld.inc
---sleep 5
---source include/wait_until_connected_again.inc
 
 INSERT INTO t1 VALUES (221);
 
@@ -92,7 +86,6 @@ INSERT INTO t1 VALUES (34);
 
 --echo Shutting down server ...
 --source include/shutdown_mysqld.inc
---sleep 10
 
 --connection node_1
 INSERT INTO t1 VALUES (31);
@@ -105,8 +98,6 @@ INSERT INTO t1 VALUES (33);
 
 --connection node_4
 --source include/start_mysqld.inc
---sleep 5
---source include/wait_until_connected_again.inc
 
 INSERT INTO t1 VALUES (341);
 

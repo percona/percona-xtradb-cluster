@@ -1,0 +1,33 @@
+CREATE TABLE user(id int primary key, j int) ENGINE=InnoDB;
+CREATE TABLE user_session(id int primary key, fk1 int, fk2 int) ENGINE=InnoDB;
+alter table user_session add foreign key (fk1) references user(id);
+INSERT INTO user values (1,0), (2,0), (3,0), (4,0);
+INSERT INTO user_session values (1,1,1);
+"Phase 1: plain SQL statements"
+begin;
+update user set j = j + 1 WHERE id > 0;
+set wsrep_retry_autocommit=0;
+set debug_sync='lock_wait_suspend_thread_enter SIGNAL ins_waiting WAIT_FOR cont_ins';
+insert into user_session(id,fk1,fk2) values (2, 2, 2);
+set debug_sync='now WAIT_FOR ins_waiting';
+insert into user_session(id,fk1,fk2) values (2, 2, 3);
+set debug_sync='now SIGNAL cont_ins';
+commit;
+truncate user_session;
+set debug_sync = reset;
+"Phase 2: prepared statements"
+prepare upd  from 'update user set j = j + 1 WHERE id > 0';
+prepare ins1 from 'insert into user_session(id,fk1,fk2) values (2, 2, 2)';
+prepare ins2 from 'insert into user_session(id,fk1,fk2) values (2, 2, 3)';
+begin;
+execute upd;
+set debug_sync='lock_wait_suspend_thread_enter SIGNAL ins_waiting WAIT_FOR cont_ins';
+execute ins1;
+set debug_sync='now WAIT_FOR ins_waiting';
+execute ins2;
+set debug_sync='now SIGNAL cont_ins';
+commit;
+truncate user_session;
+set debug_sync = reset;
+drop table user_session;
+drop table user;

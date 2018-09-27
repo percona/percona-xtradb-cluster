@@ -37,10 +37,8 @@ INSERT INTO t1 VALUES (4);
 INSERT INTO t1 VALUES (13);
 
 --source include/kill_galera.inc
---sleep 5
 
 --connection node_1
---source include/wait_until_connected_again.inc
 INSERT INTO t1 VALUES (11);
 
 --connection node_2
@@ -51,8 +49,6 @@ INSERT INTO t1 VALUES (14);
 
 --connection node_3
 --source include/start_mysqld.inc
---sleep 5
---source include/wait_until_connected_again.inc
 
 INSERT INTO t1 VALUES (131);
 
@@ -64,10 +60,8 @@ INSERT INTO t1 VALUES (131);
 INSERT INTO t1 VALUES (22);
 
 --source include/kill_galera.inc
---sleep 5
 
 --connection node_1
---source include/wait_until_connected_again.inc
 INSERT INTO t1 VALUES (21);
 
 --connection node_3
@@ -78,8 +72,6 @@ INSERT INTO t1 VALUES (24);
 
 --connection node_2
 --source include/start_mysqld.inc
---sleep 5
---source include/wait_until_connected_again.inc
 
 INSERT INTO t1 VALUES (221);
 
@@ -91,10 +83,8 @@ INSERT INTO t1 VALUES (221);
 INSERT INTO t1 VALUES (34);
 
 --source include/kill_galera.inc
---sleep 5
 
 --connection node_1
---source include/wait_until_connected_again.inc
 INSERT INTO t1 VALUES (31);
 
 --connection node_2
@@ -105,8 +95,6 @@ INSERT INTO t1 VALUES (33);
 
 --connection node_4
 --source include/start_mysqld.inc
---sleep 5
---source include/wait_until_connected_again.inc
 
 INSERT INTO t1 VALUES (341);
 

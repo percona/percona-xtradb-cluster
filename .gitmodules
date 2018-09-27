@@ -2,3 +2,7 @@
 	path = percona-xtradb-cluster-galera
 	url = https://github.com/percona/galera
 	branch = 3.x-5.7
+[submodule "wsrep-API"]
+	path = wsrep/src
+	url = https://github.com/percona/wsrep-API.git
+	branch = percona-3.x-5.7-v31

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 1995, 2018, Oracle and/or its affiliates. All rights reserved.
 Copyright (c) 2008, 2009, Google Inc.
 Copyright (c) 2009, 2016, Percona Inc.
 
@@ -303,6 +303,11 @@ extern const ulong	srv_tmp_undo_logs;
 /** Enable or disable encryption of temporary tablespace.*/
 extern my_bool	srv_tmp_tablespace_encrypt;
 
+/** Enable this option to encrypt system tablespace at bootstrap. */
+extern my_bool	srv_sys_tablespace_encrypt;
+
+/** Enable or disable encryption of pages in parallel doublewrite buffer file */
+extern my_bool	srv_parallel_dblwr_encrypt;
 
 /** Whether the redo log tracking is currently enabled. Note that it is
 possible for the log tracker thread to be running and the tracking to be
@@ -360,7 +365,7 @@ extern const ulint	srv_buf_pool_min_size;
 extern const ulint	srv_buf_pool_def_size;
 /** Requested buffer pool chunk size. Each buffer pool instance consists
 of one or more chunks. */
-extern ulong		srv_buf_pool_chunk_unit;
+extern ulonglong	srv_buf_pool_chunk_unit;
 /** Requested number of buffer pool instances */
 extern ulong		srv_buf_pool_instances;
 /** Default number of buffer pool instances */
@@ -526,9 +531,6 @@ extern my_bool	srv_purge_view_update_only_debug;
 
 /** Value of MySQL global used to disable master thread. */
 extern my_bool	srv_master_thread_disabled_debug;
-/** Pause master thread in the middle of enabling of temporary tablespace
-encryption */
-extern ulint	srv_master_encrypt_debug;
 #endif /* UNIV_DEBUG */
 
 extern ulint	srv_fatal_semaphore_wait_threshold;
@@ -1031,6 +1033,14 @@ srv_master_thread_disabled_debug_update(
 	void*				var_ptr,
 	const void*			save);
 #endif /* UNIV_DEBUG */
+
+/** Set temporary tablespace to be encrypted if global variable
+innodb_temp_tablespace_encrypt is TRUE
+@param[in]	enable	true to enable encryption, false to disable
+@return DB_SUCCESS on success, DB_ERROR on failure */
+MY_NODISCARD
+dberr_t
+srv_temp_encryption_update(bool enable);
 
 /** Status variables to be passed to MySQL */
 struct export_var_t{

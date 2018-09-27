@@ -1237,14 +1237,25 @@ srv_open_tmp_tablespace(
 
 			if (srv_tmp_tablespace_encrypt) {
 
+				/* Make sure the keyring is loaded. */
+				if (!Encryption::check_keyring()) {
+					srv_tmp_tablespace_encrypt = false;
+					ib::error() << "Can't set temporary"
+						<< " tablespace to be encrypted"
+						<< " because keyring plugin is"
+						<< " not available.";
+				        return(DB_ERROR);
+				}
+
 				fil_space_t*	space =
 					fil_space_get(temp_space_id);
-				space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
 
 				err = fil_set_encryption(space->id,
 							 Encryption::AES,
 							 NULL,
 							 NULL);
+
+				tmp_space->set_flags(space->flags);
 				ut_a(err == DB_SUCCESS);
 			}
 
@@ -1493,6 +1504,67 @@ srv_prepare_to_delete_redo_log_files(
 	} while (buf_pool_check_no_pending_io());
 
 	return(flushed_lsn);
+}
+
+/** Enable encryption of system tablespace if requested. At
+startup load the encryption information from first datafile
+to tablespace object
+@return DB_SUCCESS on succes, others on failure */
+static
+dberr_t
+srv_sys_enable_encryption(bool create_new_db) {
+
+	fil_space_t*	space = fil_space_get(TRX_SYS_SPACE);
+	dberr_t		err = DB_SUCCESS;
+
+	if (create_new_db && srv_sys_tablespace_encrypt) {
+
+		space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+		srv_sys_space.set_flags(space->flags);
+
+		err = fil_set_encryption(space->id,
+					 Encryption::AES,
+					 NULL,
+					 NULL);
+		ut_ad(err == DB_SUCCESS);
+	} else {
+
+		ulint	fsp_flags = srv_sys_space.m_files.begin()->flags();
+		bool	is_encrypted = FSP_FLAGS_GET_ENCRYPTION(fsp_flags);
+
+		if (is_encrypted && !srv_sys_tablespace_encrypt) {
+			ib::error() << "The system tablespace is encrypted but"
+				<< " --innodb_sys_tablespace_encrypt is"
+				<< " OFF. Enable the option and start server";
+			return(DB_ERROR);
+		}
+
+		if (!is_encrypted && srv_sys_tablespace_encrypt) {
+			ib::error() << "The system tablespace is not encrypted but"
+				<< " --innodb_sys_tablespace_encrypt is"
+				<< " ON. This instance was not bootstrapped"
+				<< " with --innodb_sys_tablespace_encrypt=ON."
+				<< " Disable this option and start server";
+			return(DB_ERROR);
+		}
+
+		if (is_encrypted) {
+
+			space->flags |= FSP_FLAGS_MASK_ENCRYPTION;
+			srv_sys_space.set_flags(space->flags);
+
+			err = fil_set_encryption(
+				space->id,
+				Encryption::AES,
+				srv_sys_space.m_files.begin()->m_encryption_key,
+				srv_sys_space.m_files.begin()->m_encryption_iv);
+			ut_ad(err == DB_SUCCESS);
+
+			recv_sys->dblwr.decrypt_sys_dblwr_pages();
+		}
+	}
+
+	return(err);
 }
 
 /********************************************************************
@@ -2009,6 +2081,10 @@ innobase_start_or_create_for_mysql(void)
 
 	switch (err) {
 	case DB_SUCCESS:
+		err = srv_sys_enable_encryption(create_new_db);
+		if (err != DB_SUCCESS) {
+			return(srv_init_abort(err));
+		}
 		break;
 	case DB_CANNOT_OPEN_FILE:
 		ib::error()

@@ -53,15 +53,16 @@ using std::vector;
 #include <pfs_statement_provider.h>
 #include <mysql/psi/mysql_statement.h>
 
+#include <bitset>
 #include <memory>
 #include "mysql/thread_type.h"
 
+#include "log.h"
 #include "violite.h"                       /* SSL_handle */
 
 #include "query_strip_comments.h"
 #include "sql_thd_internal_api.h"
 
-#include "log.h"
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
 struct wsrep_thd_shadow {
@@ -74,7 +75,8 @@ struct wsrep_thd_shadow {
   struct timeval       user_time;
   longlong             row_count_func;
 };
-#endif
+#endif /* WITH_WSREP */
+
 class Reprepare_observer;
 class sp_cache;
 class Rows_log_event;
@@ -1390,6 +1392,14 @@ public:
   }
 };
 
+class Key_length_error_handler : public Internal_error_handler {
+ public:
+  virtual bool handle_condition(THD *, uint sql_errno, const char *,
+                                Sql_condition::enum_severity_level *,
+                                const char *) {
+    return (sql_errno == ER_TOO_LONG_KEY);
+  }
+};
 
 /**
   This class is an internal error handler implementation for
@@ -1710,6 +1720,70 @@ typedef struct
 } QUERY_START_TIME_INFO;
 
 /**
+   A single-hash-function bloom filter for approximate accessed page
+   counter.
+*/
+class Bloom_filter {
+ private:
+  /** Bloom filter size, and a prime number for the calculation below */
+  enum { SIZE= 8191 };
+
+  typedef std::bitset<SIZE> Bit_set;
+
+  /** The bit set, which is allocated in a MEM_ROOT */
+  Bit_set *bit_set;
+
+  // Non-copyable
+  Bloom_filter (const Bloom_filter &);
+  Bloom_filter & operator = (const Bloom_filter &);
+
+ public:
+  Bloom_filter() : bit_set(NULL) {}
+
+  ~Bloom_filter()
+  {
+    // Do not delete, just destruct, due to MEM_ROOT allocation
+    bit_set->~bitset();
+  }
+
+  void clear()
+  {
+    // Do not delete, just force new MEM_ROOT allocation on the next use
+    bit_set= NULL;
+  }
+
+  /**
+     Check whether key is maybe a member of a set
+
+     @param[in, out]    mem_root        MEM_ROOT to allocate the bit set in, if
+      not allocated already
+     @param[in]         key             key whose presence to check
+
+     @return if true, the key might be a member of the set. If false, the key
+     is definitely not a member of the set.
+  */
+  bool test_and_set(MEM_ROOT *mem_root, ulong key)
+  {
+    if (!bit_set)
+    {
+      void *bit_set_place= alloc_root(mem_root, sizeof(Bit_set));
+      // FIXME: memory allocation failure is eaten silently. Nonexact stats are
+      // the least of the concerns then.
+      if (!bit_set_place)
+        return false;
+      bit_set= new (bit_set_place) Bit_set();
+    }
+    // Duplicating ut_hash_ulint calculation
+    const ulong pos= (key ^ 1653893711) % SIZE;
+    DBUG_ASSERT(pos < SIZE);
+    if (bit_set->test(pos))
+      return false;
+    bit_set->set(pos);
+    return true;
+  }
+};
+
+/**
   @class THD
   For each client connection we create a separate thread with THD serving as
   a thread/connection descriptor
@@ -1832,6 +1906,12 @@ public:
     ha_data associated with it and memorizes the fact of that.
   */
   void rpl_detach_engine_ha_data();
+
+  /**
+    When the thread is a binlog or slave applier it reattaches the engine
+    ha_data associated with it and memorizes the fact of that.
+  */
+  void rpl_reattach_engine_ha_data();
 
   /**
     @return true   when the current binlog (rli_fake) or slave (rli_slave)
@@ -2267,10 +2347,6 @@ public:
   ulong      tmp_tables_disk_used;
   ulonglong  tmp_tables_size;
   /*
-    Variable innodb_was_used shows used or not InnoDB engine in current query.
-  */
-  bool       innodb_was_used;
-  /*
     Following Variables innodb_*** (is |should be) different from
     default values only if (innodb_was_used==true)
   */
@@ -2280,7 +2356,40 @@ public:
   ulong      innodb_io_reads_wait_timer;
   ulong      innodb_lock_que_wait_timer;
   ulong      innodb_innodb_que_wait_timer;
+
+ private:
+  /*
+    Variable innodb_was_used shows used or not InnoDB engine in current query.
+  */
+  bool         innodb_was_used;
+  Bloom_filter approx_distinct_pages;
+
+ public:
   ulong      innodb_page_access;
+
+  void mark_innodb_used(ulonglong trx_id)
+  {
+    DBUG_ASSERT(innodb_trx_id == 0 || innodb_trx_id == trx_id);
+    innodb_trx_id= trx_id;
+    innodb_was_used= true;
+  }
+
+  void access_distinct_page(ulong page_id)
+  {
+    if (approx_distinct_pages.test_and_set(&main_mem_root, page_id))
+      innodb_page_access++;
+  }
+
+  bool innodb_slow_log_enabled() const
+  {
+    return variables.log_slow_verbosity & (1ULL << SLOG_V_INNODB);
+  }
+
+  bool innodb_slow_log_data_logged() const
+  {
+    DBUG_ASSERT(!innodb_was_used || innodb_slow_log_enabled());
+    return innodb_was_used;
+  }
 
   /*
     Variable query_plan_flags collects information about query plan entites
@@ -5317,11 +5426,29 @@ my_eof(THD *thd)
   }
 }
 
-#define tmp_disable_binlog(A)       \
-  {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
-  (A)->variables.option_bits&= ~OPTION_BIN_LOG
+#ifdef WITH_WSREP
 
-#define reenable_binlog(A)   (A)->variables.option_bits= tmp_disable_binlog__save_options;}
+  #define tmp_disable_binlog(A)                                               \
+    {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits;  \
+    my_bool tmp_disable_binlog__save_wsrep_on= (A)->variables.wsrep_on;       \
+    (A)->variables.wsrep_on= 0;                                               \
+    (A)->variables.option_bits&= ~OPTION_BIN_LOG
+  
+  #define reenable_binlog(A)                                                  \
+    (A)->variables.wsrep_on= tmp_disable_binlog__save_wsrep_on;               \
+    (A)->variables.option_bits= tmp_disable_binlog__save_options;}
+
+  #define reenable_wsrep(A)    (A)->variables.wsrep_on= tmp_disable_binlog__save_wsrep_on;
+
+#else
+
+  #define tmp_disable_binlog(A)       \
+    {ulonglong tmp_disable_binlog__save_options= (A)->variables.option_bits; \
+    (A)->variables.option_bits&= ~OPTION_BIN_LOG
+
+  #define reenable_binlog(A)   (A)->variables.option_bits= tmp_disable_binlog__save_options;}
+
+#endif
 
 LEX_STRING *
 make_lex_string_root(MEM_ROOT *mem_root,
@@ -6193,6 +6320,20 @@ inline void reattach_engine_ha_data_to_thd(THD *thd, const struct handlerton *ht
       replace_native_transaction_in_thd(thd, *trx_backup, NULL);
     *trx_backup= NULL;
   }
+}
+
+/**
+  Check if engine substitution is allowed in the current thread context.
+
+  @param thd         thread context
+  @return
+  @retval            true if engine substitution is allowed
+  @retval            false otherwise
+*/
+
+static inline bool is_engine_substitution_allowed(THD* thd)
+{
+  return !(thd->variables.sql_mode & MODE_NO_ENGINE_SUBSTITUTION);
 }
 
 /*************************************************************************/

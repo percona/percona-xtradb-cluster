@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2005, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -1366,6 +1366,9 @@ int ha_partition::write_row_in_new_part(uint part_id)
   }
 
   tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif
   error= m_new_file[part_id]->ha_write_row(table->record[0]);
   reenable_binlog(thd);
   DBUG_RETURN(error);
@@ -1466,7 +1469,6 @@ void ha_partition::update_create_info(HA_CREATE_INFO *create_info)
   uint num_parts = num_subparts ? m_file_tot_parts / num_subparts
                                 : m_file_tot_parts;
   HA_CREATE_INFO dummy_info;
-  memset(static_cast<void*>(&dummy_info), 0, sizeof(dummy_info));
 
   /*
   Since update_create_info() can be called from mysql_prepare_alter_table()
@@ -3032,6 +3034,9 @@ int ha_partition::write_row_in_part(uint part_id, uchar *buf)
   start_part_bulk_insert(thd, part_id);
 
   tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif
   error= m_file[part_id]->ha_write_row(buf);
   reenable_binlog(thd);
   DBUG_RETURN(error);
@@ -3047,6 +3052,9 @@ int ha_partition::update_row_in_part(uint part_id,
   DBUG_ENTER("ha_partition::update_row_in_part");
   start_part_bulk_insert(thd, part_id);
   tmp_disable_binlog(thd); /* Do not replicate the low-level changes. */
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif
   error= m_file[part_id]->ha_update_row(old_data, new_data);
   reenable_binlog(thd);
   DBUG_RETURN(error);
@@ -3083,6 +3091,9 @@ int ha_partition::delete_row_in_part(uint part_id, const uchar *buf)
   m_last_part= part_id;
   /* Do not replicate low level changes, already registered in ha_* wrapper. */
   tmp_disable_binlog(thd);
+#ifdef WITH_WSREP
+  reenable_wsrep(thd);
+#endif
   error= m_file[part_id]->ha_delete_row(buf);
   reenable_binlog(thd);
   DBUG_RETURN(error);
@@ -5634,6 +5645,21 @@ uint ha_partition::min_of_the_max_uint(
 }
 
 
+uint ha_partition::min_of_the_max_uint(HA_CREATE_INFO *create_info,
+                       uint (handler::*operator_func)(HA_CREATE_INFO *) const) const
+{
+  handler **file;
+  uint min_of_the_max= ((*m_file)->*operator_func)(create_info);
+
+  for (file= m_file+1; *file; file++)
+  {
+    uint tmp= ((*file)->*operator_func)(create_info);
+    set_if_smaller(min_of_the_max, tmp);
+  }
+  return min_of_the_max;
+}
+
+
 uint ha_partition::max_supported_key_parts() const
 {
   return min_of_the_max_uint(&handler::max_supported_key_parts);
@@ -5646,9 +5672,11 @@ uint ha_partition::max_supported_key_length() const
 }
 
 
-uint ha_partition::max_supported_key_part_length() const
+uint ha_partition::max_supported_key_part_length(HA_CREATE_INFO
+                                                 *create_info) const
 {
-  return min_of_the_max_uint(&handler::max_supported_key_part_length);
+  return
+  min_of_the_max_uint(create_info, &handler::max_supported_key_part_length);
 }
 
 
