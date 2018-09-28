@@ -130,6 +130,7 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
         delete ev;
         continue;
       }
+      break;
     }
     default:
       break;
@@ -175,7 +176,19 @@ static wsrep_cb_status_t wsrep_apply_events(THD*        thd,
       DBUG_RETURN(WSREP_CB_FAILURE);
     }
 
-    delete ev;
+    switch (ev->get_type_code()) {
+    case ROWS_QUERY_LOG_EVENT:
+      /*
+         Keeping Rows_log event, it will be needed still, and will be deleted later
+         in rli->cleanup_context()
+         Also FORMAT_DESCRIPTION_EVENT is needed further, but it skipped from this loop
+         by 'continue' above, and thus  avoids the following 'delete ev'
+      */
+      continue;
+    default:
+      delete ev;
+      break;
+    }
   }
 
  error:

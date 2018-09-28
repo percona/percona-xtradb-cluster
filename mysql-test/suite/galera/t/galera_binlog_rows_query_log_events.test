@@ -5,10 +5,6 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
---let $binlog_rows_query_log_events_orig = `SELECT @@binlog_rows_query_log_events`
-
-SET GLOBAL binlog_rows_query_log_events=TRUE;
-
 CREATE TABLE t1 (f1 INT PRIMARY KEY) ENGINE=InnoDB;
 
 INSERT INTO t1 VALUES (1);
@@ -22,7 +18,8 @@ UPDATE t1 SET f1 = 2 WHERE f1 = 1;
 --connection node_2
 SELECT COUNT(*) = 1 FROM t1 WHERE f1 = 2;
 
---connection node_1
---eval SET GLOBAL binlog_rows_query_log_events = $binlog_rows_query_log_events_orig
+# verify that query log event is present in node 2
+SHOW BINLOG EVENTS IN 'mysqld-bin.000001' FROM 312 LIMIT 1;
 
+--connection node_1
 DROP TABLE t1;
