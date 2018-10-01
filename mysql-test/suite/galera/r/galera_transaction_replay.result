@@ -28,6 +28,37 @@ SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
 COUNT(*) = 1
 1
 DROP TABLE t1;
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1));
+INSERT INTO t1 VALUES (1, 'a');
+INSERT INTO t1 VALUES (2, 'a');
+SET AUTOCOMMIT=OFF;
+START TRANSACTION;
+UPDATE t1 SET f2 = 'b' WHERE f1 = 1;
+SELECT * FROM t1 WHERE f1 = 2 FOR UPDATE;
+f1	f2
+2	a
+SET GLOBAL wsrep_provider_options = 'dbug=d,commit_monitor_enter_sync';
+COMMIT;;
+SET SESSION wsrep_sync_wait = 0;
+UPDATE t1 SET f2 = 'c' WHERE f1 = 2;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=commit_monitor_enter_sync';
+SET AUTOCOMMIT=ON;
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+COUNT(*) = 1
+1
+wsrep_local_replays
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'b';
+COUNT(*) = 1
+1
+SELECT COUNT(*) = 1 FROM t1 WHERE f2 = 'c';
+COUNT(*) = 1
+1
+DROP TABLE t1;
 #node_1
 create table t1 (i int primary key, c char(1)) engine=innodb;
 insert into t1 values (1, 'a'), (2, 'a'), (5, 'a'), (6, 'a');
