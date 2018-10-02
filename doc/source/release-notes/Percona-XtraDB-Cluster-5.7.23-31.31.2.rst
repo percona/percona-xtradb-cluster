@@ -4,11 +4,13 @@
 |product| |release|
 =====================================
 
-Percona is glad to announce the release of
-|product| |release| on |release-date|.
-Binaries are available from the `downloads section
-<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/>`_
-or from our :ref:`software repositories <install>`.
+To resolve a critical regression, Percona announces the release of |product|
+|release| on |release-date|.  Binaries are available from the `downloads section
+<http://www.percona.com/downloads/Percona-XtraDB-Cluster-57/>`_ or from our
+:ref:`software repositories <install>`.
+
+This release resolves a critical regression in the upstream wsrep library and
+supersedes :rn:`5.7.23-31.31`.
 
 |product| |release| is now the current release,
 based on the following:

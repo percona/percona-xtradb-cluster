@@ -4,6 +4,8 @@
 Percona XtraDB Cluster |release|
 =====================================
 
+**This release has been superseded by 5.7.23-31.31.2 after a critical regression was found.** :rn:`Please update to the latest release <5.7.23-31.31.2>`.
+
 Percona is glad to announce the release of
 Percona XtraDB Cluster |release| on September 26, 2018.
 Binaries are available from the `downloads section
