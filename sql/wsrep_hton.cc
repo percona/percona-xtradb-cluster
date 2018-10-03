@@ -170,12 +170,14 @@ void wsrep_post_commit(THD* thd, bool all)
        rolls back to savepoint after first operation. 
       */
      if (all && thd->wsrep_conflict_state != MUST_REPLAY &&
+         thd->wsrep_conflict_state != REPLAYING &&
          wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle))
      {
          WSREP_WARN("post_rollback fail: %llu %d",
                     (long long)thd->thread_id(), thd->get_stmt_da()->status());
      }
-     if (thd->wsrep_conflict_state != MUST_REPLAY)
+     if (thd->wsrep_conflict_state != MUST_REPLAY &&
+         thd->wsrep_conflict_state != REPLAYING)
      {
        wsrep_cleanup_transaction(thd);
      }
