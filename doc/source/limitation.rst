@@ -49,13 +49,13 @@ The following limitations apply to |PXC|:
 
 * XA transactions are not supported due to possible rollback on commit.
 
-* The write throughput of the whole cluster is limited by weakest node.
-  If one node becomes slow, the whole cluster slows down.
-  If you have requirements for stable high performance,
-  then it should be supported by corresponding hardware.
+* The write throughput of the whole cluster is limited by the weakest node.  If
+  one node becomes slow, the whole cluster slows down.  If you have requirements
+  for stable high performance, then it should be supported by corresponding
+  hardware.
 
-* The minimal recommended size of cluster is 3 nodes.
-  The 3rd node can be an arbitrator.
+* The minimal recommended size of cluster is 3 nodes.  The 3rd node can be an
+  arbitrator.
 
 * InnoDB fake changes feature is not supported.
 
@@ -68,3 +68,11 @@ The following limitations apply to |PXC|:
   avoid ``ALTER TABLE ... IMPORT/EXPORT`` workloads.
   It can lead to node inconsistency if not executed in sync on all nodes.
 
+* All tables must have the primary key. This ensures that the same rows appear
+  in the same order on different nodes. The ``DELETE`` statement is not supported on
+  tables without a primary key.
+
+  .. seealso::
+
+     Galera Documentation: Tables without Primary Keys
+        http://galeracluster.com/documentation-webpages/limitations.html#tables-without-primary-keys
