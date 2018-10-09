@@ -159,6 +159,110 @@ static void wsrep_return_from_bf_mode(THD *thd, struct wsrep_thd_shadow* shadow)
   thd->set_row_count_func(shadow->row_count_func);
 }
 
+void wsrep_replay_sp_transaction(THD* thd)
+{
+  DBUG_ENTER("wsrep_replay_sp_transaction");
+  mysql_mutex_assert_owner(&thd->LOCK_wsrep_thd);
+  DBUG_ASSERT(thd->wsrep_conflict_state == MUST_REPLAY);
+  DBUG_ASSERT(thd->sp_runtime_ctx);
+  DBUG_ASSERT(wsrep_thd_trx_seqno(thd) > 0);
+
+  close_thread_tables(thd);
+  if (thd->locked_tables_mode && thd->lock)
+  {
+    WSREP_DEBUG("releasing table lock for replaying (%lu)",
+                thd->thread_id);
+    thd->locked_tables_list.unlock_locked_tables(thd);
+    thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
+  }
+  thd->mdl_context.release_transactional_locks();
+
+  THD *replay_thd= new THD(true, true);
+  replay_thd->thread_stack= thd->thread_stack;
+
+  struct wsrep_thd_shadow shadow;
+  wsrep_prepare_bf_thd(replay_thd, &shadow);
+  replay_thd->wsrep_trx_meta= thd->wsrep_trx_meta;
+  replay_thd->wsrep_ws_handle= thd->wsrep_ws_handle;
+  replay_thd->wsrep_ws_handle.trx_id= WSREP_UNDEFINED_TRX_ID;
+  replay_thd->wsrep_conflict_state= REPLAYING;
+
+  replay_thd->variables.option_bits|= OPTION_BEGIN;
+  replay_thd->server_status|= SERVER_STATUS_IN_TRANS;
+
+  mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+
+  thd->restore_globals();
+  replay_thd->store_globals();
+  wsrep_status_t rcode= wsrep->replay_trx(wsrep,
+                                          &replay_thd->wsrep_ws_handle,
+                                          (void*) replay_thd);
+
+  wsrep_return_from_bf_mode(replay_thd, &shadow);
+  replay_thd->restore_globals();
+  delete replay_thd;
+
+  mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+
+  thd->store_globals();
+
+  switch (rcode)
+  {
+  case WSREP_OK:
+    {
+      thd->wsrep_conflict_state= NO_CONFLICT;
+      thd->killed= THD::NOT_KILLED;
+      wsrep_status_t rcode= wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
+      if (rcode != WSREP_OK)
+      {
+        WSREP_WARN("Post commit failed for SP replay: thd: %lu error: %d",
+                   thd->thread_id, rcode);
+      }
+      /* As replaying the transaction was successful, an error must not
+         be returned to client, so we need to reset the error state of
+         the diagnostics area */
+      thd->get_stmt_da()->reset_diagnostics_area();
+      break;
+    }
+  case WSREP_TRX_FAIL:
+    {
+      thd->wsrep_conflict_state= ABORTED;
+      wsrep_status_t rcode= wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
+      if (rcode != WSREP_OK)
+      {
+        WSREP_WARN("Post rollback failed for SP replay: thd: %lu error: %d",
+                   thd->thread_id, rcode);
+      }
+      if (thd->get_stmt_da()->is_set())
+      {
+        thd->get_stmt_da()->reset_diagnostics_area();
+      }
+      my_error(ER_LOCK_DEADLOCK, MYF(0));
+      break;
+    }
+  default:
+    WSREP_ERROR("trx_replay failed for: %d, schema: %s, query: %s",
+                rcode,
+                (thd->db ? thd->db : "(null)"),
+                WSREP_QUERY(thd));
+    /* we're now in inconsistent state, must abort */
+    mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    unireg_abort(1);
+    break;
+  }
+
+  wsrep_cleanup_transaction(thd);
+
+  mysql_mutex_lock(&LOCK_wsrep_replaying);
+  wsrep_replaying--;
+  WSREP_DEBUG("replaying decreased: %d, thd: %lu",
+              wsrep_replaying, thd->thread_id);
+  mysql_cond_broadcast(&COND_wsrep_replaying);
+  mysql_mutex_unlock(&LOCK_wsrep_replaying);
+
+  DBUG_VOID_RETURN;
+}
+
 void wsrep_replay_transaction(THD *thd)
 {
   DBUG_ENTER("wsrep_replay_transaction");

@@ -1,0 +1,34 @@
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 INTEGER) ENGINE=InnoDB;
+CREATE PROCEDURE proc_insert()
+BEGIN
+DECLARE i INT;
+DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+SET i = 0;
+WHILE i < 1000 DO
+INSERT IGNORE INTO t1 (f1, f2)
+VALUES (FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15)),
+(FLOOR(1 + RAND() * 65535), FLOOR(1 + RAND() * 15));
+SET i = i + 1;
+END WHILE;
+END|
+SELECT 0;
+0
+0
+SET SESSION wsrep_sync_wait = 0;
+CALL proc_insert;
+SELECT 0;
+0
+0
+SET SESSION wsrep_sync_wait = 0;
+CALL proc_insert;
+SET SESSION wsrep_sync_wait = default;
+SET SESSION wsrep_sync_wait = default;
+DROP PROCEDURE proc_insert;
+DROP TABLE t1;
