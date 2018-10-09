@@ -39,7 +39,8 @@ enum wsrep_trx_status wsrep_run_wsrep_commit(THD *thd, handlerton *hton,
 void wsrep_cleanup_transaction(THD *thd)
 {
   if (!WSREP(thd)) return;
-
+  DBUG_ASSERT(thd->wsrep_conflict_state != MUST_REPLAY &&
+              thd->wsrep_conflict_state != REPLAYING);
   if (wsrep_emulate_bin_log) thd_binlog_trx_reset(thd);
   thd->wsrep_ws_handle.trx_id= WSREP_UNDEFINED_TRX_ID;
   thd->wsrep_trx_meta.gtid= WSREP_GTID_UNDEFINED;
@@ -136,8 +137,11 @@ void wsrep_post_commit(THD* thd, bool all)
      /* non-InnoDB statements may have populated events in stmt cache 
 	=> cleanup 
      */
-     WSREP_DEBUG("cleanup transaction for LOCAL_STATE: %s",
-                 WSREP_QUERY(thd));
+     if (thd->wsrep_conflict_state != MUST_REPLAY)
+     {
+       WSREP_DEBUG("cleanup transaction for LOCAL_STATE: %s",
+                   WSREP_QUERY(thd));
+     }
      /*
        Run post-rollback hook to clean up in the case if
        some keys were populated for the transaction in provider
@@ -151,7 +155,10 @@ void wsrep_post_commit(THD* thd, bool all)
          WSREP_WARN("post_rollback fail: %llu %d",
                     (long long)thd->thread_id, thd->get_stmt_da()->status());
      }
-     wsrep_cleanup_transaction(thd);
+     if (thd->wsrep_conflict_state != MUST_REPLAY)
+     {
+       wsrep_cleanup_transaction(thd);
+     }
      break;
    }
   default: break;

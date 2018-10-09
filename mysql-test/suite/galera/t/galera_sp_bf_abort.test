@@ -311,7 +311,7 @@ DELETE FROM t1;
 DELIMITER |;
 CREATE PROCEDURE proc_insert_insert_conflict_with_continue_handler()
 BEGIN
-  DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SELECT "Conflict exit handler";
+  DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SELECT "Conflict continue handler";
   INSERT INTO t1 VALUES (2, 'd');
   INSERT INTO t1 VALUES (4, 'd');
 END|

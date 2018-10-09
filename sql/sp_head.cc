@@ -41,6 +41,9 @@
 #include "global_threads.h"
 
 #include <my_user.h>           // parse_user
+#ifdef WITH_WSREP
+#include "wsrep_thd.h"
+#endif /* WITH_WSREP */
 
 /**
   SP_TABLE represents all instances of one table in an optimized multi-set of
@@ -646,7 +649,35 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
     thd->m_digest= NULL;
 
     err_status= i->execute(thd, &ip);
-
+#ifdef WITH_WSREP
+    if (m_type == SP_TYPE_PROCEDURE)
+    {
+      mysql_mutex_lock(&thd->LOCK_wsrep_thd);
+      if (thd->wsrep_conflict_state == MUST_REPLAY)
+      {
+        wsrep_replay_sp_transaction(thd);
+        err_status= thd->get_stmt_da()->is_set();
+        thd->wsrep_conflict_state= NO_CONFLICT;
+      }
+      else if (thd->wsrep_conflict_state == ABORTED ||
+               thd->wsrep_conflict_state == CERT_FAILURE)
+      {
+        /*
+          If the statement execution was BF aborted or was aborted
+          due to certification failure, clean up transaction here
+          and reset conflict state to NO_CONFLICT and thd->killed
+          to THD::NOT_KILLED. Error handling is done based on err_status
+          below. Error must have been raised by wsrep hton code before
+          entering here.
+         */
+        DBUG_ASSERT(err_status);
+        DBUG_ASSERT(thd->get_stmt_da()->is_error());
+        thd->wsrep_conflict_state= NO_CONFLICT;
+        thd->killed= THD::NOT_KILLED;
+      }
+      mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
+    }
+#endif /* WITH_WSREP */
     thd->m_digest= parent_digest;
 
     if (i->free_list)
