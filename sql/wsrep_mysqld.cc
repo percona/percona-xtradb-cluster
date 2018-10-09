@@ -1526,7 +1526,7 @@ static int wsrep_RSU_begin(THD *thd, char *db_, char *table_)
   wsrep_replaying++;
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
-  if (wsrep_wait_committing_connections_close(5000))
+  if (wsrep_wait_committing_connections_close(wsrep_RSU_commit_timeout))
   {
     /* no can do, bail out from DDL */
     WSREP_WARN("RSU failed due to pending transactions, schema: %s, query %s",
