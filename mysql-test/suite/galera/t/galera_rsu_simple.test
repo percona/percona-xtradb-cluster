@@ -64,6 +64,7 @@ call mtr.add_suppression("WSREP: ALTER TABLE isolation failure");
 SET SESSION wsrep_OSU_method = "RSU";
 --error ER_LOCK_DEADLOCK
 ALTER TABLE t1 ADD COLUMN f2 INTEGER;
+SET SESSION wsrep_OSU_method = default;
 #
 --source include/galera_clear_sync_point.inc
 --source include/galera_signal_sync_point.inc
@@ -75,7 +76,7 @@ ALTER TABLE t1 ADD COLUMN f2 INTEGER;
 SELECT * from t1;
 
 #------------------------------------------------------------------------------
-# try with default wsrep_RSU_commit_timeout
+# try with csutomer wsrep_RSU_commit_timeout
 
 # increase timeout to 60 sec (timeout unit is micro-seconds)
 --connection node_1
@@ -103,6 +104,7 @@ SET SESSION wsrep_OSU_method = "RSU";
 
 --connection node_1a
 --echo #node-1a
+--sleep 2
 --source include/galera_clear_sync_point.inc
 --source include/galera_signal_sync_point.inc
 
@@ -115,7 +117,7 @@ SET SESSION wsrep_OSU_method = "RSU";
 --connection node_1
 --echo #node-1
 --reap
-SET SESSION wsrep_OSU_method = "TOI";
+SET SESSION wsrep_OSU_method = default;
 --eval set global wsrep_RSU_commit_timeout=$RSU_timeout
 SELECT * from t1;
 DROP TABLE t1;
