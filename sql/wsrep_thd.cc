@@ -170,8 +170,8 @@ void wsrep_replay_sp_transaction(THD* thd)
   close_thread_tables(thd);
   if (thd->locked_tables_mode && thd->lock)
   {
-    WSREP_DEBUG("releasing table lock for replaying (%lu)",
-                thd->thread_id);
+    WSREP_DEBUG("releasing table lock for replaying (%u)",
+                thd->thread_id());
     thd->locked_tables_list.unlock_locked_tables(thd);
     thd->variables.option_bits&= ~(OPTION_TABLE_LOCK);
   }
@@ -215,8 +215,8 @@ void wsrep_replay_sp_transaction(THD* thd)
       wsrep_status_t rcode= wsrep->post_commit(wsrep, &thd->wsrep_ws_handle);
       if (rcode != WSREP_OK)
       {
-        WSREP_WARN("Post commit failed for SP replay: thd: %lu error: %d",
-                   thd->thread_id, rcode);
+        WSREP_WARN("Post commit failed for SP replay: thd: %u error: %d",
+                   thd->thread_id(), rcode);
       }
       /* As replaying the transaction was successful, an error must not
          be returned to client, so we need to reset the error state of
@@ -230,8 +230,8 @@ void wsrep_replay_sp_transaction(THD* thd)
       wsrep_status_t rcode= wsrep->post_rollback(wsrep, &thd->wsrep_ws_handle);
       if (rcode != WSREP_OK)
       {
-        WSREP_WARN("Post rollback failed for SP replay: thd: %lu error: %d",
-                   thd->thread_id, rcode);
+        WSREP_WARN("Post rollback failed for SP replay: thd: %u error: %d",
+                   thd->thread_id(), rcode);
       }
       if (thd->get_stmt_da()->is_set())
       {
@@ -243,7 +243,7 @@ void wsrep_replay_sp_transaction(THD* thd)
   default:
     WSREP_ERROR("trx_replay failed for: %d, schema: %s, query: %s",
                 rcode,
-                (thd->db ? thd->db : "(null)"),
+                (thd->db().str ? thd->db().str : "(null)"),
                 WSREP_QUERY(thd));
     /* we're now in inconsistent state, must abort */
     mysql_mutex_unlock(&thd->LOCK_wsrep_thd);
@@ -255,8 +255,8 @@ void wsrep_replay_sp_transaction(THD* thd)
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
   wsrep_replaying--;
-  WSREP_DEBUG("replaying decreased: %d, thd: %lu",
-              wsrep_replaying, thd->thread_id);
+  WSREP_DEBUG("replaying decreased: %d, thd: %u",
+              wsrep_replaying, thd->thread_id());
   mysql_cond_broadcast(&COND_wsrep_replaying);
   mysql_mutex_unlock(&LOCK_wsrep_replaying);
 
