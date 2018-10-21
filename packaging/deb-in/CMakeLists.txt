@@ -308,7 +308,7 @@ ELSEIF(DEB_CODENAME STREQUAL "bionic")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server${DEB_PRODUCTSERIES} --profile-name=usr.sbin.mysqld")
   SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql --no-enable)
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql --no-enable")
   SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
   SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start
   usr/lib/tmpfiles.d/mysql.conf")
