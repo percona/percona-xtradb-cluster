@@ -307,12 +307,16 @@ ELSEIF(DEB_CODENAME STREQUAL "bionic")
     "install -g root -o root -m 0644 -D debian/extra/apparmor-profile debian/tmp/etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_RULES_APPARMOR_LOAD
     "dh_apparmor -pmysql-${DEB_PRODUCTNAME}-server${DEB_PRODUCTSERIES} --profile-name=usr.sbin.mysqld")
-  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql")
+  SET (DEB_SYSTEMD_SERVICE_NAME "mysql")
+  SET (DEB_RULES_SYSTEMD_ENABLE "dh_systemd_enable --name=mysql --no-enable)
   SET (DEB_RULES_SYSTEMD_START "dh_systemd_start --restart-after-upgrade")
-  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start")
+  SET (DEB_INSTALL_SERVER_SYSTEMD "usr/share/mysql/mysql-systemd-start
+  usr/lib/tmpfiles.d/mysql.conf")
   SET (DEB_INSTALL_SERVER_APPARMOR "etc/apparmor.d/usr.sbin.mysqld")
   SET (DEB_SERVICE_SERVER_EXECPRE
     "ExecStartPre=/usr/share/mysql/mysql-systemd-start pre")
+  SET (DEB_SERVICE_SERVER_EXECPOST
+    "ExecStartPost=/usr/share/mysql/mysql-systemd-start post")
   SET (DEB_INIT_APPARMOR "/lib/apparmor/profile-load usr.sbin.mysqld")
   SET (DEB_STARTUP "SYSTEMD")
 ELSE()
