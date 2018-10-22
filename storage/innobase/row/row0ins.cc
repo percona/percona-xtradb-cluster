@@ -1921,6 +1921,11 @@ do_possible_lock_wait:
 #endif /* WITH_WSREP */
 		thr->lock_state = QUE_THR_LOCK_NOLOCK;
 
+		if(trx->error_state != DB_SUCCESS) {
+		    err = trx->error_state;
+		    goto exit_func;
+		}
+
 		DBUG_PRINT("to_be_dropped",
 			   ("table: %s", check_table->name.m_name));
 		if (check_table->to_be_dropped) {
