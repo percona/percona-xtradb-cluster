@@ -407,6 +407,7 @@ Obsoletes:      mysql-bench
 Obsoletes:      MySQL-bench
 Provides:       mysql-test = %{version}-%{release}
 Provides:       mysql-test%{?_isa} = %{version}-%{release}
+Requires:       perl(Data::Dumper)
 AutoReqProv:    no
 
 %description -n mysql-wsrep-test%{product_suffix}
