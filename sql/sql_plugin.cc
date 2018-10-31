@@ -4391,9 +4391,11 @@ static int test_plugin_options(MEM_ROOT *tmp_root, st_plugin_int *tmp,
       my_strcasecmp(&my_charset_latin1, tmp->name.str, "ndbcluster")))
     plugin_load_option= PLUGIN_OFF;
 
+#ifdef WITH_WSREP
   if (!(my_strcasecmp(&my_charset_latin1, tmp->name.str, "keyring_file") &&
       my_strcasecmp(&my_charset_latin1, tmp->name.str, "keyring_vault")))
     plugin_load_option= PLUGIN_FORCE;
+#endif /* WITH_WSREP */
 
   for (opt= tmp->plugin->system_vars; opt && *opt; opt++)
     count+= 2; /* --{plugin}-{optname} and --plugin-{plugin}-{optname} */

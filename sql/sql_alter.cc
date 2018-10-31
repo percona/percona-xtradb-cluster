@@ -543,6 +543,7 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd)
   /* first table of first SELECT_LEX */
   TABLE_LIST *table_list= select_lex->get_table_list();
 
+#ifdef WITH_WSREP
   /* Disable DISCARD/IMPORT TABLESPACE as this command
   will execute on single node and can introduce data
   in-consistency in cluster. */
@@ -583,6 +584,7 @@ bool Sql_cmd_discard_import_tablespace::execute(THD *thd)
 
   if (block)
     return true;
+#endif /* WITH_WSREP */
 
   if (check_access(thd, ALTER_ACL, table_list->db,
                    &table_list->grant.privilege,

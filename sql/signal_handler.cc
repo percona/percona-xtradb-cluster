@@ -24,7 +24,7 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-#endif
+#endif /* WITH_WSREP */
 
 #ifdef _WIN32
 #include <crtdbg.h>
@@ -73,7 +73,7 @@ extern "C" void handle_fatal_signal(int sig)
 */
 #ifdef WITH_WSREP
   wsrep_handle_fatal_signal(sig);
-#endif
+#endif /* WITH_WSREP */
 
 #ifdef _WIN32
   SYSTEMTIME utc_time;

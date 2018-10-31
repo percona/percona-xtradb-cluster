@@ -599,7 +599,7 @@ bool reset_master(THD* thd)
   if (WSREP(thd) && get_gtid_mode(GTID_MODE_LOCK_NONE) > 0)
   {
     /* RESET MASTER will initialize GTID sequence, and that would happen locally
-       in this node, so better reject it
+       in this node only, so better reject it
     */
     my_message(ER_NOT_ALLOWED_COMMAND,
                "RESET MASTER not allowed when node is in cluster", MYF(0));

@@ -870,7 +870,9 @@ public:
     if (deferred_events)
     {
       delete deferred_events;
+#ifdef WITH_WSREP
       deferred_events= NULL;
+#endif /* WITH_WSREP */
     }
   };
    

@@ -43,16 +43,14 @@ Created 2011/04/18 Sunny Bains
 #include "srv0srv.h"
 #include "btr0types.h"
 #include "trx0trx.h"
+
 #ifdef WITH_WSREP
+#include "row0mysql.h"
+#include "dict0dict.h"
+
 extern "C" int wsrep_trx_is_aborting(void *thd_ptr);
 extern my_bool wsrep_debug;
 #endif /* WITH_WSREP */
-#include "row0mysql.h"
-#include "dict0dict.h"
-#ifdef WITH_WSREP
-extern "C" int wsrep_trx_is_aborting(void *thd_ptr);
-extern my_bool wsrep_debug;
-#endif
 
 /** Number of times a thread is allowed to enter InnoDB within the same
 SQL query after it has once got the ticket. */

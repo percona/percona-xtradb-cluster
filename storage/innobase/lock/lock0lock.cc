@@ -54,7 +54,7 @@ Created 5/7/1996 Heikki Tuuri
 extern my_bool wsrep_debug;
 extern my_bool wsrep_log_conflicts;
 #include <wsrep_mysqld.h>
-#endif
+#endif /* WITH_WSREP */
 
 /* Flag to enable/disable deadlock detector. */
 my_bool	innobase_deadlock_detect = TRUE;
@@ -2514,7 +2514,7 @@ RecLock::jump_queue(
 	ut_ad(conflict_lock->trx != m_trx);
 #ifndef WITH_WSREP
 	ut_ad(trx_is_high_priority(m_trx));
-#endif /* WITH_WSREP */
+#endif /* !WITH_WSREP */
 	ut_ad(m_rec_id.m_heap_no != ULINT32_UNDEFINED);
 
 	bool	high_priority = false;
