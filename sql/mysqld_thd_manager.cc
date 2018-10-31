@@ -70,10 +70,12 @@ private:
   Find_THD_Impl *m_impl;
 };
 
+#ifdef WITH_WSREP
 Do_THD_Impl::Do_THD_Impl()
 {
   /* Empty constructor */
 }
+#endif /* WITH_WSREP */
 
 
 #ifdef HAVE_PSI_INTERFACE

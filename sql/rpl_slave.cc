@@ -26,7 +26,8 @@
 
 #ifdef WITH_WSREP
 #include "wsrep_mysqld.h"
-#endif
+#endif /* WITH_WSREP */
+
 #ifdef HAVE_REPLICATION
 #include "rpl_slave.h"
 
@@ -55,9 +56,6 @@
 #include "tztime.h"                            // Time_zone
 #include "rpl_group_replication.h"
 
-#ifdef WITH_WSREP
-#include "wsrep_mysqld.h"
-#endif
 // Sic: Must be after mysqld.h to get the right ER macro.
 #include "errmsg.h"                            // CR_*
 
@@ -85,7 +83,7 @@ char slave_skip_error_names[SHOW_VAR_FUNC_BUFF_SIZE];
 char* slave_load_tmpdir = 0;
 #ifdef WITH_WSREP
 Master_info *active_mi= 0;
-#endif
+#endif /* WITH_WSREP */
 my_bool replicate_same_server_id;
 ulonglong relay_log_space_limit = 0;
 

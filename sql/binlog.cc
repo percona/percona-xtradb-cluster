@@ -2041,10 +2041,12 @@ static int binlog_start_consistent_snapshot(handlerton *hton, THD *thd)
   LOG_INFO li;
   DBUG_ENTER("binlog_start_consistent_snapshot");
 
-#ifdef WSREP
+#if 0
+#ifdef WITH_WSREP
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
 #endif /* WITH_WSREP */
+#endif
 
   if ((err= thd->binlog_setup_trx_data()))
     DBUG_RETURN(err);
@@ -2070,10 +2072,12 @@ static int binlog_clone_consistent_snapshot(handlerton *hton, THD *thd,
 
   DBUG_ENTER("binlog_clone_consistent_snapshot");
 
-#ifdef WSREP
+#if 0
+#ifdef WITH_WSREP
   if (wsrep_emulate_bin_log)
     DBUG_RETURN(0);
 #endif /* WITH_WSREP */
+#endif
 
   from_cache_mngr= opt_bin_log ?
     (binlog_cache_mngr *) thd_get_cache_mngr(from_thd) : NULL;
@@ -10292,7 +10296,9 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit)
     DBUG_RETURN(finish_commit(thd));
   }
 
+#ifdef WITH_WSREP
   DEBUG_SYNC(thd, "pxc_in_commit_flush_stage");
+#endif /* WITH_WSREP */
 
   THD *wait_queue= NULL, *final_queue= NULL;
   mysql_mutex_t *leave_mutex_before_commit_stage= NULL;

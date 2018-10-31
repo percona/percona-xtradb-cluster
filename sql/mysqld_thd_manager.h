@@ -41,12 +41,14 @@ void thd_unlock_thread_count(THD *thd);
 class Do_THD_Impl
 {
 public:
+#ifdef WITH_WSREP
   /* We add this empty constructor and defne it in .cc file
   just to avoid gcc-4.4.7 to overoptimize this class in release
   mode that causes gcc to call pure-virtual function for operator()
   instead of derive class function. This is compiler bug observed
   only with Red-Hat shipped compiler and is fixed in gcc-4.8+ for sure. */
   Do_THD_Impl();
+#endif /* WITH_WSREP */
   virtual ~Do_THD_Impl() {}
   virtual void operator()(THD*) = 0;
 #ifdef WITH_WSREP

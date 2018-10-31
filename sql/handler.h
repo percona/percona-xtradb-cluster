@@ -907,13 +907,16 @@ struct handlerton
                      const char *wild, bool dir, List<LEX_STRING> *files);
    int (*table_exists_in_engine)(handlerton *hton, THD* thd, const char *db,
                                  const char *name);
+   int (*make_pushed_join)(handlerton *hton, THD* thd,
+                           const AQP::Join_plan* plan);
+
+#ifdef WITH_WSREP
    int (*wsrep_abort_transaction)(handlerton *hton, THD *bf_thd, 
 				  THD *victim_thd, my_bool signal);
    int (*wsrep_set_checkpoint)(handlerton *hton, const XID* xid);
    int (*wsrep_get_checkpoint)(handlerton *hton, XID* xid);
    void (*wsrep_fake_trx_id)(handlerton *hton, THD *thd);
-   int (*make_pushed_join)(handlerton *hton, THD* thd, 
-                           const AQP::Join_plan* plan);
+#endif /* WITH_WSREP */
 
   /**
     List of all system tables specific to the SE.

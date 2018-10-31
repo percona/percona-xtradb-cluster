@@ -6207,11 +6207,12 @@ finish:
     thd->mdl_context.release_statement_locks();
   }
 
+#ifdef WITH_WSREP
+
   /* If DDL has failed then avoid SE checkpoint. */
   thd->wsrep_skip_SE_checkpoint= (res || thd->is_error());
   WSREP_TO_ISOLATION_END;
 
-#ifdef WITH_WSREP
   /*
     Force release of transactional locks if not in active MST and wsrep is on.
   */

@@ -54,7 +54,7 @@ Created 12/27/1996 Heikki Tuuri
 #include "buf0lru.h"
 #ifdef WITH_WSREP
 extern my_bool wsrep_debug;
-#endif
+#endif /* WITH_WSREP */
 #include "trx0rec.h"
 #include "fts0fts.h"
 #include "fts0types.h"
