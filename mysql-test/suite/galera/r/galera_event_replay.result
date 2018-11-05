@@ -1,0 +1,50 @@
+CREATE TABLE t(id int primary key auto_increment, j int) ENGINE=InnoDB;
+INSERT INTO t values (1,0), (2,0), (4,0);
+SET wsrep_sync_wait=0;
+SET GLOBAL event_scheduler = OFF;
+CREATE EVENT e_minutely
+ON SCHEDULE
+EVERY 5 SECOND
+DO
+begin
+DELETE FROM test.t where id > 2;
+end
+|
+SET GLOBAL wsrep_provider_options = 'dbug=d,apply_monitor_slave_enter_sync';
+INSERT INTO t values (3,2);
+select * from t;
+id	j
+1	0
+2	0
+3	2
+4	0
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'dbug=d,after_replicate_sync';
+SET GLOBAL event_scheduler = ON;
+SET SESSION wsrep_on = 0;
+SET SESSION wsrep_on = 1;
+SET GLOBAL wsrep_provider_options = 'dbug=';
+SET GLOBAL wsrep_provider_options = 'signal=apply_monitor_slave_enter_sync';
+SET GLOBAL wsrep_provider_options = 'signal=after_replicate_sync';
+SET SESSION wsrep_sync_wait = default;
+SELECT * FROM t;
+id	j
+1	0
+2	0
+3	2
+wsrep_local_replays
+1
+delete from t where id > 2;
+select "node2", id, j from t;
+node2	id	j
+node2	1	0
+node2	2	0
+select "node1", id, j from t;
+node1	id	j
+node1	1	0
+node1	2	0
+SET GLOBAL event_scheduler = OFF;
+DROP EVENT e_minutely;
+DROP TABLE t;
