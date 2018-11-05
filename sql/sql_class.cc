@@ -888,6 +888,7 @@ extern "C" const char *wsrep_thd_conflict_state_str(THD *thd)
     (thd->wsrep_conflict_state == NO_CONFLICT)      ? "no conflict"  :
     (thd->wsrep_conflict_state == MUST_ABORT)       ? "must abort"   :
     (thd->wsrep_conflict_state == ABORTING)         ? "aborting"     :
+    (thd->wsrep_conflict_state == ABORTED)          ? "aborted"      :
     (thd->wsrep_conflict_state == MUST_REPLAY)      ? "must replay"  : 
     (thd->wsrep_conflict_state == REPLAYING)        ? "replaying"    : 
     (thd->wsrep_conflict_state == RETRY_AUTOCOMMIT) ? "retrying"     : 
