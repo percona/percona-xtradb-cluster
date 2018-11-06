@@ -335,6 +335,9 @@ Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event)
 
   thd->enable_slow_log= TRUE;
 
+#ifdef WITH_WSREP
+  thd->wsrep_query_state= QUERY_EXEC;
+#endif /* WITH_WSREP */
   res= job_data.execute(thd, event->dropped);
 
   print_warnings(thd, &job_data);
