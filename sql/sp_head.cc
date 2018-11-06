@@ -804,7 +804,8 @@ bool sp_head::execute(THD *thd, bool merge_da_on_success)
 #endif
 
 #ifdef WITH_WSREP
-    if (m_type == SP_TYPE_PROCEDURE)
+    if (m_type == SP_TYPE_PROCEDURE ||
+        m_type == SP_TYPE_EVENT)
     {
       mysql_mutex_lock(&thd->LOCK_wsrep_thd);
       if (thd->wsrep_conflict_state == MUST_REPLAY)
