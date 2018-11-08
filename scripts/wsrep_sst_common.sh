@@ -135,6 +135,9 @@ parse_cnf()
     local var=$2
     local reval=""
 
+    # normalize the variable name by replacing all '_' with '-'
+    var=${var//_/-}
+
     # print the default settings for given group using my_print_default.
     # normalize the variable names specified in cnf file (user can use _ or - for example log-bin or log_bin)
     # then grep for needed variable
@@ -223,12 +226,9 @@ wsrep_auth_not_set()
 }
 
 # For Bug:1200727
-if $MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF sst | grep -q "wsrep_sst_auth"
+if wsrep_auth_not_set
 then
-    if wsrep_auth_not_set
-    then
-        WSREP_SST_OPT_AUTH=$($MY_PRINT_DEFAULTS -c $WSREP_SST_OPT_CONF sst | grep -- "--wsrep_sst_auth" | cut -d= -f2)
-    fi
+    WSREP_SST_OPT_AUTH=$(parse_cnf sst wsrep-sst-auth "")
 fi
 readonly WSREP_SST_OPT_AUTH
 
@@ -250,13 +250,7 @@ else
 fi
 
 
-WSREP_LOG_DEBUG=$(parse_cnf sst wsrep_debug "")
-if [ -z "$WSREP_LOG_DEBUG" ]; then
-    WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-debug "")
-fi
-if [ -z "$WSREP_LOG_DEBUG" ]; then
-    WSREP_LOG_DEBUG=$(parse_cnf mysqld wsrep_debug "")
-fi
+WSREP_LOG_DEBUG=$(parse_cnf sst wsrep-debug "")
 if [ -z "$WSREP_LOG_DEBUG" ]; then
     WSREP_LOG_DEBUG=$(parse_cnf mysqld wsrep-debug "")
 fi
@@ -268,9 +262,6 @@ fi
 
 # Determine the timezone to use for error logging
 LOGGING_TZ=$(parse_cnf mysqld log-timestamps "")
-if [ -z "$LOGGING_TZ" ]; then
-    LOGGING_TZ=$(parse_cnf mysqld log_timestamps "")
-fi
 if [ -z "$LOGGING_TZ" ]; then
     LOGGING_TZ="UTC"
 fi
